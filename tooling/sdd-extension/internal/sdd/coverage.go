@@ -20,8 +20,10 @@ import (
 // does its code serve? It answers with a feature authored in its own
 // putnami.features.json, a spec under its own specs/, or a reviewed
 // featureAuthority in its putnami.json: an owner that names an authored
-// feature, or none with the reason the project has no feature. A project that
-// gives no answer fails, unless the committed debt list names it.
+// feature, none with the reason the project has no feature, dependents when a
+// project that depends on it declares a feature or hosts a spec, or a provider
+// that names a member that passes on its own answer. A project that gives no
+// answer fails, unless the committed debt list names it.
 //
 // The debt list, options.sdd.featureCoverage.debt in putnami.workspace.json,
 // is exact. An entry whose project now answers fails until it is removed, and
@@ -117,11 +119,11 @@ func BuildFeatureCoverageResult(ws *workspace.Workspace, workspaceOptions map[st
 	// project-scoped validate steps report the document itself.
 	manifests := featureengine.DiscoverAuthoredManifestsWith(ws, reader)
 	specs := featureengine.DiscoverSpecsWith(ws, nil, reader)
-	covered := coveredRoots(manifests.Manifests, specs.Specs)
 	authored := make(map[string]bool)
 	for _, id := range featureproto.AuthoredFeatureIDs(manifests.Manifests) {
 		authored[id] = true
 	}
+	resolver := newCoverageResolver(ws, coveredRoots(manifests.Manifests, specs.Specs), authored)
 
 	listed := make(map[string]bool, len(debt))
 	for _, id := range debt {
@@ -130,7 +132,8 @@ func BuildFeatureCoverageResult(ws *workspace.Workspace, workspaceOptions map[st
 	kinds := make(map[string]coverageKind, len(ws.Projects))
 	for _, project := range sortedMembers(ws) {
 		report.Projects++
-		kind, dangling := projectCoverage(project, covered, authored)
+		answer := resolver.resolve(project)
+		kind := answer.kind
 		kinds[project.ID] = kind
 		switch kind {
 		case coverageFeatureOrSpec:
@@ -142,7 +145,7 @@ func BuildFeatureCoverageResult(ws *workspace.Workspace, workspaceOptions map[st
 		}
 		report.Uncovered = append(report.Uncovered, project.ID)
 		if adopted && !listed[project.ID] {
-			report.Diagnostics = append(report.Diagnostics, uncoveredProjectDiagnostic(project, dangling))
+			report.Diagnostics = append(report.Diagnostics, uncoveredProjectDiagnostic(project, answer.unresolved))
 		}
 	}
 	if !adopted {
@@ -273,34 +276,143 @@ func coveredRoots(manifests []featureproto.ManifestSource, specs []featureengine
 	return covered
 }
 
-// projectCoverage answers the coverage question for one project. covered marks
-// the roots that declare a feature or host a spec, and authored holds every
-// authored feature id. A reviewed featureAuthority answers the question, so it
-// covers the project. An owner that names no authored feature covers nothing
-// and is returned so the caller can name it: an unresolvable answer is worse
-// than none, or the field becomes the cheapest way to silence the check.
-func projectCoverage(project *workspace.Project, covered, authored map[string]bool) (coverageKind, string) {
-	if covered[project.Path] {
-		return coverageFeatureOrSpec, ""
-	}
-	switch authority := projectFeatureAuthority(project); {
-	case authority == nil:
-		return coverageNone, ""
-	case authority.None != "":
-		return coverageAuthority, ""
-	case authored[authority.Owner]:
-		return coverageAuthority, ""
-	default:
-		return coverageNone, authority.Owner
-	}
+// coverageAnswer is how one project answers the coverage question.
+type coverageAnswer struct {
+	kind coverageKind
+	// unresolved says why a declared featureAuthority covers nothing, in words
+	// that follow "project <id>"; empty when the project declares none or it
+	// resolves.
+	unresolved string
 }
 
-func uncoveredProjectDiagnostic(project *workspace.Project, dangling string) diag.Diagnostic {
+// coverageResolver answers the coverage question for the members of one
+// workspace. covered marks the roots that declare a feature or host a spec,
+// and authored holds every authored feature id. A reviewed featureAuthority
+// answers the question, so it covers the project. An answer the resolver
+// cannot resolve covers nothing and says why, so the caller can name it: an
+// unresolvable answer is worse than none, or the field becomes the cheapest
+// way to silence the check.
+type coverageResolver struct {
+	covered  map[string]bool
+	authored map[string]bool
+	// members indexes the workspace members by id, and dependents holds the
+	// reversed direct edges of the resolved dependency graph.
+	members    map[string]*workspace.Project
+	dependents map[string][]string
+	answers    map[string]coverageAnswer
+	// resolving holds the projects on the current provider chain, so a cycle
+	// resolves to no answer instead of recursing forever.
+	resolving map[string]bool
+}
+
+func newCoverageResolver(ws *workspace.Workspace, covered, authored map[string]bool) *coverageResolver {
+	members := sortedMembers(ws)
+	resolver := &coverageResolver{
+		covered:    covered,
+		authored:   authored,
+		members:    make(map[string]*workspace.Project, len(members)),
+		dependents: make(map[string][]string),
+		answers:    make(map[string]coverageAnswer),
+		resolving:  make(map[string]bool),
+	}
+	for _, project := range members {
+		resolver.members[project.ID] = project
+		for _, dependency := range ws.Graph.DependenciesOf(project.ID) {
+			resolver.dependents[dependency] = append(resolver.dependents[dependency], project.ID)
+		}
+	}
+	return resolver
+}
+
+// resolve answers the coverage question for one project.
+func (resolver *coverageResolver) resolve(project *workspace.Project) coverageAnswer {
+	if answer, done := resolver.answers[project.ID]; done {
+		return answer
+	}
+	answer := resolver.answer(project)
+	resolver.answers[project.ID] = answer
+	return answer
+}
+
+func (resolver *coverageResolver) answer(project *workspace.Project) coverageAnswer {
+	if resolver.covered[project.Path] {
+		return coverageAnswer{kind: coverageFeatureOrSpec}
+	}
+	authority := projectFeatureAuthority(project)
+	switch {
+	case authority == nil:
+		return coverageAnswer{kind: coverageNone}
+	case authority.None != "":
+		return coverageAnswer{kind: coverageAuthority}
+	case authority.Owner != "":
+		if resolver.authored[authority.Owner] {
+			return coverageAnswer{kind: coverageAuthority}
+		}
+		return coverageAnswer{kind: coverageNone, unresolved: fmt.Sprintf(
+			"names featureAuthority.owner %q, which is no authored feature", authority.Owner)}
+	case authority.Dependents:
+		if resolver.dependentCarriesFeatureOrSpec(project.ID) {
+			return coverageAnswer{kind: coverageAuthority}
+		}
+		return coverageAnswer{kind: coverageNone, unresolved: "declares featureAuthority.dependents, " +
+			"but no project that depends on it, directly or not, declares a feature or hosts a spec"}
+	case authority.Provider != "":
+		return resolver.provider(project, authority.Provider)
+	}
+	return coverageAnswer{kind: coverageNone}
+}
+
+// provider resolves a featureAuthority.provider answer: the provider must be
+// a member that passes on its own answer. A debt entry is no answer.
+func (resolver *coverageResolver) provider(project *workspace.Project, id string) coverageAnswer {
+	member, found := resolver.members[id]
+	if !found {
+		return coverageAnswer{kind: coverageNone, unresolved: fmt.Sprintf(
+			"names featureAuthority.provider %q, which is no workspace project", id)}
+	}
+	uncovered := coverageAnswer{kind: coverageNone, unresolved: fmt.Sprintf(
+		"names featureAuthority.provider %q, which carries no feature, no spec and no resolvable featureAuthority", id)}
+	if resolver.resolving[member.ID] || member.ID == project.ID {
+		return uncovered
+	}
+	resolver.resolving[project.ID] = true
+	defer delete(resolver.resolving, project.ID)
+	if resolver.resolve(member).kind == coverageNone {
+		return uncovered
+	}
+	return coverageAnswer{kind: coverageAuthority}
+}
+
+// dependentCarriesFeatureOrSpec walks the dependency graph backwards from id
+// and reports whether a project that depends on it, directly or not, declares
+// a feature or hosts a spec at its own root. A dependent's own
+// featureAuthority does not count: it carries no requirement either.
+func (resolver *coverageResolver) dependentCarriesFeatureOrSpec(id string) bool {
+	seen := map[string]bool{id: true}
+	queue := []string{id}
+	for len(queue) > 0 {
+		current := queue[0]
+		queue = queue[1:]
+		for _, dependent := range resolver.dependents[current] {
+			if seen[dependent] {
+				continue
+			}
+			seen[dependent] = true
+			if member := resolver.members[dependent]; member != nil && resolver.covered[member.Path] {
+				return true
+			}
+			queue = append(queue, dependent)
+		}
+	}
+	return false
+}
+
+func uncoveredProjectDiagnostic(project *workspace.Project, unresolved string) diag.Diagnostic {
 	field := path.Join(project.Path, wsproto.ConfigFilename) + "#featureAuthority"
-	if dangling != "" {
+	if unresolved != "" {
 		return diag.Errorf(ErrorCodeUncoveredProject, field,
-			"project %s names featureAuthority.owner %q, which is no authored feature; name an authored feature, or list the project in options.sdd.%s.%s",
-			project.ID, dangling, FeatureCoverageOption, featureCoverageDebtMember)
+			"project %s %s; give an answer that resolves, or list the project in options.sdd.%s.%s",
+			project.ID, unresolved, FeatureCoverageOption, featureCoverageDebtMember)
 	}
 	return diag.Errorf(ErrorCodeUncoveredProject, field,
 		"project %s carries no feature of its own, no spec under specs/ and no featureAuthority; add one, or list the project in options.sdd.%s.%s",

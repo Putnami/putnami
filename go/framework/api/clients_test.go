@@ -114,7 +114,15 @@ func TestClients_EmitsConfigAndClient(t *testing.T) {
 	if err != nil {
 		t.Fatalf("read putnami.json: %v", err)
 	}
-	if want := renderGeneratedGoProject(cfg.Go.ModulePath); string(project) != want {
+	cwd, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	provider, err := providerProjectID(cwd)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := renderGeneratedGoProject(cfg.Go.ModulePath, provider); string(project) != want {
 		t.Errorf("staged putnami.json differs from the cross-language scaffold:\n%s\nwant:\n%s", project, want)
 	}
 	var meta struct {

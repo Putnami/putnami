@@ -440,7 +440,16 @@ func (p *ClientsPlugin) stageGoClient(outputDir string, cfg clientGenConfig, sou
 		if err := os.WriteFile(filepath.Join(dir, "go.mod"), []byte(gomod), 0o600); err != nil {
 			return err
 		}
-		project := renderGeneratedGoProject(cfg.Go.ModulePath)
+		// The runner starts the describe binary in the provider's root.
+		providerRoot, err := os.Getwd()
+		if err != nil {
+			return err
+		}
+		provider, err := providerProjectID(providerRoot)
+		if err != nil {
+			return err
+		}
+		project := renderGeneratedGoProject(cfg.Go.ModulePath, provider)
 		if err := os.WriteFile(filepath.Join(dir, "putnami.json"), []byte(project), 0o600); err != nil {
 			return err
 		}

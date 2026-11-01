@@ -258,10 +258,18 @@ its existing admission gate; the shared absent-policy default remains `report`.
 - **`feature-coverage-validate`** — the feature-coverage gate. Every project
   answers one question: which outcome does its code serve? A project answers
   with a feature in its own `putnami.features.json`, a spec under its own
-  `specs/`, or a reviewed `featureAuthority` in its `putnami.json`: an `owner`
-  that names an authored feature, or `none` with the reason the project has no
-  feature. Once the workspace adopts the gate in `putnami.workspace.json`, the
-  step judges every member of the workspace, with or without a `putnami.json`:
+  `specs/`, or a reviewed `featureAuthority` in its `putnami.json`. The
+  `featureAuthority` block sets exactly one of four answers:
+
+  | Answer | Covers the project when |
+  |---|---|
+  | `"owner": "<feature id>"` | The id names an authored feature |
+  | `"none": "<reason>"` | Always: the project serves no outcome, such as a fixture or a repository tool |
+  | `"dependents": true` | A project that depends on it, directly or not, declares a feature or hosts a spec at its own root. Use it for a library: the specs of its dependents state its behavior |
+  | `"provider": "<project id>"` | The id names a workspace member that passes on its own answer; a `debt` entry is no answer. The Go and TypeScript client generators write it for a generated client |
+
+  Once the workspace adopts the gate in `putnami.workspace.json`, the step
+  judges every member of the workspace, with or without a `putnami.json`:
 
   ```json
   "options": {
@@ -276,6 +284,8 @@ its existing admission gate; the shared absent-policy default remains `report`.
   | `options.sdd.featureCoverage` unset | Passes, with a note that counts the projects that give no answer |
   | A project gives no answer and `debt` does not list it | Fails with one `sdd.uncovered_project` diagnostic at the project's `putnami.json#featureAuthority` |
   | A `featureAuthority.owner` names no authored feature | Covers nothing: `sdd.uncovered_project`, naming the owner |
+  | A `featureAuthority.dependents` has no dependent with a feature or a spec | Covers nothing: `sdd.uncovered_project` |
+  | A `featureAuthority.provider` names no member, or a member that does not pass on its own answer | Covers nothing: `sdd.uncovered_project`, naming the provider |
   | A `debt` entry whose project answers | Fails with `sdd.stale_coverage_debt`: remove the entry |
   | A `debt` entry that names no project | Fails with `sdd.unknown_coverage_debt` |
   | Another member, no `debt`, an entry that is not a project id, or a duplicate entry | Fails with `sdd.invalid_feature_coverage`, and judges no project |

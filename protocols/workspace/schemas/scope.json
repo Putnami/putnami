@@ -132,7 +132,7 @@
     },
     "featureAuthority": {
       "type": "object",
-      "description": "Why this project declares no user-facing feature of its own. Set exactly one member. Absent means the project is expected to declare a feature.",
+      "description": "Why this project declares no user-facing feature of its own, or where its coverage comes from. Set exactly one member. Absent means the project is expected to declare a feature.",
       "additionalProperties": false,
       "properties": {
         "owner": {
@@ -144,9 +144,23 @@
           "type": "string",
           "minLength": 1,
           "description": "Why this project deliberately has no user-facing feature."
+        },
+        "dependents": {
+          "const": true,
+          "description": "The specs of the projects that depend on this one, directly or not, cover it. Feature coverage fails when none of them declares a feature or hosts a spec."
+        },
+        "provider": {
+          "type": "string",
+          "pattern": "^/.+",
+          "description": "The project id of the provider this project is generated from, such as /go/samples/task-api. Client generators write it."
         }
       },
-      "oneOf": [{ "required": ["owner"] }, { "required": ["none"] }]
+      "oneOf": [
+        { "required": ["owner"] },
+        { "required": ["none"] },
+        { "required": ["dependents"] },
+        { "required": ["provider"] }
+      ]
     }
   },
   "if": {

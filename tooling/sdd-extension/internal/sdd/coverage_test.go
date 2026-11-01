@@ -274,3 +274,142 @@ func TestFeatureCoverageMalformedBlockFailsClosed(t *testing.T) {
 		})
 	}
 }
+
+// dependentOf is a fixture member at <path> that depends on the ids given and
+// answers with the featureAuthority given.
+func dependentOf(path string, authority *wsproto.ProjectFeatureAuthority, dependencies ...string) *workspace.Project {
+	project := appProject(path, path)
+	project.Dependencies = dependencies
+	project.Config = &wsproto.ProjectConfig{Name: path, FeatureAuthority: authority}
+	return project
+}
+
+// onlyUncoveredWire asserts that the report fails /wire alone, on its
+// putnami.json, with a message that contains each of want.
+func onlyUncoveredWire(t *testing.T, report FeatureCoverageReport, err error, want ...string) {
+	t.Helper()
+	if err == nil {
+		t.Fatal("an unresolvable featureAuthority covered its project")
+	}
+	if len(report.Diagnostics) != 1 {
+		t.Fatalf("diagnostics = %+v, want exactly one", report.Diagnostics)
+	}
+	finding := report.Diagnostics[0]
+	if finding.Code != ErrorCodeUncoveredProject || finding.Field != "wire/putnami.json#featureAuthority" {
+		t.Fatalf("finding = %+v, want %s on /wire's putnami.json", finding, ErrorCodeUncoveredProject)
+	}
+	for _, text := range want {
+		if !strings.Contains(finding.Message, text) {
+			t.Fatalf("finding message %q does not say %q", finding.Message, text)
+		}
+	}
+	if !reflect.DeepEqual(report.Uncovered, []string{"/wire"}) {
+		t.Fatalf("uncovered = %v, want /wire alone", report.Uncovered)
+	}
+}
+
+// TestFeatureCoverageLibraryWhoseDependentsCarryNoFeatureFails keeps
+// dependents an answer the step checks: a dependent that answers with its own
+// featureAuthority carries no requirement, so it covers nothing.
+func TestFeatureCoverageLibraryWhoseDependentsCarryNoFeatureFails(t *testing.T) {
+	spectest.Proves(t, "tooling/specification-driven-development", "feature-authority-answers-resolve", "a-library-whose-dependents-carry-no-feature-fails")
+	for _, test := range []struct {
+		name  string
+		extra []*workspace.Project
+	}{
+		{name: "no dependent"},
+		{
+			name:  "a dependent that answers with none",
+			extra: []*workspace.Project{dependentOf("tool", &wsproto.ProjectFeatureAuthority{None: noFeatureReason}, "/wire")},
+		},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			ws := coverageWorkspace(t, &wsproto.ProjectFeatureAuthority{Dependents: true}, test.extra...)
+			report, err := BuildFeatureCoverageResult(ws, coverageOptions())
+			onlyUncoveredWire(t, report, err, "project /wire ", "featureAuthority.dependents")
+		})
+	}
+}
+
+// TestFeatureCoverageDependentWithFeatureOrSpecCoversLibrary walks the
+// dependency graph backwards: a project that declares a feature, directly or
+// through another library, covers the library it depends on.
+func TestFeatureCoverageDependentWithFeatureOrSpecCoversLibrary(t *testing.T) {
+	spectest.Proves(t, "tooling/specification-driven-development", "feature-authority-answers-resolve", "a-dependent-with-a-feature-or-spec-covers-a-library")
+	for _, test := range []struct {
+		name     string
+		consumer string
+	}{
+		{name: "a dependent declares a feature", consumer: "featured"},
+		{name: "a dependent hosts a spec", consumer: "specced"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			middle := dependentOf("middle", &wsproto.ProjectFeatureAuthority{Dependents: true}, "/wire")
+			ws := coverageWorkspace(t, &wsproto.ProjectFeatureAuthority{Dependents: true}, middle)
+			for _, project := range ws.Projects {
+				if project.ID == "/"+test.consumer {
+					project.Dependencies = []string{"/middle"}
+				}
+			}
+			ws = fixtureWorkspace("w", ws.Root, ws.Projects...)
+
+			report, err := BuildFeatureCoverageResult(ws, coverageOptions())
+			if err != nil {
+				t.Fatalf("a library a featured project depends on failed: %v (%+v)", err, report.Diagnostics)
+			}
+			if report.Authority != 2 || len(report.Uncovered) != 0 {
+				t.Fatalf("report = %+v, want /middle and /wire covered by their dependents", report)
+			}
+		})
+	}
+}
+
+// TestFeatureCoverageUnknownProviderFails keeps provider an answer the step
+// checks: an id that names no workspace member covers nothing.
+func TestFeatureCoverageUnknownProviderFails(t *testing.T) {
+	spectest.Proves(t, "tooling/specification-driven-development", "feature-authority-answers-resolve", "an-unknown-provider-fails")
+	ws := coverageWorkspace(t, &wsproto.ProjectFeatureAuthority{Provider: "/nowhere"})
+
+	report, err := BuildFeatureCoverageResult(ws, coverageOptions())
+	onlyUncoveredWire(t, report, err, "project /wire ", `"/nowhere"`, "no workspace project")
+}
+
+// TestFeatureCoverageProviderWithoutCoverageFails resolves a provider through
+// its own answer: a provider that answers nothing, that only a debt entry
+// defers, or that points back at its client covers nothing, and a provider
+// that passes covers its client.
+func TestFeatureCoverageProviderWithoutCoverageFails(t *testing.T) {
+	spectest.Proves(t, "tooling/specification-driven-development", "feature-authority-answers-resolve", "a-provider-without-coverage-fails")
+	for _, test := range []struct {
+		name     string
+		provider *workspace.Project
+		debt     []any
+	}{
+		{name: "a provider that answers nothing", provider: dependentOf("api", nil)},
+		{name: "a provider in debt", provider: dependentOf("api", nil), debt: []any{"/api"}},
+		{name: "a provider cycle", provider: dependentOf("api", &wsproto.ProjectFeatureAuthority{Provider: "/wire"})},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			ws := coverageWorkspace(t, &wsproto.ProjectFeatureAuthority{Provider: "/api"}, test.provider)
+			report, err := BuildFeatureCoverageResult(ws, coverageOptions(test.debt...))
+			if len(report.Diagnostics) == 0 || err == nil {
+				t.Fatalf("report = %+v, want /wire to fail", report)
+			}
+			var wire []string
+			for _, finding := range report.Diagnostics {
+				if finding.Field == "wire/putnami.json#featureAuthority" {
+					wire = append(wire, finding.Message)
+				}
+			}
+			if len(wire) != 1 || !strings.Contains(wire[0], `featureAuthority.provider "/api"`) {
+				t.Fatalf("findings on /wire = %q, want one naming the provider /api", wire)
+			}
+		})
+	}
+
+	covered := coverageWorkspace(t, &wsproto.ProjectFeatureAuthority{Provider: "/featured"})
+	report, err := BuildFeatureCoverageResult(covered, coverageOptions())
+	if err != nil || report.Authority != 1 || len(report.Uncovered) != 0 {
+		t.Fatalf("report = %+v, err = %v, want a client of /featured covered", report, err)
+	}
+}

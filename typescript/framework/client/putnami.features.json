@@ -570,7 +570,7 @@
           "verification": {
             "kind": "acceptance",
             "checks": [
-              "a-new-client-gets-a-putnami-json-declaring-feature-authority-none",
+              "a-new-client-gets-a-putnami-json-naming-its-provider",
               "an-existing-putnami-json-is-kept-byte-for-byte"
             ]
           }

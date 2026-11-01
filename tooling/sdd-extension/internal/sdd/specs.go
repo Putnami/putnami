@@ -38,7 +38,8 @@ const (
 	// no record in the current worktree.
 	SpecCodeUnresolvedDecision = "specs.unresolved_decision"
 	// SpecCodeUnresolvedFeatureAuthority reports a project whose
-	// `featureAuthority.owner` names no authored feature. A claim that cannot be
+	// featureAuthority does not resolve, such as an `owner` that names no
+	// authored feature. A claim that cannot be
 	// resolved must be louder than the missing link it explains away, or the
 	// field becomes the cheapest way to silence completeness.
 	SpecCodeUnresolvedFeatureAuthority = "specs.unresolved_feature_authority"
@@ -712,6 +713,7 @@ func assessSpecCompleteness(repository *specRepository) (SpecCompleteness, int, 
 	for _, feature := range repository.authored {
 		authoredIDs[feature] = true
 	}
+	resolver := newCoverageResolver(repository.workspace, linked, authoredIDs)
 	assessed := assessedProjects(repository.workspace, classified, repository.scope)
 	for _, project := range assessed {
 		name := project.Name
@@ -725,17 +727,16 @@ func assessSpecCompleteness(repository *specRepository) (SpecCompleteness, int, 
 				"publishable project %q has no %q entry in %s", name, requiredSupport.kind, supportproto.CatalogFilename))
 		}
 		// The validate-workspace coverage gate asks the same question of every
-		// member, so both answer through projectCoverage (coverage.go). A
+		// member, so both answer through coverageResolver (coverage.go). A
 		// reviewed `featureAuthority` closes the gap instead of suppressing the
-		// report; an `owner` naming no authored feature is reported and the
-		// project still counts as unlinked.
-		kind, dangling := projectCoverage(project, linked, authoredIDs)
-		if dangling != "" {
+		// report; an answer that does not resolve is reported and the project
+		// still counts as unlinked.
+		answer := resolver.resolve(project)
+		if answer.unresolved != "" {
 			diagnostics = append(diagnostics, diag.Warningf(SpecCodeUnresolvedFeatureAuthority, project.Path,
-				"project %q claims feature %q owns its outcome, but no authored feature has that id",
-				name, dangling))
+				"project %q %s", name, answer.unresolved))
 		}
-		if kind != coverageNone {
+		if answer.kind != coverageNone {
 			continue
 		}
 		completeness.ProjectsWithoutFeature = append(completeness.ProjectsWithoutFeature, name)

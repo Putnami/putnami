@@ -58,7 +58,11 @@ describe('ClientGeneratorPlugin.postGenerate', () => {
 
   beforeEach(() => {
     originalProjectRoot = process.env['PUTNAMI_PROJECT_ROOT'];
-    projectRoot = mkdtempSync(join(tmpdir(), 'putnami-clientgen-'));
+    // The provider is `svc` in a fresh workspace, so its client can name it.
+    const workspace = mkdtempSync(join(tmpdir(), 'putnami-clientgen-'));
+    writeFileSync(join(workspace, 'putnami.workspace.json'), '{"name":"w"}\n');
+    projectRoot = join(workspace, 'svc');
+    mkdirSync(projectRoot);
     process.env['PUTNAMI_PROJECT_ROOT'] = projectRoot;
     writeFileSync(join(projectRoot, 'package.json'), JSON.stringify({ name: '@demo/widgets', version: '1.2.3' }));
     writeFileSync(join(projectRoot, 'biome.json'), DEFAULT_BIOME_CONFIG);
@@ -70,7 +74,7 @@ describe('ClientGeneratorPlugin.postGenerate', () => {
     } else {
       process.env['PUTNAMI_PROJECT_ROOT'] = originalProjectRoot;
     }
-    rmSync(projectRoot, { recursive: true, force: true });
+    rmSync(dirname(projectRoot), { recursive: true, force: true });
   });
 
   test('always emits .gen/clientgen/config.json with the resolved schema', async () => {
