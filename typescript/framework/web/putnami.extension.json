@@ -1,5 +1,6 @@
 {
   "$schema": "https://putnami.dev/schemas/putnami-extension.json",
+  "cliContract": 4,
   "name": "@putnami/web",
   "extensionDependencies": ["@putnami/application"],
   "hooks": {
@@ -11,5 +12,50 @@
       "timeoutMs": 120000
     }
   },
-  "commands": {}
+  "commands": {
+    "web-i18n-sync": {
+      "description": "Sync the translation catalogs of a localized web application",
+      "visibility": "internal",
+      "activationFiles": ["src/**/*.messages.ts", "src/**/*.messages.tsx"],
+      "run": [
+        {
+          "id": "sync",
+          "task": "web-i18n-sync-exec"
+        }
+      ]
+    }
+  },
+  "commandGroups": {
+    "i18n": {
+      "description": "Keep the translation catalogs of a localized web application in step with its messages",
+      "subcommands": {
+        "sync": {
+          "description": "Add an entry for each new message to locales/<locale>.json, remove the entries of deleted messages, and mark stale each translation whose default text changed while keeping its text. Writes only the catalogs that differ",
+          "command": "web-i18n-sync",
+          "examples": [
+            {
+              "command": "putnami i18n sync --projects /sites/putnami.dev"
+            }
+          ]
+        }
+      }
+    }
+  },
+  "tasks": {
+    "web-i18n-sync-exec": {
+      "description": "Write locales/<locale>.json for each non-default locale whose synced catalog differs from the file",
+      "kind": "command",
+      "command": "bun",
+      "args": ["run", "{extensionRoot}/bin/i18n.ts", "sync"],
+      "cwd": "{projectRoot}",
+      "timeoutMs": 120000,
+      "writes": ["sources"],
+      "cache": {
+        "enabled": false
+      },
+      "declares": {
+        "mutatesSources": true
+      }
+    }
+  }
 }

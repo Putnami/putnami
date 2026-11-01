@@ -268,6 +268,34 @@ import {
 } from '@putnami/web';
 ```
 
+## Localization
+
+Configure `options["@putnami/web:generate"].i18n` (`locales`, `defaultLocale`,
+`siteUrl`, `exclude`) in the project's `putnami.json`. The default locale is
+unprefixed; every other locale is the first path segment.
+
+```ts
+// src/app/home.messages.ts — any src/**/*.messages.ts(x) file
+export default messages('home', { seats: '{count, plural, one {# seat} other {# seats}}' });
+// in a component
+const t = useT(home);
+t.seats({ count: 2 });
+```
+
+- Run `putnami i18n sync` after adding, changing or removing a message. It
+  writes `locales/<locale>.json`; the build never writes it.
+- To translate, fill `text` and set `state: "draft"`. Never change an entry
+  whose `state` is `validated`: a person locked it. Revise a `stale` entry
+  from its kept text, set `state: "draft"`, and delete `source`.
+- `putnami build` fails on a missing translation, invalid ICU syntax, or a
+  translation whose arguments differ from its default text.
+- `<Link to="/x">` keeps the current locale prefix. Use a plain `<a>` for
+  files. `<LocaleSwitcher label="…" />` renders the locale links;
+  `useLocale()` gives the locale and `localize(path, locale?)`.
+- Only `/` negotiates the locale (cookie `putnami-locale`, then
+  `Accept-Language`). The framework writes `<html lang dir>`, the canonical
+  link, hreflang alternates with `x-default`, and `og:locale`.
+
 ## Plugin seams
 
 Generic, plugin-facing surfaces. Nothing in this package knows what a plugin

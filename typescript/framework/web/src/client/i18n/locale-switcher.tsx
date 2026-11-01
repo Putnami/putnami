@@ -75,11 +75,12 @@ export interface LocaleLink {
  */
 export function useLocaleLinks(): LocaleLink[] {
   const info = useLocale();
-  const target = info.localized ? info.path : '/';
+  // A page served in the default locale only links the other locales to their home.
+  const target = (locale: string) => (info.localized || locale === info.locale ? info.path : '/');
   return info.locales.map((locale) => ({
     locale,
     label: localeEndonym(locale),
-    href: info.localize(target, locale),
+    href: info.localize(target(locale), locale),
     current: locale === info.locale,
     select: () => rememberLocale(locale),
   }));
@@ -96,10 +97,13 @@ export interface LocaleSwitcherProps {
 /**
  * Plain links to the current page in every published locale: they work without
  * JavaScript, crawlers follow them, and each one carries its language so a
- * screen reader pronounces the locale's name correctly.
+ * screen reader pronounces the locale's name correctly. Renders nothing when
+ * the application publishes a single locale.
  */
 export function LocaleSwitcher({ label, className, children }: LocaleSwitcherProps) {
   const links = useLocaleLinks();
+  // One locale offers no choice: nothing to switch to.
+  if (links.length < 2) return null;
   if (children) return <>{children(links)}</>;
   return (
     <nav aria-label={label} className={className}>
