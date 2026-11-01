@@ -14,100 +14,190 @@
         {
           "id": "version-1-and-closed-vocabularies",
           "stage": "coded",
-          "evidenceKinds": ["attestation"],
+          "evidenceKinds": [
+            "attestation"
+          ],
           "verification": {
             "kind": "acceptance",
-            "checks": ["the-protocol-version-is-1", "the-vocabularies-are-closed", "every-code-starts-with-evidence"]
+            "checks": [
+              "the-protocol-version-is-1",
+              "the-vocabularies-are-closed",
+              "every-code-starts-with-evidence"
+            ]
           }
         },
         {
           "id": "one-member-set",
           "stage": "coded",
-          "evidenceKinds": ["attestation"],
+          "evidenceKinds": [
+            "attestation"
+          ],
           "verification": {
             "kind": "acceptance",
-            "checks": ["the-schema-declares-the-go-members", "the-strict-walk-declares-the-go-members", "the-schema-enums-are-the-go-vocabularies"]
+            "checks": [
+              "the-schema-declares-the-go-members",
+              "the-strict-walk-declares-the-go-members",
+              "the-schema-enums-are-the-go-vocabularies"
+            ]
           }
         },
         {
           "id": "one-fixture-corpus",
           "stage": "coded",
-          "evidenceKinds": ["attestation"],
+          "evidenceKinds": [
+            "attestation"
+          ],
           "verification": {
             "kind": "acceptance",
-            "checks": ["the-corpus-is-what-expectations-lists", "every-fixture-gets-its-listed-codes"]
+            "checks": [
+              "the-corpus-is-what-expectations-lists",
+              "every-fixture-gets-its-listed-codes"
+            ]
           }
         },
         {
           "id": "parsing-is-strict",
           "stage": "coded",
-          "evidenceKinds": ["attestation"],
+          "evidenceKinds": [
+            "attestation"
+          ],
           "verification": {
             "kind": "acceptance",
-            "checks": ["non-documents-are-parse-errors", "an-undeclared-member-is-an-unknown-field"]
+            "checks": [
+              "non-documents-are-parse-errors",
+              "an-undeclared-member-is-an-unknown-field"
+            ]
           }
         },
         {
           "id": "the-subject-names-the-change",
           "stage": "coded",
-          "evidenceKinds": ["attestation"],
+          "evidenceKinds": [
+            "attestation"
+          ],
           "verification": {
             "kind": "acceptance",
-            "checks": ["each-subject-defect-gets-its-code"]
+            "checks": [
+              "each-subject-defect-gets-its-code"
+            ]
+          }
+        },
+        {
+          "id": "the-ci-run-is-identified",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "each-ci-defect-gets-its-code"
+            ]
           }
         },
         {
           "id": "paths-stay-in-the-repository",
           "stage": "coded",
-          "evidenceKinds": ["attestation"],
+          "evidenceKinds": [
+            "attestation"
+          ],
           "verification": {
             "kind": "acceptance",
-            "checks": ["each-path-defect-is-an-invalid-path"]
+            "checks": [
+              "each-path-defect-is-an-invalid-path"
+            ]
           }
         },
         {
           "id": "references-resolve",
           "stage": "coded",
-          "evidenceKinds": ["attestation"],
+          "evidenceKinds": [
+            "attestation"
+          ],
           "verification": {
             "kind": "acceptance",
-            "checks": ["duplicates-are-refused", "every-reference-names-a-component"]
+            "checks": [
+              "duplicates-are-refused",
+              "every-reference-names-a-component"
+            ]
+          }
+        },
+        {
+          "id": "components-are-well-formed",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "each-component-defect-is-an-invalid-component"
+            ]
           }
         },
         {
           "id": "impact-is-consistent",
           "stage": "coded",
-          "evidenceKinds": ["attestation"],
+          "evidenceKinds": [
+            "attestation"
+          ],
           "verification": {
             "kind": "acceptance",
-            "checks": ["the-impact-follows-the-files-and-the-edges"]
+            "checks": [
+              "the-impact-follows-the-files-and-the-edges"
+            ]
           }
         },
         {
           "id": "counts-add-up",
           "stage": "coded",
-          "evidenceKinds": ["attestation"],
+          "evidenceKinds": [
+            "attestation"
+          ],
           "verification": {
             "kind": "acceptance",
-            "checks": ["each-count-defect-is-an-invalid-count"]
+            "checks": [
+              "each-count-defect-is-an-invalid-count"
+            ]
           }
         },
         {
           "id": "dependency-changes-are-well-formed",
           "stage": "coded",
-          "evidenceKinds": ["attestation"],
+          "evidenceKinds": [
+            "attestation"
+          ],
           "verification": {
             "kind": "acceptance",
-            "checks": ["each-change-kind-has-its-versions"]
+            "checks": [
+              "each-change-kind-has-its-versions"
+            ]
           }
         },
         {
           "id": "the-document-is-bounded",
           "stage": "coded",
-          "evidenceKinds": ["attestation"],
+          "evidenceKinds": [
+            "attestation"
+          ],
           "verification": {
             "kind": "acceptance",
-            "checks": ["each-bound-is-enforced", "timestamps-and-diagnostics-are-checked"]
+            "checks": [
+              "each-bound-is-enforced"
+            ]
+          }
+        },
+        {
+          "id": "timestamps-and-diagnostics-are-well-formed",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "timestamps-and-diagnostics-are-checked"
+            ]
           }
         }
       ]

@@ -2,6 +2,7 @@
   "$schema": "https://putnami.dev/schemas/putnami-specs-baseline.json",
   "protocolVersion": 2,
   "executableRequirements": [
+    "evidence/change-evidence-document#components-are-well-formed",
     "evidence/change-evidence-document#counts-add-up",
     "evidence/change-evidence-document#dependency-changes-are-well-formed",
     "evidence/change-evidence-document#impact-is-consistent",
@@ -10,8 +11,10 @@
     "evidence/change-evidence-document#parsing-is-strict",
     "evidence/change-evidence-document#paths-stay-in-the-repository",
     "evidence/change-evidence-document#references-resolve",
+    "evidence/change-evidence-document#the-ci-run-is-identified",
     "evidence/change-evidence-document#the-document-is-bounded",
     "evidence/change-evidence-document#the-subject-names-the-change",
+    "evidence/change-evidence-document#timestamps-and-diagnostics-are-well-formed",
     "evidence/change-evidence-document#version-1-and-closed-vocabularies"
   ]
 }

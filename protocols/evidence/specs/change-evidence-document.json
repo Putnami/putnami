@@ -19,7 +19,7 @@
     },
     {
       "id": "one-member-set",
-      "text": "For every object, schemas/evidence.json declares exactly the members of the Go type, and so does the strict decoder's case-sensitive member walk. The schema's enums are the Go vocabularies."
+      "text": "For every object, schemas/evidence.json declares exactly the members of the Go type, and so does the strict decoder's case-sensitive member walk. The schema's enums are the Go vocabularies and its patterns are the expressions the Go validator applies."
     },
     {
       "id": "one-fixture-corpus",
@@ -27,19 +27,27 @@
     },
     {
       "id": "parsing-is-strict",
-      "text": "The reader refuses with evidence.parse_error bytes that are not JSON, a second document after the first, a document that is not an object, or a member of the wrong type. A member the schema does not declare, at any depth and compared case-sensitively, is evidence.unknown_field at its dotted path."
+      "text": "The reader refuses with evidence.parse_error bytes that are not JSON, a second document after the first, a document that is not an object, or a member of the wrong type. A member the schema does not declare, at any depth and compared case-sensitively, is evidence.unknown_field at its dotted path. A required top-level member that is absent or null, and an empty producer name or version, is evidence.required."
     },
     {
       "id": "the-subject-names-the-change",
-      "text": "The subject names its code host, its repository and a commit sha of 40 or 64 lowercase hexadecimal characters; a base sha, when present, has the same form. A github or gitlab subject also names its host and its numeric project id, the stable key that survives a rename. A change request number is positive. A CI run URL is https and carries no credentials. Any other subject or CI defect is evidence.invalid_subject or evidence.invalid_ci."
+      "text": "The subject names its code host and its repository, else evidence.required, and a commit sha of 40 or 64 lowercase hexadecimal characters; a base sha, when present, has the same form, and a document with changed files or changed-line coverage has one. A github or gitlab subject names its host, a lowercase DNS name with an optional port, and its numeric project id, the key that survives a rename. A change request number is positive. Any other defect is evidence.invalid_subject."
+    },
+    {
+      "id": "the-ci-run-is-identified",
+      "text": "The CI system is github-actions, gitlab-ci or generic; the run and job ids and the attempt, when present, identify the document among the runs, jobs and re-runs of one commit, and the attempt is positive; the run URL is https and carries no credentials. Any defect is evidence.invalid_ci."
     },
     {
       "id": "paths-stay-in-the-repository",
-      "text": "Every path is relative to the repository root, slash-separated, non-empty, with no leading slash, no backslash and no dot-dot segment; a component id is such a path or the root, written as a single dot. A renamed file names its previous path and no other status does. Any defect is evidence.invalid_path."
+      "text": "Every path is relative to the repository root, slash-separated, non-empty, with no leading slash, no drive letter, no backslash, no control character and no empty, dot or dot-dot segment; a component id is such a path or the root, written as a single dot. A renamed file names a previous path that differs from its path, and no other status names one. A changed-line coverage file is a changed file that was not deleted. Any defect, or an unknown file status, is evidence.invalid_path."
     },
     {
       "id": "references-resolve",
-      "text": "Component ids, changed file paths, and the components of tests and coverage entries are unique, else evidence.duplicate. Every component a changed file, a dependency edge, a tests or coverage entry or a dependency change names exists, else evidence.unknown_component."
+      "text": "Component ids, the edges of one component, changed file paths, changed-line coverage files, and the components of tests and coverage entries are unique, else evidence.duplicate. Every component a changed file, a dependency edge, a tests or coverage entry or a dependency change names exists, and an edge is never empty, else evidence.unknown_component."
+    },
+    {
+      "id": "components-are-well-formed",
+      "text": "A component's ecosystem is a lowercase slug and its source is known; a component never depends on itself; a changed file lies inside the directory of the component it names. Any defect is evidence.invalid_component."
     },
     {
       "id": "impact-is-consistent",
@@ -51,11 +59,15 @@
     },
     {
       "id": "dependency-changes-are-well-formed",
-      "text": "A dependency change names its ecosystem, its lockfile and its package. An added package has a to version and no from version, a removed one a from version and no to version, and every other change both versions, which differ. Any defect is evidence.invalid_dependency_change."
+      "text": "A dependency change names its ecosystem, a lockfile that is a changed file, and its package. An added package has a to version and no from version, a removed one a from version and no to version, and every other change both versions, which differ. Any defect is evidence.invalid_dependency_change."
     },
     {
       "id": "the-document-is-bounded",
-      "text": "A document holds at most 20000 changed files, 5000 components, 10000 dependency changes, 20000 changed-line coverage files and 500 diagnostics; a tests entry at most 50 failing cases and a file at most 200 uncovered line numbers. A larger member is evidence.too_large. generatedAt is an RFC 3339 timestamp with a zone, else evidence.invalid_timestamp; a reader diagnostic has a known severity and a dotted code, else evidence.invalid_diagnostic."
+      "text": "A document holds at most 20000 changed files, 5000 components, 100000 dependency edges, 10000 dependency changes, 20000 changed-line coverage files and 500 diagnostics; a tests entry at most 50 failing cases, a file at most 200 uncovered line numbers, and every string at most 4096 bytes. A larger member is evidence.too_large. Checking the impact is linear in the components and the edges."
+    },
+    {
+      "id": "timestamps-and-diagnostics-are-well-formed",
+      "text": "generatedAt is a valid RFC 3339 timestamp with a zone, else evidence.invalid_timestamp. A reader diagnostic has a known severity, a dotted lowercase code and a message, else evidence.invalid_diagnostic; whatever its severity, it never makes the document invalid."
     }
   ],
   "decisions": [
