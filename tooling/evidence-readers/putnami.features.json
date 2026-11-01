@@ -1,0 +1,89 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-features.json",
+  "protocolVersion": 2,
+  "namespace": "evidence-readers",
+  "features": [
+    {
+      "id": "evidence-readers/report-readers",
+      "type": "feature",
+      "name": "Test and coverage report readers",
+      "outcome": "A tool that observes a CI it does not run reads the JUnit, LCOV, Cobertura, Clover and Go cover reports that CI already wrote into one set of typed test cases and line-level file coverage, and a report it cannot read becomes a diagnostic, never a crash.",
+      "owner": "tooling",
+      "target": "coded",
+      "requirements": [
+        {
+          "id": "junit-reads-every-case",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "real-junit-reports-read-to-their-expected-cases",
+              "the-file-attribute-is-kept",
+              "an-error-element-fails-the-case"
+            ]
+          }
+        },
+        {
+          "id": "coverage-reads-every-instrumented-line",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "real-coverage-reports-read-to-their-expected-lines",
+              "a-repeated-line-keeps-its-largest-count",
+              "lcov-stated-totals-stand-without-lines"
+            ]
+          }
+        },
+        {
+          "id": "go-cover-blocks-become-lines",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-line-takes-the-largest-count-of-its-blocks",
+              "a-repeated-block-sums-its-counts",
+              "concatenated-profiles-read-as-one"
+            ]
+          }
+        },
+        {
+          "id": "paths-as-the-report-states",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "paths-are-kept-as-stated"
+            ]
+          }
+        },
+        {
+          "id": "malformed-reports-are-diagnostics",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "every-malformed-fixture-returns-its-code",
+              "arbitrary-bytes-never-panic"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}
