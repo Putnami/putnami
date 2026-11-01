@@ -326,6 +326,146 @@
           }
         }
       ]
+    },
+    {
+      "id": "typescript/web-localization",
+      "type": "feature",
+      "name": "TypeScript web localization",
+      "outcome": "TypeScript web applications serve each route at a stable URL per locale, with typed messages, complete published catalogs that track their source text, and language metadata for search engines and assistive technology",
+      "owner": "typescript",
+      "target": "modeled",
+      "requirements": [
+        {
+          "id": "locale-configuration",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "an-invalid-i18n-block-fails-before-generation-writes",
+              "the-default-locale-must-be-listed"
+            ]
+          }
+        },
+        {
+          "id": "locale-routes",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "each-route-is-registered-once-per-published-locale",
+              "an-excluded-route-stays-in-the-default-locale-only",
+              "the-manifest-lists-each-localized-route"
+            ]
+          }
+        },
+        {
+          "id": "locale-document",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-html-element-carries-the-route-locale-and-direction",
+              "a-per-request-page-sends-content-language"
+            ]
+          }
+        },
+        {
+          "id": "typed-messages",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-message-formats-from-the-locale-catalog",
+              "plural-select-and-number-arguments-format-through-intl",
+              "a-missing-translation-falls-back-to-the-default-text"
+            ]
+          }
+        },
+        {
+          "id": "message-payload",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": ["a-static-page-ships-only-its-rendered-namespaces", "a-hydrated-page-ships-its-locale-catalog", "the-default-locale-ships-no-catalog"]
+          }
+        },
+        {
+          "id": "catalog-sync",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-new-key-is-added-and-an-orphan-removed",
+              "a-changed-source-marks-the-translation-stale-and-keeps-its-text"
+            ]
+          }
+        },
+        {
+          "id": "catalog-check",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-missing-translation-in-a-published-locale-fails",
+              "an-invalid-icu-message-fails",
+              "an-argument-mismatch-fails",
+              "a-stale-translation-warns"
+            ]
+          }
+        },
+        {
+          "id": "alternate-links",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-localized-page-lists-absolute-alternates-and-x-default",
+              "a-route-outside-the-localized-set-has-no-alternates"
+            ]
+          }
+        },
+        {
+          "id": "locale-switcher",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-switcher-links-each-locale-with-hreflang-lang-and-endonym",
+              "the-current-locale-carries-aria-current"
+            ]
+          }
+        },
+        {
+          "id": "localized-links",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": ["an-absolute-link-keeps-the-current-locale-prefix"]
+          }
+        },
+        {
+          "id": "entry-negotiation",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-root-redirects-to-the-preferred-locale-with-vary",
+              "a-content-path-is-never-redirected"
+            ]
+          }
+        }
+      ]
     }
   ]
 }
