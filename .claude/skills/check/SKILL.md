@@ -192,9 +192,10 @@ never a pass: an `unsupported` outcome means the proposals contract is unbound,
 `unavailable` means the provider could not answer, and no proposal means there
 is no text to check yet. Exit 1 lists each offender with its signals and lines:
 rewrite the text in English (reword commit messages before pushing). Exit 2 is
-a tool failure, never a pass. The detector already skips test files, fixtures
-and allowlisted proper nouns, and the publication helper refuses a non-English
-proposal title or body on its own when the policy sets the rule.
+a tool failure, never a pass. The detector already skips test files, fixtures,
+translation catalogs of other locales and allowlisted proper nouns, and the
+publication helper refuses a non-English proposal title or body on its own when
+the policy sets the rule.
 
 ### 6. Summary
 
