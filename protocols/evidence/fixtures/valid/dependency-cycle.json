@@ -1,0 +1,69 @@
+{
+  "protocolVersion": 1,
+  "subject": {
+    "provider": "generic",
+    "repository": "internal/tools",
+    "sha": "4f6c2a9e1b7d3c5a8e0f2b4d6a8c0e1f3a5b7c9d",
+    "baseSha": "0a1b2c3d4e5f60718293a4b5c6d7e8f901234567"
+  },
+  "ci": {
+    "system": "generic"
+  },
+  "producer": {
+    "name": "@putnami/observe",
+    "version": "0.1.0"
+  },
+  "generatedAt": "2026-11-03T08:00:00Z",
+  "changedFiles": [
+    {
+      "path": "core/x.go",
+      "status": "modified",
+      "component": "core"
+    }
+  ],
+  "components": [
+    {
+      "id": "a",
+      "ecosystem": "go",
+      "source": "workspace",
+      "impact": "dependent",
+      "dependsOn": [
+        "b"
+      ]
+    },
+    {
+      "id": "b",
+      "ecosystem": "go",
+      "source": "workspace",
+      "impact": "dependent",
+      "dependsOn": [
+        "a",
+        "core"
+      ]
+    },
+    {
+      "id": "c",
+      "ecosystem": "go",
+      "source": "workspace",
+      "impact": "unaffected",
+      "dependsOn": [
+        "d"
+      ]
+    },
+    {
+      "id": "d",
+      "ecosystem": "go",
+      "source": "workspace",
+      "impact": "unaffected",
+      "dependsOn": [
+        "c"
+      ]
+    },
+    {
+      "id": "core",
+      "ecosystem": "go",
+      "source": "workspace",
+      "impact": "changed"
+    }
+  ]
+}

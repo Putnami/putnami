@@ -1,0 +1,101 @@
+{
+  "protocolVersion": 1,
+  "subject": {
+    "provider": "gitlab",
+    "host": "gitlab.example.com",
+    "projectId": "4521",
+    "repository": "shop/backoffice",
+    "sha": "4f6c2a9e1b7d3c5a8e0f2b4d6a8c0e1f3a5b7c9d",
+    "baseSha": "0a1b2c3d4e5f60718293a4b5c6d7e8f901234567",
+    "branch": "fix/invoice-rounding",
+    "changeRequest": {
+      "number": 7
+    }
+  },
+  "ci": {
+    "system": "gitlab-ci",
+    "runId": "123456",
+    "url": "https://gitlab.example.com/shop/backoffice/-/pipelines/123456"
+  },
+  "producer": {
+    "name": "@putnami/observe",
+    "version": "0.1.0"
+  },
+  "generatedAt": "2026-11-03T15:00:00+01:00",
+  "changedFiles": [
+    {
+      "path": "src/Invoice/Rounding.php",
+      "status": "renamed",
+      "previousPath": "src/Invoice/Round.php",
+      "component": "."
+    },
+    {
+      "path": "composer.lock",
+      "status": "modified",
+      "component": "."
+    }
+  ],
+  "components": [
+    {
+      "id": ".",
+      "name": "shop/backoffice",
+      "ecosystem": "composer",
+      "source": "manifest",
+      "impact": "changed"
+    }
+  ],
+  "tests": [
+    {
+      "component": ".",
+      "passed": 230,
+      "failed": 0,
+      "skipped": 4
+    }
+  ],
+  "coverage": [
+    {
+      "component": ".",
+      "coveredLines": 5120,
+      "totalLines": 7400
+    }
+  ],
+  "changedLineCoverage": {
+    "coveredLines": 9,
+    "totalLines": 9,
+    "files": [
+      {
+        "path": "src/Invoice/Rounding.php",
+        "coveredLines": 9,
+        "totalLines": 9
+      }
+    ]
+  },
+  "dependencyChanges": [
+    {
+      "ecosystem": "composer",
+      "lockfile": "composer.lock",
+      "name": "symfony/http-kernel",
+      "change": "upgraded",
+      "from": "v7.1.4",
+      "to": "v7.1.4",
+      "component": "."
+    },
+    {
+      "ecosystem": "composer",
+      "lockfile": "composer.lock",
+      "name": "acme/legacy-pdf",
+      "change": "removed",
+      "from": "1.2.0",
+      "component": "."
+    },
+    {
+      "ecosystem": "composer",
+      "lockfile": "composer.lock",
+      "name": "acme/pdf",
+      "change": "changed",
+      "from": "dev-main#1a2b3c",
+      "to": "dev-main#4d5e6f",
+      "component": "."
+    }
+  ]
+}
