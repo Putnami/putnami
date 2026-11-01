@@ -5,6 +5,14 @@
   "extensions": ["@putnami/typescript", "/tooling/sdd-extension"],
   "dependencies": ["/protocols/sitecontent"],
   "options": {
+    "@putnami/web:generate": {
+      "i18n": {
+        "locales": ["en", "fr"],
+        "defaultLocale": "en",
+        "siteUrl": "https://putnami.dev",
+        "exclude": ["/docs/**", "/privacy"]
+      }
+    },
     "@putnami/cloud:publish-migration": { "namespace": "putnami" },
     "@putnami/cloud:publish-config": { "namespace": "putnami" },
     "package": {

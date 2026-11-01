@@ -1,4 +1,4 @@
-import { Favicon, HeaderLink, layout, Meta, Outlet, Style, useLoaderData } from '@putnami/web';
+import { Favicon, HeaderLink, layout, Meta, Outlet, Style, useLoaderData, useT } from '@putnami/web';
 import { Box, Container, ThemeProvider } from '@putnami/ui';
 import { PageMeta } from '../components/page-meta';
 import type { NavItem } from '../lib/docs/navigation';
@@ -7,17 +7,16 @@ import { Footer } from '../components/footer';
 import NavbarIsland from './navbar.island';
 import ReleaseVersionIsland from './release-version.island';
 import SearchIsland from './search.island';
+import layoutMessages from './layout.messages';
 
 export default layout().render(() => {
   const { navItems } = useLoaderData<{ navItems: NavItem[] }>() || {};
+  const t = useT(layoutMessages);
 
   return (
     <ThemeProvider theme={putnamiTheme}>
       {/* Default meta tags - pages override these with their own PageMeta */}
-      <PageMeta
-        title='Putnami — Branch-native workspace tooling for TypeScript'
-        description='Local-first monorepo tooling where every branch is a runnable environment. Workspace orchestration, polyglot framework support, and preview deployments — designed for humans and AI agents.'
-      />
+      <PageMeta title={t.metaTitle()} description={t.description()} />
       <Meta name='viewport' content='width=device-width, initial-scale=1' />
       <Favicon href='/assets/favico.svg' />
       <HeaderLink rel='icon' type='image/x-icon' href='/favicon.ico' />

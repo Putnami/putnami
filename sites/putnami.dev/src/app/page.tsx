@@ -1,96 +1,50 @@
 import { Box, Button, Flex, Grid, Heading, Link, styled, Text } from '@putnami/ui';
-import { page } from '@putnami/web';
+import { page, useT } from '@putnami/web';
 import { PageMeta } from '../components/page-meta';
 import { ToolGlyph } from '../components/tool-glyph';
-import { pageCountLabel, toolList } from '../lib/tools';
+import { toolList } from '../lib/tools';
 import HeroTerminalIsland from './hero-terminal.island';
+import home from './home.messages';
 
-const DESCRIPTION =
-  'A workspace model, framework primitives for Go and TypeScript, and a layer of wire protocols underneath them. Your build, your CI, your infrastructure and your agents read the same contracts.';
+type HomeKey = keyof (typeof home)['definitions'];
 
 /**
  * Each row is a wire protocol: you declare intent next to the code, Putnami
  * derives a document, and a named consumer reads it. The agent-context row is
  * marked `derived` because it is the one input nobody writes — it falls out of
- * the rows above it, which is the whole argument of the page.
+ * the rows above it, which is the whole argument of the page. A file name is
+ * code, not copy, so it is not translated.
  */
-const CHAIN = [
-  {
-    declare: 'putnami.json',
-    derives: 'the workspace graph',
-    reads: 'the CLI, every extension, every task',
-  },
-  {
-    declare: 'an HTTP handler',
-    derives: 'a route inventory',
-    reads: 'your edge, as a generated default-deny allowlist',
-  },
-  {
-    declare: 'an infra need, next to the code',
-    derives: 'one merged manifest, with provenance',
-    reads: 'your deploy target',
-  },
-  {
-    declare: 'putnami.ci.json',
-    derives: 'a validated job graph',
-    reads: 'any execution plane — it reads the document, it never widens it',
-  },
-  {
-    declare: 'a migration, a repository',
-    derives: 'a bundle digest',
-    reads: 'Go and TypeScript adapters, the test provisioner',
-  },
-  {
-    declare: '— nothing. it’s derived',
-    derives: 'the agent context',
-    reads: 'your agent, through the CLI',
-    derived: true,
-  },
+const CHAIN: { declare: HomeKey | { code: string }; derives: HomeKey; reads: HomeKey; derived?: boolean }[] = [
+  { declare: { code: 'putnami.json' }, derives: 'chain1Derives', reads: 'chain1Reads' },
+  { declare: 'chain2Declare', derives: 'chain2Derives', reads: 'chain2Reads' },
+  { declare: 'chain3Declare', derives: 'chain3Derives', reads: 'chain3Reads' },
+  { declare: { code: 'putnami.ci.json' }, derives: 'chain4Derives', reads: 'chain4Reads' },
+  { declare: 'chain5Declare', derives: 'chain5Derives', reads: 'chain5Reads' },
+  { declare: 'chain6Declare', derives: 'chain6Derives', reads: 'chain6Reads', derived: true },
 ];
 
-const PRINCIPLES = [
-  {
-    title: 'Observable by construction',
-    desc: 'Every runtime emits structured signals by default. Local, preview and production expose the same shape.',
-  },
-  {
-    title: 'Performance is a constraint',
-    desc: 'Defaults must survive production load. Regressions are detectable in CI. Abstractions expose their cost.',
-  },
-  {
-    title: 'Deterministic and reviewable',
-    desc: 'Git defines system intent. Deployments are pure functions of versioned state. Drift is detectable.',
-  },
-  {
-    title: 'Security is foundational',
-    desc: 'Secure defaults are enforced. The system fails closed. Unsafe paths require explicit acknowledgment.',
-  },
-  {
-    title: 'Data ownership is non-negotiable',
-    desc: 'Data lives in stores you control. Schemas are versioned, portable, and part of the contract.',
-  },
-  {
-    title: 'Automation is a first-class user',
-    desc: 'The CLI is the primary interface. Output is deterministic and machine-readable, so humans and machines follow the same rules.',
-  },
+const PRINCIPLES: { title: HomeKey; desc: HomeKey }[] = [
+  { title: 'principle1Title', desc: 'principle1Desc' },
+  { title: 'principle2Title', desc: 'principle2Desc' },
+  { title: 'principle3Title', desc: 'principle3Desc' },
+  { title: 'principle4Title', desc: 'principle4Desc' },
+  { title: 'principle5Title', desc: 'principle5Desc' },
+  { title: 'principle6Title', desc: 'principle6Desc' },
 ];
 
-const SURFACES = [
-  {
-    key: 'putnami.dev',
-    name: 'Putnami',
-    desc: 'Structural precision. The workspace model, the framework primitives, the CLI, and the protocol layer underneath them. Complete locally, no account required. FSL-1.1-MIT.',
-  },
-  {
-    key: 'putnami.cloud',
-    name: 'Putnami Cloud',
-    desc: 'Operational depth on the same documents: release provenance, runtime correlation, incident context, rollout protection. It reads your route inventory to build an allowlist, your infra manifest to provision, your CI document to execute. It gets no private dialect.',
-  },
-  {
-    key: 'intelligence',
-    name: 'Putnami Intelligence',
-    desc: 'What ships today: agent orientation through the CLI, a versioned workspace index, and spec-driven development — features, specs and architecture recorded next to the code. The review-and-audit loop, with freshness and receipts on every finding, is where this is going. It stands alone: useful with neither Putnami frameworks nor Putnami Cloud.',
-  },
+const PAINS: { title: HomeKey; desc: HomeKey }[] = [
+  { title: 'pain1Title', desc: 'pain1Desc' },
+  { title: 'pain2Title', desc: 'pain2Desc' },
+  { title: 'pain3Title', desc: 'pain3Desc' },
+  { title: 'pain4Title', desc: 'pain4Desc' },
+];
+
+// Product names are not translated.
+const SURFACES: { key: string; name: string; desc: HomeKey }[] = [
+  { key: 'putnami.dev', name: 'Putnami', desc: 'surfaceDev' },
+  { key: 'putnami.cloud', name: 'Putnami Cloud', desc: 'surfaceCloud' },
+  { key: 'intelligence', name: 'Putnami Intelligence', desc: 'surfaceIntelligence' },
 ];
 
 // Pre-rendered at build (SSG) and revalidated on the cloud runtime — by TTL and
@@ -99,18 +53,20 @@ const SURFACES = [
 export default page()
   .static({ revalidate: { seconds: 3600, tags: ['docs'] } })
   .render(() => {
+    const t = useT(home);
+    const text = (key: HomeKey) => (t[key] as () => string)();
     return (
       <Box as='main' pt='var(--space-2xl)' pb='var(--space-3xl)'>
         <PageMeta
-          title='Putnami — Declare the system once'
-          description={DESCRIPTION}
+          title={t.metaTitle()}
+          description={t.description()}
           url='/'
           jsonLd={{
             '@context': 'https://schema.org',
             '@type': 'WebSite',
             name: 'Putnami',
             url: 'https://putnami.dev',
-            description: DESCRIPTION,
+            description: t.description(),
             publisher: {
               '@type': 'Organization',
               name: 'Putnami',
@@ -127,21 +83,19 @@ export default page()
         <Box as='section' textAlign='center' mb='var(--space-3xl)' px='var(--space-md)'>
           <HeroPill>
             <span className='pill-dot' />
-            Workspace · Protocols · Agent-operable
+            {t.heroPill()}
           </HeroPill>
           <Heading level={1} size={['2xl', '3xl', '4xl']} mb='md' style={{ letterSpacing: '-0.02em' }}>
-            Declare the system once. Humans review it. Agents operate it.
+            {t.heroTitle()}
           </Heading>
           <Text as='p' size='lg' color='secondary' mx='auto' mb='lg' maxWidth='640px' style={{ lineHeight: 1.6 }}>
-            Putnami is a workspace model, framework primitives for Go and TypeScript, and a layer of wire protocols
-            underneath them. Your build, your CI, your infrastructure and your agents all read the same contracts — from
-            your laptop to production.
+            {t.heroLede()}
           </Text>
           <Flex justify='center' align='center' wrap='wrap' gap='lg'>
             <Link to='/docs/getting-started'>
-              <Button size='lg'>Get started</Button>
+              <Button size='lg'>{t.getStarted()}</Button>
             </Link>
-            <SecondaryLink to='/docs/why'>Why Putnami →</SecondaryLink>
+            <SecondaryLink to='/docs/why'>{t.whyPutnami()}</SecondaryLink>
           </Flex>
         </Box>
 
@@ -152,153 +106,120 @@ export default page()
 
         {/* The problem */}
         <Box as='section' mb='var(--space-3xl)' maxWidth='1000px' mx='auto' px='var(--space-md)'>
-          <SectionLabel>Why this exists</SectionLabel>
+          <SectionLabel>{t.problemLabel()}</SectionLabel>
           <SectionHeading level={2} mb='md'>
-            Your system is real. Your description of it isn’t.
+            {t.problemTitle()}
           </SectionHeading>
           <Grid columns={[1, 2]} gap='md'>
-            <PainCard
-              title='The system only exists at runtime'
-              desc='Config in five dialects, infrastructure in another repo, CI in provider YAML. Nothing in git states what the system is — only fragments of how to rebuild it, if you already know.'
-            />
-            <PainCard
-              title='Every boundary is a convention'
-              desc='The CLI knows what the framework emits because the same person wrote both. Add a language, a second consumer, or an agent, and the convention lives only in someone’s head.'
-            />
-            <PainCard
-              title='Drift isn’t unfixed. It’s invisible.'
-              desc='Local, CI and production diverge quietly, because nothing in the system compares them. You find out at the worst possible moment.'
-            />
-            <PainCard
-              title='Agents can edit. They can’t operate.'
-              desc='An agent can write code against your repo. Operating your system — knowing the blast radius, reading the state, undoing a mistake — needs a contract, and you don’t have one to hand it.'
-            />
+            {PAINS.map((pain) => (
+              <PainCard key={pain.title} title={text(pain.title)} desc={text(pain.desc)} />
+            ))}
           </Grid>
         </Box>
 
         {/* The chain */}
         <Box as='section' mb='var(--space-3xl)' maxWidth='1000px' mx='auto' px='var(--space-md)'>
-          <SectionLabel>How it works</SectionLabel>
+          <SectionLabel>{t.chainLabel()}</SectionLabel>
           <SectionHeading level={2} mb='md'>
-            One declaration. Everything downstream reads it.
+            {t.chainTitle()}
           </SectionHeading>
           <Text as='p' color='secondary' mb='md' maxWidth='680px' style={{ lineHeight: 1.6 }}>
-            You write intent next to the code it describes. Putnami derives the rest, deterministically, and publishes
-            it as a contract anyone can parse — including the tools you didn’t write.
+            {t.chainLede()}
           </Text>
           <ChainTable>
             <table>
               <thead>
                 <tr>
-                  <th>You declare</th>
-                  <th>Putnami derives</th>
-                  <th>Who reads it</th>
+                  <th>{t.chainDeclare()}</th>
+                  <th>{t.chainDerives()}</th>
+                  <th>{t.chainReads()}</th>
                 </tr>
               </thead>
               <tbody>
                 {CHAIN.map((row) => (
                   <tr key={row.derives} className={row.derived ? 'derived' : undefined}>
-                    <td data-label='You declare'>{row.declare}</td>
-                    <td data-label='Putnami derives'>{row.derives}</td>
-                    <td data-label='Who reads it'>{row.reads}</td>
+                    <td data-label={t.chainDeclare()}>
+                      {typeof row.declare === 'string' ? text(row.declare) : row.declare.code}
+                    </td>
+                    <td data-label={t.chainDerives()}>{text(row.derives)}</td>
+                    <td data-label={t.chainReads()}>{text(row.reads)}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </ChainTable>
           <Text as='p' color='secondary' mt='md' maxWidth='680px' style={{ lineHeight: 1.6 }}>
-            <strong>Your branch is already an environment.</strong> Git carries the intent — what changed, by whom,
-            against what — and every document above is derived from it, so one workspace structure, one set of commands
-            and one set of contracts hold from your laptop through CI to whatever runs it. Managed per-branch previews
-            and deploys are where this is going; nothing in the chain requires an account.
+            <strong>{t.branchLead()}</strong> {t.branchBody()}
           </Text>
           <Caption as='p' mt='md'>
-            Every row above is a wire protocol: a published schema, a corpus of valid and invalid fixtures, and a strict
-            parser in each language that implements it.{' '}
-            <SecondaryLink to='/docs/protocols'>Read the protocols →</SecondaryLink>
+            {t.chainCaption()} <SecondaryLink to='/docs/protocols'>{t.readProtocols()}</SecondaryLink>
           </Caption>
         </Box>
 
         {/* Agent-operable */}
         <Box as='section' mb='var(--space-3xl)' maxWidth='1000px' mx='auto' px='var(--space-md)'>
-          <SectionLabel>Built to be operated</SectionLabel>
+          <SectionLabel>{t.operateLabel()}</SectionLabel>
           <SectionHeading level={2} mb='sm'>
-            An agent doesn’t need to be taught your repository.
+            {t.operateTitle()}
           </SectionHeading>
           <Text as='p' color='secondary' mb='md' maxWidth='680px' style={{ lineHeight: 1.6 }}>
-            It reads the same contracts your build reads.
+            {t.operateLede()}
           </Text>
           <Grid columns={[1, 2]} gap='md'>
             <SurfaceCard title='putnami context pack'>
-              A deterministic per-project orientation document: identity and dependency graph, composition roots,
-              capability and contract references, representative source ranges, tests, docs, provenance. Aggregated{' '}
-              <strong>by reference</strong> — paths, digests and ranges, never file contents — behind a fail-closed
-              publish-safety gate. Printed read-only by the CLI.
+              {t.contextPackBefore()} <strong>{t.contextPackStrong()}</strong> {t.contextPackAfter()}
             </SurfaceCard>
-            <SurfaceCard title='--impacted'>
-              The blast radius of a change, before anything acts on it. An agent that knows what it is about to affect
-              is an agent you can let run.
-            </SurfaceCard>
-            <SurfaceCard title='--output=json · jsonl'>
-              Exit codes, output modes and machine documents are a versioned contract, not an implementation detail that
-              moves under a parser. The same corpus validates the Go and the TypeScript CLI.
-            </SurfaceCard>
-            <SurfaceCard title='putnami doctor'>
-              Production-readiness findings under a deployment profile, a frozen check-code taxonomy, and a remediation
-              baked into every check. “What’s wrong and what do I do about it” is data, not prose.
-            </SurfaceCard>
+            <SurfaceCard title='--impacted'>{t.impacted()}</SurfaceCard>
+            <SurfaceCard title='--output=json · jsonl'>{t.outputModes()}</SurfaceCard>
+            <SurfaceCard title='putnami doctor'>{t.doctor()}</SurfaceCard>
           </Grid>
           <Caption as='p' mt='md'>
-            One JSONL event stream per job, so the agent watching a build and the human reading the log are parsing the
-            same lines.
+            {t.operateCaption()}
           </Caption>
         </Box>
 
         {/* Protocols */}
         <Box as='section' mb='var(--space-3xl)' maxWidth='1000px' mx='auto' px='var(--space-md)'>
-          <SectionLabel>Why you can check any of this</SectionLabel>
+          <SectionLabel>{t.protocolsLabel()}</SectionLabel>
           <SectionHeading level={2} mb='md'>
-            One package per boundary. No shared assumptions.
+            {t.protocolsTitle()}
           </SectionHeading>
           <Text as='p' color='secondary' mb='md' maxWidth='680px' style={{ lineHeight: 1.6 }}>
-            The frameworks, the tooling and the platform don’t integrate through shared code. They integrate through
-            protocols: a published schema, a corpus of valid and invalid fixtures, a strict parser in every language
-            that implements it, and at least one real consumer.
+            {t.protocolsLede()}
           </Text>
-          <Pullquote>A protocol without consumers is a spec, not a contract.</Pullquote>
+          <Pullquote>{t.protocolsQuote()}</Pullquote>
           <Text as='p' color='secondary' mb='md' maxWidth='680px' style={{ lineHeight: 1.6 }}>
-            The repository publishes a conformance matrix — who implements or consumes each contract, and how it’s
-            verified. It has three states, and the middle one is published on purpose: <strong>tested</strong>,{' '}
-            <strong>aligned by hand</strong> (drift possible), and <strong>not a consumer</strong>. A matrix that only
-            showed green would be marketing.
+            {t.matrixBefore()} <strong>{t.matrixTested()}</strong>, <strong>{t.matrixAligned()}</strong>{' '}
+            {t.matrixAlignedNote()} <strong>{t.matrixNotConsumer()}</strong>
+            {t.matrixAfter()}
           </Text>
           <Flex align='center' wrap='wrap' gap='lg'>
-            <SecondaryLink to='/docs/protocols'>Read the protocols →</SecondaryLink>
-            <SecondaryLink to='/docs/support'>Support status →</SecondaryLink>
+            <SecondaryLink to='/docs/protocols'>{t.readProtocols()}</SecondaryLink>
+            <SecondaryLink to='/docs/support'>{t.supportStatus()}</SecondaryLink>
           </Flex>
         </Box>
 
         {/* Principles */}
         <Box as='section' mb='var(--space-3xl)' maxWidth='1000px' mx='auto' px='var(--space-md)'>
-          <SectionLabel>Principles</SectionLabel>
+          <SectionLabel>{t.principlesLabel()}</SectionLabel>
           <SectionHeading level={2} mb='md'>
-            Constraints, not aspirations. Violations are bugs.
+            {t.principlesTitle()}
           </SectionHeading>
           <Grid columns={[1, 2]} gap='md'>
             {PRINCIPLES.map((principle) => (
-              <PrincipleItem key={principle.title} title={principle.title} desc={principle.desc} />
+              <PrincipleItem key={principle.title} title={text(principle.title)} desc={text(principle.desc)} />
             ))}
           </Grid>
           <Box mt='md'>
-            <SecondaryLink to='/docs/principles'>Read the full principles →</SecondaryLink>
+            <SecondaryLink to='/docs/principles'>{t.readPrinciples()}</SecondaryLink>
           </Box>
         </Box>
 
         {/* Three surfaces */}
         <Box as='section' mb='var(--space-3xl)' maxWidth='1000px' mx='auto' px='var(--space-md)'>
-          <SectionLabel>The shape of the product</SectionLabel>
+          <SectionLabel>{t.surfacesLabel()}</SectionLabel>
           <SectionHeading level={2} mb='md'>
-            Three surfaces. One declaration.
+            {t.surfacesTitle()}
           </SectionHeading>
           <Grid columns={[1, 3]} gap='md'>
             {SURFACES.map((surface) => (
@@ -308,25 +229,22 @@ export default page()
                   {surface.name}
                 </Heading>
                 <Text color='secondary' size='sm' style={{ lineHeight: 1.6 }}>
-                  {surface.desc}
+                  {text(surface.desc)}
                 </Text>
               </Card>
             ))}
           </Grid>
           <Caption as='p' mt='md'>
-            Adopting putnami.dev sharpens what Intelligence knows about your structure. Adopting Cloud deepens what it
-            knows about your operations. Neither is a prerequisite — and Cloud integrates through the same published
-            contracts as any third-party adapter. Its advantage is zero-configuration correlation, not a private
-            backchannel.
+            {t.surfacesCaption()}
           </Caption>
         </Box>
 
         {/* One docs model, every surface — ties the home into the docs IA */}
         <Box as='section' mb='var(--space-3xl)' maxWidth='1000px' mx='auto' px='var(--space-md)'>
           <Box textAlign='center' mb='lg'>
-            <SectionLabel as='span'>One docs model, every surface</SectionLabel>
+            <SectionLabel as='span'>{t.docsLabel()}</SectionLabel>
             <SectionHeading level={2} mb='sm'>
-              Tooling first. Language depth when you need it.
+              {t.docsTitle()}
             </SectionHeading>
           </Box>
           <ToolStrip>
@@ -334,13 +252,13 @@ export default page()
               <Link key={tool.id} to={tool.href} className='tool-cell'>
                 <ToolGlyph tool={tool} size={40} />
                 <span className='tool-name'>{tool.short}</span>
-                <span className='tool-pages'>{pageCountLabel(tool.pages)}</span>
+                <span className='tool-pages'>{t.pageCount({ count: tool.pages })}</span>
               </Link>
             ))}
           </ToolStrip>
           <Box textAlign='center' mt='md'>
             <Link to='/docs' style={{ color: 'var(--color-primary)', fontWeight: 500, textDecoration: 'none' }}>
-              Open the documentation hub →
+              {t.openDocs()}
             </Link>
           </Box>
         </Box>
@@ -348,17 +266,16 @@ export default page()
         {/* Final CTA */}
         <Box as='section' textAlign='center' maxWidth='760px' mx='auto' px='var(--space-md)' pt='var(--space-xl)'>
           <Heading level={2} mb='sm'>
-            Start with a workspace.
+            {t.ctaTitle()}
           </Heading>
           <Text as='p' color='secondary' mb='md'>
-            Everything above runs on your machine, without an account. The platform is there when operating it stops
-            being your job.
+            {t.ctaLede()}
           </Text>
           <Flex justify='center' align='center' wrap='wrap' gap='lg'>
             <Link to='/docs/getting-started'>
-              <Button size='lg'>Get started</Button>
+              <Button size='lg'>{t.getStarted()}</Button>
             </Link>
-            <SecondaryLink to='https://github.com/putnami/putnami'>View on GitHub</SecondaryLink>
+            <SecondaryLink to='https://github.com/putnami/putnami'>{t.viewOnGithub()}</SecondaryLink>
           </Flex>
         </Box>
       </Box>
