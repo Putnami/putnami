@@ -12,7 +12,7 @@
     "Running go, reading the module cache or the network: the detector reads files only",
     "Computing the changed and dependent components, the tests and coverage per component, the changed-line coverage and the dependency changes: the change analyses own them",
     "Reading the content of test and coverage reports: the evidence readers own it",
-    "Running as its own extension over the workspace probe transport, which needs the host call of Putnami/putnami#742"
+    "Running as its own extension over the workspace probe transport, which needs a host call that runs workspace probes outside a workspace"
   ],
   "requirements": [
     {

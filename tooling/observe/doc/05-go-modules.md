@@ -56,8 +56,8 @@ Each module's `go.mod` is its lockfile. Its locked dependencies are its
 requires, each with the version that the `replace` directives of the
 `go.mod` and of the root `go.work` at the same commit select, and whether it
 is `// indirect`. `go.work` belongs to no module, so a change made only in its
-`replace` directives shows in no lockfile. A require replaced by a local directory, or of a module
-of the repository, is not a locked dependency. `go.sum` holds checksums, not
+`replace` directives shows in no lockfile. A require replaced by a local
+directory, or of a module of the repository, is not a locked dependency. `go.sum` holds checksums, not
 a selection, so the detector does not read it. Versions compare in Go's
 semantic version order, pseudo-versions included.
 

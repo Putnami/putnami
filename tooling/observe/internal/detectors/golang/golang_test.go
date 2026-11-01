@@ -492,6 +492,11 @@ func TestGoWorkReplacesOverrideTheGoModAndAVersionedReplaceWins(t *testing.T) {
 	if err != nil || !reflect.DeepEqual(locked, []Locked{{Name: "example.com/x", Version: "v1.4.0"}}) {
 		t.Fatalf("go.work replace: %+v %v", locked, err)
 	}
+	// The detection's own go.work does not reach a read given no go.work.
+	locked, err = d.ReadLock("app/go.mod", []byte("module example.com/app\nrequire example.com/lib v1.0.0\n"), nil)
+	if err != nil || !reflect.DeepEqual(locked, []Locked{{Name: "example.com/lib", Version: "v1.0.0"}}) {
+		t.Fatalf("read without go.work: %+v %v", locked, err)
+	}
 	locked, err = d.ReadLock("m/go.mod", goMod, []byte("go 1.23\nreplace example.com/x => ./x\n"))
 	if err != nil || len(locked) != 0 {
 		t.Fatalf("go.work local replace: %+v %v", locked, err)
@@ -502,6 +507,26 @@ func TestAGoWorkUseOutsideTheRepositoryIsADiagnostic(t *testing.T) {
 	spectest.Proves(t, feature, "go-modules-are-components", "an-unreadable-manifest-is-a-diagnostic")
 	d := Detect(tree(t, with(demo, map[string]string{"go.work": "go 1.23\nuse (\n\t./api\n\t./pricing\n\t../elsewhere\n)\n"})))
 	if got := codes(d.Diagnostics); !reflect.DeepEqual(got, []string{CodeManifestInvalid}) {
+		t.Fatalf("diagnostics %v", d.Diagnostics)
+	}
+	if len(d.Modules) != 2 {
+		t.Fatalf("modules %+v", d.Modules)
+	}
+}
+
+func TestAnUnreadableDirectoryIsADiagnostic(t *testing.T) {
+	spectest.Proves(t, feature, "go-modules-are-components", "an-unreadable-manifest-is-a-diagnostic")
+	root := tree(t, with(demo, map[string]string{"locked/inner/go.mod": "module example.com/inner\n"}))
+	dir := filepath.Join(root, "locked")
+	if err := os.Chmod(dir, 0o000); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(dir, 0o755) })
+	if _, err := os.ReadDir(dir); err == nil {
+		t.Skip("the directory stays readable: the test runs with privileges")
+	}
+	d := Detect(root)
+	if got := codes(d.Diagnostics); !reflect.DeepEqual(got, []string{CodeManifestUnreadable}) || d.Diagnostics[0].Field != "locked" {
 		t.Fatalf("diagnostics %v", d.Diagnostics)
 	}
 	if len(d.Modules) != 2 {
