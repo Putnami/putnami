@@ -1,0 +1,43 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-spec.json",
+  "protocolVersion": 1,
+  "feature": "tooling/observe-analyses",
+  "outcomes": [
+    "The CI log of a change names the components it changed and the components that depend on them, inferred from the repository's own manifests",
+    "The same log gives the tests and the line coverage of each component, and the coverage of the lines the change added or modified",
+    "The same log lists the packages whose locked version the change added, removed, upgraded or downgraded",
+    "The evidence document carries the same facts and validates against protocol/evidence v1"
+  ],
+  "nonGoals": [
+    "Reading a putnami.workspace.json through go.putnami.dev/cli/model: a Putnami workspace runs its own extensions",
+    "Running a package manager, an orchestrator or the tests",
+    "Licences, vulnerabilities and SBOM documents",
+    "Attributing a JUnit case by its class name alone, when neither its file nor its report lies in a component"
+  ],
+  "requirements": [
+    {
+      "id": "components",
+      "text": "The Nx, Node workspace, Composer and Go detectors answer for the repository. When two name one directory, the higher source wins: orchestrator, then workspace, then manifest. A changed file belongs to the innermost component that holds it. A component is changed when one of its files changed, dependent when it reaches a changed one through its edges. Edges to an unknown component are dropped. When no detector finds a component, the repository is one fallback component."
+    },
+    {
+      "id": "tests-and-coverage",
+      "text": "A JUnit case goes to the component that holds its test file, else to the component of the Go package its suite names, else to the component that holds its report. A covered file goes to the component that holds it. A report path is read as repository-relative, relative to the report's component or directory, absolute under the repository, or as a Go import path. Each component sums its passed, failed and skipped cases, its duration, its failing cases and its covered and instrumented lines."
+    },
+    {
+      "id": "changed-line-coverage",
+      "text": "The lines a change added or modified are the added lines of the diff from the merge base to the head, with no context. Each changed file that still exists and that a coverage report instruments gets its covered and instrumented changed lines and its uncovered line numbers. A line two reports instrument is covered when either covers it. Without a base or a coverage report, there is no changed-line coverage."
+    },
+    {
+      "id": "dependency-changes",
+      "text": "Each changed package-lock.json, pnpm-lock.yaml, yarn.lock, composer.lock and go.mod is read at the merge base and at the head. A package present on one side only is added or removed; a package whose versions differ is upgraded, downgraded or, when the versions do not compare, changed. Workspace links, path packages and modules of the repository are no dependency. A lockfile that cannot be read is a diagnostic."
+    },
+    {
+      "id": "summary",
+      "text": "The text summary lists the changed and dependent components, the tests and coverage of each component, the changed-line coverage with its least covered files, and the dependency changes. --output=json prints the same observation as one document. --evidence writes the components, their impacts and edges, the tests, the coverage, the changed-line coverage and the dependency changes, and the document validates against protocol/evidence v1."
+    }
+  ],
+  "decisions": [
+    "tooling/cli/doc/adr/0051-user-scope-extensions-run-without-a-workspace.md",
+    "protocols/evidence/doc/adr/0001-one-self-reported-change-evidence-document.md"
+  ]
+}

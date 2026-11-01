@@ -11,7 +11,7 @@
   ],
   "nonGoals": [
     "Running a build or tests, or asking the team to change how it builds or tests",
-    "Inferring components beyond the repository itself, mapping reports to components, changed-line coverage and dependency changes: the detectors, the readers and the change analyses own them",
+    "Inferring components, mapping reports to components, changed-line coverage and dependency changes: the detectors and the change analyses own them",
     "Uploading the change evidence document: the cloud reporter owns it",
     "Reading another extension's workspace probe outside a workspace, which needs a host call the CLI does not offer yet",
     "Running inside a Putnami workspace: there the workspace's own extensions answer"
@@ -35,7 +35,7 @@
     },
     {
       "id": "evidence-document",
-      "text": "--evidence <path>, resolved against the invocation directory, writes a protocol/evidence v1 document: the subject, the CI run, the producer, the changed files and, until a detector names components, the repository as one fallback component, changed when a file changed. The document is validated before it is written; one that does not validate is written nowhere and is a diagnostic, as is a path that cannot be written."
+      "text": "--evidence <path>, resolved against the invocation directory, writes a protocol/evidence v1 document: the subject, the CI run, the producer, the changed files and the components the change analyses found. The document is validated before it is written; one that does not validate is written nowhere and is a diagnostic, as is a path that cannot be written."
     },
     {
       "id": "caller-directory-writes",
