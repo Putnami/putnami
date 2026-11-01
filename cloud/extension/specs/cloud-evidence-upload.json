@@ -1,0 +1,27 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-spec.json",
+  "protocolVersion": 1,
+  "feature": "cloud/evidence-upload",
+  "outcomes": [
+    "A CI job that is not Putnami's uploads its change evidence document to Putnami Cloud with a workspace token, and the run shows its tests, coverage, components, changed-line coverage and dependency changes, marked as self-reported"
+  ],
+  "nonGoals": [
+    "Creating the observed workspace or its token: the runbook does it by hand for this slice",
+    "Uploading from a CI other than GitHub Actions or GitLab CI: Delivery has no provenance for it",
+    "Signing in as a person: the upload uses the workspace token alone"
+  ],
+  "requirements": [
+    {
+      "id": "opens-the-external-run",
+      "text": "putnami cloud evidence-report --file <path> reads a protocol/evidence v1 document and opens its run with POST /v1/delivery/records under the PUTNAMI_CLOUD_TOKEN bearer: the subject's provider, numeric project id as repo, commit and branch, provenance gha or gitlab from the CI, the pull or merge request as changeRequest, conclusion failure when a test failed, else success, and a submission id derived from the CI job, so a repeated upload opens no second run."
+    },
+    {
+      "id": "posts-the-reports-in-two-batches",
+      "text": "After the run, it posts the tests and coverage of each component in one batch to POST /v1/delivery/records/reports, then the components, the changed-line coverage and the dependency changes, copied from the document, in a second batch under the same submission id. A batch with nothing to carry is not sent."
+    },
+    {
+      "id": "refuses-what-it-cannot-upload",
+      "text": "Without PUTNAMI_CLOUD_TOKEN, with a document that does not parse or validate, or with a generic CI, it sends nothing and exits non-zero with a message that names the cause. A refused run or batch exits non-zero with the route and the server's reason, and never prints the token."
+    }
+  ]
+}

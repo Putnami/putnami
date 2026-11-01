@@ -1,0 +1,25 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-spec.json",
+  "protocolVersion": 1,
+  "feature": "tooling/observe-upload",
+  "outcomes": [
+    "A CI job adds --upload to putnami observe and its change evidence document reaches the reporter it selected, Putnami Cloud by default",
+    "A third party writes its own reporter as an extension that answers one subcommand, with no change to observe or to the CLI",
+    "An upload that fails leaves a diagnostic in the log and never fails the CI job"
+  ],
+  "nonGoals": [
+    "Talking to Putnami Cloud: the reporter owns the routes, the token and the retries",
+    "Uploading a document that does not validate against protocol/evidence v1",
+    "Choosing the reporter from the workspace configuration: a CI job outside a workspace has none"
+  ],
+  "requirements": [
+    {
+      "id": "upload-hands-the-document-to-the-reporter",
+      "text": "With --upload, putnami observe writes the evidence document to the --evidence path, else to a temporary file it removes, then runs the CLI that started it, or putnami on PATH, as <name> evidence-report --file <path>, where <name> is the name without scope of the extension PUTNAMI_EVIDENCE_REPORTER selects, @putnami/cloud when the variable is unset. The reporter's output goes to observe's standard error, so --output=json still prints one document."
+    },
+    {
+      "id": "upload-fails-open",
+      "text": "A selector that is not an extension name, a document that was not written, a reporter that cannot start, exits non-zero or runs past two minutes each give one warning diagnostic, observe.upload_failed, and putnami observe still exits 0."
+    }
+  ]
+}

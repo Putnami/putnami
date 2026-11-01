@@ -30,6 +30,8 @@
     "tooling/observe-nx#change-inputs",
     "tooling/observe-nx#configuration",
     "tooling/observe-nx#graph-export",
-    "tooling/observe-nx#probe-wire"
+    "tooling/observe-nx#probe-wire",
+    "tooling/observe-upload#upload-fails-open",
+    "tooling/observe-upload#upload-hands-the-document-to-the-reporter"
   ]
 }

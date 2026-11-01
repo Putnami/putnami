@@ -477,6 +477,43 @@
           }
         }
       ]
+    },
+    {
+      "id": "tooling/observe-upload",
+      "type": "feature",
+      "name": "Hand the change evidence document to a reporter",
+      "outcome": "A CI job adds --upload to putnami observe and its change evidence document reaches the reporter it selected, Putnami Cloud by default, and an upload that fails is a diagnostic that never fails the job",
+      "owner": "tooling",
+      "target": "modeled",
+      "requirements": [
+        {
+          "id": "upload-hands-the-document-to-the-reporter",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "upload-runs-the-selected-reporter-with-the-document",
+              "an-unset-selector-picks-putnami-cloud"
+            ]
+          }
+        },
+        {
+          "id": "upload-fails-open",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-failed-upload-is-a-diagnostic"
+            ]
+          }
+        }
+      ]
     }
   ]
 }
