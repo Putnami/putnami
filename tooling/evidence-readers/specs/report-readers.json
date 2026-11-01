@@ -32,7 +32,7 @@
     },
     {
       "id": "malformed-reports-are-diagnostics",
-      "text": "A report that does not decode, whose root is not its format's, or that states an impossible value (a line below 1, a negative count, a malformed record) returns no case and no file, and one error diagnostic of code readers.malformed that names the location. A report larger than MaxReportBytes returns readers.too_large, and ReadFile returns readers.missing for a file that does not exist. No input makes a reader panic."
+      "text": "A report that does not decode, whose root is not its format's, or that states an impossible value (a line below 1, a negative count, a malformed record) returns no case and no file, and one error diagnostic of code readers.malformed. A report larger than MaxReportBytes, or whose files mark more than MaxLineMarks lines, returns readers.too_large, and ReadFile returns readers.missing for a file that does not exist. No input makes a reader panic."
     }
   ]
 }
