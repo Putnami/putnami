@@ -71,7 +71,9 @@ func ReadLCOV(data []byte) (CoverageReport, []diag.Diagnostic) {
 			if diagnostics := checkLine("LCOV line "+strconv.Itoa(number), lineNumber, hits); diagnostics != nil {
 				return CoverageReport{}, diagnostics
 			}
-			file.line(lineNumber, hits)
+			if diagnostics := file.line(lineNumber, hits); diagnostics != nil {
+				return CoverageReport{}, diagnostics
+			}
 		case "FN":
 			name, ok := functionName(value)
 			if !ok {

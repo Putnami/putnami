@@ -156,13 +156,18 @@ func junitTotals(root junitNode) (Totals, []diag.Diagnostic) {
 }
 
 // collectJUnit appends the cases of element and of its nested suites, in
-// document order, each under suites.
+// document order, each under suites. A nested testsuites element groups its
+// children without being a suite.
 func collectJUnit(element junitNode, suites []Suite, out *[]TestCase) []diag.Diagnostic {
 	for _, child := range element.Children {
 		switch child.XMLName.Local {
 		case "testsuite":
 			nested := append(slices.Clone(suites), Suite{Name: child.Name, File: slashPath(child.File)})
 			if diagnostics := collectJUnit(child, nested, out); diagnostics != nil {
+				return diagnostics
+			}
+		case "testsuites":
+			if diagnostics := collectJUnit(child, suites, out); diagnostics != nil {
 				return diagnostics
 			}
 		case "testcase":

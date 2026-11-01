@@ -15,7 +15,8 @@ import (
 // CoverageSummary holds aggregate coverage metrics.
 //
 // LineCoverage / TotalLines / CoveredLines are derived solely from LCOV's
-// instrumented-line counts (LF/LH). Source files that tests never imported are
+// instrumented lines: the DA lines of each record, or its LF/LH when it lists
+// none. Source files that tests never imported are
 // surfaced via UncoveredFileCount and as not-analyzed per-file entries, but are
 // intentionally kept out of the line-percentage denominator: counting their
 // raw source lines (imports, comments, type-only declarations) as a proxy for
@@ -54,7 +55,7 @@ type FileCoverage struct {
 // are reported as not-analyzed (0% coverage) entries for visibility, but their
 // raw source lines are deliberately NOT folded into the aggregate line-coverage
 // denominator: a non-empty-line count is a poor proxy for LCOV's instrumented
-// lines (LF) and would make the reported project percentage inconsistent with
+// lines and would make the reported project percentage inconsistent with
 // the per-file LCOV numbers (see CoverageSummary doc comment).
 //
 // Returns the aggregate summary (line counts from LCOV only) and the combined

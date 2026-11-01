@@ -86,7 +86,9 @@ func ReadClover(data []byte) (CoverageReport, []diag.Diagnostic) {
 			case "method":
 				file.function(strconv.Itoa(number)+"\x00"+line.Name, hits > 0)
 			case "stmt", "cond":
-				file.line(number, hits)
+				if diagnostics := file.line(number, hits); diagnostics != nil {
+					return CoverageReport{}, diagnostics
+				}
 			}
 		}
 		if entry.Metrics != nil && (entry.Metrics.Methods != "" || entry.Metrics.CoveredMethods != "") {

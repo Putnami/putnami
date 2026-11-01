@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"flag"
+	"fmt"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -370,6 +371,48 @@ func allReaders() map[string]func([]byte) []diag.Diagnostic {
 	return readers
 }
 
+func TestAReportOverTheLineBoundIsTooLarge(t *testing.T) {
+	var profile strings.Builder
+	profile.WriteString("mode: set\n")
+	for block := range MaxLineMarks/1000 + 1 {
+		fmt.Fprintf(&profile, "example.com/a/a.go:1.%d,1000.1 1 1\n", 1+block)
+	}
+	if _, diagnostics := ReadGoCover([]byte(profile.String())); len(diagnostics) != 1 || diagnostics[0].Code != CodeTooLarge {
+		t.Errorf("overlapping blocks over the bound: %v, want %s", diagnostics, CodeTooLarge)
+	}
+	var lcov strings.Builder
+	lcov.WriteString("SF:a.js\n")
+	for line := range MaxLineMarks + 1 {
+		fmt.Fprintf(&lcov, "DA:%d,1\n", 1+line%10)
+	}
+	lcov.WriteString("end_of_record\n")
+	if _, diagnostics := ReadLCOV([]byte(lcov.String())); len(diagnostics) != 1 || diagnostics[0].Code != CodeTooLarge {
+		t.Errorf("repeated DA lines over the bound: %v, want %s", diagnostics, CodeTooLarge)
+	}
+	spectest.Proves(t, feature, "malformed-reports-are-diagnostics", "every-malformed-fixture-returns-its-code")
+}
+
+func TestANestedTestsuitesElementKeepsItsCases(t *testing.T) {
+	report, diagnostics := ReadJUnit([]byte(`<testsuites><testsuites><testsuite name="s"><testcase name="x"/></testsuite></testsuites><testcase name="y"/></testsuites>`))
+	if len(diagnostics) != 0 {
+		t.Fatal(diagnostics)
+	}
+	want := []TestCase{{Name: "x", Suites: []Suite{{Name: "s"}}, Status: StatusPassed}, {Name: "y", Status: StatusPassed}}
+	if !reflect.DeepEqual(report.Cases, want) {
+		t.Errorf("cases %+v, want %+v", report.Cases, want)
+	}
+}
+
+func TestCoberturaMethodsOfTwoClassesInOneFileStayDistinct(t *testing.T) {
+	report, _ := ReadCobertura([]byte(`<coverage><packages><package><classes>
+  <class name="A" filename="a.php"><methods><method name="run" signature="" hits="1"/></methods></class>
+  <class name="B" filename="a.php"><methods><method name="run" signature="" hits="0"/></methods></class>
+</classes></package></packages></coverage>`))
+	if got := report.Files[0].Functions; got != (Counts{Total: 2, Covered: 1}) {
+		t.Errorf("functions %+v, want two methods, one covered", got)
+	}
+}
+
 // TestArbitraryBytesNeverPanic feeds every reader every fixture cut at every
 // length and with each byte flipped in turn: each returns a result or one
 // malformed diagnostic, and none panics. FuzzReaders explores further.
@@ -391,7 +434,7 @@ func TestArbitraryBytesNeverPanic(t *testing.T) {
 	for name, reader := range allReaders() {
 		for _, input := range inputs {
 			diagnostics := reader(input)
-			if len(diagnostics) > 1 || (len(diagnostics) == 1 && diagnostics[0].Code != CodeMalformed) {
+			if len(diagnostics) > 1 || (len(diagnostics) == 1 && diagnostics[0].Code != CodeMalformed && diagnostics[0].Code != CodeTooLarge) {
 				t.Fatalf("%s: %v for %q", name, diagnostics, input)
 			}
 		}

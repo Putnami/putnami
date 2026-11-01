@@ -90,7 +90,9 @@ func ReadGoCover(data []byte) (CoverageReport, []diag.Diagnostic) {
 			continue
 		}
 		for line := block.startLine; line <= block.endLine; line++ {
-			file.line(line, counts[block])
+			if diagnostics := file.line(line, counts[block]); diagnostics != nil {
+				return CoverageReport{}, diagnostics
+			}
 		}
 	}
 	return builder.report(nil), nil

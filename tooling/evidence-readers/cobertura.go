@@ -21,6 +21,7 @@ type coberturaPackages struct {
 }
 
 type coberturaClass struct {
+	Name     string `xml:"name,attr"`
 	Filename string `xml:"filename,attr"`
 	Methods  []struct {
 		Name      string          `xml:"name,attr"`
@@ -63,7 +64,9 @@ func ReadCobertura(data []byte) (CoverageReport, []diag.Diagnostic) {
 				if diagnostics != nil {
 					return CoverageReport{}, diagnostics
 				}
-				file.line(number, hits)
+				if diagnostics := file.line(number, hits); diagnostics != nil {
+					return CoverageReport{}, diagnostics
+				}
 			}
 			for _, method := range class.Methods {
 				ran := false
@@ -81,7 +84,7 @@ func ReadCobertura(data []byte) (CoverageReport, []diag.Diagnostic) {
 					}
 					ran = ran || (method.Hits == "" && hits > 0)
 				}
-				file.function(method.Name+"\x00"+method.Signature, ran)
+				file.function(class.Name+"\x00"+method.Name+"\x00"+method.Signature, ran)
 			}
 		}
 	}

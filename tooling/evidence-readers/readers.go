@@ -17,6 +17,7 @@ import (
 	"io"
 	"io/fs"
 	"os"
+	"path/filepath"
 	"slices"
 	"strings"
 
@@ -39,12 +40,16 @@ const (
 // MaxReportBytes caps the size of one report.
 const MaxReportBytes = 256 << 20
 
+// MaxLineMarks caps the line entries one coverage report marks, a line
+// stated twice counted twice; a Go block marks every line of its span.
+const MaxLineMarks = 4_000_000
+
 // ReadFile reads the report at path with read. A missing file returns
 // CodeMissing, a file larger than MaxReportBytes CodeTooLarge, and a file that
 // cannot be read CodeUnreadable; each diagnostic names path in its field.
 func ReadFile[T any](path string, read func([]byte) (T, []diag.Diagnostic)) (T, []diag.Diagnostic) {
 	var zero T
-	file, err := os.Open(path) //nolint:gosec // the caller names the report to read
+	file, err := os.Open(filepath.Clean(path))
 	if err != nil {
 		if errors.Is(err, fs.ErrNotExist) {
 			return zero, []diag.Diagnostic{diag.Errorf(CodeMissing, path, "report %s does not exist", path)}
@@ -125,10 +130,13 @@ type CoverageReport struct {
 type coverageBuilder struct {
 	order []string
 	files map[string]*fileBuilder
+	// marks counts the line entries recorded, up to MaxLineMarks.
+	marks int
 }
 
 type fileBuilder struct {
-	lines map[int]int64
+	builder *coverageBuilder
+	lines   map[int]int64
 	// functions maps a function's identity to whether it ran.
 	functions map[string]bool
 	// stated are the totals the report states for the file, when it does.
@@ -143,7 +151,7 @@ func (b *coverageBuilder) file(path string) *fileBuilder {
 	path = slashPath(path)
 	file, ok := b.files[path]
 	if !ok {
-		file = &fileBuilder{lines: map[int]int64{}, functions: map[string]bool{}}
+		file = &fileBuilder{builder: b, lines: map[int]int64{}, functions: map[string]bool{}}
 		b.files[path] = file
 		b.order = append(b.order, path)
 	}
@@ -151,10 +159,16 @@ func (b *coverageBuilder) file(path string) *fileBuilder {
 }
 
 // line records a line's count; a line stated twice keeps its largest count.
-func (f *fileBuilder) line(number int, hits int64) {
+// Past MaxLineMarks entries it records nothing and returns CodeTooLarge.
+func (f *fileBuilder) line(number int, hits int64) []diag.Diagnostic {
+	f.builder.marks++
+	if f.builder.marks > MaxLineMarks {
+		return []diag.Diagnostic{diag.Errorf(CodeTooLarge, "", "report marks more than %d lines", MaxLineMarks)}
+	}
 	if current, ok := f.lines[number]; !ok || hits > current {
 		f.lines[number] = hits
 	}
+	return nil
 }
 
 func (f *fileBuilder) function(identity string, ran bool) {
