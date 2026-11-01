@@ -255,9 +255,52 @@ func TestAMalformedGraphExportFallsBackToTheConfiguration(t *testing.T) {
 		})
 	}
 	t.Run("an unrelated graph.json outside Nx is no finding", func(t *testing.T) {
-		r := probe(t, tree(t, map[string]string{"graph.json": `{"vertices": []}`}), Options{})
-		if len(r.Diagnostics) != 0 || len(r.Projects) != 0 {
-			t.Fatalf("result = %+v", r)
+		for _, content := range []string{`{"vertices": []}`, `{"graph": {"nodes": {"a": {}, "b": {}}}}`} {
+			r := probe(t, tree(t, map[string]string{"graph.json": content}), Options{})
+			if len(r.Diagnostics) != 0 || len(r.Projects) != 0 {
+				t.Fatalf("result = %+v", r)
+			}
+		}
+	})
+	t.Run("an export without project roots", func(t *testing.T) {
+		r := probe(t, tree(t, with(demo, map[string]string{"graph.json": `{"graph": {"nodes": {"a": {}, "b": {}}}}`})), Options{})
+		if got := codes(r.Diagnostics); !reflect.DeepEqual(got, []string{CodeGraphUnreadable}) {
+			t.Fatalf("diagnostics = %v", got)
+		}
+		if len(r.Projects) != 2 {
+			t.Fatalf("projects = %v", paths(r))
+		}
+	})
+	t.Run("a node without a root and a shared root are skipped", func(t *testing.T) {
+		graph := `{"graph": {"nodes": {
+  "repo": {"name": "repo", "data": {"root": "."}},
+  "nameless": {"name": "nameless", "data": {}},
+  "a": {"name": "a", "data": {"root": "libs/a"}},
+  "b": {"name": "b", "data": {"root": "libs/a"}}
+}, "dependencies": {}}}`
+		var stdin, stdout bytes.Buffer
+		if err := workspace.EncodeProbeRequest(&stdin, workspace.ProbeRequest{Extension: Extension}); err != nil {
+			t.Fatal(err)
+		}
+		root := tree(t, map[string]string{"graph.json": graph})
+		if _, err := workspace.ServeProbe(workspace.ProbeControlArgs(), &stdin, &stdout, Answer(root, Options{})); err != nil {
+			t.Fatal(err)
+		}
+		r := probe(t, root, Options{})
+		if got := paths(r); !reflect.DeepEqual(got, []string{".", "libs/a"}) {
+			t.Fatalf("paths = %v", got)
+		}
+		a, _ := project(t, r, "libs/a")
+		if a.SourceName != "a" {
+			t.Fatalf("libs/a = %+v", a)
+		}
+		if got := codes(r.Diagnostics); !reflect.DeepEqual(got, []string{CodeGraphUnreadable, CodeGraphUnreadable}) {
+			t.Fatalf("diagnostics = %v", got)
+		}
+		for i := 0; i < 10; i++ {
+			if again := probe(t, root, Options{}); !reflect.DeepEqual(again.Diagnostics, r.Diagnostics) {
+				t.Fatalf("diagnostics move between probes: %v, then %v", r.Diagnostics, again.Diagnostics)
+			}
 		}
 	})
 	t.Run("a graph export that is a directory", func(t *testing.T) {
@@ -314,9 +357,9 @@ func TestProjectJSONAndWorkspacePackageJSONAreProjects(t *testing.T) {
 	}
 	want := map[string]string{
 		"apps/web":          "web apps/web/project.json application",
-		"libs/d":            "libs/d libs/d/project.json ",
+		"libs/d":            "d libs/d/project.json ",
 		"packages/a":        "a packages/a/project.json library",
-		"packages/c":        "packages/c packages/c/package.json ",
+		"packages/c":        "c packages/c/package.json ",
 		"packages/nested/b": "b packages/nested/b/package.json application",
 	}
 	if !reflect.DeepEqual(names, want) {
@@ -360,6 +403,57 @@ catalog:
 		}
 		if !reflect.DeepEqual(r.WatchedFiles, []string{"nx.json", "package.json", "pnpm-workspace.yaml"}) {
 			t.Fatalf("watched = %v", r.WatchedFiles)
+		}
+	})
+	t.Run("package.json, pnpm-workspace.yaml and lerna.json add up", func(t *testing.T) {
+		root := tree(t, map[string]string{
+			"nx.json":                   `{}`,
+			"package.json":              `{"workspaces": ["apps/*"]}`,
+			"pnpm-workspace.yaml":       "packages: [\"libs/*\", 'tools/*']\n",
+			"lerna.json":                `{"packages": ["modules/*"]}`,
+			"apps/one/package.json":     `{"name": "one"}`,
+			"libs/two/package.json":     `{"name": "two"}`,
+			"tools/three/package.json":  `{"name": "three"}`,
+			"modules/four/package.json": `{"name": "four"}`,
+		})
+		r := probe(t, root, Options{})
+		if got := paths(r); !reflect.DeepEqual(got, []string{"apps/one", "libs/two", "modules/four", "tools/three"}) {
+			t.Fatalf("paths = %v", got)
+		}
+		if !reflect.DeepEqual(r.WatchedFiles, []string{"lerna.json", "nx.json", "package.json", "pnpm-workspace.yaml"}) {
+			t.Fatalf("watched = %v", r.WatchedFiles)
+		}
+	})
+	t.Run("the package.json beside a project.json names it", func(t *testing.T) {
+		root := tree(t, map[string]string{
+			"nx.json":                  `{}`,
+			"package.json":             `{"name": "solo", "version": "3.0.0"}`,
+			"project.json":             `{}`,
+			"apps/api/project.json":    `{}`,
+			"apps/api/package.json":    `{"name": "@x/api", "dependencies": {"solo": "*"}}`,
+			"apps/web/project.json":    `{"implicitDependencies": ["@x/api"]}`,
+			"apps/broken/project.json": `{"name": "broken"}`,
+			"apps/broken/package.json": `{`,
+		})
+		r := probe(t, root, Options{})
+		names := map[string]string{}
+		for _, p := range r.Projects {
+			names[p.Path] = p.SourceName + " " + p.SourceFile + " " + p.Version
+		}
+		want := map[string]string{
+			".":           "solo project.json 3.0.0",
+			"apps/api":    "@x/api apps/api/project.json ",
+			"apps/broken": "broken apps/broken/project.json ",
+			"apps/web":    "web apps/web/project.json ",
+		}
+		if !reflect.DeepEqual(names, want) {
+			t.Fatalf("names = %v, want %v", names, want)
+		}
+		if got := edges(r); !reflect.DeepEqual(got, map[string][]string{".": nil, "apps/api": {"."}, "apps/broken": nil, "apps/web": {"apps/api"}}) {
+			t.Fatalf("edges = %v", got)
+		}
+		if got := codes(r.Diagnostics); !reflect.DeepEqual(got, []string{CodeManifestUnreadable}) {
+			t.Fatalf("diagnostics = %v", got)
 		}
 	})
 	t.Run("a malformed root package.json lists nothing", func(t *testing.T) {
@@ -409,6 +503,29 @@ func TestEdgesComeFromImplicitDependenciesAndPackageDependencies(t *testing.T) {
 	if got := edges(r); !reflect.DeepEqual(got, want) {
 		t.Fatalf("edges = %v, want %v", got, want)
 	}
+
+	t.Run("star, tags and exclusions over scoped names", func(t *testing.T) {
+		root := tree(t, map[string]string{
+			"nx.json":                `{}`,
+			"package.json":           `{"workspaces": ["libs/*", "apps/*"]}`,
+			"apps/all/package.json":  `{"name": "@x/all", "nx": {"implicitDependencies": ["*", "!@x/b"]}, "dependencies": {"@x/b": "*"}}`,
+			"apps/tags/package.json": `{"name": "@x/tags", "nx": {"implicitDependencies": ["tag:scope:shared", "@x/*-ui"]}}`,
+			"libs/a/package.json":    `{"name": "@x/a", "nx": {"tags": ["scope:shared"]}}`,
+			"libs/b/package.json":    `{"name": "@x/b"}`,
+			"libs/c/package.json":    `{"name": "@x/c-ui"}`,
+		})
+		r := probe(t, root, Options{})
+		want := map[string][]string{
+			"apps/all":  {"apps/tags", "libs/a", "libs/c"},
+			"apps/tags": {"libs/a", "libs/c"},
+			"libs/a":    nil,
+			"libs/b":    nil,
+			"libs/c":    nil,
+		}
+		if got := edges(r); !reflect.DeepEqual(got, want) {
+			t.Fatalf("edges = %v, want %v", got, want)
+		}
+	})
 }
 
 func TestARepositoryWithoutNxHasNoNxProject(t *testing.T) {

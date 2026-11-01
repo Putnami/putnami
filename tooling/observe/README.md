@@ -41,6 +41,8 @@ reporter can upload.
 
 See [doc/01-observe.md](doc/01-observe.md) for what each CI provides, how the
 base is found and how reports are discovered.
+See [doc/02-nx.md](doc/02-nx.md) for how it reads the projects of an Nx
+workspace.
 
 ## Support
 

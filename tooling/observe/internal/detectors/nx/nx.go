@@ -168,18 +168,44 @@ func (d *detector) fromGraph(graphFile string, named bool) ([]workspace.ProbePro
 		d.warn(CodeGraphUnreadable, graphFile, "%s is not an Nx graph export (graph.nodes and graph.dependencies); the Nx configuration answers instead", graphFile)
 		return nil, nil, false
 	}
-	roots := make(map[string]string, len(export.Graph.Nodes))
+	keys := make([]string, 0, len(export.Graph.Nodes))
+	rooted := false
 	for key, node := range export.Graph.Nodes {
+		keys = append(keys, key)
+		rooted = rooted || node.Data.Root != ""
+	}
+	if !rooted {
+		if !named && !exists(d.root, "nx.json") {
+			return nil, nil, false
+		}
+		d.warn(CodeGraphUnreadable, graphFile, "%s names no project root; the Nx configuration answers instead", graphFile)
+		return nil, nil, false
+	}
+	sort.Strings(keys)
+	roots := make(map[string]string, len(keys))
+	owners := make(map[string]string, len(keys))
+	for _, key := range keys {
+		node := export.Graph.Nodes[key]
+		if node.Data.Root == "" {
+			d.warn(CodeGraphUnreadable, graphFile, "project %s has no root and is skipped", key)
+			continue
+		}
 		root, ok := workspace.NormalizeProbePath(node.Data.Root)
 		if !ok {
 			d.warn(CodeGraphUnreadable, graphFile, "project %s has a root outside the repository: %q", key, node.Data.Root)
 			continue
 		}
+		if other, taken := owners[root]; taken {
+			d.warn(CodeGraphUnreadable, graphFile, "projects %s and %s share the root %s; %s is skipped", other, key, root, key)
+			continue
+		}
+		owners[root] = key
 		roots[key] = root
 	}
 	defaults := d.targetDefaults()
 	var projects []workspace.ProbeProject
-	for key, node := range export.Graph.Nodes {
+	for _, key := range keys {
+		node := export.Graph.Nodes[key]
 		root, ok := roots[key]
 		if !ok {
 			continue
@@ -284,15 +310,8 @@ func (d *detector) fromConfiguration() ([]workspace.ProbeProject, []string) {
 	}
 	patterns, workspaceFiles := d.workspacePatterns()
 	watched := append([]string{"nx.json"}, workspaceFiles...)
-	byRoot := map[string]*candidate{}
-	get := func(root string) *candidate {
-		if c, ok := byRoot[root]; ok {
-			return c
-		}
-		c := &candidate{root: root}
-		byRoot[root] = c
-		return c
-	}
+	projectDirs := map[string]bool{}
+	packageDirs := map[string]bool{}
 	_ = filepath.WalkDir(d.root, func(p string, entry fs.DirEntry, err error) error {
 		if err != nil {
 			return nil
@@ -303,43 +322,54 @@ func (d *detector) fromConfiguration() ([]workspace.ProbeProject, []string) {
 			}
 			return nil
 		}
-		rel := relative(d.root, p)
-		dir := path.Dir(rel)
+		dir := path.Dir(relative(d.root, p))
 		switch entry.Name() {
 		case "project.json":
-			var project projectJSON
-			if !d.readJSON(rel, &project) {
-				return nil
-			}
-			get(dir).project = &project
+			projectDirs[dir] = true
 		case "package.json":
-			if dir == "." || !matchesAny(patterns, dir) {
-				return nil
-			}
-			var pkg packageJSON
-			if !d.readJSON(rel, &pkg) {
-				return nil
-			}
-			get(dir).pkg = &pkg
+			packageDirs[dir] = true
 		}
 		return nil
 	})
-	if len(byRoot) == 0 {
-		return nil, watched
+	// A project is a directory with a project.json, or one whose package.json
+	// the workspace lists; the package.json beside a project.json is read in
+	// both cases.
+	dirs := make([]string, 0, len(projectDirs)+len(packageDirs))
+	for dir := range projectDirs {
+		dirs = append(dirs, dir)
 	}
-	candidates := make([]*candidate, 0, len(byRoot))
-	for _, c := range byRoot {
-		if c.project == nil && c.pkg == nil {
-			continue
+	for dir := range packageDirs {
+		if !projectDirs[dir] && dir != "." && matchesAny(patterns, dir) {
+			dirs = append(dirs, dir)
+		}
+	}
+	sort.Strings(dirs)
+	candidates := make([]*candidate, 0, len(dirs))
+	for _, dir := range dirs {
+		c := &candidate{root: dir}
+		if projectDirs[dir] {
+			var project projectJSON
+			if !d.readJSON(path.Join(dir, "project.json"), &project) {
+				continue
+			}
+			c.project = &project
+		}
+		if packageDirs[dir] {
+			var pkg packageJSON
+			if d.readJSON(path.Join(dir, "package.json"), &pkg) {
+				c.pkg = &pkg
+			} else if c.project == nil {
+				continue
+			}
 		}
 		d.resolve(c)
 		candidates = append(candidates, c)
 	}
-	sort.Slice(candidates, func(i, j int) bool { return candidates[i].root < candidates[j].root })
-	names := map[string]string{}
+	if len(candidates) == 0 {
+		return nil, watched
+	}
 	packages := map[string]string{}
 	for _, c := range candidates {
-		names[c.name] = c.root
 		if c.pkg != nil && c.pkg.Name != "" {
 			packages[c.pkg.Name] = c.root
 		}
@@ -347,11 +377,12 @@ func (d *detector) fromConfiguration() ([]workspace.ProbeProject, []string) {
 	defaults := d.targetDefaults()
 	projects := make([]workspace.ProbeProject, 0, len(candidates))
 	for _, c := range candidates {
-		deps := implicitDependencies(c.implicit, names, c.name)
+		selected, excluded := implicitDependencies(c, candidates)
+		deps := selected
 		if c.pkg != nil {
 			for _, group := range []map[string]string{c.pkg.Dependencies, c.pkg.DevDependencies, c.pkg.PeerDependencies, c.pkg.OptionalDependencies} {
 				for dep := range group {
-					if root, ok := packages[dep]; ok && root != c.root {
+					if root, ok := packages[dep]; ok && root != c.root && !excluded[root] {
 						deps = append(deps, root)
 					}
 				}
@@ -410,7 +441,7 @@ func (d *detector) resolve(c *candidate) {
 		}
 	}
 	if c.name == "" {
-		c.name = c.root
+		c.name = path.Base(c.root)
 	}
 }
 
@@ -445,53 +476,91 @@ func projectTypeOf(t string) string {
 	return ""
 }
 
-// implicitDependencies resolves Nx implicitDependencies: project names, *
-// patterns, and !-prefixed exclusions, to project roots.
-func implicitDependencies(entries []string, names map[string]string, self string) []string {
-	if len(entries) == 0 {
-		return nil
+// implicitDependencies resolves the Nx implicitDependencies of c against the
+// other projects: a name, a * pattern that matches across /, or tag:<tag>,
+// each !-prefixed to exclude. It returns the selected roots and the roots an
+// exclusion names, which no package dependency of c may add back.
+func implicitDependencies(c *candidate, candidates []*candidate) ([]string, map[string]bool) {
+	if len(c.implicit) == 0 {
+		return nil, nil
 	}
 	selected := map[string]bool{}
-	for _, entry := range entries {
+	excluded := map[string]bool{}
+	for _, entry := range c.implicit {
 		exclude := strings.HasPrefix(entry, "!")
 		pattern := strings.TrimPrefix(entry, "!")
-		for name := range names {
-			if name == self {
+		for _, other := range candidates {
+			if other == c || !selects(pattern, other) {
 				continue
 			}
-			if matched, _ := path.Match(pattern, name); matched || name == pattern {
-				selected[name] = !exclude
+			selected[other.root] = !exclude
+			if exclude {
+				excluded[other.root] = true
 			}
 		}
 	}
 	var out []string
-	for name, on := range selected {
-		if on {
-			out = append(out, names[name])
+	for _, other := range candidates {
+		if selected[other.root] {
+			out = append(out, other.root)
 		}
 	}
-	return out
+	return out, excluded
 }
 
-// workspacePatterns reads the package manager workspace: package.json
-// workspaces, else pnpm-workspace.yaml. It returns the directory patterns and
-// the files it read.
+// selects reports whether an implicitDependencies pattern names a project.
+func selects(pattern string, c *candidate) bool {
+	if tag, ok := strings.CutPrefix(pattern, "tag:"); ok {
+		return slices.Contains(c.tags, tag)
+	}
+	return wildcard(pattern, c.name)
+}
+
+// wildcard matches a name against a pattern whose * matches any run of
+// characters, / included.
+func wildcard(pattern, name string) bool {
+	head, rest, found := strings.Cut(pattern, "*")
+	if !found {
+		return pattern == name
+	}
+	if !strings.HasPrefix(name, head) {
+		return false
+	}
+	name = name[len(head):]
+	for i := 0; i <= len(name); i++ {
+		if wildcard(rest, name[i:]) {
+			return true
+		}
+	}
+	return false
+}
+
+// workspacePatterns reads the package manager workspace: the union of
+// package.json workspaces, pnpm-workspace.yaml packages and lerna.json
+// packages. It returns the directory patterns and the files it read.
 func (d *detector) workspacePatterns() ([]string, []string) {
-	var files []string
+	var patterns, files []string
 	if exists(d.root, "package.json") {
 		files = append(files, "package.json")
 		var root packageJSON
 		if d.readJSON("package.json", &root) {
-			if patterns := workspaceList(root.Workspaces); len(patterns) > 0 {
-				return patterns, files
-			}
+			patterns = append(patterns, workspaceList(root.Workspaces)...)
 		}
 	}
-	data, err := os.ReadFile(filepath.Join(d.root, "pnpm-workspace.yaml"))
-	if err != nil {
-		return nil, files
+	if data, err := os.ReadFile(filepath.Join(d.root, "pnpm-workspace.yaml")); err == nil {
+		files = append(files, "pnpm-workspace.yaml")
+		patterns = append(patterns, pnpmPackages(string(data))...)
 	}
-	return pnpmPackages(string(data)), append(files, "pnpm-workspace.yaml")
+	if exists(d.root, "lerna.json") {
+		files = append(files, "lerna.json")
+		var lerna struct {
+			Packages []string `json:"packages"`
+		}
+		if d.readJSON("lerna.json", &lerna) {
+			patterns = append(patterns, lerna.Packages...)
+		}
+	}
+	return patterns, files
 }
 
 // workspaceList reads package.json workspaces, an array or an object with a
@@ -514,7 +583,7 @@ func workspaceList(raw json.RawMessage) []string {
 }
 
 // pnpmPackages reads the packages list of pnpm-workspace.yaml: the block
-// sequence under a top-level packages key.
+// or flow sequence under a top-level packages key.
 func pnpmPackages(yaml string) []string {
 	var out []string
 	inPackages := false
@@ -524,7 +593,17 @@ func pnpmPackages(yaml string) []string {
 			continue
 		}
 		if !strings.HasPrefix(line, " ") && !strings.HasPrefix(line, "\t") && !strings.HasPrefix(line, "-") {
-			inPackages = strings.HasPrefix(trimmed, "packages:")
+			value, isPackages := strings.CutPrefix(trimmed, "packages:")
+			inPackages = isPackages
+			if flow := strings.TrimSpace(value); isPackages && strings.HasPrefix(flow, "[") {
+				flow, _, _ = strings.Cut(strings.TrimPrefix(flow, "["), "]")
+				for _, item := range strings.Split(flow, ",") {
+					if item = strings.Trim(strings.TrimSpace(item), `"'`); item != "" {
+						out = append(out, item)
+					}
+				}
+				inPackages = false
+			}
 			continue
 		}
 		if !inPackages || !strings.HasPrefix(trimmed, "-") {
