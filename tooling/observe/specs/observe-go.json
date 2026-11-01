@@ -17,7 +17,7 @@
   "requirements": [
     {
       "id": "go-modules-are-components",
-      "text": "Each directory a root go.work uses is a component of source workspace; each other go.mod the bounded walk finds, skipping .git, node_modules, vendor, testdata and directories whose name starts with a dot or an underscore, is a component of source manifest. A component's id is its directory relative to the repository root, . for the root, its name is the module path and its ecosystem is go. A file belongs to the innermost component whose directory holds it. A go.work or go.mod that cannot be read or parsed is a diagnostic. A go.mod only the lenient grammar reads keeps its module path and requires without its replace directives; one no grammar reads still makes its directory a component, without a name or edges."
+      "text": "Each directory a root go.work uses is a component of source workspace; each other go.mod found, skipping .git, node_modules, vendor, testdata and dot or underscore directories, is one of source manifest. Its id is its directory (. for the root), its name the module path, its ecosystem go. A file belongs to the innermost component holding it. An unreadable or invalid manifest is a diagnostic; a go.mod no grammar reads still makes a component, without name or edges."
     },
     {
       "id": "go-module-edges",

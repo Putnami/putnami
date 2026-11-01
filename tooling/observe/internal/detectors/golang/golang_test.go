@@ -31,10 +31,10 @@ require golang.org/x/text v0.21.0 // indirect
 
 replace github.com/Putnami/demo-observe-go/pricing => ../pricing
 `,
-	"api/go.sum":     "github.com/google/uuid v1.5.0 h1:x=\n",
-	"api/quote.go":   "package main\n",
-	"pricing/go.mod": "module github.com/Putnami/demo-observe-go/pricing\n\ngo 1.23\n\nrequire golang.org/x/text v0.21.0\n",
-	"pricing/go.sum": "golang.org/x/text v0.21.0 h1:x=\n",
+	"api/go.sum":         "github.com/google/uuid v1.5.0 h1:x=\n",
+	"api/quote.go":       "package main\n",
+	"pricing/go.mod":     "module github.com/Putnami/demo-observe-go/pricing\n\ngo 1.23\n\nrequire golang.org/x/text v0.21.0\n",
+	"pricing/go.sum":     "golang.org/x/text v0.21.0 h1:x=\n",
 	"pricing/pricing.go": "package pricing\n",
 	"README.md":          "# demo\n",
 }
@@ -77,7 +77,7 @@ func module(t *testing.T, d Detection, dir string) Module {
 }
 
 func codes(list []diag.Diagnostic) []string {
-	var out []string
+	out := make([]string, 0, len(list))
 	for _, d := range list {
 		out = append(out, d.Code)
 	}
@@ -114,7 +114,7 @@ func TestAGoModOutsideGoWorkIsAManifestComponent(t *testing.T) {
 		"vendor/example.com/go.mod": "module example.com/vendored\n",
 	}))
 	d := Detect(root)
-	var dirs []string
+	dirs := make([]string, 0, len(d.Modules))
 	for _, m := range d.Modules {
 		dirs = append(dirs, m.Dir+":"+m.Source)
 	}
