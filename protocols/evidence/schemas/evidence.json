@@ -2,10 +2,18 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://putnami.dev/schemas/putnami-change-evidence.json",
   "title": "Putnami Change Evidence",
-  "description": "One change in a repository that keeps its own CI, as one CI job observed it: the files it touches, the components they belong to and the components that depend on them, tests and coverage per component, the coverage of the changed lines and the dependency changes. The document is self-reported: it carries no verdict and no trust claim. It is consistent (every reference resolves, every impact follows from the files and the edges, every count adds up) and bounded.",
+  "description": "One change in a repository that keeps its own CI, as one CI job observed it: the files it touches, the components they belong to and the components that depend on them, tests and coverage per component, the coverage of the changed lines and the dependency changes. The document is self-reported: it carries no verdict and no trust claim. It is consistent (every reference resolves, every impact follows from the files and the edges, every count adds up) and bounded. Every string holds at most 4096 bytes.",
   "type": "object",
   "additionalProperties": false,
-  "required": ["protocolVersion", "subject", "ci", "producer", "generatedAt", "changedFiles", "components"],
+  "required": [
+    "protocolVersion",
+    "subject",
+    "ci",
+    "producer",
+    "generatedAt",
+    "changedFiles",
+    "components"
+  ],
   "properties": {
     "protocolVersion": {
       "type": "integer",
@@ -15,46 +23,64 @@
     "subject": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["provider", "repository", "sha"],
+      "required": [
+        "provider",
+        "repository",
+        "sha"
+      ],
       "description": "The change: the repository and the commits.",
       "properties": {
         "provider": {
           "type": "string",
-          "enum": ["github", "gitlab", "generic"],
-          "description": "The code host."
+          "enum": [
+            "github",
+            "gitlab",
+            "generic"
+          ],
+          "description": "The code host.",
+          "maxLength": 4096
         },
         "host": {
           "type": "string",
-          "description": "The code host's lowercase hostname. Required for github and gitlab."
+          "description": "The code host's lowercase DNS name, with an optional port. Required for github and gitlab.",
+          "pattern": "^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?(\\.[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)*(:[0-9]{1,5})?$",
+          "maxLength": 4096
         },
         "projectId": {
           "type": "string",
           "pattern": "^[1-9][0-9]*$",
-          "description": "The code host's numeric id of the repository, the key that survives a rename or a transfer. Required for github and gitlab."
+          "description": "The code host's numeric id of the repository, the key that survives a rename or a transfer. Required for github and gitlab.",
+          "maxLength": 4096
         },
         "repository": {
           "type": "string",
           "minLength": 1,
-          "description": "The repository's path or name, for display."
+          "description": "The repository's path or name, for display.",
+          "maxLength": 4096
         },
         "sha": {
           "type": "string",
           "pattern": "^([0-9a-f]{40}|[0-9a-f]{64})$",
-          "description": "The commit the document describes."
+          "description": "The commit the document describes.",
+          "maxLength": 4096
         },
         "baseSha": {
           "type": "string",
           "pattern": "^([0-9a-f]{40}|[0-9a-f]{64})$",
-          "description": "The commit the change is measured against. Absent when no base was resolved."
+          "description": "The commit the change is measured against. Absent when no base was resolved.",
+          "maxLength": 4096
         },
         "branch": {
           "type": "string",
-          "description": "The branch the commit was built on."
+          "description": "The branch the commit was built on.",
+          "maxLength": 4096
         },
         "changeRequest": {
           "type": "object",
           "additionalProperties": false,
-          "required": ["number"],
+          "required": [
+            "number"
+          ],
           "description": "The merge request (GitLab) or pull request (GitHub) the job built.",
           "properties": {
             "number": {
@@ -69,75 +95,126 @@
     "ci": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["system"],
+      "required": [
+        "system"
+      ],
       "description": "The job that produced the document.",
       "properties": {
         "system": {
           "type": "string",
-          "enum": ["github-actions", "gitlab-ci", "generic"],
-          "description": "The CI system."
+          "enum": [
+            "github-actions",
+            "gitlab-ci",
+            "generic"
+          ],
+          "description": "The CI system.",
+          "maxLength": 4096
         },
         "runId": {
           "type": "string",
-          "description": "The CI system's id of the run or pipeline."
+          "description": "The CI system's id of the run or pipeline.",
+          "maxLength": 4096
+        },
+        "jobId": {
+          "type": "string",
+          "description": "The CI system's id of the job inside the run, so two jobs of one run (a matrix) are two documents.",
+          "maxLength": 4096
+        },
+        "attempt": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "The run's attempt number, when the CI system re-runs a run under the same id."
         },
         "url": {
           "type": "string",
-          "description": "The run's page: an https URL without credentials."
+          "description": "The run's page: an https URL without credentials.",
+          "maxLength": 4096
         }
       }
     },
     "producer": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["name", "version"],
+      "required": [
+        "name",
+        "version"
+      ],
       "description": "The program that wrote the document.",
       "properties": {
-        "name": { "type": "string", "minLength": 1 },
-        "version": { "type": "string", "minLength": 1 }
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4096
+        },
+        "version": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4096
+        }
       }
     },
     "generatedAt": {
       "type": "string",
       "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]+)?(Z|[+-][0-9]{2}:[0-9]{2})$",
-      "description": "When the document was written, RFC 3339 with a zone."
+      "description": "When the document was written, RFC 3339 with a zone.",
+      "maxLength": 4096
     },
     "changedFiles": {
       "type": "array",
       "maxItems": 20000,
       "description": "The diff between the base and the commit. Empty when no base was resolved.",
-      "items": { "$ref": "#/$defs/changedFile" }
+      "items": {
+        "$ref": "#/$defs/changedFile"
+      }
     },
     "components": {
       "type": "array",
       "maxItems": 5000,
       "description": "Every component the producer found.",
-      "items": { "$ref": "#/$defs/component" }
+      "items": {
+        "$ref": "#/$defs/component"
+      }
     },
     "tests": {
       "type": "array",
       "maxItems": 5000,
       "description": "One entry per component whose test reports were read.",
-      "items": { "$ref": "#/$defs/componentTests" }
+      "items": {
+        "$ref": "#/$defs/componentTests"
+      }
     },
     "coverage": {
       "type": "array",
       "maxItems": 5000,
       "description": "One entry per component whose coverage was read.",
-      "items": { "$ref": "#/$defs/componentCoverage" }
+      "items": {
+        "$ref": "#/$defs/componentCoverage"
+      }
     },
     "changedLineCoverage": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["coveredLines", "totalLines", "files"],
+      "required": [
+        "coveredLines",
+        "totalLines",
+        "files"
+      ],
       "description": "The coverage of the lines the change added or modified that the coverage reports instrument. The totals are the sums of the files.",
       "properties": {
-        "coveredLines": { "type": "integer", "minimum": 0 },
-        "totalLines": { "type": "integer", "minimum": 0 },
+        "coveredLines": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "totalLines": {
+          "type": "integer",
+          "minimum": 0
+        },
         "files": {
           "type": "array",
           "maxItems": 20000,
-          "items": { "$ref": "#/$defs/changedLineCoverageFile" }
+          "items": {
+            "$ref": "#/$defs/changedLineCoverageFile"
+          }
         }
       }
     },
@@ -145,30 +222,46 @@
       "type": "array",
       "maxItems": 10000,
       "description": "The difference of the lockfiles between the base and the commit.",
-      "items": { "$ref": "#/$defs/dependencyChange" }
+      "items": {
+        "$ref": "#/$defs/dependencyChange"
+      }
     },
     "diagnostics": {
       "type": "array",
       "maxItems": 500,
       "description": "The producer's findings: a missing or malformed report, an unresolved base. They never make the document invalid.",
-      "items": { "$ref": "#/$defs/diagnostic" }
+      "items": {
+        "$ref": "#/$defs/diagnostic"
+      }
     }
   },
   "$defs": {
     "path": {
       "type": "string",
       "minLength": 1,
-      "description": "A path relative to the repository root, slash-separated, with no leading slash, no backslash and no empty, dot or dot-dot segment."
+      "description": "A path relative to the repository root, slash-separated, with no leading slash, no backslash and no empty, dot or dot-dot segment.",
+      "maxLength": 4096
     },
     "changedFile": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["path", "status"],
+      "required": [
+        "path",
+        "status"
+      ],
       "properties": {
-        "path": { "$ref": "#/$defs/path" },
+        "path": {
+          "$ref": "#/$defs/path"
+        },
         "status": {
           "type": "string",
-          "enum": ["added", "modified", "deleted", "renamed"]
+          "enum": [
+            "added",
+            "modified",
+            "deleted",
+            "renamed"
+          ],
+          "maxLength": 4096
         },
         "previousPath": {
           "$ref": "#/$defs/path",
@@ -176,42 +269,66 @@
         },
         "component": {
           "type": "string",
-          "description": "The id of the component the file belongs to, when one does."
+          "description": "The id of the component the file belongs to, when one does.",
+          "maxLength": 4096
         }
       }
     },
     "component": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["id", "ecosystem", "source", "impact"],
+      "required": [
+        "id",
+        "ecosystem",
+        "source",
+        "impact"
+      ],
       "properties": {
         "id": {
           "type": "string",
           "minLength": 1,
-          "description": "The component's directory relative to the repository root, or . for the whole repository."
+          "description": "The component's directory relative to the repository root, or . for the whole repository.",
+          "maxLength": 4096
         },
         "name": {
           "type": "string",
-          "description": "The component's own name: package name, module path, project name."
+          "description": "The component's own name: package name, module path, project name.",
+          "maxLength": 4096
         },
         "ecosystem": {
           "type": "string",
           "pattern": "^[a-z][a-z0-9-]*$",
-          "description": "An open lowercase slug: node, composer, go, nx, ..."
+          "description": "An open lowercase slug: node, composer, go, nx, ...",
+          "maxLength": 4096
         },
         "source": {
           "type": "string",
-          "enum": ["orchestrator", "workspace", "manifest", "fallback", "declared"],
-          "description": "How the component was found."
+          "enum": [
+            "orchestrator",
+            "workspace",
+            "manifest",
+            "fallback",
+            "declared"
+          ],
+          "description": "How the component was found.",
+          "maxLength": 4096
         },
         "impact": {
           "type": "string",
-          "enum": ["changed", "dependent", "unaffected"],
-          "description": "changed when a changed file belongs to it; dependent when it reaches a changed component through dependsOn; unaffected otherwise."
+          "enum": [
+            "changed",
+            "dependent",
+            "unaffected"
+          ],
+          "description": "changed when a changed file belongs to it; dependent when it reaches a changed component through dependsOn; unaffected otherwise.",
+          "maxLength": 4096
         },
         "dependsOn": {
           "type": "array",
-          "items": { "type": "string" },
+          "items": {
+            "type": "string",
+            "maxLength": 4096
+          },
           "description": "The ids of the components this one depends on."
         }
       }
@@ -219,98 +336,208 @@
     "componentTests": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["component", "passed", "failed", "skipped"],
+      "required": [
+        "component",
+        "passed",
+        "failed",
+        "skipped"
+      ],
       "properties": {
-        "component": { "type": "string", "minLength": 1 },
-        "passed": { "type": "integer", "minimum": 0 },
-        "failed": { "type": "integer", "minimum": 0 },
-        "skipped": { "type": "integer", "minimum": 0 },
-        "durationMs": { "type": "integer", "minimum": 0 },
+        "component": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4096
+        },
+        "passed": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "failed": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "skipped": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "durationMs": {
+          "type": "integer",
+          "minimum": 0
+        },
         "failingCases": {
           "type": "array",
           "maxItems": 50,
           "description": "At most failed entries.",
-          "items": { "$ref": "#/$defs/failingCase" }
+          "items": {
+            "$ref": "#/$defs/failingCase"
+          }
         }
       }
     },
     "failingCase": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["name"],
+      "required": [
+        "name"
+      ],
       "properties": {
-        "name": { "type": "string", "minLength": 1 },
-        "suite": { "type": "string" },
-        "file": { "type": "string" },
-        "message": { "type": "string" }
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4096
+        },
+        "suite": {
+          "type": "string",
+          "maxLength": 4096
+        },
+        "file": {
+          "type": "string",
+          "maxLength": 4096
+        },
+        "message": {
+          "type": "string",
+          "maxLength": 4096
+        }
       }
     },
     "componentCoverage": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["component", "coveredLines", "totalLines"],
+      "required": [
+        "component",
+        "coveredLines",
+        "totalLines"
+      ],
       "properties": {
-        "component": { "type": "string", "minLength": 1 },
-        "coveredLines": { "type": "integer", "minimum": 0 },
-        "totalLines": { "type": "integer", "minimum": 0 }
+        "component": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4096
+        },
+        "coveredLines": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "totalLines": {
+          "type": "integer",
+          "minimum": 0
+        }
       }
     },
     "changedLineCoverageFile": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["path", "coveredLines", "totalLines"],
+      "required": [
+        "path",
+        "coveredLines",
+        "totalLines"
+      ],
       "properties": {
-        "path": { "$ref": "#/$defs/path" },
-        "coveredLines": { "type": "integer", "minimum": 0 },
-        "totalLines": { "type": "integer", "minimum": 0 },
+        "path": {
+          "$ref": "#/$defs/path"
+        },
+        "coveredLines": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "totalLines": {
+          "type": "integer",
+          "minimum": 0
+        },
         "uncoveredLines": {
           "type": "array",
           "maxItems": 200,
           "description": "The uncovered changed line numbers, strictly increasing.",
-          "items": { "type": "integer", "minimum": 1 }
+          "items": {
+            "type": "integer",
+            "minimum": 1
+          }
         }
       }
     },
     "dependencyChange": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["ecosystem", "lockfile", "name", "change"],
+      "required": [
+        "ecosystem",
+        "lockfile",
+        "name",
+        "change"
+      ],
       "properties": {
         "ecosystem": {
           "type": "string",
           "pattern": "^[a-z][a-z0-9-]*$",
-          "description": "An open lowercase slug: npm, composer, go, ..."
+          "description": "An open lowercase slug: npm, composer, go, ...",
+          "maxLength": 4096
         },
-        "lockfile": { "$ref": "#/$defs/path" },
-        "name": { "type": "string", "minLength": 1 },
+        "lockfile": {
+          "$ref": "#/$defs/path"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4096
+        },
         "change": {
           "type": "string",
-          "enum": ["added", "removed", "upgraded", "downgraded", "changed"],
-          "description": "added has only to; removed has only from; the others have two different versions."
+          "enum": [
+            "added",
+            "removed",
+            "upgraded",
+            "downgraded",
+            "changed"
+          ],
+          "description": "added has only to; removed has only from; the others have two different versions.",
+          "maxLength": 4096
         },
-        "from": { "type": "string" },
-        "to": { "type": "string" },
+        "from": {
+          "type": "string",
+          "maxLength": 4096
+        },
+        "to": {
+          "type": "string",
+          "maxLength": 4096
+        },
         "component": {
           "type": "string",
-          "description": "The id of the component whose lockfile it is, when one does."
+          "description": "The id of the component whose lockfile it is, when one does.",
+          "maxLength": 4096
         }
       }
     },
     "diagnostic": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["severity", "code", "message"],
+      "required": [
+        "severity",
+        "code",
+        "message"
+      ],
       "properties": {
         "severity": {
           "type": "string",
-          "enum": ["error", "warning", "info"]
+          "enum": [
+            "error",
+            "warning",
+            "info"
+          ],
+          "maxLength": 4096
         },
         "code": {
           "type": "string",
-          "pattern": "^[a-z][a-z0-9_-]*(\\.[a-z][a-z0-9_-]*)+$"
+          "pattern": "^[a-z][a-z0-9_-]*(\\.[a-z][a-z0-9_-]*)+$",
+          "maxLength": 4096
         },
-        "message": { "type": "string" },
-        "field": { "type": "string" }
+        "message": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4096
+        },
+        "field": {
+          "type": "string",
+          "maxLength": 4096
+        }
       }
     }
   }

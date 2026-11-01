@@ -22,7 +22,7 @@ A document (`schemas/evidence.json`) has `protocolVersion: 1` and:
 | Member | Content |
 | --- | --- |
 | `subject` | The code host (`github`, `gitlab`, `generic`), its hostname and the repository's numeric project id (required for github and gitlab: the key that survives a rename), the repository name, the commit `sha`, the `baseSha` when one was resolved, the branch and the change request number. |
-| `ci` | The CI system (`github-actions`, `gitlab-ci`, `generic`), its run id and an https run URL without credentials. |
+| `ci` | The CI system (`github-actions`, `gitlab-ci`, `generic`), its run id, job id and attempt (which, with the commit, identify the document among the jobs and re-runs of one commit), and an https run URL without credentials. |
 | `producer`, `generatedAt` | The program that wrote the document and when (RFC 3339 with a zone). |
 | `changedFiles` | The diff: path, status (`added`, `modified`, `deleted`, `renamed` with its `previousPath`), and the component the file belongs to. |
 | `components` | Repository-relative directories (`.` for the whole repository), with an open `ecosystem` slug, the `source` that found them (`orchestrator`, `workspace`, `manifest`, `fallback`, `declared`), their `impact` and their `dependsOn` edges. |
@@ -41,16 +41,19 @@ A document (`schemas/evidence.json`) has `protocolVersion: 1` and:
 - **Consistent.** Every component reference resolves
   (`evidence.unknown_component`), ids and paths are unique
   (`evidence.duplicate`), every path stays in the repository
-  (`evidence.invalid_path`). A component is `changed` exactly when a changed
+  (`evidence.invalid_path`), a changed file lies inside its component
+  (`evidence.invalid_component`), and a diff needs its base
+  (`evidence.invalid_subject`). A component is `changed` exactly when a changed
   file belongs to it, `dependent` exactly when it is not changed and reaches a
   changed component through `dependsOn`, and `unaffected` otherwise
-  (`evidence.invalid_impact`). Counts add up (`evidence.invalid_count`), and a
+  (`evidence.invalid_impact`); one walk over the reversed edges decides it, in
+  linear time. Counts add up (`evidence.invalid_count`), and a
   dependency change carries the versions its kind needs
   (`evidence.invalid_dependency_change`).
 - **Bounded.** At most 20000 changed files, 5000 components, 10000 dependency
-  changes, 20000 changed-line coverage files, 500 diagnostics, 50 failing cases
-  per tests entry and 200 uncovered line numbers per file
-  (`evidence.too_large`).
+  changes, 100000 dependency edges, 20000 changed-line coverage files, 500
+  diagnostics, 50 failing cases per tests entry, 200 uncovered line numbers per
+  file and 4096 bytes per string (`evidence.too_large`).
 - **Open where stacks grow.** Ecosystems are slugs: a new stack needs no
   protocol version. A new code host or CI system does.
 

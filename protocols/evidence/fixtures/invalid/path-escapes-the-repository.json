@@ -15,6 +15,8 @@
   "ci": {
     "system": "github-actions",
     "runId": "9876543210",
+    "jobId": "27719033811",
+    "attempt": 1,
     "url": "https://github.com/acme/storefront/actions/runs/9876543210"
   },
   "producer": {
@@ -32,6 +34,10 @@
       "path": "packages/ui/src/badge.test.tsx",
       "status": "added",
       "component": "packages/ui"
+    },
+    {
+      "path": "pnpm-lock.yaml",
+      "status": "modified"
     },
     {
       "path": "../secrets.env",

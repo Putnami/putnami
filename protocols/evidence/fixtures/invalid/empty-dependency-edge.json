@@ -1,0 +1,152 @@
+{
+  "protocolVersion": 1,
+  "subject": {
+    "provider": "github",
+    "host": "github.com",
+    "projectId": "812345678",
+    "repository": "acme/storefront",
+    "sha": "4f6c2a9e1b7d3c5a8e0f2b4d6a8c0e1f3a5b7c9d",
+    "baseSha": "0a1b2c3d4e5f60718293a4b5c6d7e8f901234567",
+    "branch": "feat/cart-badge",
+    "changeRequest": {
+      "number": 42
+    }
+  },
+  "ci": {
+    "system": "github-actions",
+    "runId": "9876543210",
+    "jobId": "27719033811",
+    "attempt": 1,
+    "url": "https://github.com/acme/storefront/actions/runs/9876543210"
+  },
+  "producer": {
+    "name": "@putnami/observe",
+    "version": "0.1.0"
+  },
+  "generatedAt": "2026-11-03T14:05:09.123Z",
+  "changedFiles": [
+    {
+      "path": "packages/ui/src/badge.tsx",
+      "status": "modified",
+      "component": "packages/ui"
+    },
+    {
+      "path": "packages/ui/src/badge.test.tsx",
+      "status": "added",
+      "component": "packages/ui"
+    },
+    {
+      "path": "pnpm-lock.yaml",
+      "status": "modified"
+    }
+  ],
+  "components": [
+    {
+      "id": "apps/web",
+      "name": "@acme/web",
+      "ecosystem": "node",
+      "source": "workspace",
+      "impact": "dependent",
+      "dependsOn": [
+        "packages/ui"
+      ]
+    },
+    {
+      "id": "apps/docs",
+      "name": "@acme/docs",
+      "ecosystem": "node",
+      "source": "workspace",
+      "impact": "unaffected",
+      "dependsOn": [
+        ""
+      ]
+    },
+    {
+      "id": "packages/ui",
+      "name": "@acme/ui",
+      "ecosystem": "node",
+      "source": "workspace",
+      "impact": "changed"
+    }
+  ],
+  "tests": [
+    {
+      "component": "packages/ui",
+      "passed": 41,
+      "failed": 1,
+      "skipped": 2,
+      "durationMs": 3120,
+      "failingCases": [
+        {
+          "name": "renders the count",
+          "suite": "Badge",
+          "file": "packages/ui/src/badge.test.tsx",
+          "message": "expected 3, received 2"
+        }
+      ]
+    },
+    {
+      "component": "apps/web",
+      "passed": 118,
+      "failed": 0,
+      "skipped": 0,
+      "durationMs": 9050
+    }
+  ],
+  "coverage": [
+    {
+      "component": "packages/ui",
+      "coveredLines": 812,
+      "totalLines": 940
+    },
+    {
+      "component": "apps/web",
+      "coveredLines": 2210,
+      "totalLines": 3105
+    }
+  ],
+  "changedLineCoverage": {
+    "coveredLines": 14,
+    "totalLines": 18,
+    "files": [
+      {
+        "path": "packages/ui/src/badge.tsx",
+        "coveredLines": 14,
+        "totalLines": 18,
+        "uncoveredLines": [
+          22,
+          23,
+          31,
+          40
+        ]
+      }
+    ]
+  },
+  "dependencyChanges": [
+    {
+      "ecosystem": "npm",
+      "lockfile": "pnpm-lock.yaml",
+      "name": "clsx",
+      "change": "upgraded",
+      "from": "2.0.0",
+      "to": "2.1.1",
+      "component": "packages/ui"
+    },
+    {
+      "ecosystem": "npm",
+      "lockfile": "pnpm-lock.yaml",
+      "name": "date-fns",
+      "change": "added",
+      "to": "4.1.0",
+      "component": "apps/web"
+    }
+  ],
+  "diagnostics": [
+    {
+      "severity": "warning",
+      "code": "observe.report_missing",
+      "message": "no coverage report for apps/docs",
+      "field": "coverage"
+    }
+  ]
+}

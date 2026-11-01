@@ -30,14 +30,35 @@
     "diagnostic-without-a-dotted-code.json": [
       "evidence.invalid_diagnostic"
     ],
+    "diff-without-a-base.json": [
+      "evidence.invalid_subject"
+    ],
     "duplicate-component.json": [
       "evidence.duplicate"
+    ],
+    "empty-dependency-edge.json": [
+      "evidence.unknown_component"
+    ],
+    "file-outside-its-component.json": [
+      "evidence.invalid_component"
     ],
     "github-without-project-id.json": [
       "evidence.invalid_subject"
     ],
+    "host-with-a-trailing-dot.json": [
+      "evidence.invalid_subject"
+    ],
+    "impossible-timestamp.json": [
+      "evidence.invalid_timestamp"
+    ],
     "local-timestamp.json": [
       "evidence.invalid_timestamp"
+    ],
+    "lockfile-that-did-not-change.json": [
+      "evidence.invalid_dependency_change"
+    ],
+    "missing-components.json": [
+      "evidence.required"
     ],
     "missing-producer.json": [
       "evidence.required"
@@ -47,6 +68,9 @@
     ],
     "not-an-object.json": [
       "evidence.parse_error"
+    ],
+    "oversized-message.json": [
+      "evidence.too_large"
     ],
     "path-escapes-the-repository.json": [
       "evidence.invalid_path"

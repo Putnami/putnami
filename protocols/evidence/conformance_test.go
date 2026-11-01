@@ -2,6 +2,7 @@ package evidence
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -9,6 +10,7 @@ import (
 	"sort"
 	"strings"
 	"testing"
+	"time"
 
 	diag "go.putnami.dev/protocol/diagnostic"
 	"go.putnami.dev/protocol/features/spectest"
@@ -132,6 +134,7 @@ type schemaNode struct {
 	Defs       map[string]*schemaNode `json:"$defs"`
 	Ref        string                 `json:"$ref"`
 	Enum       []string               `json:"enum"`
+	Pattern    string                 `json:"pattern"`
 }
 
 func readSchema(t *testing.T) *schemaNode {
@@ -265,6 +268,22 @@ func TestConformance_SchemaEnumsAreTheGoVocabularies(t *testing.T) {
 			t.Errorf("%s: schema enum %v, Go vocabulary %v", name, pair[0], pair[1])
 		}
 	}
+	// The schema's patterns are the expressions the Go validator applies.
+	patterns := map[string][2]string{
+		"subject.sha":          {root.Properties["subject"].Properties["sha"].Pattern, shaExpression},
+		"subject.baseSha":      {root.Properties["subject"].Properties["baseSha"].Pattern, shaExpression},
+		"subject.projectId":    {root.Properties["subject"].Properties["projectId"].Pattern, projectIDExpression},
+		"subject.host":         {root.Properties["subject"].Properties["host"].Pattern, hostExpression},
+		"generatedAt":          {root.Properties["generatedAt"].Pattern, timestampExpression},
+		"component.ecosystem":  {root.Defs["component"].Properties["ecosystem"].Pattern, slugExpression},
+		"dependency.ecosystem": {root.Defs["dependencyChange"].Properties["ecosystem"].Pattern, slugExpression},
+		"diagnostic.code":      {root.Defs["diagnostic"].Properties["code"].Pattern, codeExpression},
+	}
+	for name, pair := range patterns {
+		if pair[0] != pair[1] {
+			t.Errorf("%s: schema pattern %q, Go expression %q", name, pair[0], pair[1])
+		}
+	}
 }
 
 func TestConformance_CorpusIsWhatExpectationsLists(t *testing.T) {
@@ -326,6 +345,26 @@ func TestConformance_NonDocumentsAreParseErrors(t *testing.T) {
 		_, diags := ParseAndValidate([]byte(input))
 		expectCodes(t, label, distinctCodes(diags), ErrorCodeParseError)
 	}
+	// A required member absent or null is evidence.required, not a silent zero.
+	for _, member := range requiredMembers {
+		var raw map[string]any
+		if err := json.Unmarshal(minimal, &raw); err != nil {
+			t.Fatal(err)
+		}
+		for _, value := range []any{nil, "absent"} {
+			if value == nil {
+				raw[member] = nil
+			} else {
+				delete(raw, member)
+			}
+			data, err := json.Marshal(raw)
+			if err != nil {
+				t.Fatal(err)
+			}
+			_, diags := ParseAndValidate(data)
+			expectCodes(t, member+" absent or null", distinctCodes(diags), ErrorCodeRequired)
+		}
+	}
 }
 
 func TestConformance_UndeclaredMemberIsAnUnknownField(t *testing.T) {
@@ -355,9 +394,19 @@ func TestConformance_EachSubjectDefectGetsItsCode(t *testing.T) {
 		"bad base sha":        {"turbo-pull-request.json", func(d *Document) { d.Subject.BaseSHA = "main" }, ErrorCodeInvalidSubject},
 		"negative request":    {"turbo-pull-request.json", func(d *Document) { d.Subject.ChangeRequest.Number = -1 }, ErrorCodeInvalidSubject},
 		"no repository":       {"generic-minimal.json", func(d *Document) { d.Subject.Repository = " " }, ErrorCodeRequired},
-		"http run url":        {"turbo-pull-request.json", func(d *Document) { d.CI.URL = "http://github.com/run/1" }, ErrorCodeInvalidCI},
-		"unknown ci":          {"generic-minimal.json", func(d *Document) { d.CI.System = "circleci" }, ErrorCodeInvalidCI},
+		"diff without base":   {"turbo-pull-request.json", func(d *Document) { d.Subject.BaseSHA = "" }, ErrorCodeInvalidSubject},
+		"coverage, no base": {"generic-minimal.json", func(d *Document) {
+			d.ChangedLineCoverage = &ChangedLineCoverage{Files: []ChangedLineCoverageFile{}}
+		}, ErrorCodeInvalidSubject},
 	}
+	for _, host := range []string{"github.com\n", "-", "...", "gitlab.example.com.", "a_b.example", "ｇｉｔｈｕｂ.com", "git lab.com", "user@gitlab.com"} {
+		expectCodes(t, "host "+host, codesOf(t, "symfony-merge-request.json", func(d *Document) {
+			d.Subject.Host = host
+		}), ErrorCodeInvalidSubject)
+	}
+	expectCodes(t, "self-managed host with a port", codesOf(t, "symfony-merge-request.json", func(d *Document) {
+		d.Subject.Host = "gitlab.internal.example:8443"
+	}))
 	for label, c := range cases {
 		expectCodes(t, label, codesOf(t, c.fixture, c.mutate), c.want)
 	}
@@ -367,13 +416,35 @@ func TestConformance_EachSubjectDefectGetsItsCode(t *testing.T) {
 	}))
 }
 
+func TestConformance_EachCIDefectGetsItsCode(t *testing.T) {
+	spectest.Proves(t, feature, "the-ci-run-is-identified", "each-ci-defect-gets-its-code")
+	cases := map[string]func(*Document){
+		"http run url":       func(d *Document) { d.CI.URL = "http://github.com/run/1" },
+		"credentials in url": func(d *Document) { d.CI.URL = "https://token:x@github.com/run/1" },
+		"unknown ci":         func(d *Document) { d.CI.System = "circleci" },
+		"negative attempt":   func(d *Document) { d.CI.Attempt = -1 },
+	}
+	for label, mutate := range cases {
+		expectCodes(t, label, codesOf(t, "turbo-pull-request.json", mutate), ErrorCodeInvalidCI)
+	}
+}
+
 func TestConformance_EachPathDefectIsAnInvalidPath(t *testing.T) {
 	spectest.Proves(t, feature, "paths-stay-in-the-repository", "each-path-defect-is-an-invalid-path")
-	for _, bad := range []string{"/etc/passwd", `src\main.go`, "src/../../x", "src//x", "./src/x", "src/", ".."} {
+	for _, bad := range []string{"/etc/passwd", `src\main.go`, "src/../../x", "src//x", "./src/x", "src/", "..", "c:/x", "src/a\x00b", "src/\nx"} {
 		expectCodes(t, "changed file "+bad, codesOf(t, "turbo-pull-request.json", func(d *Document) {
-			d.ChangedFiles[2].Path = bad
+			d.ChangedFiles = append(d.ChangedFiles, ChangedFile{Path: bad, Status: FileModified})
 		}), ErrorCodeInvalidPath)
 	}
+	expectCodes(t, "renamed onto itself", codesOf(t, "symfony-merge-request.json", func(d *Document) {
+		d.ChangedFiles[0].PreviousPath = d.ChangedFiles[0].Path
+	}), ErrorCodeInvalidPath)
+	expectCodes(t, "changed-line coverage of an unchanged file", codesOf(t, "turbo-pull-request.json", func(d *Document) {
+		d.ChangedLineCoverage.Files[0].Path = "packages/ui/src/index.ts"
+	}), ErrorCodeInvalidPath)
+	expectCodes(t, "changed-line coverage of a deleted file", codesOf(t, "turbo-pull-request.json", func(d *Document) {
+		d.ChangedFiles[0].Status = FileDeleted
+	}), ErrorCodeInvalidPath)
 	expectCodes(t, "empty lockfile", codesOf(t, "turbo-pull-request.json", func(d *Document) {
 		d.DependencyChanges[0].Lockfile = ""
 	}), ErrorCodeInvalidPath)
@@ -411,9 +482,23 @@ func TestConformance_EveryReferenceNamesAComponent(t *testing.T) {
 		"tests":        func(d *Document) { d.Tests[1].Component = "apps/admin" },
 		"coverage":     func(d *Document) { d.Coverage[1].Component = "apps/admin" },
 		"dependency":   func(d *Document) { d.DependencyChanges[1].Component = "apps/admin" },
+		"empty edge":   func(d *Document) { d.Components[1].DependsOn = []string{""} },
 	}
 	for label, mutate := range cases {
 		expectCodes(t, label, codesOf(t, "turbo-pull-request.json", mutate), ErrorCodeUnknownComponent)
+	}
+}
+
+func TestConformance_EachComponentDefectIsAnInvalidComponent(t *testing.T) {
+	spectest.Proves(t, feature, "components-are-well-formed", "each-component-defect-is-an-invalid-component")
+	cases := map[string]func(*Document){
+		"file outside its component": func(d *Document) { d.ChangedFiles[2].Component = "apps/docs" },
+		"a self edge":                func(d *Document) { d.Components[1].DependsOn = []string{"apps/docs"} },
+		"ecosystem not a slug":       func(d *Document) { d.Components[1].Ecosystem = "Node.js" },
+		"unknown source":             func(d *Document) { d.Components[1].Source = "guessed" },
+	}
+	for label, mutate := range cases {
+		expectCodes(t, label, codesOf(t, "turbo-pull-request.json", mutate), ErrorCodeInvalidComponent)
 	}
 }
 
@@ -467,6 +552,7 @@ func TestConformance_EachChangeKindHasItsVersions(t *testing.T) {
 		"unknown kind":         func(d *Document) { d.DependencyChanges[0].Change = "bumped" },
 		"no name":              func(d *Document) { d.DependencyChanges[0].Name = "" },
 		"ecosystem not a slug": func(d *Document) { d.DependencyChanges[0].Ecosystem = "NPM" },
+		"unchanged lockfile":   func(d *Document) { d.DependencyChanges[0].Lockfile = "apps/web/package-lock.json" },
 	}
 	for label, mutate := range cases {
 		expectCodes(t, label, codesOf(t, "turbo-pull-request.json", mutate), ErrorCodeInvalidDependencyChange)
@@ -494,10 +580,57 @@ func TestConformance_EachBoundIsEnforced(t *testing.T) {
 	for label, mutate := range cases {
 		expectCodes(t, label, codesOf(t, "turbo-pull-request.json", mutate), ErrorCodeTooLarge)
 	}
+	expectCodes(t, "edges", codesOf(t, "generic-minimal.json", func(d *Document) {
+		d.Components = make([]Component, 21)
+		for index := range d.Components {
+			d.Components[index] = Component{ID: fmt.Sprintf("c%d", index), Ecosystem: "go", Source: SourceWorkspace, Impact: ImpactUnaffected}
+			d.Components[index].DependsOn = make([]string, MaxEdges/20)
+		}
+	}), ErrorCodeTooLarge)
+	data, err := os.ReadFile(filepath.Join("fixtures", "invalid", "oversized-message.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, diags := ParseAndValidate(data); len(diags) != 1 || diags[0].Field != "tests[0].failingCases[0].message" {
+		t.Errorf("oversized string: diags = %v, want one too_large at tests[0].failingCases[0].message", diags)
+	}
+	// The impact walk is linear: a dense graph at the component bound validates
+	// in well under a second, where enumerating paths would never finish.
+	document := denseGraph(MaxComponents, 20)
+	started := time.Now()
+	if diags := ValidateDocument(document); diag.HasErrors(diags) {
+		t.Fatalf("dense graph: %v", diag.ErrorText(diags))
+	}
+	if elapsed := time.Since(started); elapsed > 5*time.Second {
+		t.Errorf("dense graph took %s", elapsed)
+	}
+}
+
+// denseGraph builds size components where each depends on the next fanout
+// ones, and only the last is changed, so every other component is dependent.
+func denseGraph(size, fanout int) *Document {
+	document := &Document{
+		ProtocolVersion: ProtocolVersion,
+		Subject:         Subject{Provider: ProviderGeneric, Repository: "dense", SHA: strings.Repeat("a", 40), BaseSHA: strings.Repeat("b", 40)},
+		CI:              CI{System: CISystemGeneric},
+		Producer:        Producer{Name: "test", Version: "0"},
+		GeneratedAt:     "2026-11-03T08:00:00Z",
+	}
+	for index := range size {
+		component := Component{ID: fmt.Sprintf("c%d", index), Ecosystem: "go", Source: SourceWorkspace, Impact: ImpactDependent}
+		for next := index + 1; next <= index+fanout && next < size; next++ {
+			component.DependsOn = append(component.DependsOn, fmt.Sprintf("c%d", next))
+		}
+		document.Components = append(document.Components, component)
+	}
+	last := fmt.Sprintf("c%d", size-1)
+	document.Components[size-1].Impact = ImpactChanged
+	document.ChangedFiles = []ChangedFile{{Path: last + "/main.go", Status: FileModified, Component: last}}
+	return document
 }
 
 func TestConformance_TimestampsAndDiagnosticsAreChecked(t *testing.T) {
-	spectest.Proves(t, feature, "the-document-is-bounded", "timestamps-and-diagnostics-are-checked")
+	spectest.Proves(t, feature, "timestamps-and-diagnostics-are-well-formed", "timestamps-and-diagnostics-are-checked")
 	for _, bad := range []string{"", "2026-11-03", "2026-11-03 08:00:00Z", "2026-11-03T08:00:00"} {
 		expectCodes(t, "timestamp "+bad, codesOf(t, "generic-minimal.json", func(d *Document) {
 			d.GeneratedAt = bad
@@ -509,6 +642,12 @@ func TestConformance_TimestampsAndDiagnosticsAreChecked(t *testing.T) {
 	expectCodes(t, "undotted code", codesOf(t, "turbo-pull-request.json", func(d *Document) {
 		d.Diagnostics[0].Code = "report_missing"
 	}), ErrorCodeInvalidDiagnostic)
+	expectCodes(t, "diagnostic without a message", codesOf(t, "turbo-pull-request.json", func(d *Document) {
+		d.Diagnostics[0].Message = ""
+	}), ErrorCodeInvalidDiagnostic)
+	expectCodes(t, "impossible timestamp", codesOf(t, "generic-minimal.json", func(d *Document) {
+		d.GeneratedAt = "2026-99-99T99:99:99+99:99"
+	}), ErrorCodeInvalidTimestamp)
 	// A reader diagnostic of error severity never makes the document invalid.
 	expectCodes(t, "error diagnostic", codesOf(t, "turbo-pull-request.json", func(d *Document) {
 		d.Diagnostics[0].Severity = diag.Error

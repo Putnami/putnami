@@ -134,6 +134,7 @@ func authoredProtocolsDomain() *arch.Builder {
 			"/protocols/doccov",
 			"/protocols/doctor",
 			"/protocols/events",
+			"/protocols/evidence",
 			"/protocols/extension",
 			"/protocols/features",
 			"/protocols/gomod",

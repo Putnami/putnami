@@ -112,9 +112,15 @@ const (
 	MaxDiagnostics             = 500
 	MaxFailingCases            = 50
 	MaxUncoveredLines          = 200
+	// MaxEdges caps the dependency edges of all components together.
+	MaxEdges = 100000
+	// MaxStringBytes caps every string member. A producer truncates a longer
+	// message before it writes the document.
+	MaxStringBytes = 4096
 )
 
-// Document is one change, as one CI job observed it.
+// Document is one change, as one CI job observed it. A reader identifies it by
+// its subject's sha with its CI system, run, job and attempt.
 type Document struct {
 	// ProtocolVersion is always ProtocolVersion.
 	ProtocolVersion int `json:"protocolVersion"`
@@ -180,6 +186,12 @@ type CI struct {
 	System string `json:"system"`
 	// RunID is the CI system's id of the run or pipeline.
 	RunID string `json:"runId,omitempty"`
+	// JobID is the CI system's id of the job inside the run, so two jobs of one
+	// run (a matrix) are two documents.
+	JobID string `json:"jobId,omitempty"`
+	// Attempt is the run's attempt number, from 1, when the CI system re-runs a
+	// run under the same id.
+	Attempt int `json:"attempt,omitempty"`
 	// URL is the run's page, https and without credentials.
 	URL string `json:"url,omitempty"`
 }

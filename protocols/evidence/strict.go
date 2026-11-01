@@ -11,6 +11,7 @@ import (
 	"slices"
 	"sort"
 	"strings"
+	"time"
 
 	diag "go.putnami.dev/protocol/diagnostic"
 )
@@ -56,14 +57,34 @@ var ValidErrorCodes = map[string]bool{
 	ErrorCodeTooLarge:                   true,
 }
 
-var (
-	shaPattern       = regexp.MustCompile(`^([0-9a-f]{40}|[0-9a-f]{64})$`)
-	projectIDPattern = regexp.MustCompile(`^[1-9][0-9]*$`)
-	slugPattern      = regexp.MustCompile(`^[a-z][a-z0-9-]*$`)
-	codePattern      = regexp.MustCompile(`^[a-z][a-z0-9_-]*(\.[a-z][a-z0-9_-]*)+$`)
-	// timestampPattern is RFC 3339 with an optional fraction and a zone.
-	timestampPattern = regexp.MustCompile(`^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\.[0-9]+)?(Z|[+-][0-9]{2}:[0-9]{2})$`)
+// Patterns. The schema declares the same expressions, and a conformance test
+// keeps the two equal.
+const (
+	shaExpression       = `^([0-9a-f]{40}|[0-9a-f]{64})$`
+	projectIDExpression = `^[1-9][0-9]*$`
+	// hostExpression is a lowercase DNS name with an optional port: labels of
+	// letters, digits and inner hyphens, no trailing dot.
+	hostExpression = `^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?(\.[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)*(:[0-9]{1,5})?$`
+	slugExpression = `^[a-z][a-z0-9-]*$`
+	codeExpression = `^[a-z][a-z0-9_-]*(\.[a-z][a-z0-9_-]*)+$`
+	// timestampExpression is RFC 3339 with an optional fraction and a zone;
+	// time.Parse then refuses an impossible date or time.
+	timestampExpression = `^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\.[0-9]+)?(Z|[+-][0-9]{2}:[0-9]{2})$`
 )
+
+var (
+	shaPattern       = regexp.MustCompile(shaExpression)
+	projectIDPattern = regexp.MustCompile(projectIDExpression)
+	hostPattern      = regexp.MustCompile(hostExpression)
+	slugPattern      = regexp.MustCompile(slugExpression)
+	codePattern      = regexp.MustCompile(codeExpression)
+	timestampPattern = regexp.MustCompile(timestampExpression)
+	drivePattern     = regexp.MustCompile(`^[A-Za-z]:`)
+)
+
+// requiredMembers are the top-level members a document always carries, even
+// empty.
+var requiredMembers = []string{"protocolVersion", "subject", "ci", "producer", "generatedAt", "changedFiles", "components"}
 
 // member describes the members an object may carry. A nil member is a scalar;
 // items describes the elements of an array member.
@@ -82,7 +103,7 @@ var documentShape = object(map[string]*member{
 		"sha": nil, "baseSha": nil, "branch": nil,
 		"changeRequest": object(map[string]*member{"number": nil}),
 	}),
-	"ci":          object(map[string]*member{"system": nil, "runId": nil, "url": nil}),
+	"ci":          object(map[string]*member{"system": nil, "runId": nil, "jobId": nil, "attempt": nil, "url": nil}),
 	"producer":    object(map[string]*member{"name": nil, "version": nil}),
 	"generatedAt": nil,
 	"changedFiles": array(object(map[string]*member{
@@ -132,11 +153,24 @@ func strictDecode(data []byte, shape *member, into any) []diag.Diagnostic {
 	if err := decoder.Decode(&trailing); !errors.Is(err, io.EOF) {
 		return []diag.Diagnostic{diag.Errorf(ErrorCodeParseError, "", "trailing data after the JSON document")}
 	}
-	if _, ok := raw.(map[string]any); !ok {
+	top, ok := raw.(map[string]any)
+	if !ok {
 		return []diag.Diagnostic{diag.Errorf(ErrorCodeParseError, "", "the document must be a JSON object")}
 	}
 	if field, ok := firstUnknownMember(raw, shape, ""); !ok {
 		return []diag.Diagnostic{diag.Errorf(ErrorCodeUnknownField, field, "unknown member %q", field)}
+	}
+	var diags []diag.Diagnostic
+	for _, name := range requiredMembers {
+		if value, present := top[name]; !present || value == nil {
+			diags = append(diags, diag.Errorf(ErrorCodeRequired, name, "%s is required", name))
+		}
+	}
+	if field, ok := firstOversizedString(raw, ""); !ok {
+		diags = append(diags, diag.Errorf(ErrorCodeTooLarge, field, "%s is longer than %d bytes", field, MaxStringBytes))
+	}
+	if diags != nil {
+		return diags
 	}
 	typed := json.NewDecoder(bytes.NewReader(data))
 	typed.DisallowUnknownFields()
@@ -185,6 +219,33 @@ func firstUnknownMember(value any, shape *member, path string) (string, bool) {
 	return "", true
 }
 
+// firstOversizedString returns the dotted path of the first string longer than
+// MaxStringBytes, visiting object members in sorted order.
+func firstOversizedString(value any, path string) (string, bool) {
+	switch typed := value.(type) {
+	case string:
+		return path, len(typed) <= MaxStringBytes
+	case map[string]any:
+		keys := make([]string, 0, len(typed))
+		for key := range typed {
+			keys = append(keys, key)
+		}
+		sort.Strings(keys)
+		for _, key := range keys {
+			if field, ok := firstOversizedString(typed[key], joinPath(path, key)); !ok {
+				return field, false
+			}
+		}
+	case []any:
+		for index, item := range typed {
+			if field, ok := firstOversizedString(item, fmt.Sprintf("%s[%d]", path, index)); !ok {
+				return field, false
+			}
+		}
+	}
+	return "", true
+}
+
 func joinPath(parent, key string) string {
 	if parent == "" {
 		return key
@@ -208,22 +269,33 @@ func ValidateDocument(document *Document) []diag.Diagnostic {
 	if strings.TrimSpace(document.Producer.Version) == "" {
 		v.add(ErrorCodeRequired, "producer.version", "producer.version is required")
 	}
-	if !timestampPattern.MatchString(document.GeneratedAt) {
+	if !validTimestamp(document.GeneratedAt) {
 		v.add(ErrorCodeInvalidTimestamp, "generatedAt", "generatedAt must be an RFC 3339 timestamp with a zone")
 	}
 	if !v.bounds(document) {
 		// A document over a bound is refused before its contents are walked.
 		return v.diags
 	}
+	if document.Subject.BaseSHA == "" && (len(document.ChangedFiles) > 0 || document.ChangedLineCoverage != nil) {
+		v.add(ErrorCodeInvalidSubject, "subject.baseSha", "a diff and its changed-line coverage need the base they are measured against")
+	}
 	components := v.components(document.Components)
-	v.changedFiles(document.ChangedFiles, components)
+	changed := v.changedFiles(document.ChangedFiles, components)
 	v.impact(document, components)
 	v.tests(document.Tests, components)
 	v.coverage(document.Coverage, components)
-	v.changedLineCoverage(document.ChangedLineCoverage)
-	v.dependencyChanges(document.DependencyChanges, components)
+	v.changedLineCoverage(document.ChangedLineCoverage, changed)
+	v.dependencyChanges(document.DependencyChanges, components, changed)
 	v.diagnostics(document.Diagnostics)
 	return v.diags
+}
+
+func validTimestamp(value string) bool {
+	if !timestampPattern.MatchString(value) {
+		return false
+	}
+	_, err := time.Parse(time.RFC3339Nano, value)
+	return err == nil
 }
 
 type validator struct {
@@ -268,15 +340,15 @@ func (v *validator) subject(subject Subject) {
 }
 
 func isHostname(host string) bool {
-	if host == "" || len(host) > 253 || strings.ContainsAny(host, "/@:?# ") {
-		return false
-	}
-	return strings.ToLower(host) == host
+	return len(host) <= 253+6 && hostPattern.MatchString(host)
 }
 
 func (v *validator) ci(ci CI) {
 	if !slices.Contains(CISystems, ci.System) {
 		v.add(ErrorCodeInvalidCI, "ci.system", "system %q is not one of %s", ci.System, strings.Join(CISystems, ", "))
+	}
+	if ci.Attempt < 0 {
+		v.add(ErrorCodeInvalidCI, "ci.attempt", "an attempt number starts at 1")
 	}
 	if ci.URL == "" {
 		return
@@ -304,9 +376,11 @@ func (v *validator) bounds(document *Document) bool {
 	for index, entry := range document.Tests {
 		over(fmt.Sprintf("tests[%d].failingCases", index), len(entry.FailingCases), MaxFailingCases)
 	}
-	for index, component := range document.Components {
-		over(fmt.Sprintf("components[%d].dependsOn", index), len(component.DependsOn), MaxComponents)
+	edges := 0
+	for _, component := range document.Components {
+		edges += len(component.DependsOn)
 	}
+	over("components[].dependsOn", edges, MaxEdges)
 	if coverage := document.ChangedLineCoverage; coverage != nil {
 		over("changedLineCoverage.files", len(coverage.Files), MaxChangedLineCoverageFile)
 		for index, file := range coverage.Files {
@@ -319,8 +393,13 @@ func (v *validator) bounds(document *Document) bool {
 // validPath reports whether path is relative to the repository root,
 // slash-separated, and stays inside it.
 func validPath(path string) bool {
-	if path == "" || strings.HasPrefix(path, "/") || strings.Contains(path, `\`) {
+	if path == "" || strings.HasPrefix(path, "/") || strings.Contains(path, `\`) || drivePattern.MatchString(path) {
 		return false
+	}
+	for _, r := range path {
+		if r < 0x20 || r == 0x7f {
+			return false
+		}
 	}
 	for _, segment := range strings.Split(path, "/") {
 		if segment == "" || segment == "." || segment == ".." {
@@ -377,38 +456,53 @@ func (v *validator) components(list []Component) map[string]Component {
 				v.add(ErrorCodeDuplicate, field, "dependency %q is listed twice", target)
 			}
 			seen[target] = true
-			if target == component.ID {
+			switch {
+			case target == "":
+				v.add(ErrorCodeUnknownComponent, field, "a dependency edge names a component")
+			case target == component.ID:
 				v.add(ErrorCodeInvalidComponent, field, "component %q depends on itself", target)
-				continue
+			default:
+				v.reference(field, target, components)
 			}
-			v.reference(field, target, components)
 		}
 	}
 	return components
 }
 
-func (v *validator) changedFiles(files []ChangedFile, components map[string]Component) {
-	seen := map[string]bool{}
+// changedFiles checks the diff and returns the status of each changed path.
+func (v *validator) changedFiles(files []ChangedFile, components map[string]Component) map[string]string {
+	seen := map[string]string{}
 	for index, file := range files {
 		field := fmt.Sprintf("changedFiles[%d]", index)
 		v.path(field+".path", file.Path)
-		if seen[file.Path] {
+		if _, twice := seen[file.Path]; twice {
 			v.add(ErrorCodeDuplicate, field+".path", "file %q is listed twice", file.Path)
 		}
-		seen[file.Path] = true
+		seen[file.Path] = file.Status
 		if !slices.Contains(FileStatuses, file.Status) {
 			v.add(ErrorCodeInvalidPath, field+".status", "status %q is not one of %s", file.Status, strings.Join(FileStatuses, ", "))
 		}
 		switch {
 		case file.Status == FileRenamed && file.PreviousPath == "":
 			v.add(ErrorCodeInvalidPath, field+".previousPath", "a renamed file names its previous path")
+		case file.Status == FileRenamed && file.PreviousPath == file.Path:
+			v.add(ErrorCodeInvalidPath, field+".previousPath", "a renamed file's previous path differs from its path")
 		case file.Status == FileRenamed:
 			v.path(field+".previousPath", file.PreviousPath)
 		case file.PreviousPath != "":
 			v.add(ErrorCodeInvalidPath, field+".previousPath", "only a renamed file names a previous path")
 		}
 		v.reference(field+".component", file.Component, components)
+		if _, known := components[file.Component]; known && !contains(file.Component, file.Path) {
+			v.add(ErrorCodeInvalidComponent, field+".component", "file %q is not inside component %q", file.Path, file.Component)
+		}
 	}
+	return seen
+}
+
+// contains reports whether path lies inside the component directory id.
+func contains(id, path string) bool {
+	return id == RootComponent || strings.HasPrefix(path, id+"/")
 }
 
 // impact checks that every component's impact follows from the changed files
@@ -416,36 +510,35 @@ func (v *validator) changedFiles(files []ChangedFile, components map[string]Comp
 func (v *validator) impact(document *Document, components map[string]Component) {
 	changed := map[string]bool{}
 	for _, file := range document.ChangedFiles {
-		if _, ok := components[file.Component]; ok {
+		// A file attributed to a component it does not lie in is reported by
+		// changedFiles; it makes no component changed.
+		if _, ok := components[file.Component]; ok && contains(file.Component, file.Path) {
 			changed[file.Component] = true
 		}
 	}
+	// One breadth-first walk over the reversed edges, from every changed
+	// component at once, marks each component that reaches one: linear in the
+	// components and the edges, cycles included.
+	dependents := map[string][]string{}
+	for _, component := range document.Components {
+		for _, target := range component.DependsOn {
+			dependents[target] = append(dependents[target], component.ID)
+		}
+	}
 	reaches := map[string]bool{}
-	var visit func(id string, path map[string]bool) bool
-	visit = func(id string, path map[string]bool) bool {
-		if known, ok := reaches[id]; ok {
-			return known
-		}
-		if path[id] {
-			return false
-		}
-		path[id] = true
-		defer delete(path, id)
-		for _, target := range components[id].DependsOn {
-			if _, ok := components[target]; !ok || target == id {
-				continue
-			}
-			if changed[target] || visit(target, path) {
-				reaches[id] = true
-				return true
+	queue := make([]string, 0, len(changed))
+	for id := range changed {
+		queue = append(queue, id)
+	}
+	for len(queue) > 0 {
+		id := queue[0]
+		queue = queue[1:]
+		for _, dependent := range dependents[id] {
+			if !reaches[dependent] {
+				reaches[dependent] = true
+				queue = append(queue, dependent)
 			}
 		}
-		// A component inside a cycle is settled by the walk that entered the cycle
-		// first; memoize only an answer reached outside one.
-		if len(path) == 1 {
-			reaches[id] = false
-		}
-		return false
 	}
 	for index, component := range document.Components {
 		if !slices.Contains(Impacts, component.Impact) {
@@ -455,7 +548,7 @@ func (v *validator) impact(document *Document, components map[string]Component) 
 		switch {
 		case changed[component.ID]:
 			want = ImpactChanged
-		case visit(component.ID, map[string]bool{}):
+		case reaches[component.ID]:
 			want = ImpactDependent
 		}
 		if component.Impact != want {
@@ -514,9 +607,15 @@ func (v *validator) lines(field string, covered, total int) {
 	}
 }
 
-func (v *validator) changedLineCoverage(coverage *ChangedLineCoverage) {
+func (v *validator) changedLineCoverage(coverage *ChangedLineCoverage, changed map[string]string) {
 	if coverage == nil {
 		return
+	}
+	for index, file := range coverage.Files {
+		if status, ok := changed[file.Path]; !ok || status == FileDeleted {
+			v.add(ErrorCodeInvalidPath, fmt.Sprintf("changedLineCoverage.files[%d].path", index),
+				"file %q is not a changed file that still exists", file.Path)
+		}
 	}
 	v.lines("changedLineCoverage", coverage.CoveredLines, coverage.TotalLines)
 	covered, total := 0, 0
@@ -550,13 +649,16 @@ func (v *validator) changedLineCoverage(coverage *ChangedLineCoverage) {
 	}
 }
 
-func (v *validator) dependencyChanges(changes []DependencyChange, components map[string]Component) {
+func (v *validator) dependencyChanges(changes []DependencyChange, components map[string]Component, changed map[string]string) {
 	for index, change := range changes {
 		field := fmt.Sprintf("dependencyChanges[%d]", index)
 		if !slugPattern.MatchString(change.Ecosystem) {
 			v.add(ErrorCodeInvalidDependencyChange, field+".ecosystem", "ecosystem %q is not a lowercase slug", change.Ecosystem)
 		}
 		v.path(field+".lockfile", change.Lockfile)
+		if _, ok := changed[change.Lockfile]; validPath(change.Lockfile) && !ok {
+			v.add(ErrorCodeInvalidDependencyChange, field+".lockfile", "lockfile %q is not a changed file", change.Lockfile)
+		}
 		if strings.TrimSpace(change.Name) == "" {
 			v.add(ErrorCodeInvalidDependencyChange, field+".name", "a dependency change names its package")
 		}
@@ -591,6 +693,9 @@ func (v *validator) diagnostics(list []diag.Diagnostic) {
 		}
 		if !codePattern.MatchString(finding.Code) {
 			v.add(ErrorCodeInvalidDiagnostic, field+".code", "code %q is not a dotted lowercase code", finding.Code)
+		}
+		if strings.TrimSpace(finding.Message) == "" {
+			v.add(ErrorCodeInvalidDiagnostic, field+".message", "a diagnostic explains itself")
 		}
 	}
 }
