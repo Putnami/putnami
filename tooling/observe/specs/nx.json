@@ -22,7 +22,7 @@
     },
     {
       "id": "configuration",
-      "text": "Without a usable export, a root nx.json makes an Nx workspace. Its projects are the directories holding a project.json, and those whose package.json the package manager workspace lists; node_modules, dist and hidden directories are skipped. Edges come from implicitDependencies (names, * patterns, ! exclusions) and from package dependencies that name another project's package. A malformed manifest is a warning and is skipped. Without nx.json and export, there is no Nx project."
+      "text": "Without a usable export, a root nx.json makes an Nx workspace. Its projects are the directories holding a project.json, and those whose package.json the package manager workspace lists; node_modules, dist and hidden directories are skipped. Edges come from implicitDependencies (names, * patterns, tag: selectors, ! exclusions) and from package dependencies naming another project's package. A malformed manifest is a warning and is skipped. Without nx.json and export, there is no Nx project."
     },
     {
       "id": "change-inputs",
