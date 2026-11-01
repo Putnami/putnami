@@ -17,10 +17,10 @@
   "clover-a-cobertura-report.xml": {"reader": "clover", "code": "readers.malformed"},
   "clover-negative-count.xml": {"reader": "clover", "code": "readers.malformed"},
   "clover-bad-metrics.xml": {"reader": "clover", "code": "readers.malformed"},
-  "gocover-no-mode.out": {"reader": "gocover", "code": "readers.malformed"},
-  "gocover-bad-block.out": {"reader": "gocover", "code": "readers.malformed"},
-  "gocover-mixed-modes.out": {"reader": "gocover", "code": "readers.malformed"},
-  "gocover-end-before-start.out": {"reader": "gocover", "code": "readers.malformed"},
-  "gocover-unknown-mode.out": {"reader": "gocover", "code": "readers.malformed"},
-  "gocover-empty.out": {"reader": "gocover", "code": "readers.malformed"}
+  "gocover-no-mode.coverprofile": {"reader": "gocover", "code": "readers.malformed"},
+  "gocover-bad-block.coverprofile": {"reader": "gocover", "code": "readers.malformed"},
+  "gocover-mixed-modes.coverprofile": {"reader": "gocover", "code": "readers.malformed"},
+  "gocover-end-before-start.coverprofile": {"reader": "gocover", "code": "readers.malformed"},
+  "gocover-unknown-mode.coverprofile": {"reader": "gocover", "code": "readers.malformed"},
+  "gocover-empty.coverprofile": {"reader": "gocover", "code": "readers.malformed"}
 }

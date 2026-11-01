@@ -266,7 +266,7 @@ func TestARepeatedGoBlockSumsItsCounts(t *testing.T) {
 			t.Errorf("mode %s: hits %d, want %d", tc.mode, got, tc.want)
 		}
 	}
-	atomic, _ := ReadGoCover(read(t, "testdata/gocover/atomic.out"))
+	atomic, _ := ReadGoCover(read(t, "testdata/gocover/atomic.coverprofile"))
 	if got := atomic.Files[1].Lines[0]; got != (Line{Number: 3, Hits: 2}) {
 		t.Errorf("atomic fixture fmtx.go line 3 %+v, want the two binaries' 1 and 1 summed", got)
 	}
@@ -298,7 +298,7 @@ func TestPathsAreKeptAsStated(t *testing.T) {
 	if !slices.Equal(cobertura.Sources, []string{"/app/src"}) || cobertura.Files[0].Path != "Calc.php" {
 		t.Errorf("cobertura sources %v file %q, want /app/src and Calc.php", cobertura.Sources, cobertura.Files[0].Path)
 	}
-	goCover, _ := ReadGoCover(read(t, "testdata/gocover/set.out"))
+	goCover, _ := ReadGoCover(read(t, "testdata/gocover/set.coverprofile"))
 	if got := goCover.Files[0].Path; got != "example.com/calc/calc.go" {
 		t.Errorf("go cover path %q, want the import path", got)
 	}
