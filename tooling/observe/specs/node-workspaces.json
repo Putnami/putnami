@@ -3,7 +3,7 @@
   "protocolVersion": 1,
   "feature": "tooling/observe-node-workspaces",
   "outcomes": [
-    "A Node monorepo on npm, pnpm or yarn workspaces, Turborepo and Lerna included, is read as its packages, each a component named by its directory",
+    "A Node monorepo on npm, pnpm or yarn workspaces, Turborepo and Lerna on those workspaces included, is read as its packages, each a component named by its directory",
     "Each package lists the packages of the same workspace it depends on, so a change to one package names the packages that depend on it",
     "Each package names the lockfile whose diff is its dependency change and the standard places its test and coverage reports are written",
     "The answer is a workspace probe result, so the detector can move to an extension of its own without a contract change"
@@ -17,7 +17,7 @@
   "requirements": [
     {
       "id": "workspace-members",
-      "text": "The members are the directories holding a package.json that match the root package.json workspaces, a list or the packages of an object, or the packages of pnpm-workspace.yaml, which wins. A pattern takes *, ?, [...] and **, and one starting with ! excludes; node_modules and .git are skipped. Each member is a component named by its directory, with its package name and version. The root is not a member; a repository without workspaces is not detected."
+      "text": "The members are the directories holding a package.json that match the packages of pnpm-workspace.yaml when it declares them, else the root package.json workspaces, a list or the packages of an object. A pattern takes *, ?, [...], {a,b} and **, and one starting with ! excludes; node_modules, .git and dot-directories no pattern names are skipped. Each member is a component named by its directory, with its package name and version. The root is not a member; a repository declaring no members is not detected."
     },
     {
       "id": "internal-edges",
@@ -25,15 +25,15 @@
     },
     {
       "id": "probe-answer",
-      "text": "The detector answers a workspace probe request with a probe result the probe protocol accepts: a project per member with its path, package name, package.json, version and dependency paths, attributed to package-json when asked, and its metadata. A request's paths limit the answer to those members. The result watches the root package.json, pnpm-workspace.yaml, .npmrc and the lockfile."
+      "text": "The detector answers a workspace probe request with a probe result the probe protocol accepts: a project per member with its path, package name, package.json, version and dependency paths, attributed to package-json when asked, and its metadata. A request's paths limit the answer to those members. The result watches the root package.json, pnpm-workspace.yaml, .npmrc and lockfiles, whether they exist or not."
     },
     {
       "id": "lockfile-and-reports",
-      "text": "Each member's metadata names the ecosystem node, the package manager (the packageManager field, else pnpm-workspace.yaml, else the lockfile, else npm), the root lockfile when one exists (pnpm-lock.yaml, yarn.lock, package-lock.json or npm-shrinkwrap.json), and the report patterns relative to the member: JUnit XML and LCOV, Cobertura, Clover or Istanbul coverage-final.json at their standard places."
+      "text": "Each member's metadata names the ecosystem node, the package manager (the packageManager field, else pnpm-workspace.yaml, else the lockfile, else npm), the root lockfile of that manager, else another root lockfile (pnpm-lock.yaml, yarn.lock, package-lock.json, npm-shrinkwrap.json), and the report patterns relative to the member: JUnit XML and LCOV, Cobertura, Clover or Istanbul coverage-final.json at their standard places."
     },
     {
       "id": "malformed-manifests",
-      "text": "A package.json or pnpm-workspace.yaml that cannot be read or parsed, a pattern that is not valid, and a walk that reaches its bound are diagnostics: the member is left out or the walk stops, and the detector answers with what it read. It never fails the run."
+      "text": "A package.json or pnpm-workspace.yaml that cannot be read or parsed, a pattern that is not valid, two members with one package name and a walk that reaches its bound are diagnostics: the member is left out, the first directory keeps the name, or the walk stops, and the detector answers with what it read. It never fails the run."
     }
   ],
   "decisions": [

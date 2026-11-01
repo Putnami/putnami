@@ -238,7 +238,7 @@
       "id": "tooling/observe-node-workspaces",
       "type": "feature",
       "name": "Detect the packages of a Node workspace",
-      "outcome": "putnami observe names the packages of an npm, pnpm or yarn workspace, Turborepo and Lerna included, as components with the packages each one depends on, the lockfile whose diff is the dependency change, and where each package writes its test and coverage reports, from the repository's own files and without running a package manager",
+      "outcome": "putnami observe names the packages of an npm, pnpm or yarn workspace, Turborepo and Lerna on those workspaces included, as components with the packages each one depends on, the lockfile whose diff is the dependency change, and where each package writes its test and coverage reports, from the repository's own files and without running a package manager",
       "owner": "tooling",
       "target": "modeled",
       "requirements": [
@@ -254,7 +254,8 @@
               "npm-and-yarn-workspaces-name-the-members",
               "a-pnpm-workspace-names-the-members",
               "a-negated-pattern-excludes-a-member",
-              "a-repository-without-a-workspace-is-not-detected"
+              "a-repository-without-a-workspace-is-not-detected",
+              "a-brace-pattern-names-each-alternative"
             ]
           }
         },
@@ -310,7 +311,8 @@
           "verification": {
             "kind": "acceptance",
             "checks": [
-              "a-malformed-manifest-is-a-diagnostic"
+              "a-malformed-manifest-is-a-diagnostic",
+              "a-bounded-walk-is-a-diagnostic"
             ]
           }
         }
