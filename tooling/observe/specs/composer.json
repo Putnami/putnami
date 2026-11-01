@@ -20,7 +20,7 @@
     },
     {
       "id": "path-repository-edges",
-      "text": "A path repository of any manifest, its url a directory or a glob pattern relative to that manifest, provides the package of each matched directory's composer.json. A require or require-dev entry naming a package a path repository provides is an edge to that package's directory. A package no path repository provides, a path outside the repository and an entry naming the component itself are not edges."
+      "text": "A path repository of any manifest, its url a directory or a glob pattern relative to that manifest, provides the package of each matched directory's composer.json. A require or require-dev entry naming a package a path repository provides is an edge to that package's directory. The pattern is matched inside the repository, whatever directory holds the checkout. A package no path repository provides, an absolute url, a path outside the repository and an entry naming the component itself are not edges."
     },
     {
       "id": "areas",
@@ -28,7 +28,7 @@
     },
     {
       "id": "analysis-inputs",
-      "text": "Each component carries, in its provider metadata, the composer.lock beside its manifest, its PSR-4 source roots, its test roots (the autoload-dev roots no manifest also autoloads, and the PHPUnit test suite directories), and the PHPUnit configuration beside it (phpunit.xml, phpunit.xml.dist or phpunit.dist.xml) with the JUnit, Clover and Cobertura output files it names; the lockfile is a watched file. A composer.json or PHPUnit configuration that does not parse is a diagnostic and the detector continues."
+      "text": "Each component's metadata carries the composer.lock beside its manifest, its PSR-4 source roots, its test roots (autoload-dev roots not also autoloaded, and PHPUnit test suite directories), and the first of phpunit.xml, phpunit.dist.xml and phpunit.xml.dist beside it, in PHPUnit's lookup order, with the JUnit, Clover and Cobertura outputs it names. The lockfile is a watched file. A composer.json or PHPUnit configuration that does not parse is a diagnostic."
     }
   ],
   "decisions": [
