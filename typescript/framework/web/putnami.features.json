@@ -341,10 +341,7 @@
           "evidenceKinds": ["attestation"],
           "verification": {
             "kind": "acceptance",
-            "checks": [
-              "an-invalid-i18n-block-fails-before-generation-writes",
-              "the-default-locale-must-be-listed"
-            ]
+            "checks": ["an-invalid-i18n-block-fails-before-generation-writes", "the-default-locale-must-be-listed"]
           }
         },
         {
@@ -391,7 +388,11 @@
           "evidenceKinds": ["attestation"],
           "verification": {
             "kind": "acceptance",
-            "checks": ["a-static-page-ships-only-its-rendered-namespaces", "a-hydrated-page-ships-its-locale-catalog", "the-default-locale-ships-no-catalog"]
+            "checks": [
+              "a-static-page-ships-only-its-rendered-namespaces",
+              "a-hydrated-page-ships-its-locale-catalog",
+              "the-default-locale-ships-no-catalog"
+            ]
           }
         },
         {
@@ -459,10 +460,7 @@
           "evidenceKinds": ["attestation"],
           "verification": {
             "kind": "acceptance",
-            "checks": [
-              "the-root-redirects-to-the-preferred-locale-with-vary",
-              "a-content-path-is-never-redirected"
-            ]
+            "checks": ["the-root-redirects-to-the-preferred-locale-with-vary", "a-content-path-is-never-redirected"]
           }
         }
       ]

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useContext } from 'react';
 import {
   createPath,
   Link as RouterLink,
@@ -6,6 +6,8 @@ import {
   useInRouterContext,
   useLocation,
 } from 'react-router';
+import { isLocalizedPath, localizePath } from '../../shared/i18n/locale';
+import { I18nContext, type I18nState } from '../../shared/i18n/messages';
 import { type PrefetchBehavior, usePrefetch } from '../hooks/use-prefetch.hook';
 
 export type LinkProps = RouterLinkProps & { prefetch?: PrefetchBehavior };
@@ -15,8 +17,12 @@ export type LinkProps = RouterLinkProps & { prefetch?: PrefetchBehavior };
  * the hash, navigates like any other: React Router replaces the entry and
  * re-runs the loaders of a same-URL navigation.
  *
- * Outside a router (a static render, a component test), the link renders a
- * plain `<a href>` with the same anchor props.
+ * Outside a router (an island, a component test), the link renders a plain
+ * `<a href>` with the same anchor props.
+ *
+ * In a localized application an absolute path stays in the current locale:
+ * the router prefixes it on a hydrated page, and the plain link does the same.
+ * A path served in the default locale only (`i18n.exclude`) links there.
  */
 export const Link = React.forwardRef<HTMLAnchorElement, LinkProps>((props, ref) =>
   useInRouterContext() ? <RoutedLink {...props} ref={ref} /> : <PlainLink {...props} ref={ref} />,
@@ -34,6 +40,12 @@ const RoutedLink = React.forwardRef<HTMLAnchorElement, LinkProps>(({ to, prefetc
   const isPlaceholder = to === '#' || !to;
   if (isPlaceholder) {
     to = location.pathname;
+  }
+
+  const i18n = useContext(I18nContext);
+  if (typeof to === 'string' && leavesLocale(i18n, to)) {
+    // The router would put the locale prefix in front of it; that page does not exist.
+    return <PlainLink {...props} ref={ref} to={to} />;
   }
 
   const mustPreload = prefetch === 'intent' && !to.toString().startsWith('http');
@@ -97,7 +109,31 @@ const PlainLink = React.forwardRef<HTMLAnchorElement, LinkProps>(
       ...anchorProps
     },
     ref,
-  ) => <a {...anchorProps} ref={ref} href={typeof to === 'string' ? to : createPath(to)} />,
+  ) => {
+    const i18n = useContext(I18nContext);
+    return <a {...anchorProps} ref={ref} href={localizedHref(i18n, typeof to === 'string' ? to : createPath(to))} />;
+  },
 );
 
 PlainLink.displayName = 'PlainLink';
+
+/** Split a site-absolute href into its path and its query plus hash. */
+function splitHref(href: string): { path: string; rest: string } | undefined {
+  if (!href.startsWith('/') || href.startsWith('//')) return undefined;
+  const end = href.search(/[?#]/);
+  return end === -1 ? { path: href, rest: '' } : { path: href.slice(0, end), rest: href.slice(end) };
+}
+
+/** Whether a site-absolute link from a non-default locale targets a default-locale-only path. */
+function leavesLocale(i18n: I18nState | undefined, href: string): boolean {
+  if (!i18n || i18n.locale === i18n.settings.defaultLocale) return false;
+  const parts = splitHref(href);
+  return parts !== undefined && !isLocalizedPath(i18n.settings, parts.path);
+}
+
+/** The href of a site-absolute path in the current locale. */
+function localizedHref(i18n: I18nState | undefined, href: string): string {
+  const parts = i18n ? splitHref(href) : undefined;
+  if (!i18n || !parts) return href;
+  return `${localizePath(i18n.settings, parts.path, i18n.locale)}${parts.rest}`;
+}

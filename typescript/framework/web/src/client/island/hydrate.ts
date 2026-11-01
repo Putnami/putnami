@@ -12,6 +12,8 @@ import {
   type IslandStrategy,
   parseIslandProps,
 } from './island-types';
+import { type I18nState, I18nProvider } from '../../shared/i18n/messages';
+import { readI18nPayload } from '../../shared/i18n/payload';
 import { IslandModeContext, SlotHtmlContext } from './island';
 
 /** Lazy loader for an island module (its default export is the island host). */
@@ -101,14 +103,25 @@ export function hydrateIslandElement(marker: Element, host: IslandComponent): vo
   const component = host.__island.component;
   HYDRATED.add(marker);
 
-  hydrateRoot(
-    root,
-    React.createElement(
-      IslandModeContext.Provider,
-      { value: 'hydrate' as const },
-      React.createElement(SlotHtmlContext.Provider, { value: slotHtml }, React.createElement(component, props)),
-    ),
+  const island = React.createElement(
+    IslandModeContext.Provider,
+    { value: 'hydrate' as const },
+    React.createElement(SlotHtmlContext.Provider, { value: slotHtml }, React.createElement(component, props)),
   );
+  const i18nState = pageI18nState(marker.ownerDocument);
+  hydrateRoot(root, i18nState ? React.createElement(I18nProvider, { value: i18nState }, island) : island);
+}
+
+const I18N_STATES = new WeakMap<Document, I18nState | null>();
+
+/** The page's locale payload, read once per document for all its islands. */
+function pageI18nState(doc: Document): I18nState | undefined {
+  let state = I18N_STATES.get(doc);
+  if (state === undefined) {
+    state = readI18nPayload(doc) ?? null;
+    I18N_STATES.set(doc, state);
+  }
+  return state ?? undefined;
 }
 
 /**

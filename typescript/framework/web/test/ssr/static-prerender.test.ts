@@ -16,7 +16,7 @@ import { StaticRenderViolation } from '../../src/ssr/static';
 import { readStaticBuildVersion, writeStaticBuildVersion } from '../../src/ssr/static-build-version';
 
 function fakeApp(prerender: (pathname: string) => Promise<StaticRenderResult>): ReactApplication {
-  return { prerender } as unknown as ReactApplication;
+  return { prerender, localizedPathnames: (pathname: string) => [pathname] } as unknown as ReactApplication;
 }
 
 function tempDir(): string {

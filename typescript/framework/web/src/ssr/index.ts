@@ -5,6 +5,7 @@ export * from '../client/document';
 export * from '../client/error';
 export * from '../client/event';
 export * from '../client/hooks';
+export * from '../client/i18n';
 export * from '../shared/context-slots';
 export * from '../shared/csrf-context';
 export * from '../shared/security.types';

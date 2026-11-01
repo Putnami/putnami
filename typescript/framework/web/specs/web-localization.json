@@ -60,7 +60,5 @@
       "text": "A request for the application root without a locale prefix redirects with 302 and Vary: Accept-Language, Cookie to the locale named by the preference cookie, else the best Accept-Language match, when that locale is not the default; every other path is served in the locale its URL names."
     }
   ],
-  "decisions": [
-    "typescript/framework/web/doc/adr/0001-rendering-is-explicit-across-separate-runtime-graphs.md"
-  ]
+  "decisions": ["typescript/framework/web/doc/adr/0001-rendering-is-explicit-across-separate-runtime-graphs.md"]
 }
