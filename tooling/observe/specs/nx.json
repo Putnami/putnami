@@ -18,7 +18,7 @@
   "requirements": [
     {
       "id": "graph-export",
-      "text": "When the repository root holds graph.json, or the file the caller names, and it is an Nx graph export (graph.nodes and graph.dependencies), each project node is a project at its data.root, and each dependency whose source and target are project nodes is an edge, whatever its type. External nodes such as npm packages are dropped. A file that is missing is not a finding; a file that is not an Nx graph export is a warning diagnostic, and the configuration answers instead."
+      "text": "When the repository root holds graph.json, or the file the caller names, and it is an Nx graph export (graph.nodes and graph.dependencies), each project node is a project at its data.root, and each dependency between two project nodes is an edge, whatever its type. External nodes such as npm packages are dropped. A missing file is no finding; a file that is not an export is a warning when the caller named it or nx.json exists, and the configuration answers instead."
     },
     {
       "id": "configuration",
@@ -26,7 +26,7 @@
     },
     {
       "id": "change-inputs",
-      "text": "Each project's metadata names its Nx project name, the ecosystem nx, its component source (orchestrator for an export, workspace otherwise), the repository-relative outputs of its test targets, and the root lockfile. A test target is named test, test-*, *-test or e2e, or runs jest, vitest, playwright or cypress. Its outputs come from the target, else from nx.json targetDefaults; Nx tokens are resolved, a glob is cut to its directory, and an output that stays unresolved is dropped."
+      "text": "Each project's metadata names its Nx project name, the ecosystem nx, its component source (orchestrator for an export, workspace otherwise), the repository-relative outputs of its test targets, and the root lockfile. A test target is named test, test-*, test:*, *-test or e2e, or its executor ends in :test or runs jest, vitest, playwright or cypress. Outputs come from the target, else nx.json targetDefaults; Nx tokens are resolved, a glob is cut to its directory, and the rest is dropped."
     },
     {
       "id": "probe-wire",
