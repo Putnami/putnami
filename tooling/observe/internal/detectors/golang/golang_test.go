@@ -219,6 +219,61 @@ func TestADuplicateModulePathIsADiagnostic(t *testing.T) {
 	}
 }
 
+func TestAGoWorkMemberNamesItsModulePath(t *testing.T) {
+	spectest.Proves(t, feature, "go-module-edges", "a-require-of-a-repository-module-is-an-edge")
+	spectest.Proves(t, feature, "go-report-paths", "an-import-path-names-its-file-and-module")
+	// api requires pricing without a replace: go.work resolves it to the
+	// member, not to copy/, which sorts first and declares the same path.
+	d := Detect(tree(t, with(demo, map[string]string{
+		"api/go.mod":  "module github.com/Putnami/demo-observe-go/api\nrequire github.com/Putnami/demo-observe-go/pricing v0.0.0\n",
+		"copy/go.mod": "module github.com/Putnami/demo-observe-go/pricing\n",
+	})))
+	if len(d.Diagnostics) != 1 || d.Diagnostics[0].Code != CodeDuplicateModule || d.Diagnostics[0].Field != "copy/go.mod" {
+		t.Fatalf("diagnostics %v", d.Diagnostics)
+	}
+	if got := module(t, d, "api").DependsOn; !reflect.DeepEqual(got, []string{"pricing"}) {
+		t.Fatalf("api depends on %v", got)
+	}
+	if file, component, ok := d.Locate("github.com/Putnami/demo-observe-go/pricing/pricing.go"); !ok || file != "pricing/pricing.go" || component != "pricing" {
+		t.Fatalf("Locate = %q %q %v", file, component, ok)
+	}
+
+	// Without go.work, the first directory in path order names the path.
+	manifests := Detect(tree(t, map[string]string{
+		"a/go.mod":   "module example.com/dup\n",
+		"b/go.mod":   "module example.com/dup\n",
+		"app/go.mod": "module example.com/app\nrequire example.com/dup v0.0.0\n",
+	}))
+	if got := module(t, manifests, "app").DependsOn; !reflect.DeepEqual(got, []string{"a"}) {
+		t.Fatalf("app depends on %v", got)
+	}
+	if len(manifests.Diagnostics) != 1 || manifests.Diagnostics[0].Field != "b/go.mod" {
+		t.Fatalf("diagnostics %v", manifests.Diagnostics)
+	}
+}
+
+func TestAnEscapingPathHasNoComponent(t *testing.T) {
+	spectest.Proves(t, feature, "go-modules-are-components", "a-file-belongs-to-its-innermost-module")
+	spectest.Proves(t, feature, "go-report-paths", "an-import-path-names-its-file-and-module")
+	d := Detect(tree(t, with(demo, map[string]string{"go.mod": "module github.com/Putnami/demo-observe-go\n"})))
+	for _, file := range []string{"", ".", "..", "../outside.go", "/etc/passwd", "pricing/../../x.go"} {
+		if got, ok := d.Owner(file); ok {
+			t.Errorf("Owner(%q) = %q", file, got)
+		}
+	}
+	for _, importPath := range []string{
+		"github.com/Putnami/demo-observe-go/../x.go",
+		"github.com/Putnami/demo-observe-go/pricing/../../x.go",
+		"github.com/Putnami/demo-observe-go/./x.go",
+		"github.com/Putnami/demo-observe-go//x.go",
+		"github.com/Putnami/demo-observe-go/",
+	} {
+		if file, component, ok := d.Locate(importPath); ok {
+			t.Errorf("Locate(%q) = %q %q", importPath, file, component)
+		}
+	}
+}
+
 func TestARequireOfARepositoryModuleIsAnEdge(t *testing.T) {
 	spectest.Proves(t, feature, "go-module-edges", "a-require-of-a-repository-module-is-an-edge")
 	d := Detect(tree(t, map[string]string{

@@ -32,7 +32,9 @@ A module depends on another module of the repository when:
   `replace example.com/pricing => ../pricing`, points to that module's
   directory.
 
-A require of a module outside the repository is no edge.
+A require of a module outside the repository is no edge. An import that only
+`go.work` resolves, without a require in the `go.mod`, is no edge either: the
+detector reads manifests, not Go sources.
 
 ## Reports
 
@@ -57,8 +59,8 @@ requires, each with the version that the `replace` directives of the
 `go.mod` and of the root `go.work` at the same commit select, and whether it
 is `// indirect`. `go.work` belongs to no module, so a change made only in its
 `replace` directives shows in no lockfile. A require replaced by a local
-directory, or of a module of the repository, is not a locked dependency. `go.sum` holds checksums, not
-a selection, so the detector does not read it. Versions compare in Go's
+directory, or of a module of the repository, is not a locked dependency.
+`go.sum` holds checksums, not a selection, so the detector does not read it. Versions compare in Go's
 semantic version order, pseudo-versions included.
 
 ## Diagnostics
@@ -67,5 +69,5 @@ semantic version order, pseudo-versions included.
 |---|---|
 | `observe.go_manifest_unreadable` | A `go.work`, a `go.mod` or a directory cannot be read. A module without a readable `go.mod` is not a component. |
 | `observe.go_manifest_invalid` | A `go.work` or `go.mod` cannot be parsed, or `go.work` uses a directory outside the repository. A `go.mod` that only the lenient grammar reads keeps its module and requires, without its `replace` directives; one that no grammar reads is a component without a name or edges. |
-| `observe.go_duplicate_module` | Two `go.mod` files declare one module path. Both are components; a require of that path is an edge to the first directory in path order. |
+| `observe.go_duplicate_module` | Two `go.mod` files declare one module path. Both are components. The path names the `go.work` member, else the first directory in path order: a require of it is an edge to that directory, and a report's import path maps there. |
 | `observe.go_walk_bounded` | The search for `go.mod` stopped after 200,000 entries. |

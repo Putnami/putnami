@@ -82,6 +82,8 @@ type Detection struct {
 	Diagnostics []diag.Diagnostic `json:"diagnostics,omitempty"`
 
 	workReplaces []*modfile.Replace
+	// byPath names the component directory of each module path.
+	byPath map[string]string
 }
 
 // Detect reads the Go modules of the repository at root. A repository without
@@ -218,19 +220,27 @@ func parseGoMod(name string, data []byte) (*modfile.File, error) {
 // root go.work's replaces.
 func (d *Detection) link() {
 	byPath := map[string]string{}
+	source := map[string]string{}
 	byDir := map[string]bool{}
+	// A go.work member names its module path, as the go command builds it;
+	// among directories of one source, the first in path order does.
 	for _, m := range d.Modules {
 		byDir[m.Dir] = true
+		source[m.Dir] = m.Source
 		if m.Path == "" {
 			continue
 		}
-		if first, seen := byPath[m.Path]; seen {
-			d.Diagnostics = append(d.Diagnostics, diag.Warningf(CodeDuplicateModule, m.GoMod,
-				"%s declares module %s, which %s already declares; the module path names %s", m.GoMod, m.Path, join(first, GoMod), first))
-			continue
+		if kept, seen := byPath[m.Path]; !seen || (m.Source == evidence.SourceWorkspace && source[kept] != evidence.SourceWorkspace) {
+			byPath[m.Path] = m.Dir
 		}
-		byPath[m.Path] = m.Dir
 	}
+	for _, m := range d.Modules {
+		if m.Path != "" && byPath[m.Path] != m.Dir {
+			d.Diagnostics = append(d.Diagnostics, diag.Warningf(CodeDuplicateModule, m.GoMod,
+				"%s declares module %s, which %s also declares; the module path names %s", m.GoMod, m.Path, join(byPath[m.Path], GoMod), byPath[m.Path]))
+		}
+	}
+	d.byPath = byPath
 	for i := range d.Modules {
 		m := &d.Modules[i]
 		if m.file == nil {
@@ -340,9 +350,12 @@ func join(dir, name string) string {
 }
 
 // Owner returns the id of the innermost component whose directory holds the
-// repository-relative file.
+// repository-relative file. An empty, absolute or escaping path has none.
 func (d Detection) Owner(file string) (string, bool) {
 	file = path.Clean(filepath.ToSlash(file))
+	if file == "." || file == ".." || strings.HasPrefix(file, "../") || strings.HasPrefix(file, "/") || filepath.IsAbs(file) {
+		return "", false
+	}
 	best, found := "", false
 	for _, m := range d.Modules {
 		if m.Dir == "." || file == m.Dir || strings.HasPrefix(file, m.Dir+"/") {
@@ -363,11 +376,17 @@ func depth(dir string) int {
 
 // Locate maps an import path, or an import path followed by a file name as a
 // cover profile writes it, to its repository-relative path and the component
-// whose module path is its longest prefix on a slash boundary.
+// whose module path is its longest prefix on a slash boundary. A path with an
+// empty, . or .. element maps to nothing.
 func (d Detection) Locate(importPath string) (file, component string, ok bool) {
+	for _, element := range strings.Split(importPath, "/") {
+		if element == "" || element == "." || element == ".." {
+			return "", "", false
+		}
+	}
 	best := -1
 	for i, m := range d.Modules {
-		if m.Path == "" {
+		if m.Path == "" || d.byPath[m.Path] != m.Dir {
 			continue
 		}
 		if importPath != m.Path && !strings.HasPrefix(importPath, m.Path+"/") {

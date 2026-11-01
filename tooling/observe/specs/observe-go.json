@@ -21,11 +21,11 @@
     },
     {
       "id": "go-module-edges",
-      "text": "A component depends on each other component whose module path its go.mod requires, after the replace directives of its go.mod and of the root go.work, and on each component a local replace directive of its go.mod points to. A local replace resolves against the directory of the file that holds it. A require of a module the repository does not hold is no edge, and a component never depends on itself."
+      "text": "A component depends on each other component whose module path its go.mod requires, after the replace directives of its go.mod and of the root go.work, and on each component a local replace of its go.mod points to, resolved against the directory of the file holding it. A require outside the repository, or an import without a require, is no edge; nor is the component itself. A go.work member names its module path over other directories, else the first in path order."
     },
     {
       "id": "go-report-paths",
-      "text": "An import path, as a go test -json event, a gotestsum or go-junit-report suite name and a go test -coverprofile file name write it, maps to the path below the component whose module path is its longest prefix on a slash boundary, and to that component. An import path no component's module path prefixes maps to nothing."
+      "text": "An import path, as a go test -json event, a gotestsum or go-junit-report suite name and a go test -coverprofile file name write it, maps to the path below the component whose module path is its longest prefix on a slash boundary, and to that component. An import path no component's module path prefixes, or with an empty, . or .. element, maps to nothing."
     },
     {
       "id": "go-locked-versions",
