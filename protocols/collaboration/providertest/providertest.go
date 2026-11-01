@@ -230,6 +230,8 @@ func normalize(contract, operation, arguments, workspace string) json.RawMessage
 		identity(&in.Identity)
 	case *collab.MemoryCheckpointInput:
 		identity(&in.Identity)
+	case *collab.MissionsStatusInput:
+		page(&in.Page)
 	}
 	encoded, err := json.Marshal(input)
 	if err != nil {

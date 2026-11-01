@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -35,10 +36,15 @@ func TestTheSharedContractScenarios(t *testing.T) {
 // TestTheMissionsScenarios runs the scenarios every missions provider passes
 // against a fresh local store on disk. The target posts a message and answers
 // a decision the way the store's owner does: by writing a file to the store
-// directory.
+// directory. The status scenario must run, not skip.
 func TestTheMissionsScenarios(t *testing.T) {
 	spectest.Proves(t, "collaboration/provider-contract", "missions-provider-semantics", "the-local-provider-passes-the-missions-scenarios")
+	spectest.Proves(t, "collaboration/provider-contract", "missions-status", "the-local-provider-passes-the-missions-status-scenario")
+	statusRan := false
 	providertest.RunMissions(t, func(t *testing.T) providertest.Target {
+		if strings.HasSuffix(t.Name(), "status_lists_the_sessions_of_a_mission,_newest_first") {
+			t.Cleanup(func() { statusRan = !t.Skipped() })
+		}
 		clock := time.Date(2026, 10, 26, 9, 0, 0, 0, time.UTC)
 		p := &Provider{Now: func() time.Time { return clock }}
 		workspace := t.TempDir()
@@ -58,6 +64,9 @@ func TestTheMissionsScenarios(t *testing.T) {
 			},
 		}
 	})
+	if !statusRan {
+		t.Error("the missions status scenario did not run against the local provider")
+	}
 }
 
 // writeOwnerFile writes one owner file the way the README tells a person to.

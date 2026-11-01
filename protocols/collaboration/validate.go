@@ -330,6 +330,9 @@ func ValidateInput(input any) []diag.Diagnostic {
 	case *MissionsReplyInput:
 		c.missionID("message", in.Message)
 		c.text("reply", in.Reply, MaxReplyLength, true)
+	case *MissionsStatusInput:
+		c.missionName("mission", in.Mission)
+		c.page(in.Page)
 	case *CapabilitiesInput:
 	default:
 		c.errorf(ErrorCodeUnknownOperation, "", "no request validator for %T", input)
@@ -404,6 +407,8 @@ func ValidateResult(result any) []diag.Diagnostic {
 		if r.Message.State != ReplyStateReplied {
 			c.errorf(ErrorCodeInvalidState, "message.state", "a recorded reply leaves its message %q, not %q", ReplyStateReplied, r.Message.State)
 		}
+	case *MissionsStatusResult:
+		c.statusResult(r)
 	case *Capabilities:
 		c.diags = append(c.diags, validateCapabilities(r)...)
 	default:
@@ -1045,6 +1050,28 @@ func (c *checker) utcTimestamp(field, value string) {
 	}
 }
 
+// sessionOutcome checks the error and waitUntil a session carries under
+// prefix: an error only when it failed, and waitUntil when it waits and only
+// then.
+func (c *checker) sessionOutcome(prefix string, state SessionState, failure, waitUntil string) {
+	field := func(name string) string {
+		if prefix == "" {
+			return name
+		}
+		return prefix + "." + name
+	}
+	c.text(field("error"), failure, MaxErrorLength, false)
+	if failure != "" && state != SessionStateFailed {
+		c.errorf(ErrorCodeInvalidValue, field("error"), "only a failed session reports an error")
+	}
+	switch {
+	case state == SessionStateWaiting:
+		c.timestamp(field("waitUntil"), waitUntil, true)
+	case waitUntil != "":
+		c.errorf(ErrorCodeInvalidValue, field("waitUntil"), "only a waiting session reports waitUntil")
+	}
+}
+
 func (c *checker) syncInput(in *MissionsSyncInput) {
 	c.session("session", in.Session)
 	c.missionName("mission", in.Mission)
@@ -1059,37 +1086,12 @@ func (c *checker) syncInput(in *MissionsSyncInput) {
 	c.bounded("model", in.Model, MaxModelLength, false)
 	c.bounded("branch", in.Branch, MaxBranchLength, false)
 	c.text("lastMessage", in.LastMessage, MaxLastMessageLength, false)
-	c.text("error", in.Error, MaxErrorLength, false)
-	if in.Error != "" && in.State != SessionStateFailed {
-		c.errorf(ErrorCodeInvalidValue, "error", "only a failed session reports an error")
-	}
-	switch {
-	case in.State == SessionStateWaiting:
-		c.timestamp("waitUntil", in.WaitUntil, true)
-	case in.WaitUntil != "":
-		c.errorf(ErrorCodeInvalidValue, "waitUntil", "only a waiting session reports waitUntil")
-	}
+	c.sessionOutcome("", in.State, in.Error, in.WaitUntil)
 	if in.Plan != nil {
 		c.plan("plan", *in.Plan)
 	}
-	if in.Stage != "" && !slices.Contains(ValidLoopStages, in.Stage) {
-		c.errorf(ErrorCodeInvalidValue, "stage", "unknown loop stage %q", in.Stage)
-	}
-	if usage := in.Usage; usage != nil {
-		for _, count := range []struct {
-			field string
-			value int64
-		}{
-			{"usage.inputTokens", usage.InputTokens},
-			{"usage.outputTokens", usage.OutputTokens},
-			{"usage.cacheWriteTokens", usage.CacheWriteTokens},
-			{"usage.cacheReadTokens", usage.CacheReadTokens},
-		} {
-			if count.value < 0 || count.value > MaxUsageTokens {
-				c.errorf(ErrorCodeInvalidValue, count.field, "%s must be between 0 and %d", count.field, int64(MaxUsageTokens))
-			}
-		}
-	}
+	c.loopStage("stage", in.Stage)
+	c.usage("usage", in.Usage)
 	c.missionIDs("delivered", in.Delivered, MaxListMembers)
 	c.missionIDs("decisions", in.Decisions, MaxSyncDecisions)
 	if len(in.Replies) > MaxSyncReplies {
@@ -1104,6 +1106,33 @@ func (c *checker) syncInput(in *MissionsSyncInput) {
 		}
 		seen[reply.Message] = true
 		c.text(entry+".reply", reply.Reply, MaxReplyLength, true)
+	}
+}
+
+// loopStage checks an optional loop stage.
+func (c *checker) loopStage(field string, stage LoopStage) {
+	if stage != "" && !slices.Contains(ValidLoopStages, stage) {
+		c.errorf(ErrorCodeInvalidValue, field, "unknown loop stage %q", stage)
+	}
+}
+
+// usage checks an optional session usage: each count is 0 to MaxUsageTokens.
+func (c *checker) usage(field string, usage *SessionUsage) {
+	if usage == nil {
+		return
+	}
+	for _, count := range []struct {
+		field string
+		value int64
+	}{
+		{field + ".inputTokens", usage.InputTokens},
+		{field + ".outputTokens", usage.OutputTokens},
+		{field + ".cacheWriteTokens", usage.CacheWriteTokens},
+		{field + ".cacheReadTokens", usage.CacheReadTokens},
+	} {
+		if count.value < 0 || count.value > MaxUsageTokens {
+			c.errorf(ErrorCodeInvalidValue, count.field, "%s must be between 0 and %d", count.field, int64(MaxUsageTokens))
+		}
 	}
 }
 
@@ -1164,24 +1193,54 @@ func (c *checker) answerOption(field, option, answer string) {
 	}
 }
 
-func (c *checker) syncResult(r *MissionsSyncResult) {
-	c.sessionState("session.state", r.Session.State)
-	mission := r.Mission
-	c.token("mission.key", mission.Key)
-	c.bounded("mission.title", mission.Title, MaxTitleLength, false)
-	c.url("mission.url", mission.URL)
-	c.plan("mission.plan", mission.Plan)
+// missionView checks the view of one mission, as sync and status answer it.
+func (c *checker) missionView(field string, mission MissionView) {
+	c.token(field+".key", mission.Key)
+	c.bounded(field+".title", mission.Title, MaxTitleLength, false)
+	c.url(field+".url", mission.URL)
+	c.plan(field+".plan", mission.Plan)
 	if mission.OpenDecisions == nil {
-		c.errorf(ErrorCodeRequired, "mission.openDecisions", "mission.openDecisions is required; none is []")
+		c.errorf(ErrorCodeRequired, field+".openDecisions", "%s.openDecisions is required; none is []", field)
 	}
 	if len(mission.OpenDecisions) > MaxOpenDecisions {
-		c.errorf(ErrorCodeTooLarge, "mission.openDecisions", "at most %d members", MaxOpenDecisions)
+		c.errorf(ErrorCodeTooLarge, field+".openDecisions", "at most %d members", MaxOpenDecisions)
 	}
 	for i, decision := range mission.OpenDecisions {
-		entry := fmt.Sprintf("mission.openDecisions[%d]", i)
+		entry := fmt.Sprintf("%s.openDecisions[%d]", field, i)
 		c.missionID(entry+".id", decision.ID)
 		c.text(entry+".question", decision.Question, MaxQuestionLength, true)
 	}
+}
+
+// statusResult checks a status answer: the mission's view and a page of
+// sessions, each once.
+func (c *checker) statusResult(r *MissionsStatusResult) {
+	c.missionView("mission", r.Mission)
+	if r.Sessions == nil {
+		c.errorf(ErrorCodeRequired, "sessions", "sessions is required; none is []")
+	}
+	c.listBound("sessions", len(r.Sessions))
+	c.nextCursor(r.Page.Next)
+	seen := map[SessionRef]bool{}
+	for i, session := range r.Sessions {
+		entry := fmt.Sprintf("sessions[%d]", i)
+		c.session(entry+".session", session.Session)
+		if seen[session.Session] {
+			c.errorf(ErrorCodeInvalidValue, entry+".session", "session %s/%s is repeated", session.Session.Engine, session.Session.ID)
+		}
+		seen[session.Session] = true
+		c.sessionState(entry+".state", session.State)
+		c.utcTimestamp(entry+".observedAt", session.ObservedAt)
+		c.loopStage(entry+".stage", session.Stage)
+		c.usage(entry+".usage", session.Usage)
+		c.bounded(entry+".branch", session.Branch, MaxBranchLength, false)
+		c.sessionOutcome(entry, session.State, session.Error, session.WaitUntil)
+	}
+}
+
+func (c *checker) syncResult(r *MissionsSyncResult) {
+	c.sessionState("session.state", r.Session.State)
+	c.missionView("mission", r.Mission)
 	c.inbox(r.Inbox)
 	if r.Decisions == nil {
 		c.errorf(ErrorCodeRequired, "decisions", "decisions is required; none is []")

@@ -1,0 +1,37 @@
+{
+  "mission": {
+    "key": "issue-701",
+    "title": "Read a mission's sessions",
+    "plan": { "steps": [{ "key": "contract", "status": "doing", "text": "Add missions.status" }] },
+    "openDecisions": []
+  },
+  "sessions": [
+    {
+      "session": { "engine": "host-a", "id": "s-3" },
+      "state": "waiting",
+      "observedAt": "2026-10-29T10:06:00Z",
+      "waitUntil": "2026-10-29T11:06:00+01:00"
+    },
+    {
+      "session": { "engine": "host-a", "id": "s-2" },
+      "state": "working",
+      "observedAt": "2026-10-29T10:05:00Z",
+      "stage": "code",
+      "usage": { "inputTokens": 1200, "outputTokens": 3400, "cacheWriteTokens": 56000, "cacheReadTokens": 789000 },
+      "branch": "owner/build-701"
+    },
+    {
+      "session": { "engine": "host-b", "id": "s-4" },
+      "state": "failed",
+      "observedAt": "2026-10-29T10:05:00Z",
+      "stage": "check",
+      "error": "the gate failed: 2 tests"
+    },
+    {
+      "session": { "engine": "host-b", "id": "s-1" },
+      "state": "ended",
+      "observedAt": "2026-10-29T09:00:00.5Z"
+    }
+  ],
+  "page": { "next": "c2" }
+}

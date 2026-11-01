@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://putnami.dev/schemas/putnami-collaboration-missions.v1.json",
   "title": "Putnami missions contract, version 1",
-  "description": "Request (<operation>Input) and result (<operation>Result) documents of every missions v1 operation. Required: sync, ask, reply. sync is host-only: the host that runs an agent calls it, never the agent itself. Message and decision ids are bare tokens, not refs: an agent types them, and they never leave their provider. A mission is named by its repository and key, compared exactly. Lengths count characters.",
+  "description": "Request (<operation>Input) and result (<operation>Result) documents of every missions v1 operation. Required: sync, ask, reply. Optional: status. sync is host-only: the host that runs an agent calls it, never the agent itself. Message and decision ids are bare tokens, not refs: an agent types them, and they never leave their provider. A mission is named by its repository and key, compared exactly. Lengths count characters.",
   "$defs": {
     "id": {
       "type": "string",
@@ -124,11 +124,11 @@
     },
     "missionView": {
       "type": "object",
-      "description": "Always the mission the sync named, whatever the sync's age. A provider that does not hold it answers its key, an empty title, an empty plan and no open decision.",
+      "description": "Always the mission the request named, whatever a sync's age. A provider that does not hold it answers its key, an empty title, an empty plan and no open decision.",
       "additionalProperties": false,
       "required": ["key", "title", "plan", "openDecisions"],
       "properties": {
-        "key": { "$ref": "collaboration.json#/$defs/token", "description": "The key the sync named." },
+        "key": { "$ref": "collaboration.json#/$defs/token", "description": "The key the request named." },
         "title": { "type": "string", "maxLength": 256 },
         "url": { "$ref": "collaboration.json#/$defs/url" },
         "plan": { "$ref": "#/$defs/plan", "description": "The mission's current plan: the plan that the session that published last sent. Empty when none did." },
@@ -289,6 +289,47 @@
           }
         },
         "replayed": { "type": "boolean", "description": "True when the message already held this reply, so nothing was written again." }
+      }
+    },
+    "statusInput": {
+      "type": "object",
+      "description": "Reads a mission's view and a page of its sessions. Optional: a provider that does not offer it answers unsupported. An agent may call it.",
+      "additionalProperties": false,
+      "required": ["mission"],
+      "properties": {
+        "mission": { "$ref": "#/$defs/missionName", "description": "The mission to read. Its title is for display and changes nothing." },
+        "page": { "$ref": "collaboration.json#/$defs/pageRequest" }
+      }
+    },
+    "missionSession": {
+      "type": "object",
+      "description": "One session of the mission, as the last sync the provider applied for it reported it.",
+      "additionalProperties": false,
+      "required": ["session", "state", "observedAt"],
+      "properties": {
+        "session": { "$ref": "#/$defs/session" },
+        "state": { "$ref": "#/$defs/sessionState" },
+        "observedAt": { "$ref": "#/$defs/utcTimestamp", "description": "The observation time of the last sync applied for the session." },
+        "stage": { "$ref": "#/$defs/loopStage", "description": "Present when the provider holds a stage for the session." },
+        "usage": { "$ref": "#/$defs/sessionUsage", "description": "Present when the provider holds a usage for the session." },
+        "branch": { "type": "string", "maxLength": 256, "description": "One line." },
+        "error": { "type": "string", "maxLength": 1024, "description": "The error that stopped the session. Only when state is failed." },
+        "waitUntil": { "$ref": "collaboration.json#/$defs/timestamp", "description": "When the session stops waiting. Required when state is waiting, and only then." }
+      }
+    },
+    "statusResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["mission", "sessions", "page"],
+      "properties": {
+        "mission": { "$ref": "#/$defs/missionView", "description": "The mission the request named. A provider that does not hold it answers its empty view." },
+        "sessions": {
+          "type": "array",
+          "maxItems": 100,
+          "items": { "$ref": "#/$defs/missionSession" },
+          "description": "A page of the sessions whose last applied sync named the mission, in every state, newest observedAt first, then by engine and id. A session appears once. A traversal lists once every session that does not sync during it."
+        },
+        "page": { "$ref": "collaboration.json#/$defs/page" }
       }
     }
   }

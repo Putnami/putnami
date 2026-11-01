@@ -219,7 +219,11 @@ write.
   sync ignores ids it does not know and counts a repeated id once, that a
   session acknowledges a message of the mission it left, that each refused
   reply has its own entry, that an older sync never overwrites a newer one,
-  and that an older sync still describes the mission it names.
+  and that an older sync still describes the mission it names. When the
+  target answers `status`, it also checks that two sessions synced to one
+  mission are listed with their state, stage, usage and branch, newest first,
+  that a session that moved to another mission leaves the list, and that an
+  unknown mission answers its empty view and no session.
 - Drive your handlers through `collab.Serve` with the request a routed call
   carries (`tooling/local-collaboration/internal/provider/provider_test.go`),
   so every answer passes the same validation a real call does.

@@ -53,6 +53,7 @@ func localProviderWorkspace(t *testing.T) string {
 		`"extensions":[`+mustJSONString(t, extensionRoot)+`],`+
 		`"options":{"collaboration":{`+
 		`"tasks":{"provider":"@putnami/local-collaboration","version":1},`+
+		`"missions":{"provider":"@putnami/local-collaboration","version":1},`+
 		`"proposals":{"provider":"@putnami/local-collaboration","version":1,"settings":{"repository":"acme/app"}}}}}`)
 	writeParityFile(t, filepath.Join(root, "packages", "app"), "putnami.json", `{"name":"app","type":"library"}`)
 	workspace.InvalidateLoadCache(root)
@@ -146,6 +147,40 @@ func TestTheLocalProviderAnswersBothEntryPaths(t *testing.T) {
 	stdout, _, _ = runCollabCommand(t, root, "", "memory", "capabilities", "--output=json")
 	if err := json.Unmarshal(decodeCollabEnvelope(t, stdout).Result, &capabilities); err != nil || capabilities.Status != collab.BindingStatusUnbound {
 		t.Fatalf("memory capabilities: %s", stdout)
+	}
+}
+
+// TestTheLocalProviderReadsASessionWithMissionsStatus: what a host syncs
+// through the CLI, `putnami missions status` reads back from the local store,
+// with the session's stage and token usage.
+func TestTheLocalProviderReadsASessionWithMissionsStatus(t *testing.T) {
+	t.Parallel()
+	spectest.Proves(t, "collaboration/provider-contract", "missions-status", "the-cli-reads-a-session-stage-and-usage-with-missions-status")
+	root := localProviderWorkspace(t)
+
+	stdout, stderr, code := runCollabCommand(t, root, "", "missions", "sync", "--output=json", "--input",
+		`{"session":{"engine":"host-b","id":"s-1"},"mission":{"repository":"acme/app","key":"issue-42"},"event":"post_tool_use",`+
+			`"state":"working","observedAt":"2026-10-26T09:00:00Z","stage":"check","branch":"fix-issue-42",`+
+			`"usage":{"inputTokens":1200,"outputTokens":300,"cacheWriteTokens":40,"cacheReadTokens":9000}}`)
+	if code != ExitSuccess || decodeCollabEnvelope(t, stdout).Outcome != collab.OutcomeOK {
+		t.Fatalf("missions sync: code %d\n%s\n%s", code, stdout, stderr)
+	}
+
+	stdout, stderr, code = runCollabCommand(t, root, "", "missions", "status", "--output=json", "--input",
+		`{"mission":{"repository":"acme/app","key":"issue-42"}}`)
+	envelope := decodeCollabEnvelope(t, stdout)
+	var status collab.MissionsStatusResult
+	if err := json.Unmarshal(envelope.Result, &status); err != nil || code != ExitSuccess || envelope.Outcome != collab.OutcomeOK {
+		t.Fatalf("missions status: code %d\n%s\n%s", code, stdout, stderr)
+	}
+	if status.Mission.Key != "issue-42" || len(status.Sessions) != 1 {
+		t.Fatalf("missions status answered %s", envelope.Result)
+	}
+	want := collab.SessionUsage{InputTokens: 1200, OutputTokens: 300, CacheWriteTokens: 40, CacheReadTokens: 9000}
+	if session := status.Sessions[0]; session.Session != (collab.SessionRef{Engine: "host-b", ID: "s-1"}) ||
+		session.State != collab.SessionStateWorking || session.Stage != collab.LoopStageCheck ||
+		session.Usage == nil || *session.Usage != want || session.Branch != "fix-issue-42" {
+		t.Errorf("the session reads back as %+v", session)
 	}
 }
 

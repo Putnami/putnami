@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/sha256"
+	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -26,9 +27,10 @@ import (
 //
 // The owner answers a decision and writes a message outside the contract, as
 // files of the store directory (store.AnswersDir, store.MessagesDir). Every
-// missions operation first takes the owner files it has not taken yet, under
-// the store lock and in the same write as the operation, so two provider
-// processes never take one file twice.
+// missions write (sync, ask, reply) first takes the owner files it has not
+// taken yet, under the store lock and in the same write as the operation, so
+// two provider processes never take one file twice. status, a read, takes
+// none: it answers the store as the last write left it.
 //
 // The provider never changes or removes an owner file. Beside a file it does
 // not take, it writes a note, <name>.refused, that says why, and it removes
@@ -544,4 +546,110 @@ func (p *Provider) replyToMessage(_ context.Context, call collab.Call) (any, *co
 		return nil, failure
 	}
 	return result, nil
+}
+
+// missionStatus answers the named mission's view and a page of the sessions
+// whose last applied sync named it. It reads the store without its lock and
+// takes no owner file.
+func (p *Provider) missionStatus(_ context.Context, call collab.Call) (any, *collab.Failure) {
+	in, failure := inputOf[*collab.MissionsStatusInput](call)
+	if failure != nil {
+		return nil, failure
+	}
+	after, failure := sessionCursor(in.Page)
+	if failure != nil {
+		return nil, failure
+	}
+	s, _, failure := storeOf(call)
+	if failure != nil {
+		return nil, failure
+	}
+	m, err := s.ReadMissions()
+	if err != nil {
+		return nil, collab.Fail(collab.OutcomeUnavailable, "store.unreadable", "%v", err)
+	}
+	mission := keyOf(in.Mission)
+	sessions, page := missionSessions(m, mission, after, pageSize(in.Page))
+	return &collab.MissionsStatusResult{Mission: missionView(m, mission), Sessions: sessions, Page: page}, nil
+}
+
+// sessionPosition is a session's place in the status order: newest
+// observation first, then by engine, then by id. A cursor names the position
+// of a page's last session rather than its ordinal, so a sync between two
+// pages neither repeats nor skips a session that did not sync; a session that
+// syncs moves ahead of the cursor.
+type sessionPosition struct {
+	Observed time.Time `json:"o"`
+	Engine   string    `json:"e"`
+	ID       string    `json:"i"`
+}
+
+func positionOf(session store.Session) sessionPosition {
+	at, _ := time.Parse(time.RFC3339Nano, session.ObservedAt)
+	return sessionPosition{Observed: at, Engine: session.Engine, ID: session.ID}
+}
+
+func (p sessionPosition) compare(q sessionPosition) int {
+	if order := q.Observed.Compare(p.Observed); order != 0 {
+		return order
+	}
+	if order := strings.Compare(p.Engine, q.Engine); order != 0 {
+		return order
+	}
+	return strings.Compare(p.ID, q.ID)
+}
+
+func (p sessionPosition) cursor() string {
+	encoded, _ := json.Marshal(p)
+	return base64.RawURLEncoding.EncodeToString(encoded)
+}
+
+// sessionCursor decodes the position a status page continues after, or nil
+// for the first page.
+func sessionCursor(page *collab.PageRequest) (*sessionPosition, *collab.Failure) {
+	if page == nil || page.Cursor == "" {
+		return nil, nil
+	}
+	var position sessionPosition
+	encoded, err := base64.RawURLEncoding.DecodeString(page.Cursor)
+	if err == nil {
+		err = json.Unmarshal(encoded, &position)
+	}
+	if err != nil || position.Engine == "" || position.ID == "" {
+		return nil, collab.Fail(collab.OutcomeInvalid, collab.ReasonRequestInvalid, "cursor %q was not issued by this provider", page.Cursor)
+	}
+	return &position, nil
+}
+
+func pageSize(page *collab.PageRequest) int {
+	if page == nil || page.Size == 0 {
+		return collab.DefaultPageSize
+	}
+	return page.Size
+}
+
+// missionSessions lists, in status order, up to size sessions whose last
+// applied sync named the mission and that come after the cursor's position,
+// and the cursor of the page that follows.
+func missionSessions(m *store.Missions, mission store.MissionKey, after *sessionPosition, size int) ([]collab.MissionSession, collab.Page) {
+	var held []store.Session
+	for _, session := range m.Sessions {
+		if session.Mission == mission && (after == nil || after.compare(positionOf(session)) < 0) {
+			held = append(held, session)
+		}
+	}
+	slices.SortFunc(held, func(a, b store.Session) int { return positionOf(a).compare(positionOf(b)) })
+	var page collab.Page
+	if len(held) > size {
+		held = held[:size]
+		page.Next = positionOf(held[size-1]).cursor()
+	}
+	sessions := make([]collab.MissionSession, 0, len(held))
+	for _, session := range held {
+		sessions = append(sessions, collab.MissionSession{
+			Session: collab.SessionRef{Engine: session.Engine, ID: session.ID}, State: session.State, ObservedAt: session.ObservedAt,
+			Stage: session.Stage, Usage: session.Usage, Branch: session.Branch, Error: session.Error, WaitUntil: session.WaitUntil,
+		})
+	}
+	return sessions, page
 }

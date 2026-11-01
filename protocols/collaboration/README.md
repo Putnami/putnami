@@ -30,7 +30,7 @@ describes every operation.
 | `tasks` v1 | `find`, `get`, `create`, `update`, `transition` | `assign`, `link`, `claim` |
 | `proposals` v1 | `find`, `upsert`, `status`, `review` | `comments`, `merge` |
 | `memory` v1 | `context`, `mission`, `checkpoint` | `search` |
-| `missions` v1 | `sync`, `ask`, `reply` | — |
+| `missions` v1 | `sync`, `ask`, `reply` | `status` |
 
 `capabilities` is reserved in every contract: the orchestrator answers it from
 the binding and the provider's manifest, without running the provider.
@@ -115,9 +115,8 @@ semantics. Every diagnostic code carries the `collaboration.` prefix;
   backend defines, so a provider can run it against a shared one. A scenario
   of an optional operation runs only against a provider that offers it.
   `@putnami/memory-store` runs `RunMemory` against its file backend, its Git
-  backend and its Git backend behind a bare remote. No provider in this
-  repository implements missions yet: `RunMissions` runs against an in-test
-  store.
+  backend and its Git backend behind a bare remote.
+  `@putnami/local-collaboration` runs `RunMissions` against a fresh store.
 - The CLI routes calls: [`tooling/cli/doc/25-collaboration-providers.md`](../../tooling/cli/doc/25-collaboration-providers.md).
 - [`@putnami/memory-store`](../../tooling/memory-store/README.md) implements
   the memory contract with a file or a Git backend.
@@ -146,8 +145,8 @@ implementation proves the rest in its own tests:
   and contract names that never shadow a command.
 - `@putnami/local-collaboration` and `@putnami/github-collaboration` pass the
   task and proposal scenarios, and their manifests draw no diagnostic.
-  `@putnami/local-collaboration` also passes the missions scenarios, across
-  concurrent processes on one store.
+  `@putnami/local-collaboration` also passes the missions scenarios, the
+  status scenario included, across concurrent processes on one store.
 - `@putnami/memory-store` passes the memory scenarios on every backend, and
   its manifest draws no diagnostic.
 - `@putnami/contributor` stops `putnami change finalize` at an unresolved
@@ -165,6 +164,9 @@ implementation proves the rest in its own tests:
 - [ADR 0003 — The missions contract](doc/adr/0003-missions-contract.md): the
   missions operations, host-only operations, natural keys for `sync` and
   `reply`, and bare ids. It amends ADR 0001 decisions 5 and 6.
+- [ADR 0005 — `missions.status` reads a mission's sessions](doc/adr/0005-missions-status-reads-a-missions-sessions.md):
+  the optional read of a mission's view and sessions. It amends ADR 0003
+  decisions 1 and 8.
 
 ## Support
 

@@ -928,12 +928,12 @@ type OpenDecision struct {
 	Question string `json:"question"`
 }
 
-// MissionView is what a session reads about its mission. It always describes
-// the mission the sync named, whatever the sync's age. A provider that does
+// MissionView is what a sync or a status reads about a mission. It always
+// describes the mission the request named, whatever a sync's age. A provider that does
 // not hold that mission answers its key, an empty title, an empty plan and no
 // open decision.
 type MissionView struct {
-	// Key is the mission's key: the one the sync named.
+	// Key is the mission's key: the one the request named.
 	Key string `json:"key"`
 	// Title is the mission's title, empty when it has none.
 	Title string `json:"title"`
@@ -1160,6 +1160,55 @@ type MissionsReplyResult struct {
 	Message RepliedMessage `json:"message"`
 	// Replayed is true when the message already held this reply.
 	Replayed bool `json:"replayed"`
+}
+
+// MissionsStatusInput is the missions.status request: the mission to read
+// and the page of its sessions. Mission.Title is for display and changes
+// nothing.
+type MissionsStatusInput struct {
+	// Mission is the mission whose view and sessions to read.
+	Mission MissionName `json:"mission"`
+	// Page selects the page of sessions.
+	Page *PageRequest `json:"page,omitempty"`
+}
+
+// MissionSession is one session of a mission, as the last sync the provider
+// applied for it reported it.
+type MissionSession struct {
+	// Session names the session on its host.
+	Session SessionRef `json:"session"`
+	// State is the state the provider holds for the session.
+	State SessionState `json:"state"`
+	// ObservedAt is the observation time of the last sync applied for the
+	// session, in RFC 3339 UTC.
+	ObservedAt string `json:"observedAt"`
+	// Stage is the loop stage the provider holds for the session, when it
+	// holds one.
+	Stage LoopStage `json:"stage,omitempty"`
+	// Usage is the tokens the provider holds for the session, when it holds
+	// them.
+	Usage *SessionUsage `json:"usage,omitempty"`
+	// Branch is the branch the session works on, when known.
+	Branch string `json:"branch,omitempty"`
+	// Error is the error that stopped a failed session; only a failed
+	// session carries one.
+	Error string `json:"error,omitempty"`
+	// WaitUntil is when a waiting session stops waiting, in RFC 3339. A
+	// waiting session always carries it, and no other session does.
+	WaitUntil string `json:"waitUntil,omitempty"`
+}
+
+// MissionsStatusResult is the missions.status result.
+type MissionsStatusResult struct {
+	// Mission is the mission the request named. A provider that does not
+	// hold it answers its empty view.
+	Mission MissionView `json:"mission"`
+	// Sessions are a page of the sessions whose last applied sync named the
+	// mission, newest observation first, then by engine and id, each once. A
+	// traversal lists once every session that does not sync during it.
+	Sessions []MissionSession `json:"sessions"`
+	// Page carries the cursor of the next page of sessions.
+	Page Page `json:"page"`
 }
 
 // CapabilitiesInput is the capabilities request. It takes no member.
