@@ -10,10 +10,13 @@ import (
 	"io"
 	"net/url"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	diag "go.putnami.dev/protocol/diagnostic"
+	"go.putnami.dev/tooling/observe/internal/analyze"
 	"go.putnami.dev/tooling/observe/internal/ci"
+	"go.putnami.dev/tooling/observe/internal/components"
 	"go.putnami.dev/tooling/observe/internal/gitbase"
 	"go.putnami.dev/tooling/observe/internal/reports"
 )
@@ -36,7 +39,10 @@ type Observation struct {
 	DeepenedCommits int                   `json:"deepenedCommits,omitempty"`
 	ChangedFiles    []gitbase.ChangedFile `json:"changedFiles"`
 	Reports         []reports.Report      `json:"reports"`
-	Diagnostics     []diag.Diagnostic     `json:"diagnostics"`
+	// Analysis is what the change touches: components, tests, coverage,
+	// changed-line coverage and dependency changes.
+	Analysis    analyze.Result    `json:"analysis"`
+	Diagnostics []diag.Diagnostic `json:"diagnostics"`
 }
 
 // Options are the inputs of one run.
@@ -52,6 +58,8 @@ type Options struct {
 	// Resolve turns a named report path into an absolute one.
 	Resolve  func(string) string
 	Producer Producer
+	// Detectors replace the default detectors when not nil.
+	Detectors []components.Detector
 }
 
 // Run observes the job.
@@ -87,8 +95,42 @@ func Run(ctx context.Context, opts Options) Observation {
 	if o.Reports == nil {
 		o.Reports = []reports.Report{}
 	}
-	o.Diagnostics = append(append(append([]diag.Diagnostic{}, detection.Diagnostics...), resolved.Diagnostics...), reportDiags...)
+	set := components.Detect(root, opts.detectors())
+	input := analyze.Input{Root: root, Set: set, ChangedFiles: o.ChangedFiles, Reports: o.Reports}
+	var analysisDiags []diag.Diagnostic
+	if resolved.BaseSHA != "" && resolved.HeadSHA != "" {
+		added, err := gitbase.AddedLines(ctx, root, resolved.BaseSHA, resolved.HeadSHA)
+		if err != nil {
+			analysisDiags = append(analysisDiags, diag.Warningf(CodeChangedLinesUnread, "",
+				"the changed lines from %s to %s cannot be read: %v", resolved.BaseSHA, resolved.HeadSHA, err))
+		} else {
+			input.AddedLines = added
+		}
+		input.Show = func(side analyze.Revision, file string) ([]byte, bool, error) {
+			revision := resolved.HeadSHA
+			if side == analyze.Base {
+				revision = resolved.BaseSHA
+			}
+			return gitbase.Show(ctx, root, revision, file)
+		}
+	}
+	o.Analysis = analyze.Run(input)
+	o.Diagnostics = slices.Concat(detection.Diagnostics, resolved.Diagnostics, reportDiags, set.Diagnostics, analysisDiags, o.Analysis.Diagnostics)
+	if o.Diagnostics == nil {
+		o.Diagnostics = []diag.Diagnostic{}
+	}
 	return o
+}
+
+// CodeChangedLinesUnread is the diagnostic of a diff whose lines cannot be
+// read.
+const CodeChangedLinesUnread = "observe.changed_lines_unread"
+
+func (opts Options) detectors() []components.Detector {
+	if opts.Detectors != nil {
+		return opts.Detectors
+	}
+	return components.Default()
 }
 
 // repositoryName names a repository no CI names: the path of its origin
@@ -148,6 +190,7 @@ func WriteText(w io.Writer, o Observation) error {
 		}
 		fmt.Fprintf(&b, "    %-9s %s\n", file.Status, name)
 	}
+	writeAnalysis(&b, o.Analysis)
 	fmt.Fprintf(&b, "  reports  %s\n", count(len(o.Reports), "report"))
 	for _, r := range o.Reports {
 		fmt.Fprintf(&b, "    %-9s %s\n", r.Format, r.Path)

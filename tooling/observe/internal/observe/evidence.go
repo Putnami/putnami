@@ -24,8 +24,7 @@ const (
 )
 
 // Evidence returns the change evidence document of an observation made at
-// now. Until a detector names components, the repository is one fallback
-// component, changed when a file changed.
+// now, with the components and the analyses the observation carries.
 func Evidence(o Observation, now time.Time) *evidence.Document {
 	version := o.Producer.Version
 	if version == "" {
@@ -57,16 +56,20 @@ func Evidence(o Observation, now time.Time) *evidence.Document {
 	}
 	for _, file := range o.ChangedFiles {
 		doc.ChangedFiles = append(doc.ChangedFiles, evidence.ChangedFile{
-			Path: file.Path, Status: file.Status, PreviousPath: file.PreviousPath, Component: evidence.RootComponent,
+			Path: file.Path, Status: file.Status, PreviousPath: file.PreviousPath, Component: o.Analysis.Owners[file.Path],
 		})
 	}
-	impact := evidence.ImpactUnaffected
-	if len(doc.ChangedFiles) > 0 {
-		impact = evidence.ImpactChanged
+	doc.Components = o.Analysis.Components
+	if len(doc.Components) == 0 {
+		doc.Components = fallbackComponents(len(doc.ChangedFiles) > 0)
+		for i := range doc.ChangedFiles {
+			doc.ChangedFiles[i].Component = evidence.RootComponent
+		}
 	}
-	doc.Components = []evidence.Component{{
-		ID: evidence.RootComponent, Ecosystem: fallbackEcosystem, Source: evidence.SourceFallback, Impact: impact,
-	}}
+	doc.Tests = o.Analysis.Tests
+	doc.Coverage = o.Analysis.Coverage
+	doc.ChangedLineCoverage = o.Analysis.ChangedLineCoverage
+	doc.DependencyChanges = o.Analysis.DependencyChanges
 	diags := o.Diagnostics
 	if httpsURL(o.CI.URL) {
 		doc.CI.URL = o.CI.URL
@@ -76,6 +79,16 @@ func Evidence(o Observation, now time.Time) *evidence.Document {
 	}
 	doc.Diagnostics = boundedDiagnostics(diags)
 	return doc
+}
+
+// fallbackComponents is the repository as one component, for an
+// observation that carries no analysis.
+func fallbackComponents(changed bool) []evidence.Component {
+	impact := evidence.ImpactUnaffected
+	if changed {
+		impact = evidence.ImpactChanged
+	}
+	return []evidence.Component{{ID: evidence.RootComponent, Ecosystem: fallbackEcosystem, Source: evidence.SourceFallback, Impact: impact}}
 }
 
 // httpsURL reports whether raw is an https URL without credentials, the only
