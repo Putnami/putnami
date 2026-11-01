@@ -161,6 +161,38 @@ func TestAPNPMWorkspaceNamesTheMembers(t *testing.T) {
 	if ws := read(t, flow); !reflect.DeepEqual(ws.Members, []string{"apps/web", "libs/core"}) {
 		t.Fatalf("members %v", ws.Members)
 	}
+
+	// A pnpm-workspace.yaml that holds only settings declares no member.
+	settings := tree(t, map[string]string{
+		"package.json":        `{"workspaces":["libs/*"]}`,
+		"pnpm-workspace.yaml": "onlyBuiltDependencies:\n  - esbuild\n",
+		"libs/a/package.json": pkg("a", "1.0.0", nil),
+	})
+	if ws := read(t, settings); ws.Source != PackageJSON || !reflect.DeepEqual(ws.Members, []string{"libs/a"}) {
+		t.Fatalf("workspace %+v", ws)
+	}
+}
+
+func TestABracePatternNamesEachAlternative(t *testing.T) {
+	spectest.Proves(t, feature, "workspace-members", "a-brace-pattern-names-each-alternative")
+	root := tree(t, map[string]string{
+		"package.json":                `{"workspaces":["{apps,tools/{lint,config}}/*","!apps/{old,legacy}","packages/{a","b}"]}`,
+		"apps/web/package.json":       pkg("web", "1.0.0", nil),
+		"apps/old/package.json":       pkg("old", "1.0.0", nil),
+		"tools/lint/x/package.json":   pkg("x", "1.0.0", nil),
+		"tools/config/y/package.json": pkg("y", "1.0.0", nil),
+		"tools/other/z/package.json":  pkg("z", "1.0.0", nil),
+	})
+	ws, ok, diags := Read(root)
+	if !ok || !reflect.DeepEqual(ws.Members, []string{"apps/web", "tools/config/y", "tools/lint/x"}) {
+		t.Fatalf("members %v, diagnostics %v", ws.Members, diags)
+	}
+	if len(diags) != 2 || !hasCode(diags, CodePatternInvalid) {
+		t.Fatalf("unbalanced braces are not diagnostics: %v", diags)
+	}
+	if _, ok := expandBraces(strings.Repeat("{a,b,c,d}", 5)); ok {
+		t.Fatal("a brace pattern past the bound is expanded")
+	}
 }
 
 func TestANegatedPatternExcludesAMember(t *testing.T) {
@@ -172,6 +204,8 @@ func TestANegatedPatternExcludesAMember(t *testing.T) {
 		"packages/legacy/package.json":             pkg("legacy", "1.0.0", nil),
 		"packages/a/test/fixture/package.json":     pkg("fixture", "1.0.0", nil),
 		"packages/a/node_modules/dep/package.json": pkg("dep", "1.0.0", nil),
+		"packages/.cache/c/package.json":           pkg("cached", "1.0.0", nil),
+		"packages/.hidden/package.json":            pkg("hidden", "1.0.0", nil),
 	})
 	if ws := read(t, root); !reflect.DeepEqual(ws.Members, []string{"packages/a", "packages/group/b"}) {
 		t.Fatalf("members %v", ws.Members)
@@ -181,8 +215,9 @@ func TestANegatedPatternExcludesAMember(t *testing.T) {
 func TestARepositoryWithoutAWorkspaceIsNotDetected(t *testing.T) {
 	spectest.Proves(t, feature, "workspace-members", "a-repository-without-a-workspace-is-not-detected")
 	for name, files := range map[string]map[string]string{
-		"single package": {"package.json": pkg("app", "1.0.0", nil), "package-lock.json": "{}"},
-		"no package":     {"go.mod": "module x\n"},
+		"single package":     {"package.json": pkg("app", "1.0.0", nil), "package-lock.json": "{}"},
+		"no package":         {"go.mod": "module x\n"},
+		"pnpm settings only": {"package.json": pkg("app", "1.0.0", nil), "pnpm-workspace.yaml": "onlyBuiltDependencies:\n  - esbuild\n"},
 	} {
 		root := tree(t, files)
 		if _, ok, diags := Read(root); ok || len(diags) != 0 {
@@ -342,7 +377,7 @@ func TestTheAnswerValidatesOnTheProbeWire(t *testing.T) {
 		app.DependencySources["p/core"] != wsproto.DependencySourcePackageJSON {
 		t.Fatalf("app %+v", app)
 	}
-	if want := []string{"package.json", "yarn.lock"}; !reflect.DeepEqual(result.WatchedFiles, want) {
+	if want := []string{".npmrc", "npm-shrinkwrap.json", "package-lock.json", "package.json", "pnpm-lock.yaml", "pnpm-workspace.yaml", "yarn.lock"}; !reflect.DeepEqual(result.WatchedFiles, want) {
 		t.Fatalf("watched %v, want %v", result.WatchedFiles, want)
 	}
 	if result.Extension != Extension {
@@ -395,7 +430,7 @@ func TestTheTurborepoDemoLayout(t *testing.T) {
 	if !contains(meta.Reports.JUnit, "reports/junit.xml") || !contains(meta.Reports.Coverage, "reports/coverage/lcov.info") {
 		t.Fatalf("the demo's report locations are not named: %+v", meta.Reports)
 	}
-	if want := []string{"package.json", "pnpm-lock.yaml", "pnpm-workspace.yaml"}; !reflect.DeepEqual(result.WatchedFiles, want) {
+	if want := []string{".npmrc", "npm-shrinkwrap.json", "package-lock.json", "package.json", "pnpm-lock.yaml", "pnpm-workspace.yaml", "yarn.lock"}; !reflect.DeepEqual(result.WatchedFiles, want) {
 		t.Fatalf("watched %v, want %v", result.WatchedFiles, want)
 	}
 }
@@ -422,6 +457,8 @@ func TestTheManagerAndTheLockfileAreNamed(t *testing.T) {
 		{"yarn lockfile", map[string]string{"package.json": `{"workspaces":["a"]}`, "yarn.lock": ""}, ManagerYarn, "yarn.lock"},
 		{"pnpm lockfile", map[string]string{"package.json": `{"workspaces":["a"]}`, "pnpm-lock.yaml": ""}, ManagerPNPM, "pnpm-lock.yaml"},
 		{"shrinkwrap", map[string]string{"package.json": `{"workspaces":["a"]}`, "npm-shrinkwrap.json": "{}"}, ManagerNPM, "npm-shrinkwrap.json"},
+		{"the manager's own lockfile", map[string]string{"package.json": `{"packageManager":"npm@10.9.0","workspaces":["a"]}`, "yarn.lock": "", "package-lock.json": "{}"}, ManagerNPM, "package-lock.json"},
+		{"another lockfile", map[string]string{"package.json": `{"packageManager":"npm@10.9.0","workspaces":["a"]}`, "yarn.lock": ""}, ManagerNPM, "yarn.lock"},
 		{"nothing else", map[string]string{"package.json": `{"packageManager":"bun@1.2.0","workspaces":["a"]}`}, ManagerNPM, ""},
 	} {
 		c.files["a/package.json"] = member
@@ -503,6 +540,18 @@ func TestAMalformedManifestIsADiagnostic(t *testing.T) {
 	if len(result.Projects) != 1 || result.Projects[0].Path != "p/ok" || len(result.Projects[0].Dependencies) != 0 || !hasCode(result.Diagnostics, CodeManifestInvalid) {
 		t.Fatalf("result %+v", result)
 	}
+	// Two members with one name: the first directory keeps it, with a diagnostic.
+	projects, result := func() (map[string]wsproto.ProbeProject, wsproto.ProbeResult) {
+		return detect(t, tree(t, map[string]string{
+			"package.json":       `{"workspaces":["p/*"]}`,
+			"p/a/package.json":   pkg("shared", "1.0.0", nil),
+			"p/b/package.json":   pkg("shared", "1.0.0", nil),
+			"p/app/package.json": pkg("app", "1.0.0", map[string]string{"shared": "workspace:*"}),
+		}))
+	}()
+	if !reflect.DeepEqual(projects["p/app"].Dependencies, []string{"p/a"}) || !hasCode(result.Diagnostics, CodeManifestInvalid) {
+		t.Fatalf("app depends on %v, diagnostics %v", projects["p/app"].Dependencies, result.Diagnostics)
+	}
 	// Outside a workspace the probe answers nothing, with no error.
 	result, err = Probe(t.TempDir(), wsproto.ProbeRequest{Version: wsproto.ProbeProtocolVersion, Extension: Extension, Paths: []string{"a"}})
 	if err != nil || len(result.Projects) != 0 {
@@ -510,7 +559,8 @@ func TestAMalformedManifestIsADiagnostic(t *testing.T) {
 	}
 }
 
-func TestTheWalkIsBounded(t *testing.T) {
+func TestABoundedWalkIsADiagnostic(t *testing.T) {
+	spectest.Proves(t, feature, "malformed-manifests", "a-bounded-walk-is-a-diagnostic")
 	saved := maxWalkEntries
 	t.Cleanup(func() { maxWalkEntries = saved })
 	maxWalkEntries = 3

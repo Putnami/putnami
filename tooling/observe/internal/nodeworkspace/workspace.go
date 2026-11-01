@@ -109,7 +109,8 @@ func ReadManifest(root, dir string) (*Manifest, error) {
 }
 
 // Read reads the Node workspace rooted at root. ok is false when root declares
-// no workspace: no pnpm-workspace.yaml and no workspaces in its package.json.
+// no members: neither packages in pnpm-workspace.yaml nor workspaces in its
+// package.json.
 // A file it cannot read or parse, an invalid pattern and a bounded walk are
 // diagnostics, never errors.
 func Read(root string) (ws Workspace, ok bool, diags []diag.Diagnostic) {
@@ -121,7 +122,7 @@ func Read(root string) (ws Workspace, ok bool, diags []diag.Diagnostic) {
 	diags = append(diags, pnpmDiags...)
 
 	switch {
-	case hasPNPM:
+	case hasPNPM && pnpm.declared:
 		ws.Source = PNPMWorkspace
 		ws.Patterns = pnpm.packages
 	case manifest != nil && len(manifest.Workspaces) > 0:
@@ -137,17 +138,13 @@ func Read(root string) (ws Workspace, ok bool, diags []diag.Diagnostic) {
 	}
 
 	ws.Manager = manager(manifest, hasPNPM, root)
-	for _, lock := range lockfiles {
-		if fileExists(root, lock.name) {
-			ws.Lockfile = lock.name
-			break
-		}
-	}
+	ws.Lockfile = lockfile(root, ws.Manager)
 	ws.LinkRanges = ws.Manager != ManagerPNPM || pnpm.linkWorkspacePackages || npmrcLinksWorkspacePackages(root)
-	for _, name := range []string{PackageJSON, PNPMWorkspace, NPMRC, ws.Lockfile} {
-		if name != "" && fileExists(root, name) {
-			ws.WatchedFiles = append(ws.WatchedFiles, name)
-		}
+	// A root file that appears later changes the answer, so each one is
+	// watched whether it exists or not.
+	ws.WatchedFiles = []string{PackageJSON, PNPMWorkspace, NPMRC}
+	for _, lock := range lockfiles {
+		ws.WatchedFiles = append(ws.WatchedFiles, lock.name)
 	}
 	members, memberDiags := expandMembers(root, ws.Source, ws.Patterns)
 	ws.Members = members
@@ -191,6 +188,19 @@ func manager(m *Manifest, hasPNPM bool, root string) string {
 	return ManagerNPM
 }
 
+// lockfile returns the root lockfile of the manager, else another root
+// lockfile, else "".
+func lockfile(root, manager string) string {
+	for _, own := range []bool{true, false} {
+		for _, lock := range lockfiles {
+			if (lock.manager == manager) == own && fileExists(root, lock.name) {
+				return lock.name
+			}
+		}
+	}
+	return ""
+}
+
 // npmrcLinksWorkspacePackages reports whether the root .npmrc sets
 // link-workspace-packages to true or deep.
 func npmrcLinksWorkspacePackages(root string) bool {
@@ -220,15 +230,21 @@ func expandMembers(root, source string, patterns []string) ([]string, []diag.Dia
 	var diags []diag.Diagnostic
 	for _, raw := range patterns {
 		negated := strings.HasPrefix(raw, "!")
-		segments, ok := patternSegments(strings.TrimPrefix(raw, "!"))
+		alternatives, ok := expandBraces(strings.TrimPrefix(raw, "!"))
+		var expanded [][]string
+		for _, alternative := range alternatives {
+			segments, valid := patternSegments(alternative)
+			ok = ok && valid
+			expanded = append(expanded, segments)
+		}
 		if !ok {
 			diags = append(diags, diag.Warningf(CodePatternInvalid, source, "the workspace pattern %q is not a repository-relative glob and is ignored", raw))
 			continue
 		}
 		if negated {
-			exclude = append(exclude, segments)
+			exclude = append(exclude, expanded...)
 		} else {
-			include = append(include, segments)
+			include = append(include, expanded...)
 		}
 	}
 	if len(include) == 0 {
@@ -340,8 +356,62 @@ func staticPrefix(segments []string) []string {
 	return segments
 }
 
+// maxBraceAlternatives bounds the patterns one brace pattern expands to.
+const maxBraceAlternatives = 256
+
+// expandBraces expands the {a,b} alternatives of a pattern, nested ones
+// included. ok is false for an unbalanced brace or too many alternatives.
+func expandBraces(pattern string) ([]string, bool) {
+	open := strings.IndexByte(pattern, '{')
+	if open < 0 {
+		return []string{pattern}, !strings.ContainsRune(pattern, '}')
+	}
+	depth, start := 0, open+1
+	var parts []string
+	for i := open; i < len(pattern); i++ {
+		switch pattern[i] {
+		case '{':
+			depth++
+		case ',':
+			if depth == 1 {
+				parts = append(parts, pattern[start:i])
+				start = i + 1
+			}
+		case '}':
+			depth--
+			if depth > 0 {
+				continue
+			}
+			parts = append(parts, pattern[start:i])
+			var out []string
+			for _, part := range parts {
+				expanded, ok := expandBraces(pattern[:open] + part + pattern[i+1:])
+				if !ok {
+					return nil, false
+				}
+				out = append(out, expanded...)
+				if len(out) > maxBraceAlternatives {
+					return nil, false
+				}
+			}
+			return out, true
+		}
+	}
+	return nil, false
+}
+
+// matchSegment matches one path segment. A wildcard never matches a
+// dot-directory; a pattern segment that starts with a dot does.
+func matchSegment(pattern, part string) bool {
+	if strings.HasPrefix(part, ".") && !strings.HasPrefix(pattern, ".") {
+		return false
+	}
+	matched, err := path.Match(pattern, part)
+	return err == nil && matched
+}
+
 // matchSegments reports whether a path matches a pattern, where "**" matches
-// any number of segments, none included.
+// any number of segments, none included, but no dot-directory.
 func matchSegments(pattern, parts []string) bool {
 	if len(pattern) == 0 {
 		return len(parts) == 0
@@ -351,14 +421,13 @@ func matchSegments(pattern, parts []string) bool {
 			if matchSegments(pattern[1:], parts[i:]) {
 				return true
 			}
+			if i < len(parts) && strings.HasPrefix(parts[i], ".") {
+				return false
+			}
 		}
 		return false
 	}
-	if len(parts) == 0 {
-		return false
-	}
-	matched, err := path.Match(pattern[0], parts[0])
-	return err == nil && matched && matchSegments(pattern[1:], parts[1:])
+	return len(parts) > 0 && matchSegment(pattern[0], parts[0]) && matchSegments(pattern[1:], parts[1:])
 }
 
 // canMatchBelow reports whether a directory, or one below it, can match the
@@ -369,9 +438,14 @@ func canMatchBelow(pattern, parts []string) bool {
 			return false
 		}
 		if pattern[i] == "**" {
+			for _, rest := range parts[i:] {
+				if strings.HasPrefix(rest, ".") {
+					return false
+				}
+			}
 			return true
 		}
-		if matched, err := path.Match(pattern[i], part); err != nil || !matched {
+		if !matchSegment(pattern[i], part) {
 			return false
 		}
 	}

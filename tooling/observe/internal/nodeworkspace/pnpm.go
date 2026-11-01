@@ -12,6 +12,9 @@ import (
 
 // pnpmWorkspace is what the detector reads from pnpm-workspace.yaml.
 type pnpmWorkspace struct {
+	// declared reports whether the file has a packages key: a file that holds
+	// only settings declares no workspace.
+	declared              bool
 	packages              []string
 	linkWorkspacePackages bool
 }
@@ -25,11 +28,11 @@ func readPNPMWorkspace(root string) (ws pnpmWorkspace, found bool, diags []diag.
 		return pnpmWorkspace{}, false, nil
 	}
 	if err != nil {
-		return pnpmWorkspace{}, true, []diag.Diagnostic{diag.Warningf(CodeManifestInvalid, PNPMWorkspace, "pnpm-workspace.yaml cannot be read: %v", err)}
+		return pnpmWorkspace{declared: true}, true, []diag.Diagnostic{diag.Warningf(CodeManifestInvalid, PNPMWorkspace, "pnpm-workspace.yaml cannot be read: %v", err)}
 	}
 	ws, err = parsePNPMWorkspace(string(data))
 	if err != nil {
-		return pnpmWorkspace{}, true, []diag.Diagnostic{diag.Warningf(CodeManifestInvalid, PNPMWorkspace, "pnpm-workspace.yaml cannot be read: %v", err)}
+		return pnpmWorkspace{declared: true}, true, []diag.Diagnostic{diag.Warningf(CodeManifestInvalid, PNPMWorkspace, "pnpm-workspace.yaml cannot be read: %v", err)}
 	}
 	return ws, true, nil
 }
@@ -55,6 +58,7 @@ func parsePNPMWorkspace(text string) (pnpmWorkspace, error) {
 		case "linkWorkspacePackages":
 			ws.linkWorkspacePackages = value == "true" || value == "deep"
 		case "packages":
+			ws.declared = true
 			if value != "" {
 				list, err := flowList(value)
 				if err != nil {

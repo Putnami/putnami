@@ -80,10 +80,10 @@ func Detect(root string) (result wsproto.ProbeResult, ok bool) {
 	return result, true
 }
 
-// Probe answers a workspace probe request against the tree rooted at root. It
-// has the shape of wsproto.ProbeAnswerFunc: it reports the members among the
-// request's paths, and a workspace it cannot read as diagnostics, never as an
-// error.
+// Probe answers a workspace probe request against the tree rooted at root;
+// bound to a root, it is a wsproto.ProbeAnswerFunc. It reports the members
+// among the request's paths, and a workspace it cannot read as diagnostics,
+// never as an error.
 func Probe(root string, request wsproto.ProbeRequest) (wsproto.ProbeResult, error) {
 	ws, ok, diags := Read(root)
 	if !ok {
@@ -124,7 +124,10 @@ func answer(root string, ws Workspace, request wsproto.ProbeRequest) wsproto.Pro
 		isMember[dir] = true
 		// Members are sorted, so the first of two packages with one name wins
 		// whatever the walk order.
-		if _, taken := byName[manifest.Name]; manifest.Name != "" && !taken {
+		if first, taken := byName[manifest.Name]; manifest.Name != "" && taken {
+			result.Diagnostics = append(result.Diagnostics, diag.Warningf(CodeManifestInvalid, path.Join(dir, PackageJSON),
+				"%s and %s are both named %s; a dependency on that name resolves to %s", first, dir, manifest.Name, first))
+		} else if manifest.Name != "" {
 			byName[manifest.Name] = dir
 		}
 	}
