@@ -198,7 +198,9 @@ type CI struct {
 
 // Producer names the program that wrote the document.
 type Producer struct {
-	Name    string `json:"name"`
+	// Name is the producer's package or program name.
+	Name string `json:"name"`
+	// Version is the producer's version.
 	Version string `json:"version"`
 }
 
@@ -233,42 +235,61 @@ type Component struct {
 
 // ComponentTests is the test outcome of one component.
 type ComponentTests struct {
-	Component    string        `json:"component"`
-	Passed       int           `json:"passed"`
-	Failed       int           `json:"failed"`
-	Skipped      int           `json:"skipped"`
-	DurationMs   int64         `json:"durationMs,omitempty"`
+	// Component is the id of the component the tests belong to.
+	Component string `json:"component"`
+	// Passed counts the passed test cases.
+	Passed int `json:"passed"`
+	// Failed counts the failed test cases, errors included.
+	Failed int `json:"failed"`
+	// Skipped counts the skipped test cases.
+	Skipped int `json:"skipped"`
+	// DurationMs is the summed duration of the test cases, in milliseconds.
+	DurationMs int64 `json:"durationMs,omitempty"`
+	// FailingCases lists failing cases, at most Failed and at most MaxFailingCases.
 	FailingCases []FailingCase `json:"failingCases,omitempty"`
 }
 
 // FailingCase is one failing test case.
 type FailingCase struct {
-	Name    string `json:"name"`
-	Suite   string `json:"suite,omitempty"`
-	File    string `json:"file,omitempty"`
+	// Name is the test case name.
+	Name string `json:"name"`
+	// Suite is the suite or class that holds the case.
+	Suite string `json:"suite,omitempty"`
+	// File is the test file, relative to the repository root, when the report names it.
+	File string `json:"file,omitempty"`
+	// Message is the failure message, truncated to MaxStringBytes.
 	Message string `json:"message,omitempty"`
 }
 
 // ComponentCoverage is the line coverage of one component.
 type ComponentCoverage struct {
-	Component    string `json:"component"`
-	CoveredLines int    `json:"coveredLines"`
-	TotalLines   int    `json:"totalLines"`
+	// Component is the id of the component the coverage belongs to.
+	Component string `json:"component"`
+	// CoveredLines counts the instrumented lines the tests executed.
+	CoveredLines int `json:"coveredLines"`
+	// TotalLines counts the instrumented lines.
+	TotalLines int `json:"totalLines"`
 }
 
 // ChangedLineCoverage is the coverage of the lines the change added or
 // modified that the coverage reports instrument.
 type ChangedLineCoverage struct {
-	CoveredLines int                       `json:"coveredLines"`
-	TotalLines   int                       `json:"totalLines"`
-	Files        []ChangedLineCoverageFile `json:"files"`
+	// CoveredLines is the sum of the files' covered changed lines.
+	CoveredLines int `json:"coveredLines"`
+	// TotalLines is the sum of the files' instrumented changed lines.
+	TotalLines int `json:"totalLines"`
+	// Files is one entry per changed file the coverage instruments.
+	Files []ChangedLineCoverageFile `json:"files"`
 }
 
 // ChangedLineCoverageFile is the changed-line coverage of one file.
 type ChangedLineCoverageFile struct {
-	Path         string `json:"path"`
-	CoveredLines int    `json:"coveredLines"`
-	TotalLines   int    `json:"totalLines"`
+	// Path is a changed file that still exists, relative to the repository root.
+	Path string `json:"path"`
+	// CoveredLines counts the file's changed lines the tests executed.
+	CoveredLines int `json:"coveredLines"`
+	// TotalLines counts the file's instrumented changed lines.
+	TotalLines int `json:"totalLines"`
 	// UncoveredLines lists the uncovered changed line numbers, increasing,
 	// capped at MaxUncoveredLines.
 	UncoveredLines []int `json:"uncoveredLines,omitempty"`
