@@ -348,6 +348,9 @@ func TestEveryMalformedFixtureReturnsItsCode(t *testing.T) {
 	if _, diagnostics := ReadFile("testdata/no-such-report.xml", ReadJUnit); len(diagnostics) != 1 || diagnostics[0].Code != CodeMissing {
 		t.Errorf("missing file: %v, want %s", diagnostics, CodeMissing)
 	}
+	if _, diagnostics := ReadFile("", ReadJUnit); len(diagnostics) != 1 || diagnostics[0].Code != CodeMissing {
+		t.Errorf("empty path: %v, want %s", diagnostics, CodeMissing)
+	}
 	if _, diagnostics := ReadFile("testdata", ReadLCOV); len(diagnostics) != 1 || diagnostics[0].Code != CodeUnreadable {
 		t.Errorf("directory: %v, want %s", diagnostics, CodeUnreadable)
 	}
@@ -403,6 +406,19 @@ func TestANestedTestsuitesElementKeepsItsCases(t *testing.T) {
 	}
 }
 
+func TestJUnitSuitesNestUpToMaxSuiteDepth(t *testing.T) {
+	nested := func(depth int) []byte {
+		return []byte(strings.Repeat(`<testsuite name="s">`, depth) + `<testcase name="a"/><testcase name="b"/>` + strings.Repeat(`</testsuite>`, depth))
+	}
+	report, diagnostics := ReadJUnit(nested(MaxSuiteDepth))
+	if diagnostics != nil || len(report.Cases) != 2 || len(report.Cases[1].Suites) != MaxSuiteDepth {
+		t.Fatalf("%d suites: %v, %d cases, want 2 cases under %d suites", MaxSuiteDepth, diagnostics, len(report.Cases), MaxSuiteDepth)
+	}
+	if _, diagnostics := ReadJUnit(nested(MaxSuiteDepth + 1)); len(diagnostics) != 1 || diagnostics[0].Code != CodeMalformed {
+		t.Errorf("%d suites: %v, want %s", MaxSuiteDepth+1, diagnostics, CodeMalformed)
+	}
+}
+
 func TestCoberturaMethodsOfTwoClassesInOneFileStayDistinct(t *testing.T) {
 	report, _ := ReadCobertura([]byte(`<coverage><packages><package><classes>
   <class name="A" filename="a.php"><methods><method name="run" signature="" hits="1"/></methods></class>
@@ -415,11 +431,20 @@ func TestCoberturaMethodsOfTwoClassesInOneFileStayDistinct(t *testing.T) {
 
 // TestArbitraryBytesNeverPanic feeds every reader every fixture cut at every
 // length and with each byte flipped in turn: each returns a result or one
-// malformed diagnostic, and none panics. FuzzReaders explores further.
+// malformed or too_large diagnostic, and none panics. The fixtures that are
+// too large stay out: TestEveryMalformedFixtureReturnsItsCode reads them.
+// FuzzReaders explores further.
 func TestArbitraryBytesNeverPanic(t *testing.T) {
+	var expectations map[string]struct{ Code string }
+	if err := json.Unmarshal(read(t, "testdata/malformed/expectations.json"), &expectations); err != nil {
+		t.Fatal(err)
+	}
 	var inputs [][]byte
 	for _, dir := range []string{"junit", "lcov", "cobertura", "clover", "gocover", "malformed"} {
 		for _, fixture := range fixtures(t, dir) {
+			if expectations[filepath.Base(fixture)].Code == CodeTooLarge {
+				continue
+			}
 			data := read(t, fixture)
 			for cut := 0; cut <= len(data); cut += max(1, len(data)/64) {
 				inputs = append(inputs, data[:cut])

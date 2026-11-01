@@ -51,9 +51,9 @@ read returns an empty result and one error diagnostic:
 
 | Code | Meaning |
 | --- | --- |
-| `readers.malformed` | The report does not decode, its root is not its format's, or it states an impossible value: a line below 1, a negative count, an LCOV record without `end_of_record`. |
-| `readers.too_large` | The report is larger than `MaxReportBytes` (256 MiB). |
-| `readers.missing` | `ReadFile`: the file does not exist. |
+| `readers.malformed` | The report does not decode, its root is not its format's, or it states an impossible value: a line below 1, a negative count, an LCOV record without `end_of_record`, JUnit suites nested deeper than `MaxSuiteDepth` (100). |
+| `readers.too_large` | The report is larger than `MaxReportBytes` (256 MiB), or its files mark more than `MaxLineMarks` (4,000,000) lines; a Go block marks every line of its span. |
+| `readers.missing` | `ReadFile`: the file does not exist, or the path is empty. |
 | `readers.unreadable` | `ReadFile`: the file exists but cannot be read. |
 
 `ReadFile` sets the diagnostic's field to the report's path.

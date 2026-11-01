@@ -4,6 +4,7 @@
   "junit-negative-line.xml": {"reader": "junit", "code": "readers.malformed"},
   "junit-not-xml.txt": {"reader": "junit", "code": "readers.malformed"},
   "junit-empty.xml": {"reader": "junit", "code": "readers.malformed"},
+  "junit-too-deep.xml": {"reader": "junit", "code": "readers.malformed"},
   "lcov-da-outside-record.info": {"reader": "lcov", "code": "readers.malformed"},
   "lcov-no-end-of-record.info": {"reader": "lcov", "code": "readers.malformed"},
   "lcov-bad-da.info": {"reader": "lcov", "code": "readers.malformed"},

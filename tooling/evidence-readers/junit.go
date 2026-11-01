@@ -4,11 +4,14 @@ import (
 	"bytes"
 	"encoding/xml"
 	"math"
-	"slices"
 	"strconv"
 
 	diag "go.putnami.dev/protocol/diagnostic"
 )
+
+// MaxSuiteDepth is the deepest nesting of testsuite elements a JUnit report
+// may state; a deeper report is malformed.
+const MaxSuiteDepth = 100
 
 // Test case statuses.
 const (
@@ -44,7 +47,8 @@ type TestCase struct {
 	// Classname is the case's classname attribute.
 	Classname string `json:"classname,omitempty"`
 	// Suites are the testsuite elements that enclose the case, outermost
-	// first. A testsuites root is not one of them; a testsuite root is.
+	// first. A testsuites root is not one of them; a testsuite root is. The
+	// cases of one suite share the slice: read it, do not write it.
 	Suites []Suite `json:"suites,omitempty"`
 	// File is the case's file attribute, else the one of its nearest
 	// enclosing suite that states one, in slash form.
@@ -105,6 +109,7 @@ type junitNode struct {
 }
 
 // ReadJUnit reads a JUnit XML report whose root is testsuites or testsuite.
+// Suites nested deeper than MaxSuiteDepth are malformed.
 func ReadJUnit(data []byte) (TestReport, []diag.Diagnostic) {
 	if diagnostics := tooLarge(data); diagnostics != nil {
 		return TestReport{}, diagnostics
@@ -162,7 +167,12 @@ func collectJUnit(element junitNode, suites []Suite, out *[]TestCase) []diag.Dia
 	for _, child := range element.Children {
 		switch child.XMLName.Local {
 		case "testsuite":
-			nested := append(slices.Clone(suites), Suite{Name: child.Name, File: slashPath(child.File)})
+			if len(suites) >= MaxSuiteDepth {
+				return malformed("JUnit suite %q nests deeper than %d suites", child.Name, MaxSuiteDepth)
+			}
+			nested := make([]Suite, len(suites)+1)
+			copy(nested, suites)
+			nested[len(suites)] = Suite{Name: child.Name, File: slashPath(child.File)}
 			if diagnostics := collectJUnit(child, nested, out); diagnostics != nil {
 				return diagnostics
 			}
@@ -189,7 +199,7 @@ func junitCase(tc junitNode, suites []Suite) (TestCase, []diag.Diagnostic) {
 	testCase := TestCase{
 		Name:       tc.Name,
 		Classname:  tc.Classname,
-		Suites:     slices.Clone(suites),
+		Suites:     suites,
 		File:       slashPath(tc.File),
 		Line:       line,
 		Status:     StatusPassed,

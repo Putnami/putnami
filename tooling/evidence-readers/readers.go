@@ -29,7 +29,8 @@ const (
 	// CodeMalformed is a report that does not decode, whose root is not its
 	// format's, or that states an impossible value.
 	CodeMalformed = "readers.malformed"
-	// CodeTooLarge is a report larger than MaxReportBytes.
+	// CodeTooLarge is a report larger than MaxReportBytes, or a coverage
+	// report that marks more than MaxLineMarks lines.
 	CodeTooLarge = "readers.too_large"
 	// CodeMissing is a report file that does not exist.
 	CodeMissing = "readers.missing"
@@ -44,11 +45,14 @@ const MaxReportBytes = 256 << 20
 // stated twice counted twice; a Go block marks every line of its span.
 const MaxLineMarks = 4_000_000
 
-// ReadFile reads the report at path with read. A missing file returns
-// CodeMissing, a file larger than MaxReportBytes CodeTooLarge, and a file that
+// ReadFile reads the report at path with read. A missing file, or an empty
+// path, returns CodeMissing, a file larger than MaxReportBytes CodeTooLarge, and a file that
 // cannot be read CodeUnreadable; each diagnostic names path in its field.
 func ReadFile[T any](path string, read func([]byte) (T, []diag.Diagnostic)) (T, []diag.Diagnostic) {
 	var zero T
+	if path == "" {
+		return zero, []diag.Diagnostic{diag.Errorf(CodeMissing, "", "report path is empty")}
+	}
 	file, err := os.Open(filepath.Clean(path))
 	if err != nil {
 		if errors.Is(err, fs.ErrNotExist) {

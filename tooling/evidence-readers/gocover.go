@@ -29,7 +29,8 @@ type goCoverBlock struct {
 // line names the same mode. A block stated more than once sums its counts in
 // count and atomic mode and keeps the largest in set mode. A block with
 // statements marks each line from its start line to its end line, and a line
-// takes the largest count of the blocks that span it.
+// takes the largest count of the blocks that span it. A profile whose blocks
+// mark more than MaxLineMarks lines is CodeTooLarge.
 func ReadGoCover(data []byte) (CoverageReport, []diag.Diagnostic) {
 	if diagnostics := tooLarge(data); diagnostics != nil {
 		return CoverageReport{}, diagnostics
