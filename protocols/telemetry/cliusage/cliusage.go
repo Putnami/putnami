@@ -143,7 +143,6 @@ var Commands = []string{
 	"config-merge",
 	"credential-provider",
 	"log-reporter",
-	"observe-run",
 	"qualify",
 	"qualify-run",
 	"session-reporter",

@@ -10,6 +10,7 @@
     "/tooling/github-collaboration",
     "/tooling/local-collaboration",
     "/tooling/memory-store",
+    "/tooling/observe",
     "/tooling/scaffold",
     "/typescript/extension"
   ],
@@ -139,6 +140,11 @@
         {
           "kind": "project-dependency",
           "consumerProject": "/tooling/memory-store",
+          "producerProject": "/tooling/extension-sdk"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/observe",
           "producerProject": "/tooling/extension-sdk"
         },
         {
@@ -783,6 +789,106 @@
         {
           "kind": "project-dependency",
           "consumerProject": "/tooling/memory-store",
+          "producerProject": "/protocols/workspace"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/observe",
+          "producerProject": "/protocols/architecture"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/observe",
+          "producerProject": "/protocols/capabilities"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/observe",
+          "producerProject": "/protocols/cli"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/observe",
+          "producerProject": "/protocols/collaboration"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/observe",
+          "producerProject": "/protocols/database"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/observe",
+          "producerProject": "/protocols/diagnostic"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/observe",
+          "producerProject": "/protocols/distribution"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/observe",
+          "producerProject": "/protocols/events"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/observe",
+          "producerProject": "/protocols/evidence"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/observe",
+          "producerProject": "/protocols/extension"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/observe",
+          "producerProject": "/protocols/features"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/observe",
+          "producerProject": "/protocols/gomod"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/observe",
+          "producerProject": "/protocols/infra"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/observe",
+          "producerProject": "/protocols/job"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/observe",
+          "producerProject": "/protocols/oci"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/observe",
+          "producerProject": "/protocols/put"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/observe",
+          "producerProject": "/protocols/registry"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/observe",
+          "producerProject": "/protocols/runtime"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/observe",
+          "producerProject": "/protocols/storage"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/observe",
           "producerProject": "/protocols/workspace"
         },
         {

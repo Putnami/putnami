@@ -1,11 +1,11 @@
 # Repository adoption matrix
 
-This repository maps **98 of its 157 projects** to **10 architecture domains**.
+This repository maps **99 of its 158 projects** to **10 architecture domains**.
 The other **59 are excluded on purpose**: 28 samples, 7 templates, 2 template
 proofs, 2 protocol proofs, the standalone area detector, the 2 Cloud runtime
 destinations, the Cloud CLI extension with its 14 generated clients, the new
 development verb vocabulary and the new evidence report readers. Every one of
-the 157 appears in a table below, mapped or excluded, with a reason.
+the 158 appears in a table below, mapped or excluded, with a reason.
 
 The matrix exists so the adoption frontier is measurable instead of implied.
 `putnami architecture validate` proves that every mapped project's cross-domain
@@ -32,7 +32,7 @@ an unmapped project is simply invisible to it. This file is that second half.
 | `protocols` | `protocols` | 42 | `protocols/putnami.architecture.json` |
 | `go-framework` | `framework` | 24 | `go/framework/putnami.architecture.json` |
 | `typescript-framework` | `framework` | 14 | `typescript/framework/putnami.architecture.json` |
-| `extension-providers` | `extension-providers` | 8 | `go/extension/putnami.architecture.json` |
+| `extension-providers` | `extension-providers` | 9 | `go/extension/putnami.architecture.json` |
 | `cli` | `cli` | 5 | `tooling/cli/putnami.architecture.json` |
 | `sdd` | `sdd` | 1 | `tooling/sdd-extension/putnami.architecture.json` |
 | `extension-sdk` | `tooling` | 1 | `tooling/extension-sdk/putnami.architecture.json` |
@@ -158,7 +158,7 @@ tenant TypeScript application links, with the same authority relationship as
 | `/typescript/framework/utils` | `@putnami/utils` | The shared primitives the other packages build on. |
 | `/typescript/framework/web` | `@putnami/web` | Routing, rendering, islands, and the web pipeline. |
 
-### `extension-providers` — 8 projects
+### `extension-providers` — 9 projects
 
 **Membership test:** the project is an extension binary that *answers the
 orchestrator* — it owns the probe answers, the lifecycle jobs, the verification
@@ -175,6 +175,7 @@ authority is what it reports, not what it builds.
 | `/tooling/github-collaboration` | `@putnami/github-collaboration` | The task and proposal provider results for GitHub: how a GitHub issue or pull request maps onto the collaboration contracts. |
 | `/tooling/local-collaboration` | `@putnami/local-collaboration` | The task and proposal provider results for the local file-backed store. |
 | `/tooling/memory-store` | `@putnami/memory-store` | The memory provider results for the file and Git stores: context selection and compare-and-set checkpoints. |
+| `/tooling/observe` | `@putnami/observe` | What a CI job reports about its change: the repository key, the diff base, the changed files, the reports it found, and the change evidence document. |
 
 ### `cli` — 5 projects
 
