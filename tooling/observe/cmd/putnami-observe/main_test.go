@@ -67,7 +67,9 @@ func TestTheManifestDeclaresAWorkspaceOptionalCommand(t *testing.T) {
 
 func git(t *testing.T, dir string, args ...string) string {
 	t.Helper()
-	cmd := exec.Command("git", args...)
+	// The fixture's commits run no automatic maintenance, so every git
+	// process has exited when the test removes its directories.
+	cmd := exec.Command("git", append([]string{"-c", "maintenance.auto=false", "-c", "gc.auto=0"}, args...)...)
 	cmd.Dir = dir
 	cmd.Env = append(os.Environ(),
 		"GIT_CONFIG_GLOBAL=/dev/null", "GIT_CONFIG_NOSYSTEM=1",

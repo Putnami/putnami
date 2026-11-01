@@ -30,15 +30,12 @@ type fixture struct {
 
 func run(t *testing.T, dir string, args ...string) string {
 	t.Helper()
-	cmd := exec.Command("git", args...)
+	// The fixture's own commits and fetches run no automatic maintenance, so
+	// every git process has exited when the test removes its directories.
+	cmd := exec.Command("git", append([]string{"-c", "maintenance.auto=false", "-c", "gc.auto=0"}, args...)...)
 	cmd.Dir = dir
-	// The fixture's own commits and fetches start no automatic maintenance
-	// either: a detached repack would still write in a temporary directory
-	// the test is removing.
 	cmd.Env = append(gitEnv(),
 		"GIT_CONFIG_GLOBAL=/dev/null", "GIT_CONFIG_NOSYSTEM=1",
-		"GIT_CONFIG_COUNT=2", "GIT_CONFIG_KEY_0=maintenance.auto", "GIT_CONFIG_VALUE_0=false",
-		"GIT_CONFIG_KEY_1=gc.auto", "GIT_CONFIG_VALUE_1=0",
 		"GIT_AUTHOR_NAME=t", "GIT_AUTHOR_EMAIL=t@example.com",
 		"GIT_COMMITTER_NAME=t", "GIT_COMMITTER_EMAIL=t@example.com")
 	out, err := cmd.CombinedOutput()
@@ -138,7 +135,7 @@ func traceGit(t *testing.T) string {
 }
 
 // noMaintenance fails when a traced git command started automatic
-// maintenance, which goes on writing in the checkout after observe exits.
+// maintenance.
 func noMaintenance(t *testing.T, trace string) {
 	t.Helper()
 	file, err := os.Open(trace)

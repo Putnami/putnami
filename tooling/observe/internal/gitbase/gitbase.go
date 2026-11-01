@@ -319,9 +319,8 @@ func (g git) shallow() bool {
 	return err == nil && out == "true"
 }
 
-// fetchArgs start every fetch. --no-auto-maintenance keeps a fetch from
-// starting a detached `git maintenance run --auto`, which would go on
-// repacking the caller's history after observe exits.
+// fetchArgs start every fetch. A fetch runs no automatic maintenance, so no
+// git process outlives observe in the caller's checkout.
 var fetchArgs = []string{"fetch", "--quiet", "--no-tags", "--no-write-fetch-head", "--no-recurse-submodules", "--no-auto-maintenance"}
 
 // fetch fetches refspec from origin, depth commits deep when depth > 0.
