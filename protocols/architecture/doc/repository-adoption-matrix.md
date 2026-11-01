@@ -331,13 +331,16 @@ protocols and the extension SDK need.
 
 **Why excluded:** `@putnami/evidence-readers` is a new project. It reads the
 JUnit, LCOV, Cobertura, Clover and Go cover reports a CI already wrote into
-test cases and line coverage; `/typescript/extension` reads its own reports
-through it. A new project starts excluded (rule 4), and no review has yet
-named the domain that owns the reading of CI reports.
+test cases and line coverage. Unlike the other excluded libraries, it already
+has a workspace consumer: `/typescript/extension` reads its own reports
+through it. A new project starts excluded (rule 4), and the domain that owns
+the reading of CI reports stays undecided until the library's second consumer,
+the observe extension, settles who reads them.
 
-**What would change it:** a review that states which domain carries that
-reading, with the exact cross-domain permissions its import of the protocols
-and its consumers in `extension-providers` need.
+**What would change it:** a second consumer, or a review before it, that
+states which domain carries that reading, with the exact cross-domain
+permissions its import of the protocols and its consumer in
+`extension-providers` need.
 
 | Project | Class | Owner |
 |---|---|---|

@@ -231,13 +231,16 @@ its declarations complete, so there has never been debt to record.
 The excluded 59 are the 28 samples, 7 templates, 2 template proofs, 2 protocol
 proofs, the standalone area detector, the 2 Cloud runtime
 destinations, the Cloud CLI extension with its 14 generated clients, the
-development verb vocabulary and the evidence report readers. Samples, templates and proofs prove or
-seed the public API without owning a fact another repository project consumes.
+development verb vocabulary and the evidence report readers. Samples,
+templates and proofs prove or seed the public API without owning a fact another repository project consumes.
 The area detector reads the manifests of repositories that are not Putnami
 workspaces; no repository project imports it, and no existing domain owns that
 reading. Mapping it now would imply an authority that domain does not hold.
 The Cloud runtime destinations and the Cloud CLI extension are hosted-platform
 client code that no repository project links from the workspace.
+The development verb vocabulary and the evidence report readers are new
+projects, excluded until a review names the domain that owns their authority;
+the TypeScript extension already reads its reports through the readers.
 The full inventory, the reason for every exclusion, and the completion rule live
 in [`doc/repository-adoption-matrix.md`](doc/repository-adoption-matrix.md), and
 `TestEveryWorkspaceProjectIsClassified` in
