@@ -16,7 +16,7 @@
   "requirements": [
     {
       "id": "junit-reads-every-case",
-      "text": "ReadJUnit reads a testsuites or testsuite root, at any depth, into one case per testcase element in document order, with its name, classname, enclosing suites, file, line, duration in milliseconds and failure or skip. A case's file is its file attribute, else the one of its nearest enclosing suite that states one. A failure or error element fails the case, a skipped element skips it, and a case with neither passed."
+      "text": "ReadJUnit reads a testsuites or testsuite root, up to MaxSuiteDepth nested suites, into one case per testcase element in document order, with its name, classname, enclosing suites, file, line, duration in milliseconds and failure or skip. A case's file is its file attribute, else the one of its nearest enclosing suite that states one. A failure or error element fails the case, a skipped element skips it, and a case with neither passed."
     },
     {
       "id": "coverage-reads-every-instrumented-line",
@@ -32,7 +32,7 @@
     },
     {
       "id": "malformed-reports-are-diagnostics",
-      "text": "A report that does not decode, whose root is not its format's, or that states an impossible value (a line below 1, a negative count, a malformed record) returns no case and no file, and one error diagnostic of code readers.malformed. A report larger than MaxReportBytes, or whose files mark more than MaxLineMarks lines, returns readers.too_large, and ReadFile returns readers.missing for a file that does not exist. No input makes a reader panic."
+      "text": "A report that does not decode, whose root is not its format's, or that states an impossible value (a line below 1, a negative count, a malformed record, suites nested deeper than MaxSuiteDepth) returns no case and no file, and one error diagnostic of code readers.malformed. A report larger than MaxReportBytes, or whose files mark more than MaxLineMarks lines, returns readers.too_large, and ReadFile returns readers.missing for a file that does not exist. No input makes a reader panic."
     }
   ]
 }
