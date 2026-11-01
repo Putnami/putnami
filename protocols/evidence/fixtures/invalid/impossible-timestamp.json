@@ -1,0 +1,25 @@
+{
+  "protocolVersion": 1,
+  "subject": {
+    "provider": "generic",
+    "repository": "internal/tools",
+    "sha": "4f6c2a9e1b7d3c5a8e0f2b4d6a8c0e1f3a5b7c9d"
+  },
+  "ci": {
+    "system": "generic"
+  },
+  "producer": {
+    "name": "@putnami/observe",
+    "version": "0.1.0"
+  },
+  "generatedAt": "2026-13-40T25:61:00Z",
+  "changedFiles": [],
+  "components": [
+    {
+      "id": ".",
+      "ecosystem": "go",
+      "source": "fallback",
+      "impact": "unaffected"
+    }
+  ]
+}

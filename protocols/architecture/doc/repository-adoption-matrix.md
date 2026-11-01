@@ -1,10 +1,10 @@
 # Repository adoption matrix
 
-This repository maps **97 of its 155 projects** to **10 architecture domains**.
+This repository maps **98 of its 156 projects** to **10 architecture domains**.
 The other **58 are excluded on purpose**: 28 samples, 7 templates, 2 template
 proofs, 2 protocol proofs, the standalone area detector, the 2 Cloud runtime
 destinations, the Cloud CLI extension with its 14 generated clients, and the new
-development verb vocabulary. Every one of the 155 appears in a table below,
+development verb vocabulary. Every one of the 156 appears in a table below,
 mapped or excluded, with a reason.
 
 The matrix exists so the adoption frontier is measurable instead of implied.
@@ -29,7 +29,7 @@ an unmapped project is simply invisible to it. This file is that second half.
 
 | Domain | Owner | Projects | Manifest |
 |---|---|---|---|
-| `protocols` | `protocols` | 41 | `protocols/putnami.architecture.json` |
+| `protocols` | `protocols` | 42 | `protocols/putnami.architecture.json` |
 | `go-framework` | `framework` | 24 | `go/framework/putnami.architecture.json` |
 | `typescript-framework` | `framework` | 14 | `typescript/framework/putnami.architecture.json` |
 | `extension-providers` | `extension-providers` | 8 | `go/extension/putnami.architecture.json` |
@@ -51,7 +51,7 @@ from the directory.
 Each section states the domain's **membership test** first. A project belongs
 because it passes that test, not because of where its directory sits.
 
-### `protocols` — 41 projects
+### `protocols` — 42 projects
 
 **Membership test:** the project decides what one wire document *means*. It owns
 that document's strict parser, its validator, and its canonical writer, and no
@@ -76,6 +76,7 @@ other project in the repository may reinterpret it.
 | `/protocols/doccov` | `go.putnami.dev/protocol/doccov` | The documentation-coverage guard over the wire contracts. |
 | `/protocols/doctor` | `go.putnami.dev/protocol/doctor` | The environment-diagnosis wire, contract only, never the engine. |
 | `/protocols/events` | `go.putnami.dev/protocol/events` | The event/messaging resource contract. |
+| `/protocols/evidence` | `go.putnami.dev/protocol/evidence` | The change evidence document: one self-reported change in a repository that keeps its own CI. |
 | `/protocols/extension` | `go.putnami.dev/protocol/extension` | `putnami.extension.json`: what an extension may declare. |
 | `/protocols/features` | `go.putnami.dev/protocol/features` | Feature manifests, specs, criteria, and verification reports. |
 | `/protocols/gomod` | `go.putnami.dev/protocol/gomod` | The Go module registry write protocol. |

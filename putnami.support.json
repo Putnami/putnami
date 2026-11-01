@@ -408,6 +408,12 @@
       "status": "preview"
     },
     {
+      "id": "go.putnami.dev/protocol/evidence",
+      "kind": "protocol",
+      "status": "experimental",
+      "default": false
+    },
+    {
       "id": "go.putnami.dev/protocol/extension",
       "kind": "protocol",
       "status": "stable"

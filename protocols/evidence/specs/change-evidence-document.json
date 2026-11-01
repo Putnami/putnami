@@ -1,0 +1,76 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-spec.json",
+  "protocolVersion": 1,
+  "feature": "evidence/change-evidence-document",
+  "outcomes": [
+    "A repository that keeps its own CI describes one change, what it touches, its tests, its coverage and its dependency changes, in one versioned document that any reader interprets the same way.",
+    "A producer and every reader share one schema, one strict parser and one fixture corpus, so a document either validates everywhere or is refused with the same codes.",
+    "A document is internally consistent and bounded: every reference resolves, every count adds up, and no member grows without limit."
+  ],
+  "nonGoals": [
+    "Collecting the reports, detecting components or computing the analyses, which the observe extension owns.",
+    "Uploading the document or deciding how much a reader trusts it: the document carries no verdict and no trust claim, and a reader treats it as self-reported.",
+    "Spec, architecture or task evidence, which later protocol versions or other protocols carry."
+  ],
+  "requirements": [
+    {
+      "id": "version-1-and-closed-vocabularies",
+      "text": "Documents are protocol version 1. The code host is github, gitlab or generic; the CI system is github-actions, gitlab-ci or generic; a component source is orchestrator, workspace, manifest, fallback or declared; a component impact is changed, dependent or unaffected; a file status is added, modified, deleted or renamed; a dependency change is added, removed, upgraded, downgraded or changed. Ecosystems are open lowercase slugs. Every validation code starts with evidence."
+    },
+    {
+      "id": "one-member-set",
+      "text": "For every object, schemas/evidence.json declares exactly the members of the Go type, and so does the strict decoder's case-sensitive member walk. The schema's enums are the Go vocabularies and its patterns are the expressions the Go validator applies."
+    },
+    {
+      "id": "one-fixture-corpus",
+      "text": "fixtures/expectations.json lists exactly the fixtures on disk. The reader validates each valid fixture without an error and gives each invalid fixture exactly its listed distinct codes, all in the closed validation set."
+    },
+    {
+      "id": "parsing-is-strict",
+      "text": "The reader refuses with evidence.parse_error bytes that are not JSON, a second document after the first, a document that is not an object, or a member of the wrong type. A member the schema does not declare, at any depth and compared case-sensitively, is evidence.unknown_field at its dotted path. A required top-level member that is absent or null, and an empty producer name or version, is evidence.required."
+    },
+    {
+      "id": "the-subject-names-the-change",
+      "text": "The subject names its code host and its repository, else evidence.required, and a commit sha of 40 or 64 lowercase hexadecimal characters; a base sha, when present, has the same form, and a document with changed files or changed-line coverage has one. A github or gitlab subject names its host, a lowercase DNS name with an optional port, and its numeric project id, the key that survives a rename. A change request number is positive. Any other defect is evidence.invalid_subject."
+    },
+    {
+      "id": "the-ci-run-is-identified",
+      "text": "The CI system is github-actions, gitlab-ci or generic; the run and job ids and the attempt, when present, identify the document among the runs, jobs and re-runs of one commit, and the attempt is positive; the run URL is https and carries no credentials. Any defect is evidence.invalid_ci."
+    },
+    {
+      "id": "paths-stay-in-the-repository",
+      "text": "Every path is relative to the repository root, slash-separated, non-empty, with no leading slash, no drive letter, no backslash, no control character and no empty, dot or dot-dot segment; a component id is such a path or the root, written as a single dot. A renamed file names a previous path that differs from its path, and no other status names one. A changed-line coverage file is a changed file that was not deleted. Any defect, or an unknown file status, is evidence.invalid_path."
+    },
+    {
+      "id": "references-resolve",
+      "text": "Component ids, the edges of one component, changed file paths, changed-line coverage files, and the components of tests and coverage entries are unique, else evidence.duplicate. Every component a changed file, a dependency edge, a tests or coverage entry or a dependency change names exists, and an edge is never empty, else evidence.unknown_component."
+    },
+    {
+      "id": "components-are-well-formed",
+      "text": "A component's ecosystem is a lowercase slug and its source is known; a component never depends on itself; a changed file lies inside the directory of the component it names. Any defect is evidence.invalid_component."
+    },
+    {
+      "id": "impact-is-consistent",
+      "text": "A component is changed exactly when a changed file belongs to it; it is dependent exactly when it is not changed and reaches a changed component through its dependency edges; every other component is unaffected. Any other impact is evidence.invalid_impact."
+    },
+    {
+      "id": "counts-add-up",
+      "text": "Counts and durations are non-negative; covered lines never exceed total lines; a tests entry lists no more failing cases than it counts failures; the changed-line coverage totals are the sums of its files; uncovered line numbers are positive, strictly increasing, and no more than the file's uncovered lines. Any defect is evidence.invalid_count."
+    },
+    {
+      "id": "dependency-changes-are-well-formed",
+      "text": "A dependency change names its ecosystem, a lockfile that is a changed file, and its package. An added package has a to version and no from version, a removed one a from version and no to version, and every other change both versions, which differ. Any defect is evidence.invalid_dependency_change."
+    },
+    {
+      "id": "the-document-is-bounded",
+      "text": "A document holds at most 20000 changed files, 5000 components, 100000 dependency edges, 10000 dependency changes, 20000 changed-line coverage files and 500 diagnostics; a tests entry at most 50 failing cases, a file at most 200 uncovered line numbers, and every string at most 4096 bytes. A larger member is evidence.too_large. Checking the impact is linear in the components and the edges."
+    },
+    {
+      "id": "timestamps-and-diagnostics-are-well-formed",
+      "text": "generatedAt is a valid RFC 3339 timestamp with a zone, else evidence.invalid_timestamp. A reader diagnostic has a known severity, a dotted lowercase code and a message, else evidence.invalid_diagnostic; whatever its severity, it never makes the document invalid."
+    }
+  ],
+  "decisions": [
+    "protocols/evidence/doc/adr/0001-one-self-reported-change-evidence-document.md"
+  ]
+}

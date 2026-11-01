@@ -1,0 +1,106 @@
+{
+  "valid": [
+    "dependency-cycle.json",
+    "generic-minimal.json",
+    "symfony-merge-request.json",
+    "turbo-pull-request.json"
+  ],
+  "invalid": {
+    "added-with-a-from-version.json": [
+      "evidence.invalid_dependency_change"
+    ],
+    "case-alias-member.json": [
+      "evidence.unknown_field"
+    ],
+    "changed-line-totals-are-not-the-sums.json": [
+      "evidence.invalid_count"
+    ],
+    "changed-without-a-changed-file.json": [
+      "evidence.invalid_impact"
+    ],
+    "ci-url-with-credentials.json": [
+      "evidence.invalid_ci"
+    ],
+    "covered-above-total.json": [
+      "evidence.invalid_count"
+    ],
+    "dependent-without-a-changed-dependency.json": [
+      "evidence.invalid_impact"
+    ],
+    "diagnostic-without-a-dotted-code.json": [
+      "evidence.invalid_diagnostic"
+    ],
+    "diff-without-a-base.json": [
+      "evidence.invalid_subject"
+    ],
+    "duplicate-component.json": [
+      "evidence.duplicate"
+    ],
+    "empty-dependency-edge.json": [
+      "evidence.unknown_component"
+    ],
+    "file-outside-its-component.json": [
+      "evidence.invalid_component"
+    ],
+    "github-without-project-id.json": [
+      "evidence.invalid_subject"
+    ],
+    "host-with-a-trailing-dot.json": [
+      "evidence.invalid_subject"
+    ],
+    "impossible-timestamp.json": [
+      "evidence.invalid_timestamp"
+    ],
+    "local-timestamp.json": [
+      "evidence.invalid_timestamp"
+    ],
+    "lockfile-that-did-not-change.json": [
+      "evidence.invalid_dependency_change"
+    ],
+    "missing-components.json": [
+      "evidence.required"
+    ],
+    "missing-producer.json": [
+      "evidence.required"
+    ],
+    "more-failing-cases-than-failures.json": [
+      "evidence.invalid_count"
+    ],
+    "not-an-object.json": [
+      "evidence.parse_error"
+    ],
+    "oversized-message.json": [
+      "evidence.too_large"
+    ],
+    "path-escapes-the-repository.json": [
+      "evidence.invalid_path"
+    ],
+    "renamed-without-previous-path.json": [
+      "evidence.invalid_path"
+    ],
+    "too-many-failing-cases.json": [
+      "evidence.too_large"
+    ],
+    "unknown-ci-system.json": [
+      "evidence.invalid_ci"
+    ],
+    "unknown-component.json": [
+      "evidence.unknown_component"
+    ],
+    "unknown-field.json": [
+      "evidence.unknown_field"
+    ],
+    "upgraded-to-the-same-version.json": [
+      "evidence.invalid_dependency_change"
+    ],
+    "uppercase-sha.json": [
+      "evidence.invalid_subject"
+    ],
+    "version-2.json": [
+      "evidence.unsupported_protocol_version"
+    ],
+    "zero-change-request.json": [
+      "evidence.invalid_subject"
+    ]
+  }
+}
