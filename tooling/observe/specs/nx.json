@@ -1,0 +1,39 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-spec.json",
+  "protocolVersion": 1,
+  "feature": "tooling/observe-nx",
+  "outcomes": [
+    "In an Nx repository, observe knows which Nx project owns each changed file and which projects depend on it, with or without a graph export",
+    "When the CI ran nx graph --file=graph.json, Nx is the authority: its project graph, source imports included, is the one observe uses",
+    "Without an export, observe reads the Nx configuration and the package manager workspace, and never runs nx",
+    "The change analysis learns where each project's tests write their reports and which lockfile pins its dependencies"
+  ],
+  "nonGoals": [
+    "Running nx or any package manager command",
+    "Edges that only source imports carry, without a graph export: Nx computes them from the code, and the export carries them",
+    "Nx plugins that infer projects from files other than project.json and package.json",
+    "Mapping changed files and reports to projects, changed-line coverage and lockfile diffs: the change analyses own them",
+    "Running the detector as its own extension: it lives in @putnami/observe until a host call runs probes outside a workspace"
+  ],
+  "requirements": [
+    {
+      "id": "graph-export",
+      "text": "When the repository root holds graph.json, or the file the caller names, and it is an Nx graph export (graph.nodes and graph.dependencies), each project node is a project at its data.root, and each dependency between two project nodes is an edge, whatever its type. External nodes such as npm packages are dropped. A missing file is no finding; a file that is not an export is a warning when the caller named it or nx.json exists, and the configuration answers instead."
+    },
+    {
+      "id": "configuration",
+      "text": "Without a usable export, a root nx.json makes an Nx workspace. Its projects are the directories holding a project.json, and those whose package.json the package manager workspace lists; node_modules, dist and hidden directories are skipped. Edges come from implicitDependencies (names, * patterns, tag: selectors, ! exclusions) and from package dependencies naming another project's package. A malformed manifest is a warning and is skipped. Without nx.json and export, there is no Nx project."
+    },
+    {
+      "id": "change-inputs",
+      "text": "Each project's metadata names its Nx project name, the ecosystem nx, its component source (orchestrator for an export, workspace otherwise), the repository-relative outputs of its test targets, and the root lockfile. A test target is named test, test-*, test:*, *-test or e2e, or its executor ends in :test or runs jest, vitest, playwright or cypress. Outputs come from the target, else nx.json targetDefaults; Nx tokens are resolved, a glob is cut to its directory, and the rest is dropped."
+    },
+    {
+      "id": "probe-wire",
+      "text": "The detector answers a workspace probe request with a workspace probe result for the extension @putnami/observe: projects keyed by their repository-relative path, the manifest each name was read from, dependencies as project paths, metadata as a JSON object, and the files whose content changes the answer. The answer passes the probe protocol's strict validation. A request that names candidate paths gets only the projects among them."
+    }
+  ],
+  "decisions": [
+    "tooling/cli/doc/adr/0051-user-scope-extensions-run-without-a-workspace.md"
+  ]
+}
