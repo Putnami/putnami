@@ -2,7 +2,7 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://putnami.dev/schemas/putnami-change-evidence.json",
   "title": "Putnami Change Evidence",
-  "description": "One change in a repository that keeps its own CI, as one CI job observed it: the files it touches, the components they belong to and the components that depend on them, tests and coverage per component, the coverage of the changed lines and the dependency changes. The document is self-reported: it carries no verdict and no trust claim. It is consistent (every reference resolves, every impact follows from the files and the edges, every count adds up) and bounded. Every string holds at most 4096 bytes.",
+  "description": "One change in a repository that keeps its own CI, as one CI job observed it: the files it touches, the components they belong to and the components that depend on them, tests and coverage per component, the coverage of the changed lines and the dependency changes. The document is self-reported: it carries no verdict and no trust claim. It is consistent (every reference resolves, every impact follows from the files and the edges, every count adds up) and bounded. Every string holds at most 4096 bytes of UTF-8, which the strict reader checks; a schema validator counts characters, so it is the looser of the two.",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -327,7 +327,8 @@
           "type": "array",
           "items": {
             "type": "string",
-            "maxLength": 4096
+            "maxLength": 4096,
+            "minLength": 1
           },
           "description": "The ids of the components this one depends on."
         }

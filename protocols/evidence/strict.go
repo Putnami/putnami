@@ -347,7 +347,7 @@ func (v *validator) ci(ci CI) {
 	if !slices.Contains(CISystems, ci.System) {
 		v.add(ErrorCodeInvalidCI, "ci.system", "system %q is not one of %s", ci.System, strings.Join(CISystems, ", "))
 	}
-	if ci.Attempt < 0 {
+	if ci.Attempt != nil && *ci.Attempt < 1 {
 		v.add(ErrorCodeInvalidCI, "ci.attempt", "an attempt number starts at 1")
 	}
 	if ci.URL == "" {

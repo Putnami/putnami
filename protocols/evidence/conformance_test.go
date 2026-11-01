@@ -422,7 +422,7 @@ func TestConformance_EachCIDefectGetsItsCode(t *testing.T) {
 		"http run url":       func(d *Document) { d.CI.URL = "http://github.com/run/1" },
 		"credentials in url": func(d *Document) { d.CI.URL = "https://token:x@github.com/run/1" },
 		"unknown ci":         func(d *Document) { d.CI.System = "circleci" },
-		"negative attempt":   func(d *Document) { d.CI.Attempt = -1 },
+		"attempt zero":       func(d *Document) { zero := 0; d.CI.Attempt = &zero },
 	}
 	for label, mutate := range cases {
 		expectCodes(t, label, codesOf(t, "turbo-pull-request.json", mutate), ErrorCodeInvalidCI)

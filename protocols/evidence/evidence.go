@@ -191,7 +191,7 @@ type CI struct {
 	JobID string `json:"jobId,omitempty"`
 	// Attempt is the run's attempt number, from 1, when the CI system re-runs a
 	// run under the same id.
-	Attempt int `json:"attempt,omitempty"`
+	Attempt *int `json:"attempt,omitempty"`
 	// URL is the run's page, https and without credentials.
 	URL string `json:"url,omitempty"`
 }
