@@ -11,6 +11,10 @@
     "tooling/observe-composer#analysis-inputs",
     "tooling/observe-composer#areas",
     "tooling/observe-composer#components-from-manifests",
-    "tooling/observe-composer#path-repository-edges"
+    "tooling/observe-composer#path-repository-edges",
+    "tooling/observe-nx#change-inputs",
+    "tooling/observe-nx#configuration",
+    "tooling/observe-nx#graph-export",
+    "tooling/observe-nx#probe-wire"
   ]
 }

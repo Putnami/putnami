@@ -167,6 +167,72 @@
           }
         }
       ]
+    },
+    {
+      "id": "tooling/observe-nx",
+      "type": "feature",
+      "name": "Read the projects and dependency graph of an Nx workspace",
+      "outcome": "putnami observe learns the Nx projects of a repository, which directory each one owns, which projects each one depends on, where its tests write their reports and which lockfile pins its dependencies, from the graph export the CI wrote when there is one and from the Nx configuration otherwise, without running nx",
+      "owner": "tooling",
+      "target": "modeled",
+      "requirements": [
+        {
+          "id": "graph-export",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-graph-export-gives-the-projects-and-their-edges",
+              "a-malformed-graph-export-falls-back-to-the-configuration"
+            ]
+          }
+        },
+        {
+          "id": "configuration",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "project-json-and-workspace-package-json-are-projects",
+              "edges-come-from-implicit-dependencies-and-package-dependencies",
+              "a-repository-without-nx-has-no-nx-project"
+            ]
+          }
+        },
+        {
+          "id": "change-inputs",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-project-names-its-test-outputs-and-its-lockfile"
+            ]
+          }
+        },
+        {
+          "id": "probe-wire",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-answer-is-a-valid-probe-result",
+              "the-nx-demo-maps-changed-files-with-and-without-a-graph-export"
+            ]
+          }
+        }
+      ]
     }
   ]
 }
