@@ -15,6 +15,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"slices"
 	"strings"
 
 	diag "go.putnami.dev/protocol/diagnostic"
@@ -318,9 +319,13 @@ func (g git) shallow() bool {
 	return err == nil && out == "true"
 }
 
+// fetchArgs start every fetch. A fetch runs no automatic maintenance, so no
+// git process outlives observe in the caller's checkout.
+var fetchArgs = []string{"fetch", "--quiet", "--no-tags", "--no-write-fetch-head", "--no-recurse-submodules", "--no-auto-maintenance"}
+
 // fetch fetches refspec from origin, depth commits deep when depth > 0.
 func (g git) fetch(depth int, refspec string) error {
-	args := []string{"fetch", "--quiet", "--no-tags", "--no-write-fetch-head", "--no-recurse-submodules"}
+	args := slices.Clone(fetchArgs)
 	if depth > 0 {
 		args = append(args, fmt.Sprintf("--depth=%d", depth))
 	}
@@ -332,7 +337,7 @@ func (g git) fetch(depth int, refspec string) error {
 // commits. A remote that refuses a fetch by commit id is deepened through
 // its configured refspecs.
 func (g git) deepen(step int, base, head string) error {
-	args := []string{"fetch", "--quiet", "--no-tags", "--no-write-fetch-head", "--no-recurse-submodules", fmt.Sprintf("--deepen=%d", step), "--end-of-options", remote}
+	args := append(slices.Clone(fetchArgs), fmt.Sprintf("--deepen=%d", step), "--end-of-options", remote)
 	if _, err := g.raw(append(args, head, base)...); err == nil {
 		return nil
 	}
