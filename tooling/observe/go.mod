@@ -10,12 +10,12 @@ require (
 	go.putnami.dev/protocol/job v0.0.0
 	go.putnami.dev/protocol/workspace v0.0.0
 	go.putnami.dev/sdk/extension v0.0.0
+	golang.org/x/mod v0.36.0
 )
 
 require (
 	go.putnami.dev/protocol/cli v0.0.0 // indirect
 	go.putnami.dev/protocol/runtime v0.0.0 // indirect
-	golang.org/x/mod v0.36.0
 	golang.org/x/sys v0.44.0 // indirect
 )
 

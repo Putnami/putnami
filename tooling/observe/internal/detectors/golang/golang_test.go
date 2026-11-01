@@ -324,7 +324,7 @@ func TestGoModRequiresAreTheLockedVersions(t *testing.T) {
 		t.Fatalf("lockfiles %+v", got)
 	}
 	base := []byte("module github.com/Putnami/demo-observe-go/api\nrequire (\n\tgithub.com/Putnami/demo-observe-go/pricing v0.0.0\n\tgithub.com/google/uuid v1.5.0\n)\nrequire golang.org/x/text v0.20.0 // indirect\nreplace github.com/Putnami/demo-observe-go/pricing => ../pricing\n")
-	locked, err := d.ReadLock("api/go.mod", base)
+	locked, err := d.ReadLock("api/go.mod", base, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -362,7 +362,7 @@ replace example.com/b v1.0.0 => example.com/fork v2.0.0
 replace example.com/c v0.9.0 => example.com/c v0.9.1
 replace example.com/d => ./d
 replace example.com/e => ../../outside
-`))
+`), nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -374,8 +374,16 @@ replace example.com/e => ../../outside
 	if !reflect.DeepEqual(locked, want) {
 		t.Fatalf("locked %+v, want %+v", locked, want)
 	}
-	if _, err := d.ReadLock("go.mod", []byte("require (\n")); err == nil {
+	if _, err := d.ReadLock("go.mod", []byte("require (\n"), nil); err == nil {
 		t.Fatal("a go.mod that cannot be parsed is not an error")
+	}
+	if _, err := d.ReadLock("go.mod", []byte("module example.com/m\n"), []byte("use (\n")); err == nil {
+		t.Fatal("a go.work that cannot be parsed is not an error")
+	}
+	// A directive a newer go added: the requires are still read.
+	lax, err := d.ReadLock("go.mod", []byte("module example.com/m\nfrobnicate on\nrequire example.com/a v1.0.0\n"), nil)
+	if err != nil || !reflect.DeepEqual(lax, []Locked{{Name: "example.com/a", Version: "v1.0.0"}}) {
+		t.Fatalf("lenient read %+v %v", lax, err)
 	}
 }
 
@@ -387,7 +395,7 @@ func TestARepositoryModuleIsNotALockedDependency(t *testing.T) {
 	if got := module(t, d, "api").DependsOn; !reflect.DeepEqual(got, []string{"pricing"}) {
 		t.Fatalf("api depends on %v", got)
 	}
-	locked, err := d.ReadLock("api/go.mod", []byte(apiGoMod))
+	locked, err := d.ReadLock("api/go.mod", []byte(apiGoMod), nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -457,5 +465,46 @@ func TestTheDemoChangeMapsToItsModuleAndDependents(t *testing.T) {
 	}
 	if !reflect.DeepEqual(dependents, map[string][]string{"pricing": {"api"}}) {
 		t.Fatalf("dependents %v", dependents)
+	}
+}
+
+func TestGoWorkReplacesOverrideTheGoModAndAVersionedReplaceWins(t *testing.T) {
+	spectest.Proves(t, feature, "go-module-edges", "a-local-replace-is-an-edge")
+	spectest.Proves(t, feature, "go-locked-versions", "go-mod-requires-are-the-locked-versions")
+	d := Detect(tree(t, map[string]string{
+		"go.work":         "go 1.23\nuse ./app\nreplace example.com/lib => ./lib-work\n",
+		"app/go.mod":      "module example.com/app\nrequire example.com/lib v1.0.0\nreplace example.com/lib => ../lib-mod\n",
+		"lib-work/go.mod": "module example.com/lib-work\n",
+		"lib-mod/go.mod":  "module example.com/lib-mod\n",
+	}))
+	// go.work sends the require to lib-work; the go.mod's own local replace
+	// stays an edge as well.
+	if got := module(t, d, "app").DependsOn; !reflect.DeepEqual(got, []string{"lib-mod", "lib-work"}) {
+		t.Fatalf("app depends on %v", got)
+	}
+
+	goMod := []byte("module example.com/m\nrequire example.com/x v1.2.0\nreplace example.com/x => example.com/x v1.3.0\nreplace example.com/x v1.2.0 => example.com/x v1.2.1\n")
+	locked, err := d.ReadLock("m/go.mod", goMod, nil)
+	if err != nil || !reflect.DeepEqual(locked, []Locked{{Name: "example.com/x", Version: "v1.2.1"}}) {
+		t.Fatalf("exact-version replace: %+v %v", locked, err)
+	}
+	locked, err = d.ReadLock("m/go.mod", goMod, []byte("go 1.23\nreplace example.com/x => example.com/x v1.4.0\n"))
+	if err != nil || !reflect.DeepEqual(locked, []Locked{{Name: "example.com/x", Version: "v1.4.0"}}) {
+		t.Fatalf("go.work replace: %+v %v", locked, err)
+	}
+	locked, err = d.ReadLock("m/go.mod", goMod, []byte("go 1.23\nreplace example.com/x => ./x\n"))
+	if err != nil || len(locked) != 0 {
+		t.Fatalf("go.work local replace: %+v %v", locked, err)
+	}
+}
+
+func TestAGoWorkUseOutsideTheRepositoryIsADiagnostic(t *testing.T) {
+	spectest.Proves(t, feature, "go-modules-are-components", "an-unreadable-manifest-is-a-diagnostic")
+	d := Detect(tree(t, with(demo, map[string]string{"go.work": "go 1.23\nuse (\n\t./api\n\t./pricing\n\t../elsewhere\n)\n"})))
+	if got := codes(d.Diagnostics); !reflect.DeepEqual(got, []string{CodeManifestInvalid}) {
+		t.Fatalf("diagnostics %v", d.Diagnostics)
+	}
+	if len(d.Modules) != 2 {
+		t.Fatalf("modules %+v", d.Modules)
 	}
 }

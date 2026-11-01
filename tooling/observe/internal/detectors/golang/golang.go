@@ -99,6 +99,9 @@ func Detect(root string) Detection {
 			for _, use := range work.Use {
 				if dir, ok := within(".", use.Path); ok {
 					members[dir] = true
+				} else {
+					d.Diagnostics = append(d.Diagnostics, diag.Warningf(CodeManifestInvalid, GoWork,
+						"go.work uses %s, which is outside the repository and is not a component", use.Path))
 				}
 			}
 			d.workReplaces = work.Replace
@@ -137,8 +140,14 @@ func findModules(root string) ([]string, []diag.Diagnostic) {
 	var diags []diag.Diagnostic
 	walked := 0
 	errBound := errors.New("bound")
-	err := filepath.WalkDir(root, func(file string, entry fs.DirEntry, err error) error {
+	// WalkDir returns only errBound: every other error is a diagnostic.
+	_ = filepath.WalkDir(root, func(file string, entry fs.DirEntry, err error) error {
 		if err != nil {
+			rel, relErr := filepath.Rel(root, file)
+			if relErr != nil {
+				rel = file
+			}
+			diags = append(diags, diag.Warningf(CodeManifestUnreadable, filepath.ToSlash(rel), "%s cannot be searched for go.mod: %v", filepath.ToSlash(rel), err))
 			return nil
 		}
 		walked++
@@ -161,9 +170,6 @@ func findModules(root string) ([]string, []diag.Diagnostic) {
 		}
 		return nil
 	})
-	if err != nil && !errors.Is(err, errBound) {
-		diags = append(diags, diag.Warningf(CodeManifestUnreadable, "", "the repository cannot be walked: %v", err))
-	}
 	return dirs, diags
 }
 
@@ -233,7 +239,7 @@ func (d *Detection) link() {
 		edges := map[string]bool{}
 		for _, req := range m.file.Require {
 			local := ""
-			if target, ok := d.replace(m.Dir, m.file.Replace, req.Mod.Path, req.Mod.Version); ok {
+			if target, ok := replace(d.workReplaces, m.Dir, m.file.Replace, req.Mod.Path, req.Mod.Version); ok {
 				if target.local != "" {
 					local = target.local
 				} else if target.path != "" {
@@ -277,15 +283,15 @@ type replacement struct {
 // version: the root go.work's directives override the go.mod's, as the go
 // command applies them, and a directive for that exact version overrides one
 // for every version.
-func (d *Detection) replace(dir string, own []*modfile.Replace, modulePath, version string) (replacement, bool) {
-	if target, ok := match(".", d.workReplaces, modulePath, version); ok {
+func replace(work []*modfile.Replace, dir string, own []*modfile.Replace, modulePath, version string) (replacement, bool) {
+	if target, ok := match(".", work, modulePath, version); ok {
 		return target, true
 	}
 	return match(dir, own, modulePath, version)
 }
 
 func match(base string, list []*modfile.Replace, modulePath, version string) (replacement, bool) {
-	var any *modfile.Replace
+	var every *modfile.Replace
 	for _, r := range list {
 		if r.Old.Path != modulePath {
 			continue
@@ -294,13 +300,13 @@ func match(base string, list []*modfile.Replace, modulePath, version string) (re
 			return replacementOf(base, r), true
 		}
 		if r.Old.Version == "" {
-			any = r
+			every = r
 		}
 	}
-	if any == nil {
+	if every == nil {
 		return replacement{}, false
 	}
-	return replacementOf(base, any), true
+	return replacementOf(base, every), true
 }
 
 func replacementOf(base string, r *modfile.Replace) replacement {
@@ -405,7 +411,9 @@ type Lockfile struct {
 }
 
 // Lockfiles returns each component's go.mod, which holds the versions it
-// selects. go.sum holds checksums, not a selection, so it is not one.
+// selects. go.sum holds checksums, not a selection, so it is not one, and
+// go.work belongs to no component: a change made only in its replace
+// directives shows in no lockfile.
 func (d Detection) Lockfiles() []Lockfile {
 	out := make([]Lockfile, 0, len(d.Modules))
 	for _, m := range d.Modules {
@@ -426,13 +434,25 @@ type Locked struct {
 }
 
 // ReadLock returns the dependencies a go.mod's content locks, sorted by name.
-// A require replaced by a local directory, or of a module the repository
-// holds, is not one: its code is in the repository. A go.mod that cannot be
-// parsed is an error.
-func (d Detection) ReadLock(goModPath string, data []byte) ([]Locked, error) {
-	file, err := modfile.Parse(goModPath, data, nil)
-	if err != nil {
+// goWork is the content of the root go.work at the same commit, nil when it
+// has none: its replace directives override the go.mod's, as the go command
+// applies them. A require replaced by a local directory, or of a module the
+// detected repository holds, is not one: its code is in the repository. A
+// go.mod is read as Detect reads it, so one that only the lenient grammar
+// reads gives its requires without its replace directives; a go.mod or a
+// go.work that no grammar reads is an error.
+func (d Detection) ReadLock(goModPath string, goMod, goWork []byte) ([]Locked, error) {
+	file, err := parseGoMod(goModPath, goMod)
+	if file == nil {
 		return nil, err
+	}
+	var work []*modfile.Replace
+	if goWork != nil {
+		parsed, err := modfile.ParseWork(GoWork, goWork, nil)
+		if err != nil {
+			return nil, err
+		}
+		work = parsed.Replace
 	}
 	dir := path.Dir(filepath.ToSlash(goModPath))
 	internal := map[string]bool{}
@@ -447,7 +467,7 @@ func (d Detection) ReadLock(goModPath string, data []byte) ([]Locked, error) {
 			continue
 		}
 		version := req.Mod.Version
-		if target, ok := d.replace(dir, file.Replace, req.Mod.Path, req.Mod.Version); ok {
+		if target, ok := replace(work, dir, file.Replace, req.Mod.Path, req.Mod.Version); ok {
 			switch {
 			case target.local != "" || target.outside:
 				continue

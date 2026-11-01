@@ -17,7 +17,7 @@
   "requirements": [
     {
       "id": "go-modules-are-components",
-      "text": "Each directory a root go.work uses is a component of source workspace; each other go.mod found, skipping .git, node_modules, vendor, testdata and dot or underscore directories, is one of source manifest. Its id is its directory (. for the root), its name the module path, its ecosystem go. A file belongs to the innermost component holding it. An unreadable or invalid manifest is a diagnostic; a go.mod no grammar reads still makes a component, without name or edges."
+      "text": "Each directory a root go.work uses is a component of source workspace; each other go.mod found, skipping node_modules, vendor, testdata and dot or underscore directories, is one of source manifest. Its id is its directory (. for the root), its name the module path, its ecosystem go. A file belongs to the innermost component. An unreadable or invalid manifest or directory, or a use outside the repository, is a diagnostic; a go.mod no grammar reads is a component without name or edges."
     },
     {
       "id": "go-module-edges",
@@ -29,7 +29,7 @@
     },
     {
       "id": "go-locked-versions",
-      "text": "The locked dependencies of a go.mod are its requires, each with the version the go.mod's replace directives select and whether it is indirect. A require replaced by a local directory, or of a module the repository holds, is not a locked dependency. Each component names its go.mod as its lockfile and its go.mod and go.sum as watched files. Versions compare by Go's semantic version order."
+      "text": "A go.mod locks its requires, each with the version that the replace directives of the go.mod and of the root go.work at the same commit select, and whether it is indirect. A require replaced by a local directory, or of a module the repository holds, is not locked. Each component names its go.mod as its lockfile and its go.mod and go.sum as watched files. Versions compare by Go's semantic version order."
     },
     {
       "id": "go-probe-answer",

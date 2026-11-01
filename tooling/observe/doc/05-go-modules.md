@@ -14,8 +14,8 @@ Each Go module is a component:
 - A directory that the root `go.work` lists in `use` is a component of source
   `workspace`.
 - Any other `go.mod` is a component of source `manifest`. The search skips
-  `.git`, `node_modules`, `vendor`, `testdata` and the directories whose name
-  starts with `.` or `_`, as the `go` command does.
+  `node_modules`, `vendor`, `testdata` and the directories whose name starts
+  with `.` or `_`, such as `.git`.
 
 A component's id is its directory relative to the repository root, `.` for
 the root. Its name is the module path and its ecosystem is `go`. A file
@@ -53,8 +53,10 @@ whose path is its longest prefix, and to that module. For example, in
 ## Dependency versions
 
 Each module's `go.mod` is its lockfile. Its locked dependencies are its
-requires, each with the version its `replace` directives select and whether
-it is `// indirect`. A require replaced by a local directory, or of a module
+requires, each with the version that the `replace` directives of the
+`go.mod` and of the root `go.work` at the same commit select, and whether it
+is `// indirect`. `go.work` belongs to no module, so a change made only in its
+`replace` directives shows in no lockfile. A require replaced by a local directory, or of a module
 of the repository, is not a locked dependency. `go.sum` holds checksums, not
 a selection, so the detector does not read it. Versions compare in Go's
 semantic version order, pseudo-versions included.
@@ -63,7 +65,7 @@ semantic version order, pseudo-versions included.
 
 | Code | Meaning |
 |---|---|
-| `observe.go_manifest_unreadable` | A `go.work` or `go.mod` cannot be read. A module without a readable `go.mod` is not a component. |
-| `observe.go_manifest_invalid` | A `go.work` or `go.mod` cannot be parsed. A `go.mod` that only the lenient grammar reads keeps its module and requires, without its `replace` directives; one that no grammar reads is a component without a name or edges. |
-| `observe.go_duplicate_module` | Two `go.mod` files declare one module path. The first directory, in path order, keeps the name. |
+| `observe.go_manifest_unreadable` | A `go.work`, a `go.mod` or a directory cannot be read. A module without a readable `go.mod` is not a component. |
+| `observe.go_manifest_invalid` | A `go.work` or `go.mod` cannot be parsed, or `go.work` uses a directory outside the repository. A `go.mod` that only the lenient grammar reads keeps its module and requires, without its `replace` directives; one that no grammar reads is a component without a name or edges. |
+| `observe.go_duplicate_module` | Two `go.mod` files declare one module path. Both are components; a require of that path is an edge to the first directory in path order. |
 | `observe.go_walk_bounded` | The search for `go.mod` stopped after 200,000 entries. |
