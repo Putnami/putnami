@@ -1,0 +1,16 @@
+{
+    "name": "demo/pricing",
+    "description": "Order pricing for the demo shop.",
+    "type": "library",
+    "version": "1.0.0",
+    "license": "MIT",
+    "require": {
+        "php": ">=8.4",
+        "brick/math": "0.13.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "Demo\\Pricing\\": "src/"
+        }
+    }
+}

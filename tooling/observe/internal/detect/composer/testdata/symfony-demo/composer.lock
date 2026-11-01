@@ -1,0 +1,8 @@
+{
+    "_readme": ["A trimmed copy of the demo's lockfile: the detector only locates it."],
+    "packages": [
+        {"name": "brick/math", "version": "0.13.1", "type": "library"},
+        {"name": "demo/pricing", "version": "1.0.0", "dist": {"type": "path", "url": "packages/pricing"}, "type": "library"}
+    ],
+    "packages-dev": []
+}

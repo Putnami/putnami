@@ -101,6 +101,72 @@
           }
         }
       ]
+    },
+    {
+      "id": "tooling/observe-composer",
+      "type": "feature",
+      "name": "Find the Composer components and areas of a Symfony application",
+      "outcome": "putnami observe reads the composer.json manifests of a PHP repository without running Composer and knows its components, the edges its path repositories create, the src/ directories that are areas of a component, and the lockfile, test directories and PHPUnit report outputs each component carries, so each changed file maps to its component or area",
+      "owner": "tooling",
+      "target": "modeled",
+      "requirements": [
+        {
+          "id": "components-from-manifests",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "one-component-per-composer-json",
+              "the-answer-is-a-valid-probe-result"
+            ]
+          }
+        },
+        {
+          "id": "path-repository-edges",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-required-path-repository-package-is-an-edge",
+              "a-registry-package-is-not-an-edge"
+            ]
+          }
+        },
+        {
+          "id": "areas",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "autoload-directories-are-areas",
+              "the-symfony-demo-maps-each-changed-file"
+            ]
+          }
+        },
+        {
+          "id": "analysis-inputs",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-lockfile-and-report-outputs-are-exposed",
+              "a-malformed-manifest-is-a-diagnostic"
+            ]
+          }
+        }
+      ]
     }
   ]
 }
