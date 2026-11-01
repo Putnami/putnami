@@ -20,7 +20,7 @@
     },
     {
       "id": "coverage-reads-every-instrumented-line",
-      "text": "ReadLCOV, ReadCobertura, ReadClover and ReadGoCover read a report into one entry per source file, in the order the report first names it, with its instrumented lines in increasing order and each line's hit count. A line the report states more than once keeps its largest count. A file's line and function totals are counted from its lines and functions; an LCOV record that lists none keeps the totals it states."
+      "text": "ReadLCOV, ReadCobertura, ReadClover and ReadGoCover read a report into one entry per source file, in the order the report first names it, with its instrumented lines in increasing order and each line's hit count. A line the report states more than once keeps its largest count. A file's line and function totals are counted from the lines and functions the report lists for it. For a file whose report lists none, they are the totals the report states: LCOV's LF, LH, FNF and FNH, and the methods and coveredmethods metrics of a Clover file."
     },
     {
       "id": "go-cover-blocks-become-lines",

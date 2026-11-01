@@ -37,7 +37,7 @@
             "checks": [
               "real-coverage-reports-read-to-their-expected-lines",
               "a-repeated-line-keeps-its-largest-count",
-              "lcov-stated-totals-stand-without-lines"
+              "stated-totals-stand-when-the-report-lists-none"
             ]
           }
         },
