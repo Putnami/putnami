@@ -307,6 +307,7 @@
             "kind": "acceptance",
             "checks": [
               "the-summary-shows-the-analyses",
+              "a-changed-component-names-the-changed-components-it-depends-on",
               "the-demo-evidence-documents-validate"
             ]
           }
