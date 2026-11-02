@@ -1,0 +1,50 @@
+{
+  "format": "cyclonedx",
+  "specVersion": "1.5",
+  "packages": [
+    {
+      "name": "lodash",
+      "version": "4.17.20",
+      "purl": "pkg:npm/lodash@4.17.20",
+      "licenses": [
+        "MIT"
+      ],
+      "vulnerabilities": [
+        {
+          "id": "GHSA-29mw-wpgm-hmr9",
+          "severity": "medium"
+        },
+        {
+          "id": "GHSA-35jh-r3h4-6jhm",
+          "severity": "high"
+        },
+        {
+          "id": "GHSA-f23m-r3pf-42rh",
+          "severity": "medium"
+        },
+        {
+          "id": "GHSA-r5fr-rjxr-66jc",
+          "severity": "high"
+        },
+        {
+          "id": "GHSA-xxjr-mmjv-4gpg",
+          "severity": "medium"
+        }
+      ]
+    },
+    {
+      "name": "minimist",
+      "version": "1.2.5",
+      "purl": "pkg:npm/minimist@1.2.5",
+      "licenses": [
+        "MIT"
+      ],
+      "vulnerabilities": [
+        {
+          "id": "GHSA-xvch-5gv4-984h",
+          "severity": "critical"
+        }
+      ]
+    }
+  ]
+}

@@ -21,6 +21,7 @@ Every reader takes the report's bytes and returns its result and diagnostics.
 | `ReadCobertura` | Cobertura XML | `CoverageReport`, with the report's source roots |
 | `ReadClover` | Clover XML | `CoverageReport` |
 | `ReadGoCover` | `go test -coverprofile`, mode `set`, `count` or `atomic` | `CoverageReport` |
+| `ReadSBOM` | CycloneDX 1.4, 1.5 or 1.6 JSON (`bomFormat: CycloneDX`), SPDX 2.3 JSON (`spdxVersion: SPDX-2.3`) | `SBOM`: the format, its spec version and one `Package` per component or package |
 
 A `TestCase` keeps its name, classname, enclosing suites (outermost first),
 file and line, status (`passed`, `failed`, `skipped`), duration in
@@ -35,6 +36,23 @@ or no function keeps the totals the report states: LCOV's `LF`, `LH`, `FNF` and
 `FNH`, a Clover file's `methods` and `coveredmethods` metrics. A Go block marks
 every line from its start line to its end line; a block stated twice sums its
 counts in `count` and `atomic` mode.
+
+## Software bills of materials
+
+A software bill of materials (SBOM) lists the packages a build uses.
+`ReadSBOM` reads the one a CI tool wrote, such as osv-scanner, Trivy or Syft,
+and queries no vulnerability database. A `Package` keeps its name, version,
+package URL (`purl`), licences and known vulnerabilities, each an id and a
+severity: `critical`, `high`, `medium`, `low`, `info`, `none` or `unknown`.
+
+| Format | Packages | Licences | Vulnerabilities |
+| --- | --- | --- | --- |
+| CycloneDX | every component, nested ones included; a `group` prefixes the name | each licence `id`, else `name`, and each `expression` | each entry of `vulnerabilities`, on every component an `affects` ref names: by `bom-ref`, by the `#` part of a BOM-Link, or by package URL with or without its version. The severity is the highest of its `ratings`. |
+| SPDX | every package the document does not describe as itself | `licenseConcluded`, else `licenseDeclared`, unless `NOASSERTION` or `NONE` | each `SECURITY` `advisory` external reference, named by the last segment of its locator, severity `unknown` |
+
+Most SPDX writers, osv-scanner included, write no vulnerability: use
+CycloneDX for them. `ParsePURL` reads a package URL into its type, its name
+(namespace and name, decoded) and its version.
 
 ## Paths
 

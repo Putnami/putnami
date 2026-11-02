@@ -1,0 +1,109 @@
+{
+  "spdxVersion": "SPDX-2.3",
+  "dataLicense": "CC0-1.0",
+  "SPDXID": "SPDXRef-DOCUMENT",
+  "name": "SCALIBR-generated SPDX",
+  "documentNamespace": "https://spdx.google/9572c98c-271d-4487-bd9a-f11bfbdde3ac",
+  "creationInfo": {
+    "creators": [
+      "Tool: SCALIBR"
+    ],
+    "created": "2026-11-02T08:42:35Z"
+  },
+  "packages": [
+    {
+      "name": "main",
+      "SPDXID": "SPDXRef-Package-main-62922412-c2b3-4226-b40e-93542423bf0b",
+      "versionInfo": "0",
+      "supplier": "NOASSERTION",
+      "downloadLocation": "NOASSERTION",
+      "filesAnalyzed": false
+    },
+    {
+      "name": "lodash",
+      "SPDXID": "SPDXRef-Package-lodash-03fda0d9-aaa9-4d91-8d4a-5ebd1d4170c4",
+      "versionInfo": "4.17.20",
+      "supplier": "NOASSERTION",
+      "downloadLocation": "NOASSERTION",
+      "filesAnalyzed": false,
+      "sourceInfo": "Identified by the javascript/packagelockjson extractor from src/package-lock.json",
+      "licenseConcluded": "MIT",
+      "licenseDeclared": "NOASSERTION",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceType": "purl",
+          "referenceLocator": "pkg:npm/lodash@4.17.20?source=PUBLIC_REGISTRY"
+        }
+      ]
+    },
+    {
+      "name": "minimist",
+      "SPDXID": "SPDXRef-Package-minimist-9e817101-2987-4263-b904-c288a4c29265",
+      "versionInfo": "1.2.5",
+      "supplier": "NOASSERTION",
+      "downloadLocation": "NOASSERTION",
+      "filesAnalyzed": false,
+      "sourceInfo": "Identified by the javascript/packagelockjson extractor from src/package-lock.json",
+      "licenseConcluded": "MIT",
+      "licenseDeclared": "NOASSERTION",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceType": "purl",
+          "referenceLocator": "pkg:npm/minimist@1.2.5?source=PUBLIC_REGISTRY"
+        }
+      ]
+    }
+  ],
+  "files": [
+    {
+      "fileName": "src/package-lock.json",
+      "SPDXID": "SPDXRef-File-src-package-lock.json-998cefe6",
+      "checksums": [
+        {
+          "algorithm": "SHA256",
+          "checksumValue": "917c3dd254d022d0ba9e9264d8842b5962bdff40be20ff51f14b0cb6b228afcd"
+        }
+      ],
+      "copyrightText": "NOASSERTION"
+    }
+  ],
+  "relationships": [
+    {
+      "spdxElementId": "SPDXRef-DOCUMENT",
+      "relatedSpdxElement": "SPDXRef-Package-main-62922412-c2b3-4226-b40e-93542423bf0b",
+      "relationshipType": "DESCRIBES"
+    },
+    {
+      "spdxElementId": "SPDXRef-Package-main-62922412-c2b3-4226-b40e-93542423bf0b",
+      "relatedSpdxElement": "SPDXRef-Package-lodash-03fda0d9-aaa9-4d91-8d4a-5ebd1d4170c4",
+      "relationshipType": "CONTAINS"
+    },
+    {
+      "spdxElementId": "SPDXRef-Package-lodash-03fda0d9-aaa9-4d91-8d4a-5ebd1d4170c4",
+      "relatedSpdxElement": "NOASSERTION",
+      "relationshipType": "CONTAINS"
+    },
+    {
+      "spdxElementId": "SPDXRef-File-src-package-lock.json-998cefe6",
+      "relatedSpdxElement": "SPDXRef-Package-lodash-03fda0d9-aaa9-4d91-8d4a-5ebd1d4170c4",
+      "relationshipType": "DEPENDENCY_MANIFEST_OF"
+    },
+    {
+      "spdxElementId": "SPDXRef-Package-main-62922412-c2b3-4226-b40e-93542423bf0b",
+      "relatedSpdxElement": "SPDXRef-Package-minimist-9e817101-2987-4263-b904-c288a4c29265",
+      "relationshipType": "CONTAINS"
+    },
+    {
+      "spdxElementId": "SPDXRef-Package-minimist-9e817101-2987-4263-b904-c288a4c29265",
+      "relatedSpdxElement": "NOASSERTION",
+      "relationshipType": "CONTAINS"
+    },
+    {
+      "spdxElementId": "SPDXRef-File-src-package-lock.json-998cefe6",
+      "relatedSpdxElement": "SPDXRef-Package-minimist-9e817101-2987-4263-b904-c288a4c29265",
+      "relationshipType": "DEPENDENCY_MANIFEST_OF"
+    }
+  ]
+}

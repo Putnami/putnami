@@ -1,0 +1,42 @@
+{
+  "format": "cyclonedx",
+  "specVersion": "1.5",
+  "packages": [
+    {
+      "name": "lodash",
+      "version": "4.17.21",
+      "purl": "pkg:npm/lodash@4.17.21",
+      "licenses": [
+        "MIT"
+      ],
+      "vulnerabilities": [
+        {
+          "id": "GHSA-f23m-r3pf-42rh",
+          "severity": "medium"
+        },
+        {
+          "id": "GHSA-r5fr-rjxr-66jc",
+          "severity": "high"
+        },
+        {
+          "id": "GHSA-xxjr-mmjv-4gpg",
+          "severity": "medium"
+        }
+      ]
+    },
+    {
+      "name": "zod",
+      "version": "3.23.8",
+      "purl": "pkg:npm/zod@3.23.8",
+      "licenses": [
+        "MIT"
+      ],
+      "vulnerabilities": [
+        {
+          "id": "GHSA-mrhx-c7xc-m3w5",
+          "severity": "high"
+        }
+      ]
+    }
+  ]
+}
