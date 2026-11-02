@@ -99,6 +99,7 @@ describe('translated paths', () => {
       expect(french).toMatch(/<a href="\/fr\/tarifs\?plan=team"[^>]*>self<\/a>/);
       expect(french).toContain('href="https://example.com/fr/tarifs"');
       expect(french).toContain('href="/fr/tarifs?locale=fr" hrefLang="fr"');
+      expect(french).toContain('href="/pricing?locale=en" hrefLang="en"');
       const english = await (await get('/pricing')).text();
       expect(english).toMatch(/<a href="\/pricing\?plan=team"[^>]*>self<\/a>/);
       expect(english).toContain('href="/fr/tarifs?locale=fr" hrefLang="fr"');

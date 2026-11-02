@@ -5,9 +5,10 @@ import {
   LOCALE_PARAM,
   localeCookie,
   localeEndonym,
-  localizePath,
+  localeHref,
   normalizePath,
   textDirection,
+  untranslatePath,
 } from '../../shared/i18n/locale';
 import { I18nContext } from '../../shared/i18n/messages';
 
@@ -21,35 +22,40 @@ export interface LocaleInfo {
   path: string;
   /** Whether the current path exists in every locale. */
   localized: boolean;
-  /** The path of a locale-free path in the current locale, or in `locale`. */
+  /**
+   * The href of a locale-free path in the current locale, or in `locale`: a
+   * path, or an absolute URL when the locale is served at another origin.
+   */
   localize: (path: string, locale?: string) => string;
 }
 
-function useCurrentPath(fallback: string): string {
-  // Inside a router the location is already relative to the locale basename.
-  // The payload path is normalized, so the router path is too: an island
-  // hydrates without a router and must render the same links.
+/** The router's path, relative to the locale basename; `undefined` outside a router. */
+function useRouterPath(): string | undefined {
+  // An island hydrates without a router and reads the payload path instead,
+  // which is normalized like this one, so both render the same links.
   const inRouter = useInRouterContext();
   // biome-ignore lint/correctness/useHookAtTopLevel: the router context of a tree never changes
-  return normalizePath(inRouter ? useLocation().pathname : fallback);
+  return inRouter ? normalizePath(useLocation().pathname) : undefined;
 }
 
 /** The locale of the current page and helpers to build links in other locales. */
 export function useLocale(): LocaleInfo {
   const state = useContext(I18nContext);
-  const path = useCurrentPath(state?.path ?? '/');
+  const routerPath = useRouterPath();
   if (!state) {
     return {
       locale: 'en',
       defaultLocale: 'en',
       locales: ['en'],
       dir: 'ltr',
-      path,
+      path: routerPath ?? '/',
       localized: false,
       localize: (target) => target,
     };
   }
   const { settings, locale } = state;
+  // The router path is the page's path as its locale names it: `/tarifs` reads `/pricing`.
+  const path = routerPath === undefined ? state.path : untranslatePath(settings, routerPath, locale);
   return {
     locale,
     defaultLocale: settings.defaultLocale,
@@ -57,7 +63,7 @@ export function useLocale(): LocaleInfo {
     dir: textDirection(locale),
     path,
     localized: isLocalizedPath(settings, path),
-    localize: (target, targetLocale = locale) => localizePath(settings, target, targetLocale),
+    localize: (target, targetLocale = locale) => localeHref(settings, target, targetLocale, state),
   };
 }
 

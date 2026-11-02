@@ -16,6 +16,8 @@ export interface LocaleSettings {
   readonly exclude: readonly string[];
   /** Translated paths by locale, then by route: `{ fr: { '/privacy': '/confidentialite' } }`. */
   readonly paths: Readonly<Record<string, Readonly<Record<string, string>>>>;
+  /** The origin a locale is served at, by non-default locale: `{ fr: 'https://example.fr' }`. */
+  readonly domains: Readonly<Record<string, string>>;
 }
 
 /** The cookie that records a reader's explicit locale choice. */
@@ -61,7 +63,7 @@ export function parseLocaleSettings(raw: unknown): LocaleSettings {
     throw new LocaleSettingsError('i18n must be an object');
   }
   const block = raw as Record<string, unknown>;
-  const known = new Set(['locales', 'defaultLocale', 'siteUrl', 'exclude', 'paths']);
+  const known = new Set(['locales', 'defaultLocale', 'siteUrl', 'exclude', 'paths', 'domains']);
   for (const key of Object.keys(block)) {
     if (!known.has(key)) throw new LocaleSettingsError(`unknown key i18n.${key}`);
   }
@@ -106,8 +108,53 @@ export function parseLocaleSettings(raw: unknown): LocaleSettings {
     siteUrl: siteUrl.toString().replace(/\/$/, ''),
     exclude: [...(excludeRaw as string[])].sort(),
     paths: {},
+    domains: {},
   };
-  return { ...settings, paths: parseTranslatedPaths(settings, block['paths'] ?? {}) };
+  return {
+    ...settings,
+    paths: parseTranslatedPaths(settings, block['paths'] ?? {}),
+    domains: parseDomains(settings, block['domains'] ?? {}),
+  };
+}
+
+/**
+ * Validate `i18n.domains`: per non-default locale, the http or https origin
+ * it is served at, without a path, a query or a fragment. Each origin serves
+ * one locale, and none is the site's.
+ */
+function parseDomains(settings: LocaleSettings, raw: unknown): LocaleSettings['domains'] {
+  if (raw === null || typeof raw !== 'object' || Array.isArray(raw)) {
+    throw new LocaleSettingsError('i18n.domains must map a locale to the origin it is served at');
+  }
+  const domains: Record<string, string> = {};
+  const used = new Map<string, string>([[new URL(settings.siteUrl).host, 'i18n.siteUrl']]);
+  for (const [locale, value] of Object.entries(raw as Record<string, unknown>)) {
+    const where = `i18n.domains.${locale}`;
+    if (!settings.locales.includes(locale) || locale === settings.defaultLocale) {
+      throw new LocaleSettingsError(`${where}: '${locale}' is not a published locale other than the default`);
+    }
+    let url: URL | undefined;
+    try {
+      url = typeof value === 'string' ? new URL(value) : undefined;
+    } catch {
+      url = undefined;
+    }
+    if (
+      !url ||
+      (url.protocol !== 'https:' && url.protocol !== 'http:') ||
+      url.pathname !== '/' ||
+      url.search ||
+      url.hash ||
+      url.username
+    ) {
+      throw new LocaleSettingsError(`${where} must be an http or https origin, such as https://example.fr`);
+    }
+    const other = used.get(url.host);
+    if (other) throw new LocaleSettingsError(`${where}: '${url.host}' is already the host of ${other}`);
+    used.set(url.host, where);
+    domains[locale] = url.origin;
+  }
+  return domains;
 }
 
 /** Whether a path matches more than one URL: `/blog/:slug`, `/docs/*`, `/blog/[slug]`. */
@@ -191,9 +238,14 @@ export function splitLocalePath(settings: LocaleSettings, pathname: string): Loc
   if (!locale) return { locale: settings.defaultLocale, path };
   const rest = path.slice(segment.length + 1) || '/';
   // A translated path reads as the route it translates.
+  return { locale, path: untranslatePath(settings, rest, locale) };
+}
+
+/** The route a locale's path translates: `/confidentialite` reads `/privacy` in French. */
+export function untranslatePath(settings: LocaleSettings, path: string, locale: string): string {
+  const target = normalizePath(path);
   const translations = settings.paths[locale] ?? {};
-  const route = Object.keys(translations).find((r) => translations[r] === rest);
-  return { locale, path: route ?? rest };
+  return Object.keys(translations).find((r) => translations[r] === target) ?? target;
 }
 
 function patternToRegExp(pattern: string): RegExp {
@@ -248,10 +300,65 @@ export function localizePath(settings: LocaleSettings, path: string, locale: str
   return target === '/' ? prefix : `${prefix}${translatePath(settings, target, locale)}`;
 }
 
+/** Whether a locale-free path is served in a locale at the locale's own origin. */
+function onLocaleDomain(settings: LocaleSettings, path: string, locale: string): boolean {
+  return settings.domains[locale] !== undefined && isLocalizedPath(settings, path);
+}
+
+/** The site URL a locale-free path is served under in a locale: its domain, else `siteUrl`. */
+function siteRoot(settings: LocaleSettings, path: string, locale: string): string {
+  const domain = settings.domains[locale];
+  if (!domain || !onLocaleDomain(settings, path, locale)) return settings.siteUrl;
+  return `${domain}${new URL(settings.siteUrl).pathname.replace(/\/$/, '')}`;
+}
+
+/**
+ * The path of a locale-free path in a locale, on the origin that serves it: a
+ * locale with a domain is served at the root of that domain, every other one
+ * under its prefix.
+ */
+export function localePagePath(settings: LocaleSettings, path: string, locale: string): string {
+  return onLocaleDomain(settings, path, locale)
+    ? translatePath(settings, path, locale)
+    : localizePath(settings, path, locale);
+}
+
 /** The absolute URL of a locale-free path in a given locale. */
 export function localizedUrl(settings: LocaleSettings, path: string, locale: string): string {
-  const localized = localizePath(settings, path, locale);
-  return `${settings.siteUrl}${localized === '/' ? '/' : localized}`;
+  const localized = localePagePath(settings, path, locale);
+  return `${siteRoot(settings, path, locale)}${localized === '/' ? '/' : localized}`;
+}
+
+/**
+ * Where a page is served: `domain` at the root of its locale's domain, `site`
+ * on the host of `siteUrl`, `prefix` on any other host, such as a development
+ * server or a preview, which serves every locale under its prefix.
+ */
+export type LocaleServing = 'domain' | 'site' | 'prefix';
+
+/** The page a link sits on. */
+export interface LocaleOrigin {
+  locale: string;
+  served: LocaleServing;
+}
+
+/**
+ * The href of a locale-free path in a locale, from a page: a path when the
+ * page's origin serves it, the absolute URL when another origin does. On a
+ * host that is neither the site nor a domain, every href is a path.
+ */
+export function localeHref(settings: LocaleSettings, path: string, locale: string, from: LocaleOrigin): string {
+  const target = normalizePath(path);
+  if (from.served === 'prefix') return localizePath(settings, target, locale);
+  const targetDomain = onLocaleDomain(settings, target, locale) ? settings.domains[locale] : undefined;
+  const fromDomain = from.served === 'domain' ? settings.domains[from.locale] : undefined;
+  if (targetDomain !== fromDomain) return localizedUrl(settings, target, locale);
+  return localePagePath(settings, target, locale);
+}
+
+/** The locale whose domain a host names, such as `example.fr`. */
+export function domainLocale(settings: LocaleSettings, host: string): string | undefined {
+  return Object.keys(settings.domains).find((locale) => new URL(settings.domains[locale] as string).host === host);
 }
 
 export function textDirection(locale: string): 'ltr' | 'rtl' {

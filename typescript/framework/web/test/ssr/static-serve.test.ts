@@ -10,7 +10,11 @@ import type { StaticRenderResult } from '../../src/ssr/static-render';
 import { STATIC_BUILD_VERSION_FILE } from '../../src/ssr/static-build-version';
 
 function ctxFor(pathname: string, params: Record<string, string> = {}): HttpRequestContext {
-  return { req: { url: `http://localhost${pathname}` }, params } as unknown as HttpRequestContext;
+  return {
+    url: `http://localhost${pathname}`,
+    req: { url: `http://localhost${pathname}` },
+    params,
+  } as unknown as HttpRequestContext;
 }
 
 function tempStaticDir(files: Record<string, string>): string {

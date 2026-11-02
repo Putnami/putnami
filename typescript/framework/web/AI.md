@@ -306,6 +306,11 @@ t.terms({ link: (chunks) => <Link to='/terms'>{chunks}</Link> });
 - `i18n.paths` (`{"fr": {"/privacy": "/confidentialite"}}`) serves a page at
   its translated path; the untranslated one redirects with 308. Code keeps
   writing `/privacy`. The build writes `/sitemap.xml` with the alternates.
+- `i18n.domains` (`{"fr": "https://example.fr"}`) serves a locale at the
+  root of its origin; its URLs use that origin. On the `siteUrl` host,
+  `/fr/x` redirects with 308 to `https://example.fr/x`; other hosts (dev,
+  preview) keep `/fr`. The routing uses `HttpPlugin.rewrite()`: `ctx.url` is
+  the routed URL, `ctx.req.url` the client's.
 - Only `/` negotiates the locale (cookie `putnami-locale`, then
   `Accept-Language`). The framework writes `<html lang dir>`, the canonical
   link, hreflang alternates with `x-default`, and `og:locale`.

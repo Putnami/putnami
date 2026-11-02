@@ -6,7 +6,7 @@ import {
   useInRouterContext,
   useLocation,
 } from 'react-router';
-import { isLocalizedPath, localizePath, splitLocalePath, translatePath } from '../../shared/i18n/locale';
+import { isLocalizedPath, localeHref, splitLocalePath, translatePath } from '../../shared/i18n/locale';
 import { I18nContext, type I18nState } from '../../shared/i18n/messages';
 import { type PrefetchBehavior, usePrefetch } from '../hooks/use-prefetch.hook';
 
@@ -157,9 +157,12 @@ function translatedTo(i18n: I18nState, to: LinkProps['to']): LinkProps['to'] {
   return `${translatePath(i18n.settings, parts.path, i18n.locale)}${parts.rest}`;
 }
 
-/** The href of a site-absolute path in the current locale; a path that names a locale stays as written. */
+/**
+ * The href of a site-absolute path in the current locale, absolute when
+ * another origin serves it; a path that names a locale stays as written.
+ */
 function localizedHref(i18n: I18nState | undefined, href: string): string {
   const parts = i18n ? splitHref(href) : undefined;
   if (!i18n || !parts || namesLocale(i18n, parts.path)) return href;
-  return `${localizePath(i18n.settings, parts.path, i18n.locale)}${parts.rest}`;
+  return `${localeHref(i18n.settings, parts.path, i18n.locale, i18n)}${parts.rest}`;
 }

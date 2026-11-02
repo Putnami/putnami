@@ -558,7 +558,7 @@
             "checks": [
               "a-request-to-a-locale-domain-is-served-in-its-locale",
               "the-urls-of-a-domain-locale-use-its-origin",
-              "the-prefix-on-another-host-redirects-to-the-domain"
+              "the-prefix-on-the-site-redirects-to-the-domain"
             ]
           }
         },

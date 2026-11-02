@@ -2,6 +2,7 @@ import type { DocumentMeta } from '../../client/document/document.types';
 import { escapeHtml } from '../../client/document/tag.utils';
 import {
   isLocalizedPath,
+  type LocaleServing,
   type LocaleSettings,
   localePrefix,
   localizedUrl,
@@ -21,24 +22,35 @@ export interface I18nRuntimeOptions {
 }
 
 /**
- * The locale state of one render, from the request path without the
- * application's own module prefix. `collect` records the namespaces the render
- * reads, which a static page's payload is cut to.
+ * The locale state of one render, from the routed path without the
+ * application's own module prefix: `/fr/pricing` for the French page, on its
+ * domain too. `collect` records the namespaces the render reads, which a
+ * static page's payload is cut to. `served` says where the page is served;
+ * only a locale with a domain is served at one.
  */
-export function createI18nState(options: I18nRuntimeOptions, pathname: string, collect: boolean): I18nState {
+export function createI18nState(
+  options: I18nRuntimeOptions,
+  pathname: string,
+  collect: boolean,
+  served: LocaleServing = 'prefix',
+): I18nState {
   const { locale, path } = splitLocalePath(options.settings, pathname);
   return {
     settings: options.settings,
     locale,
     path,
+    served: served === 'domain' && options.settings.domains[locale] === undefined ? 'site' : served,
     messages: options.messages[locale] ?? {},
     ...(collect ? { rendered: new Set<string>() } : {}),
   };
 }
 
-/** The router basename of a render: the module prefix, then the locale prefix. */
+/**
+ * The router basename of a render: the module prefix, then the locale prefix,
+ * except on the locale's domain, which serves it at its root.
+ */
 export function localeBasename(state: I18nState, moduleBase: string | undefined): string | undefined {
-  const prefix = localePrefix(state.settings, state.locale);
+  const prefix = state.served === 'domain' ? '' : localePrefix(state.settings, state.locale);
   if (!prefix) return moduleBase;
   return `${moduleBase ?? ''}${prefix}`;
 }
@@ -106,6 +118,12 @@ export function i18nPayloadScript(options: I18nRuntimeOptions, state: I18nState,
       if (entries) messages[namespace] = entries;
     }
   }
-  const payload: I18nPayload = { settings: state.settings, locale: state.locale, path: state.path, messages };
+  const payload: I18nPayload = {
+    settings: state.settings,
+    locale: state.locale,
+    path: state.path,
+    served: state.served,
+    messages,
+  };
   return `<script type="application/json" id="${I18N_PAYLOAD_ID}">${safeJsonForScript(payload)}</script>`;
 }

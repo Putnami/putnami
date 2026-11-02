@@ -370,7 +370,7 @@ describe('locale head', () => {
         siteUrl: 'https://example.com',
       });
       const meta = { metas: [{ name: 'robots', content: 'noindex' }] };
-      applyLocaleHead(meta, { settings, locale: 'fr', path: '/nothing', messages: {} });
+      applyLocaleHead(meta, { settings, locale: 'fr', path: '/nothing', served: 'prefix', messages: {} });
       expect<unknown>(meta).toEqual({ links: [], metas: [{ name: 'robots', content: 'noindex' }] });
     },
   );

@@ -238,6 +238,20 @@ Generation fails when a translated path:
 - leaves the localized set (`/docs/x` when `/docs/**` is excluded);
 - leaves the layout of its page: `/blog/post` can become `/blog/billet`, not `/billet`, because the page renders inside the `/blog` layout.
 
+## Locale domains
+
+`i18n.domains` serves a locale at the root of its own origin:
+
+```json
+"domains": { "fr": "https://example.fr" }
+```
+
+A request to `example.fr` gets the French pages: `https://example.fr/confidentialite` serves what `/fr/confidentialite` serves on the site. Every URL built for French uses the domain, without the prefix: links, the canonical and alternate links, the switcher and the sitemap. A link to another origin is absolute; the switcher on `example.fr` links English to `https://example.com/privacy?locale=en`.
+
+On the host of `siteUrl`, `/fr/x` redirects with `308` to `https://example.fr/x`, with the query, and the root sends a French reader to `https://example.fr/`. Any other host, such as your development server or a preview, serves French under `/fr` and links every locale there. A path the domain does not serve in French, such as an excluded `/docs/x`, redirects to the site.
+
+Each domain is an `http` or `https` origin, without a path, a query or a fragment, and serves one locale other than the default. Point the domain's DNS at the same deployment as the site.
+
 ## Locale switcher
 
 ```tsx
@@ -287,4 +301,4 @@ The payload is a `<script type="application/json">` data block, which a strict C
 
 - An application served below the site root (a module path such as `/app`) cannot be localized yet.
 - A route with parameters keeps its path in every locale, and a translated path stays under the layout of its page.
-- One domain serves every locale.
+- A locale with a domain is served at the root of that domain, and its prefix moves there from the site only.

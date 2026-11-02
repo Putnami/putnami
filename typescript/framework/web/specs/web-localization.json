@@ -90,7 +90,7 @@
     },
     {
       "id": "locale-domains",
-      "text": "The i18n.domains block maps a non-default locale to an origin: a request to that host is served as the locale's prefixed route, every URL built for that locale uses that origin without the prefix, and a request under the locale's prefix on another host redirects with 308 to the same path and query on the locale's origin."
+      "text": "The i18n.domains block maps a non-default locale to an origin: a request to that host is served as the locale's prefixed route, every URL built for that locale uses that origin without the prefix, a request under the locale's prefix on the site's host redirects with 308 to the same path and query on the locale's origin, and any other host, such as a development server or a preview, serves the locale under its prefix."
     },
     {
       "id": "locale-suggestion",

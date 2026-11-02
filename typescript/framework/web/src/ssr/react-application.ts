@@ -10,12 +10,26 @@ import { useConfig } from '@putnami/runtime';
 import { joinPath } from '@putnami/utils';
 import React, { type ReactNode } from 'react';
 import type { RouteObject } from 'react-router';
-import { isLocalizedPath, localePrefix, localizePath, parseLocaleSettings, translatePath } from '../shared/i18n/locale';
+import {
+  isLocalizedPath,
+  type LocaleSettings,
+  localePrefix,
+  localizePath,
+  parseLocaleSettings,
+  translatePath,
+} from '../shared/i18n/locale';
 import type { LocaleMessages } from '../shared/i18n/messages';
 import { createPageElement } from '../shared/page-element';
 import { RouteTreeHelper } from '../shared/route-tree.utils';
 import type { I18nRuntimeOptions } from './i18n/runtime';
-import { excludedRouteRedirect, movedTo, negotiatingEntry, recordingChoice } from './i18n/negotiation';
+import {
+  excludedRouteRedirect,
+  localeDomainRewrite,
+  movedTo,
+  negotiatingEntry,
+  recordingChoice,
+  servingOnDomain,
+} from './i18n/negotiation';
 import { SITEMAP_FILE, sitemapHandler } from './i18n/sitemap';
 import type {
   ErrorModule,
@@ -171,8 +185,9 @@ export class ReactApplication {
   /**
    * Localize the application: every page, loader and action outside
    * `settings.exclude` is served once per locale, the default locale
-   * unprefixed and every other one under `/<locale>`. Called by the generated
-   * module before any route, with the catalogs of the non-default locales.
+   * unprefixed and every other one under `/<locale>`. A locale with a domain
+   * is served at the root of that domain too. Called by the generated module
+   * before any route, with the catalogs of the non-default locales.
    */
   i18n(options: { settings: unknown; messages?: Readonly<Record<string, LocaleMessages>> }) {
     if (this.reactRouter[0]?.children?.length || this.reactRouter[0]?.element) {
@@ -184,7 +199,16 @@ export class ReactApplication {
       sitemapHandler(joinPath(this.statics.getPublicOutputDir(), SITEMAP_FILE)),
       this.routeOptions(),
     );
+    if (Object.keys(this._i18n.settings.domains).length > 0) {
+      this.httpPlugin.rewrite(localeDomainRewrite(this._i18n.settings));
+    }
     return this;
+  }
+
+  /** The locale settings of a localized application; only called once i18n is set. */
+  private i18nSettings(): LocaleSettings {
+    if (!this._i18n) throw new Error('ReactApplication i18n settings read before i18n()');
+    return this._i18n.settings;
   }
 
   /** The locales and catalogs of a localized application. */
@@ -278,6 +302,8 @@ export class ReactApplication {
     if (settings && settings.locales.length > 1) {
       served = recordingChoice(httpRoute === '/' ? negotiatingEntry(handler, settings) : handler, settings);
     }
+    // A locale with a domain is served there: its prefix on the site moves to it.
+    if (settings && Object.keys(settings.domains).length > 0) served = servingOnDomain(served, settings);
     this.httpPlugin.get(httpRoute, served, {
       ...this.routeOptions(),
       accept: ['text/html', '*/*'],
@@ -476,7 +502,11 @@ export class ReactApplication {
     }
 
     for (const prefix of this.excludedPrefixes(route)) {
-      this.httpPlugin.get(localizedHttpRoute(prefix, route), excludedRouteRedirect(prefix), this.routeOptions());
+      this.httpPlugin.get(
+        localizedHttpRoute(prefix, route),
+        excludedRouteRedirect(prefix, this.i18nSettings()),
+        this.routeOptions(),
+      );
     }
 
     // Static routes (SSG/ISR) serve pre-rendered, zero-JS HTML from the build
@@ -486,7 +516,7 @@ export class ReactApplication {
       if (localeRoute !== route) {
         this.httpPlugin.get(
           localizedHttpRoute(prefix, route),
-          movedTo(localizedHttpRoute(prefix, localeRoute)),
+          movedTo(localizedHttpRoute(prefix, localeRoute), this.i18nSettings()),
           this.routeOptions(),
         );
       }

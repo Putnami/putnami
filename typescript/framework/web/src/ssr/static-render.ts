@@ -12,6 +12,7 @@ import { ISLAND_TAG } from '../client/island/island-types';
 import { CsrfTokenContext } from '../shared/csrf-context';
 import { I18nProvider } from '../shared/i18n/messages';
 import { localeRoutes } from '../shared/i18n/route-aliases';
+import { type LocaleServing, localePrefix } from '../shared/i18n/locale';
 import {
   applyLocaleHead,
   createI18nState,
@@ -58,6 +59,11 @@ interface StaticRenderOptions {
   islandsScript?: string;
   /** The application's locales and catalogs, when it is localized. */
   i18n?: I18nRuntimeOptions;
+  /**
+   * Where the page is served. By default, as in production: a locale with a
+   * domain at its domain, every other one on the site.
+   */
+  served?: LocaleServing;
 }
 
 /** Reads the inner HTML of a `<div>` whose open tag ended at `from`, honouring nested `<div>`s. */
@@ -159,13 +165,17 @@ export function inlineDeferredBoundaries(html: string): string {
  */
 export async function renderStaticDocument(options: StaticRenderOptions): Promise<StaticRenderResult> {
   const { routes, route, pathname, params = {}, timeoutMs = 10_000 } = options;
-  // The pathname carries the locale prefix; the router basename takes it off.
-  const i18nState = options.i18n ? createI18nState(options.i18n, pathname, true) : undefined;
+  // The pathname carries the locale prefix; the router basename takes it off,
+  // and a page served at its locale's domain is requested without it.
+  const i18nState = options.i18n
+    ? createI18nState(options.i18n, pathname, true, options.served ?? 'domain')
+    : undefined;
   const basename = i18nState ? localeBasename(i18nState, options.basename) : options.basename;
 
   const localeTree = i18nState ? localeRoutes(routes, i18nState.settings, i18nState.locale) : routes;
   const staticHandler = createStaticHandler(localeTree, basename ? { basename } : undefined);
-  const url = new URL(pathname, 'http://localhost');
+  const prefix = i18nState?.served === 'domain' ? localePrefix(i18nState.settings, i18nState.locale) : '';
+  const url = new URL(pathname.slice(prefix.length) || '/', 'http://localhost');
   const request = new Request(url.toString(), { method: 'GET' });
 
   const ctx = createStaticRenderContext(route, params) as unknown as Record<string, unknown>;

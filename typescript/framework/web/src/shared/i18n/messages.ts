@@ -9,7 +9,7 @@ import {
   icuArguments,
   parseIcu,
 } from './icu';
-import type { LocaleSettings } from './locale';
+import type { LocaleServing, LocaleSettings } from './locale';
 import type { MessageFormatter, TagRenderer } from './message-types';
 
 /** A default message: its ICU text, and optional context for translators. */
@@ -70,6 +70,8 @@ export interface I18nState {
   readonly locale: string;
   /** The current page's path without its locale prefix. */
   readonly path: string;
+  /** Where the page is served: at its locale's domain, on the site, or under its prefix elsewhere. */
+  readonly served: LocaleServing;
   /** Translations of the current locale; empty for the default locale. */
   readonly messages: LocaleMessages;
   /** Namespaces read while rendering, collected on the server for the payload. */

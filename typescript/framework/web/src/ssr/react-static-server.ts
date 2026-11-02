@@ -1,8 +1,10 @@
 import type { RouteHandler } from '@putnami/application';
 import { getBuildInfo, getProjectRoot, joinPath } from '@putnami/utils';
 import type { RouteObject } from 'react-router';
+import type { LocaleServing } from '../shared/i18n/locale';
 import type { ReactPluginConfig } from './react-plugin';
 import type { PutnamiReactConfigExtras } from './react-ssr.config';
+import { serving } from './i18n/negotiation';
 import type { I18nRuntimeOptions } from './i18n/runtime';
 import { renderStaticDocument, type StaticRenderResult } from './static-render';
 import { staticServeHandler } from './static-serve.utils';
@@ -60,11 +62,24 @@ export class ReactStaticServer {
       staticDir: this.getStaticOutputDir(),
       basename: this.basename(),
       render: (pathname, params) => this.render(pathname, params, route),
+      // The build renders a localized application's pages as its site and its
+      // domains serve them; another host serves every locale under its prefix.
+      renderLive: (ctx) => {
+        const i18n = this.i18n();
+        if (!i18n || Object.keys(i18n.settings.domains).length === 0) return undefined;
+        if (serving(ctx, i18n.settings) !== 'prefix') return undefined;
+        return (pathname, params) => this.render(pathname, params, route, 'prefix');
+      },
       currentVersion: () => getBuildInfo()?.version,
     });
   }
 
-  private render(pathname: string, params: StaticPathParams, route: string): Promise<StaticRenderResult> {
+  private render(
+    pathname: string,
+    params: StaticPathParams,
+    route: string,
+    served?: LocaleServing,
+  ): Promise<StaticRenderResult> {
     return renderStaticDocument({
       routes: this.routes(),
       route,
@@ -74,6 +89,7 @@ export class ReactStaticServer {
       timeoutMs: this.config.ssrTimeout,
       islandsScript: this.islandsScript(),
       i18n: this.i18n(),
+      served,
     });
   }
 }

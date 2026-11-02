@@ -14,7 +14,13 @@ const settings = parseLocaleSettings({
   exclude: ['/docs/**'],
 });
 
-const fr: I18nState = { settings, locale: 'fr', path: '/pricing', messages: { home: { title: 'Tarifs' } } };
+const fr: I18nState = {
+  settings,
+  locale: 'fr',
+  path: '/pricing',
+  served: 'prefix',
+  messages: { home: { title: 'Tarifs' } },
+};
 
 const inFrench = (node: React.ReactNode) =>
   renderToStaticMarkup(React.createElement(I18nProvider, { value: fr }, node));
@@ -27,7 +33,13 @@ function documentWith(text: string | undefined): Document {
 
 describe('readI18nPayload', () => {
   it('reads the locale state the server rendered', () => {
-    const payload = { settings, locale: 'fr', path: '/pricing', messages: { home: { title: 'Tarifs' } } };
+    const payload = {
+      settings,
+      locale: 'fr',
+      path: '/pricing',
+      served: 'prefix' as const,
+      messages: { home: { title: 'Tarifs' } },
+    };
     expect(readI18nPayload(documentWith(JSON.stringify(payload)))).toEqual(payload);
   });
 
