@@ -23,7 +23,9 @@ import (
 	"fmt"
 	"io"
 	"math"
+	"net/http"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -155,14 +157,20 @@ func EvidenceReport(params map[string]any, env map[string]string, ioctx clicore.
 		}
 	}
 
-	resp, err := postReport(ioctx, controlURL, recordsIngestPath, token, run,
-		func(callCtx context.Context, api *deliveryapiclient.DeliveryClient, raw []byte) (*deliveryapiclient.SubmitResponse, error) {
-			var in deliveryapiclient.CreateV1DeliveryRecordsInput
-			if err := json.Unmarshal(raw, &in.Body); err != nil {
-				return nil, err
-			}
-			return api.CreateV1DeliveryRecords(callCtx, in)
-		})
+	resp, refused, err := openEvidenceRun(ioctx, controlURL, token, run)
+	if err != nil && refused == http.StatusBadRequest && run.Operational != nil {
+		// Delivery refuses operational on a control plane that predates
+		// self-reported trees, or on a commit another provenance already
+		// recorded. The evidence still matters: open the run without it, under
+		// the same submission id.
+		ioctx.Stderr("warning: cloud evidence-report sends no operational: " + err.Error())
+		if leftOut == nil {
+			leftOut = map[string]string{}
+		}
+		leftOut["operational"] = err.Error()
+		run.Operational = nil
+		resp, _, err = openEvidenceRun(ioctx, controlURL, token, run)
+	}
 	if err != nil {
 		return err
 	}
@@ -288,6 +296,23 @@ func evidenceRun(doc *evidence.Document) (evidenceSubmitRequest, error) {
 	return run, nil
 }
 
+// openEvidenceRun opens the run on the records route. It also returns the
+// status of the last refused call, 0 when there was none.
+func openEvidenceRun(ioctx clicore.IO, controlURL, token string, run evidenceSubmitRequest) (*deliveryapiclient.SubmitResponse, int, error) {
+	refused := 0
+	resp, err := postReport(ioctx, controlURL, recordsIngestPath, token, run,
+		func(callCtx context.Context, api *deliveryapiclient.DeliveryClient, raw []byte) (*deliveryapiclient.SubmitResponse, error) {
+			var in deliveryapiclient.CreateV1DeliveryRecordsInput
+			if err := json.Unmarshal(raw, &in.Body); err != nil {
+				return nil, err
+			}
+			resp, err := api.CreateV1DeliveryRecords(callCtx, in)
+			refused = clicore.ServiceStatus(err)
+			return resp, err
+		})
+	return resp, refused, err
+}
+
 // evidenceTested reads, with Git in dir, the tree the job tested and the merge
 // base of the document's base and commit. It returns nil when it knows
 // neither, and the reason of each member it leaves out, keyed by its name.
@@ -302,7 +327,7 @@ func evidenceTested(doc *evidence.Document, env map[string]string, dir string) (
 	if evidenceTestedMerge(doc, env) {
 		field = evidenceTestedTree
 	}
-	tree, err := runGit(dir, "rev-parse", "--verify", "--quiet", "--end-of-options", doc.Subject.SHA+"^{tree}")
+	tree, err := evidenceGit(dir, "rev-parse", "--verify", "--quiet", "--end-of-options", doc.Subject.SHA+"^{tree}")
 	switch {
 	case err != nil || tree == "":
 		leftOut[field] = fmt.Sprintf("the commit %s is not in the Git checkout of %s", shortSHA(doc.Subject.SHA), where)
@@ -315,24 +340,58 @@ func evidenceTested(doc *evidence.Document, env map[string]string, dir string) (
 	case base == "":
 		leftOut[evidenceBaselineMergeBase] = "the document names no base for its change"
 	default:
-		mergeBase, err := runGit(dir, "merge-base", "--end-of-options", base, doc.Subject.SHA)
+		mergeBase, err := evidenceGit(dir, "merge-base", "--end-of-options", base, doc.Subject.SHA)
 		if err == nil && mergeBase != "" {
 			operational.BaselineMergeBase = mergeBase
 			break
 		}
 		reason := fmt.Sprintf("Git finds no merge base of %s and %s in the checkout of %s", shortSHA(base), shortSHA(doc.Subject.SHA), where)
-		if shallow, _ := runGit(dir, "rev-parse", "--is-shallow-repository"); shallow == "true" {
+		if shallow, _ := evidenceGit(dir, "rev-parse", "--is-shallow-repository"); shallow == "true" {
 			reason += ": the clone is shallow and does not reach it"
 		}
 		leftOut[evidenceBaselineMergeBase] = reason
 	}
+	if operational.TestedTree == "" && operational.TestedHeadTree == "" {
+		// Delivery reads a merge base only beside the tree it was measured
+		// for, and refuses one alone.
+		if operational.BaselineMergeBase != "" {
+			leftOut[evidenceBaselineMergeBase] = "no tested tree goes with it"
+		}
+		return nil, leftOut
+	}
 	if len(leftOut) == 0 {
 		leftOut = nil
 	}
-	if operational == (evidenceOperational{}) {
-		return nil, leftOut
-	}
 	return &operational, leftOut
+}
+
+// evidenceGitLocating are the variables that point Git at another repository
+// or index. The command reads the checkout of the directory it runs Git in, as
+// putnami observe does when it writes the document.
+var evidenceGitLocating = map[string]bool{
+	"GIT_DIR": true, "GIT_WORK_TREE": true, "GIT_INDEX_FILE": true, "GIT_OBJECT_DIRECTORY": true,
+	"GIT_ALTERNATE_OBJECT_DIRECTORIES": true, "GIT_COMMON_DIR": true, "GIT_NAMESPACE": true,
+	"GIT_CEILING_DIRECTORIES": true, "GIT_DISCOVERY_ACROSS_FILESYSTEM": true,
+}
+
+// evidenceGit runs one Git command in dir, the working directory when empty,
+// and returns its trimmed stdout. It never prompts.
+func evidenceGit(dir string, args ...string) (string, error) {
+	cmd := exec.Command("git", args...)
+	cmd.Dir = dir
+	env := make([]string, 0, len(os.Environ())+2)
+	for _, kv := range os.Environ() {
+		if name, _, _ := strings.Cut(kv, "="); !evidenceGitLocating[name] {
+			env = append(env, kv)
+		}
+	}
+	env = append(env, "GIT_TERMINAL_PROMPT=0", "LC_ALL=C")
+	cmd.Env = env
+	out, err := cmd.Output()
+	if err != nil {
+		return "", fmt.Errorf("git %s: %w", args[0], err)
+	}
+	return strings.TrimSpace(string(out)), nil
 }
 
 // evidenceTestedMerge reports whether the document's commit is the merge the CI

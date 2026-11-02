@@ -19,7 +19,7 @@ type evidenceHistory struct {
 	dir, fork, head, baseTip, merge string
 }
 
-func evidenceGit(t *testing.T, dir string, args ...string) string {
+func testGit(t *testing.T, dir string, args ...string) string {
 	t.Helper()
 	cmd := exec.Command("git", append([]string{
 		"-c", "user.name=Putnami Test", "-c", "user.email=test@putnami.invalid",
@@ -41,25 +41,25 @@ func newEvidenceHistory(t *testing.T) evidenceHistory {
 		if err := os.WriteFile(filepath.Join(dir, file), []byte(content), 0o600); err != nil {
 			t.Fatal(err)
 		}
-		evidenceGit(t, dir, "add", file)
-		evidenceGit(t, dir, "commit", "-q", "-m", message)
-		return evidenceGit(t, dir, "rev-parse", "HEAD")
+		testGit(t, dir, "add", file)
+		testGit(t, dir, "commit", "-q", "-m", message)
+		return testGit(t, dir, "rev-parse", "HEAD")
 	}
-	evidenceGit(t, dir, "init", "-q")
+	testGit(t, dir, "init", "-q")
 	h := evidenceHistory{dir: dir}
 	h.fork = commit("pricing.txt", "price 10\n", "pricing")
-	evidenceGit(t, dir, "checkout", "-q", "-b", "feature")
+	testGit(t, dir, "checkout", "-q", "-b", "feature")
 	h.head = commit("pricing.txt", "price 12\n", "raise the price")
-	evidenceGit(t, dir, "checkout", "-q", "main")
+	testGit(t, dir, "checkout", "-q", "main")
 	h.baseTip = commit("readme.txt", "shop\n", "readme")
-	evidenceGit(t, dir, "merge", "-q", "--no-ff", "-m", "merge feature", "feature")
-	h.merge = evidenceGit(t, dir, "rev-parse", "HEAD")
+	testGit(t, dir, "merge", "-q", "--no-ff", "-m", "merge feature", "feature")
+	h.merge = testGit(t, dir, "rev-parse", "HEAD")
 	return h
 }
 
 func (h evidenceHistory) tree(t *testing.T, commit string) string {
 	t.Helper()
-	return evidenceGit(t, h.dir, "rev-parse", commit+"^{tree}")
+	return testGit(t, h.dir, "rev-parse", commit+"^{tree}")
 }
 
 // evidenceDocAt writes the fixture with its subject moved to sha and base.
@@ -192,7 +192,7 @@ func TestEvidenceReportLeavesOutWhatAShallowCloneCannotCompute(t *testing.T) {
 	spectest.Proves(t, evidenceFeature, "sends-the-tested-tree", "a-shallow-clone-leaves-out-what-it-cannot-compute")
 	h := newEvidenceHistory(t)
 	shallow := filepath.Join(t.TempDir(), "shallow")
-	evidenceGit(t, h.dir, "clone", "-q", "--depth", "1", "--branch", "feature", "file://"+h.dir, shallow)
+	testGit(t, h.dir, "clone", "-q", "--depth", "1", "--branch", "feature", "file://"+h.dir, shallow)
 
 	t.Run("the merge base is beyond the shallow clone", func(t *testing.T) {
 		fake := &evidenceFakeServer{}
@@ -225,6 +225,39 @@ func TestEvidenceReportLeavesOutWhatAShallowCloneCannotCompute(t *testing.T) {
 			t.Fatalf("stderr = %q, want both left-out members and why", stderr)
 		}
 	})
+}
+
+func TestEvidenceReportOpensTheRunWithoutOperationalWhenDeliveryRefusesIt(t *testing.T) {
+	spectest.Proves(t, evidenceFeature, "sends-the-tested-tree", "a-shallow-clone-leaves-out-what-it-cannot-compute")
+	h := newEvidenceHistory(t)
+	fake := &evidenceFakeServer{refuseOperational: true}
+	env := evidenceJobEnv(h.dir, "CI_MERGE_REQUEST_EVENT_TYPE", "detached", "CI_COMMIT_SHA", h.head)
+	stdout, stderr, err := runEvidenceReportLogged(t, fake, env, "--file", evidenceDocAt(t, "symfony-merge-request.json", h.head, h.fork), "--output=json")
+	if err != nil {
+		t.Fatalf("evidence-report: %v, want the upload to go on without operational", err)
+	}
+	want := []string{"POST " + recordsIngestPath, "POST " + recordsIngestPath, "POST " + recordsReportsIngestPath, "POST " + recordsReportsIngestPath}
+	if got := fake.paths(); strings.Join(got, ",") != strings.Join(want, ",") {
+		t.Fatalf("requests = %v, want the refused run, the run again and both batches", got)
+	}
+	if _, ok := fake.requests[1].Body["operational"]; ok || fake.requests[1].Body["submissionId"] != fake.requests[0].Body["submissionId"] {
+		t.Fatalf("second run = %v, want the same submission without operational", fake.requests[1].Body)
+	}
+	if !strings.Contains(stderr, "sends no operational") || !strings.Contains(stderr, "operational metrics require a run credential") {
+		t.Fatalf("stderr = %q, want the refusal and its reason", stderr)
+	}
+	if !strings.Contains(stdout, `"operational_left_out"`) || strings.Contains(stdout, `"operational": {`) {
+		t.Fatalf("stdout = %q, want operational reported as left out", stdout)
+	}
+}
+
+func TestEvidenceGitIgnoresALocatingVariable(t *testing.T) {
+	h := newEvidenceHistory(t)
+	t.Setenv("GIT_DIR", filepath.Join(t.TempDir(), "elsewhere"))
+	tree, err := evidenceGit(h.dir, "rev-parse", h.head+"^{tree}")
+	if err != nil || tree == "" {
+		t.Fatalf("evidenceGit = %q, %v, want the tree of the checkout in its directory", tree, err)
+	}
 }
 
 func TestPullRequestMergeRef(t *testing.T) {

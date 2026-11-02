@@ -3,6 +3,7 @@ package deliverycli
 import (
 	"encoding/json"
 	"io"
+	"maps"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -25,6 +26,9 @@ type evidenceFakeServer struct {
 	requests      []reportCapturedRequest
 	refuseRun     int
 	refuseReports int
+	// refuseOperational answers a run that carries operational as a control
+	// plane that does not take it from a workspace token.
+	refuseOperational bool
 	// alreadyStored answers every kind as already stored when it is true.
 	alreadyStored bool
 }
@@ -37,6 +41,9 @@ func (s *evidenceFakeServer) RoundTrip(req *http.Request) (*http.Response, error
 	s.requests = append(s.requests, reportCapturedRequest{Method: req.Method, Path: req.URL.Path, Auth: req.Header.Get("Authorization"), Body: body})
 	switch req.URL.Path {
 	case recordsIngestPath:
+		if _, ok := body["operational"]; ok && s.refuseOperational {
+			return reportJSONResponse(http.StatusBadRequest, map[string]any{"error": "operational metrics require a run credential", "message": "operational metrics require a run credential"}), nil
+		}
 		if s.refuseRun != 0 {
 			return reportJSONResponse(s.refuseRun, map[string]any{"error": "changeRequest.host is invalid", "message": "changeRequest.host is invalid"}), nil
 		}
@@ -80,6 +87,11 @@ func runEvidenceReport(t *testing.T, fake *evidenceFakeServer, env map[string]st
 func runEvidenceReportLogged(t *testing.T, fake *evidenceFakeServer, env map[string]string, args ...string) (stdout, stderr string, err error) {
 	t.Helper()
 	stubReportRetrySleep(t)
+	if _, ok := env[evidenceInvocationDirEnv]; !ok && env != nil {
+		// Git reads an empty directory, never the checkout the tests run in.
+		env = maps.Clone(env)
+		env[evidenceInvocationDirEnv] = t.TempDir()
+	}
 	var out, log []string
 	ioctx := clicore.IO{
 		Env:    env,

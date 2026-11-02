@@ -64,11 +64,7 @@ var reportRetrySleep = func(attempt int) {
 // reportGitRun is the git seam: it runs one git command in dir and returns its
 // trimmed stdout. A package var so unit tests never depend on the ambient
 // repository state.
-var reportGitRun = runGit
-
-// runGit runs one git command in dir, the working directory when empty, and
-// returns its trimmed stdout, or an error that carries git's stderr.
-func runGit(dir string, args ...string) (string, error) {
+var reportGitRun = func(dir string, args ...string) (string, error) {
 	cmd := exec.Command("git", args...)
 	if dir != "" {
 		cmd.Dir = dir
