@@ -2,7 +2,7 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://putnami.dev/schemas/putnami-change-evidence.json",
   "title": "Putnami Change Evidence",
-  "description": "One change in a repository that keeps its own CI, as one CI job observed it: the files it touches, the components they belong to and the components that depend on them, tests and coverage per component, the coverage of the changed lines and the dependency changes. The document is self-reported: it carries no verdict and no trust claim. It is consistent (every reference resolves, every impact follows from the files and the edges, every count adds up) and bounded. Every string holds at most 4096 bytes of UTF-8, which the strict reader checks; a schema validator counts characters, so it is the looser of the two.",
+  "description": "One change in a repository that keeps its own CI, as one CI job observed it: the files it touches, the components they belong to and the components that depend on them, tests and coverage per component, the coverage of the changed lines, the dependency changes and, from a software bill of materials the CI wrote, the licences and known vulnerabilities of each changed dependency. The document is self-reported: it carries no verdict and no trust claim. It is consistent (every reference resolves, every impact follows from the files and the edges, every count adds up) and bounded. Every string holds at most 4096 bytes of UTF-8, which the strict reader checks; a schema validator counts characters, so it is the looser of the two.",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -224,6 +224,19 @@
       "description": "The difference of the lockfiles between the base and the commit.",
       "items": {
         "$ref": "#/$defs/dependencyChange"
+      }
+    },
+    "sbom": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "The software bills of materials (SBOM) the dependency states were read from: head for the commit, base for the base, each absent when none was read. Without a base, every base state is unknown. Absent when the producer read none.",
+      "properties": {
+        "head": {
+          "$ref": "#/$defs/sbomDocument"
+        },
+        "base": {
+          "$ref": "#/$defs/sbomDocument"
+        }
       }
     },
     "diagnostics": {
@@ -504,6 +517,12 @@
           "type": "string",
           "description": "The id of the component whose lockfile it is, when one does.",
           "maxLength": 4096
+        },
+        "before": {
+          "$ref": "#/$defs/dependencyState"
+        },
+        "after": {
+          "$ref": "#/$defs/dependencyState"
         }
       }
     },
@@ -537,6 +556,84 @@
         },
         "field": {
           "type": "string",
+          "maxLength": 4096
+        }
+      }
+    },
+    "sbomDocument": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "format",
+        "specVersion"
+      ],
+      "properties": {
+        "format": {
+          "type": "string",
+          "enum": [
+            "cyclonedx",
+            "spdx"
+          ],
+          "maxLength": 4096
+        },
+        "specVersion": {
+          "type": "string",
+          "pattern": "^[0-9]+\\.[0-9]+(\\.[0-9]+)?$",
+          "description": "The version of the format the document states, such as 1.5 or 2.3.",
+          "maxLength": 4096
+        }
+      }
+    },
+    "dependencyState": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "What an SBOM says of a package at one side of the change: before at the base, after at the commit. A side is absent for an added (before) or removed (after) package, without that side's SBOM, or when it does not list the package.",
+      "properties": {
+        "licenses": {
+          "type": "array",
+          "maxItems": 20,
+          "description": "SPDX ids, expressions or licence names.",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4096
+          }
+        },
+        "vulnerabilities": {
+          "type": "array",
+          "maxItems": 200,
+          "description": "Known vulnerabilities; an id appears once.",
+          "items": {
+            "$ref": "#/$defs/vulnerability"
+          }
+        }
+      }
+    },
+    "vulnerability": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "severity"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The advisory identifier: CVE-..., GHSA-..., GO-...",
+          "maxLength": 4096
+        },
+        "severity": {
+          "type": "string",
+          "enum": [
+            "critical",
+            "high",
+            "medium",
+            "low",
+            "info",
+            "none",
+            "unknown"
+          ],
           "maxLength": 4096
         }
       }

@@ -32,6 +32,7 @@ const (
 	ErrorCodeInvalidImpact              = "evidence.invalid_impact"
 	ErrorCodeInvalidCount               = "evidence.invalid_count"
 	ErrorCodeInvalidDependencyChange    = "evidence.invalid_dependency_change"
+	ErrorCodeInvalidSBOM                = "evidence.invalid_sbom"
 	ErrorCodeInvalidTimestamp           = "evidence.invalid_timestamp"
 	ErrorCodeInvalidDiagnostic          = "evidence.invalid_diagnostic"
 	ErrorCodeTooLarge                   = "evidence.too_large"
@@ -52,6 +53,7 @@ var ValidErrorCodes = map[string]bool{
 	ErrorCodeInvalidImpact:              true,
 	ErrorCodeInvalidCount:               true,
 	ErrorCodeInvalidDependencyChange:    true,
+	ErrorCodeInvalidSBOM:                true,
 	ErrorCodeInvalidTimestamp:           true,
 	ErrorCodeInvalidDiagnostic:          true,
 	ErrorCodeTooLarge:                   true,
@@ -67,19 +69,22 @@ const (
 	hostExpression = `^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?(\.[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)*(:[0-9]{1,5})?$`
 	slugExpression = `^[a-z][a-z0-9-]*$`
 	codeExpression = `^[a-z][a-z0-9_-]*(\.[a-z][a-z0-9_-]*)+$`
+	// specVersionExpression is a dotted version number: 1.5, 2.3.
+	specVersionExpression = `^[0-9]+\.[0-9]+(\.[0-9]+)?$`
 	// timestampExpression is RFC 3339 with an optional fraction and a zone;
 	// time.Parse then refuses an impossible date or time.
 	timestampExpression = `^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\.[0-9]+)?(Z|[+-][0-9]{2}:[0-9]{2})$`
 )
 
 var (
-	shaPattern       = regexp.MustCompile(shaExpression)
-	projectIDPattern = regexp.MustCompile(projectIDExpression)
-	hostPattern      = regexp.MustCompile(hostExpression)
-	slugPattern      = regexp.MustCompile(slugExpression)
-	codePattern      = regexp.MustCompile(codeExpression)
-	timestampPattern = regexp.MustCompile(timestampExpression)
-	drivePattern     = regexp.MustCompile(`^[A-Za-z]:`)
+	shaPattern         = regexp.MustCompile(shaExpression)
+	projectIDPattern   = regexp.MustCompile(projectIDExpression)
+	hostPattern        = regexp.MustCompile(hostExpression)
+	slugPattern        = regexp.MustCompile(slugExpression)
+	codePattern        = regexp.MustCompile(codeExpression)
+	specVersionPattern = regexp.MustCompile(specVersionExpression)
+	timestampPattern   = regexp.MustCompile(timestampExpression)
+	drivePattern       = regexp.MustCompile(`^[A-Za-z]:`)
 )
 
 // requiredMembers are the top-level members a document always carries, even
@@ -95,6 +100,13 @@ type member struct {
 
 func object(fields map[string]*member) *member { return &member{fields: fields} }
 func array(items *member) *member              { return &member{items: items} }
+
+var (
+	dependencyStateShape = object(map[string]*member{
+		"licenses": nil, "vulnerabilities": array(object(map[string]*member{"id": nil, "severity": nil})),
+	})
+	sbomDocumentShape = object(map[string]*member{"format": nil, "specVersion": nil})
+)
 
 var documentShape = object(map[string]*member{
 	"protocolVersion": nil,
@@ -123,7 +135,9 @@ var documentShape = object(map[string]*member{
 	}),
 	"dependencyChanges": array(object(map[string]*member{
 		"ecosystem": nil, "lockfile": nil, "name": nil, "change": nil, "from": nil, "to": nil, "component": nil,
+		"before": dependencyStateShape, "after": dependencyStateShape,
 	})),
+	"sbom":        object(map[string]*member{"head": sbomDocumentShape, "base": sbomDocumentShape}),
 	"diagnostics": array(object(map[string]*member{"severity": nil, "code": nil, "message": nil, "field": nil})),
 })
 
@@ -285,7 +299,9 @@ func ValidateDocument(document *Document) []diag.Diagnostic {
 	v.tests(document.Tests, components)
 	v.coverage(document.Coverage, components)
 	v.changedLineCoverage(document.ChangedLineCoverage, changed)
+	v.sbom(document.SBOM)
 	v.dependencyChanges(document.DependencyChanges, components, changed)
+	v.dependencyStates(document.DependencyChanges, document.SBOM)
 	v.diagnostics(document.Diagnostics)
 	return v.diags
 }
@@ -381,6 +397,16 @@ func (v *validator) bounds(document *Document) bool {
 		edges += len(component.DependsOn)
 	}
 	over("components[].dependsOn", edges, MaxEdges)
+	for index, change := range document.DependencyChanges {
+		for side, state := range []*DependencyState{change.Before, change.After} {
+			if state == nil {
+				continue
+			}
+			field := fmt.Sprintf("dependencyChanges[%d].%s", index, []string{"before", "after"}[side])
+			over(field+".licenses", len(state.Licenses), MaxLicenses)
+			over(field+".vulnerabilities", len(state.Vulnerabilities), MaxVulnerabilities)
+		}
+	}
 	if coverage := document.ChangedLineCoverage; coverage != nil {
 		over("changedLineCoverage.files", len(coverage.Files), MaxChangedLineCoverageFile)
 		for index, file := range coverage.Files {
@@ -680,6 +706,77 @@ func (v *validator) dependencyChanges(changes []DependencyChange, components map
 			v.add(ErrorCodeInvalidDependencyChange, field+".change", "change %q is not one of %s", change.Change, strings.Join(DependencyChanges, ", "))
 		}
 		v.reference(field+".component", change.Component, components)
+	}
+}
+
+// sbom checks the software bills of materials the document names.
+func (v *validator) sbom(sbom *SBOM) {
+	if sbom == nil {
+		return
+	}
+	for _, side := range []struct {
+		name     string
+		document *SBOMDocument
+	}{{"head", sbom.Head}, {"base", sbom.Base}} {
+		if side.document == nil {
+			continue
+		}
+		field := "sbom." + side.name
+		if !slices.Contains(SBOMFormats, side.document.Format) {
+			v.add(ErrorCodeInvalidSBOM, field+".format", "format %q is not one of %s", side.document.Format, strings.Join(SBOMFormats, ", "))
+		}
+		if !specVersionPattern.MatchString(side.document.SpecVersion) {
+			v.add(ErrorCodeInvalidSBOM, field+".specVersion", "specVersion %q is not a dotted version number", side.document.SpecVersion)
+		}
+	}
+}
+
+// dependencyStates checks the before and after states of each dependency
+// change: a side needs its SBOM and a version, and a state is well formed.
+func (v *validator) dependencyStates(changes []DependencyChange, sbom *SBOM) {
+	hasBase := sbom != nil && sbom.Base != nil
+	hasHead := sbom != nil && sbom.Head != nil
+	for index, change := range changes {
+		field := fmt.Sprintf("dependencyChanges[%d]", index)
+		if change.Before != nil {
+			switch {
+			case !hasBase:
+				v.add(ErrorCodeInvalidDependencyChange, field+".before", "a before state needs the base SBOM it was read from")
+			case change.Change == DependencyAdded:
+				v.add(ErrorCodeInvalidDependencyChange, field+".before", "an added package has no before state")
+			}
+			v.dependencyState(field+".before", change.Before)
+		}
+		if change.After != nil {
+			switch {
+			case !hasHead:
+				v.add(ErrorCodeInvalidDependencyChange, field+".after", "an after state needs the head SBOM it was read from")
+			case change.Change == DependencyRemoved:
+				v.add(ErrorCodeInvalidDependencyChange, field+".after", "a removed package has no after state")
+			}
+			v.dependencyState(field+".after", change.After)
+		}
+	}
+}
+
+func (v *validator) dependencyState(field string, state *DependencyState) {
+	for index, license := range state.Licenses {
+		if strings.TrimSpace(license) == "" {
+			v.add(ErrorCodeInvalidDependencyChange, fmt.Sprintf("%s.licenses[%d]", field, index), "a licence is not empty")
+		}
+	}
+	seen := map[string]bool{}
+	for index, vulnerability := range state.Vulnerabilities {
+		item := fmt.Sprintf("%s.vulnerabilities[%d]", field, index)
+		if strings.TrimSpace(vulnerability.ID) == "" {
+			v.add(ErrorCodeInvalidDependencyChange, item+".id", "a vulnerability names its id")
+		} else if seen[vulnerability.ID] {
+			v.add(ErrorCodeDuplicate, item+".id", "vulnerability %q is listed twice", vulnerability.ID)
+		}
+		seen[vulnerability.ID] = true
+		if !slices.Contains(Severities, vulnerability.Severity) {
+			v.add(ErrorCodeInvalidDependencyChange, item+".severity", "severity %q is not one of %s", vulnerability.Severity, strings.Join(Severities, ", "))
+		}
 	}
 }
 

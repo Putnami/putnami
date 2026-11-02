@@ -2,11 +2,15 @@
   "valid": [
     "dependency-cycle.json",
     "generic-minimal.json",
+    "sbom-pull-request.json",
     "symfony-merge-request.json",
     "turbo-pull-request.json"
   ],
   "invalid": {
     "added-with-a-from-version.json": [
+      "evidence.invalid_dependency_change"
+    ],
+    "before-without-a-base-sbom.json": [
       "evidence.invalid_dependency_change"
     ],
     "case-alias-member.json": [
@@ -35,6 +39,10 @@
     ],
     "duplicate-component.json": [
       "evidence.duplicate"
+    ],
+    "duplicate-vulnerability-with-an-unknown-severity.json": [
+      "evidence.duplicate",
+      "evidence.invalid_dependency_change"
     ],
     "empty-dependency-edge.json": [
       "evidence.unknown_component"
@@ -89,6 +97,9 @@
     ],
     "unknown-field.json": [
       "evidence.unknown_field"
+    ],
+    "unknown-sbom-format.json": [
+      "evidence.invalid_sbom"
     ],
     "upgraded-to-the-same-version.json": [
       "evidence.invalid_dependency_change"
