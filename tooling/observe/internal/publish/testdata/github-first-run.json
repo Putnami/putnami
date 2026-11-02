@@ -1,5 +1,5 @@
 {
-  "comment": "A first run on GitHub pull request #42: the status, then a note is created because no comment starts with the marker. A comment that quotes the marker is not the note.",
+  "comment": "A first run on the GitHub pull request: the status, then a note is created because no comment starts with the marker. A comment that quotes the marker is not the note.",
   "exchanges": [
     {
       "request": {

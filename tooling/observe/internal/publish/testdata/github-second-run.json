@@ -1,5 +1,5 @@
 {
-  "comment": "A second run on GitHub pull request #42 finds the note it created and updates it in place.",
+  "comment": "A second run on the GitHub pull request finds the note it created and updates it in place.",
   "exchanges": [
     {
       "request": {"method": "POST", "url": "https://api.github.com/repos/acme/shop/statuses/cccccccccccccccccccccccccccccccccccccccc", "headers": {"Authorization": "Bearer ghs_fixturetoken"}},

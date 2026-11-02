@@ -1,5 +1,5 @@
 {
-  "comment": "A retried job on merge request !7: GitLab refuses to set the same status twice, which is no failure, and the note is found on the second page of notes and updated in place. The test reads two notes per page.",
+  "comment": "A retried job on the merge request: GitLab refuses to set the same status twice, which is no failure, and the note is found on the second page of notes and updated in place. The test reads two notes per page.",
   "exchanges": [
     {
       "request": {"method": "POST", "url": "https://gitlab.com/api/v4/projects/4242/statuses/cccccccccccccccccccccccccccccccccccccccc", "headers": {"Private-Token": "glpat-fixturetoken"}},

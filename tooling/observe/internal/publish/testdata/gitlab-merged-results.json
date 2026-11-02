@@ -1,5 +1,5 @@
 {
-  "comment": "A merged results pipeline on merge request !7 runs for a merge commit: the status goes on that commit and joins the job's pipeline.",
+  "comment": "A merged results pipeline on the merge request runs for a merge commit: the status goes on that commit and joins the job's pipeline.",
   "exchanges": [
     {
       "request": {

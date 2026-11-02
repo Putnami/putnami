@@ -1,5 +1,5 @@
 {
-  "comment": "A first run on GitLab merge request !7: the status joins the job's pipeline, then a note is created because no note starts with the marker. System notes are skipped.",
+  "comment": "A first run on the GitLab merge request: the status joins the job's pipeline, then a note is created because no note starts with the marker. System notes are skipped.",
   "exchanges": [
     {
       "request": {
