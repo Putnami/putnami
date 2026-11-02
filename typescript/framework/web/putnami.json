@@ -5,7 +5,7 @@
   "type": "library",
   "tags": ["ts"],
   "extensions": ["/typescript/extension", "/tooling/sdd-extension"],
-  "dependencies": ["/protocols/http-routes"],
+  "dependencies": ["/protocols/http-routes", "/protocols/i18n"],
   "options": {
     "package": {
       "npm": true
@@ -17,6 +17,13 @@
       "verification": {
         "specs": "enforce"
       }
+    },
+    "test": {
+      "filePatterns": ["../../../protocols/i18n/fixtures/**", "../../../protocols/i18n/schemas/**"]
+    },
+    "agent-artifact": {
+      "forbiddenContent": ["password", "access token", "api key", "github.com"],
+      "requiredSkills": ["i18n-translate"]
     }
   }
 }

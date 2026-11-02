@@ -1,0 +1,9 @@
+{
+  "title": {
+    "text": "Tarifs",
+    "source": "Pricing",
+    "state": "validated",
+    "validatedBy": "Ada Lovelace <ada@example.com>",
+    "validatedAt": "yesterday"
+  }
+}

@@ -380,10 +380,13 @@ async function resolveI18n(
   for (const warning of i18n.diagnostics.filter((d) => d.level === 'warning')) {
     emitLog('warn', formatDiagnostic(warning));
   }
+  const untranslated = i18n.diagnostics.filter((d) => d.code === 'missing' || d.code === 'stale').length;
   if (errors.length > 0) {
-    throw new Error(
-      `${errors.length} localization error(s); run \`putnami i18n sync\` and translate:\n${errors.map(formatDiagnostic).join('\n')}`,
-    );
+    const next = untranslated > 0 ? '\nRun `putnami i18n translate` to draft the missing translations.' : '';
+    throw new Error(`${errors.length} localization error(s):\n${errors.map(formatDiagnostic).join('\n')}${next}`);
+  }
+  if (untranslated > 0) {
+    emitLog('warn', `${untranslated} message(s) to translate; run \`putnami i18n translate\` to draft them`);
   }
   const stale = i18n.catalogs.filter((c) => c.outOfSync).map((c) => c.locale);
   if (stale.length > 0) {

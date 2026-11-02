@@ -1,0 +1,20 @@
+{
+  "$schema": "https://putnami.dev/schemas/i18n/glossary.json",
+  "Putnami": { "translation": null, "note": "The product name." },
+  "workspace": { "translation": null, "note": "A Putnami term, kept in English and masculine: « le workspace »." },
+  "CLI": { "translation": null, "note": "Feminine: « la CLI »." },
+  "build": { "translation": null, "note": "Masculine: « le build »." },
+  "job": { "translation": null, "note": "Masculine: « un job »." },
+  "edge": { "translation": null, "note": "The network edge in front of the application: « votre edge »." },
+  "handler": { "translation": null, "note": "Masculine: « un handler HTTP »." },
+  "repository": {
+    "translation": "dépôt",
+    "note": "A Git repository. The data-access pattern of the same name stays « repository »."
+  },
+  "drift": { "translation": "dérive" },
+  "wire protocol": { "translation": "protocole filaire" },
+  "fixture": { "translation": "exemple", "note": "A test fixture of a protocol corpus." },
+  "deterministic": { "translation": "déterministe" },
+  "agent": { "translation": "agent", "note": "An AI agent that operates the system." },
+  "privacy": { "translation": "confidentialité" }
+}

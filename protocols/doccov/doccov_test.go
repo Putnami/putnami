@@ -57,7 +57,10 @@ var documentedPackages = []string{"cache", "config", "diagnostic", "events", "jo
 // validation functions, so a zero field count is expected, not a scanner
 // regression. Every OTHER guarded package must scan at least one wire field;
 // see the Total()==0 guard in TestWireFieldDocCoverage.
-var wirelessContracts = map[string]bool{}
+var wirelessContracts = map[string]bool{
+	// i18n's contract is its JSON schemas: no Go code reads a catalog.
+	"i18n": true,
+}
 
 // TestWireFieldDocCoverage is the deterministic doc-coverage guard. It scans
 // every sibling protocols/* package's Go source (as text) plus its schemas and

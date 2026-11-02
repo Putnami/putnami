@@ -1,0 +1,23 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-spec.json",
+  "protocolVersion": 1,
+  "feature": "i18n/catalog-format",
+  "outcomes": [
+    "An editor, a translator's tool or an agent checks a catalog or a glossary file against a published schema, without running Putnami",
+    "The schemas and the @putnami/web reader accept and refuse the same files"
+  ],
+  "nonGoals": [
+    "The work file putnami i18n translate writes, which only the CLI and its skill read",
+    "A Go reader of catalogs: no Go code reads them"
+  ],
+  "requirements": [
+    {
+      "id": "the-schemas-are-published",
+      "text": "schemas/catalog.json and schemas/glossary.json are JSON Schema 2020-12 documents whose $id is https://putnami.dev/schemas/i18n/catalog.json and https://putnami.dev/schemas/i18n/glossary.json, where putnami.dev publishes them."
+    },
+    {
+      "id": "the-fixture-corpus-is-the-contract",
+      "text": "Every fixture is a JSON object. @putnami/web reads each valid catalog and glossary fixture and refuses each invalid one: an unknown field, an unknown state, a text that is not a string, a validated entry without validatedBy and validatedAt, an entry that is not an object, a glossary term without a translation or with an empty one."
+    }
+  ]
+}

@@ -1,0 +1,8 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-specs-baseline.json",
+  "protocolVersion": 2,
+  "executableRequirements": [
+    "i18n/catalog-format#the-fixture-corpus-is-the-contract",
+    "i18n/catalog-format#the-schemas-are-published"
+  ]
+}

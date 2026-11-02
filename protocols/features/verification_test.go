@@ -176,6 +176,7 @@ func TestCommittedRepositoryContentStaysOnTheLegacyManifestWire(t *testing.T) {
 		filepath.Join("tooling", "sdd-extension", ManifestFilename):               true,
 		filepath.Join("protocols", "architecture", ManifestFilename):              true,
 		filepath.Join("protocols", "clientcontract", ManifestFilename):            true,
+		filepath.Join("protocols", "i18n", ManifestFilename):                      true,
 		filepath.Join("python", "extension", ManifestFilename):                    true,
 		filepath.Join("sites", "telemetry.putnami.dev", ManifestFilename):         true,
 		filepath.Join("sites", "putnami.dev", ManifestFilename):                   true,

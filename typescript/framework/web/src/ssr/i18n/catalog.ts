@@ -1,4 +1,3 @@
-import { createHash } from 'node:crypto';
 import { icuArguments, IcuSyntaxError, parseIcu } from '../../shared/i18n/icu';
 import type { LocaleMessages } from '../../shared/i18n/messages';
 
@@ -14,10 +13,12 @@ export type CatalogState = 'missing' | 'draft' | 'validated' | 'stale';
 
 export interface CatalogEntry {
   text: string;
-  /** Hash of the default text this translation was made from. */
+  /** The default text this translation was made from. */
   source?: string;
   state: CatalogState;
+  /** Who validated it, `Name <email>` from their git identity. */
   validatedBy?: string;
+  /** The day it was validated, `YYYY-MM-DD`. */
   validatedAt?: string;
 }
 
@@ -32,9 +33,10 @@ export type DeclaredMessages = ReadonlyMap<string, Readonly<Record<string, strin
 
 const STATES = new Set<CatalogState>(['missing', 'draft', 'validated', 'stale']);
 
-export function sourceHash(text: string): string {
-  return createHash('sha256').update(text, 'utf8').digest('hex').slice(0, 16);
-}
+/** The schema every catalog file names, published by putnami.dev from `protocols/i18n`. */
+export const CATALOG_SCHEMA = 'https://putnami.dev/schemas/i18n/catalog.json';
+
+const DAY = /^\d{4}-\d{2}-\d{2}$/;
 
 export class CatalogFormatError extends Error {
   constructor(file: string, detail: string) {
@@ -62,13 +64,14 @@ export function parseCatalogFile(file: string, value: unknown): CatalogFile {
     if (typeof state !== 'string' || !STATES.has(state as CatalogState)) {
       throw new CatalogFormatError(file, `${key}.state must be one of ${[...STATES].join(', ')}`);
     }
-    for (const [name, field] of [
-      ['validatedBy', validatedBy],
-      ['validatedAt', validatedAt],
-    ] as const) {
-      if (field !== undefined && typeof field !== 'string') {
-        throw new CatalogFormatError(file, `${key}.${name} must be a string`);
-      }
+    if (validatedBy !== undefined && (typeof validatedBy !== 'string' || validatedBy === '')) {
+      throw new CatalogFormatError(file, `${key}.validatedBy must be a non-empty string`);
+    }
+    if (validatedAt !== undefined && (typeof validatedAt !== 'string' || !DAY.test(validatedAt))) {
+      throw new CatalogFormatError(file, `${key}.validatedAt must be a day, YYYY-MM-DD`);
+    }
+    if (state === 'validated' && (validatedBy === undefined || validatedAt === undefined)) {
+      throw new CatalogFormatError(file, `${key} is validated without validatedBy and validatedAt`);
     }
     entries[key] = {
       text,
@@ -89,7 +92,7 @@ export interface SyncChanges {
 
 /**
  * Align a catalog with the declared messages. Adds a `missing` entry for each
- * new key, drops keys no declaration holds, fills an absent source hash, and
+ * new key, drops keys no declaration holds, fills an absent source, and
  * marks a translation `stale` when its default text changed; it never edits a
  * translation's text. The result is sorted, so the same inputs write the same
  * bytes.
@@ -102,21 +105,21 @@ export function syncCatalog(declared: DeclaredMessages, current: Catalog): { cat
     const existing = current[namespace] ?? {};
     const entries: CatalogFile = {};
     for (const key of Object.keys(defaults).sort()) {
-      const hash = sourceHash(defaults[key] as string);
+      const source = defaults[key] as string;
       const entry = existing[key];
       if (!entry) {
-        entries[key] = { text: '', source: hash, state: 'missing' };
+        entries[key] = { text: '', source, state: 'missing' };
         changes.added.push(`${namespace}.${key}`);
         continue;
       }
       const next: CatalogEntry = { ...entry };
       if (next.text === '') {
         next.state = 'missing';
-        next.source = hash;
+        next.source = source;
       } else if (next.source === undefined) {
-        next.source = hash;
+        next.source = source;
         if (next.state === 'missing') next.state = 'draft';
-      } else if (next.source !== hash && next.state !== 'stale') {
+      } else if (next.source !== source && next.state !== 'stale') {
         next.state = 'stale';
         changes.staled.push(`${namespace}.${key}`);
       } else if (next.state === 'missing') {
@@ -147,8 +150,9 @@ function orderEntry(entry: CatalogEntry): CatalogEntry {
   };
 }
 
+/** A catalog file's bytes: its schema first, then its entries in key order. */
 export function serializeCatalogFile(entries: CatalogFile): string {
-  return `${JSON.stringify(entries, null, 2)}\n`;
+  return `${JSON.stringify({ $schema: CATALOG_SCHEMA, ...entries }, null, 2)}\n`;
 }
 
 export interface CatalogDiagnostic {
@@ -159,8 +163,8 @@ export interface CatalogDiagnostic {
   message: string;
 }
 
-/** The arguments and tags a message uses, written `{name}` and `<name>`, sorted. */
-function argumentNames(text: string): string[] {
+/** The arguments and tags a message uses, written `{name}` and `<name>`, sorted. Throws on invalid ICU. */
+export function messageArguments(text: string): string[] {
   return [...icuArguments(parseIcu(text))].map(([name, kind]) => (kind === 'tag' ? `<${name}>` : `{${name}}`)).sort();
 }
 
@@ -182,7 +186,7 @@ export function checkCatalog(
       const id = `${namespace}.${key}`;
       let expected: string[];
       try {
-        expected = argumentNames(defaultText);
+        expected = messageArguments(defaultText);
       } catch (error) {
         diagnostics.push({
           level: 'error',
@@ -206,7 +210,7 @@ export function checkCatalog(
       }
       let actual: string[];
       try {
-        actual = argumentNames(entry.text);
+        actual = messageArguments(entry.text);
       } catch (error) {
         const detail = error instanceof IcuSyntaxError ? error.message : String(error);
         diagnostics.push({

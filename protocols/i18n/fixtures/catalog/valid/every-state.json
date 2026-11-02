@@ -1,0 +1,13 @@
+{
+  "$schema": "https://putnami.dev/schemas/i18n/catalog.json",
+  "draft": { "text": "Tarifs", "source": "Pricing", "state": "draft" },
+  "missing": { "text": "", "source": "Plans", "state": "missing" },
+  "stale": { "text": "{count, plural, one {# siège} other {# sièges}}", "source": "{count, plural, one {# seat} other {# seats}}", "state": "stale" },
+  "validated": {
+    "text": "Lire les <link>conditions</link>",
+    "source": "Read the <link>terms</link>",
+    "state": "validated",
+    "validatedBy": "Ada Lovelace <ada@example.com>",
+    "validatedAt": "2026-11-02"
+  }
+}

@@ -12,6 +12,15 @@
     "publish": {
       "archives": false
     },
+    "test": {
+      "filePatterns": [
+        "../../putnami.workspace.json",
+        "../../putnami.support.json",
+        "../*/README.md",
+        "../*/go.mod",
+        "../../tooling/cli/doc/21-compatibility-and-migration.md"
+      ]
+    },
     "sdd": {
       "verification": {
         "specs": "enforce"

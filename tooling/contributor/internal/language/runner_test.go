@@ -31,12 +31,12 @@ func TestLanguageFileExclusions(t *testing.T) {
 			t.Errorf("unrelated source %s was excluded", path)
 		}
 	}
-	for _, path := range []string{"sites/putnami.dev/locales/fr.json", "app/locales/pt-BR.json", `app\locales\de.json`, "sites/putnami.dev/locales/fr/home.json", "app/locales/pt-BR/docs/sidebar.json"} {
+	for _, path := range []string{"sites/putnami.dev/locales/fr.json", "app/locales/pt-BR.json", `app\locales\de.json`, "sites/putnami.dev/locales/fr/home.json", "app/locales/pt-BR/docs/sidebar.json", "sites/putnami.dev/locales/fr.glossary.json"} {
 		if !ExcludedLanguagePath(path) {
 			t.Errorf("translation catalog %s was scanned as English prose", path)
 		}
 	}
-	for _, path := range []string{"app/locales/en.json", "app/locales/en-GB.json", "app/locales/fr.md", "app/fr.json", "app/locales/notes.json", "app/locales/en/home.json", "app/locales/fr/notes.md", "app/locales/readme/fr.json"} {
+	for _, path := range []string{"app/locales/en.json", "app/locales/en-GB.json", "app/locales/fr.md", "app/fr.json", "app/locales/notes.json", "app/locales/en/home.json", "app/locales/fr/notes.md", "app/locales/readme/fr.json", "app/locales/en.glossary.json"} {
 		if ExcludedLanguagePath(path) {
 			t.Errorf("%s left the English rule", path)
 		}
