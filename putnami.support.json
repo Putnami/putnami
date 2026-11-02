@@ -448,6 +448,11 @@
       "status": "stable"
     },
     {
+      "id": "go.putnami.dev/protocol/i18n",
+      "kind": "protocol",
+      "status": "preview"
+    },
+    {
       "id": "go.putnami.dev/protocol/identity",
       "kind": "protocol",
       "status": "preview"

@@ -1,77 +1,78 @@
 {
+  "$schema": "https://putnami.dev/schemas/i18n/catalog.json",
   "allFrameworks": {
     "text": "Tous les frameworks →",
-    "source": "668287fc391257f3",
+    "source": "All frameworks →",
     "state": "draft"
   },
   "chooseSurface": {
     "text": "Choisir une surface",
-    "source": "6e3261bb60678613",
+    "source": "Choose a surface",
     "state": "draft"
   },
   "commonGuides": {
     "text": "Guides courants",
-    "source": "6e684cdba36f6700",
+    "source": "Common guides",
     "state": "draft"
   },
   "docs": {
     "text": "Docs",
-    "source": "7af023c43013b9a5",
+    "source": "Docs",
     "state": "draft"
   },
   "frameworks": {
     "text": "Frameworks",
-    "source": "cafd6b725820bd8e",
+    "source": "Frameworks",
     "state": "draft"
   },
   "home": {
     "text": "Accueil Putnami",
-    "source": "d246c416aa5bda9e",
+    "source": "Putnami home",
     "state": "draft"
   },
   "menu": {
     "text": "Menu",
-    "source": "99af6606ff9d6cd5",
+    "source": "Menu",
     "state": "draft"
   },
   "navigation": {
     "text": "Navigation",
-    "source": "3db65f8c2a7d1861",
+    "source": "Navigation",
     "state": "draft"
   },
   "openMenu": {
     "text": "Ouvrir le menu",
-    "source": "c219bbd71512525e",
+    "source": "Open Menu",
     "state": "draft"
   },
   "search": {
     "text": "Rechercher",
-    "source": "49c266baaaa70981",
+    "source": "Search",
     "state": "draft"
   },
   "searchDocs": {
     "text": "Rechercher dans la documentation",
-    "source": "ea582e69cce77d67",
+    "source": "Search documentation",
     "state": "draft"
   },
   "start": {
     "text": "Démarrer",
-    "source": "e4bb9f1ece9af926",
+    "source": "Start",
     "state": "draft"
   },
   "systemModel": {
     "text": "Le modèle du système",
-    "source": "0efd58bdac8b3836",
+    "source": "The system model",
     "state": "draft"
   },
   "viewOnGithub": {
     "text": "Voir sur GitHub",
-    "source": "20672423d7169088",
+    "source": "View on GitHub",
     "state": "draft"
   },
   "why": {
     "text": "Pourquoi",
-    "source": "d3ae14a50bfe463f",
+    "source": "Why",
     "state": "draft"
   }
 }

@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://putnami.dev/schemas/i18n/glossary.json",
+  "title": "Putnami translation glossary",
+  "description": "The terms of one locale, at locales/<locale>.glossary.json: each default-locale term holds its translation, or null to keep it as written, and an optional note for the translator.",
+  "type": "object",
+  "properties": {
+    "$schema": { "type": "string" }
+  },
+  "additionalProperties": { "$ref": "#/$defs/term" },
+  "$defs": {
+    "term": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["translation"],
+      "properties": {
+        "translation": {
+          "type": ["string", "null"],
+          "minLength": 1,
+          "description": "The term in the locale, or null to keep the term as written, such as a product name."
+        },
+        "note": {
+          "type": "string",
+          "minLength": 1,
+          "description": "What the translator needs to know: the meaning, the register, a form to avoid."
+        }
+      }
+    }
+  }
+}

@@ -110,6 +110,7 @@ consumer rather than belonging to whichever pillar defined it first.
 | [`ci`](https://github.com/putnami/putnami/tree/main/protocols/ci) | `putnami.ci.json`: triggers, branch rules, jobs, runners, publish/deploy clauses — plane-neutral, canonically normalized, digested, and rejecting literal credentials. |
 | [`features`](https://github.com/putnami/putnami/tree/main/protocols/features) | Feature intent, repository evidence, durable specs, and the verification report that connects them. Maturity is an evidence ladder, not an adjective. |
 | [`support`](https://github.com/putnami/putnami/tree/main/protocols/support) | The closed vocabulary behind `putnami.support.json` — one reviewed authority for what you may depend on. |
+| [`i18n`](https://github.com/putnami/putnami/tree/main/protocols/i18n) | The JSON schemas of a message catalog and a translation glossary, with a fixture corpus every reader must agree with. A validated entry names the person who validated it. |
 | [`architecture`](https://github.com/putnami/putnami/tree/main/protocols/architecture) | Architecture Rules as Code (ARC) and Domain Access & Replication Contracts (DARC). *Data may be copied. Authority may not be copied.* Opt-in, and free to change its wire format without a migration path. See [spec-driven development](/docs/concepts/spec-driven-development). |
 
 ### Execution, diagnostics, and observability

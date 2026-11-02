@@ -140,6 +140,7 @@ func authoredProtocolsDomain() *arch.Builder {
 			"/protocols/gomod",
 			"/protocols/grpc-services",
 			"/protocols/http-routes",
+			"/protocols/i18n",
 			"/protocols/identity",
 			"/protocols/infra",
 			"/protocols/job",

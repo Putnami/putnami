@@ -1,17 +1,18 @@
 {
+  "$schema": "https://putnami.dev/schemas/i18n/catalog.json",
   "language": {
     "text": "Langue",
-    "source": "a4fe65264ef7dbb3",
+    "source": "Language",
     "state": "draft"
   },
   "licensedUnder": {
     "text": "Sous licence",
-    "source": "6c09ec564736f285",
+    "source": "Licensed under",
     "state": "draft"
   },
   "privacy": {
     "text": "Confidentialité",
-    "source": "54a57c3147c49f33",
+    "source": "Privacy",
     "state": "draft"
   }
 }

@@ -1,6 +1,6 @@
 # Repository adoption matrix
 
-This repository maps **99 of its 158 projects** to **10 architecture domains**.
+This repository maps **100 of its 159 projects** to **10 architecture domains**.
 The other **59 are excluded on purpose**: 28 samples, 7 templates, 2 template
 proofs, 2 protocol proofs, the standalone area detector, the 2 Cloud runtime
 destinations, the Cloud CLI extension with its 14 generated clients, the new
@@ -29,7 +29,7 @@ an unmapped project is simply invisible to it. This file is that second half.
 
 | Domain | Owner | Projects | Manifest |
 |---|---|---|---|
-| `protocols` | `protocols` | 42 | `protocols/putnami.architecture.json` |
+| `protocols` | `protocols` | 43 | `protocols/putnami.architecture.json` |
 | `go-framework` | `framework` | 24 | `go/framework/putnami.architecture.json` |
 | `typescript-framework` | `framework` | 14 | `typescript/framework/putnami.architecture.json` |
 | `extension-providers` | `extension-providers` | 9 | `go/extension/putnami.architecture.json` |
@@ -51,7 +51,7 @@ from the directory.
 Each section states the domain's **membership test** first. A project belongs
 because it passes that test, not because of where its directory sits.
 
-### `protocols` — 42 projects
+### `protocols` — 43 projects
 
 **Membership test:** the project decides what one wire document *means*. It owns
 that document's strict parser, its validator, and its canonical writer, and no
@@ -82,6 +82,7 @@ other project in the repository may reinterpret it.
 | `/protocols/gomod` | `go.putnami.dev/protocol/gomod` | The Go module registry write protocol. |
 | `/protocols/grpc-services` | `go.putnami.dev/protocol/grpc-services` | The build-time inventory of the gRPC and Connect services an application registered. |
 | `/protocols/http-routes` | `go.putnami.dev/protocol/http-routes` | The deterministic public-route inventory. |
+| `/protocols/i18n` | `go.putnami.dev/protocol/i18n` | The translation catalog and glossary formats of a localized web project. |
 | `/protocols/identity` | `go.putnami.dev/protocol/identity` | The consumer-side identity vocabulary the frameworks share. |
 | `/protocols/infra` | `go.putnami.dev/protocol/infra` | Per-project and aggregated infrastructure requirements. |
 | `/protocols/job` | `go.putnami.dev/protocol/job` | The job execution context handed to every extension. |

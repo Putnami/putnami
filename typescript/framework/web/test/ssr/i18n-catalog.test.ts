@@ -1,20 +1,21 @@
 import { afterEach, describe, expect, it } from 'bun:test';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { specTest } from '@putnami/runtime/spectest';
 import { sync } from '../../bin/i18n';
 import { formatDiagnostic } from '../../src/ssr/i18n/build';
 import {
+  CATALOG_SCHEMA,
   type Catalog,
   CatalogFormatError,
   checkCatalog,
   parseCatalogFile,
   runtimeMessages,
   serializeCatalogFile,
-  sourceHash,
   syncCatalog,
 } from '../../src/ssr/i18n/catalog';
+import { GLOSSARY_SCHEMA, parseGlossaryFile } from '../../src/ssr/i18n/glossary';
 
 const feature = 'typescript/web-localization';
 
@@ -25,10 +26,16 @@ const declared = new Map<string, Record<string, string>>([
 function translated(): Catalog {
   return {
     home: {
-      title: { text: 'Tarifs', source: sourceHash('Pricing'), state: 'validated', validatedBy: 'ada' },
+      title: {
+        text: 'Tarifs',
+        source: 'Pricing',
+        state: 'validated',
+        validatedBy: 'Ada <ada@example.com>',
+        validatedAt: '2026-11-02',
+      },
       seats: {
         text: '{count, plural, one {# siège} other {# sièges}}',
-        source: sourceHash('{count, plural, one {# seat} other {# seats}}'),
+        source: '{count, plural, one {# seat} other {# seats}}',
         state: 'draft',
       },
     },
@@ -46,7 +53,7 @@ describe('syncCatalog', () => {
       const { catalog, changes } = syncCatalog(declared, current);
       expect(catalog['home']?.['seats']).toEqual({
         text: '',
-        source: sourceHash('{count, plural, one {# seat} other {# seats}}'),
+        source: '{count, plural, one {# seat} other {# seats}}',
         state: 'missing',
       });
       expect(catalog['old']).toBeUndefined();
@@ -64,9 +71,10 @@ describe('syncCatalog', () => {
       const { catalog, changes } = syncCatalog(changed, translated());
       expect(catalog['home']?.['title']).toEqual({
         text: 'Tarifs',
-        source: sourceHash('Pricing'),
+        source: 'Pricing',
         state: 'stale',
-        validatedBy: 'ada',
+        validatedBy: 'Ada <ada@example.com>',
+        validatedAt: '2026-11-02',
       });
       expect(changes.staled).toEqual(['home.title']);
       // A second sync keeps it stale and reports nothing new.
@@ -74,21 +82,67 @@ describe('syncCatalog', () => {
     },
   );
 
-  it('fills an absent source hash, which acknowledges the current default text', () => {
+  it('fills an absent source, which acknowledges the current default text', () => {
     const current = translated();
     const title = current['home']?.['title'];
     if (title) {
       title.source = undefined;
       title.state = 'draft';
     }
-    expect(syncCatalog(declared, current).catalog['home']?.['title']?.source).toBe(sourceHash('Pricing'));
+    expect(syncCatalog(declared, current).catalog['home']?.['title']?.source).toBe('Pricing');
   });
 
   it('writes the same bytes for the same inputs, keys sorted', () => {
     const a = serializeCatalogFile(syncCatalog(declared, translated()).catalog['home'] ?? {});
     const b = serializeCatalogFile(syncCatalog(declared, { home: JSON.parse(a) }).catalog['home'] ?? {});
     expect(a).toBe(b);
-    expect(Object.keys(JSON.parse(a))).toEqual(['seats', 'title']);
+    expect(Object.keys(JSON.parse(a))).toEqual(['$schema', 'seats', 'title']);
+  });
+
+  specTest(
+    'writes a catalog file that names its schema and keeps the default text',
+    { feature, requirement: 'catalog-sync', check: 'a-catalog-file-names-its-schema-and-keeps-the-default-text' },
+    () => {
+      const written = JSON.parse(serializeCatalogFile(syncCatalog(declared, {}).catalog['home'] ?? {}));
+      expect(written.$schema).toBe(CATALOG_SCHEMA);
+      expect(written.title).toEqual({ text: '', source: 'Pricing', state: 'missing' });
+      expect(parseCatalogFile('home.json', written)['title']?.source).toBe('Pricing');
+    },
+  );
+});
+
+describe('the catalog and glossary formats of protocols/i18n', () => {
+  const fixtures = join(import.meta.dir, '../../../../../protocols/i18n/fixtures');
+  const corpus = (format: string, kind: string) =>
+    readdirSync(join(fixtures, format, kind)).map((name) => ({
+      name,
+      value: JSON.parse(readFileSync(join(fixtures, format, kind, name), 'utf8')) as unknown,
+    }));
+  const parsers = { catalog: parseCatalogFile, glossary: parseGlossaryFile };
+
+  specTest(
+    'reads every valid fixture and refuses every invalid one',
+    {
+      feature: 'i18n/catalog-format',
+      requirement: 'the-fixture-corpus-is-the-contract',
+      check: 'the-web-reader-agrees-with-the-fixtures',
+    },
+    () => {
+      for (const [format, parse] of Object.entries(parsers)) {
+        const valid = corpus(format, 'valid');
+        const invalid = corpus(format, 'invalid');
+        expect(valid.length).toBeGreaterThan(0);
+        expect(invalid.length).toBeGreaterThan(0);
+        for (const { name, value } of valid) expect(() => parse(name, value)).not.toThrow();
+        for (const { name, value } of invalid) expect(() => parse(name, value)).toThrow(CatalogFormatError);
+      }
+    },
+  );
+
+  it('names the schemas protocols/i18n publishes', () => {
+    const schemas = join(fixtures, '../schemas');
+    expect(JSON.parse(readFileSync(join(schemas, 'catalog.json'), 'utf8')).$id).toBe(CATALOG_SCHEMA);
+    expect(JSON.parse(readFileSync(join(schemas, 'glossary.json'), 'utf8')).$id).toBe(GLOSSARY_SCHEMA);
   });
 });
 
@@ -141,7 +195,7 @@ describe('checkCatalog', () => {
     () => {
       const defaults = new Map([['legal', { terms: 'Read the <link>terms</link>' }]]);
       const catalog = (text: string): Catalog => ({
-        legal: { terms: { text, source: sourceHash('Read the <link>terms</link>'), state: 'draft' } },
+        legal: { terms: { text, source: 'Read the <link>terms</link>', state: 'draft' } },
       });
       expect(run(catalog('Lisez les <a>conditions</a>'), true, defaults)[0]).toMatchObject({
         level: 'error',
@@ -223,7 +277,7 @@ export const home = messages('home', { title: 'Pricing' });`,
         'src/docs/sidebar.messages.ts': `import { messages } from '${messagesModule}';
 export const sidebar = messages('docs/sidebar', { intro: 'Introduction' });`,
         'locales/fr/home.json': serializeCatalogFile({
-          title: { text: 'Tarifs', source: sourceHash('Pricing'), state: 'draft' },
+          title: { text: 'Tarifs', source: 'Pricing', state: 'draft' },
         }),
         'locales/fr/old/gone.json': serializeCatalogFile({ a: { text: 'Parti', state: 'draft' } }),
       });
@@ -231,7 +285,8 @@ export const sidebar = messages('docs/sidebar', { intro: 'Introduction' });`,
       expect(await sync(dir, (line) => lines.push(line))).toBe(0);
 
       expect(JSON.parse(readFileSync(join(dir, 'locales/fr/docs/sidebar.json'), 'utf8'))).toEqual({
-        intro: { text: '', source: sourceHash('Introduction'), state: 'missing' },
+        $schema: CATALOG_SCHEMA,
+        intro: { text: '', source: 'Introduction', state: 'missing' },
       });
       expect(existsSync(join(dir, 'locales/fr/old'))).toBe(false);
       expect(lines).toContain('  wrote locales/fr/docs/sidebar.json');

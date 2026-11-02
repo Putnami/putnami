@@ -1,37 +1,38 @@
 {
+  "$schema": "https://putnami.dev/schemas/i18n/catalog.json",
   "backHome": {
     "text": "← Retour à l’accueil",
-    "source": "248d73477b661c52",
+    "source": "← Back to home",
     "state": "draft"
   },
   "error": {
     "text": "Une erreur est survenue",
-    "source": "ab827e3fe17da220",
+    "source": "Something went wrong",
     "state": "draft"
   },
   "errorDescription": {
     "text": "Une erreur inattendue s’est produite.",
-    "source": "7053d12aceb59a1f",
+    "source": "An unexpected error occurred.",
     "state": "draft"
   },
   "errorTitle": {
     "text": "Une erreur est survenue — Putnami",
-    "source": "5b2e646cf2f03a10",
+    "source": "Something Went Wrong — Putnami",
     "state": "draft"
   },
   "notFound": {
     "text": "Page introuvable",
-    "source": "a469ab4ca4e55bf5",
+    "source": "Page not found",
     "state": "draft"
   },
   "notFoundDescription": {
     "text": "La page que vous cherchez n’existe pas.",
-    "source": "74b78a922b993abc",
+    "source": "The page you are looking for does not exist.",
     "state": "draft"
   },
   "notFoundTitle": {
     "text": "Page introuvable — Putnami",
-    "source": "707cea469128542f",
+    "source": "Page Not Found — Putnami",
     "state": "draft"
   }
 }

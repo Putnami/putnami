@@ -1,0 +1,35 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-features.json",
+  "protocolVersion": 2,
+  "namespace": "i18n",
+  "features": [
+    {
+      "id": "i18n/catalog-format",
+      "type": "feature",
+      "name": "Translation catalog and glossary formats",
+      "outcome": "A localized web project's catalogs and glossaries follow published schemas that @putnami/web and any external tool read the same way",
+      "owner": "framework",
+      "target": "coded",
+      "requirements": [
+        {
+          "id": "the-schemas-are-published",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": ["each-schema-names-its-published-id"]
+          }
+        },
+        {
+          "id": "the-fixture-corpus-is-the-contract",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": ["every-fixture-is-a-json-object", "the-web-reader-agrees-with-the-fixtures"]
+          }
+        }
+      ]
+    }
+  ]
+}
