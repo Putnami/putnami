@@ -52,8 +52,8 @@ describe('optional credential', () => {
     () => {
       const operation = publish({ optional: true, scopes: ['packages:read'] }, [user, anonymous]).paths[
         '/packages/{name}/resolve'
-      ].get;
-      expect(operation['x-putnami-client'].security).toEqual({
+      ]['get'];
+      expect(operation['x-putnami-client']?.security).toEqual({
         alternatives: [user, anonymous],
         authorization: { scopesAll: ['packages:read'] },
       });

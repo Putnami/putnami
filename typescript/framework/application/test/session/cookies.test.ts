@@ -104,7 +104,8 @@ function createContext({
 }
 
 function applyCallbacks(context: TestCookieContext): HttpResponse {
-  return (context.__callbacks ?? []).reduce((response, callback) => callback(response), new HttpResponse('ok'));
+  const callbacks = (context['__callbacks'] ?? []) as ((response: HttpResponse) => HttpResponse)[];
+  return callbacks.reduce((response, callback) => callback(response), new HttpResponse('ok'));
 }
 
 function extractCookiePair(setCookieHeader: string): string {
@@ -313,7 +314,7 @@ describe('cookies()', () => {
         // Wire secured() to the real scanner so the proxy header is honoured.
         secured: () => urlScanner.secured,
       } as TestCookieContext;
-      context.__callbacks = [];
+      context['__callbacks'] = [];
 
       runInContext(context, () => {
         cookies().set('session', JSON.stringify({ userId: 1 }));
@@ -338,7 +339,7 @@ describe('CookieSessionStore', () => {
 
     runInContext(context, () => {
       const store = new CookieSessionStore();
-      expect(store.getAll('__cookie__')).toEqual({});
+      expect<unknown>(store.getAll('__cookie__')).toEqual({});
     });
 
     expect(
@@ -356,7 +357,7 @@ describe('CookieSessionStore', () => {
 
     runInContext(context, () => {
       const store = new CookieSessionStore();
-      expect(store.getAll('__cookie__')).toEqual({});
+      expect<unknown>(store.getAll('__cookie__')).toEqual({});
     });
 
     expect(
@@ -374,7 +375,7 @@ describe('CookieSessionStore', () => {
       store.set('__cookie__', 'theme', 'dark');
 
       expect(store.get<number>('__cookie__', 'userId')).toBe(42);
-      expect(store.getAll('__cookie__')).toEqual({
+      expect<unknown>(store.getAll('__cookie__')).toEqual({
         theme: 'dark',
         userId: 42,
       });
@@ -393,18 +394,18 @@ describe('CookieSessionStore', () => {
       const store = new CookieSessionStore();
 
       expect(store.exists('__cookie__')).toBe(true);
-      expect(store.getAll('__cookie__')).toEqual({
+      expect<unknown>(store.getAll('__cookie__')).toEqual({
         theme: 'dark',
         userId: 42,
       });
 
       store.delete('__cookie__', 'theme');
-      expect(store.getAll('__cookie__')).toEqual({
+      expect<unknown>(store.getAll('__cookie__')).toEqual({
         userId: 42,
       });
 
       store.deleteAll('__cookie__');
-      expect(store.getAll('__cookie__')).toEqual({});
+      expect<unknown>(store.getAll('__cookie__')).toEqual({});
 
       const response = applyCallbacks(updateContext);
       const setCookieHeader = response.getHeaders('Set-Cookie')[0];
@@ -418,7 +419,7 @@ describe('CookieSessionStore', () => {
     const finalContext = createContext({ cookie: clearedCookie });
     runInContext(finalContext, () => {
       const store = new CookieSessionStore();
-      expect(store.getAll('__cookie__')).toEqual({});
+      expect<unknown>(store.getAll('__cookie__')).toEqual({});
       expect(store.exists('__cookie__')).toBe(false);
     });
   });

@@ -1,6 +1,15 @@
 import { describe, expect, it } from 'bun:test';
-import { Config, configToken, Default, getRegisteredConfigDefinitions, Optional, Sensitive } from '@putnami/runtime';
+import {
+  Config,
+  type ConfigContributor,
+  configToken,
+  Default,
+  getRegisteredConfigDefinitions,
+  Optional,
+  Sensitive,
+} from '@putnami/runtime';
 import { application } from '../../src/application';
+import type { Plugin } from '../../src/application/module.types';
 import { extractConfigSchema } from '../../src/config/config-schema-extract';
 
 // registerContributedConfigs() writes into the process-global config registry,
@@ -37,7 +46,8 @@ describe('Application.registerContributedConfigs', () => {
   it('throws when a dependency claims a path the workload already defines', () => {
     configToken(Config('contrib-app-conflict', { b: Optional(String) })); // workload's own block
     const dependency = Config('contrib-app-conflict', { a: Optional(String) });
-    const app = application().use({ name: 'dep', configDefinitions: () => [dependency] });
+    const dep: Plugin & ConfigContributor = { name: 'dep', configDefinitions: () => [dependency] };
+    const app = application().use(dep);
     expect(() => app.registerContributedConfigs()).toThrow(/contrib-app-conflict/);
   });
 });

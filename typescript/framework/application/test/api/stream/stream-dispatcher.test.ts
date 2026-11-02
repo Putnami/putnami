@@ -332,7 +332,7 @@ describe('resolveStreamHandlers', () => {
         const stream = new MessageStream<unknown>(2);
         for (let i = 0; i < 5; i++) stream.push(i); // bound 2 → 3 dropped
         expect(stream.droppedCount).toBe(3);
-        ws.data.__messageStream = stream;
+        ws.data['__messageStream'] = stream;
 
         handlers.CLOSE?.({ ws, path: () => '/ws' } as unknown as WsCloseContext);
 
@@ -354,7 +354,7 @@ describe('resolveStreamHandlers', () => {
       try {
         const handlers = resolveStreamHandlers(buildStreamDefinition('bidirectional', async () => {}));
         const { ws } = mockWs();
-        ws.data.__messageStream = new MessageStream<unknown>(2); // no pushes, no drops
+        ws.data['__messageStream'] = new MessageStream<unknown>(2); // no pushes, no drops
 
         handlers.CLOSE?.({ ws, path: () => '/ws' } as unknown as WsCloseContext);
 

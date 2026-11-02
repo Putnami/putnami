@@ -48,19 +48,18 @@ describe('raw HTTP streams', () => {
         .returns(BinaryStream({ maxBytes: 4096 }))
         .handle(async (ctx) => new HttpResponse(await ctx.body(), { headers: { 'Content-Type': 'image/png' } }));
       const spec = generateOpenApiSpec([{ method: 'POST', path: '/echo', schemas: def.schemas }], {
-        title: 'Streams',
-        version: '1',
+        info: { title: 'Streams', version: '1' },
       });
-      const operation = spec.paths['/echo'].post;
+      const operation = spec.paths['/echo']['post'];
       const content = {
         '*/*': {
           schema: { type: 'string', format: 'binary' },
           'x-putnami-max-bytes': 4096,
-          'x-putnami-streamed': true,
+          'x-putnami-streamed': true as const,
         },
       };
       expect(operation.requestBody?.content).toEqual(content);
-      expect(operation.responses['200'].content).toEqual(content);
+      expect<unknown>(operation.responses['200'].content).toEqual(content);
       expect(operation.responses['413']).toBeDefined();
       expect(operation.responses['415']).toBeDefined();
       for (const maxBytes of [-1, 0]) {
@@ -236,14 +235,14 @@ describe('raw HTTP streams', () => {
         );
         const reader = response.body?.getReader();
         expect(closed).toBe(0);
-        expect((await reader.read()).value).toEqual(new Uint8Array([255]));
+        expect((await reader?.read())?.value).toEqual(new Uint8Array([255]));
         expect(closed).toBe(0);
-        if (terminal === 'cancel') await reader.cancel();
+        if (terminal === 'cancel') await reader?.cancel();
         else if (terminal === 'abort') {
           abort.abort();
-          await reader.read();
-        } else if (terminal === 'error') await expect(reader.read()).rejects.toThrow('source failed');
-        else expect((await reader.read()).done).toBe(true);
+          await reader?.read();
+        } else if (terminal === 'error') await expect(reader?.read()).rejects.toThrow('source failed');
+        else expect((await reader?.read())?.done).toBe(true);
         await Promise.resolve();
         expect(closed).toBe(1);
         if (terminal === 'cancel' || terminal === 'abort') expect(canceled).toBe(1);

@@ -342,7 +342,8 @@ describe('Application', () => {
             namespace: 'app',
             migrationBundleOperations: () => ({ operations: [op], payloads: [{ path: upPath, bytes: up }] }),
           };
-          app.use({ migrationSources: () => [source] } satisfies Plugin & { migrationSources(): MigrationSource[] });
+          const migrations: Plugin & { migrationSources(): MigrationSource[] } = { migrationSources: () => [source] };
+          app.use(migrations);
 
           await app.build({ publishCapabilityManifest: false, projectName: 'identity/workloads/auth-server' });
 
@@ -397,9 +398,7 @@ describe('Application', () => {
             namespace: 'app',
             migrationBundleOperations: () => ({ operations: [op], payloads: [{ path: upPath, bytes: up }] }),
           };
-          const migrations = { migrationSources: () => [source] } satisfies Plugin & {
-            migrationSources(): MigrationSource[];
-          };
+          const migrations: Plugin & { migrationSources(): MigrationSource[] } = { migrationSources: () => [source] };
           const bundlePath = join(projectRoot, '.gen', 'migration-bundle', 'bundle.json');
 
           // 1. The build-generate hook: carries the putnami project identity.
@@ -462,7 +461,8 @@ describe('Application', () => {
             namespace: 'app',
             migrationBundleOperations: () => ({ operations: [op], payloads: [{ path: upPath, bytes: up }] }),
           };
-          app.use({ migrationSources: () => [source] } satisfies Plugin & { migrationSources(): MigrationSource[] });
+          const migrations: Plugin & { migrationSources(): MigrationSource[] } = { migrationSources: () => [source] };
+          app.use(migrations);
 
           await app.build({
             publishCapabilityManifest: false,
@@ -850,8 +850,16 @@ describe('Application', () => {
       },
       async () => {
         const order: string[] = [];
-        const appPlugin: Plugin = { warmup: mock(async () => order.push('app-plugin')) };
-        const modPlugin: Plugin = { warmup: mock(async () => order.push('mod-plugin')) };
+        const appPlugin: Plugin = {
+          warmup: mock(async () => {
+            order.push('app-plugin');
+          }),
+        };
+        const modPlugin: Plugin = {
+          warmup: mock(async () => {
+            order.push('mod-plugin');
+          }),
+        };
 
         const mod = module('auth').use(modPlugin);
         app.use(appPlugin).use(mod);
@@ -871,8 +879,16 @@ describe('Application', () => {
       },
       async () => {
         const order: string[] = [];
-        const appPlugin: Plugin = { start: mock(async () => order.push('app')) };
-        const modPlugin: Plugin = { start: mock(async () => order.push('mod')) };
+        const appPlugin: Plugin = {
+          start: mock(async () => {
+            order.push('app');
+          }),
+        };
+        const modPlugin: Plugin = {
+          start: mock(async () => {
+            order.push('mod');
+          }),
+        };
 
         const mod = module('auth').use(modPlugin);
         app.use(appPlugin).use(mod);
@@ -894,9 +910,21 @@ describe('Application', () => {
       },
       async () => {
         const order: string[] = [];
-        const p1: Plugin = { stop: mock(async () => order.push('p1')) };
-        const p2: Plugin = { stop: mock(async () => order.push('p2')) };
-        const p3: Plugin = { stop: mock(async () => order.push('p3')) };
+        const p1: Plugin = {
+          stop: mock(async () => {
+            order.push('p1');
+          }),
+        };
+        const p2: Plugin = {
+          stop: mock(async () => {
+            order.push('p2');
+          }),
+        };
+        const p3: Plugin = {
+          stop: mock(async () => {
+            order.push('p3');
+          }),
+        };
 
         const mod = module('auth').use(p2);
         app.use(p1).use(mod).use(p3);
@@ -918,8 +946,12 @@ describe('Application', () => {
       async () => {
         const order: string[] = [];
         const mod = module('auth');
-        mod.onStop(async () => order.push('mod-hook'));
-        app.onStop(async () => order.push('app-hook'));
+        mod.onStop(async () => {
+          order.push('mod-hook');
+        });
+        app.onStop(async () => {
+          order.push('app-hook');
+        });
         app.use(mod);
 
         await app.start();
@@ -967,9 +999,21 @@ describe('Application', () => {
 
     it('should support nested modules', async () => {
       const order: string[] = [];
-      const p1: Plugin = { warmup: mock(async () => order.push('p1')) };
-      const p2: Plugin = { warmup: mock(async () => order.push('p2')) };
-      const p3: Plugin = { warmup: mock(async () => order.push('p3')) };
+      const p1: Plugin = {
+        warmup: mock(async () => {
+          order.push('p1');
+        }),
+      };
+      const p2: Plugin = {
+        warmup: mock(async () => {
+          order.push('p2');
+        }),
+      };
+      const p3: Plugin = {
+        warmup: mock(async () => {
+          order.push('p3');
+        }),
+      };
 
       const inner = module('inner').use(p2);
       const outer = module('outer').use(inner).use(p3);
@@ -1314,8 +1358,8 @@ describe('Application', () => {
       app.provide(RequestId, { scope: 'scoped' });
       await app.start();
 
-      let id1: string | undefined;
-      let id2: string | undefined;
+      let id1: RequestId['id'] | undefined;
+      let id2: RequestId['id'] | undefined;
 
       await app.context.scope(async (scope) => {
         id1 = scope.get(RequestId).id;

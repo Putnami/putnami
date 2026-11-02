@@ -23,7 +23,7 @@ const testdataDir = resolve(contractsRoot, 'testdata');
 const schemaGolden = resolve(testdataDir, 'contracts.schema.json');
 const tsGolden = resolve(testdataDir, 'contracts.golden.ts');
 
-const update = process.env.PUTNAMI_UPDATE_GOLDEN === '1';
+const update = process.env['PUTNAMI_UPDATE_GOLDEN'] === '1';
 
 function loadManifest(): ContractManifest {
   return JSON.parse(readFileSync(goldenInput, 'utf8')) as ContractManifest;

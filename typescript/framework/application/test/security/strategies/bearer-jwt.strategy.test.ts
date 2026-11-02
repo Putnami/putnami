@@ -16,7 +16,7 @@ const verifiedBearer = {
 // extraction, claim pass-through, issuer/audience forwarding, fail-closed).
 
 function bearerCtx(token?: string): HttpRequestContext {
-  const headers = token ? { Authorization: `Bearer ${token}` } : {};
+  const headers: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {};
   return { req: new Request('http://localhost/v1/traces', { method: 'POST', headers }) } as HttpRequestContext;
 }
 

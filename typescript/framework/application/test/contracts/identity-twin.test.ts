@@ -61,9 +61,9 @@ describe('identity contract twin', () => {
       // change in the manifest fails here instead of silently diverging from the
       // Go framework's adopted constants.
       const manifest = loadManifest();
-      expect({ ...ClaimName }).toEqual(enumPairs(manifest, 'ClaimName'));
-      expect({ ...PrincipalKind }).toEqual(enumPairs(manifest, 'PrincipalKind'));
-      expect({ ...AuthDecision }).toEqual(enumPairs(manifest, 'AuthDecision'));
+      expect<unknown>({ ...ClaimName }).toEqual(enumPairs(manifest, 'ClaimName'));
+      expect<unknown>({ ...PrincipalKind }).toEqual(enumPairs(manifest, 'PrincipalKind'));
+      expect<unknown>({ ...AuthDecision }).toEqual(enumPairs(manifest, 'AuthDecision'));
     },
   );
 });

@@ -10,21 +10,21 @@ import { Favicon, HeaderLink, Lang, Meta, PageMeta, Script, Style, Title } from 
 import * as clientIndex from '../../src/client';
 import { FakeDocument } from '../utils/fake-document';
 
-type BrowserGlobals = typeof globalThis & {
+type BrowserGlobals = {
   document?: FakeDocument;
   window?: Record<string, unknown>;
 };
 
 function withBrowserDocument() {
   const fakeDocument = new FakeDocument();
-  const globals = globalThis as BrowserGlobals;
+  const globals = globalThis as unknown as BrowserGlobals;
   globals.document = fakeDocument;
   globals.window = {};
   return fakeDocument;
 }
 
 function clearBrowserDocument() {
-  const globals = globalThis as BrowserGlobals;
+  const globals = globalThis as unknown as BrowserGlobals;
   globals.document = undefined;
   globals.window = undefined;
 }
@@ -91,7 +91,9 @@ describe('document runtime helpers', () => {
     };
 
     const html = renderToStaticMarkup(
-      React.createElement(DocumentMetaProvider, { meta: ssrMeta }, React.createElement(Reader)),
+      <DocumentMetaProvider meta={ssrMeta}>
+        <Reader />
+      </DocumentMetaProvider>,
     );
 
     expect(html).toContain('SSR title');
@@ -149,8 +151,8 @@ describe('document runtime helpers', () => {
       // the other's document meta.
       const tick = () => new Promise((resolve) => setTimeout(resolve, 0));
 
-      const render = (title: string, extraDelay: boolean): Promise<{ title: string; head: string }> =>
-        runInContext({} as never, async () => {
+      const render = async (title: string, extraDelay: boolean): Promise<{ title: string; head: string }> =>
+        await runInContext({} as never, async () => {
           const helper = new SsrDocumentHelper();
           helper.title = title;
           helper.addMeta({ name: 'request', content: title });
@@ -183,18 +185,16 @@ describe('document runtime helpers', () => {
     } = {};
 
     renderToStaticMarkup(
-      React.createElement(
-        DocumentMetaProvider,
-        { meta: documentMeta },
-        React.createElement(PageMeta, {
-          title: 'Getting Started',
-          description: 'Setup guide',
-          url: '/docs/getting-started',
-          baseUrl: 'https://putnami.dev',
-          siteName: 'Putnami',
-          image: '/cover.png',
-        }),
-      ),
+      <DocumentMetaProvider meta={documentMeta}>
+        <PageMeta
+          title='Getting Started'
+          description='Setup guide'
+          url='/docs/getting-started'
+          baseUrl='https://putnami.dev'
+          siteName='Putnami'
+          image='/cover.png'
+        />
+      </DocumentMetaProvider>,
     );
 
     expect(documentMeta.title).toBe('Getting Started');

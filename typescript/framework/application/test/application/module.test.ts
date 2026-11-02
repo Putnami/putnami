@@ -327,7 +327,7 @@ describe('Module', () => {
     });
 
     it('should store a guard function', () => {
-      const guard = (user: Record<string, unknown>) => user.role === 'admin';
+      const guard = (user: Record<string, unknown>) => user['role'] === 'admin';
       const mod = module('guarded').secure(guard);
       expect(mod.getSecurity()).toBe(guard);
     });

@@ -298,7 +298,7 @@ describe('SecurityMiddleware', () => {
     });
 
     it('should receive user claims and context', async () => {
-      const mw = SecurityMiddleware((user, ctx) => user.orgId === ctx.params?.orgId);
+      const mw = SecurityMiddleware((user, ctx) => user['orgId'] === ctx.params?.['orgId']);
 
       const passCtx = createMockContext({ sub: 'user-1', orgId: 'org-42' }, { orgId: 'org-42' });
       const passResult = await runMiddleware(mw, passCtx);
@@ -312,7 +312,7 @@ describe('SecurityMiddleware', () => {
     it('should support async guard functions', async () => {
       const mw = SecurityMiddleware(async (user) => {
         await Promise.resolve();
-        return user.role === 'admin';
+        return user['role'] === 'admin';
       });
 
       const passCtx = createMockContext({ sub: 'user-1', role: 'admin' });

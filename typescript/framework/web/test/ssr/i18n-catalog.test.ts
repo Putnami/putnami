@@ -41,10 +41,10 @@ describe('syncCatalog', () => {
     { feature, requirement: 'catalog-sync', check: 'a-new-key-is-added-and-an-orphan-removed' },
     () => {
       const current = translated();
-      delete current.home?.seats;
+      delete current['home']?.['seats'];
       current['old'] = { gone: { text: 'Parti', source: 'x', state: 'draft' } };
       const { catalog, changes } = syncCatalog(declared, current);
-      expect(catalog.home?.seats).toEqual({
+      expect(catalog['home']?.['seats']).toEqual({
         text: '',
         source: sourceHash('{count, plural, one {# seat} other {# seats}}'),
         state: 'missing',
@@ -58,9 +58,11 @@ describe('syncCatalog', () => {
     'marks a translation stale when its default text changes and keeps its text',
     { feature, requirement: 'catalog-sync', check: 'a-changed-source-marks-the-translation-stale-and-keeps-its-text' },
     () => {
-      const changed = new Map([['home', { title: 'Plans and pricing', seats: declared.get('home')?.seats as string }]]);
+      const changed = new Map([
+        ['home', { title: 'Plans and pricing', seats: declared.get('home')?.['seats'] as string }],
+      ]);
       const { catalog, changes } = syncCatalog(changed, translated());
-      expect(catalog.home?.title).toEqual({
+      expect(catalog['home']?.['title']).toEqual({
         text: 'Tarifs',
         source: sourceHash('Pricing'),
         state: 'stale',
@@ -74,17 +76,17 @@ describe('syncCatalog', () => {
 
   it('fills an absent source hash, which acknowledges the current default text', () => {
     const current = translated();
-    const title = current.home?.title;
+    const title = current['home']?.['title'];
     if (title) {
       title.source = undefined;
       title.state = 'draft';
     }
-    expect(syncCatalog(declared, current).catalog.home?.title?.source).toBe(sourceHash('Pricing'));
+    expect(syncCatalog(declared, current).catalog['home']?.['title']?.source).toBe(sourceHash('Pricing'));
   });
 
   it('writes the same bytes for the same inputs, keys sorted', () => {
-    const a = serializeCatalogFile(syncCatalog(declared, translated()).catalog.home ?? {});
-    const b = serializeCatalogFile(syncCatalog(declared, { home: JSON.parse(a) }).catalog.home ?? {});
+    const a = serializeCatalogFile(syncCatalog(declared, translated()).catalog['home'] ?? {});
+    const b = serializeCatalogFile(syncCatalog(declared, { home: JSON.parse(a) }).catalog['home'] ?? {});
     expect(a).toBe(b);
     expect(Object.keys(JSON.parse(a))).toEqual(['seats', 'title']);
   });
@@ -101,7 +103,7 @@ describe('checkCatalog', () => {
     { feature, requirement: 'catalog-check', check: 'a-missing-translation-in-a-published-locale-fails' },
     () => {
       const current = translated();
-      delete current.home?.seats;
+      delete current['home']?.['seats'];
       expect(run(current)).toEqual([
         { level: 'error', code: 'missing', locale: 'fr', key: 'home.seats', message: 'no translation' },
       ]);
@@ -114,7 +116,7 @@ describe('checkCatalog', () => {
     { feature, requirement: 'catalog-check', check: 'an-invalid-icu-message-fails' },
     () => {
       const current = translated();
-      if (current.home?.seats) current.home.seats.text = '{count, plural, one {# siège}';
+      if (current['home']?.['seats']) current['home']['seats'].text = '{count, plural, one {# siège}';
       const [diagnostic] = run(current);
       expect(diagnostic?.code).toBe('invalid-icu');
       expect(diagnostic?.level).toBe('error');
@@ -128,7 +130,7 @@ describe('checkCatalog', () => {
     { feature, requirement: 'catalog-check', check: 'an-argument-mismatch-fails' },
     () => {
       const current = translated();
-      if (current.home?.seats) current.home.seats.text = '{n, plural, one {# siège} other {# sièges}}';
+      if (current['home']?.['seats']) current['home']['seats'].text = '{n, plural, one {# siège} other {# sièges}}';
       expect(run(current)[0]).toMatchObject({ level: 'error', code: 'argument-mismatch', key: 'home.seats' });
     },
   );
@@ -157,7 +159,7 @@ describe('checkCatalog', () => {
     'warns for a stale translation',
     { feature, requirement: 'catalog-check', check: 'a-stale-translation-warns' },
     () => {
-      const changed = new Map([['home', { title: 'Plans', seats: declared.get('home')?.seats as string }]]);
+      const changed = new Map([['home', { title: 'Plans', seats: declared.get('home')?.['seats'] as string }]]);
       expect(run(translated(), true, changed)).toEqual([
         {
           level: 'warning',
@@ -183,7 +185,7 @@ describe('catalog files', () => {
 
   it('serves every translated entry, stale ones included, and no missing one', () => {
     const catalog = translated();
-    if (catalog.home?.seats) catalog.home.seats.state = 'stale';
+    if (catalog['home']?.['seats']) catalog['home']['seats'].state = 'stale';
     catalog['empty'] = { a: { text: '', state: 'missing' } };
     expect(runtimeMessages(catalog)).toEqual({
       home: { title: 'Tarifs', seats: '{count, plural, one {# siège} other {# sièges}}' },

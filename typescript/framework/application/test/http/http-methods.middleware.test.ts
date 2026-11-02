@@ -99,7 +99,7 @@ describe('HttpMethodsMiddleware', () => {
 
     it('should work with dynamic route params', async () => {
       const p = http({ port: 0 });
-      p.get('/users/[id]', (ctx) => HttpResponse.json({ id: ctx.params?.id }));
+      p.get('/users/[id]', (ctx) => HttpResponse.json({ id: ctx.params?.['id'] }));
       await start(p);
 
       const res = await fetch(`${baseUrl}/users/42`, { method: 'HEAD' });

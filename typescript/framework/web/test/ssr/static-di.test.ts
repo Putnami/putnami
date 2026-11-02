@@ -6,10 +6,11 @@ import { named } from '../../../runtime/src/inject/token';
 import { isStaticRenderViolation, StaticRenderViolation } from '../../src/ssr/static';
 import { proveStaticRouteSafety } from '../../src/ssr/static-di';
 
-function lookupFrom(...registrations: ReturnType<typeof provide>[]) {
+// Registration<T> is invariant in T: the lookup takes each one as a provider of unknown.
+function lookupFrom(...registrations: { provider: { token: Token } }[]) {
   const map = new Map<Token, Provider>();
   for (const reg of registrations) {
-    map.set(reg.provider.token, reg.provider);
+    map.set(reg.provider.token, reg.provider as unknown as Provider);
   }
   return (token: Token) => map.get(token);
 }

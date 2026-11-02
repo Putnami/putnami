@@ -86,12 +86,12 @@ describe('an operation an external authority owns', () => {
       await app.start();
       try {
         const spec = openapiPlugin.spec();
-        const external = spec?.paths['/v2/{name}/manifests/{reference}']?.get;
+        const external = spec?.paths['/v2/{name}/manifests/{reference}']?.['get'];
         expect(external?.['x-putnami-external-contract']).toBe(OCI);
         expect(external?.['x-putnami-client']).toBeUndefined();
         expect(external?.parameters?.map((parameter) => parameter.name)).toEqual(['name', 'reference']);
 
-        const firstParty = spec?.paths['/v2/_putnami/capabilities']?.get;
+        const firstParty = spec?.paths['/v2/_putnami/capabilities']?.['get'];
         expect(firstParty?.['x-putnami-client']).toBeDefined();
         expect(firstParty?.['x-putnami-external-contract']).toBeUndefined();
 
@@ -163,7 +163,7 @@ describe('an operation an external authority owns', () => {
         client: clientService,
       });
 
-      const external = document.paths['/v2/{name}/manifests/latest'].get;
+      const external = document.paths['/v2/{name}/manifests/latest']['get'];
       expect(external['x-putnami-external-contract']).toBe(OCI);
       expect(external.responses['200'].content?.['application/json']?.schema).toEqual({
         type: 'object',
@@ -175,7 +175,7 @@ describe('an operation an external authority owns', () => {
       // not become a component: a shared component is first-party, and every
       // reader validates it.
       expect(Object.keys(document.components?.schemas ?? {})).toEqual([]);
-      expect(document.paths['/v2/_putnami/capabilities'].get['x-putnami-client']).toBeDefined();
+      expect(document.paths['/v2/_putnami/capabilities']['get']['x-putnami-client']).toBeDefined();
 
       // Non-vacuity: the same declarations on a first-party route still fail.
       expect(() =>
@@ -249,7 +249,7 @@ describe('an operation an external authority owns', () => {
         { external: OCI, transports: [], connectEncodings: [] },
       ] satisfies ClientOperationPolicy[]) {
         const document = generate(externalRoute(policy));
-        expect(document.paths['/v2/{name}/manifests/{reference}'].get['x-putnami-external-contract']).toBe(OCI);
+        expect(document.paths['/v2/{name}/manifests/{reference}']['get']['x-putnami-external-contract']).toBe(OCI);
       }
     },
   );

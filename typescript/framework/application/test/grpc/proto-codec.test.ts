@@ -49,9 +49,9 @@ describe('proto-codec', () => {
       expect(encoded.length).toBeGreaterThan(0);
 
       const decoded = decodeProto(encoded, simpleFields);
-      expect(decoded.name).toBe('Alice');
-      expect(decoded.age).toBe(30);
-      expect(decoded.active).toBe(true);
+      expect(decoded['name']).toBe('Alice');
+      expect(decoded['age']).toBe(30);
+      expect(decoded['active']).toBe(true);
     });
 
     it('writes nothing for a message whose fields all hold their zero value', () => {
@@ -70,9 +70,9 @@ describe('proto-codec', () => {
       const data = { name: 'Bob' };
       const encoded = encodeProto(data, simpleFields);
       const decoded = decodeProto(encoded, simpleFields);
-      expect(decoded.name).toBe('Bob');
-      expect(decoded.age).toBe(0);
-      expect(decoded.active).toBe(false);
+      expect(decoded['name']).toBe('Bob');
+      expect(decoded['age']).toBe(0);
+      expect(decoded['active']).toBe(false);
     });
 
     it('should handle camelCase input keys', () => {
@@ -82,7 +82,7 @@ describe('proto-codec', () => {
       const data = { firstName: 'Charlie' };
       const encoded = encodeProto(data, fields);
       const decoded = decodeProto(encoded, fields);
-      expect(decoded.first_name).toBe('Charlie');
+      expect(decoded['first_name']).toBe('Charlie');
     });
 
     it('should handle repeated string fields', () => {
@@ -90,7 +90,7 @@ describe('proto-codec', () => {
       const data = { tags: ['a', 'b', 'c'] };
       const encoded = encodeProto(data, fields);
       const decoded = decodeProto(encoded, fields);
-      expect(decoded.tags).toEqual(['a', 'b', 'c']);
+      expect(decoded['tags']).toEqual(['a', 'b', 'c']);
     });
 
     it('should handle bool false correctly', () => {
@@ -100,7 +100,7 @@ describe('proto-codec', () => {
       // Proto3 skips default values; false is the default for bool
       // But we encode all present values
       const decoded = decodeProto(encoded, fields);
-      expect(decoded.flag).toBe(false);
+      expect(decoded['flag']).toBe(false);
     });
 
     it('should handle nested messages', () => {
@@ -118,8 +118,8 @@ describe('proto-codec', () => {
       const encoded = encodeProto(data, userFields, allMessages);
       const decoded = decodeProto(encoded, userFields, allMessages);
 
-      expect(decoded.name).toBe('Dave');
-      expect(decoded.address).toEqual({ street: '123 Main St', city: 'Springfield' });
+      expect(decoded['name']).toBe('Dave');
+      expect(decoded['address']).toEqual({ street: '123 Main St', city: 'Springfield' });
     });
 
     it('should handle double with decimal precision', () => {
@@ -127,7 +127,7 @@ describe('proto-codec', () => {
       const data = { price: 19.99 };
       const encoded = encodeProto(data, fields);
       const decoded = decodeProto(encoded, fields);
-      expect(decoded.price).toBeCloseTo(19.99, 10);
+      expect(decoded['price']).toBeCloseTo(19.99, 10);
     });
   });
 
@@ -143,22 +143,22 @@ describe('proto-codec', () => {
       expect(encoded.length).toBeGreaterThan(0);
 
       const decoded = decodeProto(encoded, int32Fields);
-      expect(decoded.count).toBe(42);
-      expect(decoded.offset).toBe(100);
+      expect(decoded['count']).toBe(42);
+      expect(decoded['offset']).toBe(100);
     });
 
     it('should encode int32 zero', () => {
       const data = { count: 0 };
       const encoded = encodeProto(data, int32Fields);
       const decoded = decodeProto(encoded, int32Fields);
-      expect(decoded.count).toBe(0);
+      expect(decoded['count']).toBe(0);
     });
 
     it('should handle large int32 values', () => {
       const data = { count: 2_147_483_647 }; // INT32_MAX
       const encoded = encodeProto(data, int32Fields);
       const decoded = decodeProto(encoded, int32Fields);
-      expect(decoded.count).toBe(2_147_483_647);
+      expect(decoded['count']).toBe(2_147_483_647);
     });
   });
 
@@ -171,28 +171,28 @@ describe('proto-codec', () => {
       const data = { value: 42 };
       const encoded = encodeProto(data, sint32Fields);
       const decoded = decodeProto(encoded, sint32Fields);
-      expect(decoded.value).toBe(42);
+      expect(decoded['value']).toBe(42);
     });
 
     it('should round-trip negative sint32', () => {
       const data = { value: -1 };
       const encoded = encodeProto(data, sint32Fields);
       const decoded = decodeProto(encoded, sint32Fields);
-      expect(decoded.value).toBe(-1);
+      expect(decoded['value']).toBe(-1);
     });
 
     it('should round-trip large negative sint32', () => {
       const data = { value: -1000 };
       const encoded = encodeProto(data, sint32Fields);
       const decoded = decodeProto(encoded, sint32Fields);
-      expect(decoded.value).toBe(-1000);
+      expect(decoded['value']).toBe(-1000);
     });
 
     it('should round-trip zero', () => {
       const data = { value: 0 };
       const encoded = encodeProto(data, sint32Fields);
       const decoded = decodeProto(encoded, sint32Fields);
-      expect(decoded.value).toBe(0);
+      expect(decoded['value']).toBe(0);
     });
 
     it('should use ZigZag encoding (negative values are small varints)', () => {
@@ -214,7 +214,7 @@ describe('proto-codec', () => {
       const data = { value: -999 };
       const encoded = encodeProto(data, sint64Fields);
       const decoded = decodeProto(encoded, sint64Fields);
-      expect(decoded.value).toBe(-999);
+      expect(decoded['value']).toBe(-999);
     });
   });
 
@@ -224,7 +224,7 @@ describe('proto-codec', () => {
       const data = { big: 4_294_967_296 }; // 2^32 — exceeds 32-bit range
       const encoded = encodeProto(data, fields);
       const decoded = decodeProto(encoded, fields);
-      expect(decoded.big).toBe(4_294_967_296);
+      expect(decoded['big']).toBe(4_294_967_296);
     });
 
     it('should round-trip uint64 with large value', () => {
@@ -232,7 +232,7 @@ describe('proto-codec', () => {
       const data = { val: 9_007_199_254_740_991 }; // Number.MAX_SAFE_INTEGER
       const encoded = encodeProto(data, fields);
       const decoded = decodeProto(encoded, fields);
-      expect(decoded.val).toBe(9_007_199_254_740_991);
+      expect(decoded['val']).toBe(9_007_199_254_740_991);
     });
 
     it('should round-trip sint64 with large negative value', () => {
@@ -240,7 +240,7 @@ describe('proto-codec', () => {
       const data = { val: -4_294_967_296 }; // -2^32
       const encoded = encodeProto(data, fields);
       const decoded = decodeProto(encoded, fields);
-      expect(decoded.val).toBe(-4_294_967_296);
+      expect(decoded['val']).toBe(-4_294_967_296);
     });
 
     it('should round-trip int64 with BigInt input', () => {
@@ -248,7 +248,7 @@ describe('proto-codec', () => {
       const data = { val: BigInt('1099511627776') }; // 2^40
       const encoded = encodeProto(data, fields);
       const decoded = decodeProto(encoded, fields);
-      expect(decoded.val).toBe(1_099_511_627_776);
+      expect(decoded['val']).toBe(1_099_511_627_776);
     });
 
     specTest(
@@ -264,8 +264,8 @@ describe('proto-codec', () => {
         const data = { val: bigValue };
         const encoded = encodeProto(data, fields);
         const decoded = decodeProto(encoded, fields);
-        expect(typeof decoded.val).toBe('bigint');
-        expect(decoded.val).toBe(bigValue);
+        expect(typeof decoded['val']).toBe('bigint');
+        expect(decoded['val']).toBe(bigValue);
       },
     );
 
@@ -284,8 +284,8 @@ describe('proto-codec', () => {
         { name: 'label', number: 3, type: 'string', optional: false, repeated: false },
       ];
       const decoded = decodeProto(encoded, partialFields);
-      expect(decoded.name).toBe('test');
-      expect(decoded.label).toBe('ok');
+      expect(decoded['name']).toBe('test');
+      expect(decoded['label']).toBe('ok');
     });
   });
 
@@ -295,7 +295,7 @@ describe('proto-codec', () => {
       const data = { val: 4_294_967_296 }; // 2^32
       const encoded = encodeProto(data, fields);
       const decoded = decodeProto(encoded, fields);
-      expect(decoded.val).toBe(4_294_967_296);
+      expect(decoded['val']).toBe(4_294_967_296);
     });
 
     it('should round-trip sfixed64 with large negative value', () => {
@@ -303,7 +303,7 @@ describe('proto-codec', () => {
       const data = { val: -4_294_967_296 };
       const encoded = encodeProto(data, fields);
       const decoded = decodeProto(encoded, fields);
-      expect(decoded.val).toBe(-4_294_967_296);
+      expect(decoded['val']).toBe(-4_294_967_296);
     });
 
     it('should encode fixed64 as exactly 8 bytes (not float64)', () => {
@@ -323,7 +323,7 @@ describe('proto-codec', () => {
       const data = { ids: [1, 4_294_967_296, 9_007_199_254_740_991] };
       const encoded = encodeProto(data, fields);
       const decoded = decodeProto(encoded, fields);
-      expect(decoded.ids).toEqual([1, 4_294_967_296, 9_007_199_254_740_991]);
+      expect(decoded['ids']).toEqual([1, 4_294_967_296, 9_007_199_254_740_991]);
     });
   });
 
@@ -333,7 +333,7 @@ describe('proto-codec', () => {
       const data = { val: 12_345 };
       const encoded = encodeProto(data, fields);
       const decoded = decodeProto(encoded, fields);
-      expect(decoded.val).toBe(12_345);
+      expect(decoded['val']).toBe(12_345);
     });
 
     it('should round-trip fixed32 max value', () => {
@@ -341,7 +341,7 @@ describe('proto-codec', () => {
       const data = { val: 4_294_967_295 }; // UINT32_MAX
       const encoded = encodeProto(data, fields);
       const decoded = decodeProto(encoded, fields);
-      expect(decoded.val).toBe(4_294_967_295);
+      expect(decoded['val']).toBe(4_294_967_295);
     });
 
     it('should round-trip sfixed32 (signed negative)', () => {
@@ -349,7 +349,7 @@ describe('proto-codec', () => {
       const data = { val: -42 };
       const encoded = encodeProto(data, fields);
       const decoded = decodeProto(encoded, fields);
-      expect(decoded.val).toBe(-42);
+      expect(decoded['val']).toBe(-42);
     });
 
     it('should round-trip sfixed32 INT32_MIN', () => {
@@ -357,7 +357,7 @@ describe('proto-codec', () => {
       const data = { val: -2_147_483_648 }; // INT32_MIN
       const encoded = encodeProto(data, fields);
       const decoded = decodeProto(encoded, fields);
-      expect(decoded.val).toBe(-2_147_483_648);
+      expect(decoded['val']).toBe(-2_147_483_648);
     });
   });
 
@@ -370,7 +370,7 @@ describe('proto-codec', () => {
       const data = { value: 3.14 };
       const encoded = encodeProto(data, floatFields);
       const decoded = decodeProto(encoded, floatFields);
-      expect(decoded.value).toBeCloseTo(3.14, 5);
+      expect(decoded['value']).toBeCloseTo(3.14, 5);
     });
 
     it('should be exactly 4 bytes for the value (not 8 like double)', () => {
@@ -389,7 +389,7 @@ describe('proto-codec', () => {
       const original = new Uint8Array([0xde, 0xad, 0xbe, 0xef]);
       const encoded = encodeProto({ payload: original }, fields);
       const decoded = decodeProto(encoded, fields);
-      expect(decoded.payload).toEqual(new Uint8Array([0xde, 0xad, 0xbe, 0xef]));
+      expect(decoded['payload']).toEqual(new Uint8Array([0xde, 0xad, 0xbe, 0xef]));
     });
   });
 
@@ -403,7 +403,7 @@ describe('proto-codec', () => {
       const data = { status: 2 };
       const encoded = encodeProto(data, enumFields, undefined, enumTypes);
       const decoded = decodeProto(encoded, enumFields);
-      expect(decoded.status).toBe(2);
+      expect(decoded['status']).toBe(2);
     });
 
     it('omits an enum holding its zero value and reads it back as that zero', () => {
@@ -415,7 +415,7 @@ describe('proto-codec', () => {
       const encoded = encodeProto(data, enumFields, undefined, enumTypes);
       expect(encoded.length).toBe(0);
       const decoded = decodeProto(encoded, enumFields, undefined, enumTypes);
-      expect(decoded.status).toBe(0);
+      expect(decoded['status']).toBe(0);
     });
   });
 
@@ -425,7 +425,7 @@ describe('proto-codec', () => {
       const data = { ids: [1, 2, 3, 100, 200] };
       const encoded = encodeProto(data, fields);
       const decoded = decodeProto(encoded, fields);
-      expect(decoded.ids).toEqual([1, 2, 3, 100, 200]);
+      expect(decoded['ids']).toEqual([1, 2, 3, 100, 200]);
     });
 
     it('should produce smaller output than non-packed for many values', () => {
@@ -442,8 +442,8 @@ describe('proto-codec', () => {
       const data = { scores: [1.5, 2.5, 3.5] };
       const encoded = encodeProto(data, fields);
       const decoded = decodeProto(encoded, fields);
-      expect(decoded.scores).toHaveLength(3);
-      const scores = decoded.scores as number[];
+      expect(decoded['scores']).toHaveLength(3);
+      const scores = decoded['scores'] as number[];
       expect(scores[0]).toBeCloseTo(1.5, 5);
       expect(scores[1]).toBeCloseTo(2.5, 5);
       expect(scores[2]).toBeCloseTo(3.5, 5);
@@ -454,7 +454,7 @@ describe('proto-codec', () => {
       const data = { values: [1.1, 2.2, 3.3] };
       const encoded = encodeProto(data, fields);
       const decoded = decodeProto(encoded, fields);
-      expect(decoded.values).toEqual([1.1, 2.2, 3.3]);
+      expect(decoded['values']).toEqual([1.1, 2.2, 3.3]);
     });
 
     it('should round-trip packed repeated bool', () => {
@@ -462,7 +462,7 @@ describe('proto-codec', () => {
       const data = { flags: [true, false, true, true] };
       const encoded = encodeProto(data, fields);
       const decoded = decodeProto(encoded, fields);
-      expect(decoded.flags).toEqual([true, false, true, true]);
+      expect(decoded['flags']).toEqual([true, false, true, true]);
     });
 
     it('should round-trip packed repeated sint32 with negatives', () => {
@@ -470,7 +470,7 @@ describe('proto-codec', () => {
       const data = { deltas: [-5, 0, 5, -100, 100] };
       const encoded = encodeProto(data, fields);
       const decoded = decodeProto(encoded, fields);
-      expect(decoded.deltas).toEqual([-5, 0, 5, -100, 100]);
+      expect(decoded['deltas']).toEqual([-5, 0, 5, -100, 100]);
     });
 
     it('should NOT pack repeated strings (still use individual tags)', () => {
@@ -478,7 +478,7 @@ describe('proto-codec', () => {
       const data = { names: ['a', 'b'] };
       const encoded = encodeProto(data, fields);
       const decoded = decodeProto(encoded, fields);
-      expect(decoded.names).toEqual(['a', 'b']);
+      expect(decoded['names']).toEqual(['a', 'b']);
     });
 
     it('should handle empty packed array', () => {
@@ -543,7 +543,7 @@ describe('proto-codec', () => {
       expect(encoded.length).toBeGreaterThan(0);
 
       const decoded = decodeProto(encoded, fields);
-      expect(decoded.labels).toEqual({ env: 'prod', region: 'us-east' });
+      expect(decoded['labels']).toEqual({ env: 'prod', region: 'us-east' });
     });
 
     specTest(
@@ -578,7 +578,7 @@ describe('proto-codec', () => {
         const encoded = encodeProto({ labels }, fields);
         const decoded = decodeProto(encoded, fields) as { labels: Record<string, string> };
 
-        expect(decoded.labels.env).toBe('prod');
+        expect(decoded.labels['env']).toBe('prod');
         // Prototype must not be reassigned by the attacker-controlled key.
         expect(Object.getPrototypeOf(decoded.labels)).toBeNull();
         expect(Object.hasOwn(decoded.labels, '__proto__')).toBe(false);
@@ -601,7 +601,7 @@ describe('proto-codec', () => {
 
       const encoded = encodeProto(data, fields);
       const decoded = decodeProto(encoded, fields);
-      expect(decoded.prices).toEqual({ apple: 1.5, banana: 0.75 });
+      expect(decoded['prices']).toEqual({ apple: 1.5, banana: 0.75 });
     });
 
     it('should round-trip map<string, int32>', () => {
@@ -620,7 +620,7 @@ describe('proto-codec', () => {
 
       const encoded = encodeProto(data, fields);
       const decoded = decodeProto(encoded, fields);
-      expect(decoded.counts).toEqual({ a: 10, b: 20, c: 0 });
+      expect(decoded['counts']).toEqual({ a: 10, b: 20, c: 0 });
     });
 
     it('should round-trip map<string, bool>', () => {
@@ -639,7 +639,7 @@ describe('proto-codec', () => {
 
       const encoded = encodeProto(data, fields);
       const decoded = decodeProto(encoded, fields);
-      expect(decoded.flags).toEqual({ enabled: true, debug: false });
+      expect(decoded['flags']).toEqual({ enabled: true, debug: false });
     });
 
     it('should handle empty map', () => {
@@ -659,7 +659,7 @@ describe('proto-codec', () => {
       const encoded = encodeProto(data, fields);
       const decoded = decodeProto(encoded, fields);
       // Empty map produces no bytes — decoding gives undefined for the field
-      expect(decoded.labels ?? {}).toEqual({});
+      expect(decoded['labels'] ?? {}).toEqual({});
     });
 
     it('should work alongside other fields', () => {
@@ -680,9 +680,9 @@ describe('proto-codec', () => {
 
       const encoded = encodeProto(data, fields);
       const decoded = decodeProto(encoded, fields);
-      expect(decoded.name).toBe('item-1');
-      expect(decoded.labels).toEqual({ color: 'red' });
-      expect(decoded.active).toBe(true);
+      expect(decoded['name']).toBe('item-1');
+      expect(decoded['labels']).toEqual({ color: 'red' });
+      expect(decoded['active']).toBe(true);
     });
 
     it('should round-trip map<int32, string>', () => {
@@ -701,7 +701,7 @@ describe('proto-codec', () => {
 
       const encoded = encodeProto(data, fields);
       const decoded = decodeProto(encoded, fields);
-      expect(decoded.lookup).toEqual({ 1: 'one', 2: 'two', 100: 'hundred' });
+      expect(decoded['lookup']).toEqual({ 1: 'one', 2: 'two', 100: 'hundred' });
     });
   });
 
@@ -719,7 +719,7 @@ describe('proto-codec', () => {
         const truncated = new Uint8Array([0x11, 0x00, 0x00, 0x00]);
         expect(() => decodeProto(truncated, fields)).not.toThrow();
         // The field never arrived, so implicit presence reads it back as 0.
-        expect(decodeProto(truncated, fields).age).toBe(0);
+        expect(decodeProto(truncated, fields)['age']).toBe(0);
       },
     );
 
@@ -762,8 +762,8 @@ describe('proto-codec', () => {
           { name: 'name', number: 1, type: 'string', optional: false, repeated: false },
         ];
         const decoded = decodeProto(encoded, partialFields);
-        expect(decoded.name).toBe('Alice');
-        expect(decoded.age).toBeUndefined();
+        expect(decoded['name']).toBe('Alice');
+        expect(decoded['age']).toBeUndefined();
       },
     );
 
@@ -789,9 +789,9 @@ describe('proto-codec', () => {
           { name: 'count', number: 3, type: 'int32', optional: false, repeated: false },
         ];
         const decoded = decodeProto(encoded, partialFields);
-        expect(decoded.id).toBe('abc');
-        expect(decoded.count).toBe(42);
-        expect(decoded.extra).toBeUndefined();
+        expect(decoded['id']).toBe('abc');
+        expect(decoded['count']).toBe(42);
+        expect(decoded['extra']).toBeUndefined();
       },
     );
 
@@ -816,9 +816,9 @@ describe('proto-codec', () => {
           { name: 'active', number: 3, type: 'bool', optional: false, repeated: false },
         ];
         const decoded = decodeProto(encoded, partialFields);
-        expect(decoded.name).toBe('test');
-        expect(decoded.active).toBe(true);
-        expect(decoded.value).toBeUndefined();
+        expect(decoded['name']).toBe('test');
+        expect(decoded['active']).toBe(true);
+        expect(decoded['value']).toBeUndefined();
       },
     );
 
@@ -843,9 +843,9 @@ describe('proto-codec', () => {
           { name: 'label', number: 3, type: 'string', optional: false, repeated: false },
         ];
         const decoded = decodeProto(encoded, partialFields);
-        expect(decoded.name).toBe('test');
-        expect(decoded.label).toBe('ok');
-        expect(decoded.score).toBeUndefined();
+        expect(decoded['name']).toBe('test');
+        expect(decoded['label']).toBe('ok');
+        expect(decoded['score']).toBeUndefined();
       },
     );
 
@@ -875,8 +875,8 @@ describe('proto-codec', () => {
           { name: 'result', number: 5, type: 'string', optional: false, repeated: false },
         ];
         const decoded = decodeProto(encoded, partialFields);
-        expect(decoded.id).toBe('start');
-        expect(decoded.result).toBe('end');
+        expect(decoded['id']).toBe('start');
+        expect(decoded['result']).toBe('end');
       },
     );
 

@@ -29,7 +29,9 @@ describe('OpenApiPlugin', () => {
     // Generation may add this export, but a committed export belongs to the
     // project. Cleanup must never remove a declaration the suite did not add.
     if (originalServeExport !== undefined) {
-      expect(typeof exports === 'object' && exports ? exports['./serve'] : undefined).toEqual(originalServeExport);
+      expect<unknown>(typeof exports === 'object' && exports ? exports['./serve'] : undefined).toEqual(
+        originalServeExport,
+      );
       return;
     }
     if (typeof exports === 'object' && exports && './serve' in exports) {
@@ -105,7 +107,9 @@ describe('OpenApiPlugin', () => {
         expect(
           openapiPlugin
             .spec()
-            ?.paths['/events']?.get?.['x-putnami-client']?.transports.filter((entry) => entry.protocol === 'connect'),
+            ?.paths['/events']?.['get']?.['x-putnami-client']?.transports.filter(
+              (entry) => entry.protocol === 'connect',
+            ),
         ).toEqual([
           {
             protocol: 'connect',
@@ -153,7 +157,7 @@ describe('OpenApiPlugin', () => {
       await app.start();
       try {
         const protocols = (path: string) =>
-          openapiPlugin.spec()?.paths[path]?.get?.['x-putnami-client']?.transports.map((entry) => entry.protocol);
+          openapiPlugin.spec()?.paths[path]?.['get']?.['x-putnami-client']?.transports.map((entry) => entry.protocol);
         expect(protocols('/blobs/{id}')).toEqual(['rest-json']);
         // The JSON sibling on the same provider still announces Connect first.
         expect(protocols('/blobs/{id}/name')).toEqual(['connect', 'connect', 'rest-json']);
@@ -200,9 +204,9 @@ describe('OpenApiPlugin', () => {
       expect(spec?.openapi).toBe('3.0.3');
       expect(spec?.info.title).toBe('Test API');
       expect(Object.keys(spec?.paths ?? {})).toHaveLength(2);
-      expect(spec?.paths['/users'].get).toBeDefined();
-      expect(spec?.paths['/users'].post).toBeDefined();
-      expect(spec?.paths['/users/{id}'].get).toBeDefined();
+      expect(spec?.paths['/users']['get']).toBeDefined();
+      expect(spec?.paths['/users']['post']).toBeDefined();
+      expect(spec?.paths['/users/{id}']['get']).toBeDefined();
 
       await app.stop();
     });
@@ -516,5 +520,5 @@ describe('OpenApiPlugin', () => {
 });
 
 function specTransport(spec: ReturnType<OpenApiPlugin['spec']>, path: string, protocol: string) {
-  return spec?.paths[path]?.get?.['x-putnami-client']?.transports.find((entry) => entry.protocol === protocol);
+  return spec?.paths[path]?.['get']?.['x-putnami-client']?.transports.find((entry) => entry.protocol === protocol);
 }

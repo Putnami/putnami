@@ -49,7 +49,7 @@ describe('LayoutBuilder', () => {
       .render(MockComponent);
 
     expect(def.middleware).toHaveLength(1);
-    expect(def.middleware[0]).toBe(customMiddleware);
+    expect<unknown>(def.middleware[0]).toBe(customMiddleware);
   });
 
   it('returns a new middleware array (not shared reference)', () => {

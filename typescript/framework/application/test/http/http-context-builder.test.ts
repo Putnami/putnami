@@ -106,13 +106,13 @@ describe('buildHttpContext', () => {
       headers: { Authorization: 'Bearer token123' },
     });
     const ctx = buildHttpContext<HttpRequestContext>({ req });
-    expect(ctx.__authorizationHeader).toBe('Bearer token123');
+    expect(ctx['__authorizationHeader']).toBe('Bearer token123');
   });
 
   it('sets undefined __authorizationHeader when no auth header', () => {
     const req = new Request('http://localhost/test');
     const ctx = buildHttpContext<HttpRequestContext>({ req });
-    expect(ctx.__authorizationHeader).toBeUndefined();
+    expect(ctx['__authorizationHeader']).toBeUndefined();
   });
 
   it('parses JSON body', async () => {

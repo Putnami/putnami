@@ -47,8 +47,8 @@ describe('generateProto', () => {
           { method: 'GET', path: '/orders' },
         ];
         const proto = generateProto(routes, defaultOptions);
-        expect(proto.services.UsersService).toBeDefined();
-        expect(proto.services.OrdersService).toBeDefined();
+        expect(proto.services['UsersService']).toBeDefined();
+        expect(proto.services['OrdersService']).toBeDefined();
       },
     );
 
@@ -59,7 +59,7 @@ describe('generateProto', () => {
         { method: 'POST', path: '/users' },
       ];
       const proto = generateProto(routes, defaultOptions);
-      expect(proto.services.UsersService).toHaveLength(3);
+      expect(proto.services['UsersService']).toHaveLength(3);
     });
 
     specTest(
@@ -80,7 +80,7 @@ describe('generateProto', () => {
         const reversed = generateProto([...routes].reverse(), defaultOptions);
         expect(reversed.content).toBe(forward.content);
         expect(Object.keys(forward.services)).toEqual(['OrdersService', 'UsersService']);
-        expect(forward.services.UsersService).toEqual(['ListUsers', 'CreateUsers', 'GetUsersById']);
+        expect(forward.services['UsersService']).toEqual(['ListUsers', 'CreateUsers', 'GetUsersById']);
       },
     );
   });
@@ -89,37 +89,37 @@ describe('generateProto', () => {
     it('should use List prefix for GET on collection', () => {
       const routes: DiscoveredRoute[] = [{ method: 'GET', path: '/users' }];
       const proto = generateProto(routes, defaultOptions);
-      expect(proto.services.UsersService).toContain('ListUsers');
+      expect(proto.services['UsersService']).toContain('ListUsers');
     });
 
     it('should use Get prefix for GET with path param', () => {
       const routes: DiscoveredRoute[] = [{ method: 'GET', path: '/users/[id]' }];
       const proto = generateProto(routes, defaultOptions);
-      expect(proto.services.UsersService).toContain('GetUsersById');
+      expect(proto.services['UsersService']).toContain('GetUsersById');
     });
 
     it('should use Create prefix for POST', () => {
       const routes: DiscoveredRoute[] = [{ method: 'POST', path: '/users' }];
       const proto = generateProto(routes, defaultOptions);
-      expect(proto.services.UsersService).toContain('CreateUsers');
+      expect(proto.services['UsersService']).toContain('CreateUsers');
     });
 
     it('should use Update prefix for PUT', () => {
       const routes: DiscoveredRoute[] = [{ method: 'PUT', path: '/users/[id]' }];
       const proto = generateProto(routes, defaultOptions);
-      expect(proto.services.UsersService).toContain('UpdateUsersById');
+      expect(proto.services['UsersService']).toContain('UpdateUsersById');
     });
 
     it('should use Delete prefix for DELETE', () => {
       const routes: DiscoveredRoute[] = [{ method: 'DELETE', path: '/users/[id]' }];
       const proto = generateProto(routes, defaultOptions);
-      expect(proto.services.UsersService).toContain('DeleteUsersById');
+      expect(proto.services['UsersService']).toContain('DeleteUsersById');
     });
 
     it('should use Patch prefix for PATCH', () => {
       const routes: DiscoveredRoute[] = [{ method: 'PATCH', path: '/users/[id]' }];
       const proto = generateProto(routes, defaultOptions);
-      expect(proto.services.UsersService).toContain('PatchUsersById');
+      expect(proto.services['UsersService']).toContain('PatchUsersById');
     });
   });
 
@@ -224,7 +224,7 @@ describe('generateProto', () => {
     it('sets the Int field type to int64 in messageMeta (D0.2)', () => {
       const routes: DiscoveredRoute[] = [{ method: 'POST', path: '/items', schemas: { body: { count: Int } } }];
       const proto = generateProto(routes, defaultOptions);
-      const field = proto.messageMeta.CreateItemsRequestBody.find((f) => f.name === 'count');
+      const field = proto.messageMeta['CreateItemsRequestBody'].find((f) => f.name === 'count');
       expect(field?.type).toBe('int64');
     });
   });
@@ -251,10 +251,10 @@ describe('generateProto', () => {
         const proto = generateProto(routes, defaultOptions);
         expect(proto.content).toContain('GetUsersByIdRequestParams params = 1;');
         expect(proto.content).toContain('GetUsersByIdRequestQuery query = 2;');
-        expect(proto.messageMeta.GetUsersByIdRequestParams?.map((field) => `${field.name}=${field.number}`)).toEqual([
-          'id=1',
-        ]);
-        expect(proto.messageMeta.GetUsersByIdRequestQuery?.map((field) => `${field.name}=${field.number}`)).toEqual([
+        expect(proto.messageMeta['GetUsersByIdRequestParams']?.map((field) => `${field.name}=${field.number}`)).toEqual(
+          ['id=1'],
+        );
+        expect(proto.messageMeta['GetUsersByIdRequestQuery']?.map((field) => `${field.name}=${field.number}`)).toEqual([
           'include=1',
         ]);
       },
@@ -331,7 +331,7 @@ describe('generateProto', () => {
         },
       ];
       const proto = generateProto(routes, defaultOptions);
-      const body = proto.messageMeta.CreateProfilesRequestBody;
+      const body = proto.messageMeta['CreateProfilesRequestBody'];
       expect(body.find((field) => field.name === 'profile')).toMatchObject({
         type: 'CreateProfilesRequestBodyProfile',
         optional: true,
@@ -344,18 +344,18 @@ describe('generateProto', () => {
         type: 'map',
         mapValueType: 'CreateProfilesRequestBodyLookupValue',
       });
-      expect(proto.messageMeta.CreateProfilesRequestBodyProfile).toEqual([
+      expect(proto.messageMeta['CreateProfilesRequestBodyProfile']).toEqual([
         expect.objectContaining({ name: 'name', type: 'string' }),
         expect.objectContaining({ name: 'address', type: 'CreateProfilesRequestBodyProfileAddress' }),
       ]);
-      expect(proto.messageMeta.CreateProfilesRequestBodyProfileAddress[0].name).toBe('city');
-      expect(proto.messageMeta.CreateProfilesRequestBodyEntries[0].name).toBe('name');
-      expect(proto.messageMeta.CreateProfilesRequestBodyLookupValue[0].name).toBe('name');
-      expect(proto.messageMeta.CreateProfilesResponse[0]).toMatchObject({
+      expect(proto.messageMeta['CreateProfilesRequestBodyProfileAddress'][0].name).toBe('city');
+      expect(proto.messageMeta['CreateProfilesRequestBodyEntries'][0].name).toBe('name');
+      expect(proto.messageMeta['CreateProfilesRequestBodyLookupValue'][0].name).toBe('name');
+      expect(proto.messageMeta['CreateProfilesResponse'][0]).toMatchObject({
         type: 'CreateProfilesResponseProfile',
         optional: true,
       });
-      expect(proto.messageMeta.CreateProfilesResponseProfile[0].name).toBe('name');
+      expect(proto.messageMeta['CreateProfilesResponseProfile'][0].name).toBe('name');
 
       const bare = generateProto(
         [
@@ -369,13 +369,13 @@ describe('generateProto', () => {
         ],
         defaultOptions,
       );
-      expect(proto.messageMeta.CreateProfilesRequestBodyProfile).toEqual(
-        bare.messageMeta.CreateProfilesRequestBodyProfile,
+      expect(proto.messageMeta['CreateProfilesRequestBodyProfile']).toEqual(
+        bare.messageMeta['CreateProfilesRequestBodyProfile'],
       );
-      expect(proto.messageMeta.CreateProfilesRequestBodyProfileAddress).toEqual(
-        bare.messageMeta.CreateProfilesRequestBodyProfileAddress,
+      expect(proto.messageMeta['CreateProfilesRequestBodyProfileAddress']).toEqual(
+        bare.messageMeta['CreateProfilesRequestBodyProfileAddress'],
       );
-      expect(bare.messageMeta.CreateProfilesRequestBody[0].optional).toBe(false);
+      expect(bare.messageMeta['CreateProfilesRequestBody'][0].optional).toBe(false);
 
       const request = {
         body: {
@@ -384,8 +384,8 @@ describe('generateProto', () => {
           lookup: { primary: { name: 'Kai' } },
         },
       };
-      const encoded = encodeProto(request, proto.messageMeta.CreateProfilesRequest, proto.messageMeta);
-      const decoded = decodeProto(encoded, proto.messageMeta.CreateProfilesRequest, proto.messageMeta);
+      const encoded = encodeProto(request, proto.messageMeta['CreateProfilesRequest'], proto.messageMeta);
+      const decoded = decodeProto(encoded, proto.messageMeta['CreateProfilesRequest'], proto.messageMeta);
       expect(decoded).toEqual(request);
       const bodyValue = readRequestEnvelope(decoded).body;
       const validated = validateSchema(routes[0].schemas?.body ?? {}, bodyValue);
@@ -393,11 +393,11 @@ describe('generateProto', () => {
       expect(validated.data).toEqual(request.body);
       expect(validateSchema(routes[0].schemas?.body ?? {}, { profile: 'Ada' }).errors).not.toEqual([]);
       const absent = decodeProto(
-        encodeProto({ body: {} }, proto.messageMeta.CreateProfilesRequest, proto.messageMeta),
-        proto.messageMeta.CreateProfilesRequest,
+        encodeProto({ body: {} }, proto.messageMeta['CreateProfilesRequest'], proto.messageMeta),
+        proto.messageMeta['CreateProfilesRequest'],
         proto.messageMeta,
       );
-      expect((absent.body as Record<string, unknown>).profile).toBeUndefined();
+      expect((absent['body'] as Record<string, unknown>)['profile']).toBeUndefined();
     });
 
     specTest(
@@ -595,7 +595,7 @@ describe('generateProto', () => {
       expect(proto.messages).toContain('DeleteUsersByIdResponse');
 
       // Service
-      expect(proto.services.UsersService).toHaveLength(4);
+      expect(proto.services['UsersService']).toHaveLength(4);
       expect(proto.content).toContain('service UsersService {');
     });
   });
@@ -629,16 +629,16 @@ describe('generateProto', () => {
       ];
       const proto = generateProto(routes, defaultOptions);
 
-      expect(proto.messageMeta.GetUsersByIdRequest).toBeDefined();
-      expect(proto.messageMeta.GetUsersByIdRequest).toHaveLength(1);
-      expect(proto.messageMeta.GetUsersByIdRequest[0].name).toBe('params');
-      expect(proto.messageMeta.GetUsersByIdRequest[0].type).toBe('GetUsersByIdRequestParams');
-      expect(proto.messageMeta.GetUsersByIdRequestParams[0].name).toBe('id');
-      expect(proto.messageMeta.GetUsersByIdRequestParams[0].number).toBe(1);
-      expect(proto.messageMeta.GetUsersByIdRequestParams[0].type).toBe('string');
+      expect(proto.messageMeta['GetUsersByIdRequest']).toBeDefined();
+      expect(proto.messageMeta['GetUsersByIdRequest']).toHaveLength(1);
+      expect(proto.messageMeta['GetUsersByIdRequest'][0].name).toBe('params');
+      expect(proto.messageMeta['GetUsersByIdRequest'][0].type).toBe('GetUsersByIdRequestParams');
+      expect(proto.messageMeta['GetUsersByIdRequestParams'][0].name).toBe('id');
+      expect(proto.messageMeta['GetUsersByIdRequestParams'][0].number).toBe(1);
+      expect(proto.messageMeta['GetUsersByIdRequestParams'][0].type).toBe('string');
 
-      expect(proto.messageMeta.GetUsersByIdResponse).toBeDefined();
-      expect(proto.messageMeta.GetUsersByIdResponse).toHaveLength(2);
+      expect(proto.messageMeta['GetUsersByIdResponse']).toBeDefined();
+      expect(proto.messageMeta['GetUsersByIdResponse']).toHaveLength(2);
     });
 
     it('should include repeated and optional flags in messageMeta', () => {
@@ -652,7 +652,7 @@ describe('generateProto', () => {
         },
       ];
       const proto = generateProto(routes, defaultOptions);
-      const fields = proto.messageMeta.CreateItemsRequestBody;
+      const fields = proto.messageMeta['CreateItemsRequestBody'];
       expect(fields).toBeDefined();
 
       const nameField = fields.find((f) => f.name === 'name');
@@ -678,7 +678,7 @@ describe('generateProto', () => {
       ];
       const proto = generateProto(routes, defaultOptions);
       expect(proto.enumMeta).toBeDefined();
-      expect(proto.enumMeta.CreateItemsRequestBodyStatus).toEqual(['active', 'inactive', 'archived']);
+      expect(proto.enumMeta['CreateItemsRequestBodyStatus']).toEqual(['active', 'inactive', 'archived']);
     });
 
     it('should return empty enumMeta when no enums exist', () => {
@@ -694,9 +694,9 @@ describe('generateProto', () => {
       ];
       const proto = generateProto(routes, defaultOptions);
       expect(proto.serviceMeta).toBeDefined();
-      expect(proto.serviceMeta.UsersService).toHaveLength(2);
+      expect(proto.serviceMeta['UsersService']).toHaveLength(2);
 
-      const listRpc = proto.serviceMeta.UsersService.find((m) => m.name === 'ListUsers');
+      const listRpc = proto.serviceMeta['UsersService'].find((m) => m.name === 'ListUsers');
       expect(listRpc).toBeDefined();
       expect(listRpc?.requestMessage).toBe('ListUsersRequest');
       expect(listRpc?.responseMessage).toBe('ListUsersResponse');
@@ -714,7 +714,7 @@ describe('generateProto', () => {
         },
       ];
       const proto = generateProto(routes, defaultOptions);
-      const rpc = proto.serviceMeta.EventsService?.[0];
+      const rpc = proto.serviceMeta['EventsService']?.[0];
       expect(rpc?.serverStreaming).toBe(true);
       expect(rpc?.clientStreaming).toBe(false);
     });
@@ -802,7 +802,7 @@ describe('generateProto', () => {
         },
       ];
       const proto = generateProto(routes, defaultOptions);
-      const fields = proto.messageMeta.CreateItemsRequestBody;
+      const fields = proto.messageMeta['CreateItemsRequestBody'];
 
       const labelsField = fields.find((f) => f.name === 'labels');
       expect(labelsField?.mapKeyType).toBe('string');

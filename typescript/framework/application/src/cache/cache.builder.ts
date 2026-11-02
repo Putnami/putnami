@@ -65,7 +65,7 @@ export interface CacheBuilder {
    * Set the cache key or key generator function
    * @param key - Static key string or function that generates key from arguments
    */
-  for(key: string | ((...args: unknown[]) => string)): CacheBuilder;
+  for(key: string | CacheKeyFn): CacheBuilder;
 
   /**
    * Fetch data, using cache if available
@@ -73,12 +73,19 @@ export interface CacheBuilder {
    * @param args - Arguments to pass to the function (and key generator if dynamic)
    * @returns Cached or freshly computed result
    */
-  fetch<R>(fn: (...args: unknown[]) => Promise<R> | R, ...args: unknown[]): Promise<R>;
+  fetch<R, A extends unknown[] = unknown[]>(fn: (...args: A) => Promise<R> | R, ...args: A): Promise<R>;
 }
+
+/**
+ * A key generator: it receives the arguments `fetch` passes to its function.
+ * Its parameters may have any type; `never[]` is the type every parameter list
+ * accepts.
+ */
+export type CacheKeyFn = (...args: never[]) => string;
 
 class CacheBuilderImpl implements CacheBuilder {
   private _ttl?: number;
-  private _key?: string | ((...args: unknown[]) => string);
+  private _key?: string | CacheKeyFn;
 
   constructor(private readonly _name: string) {}
 
@@ -87,12 +94,12 @@ class CacheBuilderImpl implements CacheBuilder {
     return this;
   }
 
-  for(key: string | ((...args: unknown[]) => string)): CacheBuilder {
+  for(key: string | CacheKeyFn): CacheBuilder {
     this._key = key;
     return this;
   }
 
-  async fetch<R>(fn: (...args: unknown[]) => Promise<R> | R, ...args: unknown[]): Promise<R> {
+  async fetch<R, A extends unknown[] = unknown[]>(fn: (...args: A) => Promise<R> | R, ...args: A): Promise<R> {
     // Generate cache key
     const cacheKey = this.generateKey(args);
 
@@ -134,7 +141,8 @@ class CacheBuilderImpl implements CacheBuilder {
     }
 
     // Dynamic key function
-    return `${prefix}:${this._key(...args)}`;
+    // The generator receives the arguments fetch received for its function.
+    return `${prefix}:${(this._key as (...args: unknown[]) => string)(...args)}`;
   }
 }
 

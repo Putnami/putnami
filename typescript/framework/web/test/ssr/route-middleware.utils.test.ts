@@ -5,8 +5,8 @@ import { composeMiddleware, wrapWithMiddleware } from '../../src/ssr/route-middl
 
 describe('route-middleware.utils', () => {
   describe('composeMiddleware', () => {
-    const mw1 = async (_ctx: unknown, next: () => Promise<unknown>) => next();
-    const mw2 = async (_ctx: unknown, next: () => Promise<unknown>) => next();
+    const mw1 = async (_ctx: unknown, next: () => Promise<HttpResponse | undefined>) => next();
+    const mw2 = async (_ctx: unknown, next: () => Promise<HttpResponse | undefined>) => next();
 
     specTest(
       'returns undefined when both are undefined',
@@ -22,12 +22,12 @@ describe('route-middleware.utils', () => {
 
     it('returns page middleware when layout is undefined', () => {
       const result = composeMiddleware(undefined, [mw1]);
-      expect(result).toEqual([mw1]);
+      expect<unknown>(result).toEqual([mw1]);
     });
 
     it('returns layout middleware when page is undefined', () => {
       const result = composeMiddleware([mw1], undefined);
-      expect(result).toEqual([mw1]);
+      expect<unknown>(result).toEqual([mw1]);
     });
 
     specTest(
@@ -39,7 +39,7 @@ describe('route-middleware.utils', () => {
       },
       () => {
         const result = composeMiddleware([mw1], [mw2]);
-        expect(result).toEqual([mw1, mw2]);
+        expect<unknown>(result).toEqual([mw1, mw2]);
       },
     );
   });
@@ -56,7 +56,7 @@ describe('route-middleware.utils', () => {
       },
       async () => {
         const wrapped = wrapWithMiddleware(async () => ({ ok: true }), []);
-        const response = await wrapped(createCtx());
+        const response = (await wrapped(createCtx())) as HttpResponse;
 
         expect(response).toBeInstanceOf(HttpResponse);
         expect(await response?.get().json()).toEqual({ ok: true });
@@ -66,7 +66,7 @@ describe('route-middleware.utils', () => {
 
     it('serializes string responses to text/plain', async () => {
       const wrapped = wrapWithMiddleware(async () => 'hello', []);
-      const response = await wrapped(createCtx());
+      const response = (await wrapped(createCtx())) as HttpResponse;
       const native = response?.get();
 
       expect(await native?.text()).toBe('hello');
@@ -75,7 +75,7 @@ describe('route-middleware.utils', () => {
 
     it('preserves HttpResponse results returned by the handler', async () => {
       const wrapped = wrapWithMiddleware(async () => new HttpResponse('ready', { status: 204 }), []);
-      const response = await wrapped(createCtx());
+      const response = (await wrapped(createCtx())) as HttpResponse;
 
       expect(response?.status).toBe(204);
       expect(await response?.get().text()).toBe('ready');
@@ -106,7 +106,7 @@ describe('route-middleware.utils', () => {
           },
         ]);
 
-        const response = await wrapped(createCtx());
+        const response = (await wrapped(createCtx())) as HttpResponse;
 
         expect(events).toEqual(['mw1-before', 'mw2-stop', 'mw1-after']);
         expect(response?.status).toBe(403);

@@ -46,14 +46,18 @@ const nativeCompositionPlugin: Plugin & ConfigContributor & InfraContributor & T
   stop: () => {},
 };
 
-class TaskStoreContributor implements DesignContributor {
+class TaskStoreContributor implements Plugin, DesignContributor {
+  readonly name = 'task-store';
+
   contributeDesign(builder: DesignBuilder): void {
     builder.addNode({ id: 'service:task-store', kind: 'service', name: 'task-store' });
     builder.relateFromModule('service:task-store', 'injects');
   }
 }
 
-class ConflictingUnscopedContributor implements DesignContributor {
+class ConflictingUnscopedContributor implements Plugin, DesignContributor {
+  readonly name = 'conflicting-unscoped';
+
   contributeDesign(builder: DesignBuilder): void {
     builder.addNode({ id: 'service:task-store', kind: 'service', name: 'wrong-store' });
   }
@@ -64,7 +68,9 @@ class ConflictingUnscopedContributor implements DesignContributor {
  * whole workload, and locating each declaration by its own source rather than by
  * the module it is attached to.
  */
-class WorkloadWideDataContributor implements SourceScopedDesignContributor {
+class WorkloadWideDataContributor implements Plugin, SourceScopedDesignContributor {
+  readonly name = 'workload-wide-data';
+
   readonly designAttribution = 'source' as const;
 
   contributeDesign(builder: DesignBuilder): void {
@@ -78,7 +84,9 @@ class WorkloadWideDataContributor implements SourceScopedDesignContributor {
  * the OpenAPI IR while the api plugin owns the operation nodes. When the two
  * disagree the edge has no endpoint.
  */
-class DanglingClientContributor implements DesignContributor {
+class DanglingClientContributor implements Plugin, DesignContributor {
+  readonly name = 'dangling-client';
+
   contributeDesign(builder: DesignBuilder): void {
     builder.addNode({ id: 'client.generated:ts:@example/items/ItemsClient', kind: 'client.generated', name: 'Items' });
     builder.addEdge({
@@ -129,7 +137,7 @@ describe('native feature design graph', () => {
 
   it('refuses a partial spec-check binding on a declared test', async () => {
     const broken: Plugin & TestContributor = {
-      name: () => 'broken-proof',
+      name: 'broken-proof',
       designTests: () => [
         {
           name: 'tasks/create',
@@ -159,6 +167,10 @@ describe('native feature design graph', () => {
         },
       ],
     });
+    const tasksInfra: Plugin & InfraContributor = {
+      name: 'tasks-infra',
+      designInfraRequirements: () => [{ name: 'tasks', kind: 'database' as const }],
+    };
     const application = module('app').use(
       module('tasks')
         .feature({
@@ -167,7 +179,7 @@ describe('native feature design graph', () => {
           outcome: 'Users can manage tasks',
           owner: 'samples',
         })
-        .use({ designInfraRequirements: () => [{ name: 'tasks', kind: 'database' as const }] })
+        .use(tasksInfra)
         .use(requirement('src/tasks/z.database.ts'))
         .use(requirement('src/tasks/a.database.ts', 20))
         .use(requirement('src/tasks/a.database.ts', 3)),
@@ -290,7 +302,8 @@ describe('native feature design graph', () => {
     // mints one per datasource schema. A table named after a schema on the same
     // datasource used to produce the same id under one shared kind, which
     // addNode rejected as a conflicting native declaration.
-    const tables: DesignContributor = {
+    const tables: Plugin & DesignContributor = {
+      name: 'tables',
       contributeDesign(builder: DesignBuilder): void {
         builder.addNode({
           id: 'data.table:default:audit',
@@ -719,7 +732,8 @@ describe('native feature design graph', () => {
       { id: 'auth/opaque-tokens', name: 'Opaque tokens', outcome: 'Tokens are revocable', owner: 'auth' },
       { sources: ['src/api/auth/token'] },
     );
-    const selected: DesignContributor = {
+    const selected: Plugin & DesignContributor = {
+      name: 'selected',
       contributeDesign(builder: DesignBuilder): void {
         builder.addNode({
           id: 'api.operation:POST:/auth/token',

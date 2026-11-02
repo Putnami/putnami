@@ -17,7 +17,7 @@ import type { ClientSecurityContext, ClientSecurityRequirement } from '../../sha
  * @example
  * ```ts
  * const { authenticated, roles, scopes } = useSecurityContext();
- * const allowed = checkAccess({ authenticated, roles, scopes }, { roles: ['admin'] });
+ * const allowed = checkAccess({ authenticated, roles, scopes }, { authenticated: true, roles: ['admin'] });
  * ```
  */
 export function checkAccess(ctx: ClientSecurityContext, requirement: ClientSecurityRequirement): boolean {

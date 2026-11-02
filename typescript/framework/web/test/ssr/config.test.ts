@@ -51,14 +51,20 @@ describe('PutnamiReactConfig', () => {
     const config = useConfig(PutnamiReactConfig, {
       confInit: {
         scanFolder: 'custom-app',
-        scanRoots: [{ path: 'src/app' }, { path: 'src/projects/web', routePrefix: '/projects' }],
+        scanRoots: [
+          { path: 'src/app', routePrefix: undefined },
+          { path: 'src/projects/web', routePrefix: '/projects' },
+        ],
         ssrTimeout: 5000,
         minify: false,
       },
     });
 
     expect(config.scanFolder).toBe('custom-app');
-    expect(config.scanRoots).toEqual([{ path: 'src/app' }, { path: 'src/projects/web', routePrefix: '/projects' }]);
+    expect<unknown>(config.scanRoots).toEqual([
+      { path: 'src/app' },
+      { path: 'src/projects/web', routePrefix: '/projects' },
+    ]);
     expect(config.ssrTimeout).toBe(5000);
     expect(config.minify).toBe(false);
   });

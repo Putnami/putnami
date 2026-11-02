@@ -109,9 +109,9 @@ describe('TelemetryPlugin', () => {
       expect(collector).toBeDefined();
 
       const buckets = collector?.drainAll();
-      expect(buckets.length).toBeGreaterThanOrEqual(1);
+      expect(buckets?.length).toBeGreaterThanOrEqual(1);
 
-      const allCounters = Object.assign({}, ...buckets.map((b) => b.counters));
+      const allCounters = Object.assign({}, ...(buckets?.map((b) => b.counters) ?? []));
       expect(allCounters['http.GET./api/test.200']).toBe(1);
     },
   );
@@ -134,7 +134,7 @@ describe('TelemetryPlugin', () => {
 
       const collector = getCollector();
       const buckets = collector?.drainAll();
-      const allCounters = Object.assign({}, ...buckets.map((b) => b.counters));
+      const allCounters = Object.assign({}, ...(buckets?.map((b) => b.counters) ?? []));
       expect(allCounters['custom.metric']).toBe(3);
     },
   );

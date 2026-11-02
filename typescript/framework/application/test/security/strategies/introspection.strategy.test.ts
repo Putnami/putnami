@@ -115,7 +115,7 @@ async function runIntrospect(
   token: string,
 ): Promise<{ principal: Awaited<ReturnType<AuthStrategy>>; logger: MemoryLogger }> {
   const logger = new MemoryLogger();
-  const headers = token ? { Authorization: `Bearer ${token}` } : {};
+  const headers: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {};
   const ctx = { logger, req: new Request('http://localhost/', { headers }) } as unknown as HttpRequestContext;
   const principal = await runInContext(ctx, () => strategy(ctx));
   return { principal, logger };

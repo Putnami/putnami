@@ -430,7 +430,7 @@ test('a provider-owned wire keeps the first-party conversation untouched', async
   running.push(async () => {
     await app.stop();
   });
-  const paths = providerOpenApi.spec()?.['paths'] as Record<string, { get: Record<string, unknown> }>;
+  const paths = providerOpenApi.spec()?.['paths'] as unknown as Record<string, { get: Record<string, unknown> }>;
   const chat = paths['/widgets/chat'] as { get: Record<string, unknown> };
   expect((chat.get['x-putnami-client'] as Record<string, unknown>)['transports']).toEqual([
     {

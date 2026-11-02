@@ -111,7 +111,7 @@ describe('useSessionId', () => {
       const a = useSessionId();
       const b = useSessionId();
       return [a, b];
-    });
+    }) as [string, string];
     expect(id1).toBe(id2);
   });
 });
@@ -134,7 +134,7 @@ describe('session CRUD (cookie store)', () => {
       setSession('b', 2);
       deleteSession('a');
       expect(useSession('a')).toBeUndefined();
-      expect(useSession('b')).toBe(2);
+      expect<unknown>(useSession('b')).toBe(2);
     });
   });
 
@@ -144,7 +144,7 @@ describe('session CRUD (cookie store)', () => {
     runInContext(context, () => {
       setSession('old', true);
       setSessionAll({ replaced: true });
-      expect(useSessionAll()).toEqual({ replaced: true });
+      expect<unknown>(useSessionAll()).toEqual({ replaced: true });
     });
   });
 
@@ -154,7 +154,7 @@ describe('session CRUD (cookie store)', () => {
     runInContext(context, () => {
       setSession('key', 'val');
       deleteSessionAll();
-      expect(useSessionAll()).toEqual({});
+      expect<unknown>(useSessionAll()).toEqual({});
     });
   });
 });

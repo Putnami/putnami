@@ -4,13 +4,16 @@ import { actionHandler as clientActionHandler } from '../../src/client/form/acti
 import { layoutLoaderHandler, pageLoaderHandler } from '../../src/client/form/loader.handler';
 import { setRouterRoutes } from '../../src/client/router/router-routes';
 
+// The handlers call fetch(input, init); Bun's fetch type also carries preconnect.
+type Fetch = (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
+
 describe('Client Form Handlers', () => {
   const originalFetch = globalThis.fetch;
-  const fetchMock = mock<typeof fetch>(async () => new Response(JSON.stringify({ ok: true }), { status: 200 }));
+  const fetchMock = mock<Fetch>(async () => new Response(JSON.stringify({ ok: true }), { status: 200 }));
 
   beforeEach(() => {
     fetchMock.mockClear();
-    globalThis.fetch = fetchMock;
+    globalThis.fetch = fetchMock as unknown as typeof fetch;
     Reflect.deleteProperty(globalThis, 'document');
     Reflect.deleteProperty(globalThis, 'window');
   });
@@ -314,7 +317,7 @@ describe('Client Form Handlers', () => {
     it('prepends the mounted basename so a prefixed app hits the right endpoint', async () => {
       // App mounted under `/app`: the JSON endpoints are served under that
       // prefix too, so the reconstructed pattern-based URL must include it.
-      (globalThis as typeof globalThis & { window?: { __basename?: string } }).window = { __basename: '/app' };
+      Reflect.set(globalThis, 'window', { __basename: '/app' });
       const handler = layoutLoaderHandler('/docs');
 
       await handler({
@@ -394,7 +397,7 @@ describe('Client Form Handlers', () => {
       });
 
       specTest('keeps the basename and the query string around the filled path', fillsParams, async () => {
-        (globalThis as typeof globalThis & { window?: { __basename?: string } }).window = { __basename: '/app' };
+        Reflect.set(globalThis, 'window', { __basename: '/app' });
 
         await layoutLoaderHandler('/w/:workspace')({
           request: new Request('http://localhost/app/w/acme/settings?tab=2'),

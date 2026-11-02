@@ -253,7 +253,7 @@ describe('endpoint() security builder steps', () => {
 
       const plugin = api({ autoScan: false });
       const handler = endpoint()
-        .secure((user, ctx) => user.orgId === ctx.params?.orgId)
+        .secure((user, ctx) => user['orgId'] === ctx.params?.['orgId'])
         .handle(() => ({ data: 'org-scoped' }));
 
       plugin.register('/api/orgs/[orgId]/data', { default: handler }, 'GET');

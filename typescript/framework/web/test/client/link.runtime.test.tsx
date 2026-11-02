@@ -68,16 +68,14 @@ describe('Link runtime behavior', () => {
     lastRouterLinkProps = undefined;
     fetcherLoadMock.mockClear();
     lazyGuidesMock.mockClear();
-    const globals = globalThis as typeof globalThis & { document?: FakeDocument; window?: Record<string, unknown> };
+    const globals = globalThis as unknown as { document?: FakeDocument; window?: Record<string, unknown> };
     globals.document = new FakeDocument();
     globals.window = {};
   });
 
   afterEach(() => {
-    (globalThis as typeof globalThis & { document?: FakeDocument; window?: Record<string, unknown> }).document =
-      undefined;
-    (globalThis as typeof globalThis & { document?: FakeDocument; window?: Record<string, unknown> }).window =
-      undefined;
+    (globalThis as unknown as { document?: FakeDocument; window?: Record<string, unknown> }).document = undefined;
+    (globalThis as unknown as { document?: FakeDocument; window?: Record<string, unknown> }).window = undefined;
   });
 
   it('keeps its display name for debugging', () => {
@@ -87,7 +85,7 @@ describe('Link runtime behavior', () => {
   it('normalizes hash targets to the current pathname', () => {
     renderToStaticMarkup(React.createElement(Link, { to: '#', prefetch: 'none' }, 'Docs'));
 
-    expect(lastRouterLinkProps?.to).toBe('/docs');
+    expect(lastRouterLinkProps?.['to']).toBe('/docs');
   });
 
   it('runs the onClick of a placeholder link and does not navigate', () => {
@@ -110,7 +108,7 @@ describe('Link runtime behavior', () => {
 
     expect(onClick).toHaveBeenCalledTimes(1);
     expect(preventDefault).not.toHaveBeenCalled();
-    expect(lastRouterLinkProps?.to).toBe('/docs');
+    expect(lastRouterLinkProps?.['to']).toBe('/docs');
   });
 
   specTest(

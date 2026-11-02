@@ -48,7 +48,7 @@ describe('createTestApp', () => {
         namespace: 'app',
         migrationBundleOperations: () => ({ operations: [op], payloads: [{ path: upPath, bytes: up }] }),
       };
-      const migrations = { migrationSources: () => [source] } satisfies Plugin & {
+      const migrations = { name: 'migrations', migrationSources: () => [source] } satisfies Plugin & {
         migrationSources(): MigrationSource[];
       };
 

@@ -5,7 +5,7 @@ const mockAppend = mock();
 const mockAppendHead = mock();
 const mockAddImportModule = mock((file: string) => `mod_${file.replace(/[^\w]/g, '_')}`);
 const mockWrite = mock();
-const mockFileExists = mock(() => false);
+const mockFileExists = mock((_path: string) => false);
 
 mock.module('@putnami/utils', () => ({
   fileExists: mockFileExists,

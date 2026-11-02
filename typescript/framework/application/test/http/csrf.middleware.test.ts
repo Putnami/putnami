@@ -105,7 +105,7 @@ describe('CsrfMiddleware', () => {
       headers: {
         'Content-Type': 'application/json',
         Cookie: `_csrf=${csrfToken}`,
-        'X-CSRF-Token': csrfToken,
+        'X-CSRF-Token': csrfToken ?? '',
       },
       body: JSON.stringify({ data: 'test' }),
     });
@@ -212,7 +212,7 @@ describe('CsrfMiddleware', () => {
       headers: {
         'Content-Type': 'application/json',
         Cookie: `my-csrf=${token}`,
-        'X-My-Token': token,
+        'X-My-Token': token ?? '',
       },
       body: JSON.stringify({}),
     });
@@ -529,7 +529,7 @@ describe('CsrfMiddleware', () => {
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
         Cookie: `_csrf=${csrfToken}`,
-        'X-CSRF-Token': csrfToken,
+        'X-CSRF-Token': csrfToken ?? '',
       },
       body: formBody.toString(),
     });

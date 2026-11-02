@@ -129,7 +129,7 @@ const hooks = await import('../../src/client/hooks');
 const { useFetch } = await import('../../src/client/hooks/use-fetch.hook');
 const { usePrefetch } = await import('../../src/client/hooks/use-prefetch.hook');
 
-type BrowserGlobals = typeof globalThis & { window?: { __reactClientFetchTimeoutMs?: number } };
+type BrowserGlobals = { window?: { __reactClientFetchTimeoutMs?: number } };
 type UseFetchStoreState = { loading: boolean; error?: Error; data?: unknown };
 
 // A hung server: the returned promise only settles when the request's signal
@@ -167,20 +167,20 @@ describe('hook runtime behavior', () => {
     useHrefMock.mockClear();
     routerBasename = '';
     fetcherLoadMock.mockClear();
-    (globalThis as typeof globalThis & { document?: FakeDocument; fetch?: typeof fetch }).document = new FakeDocument();
+    (globalThis as unknown as { document?: FakeDocument; fetch?: typeof fetch }).document = new FakeDocument();
   });
 
   afterEach(() => {
     runEffectCleanups();
-    (globalThis as typeof globalThis & { document?: FakeDocument; fetch?: typeof fetch }).document = undefined;
+    (globalThis as unknown as { document?: FakeDocument; fetch?: typeof fetch }).document = undefined;
     globalThis.fetch = originalFetch;
-    (globalThis as BrowserGlobals).window = undefined;
+    (globalThis as unknown as BrowserGlobals).window = undefined;
   });
 
   it('proxies typed router hooks and form actions', () => {
-    expect(hooks.useLoaderData()).toEqual({ page: 'docs' });
-    expect(hooks.useActionData()).toEqual({ ok: true, status: 201, message: 'saved' });
-    expect(hooks.useRouteLoaderData('root')).toEqual({ id: 'root', title: 'root-data' });
+    expect<unknown>(hooks.useLoaderData()).toEqual({ page: 'docs' });
+    expect<unknown>(hooks.useActionData()).toEqual({ ok: true, status: 201, message: 'saved' });
+    expect<unknown>(hooks.useRouteLoaderData('root')).toEqual({ id: 'root', title: 'root-data' });
     expect(hooks.useFormAction('/users')).toBe('/resolved/users');
   });
 
@@ -189,17 +189,17 @@ describe('hook runtime behavior', () => {
       async () =>
         new Response(JSON.stringify({ ok: true }), { status: 200, headers: { 'content-type': 'application/json' } }),
     );
-    (globalThis as typeof globalThis & { fetch?: typeof fetch }).fetch = fetchMock as typeof fetch;
+    (globalThis as typeof globalThis & { fetch?: typeof fetch }).fetch = fetchMock as unknown as typeof fetch;
 
     const result = useFetch<{ ok: boolean }>('/api/data');
     await flushMicrotasks();
 
-    const fetchArgs = fetchMock.mock.calls[0] as [string, RequestInit];
+    const fetchArgs = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
     expect(fetchArgs[0]).toBe('/api/data');
     const dataHeaders = new Headers(fetchArgs[1]?.headers);
     expect([...dataHeaders]).toEqual([]);
-    expect((stateStore[0] as Record<string, unknown>).loading).toBe(false);
-    expect((stateStore[0] as Record<string, unknown>).data).toEqual({ ok: true });
+    expect((stateStore[0] as Record<string, unknown>)['loading']).toBe(false);
+    expect((stateStore[0] as Record<string, unknown>)['data']).toEqual({ ok: true });
     expect(fetchMock).toHaveBeenCalledTimes(1);
 
     // refetch() must bump the reload token *and* the effect must re-run on the
@@ -218,7 +218,7 @@ describe('hook runtime behavior', () => {
       async () =>
         new Response(JSON.stringify({ ok: true }), { status: 200, headers: { 'content-type': 'application/json' } }),
     );
-    (globalThis as typeof globalThis & { fetch?: typeof fetch }).fetch = fetchMock as typeof fetch;
+    (globalThis as typeof globalThis & { fetch?: typeof fetch }).fetch = fetchMock as unknown as typeof fetch;
 
     // First render with an inline init object.
     useFetch('/api/data', { method: 'GET' });
@@ -235,11 +235,11 @@ describe('hook runtime behavior', () => {
   });
 
   it('adds CSRF protection to state-changing requests and surfaces HTTP failures', async () => {
-    const fakeDocument = (globalThis as typeof globalThis & { document?: FakeDocument }).document!;
+    const fakeDocument = (globalThis as unknown as { document?: FakeDocument }).document!;
     fakeDocument.cookie = '_csrf=csrf-token';
 
     const fetchMock = mock(async () => new Response(JSON.stringify({ ok: false }), { status: 403 }));
-    (globalThis as typeof globalThis & { fetch?: typeof fetch }).fetch = fetchMock as typeof fetch;
+    (globalThis as typeof globalThis & { fetch?: typeof fetch }).fetch = fetchMock as unknown as typeof fetch;
 
     useFetch('/api/save', {
       method: 'POST',
@@ -247,17 +247,17 @@ describe('hook runtime behavior', () => {
     });
     await flushMicrotasks();
 
-    const [, requestInit] = fetchMock.mock.calls[0] as [string, RequestInit];
+    const [, requestInit] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
     const sentHeaders = new Headers(requestInit.headers);
     expect(sentHeaders.get('X-CSRF-Token')).toBe('csrf-token');
     expect(sentHeaders.get('X-Test')).toBe('1');
-    expect(((stateStore[0] as Record<string, unknown>).error as Error).message).toContain('403');
+    expect(((stateStore[0] as Record<string, unknown>)['error'] as Error).message).toContain('403');
   });
 
   it('aborts a request that exceeds the client fetch timeout and surfaces a timeout error', async () => {
     // Shrink the configurable timeout (normally SSR-injected, default 30s) so
     // the test observes the abort quickly.
-    (globalThis as BrowserGlobals).window = { __reactClientFetchTimeoutMs: 20 };
+    (globalThis as unknown as BrowserGlobals).window = { __reactClientFetchTimeoutMs: 20 };
     const fetchMock = makeHangingFetchMock();
     (globalThis as typeof globalThis & { fetch?: typeof fetch }).fetch = fetchMock as unknown as typeof fetch;
 
@@ -270,7 +270,7 @@ describe('hook runtime behavior', () => {
       await new Promise((resolve) => setTimeout(resolve, 5));
     }
 
-    const [, requestInit] = fetchMock.mock.calls[0] as [string, RequestInit];
+    const [, requestInit] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
     expect(requestInit.signal?.aborted).toBe(true);
     const state = stateStore[0] as UseFetchStoreState;
     expect(state.loading).toBe(false);
@@ -286,7 +286,7 @@ describe('hook runtime behavior', () => {
     runEffectCleanups();
     await flushMicrotasks();
 
-    const [, requestInit] = fetchMock.mock.calls[0] as [string, RequestInit];
+    const [, requestInit] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
     expect(requestInit.signal?.aborted).toBe(true);
     const state = stateStore[0] as UseFetchStoreState;
     expect(state.error).toBeUndefined();
@@ -294,14 +294,14 @@ describe('hook runtime behavior', () => {
   });
 
   it('preserves caller headers passed as a Headers instance and keeps the CSRF token authoritative', async () => {
-    const fakeDocument = (globalThis as typeof globalThis & { document?: FakeDocument }).document!;
+    const fakeDocument = (globalThis as unknown as { document?: FakeDocument }).document!;
     fakeDocument.cookie = '_csrf=real-csrf';
 
     const fetchMock = mock(
       async () =>
         new Response(JSON.stringify({ ok: true }), { status: 200, headers: { 'content-type': 'application/json' } }),
     );
-    (globalThis as typeof globalThis & { fetch?: typeof fetch }).fetch = fetchMock as typeof fetch;
+    (globalThis as typeof globalThis & { fetch?: typeof fetch }).fetch = fetchMock as unknown as typeof fetch;
 
     // Caller passes headers as a `Headers` instance (the form that the old
     // record-spread silently dropped) and also tries to override the CSRF token.
@@ -315,7 +315,7 @@ describe('hook runtime behavior', () => {
     });
     await flushMicrotasks();
 
-    const [, requestInit] = fetchMock.mock.calls[0] as [string, RequestInit];
+    const [, requestInit] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
     const sentHeaders = new Headers(requestInit.headers);
     // Caller's Authorization header survives (record-spread would have dropped it).
     expect(sentHeaders.get('Authorization')).toBe('Bearer abc123');
@@ -325,16 +325,16 @@ describe('hook runtime behavior', () => {
 
   it('falls back for unserializable init objects and prefetches on render', () => {
     const fetchMock = mock(async () => new Response(JSON.stringify({ ok: true }), { status: 200 }));
-    (globalThis as typeof globalThis & { fetch?: typeof fetch }).fetch = fetchMock as typeof fetch;
+    (globalThis as typeof globalThis & { fetch?: typeof fetch }).fetch = fetchMock as unknown as typeof fetch;
 
     const circularInit = { method: 'GET' } as RequestInit & { self?: unknown };
     circularInit.self = circularInit;
     useFetch('/api/circular', circularInit);
 
-    const fakeDocument = (globalThis as typeof globalThis & { document?: FakeDocument }).document!;
+    const fakeDocument = (globalThis as unknown as { document?: FakeDocument }).document!;
     const appendedLinks: Record<string, string>[] = [];
-    fakeDocument.head.appendChild = mock((element: Record<string, string>) => {
-      appendedLinks.push(element);
+    fakeDocument.head.appendChild = mock(<T>(element: T) => {
+      appendedLinks.push(element as Record<string, string>);
       return element;
     });
 
@@ -345,21 +345,21 @@ describe('hook runtime behavior', () => {
     expect(lazyDocsMock).toHaveBeenCalled();
     expect(fetcherLoadMock).not.toHaveBeenCalled();
     expect(appendedLinks).toHaveLength(1);
-    expect(appendedLinks[0]?.href).toBe('/docs.json');
+    expect(appendedLinks[0]?.['href']).toBe('/docs.json');
   });
 
   it('prefetches the loader endpoint the navigation fetches: basename, path, then query', () => {
     routerBasename = '/app';
-    const fakeDocument = (globalThis as typeof globalThis & { document?: FakeDocument }).document!;
+    const fakeDocument = (globalThis as unknown as { document?: FakeDocument }).document!;
     const appendedLinks: Record<string, string>[] = [];
-    fakeDocument.head.appendChild = mock((element: Record<string, string>) => {
-      appendedLinks.push(element);
+    fakeDocument.head.appendChild = mock(<T>(element: T) => {
+      appendedLinks.push(element as Record<string, string>);
       return element;
     });
 
     usePrefetch('/tasks?page=2#top', 'render');
 
     expect(appendedLinks).toHaveLength(1);
-    expect(appendedLinks[0]?.href).toBe('/app/tasks.json?page=2');
+    expect(appendedLinks[0]?.['href']).toBe('/app/tasks.json?page=2');
   });
 });

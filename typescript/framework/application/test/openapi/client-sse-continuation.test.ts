@@ -28,7 +28,7 @@ function logRoute(client: ClientOperationPolicy, overrides: Partial<DiscoveredRo
 }
 
 function publish(route: DiscoveredRoute, options: OpenApiOptions = OPTIONS) {
-  const operation = generateOpenApiSpec([route], options).paths['/runs/{run}/logs'].get['x-putnami-client'];
+  const operation = generateOpenApiSpec([route], options).paths['/runs/{run}/logs']['get']['x-putnami-client'];
   if (!operation) throw new Error('the route published no client contract');
   return operation;
 }

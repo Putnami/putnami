@@ -36,12 +36,12 @@ const clientOptions = {
 type PublishedError = { status: number; code: string; schema?: OpenApiSchema; retryable?: boolean };
 
 function publishedErrors(spec: OpenApiDocument): Record<string, PublishedError> {
-  const errors = (spec.paths['/deploys'].post['x-putnami-client']?.errors ?? []) as PublishedError[];
+  const errors = (spec.paths['/deploys']['post']['x-putnami-client']?.errors ?? []) as PublishedError[];
   return Object.fromEntries(errors.map((error) => [error.code, error]));
 }
 
 function documentedDetails(spec: OpenApiDocument, status: string): OpenApiSchema | undefined {
-  return spec.paths['/deploys'].post.responses[status].content?.['application/json'].schema.properties?.['details'];
+  return spec.paths['/deploys']['post'].responses[status].content?.['application/json'].schema.properties?.['details'];
 }
 
 /**
@@ -96,7 +96,7 @@ describe('declared error details', () => {
       );
       expect(JSON.stringify(reverse)).toBe(JSON.stringify(forward));
 
-      const errors = forward.paths['/deploys'].post['x-putnami-client']?.errors ?? [];
+      const errors = forward.paths['/deploys']['post']['x-putnami-client']?.errors ?? [];
       // A code declared twice — details beside a retry classification — is one error.
       expect(errors.filter((error) => error.code === 'conflict')).toHaveLength(1);
       const byCode = publishedErrors(forward);
@@ -295,8 +295,8 @@ describe('declared error details', () => {
         expect(Object.keys(body).sort()).toEqual(['code', 'details', 'error', 'message']);
         expect(body).toMatchObject({ code: 'conflict', error: 'Conflict' });
         expect(body['details']).toEqual(sampleRejection);
-        const published = openapiPlugin.spec()?.paths['/deploys'].post['x-putnami-client'].errors;
-        expect(published.find((error: { code: string }) => error.code === 'conflict').schema).toBeDefined();
+        const published = openapiPlugin.spec()?.paths['/deploys']['post']['x-putnami-client']?.errors;
+        expect(published?.find((error: { code: string }) => error.code === 'conflict')?.schema).toBeDefined();
       } finally {
         await app.stop();
       }

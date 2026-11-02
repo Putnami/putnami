@@ -62,7 +62,7 @@ describe('putnami.http-routes.v1 shared conformance', () => {
       check: 'the-typescript-validator-gives-every-fixture-its-verdict-and-code',
     },
     () => {
-      const declared = new Set(Object.values(HTTP_ROUTES_ERROR_CODES));
+      const declared = new Set<string>(Object.values(HTTP_ROUTES_ERROR_CODES));
       for (const code of Object.values(expectations.invalid)) expect(declared.has(code), code).toBe(true);
     },
   );

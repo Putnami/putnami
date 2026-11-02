@@ -5,6 +5,8 @@ import {
   LoggerMiddleware,
   SecurityHeadersMiddleware,
   type HttpRequestContext,
+  type HttpResponse,
+  type RouteHandler,
 } from '@putnami/application';
 import { HttpException } from '@putnami/runtime';
 import { specTest } from '@putnami/runtime/spectest';
@@ -29,9 +31,14 @@ import { clientBootstrapEmitted } from '../../src/shared/context-slots';
 const SSR_TIMEOUT_MS = 500;
 
 function createMockContext(overrides: Record<string, unknown> = {}) {
-  const req = overrides.req instanceof Request ? overrides.req : new Request('http://localhost/');
+  const req = overrides['req'] instanceof Request ? overrides['req'] : new Request('http://localhost/');
   const { req: _req, ...rest } = overrides;
   return Object.assign(buildHttpContext<HttpRequestContext>({ req }), { params: {}, statusCode: 0 }, rest) as never;
+}
+
+// pageRenderer answers every request with an HttpResponse.
+async function respond(handler: RouteHandler, ctx: HttpRequestContext): Promise<HttpResponse> {
+  return (await handler(ctx)) as HttpResponse;
 }
 
 const createRouterContext = (overrides: Partial<StaticHandlerContext> = {}): StaticHandlerContext => ({
@@ -61,7 +68,8 @@ async function renderRoute(
     basename ? () => basename : undefined,
   );
 
-  return await runInContext(createMockContext(ctxOverrides), async () => await handler());
+  const ctx = createMockContext(ctxOverrides);
+  return await runInContext(ctx, async () => await respond(handler, ctx));
 }
 
 describe('page.renderer', () => {
@@ -72,8 +80,8 @@ describe('page.renderer', () => {
         element: React.createElement('div', null, 'Hello SSR'),
       });
 
-      expect(response.status).toBe(200);
-      const html = await response.get().text();
+      expect(response?.status).toBe(200);
+      const html = await response?.get().text();
       expect(html).toContain('<div>Hello SSR</div>');
       expect(html).toContain('src="/hydrate.js"');
       expect(html).toContain('window.__staticRouterHydrationData = {"loaderData":{},"actionData":null,"errors":null};');
@@ -92,8 +100,8 @@ describe('page.renderer', () => {
       // document that carries what it published from one that does not — a
       // pre-rendered page never reaches this code.
       expect(clientBootstrapEmitted(ctx)).toBe(false);
-      const response = await runInContext(ctx, async () => await handler());
-      await response.get().text();
+      const response = await runInContext(ctx, async () => await respond(handler, ctx));
+      await response?.get().text();
 
       expect(clientBootstrapEmitted(ctx)).toBe(true);
     });
@@ -106,10 +114,10 @@ describe('page.renderer', () => {
         () => 'hydrate.js',
         500,
       );
-      const response = await runInContext(ctx, async () => await handler());
+      const response = await runInContext(ctx, async () => await respond(handler, ctx));
 
       // get() may only be called once — it marks the body as used.
-      const built = response.get();
+      const built = response?.get();
       const nonce = (ctx as Record<string, unknown>)[CSP_NONCE_CONTEXT_KEY] as string;
       expect(nonce.length).toBeGreaterThan(0);
       expect(built.headers.get('content-security-policy')).toBeNull();
@@ -159,8 +167,8 @@ describe('page.renderer', () => {
           () => 'hydrate.js',
           SSR_TIMEOUT_MS,
         );
-        const response = await runInContext(ctx, async () => await handler());
-        const html = await response.get().text();
+        const response = await runInContext(ctx, async () => await respond(handler, ctx));
+        const html = await response?.get().text();
         const nonce = (ctx as Record<string, unknown>)[CSP_NONCE_CONTEXT_KEY] as string;
 
         const root = html.slice(html.indexOf('<div id="root">'));
@@ -183,7 +191,10 @@ describe('page.renderer', () => {
         contentSecurityPolicy: "default-src 'self'; script-src 'self' https://cdn.example.com",
       });
 
-      const response = await runInContext(ctx, async () => await middleware(ctx, async () => await handler()));
+      const response = await runInContext(
+        ctx,
+        async () => await middleware(ctx, async () => await respond(handler, ctx)),
+      );
       if (!response) throw new Error('expected SSR response');
       const built = response.get();
       const csp = built.headers.get('content-security-policy');
@@ -207,7 +218,7 @@ describe('page.renderer', () => {
         '/docs',
       );
 
-      const html = await response.get().text();
+      const html = await response?.get().text();
       expect(html).toContain('window.__basename="\\/docs"'.replace('\\/', '/'));
       expect(html).toContain('"authenticated":true');
       expect(html).toContain('"roles":["admin"]');
@@ -228,9 +239,9 @@ describe('page.renderer', () => {
         },
       );
 
-      expect(response.status).toBe(302);
-      expect(response.redirected).toBe(true);
-      expect(response.get().headers.get('location')).toBe('http://localhost/to');
+      expect(response?.status).toBe(302);
+      expect(response?.redirected).toBe(true);
+      expect(response?.get().headers.get('location')).toBe('http://localhost/to');
     });
 
     it('renders route errors with the router status code', async () => {
@@ -247,8 +258,8 @@ describe('page.renderer', () => {
         },
       );
 
-      expect(response.status).toBe(404);
-      const html = await response.get().text();
+      expect(response?.status).toBe(404);
+      const html = await response?.get().text();
       expect(html).toContain('Unexpected Application Error');
       expect(html).toContain('"status":404');
     });
@@ -279,7 +290,9 @@ describe('page.renderer', () => {
           SSR_TIMEOUT_MS,
         );
 
-        const response = await runInContext(ctx, () => LoggerMiddleware()(ctx, async () => await handler()));
+        const response = await runInContext(ctx, () =>
+          LoggerMiddleware()(ctx, async () => await respond(handler, ctx)),
+        );
         await response?.get().text();
 
         expect(response?.status).toBe(500);
@@ -297,7 +310,7 @@ describe('page.renderer', () => {
     );
 
     it('records an HttpException a loader throws as the request error without logging it', async () => {
-      const exception = new HttpException(404, 'Post not found');
+      const exception = new HttpException('Post not found', 404);
       const logger = new MemoryLogger();
       const ctx = createMockContext({ req: new Request('http://localhost/posts'), logger });
       const handler = pageRenderer(
@@ -315,10 +328,10 @@ describe('page.renderer', () => {
         SSR_TIMEOUT_MS,
       );
 
-      const response = await runInContext(ctx, async () => await handler());
-      await response.get().text();
+      const response = await runInContext(ctx, async () => await respond(handler, ctx));
+      await response?.get().text();
 
-      expect((ctx as Record<string, unknown>).__requestError).toBe(exception);
+      expect((ctx as Record<string, unknown>)['__requestError']).toBe(exception);
       expect(logger.entries.filter((entry) => entry.level === 'error')).toHaveLength(0);
     });
 
@@ -334,7 +347,7 @@ describe('page.renderer', () => {
         },
         { req: new Request('http://localhost/missing'), logger },
       );
-      await statusResponse.get().text();
+      await statusResponse?.get().text();
       const redirectResponse = await renderRoute(
         {
           path: '/from',
@@ -346,8 +359,8 @@ describe('page.renderer', () => {
         { req: new Request('http://localhost/from'), logger },
       );
 
-      expect(statusResponse.status).toBe(404);
-      expect(redirectResponse.status).toBe(302);
+      expect(statusResponse?.status).toBe(404);
+      expect(redirectResponse?.status).toBe(302);
       expect(logger.entries.filter((entry) => entry.level === 'error')).toHaveLength(0);
     });
 
@@ -362,7 +375,7 @@ describe('page.renderer', () => {
         },
       );
 
-      expect(response.status).toBe(201);
+      expect(response?.status).toBe(201);
     });
 
     it('returns a formatted 500 response when rendering throws', async () => {
@@ -373,8 +386,8 @@ describe('page.renderer', () => {
         }),
       });
 
-      expect(response.status).toBe(500);
-      const html = await response.get().text();
+      expect(response?.status).toBe(500);
+      const html = await response?.get().text();
       expect(html).toContain('<h1>Something went wrong</h1>');
       expect(html).toContain('Error: boom');
     });
@@ -396,10 +409,10 @@ describe('page.renderer', () => {
         SSR_TIMEOUT_MS,
       );
 
-      const response = await runInContext(ctx, async () => await handler());
+      const response = await runInContext(ctx, async () => await respond(handler, ctx));
 
-      expect(response.status).toBe(500);
-      expect((ctx as Record<string, unknown>).__requestError).toBe(failure);
+      expect(response?.status).toBe(500);
+      expect((ctx as Record<string, unknown>)['__requestError']).toBe(failure);
     });
 
     it('clears the abort timeout when rendering throws before streaming', async () => {
@@ -429,7 +442,7 @@ describe('page.renderer', () => {
           }),
         });
 
-        expect(response.status).toBe(500);
+        expect(response?.status).toBe(500);
         expect(abortTimerIds.size).toBeGreaterThan(0);
         for (const id of abortTimerIds) {
           expect(cleared.has(id)).toBe(true);

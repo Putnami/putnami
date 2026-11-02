@@ -96,7 +96,7 @@ describe('validateSchema', () => {
   describe('constraints', () => {
     it('should validate Uuid constraint', () => {
       const result = validateSchema({ id: Uuid }, { id: '550e8400-e29b-41d4-a716-446655440000' });
-      expect(result.id).toBe('550e8400-e29b-41d4-a716-446655440000');
+      expect(result['id']).toBe('550e8400-e29b-41d4-a716-446655440000');
     });
 
     it('should reject invalid Uuid', () => {
@@ -105,7 +105,7 @@ describe('validateSchema', () => {
 
     it('should validate Email constraint', () => {
       const result = validateSchema({ email: Email }, { email: 'test@example.com' });
-      expect(result.email).toBe('test@example.com');
+      expect(result['email']).toBe('test@example.com');
     });
 
     it('should reject invalid Email', () => {
@@ -114,7 +114,7 @@ describe('validateSchema', () => {
 
     it('should validate Int constraint', () => {
       const result = validateSchema({ count: Int }, { count: 42 });
-      expect(result.count).toBe(42);
+      expect(result['count']).toBe(42);
     });
 
     it('should reject non-integer for Int', () => {
@@ -139,7 +139,7 @@ describe('validateSchema', () => {
     it('should validate array of constrained types', () => {
       const ids = ['550e8400-e29b-41d4-a716-446655440000', '6ba7b810-9dad-11d1-80b4-00c04fd430c8'];
       const result = validateSchema({ ids: ArrayOf(Uuid) }, { ids });
-      expect(result.ids).toEqual(ids);
+      expect(result['ids']).toEqual(ids);
     });
   });
 
@@ -180,7 +180,7 @@ describe('validateSchema', () => {
         validateSchema(schema, {}, { label: 'body' });
         expect(true).toBe(false);
       } catch (e) {
-        const error = e as BadRequestException;
+        const error = e as InstanceType<typeof BadRequestException>;
         const response = error.getResponse() as {
           message?: string;
           errors?: Array<{ field: string; message: string }>;
@@ -198,7 +198,7 @@ describe('validateSchema', () => {
   describe('new constrained types', () => {
     it('should validate Url constraint', () => {
       const result = validateSchema({ link: Url }, { link: 'https://example.com' });
-      expect(result.link).toBe('https://example.com');
+      expect(result['link']).toBe('https://example.com');
     });
 
     it('should reject invalid Url', () => {
@@ -207,7 +207,7 @@ describe('validateSchema', () => {
 
     it('should validate DateIso constraint', () => {
       const result = validateSchema({ date: DateIso }, { date: '2024-01-15T10:30:00Z' });
-      expect(result.date).toBe('2024-01-15T10:30:00Z');
+      expect(result['date']).toBe('2024-01-15T10:30:00Z');
     });
 
     it('should reject invalid DateIso', () => {
@@ -216,7 +216,7 @@ describe('validateSchema', () => {
 
     it('should validate Min constraint', () => {
       const result = validateSchema({ age: Min(18) }, { age: 25 });
-      expect(result.age).toBe(25);
+      expect(result['age']).toBe(25);
     });
 
     it('should reject below Min', () => {
@@ -225,7 +225,7 @@ describe('validateSchema', () => {
 
     it('should validate Max constraint', () => {
       const result = validateSchema({ score: Max(100) }, { score: 85 });
-      expect(result.score).toBe(85);
+      expect(result['score']).toBe(85);
     });
 
     it('should reject above Max', () => {
@@ -234,7 +234,7 @@ describe('validateSchema', () => {
 
     it('should validate MinLength constraint', () => {
       const result = validateSchema({ name: MinLength(2) }, { name: 'Jo' });
-      expect(result.name).toBe('Jo');
+      expect(result['name']).toBe('Jo');
     });
 
     it('should reject below MinLength', () => {
@@ -243,7 +243,7 @@ describe('validateSchema', () => {
 
     it('should validate MaxLength constraint', () => {
       const result = validateSchema({ code: MaxLength(5) }, { code: 'ABC' });
-      expect(result.code).toBe('ABC');
+      expect(result['code']).toBe('ABC');
     });
 
     it('should reject above MaxLength', () => {
@@ -252,7 +252,7 @@ describe('validateSchema', () => {
 
     it('should validate Pattern constraint', () => {
       const result = validateSchema({ slug: Pattern(/^[a-z0-9-]+$/) }, { slug: 'my-post-123' });
-      expect(result.slug).toBe('my-post-123');
+      expect(result['slug']).toBe('my-post-123');
     });
 
     it('should reject non-matching Pattern', () => {
@@ -337,7 +337,7 @@ describe('validateSchema', () => {
         validateSchema({ id: String }, {}, { label: 'params' });
         expect(true).toBe(false);
       } catch (e) {
-        expect((e as BadRequestException).message).toContain('params.id');
+        expect((e as InstanceType<typeof BadRequestException>).message).toContain('params.id');
       }
     });
   });

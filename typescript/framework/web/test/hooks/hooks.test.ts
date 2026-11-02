@@ -35,9 +35,12 @@ describe('React Hooks Exports', () => {
     });
 
     it('has correct return type signature', () => {
-      // Type assertion test - verifies nullable return with status fields
+      // Type assertion test - verifies the nullable result discriminated on ok
       type ActionData = { success: boolean };
-      const hook: () => (ActionData & { ok: boolean; status: number }) | undefined = useActionData<ActionData>;
+      const hook: () =>
+        | ({ ok: true; status: number } & ActionData)
+        | { ok: false; status: number; error?: string; errors?: Record<string, string[]> }
+        | undefined = useActionData<ActionData>;
       expect(typeof hook).toBe('function');
     });
   });

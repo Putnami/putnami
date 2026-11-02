@@ -97,6 +97,7 @@ describe('endpoint() with Stream()', () => {
           for await (const msg of ctx.messages()) {
             ctx.send({ event: 'echo', payload: msg.data });
           }
+          return { event: 'bye', payload: '' };
         });
       expect(isStreamEndpointDefinition(def)).toBe(true);
       expect((def as StreamEndpointDefinition).mode).toBe('bidirectional');
@@ -108,7 +109,7 @@ describe('endpoint() with Stream()', () => {
         .query({ token: Optional(String) })
         .body(Stream({ data: String }))
         .returns(Stream({ event: String }))
-        .handle(async () => {}) as StreamEndpointDefinition;
+        .handle(async () => ({ event: 'done' })) as StreamEndpointDefinition;
       expect(def.schemas?.params).toBeDefined();
       expect(def.schemas?.query).toBeDefined();
       expect(def.schemas?.body).toBeDefined();
@@ -184,7 +185,7 @@ describe('ApiPlugin stream registration', () => {
     const def = endpoint()
       .body(Stream({ data: String }))
       .returns(Stream({ event: String }))
-      .handle(async () => {});
+      .handle(async () => ({ event: 'done' }));
 
     const result = plugin.register('/ws', def);
     expect(result).toBe(plugin);
@@ -196,7 +197,7 @@ describe('ApiPlugin stream registration', () => {
       .params({ roomId: Uuid })
       .body(Stream({ data: String }))
       .returns(Stream({ event: String }))
-      .handle(async () => {}) as StreamEndpointDefinition;
+      .handle(async () => ({ event: 'done' })) as StreamEndpointDefinition;
 
     const result = plugin.register('/chat/[roomId]', def);
     expect(result).toBe(plugin);

@@ -82,7 +82,7 @@ describe('TelemetryMiddleware', () => {
     async () => {
       const collector = new TelemetryCollector();
       const httpPlugin = http({ port: 0 }).use(TelemetryMiddleware(collector));
-      httpPlugin.get('/users/[id]', (ctx) => ({ id: ctx.params?.id }));
+      httpPlugin.get('/users/[id]', (ctx) => ({ id: ctx.params?.['id'] }));
 
       app = application().use(httpPlugin);
       await app.start();
