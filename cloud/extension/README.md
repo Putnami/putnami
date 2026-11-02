@@ -261,6 +261,23 @@ The command reads a `protocol/evidence` v1 document and makes three calls:
    job, so uploading one job twice opens one run. GitHub Actions gives every
    leg of a matrix the same job key, so a `gha` id also carries a digest of
    what the leg measured, and each leg opens its own run.
+   The run's `operational` member names what the job tested, read with Git
+   in the directory the command was invoked from. `testedTree` is the tree
+   of the document's commit when that commit is the merge the CI built: a
+   GitHub job on `refs/pull/<n>/merge` whose `GITHUB_SHA` is the commit, or
+   a GitLab merged results or merge train pipeline whose `CI_COMMIT_SHA` is.
+   Otherwise `testedHeadTree` is the tree of the commit. `baselineMergeBase`
+   is the merge base of the document's `baseSha` and its commit. A value Git
+   cannot compute, such as a merge base beyond a shallow clone or a commit
+   missing from the checkout, is left out with a warning that names the
+   member and the reason, and the upload goes on. A merge base goes only
+   with a tree. When Delivery refuses `operational`, as a control plane
+   that predates self-reported trees does, the command warns and opens the
+   run again without it. The CI variables say whether the job built a
+   merge, so run the upload in the job that observed the change.
+   `putnami observe` deepens a shallow clone to the merge base before it
+   writes the document, so a job that runs `putnami observe --upload` needs
+   no deeper fetch.
 2. `POST /v1/delivery/records/reports` posts the tests and coverage of each
    component.
 3. The same route then posts `components`, `changedLineCoverage` and

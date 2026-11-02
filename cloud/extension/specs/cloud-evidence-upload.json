@@ -16,12 +16,16 @@
       "text": "putnami cloud evidence-report --file <path> reads a protocol/evidence v1 document and opens its run with POST /v1/delivery/records under the PUTNAMI_CLOUD_TOKEN bearer: the subject's provider, numeric project id as repo, commit and branch, provenance gha or gitlab from the CI, the pull or merge request as changeRequest, conclusion failure when a test failed, else success, and a submission id derived from the CI job, so a repeated upload opens no second run."
     },
     {
+      "id": "sends-the-tested-tree",
+      "text": "The run carries under operational what the job tested, read with Git where the command was invoked: testedTree when the subject's commit is the merge the CI built (GitHub refs/pull/<n>/merge at GITHUB_SHA, a GitLab merged results or merge train pipeline at CI_COMMIT_SHA), else testedHeadTree; with it, baselineMergeBase of the document's base and commit. A value Git cannot compute is left out with a warning naming it and why. A run refused for its operational opens again without it."
+    },
+    {
       "id": "posts-the-reports-in-two-batches",
       "text": "After the run, it posts the tests and coverage of each component in one batch to POST /v1/delivery/records/reports, then the components, the changed-line coverage and the dependency changes, copied from the document, in a second batch under the same submission id. A batch with nothing to carry is not sent."
     },
     {
       "id": "refuses-what-it-cannot-upload",
-      "text": "Without PUTNAMI_CLOUD_TOKEN, with a document that does not parse or validate, or with a generic CI, it sends nothing and exits non-zero with a message that names the cause. A refused run or batch exits non-zero with the route and the server's reason, and never prints the token."
+      "text": "Without PUTNAMI_CLOUD_TOKEN, with a document that does not parse or validate, or with a generic CI, it sends nothing and exits non-zero with a message that names the cause. A refused run or batch exits non-zero with the route and the server's reason, and never prints the token; a run opened again without its operational counts as refused only when that call is refused too."
     }
   ]
 }
