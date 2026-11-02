@@ -2510,6 +2510,21 @@
     },
     {
       "match": "exact",
+      "path": "/fr/privacy",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "publicEdge": true,
+      "provenance": {
+        "project": "putnami.dev",
+        "package": "@putnami/web",
+        "sourceKind": "file-route",
+        "evidencePath": "src/app/privacy/page.tsx"
+      }
+    },
+    {
+      "match": "exact",
       "path": "/install-commands.txt",
       "methods": [
         "GET",
@@ -2712,5 +2727,5 @@
       }
     }
   ],
-  "digest": "sha256:20d3063b64f96c09d4cbb03c9b31733d944e845065a3a41aed3becba24718aba"
+  "digest": "sha256:8316351b3421ec64aed636d8a1715c386232d8fb12fd45f8bde8290e3e9e3db3"
 }
