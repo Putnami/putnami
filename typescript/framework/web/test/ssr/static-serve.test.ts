@@ -85,6 +85,28 @@ describe('staticServeHandler — SSG', () => {
     rmSync(dir, { recursive: true, force: true });
   });
 
+  it('keeps no live render that is not a page', async () => {
+    const dir = tempStaticDir({});
+    let renders = 0;
+    const handler = staticServeHandler({
+      route: '/docs/*',
+      staticConfig: { mode: 'ssg' },
+      staticDir: dir,
+      render: async () => ({ html: 'BUILD', status: 200 }) as StaticRenderResult,
+      renderLive: () => async () => {
+        renders++;
+        return { html: 'missing', status: 404 } as StaticRenderResult;
+      },
+    });
+
+    for (let i = 0; i < 2; i++) {
+      const res = (await handler(ctxFor('/docs/picked-by-the-client'))) as { get: () => Response };
+      expect(res.get().status).toBe(404);
+    }
+    expect(renders).toBe(2);
+    rmSync(dir, { recursive: true, force: true });
+  });
+
   it('propagates a loader-driven redirect from the live fallback (e.g. legacy URLs)', async () => {
     const dir = tempStaticDir({});
     const handler = staticServeHandler({

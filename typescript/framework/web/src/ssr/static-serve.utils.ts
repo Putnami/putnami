@@ -162,6 +162,11 @@ async function readPrebuilt(
  *
  * Static output is always zero-JavaScript (the same render path as the build).
  */
+/** A live render the cache does not keep, answered as it is. */
+class UncachedPage {
+  constructor(readonly page: ServedPage) {}
+}
+
 export function staticServeHandler(options: StaticServeOptions): RouteHandler {
   const { route, staticConfig, staticDir, basename, render, renderLive, currentVersion } = options;
   const isIsr = staticConfig.mode === 'isr';
@@ -185,18 +190,27 @@ export function staticServeHandler(options: StaticServeOptions): RouteHandler {
     const params = (ctx.params ?? {}) as StaticPathParams;
 
     // A request the build output does not apply to is rendered once and kept
-    // apart from the build output, with the same lifetime and tags.
+    // apart from the build output, with the same lifetime and tags. Only a
+    // page is kept: a path that answers anything else would let a client
+    // fill the cache with the paths it picks.
     const live = renderLive?.(ctx);
     if (live) {
       const liveKey = `live:${route}:${pathname}`;
-      registerTags(tags, liveKey);
       let liveBuilder = cache(CACHE_NAME).for(liveKey);
       if (ttlMs) liveBuilder = liveBuilder.ttl(ttlMs);
-      const served = await liveBuilder.fetch<ServedPage>(async () => {
-        const result = await live(pathname, params);
-        return { html: result.html, status: result.status, redirect: result.redirectLocation };
-      });
-      return toResponse(served);
+      try {
+        const served = await liveBuilder.fetch<ServedPage>(async () => {
+          const result = await live(pathname, params);
+          const page = { html: result.html, status: result.status, redirect: result.redirectLocation };
+          if (page.status !== 200 || page.redirect !== undefined) throw new UncachedPage(page);
+          registerTags(tags, liveKey);
+          return page;
+        });
+        return toResponse(served);
+      } catch (error) {
+        if (error instanceof UncachedPage) return toResponse(error.page);
+        throw error;
+      }
     }
 
     const produce = async (): Promise<ServedPage> => {

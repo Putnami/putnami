@@ -13,6 +13,9 @@ import { type StaticPathParams, type StaticRouteMeta, toStaticConfig } from './s
 
 type ReactRuntimeConfig = ReactPluginConfig & PutnamiReactConfigExtras;
 
+/** The hosts reported as rendering static pages under their prefix, at most. */
+const MAX_REPORTED_HOSTS = 16;
+
 /**
  * Serves and pre-renders static (SSG/ISR) routes for a ReactApplication. Owns
  * the static output directory and the zero-JavaScript render pipeline shared by
@@ -73,11 +76,10 @@ export class ReactStaticServer {
         if (!i18n || Object.keys(i18n.settings.domains).length === 0) return undefined;
         if (serving(ctx, i18n.settings) !== 'prefix') return undefined;
         const host = ctx.host();
-        if (!this.prefixHosts.has(host)) {
+        // The Host header is the client's: report a bounded number of hosts.
+        if (this.prefixHosts.size < MAX_REPORTED_HOSTS && !this.prefixHosts.has(host)) {
           this.prefixHosts.add(host);
-          useLogger('@putnami/web').warn(
-            `'${host}' is neither the host of i18n.siteUrl nor a locale domain: its static pages render under their locale prefix`,
-          );
+          useLogger('@putnami/web').warn(`'${host}' renders static pages under their locale prefix, once per page`);
         }
         return (pathname, params) => this.render(pathname, params, route, 'prefix');
       },
