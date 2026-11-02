@@ -24,6 +24,10 @@
       "text": "Generation registers every layout, page, error and not-found route once per published locale, unprefixed for the default locale and under /<locale> otherwise, except routes matching an excluded pattern, which stay in the default locale only; the render manifest and the HTTP route inventory list each registered route."
     },
     {
+      "id": "excluded-route-redirect",
+      "text": "A request for a route outside the localized set under a locale prefix redirects with 308 to the same path and query without the prefix."
+    },
+    {
       "id": "locale-document",
       "text": "A rendered page carries its route's locale in the html lang attribute, the matching text direction in the dir attribute, and the Content-Language response header when it is rendered per request."
     },
@@ -32,12 +36,16 @@
       "text": "A messages declaration names a namespace and default ICU MessageFormat strings; formatting in a locale uses that locale's catalog text, supports arguments, plural, selectordinal, select, number and date arguments through Intl, and falls back to the default text when the catalog holds no translation, which a production build refuses for a published locale."
     },
     {
+      "id": "inline-tags",
+      "text": "A message can wrap part of its text in a named tag such as <link>…</link>; formatting renders each tag through the function passed under its name, the tag functions are typed from the message, and a translation must use the same tags as its default text."
+    },
+    {
       "id": "message-payload",
       "text": "A static page's islands receive the catalog entries of the namespaces the page rendered, and a hydrated page receives its locale's whole catalog because client navigation can render any namespace; both receive their locale only, through script-safe serialization, and the default locale ships no catalog."
     },
     {
       "id": "catalog-sync",
-      "text": "Generation keeps each non-default locale catalog aligned with the declared messages: it adds a missing key, removes a key no declaration holds, records the source hash a translation was made from, and marks a translation stale when its source hash changes, without altering its text."
+      "text": "Generation keeps each non-default locale catalog aligned with the declared messages, one file per namespace at locales/<locale>/<namespace>.json: it adds a missing key, removes a key no declaration holds and the file of a namespace no declaration holds, records the source hash a translation was made from, and marks a translation stale when its source hash changes, without altering its text."
     },
     {
       "id": "catalog-check",
