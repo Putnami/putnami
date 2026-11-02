@@ -1,0 +1,23 @@
+{
+  "comment": "A second run on the GitHub pull request finds the note it created and updates it in place.",
+  "exchanges": [
+    {
+      "request": {"method": "POST", "url": "https://api.github.com/repos/acme/shop/statuses/cccccccccccccccccccccccccccccccccccccccc", "headers": {"Authorization": "Bearer ghs_fixturetoken"}},
+      "response": {"status": 201, "body": {"id": 34561234999, "state": "success", "context": "putnami/observe"}}
+    },
+    {
+      "request": {"method": "GET", "url": "https://api.github.com/repos/acme/shop/issues/42/comments?page=1&per_page=100", "headers": {"Authorization": "Bearer ghs_fixturetoken"}},
+      "response": {
+        "status": 200,
+        "body": [
+          {"id": 2468013579, "html_url": "https://github.com/acme/shop/pull/42#issuecomment-2468013579", "user": {"login": "ada", "type": "User"}, "body": "Can we keep the old discount for one release?"},
+          {"id": 2468024680, "html_url": "https://github.com/acme/shop/pull/42#issuecomment-2468024680", "user": {"login": "github-actions[bot]", "type": "Bot"}, "body": "<!-- putnami-observe:summary -->\r\n### putnami observe\r\n\r\n**2 changed, 0 dependent components; changed lines 50.0% covered; 0 dependency changes**\r\n"}
+        ]
+      }
+    },
+    {
+      "request": {"method": "PATCH", "url": "https://api.github.com/repos/acme/shop/issues/comments/2468024680", "headers": {"Authorization": "Bearer ghs_fixturetoken"}, "noteGolden": "note-github.md"},
+      "response": {"status": 200, "body": {"id": 2468024680, "html_url": "https://github.com/acme/shop/pull/42#issuecomment-2468024680", "updated_at": "2026-11-02T10:02:41Z"}}
+    }
+  ]
+}

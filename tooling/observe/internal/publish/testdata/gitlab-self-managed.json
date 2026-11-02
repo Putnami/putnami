@@ -1,0 +1,17 @@
+{
+  "comment": "A self-managed GitLab under a path, named by CI_SERVER_URL alone.",
+  "exchanges": [
+    {
+      "request": {"method": "POST", "url": "https://git.example.org/gitlab/api/v4/projects/4242/statuses/cccccccccccccccccccccccccccccccccccccccc", "headers": {"Private-Token": "glpat-fixturetoken"}},
+      "response": {"status": 201, "body": {"id": 11, "status": "success", "name": "putnami/observe"}}
+    },
+    {
+      "request": {"method": "GET", "url": "https://git.example.org/gitlab/api/v4/projects/4242/merge_requests/7/notes?order_by=created_at&page=1&per_page=100&sort=asc"},
+      "response": {"status": 200, "body": []}
+    },
+    {
+      "request": {"method": "POST", "url": "https://git.example.org/gitlab/api/v4/projects/4242/merge_requests/7/notes", "noteFromObservation": true},
+      "response": {"status": 201, "body": {"id": 12, "system": false}}
+    }
+  ]
+}

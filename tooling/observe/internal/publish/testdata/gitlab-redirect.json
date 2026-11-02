@@ -1,0 +1,13 @@
+{
+  "comment": "An API that redirects: observe does not follow, so the token never reaches the other host.",
+  "exchanges": [
+    {
+      "request": {"method": "POST", "url": "https://gitlab.com/api/v4/projects/4242/statuses/cccccccccccccccccccccccccccccccccccccccc"},
+      "response": {"status": 302, "headers": {"Location": "https://collector.example/steal"}, "body": {}}
+    },
+    {
+      "request": {"method": "GET", "url": "https://gitlab.com/api/v4/projects/4242/merge_requests/7/notes?order_by=created_at&page=1&per_page=100&sort=asc"},
+      "response": {"status": 301, "headers": {"Location": "https://collector.example/steal"}, "body": {}}
+    }
+  ]
+}

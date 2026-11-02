@@ -65,7 +65,7 @@ func TestAGitHubActionsPullRequest(t *testing.T) {
 	want := Detection{
 		Subject: Subject{
 			Provider: ProviderGitHub, Host: "github.com", ProjectID: "123456", Repository: "acme/shop",
-			SHA: mergeSHA, Branch: "feature/cart", ChangeRequest: &ChangeRequest{Number: 42},
+			SHA: mergeSHA, Branch: "feature/cart", ChangeRequest: &ChangeRequest{Number: 42, HeadSHA: headSHA},
 		},
 		Run: Run{
 			System: SystemGitHubActions, RunID: "987", JobID: "test", Attempt: &attempt,
@@ -153,7 +153,7 @@ func TestAGitLabMergeRequest(t *testing.T) {
 	want := Detection{
 		Subject: Subject{
 			Provider: ProviderGitLab, Host: "gitlab.example.com", ProjectID: "77", Repository: "group/sub/app",
-			SHA: headSHA, Branch: "feature/x", ChangeRequest: &ChangeRequest{Number: 9},
+			SHA: headSHA, Branch: "feature/x", ChangeRequest: &ChangeRequest{Number: 9, HeadSHA: headSHA},
 		},
 		Run: Run{
 			System: SystemGitLabCI, RunID: "555", JobID: "666",
@@ -164,6 +164,20 @@ func TestAGitLabMergeRequest(t *testing.T) {
 	}
 	if !reflect.DeepEqual(d, want) {
 		t.Fatalf("detection:\n got %+v\nwant %+v", d, want)
+	}
+}
+
+func TestAMergedResultsPipelineNamesTheSourceBranchHead(t *testing.T) {
+	spectest.Proves(t, feature, "ci-detection", "a-gitlab-merge-request")
+	d := Detect(envOf(map[string]string{
+		"GITLAB_CI":                          "true",
+		"CI_PROJECT_ID":                      "77",
+		"CI_COMMIT_SHA":                      mergeSHA,
+		"CI_MERGE_REQUEST_IID":               "9",
+		"CI_MERGE_REQUEST_SOURCE_BRANCH_SHA": headSHA,
+	}), filesOf(nil), Overrides{})
+	if d.Subject.SHA != mergeSHA || d.Subject.ChangeRequest == nil || d.Subject.ChangeRequest.HeadSHA != headSHA {
+		t.Fatalf("subject %+v, change request %+v", d.Subject, d.Subject.ChangeRequest)
 	}
 }
 

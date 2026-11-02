@@ -1,0 +1,17 @@
+{
+  "comment": "A pull request from a fork: GITHUB_TOKEN is read-only, so GitHub refuses the status and the note.",
+  "exchanges": [
+    {
+      "request": {"method": "POST", "url": "https://api.github.com/repos/acme/shop/statuses/cccccccccccccccccccccccccccccccccccccccc"},
+      "response": {"status": 403, "body": {"message": "Resource not accessible by integration", "documentation_url": "https://docs.github.com/rest/commits/statuses#create-a-commit-status", "status": "403"}}
+    },
+    {
+      "request": {"method": "GET", "url": "https://api.github.com/repos/acme/shop/issues/42/comments?page=1&per_page=100"},
+      "response": {"status": 200, "body": []}
+    },
+    {
+      "request": {"method": "POST", "url": "https://api.github.com/repos/acme/shop/issues/42/comments"},
+      "response": {"status": 403, "body": {"message": "Resource not accessible by integration", "documentation_url": "https://docs.github.com/rest/issues/comments#create-an-issue-comment", "status": "403"}}
+    }
+  ]
+}

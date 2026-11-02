@@ -3,6 +3,8 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"io"
+	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -399,5 +401,69 @@ func TestAFailedUploadIsADiagnosticAndExitsZero(t *testing.T) {
 
 	if code := run([]string{"run", "--upload=yes"}, func(k string) string { return env[k] }, &stdout, &stderr); code != 2 {
 		t.Fatalf("--upload=yes exits %d, want 2", code)
+	}
+}
+
+type roundTrip func(*http.Request) (*http.Response, error)
+
+func (f roundTrip) RoundTrip(req *http.Request) (*http.Response, error) { return f(req) }
+
+func TestPublishPostsTheSummaryOnTheMergeRequest(t *testing.T) {
+	spectest.Proves(t, "tooling/observe-host-report", "publish-fails-open", "a-missing-token-publishes-nothing")
+	spectest.Proves(t, "tooling/observe-host-report", "publish-note", "a-gitlab-merge-request-gets-a-status-and-a-note")
+	repo, env, _ := uploadFixture(t, "0")
+	t.Chdir(repo)
+	var requests []string
+	var note string
+	publishClient = &http.Client{Transport: roundTrip(func(req *http.Request) (*http.Response, error) {
+		requests = append(requests, req.Method+" "+req.URL.Path)
+		answer := `{"id":1}`
+		switch {
+		case req.Method == http.MethodGet:
+			answer = `[]`
+		case strings.HasSuffix(req.URL.Path, "/notes"):
+			var body map[string]string
+			_ = json.NewDecoder(req.Body).Decode(&body)
+			note = body["body"]
+		}
+		return &http.Response{StatusCode: 201, Header: http.Header{}, Body: io.NopCloser(strings.NewReader(answer)), Request: req}, nil
+	})}
+	t.Cleanup(func() { publishClient = nil })
+
+	observeJSON := func() observe.Observation {
+		t.Helper()
+		var stdout, stderr bytes.Buffer
+		if code := run([]string{"run", "--no-fetch", "--publish", "--putnamiContext", jobContext(t, repo, repo, "json")},
+			func(k string) string { return env[k] }, &stdout, &stderr); code != 0 {
+			t.Fatalf("exit %d: %s", code, stderr.String())
+		}
+		var o observe.Observation
+		if err := json.Unmarshal(stdout.Bytes(), &o); err != nil {
+			t.Fatalf("the publication's output reached stdout: %v\n%s", err, stdout.String())
+		}
+		return o
+	}
+
+	o := observeJSON()
+	if len(requests) != 0 || !slices.ContainsFunc(o.Diagnostics, func(d diag.Diagnostic) bool { return d.Code == "observe.publish_token_missing" }) {
+		t.Fatalf("without a token: requests %v, diagnostics %v", requests, o.Diagnostics)
+	}
+
+	env["PUTNAMI_GITLAB_TOKEN"] = "glpat-test"
+	env["CI_API_V4_URL"] = "https://gitlab.com/api/v4"
+	o = observeJSON()
+	for _, d := range o.Diagnostics {
+		if strings.HasPrefix(d.Code, "observe.publish") {
+			t.Fatalf("diagnostic %+v", d)
+		}
+	}
+	head := env["CI_COMMIT_SHA"]
+	want := []string{
+		"POST /api/v4/projects/4242/statuses/" + head,
+		"GET /api/v4/projects/4242/merge_requests/7/notes",
+		"POST /api/v4/projects/4242/merge_requests/7/notes",
+	}
+	if !slices.Equal(requests, want) || !strings.HasPrefix(note, "<!-- putnami-observe:summary -->\n") {
+		t.Fatalf("requests %v, note %q", requests, note)
 	}
 }
