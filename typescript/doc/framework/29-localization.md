@@ -80,25 +80,59 @@ A message is an ICU MessageFormat string (ICU is the Unicode standard for messag
 | Select | `{role, select, admin {Admin} other {Member}}` | `string` |
 | Number | `{ratio, number, percent}` | `number` |
 | Date and time | `{at, date, long}`, `{at, time, short}` | `Date` or a timestamp |
+| Tag | `Read the <link>terms</link>` | `(chunks) => ReactNode` |
 
-Every `plural`, `selectordinal` and `select` needs an `other` branch. A `'` before `{` or `}` quotes it: `'{literal}'`.
+Every `plural`, `selectordinal` and `select` needs an `other` branch. A `'` before `{`, `}` or `<` quotes it: `'{literal}'`, `'<b>'`.
 
-A namespace is an explicit string, unique in the project. Keys are identifiers. Inline markup is not part of a message: split a paragraph that holds a `<strong>` into one message per part.
+A namespace is an explicit string, unique in the project. Keys are identifiers.
+
+### Tags
+
+A tag wraps part of a message, so a link or a `<code>` stays inside its sentence and a translator can move it:
+
+```ts
+export default messages('legal', {
+  terms: 'Read the <link>terms</link> before you write to <mail>us</mail>.',
+});
+```
+
+Pass one function per tag. It receives what the tag wraps and returns what to render:
+
+```tsx
+const t = useT(legal);
+<p>
+  {t.terms({
+    link: (chunks) => <Link to='/terms'>{chunks}</Link>,
+    mail: (chunks) => <a href='mailto:hello@example.com'>{chunks}</a>,
+  })}
+</p>
+```
+
+A message with tags returns a React node; a message without returns a string. The tag functions are typed from the default text, like the arguments. A tag name is an identifier, and a `<` that opens no tag, as in `a < b`, is text. A translation must use the same tags as its default text.
 
 ## Catalogs
 
-Each non-default locale has one file, `locales/<locale>.json`:
+Each non-default locale has one directory, with one file per namespace: `locales/<locale>/<namespace>.json`. A namespace with a `/` is a nested file: `docs/sidebar` is `locales/fr/docs/sidebar.json`.
+
+```text
+locales/
+  fr/
+    home.json
+    footer.json
+    docs/
+      sidebar.json
+```
+
+Each file maps a key to its entry:
 
 ```json
 {
-  "home": {
-    "title": {
-      "text": "Tarifs",
-      "source": "6c09ec564736f285",
-      "state": "validated",
-      "validatedBy": "ada",
-      "validatedAt": "2026-11-01"
-    }
+  "title": {
+    "text": "Tarifs",
+    "source": "6c09ec564736f285",
+    "state": "validated",
+    "validatedBy": "ada",
+    "validatedAt": "2026-11-01"
   }
 }
 ```
@@ -113,7 +147,7 @@ Each non-default locale has one file, `locales/<locale>.json`:
 `putnami i18n sync` keeps the catalogs in step with the code:
 
 - a new message gets an entry in state `missing`;
-- a deleted message loses its entry;
+- a deleted message loses its entry, and a deleted namespace loses its file;
 - a message whose default text changed has its translation marked `stale`. The text stays, so the translator sees what to revise.
 
 An agent drafts a translation by filling `text` and setting `state` to `draft`. A person validates it by setting `state` to `validated` with `validatedBy` and `validatedAt`. To accept a stale translation, revise `text`, set `state`, and delete `source`; the next sync records the current default text.
@@ -124,10 +158,23 @@ The build reads the catalogs and writes none of them:
 |---------|-----------------|------------------------------------|
 | A missing translation | Fails | Warns, and serves the default text |
 | Invalid ICU syntax | Fails | Fails |
-| A translation that reads other arguments than its default text | Fails | Fails |
+| A translation that reads other arguments or tags than its default text | Fails | Fails |
 | A stale translation | Warns, and serves the stale text | Warns |
 
 A locale is published only when its catalog is complete.
+
+## Fallback
+
+A reader can ask for something that does not exist in their locale at three levels: a message, a page, or the whole site.
+
+| What is missing | What the reader gets |
+|-----------------|----------------------|
+| A message's translation | The default text, in serve and test, with a warning. A production build fails instead, so a published locale never shows it. |
+| A message's translation is stale | The old translation, with a warning, until someone revises it. |
+| A page in the reader's locale (an excluded route) | `/fr/docs/intro` redirects with `308` to `/docs/intro`, query kept. Links from a French page to it point to `/docs/intro` directly. |
+| The reader's locale on the site | At `/`, the locale chosen in the switcher (its cookie), else the closest `Accept-Language` match (`fr-CA` gets `fr`), else the default locale. |
+
+A page never mixes locales by surprise: either every message of a published locale has a translation, or the build stops. The one page that shows another locale's text on purpose is an excluded route, and its URL says so.
 
 ## Routes and links
 
@@ -135,6 +182,8 @@ Every page, loader and action is served once per locale, except the routes in `e
 
 - a link to an excluded route (`/docs/intro`);
 - a link that names a locale (`/ar/pricing`).
+
+An excluded route has one URL. The same path under a locale prefix, such as `/fr/docs/intro`, redirects with `308` to it.
 
 A locale prefix matches the locale tag exactly: `/fr/pricing` is French, `/FR/pricing` is a page that does not exist.
 

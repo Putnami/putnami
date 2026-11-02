@@ -1,0 +1,202 @@
+{
+  "actionCopy": {
+    "text": "<code>doc_copy_markdown</code> — vous avez copié une page en Markdown, et depuis quel endroit ;",
+    "source": "3e80b6baefadca7e",
+    "state": "draft"
+  },
+  "actionDownload": {
+    "text": "<code>cli_download</code> — un artefact de la CLI a été résolu pour téléchargement via ce site, avec sa plateforme, son architecture et son canal de publication.",
+    "source": "a306476b9c12344a",
+    "state": "draft"
+  },
+  "actionSearch": {
+    "text": "<code>docs_search_open</code> — vous avez ouvert une page de documentation depuis la palette de recherche, avec le nombre de résultats renvoyés ;",
+    "source": "28f07e5b0c00ce3a",
+    "state": "draft"
+  },
+  "actionsIntro": {
+    "text": "En plus des pages vues, trois actions sont enregistrées, et seulement ces trois :",
+    "source": "3dceb24e35d2a923",
+    "state": "draft"
+  },
+  "basis": {
+    "text": "Mesurer notre propre site, sur nos propres serveurs, sans suivi d’un site à l’autre, relève de notre intérêt légitime à le faire fonctionner et entre dans l’exemption prévue pour la mesure d’audience. Nous ne demandons donc pas votre consentement, et le site fonctionne de la même façon que vous envoyiez ou non un signal d’opposition.",
+    "source": "e95c1551394a10b7",
+    "state": "draft"
+  },
+  "basisTitle": {
+    "text": "Base légale",
+    "source": "988015bfb5ebea95",
+    "state": "draft"
+  },
+  "browserCsrf": {
+    "text": "<code>_csrf</code>, un cookie qui empêche de falsifier les envois de formulaire. Il est strictement nécessaire, ne porte aucune identité et disparaît à la fermeture du navigateur.",
+    "source": "4b7e1684b3430687",
+    "state": "draft"
+  },
+  "browserIntro": {
+    "text": "Trois choses, toutes propres à ce site, qu’aucun autre site ne peut lire :",
+    "source": "30a49a124ddb97c7",
+    "state": "draft"
+  },
+  "browserQueue": {
+    "text": "une petite file d’événements de mesure dans le <em>local storage</em>, gardée seulement jusqu’à leur envoi. Elle évite qu’une page fermée sur une connexion instable soit comptée deux fois.",
+    "source": "e49cc3a9c2564abf",
+    "state": "draft"
+  },
+  "browserTitle": {
+    "text": "Ce qui est conservé dans votre navigateur",
+    "source": "9143d19e94f5bb2a",
+    "state": "draft"
+  },
+  "browserVisit": {
+    "text": "un identifiant de visite dans le <em>session storage</em>, pour que plusieurs pages lues à la suite comptent comme une seule visite. Il est effacé à la fermeture de l’onglet et n’est jamais relié à une visite précédente.",
+    "source": "f8a2929dc2f8e480",
+    "state": "draft"
+  },
+  "collectDevice": {
+    "text": "la famille de votre navigateur et de votre système d’exploitation, votre type d’appareil, la langue de votre navigateur et une classe approximative de taille de fenêtre.",
+    "source": "08a84adf813f113c",
+    "state": "draft"
+  },
+  "collectIntro": {
+    "text": "Pour chaque page que vous ouvrez, nous enregistrons :",
+    "source": "b5d0dc931ee90280",
+    "state": "draft"
+  },
+  "collectReferrer": {
+    "text": "le site d’où vous venez, et les cinq paramètres <code>utm_*</code> de l’adresse par laquelle vous êtes arrivé ;",
+    "source": "f667bb187c329c96",
+    "state": "draft"
+  },
+  "collectRoute": {
+    "text": "la route et le chemin de la page ;",
+    "source": "749bea49a5ea468d",
+    "state": "draft"
+  },
+  "collectTitle": {
+    "text": "Ce que nous collectons",
+    "source": "bef04e58c3f6e250",
+    "state": "draft"
+  },
+  "collectVisible": {
+    "text": "combien de temps la page est restée visible ;",
+    "source": "fbe6fde8219bf90b",
+    "state": "draft"
+  },
+  "complaint": {
+    "text": "Vous pouvez aussi adresser une réclamation à l’autorité de contrôle de votre pays — en France, la CNIL (Commission nationale de l’informatique et des libertés).",
+    "source": "e59f91c23c3c6bbb",
+    "state": "draft"
+  },
+  "controller": {
+    "text": "Fabien Dumay est le responsable du traitement de la mesure d’audience décrite ici. Pour un droit d’accès, de rectification, d’effacement ou d’opposition, écrivez à <mail>contact@putnami.com</mail>.",
+    "source": "7a32b4e258fe80ca",
+    "state": "draft"
+  },
+  "controllerTitle": {
+    "text": "Qui est responsable",
+    "source": "78263442d81cefe7",
+    "state": "draft"
+  },
+  "counted": {
+    "text": "Aucun cookie de mesure n’est déposé. Pour vous compter une fois plutôt que plusieurs, le serveur calcule un code court à partir de votre adresse réseau, de la famille de votre navigateur et d’une clé secrète qui change chaque jour à minuit UTC. Votre adresse réseau n’est jamais écrite : elle n’existe que le temps du calcul. Comme la clé change chaque jour, le code d’aujourd’hui ne peut pas être relié à celui d’hier.",
+    "source": "e99be0a01474b80d",
+    "state": "draft"
+  },
+  "countedTitle": {
+    "text": "Comment vous êtes compté",
+    "source": "efaf5330cecb1b01",
+    "state": "draft"
+  },
+  "how": {
+    "text": "La mesure est <link>un package du framework Putnami</link>, qui tourne à l’intérieur de ce site. Ce qu’elle enregistre, où cela aboutit et les décisions qui la sous-tendent sont documentés sur cette page.",
+    "source": "4d325639887ffab4",
+    "state": "draft"
+  },
+  "howTitle": {
+    "text": "Comment cela fonctionne",
+    "source": "bdbd7706de64ff6a",
+    "state": "draft"
+  },
+  "lede": {
+    "text": "Ce site mesure la façon dont il est utilisé. Il ne dépose aucun cookie pour cela, n’envoie rien à un tiers et ne vous demande rien. Voici exactement ce qui se passe.",
+    "source": "d2c4c10ddce28d9e",
+    "state": "draft"
+  },
+  "metaDescription": {
+    "text": "Ce que putnami.dev mesure, comment les visiteurs sont comptés sans cookie, combien de temps les données sont conservées et comment s’y opposer.",
+    "source": "f24e733834ce819c",
+    "state": "draft"
+  },
+  "metaTitle": {
+    "text": "Confidentialité — Putnami",
+    "source": "39e296753f1ce866",
+    "state": "draft"
+  },
+  "never": {
+    "text": "Ni votre adresse IP. Ni la chaîne d’identification complète de votre navigateur. Ni ce que vous avez tapé dans la recherche, ni le contenu d’aucun autre champ. Aucun titre de page, aucun jeton, aucune adresse e-mail. Ce site n’a pas de comptes : rien ici n’est jamais rattaché à une identité.",
+    "source": "efea1c3e4e0cbc3d",
+    "state": "draft"
+  },
+  "neverTitle": {
+    "text": "Ce que nous ne collectons jamais",
+    "source": "69b3d01501378c67",
+    "state": "draft"
+  },
+  "purpose": {
+    "text": "Pour savoir quelles pages de documentation sont lues, quelles recherches ne trouvent rien et pour quelles plateformes la CLI est téléchargée. Le but est de faire fonctionner et d’améliorer ce site. Nous ne construisons aucun profil publicitaire, et nous ne vendons ni ne partageons ces données.",
+    "source": "59e9e3cdb4045350",
+    "state": "draft"
+  },
+  "purposeTitle": {
+    "text": "Pourquoi nous mesurons",
+    "source": "328661f5498c1853",
+    "state": "draft"
+  },
+  "retention": {
+    "text": "Les événements individuels sont supprimés après 90 jours. Les totaux quotidiens, qui n’identifient personne, sont conservés 760 jours.",
+    "source": "e25e3318e99a702a",
+    "state": "draft"
+  },
+  "retentionTitle": {
+    "text": "Combien de temps nous les gardons",
+    "source": "a37efe89b9d228de",
+    "state": "draft"
+  },
+  "rights": {
+    "text": "Vous pouvez demander une copie des données qui vous concernent, demander leur rectification ou leur effacement, ou vous opposer à ce traitement. Écrivez à <mail>contact@putnami.com</mail>. Gardez en tête ce que décrivent les sections ci-dessus : en dehors du jour de la collecte, nous ne détenons rien qui puisse remonter jusqu’à vous — le code quotidien ne peut pas être inversé, et la clé qui l’a produit a disparu. Effacer le stockage de ce site dans votre navigateur supprime à tout moment l’identifiant de visite et la file en attente.",
+    "source": "e2a75c2d27056844",
+    "state": "draft"
+  },
+  "rightsTitle": {
+    "text": "Vos droits",
+    "source": "08440e966836527e",
+    "state": "draft"
+  },
+  "signals": {
+    "text": "Si votre navigateur envoie <code>Sec-GPC: 1</code> (Global Privacy Control) ou <code>DNT: 1</code> (Do Not Track), aucun cookie de mesure n’est jamais déposé pour vous. Comme ce site n’en dépose aucun de toute façon, ces signaux ne changent rien ici — ils sont respectés quand même.",
+    "source": "1b3088b9aca31036",
+    "state": "draft"
+  },
+  "signalsTitle": {
+    "text": "Signaux d’opposition",
+    "source": "000ef0c716fcfd77",
+    "state": "draft"
+  },
+  "storage": {
+    "text": "Dans la base de données de ce site, que nous exploitons. Aucun tiers ne les reçoit. Rien n’est envoyé à un service d’analyse, et le site ne charge aucun script de mesure tiers.",
+    "source": "24d7e4962de7201f",
+    "state": "draft"
+  },
+  "storageTitle": {
+    "text": "Où elles sont stockées",
+    "source": "38b73f56e9c6a9f3",
+    "state": "draft"
+  },
+  "title": {
+    "text": "Confidentialité",
+    "source": "54a57c3147c49f33",
+    "state": "draft"
+  }
+}

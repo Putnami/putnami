@@ -14,7 +14,7 @@ import type { LocaleMessages } from '../shared/i18n/messages';
 import { createPageElement } from '../shared/page-element';
 import { RouteTreeHelper } from '../shared/route-tree.utils';
 import type { I18nRuntimeOptions } from './i18n/runtime';
-import { negotiatingEntry } from './i18n/negotiation';
+import { excludedRouteRedirect, negotiatingEntry } from './i18n/negotiation';
 import type {
   ErrorModule,
   LayoutModule,
@@ -200,6 +200,15 @@ export class ReactApplication {
     const i18n = this._i18n;
     if (!i18n || !isLocalizedPath(i18n.settings, route)) return [''];
     return i18n.settings.locales.map((locale) => localePrefix(i18n.settings, locale));
+  }
+
+  /** The locale prefixes under which an excluded route redirects to its one URL. */
+  private excludedPrefixes(route: string): string[] {
+    const i18n = this._i18n;
+    if (!i18n || isLocalizedPath(i18n.settings, route)) return [];
+    return i18n.settings.locales
+      .filter((l) => l !== i18n.settings.defaultLocale)
+      .map((l) => localePrefix(i18n.settings, l));
   }
 
   /**
@@ -440,6 +449,10 @@ export class ReactApplication {
           }
         }
       }
+    }
+
+    for (const prefix of this.excludedPrefixes(route)) {
+      this.httpPlugin.get(localizedHttpRoute(prefix, route), excludedRouteRedirect(prefix), this.routeOptions());
     }
 
     // Static routes (SSG/ISR) serve pre-rendered, zero-JS HTML from the build

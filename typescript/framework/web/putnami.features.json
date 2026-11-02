@@ -358,6 +358,15 @@
           }
         },
         {
+          "id": "excluded-route-redirect",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": ["an-excluded-route-under-a-prefix-redirects"]
+          }
+        },
+        {
           "id": "locale-document",
           "stage": "coded",
           "evidenceKinds": ["attestation"],
@@ -383,6 +392,15 @@
           }
         },
         {
+          "id": "inline-tags",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": ["a-tag-renders-through-its-function", "a-translation-with-other-tags-fails"]
+          }
+        },
+        {
           "id": "message-payload",
           "stage": "coded",
           "evidenceKinds": ["attestation"],
@@ -403,7 +421,8 @@
             "kind": "acceptance",
             "checks": [
               "a-new-key-is-added-and-an-orphan-removed",
-              "a-changed-source-marks-the-translation-stale-and-keeps-its-text"
+              "a-changed-source-marks-the-translation-stale-and-keeps-its-text",
+              "each-namespace-has-its-own-catalog-file"
             ]
           }
         },

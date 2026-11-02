@@ -14,7 +14,7 @@ import {
   ThemeToggle,
   Tooltip,
 } from '@putnami/ui';
-import { LocaleSwitcher, useLocale, useT } from '@putnami/web';
+import { useLocale, useT } from '@putnami/web';
 import { useState } from 'react';
 import type { NavItem } from '../lib/docs/navigation';
 import { SITE_MAX_WIDTH } from '../theme';
@@ -170,7 +170,6 @@ export function Navbar({ navItems }: { navItems?: NavItem[] }) {
                 </SearchKbd>
               </SearchButton>
               <ThemeToggle />
-              <LocaleSwitcher label={t.language()} className='locale-switcher' />
               <Tooltip label={t.viewOnGithub()}>
                 <a
                   href='https://github.com/putnami/putnami'
@@ -262,7 +261,6 @@ export function Navbar({ navItems }: { navItems?: NavItem[] }) {
               Docs
             </StyledMobileNavLink>
             <Flex alignItems='center' gap='md'>
-              <LocaleSwitcher label={t.language()} className='locale-switcher' />
               <a
                 href='https://github.com/putnami/putnami'
                 target='_blank'
@@ -293,36 +291,6 @@ const StyledNav = styled.header`
   }
   backdrop-filter: blur(12px);
   border-bottom: 1px solid var(--color-border);
-
-  /* The locale switcher is a list of links, one per locale; the current one
-     carries aria-current and is not a call to action. */
-  .locale-switcher ul {
-    display: flex;
-    gap: 2px;
-    margin: 0;
-    padding: 0;
-    list-style: none;
-  }
-
-  .locale-switcher a {
-    display: block;
-    padding: 2px 6px;
-    border-radius: var(--radius-sm);
-    color: var(--color-text-muted);
-    font-size: 0.8rem;
-    font-weight: 500;
-    text-decoration: none;
-  }
-
-  .locale-switcher a:hover {
-    color: var(--color-text);
-    background: var(--color-surface-hover);
-  }
-
-  .locale-switcher a[aria-current='page'] {
-    color: var(--color-text);
-    background: var(--color-surface-hover);
-  }
 `;
 
 const StyledNavLink = styled.a`

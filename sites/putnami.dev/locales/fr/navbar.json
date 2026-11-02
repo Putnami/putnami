@@ -1,0 +1,77 @@
+{
+  "allFrameworks": {
+    "text": "Tous les frameworks →",
+    "source": "668287fc391257f3",
+    "state": "draft"
+  },
+  "chooseSurface": {
+    "text": "Choisir une surface",
+    "source": "6e3261bb60678613",
+    "state": "draft"
+  },
+  "commonGuides": {
+    "text": "Guides courants",
+    "source": "6e684cdba36f6700",
+    "state": "draft"
+  },
+  "docs": {
+    "text": "Docs",
+    "source": "7af023c43013b9a5",
+    "state": "draft"
+  },
+  "frameworks": {
+    "text": "Frameworks",
+    "source": "cafd6b725820bd8e",
+    "state": "draft"
+  },
+  "home": {
+    "text": "Accueil Putnami",
+    "source": "d246c416aa5bda9e",
+    "state": "draft"
+  },
+  "menu": {
+    "text": "Menu",
+    "source": "99af6606ff9d6cd5",
+    "state": "draft"
+  },
+  "navigation": {
+    "text": "Navigation",
+    "source": "3db65f8c2a7d1861",
+    "state": "draft"
+  },
+  "openMenu": {
+    "text": "Ouvrir le menu",
+    "source": "c219bbd71512525e",
+    "state": "draft"
+  },
+  "search": {
+    "text": "Rechercher",
+    "source": "49c266baaaa70981",
+    "state": "draft"
+  },
+  "searchDocs": {
+    "text": "Rechercher dans la documentation",
+    "source": "ea582e69cce77d67",
+    "state": "draft"
+  },
+  "start": {
+    "text": "Démarrer",
+    "source": "e4bb9f1ece9af926",
+    "state": "draft"
+  },
+  "systemModel": {
+    "text": "Le modèle du système",
+    "source": "0efd58bdac8b3836",
+    "state": "draft"
+  },
+  "viewOnGithub": {
+    "text": "Voir sur GitHub",
+    "source": "20672423d7169088",
+    "state": "draft"
+  },
+  "why": {
+    "text": "Pourquoi",
+    "source": "d3ae14a50bfe463f",
+    "state": "draft"
+  }
+}

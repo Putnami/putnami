@@ -1,0 +1,12 @@
+{
+  "description": {
+    "text": "Un outillage de monorepo local d’abord, où chaque branche est un environnement exécutable. Orchestration du workspace, frameworks polyglottes et déploiements de prévisualisation — conçu pour les humains et les agents IA.",
+    "source": "937526e64a39b61b",
+    "state": "draft"
+  },
+  "metaTitle": {
+    "text": "Putnami — L’outillage de workspace natif aux branches pour TypeScript",
+    "source": "386fe077ea2d6f89",
+    "state": "draft"
+  }
+}

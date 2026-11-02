@@ -170,9 +170,9 @@ Route facts are merged from per-emitter fragments under
 
 | Fragment | Emitter | Contributes |
 |----------|---------|-------------|
-| `web.json` | `@putnami/web` | file-routes from `src/app/` (`/`, `/docs`, and the enumerated `/docs/[...page]` expansion) plus the hashed client-bundle prefixes `/react/` and `/react-islands/` |
+| `web.json` | `@putnami/web` | file-routes from `src/app/` (`/`, `/docs`, the enumerated `/docs/[...page]` expansion, each localized page under `/fr`, and each built `/fr/docs` redirect to the English docs) plus the hashed client-bundle prefixes `/react/` and `/react-islands/` |
 | `application.json` | `@putnami/application` | typed API routes from `src/api/`, and the static mounts/files found in the source `public/` folder (`/favicon.ico`, `/robots.txt`, `/assets/`, `/fonts/`, `/schemas/`). The search index is written after that scan, only under `.gen/public/search/`, so it is not one of them |
-| `application.json` | `src/plugins/public-surface.plugin.ts` | everything no framework emitter can see: the `putnami.json` `generate.assets` copies (`/install.sh`, `/install-commands.txt`, `/install.ps1`, `/LICENSE.md`, `/docs/`), the SSG mirror `/static/`, and the routes registered at warmup (`/search/index.json`, `/api/content/refresh`, `/_/livez`, `/_/healthz`, `/_/readyz`, `/_/version`) |
+| `application.json` | `src/plugins/public-surface.plugin.ts` | everything no framework emitter can see: the `putnami.json` `generate.assets` copies (`/install.sh`, `/install-commands.txt`, `/install.ps1`, `/LICENSE.md`, `/docs/`), the SSG mirror `/static/`, the `/fr/docs/` prefix that lets any French docs path reach its redirect to the English page, and the routes registered at warmup (`/search/index.json`, `/api/content/refresh`, `/_/livez`, `/_/healthz`, `/_/readyz`, `/_/version`) |
 
 Two entries are `publicEdge: false` — represented so a validator can prove no
 public prefix admits them, but denied at the edge:

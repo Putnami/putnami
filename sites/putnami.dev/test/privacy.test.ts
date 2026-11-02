@@ -10,9 +10,19 @@ const REQUIREMENT = 'what-the-site-records-is-what-the-notice-says';
 
 const SRC_ROOT = joinPath(import.meta.dir, '..', 'src');
 const CONF_ROOT = joinPath(import.meta.dir, '..', 'conf');
-const PRIVACY_PAGE = joinPath(SRC_ROOT, 'app', 'privacy', 'page.tsx');
+const PRIVACY_DIR = joinPath(SRC_ROOT, 'app', 'privacy');
+const LOCALES_ROOT = joinPath(import.meta.dir, '..', 'locales');
 
-const privacySource = (): string => readFileSync(PRIVACY_PAGE, 'utf8');
+/** The notice as the page renders it: its markup and its default-locale messages. */
+const privacySource = (): string =>
+  ['page.tsx', 'privacy.messages.ts'].map((file) => readFileSync(joinPath(PRIVACY_DIR, file), 'utf8')).join('\n');
+
+/** Each translated notice, by locale: every catalog has to state the same facts. */
+const translatedNotices = (): [string, string][] =>
+  [...new Glob('*/privacy.json').scanSync({ cwd: LOCALES_ROOT })].map((file) => [
+    file.split('/')[0] as string,
+    readFileSync(joinPath(LOCALES_ROOT, file), 'utf8'),
+  ]);
 
 /**
  * Every action name the site moves, read from the source rather than from a
@@ -47,6 +57,12 @@ describe('the audience-measurement notice', () => {
       // a new action that never reaches it is collection nobody was told about.
       for (const name of Object.keys(siteEvents)) {
         expect(page).toContain(name);
+      }
+      expect(translatedNotices().length).toBeGreaterThan(0);
+      for (const [, notice] of translatedNotices()) {
+        for (const name of Object.keys(siteEvents)) {
+          expect(notice).toContain(name);
+        }
       }
     },
   );
@@ -83,6 +99,10 @@ describe('the audience-measurement notice', () => {
       expect(conf).not.toContain('retentionAggregateDays');
       expect(page).toContain('deleted after 90 days');
       expect(page).toContain('kept for 760 days');
+      for (const [, notice] of translatedNotices()) {
+        expect(notice).toContain('90');
+        expect(notice).toContain('760');
+      }
     },
   );
 

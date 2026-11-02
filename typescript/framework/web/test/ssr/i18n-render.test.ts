@@ -10,7 +10,7 @@ import { island } from '../../src/client/island/island';
 import { parseLocaleSettings } from '../../src/shared/i18n/locale';
 import { messages, useT } from '../../src/shared/i18n/messages';
 import { I18N_PAYLOAD_ID } from '../../src/shared/i18n/payload';
-import { localizeRows } from '../../src/ssr/i18n/build';
+import { excludedRedirectRows, localizeRows } from '../../src/ssr/i18n/build';
 import { applyLocaleHead, type I18nRuntimeOptions } from '../../src/ssr/i18n/runtime';
 import { ReactApplication } from '../../src/ssr/react-application';
 import { renderStaticDocument } from '../../src/ssr/static-render';
@@ -111,7 +111,20 @@ describe('localized server render', () => {
     { feature, requirement: 'locale-routes', check: 'an-excluded-route-stays-in-the-default-locale-only' },
     async () => {
       expect((await get('/docs/intro')).status).toBe(200);
-      expect((await get('/fr/docs/intro')).status).toBe(404);
+      expect((await get('/fr/docs/intro')).status).toBe(308);
+    },
+  );
+
+  specTest(
+    'redirects an excluded route under a locale prefix to its one URL',
+    { feature, requirement: 'excluded-route-redirect', check: 'an-excluded-route-under-a-prefix-redirects' },
+    async () => {
+      for (const path of ['/fr/docs/intro?q=1', '/ar/docs/intro?q=1']) {
+        const response = await get(path);
+        expect(response.status).toBe(308);
+        expect(response.headers.get('location')).toBe('/docs/intro?q=1');
+      }
+      expect((await get('/fr/docs/missing')).status).toBe(404);
     },
   );
 
@@ -344,6 +357,36 @@ describe('localized manifest rows', () => {
       expect(rows[5]?.expandedPaths).toEqual([]);
     },
   );
+
+  it('lists the redirect of each excluded route under each other locale', () => {
+    const rows = excludedRedirectRows(settings, [
+      { route: '/pricing', evidencePath: 'src/app/pricing/page.tsx', hasAction: true },
+      { route: '/docs', evidencePath: 'src/app/docs/page.tsx', hasAction: false },
+      {
+        route: '/docs/*',
+        evidencePath: 'src/app/docs/[...slug]/page.tsx',
+        hasAction: true,
+        expandedPaths: ['/docs/a'],
+      },
+    ]);
+    expect(rows).toEqual([
+      { route: '/fr/docs', evidencePath: 'src/app/docs/page.tsx', hasAction: false },
+      { route: '/ar/docs', evidencePath: 'src/app/docs/page.tsx', hasAction: false },
+      {
+        route: '/fr/docs/*',
+        evidencePath: 'src/app/docs/[...slug]/page.tsx',
+        hasAction: false,
+        expandedPaths: ['/fr/docs/a'],
+      },
+      {
+        route: '/ar/docs/*',
+        evidencePath: 'src/app/docs/[...slug]/page.tsx',
+        hasAction: false,
+        expandedPaths: ['/ar/docs/a'],
+      },
+    ]);
+    expect(excludedRedirectRows(undefined, [{ route: '/docs/*', evidencePath: 'x', hasAction: false }])).toEqual([]);
+  });
 
   it('refuses i18n on an application mounted below the site root', () => {
     const app = new ReactApplication(createMockReactConfig({}), new HttpPlugin()).i18n(i18n);

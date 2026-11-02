@@ -20,5 +20,4 @@ export default messages('navbar', {
   viewOnGithub: 'View on GitHub',
   openMenu: 'Open Menu',
   menu: 'Menu',
-  language: 'Language',
 });

@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { Link, useT } from '@putnami/web';
+import { Link, LocaleSwitcher, useT } from '@putnami/web';
 import { styled } from '@putnami/ui';
 import footer from './footer.messages';
 
@@ -20,6 +20,7 @@ export const Footer = ({ release }: { release?: ReactNode }) => {
             from consent, never from telling people about it. */}
         <Link to='/privacy'>{t.privacy()}</Link>
       </FooterLicense>
+      <LocaleSwitcher label={t.language()} className='locale-switcher' />
     </StyledFooter>
   );
 };
@@ -40,6 +41,30 @@ const StyledFooter = styled.footer`
     &:hover {
       color: var(--color-primary);
     }
+  }
+
+  /* One small link per locale, separated by a dot; the current one carries
+     aria-current and reads as text, not as a call to action. */
+  .locale-switcher ul {
+    display: flex;
+    justify-content: center;
+    margin: var(--space-sm) 0 0;
+    padding: 0;
+    list-style: none;
+    font-size: 0.75rem;
+  }
+
+  .locale-switcher li + li::before {
+    content: '·';
+    padding: 0 var(--space-xs);
+  }
+
+  .locale-switcher a {
+    color: var(--color-text-muted);
+  }
+
+  .locale-switcher a[aria-current='page'] {
+    color: var(--color-text);
   }
 `;
 

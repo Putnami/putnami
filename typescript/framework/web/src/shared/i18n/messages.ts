@@ -1,7 +1,16 @@
-import { createContext, createElement, type ReactNode, useContext, useMemo } from 'react';
-import { formatIcu, type IcuNode, type IcuValues, parseIcu } from './icu';
+import { createContext, createElement, Fragment, type ReactNode, useContext, useMemo } from 'react';
+import {
+  formatIcu,
+  formatIcuParts,
+  type IcuNode,
+  type IcuTag,
+  type IcuValue,
+  type IcuValues,
+  icuArguments,
+  parseIcu,
+} from './icu';
 import type { LocaleSettings } from './locale';
-import type { MessageFormatter } from './message-types';
+import type { MessageFormatter, TagRenderer } from './message-types';
 
 /** A default message: its ICU text, and optional context for translators. */
 export type MessageDefinition = string | { readonly text: string; readonly context?: string };
@@ -26,7 +35,11 @@ const KEY = /^[A-Za-z_][A-Za-z0-9_]*$/;
  * export default messages('home', {
  *   title: 'Pricing',
  *   seats: { text: '{count, plural, one {# seat} other {# seats}}', context: 'Price card' },
+ *   terms: 'Read the <link>terms</link>.',
  * });
+ *
+ * // A message with tags renders a React node; each tag takes a function.
+ * t.terms({ link: (chunks) => <Link to='/terms'>{chunks}</Link> });
  */
 export function messages<const D extends Record<string, MessageDefinition>>(
   namespace: string,
@@ -84,17 +97,46 @@ export type Translator<D extends Record<string, MessageDefinition>> = {
   readonly [K in keyof D]: MessageFormatter<TextOf<D[K]>>;
 };
 
-/** Build the formatters of a namespace for a locale, outside React. */
+function hasTags(nodes: IcuNode[]): boolean {
+  return [...icuArguments(nodes).values()].includes('tag');
+}
+
+/** Format a message with tags: function values render tags, the others fill arguments. */
+function formatRich(nodes: IcuNode[], locale: string, values: Record<string, unknown> = {}): ReactNode {
+  const plain: IcuValues = {};
+  const tags: Record<string, IcuTag<ReactNode>> = {};
+  for (const [name, value] of Object.entries(values)) {
+    if (typeof value === 'function') {
+      const render = value as TagRenderer;
+      tags[name] = (parts) => render(createElement(Fragment, null, ...parts));
+    } else {
+      plain[name] = value as IcuValue;
+    }
+  }
+  // Parts passed as separate children need no keys.
+  return createElement(Fragment, null, ...formatIcuParts(nodes, locale, plain, tags));
+}
+
+/**
+ * Build the formatters of a namespace for a locale, outside React. A message
+ * whose default text has tags formats to a React node, any other to a string.
+ * Reading the tags parses every default text here, so an invalid one throws
+ * for the whole namespace on first use. The build of a project with an
+ * `i18n` block refuses an invalid default text before that.
+ */
 export function translator<D extends Record<string, MessageDefinition>>(
   bundle: Messages<D>,
   locale: string,
   translations: LocaleMessages = {},
 ): Translator<D> {
   const own = translations[bundle.namespace] ?? {};
-  const out: Record<string, (values?: IcuValues) => string> = {};
+  const out: Record<string, (values?: Record<string, unknown>) => ReactNode> = {};
   for (const [key, definition] of Object.entries(bundle.definitions)) {
-    const text = own[key] || definitionText(definition);
-    out[key] = (values?: IcuValues) => formatIcu(nodesOf(text), locale, values);
+    const fallback = definitionText(definition);
+    const text = own[key] || fallback;
+    out[key] = hasTags(nodesOf(fallback))
+      ? (values) => formatRich(nodesOf(text), locale, values)
+      : (values) => formatIcu(nodesOf(text), locale, values as IcuValues);
   }
   return out as Translator<D>;
 }

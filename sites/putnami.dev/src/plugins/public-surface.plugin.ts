@@ -19,8 +19,9 @@
  *   The search index is not among them: it is written in postGenerate(), after
  *   the scan, and only under `.gen/public/search/`, so its one file is declared
  *   below with the warmup routes;
- * - `@putnami/web` file-routes (`/`, `/docs`, and the enumerated expansion of
- *   the `/docs/[...page]` catch-all) and the hashed client bundle prefixes
+ * - `@putnami/web` file-routes (`/`, `/docs`, the enumerated expansion of the
+ *   `/docs/[...page]` catch-all, each localized page under `/fr`, and each
+ *   built `/fr/docs` redirect to the English docs) and the hashed client bundle prefixes
  *   `/react/` and `/react-islands/`.
  *
  * What is left, and why only this plugin can state it:
@@ -218,10 +219,43 @@ export function assertNoSourceMirror(projectRoot: string, declared: readonly Gen
   }
 }
 
+/**
+ * Route facts for the locale-prefixed redirects of an excluded subtree. A
+ * `<base>/**` pattern in the `i18n` exclude list makes `/<locale><base>/x`
+ * answer 308 to `<base>/x` for any path, built or not, so each non-default
+ * locale gets the bounded prefix `/<locale><base>/`; `@putnami/web` lists the
+ * built paths one by one.
+ */
+export function buildExcludedRedirectHttpRoutes(projectRoot: string): GeneratedHttpRoute[] {
+  const config = JSON.parse(readFileSync(joinPath(projectRoot, 'putnami.json'), 'utf8')) as {
+    options?: {
+      '@putnami/web:generate'?: { i18n?: { locales?: string[]; defaultLocale?: string; exclude?: string[] } };
+    };
+  };
+  const i18n = config.options?.['@putnami/web:generate']?.i18n;
+  if (!i18n?.locales) return [];
+  const subtrees = (i18n.exclude ?? []).filter((p) => p.endsWith('/**')).map((p) => p.slice(0, -'/**'.length));
+  return i18n.locales
+    .filter((locale) => locale !== i18n.defaultLocale)
+    .flatMap((locale) =>
+      subtrees.map(
+        (base): GeneratedHttpRoute => ({
+          match: 'prefix',
+          path: `/${locale}${base}/`,
+          methods: ['GET', 'HEAD'],
+          publicEdge: true,
+          provenance: { sourceKind: 'manual', evidencePath: 'putnami.json' },
+        }),
+      ),
+    )
+    .sort((a, b) => (a.path < b.path ? -1 : a.path > b.path ? 1 : 0));
+}
+
 /** The complete set of facts this site owns, in deterministic order. */
 export function buildPublicSurfaceHttpRoutes(input: PublicSurfaceInput): GeneratedHttpRoute[] {
   return [
     ...buildGenerateAssetHttpRoutes(input),
+    ...buildExcludedRedirectHttpRoutes(input.projectRoot),
     {
       match: 'prefix',
       path: `/${SSG_OUTPUT_DIRECTORY}/`,

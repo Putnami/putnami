@@ -280,18 +280,23 @@ export default messages('home', { seats: '{count, plural, one {# seat} other {# 
 // in a component
 const t = useT(home);
 t.seats({ count: 2 });
+// a tag wraps part of the text; pass one function per tag, get a React node
+// terms: 'Read the <link>terms</link>'
+t.terms({ link: (chunks) => <Link to='/terms'>{chunks}</Link> });
 ```
 
 - Run `putnami i18n sync` after adding, changing or removing a message. It
-  writes `locales/<locale>.json`; the build never writes it.
+  writes one file per namespace, `locales/<locale>/<namespace>.json`, and
+  deletes the file of a removed namespace; the build never writes them.
 - To translate, fill `text` and set `state: "draft"`. Never change an entry
   whose `state` is `validated`: a person locked it. Revise a `stale` entry
   from its kept text, set `state: "draft"`, and delete `source`.
 - `putnami build` fails on a missing translation, invalid ICU syntax, or a
-  translation whose arguments differ from its default text.
+  translation whose arguments or tags differ from its default text. Serve and
+  test show the default text for a missing one, with a warning.
 - `<Link to="/x">` keeps the current locale prefix; a path that names a
   locale (`/fr/x`) or is excluded stays as written. Exclude whole subtrees
-  (`/blog/**`). Use a plain `<a>` for files. `<LocaleSwitcher label="…" />` renders the locale links;
+  (`/blog/**`); `/fr/blog/x` redirects with 308 to `/blog/x`. Use a plain `<a>` for files. `<LocaleSwitcher label="…" />` renders the locale links;
   `useLocale()` gives the locale and `localize(path, locale?)`.
 - Only `/` negotiates the locale (cookie `putnami-locale`, then
   `Accept-Language`). The framework writes `<html lang dir>`, the canonical

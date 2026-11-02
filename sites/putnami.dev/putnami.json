@@ -10,7 +10,7 @@
         "locales": ["en", "fr"],
         "defaultLocale": "en",
         "siteUrl": "https://putnami.dev",
-        "exclude": ["/docs/**", "/privacy"]
+        "exclude": ["/docs/**"]
       }
     },
     "@putnami/cloud:publish-migration": { "namespace": "putnami" },

@@ -1,12 +1,17 @@
-import { describe, expect, it } from 'bun:test';
+import { afterEach, describe, expect, it } from 'bun:test';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { dirname, join } from 'node:path';
 import { specTest } from '@putnami/runtime/spectest';
+import { sync } from '../../bin/i18n';
+import { formatDiagnostic } from '../../src/ssr/i18n/build';
 import {
   type Catalog,
   CatalogFormatError,
   checkCatalog,
-  parseCatalog,
+  parseCatalogFile,
   runtimeMessages,
-  serializeCatalog,
+  serializeCatalogFile,
   sourceHash,
   syncCatalog,
 } from '../../src/ssr/i18n/catalog';
@@ -78,10 +83,10 @@ describe('syncCatalog', () => {
   });
 
   it('writes the same bytes for the same inputs, keys sorted', () => {
-    const a = serializeCatalog(syncCatalog(declared, translated()).catalog);
-    const b = serializeCatalog(syncCatalog(declared, JSON.parse(a)).catalog);
+    const a = serializeCatalogFile(syncCatalog(declared, translated()).catalog.home ?? {});
+    const b = serializeCatalogFile(syncCatalog(declared, { home: JSON.parse(a) }).catalog.home ?? {});
     expect(a).toBe(b);
-    expect(Object.keys(JSON.parse(a).home)).toEqual(['seats', 'title']);
+    expect(Object.keys(JSON.parse(a))).toEqual(['seats', 'title']);
   });
 });
 
@@ -129,6 +134,26 @@ describe('checkCatalog', () => {
   );
 
   specTest(
+    'fails when a translation uses other tags than its default text',
+    { feature, requirement: 'inline-tags', check: 'a-translation-with-other-tags-fails' },
+    () => {
+      const defaults = new Map([['legal', { terms: 'Read the <link>terms</link>' }]]);
+      const catalog = (text: string): Catalog => ({
+        legal: { terms: { text, source: sourceHash('Read the <link>terms</link>'), state: 'draft' } },
+      });
+      expect(run(catalog('Lisez les <a>conditions</a>'), true, defaults)[0]).toMatchObject({
+        level: 'error',
+        code: 'argument-mismatch',
+        message: 'uses <a> where the default text uses <link>',
+      });
+      expect(run(catalog('Lisez les {link}'), true, defaults)[0]?.message).toBe(
+        'uses {link} where the default text uses <link>',
+      );
+      expect(run(catalog('Lisez les <link>conditions</link>'), true, defaults)).toEqual([]);
+    },
+  );
+
+  specTest(
     'warns for a stale translation',
     { feature, requirement: 'catalog-check', check: 'a-stale-translation-warns' },
     () => {
@@ -148,12 +173,12 @@ describe('checkCatalog', () => {
 
 describe('catalog files', () => {
   it('refuses a shape the sync would not write', () => {
-    expect(() => parseCatalog('fr.json', [])).toThrow(CatalogFormatError);
-    expect(() => parseCatalog('fr.json', { home: { title: { text: 'x', state: 'done' } } })).toThrow('state');
-    expect(() => parseCatalog('fr.json', { home: { title: { text: 'x', state: 'draft', note: 1 } } })).toThrow(
+    expect(() => parseCatalogFile('home.json', [])).toThrow(CatalogFormatError);
+    expect(() => parseCatalogFile('home.json', { title: { text: 'x', state: 'done' } })).toThrow('state');
+    expect(() => parseCatalogFile('home.json', { title: { text: 'x', state: 'draft', note: 1 } })).toThrow(
       "unknown field 'note'",
     );
-    expect(parseCatalog('fr.json', { $schema: 'x', home: {} })).toEqual({ home: {} });
+    expect(parseCatalogFile('home.json', { $schema: 'x' })).toEqual({});
   });
 
   it('serves every translated entry, stale ones included, and no missing one', () => {
@@ -163,5 +188,62 @@ describe('catalog files', () => {
     expect(runtimeMessages(catalog)).toEqual({
       home: { title: 'Tarifs', seats: '{count, plural, one {# siège} other {# sièges}}' },
     });
+  });
+});
+
+describe('putnami i18n sync', () => {
+  const messagesModule = join(import.meta.dir, '../../src/shared/i18n/messages');
+  let root: string | undefined;
+
+  afterEach(() => {
+    if (root) rmSync(root, { recursive: true, force: true });
+    root = undefined;
+  });
+
+  function project(files: Record<string, string>): string {
+    root = mkdtempSync(join(tmpdir(), 'putnami-i18n-'));
+    const i18n = { locales: ['en', 'fr'], defaultLocale: 'en', siteUrl: 'https://example.com' };
+    files['putnami.json'] = JSON.stringify({ name: 'site', options: { '@putnami/web:generate': { i18n } } });
+    for (const [path, content] of Object.entries(files)) {
+      mkdirSync(dirname(join(root, path)), { recursive: true });
+      writeFileSync(join(root, path), content);
+    }
+    return root;
+  }
+
+  specTest(
+    'writes one catalog file per namespace and deletes the file of an undeclared one',
+    { feature, requirement: 'catalog-sync', check: 'each-namespace-has-its-own-catalog-file' },
+    async () => {
+      const dir = project({
+        'src/app/home.messages.ts': `import { messages } from '${messagesModule}';
+export const home = messages('home', { title: 'Pricing' });`,
+        'src/docs/sidebar.messages.ts': `import { messages } from '${messagesModule}';
+export const sidebar = messages('docs/sidebar', { intro: 'Introduction' });`,
+        'locales/fr/home.json': serializeCatalogFile({
+          title: { text: 'Tarifs', source: sourceHash('Pricing'), state: 'draft' },
+        }),
+        'locales/fr/old/gone.json': serializeCatalogFile({ a: { text: 'Parti', state: 'draft' } }),
+      });
+      const lines: string[] = [];
+      expect(await sync(dir, (line) => lines.push(line))).toBe(0);
+
+      expect(JSON.parse(readFileSync(join(dir, 'locales/fr/docs/sidebar.json'), 'utf8'))).toEqual({
+        intro: { text: '', source: sourceHash('Introduction'), state: 'missing' },
+      });
+      expect(existsSync(join(dir, 'locales/fr/old'))).toBe(false);
+      expect(lines).toContain('  wrote locales/fr/docs/sidebar.json');
+      expect(lines).not.toContain('  wrote locales/fr/home.json');
+
+      lines.length = 0;
+      expect(await sync(dir, (line) => lines.push(line))).toBe(0);
+      expect(lines[0]).toBe('locales/fr: up to date (0 added, 0 removed, 0 stale)');
+    },
+  );
+
+  it('names the namespace file in a diagnostic', () => {
+    expect(
+      formatDiagnostic({ level: 'error', code: 'missing', locale: 'fr', key: 'docs/sidebar.intro', message: 'x' }),
+    ).toBe('locales/fr/docs/sidebar.json intro: x');
   });
 });
