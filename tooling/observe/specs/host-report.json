@@ -1,0 +1,37 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-spec.json",
+  "protocolVersion": 1,
+  "feature": "tooling/observe-host-report",
+  "outcomes": [
+    "A reviewer reads the change summary on the pull request or merge request, not in the CI log",
+    "A CI job adds --publish to putnami observe with a token the CI already holds, and gets a commit status and one summary note that the next run updates in place",
+    "A job without a token, or outside a pull or merge request, logs why it published nothing and still passes"
+  ],
+  "nonGoals": [
+    "Failing the commit status on a failed test or a low coverage: the status says the analysis ran",
+    "Code hosts other than GitHub and GitLab, and CI systems other than GitHub Actions and GitLab CI",
+    "Inline comments on changed lines",
+    "Publishing on a branch push that has no pull or merge request"
+  ],
+  "requirements": [
+    {
+      "id": "publish-status",
+      "text": "With --publish, in a GitHub Actions job of a pull request or a GitLab CI job of a merge request, putnami observe sets the commit status putnami/observe to success on the head commit of the pull or merge request. Its description, at most 140 characters, counts the changed and dependent components, the changed-line coverage and the dependency changes, and the status links the CI run page."
+    },
+    {
+      "id": "publish-note",
+      "text": "With --publish, putnami observe writes one Markdown summary note on the pull or merge request whose first line is the hidden marker <!-- putnami-observe:summary -->. It updates the first note whose body starts with that marker and creates one when none does, so a second run updates the same note. A failed status call does not stop the note."
+    },
+    {
+      "id": "publish-host-endpoints",
+      "text": "On GitHub the token is GITHUB_TOKEN and the API is GITHUB_API_URL, https://api.github.com when unset. On GitLab the token is PUTNAMI_GITLAB_TOKEN, a project or personal access token, and the API is CI_API_V4_URL, else CI_SERVER_URL followed by /api/v4, so a self-managed GitLab answers on its own URL. The token goes only to an https API URL without credentials, redirects are not followed, and no token appears in a diagnostic or in the output."
+    },
+    {
+      "id": "publish-fails-open",
+      "text": "--publish without the code host's token gives the warning observe.publish_token_missing, and in a generic CI or outside a pull or merge request it gives the info observe.publish_skipped; neither sends a request. A refused or failed call, an API URL that is not https or a run past one minute gives the warning observe.publish_failed. putnami observe still exits 0."
+    }
+  ],
+  "decisions": [
+    "tooling/cli/doc/adr/0051-user-scope-extensions-run-without-a-workspace.md"
+  ]
+}
