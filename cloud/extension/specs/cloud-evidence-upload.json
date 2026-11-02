@@ -17,7 +17,7 @@
     },
     {
       "id": "sends-the-tested-tree",
-      "text": "The run carries under operational the tree the job tested, read with Git where the command was invoked: testedTree when the subject's commit is the merge the CI built (GitHub refs/pull/<n>/merge at GITHUB_SHA, or a GitLab merged results or merge train pipeline at CI_COMMIT_SHA), else testedHeadTree; and baselineMergeBase, the merge base of the document's base and commit. A value Git cannot compute, as on a shallow clone, is left out with a warning naming the field and why."
+      "text": "The run carries under operational what the job tested, read with Git where the command was invoked: testedTree when the subject's commit is the merge the CI built (GitHub refs/pull/<n>/merge at GITHUB_SHA, a GitLab merged results or merge train pipeline at CI_COMMIT_SHA), else testedHeadTree; with it, baselineMergeBase of the document's base and commit. A value Git cannot compute is left out with a warning naming it and why. A run refused for its operational opens again without it."
     },
     {
       "id": "posts-the-reports-in-two-batches",
@@ -25,7 +25,7 @@
     },
     {
       "id": "refuses-what-it-cannot-upload",
-      "text": "Without PUTNAMI_CLOUD_TOKEN, with a document that does not parse or validate, or with a generic CI, it sends nothing and exits non-zero with a message that names the cause. A refused run or batch exits non-zero with the route and the server's reason, and never prints the token."
+      "text": "Without PUTNAMI_CLOUD_TOKEN, with a document that does not parse or validate, or with a generic CI, it sends nothing and exits non-zero with a message that names the cause. A refused run or batch exits non-zero with the route and the server's reason, and never prints the token; a run opened again without its operational counts as refused only when that call is refused too."
     }
   ]
 }
