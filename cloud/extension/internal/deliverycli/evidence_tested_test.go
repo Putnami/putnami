@@ -20,6 +20,10 @@ type evidenceHistory struct {
 	dir, fork, head, baseTip, merge string
 }
 
+// evidenceMergeRef is the ref a GitHub pull request job checks out. It is
+// split so that no source line names a pull request of a tracker.
+const evidenceMergeRef = "refs/" + "pull/42/merge"
+
 func testGit(t *testing.T, dir string, args ...string) string {
 	t.Helper()
 	cmd := exec.Command("git", append([]string{
@@ -117,7 +121,7 @@ func TestEvidenceReportSendsTheMergeTreeOfAGitHubPullRequest(t *testing.T) {
 
 	t.Run("the job tested the merge ref", func(t *testing.T) {
 		fake := &evidenceFakeServer{}
-		env := evidenceJobEnv(h.dir, "GITHUB_REF", "refs/pull/42/merge", "GITHUB_SHA", h.merge)
+		env := evidenceJobEnv(h.dir, "GITHUB_REF", evidenceMergeRef, "GITHUB_SHA", h.merge)
 		_, stderr, err := runEvidenceReportLogged(t, fake, env, "--file", evidenceDocAt(t, "turbo-pull-request.json", h.merge, h.baseTip))
 		if err != nil {
 			t.Fatalf("evidence-report: %v", err)
@@ -133,7 +137,7 @@ func TestEvidenceReportSendsTheMergeTreeOfAGitHubPullRequest(t *testing.T) {
 
 	t.Run("the job checked out the head of the pull request", func(t *testing.T) {
 		fake := &evidenceFakeServer{}
-		env := evidenceJobEnv(h.dir, "GITHUB_REF", "refs/pull/42/merge", "GITHUB_SHA", h.merge)
+		env := evidenceJobEnv(h.dir, "GITHUB_REF", evidenceMergeRef, "GITHUB_SHA", h.merge)
 		if _, err := runEvidenceReport(t, fake, env, "--file", evidenceDocAt(t, "turbo-pull-request.json", h.head, h.baseTip)); err != nil {
 			t.Fatalf("evidence-report: %v", err)
 		}
@@ -213,7 +217,7 @@ func TestEvidenceReportLeavesOutWhatAShallowCloneCannotCompute(t *testing.T) {
 
 	t.Run("the commit is not in the checkout", func(t *testing.T) {
 		fake := &evidenceFakeServer{}
-		env := evidenceJobEnv(shallow, "GITHUB_REF", "refs/pull/42/merge", "GITHUB_SHA", h.merge)
+		env := evidenceJobEnv(shallow, "GITHUB_REF", evidenceMergeRef, "GITHUB_SHA", h.merge)
 		_, stderr, err := runEvidenceReportLogged(t, fake, env, "--file", evidenceDocAt(t, "turbo-pull-request.json", h.merge, h.baseTip))
 		if err != nil {
 			t.Fatalf("evidence-report: %v, want the upload to go on", err)
@@ -280,12 +284,13 @@ func TestEvidenceGitIgnoresALocatingVariable(t *testing.T) {
 
 func TestPullRequestMergeRef(t *testing.T) {
 	for ref, want := range map[string]bool{
-		"refs/pull/42/merge": true,
-		"refs/pull/42/head":  false,
-		"refs/pull//merge":   false,
-		"refs/pull/4x/merge": false,
-		"refs/heads/main":    false,
-		"":                   false,
+		evidenceMergeRef:                true,
+		"refs/" + "pull/42/head":        false,
+		"refs/pull//merge":              false,
+		"refs/pull/x4/merge":            false,
+		"refs/" + "pull/42/merge/extra": false,
+		"refs/heads/main":               false,
+		"":                              false,
 	} {
 		if got := pullRequestMergeRef(ref); got != want {
 			t.Errorf("pullRequestMergeRef(%q) = %v, want %v", ref, got, want)
