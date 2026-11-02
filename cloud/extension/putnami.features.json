@@ -360,6 +360,21 @@
           }
         },
         {
+          "id": "sends-the-tested-tree",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-github-pull-request-sends-the-merge-tree",
+              "a-gitlab-merge-request-sends-the-head-tree-and-merge-base",
+              "a-shallow-clone-leaves-out-what-it-cannot-compute"
+            ]
+          }
+        },
+        {
           "id": "posts-the-reports-in-two-batches",
           "stage": "coded",
           "evidenceKinds": [
