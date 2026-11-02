@@ -73,18 +73,24 @@ func (s *evidenceFakeServer) paths() []string {
 
 func runEvidenceReport(t *testing.T, fake *evidenceFakeServer, env map[string]string, args ...string) (stdout string, err error) {
 	t.Helper()
+	stdout, _, err = runEvidenceReportLogged(t, fake, env, args...)
+	return stdout, err
+}
+
+func runEvidenceReportLogged(t *testing.T, fake *evidenceFakeServer, env map[string]string, args ...string) (stdout, stderr string, err error) {
+	t.Helper()
 	stubReportRetrySleep(t)
-	var out []string
+	var out, log []string
 	ioctx := clicore.IO{
 		Env:    env,
 		Stdout: func(line string) { out = append(out, line) },
-		Stderr: func(string) {},
+		Stderr: func(line string) { log = append(log, line) },
 		Client: &http.Client{Transport: fake},
 		Now:    func() time.Time { return time.Date(2026, 11, 3, 8, 0, 0, 0, time.UTC) },
 	}
 	params := clicore.MergeParams(clicore.ParseFlags(args))
 	err = EvidenceReport(params, env, ioctx)
-	return strings.Join(out, "\n"), err
+	return strings.Join(out, "\n"), strings.Join(log, "\n"), err
 }
 
 func evidenceEnv() map[string]string {

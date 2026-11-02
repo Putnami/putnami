@@ -9,6 +9,10 @@
 // and the dependency changes. The second batch rides apart because the route
 // refuses a body over 1 MiB whole. The bearer is the workspace token in
 // PUTNAMI_CLOUD_TOKEN; the workspace comes out of it, never out of the body.
+//
+// The run also names, under operational, the tree the job tested and the merge
+// base its diff started from. Only the job's checkout knows them, so the
+// command reads them with Git in the directory it was invoked from.
 package deliverycli
 
 import (
@@ -39,6 +43,18 @@ const maxEvidenceBytes = 64 << 20
 // evidenceStreamVersion names the source of a batch in its stream stats.
 const evidenceStreamVersion = "evidence/1"
 
+// evidenceInvocationDirEnv names the directory the command was invoked from.
+// The CLI sets it for an interactive extension command; Git reads the job's
+// checkout there, and in the working directory when it is unset.
+const evidenceInvocationDirEnv = "PUTNAMI_INVOCATION_DIR"
+
+// The operational members the command fills, as the records ingest names them.
+const (
+	evidenceTestedTree        = "testedTree"
+	evidenceTestedHeadTree    = "testedHeadTree"
+	evidenceBaselineMergeBase = "baselineMergeBase"
+)
+
 // evidenceSubmitRequest is the records ingest body of an external run. Its
 // keys are the delivery API's SubmitRequest keys.
 type evidenceSubmitRequest struct {
@@ -52,6 +68,16 @@ type evidenceSubmitRequest struct {
 	SubmissionID  string                 `json:"submissionId"`
 	Status        string                 `json:"status"`
 	Conclusion    string                 `json:"conclusion"`
+	Operational   *evidenceOperational   `json:"operational,omitempty"`
+}
+
+// evidenceOperational is the part of the run's operational metrics an observed
+// job knows. TestedTree and TestedHeadTree are exclusive: the first is the tree
+// of a merge the CI built, the second the tree of a commit as it was pushed.
+type evidenceOperational struct {
+	TestedTree        string `json:"testedTree,omitempty"`
+	TestedHeadTree    string `json:"testedHeadTree,omitempty"`
+	BaselineMergeBase string `json:"baselineMergeBase,omitempty"`
 }
 
 // evidenceChangeRequest is the provider-neutral pull or merge request.
@@ -121,6 +147,13 @@ func EvidenceReport(params map[string]any, env map[string]string, ioctx clicore.
 		return clicore.NewError(evidenceTokenEnv+" must contain exactly one bearer token", clicore.ExitAuth)
 	}
 	controlURL := clicore.ControlPlaneBaseURL(params, env, "")
+	var leftOut map[string]string
+	run.Operational, leftOut = evidenceTested(doc, env, clicore.EnvGet(env, evidenceInvocationDirEnv))
+	for _, field := range []string{evidenceTestedTree, evidenceTestedHeadTree, evidenceBaselineMergeBase} {
+		if reason, ok := leftOut[field]; ok {
+			ioctx.Stderr("warning: cloud evidence-report sends no " + field + ": " + reason)
+		}
+	}
 
 	resp, err := postReport(ioctx, controlURL, recordsIngestPath, token, run,
 		func(callCtx context.Context, api *deliveryapiclient.DeliveryClient, raw []byte) (*deliveryapiclient.SubmitResponse, error) {
@@ -165,6 +198,12 @@ func EvidenceReport(params map[string]any, env map[string]string, ioctx clicore.
 		"submission_id":  run.SubmissionID,
 		"stored":         stored,
 		"already_stored": already,
+	}
+	if run.Operational != nil {
+		result["operational"] = run.Operational
+	}
+	if len(leftOut) > 0 {
+		result["operational_left_out"] = leftOut
 	}
 	if len(failures) > 0 {
 		result["failed"] = failures
@@ -247,6 +286,90 @@ func evidenceRun(doc *evidence.Document) (evidenceSubmitRequest, error) {
 		}
 	}
 	return run, nil
+}
+
+// evidenceTested reads, with Git in dir, the tree the job tested and the merge
+// base of the document's base and commit. It returns nil when it knows
+// neither, and the reason of each member it leaves out, keyed by its name.
+func evidenceTested(doc *evidence.Document, env map[string]string, dir string) (*evidenceOperational, map[string]string) {
+	where := "the working directory"
+	if dir != "" {
+		where = dir
+	}
+	var operational evidenceOperational
+	leftOut := map[string]string{}
+	field := evidenceTestedHeadTree
+	if evidenceTestedMerge(doc, env) {
+		field = evidenceTestedTree
+	}
+	tree, err := runGit(dir, "rev-parse", "--verify", "--quiet", "--end-of-options", doc.Subject.SHA+"^{tree}")
+	switch {
+	case err != nil || tree == "":
+		leftOut[field] = fmt.Sprintf("the commit %s is not in the Git checkout of %s", shortSHA(doc.Subject.SHA), where)
+	case field == evidenceTestedTree:
+		operational.TestedTree = tree
+	default:
+		operational.TestedHeadTree = tree
+	}
+	switch base := doc.Subject.BaseSHA; {
+	case base == "":
+		leftOut[evidenceBaselineMergeBase] = "the document names no base for its change"
+	default:
+		mergeBase, err := runGit(dir, "merge-base", "--end-of-options", base, doc.Subject.SHA)
+		if err == nil && mergeBase != "" {
+			operational.BaselineMergeBase = mergeBase
+			break
+		}
+		reason := fmt.Sprintf("Git finds no merge base of %s and %s in the checkout of %s", shortSHA(base), shortSHA(doc.Subject.SHA), where)
+		if shallow, _ := runGit(dir, "rev-parse", "--is-shallow-repository"); shallow == "true" {
+			reason += ": the clone is shallow and does not reach it"
+		}
+		leftOut[evidenceBaselineMergeBase] = reason
+	}
+	if len(leftOut) == 0 {
+		leftOut = nil
+	}
+	if operational == (evidenceOperational{}) {
+		return nil, leftOut
+	}
+	return &operational, leftOut
+}
+
+// evidenceTestedMerge reports whether the document's commit is the merge the CI
+// built rather than a commit that was pushed: the merge ref of a GitHub pull
+// request, or the merge commit of a GitLab merged results or merge train
+// pipeline. The commit must be the one the CI names, so a job that checked out
+// another one tested that one as it was pushed.
+func evidenceTestedMerge(doc *evidence.Document, env map[string]string) bool {
+	switch doc.CI.System {
+	case evidence.CISystemGitHubActions:
+		return pullRequestMergeRef(clicore.EnvGet(env, "GITHUB_REF")) &&
+			strings.EqualFold(clicore.EnvGet(env, "GITHUB_SHA"), doc.Subject.SHA)
+	case evidence.CISystemGitLabCI:
+		switch clicore.EnvGet(env, "CI_MERGE_REQUEST_EVENT_TYPE") {
+		case "merged_result", "merge_train":
+			return strings.EqualFold(clicore.EnvGet(env, "CI_COMMIT_SHA"), doc.Subject.SHA)
+		}
+	}
+	return false
+}
+
+// pullRequestMergeRef reports whether ref is refs/pull/<n>/merge.
+func pullRequestMergeRef(ref string) bool {
+	number, ok := strings.CutPrefix(ref, "refs/pull/")
+	if !ok {
+		return false
+	}
+	number, ok = strings.CutSuffix(number, "/merge")
+	if !ok || number == "" {
+		return false
+	}
+	for _, c := range number {
+		if c < '0' || c > '9' {
+			return false
+		}
+	}
+	return true
 }
 
 // evidenceSubmissionID names the run after the CI job that observed it, so
