@@ -221,8 +221,8 @@ export function localizeRows<T extends { route: string; expandedPaths?: string[]
 /**
  * The page routes outside the localized set, once per other locale prefix:
  * `/fr/docs/intro` answers a 308 to `/docs/intro`, so the HTTP route
- * inventory lists it, with a catch-all's expanded paths. A redirect takes no
- * action.
+ * inventory lists it, with a catch-all's expanded paths like its own row. A
+ * redirect takes no action.
  */
 export function excludedRedirectRows(
   settings: LocaleSettings | undefined,

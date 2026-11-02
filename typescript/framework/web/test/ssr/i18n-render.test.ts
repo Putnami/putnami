@@ -361,6 +361,7 @@ describe('localized manifest rows', () => {
   it('lists the redirect of each excluded route under each other locale', () => {
     const rows = excludedRedirectRows(settings, [
       { route: '/pricing', evidencePath: 'src/app/pricing/page.tsx', hasAction: true },
+      { route: '/docs', evidencePath: 'src/app/docs/page.tsx', hasAction: false },
       {
         route: '/docs/*',
         evidencePath: 'src/app/docs/[...slug]/page.tsx',
@@ -369,6 +370,8 @@ describe('localized manifest rows', () => {
       },
     ]);
     expect(rows).toEqual([
+      { route: '/fr/docs', evidencePath: 'src/app/docs/page.tsx', hasAction: false },
+      { route: '/ar/docs', evidencePath: 'src/app/docs/page.tsx', hasAction: false },
       {
         route: '/fr/docs/*',
         evidencePath: 'src/app/docs/[...slug]/page.tsx',

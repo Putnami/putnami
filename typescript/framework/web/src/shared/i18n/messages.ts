@@ -121,7 +121,8 @@ function formatRich(nodes: IcuNode[], locale: string, values: Record<string, unk
  * Build the formatters of a namespace for a locale, outside React. A message
  * whose default text has tags formats to a React node, any other to a string.
  * Reading the tags parses every default text here, so an invalid one throws
- * for the whole namespace on first use; the build refuses it anyway.
+ * for the whole namespace on first use. The build of a project with an
+ * `i18n` block refuses an invalid default text before that.
  */
 export function translator<D extends Record<string, MessageDefinition>>(
   bundle: Messages<D>,
