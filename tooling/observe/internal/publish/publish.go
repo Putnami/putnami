@@ -1,6 +1,7 @@
 // Package publish posts what observe found on the pull request or merge
-// request its job ran for: a commit status on the request's head commit and
-// one summary note that the next run updates in place.
+// request its job ran for: a commit status, on the pull request's head commit
+// or on the commit of the merge request pipeline, and one summary note that
+// the next run updates in place.
 //
 // GitHub Actions publishes with GITHUB_TOKEN, GitLab CI with a project or
 // personal access token in PUTNAMI_GITLAB_TOKEN, because the GitLab job token
