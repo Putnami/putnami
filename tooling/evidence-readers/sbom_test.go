@@ -106,7 +106,8 @@ func TestAVulnerabilityGoesToTheComponentsItAffects(t *testing.T) {
   "specVersion": "1.5",
   "components": [
     {"name": "minimist", "version": "0.0.8", "purl": "pkg:npm/minimist@0.0.8"},
-    {"name": "minimist", "version": "1.2.8", "purl": "pkg:npm/minimist@1.2.8"}
+    {"name": "minimist", "version": "1.2.8", "purl": "pkg:npm/minimist@1.2.8"},
+    {"name": "minimist", "purl": "pkg:npm/minimist@0.0.8?source=lockfile"}
   ],
   "vulnerabilities": [
     {"id": "GHSA-exact", "affects": [{"ref": "pkg:npm/minimist", "versions": [{"version": "0.0.8", "status": "affected"}]}]},
@@ -124,6 +125,10 @@ func TestAVulnerabilityGoesToTheComponentsItAffects(t *testing.T) {
 		}
 		if got := vulnerabilityIDs(t, sbom, "minimist", "1.2.8"); !slices.Equal(got, []string{"GHSA-range unknown", "GHSA-unstated unknown"}) {
 			t.Errorf("minimist@1.2.8: %v", got)
+		}
+		// A component without a version takes the one of its package URL.
+		if got := vulnerabilityIDs(t, sbom, "minimist", ""); !slices.Equal(got, []string{"GHSA-exact unknown", "GHSA-range unknown", "GHSA-unaffected unknown", "GHSA-unstated unknown"}) {
+			t.Errorf("minimist without a version: %v", got)
 		}
 	})
 	purl, err := ParsePURL(sbom.Packages[1].PURL)

@@ -241,7 +241,11 @@ func affectedVersions(indexes []int, versions []cdxAffectedVersion, packages []P
 		}
 	}
 	return slices.DeleteFunc(slices.Clone(indexes), func(index int) bool {
-		version := strings.TrimPrefix(packages[index].Version, "v")
+		version := packages[index].Version
+		if purl, err := ParsePURL(packages[index].PURL); version == "" && err == nil {
+			version = purl.Version
+		}
+		version = strings.TrimPrefix(version, "v")
 		return unaffected[version] || (len(affected) > 0 && !ranged && !affected[version])
 	})
 }
