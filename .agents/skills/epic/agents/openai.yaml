@@ -1,0 +1,6 @@
+interface:
+  display_name: "Epic"
+  short_description: "Plan issues in waves and launch one build session per issue"
+  default_prompt: "Use $epic to plan this outcome as several issues and launch them in waves."
+policy:
+  allow_implicit_invocation: false

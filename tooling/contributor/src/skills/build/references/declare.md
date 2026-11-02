@@ -54,7 +54,8 @@ run notes, give each slice its goal, its done criteria tied to specs or
 tests, its proof command and its effort.
 
 One issue is one proposal, with no line or time cap. Work that needs several
-proposals is several issues, ordered in an epic.
+proposals is several issues, ordered in an epic the
+[epic](../../epic/SKILL.md) workflow plans and launches.
 
 A sensitive zone is one the project declares in its specification; a project
 that declares none has two: data migrations and the public API. State the

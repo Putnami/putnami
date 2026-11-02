@@ -23,11 +23,11 @@ const contributorExtension = "@putnami/contributor"
 
 // contributorSkills are the complete active entry-point inventory.
 var contributorSkills = []string{
-	"build", "spec", "design", "review", "check", "content-bump",
+	"build", "spec", "design", "review", "check", "epic", "content-bump",
 }
 
 var contributorRemovedSkills = []string{
-	"plan", "execute", "fix", "epic", "code-review", "fix-loop",
+	"plan", "execute", "fix", "code-review", "fix-loop",
 	"putnami-plan", "putnami-change", "putnami-check", "putnami-review",
 	"adr", "prototype",
 }
@@ -40,7 +40,7 @@ var contributorRemovedWorkers = []string{"fix-light", "epic-analyst"}
 
 // contributorExplicitOnly are the skills that never run on implicit selection:
 // they mutate shared state in bulk or only apply to a configured integration.
-var contributorExplicitOnly = []string{"content-bump"}
+var contributorExplicitOnly = []string{"epic", "content-bump"}
 
 func contributorRoot(t *testing.T) string {
 	t.Helper()
@@ -504,6 +504,45 @@ func TestContributorBuildLoopChecksDeclarationsBeforeThePush(t *testing.T) {
 	} {
 		if !strings.Contains(section, want) {
 			t.Errorf("the Intent first section of show.md lacks %q", want)
+		}
+	}
+}
+
+// TestContributorEpicLaunchesChildrenAndNeverCodes pins the epic workflow:
+// it checks its plan with epic plan, gets one approval, launches one build
+// session per issue in a local workspace, stacks a child on at most one ready
+// parent, follows the children with epic status, and never codes. Build
+// takes a child of an approved epic as approved, under the same stop rules.
+func TestContributorEpicLaunchesChildrenAndNeverCodes(t *testing.T) {
+	t.Parallel()
+	spectest.Proves(t, "cli/contributor-workflows", "epic-orchestration", "the-epic-skill-launches-children-and-never-codes")
+	result := buildContributorContent(t)
+	epic := strings.Join(strings.Fields(string(result.Files[".agents/skills/epic/SKILL.md"])), " ")
+	for _, want := range []string{
+		"It never codes, never commits to a child's branch and never merges.",
+		"`\"$PUTNAMI_CLI\" epic plan --epic <epic>`",
+		"`\"$PUTNAMI_CLI\" epic status --epic <epic>`",
+		"`local` is the only one",
+		"One approval covers every child",
+		"passes 150 % of its share, touches a sensitive zone its plan did not name, must change the approved design, or contradicts an ADR",
+		"exactly one dependency is not merged and that parent's proposal is ready for review",
+		"With two or more unmerged dependencies, the issue waits for their merges.",
+		"`.putnami/<epic>/launches.json`",
+		"Record it before the owner opens the session.",
+		"`git rebase --onto <base> <parent's last head>`",
+		"When the envelope is spent, launch nothing new.",
+	} {
+		if !strings.Contains(epic, want) {
+			t.Errorf("epic SKILL.md lacks %q", want)
+		}
+	}
+	build := strings.Join(strings.Fields(string(result.Files[".agents/skills/build/SKILL.md"])), " ")
+	for _, want := range []string{
+		"a child of an approved [epic]",
+		"passes 150 % of the envelope, touches a sensitive zone the plan did not name",
+	} {
+		if !strings.Contains(build, want) {
+			t.Errorf("build SKILL.md lacks %q", want)
 		}
 	}
 }

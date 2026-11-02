@@ -2,8 +2,11 @@
 
 ## Entry points
 
-The extension now installs `build`, `spec`, `design`, `review` and `check`. `build` owns the single shared implementation and evidence
-loop. `content-bump` remains a separately configured explicit-only utility.
+The extension now installs `build`, `spec`, `design`, `review`, `check` and
+`epic`. `build` owns the single shared implementation and evidence loop;
+`epic` plans several issues and launches one `build` session per issue, and
+never codes. `epic` and `content-bump`, a separately configured utility, are
+explicit-only.
 This is an owner-authorized breaking change in the current pre-1.0 line.
 
 | Before | Now | Status |
@@ -15,7 +18,7 @@ This is an owner-authorized breaking change in the current pre-1.0 line.
 | `execute` | `build` for the one implementation, review and evidence loop | Removed; no inherited external authority |
 | `plan` | `build` for outcome mapping and a precise next cycle | Removed; no implicit task creation |
 | `fix` | `build <named-task>` under an explicit task mandate | Removed; no implicit backlog selection or claim |
-| `epic` | `build` with coordinated delivery units and milestones | Removed; no separate epic controller |
+| `epic` | `epic` plans issues in waves under one envelope and launches one `build` session per issue | Replaced, explicit-only; it never codes |
 | `code-review` | `review` for an independent candidate review | Removed; publication requires separate explicit authority |
 | `putnami-plan`, `putnami-change`, `putnami-check`, `putnami-review` | Canonical intervention named above | Removed; no alias invocation |
 | `fix-loop` | No automatic batch successor | Removed |

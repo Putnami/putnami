@@ -33,6 +33,8 @@ jq '.options["@putnami/contributor"] // {}' putnami.workspace.json
 | `publication.bodyMaxBytes` | none | change finalize | Largest proposal body the command publishes; the body becomes the squash commit message. Absent, only the contract's 65536 bytes apply. |
 | `publication.taskReference` | none | change finalize | Line that links a complete outcome's proposal to its task, with `{id}` replaced by the task reference id (for example a closing keyword the provider understands). The command adds it to the commit message and proposal body only for normal delivery; `--partial-delivery` uses a non-closing parent reference and skips the delivered transition. |
 | `estimate` | the committed table | change estimate | Coefficients that size a change plan: `files` buckets, `endpointFiles`, `screenFiles` and `sizeMinutes`. Each member set replaces the default one whole. |
+| `epic.sessions` | `3` | epic | Child sessions an epic plan's envelope runs at once, 1 to 20. |
+| `epic.launch` | `local` | epic | Launch target of an epic's children. `local`, a local workspace the owner opens, is the only target. |
 | `integrations.contentBump` | none | content-bump | `{"lock", "command", "projects", "reference"}` of a pinned-content lock the `content-bump` workflow refreshes. Without it, that workflow reports that it is not configured. |
 
 Stored `tasks.backlog`, `tasks.filters`, `tasks.rank` and `tasks.planLabels`

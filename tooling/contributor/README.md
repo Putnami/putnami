@@ -48,9 +48,10 @@ state the repository's conventions in its [policy](doc/02-repository-policy.md).
 | `design` | Resolve a material technical choice, with a bounded prototype or an ADR when it needs one | implicit |
 | `review` | Independently challenge a material artifact or frozen candidate | implicit |
 | `check` | Run the gate, applicable local proof, the documentation audit and the language rule | implicit |
+| `epic` | Plan several issues in waves under one envelope and launch one `build` session per issue, without coding | explicit only |
 | `content-bump` | Refresh a pinned-content lock the policy declares | explicit only |
 
-The former `plan`, `execute`, `fix`, `epic`, `code-review`, `adr`,
+The former `plan`, `execute`, `fix`, `code-review`, `adr`,
 `prototype`, four `putnami-*` aliases and `fix-loop` entries are removed. This intentional breaking change
 is documented in the [migration guide](doc/03-entry-point-migration.md).
 `build` handles named tasks and coordinated units only within its mandate;
