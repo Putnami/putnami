@@ -27,7 +27,10 @@ oci-server, put-server, runtime-api and source-api.
 | File layout | `docs/cloud-cli-schema/services/<service>/openapi.json` |
 
 Each `<service>/schema/openapi.json` is a byte-for-byte copy of the package
-file.
+file, except `delivery-api`. Its copy comes from the Cloud schema source at
+commit `cbfc1d82576c7dfc8359a4e441575e37f01296bc`, ahead of the next `canary`
+publish, for the `changeRequest` of a delivery run. The next schema update
+replaces it with the package file.
 
 ## Update the schemas
 
