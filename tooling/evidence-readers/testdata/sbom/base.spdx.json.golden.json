@@ -1,0 +1,22 @@
+{
+  "format": "spdx",
+  "specVersion": "2.3",
+  "packages": [
+    {
+      "name": "lodash",
+      "version": "4.17.20",
+      "purl": "pkg:npm/lodash@4.17.20?source=PUBLIC_REGISTRY",
+      "licenses": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "minimist",
+      "version": "1.2.5",
+      "purl": "pkg:npm/minimist@1.2.5?source=PUBLIC_REGISTRY",
+      "licenses": [
+        "MIT"
+      ]
+    }
+  ]
+}

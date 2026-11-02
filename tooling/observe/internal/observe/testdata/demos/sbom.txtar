@@ -1,0 +1,792 @@
+The sbom demo: a Node package that upgrades lodash, drops minimist and adds zod, and the SBOMs osv-scanner 2.7.0 wrote for its base and its head (see tooling/evidence-readers/testdata/SOURCES.md).
+-- base/package.json --
+{
+  "name": "demo",
+  "version": "1.0.0",
+  "dependencies": {"lodash": "4.17.20", "minimist": "1.2.5"}
+}
+-- base/package-lock.json --
+{
+  "name": "demo",
+  "version": "1.0.0",
+  "lockfileVersion": 3,
+  "requires": true,
+  "packages": {
+    "": {"name": "demo", "version": "1.0.0", "dependencies": {"lodash": "4.17.20", "minimist": "1.2.5"}},
+    "node_modules/lodash": {"version": "4.17.20", "resolved": "https://registry.npmjs.org/lodash/-/lodash-4.17.20.tgz", "license": "MIT"},
+    "node_modules/minimist": {"version": "1.2.5", "resolved": "https://registry.npmjs.org/minimist/-/minimist-1.2.5.tgz", "license": "MIT"}
+  }
+}
+-- head/package.json --
+{
+  "name": "demo",
+  "version": "1.0.0",
+  "dependencies": {"lodash": "4.17.21", "zod": "3.23.8"}
+}
+-- head/package-lock.json --
+{
+  "name": "demo",
+  "version": "1.0.0",
+  "lockfileVersion": 3,
+  "requires": true,
+  "packages": {
+    "": {"name": "demo", "version": "1.0.0", "dependencies": {"lodash": "4.17.21", "zod": "3.23.8"}},
+    "node_modules/lodash": {"version": "4.17.21", "resolved": "https://registry.npmjs.org/lodash/-/lodash-4.17.21.tgz", "license": "MIT"},
+    "node_modules/zod": {"version": "3.23.8", "resolved": "https://registry.npmjs.org/zod/-/zod-3.23.8.tgz", "license": "MIT"}
+  }
+}
+-- sbom/base.cdx.json --
+{
+  "$schema": "http://cyclonedx.org/schema/bom-1.5.schema.json",
+  "bomFormat": "CycloneDX",
+  "specVersion": "1.5",
+  "version": 1,
+  "components": [
+    {
+      "bom-ref": "pkg:npm/lodash@4.17.20",
+      "type": "library",
+      "name": "lodash",
+      "version": "4.17.20",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "purl": "pkg:npm/lodash@4.17.20"
+    },
+    {
+      "bom-ref": "pkg:npm/minimist@1.2.5",
+      "type": "library",
+      "name": "minimist",
+      "version": "1.2.5",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "purl": "pkg:npm/minimist@1.2.5"
+    }
+  ],
+  "vulnerabilities": [
+    {
+      "id": "GHSA-29mw-wpgm-hmr9",
+      "references": [
+        {
+          "id": "CVE-2020-28500",
+          "source": {}
+        }
+      ],
+      "ratings": [
+        {
+          "score": 5.3,
+          "severity": "medium",
+          "method": "CVSSv3",
+          "vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:L"
+        }
+      ],
+      "description": "Regular Expression Denial of Service (ReDoS) in lodash",
+      "detail": "All versions of package lodash prior to 4.17.21 are vulnerable to Regular Expression Denial of Service (ReDoS) via the `toNumber`, `trim` and `trimEnd` functions. \n\nSteps to reproduce (provided by reporter Liyuan Chen):\n```js\nvar lo = require('lodash');\n\nfunction build_blank(n) {\n    var ret = \"1\"\n    for (var i = 0; i \u003c n; i++) {\n        ret += \" \"\n    }\n    return ret + \"1\";\n}\nvar s = build_blank(50000) var time0 = Date.now();\nlo.trim(s) \nvar time_cost0 = Date.now() - time0;\nconsole.log(\"time_cost0: \" + time_cost0);\nvar time1 = Date.now();\nlo.toNumber(s) var time_cost1 = Date.now() - time1;\nconsole.log(\"time_cost1: \" + time_cost1);\nvar time2 = Date.now();\nlo.trimEnd(s);\nvar time_cost2 = Date.now() - time2;\nconsole.log(\"time_cost2: \" + time_cost2);\n```",
+      "advisories": [
+        {
+          "url": "https://nvd.nist.gov/vuln/detail/CVE-2020-28500"
+        }
+      ],
+      "published": "2022-01-06T20:30:46Z",
+      "updated": "2025-09-29T21:12:31Z",
+      "credits": {
+        "organizations": []
+      },
+      "affects": [
+        {
+          "ref": "pkg:npm/lodash"
+        },
+        {
+          "ref": "pkg:npm/lodash-es"
+        },
+        {
+          "ref": "pkg:npm/lodash.trimend"
+        },
+        {
+          "ref": "pkg:npm/lodash.trim"
+        },
+        {
+          "ref": "pkg:gem/lodash-rails"
+        }
+      ]
+    },
+    {
+      "id": "GHSA-35jh-r3h4-6jhm",
+      "references": [
+        {
+          "id": "CVE-2021-23337",
+          "source": {}
+        }
+      ],
+      "ratings": [
+        {
+          "score": 7.2,
+          "severity": "high",
+          "method": "CVSSv3",
+          "vector": "CVSS:3.1/AV:N/AC:L/PR:H/UI:N/S:U/C:H/I:H/A:H"
+        }
+      ],
+      "description": "Command Injection in lodash",
+      "detail": "`lodash` versions prior to 4.17.21 are vulnerable to Command Injection via the template function.",
+      "advisories": [
+        {
+          "url": "https://nvd.nist.gov/vuln/detail/CVE-2021-23337"
+        }
+      ],
+      "published": "2021-05-06T16:05:51Z",
+      "updated": "2026-10-17T02:55:38Z",
+      "credits": {
+        "organizations": []
+      },
+      "affects": [
+        {
+          "ref": "pkg:npm/lodash"
+        },
+        {
+          "ref": "pkg:npm/lodash-es"
+        },
+        {
+          "ref": "pkg:npm/lodash.template"
+        },
+        {
+          "ref": "pkg:npm/lodash-template"
+        },
+        {
+          "ref": "pkg:gem/lodash-rails"
+        }
+      ]
+    },
+    {
+      "id": "GHSA-f23m-r3pf-42rh",
+      "references": [
+        {
+          "id": "CVE-2026-2950",
+          "source": {}
+        }
+      ],
+      "ratings": [
+        {
+          "score": 6.5,
+          "severity": "medium",
+          "method": "CVSSv3",
+          "vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:L/A:L"
+        }
+      ],
+      "description": "lodash vulnerable to Prototype Pollution via array path bypass in `_.unset` and `_.omit`",
+      "detail": "### Impact\n\nLodash versions 4.17.23 and earlier are vulnerable to prototype pollution in the `_.unset` and `_.omit` functions. The fix for [CVE-2025-13465](https://github.com/lodash/lodash/security/advisories/GHSA-xxjr-mmjv-4gpg) only guards against string key members, so an attacker can bypass the check by passing array-wrapped path segments. This allows deletion of properties from built-in prototypes such as `Object.prototype`, `Number.prototype`, and `String.prototype`.\n\nThe issue permits deletion of prototype properties but does not allow overwriting their original behavior.\n\n### Patches\n\nThis issue is patched in 4.18.0.\n\n### Workarounds\n\nNone. Upgrade to the patched version.",
+      "advisories": [
+        {
+          "url": "https://nvd.nist.gov/vuln/detail/CVE-2026-2950"
+        }
+      ],
+      "published": "2026-04-01T23:50:27Z",
+      "updated": "2026-10-17T02:56:13Z",
+      "credits": {
+        "organizations": []
+      },
+      "affects": [
+        {
+          "ref": "pkg:npm/lodash"
+        },
+        {
+          "ref": "pkg:npm/lodash-es"
+        },
+        {
+          "ref": "pkg:npm/lodash-amd"
+        },
+        {
+          "ref": "pkg:npm/lodash.unset"
+        }
+      ]
+    },
+    {
+      "id": "GHSA-r5fr-rjxr-66jc",
+      "references": [
+        {
+          "id": "CVE-2026-4800",
+          "source": {}
+        }
+      ],
+      "ratings": [
+        {
+          "score": 8.1,
+          "severity": "high",
+          "method": "CVSSv3",
+          "vector": "CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:U/C:H/I:H/A:H"
+        }
+      ],
+      "description": "lodash vulnerable to Code Injection via `_.template` imports key names",
+      "detail": "### Impact\n\nThe fix for [CVE-2021-23337](https://github.com/advisories/GHSA-35jh-r3h4-6jhm) added validation for the `variable` option in `_.template` but did not apply the same validation to `options.imports` key names. Both paths flow into the same `Function()` constructor sink.\n\nWhen an application passes untrusted input as `options.imports` key names, an attacker can inject default-parameter expressions that execute arbitrary code at template compilation time.\n\nAdditionally, `_.template` uses `assignInWith` to merge imports, which enumerates inherited properties via `for..in`. If `Object.prototype` has been polluted by any other vector, the polluted keys are copied into the imports object and passed to `Function()`.\n\n### Patches\n\nUsers should upgrade to version 4.18.0.\n\nThe fix applies two changes:\n1. Validate `importsKeys` against the existing `reForbiddenIdentifierChars` regex (same check already used for the `variable` option)\n2. Replace `assignInWith` with `assignWith` when merging imports, so only own properties are enumerated\n\n### Workarounds\n\nDo not pass untrusted input as key names in `options.imports`. Only use developer-controlled, static key names.",
+      "advisories": [
+        {
+          "url": "https://nvd.nist.gov/vuln/detail/CVE-2026-4800"
+        },
+        {
+          "url": "https://github.com/advisories/GHSA-35jh-r3h4-6jhm"
+        }
+      ],
+      "published": "2026-04-01T23:51:12Z",
+      "updated": "2026-10-17T02:56:15Z",
+      "credits": {
+        "organizations": []
+      },
+      "affects": [
+        {
+          "ref": "pkg:npm/lodash"
+        },
+        {
+          "ref": "pkg:npm/lodash-es"
+        },
+        {
+          "ref": "pkg:npm/lodash-amd"
+        },
+        {
+          "ref": "pkg:npm/lodash.template"
+        }
+      ]
+    },
+    {
+      "id": "GHSA-xvch-5gv4-984h",
+      "references": [
+        {
+          "id": "CVE-2021-44906",
+          "source": {}
+        }
+      ],
+      "ratings": [
+        {
+          "score": 9.8,
+          "severity": "critical",
+          "method": "CVSSv3",
+          "vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H"
+        }
+      ],
+      "description": "Prototype Pollution in minimist",
+      "detail": "Minimist prior to 1.2.6 and 0.2.4 is vulnerable to Prototype Pollution via file `index.js`, function `setKey()` (lines 69-95).",
+      "advisories": [
+        {
+          "url": "https://nvd.nist.gov/vuln/detail/CVE-2021-44906"
+        }
+      ],
+      "published": "2022-03-18T00:01:09Z",
+      "updated": "2026-03-13T22:11:59Z",
+      "credits": {
+        "organizations": []
+      },
+      "affects": [
+        {
+          "ref": "pkg:npm/minimist"
+        }
+      ]
+    },
+    {
+      "id": "GHSA-xxjr-mmjv-4gpg",
+      "references": [
+        {
+          "id": "CVE-2025-13465",
+          "source": {}
+        }
+      ],
+      "ratings": [
+        {
+          "score": 6.5,
+          "severity": "medium",
+          "method": "CVSSv3",
+          "vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:L/A:L"
+        },
+        {
+          "score": 6.9,
+          "severity": "medium",
+          "method": "CVSSv4",
+          "vector": "CVSS:4.0/AV:N/AC:L/AT:N/PR:N/UI:N/VC:N/VI:L/VA:L/SC:H/SI:H/SA:H/E:P"
+        }
+      ],
+      "description": "Lodash has Prototype Pollution Vulnerability in `_.unset` and `_.omit` functions",
+      "detail": "### Impact\n\nLodash versions 4.0.0 through 4.17.22 are vulnerable to prototype pollution in the `_.unset` and `_.omit` functions. An attacker can pass crafted paths which cause Lodash to delete methods from global prototypes. \n\nThe issue permits deletion of properties but does not allow overwriting their original behavior.  \n\n### Patches\n\nThis issue is patched on 4.17.23.",
+      "advisories": [
+        {
+          "url": "https://nvd.nist.gov/vuln/detail/CVE-2025-13465"
+        }
+      ],
+      "published": "2026-01-21T23:01:22Z",
+      "updated": "2026-10-17T02:55:54Z",
+      "credits": {
+        "organizations": []
+      },
+      "affects": [
+        {
+          "ref": "pkg:npm/lodash"
+        },
+        {
+          "ref": "pkg:npm/lodash.unset"
+        },
+        {
+          "ref": "pkg:npm/lodash-es"
+        },
+        {
+          "ref": "pkg:npm/lodash-amd"
+        }
+      ]
+    }
+  ]
+}
+-- sbom/head.cdx.json --
+{
+  "$schema": "http://cyclonedx.org/schema/bom-1.5.schema.json",
+  "bomFormat": "CycloneDX",
+  "specVersion": "1.5",
+  "version": 1,
+  "components": [
+    {
+      "bom-ref": "pkg:npm/lodash@4.17.21",
+      "type": "library",
+      "name": "lodash",
+      "version": "4.17.21",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "purl": "pkg:npm/lodash@4.17.21"
+    },
+    {
+      "bom-ref": "pkg:npm/zod@3.23.8",
+      "type": "library",
+      "name": "zod",
+      "version": "3.23.8",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "purl": "pkg:npm/zod@3.23.8"
+    }
+  ],
+  "vulnerabilities": [
+    {
+      "id": "GHSA-f23m-r3pf-42rh",
+      "references": [
+        {
+          "id": "CVE-2026-2950",
+          "source": {}
+        }
+      ],
+      "ratings": [
+        {
+          "score": 6.5,
+          "severity": "medium",
+          "method": "CVSSv3",
+          "vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:L/A:L"
+        }
+      ],
+      "description": "lodash vulnerable to Prototype Pollution via array path bypass in `_.unset` and `_.omit`",
+      "detail": "### Impact\n\nLodash versions 4.17.23 and earlier are vulnerable to prototype pollution in the `_.unset` and `_.omit` functions. The fix for [CVE-2025-13465](https://github.com/lodash/lodash/security/advisories/GHSA-xxjr-mmjv-4gpg) only guards against string key members, so an attacker can bypass the check by passing array-wrapped path segments. This allows deletion of properties from built-in prototypes such as `Object.prototype`, `Number.prototype`, and `String.prototype`.\n\nThe issue permits deletion of prototype properties but does not allow overwriting their original behavior.\n\n### Patches\n\nThis issue is patched in 4.18.0.\n\n### Workarounds\n\nNone. Upgrade to the patched version.",
+      "advisories": [
+        {
+          "url": "https://nvd.nist.gov/vuln/detail/CVE-2026-2950"
+        }
+      ],
+      "published": "2026-04-01T23:50:27Z",
+      "updated": "2026-10-17T02:56:13Z",
+      "credits": {
+        "organizations": []
+      },
+      "affects": [
+        {
+          "ref": "pkg:npm/lodash"
+        },
+        {
+          "ref": "pkg:npm/lodash-es"
+        },
+        {
+          "ref": "pkg:npm/lodash-amd"
+        },
+        {
+          "ref": "pkg:npm/lodash.unset"
+        }
+      ]
+    },
+    {
+      "id": "GHSA-mrhx-c7xc-m3w5",
+      "references": [
+        {
+          "id": "CVE-2023-54404",
+          "source": {}
+        }
+      ],
+      "ratings": [
+        {
+          "score": 7.5,
+          "severity": "high",
+          "method": "CVSSv3",
+          "vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:H"
+        },
+        {
+          "score": 8.2,
+          "severity": "high",
+          "method": "CVSSv4",
+          "vector": "CVSS:4.0/AV:N/AC:L/AT:P/PR:N/UI:N/VC:N/VI:N/VA:H/SC:N/SI:N/SA:N"
+        }
+      ],
+      "description": "Zod can exhaust memory while validating oversized constrained collections",
+      "detail": "Zod schema-validation library through 4.6.5 contains an uncontrolled resource consumption vulnerability that allows attackers to exhaust memory by submitting a large array to an application using an array schema without a length constraint. Attackers can exploit the handleArrayResult parse logic in $ZodArray, which accumulates every validation issue for each failing element with no cap or early termination, causing the process to allocate excessive issue objects and crash due to out-of-memory conditions.",
+      "advisories": [
+        {
+          "url": "https://nvd.nist.gov/vuln/detail/CVE-2023-54404"
+        }
+      ],
+      "published": "2026-10-01T18:32:46Z",
+      "updated": "2026-10-23T18:30:09Z",
+      "credits": {
+        "organizations": []
+      },
+      "affects": [
+        {
+          "ref": "pkg:npm/zod"
+        }
+      ]
+    },
+    {
+      "id": "GHSA-r5fr-rjxr-66jc",
+      "references": [
+        {
+          "id": "CVE-2026-4800",
+          "source": {}
+        }
+      ],
+      "ratings": [
+        {
+          "score": 8.1,
+          "severity": "high",
+          "method": "CVSSv3",
+          "vector": "CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:U/C:H/I:H/A:H"
+        }
+      ],
+      "description": "lodash vulnerable to Code Injection via `_.template` imports key names",
+      "detail": "### Impact\n\nThe fix for [CVE-2021-23337](https://github.com/advisories/GHSA-35jh-r3h4-6jhm) added validation for the `variable` option in `_.template` but did not apply the same validation to `options.imports` key names. Both paths flow into the same `Function()` constructor sink.\n\nWhen an application passes untrusted input as `options.imports` key names, an attacker can inject default-parameter expressions that execute arbitrary code at template compilation time.\n\nAdditionally, `_.template` uses `assignInWith` to merge imports, which enumerates inherited properties via `for..in`. If `Object.prototype` has been polluted by any other vector, the polluted keys are copied into the imports object and passed to `Function()`.\n\n### Patches\n\nUsers should upgrade to version 4.18.0.\n\nThe fix applies two changes:\n1. Validate `importsKeys` against the existing `reForbiddenIdentifierChars` regex (same check already used for the `variable` option)\n2. Replace `assignInWith` with `assignWith` when merging imports, so only own properties are enumerated\n\n### Workarounds\n\nDo not pass untrusted input as key names in `options.imports`. Only use developer-controlled, static key names.",
+      "advisories": [
+        {
+          "url": "https://nvd.nist.gov/vuln/detail/CVE-2026-4800"
+        },
+        {
+          "url": "https://github.com/advisories/GHSA-35jh-r3h4-6jhm"
+        }
+      ],
+      "published": "2026-04-01T23:51:12Z",
+      "updated": "2026-10-17T02:56:15Z",
+      "credits": {
+        "organizations": []
+      },
+      "affects": [
+        {
+          "ref": "pkg:npm/lodash"
+        },
+        {
+          "ref": "pkg:npm/lodash-es"
+        },
+        {
+          "ref": "pkg:npm/lodash-amd"
+        },
+        {
+          "ref": "pkg:npm/lodash.template"
+        }
+      ]
+    },
+    {
+      "id": "GHSA-xxjr-mmjv-4gpg",
+      "references": [
+        {
+          "id": "CVE-2025-13465",
+          "source": {}
+        }
+      ],
+      "ratings": [
+        {
+          "score": 6.5,
+          "severity": "medium",
+          "method": "CVSSv3",
+          "vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:L/A:L"
+        },
+        {
+          "score": 6.9,
+          "severity": "medium",
+          "method": "CVSSv4",
+          "vector": "CVSS:4.0/AV:N/AC:L/AT:N/PR:N/UI:N/VC:N/VI:L/VA:L/SC:H/SI:H/SA:H/E:P"
+        }
+      ],
+      "description": "Lodash has Prototype Pollution Vulnerability in `_.unset` and `_.omit` functions",
+      "detail": "### Impact\n\nLodash versions 4.0.0 through 4.17.22 are vulnerable to prototype pollution in the `_.unset` and `_.omit` functions. An attacker can pass crafted paths which cause Lodash to delete methods from global prototypes. \n\nThe issue permits deletion of properties but does not allow overwriting their original behavior.  \n\n### Patches\n\nThis issue is patched on 4.17.23.",
+      "advisories": [
+        {
+          "url": "https://nvd.nist.gov/vuln/detail/CVE-2025-13465"
+        }
+      ],
+      "published": "2026-01-21T23:01:22Z",
+      "updated": "2026-10-17T02:55:54Z",
+      "credits": {
+        "organizations": []
+      },
+      "affects": [
+        {
+          "ref": "pkg:npm/lodash"
+        },
+        {
+          "ref": "pkg:npm/lodash.unset"
+        },
+        {
+          "ref": "pkg:npm/lodash-es"
+        },
+        {
+          "ref": "pkg:npm/lodash-amd"
+        }
+      ]
+    }
+  ]
+}
+-- sbom/base.spdx.json --
+{
+  "spdxVersion": "SPDX-2.3",
+  "dataLicense": "CC0-1.0",
+  "SPDXID": "SPDXRef-DOCUMENT",
+  "name": "SCALIBR-generated SPDX",
+  "documentNamespace": "https://spdx.google/9572c98c-271d-4487-bd9a-f11bfbdde3ac",
+  "creationInfo": {
+    "creators": [
+      "Tool: SCALIBR"
+    ],
+    "created": "2026-11-02T08:42:35Z"
+  },
+  "packages": [
+    {
+      "name": "main",
+      "SPDXID": "SPDXRef-Package-main-62922412-c2b3-4226-b40e-93542423bf0b",
+      "versionInfo": "0",
+      "supplier": "NOASSERTION",
+      "downloadLocation": "NOASSERTION",
+      "filesAnalyzed": false
+    },
+    {
+      "name": "lodash",
+      "SPDXID": "SPDXRef-Package-lodash-03fda0d9-aaa9-4d91-8d4a-5ebd1d4170c4",
+      "versionInfo": "4.17.20",
+      "supplier": "NOASSERTION",
+      "downloadLocation": "NOASSERTION",
+      "filesAnalyzed": false,
+      "sourceInfo": "Identified by the javascript/packagelockjson extractor from src/package-lock.json",
+      "licenseConcluded": "MIT",
+      "licenseDeclared": "NOASSERTION",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceType": "purl",
+          "referenceLocator": "pkg:npm/lodash@4.17.20?source=PUBLIC_REGISTRY"
+        }
+      ]
+    },
+    {
+      "name": "minimist",
+      "SPDXID": "SPDXRef-Package-minimist-9e817101-2987-4263-b904-c288a4c29265",
+      "versionInfo": "1.2.5",
+      "supplier": "NOASSERTION",
+      "downloadLocation": "NOASSERTION",
+      "filesAnalyzed": false,
+      "sourceInfo": "Identified by the javascript/packagelockjson extractor from src/package-lock.json",
+      "licenseConcluded": "MIT",
+      "licenseDeclared": "NOASSERTION",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceType": "purl",
+          "referenceLocator": "pkg:npm/minimist@1.2.5?source=PUBLIC_REGISTRY"
+        }
+      ]
+    }
+  ],
+  "files": [
+    {
+      "fileName": "src/package-lock.json",
+      "SPDXID": "SPDXRef-File-src-package-lock.json-998cefe6",
+      "checksums": [
+        {
+          "algorithm": "SHA256",
+          "checksumValue": "917c3dd254d022d0ba9e9264d8842b5962bdff40be20ff51f14b0cb6b228afcd"
+        }
+      ],
+      "copyrightText": "NOASSERTION"
+    }
+  ],
+  "relationships": [
+    {
+      "spdxElementId": "SPDXRef-DOCUMENT",
+      "relatedSpdxElement": "SPDXRef-Package-main-62922412-c2b3-4226-b40e-93542423bf0b",
+      "relationshipType": "DESCRIBES"
+    },
+    {
+      "spdxElementId": "SPDXRef-Package-main-62922412-c2b3-4226-b40e-93542423bf0b",
+      "relatedSpdxElement": "SPDXRef-Package-lodash-03fda0d9-aaa9-4d91-8d4a-5ebd1d4170c4",
+      "relationshipType": "CONTAINS"
+    },
+    {
+      "spdxElementId": "SPDXRef-Package-lodash-03fda0d9-aaa9-4d91-8d4a-5ebd1d4170c4",
+      "relatedSpdxElement": "NOASSERTION",
+      "relationshipType": "CONTAINS"
+    },
+    {
+      "spdxElementId": "SPDXRef-File-src-package-lock.json-998cefe6",
+      "relatedSpdxElement": "SPDXRef-Package-lodash-03fda0d9-aaa9-4d91-8d4a-5ebd1d4170c4",
+      "relationshipType": "DEPENDENCY_MANIFEST_OF"
+    },
+    {
+      "spdxElementId": "SPDXRef-Package-main-62922412-c2b3-4226-b40e-93542423bf0b",
+      "relatedSpdxElement": "SPDXRef-Package-minimist-9e817101-2987-4263-b904-c288a4c29265",
+      "relationshipType": "CONTAINS"
+    },
+    {
+      "spdxElementId": "SPDXRef-Package-minimist-9e817101-2987-4263-b904-c288a4c29265",
+      "relatedSpdxElement": "NOASSERTION",
+      "relationshipType": "CONTAINS"
+    },
+    {
+      "spdxElementId": "SPDXRef-File-src-package-lock.json-998cefe6",
+      "relatedSpdxElement": "SPDXRef-Package-minimist-9e817101-2987-4263-b904-c288a4c29265",
+      "relationshipType": "DEPENDENCY_MANIFEST_OF"
+    }
+  ]
+}
+-- sbom/head-advisories.spdx.json --
+{
+  "spdxVersion": "SPDX-2.3",
+  "dataLicense": "CC0-1.0",
+  "SPDXID": "SPDXRef-DOCUMENT",
+  "name": "SCALIBR-generated SPDX",
+  "documentNamespace": "https://spdx.google/985576b7-4d89-4f4a-9899-fe28e4526105",
+  "creationInfo": {
+    "creators": [
+      "Tool: SCALIBR"
+    ],
+    "created": "2026-11-02T08:42:47Z"
+  },
+  "packages": [
+    {
+      "name": "main",
+      "SPDXID": "SPDXRef-Package-main-246fb886-db53-45c0-a9e6-a320a8cd5f3c",
+      "versionInfo": "0",
+      "supplier": "NOASSERTION",
+      "downloadLocation": "NOASSERTION",
+      "filesAnalyzed": false
+    },
+    {
+      "name": "lodash",
+      "SPDXID": "SPDXRef-Package-lodash-d8e8797f-1c92-48f3-81fc-45f5bfa5d007",
+      "versionInfo": "4.17.21",
+      "supplier": "NOASSERTION",
+      "downloadLocation": "NOASSERTION",
+      "filesAnalyzed": false,
+      "sourceInfo": "Identified by the javascript/packagelockjson extractor from src/package-lock.json",
+      "licenseConcluded": "MIT",
+      "licenseDeclared": "NOASSERTION",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceType": "purl",
+          "referenceLocator": "pkg:npm/lodash@4.17.21?source=PUBLIC_REGISTRY"
+        },
+        {
+          "referenceCategory": "SECURITY",
+          "referenceType": "advisory",
+          "referenceLocator": "https://github.com/advisories/GHSA-f23m-r3pf-42rh"
+        },
+        {
+          "referenceCategory": "SECURITY",
+          "referenceType": "cpe23Type",
+          "referenceLocator": "cpe:2.3:a:lodash:lodash:4.17.21:*:*:*:*:node.js:*:*"
+        }
+      ]
+    },
+    {
+      "name": "zod",
+      "SPDXID": "SPDXRef-Package-zod-21b38894-23e7-4312-afb1-d22dcc7102b8",
+      "versionInfo": "3.23.8",
+      "supplier": "NOASSERTION",
+      "downloadLocation": "NOASSERTION",
+      "filesAnalyzed": false,
+      "sourceInfo": "Identified by the javascript/packagelockjson extractor from src/package-lock.json",
+      "licenseConcluded": "MIT",
+      "licenseDeclared": "NOASSERTION",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceType": "purl",
+          "referenceLocator": "pkg:npm/zod@3.23.8?source=PUBLIC_REGISTRY"
+        },
+        {
+          "referenceCategory": "SECURITY",
+          "referenceType": "advisory",
+          "referenceLocator": "https://osv.dev/vulnerability/GHSA-mrhx-c7xc-m3w5"
+        }
+      ]
+    }
+  ],
+  "files": [
+    {
+      "fileName": "src/package-lock.json",
+      "SPDXID": "SPDXRef-File-src-package-lock.json-998cefe6",
+      "checksums": [
+        {
+          "algorithm": "SHA256",
+          "checksumValue": "48bdaafad48c9c26efe87fe9f01a8e33c2891f7f3581cdca270d058610c6a188"
+        }
+      ],
+      "copyrightText": "NOASSERTION"
+    }
+  ],
+  "relationships": [
+    {
+      "spdxElementId": "SPDXRef-DOCUMENT",
+      "relatedSpdxElement": "SPDXRef-Package-main-246fb886-db53-45c0-a9e6-a320a8cd5f3c",
+      "relationshipType": "DESCRIBES"
+    },
+    {
+      "spdxElementId": "SPDXRef-Package-main-246fb886-db53-45c0-a9e6-a320a8cd5f3c",
+      "relatedSpdxElement": "SPDXRef-Package-lodash-d8e8797f-1c92-48f3-81fc-45f5bfa5d007",
+      "relationshipType": "CONTAINS"
+    },
+    {
+      "spdxElementId": "SPDXRef-Package-lodash-d8e8797f-1c92-48f3-81fc-45f5bfa5d007",
+      "relatedSpdxElement": "NOASSERTION",
+      "relationshipType": "CONTAINS"
+    },
+    {
+      "spdxElementId": "SPDXRef-File-src-package-lock.json-998cefe6",
+      "relatedSpdxElement": "SPDXRef-Package-lodash-d8e8797f-1c92-48f3-81fc-45f5bfa5d007",
+      "relationshipType": "DEPENDENCY_MANIFEST_OF"
+    },
+    {
+      "spdxElementId": "SPDXRef-Package-main-246fb886-db53-45c0-a9e6-a320a8cd5f3c",
+      "relatedSpdxElement": "SPDXRef-Package-zod-21b38894-23e7-4312-afb1-d22dcc7102b8",
+      "relationshipType": "CONTAINS"
+    },
+    {
+      "spdxElementId": "SPDXRef-Package-zod-21b38894-23e7-4312-afb1-d22dcc7102b8",
+      "relatedSpdxElement": "NOASSERTION",
+      "relationshipType": "CONTAINS"
+    },
+    {
+      "spdxElementId": "SPDXRef-File-src-package-lock.json-998cefe6",
+      "relatedSpdxElement": "SPDXRef-Package-zod-21b38894-23e7-4312-afb1-d22dcc7102b8",
+      "relationshipType": "DEPENDENCY_MANIFEST_OF"
+    }
+  ]
+}

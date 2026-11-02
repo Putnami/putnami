@@ -11,6 +11,8 @@
     "tooling/observe-analyses#changed-line-coverage",
     "tooling/observe-analyses#components",
     "tooling/observe-analyses#dependency-changes",
+    "tooling/observe-analyses#dependency-sbom-facts",
+    "tooling/observe-analyses#sbom-documents",
     "tooling/observe-analyses#summary",
     "tooling/observe-analyses#tests-and-coverage",
     "tooling/observe-composer#analysis-inputs",

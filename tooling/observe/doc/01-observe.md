@@ -13,6 +13,8 @@ answer, so the workspace must declare `@putnami/observe` to run it there.
 | `--head <revision>` | The commit that was built. Default `HEAD`. |
 | `--junit <paths>` | Comma-separated JUnit XML paths or glob patterns, resolved against the directory you run in. Replaces JUnit discovery. |
 | `--coverage <paths>` | The same for coverage reports. Replaces coverage discovery. |
+| `--sbom <path>` | The software bill of materials (SBOM) of the commit, a path or glob pattern. Replaces SBOM discovery. |
+| `--base-sbom <path>` | The SBOM of the base. Without it, the base state of each dependency is unknown. |
 | `--no-fetch` | Read only the local history: fetch no base and deepen no shallow clone. |
 | `--evidence <path>` | Write the change evidence document to this path, resolved against the directory you run in. |
 | `--upload` | Hand the change evidence document to the evidence reporter. See [Uploading the evidence](#uploading-the-evidence). |
@@ -92,6 +94,16 @@ keeps a file by its content:
 | LCOV | a first `TN:` or `SF:` record |
 | Go cover profile | a first `mode: set`, `mode: count` or `mode: atomic` line |
 
+Without `--sbom`, it also reads the `.json` files whose name contains `bom`,
+`cdx`, `cyclonedx` or `spdx`, and keeps a CycloneDX document (a
+`"bomFormat": "CycloneDX"` member) or an SPDX one (a `"spdxVersion": "SPDX-…"`
+member) as the commit's SBOM. A missing SBOM is no diagnostic. The base SBOM
+is never discovered: name it with `--base-sbom`, and discovery then leaves
+that file out. When a side has several SBOMs, none is read, with
+`observe.sbom_ambiguous`: a repository that commits SBOM documents, such as
+test fixtures, names its own with `--sbom`. See
+[licences and vulnerabilities](06-change-analyses.md#licences-and-vulnerabilities).
+
 Discovery stops after 200 000 entries or 10 000 candidate files, and keeps at
 most 1 000 reports, with the `observe.discovery_bounded` diagnostic. A named
 glob pattern has the same bounds and the same diagnostic. A kind
@@ -105,7 +117,8 @@ nothing gets `observe.report_missing`, an unreadable file
 The summary names the CI, the repository, the commit, the base, the changed
 files (the first 50), the changed and dependent components, the tests and
 coverage of each component, the coverage of the changed lines, the dependency
-changes and the reports, then each diagnostic. See
+changes with their licences and vulnerabilities, and the reports, then each
+diagnostic. See
 [the change analyses](06-change-analyses.md). `putnami observe`
 exits 0 whatever it observes, 2 on a usage error, and 1 when it cannot read its
 job context or write its output. `--output=json`
@@ -118,8 +131,8 @@ prints one document with `subject`, `ci`, `producer`, `base`,
 [`protocol/evidence`](../../../protocols/evidence/README.md) v1 document: the
 subject, the CI run, the producer, the changed files with their component,
 the components with their impact and edges, the tests and coverage per
-component, the changed-line coverage, the dependency changes and the
-diagnostics.
+component, the changed-line coverage, the dependency changes with their
+`before` and `after` states, the `sbom` they come from, and the diagnostics.
 
 The document is validated before it is written, and replaces the file in one
 rename. A document that does not validate, such as one without a commit or a

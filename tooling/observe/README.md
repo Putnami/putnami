@@ -15,7 +15,9 @@ It answers five questions:
   components depend on those.
 - Which tests passed or failed and which lines they covered, per component,
   and how much of the changed lines they covered.
-- Which dependency versions the lockfiles moved.
+- Which dependency versions the lockfiles moved and, from the software bills
+  of materials (SBOM) the CI wrote, their licences and the known
+  vulnerabilities each change fixes or introduces.
 
 A missing or malformed report, or a base it cannot reach, is a diagnostic:
 `putnami observe` exits 0 whatever it observes, 2 on a usage error, and 1 when

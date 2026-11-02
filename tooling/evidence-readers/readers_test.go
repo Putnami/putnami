@@ -367,6 +367,7 @@ func TestEveryMalformedFixtureReturnsItsCode(t *testing.T) {
 func allReaders() map[string]func([]byte) []diag.Diagnostic {
 	readers := map[string]func([]byte) []diag.Diagnostic{
 		"junit": func(data []byte) []diag.Diagnostic { _, d := ReadJUnit(data); return d },
+		"sbom":  func(data []byte) []diag.Diagnostic { _, d := ReadSBOM(data); return d },
 	}
 	for name, reader := range coverageReaders {
 		readers[name] = func(data []byte) []diag.Diagnostic { _, d := reader(data); return d }
@@ -440,7 +441,7 @@ func TestArbitraryBytesNeverPanic(t *testing.T) {
 		t.Fatal(err)
 	}
 	var inputs [][]byte
-	for _, dir := range []string{"junit", "lcov", "cobertura", "clover", "gocover", "malformed"} {
+	for _, dir := range []string{"junit", "lcov", "cobertura", "clover", "gocover", "sbom", "malformed"} {
 		for _, fixture := range fixtures(t, dir) {
 			if expectations[filepath.Base(fixture)].Code == CodeTooLarge {
 				continue
@@ -468,7 +469,7 @@ func TestArbitraryBytesNeverPanic(t *testing.T) {
 }
 
 func FuzzReaders(f *testing.F) {
-	for _, dir := range []string{"junit", "lcov", "cobertura", "clover", "gocover"} {
+	for _, dir := range []string{"junit", "lcov", "cobertura", "clover", "gocover", "sbom"} {
 		entries, _ := os.ReadDir(filepath.Join("testdata", dir))
 		for _, entry := range entries {
 			if data, err := os.ReadFile(filepath.Join("testdata", dir, entry.Name())); err == nil {

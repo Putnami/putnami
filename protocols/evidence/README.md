@@ -28,7 +28,8 @@ A document (`schemas/evidence.json`) has `protocolVersion: 1` and:
 | `components` | Repository-relative directories (`.` for the whole repository), with an open `ecosystem` slug, the `source` that found them (`orchestrator`, `workspace`, `manifest`, `fallback`, `declared`), their `impact` and their `dependsOn` edges. |
 | `tests`, `coverage` | One entry per component: passed, failed, skipped, duration and failing cases; covered and total lines. |
 | `changedLineCoverage` | The coverage of the lines the change added or modified, per file, with the uncovered line numbers. |
-| `dependencyChanges` | The lockfile difference: ecosystem, lockfile, package, `added`, `removed`, `upgraded`, `downgraded` or `changed`, from and to versions. |
+| `dependencyChanges` | The lockfile difference: ecosystem, lockfile, package, `added`, `removed`, `upgraded`, `downgraded` or `changed`, from and to versions. From a software bill of materials (SBOM), a `before` and an `after` state: the package's licences and known vulnerabilities, each an id and a severity (`critical`, `high`, `medium`, `low`, `info`, `none`, `unknown`). |
+| `sbom` | The SBOMs the states were read from: a `head` and a `base` document, each with its `format` (`cyclonedx` or `spdx`) and `specVersion`. Absent when the producer read none. Without a `base`, every base state is unknown. |
 | `diagnostics` | The producer's own findings (a missing report, an unresolved base). They never make the document invalid. |
 
 ## Rules
@@ -49,13 +50,23 @@ A document (`schemas/evidence.json`) has `protocolVersion: 1` and:
   (`evidence.invalid_impact`); one walk over the reversed edges decides it, in
   linear time. Counts add up (`evidence.invalid_count`), and a
   dependency change carries the versions its kind needs
-  (`evidence.invalid_dependency_change`).
+  (`evidence.invalid_dependency_change`). A `before` state needs a `base` SBOM
+  and a package that was not added; an `after` state needs a `head` SBOM and a
+  package that was not removed (`evidence.invalid_dependency_change`). An SBOM
+  names a known format and a dotted spec version (`evidence.invalid_sbom`).
 - **Bounded.** At most 20000 changed files, 5000 components, 10000 dependency
   changes, 100000 dependency edges, 20000 changed-line coverage files, 500
   diagnostics, 50 failing cases per tests entry, 200 uncovered line numbers per
-  file and 4096 bytes per string (`evidence.too_large`).
+  file, 20 licences and 200 vulnerabilities per dependency state, and 4096
+  bytes per string (`evidence.too_large`).
 - **Open where stacks grow.** Ecosystems are slugs: a new stack needs no
   protocol version. A new code host or CI system does.
+- **Optional members stay optional.** The `sbom` member and the dependency
+  states are optional members of version 1: a document without them validates
+  as before, and a producer that read no SBOM writes none of them. A reader
+  built before they existed refuses a document that carries them
+  (`evidence.unknown_field`), so a reader updates before its producers write
+  them.
 
 ## Conformance
 

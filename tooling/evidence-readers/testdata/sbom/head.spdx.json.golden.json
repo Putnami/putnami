@@ -1,0 +1,22 @@
+{
+  "format": "spdx",
+  "specVersion": "2.3",
+  "packages": [
+    {
+      "name": "lodash",
+      "version": "4.17.21",
+      "purl": "pkg:npm/lodash@4.17.21?source=PUBLIC_REGISTRY",
+      "licenses": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "zod",
+      "version": "3.23.8",
+      "purl": "pkg:npm/zod@3.23.8?source=PUBLIC_REGISTRY",
+      "licenses": [
+        "MIT"
+      ]
+    }
+  ]
+}

@@ -100,12 +100,14 @@ func TestConformance_ProtocolVersion(t *testing.T) {
 func TestConformance_VocabulariesAreClosed(t *testing.T) {
 	spectest.Proves(t, feature, "version-1-and-closed-vocabularies", "the-vocabularies-are-closed")
 	pins := map[string][2][]string{
-		"providers":   {Providers, {"github", "gitlab", "generic"}},
-		"ci systems":  {CISystems, {"github-actions", "gitlab-ci", "generic"}},
-		"sources":     {ComponentSources, {"orchestrator", "workspace", "manifest", "fallback", "declared"}},
-		"impacts":     {Impacts, {"changed", "dependent", "unaffected"}},
-		"statuses":    {FileStatuses, {"added", "modified", "deleted", "renamed"}},
-		"dep changes": {DependencyChanges, {"added", "removed", "upgraded", "downgraded", "changed"}},
+		"providers":    {Providers, {"github", "gitlab", "generic"}},
+		"ci systems":   {CISystems, {"github-actions", "gitlab-ci", "generic"}},
+		"sources":      {ComponentSources, {"orchestrator", "workspace", "manifest", "fallback", "declared"}},
+		"impacts":      {Impacts, {"changed", "dependent", "unaffected"}},
+		"statuses":     {FileStatuses, {"added", "modified", "deleted", "renamed"}},
+		"dep changes":  {DependencyChanges, {"added", "removed", "upgraded", "downgraded", "changed"}},
+		"sbom formats": {SBOMFormats, {"cyclonedx", "spdx"}},
+		"severities":   {Severities, {"critical", "high", "medium", "low", "info", "none", "unknown"}},
 	}
 	for name, pin := range pins {
 		if !slices.Equal(pin[0], pin[1]) {
@@ -256,12 +258,14 @@ func TestConformance_SchemaEnumsAreTheGoVocabularies(t *testing.T) {
 	spectest.Proves(t, feature, "one-member-set", "the-schema-enums-are-the-go-vocabularies")
 	root := readSchema(t)
 	enums := map[string][2][]string{
-		"subject.provider":   {root.Properties["subject"].Properties["provider"].Enum, Providers},
-		"ci.system":          {root.Properties["ci"].Properties["system"].Enum, CISystems},
-		"component.source":   {root.Defs["component"].Properties["source"].Enum, ComponentSources},
-		"component.impact":   {root.Defs["component"].Properties["impact"].Enum, Impacts},
-		"changedFile.status": {root.Defs["changedFile"].Properties["status"].Enum, FileStatuses},
-		"dependency.change":  {root.Defs["dependencyChange"].Properties["change"].Enum, DependencyChanges},
+		"subject.provider":       {root.Properties["subject"].Properties["provider"].Enum, Providers},
+		"ci.system":              {root.Properties["ci"].Properties["system"].Enum, CISystems},
+		"component.source":       {root.Defs["component"].Properties["source"].Enum, ComponentSources},
+		"component.impact":       {root.Defs["component"].Properties["impact"].Enum, Impacts},
+		"changedFile.status":     {root.Defs["changedFile"].Properties["status"].Enum, FileStatuses},
+		"dependency.change":      {root.Defs["dependencyChange"].Properties["change"].Enum, DependencyChanges},
+		"sbom.format":            {root.Defs["sbomDocument"].Properties["format"].Enum, SBOMFormats},
+		"vulnerability.severity": {root.Defs["vulnerability"].Properties["severity"].Enum, Severities},
 	}
 	for name, pair := range enums {
 		if !slices.Equal(pair[0], pair[1]) {
@@ -278,6 +282,7 @@ func TestConformance_SchemaEnumsAreTheGoVocabularies(t *testing.T) {
 		"component.ecosystem":  {root.Defs["component"].Properties["ecosystem"].Pattern, slugExpression},
 		"dependency.ecosystem": {root.Defs["dependencyChange"].Properties["ecosystem"].Pattern, slugExpression},
 		"diagnostic.code":      {root.Defs["diagnostic"].Properties["code"].Pattern, codeExpression},
+		"sbom.specVersion":     {root.Defs["sbomDocument"].Properties["specVersion"].Pattern, specVersionExpression},
 	}
 	for name, pair := range patterns {
 		if pair[0] != pair[1] {
@@ -580,6 +585,14 @@ func TestConformance_EachBoundIsEnforced(t *testing.T) {
 	for label, mutate := range cases {
 		expectCodes(t, label, codesOf(t, "turbo-pull-request.json", mutate), ErrorCodeTooLarge)
 	}
+	for label, mutate := range map[string]func(*Document){
+		"licenses": func(d *Document) { d.DependencyChanges[0].After.Licenses = make([]string, MaxLicenses+1) },
+		"vulnerabilities": func(d *Document) {
+			d.DependencyChanges[0].Before.Vulnerabilities = make([]Vulnerability, MaxVulnerabilities+1)
+		},
+	} {
+		expectCodes(t, label, codesOf(t, "sbom-pull-request.json", mutate), ErrorCodeTooLarge)
+	}
 	expectCodes(t, "edges", codesOf(t, "generic-minimal.json", func(d *Document) {
 		d.Components = make([]Component, 21)
 		for index := range d.Components {
@@ -652,4 +665,109 @@ func TestConformance_TimestampsAndDiagnosticsAreChecked(t *testing.T) {
 	expectCodes(t, "error diagnostic", codesOf(t, "turbo-pull-request.json", func(d *Document) {
 		d.Diagnostics[0].Severity = diag.Error
 	}))
+}
+
+func TestConformance_EachSBOMDefectGetsItsCode(t *testing.T) {
+	spectest.Proves(t, feature, "sbom-sources-are-named", "each-sbom-defect-gets-its-code")
+	cases := map[string]func(*Document){
+		"unknown format":       func(d *Document) { d.SBOM.Head.Format = "syft-json" },
+		"uppercase format":     func(d *Document) { d.SBOM.Base.Format = "SPDX" },
+		"empty spec version":   func(d *Document) { d.SBOM.Head.SpecVersion = "" },
+		"prefixed version":     func(d *Document) { d.SBOM.Base.SpecVersion = "SPDX-2.3" },
+		"single-number":        func(d *Document) { d.SBOM.Head.SpecVersion = "1" },
+		"trailing text":        func(d *Document) { d.SBOM.Head.SpecVersion = "1.5-rc" },
+		"empty head document":  func(d *Document) { d.SBOM.Head = &SBOMDocument{} },
+		"base format and spec": func(d *Document) { d.SBOM.Base = &SBOMDocument{Format: "cdx", SpecVersion: "x"} },
+	}
+	for label, mutate := range cases {
+		expectCodes(t, label, codesOf(t, "sbom-pull-request.json", mutate), ErrorCodeInvalidSBOM)
+	}
+	// A patch-level spec version is a dotted version too.
+	expectCodes(t, "three-part version", codesOf(t, "sbom-pull-request.json", func(d *Document) {
+		d.SBOM.Head.SpecVersion = "1.6.1"
+	}))
+	_, diags := ParseAndValidate([]byte(strings.Replace(mustRead(t, "valid", "sbom-pull-request.json"), `"specVersion": "1.5"`, `"specVersion": "1.5", "tool": "osv-scanner"`, 1)))
+	if len(diags) != 1 || diags[0].Code != ErrorCodeUnknownField || diags[0].Field != "sbom.head.tool" {
+		t.Errorf("an undeclared sbom member: diags = %v, want one unknown_field at sbom.head.tool", diags)
+	}
+}
+
+func TestConformance_ADocumentWithoutSBOMMembersValidatesAsBefore(t *testing.T) {
+	spectest.Proves(t, feature, "sbom-sources-are-named", "a-document-without-sbom-members-validates-as-before")
+	// Every fixture written before the sbom members existed still validates,
+	// and marshals without them.
+	for _, name := range []string{"generic-minimal.json", "turbo-pull-request.json", "symfony-merge-request.json", "dependency-cycle.json"} {
+		document := readValid(t, name)
+		data, err := json.Marshal(document)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if strings.Contains(string(data), `"sbom"`) || strings.Contains(string(data), `"before"`) || strings.Contains(string(data), `"after"`) {
+			t.Errorf("%s marshals sbom members it does not carry: %s", name, data)
+		}
+	}
+	// Stripping the sbom members from a document that carries them leaves a
+	// valid document.
+	expectCodes(t, "stripped", codesOf(t, "sbom-pull-request.json", func(d *Document) {
+		d.SBOM = nil
+		for index := range d.DependencyChanges {
+			d.DependencyChanges[index].Before, d.DependencyChanges[index].After = nil, nil
+		}
+	}))
+	// An sbom member that names only the head, or no document at all, is valid.
+	expectCodes(t, "head only", codesOf(t, "sbom-pull-request.json", func(d *Document) {
+		d.SBOM.Base = nil
+		for index := range d.DependencyChanges {
+			d.DependencyChanges[index].Before = nil
+		}
+	}))
+	expectCodes(t, "empty sbom", codesOf(t, "generic-minimal.json", func(d *Document) { d.SBOM = &SBOM{} }))
+}
+
+func TestConformance_EachDependencyStateDefectGetsItsCode(t *testing.T) {
+	spectest.Proves(t, feature, "dependency-states-are-well-formed", "each-dependency-state-defect-gets-its-code")
+	cases := map[string]func(*Document){
+		"before without a base sbom": func(d *Document) { d.SBOM.Base = nil; d.DependencyChanges[2].After = nil },
+		"after without a head sbom":  func(d *Document) { d.SBOM.Head = nil; d.DependencyChanges[0].Before = nil },
+		"no sbom member":             func(d *Document) { d.SBOM = nil },
+		"before on an added package": func(d *Document) { d.DependencyChanges[2].Before = &DependencyState{} },
+		"after on a removed package": func(d *Document) { d.DependencyChanges[1].After = &DependencyState{} },
+		"empty license":              func(d *Document) { d.DependencyChanges[0].After.Licenses = []string{" "} },
+		"vulnerability without id": func(d *Document) {
+			d.DependencyChanges[2].After.Vulnerabilities[0].ID = ""
+		},
+		"unknown severity": func(d *Document) {
+			d.DependencyChanges[2].After.Vulnerabilities[0].Severity = "moderate"
+		},
+		"missing severity": func(d *Document) {
+			d.DependencyChanges[1].Before.Vulnerabilities[0].Severity = ""
+		},
+	}
+	for label, mutate := range cases {
+		expectCodes(t, label, codesOf(t, "sbom-pull-request.json", mutate), ErrorCodeInvalidDependencyChange)
+	}
+	expectCodes(t, "vulnerability twice", codesOf(t, "sbom-pull-request.json", func(d *Document) {
+		state := d.DependencyChanges[0].Before
+		state.Vulnerabilities = append(state.Vulnerabilities, state.Vulnerabilities[0])
+	}), ErrorCodeDuplicate)
+	// One id in the before state and the after state is one vulnerability the
+	// change keeps, not a duplicate.
+	expectCodes(t, "kept vulnerability", codesOf(t, "sbom-pull-request.json", func(d *Document) {
+		d.DependencyChanges[0].After.Vulnerabilities = []Vulnerability{d.DependencyChanges[0].Before.Vulnerabilities[0]}
+	}))
+	// Every severity of the closed vocabulary is accepted.
+	for _, severity := range Severities {
+		expectCodes(t, "severity "+severity, codesOf(t, "sbom-pull-request.json", func(d *Document) {
+			d.DependencyChanges[2].After.Vulnerabilities[0].Severity = severity
+		}))
+	}
+}
+
+func mustRead(t *testing.T, dir, name string) string {
+	t.Helper()
+	data, err := os.ReadFile(filepath.Join("fixtures", dir, name))
+	if err != nil {
+		t.Fatal(err)
+	}
+	return string(data)
 }

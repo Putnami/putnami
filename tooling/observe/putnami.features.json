@@ -238,7 +238,7 @@
       "id": "tooling/observe-analyses",
       "type": "feature",
       "name": "Explain what a change touches in a repository that keeps its own CI",
-      "outcome": "putnami observe tells the CI log, and the evidence document, which components a change touched and which depend on them, the tests and coverage of each one, the coverage of the changed lines and the dependency versions the change moved, from the detectors, the git diff, the reports and the lockfiles, without running a build",
+      "outcome": "putnami observe tells the CI log, and the evidence document, which components a change touched and which depend on them, the tests and coverage of each one, the coverage of the changed lines, the dependency versions the change moved and, from a software bill of materials the CI wrote, the licences and known vulnerabilities of each moved dependency, from the detectors, the git diff, the reports and the lockfiles, without running a build",
       "owner": "tooling",
       "target": "modeled",
       "requirements": [
@@ -309,6 +309,35 @@
               "the-summary-shows-the-analyses",
               "a-changed-component-names-the-changed-components-it-depends-on",
               "the-demo-evidence-documents-validate"
+            ]
+          }
+        },
+        {
+          "id": "sbom-documents",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "an-sbom-is-found-by-its-content-or-named"
+            ]
+          }
+        },
+        {
+          "id": "dependency-sbom-facts",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-cyclonedx-pair-gives-each-changed-dependency-its-facts",
+              "an-spdx-document-gives-licenses-and-advisories",
+              "without-a-base-sbom-the-base-is-unknown",
+              "the-summary-counts-the-vulnerabilities-per-dependency"
             ]
           }
         }

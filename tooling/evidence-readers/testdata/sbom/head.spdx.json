@@ -1,0 +1,109 @@
+{
+  "spdxVersion": "SPDX-2.3",
+  "dataLicense": "CC0-1.0",
+  "SPDXID": "SPDXRef-DOCUMENT",
+  "name": "SCALIBR-generated SPDX",
+  "documentNamespace": "https://spdx.google/985576b7-4d89-4f4a-9899-fe28e4526105",
+  "creationInfo": {
+    "creators": [
+      "Tool: SCALIBR"
+    ],
+    "created": "2026-11-02T08:42:47Z"
+  },
+  "packages": [
+    {
+      "name": "main",
+      "SPDXID": "SPDXRef-Package-main-246fb886-db53-45c0-a9e6-a320a8cd5f3c",
+      "versionInfo": "0",
+      "supplier": "NOASSERTION",
+      "downloadLocation": "NOASSERTION",
+      "filesAnalyzed": false
+    },
+    {
+      "name": "lodash",
+      "SPDXID": "SPDXRef-Package-lodash-d8e8797f-1c92-48f3-81fc-45f5bfa5d007",
+      "versionInfo": "4.17.21",
+      "supplier": "NOASSERTION",
+      "downloadLocation": "NOASSERTION",
+      "filesAnalyzed": false,
+      "sourceInfo": "Identified by the javascript/packagelockjson extractor from src/package-lock.json",
+      "licenseConcluded": "MIT",
+      "licenseDeclared": "NOASSERTION",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceType": "purl",
+          "referenceLocator": "pkg:npm/lodash@4.17.21?source=PUBLIC_REGISTRY"
+        }
+      ]
+    },
+    {
+      "name": "zod",
+      "SPDXID": "SPDXRef-Package-zod-21b38894-23e7-4312-afb1-d22dcc7102b8",
+      "versionInfo": "3.23.8",
+      "supplier": "NOASSERTION",
+      "downloadLocation": "NOASSERTION",
+      "filesAnalyzed": false,
+      "sourceInfo": "Identified by the javascript/packagelockjson extractor from src/package-lock.json",
+      "licenseConcluded": "MIT",
+      "licenseDeclared": "NOASSERTION",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceType": "purl",
+          "referenceLocator": "pkg:npm/zod@3.23.8?source=PUBLIC_REGISTRY"
+        }
+      ]
+    }
+  ],
+  "files": [
+    {
+      "fileName": "src/package-lock.json",
+      "SPDXID": "SPDXRef-File-src-package-lock.json-998cefe6",
+      "checksums": [
+        {
+          "algorithm": "SHA256",
+          "checksumValue": "48bdaafad48c9c26efe87fe9f01a8e33c2891f7f3581cdca270d058610c6a188"
+        }
+      ],
+      "copyrightText": "NOASSERTION"
+    }
+  ],
+  "relationships": [
+    {
+      "spdxElementId": "SPDXRef-DOCUMENT",
+      "relatedSpdxElement": "SPDXRef-Package-main-246fb886-db53-45c0-a9e6-a320a8cd5f3c",
+      "relationshipType": "DESCRIBES"
+    },
+    {
+      "spdxElementId": "SPDXRef-Package-main-246fb886-db53-45c0-a9e6-a320a8cd5f3c",
+      "relatedSpdxElement": "SPDXRef-Package-lodash-d8e8797f-1c92-48f3-81fc-45f5bfa5d007",
+      "relationshipType": "CONTAINS"
+    },
+    {
+      "spdxElementId": "SPDXRef-Package-lodash-d8e8797f-1c92-48f3-81fc-45f5bfa5d007",
+      "relatedSpdxElement": "NOASSERTION",
+      "relationshipType": "CONTAINS"
+    },
+    {
+      "spdxElementId": "SPDXRef-File-src-package-lock.json-998cefe6",
+      "relatedSpdxElement": "SPDXRef-Package-lodash-d8e8797f-1c92-48f3-81fc-45f5bfa5d007",
+      "relationshipType": "DEPENDENCY_MANIFEST_OF"
+    },
+    {
+      "spdxElementId": "SPDXRef-Package-main-246fb886-db53-45c0-a9e6-a320a8cd5f3c",
+      "relatedSpdxElement": "SPDXRef-Package-zod-21b38894-23e7-4312-afb1-d22dcc7102b8",
+      "relationshipType": "CONTAINS"
+    },
+    {
+      "spdxElementId": "SPDXRef-Package-zod-21b38894-23e7-4312-afb1-d22dcc7102b8",
+      "relatedSpdxElement": "NOASSERTION",
+      "relationshipType": "CONTAINS"
+    },
+    {
+      "spdxElementId": "SPDXRef-File-src-package-lock.json-998cefe6",
+      "relatedSpdxElement": "SPDXRef-Package-zod-21b38894-23e7-4312-afb1-d22dcc7102b8",
+      "relationshipType": "DEPENDENCY_MANIFEST_OF"
+    }
+  ]
+}

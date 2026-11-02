@@ -100,6 +100,31 @@ const (
 // DependencyChanges is the closed dependency-change vocabulary.
 var DependencyChanges = []string{DependencyAdded, DependencyRemoved, DependencyUpgraded, DependencyDowngraded, DependencyChanged}
 
+// Software bill of materials (SBOM) formats.
+const (
+	SBOMCycloneDX = "cyclonedx"
+	SBOMSPDX      = "spdx"
+)
+
+// SBOMFormats is the closed SBOM-format vocabulary.
+var SBOMFormats = []string{SBOMCycloneDX, SBOMSPDX}
+
+// Vulnerability severities, as CycloneDX names them. An SBOM that states no
+// severity gives SeverityUnknown.
+const (
+	SeverityCritical = "critical"
+	SeverityHigh     = "high"
+	SeverityMedium   = "medium"
+	SeverityLow      = "low"
+	SeverityInfo     = "info"
+	SeverityNone     = "none"
+	SeverityUnknown  = "unknown"
+)
+
+// Severities is the closed severity vocabulary, from the most to the least
+// severe, unknown last.
+var Severities = []string{SeverityCritical, SeverityHigh, SeverityMedium, SeverityLow, SeverityInfo, SeverityNone, SeverityUnknown}
+
 // RootComponent is the id of a component that is the whole repository.
 const RootComponent = "."
 
@@ -112,6 +137,9 @@ const (
 	MaxDiagnostics             = 500
 	MaxFailingCases            = 50
 	MaxUncoveredLines          = 200
+	// MaxLicenses and MaxVulnerabilities cap one dependency state.
+	MaxLicenses        = 20
+	MaxVulnerabilities = 200
 	// MaxEdges caps the dependency edges of all components together.
 	MaxEdges = 100000
 	// MaxStringBytes caps every string member. A producer truncates a longer
@@ -147,6 +175,9 @@ type Document struct {
 	// DependencyChanges is the difference of the lockfiles between the base and
 	// the commit.
 	DependencyChanges []DependencyChange `json:"dependencyChanges,omitempty"`
+	// SBOM names the software bills of materials the dependency states were
+	// read from. Absent when the producer read none.
+	SBOM *SBOM `json:"sbom,omitempty"`
 	// Diagnostics are the producer's findings: a missing or malformed report, an
 	// unresolved base. They never make the document invalid.
 	Diagnostics []diag.Diagnostic `json:"diagnostics,omitempty"`
@@ -311,4 +342,48 @@ type DependencyChange struct {
 	To string `json:"to,omitempty"`
 	// Component is the id of the component whose lockfile it is, when one does.
 	Component string `json:"component,omitempty"`
+	// Before is the package at the base, as the base SBOM lists it at the
+	// From versions. Absent for an added package, without a base SBOM, or when
+	// the base SBOM does not list it.
+	Before *DependencyState `json:"before,omitempty"`
+	// After is the package at the commit, as the head SBOM lists it at the To
+	// versions. Absent for a removed package, without a head SBOM, or when the
+	// head SBOM does not list it.
+	After *DependencyState `json:"after,omitempty"`
+}
+
+// SBOM names the software bills of materials a producer read. The CI wrote
+// them; the producer queries no vulnerability database.
+type SBOM struct {
+	// Head is the document of the commit. Absent when none was read.
+	Head *SBOMDocument `json:"head,omitempty"`
+	// Base is the document of the base. Absent when none was read: the base
+	// state of every dependency is then unknown.
+	Base *SBOMDocument `json:"base,omitempty"`
+}
+
+// SBOMDocument is one software bill of materials.
+type SBOMDocument struct {
+	// Format is cyclonedx or spdx.
+	Format string `json:"format"`
+	// SpecVersion is the format's version the document states, such as 1.5
+	// or 2.3.
+	SpecVersion string `json:"specVersion"`
+}
+
+// DependencyState is what a software bill of materials says of a package at
+// one side of the change.
+type DependencyState struct {
+	// Licenses are the package's licenses: SPDX ids, expressions or names.
+	Licenses []string `json:"licenses,omitempty"`
+	// Vulnerabilities are the package's known vulnerabilities.
+	Vulnerabilities []Vulnerability `json:"vulnerabilities,omitempty"`
+}
+
+// Vulnerability is one known vulnerability of a package.
+type Vulnerability struct {
+	// ID is the advisory's identifier: CVE-..., GHSA-..., GO-...
+	ID string `json:"id"`
+	// Severity is critical, high, medium, low, info, none or unknown.
+	Severity string `json:"severity"`
 }

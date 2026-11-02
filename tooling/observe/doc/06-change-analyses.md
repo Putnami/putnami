@@ -1,8 +1,9 @@
 # How `putnami observe` explains a change
 
 `putnami observe` reads the repository's manifests, the git diff, the test and
-coverage reports and the lockfiles. It runs no package manager, no
-orchestrator and no test.
+coverage reports, the lockfiles and the software bills of materials (SBOM).
+It runs no package manager, no orchestrator, no test and no SBOM tool, and
+queries no vulnerability database.
 
 ## Components
 
@@ -92,12 +93,56 @@ the package has several versions. A lockfile that cannot be read gets
 `observe.lockfile_unreadable`. The dependency change names the component that
 holds the lockfile, when one does.
 
+## Licences and vulnerabilities
+
+An SBOM lists the packages of a build with their licences and, for
+CycloneDX, their known vulnerabilities. The CI writes it, with osv-scanner,
+Trivy or Syft; `putnami observe` reads one for the head (`--sbom`, or
+discovered) and one for the base (`--base-sbom`):
+
+| Format | Versions | Vulnerabilities |
+|---|---|---|
+| CycloneDX JSON | 1.4, 1.5, 1.6 | each entry of `vulnerabilities`, with the highest severity of its ratings |
+| SPDX JSON | 2.3 | each `SECURITY` `advisory` external reference, severity `unknown` |
+
+osv-scanner writes no vulnerability in SPDX: use CycloneDX for them.
+
+A package of the SBOM matches a dependency change by the ecosystem its
+package URL names (`npm`, `composer`, `golang` is `go`), its name and its
+version, a leading `v` ignored; a package without a package URL matches by
+name and version. For each change, the base SBOM gives the `before` state,
+unless the package was added, and the head SBOM the `after` state, unless it
+was removed: its licences and its vulnerabilities, each an id and a severity,
+the most severe first. A package the SBOM does not list gets no state, and
+the summary says so. Without a base SBOM, every base state is unknown.
+osv-scanner names a vulnerable package without its version: when one SBOM
+lists two versions of a package, both get its vulnerabilities. A
+state holds at most 20 licences and 200 vulnerabilities.
+
+The summary names the SBOMs after the dependency count, then gives each
+change one line:
+
+```text
+  dependencies  3 changes, SBOM head CycloneDX 1.5, base CycloneDX 1.5
+    upgraded   lodash 4.17.20 -> 4.17.21, in package-lock.json
+               fixes 2 (GHSA-35jh-r3h4-6jhm high, GHSA-29mw-wpgm-hmr9 medium), introduces 0, keeps 3; license MIT
+    removed    minimist 1.2.5, in package-lock.json
+               fixes 1 (GHSA-xvch-5gv4-984h critical); license MIT
+    added      zod 3.23.8, in package-lock.json
+               introduces 1 (GHSA-mrhx-c7xc-m3w5 high); license MIT
+```
+
+Without a base SBOM, an upgrade reads `3 (…) known at the head, base
+unknown`. A line names at most 5 vulnerabilities. Without an SBOM, the
+summary and the evidence document are what they were.
+
 ## Diagnostics
 
 | Code | Meaning |
 |---|---|
-| `observe.report_unread` | A reader refused a report: it is malformed or too large. |
+| `observe.report_unread` | A reader refused a report or an SBOM: it is malformed, too large or of an unsupported version. Its side is unknown. |
 | `observe.tests_unattributed` | Test cases of a report belong to no component. |
 | `observe.coverage_unmapped` | Files of a coverage report are not files of the repository. |
 | `observe.lockfile_unreadable` | A changed lockfile cannot be read at the base or the head. |
 | `observe.changed_lines_unread` | The diff's changed lines cannot be read. |
+| `observe.sbom_ambiguous` | One side has several SBOMs, so none is read and that side is unknown. |

@@ -267,3 +267,123 @@ func TestMatchSegments(t *testing.T) {
 func splitSlash(s string) []string {
 	return strings.Split(s, "/")
 }
+
+const (
+	cycloneDXJSON = `{"$schema":"http://cyclonedx.org/schema/bom-1.5.schema.json","bomFormat": "CycloneDX","specVersion":"1.5","components":[]}`
+	spdxJSON      = "{\n  \"spdxVersion\" : \"SPDX-2.3\",\n  \"SPDXID\": \"SPDXRef-DOCUMENT\"\n}"
+)
+
+func TestAnSBOMIsFoundByItsContentOrNamed(t *testing.T) {
+	spectest.Proves(t, "tooling/observe-analyses", "sbom-documents", "an-sbom-is-found-by-its-content-or-named")
+	for content, want := range map[string]string{
+		cycloneDXJSON:                      FormatCycloneDX,
+		spdxJSON:                           FormatSPDX,
+		`{"bomFormat":"SomethingElse"}`:    "",
+		`{"name":"bom","version":"1.0.0"}`: "",
+		`[{"bomFormat":"CycloneDX"}]`:      "",
+	} {
+		if got := Sniff([]byte(content)); got != want {
+			t.Errorf("Sniff(%q) = %q, want %q", content, got, want)
+		}
+	}
+
+	t.Run("discovered by content among the json files an SBOM name marks", func(t *testing.T) {
+		root := tree(t, map[string]string{
+			"sbom.cdx.json":              cycloneDXJSON,
+			"package.json":               cycloneDXJSON,
+			"bom-notes.json":             `{"name":"bom"}`,
+			"node_modules/dep/bom.json":  cycloneDXJSON,
+			"reports/junit.xml":          junitXML,
+			"coverage/lcov.info":         lcovTrace,
+			"build/trivy-cyclonedx.json": "not json",
+		})
+		reports, diags := Collect(Request{Root: root, Resolve: resolver(root)})
+		if len(diags) != 0 {
+			t.Fatalf("diagnostics %v", diags)
+		}
+		var sboms []Report
+		for _, r := range reports {
+			if r.Kind == KindSBOM || r.Kind == KindBaseSBOM {
+				sboms = append(sboms, r)
+			}
+		}
+		want := []Report{{Path: "sbom.cdx.json", Kind: KindSBOM, Format: FormatCycloneDX, Source: SourceDiscovered}}
+		if !reflect.DeepEqual(sboms, want) {
+			t.Fatalf("sboms:\n got %+v\nwant %+v", sboms, want)
+		}
+	})
+
+	t.Run("a named base SBOM is never the commit's, and is never discovered", func(t *testing.T) {
+		root := tree(t, map[string]string{
+			"sbom.cdx.json": cycloneDXJSON,
+			"base.cdx.json": cycloneDXJSON,
+		})
+		reports, diags := Collect(Request{Root: root, Resolve: resolver(root), BaseSBOM: []string{"base.cdx.json"}, JUnit: []string{"none.xml"}, Coverage: []string{"none.info"}})
+		if got := codes(diags); !reflect.DeepEqual(got, []string{CodeReportMissing, CodeReportMissing}) {
+			t.Fatalf("codes %v", got)
+		}
+		want := []Report{
+			{Path: "base.cdx.json", Kind: KindBaseSBOM, Format: FormatCycloneDX, Source: SourceNamed},
+			{Path: "sbom.cdx.json", Kind: KindSBOM, Format: FormatCycloneDX, Source: SourceDiscovered},
+		}
+		if !reflect.DeepEqual(reports, want) {
+			t.Fatalf("reports:\n got %+v\nwant %+v", reports, want)
+		}
+	})
+
+	t.Run("a named SBOM outside the repository replaces discovery", func(t *testing.T) {
+		root := tree(t, map[string]string{"sbom.cdx.json": cycloneDXJSON})
+		outside := tree(t, map[string]string{"head.spdx.json": spdxJSON})
+		named := filepath.Join(outside, "head.spdx.json")
+		reports, _ := Collect(Request{Root: root, Resolve: resolver(root), SBOM: []string{named}})
+		want := []Report{{Path: filepath.ToSlash(named), Kind: KindSBOM, Format: FormatSPDX, Source: SourceNamed}}
+		var sboms []Report
+		for _, r := range reports {
+			if r.Kind == KindSBOM {
+				sboms = append(sboms, r)
+			}
+		}
+		if !reflect.DeepEqual(sboms, want) {
+			t.Fatalf("sboms:\n got %+v\nwant %+v", sboms, want)
+		}
+	})
+
+	t.Run("several documents for one side leave it unknown", func(t *testing.T) {
+		root := tree(t, map[string]string{
+			"a/sbom.cdx.json":  cycloneDXJSON,
+			"b/sbom.spdx.json": spdxJSON,
+			"base1.cdx.json":   cycloneDXJSON,
+			"base2.cdx.json":   cycloneDXJSON,
+		})
+		reports, diags := Collect(Request{Root: root, Resolve: resolver(root), BaseSBOM: []string{"base*.cdx.json"}, JUnit: []string{"none.xml"}, Coverage: []string{"none.info"}})
+		var ambiguous []diag.Diagnostic
+		for _, d := range diags {
+			if d.Code == CodeSBOMAmbiguous {
+				ambiguous = append(ambiguous, d)
+			}
+		}
+		if len(ambiguous) != 2 || ambiguous[0].Field != KindSBOM || ambiguous[1].Field != KindBaseSBOM {
+			t.Fatalf("ambiguous %+v", ambiguous)
+		}
+		if !strings.Contains(ambiguous[0].Message, "a/sbom.cdx.json, b/sbom.spdx.json") || !strings.Contains(ambiguous[1].Message, "--base-sbom") {
+			t.Fatalf("messages %q, %q", ambiguous[0].Message, ambiguous[1].Message)
+		}
+		if len(reports) != 0 {
+			t.Fatalf("reports %+v", reports)
+		}
+	})
+
+	t.Run("a named file that is not an SBOM is a diagnostic", func(t *testing.T) {
+		root := tree(t, map[string]string{"package.json": `{"name":"app"}`, "junit.xml": junitXML})
+		reports, diags := Collect(Request{Root: root, Resolve: resolver(root), SBOM: []string{"package.json"}, BaseSBOM: []string{"junit.xml"}, JUnit: []string{"junit.xml"}, Coverage: []string{"none.info"}})
+		if got := codes(diags); !reflect.DeepEqual(got, []string{CodeReportMissing, CodeReportUnrecognized, CodeReportUnrecognized}) {
+			t.Fatalf("codes %v", got)
+		}
+		if !strings.Contains(diags[2].Message, "junit.xml is not a base SBOM report (it reads as junit)") {
+			t.Fatalf("message %q", diags[2].Message)
+		}
+		if len(reports) != 1 || reports[0].Kind != KindJUnit {
+			t.Fatalf("reports %+v", reports)
+		}
+	})
+}

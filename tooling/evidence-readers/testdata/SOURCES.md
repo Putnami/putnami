@@ -23,3 +23,22 @@ The Node and PHP projects ran mounted at `/app` in a container whose hostname
 is `ci-runner`, so the absolute paths in the reports start with `/app`. The Go
 module is `example.com/calc`; its `go.mod` is kept as `go.mod.txt` so that no
 tool takes `sources/go` for a module.
+
+## Software bills of materials
+
+`sbom/` holds the CycloneDX 1.5 and SPDX 2.3 documents osv-scanner 2.7.0
+(`ghcr.io/google/osv-scanner`, osv-scalibr 0.5.3) wrote on 2026-11-02 for two
+npm lockfiles, kept under `sources/sbom/`: the base locks lodash 4.17.20 and
+minimist 1.2.5, the head locks lodash 4.17.21 and zod 3.23.8. The command, with
+the lockfile mounted at `/src`:
+
+```bash
+osv-scanner scan source --all-packages --licenses --format cyclonedx-1-5 -L /src/package-lock.json
+osv-scanner scan source --all-packages --licenses --format spdx-2-3 -L /src/package-lock.json
+```
+
+`base.cdx.json`, `head.cdx.json`, `base.spdx.json` and `head.spdx.json` are
+unmodified. osv-scanner writes no vulnerability into SPDX, so
+`head-advisories.spdx.json` is `head.spdx.json` with three `externalRefs`
+added by hand: a `SECURITY` `advisory` reference on each package and a
+`cpe23Type` one on lodash, the shape SPDX 2.3 gives a known vulnerability.
