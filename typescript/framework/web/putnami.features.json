@@ -429,7 +429,8 @@
             "kind": "acceptance",
             "checks": [
               "a-localized-page-lists-absolute-alternates-and-x-default",
-              "a-route-outside-the-localized-set-has-no-alternates"
+              "a-route-outside-the-localized-set-has-no-alternates",
+              "a-noindex-page-has-no-locale-links"
             ]
           }
         },
@@ -451,7 +452,10 @@
           "evidenceKinds": ["attestation"],
           "verification": {
             "kind": "acceptance",
-            "checks": ["an-absolute-link-keeps-the-current-locale-prefix"]
+            "checks": [
+              "an-absolute-link-keeps-the-current-locale-prefix",
+              "a-link-that-names-a-locale-stays-as-written"
+            ]
           }
         },
         {

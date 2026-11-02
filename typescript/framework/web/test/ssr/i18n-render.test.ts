@@ -192,10 +192,16 @@ describe('localized server render', () => {
       expect(html).toMatch(/<a href="\/fr\/pricing"[^>]*>pricing<\/a>/);
       expect(html).toMatch(/<a href="\/docs\/intro"[^>]*>docs<\/a>/);
       expect(html).toMatch(/<a href="\/docs\/intro#a"[^>]*>docs-object<\/a>/);
-      expect(html).toMatch(/<a href="\/ar\/pricing"[^>]*>arabic<\/a>/);
-      const english = await (await get('/pricing')).text();
-      expect(english).toMatch(/<a href="\/pricing"[^>]*>pricing<\/a>/);
-      expect(english).toMatch(/<a href="\/ar\/pricing"[^>]*>arabic<\/a>/);
+      expect(await (await get('/pricing')).text()).toMatch(/<a href="\/pricing"[^>]*>pricing<\/a>/);
+    },
+  );
+
+  specTest(
+    'links a path that names a locale as written, from any locale',
+    { feature, requirement: 'localized-links', check: 'a-link-that-names-a-locale-stays-as-written' },
+    async () => {
+      expect(await (await get('/fr/pricing')).text()).toMatch(/<a href="\/ar\/pricing"[^>]*>arabic<\/a>/);
+      expect(await (await get('/pricing')).text()).toMatch(/<a href="\/ar\/pricing"[^>]*>arabic<\/a>/);
     },
   );
 
@@ -298,16 +304,20 @@ describe('localized static render', () => {
 });
 
 describe('locale head', () => {
-  it('writes no canonical or alternate links on a noindex page', () => {
-    const settings = parseLocaleSettings({
-      locales: ['en', 'fr'],
-      defaultLocale: 'en',
-      siteUrl: 'https://example.com',
-    });
-    const meta = { metas: [{ name: 'robots', content: 'noindex' }] };
-    applyLocaleHead(meta, { settings, locale: 'fr', path: '/nothing', messages: {} });
-    expect(meta).toEqual({ links: [], metas: [{ name: 'robots', content: 'noindex' }] });
-  });
+  specTest(
+    'writes no canonical or alternate links on a noindex page',
+    { feature, requirement: 'alternate-links', check: 'a-noindex-page-has-no-locale-links' },
+    () => {
+      const settings = parseLocaleSettings({
+        locales: ['en', 'fr'],
+        defaultLocale: 'en',
+        siteUrl: 'https://example.com',
+      });
+      const meta = { metas: [{ name: 'robots', content: 'noindex' }] };
+      applyLocaleHead(meta, { settings, locale: 'fr', path: '/nothing', messages: {} });
+      expect(meta).toEqual({ links: [], metas: [{ name: 'robots', content: 'noindex' }] });
+    },
+  );
 });
 
 describe('localized manifest rows', () => {

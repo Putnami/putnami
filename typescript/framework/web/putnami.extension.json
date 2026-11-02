@@ -1,6 +1,6 @@
 {
   "$schema": "https://putnami.dev/schemas/putnami-extension.json",
-  "cliContract": 4,
+  "cliContract": 8,
   "name": "@putnami/web",
   "extensionDependencies": ["@putnami/application"],
   "hooks": {
@@ -49,9 +49,27 @@
       "args": ["run", "{extensionRoot}/bin/i18n.ts", "sync"],
       "cwd": "{projectRoot}",
       "timeoutMs": 120000,
+      "inputs": {
+        "messages": {
+          "from": "project",
+          "files": ["src/**/*.messages.ts", "src/**/*.messages.tsx"]
+        },
+        "catalogs": {
+          "from": "project",
+          "files": ["locales/*.json"]
+        },
+        "config": {
+          "from": "project",
+          "files": ["putnami.json"]
+        },
+        "extensionVersion": {
+          "from": "runtime"
+        }
+      },
       "writes": ["sources"],
       "cache": {
-        "enabled": false
+        "enabled": true,
+        "noOutput": true
       },
       "declares": {
         "mutatesSources": true
