@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"maps"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -19,13 +20,18 @@ import (
 	"go.putnami.dev/tooling/observe/internal/reports"
 )
 
-// sbomEnv is a GitHub Actions pull request job of the sbom demo.
-var sbomEnv = map[string]string{"GITHUB_ACTIONS": "true", "GITHUB_SERVER_URL": "https://github.com", "GITHUB_REPOSITORY": "Putnami/demo-observe-sbom", "GITHUB_REPOSITORY_ID": "1106", "GITHUB_RUN_ID": "41335501400", "GITHUB_JOB": "test", "GITHUB_REF": "refs/pull/1/merge"}
+// sbomEnv is the GitHub Actions pull request job of the turbo demo, for
+// another repository.
+var sbomEnv = func() map[string]string {
+	env := maps.Clone(demos["turbo"].env)
+	env["GITHUB_REPOSITORY"] = "Putnami/demo-observe-sbom"
+	env["GITHUB_REPOSITORY_ID"] = "1106"
+	return env
+}()
 
 // observeSBOMDemo observes the sbom demo. inRepository writes SBOM files of
 // the demo, or the given content, into the working tree, as a CI would; head
-// and base name SBOM
-// files written outside the repository, empty for none.
+// and base name SBOM files written outside the repository, empty for none.
 func observeSBOMDemo(t *testing.T, inRepository map[string]string, head, base string) Observation {
 	t.Helper()
 	root, baseSHA := demoRepository(t, "sbom")
