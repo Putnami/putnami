@@ -1,0 +1,29 @@
+{
+  "protocolVersion": 2,
+  "contracts": [
+    {
+      "authority": "GitHub REST API 2022-11-28 (docs.github.com/rest: commit statuses, issue comments) and GitLab REST API v4 (docs.gitlab.com/api: commit statuses, merge request notes)",
+      "adapter": "tooling/observe/internal/publish/api.go",
+      "callsites": [
+        {
+          "path": "tooling/observe/internal/publish/api.go",
+          "transport": "http",
+          "symbol": "http.Client",
+          "fingerprint": "5e4bd1b3b1a65fdc9826775fa95c1b034d5fc2086b6174c44c99dce4149451aa"
+        },
+        {
+          "path": "tooling/observe/internal/publish/api.go",
+          "transport": "http",
+          "symbol": "http.NewRequestWithContext",
+          "fingerprint": "4bfd834d67edb0e6167a771cc5c3828a9e6fd8fa4dae70e8b9b3ea8440f60890"
+        }
+      ],
+      "owner": "@putnami/observe",
+      "tests": [
+        "tooling/observe/cmd/putnami-observe/main_test.go",
+        "tooling/observe/internal/publish/publish_test.go"
+      ],
+      "reason": "putnami observe --publish posts a commit status and one summary note on the pull request or merge request its CI job runs for, with the token of that CI."
+    }
+  ]
+}

@@ -15,6 +15,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"net/http"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -30,6 +31,7 @@ import (
 	sdkcontext "go.putnami.dev/sdk/extension/context"
 	"go.putnami.dev/sdk/extension/runtimeinfo"
 	"go.putnami.dev/tooling/observe/internal/observe"
+	"go.putnami.dev/tooling/observe/internal/publish"
 	"go.putnami.dev/tooling/observe/internal/reports"
 	"go.putnami.dev/tooling/observe/internal/upload"
 )
@@ -49,7 +51,7 @@ const contextFlag = "--putnamiContext"
 var runtimeVersion string
 
 // knownFlags are the flags `putnami observe` takes.
-var knownFlags = []string{"base", "head", "junit", "coverage", "fetch", "evidence", "upload"}
+var knownFlags = []string{"base", "head", "junit", "coverage", "fetch", "evidence", "upload", "publish"}
 
 func run(args []string, getenv func(string) string, stdout, stderr io.Writer) int {
 	handled, err := runtimeinfo.Handle(args, stdout, extensionName, runtimeVersion)
@@ -84,6 +86,9 @@ func run(args []string, getenv func(string) string, stdout, stderr io.Writer) in
 	defer stop()
 	o := observe.Run(ctx, opts)
 	o.Diagnostics = append(o.Diagnostics, writeAndUpload(ctx, o, out, getenv, stderr)...)
+	if out.publish {
+		o.Diagnostics = append(o.Diagnostics, publish.Run(ctx, publish.Request{Observation: o, Getenv: getenv, Client: publishClient, Output: stderr})...)
+	}
 	write := observe.WriteText
 	if out.json {
 		write = observe.WriteJSON
@@ -103,7 +108,14 @@ type outputs struct {
 	upload bool
 	// json prints the observation as one JSON document.
 	json bool
+	// publish posts a commit status and a summary note on the pull or merge
+	// request.
+	publish bool
 }
+
+// publishClient sends the requests of --publish; nil is the default client.
+// Tests replace it.
+var publishClient *http.Client
 
 // writeAndUpload writes the evidence document when --evidence or --upload asks
 // for it, hands it to the evidence reporter on --upload, and returns the
@@ -156,6 +168,10 @@ func parseRun(args []string, launch *job.Context) (observe.Options, outputs, err
 	if err != nil {
 		return observe.Options{}, outputs{}, err
 	}
+	publishFlag, err := boolFlag(flags, "publish", false)
+	if err != nil {
+		return observe.Options{}, outputs{}, err
+	}
 	for _, name := range []string{"base", "head", "junit", "coverage", "evidence"} {
 		if value, ok := flags[name]; ok && (value == "" || value == "true") {
 			return observe.Options{}, outputs{}, fmt.Errorf("--%s needs a value", name)
@@ -175,7 +191,7 @@ func parseRun(args []string, launch *job.Context) (observe.Options, outputs, err
 	}
 	opts.Overrides.Base = flags["base"]
 	opts.Overrides.Head = flags["head"]
-	out := outputs{upload: uploadFlag}
+	out := outputs{upload: uploadFlag, publish: publishFlag}
 	if launch != nil {
 		switch launch.Params.String("output") {
 		case "json", "jsonl", "cloud-logging":

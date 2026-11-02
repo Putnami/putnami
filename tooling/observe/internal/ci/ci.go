@@ -63,6 +63,10 @@ type Subject struct {
 // ChangeRequest is a merge request (GitLab) or a pull request (GitHub).
 type ChangeRequest struct {
 	Number int `json:"number"`
+	// HeadSHA is the last commit of the request's source branch, where a
+	// commit status shows on the request. On a GitHub pull request the job
+	// builds a merge commit, so it differs from the subject's commit.
+	HeadSHA string `json:"headSha,omitempty"`
 }
 
 // Run names the CI job.
@@ -175,6 +179,9 @@ func detectGitHub(env Env, readFile ReadFile) Detection {
 		if d.Subject.ChangeRequest == nil && event.PullRequest.Number > 0 {
 			d.Subject.ChangeRequest = &ChangeRequest{Number: event.PullRequest.Number}
 		}
+		if d.Subject.ChangeRequest != nil && commitID(event.PullRequest.Head.SHA) {
+			d.Subject.ChangeRequest.HeadSHA = strings.ToLower(event.PullRequest.Head.SHA)
+		}
 	}
 	switch {
 	case env("GITHUB_BASE_REF") != "":
@@ -203,7 +210,16 @@ func detectGitLab(env Env) Detection {
 	}
 	d.Subject.ProjectID, d.Diagnostics = projectID(env("CI_PROJECT_ID"), "CI_PROJECT_ID", d.Diagnostics)
 	if number := positive(env("CI_MERGE_REQUEST_IID")); number != nil {
-		d.Subject.ChangeRequest = &ChangeRequest{Number: *number}
+		// A merged results pipeline builds a merge commit and names the
+		// source branch's commit in CI_MERGE_REQUEST_SOURCE_BRANCH_SHA.
+		head := ""
+		for _, sha := range []string{env("CI_MERGE_REQUEST_SOURCE_BRANCH_SHA"), env("CI_COMMIT_SHA")} {
+			if commitID(sha) {
+				head = strings.ToLower(sha)
+				break
+			}
+		}
+		d.Subject.ChangeRequest = &ChangeRequest{Number: *number, HeadSHA: head}
 	}
 	switch base := env("CI_MERGE_REQUEST_DIFF_BASE_SHA"); {
 	case commitID(base):
@@ -231,6 +247,9 @@ type event struct {
 		Base   struct {
 			SHA string `json:"sha"`
 		} `json:"base"`
+		Head struct {
+			SHA string `json:"sha"`
+		} `json:"head"`
 	} `json:"pull_request"`
 }
 
