@@ -7,6 +7,7 @@ import {
   SecurityHeadersMiddleware,
 } from '@putnami/application';
 import { useConfig } from '@putnami/runtime';
+import { joinPath } from '@putnami/utils';
 import React, { type ReactNode } from 'react';
 import type { RouteObject } from 'react-router';
 import { isLocalizedPath, localePrefix, localizePath, parseLocaleSettings } from '../shared/i18n/locale';
@@ -15,6 +16,7 @@ import { createPageElement } from '../shared/page-element';
 import { RouteTreeHelper } from '../shared/route-tree.utils';
 import type { I18nRuntimeOptions } from './i18n/runtime';
 import { excludedRouteRedirect, negotiatingEntry, recordingChoice } from './i18n/negotiation';
+import { SITEMAP_FILE, sitemapHandler } from './i18n/sitemap';
 import type {
   ErrorModule,
   LayoutModule,
@@ -177,6 +179,11 @@ export class ReactApplication {
       throw new Error('ReactApplication.i18n() must be called before any route is registered');
     }
     this._i18n = { settings: parseLocaleSettings(options.settings), messages: options.messages ?? {} };
+    this.httpPlugin.get(
+      '/sitemap.xml',
+      sitemapHandler(joinPath(this.statics.getPublicOutputDir(), SITEMAP_FILE)),
+      this.routeOptions(),
+    );
     return this;
   }
 

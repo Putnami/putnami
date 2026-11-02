@@ -4987,9 +4987,9 @@
       "publicEdge": true,
       "provenance": {
         "project": "putnami.dev",
-        "package": "@putnami/application",
-        "sourceKind": "typed-api",
-        "evidencePath": "src/api/sitemap.xml/get.ts"
+        "package": "@putnami/web",
+        "sourceKind": "public-file",
+        "evidencePath": ".gen/public/sitemap.xml"
       }
     },
     {
@@ -5021,5 +5021,5 @@
       }
     }
   ],
-  "digest": "sha256:d577e7809a844f4230c555fdcfedfdbb4d865cfa657de338c67328de83c4a589"
+  "digest": "sha256:771b1e03535846824b1cbe0b521975728022cc4ccd5a4ac4a10177f6ba7035c4"
 }

@@ -11,7 +11,7 @@
  * `http_routes.duplicate_route` and fails the build):
  *
  * - `@putnami/application` typed API routes scanned from `src/api/`
- *   (`/llms.txt`, `/sitemap.xml`, `/dl/{artifact}`, `/doc-markdown`);
+ *   (`/llms.txt`, `/dl/{artifact}`, `/doc-markdown`);
  * - `@putnami/application` staticFiles, from the files present in the SOURCE
  *   `public/` folder at generate time — `/favicon.ico`, `/robots.txt`,
  *   `/assets/`, `/fonts/`, plus `/schemas/`, whose dev mirror is written
@@ -21,8 +21,9 @@
  *   below with the warmup routes;
  * - `@putnami/web` file-routes (`/`, `/docs`, the enumerated expansion of the
  *   `/docs/[...page]` catch-all, each localized page under `/fr`, and each
- *   built `/fr/docs` redirect to the English docs) and the hashed client bundle prefixes
- *   `/react/` and `/react-islands/`.
+ *   built `/fr/docs` redirect to the English docs), the `/sitemap.xml` the
+ *   build writes with an alternate per locale, and the hashed client bundle
+ *   prefixes `/react/` and `/react-islands/`.
  *
  * What is left, and why only this plugin can state it:
  *

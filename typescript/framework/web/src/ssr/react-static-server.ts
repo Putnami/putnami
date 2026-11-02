@@ -29,8 +29,12 @@ export class ReactStaticServer {
    * (`.gen/<public>/static`).
    */
   getStaticOutputDir(): string {
-    const base = this.config.assetsDir ?? joinPath(getProjectRoot(), '.gen', this.config.publicFolder);
-    return joinPath(base, 'static');
+    return joinPath(this.getPublicOutputDir(), 'static');
+  }
+
+  /** Absolute directory of the build's public output (`.gen/<public>`). */
+  getPublicOutputDir(): string {
+    return this.config.assetsDir ?? joinPath(getProjectRoot(), '.gen', this.config.publicFolder);
   }
 
   /**

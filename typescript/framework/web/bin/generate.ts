@@ -60,8 +60,14 @@ import {
   localizeRows,
   resolveI18nBuild,
 } from '../src/ssr/i18n/build';
+import { buildSitemap, SITEMAP_FILE } from '../src/ssr/i18n/sitemap';
 import type { ReactApplication } from '../src/ssr/react-application';
-import { buildWebAssetHttpRoutes, buildWebPageHttpRoutes, type WebPageRouteFact } from '../src/ssr/http-routes';
+import {
+  buildWebAssetHttpRoutes,
+  buildWebPageHttpRoutes,
+  buildWebSitemapHttpRoutes,
+  type WebPageRouteFact,
+} from '../src/ssr/http-routes';
 import { PutnamiReactConfig } from '../src/ssr/react-ssr.config';
 import { applyRoutePrefix, asRoute } from '../src/ssr/react-ssr.utils';
 import { resolveScanRoots } from '../src/ssr/scan-roots.utils';
@@ -269,6 +275,7 @@ async function runGenerate(_options: unknown, context: HookContext): Promise<Hoo
   emitArtifact('write', relativePath(projectRoot, reactApplicationPath));
 
   // Pre-render static routes (SSG/ISR) to zero-JS HTML.
+  const prerenderedPaths = new Map<string, string[]>();
   if (staticSpecs.length > 0) {
     emitProgress('Pre-rendering static routes', 90, 'prerender');
     const staticDir = joinPath(projectRoot, '.gen', config.publicFolder, 'static');
@@ -278,6 +285,7 @@ async function runGenerate(_options: unknown, context: HookContext): Promise<Hoo
         emitLog('info', msg),
       );
       for (const p of prerendered) {
+        prerenderedPaths.set(p.route, [...(prerenderedPaths.get(p.route) ?? []), p.pathname]);
         emitArtifact(
           'write',
           joinPath(config.publicFolder, 'static', p.file),
@@ -302,6 +310,17 @@ async function runGenerate(_options: unknown, context: HookContext): Promise<Hoo
       emitLog('error', `Static pre-render failed: ${error instanceof Error ? error.message : String(error)}`);
       throw error;
     }
+  }
+
+  // A localized application's sitemap lists every page URL with its alternates.
+  if (i18n) {
+    const sitemapPath = joinPath(projectRoot, '.gen', config.publicFolder, SITEMAP_FILE);
+    const pagesForSitemap = httpPageRoutes.map((page) => ({
+      route: page.route,
+      prerendered: prerenderedPaths.get(page.route) ?? [],
+    }));
+    await write(sitemapPath, buildSitemap(i18n.settings, pagesForSitemap));
+    emitArtifact('write', relativePath(projectRoot, sitemapPath));
   }
 
   // Emit the per-route determinism manifest (route · mode · hydration · JS budget).
@@ -344,6 +363,7 @@ async function runGenerate(_options: unknown, context: HookContext): Promise<Hoo
       ...localizeRows(i18n?.settings, httpPageRoutes),
       ...excludedRedirectRows(i18n?.settings, httpPageRoutes),
     ]),
+    ...(i18n ? buildWebSitemapHttpRoutes(config.publicFolder) : []),
     ...buildWebAssetHttpRoutes(
       config.publicFolder,
       [...addClientScripts, ...islandScripts].map((script) => script.route),
