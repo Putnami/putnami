@@ -276,7 +276,7 @@ func TestWithoutABaseSBOMTheBaseIsUnknown(t *testing.T) {
 	)
 }
 
-func TestAnSPDXDocumentGivesLicencesAndAdvisories(t *testing.T) {
+func TestAnSPDXDocumentGivesLicensesAndAdvisories(t *testing.T) {
 	spectest.Proves(t, analysesFeature, "dependency-sbom-facts", "an-spdx-document-gives-licenses-and-advisories")
 	// The head SBOM is discovered in the working tree; the base one is named.
 	o := observeSBOMDemo(t, map[string]string{"sbom.spdx.json": "head-advisories.spdx.json"}, "", "base.spdx.json")
