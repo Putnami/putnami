@@ -169,9 +169,10 @@ A locale is published only when its catalog is complete.
 An agent drafts translations; a person locks the ones they checked.
 
 1. `putnami i18n translate --projects /my-site` writes `.putnami/i18n/translate.json` in the project: each missing and stale entry with `text: null`, its default text, a stale entry's old default text and translation, the namespace's other translations, and the glossary terms it contains.
-2. An agent fills each `text`. The web extension installs the `i18n-translate` skill, which tells it how: keep the arguments and tags, follow the glossary, reuse the words of the other translations.
-3. `putnami i18n translate --apply --projects /my-site` writes the answers as `draft` entries and deletes the work file. It writes nothing when one answer is refused: an answer for a validated entry, invalid ICU, other arguments or tags than the default text, or a default text that changed since the work file was written.
-4. `putnami i18n validate --projects /my-site --locale fr` shows a person each draft and stale translation next to its default text. Each one they accept becomes `validated`, with their git `user.name` and `user.email` and the day. Validating a stale translation records the current default text as its `source`.
+2. An agent fills each `text`. The `i18n-translate` skill tells it how: keep the arguments and tags, follow the glossary, reuse the words of the other translations. A workspace installs the skill by listing `"extension:@putnami/web"` in `agentArtifacts` in `putnami.workspace.json`.
+   Running `translate` again keeps the answers whose default text did not change.
+3. `putnami i18n translate --apply --projects /my-site` writes the answers as `draft` entries and deletes the work file. It writes nothing when one answer is refused: an answer for a validated entry or an unknown locale, namespace or key, invalid ICU, other arguments or tags than the default text, or a default text that changed since the work file was written.
+4. `putnami i18n validate --projects /my-site --locale fr` shows a person each draft and stale translation next to its default text. Each one they accept becomes `validated`, with their git `user.name` and `user.email` and the day in their time zone. Validating a stale translation records the current default text as its `source`.
 
 `validate` refuses without an interactive terminal, inside an agent session, or without a git identity. No Putnami command calls a model: the agent of your session translates. When a build reports missing or stale translations, it names `putnami i18n translate`, and the contributor workflow runs it before committing.
 

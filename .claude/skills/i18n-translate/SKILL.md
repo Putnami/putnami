@@ -23,7 +23,8 @@ person validates drafts later with `putnami i18n validate`; you never do.
 3. Run `putnami i18n translate --apply --projects <project>`. It writes your
    answers as drafts and deletes the work file. When it refuses an answer, it
    writes nothing and names each refused entry: correct those in the work
-   file and apply again.
+   file and apply again. When a default text changed meanwhile, run step 1
+   again: it keeps your other answers and asks for that entry anew.
 4. Commit the catalogs with the change that altered the messages.
 
 ## How to translate

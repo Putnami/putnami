@@ -290,8 +290,9 @@ t.terms({ link: (chunks) => <Link to='/terms'>{chunks}</Link> });
   deletes the file of a removed namespace; the build never writes them.
 - To translate, run `putnami i18n translate --projects <project>`, fill
   each `text: null` of `<project>/.putnami/i18n/translate.json` (the
-  `i18n-translate` skill says how), then run it again with `--apply`: it
-  writes drafts. Never edit catalog entries by hand, never write
+  `i18n-translate` skill says how; a workspace installs it with
+  `"extension:@putnami/web"` in `agentArtifacts`), then run it again with
+  `--apply`: it writes drafts. Never edit catalog entries by hand, never write
   `validated`: a person runs `putnami i18n validate`.
 - `putnami build` fails on a missing translation, invalid ICU syntax, or a
   translation whose arguments or tags differ from its default text. Serve and

@@ -187,10 +187,42 @@ describe('putnami i18n translate', () => {
       const stale: string[] = [];
       expect(await translate(dir, true, (line) => stale.push(line))).toBe(1);
       expect(stale[0]).toBe(
-        'error locales/fr/home.json seats: the default text changed after the work file was written; run `putnami i18n translate` again',
+        'error locales/fr/home.json seats: the default text changed after the work file was written; run `putnami i18n translate` again: it keeps the other answers',
       );
     },
   );
+
+  it('keeps the answers whose default text did not change when it rewrites the work file', async () => {
+    const dir = project();
+    await translate(dir, false, () => {});
+    answer(dir, {
+      lede: 'Créez un espace de travail Putnami en quelques minutes.',
+      seats: '{count, plural, one {# siège} other {# sièges}}',
+    });
+    // The seats answer was made from another default text than the current one.
+    const outdated = readWork(dir);
+    const seats = outdated.locales['fr']?.['home']?.entries['seats'];
+    if (seats) seats.source = '{count} seats';
+    writeFileSync(join(dir, WORK_FILE), JSON.stringify(outdated));
+    const lines: string[] = [];
+    expect(await translate(dir, false, (line) => lines.push(line))).toBe(0);
+    expect(lines[0]).toContain('2 entries to translate, 1 answered in the previous work file');
+    const entries = readWork(dir).locales['fr']?.['home']?.entries;
+    expect(entries?.['lede']?.text).toBe('Créez un espace de travail Putnami en quelques minutes.');
+    expect(entries?.['seats']).toEqual({ source: '{count, plural, one {# seat} other {# seats}}', text: null });
+  });
+
+  it('refuses an answer that is not an object', async () => {
+    const dir = project();
+    await translate(dir, false, () => {});
+    const work = readWork(dir) as unknown as { locales: Record<string, Record<string, { entries: unknown }>> };
+    const home = work.locales['fr']?.['home'];
+    if (home) home.entries = { seats: '{count} sièges' };
+    writeFileSync(join(dir, WORK_FILE), JSON.stringify(work));
+    const lines: string[] = [];
+    expect(await translate(dir, true, (line) => lines.push(line))).toBe(1);
+    expect(lines[0]).toBe('error locales/fr/home.json seats: an answer is an object with source and text');
+  });
 
   it('refuses to apply without a work file, or one that is not version 1', async () => {
     const dir = project();

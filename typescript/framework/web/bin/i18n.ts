@@ -28,7 +28,13 @@ import { dirname, join, relative } from 'node:path';
 import { readProjectConfigFile } from '@putnami/utils';
 import { formatDiagnostic, type I18nBuild, resolveI18nBuild } from '../src/ssr/i18n/build';
 import { type Glossary, readGlossary } from '../src/ssr/i18n/glossary';
-import { applyTranslationWork, countWork, translationWork, WORK_FILE } from '../src/ssr/i18n/translate';
+import {
+  applyTranslationWork,
+  carryOverAnswers,
+  countWork,
+  translationWork,
+  WORK_FILE,
+} from '../src/ssr/i18n/translate';
 import {
   AGENT_SESSION_VARIABLES,
   type ValidationCandidate,
@@ -132,12 +138,39 @@ export async function translate(projectRoot: string, apply: boolean, log: (line:
     log('Every published locale is translated; nothing to do');
     return 0;
   }
+  const kept = existsSync(workFile) ? carryOverAnswers(work, readJson(workFile)) : 0;
   mkdirSync(dirname(workFile), { recursive: true });
   writeFileSync(workFile, `${JSON.stringify(work, null, 2)}\n`);
   log(
-    `wrote ${WORK_FILE}: ${count} entr${count === 1 ? 'y' : 'ies'} to translate. Fill each null text, then run \`putnami i18n translate --apply\``,
+    `wrote ${WORK_FILE}: ${count} entr${count === 1 ? 'y' : 'ies'} to translate${kept > 0 ? `, ${kept} answered in the previous work file` : ''}. Fill each null text, then run \`putnami i18n translate --apply\``,
   );
   return 0;
+}
+
+/** Ask until the person answers yes, no or quit. */
+async function decision(session: ValidationSession): Promise<'yes' | 'no' | 'quit'> {
+  for (;;) {
+    const reply = (await session.ask('Validate? [y]es, [n]o, [q]uit: ')).trim().toLowerCase();
+    if (reply === 'y' || reply === 'yes') return 'yes';
+    if (reply === 'n' || reply === 'no') return 'no';
+    if (reply === 'q' || reply === 'quit') return 'quit';
+    session.log('  answer y, n or q');
+  }
+}
+
+/** The calendar day of a date in the local time zone, as `YYYY-MM-DD`. */
+export function localDay(date: Date): string {
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+}
+
+/** The parsed JSON of a file, or undefined when it is not JSON. */
+function readJson(file: string): unknown {
+  try {
+    return JSON.parse(readFileSync(file, 'utf8'));
+  } catch {
+    return undefined;
+  }
 }
 
 /** What validation reads from the person's session, injected so a test can play the person. */
@@ -212,9 +245,9 @@ export async function validate(
       log(`  skipped: ${candidate.defect}; correct it in ${catalogLabel(candidate)} first`);
       continue;
     }
-    const reply = (await session.ask('Validate? [y]es, [n]o, [q]uit: ')).trim().toLowerCase();
-    if (reply === 'q' || reply === 'quit') break;
-    if (reply === 'y' || reply === 'yes') accepted.push(candidate);
+    const reply = await decision(session);
+    if (reply === 'quit') break;
+    if (reply === 'yes') accepted.push(candidate);
   }
   const writes = validateEntries(build, accepted, `${identity.name} <${identity.email}>`, session.today());
   for (const { file, content } of writes) {
@@ -269,7 +302,7 @@ async function validateSelected(context: JobContext, log: (line: string) => void
         const email = gitConfig(root, 'user.email');
         return name && email ? { name, email } : undefined;
       },
-      today: () => new Date().toISOString().slice(0, 10),
+      today: () => localDay(new Date()),
       ask: (question) => prompt.question(question),
       log,
     });
@@ -282,12 +315,15 @@ if (import.meta.main) {
   const args = process.argv.slice(2);
   const [verb] = args;
   const context = jobContext(args);
+  // The CLI skips a captured task's plain stdout lines and shows its stderr when it fails:
+  // a refused entry reaches the person or agent that ran the command.
   // biome-ignore lint/suspicious/noConsole: CLI report output
-  const log = (line: string) => console.log(line);
-  // process.exitCode, not process.exit(): exit drops the report lines still queued on a stdout pipe.
-  if (verb === 'sync') process.exitCode = await sync(process.cwd(), log);
-  else if (verb === 'translate') process.exitCode = await translate(process.cwd(), flag(context, 'apply'), log);
-  else if (verb === 'validate') process.exitCode = await validateSelected(context, log);
+  const report = (line: string) => console.error(line);
+  // process.exitCode, not process.exit(): exit drops the lines still queued on a pipe.
+  if (verb === 'sync') process.exitCode = await sync(process.cwd(), report);
+  else if (verb === 'translate') process.exitCode = await translate(process.cwd(), flag(context, 'apply'), report);
+  // biome-ignore lint/suspicious/noConsole: validate owns the terminal
+  else if (verb === 'validate') process.exitCode = await validateSelected(context, (line) => console.log(line));
   else {
     // biome-ignore lint/suspicious/noConsole: CLI usage output
     console.error('Usage: putnami i18n sync|translate|validate');

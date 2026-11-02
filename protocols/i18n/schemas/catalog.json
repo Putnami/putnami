@@ -34,7 +34,8 @@
         "validatedAt": {
           "type": "string",
           "format": "date",
-          "description": "The day it was validated, as YYYY-MM-DD."
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$",
+          "description": "The day it was validated, as YYYY-MM-DD in the validator's local calendar."
         }
       },
       "if": { "properties": { "state": { "const": "validated" } } },

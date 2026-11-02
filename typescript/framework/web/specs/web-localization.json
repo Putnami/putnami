@@ -54,7 +54,7 @@
     },
     {
       "id": "agent-translation",
-      "text": "putnami i18n translate writes a work file with every missing and stale entry of each published locale, its default text, the old default text and translation of a stale entry, the glossary terms it contains and its namespace's other messages. Applying the file writes each answer as a draft, and writes nothing when one answer names an unknown key or a validated entry, is not valid ICU MessageFormat, or uses other arguments or tags than its default text."
+      "text": "putnami i18n translate writes a work file with every missing and stale entry of each published locale, its default text, a stale entry's old text and translation, its glossary terms and its namespace's other messages. Applying the file writes each answer as a draft, and writes nothing when one answer names an unknown locale, namespace or key, or a validated entry, answers an outdated default text, is not valid ICU MessageFormat, or uses other arguments or tags than its default text."
     },
     {
       "id": "human-validation",

@@ -85,6 +85,34 @@ export function countWork(work: TranslationWork): number {
   return count;
 }
 
+/**
+ * Keep the answers of a previous work file in a new one: an entry whose default
+ * text is unchanged keeps its non-empty text, so rewriting the work file after
+ * one default text changed costs only that entry. Returns how many it kept.
+ */
+export function carryOverAnswers(work: TranslationWork, previous: unknown): number {
+  if (!isObject(previous) || previous['protocolVersion'] !== 1 || !isObject(previous['locales'])) return 0;
+  let kept = 0;
+  for (const [locale, namespaces] of Object.entries(work.locales)) {
+    const before = previous['locales'][locale];
+    if (!isObject(before)) continue;
+    for (const [namespace, group] of Object.entries(namespaces)) {
+      const old = before[namespace];
+      const entries = isObject(old) && isObject(old['entries']) ? old['entries'] : {};
+      for (const [key, entry] of Object.entries(group.entries)) {
+        const answer = entries[key];
+        if (!isObject(answer) || answer['source'] !== entry.source) continue;
+        const text = answer['text'];
+        if (typeof text === 'string' && text.trim() !== '') {
+          entry.text = text;
+          kept++;
+        }
+      }
+    }
+  }
+  return kept;
+}
+
 export interface AppliedWork {
   /** The catalog files to write, absolute, when no answer was refused. */
   writes: { file: string; content: string }[];
@@ -134,7 +162,11 @@ export function applyTranslationWork(build: I18nBuild, work: unknown): AppliedWo
       }
       for (const [key, answer] of Object.entries(group['entries'])) {
         const where = `${label} ${key}`;
-        const text = isObject(answer) ? answer['text'] : undefined;
+        if (!isObject(answer)) {
+          errors.push(`${where}: an answer is an object with source and text`);
+          continue;
+        }
+        const text = answer['text'];
         if (text === null) continue;
         const source = defaults[key];
         if (source === undefined) {
@@ -146,9 +178,9 @@ export function applyTranslationWork(build: I18nBuild, work: unknown): AppliedWo
           errors.push(`${where}: a person validated this translation; an agent never rewrites it`);
           continue;
         }
-        if (!isObject(answer) || answer['source'] !== source) {
+        if (answer['source'] !== source) {
           errors.push(
-            `${where}: the default text changed after the work file was written; run \`putnami i18n translate\` again`,
+            `${where}: the default text changed after the work file was written; run \`putnami i18n translate\` again: it keeps the other answers`,
           );
           continue;
         }

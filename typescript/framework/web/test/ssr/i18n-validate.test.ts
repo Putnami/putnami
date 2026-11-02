@@ -3,7 +3,7 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'nod
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { specTest } from '@putnami/runtime/spectest';
-import { type ValidationSession, validate } from '../../bin/i18n';
+import { localDay, type ValidationSession, validate } from '../../bin/i18n';
 import { type CatalogFile, serializeCatalogFile } from '../../src/ssr/i18n/catalog';
 
 const feature = 'typescript/web-localization';
@@ -129,6 +129,20 @@ describe('putnami i18n validate', () => {
       expect(readFileSync(join(dir, 'locales/fr/home.json'), 'utf8')).toBe(before);
     },
   );
+
+  it('asks again after a reply it does not know', async () => {
+    const dir = project();
+    const person = session(['oui', '', 'y', 'q']);
+    expect(await validate(dir, 'fr', person)).toBe(0);
+    expect(person.lines.filter((line) => line === '  answer y, n or q')).toHaveLength(2);
+    // The lede comes first: the person accepted it at the third reply, then quit at the title.
+    expect(readCatalog(dir).lede?.state).toBe('validated');
+    expect(readCatalog(dir).title?.state).toBe('draft');
+  });
+
+  it('records the local calendar day', () => {
+    expect(localDay(new Date(2026, 10, 3, 0, 30))).toBe('2026-11-03');
+  });
 
   it('refuses a locale that is not published', async () => {
     const dir = project();
