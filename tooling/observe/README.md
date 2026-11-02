@@ -5,14 +5,17 @@ keeps its own CI and has no Putnami workspace. Its `putnami observe` command
 runs at the end of the job, after the build and the tests, and changes nothing
 in the pipeline.
 
-It answers four questions:
+It answers five questions:
 
 - Which CI ran the job, and which repository and commit it built. The
   repository key is the code host and its numeric project id, which survive a
   rename or a transfer.
 - Which commit the change is measured against, even on a shallow clone.
-- Which files the change touches.
-- Which test and coverage reports the job produced.
+- Which files the change touches, which components they belong to, and which
+  components depend on those.
+- Which tests passed or failed and which lines they covered, per component,
+  and how much of the changed lines they covered.
+- Which dependency versions the lockfiles moved.
 
 A missing or malformed report, or a base it cannot reach, is a diagnostic:
 `putnami observe` exits 0 whatever it observes, 2 on a usage error, and 1 when
@@ -47,6 +50,8 @@ See [doc/04-node-workspaces.md](doc/04-node-workspaces.md) for how it reads the
 packages of an npm, pnpm or yarn workspace.
 See [doc/05-go-modules.md](doc/05-go-modules.md) for how it reads the modules,
 edges and dependency versions of a Go repository.
+See [doc/06-change-analyses.md](doc/06-change-analyses.md) for how it maps a
+change to components, tests, coverage and dependencies.
 
 ## Support
 

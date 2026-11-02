@@ -1,0 +1,513 @@
+The nx demo: its base, the files its change rewrites, and the reports its CI wrote.
+-- base/nx.json --
+{
+  "$schema": "./node_modules/nx/schemas/nx-schema.json",
+  "neverConnectToCloud": true,
+  "targetDefaults": {
+    "build": {
+      "dependsOn": ["^build"],
+      "outputs": ["{projectRoot}/dist"],
+      "cache": true
+    },
+    "test": {
+      "dependsOn": ["^build"],
+      "outputs": ["{projectRoot}/reports"],
+      "cache": true
+    }
+  }
+}
+-- base/package.json --
+{
+  "name": "demo-observe-nx",
+  "private": true,
+  "workspaces": ["apps/*", "packages/*"],
+  "scripts": {
+    "build": "nx run-many -t build",
+    "test": "nx run-many -t test"
+  },
+  "devDependencies": {
+    "@types/jest": "^30.0.0",
+    "@types/node": "^22.0.0",
+    "jest": "^30.0.0",
+    "jest-junit": "^16.0.0",
+    "nx": "^21.0.0",
+    "ts-jest": "^29.4.0",
+    "typescript": "^5.6.0"
+  }
+}
+-- base/package-lock.json --
+{
+  "name": "demo-observe-nx",
+  "lockfileVersion": 3,
+  "requires": true,
+  "packages": {
+    "": {
+      "name": "demo-observe-nx",
+      "workspaces": [
+        "apps/*",
+        "packages/*"
+      ],
+      "devDependencies": {
+        "@types/jest": "^30.0.0",
+        "@types/node": "^22.0.0",
+        "jest": "^30.0.0",
+        "jest-junit": "^16.0.0",
+        "nx": "^21.0.0",
+        "ts-jest": "^29.4.0",
+        "typescript": "^5.6.0"
+      }
+    },
+    "apps/api": {
+      "name": "@demo/api",
+      "version": "1.0.0",
+      "dependencies": {
+        "@demo/pricing": "1.0.0"
+      }
+    },
+    "node_modules/@demo/api": {
+      "resolved": "apps/api",
+      "link": true
+    },
+    "node_modules/@demo/pricing": {
+      "resolved": "packages/pricing",
+      "link": true
+    },
+    "node_modules/decimal.js": {
+      "version": "10.4.3",
+      "resolved": "https://registry.npmjs.org/decimal.js/-/decimal.js-10.4.3.tgz",
+      "integrity": "sha512-VBBaLc1MgL5XpzgIP7ny5Z6Nx3UrRkIViUkPUdtl9aya5amy3De1gsUUSB1g3+3sExYNjCAsAznmukyxCb1GRA=="
+    },
+    "node_modules/jest": {
+      "version": "30.5.2",
+      "resolved": "https://registry.npmjs.org/jest/-/jest-30.5.2.tgz",
+      "integrity": "sha512-3gnpdBIza8ijCl3iMV9ChE3hSt1+46865qqod863gQtJr1DixOkAU5DoGbi3u+XlRcw++BhZQMu/y4xBdHBvSQ==",
+      "dev": true,
+      "dependencies": {
+        "@jest/core": "30.5.2",
+        "@jest/types": "30.5.1",
+        "import-local": "^3.2.0",
+        "jest-cli": "30.5.2"
+      },
+      "bin": {
+        "jest": "bin/jest.js"
+      },
+      "engines": {
+        "node": "^18.14.0 || ^20.0.0 || ^22.0.0 || >=24.0.0"
+      },
+      "peerDependencies": {
+        "node-notifier": "^8.0.1 || ^9.0.0 || ^10.0.0"
+      },
+      "peerDependenciesMeta": {
+        "node-notifier": {
+          "optional": true
+        }
+      }
+    },
+    "packages/pricing": {
+      "name": "@demo/pricing",
+      "version": "1.0.0",
+      "dependencies": {
+        "decimal.js": "10.4.3"
+      }
+    }
+  }
+}
+-- base/packages/pricing/package.json --
+{
+  "name": "@demo/pricing",
+  "version": "1.0.0",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "jest"
+  },
+  "dependencies": {
+    "decimal.js": "10.4.3"
+  }
+}
+-- base/packages/pricing/jest.config.js --
+/** @type {import('jest').Config} */
+module.exports = {
+  preset: 'ts-jest',
+  testEnvironment: 'node',
+  testMatch: ['<rootDir>/src/**/*.spec.ts'],
+  reporters: ['default', ['jest-junit', { outputDirectory: 'reports', outputName: 'junit.xml' }]],
+  collectCoverage: true,
+  collectCoverageFrom: ['src/**/*.ts', '!src/**/*.spec.ts', '!src/server.ts'],
+  coverageDirectory: 'reports/coverage',
+  coverageReporters: ['text', 'cobertura'],
+};
+-- base/packages/pricing/src/index.ts --
+import Decimal from 'decimal.js';
+
+export interface Line {
+  sku: string;
+  unitPrice: string;
+  quantity: number;
+}
+
+/** Sum of the lines, before tax, as a decimal string with two places. */
+export function subtotal(lines: Line[]): string {
+  const total = lines.reduce((sum, line) => {
+    const price = new Decimal(line.unitPrice);
+    if (price.isNegative() || line.quantity < 0) {
+      throw new RangeError(`invalid line ${line.sku}`);
+    }
+    return sum.plus(price.times(line.quantity));
+  }, new Decimal(0));
+  return total.toFixed(2);
+}
+
+/** Adds a tax rate given as a fraction, for example "0.2", rounded half up. */
+export function withTax(amount: string, rate: string): string {
+  const value = new Decimal(amount);
+  return value.plus(value.times(rate)).toDecimalPlaces(2, Decimal.ROUND_HALF_UP).toFixed(2);
+}
+-- base/packages/pricing/src/index.spec.ts --
+import { subtotal, withTax } from './index';
+
+describe('subtotal', () => {
+  it('sums the lines', () => {
+    expect(
+      subtotal([
+        { sku: 'a', unitPrice: '2.50', quantity: 2 },
+        { sku: 'b', unitPrice: '1.00', quantity: 1 },
+      ]),
+    ).toBe('6.00');
+  });
+
+  it('rejects a negative price', () => {
+    expect(() => subtotal([{ sku: 'a', unitPrice: '-1', quantity: 1 }])).toThrow(RangeError);
+  });
+});
+
+describe('withTax', () => {
+  it('adds 20 %', () => {
+    expect(withTax('10.00', '0.2')).toBe('12.00');
+  });
+});
+-- base/apps/api/package.json --
+{
+  "name": "@demo/api",
+  "version": "1.0.0",
+  "private": true,
+  "main": "dist/server.js",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "jest",
+    "start": "node dist/server.js"
+  },
+  "dependencies": {
+    "@demo/pricing": "1.0.0"
+  }
+}
+-- base/apps/api/jest.config.js --
+/** @type {import('jest').Config} */
+module.exports = {
+  preset: 'ts-jest',
+  testEnvironment: 'node',
+  testMatch: ['<rootDir>/src/**/*.spec.ts'],
+  reporters: ['default', ['jest-junit', { outputDirectory: 'reports', outputName: 'junit.xml' }]],
+  collectCoverage: true,
+  collectCoverageFrom: ['src/**/*.ts', '!src/**/*.spec.ts', '!src/server.ts'],
+  coverageDirectory: 'reports/coverage',
+  coverageReporters: ['text', 'cobertura'],
+};
+-- base/apps/api/src/quote.ts --
+import { randomUUID } from 'node:crypto';
+import { Line, subtotal, withTax } from '@demo/pricing';
+
+/** Tax rate applied to every quote: 20 %. */
+const TAX_RATE = '0.2';
+
+export interface Quote {
+  id: string;
+  total: string;
+}
+
+export function quote(lines: Line[]): Quote {
+  return { id: randomUUID(), total: withTax(subtotal(lines), TAX_RATE) };
+}
+-- base/apps/api/src/quote.spec.ts --
+import { quote } from './quote';
+
+describe('quote', () => {
+  it('prices the lines with tax', () => {
+    const result = quote([{ sku: 'a', unitPrice: '5.00', quantity: 2 }]);
+    expect(result.total).toBe('12.00');
+    expect(result.id).toMatch(/^[0-9a-f-]{36}$/);
+  });
+
+  it('rejects an invalid line', () => {
+    expect(() => quote([{ sku: 'a', unitPrice: '-5', quantity: 1 }])).toThrow(RangeError);
+  });
+});
+-- head/package-lock.json --
+{
+  "name": "demo-observe-nx",
+  "lockfileVersion": 3,
+  "requires": true,
+  "packages": {
+    "": {
+      "name": "demo-observe-nx",
+      "workspaces": [
+        "apps/*",
+        "packages/*"
+      ],
+      "devDependencies": {
+        "@types/jest": "^30.0.0",
+        "@types/node": "^22.0.0",
+        "jest": "^30.0.0",
+        "jest-junit": "^16.0.0",
+        "nx": "^21.0.0",
+        "ts-jest": "^29.4.0",
+        "typescript": "^5.6.0"
+      }
+    },
+    "apps/api": {
+      "name": "@demo/api",
+      "version": "1.0.0",
+      "dependencies": {
+        "@demo/pricing": "1.0.0"
+      }
+    },
+    "node_modules/@demo/api": {
+      "resolved": "apps/api",
+      "link": true
+    },
+    "node_modules/@demo/pricing": {
+      "resolved": "packages/pricing",
+      "link": true
+    },
+    "node_modules/decimal.js": {
+      "version": "10.5.0",
+      "resolved": "https://registry.npmjs.org/decimal.js/-/decimal.js-10.5.0.tgz",
+      "integrity": "sha512-8vDa8Qxvr/+d94hSh5P3IJwI5t8/c0KsMp+g8bNw9cY2icONa5aPfvKeieW1WlG0WQYwwhJ7mjui2xtiePQSXw=="
+    },
+    "node_modules/jest": {
+      "version": "30.5.2",
+      "resolved": "https://registry.npmjs.org/jest/-/jest-30.5.2.tgz",
+      "integrity": "sha512-3gnpdBIza8ijCl3iMV9ChE3hSt1+46865qqod863gQtJr1DixOkAU5DoGbi3u+XlRcw++BhZQMu/y4xBdHBvSQ==",
+      "dev": true,
+      "dependencies": {
+        "@jest/core": "30.5.2",
+        "@jest/types": "30.5.1",
+        "import-local": "^3.2.0",
+        "jest-cli": "30.5.2"
+      },
+      "bin": {
+        "jest": "bin/jest.js"
+      },
+      "engines": {
+        "node": "^18.14.0 || ^20.0.0 || ^22.0.0 || >=24.0.0"
+      },
+      "peerDependencies": {
+        "node-notifier": "^8.0.1 || ^9.0.0 || ^10.0.0"
+      },
+      "peerDependenciesMeta": {
+        "node-notifier": {
+          "optional": true
+        }
+      }
+    },
+    "packages/pricing": {
+      "name": "@demo/pricing",
+      "version": "1.0.0",
+      "dependencies": {
+        "decimal.js": "10.5.0"
+      }
+    }
+  }
+}
+-- head/packages/pricing/package.json --
+{
+  "name": "@demo/pricing",
+  "version": "1.0.0",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "jest"
+  },
+  "dependencies": {
+    "decimal.js": "10.5.0"
+  }
+}
+-- head/packages/pricing/src/index.ts --
+import Decimal from 'decimal.js';
+
+export interface Line {
+  sku: string;
+  unitPrice: string;
+  quantity: number;
+}
+
+/** Sum of the lines, before tax, as a decimal string with two places. */
+export function subtotal(lines: Line[]): string {
+  const total = lines.reduce((sum, line) => {
+    const price = new Decimal(line.unitPrice);
+    if (price.isNegative() || line.quantity < 0) {
+      throw new RangeError(`invalid line ${line.sku}`);
+    }
+    return sum.plus(price.times(line.quantity));
+  }, new Decimal(0));
+  return total.toFixed(2);
+}
+
+/** Adds a tax rate given as a fraction, for example "0.2", rounded half up. */
+export function withTax(amount: string, rate: string): string {
+  const value = new Decimal(amount);
+  return value.plus(value.times(rate)).toDecimalPlaces(2, Decimal.ROUND_HALF_UP).toFixed(2);
+}
+
+/** Removes a percentage given as a fraction, rounded in favor of the customer. */
+export function discount(amount: string, rate: string): string {
+  const value = new Decimal(amount);
+  const off = Decimal.min(Decimal.max(new Decimal(rate), 0), 1);
+  return value.minus(value.times(off).toDecimalPlaces(2, Decimal.ROUND_HALF_DOWN)).toFixed(2);
+}
+-- head/packages/pricing/src/index.spec.ts --
+import { discount, subtotal, withTax } from './index';
+
+describe('subtotal', () => {
+  it('sums the lines', () => {
+    expect(
+      subtotal([
+        { sku: 'a', unitPrice: '2.50', quantity: 2 },
+        { sku: 'b', unitPrice: '1.00', quantity: 1 },
+      ]),
+    ).toBe('6.00');
+  });
+
+  it('rejects a negative price', () => {
+    expect(() => subtotal([{ sku: 'a', unitPrice: '-1', quantity: 1 }])).toThrow(RangeError);
+  });
+});
+
+describe('withTax', () => {
+  it('adds 20 %', () => {
+    expect(withTax('10.00', '0.2')).toBe('12.00');
+  });
+});
+
+describe('discount', () => {
+  it('removes 10 %', () => {
+    expect(discount('10.00', '0.1')).toBe('9.00');
+  });
+
+  it('never goes below zero', () => {
+    expect(discount('10.00', '1.5')).toBe('0.00');
+  });
+});
+-- ci/packages/pricing/reports/junit.xml --
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites name="jest tests" tests="5" failures="0" errors="0" time="11.13">
+  <testsuite name="subtotal" errors="0" failures="0" skipped="0" timestamp="2026-11-01T18:34:53" time="10.514" tests="5">
+    <testcase classname="subtotal sums the lines" name="subtotal sums the lines" time="0.007">
+    </testcase>
+    <testcase classname="subtotal rejects a negative price" name="subtotal rejects a negative price" time="0.025">
+    </testcase>
+    <testcase classname="withTax adds 20 %" name="withTax adds 20 %" time="0.002">
+    </testcase>
+    <testcase classname="discount removes 10 %" name="discount removes 10 %" time="0.002">
+    </testcase>
+    <testcase classname="discount never goes below zero" name="discount never goes below zero" time="0.001">
+    </testcase>
+  </testsuite>
+</testsuites>
+-- ci/packages/pricing/reports/coverage/cobertura-coverage.xml --
+<?xml version="1.0" ?>
+<!DOCTYPE coverage SYSTEM "http://cobertura.sourceforge.net/xml/coverage-04.dtd">
+<coverage lines-valid="15" lines-covered="15" line-rate="1" branches-valid="4" branches-covered="4" branch-rate="1" timestamp="1793558104465" complexity="0" version="0.1">
+  <sources>
+    <source>/builds/putnami/demo-observe-nx/packages/pricing</source>
+  </sources>
+  <packages>
+    <package name="main" line-rate="1" branch-rate="1">
+      <classes>
+        <class name="index.ts" filename="src/index.ts" line-rate="1" branch-rate="1">
+          <methods>
+            <method name="subtotal" hits="2" signature="()V">
+              <lines>
+                <line number="10" hits="2"/>
+              </lines>
+            </method>
+            <method name="(anonymous_2)" hits="3" signature="()V">
+              <lines>
+                <line number="11" hits="3"/>
+              </lines>
+            </method>
+            <method name="withTax" hits="1" signature="()V">
+              <lines>
+                <line number="22" hits="1"/>
+              </lines>
+            </method>
+            <method name="discount" hits="2" signature="()V">
+              <lines>
+                <line number="28" hits="2"/>
+              </lines>
+            </method>
+          </methods>
+          <lines>
+            <line number="1" hits="1" branch="false"/>
+            <line number="10" hits="1" branch="false"/>
+            <line number="11" hits="2" branch="false"/>
+            <line number="12" hits="3" branch="false"/>
+            <line number="13" hits="3" branch="true" condition-coverage="100% (4/4)"/>
+            <line number="14" hits="1" branch="false"/>
+            <line number="16" hits="2" branch="false"/>
+            <line number="18" hits="1" branch="false"/>
+            <line number="22" hits="1" branch="false"/>
+            <line number="23" hits="1" branch="false"/>
+            <line number="24" hits="1" branch="false"/>
+            <line number="28" hits="1" branch="false"/>
+            <line number="29" hits="2" branch="false"/>
+            <line number="30" hits="2" branch="false"/>
+            <line number="31" hits="2" branch="false"/>
+          </lines>
+        </class>
+      </classes>
+    </package>
+  </packages>
+</coverage>
+-- ci/apps/api/reports/junit.xml --
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites name="jest tests" tests="2" failures="0" errors="0" time="8.367">
+  <testsuite name="quote" errors="0" failures="0" skipped="0" timestamp="2026-11-01T18:35:00" time="6.514" tests="2">
+    <testcase classname="quote prices the lines with tax" name="quote prices the lines with tax" time="0.007">
+    </testcase>
+    <testcase classname="quote rejects an invalid line" name="quote rejects an invalid line" time="0.021">
+    </testcase>
+  </testsuite>
+</testsuites>
+-- ci/apps/api/reports/coverage/cobertura-coverage.xml --
+<?xml version="1.0" ?>
+<!DOCTYPE coverage SYSTEM "http://cobertura.sourceforge.net/xml/coverage-04.dtd">
+<coverage lines-valid="5" lines-covered="5" line-rate="1" branches-valid="0" branches-covered="0" branch-rate="1" timestamp="1793558106960" complexity="0" version="0.1">
+  <sources>
+    <source>/builds/putnami/demo-observe-nx/apps/api</source>
+  </sources>
+  <packages>
+    <package name="main" line-rate="1" branch-rate="1">
+      <classes>
+        <class name="quote.ts" filename="src/quote.ts" line-rate="1" branch-rate="1">
+          <methods>
+            <method name="quote" hits="2" signature="()V">
+              <lines>
+                <line number="12" hits="2"/>
+              </lines>
+            </method>
+          </methods>
+          <lines>
+            <line number="1" hits="1" branch="false"/>
+            <line number="2" hits="1" branch="false"/>
+            <line number="5" hits="1" branch="false"/>
+            <line number="12" hits="1" branch="false"/>
+            <line number="13" hits="2" branch="false"/>
+          </lines>
+        </class>
+      </classes>
+    </package>
+  </packages>
+</coverage>

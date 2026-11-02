@@ -71,9 +71,12 @@ func (r *Result) dependencyChanges(in Input) {
 		if file.PreviousPath != "" {
 			basePath = file.PreviousPath
 		}
-		before, okBefore := r.readLock(in, Base, basePath, file.Status != gitbase.StatusAdded, read)
-		after, okAfter := r.readLock(in, Head, file.Path, file.Status != gitbase.StatusDeleted, read)
-		if !okBefore || !okAfter {
+		before, ok := r.readLock(in, Base, basePath, file.Status != gitbase.StatusAdded, read)
+		if !ok {
+			continue
+		}
+		after, ok := r.readLock(in, Head, file.Path, file.Status != gitbase.StatusDeleted, read)
+		if !ok {
 			continue
 		}
 		owner := r.Owners[file.Path]

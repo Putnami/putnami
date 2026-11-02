@@ -1,0 +1,1071 @@
+The symfony demo: its base, the files its change rewrites, and the reports its CI wrote.
+-- base/composer.json --
+{
+    "type": "project",
+    "license": "proprietary",
+    "minimum-stability": "stable",
+    "prefer-stable": true,
+    "require": {
+        "php": ">=8.4",
+        "ext-ctype": "*",
+        "ext-iconv": "*",
+        "demo/pricing": "^1.0",
+        "symfony/console": "8.1.*",
+        "symfony/dotenv": "8.1.*",
+        "symfony/flex": "^2",
+        "symfony/framework-bundle": "8.1.*",
+        "symfony/runtime": "8.1.*",
+        "symfony/uid": "8.1.*",
+        "symfony/yaml": "8.1.*"
+    },
+    "require-dev": {
+        "phpunit/phpunit": "^12",
+        "symfony/browser-kit": "8.1.*"
+    },
+    "config": {
+        "allow-plugins": {
+            "php-http/discovery": true,
+            "symfony/flex": true,
+            "symfony/runtime": true
+        },
+        "bump-after-update": true,
+        "sort-packages": true,
+        "platform": {
+            "php": "8.4.10"
+        }
+    },
+    "autoload": {
+        "psr-4": {
+            "App\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "App\\Tests\\": "tests/",
+            "Demo\\Pricing\\Tests\\": "packages/pricing/tests/",
+            "Demo\\Pricing\\": "packages/pricing/src/"
+        }
+    },
+    "replace": {
+        "symfony/polyfill-ctype": "*",
+        "symfony/polyfill-iconv": "*",
+        "symfony/polyfill-php72": "*",
+        "symfony/polyfill-php73": "*",
+        "symfony/polyfill-php74": "*",
+        "symfony/polyfill-php80": "*",
+        "symfony/polyfill-php81": "*",
+        "symfony/polyfill-php82": "*",
+        "symfony/polyfill-php83": "*",
+        "symfony/polyfill-php84": "*"
+    },
+    "scripts": {
+        "auto-scripts": {
+            "cache:clear": "symfony-cmd",
+            "assets:install %PUBLIC_DIR%": "symfony-cmd"
+        },
+        "post-install-cmd": [
+            "@auto-scripts"
+        ],
+        "post-update-cmd": [
+            "@auto-scripts"
+        ]
+    },
+    "conflict": {
+        "symfony/symfony": "*"
+    },
+    "extra": {
+        "symfony": {
+            "allow-contrib": false,
+            "require": "8.1.*"
+        }
+    },
+    "repositories": [
+        {
+            "type": "path",
+            "url": "packages/*",
+            "options": {
+                "symlink": true
+            }
+        }
+    ]
+}
+-- base/composer.lock --
+{
+    "_readme": [
+        "This file locks the dependencies of your project to a known state",
+        "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
+        "This file is @generated automatically"
+    ],
+    "content-hash": "c10e84596cbcb5c28e18356bb776a2c4",
+    "packages": [
+        {
+            "name": "brick/math",
+            "version": "0.13.0",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/brick/math.git",
+                "reference": "efe64d2cd94d410ba85831a6d4c16ac48542751b"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/brick/math/zipball/efe64d2cd94d410ba85831a6d4c16ac48542751b",
+                "reference": "efe64d2cd94d410ba85831a6d4c16ac48542751b",
+                "shasum": ""
+            },
+            "require": {
+                "php": "^8.1"
+            },
+            "require-dev": {
+                "php-coveralls/php-coveralls": "^2.2",
+                "phpunit/phpunit": "^10.1",
+                "vimeo/psalm": "6.8.8"
+            },
+            "type": "library",
+            "autoload": {
+                "psr-4": {
+                    "Brick\\Math\\": "src/"
+                }
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "MIT"
+            ],
+            "description": "Arbitrary-precision arithmetic library",
+            "keywords": [
+                "Arbitrary-precision",
+                "BigInteger",
+                "BigRational",
+                "arithmetic",
+                "bigdecimal",
+                "bignum",
+                "bignumber",
+                "brick",
+                "decimal",
+                "integer",
+                "math",
+                "mathematics",
+                "rational"
+            ],
+            "support": {
+                "issues": "https://github.com/brick/math/issues",
+                "source": "https://github.com/brick/math/tree/0.13.0"
+            },
+            "funding": [
+                {
+                    "url": "https://github.com/BenMorel",
+                    "type": "github"
+                }
+            ],
+            "time": "2025-03-03T13:19:29+00:00",
+            "published-time": "2025-03-03T13:22:41+00:00"
+        },
+        {
+            "name": "demo/pricing",
+            "version": "1.0.0",
+            "dist": {
+                "type": "path",
+                "url": "packages/pricing",
+                "reference": "b3765ca10687a78df02acd82c408e28f9d1a67f2"
+            },
+            "require": {
+                "brick/math": "0.13.0",
+                "php": ">=8.4"
+            },
+            "type": "library",
+            "autoload": {
+                "psr-4": {
+                    "Demo\\Pricing\\": "src/"
+                }
+            },
+            "license": [
+                "MIT"
+            ],
+            "description": "Order pricing for the demo shop.",
+            "transport-options": {
+                "symlink": true,
+                "relative": true
+            }
+        }
+    ],
+    "packages-dev": [
+        {
+            "name": "phpunit/phpunit",
+            "version": "12.5.42",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/sebastianbergmann/phpunit.git",
+                "reference": "1d6dbe748c079e5d2b03bca1be69d0f4cc52a578"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/sebastianbergmann/phpunit/zipball/1d6dbe748c079e5d2b03bca1be69d0f4cc52a578",
+                "reference": "1d6dbe748c079e5d2b03bca1be69d0f4cc52a578",
+                "shasum": ""
+            },
+            "require": {
+                "ext-dom": "*",
+                "ext-filter": "*",
+                "ext-json": "*",
+                "ext-libxml": "*",
+                "ext-mbstring": "*",
+                "ext-xmlwriter": "*",
+                "myclabs/deep-copy": "^1.14.0",
+                "phar-io/manifest": "^2.0.4",
+                "phar-io/version": "^3.2.1",
+                "php": ">=8.3",
+                "phpunit/php-code-coverage": "^12.5.8",
+                "phpunit/php-file-iterator": "^6.0.2",
+                "phpunit/php-invoker": "^6.0.0",
+                "phpunit/php-text-template": "^5.0.1",
+                "phpunit/php-timer": "^8.0.0",
+                "sebastian/cli-parser": "^4.2.1",
+                "sebastian/comparator": "^7.1.8",
+                "sebastian/diff": "^7.0.1",
+                "sebastian/environment": "^8.1.2",
+                "sebastian/exporter": "^7.0.3",
+                "sebastian/global-state": "^8.0.3",
+                "sebastian/object-enumerator": "^7.0.0",
+                "sebastian/recursion-context": "^7.0.1",
+                "sebastian/type": "^6.0.4",
+                "sebastian/version": "^6.0.1",
+                "staabm/side-effects-detector": "^1.0.5"
+            },
+            "bin": [
+                "phpunit"
+            ],
+            "type": "library",
+            "extra": {
+                "branch-alias": {
+                    "dev-main": "12.5-dev"
+                }
+            },
+            "autoload": {
+                "files": [
+                    "src/Framework/Assert/Functions.php"
+                ],
+                "classmap": [
+                    "src/"
+                ]
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "BSD-3-Clause"
+            ],
+            "authors": [
+                {
+                    "name": "Sebastian Bergmann",
+                    "email": "sebastian@phpunit.de",
+                    "role": "lead"
+                }
+            ],
+            "description": "The PHP Unit Testing framework.",
+            "homepage": "https://phpunit.de/",
+            "keywords": [
+                "phpunit",
+                "testing",
+                "xunit"
+            ],
+            "support": {
+                "issues": "https://github.com/sebastianbergmann/phpunit/issues",
+                "security": "https://github.com/sebastianbergmann/phpunit/security/policy",
+                "source": "https://github.com/sebastianbergmann/phpunit/tree/12.5.42"
+            },
+            "funding": [
+                {
+                    "url": "https://phpunit.de/sponsoring.html",
+                    "type": "other"
+                }
+            ],
+            "time": "2026-10-27T04:15:03+00:00",
+            "published-time": "2026-10-27T04:18:06+00:00"
+        }
+    ],
+    "aliases": [],
+    "minimum-stability": "stable",
+    "stability-flags": {},
+    "prefer-stable": true,
+    "prefer-lowest": false,
+    "platform": {
+        "php": ">=8.4",
+        "ext-ctype": "*",
+        "ext-iconv": "*"
+    },
+    "platform-dev": {},
+    "platform-overrides": {
+        "php": "8.4.10"
+    },
+    "plugin-api-version": "2.11.0"
+}
+-- base/phpunit.dist.xml --
+<?xml version="1.0" encoding="UTF-8"?>
+
+<!-- https://phpunit.readthedocs.io/en/latest/configuration.html -->
+<phpunit xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:noNamespaceSchemaLocation="vendor/phpunit/phpunit/phpunit.xsd"
+         colors="true"
+         failOnDeprecation="true"
+         failOnNotice="true"
+         failOnWarning="true"
+         bootstrap="tests/bootstrap.php"
+         cacheDirectory=".phpunit.cache"
+>
+    <php>
+        <ini name="display_errors" value="1" />
+        <ini name="error_reporting" value="-1" />
+        <server name="APP_ENV" value="test" force="true" />
+        <server name="SHELL_VERBOSITY" value="-1" />
+    </php>
+
+    <testsuites>
+        <testsuite name="app">
+            <directory>tests</directory>
+        </testsuite>
+        <testsuite name="pricing">
+            <directory>packages/pricing/tests</directory>
+        </testsuite>
+    </testsuites>
+
+    <source ignoreSuppressionOfDeprecations="true"
+            ignoreIndirectDeprecations="true"
+            restrictNotices="true"
+            restrictWarnings="true"
+    >
+        <include>
+            <directory>src</directory>
+            <directory>packages/pricing/src</directory>
+        </include>
+        <exclude>
+            <file>src/Kernel.php</file>
+        </exclude>
+
+        <deprecationTrigger>
+            <function>trigger_deprecation</function>
+        </deprecationTrigger>
+    </source>
+
+    <extensions>
+    </extensions>
+</phpunit>
+-- base/packages/pricing/composer.json --
+{
+    "name": "demo/pricing",
+    "description": "Order pricing for the demo shop.",
+    "type": "library",
+    "version": "1.0.0",
+    "license": "MIT",
+    "require": {
+        "php": ">=8.4",
+        "brick/math": "0.13.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "Demo\\Pricing\\": "src/"
+        }
+    }
+}
+-- base/packages/pricing/src/Calculator.php --
+<?php
+
+namespace Demo\Pricing;
+
+use Brick\Math\BigDecimal;
+use Brick\Math\RoundingMode;
+
+final class Calculator
+{
+    /**
+     * Sum of the lines, before tax, with two decimal places.
+     *
+     * @param list<Line> $lines
+     */
+    public function subtotal(array $lines): string
+    {
+        $total = BigDecimal::zero();
+        foreach ($lines as $line) {
+            $price = BigDecimal::of($line->unitPrice);
+            if ($price->isNegative() || $line->quantity < 0) {
+                throw new \InvalidArgumentException(sprintf('Invalid line %s.', $line->sku));
+            }
+            $total = $total->plus($price->multipliedBy($line->quantity));
+        }
+
+        return (string) $total->toScale(2);
+    }
+
+    /**
+     * Adds a tax rate given as a fraction, for example "0.2", rounded half up.
+     */
+    public function withTax(string $amount, string $rate): string
+    {
+        $value = BigDecimal::of($amount);
+
+        return (string) $value->plus($value->multipliedBy($rate))->toScale(2, RoundingMode::HALF_UP);
+    }
+}
+-- base/packages/pricing/src/Line.php --
+<?php
+
+namespace Demo\Pricing;
+
+final readonly class Line
+{
+    public function __construct(
+        public string $sku,
+        public string $unitPrice,
+        public int $quantity,
+    ) {
+    }
+}
+-- base/packages/pricing/tests/CalculatorTest.php --
+<?php
+
+namespace Demo\Pricing\Tests;
+
+use Demo\Pricing\Calculator;
+use Demo\Pricing\Line;
+use PHPUnit\Framework\TestCase;
+
+final class CalculatorTest extends TestCase
+{
+    public function testSubtotalSumsTheLines(): void
+    {
+        $lines = [new Line('a', '2.50', 2), new Line('b', '1.00', 1)];
+
+        self::assertSame('6.00', (new Calculator())->subtotal($lines));
+    }
+
+    public function testSubtotalRejectsANegativePrice(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+
+        (new Calculator())->subtotal([new Line('a', '-1', 1)]);
+    }
+
+    public function testWithTaxAddsTwentyPercent(): void
+    {
+        self::assertSame('12.00', (new Calculator())->withTax('10.00', '0.2'));
+    }
+}
+-- base/src/Kernel.php --
+<?php
+
+namespace App;
+
+use Symfony\Bundle\FrameworkBundle\Kernel\MicroKernelTrait;
+use Symfony\Component\HttpKernel\Kernel as BaseKernel;
+
+class Kernel extends BaseKernel
+{
+    use MicroKernelTrait;
+
+    /**
+     * @return list<string> An array of allowed values for APP_ENV
+     */
+    private function getAllowedEnvs(): array
+    {
+        return ['prod', 'dev', 'test'];
+    }
+}
+-- base/src/Controller/QuoteController.php --
+<?php
+
+namespace App\Controller;
+
+use Demo\Pricing\Calculator;
+use Demo\Pricing\Line;
+use Symfony\Component\HttpFoundation\JsonResponse;
+use Symfony\Component\HttpFoundation\Request;
+use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\Routing\Attribute\Route;
+use Symfony\Component\Uid\Uuid;
+
+final class QuoteController
+{
+    /** Tax rate applied to every quote: 20 %. */
+    private const string TAX_RATE = '0.2';
+
+    public function __construct(private readonly Calculator $calculator)
+    {
+    }
+
+    #[Route('/quote', name: 'quote', methods: ['POST'])]
+    public function __invoke(Request $request): JsonResponse
+    {
+        try {
+            $body = json_decode($request->getContent(), true, flags: \JSON_THROW_ON_ERROR);
+            $lines = array_map(
+                static fn (array $line): Line => new Line((string) $line['sku'], (string) $line['unitPrice'], (int) $line['quantity']),
+                $body['lines'] ?? [],
+            );
+            $total = $this->calculator->withTax($this->calculator->subtotal($lines), self::TAX_RATE);
+        } catch (\JsonException|\InvalidArgumentException|\TypeError) {
+            return new JsonResponse(['error' => 'invalid quote request'], Response::HTTP_UNPROCESSABLE_ENTITY);
+        }
+
+        return new JsonResponse(['id' => (string) Uuid::v7(), 'total' => $total]);
+    }
+}
+-- base/tests/Controller/QuoteControllerTest.php --
+<?php
+
+namespace App\Tests\Controller;
+
+use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
+
+final class QuoteControllerTest extends WebTestCase
+{
+    public function testQuotePricesTheLinesWithTax(): void
+    {
+        $client = static::createClient();
+        $client->request('POST', '/quote', content: '{"lines":[{"sku":"a","unitPrice":"5.00","quantity":2}]}');
+
+        self::assertResponseIsSuccessful();
+        $body = json_decode($client->getResponse()->getContent(), true);
+        self::assertSame('12.00', $body['total']);
+        self::assertNotEmpty($body['id']);
+    }
+
+    public function testQuoteRejectsAnInvalidLine(): void
+    {
+        $client = static::createClient();
+        $client->request('POST', '/quote', content: '{"lines":[{"sku":"a","unitPrice":"-5","quantity":1}]}');
+
+        self::assertResponseStatusCodeSame(422);
+    }
+
+    public function testQuoteRejectsAnInvalidBody(): void
+    {
+        $client = static::createClient();
+        $client->request('POST', '/quote', content: 'not json');
+
+        self::assertResponseStatusCodeSame(422);
+    }
+}
+-- head/composer.lock --
+{
+    "_readme": [
+        "This file locks the dependencies of your project to a known state",
+        "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
+        "This file is @generated automatically"
+    ],
+    "content-hash": "c10e84596cbcb5c28e18356bb776a2c4",
+    "packages": [
+        {
+            "name": "brick/math",
+            "version": "0.13.1",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/brick/math.git",
+                "reference": "fc7ed316430118cc7836bf45faff18d5dfc8de04"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/brick/math/zipball/fc7ed316430118cc7836bf45faff18d5dfc8de04",
+                "reference": "fc7ed316430118cc7836bf45faff18d5dfc8de04",
+                "shasum": ""
+            },
+            "require": {
+                "php": "^8.1"
+            },
+            "require-dev": {
+                "php-coveralls/php-coveralls": "^2.2",
+                "phpunit/phpunit": "^10.1",
+                "vimeo/psalm": "6.8.8"
+            },
+            "type": "library",
+            "autoload": {
+                "psr-4": {
+                    "Brick\\Math\\": "src/"
+                }
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "MIT"
+            ],
+            "description": "Arbitrary-precision arithmetic library",
+            "keywords": [
+                "Arbitrary-precision",
+                "BigInteger",
+                "BigRational",
+                "arithmetic",
+                "bigdecimal",
+                "bignum",
+                "bignumber",
+                "brick",
+                "decimal",
+                "integer",
+                "math",
+                "mathematics",
+                "rational"
+            ],
+            "support": {
+                "issues": "https://github.com/brick/math/issues",
+                "source": "https://github.com/brick/math/tree/0.13.1"
+            },
+            "funding": [
+                {
+                    "url": "https://github.com/BenMorel",
+                    "type": "github"
+                }
+            ],
+            "time": "2025-03-29T13:50:30+00:00",
+            "published-time": "2025-03-29T13:51:27+00:00"
+        },
+        {
+            "name": "demo/pricing",
+            "version": "1.0.0",
+            "dist": {
+                "type": "path",
+                "url": "packages/pricing",
+                "reference": "f0b1ee7b6eb6c7106561822a7dd7fbd0baee9a8b"
+            },
+            "require": {
+                "brick/math": "0.13.1",
+                "php": ">=8.4"
+            },
+            "type": "library",
+            "autoload": {
+                "psr-4": {
+                    "Demo\\Pricing\\": "src/"
+                }
+            },
+            "license": [
+                "MIT"
+            ],
+            "description": "Order pricing for the demo shop.",
+            "transport-options": {
+                "symlink": true,
+                "relative": true
+            }
+        }
+    ],
+    "packages-dev": [
+        {
+            "name": "phpunit/phpunit",
+            "version": "12.5.42",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/sebastianbergmann/phpunit.git",
+                "reference": "1d6dbe748c079e5d2b03bca1be69d0f4cc52a578"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/sebastianbergmann/phpunit/zipball/1d6dbe748c079e5d2b03bca1be69d0f4cc52a578",
+                "reference": "1d6dbe748c079e5d2b03bca1be69d0f4cc52a578",
+                "shasum": ""
+            },
+            "require": {
+                "ext-dom": "*",
+                "ext-filter": "*",
+                "ext-json": "*",
+                "ext-libxml": "*",
+                "ext-mbstring": "*",
+                "ext-xmlwriter": "*",
+                "myclabs/deep-copy": "^1.14.0",
+                "phar-io/manifest": "^2.0.4",
+                "phar-io/version": "^3.2.1",
+                "php": ">=8.3",
+                "phpunit/php-code-coverage": "^12.5.8",
+                "phpunit/php-file-iterator": "^6.0.2",
+                "phpunit/php-invoker": "^6.0.0",
+                "phpunit/php-text-template": "^5.0.1",
+                "phpunit/php-timer": "^8.0.0",
+                "sebastian/cli-parser": "^4.2.1",
+                "sebastian/comparator": "^7.1.8",
+                "sebastian/diff": "^7.0.1",
+                "sebastian/environment": "^8.1.2",
+                "sebastian/exporter": "^7.0.3",
+                "sebastian/global-state": "^8.0.3",
+                "sebastian/object-enumerator": "^7.0.0",
+                "sebastian/recursion-context": "^7.0.1",
+                "sebastian/type": "^6.0.4",
+                "sebastian/version": "^6.0.1",
+                "staabm/side-effects-detector": "^1.0.5"
+            },
+            "bin": [
+                "phpunit"
+            ],
+            "type": "library",
+            "extra": {
+                "branch-alias": {
+                    "dev-main": "12.5-dev"
+                }
+            },
+            "autoload": {
+                "files": [
+                    "src/Framework/Assert/Functions.php"
+                ],
+                "classmap": [
+                    "src/"
+                ]
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "BSD-3-Clause"
+            ],
+            "authors": [
+                {
+                    "name": "Sebastian Bergmann",
+                    "email": "sebastian@phpunit.de",
+                    "role": "lead"
+                }
+            ],
+            "description": "The PHP Unit Testing framework.",
+            "homepage": "https://phpunit.de/",
+            "keywords": [
+                "phpunit",
+                "testing",
+                "xunit"
+            ],
+            "support": {
+                "issues": "https://github.com/sebastianbergmann/phpunit/issues",
+                "security": "https://github.com/sebastianbergmann/phpunit/security/policy",
+                "source": "https://github.com/sebastianbergmann/phpunit/tree/12.5.42"
+            },
+            "funding": [
+                {
+                    "url": "https://phpunit.de/sponsoring.html",
+                    "type": "other"
+                }
+            ],
+            "time": "2026-10-27T04:15:03+00:00",
+            "published-time": "2026-10-27T04:18:06+00:00"
+        }
+    ],
+    "aliases": [],
+    "minimum-stability": "stable",
+    "stability-flags": {},
+    "prefer-stable": true,
+    "prefer-lowest": false,
+    "platform": {
+        "php": ">=8.4",
+        "ext-ctype": "*",
+        "ext-iconv": "*"
+    },
+    "platform-dev": {},
+    "platform-overrides": {
+        "php": "8.4.10"
+    },
+    "plugin-api-version": "2.11.0"
+}
+-- head/packages/pricing/composer.json --
+{
+    "name": "demo/pricing",
+    "description": "Order pricing for the demo shop.",
+    "type": "library",
+    "version": "1.0.0",
+    "license": "MIT",
+    "require": {
+        "php": ">=8.4",
+        "brick/math": "0.13.1"
+    },
+    "autoload": {
+        "psr-4": {
+            "Demo\\Pricing\\": "src/"
+        }
+    }
+}
+-- head/packages/pricing/src/Calculator.php --
+<?php
+
+namespace Demo\Pricing;
+
+use Brick\Math\BigDecimal;
+use Brick\Math\RoundingMode;
+
+final class Calculator
+{
+    /**
+     * Sum of the lines, before tax, with two decimal places.
+     *
+     * @param list<Line> $lines
+     */
+    public function subtotal(array $lines): string
+    {
+        $total = BigDecimal::zero();
+        foreach ($lines as $line) {
+            $price = BigDecimal::of($line->unitPrice);
+            if ($price->isNegative() || $line->quantity < 0) {
+                throw new \InvalidArgumentException(sprintf('Invalid line %s.', $line->sku));
+            }
+            $total = $total->plus($price->multipliedBy($line->quantity));
+        }
+
+        return (string) $total->toScale(2);
+    }
+
+    /**
+     * Adds a tax rate given as a fraction, for example "0.2", rounded half up.
+     */
+    public function withTax(string $amount, string $rate): string
+    {
+        $value = BigDecimal::of($amount);
+
+        return (string) $value->plus($value->multipliedBy($rate))->toScale(2, RoundingMode::HALF_UP);
+    }
+
+    /**
+     * Removes a percentage given as a fraction, rounded in favor of the customer.
+     */
+    public function discount(string $amount, string $rate): string
+    {
+        $value = BigDecimal::of($amount);
+        $off = BigDecimal::of($rate);
+        if ($off->isNegativeOrZero()) {
+            return (string) $value->toScale(2);
+        }
+        if ($off->isGreaterThanOrEqualTo(1)) {
+            return '0.00';
+        }
+
+        return (string) $value->minus($value->multipliedBy($off)->toScale(2, RoundingMode::HALF_DOWN))->toScale(2);
+    }
+}
+-- head/packages/pricing/tests/CalculatorTest.php --
+<?php
+
+namespace Demo\Pricing\Tests;
+
+use Demo\Pricing\Calculator;
+use Demo\Pricing\Line;
+use PHPUnit\Framework\TestCase;
+
+final class CalculatorTest extends TestCase
+{
+    public function testSubtotalSumsTheLines(): void
+    {
+        $lines = [new Line('a', '2.50', 2), new Line('b', '1.00', 1)];
+
+        self::assertSame('6.00', (new Calculator())->subtotal($lines));
+    }
+
+    public function testSubtotalRejectsANegativePrice(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+
+        (new Calculator())->subtotal([new Line('a', '-1', 1)]);
+    }
+
+    public function testWithTaxAddsTwentyPercent(): void
+    {
+        self::assertSame('12.00', (new Calculator())->withTax('10.00', '0.2'));
+    }
+
+    public function testDiscountRemovesTenPercent(): void
+    {
+        self::assertSame('9.00', (new Calculator())->discount('10.00', '0.1'));
+    }
+
+    public function testDiscountKeepsTheAmountWithoutARate(): void
+    {
+        self::assertSame('10.00', (new Calculator())->discount('10', '0'));
+    }
+
+    public function testDiscountNeverGoesBelowZero(): void
+    {
+        self::assertSame('0.00', (new Calculator())->discount('10.00', '1.5'));
+    }
+}
+-- ci/reports/junit.xml --
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites>
+  <testsuite name="/builds/putnami/demo-observe-symfony/phpunit.dist.xml" tests="9" assertions="11" errors="0" failures="0" skipped="0" time="0.318658">
+    <testsuite name="app" tests="3" assertions="5" errors="0" failures="0" skipped="0" time="0.315863">
+      <testsuite name="App\Tests\Controller\QuoteControllerTest" file="/builds/putnami/demo-observe-symfony/tests/Controller/QuoteControllerTest.php" tests="3" assertions="5" errors="0" failures="0" skipped="0" time="0.315863">
+        <testcase name="testQuotePricesTheLinesWithTax" file="/builds/putnami/demo-observe-symfony/tests/Controller/QuoteControllerTest.php" line="9" class="App\Tests\Controller\QuoteControllerTest" classname="App.Tests.Controller.QuoteControllerTest" assertions="3" time="0.310872"/>
+        <testcase name="testQuoteRejectsAnInvalidLine" file="/builds/putnami/demo-observe-symfony/tests/Controller/QuoteControllerTest.php" line="20" class="App\Tests\Controller\QuoteControllerTest" classname="App.Tests.Controller.QuoteControllerTest" assertions="1" time="0.002866"/>
+        <testcase name="testQuoteRejectsAnInvalidBody" file="/builds/putnami/demo-observe-symfony/tests/Controller/QuoteControllerTest.php" line="28" class="App\Tests\Controller\QuoteControllerTest" classname="App.Tests.Controller.QuoteControllerTest" assertions="1" time="0.002125"/>
+      </testsuite>
+    </testsuite>
+    <testsuite name="pricing" tests="6" assertions="6" errors="0" failures="0" skipped="0" time="0.002795">
+      <testsuite name="Demo\Pricing\Tests\CalculatorTest" file="/builds/putnami/demo-observe-symfony/packages/pricing/tests/CalculatorTest.php" tests="6" assertions="6" errors="0" failures="0" skipped="0" time="0.002795">
+        <testcase name="testSubtotalSumsTheLines" file="/builds/putnami/demo-observe-symfony/packages/pricing/tests/CalculatorTest.php" line="11" class="Demo\Pricing\Tests\CalculatorTest" classname="Demo.Pricing.Tests.CalculatorTest" assertions="1" time="0.000499"/>
+        <testcase name="testSubtotalRejectsANegativePrice" file="/builds/putnami/demo-observe-symfony/packages/pricing/tests/CalculatorTest.php" line="18" class="Demo\Pricing\Tests\CalculatorTest" classname="Demo.Pricing.Tests.CalculatorTest" assertions="1" time="0.000472"/>
+        <testcase name="testWithTaxAddsTwentyPercent" file="/builds/putnami/demo-observe-symfony/packages/pricing/tests/CalculatorTest.php" line="25" class="Demo\Pricing\Tests\CalculatorTest" classname="Demo.Pricing.Tests.CalculatorTest" assertions="1" time="0.000453"/>
+        <testcase name="testDiscountRemovesTenPercent" file="/builds/putnami/demo-observe-symfony/packages/pricing/tests/CalculatorTest.php" line="30" class="Demo\Pricing\Tests\CalculatorTest" classname="Demo.Pricing.Tests.CalculatorTest" assertions="1" time="0.000496"/>
+        <testcase name="testDiscountKeepsTheAmountWithoutARate" file="/builds/putnami/demo-observe-symfony/packages/pricing/tests/CalculatorTest.php" line="35" class="Demo\Pricing\Tests\CalculatorTest" classname="Demo.Pricing.Tests.CalculatorTest" assertions="1" time="0.000422"/>
+        <testcase name="testDiscountNeverGoesBelowZero" file="/builds/putnami/demo-observe-symfony/packages/pricing/tests/CalculatorTest.php" line="40" class="Demo\Pricing\Tests\CalculatorTest" classname="Demo.Pricing.Tests.CalculatorTest" assertions="1" time="0.000453"/>
+      </testsuite>
+    </testsuite>
+  </testsuite>
+</testsuites>
+-- ci/reports/clover.xml --
+<?xml version="1.0" encoding="UTF-8"?>
+<coverage generated="1793558083">
+  <project timestamp="1793558083" name="Clover Coverage">
+    <package name="Demo\Pricing">
+      <file name="/builds/putnami/demo-observe-symfony/packages/pricing/src/Calculator.php">
+        <class name="Demo\Pricing\Calculator" namespace="Demo\Pricing">
+          <metrics complexity="8" methods="3" coveredmethods="3" conditionals="0" coveredconditionals="0" statements="16" coveredstatements="16" elements="19" coveredelements="19"/>
+        </class>
+        <line num="15" type="method" name="subtotal" visibility="public" complexity="4" crap="4" count="4"/>
+        <line num="17" type="stmt" count="4"/>
+        <line num="18" type="stmt" count="4"/>
+        <line num="19" type="stmt" count="4"/>
+        <line num="20" type="stmt" count="4"/>
+        <line num="21" type="stmt" count="2"/>
+        <line num="23" type="stmt" count="2"/>
+        <line num="26" type="stmt" count="2"/>
+        <line num="32" type="method" name="withTax" visibility="public" complexity="1" crap="1" count="2"/>
+        <line num="34" type="stmt" count="2"/>
+        <line num="36" type="stmt" count="2"/>
+        <line num="42" type="method" name="discount" visibility="public" complexity="3" crap="3" count="3"/>
+        <line num="44" type="stmt" count="3"/>
+        <line num="45" type="stmt" count="3"/>
+        <line num="46" type="stmt" count="3"/>
+        <line num="47" type="stmt" count="1"/>
+        <line num="49" type="stmt" count="2"/>
+        <line num="50" type="stmt" count="1"/>
+        <line num="53" type="stmt" count="1"/>
+        <metrics loc="56" ncloc="45" classes="1" methods="3" coveredmethods="3" conditionals="0" coveredconditionals="0" statements="16" coveredstatements="16" elements="19" coveredelements="19"/>
+      </file>
+      <file name="/builds/putnami/demo-observe-symfony/packages/pricing/src/Line.php">
+        <class name="Demo\Pricing\Line" namespace="Demo\Pricing">
+          <metrics complexity="1" methods="1" coveredmethods="1" conditionals="0" coveredconditionals="0" statements="1" coveredstatements="1" elements="2" coveredelements="2"/>
+        </class>
+        <line num="7" type="method" name="__construct" visibility="public" complexity="1" crap="1" count="4"/>
+        <line num="12" type="stmt" count="4"/>
+        <metrics loc="14" ncloc="14" classes="1" methods="1" coveredmethods="1" conditionals="0" coveredconditionals="0" statements="1" coveredstatements="1" elements="2" coveredelements="2"/>
+      </file>
+    </package>
+    <package name="App\Controller">
+      <file name="/builds/putnami/demo-observe-symfony/src/Controller/QuoteController.php">
+        <class name="App\Controller\QuoteController" namespace="App\Controller">
+          <metrics complexity="3" methods="2" coveredmethods="2" conditionals="0" coveredconditionals="0" statements="10" coveredstatements="10" elements="12" coveredelements="12"/>
+        </class>
+        <line num="18" type="method" name="__construct" visibility="public" complexity="1" crap="1" count="3"/>
+        <line num="20" type="stmt" count="3"/>
+        <line num="22" type="method" name="__invoke" visibility="public" complexity="2" crap="2" count="3"/>
+        <line num="26" type="stmt" count="3"/>
+        <line num="27" type="stmt" count="2"/>
+        <line num="28" type="stmt" count="2"/>
+        <line num="29" type="stmt" count="2"/>
+        <line num="30" type="stmt" count="2"/>
+        <line num="31" type="stmt" count="2"/>
+        <line num="32" type="stmt" count="2"/>
+        <line num="33" type="stmt" count="2"/>
+        <line num="36" type="stmt" count="1"/>
+        <metrics loc="39" ncloc="38" classes="1" methods="2" coveredmethods="2" conditionals="0" coveredconditionals="0" statements="10" coveredstatements="10" elements="12" coveredelements="12"/>
+      </file>
+    </package>
+    <metrics files="3" loc="109" ncloc="97" classes="3" methods="6" coveredmethods="6" conditionals="0" coveredconditionals="0" statements="27" coveredstatements="27" elements="33" coveredelements="33"/>
+  </project>
+</coverage>
+-- ci/reports/cobertura.xml --
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE coverage SYSTEM "http://cobertura.sourceforge.net/xml/coverage-04.dtd">
+<coverage line-rate="1" branch-rate="0" lines-covered="27" lines-valid="27" branches-covered="0" branches-valid="0" complexity="12" version="0.4" timestamp="1793558083">
+  <sources>
+    <source>/builds/putnami/demo-observe-symfony</source>
+  </sources>
+  <packages>
+    <package name="packages/pricing/src/Calculator.php" line-rate="1" branch-rate="0" complexity="8">
+      <classes>
+        <class name="Demo\Pricing\Calculator" filename="packages/pricing/src/Calculator.php" line-rate="1" branch-rate="0" complexity="8">
+          <methods>
+            <method name="subtotal" signature="array $lines" line-rate="1" branch-rate="0" complexity="4">
+              <lines>
+                <line number="17" hits="4"/>
+                <line number="18" hits="4"/>
+                <line number="19" hits="4"/>
+                <line number="20" hits="4"/>
+                <line number="21" hits="2"/>
+                <line number="23" hits="2"/>
+                <line number="26" hits="2"/>
+              </lines>
+            </method>
+            <method name="withTax" signature="string $amount, string $rate" line-rate="1" branch-rate="0" complexity="1">
+              <lines>
+                <line number="34" hits="2"/>
+                <line number="36" hits="2"/>
+              </lines>
+            </method>
+            <method name="discount" signature="string $amount, string $rate" line-rate="1" branch-rate="0" complexity="3">
+              <lines>
+                <line number="44" hits="3"/>
+                <line number="45" hits="3"/>
+                <line number="46" hits="3"/>
+                <line number="47" hits="1"/>
+                <line number="49" hits="2"/>
+                <line number="50" hits="1"/>
+                <line number="53" hits="1"/>
+              </lines>
+            </method>
+          </methods>
+          <lines>
+            <line number="17" hits="4"/>
+            <line number="18" hits="4"/>
+            <line number="19" hits="4"/>
+            <line number="20" hits="4"/>
+            <line number="21" hits="2"/>
+            <line number="23" hits="2"/>
+            <line number="26" hits="2"/>
+            <line number="34" hits="2"/>
+            <line number="36" hits="2"/>
+            <line number="44" hits="3"/>
+            <line number="45" hits="3"/>
+            <line number="46" hits="3"/>
+            <line number="47" hits="1"/>
+            <line number="49" hits="2"/>
+            <line number="50" hits="1"/>
+            <line number="53" hits="1"/>
+          </lines>
+        </class>
+      </classes>
+    </package>
+    <package name="packages/pricing/src/Line.php" line-rate="1" branch-rate="0" complexity="1">
+      <classes>
+        <class name="Demo\Pricing\Line" filename="packages/pricing/src/Line.php" line-rate="1" branch-rate="0" complexity="1">
+          <methods>
+            <method name="__construct" signature="string $sku, string $unitPrice, int $quantity" line-rate="1" branch-rate="0" complexity="1">
+              <lines>
+                <line number="12" hits="4"/>
+              </lines>
+            </method>
+          </methods>
+          <lines>
+            <line number="12" hits="4"/>
+          </lines>
+        </class>
+      </classes>
+    </package>
+    <package name="src/Controller/QuoteController.php" line-rate="1" branch-rate="0" complexity="3">
+      <classes>
+        <class name="App\Controller\QuoteController" filename="src/Controller/QuoteController.php" line-rate="1" branch-rate="0" complexity="3">
+          <methods>
+            <method name="__construct" signature="Calculator $calculator" line-rate="1" branch-rate="0" complexity="1">
+              <lines>
+                <line number="20" hits="3"/>
+              </lines>
+            </method>
+            <method name="__invoke" signature="Request $request" line-rate="1" branch-rate="0" complexity="2">
+              <lines>
+                <line number="26" hits="3"/>
+                <line number="27" hits="2"/>
+                <line number="28" hits="2"/>
+                <line number="29" hits="2"/>
+                <line number="30" hits="2"/>
+                <line number="31" hits="2"/>
+                <line number="32" hits="2"/>
+                <line number="33" hits="2"/>
+                <line number="36" hits="1"/>
+              </lines>
+            </method>
+          </methods>
+          <lines>
+            <line number="20" hits="3"/>
+            <line number="26" hits="3"/>
+            <line number="27" hits="2"/>
+            <line number="28" hits="2"/>
+            <line number="29" hits="2"/>
+            <line number="30" hits="2"/>
+            <line number="31" hits="2"/>
+            <line number="32" hits="2"/>
+            <line number="33" hits="2"/>
+            <line number="36" hits="1"/>
+          </lines>
+        </class>
+      </classes>
+    </package>
+  </packages>
+</coverage>

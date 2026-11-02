@@ -38,7 +38,8 @@ func parseAddedLines(out []byte) (map[string][]int, error) {
 		case strings.HasPrefix(line, "diff --git "):
 			current = ""
 		case strings.HasPrefix(line, "+++ "):
-			name := strings.TrimPrefix(line, "+++ ")
+			// git ends the name with a tab when it holds a space.
+			name := strings.TrimSuffix(strings.TrimPrefix(line, "+++ "), "\t")
 			if name == "/dev/null" {
 				current = ""
 				continue

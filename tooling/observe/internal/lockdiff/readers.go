@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"slices"
 	"strings"
 )
 
@@ -146,7 +147,7 @@ func ReadYarnLock(data []byte) (Packages, error) {
 					skip = true
 				}
 				name := descriptor[:at]
-				if !containsString(names, name) {
+				if !slices.Contains(names, name) {
 					names = append(names, name)
 				}
 			}
@@ -168,15 +169,6 @@ func ReadYarnLock(data []byte) (Packages, error) {
 		return nil, fmt.Errorf("yarn.lock cannot be read: %w", err)
 	}
 	return out, nil
-}
-
-func containsString(list []string, s string) bool {
-	for _, item := range list {
-		if item == s {
-			return true
-		}
-	}
-	return false
 }
 
 // ReadComposerLock reads the packages and packages-dev of a composer.lock.

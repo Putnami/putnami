@@ -1,0 +1,289 @@
+package observe
+
+import (
+	"bytes"
+	"context"
+	"encoding/json"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"strings"
+	"testing"
+
+	diag "go.putnami.dev/protocol/diagnostic"
+	"go.putnami.dev/protocol/evidence"
+	"go.putnami.dev/protocol/features/spectest"
+)
+
+const analysesFeature = "tooling/observe-analyses"
+
+// demoFile is one file of a demo fixture: base/ files are the target
+// branch, head/ files the ones the change rewrites, ci/ files the reports the
+// CI wrote.
+type demoFile struct {
+	name, content string
+}
+
+// readDemo reads testdata/demos/<name>.txtar: a comment line, then files,
+// each after a "-- <path> --" line.
+func readDemo(t *testing.T, name string) []demoFile {
+	t.Helper()
+	data, err := os.ReadFile(filepath.Join("testdata", "demos", name+".txtar"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var files []demoFile
+	for _, line := range strings.SplitAfter(string(data), "\n") {
+		if header, ok := strings.CutPrefix(strings.TrimSuffix(line, "\n"), "-- "); ok && strings.HasSuffix(header, " --") {
+			files = append(files, demoFile{name: strings.TrimSuffix(header, " --")})
+			continue
+		}
+		if len(files) > 0 {
+			files[len(files)-1].content += line
+		}
+	}
+	return files
+}
+
+func git(t *testing.T, dir string, args ...string) string {
+	t.Helper()
+	cmd := exec.Command("git", args...)
+	cmd.Dir = dir
+	cmd.Env = append(os.Environ(), "GIT_CONFIG_GLOBAL=/dev/null", "GIT_CONFIG_NOSYSTEM=1",
+		"GIT_AUTHOR_NAME=t", "GIT_AUTHOR_EMAIL=t@example.com", "GIT_COMMITTER_NAME=t", "GIT_COMMITTER_EMAIL=t@example.com")
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("git %s: %v\n%s", strings.Join(args, " "), err, out)
+	}
+	return strings.TrimSpace(string(out))
+}
+
+func writeDemoFile(t *testing.T, root, name, content string) {
+	t.Helper()
+	p := filepath.Join(root, filepath.FromSlash(name))
+	if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(p, []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// demoRepository builds the demo as a repository: the base commit, the
+// change on top of it, then the reports in the working tree. It returns the
+// root and the base commit.
+func demoRepository(t *testing.T, name string) (string, string) {
+	t.Helper()
+	root := t.TempDir()
+	git(t, root, "init", "--quiet", "--initial-branch=main")
+	files := readDemo(t, name)
+	for _, stage := range []string{"base/", "head/"} {
+		for _, f := range files {
+			if rest, ok := strings.CutPrefix(f.name, stage); ok {
+				writeDemoFile(t, root, rest, f.content)
+			}
+		}
+		git(t, root, "add", "--all")
+		git(t, root, "commit", "--quiet", "-m", stage)
+	}
+	for _, f := range files {
+		if rest, ok := strings.CutPrefix(f.name, "ci/"); ok {
+			writeDemoFile(t, root, rest, f.content)
+		}
+	}
+	return root, git(t, root, "rev-parse", "HEAD~1")
+}
+
+type demoExpectation struct {
+	env        map[string]string
+	changed    []string
+	dependent  []string
+	tests      map[string]int
+	covered    []string
+	lineFile   string
+	dependency evidence.DependencyChange
+}
+
+var demos = map[string]demoExpectation{
+	"turbo": {
+		env:        map[string]string{"GITHUB_ACTIONS": "true", "GITHUB_SERVER_URL": "https://github.com", "GITHUB_REPOSITORY": "Putnami/demo-observe-turbo", "GITHUB_REPOSITORY_ID": "1104", "GITHUB_RUN_ID": "41335501311", "GITHUB_JOB": "test", "GITHUB_REF": "refs/pull/1/merge"},
+		changed:    []string{"packages/pricing"},
+		dependent:  []string{"apps/api"},
+		tests:      map[string]int{"packages/pricing": 6, "apps/api": 3},
+		covered:    []string{"apps/api", "packages/pricing"},
+		lineFile:   "packages/pricing/src/index.ts",
+		dependency: evidence.DependencyChange{Ecosystem: "npm", Lockfile: "pnpm-lock.yaml", Name: "zod", Change: evidence.DependencyUpgraded, From: "3.23.8", To: "3.24.1"},
+	},
+	"go": {
+		env:     map[string]string{"GITHUB_ACTIONS": "true", "GITHUB_SERVER_URL": "https://github.com", "GITHUB_REPOSITORY": "Putnami/demo-observe-go", "GITHUB_REPOSITORY_ID": "1105", "GITHUB_RUN_ID": "41335469595", "GITHUB_JOB": "test", "GITHUB_REF": "refs/pull/1/merge"},
+		changed: []string{"api", "pricing"},
+		tests:   map[string]int{"pricing": 5, "api": 3},
+		covered: []string{"api", "pricing"},
+		// The bump changes api/go.mod too: Go records the indirect
+		// dependency in every module that builds pricing.
+		lineFile:   "pricing/pricing.go",
+		dependency: evidence.DependencyChange{Ecosystem: "go", Lockfile: "pricing/go.mod", Name: "golang.org/x/text", Change: evidence.DependencyUpgraded, From: "v0.20.0", To: "v0.21.0", Component: "pricing"},
+	},
+	"nx": {
+		env:        map[string]string{"GITLAB_CI": "true", "CI_SERVER_HOST": "gitlab.com", "CI_PROJECT_ID": "88373083", "CI_PROJECT_PATH": "putnami/demo-observe-nx", "CI_PIPELINE_ID": "3015178231", "CI_JOB_ID": "17647015420", "CI_MERGE_REQUEST_IID": "1"},
+		changed:    []string{"packages/pricing"},
+		dependent:  []string{"apps/api"},
+		tests:      map[string]int{"packages/pricing": 5, "apps/api": 2},
+		covered:    []string{"apps/api", "packages/pricing"},
+		lineFile:   "packages/pricing/src/index.ts",
+		dependency: evidence.DependencyChange{Ecosystem: "npm", Lockfile: "package-lock.json", Name: "decimal.js", Change: evidence.DependencyUpgraded, From: "10.4.3", To: "10.5.0"},
+	},
+	"symfony": {
+		env: map[string]string{"GITLAB_CI": "true", "CI_SERVER_HOST": "gitlab.com", "CI_PROJECT_ID": "88373184", "CI_PROJECT_PATH": "putnami/demo-observe-symfony", "CI_PIPELINE_ID": "3015177948", "CI_JOB_ID": "17647015000", "CI_MERGE_REQUEST_IID": "1"},
+		// composer.lock lies in the application at the root, which the
+		// change therefore also touches.
+		changed:    []string{".", "packages/pricing"},
+		tests:      map[string]int{"packages/pricing": 6, ".": 3},
+		covered:    []string{".", "packages/pricing"},
+		lineFile:   "packages/pricing/src/Calculator.php",
+		dependency: evidence.DependencyChange{Ecosystem: "composer", Lockfile: "composer.lock", Name: "brick/math", Change: evidence.DependencyUpgraded, From: "0.13.0", To: "0.13.1", Component: "."},
+	},
+}
+
+func observeDemo(t *testing.T, name string) Observation {
+	t.Helper()
+	root, base := demoRepository(t, name)
+	env := demos[name].env
+	opts := Options{
+		Dir:      root,
+		Env:      func(key string) string { return env[key] },
+		ReadFile: func(string) ([]byte, error) { return nil, os.ErrNotExist },
+		Resolve:  func(p string) string { return filepath.Join(root, p) },
+		Producer: Producer{Name: "@putnami/observe", Version: "1.0.0"},
+	}
+	opts.Overrides.Base = base
+	return Run(context.Background(), opts)
+}
+
+func impacts(o Observation, impact string) []string {
+	var out []string
+	for _, c := range o.Analysis.Components {
+		if c.Impact == impact {
+			out = append(out, c.ID)
+		}
+	}
+	return out
+}
+
+func TestEachDemoChangeIsExplained(t *testing.T) {
+	spectest.Proves(t, analysesFeature, "summary", "the-demo-evidence-documents-validate")
+	spectest.Proves(t, analysesFeature, "components", "changed-files-give-changed-and-dependent-components")
+	for name, want := range demos {
+		t.Run(name, func(t *testing.T) {
+			o := observeDemo(t, name)
+			a := o.Analysis
+			if got := strings.Join(impacts(o, evidence.ImpactChanged), ","); got != strings.Join(want.changed, ",") {
+				t.Errorf("changed %s, want %v", got, want.changed)
+			}
+			if got := strings.Join(impacts(o, evidence.ImpactDependent), ","); got != strings.Join(want.dependent, ",") {
+				t.Errorf("dependent %s, want %v", got, want.dependent)
+			}
+			for component, passed := range want.tests {
+				found := false
+				for _, entry := range a.Tests {
+					if entry.Component == component {
+						found = entry.Passed == passed && entry.Failed == 0
+					}
+				}
+				if !found {
+					t.Errorf("tests of %s: %+v, want %d passed", component, a.Tests, passed)
+				}
+			}
+			var covered []string
+			for _, c := range a.Coverage {
+				if c.TotalLines > 0 {
+					covered = append(covered, c.Component)
+				}
+			}
+			if strings.Join(covered, ",") != strings.Join(want.covered, ",") {
+				t.Errorf("coverage %+v, want %v", a.Coverage, want.covered)
+			}
+			if a.ChangedLineCoverage == nil || a.ChangedLineCoverage.TotalLines == 0 {
+				t.Fatalf("changed-line coverage %+v", a.ChangedLineCoverage)
+			}
+			lineFound := false
+			for _, f := range a.ChangedLineCoverage.Files {
+				lineFound = lineFound || (f.Path == want.lineFile && f.TotalLines > 0 && f.CoveredLines == f.TotalLines)
+			}
+			if !lineFound {
+				t.Errorf("changed lines %+v, want %s covered", a.ChangedLineCoverage.Files, want.lineFile)
+			}
+			depFound := false
+			for _, d := range a.DependencyChanges {
+				depFound = depFound || d == want.dependency
+			}
+			if !depFound {
+				t.Errorf("dependency changes %+v, want %+v", a.DependencyChanges, want.dependency)
+			}
+			for _, d := range o.Diagnostics {
+				if d.Severity != diag.Info && !strings.HasPrefix(d.Code, "observe.report_") {
+					t.Errorf("diagnostic %s: %s", d.Code, d.Message)
+				}
+			}
+			doc := Evidence(o, now)
+			if problems := evidence.ValidateDocument(doc); diag.HasErrors(problems) {
+				t.Fatalf("the evidence document does not validate: %v", problems)
+			}
+			data, err := json.Marshal(doc)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if _, problems := evidence.ParseAndValidate(data); diag.HasErrors(problems) {
+				t.Fatalf("the written evidence document does not parse back: %v", problems)
+			}
+			if doc.Subject.ChangeRequest == nil || doc.Subject.ChangeRequest.Number != 1 || doc.Subject.ProjectID != want.env[projectIDVariable(want.env)] {
+				t.Errorf("subject %+v", doc.Subject)
+			}
+		})
+	}
+}
+
+func projectIDVariable(env map[string]string) string {
+	if env["GITLAB_CI"] == "true" {
+		return "CI_PROJECT_ID"
+	}
+	return "GITHUB_REPOSITORY_ID"
+}
+
+func TestTheSummaryShowsTheAnalyses(t *testing.T) {
+	spectest.Proves(t, analysesFeature, "summary", "the-summary-shows-the-analyses")
+	o := observeDemo(t, "turbo")
+	var text bytes.Buffer
+	if err := WriteText(&text, o); err != nil {
+		t.Fatal(err)
+	}
+	for _, line := range []string{
+		"  components  1 changed, 1 dependent, 0 unaffected\n",
+		"    changed   packages/pricing (@demo/pricing) [node, workspace]\n",
+		"    dependent apps/api (@demo/api) [node, workspace], depends on packages/pricing\n",
+		"    packages/pricing  6 passed, 0 failed, 0 skipped, coverage 19 of 19 lines (100.0%)\n",
+		"  changed lines  5 of 5 lines (100.0%) covered\n",
+		"    upgraded   zod 3.23.8 -> 3.24.1, in pnpm-lock.yaml\n",
+	} {
+		if !strings.Contains(text.String(), line) {
+			t.Errorf("the summary lacks %q:\n%s", line, text.String())
+		}
+	}
+	var out bytes.Buffer
+	if err := WriteJSON(&out, o); err != nil {
+		t.Fatal(err)
+	}
+	var decoded struct {
+		Analysis struct {
+			Components          []evidence.Component          `json:"components"`
+			ChangedLineCoverage *evidence.ChangedLineCoverage `json:"changedLineCoverage"`
+			DependencyChanges   []evidence.DependencyChange   `json:"dependencyChanges"`
+		} `json:"analysis"`
+	}
+	if err := json.Unmarshal(out.Bytes(), &decoded); err != nil {
+		t.Fatal(err)
+	}
+	if len(decoded.Analysis.Components) != 2 || decoded.Analysis.ChangedLineCoverage == nil || len(decoded.Analysis.DependencyChanges) != 1 {
+		t.Fatalf("the JSON output lacks the analysis: %s", out.String())
+	}
+}

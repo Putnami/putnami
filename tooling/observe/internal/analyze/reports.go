@@ -116,7 +116,11 @@ func (r *Result) mapCoverage(report reports.Report, result readers.CoverageRepor
 	for _, file := range result.Files {
 		rel, ok := m.resolve(file.Path, append(sourceBases, bases...))
 		if !ok && report.Format == reports.FormatGoCover {
-			rel, _, ok = m.set.Locate(file.Path)
+			// A Go profile names import paths; only a located file that
+			// exists is one.
+			if located, _, found := m.set.Locate(file.Path); found && m.isFile(located) {
+				rel, ok = located, true
+			}
 		}
 		if !ok {
 			unmapped++

@@ -1,0 +1,371 @@
+The go demo: its base, the files its change rewrites, and the reports its CI wrote.
+-- base/go.work --
+go 1.23
+
+use (
+	./api
+	./pricing
+)
+-- base/api/go.mod --
+module github.com/Putnami/demo-observe-go/api
+
+go 1.23
+
+require (
+	github.com/Putnami/demo-observe-go/pricing v0.0.0
+	github.com/google/uuid v1.5.0
+)
+
+require golang.org/x/text v0.20.0 // indirect
+
+replace github.com/Putnami/demo-observe-go/pricing => ../pricing
+-- base/api/go.sum --
+github.com/google/uuid v1.5.0 h1:1p67kYwdtXjb0gL0BPiP1Av9wiZPo5A8z2cWkTZ+eyU=
+github.com/google/uuid v1.5.0/go.mod h1:TIyPZe4MgqvfeYDBFedMoGGpEw/LqOeaOT+nhxU+yHo=
+golang.org/x/text v0.20.0 h1:gK/Kv2otX8gz+wn7Rmb3vT96ZwuoxnQlY+HlJVj7Qug=
+golang.org/x/text v0.20.0/go.mod h1:D4IsuqiFMhST5bX19pQ9ikHC2GsaKyk/oF+pn3ducp4=
+-- base/api/main.go --
+package main
+
+import (
+	"log"
+	"net/http"
+	"os"
+)
+
+func main() {
+	addr := os.Getenv("ADDR")
+	if addr == "" {
+		addr = ":8080"
+	}
+	http.HandleFunc("/quote", quote)
+	log.Fatal(http.ListenAndServe(addr, nil))
+}
+-- base/api/quote.go --
+// Package main serves order quotes over HTTP.
+package main
+
+import (
+	"encoding/json"
+	"net/http"
+
+	"github.com/Putnami/demo-observe-go/pricing"
+	"github.com/google/uuid"
+)
+
+// taxBasisPoints is the tax rate applied to every quote: 20 %.
+const taxBasisPoints = 2000
+
+type quoteRequest struct {
+	Lines []pricing.Line `json:"lines"`
+}
+
+type quoteResponse struct {
+	ID         string `json:"id"`
+	TotalCents int64  `json:"totalCents"`
+}
+
+func quote(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	var req quoteRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "invalid body", http.StatusBadRequest)
+		return
+	}
+	subtotal, err := pricing.Subtotal(req.Lines)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusUnprocessableEntity)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(quoteResponse{
+		ID:         uuid.NewString(),
+		TotalCents: pricing.WithTax(subtotal, taxBasisPoints),
+	})
+}
+-- base/api/quote_test.go --
+package main
+
+import (
+	"encoding/json"
+	"net/http"
+	"net/http/httptest"
+	"strings"
+	"testing"
+)
+
+func TestQuote(t *testing.T) {
+	body := `{"lines":[{"SKU":"a","UnitCents":500,"Quantity":2}]}`
+	rec := httptest.NewRecorder()
+	quote(rec, httptest.NewRequest(http.MethodPost, "/quote", strings.NewReader(body)))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200", rec.Code)
+	}
+	var got quoteResponse
+	if err := json.NewDecoder(rec.Body).Decode(&got); err != nil {
+		t.Fatal(err)
+	}
+	if got.TotalCents != 1200 {
+		t.Fatalf("TotalCents = %d, want 1200", got.TotalCents)
+	}
+	if got.ID == "" {
+		t.Fatal("ID is empty")
+	}
+}
+
+func TestQuoteRejectsNegative(t *testing.T) {
+	body := `{"lines":[{"SKU":"a","UnitCents":-5,"Quantity":1}]}`
+	rec := httptest.NewRecorder()
+	quote(rec, httptest.NewRequest(http.MethodPost, "/quote", strings.NewReader(body)))
+	if rec.Code != http.StatusUnprocessableEntity {
+		t.Fatalf("status = %d, want 422", rec.Code)
+	}
+}
+
+func TestQuoteRejectsGet(t *testing.T) {
+	rec := httptest.NewRecorder()
+	quote(rec, httptest.NewRequest(http.MethodGet, "/quote", nil))
+	if rec.Code != http.StatusMethodNotAllowed {
+		t.Fatalf("status = %d, want 405", rec.Code)
+	}
+}
+-- base/pricing/go.mod --
+module github.com/Putnami/demo-observe-go/pricing
+
+go 1.23
+
+require golang.org/x/text v0.20.0
+-- base/pricing/go.sum --
+golang.org/x/text v0.20.0 h1:gK/Kv2otX8gz+wn7Rmb3vT96ZwuoxnQlY+HlJVj7Qug=
+golang.org/x/text v0.20.0/go.mod h1:D4IsuqiFMhST5bX19pQ9ikHC2GsaKyk/oF+pn3ducp4=
+-- base/pricing/format.go --
+package pricing
+
+import (
+	"golang.org/x/text/currency"
+	"golang.org/x/text/language"
+	"golang.org/x/text/message"
+)
+
+// Format renders an amount in cents as a localized euro amount.
+func Format(cents int64, tag language.Tag) string {
+	amount := currency.EUR.Amount(float64(cents) / 100)
+	return message.NewPrinter(tag).Sprint(currency.Symbol(amount))
+}
+-- base/pricing/pricing.go --
+// Package pricing computes order totals in cents.
+package pricing
+
+import "errors"
+
+// ErrNegative reports a negative quantity or price.
+var ErrNegative = errors.New("pricing: negative value")
+
+// Line is one order line.
+type Line struct {
+	SKU       string
+	UnitCents int64
+	Quantity  int64
+}
+
+// Subtotal returns the sum of the lines, before tax.
+func Subtotal(lines []Line) (int64, error) {
+	var total int64
+	for _, l := range lines {
+		if l.UnitCents < 0 || l.Quantity < 0 {
+			return 0, ErrNegative
+		}
+		total += l.UnitCents * l.Quantity
+	}
+	return total, nil
+}
+
+// WithTax adds a tax rate, in basis points, rounded half up.
+func WithTax(cents int64, basisPoints int64) int64 {
+	return cents + (cents*basisPoints+5000)/10000
+}
+-- base/pricing/pricing_test.go --
+package pricing
+
+import "testing"
+
+func TestSubtotal(t *testing.T) {
+	got, err := Subtotal([]Line{{SKU: "a", UnitCents: 250, Quantity: 2}, {SKU: "b", UnitCents: 100, Quantity: 1}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != 600 {
+		t.Fatalf("Subtotal = %d, want 600", got)
+	}
+}
+
+func TestSubtotalRejectsNegative(t *testing.T) {
+	if _, err := Subtotal([]Line{{SKU: "a", UnitCents: -1, Quantity: 1}}); err != ErrNegative {
+		t.Fatalf("err = %v, want ErrNegative", err)
+	}
+}
+
+func TestWithTax(t *testing.T) {
+	if got := WithTax(1000, 2000); got != 1200 {
+		t.Fatalf("WithTax = %d, want 1200", got)
+	}
+}
+-- head/api/go.mod --
+module github.com/Putnami/demo-observe-go/api
+
+go 1.23
+
+require (
+	github.com/Putnami/demo-observe-go/pricing v0.0.0
+	github.com/google/uuid v1.5.0
+)
+
+require golang.org/x/text v0.21.0 // indirect
+
+replace github.com/Putnami/demo-observe-go/pricing => ../pricing
+-- head/api/go.sum --
+github.com/google/uuid v1.5.0 h1:1p67kYwdtXjb0gL0BPiP1Av9wiZPo5A8z2cWkTZ+eyU=
+github.com/google/uuid v1.5.0/go.mod h1:TIyPZe4MgqvfeYDBFedMoGGpEw/LqOeaOT+nhxU+yHo=
+golang.org/x/text v0.21.0 h1:zyQAAkrwaneQ066sspRyJaG9VNi/YJ1NfzcGB3hZ/qo=
+golang.org/x/text v0.21.0/go.mod h1:4IBbMaMmOPCJ8SecivzSH54+73PCFmPWxNTLm+vZkEQ=
+-- head/pricing/go.mod --
+module github.com/Putnami/demo-observe-go/pricing
+
+go 1.23
+
+require golang.org/x/text v0.21.0
+-- head/pricing/go.sum --
+golang.org/x/text v0.21.0 h1:zyQAAkrwaneQ066sspRyJaG9VNi/YJ1NfzcGB3hZ/qo=
+golang.org/x/text v0.21.0/go.mod h1:4IBbMaMmOPCJ8SecivzSH54+73PCFmPWxNTLm+vZkEQ=
+-- head/pricing/pricing.go --
+// Package pricing computes order totals in cents.
+package pricing
+
+import "errors"
+
+// ErrNegative reports a negative quantity or price.
+var ErrNegative = errors.New("pricing: negative value")
+
+// Line is one order line.
+type Line struct {
+	SKU       string
+	UnitCents int64
+	Quantity  int64
+}
+
+// Subtotal returns the sum of the lines, before tax.
+func Subtotal(lines []Line) (int64, error) {
+	var total int64
+	for _, l := range lines {
+		if l.UnitCents < 0 || l.Quantity < 0 {
+			return 0, ErrNegative
+		}
+		total += l.UnitCents * l.Quantity
+	}
+	return total, nil
+}
+
+// WithTax adds a tax rate, in basis points, rounded half up.
+func WithTax(cents int64, basisPoints int64) int64 {
+	return cents + (cents*basisPoints+5000)/10000
+}
+
+// Discount removes a percentage, in basis points, rounded half down in favor
+// of the customer.
+func Discount(cents int64, basisPoints int64) int64 {
+	if basisPoints <= 0 {
+		return cents
+	}
+	if basisPoints >= 10000 {
+		return 0
+	}
+	return cents - (cents*basisPoints+4999)/10000
+}
+-- head/pricing/pricing_test.go --
+package pricing
+
+import "testing"
+
+func TestSubtotal(t *testing.T) {
+	got, err := Subtotal([]Line{{SKU: "a", UnitCents: 250, Quantity: 2}, {SKU: "b", UnitCents: 100, Quantity: 1}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != 600 {
+		t.Fatalf("Subtotal = %d, want 600", got)
+	}
+}
+
+func TestSubtotalRejectsNegative(t *testing.T) {
+	if _, err := Subtotal([]Line{{SKU: "a", UnitCents: -1, Quantity: 1}}); err != ErrNegative {
+		t.Fatalf("err = %v, want ErrNegative", err)
+	}
+}
+
+func TestWithTax(t *testing.T) {
+	if got := WithTax(1000, 2000); got != 1200 {
+		t.Fatalf("WithTax = %d, want 1200", got)
+	}
+}
+
+func TestDiscount(t *testing.T) {
+	cases := []struct{ cents, bp, want int64 }{
+		{1000, 1000, 900},
+		{1000, 0, 1000},
+		{1000, 12000, 0},
+	}
+	for _, c := range cases {
+		if got := Discount(c.cents, c.bp); got != c.want {
+			t.Fatalf("Discount(%d, %d) = %d, want %d", c.cents, c.bp, got, c.want)
+		}
+	}
+}
+-- ci/reports/junit.xml --
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites tests="8" failures="0" errors="0" time="3.567156">
+	<testsuite tests="3" failures="0" time="0.006000" name="github.com/Putnami/demo-observe-go/api" timestamp="2026-11-01T18:13:50Z">
+		<properties>
+			<property name="go.version" value="go1.23.12 linux/amd64"></property>
+		</properties>
+		<testcase classname="github.com/Putnami/demo-observe-go/api" name="TestQuote" time="0.000000"></testcase>
+		<testcase classname="github.com/Putnami/demo-observe-go/api" name="TestQuoteRejectsNegative" time="0.000000"></testcase>
+		<testcase classname="github.com/Putnami/demo-observe-go/api" name="TestQuoteRejectsGet" time="0.000000"></testcase>
+	</testsuite>
+	<testsuite tests="5" failures="0" time="0.007000" name="github.com/Putnami/demo-observe-go/pricing" timestamp="2026-11-01T18:13:50Z">
+		<properties>
+			<property name="go.version" value="go1.23.12 linux/amd64"></property>
+		</properties>
+		<testcase classname="github.com/Putnami/demo-observe-go/pricing" name="TestFormat" time="0.000000"></testcase>
+		<testcase classname="github.com/Putnami/demo-observe-go/pricing" name="TestSubtotal" time="0.000000"></testcase>
+		<testcase classname="github.com/Putnami/demo-observe-go/pricing" name="TestSubtotalRejectsNegative" time="0.000000"></testcase>
+		<testcase classname="github.com/Putnami/demo-observe-go/pricing" name="TestWithTax" time="0.000000"></testcase>
+		<testcase classname="github.com/Putnami/demo-observe-go/pricing" name="TestDiscount" time="0.000000"></testcase>
+	</testsuite>
+</testsuites>
+-- ci/reports/coverage.out --
+mode: set
+github.com/Putnami/demo-observe-go/pricing/format.go:10.51,13.2 2 1
+github.com/Putnami/demo-observe-go/pricing/pricing.go:17.44,19.26 2 1
+github.com/Putnami/demo-observe-go/pricing/pricing.go:19.26,20.40 1 1
+github.com/Putnami/demo-observe-go/pricing/pricing.go:20.40,22.4 1 1
+github.com/Putnami/demo-observe-go/pricing/pricing.go:23.3,23.36 1 1
+github.com/Putnami/demo-observe-go/pricing/pricing.go:25.2,25.19 1 1
+github.com/Putnami/demo-observe-go/pricing/pricing.go:29.52,31.2 1 1
+github.com/Putnami/demo-observe-go/pricing/pricing.go:35.53,36.22 1 1
+github.com/Putnami/demo-observe-go/pricing/pricing.go:36.22,38.3 1 1
+github.com/Putnami/demo-observe-go/pricing/pricing.go:39.2,39.26 1 1
+github.com/Putnami/demo-observe-go/pricing/pricing.go:39.26,41.3 1 1
+github.com/Putnami/demo-observe-go/pricing/pricing.go:42.2,42.47 1 1
+github.com/Putnami/demo-observe-go/api/main.go:9.13,11.16 2 0
+github.com/Putnami/demo-observe-go/api/main.go:11.16,13.3 1 0
+github.com/Putnami/demo-observe-go/api/main.go:14.2,15.43 2 0
+github.com/Putnami/demo-observe-go/api/quote.go:24.52,25.33 1 1
+github.com/Putnami/demo-observe-go/api/quote.go:25.33,28.3 2 1
+github.com/Putnami/demo-observe-go/api/quote.go:29.2,30.61 2 1
+github.com/Putnami/demo-observe-go/api/quote.go:30.61,33.3 2 0
+github.com/Putnami/demo-observe-go/api/quote.go:34.2,35.16 2 1
+github.com/Putnami/demo-observe-go/api/quote.go:35.16,38.3 2 1
+github.com/Putnami/demo-observe-go/api/quote.go:39.2,43.4 2 1

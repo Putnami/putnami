@@ -26,11 +26,11 @@ const (
 
 // Lockfile names the readers know.
 const (
-	PackageLock = "package-lock.json"
-	PNPMLock    = "pnpm-lock.yaml"
-	YarnLock    = "yarn.lock"
+	PackageLock  = "package-lock.json"
+	PNPMLock     = "pnpm-lock.yaml"
+	YarnLock     = "yarn.lock"
 	ComposerLock = "composer.lock"
-	GoMod       = "go.mod"
+	GoMod        = "go.mod"
 )
 
 // Packages maps a package name to the versions a lockfile pins for it.

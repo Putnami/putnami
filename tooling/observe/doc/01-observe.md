@@ -101,21 +101,23 @@ nothing gets `observe.report_missing`, an unreadable file
 ## Output
 
 The summary names the CI, the repository, the commit, the base, the changed
-files (the first 50) and the reports, then each diagnostic. `putnami observe`
+files (the first 50), the changed and dependent components, the tests and
+coverage of each component, the coverage of the changed lines, the dependency
+changes and the reports, then each diagnostic. See
+[the change analyses](06-change-analyses.md). `putnami observe`
 exits 0 whatever it observes, 2 on a usage error, and 1 when it cannot read its
 job context or write its output. `--output=json`
 prints one document with `subject`, `ci`, `producer`, `base`,
-`deepenedCommits`, `changedFiles`, `reports` and `diagnostics`.
+`deepenedCommits`, `changedFiles`, `reports`, `analysis` and `diagnostics`.
 
 ## The evidence document
 
 `--evidence <path>` writes a
 [`protocol/evidence`](../../../protocols/evidence/README.md) v1 document: the
-subject, the CI run, the producer, the changed files and the diagnostics. Until
-a detector names the repository's components, the repository is one
-`fallback` component `.` of ecosystem `unknown`, `changed` when a file changed
-and `unaffected` otherwise. Tests and coverage per component are not written
-yet.
+subject, the CI run, the producer, the changed files with their component,
+the components with their impact and edges, the tests and coverage per
+component, the changed-line coverage, the dependency changes and the
+diagnostics.
 
 The document is validated before it is written, and replaces the file in one
 rename. A document that does not validate, such as one without a commit or a
