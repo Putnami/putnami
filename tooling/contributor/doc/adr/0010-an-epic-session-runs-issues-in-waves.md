@@ -63,15 +63,19 @@ ADR. The epic launches nothing new once its envelope is spent.
 ### 5. A child stacks on one parent at most
 
 A child starts when every dependency is merged, or when exactly one is not
-merged and its proposal is ready for review. Its branch then starts from that
-parent's branch. With two or more dependencies not merged, the child waits.
+merged, its proposal is ready for review, and it started from the epic's
+base. Its branch then starts from that parent's branch, and its proposal
+targets it. A stack is never two levels deep. With two or more dependencies
+not merged, the child waits.
 
 ### 6. A stacked child rebases onto the base after its parent merges
 
 After the parent's squash merge, the child runs
 `git rebase --onto <base> <parent's last head>`, where the parent's last
 head is the head commit `proposals.status` reports for the merged proposal.
-Only the child's own commits move.
+Only the child's own commits move, provided the child rebased onto the
+parent's branch each time it moved before the merge. The child's proposal
+then targets the base.
 
 ## Consequences
 
