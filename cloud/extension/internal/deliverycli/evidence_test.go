@@ -7,11 +7,14 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
 
+	deliveryapiclient "go.putnami.dev/cloud/clients/delivery-api/go"
 	clicore "go.putnami.dev/cloud/extension/internal/clicore"
+	"go.putnami.dev/protocol/evidence"
 	"go.putnami.dev/protocol/features/spectest"
 )
 
@@ -23,7 +26,9 @@ const (
 // evidenceFakeServer stands in for Delivery's records routes. It records every
 // request and answers each route with what the real one would.
 type evidenceFakeServer struct {
-	requests      []reportCapturedRequest
+	requests []reportCapturedRequest
+	// raw holds the body of each request as it was sent.
+	raw           [][]byte
 	refuseRun     int
 	refuseReports int
 	// refuseOperational answers a run that carries operational as a control
@@ -31,11 +36,15 @@ type evidenceFakeServer struct {
 	refuseOperational bool
 	// alreadyStored answers every kind as already stored when it is true.
 	alreadyStored bool
+	// refuseStates answers a batch whose dependency changes carry a before or
+	// after state as a body over the route's size.
+	refuseStates bool
 }
 
 func (s *evidenceFakeServer) RoundTrip(req *http.Request) (*http.Response, error) {
 	raw, _ := io.ReadAll(req.Body)
 	_ = req.Body.Close()
+	s.raw = append(s.raw, raw)
 	var body map[string]any
 	_ = json.Unmarshal(raw, &body)
 	s.requests = append(s.requests, reportCapturedRequest{Method: req.Method, Path: req.URL.Path, Auth: req.Header.Get("Authorization"), Body: body})
@@ -52,6 +61,9 @@ func (s *evidenceFakeServer) RoundTrip(req *http.Request) (*http.Response, error
 			"conclusion": body["conclusion"], "provenance": body["provenance"], "verified": false,
 		}), nil
 	case recordsReportsIngestPath:
+		if s.refuseStates && (strings.Contains(string(raw), `"before":`) || strings.Contains(string(raw), `"after":`)) {
+			return reportJSONResponse(http.StatusRequestEntityTooLarge, map[string]any{"error": "Request body exceeds the declared bound", "message": "Request body exceeds the declared bound"}), nil
+		}
 		if s.refuseReports != 0 {
 			return reportJSONResponse(s.refuseReports, map[string]any{"error": "request body too large", "message": "request body too large"}), nil
 		}
@@ -364,4 +376,226 @@ func TestEvidenceReportSaysWhatWasAlreadyStored(t *testing.T) {
 	if !strings.Contains(stdout, "stored no report; already stored tests, coverage, components") {
 		t.Fatalf("stdout = %q, want the kinds that were already stored apart", stdout)
 	}
+}
+
+// evidenceRequestsTranscript lists each request the fake received: its method
+// and path on one line, then its body as it was sent.
+func evidenceRequestsTranscript(fake *evidenceFakeServer) []byte {
+	var out []byte
+	for i, request := range fake.requests {
+		out = append(out, request.Method+" "+request.Path+"\n"...)
+		out = append(out, fake.raw[i]...)
+		if len(fake.raw[i]) == 0 || fake.raw[i][len(fake.raw[i])-1] != '\n' {
+			out = append(out, '\n')
+		}
+	}
+	return out
+}
+
+func TestEvidenceReportSendsTheStatesOfEachDependencyChange(t *testing.T) {
+	spectest.Proves(t, evidenceFeature, "sends-the-dependency-states", "a-dependency-change-carries-its-before-and-after-states")
+	fake := &evidenceFakeServer{}
+	if _, err := runEvidenceReport(t, fake, evidenceEnv(), "--file", evidenceFixture("sbom-pull-request.json")); err != nil {
+		t.Fatalf("evidence-report: %v", err)
+	}
+	if got := fake.paths(); len(got) != 2 || got[1] != "POST "+recordsReportsIngestPath {
+		t.Fatalf("requests = %v, want the run and the evidence batch", got)
+	}
+	members := fake.requests[1].Body
+	if _, ok := members["sbom"]; ok {
+		t.Fatalf("the evidence batch carries the document's sbom member: %v", members)
+	}
+
+	var fixture map[string]any
+	data, err := os.ReadFile(evidenceFixture("sbom-pull-request.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := json.Unmarshal(data, &fixture); err != nil {
+		t.Fatal(err)
+	}
+	got, _ := json.Marshal(members["dependencyChanges"])
+	want, _ := json.Marshal(fixture["dependencyChanges"])
+	if string(got) != string(want) {
+		t.Fatalf("dependencyChanges = %s, want the document's own %s", got, want)
+	}
+
+	changes := members["dependencyChanges"].([]any)
+	lodash := changes[0].(map[string]any)
+	before, _ := lodash["before"].(map[string]any)
+	after, _ := lodash["after"].(map[string]any)
+	if before == nil || after == nil {
+		t.Fatalf("lodash = %v, want its before and after states", lodash)
+	}
+	fixed, _ := before["vulnerabilities"].([]any)
+	if len(fixed) != 2 || fixed[1].(map[string]any)["id"] != "GHSA-35jh-r3h4-6jhm" || fixed[1].(map[string]any)["severity"] != "high" {
+		t.Fatalf("lodash before = %v, want its two known vulnerabilities with id and severity", before)
+	}
+	if licenses, _ := after["licenses"].([]any); len(licenses) != 1 || licenses[0] != "MIT" {
+		t.Fatalf("lodash after = %v, want its MIT license", after)
+	}
+	if _, ok := after["vulnerabilities"]; ok {
+		t.Fatalf("lodash after = %v, want no vulnerability member", after)
+	}
+	if removed := changes[1].(map[string]any); removed["after"] != nil || removed["before"] == nil {
+		t.Fatalf("minimist = %v, want its before state alone", removed)
+	}
+	if added := changes[2].(map[string]any); added["before"] != nil || added["after"] == nil {
+		t.Fatalf("zod = %v, want its after state alone", added)
+	}
+	if plain := changes[3].(map[string]any); plain["before"] != nil || plain["after"] != nil {
+		t.Fatalf("left-pad = %v, want no state", plain)
+	}
+}
+
+func TestEvidenceReportUploadsADocumentWithoutStatesAsItDidBefore(t *testing.T) {
+	spectest.Proves(t, evidenceFeature, "sends-the-dependency-states", "a-document-without-states-uploads-the-same-body")
+	for _, name := range []string{"turbo-pull-request", "symfony-merge-request"} {
+		t.Run(name, func(t *testing.T) {
+			fake := &evidenceFakeServer{}
+			if _, err := runEvidenceReport(t, fake, evidenceEnv(), "--file", evidenceFixture(name+".json")); err != nil {
+				t.Fatalf("evidence-report: %v", err)
+			}
+			want, err := os.ReadFile(evidenceFixture(name + ".requests.golden"))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got := evidenceRequestsTranscript(fake); string(got) != string(want) {
+				t.Fatalf("requests =\n%s\nwant the bodies the upload sent before dependency states existed:\n%s", got, want)
+			}
+		})
+	}
+}
+
+func TestEvidenceReportKeepsAnEmptyState(t *testing.T) {
+	spectest.Proves(t, evidenceFeature, "sends-the-dependency-states", "a-dependency-change-carries-its-before-and-after-states")
+	doc := map[string]any{}
+	data, err := os.ReadFile(evidenceFixture("sbom-pull-request.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := json.Unmarshal(data, &doc); err != nil {
+		t.Fatal(err)
+	}
+	doc["dependencyChanges"].([]any)[2].(map[string]any)["after"] = map[string]any{}
+	fake := &evidenceFakeServer{}
+	if _, err := runEvidenceReport(t, fake, evidenceEnv(), "--file", writeEvidenceDoc(t, doc)); err != nil {
+		t.Fatalf("evidence-report: %v", err)
+	}
+	if body := string(fake.raw[1]); !strings.Contains(body, `"after":{},"change":"added"`) {
+		t.Fatalf("evidence batch = %s, want zod's empty after state", body)
+	}
+}
+
+func TestEvidenceReportPostsARefusedBatchAgainWithoutTheStates(t *testing.T) {
+	spectest.Proves(t, evidenceFeature, "sends-the-dependency-states", "a-refused-batch-is-posted-again-without-the-states")
+	t.Run("too large with its states", func(t *testing.T) {
+		fake := &evidenceFakeServer{refuseStates: true}
+		stdout, stderr, err := runEvidenceReportLogged(t, fake, evidenceEnv(), "--file", evidenceFixture("sbom-pull-request.json"), "--output=json")
+		if err != nil {
+			t.Fatalf("evidence-report: %v", err)
+		}
+		if got := fake.paths(); len(got) != 3 {
+			t.Fatalf("requests = %v, want the run, the refused batch and the batch again", got)
+		}
+		again := fake.requests[2].Body
+		if again["submissionId"] != fake.requests[1].Body["submissionId"] {
+			t.Fatalf("the batch goes again under %v, want %v", again["submissionId"], fake.requests[1].Body["submissionId"])
+		}
+		changes, _ := again["dependencyChanges"].([]any)
+		if len(changes) != 4 {
+			t.Fatalf("dependencyChanges = %v, want the four changes", again["dependencyChanges"])
+		}
+		for _, change := range changes {
+			change := change.(map[string]any)
+			if _, ok := change["before"]; ok {
+				t.Fatalf("change %v still carries before", change)
+			}
+			if _, ok := change["after"]; ok {
+				t.Fatalf("change %v still carries after", change)
+			}
+			if change["name"] == nil || change["change"] == nil {
+				t.Fatalf("change %v lost its members", change)
+			}
+		}
+		if _, ok := again["components"]; !ok {
+			t.Fatalf("the batch goes again without its components: %v", again)
+		}
+		if !strings.Contains(stderr, "sends no dependency states") || !strings.Contains(stderr, "exceeds the declared bound") {
+			t.Fatalf("stderr = %q, want a warning that names the refusal", stderr)
+		}
+		if !strings.Contains(stdout, `"dependency_states_left_out"`) || !strings.Contains(stdout, "exceeds the declared bound") {
+			t.Fatalf("stdout = %q, want the refusal under dependency_states_left_out", stdout)
+		}
+	})
+
+	t.Run("refused again", func(t *testing.T) {
+		fake := &evidenceFakeServer{refuseReports: http.StatusRequestEntityTooLarge}
+		_, stderr, err := runEvidenceReportLogged(t, fake, evidenceEnv(), "--file", evidenceFixture("sbom-pull-request.json"))
+		if err == nil || clicore.ExitCode(err) != clicore.ExitAPI || !strings.Contains(err.Error(), "request body too large") {
+			t.Fatalf("err = %v, want the refusal of the batch without states", err)
+		}
+		if got := fake.paths(); len(got) != 3 {
+			t.Fatalf("requests = %v, want the run, the batch and the batch again", got)
+		}
+		if strings.Contains(stderr, "sends no dependency states") {
+			t.Fatalf("stderr = %q warns of states left out of a batch that was not stored", stderr)
+		}
+	})
+
+	t.Run("refused for another reason", func(t *testing.T) {
+		fake := &evidenceFakeServer{refuseReports: http.StatusBadRequest}
+		if _, err := runEvidenceReport(t, fake, evidenceEnv(), "--file", evidenceFixture("sbom-pull-request.json")); err == nil {
+			t.Fatal("evidence-report succeeded, want the refused batch")
+		}
+		if got := fake.paths(); len(got) != 2 {
+			t.Fatalf("requests = %v, want the run and the batch once", got)
+		}
+	})
+
+	t.Run("no state to leave out", func(t *testing.T) {
+		fake := &evidenceFakeServer{refuseReports: http.StatusRequestEntityTooLarge}
+		if _, err := runEvidenceReport(t, fake, evidenceEnv(), "--file", evidenceFixture("turbo-pull-request.json")); err == nil {
+			t.Fatal("evidence-report succeeded, want the refused batches")
+		}
+		if got := fake.paths(); len(got) != 3 {
+			t.Fatalf("requests = %v, want the run and each batch once", got)
+		}
+	})
+}
+
+// TestEvidenceBatchMembersReachTheGeneratedClient fails when the protocol
+// gives an evidence member a JSON member the generated Delivery client does
+// not know: the upload decodes the batch into that client and would drop it.
+func TestEvidenceBatchMembersReachTheGeneratedClient(t *testing.T) {
+	spectest.Proves(t, evidenceFeature, "sends-the-dependency-states", "a-dependency-change-carries-its-before-and-after-states")
+	for _, pair := range []struct{ protocol, client any }{
+		{evidence.Component{}, deliveryapiclient.Component{}},
+		{evidence.ChangedLineCoverage{}, deliveryapiclient.ChangedLineCoverage{}},
+		{evidence.ChangedLineCoverageFile{}, deliveryapiclient.ChangedLineCoverageFile{}},
+		{evidence.DependencyChange{}, deliveryapiclient.DependencyChange{}},
+		{evidence.DependencyState{}, deliveryapiclient.DependencyState{}},
+		{evidence.Vulnerability{}, deliveryapiclient.Vulnerability{}},
+	} {
+		known := map[string]bool{}
+		for _, name := range jsonMemberNames(reflect.TypeOf(pair.client)) {
+			known[name] = true
+		}
+		for _, name := range jsonMemberNames(reflect.TypeOf(pair.protocol)) {
+			if !known[name] {
+				t.Errorf("%s has %q, which %s does not know", reflect.TypeOf(pair.protocol), name, reflect.TypeOf(pair.client))
+			}
+		}
+	}
+}
+
+func jsonMemberNames(typ reflect.Type) []string {
+	var names []string
+	for i := range typ.NumField() {
+		name, _, _ := strings.Cut(typ.Field(i).Tag.Get("json"), ",")
+		if name != "" && name != "-" {
+			names = append(names, name)
+		}
+	}
+	return names
 }

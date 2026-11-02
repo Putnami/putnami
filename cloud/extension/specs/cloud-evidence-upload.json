@@ -24,6 +24,10 @@
       "text": "After the run, it posts the tests and coverage of each component in one batch to POST /v1/delivery/records/reports, then the components, the changed-line coverage and the dependency changes, copied from the document, in a second batch under the same submission id. A batch with nothing to carry is not sent."
     },
     {
+      "id": "sends-the-dependency-states",
+      "text": "Each dependency change in the second batch keeps the before and after states the document gives it: the licenses and the known vulnerabilities, each with its id and severity, and an empty state as empty. A dependency change without a state uploads the same body as before the states existed. A batch refused with 413 for its size while it carries states is posted again without them, with a warning that names the refusal."
+    },
+    {
       "id": "refuses-what-it-cannot-upload",
       "text": "Without PUTNAMI_CLOUD_TOKEN, with a document that does not parse or validate, or with a generic CI, it sends nothing and exits non-zero with a message that names the cause. A refused run or batch exits non-zero with the route and the server's reason, and never prints the token; a run opened again without its operational counts as refused only when that call is refused too."
     }

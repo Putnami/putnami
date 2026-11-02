@@ -1,0 +1,128 @@
+{
+  "protocolVersion": 1,
+  "subject": {
+    "provider": "github",
+    "host": "github.com",
+    "projectId": "812345678",
+    "repository": "acme/storefront",
+    "sha": "4f6c2a9e1b7d3c5a8e0f2b4d6a8c0e1f3a5b7c9d",
+    "baseSha": "0a1b2c3d4e5f60718293a4b5c6d7e8f901234567",
+    "changeRequest": {
+      "number": 43
+    }
+  },
+  "ci": {
+    "system": "github-actions",
+    "runId": "9876543211",
+    "jobId": "test"
+  },
+  "producer": {
+    "name": "@putnami/observe",
+    "version": "0.1.0"
+  },
+  "generatedAt": "2026-11-03T14:05:09Z",
+  "changedFiles": [
+    {
+      "path": "package-lock.json",
+      "status": "modified",
+      "component": "."
+    }
+  ],
+  "components": [
+    {
+      "id": ".",
+      "name": "storefront",
+      "ecosystem": "node",
+      "source": "manifest",
+      "impact": "changed"
+    }
+  ],
+  "dependencyChanges": [
+    {
+      "ecosystem": "npm",
+      "lockfile": "package-lock.json",
+      "name": "lodash",
+      "change": "upgraded",
+      "from": "4.17.20",
+      "to": "4.17.21",
+      "component": ".",
+      "before": {
+        "licenses": [
+          "MIT"
+        ],
+        "vulnerabilities": [
+          {
+            "id": "GHSA-29mw-wpgm-hmr9",
+            "severity": "medium"
+          },
+          {
+            "id": "GHSA-35jh-r3h4-6jhm",
+            "severity": "high"
+          }
+        ]
+      },
+      "after": {
+        "licenses": [
+          "MIT"
+        ]
+      }
+    },
+    {
+      "ecosystem": "npm",
+      "lockfile": "package-lock.json",
+      "name": "minimist",
+      "change": "removed",
+      "from": "1.2.5",
+      "component": ".",
+      "before": {
+        "licenses": [
+          "MIT"
+        ],
+        "vulnerabilities": [
+          {
+            "id": "GHSA-xvch-5gv4-984h",
+            "severity": "critical"
+          }
+        ]
+      }
+    },
+    {
+      "ecosystem": "npm",
+      "lockfile": "package-lock.json",
+      "name": "zod",
+      "change": "added",
+      "to": "3.23.8",
+      "component": ".",
+      "after": {
+        "licenses": [
+          "MIT"
+        ],
+        "vulnerabilities": [
+          {
+            "id": "GHSA-mrhx-c7xc-m3w5",
+            "severity": "high"
+          }
+        ]
+      }
+    },
+    {
+      "ecosystem": "npm",
+      "lockfile": "package-lock.json",
+      "name": "left-pad",
+      "change": "upgraded",
+      "from": "1.2.0",
+      "to": "1.3.0",
+      "component": "."
+    }
+  ],
+  "sbom": {
+    "head": {
+      "format": "cyclonedx",
+      "specVersion": "1.5"
+    },
+    "base": {
+      "format": "spdx",
+      "specVersion": "2.3"
+    }
+  }
+}

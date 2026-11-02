@@ -23,14 +23,11 @@ oci-server, put-server, runtime-api and source-api.
 | --- | --- |
 | Put package | `cloud/doc-contents-cloud-cli-schema` |
 | Channel | `canary` |
-| Version | `0.0.0-20261028150609-db578822b`, published on 2026-10-28, archive digest `sha256:90e2a8caef626020d1616d72cb0acb95ea708bc97cd3dded62a29bec40faae44` |
+| Version | `0.0.0-20261102145238-eda90513c`, published on 2026-11-02, archive digest `sha256:dab1f1b3075d46e412de527001649b4e46a7f8374e57764ae532bf5216df1204` |
 | File layout | `docs/cloud-cli-schema/services/<service>/openapi.json` |
 
 Each `<service>/schema/openapi.json` is a byte-for-byte copy of the package
-file, except `delivery-api`. Its copy comes from the Cloud schema source on
-`main` at commit `7a2ff2480015b1c81b2ee0d48065622d02eb26ca`, ahead of the next `canary`
-publish, for the `changeRequest` of a delivery run. The next schema update
-replaces it with the package file.
+file.
 
 ## Update the schemas
 
