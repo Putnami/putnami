@@ -37,8 +37,8 @@ type evidenceFakeServer struct {
 	// alreadyStored answers every kind as already stored when it is true.
 	alreadyStored bool
 	// refuseStates answers a batch whose dependency changes carry a before or
-	// after state with this status.
-	refuseStates int
+	// after state as a body over the route's size.
+	refuseStates bool
 }
 
 func (s *evidenceFakeServer) RoundTrip(req *http.Request) (*http.Response, error) {
@@ -61,8 +61,8 @@ func (s *evidenceFakeServer) RoundTrip(req *http.Request) (*http.Response, error
 			"conclusion": body["conclusion"], "provenance": body["provenance"], "verified": false,
 		}), nil
 	case recordsReportsIngestPath:
-		if s.refuseStates != 0 && (strings.Contains(string(raw), `"before":`) || strings.Contains(string(raw), `"after":`)) {
-			return reportJSONResponse(s.refuseStates, map[string]any{"error": "dependencyChanges[0]: unknown member before", "message": "dependencyChanges[0]: unknown member before"}), nil
+		if s.refuseStates && (strings.Contains(string(raw), `"before":`) || strings.Contains(string(raw), `"after":`)) {
+			return reportJSONResponse(http.StatusRequestEntityTooLarge, map[string]any{"error": "Request body exceeds the declared bound", "message": "Request body exceeds the declared bound"}), nil
 		}
 		if s.refuseReports != 0 {
 			return reportJSONResponse(s.refuseReports, map[string]any{"error": "request body too large", "message": "request body too large"}), nil
@@ -489,47 +489,45 @@ func TestEvidenceReportKeepsAnEmptyState(t *testing.T) {
 
 func TestEvidenceReportPostsARefusedBatchAgainWithoutTheStates(t *testing.T) {
 	spectest.Proves(t, evidenceFeature, "sends-the-dependency-states", "a-refused-batch-is-posted-again-without-the-states")
-	for _, status := range []int{http.StatusBadRequest, http.StatusRequestEntityTooLarge} {
-		t.Run(http.StatusText(status), func(t *testing.T) {
-			fake := &evidenceFakeServer{refuseStates: status}
-			stdout, stderr, err := runEvidenceReportLogged(t, fake, evidenceEnv(), "--file", evidenceFixture("sbom-pull-request.json"), "--output=json")
-			if err != nil {
-				t.Fatalf("evidence-report: %v", err)
+	t.Run("too large with its states", func(t *testing.T) {
+		fake := &evidenceFakeServer{refuseStates: true}
+		stdout, stderr, err := runEvidenceReportLogged(t, fake, evidenceEnv(), "--file", evidenceFixture("sbom-pull-request.json"), "--output=json")
+		if err != nil {
+			t.Fatalf("evidence-report: %v", err)
+		}
+		if got := fake.paths(); len(got) != 3 {
+			t.Fatalf("requests = %v, want the run, the refused batch and the batch again", got)
+		}
+		again := fake.requests[2].Body
+		if again["submissionId"] != fake.requests[1].Body["submissionId"] {
+			t.Fatalf("the batch goes again under %v, want %v", again["submissionId"], fake.requests[1].Body["submissionId"])
+		}
+		changes, _ := again["dependencyChanges"].([]any)
+		if len(changes) != 4 {
+			t.Fatalf("dependencyChanges = %v, want the four changes", again["dependencyChanges"])
+		}
+		for _, change := range changes {
+			change := change.(map[string]any)
+			if _, ok := change["before"]; ok {
+				t.Fatalf("change %v still carries before", change)
 			}
-			if got := fake.paths(); len(got) != 3 {
-				t.Fatalf("requests = %v, want the run, the refused batch and the batch again", got)
+			if _, ok := change["after"]; ok {
+				t.Fatalf("change %v still carries after", change)
 			}
-			again := fake.requests[2].Body
-			if again["submissionId"] != fake.requests[1].Body["submissionId"] {
-				t.Fatalf("the batch goes again under %v, want %v", again["submissionId"], fake.requests[1].Body["submissionId"])
+			if change["name"] == nil || change["change"] == nil {
+				t.Fatalf("change %v lost its members", change)
 			}
-			changes, _ := again["dependencyChanges"].([]any)
-			if len(changes) != 4 {
-				t.Fatalf("dependencyChanges = %v, want the four changes", again["dependencyChanges"])
-			}
-			for _, change := range changes {
-				change := change.(map[string]any)
-				if _, ok := change["before"]; ok {
-					t.Fatalf("change %v still carries before", change)
-				}
-				if _, ok := change["after"]; ok {
-					t.Fatalf("change %v still carries after", change)
-				}
-				if change["name"] == nil || change["change"] == nil {
-					t.Fatalf("change %v lost its members", change)
-				}
-			}
-			if _, ok := again["components"]; !ok {
-				t.Fatalf("the batch goes again without its components: %v", again)
-			}
-			if !strings.Contains(stderr, "sends no dependency states") || !strings.Contains(stderr, "unknown member before") {
-				t.Fatalf("stderr = %q, want a warning that names the refusal", stderr)
-			}
-			if !strings.Contains(stdout, `"dependency_states_left_out"`) || !strings.Contains(stdout, "unknown member before") {
-				t.Fatalf("stdout = %q, want the refusal under dependency_states_left_out", stdout)
-			}
-		})
-	}
+		}
+		if _, ok := again["components"]; !ok {
+			t.Fatalf("the batch goes again without its components: %v", again)
+		}
+		if !strings.Contains(stderr, "sends no dependency states") || !strings.Contains(stderr, "exceeds the declared bound") {
+			t.Fatalf("stderr = %q, want a warning that names the refusal", stderr)
+		}
+		if !strings.Contains(stdout, `"dependency_states_left_out"`) || !strings.Contains(stdout, "exceeds the declared bound") {
+			t.Fatalf("stdout = %q, want the refusal under dependency_states_left_out", stdout)
+		}
+	})
 
 	t.Run("refused again", func(t *testing.T) {
 		fake := &evidenceFakeServer{refuseReports: http.StatusRequestEntityTooLarge}
@@ -542,6 +540,16 @@ func TestEvidenceReportPostsARefusedBatchAgainWithoutTheStates(t *testing.T) {
 		}
 		if strings.Contains(stderr, "sends no dependency states") {
 			t.Fatalf("stderr = %q warns of states left out of a batch that was not stored", stderr)
+		}
+	})
+
+	t.Run("refused for another reason", func(t *testing.T) {
+		fake := &evidenceFakeServer{refuseReports: http.StatusBadRequest}
+		if _, err := runEvidenceReport(t, fake, evidenceEnv(), "--file", evidenceFixture("sbom-pull-request.json")); err == nil {
+			t.Fatal("evidence-report succeeded, want the refused batch")
+		}
+		if got := fake.paths(); len(got) != 2 {
+			t.Fatalf("requests = %v, want the run and the batch once", got)
 		}
 	})
 

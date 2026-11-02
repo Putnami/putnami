@@ -287,9 +287,10 @@ The command reads a `protocol/evidence` v1 document and makes three calls:
    bill of materials): the head one from `--sbom` or found in the checkout,
    the base one from `--base-sbom`. A state lists the licenses and the known
    vulnerabilities, each with its id and severity. When Delivery refuses the
-   batch with 400 or 413 while it carries states, as a Delivery that predates
-   them does, or for its size, the command warns and posts the batch again
-   without them. The document's `sbom` member is not sent.
+   batch for its size, with 413, while it carries states, the command warns
+   and posts the batch again without them. A Delivery that predates the
+   states ignores them and stores the changes alone. The document's `sbom`
+   member is not sent.
 
 A batch with nothing to carry is not sent. The summary lists apart the kinds
 Delivery already held for that submission. Without the token, with a document

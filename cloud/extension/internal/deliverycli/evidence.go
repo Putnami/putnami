@@ -7,8 +7,8 @@
 // POST /v1/delivery/records/reports under the same submission id: the tests and
 // coverage of each component, then the components, the changed-line coverage
 // and the dependency changes. The second batch rides apart because the route
-// refuses a body over 1 MiB whole; refused while its dependency changes carry
-// before and after states, it goes again without them. The bearer is the workspace token in
+// refuses a body over 1 MiB whole; refused for its size while its dependency
+// changes carry before and after states, it goes again without them. The bearer is the workspace token in
 // PUTNAMI_CLOUD_TOKEN; the workspace comes out of it, never out of the body.
 //
 // The run also names, under operational, the tree the job tested and the merge
@@ -182,9 +182,8 @@ func EvidenceReport(params map[string]any, env map[string]string, ioctx clicore.
 	statesLeftOut := ""
 	for _, batch := range evidenceBatches(doc, run.SubmissionID) {
 		answer, refused, err := postEvidenceBatch(ioctx, controlURL, token, batch)
-		if err != nil && (refused == http.StatusBadRequest || refused == http.StatusRequestEntityTooLarge) {
-			// A Delivery that predates the dependency states refuses them, and
-			// the route refuses a body over its size whole. The other members
+		if err != nil && refused == http.StatusRequestEntityTooLarge {
+			// The route refuses a body over its size whole. The other members
 			// still matter: post the batch again without the states.
 			if plain, ok := evidenceWithoutStates(batch); ok {
 				refusal := err.Error()
