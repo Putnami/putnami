@@ -71,7 +71,7 @@ describe('putnami i18n validate', () => {
       const person = session(['y', 'yes']);
       expect(await validate(dir, 'fr', person)).toBe(0);
       const catalog = readCatalog(dir);
-      expect(catalog.title).toEqual({
+      expect(catalog['title']).toEqual({
         text: 'Tarifs',
         source: 'Pricing',
         state: 'validated',
@@ -79,9 +79,9 @@ describe('putnami i18n validate', () => {
         validatedAt: '2026-11-02',
       });
       // A stale translation, once accepted, is made from the current default text.
-      expect(catalog.lede).toMatchObject({ state: 'validated', source: 'Build a workspace in minutes.' });
-      expect(catalog.seats?.state).toBe('draft');
-      expect(catalog.plans?.state).toBe('missing');
+      expect(catalog['lede']).toMatchObject({ state: 'validated', source: 'Build a workspace in minutes.' });
+      expect(catalog['seats']?.state).toBe('draft');
+      expect(catalog['plans']?.state).toBe('missing');
       expect(person.lines).toContain(
         '[1/3] locales/fr/home.json lede (stale)\n  en, translated from: Build a workspace in an hour.\n  en: Build a workspace in minutes.\n  fr: Créez un espace en une heure.',
       );
@@ -96,9 +96,9 @@ describe('putnami i18n validate', () => {
     const dir = project();
     const person = session(['n', 'q']);
     expect(await validate(dir, undefined, person)).toBe(0);
-    expect(readCatalog(dir).title?.state).toBe('draft');
+    expect(readCatalog(dir)['title']?.state).toBe('draft');
     // Quit before the stale lede: its entry keeps the old default text it was translated from.
-    expect(readCatalog(dir).lede).toEqual({
+    expect(readCatalog(dir)['lede']).toEqual({
       text: 'Créez un espace en une heure.',
       source: 'Build a workspace in an hour.',
       state: 'draft',
@@ -136,8 +136,8 @@ describe('putnami i18n validate', () => {
     expect(await validate(dir, 'fr', person)).toBe(0);
     expect(person.lines.filter((line) => line === '  answer y, n or q')).toHaveLength(2);
     // The lede comes first: the person accepted it at the third reply, then quit at the title.
-    expect(readCatalog(dir).lede?.state).toBe('validated');
-    expect(readCatalog(dir).title?.state).toBe('draft');
+    expect(readCatalog(dir)['lede']?.state).toBe('validated');
+    expect(readCatalog(dir)['title']?.state).toBe('draft');
   });
 
   it('records the local calendar day', () => {

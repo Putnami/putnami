@@ -132,13 +132,13 @@ describe('putnami i18n translate', () => {
       const lines: string[] = [];
       expect(await translate(dir, true, (line) => lines.push(line))).toBe(0);
       const catalog = readCatalog(dir);
-      expect(catalog.lede).toEqual({
+      expect(catalog['lede']).toEqual({
         text: 'Créez un espace de travail Putnami en quelques minutes.',
         source: 'Build a Putnami workspace in minutes.',
         state: 'draft',
       });
-      expect(catalog.seats?.state).toBe('missing');
-      expect(catalog.title).toEqual(validated);
+      expect(catalog['seats']?.state).toBe('missing');
+      expect(catalog['title']).toEqual(validated);
       expect(existsSync(join(dir, WORK_FILE))).toBe(false);
       expect(lines.at(-1)).toBe('1 draft(s) written; a person validates them with `putnami i18n validate`');
 
@@ -150,8 +150,8 @@ describe('putnami i18n translate', () => {
         'error locales/fr/home.json title: a person validated this translation; an agent never rewrites it',
       );
       // One refused answer refuses the file: the valid seats answer is not written either.
-      expect(readCatalog(dir).seats?.state).toBe('missing');
-      expect(readCatalog(dir).title).toEqual(validated);
+      expect(readCatalog(dir)['seats']?.state).toBe('missing');
+      expect(readCatalog(dir)['title']).toEqual(validated);
     },
   );
 
@@ -176,7 +176,7 @@ describe('putnami i18n translate', () => {
         'error locales/fr/gone.json: no messages declaration holds this namespace',
       ]);
       // Nothing is written: the catalog still lacks the seats entry.
-      expect(readCatalog(dir).seats).toBeUndefined();
+      expect(readCatalog(dir)['seats']).toBeUndefined();
 
       answer(dir, { seats: '{count, plural, one {# siège} other {# sièges}}', lede: null });
       const outdated = readWork(dir);
