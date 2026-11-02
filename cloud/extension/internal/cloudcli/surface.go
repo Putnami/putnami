@@ -58,7 +58,7 @@ var publicEntries = []publicEntry{
 // protocol: do not rename them.
 var machineCommands = []string{
 	"install", "release-set", "registry-token", "image-layers", "publish-provider",
-	"cache-provider", "credential-provider", "session-reporter", "log-reporter", "shell-test",
+	"cache-provider", "credential-provider", "session-reporter", "log-reporter", "evidence-report", "shell-test",
 	"validate-config-project", "package-config-member", "package-site-content",
 	"validate-site-content", "publish-site-content", "publish-deployment",
 }

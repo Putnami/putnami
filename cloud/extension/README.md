@@ -239,6 +239,38 @@ workspace, nothing is sent and the run's result does not change.
 [Local mode](internal/deliverycli/README.md#local-mode) describes the route,
 the credential rules and the refusals.
 
+## Upload a change evidence document
+
+`@putnami/cloud` is the default evidence reporter of `putnami observe
+--upload`, which runs `putnami cloud evidence-report --file <path>` with the
+document it wrote. The command runs outside a workspace. In a GitHub Actions
+or GitLab CI job, set `PUTNAMI_CLOUD_TOKEN` to a workspace token of scope
+`delivery.ingest`; the token names the workspace.
+
+```sh
+putnami extensions install --user @putnami/observe @putnami/cloud
+PUTNAMI_CLOUD_TOKEN=pkt_... putnami observe --upload
+```
+
+The command reads a `protocol/evidence` v1 document and makes three calls:
+
+1. `POST /v1/delivery/records` opens the run. The repository is the numeric
+   project id, the provenance is `gha` or `gitlab`, the pull or merge request
+   is `changeRequest`, and the conclusion is `failure` when a test failed,
+   else `success`. The submission id names the CI run, its attempt and its
+   job, so uploading one job twice opens one run.
+2. `POST /v1/delivery/records/reports` posts the tests and coverage of each
+   component.
+3. The same route then posts `components`, `changedLineCoverage` and
+   `dependencyChanges` as the document holds them. They go apart because the
+   route refuses a body over 1 MiB whole.
+
+A batch with nothing to carry is not sent. Without the token, with a document
+that does not validate, or for a generic CI, it sends nothing. Any refusal
+exits non-zero with the route and the server's reason; `putnami observe`
+turns that into a diagnostic and still exits 0. `PUTNAMI_CLOUD_API_URL`
+overrides the control plane, `https://api.putnami.cloud` by default.
+
 ## Commands
 
 Validate a project's authored production Config inputs before starting the full

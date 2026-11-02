@@ -354,6 +354,8 @@ func RunCommand(command string, ioctx IO, args []string) error {
 		return deliverycli.SessionReporter(params, args, workspaceRoot, env, ioctx)
 	case "log-reporter":
 		return deliverycli.LogReporter(params, args, workspaceRoot, env, ioctx)
+	case "evidence-report":
+		return deliverycli.EvidenceReport(params, env, ioctx)
 	case "image-layers":
 		return deliverycli.ImageLayers(params, args, workspaceRoot, env, ioctx)
 	case "shell-test":
