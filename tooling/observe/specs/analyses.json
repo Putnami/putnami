@@ -33,7 +33,7 @@
     },
     {
       "id": "summary",
-      "text": "The text summary lists the changed and dependent components, the tests and coverage of each component, the changed-line coverage with its least covered files, and the dependency changes. --output=json prints the same observation as one document. --evidence writes the components, their impacts and edges, the tests, the coverage, the changed-line coverage and the dependency changes, and the document validates against protocol/evidence v1."
+      "text": "The text summary lists the changed and dependent components: a dependent one names the components it depends on, a changed one the other changed components it reaches, directly or not. It then lists each component's tests and coverage, the changed-line coverage with its least covered files, and the dependency changes. --output=json prints the same observation. --evidence writes the components with their impacts and edges and the same analyses, valid against protocol/evidence v1."
     }
   ],
   "decisions": [

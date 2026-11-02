@@ -4,15 +4,18 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
 	diag "go.putnami.dev/protocol/diagnostic"
 	"go.putnami.dev/protocol/evidence"
 	"go.putnami.dev/protocol/features/spectest"
+	"go.putnami.dev/tooling/observe/internal/analyze"
 )
 
 const analysesFeature = "tooling/observe-analyses"
@@ -285,5 +288,96 @@ func TestTheSummaryShowsTheAnalyses(t *testing.T) {
 	}
 	if len(decoded.Analysis.Components) != 2 || decoded.Analysis.ChangedLineCoverage == nil || len(decoded.Analysis.DependencyChanges) != 1 {
 		t.Fatalf("the JSON output lacks the analysis: %s", out.String())
+	}
+}
+
+func TestAChangedComponentNamesTheChangedComponentsItDependsOn(t *testing.T) {
+	spectest.Proves(t, analysesFeature, "summary", "a-changed-component-names-the-changed-components-it-depends-on")
+	for name, want := range map[string]struct {
+		component, dependency string
+		lines                 []string
+	}{
+		"go": {"api", "pricing", []string{
+			"  components  2 changed, 0 dependent, 0 unaffected\n",
+			"    changed   api (github.com/Putnami/demo-observe-go/api) [go, workspace], depends on pricing\n",
+			"    changed   pricing (github.com/Putnami/demo-observe-go/pricing) [go, workspace]\n",
+		}},
+		"symfony": {".", "packages/pricing", []string{
+			"  components  2 changed, 0 dependent, 0 unaffected\n",
+			"    changed   . [composer, manifest], depends on packages/pricing\n",
+			"    changed   packages/pricing (demo/pricing) [composer, manifest]\n",
+		}},
+	} {
+		t.Run(name, func(t *testing.T) {
+			o := observeDemo(t, name)
+			var text bytes.Buffer
+			if err := WriteText(&text, o); err != nil {
+				t.Fatal(err)
+			}
+			for _, line := range want.lines {
+				if !strings.Contains(text.String(), line) {
+					t.Errorf("the summary lacks %q:\n%s", line, text.String())
+				}
+			}
+			// The evidence document keeps the edge of a changed component.
+			found := false
+			for _, c := range Evidence(o, now).Components {
+				found = found || (c.ID == want.component && c.Impact == evidence.ImpactChanged && slices.Contains(c.DependsOn, want.dependency))
+			}
+			if !found {
+				t.Errorf("the evidence document lacks the edge %s -> %s", want.component, want.dependency)
+			}
+		})
+	}
+}
+
+func TestAChangedComponentNamesAChangedComponentItReachesThroughAnother(t *testing.T) {
+	spectest.Proves(t, analysesFeature, "summary", "a-changed-component-names-the-changed-components-it-depends-on")
+	a := analyze.Result{Components: []evidence.Component{
+		{ID: "api", Ecosystem: "go", Source: "workspace", Impact: evidence.ImpactChanged, DependsOn: []string{"lib"}},
+		{ID: "cli", Ecosystem: "go", Source: "workspace", Impact: evidence.ImpactChanged, DependsOn: []string{"tools"}},
+		{ID: "core", Ecosystem: "go", Source: "workspace", Impact: evidence.ImpactChanged},
+		{ID: "lib", Ecosystem: "go", Source: "workspace", Impact: evidence.ImpactDependent, DependsOn: []string{"api", "pricing"}},
+		{ID: "pricing", Ecosystem: "go", Source: "workspace", Impact: evidence.ImpactChanged, DependsOn: []string{"core"}},
+		{ID: "tools", Ecosystem: "go", Source: "workspace", Impact: evidence.ImpactUnaffected},
+	}}
+	var b strings.Builder
+	writeAnalysis(&b, a)
+	for _, line := range []string{
+		"  components  4 changed, 1 dependent, 1 unaffected\n",
+		"    changed   api [go, workspace], depends on core, pricing\n",
+		"    changed   cli [go, workspace]\n",
+		"    changed   core [go, workspace]\n",
+		"    changed   pricing [go, workspace], depends on core\n",
+		"    dependent lib [go, workspace], depends on api, pricing\n",
+	} {
+		if !strings.Contains(b.String(), line) {
+			t.Errorf("the summary lacks %q:\n%s", line, b.String())
+		}
+	}
+}
+
+func TestADependsOnListNamesTenComponents(t *testing.T) {
+	spectest.Proves(t, analysesFeature, "summary", "a-changed-component-names-the-changed-components-it-depends-on")
+	a := analyze.Result{}
+	all := make([]string, 0, 12)
+	for i := range 12 {
+		id := fmt.Sprintf("m%02d", i)
+		all = append(all, id)
+		a.Components = append(a.Components, evidence.Component{ID: id, Ecosystem: "go", Source: "workspace", Impact: evidence.ImpactChanged})
+	}
+	a.Components = append(a.Components,
+		evidence.Component{ID: "top", Ecosystem: "go", Source: "workspace", Impact: evidence.ImpactChanged, DependsOn: all},
+		evidence.Component{ID: "user", Ecosystem: "go", Source: "workspace", Impact: evidence.ImpactDependent, DependsOn: all})
+	var b strings.Builder
+	writeAnalysis(&b, a)
+	names := strings.Join(all[:10], ", ") + " and 2 more\n"
+	for _, line := range []string{
+		"    changed   top [go, workspace], depends on " + names,
+		"    dependent user [go, workspace], depends on " + names,
+	} {
+		if !strings.Contains(b.String(), line) {
+			t.Errorf("the summary lacks %q:\n%s", line, b.String())
+		}
 	}
 }
