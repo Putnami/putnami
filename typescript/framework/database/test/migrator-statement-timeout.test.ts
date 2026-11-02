@@ -38,7 +38,7 @@ class RecordingSql {
   // Emulate the postgres.js callable tag: sql`...` and sql.unsafe(...).
   make(): postgres.ReservedSql {
     const tag = (strings: TemplateStringsArray, ...values: unknown[]) => this.record(strings, values);
-    const withUnsafe = tag as unknown as postgres.ReservedSql & {
+    const withUnsafe = tag as unknown as {
       unsafe: (query: string) => Promise<unknown[]>;
     };
     withUnsafe.unsafe = (query: string) => {
@@ -46,7 +46,7 @@ class RecordingSql {
       this.values.push([]);
       return Promise.resolve([]);
     };
-    return withUnsafe as postgres.ReservedSql;
+    return withUnsafe as unknown as postgres.ReservedSql;
   }
 }
 

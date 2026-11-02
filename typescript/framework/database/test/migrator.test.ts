@@ -60,10 +60,10 @@ describe.skipIf(!dockerAvailable)('Migrator up-path atomicity', () => {
       WHERE db_name = ${DB_NAME} AND name = 'migrator-atomic-test/create-atomic-ok'
     `;
     expect(rows.length).toBe(1);
-    expect(rows[0].success).toBe(1);
+    expect(rows[0]['success']).toBe(1);
 
     const reg = await sql`SELECT to_regclass('atomic_ok') AS reg`;
-    expect(reg[0].reg).not.toBeNull();
+    expect(reg[0]['reg']).not.toBeNull();
   });
 
   it('rolls back the applied DDL when the bookkeeping insert fails (atomic up-path)', async () => {
@@ -93,7 +93,7 @@ describe.skipIf(!dockerAvailable)('Migrator up-path atomicity', () => {
     // The DDL must NOT have committed — it shares the bookkeeping insert's
     // transaction, so the failed INSERT rolls the CREATE TABLE back too.
     const tables = await sql`SELECT to_regclass('atomic_tripwire') AS reg`;
-    expect(tables[0].reg).toBeNull();
+    expect(tables[0]['reg']).toBeNull();
 
     // And there must be no SUCCESS bookkeeping row; otherwise a re-run would
     // skip a migration whose effects were rolled back (broken idempotency).
@@ -174,18 +174,18 @@ describe.skipIf(!dockerAvailable)('Migrator targets the declared schema via sear
     await new Migrator(DS, [{ name: 'app/0001_widgets', sql: 'CREATE TABLE widgets (id int);' }], 'tenant_a').up();
     await new Migrator(DS, [{ name: 'app/0002_gadgets', sql: 'CREATE TABLE gadgets (id int);' }], 'tenant_b').up();
 
-    expect((await sql`SELECT to_regclass('tenant_a.widgets') AS reg`)[0].reg).not.toBeNull();
-    expect((await sql`SELECT to_regclass('tenant_b.gadgets') AS reg`)[0].reg).not.toBeNull();
+    expect((await sql`SELECT to_regclass('tenant_a.widgets') AS reg`)[0]['reg']).not.toBeNull();
+    expect((await sql`SELECT to_regclass('tenant_b.gadgets') AS reg`)[0]['reg']).not.toBeNull();
     // Neither leaked into the connection's default (public) schema.
-    expect((await sql`SELECT to_regclass('public.widgets') AS reg`)[0].reg).toBeNull();
-    expect((await sql`SELECT to_regclass('public.gadgets') AS reg`)[0].reg).toBeNull();
+    expect((await sql`SELECT to_regclass('public.widgets') AS reg`)[0]['reg']).toBeNull();
+    expect((await sql`SELECT to_regclass('public.gadgets') AS reg`)[0]['reg']).toBeNull();
   });
 
   it('leaves the connection search_path in force when no schema is declared', async () => {
     await new Migrator(DS, [{ name: 'app/0003_sprockets', sql: 'CREATE TABLE sprockets (id int);' }]).up();
     // No declared schema → the runner sets no search_path, so the body lands in
     // the connection's default (public) schema.
-    expect((await sql`SELECT to_regclass('public.sprockets') AS reg`)[0].reg).not.toBeNull();
+    expect((await sql`SELECT to_regclass('public.sprockets') AS reg`)[0]['reg']).not.toBeNull();
   });
 });
 

@@ -83,7 +83,7 @@ describe('handler()', () => {
     const def = handler(TestTopic)
       .inject({ dependency: token })
       .handle(async ({ dependency }, msg) => {
-        expect(dependency).toEqual({ service: 'injected-service' });
+        expect<unknown>(dependency).toEqual({ service: 'injected-service' });
         expect(msg.topic).toBe(TestTopic.name);
       });
 

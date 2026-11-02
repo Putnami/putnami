@@ -78,10 +78,10 @@ describe('native events design contributions', () => {
   beforeEach(() => {
     registerModuleLoader(
       'events-loader',
-      mock(async () => undefined),
+      mock(async () => undefined as unknown as Record<string, unknown>),
     );
     process.env.PUTNAMI_PROJECT_ROOT = eventsRoot;
-    delete process.env.EVENTS_ENDPOINT;
+    Reflect.deleteProperty(process.env, 'EVENTS_ENDPOINT');
     delete process.env.CONFIG_DATA;
     resetConfigLoader();
     // The publisher call-site registry is a process global. Clear it so the
@@ -95,7 +95,7 @@ describe('native events design contributions', () => {
     }
     cleanupPaths.clear();
     delete process.env.PUTNAMI_PROJECT_ROOT;
-    delete process.env.EVENTS_ENDPOINT;
+    Reflect.deleteProperty(process.env, 'EVENTS_ENDPOINT');
     delete process.env.CONFIG_DATA;
     resetConfigLoader();
     clearDesignPublications();

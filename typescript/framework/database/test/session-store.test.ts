@@ -37,7 +37,7 @@ describe.skipIf(!dockerAvailable)('DatabaseSessionStore', () => {
           WHERE table_name = 'sessions'
         );
       `;
-      expect(result[0].exists).toBe(true);
+      expect(result[0]['exists']).toBe(true);
     });
 
     it('should create index on expires_at', async () => {
@@ -47,7 +47,7 @@ describe.skipIf(!dockerAvailable)('DatabaseSessionStore', () => {
           WHERE indexname = 'idx_sessions_expires_at'
         );
       `;
-      expect(result[0].exists).toBe(true);
+      expect(result[0]['exists']).toBe(true);
     });
   });
 
@@ -63,9 +63,9 @@ describe.skipIf(!dockerAvailable)('DatabaseSessionStore', () => {
       await store.setAllAsync(sessionId, sessionData);
       const retrieved = await store.getAllAsync(sessionId);
 
-      expect(retrieved.userId).toBe('user-123');
-      expect(retrieved.role).toBe('admin');
-      expect(retrieved.preferences.theme).toBe('dark');
+      expect(retrieved['userId']).toBe('user-123');
+      expect(retrieved['role']).toBe('admin');
+      expect((retrieved['preferences'] as { theme: string }).theme).toBe('dark');
     });
 
     it('should update existing session', async () => {
@@ -77,7 +77,7 @@ describe.skipIf(!dockerAvailable)('DatabaseSessionStore', () => {
       await store.setAllAsync(sessionId, updatedData);
 
       const retrieved = await store.getAllAsync(sessionId);
-      expect(retrieved.count).toBe(2);
+      expect(retrieved['count']).toBe(2);
     });
 
     it('should return empty object for non-existent session', async () => {
@@ -275,9 +275,10 @@ describe.skipIf(!dockerAvailable)('DatabaseSessionStore', () => {
       await store.setAllAsync(sessionId, sessionData);
       const retrieved = await store.getAllAsync(sessionId);
 
-      expect(retrieved.user.id).toBe('user-123');
-      expect(retrieved.user.profile.name).toBe('John Doe');
-      expect(retrieved.user.profile.settings.theme).toBe('dark');
+      const user = retrieved['user'] as { id: string; profile: { name: string; settings: { theme: string } } };
+      expect(user.id).toBe('user-123');
+      expect(user.profile.name).toBe('John Doe');
+      expect(user.profile.settings.theme).toBe('dark');
     });
   });
 });

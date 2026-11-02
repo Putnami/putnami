@@ -72,13 +72,19 @@ const FILTER_OPERATOR_KEYS = new Set([
 export type QueryConditionValue<T = unknown> = T | QueryFilterOperators<T>;
 
 /**
- * Query filters with support for operators
+ * Field conditions, each a value or a set of operators, AND-joined.
  */
-export type QueryFilters<ENTITY> = {
+export type QueryConditions<ENTITY> = {
   [K in keyof ENTITY]?: QueryConditionValue<ENTITY[K]>;
-} & {
-  $or?: Partial<ENTITY>[];
-  $and?: Partial<ENTITY>[];
+};
+
+/**
+ * Query filters with support for operators. Each `$or` and `$and` entry takes
+ * operators too.
+ */
+export type QueryFilters<ENTITY> = QueryConditions<ENTITY> & {
+  $or?: QueryConditions<ENTITY>[];
+  $and?: QueryConditions<ENTITY>[];
 };
 
 function isFilterOperators(value: unknown): value is QueryFilterOperators {

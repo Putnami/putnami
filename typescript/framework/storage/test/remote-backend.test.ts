@@ -19,7 +19,7 @@ function jsonResponse(body: unknown, init?: ResponseInit): Response {
 describe('RemoteBackend', () => {
   beforeEach(() => {
     fetchMock.mockReset();
-    globalThis.fetch = fetchMock as typeof fetch;
+    globalThis.fetch = fetchMock as unknown as typeof fetch;
   });
 
   afterAll(() => {
@@ -47,7 +47,7 @@ describe('RemoteBackend', () => {
 
       const [, init] = fetchMock.mock.calls[0]!;
       const headers = (init?.headers ?? {}) as Record<string, string>;
-      expect(headers.authorization).toBe('Bearer access-token');
+      expect(headers['authorization']).toBe('Bearer access-token');
       // No client-side secret-key signing: the only credential header is the bearer token.
       const headerKeys = Object.keys(headers).map((k) => k.toLowerCase());
       expect(headerKeys).toEqual(['authorization']);

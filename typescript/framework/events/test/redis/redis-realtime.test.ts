@@ -24,7 +24,7 @@ describe('Redis Pub/Sub realtime broker', () => {
     const sub = await broker.subscribe(UserUpdated, async (message) => {
       received.push(message.payload.name);
       expect(message.topic).toBe(UserUpdated.name);
-      expect(message.attributes.region).toBe('eu');
+      expect(message.attributes['region']).toBe('eu');
     });
 
     await broker.publish(
@@ -44,7 +44,6 @@ describe('Redis Pub/Sub realtime broker', () => {
     const redis = new FakePubSubRedis();
     const broker = redisPubSub({ publisher: redis, subscriber: redis });
 
-    // @ts-expect-error Testing runtime validation
     await expect(broker.publish(UserUpdated, { id: 'not-a-uuid', name: 'Jane' })).rejects.toThrow('Invalid payload');
     expect(redis.publishedChannels).toEqual([]);
   });

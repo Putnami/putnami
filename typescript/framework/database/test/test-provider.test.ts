@@ -239,8 +239,8 @@ describe('runtimeBinding', () => {
         isoSchema: 'iam',
       },
     ]);
-    expect(binding.databases?.auth.connection?.database).toBe('auth_t_x');
-    expect(binding.databases?.auth.schema).toBe('iam');
+    expect(binding.databases?.['auth'].connection?.database).toBe('auth_t_x');
+    expect(binding.databases?.['auth'].schema).toBe('iam');
     expect(binding.protocolVersion).toBe(1);
   });
 
@@ -253,8 +253,8 @@ describe('runtimeBinding', () => {
         isoSchema: 'iam_t_x',
       },
     ]);
-    expect(binding.databases?.auth.schema).toBe('iam_t_x');
-    expect(binding.databases?.auth.connection?.database).toBe('auth');
+    expect(binding.databases?.['auth'].schema).toBe('iam_t_x');
+    expect(binding.databases?.['auth'].connection?.database).toBe('auth');
   });
 
   it('does not mutate the input connection', () => {
@@ -283,7 +283,7 @@ describe('runtimeBinding', () => {
         isoDB: 'events_t_x',
       },
     ]);
-    const dsn = binding.databases?.events.connection?.dsn ?? '';
+    const dsn = binding.databases?.['events'].connection?.dsn ?? '';
     expect(dsn).toContain('/events_t_x');
     expect(dsn).toContain('sslmode=disable');
   });

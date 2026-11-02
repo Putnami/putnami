@@ -85,7 +85,7 @@ describe('Security', () => {
       async () => {
         backend = new FileBackend(TEST_DIR, TOKEN_SECRET);
         const { url } = await backend.signedUploadUrl('mybucket', 'mykey', { expiresIn: '15m' });
-        const token = url.match(/token=([^&]+)/)?.[1];
+        const token = url.match(/token=([^&]+)/)?.[1] ?? '';
         expect(backend.validateToken('PUT', token, 'mybucket', 'mykey')).toBe(true);
       },
     );
@@ -100,7 +100,7 @@ describe('Security', () => {
       async () => {
         backend = new FileBackend(TEST_DIR, TOKEN_SECRET);
         const { url } = await backend.signedUploadUrl('mybucket', 'allowed-key', { expiresIn: '15m' });
-        const token = url.match(/token=([^&]+)/)?.[1];
+        const token = url.match(/token=([^&]+)/)?.[1] ?? '';
         // Try to use this token for a different key
         expect(backend.validateToken('PUT', token, 'mybucket', 'malicious-key')).toBe(false);
       },
@@ -116,7 +116,7 @@ describe('Security', () => {
       async () => {
         backend = new FileBackend(TEST_DIR, TOKEN_SECRET);
         const { url } = await backend.signedUploadUrl('allowed-bucket', 'mykey', { expiresIn: '15m' });
-        const token = url.match(/token=([^&]+)/)?.[1];
+        const token = url.match(/token=([^&]+)/)?.[1] ?? '';
         expect(backend.validateToken('PUT', token, 'malicious-bucket', 'mykey')).toBe(false);
       },
     );

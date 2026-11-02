@@ -307,17 +307,17 @@ describe('S3Backend (unit, no network)', () => {
 //   S3_ACCESS_KEY_ID=minioadmin S3_SECRET_ACCESS_KEY=minioadmin \
 //   bun test test/s3-backend.test.ts
 // ---------------------------------------------------------------------------
-const INTEGRATION_ENDPOINT = process.env.PUTNAMI_S3_TEST_ENDPOINT;
-const INTEGRATION_BUCKET = process.env.PUTNAMI_S3_TEST_BUCKET ?? 'putnami-test';
+const INTEGRATION_ENDPOINT = process.env['PUTNAMI_S3_TEST_ENDPOINT'];
+const INTEGRATION_BUCKET = process.env['PUTNAMI_S3_TEST_BUCKET'] ?? 'putnami-test';
 const itIntegration = INTEGRATION_ENDPOINT ? it : it.skip;
 
 describe('S3Backend (integration, requires PUTNAMI_S3_TEST_ENDPOINT)', () => {
   function makeBackend(): S3Backend {
     return new S3Backend({
       endpoint: INTEGRATION_ENDPOINT,
-      accessKeyId: process.env.S3_ACCESS_KEY_ID ?? process.env.AWS_ACCESS_KEY_ID,
-      secretAccessKey: process.env.S3_SECRET_ACCESS_KEY ?? process.env.AWS_SECRET_ACCESS_KEY,
-      region: process.env.S3_REGION ?? process.env.AWS_REGION ?? 'us-east-1',
+      accessKeyId: process.env['S3_ACCESS_KEY_ID'] ?? process.env['AWS_ACCESS_KEY_ID'],
+      secretAccessKey: process.env['S3_SECRET_ACCESS_KEY'] ?? process.env['AWS_SECRET_ACCESS_KEY'],
+      region: process.env['S3_REGION'] ?? process.env['AWS_REGION'] ?? 'us-east-1',
     });
   }
 

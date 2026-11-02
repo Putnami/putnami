@@ -146,7 +146,7 @@ describe('Outcome enum — cross-language byte parity', () => {
       check: 'the-typescript-outcomes-are-the-same-closed-set',
     },
     () => {
-      expect([...Object.values(Outcome)].sort()).toEqual(
+      expect<unknown>([...Object.values(Outcome)].sort()).toEqual(
         ['already-consumed-conflict', 'applied', 'not-found', 'retryable-serialization-failure'].sort(),
       );
     },

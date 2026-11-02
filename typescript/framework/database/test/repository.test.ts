@@ -77,7 +77,7 @@ describe.skipIf(!dockerAvailable)('Repository', () => {
       );
     `;
 
-    if (!tableCheck[0].exists) {
+    if (!tableCheck[0]['exists']) {
       throw new Error('Table test_assets was not created by migrations');
     }
 
@@ -582,7 +582,7 @@ describe.skipIf(!dockerAvailable)('Repository', () => {
       expect(connection).toBeDefined();
 
       const result = await connection`SELECT 1 as test`;
-      expect(result[0].test).toBe(1);
+      expect(result[0]['test']).toBe(1);
     });
   });
 

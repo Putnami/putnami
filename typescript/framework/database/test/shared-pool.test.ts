@@ -9,6 +9,10 @@ import { createDatasourceClient, RESET_SEARCH_PATH_SQL, SET_SEARCH_PATH_SQL } fr
 import { __setPhysicalPoolFactoryForTests } from '../src/postgres/physical-pool';
 import { setPrimaryDatasource } from '../src/primary-datasource';
 
+// postgres.js types TransactionSql through Omit, which drops its tagged-template
+// call signature; the transaction still runs tagged-template queries.
+const tagged = (tx: postgres.TransactionSql) => tx as unknown as postgres.Sql;
+
 const FEATURE = 'typescript/shared-datasource-pooling';
 
 /**
@@ -413,7 +417,7 @@ describe('datasource-bound client — search_path per operation', () => {
     async () => {
       const { physical, sql } = client('tenant_a, public');
       const rows = await sql`SELECT v FROM t WHERE id = ${1}`;
-      expect(rows).toEqual([{ ok: 1 }]);
+      expect<unknown>(rows).toEqual([{ ok: 1 }]);
       expect(physical.log).toEqual([
         'reserve',
         `then:unsafe:${SET_SEARCH_PATH_SQL}:["tenant_a, public"]`,
@@ -516,7 +520,7 @@ describe('datasource-bound client — search_path per operation', () => {
       const { physical, sql } = client('tenant_a');
       const result = await sql.begin(async (tx) => {
         physical.log.push('callback');
-        await tx`INSERT INTO t VALUES (1)`;
+        await tagged(tx)`INSERT INTO t VALUES (1)`;
         return 'done';
       });
       expect(result).toBe('done');
@@ -529,7 +533,7 @@ describe('datasource-bound client — search_path per operation', () => {
         'commit',
       ]);
       physical.log.length = 0;
-      const results = await sql.begin('read write', (tx) => [tx`SELECT 1`, tx`SELECT 2`]);
+      const results = await sql.begin('read write', (tx) => [tagged(tx)`SELECT 1`, tagged(tx)`SELECT 2`]);
       expect(results).toHaveLength(2);
       expect(physical.log.slice(0, 3)).toEqual([
         'begin:read write',
@@ -549,9 +553,9 @@ describe('datasource-bound client — search_path per operation', () => {
     },
     async () => {
       const { physical, sql } = client('tenant_a');
-      expect(sql('my_table')).toEqual({ identifier: 'my_table' });
+      expect<unknown>(sql('my_table')).toEqual({ identifier: 'my_table' });
       const rows = [{ a: 1 }];
-      expect(sql(rows as never, 'a')).toEqual({ builder: [rows, 'a'] });
+      expect<unknown>(sql(rows as never, 'a')).toEqual({ builder: [rows, 'a'] });
       expect(sql.json({ k: 1 })).toEqual({ json: { k: 1 } } as never);
       expect(physical.log).toEqual([]);
       expect(typeof sql).toBe('function');
@@ -595,7 +599,8 @@ describe('datasource-bound client — search_path per operation', () => {
         released++;
       });
       await sql.end();
-      await sql.close();
+      // The datasource client also answers close(), which postgres.Sql does not declare.
+      await (sql as postgres.Sql & { close(): Promise<void> }).close();
       expect(released).toBe(1);
       await expect(Promise.resolve(sql`SELECT 1`)).rejects.toThrow('is closed');
     },

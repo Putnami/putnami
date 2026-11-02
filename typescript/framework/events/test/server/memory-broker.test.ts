@@ -168,8 +168,8 @@ describe('MemoryBroker', () => {
             callback(...args);
           }
         });
-        return 0 as ReturnType<typeof setTimeout>;
-      }) as typeof setTimeout;
+        return 0 as unknown as ReturnType<typeof setTimeout>;
+      }) as unknown as typeof setTimeout;
 
       try {
         await broker.publish(TestTopic.name, makeEnvelope());
@@ -358,8 +358,8 @@ describe('MemoryBroker', () => {
             callback(...args);
           }
         });
-        return 0 as ReturnType<typeof setTimeout>;
-      }) as typeof setTimeout;
+        return 0 as unknown as ReturnType<typeof setTimeout>;
+      }) as unknown as typeof setTimeout;
 
       try {
         await broker.publish(TestTopic.name, makeEnvelope());
@@ -607,8 +607,8 @@ describe('MemoryBroker', () => {
             callback(...args);
           }
         });
-        return 0 as ReturnType<typeof setTimeout>;
-      }) as typeof setTimeout;
+        return 0 as unknown as ReturnType<typeof setTimeout>;
+      }) as unknown as typeof setTimeout;
 
       try {
         await broker.publish(TestTopic.name, makeEnvelope());
@@ -863,8 +863,8 @@ describe('MemoryBroker', () => {
             callback(...args);
           }
         });
-        return 0 as ReturnType<typeof setTimeout>;
-      }) as typeof setTimeout;
+        return 0 as unknown as ReturnType<typeof setTimeout>;
+      }) as unknown as typeof setTimeout;
 
       try {
         await broker.publish(TestTopic.name, makeEnvelope());
@@ -892,7 +892,7 @@ describe('MemoryBroker', () => {
     async () => {
       const started: string[] = [];
       const finished: string[] = [];
-      let releaseFirst: () => void;
+      let releaseFirst: (() => void) | undefined;
       const firstBlocked = new Promise<void>((resolve) => {
         releaseFirst = resolve;
       });
@@ -934,7 +934,7 @@ describe('MemoryBroker', () => {
     },
     async () => {
       const processed: string[] = [];
-      let releaseFirst: () => void;
+      let releaseFirst: (() => void) | undefined;
       const firstBlocked = new Promise<void>((resolve) => {
         releaseFirst = resolve;
       });
@@ -986,7 +986,7 @@ describe('MemoryBroker', () => {
       await fastBroker.start();
 
       const processed: string[] = [];
-      let releaseHang: () => void;
+      let releaseHang: (() => void) | undefined;
       const hang = new Promise<void>((resolve) => {
         releaseHang = resolve;
       });
@@ -1218,7 +1218,7 @@ describe('MemoryBroker', () => {
       process.on('uncaughtException', onUncaught);
       process.on('unhandledRejection', onUnhandled);
 
-      let releaseFirst: () => void;
+      let releaseFirst: (() => void) | undefined;
       const firstBlocked = new Promise<void>((resolve) => {
         releaseFirst = resolve;
       });

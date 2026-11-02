@@ -145,12 +145,12 @@ class RecordingSql {
     // through the template tag and resolve empty; only migration BODIES go through
     // `unsafe`, which is where a failure can be injected.
     const tag = () => Promise.resolve([]);
-    const withUnsafe = tag as unknown as postgres.ReservedSql & { unsafe: (query: string) => Promise<unknown[]> };
+    const withUnsafe = tag as unknown as { unsafe: (query: string) => Promise<unknown[]> };
     withUnsafe.unsafe = (query: string) => {
       const failure = this.failures.get(query);
       return failure ? Promise.reject(failure) : Promise.resolve([]);
     };
-    return withUnsafe as postgres.ReservedSql;
+    return withUnsafe as unknown as postgres.ReservedSql;
   }
 }
 

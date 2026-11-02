@@ -287,9 +287,9 @@ describe('MemoryServer', () => {
       expect(delivered[0]['auth.sub']).toBeUndefined();
       expect(delivered[0]['auth.email']).toBeUndefined();
       // Legitimate non-auth string attributes pass through untouched.
-      expect(delivered[0].region).toBe('eu');
+      expect(delivered[0]['region']).toBe('eu');
       // Non-string values are dropped (attributes are Record<string, string>).
-      expect(delivered[0].count).toBeUndefined();
+      expect(delivered[0]['count']).toBeUndefined();
     });
   });
 
@@ -457,10 +457,10 @@ describe('MemoryServer', () => {
     it('returns the internal broker instance', () => {
       const broker = server?.getBroker();
       expect(broker).toBeDefined();
-      expect(typeof broker.start).toBe('function');
-      expect(typeof broker.stop).toBe('function');
-      expect(typeof broker.publish).toBe('function');
-      expect(typeof broker.subscribe).toBe('function');
+      expect(typeof broker?.start).toBe('function');
+      expect(typeof broker?.stop).toBe('function');
+      expect(typeof broker?.publish).toBe('function');
+      expect(typeof broker?.subscribe).toBe('function');
     });
   });
 });
@@ -473,5 +473,8 @@ async function allocatePort(): Promise<number> {
   });
   const port = reservation.port;
   reservation.stop(true);
+  if (port === undefined) {
+    throw new Error('the reservation server has no port');
+  }
   return port;
 }
