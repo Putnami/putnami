@@ -1859,6 +1859,105 @@
         "additionalProperties": false,
         "type": "object"
       },
+      "ChangeRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "host": {
+            "type": "string"
+          },
+          "number": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "provider": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "ChangedLineCoverage": {
+        "additionalProperties": false,
+        "properties": {
+          "coveredLines": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "files": {
+            "items": {
+              "$ref": "#/components/schemas/ChangedLineCoverageFile"
+            },
+            "type": "array"
+          },
+          "totalLines": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "ChangedLineCoverageFile": {
+        "additionalProperties": false,
+        "properties": {
+          "coveredLines": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "path": {
+            "type": "string"
+          },
+          "totalLines": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "uncoveredLines": {
+            "items": {
+              "format": "int64",
+              "maximum": 9223372036854775807,
+              "minimum": -9223372036854775808,
+              "type": "integer"
+            },
+            "type": "array"
+          }
+        },
+        "type": "object"
+      },
+      "Component": {
+        "additionalProperties": false,
+        "properties": {
+          "dependsOn": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "ecosystem": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "impact": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "source": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "CoverageReport": {
         "additionalProperties": false,
         "properties": {
@@ -1912,6 +2011,33 @@
             "maximum": 9223372036854775807,
             "minimum": -9223372036854775808,
             "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "DependencyChange": {
+        "additionalProperties": false,
+        "properties": {
+          "change": {
+            "type": "string"
+          },
+          "component": {
+            "type": "string"
+          },
+          "ecosystem": {
+            "type": "string"
+          },
+          "from": {
+            "type": "string"
+          },
+          "lockfile": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "to": {
+            "type": "string"
           }
         },
         "type": "object"
@@ -2903,9 +3029,25 @@
             "$ref": "#/components/schemas/BuildsReport",
             "nullable": true
           },
+          "changedLineCoverage": {
+            "$ref": "#/components/schemas/ChangedLineCoverage",
+            "nullable": true
+          },
+          "components": {
+            "items": {
+              "$ref": "#/components/schemas/Component"
+            },
+            "type": "array"
+          },
           "coverage": {
             "$ref": "#/components/schemas/CoverageReport",
             "nullable": true
+          },
+          "dependencyChanges": {
+            "items": {
+              "$ref": "#/components/schemas/DependencyChange"
+            },
+            "type": "array"
           },
           "selection": {
             "$ref": "#/components/schemas/SelectionReport",
@@ -3528,6 +3670,10 @@
           "branch": {
             "type": "string"
           },
+          "changeRequest": {
+            "$ref": "#/components/schemas/ChangeRequest",
+            "nullable": true
+          },
           "conclusion": {
             "type": "string"
           },
@@ -3588,6 +3734,10 @@
       "SubmitResponse": {
         "additionalProperties": false,
         "properties": {
+          "changeRequest": {
+            "$ref": "#/components/schemas/ChangeRequest",
+            "nullable": true
+          },
           "conclusion": {
             "type": "string"
           },
@@ -3797,6 +3947,12 @@
             "minimum": -9223372036854775808,
             "type": "integer"
           },
+          "droppedDurationMs": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
           "failed": {
             "format": "int64",
             "maximum": 9223372036854775807,
@@ -3807,6 +3963,18 @@
             "type": "string"
           },
           "omitted": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "omittedDurationMs": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "omittedMaxMs": {
             "format": "int64",
             "maximum": 9223372036854775807,
             "minimum": -9223372036854775808,
@@ -4793,7 +4961,7 @@
     },
     "/v1/delivery/records/reports": {
       "post": {
-        "description": "Submit a parsed report batch (tests, coverage, builds, selection) for an existing run. Idempotent per submission id and report kind; the workspace comes out of the credential, and a body workspace is accepted only as a consistency assertion.",
+        "description": "Submit a parsed report batch (tests, coverage, builds, selection, and the change evidence members components, changedLineCoverage and dependencyChanges) for an existing run. Idempotent per submission id and report kind; the workspace comes out of the credential, and a body workspace is accepted only as a consistency assertion. The body is capped at 1 MiB and an over-cap body stores nothing, so send the change evidence members in their own batch.",
         "operationId": "postV1_Delivery_Records_Reports",
         "requestBody": {
           "content": {

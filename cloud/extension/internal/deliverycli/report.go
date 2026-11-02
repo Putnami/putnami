@@ -470,11 +470,18 @@ func postReport[T any](ioctx clicore.IO, controlURL, path, token string, body an
 			return resp, nil
 		}
 		lastErr = reportCallError(url, err)
-		if code := clicore.ExitCode(lastErr); code == clicore.ExitAuth || code == clicore.ExitUsage {
+		if code := clicore.ExitCode(lastErr); code == clicore.ExitAuth || code == clicore.ExitUsage || !retryableStatus(clicore.ServiceStatus(err)) {
 			return nil, lastErr
 		}
 	}
 	return nil, lastErr
+}
+
+// retryableStatus reports whether a call that ended with status may succeed
+// when repeated: a transport failure (status 0), a timeout, a rate limit or a
+// server error. Any other client error answers the same body the same way.
+func retryableStatus(status int) bool {
+	return status == 0 || status == http.StatusRequestTimeout || status == http.StatusTooManyRequests || status >= http.StatusInternalServerError
 }
 
 // reportCallError renders a failed generated records call the way the CLI

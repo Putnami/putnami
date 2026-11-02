@@ -15,6 +15,7 @@ answer, so the workspace must declare `@putnami/observe` to run it there.
 | `--coverage <paths>` | The same for coverage reports. Replaces coverage discovery. |
 | `--no-fetch` | Read only the local history: fetch no base and deepen no shallow clone. |
 | `--evidence <path>` | Write the change evidence document to this path, resolved against the directory you run in. |
+| `--upload` | Hand the change evidence document to the evidence reporter. See [Uploading the evidence](#uploading-the-evidence). |
 
 A glob pattern takes `*`, `?`, `[...]` and `**`, which matches any number of
 directories.
@@ -127,3 +128,26 @@ gets `observe.evidence_invalid`; a path that cannot be written gets
 summarized by `observe.too_many_diagnostics`. A run page that is not an https
 URL without credentials is left out with `observe.run_url_dropped`, and the
 rest of the document is written.
+
+## Uploading the evidence
+
+`--upload` hands the evidence document to the evidence reporter. Without
+`--evidence`, the document goes to a temporary file that is removed after the
+upload.
+
+The reporter is an installed extension. `PUTNAMI_EVIDENCE_REPORTER` names it,
+`@putnami/cloud` when unset. Observe runs
+`putnami <name> evidence-report --file <path>`, where `<name>` is the
+extension name without its scope, through the CLI that started it, with
+`PUTNAMI_NO_AUTO_INSTALL=1`. The reporter's output goes to standard error. A
+third party writes its own reporter as one workspace-optional subcommand
+`evidence-report` that takes `--file`.
+
+The upload never fails the job. A reporter that cannot start, exits non-zero
+or runs past 2 minutes, a selector that is not an extension name, and a
+document that was not written each give `observe.upload_failed`, and observe
+still exits 0.
+
+For `@putnami/cloud`, the job sets `PUTNAMI_CLOUD_TOKEN` to a workspace token
+of scope `delivery.ingest`. See
+[the Cloud extension](../../../cloud/extension/README.md#upload-a-change-evidence-document).

@@ -592,6 +592,18 @@
             }
           ]
         },
+        "evidence-report": {
+          "description": "Machine command: upload a change evidence document to Putnami Cloud, as the evidence reporter putnami observe --upload runs.",
+          "command": "cloud-evidence-report",
+          "interactive": true,
+          "workspace": "optional",
+          "examples": [
+            {
+              "command": "putnami cloud evidence-report --file putnami-evidence.json",
+              "description": "Under PUTNAMI_CLOUD_TOKEN, open the run of a GitHub Actions or GitLab CI job and post its tests, coverage, components, changed-line coverage and dependency changes"
+            }
+          ]
+        },
         "image-layers": {
           "description": "Machine command: produce an image project's declared layer tarballs, deterministically.",
           "command": "cloud-image-layers",
@@ -1105,6 +1117,22 @@
         {
           "id": "registry-token",
           "task": "cloud-registry-token"
+        }
+      ]
+    },
+    "cloud-evidence-report": {
+      "visibility": "internal",
+      "description": "Upload a protocol/evidence v1 document to Delivery under the workspace token in PUTNAMI_CLOUD_TOKEN: open the run on POST /v1/delivery/records with provenance gha or gitlab and the pull or merge request, then post the tests and coverage, and the components, changed-line coverage and dependency changes, as two batches on POST /v1/delivery/records/reports.",
+      "flags": {
+        "file": {
+          "type": "string",
+          "description": "Path of the change evidence document, resolved against the working directory."
+        }
+      },
+      "run": [
+        {
+          "id": "evidence-report",
+          "task": "cloud-evidence-report"
         }
       ]
     },
@@ -2337,6 +2365,22 @@
       "cache": false,
       "description": "Mint your registry bearer for one known registry host.",
       "timeoutMs": 30000
+    },
+    "cloud-evidence-report": {
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": [
+        "evidence-report"
+      ],
+      "cache": false,
+      "declares": {
+        "effects": [
+          "process",
+          "network"
+        ]
+      },
+      "description": "Upload a change evidence document to Delivery under PUTNAMI_CLOUD_TOKEN.",
+      "timeoutMs": 120000
     },
     "cloud-cache": {
       "kind": "command",

@@ -68,7 +68,7 @@
   "commands": {
     "observe-run": {
       "visibility": "internal",
-      "description": "Observe the change a CI job built, in a repository that keeps its own CI and needs no Putnami workspace. It detects GitHub Actions, GitLab CI or a generic CI, names the repository by its code host and numeric project id, resolves the commit the change is measured against, deepening a shallow clone up to the merge base, lists the changed files, and finds the test and coverage reports the job produced. A missing or malformed report, or a base it cannot reach, is a diagnostic: it exits 0 whatever it observes, 2 on a usage error and 1 when it cannot read its job context or write its output. It prints a text summary, or one JSON document with --output=json. In the caller's directory it writes only the Git history it fetches, which --no-fetch turns off, and the change evidence document --evidence names.",
+      "description": "Observe the change a CI job built, in a repository that keeps its own CI and needs no Putnami workspace. It detects GitHub Actions, GitLab CI or a generic CI, names the repository by its code host and numeric project id, resolves the commit the change is measured against, deepening a shallow clone up to the merge base, lists the changed files, and finds the test and coverage reports the job produced. A missing or malformed report, or a base it cannot reach, is a diagnostic: it exits 0 whatever it observes, 2 on a usage error and 1 when it cannot read its job context or write its output. It prints a text summary, or one JSON document with --output=json. In the caller's directory it writes only the Git history it fetches, which --no-fetch turns off, and the change evidence document --evidence names. --upload hands that document to the evidence reporter extension and never fails the job.",
       "flags": {
         "base": {
           "type": "string",
@@ -94,6 +94,11 @@
         "evidence": {
           "type": "string",
           "description": "Write the change evidence document (protocol/evidence v1) to this path, resolved against the invocation directory."
+        },
+        "upload": {
+          "type": "boolean",
+          "default": false,
+          "description": "Hand the change evidence document to the evidence reporter: the extension PUTNAMI_EVIDENCE_REPORTER names, @putnami/cloud when unset. A failed upload is a diagnostic; the exit code does not change."
         }
       },
       "run": [
@@ -130,6 +135,10 @@
             {
               "command": "putnami observe --evidence putnami-evidence.json",
               "description": "Keep the change evidence document as a CI artifact."
+            },
+            {
+              "command": "putnami observe --upload",
+              "description": "Upload the change evidence to Putnami Cloud; the job sets PUTNAMI_CLOUD_TOKEN."
             }
           ]
         }

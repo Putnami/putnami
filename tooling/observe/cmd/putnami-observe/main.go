@@ -24,12 +24,14 @@ import (
 	"time"
 	"unicode"
 
+	diag "go.putnami.dev/protocol/diagnostic"
 	"go.putnami.dev/protocol/job"
 	sdkcli "go.putnami.dev/sdk/extension/cli"
 	sdkcontext "go.putnami.dev/sdk/extension/context"
 	"go.putnami.dev/sdk/extension/runtimeinfo"
 	"go.putnami.dev/tooling/observe/internal/observe"
 	"go.putnami.dev/tooling/observe/internal/reports"
+	"go.putnami.dev/tooling/observe/internal/upload"
 )
 
 // extensionName must equal the manifest's name: core compares the runtime
@@ -47,7 +49,7 @@ const contextFlag = "--putnamiContext"
 var runtimeVersion string
 
 // knownFlags are the flags `putnami observe` takes.
-var knownFlags = []string{"base", "head", "junit", "coverage", "fetch", "evidence"}
+var knownFlags = []string{"base", "head", "junit", "coverage", "fetch", "evidence", "upload"}
 
 func run(args []string, getenv func(string) string, stdout, stderr io.Writer) int {
 	handled, err := runtimeinfo.Handle(args, stdout, extensionName, runtimeVersion)
@@ -72,7 +74,7 @@ func run(args []string, getenv func(string) string, stdout, stderr io.Writer) in
 		fmt.Fprintln(stderr, "putnami-observe: unknown invocation; this runtime answers the Putnami runtime handshake and `run`")
 		return 2
 	}
-	opts, evidencePath, jsonOutput, err := parseRun(args[1:], launch)
+	opts, out, err := parseRun(args[1:], launch)
 	if err != nil {
 		fmt.Fprintf(stderr, "putnami observe: %v\n", err)
 		return 2
@@ -81,11 +83,9 @@ func run(args []string, getenv func(string) string, stdout, stderr io.Writer) in
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 	o := observe.Run(ctx, opts)
-	if evidencePath != "" {
-		o.Diagnostics = append(o.Diagnostics, observe.WriteEvidence(evidencePath, o, time.Now())...)
-	}
+	o.Diagnostics = append(o.Diagnostics, writeAndUpload(ctx, o, out, getenv, stderr)...)
 	write := observe.WriteText
-	if jsonOutput {
+	if out.json {
 		write = observe.WriteJSON
 	}
 	if err := write(stdout, o); err != nil {
@@ -95,39 +95,75 @@ func run(args []string, getenv func(string) string, stdout, stderr io.Writer) in
 	return 0
 }
 
+// outputs are what a run writes besides its summary.
+type outputs struct {
+	// evidence is the absolute path of the evidence document, "" for none.
+	evidence string
+	// upload hands the evidence document to the evidence reporter.
+	upload bool
+	// json prints the observation as one JSON document.
+	json bool
+}
+
+// writeAndUpload writes the evidence document when --evidence or --upload asks
+// for it, hands it to the evidence reporter on --upload, and returns the
+// diagnostics of both. Without --evidence the document lives in a temporary
+// file for the upload alone.
+func writeAndUpload(ctx context.Context, o observe.Observation, out outputs, getenv func(string) string, stderr io.Writer) []diag.Diagnostic {
+	path := out.evidence
+	if path == "" && out.upload {
+		dir, err := os.MkdirTemp("", "putnami-evidence-")
+		if err != nil {
+			return upload.Skipped()
+		}
+		defer os.RemoveAll(dir)
+		path = filepath.Join(dir, "evidence.json")
+	}
+	if path == "" {
+		return nil
+	}
+	diags := observe.WriteEvidence(path, o, time.Now())
+	if !out.upload {
+		return diags
+	}
+	if len(diags) > 0 {
+		return append(diags, upload.Skipped()...)
+	}
+	return upload.Run(ctx, upload.Request{Path: path, Getenv: getenv, Output: stderr})
+}
+
 // parseRun reads the flags of `run` against the job context, nil outside
-// Putnami, and returns the options, the absolute evidence path ("" for none)
-// and whether the output is JSON.
-func parseRun(args []string, launch *job.Context) (observe.Options, string, bool, error) {
+// Putnami, and returns the options and what the run writes.
+func parseRun(args []string, launch *job.Context) (observe.Options, outputs, error) {
 	for _, arg := range args {
 		if len(arg) == 0 || arg[0] != '-' {
 			continue
 		}
 		name := flagName(arg)
 		if !slices.Contains(knownFlags, name) {
-			return observe.Options{}, "", false, fmt.Errorf("unknown flag %s", arg)
+			return observe.Options{}, outputs{}, fmt.Errorf("unknown flag %s", arg)
 		}
 	}
 	if positional := positionals(args); len(positional) > 0 {
-		return observe.Options{}, "", false, fmt.Errorf("takes no argument, got %q", positional[0])
+		return observe.Options{}, outputs{}, fmt.Errorf("takes no argument, got %q", positional[0])
 	}
 	flags := sdkcli.ParseFlags(args)
-	fetch := true
-	switch value, ok := flags["fetch"]; {
-	case !ok, value == "true":
-	case value == "false":
-		fetch = false
-	default:
-		return observe.Options{}, "", false, fmt.Errorf("--fetch takes no value, got %q", value)
+	fetch, err := boolFlag(flags, "fetch", true)
+	if err != nil {
+		return observe.Options{}, outputs{}, err
+	}
+	uploadFlag, err := boolFlag(flags, "upload", false)
+	if err != nil {
+		return observe.Options{}, outputs{}, err
 	}
 	for _, name := range []string{"base", "head", "junit", "coverage", "evidence"} {
 		if value, ok := flags[name]; ok && (value == "" || value == "true") {
-			return observe.Options{}, "", false, fmt.Errorf("--%s needs a value", name)
+			return observe.Options{}, outputs{}, fmt.Errorf("--%s needs a value", name)
 		}
 	}
 	dir, err := os.Getwd()
 	if err != nil {
-		return observe.Options{}, "", false, err
+		return observe.Options{}, outputs{}, err
 	}
 	opts := observe.Options{
 		Dir:      dir,
@@ -139,18 +175,32 @@ func parseRun(args []string, launch *job.Context) (observe.Options, string, bool
 	}
 	opts.Overrides.Base = flags["base"]
 	opts.Overrides.Head = flags["head"]
-	jsonOutput := false
+	out := outputs{upload: uploadFlag}
 	if launch != nil {
 		switch launch.Params.String("output") {
 		case "json", "jsonl", "cloud-logging":
-			jsonOutput = true
+			out.json = true
 		}
 	}
-	evidencePath := ""
 	if flags["evidence"] != "" {
-		evidencePath = opts.Resolve(flags["evidence"])
+		out.evidence = opts.Resolve(flags["evidence"])
 	}
-	return opts, evidencePath, jsonOutput, nil
+	return opts, out, nil
+}
+
+// boolFlag reads a boolean flag: absent is fallback, --name is true and
+// --no-name is false.
+func boolFlag(flags map[string]string, name string, fallback bool) (bool, error) {
+	switch value, ok := flags[name]; {
+	case !ok:
+		return fallback, nil
+	case value == "true":
+		return true, nil
+	case value == "false":
+		return false, nil
+	default:
+		return false, fmt.Errorf("--%s takes no value, got %q", name, value)
+	}
 }
 
 // flagName returns the name of a flag token, without dashes, value or the

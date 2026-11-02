@@ -31,6 +31,7 @@ require (
 	go.putnami.dev/protocol/config v0.0.0
 	go.putnami.dev/protocol/diagnostic v0.0.0
 	go.putnami.dev/protocol/distribution v0.0.0
+	go.putnami.dev/protocol/evidence v0.0.0
 	go.putnami.dev/protocol/extension v0.0.0
 	go.putnami.dev/protocol/features v0.0.0
 	go.putnami.dev/protocol/infra v0.0.0
@@ -176,3 +177,5 @@ replace go.putnami.dev/protocol/workspace => ../../protocols/workspace
 replace go.putnami.dev/schema => ../../go/framework/schema
 
 replace go.putnami.dev/sdk/extension => ../../tooling/extension-sdk
+
+replace go.putnami.dev/protocol/evidence => ../../protocols/evidence

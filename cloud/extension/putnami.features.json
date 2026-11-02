@@ -336,6 +336,57 @@
           }
         }
       ]
+    },
+    {
+      "id": "cloud/evidence-upload",
+      "type": "feature",
+      "name": "Upload a change evidence document to Putnami Cloud",
+      "outcome": "A CI job that is not Putnami's uploads its change evidence document to Putnami Cloud with a workspace token, and the run shows its tests, coverage, components, changed-line coverage and dependency changes, marked as self-reported",
+      "owner": "cloud",
+      "target": "coded",
+      "requirements": [
+        {
+          "id": "opens-the-external-run",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-gitlab-merge-request-opens-a-gitlab-run",
+              "a-github-pull-request-opens-a-gha-run"
+            ]
+          }
+        },
+        {
+          "id": "posts-the-reports-in-two-batches",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "tests-and-coverage-then-the-evidence-members"
+            ]
+          }
+        },
+        {
+          "id": "refuses-what-it-cannot-upload",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "nothing-is-sent-without-a-token-or-a-valid-document",
+              "a-refused-call-names-the-route-and-the-reason"
+            ]
+          }
+        }
+      ]
     }
   ]
 }
