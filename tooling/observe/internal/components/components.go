@@ -218,9 +218,10 @@ func (s Set) Impacts(changed map[string]bool) map[string]string {
 }
 
 // Contains reports whether the repository-relative path lies inside the
-// component directory id.
+// component directory id. The directory itself, such as a submodule's
+// gitlink, is not inside it: this is the rule protocol/evidence checks.
 func Contains(id, file string) bool {
-	return id == evidence.RootComponent || file == id || strings.HasPrefix(file, id+"/")
+	return id == evidence.RootComponent || strings.HasPrefix(file, id+"/")
 }
 
 func depth(id string) int {

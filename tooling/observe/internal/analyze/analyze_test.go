@@ -130,6 +130,11 @@ func TestCoverageGoesToTheComponentOfEachFile(t *testing.T) {
 		</classes></package></packages></coverage>`,
 		// Clover from another checkout directory.
 		"reports/clover.xml": `<coverage><project><file name="/builds/acme/shop/apps/api/src/quote.ts"><line num="2" type="stmt" count="0"/><line num="3" type="stmt" count="0"/></file></project></coverage>`,
+		// Cobertura gathered in a root folder, its source from another
+		// checkout directory; a source with ".." matches nothing.
+		"reports/api/cobertura.xml": `<coverage><sources><source>/builds/acme/shop/apps/api</source><source>/x/../../apps</source></sources><packages><package name="p"><classes>
+			<class name="quote" filename="src/quote.ts"><lines><line number="4" hits="1"/></lines></class>
+		</classes></package></packages></coverage>`,
 		// A Go cover profile names import paths.
 		"reports/cover.out": "mode: set\nexample.com/svc/calc.go:1.1,2.2 1 1\nexample.com/svc/calc.go:3.1,3.5 1 0\n",
 		"reports/bad.info":  "SF:x\nDA:0,1\n",
@@ -138,11 +143,12 @@ func TestCoverageGoesToTheComponentOfEachFile(t *testing.T) {
 		{Path: "packages/pricing/coverage/lcov.info", Kind: reports.KindCoverage, Format: reports.FormatLCOV},
 		{Path: "apps/api/coverage/cobertura.xml", Kind: reports.KindCoverage, Format: reports.FormatCobertura},
 		{Path: "reports/clover.xml", Kind: reports.KindCoverage, Format: reports.FormatClover},
+		{Path: "reports/api/cobertura.xml", Kind: reports.KindCoverage, Format: reports.FormatCobertura},
 		{Path: "reports/cover.out", Kind: reports.KindCoverage, Format: reports.FormatGoCover},
 		{Path: "reports/bad.info", Kind: reports.KindCoverage, Format: reports.FormatLCOV},
 	}})
 	want := []evidence.ComponentCoverage{
-		{Component: "apps/api", CoveredLines: 2, TotalLines: 3},
+		{Component: "apps/api", CoveredLines: 3, TotalLines: 4},
 		{Component: "packages/pricing", CoveredLines: 1, TotalLines: 2},
 		{Component: "svc", CoveredLines: 2, TotalLines: 3},
 	}

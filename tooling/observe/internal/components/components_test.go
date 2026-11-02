@@ -90,6 +90,9 @@ func TestChangedFilesGiveChangedAndDependentComponents(t *testing.T) {
 		"packages/pricingx/a.ts":            ".",
 		"README.md":                         ".",
 		"apps/api/../../packages/pricing/x": "packages/pricing",
+		// A submodule's gitlink is the directory, not a file inside it.
+		"packages/pricing/plugins": "packages/pricing",
+		"apps/admin":               ".",
 	} {
 		if got, ok := set.Owner(file); !ok || got != want {
 			t.Errorf("owner of %s = %q, want %q", file, got, want)

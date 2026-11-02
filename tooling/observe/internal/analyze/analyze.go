@@ -144,11 +144,8 @@ func (m *mapper) resolve(stated string, bases []string) (string, bool) {
 		if rel, ok := m.relative(stated); ok && m.isFile(rel) {
 			return rel, true
 		}
-		segments := strings.Split(strings.TrimLeft(stated, "/"), "/")
-		for start := max(1, len(segments)-maxSuffixSegments); start < len(segments); start++ {
-			if rel := path.Join(segments[start:]...); m.isFile(rel) {
-				return rel, true
-			}
+		if rel, ok := m.suffix(stated, m.isFile); ok {
+			return rel, true
 		}
 		return "", false
 	}
@@ -162,6 +159,28 @@ func (m *mapper) resolve(stated string, bases []string) (string, bool) {
 		}
 	}
 	return "", false
+}
+
+// suffix matches an absolute path written in another checkout by its longest
+// trailing segments that name an existing repository path. A path with a ".."
+// segment matches nothing.
+func (m *mapper) suffix(abs string, exists func(string) bool) (string, bool) {
+	segments := strings.Split(strings.TrimLeft(abs, "/"), "/")
+	if slices.Contains(segments, "..") {
+		return "", false
+	}
+	for start := max(1, len(segments)-maxSuffixSegments); start < len(segments); start++ {
+		if rel := path.Join(segments[start:]...); exists(rel) {
+			return rel, true
+		}
+	}
+	return "", false
+}
+
+// isDir reports whether the repository path is a directory.
+func (m *mapper) isDir(rel string) bool {
+	info, err := os.Stat(filepath.Join(m.root, filepath.FromSlash(rel)))
+	return err == nil && info.IsDir()
 }
 
 func isAbsolute(p string) bool {

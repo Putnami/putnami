@@ -2,6 +2,7 @@ package analyze
 
 import (
 	"path/filepath"
+	"strings"
 	"unicode/utf8"
 
 	readers "go.putnami.dev/evidence/readers"
@@ -103,7 +104,11 @@ func (r *Result) mapCoverage(report reports.Report, result readers.CoverageRepor
 	var sourceBases []string
 	for _, source := range result.Sources {
 		if isAbsolute(source) {
+			source = strings.ReplaceAll(source, `\`, "/")
 			if rel, ok := m.relative(source); ok {
+				sourceBases = append(sourceBases, rel)
+			} else if rel, ok := m.suffix(source, m.isDir); ok {
+				// A source written in another checkout directory.
 				sourceBases = append(sourceBases, rel)
 			}
 			continue
