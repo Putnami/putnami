@@ -311,6 +311,9 @@ t.terms({ link: (chunks) => <Link to='/terms'>{chunks}</Link> });
   `/fr/x` redirects with 308 to `https://example.fr/x`; other hosts (dev,
   preview) keep `/fr`. The routing uses `HttpPlugin.rewrite()`: `ctx.url` is
   the routed URL, `ctx.req.url` the client's.
+- `<LocaleSuggestion messages={…} />`, in an island, offers the page in the
+  reader's language (cookie, then browser languages); its namespace, named by
+  `i18n.suggestion`, ships in every locale. Dismiss records the page locale.
 - Only `/` negotiates the locale (cookie `putnami-locale`, then
   `Accept-Language`). The framework writes `<html lang dir>`, the canonical
   link, hreflang alternates with `x-default`, and `og:locale`.

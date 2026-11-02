@@ -18,6 +18,8 @@ export interface LocaleSettings {
   readonly paths: Readonly<Record<string, Readonly<Record<string, string>>>>;
   /** The origin a locale is served at, by non-default locale: `{ fr: 'https://example.fr' }`. */
   readonly domains: Readonly<Record<string, string>>;
+  /** The messages namespace of `LocaleSuggestion`, sent to the browser in every locale. */
+  readonly suggestion?: string;
 }
 
 /** The cookie that records a reader's explicit locale choice. */
@@ -63,7 +65,7 @@ export function parseLocaleSettings(raw: unknown): LocaleSettings {
     throw new LocaleSettingsError('i18n must be an object');
   }
   const block = raw as Record<string, unknown>;
-  const known = new Set(['locales', 'defaultLocale', 'siteUrl', 'exclude', 'paths', 'domains']);
+  const known = new Set(['locales', 'defaultLocale', 'siteUrl', 'exclude', 'paths', 'domains', 'suggestion']);
   for (const key of Object.keys(block)) {
     if (!known.has(key)) throw new LocaleSettingsError(`unknown key i18n.${key}`);
   }
@@ -110,12 +112,20 @@ export function parseLocaleSettings(raw: unknown): LocaleSettings {
     paths: {},
     domains: {},
   };
+  const suggestion = block['suggestion'];
+  if (suggestion !== undefined && (typeof suggestion !== 'string' || !SUGGESTION_NAMESPACE.test(suggestion))) {
+    throw new LocaleSettingsError("i18n.suggestion must name a messages namespace, such as 'locale-suggestion'");
+  }
   return {
     ...settings,
     paths: parseTranslatedPaths(settings, block['paths'] ?? {}),
     domains: parseDomains(settings, block['domains'] ?? {}),
+    ...(suggestion === undefined ? {} : { suggestion }),
   };
 }
+
+/** A namespace as `messages()` accepts it. */
+const SUGGESTION_NAMESPACE = /^[a-z0-9]+(?:[-./][a-z0-9]+)*$/;
 
 /**
  * Validate `i18n.domains`: per non-default locale, the http or https origin
@@ -412,6 +422,23 @@ export function negotiateLocale(settings: LocaleSettings, acceptLanguage: string
 export function publishedLocale(settings: LocaleSettings, tag: string): string | undefined {
   const lowered = tag.toLowerCase();
   return settings.locales.find((l) => l.toLowerCase() === lowered);
+}
+
+/**
+ * The locale to suggest a page in: the reader's choice, from the preference
+ * cookie, else the published locale their browser languages match first,
+ * when it is not the page's own. A page served in the default locale only
+ * suggests nothing.
+ */
+export function suggestedLocale(
+  settings: LocaleSettings,
+  page: { locale: string; path: string },
+  cookieHeader: string | null,
+  languages: readonly string[],
+): string | undefined {
+  if (!isLocalizedPath(settings, page.path)) return undefined;
+  const preferred = preferredLocale(settings, cookieHeader) ?? negotiateLocale(settings, languages.join(','));
+  return preferred === page.locale ? undefined : preferred;
 }
 
 /** Read the locale preference cookie, when it names a published locale. */

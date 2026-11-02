@@ -74,6 +74,8 @@ export interface I18nState {
   readonly served: LocaleServing;
   /** Translations of the current locale; empty for the default locale. */
   readonly messages: LocaleMessages;
+  /** The `i18n.suggestion` namespace's translations, by non-default locale. */
+  readonly suggestions?: Readonly<Record<string, Readonly<Record<string, string>>>>;
   /** Namespaces read while rendering, collected on the server for the payload. */
   readonly rendered?: Set<string>;
 }

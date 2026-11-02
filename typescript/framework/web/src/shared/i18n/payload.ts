@@ -11,6 +11,8 @@ export interface I18nPayload {
   path: string;
   served: LocaleServing;
   messages: LocaleMessages;
+  /** The `i18n.suggestion` namespace's translations, by non-default locale. */
+  suggestions?: Readonly<Record<string, Readonly<Record<string, string>>>>;
 }
 
 /**
@@ -29,6 +31,7 @@ export function readI18nPayload(doc: Document | undefined = globalThis.document)
       path: payload.path,
       served: payload.served ?? 'prefix',
       messages: payload.messages,
+      ...(payload.suggestions ? { suggestions: payload.suggestions } : {}),
     };
   } catch {
     return undefined;

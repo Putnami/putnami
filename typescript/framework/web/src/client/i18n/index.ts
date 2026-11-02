@@ -11,3 +11,4 @@ export {
   useLocale,
   useLocaleLinks,
 } from './locale-switcher';
+export { LocaleSuggestion, type LocaleSuggestionMessages, type LocaleSuggestionProps } from './locale-suggestion';

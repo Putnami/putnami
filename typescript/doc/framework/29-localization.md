@@ -266,6 +266,36 @@ Each link carries the choice in its query: `/pricing?locale=en`. The server reco
 
 Pass a render function as `children` for your own markup: each link's `href` already carries the choice. To record a choice from your own browser code, call `rememberLocale(locale)`.
 
+## Language suggestion
+
+`LocaleSuggestion` offers the current page in the reader's language, written in that language:
+
+```tsx
+// src/app/locale-suggestion.messages.ts
+export default messages('locale-suggestion', {
+  message: 'Read this page in <link>English</link>.',
+  dismiss: 'Dismiss',
+});
+
+// src/app/locale-suggestion.island.tsx
+function Suggestion() {
+  return <LocaleSuggestion messages={suggestion} />;
+}
+export default island().load('idle').render(Suggestion);
+```
+
+Name the namespace in `i18n.suggestion`:
+
+```json
+"suggestion": "locale-suggestion"
+```
+
+Every page's payload then carries that namespace in every locale, so a French reader on an English page reads French. Write the text as the suggested locale says it: the English text shows on a French page.
+
+The component renders nothing on the server. In the browser, it picks the locale the reader chose (the `putnami-locale` cookie), else the first published locale their browser languages match. When that locale is not the page's, it shows one line with a link to the page in that locale, with `?locale=`, and a dismiss button. Dismissing records the page's locale as the reader's choice, so the line does not come back. A page served in the default locale only shows nothing.
+
+Put it in an island: a pre-rendered page stays the same bytes for every reader and every cache.
+
 ## Locale detection
 
 Only the site root negotiates. A request for `/` redirects with `302` to the locale the cookie names, else to the best match of the browser's `Accept-Language` header, when that locale is not the default. The response carries `Vary: Accept-Language, Cookie`.

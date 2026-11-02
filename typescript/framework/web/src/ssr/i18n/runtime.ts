@@ -103,6 +103,22 @@ export function htmlAttributes(lang: string, state: I18nState | undefined): stri
 }
 
 /**
+ * The suggestion namespace in every non-default locale: `LocaleSuggestion`
+ * speaks the locale it suggests, not the page's. The default locale's text is
+ * in the code.
+ */
+function suggestionsPayload(options: I18nRuntimeOptions): Pick<I18nPayload, 'suggestions'> {
+  const namespace = options.settings.suggestion;
+  if (!namespace) return {};
+  const suggestions: Record<string, Readonly<Record<string, string>>> = {};
+  for (const locale of options.settings.locales) {
+    const entries = options.messages[locale]?.[namespace];
+    if (entries) suggestions[locale] = entries;
+  }
+  return { suggestions };
+}
+
+/**
  * The locale payload a browser tree reads before it hydrates. `whole` ships the
  * locale's full catalog, because a hydrated page can navigate to any
  * namespace; otherwise only the namespaces the render read. The default locale
@@ -124,6 +140,7 @@ export function i18nPayloadScript(options: I18nRuntimeOptions, state: I18nState,
     path: state.path,
     served: state.served,
     messages,
+    ...suggestionsPayload(options),
   };
   return `<script type="application/json" id="${I18N_PAYLOAD_ID}">${safeJsonForScript(payload)}</script>`;
 }
