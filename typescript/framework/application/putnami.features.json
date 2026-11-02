@@ -1182,7 +1182,7 @@
             "kind": "acceptance",
             "checks": [
               "a-rewritten-path-is-matched-and-handled",
-              "a-rewrite-can-answer-the-request",
+              "a-rewrite-to-a-path-no-route-serves-is-ignored",
               "a-merged-plugin-rewrite-runs-in-the-root-plugin"
             ]
           }

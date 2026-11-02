@@ -24,7 +24,7 @@ import { HttpResponse } from './http-response';
 import { retainRawHttpStreamScope } from './raw-http-stream';
 import { OriginGuardMiddleware } from './origin-guard.middleware';
 import { RouteController } from './route.controller';
-import type { NativeResponder, RouteHandler, RouteOptions } from './route.type';
+import type { NativeResponder, RequestRewrite, RouteHandler, RouteOptions } from './route.type';
 import { SecurityHeadersMiddleware } from './security-headers.middleware';
 import type { ServerOptions } from './server.config';
 import { normalizeGeneratedHttpRoutePath, type GeneratedHttpRoute } from '../http-routes/generation';
@@ -123,6 +123,7 @@ export class HttpPlugin implements Plugin {
   private middlewares: HttpMiddleware[] = [];
   private _routeEntries: RouteEntry[] = [];
   private _nativeRoutes: NativeRouteEntry[] = [];
+  private _rewrites: RequestRewrite[] = [];
 
   constructor(options: ServerOptions = {}) {
     this.options = options;
@@ -135,6 +136,23 @@ export class HttpPlugin implements Plugin {
 
   prepend(middleware: HttpMiddleware): this {
     this.middlewares.unshift(middleware);
+    return this;
+  }
+
+  /**
+   * Register a request rewrite. Before route matching, the first rewrite, in
+   * registration order, that returns a path a route serves replaces the
+   * request's path; the query stays. Route matching, middleware and the
+   * handler see the rewritten URL in `ctx.url` and `ctx.path()`; `ctx.req.url`
+   * keeps the client's. Native routes are not rewritten.
+   *
+   * @example Serve a host's pages under a prefix
+   * ```ts
+   * http().rewrite((req, path) => (new URL(req.url).hostname === 'fr.example.com' ? `/fr${path}` : undefined));
+   * ```
+   */
+  rewrite(rewrite: RequestRewrite): this {
+    this._rewrites.push(rewrite);
     return this;
   }
 
@@ -204,6 +222,7 @@ export class HttpPlugin implements Plugin {
     this.mergeMiddlewares(other.middlewares);
     this._routeEntries.push(...other._routeEntries);
     this._nativeRoutes.push(...other._nativeRoutes);
+    this._rewrites.push(...other._rewrites);
     return this;
   }
 
@@ -219,7 +238,20 @@ export class HttpPlugin implements Plugin {
     for (const { method, path, responder } of other._nativeRoutes) {
       this._nativeRoutes.push({ method, path: prefixFn(path, prefix), responder });
     }
+    this._rewrites.push(...other._rewrites);
     return this;
+  }
+
+  /** The URL the first rewrite whose path a route serves gives the request, or `undefined`. */
+  private rewrittenUrl(req: Request): string | undefined {
+    const url = new URL(req.url);
+    for (const rewrite of this._rewrites) {
+      const path = rewrite(req, url.pathname);
+      if (path === undefined || path === url.pathname || this.router.findMethods(path).length === 0) continue;
+      url.pathname = path;
+      return url.href;
+    }
+    return undefined;
   }
 
   /**
@@ -324,6 +356,7 @@ export class HttpPlugin implements Plugin {
 
         const context = buildHttpContext<HttpRequestContextInternal>({
           req,
+          url: this._rewrites.length > 0 ? this.rewrittenUrl(req) : undefined,
           // Bun.serve returns a Server type that is structurally compatible with HttpServer
           server: server as unknown as HttpServer,
           signal: requestSignal,

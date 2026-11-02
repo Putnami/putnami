@@ -26,6 +26,10 @@ export type Server = {
  * {@link HttpRequestContextInternal}, which is not exported from the package.
  */
 export type HttpRequestContext = Context & {
+  /**
+   * The URL the request is routed and handled at. A request rewrite replaces
+   * its path; `req.url` keeps the URL the client sent.
+   */
   url: string;
   method: HttpMethod;
   headers: Headers;

@@ -66,7 +66,7 @@
     },
     {
       "id": "request-rewrite",
-      "text": "A request rewrite registered on the HTTP plugin runs before route matching, in registration order, and may replace the request URL's path or answer the request itself; route matching, middleware and the handler then see the rewritten URL, and a rewrite merged from another plugin runs in the root plugin."
+      "text": "A request rewrite registered on the HTTP plugin runs before route matching, in registration order, and may replace the request's path; the first rewrite whose path a route serves wins and the query stays. Route matching, middleware and the handler then see the rewritten URL while the client's request keeps its own, a path no route serves is ignored, and a rewrite merged from another plugin runs in the root plugin."
     }
   ]
 }

@@ -11,6 +11,8 @@ import { UrlScanner } from './url.scanner';
 
 type BuildContextArgs = {
   req: Request;
+  /** The URL the request is routed and handled at, when a rewrite replaced the client's. */
+  url?: string;
   server?: Server;
   signal?: AbortSignal;
   maxBodySizeBytes?: number;
@@ -70,9 +72,9 @@ class HttpContext {
     this.signal = args.signal ?? req.signal;
     this.headers = req.headers;
     this.method = req.method as HttpMethod;
-    this.url = req.url;
+    this.url = args.url ?? req.url;
     this.server = args.server;
-    this._scanner = new UrlScanner(req.url, req.headers);
+    this._scanner = new UrlScanner(this.url, req.headers);
 
     // Capture raw Authorization header for downstream service-to-service JWT forwarding.
     this.__authorizationHeader = req.headers.get('Authorization') ?? req.headers.get('authorization') ?? undefined;
