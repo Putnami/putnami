@@ -1,0 +1,22 @@
+{
+  "comment": "A merged results pipeline on merge request !7 runs for a merge commit: the status goes on that commit and joins the job's pipeline.",
+  "exchanges": [
+    {
+      "request": {
+        "method": "POST",
+        "url": "https://gitlab.com/api/v4/projects/4242/statuses/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "headers": {"Private-Token": "glpat-fixturetoken"},
+        "body": {"state": "success", "name": "putnami/observe", "description": "1 changed, 1 dependent components; changed lines 80.0% covered; 1 dependency change", "target_url": "https://gitlab.com/acme/shop/-/pipelines/555", "pipeline_id": 555}
+      },
+      "response": {"status": 201, "body": {"id": 9876543211, "sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "ref": "refs/merge-requests/7/merge", "status": "success", "name": "putnami/observe", "pipeline_id": 555}}
+    },
+    {
+      "request": {"method": "GET", "url": "https://gitlab.com/api/v4/projects/4242/merge_requests/7/notes?order_by=created_at&page=1&per_page=100&sort=asc"},
+      "response": {"status": 200, "body": []}
+    },
+    {
+      "request": {"method": "POST", "url": "https://gitlab.com/api/v4/projects/4242/merge_requests/7/notes", "noteFromObservation": true},
+      "response": {"status": 201, "body": {"id": 2210004, "system": false}}
+    }
+  ]
+}

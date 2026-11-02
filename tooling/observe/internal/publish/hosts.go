@@ -18,6 +18,7 @@ type gitHub struct {
 	api
 	repository string // owner/name, each segment escaped
 	number     int
+	headSHA    string
 }
 
 // gitHubAPI is the API of github.com; GitHub Enterprise names its own in
@@ -41,10 +42,15 @@ func newGitHub(client *http.Client, getenv func(string) string, token string, o 
 		}},
 		repository: url.PathEscape(owner) + "/" + url.PathEscape(name),
 		number:     o.Subject.ChangeRequest.Number,
+		headSHA:    o.Subject.ChangeRequest.HeadSHA,
 	}, nil
 }
 
 func (g *gitHub) requestLabel() string { return label(ci.ProviderGitHub, g.number) }
+
+// statusSHA is the pull request's head: the job built a merge commit that is
+// no commit of the pull request.
+func (g *gitHub) statusSHA() string { return g.headSHA }
 
 func (g *gitHub) setStatus(ctx context.Context, sha string, s status) error {
 	body := map[string]string{"state": "success", "context": StatusName, "description": s.Description}
@@ -100,20 +106,17 @@ type gitLab struct {
 	api
 	project    string // numeric project id
 	number     int
-	pipeline   string // the pipeline the status joins, "" for none
+	sha        string // the commit the status goes on
+	pipeline   uint64 // the pipeline the status joins, 0 for none
 	projectURL string // the project's page, "" when unknown
-	headSHA    string
 }
 
 func newGitLab(client *http.Client, getenv func(string) string, token string, o observe.Observation) (*gitLab, error) {
-	raw := getenv("CI_API_V4_URL")
+	raw := strings.TrimSpace(getenv("CI_API_V4_URL"))
 	if raw == "" {
-		server := getenv("CI_SERVER_URL")
-		if server == "" && o.Subject.Host != "" {
-			server = "https://" + o.Subject.Host
-		}
+		server := strings.TrimSpace(getenv("CI_SERVER_URL"))
 		if server == "" {
-			server = "https://gitlab.com"
+			return nil, errors.New("neither CI_API_V4_URL nor CI_SERVER_URL names the GitLab API")
 		}
 		raw = strings.TrimRight(server, "/") + "/api/v4"
 	}
@@ -128,12 +131,15 @@ func newGitLab(client *http.Client, getenv func(string) string, token string, o 
 		api:     api{client: client, base: base, auth: func(r *http.Request) { r.Header.Set("PRIVATE-TOKEN", token) }},
 		project: url.PathEscape(o.Subject.ProjectID),
 		number:  o.Subject.ChangeRequest.Number,
-		headSHA: o.Subject.ChangeRequest.HeadSHA,
+		sha:     o.Subject.ChangeRequest.HeadSHA,
 	}
-	// The status joins the job's own pipeline when that pipeline built the
-	// head commit, so it shows on the merge request next to the pipeline.
-	if _, err := strconv.ParseUint(o.CI.RunID, 10, 64); err == nil && o.Subject.SHA == g.headSHA {
-		g.pipeline = o.CI.RunID
+	// The status goes on the commit the job's pipeline ran for and joins that
+	// pipeline, the one the merge request shows. A merged results pipeline
+	// runs for a merge commit: a status on the source branch's head would
+	// start another pipeline.
+	if commit := strings.ToLower(strings.TrimSpace(getenv("CI_COMMIT_SHA"))); fullSHA(commit) {
+		g.sha = commit
+		g.pipeline, _ = strconv.ParseUint(o.CI.RunID, 10, 64)
 	}
 	if page, err := apiBase(getenv("CI_PROJECT_URL")); err == nil {
 		g.projectURL = page.String()
@@ -142,6 +148,8 @@ func newGitLab(client *http.Client, getenv func(string) string, token string, o 
 }
 
 func (g *gitLab) requestLabel() string { return label(ci.ProviderGitLab, g.number) }
+
+func (g *gitLab) statusSHA() string { return g.sha }
 
 // alreadySet is GitLab's answer to a status that already has this state, as
 // when a job is retried on the same commit.
@@ -152,9 +160,8 @@ func (g *gitLab) setStatus(ctx context.Context, sha string, s status) error {
 	if s.TargetURL != "" {
 		body["target_url"] = s.TargetURL
 	}
-	if g.pipeline != "" && sha == g.headSHA {
-		pipeline, _ := strconv.ParseUint(g.pipeline, 10, 64)
-		body["pipeline_id"] = pipeline
+	if g.pipeline > 0 {
+		body["pipeline_id"] = g.pipeline
 	}
 	err := g.do(ctx, http.MethodPost, "/projects/"+g.project+"/statuses/"+url.PathEscape(sha), nil, body, nil)
 	var refused *apiError
@@ -217,6 +224,14 @@ func (g *gitLab) noteURL(id int64) string {
 		return ""
 	}
 	return fmt.Sprintf("%s/-/merge_requests/%d#note_%d", g.projectURL, g.number, id)
+}
+
+// fullSHA reports whether value is a full lowercase SHA-1 or SHA-256 id.
+func fullSHA(value string) bool {
+	if len(value) != 40 && len(value) != 64 {
+		return false
+	}
+	return strings.Trim(value, "0123456789abcdef") == ""
 }
 
 // marked reports whether a note body starts with Marker.

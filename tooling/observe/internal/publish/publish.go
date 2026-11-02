@@ -64,6 +64,8 @@ type Request struct {
 
 // host is one code host's API for one pull or merge request.
 type host interface {
+	// statusSHA is the commit the status goes on, "" when the CI names none.
+	statusSHA() string
 	setStatus(ctx context.Context, sha string, s status) error
 	// findNote returns the id of the first note whose body starts with
 	// Marker, "" when none does.
@@ -132,13 +134,13 @@ func Run(ctx context.Context, req Request) []diag.Diagnostic {
 	}
 
 	var diags []diag.Diagnostic
-	if cr.HeadSHA == "" {
+	if sha := h.statusSHA(); sha == "" {
 		diags = append(diags, diag.Warningf(CodeFailed, "publish",
-			"the CI names no head commit of %s, so no commit status was set", h.requestLabel()))
-	} else if err := h.setStatus(ctx, cr.HeadSHA, status{Description: Description(o.Analysis), TargetURL: runURL(o.CI.URL)}); err != nil {
+			"the CI names no commit of %s, so no commit status was set", h.requestLabel()))
+	} else if err := h.setStatus(ctx, sha, status{Description: Description(o), TargetURL: runURL(o.CI.URL)}); err != nil {
 		diags = append(diags, fail("setting the commit status "+StatusName, err))
 	} else {
-		fmt.Fprintf(output, "putnami observe: set the commit status %s on %s\n", StatusName, short(cr.HeadSHA))
+		fmt.Fprintf(output, "putnami observe: set the commit status %s on %s\n", StatusName, short(sha))
 	}
 
 	body := Note(o)

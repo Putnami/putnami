@@ -158,12 +158,15 @@ of scope `delivery.ingest`. See
 `--publish` posts the summary where a reviewer reads it, with a token the CI
 already has. On a GitHub pull request or a GitLab merge request it:
 
-1. Sets the commit status `putnami/observe` to success on the head commit of
-   the request. The status means the analysis ran, not that the tests passed.
-   Its description counts the changed and dependent components, the coverage
-   of the changed lines and the dependency changes, for example
-   `1 changed, 2 dependent components; changed lines 80.0% covered; 1 dependency change`.
-   It links the CI run.
+1. Sets the commit status `putnami/observe` to success. On GitHub it goes on
+   the head commit of the pull request, since the job built a merge commit.
+   On GitLab it goes on the commit the pipeline ran for, `CI_COMMIT_SHA`, and
+   joins that pipeline, so a merged results pipeline starts no other one. The
+   status means the analysis ran, not that the tests passed. Its description
+   counts the changed and dependent components, the coverage of the changed
+   lines and the dependency changes, for example
+   `1 changed, 2 dependent components; changed lines 80.0% covered; 1 dependency change`,
+   or says that the base was not resolved. It links the CI run.
 2. Writes one Markdown note on the request: the components with their tests
    and coverage, the failing tests, the least covered changed files, the
    dependency changes and the diagnostic codes. The note starts with the
@@ -190,8 +193,13 @@ Publishing never fails the job:
 |---|---|
 | A generic CI, or a job that runs for no pull or merge request, such as a branch push | `observe.publish_skipped` (info) |
 | The code host's token is unset | `observe.publish_token_missing` (warning) |
-| A refused or failed call, an API URL that is not https, or a run past 1 minute | `observe.publish_failed` (warning) |
+| A refused or failed call, no GitLab API URL, an API URL that is not https, no commit to set the status on, or a run past 1 minute | `observe.publish_failed` (warning) |
 
 A pull request from a fork gets a read-only `GITHUB_TOKEN`, so GitHub refuses
 both calls with `observe.publish_failed`. A failed status call does not stop
 the note.
+
+The note is the first one that starts with the hidden line, whoever wrote it.
+A comment that starts with that line is overwritten by the summary. When the
+token changes owner, for example a new GitLab project access token, the old
+note may refuse the update: delete it, and the next run creates a new one.

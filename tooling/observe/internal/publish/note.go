@@ -26,8 +26,13 @@ const (
 
 // Description is the one-line summary of the commit status: the changed and
 // dependent components, the changed-line coverage and the dependency
-// changes, at most 140 characters.
-func Description(a analyze.Result) string {
+// changes, at most 140 characters. Without a base nothing was measured, and
+// it says so.
+func Description(o observe.Observation) string {
+	if o.Subject.BaseSHA == "" {
+		return "the base of the change was not resolved, so no change was measured; see the job log"
+	}
+	a := o.Analysis
 	changed, dependent := 0, 0
 	for _, c := range a.Components {
 		switch c.Impact {
@@ -52,7 +57,7 @@ func Note(o observe.Observation) string {
 	fmt.Fprintln(&b, Marker)
 	fmt.Fprintln(&b, "### putnami observe")
 	fmt.Fprintln(&b)
-	fmt.Fprintf(&b, "**%s**\n\n", Description(o.Analysis))
+	fmt.Fprintf(&b, "**%s**\n\n", Description(o))
 	head := "Commit " + code(short(o.Subject.SHA))
 	if o.Subject.BaseSHA != "" {
 		head += ", measured from " + code(short(o.Subject.BaseSHA))

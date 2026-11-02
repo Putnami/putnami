@@ -204,6 +204,7 @@ var gitlabEnv = map[string]string{
 	"CI_API_V4_URL":        "https://gitlab.com/api/v4",
 	"CI_SERVER_URL":        "https://gitlab.com",
 	"CI_PROJECT_URL":       "https://gitlab.com/acme/shop",
+	"CI_COMMIT_SHA":        headSHA,
 }
 
 // publish runs Run against a fixture and returns its diagnostics and output.
@@ -284,10 +285,46 @@ func TestASelfManagedGitLabUsesItsOwnAPIURL(t *testing.T) {
 	diags, _, _ := publish(t, "gitlab-self-managed.json", o, map[string]string{
 		"PUTNAMI_GITLAB_TOKEN": gitlabToken,
 		"CI_SERVER_URL":        "https://git.example.org/gitlab/",
+		"CI_COMMIT_SHA":        headSHA,
 	})
 	if len(diags) != 0 {
 		t.Fatalf("diagnostics %v", diags)
 	}
+
+	t.Run("no API URL", func(t *testing.T) {
+		diags, _, _ := publish(t, "none.json", mergeRequest(), map[string]string{"PUTNAMI_GITLAB_TOKEN": gitlabToken})
+		if len(diags) != 1 || diags[0].Code != CodeFailed || !strings.Contains(diags[0].Message, "neither CI_API_V4_URL nor CI_SERVER_URL") {
+			t.Fatalf("diagnostics %v", diags)
+		}
+	})
+}
+
+func TestAMergedResultsPipelineGetsTheStatusOnItsOwnCommit(t *testing.T) {
+	spectest.Proves(t, feature, "publish-status", "a-gitlab-merge-request-gets-a-status-and-a-note")
+	o := mergeRequest()
+	o.Subject.SHA = mergeSHA
+	env := map[string]string{}
+	for k, v := range gitlabEnv {
+		env[k] = v
+	}
+	env["CI_COMMIT_SHA"] = strings.ToUpper(mergeSHA)
+	diags, out, _ := publish(t, "gitlab-merged-results.json", o, env)
+	if len(diags) != 0 || !strings.Contains(out, "on aaaaaaaaaaaa") {
+		t.Fatalf("diagnostics %v, output %q", diags, out)
+	}
+
+	t.Run("no commit", func(t *testing.T) {
+		o := mergeRequest()
+		o.Subject.ChangeRequest.HeadSHA = ""
+		env["CI_COMMIT_SHA"] = "main"
+		r := load(t, "gitlab-first-run.json", Note(o))
+		r.exchanges = r.exchanges[1:]
+		diags := Run(context.Background(), Request{Observation: o, Getenv: envOf(env), Client: &http.Client{Transport: r}})
+		r.done()
+		if len(diags) != 1 || !strings.Contains(diags[0].Message, "names no commit of merge request !7") {
+			t.Fatalf("diagnostics %v", diags)
+		}
+	})
 }
 
 func TestTheTokenGoesOnlyToAnHTTPSAPI(t *testing.T) {
@@ -458,15 +495,21 @@ func TestTheNoteAndTheDescriptionAreBounded(t *testing.T) {
 	if got := bounded(strings.Repeat("line\n", maxNoteBytes)); len(got) > maxNoteBytes+100 || !strings.HasSuffix(got, "the job log holds the rest.\n") {
 		t.Fatalf("bounded note of %d bytes ends %q", len(got), got[len(got)-40:])
 	}
-	if d := Description(analyze.Result{Components: []evidence.Component{{Impact: evidence.ImpactDependent}}, DependencyChanges: make([]evidence.DependencyChange, 2)}); d != "0 changed, 1 dependent components; changed lines not measured; 2 dependency changes" {
+	measured := observe.Observation{Subject: ci.Subject{BaseSHA: baseSHA}}
+	measured.Analysis = analyze.Result{Components: []evidence.Component{{Impact: evidence.ImpactDependent}}, DependencyChanges: make([]evidence.DependencyChange, 2)}
+	if d := Description(measured); d != "0 changed, 1 dependent components; changed lines not measured; 2 dependency changes" {
 		t.Fatalf("description %q", d)
+	}
+	measured.Subject.BaseSHA = ""
+	if d := Description(measured); !strings.HasPrefix(d, "the base of the change was not resolved") || len(d) > maxDescription {
+		t.Fatalf("description without a base %q", d)
 	}
 	huge := analyze.Result{ChangedLineCoverage: &evidence.ChangedLineCoverage{CoveredLines: 99999, TotalLines: 100000}}
 	for range 100000 {
 		huge.Components = append(huge.Components, evidence.Component{Impact: evidence.ImpactChanged})
 	}
 	huge.DependencyChanges = make([]evidence.DependencyChange, 100000)
-	if d := Description(huge); len([]rune(d)) > maxDescription {
+	if d := Description(observe.Observation{Subject: ci.Subject{BaseSHA: baseSHA}, Analysis: huge}); len([]rune(d)) > maxDescription {
 		t.Fatalf("description of %d characters: %q", len([]rune(d)), d)
 	}
 }
