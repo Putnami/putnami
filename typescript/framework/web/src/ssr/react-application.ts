@@ -14,7 +14,7 @@ import type { LocaleMessages } from '../shared/i18n/messages';
 import { createPageElement } from '../shared/page-element';
 import { RouteTreeHelper } from '../shared/route-tree.utils';
 import type { I18nRuntimeOptions } from './i18n/runtime';
-import { excludedRouteRedirect, negotiatingEntry } from './i18n/negotiation';
+import { excludedRouteRedirect, negotiatingEntry, recordingChoice } from './i18n/negotiation';
 import type {
   ErrorModule,
   LayoutModule,
@@ -251,10 +251,13 @@ export class ReactApplication {
    * invariant in one place; behavior is identical to inlining the options.
    */
   private registerPageGet(httpRoute: string, handler: RouteHandler, statusCode: number): void {
-    // The unprefixed root is the one URL that negotiates the reader's locale.
+    // Every page records a locale link's choice; the unprefixed root is the one
+    // URL that negotiates the reader's locale.
     const settings = this._i18n?.settings;
-    const served =
-      settings && httpRoute === '/' && settings.locales.length > 1 ? negotiatingEntry(handler, settings) : handler;
+    let served = handler;
+    if (settings && settings.locales.length > 1) {
+      served = recordingChoice(httpRoute === '/' ? negotiatingEntry(handler, settings) : handler, settings);
+    }
     this.httpPlugin.get(httpRoute, served, {
       ...this.routeOptions(),
       accept: ['text/html', '*/*'],

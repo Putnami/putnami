@@ -2,7 +2,8 @@ import { type ReactNode, useContext } from 'react';
 import { useInRouterContext, useLocation } from 'react-router';
 import {
   isLocalizedPath,
-  LOCALE_COOKIE,
+  LOCALE_PARAM,
+  localeCookie,
   localeEndonym,
   localizePath,
   normalizePath,
@@ -60,22 +61,25 @@ export function useLocale(): LocaleInfo {
   };
 }
 
-/** Record an explicit locale choice; the server reads it when a reader opens `/`. */
+/**
+ * Record an explicit locale choice from the browser; the server reads it when a
+ * reader opens `/`. A locale link needs none of this: its `?locale=` query
+ * records the choice on the server.
+ */
 export function rememberLocale(locale: string): void {
   if (typeof document === 'undefined') return;
-  const secure = typeof location !== 'undefined' && location.protocol === 'https:' ? '; Secure' : '';
+  const secure = typeof location !== 'undefined' && location.protocol === 'https:';
   // biome-ignore lint/suspicious/noDocumentCookie: a first-party preference cookie the server must read
-  document.cookie = `${LOCALE_COOKIE}=${encodeURIComponent(locale)}; Path=/; Max-Age=31536000; SameSite=Lax${secure}`;
+  document.cookie = localeCookie(locale, secure);
 }
 
 export interface LocaleLink {
   locale: string;
   /** The locale's own name: `Français`. */
   label: string;
+  /** The page in that locale, with the `?locale=` query that records the choice. */
   href: string;
   current: boolean;
-  /** Records the choice; call it from the link's click handler. */
-  select: () => void;
 }
 
 /**
@@ -89,9 +93,8 @@ export function useLocaleLinks(): LocaleLink[] {
   return info.locales.map((locale) => ({
     locale,
     label: localeEndonym(locale),
-    href: info.localize(target(locale), locale),
+    href: `${info.localize(target(locale), locale)}?${LOCALE_PARAM}=${encodeURIComponent(locale)}`,
     current: locale === info.locale,
-    select: () => rememberLocale(locale),
   }));
 }
 
@@ -104,9 +107,10 @@ export interface LocaleSwitcherProps {
 }
 
 /**
- * Plain links to the current page in every published locale: they work without
- * JavaScript, crawlers follow them, and each one carries its language so a
- * screen reader pronounces the locale's name correctly. Renders nothing when
+ * Plain links to the current page in every published locale: each one records
+ * the reader's choice through its query, with or without JavaScript, and
+ * carries its language so a screen reader pronounces the locale's name
+ * correctly. Renders nothing when
  * the application publishes a single locale.
  */
 export function LocaleSwitcher({ label, className, children }: LocaleSwitcherProps) {
@@ -124,7 +128,6 @@ export function LocaleSwitcher({ label, className, children }: LocaleSwitcherPro
               hrefLang={link.locale}
               lang={link.locale}
               aria-current={link.current ? 'page' : undefined}
-              onClick={link.select}
             >
               {link.label}
             </a>

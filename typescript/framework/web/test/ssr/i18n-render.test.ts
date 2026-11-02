@@ -224,8 +224,8 @@ describe('localized server render', () => {
     async () => {
       const html = await (await get('/fr/pricing')).text();
       expect(html).toContain('<nav aria-label="Language">');
-      expect(html).toMatch(/<a href="\/pricing" hrefLang="en" lang="en"[^>]*>English<\/a>/i);
-      expect(html).toMatch(/<a href="\/ar\/pricing" hrefLang="ar" lang="ar"[^>]*>العربية<\/a>/i);
+      expect(html).toMatch(/<a href="\/pricing\?locale=en" hrefLang="en" lang="en"[^>]*>English<\/a>/i);
+      expect(html).toMatch(/<a href="\/ar\/pricing\?locale=ar" hrefLang="ar" lang="ar"[^>]*>العربية<\/a>/i);
     },
   );
 
@@ -234,8 +234,51 @@ describe('localized server render', () => {
     { feature, requirement: 'locale-switcher', check: 'the-current-locale-carries-aria-current' },
     async () => {
       const html = await (await get('/fr/pricing')).text();
-      expect(html).toMatch(/<a href="\/fr\/pricing" hrefLang="fr" lang="fr" aria-current="page"[^>]*>Français<\/a>/i);
+      expect(html).toMatch(
+        /<a href="\/fr\/pricing\?locale=fr" hrefLang="fr" lang="fr" aria-current="page"[^>]*>Français<\/a>/i,
+      );
       expect(html).not.toMatch(/hrefLang="en" lang="en" aria-current/i);
+    },
+  );
+
+  specTest(
+    'carries the choice of each switcher link in its query',
+    { feature, requirement: 'locale-switcher', check: 'each-switcher-link-carries-its-locale-choice' },
+    async () => {
+      const html = await (await get('/pricing')).text();
+      for (const locale of ['en', 'fr', 'ar'])
+        expect(html).toMatch(new RegExp(`\\?locale=${locale}" hrefLang="${locale}"`));
+    },
+  );
+
+  const localeCookie = (response: Response) =>
+    response.headers.getSetCookie().find((c) => c.startsWith('putnami-locale='));
+
+  specTest(
+    'records the choice a locale link carries and redirects to the clean URL',
+    { feature, requirement: 'locale-choice', check: 'a-locale-query-sets-the-cookie-and-redirects-to-the-clean-url' },
+    async () => {
+      const chosen = await get('/fr/pricing?ref=mail&locale=FR');
+      expect(chosen.status).toBe(302);
+      expect(chosen.headers.get('location')).toBe('/fr/pricing?ref=mail');
+      expect(localeCookie(chosen)).toBe('putnami-locale=fr; Path=/; Max-Age=31536000; SameSite=Lax');
+      expect(chosen.headers.get('cache-control')).toBe('no-store');
+      // The choice wins over the browser's language at the root.
+      const root = await get('/?locale=en', { 'accept-language': 'fr' });
+      expect(root.headers.get('location')).toBe('/');
+      expect(localeCookie(root)).toStartWith('putnami-locale=en;');
+      const secure = await get('/pricing?locale=en', { 'x-forwarded-proto': 'https' });
+      expect(localeCookie(secure)).toEndWith('; Secure');
+    },
+  );
+
+  specTest(
+    'serves a page whose locale query names no published locale',
+    { feature, requirement: 'locale-choice', check: 'an-unpublished-locale-query-is-served-as-is' },
+    async () => {
+      const page = await get('/pricing?locale=de');
+      expect(page.status).toBe(200);
+      expect(localeCookie(page)).toBeUndefined();
     },
   );
 

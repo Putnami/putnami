@@ -1,5 +1,13 @@
 import { HttpResponse, type RouteHandler } from '@putnami/application';
-import { type LocaleSettings, localizePath, negotiateLocale, preferredLocale } from '../../shared/i18n/locale';
+import {
+  LOCALE_PARAM,
+  type LocaleSettings,
+  localeCookie,
+  localizePath,
+  negotiateLocale,
+  preferredLocale,
+  publishedLocale,
+} from '../../shared/i18n/locale';
 
 /** What the entry response depends on, for every cache between it and the reader. */
 const ENTRY_VARY = 'Accept-Language, Cookie';
@@ -30,6 +38,31 @@ export function negotiatingEntry(handler: RouteHandler, settings: LocaleSettings
       response.setHeader('vary', vary ? `${vary}, ${ENTRY_VARY}` : ENTRY_VARY);
     }
     return response;
+  };
+}
+
+/**
+ * Record the choice a locale link carries, `/pricing?locale=fr`, in the
+ * preference cookie, and send the reader to the same URL without it. A link
+ * records the choice this way on every page, with or without JavaScript. The
+ * answer sets a cookie, so no cache keeps it. A tag that names no published
+ * locale is ignored.
+ */
+export function recordingChoice(handler: RouteHandler, settings: LocaleSettings): RouteHandler {
+  return (ctx) => {
+    const url = new URL(ctx.req.url);
+    const tag = url.searchParams.get(LOCALE_PARAM);
+    const locale = tag === null ? undefined : publishedLocale(settings, tag);
+    if (!locale) return handler(ctx);
+    url.searchParams.delete(LOCALE_PARAM);
+    return new HttpResponse('', {
+      status: 302,
+      headers: {
+        location: `${url.pathname}${url.search}`,
+        'set-cookie': localeCookie(locale, ctx.secured()),
+        'cache-control': 'no-store',
+      },
+    });
   };
 }
 

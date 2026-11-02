@@ -228,7 +228,9 @@ import { LocaleSwitcher } from '@putnami/web';
 
 It renders a `<nav>` of plain links, one per locale, to the current page in that locale, or to the locale's home when the page exists in the default locale only. Each link carries `hreflang` and `lang`, shows the locale's own name (`Français`), and the current one carries `aria-current="page"`. It renders nothing when one locale is published.
 
-A click records the choice in the `putnami-locale` cookie. Pass a render function as `children` for your own markup, and call each link's `select()` on click.
+Each link carries the choice in its query: `/pricing?locale=en`. The server records it in the `putnami-locale` cookie for a year and redirects with `302` to `/pricing`. The choice persists without JavaScript, on a static page as well. A `locale` value that names no published locale is ignored.
+
+Pass a render function as `children` for your own markup: each link's `href` already carries the choice. To record a choice from your own browser code, call `rememberLocale(locale)`.
 
 ## Locale detection
 

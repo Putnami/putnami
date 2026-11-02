@@ -93,8 +93,8 @@ describe('locale hooks', () => {
     const html = renderToStaticMarkup(
       React.createElement(I18nProvider, { value: docs }, React.createElement(LocaleSwitcher, { label: 'Language' })),
     );
-    expect(html).toContain('href="/docs/intro" hrefLang="en"');
-    expect(html).toContain('href="/fr" hrefLang="fr"');
+    expect(html).toContain('href="/docs/intro?locale=en" hrefLang="en"');
+    expect(html).toContain('href="/fr?locale=fr" hrefLang="fr"');
   });
 
   it('passes the links to a custom render function', () => {
@@ -103,7 +103,7 @@ describe('locale hooks', () => {
         {(links) => links.map((l) => `${l.locale}:${l.href}:${l.current}`).join(' ')}
       </LocaleSwitcher>,
     );
-    expect(html).toBe('en:/pricing:false fr:/fr/pricing:true');
+    expect(html).toBe('en:/pricing?locale=en:false fr:/fr/pricing?locale=fr:true');
   });
 });
 

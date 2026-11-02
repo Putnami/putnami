@@ -16,8 +16,16 @@ export interface LocaleSettings {
   readonly exclude: readonly string[];
 }
 
-/** The cookie an explicit choice in the locale switcher writes. */
+/** The cookie that records a reader's explicit locale choice. */
 export const LOCALE_COOKIE = 'putnami-locale';
+
+/** The query parameter a locale link carries its choice in: `/?locale=en`. */
+export const LOCALE_PARAM = 'locale';
+
+/** The `Set-Cookie` and `document.cookie` value that records a locale choice for a year. */
+export function localeCookie(locale: string, secure: boolean): string {
+  return `${LOCALE_COOKIE}=${encodeURIComponent(locale)}; Path=/; Max-Age=31536000; SameSite=Lax${secure ? '; Secure' : ''}`;
+}
 
 const RTL_LANGUAGES = new Set(['ar', 'arc', 'ckb', 'dv', 'fa', 'he', 'ks', 'ku', 'ps', 'sd', 'ug', 'ur', 'yi']);
 
@@ -227,19 +235,23 @@ export function negotiateLocale(settings: LocaleSettings, acceptLanguage: string
   return undefined;
 }
 
+/** The published locale a tag names, whatever its case. */
+export function publishedLocale(settings: LocaleSettings, tag: string): string | undefined {
+  const lowered = tag.toLowerCase();
+  return settings.locales.find((l) => l.toLowerCase() === lowered);
+}
+
 /** Read the locale preference cookie, when it names a published locale. */
 export function preferredLocale(settings: LocaleSettings, cookieHeader: string | null): string | undefined {
   if (!cookieHeader) return undefined;
   for (const part of cookieHeader.split(';')) {
     const [name, ...value] = part.trim().split('=');
     if (name === LOCALE_COOKIE) {
-      let tag: string;
       try {
-        tag = decodeURIComponent(value.join('=')).toLowerCase();
+        return publishedLocale(settings, decodeURIComponent(value.join('=')));
       } catch {
         return undefined;
       }
-      return settings.locales.find((l) => l.toLowerCase() === tag);
     }
   }
   return undefined;

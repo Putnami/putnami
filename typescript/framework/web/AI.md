@@ -299,7 +299,9 @@ t.terms({ link: (chunks) => <Link to='/terms'>{chunks}</Link> });
   test show the default text for a missing one, with a warning.
 - `<Link to="/x">` keeps the current locale prefix; a path that names a
   locale (`/fr/x`) or is excluded stays as written. Exclude whole subtrees
-  (`/blog/**`); `/fr/blog/x` redirects with 308 to `/blog/x`. Use a plain `<a>` for files. `<LocaleSwitcher label="…" />` renders the locale links;
+  (`/blog/**`); `/fr/blog/x` redirects with 308 to `/blog/x`. Use a plain `<a>` for files. `<LocaleSwitcher label="…" />` renders the locale links,
+  each with `?locale=<tag>`: the server records the choice in the
+  `putnami-locale` cookie and redirects to the URL without it.
   `useLocale()` gives the locale and `localize(path, locale?)`.
 - Only `/` negotiates the locale (cookie `putnami-locale`, then
   `Accept-Language`). The framework writes `<html lang dir>`, the canonical
