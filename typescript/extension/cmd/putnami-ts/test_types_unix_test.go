@@ -98,6 +98,37 @@ func TestTestTypesFailsOnAnUnusedExpectErrorInATestFile(t *testing.T) {
 	}
 }
 
+func TestTestTypesFailsOnATypeErrorUnderADotDirectory(t *testing.T) {
+	ctx := typeCheckStarter(t, map[string]string{
+		".gen/src/gen.ts": "export const n: number = 'not a number';\n",
+	})
+
+	status, _, err := runTestTypes(ctx, jsonl.New(), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if status != "FAILED" {
+		t.Fatalf("test~types ended %s, want FAILED", status)
+	}
+	if got := typeCheckDiagnostics(t, ctx); strings.Join(got, ",") != ".gen/src/gen.ts TS2322" {
+		t.Errorf("diagnostics %v, want the type error of .gen/src/gen.ts", got)
+	}
+}
+
+func TestTestTypesChecksAProjectWhoseFilesAllLieUnderADotDirectory(t *testing.T) {
+	ctx := typeCheckStarter(t, map[string]string{
+		".gen/src/gen.ts": "export const n: number = 1;\n",
+	})
+	for _, name := range []string{"src", "test"} {
+		if err := os.RemoveAll(filepath.Join(ctx.WorkspaceRoot, "webapp", name)); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	status, _, err := runTestTypes(ctx, jsonl.New(), nil)
+	expectJobOK(t, "test~types", status, err)
+}
+
 func TestTestTypesEmitsNothing(t *testing.T) {
 	spectest.Proves(t, "typescript/typescript-project-toolchain", "test-files-are-type-checked", "the-type-check-emits-nothing")
 	ctx := typeCheckStarter(t, map[string]string{

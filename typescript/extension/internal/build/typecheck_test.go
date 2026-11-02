@@ -129,6 +129,54 @@ func TestRunTypeCheck_WithoutATsconfigExtendsNothing(t *testing.T) {
 	}
 }
 
+func TestRunTypeCheck_IncludesTheFilesUnderADotDirectory(t *testing.T) {
+	dir := t.TempDir()
+	writeProjectFiles(t, dir, "src/index.ts", ".gen/src/gen.ts", ".gen/src/more.tsx", "test/.fixtures/a.ts", "test/.fixtures/deep/b.ts", ".storybook.ts", ".hidden/.client.gen.tsx", ".empty/types.d.ts", ".putnami/cache.ts")
+
+	var config map[string]any
+	withMockExec(t, func(_ string, a []string, _ ...exec.Option) (*exec.Result, error) {
+		data, err := os.ReadFile(a[len(a)-1])
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := json.Unmarshal(data, &config); err != nil {
+			t.Fatal(err)
+		}
+		return &exec.Result{Success: true}, nil
+	})
+
+	if _, err := RunTypeCheck("bun", dir, ""); err != nil {
+		t.Fatal(err)
+	}
+	anchored := func(pattern string) any { return filepath.ToSlash(filepath.Join(dir, pattern)) }
+	include, _ := config["include"].([]any)
+	for _, want := range []string{"**/*.ts", ".gen/**/*.ts", ".gen/**/*.tsx", "test/.fixtures/**/*.ts"} {
+		if !slices.Contains(include, anchored(want)) {
+			t.Errorf("include %v lacks %s", include, anchored(want))
+		}
+	}
+	for _, unwanted := range []string{".storybook.ts", ".hidden/**/*.ts", ".empty/**/*.ts", ".putnami/**/*.ts", "test/.fixtures/deep/**/*.ts"} {
+		if slices.Contains(include, anchored(unwanted)) {
+			t.Errorf("include %v holds %s", include, anchored(unwanted))
+		}
+	}
+}
+
+func TestDeepestDotDirectory(t *testing.T) {
+	for dir, want := range map[string]string{
+		".":              "",
+		"src/a":          "",
+		".gen":           ".gen",
+		".gen/src":       ".gen",
+		"test/.fixtures": "test/.fixtures",
+		".gen/src/.x/y":  ".gen/src/.x",
+	} {
+		if got := deepestDotDirectory(dir); got != want {
+			t.Errorf("deepestDotDirectory(%q) = %q, want %q", dir, got, want)
+		}
+	}
+}
+
 func TestIsTypeCheckFile(t *testing.T) {
 	for name, want := range map[string]bool{
 		"a.ts": true, "a.tsx": true, "a.mts": true, "a.cts": true, "a.test.ts": true,

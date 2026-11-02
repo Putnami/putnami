@@ -80,11 +80,11 @@ If no test files are found, the command returns `SKIP` (exit 0) unless `--pass-w
 
 ## Type-check
 
-Bun strips types when it runs a test, and `build~types` reads only `src/`, `bin/` and `.gen/`. The `test~types` step is the one that type-checks the rest: it runs `tsc --noEmit` over every `.ts`, `.tsx`, `.mts` and `.cts` file of the project, tests, fixtures and benchmarks included. A type error, or a `@ts-expect-error` that no longer marks an error, fails `putnami test`.
+Bun strips types when it runs a test, and `build~types` reads only `src/`, `bin/` and `.gen/`. The `test~types` step is the one that type-checks the rest: it runs `tsc --noEmit` over every `.ts`, `.tsx`, `.mts` and `.cts` file of the project, tests, fixtures, benchmarks and dot-directories such as `.gen/` or `.storybook/` included. A dot-named file, such as the generated `.react-client.gen.tsx` the browser bundle reads, stays out, as in `build~types`. A type error, or a `@ts-expect-error` that no longer marks an error, fails `putnami test`.
 
 - It runs after `generate`, beside the test run, so a test that imports `.gen/` is checked against the current generated code.
 - It uses the tsconfig `build~types` resolves and the same compiler options, so a test is judged the way a source file is. It emits nothing.
-- It leaves out `node_modules`, `dist`, `.putnami`, `out`, `vendor`, and every nested project: a subdirectory with its own `putnami.json` is checked by its own `test`.
+- It leaves out `node_modules`, `dist`, `.putnami`, `out`, `vendor`, and every nested project: a subdirectory with its own `putnami.json` is checked by its own `test`. A change to a nested project's files still re-runs the parent's check, since the task's cache inputs cover the whole project tree.
 - It keeps `tsc`'s incremental build info in the extension's cache scratch, so a warm run re-checks only what changed. `putnami cache clean` removes it.
 - It caches like the test run: an unchanged project replays its verdict.
 

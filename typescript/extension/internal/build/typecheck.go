@@ -2,7 +2,10 @@ package build
 
 import (
 	"os"
+	"path"
 	"path/filepath"
+	"slices"
+	"strings"
 	"time"
 
 	"go.putnami.dev/sdk/extension/exec"
@@ -10,7 +13,11 @@ import (
 	"go.putnami.dev/typescript/extension/internal/project"
 )
 
-// typeCheckPatterns are the project files the test type-check reads.
+// typeCheckPatterns are the project files the test type-check reads. tsc's
+// wildcards never match a name that starts with a dot, so typeCheckScope adds
+// the dot-directories that hold one, such as .gen. A dot-named file stays
+// out, as in build~types: the generator hides the entries it writes for
+// another target, such as the browser client.
 var typeCheckPatterns = []string{"**/*.ts", "**/*.tsx", "**/*.mts", "**/*.cts"}
 
 // typeCheckSkippedDirectories are the directories the type-check leaves out:
@@ -35,13 +42,14 @@ type TypeCheckResult struct {
 // the scratch tsconfig and tsc's incremental build info, so a later run
 // re-checks only what changed.
 func RunTypeCheck(bunBin, projectPath, buildInfoDir string) (*TypeCheckResult, error) {
-	nested, found, err := typeCheckScope(projectPath)
+	scope, err := typeCheckScope(projectPath)
 	if err != nil {
 		return nil, err
 	}
-	if !found {
+	if !scope.found {
 		return &TypeCheckResult{Success: true}, nil
 	}
+	nested := scope.nested
 
 	exclude := make([]string, 0, 2*len(typeCheckSkippedDirectories)+len(nested))
 	for _, dir := range typeCheckSkippedDirectories {
@@ -49,7 +57,8 @@ func RunTypeCheck(bunBin, projectPath, buildInfoDir string) (*TypeCheckResult, e
 	}
 	exclude = append(exclude, nested...)
 	tsconfig := project.ResolveTsConfig(projectPath, filepath.Dir(projectPath))
-	scratch, err := writeScratchTsConfig(buildInfoDir, "tsconfig.typecheck.*.json", projectPath, tsconfig, typeCheckPatterns, exclude)
+	include := slices.Concat(typeCheckPatterns, scope.dotIncludes)
+	scratch, err := writeScratchTsConfig(buildInfoDir, "tsconfig.typecheck.*.json", projectPath, tsconfig, include, exclude)
 	if err != nil {
 		return nil, err
 	}
@@ -82,46 +91,78 @@ func RunTypeCheck(bunBin, projectPath, buildInfoDir string) (*TypeCheckResult, e
 	}, nil
 }
 
-// typeCheckScope walks the project and returns the project-relative paths of
-// its nested projects, and whether any TypeScript file lies outside them and
-// outside the skipped directories.
-func typeCheckScope(projectPath string) ([]string, bool, error) {
+// typeCheckScopeResult is what typeCheckScope finds in a project.
+type typeCheckScopeResult struct {
+	// nested holds the project-relative paths of the nested projects.
+	nested []string
+	// dotIncludes holds the include patterns that reach the checked files
+	// typeCheckPatterns miss: those under a dot-directory.
+	dotIncludes []string
+	// found reports whether any TypeScript file to check lies outside the
+	// nested projects and the skipped directories.
+	found bool
+}
+
+// typeCheckScope walks the project and returns its nested projects, the
+// patterns its dot-directories need, and whether it holds a file to check.
+func typeCheckScope(projectPath string) (typeCheckScopeResult, error) {
 	skipped := make(map[string]bool, len(typeCheckSkippedDirectories))
 	for _, dir := range typeCheckSkippedDirectories {
 		skipped[dir] = true
 	}
-	var nested []string
-	found := false
-	err := filepath.WalkDir(projectPath, func(path string, d os.DirEntry, err error) error {
+	var scope typeCheckScopeResult
+	dotDirs := map[string]bool{}
+	err := filepath.WalkDir(projectPath, func(file string, d os.DirEntry, err error) error {
 		if err != nil {
-			if path == projectPath {
+			if file == projectPath {
 				return err
 			}
 			return nil
 		}
+		if file == projectPath {
+			return nil
+		}
+		rel, err := filepath.Rel(projectPath, file)
+		if err != nil {
+			return err
+		}
+		rel = filepath.ToSlash(rel)
 		if d.IsDir() {
-			if path == projectPath {
-				return nil
-			}
 			if skipped[d.Name()] {
 				return filepath.SkipDir
 			}
-			if _, err := os.Stat(filepath.Join(path, "putnami.json")); err == nil {
-				rel, err := filepath.Rel(projectPath, path)
-				if err != nil {
-					return err
-				}
-				nested = append(nested, filepath.ToSlash(rel))
+			if _, err := os.Stat(filepath.Join(file, "putnami.json")); err == nil {
+				scope.nested = append(scope.nested, rel)
 				return filepath.SkipDir
 			}
 			return nil
 		}
-		if !found && isTypeCheckFile(d.Name()) {
-			found = true
+		if strings.HasPrefix(d.Name(), ".") || !isTypeCheckFile(d.Name()) {
+			return nil
+		}
+		scope.found = true
+		if dir := deepestDotDirectory(path.Dir(rel)); dir != "" && !dotDirs[dir] {
+			dotDirs[dir] = true
+			for _, pattern := range typeCheckPatterns {
+				scope.dotIncludes = append(scope.dotIncludes, dir+"/"+pattern)
+			}
 		}
 		return nil
 	})
-	return nested, found, err
+	return scope, err
+}
+
+// deepestDotDirectory returns the prefix of dir that ends with its last
+// dot-named segment, or "" when no segment starts with a dot. Below that
+// prefix, typeCheckPatterns match every file again.
+func deepestDotDirectory(dir string) string {
+	segments := strings.Split(dir, "/")
+	for i := len(segments) - 1; i >= 0; i-- {
+		if strings.HasPrefix(segments[i], ".") && segments[i] != "." {
+			return strings.Join(segments[:i+1], "/")
+		}
+	}
+	return ""
 }
 
 // isTypeCheckFile reports whether name is a TypeScript file tsc checks: any
