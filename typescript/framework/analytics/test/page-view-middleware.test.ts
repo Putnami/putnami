@@ -92,7 +92,7 @@ describe('pageViewMiddleware', () => {
       const response = await testApp?.fetch('/', { headers: { 'user-agent': CHROME_UA } });
       await flush();
 
-      expect(response.status).toBe(200);
+      expect(response?.status).toBe(200);
       expect(sink.rows).toHaveLength(1);
       const row = sink.rows[0];
       expect(row?.name).toBe('page_view');
@@ -121,7 +121,7 @@ describe('pageViewMiddleware', () => {
       const response = await testApp?.fetch('/', { headers: { 'user-agent': CHROME_UA } });
       await flush();
 
-      expect(response.headers.get('set-cookie')).toBeNull();
+      expect(response?.headers.get('set-cookie')).toBeNull();
       expect(sink.rows[0]?.visitorKind).toBe('daily');
     },
   );
@@ -156,11 +156,11 @@ describe('pageViewMiddleware', () => {
       const response = await testApp?.fetch('/', { headers: { 'user-agent': BOT_UA } });
       await flush();
 
-      expect(response.status).toBe(200);
+      expect(response?.status).toBe(200);
       expect(sink.rows).toHaveLength(0);
       expect(seenBootstrap).toBeUndefined();
       expect(seenScripts).toEqual([]);
-      expect(response.headers.get('set-cookie')).toBeNull();
+      expect(response?.headers.get('set-cookie')).toBeNull();
     },
   );
 
@@ -170,7 +170,7 @@ describe('pageViewMiddleware', () => {
     const response = await testApp?.fetch('/api/json', { headers: { 'user-agent': CHROME_UA } });
     await flush();
 
-    expect(response.status).toBe(200);
+    expect(response?.status).toBe(200);
     expect(sink.rows).toHaveLength(0);
   });
 
@@ -180,7 +180,7 @@ describe('pageViewMiddleware', () => {
     const response = await testApp?.fetch('/gone', { headers: { 'user-agent': CHROME_UA } });
     await flush();
 
-    expect(response.status).toBe(404);
+    expect(response?.status).toBe(404);
     expect(sink.rows).toHaveLength(0);
   });
 
@@ -242,7 +242,7 @@ describe('pageViewMiddleware', () => {
     const response = await testApp?.fetch('/signup', { method: 'POST', headers: { 'user-agent': CHROME_UA } });
     await flush();
 
-    expect(response.status).toBe(200);
+    expect(response?.status).toBe(200);
     expect(sink.named('form_submit')).toHaveLength(1);
     const row = sink.named('form_submit')[0];
     expect(row?.route).toBe('/signup');
@@ -284,7 +284,7 @@ describe('pageViewMiddleware in identified mode', () => {
     const response = await testApp?.fetch('/', { headers: { 'user-agent': CHROME_UA, 'Sec-GPC': '1' } });
     await flush();
 
-    expect(response.headers.get('set-cookie')).toBeNull();
+    expect(response?.headers.get('set-cookie')).toBeNull();
     expect(sink.rows[0]?.visitorKind).toBe('daily');
   });
 
@@ -294,7 +294,7 @@ describe('pageViewMiddleware in identified mode', () => {
     const response = await testApp?.fetch('/', { headers: { 'user-agent': CHROME_UA } });
     await flush();
 
-    const cookie = response.headers.get('set-cookie') ?? '';
+    const cookie = response?.headers.get('set-cookie') ?? '';
     expect(cookie).toContain('_pa=');
     expect(cookie).toContain('HttpOnly');
     expect(cookie).toContain('SameSite=Lax');
@@ -316,8 +316,8 @@ describe('pageViewMiddleware and the write queue', () => {
       //    empty when it arrives, so it renders, queues its row, and returns.
       const first = await testApp?.fetch('/', { headers: { 'user-agent': CHROME_UA } });
 
-      expect(first.status).toBe(200);
-      expect(await first.text()).toContain('home');
+      expect(first?.status).toBe(200);
+      expect(await first?.text()).toContain('home');
       expect(sink.batches).toHaveLength(0);
       expect(rt.queue.size()).toBe(1);
 
@@ -328,8 +328,8 @@ describe('pageViewMiddleware and the write queue', () => {
       const second = await testApp?.fetch('/', { headers: { 'user-agent': CHROME_UA } });
       const elapsed = Date.now() - startedAt;
 
-      expect(second.status).toBe(200);
-      expect(await second.text()).toContain('home');
+      expect(second?.status).toBe(200);
+      expect(await second?.text()).toContain('home');
       expect(elapsed).toBeLessThan(2000);
       // Returned before the sink settled, which is the invariant: a hung
       // database costs one request the cap, and no request more than that.
@@ -340,7 +340,7 @@ describe('pageViewMiddleware and the write queue', () => {
       //    returns while that same write is still pending.
       const third = await testApp?.fetch('/', { headers: { 'user-agent': CHROME_UA } });
 
-      expect(third.status).toBe(200);
+      expect(third?.status).toBe(200);
       expect(sink.pending()).toBe(1);
       expect(sink.batches).toHaveLength(1);
       sink.release();
@@ -361,7 +361,7 @@ describe('pageViewMiddleware and the write queue', () => {
     // The elected request paid for the batch, so the row is stored by the time
     // the page is returned. That is what makes a flush land at all on
     // request-based CPU: a flush nobody waits for has no CPU after the response.
-    expect(response.status).toBe(200);
+    expect(response?.status).toBe(200);
     expect(sink.rows).toHaveLength(1);
   });
 

@@ -75,7 +75,7 @@ describe('createPathCap', () => {
     const plan = planFold([older, current], [resultFor(older), resultFor(current)], new Set([older.day]));
     const paths = plan.counters.filter((counter) => counter.dimension === 'path');
 
-    expect(paths).toEqual([
+    expect<unknown>(paths).toEqual([
       { day: older.day, dimension: 'path', key: OVERFLOW_KEY, count: 1 },
       { day: current.day, dimension: 'path', key: current.path, count: 1 },
     ]);

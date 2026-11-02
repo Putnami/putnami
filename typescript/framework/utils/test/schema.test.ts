@@ -119,7 +119,7 @@ describe('schema utilities', () => {
     for (const entry of decorated) {
       expect(entry.baseType).toBe('object');
       expect(entry.schema).toBe(nested);
-      expect(entry.schema?.child).toBe(nested.child);
+      expect(entry.schema?.['child']).toBe(nested.child);
     }
 
     const composed = Sensitive(Optional(Env('NESTED_CONFIG', Desc('Nested settings', nested))));

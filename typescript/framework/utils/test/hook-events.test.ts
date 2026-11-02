@@ -131,7 +131,7 @@ describe('hook-events', () => {
 
     // A prototype-pollution attempt is just an object that fails the envelope check.
     expect(parseEvent('{"__proto__":{"polluted":true},"type":"log"}')).toBeNull();
-    expect(({} as Record<string, unknown>).polluted).toBeUndefined();
+    expect(({} as Record<string, unknown>)['polluted']).toBeUndefined();
   });
 });
 

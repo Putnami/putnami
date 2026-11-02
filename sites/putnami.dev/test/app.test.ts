@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { cpSync, mkdirSync, readFileSync } from 'node:fs';
 import { fileExists, getBuildInfo, joinPath } from '@putnami/utils';
-import { HttpPlugin, application, http, staticFiles } from '@putnami/application';
+import { type Application, HttpPlugin, application, http, staticFiles } from '@putnami/application';
 import { specTest } from '@putnami/spectest';
 import { ReactPlugin, react } from '@putnami/web';
 import { statusLabel, statusOf } from '../src/lib/support/catalog';

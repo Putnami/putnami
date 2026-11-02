@@ -10,7 +10,7 @@ const EXPECTED = ['xs', 'xs', 'sm', 'sm', 'md', 'md', 'lg', 'lg', 'xl', 'xl'];
 
 describe('viewportClassOf', () => {
   it('buckets the five documented widths', () => {
-    expect(WIDTHS.map(viewportClassOf)).toEqual(EXPECTED);
+    expect<unknown>(WIDTHS.map(viewportClassOf)).toEqual(EXPECTED);
   });
 
   it('only ever emits a protocol viewport class', () => {

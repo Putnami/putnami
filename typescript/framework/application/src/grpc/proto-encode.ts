@@ -80,7 +80,7 @@ export function encodeProto(
   allMessages?: Record<string, ProtoFieldMeta[]>,
   enumTypes?: ReadonlySet<string>,
   enumValues?: ProtoEnumValues,
-): Uint8Array {
+): Uint8Array<ArrayBuffer> {
   const wb = new WriteBuffer();
   encodeMessageInto(wb, data, fields, allMessages, enumTypes, enumValues);
   return wb.finish();

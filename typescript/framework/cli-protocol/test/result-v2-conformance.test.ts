@@ -145,7 +145,7 @@ describe('CLI result v2 conformance corpus', () => {
       if (testCase.expect === 'reject') {
         expect(expected.length).toBeGreaterThan(0);
         for (const violation of expected) {
-          expect(Object.values(VIOLATION_CODE)).toContain(violation.code);
+          expect<unknown>(Object.values(VIOLATION_CODE)).toContain(violation.code);
         }
       } else {
         expect(testCase.violations).toBeUndefined();

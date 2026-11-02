@@ -9,7 +9,10 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 /** Recursively merges a partial theme into a base theme. */
-export function deepMerge<T extends object>(target: T, source: Partial<T>): T {
+/** `Partial` at every depth: each nested object may also omit fields. */
+export type DeepPartial<T> = { [K in keyof T]?: T[K] extends object ? DeepPartial<T[K]> : T[K] };
+
+export function deepMerge<T extends object>(target: T, source: DeepPartial<T>): T {
   const result = { ...target } as T;
   for (const key in source) {
     const sourceValue = source[key as keyof T];

@@ -7,8 +7,10 @@ import { CompositeDocumentIdNotSupported, IndexMissing } from '../src/errors';
 import { Repository } from '../src/repository/repository';
 import { createFirestoreAdapter } from './firestore.fake';
 
-const firestoreAvailable = await import('@google-cloud/firestore').then(() => true).catch(() => false);
-const emulatorHost = process.env.FIRESTORE_EMULATOR_HOST;
+// A variable specifier: the optional peer dependency has no types when it is absent.
+const firestoreModule = '@google-cloud/firestore';
+const firestoreAvailable = await import(firestoreModule).then(() => true).catch(() => false);
+const emulatorHost = process.env['FIRESTORE_EMULATOR_HOST'];
 
 function configureFirestore(extra: Record<string, unknown> = {}) {
   resetConfigLoader();

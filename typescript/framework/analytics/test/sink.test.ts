@@ -348,7 +348,7 @@ describe('createSink', () => {
     const paths = (counters[1] ?? []).flatMap((dimension, index) =>
       dimension === 'path' ? [{ day: counters[0]?.[index], key: counters[2]?.[index] }] : [],
     );
-    expect(paths).toEqual([
+    expect<unknown>(paths).toEqual([
       { day: older.day, key: OVERFLOW_KEY },
       { day: first.day, key: first.path },
     ]);

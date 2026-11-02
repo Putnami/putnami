@@ -191,7 +191,7 @@ describe.skipIf(!CRON_RAW)('analytics pg_cron retention in a named schema (live)
         } as never,
       },
     });
-    schema = provisioned.binding.databases[CRON_DATASOURCE]?.schema ?? '';
+    schema = provisioned.binding.databases?.[CRON_DATASOURCE]?.schema ?? '';
   }, 60_000);
 
   afterAll(async () => {
@@ -227,7 +227,7 @@ describe.skipIf(!CRON_RAW)('analytics pg_cron retention in a named schema (live)
 
     // 003 returned to the login before scheduling, so the job runs as it.
     const jobs = await jobsNamed(jobName);
-    expect(jobs).toEqual([{ command: `SELECT "${schema}".analytics_expire()`, username: login }]);
+    expect<unknown>(jobs).toEqual([{ command: `SELECT "${schema}".analytics_expire()`, username: login }]);
 
     // What the background worker does at 00:15: the job's command, as the
     // login, from its default search path. A schema the login cannot use
@@ -247,7 +247,7 @@ describe.skipIf(!CRON_RAW)('analytics pg_cron retention in a named schema (live)
 
     // 003's down unschedules exactly this schema's job.
     await migrator.rollback();
-    expect(await jobsNamed(jobName)).toEqual([]);
+    expect<unknown>(await jobsNamed(jobName)).toEqual([]);
   }, 60_000);
 });
 

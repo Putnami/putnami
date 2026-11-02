@@ -1,0 +1,183 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-capabilities-v2.json",
+  "protocolVersion": 2,
+  "project": "@example/03-web",
+  "configDefinitions": [
+    {
+      "identity": {
+        "ownerProject": "@example/03-web",
+        "kind": "config",
+        "key": "analytics"
+      },
+      "path": "analytics",
+      "fields": [
+        {
+          "name": "enabled",
+          "type": "bool"
+        },
+        {
+          "name": "mode",
+          "type": "string"
+        },
+        {
+          "name": "datasource",
+          "type": "string"
+        },
+        {
+          "name": "schema",
+          "type": "string"
+        },
+        {
+          "name": "secret",
+          "type": "string",
+          "sensitive": true
+        },
+        {
+          "name": "serverPageViews",
+          "type": "bool"
+        },
+        {
+          "name": "respectGpc",
+          "type": "bool"
+        },
+        {
+          "name": "respectDnt",
+          "type": "bool"
+        },
+        {
+          "name": "countryHeader",
+          "type": "string"
+        },
+        {
+          "name": "trustedProxies",
+          "type": "array"
+        },
+        {
+          "name": "retentionRawDays",
+          "type": "int"
+        },
+        {
+          "name": "retentionAggregateDays",
+          "type": "int"
+        },
+        {
+          "name": "retentionMode",
+          "type": "string"
+        },
+        {
+          "name": "maxPathKeysPerDay",
+          "type": "int"
+        },
+        {
+          "name": "rateLimitPerMinute",
+          "type": "int"
+        },
+        {
+          "name": "flushIntervalMs",
+          "type": "int"
+        },
+        {
+          "name": "flushWaitMs",
+          "type": "int"
+        },
+        {
+          "name": "queueCapacity",
+          "type": "int"
+        },
+        {
+          "name": "flushBatch",
+          "type": "int"
+        },
+        {
+          "name": "flushDeadlineMs",
+          "type": "int"
+        },
+        {
+          "name": "cookieName",
+          "type": "string"
+        },
+        {
+          "name": "cookieMaxAgeDays",
+          "type": "int"
+        }
+      ],
+      "provenance": {
+        "project": "@example/03-web",
+        "package": "@example/03-web",
+        "sourceKind": "framework",
+        "declaration": {
+          "root": "project",
+          "path": "putnami.json"
+        }
+      }
+    }
+  ],
+  "schemas": [
+    {
+      "identity": {
+        "ownerProject": "@example/03-web",
+        "kind": "schema",
+        "subkind": "route",
+        "key": "react-loader"
+      },
+      "name": "react-loader",
+      "kind": "route",
+      "path": ".gen/src/app/.react-application.gen.tsx",
+      "provenance": {
+        "project": "@example/03-web",
+        "package": "@example/03-web",
+        "sourceKind": "generated",
+        "declaration": {
+          "root": "project",
+          "path": "putnami.json"
+        },
+        "artifacts": [
+          {
+            "root": "project",
+            "path": ".gen/src/app/.react-application.gen.tsx"
+          }
+        ]
+      }
+    }
+  ],
+  "discoverers": [
+    {
+      "identity": {
+        "ownerProject": "@example/03-web",
+        "kind": "discoverer",
+        "subkind": "config",
+        "key": "analytics"
+      },
+      "name": "analytics",
+      "kind": "config",
+      "provenance": {
+        "project": "@example/03-web",
+        "package": "@example/03-web",
+        "sourceKind": "framework",
+        "declaration": {
+          "root": "project",
+          "path": "putnami.json"
+        }
+      }
+    }
+  ],
+  "packages": [
+    {
+      "identity": {
+        "ownerProject": "@example/03-web",
+        "kind": "package",
+        "key": "@example/03-web"
+      },
+      "package": "@example/03-web",
+      "provenance": {
+        "project": "@example/03-web",
+        "package": "@example/03-web",
+        "sourceKind": "framework",
+        "declaration": {
+          "root": "project",
+          "path": "putnami.json"
+        }
+      }
+    }
+  ]
+}

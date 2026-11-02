@@ -65,7 +65,7 @@ describe('installTracker', () => {
       env: 'test',
       version: '1.2.3',
       declared: new Set(['signup_click']),
-    } as Parameters<typeof buildBootstrap>[0];
+    };
     // Structural pin: the browser copy of the type and the server's producer
     // are the same shape, so a field added on one side breaks the build.
     const server: ClientBootstrap = buildBootstrap(runtime, '0192f0c0-1234-7abc-8def-0123456789ab', '/docs/[slug]');

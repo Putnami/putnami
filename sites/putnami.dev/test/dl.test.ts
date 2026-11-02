@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
-import { ApiPlugin, application, HttpPlugin, http } from '@putnami/application';
+import { type Application, ApiPlugin, application, HttpPlugin, http } from '@putnami/application';
 import downloadResolver from '../src/api/dl/[artifact]/get';
 
 describe('putnami.dev download resolver', () => {
@@ -34,7 +34,7 @@ describe('putnami.dev download resolver', () => {
   afterAll(async () => {
     await app.stop();
     if (previousRegistryUrl === undefined) {
-      delete process.env.PUTNAMI_REGISTRY_URL;
+      Reflect.deleteProperty(process.env, 'PUTNAMI_REGISTRY_URL');
     } else {
       process.env['PUTNAMI_REGISTRY_URL'] = previousRegistryUrl;
     }

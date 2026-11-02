@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
-import { HttpPlugin, application, api, http } from '@putnami/application';
+import { type Application, HttpPlugin, application, api, http } from '@putnami/application';
 
 describe('storage sample', () => {
   let app: Application;

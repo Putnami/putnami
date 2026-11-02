@@ -41,7 +41,7 @@ describe('classifyReferrer', () => {
       // The corpus writes an absent referrer as the empty string; the folded
       // value is null, because the column is nullable.
       expect(info.referrer ?? '').toBe(fixture.expected.referrer);
-      expect(info.referrerType).toBe(fixture.expected.referrerType);
+      expect<unknown>(info.referrerType).toBe(fixture.expected.referrerType);
       expect(REFERRER_TYPES).toContain(info.referrerType);
     });
   }

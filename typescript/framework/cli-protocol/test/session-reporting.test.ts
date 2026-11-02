@@ -139,7 +139,7 @@ test('session reporter schema field sets and byte bounds', async () => {
   }
 });
 
-async function sha256(bytes: Uint8Array): Promise<string> {
+async function sha256(bytes: Uint8Array<ArrayBuffer>): Promise<string> {
   const digest = new Uint8Array(await crypto.subtle.digest('SHA-256', bytes));
   return Array.from(digest, (b) => b.toString(16).padStart(2, '0')).join('');
 }
@@ -183,7 +183,7 @@ test('plan.json and spec-verification.json chunks end at or before their bound, 
       const line = await frame(artifact, offset, size);
       let accepted = true;
       try {
-        expect((await parseSessionReportingChunk(line)).artifact).toBe(artifact);
+        expect<unknown>((await parseSessionReportingChunk(line)).artifact).toBe(artifact);
       } catch {
         accepted = false;
       }

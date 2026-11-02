@@ -70,7 +70,7 @@ describe('object.utils', () => {
     it('returns undefined for inherited (non-own) properties', () => {
       const proto = { inherited: 'nope' };
       const child = Object.create(proto) as Record<string, unknown>;
-      child.own = 'yes';
+      child['own'] = 'yes';
 
       expect(getDeep(child, 'own')).toBe('yes');
       expect(getDeep(child, 'inherited')).toBeUndefined();
@@ -158,8 +158,8 @@ describe('object.utils', () => {
     it('tolerates a nullish base object', () => {
       const overrides = { theme: { color: 'red' } };
 
-      expect(mergeDeep(undefined, overrides)).toEqual({ theme: { color: 'red' } });
-      expect(mergeDeep(null, overrides)).toEqual({ theme: { color: 'red' } });
+      expect<unknown>(mergeDeep(undefined, overrides)).toEqual({ theme: { color: 'red' } });
+      expect<unknown>(mergeDeep(null, overrides)).toEqual({ theme: { color: 'red' } });
       // The overriding value is still copied, not shared.
       expect(mergeDeep(undefined, overrides).theme).not.toBe(overrides.theme);
     });
@@ -224,11 +224,11 @@ describe('object.utils', () => {
     it('does not pollute Object.prototype via __proto__/constructor payloads', () => {
       const protoPayload = JSON.parse('{"__proto__":{"polluted":true}}');
       mergeDeep({}, protoPayload);
-      expect(({} as Record<string, unknown>).polluted).toBeUndefined();
+      expect(({} as Record<string, unknown>)['polluted']).toBeUndefined();
 
       const ctorPayload = JSON.parse('{"constructor":{"prototype":{"polluted":true}}}');
       const result = mergeDeep({ safe: 1 }, ctorPayload);
-      expect(({} as Record<string, unknown>).polluted).toBeUndefined();
+      expect(({} as Record<string, unknown>)['polluted']).toBeUndefined();
       // Dangerous keys are skipped; legitimate keys still merge.
       expect(result.safe).toBe(1);
     });
@@ -237,7 +237,7 @@ describe('object.utils', () => {
   describe('sortObjectKeys / sortKeys', () => {
     it('sorts object keys alphabetically', () => {
       const result = sortObjectKeys({ z: 1, a: 2, m: 3 });
-      const keys = Object.keys(result);
+      const keys = Object.keys(result ?? {});
       expect(keys).toEqual(['a', 'm', 'z']);
     });
 
@@ -254,12 +254,12 @@ describe('object.utils', () => {
   describe('omitUndefinedValues / omitUndefined', () => {
     it('removes undefined values', () => {
       const result = omitUndefinedValues({ a: 1, b: undefined, c: 3 });
-      expect(result).toEqual({ a: 1, c: 3 });
+      expect<unknown>(result).toEqual({ a: 1, c: 3 });
     });
 
     it('preserves null values', () => {
       const result = omitUndefinedValues({ a: null, b: undefined });
-      expect(result).toEqual({ a: null });
+      expect<unknown>(result).toEqual({ a: null });
     });
 
     it('preserves Date objects', () => {
@@ -273,14 +273,14 @@ describe('object.utils', () => {
         a: 1,
         nested: { b: undefined, c: 2 },
       });
-      expect(result).toEqual({ a: 1, nested: { c: 2 } });
+      expect<unknown>(result).toEqual({ a: 1, nested: { c: 2 } });
     });
 
     it('strips undefined from deeply nested plain objects', () => {
       const result = omitUndefinedValues({
         a: { b: { c: undefined, d: 1 } },
       });
-      expect(result).toEqual({ a: { b: { d: 1 } } });
+      expect<unknown>(result).toEqual({ a: { b: { d: 1 } } });
     });
 
     it('preserves functions unchanged (identity + typeof)', () => {

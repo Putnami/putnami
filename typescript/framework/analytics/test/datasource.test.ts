@@ -9,7 +9,7 @@ function setConfig(tree: Record<string, unknown>): void {
 
 afterEach(() => {
   delete process.env.CONFIG_DATA;
-  delete process.env.DATABASE_BINDINGS;
+  Reflect.deleteProperty(process.env, 'DATABASE_BINDINGS');
   resetConfigLoader();
 });
 
@@ -40,7 +40,7 @@ describe('resolveAnalyticsDatasource', () => {
 
   it('keeps the name when DATABASE_BINDINGS declares it', () => {
     setConfig({});
-    process.env.DATABASE_BINDINGS = JSON.stringify({
+    process.env['DATABASE_BINDINGS'] = JSON.stringify({
       protocolVersion: 1,
       databases: { analytics: { engine: 'postgres', schema: 'analytics', connection: { host: 'h', database: 'a' } } },
     });
@@ -56,7 +56,7 @@ describe('resolveAnalyticsDatasource', () => {
 
   it('falls back to default when DATABASE_BINDINGS is not valid JSON', () => {
     setConfig({});
-    process.env.DATABASE_BINDINGS = 'not-json';
+    process.env['DATABASE_BINDINGS'] = 'not-json';
 
     expect(resolveAnalyticsDatasource('analytics')).toBe('default');
   });

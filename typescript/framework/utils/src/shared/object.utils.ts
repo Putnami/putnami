@@ -87,6 +87,8 @@ export function getDeep(object: unknown, path: string | (string | number)[]): un
  * // { theme: { color: 'red', size: 'md' } }
  * ```
  */
+export function mergeDeep<B>(a: null | undefined, b: B): B;
+export function mergeDeep<A, B>(a: A, b: B): A & B;
 export function mergeDeep<A, B>(a: A, b: B): A & B {
   const isMergeableObject = (obj: unknown): obj is Record<string, unknown> => {
     if (!obj || typeof obj !== 'object' || Array.isArray(obj)) {

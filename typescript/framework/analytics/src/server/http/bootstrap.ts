@@ -38,7 +38,11 @@ export interface AnalyticsBootstrap {
  * @param route - The matched route pattern, or `__unmatched__`.
  * @returns The bootstrap payload.
  */
-export function buildBootstrap(rt: AnalyticsRuntime, pv: string, route: string): AnalyticsBootstrap {
+export function buildBootstrap(
+  rt: Pick<AnalyticsRuntime, 'endpoint' | 'app' | 'env' | 'version' | 'declared'>,
+  pv: string,
+  route: string,
+): AnalyticsBootstrap {
   return {
     pv,
     route,

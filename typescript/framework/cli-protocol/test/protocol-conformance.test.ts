@@ -57,11 +57,11 @@ describe('CLI result-envelope protocol conformance', () => {
   });
 
   it('status enum matches the schema', () => {
-    expect(Object.values(RESULT_STATUS).sort()).toEqual([...(schema.properties['status'].enum ?? [])].sort());
+    expect<unknown>(Object.values(RESULT_STATUS).sort()).toEqual([...(schema.properties['status'].enum ?? [])].sort());
   });
 
   it('error code enum matches the schema', () => {
-    expect(Object.values(RESULT_ERROR_CODE).sort()).toEqual(
+    expect<unknown>(Object.values(RESULT_ERROR_CODE).sort()).toEqual(
       [...(schema.$defs.resultError.properties['code'].enum ?? [])].sort(),
     );
   });

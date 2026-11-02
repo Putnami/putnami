@@ -1,5 +1,6 @@
 import {
   eventServerTransport,
+  type EventServerFetch,
   type EventServerRetryConfig,
   type EventServerTokenRequest,
   type EventServerTokenSource,
@@ -65,7 +66,7 @@ export interface EventServerCredentialCacheOptions {
 
 export interface GoogleEventServerTokenSourceOptions extends EventServerCredentialCacheOptions {
   /** Deterministic HTTP seam for tests. */
-  fetch?: typeof globalThis.fetch;
+  fetch?: EventServerFetch;
 }
 
 export interface EventServerDestinationOptions {
@@ -81,7 +82,7 @@ export interface EventServerDestinationOptions {
   metadata?: Pick<GoogleEventServerTokenSourceOptions, 'fetch'>;
   /** Framework HTTP/retry seams. They cannot override binding identity. */
   transport?: {
-    fetch?: typeof globalThis.fetch;
+    fetch?: EventServerFetch;
     random?: () => number;
     sleep?: (delayMs: number, signal: AbortSignal) => Promise<void>;
     requestTimeoutMs?: number;

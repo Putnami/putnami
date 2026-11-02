@@ -84,9 +84,9 @@ describe('bootstrapServe', () => {
       expect(exitCode).toBe(1);
       expect(lines).toHaveLength(1);
       const entry = JSON.parse(lines[0]) as Record<string, unknown>;
-      expect(entry.severity).toBe('ERROR');
-      expect(entry.message).toContain('startup failed: config-server returned non-200: status 404');
-      expect(entry.error).toMatchObject({
+      expect(entry['severity']).toBe('ERROR');
+      expect(entry['message']).toContain('startup failed: config-server returned non-200: status 404');
+      expect(entry['error']).toMatchObject({
         name: 'RemoteConfigError',
         message: 'config-server returned non-200: status 404',
         url: 'https://config.putnami.test/api/configs/resolve',
@@ -101,7 +101,7 @@ describe('bootstrapServe', () => {
           message: 'status 404',
         },
       });
-      expect((entry.error as { stack?: unknown }).stack).toEqual(expect.any(String));
+      expect((entry['error'] as { stack?: unknown }).stack).toEqual(expect.any(String));
     },
   );
 });

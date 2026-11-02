@@ -39,7 +39,7 @@ export const textDecoder = new TextDecoder();
 const INITIAL_CAPACITY = 256;
 
 export class WriteBuffer {
-  buf: Uint8Array;
+  buf: Uint8Array<ArrayBuffer>;
   pos = 0;
   private dv: DataView;
 
@@ -145,7 +145,7 @@ export class WriteBuffer {
   }
 
   /** Return a trimmed copy of the written bytes. */
-  finish(): Uint8Array {
+  finish(): Uint8Array<ArrayBuffer> {
     return this.buf.slice(0, this.pos);
   }
 }
