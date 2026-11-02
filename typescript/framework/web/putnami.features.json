@@ -487,7 +487,8 @@
             "kind": "acceptance",
             "checks": [
               "the-switcher-links-each-locale-with-hreflang-lang-and-endonym",
-              "the-current-locale-carries-aria-current"
+              "the-current-locale-carries-aria-current",
+              "each-switcher-link-carries-its-locale-choice"
             ]
           }
         },
