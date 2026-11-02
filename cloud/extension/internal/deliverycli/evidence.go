@@ -163,13 +163,15 @@ func EvidenceReport(params map[string]any, env map[string]string, ioctx clicore.
 		// self-reported trees, or on a commit another provenance already
 		// recorded. The evidence still matters: open the run without it, under
 		// the same submission id.
-		ioctx.Stderr("warning: cloud evidence-report sends no operational: " + err.Error())
-		if leftOut == nil {
-			leftOut = map[string]string{}
-		}
-		leftOut["operational"] = err.Error()
+		refusal := err.Error()
 		run.Operational = nil
-		resp, _, err = openEvidenceRun(ioctx, controlURL, token, run)
+		if resp, _, err = openEvidenceRun(ioctx, controlURL, token, run); err == nil {
+			ioctx.Stderr("warning: cloud evidence-report sends no operational: " + refusal)
+			if leftOut == nil {
+				leftOut = map[string]string{}
+			}
+			leftOut["operational"] = refusal
+		}
 	}
 	if err != nil {
 		return err
@@ -314,8 +316,8 @@ func openEvidenceRun(ioctx clicore.IO, controlURL, token string, run evidenceSub
 }
 
 // evidenceTested reads, with Git in dir, the tree the job tested and the merge
-// base of the document's base and commit. It returns nil when it knows
-// neither, and the reason of each member it leaves out, keyed by its name.
+// base of the document's base and commit. It returns nil when it reads no
+// tested tree, and the reason of each member it leaves out, keyed by its name.
 func evidenceTested(doc *evidence.Document, env map[string]string, dir string) (*evidenceOperational, map[string]string) {
 	where := "the working directory"
 	if dir != "" {

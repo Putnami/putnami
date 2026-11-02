@@ -2,6 +2,7 @@ package deliverycli
 
 import (
 	"encoding/json"
+	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -228,7 +229,7 @@ func TestEvidenceReportLeavesOutWhatAShallowCloneCannotCompute(t *testing.T) {
 }
 
 func TestEvidenceReportOpensTheRunWithoutOperationalWhenDeliveryRefusesIt(t *testing.T) {
-	spectest.Proves(t, evidenceFeature, "sends-the-tested-tree", "a-shallow-clone-leaves-out-what-it-cannot-compute")
+	spectest.Proves(t, evidenceFeature, "sends-the-tested-tree", "a-refused-operational-opens-the-run-without-it")
 	h := newEvidenceHistory(t)
 	fake := &evidenceFakeServer{refuseOperational: true}
 	env := evidenceJobEnv(h.dir, "CI_MERGE_REQUEST_EVENT_TYPE", "detached", "CI_COMMIT_SHA", h.head)
@@ -248,6 +249,23 @@ func TestEvidenceReportOpensTheRunWithoutOperationalWhenDeliveryRefusesIt(t *tes
 	}
 	if !strings.Contains(stdout, `"operational_left_out"`) || strings.Contains(stdout, `"operational": {`) {
 		t.Fatalf("stdout = %q, want operational reported as left out", stdout)
+	}
+}
+
+func TestEvidenceReportBlamesNoOperationalForAnotherRefusal(t *testing.T) {
+	spectest.Proves(t, evidenceFeature, "refuses-what-it-cannot-upload", "a-refused-call-names-the-route-and-the-reason")
+	h := newEvidenceHistory(t)
+	fake := &evidenceFakeServer{refuseRun: http.StatusBadRequest}
+	env := evidenceJobEnv(h.dir, "CI_MERGE_REQUEST_EVENT_TYPE", "detached", "CI_COMMIT_SHA", h.head)
+	_, stderr, err := runEvidenceReportLogged(t, fake, env, "--file", evidenceDocAt(t, "symfony-merge-request.json", h.head, h.fork))
+	if err == nil || !strings.Contains(err.Error(), "changeRequest.host is invalid") {
+		t.Fatalf("err = %v, want the server's reason", err)
+	}
+	if strings.Contains(stderr, "sends no operational") {
+		t.Fatalf("stderr = %q blames operational for another refusal", stderr)
+	}
+	if got := fake.paths(); len(got) != 2 {
+		t.Fatalf("requests = %v, want the run and the run again without operational, and no batch", got)
 	}
 }
 
