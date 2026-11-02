@@ -123,15 +123,16 @@ locales/
       sidebar.json
 ```
 
-Each file maps a key to its entry:
+Each file names its schema and maps a key to its entry:
 
 ```json
 {
+  "$schema": "https://putnami.dev/schemas/i18n/catalog.json",
   "title": {
     "text": "Tarifs",
-    "source": "6c09ec564736f285",
+    "source": "Pricing",
     "state": "validated",
-    "validatedBy": "ada",
+    "validatedBy": "Ada Lovelace <ada@example.com>",
     "validatedAt": "2026-11-01"
   }
 }
@@ -140,17 +141,17 @@ Each file maps a key to its entry:
 | Field | Meaning |
 |-------|---------|
 | `text` | The translation. |
-| `source` | A hash of the default text the translation was written from. |
+| `source` | The default text the translation was written from. |
 | `state` | `missing`, `draft`, `validated` or `stale`. |
-| `validatedBy`, `validatedAt` | Who validated the translation, and when. |
+| `validatedBy`, `validatedAt` | Who validated the translation, from their git identity, and the day. |
+
+The schema is published at its `$schema` URL, so an editor or a translation tool checks a file without Putnami.
 
 `putnami i18n sync` keeps the catalogs in step with the code:
 
 - a new message gets an entry in state `missing`;
 - a deleted message loses its entry, and a deleted namespace loses its file;
-- a message whose default text changed has its translation marked `stale`. The text stays, so the translator sees what to revise.
-
-An agent drafts a translation by filling `text` and setting `state` to `draft`. A person validates it by setting `state` to `validated` with `validatedBy` and `validatedAt`. To accept a stale translation, revise `text`, set `state`, and delete `source`; the next sync records the current default text.
+- a message whose default text changed has its translation marked `stale`. The text and its old `source` stay, so the translator sees what changed.
 
 The build reads the catalogs and writes none of them:
 
@@ -162,6 +163,29 @@ The build reads the catalogs and writes none of them:
 | A stale translation | Warns, and serves the stale text | Warns |
 
 A locale is published only when its catalog is complete.
+
+## Translate and validate
+
+An agent drafts translations; a person locks the ones they checked.
+
+1. `putnami i18n translate --projects /my-site` writes `.putnami/i18n/translate.json` in the project: each missing and stale entry with `text: null`, its default text, a stale entry's old default text and translation, the namespace's other translations, and the glossary terms it contains.
+2. An agent fills each `text`. The web extension installs the `i18n-translate` skill, which tells it how: keep the arguments and tags, follow the glossary, reuse the words of the other translations.
+3. `putnami i18n translate --apply --projects /my-site` writes the answers as `draft` entries and deletes the work file. It writes nothing when one answer is refused: an answer for a validated entry, invalid ICU, other arguments or tags than the default text, or a default text that changed since the work file was written.
+4. `putnami i18n validate --projects /my-site --locale fr` shows a person each draft and stale translation next to its default text. Each one they accept becomes `validated`, with their git `user.name` and `user.email` and the day. Validating a stale translation records the current default text as its `source`.
+
+`validate` refuses without an interactive terminal, inside an agent session, or without a git identity. No Putnami command calls a model: the agent of your session translates. When a build reports missing or stale translations, it names `putnami i18n translate`, and the contributor workflow runs it before committing.
+
+A glossary per locale, `locales/<locale>.glossary.json`, keeps terms consistent:
+
+```json
+{
+  "$schema": "https://putnami.dev/schemas/i18n/glossary.json",
+  "Putnami": { "translation": null, "note": "The product name." },
+  "repository": { "translation": "dépôt" }
+}
+```
+
+A term with `translation: null` stays as written.
 
 ## Fallback
 

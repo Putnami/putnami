@@ -288,9 +288,11 @@ t.terms({ link: (chunks) => <Link to='/terms'>{chunks}</Link> });
 - Run `putnami i18n sync` after adding, changing or removing a message. It
   writes one file per namespace, `locales/<locale>/<namespace>.json`, and
   deletes the file of a removed namespace; the build never writes them.
-- To translate, fill `text` and set `state: "draft"`. Never change an entry
-  whose `state` is `validated`: a person locked it. Revise a `stale` entry
-  from its kept text, set `state: "draft"`, and delete `source`.
+- To translate, run `putnami i18n translate --projects <project>`, fill
+  each `text: null` of `<project>/.putnami/i18n/translate.json` (the
+  `i18n-translate` skill says how), then run it again with `--apply`: it
+  writes drafts. Never edit catalog entries by hand, never write
+  `validated`: a person runs `putnami i18n validate`.
 - `putnami build` fails on a missing translation, invalid ICU syntax, or a
   translation whose arguments or tags differ from its default text. Serve and
   test show the default text for a missing one, with a warning.
