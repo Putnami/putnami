@@ -1,0 +1,507 @@
+The turbo demo: its base, the files its change rewrites, and the reports its CI wrote.
+-- base/package.json --
+{
+  "name": "demo-observe-turbo",
+  "private": true,
+  "packageManager": "pnpm@10.26.1",
+  "scripts": {
+    "build": "turbo run build",
+    "test": "turbo run test"
+  },
+  "devDependencies": {
+    "turbo": "^2.5.0",
+    "typescript": "^5.6.0",
+    "vitest": "^3.2.0",
+    "@vitest/coverage-v8": "^3.2.0"
+  }
+}
+-- base/pnpm-workspace.yaml --
+packages:
+  - apps/*
+  - packages/*
+onlyBuiltDependencies:
+  - esbuild
+-- base/pnpm-lock.yaml --
+lockfileVersion: '9.0'
+
+settings:
+  autoInstallPeers: true
+  excludeLinksFromLockfile: false
+
+importers:
+
+  .:
+    devDependencies:
+      '@vitest/coverage-v8':
+        specifier: ^3.2.0
+        version: 3.2.7(vitest@3.2.7(@types/node@22.20.5))
+      turbo:
+        specifier: ^2.5.0
+        version: 2.11.10
+      typescript:
+        specifier: ^5.6.0
+        version: 5.9.3
+      vitest:
+        specifier: ^3.2.0
+        version: 3.2.7(@types/node@22.20.5)
+
+  apps/api:
+    dependencies:
+      '@demo/pricing':
+        specifier: workspace:*
+        version: link:../../packages/pricing
+    devDependencies:
+      '@types/node':
+        specifier: ^22.20.5
+        version: 22.20.5
+
+  packages/pricing:
+    dependencies:
+      zod:
+        specifier: 3.23.8
+        version: 3.23.8
+
+packages:
+
+  '@vitest/coverage-v8@3.2.7':
+    resolution: {integrity: sha512-NEGWJS2XNu2PfRLQwOO3CTKj1tTETxNBdk454vDxVBhxJYhPaA/eS0nAI0c+1El1P7a60z8+i+ZrQoGESweGKg==}
+    peerDependencies:
+      '@vitest/browser': 3.2.7
+      vitest: 3.2.7
+    peerDependenciesMeta:
+      '@vitest/browser':
+        optional: true
+
+  vitest@3.2.7:
+    resolution: {integrity: sha512-KrxIJ62Fd89gfysR4WotlgZABiz2dqFPgqGzX7s+CwsqLFomRH7777ZcrOD6+WVAh7khPQP41A+BKbpcJFrdEg==}
+    engines: {node: ^18.0.0 || ^20.0.0 || >=22.0.0}
+    hasBin: true
+    peerDependencies:
+      '@edge-runtime/vm': '*'
+      '@types/debug': ^4.1.12
+      '@types/node': ^18.0.0 || ^20.0.0 || >=22.0.0
+      '@vitest/browser': 3.2.7
+      '@vitest/ui': 3.2.7
+      happy-dom: '*'
+      jsdom: '*'
+    peerDependenciesMeta:
+      '@edge-runtime/vm':
+        optional: true
+      '@types/debug':
+        optional: true
+      '@types/node':
+        optional: true
+      '@vitest/browser':
+        optional: true
+      '@vitest/ui':
+        optional: true
+      happy-dom:
+        optional: true
+      jsdom:
+        optional: true
+
+  zod@3.23.8:
+    resolution: {integrity: sha512-XBx9AXhXktjUqnepgTiE5flcKIYWi/rme0Eaj+5Y0lftuGBq+jyRu/md4WnuxqgP1ubdpNCsYEYPxrzVHD8d6g==}
+-- base/turbo.json --
+{
+  "$schema": "https://turborepo.com/schema.json",
+  "tasks": {
+    "build": {
+      "dependsOn": ["^build"],
+      "outputs": ["dist/**"]
+    },
+    "test": {
+      "dependsOn": ["^build"],
+      "outputs": ["reports/**"]
+    }
+  }
+}
+-- base/packages/pricing/package.json --
+{
+  "name": "@demo/pricing",
+  "version": "1.0.0",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "zod": "3.23.8"
+  }
+}
+-- base/packages/pricing/src/index.ts --
+import { z } from 'zod';
+
+export const lineSchema = z.object({
+  sku: z.string().min(1),
+  unitCents: z.number().int().nonnegative(),
+  quantity: z.number().int().nonnegative(),
+});
+
+export type Line = z.infer<typeof lineSchema>;
+
+/** Sum of the lines, before tax, in cents. Throws on an invalid line. */
+export function subtotal(lines: unknown[]): number {
+  return lines
+    .map((line) => lineSchema.parse(line))
+    .reduce((total, line) => total + line.unitCents * line.quantity, 0);
+}
+
+/** Adds a tax rate in basis points, rounded half up. */
+export function withTax(cents: number, basisPoints: number): number {
+  return cents + Math.floor((cents * basisPoints + 5000) / 10000);
+}
+-- base/packages/pricing/src/index.test.ts --
+import { describe, expect, it } from 'vitest';
+import { subtotal, withTax } from './index.js';
+
+describe('subtotal', () => {
+  it('sums the lines', () => {
+    expect(
+      subtotal([
+        { sku: 'a', unitCents: 250, quantity: 2 },
+        { sku: 'b', unitCents: 100, quantity: 1 },
+      ]),
+    ).toBe(600);
+  });
+
+  it('rejects a negative price', () => {
+    expect(() => subtotal([{ sku: 'a', unitCents: -1, quantity: 1 }])).toThrow();
+  });
+});
+
+describe('withTax', () => {
+  it('adds 20 %', () => {
+    expect(withTax(1000, 2000)).toBe(1200);
+  });
+});
+-- base/apps/api/package.json --
+{
+  "name": "@demo/api",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "main": "dist/server.js",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "vitest run",
+    "start": "node dist/server.js"
+  },
+  "dependencies": {
+    "@demo/pricing": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.5"
+  }
+}
+-- base/apps/api/src/quote.ts --
+import { randomUUID } from 'node:crypto';
+import { subtotal, withTax } from '@demo/pricing';
+
+/** Tax rate applied to every quote: 20 %. */
+const TAX_BASIS_POINTS = 2000;
+
+export interface Quote {
+  id: string;
+  totalCents: number;
+}
+
+export type QuoteResult = { ok: true; quote: Quote } | { ok: false; error: string };
+
+export function quote(body: unknown): QuoteResult {
+  if (typeof body !== 'object' || body === null || !Array.isArray((body as { lines?: unknown }).lines)) {
+    return { ok: false, error: 'lines must be an array' };
+  }
+  try {
+    const cents = subtotal((body as { lines: unknown[] }).lines);
+    return { ok: true, quote: { id: randomUUID(), totalCents: withTax(cents, TAX_BASIS_POINTS) } };
+  } catch {
+    return { ok: false, error: 'invalid line' };
+  }
+}
+-- base/apps/api/src/quote.test.ts --
+import { describe, expect, it } from 'vitest';
+import { quote } from './quote.js';
+
+describe('quote', () => {
+  it('prices the lines with tax', () => {
+    const result = quote({ lines: [{ sku: 'a', unitCents: 500, quantity: 2 }] });
+    expect(result.ok && result.quote.totalCents).toBe(1200);
+  });
+
+  it('rejects a body without lines', () => {
+    expect(quote({})).toEqual({ ok: false, error: 'lines must be an array' });
+  });
+
+  it('rejects an invalid line', () => {
+    expect(quote({ lines: [{ sku: '', unitCents: 1, quantity: 1 }] })).toEqual({ ok: false, error: 'invalid line' });
+  });
+});
+-- head/pnpm-lock.yaml --
+lockfileVersion: '9.0'
+
+settings:
+  autoInstallPeers: true
+  excludeLinksFromLockfile: false
+
+importers:
+
+  .:
+    devDependencies:
+      '@vitest/coverage-v8':
+        specifier: ^3.2.0
+        version: 3.2.7(vitest@3.2.7(@types/node@22.20.5))
+      turbo:
+        specifier: ^2.5.0
+        version: 2.11.10
+      typescript:
+        specifier: ^5.6.0
+        version: 5.9.3
+      vitest:
+        specifier: ^3.2.0
+        version: 3.2.7(@types/node@22.20.5)
+
+  apps/api:
+    dependencies:
+      '@demo/pricing':
+        specifier: workspace:*
+        version: link:../../packages/pricing
+    devDependencies:
+      '@types/node':
+        specifier: ^22.20.5
+        version: 22.20.5
+
+  packages/pricing:
+    dependencies:
+      zod:
+        specifier: 3.24.1
+        version: 3.24.1
+
+packages:
+
+  '@vitest/coverage-v8@3.2.7':
+    resolution: {integrity: sha512-NEGWJS2XNu2PfRLQwOO3CTKj1tTETxNBdk454vDxVBhxJYhPaA/eS0nAI0c+1El1P7a60z8+i+ZrQoGESweGKg==}
+    peerDependencies:
+      '@vitest/browser': 3.2.7
+      vitest: 3.2.7
+    peerDependenciesMeta:
+      '@vitest/browser':
+        optional: true
+
+  vitest@3.2.7:
+    resolution: {integrity: sha512-KrxIJ62Fd89gfysR4WotlgZABiz2dqFPgqGzX7s+CwsqLFomRH7777ZcrOD6+WVAh7khPQP41A+BKbpcJFrdEg==}
+    engines: {node: ^18.0.0 || ^20.0.0 || >=22.0.0}
+    hasBin: true
+    peerDependencies:
+      '@edge-runtime/vm': '*'
+      '@types/debug': ^4.1.12
+      '@types/node': ^18.0.0 || ^20.0.0 || >=22.0.0
+      '@vitest/browser': 3.2.7
+      '@vitest/ui': 3.2.7
+      happy-dom: '*'
+      jsdom: '*'
+    peerDependenciesMeta:
+      '@edge-runtime/vm':
+        optional: true
+      '@types/debug':
+        optional: true
+      '@types/node':
+        optional: true
+      '@vitest/browser':
+        optional: true
+      '@vitest/ui':
+        optional: true
+      happy-dom:
+        optional: true
+      jsdom:
+        optional: true
+
+  zod@3.24.1:
+    resolution: {integrity: sha512-muH7gBL9sI1nciMZV67X5fTKKBLtwpZ5VBp1vsOQzj1MhrBZ4wlVCm3gedKZWLp0Oyel8sIGfeiz54Su+OVT+A==}
+-- head/packages/pricing/package.json --
+{
+  "name": "@demo/pricing",
+  "version": "1.0.0",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "zod": "3.24.1"
+  }
+}
+-- head/packages/pricing/src/index.ts --
+import { z } from 'zod';
+
+export const lineSchema = z.object({
+  sku: z.string().min(1),
+  unitCents: z.number().int().nonnegative(),
+  quantity: z.number().int().nonnegative(),
+});
+
+export type Line = z.infer<typeof lineSchema>;
+
+/** Sum of the lines, before tax, in cents. Throws on an invalid line. */
+export function subtotal(lines: unknown[]): number {
+  return lines
+    .map((line) => lineSchema.parse(line))
+    .reduce((total, line) => total + line.unitCents * line.quantity, 0);
+}
+
+/** Adds a tax rate in basis points, rounded half up. */
+export function withTax(cents: number, basisPoints: number): number {
+  return cents + Math.floor((cents * basisPoints + 5000) / 10000);
+}
+
+/** Removes a percentage in basis points, rounded in favor of the customer. */
+export function discount(cents: number, basisPoints: number): number {
+  if (basisPoints <= 0) return cents;
+  if (basisPoints >= 10000) return 0;
+  return cents - Math.floor((cents * basisPoints + 4999) / 10000);
+}
+-- head/packages/pricing/src/index.test.ts --
+import { describe, expect, it } from 'vitest';
+import { discount, subtotal, withTax } from './index.js';
+
+describe('subtotal', () => {
+  it('sums the lines', () => {
+    expect(
+      subtotal([
+        { sku: 'a', unitCents: 250, quantity: 2 },
+        { sku: 'b', unitCents: 100, quantity: 1 },
+      ]),
+    ).toBe(600);
+  });
+
+  it('rejects a negative price', () => {
+    expect(() => subtotal([{ sku: 'a', unitCents: -1, quantity: 1 }])).toThrow();
+  });
+});
+
+describe('withTax', () => {
+  it('adds 20 %', () => {
+    expect(withTax(1000, 2000)).toBe(1200);
+  });
+});
+
+describe('discount', () => {
+  it('removes 10 %', () => {
+    expect(discount(1000, 1000)).toBe(900);
+  });
+
+  it('keeps the amount without a rate', () => {
+    expect(discount(1000, 0)).toBe(1000);
+  });
+
+  it('never goes below zero', () => {
+    expect(discount(1000, 12000)).toBe(0);
+  });
+});
+-- ci/packages/pricing/reports/junit.xml --
+<?xml version="1.0" encoding="UTF-8" ?>
+<testsuites name="vitest tests" tests="6" failures="0" errors="0" time="0.0090897">
+    <testsuite name="src/index.test.ts" timestamp="2026-11-01T18:13:52.411Z" hostname="runnervm48cm3" tests="6" failures="0" errors="0" skipped="0" time="0.0090897">
+        <testcase classname="src/index.test.ts" name="subtotal &gt; sums the lines" time="0.003677752">
+        </testcase>
+        <testcase classname="src/index.test.ts" name="subtotal &gt; rejects a negative price" time="0.002189189">
+        </testcase>
+        <testcase classname="src/index.test.ts" name="withTax &gt; adds 20 %" time="0.000215028">
+        </testcase>
+        <testcase classname="src/index.test.ts" name="discount &gt; removes 10 %" time="0.000199054">
+        </testcase>
+        <testcase classname="src/index.test.ts" name="discount &gt; keeps the amount without a rate" time="0.000159135">
+        </testcase>
+        <testcase classname="src/index.test.ts" name="discount &gt; never goes below zero" time="0.000136872">
+        </testcase>
+    </testsuite>
+</testsuites>
+-- ci/packages/pricing/reports/coverage/lcov.info --
+TN:
+SF:src/index.ts
+FN:12,subtotal
+FN:19,withTax
+FN:24,discount
+FNF:3
+FNH:3
+FNDA:2,subtotal
+FNDA:1,withTax
+FNDA:3,discount
+DA:1,1
+DA:3,1
+DA:4,1
+DA:5,1
+DA:6,1
+DA:7,1
+DA:12,1
+DA:13,2
+DA:14,2
+DA:15,2
+DA:16,2
+DA:19,1
+DA:20,1
+DA:21,1
+DA:24,1
+DA:25,3
+DA:26,3
+DA:27,1
+DA:28,1
+LF:19
+LH:19
+BRDA:12,0,0,2
+BRDA:14,1,0,3
+BRDA:15,2,0,2
+BRDA:19,3,0,1
+BRDA:24,4,0,3
+BRDA:25,5,0,1
+BRDA:25,6,0,2
+BRDA:26,7,0,1
+BRF:8
+BRH:8
+end_of_record
+-- ci/apps/api/reports/junit.xml --
+<?xml version="1.0" encoding="UTF-8" ?>
+<testsuites name="vitest tests" tests="3" failures="0" errors="0" time="0.008524799">
+    <testsuite name="src/quote.test.ts" timestamp="2026-11-01T18:13:52.336Z" hostname="runnervm48cm3" tests="3" failures="0" errors="0" skipped="0" time="0.008524799">
+        <testcase classname="src/quote.test.ts" name="quote &gt; prices the lines with tax" time="0.005105013">
+        </testcase>
+        <testcase classname="src/quote.test.ts" name="quote &gt; rejects a body without lines" time="0.000815286">
+        </testcase>
+        <testcase classname="src/quote.test.ts" name="quote &gt; rejects an invalid line" time="0.000776709">
+        </testcase>
+    </testsuite>
+</testsuites>
+-- ci/apps/api/reports/coverage/lcov.info --
+TN:
+SF:src/quote.ts
+FN:14,quote
+FNF:1
+FNH:1
+FNDA:3,quote
+DA:1,1
+DA:2,1
+DA:5,1
+DA:14,1
+DA:15,3
+DA:16,1
+DA:17,1
+DA:18,2
+DA:19,2
+DA:20,2
+DA:21,3
+DA:22,1
+DA:23,1
+DA:24,3
+LF:14
+LH:14
+BRDA:14,0,0,3
+BRDA:15,1,0,1
+BRDA:17,2,0,2
+BRDA:21,3,0,1
+BRF:4
+BRH:4
+end_of_record

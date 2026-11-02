@@ -3,6 +3,7 @@ module go.putnami.dev/tooling/observe
 go 1.25.7
 
 require (
+	go.putnami.dev/evidence/readers v0.0.0
 	go.putnami.dev/protocol/diagnostic v0.0.0
 	go.putnami.dev/protocol/evidence v0.0.0
 	go.putnami.dev/protocol/extension v0.0.0
@@ -20,6 +21,7 @@ require (
 )
 
 replace (
+	go.putnami.dev/evidence/readers => ../evidence-readers
 	go.putnami.dev/protocol/architecture => ../../protocols/architecture
 	go.putnami.dev/protocol/capabilities => ../../protocols/capabilities
 	go.putnami.dev/protocol/cli => ../../protocols/cli

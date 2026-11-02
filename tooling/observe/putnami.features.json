@@ -235,6 +235,85 @@
       ]
     },
     {
+      "id": "tooling/observe-analyses",
+      "type": "feature",
+      "name": "Explain what a change touches in a repository that keeps its own CI",
+      "outcome": "putnami observe tells the CI log, and the evidence document, which components a change touched and which depend on them, the tests and coverage of each one, the coverage of the changed lines and the dependency versions the change moved, from the detectors, the git diff, the reports and the lockfiles, without running a build",
+      "owner": "tooling",
+      "target": "modeled",
+      "requirements": [
+        {
+          "id": "components",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-detectors-combine-by-precedence",
+              "changed-files-give-changed-and-dependent-components",
+              "a-repository-without-detected-components-is-one-component"
+            ]
+          }
+        },
+        {
+          "id": "tests-and-coverage",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-test-goes-to-the-component-of-its-file-else-of-its-report",
+              "coverage-goes-to-the-component-of-each-file"
+            ]
+          }
+        },
+        {
+          "id": "changed-line-coverage",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "changed-lines-are-measured-against-line-coverage"
+            ]
+          }
+        },
+        {
+          "id": "dependency-changes",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "each-lockfile-format-gives-its-package-changes"
+            ]
+          }
+        },
+        {
+          "id": "summary",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-summary-shows-the-analyses",
+              "the-demo-evidence-documents-validate"
+            ]
+          }
+        }
+      ]
+    },
+    {
       "id": "tooling/observe-node-workspaces",
       "type": "feature",
       "name": "Detect the packages of a Node workspace",
