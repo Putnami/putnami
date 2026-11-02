@@ -303,6 +303,9 @@ t.terms({ link: (chunks) => <Link to='/terms'>{chunks}</Link> });
   each with `?locale=<tag>`: the server records the choice in the
   `putnami-locale` cookie and redirects to the URL without it.
   `useLocale()` gives the locale and `localize(path, locale?)`.
+- `i18n.paths` (`{"fr": {"/privacy": "/confidentialite"}}`) serves a page at
+  its translated path; the untranslated one redirects with 308. Code keeps
+  writing `/privacy`. The build writes `/sitemap.xml` with the alternates.
 - Only `/` negotiates the locale (cookie `putnami-locale`, then
   `Accept-Language`). The framework writes `<html lang dir>`, the canonical
   link, hreflang alternates with `x-default`, and `og:locale`.

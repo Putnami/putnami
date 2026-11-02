@@ -14,6 +14,8 @@ export interface LocaleSettings {
   readonly siteUrl: string;
   /** Route patterns served in the default locale only (`/docs/**`). */
   readonly exclude: readonly string[];
+  /** Translated paths by locale, then by route: `{ fr: { '/privacy': '/confidentialite' } }`. */
+  readonly paths: Readonly<Record<string, Readonly<Record<string, string>>>>;
 }
 
 /** The cookie that records a reader's explicit locale choice. */
@@ -59,7 +61,7 @@ export function parseLocaleSettings(raw: unknown): LocaleSettings {
     throw new LocaleSettingsError('i18n must be an object');
   }
   const block = raw as Record<string, unknown>;
-  const known = new Set(['locales', 'defaultLocale', 'siteUrl', 'exclude']);
+  const known = new Set(['locales', 'defaultLocale', 'siteUrl', 'exclude', 'paths']);
   for (const key of Object.keys(block)) {
     if (!known.has(key)) throw new LocaleSettingsError(`unknown key i18n.${key}`);
   }
@@ -98,12 +100,67 @@ export function parseLocaleSettings(raw: unknown): LocaleSettings {
     throw new LocaleSettingsError('i18n.exclude must list route patterns that start with /');
   }
 
-  return {
+  const settings: LocaleSettings = {
     locales: [defaultLocale, ...locales.filter((l) => l !== defaultLocale)],
     defaultLocale,
     siteUrl: siteUrl.toString().replace(/\/$/, ''),
     exclude: [...(excludeRaw as string[])].sort(),
+    paths: {},
   };
+  return { ...settings, paths: parseTranslatedPaths(settings, block['paths'] ?? {}) };
+}
+
+/** Whether a path matches more than one URL: `/blog/:slug`, `/docs/*`, `/blog/[slug]`. */
+function hasParameters(path: string): boolean {
+  return /[:*[]/.test(path);
+}
+
+/**
+ * Validate `i18n.paths`: per non-default locale, a map from a localized route
+ * without parameters to its path in that locale. A translated path names no
+ * locale and is unique in its locale. Whether each route exists, and whether a
+ * translated path collides with another route, is checked against the routes
+ * at generation.
+ */
+function parseTranslatedPaths(settings: LocaleSettings, raw: unknown): LocaleSettings['paths'] {
+  if (raw === null || typeof raw !== 'object' || Array.isArray(raw)) {
+    throw new LocaleSettingsError('i18n.paths must map a locale to its translated paths');
+  }
+  const paths: Record<string, Record<string, string>> = {};
+  for (const [locale, entries] of Object.entries(raw as Record<string, unknown>)) {
+    const where = `i18n.paths.${locale}`;
+    if (!settings.locales.includes(locale) || locale === settings.defaultLocale) {
+      throw new LocaleSettingsError(`${where}: '${locale}' is not a published locale other than the default`);
+    }
+    if (entries === null || typeof entries !== 'object' || Array.isArray(entries)) {
+      throw new LocaleSettingsError(`${where} must map a route to its path in ${locale}`);
+    }
+    const translated: Record<string, string> = {};
+    const used = new Map<string, string>();
+    for (const [route, path] of Object.entries(entries as Record<string, unknown>)) {
+      if (typeof path !== 'string' || !route.startsWith('/') || !path.startsWith('/')) {
+        throw new LocaleSettingsError(`${where} must map a route that starts with / to a path that starts with /`);
+      }
+      const from = normalizePath(route);
+      const to = normalizePath(path);
+      if (from === '/' || to === '/') throw new LocaleSettingsError(`${where}: the locale's home is not translated`);
+      if (hasParameters(from) || hasParameters(to)) {
+        throw new LocaleSettingsError(`${where}['${route}']: a route with parameters is not translated`);
+      }
+      if (settings.locales.includes(to.split('/')[1] ?? '')) {
+        throw new LocaleSettingsError(`${where}['${route}']: '${to}' names a locale`);
+      }
+      if (!isLocalizedPath(settings, from) || !isLocalizedPath(settings, to)) {
+        throw new LocaleSettingsError(`${where}['${route}']: '${from}' and '${to}' must both be localized`);
+      }
+      const other = used.get(to);
+      if (other) throw new LocaleSettingsError(`${where}: '${other}' and '${from}' both translate to '${to}'`);
+      used.set(to, from);
+      if (to !== from) translated[from] = to;
+    }
+    if (Object.keys(translated).length > 0) paths[locale] = translated;
+  }
+  return paths;
 }
 
 /** `''` for the default locale, `/<locale>` otherwise. */
@@ -132,8 +189,11 @@ export function splitLocalePath(settings: LocaleSettings, pathname: string): Loc
   const segment = path.split('/')[1] ?? '';
   const locale = settings.locales.find((l) => l !== settings.defaultLocale && l === segment);
   if (!locale) return { locale: settings.defaultLocale, path };
-  const rest = path.slice(segment.length + 1);
-  return { locale, path: rest === '' ? '/' : rest };
+  const rest = path.slice(segment.length + 1) || '/';
+  // A translated path reads as the route it translates.
+  const translations = settings.paths[locale] ?? {};
+  const route = Object.keys(translations).find((r) => translations[r] === rest);
+  return { locale, path: route ?? rest };
 }
 
 function patternToRegExp(pattern: string): RegExp {
@@ -173,13 +233,19 @@ export function isLocalizedPath(settings: LocaleSettings, path: string): boolean
   });
 }
 
-/** The path of a locale-free path in a given locale. */
+/** A locale-free path as a locale names it, without the locale prefix: `/privacy` reads `/confidentialite` in French. */
+export function translatePath(settings: LocaleSettings, path: string, locale: string): string {
+  const target = normalizePath(path);
+  return settings.paths[locale]?.[target] ?? target;
+}
+
+/** The path of a locale-free path in a given locale, translated when the locale translates it. */
 export function localizePath(settings: LocaleSettings, path: string, locale: string): string {
   const target = normalizePath(path);
   if (!isLocalizedPath(settings, target)) return target;
   const prefix = localePrefix(settings, locale);
   if (!prefix) return target;
-  return target === '/' ? prefix : `${prefix}${target}`;
+  return target === '/' ? prefix : `${prefix}${translatePath(settings, target, locale)}`;
 }
 
 /** The absolute URL of a locale-free path in a given locale. */

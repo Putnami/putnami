@@ -78,3 +78,15 @@ export function excludedRouteRedirect(prefix: string): RouteHandler {
     return new HttpResponse('', { status: 308, headers: { location: `${path}${url.search}` } });
   };
 }
+
+/**
+ * Send a reader from a path its locale translates, `/fr/privacy`, to the
+ * translated one, `/fr/confidentialite`, with the query. 308 keeps the method
+ * and tells caches and crawlers the move is permanent.
+ */
+export function movedTo(path: string): RouteHandler {
+  return (ctx) => {
+    const url = new URL(ctx.req.url);
+    return new HttpResponse('', { status: 308, headers: { location: `${path}${url.search}` } });
+  };
+}

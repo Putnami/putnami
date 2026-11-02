@@ -3,6 +3,7 @@ import { hydrateRoot } from 'react-dom/client';
 import { createBrowserRouter, matchRoutes, type RouteObject, RouterProvider, type RouterState } from 'react-router';
 import { I18nProvider } from '../../shared/i18n/messages';
 import { readI18nPayload } from '../../shared/i18n/payload';
+import { localeRoutes } from '../../shared/i18n/route-aliases';
 import { ANONYMOUS_SECURITY_CONTEXT, type ClientSecurityContext } from '../../shared/security.types';
 import { SecurityContextProvider, setSecurityContext } from '../security/security-context';
 import { followFragmentSteps } from './fragment-steps';
@@ -61,8 +62,13 @@ function scheduleServerContentGuard(check: () => void): void {
   }
 }
 
-export async function hydratePage(containerId: string, routes: RouteObject[]) {
+export async function hydratePage(containerId: string, generatedRoutes: RouteObject[]) {
   const basename = window.__basename;
+  // A localized page carries its locale and catalog; the tree must read the
+  // same text and match the same translated paths the server rendered, or
+  // hydration mismatches.
+  const i18nState = readI18nPayload(document);
+  const routes = i18nState ? localeRoutes(generatedRoutes, i18nState.settings, i18nState.locale) : generatedRoutes;
 
   // Read security context injected by SSR (roles, scopes, authenticated status).
   // Falls back to anonymous if no context was serialized.
@@ -148,9 +154,6 @@ export async function hydratePage(containerId: string, routes: RouteObject[]) {
   const routerElement = React.createElement(RouterProvider, { router });
 
   const securedElement = React.createElement(SecurityContextProvider, { value: securityContext }, routerElement);
-  // A localized page carries its locale and catalog; the tree must read the
-  // same text the server rendered, or hydration mismatches.
-  const i18nState = readI18nPayload(document);
   const elem = i18nState ? React.createElement(I18nProvider, { value: i18nState }, securedElement) : securedElement;
 
   // Container-level safety net that does NOT depend on which internal React path

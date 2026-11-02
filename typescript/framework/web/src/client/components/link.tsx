@@ -6,7 +6,7 @@ import {
   useInRouterContext,
   useLocation,
 } from 'react-router';
-import { isLocalizedPath, localizePath, splitLocalePath } from '../../shared/i18n/locale';
+import { isLocalizedPath, localizePath, splitLocalePath, translatePath } from '../../shared/i18n/locale';
 import { I18nContext, type I18nState } from '../../shared/i18n/messages';
 import { type PrefetchBehavior, usePrefetch } from '../hooks/use-prefetch.hook';
 
@@ -49,6 +49,9 @@ const RoutedLink = React.forwardRef<HTMLAnchorElement, LinkProps>(({ to, prefetc
     // The router would put the current locale prefix in front of it; that page does not exist.
     return <PlainLink {...props} ref={ref} to={href} />;
   }
+
+  // The router adds the locale prefix; the path is the one the locale names.
+  if (i18n && !isPlaceholder) to = translatedTo(i18n, to);
 
   const mustPreload = prefetch === 'intent' && !to.toString().startsWith('http');
 
@@ -140,6 +143,18 @@ function leavesLocale(i18n: I18nState | undefined, href: string): boolean {
   if (!i18n || !parts) return false;
   if (namesLocale(i18n, parts.path)) return true;
   return i18n.locale !== i18n.settings.defaultLocale && !isLocalizedPath(i18n.settings, parts.path);
+}
+
+/** A router `to` with its site-absolute path as the current locale names it: `/privacy` reads `/confidentialite` in French. */
+function translatedTo(i18n: I18nState, to: LinkProps['to']): LinkProps['to'] {
+  if (typeof to !== 'string') {
+    return to.pathname?.startsWith('/')
+      ? { ...to, pathname: translatePath(i18n.settings, to.pathname, i18n.locale) }
+      : to;
+  }
+  const parts = splitHref(to);
+  if (!parts || !isLocalizedPath(i18n.settings, parts.path)) return to;
+  return `${translatePath(i18n.settings, parts.path, i18n.locale)}${parts.rest}`;
 }
 
 /** The href of a site-absolute path in the current locale; a path that names a locale stays as written. */

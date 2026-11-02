@@ -21,6 +21,7 @@ import { escapeHtml } from '../client/document/tag.utils';
 import { SsrDocumentHelper } from '../client/document/document-ssr.helper';
 import { CsrfTokenContext } from '../shared/csrf-context';
 import { I18nProvider, type I18nState } from '../shared/i18n/messages';
+import { localeRoutes } from '../shared/i18n/route-aliases';
 import { generateCspNonce } from './csp';
 import {
   applyLocaleHead,
@@ -76,7 +77,8 @@ export const pageRenderer =
       : undefined;
     const resolvedBasename = i18nState ? localeBasename(i18nState, moduleBase) : moduleBase;
     const staticOpts = resolvedBasename ? { basename: resolvedBasename } : undefined;
-    const reactStaticHandler = createStaticHandler(routes(), staticOpts);
+    const tree = i18nState ? localeRoutes(routes(), i18nState.settings, i18nState.locale) : routes();
+    const reactStaticHandler = createStaticHandler(tree, staticOpts);
     const reactStaticContext = await reactStaticHandler.query(req);
     reportLoaderErrors(reactStaticContext, reqContext, logger);
 

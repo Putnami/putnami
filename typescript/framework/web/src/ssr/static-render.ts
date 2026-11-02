@@ -11,6 +11,7 @@ import { IslandModeContext } from '../client/island/island';
 import { ISLAND_TAG } from '../client/island/island-types';
 import { CsrfTokenContext } from '../shared/csrf-context';
 import { I18nProvider } from '../shared/i18n/messages';
+import { localeRoutes } from '../shared/i18n/route-aliases';
 import {
   applyLocaleHead,
   createI18nState,
@@ -162,7 +163,8 @@ export async function renderStaticDocument(options: StaticRenderOptions): Promis
   const i18nState = options.i18n ? createI18nState(options.i18n, pathname, true) : undefined;
   const basename = i18nState ? localeBasename(i18nState, options.basename) : options.basename;
 
-  const staticHandler = createStaticHandler(routes, basename ? { basename } : undefined);
+  const localeTree = i18nState ? localeRoutes(routes, i18nState.settings, i18nState.locale) : routes;
+  const staticHandler = createStaticHandler(localeTree, basename ? { basename } : undefined);
   const url = new URL(pathname, 'http://localhost');
   const request = new Request(url.toString(), { method: 'GET' });
 

@@ -86,7 +86,7 @@
     },
     {
       "id": "translated-paths",
-      "text": "The i18n.paths block maps a route to its path in a non-default locale: the page is served at the translated path under that locale, its untranslated path under that locale redirects with 308 to the translated one with the query, and links, alternates, the switcher and the sitemap use the translated path; a translated path that names a locale, collides with another route or leaves the localized set fails generation."
+      "text": "The i18n.paths block maps a route to its path in a non-default locale: the page is served at the translated path under that locale, its untranslated path under that locale redirects with 308 to the translated one with the query, and links, alternates, the switcher and the sitemap use the translated path; a translated route with parameters, and a translated path that names a locale, is another page's path, leaves the localized set or leaves the layout of its page, fails generation."
     },
     {
       "id": "locale-domains",

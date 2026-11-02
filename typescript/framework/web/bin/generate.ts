@@ -59,6 +59,8 @@ import {
   type I18nBuild,
   localizeRows,
   resolveI18nBuild,
+  translatedPathErrors,
+  translatedRedirectRows,
 } from '../src/ssr/i18n/build';
 import { buildSitemap, SITEMAP_FILE } from '../src/ssr/i18n/sitemap';
 import type { ReactApplication } from '../src/ssr/react-application';
@@ -148,6 +150,7 @@ async function runGenerate(_options: unknown, context: HookContext): Promise<Hoo
   const manifestRoutes = new Map<string, ManifestRow>();
   const manifestIslands: ManifestIsland[] = [];
   const httpPageRoutes: WebPageRouteFact[] = [];
+  const layoutRoutes: string[] = [];
 
   emitProgress('Scanning for React components', 10, 'scan');
 
@@ -167,6 +170,7 @@ async function runGenerate(_options: unknown, context: HookContext): Promise<Hoo
 
     for (const f of new Glob('**/layout.tsx').scanSync(root.scanPath)) {
       layouts.push(joinPath(root.relativePath, f));
+      layoutRoutes.push(applyRoutePrefix(asRoute(f), root.routePrefix));
       appGenerator.addLayout(f, options);
       clientGenerator.addLayout(f, options);
       const loaderPath = joinPath(root.scanPath, getDirectoryName(f), 'layout.loader.ts');
@@ -237,6 +241,17 @@ async function runGenerate(_options: unknown, context: HookContext): Promise<Hoo
     'info',
     `Found ${layouts.length} layouts, ${pages.length} pages, ${errors.length} errors, ${notFounds.length} not-founds`,
   );
+
+  if (i18n) {
+    const pathErrors = translatedPathErrors(
+      i18n.settings,
+      httpPageRoutes.map((page) => page.route),
+      layoutRoutes,
+    );
+    if (pathErrors.length > 0) {
+      throw new Error(`${pathErrors.length} translated path error(s):\n${pathErrors.join('\n')}`);
+    }
+  }
 
   if (pages.length === 0 && layouts.length === 0) {
     emitLog('info', 'No React components found, skipping generation');
@@ -362,6 +377,7 @@ async function runGenerate(_options: unknown, context: HookContext): Promise<Hoo
     ...buildWebPageHttpRoutes([
       ...localizeRows(i18n?.settings, httpPageRoutes),
       ...excludedRedirectRows(i18n?.settings, httpPageRoutes),
+      ...translatedRedirectRows(i18n?.settings, httpPageRoutes),
     ]),
     ...(i18n ? buildWebSitemapHttpRoutes(config.publicFolder) : []),
     ...buildWebAssetHttpRoutes(

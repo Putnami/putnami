@@ -29,6 +29,7 @@ Declare the locales in the project's `putnami.json`:
 | `defaultLocale` | The locale served without a prefix. It must be listed in `locales`. |
 | `siteUrl` | The absolute origin the alternate links are built from. |
 | `exclude` | Route patterns served in the default locale only. `/docs/**` covers `/docs` and everything below it; `*` matches one segment. |
+| `paths` | Translated paths, per locale: `{"fr": {"/privacy": "/confidentialite"}}`. See [Translated paths](#translated-paths). |
 
 Declare the text of a component in a `*.messages.ts` file under `src/`:
 
@@ -218,6 +219,25 @@ Use `<Link>` for pages and a plain `<a>` for files such as `/LICENSE.md`: a link
 
 `useLocale()` returns the current locale, its direction and a `localize(path, locale?)` helper for the cases a `Link` does not cover.
 
+## Translated paths
+
+`i18n.paths` gives a page its own path in a locale:
+
+```json
+"paths": { "fr": { "/privacy": "/confidentialite" } }
+```
+
+The French page is served at `/fr/confidentialite`. `/fr/privacy` redirects with `308` to it, with the query. `<Link to="/privacy">`, the alternate links, the switcher and the sitemap all use the translated path. Keep writing `/privacy` in your code: the framework translates it.
+
+A person writes this block, not an agent: a translated path is a public URL, and changing it breaks every link to it.
+
+Generation fails when a translated path:
+
+- translates a route with parameters (`/blog/:slug`), or the locale's home;
+- names a locale (`/fr/x`), or is the path of another page;
+- leaves the localized set (`/docs/x` when `/docs/**` is excluded);
+- leaves the layout of its page: `/blog/post` can become `/blog/billet`, not `/billet`, because the page renders inside the `/blog` layout.
+
 ## Locale switcher
 
 ```tsx
@@ -250,6 +270,8 @@ On every localized page, the framework writes:
 
 A page outside the localized set gets its canonical link only. A page with `<Meta name='robots' content='noindex' />`, such as a not-found page, gets none of these links.
 
+The build writes `/sitemap.xml`: one URL per page without parameters and per pre-rendered path, in each locale the page is served in, each with the same alternates as its page. A route with parameters and no pre-rendered path is left out. Point `robots.txt` to it with `Sitemap: https://example.com/sitemap.xml`.
+
 ## What the browser receives
 
 | Page | Catalog shipped |
@@ -264,5 +286,5 @@ The payload is a `<script type="application/json">` data block, which a strict C
 ## Limits
 
 - An application served below the site root (a module path such as `/app`) cannot be localized yet.
-- Paths are not translated: `/fr/pricing`, not `/fr/tarifs`.
+- A route with parameters keeps its path in every locale, and a translated path stays under the layout of its page.
 - One domain serves every locale.

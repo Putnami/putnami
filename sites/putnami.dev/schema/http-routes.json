@@ -2510,6 +2510,21 @@
     },
     {
       "match": "exact",
+      "path": "/fr/confidentialite",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "publicEdge": true,
+      "provenance": {
+        "project": "putnami.dev",
+        "package": "@putnami/web",
+        "sourceKind": "file-route",
+        "evidencePath": "src/app/privacy/page.tsx"
+      }
+    },
+    {
+      "match": "exact",
       "path": "/fr/docs",
       "methods": [
         "GET",
@@ -5021,5 +5036,5 @@
       }
     }
   ],
-  "digest": "sha256:771b1e03535846824b1cbe0b521975728022cc4ccd5a4ac4a10177f6ba7035c4"
+  "digest": "sha256:5bc2bd635b531733432c09c22b2fcb9dc63e48a291af6d3d80d1b6ca2458ba61"
 }

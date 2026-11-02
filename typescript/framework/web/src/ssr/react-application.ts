@@ -10,12 +10,12 @@ import { useConfig } from '@putnami/runtime';
 import { joinPath } from '@putnami/utils';
 import React, { type ReactNode } from 'react';
 import type { RouteObject } from 'react-router';
-import { isLocalizedPath, localePrefix, localizePath, parseLocaleSettings } from '../shared/i18n/locale';
+import { isLocalizedPath, localePrefix, localizePath, parseLocaleSettings, translatePath } from '../shared/i18n/locale';
 import type { LocaleMessages } from '../shared/i18n/messages';
 import { createPageElement } from '../shared/page-element';
 import { RouteTreeHelper } from '../shared/route-tree.utils';
 import type { I18nRuntimeOptions } from './i18n/runtime';
-import { excludedRouteRedirect, negotiatingEntry, recordingChoice } from './i18n/negotiation';
+import { excludedRouteRedirect, movedTo, negotiatingEntry, recordingChoice } from './i18n/negotiation';
 import { SITEMAP_FILE, sitemapHandler } from './i18n/sitemap';
 import type {
   ErrorModule,
@@ -209,6 +209,19 @@ export class ReactApplication {
     return i18n.settings.locales.map((locale) => localePrefix(i18n.settings, locale));
   }
 
+  /**
+   * The locales a page is registered under: each one's prefix and the route as
+   * that locale names it, translated when `i18n.paths` translates it.
+   */
+  private localizedPages(route: string): { prefix: string; route: string }[] {
+    const i18n = this._i18n;
+    if (!i18n || !isLocalizedPath(i18n.settings, route)) return [{ prefix: '', route }];
+    return i18n.settings.locales.map((locale) => ({
+      prefix: localePrefix(i18n.settings, locale),
+      route: translatePath(i18n.settings, route, locale),
+    }));
+  }
+
   /** The locale prefixes under which an excluded route redirects to its one URL. */
   private excludedPrefixes(route: string): string[] {
     const i18n = this._i18n;
@@ -375,9 +388,10 @@ export class ReactApplication {
    */
   reactPage(route: string, options: ReactPageOptions) {
     const pageNode = ensurePageNode(this.routeHelper, route);
-    // Each HTTP registration below repeats once per locale prefix; the React
-    // route tree stays single, and the request's prefix becomes its basename.
-    const prefixes = this.localePrefixes(route);
+    // Each HTTP registration below repeats once per locale, at the route as the
+    // locale names it; the request's prefix becomes the router basename, and
+    // a translated path matches its locale's alias in the route tree.
+    const pages = this.localizedPages(route);
     const staticMeta = options.static;
     const notFoundMiddleware = options.notFoundMiddleware;
 
@@ -425,7 +439,7 @@ export class ReactApplication {
       // The lazy renderer resolves and applies its own middleware on first
       // request, so it is registered directly. Skipped for static routes (below).
       if (!staticMeta) {
-        for (const prefix of prefixes) {
+        for (const { prefix, route: localeRoute } of pages) {
           const lazyRenderer = createLazyPageRenderer(
             this.renderContext(),
             this.cache,
@@ -433,9 +447,9 @@ export class ReactApplication {
             route,
             lazyPage,
             notFoundMiddleware,
-            `${prefix}${route}`,
+            `${prefix}${localeRoute}`,
           );
-          this.registerPageGet(localizedHttpRoute(prefix, route), lazyRenderer, statusCode);
+          this.registerPageGet(localizedHttpRoute(prefix, localeRoute), lazyRenderer, statusCode);
         }
       }
     } else {
@@ -449,10 +463,10 @@ export class ReactApplication {
       if (pageElement) {
         pageNode.element = pageElement;
         if (!staticMeta) {
-          for (const prefix of prefixes) {
-            const renderer = createPageRenderer(this.renderContext(), `${prefix}${route}`, pageDef?.cache);
+          for (const { prefix, route: localeRoute } of pages) {
+            const renderer = createPageRenderer(this.renderContext(), `${prefix}${localeRoute}`, pageDef?.cache);
             this.registerPageGet(
-              localizedHttpRoute(prefix, route),
+              localizedHttpRoute(prefix, localeRoute),
               applyMiddlewareSource(renderer, pageMiddleware),
               statusCode,
             );
@@ -467,8 +481,16 @@ export class ReactApplication {
 
     // Static routes (SSG/ISR) serve pre-rendered, zero-JS HTML from the build
     // output instead of rendering per request.
-    for (const prefix of prefixes) {
-      const httpRoute = localizedHttpRoute(prefix, route);
+    for (const { prefix, route: localeRoute } of pages) {
+      // The path a locale translates answers its untranslated one with a 308.
+      if (localeRoute !== route) {
+        this.httpPlugin.get(
+          localizedHttpRoute(prefix, route),
+          movedTo(localizedHttpRoute(prefix, localeRoute)),
+          this.routeOptions(),
+        );
+      }
+      const httpRoute = localizedHttpRoute(prefix, localeRoute);
       if (staticMeta) {
         this.registerPageGet(httpRoute, this.statics.buildStaticServe(route, staticMeta), statusCode);
       }
