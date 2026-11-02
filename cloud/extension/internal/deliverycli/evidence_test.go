@@ -25,6 +25,8 @@ type evidenceFakeServer struct {
 	requests      []reportCapturedRequest
 	refuseRun     int
 	refuseReports int
+	// alreadyStored answers every kind as already stored when it is true.
+	alreadyStored bool
 }
 
 func (s *evidenceFakeServer) RoundTrip(req *http.Request) (*http.Response, error) {
@@ -52,7 +54,11 @@ func (s *evidenceFakeServer) RoundTrip(req *http.Request) (*http.Response, error
 				stored = append(stored, kind)
 			}
 		}
-		return reportJSONResponse(http.StatusOK, map[string]any{"runId": "run-1", "subjectId": "subject-1", "stored": stored}), nil
+		answer := "stored"
+		if s.alreadyStored {
+			answer = "idempotent"
+		}
+		return reportJSONResponse(http.StatusOK, map[string]any{"runId": "run-1", "subjectId": "subject-1", answer: stored}), nil
 	}
 	return reportJSONResponse(http.StatusNotFound, map[string]any{"error": "not found"}), nil
 }
@@ -135,8 +141,10 @@ func TestEvidenceReportOpensAGHARunForAPullRequest(t *testing.T) {
 	if run["conclusion"] != "failure" {
 		t.Fatalf("conclusion = %v, want failure: a test of packages/ui failed", run["conclusion"])
 	}
-	if run["submissionId"] != "observe-gha-812345678-9876543210-1-27719033811" {
-		t.Fatalf("submissionId = %v, want the run, attempt and job of the CI", run["submissionId"])
+	id, _ := run["submissionId"].(string)
+	leg, ok := strings.CutPrefix(id, "observe-gha-812345678-9876543210-1-27719033811-")
+	if !ok || len(leg) != 12 {
+		t.Fatalf("submissionId = %v, want the run, attempt and job of the CI and the leg's digest", run["submissionId"])
 	}
 	ref, _ := run["changeRequest"].(map[string]any)
 	if ref["provider"] != "github" || ref["host"] != "github.com" || ref["number"] != float64(42) {
@@ -295,5 +303,47 @@ func TestEvidenceReportNamesTheRouteAndTheReasonOfARefusal(t *testing.T) {
 	}
 	if !strings.Contains(stdout, "run run-1") || strings.Contains(err.Error(), evidenceTestToken) {
 		t.Fatalf("stdout = %q, err = %v: want the opened run and no token", stdout, err)
+	}
+}
+
+func TestEvidenceReportOpensOneRunPerMatrixLeg(t *testing.T) {
+	spectest.Proves(t, evidenceFeature, "opens-the-external-run", "a-github-pull-request-opens-a-gha-run")
+	doc := map[string]any{}
+	data, err := os.ReadFile(evidenceFixture("turbo-pull-request.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := json.Unmarshal(data, &doc); err != nil {
+		t.Fatal(err)
+	}
+	submission := func(doc map[string]any) string {
+		t.Helper()
+		fake := &evidenceFakeServer{}
+		if _, err := runEvidenceReport(t, fake, evidenceEnv(), "--file", writeEvidenceDoc(t, doc)); err != nil {
+			t.Fatalf("evidence-report: %v", err)
+		}
+		id, _ := fake.requests[0].Body["submissionId"].(string)
+		return id
+	}
+	first := submission(doc)
+	doc["generatedAt"] = "2026-11-03T09:00:00Z"
+	if again := submission(doc); again != first {
+		t.Fatalf("the same leg uploaded again opens %s, want %s", again, first)
+	}
+	delete(doc, "tests")
+	if other := submission(doc); other == first {
+		t.Fatalf("another leg of the matrix shares the submission id %s", first)
+	}
+}
+
+func TestEvidenceReportSaysWhatWasAlreadyStored(t *testing.T) {
+	spectest.Proves(t, evidenceFeature, "posts-the-reports-in-two-batches", "tests-and-coverage-then-the-evidence-members")
+	fake := &evidenceFakeServer{alreadyStored: true}
+	stdout, err := runEvidenceReport(t, fake, evidenceEnv(), "--file", evidenceFixture("turbo-pull-request.json"))
+	if err != nil {
+		t.Fatalf("evidence-report: %v", err)
+	}
+	if !strings.Contains(stdout, "stored no report; already stored tests, coverage, components") {
+		t.Fatalf("stdout = %q, want the kinds that were already stored apart", stdout)
 	}
 }

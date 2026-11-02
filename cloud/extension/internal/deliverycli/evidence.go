@@ -13,6 +13,8 @@ package deliverycli
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -132,8 +134,7 @@ func EvidenceReport(params map[string]any, env map[string]string, ioctx clicore.
 		return err
 	}
 
-	var stored []string
-	var failures []string
+	var stored, already, failures []string
 	for _, batch := range evidenceBatches(doc, run.SubmissionID) {
 		answer, err := postReport(ioctx, controlURL, recordsReportsIngestPath, token, batch,
 			func(callCtx context.Context, api *deliveryapiclient.DeliveryClient, raw []byte) (*deliveryapiclient.ReportBatchResponse, error) {
@@ -148,28 +149,32 @@ func EvidenceReport(params map[string]any, env map[string]string, ioctx clicore.
 			continue
 		}
 		stored = append(stored, deref(answer.Stored)...)
-		stored = append(stored, deref(answer.Idempotent)...)
+		already = append(already, deref(answer.Idempotent)...)
 		if dropped := deref(answer.Dropped); len(dropped) > 0 {
 			ioctx.Stderr("warning: Putnami Cloud dropped " + strings.Join(dropped, ", ") + " from the evidence of run " + deref(resp.RunId))
 		}
 	}
 
 	result := map[string]any{
-		"run_id":        deref(resp.RunId),
-		"subject_id":    deref(resp.SubjectId),
-		"provenance":    deref(resp.Provenance),
-		"idempotent":    deref(resp.Idempotent),
-		"repo":          run.Repo,
-		"sha":           run.SHA,
-		"submission_id": run.SubmissionID,
-		"stored":        stored,
+		"run_id":         deref(resp.RunId),
+		"subject_id":     deref(resp.SubjectId),
+		"provenance":     deref(resp.Provenance),
+		"idempotent":     deref(resp.Idempotent),
+		"repo":           run.Repo,
+		"sha":            run.SHA,
+		"submission_id":  run.SubmissionID,
+		"stored":         stored,
+		"already_stored": already,
 	}
 	if len(failures) > 0 {
 		result["failed"] = failures
 	}
-	clicore.WriteResult(result, params, ioctx, fmt.Sprintf(
-		"Uploaded the evidence of %s@%s to Putnami Cloud: run %s (%s, self-reported), stored %s.",
-		doc.Subject.Repository, shortSHA(run.SHA), deref(resp.RunId), deref(resp.Provenance), storedLabel(stored)))
+	summary := fmt.Sprintf("Uploaded the evidence of %s@%s to Putnami Cloud: run %s (%s, self-reported), stored %s",
+		doc.Subject.Repository, shortSHA(run.SHA), deref(resp.RunId), deref(resp.Provenance), storedLabel(stored))
+	if len(already) > 0 {
+		summary += "; already stored " + strings.Join(already, ", ")
+	}
+	clicore.WriteResult(result, params, ioctx, summary+".")
 	if len(failures) > 0 {
 		return clicore.NewError("cloud evidence-report: a report batch was not stored: "+strings.Join(failures, "; "), clicore.ExitAPI)
 	}
@@ -220,13 +225,17 @@ func evidenceRun(doc *evidence.Document) (evidenceSubmitRequest, error) {
 	if doc.Subject.ProjectID == "" {
 		return evidenceSubmitRequest{}, clicore.NewError("cloud evidence-report: the document names no numeric project id for its repository", clicore.ExitUsage)
 	}
+	submissionID, err := evidenceSubmissionID(doc, provenance)
+	if err != nil {
+		return evidenceSubmitRequest{}, err
+	}
 	run := evidenceSubmitRequest{
 		Provider:     doc.Subject.Provider,
 		Repo:         doc.Subject.ProjectID,
 		SHA:          doc.Subject.SHA,
 		Branch:       doc.Subject.Branch,
 		Provenance:   provenance,
-		SubmissionID: evidenceSubmissionID(doc, provenance),
+		SubmissionID: submissionID,
 		Status:       "completed",
 		Conclusion:   evidenceConclusion(doc),
 	}
@@ -242,13 +251,16 @@ func evidenceRun(doc *evidence.Document) (evidenceSubmitRequest, error) {
 
 // evidenceSubmissionID names the run after the CI job that observed it, so
 // uploading the same job again opens no second run. A document without a run id
-// gets a fresh id.
-func evidenceSubmissionID(doc *evidence.Document, provenance string) string {
+// gets a fresh id. GitHub Actions names a job by its key, which every leg of a
+// matrix shares, so a gha id also carries the digest of what the leg measured:
+// two legs open two runs, and the same leg uploaded again opens none.
+func evidenceSubmissionID(doc *evidence.Document, provenance string) (string, error) {
 	if doc.CI.RunID == "" {
 		id, err := generateSubmissionID()
-		if err == nil {
-			return "observe-" + id
+		if err != nil {
+			return "", err
 		}
+		return "observe-" + id, nil
 	}
 	parts := []string{"observe", provenance, doc.Subject.ProjectID, doc.CI.RunID}
 	if doc.CI.Attempt != nil {
@@ -257,7 +269,26 @@ func evidenceSubmissionID(doc *evidence.Document, provenance string) string {
 	if doc.CI.JobID != "" {
 		parts = append(parts, doc.CI.JobID)
 	}
-	return strings.Join(parts, "-")
+	if provenance == "gha" {
+		leg, err := evidenceLegDigest(doc)
+		if err != nil {
+			return "", err
+		}
+		parts = append(parts, leg)
+	}
+	return strings.Join(parts, "-"), nil
+}
+
+// evidenceLegDigest is the first 12 hex digits of the SHA-256 of what a job
+// measured: its components, tests, coverage, changed-line coverage and
+// dependency changes. It leaves out the time the document was written.
+func evidenceLegDigest(doc *evidence.Document) (string, error) {
+	data, err := json.Marshal([]any{doc.Components, doc.Tests, doc.Coverage, doc.ChangedLineCoverage, doc.DependencyChanges})
+	if err != nil {
+		return "", clicore.NewError("cloud evidence-report: digest the evidence: "+err.Error(), clicore.ExitAPI)
+	}
+	sum := sha256.Sum256(data)
+	return hex.EncodeToString(sum[:6]), nil
 }
 
 // evidenceConclusion is failure when a test failed, success otherwise.
@@ -313,7 +344,7 @@ func evidenceBatches(doc *evidence.Document, submissionID string) []evidenceRepo
 		ChangedLineCoverage: doc.ChangedLineCoverage,
 		DependencyChanges:   doc.DependencyChanges,
 	}
-	if members.Components != nil || members.ChangedLineCoverage != nil || members.DependencyChanges != nil {
+	if len(members.Components) > 0 || members.ChangedLineCoverage != nil || len(members.DependencyChanges) > 0 {
 		batches = append(batches, members)
 	}
 	return batches

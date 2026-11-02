@@ -258,14 +258,17 @@ The command reads a `protocol/evidence` v1 document and makes three calls:
    project id, the provenance is `gha` or `gitlab`, the pull or merge request
    is `changeRequest`, and the conclusion is `failure` when a test failed,
    else `success`. The submission id names the CI run, its attempt and its
-   job, so uploading one job twice opens one run.
+   job, so uploading one job twice opens one run. GitHub Actions gives every
+   leg of a matrix the same job key, so a `gha` id also carries a digest of
+   what the leg measured, and each leg opens its own run.
 2. `POST /v1/delivery/records/reports` posts the tests and coverage of each
    component.
 3. The same route then posts `components`, `changedLineCoverage` and
    `dependencyChanges` as the document holds them. They go apart because the
    route refuses a body over 1 MiB whole.
 
-A batch with nothing to carry is not sent. Without the token, with a document
+A batch with nothing to carry is not sent. The summary lists apart the kinds
+Delivery already held for that submission. Without the token, with a document
 that does not validate, or for a generic CI, it sends nothing. Any refusal
 exits non-zero with the route and the server's reason; `putnami observe`
 turns that into a diagnostic and still exits 0. `PUTNAMI_CLOUD_API_URL`
