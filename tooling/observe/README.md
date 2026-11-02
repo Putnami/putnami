@@ -24,12 +24,18 @@ later.
 
 ## Use it
 
-Install the extension in the user scope, then run it in the job:
+Install the extension in the user scope, then run it in the job. It is
+published on the `canary` channel only:
 
 ```bash
-putnami extensions install --user @putnami/observe
+putnami extensions install --user @putnami/observe@canary
 putnami observe
 ```
+
+See [Observe a change in your CI](https://putnami.dev/docs/how-to/observe-a-change-in-your-ci)
+for the GitHub Actions step and the GitLab CI job that install the CLI and the
+extension, run `putnami observe`, and keep the evidence document as an
+artifact.
 
 On GitHub Actions and GitLab CI, nothing else is needed. In another CI, name
 the base:
