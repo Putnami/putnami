@@ -79,7 +79,10 @@ describe('locale paths', () => {
   it('reads the locale from the first segment only for non-default locales', () => {
     expect(splitLocalePath(settings, '/fr/pricing')).toEqual({ locale: 'fr', path: '/pricing' });
     expect(splitLocalePath(settings, '/fr')).toEqual({ locale: 'fr', path: '/' });
-    expect(splitLocalePath(settings, '/pt-br/a/')).toEqual({ locale: 'pt-BR', path: '/a' });
+    expect(splitLocalePath(settings, '/pt-BR/a/')).toEqual({ locale: 'pt-BR', path: '/a' });
+    // The prefix matches the tag exactly, as the registered routes do.
+    expect(splitLocalePath(settings, '/pt-br/a')).toEqual({ locale: 'en', path: '/pt-br/a' });
+    expect(splitLocalePath(settings, '/FR/pricing')).toEqual({ locale: 'en', path: '/FR/pricing' });
     expect(splitLocalePath(settings, '/en/pricing')).toEqual({ locale: 'en', path: '/en/pricing' });
     expect(splitLocalePath(settings, '/france')).toEqual({ locale: 'en', path: '/france' });
   });
@@ -205,5 +208,12 @@ describe('messages and translator', () => {
     // @ts-expect-error sender is required by a branch
     typed.greet({ name: 'Ada', n: 1 });
     expect(typed.when({ at: new Date(Date.UTC(2026, 0, 2)) })).toContain('26');
+  });
+
+  it('reads a quoted brace as text in the types and at runtime', () => {
+    const quoted = translator(messages('quoted', { use: "Write '{literal}' for {name}, it''s text" }), 'en');
+    expect(quoted.use({ name: 'Ada' })).toBe("Write {literal} for Ada, it's text");
+    // @ts-expect-error literal is text, not an argument
+    quoted.use({ name: 'Ada', literal: 'x' });
   });
 });

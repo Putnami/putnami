@@ -45,7 +45,7 @@
     },
     {
       "id": "alternate-links",
-      "text": "A localized page's head lists an absolute alternate link per published locale with its hreflang, an x-default alternate to the default locale, a canonical link to itself and its og:locale; a route outside the localized set emits none of them."
+      "text": "A localized page's head lists an absolute alternate link per published locale with its hreflang, an x-default alternate to the default locale, a canonical link to itself and its og:locale; a route outside the localized set emits its canonical link only, and a page marked noindex emits none of them."
     },
     {
       "id": "locale-switcher",

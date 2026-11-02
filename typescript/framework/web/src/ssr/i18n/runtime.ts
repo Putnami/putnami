@@ -59,13 +59,15 @@ export function seedDocumentLocale(documentMeta: DocumentMeta, state: I18nState)
  * Add the language metadata of a localized page: a canonical link to itself
  * unless the page set one, an alternate per locale plus `x-default`, and
  * `og:locale` with its alternates. A route served in the default locale only
- * gets its canonical link and nothing else.
+ * gets its canonical link and nothing else; a `noindex` page gets none of them.
  */
 export function applyLocaleHead(documentMeta: DocumentMeta, state: I18nState): void {
   const { settings, locale, path } = state;
   documentMeta.links ??= [];
   documentMeta.metas ??= [];
   const { links, metas } = documentMeta;
+  // A page kept out of the index (a not-found page) has no URL to point to.
+  if (metas.some((m) => m.name?.toLowerCase() === 'robots' && /noindex/i.test(String(m.content ?? '')))) return;
   if (!links.some((l) => l.rel === 'canonical')) {
     links.push({ rel: 'canonical', href: localizedUrl(settings, path, locale) });
   }

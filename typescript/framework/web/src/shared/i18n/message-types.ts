@@ -51,12 +51,28 @@ type OpenArgument<S extends string, Stack extends Mode[], Acc> = S extends `${in
     : Walk<After, Stack, Acc & { [K in Trim<Header>]: ValueOf<'string'> }>
   : Acc;
 
+/**
+ * Drop what the runtime reads as text: `''` (a literal quote) and a quoted run
+ * that opens on a brace (`'{literal}'`), so its braces open no argument.
+ */
+type StripQuotes<S extends string> = S extends `${infer A}''${infer B}`
+  ? StripQuotes<`${A}${B}`>
+  : S extends `${infer A}'{${infer B}`
+    ? B extends `${string}'${infer C}`
+      ? StripQuotes<`${A}${C}`>
+      : S
+    : S extends `${infer A}'}${infer B}`
+      ? B extends `${string}'${infer C}`
+        ? StripQuotes<`${A}${C}`>
+        : S
+      : S;
+
 type Simplify<T> = { [K in keyof T]: T[K] } & {};
 
 /** The values an ICU message needs, by argument name. */
 export type MessageArguments<S extends string> = string extends S
   ? Record<string, unknown>
-  : Simplify<Walk<S, [], unknown>>;
+  : Simplify<Walk<StripQuotes<S>, [], unknown>>;
 
 /** A formatter for one message: argument-free messages take no values. */
 export type MessageFormatter<S extends string> = keyof MessageArguments<S> extends never

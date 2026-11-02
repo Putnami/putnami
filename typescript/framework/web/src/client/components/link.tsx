@@ -6,7 +6,7 @@ import {
   useInRouterContext,
   useLocation,
 } from 'react-router';
-import { isLocalizedPath, localizePath } from '../../shared/i18n/locale';
+import { isLocalizedPath, localizePath, splitLocalePath } from '../../shared/i18n/locale';
 import { I18nContext, type I18nState } from '../../shared/i18n/messages';
 import { type PrefetchBehavior, usePrefetch } from '../hooks/use-prefetch.hook';
 
@@ -22,7 +22,8 @@ export type LinkProps = RouterLinkProps & { prefetch?: PrefetchBehavior };
  *
  * In a localized application an absolute path stays in the current locale:
  * the router prefixes it on a hydrated page, and the plain link does the same.
- * A path served in the default locale only (`i18n.exclude`) links there.
+ * A path served in the default locale only (`i18n.exclude`), and a path that
+ * names a locale (`/fr/pricing`), link to it as written.
  */
 export const Link = React.forwardRef<HTMLAnchorElement, LinkProps>((props, ref) =>
   useInRouterContext() ? <RoutedLink {...props} ref={ref} /> : <PlainLink {...props} ref={ref} />,
@@ -43,9 +44,10 @@ const RoutedLink = React.forwardRef<HTMLAnchorElement, LinkProps>(({ to, prefetc
   }
 
   const i18n = useContext(I18nContext);
-  if (typeof to === 'string' && leavesLocale(i18n, to)) {
-    // The router would put the locale prefix in front of it; that page does not exist.
-    return <PlainLink {...props} ref={ref} to={to} />;
+  const href = typeof to === 'string' ? to : createPath(to);
+  if (leavesLocale(i18n, href)) {
+    // The router would put the current locale prefix in front of it; that page does not exist.
+    return <PlainLink {...props} ref={ref} to={href} />;
   }
 
   const mustPreload = prefetch === 'intent' && !to.toString().startsWith('http');
@@ -124,16 +126,25 @@ function splitHref(href: string): { path: string; rest: string } | undefined {
   return end === -1 ? { path: href, rest: '' } : { path: href.slice(0, end), rest: href.slice(end) };
 }
 
-/** Whether a site-absolute link from a non-default locale targets a default-locale-only path. */
-function leavesLocale(i18n: I18nState | undefined, href: string): boolean {
-  if (!i18n || i18n.locale === i18n.settings.defaultLocale) return false;
-  const parts = splitHref(href);
-  return parts !== undefined && !isLocalizedPath(i18n.settings, parts.path);
+/** Whether a site-absolute path already names a non-default locale. */
+function namesLocale(i18n: I18nState, path: string): boolean {
+  return splitLocalePath(i18n.settings, path).locale !== i18n.settings.defaultLocale;
 }
 
-/** The href of a site-absolute path in the current locale. */
+/**
+ * Whether a site-absolute link sits outside the router's locale basename: it
+ * names a locale, or it targets a default-locale-only path from another locale.
+ */
+function leavesLocale(i18n: I18nState | undefined, href: string): boolean {
+  const parts = i18n ? splitHref(href) : undefined;
+  if (!i18n || !parts) return false;
+  if (namesLocale(i18n, parts.path)) return true;
+  return i18n.locale !== i18n.settings.defaultLocale && !isLocalizedPath(i18n.settings, parts.path);
+}
+
+/** The href of a site-absolute path in the current locale; a path that names a locale stays as written. */
 function localizedHref(i18n: I18nState | undefined, href: string): string {
   const parts = i18n ? splitHref(href) : undefined;
-  if (!i18n || !parts) return href;
+  if (!i18n || !parts || namesLocale(i18n, parts.path)) return href;
   return `${localizePath(i18n.settings, parts.path, i18n.locale)}${parts.rest}`;
 }

@@ -1,6 +1,13 @@
 import { type ReactNode, useContext } from 'react';
 import { useInRouterContext, useLocation } from 'react-router';
-import { isLocalizedPath, LOCALE_COOKIE, localeEndonym, localizePath, textDirection } from '../../shared/i18n/locale';
+import {
+  isLocalizedPath,
+  LOCALE_COOKIE,
+  localeEndonym,
+  localizePath,
+  normalizePath,
+  textDirection,
+} from '../../shared/i18n/locale';
 import { I18nContext } from '../../shared/i18n/messages';
 
 export interface LocaleInfo {
@@ -19,9 +26,11 @@ export interface LocaleInfo {
 
 function useCurrentPath(fallback: string): string {
   // Inside a router the location is already relative to the locale basename.
+  // The payload path is normalized, so the router path is too: an island
+  // hydrates without a router and must render the same links.
   const inRouter = useInRouterContext();
   // biome-ignore lint/correctness/useHookAtTopLevel: the router context of a tree never changes
-  return inRouter ? useLocation().pathname : fallback;
+  return normalizePath(inRouter ? useLocation().pathname : fallback);
 }
 
 /** The locale of the current page and helpers to build links in other locales. */
@@ -114,7 +123,7 @@ export function LocaleSwitcher({ label, className, children }: LocaleSwitcherPro
               href={link.href}
               hrefLang={link.locale}
               lang={link.locale}
-              aria-current={link.current ? 'true' : undefined}
+              aria-current={link.current ? 'page' : undefined}
               onClick={link.select}
             >
               {link.label}

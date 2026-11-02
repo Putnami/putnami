@@ -131,7 +131,14 @@ A locale is published only when its catalog is complete.
 
 ## Routes and links
 
-Every page, loader and action is served once per locale, except the routes in `exclude`. The router's basename carries the locale prefix, so `<Link to="/pricing">` on a French page points to `/fr/pricing`. A link to an excluded route (`/docs/intro`) points to it unchanged.
+Every page, loader and action is served once per locale, except the routes in `exclude`. The router's basename carries the locale prefix, so `<Link to="/pricing">` on a French page points to `/fr/pricing`. Two links point to their target unchanged, and load it as a new document:
+
+- a link to an excluded route (`/docs/intro`);
+- a link that names a locale (`/ar/pricing`).
+
+A locale prefix matches the locale tag exactly: `/fr/pricing` is French, `/FR/pricing` is a page that does not exist.
+
+Exclude a whole subtree (`/blog/**`), not a layout alone (`/blog`): a page under a layout must be served in the locales its layout is served in.
 
 Use `<Link>` for pages and a plain `<a>` for files such as `/LICENSE.md`: a link to a file gets no prefix only when it is a plain anchor.
 
@@ -145,7 +152,7 @@ import { LocaleSwitcher } from '@putnami/web';
 <LocaleSwitcher label='Language' />
 ```
 
-It renders a `<nav>` of plain links, one per locale, to the current page in that locale, or to the locale's home when the page exists in the default locale only. Each link carries `hreflang` and `lang`, shows the locale's own name (`Français`), and the current one carries `aria-current`. It renders nothing when one locale is published.
+It renders a `<nav>` of plain links, one per locale, to the current page in that locale, or to the locale's home when the page exists in the default locale only. Each link carries `hreflang` and `lang`, shows the locale's own name (`Français`), and the current one carries `aria-current="page"`. It renders nothing when one locale is published.
 
 A click records the choice in the `putnami-locale` cookie. Pass a render function as `children` for your own markup, and call each link's `select()` on click.
 
@@ -165,7 +172,7 @@ On every localized page, the framework writes:
 - `og:locale` and one `og:locale:alternate` per other locale;
 - a `Content-Language` header on a page rendered per request.
 
-A page outside the localized set gets its canonical link only.
+A page outside the localized set gets its canonical link only. A page with `<Meta name='robots' content='noindex' />`, such as a not-found page, gets none of these links.
 
 ## What the browser receives
 

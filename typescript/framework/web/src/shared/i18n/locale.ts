@@ -103,7 +103,8 @@ export function localePrefix(settings: LocaleSettings, locale: string): string {
   return locale === settings.defaultLocale ? '' : `/${locale}`;
 }
 
-function normalizePath(path: string): string {
+/** A path with a leading slash and no trailing one: `/docs/why/` reads `/docs/why`. */
+export function normalizePath(path: string): string {
   if (!path.startsWith('/')) path = `/${path}`;
   return path.length > 1 && path.endsWith('/') ? path.slice(0, -1) : path;
 }
@@ -114,13 +115,14 @@ export interface LocalizedPath {
   path: string;
 }
 
-/** Read the locale a path names, and the path without its prefix. */
+/**
+ * Read the locale a path names, and the path without its prefix. The prefix
+ * matches the locale tag exactly, as HTTP routes do: `/FR/pricing` names none.
+ */
 export function splitLocalePath(settings: LocaleSettings, pathname: string): LocalizedPath {
   const path = normalizePath(pathname);
   const segment = path.split('/')[1] ?? '';
-  const locale = settings.locales.find(
-    (l) => l !== settings.defaultLocale && l.toLowerCase() === segment.toLowerCase(),
-  );
+  const locale = settings.locales.find((l) => l !== settings.defaultLocale && l === segment);
   if (!locale) return { locale: settings.defaultLocale, path };
   const rest = path.slice(segment.length + 1);
   return { locale, path: rest === '' ? '/' : rest };

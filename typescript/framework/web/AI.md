@@ -289,8 +289,9 @@ t.seats({ count: 2 });
   from its kept text, set `state: "draft"`, and delete `source`.
 - `putnami build` fails on a missing translation, invalid ICU syntax, or a
   translation whose arguments differ from its default text.
-- `<Link to="/x">` keeps the current locale prefix. Use a plain `<a>` for
-  files. `<LocaleSwitcher label="…" />` renders the locale links;
+- `<Link to="/x">` keeps the current locale prefix; a path that names a
+  locale (`/fr/x`) or is excluded stays as written. Exclude whole subtrees
+  (`/blog/**`). Use a plain `<a>` for files. `<LocaleSwitcher label="…" />` renders the locale links;
   `useLocale()` gives the locale and `localize(path, locale?)`.
 - Only `/` negotiates the locale (cookie `putnami-locale`, then
   `Accept-Language`). The framework writes `<html lang dir>`, the canonical

@@ -11,7 +11,7 @@ import { parseLocaleSettings } from '../../src/shared/i18n/locale';
 import { messages, useT } from '../../src/shared/i18n/messages';
 import { I18N_PAYLOAD_ID } from '../../src/shared/i18n/payload';
 import { localizeRows } from '../../src/ssr/i18n/build';
-import type { I18nRuntimeOptions } from '../../src/ssr/i18n/runtime';
+import { applyLocaleHead, type I18nRuntimeOptions } from '../../src/ssr/i18n/runtime';
 import { ReactApplication } from '../../src/ssr/react-application';
 import { renderStaticDocument } from '../../src/ssr/static-render';
 import { createMockReactConfig } from '../fixtures/route.fixtures';
@@ -49,6 +49,8 @@ function Pricing() {
     React.createElement('h1', null, t.title()),
     React.createElement(Link, { to: '/pricing' }, 'pricing'),
     React.createElement(Link, { to: '/docs/intro' }, 'docs'),
+    React.createElement(Link, { to: { pathname: '/docs/intro', hash: '#a' } }, 'docs-object'),
+    React.createElement(Link, { to: '/ar/pricing' }, 'arabic'),
     React.createElement(LocaleSwitcher, { label: 'Language' }),
   );
 }
@@ -189,7 +191,11 @@ describe('localized server render', () => {
       const html = await (await get('/fr/pricing')).text();
       expect(html).toMatch(/<a href="\/fr\/pricing"[^>]*>pricing<\/a>/);
       expect(html).toMatch(/<a href="\/docs\/intro"[^>]*>docs<\/a>/);
-      expect(await (await get('/pricing')).text()).toMatch(/<a href="\/pricing"[^>]*>pricing<\/a>/);
+      expect(html).toMatch(/<a href="\/docs\/intro#a"[^>]*>docs-object<\/a>/);
+      expect(html).toMatch(/<a href="\/ar\/pricing"[^>]*>arabic<\/a>/);
+      const english = await (await get('/pricing')).text();
+      expect(english).toMatch(/<a href="\/pricing"[^>]*>pricing<\/a>/);
+      expect(english).toMatch(/<a href="\/ar\/pricing"[^>]*>arabic<\/a>/);
     },
   );
 
@@ -209,7 +215,7 @@ describe('localized server render', () => {
     { feature, requirement: 'locale-switcher', check: 'the-current-locale-carries-aria-current' },
     async () => {
       const html = await (await get('/fr/pricing')).text();
-      expect(html).toMatch(/<a href="\/fr\/pricing" hrefLang="fr" lang="fr" aria-current="true"[^>]*>Français<\/a>/i);
+      expect(html).toMatch(/<a href="\/fr\/pricing" hrefLang="fr" lang="fr" aria-current="page"[^>]*>Français<\/a>/i);
       expect(html).not.toMatch(/hrefLang="en" lang="en" aria-current/i);
     },
   );
@@ -288,6 +294,19 @@ describe('localized static render', () => {
       i18n,
     });
     expect(readPayload(result.html)).toBeUndefined();
+  });
+});
+
+describe('locale head', () => {
+  it('writes no canonical or alternate links on a noindex page', () => {
+    const settings = parseLocaleSettings({
+      locales: ['en', 'fr'],
+      defaultLocale: 'en',
+      siteUrl: 'https://example.com',
+    });
+    const meta = { metas: [{ name: 'robots', content: 'noindex' }] };
+    applyLocaleHead(meta, { settings, locale: 'fr', path: '/nothing', messages: {} });
+    expect(meta).toEqual({ links: [], metas: [{ name: 'robots', content: 'noindex' }] });
   });
 });
 
