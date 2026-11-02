@@ -1,7 +1,7 @@
 ---
 name: prune-triage
 description: Read-only triage worker for /audit --prune — decides apply / verdict / drop for one (scope, typology) slice of removal candidates, against every consumer repository. Use only when the audit skill delegates a slice; not for general delegation.
-tools: Bash, Read, Grep, Glob, ToolSearch, mcp__putnami__putnami_search, mcp__putnami__putnami_symbol, mcp__putnami__putnami_context, mcp__putnami__putnami_impact, mcp__putnami__putnami_related, mcp__putnami__list_projects, mcp__putnami__describe_project, mcp__putnami__deps, mcp__putnami__find_owner, mcp__putnami__why_impacted, mcp__putnami__impacted
+tools: Bash, Read, Grep, Glob
 model: claude-fable-5-1
 effort: high
 ---
@@ -32,7 +32,7 @@ Rules per typology:
 - `config-surface`: `apply` when the variable duplicates a documented config key (say which), otherwise `verdict` between documenting and deleting.
 - `doc`: dangling links are `apply`; an ADR that records a rejected, superseded or never-adopted direction is `verdict` with delete as the default.
 
-Locate code with a Putnami MCP call first (`putnami.search`, `putnami.symbol`, `putnami.impact`); load them with ToolSearch `putnami` if they are deferred, and fall back to grep when a call fails or answers stale. Read the candidate in place; do not read whole files you do not need. Be the skeptic before every `apply`: does the code reach this path, does a caller or the framework provide the guard, does a test already pin the contract. An `apply` you cannot prove becomes `verdict`, never a guess.
+Locate code through the CLI first (`putnami projects owner|deps|why`, `putnami context pack`, `putnami <verb> --impacted --dry-run`), then grep for literal text. Read the candidate in place; do not read whole files you do not need. Be the skeptic before every `apply`: does the code reach this path, does a caller or the framework provide the guard, does a test already pin the contract. An `apply` you cannot prove becomes `verdict`, never a guess.
 
 Report back exactly:
 - `OUTCOME: SUCCESS | FAILURE`

@@ -173,7 +173,7 @@ case "$cmd" in
     printf '%s\n' "$checks"
     ;;
   shared-attestations)
-    jq -e '.options["@putnami/cloud"].intelligence.enabled == true' "$(manifest)" >/dev/null 2>&1
+    jq -e '.options["@putnami/intelligence"].enabled == true' "$(manifest)" >/dev/null 2>&1
     ;;
   *)
     echo "config: unknown command '$cmd'" >&2

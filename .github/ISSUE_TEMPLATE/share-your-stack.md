@@ -2,7 +2,7 @@
 name: Share Your Stack
 about: Tell us what you run today, so we build the adoption path that helps you
 title: "Stack: "
-labels: stack
+labels: ""
 assignees: ""
 ---
 

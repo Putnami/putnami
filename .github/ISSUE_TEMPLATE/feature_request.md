@@ -2,7 +2,7 @@
 name: Feature Request
 about: Suggest a new feature or improvement for Putnami
 title: ""
-labels: enhancement
+labels: type/enhancement
 assignees: ""
 ---
 

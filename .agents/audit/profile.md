@@ -41,9 +41,16 @@ Role labels come from the project tags and the scope:
 | scope `go`, `typescript`, `python` or `protocols`, no extension or sample tag | `role/framework` |
 | scope `sites`, no other role tag | `role/site` |
 
-Issue types: a `group/security` finding gets `type/bug`. Every other finding,
-the language issue, a graduation issue and a prune umbrella issue get
-`type/task`.
+Issue types use the `type/` labels that `decisions.json` allows:
+
+| Issue | Label |
+| --- | --- |
+| `group/security` finding | `type/bug` |
+| `group/performance` finding | `type/perf` |
+| `group/operations` finding | `type/infra` |
+| `group/design` finding, prune umbrella issue | `type/refactor` |
+| `group/testing` or `group/developer-experience` finding, graduation issue | `type/enhancement` |
+| language issue | `type/docs` |
 
 ## Filing rules
 
