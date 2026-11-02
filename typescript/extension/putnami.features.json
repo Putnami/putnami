@@ -416,6 +416,22 @@
           }
         },
         {
+          "id": "test-files-are-type-checked",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-type-error-in-a-test-file-fails-the-test-command",
+              "an-unused-ts-expect-error-in-a-test-file-fails-the-test-command",
+              "the-type-check-emits-nothing",
+              "a-nested-project-is-never-type-checked-by-its-parent"
+            ]
+          }
+        },
+        {
           "id": "runtime-manifest-parity",
           "stage": "coded",
           "evidenceKinds": [

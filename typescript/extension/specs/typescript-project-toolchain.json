@@ -116,6 +116,10 @@
       "text": "Test runs emit one deterministic structured outcome summary by default, retain the complete transcript as session-detail log events, bound causal failure diagnostics to the CLI report limits with explicit omission accounting, and let test-verbose change visibility without changing the Bun invocation, result data or verdicts."
     },
     {
+      "id": "test-files-are-type-checked",
+      "text": "The test command type-checks every TypeScript file of the project, tests, fixtures and benchmarks included, with the project's tsconfig and the compiler options of the types phase, and emits nothing: a type error or an unused @ts-expect-error in any of them fails the command. The types phase still checks only src, bin and .gen. A file under node_modules, dist or a nested project root is left to its owner."
+    },
+    {
       "id": "runtime-manifest-parity",
       "text": "The runtime manifest a locally-prepared extension serves and the one a packaged archive ships describe the same runtime, so an installed extension behaves as the workspace one did."
     },
