@@ -11,7 +11,8 @@
         "defaultLocale": "en",
         "siteUrl": "https://putnami.dev",
         "exclude": ["/docs/**"],
-        "paths": { "fr": { "/privacy": "/confidentialite" } }
+        "paths": { "fr": { "/privacy": "/confidentialite" } },
+        "suggestion": "locale-suggestion"
       }
     },
     "@putnami/cloud:publish-migration": { "namespace": "putnami" },

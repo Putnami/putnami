@@ -5,6 +5,7 @@ import type { NavItem } from '../lib/docs/navigation';
 import { putnamiTheme, SITE_MAX_WIDTH } from '../theme';
 import { Footer } from '../components/footer';
 import NavbarIsland from './navbar.island';
+import LocaleSuggestionIsland from './locale-suggestion.island';
 import ReleaseVersionIsland from './release-version.island';
 import SearchIsland from './search.island';
 import layoutMessages from './layout.messages';
@@ -63,6 +64,7 @@ putnami-island[data-island='release-version'] > putnami-island-root {
       <SearchIsland />
       <Box pt={['80px', '96px']}>
         <Container maxWidth={SITE_MAX_WIDTH}>
+          <LocaleSuggestionIsland />
           <Outlet />
         </Container>
         <Footer release={<ReleaseVersionIsland />} />
