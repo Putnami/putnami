@@ -7,7 +7,7 @@
       "id": "evidence-readers/report-readers",
       "type": "feature",
       "name": "Test and coverage report readers",
-      "outcome": "A tool that observes a CI it does not run reads the JUnit, LCOV, Cobertura, Clover and Go cover reports that CI already wrote into one set of typed test cases and line-level file coverage, and a report it cannot read becomes a diagnostic, never a crash.",
+      "outcome": "A tool that observes a CI it does not run reads the JUnit, LCOV, Cobertura, Clover and Go cover reports and the CycloneDX and SPDX documents that CI already wrote into typed test cases, line-level file coverage and packages with their licences and known vulnerabilities, and a report it cannot read becomes a diagnostic, never a crash.",
       "owner": "tooling",
       "target": "coded",
       "requirements": [
@@ -80,6 +80,34 @@
             "checks": [
               "every-malformed-fixture-returns-its-code",
               "arbitrary-bytes-never-panic"
+            ]
+          }
+        },
+        {
+          "id": "cyclonedx-reads-components",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-real-cyclonedx-document-reads-to-its-expected-packages",
+              "a-vulnerability-goes-to-the-components-it-affects",
+              "an-unsupported-sbom-is-malformed"
+            ]
+          }
+        },
+        {
+          "id": "spdx-reads-packages",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-real-spdx-document-reads-to-its-expected-packages"
             ]
           }
         }

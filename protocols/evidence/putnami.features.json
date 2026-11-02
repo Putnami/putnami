@@ -7,7 +7,7 @@
       "id": "evidence/change-evidence-document",
       "type": "feature",
       "name": "Change evidence document",
-      "outcome": "A repository that keeps its own CI describes one change, what it touches, its tests, its coverage and its dependency changes, in one versioned, strict, bounded document that a producer and every reader interpret the same way.",
+      "outcome": "A repository that keeps its own CI describes one change, what it touches, its tests, its coverage, its dependency changes and the licences and known vulnerabilities of those dependencies, in one versioned, strict, bounded document that a producer and every reader interpret the same way.",
       "owner": "tooling",
       "target": "coded",
       "requirements": [
@@ -197,6 +197,33 @@
             "kind": "acceptance",
             "checks": [
               "timestamps-and-diagnostics-are-checked"
+            ]
+          }
+        },
+        {
+          "id": "sbom-sources-are-named",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "each-sbom-defect-gets-its-code",
+              "a-document-without-sbom-members-validates-as-before"
+            ]
+          }
+        },
+        {
+          "id": "dependency-states-are-well-formed",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "each-dependency-state-defect-gets-its-code"
             ]
           }
         }

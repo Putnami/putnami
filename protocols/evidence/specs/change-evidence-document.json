@@ -3,7 +3,7 @@
   "protocolVersion": 1,
   "feature": "evidence/change-evidence-document",
   "outcomes": [
-    "A repository that keeps its own CI describes one change, what it touches, its tests, its coverage and its dependency changes, in one versioned document that any reader interprets the same way.",
+    "A repository that keeps its own CI describes one change, what it touches, its tests, its coverage, its dependency changes and, when its CI wrote a software bill of materials, the licences and known vulnerabilities of each changed dependency, in one versioned document that any reader interprets the same way.",
     "A producer and every reader share one schema, one strict parser and one fixture corpus, so a document either validates everywhere or is refused with the same codes.",
     "A document is internally consistent and bounded: every reference resolves, every count adds up, and no member grows without limit."
   ],
@@ -15,7 +15,7 @@
   "requirements": [
     {
       "id": "version-1-and-closed-vocabularies",
-      "text": "Documents are protocol version 1. The code host is github, gitlab or generic; the CI system is github-actions, gitlab-ci or generic; a component source is orchestrator, workspace, manifest, fallback or declared; a component impact is changed, dependent or unaffected; a file status is added, modified, deleted or renamed; a dependency change is added, removed, upgraded, downgraded or changed. Ecosystems are open lowercase slugs. Every validation code starts with evidence."
+      "text": "Documents are protocol version 1. The code host is github, gitlab or generic; the CI system is github-actions, gitlab-ci or generic; a component source is orchestrator, workspace, manifest, fallback or declared; an impact is changed, dependent or unaffected; a file status is added, modified, deleted or renamed; a dependency change is added, removed, upgraded, downgraded or changed; an SBOM format is cyclonedx or spdx. Ecosystems are open lowercase slugs. Every validation code starts with evidence."
     },
     {
       "id": "one-member-set",
@@ -68,6 +68,14 @@
     {
       "id": "timestamps-and-diagnostics-are-well-formed",
       "text": "generatedAt is a valid RFC 3339 timestamp with a zone, else evidence.invalid_timestamp. A reader diagnostic has a known severity, a dotted lowercase code and a message, else evidence.invalid_diagnostic; whatever its severity, it never makes the document invalid."
+    },
+    {
+      "id": "sbom-sources-are-named",
+      "text": "The optional sbom member names the software bills of materials (SBOM) the producer read: a head one and a base one, each optional, each with its format and a dotted spec version, else evidence.invalid_sbom. The sbom member and the dependency states are optional: a document without them validates as before, and a producer that read no SBOM writes none of them."
+    },
+    {
+      "id": "dependency-states-are-well-formed",
+      "text": "A dependency change carries a before state only when the sbom member names a base and the package is not added, and an after state only when it names a head and the package is not removed. A state lists non-empty licences and vulnerabilities, each with an id and a severity of critical, high, medium, low, info, none or unknown, else evidence.invalid_dependency_change. An id twice in a state is evidence.duplicate; over 20 licences or 200 vulnerabilities is evidence.too_large."
     }
   ],
   "decisions": [

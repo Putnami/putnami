@@ -5,13 +5,13 @@
   "outcomes": [
     "The CI log of a change names the components it changed and the components that depend on them, inferred from the repository's own manifests",
     "The same log gives the tests and the line coverage of each component, and the coverage of the lines the change added or modified",
-    "The same log lists the packages whose locked version the change added, removed, upgraded or downgraded",
+    "The same log lists the packages whose locked version the change added, removed, upgraded or downgraded and, when the CI wrote a software bill of materials, the known vulnerabilities each one fixes and introduces and its licences before and after",
     "The evidence document carries the same facts and validates against protocol/evidence v1"
   ],
   "nonGoals": [
     "Reading a putnami.workspace.json through go.putnami.dev/cli/model: a Putnami workspace runs its own extensions",
     "Running a package manager, an orchestrator or the tests",
-    "Licences, vulnerabilities and SBOM documents",
+    "Querying a vulnerability database or running an SBOM tool: the CI writes the CycloneDX or SPDX document, observe reads it",
     "Attributing a JUnit case by its class name alone, when neither its file nor its report lies in a component"
   ],
   "requirements": [
@@ -34,6 +34,14 @@
     {
       "id": "summary",
       "text": "The text summary lists the changed and dependent components: a dependent one names the components it depends on, a changed one the other changed components it reaches, directly or not. It then lists each component's tests and coverage, the changed-line coverage with its least covered files, and the dependency changes. --output=json prints the same observation. --evidence writes the components with their impacts and edges and the same analyses, valid against protocol/evidence v1."
+    },
+    {
+      "id": "sbom-documents",
+      "text": "A software bill of materials (SBOM) is a CycloneDX 1.4 to 1.6 or SPDX 2.3 JSON document the CI wrote. The head one is the file --sbom names, else the one discovery finds by content among .json files whose name holds bom, cdx, cyclonedx or spdx; the base one is the file --base-sbom names, never discovered. Several head documents, a named file that is not one, or one that cannot be read is a diagnostic, and that side is unknown."
+    },
+    {
+      "id": "dependency-sbom-facts",
+      "text": "Each dependency change gets, per side whose SBOM lists the package at a version the lockfile locks there, its licences and known vulnerabilities, matched by ecosystem, name and version through the package URL. The summary gives per change the vulnerabilities it fixes and introduces, or the known ones at the head and an unknown base without a base SBOM, and the licences before and after. Without an SBOM, the summary and the evidence document are unchanged."
     }
   ],
   "decisions": [
