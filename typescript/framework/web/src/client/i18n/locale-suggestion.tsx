@@ -28,18 +28,13 @@ export interface LocaleSuggestionProps {
 export function LocaleSuggestion({ messages, className }: LocaleSuggestionProps) {
   const state = useContext(I18nContext);
   const info = useLocale();
+  const { locale, path } = info;
   const [suggested, setSuggested] = useState<string>();
   useEffect(() => {
     if (!state || state.settings.suggestion !== messages.namespace) return;
-    setSuggested(
-      suggestedLocale(
-        state.settings,
-        info,
-        document.cookie,
-        typeof navigator === 'undefined' ? [] : navigator.languages,
-      ),
-    );
-  }, [state, info.locale, info.path, messages.namespace, info]);
+    const languages = typeof navigator === 'undefined' ? [] : navigator.languages;
+    setSuggested(suggestedLocale(state.settings, { locale, path }, document.cookie, languages));
+  }, [state, locale, path, messages.namespace]);
   if (!state || !suggested) return null;
   return (
     <SuggestionLine

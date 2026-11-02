@@ -27,6 +27,7 @@ import { runAndEvict, wrapPageWithCache } from './route-cache.utils';
 import { registerJsonEndpoint, registerLazyJsonEndpoint } from './route-endpoint.utils';
 import { applyMiddlewareSource, type MiddlewareSource, wrapWithMiddleware } from './route-middleware.utils';
 import type { StaticRouteMeta } from './static';
+import { serving } from './i18n/negotiation';
 
 type ReactRuntimeConfig = ReactPluginConfig & PutnamiReactConfigExtras;
 
@@ -105,7 +106,12 @@ export function createPageRenderer(
     ctx.config.clientFetchTimeout,
     ctx.i18n,
   );
-  return wrapPageWithCache(baseRenderer, route, cacheOpts);
+  // A localized page renders its links and router basename for the origin it
+  // is served at, so each origin caches its own HTML.
+  return wrapPageWithCache(baseRenderer, route, cacheOpts, (request) => {
+    const settings = ctx.i18n?.()?.settings;
+    return settings && Object.keys(settings.domains).length > 0 ? serving(request, settings) : undefined;
+  });
 }
 
 /**

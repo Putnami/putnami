@@ -25,11 +25,12 @@ export function readI18nPayload(doc: Document | undefined = globalThis.document)
   if (!element?.textContent) return undefined;
   try {
     const payload = JSON.parse(element.textContent) as I18nPayload;
+    if (!payload.served) return undefined;
     return {
       settings: payload.settings,
       locale: payload.locale,
       path: payload.path,
-      served: payload.served ?? 'prefix',
+      served: payload.served,
       messages: payload.messages,
       ...(payload.suggestions ? { suggestions: payload.suggestions } : {}),
     };

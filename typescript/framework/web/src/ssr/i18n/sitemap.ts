@@ -62,11 +62,20 @@ function alternate(hreflang: string, href: string): string {
   return `    <xhtml:link rel="alternate" hreflang="${escapeHtml(hreflang)}" href="${escapeHtml(href)}"/>`;
 }
 
-/** Serve the sitemap the build wrote; 404 before any build wrote one. */
+/**
+ * Serve the sitemap the build wrote, read once, with the cache lifetime of a
+ * public file; 404 before any build wrote one.
+ */
 export function sitemapHandler(path: string): RouteHandler {
+  let text: string | undefined;
   return async () => {
-    const sitemap = file(path);
-    if (!(await sitemap.exists())) return new HttpResponse('', { status: 404 });
-    return new HttpResponse(await sitemap.text(), { headers: { 'content-type': 'application/xml; charset=utf-8' } });
+    if (text === undefined) {
+      const sitemap = file(path);
+      if (!(await sitemap.exists())) return new HttpResponse('', { status: 404 });
+      text = await sitemap.text();
+    }
+    return new HttpResponse(text, {
+      headers: { 'content-type': 'application/xml; charset=utf-8', 'cache-control': 'public, max-age=86400' },
+    });
   };
 }

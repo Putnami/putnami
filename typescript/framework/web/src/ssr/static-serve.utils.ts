@@ -184,10 +184,19 @@ export function staticServeHandler(options: StaticServeOptions): RouteHandler {
     const pathname = pathnameFromContext(ctx, basename);
     const params = (ctx.params ?? {}) as StaticPathParams;
 
+    // A request the build output does not apply to is rendered once and kept
+    // apart from the build output, with the same lifetime and tags.
     const live = renderLive?.(ctx);
     if (live) {
-      const result = await live(pathname, params);
-      return toResponse({ html: result.html, status: result.status, redirect: result.redirectLocation });
+      const liveKey = `live:${route}:${pathname}`;
+      registerTags(tags, liveKey);
+      let liveBuilder = cache(CACHE_NAME).for(liveKey);
+      if (ttlMs) liveBuilder = liveBuilder.ttl(ttlMs);
+      const served = await liveBuilder.fetch<ServedPage>(async () => {
+        const result = await live(pathname, params);
+        return { html: result.html, status: result.status, redirect: result.redirectLocation };
+      });
+      return toResponse(served);
     }
 
     const produce = async (): Promise<ServedPage> => {

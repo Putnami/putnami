@@ -93,6 +93,7 @@ describe('sitemap', () => {
     writeFileSync(path, '<urlset/>');
     const served = ((await serve(ctx)) as HttpResponse).get();
     expect(served.headers.get('content-type')).toBe('application/xml; charset=utf-8');
+    expect(served.headers.get('cache-control')).toBe('public, max-age=86400');
     expect(await served.text()).toBe('<urlset/>');
   });
 

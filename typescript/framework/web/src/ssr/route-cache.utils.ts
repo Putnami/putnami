@@ -210,12 +210,15 @@ function stableSerialize(value: unknown, seen = new WeakSet<object>()): string {
 /**
  * Wrap a page renderer with server-side caching when ttl is set.
  * SSR responses use ReadableStream which can only be consumed once,
- * so we need to read the HTML into a string for caching.
+ * so we need to read the HTML into a string for caching. `variant` names
+ * what else the HTML depends on, such as the origin a localized page is
+ * served at; it extends every key, a custom one included.
  */
 export function wrapPageWithCache(
   renderer: RouteHandler,
   route: string,
   cacheOpts: PageCacheOptions | undefined,
+  variant?: (ctx: HttpRequestContext) => string | undefined,
 ): RouteHandler {
   const ttl = cacheOpts?.ttl;
   if (!ttl) {
@@ -224,9 +227,11 @@ export function wrapPageWithCache(
 
   const keyFn = cacheOpts.key;
   return async (ctx) => {
-    const cacheKey = keyFn
+    const baseKey = keyFn
       ? keyFn(ctx)
       : `${route}:${serializeParams(ctx.params)}:${pageQueryKey(ctx)}:${pageIdentityKey(ctx)}`;
+    const extra = variant?.(ctx);
+    const cacheKey = extra ? `${baseKey}:${extra}` : baseKey;
 
     try {
       const cachedData = await cache('page')

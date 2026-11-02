@@ -131,8 +131,8 @@ export function serving(ctx: HttpRequestContext, settings: LocaleSettings): Loca
 }
 
 /**
- * Send a reader who opens a locale's page under its prefix on the site,
- * `https://example.com/fr/pricing`, to the locale's domain,
+ * Send a reader who opens a locale's page under its prefix on the site or on
+ * a locale domain, `https://example.com/fr/pricing`, to the locale's domain,
  * `https://example.fr/pricing`, with the query. Any other host, such as a
  * development server or a preview, serves the page under its prefix.
  */
@@ -140,7 +140,7 @@ export function servingOnDomain(handler: RouteHandler, settings: LocaleSettings)
   const siteHost = new URL(settings.siteUrl).host;
   return (ctx) => {
     const url = new URL(ctx.req.url);
-    if (url.host !== siteHost) return handler(ctx);
+    if (url.host !== siteHost && domainLocale(settings, url.host) === undefined) return handler(ctx);
     const { locale, path } = splitLocalePath(settings, url.pathname);
     if (settings.domains[locale] === undefined) return handler(ctx);
     return new HttpResponse('', {

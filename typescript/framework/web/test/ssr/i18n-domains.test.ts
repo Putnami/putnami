@@ -10,6 +10,7 @@ import { messages, useT } from '../../src/shared/i18n/messages';
 import { buildSitemap } from '../../src/ssr/i18n/sitemap';
 import { loader as loaderBuilder } from '../../src/ssr/loader';
 import { ReactApplication } from '../../src/ssr/react-application';
+import { page } from '../../src/ssr/page';
 import { renderStaticDocument } from '../../src/ssr/static-render';
 import { createMockReactConfig } from '../fixtures/route.fixtures';
 
@@ -53,6 +54,7 @@ describe('locale domains', () => {
       .i18n({ settings: raw, messages: { fr: { home: { title: 'Tarifs' } } } })
       .reactPage('/', { page: { default: () => React.createElement('p', null, 'home') } })
       .reactPage('/docs/intro', { page: { default: () => React.createElement('p', null, 'docs') } })
+      .reactPage('/plans', { page: { default: page().cache({ ttl: 60_000 }).render(Pricing) } })
       .reactPage('/pricing', {
         page: { default: Pricing },
         loader: { loader: loaderBuilder(() => ({ plans: 3 })) },
@@ -88,6 +90,12 @@ describe('locale domains', () => {
       const moved = await get('/pricing?plan=team', 'example.fr');
       expect(moved.status).toBe(308);
       expect(moved.headers.get('location')).toBe('/tarifs?plan=team');
+      // The locale's prefix on its own domain names the same page: it moves to the domain's root.
+      const prefixed = await get('/tarifs?plan=team', 'example.fr');
+      expect(prefixed.status).toBe(200);
+      const doubled = await get('/fr/tarifs?plan=team', 'example.fr');
+      expect(doubled.status).toBe(308);
+      expect(doubled.headers.get('location')).toBe('https://example.fr/tarifs?plan=team');
       const excluded = await get('/docs/intro', 'example.fr');
       expect(excluded.status).toBe(308);
       expect(excluded.headers.get('location')).toBe('https://example.com/docs/intro');
@@ -136,6 +144,9 @@ describe('locale domains', () => {
       expect(entry.headers.get('location')).toBe('https://example.fr/');
       // A development server keeps every locale under its prefix.
       expect((await get('/', undefined, { 'accept-language': 'fr' })).headers.get('location')).toBe('/fr');
+      // A cached page keeps one copy per origin: the prefix host's basename never reaches the domain.
+      expect(await (await get('/fr/plans')).text()).toContain('window.__basename="/fr"');
+      expect(await (await get('/plans', 'example.fr')).text()).not.toContain('window.__basename');
       const local = await get('/fr/tarifs');
       expect(local.status).toBe(200);
       const text = await local.text();

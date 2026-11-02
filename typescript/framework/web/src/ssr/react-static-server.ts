@@ -1,5 +1,6 @@
 import type { RouteHandler } from '@putnami/application';
 import { getBuildInfo, getProjectRoot, joinPath } from '@putnami/utils';
+import { useLogger } from '@putnami/runtime';
 import type { RouteObject } from 'react-router';
 import type { LocaleServing } from '../shared/i18n/locale';
 import type { ReactPluginConfig } from './react-plugin';
@@ -25,6 +26,9 @@ export class ReactStaticServer {
     private readonly islandsScript: () => string | undefined,
     private readonly i18n: () => I18nRuntimeOptions | undefined = () => undefined,
   ) {}
+
+  /** The hosts already reported as serving every locale under its prefix. */
+  private readonly prefixHosts = new Set<string>();
 
   /**
    * Absolute directory holding pre-rendered static HTML files
@@ -68,6 +72,13 @@ export class ReactStaticServer {
         const i18n = this.i18n();
         if (!i18n || Object.keys(i18n.settings.domains).length === 0) return undefined;
         if (serving(ctx, i18n.settings) !== 'prefix') return undefined;
+        const host = ctx.host();
+        if (!this.prefixHosts.has(host)) {
+          this.prefixHosts.add(host);
+          useLogger('@putnami/web').warn(
+            `'${host}' is neither the host of i18n.siteUrl nor a locale domain: its static pages render under their locale prefix`,
+          );
+        }
         return (pathname, params) => this.render(pathname, params, route, 'prefix');
       },
       currentVersion: () => getBuildInfo()?.version,

@@ -46,6 +46,10 @@ describe('readI18nPayload', () => {
   it('returns nothing for a page without a payload or with a broken one', () => {
     expect(readI18nPayload(documentWith(undefined))).toBeUndefined();
     expect(readI18nPayload(documentWith('{'))).toBeUndefined();
+    // A payload that does not say where the page is served is not this build's.
+    expect(
+      readI18nPayload(documentWith(JSON.stringify({ settings, locale: 'fr', path: '/', messages: {} }))),
+    ).toBeUndefined();
     expect(readI18nPayload(undefined)).toBeUndefined();
   });
 });

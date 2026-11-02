@@ -248,9 +248,9 @@ Generation fails when a translated path:
 
 A request to `example.fr` gets the French pages: `https://example.fr/confidentialite` serves what `/fr/confidentialite` serves on the site. Every URL built for French uses the domain, without the prefix: links, the canonical and alternate links, the switcher and the sitemap. A link to another origin is absolute; the switcher on `example.fr` links English to `https://example.com/privacy?locale=en`.
 
-On the host of `siteUrl`, `/fr/x` redirects with `308` to `https://example.fr/x`, with the query, and the root sends a French reader to `https://example.fr/`. Any other host, such as your development server or a preview, serves French under `/fr` and links every locale there. A path the domain does not serve in French, such as an excluded `/docs/x`, redirects to the site.
+On the host of `siteUrl` or of a domain, `/fr/x` redirects with `308` to `https://example.fr/x`, with the query, and the root of the site sends a French reader to `https://example.fr/`. Any other host, such as your development server or a preview, serves French under `/fr` and links every locale there. Its static pages render under the prefix, once per page, and the server logs the host once. A path the domain does not serve in French, such as an excluded `/docs/x`, redirects to the site.
 
-Each domain is an `http` or `https` origin, without a path, a query or a fragment, and serves one locale other than the default. Point the domain's DNS at the same deployment as the site.
+Each domain is an `http` or `https` origin, without a path, a query or a fragment, and serves one locale other than the default. Point the domain's DNS at the same deployment as the site. The sitemap on the site lists the domain's URLs; search engines accept them because the `robots.txt` every domain serves names the site's sitemap, `Sitemap: https://example.com/sitemap.xml`.
 
 ## Locale switcher
 

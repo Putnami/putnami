@@ -63,6 +63,28 @@ describe('staticServeHandler — SSG', () => {
     rmSync(dir, { recursive: true, force: true });
   });
 
+  it('renders a request the build output does not apply to once, apart from the build output', async () => {
+    const dir = tempStaticDir({ 'fr.html': '<html>PREBUILT</html>' });
+    let renders = 0;
+    const handler = staticServeHandler({
+      route: '/fr',
+      staticConfig: { mode: 'ssg' },
+      staticDir: dir,
+      render: async () => ({ html: 'BUILD', status: 200 }) as StaticRenderResult,
+      renderLive: () => async (pathname) => {
+        renders++;
+        return { html: `PREFIX ${pathname}`, status: 200 } as StaticRenderResult;
+      },
+    });
+
+    for (let i = 0; i < 2; i++) {
+      const res = (await handler(ctxFor('/fr'))) as { get: () => Response };
+      expect(await res.get().text()).toBe('PREFIX /fr');
+    }
+    expect(renders).toBe(1);
+    rmSync(dir, { recursive: true, force: true });
+  });
+
   it('propagates a loader-driven redirect from the live fallback (e.g. legacy URLs)', async () => {
     const dir = tempStaticDir({});
     const handler = staticServeHandler({
