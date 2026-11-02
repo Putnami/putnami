@@ -129,6 +129,16 @@ func TestTestTypesChecksAProjectWhoseFilesAllLieUnderADotDirectory(t *testing.T)
 	expectJobOK(t, "test~types", status, err)
 }
 
+func TestTestTypesReadsTheDeclarationsOfADotDirectory(t *testing.T) {
+	ctx := typeCheckStarter(t, map[string]string{
+		".gen/types/env.d.ts": "declare const generatedValue: number;\n",
+		"test/env.test.ts":    "export const value: number = generatedValue;\n",
+	})
+
+	status, _, err := runTestTypes(ctx, jsonl.New(), nil)
+	expectJobOK(t, "test~types", status, err)
+}
+
 func TestTestTypesEmitsNothing(t *testing.T) {
 	spectest.Proves(t, "typescript/typescript-project-toolchain", "test-files-are-type-checked", "the-type-check-emits-nothing")
 	ctx := typeCheckStarter(t, map[string]string{

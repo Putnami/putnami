@@ -25,7 +25,7 @@ func writeProjectFiles(t *testing.T, dir string, files ...string) {
 
 func TestRunTypeCheck_SkipsAProjectWithNothingToCheck(t *testing.T) {
 	dir := t.TempDir()
-	writeProjectFiles(t, dir, "tsconfig.json", "src/types.d.ts", "dist/index.ts", "node_modules/pkg/index.ts", "clients/ts/putnami.json", "clients/ts/src/index.ts")
+	writeProjectFiles(t, dir, "tsconfig.json", "src/types.d.ts", ".gen/types/env.d.ts", "bower_components/pkg/index.ts", "jspm_packages/pkg/index.ts", "dist/index.ts", "node_modules/pkg/index.ts", "clients/ts/putnami.json", "clients/ts/src/index.ts")
 
 	withMockExec(t, func(_ string, _ []string, _ ...exec.Option) (*exec.Result, error) {
 		t.Error("tsc ran on a project with no file of its own to check")
@@ -150,12 +150,12 @@ func TestRunTypeCheck_IncludesTheFilesUnderADotDirectory(t *testing.T) {
 	}
 	anchored := func(pattern string) any { return filepath.ToSlash(filepath.Join(dir, pattern)) }
 	include, _ := config["include"].([]any)
-	for _, want := range []string{"**/*.ts", ".gen/**/*.ts", ".gen/**/*.tsx", "test/.fixtures/**/*.ts"} {
+	for _, want := range []string{"**/*.ts", ".gen/**/*.ts", ".gen/**/*.tsx", "test/.fixtures/**/*.ts", ".empty/**/*.ts"} {
 		if !slices.Contains(include, anchored(want)) {
 			t.Errorf("include %v lacks %s", include, anchored(want))
 		}
 	}
-	for _, unwanted := range []string{".storybook.ts", ".hidden/**/*.ts", ".empty/**/*.ts", ".putnami/**/*.ts", "test/.fixtures/deep/**/*.ts"} {
+	for _, unwanted := range []string{".storybook.ts", ".hidden/**/*.ts", ".putnami/**/*.ts", "test/.fixtures/deep/**/*.ts"} {
 		if slices.Contains(include, anchored(unwanted)) {
 			t.Errorf("include %v holds %s", include, anchored(unwanted))
 		}

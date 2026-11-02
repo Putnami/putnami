@@ -11,6 +11,7 @@ import {
   Env,
   type InferPrimitive,
   type InferSchema,
+  type SchemaDescriptor,
   Int,
   isNestedSchema,
   isSchemaDescriptor,
@@ -62,8 +63,11 @@ describe('schema utilities', () => {
     const minimal: InferSchema<typeof definition> = { name: 'a', retries: 3 };
     // @ts-expect-error `retries` has a default, not an Optional: the key stays required.
     const missingDefault: InferSchema<typeof definition> = { name: 'a' };
+    // @ts-expect-error a descriptor of unknown type admits undefined, but is no Optional.
+    const missingUnknown: InferSchema<{ value: SchemaDescriptor }> = {};
     expect<unknown>(minimal).toEqual({ name: 'a', retries: 3 });
     expect<unknown>(missingDefault).toEqual({ name: 'a' });
+    expect<unknown>(missingUnknown).toEqual({});
   });
 
   it('builds descriptor combinators', async () => {

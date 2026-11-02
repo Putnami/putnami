@@ -117,7 +117,7 @@
     },
     {
       "id": "test-files-are-type-checked",
-      "text": "The test command type-checks every TypeScript file of the project, tests, fixtures and benchmarks included, with the project's tsconfig and the compiler options of the types phase, and emits nothing: a type error or an unused @ts-expect-error in any of them fails the command. The types phase still checks only src, bin and .gen. A file under node_modules, dist or a nested project root is left to its owner."
+      "text": "The test command type-checks every TypeScript file of the project, tests, fixtures, benchmarks and dot-directories such as .gen included, with the project's tsconfig and the compiler options of the types phase, and emits nothing: a type error or an unused @ts-expect-error in any of them fails the command. The types phase still checks only src, bin and .gen. A dot-named file stays out, as in the types phase, and a file under node_modules, dist or a nested project root is left to its owner."
     },
     {
       "id": "runtime-manifest-parity",

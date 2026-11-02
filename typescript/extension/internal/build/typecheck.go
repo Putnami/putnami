@@ -22,8 +22,9 @@ var typeCheckPatterns = []string{"**/*.ts", "**/*.tsx", "**/*.mts", "**/*.cts"}
 
 // typeCheckSkippedDirectories are the directories the type-check leaves out:
 // the ones the input hasher skips (tooling/cli/internal/store/cache_hash.go),
-// so no file the check reads lies outside the task key.
-var typeCheckSkippedDirectories = []string{"node_modules", ".git", ".putnami", "out", "dist", "vendor"}
+// so no file the check reads lies outside the task key, and the package
+// directories tsc itself never globs.
+var typeCheckSkippedDirectories = []string{"node_modules", ".git", ".putnami", "out", "dist", "vendor", "bower_components", "jspm_packages"}
 
 // TypeCheckResult holds the outcome of a test type-check.
 type TypeCheckResult struct {
@@ -137,10 +138,15 @@ func typeCheckScope(projectPath string) (typeCheckScopeResult, error) {
 			}
 			return nil
 		}
-		if strings.HasPrefix(d.Name(), ".") || !isTypeCheckFile(d.Name()) {
+		if strings.HasPrefix(d.Name(), ".") || !isTypeScriptFile(d.Name()) {
 			return nil
 		}
-		scope.found = true
+		// A declaration file only feeds the check, so it never makes a project
+		// worth checking, but its dot-directory still enters the include: the
+		// program needs the types it declares, as build~types reads them.
+		if isTypeCheckFile(d.Name()) {
+			scope.found = true
+		}
 		if dir := deepestDotDirectory(path.Dir(rel)); dir != "" && !dotDirs[dir] {
 			dotDirs[dir] = true
 			for _, pattern := range typeCheckPatterns {
@@ -168,9 +174,7 @@ func deepestDotDirectory(dir string) string {
 // isTypeCheckFile reports whether name is a TypeScript file tsc checks: any
 // of typeCheckPatterns except a declaration file, which only feeds the check.
 func isTypeCheckFile(name string) bool {
-	switch filepath.Ext(name) {
-	case ".ts", ".tsx", ".mts", ".cts":
-	default:
+	if !isTypeScriptFile(name) {
 		return false
 	}
 	for _, suffix := range []string{".d.ts", ".d.mts", ".d.cts"} {
@@ -179,4 +183,14 @@ func isTypeCheckFile(name string) bool {
 		}
 	}
 	return true
+}
+
+// isTypeScriptFile reports whether name matches one of typeCheckPatterns,
+// declaration files included.
+func isTypeScriptFile(name string) bool {
+	switch filepath.Ext(name) {
+	case ".ts", ".tsx", ".mts", ".cts":
+		return true
+	}
+	return false
 }
