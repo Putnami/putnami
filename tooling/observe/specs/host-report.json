@@ -16,7 +16,7 @@
   "requirements": [
     {
       "id": "publish-status",
-      "text": "With --publish, in a GitHub Actions job of a pull request or a GitLab CI job of a merge request, putnami observe sets the commit status putnami/observe to success on the head commit of the pull or merge request. Its description, at most 140 characters, counts the changed and dependent components, the changed-line coverage and the dependency changes, and the status links the CI run page."
+      "text": "With --publish, putnami observe sets the commit status putnami/observe to success on the head commit of a GitHub pull request, or on the commit of a GitLab merge request pipeline, CI_COMMIT_SHA, joined to that pipeline. Its description, at most 140 characters, counts the changed and dependent components, the changed-line coverage and the dependency changes, or says the base was not resolved, and the status links the CI run page."
     },
     {
       "id": "publish-note",
@@ -28,7 +28,7 @@
     },
     {
       "id": "publish-fails-open",
-      "text": "--publish without the code host's token gives the warning observe.publish_token_missing, and in a generic CI or outside a pull or merge request it gives the info observe.publish_skipped; neither sends a request. A refused or failed call, an API URL that is not https or a run past one minute gives the warning observe.publish_failed. putnami observe still exits 0."
+      "text": "--publish without the code host's token gives the warning observe.publish_token_missing; in a generic CI or outside a pull or merge request it gives the info observe.publish_skipped; neither sends a request. A refused or failed call, no GitLab API URL, an API URL that is not https, no commit to set the status on, or a run past one minute gives the warning observe.publish_failed. putnami observe still exits 0."
     }
   ],
   "decisions": [
