@@ -25,7 +25,7 @@
     },
     {
       "id": "explicit-only-invocation",
-      "text": "The configured content-bump utility is explicit-only on both hosts. Canonical workflows remain implicitly available for the requested objective. Implicit selection grants no backlog processing, task mutation, Git publication, merge or deployment authority; local implementation checkpoints remain within the authorized work."
+      "text": "The epic workflow and the configured content-bump utility are explicit-only on both hosts. Other canonical workflows remain implicitly available for the requested objective. Implicit selection grants no backlog processing, task mutation, Git publication, merge or deployment authority; local implementation checkpoints remain within the authorized work."
     },
     {
       "id": "canonical-entry-points",
