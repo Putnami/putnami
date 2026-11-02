@@ -317,6 +317,87 @@
           }
         }
       ]
+    },
+    {
+      "id": "tooling/observe-go",
+      "type": "feature",
+      "name": "Find the Go modules of a repository that keeps its own CI",
+      "outcome": "putnami observe, in a Go repository without a Putnami workspace, knows its modules from go.work and go.mod, which module owns each file, which modules depend on which, which module and file a Go test or coverage report names, and which dependency versions each module locks, without running go",
+      "owner": "tooling",
+      "target": "modeled",
+      "requirements": [
+        {
+          "id": "go-modules-are-components",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "go-work-members-are-workspace-components",
+              "a-go-mod-outside-go-work-is-a-manifest-component",
+              "a-file-belongs-to-its-innermost-module",
+              "an-unreadable-manifest-is-a-diagnostic"
+            ]
+          }
+        },
+        {
+          "id": "go-module-edges",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-require-of-a-repository-module-is-an-edge",
+              "a-local-replace-is-an-edge",
+              "an-outside-module-is-no-edge"
+            ]
+          }
+        },
+        {
+          "id": "go-report-paths",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "an-import-path-names-its-file-and-module"
+            ]
+          }
+        },
+        {
+          "id": "go-locked-versions",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "go-mod-requires-are-the-locked-versions",
+              "a-repository-module-is-not-a-locked-dependency"
+            ]
+          }
+        },
+        {
+          "id": "go-probe-answer",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-detection-is-a-valid-probe-answer"
+            ]
+          }
+        }
+      ]
     }
   ]
 }

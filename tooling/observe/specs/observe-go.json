@@ -1,0 +1,43 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-spec.json",
+  "protocolVersion": 1,
+  "feature": "tooling/observe-go",
+  "outcomes": [
+    "In a Go repository, each Go module is a component, named by its directory and its module path, found from go.work and go.mod",
+    "Each changed file maps to the module that holds it, and each module lists the repository modules it requires or replaces, so the change analysis can list the dependent modules",
+    "A Go test or coverage report that names a package or a file by its import path maps to the repository file and the module that holds it",
+    "Each module's go.mod gives the dependency versions it locks, so the change analysis can diff them between the base and the commit"
+  ],
+  "nonGoals": [
+    "Running go, reading the module cache or the network: the detector reads files only",
+    "Computing the changed and dependent components, the tests and coverage per component, the changed-line coverage and the dependency changes: the change analyses own them",
+    "Reading the content of test and coverage reports: the evidence readers own it",
+    "Running as its own extension over the workspace probe transport, which needs a host call that runs workspace probes outside a workspace"
+  ],
+  "requirements": [
+    {
+      "id": "go-modules-are-components",
+      "text": "Each directory a root go.work uses is a component of source workspace; each other go.mod found, skipping node_modules, vendor, testdata and dot or underscore directories, is one of source manifest. Its id is its directory (. for the root), its name the module path, its ecosystem go. A file belongs to the innermost component. An unreadable or invalid manifest or directory, or a use outside the repository, is a diagnostic; a go.mod no grammar reads is a component without name or edges."
+    },
+    {
+      "id": "go-module-edges",
+      "text": "A component depends on each other component whose module path its go.mod requires, after the replace directives of its go.mod and of the root go.work, and on each component a local replace of its go.mod points to, resolved against the directory of the file holding it. A require outside the repository, or an import without a require, is no edge; nor is the component itself. A go.work member names its module path over other directories, else the first in path order."
+    },
+    {
+      "id": "go-report-paths",
+      "text": "An import path, as a go test -json event, a gotestsum or go-junit-report suite name and a go test -coverprofile file name write it, maps to the path below the component whose module path is its longest prefix on a slash boundary, and to that component; the root module's own path maps to the root component and no file. An import path no component's module path prefixes, or with an empty, . or .. element, maps to nothing."
+    },
+    {
+      "id": "go-locked-versions",
+      "text": "A go.mod locks its requires, each with the version that the replace directives of the go.mod and of the root go.work at the same commit select, and whether it is indirect. A require replaced by a local directory, or of a module the repository holds, is not locked. Each component names its go.mod as its lockfile and its go.mod and go.sum as watched files. Versions compare by Go's semantic version order."
+    },
+    {
+      "id": "go-probe-answer",
+      "text": "The detection is also a workspace probe answer of @putnami/observe: one project per component, its module path and go.mod as source name and source file, its dependencies as component paths attributed to go-module, its go.mod and go.sum as watched files, the root go.work as a watched file. The answer validates against the workspace protocol's probe rules."
+    }
+  ],
+  "decisions": [
+    "tooling/cli/doc/adr/0051-user-scope-extensions-run-without-a-workspace.md",
+    "protocols/evidence/doc/adr/0001-one-self-reported-change-evidence-document.md"
+  ]
+}
