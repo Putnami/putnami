@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -335,18 +336,45 @@ func TestAChangedComponentNamesAChangedComponentItReachesThroughAnother(t *testi
 	a := analyze.Result{Components: []evidence.Component{
 		{ID: "api", Ecosystem: "go", Source: "workspace", Impact: evidence.ImpactChanged, DependsOn: []string{"lib"}},
 		{ID: "cli", Ecosystem: "go", Source: "workspace", Impact: evidence.ImpactChanged, DependsOn: []string{"tools"}},
-		{ID: "lib", Ecosystem: "go", Source: "workspace", Impact: evidence.ImpactDependent, DependsOn: []string{"pricing", "api"}},
-		{ID: "pricing", Ecosystem: "go", Source: "workspace", Impact: evidence.ImpactChanged},
+		{ID: "core", Ecosystem: "go", Source: "workspace", Impact: evidence.ImpactChanged},
+		{ID: "lib", Ecosystem: "go", Source: "workspace", Impact: evidence.ImpactDependent, DependsOn: []string{"api", "pricing"}},
+		{ID: "pricing", Ecosystem: "go", Source: "workspace", Impact: evidence.ImpactChanged, DependsOn: []string{"core"}},
 		{ID: "tools", Ecosystem: "go", Source: "workspace", Impact: evidence.ImpactUnaffected},
 	}}
 	var b strings.Builder
 	writeAnalysis(&b, a)
 	for _, line := range []string{
-		"  components  3 changed, 1 dependent, 1 unaffected\n",
-		"    changed   api [go, workspace], depends on pricing\n",
+		"  components  4 changed, 1 dependent, 1 unaffected\n",
+		"    changed   api [go, workspace], depends on core, pricing\n",
 		"    changed   cli [go, workspace]\n",
-		"    changed   pricing [go, workspace]\n",
-		"    dependent lib [go, workspace], depends on pricing, api\n",
+		"    changed   core [go, workspace]\n",
+		"    changed   pricing [go, workspace], depends on core\n",
+		"    dependent lib [go, workspace], depends on api, pricing\n",
+	} {
+		if !strings.Contains(b.String(), line) {
+			t.Errorf("the summary lacks %q:\n%s", line, b.String())
+		}
+	}
+}
+
+func TestADependsOnListNamesTenComponents(t *testing.T) {
+	spectest.Proves(t, analysesFeature, "summary", "a-changed-component-names-the-changed-components-it-depends-on")
+	a := analyze.Result{}
+	all := make([]string, 0, 12)
+	for i := range 12 {
+		id := fmt.Sprintf("m%02d", i)
+		all = append(all, id)
+		a.Components = append(a.Components, evidence.Component{ID: id, Ecosystem: "go", Source: "workspace", Impact: evidence.ImpactChanged})
+	}
+	a.Components = append(a.Components,
+		evidence.Component{ID: "top", Ecosystem: "go", Source: "workspace", Impact: evidence.ImpactChanged, DependsOn: all},
+		evidence.Component{ID: "user", Ecosystem: "go", Source: "workspace", Impact: evidence.ImpactDependent, DependsOn: all})
+	var b strings.Builder
+	writeAnalysis(&b, a)
+	names := strings.Join(all[:10], ", ") + " and 2 more\n"
+	for _, line := range []string{
+		"    changed   top [go, workspace], depends on " + names,
+		"    dependent user [go, workspace], depends on " + names,
 	} {
 		if !strings.Contains(b.String(), line) {
 			t.Errorf("the summary lacks %q:\n%s", line, b.String())

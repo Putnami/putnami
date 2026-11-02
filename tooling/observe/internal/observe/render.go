@@ -10,10 +10,12 @@ import (
 )
 
 // maxListedComponents caps the components and dependency changes the text
-// summary lists; maxListedLineFiles caps the changed-line coverage files.
+// summary lists; maxListedLineFiles caps the changed-line coverage files;
+// maxListedEdges caps the components one line names after "depends on".
 const (
 	maxListedComponents = 30
 	maxListedLineFiles  = 10
+	maxListedEdges      = 10
 )
 
 // writeAnalysis writes the changed and dependent components, the tests and
@@ -26,6 +28,10 @@ func writeAnalysis(b *strings.Builder, a analyze.Result) {
 	}
 	changed, dependent := byImpact[evidence.ImpactChanged], byImpact[evidence.ImpactDependent]
 	fmt.Fprintf(b, "  components  %d changed, %d dependent, %d unaffected\n", len(changed), len(dependent), len(byImpact[evidence.ImpactUnaffected]))
+	edges := make(map[string][]string, len(a.Components))
+	for _, c := range a.Components {
+		edges[c.ID] = c.DependsOn
+	}
 	listed := 0
 	for _, c := range slices.Concat(changed, dependent) {
 		if listed == maxListedComponents {
@@ -36,9 +42,11 @@ func writeAnalysis(b *strings.Builder, a analyze.Result) {
 		line := fmt.Sprintf("    %-9s %s", c.Impact, componentLabel(c))
 		dependsOn := c.DependsOn
 		if c.Impact == evidence.ImpactChanged {
-			dependsOn = changedDependencies(a.Components, c.ID)
+			dependsOn = changedDependencies(a.Components, edges, c.ID)
 		}
-		if len(dependsOn) > 0 {
+		if len(dependsOn) > maxListedEdges {
+			line += ", depends on " + strings.Join(dependsOn[:maxListedEdges], ", ") + fmt.Sprintf(" and %d more", len(dependsOn)-maxListedEdges)
+		} else if len(dependsOn) > 0 {
 			line += ", depends on " + strings.Join(dependsOn, ", ")
 		}
 		fmt.Fprintln(b, line)
@@ -60,11 +68,7 @@ func writeAnalysis(b *strings.Builder, a analyze.Result) {
 // order of the components. A change that edits a component and one that
 // depends on it marks both changed; this keeps the edge between them in the
 // summary.
-func changedDependencies(components []evidence.Component, id string) []string {
-	edges := make(map[string][]string, len(components))
-	for _, c := range components {
-		edges[c.ID] = c.DependsOn
-	}
+func changedDependencies(components []evidence.Component, edges map[string][]string, id string) []string {
 	seen := map[string]bool{id: true}
 	queue := slices.Clone(edges[id])
 	for len(queue) > 0 {

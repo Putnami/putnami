@@ -31,7 +31,8 @@ otherwise.
 depends on it marks both changed. The summary keeps the edge between them. A
 dependent component's line names the components it depends on; a changed
 component's line names the other changed components it reaches through its
-edges, directly or through other components:
+edges, directly or through other components. A line names at most 10
+components, then how many more:
 
 ```
   components  2 changed, 0 dependent, 0 unaffected
