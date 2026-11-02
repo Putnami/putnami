@@ -586,7 +586,7 @@ func TestConformance_EachBoundIsEnforced(t *testing.T) {
 		expectCodes(t, label, codesOf(t, "turbo-pull-request.json", mutate), ErrorCodeTooLarge)
 	}
 	for label, mutate := range map[string]func(*Document){
-		"licences": func(d *Document) { d.DependencyChanges[0].After.Licenses = make([]string, MaxLicenses+1) },
+		"licenses": func(d *Document) { d.DependencyChanges[0].After.Licenses = make([]string, MaxLicenses+1) },
 		"vulnerabilities": func(d *Document) {
 			d.DependencyChanges[0].Before.Vulnerabilities = make([]Vulnerability, MaxVulnerabilities+1)
 		},
@@ -732,7 +732,7 @@ func TestConformance_EachDependencyStateDefectGetsItsCode(t *testing.T) {
 		"no sbom member":             func(d *Document) { d.SBOM = nil },
 		"before on an added package": func(d *Document) { d.DependencyChanges[2].Before = &DependencyState{} },
 		"after on a removed package": func(d *Document) { d.DependencyChanges[1].After = &DependencyState{} },
-		"empty licence":              func(d *Document) { d.DependencyChanges[0].After.Licenses = []string{" "} },
+		"empty license":              func(d *Document) { d.DependencyChanges[0].After.Licenses = []string{" "} },
 		"vulnerability without id": func(d *Document) {
 			d.DependencyChanges[2].After.Vulnerabilities[0].ID = ""
 		},

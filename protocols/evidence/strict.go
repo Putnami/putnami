@@ -762,7 +762,7 @@ func (v *validator) dependencyStates(changes []DependencyChange, sbom *SBOM) {
 func (v *validator) dependencyState(field string, state *DependencyState) {
 	for index, license := range state.Licenses {
 		if strings.TrimSpace(license) == "" {
-			v.add(ErrorCodeInvalidDependencyChange, fmt.Sprintf("%s.licenses[%d]", field, index), "a licence is not empty")
+			v.add(ErrorCodeInvalidDependencyChange, fmt.Sprintf("%s.licenses[%d]", field, index), "a license is not empty")
 		}
 	}
 	seen := map[string]bool{}

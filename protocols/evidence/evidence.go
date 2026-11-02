@@ -374,7 +374,7 @@ type SBOMDocument struct {
 // DependencyState is what a software bill of materials says of a package at
 // one side of the change.
 type DependencyState struct {
-	// Licenses are the package's licences: SPDX ids, expressions or names.
+	// Licenses are the package's licenses: SPDX ids, expressions or names.
 	Licenses []string `json:"licenses,omitempty"`
 	// Vulnerabilities are the package's known vulnerabilities.
 	Vulnerabilities []Vulnerability `json:"vulnerabilities,omitempty"`
