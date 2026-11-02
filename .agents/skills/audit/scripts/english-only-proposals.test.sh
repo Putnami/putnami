@@ -10,6 +10,17 @@ case "${OSTYPE:-}" in
   msys* | cygwin*) jq() { command jq --binary "$@"; } ;;
 esac
 
+# A test run by `git bisect run` or a hook inherits GIT_DIR, which `git -C`
+# does not override, so `git init` would rewrite the caller's repository
+# instead of creating the test's own. Unset every variable that points git at
+# another repository: the output of `git rev-parse --local-env-vars`, plus
+# GIT_NAMESPACE and the discovery variables.
+unset GIT_DIR GIT_WORK_TREE GIT_IMPLICIT_WORK_TREE GIT_INDEX_FILE GIT_COMMON_DIR \
+  GIT_OBJECT_DIRECTORY GIT_ALTERNATE_OBJECT_DIRECTORIES GIT_SHALLOW_FILE GIT_GRAFT_FILE \
+  GIT_NO_REPLACE_OBJECTS GIT_REPLACE_REF_BASE GIT_PREFIX GIT_NAMESPACE \
+  GIT_CONFIG GIT_CONFIG_PARAMETERS GIT_CONFIG_COUNT \
+  GIT_CEILING_DIRECTORIES GIT_DISCOVERY_ACROSS_FILESYSTEM
+
 ROOT="$(git rev-parse --show-toplevel)"
 SCANNER="$ROOT/.agents/skills/audit/scripts/english-only-proposals.sh"
 TEST_DIR="$(mktemp -d)"

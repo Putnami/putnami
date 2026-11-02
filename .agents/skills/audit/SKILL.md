@@ -9,7 +9,7 @@ Scan Putnami projects for quality findings. Each finding becomes a GitHub issue 
 
 ## Portable host contract
 
-This is the canonical workflow for both Claude Code and Codex: invoke it with `/audit` on Claude Code or `$audit` on Codex. The `@putnami/intelligence` extension ships it; `putnami install` materializes it when the workspace lists `extension:@putnami/intelligence` in `agentArtifacts`. Helper scripts live under `.agents/skills/audit/scripts/` on both hosts; run them from the workspace root through `bash`. When the `putnami` MCP tools appear deferred on Claude Code, load them in one ToolSearch call before discovery. Run semantic audit judgment on the strongest available model.
+This is the canonical workflow for both Claude Code and Codex: invoke it with `/audit` on Claude Code or `$audit` on Codex. The `@putnami/intelligence` extension ships it; `putnami install` materializes it when the workspace lists `extension:@putnami/intelligence` in `agentArtifacts`. Helper scripts live under `.agents/skills/audit/scripts/` on both hosts; run them from the workspace root through `bash`. Run semantic audit judgment on the strongest available model.
 
 The audit unit is a Putnami **scope**: a directory whose `putnami.json` declares projects (`putnami scopes list`). Repository settings live in the workspace manifest under `options["@putnami/intelligence"].audit`; `bash .agents/skills/audit/scripts/config.sh` resolves them:
 
@@ -67,8 +67,8 @@ done
 gh label create "severity/critical" --color b60205 --force; gh label create "severity/high" --color d93f0b --force
 gh label create "severity/medium"  --color fbca04 --force; gh label create "severity/low"  --color c2e0c6 --force
 # priorities (fix-queue ordering, separate from severity)
-for p in p1 p2 p3; do gh label create "priority/$p" --color 5319e7 --force; done
-# lifecycle + provenance (status/* are shared with $fix and $fix-loop)
+for p in urgent high normal low; do gh label create "priority/$p" --color 5319e7 --force; done
+# lifecycle + provenance (status/* are shared with $build)
 for s in audit-finding confirmed in-progress needs-review; do gh label create "status/$s" --color 0e8a16 --force; done
 gh label create "source/audit" --color ededed --force
 # roles + languages
@@ -137,13 +137,13 @@ bash .agents/skills/audit/scripts/attest.sh record <project-short> <group> "$has
 
 The hash also folds each **direct dependency**'s tree object and the **rubric hash** (`SKILL.md` + `mechanical.sh` + `config.sh` + the repository profile and checks script when set), so a dep change, a rubric edit or a profile edit invalidates attestations implicitly — no manual `--no-cache`. If `putnami projects describe` is unavailable the dep set is unknown, so the hash is marked `-dirty` and the project re-scans rather than skip on a partial hash.
 
-**Shared Intelligence tier.** When the root Putnami manifest enables `options["@putnami/cloud"].intelligence`, ephemeral web sessions and CI reuse each other's verifications through `putnami cloud audit-attest` (keyed by repo + project + group + input hash + rubric hash). After a local miss `check` consults Intelligence and seeds the local ledger on a hit; `record` mirrors best-effort. This remains a pure, fail-open optimization — unavailable Intelligence degrades to local-only and never fails an audit. `fleet.sh` batch-prefetches the ledger in one ordered request before dispatch (also skipped under `--no-cache`).
+**Shared Intelligence tier.** When the root Putnami manifest enables Intelligence (`options["@putnami/intelligence"].enabled`, written by `putnami intelligence setup`), ephemeral web sessions and CI reuse each other's verifications through `putnami intelligence audit-attest` (keyed by repo + project + group + input hash + rubric hash). After a local miss `check` consults Intelligence and seeds the local ledger on a hit; `record` mirrors best-effort. This remains a pure, fail-open optimization — unavailable Intelligence degrades to local-only and never fails an audit. `fleet.sh` batch-prefetches the ledger in one ordered request before dispatch (also skipped under `--no-cache`).
 
 The helper refuses to record `-dirty` hashes, so a dirty working tree is always re-scanned. Report skipped pairs in the summary — a silent skip reads as coverage.
 
 ### 3. For each property group (in scope priority order)
 
-Scan for findings in each property. **Read the code, understand intent, trace data flow** — do not just grep. Putnami projects can run real production traffic and infrastructure; a pattern match is not evidence. When a property says "check", read the relevant code and evaluate whether it meets the bar. Ground findings in the repository profile, constraints, commit history, and runbooks. When hosted Intelligence tools are configured, prefer their context, impact, related, search, and symbol tools for structural orientation; grep stays for literal patterns.
+Scan for findings in each property. **Read the code, understand intent, trace data flow** — do not just grep. Putnami projects can run real production traffic and infrastructure; a pattern match is not evidence. When a property says "check", read the relevant code and evaluate whether it meets the bar. Ground findings in the repository profile, constraints, commit history, and runbooks. For structural orientation, use the CLI (`putnami projects list|describe|owner|deps|why`, `putnami context map|pack`, `putnami <verb> --impacted --dry-run`); grep stays for literal patterns.
 
 **Mechanical properties are script-run, not model-run.** Run `bash .agents/skills/audit/scripts/mechanical.sh <project-path>` once per project. It deterministically emits JSONL findings for `complexity-file-size`, `complexity-nesting`, `complexity-dependencies` (import fan-out), and raw-print `ops-logging` occurrences, then runs the repository checks script when the workspace sets `checks`; those lines carry the property ids the profile defines. Do not re-derive these by reading code — triage the script's output instead (e.g. a CLI output writer printing to stdout is not a logging violation; drop it) and take what survives through step 4 like any other finding.
 
@@ -252,7 +252,7 @@ Automation is a first-class user; operators run these services in production.
   bash .agents/skills/audit/scripts/english-only-proposals.sh      # open and draft proposals into origin's default branch, through `putnami proposals find`
   ```
   The proposals contract finds a proposal by its exact base and head, so `english-only-proposals.sh` takes the heads from origin's remote-tracking branches (hence the fetch) and scans each proposal's title and body with the detector's `text` mode. A proposal into another base is scanned only with `--base <branch>`. It asks about the 200 most recently committed heads (`--heads <n>` changes the bound, and the summary counts the heads left out); a head whose find answers `unavailable` is skipped, named on stderr and counted, and the scan goes on. Without an offender, an unavailable head makes the scan exit 2: the scan is incomplete, not clean. Every exit status means the same for all three scans: exit 0 is clean, exit 1 lists the offenders on stdout, and exit 2 is a tool failure — stop and report it, never read it as clean. The detector already skips test files, `testdata/` and `fixtures/`, allowlisted proper nouns, and its own tracking issue. Triage what remains: a foreign word quoted as an example inside an issue about language is a legitimate drop.
-  File every surviving offender in **one** issue, never one per offender, with fingerprint `audit-fp: workspace/language/english-only` and title `[workspace] Non-English text in GitHub artifacts, code comments, or docs`. Route it as in 4b: when it is open, replace its Evidence with the current listing; when none exists or the last one closed as completed, create it with `--label "group/developer-experience" --label "prop/language" --label "area/all" --label "severity/medium" --label "priority/p2" --label "status/audit-finding" --label "source/audit"`, plus the issue type the profile names. It is always `priority/p2`: it spans every scope, so no scope's priority order applies. `area/all` keeps it out of the scope scorecards. If the label is missing, create it first with `gh label create prop/language --force --description "Non-English text in a GitHub artifact, code comment, or doc"`. When all three scans are clean and the issue is open, close it as resolved (4e).
+  File every surviving offender in **one** issue, never one per offender, with fingerprint `audit-fp: workspace/language/english-only` and title `[workspace] Non-English text in GitHub artifacts, code comments, or docs`. Route it as in 4b: when it is open, replace its Evidence with the current listing; when none exists or the last one closed as completed, create it with `--label "group/developer-experience" --label "prop/language" --label "area/all" --label "severity/medium" --label "priority/normal" --label "status/audit-finding" --label "source/audit"`, plus the issue type the profile names. It is always `priority/normal`: it spans every scope, so no scope's priority order applies. `area/all` keeps it out of the scope scorecards. If the label is missing, create it first with `gh label create prop/language --force --description "Non-English text in a GitHub artifact, code comment, or doc"`. When all three scans are clean and the issue is open, close it as resolved (4e).
 
 ### 4. For each finding
 
@@ -265,7 +265,7 @@ Automation is a first-class user; operators run these services in production.
 
 Severity describes **impact only** — never inflate it for scheduling reasons. (An older severity-boost rule conflated impact with priority and let boosted mediums skip triage; it is gone.)
 
-Assign **priority** as a separate axis, from the position of the finding's group in the scope's priority order (`config.sh priority <scope>`): positions 1-2 → `priority/p1`, positions 3-4 → `priority/p2`, positions 5-6 → `priority/p3`. Priority orders the fix queue; severity states impact.
+Assign **priority** as a separate axis, from the position of the finding's group in the scope's priority order (`config.sh priority <scope>`): positions 1-2 → `priority/high`, positions 3-4 → `priority/normal`, positions 5-6 → `priority/low`. The audit never files `priority/urgent`: a person sets it. Priority orders the fix queue; severity states impact.
 
 #### 4b. Fingerprint, duplicates, and waivers
 
@@ -312,7 +312,7 @@ gh issue create \
   --title "[<project-short>] <description>" \
   --label "group/<group>" --label "prop/<property>" \
   --label "<scope-label>" --label "severity/<severity>" \
-  --label "priority/<p1|p2|p3>" \
+  --label "priority/<high|normal|low>" \
   --label "status/audit-finding" --label "source/audit" \
   <one --label per entry in <project-labels>> \
   --body "<body>"
@@ -320,7 +320,7 @@ gh issue create \
 
 **Issue type by group**: follow the repository profile and existing issue taxonomy. If neither defines a type policy, use `bug` for demonstrated defects and do not invent new taxonomy labels.
 
-**Auto-confirm rule**: if severity is `critical` or `high`, swap `status/audit-finding` for `status/confirmed` so `$fix` or an explicit `$fix-loop --label status/confirmed` can pick it up.
+**Auto-confirm rule**: if severity is `critical` or `high`, swap `status/audit-finding` for `status/confirmed` so `$build` can pick it up when the user names the issue.
 
 Issue body template:
 ```markdown

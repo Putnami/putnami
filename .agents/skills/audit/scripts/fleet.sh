@@ -106,9 +106,9 @@ run_slice() {
 # --- shared-tier prefetch (opt-in; fail-open) ---------------------------------
 prefetch_call() {
   if command -v timeout >/dev/null 2>&1; then
-    timeout "${PUTNAMI_AUDIT_ATTEST_TIMEOUT:-30}" putnami cloud audit-attest prefetch
+    timeout "${PUTNAMI_AUDIT_ATTEST_TIMEOUT:-30}" putnami intelligence audit-attest prefetch
   else
-    putnami cloud audit-attest prefetch
+    putnami intelligence audit-attest prefetch
   fi
 }
 

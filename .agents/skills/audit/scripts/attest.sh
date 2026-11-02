@@ -22,7 +22,7 @@
 #
 # Remote tier: when the root manifest enables Intelligence, `check`
 # consults the shared tier after a local miss (seeding local on a hit) and `record`
-# best-effort mirrors to it, via `putnami cloud audit-attest`. It is a pure
+# best-effort mirrors to it, via `putnami intelligence audit-attest`. It is a pure
 # optimization: any failure degrades to local-only and never fails an audit.
 #
 # Hash semantics: a stable fold of `git rev-parse HEAD:<path>` (the project's own
@@ -50,7 +50,7 @@ usage() {
 # Remote Intelligence attestation tier — an OPTIONAL, fail-open layer. When
 # the manifest enables Intelligence, `check` consults the shared Intelligence tier
 # after a local miss and `record` best-effort mirrors to it, via
-# `putnami cloud audit-attest get|set`. The shared key is
+# `putnami intelligence audit-attest get|set`. The shared key is
 # (repo, project, group, inputHash, rubricHash); repo comes from the git remote
 # (override with PUTNAMI_AUDIT_ATTEST_REPO), rubricHash from compute_rubric. Every
 # Intelligence call runs in a `set +e` subshell so a missing CLI, an
@@ -150,7 +150,7 @@ remote_get() ( set +e
   short="$1"; group="$2"; hash="$3"
   repo="$(attest_repo)"; [ -n "$repo" ] || exit 1
   rh="$(compute_rubric)"; [ -n "$rh" ] || exit 1
-  out="$(intelligence_timeout putnami cloud audit-attest get --json \
+  out="$(intelligence_timeout putnami intelligence audit-attest get --json \
     --repo "$repo" --project "$short" --group "$group" \
     --input-hash "$hash" --rubric-hash "$rh" 2>/dev/null)" || exit 1
   # `--json` wraps the payload in the standard {command,status,data,exitCode}
@@ -165,7 +165,7 @@ remote_set() ( set +e
   short="$1"; group="$2"; hash="$3"
   repo="$(attest_repo)"; [ -n "$repo" ] || exit 0
   rh="$(compute_rubric)"; [ -n "$rh" ] || exit 0
-  intelligence_timeout putnami cloud audit-attest set --json \
+  intelligence_timeout putnami intelligence audit-attest set --json \
     --repo "$repo" --project "$short" --group "$group" \
     --input-hash "$hash" --rubric-hash "$rh" \
     --head-sha "$(git -C "$ROOT" rev-parse HEAD 2>/dev/null)" \
