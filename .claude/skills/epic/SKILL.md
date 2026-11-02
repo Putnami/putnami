@@ -81,8 +81,9 @@ Run `"$PUTNAMI_CLI" epic status --epic <epic>`. Its `Launch now` section
 lists each issue that may start, and the branch it starts from:
 
 - the epic's base when every dependency merged;
-- the branch of its one parent when exactly one dependency is not merged and
-  that parent's proposal is ready for review. With two or more unmerged
+- the branch of its one parent when exactly one dependency is not merged,
+  that parent's proposal is ready for review, and the parent started from the
+  epic's base. A stack is never two levels deep. With two or more unmerged
   dependencies, the issue waits for their merges.
 
 For each issue it lists, in plan order:
@@ -92,8 +93,10 @@ For each issue it lists, in plan order:
    `base` and `recordedAt`. Record it before the owner opens the session.
 2. Give the owner the launch: open a local workspace on `<branch>` from
    `<base>`, then run build on the task (`/build <task id>` on Claude Code,
-   `$build <task id>` on Codex), with the epic and the child's share in the
-   mandate.
+   `$build <task id>` on Codex). The mandate names the epic, the child's
+   share, and its base: "Your proposal targets `<base>`:
+   `change finalize --base <base>`." A stacked child also rebases onto its
+   parent's branch each time the parent moves.
 
 `epic status` counts the children launched or in progress against
 `envelope.sessions`; it lists nothing once their tokens reach the envelope.
@@ -107,7 +110,10 @@ contracts it could not read.
 - A child past its share stops for the owner; report it with its tokens.
 - A stacked child whose parent merged gets the rebase line `epic status`
   prints: `git rebase --onto <base> <parent's last head>`. Pass it to the
-  child's session; it rebases before its next push.
+  child's session: it rebases before its next push, then pushes with
+  `change finalize --base <epic base>`. The contracts cannot retarget a
+  proposal: when the provider did not retarget its proposal to the epic's
+  base, ask the owner to do it.
 - When the envelope is spent, launch nothing new. Report what each running
   child still needs and ask the owner for a new envelope or a stop.
 - When a wave finishes, launch the next one.

@@ -71,11 +71,11 @@ plan S, M or L.
   (tokens, minutes, slices) before code.
 
 A decision the owner settled in talk or in the task counts as approved, and
-so does a child of an approved [epic](../epic/SKILL.md), with the high bound
-of its estimate as its envelope. After approval, stop only when the work
-passes 150 % of the envelope, touches a sensitive zone the plan did not name,
-must change the approved design, or contradicts an ADR. Slice reports inform;
-they do not ask.
+so does a child of an approved [epic](../epic/SKILL.md): its envelope is the
+share its mandate names, and it also stops past 150 % of that share or at a
+sensitive zone its plan did not name. After approval, stop only when the work
+exceeds the envelope, must change the approved design, or contradicts an
+ADR. Slice reports inform; they do not ask.
 
 ## Who runs each stage
 

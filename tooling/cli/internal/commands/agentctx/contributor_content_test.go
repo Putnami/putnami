@@ -525,8 +525,11 @@ func TestContributorEpicLaunchesChildrenAndNeverCodes(t *testing.T) {
 		"`local` is the only one",
 		"One approval covers every child",
 		"passes 150 % of its share, touches a sensitive zone its plan did not name, must change the approved design, or contradicts an ADR",
-		"exactly one dependency is not merged and that parent's proposal is ready for review",
+		"exactly one dependency is not merged, that parent's proposal is ready for review, and the parent started from the epic's base",
+		"A stack is never two levels deep.",
 		"With two or more unmerged dependencies, the issue waits for their merges.",
+		"Your proposal targets `<base>`: `change finalize --base <base>`.",
+		"retarget its proposal to the epic's base",
 		"`.putnami/<epic>/launches.json`",
 		"Record it before the owner opens the session.",
 		"`git rebase --onto <base> <parent's last head>`",
@@ -539,7 +542,8 @@ func TestContributorEpicLaunchesChildrenAndNeverCodes(t *testing.T) {
 	build := strings.Join(strings.Fields(string(result.Files[".agents/skills/build/SKILL.md"])), " ")
 	for _, want := range []string{
 		"a child of an approved [epic]",
-		"passes 150 % of the envelope, touches a sensitive zone the plan did not name",
+		"it also stops past 150 % of that share or at a sensitive zone its plan did not name",
+		"stop only when the work exceeds the envelope",
 	} {
 		if !strings.Contains(build, want) {
 			t.Errorf("build SKILL.md lacks %q", want)

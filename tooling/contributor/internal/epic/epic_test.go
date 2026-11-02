@@ -286,6 +286,36 @@ func TestTheStatusReadsEachChildThroughTheContracts(t *testing.T) {
 	if !strings.Contains(text, "Not read\n  missions.status answered unsupported: missions is not bound\n") {
 		t.Fatalf("text %q", text)
 	}
+
+	// Without the origin's repository, no mission is read, and the status
+	// says so once.
+	p = newProvider()
+	var stdout, stderr bytes.Buffer
+	command := StatusCommand{Root: root, Call: p.call, Stdout: &stdout, Stderr: &stderr}
+	if code := command.Run(context.Background(), []string{"--epic", "40"}); code != 0 || p.calls["missions.status"] != 0 ||
+		!strings.Contains(stdout.String(), "Not read\n  missions.status answered unsupported: the origin remote names no repository\n") {
+		t.Fatalf("exit %d, calls %v, stdout %q, stderr %q", code, p.calls, stdout.String(), stderr.String())
+	}
+
+	// A closed early proposal on the branch never hides the one that
+	// replaced it.
+	closed, open, merged := proposal("100", "b/read", collab.ProposalStateClosed), proposal("101", "b/read", collab.ProposalStateOpen),
+		proposal("102", "b/read", collab.ProposalStateMerged)
+	for _, tc := range []struct {
+		items []collab.Proposal
+		want  string
+	}{
+		{[]collab.Proposal{closed, open}, "101"},
+		{[]collab.Proposal{closed, open, merged}, "102"},
+		{[]collab.Proposal{closed}, "100"},
+	} {
+		if got, ok := preferred(tc.items); !ok || got.Ref.ID != tc.want {
+			t.Errorf("preferred %+v = %s, want %s", tc.items, got.Ref.ID, tc.want)
+		}
+	}
+	if _, ok := preferred(nil); ok {
+		t.Error("preferred found a proposal in an empty list")
+	}
 	spectest.Proves(t, epicFeature, epicStatus, "the-status-reads-each-child-through-the-contracts")
 }
 
@@ -327,6 +357,20 @@ func TestAChildLaunchesOnMergedOrOneReadyParent(t *testing.T) {
 	if !strings.Contains(text, "Rebase\n  status-command: git rebase --onto main 0123abc\n") {
 		t.Fatalf("text %q", text)
 	}
+
+	// A stack is never two levels deep: skill waits while the ready parent it
+	// needs is itself stacked on an unmerged branch.
+	root = workspace(t, 3, launch("read-contract", "b/read", "main"), launch("plan-command", "b/plan", "main"),
+		launch("status-command", "b/status", "b/read"))
+	p = newProvider()
+	p.proposals["b/read"] = proposal("101", "b/read", collab.ProposalStateOpen)
+	p.proposals["b/plan"] = proposal("102", "b/plan", collab.ProposalStateMerged)
+	status103 := proposal("103", "b/status", collab.ProposalStateOpen)
+	status103.Change.Base = "b/read"
+	p.proposals["b/status"] = status103
+	if result, _ := runStatus(t, root, p); issueByKey(t, result, "status-command").State != StateReady || len(result.Launchable) != 0 {
+		t.Fatalf("launchable %+v; want skill to wait for read-contract's merge", result.Launchable)
+	}
 	spectest.Proves(t, epicFeature, epicStatus, "a-child-launches-on-merged-or-one-ready-parent")
 }
 
@@ -353,6 +397,25 @@ func TestASpentEnvelopeLaunchesNothing(t *testing.T) {
 	root = workspace(t, 1, launch("read-contract", "b/read", "main"))
 	if result, _ := runStatus(t, root, p); result.Running != 1 || len(result.Launchable) != 0 {
 		t.Fatalf("running %d, launchable %+v; want one session at once and none free", result.Running, result.Launchable)
+	}
+
+	// A ready child whose session still works takes a session; a child whose
+	// sessions ended does not, and says so.
+	root = workspace(t, 1, launch("read-contract", "b/read", "main"))
+	p = newProvider()
+	p.proposals["b/read"] = proposal("101", "b/read", collab.ProposalStateOpen)
+	p.sessions["issue-41"] = []collab.MissionSession{session(collab.LoopStageValidate, "b/read", 1_000_000)}
+	if result, _ := runStatus(t, root, p); result.Running != 1 || len(result.Launchable) != 0 {
+		t.Fatalf("running %d, launchable %+v; want the ready child to take the one session", result.Running, result.Launchable)
+	}
+	ended := session(collab.LoopStageCode, "b/read", 1_000_000)
+	ended.State = collab.SessionStateEnded
+	p.sessions["issue-41"] = []collab.MissionSession{ended}
+	p.proposals["b/read"] = proposal("101", "b/read", collab.ProposalStateDraft)
+	result, text = runStatus(t, root, p)
+	if result.Running != 0 || !reflect.DeepEqual(result.Launchable, []Launchable{{Issue: "plan-command", Base: "main"}}) ||
+		!strings.Contains(text, "  read-contract (task 41): in progress at code, no live session, ") {
+		t.Fatalf("running %d, launchable %+v, text %q; want the ended session to free its slot", result.Running, result.Launchable, text)
 	}
 	spectest.Proves(t, epicFeature, epicStatus, "a-spent-envelope-launches-nothing")
 }

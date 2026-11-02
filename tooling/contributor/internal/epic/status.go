@@ -55,7 +55,9 @@ type StatusResult struct {
 	// Tokens is the sum of the tokens every child session reported.
 	Tokens        int64 `json:"tokens"`
 	EnvelopeSpent bool  `json:"envelopeSpent"`
-	// Running counts the issues launched or in progress.
+	// Running counts the issues whose session runs: one with a working,
+	// waiting or handed-back session, or launched with no session yet. When
+	// no session was read, every launched, in-progress or ready issue counts.
 	Running     int           `json:"running"`
 	Issues      []IssueStatus `json:"issues"`
 	Launchable  []Launchable  `json:"launchable"`
@@ -75,7 +77,10 @@ type IssueStatus struct {
 	Base      string            `json:"base,omitempty"`
 	Proposal  *ProposalView     `json:"proposal,omitempty"`
 	Sessions  int               `json:"sessions"`
-	Stage     collab.LoopStage  `json:"stage,omitempty"`
+	// Live counts the sessions that work, wait or were handed back; an
+	// ended or failed session does not run.
+	Live  int              `json:"live"`
+	Stage collab.LoopStage `json:"stage,omitempty"`
 	// Tokens is the sum of the tokens the issue's sessions reported;
 	// UsageReported is false when none reported usage or no mission was read.
 	Tokens        int64 `json:"tokens"`
@@ -86,6 +91,8 @@ type IssueStatus struct {
 	OverShare bool `json:"overShare"`
 	// Rebase is the command a stacked issue runs once its parent merged.
 	Rebase string `json:"rebase,omitempty"`
+	// SessionsRead is true when the issue's mission was read.
+	SessionsRead bool `json:"sessionsRead"`
 }
 
 // ProposalView is the part of a proposal the status shows.
@@ -128,7 +135,8 @@ func (c StatusCommand) Run(ctx context.Context, args []string) int {
 	if code != 0 {
 		return code
 	}
-	launches, err := readLaunches(filepath.Join(filepath.Dir(loaded.file), LaunchesFile), loaded.plan)
+	launches, err := readLaunches(filepath.Join(filepath.Dir(loaded.file), LaunchesFile),
+		filepath.Join(filepath.Dir(loaded.result.Plan), LaunchesFile), loaded.plan)
 	if err != nil {
 		fmt.Fprintf(c.Stderr, "epic status: %v\n", err)
 		return 1
@@ -209,7 +217,7 @@ func (r *statusReader) status(ctx context.Context, loaded loaded, launches map[s
 		byKey[issue.Key] = i
 		result.Issues = append(result.Issues, status)
 		result.Tokens += status.Tokens
-		if status.State == StateLaunched || status.State == StateInProgress {
+		if running(status) {
 			result.Running++
 		}
 	}
@@ -261,7 +269,15 @@ func (r *statusReader) issue(ctx context.Context, plan estimate.EpicPlan, issue 
 // sessions reads the sessions of the issue's mission, issue-<id>, and sums
 // their tokens. A task id that is not a number names no mission.
 func (r *statusReader) sessions(ctx context.Context, status *IssueStatus) error {
-	if r.repository == "" || !numeric(status.Task.ID) {
+	if !numeric(status.Task.ID) {
+		return nil
+	}
+	if r.repository == "" {
+		if !r.disabled[collab.ContractMissions] {
+			r.disabled[collab.ContractMissions] = true
+			r.unavailable = append(r.unavailable, Unavailable{Contract: collab.ContractMissions, Operation: collab.OperationStatus,
+				Outcome: string(collab.OutcomeUnsupported), Message: "the origin remote names no repository"})
+		}
 		return nil
 	}
 	input := collab.MissionsStatusInput{
@@ -277,7 +293,12 @@ func (r *statusReader) sessions(ctx context.Context, status *IssueStatus) error 
 		if err != nil {
 			return err
 		}
+		status.SessionsRead = true
 		for _, session := range answer.Sessions {
+			switch session.State {
+			case collab.SessionStateWorking, collab.SessionStateWaiting, collab.SessionStateHandedBack:
+				status.Live++
+			}
 			if status.Sessions == 0 {
 				status.Stage = session.Stage
 				if status.Branch == "" {
@@ -296,6 +317,8 @@ func (r *statusReader) sessions(ctx context.Context, status *IssueStatus) error 
 		}
 		input.Page = &collab.PageRequest{Size: collab.MaxPageSize, Cursor: answer.Page.Next}
 	}
+	r.unavailable = append(r.unavailable, Unavailable{Contract: collab.ContractMissions, Operation: collab.OperationStatus,
+		Issue: status.Key, Outcome: string(collab.OutcomeOK), Message: fmt.Sprintf("only the first %d sessions were read", maxSessionPages*collab.MaxPageSize)})
 	return nil
 }
 
@@ -317,13 +340,37 @@ func (r *statusReader) proposal(ctx context.Context, plan estimate.EpicPlan, sta
 		if err != nil {
 			return err
 		}
-		if len(found.Items) > 0 {
-			p := found.Items[0]
+		if p, ok := preferred(found.Items); ok {
 			status.Proposal = &ProposalView{Ref: p.Ref, URL: p.URL, State: p.State, HeadCommit: p.Change.HeadCommit}
 			return nil
 		}
 	}
 	return nil
+}
+
+// preferred picks the proposal that stands for the branch: a merged one,
+// else an open or draft one, else a closed one. A closed early proposal
+// never hides the one that replaced it.
+func preferred(items []collab.Proposal) (collab.Proposal, bool) {
+	rank := func(state collab.ProposalState) int {
+		switch state {
+		case collab.ProposalStateMerged:
+			return 0
+		case collab.ProposalStateClosed:
+			return 2
+		}
+		return 1
+	}
+	best := -1
+	for i, p := range items {
+		if best < 0 || rank(p.State) < rank(items[best].State) {
+			best = i
+		}
+	}
+	if best < 0 {
+		return collab.Proposal{}, false
+	}
+	return items[best], true
 }
 
 // rebase sets the command a stacked issue runs once the parent it launched
@@ -355,6 +402,21 @@ func (r *statusReader) rebase(ctx context.Context, plan estimate.EpicPlan, statu
 	return nil
 }
 
+// running reports whether the issue's session takes one of the envelope's
+// sessions at once.
+func running(status IssueStatus) bool {
+	switch status.State {
+	case StateMerged, StateClosed, StatePlanned:
+		return false
+	case StateLaunched:
+		return true
+	}
+	if status.SessionsRead {
+		return status.Live > 0
+	}
+	return true
+}
+
 // issueState derives an issue's state from its proposal, its task, its
 // sessions and its launch record, in that order.
 func issueState(status IssueStatus, launched bool) string {
@@ -382,7 +444,8 @@ func issueState(status IssueStatus, launched bool) string {
 
 // launchable names the planned issues that may launch now, in wave order:
 // each has a task, and every dependency merged, or exactly one not merged
-// whose proposal is ready, on whose branch it stacks. None launches once the
+// whose proposal is ready and which starts from the epic's base, on whose
+// branch it stacks: a stack is never two levels deep. None launches once the
 // envelope is spent, nor past the envelope's sessions at once.
 func launchable(plan estimate.EpicPlan, result StatusResult) []Launchable {
 	out := []Launchable{}
@@ -415,7 +478,8 @@ func launchable(plan estimate.EpicPlan, result StatusResult) []Launchable {
 			switch {
 			case len(open) == 0:
 				out = append(out, Launchable{Issue: issue.Key, Base: plan.Base})
-			case len(open) == 1 && open[0].State == StateReady && open[0].Branch != "":
+			case len(open) == 1 && open[0].State == StateReady && open[0].Branch != "" &&
+				(open[0].Base == "" || open[0].Base == plan.Base):
 				out = append(out, Launchable{Issue: issue.Key, Base: open[0].Branch, StacksOn: open[0].Key})
 			default:
 				continue
@@ -464,8 +528,7 @@ type Launch struct {
 
 // readLaunches reads the launch record file of plan, and answers each
 // issue's latest launch by key. A missing file records no launch.
-func readLaunches(path string, plan estimate.EpicPlan) (map[string]Launch, error) {
-	shown := filepath.Join(".putnami", plan.Epic, LaunchesFile)
+func readLaunches(path, shown string, plan estimate.EpicPlan) (map[string]Launch, error) {
 	data, err := os.ReadFile(path)
 	if errors.Is(err, os.ErrNotExist) {
 		return map[string]Launch{}, nil
@@ -585,6 +648,9 @@ func issueText(issue IssueStatus) string {
 	parts := []string{strings.ReplaceAll(issue.State, "_", " ")}
 	if issue.Stage != "" {
 		parts[0] += " at " + string(issue.Stage)
+	}
+	if issue.SessionsRead && issue.Live == 0 && (issue.State == StateInProgress || issue.State == StateReady) {
+		parts = append(parts, "no live session")
 	}
 	if issue.Proposal != nil && issue.Proposal.URL != "" {
 		parts = append(parts, issue.Proposal.URL)

@@ -129,7 +129,8 @@ target or another epic is refused with exit 1.
    repository of the workspace's `origin` remote;
 3. its proposal, with `proposals.find` on its branch: the launch record's,
    else the newest session's. It looks against the launch base, then against
-   the epic's base.
+   the epic's base, and keeps a merged proposal, else an open or draft one,
+   else a closed one.
 
 An issue is `merged` or `closed` when its proposal is; `ready` when its
 proposal is open for review; `closed` when its task is done or canceled with
@@ -139,12 +140,18 @@ its sessions reported, input, output and cache included. Its share is the
 high bound of its estimate; past 150 % of it, the child stops for the owner.
 
 An issue may launch now when it is planned, has a task, and every dependency
-merged, or exactly one dependency is not merged and its proposal is ready: it
-then starts from that parent's branch. Nothing launches once the children's
-tokens reach the envelope, nor beyond the envelope's sessions at once, which
-count the issues launched or in progress. A stacked issue whose parent merged
-gets its rebase, `git rebase --onto <base> <parent's last head>`, with the
-head commit `proposals.status` reports for the parent.
+merged, or exactly one dependency is not merged, its proposal is ready, and
+it started from the epic's base: the issue then starts from that parent's
+branch, and a stack is never two levels deep. Nothing launches once the
+children's tokens reach the envelope, nor beyond the envelope's sessions at
+once. A session counts when it works, waits or was handed back, so a ready
+issue whose session still runs counts, and one whose sessions ended or failed
+does not and shows `no live session`; a launched issue with no session yet
+counts too. When no mission could be read, every launched, in-progress or
+ready issue counts. A stacked issue whose parent merged gets its rebase,
+`git rebase --onto <base> <parent's last head>`, with the head commit
+`proposals.status` reports for the parent; its proposal then targets the
+epic's base.
 
 ```text
 Epic .putnami/42/epic.json: Plans are sized and launched in waves
@@ -160,7 +167,10 @@ Launch now
 
 A contract whose provider answers `unsupported` or `denied` is called once,
 and listed under `Not read`; any other answer that is not `ok` is listed with
-its issue. Without the host channel, as when the executable runs by hand, the
+its issue. A workspace whose `origin` remote names no repository reads no
+mission, and `Not read` says so; a mission with more than 1000 sessions is
+read up to that bound, and listed with its issue. Without the host channel, as when the executable runs by hand, the
 command exits 1 and names `putnami epic status`. `--output=json` prints the
-result document: `tokens`, `envelopeSpent`, `running`, `issues`,
+result document: `tokens`, `envelopeSpent`, `running`, `issues` (each with
+its `sessions`, `live` and `sessionsRead`),
 `launchable` and `unavailable`.
