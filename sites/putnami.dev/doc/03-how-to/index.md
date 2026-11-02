@@ -51,6 +51,7 @@ How-To is organized by user intent, not architecture.
 - [Qualify a workload](/docs/how-to/qualify-a-workload)
 - [Gate production builds with the doctor preflight](/docs/how-to/gate-production-builds-with-doctor)
 - [Publish impacted libraries coherently](/docs/how-to/publish-impacted-libraries)
+- [Observe a change in your CI](/docs/how-to/observe-a-change-in-your-ci)
 
 ### Maintain
 

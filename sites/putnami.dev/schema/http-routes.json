@@ -1730,6 +1730,21 @@
     },
     {
       "match": "exact",
+      "path": "/docs/how-to/observe-a-change-in-your-ci",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "publicEdge": true,
+      "provenance": {
+        "project": "putnami.dev",
+        "package": "@putnami/web",
+        "sourceKind": "file-route",
+        "evidencePath": "src/app/docs/[...page]/page.tsx"
+      }
+    },
+    {
+      "match": "exact",
       "path": "/docs/how-to/provision-infra-and-run-conformance-packs",
       "methods": [
         "GET",
@@ -2667,5 +2682,5 @@
       }
     }
   ],
-  "digest": "sha256:fa7ed1e05143122e64bc34a9b8890659bfd7716ffaff7bad5e7f13606dafd5b1"
+  "digest": "sha256:a394ca5b236489620820e82ed6515a16b2ca75aa8a3109ba472b72ec1d2d1c54"
 }
