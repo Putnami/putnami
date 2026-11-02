@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'bun:test';
 import { specTest } from '@putnami/runtime/spectest';
+import { createElement, type ReactNode } from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
 import { formatIcu, icuArguments, IcuSyntaxError, parseIcu } from '../../src/shared/i18n/icu';
 import {
   isLocalizedPath,
@@ -215,5 +217,62 @@ describe('messages and translator', () => {
     expect(quoted.use({ name: 'Ada' })).toBe("Write {literal} for Ada, it's text");
     // @ts-expect-error literal is text, not an argument
     quoted.use({ name: 'Ada', literal: 'x' });
+  });
+});
+
+describe('inline tags', () => {
+  const legal = messages('legal', {
+    terms: 'Read the <link>terms</link> and <b>keep <code>{file}</code></b>.',
+    seats: '{n, plural, one {<b>#</b> seat} other {<b>#</b> seats}}',
+    plain: 'a < b and 1 <2> 3',
+  });
+  const link = (chunks: ReactNode) => createElement('a', { href: '/terms' }, chunks);
+  const b = (chunks: ReactNode) => createElement('strong', null, chunks);
+  const code = (chunks: ReactNode) => createElement('code', null, chunks);
+
+  specTest(
+    'renders each tag through the function passed under its name',
+    { feature, requirement: 'inline-tags', check: 'a-tag-renders-through-its-function' },
+    () => {
+      const t = translator(legal, 'fr', {
+        legal: { terms: 'Lisez les <link>conditions</link> et <b>gardez <code>{file}</code></b>.' },
+      });
+      expect(renderToStaticMarkup(t.terms({ link, b, code, file: 'LICENSE.md' }))).toBe(
+        'Lisez les <a href="/terms">conditions</a> et <strong>gardez <code>LICENSE.md</code></strong>.',
+      );
+      expect(renderToStaticMarkup(translator(legal, 'en').seats({ n: 2, b }))).toBe('<strong>2</strong> seats');
+    },
+  );
+
+  it('reads a < that opens no tag, and a quoted tag, as text', () => {
+    expect(translator(legal, 'en').plain()).toBe('a < b and 1 <2> 3');
+    expect(format("Type '<b>' to bold", 'en')).toBe('Type <b> to bold');
+    const quoted = translator(messages('quoted-tag', { use: "Type '<b>' for {what}" }), 'en');
+    expect(quoted.use({ what: 'bold' })).toBe('Type <b> for bold');
+  });
+
+  it('refuses a tag that does not close where it opened', () => {
+    expect(() => parseIcu('<b>bold')).toThrow("Unclosed tag '<b>'");
+    expect(() => parseIcu('<b>bold</i>')).toThrow("Unclosed tag '<b>'");
+    expect(() => parseIcu('bold</b>')).toThrow("Unexpected closing tag '</b>'");
+    expect(() => parseIcu('<b>{n, plural, other {x</b>}}')).toThrow(IcuSyntaxError);
+  });
+
+  it('lists tags among the arguments and keeps their text without a renderer', () => {
+    expect([...icuArguments(parseIcu('<link>{name}</link>')).entries()]).toEqual([
+      ['link', 'tag'],
+      ['name', 'string'],
+    ]);
+    expect(format('Read the <link>terms</link>', 'en')).toBe('Read the terms');
+  });
+
+  it('types a renderer per tag and a React node result', () => {
+    const t = translator(legal, 'en');
+    // @ts-expect-error code is a tag of the message
+    t.terms({ link, b, file: 'x' });
+    const node: ReactNode = t.terms({ link, b, code, file: 'x' });
+    expect(node).toBeDefined();
+    const text: string = t.plain();
+    expect(text).toBe('a < b and 1 <2> 3');
   });
 });

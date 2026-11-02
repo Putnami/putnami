@@ -4,11 +4,13 @@
  * Supported: plain text, `'` quoting, `{name}`, `{name, number[, integer|percent]}`,
  * `{name, date|time[, short|medium|long|full]}`, `{name, plural, ...}` and
  * `{name, selectordinal, ...}` with `=N` and `offset:N`, `#` inside plural
- * branches, and `{name, select, ...}`. Anything else is a syntax error, so a
- * catalog cannot carry a message the formatter would print wrongly.
+ * branches, `{name, select, ...}`, and tags: `<link>…</link>` wraps part of the
+ * text, which the caller renders. A `<` that opens no tag is text. Anything
+ * else is a syntax error, so a catalog cannot carry a message the formatter
+ * would print wrongly.
  */
 
-export type IcuArgumentKind = 'string' | 'number' | 'date' | 'plural' | 'select';
+export type IcuArgumentKind = 'string' | 'number' | 'date' | 'plural' | 'select' | 'tag';
 
 export type IcuNode =
   | { type: 'text'; value: string }
@@ -22,7 +24,8 @@ export type IcuNode =
       offset: number;
       options: Record<string, IcuNode[]>;
     }
-  | { type: 'select'; name: string; options: Record<string, IcuNode[]> };
+  | { type: 'select'; name: string; options: Record<string, IcuNode[]> }
+  | { type: 'tag'; name: string; children: IcuNode[] };
 
 export class IcuSyntaxError extends Error {
   constructor(
@@ -38,6 +41,8 @@ const IDENT = /[A-Za-z_][A-Za-z0-9_]*/y;
 const NUMBER_STYLES = new Set(['integer', 'percent']);
 const DATE_STYLES = new Set(['short', 'medium', 'long', 'full']);
 const PLURAL_KEY = /(=\d+|zero|one|two|few|many|other)/y;
+const OPEN_TAG = /<([A-Za-z_][A-Za-z0-9_]*)>/y;
+const CLOSE_TAG = /<\/([A-Za-z_][A-Za-z0-9_]*)>/y;
 
 class Parser {
   private pos = 0;
@@ -52,7 +57,8 @@ class Parser {
     return nodes;
   }
 
-  private message(inPlural: boolean): IcuNode[] {
+  /** Text up to a `}`, the end, or the closing tag of `tag` when inside one. */
+  private message(inPlural: boolean, tag?: string): IcuNode[] {
     const nodes: IcuNode[] = [];
     let text = '';
     const flush = () => {
@@ -62,6 +68,19 @@ class Parser {
     while (this.pos < this.src.length) {
       const ch = this.src[this.pos];
       if (ch === '}') break;
+      if (ch === '<') {
+        const closing = this.peek(CLOSE_TAG);
+        if (closing !== undefined) {
+          if (tag === undefined) throw new IcuSyntaxError(`Unexpected closing tag '</${closing}>'`, this.pos);
+          break;
+        }
+        const opening = this.peek(OPEN_TAG);
+        if (opening !== undefined) {
+          flush();
+          nodes.push(this.tag(opening, inPlural));
+          continue;
+        }
+      }
       if (ch === '{') {
         flush();
         nodes.push(this.argument());
@@ -84,6 +103,21 @@ class Parser {
     return nodes;
   }
 
+  private tag(name: string, inPlural: boolean): IcuNode {
+    const at = this.pos;
+    this.pos += name.length + 2;
+    const children = this.message(inPlural, name);
+    if (this.peek(CLOSE_TAG) !== name) throw new IcuSyntaxError(`Unclosed tag '<${name}>'`, at);
+    this.pos += name.length + 3;
+    return { type: 'tag', name, children };
+  }
+
+  /** The name a tag pattern captures at the cursor, without moving it. */
+  private peek(re: RegExp): string | undefined {
+    re.lastIndex = this.pos;
+    return re.exec(this.src)?.[1];
+  }
+
   /** `''` is a literal quote; `'` before a syntax character opens a quoted run. */
   private quoted(inPlural: boolean): string {
     const next = this.src[this.pos + 1];
@@ -91,7 +125,7 @@ class Parser {
       this.pos += 2;
       return "'";
     }
-    if (next === '{' || next === '}' || (inPlural && next === '#')) {
+    if (next === '{' || next === '}' || next === '<' || (inPlural && next === '#')) {
       const end = this.src.indexOf("'", this.pos + 1);
       if (end < 0) throw new IcuSyntaxError('Unterminated quote', this.pos);
       const value = this.src.slice(this.pos + 1, end);
@@ -231,6 +265,10 @@ export function icuArguments(
         into.set(node.name, 'select');
         for (const branch of Object.values(node.options)) icuArguments(branch, into);
         break;
+      case 'tag':
+        into.set(node.name, 'tag');
+        icuArguments(node.children, into);
+        break;
     }
   }
   return into;
@@ -283,32 +321,62 @@ function toDate(value: IcuValue): Date {
   return value instanceof Date ? value : new Date(typeof value === 'number' ? value : String(value ?? ''));
 }
 
+/** Renders what a tag wraps: `<link>…</link>` calls the `link` tag with its parts. */
+export type IcuTag<T> = (parts: Array<string | T>) => T;
+
 export function formatIcu(nodes: IcuNode[], locale: string, values: IcuValues = {}, pound?: number): string {
-  let out = '';
+  return formatIcuParts<never>(nodes, locale, values, {}, pound).join('');
+}
+
+/**
+ * Format a message into text and the values its tags render, adjacent text
+ * merged. A tag without a renderer keeps its content and loses its markup.
+ */
+export function formatIcuParts<T>(
+  nodes: IcuNode[],
+  locale: string,
+  values: IcuValues = {},
+  tags: Readonly<Record<string, IcuTag<T>>> = {},
+  pound?: number,
+): Array<string | T> {
+  const parts: Array<string | T> = [];
+  const text = (value: string) => {
+    if (!value) return;
+    const last = parts.length - 1;
+    if (typeof parts[last] === 'string') parts[last] = `${parts[last]}${value}`;
+    else parts.push(value);
+  };
+  const append = (inner: Array<string | T>) => {
+    for (const part of inner) {
+      if (typeof part === 'string') text(part);
+      else parts.push(part);
+    }
+  };
   for (const node of nodes) {
     switch (node.type) {
       case 'text':
-        out += node.value;
+        text(node.value);
         break;
       case 'pound':
-        out += pound === undefined ? '#' : numberFormat(locale).format(pound);
+        text(pound === undefined ? '#' : numberFormat(locale).format(pound));
         break;
       case 'argument': {
         const value = values[node.name];
-        out +=
+        text(
           value instanceof Date
             ? dateFormat(locale, 'date').format(value)
             : typeof value === 'number' || typeof value === 'bigint'
               ? numberFormat(locale).format(value)
-              : String(value ?? '');
+              : String(value ?? ''),
+        );
         break;
       }
       case 'number':
-        out += numberFormat(locale, node.style).format(toNumber(values[node.name]));
+        text(numberFormat(locale, node.style).format(toNumber(values[node.name])));
         break;
       case 'date':
       case 'time':
-        out += dateFormat(locale, node.type, node.style).format(toDate(values[node.name]));
+        text(dateFormat(locale, node.type, node.style).format(toDate(values[node.name])));
         break;
       case 'plural':
       case 'selectordinal': {
@@ -317,16 +385,23 @@ export function formatIcu(nodes: IcuNode[], locale: string, values: IcuValues = 
         const relative = n - node.offset;
         const rule = pluralRules(locale, node.type === 'plural' ? 'cardinal' : 'ordinal').select(relative);
         const branch = exact ?? node.options[rule] ?? (node.options['other'] as IcuNode[]);
-        out += formatIcu(branch, locale, values, relative);
+        append(formatIcuParts(branch, locale, values, tags, relative));
         break;
       }
       case 'select': {
         const key = String(values[node.name] ?? '');
         const branch = node.options[key] ?? (node.options['other'] as IcuNode[]);
-        out += formatIcu(branch, locale, values, pound);
+        append(formatIcuParts(branch, locale, values, tags, pound));
+        break;
+      }
+      case 'tag': {
+        const inner = formatIcuParts(node.children, locale, values, tags, pound);
+        const render = tags[node.name];
+        if (render) parts.push(render(inner));
+        else append(inner);
         break;
       }
     }
   }
-  return out;
+  return parts;
 }

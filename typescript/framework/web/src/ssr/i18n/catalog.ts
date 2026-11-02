@@ -159,8 +159,9 @@ export interface CatalogDiagnostic {
   message: string;
 }
 
+/** The arguments and tags a message uses, written `{name}` and `<name>`, sorted. */
 function argumentNames(text: string): string[] {
-  return [...icuArguments(parseIcu(text)).keys()].sort();
+  return [...icuArguments(parseIcu(text))].map(([name, kind]) => (kind === 'tag' ? `<${name}>` : `{${name}}`)).sort();
 }
 
 /**
@@ -223,7 +224,7 @@ export function checkCatalog(
           code: 'argument-mismatch',
           locale,
           key: id,
-          message: `uses {${actual.join('}, {')}} where the default text uses {${expected.join('}, {')}}`,
+          message: `uses ${actual.join(', ') || 'no argument'} where the default text uses ${expected.join(', ') || 'no argument'}`,
         });
       }
       if (entry.state === 'stale') {

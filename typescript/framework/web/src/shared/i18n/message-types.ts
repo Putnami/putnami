@@ -1,3 +1,5 @@
+import type { ReactNode } from 'react';
+
 /**
  * Type-level reading of an ICU message's arguments, so `t.seats({ count: 3 })`
  * fails to compile when `count` is missing or has the wrong type. It mirrors
@@ -53,28 +55,63 @@ type OpenArgument<S extends string, Stack extends Mode[], Acc> = S extends `${in
 
 /**
  * Drop what the runtime reads as text: `''` (a literal quote) and a quoted run
- * that opens on a brace (`'{literal}'`), so its braces open no argument.
+ * that opens on a brace or an angle bracket (`'{literal}'`, `'<b>'`), so its
+ * braces open no argument and its brackets no tag.
  */
 type StripQuotes<S extends string> = S extends `${infer A}''${infer B}`
   ? StripQuotes<`${A}${B}`>
-  : S extends `${infer A}'{${infer B}`
+  : S extends `${infer A}'${'{' | '}' | '<'}${infer B}`
     ? B extends `${string}'${infer C}`
       ? StripQuotes<`${A}${C}`>
       : S
-    : S extends `${infer A}'}${infer B}`
-      ? B extends `${string}'${infer C}`
-        ? StripQuotes<`${A}${C}`>
-        : S
-      : S;
+    : S;
+
+type Chars<S extends string, Acc = never> = S extends `${infer C}${infer R}` ? Chars<R, Acc | C> : Acc;
+type IdentStart = Chars<'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_'>;
+type IdentChar = IdentStart | Chars<'0123456789'>;
+type IsIdentRest<S extends string> = S extends `${infer C}${infer R}`
+  ? C extends IdentChar
+    ? IsIdentRest<R>
+    : false
+  : true;
+type IsIdent<S extends string> = S extends `${infer C}${infer R}`
+  ? C extends IdentStart
+    ? IsIdentRest<R>
+    : false
+  : false;
+
+/** The names of the tags a message opens: `<link>` opens `link`; `</link>` and `a < b` open none. */
+type TagNames<S extends string, Acc = never> = S extends `${string}<${infer After}`
+  ? TagNames<
+      After,
+      Acc | (After extends `${infer Name}>${string}` ? (IsIdent<Name> extends true ? Name : never) : never)
+    >
+  : Acc;
+
+/** Renders what a tag wraps. */
+export type TagRenderer = (chunks: ReactNode) => ReactNode;
+
+type TagArguments<S extends string> = [TagNames<S>] extends [never] ? unknown : { [K in TagNames<S>]: TagRenderer };
 
 type Simplify<T> = { [K in keyof T]: T[K] } & {};
 
-/** The values an ICU message needs, by argument name. */
+/** The values an ICU message needs, by argument name, and a renderer per tag. */
 export type MessageArguments<S extends string> = string extends S
   ? Record<string, unknown>
-  : Simplify<Walk<StripQuotes<S>, [], unknown>>;
+  : Simplify<Walk<StripQuotes<S>, [], unknown> & TagArguments<StripQuotes<S>>>;
+
+/**
+ * What a message formats to: a string, or a React node when it has tags. A
+ * text the compiler cannot read, a `string` rather than a literal, types as a
+ * string.
+ */
+export type MessageResult<S extends string> = string extends S
+  ? string
+  : [TagNames<StripQuotes<S>>] extends [never]
+    ? string
+    : ReactNode;
 
 /** A formatter for one message: argument-free messages take no values. */
 export type MessageFormatter<S extends string> = keyof MessageArguments<S> extends never
-  ? () => string
-  : (values: MessageArguments<S>) => string;
+  ? () => MessageResult<S>
+  : (values: MessageArguments<S>) => MessageResult<S>;

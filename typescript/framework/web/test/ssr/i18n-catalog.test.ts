@@ -134,6 +134,26 @@ describe('checkCatalog', () => {
   );
 
   specTest(
+    'fails when a translation uses other tags than its default text',
+    { feature, requirement: 'inline-tags', check: 'a-translation-with-other-tags-fails' },
+    () => {
+      const defaults = new Map([['legal', { terms: 'Read the <link>terms</link>' }]]);
+      const catalog = (text: string): Catalog => ({
+        legal: { terms: { text, source: sourceHash('Read the <link>terms</link>'), state: 'draft' } },
+      });
+      expect(run(catalog('Lisez les <a>conditions</a>'), true, defaults)[0]).toMatchObject({
+        level: 'error',
+        code: 'argument-mismatch',
+        message: 'uses <a> where the default text uses <link>',
+      });
+      expect(run(catalog('Lisez les {link}'), true, defaults)[0]?.message).toBe(
+        'uses {link} where the default text uses <link>',
+      );
+      expect(run(catalog('Lisez les <link>conditions</link>'), true, defaults)).toEqual([]);
+    },
+  );
+
+  specTest(
     'warns for a stale translation',
     { feature, requirement: 'catalog-check', check: 'a-stale-translation-warns' },
     () => {
