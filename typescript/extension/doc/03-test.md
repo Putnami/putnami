@@ -7,6 +7,7 @@ The test command discovers and runs tests using Bun's built-in test runner. It p
 - Discovers test files by glob pattern (`*.test.ts`, `*.spec.ts`, and `.tsx`/`.js`/`.jsx` variants)
 - Skips automatically if no test files are found
 - Runs a generate phase before testing (to ensure generated code is up to date)
+- Type-checks every TypeScript file of the project, tests included, in a `types` step beside the test run
 - Produces JUnit XML reports for CI integration
 - Supports LCOV coverage reporting
 - Extracts detailed failure information including assertion details
@@ -67,6 +68,7 @@ putnami test . --concurrent
 
 ```text
 generate ──→ discover ──→ run ──→ parse
+         └──→ types
 ```
 
 1. **Generate** — runs the build generate phase to ensure `.gen/` is current. It writes the same `.gen/` tree as the `generate` step of `build`, so in a run such as `putnami lint,test,build` the planner orders the two: one never starts while the other, or a step that reads its output, still runs
@@ -75,6 +77,16 @@ generate ──→ discover ──→ run ──→ parse
 4. **Parse** — reads JUnit XML and optional LCOV output, extracts failures and metrics
 
 If no test files are found, the command returns `SKIP` (exit 0) unless `--pass-with-no-tests` is `false`.
+
+## Type-check
+
+Bun strips types when it runs a test, and `build~types` reads only `src/`, `bin/` and `.gen/`. The `test~types` step is the one that type-checks the rest: it runs `tsc --noEmit` over every `.ts`, `.tsx`, `.mts` and `.cts` file of the project, tests, fixtures and benchmarks included. A type error, or a `@ts-expect-error` that no longer marks an error, fails `putnami test`.
+
+- It runs after `generate`, beside the test run, so a test that imports `.gen/` is checked against the current generated code.
+- It uses the tsconfig `build~types` resolves and the same compiler options, so a test is judged the way a source file is. It emits nothing.
+- It leaves out `node_modules`, `dist`, `.putnami`, `out`, `vendor`, and every nested project: a subdirectory with its own `putnami.json` is checked by its own `test`.
+- It keeps `tsc`'s incremental build info in the extension's cache scratch, so a warm run re-checks only what changed. `putnami cache clean` removes it.
+- It caches like the test run: an unchanged project replays its verdict.
 
 ## Test File Conventions
 

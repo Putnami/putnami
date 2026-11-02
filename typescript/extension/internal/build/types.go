@@ -37,6 +37,27 @@ func buildTscArgs(outputPath, tsconfig string, sourceFiles []string, tsBuildInfo
 		"--declaration",
 		"--emitDeclarationOnly",
 		"--declarationMap",
+	}
+	args = append(args, tscCompilerFlags(ignoreDeprecations)...)
+	// --incremental composes with --emitDeclarationOnly: tsc persists file
+	// signatures to tsBuildInfoFile and, on a warm run, re-checks/re-emits only
+	// the files whose inputs changed.
+	if tsBuildInfoFile != "" {
+		args = append(args, "--incremental", "--tsBuildInfoFile", tsBuildInfoFile)
+	}
+	if tsconfig != "" {
+		args = append(args, "--project", tsconfig)
+	} else {
+		args = append(args, sourceFiles...)
+	}
+	return args
+}
+
+// tscCompilerFlags returns the compiler options every tsc run of this
+// extension sets, so the types phase and the test type-check judge a file the
+// same way.
+func tscCompilerFlags(ignoreDeprecations string) []string {
+	flags := []string{
 		"--experimentalDecorators",
 		"--strict", "true",
 		"--target", "esnext",
@@ -50,23 +71,11 @@ func buildTscArgs(outputPath, tsconfig string, sourceFiles []string, tsBuildInfo
 		"--forceConsistentCasingInFileNames", "true",
 	}
 	if ignoreDeprecations != "" {
-		args = append(args, "--ignoreDeprecations", ignoreDeprecations)
+		flags = append(flags, "--ignoreDeprecations", ignoreDeprecations)
 	}
 	// Force plain (non-ANSI) diagnostics so ParseTscOutput can extract
 	// file/line/column; tsc emits pretty/colorized output in a TTY otherwise.
-	args = append(args, "--pretty", "false")
-	// --incremental composes with --emitDeclarationOnly: tsc persists file
-	// signatures to tsBuildInfoFile and, on a warm run, re-checks/re-emits only
-	// the files whose inputs changed.
-	if tsBuildInfoFile != "" {
-		args = append(args, "--incremental", "--tsBuildInfoFile", tsBuildInfoFile)
-	}
-	if tsconfig != "" {
-		args = append(args, "--project", tsconfig)
-	} else {
-		args = append(args, sourceFiles...)
-	}
-	return args
+	return append(flags, "--pretty", "false")
 }
 
 // ignoreDeprecationsByMajor maps a TypeScript major version to the
@@ -144,31 +153,42 @@ type TypesResult struct {
 // project (e.g. build~types and package~types planned by `publish`) don't
 // race on writing/removing a shared `tsconfig.types.json`.
 func createTypesTsConfig(scratchDir, projectPath, baseTsConfig string) (string, error) {
+	return writeScratchTsConfig(scratchDir, "tsconfig.types.*.json", projectPath, baseTsConfig,
+		[]string{"src/**/*.ts", "src/**/*.tsx", "bin/**/*.ts", ".gen/**/*.ts", ".gen/**/*.tsx"},
+		[]string{"**/*.test.ts", "**/*.spec.ts", "**/*.test.tsx", "**/*.spec.tsx"})
+}
+
+// writeScratchTsConfig writes, under scratchDir with a name matching pattern,
+// a tsconfig that extends baseTsConfig and resolves as it would from
+// projectPath, with include and exclude, project-relative patterns, anchored
+// on projectPath. An empty baseTsConfig extends nothing.
+func writeScratchTsConfig(scratchDir, pattern, projectPath, baseTsConfig string, include, exclude []string) (string, error) {
 	projectPath, err := filepath.Abs(projectPath)
 	if err != nil {
 		return "", err
 	}
-	baseTsConfig, err = filepath.Abs(baseTsConfig)
-	if err != nil {
-		return "", err
+	inProject := func(patterns []string) []string {
+		anchored := make([]string, len(patterns))
+		for i, p := range patterns {
+			anchored[i] = filepath.ToSlash(filepath.Join(projectPath, p))
+		}
+		return anchored
 	}
-	inProject := func(pattern string) string {
-		return filepath.ToSlash(filepath.Join(projectPath, pattern))
-	}
-	chain := project.ReadTsConfigChain(baseTsConfig)
 	cfg := map[string]any{
-		"extends":         filepath.ToSlash(baseTsConfig),
-		"compilerOptions": typesCompilerOptions(projectPath, chain),
-		"include": []string{
-			inProject("src/**/*.ts"), inProject("src/**/*.tsx"), inProject("bin/**/*.ts"),
-			inProject(".gen/**/*.ts"), inProject(".gen/**/*.tsx"),
-		},
-		"exclude": []string{
-			inProject("**/*.test.ts"), inProject("**/*.spec.ts"), inProject("**/*.test.tsx"), inProject("**/*.spec.tsx"),
-		},
+		"compilerOptions": map[string]any{"typeRoots": defaultTypeRoots(projectPath)},
+		"include":         inProject(include),
+		"exclude":         inProject(exclude),
 	}
-	if files, ok := typesFiles(projectPath, chain); ok {
-		cfg["files"] = files
+	if baseTsConfig != "" {
+		if baseTsConfig, err = filepath.Abs(baseTsConfig); err != nil {
+			return "", err
+		}
+		chain := project.ReadTsConfigChain(baseTsConfig)
+		cfg["extends"] = filepath.ToSlash(baseTsConfig)
+		cfg["compilerOptions"] = typesCompilerOptions(projectPath, chain)
+		if files, ok := typesFiles(projectPath, chain); ok {
+			cfg["files"] = files
+		}
 	}
 	data, err := json.MarshalIndent(cfg, "", "  ")
 	if err != nil {
@@ -182,7 +202,7 @@ func createTypesTsConfig(scratchDir, projectPath, baseTsConfig string) (string, 
 			return "", err
 		}
 	}
-	f, err := os.CreateTemp(scratchDir, "tsconfig.types.*.json")
+	f, err := os.CreateTemp(scratchDir, pattern)
 	if err != nil {
 		return "", err
 	}

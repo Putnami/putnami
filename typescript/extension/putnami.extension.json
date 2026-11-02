@@ -400,6 +400,14 @@
           ]
         },
         {
+          "id": "types",
+          "heavy": true,
+          "task": "test-types",
+          "dependsOn": [
+            "generate"
+          ]
+        },
+        {
           "id": "test-env-teardown",
           "task": "test-env-down",
           "runOn": "finally",
@@ -1904,6 +1912,68 @@
       "declares": {
         "effects": [
           "process"
+        ]
+      }
+    },
+    "test-types": {
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": [
+        "test-types"
+      ],
+      "cwd": "{projectRoot}",
+      "timeoutMs": 300000,
+      "inputs": {
+        "sources": {
+          "from": "project",
+          "files": [
+            "**/*.ts",
+            "**/*.tsx",
+            "**/*.mts",
+            "**/*.cts",
+            "!.gen/**"
+          ]
+        },
+        "config": {
+          "from": "project",
+          "files": [
+            "tsconfig.json",
+            "tsconfig.app.json",
+            "tsconfig.lib.json",
+            "package.json"
+          ]
+        },
+        "workspaceConfig": {
+          "from": "workspace",
+          "files": [
+            "package.json",
+            "bun.lock",
+            "bun.lockb",
+            "bunfig.toml",
+            "tsconfig.json",
+            "tsconfig.base.json"
+          ]
+        },
+        "extensionVersion": {
+          "from": "runtime"
+        }
+      },
+      "outputs": {
+        "data": {
+          "description": "Type-check result of every project file, tests included"
+        }
+      },
+      "reads": [
+        "gen",
+        "sources"
+      ],
+      "cache": {
+        "noOutput": true,
+        "enabled": true
+      },
+      "declares": {
+        "effects": [
+          "toolchain-cache"
         ]
       }
     },
