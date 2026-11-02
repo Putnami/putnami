@@ -24,8 +24,8 @@ later.
 
 ## Use it
 
-Install the extension in the user scope, then run it in the job. It is
-published on the `canary` channel only:
+Install the extension in the user scope, then run it in the job. As of
+November 2026 it is published on the `canary` channel only:
 
 ```bash
 putnami extensions install --user @putnami/observe@canary

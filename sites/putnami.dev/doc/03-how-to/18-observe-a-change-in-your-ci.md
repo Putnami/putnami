@@ -2,19 +2,21 @@
 
 You will add one step to a GitHub Actions workflow, or one job to a GitLab CI pipeline, that reads what your tests already produced and writes a change evidence document: which commit was built, what it is measured against, which files changed, and which test and coverage reports the job wrote. Your repository needs no Putnami workspace, and your pipeline keeps its own build and test commands.
 
-`putnami observe` comes with the `@putnami/observe` extension. It is `experimental` and published on the `canary` channel only, so every command below names `canary`.
+`putnami observe` comes with the `@putnami/observe` extension. It is `experimental` and, as of November 2026, published on the `canary` channel only, so every command below names `canary`.
 
 ## What the snippets install
 
 | Line | What it does |
 |---|---|
-| `curl -fsSL https://putnami.dev/install.sh \| bash -s -- --version canary` | Installs the canary Putnami CLI into `~/.putnami/bin`. The stable CLI cannot load the canary `@putnami/cloud`. |
+| `curl -fsSL https://putnami.dev/install.sh \| bash -s -- --version canary` | Installs the canary Putnami CLI into `~/.putnami/bin`. The stable CLI 0.3.0 cannot load the canary `@putnami/cloud`. |
 | `export PATH="$HOME/.putnami/bin:$PATH"` | Makes `putnami` reachable in the rest of the step. A script piped into `bash` cannot change the `PATH` of the shell that runs it. |
 | `putnami extensions install --user @putnami/observe@canary` | Installs the extension in the user scope, so its command runs outside any workspace. `--user` takes one extension per command. |
 | `putnami extensions install --user @putnami/cloud@canary` | Installs the extension that uploads the evidence to Putnami Cloud. |
-| `putnami observe --evidence observe-evidence.json` | Prints the summary and writes the evidence document. It exits `0` whatever it observes, so it never fails your job. |
+| `putnami observe --evidence observe-evidence.json` | Prints the summary and writes the evidence document. It exits `0` whatever it observes: only a usage error, or a job context or output it cannot read or write, fails the step. |
 
-`putnami observe` finds the base of the change from the CI: the pull request base on GitHub, the merge request diff base on GitLab. It deepens a shallow clone itself, so you do not change `fetch-depth` or `GIT_DEPTH`. It finds JUnit, LCOV, Cobertura, Clover and Go cover reports by their content, anywhere in the checkout.
+`putnami observe` finds the base of the change from the CI: the pull request base on GitHub, the merge request diff base on GitLab, and on a branch push the commit before the push. It deepens a shallow clone itself, so you do not change `fetch-depth` or `GIT_DEPTH`. It finds JUnit, LCOV, Cobertura, Clover and Go cover reports by their content, anywhere in the checkout except `.git`, `node_modules` and `vendor`.
+
+The install lines need the network: when the installer or the registry cannot be reached, the step fails.
 
 ## Steps
 
@@ -72,7 +74,7 @@ observe:
       - observe-evidence.json
 ```
 
-Rename `test` in `needs` if your test job has another name. The image holds Bash, curl, tar and Git; any image with those, and Git 2.29 or later, works. `before_script: []` and `cache: []` keep your pipeline's defaults out of this job.
+Rename `test` in `needs` if your test job has another name. The image holds Bash, curl, tar, `sha256sum` and Git; any image with those, and Git 2.29 or later, works. `before_script: []` and `cache: []` keep your pipeline's defaults out of this job.
 
 ### 3) Read the job log
 
