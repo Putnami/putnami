@@ -54,7 +54,11 @@ type Options struct {
 	Overrides ci.Overrides
 	JUnit     []string
 	Coverage  []string
-	Fetch     bool
+	// SBOM names the software bill of materials of the commit, BaseSBOM the
+	// one of the base.
+	SBOM     []string
+	BaseSBOM []string
+	Fetch    bool
 	// Resolve turns a named report path into an absolute one.
 	Resolve  func(string) string
 	Producer Producer
@@ -90,7 +94,7 @@ func Run(ctx context.Context, opts Options) Observation {
 	if o.Subject.Repository == "" {
 		o.Subject.Repository = repositoryName(ctx, root)
 	}
-	found, reportDiags := reports.Collect(reports.Request{Root: root, JUnit: opts.JUnit, Coverage: opts.Coverage, Resolve: opts.Resolve})
+	found, reportDiags := reports.Collect(reports.Request{Root: root, JUnit: opts.JUnit, Coverage: opts.Coverage, SBOM: opts.SBOM, BaseSBOM: opts.BaseSBOM, Resolve: opts.Resolve})
 	o.Reports = found
 	if o.Reports == nil {
 		o.Reports = []reports.Report{}
@@ -193,6 +197,10 @@ func WriteText(w io.Writer, o Observation) error {
 	writeAnalysis(&b, o.Analysis)
 	fmt.Fprintf(&b, "  reports  %s\n", count(len(o.Reports), "report"))
 	for _, r := range o.Reports {
+		if r.Kind == reports.KindBaseSBOM {
+			fmt.Fprintf(&b, "    %-9s %s (base)\n", r.Format, r.Path)
+			continue
+		}
 		fmt.Fprintf(&b, "    %-9s %s\n", r.Format, r.Path)
 	}
 	for _, d := range o.Diagnostics {

@@ -53,13 +53,16 @@ func writeAnalysis(b *strings.Builder, a analyze.Result) {
 	}
 	writeTests(b, a)
 	writeChangedLines(b, a.ChangedLineCoverage)
-	fmt.Fprintf(b, "  dependencies  %s\n", count(len(a.DependencyChanges), "change"))
+	fmt.Fprintf(b, "  dependencies  %s%s\n", count(len(a.DependencyChanges), "change"), sbomLabel(a.SBOM))
 	for i, d := range a.DependencyChanges {
 		if i == maxListedComponents {
 			fmt.Fprintf(b, "    ... and %d more\n", len(a.DependencyChanges)-i)
 			break
 		}
 		fmt.Fprintf(b, "    %-10s %s %s, in %s\n", d.Change, d.Name, versions(d), d.Lockfile)
+		if facts := dependencyFacts(d, a.SBOM); facts != "" {
+			fmt.Fprintf(b, "               %s\n", facts)
+		}
 	}
 }
 
@@ -221,4 +224,127 @@ func lineList(lines []int) string {
 		i = j + 1
 	}
 	return strings.Join(parts, ", ")
+}
+
+// maxListedVulnerabilities caps the vulnerability ids one summary line names.
+const maxListedVulnerabilities = 5
+
+// sbomLabel names the software bills of materials (SBOM) the dependency facts
+// come from; empty when none was read.
+func sbomLabel(sbom *evidence.SBOM) string {
+	if sbom == nil {
+		return ""
+	}
+	side := func(d *evidence.SBOMDocument) string {
+		if d == nil {
+			return "unknown"
+		}
+		if d.Format == evidence.SBOMCycloneDX {
+			return "CycloneDX " + d.SpecVersion
+		}
+		return "SPDX " + d.SpecVersion
+	}
+	return ", SBOM head " + side(sbom.Head) + ", base " + side(sbom.Base)
+}
+
+// dependencyFacts sums up what the SBOMs say of one dependency change: the
+// vulnerabilities it fixes, introduces and keeps, and its licenses. A side
+// without an SBOM is unknown; a package the SBOM of a side does not list is
+// said to be so.
+func dependencyFacts(d evidence.DependencyChange, sbom *evidence.SBOM) string {
+	if sbom == nil {
+		return ""
+	}
+	baseKnown := sbom.Base != nil && d.Change != evidence.DependencyAdded
+	headKnown := sbom.Head != nil && d.Change != evidence.DependencyRemoved
+	var parts []string
+	if baseKnown && d.Before == nil {
+		parts = append(parts, "not listed in the base SBOM")
+		baseKnown = false
+	}
+	if headKnown && d.After == nil {
+		parts = append(parts, "not listed in the head SBOM")
+		headKnown = false
+	}
+	switch {
+	case baseKnown && headKnown:
+		fixed, introduced, kept := vulnerabilityDiff(d.Before.Vulnerabilities, d.After.Vulnerabilities)
+		parts = append(parts, "fixes "+vulnerabilityList(fixed)+", introduces "+vulnerabilityList(introduced)+fmt.Sprintf(", keeps %d", len(kept)))
+	case d.Change == evidence.DependencyAdded && headKnown:
+		parts = append(parts, "introduces "+vulnerabilityList(d.After.Vulnerabilities))
+	case d.Change == evidence.DependencyRemoved && baseKnown:
+		parts = append(parts, "fixes "+vulnerabilityList(d.Before.Vulnerabilities))
+	case headKnown:
+		parts = append(parts, vulnerabilityList(d.After.Vulnerabilities)+" known at the head, base unknown")
+	case baseKnown:
+		parts = append(parts, vulnerabilityList(d.Before.Vulnerabilities)+" known at the base, head unknown")
+	case len(parts) > 0:
+	case d.Change == evidence.DependencyRemoved:
+		parts = append(parts, "base unknown")
+	default:
+		parts = append(parts, "head unknown")
+	}
+	if licenses := licenceChange(d); licenses != "" {
+		parts = append(parts, licenses)
+	}
+	return strings.Join(parts, "; ")
+}
+
+// vulnerabilityDiff splits the vulnerabilities of two states by id: the ones
+// only before, only after, and in both.
+func vulnerabilityDiff(before, after []evidence.Vulnerability) (fixed, introduced, kept []evidence.Vulnerability) {
+	has := func(list []evidence.Vulnerability, id string) bool {
+		return slices.ContainsFunc(list, func(v evidence.Vulnerability) bool { return v.ID == id })
+	}
+	for _, v := range before {
+		if has(after, v.ID) {
+			kept = append(kept, v)
+		} else {
+			fixed = append(fixed, v)
+		}
+	}
+	for _, v := range after {
+		if !has(before, v.ID) {
+			introduced = append(introduced, v)
+		}
+	}
+	return fixed, introduced, kept
+}
+
+// vulnerabilityList counts vulnerabilities and names the first ones with
+// their severity.
+func vulnerabilityList(list []evidence.Vulnerability) string {
+	if len(list) == 0 {
+		return "0"
+	}
+	var names []string
+	for i, v := range list {
+		if i == maxListedVulnerabilities {
+			names = append(names, fmt.Sprintf("and %d more", len(list)-i))
+			break
+		}
+		names = append(names, v.ID+" "+v.Severity)
+	}
+	return fmt.Sprintf("%d (%s)", len(list), strings.Join(names, ", "))
+}
+
+// licenceChange names the licenses of a dependency, before -> after when
+// they differ.
+func licenceChange(d evidence.DependencyChange) string {
+	var before, after string
+	if d.Before != nil {
+		before = strings.Join(d.Before.Licenses, ", ")
+	}
+	if d.After != nil {
+		after = strings.Join(d.After.Licenses, ", ")
+	}
+	switch {
+	case before == "" && after == "":
+		return ""
+	case before == after, before == "":
+		return "license " + after
+	case after == "":
+		return "license " + before
+	}
+	return "license " + before + " -> " + after
 }

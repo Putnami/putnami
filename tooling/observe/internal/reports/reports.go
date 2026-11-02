@@ -1,11 +1,14 @@
-// Package reports finds the test and coverage reports a CI job produced.
+// Package reports finds the test and coverage reports and the software bills of
+// materials (SBOM) a CI job produced.
 //
 // A report is recognized by its content, never by its name alone: a JUnit XML
 // report has a testsuites or testsuite root, a Cobertura report a coverage
 // root with Cobertura attributes, a Clover report a coverage root with a
-// project, an LCOV trace starts with a TN: or SF: record, and a Go cover
-// profile starts with its mode line. Named paths replace discovery for their
-// kind. A missing, unreadable or unrecognized report is a diagnostic.
+// project, an LCOV trace starts with a TN: or SF: record, a Go cover profile
+// starts with its mode line, a CycloneDX document states its bomFormat and an
+// SPDX one its spdxVersion. Named paths replace discovery for their kind. The
+// SBOM of the base is only named, never discovered, and each side keeps at most
+// one SBOM. A missing, unreadable or unrecognized report is a diagnostic.
 package reports
 
 import (
@@ -18,6 +21,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"regexp"
 	"slices"
 	"strings"
 
@@ -28,6 +32,9 @@ import (
 const (
 	KindJUnit    = "junit"
 	KindCoverage = "coverage"
+	// KindSBOM is the SBOM of the commit, KindBaseSBOM the one of the base.
+	KindSBOM     = "sbom"
+	KindBaseSBOM = "base-sbom"
 )
 
 // Report formats.
@@ -37,6 +44,8 @@ const (
 	FormatCobertura = "cobertura"
 	FormatClover    = "clover"
 	FormatGoCover   = "go-cover"
+	FormatCycloneDX = "cyclonedx"
+	FormatSPDX      = "spdx"
 )
 
 // Report sources.
@@ -52,6 +61,7 @@ const (
 	CodeReportUnrecognized = "observe.report_unrecognized"
 	CodeDiscoveryBounded   = "observe.discovery_bounded"
 	CodePatternInvalid     = "observe.report_pattern_invalid"
+	CodeSBOMAmbiguous      = "observe.sbom_ambiguous"
 )
 
 // Bounds of discovery: the entries walked, the files sniffed, the reports
@@ -85,6 +95,10 @@ type Request struct {
 	// that kind.
 	JUnit    []string
 	Coverage []string
+	// SBOM and BaseSBOM name the SBOM of the commit and of the base, the same
+	// way. An empty SBOM discovers it; an empty BaseSBOM reads none.
+	SBOM     []string
+	BaseSBOM []string
 	// Resolve turns a named path into an absolute one.
 	Resolve func(string) string
 }
@@ -97,9 +111,11 @@ func Collect(req Request) ([]Report, []diag.Diagnostic) {
 	for _, named := range []struct {
 		kind     string
 		patterns []string
-	}{{KindJUnit, req.JUnit}, {KindCoverage, req.Coverage}} {
+	}{{KindJUnit, req.JUnit}, {KindCoverage, req.Coverage}, {KindSBOM, req.SBOM}, {KindBaseSBOM, req.BaseSBOM}} {
 		if len(named.patterns) == 0 {
-			discover[named.kind] = true
+			if named.kind != KindBaseSBOM {
+				discover[named.kind] = true
+			}
 			continue
 		}
 		found, d := collectNamed(req, named.kind, named.patterns)
@@ -108,6 +124,10 @@ func Collect(req Request) ([]Report, []diag.Diagnostic) {
 	}
 	if len(discover) > 0 {
 		found, d := discoverReports(req.Root, discover)
+		// A file named as the base SBOM is not the commit's.
+		found = slices.DeleteFunc(found, func(r Report) bool {
+			return r.Kind == KindSBOM && slices.ContainsFunc(reports, func(n Report) bool { return n.Kind == KindBaseSBOM && n.Path == r.Path })
+		})
 		reports = append(reports, found...)
 		diags = append(diags, d...)
 		for _, kind := range []string{KindJUnit, KindCoverage} {
@@ -119,6 +139,7 @@ func Collect(req Request) ([]Report, []diag.Diagnostic) {
 	}
 	slices.SortStableFunc(reports, func(a, b Report) int { return strings.Compare(a.Path, b.Path) })
 	reports = slices.CompactFunc(reports, func(a, b Report) bool { return a.Path == b.Path && a.Kind == b.Kind })
+	reports, diags = oneSBOMPerSide(reports, diags)
 	if len(reports) > MaxReports {
 		diags = append(diags, diag.Warningf(CodeDiscoveryBounded, "", "%d reports were found; the first %d are kept", len(reports), MaxReports))
 		reports = reports[:MaxReports]
@@ -166,7 +187,7 @@ func collectNamed(req Request, kind string, patterns []string) ([]Report, []diag
 			switch {
 			case err != nil:
 				diags = append(diags, diag.Warningf(CodeReportUnreadable, kind, "the %s report %s cannot be read: %v", label(kind), display, err))
-			case kindOf(format) != kind:
+			case kindOf(format) != family(kind):
 				diags = append(diags, diag.Warningf(CodeReportUnrecognized, kind, "%s is not a %s report%s", display, label(kind), recognizedAs(format)))
 			default:
 				reports = append(reports, Report{Path: display, Kind: kind, Format: format, Source: SourceNamed})
@@ -226,6 +247,10 @@ func candidate(name string) bool {
 		return true
 	case ".txt":
 		return strings.Contains(lower, "cover")
+	case ".json":
+		// An SBOM: bom.json, sbom.cdx.json, trivy-cyclonedx.json, sbom.spdx.json.
+		return strings.Contains(lower, "bom") || strings.Contains(lower, "cdx") ||
+			strings.Contains(lower, "cyclonedx") || strings.Contains(lower, "spdx")
 	}
 	return false
 }
@@ -236,15 +261,55 @@ func kindOf(format string) string {
 		return KindJUnit
 	case FormatLCOV, FormatCobertura, FormatClover, FormatGoCover:
 		return KindCoverage
+	case FormatCycloneDX, FormatSPDX:
+		return KindSBOM
 	}
 	return ""
 }
 
+// family is the kind of format a report of kind holds: the base SBOM is an
+// SBOM.
+func family(kind string) string {
+	if kind == KindBaseSBOM {
+		return KindSBOM
+	}
+	return kind
+}
+
 func label(kind string) string {
-	if kind == KindJUnit {
+	switch kind {
+	case KindJUnit:
 		return "JUnit"
+	case KindSBOM:
+		return "SBOM"
+	case KindBaseSBOM:
+		return "base SBOM"
 	}
 	return "coverage"
+}
+
+// oneSBOMPerSide keeps at most one SBOM per side: several make that side
+// unknown, with CodeSBOMAmbiguous, rather than one picked at random.
+func oneSBOMPerSide(reports []Report, diags []diag.Diagnostic) ([]Report, []diag.Diagnostic) {
+	for _, kind := range []string{KindSBOM, KindBaseSBOM} {
+		var paths []string
+		for _, r := range reports {
+			if r.Kind == kind {
+				paths = append(paths, r.Path)
+			}
+		}
+		if len(paths) < 2 {
+			continue
+		}
+		flag := "--sbom"
+		if kind == KindBaseSBOM {
+			flag = "--base-sbom"
+		}
+		diags = append(diags, diag.Warningf(CodeSBOMAmbiguous, kind,
+			"%d documents were found for the %s, so none is read: %s; name one with %s", len(paths), label(kind), strings.Join(paths, ", "), flag))
+		reports = slices.DeleteFunc(reports, func(r Report) bool { return r.Kind == kind })
+	}
+	return reports, diags
 }
 
 func recognizedAs(format string) string {
@@ -277,6 +342,9 @@ func Sniff(head []byte) string {
 	if bytes.HasPrefix(trimmed, []byte("<")) {
 		return sniffXML(trimmed)
 	}
+	if bytes.HasPrefix(trimmed, []byte("{")) {
+		return sniffJSON(trimmed)
+	}
 	scanner := bufio.NewScanner(bytes.NewReader(trimmed))
 	if !scanner.Scan() {
 		return ""
@@ -287,6 +355,23 @@ func Sniff(head []byte) string {
 		return FormatLCOV
 	case line == "mode: set", line == "mode: count", line == "mode: atomic":
 		return FormatGoCover
+	}
+	return ""
+}
+
+// cycloneDXMember and spdxMember are the members that name an SBOM's format,
+// which its writers put near the start of the document.
+var (
+	cycloneDXMember = regexp.MustCompile(`"bomFormat"\s*:\s*"CycloneDX"`)
+	spdxMember      = regexp.MustCompile(`"spdxVersion"\s*:\s*"SPDX-`)
+)
+
+func sniffJSON(head []byte) string {
+	switch {
+	case cycloneDXMember.Match(head):
+		return FormatCycloneDX
+	case spdxMember.Match(head):
+		return FormatSPDX
 	}
 	return ""
 }

@@ -117,9 +117,50 @@ Without the token, or on a branch push, the summary says why nothing was posted,
 
 To send the evidence to Putnami Cloud, store a workspace token with the `delivery.ingest` scope as the secret or masked CI/CD variable `PUTNAMI_CLOUD_TOKEN`. Then use the commented `--upload` line in place of the line above it, and on GitHub uncomment the `env` block. The token names the workspace. An upload that fails is a diagnostic in the summary, and the job still passes.
 
+### 5) Add licences and known vulnerabilities from an SBOM
+
+A software bill of materials (SBOM) lists the packages of a build with their licences and known vulnerabilities. `putnami observe` reads one the job wrote, CycloneDX 1.4 to 1.6 or SPDX 2.3 in JSON, and gives each changed dependency what it lists: the vulnerabilities the change fixes or introduces, and the licences before and after. It queries no vulnerability database itself.
+
+On GitHub Actions, put this step before the observe step. It writes an SBOM of the head and one of the pull request base with [osv-scanner](https://github.com/google/osv-scanner), which reads the lockfiles of Node, Composer and Go projects:
+
+```yaml
+      - name: Write the SBOMs
+        if: ${{ !cancelled() && github.event_name == 'pull_request' }}
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          curl -fsSL -o "$RUNNER_TEMP/osv-scanner" https://github.com/google/osv-scanner/releases/download/v2.7.0/osv-scanner_linux_amd64
+          chmod +x "$RUNNER_TEMP/osv-scanner"
+          git fetch --quiet --depth=1 origin "$BASE_SHA"
+          git worktree add --quiet --detach "$RUNNER_TEMP/base" "$BASE_SHA"
+          for side in head base; do
+            dir=.; [ "$side" = base ] && dir="$RUNNER_TEMP/base"
+            "$RUNNER_TEMP/osv-scanner" scan source --all-packages --licenses --format cyclonedx-1-5 \
+              --output-file "$RUNNER_TEMP/$side.cdx.json" -r "$dir" || true
+          done
+```
+
+Then name both documents on the observe line:
+
+```bash
+putnami observe --evidence observe-evidence.json --sbom "$RUNNER_TEMP/head.cdx.json" --base-sbom "$RUNNER_TEMP/base.cdx.json"
+```
+
+osv-scanner exits `1` when it finds a vulnerability, so `|| true` keeps the step green; a document it could not write is a warning in the summary. `--all-packages` lists every package, not only the vulnerable ones, and `--licenses` adds their licences. osv-scanner writes no vulnerability in SPDX, so use CycloneDX. On GitLab, use `$CI_MERGE_REQUEST_DIFF_BASE_SHA` as the base, and a directory outside the checkout, such as `/tmp`, in place of `$RUNNER_TEMP`. [Trivy](https://trivy.dev) also writes a CycloneDX document with vulnerabilities: `trivy fs --format cyclonedx --scanners vuln --output head.cdx.json .`.
+
+Without `--base-sbom`, each dependency gets its state at the head and the summary says the base is unknown. Without `--sbom`, `putnami observe` reads an SBOM it finds in the checkout, in a `.json` file whose name contains `bom`, `cdx`, `cyclonedx` or `spdx`. The summary then gives each change one more line:
+
+```text
+  dependencies  3 changes, SBOM head CycloneDX 1.5, base CycloneDX 1.5
+    upgraded   lodash 4.17.20 -> 4.17.21, in package-lock.json
+               fixes 2 (GHSA-35jh-r3h4-6jhm high, GHSA-29mw-wpgm-hmr9 medium), introduces 0, keeps 3; licence MIT
+    added      zod 3.23.8, in package-lock.json
+               introduces 1 (GHSA-mrhx-c7xc-m3w5 high); licence MIT
+```
+
 ## Learn more
 
-- [What `putnami observe` reads](https://github.com/putnami/putnami/blob/main/tooling/observe/doc/01-observe.md): every flag, how the base is found, and how reports are discovered.
+- [What `putnami observe` reads](https://github.com/putnami/putnami/blob/main/tooling/observe/doc/01-observe.md): every flag, how the base is found, and how reports and SBOMs are discovered.
 - [The `@putnami/observe` README](https://github.com/putnami/putnami/blob/main/tooling/observe/README.md): the questions it answers and how it reads Nx, npm, pnpm, yarn and Go repositories.
 
 You now have a CI job that records which files a change touched and which tests and coverage reports it produced, as an artifact you can keep or upload to Putnami Cloud.

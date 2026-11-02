@@ -68,7 +68,7 @@
   "commands": {
     "observe-run": {
       "visibility": "internal",
-      "description": "Observe the change a CI job built, in a repository that keeps its own CI and needs no Putnami workspace. It detects GitHub Actions, GitLab CI or a generic CI, names the repository by its code host and numeric project id, resolves the commit the change is measured against, deepening a shallow clone up to the merge base, lists the changed files, and finds the test and coverage reports the job produced. A missing or malformed report, or a base it cannot reach, is a diagnostic: it exits 0 whatever it observes, 2 on a usage error and 1 when it cannot read its job context or write its output. It prints a text summary, or one JSON document with --output=json. In the caller's directory it writes only the Git history it fetches, which --no-fetch turns off, and the change evidence document --evidence names. --upload hands that document to the evidence reporter extension, and --publish posts a commit status and one summary note on the pull or merge request; neither fails the job.",
+      "description": "Observe the change a CI job built, in a repository that keeps its own CI and needs no Putnami workspace. It detects GitHub Actions, GitLab CI or a generic CI, names the repository by its code host and numeric project id, resolves the commit the change is measured against, deepening a shallow clone up to the merge base, lists the changed files, and finds the test and coverage reports and the software bills of materials (SBOM) the job produced; an SBOM gives each changed dependency its licenses and known vulnerabilities. A missing or malformed report, or a base it cannot reach, is a diagnostic: it exits 0 whatever it observes, 2 on a usage error and 1 when it cannot read its job context or write its output. It prints a text summary, or one JSON document with --output=json. In the caller's directory it writes only the Git history it fetches, which --no-fetch turns off, and the change evidence document --evidence names. --upload hands that document to the evidence reporter extension, and --publish posts a commit status and one summary note on the pull or merge request; neither fails the job.",
       "flags": {
         "base": {
           "type": "string",
@@ -85,6 +85,14 @@
         "coverage": {
           "type": "string",
           "description": "Comma-separated coverage report paths or glob patterns (LCOV, Cobertura, Clover, Go cover profile); replaces coverage discovery."
+        },
+        "sbom": {
+          "type": "string",
+          "description": "Path or glob pattern of the software bill of materials of the commit (CycloneDX 1.4 to 1.6 or SPDX 2.3, JSON); replaces SBOM discovery. Gives each changed dependency its licences and known vulnerabilities."
+        },
+        "base-sbom": {
+          "type": "string",
+          "description": "Path or glob pattern of the software bill of materials of the base; without it the base state of each dependency is unknown."
         },
         "fetch": {
           "type": "boolean",
@@ -136,6 +144,10 @@
             {
               "command": "putnami observe --junit 'reports/*.xml' --coverage coverage/lcov.info --output=json",
               "description": "Name the reports and print one JSON document."
+            },
+            {
+              "command": "putnami observe --sbom sbom.cdx.json --base-sbom base.cdx.json",
+              "description": "Give each changed dependency the licences and known vulnerabilities two SBOMs the job wrote list."
             },
             {
               "command": "putnami observe --evidence putnami-evidence.json",

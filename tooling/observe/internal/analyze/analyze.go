@@ -1,6 +1,7 @@
 // Package analyze computes what a change touches: the changed and dependent
 // components, the tests and coverage of each component, the coverage of the
-// changed lines and the dependency changes of the lockfiles.
+// changed lines and the dependency changes of the lockfiles, with the licenses
+// and known vulnerabilities the software bills of materials list for them.
 //
 // It reads the components the detectors found, the reports the CI wrote and
 // the git diff; it runs nothing. Every finding is a diagnostic.
@@ -69,7 +70,10 @@ type Result struct {
 	ChangedLineCoverage *evidence.ChangedLineCoverage `json:"changedLineCoverage,omitempty"`
 	// DependencyChanges are the lockfile differences.
 	DependencyChanges []evidence.DependencyChange `json:"dependencyChanges,omitempty"`
-	Diagnostics       []diag.Diagnostic           `json:"-"`
+	// SBOM names the software bills of materials the dependency states were
+	// read from; nil when none was read.
+	SBOM        *evidence.SBOM    `json:"sbom,omitempty"`
+	Diagnostics []diag.Diagnostic `json:"-"`
 }
 
 // Run analyzes one change.
@@ -92,6 +96,7 @@ func Run(in Input) Result {
 	lines := r.readReports(in, m)
 	r.changedLineCoverage(in, lines)
 	r.dependencyChanges(in)
+	r.sbomFacts(in)
 	return r
 }
 
