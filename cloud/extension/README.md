@@ -283,9 +283,13 @@ The command reads a `protocol/evidence` v1 document and makes three calls:
 3. The same route then posts `components`, `changedLineCoverage` and
    `dependencyChanges` as the document holds them. They go apart because the
    route refuses a body over 1 MiB whole. A dependency change keeps its
-   `before` and `after` states when `putnami observe --sbom` wrote them: the
-   licenses and the known vulnerabilities, each with its id and severity.
-   The document's `sbom` member is not sent.
+   `before` and `after` states when `putnami observe` read an SBOM (software
+   bill of materials): the head one from `--sbom` or found in the checkout,
+   the base one from `--base-sbom`. A state lists the licenses and the known
+   vulnerabilities, each with its id and severity. When Delivery refuses the
+   batch with 400 or 413 while it carries states, as a Delivery that predates
+   them does, or for its size, the command warns and posts the batch again
+   without them. The document's `sbom` member is not sent.
 
 A batch with nothing to carry is not sent. The summary lists apart the kinds
 Delivery already held for that submission. Without the token, with a document
@@ -1363,8 +1367,8 @@ db-gateway, delivery-api, distribution-api, identity-api, observability-api,
 oci-server, put-server, runtime-api and source-api.
 
 The schemas come from the Put package `cloud/doc-contents-cloud-cli-schema`,
-channel `canary`, version `0.0.0-20261019101219-1963566e9` (archive digest
-`sha256:40ed37e5959a9da97ad06dd5da33c354db005e4c13770dd6645f6b40f8cdb923`). Its
+channel `canary`, version `0.0.0-20261102145238-eda90513c` (archive digest
+`sha256:dab1f1b3075d46e412de527001649b4e46a7f8374e57764ae532bf5216df1204`). Its
 file layout is `docs/cloud-cli-schema/services/<service>/openapi.json`. Each
 file is copied byte for byte. To update the schemas:
 

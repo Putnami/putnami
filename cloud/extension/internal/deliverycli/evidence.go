@@ -7,7 +7,8 @@
 // POST /v1/delivery/records/reports under the same submission id: the tests and
 // coverage of each component, then the components, the changed-line coverage
 // and the dependency changes. The second batch rides apart because the route
-// refuses a body over 1 MiB whole. The bearer is the workspace token in
+// refuses a body over 1 MiB whole; refused while its dependency changes carry
+// before and after states, it goes again without them. The bearer is the workspace token in
 // PUTNAMI_CLOUD_TOKEN; the workspace comes out of it, never out of the body.
 //
 // The run also names, under operational, the tree the job tested and the merge
@@ -178,15 +179,21 @@ func EvidenceReport(params map[string]any, env map[string]string, ioctx clicore.
 	}
 
 	var stored, already, failures []string
+	statesLeftOut := ""
 	for _, batch := range evidenceBatches(doc, run.SubmissionID) {
-		answer, err := postReport(ioctx, controlURL, recordsReportsIngestPath, token, batch,
-			func(callCtx context.Context, api *deliveryapiclient.DeliveryClient, raw []byte) (*deliveryapiclient.ReportBatchResponse, error) {
-				var in deliveryapiclient.CreateV1DeliveryRecordsReportsInput
-				if err := json.Unmarshal(raw, &in.Body); err != nil {
-					return nil, err
+		answer, refused, err := postEvidenceBatch(ioctx, controlURL, token, batch)
+		if err != nil && (refused == http.StatusBadRequest || refused == http.StatusRequestEntityTooLarge) {
+			// A Delivery that predates the dependency states refuses them, and
+			// the route refuses a body over its size whole. The other members
+			// still matter: post the batch again without the states.
+			if plain, ok := evidenceWithoutStates(batch); ok {
+				refusal := err.Error()
+				if answer, _, err = postEvidenceBatch(ioctx, controlURL, token, plain); err == nil {
+					ioctx.Stderr("warning: cloud evidence-report sends no dependency states: " + refusal)
+					statesLeftOut = refusal
 				}
-				return api.CreateV1DeliveryRecordsReports(callCtx, in)
-			})
+			}
+		}
 		if err != nil {
 			failures = append(failures, err.Error())
 			continue
@@ -214,6 +221,9 @@ func EvidenceReport(params map[string]any, env map[string]string, ioctx clicore.
 	}
 	if len(leftOut) > 0 {
 		result["operational_left_out"] = leftOut
+	}
+	if statesLeftOut != "" {
+		result["dependency_states_left_out"] = statesLeftOut
 	}
 	if len(failures) > 0 {
 		result["failed"] = failures
@@ -313,6 +323,42 @@ func openEvidenceRun(ioctx clicore.IO, controlURL, token string, run evidenceSub
 			return resp, err
 		})
 	return resp, refused, err
+}
+
+// postEvidenceBatch posts one report batch. It also returns the status of the
+// last refused call, 0 when there was none.
+func postEvidenceBatch(ioctx clicore.IO, controlURL, token string, batch evidenceReportBatch) (*deliveryapiclient.ReportBatchResponse, int, error) {
+	refused := 0
+	answer, err := postReport(ioctx, controlURL, recordsReportsIngestPath, token, batch,
+		func(callCtx context.Context, api *deliveryapiclient.DeliveryClient, raw []byte) (*deliveryapiclient.ReportBatchResponse, error) {
+			var in deliveryapiclient.CreateV1DeliveryRecordsReportsInput
+			if err := json.Unmarshal(raw, &in.Body); err != nil {
+				return nil, err
+			}
+			answer, err := api.CreateV1DeliveryRecordsReports(callCtx, in)
+			refused = clicore.ServiceStatus(err)
+			return answer, err
+		})
+	return answer, refused, err
+}
+
+// evidenceWithoutStates returns batch with dependency changes that carry no
+// before or after state, and whether one of them did. It leaves batch as it is.
+func evidenceWithoutStates(batch evidenceReportBatch) (evidenceReportBatch, bool) {
+	changes := make([]evidence.DependencyChange, len(batch.DependencyChanges))
+	stripped := false
+	for i, change := range batch.DependencyChanges {
+		if change.Before != nil || change.After != nil {
+			stripped = true
+		}
+		change.Before, change.After = nil, nil
+		changes[i] = change
+	}
+	if !stripped {
+		return batch, false
+	}
+	batch.DependencyChanges = changes
+	return batch, true
 }
 
 // evidenceTested reads, with Git in dir, the tree the job tested and the merge
