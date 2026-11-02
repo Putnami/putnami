@@ -30,7 +30,7 @@
       "description": "Keep the translation catalogs of a localized web application in step with its messages",
       "subcommands": {
         "sync": {
-          "description": "Add an entry for each new message to locales/<locale>.json, remove the entries of deleted messages, and mark stale each translation whose default text changed while keeping its text. Writes only the catalogs that differ",
+          "description": "Add an entry for each new message to locales/<locale>/<namespace>.json, remove the entries of deleted messages and the files of deleted namespaces, and mark stale each translation whose default text changed while keeping its text. Writes only the files that differ",
           "command": "web-i18n-sync",
           "examples": [
             {
@@ -43,7 +43,7 @@
   },
   "tasks": {
     "web-i18n-sync-exec": {
-      "description": "Write locales/<locale>.json for each non-default locale whose synced catalog differs from the file",
+      "description": "Write locales/<locale>/<namespace>.json for each namespace whose synced catalog differs from its file, and delete the files of undeclared namespaces",
       "kind": "command",
       "command": "bun",
       "args": ["run", "{extensionRoot}/bin/i18n.ts", "sync"],
@@ -56,7 +56,7 @@
         },
         "catalogs": {
           "from": "project",
-          "files": ["locales/*.json"]
+          "files": ["locales/**/*.json"]
         },
         "config": {
           "from": "project",

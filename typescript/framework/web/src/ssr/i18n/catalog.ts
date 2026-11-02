@@ -21,8 +21,11 @@ export interface CatalogEntry {
   validatedAt?: string;
 }
 
-/** One locale's catalog file: namespace, then key, then entry. */
-export type Catalog = Record<string, Record<string, CatalogEntry>>;
+/** One namespace's catalog file: key, then entry. */
+export type CatalogFile = Record<string, CatalogEntry>;
+
+/** One locale's catalogs: namespace, then key, then entry. */
+export type Catalog = Record<string, CatalogFile>;
 
 /** The default texts the code declares: namespace, then key, then ICU text. */
 export type DeclaredMessages = ReadonlyMap<string, Readonly<Record<string, string>>>;
@@ -40,48 +43,42 @@ export class CatalogFormatError extends Error {
   }
 }
 
-/** Parse a catalog file's JSON value, refusing any shape the sync would not write. */
-export function parseCatalog(file: string, value: unknown): Catalog {
+/** Parse one namespace's catalog file, refusing any shape the sync would not write. */
+export function parseCatalogFile(file: string, value: unknown): CatalogFile {
   const isObject = (v: unknown): v is Record<string, unknown> =>
     v !== null && typeof v === 'object' && !Array.isArray(v);
-  if (!isObject(value)) throw new CatalogFormatError(file, 'a catalog is a JSON object of namespaces');
-  const catalog: Catalog = {};
-  for (const [namespace, keys] of Object.entries(value)) {
-    if (namespace === '$schema') continue;
-    if (!isObject(keys)) throw new CatalogFormatError(file, `namespace '${namespace}' must be an object of keys`);
-    const entries: Record<string, CatalogEntry> = {};
-    for (const [key, raw] of Object.entries(keys)) {
-      const where = `${namespace}.${key}`;
-      if (!isObject(raw)) throw new CatalogFormatError(file, `${where} must be an object`);
-      const { text, source, state, validatedBy, validatedAt, ...rest } = raw;
-      const unknownKey = Object.keys(rest)[0];
-      if (unknownKey) throw new CatalogFormatError(file, `${where} has an unknown field '${unknownKey}'`);
-      if (typeof text !== 'string') throw new CatalogFormatError(file, `${where}.text must be a string`);
-      if (source !== undefined && typeof source !== 'string') {
-        throw new CatalogFormatError(file, `${where}.source must be a string`);
-      }
-      if (typeof state !== 'string' || !STATES.has(state as CatalogState)) {
-        throw new CatalogFormatError(file, `${where}.state must be one of ${[...STATES].join(', ')}`);
-      }
-      for (const [name, field] of [
-        ['validatedBy', validatedBy],
-        ['validatedAt', validatedAt],
-      ] as const) {
-        if (field !== undefined && typeof field !== 'string') {
-          throw new CatalogFormatError(file, `${where}.${name} must be a string`);
-        }
-      }
-      entries[key] = {
-        text,
-        ...(source !== undefined ? { source: source as string } : {}),
-        state: state as CatalogState,
-        ...(validatedBy !== undefined ? { validatedBy: validatedBy as string } : {}),
-        ...(validatedAt !== undefined ? { validatedAt: validatedAt as string } : {}),
-      };
+  if (!isObject(value)) throw new CatalogFormatError(file, 'a catalog file is a JSON object of keys');
+  const entries: CatalogFile = {};
+  for (const [key, raw] of Object.entries(value)) {
+    if (key === '$schema') continue;
+    if (!isObject(raw)) throw new CatalogFormatError(file, `${key} must be an object`);
+    const { text, source, state, validatedBy, validatedAt, ...rest } = raw;
+    const unknownKey = Object.keys(rest)[0];
+    if (unknownKey) throw new CatalogFormatError(file, `${key} has an unknown field '${unknownKey}'`);
+    if (typeof text !== 'string') throw new CatalogFormatError(file, `${key}.text must be a string`);
+    if (source !== undefined && typeof source !== 'string') {
+      throw new CatalogFormatError(file, `${key}.source must be a string`);
     }
-    catalog[namespace] = entries;
+    if (typeof state !== 'string' || !STATES.has(state as CatalogState)) {
+      throw new CatalogFormatError(file, `${key}.state must be one of ${[...STATES].join(', ')}`);
+    }
+    for (const [name, field] of [
+      ['validatedBy', validatedBy],
+      ['validatedAt', validatedAt],
+    ] as const) {
+      if (field !== undefined && typeof field !== 'string') {
+        throw new CatalogFormatError(file, `${key}.${name} must be a string`);
+      }
+    }
+    entries[key] = {
+      text,
+      ...(source !== undefined ? { source: source as string } : {}),
+      state: state as CatalogState,
+      ...(validatedBy !== undefined ? { validatedBy: validatedBy as string } : {}),
+      ...(validatedAt !== undefined ? { validatedAt: validatedAt as string } : {}),
+    };
   }
-  return catalog;
+  return entries;
 }
 
 export interface SyncChanges {
@@ -103,7 +100,7 @@ export function syncCatalog(declared: DeclaredMessages, current: Catalog): { cat
   for (const namespace of [...declared.keys()].sort()) {
     const defaults = declared.get(namespace) ?? {};
     const existing = current[namespace] ?? {};
-    const entries: Record<string, CatalogEntry> = {};
+    const entries: CatalogFile = {};
     for (const key of Object.keys(defaults).sort()) {
       const hash = sourceHash(defaults[key] as string);
       const entry = existing[key];
@@ -150,8 +147,8 @@ function orderEntry(entry: CatalogEntry): CatalogEntry {
   };
 }
 
-export function serializeCatalog(catalog: Catalog): string {
-  return `${JSON.stringify(catalog, null, 2)}\n`;
+export function serializeCatalogFile(entries: CatalogFile): string {
+  return `${JSON.stringify(entries, null, 2)}\n`;
 }
 
 export interface CatalogDiagnostic {

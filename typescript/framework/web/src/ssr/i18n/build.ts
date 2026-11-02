@@ -1,6 +1,6 @@
 import { Glob } from 'bun';
 import { existsSync, readFileSync } from 'node:fs';
-import { join, relative } from 'node:path';
+import { join, sep } from 'node:path';
 import { parseIcu } from '../../shared/i18n/icu';
 import {
   isLocalizedPath,
@@ -15,10 +15,10 @@ import {
   type CatalogDiagnostic,
   checkCatalog,
   type DeclaredMessages,
-  parseCatalog,
+  parseCatalogFile,
   runtimeMessages,
   type SyncChanges,
-  serializeCatalog,
+  serializeCatalogFile,
   syncCatalog,
 } from './catalog';
 
@@ -29,11 +29,21 @@ export const MESSAGES_GLOB = 'src/**/*.messages.{ts,tsx}';
 
 export interface LocaleCatalogState {
   locale: string;
-  file: string;
+  /** The locale's catalog directory, `locales/<locale>`, absolute. */
+  dir: string;
   synced: Catalog;
   changes: SyncChanges;
-  /** Whether the file on disk differs from the synced catalog. */
+  /** The namespace files whose bytes on disk differ from the synced catalog, absolute. */
+  writes: { file: string; content: string }[];
+  /** The files of namespaces no declaration holds, absolute. */
+  deletions: string[];
+  /** Whether the directory on disk differs from the synced catalog. */
   outOfSync: boolean;
+}
+
+/** The file of one namespace's catalog: `docs/sidebar` is `locales/fr/docs/sidebar.json`. */
+export function catalogFile(locale: string, namespace: string): string {
+  return `${CATALOG_DIR}/${locale}/${namespace}.json`;
 }
 
 export interface I18nBuild {
@@ -86,16 +96,26 @@ export async function collectMessages(
   return { declared, sources };
 }
 
-function readCatalog(file: string, label: string): { catalog: Catalog; raw: string | undefined } {
-  if (!existsSync(file)) return { catalog: {}, raw: undefined };
-  const raw = readFileSync(file, 'utf8');
-  let value: unknown;
-  try {
-    value = JSON.parse(raw);
-  } catch (error) {
-    throw new Error(`${label}: not valid JSON: ${(error as Error).message}`);
+/** Read a locale's directory: one file per namespace, named after it. */
+function readCatalog(projectRoot: string, locale: string): { catalog: Catalog; raw: Map<string, string> } {
+  const dir = join(projectRoot, CATALOG_DIR, locale);
+  const catalog: Catalog = {};
+  const raw = new Map<string, string>();
+  if (!existsSync(dir)) return { catalog, raw };
+  for (const path of [...new Glob('**/*.json').scanSync({ cwd: dir })].sort()) {
+    const namespace = path.slice(0, -'.json'.length).split(sep).join('/');
+    const label = catalogFile(locale, namespace);
+    const text = readFileSync(join(dir, path), 'utf8');
+    let value: unknown;
+    try {
+      value = JSON.parse(text);
+    } catch (error) {
+      throw new Error(`${label}: not valid JSON: ${(error as Error).message}`);
+    }
+    catalog[namespace] = parseCatalogFile(label, value);
+    raw.set(namespace, text);
   }
-  return { catalog: parseCatalog(label, value), raw };
+  return { catalog, raw };
 }
 
 /**
@@ -112,11 +132,24 @@ export async function resolveI18nBuild(projectRoot: string, rawSettings: unknown
 
   for (const locale of settings.locales) {
     if (locale === settings.defaultLocale) continue;
-    const file = join(projectRoot, CATALOG_DIR, `${locale}.json`);
-    const label = relative(projectRoot, file);
-    const { catalog, raw } = readCatalog(file, label);
+    const dir = join(projectRoot, CATALOG_DIR, locale);
+    const { catalog, raw } = readCatalog(projectRoot, locale);
     const { catalog: synced, changes } = syncCatalog(declared, catalog);
-    catalogs.push({ locale, file, synced, changes, outOfSync: raw !== serializeCatalog(synced) });
+    const writes: LocaleCatalogState['writes'] = [];
+    for (const [namespace, entries] of Object.entries(synced)) {
+      const content = serializeCatalogFile(entries);
+      if (raw.get(namespace) !== content) writes.push({ file: join(dir, `${namespace}.json`), content });
+    }
+    const deletions = [...raw.keys()].filter((ns) => !Object.hasOwn(synced, ns)).map((ns) => join(dir, `${ns}.json`));
+    catalogs.push({
+      locale,
+      dir,
+      synced,
+      changes,
+      writes,
+      deletions,
+      outOfSync: writes.length + deletions.length > 0,
+    });
     diagnostics.push(...checkCatalog(declared, locale, synced, changes, strict));
     messages[locale] = runtimeMessages(synced);
   }
@@ -155,8 +188,10 @@ function dedupe(diagnostics: CatalogDiagnostic[]): CatalogDiagnostic[] {
 }
 
 export function formatDiagnostic(d: CatalogDiagnostic): string {
-  const where = d.locale === 'default' ? d.key : `${CATALOG_DIR}/${d.locale}.json ${d.key}`;
-  return `${where}: ${d.message}`;
+  if (d.locale === 'default') return `${d.key}: ${d.message}`;
+  // A key is an identifier, so the last dot ends the namespace.
+  const dot = d.key.lastIndexOf('.');
+  return `${catalogFile(d.locale, d.key.slice(0, dot))} ${d.key.slice(dot + 1)}: ${d.message}`;
 }
 
 /**
