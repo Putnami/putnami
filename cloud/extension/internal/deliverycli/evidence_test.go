@@ -148,7 +148,7 @@ func TestEvidenceReportOpensAGHARunForAPullRequest(t *testing.T) {
 	}
 	ref, _ := run["changeRequest"].(map[string]any)
 	if ref["provider"] != "github" || ref["host"] != "github.com" || ref["number"] != float64(42) {
-		t.Fatalf("changeRequest = %v, want github pull request 42", run["changeRequest"])
+		t.Fatalf("changeRequest = %v, want the github change request numbered 42", run["changeRequest"])
 	}
 }
 
