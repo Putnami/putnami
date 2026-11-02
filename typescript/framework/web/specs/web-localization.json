@@ -12,7 +12,8 @@
     "Translating text at request time or calling a translation service from the build",
     "Redirecting a content page because of the reader's browser language or stored preference",
     "Storing the reader's locale preference in browser storage the server cannot read",
-    "Agent translation, human validation commands, sitemaps, per-locale domains and translated slugs, which later phases deliver"
+    "Sitemaps, per-locale domains, translated paths and a language suggestion banner, which a later phase delivers",
+    "Calling a model from a Putnami command: the agent of the session translates"
   ],
   "requirements": [
     {
@@ -45,11 +46,19 @@
     },
     {
       "id": "catalog-sync",
-      "text": "Generation keeps each non-default locale catalog aligned with the declared messages, one file per namespace at locales/<locale>/<namespace>.json: it adds a missing key, removes a key no declaration holds and the file of a namespace no declaration holds, records the source hash a translation was made from, and marks a translation stale when its source hash changes, without altering its text."
+      "text": "Generation keeps each non-default locale catalog aligned with the declared messages, one file per namespace at locales/<locale>/<namespace>.json that names the catalog schema: it adds a missing key, removes a key no declaration holds and the file of a namespace no declaration holds, records the default text a translation was made from, and marks a translation stale when that default text changes, without altering its text."
     },
     {
       "id": "catalog-check",
       "text": "Generation fails when a published locale lacks a translation, when a message is not valid ICU MessageFormat, or when a translation's arguments differ from its default text's arguments, and warns for each stale translation."
+    },
+    {
+      "id": "agent-translation",
+      "text": "putnami i18n translate writes a work file with every missing and stale entry of each published locale, its default text, the old default text and translation of a stale entry, the glossary terms it contains and its namespace's other messages. Applying the file writes each answer as a draft, and writes nothing when one answer names an unknown key or a validated entry, is not valid ICU MessageFormat, or uses other arguments or tags than its default text."
+    },
+    {
+      "id": "human-validation",
+      "text": "putnami i18n validate shows a person each draft and stale translation of a locale with its default text and locks each one they accept as validated, recording their git user.name and user.email and the date; it refuses to run without an interactive terminal, inside an agent session, or without a git identity, and validating a stale translation records the current default text as its source."
     },
     {
       "id": "alternate-links",

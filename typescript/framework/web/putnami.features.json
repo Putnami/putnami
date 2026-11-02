@@ -422,7 +422,8 @@
             "checks": [
               "a-new-key-is-added-and-an-orphan-removed",
               "a-changed-source-marks-the-translation-stale-and-keeps-its-text",
-              "each-namespace-has-its-own-catalog-file"
+              "each-namespace-has-its-own-catalog-file",
+              "a-catalog-file-names-its-schema-and-keeps-the-default-text"
             ]
           }
         },
@@ -437,6 +438,31 @@
               "an-invalid-icu-message-fails",
               "an-argument-mismatch-fails",
               "a-stale-translation-warns"
+            ]
+          }
+        },
+        {
+          "id": "agent-translation",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "translate-lists-missing-and-stale-entries-with-their-context",
+              "apply-writes-drafts-and-refuses-a-validated-entry",
+              "apply-refuses-an-answer-with-other-arguments"
+            ]
+          }
+        },
+        {
+          "id": "human-validation",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "validate-locks-an-accepted-draft-with-the-git-identity",
+              "validate-refuses-without-a-person-at-a-terminal"
             ]
           }
         },
