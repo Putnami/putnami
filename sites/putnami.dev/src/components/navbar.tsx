@@ -319,7 +319,7 @@ const StyledNav = styled.header`
     background: var(--color-surface-hover);
   }
 
-  .locale-switcher a[aria-current='true'] {
+  .locale-switcher a[aria-current='page'] {
     color: var(--color-text);
     background: var(--color-surface-hover);
   }

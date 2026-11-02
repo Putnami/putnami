@@ -566,5 +566,42 @@
       "source": "d3ae14a50bfe463f",
       "state": "draft"
     }
+  },
+  "status": {
+    "backHome": {
+      "text": "← Retour à l’accueil",
+      "source": "248d73477b661c52",
+      "state": "draft"
+    },
+    "error": {
+      "text": "Une erreur est survenue",
+      "source": "ab827e3fe17da220",
+      "state": "draft"
+    },
+    "errorDescription": {
+      "text": "Une erreur inattendue s’est produite.",
+      "source": "7053d12aceb59a1f",
+      "state": "draft"
+    },
+    "errorTitle": {
+      "text": "Une erreur est survenue — Putnami",
+      "source": "5b2e646cf2f03a10",
+      "state": "draft"
+    },
+    "notFound": {
+      "text": "Page introuvable",
+      "source": "a469ab4ca4e55bf5",
+      "state": "draft"
+    },
+    "notFoundDescription": {
+      "text": "La page que vous cherchez n’existe pas.",
+      "source": "74b78a922b993abc",
+      "state": "draft"
+    },
+    "notFoundTitle": {
+      "text": "Page introuvable — Putnami",
+      "source": "707cea469128542f",
+      "state": "draft"
+    }
   }
 }
