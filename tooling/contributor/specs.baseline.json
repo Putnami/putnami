@@ -24,6 +24,9 @@
     "tooling/contributor-executable#native-workflow-validation",
     "tooling/contributor-executable#provider-neutral-publication",
     "tooling/contributor-executable#repository-policy",
-    "tooling/contributor-executable#squash-ready-publication"
+    "tooling/contributor-executable#squash-ready-publication",
+    "tooling/epic#epic-plan-validation",
+    "tooling/epic#epic-status",
+    "tooling/epic#epic-waves"
   ]
 }

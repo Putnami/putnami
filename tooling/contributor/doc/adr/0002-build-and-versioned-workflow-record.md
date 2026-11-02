@@ -1,6 +1,7 @@
 # ADR 0002 — One build loop with a versioned local workflow record
 
 - **Status**: accepted for implementation, superseded in part by [ADR 0003](0003-build-publishes-its-proposal-by-default.md)
+  and [ADR 0010](0010-an-epic-session-runs-issues-in-waves.md)
 - **Scope**: `@putnami/contributor` content and its consumer CLI validator
 
 ## Context
@@ -109,3 +110,7 @@ The native result retains a typed hosted receipt referencing the original
 workflow and raw provider status. A new workflow revision can replay that
 receipt; rewriting the original makes it stale. Standalone planning validation
 cannot mint this receipt or promote a unit.
+Amended 2026-11-02: [ADR 0010](0010-an-epic-session-runs-issues-in-waves.md)
+adds an `epic` skill that plans issues and launches one `build` session per
+issue. It is not a second controller: it never codes, and `build` remains the
+only loop that changes code.

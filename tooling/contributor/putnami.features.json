@@ -398,6 +398,60 @@
           "change estimate"
         ]
       }
+    },
+    {
+      "id": "tooling/epic",
+      "type": "feature",
+      "name": "Epic plan and status",
+      "outcome": "An epic session checks its plan of issues, orders them in waves under one envelope, and follows each child's task, proposal and sessions from one command",
+      "owner": "tooling",
+      "target": "modeled",
+      "requirements": [
+        {
+          "id": "epic-plan-validation",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "an-epic-plan-in-the-format-is-read-whole",
+              "an-invalid-epic-plan-names-the-value-it-refuses",
+              "the-epic-schema-states-what-the-decoder-applies"
+            ]
+          }
+        },
+        {
+          "id": "epic-waves",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "an-issue-runs-one-wave-after-its-latest-dependency",
+              "the-epic-plan-prints-text-or-the-json-result"
+            ]
+          }
+        },
+        {
+          "id": "epic-status",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-status-reads-each-child-through-the-contracts",
+              "a-child-launches-on-merged-or-one-ready-parent",
+              "a-spent-envelope-launches-nothing"
+            ]
+          }
+        }
+      ]
     }
   ]
 }
