@@ -23,7 +23,9 @@ const (
 // evidenceFakeServer stands in for Delivery's records routes. It records every
 // request and answers each route with what the real one would.
 type evidenceFakeServer struct {
-	requests      []reportCapturedRequest
+	requests []reportCapturedRequest
+	// raw holds the body of each request as it was sent.
+	raw           [][]byte
 	refuseRun     int
 	refuseReports int
 	// refuseOperational answers a run that carries operational as a control
@@ -36,6 +38,7 @@ type evidenceFakeServer struct {
 func (s *evidenceFakeServer) RoundTrip(req *http.Request) (*http.Response, error) {
 	raw, _ := io.ReadAll(req.Body)
 	_ = req.Body.Close()
+	s.raw = append(s.raw, raw)
 	var body map[string]any
 	_ = json.Unmarshal(raw, &body)
 	s.requests = append(s.requests, reportCapturedRequest{Method: req.Method, Path: req.URL.Path, Auth: req.Header.Get("Authorization"), Body: body})
@@ -363,5 +366,94 @@ func TestEvidenceReportSaysWhatWasAlreadyStored(t *testing.T) {
 	}
 	if !strings.Contains(stdout, "stored no report; already stored tests, coverage, components") {
 		t.Fatalf("stdout = %q, want the kinds that were already stored apart", stdout)
+	}
+}
+
+// evidenceRequestsTranscript lists each request the fake received: its method
+// and path on one line, then its body as it was sent.
+func evidenceRequestsTranscript(fake *evidenceFakeServer) []byte {
+	var out []byte
+	for i, request := range fake.requests {
+		out = append(out, request.Method+" "+request.Path+"\n"...)
+		out = append(out, fake.raw[i]...)
+		if len(fake.raw[i]) == 0 || fake.raw[i][len(fake.raw[i])-1] != '\n' {
+			out = append(out, '\n')
+		}
+	}
+	return out
+}
+
+func TestEvidenceReportSendsTheStatesOfEachDependencyChange(t *testing.T) {
+	spectest.Proves(t, evidenceFeature, "sends-the-dependency-states", "a-dependency-change-carries-its-before-and-after-states")
+	fake := &evidenceFakeServer{}
+	if _, err := runEvidenceReport(t, fake, evidenceEnv(), "--file", evidenceFixture("sbom-pull-request.json")); err != nil {
+		t.Fatalf("evidence-report: %v", err)
+	}
+	if got := fake.paths(); len(got) != 2 || got[1] != "POST "+recordsReportsIngestPath {
+		t.Fatalf("requests = %v, want the run and the evidence batch", got)
+	}
+	members := fake.requests[1].Body
+	if _, ok := members["sbom"]; ok {
+		t.Fatalf("the evidence batch carries the document's sbom member: %v", members)
+	}
+
+	var fixture map[string]any
+	data, err := os.ReadFile(evidenceFixture("sbom-pull-request.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := json.Unmarshal(data, &fixture); err != nil {
+		t.Fatal(err)
+	}
+	got, _ := json.Marshal(members["dependencyChanges"])
+	want, _ := json.Marshal(fixture["dependencyChanges"])
+	if string(got) != string(want) {
+		t.Fatalf("dependencyChanges = %s, want the document's own %s", got, want)
+	}
+
+	changes := members["dependencyChanges"].([]any)
+	lodash := changes[0].(map[string]any)
+	before, _ := lodash["before"].(map[string]any)
+	after, _ := lodash["after"].(map[string]any)
+	if before == nil || after == nil {
+		t.Fatalf("lodash = %v, want its before and after states", lodash)
+	}
+	fixed, _ := before["vulnerabilities"].([]any)
+	if len(fixed) != 2 || fixed[1].(map[string]any)["id"] != "GHSA-35jh-r3h4-6jhm" || fixed[1].(map[string]any)["severity"] != "high" {
+		t.Fatalf("lodash before = %v, want its two known vulnerabilities with id and severity", before)
+	}
+	if licenses, _ := after["licenses"].([]any); len(licenses) != 1 || licenses[0] != "MIT" {
+		t.Fatalf("lodash after = %v, want its MIT license", after)
+	}
+	if _, ok := after["vulnerabilities"]; ok {
+		t.Fatalf("lodash after = %v, want no vulnerability member", after)
+	}
+	if removed := changes[1].(map[string]any); removed["after"] != nil || removed["before"] == nil {
+		t.Fatalf("minimist = %v, want its before state alone", removed)
+	}
+	if added := changes[2].(map[string]any); added["before"] != nil || added["after"] == nil {
+		t.Fatalf("zod = %v, want its after state alone", added)
+	}
+	if plain := changes[3].(map[string]any); plain["before"] != nil || plain["after"] != nil {
+		t.Fatalf("left-pad = %v, want no state", plain)
+	}
+}
+
+func TestEvidenceReportUploadsADocumentWithoutStatesAsItDidBefore(t *testing.T) {
+	spectest.Proves(t, evidenceFeature, "sends-the-dependency-states", "a-document-without-states-uploads-the-same-body")
+	for _, name := range []string{"turbo-pull-request", "symfony-merge-request"} {
+		t.Run(name, func(t *testing.T) {
+			fake := &evidenceFakeServer{}
+			if _, err := runEvidenceReport(t, fake, evidenceEnv(), "--file", evidenceFixture(name+".json")); err != nil {
+				t.Fatalf("evidence-report: %v", err)
+			}
+			want, err := os.ReadFile(evidenceFixture(name + ".requests.golden"))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got := evidenceRequestsTranscript(fake); string(got) != string(want) {
+				t.Fatalf("requests =\n%s\nwant the bodies the upload sent before dependency states existed:\n%s", got, want)
+			}
+		})
 	}
 }

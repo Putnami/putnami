@@ -590,6 +590,10 @@
             "$ref": "#/components/schemas/CacheEconomics",
             "nullable": true
           },
+          "changeRequest": {
+            "$ref": "#/components/schemas/ChangeRequest",
+            "nullable": true
+          },
           "checks": {
             "additionalProperties": {
               "type": "string"
@@ -1877,6 +1881,36 @@
         },
         "type": "object"
       },
+      "ChangeReviewReport": {
+        "additionalProperties": false,
+        "properties": {
+          "findings": {
+            "items": {
+              "$ref": "#/components/schemas/ReviewFinding"
+            },
+            "type": "array"
+          },
+          "reviewer": {
+            "$ref": "#/components/schemas/ChangeReviewer"
+          },
+          "summary": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "ChangeReviewer": {
+        "additionalProperties": false,
+        "properties": {
+          "model": {
+            "type": "string"
+          },
+          "provider": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "ChangedLineCoverage": {
         "additionalProperties": false,
         "properties": {
@@ -2018,6 +2052,14 @@
       "DependencyChange": {
         "additionalProperties": false,
         "properties": {
+          "after": {
+            "$ref": "#/components/schemas/DependencyState",
+            "nullable": true
+          },
+          "before": {
+            "$ref": "#/components/schemas/DependencyState",
+            "nullable": true
+          },
           "change": {
             "type": "string"
           },
@@ -2038,6 +2080,24 @@
           },
           "to": {
             "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "DependencyState": {
+        "additionalProperties": false,
+        "properties": {
+          "licenses": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "vulnerabilities": {
+            "items": {
+              "$ref": "#/components/schemas/Vulnerability"
+            },
+            "type": "array"
           }
         },
         "type": "object"
@@ -3029,6 +3089,10 @@
             "$ref": "#/components/schemas/BuildsReport",
             "nullable": true
           },
+          "changeReview": {
+            "$ref": "#/components/schemas/ChangeReviewReport",
+            "nullable": true
+          },
           "changedLineCoverage": {
             "$ref": "#/components/schemas/ChangedLineCoverage",
             "nullable": true
@@ -3510,6 +3574,30 @@
               "$ref": "#/components/schemas/RequiredCheckRule"
             },
             "type": "array"
+          }
+        },
+        "type": "object"
+      },
+      "ReviewFinding": {
+        "additionalProperties": false,
+        "properties": {
+          "category": {
+            "type": "string"
+          },
+          "line": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "message": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          },
+          "severity": {
+            "type": "string"
           }
         },
         "type": "object"
@@ -4032,6 +4120,18 @@
             "type": "string"
           },
           "release_set_id": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "Vulnerability": {
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "severity": {
             "type": "string"
           }
         },

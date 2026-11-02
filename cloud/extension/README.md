@@ -282,7 +282,10 @@ The command reads a `protocol/evidence` v1 document and makes three calls:
    component.
 3. The same route then posts `components`, `changedLineCoverage` and
    `dependencyChanges` as the document holds them. They go apart because the
-   route refuses a body over 1 MiB whole.
+   route refuses a body over 1 MiB whole. A dependency change keeps its
+   `before` and `after` states when `putnami observe --sbom` wrote them: the
+   licenses and the known vulnerabilities, each with its id and severity.
+   The document's `sbom` member is not sent.
 
 A batch with nothing to carry is not sent. The summary lists apart the kinds
 Delivery already held for that submission. Without the token, with a document
