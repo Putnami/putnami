@@ -264,3 +264,140 @@ func TestTheRuntimeAnswersTheHandshake(t *testing.T) {
 		t.Fatalf("handshake %s (%v)", stdout.String(), err)
 	}
 }
+
+// uploadFixture is a GitLab merge request job in a repository without a
+// workspace, and a fake CLI that records what it gets and exits with code.
+func uploadFixture(t *testing.T, code string) (repo string, env map[string]string, record string) {
+	t.Helper()
+	repo = filepath.Join(t.TempDir(), "shop")
+	git(t, t.TempDir(), "init", "--quiet", "--initial-branch=main", repo)
+	write(t, repo, "README.md", "shop\n")
+	git(t, repo, "add", "-A")
+	git(t, repo, "commit", "--quiet", "-m", "root")
+	git(t, repo, "checkout", "--quiet", "-b", "feature")
+	write(t, repo, "README.md", "shop!\n")
+	git(t, repo, "commit", "--quiet", "-am", "change")
+	record = t.TempDir()
+	cli := filepath.Join(t.TempDir(), "putnami")
+	script := "#!/bin/sh\n" +
+		"printf '%s\\n' \"$@\" > '" + record + "/args'\n" +
+		"cp \"$4\" '" + record + "/document'\n" +
+		"echo uploaded\n" +
+		"exit " + code + "\n"
+	if err := os.WriteFile(cli, []byte(script), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	env = map[string]string{
+		"GITLAB_CI":                           "true",
+		"CI_SERVER_HOST":                      "gitlab.com",
+		"CI_PROJECT_ID":                       "4242",
+		"CI_PROJECT_PATH":                     "acme/shop",
+		"CI_COMMIT_SHA":                       git(t, repo, "rev-parse", "HEAD"),
+		"CI_MERGE_REQUEST_IID":                "7",
+		"CI_MERGE_REQUEST_DIFF_BASE_SHA":      git(t, repo, "rev-parse", "main"),
+		"CI_MERGE_REQUEST_TARGET_BRANCH_NAME": "main",
+		"CI_MERGE_REQUEST_SOURCE_BRANCH_NAME": "feature",
+		"CI_PIPELINE_ID":                      "1",
+		"CI_JOB_ID":                           "2",
+		"PUTNAMI_CLI_EXECUTABLE":              cli,
+	}
+	return repo, env, record
+}
+
+func TestUploadHandsTheEvidenceDocumentToPutnamiCloud(t *testing.T) {
+	spectest.Proves(t, "tooling/observe-upload", "upload-hands-the-document-to-the-reporter", "upload-runs-the-selected-reporter-with-the-document")
+	spectest.Proves(t, "tooling/observe-upload", "upload-hands-the-document-to-the-reporter", "an-unset-selector-picks-putnami-cloud")
+	repo, env, record := uploadFixture(t, "0")
+	t.Chdir(repo)
+	var stdout, stderr bytes.Buffer
+	code := run([]string{"run", "--no-fetch", "--upload", "--putnamiContext", jobContext(t, repo, repo, "json")},
+		func(k string) string { return env[k] }, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("exit %d: %s", code, stderr.String())
+	}
+	var o observe.Observation
+	if err := json.Unmarshal(stdout.Bytes(), &o); err != nil {
+		t.Fatalf("the reporter's output reached stdout: %v\n%s", err, stdout.String())
+	}
+	for _, d := range o.Diagnostics {
+		if strings.HasPrefix(d.Code, "observe.upload") || strings.HasPrefix(d.Code, "observe.evidence") {
+			t.Fatalf("diagnostic %+v", d)
+		}
+	}
+	data, err := os.ReadFile(filepath.Join(record, "args"))
+	if err != nil {
+		t.Fatalf("the reporter did not run: %v", err)
+	}
+	args := strings.Fields(string(data))
+	if len(args) != 4 || !slices.Equal(args[:3], []string{"cloud", "evidence-report", "--file"}) {
+		t.Fatalf("reporter args %v", args)
+	}
+	if _, err := os.Stat(args[3]); !os.IsNotExist(err) {
+		t.Fatalf("the temporary document %s was not removed: %v", args[3], err)
+	}
+	document, err := os.ReadFile(filepath.Join(record, "document"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if doc, problems := evidence.ParseAndValidate(document); diag.HasErrors(problems) || doc.Subject.ProjectID != "4242" {
+		t.Fatalf("evidence %s: %v", document, problems)
+	}
+	if !strings.Contains(stderr.String(), "uploaded") {
+		t.Fatalf("the reporter's output did not reach stderr: %q", stderr.String())
+	}
+
+	kept := filepath.Join(t.TempDir(), "evidence.json")
+	stdout.Reset()
+	if code := run([]string{"run", "--no-fetch", "--upload", "--evidence", kept, "--putnamiContext", jobContext(t, repo, repo, "json")},
+		func(k string) string { return env[k] }, &stdout, &stderr); code != 0 {
+		t.Fatalf("exit %d", code)
+	}
+	data, _ = os.ReadFile(filepath.Join(record, "args"))
+	if args := strings.Fields(string(data)); len(args) != 4 || args[3] != kept {
+		t.Fatalf("with --evidence the reporter gets that path, got %v", args)
+	}
+	if _, err := os.Stat(kept); err != nil {
+		t.Fatalf("the --evidence document was removed: %v", err)
+	}
+}
+
+func TestAFailedUploadIsADiagnosticAndExitsZero(t *testing.T) {
+	spectest.Proves(t, "tooling/observe-upload", "upload-fails-open", "a-failed-upload-is-a-diagnostic")
+	repo, env, _ := uploadFixture(t, "1")
+	t.Chdir(repo)
+	var stdout, stderr bytes.Buffer
+	if code := run([]string{"run", "--no-fetch", "--upload", "--putnamiContext", jobContext(t, repo, repo, "json")},
+		func(k string) string { return env[k] }, &stdout, &stderr); code != 0 {
+		t.Fatalf("a refused upload exits %d", code)
+	}
+	var o observe.Observation
+	if err := json.Unmarshal(stdout.Bytes(), &o); err != nil {
+		t.Fatal(err)
+	}
+	if !slices.ContainsFunc(o.Diagnostics, func(d diag.Diagnostic) bool { return d.Code == "observe.upload_failed" }) {
+		t.Fatalf("diagnostics %v lack observe.upload_failed", o.Diagnostics)
+	}
+
+	// A document that does not validate is not handed to the reporter.
+	delete(env, "CI_PROJECT_ID")
+	stdout.Reset()
+	if code := run([]string{"run", "--no-fetch", "--upload", "--putnamiContext", jobContext(t, repo, repo, "json")},
+		func(k string) string { return env[k] }, &stdout, &stderr); code != 0 {
+		t.Fatalf("an unwritten document exits %d", code)
+	}
+	o = observe.Observation{}
+	if err := json.Unmarshal(stdout.Bytes(), &o); err != nil {
+		t.Fatal(err)
+	}
+	got := make([]string, 0, len(o.Diagnostics))
+	for _, d := range o.Diagnostics {
+		got = append(got, d.Code)
+	}
+	if !slices.Contains(got, "observe.evidence_invalid") || !slices.Contains(got, "observe.upload_failed") {
+		t.Fatalf("diagnostics %v", got)
+	}
+
+	if code := run([]string{"run", "--upload=yes"}, func(k string) string { return env[k] }, &stdout, &stderr); code != 2 {
+		t.Fatalf("--upload=yes exits %d, want 2", code)
+	}
+}

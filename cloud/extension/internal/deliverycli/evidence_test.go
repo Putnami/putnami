@@ -58,27 +58,27 @@ func (s *evidenceFakeServer) RoundTrip(req *http.Request) (*http.Response, error
 }
 
 func (s *evidenceFakeServer) paths() []string {
-	var out []string
+	out := make([]string, 0, len(s.requests))
 	for _, r := range s.requests {
 		out = append(out, r.Method+" "+r.Path)
 	}
 	return out
 }
 
-func runEvidenceReport(t *testing.T, fake *evidenceFakeServer, env map[string]string, args ...string) (stdout, stderr string, err error) {
+func runEvidenceReport(t *testing.T, fake *evidenceFakeServer, env map[string]string, args ...string) (stdout string, err error) {
 	t.Helper()
 	stubReportRetrySleep(t)
-	var out, errOut []string
+	var out []string
 	ioctx := clicore.IO{
 		Env:    env,
 		Stdout: func(line string) { out = append(out, line) },
-		Stderr: func(line string) { errOut = append(errOut, line) },
+		Stderr: func(string) {},
 		Client: &http.Client{Transport: fake},
 		Now:    func() time.Time { return time.Date(2026, 11, 3, 8, 0, 0, 0, time.UTC) },
 	}
 	params := clicore.MergeParams(clicore.ParseFlags(args))
 	err = EvidenceReport(params, env, ioctx)
-	return strings.Join(out, "\n"), strings.Join(errOut, "\n"), err
+	return strings.Join(out, "\n"), err
 }
 
 func evidenceEnv() map[string]string {
@@ -92,7 +92,7 @@ func evidenceFixture(name string) string {
 func TestEvidenceReportOpensAGitLabRunWithItsMergeRequest(t *testing.T) {
 	spectest.Proves(t, evidenceFeature, "opens-the-external-run", "a-gitlab-merge-request-opens-a-gitlab-run")
 	fake := &evidenceFakeServer{}
-	stdout, _, err := runEvidenceReport(t, fake, evidenceEnv(), "--file", evidenceFixture("symfony-merge-request.json"))
+	stdout, err := runEvidenceReport(t, fake, evidenceEnv(), "--file", evidenceFixture("symfony-merge-request.json"))
 	if err != nil {
 		t.Fatalf("evidence-report: %v", err)
 	}
@@ -125,7 +125,7 @@ func TestEvidenceReportOpensAGitLabRunWithItsMergeRequest(t *testing.T) {
 func TestEvidenceReportOpensAGHARunForAPullRequest(t *testing.T) {
 	spectest.Proves(t, evidenceFeature, "opens-the-external-run", "a-github-pull-request-opens-a-gha-run")
 	fake := &evidenceFakeServer{}
-	if _, _, err := runEvidenceReport(t, fake, evidenceEnv(), "--file", evidenceFixture("turbo-pull-request.json")); err != nil {
+	if _, err := runEvidenceReport(t, fake, evidenceEnv(), "--file", evidenceFixture("turbo-pull-request.json")); err != nil {
 		t.Fatalf("evidence-report: %v", err)
 	}
 	run := fake.requests[0].Body
@@ -147,7 +147,7 @@ func TestEvidenceReportOpensAGHARunForAPullRequest(t *testing.T) {
 func TestEvidenceReportPostsTestsAndCoverageThenTheEvidenceMembers(t *testing.T) {
 	spectest.Proves(t, evidenceFeature, "posts-the-reports-in-two-batches", "tests-and-coverage-then-the-evidence-members")
 	fake := &evidenceFakeServer{}
-	stdout, _, err := runEvidenceReport(t, fake, evidenceEnv(), "--file", evidenceFixture("turbo-pull-request.json"))
+	stdout, err := runEvidenceReport(t, fake, evidenceEnv(), "--file", evidenceFixture("turbo-pull-request.json"))
 	if err != nil {
 		t.Fatalf("evidence-report: %v", err)
 	}
@@ -223,7 +223,7 @@ func TestEvidenceReportSendsNoEmptyBatch(t *testing.T) {
 	delete(doc, "coverage")
 	path := writeEvidenceDoc(t, doc)
 	fake := &evidenceFakeServer{}
-	if _, _, err := runEvidenceReport(t, fake, evidenceEnv(), "--file", path); err != nil {
+	if _, err := runEvidenceReport(t, fake, evidenceEnv(), "--file", path); err != nil {
 		t.Fatalf("evidence-report: %v", err)
 	}
 	if got := fake.paths(); len(got) != 2 {
@@ -263,7 +263,7 @@ func TestEvidenceReportSendsNothingItCannotUpload(t *testing.T) {
 	} {
 		t.Run(name, func(t *testing.T) {
 			fake := &evidenceFakeServer{}
-			_, _, err := runEvidenceReport(t, fake, tc.env, tc.args...)
+			_, err := runEvidenceReport(t, fake, tc.env, tc.args...)
 			if err == nil || clicore.ExitCode(err) != tc.code || !strings.Contains(err.Error(), tc.want) {
 				t.Fatalf("err = %v (exit %d), want exit %d naming %q", err, clicore.ExitCode(err), tc.code, tc.want)
 			}
@@ -277,7 +277,7 @@ func TestEvidenceReportSendsNothingItCannotUpload(t *testing.T) {
 func TestEvidenceReportNamesTheRouteAndTheReasonOfARefusal(t *testing.T) {
 	spectest.Proves(t, evidenceFeature, "refuses-what-it-cannot-upload", "a-refused-call-names-the-route-and-the-reason")
 	fake := &evidenceFakeServer{refuseRun: http.StatusBadRequest}
-	_, _, err := runEvidenceReport(t, fake, evidenceEnv(), "--file", evidenceFixture("symfony-merge-request.json"))
+	_, err := runEvidenceReport(t, fake, evidenceEnv(), "--file", evidenceFixture("symfony-merge-request.json"))
 	if err == nil || !strings.Contains(err.Error(), reportTestBaseURL+recordsIngestPath) || !strings.Contains(err.Error(), "changeRequest.host is invalid") {
 		t.Fatalf("err = %v, want the route and the server's reason", err)
 	}
@@ -289,7 +289,7 @@ func TestEvidenceReportNamesTheRouteAndTheReasonOfARefusal(t *testing.T) {
 	}
 
 	fake = &evidenceFakeServer{refuseReports: http.StatusRequestEntityTooLarge}
-	stdout, _, err := runEvidenceReport(t, fake, evidenceEnv(), "--file", evidenceFixture("turbo-pull-request.json"))
+	stdout, err := runEvidenceReport(t, fake, evidenceEnv(), "--file", evidenceFixture("turbo-pull-request.json"))
 	if err == nil || clicore.ExitCode(err) != clicore.ExitAPI || !strings.Contains(err.Error(), recordsReportsIngestPath) || !strings.Contains(err.Error(), "request body too large") {
 		t.Fatalf("err = %v, want the refused batch route and reason", err)
 	}
