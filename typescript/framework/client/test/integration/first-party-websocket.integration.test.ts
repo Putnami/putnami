@@ -193,13 +193,13 @@ function collect<T>(stream: StreamObserver<T>): Promise<T[]> {
 }
 
 /**
- * Resolve once the provider closes the socket.
+ * Resolve with the close code once the provider closes the socket.
  *
  * The provider writes its terminal frame, then closes, and a client receives
  * every frame before the close: waiting for the close reads the whole
- * conversation at any load, where a fixed sleep misses a late answer.
+ * conversation at any load.
  */
-function closedByProvider(socket: WebSocket, timeoutMs = 3000): Promise<void> {
+function closedByProvider(socket: WebSocket, timeoutMs = 3000): Promise<number> {
   return new Promise((resolve, reject) => {
     const timer = setTimeout(() => {
       socket.close();
@@ -207,9 +207,9 @@ function closedByProvider(socket: WebSocket, timeoutMs = 3000): Promise<void> {
     }, timeoutMs);
     socket.addEventListener(
       'close',
-      () => {
+      (event) => {
         clearTimeout(timer);
-        resolve();
+        resolve(event.code);
       },
       { once: true },
     );
@@ -380,7 +380,7 @@ describe('TypeScript provider to TypeScript consumer, in process, on a real port
         headers: [],
       }),
     );
-    await closedByProvider(socket);
+    expect(await closedByProvider(socket)).toBe(1000);
     expect(frames[0]).toEqual({ v: 1, type: 'ready', resumed: false });
     expect(frames.some((frame) => frame['type'] === 'message')).toBe(true);
   });
@@ -446,7 +446,7 @@ describe('Go and TypeScript refuse the same corpus scenes with the same code', (
       socket.addEventListener('error', () => reject(new Error('upgrade failed')), { once: true });
     });
     socket.send(JSON.stringify(item.frame));
-    await closedByProvider(socket);
+    expect(await closedByProvider(socket)).toBe(1008);
     expect(frames[0]).toMatchObject({ type: 'error', error: { status: 400, code: item.code } });
     expect(JSON.stringify(frames)).not.toContain('must-not-appear-in-diagnostics');
   });
