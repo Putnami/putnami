@@ -131,7 +131,8 @@ func readCycloneDX(data []byte) (SBOM, []diag.Diagnostic) {
 				Severity string `json:"severity"`
 			} `json:"ratings"`
 			Affects []struct {
-				Ref string `json:"ref"`
+				Ref      string               `json:"ref"`
+				Versions []cdxAffectedVersion `json:"versions"`
 			} `json:"affects"`
 		} `json:"vulnerabilities"`
 	}
@@ -176,7 +177,7 @@ func readCycloneDX(data []byte) (SBOM, []diag.Diagnostic) {
 		}
 		affected := map[int]bool{}
 		for _, a := range v.Affects {
-			for _, index := range affectedPackages(a.Ref, byRef, byPURL) {
+			for _, index := range affectedVersions(affectedPackages(a.Ref, byRef, byPURL), a.Versions, out.Packages) {
 				affected[index] = true
 			}
 		}
@@ -210,6 +211,39 @@ func affectedPackages(ref string, byRef, byPURL map[string][]int) []int {
 		return byPURL[purl.versioned()]
 	}
 	return byPURL[purl.unversioned()]
+}
+
+// cdxAffectedVersion is one entry of an affects ref's versions: an exact
+// version or a range, affected unless its status says otherwise.
+type cdxAffectedVersion struct {
+	Version string `json:"version"`
+	Range   string `json:"range"`
+	Status  string `json:"status"`
+}
+
+// affectedVersions keeps the packages an affects entry's versions name. A
+// version stated unaffected leaves; when exact affected versions are stated
+// and no affected range, only those stay. Without versions, as osv-scanner
+// writes them, every version of the package the ref names stays.
+func affectedVersions(indexes []int, versions []cdxAffectedVersion, packages []Package) []int {
+	affected, unaffected := map[string]bool{}, map[string]bool{}
+	ranged := false
+	for _, v := range versions {
+		status := strings.ToLower(strings.TrimSpace(v.Status))
+		switch {
+		case v.Range != "":
+			ranged = ranged || status != "unaffected"
+		case v.Version == "":
+		case status == "unaffected":
+			unaffected[strings.TrimPrefix(v.Version, "v")] = true
+		default:
+			affected[strings.TrimPrefix(v.Version, "v")] = true
+		}
+	}
+	return slices.DeleteFunc(slices.Clone(indexes), func(index int) bool {
+		version := strings.TrimPrefix(packages[index].Version, "v")
+		return unaffected[version] || (len(affected) > 0 && !ranged && !affected[version])
+	})
 }
 
 func addVulnerability(p *Package, v Vulnerability) {
@@ -323,7 +357,11 @@ func advisoryID(locator string) string {
 	if parsed, err := url.Parse(locator); err == nil && parsed.Scheme != "" {
 		locator = parsed.Path
 	}
-	return path.Base(strings.TrimRight(locator, "/"))
+	id := path.Base(strings.TrimRight(locator, "/"))
+	if id == "." || id == "/" {
+		return ""
+	}
+	return id
 }
 
 // PURL is a parsed package URL: pkg:type/namespace/name@version, without its

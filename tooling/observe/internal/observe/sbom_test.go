@@ -7,9 +7,11 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"slices"
 	"strings"
 	"testing"
 
+	readers "go.putnami.dev/evidence/readers"
 	diag "go.putnami.dev/protocol/diagnostic"
 	"go.putnami.dev/protocol/evidence"
 	"go.putnami.dev/protocol/features/spectest"
@@ -217,6 +219,11 @@ func TestTheSummaryCountsTheVulnerabilitiesPerDependency(t *testing.T) {
 		if got := dependencyFacts(upgraded, sbom); got != "fixes 0, introduces 0, keeps 0; license MIT -> BUSL-1.1" {
 			t.Errorf("facts %q", got)
 		}
+		dropped := evidence.DependencyChange{Change: evidence.DependencyUpgraded,
+			Before: &evidence.DependencyState{Licenses: []string{"MIT"}}, After: &evidence.DependencyState{}}
+		if got := dependencyFacts(dropped, sbom); got != "fixes 0, introduces 0, keeps 0; license MIT -> none" {
+			t.Errorf("facts %q", got)
+		}
 		unlisted := evidence.DependencyChange{Change: evidence.DependencyUpgraded}
 		if got := dependencyFacts(unlisted, sbom); got != "not listed in the base SBOM; not listed in the head SBOM" {
 			t.Errorf("facts %q", got)
@@ -231,6 +238,15 @@ func TestTheSummaryCountsTheVulnerabilitiesPerDependency(t *testing.T) {
 			t.Errorf("facts %q", got)
 		}
 	})
+}
+
+func TestTheReaderSeveritiesAreTheProtocolOnes(t *testing.T) {
+	if !slices.Equal(readers.Severities, evidence.Severities) {
+		t.Fatalf("reader severities %v, protocol severities %v", readers.Severities, evidence.Severities)
+	}
+	if !slices.Equal([]string{readers.FormatCycloneDX, readers.FormatSPDX}, evidence.SBOMFormats) {
+		t.Fatalf("reader formats differ from the protocol's %v", evidence.SBOMFormats)
+	}
 }
 
 func TestWithoutABaseSBOMTheBaseIsUnknown(t *testing.T) {

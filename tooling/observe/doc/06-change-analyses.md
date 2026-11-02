@@ -114,7 +114,9 @@ name and version. For each change, the base SBOM gives the `before` state,
 unless the package was added, and the head SBOM the `after` state, unless it
 was removed: its licences and its vulnerabilities, each an id and a severity,
 the most severe first. A package the SBOM does not list gets no state, and
-the summary says so. Without a base SBOM, every base state is unknown. A
+the summary says so. Without a base SBOM, every base state is unknown.
+osv-scanner names a vulnerable package without its version: when one SBOM
+lists two versions of a package, both get its vulnerabilities. A
 state holds at most 20 licences and 200 vulnerabilities.
 
 The summary names the SBOMs after the dependency count, then gives each
@@ -123,11 +125,11 @@ change one line:
 ```text
   dependencies  3 changes, SBOM head CycloneDX 1.5, base CycloneDX 1.5
     upgraded   lodash 4.17.20 -> 4.17.21, in package-lock.json
-               fixes 2 (GHSA-35jh-r3h4-6jhm high, GHSA-29mw-wpgm-hmr9 medium), introduces 0, keeps 3; licence MIT
+               fixes 2 (GHSA-35jh-r3h4-6jhm high, GHSA-29mw-wpgm-hmr9 medium), introduces 0, keeps 3; license MIT
     removed    minimist 1.2.5, in package-lock.json
-               fixes 1 (GHSA-xvch-5gv4-984h critical); licence MIT
+               fixes 1 (GHSA-xvch-5gv4-984h critical); license MIT
     added      zod 3.23.8, in package-lock.json
-               introduces 1 (GHSA-mrhx-c7xc-m3w5 high); licence MIT
+               introduces 1 (GHSA-mrhx-c7xc-m3w5 high); license MIT
 ```
 
 Without a base SBOM, an upgrade reads `3 (…) known at the head, base

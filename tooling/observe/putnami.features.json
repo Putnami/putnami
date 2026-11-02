@@ -335,7 +335,7 @@
             "kind": "acceptance",
             "checks": [
               "a-cyclonedx-pair-gives-each-changed-dependency-its-facts",
-              "an-spdx-document-gives-licences-and-advisories",
+              "an-spdx-document-gives-licenses-and-advisories",
               "without-a-base-sbom-the-base-is-unknown",
               "the-summary-counts-the-vulnerabilities-per-dependency"
             ]

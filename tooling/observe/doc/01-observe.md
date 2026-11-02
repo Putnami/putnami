@@ -100,7 +100,8 @@ Without `--sbom`, it also reads the `.json` files whose name contains `bom`,
 member) as the commit's SBOM. A missing SBOM is no diagnostic. The base SBOM
 is never discovered: name it with `--base-sbom`, and discovery then leaves
 that file out. When a side has several SBOMs, none is read, with
-`observe.sbom_ambiguous`. See
+`observe.sbom_ambiguous`: a repository that commits SBOM documents, such as
+test fixtures, names its own with `--sbom`. See
 [licences and vulnerabilities](06-change-analyses.md#licences-and-vulnerabilities).
 
 Discovery stops after 200 000 entries or 10 000 candidate files, and keeps at

@@ -98,6 +98,34 @@ func TestAVulnerabilityGoesToTheComponentsItAffects(t *testing.T) {
 	if got := sbom.Packages[0].Licenses; !slices.Equal(got, []string{"MIT", "Custom", "MIT OR Apache-2.0"}) {
 		t.Errorf("licenses %v", got)
 	}
+	t.Run("the versions of an affects entry narrow it", func(t *testing.T) {
+		// osv-scanner names a package without its version and states no
+		// versions: every version the SBOM lists gets the advisory.
+		document := `{
+  "bomFormat": "CycloneDX",
+  "specVersion": "1.5",
+  "components": [
+    {"name": "minimist", "version": "0.0.8", "purl": "pkg:npm/minimist@0.0.8"},
+    {"name": "minimist", "version": "1.2.8", "purl": "pkg:npm/minimist@1.2.8"}
+  ],
+  "vulnerabilities": [
+    {"id": "GHSA-exact", "affects": [{"ref": "pkg:npm/minimist", "versions": [{"version": "0.0.8", "status": "affected"}]}]},
+    {"id": "GHSA-unaffected", "affects": [{"ref": "pkg:npm/minimist", "versions": [{"version": "1.2.8", "status": "unaffected"}]}]},
+    {"id": "GHSA-range", "affects": [{"ref": "pkg:npm/minimist", "versions": [{"version": "0.0.8"}, {"range": "vers:npm/<1.2.6"}]}]},
+    {"id": "GHSA-unstated", "affects": [{"ref": "pkg:npm/minimist"}]}
+  ]
+}`
+		sbom, diagnostics := ReadSBOM([]byte(document))
+		if len(diagnostics) != 0 {
+			t.Fatal(diagnostics)
+		}
+		if got := vulnerabilityIDs(t, sbom, "minimist", "0.0.8"); !slices.Equal(got, []string{"GHSA-exact unknown", "GHSA-range unknown", "GHSA-unaffected unknown", "GHSA-unstated unknown"}) {
+			t.Errorf("minimist@0.0.8: %v", got)
+		}
+		if got := vulnerabilityIDs(t, sbom, "minimist", "1.2.8"); !slices.Equal(got, []string{"GHSA-range unknown", "GHSA-unstated unknown"}) {
+			t.Errorf("minimist@1.2.8: %v", got)
+		}
+	})
 	purl, err := ParsePURL(sbom.Packages[1].PURL)
 	if err != nil || purl.Name != "@scope/b" || purl.Version != "2.0.0" || purl.Type != "npm" {
 		t.Errorf("purl %+v, %v", purl, err)
@@ -132,6 +160,12 @@ func TestARealSPDXDocumentReadsToItsExpectedPackages(t *testing.T) {
 		 "externalRefs": [{"referenceCategory": "PACKAGE_MANAGER", "referenceType": "purl", "referenceLocator": "pkg:composer/acme/b@1"}]}]}`))
 	if len(sbom.Packages) != 2 || !slices.Equal(sbom.Packages[0].Licenses, []string{"Apache-2.0"}) || sbom.Packages[1].Licenses != nil || sbom.Packages[1].PURL != "pkg:composer/acme/b@1" {
 		t.Errorf("packages %+v", sbom.Packages)
+	}
+	// An advisory locator without a last segment names no advisory.
+	for locator, want := range map[string]string{"https://osv.dev/vulnerability/GHSA-x/": "GHSA-x", "https://osv.dev/": "", "": "", "/": ""} {
+		if got := advisoryID(locator); got != want {
+			t.Errorf("advisoryID(%q) = %q, want %q", locator, got, want)
+		}
 	}
 }
 

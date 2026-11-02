@@ -274,7 +274,7 @@ const (
 )
 
 func TestAnSBOMIsFoundByItsContentOrNamed(t *testing.T) {
-	spectest.Proves(t, feature, "sbom-documents", "an-sbom-is-found-by-its-content-or-named")
+	spectest.Proves(t, "tooling/observe-analyses", "sbom-documents", "an-sbom-is-found-by-its-content-or-named")
 	for content, want := range map[string]string{
 		cycloneDXJSON:                      FormatCycloneDX,
 		spdxJSON:                           FormatSPDX,

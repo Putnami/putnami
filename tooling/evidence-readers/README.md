@@ -50,6 +50,12 @@ severity: `critical`, `high`, `medium`, `low`, `info`, `none` or `unknown`.
 | CycloneDX | every component, nested ones included; a `group` prefixes the name | each licence `id`, else `name`, and each `expression` | each entry of `vulnerabilities`, on every component an `affects` ref names: by `bom-ref`, by the `#` part of a BOM-Link, or by package URL with or without its version. The severity is the highest of its `ratings`. |
 | SPDX | every package the document does not describe as itself | `licenseConcluded`, else `licenseDeclared`, unless `NOASSERTION` or `NONE` | each `SECURITY` `advisory` external reference, named by the last segment of its locator, severity `unknown` |
 
+A CycloneDX `affects` entry that states versions narrows the vulnerability
+to them: a version stated `unaffected` leaves, and exact affected versions,
+without an affected range, keep only those. osv-scanner names a package
+without its version and states none, so when the SBOM lists two versions of
+one package, both get its vulnerabilities.
+
 Most SPDX writers, osv-scanner included, write no vulnerability: use
 CycloneDX for them. `ParsePURL` reads a package URL into its type, its name
 (namespace and name, decoded) and its version.

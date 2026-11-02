@@ -284,7 +284,7 @@ func dependencyFacts(d evidence.DependencyChange, sbom *evidence.SBOM) string {
 	default:
 		parts = append(parts, "head unknown")
 	}
-	if licenses := licenceChange(d); licenses != "" {
+	if licenses := licenseChange(d); licenses != "" {
 		parts = append(parts, licenses)
 	}
 	return strings.Join(parts, "; ")
@@ -328,9 +328,9 @@ func vulnerabilityList(list []evidence.Vulnerability) string {
 	return fmt.Sprintf("%d (%s)", len(list), strings.Join(names, ", "))
 }
 
-// licenceChange names the licenses of a dependency, before -> after when
-// they differ.
-func licenceChange(d evidence.DependencyChange) string {
+// licenseChange names the licenses of a dependency, before -> after when
+// both sides are known and differ; a side that lists none reads "none".
+func licenseChange(d evidence.DependencyChange) string {
 	var before, after string
 	if d.Before != nil {
 		before = strings.Join(d.Before.Licenses, ", ")
@@ -339,12 +339,22 @@ func licenceChange(d evidence.DependencyChange) string {
 		after = strings.Join(d.After.Licenses, ", ")
 	}
 	switch {
-	case before == "" && after == "":
-		return ""
-	case before == after, before == "":
+	case before == after:
+		if before == "" {
+			return ""
+		}
 		return "license " + after
-	case after == "":
+	case d.Before == nil:
+		return "license " + after
+	case d.After == nil:
 		return "license " + before
 	}
-	return "license " + before + " -> " + after
+	return "license " + orNone(before) + " -> " + orNone(after)
+}
+
+func orNone(licenses string) string {
+	if licenses == "" {
+		return "none"
+	}
+	return licenses
 }
