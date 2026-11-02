@@ -389,6 +389,20 @@
           }
         },
         {
+          "id": "sends-the-dependency-states",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-dependency-change-carries-its-before-and-after-states",
+              "a-document-without-states-uploads-the-same-body"
+            ]
+          }
+        },
+        {
           "id": "refuses-what-it-cannot-upload",
           "stage": "coded",
           "evidenceKinds": [
