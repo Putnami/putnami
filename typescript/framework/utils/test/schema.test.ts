@@ -10,6 +10,7 @@ import {
   Email,
   Env,
   type InferPrimitive,
+  type InferSchema,
   Int,
   isNestedSchema,
   isSchemaDescriptor,
@@ -52,6 +53,17 @@ describe('schema utilities', () => {
     expect(baseTypeName(Uuid)).toBe('string');
     expect(baseTypeName({ nested: String })).toBe('object');
     expect(baseTypeName('unexpected' as unknown as typeof String)).toBe('unknown');
+  });
+
+  it('makes an Optional field an optional key of the inferred type', () => {
+    const definition = schema({ name: String, nickname: Optional(String), retries: Default(Int, 3) });
+    // test~types checks these assignments: the Optional key may be left out,
+    // the others may not.
+    const minimal: InferSchema<typeof definition> = { name: 'a', retries: 3 };
+    // @ts-expect-error `retries` has a default, not an Optional: the key stays required.
+    const missingDefault: InferSchema<typeof definition> = { name: 'a' };
+    expect<unknown>(minimal).toEqual({ name: 'a', retries: 3 });
+    expect<unknown>(missingDefault).toEqual({ name: 'a' });
   });
 
   it('builds descriptor combinators', async () => {
