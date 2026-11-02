@@ -25,7 +25,7 @@
     },
     {
       "id": "excluded-route-redirect",
-      "text": "A request for a route outside the localized set under a locale prefix redirects with 308 to the same path and query without the prefix."
+      "text": "A GET request for a route outside the localized set under a locale prefix redirects with 308 to the same path and query without the prefix."
     },
     {
       "id": "locale-document",

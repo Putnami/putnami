@@ -32,3 +32,16 @@ export function negotiatingEntry(handler: RouteHandler, settings: LocaleSettings
     return response;
   };
 }
+
+/**
+ * Send a reader who adds a locale prefix to a route outside the localized set,
+ * such as `/fr/docs/intro`, to its one URL, `/docs/intro`, with the query.
+ * 308 keeps the method and tells caches and crawlers the move is permanent.
+ */
+export function excludedRouteRedirect(prefix: string): RouteHandler {
+  return (ctx) => {
+    const url = new URL(ctx.req.url);
+    const path = url.pathname.slice(prefix.length) || '/';
+    return new HttpResponse('', { status: 308, headers: { location: `${path}${url.search}` } });
+  };
+}
