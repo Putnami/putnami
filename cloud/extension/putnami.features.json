@@ -398,7 +398,8 @@
             "kind": "acceptance",
             "checks": [
               "a-dependency-change-carries-its-before-and-after-states",
-              "a-document-without-states-uploads-the-same-body"
+              "a-document-without-states-uploads-the-same-body",
+              "a-refused-batch-is-posted-again-without-the-states"
             ]
           }
         },

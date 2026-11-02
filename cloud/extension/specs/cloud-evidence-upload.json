@@ -25,7 +25,7 @@
     },
     {
       "id": "sends-the-dependency-states",
-      "text": "Each dependency change in the second batch keeps the before and after states the document gives it: the licenses and the known vulnerabilities, each with its id and severity. A dependency change without a state uploads the same body as before the states existed."
+      "text": "Each dependency change in the second batch keeps the before and after states the document gives it: the licenses and the known vulnerabilities, each with its id and severity, and an empty state as empty. A dependency change without a state uploads the same body as before the states existed. A batch refused with 400 or 413 while it carries states, by a Delivery that predates them or for its size, is posted again without them, with a warning that names the refusal."
     },
     {
       "id": "refuses-what-it-cannot-upload",
