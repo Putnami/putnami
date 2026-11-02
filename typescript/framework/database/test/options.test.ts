@@ -1,14 +1,24 @@
 import { afterEach, describe, expect, it } from 'bun:test';
-import { type LogEntry, type LogSink, Logger, REDACTED, resetDefaultLogger, setRootLogger } from '@putnami/runtime';
+import {
+  type InferConfig,
+  type LogEntry,
+  type LogSink,
+  Logger,
+  REDACTED,
+  resetDefaultLogger,
+  setRootLogger,
+} from '@putnami/runtime';
+import type { PostgresConfig } from '../src/postgres/config';
 import { __setIdentityResolverForTests, __setTokenFetcherForTests, buildOptions } from '../src/postgres/options';
 
-const baseConfig = {
+const baseConfig: InferConfig<typeof PostgresConfig> = {
   host: 'localhost',
   port: 5432,
   database: 'app',
   ssl: false,
   poolSize: 10,
   debug: false,
+  maxRowLimit: 10_000,
   slowQueryThresholdMs: 0,
   statementTimeoutMs: 30_000,
   idleInTransactionTimeoutMs: 300_000,

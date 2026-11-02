@@ -9,7 +9,15 @@ import {
   ClientTimeoutError,
 } from '../../src/runtime/errors';
 import type { DuplexStream, StreamObserver } from '../../src/runtime/stream.type';
-import type { ClientResponse, DisposableInterceptor, Interceptor, Transport } from '../../src/runtime/transport.type';
+import type {
+  ClientRequest,
+  ClientResponse,
+  DisposableInterceptor,
+  Interceptor,
+} from '../../src/runtime/transport.type';
+
+// A stub transport answers one fixed response, whatever data type the caller expects.
+type StubTransport = { execute(request: ClientRequest): Promise<ClientResponse> };
 
 class StreamTestClient extends BaseClient {
   readonly serviceName = 'stream-test';
@@ -240,7 +248,7 @@ describe('BaseClient request cancellation', () => {
     });
 
     let seen: AbortSignal | undefined;
-    (client as unknown as { transport: Transport }).transport = {
+    (client as unknown as { transport: StubTransport }).transport = {
       execute: async (request): Promise<ClientResponse> => {
         seen = request.signal;
         return { data: undefined, status: 200, headers: new Headers() };
@@ -269,7 +277,7 @@ describe('BaseClient request cancellation', () => {
 
     const controller = new AbortController();
     let attempts = 0;
-    (client as unknown as { transport: Transport }).transport = {
+    (client as unknown as { transport: StubTransport }).transport = {
       execute: async (): Promise<ClientResponse> => {
         attempts++;
         controller.abort();
@@ -291,7 +299,7 @@ describe('BaseClient request cancellation', () => {
     });
 
     let seen: AbortSignal | undefined;
-    (client as unknown as { transport: Transport }).transport = {
+    (client as unknown as { transport: StubTransport }).transport = {
       execute: async (request): Promise<ClientResponse> => {
         seen = request.signal;
         return { data: undefined, status: 200, headers: new Headers() };
@@ -313,7 +321,7 @@ describe('BaseClient request error mapping', () => {
     });
 
     // Inject a transport that fails like AbortSignal.timeout() would.
-    (client as unknown as { transport: Transport }).transport = {
+    (client as unknown as { transport: StubTransport }).transport = {
       execute: (): Promise<ClientResponse> => {
         throw new DOMException('Signal timed out', 'TimeoutError');
       },
@@ -330,7 +338,7 @@ describe('BaseClient request error mapping', () => {
 
   test('normalizes an untrusted network failure without preserving its message or cause', async () => {
     const client = new FirstPartyRequestTestClient();
-    (client as unknown as { transport: Transport }).transport = {
+    (client as unknown as { transport: StubTransport }).transport = {
       execute: (): Promise<ClientResponse> => {
         throw new TypeError('fetch https://service.test/?token=secret-token failed');
       },
@@ -346,7 +354,7 @@ describe('BaseClient request error mapping', () => {
   test('normalizes a caller abort reason without exposing it', async () => {
     const client = new FirstPartyRequestTestClient();
     const controller = new AbortController();
-    (client as unknown as { transport: Transport }).transport = {
+    (client as unknown as { transport: StubTransport }).transport = {
       execute: async (request): Promise<ClientResponse> => {
         controller.abort('secret abort reason');
         throw request.signal?.reason;
@@ -362,7 +370,7 @@ describe('BaseClient request error mapping', () => {
 
   test('normalizes a first-party attempt timeout as client.deadline', async () => {
     const client = new FirstPartyRequestTestClient();
-    (client as unknown as { transport: Transport }).transport = {
+    (client as unknown as { transport: StubTransport }).transport = {
       execute: (): Promise<ClientResponse> => {
         throw new DOMException('fetch secret endpoint timed out', 'TimeoutError');
       },
@@ -488,7 +496,7 @@ describe('BaseClient.dispose', () => {
       });
 
       // Transport that always 503s so the breaker opens and starts probing.
-      (client as unknown as { transport: Transport }).transport = {
+      (client as unknown as { transport: StubTransport }).transport = {
         execute: async (): Promise<ClientResponse> => ({ data: undefined, status: 503, headers: new Headers() }),
       };
 

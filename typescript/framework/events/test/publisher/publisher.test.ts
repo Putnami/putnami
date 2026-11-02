@@ -189,7 +189,7 @@ describe('getPublisher()', () => {
     expect(envelope.attributes['auth.sub']).toBe('user-123');
     expect(envelope.attributes['auth.email']).toBe('jane@example.com');
     // Non-auth attributes are passed through
-    expect(envelope.attributes.region).toBe('eu');
+    expect(envelope.attributes['region']).toBe('eu');
   });
 
   it('should generate a new traceId when none exists in context or options', async () => {

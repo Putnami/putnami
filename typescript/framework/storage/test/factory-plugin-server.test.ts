@@ -1,17 +1,18 @@
 import { afterAll, afterEach, beforeEach, describe, expect, it, mock } from 'bun:test';
+import type { HttpResponse, Module } from '@putnami/application';
 import { specTest } from '@putnami/runtime/spectest';
 import { mkdir, readFile, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 
 const debugMock = mock(() => {});
 const infoMock = mock(() => {});
-const warnMock = mock(() => {});
+const warnMock = mock((..._args: unknown[]) => {});
 const errorMock = mock(() => {});
 const useConfigMock = mock();
-const loadRegisteredModuleMock = mock(async () => undefined);
-const incCounterMock = mock(() => {});
-const observeHistogramMock = mock(() => {});
-const setGaugeMock = mock(() => {});
+const loadRegisteredModuleMock = mock(async (..._args: unknown[]): Promise<unknown> => undefined);
+const incCounterMock = mock((..._args: unknown[]) => {});
+const observeHistogramMock = mock((..._args: unknown[]) => {});
+const setGaugeMock = mock((..._args: unknown[]) => {});
 
 let currentProject: { name: string } | null = { name: 'app' };
 let dependencyGraph = new Map<string, string[]>();
@@ -85,7 +86,10 @@ const { FileBackend } = await import('../src/backend/file.backend');
 const { MemoryBackend } = await import('../src/backend/memory.backend');
 const { closeAllStorage, closeStorage, getStorageClient, storage } = await import('../src/factory');
 
-function defaultConfig(overrides: Record<string, unknown> = {}) {
+// The plugin hooks ignore the module that owns them.
+const owner = {} as Module;
+
+function defaultConfig(overrides: Record<string, unknown> = {}): NonNullable<Parameters<typeof storage>[1]> {
   return {
     backend: 'memory',
     endpoint: 'https://storage.example.com',
@@ -94,7 +98,7 @@ function defaultConfig(overrides: Record<string, unknown> = {}) {
     tokenSecret: 'factory-secret',
     slowOperationThresholdMs: 250,
     ...overrides,
-  };
+  } as NonNullable<Parameters<typeof storage>[1]>;
 }
 
 async function mountStorageServer(options?: { dataDir?: string; tokenSecret?: string }) {
@@ -138,14 +142,14 @@ beforeEach(() => {
   warnMock.mockReset();
   errorMock.mockReset();
 
-  (globalThis as Record<string, unknown>).__storagePluginLoaded = undefined;
+  (globalThis as Record<string, unknown>)['__storagePluginLoaded'] = undefined;
 });
 
 afterEach(async () => {
   await closeAllStorage();
   bucketRegistry.clear();
   await rm(projectRoot, { recursive: true, force: true });
-  (globalThis as Record<string, unknown>).__storagePluginLoaded = undefined;
+  (globalThis as Record<string, unknown>)['__storagePluginLoaded'] = undefined;
 });
 
 afterAll(() => {
@@ -276,7 +280,7 @@ describe('Factory', () => {
       confInit: explicitConfig,
     });
     expect(incCounterMock.mock.calls.filter(([metric]) => metric === 'storage.client.created')).toHaveLength(1);
-    expect(setGaugeMock.mock.calls.filter(([metric]) => metric === 'storage.client.count')).toEqual([
+    expect<unknown>(setGaugeMock.mock.calls.filter(([metric]) => metric === 'storage.client.count')).toEqual([
       ['storage.client.count', 1],
     ]);
   });
@@ -375,7 +379,7 @@ describe('Factory', () => {
     },
     async () => {
       const originalClose = MemoryBackend.prototype.close;
-      const closeMock = mock(async function (this: MemoryBackend) {
+      const closeMock = mock(async function (this: InstanceType<typeof MemoryBackend>) {
         await originalClose.call(this);
       });
       MemoryBackend.prototype.close = closeMock;
@@ -410,7 +414,7 @@ describe('Factory', () => {
     },
     async () => {
       const originalClose = MemoryBackend.prototype.close;
-      const closeMock = mock(async function (this: MemoryBackend) {
+      const closeMock = mock(async function (this: InstanceType<typeof MemoryBackend>) {
         await originalClose.call(this);
       });
       MemoryBackend.prototype.close = closeMock;
@@ -497,7 +501,7 @@ describe('storagePlugin', () => {
   });
 
   it('should use the preloaded module during warmup', async () => {
-    await storageModule.storagePlugin({ preloadedModule: { buckets: true } }).warmup?.();
+    await storageModule.storagePlugin({ preloadedModule: { buckets: true } }).warmup?.(owner);
 
     expect(debugMock).toHaveBeenCalledWith('Storage buckets registered (preloaded)');
   });
@@ -505,7 +509,7 @@ describe('storagePlugin', () => {
   it('should use a registered storage loader when one is available', async () => {
     loadRegisteredModuleMock.mockResolvedValue({ loader: true });
 
-    await storageModule.storagePlugin().warmup?.();
+    await storageModule.storagePlugin().warmup?.(owner);
 
     expect(loadRegisteredModuleMock).toHaveBeenCalledWith('storage-loader');
     expect(debugMock).toHaveBeenCalledWith('Storage buckets registered (bundled)');
@@ -514,13 +518,13 @@ describe('storagePlugin', () => {
   it('should log when no project is available', async () => {
     currentProject = null;
 
-    await storageModule.storagePlugin().warmup?.();
+    await storageModule.storagePlugin().warmup?.(owner);
 
     expect(debugMock).toHaveBeenCalledWith('No project found');
   });
 
   it('should log when the generated storage file does not exist', async () => {
-    await storageModule.storagePlugin().warmup?.();
+    await storageModule.storagePlugin().warmup?.(owner);
 
     expect(debugMock).toHaveBeenCalledWith('No storage generated file found');
   });
@@ -533,9 +537,9 @@ describe('storagePlugin', () => {
       'globalThis.__storagePluginLoaded = ((globalThis.__storagePluginLoaded as number | undefined) ?? 0) + 1;\nexport {};\n',
     );
 
-    await storageModule.storagePlugin().warmup?.();
+    await storageModule.storagePlugin().warmup?.(owner);
 
-    expect((globalThis as Record<string, unknown>).__storagePluginLoaded).toBe(1);
+    expect((globalThis as Record<string, unknown>)['__storagePluginLoaded']).toBe(1);
     expect(debugMock).toHaveBeenCalledWith('Storage buckets registered');
   });
 
@@ -544,7 +548,7 @@ describe('storagePlugin', () => {
     await mkdir(join(projectRoot, '.gen/src'), { recursive: true });
     await Bun.write(generatedPath, 'throw new Error("storage boom");\nexport {};\n');
 
-    await expect(storageModule.storagePlugin().warmup?.()).rejects.toThrow('storage boom');
+    await expect(storageModule.storagePlugin().warmup?.(owner)).rejects.toThrow('storage boom');
     expect(errorMock).toHaveBeenCalledWith('Storage initialization failed:', expect.any(Error));
   });
 
@@ -552,7 +556,7 @@ describe('storagePlugin', () => {
     Bucket('avatars');
     await storage('avatars');
 
-    await storageModule.storagePlugin().stop?.();
+    await storageModule.storagePlugin().stop?.(owner);
 
     expect(getStorageClient('avatars')).toBeUndefined();
     expect(setGaugeMock).toHaveBeenCalledWith('storage.client.count', 0);
@@ -577,12 +581,12 @@ describe('storageServer', () => {
 
     // The public bucket's bucket-wide unauthenticated-read surface is warned at startup.
     expect(warnMock).toHaveBeenCalledTimes(1);
-    const warnArg = warnMock.mock.calls[0]?.[0] as string;
+    const warnArg = String(warnMock.mock.calls[0]?.[0]);
     expect(warnArg).toContain('public-files');
     expect(warnArg).toContain('unauthenticated');
     expect(warnArg).not.toContain('private-files');
 
-    await expect(plugin.stop?.()).resolves.toBeUndefined();
+    await expect(plugin.stop?.(owner)).resolves.toBeUndefined();
   });
 
   // The positive half of the public-bucket warning lives here rather than
@@ -608,7 +612,7 @@ describe('storageServer', () => {
       });
 
       expect(warnMock).toHaveBeenCalledTimes(1);
-      const warnArg = warnMock.mock.calls[0]?.[0] as string;
+      const warnArg = String(warnMock.mock.calls[0]?.[0]);
       expect(warnArg).toContain('public-files');
       expect(warnArg).toContain('public-assets');
       expect(warnArg).toContain('unauthenticated');
@@ -645,7 +649,7 @@ describe('storageServer', () => {
       queryParams: () => ({ token: 'bad-token' }),
       body: async () => new TextEncoder().encode('x').buffer,
       headers: new Headers({ 'content-type': 'text/plain' }),
-    })) as InstanceType<typeof storageModule.HttpResponse>;
+    })) as HttpResponse;
     expect(invalidKey.status).toBe(400);
 
     const invalidToken = (await putHandler({
@@ -653,7 +657,7 @@ describe('storageServer', () => {
       queryParams: () => ({ token: 'bad-token' }),
       body: async () => new TextEncoder().encode('x').buffer,
       headers: new Headers({ 'content-type': 'text/plain' }),
-    })) as InstanceType<typeof storageModule.HttpResponse>;
+    })) as HttpResponse;
     expect(invalidToken.status).toBe(403);
   });
 
@@ -671,7 +675,7 @@ describe('storageServer', () => {
       queryParams: () => ({ token: unknownToken }),
       body: async () => new TextEncoder().encode('x').buffer,
       headers: new Headers({ 'content-type': 'text/plain' }),
-    })) as InstanceType<typeof storageModule.HttpResponse>;
+    })) as HttpResponse;
     expect(missingBucket.status).toBe(404);
 
     const limitedToken =
@@ -681,7 +685,7 @@ describe('storageServer', () => {
       queryParams: () => ({ token: limitedToken }),
       body: async () => new TextEncoder().encode('too big').buffer,
       headers: new Headers({ 'content-type': 'text/plain' }),
-    })) as InstanceType<typeof storageModule.HttpResponse>;
+    })) as HttpResponse;
     expect(rejected.status).toBe(413);
     expect(await rejected.get().json()).toEqual({
       errors: ['File size 7 bytes exceeds maximum 1b', 'MIME type "text/plain" is not allowed. Allowed: image/png'],
@@ -692,7 +696,7 @@ describe('storageServer', () => {
       queryParams: () => ({ token: limitedToken }),
       body: async () => undefined,
       headers: new Headers({ 'content-type': 'image/png' }),
-    })) as InstanceType<typeof storageModule.HttpResponse>;
+    })) as HttpResponse;
     expect(missingBody.status).toBe(400);
   });
 
@@ -719,7 +723,7 @@ describe('storageServer', () => {
       path: () => '_storage/public-files/hello.txt',
       queryParams: () => ({}),
       headers: new Headers(),
-    })) as InstanceType<typeof storageModule.HttpResponse>;
+    })) as HttpResponse;
     const http = response.get();
 
     expect(http.status).toBe(200);
@@ -741,14 +745,14 @@ describe('storageServer', () => {
       path: () => '_storage/private-files/secret.txt',
       queryParams: () => ({}),
       headers: new Headers(),
-    })) as InstanceType<typeof storageModule.HttpResponse>;
+    })) as HttpResponse;
     expect(forbidden.status).toBe(403);
 
     const ok = (await getHandler({
       path: () => '_storage/private-files/secret.txt',
       queryParams: () => ({ token }),
       headers: new Headers(),
-    })) as InstanceType<typeof storageModule.HttpResponse>;
+    })) as HttpResponse;
     expect(await ok.get().text()).toBe('top secret');
 
     const missingToken =
@@ -757,7 +761,7 @@ describe('storageServer', () => {
       path: () => '_storage/private-files/missing.txt',
       queryParams: () => ({ token: missingToken }),
       headers: new Headers(),
-    })) as InstanceType<typeof storageModule.HttpResponse>;
+    })) as HttpResponse;
     expect(missing.status).toBe(404);
   });
 
@@ -781,7 +785,7 @@ describe('storageServer', () => {
       queryParams: () => ({ token: downloadToken }),
       body: async () => new TextEncoder().encode('overwritten').buffer,
       headers: new Headers({ 'content-type': 'text/plain' }),
-    })) as InstanceType<typeof storageModule.HttpResponse>;
+    })) as HttpResponse;
     expect(overwriteAttempt.status).toBe(403);
 
     // The object is untouched.
@@ -789,7 +793,7 @@ describe('storageServer', () => {
       path: () => '_storage/private-files/secret.txt',
       queryParams: () => ({ token: downloadToken }),
       headers: new Headers(),
-    })) as InstanceType<typeof storageModule.HttpResponse>;
+    })) as HttpResponse;
     expect(await readBack.get().text()).toBe('top secret');
 
     // An upload (PUT) token must not authorize a download.
@@ -799,7 +803,7 @@ describe('storageServer', () => {
       path: () => '_storage/private-files/secret.txt',
       queryParams: () => ({ token: uploadToken }),
       headers: new Headers(),
-    })) as InstanceType<typeof storageModule.HttpResponse>;
+    })) as HttpResponse;
     expect(downloadAttempt.status).toBe(403);
   });
 
@@ -828,7 +832,7 @@ describe('storageServer', () => {
       path: () => path,
       queryParams: () => ({ token }),
       headers: new Headers(),
-    })) as InstanceType<typeof storageModule.HttpResponse>;
+    })) as HttpResponse;
 
     const http = ok.get();
     expect(http.status).toBe(200);
@@ -878,7 +882,7 @@ describe('storageServer', () => {
       path: () => '_storage/private-files/../escape.txt',
       queryParams: () => ({}),
       headers: new Headers(),
-    })) as InstanceType<typeof storageModule.HttpResponse>;
+    })) as HttpResponse;
     expect(result.status).toBe(400);
   });
 
@@ -903,7 +907,7 @@ describe('storageServer', () => {
       path: () => '_storage/private-files/configured.txt',
       queryParams: () => ({ token }),
       headers: new Headers(),
-    })) as InstanceType<typeof storageModule.HttpResponse>;
+    })) as HttpResponse;
 
     expect(await response.get().text()).toBe('from override');
   });

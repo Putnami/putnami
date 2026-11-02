@@ -1,7 +1,14 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'bun:test';
-import { closeAllDatabases, closeDatabase, database, type PostgresConfig } from '../src/factory';
+import type { InferConfig } from '@putnami/runtime';
+import type postgres from 'postgres';
+import { closeAllDatabases, closeDatabase, database } from '../src/factory';
+import type { PostgresConfig } from '../src/postgres/config';
 import { ensurePostgresContainer, isDockerAvailable, POSTGRES_SETUP_TIMEOUT_MS } from './utils/postgres-helper';
 import { setPrimaryDatasource } from '../src/primary-datasource';
+
+// postgres.js types TransactionSql through Omit, which drops its tagged-template
+// call signature; the transaction still runs tagged-template queries.
+const tagged = (tx: postgres.TransactionSql) => tx as unknown as postgres.Sql;
 
 const DB_NAME = 'factory-test';
 const DB_NAME_2 = 'factory-test-2';
@@ -37,7 +44,7 @@ describe.skipIf(!dockerAvailable)('Database Factory', () => {
 
       // Test connection
       const result = await sql`SELECT 1 as test`;
-      expect(result[0].test).toBe(1);
+      expect(result[0]['test']).toBe(1);
     });
 
     it('should reuse existing connection for same config', async () => {
@@ -59,7 +66,7 @@ describe.skipIf(!dockerAvailable)('Database Factory', () => {
     });
 
     it('should accept explicit config', async () => {
-      const config: PostgresConfig = {
+      const config = {
         host: 'localhost',
         port: 6432,
         database: 'test',
@@ -68,13 +75,13 @@ describe.skipIf(!dockerAvailable)('Database Factory', () => {
         ssl: false,
         poolSize: 10,
         debug: false,
-      };
+      } as InferConfig<typeof PostgresConfig>;
 
       const sql = await database(undefined, config);
       expect(sql).toBeDefined();
 
       const result = await sql`SELECT 1 as test`;
-      expect(result[0].test).toBe(1);
+      expect(result[0]['test']).toBe(1);
     });
 
     it('should handle default database connection', async () => {
@@ -108,7 +115,7 @@ describe.skipIf(!dockerAvailable)('Database Factory', () => {
       const results = await Promise.all(promises);
       expect(results).toHaveLength(10);
       results.forEach((result, i) => {
-        expect(Number(result[0].num)).toBe(i);
+        expect(Number(result[0]['num'])).toBe(i);
       });
     });
 
@@ -123,9 +130,9 @@ describe.skipIf(!dockerAvailable)('Database Factory', () => {
         )
       `;
 
-      await sql.begin(async (sql) => {
-        await sql`INSERT INTO factory_test (id, value) VALUES ('test-1', 'value-1')`;
-        await sql`INSERT INTO factory_test (id, value) VALUES ('test-2', 'value-2')`;
+      await sql.begin(async (tx) => {
+        await tagged(tx)`INSERT INTO factory_test (id, value) VALUES ('test-1', 'value-1')`;
+        await tagged(tx)`INSERT INTO factory_test (id, value) VALUES ('test-2', 'value-2')`;
       });
 
       const result = await sql`SELECT * FROM factory_test WHERE id IN ('test-1', 'test-2')`;
@@ -144,7 +151,7 @@ describe.skipIf(!dockerAvailable)('Database Factory', () => {
 
       // Verify connection works
       const result = await sql`SELECT 1 as test`;
-      expect(result[0].test).toBe(1);
+      expect(result[0]['test']).toBe(1);
 
       // Close the connection
       await closeDatabase(DB_NAME_CLEANUP);
@@ -167,8 +174,8 @@ describe.skipIf(!dockerAvailable)('Database Factory', () => {
       // Verify connections work
       const result1 = await sql1`SELECT 1 as test`;
       const result2 = await sql2`SELECT 1 as test`;
-      expect(result1[0].test).toBe(1);
-      expect(result2[0].test).toBe(1);
+      expect(result1[0]['test']).toBe(1);
+      expect(result2[0]['test']).toBe(1);
 
       // Close all connections
       await closeAllDatabases();
@@ -206,7 +213,7 @@ describe.skipIf(!dockerAvailable)('Database Factory', () => {
 
       // Verify new connection works
       const result = await sql2`SELECT 1 as test`;
-      expect(result[0].test).toBe(1);
+      expect(result[0]['test']).toBe(1);
 
       // Clean up
       await closeDatabase(DB_NAME_RECREATE);

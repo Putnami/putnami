@@ -16,7 +16,7 @@ describe('HttpPlugin', () => {
     it('should register GET route', () => {
       plugin.get('/test', () => new HttpResponse('ok'));
       // Verify route was added to router
-      expect(plugin.router).toBeDefined();
+      expect(plugin['router']).toBeDefined();
     });
 
     it('should chain route methods', () => {
@@ -126,7 +126,7 @@ describe('HttpPlugin', () => {
         () =>
           new HttpResponse(JSON.stringify({ message: 'hello' }), { headers: { 'Content-Type': 'application/json' } }),
       );
-      plugin.get('/users/[id]', (ctx) => new HttpResponse(`User: ${ctx.params?.id}`));
+      plugin.get('/users/[id]', (ctx) => new HttpResponse(`User: ${ctx.params?.['id']}`));
       plugin.post('/echo', async (ctx) => {
         const data = await ctx.body<{ name: string }>();
         return new HttpResponse(JSON.stringify({ received: data }), {

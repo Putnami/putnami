@@ -192,7 +192,7 @@ describe('postOtlp', () => {
       check: 'a-collector-failure-resolves-not-ok',
     },
     async () => {
-      globalThis.fetch = mock(() => Promise.resolve(new Response(null, { status: 200 }))) as typeof fetch;
+      globalThis.fetch = mock(() => Promise.resolve(new Response(null, { status: 200 }))) as unknown as typeof fetch;
       const result = await postOtlp('https://c:4318', '/v1/metrics', '{}');
       expect(result.ok).toBe(true);
     },
@@ -206,10 +206,10 @@ describe('postOtlp', () => {
       check: 'a-collector-failure-resolves-not-ok',
     },
     async () => {
-      globalThis.fetch = mock(() => Promise.resolve(new Response('err', { status: 500 }))) as typeof fetch;
+      globalThis.fetch = mock(() => Promise.resolve(new Response('err', { status: 500 }))) as unknown as typeof fetch;
       expect((await postOtlp('https://c:4318', '/v1/metrics', '{}')).ok).toBe(false);
 
-      globalThis.fetch = mock(() => Promise.reject(new Error('boom'))) as typeof fetch;
+      globalThis.fetch = mock(() => Promise.reject(new Error('boom'))) as unknown as typeof fetch;
       expect((await postOtlp('https://c:4318', '/v1/metrics', '{}')).ok).toBe(false);
     },
   );
@@ -230,7 +230,7 @@ describe('postOtlp', () => {
         headers = new Headers(init.headers);
         body = init.body as string;
         return Promise.resolve(new Response(null, { status: 200 }));
-      }) as typeof fetch;
+      }) as unknown as typeof fetch;
 
       await postOtlp('https://c:4318', '/v1/metrics', '{"x":1}', { bearer: 'tok', headers: { 'X-Tenant': 'acme' } });
       expect(url).toBe('https://c:4318/v1/metrics');
@@ -253,7 +253,7 @@ describe('postOtlp', () => {
       globalThis.fetch = mock((_u: string, init: RequestInit) => {
         headers = new Headers(init.headers);
         return Promise.resolve(new Response(null, { status: 200 }));
-      }) as typeof fetch;
+      }) as unknown as typeof fetch;
       await postOtlp('https://c:4318', '/v1/metrics', '{}');
       expect(headers?.get('Authorization')).toBeNull();
     },
@@ -280,7 +280,7 @@ describe('sendMetrics', () => {
         url = u;
         body = init.body as string;
         return Promise.resolve(new Response(null, { status: 200 }));
-      }) as typeof fetch;
+      }) as unknown as typeof fetch;
 
       const result = await sendMetrics('https://collector:4318', sampleBuckets, { app: 'my-app', bearer: 'tok' });
       expect(result.ok).toBe(true);
@@ -325,7 +325,7 @@ describe('sendTraces', () => {
         url = u;
         body = init.body as string;
         return Promise.resolve(new Response(null, { status: 200 }));
-      }) as typeof fetch;
+      }) as unknown as typeof fetch;
 
       const built = JSON.parse(buildTracesBody(spans, { app: 'consumer' })) as Record<string, unknown>;
       expect(JSON.stringify(built)).toContain('http.response.status_code');

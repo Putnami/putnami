@@ -32,7 +32,7 @@ interface BenchResult {
   p99Ns: number;
 }
 
-async function bench(name: string, iterations: number, fn: () => void | Promise<void>): Promise<BenchResult> {
+async function bench(name: string, iterations: number, fn: () => unknown): Promise<BenchResult> {
   // Warmup
   const warmup = Math.min(1000, Math.floor(iterations / 10));
   for (let i = 0; i < warmup; i++) await fn();
@@ -92,20 +92,20 @@ async function benchRouter(): Promise<BenchResult[]> {
 
   // Register 50 static routes and 20 parameterized routes
   for (let i = 0; i < 50; i++) {
-    router.add(`/api/v1/resource${i}`, handler, { accept: new Set(['application/json', '*/*']) });
+    router.add(`/api/v1/resource${i}`, handler, { accept: ['application/json', '*/*'] });
   }
   for (let i = 0; i < 20; i++) {
     router.add(`/api/v1/users/[id]/posts/[postId]/resource${i}`, handler, {
-      accept: new Set(['application/json', '*/*']),
+      accept: ['application/json', '*/*'],
     });
   }
-  router.add('/api/v1/catch/*', handler, { accept: new Set(['*/*']) });
+  router.add('/api/v1/catch/*', handler, { accept: ['*/*'] });
 
   // All-static router: no param/wildcard routes, so find() takes the O(1) map
   // fast path instead of walking the trie.
   const staticRouter = new Router<() => HttpResponse>();
   for (let i = 0; i < 50; i++) {
-    staticRouter.add(`/api/v1/resource${i}`, handler, { accept: new Set(['application/json', '*/*']) });
+    staticRouter.add(`/api/v1/resource${i}`, handler, { accept: ['application/json', '*/*'] });
   }
 
   const N = 50_000;
@@ -504,7 +504,7 @@ async function benchParamExtraction(): Promise<BenchResult[]> {
   const N = 50_000;
 
   const router = new Router<string>();
-  router.add('/users/[id]/posts/[postId]', 'handler', { accept: new Set(['*/*']) });
+  router.add('/users/[id]/posts/[postId]', 'handler', { accept: ['*/*'] });
 
   results.push(
     await bench('router param extraction (2 params)', N, () => {
@@ -534,7 +534,7 @@ async function benchIntegration(): Promise<BenchResult[]> {
   plugin.native('/api/native-health', HttpResponse.json({ status: 'ok' }));
 
   // Param route
-  plugin.get('/api/users/[id]', (ctx) => HttpResponse.json({ id: ctx.params?.id }));
+  plugin.get('/api/users/[id]', (ctx) => HttpResponse.json({ id: ctx.params?.['id'] }));
 
   // POST route
   plugin.post('/api/echo', async (ctx) => {

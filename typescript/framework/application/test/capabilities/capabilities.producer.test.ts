@@ -165,7 +165,7 @@ describe('capabilities producer', () => {
       }>;
     };
     expect(manifest.configDefinitions?.some((definition) => definition.path === 'capabilities.routeOwned')).toBe(true);
-    expect(manifest.schemas).toEqual([
+    expect<unknown>(manifest.schemas).toEqual([
       {
         identity: {
           ownerProject: 'route-config-proof',
@@ -185,7 +185,7 @@ describe('capabilities producer', () => {
         },
       },
     ]);
-    expect(manifest.discoverers).toEqual([
+    expect<unknown>(manifest.discoverers).toEqual([
       {
         identity: {
           ownerProject: 'route-config-proof',
@@ -290,7 +290,7 @@ describe('capabilities producer', () => {
       packages?: Array<{ package: string }>;
       packageVersions?: unknown;
     };
-    expect(manifest.packages).toEqual([
+    expect<unknown>(manifest.packages).toEqual([
       {
         identity: { ownerProject: 'stable-package-provider', kind: 'package', key: 'stable-package-provider' },
         package: 'stable-package-provider',

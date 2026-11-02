@@ -255,6 +255,6 @@ describe('resolveInjection', () => {
 describe('SCOPE_CONTAINER_KEY', () => {
   it('is a Symbol.for value', () => {
     expect(typeof SCOPE_CONTAINER_KEY).toBe('symbol');
-    expect(SCOPE_CONTAINER_KEY).toBe(Symbol.for('__di_scope_container__'));
+    expect<unknown>(SCOPE_CONTAINER_KEY).toBe(Symbol.for('__di_scope_container__'));
   });
 });

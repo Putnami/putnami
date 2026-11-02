@@ -17,6 +17,17 @@ import {
   isSchemaDescriptor,
 } from '../../../src/api/route';
 
+/** The validator of a schema's first constraint; a schema without one fails the test. */
+function firstValidator(schema: {
+  readonly constraints?: readonly { readonly validate: (value: unknown) => boolean }[];
+}) {
+  const constraint = schema.constraints?.[0];
+  if (!constraint) {
+    throw new Error('the schema declares no constraint');
+  }
+  return constraint.validate;
+}
+
 describe('Schema', () => {
   describe('isSchemaDescriptor', () => {
     it('should return true for schema descriptors', () => {
@@ -95,13 +106,13 @@ describe('Schema', () => {
   describe('Constrained types', () => {
     describe('Uuid', () => {
       it('should validate correct UUIDs', () => {
-        const validate = Uuid.constraints?.[0].validate;
+        const validate = firstValidator(Uuid);
         expect(validate('550e8400-e29b-41d4-a716-446655440000')).toBe(true);
         expect(validate('6ba7b810-9dad-11d1-80b4-00c04fd430c8')).toBe(true);
       });
 
       it('should reject invalid UUIDs', () => {
-        const validate = Uuid.constraints?.[0].validate;
+        const validate = firstValidator(Uuid);
         expect(validate('not-a-uuid')).toBe(false);
         expect(validate('')).toBe(false);
         expect(validate(123)).toBe(false);
@@ -110,13 +121,13 @@ describe('Schema', () => {
 
     describe('Email', () => {
       it('should validate correct emails', () => {
-        const validate = Email.constraints?.[0].validate;
+        const validate = firstValidator(Email);
         expect(validate('test@example.com')).toBe(true);
         expect(validate('user.name@domain.org')).toBe(true);
       });
 
       it('should reject invalid emails', () => {
-        const validate = Email.constraints?.[0].validate;
+        const validate = firstValidator(Email);
         expect(validate('not-an-email')).toBe(false);
         expect(validate('@missing.com')).toBe(false);
         expect(validate(42)).toBe(false);
@@ -125,14 +136,14 @@ describe('Schema', () => {
 
     describe('Int', () => {
       it('should validate integers', () => {
-        const validate = Int.constraints?.[0].validate;
+        const validate = firstValidator(Int);
         expect(validate(42)).toBe(true);
         expect(validate(0)).toBe(true);
         expect(validate(-10)).toBe(true);
       });
 
       it('should reject non-integers', () => {
-        const validate = Int.constraints?.[0].validate;
+        const validate = firstValidator(Int);
         expect(validate(3.14)).toBe(false);
         expect(validate('42')).toBe(false);
       });
@@ -140,14 +151,14 @@ describe('Schema', () => {
 
     describe('Url', () => {
       it('should validate correct URLs', () => {
-        const validate = Url.constraints?.[0].validate;
+        const validate = firstValidator(Url);
         expect(validate('https://example.com')).toBe(true);
         expect(validate('http://example.com/path?q=1')).toBe(true);
         expect(validate('ftp://files.example.com')).toBe(true);
       });
 
       it('should reject invalid URLs', () => {
-        const validate = Url.constraints?.[0].validate;
+        const validate = firstValidator(Url);
         expect(validate('not-a-url')).toBe(false);
         expect(validate('')).toBe(false);
         expect(validate(42)).toBe(false);
@@ -156,14 +167,14 @@ describe('Schema', () => {
 
     describe('DateIso', () => {
       it('should validate ISO date strings', () => {
-        const validate = DateIso.constraints?.[0].validate;
+        const validate = firstValidator(DateIso);
         expect(validate('2024-01-15')).toBe(true);
         expect(validate('2024-01-15T10:30:00Z')).toBe(true);
         expect(validate('2024-01-15T10:30:00.000+05:00')).toBe(true);
       });
 
       it('should reject invalid dates', () => {
-        const validate = DateIso.constraints?.[0].validate;
+        const validate = firstValidator(DateIso);
         expect(validate('not-a-date')).toBe(false);
         expect(validate('15/01/2024')).toBe(false);
         expect(validate(42)).toBe(false);
@@ -173,14 +184,14 @@ describe('Schema', () => {
     describe('Min', () => {
       it('should validate values >= minimum', () => {
         const min5 = Min(5);
-        const validate = min5.constraints?.[0].validate;
+        const validate = firstValidator(min5);
         expect(validate(5)).toBe(true);
         expect(validate(10)).toBe(true);
       });
 
       it('should reject values below minimum', () => {
         const min5 = Min(5);
-        const validate = min5.constraints?.[0].validate;
+        const validate = firstValidator(min5);
         expect(validate(4)).toBe(false);
         expect(validate(-1)).toBe(false);
       });
@@ -189,14 +200,14 @@ describe('Schema', () => {
     describe('Max', () => {
       it('should validate values <= maximum', () => {
         const max10 = Max(10);
-        const validate = max10.constraints?.[0].validate;
+        const validate = firstValidator(max10);
         expect(validate(10)).toBe(true);
         expect(validate(5)).toBe(true);
       });
 
       it('should reject values above maximum', () => {
         const max10 = Max(10);
-        const validate = max10.constraints?.[0].validate;
+        const validate = firstValidator(max10);
         expect(validate(11)).toBe(false);
         expect(validate(100)).toBe(false);
       });
@@ -205,14 +216,14 @@ describe('Schema', () => {
     describe('MinLength', () => {
       it('should validate strings with length >= minimum', () => {
         const minLen3 = MinLength(3);
-        const validate = minLen3.constraints?.[0].validate;
+        const validate = firstValidator(minLen3);
         expect(validate('abc')).toBe(true);
         expect(validate('abcdef')).toBe(true);
       });
 
       it('should reject strings shorter than minimum', () => {
         const minLen3 = MinLength(3);
-        const validate = minLen3.constraints?.[0].validate;
+        const validate = firstValidator(minLen3);
         expect(validate('ab')).toBe(false);
         expect(validate('')).toBe(false);
       });
@@ -221,14 +232,14 @@ describe('Schema', () => {
     describe('MaxLength', () => {
       it('should validate strings with length <= maximum', () => {
         const maxLen5 = MaxLength(5);
-        const validate = maxLen5.constraints?.[0].validate;
+        const validate = firstValidator(maxLen5);
         expect(validate('abc')).toBe(true);
         expect(validate('abcde')).toBe(true);
       });
 
       it('should reject strings longer than maximum', () => {
         const maxLen5 = MaxLength(5);
-        const validate = maxLen5.constraints?.[0].validate;
+        const validate = firstValidator(maxLen5);
         expect(validate('abcdef')).toBe(false);
       });
     });
@@ -236,14 +247,14 @@ describe('Schema', () => {
     describe('Pattern', () => {
       it('should validate strings matching the pattern', () => {
         const hex = Pattern(/^[0-9a-f]+$/);
-        const validate = hex.constraints?.[0].validate;
+        const validate = firstValidator(hex);
         expect(validate('deadbeef')).toBe(true);
         expect(validate('0123456789abcdef')).toBe(true);
       });
 
       it('should reject strings not matching the pattern', () => {
         const hex = Pattern(/^[0-9a-f]+$/);
-        const validate = hex.constraints?.[0].validate;
+        const validate = firstValidator(hex);
         expect(validate('xyz')).toBe(false);
         expect(validate('DEADBEEF')).toBe(false);
       });

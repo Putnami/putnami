@@ -199,9 +199,7 @@ describe('eventClient()', () => {
       UserUpdated,
       (message) => {
         handled.push(message.id);
-        if (message.id === 'msg-1') {
-          return firstDelivery.promise;
-        }
+        return message.id === 'msg-1' ? firstDelivery.promise : undefined;
       },
       { onError: (error) => errors.push(error.message) },
     );

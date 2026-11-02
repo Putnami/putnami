@@ -46,6 +46,11 @@ batchable until it has one.
 - **Prove loadability.** A staged package that does not load under its claimed
   CLI contract is not shipped, a claim newer than the packager's is rejected,
   and a stale lower claim is ratcheted up.
+- **Tests are type-checked by `test~types`, not by `build~types`.** The types
+  phase reads `src`, `bin` and `.gen` only, to keep declaration builds fast;
+  `test~types` runs `tsc --noEmit` over every project file, dot-directories
+  included and dot-named files left out, with the same compiler options
+  (`tscCompilerFlags`). Keep the two flag sets shared.
 - **`catalog:` has one reader.** `internal/catalog` is it. Install, upgrade and
   the npm publisher all resolve specifiers through that package.
 

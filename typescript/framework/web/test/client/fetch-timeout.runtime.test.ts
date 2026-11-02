@@ -2,11 +2,11 @@ import { afterEach, describe, expect, it } from 'bun:test';
 import { specTest } from '@putnami/runtime/spectest';
 import { clientFetchTimeoutMs, DEFAULT_CLIENT_FETCH_TIMEOUT_MS } from '../../src/client/form/fetch-timeout';
 
-type BrowserGlobals = typeof globalThis & {
+type BrowserGlobals = {
   window?: { __reactClientFetchTimeoutMs?: number };
 };
 
-const globals = globalThis as BrowserGlobals;
+const globals = globalThis as unknown as BrowserGlobals;
 
 afterEach(() => {
   globals.window = undefined;

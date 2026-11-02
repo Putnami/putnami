@@ -334,7 +334,7 @@ describe('registry seams', () => {
     globalThis.fetch = (() =>
       Promise.resolve(
         new Response(JSON.stringify({ version: '', digest: sha256Hex(bytes('blob')) }), { status: 200 }),
-      )) as typeof fetch;
+      )) as unknown as typeof fetch;
     try {
       await expect(
         resolveChannelFromRegistry('site-content/cloud', 'stable', 'https://put.putnami.dev', () => ({
@@ -359,7 +359,7 @@ describe('registry seams', () => {
         return Promise.resolve(new Response(JSON.stringify({ version: '0.0.0-1-abc', digest }), { status: 200 }));
       }
       return Promise.resolve(new Response(blob, { status: 200 }));
-    }) as typeof fetch;
+    }) as unknown as typeof fetch;
     try {
       const resolved = await resolveChannelFromRegistry(
         'cloud/doc-contents-platform',

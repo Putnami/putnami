@@ -379,7 +379,7 @@ describe('OAuth2 / OIDC end-to-end flow', () => {
       expect(body.get('code_verifier')).toBeTruthy();
       expect(body.get('client_secret')).toBeNull();
       const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(body.get('code_verifier')!));
-      expect(base64UrlEncode(new Uint8Array(digest))).toBe(challenge);
+      expect<unknown>(base64UrlEncode(new Uint8Array(digest))).toBe(challenge);
     } finally {
       await app.stop();
     }
@@ -611,7 +611,7 @@ describe('OAuth2 / OIDC end-to-end flow', () => {
     try {
       const port = hp.getServer()?.port ?? 0;
       hp.route('GET', '/me', async () => {
-        const user = await useUser<{ sub?: string }>({ redirect: false });
+        const user = await useUser({ redirect: false });
         return user ?? null;
       });
       const sessionCookie = await loginAndCallback(port, state, 'code-aud');
@@ -656,7 +656,7 @@ describe('OAuth2 / OIDC end-to-end flow', () => {
     try {
       const port = hp.getServer()?.port ?? 0;
       hp.route('GET', '/me', async () => {
-        const user = await useUser<{ sub?: string }>({ redirect: false });
+        const user = await useUser({ redirect: false });
         return user ?? null;
       });
       const sessionCookie = await loginAndCallback(port, state, 'code-aud-ui');
@@ -699,7 +699,7 @@ describe('OAuth2 / OIDC end-to-end flow', () => {
     try {
       const port = hp.getServer()?.port ?? 0;
       hp.route('GET', '/me', async () => {
-        const user = await useUser<{ sub?: string }>({ redirect: false });
+        const user = await useUser({ redirect: false });
         return user ?? null;
       });
       const sessionCookie = await loginAndCallback(port, state, 'code-aud-ok');

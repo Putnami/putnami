@@ -32,6 +32,7 @@ var commands = map[string]cli.JobFunc{
 	"test-env-up":   dbtestenv.UpJob(),
 	"test-env-down": dbtestenv.DownJob(),
 	"test":          runTest,
+	"test-types":    runTestTypes,
 	"lint":          runLint,
 	"lint-format":   runLintFormat,
 	"lint-check":    runLintCheck,

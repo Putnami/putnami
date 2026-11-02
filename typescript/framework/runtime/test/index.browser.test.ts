@@ -27,8 +27,8 @@ describe('browser entrypoint stubs', () => {
           },
         });
 
-        expect(config.host).toBe('localhost');
-        expect(config.port).toBe(5432);
+        expect(config['host']).toBe('localhost');
+        expect(config['port']).toBe(5432);
       },
     );
 
@@ -50,8 +50,8 @@ describe('browser entrypoint stubs', () => {
           { confInit: { port: 3306 } },
         );
 
-        expect(config.host).toBe('localhost');
-        expect(config.port).toBe(3306);
+        expect(config['host']).toBe('localhost');
+        expect(config['port']).toBe(3306);
       },
     );
 
@@ -77,7 +77,7 @@ describe('browser entrypoint stubs', () => {
             required: String,
           },
         });
-        expect(config.required).toBeUndefined();
+        expect(config['required']).toBeUndefined();
       },
     );
 
@@ -104,8 +104,8 @@ describe('browser entrypoint stubs', () => {
             },
           });
 
-          expect(config.host).toBe('localhost');
-          expect(config.secret).toBe('unset');
+          expect(config['host']).toBe('localhost');
+          expect(config['secret']).toBe('unset');
         } finally {
           restoreEnv('CONFIG_DATA', previousConfigData);
           restoreEnv('BROWSER_STUB_SECRET', previousSecret);

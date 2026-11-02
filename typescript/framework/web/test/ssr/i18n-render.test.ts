@@ -328,7 +328,7 @@ describe('locale head', () => {
       });
       const meta = { metas: [{ name: 'robots', content: 'noindex' }] };
       applyLocaleHead(meta, { settings, locale: 'fr', path: '/nothing', messages: {} });
-      expect(meta).toEqual({ links: [], metas: [{ name: 'robots', content: 'noindex' }] });
+      expect<unknown>(meta).toEqual({ links: [], metas: [{ name: 'robots', content: 'noindex' }] });
     },
   );
 });

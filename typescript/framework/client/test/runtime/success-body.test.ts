@@ -78,7 +78,12 @@ const operations: Record<string, ClientContractOperation> = {
       output: { type: 'object', properties: { value: { type: 'string' } } },
     },
     transports: [
-      { protocol: 'websocket', path: '/adjust', encoding: 'json', websocket: { subprotocol: 'putnami.service.v1' } },
+      {
+        protocol: 'websocket',
+        path: '/adjust',
+        encoding: 'json',
+        websocket: { subprotocol: 'putnami.service.v1', resume: false },
+      },
     ],
     security: anonymous,
     errors: [],

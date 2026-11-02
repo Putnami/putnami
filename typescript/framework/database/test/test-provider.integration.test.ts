@@ -40,14 +40,14 @@ describe('provision (live)', () => {
         const sql = await database(name);
         const [{ one }] = await sql<{ one: number }[]>`SELECT 1 AS one`;
         expect(one).toBe(1);
-        if (entry.schema) {
+        if (entry?.schema) {
           // The factory's postgres.camel transform renames the search_path
           // column to searchPath in result rows.
           const [{ searchPath }] = await sql<{ searchPath: string }[]>`SHOW search_path`;
           const onPath = searchPath
             .split(',')
             .map((p) => p.trim().replace(/^["']|["']$/g, ''))
-            .includes(entry.schema);
+            .includes(entry?.schema);
           expect(onPath).toBe(true);
         }
       }
@@ -143,7 +143,7 @@ describe('provision reclaims orphans (live)', () => {
       const result = await provision({
         binding: { protocolVersion: 1, mode: 'require', isolation: 'database', databases: { reclaim: entry } },
       });
-      const provisioned = result.binding.databases?.reclaim?.connection?.database as string;
+      const provisioned = result.binding.databases?.['reclaim']?.connection?.database as string;
 
       expect(await exists(orphan)).toBe(false);
       expect(await exists(live)).toBe(true);

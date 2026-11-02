@@ -7,7 +7,7 @@ describe('deepMerge', () => {
   it('merges two flat objects', () => {
     const target = { a: 1, b: 2 };
     const source = { b: 3, c: 4 };
-    expect(deepMerge(target, source)).toEqual({ a: 1, b: 3, c: 4 });
+    expect<unknown>(deepMerge(target, source)).toEqual({ a: 1, b: 3, c: 4 });
   });
 
   it('deeply merges nested objects', () => {
@@ -24,7 +24,7 @@ describe('deepMerge', () => {
   });
 
   it('does not mutate the source', () => {
-    const target = { a: 1 };
+    const target: { a: number; b?: number } = { a: 1 };
     const source = { b: 2 };
     deepMerge(target, source);
     expect(source).toEqual({ b: 2 });
@@ -47,7 +47,7 @@ describe('deepMerge', () => {
     const target = { nested: { x: 1 } };
     const source = { nested: 'flat' as unknown as { x: number } };
     const result = deepMerge(target, source);
-    expect(result.nested).toBe('flat');
+    expect<unknown>(result.nested).toBe('flat');
   });
 
   it('handles three levels of nesting', () => {

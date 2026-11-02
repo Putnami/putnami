@@ -7,6 +7,7 @@ import {
   type DiDebugLogger,
   ScopedContainer,
 } from './container';
+import type { ContainerContextFork } from './container-context-fork';
 import { applyTracing, collectScopedProviders, createDiDebugLogger } from './container-context-helpers';
 import { ContainerClosedError, ContainerValidationError, NotRegisteredError, RequirementNotMetError } from './errors';
 import type {
@@ -336,7 +337,7 @@ export class ContainerContext {
    * The fork copies all registrations and module structure, then allows
    * overriding specific providers with test doubles.
    */
-  fork() {
+  fork(): ContainerContextFork {
     if (!_forkFactory) {
       throw new Error('ContainerContextFork not registered. Import container-context-fork first.');
     }
@@ -497,7 +498,7 @@ export class ContainerContext {
 // Fork factory — breaks circular dependency with container-context-fork.ts
 // ---------------------------------------------------------------------------
 
-type ForkFactory = (parent: ContainerContext, options: ContainerContextOptions) => ContainerContext;
+type ForkFactory = (parent: ContainerContext, options: ContainerContextOptions) => ContainerContextFork;
 let _forkFactory: ForkFactory | undefined;
 
 /** @internal Register the fork constructor, called by container-context-fork.ts at import time. */

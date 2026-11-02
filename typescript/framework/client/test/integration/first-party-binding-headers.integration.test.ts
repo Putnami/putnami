@@ -12,7 +12,7 @@ import {
   openapi,
   PrincipalKind,
 } from '@putnami/application';
-import { resetConfigLoader, runInContext } from '@putnami/runtime';
+import { resetConfigLoader, runInContext, type Type } from '@putnami/runtime';
 import { specTest } from '@putnami/runtime/spectest';
 import { readOpenApiSource } from '../../src/generator/openapi-reader';
 import { generateTypeScriptClient } from '../../src/generator/ts/ts-generator';
@@ -113,7 +113,7 @@ describe('first-party static binding headers', () => {
         }
         type Reply = { revision: string; caller: string };
         type Generated = Record<string, () => Promise<Reply>> & { dispose(): void };
-        const Client = generated[className] as new (...args: never[]) => Generated;
+        const Client = generated[className] as Type<Generated>;
         const register = generated[registerName] as (
           target: ReturnType<typeof application>,
           binding?: Record<string, unknown>,

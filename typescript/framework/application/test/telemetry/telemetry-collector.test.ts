@@ -20,7 +20,7 @@ describe('TelemetryCollector', () => {
 
         const buckets = collector.drainAll();
         expect(buckets).toHaveLength(1);
-        expect(buckets[0].counters.requests).toBe(2);
+        expect(buckets[0].counters['requests']).toBe(2);
       },
     );
 
@@ -39,7 +39,7 @@ describe('TelemetryCollector', () => {
         collector.incCounter('bytes', 512, ts);
 
         const buckets = collector.drainAll();
-        expect(buckets[0].counters.bytes).toBe(768);
+        expect(buckets[0].counters['bytes']).toBe(768);
       },
     );
 
@@ -61,9 +61,9 @@ describe('TelemetryCollector', () => {
         const buckets = collector.drainAll();
         expect(buckets).toHaveLength(2);
         expect(buckets[0].ts).toBe(1_700_000_000);
-        expect(buckets[0].counters.req).toBe(1);
+        expect(buckets[0].counters['req']).toBe(1);
         expect(buckets[1].ts).toBe(1_700_000_001);
-        expect(buckets[1].counters.req).toBe(1);
+        expect(buckets[1].counters['req']).toBe(1);
       },
     );
   });
@@ -84,7 +84,7 @@ describe('TelemetryCollector', () => {
         collector.setGauge('connections', 3, ts);
 
         const buckets = collector.drainAll();
-        expect(buckets[0].gauges.connections).toBe(3);
+        expect(buckets[0].gauges['connections']).toBe(3);
       },
     );
   });
@@ -106,7 +106,7 @@ describe('TelemetryCollector', () => {
         collector.observeHistogram('duration', 5, ts);
 
         const buckets = collector.drainAll();
-        const h = buckets[0].histograms.duration;
+        const h = buckets[0].histograms['duration'];
         expect(h.count).toBe(3);
         expect(h.sum).toBe(65);
         expect(h.min).toBe(5);
@@ -128,7 +128,7 @@ describe('TelemetryCollector', () => {
         collector.observeHistogram('latency', 42, ts);
 
         const buckets = collector.drainAll();
-        const h = buckets[0].histograms.latency;
+        const h = buckets[0].histograms['latency'];
         expect(h.count).toBe(1);
         expect(h.sum).toBe(42);
         expect(h.min).toBe(42);
@@ -163,7 +163,7 @@ describe('TelemetryCollector', () => {
         // Current bucket still present
         const remaining = collector.drainAll();
         expect(remaining).toHaveLength(1);
-        expect(remaining[0].counters.c).toBe(1);
+        expect(remaining[0].counters['c']).toBe(1);
       },
     );
 

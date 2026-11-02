@@ -54,7 +54,7 @@ describe('client contract corpus conformance', () => {
       // framework-derived, not provider input — see `ClientServiceContract`).
       const client = { service, credentials, defaults } as ClientServiceContract;
 
-      const getWidget = fixture.paths['/widgets/{id}'].get['x-putnami-client'] as {
+      const getWidget = fixture.paths['/widgets/{id}']['get']['x-putnami-client'] as {
         security: { alternatives: readonly { allOf: readonly { profile: string }[] }[] };
         idempotency: { kind: 'safe' | 'idempotent' | 'non-idempotent' };
         resilience?: Record<string, unknown>;
@@ -87,17 +87,17 @@ describe('client contract corpus conformance', () => {
       await app.start();
       try {
         const spec = openapiPlugin.spec();
-        expect(spec?.['x-putnami-client']).toEqual({
+        expect<unknown>(spec?.['x-putnami-client']).toEqual({
           protocolVersion: 1,
           service,
           credentials,
           ...(defaults ? { defaults } : {}),
         });
 
-        const operation = spec?.paths['/widgets/{id}']?.get['x-putnami-client'];
-        expect(operation.security).toEqual(getWidget.security);
-        expect(operation.idempotency).toEqual(getWidget.idempotency);
-        expect(operation.resilience).toEqual(getWidget.resilience);
+        const operation = spec?.paths['/widgets/{id}']?.['get']['x-putnami-client'];
+        expect(operation?.security).toEqual(getWidget.security);
+        expect(operation?.idempotency).toEqual(getWidget.idempotency);
+        expect(operation?.resilience).toEqual(getWidget.resilience);
       } finally {
         await app.stop();
       }
@@ -115,7 +115,7 @@ describe('client contract corpus conformance', () => {
       const fixture = readFixture('invalid/idempotency-identity-header-collision.openapi.json') as {
         paths: Record<string, Record<string, { 'x-putnami-client': { idempotency: { keyHeader: string } } }>>;
       };
-      const keyHeader = fixture.paths['/items'].post['x-putnami-client'].idempotency.keyHeader;
+      const keyHeader = fixture.paths['/items']['post']['x-putnami-client'].idempotency.keyHeader;
 
       const apiPlugin = api({
         autoScan: false,
@@ -166,9 +166,9 @@ describe('client contract corpus conformance', () => {
         .use(openapiPlugin);
       await app.start();
       try {
-        const responses = openapiPlugin.spec()?.paths['/widgets'].post.responses;
-        expect(responses['201'].description).toBe('Created');
-        expect(responses['201'].content?.['application/json'].schema).toEqual({
+        const responses = openapiPlugin.spec()?.paths['/widgets']['post'].responses;
+        expect(responses?.['201'].description).toBe('Created');
+        expect(responses?.['201'].content?.['application/json'].schema).toEqual({
           type: 'object',
           properties: { id: { type: 'string', format: 'uuid' }, name: { type: 'string' } },
           required: ['id', 'name'],
@@ -215,10 +215,10 @@ describe('client contract corpus conformance', () => {
         .use(openapiPlugin);
       await app.start();
       try {
-        const security = openapiPlugin.spec()?.paths['/widgets/{id}'].get['x-putnami-client'].security;
-        expect(security.alternatives).toHaveLength(2);
-        expect(security.alternatives[0].allOf).toHaveLength(2); // AND
-        expect(security.alternatives[1].allOf).toHaveLength(1); // OR branch
+        const security = openapiPlugin.spec()?.paths['/widgets/{id}']['get']['x-putnami-client']?.security;
+        expect(security?.alternatives).toHaveLength(2);
+        expect(security?.alternatives[0].allOf).toHaveLength(2); // AND
+        expect(security?.alternatives[1].allOf).toHaveLength(1); // OR branch
       } finally {
         await app.stop();
       }
@@ -262,10 +262,10 @@ describe('client contract corpus conformance', () => {
         // D0.1: `.mayThrowWith('Conflict', ...)` is the PascalCase DX affordance; the wire
         // code projected into `x-putnami-client` is the stable, dotted `errorCodeToStableCode`
         // value ('conflict'), mirroring go/framework/errors's `CodeConflict`.
-        const widgetError = spec?.paths['/widgets/{id}'].get['x-putnami-client'].errors.find(
+        const widgetError = spec?.paths['/widgets/{id}']['get']['x-putnami-client']?.errors.find(
           (error: { code: string }) => error.code === 'conflict',
         );
-        const orderError = spec?.paths['/orders/{id}'].get['x-putnami-client'].errors.find(
+        const orderError = spec?.paths['/orders/{id}']['get']['x-putnami-client']?.errors.find(
           (error: { code: string }) => error.code === 'conflict',
         );
         expect(widgetError).toEqual({

@@ -58,9 +58,9 @@ describe('raw octet payloads', () => {
             },
           },
         ],
-        { title: 'Blobs', version: '1.0.0' },
+        { info: { title: 'Blobs', version: '1.0.0' } },
       );
-      const operation = spec.paths['/echo'].post;
+      const operation = spec.paths['/echo']['post'];
       expect(operation.requestBody?.content[MEDIA_TYPE]).toEqual({
         schema: { type: 'string', format: 'binary' },
         'x-putnami-max-bytes': 4096,

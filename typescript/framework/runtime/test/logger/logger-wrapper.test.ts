@@ -94,7 +94,7 @@ describe('ConsoleSink', () => {
     try {
       const sink = new ConsoleSink();
       const circular: Record<string, unknown> = {};
-      circular.self = circular;
+      circular['self'] = circular;
       sink.write({
         level: 'info',
         message: 'msg',
@@ -295,8 +295,8 @@ describe('JsonSink', () => {
     };
     const originalProject = process.env['GOOGLE_CLOUD_PROJECT'];
     const originalGcpProject = process.env['GCP_PROJECT'];
-    delete process.env.GOOGLE_CLOUD_PROJECT;
-    delete process.env.GCP_PROJECT;
+    Reflect.deleteProperty(process.env, 'GOOGLE_CLOUD_PROJECT');
+    Reflect.deleteProperty(process.env, 'GCP_PROJECT');
 
     try {
       const sink = new JsonSink();
@@ -427,8 +427,8 @@ describe('JsonSink', () => {
       logger.info('siblings', holder);
 
       const parsed = JSON.parse(output[0]) as Record<string, unknown>;
-      const first = parsed.first as { ref: { id: string } };
-      const second = parsed.second as { ref: { id: string } };
+      const first = parsed['first'] as { ref: { id: string } };
+      const second = parsed['second'] as { ref: { id: string } };
       expect(first.ref.id).toBe('shared-node');
       expect(second.ref.id).toBe('shared-node');
       expect(output[0]).not.toContain('[Circular]');

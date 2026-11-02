@@ -250,8 +250,8 @@ describe('dev error page', () => {
       check: 'the-dev-errors-switch-hides-the-error-details',
     },
     async () => {
-      const previousVal = process.env.PUTNAMI_DEV_ERRORS;
-      process.env.PUTNAMI_DEV_ERRORS = 'false';
+      const previousVal = process.env['PUTNAMI_DEV_ERRORS'];
+      process.env['PUTNAMI_DEV_ERRORS'] = 'false';
       const p = http({ port: 0 });
       p.get('/fail', () => {
         throw new Error('hidden-error');
@@ -278,8 +278,8 @@ describe('dev error page', () => {
       check: 'the-dev-errors-switch-hides-the-error-details',
     },
     async () => {
-      const previousVal = process.env.PUTNAMI_DEV_ERRORS;
-      process.env.PUTNAMI_DEV_ERRORS = 'false';
+      const previousVal = process.env['PUTNAMI_DEV_ERRORS'];
+      process.env['PUTNAMI_DEV_ERRORS'] = 'false';
       const p = http({ port: 0 });
       p.get('/fail', () => {
         throw new Error('hidden-html-error');

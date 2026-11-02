@@ -25,11 +25,11 @@ const makeFakeRouter = () => ({
 });
 
 let lastRouter: ReturnType<typeof makeFakeRouter> | undefined;
-const createBrowserRouterMock = mock(() => {
+const createBrowserRouterMock = mock((..._args: unknown[]) => {
   lastRouter = makeFakeRouter();
   return lastRouter;
 });
-const matchRoutesMock = mock(() => null);
+const matchRoutesMock = mock((..._args: unknown[]): unknown => null);
 const hydrateRootMock = mock((_root: unknown, _element: unknown, _options: unknown) => ({ hydrated: true }));
 
 mock.module('react-dom/client', () => ({
@@ -88,7 +88,7 @@ describe('hydratePage', () => {
     lastRouter = undefined;
 
     (
-      globalThis as typeof globalThis & {
+      globalThis as unknown as {
         document?: { getElementById: (id: string) => unknown };
         window?: Record<string, unknown>;
       }
@@ -96,7 +96,7 @@ describe('hydratePage', () => {
       getElementById: (id: string) => (id === 'root' ? rootElement : null),
     };
     (
-      globalThis as typeof globalThis & {
+      globalThis as unknown as {
         document?: { getElementById: (id: string) => unknown };
         window?: Record<string, unknown>;
       }
@@ -118,8 +118,8 @@ describe('hydratePage', () => {
 
   afterEach(() => {
     setRouterRoutes(undefined);
-    (globalThis as typeof globalThis & { document?: unknown; window?: unknown }).document = undefined;
-    (globalThis as typeof globalThis & { document?: unknown; window?: unknown }).window = undefined;
+    (globalThis as unknown as { document?: unknown; window?: unknown }).document = undefined;
+    (globalThis as unknown as { document?: unknown; window?: unknown }).window = undefined;
     // Drop any callbacks left over from the scheduled guard so they cannot leak
     // into (or fire during) another test.
     animationFrameQueue = [];
@@ -180,7 +180,7 @@ describe('hydratePage', () => {
 
       const result = await hydratePage('root', routes as never);
 
-      expect(result).toEqual({ hydrated: true });
+      expect<unknown>(result).toEqual({ hydrated: true });
       expect(matchRoutesMock).toHaveBeenCalledWith(routes, '/docs', '/docs');
       expect(lazyLoad).toHaveBeenCalledTimes(1);
       expect(routes[0]).toMatchObject({
@@ -196,7 +196,7 @@ describe('hydratePage', () => {
 
       const [, element, options] = hydrateRootMock.mock.calls[0] as [
         unknown,
-        React.ReactElement,
+        React.ReactElement<{ value: unknown; children: React.ReactElement<{ router: unknown }> }>,
         Record<string, unknown>,
       ];
       expect(element.props.value).toEqual(securityContext);
@@ -204,16 +204,16 @@ describe('hydratePage', () => {
       // Navigation announcements and fragment steps are each wired once, on the
       // router that was handed to RouterProvider.
       expect(routerSubscribers).toHaveLength(2);
-      (options.onRecoverableError as (error: Error, info: { componentStack: string }) => void)(
+      (options['onRecoverableError'] as (error: Error, info: { componentStack: string }) => void)(
         new Error('recoverable'),
         {
           componentStack: 'stack',
         },
       );
-      (options.onCaughtError as (error: Error, info: { componentStack: string }) => void)(new Error('caught'), {
+      (options['onCaughtError'] as (error: Error, info: { componentStack: string }) => void)(new Error('caught'), {
         componentStack: 'stack',
       });
-      (options.onUncaughtError as (error: Error, info: { componentStack: string }) => void)(new Error('uncaught'), {
+      (options['onUncaughtError'] as (error: Error, info: { componentStack: string }) => void)(new Error('uncaught'), {
         componentStack: 'stack',
       });
       expect(consoleErrorMock).toHaveBeenCalledTimes(3);
@@ -229,7 +229,7 @@ describe('hydratePage', () => {
     },
     async () => {
       (
-        globalThis as typeof globalThis & {
+        globalThis as unknown as {
           document?: { getElementById: (id: string) => unknown };
           window?: Record<string, unknown>;
         }
@@ -292,7 +292,7 @@ describe('hydratePage', () => {
       const [, , options] = hydrateRootMock.mock.calls[0] as [unknown, unknown, Record<string, unknown>];
       // Simulate React tearing the SSR tree down while unwinding a failed hydration.
       rootElement.innerHTML = '';
-      (options.onUncaughtError as (error: Error, info: { componentStack: string }) => void)(new Error('boom'), {
+      (options['onUncaughtError'] as (error: Error, info: { componentStack: string }) => void)(new Error('boom'), {
         componentStack: 'stack',
       });
 

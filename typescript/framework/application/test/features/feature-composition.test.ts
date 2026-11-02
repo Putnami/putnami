@@ -10,6 +10,7 @@ import {
   type DesignContributor,
   module,
   type Module,
+  type Plugin,
 } from '../../src';
 
 const applicationRoot = join(import.meta.dir, '..', '..');
@@ -61,8 +62,12 @@ function writeRoute(projectRoot: string, relative: string, body: string): void {
   writeFileSync(file, `import { endpoint } from ${JSON.stringify(routeModule)};\n${body}`);
 }
 
-class OauthContributor implements DesignContributor {
-  constructor(private readonly provider: string) {}
+class OauthContributor implements Plugin, DesignContributor {
+  readonly name: string;
+
+  constructor(private readonly provider: string) {
+    this.name = `${provider}-oauth`;
+  }
 
   contributeDesign(builder: DesignBuilder): void {
     const id = `service:${this.provider}-oauth-client`;

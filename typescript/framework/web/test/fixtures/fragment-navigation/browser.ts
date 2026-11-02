@@ -59,6 +59,9 @@ Object.assign(globalThis, {
 });
 
 const { createPath, Link, Outlet, useLocation, useRevalidator } = await import('react-router');
+// A spread attribute escapes the excess-property check that rejects
+// data-testid in a Link props literal.
+const testId = (id: string) => ({ 'data-testid': id });
 const { hydratePage } = await import('../../../src/client/router/hydrate');
 
 let loads: string[] = [];
@@ -75,8 +78,8 @@ function Page() {
     null,
     React.createElement('output', { 'data-testid': 'rendered' }, createPath(useLocation())),
     React.createElement('a', { 'data-testid': 'fragment', href: '#section' }, 'Section'),
-    React.createElement(Link, { 'data-testid': 'page', to: '/page' }, 'Page'),
-    React.createElement(Link, { 'data-testid': 'query', to: '?tab=2' }, 'Tab'),
+    React.createElement(Link, { ...testId('page'), to: '/page' }, 'Page'),
+    React.createElement(Link, { ...testId('query'), to: '?tab=2' }, 'Tab'),
     React.createElement(
       'button',
       { 'data-testid': 'revalidate', type: 'button', onClick: () => revalidator.revalidate() },

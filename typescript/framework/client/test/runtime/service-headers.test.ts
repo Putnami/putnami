@@ -168,7 +168,7 @@ function provider(options: { failFirstRevision?: boolean } = {}): Provider {
   const seen: Seen[] = [];
   const inits: Record<string, unknown>[] = [];
   let revisionCalls = 0;
-  const server = Bun.serve<{ path: string }, Record<string, never>>({
+  const server = Bun.serve<{ path: string }>({
     port: 0,
     fetch(request, target) {
       const path = new URL(request.url).pathname;
@@ -243,8 +243,8 @@ function collect<T>(stream: StreamObserver<T>): Promise<{ values: T[]; failure?:
   });
 }
 
-function asUser<T>(user: string, run: () => Promise<T>): Promise<T> {
-  return runInContext({ __authorizationHeader: `Bearer ${user}` }, run);
+async function asUser<T>(user: string, run: () => Promise<T>): Promise<T> {
+  return await runInContext({ __authorizationHeader: `Bearer ${user}` }, run);
 }
 
 describe('static service binding headers', () => {
@@ -294,7 +294,11 @@ describe('static service binding headers', () => {
         }
         throw new Error('the binding was accepted');
       };
-      for (const headers of [{ authorization: 'private-value' }, { 'X-TRACE-ID': 'private-value' }]) {
+      const reserved: Record<string, string>[] = [
+        { authorization: 'private-value' },
+        { 'X-TRACE-ID': 'private-value' },
+      ];
+      for (const headers of reserved) {
         refuse(() =>
           registerServiceClient(application(), RevisionsClient, descriptor(), binding(upstream.url, { headers })),
         );
@@ -368,7 +372,7 @@ describe('static service binding headers', () => {
         headers['X-Revision'] = `changed-${index}`;
         headers['X-Added'] = 'added';
       }
-      headers['X-Revision'] = undefined;
+      Reflect.set(headers, 'X-Revision', undefined);
       calls.push(direct.cached({ 'x-call': 'last' }), registered.cached({ 'x-call': 'last' }));
       // The caller still owns a mutable object: the binding copied it rather
       // than freezing it in place.

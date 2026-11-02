@@ -72,7 +72,7 @@ describe('Repository (memory)', () => {
         name: 'Alice Updated',
       });
 
-      expect(await repo.get('user-1')).toEqual({
+      expect<unknown>(await repo.get('user-1')).toEqual({
         id: 'user-1',
         email: 'alice@example.com',
         name: 'Alice Updated',
@@ -105,7 +105,7 @@ describe('Repository (memory)', () => {
         { merge: true },
       );
 
-      expect(await repo.get('user-1')).toEqual({
+      expect<unknown>(await repo.get('user-1')).toEqual({
         id: 'user-1',
         email: 'alice@example.com',
         name: 'Alice Updated',
@@ -183,7 +183,7 @@ describe('Repository (memory)', () => {
       { id: 'user-3', email: 'charlie@example.com', name: 'Charlie', age: 19 },
     ]);
 
-    expect(await repo.delete('user-1')).toEqual({
+    expect<unknown>(await repo.delete('user-1')).toEqual({
       success: true,
       item: {
         id: 'user-1',

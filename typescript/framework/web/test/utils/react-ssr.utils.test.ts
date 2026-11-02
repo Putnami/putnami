@@ -68,31 +68,32 @@ describe('react-ssr.utils', () => {
 
   describe('inModuleOrDefault', () => {
     it('returns undefined for undefined module', () => {
-      expect(inModuleOrDefault(undefined, 'loader')).toBeUndefined();
+      expect(inModuleOrDefault<unknown>(undefined, 'loader')).toBeUndefined();
     });
 
     it('returns undefined for null module', () => {
+      // @ts-expect-error null is outside the signature; the guard still holds at runtime.
       expect(inModuleOrDefault(null, 'loader')).toBeUndefined();
     });
 
     it('returns the named export if found', () => {
       const module = { loader: () => 'data', other: () => 'other' };
-      expect(inModuleOrDefault(module, 'loader')).toBe(module.loader);
+      expect<unknown>(inModuleOrDefault(module, 'loader')).toBe(module.loader);
     });
 
     it('returns the first matching named export', () => {
       const module = { action: () => 'action', loader: () => 'loader' };
-      expect(inModuleOrDefault(module, 'loader', 'action')).toBe(module.loader);
+      expect<unknown>(inModuleOrDefault(module, 'loader', 'action')).toBe(module.loader);
     });
 
     it('returns default export if no named export matches', () => {
       const defaultFn = () => 'default';
-      const module = { default: defaultFn };
-      expect(inModuleOrDefault(module, 'loader')).toBe(defaultFn);
+      const module: Record<string, unknown> = { default: defaultFn };
+      expect<unknown>(inModuleOrDefault(module, 'loader')).toBe(defaultFn);
     });
 
     it('returns undefined if no match and no default', () => {
-      const module = { other: () => 'other' };
+      const module: Record<string, unknown> = { other: () => 'other' };
       expect(inModuleOrDefault(module, 'loader')).toBeUndefined();
     });
   });

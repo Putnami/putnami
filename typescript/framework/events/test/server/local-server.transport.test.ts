@@ -78,7 +78,7 @@ describe('LocalServerTransport', () => {
       });
       // Await the subscription: a message published before the server knows the
       // subscriber has nobody to be queued for and is never delivered.
-      await transport.subscribe(def, def.handler);
+      await transport.subscribe(def, async (message) => def.handler(message));
       await transport.start();
 
       // Publish a message via the server's broker (simulating another service)
@@ -108,7 +108,7 @@ describe('LocalServerTransport', () => {
           resolveDelivered();
         }
       });
-      await transport.subscribe(def, def.handler);
+      await transport.subscribe(def, async (message) => def.handler(message));
       await transport.start();
 
       // A malformed payload (missing the required `value`) as a buggy or malicious
@@ -139,7 +139,7 @@ describe('LocalServerTransport', () => {
         values.push((msg.payload as { value: string }).value);
         if (values.length === 3) resolveAll();
       });
-      await transport.subscribe(def, def.handler);
+      await transport.subscribe(def, async (message) => def.handler(message));
       await transport.start();
 
       for (const v of ['first', 'second', 'third']) {
@@ -173,7 +173,7 @@ describe('LocalServerTransport', () => {
         values.push((msg.payload as { value: string }).value);
         resolveSecond();
       });
-      await transport.subscribe(def, def.handler);
+      await transport.subscribe(def, async (message) => def.handler(message));
       await transport.start();
 
       // First message — handler throws
@@ -194,7 +194,7 @@ describe('LocalServerTransport', () => {
   describe('stop', () => {
     it('stops the pull loop and unsubscribes', async () => {
       const def = makeHandlerDef(async () => {});
-      await transport.subscribe(def, def.handler);
+      await transport.subscribe(def, async (message) => def.handler(message));
       await transport.start();
 
       // Should not throw or hang

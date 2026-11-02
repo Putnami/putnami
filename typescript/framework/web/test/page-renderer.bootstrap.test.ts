@@ -1,6 +1,6 @@
 import React from 'react';
 import { describe, expect, it } from 'bun:test';
-import type { HttpRequestContext } from '@putnami/application';
+import type { HttpRequestContext, HttpResponse } from '@putnami/application';
 import type { StaticHandlerContext } from 'react-router';
 import { buildHttpContext } from '../../application/src/http/http-context.builder';
 import { runInContext } from '../../runtime/src/context/context.utils';
@@ -123,8 +123,8 @@ describe('page renderer client bootstrap slot', () => {
       () => 'hydrate.js',
       500,
     );
-    const response = await runInContext(ctx as never, async () => await handler());
-    const html = await response.get().text();
+    const response = await runInContext(ctx as never, async () => (await handler(ctx as never)) as HttpResponse);
+    const html = await response?.get().text();
 
     expect(html).toContain('window.__putnamiBootstrap={"plugin":{"pv":"y"},"other":1};');
     expect(html).toContain('src="/tracker.js"></script>');

@@ -79,12 +79,12 @@ describe('client security runtime', () => {
 
       expect(checkAccess(context, { authenticated: true })).toBe(true);
       expect(checkAccess(ANONYMOUS_SECURITY_CONTEXT, { authenticated: true })).toBe(false);
-      expect(checkAccess(context, { roles: ['admin'] })).toBe(true);
-      expect(checkAccess(context, { roles: ['admin', 'ops'] })).toBe(false);
-      expect(checkAccess(context, { rolesAny: ['viewer', 'editor'] })).toBe(true);
-      expect(checkAccess(context, { scopes: ['docs:read', 'docs:write'] })).toBe(true);
-      expect(checkAccess(context, { scopesAny: ['billing:read', 'docs:write'] })).toBe(true);
-      expect(checkAccess(context, { scopesAny: ['billing:read'] })).toBe(false);
+      expect(checkAccess(context, { authenticated: true, roles: ['admin'] })).toBe(true);
+      expect(checkAccess(context, { authenticated: true, roles: ['admin', 'ops'] })).toBe(false);
+      expect(checkAccess(context, { authenticated: true, rolesAny: ['viewer', 'editor'] })).toBe(true);
+      expect(checkAccess(context, { authenticated: true, scopes: ['docs:read', 'docs:write'] })).toBe(true);
+      expect(checkAccess(context, { authenticated: true, scopesAny: ['billing:read', 'docs:write'] })).toBe(true);
+      expect(checkAccess(context, { authenticated: true, scopesAny: ['billing:read'] })).toBe(false);
     },
   );
 

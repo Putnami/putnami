@@ -3,7 +3,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { api, application, endpoint, http, openapi } from '@putnami/application';
-import { resetConfigLoader } from '@putnami/runtime';
+import { resetConfigLoader, type Type } from '@putnami/runtime';
 import { specTest } from '@putnami/runtime/spectest';
 import { readOpenApiSource } from '../../src/generator/openapi-reader';
 import { generateTypeScriptClient } from '../../src/generator/ts/ts-generator';
@@ -84,7 +84,7 @@ describe('first-party response cache, provider to generated consumer', () => {
         );
         const registerName = Object.keys(generated).find((name) => name.startsWith('register'));
         if (!clientName || !registerName || !method) throw new Error('the emitted module has no client binding');
-        const Client = generated[clientName] as new (...args: never[]) => Record<string, unknown>;
+        const Client = generated[clientName] as Type<Record<string, unknown>>;
         (generated[registerName] as (target: typeof consumer) => unknown)(consumer);
         process.env.CONFIG_DATA = JSON.stringify({
           clients: {
@@ -189,7 +189,7 @@ describe('first-party response cache, provider to generated consumer', () => {
         const generated = (await import(join(directory, 'src', 'index.ts'))) as Record<string, unknown>;
         // The emitter groups the two paths into two client classes of one
         // service: they share that service's cache in the consumer.
-        type GeneratedClass = new (...args: never[]) => Record<string, unknown>;
+        type GeneratedClass = Type<Record<string, unknown>>;
         const classOf = (methodName: string) =>
           Object.values(generated).find(
             (value): value is GeneratedClass =>

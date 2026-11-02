@@ -52,6 +52,7 @@ function makeSpec(overrides?: Partial<SpecIR>): SpecIR {
       },
     ],
     ...overrides,
+    irVersion: 1,
   };
 }
 
@@ -224,6 +225,7 @@ describe('generateTypeScriptClient', () => {
               successes: [
                 {
                   status: 200,
+                  description: 'OK',
                   content: [
                     {
                       mediaType: 'application/json',
@@ -406,6 +408,7 @@ describe('generateTypeScriptClient', () => {
   // canonical id, never the symbol.
   test('preserves a canonical operation id the TypeScript symbol cannot keep', () => {
     const spec: SpecIR = {
+      irVersion: 1,
       transport: 'http',
       specHash: 'spec-123',
       services: [
@@ -502,7 +505,7 @@ describe('generateTypeScriptClient', () => {
       packageName: '@test/users-client',
       version: '1.2.3',
     });
-    const pkg = JSON.parse(files.find((f) => f.path === 'package.json')?.content);
+    const pkg = JSON.parse(files.find((f) => f.path === 'package.json')?.content ?? '');
 
     expect(pkg.name).toBe('@test/users-client');
     expect(pkg.version).toBe('1.2.3');
@@ -515,7 +518,7 @@ describe('generateTypeScriptClient', () => {
       packageName: '@test/users-client',
       clientDependency: 'catalog:',
     });
-    const pkg = JSON.parse(files.find((f) => f.path === 'package.json')?.content);
+    const pkg = JSON.parse(files.find((f) => f.path === 'package.json')?.content ?? '');
     expect(pkg.dependencies['@putnami/client']).toBe('catalog:');
   });
 
@@ -603,6 +606,7 @@ describe('generateTypeScriptClient', () => {
 
   describe('shared named types ($ref)', () => {
     const namedSpec: SpecIR = {
+      irVersion: 1,
       transport: 'http',
       namedTypes: {
         User: [
@@ -673,6 +677,7 @@ describe('generateTypeScriptClient', () => {
     /** Minimal valid single-method spec with hostile overrides applied. */
     function specWith(method: Partial<MethodIR>, service?: Partial<ServiceIR>): SpecIR {
       return {
+        irVersion: 1,
         transport: 'http',
         services: [
           {

@@ -110,7 +110,7 @@ describe('document backend factory', () => {
     async () => {
       const first = await useBackend();
 
-      await document().stop({} as never);
+      await document().stop?.({} as never);
 
       expect(await useBackend()).not.toBe(first);
     },

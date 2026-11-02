@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { cpSync, mkdirSync } from 'node:fs';
-import { ApiPlugin, application, HttpPlugin, http } from '@putnami/application';
+import { type Application, ApiPlugin, application, HttpPlugin, http } from '@putnami/application';
 import { specTest } from '@putnami/spectest';
 import { fileExists, joinPath } from '@putnami/utils';
 import docMarkdown from '../src/api/doc-markdown/get';

@@ -2,7 +2,15 @@ import { describe, expect } from 'bun:test';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { specTest } from '@putnami/runtime/spectest';
-import { api, application, endpoint, http, type ClientCachePolicy } from '@putnami/application';
+import {
+  api,
+  application,
+  endpoint,
+  http,
+  type ClientCachePolicy,
+  type EndpointDefinition,
+  type RouteHandlerResult,
+} from '@putnami/application';
 import { type OpenApiDocument, validateCacheInvalidationFields } from '../../src/openapi/openapi';
 import { openapi } from '../../src/openapi/openapi.plugin';
 
@@ -57,7 +65,8 @@ const REQUIREMENT = 'declared-response-cache';
 function provider(
   path: string,
   method: 'GET' | 'POST',
-  definition: ReturnType<typeof endpoint>,
+  // Any endpoint builder, whatever its declared params, body and returns.
+  definition: { handle(handler: () => RouteHandlerResult): EndpointDefinition },
   defaults?: { resilience: { cache: ClientCachePolicy } },
 ) {
   const apiPlugin = api({
@@ -105,8 +114,8 @@ describe('declared response cache', () => {
       );
       await app.start();
       try {
-        const operation = openapiPlugin.spec()?.paths['/accounts/{id}'].get['x-putnami-client'];
-        expect(operation.resilience.cache).toEqual(cache);
+        const operation = openapiPlugin.spec()?.paths['/accounts/{id}']['get']['x-putnami-client'];
+        expect(operation?.resilience?.cache).toEqual(cache);
       } finally {
         await app.stop();
       }
@@ -207,8 +216,8 @@ describe('declared response cache', () => {
       );
       await app.start();
       try {
-        const operation = openapiPlugin.spec()?.paths['/accounts/{id}'].get['x-putnami-client'];
-        expect(operation.resilience.cache).toEqual(cache);
+        const operation = openapiPlugin.spec()?.paths['/accounts/{id}']['get']['x-putnami-client'];
+        expect(operation?.resilience?.cache).toEqual(cache);
       } finally {
         await app.stop();
       }
@@ -297,11 +306,12 @@ describe('declared response cache', () => {
       ).toThrow('must name a string, integer or boolean property');
       // An error status, a status range and a media type with parameters are
       // no success body the Go reader reads.
-      for (const responses of [
+      const refused: Parameters<typeof cachedDocument>[0][] = [
         { '404': jsonBody({ field: text }) },
         { '2XX': jsonBody({ field: text }) },
         { '200': jsonBody({ field: text }, 'application/json; charset=utf-8') },
-      ]) {
+      ];
+      for (const responses of refused) {
         expect(() => validateCacheInvalidationFields(cachedDocument(responses))).toThrow(
           'names no top-level property of a JSON success body',
         );

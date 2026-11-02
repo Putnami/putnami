@@ -139,7 +139,7 @@ describe('first-party OpenAPI client contract reader', () => {
       mode: 'firstParty',
     });
     const goldenPath = join(SHARED_FIXTURE_ROOT, '..', 'ir', 'full.ir.json');
-    if (process.env.PUTNAMI_UPDATE_GOLDEN === '1') {
+    if (process.env['PUTNAMI_UPDATE_GOLDEN'] === '1') {
       writeFileSync(goldenPath, `${serializeNeutralClientIR(spec)}\n`);
     }
     expect(`${serializeNeutralClientIR(spec)}\n`).toBe(readFileSync(goldenPath, 'utf8'));
@@ -154,7 +154,7 @@ describe('first-party OpenAPI client contract reader', () => {
         expect.objectContaining({ name: 'user_owner', oneof: 'owner' }),
       ]),
     );
-    expect(spec.schemas?.WidgetEvent.properties?.sequence).toMatchObject({
+    expect(spec.schemas?.['WidgetEvent'].properties?.['sequence']).toMatchObject({
       type: 'integer',
       format: 'uint64',
       maximum: new ExactJsonNumber('18446744073709551615'),
@@ -261,7 +261,7 @@ describe('first-party OpenAPI client contract reader', () => {
         thrown = error;
       }
       expect(thrown, name).toBeInstanceOf(ClientGenerationError);
-      expect((thrown as ClientGenerationError).contractCode, name).toBe(expectations.invalid[name]);
+      expect<unknown>((thrown as ClientGenerationError).contractCode, name).toBe(expectations.invalid[name]);
     }
   });
 
@@ -298,8 +298,8 @@ describe('first-party OpenAPI client contract reader', () => {
 
     // The same stream relying on the document default is refused the same way.
     const inherited = fixture('invalid', 'reconnect-without-resumable-transport.openapi.json');
-    inherited.paths['/stream'].get['x-putnami-client'].resilience = undefined;
-    inherited['x-putnami-client'].defaults = { resilience: { stream: { reconnect: true } } };
+    inherited.paths['/stream'].get['x-putnami-client']['resilience'] = undefined;
+    inherited['x-putnami-client']['defaults'] = { resilience: { stream: { reconnect: true } } };
     expectUnresumable(refusal(inherited), 'invalid.stream');
 
     // The document default leaves a unary operation valid.
@@ -314,7 +314,7 @@ describe('first-party OpenAPI client contract reader', () => {
 
     // An operation's own reconnect always counts, on a unary operation too.
     const unary = fixture('valid', 'reconnect-default-with-unary-operation.openapi.json');
-    unary.paths['/clock'].get['x-putnami-client'].resilience = { stream: { reconnect: true } };
+    unary.paths['/clock'].get['x-putnami-client']['resilience'] = { stream: { reconnect: true } };
     expectUnresumable(refusal(unary), 'readClock');
   });
 
@@ -377,13 +377,13 @@ describe('first-party OpenAPI client contract reader', () => {
     // sse metadata on another transport is refused where it stands.
     expect(
       variant((document) => {
-        operation(document, '/runs/{run}/logs/tail').transports[1].sse = { continuation: { mode: 'best-effort' } };
+        operation(document, '/runs/{run}/logs/tail').transports[1]['sse'] = { continuation: { mode: 'best-effort' } };
       }),
     ).toMatchObject({ contractCode: 'client_contract.invalid_transport', field: 'x-putnami-client.transports.1.sse' });
     // A blank mode is missing, as in Go; an unknown one is outside the closed set.
     expect(
       variant((document) => {
-        operation(document, '/logs/tail').transports[0].sse = { continuation: { mode: ' ' } };
+        operation(document, '/logs/tail').transports[0]['sse'] = { continuation: { mode: ' ' } };
       }),
     ).toMatchObject({
       contractCode: 'client_contract.required',
@@ -391,15 +391,15 @@ describe('first-party OpenAPI client contract reader', () => {
     });
     expect(
       variant((document) => {
-        operation(document, '/logs/tail').transports[0].sse = { continuation: { mode: 5 } };
+        operation(document, '/logs/tail').transports[0]['sse'] = { continuation: { mode: 5 } };
       }),
     ).toMatchObject({ contractCode: 'client_contract.parse_error' });
     // References are judged after one local component reference, like Go.
     expect(
       variant((document) => {
         const position = (document as unknown as { components: { schemas: Record<string, Record<string, unknown>> } })
-          .components.schemas.Position;
-        position.format = 'uuid';
+          .components.schemas['Position'];
+        position['format'] = 'uuid';
       }),
     ).toMatchObject({
       contractCode: 'client_contract.invalid_resilience',
@@ -472,7 +472,8 @@ describe('first-party OpenAPI client contract reader', () => {
     const expectations = JSON.parse(readFileSync(join(SHARED_FIXTURE_ROOT, 'expectations.json'), 'utf8')) as {
       invalid: Record<string, string>;
     };
-    for (const code of Object.values(expectations.invalid)) expect(CLIENT_CONTRACT_DIAGNOSTIC_CODES).toContain(code);
+    for (const code of Object.values(expectations.invalid))
+      expect<unknown>(CLIENT_CONTRACT_DIAGNOSTIC_CODES).toContain(code);
   });
 
   it('rejects duplicate source keys and serializes wide integers as exact JSON numeric tokens', () => {
@@ -496,9 +497,10 @@ describe('first-party OpenAPI client contract reader', () => {
     [
       'operation header parameter',
       (document: OpenApiDocument) => {
-        document.paths['/documents/{id}'].get.parameters?.push({
+        document.paths['/documents/{id}']['get'].parameters?.push({
           name: 'X-Client-Id',
           in: 'header',
+          required: false,
           schema: { type: 'string' },
         });
       },
@@ -515,12 +517,9 @@ describe('first-party OpenAPI client contract reader', () => {
     [
       'idempotency header',
       (document: OpenApiDocument) => {
-        const operationContract = document.paths['/documents/{id}'].get['x-putnami-client'];
+        const operationContract = document.paths['/documents/{id}']['get']['x-putnami-client'];
         if (!operationContract) throw new Error('missing client operation contract');
-        operationContract.idempotency = {
-          kind: 'idempotent',
-          keyHeader: 'X-Client-Id',
-        };
+        Object.assign(operationContract, { idempotency: { kind: 'idempotent', keyHeader: 'X-Client-Id' } });
       },
     ],
   ])('rejects a framework-owned client identity used as %s', (_name, mutate) => {
@@ -581,7 +580,7 @@ describe('first-party OpenAPI client contract reader', () => {
         ],
       },
     ]);
-    expect(method.client).toEqual(fullDocument().paths['/documents/{id}'].get['x-putnami-client']);
+    expect(method.client).toEqual(fullDocument().paths['/documents/{id}']['get']['x-putnami-client']);
   });
 
   it('requires the first-party marker when the provider flow requests strict generation', () => {
@@ -594,7 +593,7 @@ describe('first-party OpenAPI client contract reader', () => {
 
   it('automatically reads marked documents strictly and names the operation and field on failure', () => {
     const document = fullDocument() as OpenApiDocument & Record<string, unknown>;
-    const operation = document.paths['/documents/{id}'].get as unknown as Record<string, unknown>;
+    const operation = document.paths['/documents/{id}']['get'] as unknown as Record<string, unknown>;
     operation['x-putnami-client'] = {
       ...(operation['x-putnami-client'] as object),
       unexpectedFallback: true,
@@ -614,7 +613,7 @@ describe('first-party OpenAPI client contract reader', () => {
   it('merges path parameters with operation overrides using OpenAPI defaults', () => {
     const document = fullDocument();
     const pathItem = document.paths['/documents/{id}'] as unknown as Record<string, unknown>;
-    pathItem.parameters = [
+    pathItem['parameters'] = [
       { name: 'X-Version', in: 'header', schema: { type: 'integer', format: 'int32' } },
       { name: 'trace', in: 'query', schema: { type: 'string' } },
     ];
@@ -628,12 +627,12 @@ describe('first-party OpenAPI client contract reader', () => {
 
   it('rejects path references and operation callbacks instead of skipping their semantics', () => {
     const referenced = fullDocument();
-    (referenced.paths['/documents/{id}'] as unknown as Record<string, unknown>).$ref =
+    (referenced.paths['/documents/{id}'] as unknown as Record<string, unknown>)['$ref'] =
       '#/components/pathItems/Document';
     expect(() => readOpenApiSpec(referenced)).toThrow(/paths\.\/documents\/\{id\}.*\$ref/);
 
     const callback = fullDocument();
-    (callback.paths['/documents/{id}'].get as unknown as Record<string, unknown>).callbacks = {};
+    (callback.paths['/documents/{id}']['get'] as unknown as Record<string, unknown>)['callbacks'] = {};
     expect(() => readOpenApiSpec(callback)).toThrow(/getDocument.*callbacks/);
   });
 
@@ -641,17 +640,17 @@ describe('first-party OpenAPI client contract reader', () => {
     const duplicate = fullDocument();
     duplicate.paths['/documents'] = {
       post: {
-        ...duplicate.paths['/documents/{id}'].get,
+        ...duplicate.paths['/documents/{id}']['get'],
         operationId: 'getDocument',
       },
     };
     expect(() => readOpenApiSpec(duplicate)).toThrow(/duplicate operationId/);
 
     const collision = fullDocument();
-    collision.paths['/documents/{id}'].get.operationId = 'get-document';
+    collision.paths['/documents/{id}']['get'].operationId = 'get-document';
     collision.paths['/documents'] = {
       post: {
-        ...collision.paths['/documents/{id}'].get,
+        ...collision.paths['/documents/{id}']['get'],
         operationId: 'get_document',
       },
     };
@@ -678,7 +677,7 @@ describe('first-party OpenAPI client contract reader', () => {
 
   it('rejects schema keywords that cannot be represented instead of degrading them', () => {
     const document = fullDocument();
-    const schema = document.paths['/documents/{id}'].get.responses['200'].content?.['application/json']
+    const schema = document.paths['/documents/{id}']['get'].responses['200'].content?.['application/json']
       .schema as unknown as Record<string, unknown>;
     schema['allOf'] = [{ type: 'string' }];
 

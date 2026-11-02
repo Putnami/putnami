@@ -313,14 +313,14 @@ describe('the resume grant store bounds what it holds', () => {
     () => {
       const store = new ResumeGrantStore();
       let issued = store.issue('getWidgetsFeed', CLIENT_ID, 0n, RESUME_BOUNDS.budget);
-      let budget = RESUME_BOUNDS.budget;
+      let budget: number = RESUME_BOUNDS.budget;
       for (let continuation = 0; continuation < RESUME_BOUNDS.budget; continuation += 1) {
         const redemption = store.redeem(issued?.token ?? '', 'getWidgetsFeed', CLIENT_ID, 0n);
         expect(redemption).toHaveProperty('grant');
         budget = ('grant' in redemption ? redemption.grant.budget : 0) - 1;
         issued = store.issue('getWidgetsFeed', CLIENT_ID, 0n, budget);
       }
-      expect(budget).toBe(0);
+      expect<unknown>(budget).toBe(0);
       expect(issued).toBeUndefined();
     },
   );

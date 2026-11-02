@@ -10,6 +10,7 @@ import {
   HttpPlugin,
   HttpResponse,
   redirect,
+  type RouteHandlerResult,
 } from '@putnami/application';
 import { resolve } from 'node:path';
 import React from 'react';
@@ -464,7 +465,7 @@ describe('ReactApplication', () => {
       const calls = httpPluginMock.get.mock.calls;
       const pageCall = calls.find((c: unknown[]) => c[0] === '/forbidden');
       expect(pageCall).toBeDefined();
-      expect(pageCall[2]).toMatchObject({ statusCode: 403 });
+      expect(pageCall?.[2]).toMatchObject({ statusCode: 403 });
     });
 
     it('wraps page handler with middleware from page definition (enforces 401 unauthenticated)', async () => {
@@ -491,7 +492,7 @@ describe('ReactApplication', () => {
       // ENFORCEMENT: the page's own .secure() must reject an unauthenticated
       // request with 401 instead of rendering the page.
       const ctx = createHttpContext('http://localhost/admin');
-      const response = await runInContext(ctx, async () => pageCall[1](ctx));
+      const response = await runInContext(ctx, async () => pageCall?.[1](ctx));
       expect(response.status).toBe(401);
     });
 
@@ -520,7 +521,7 @@ describe('ReactApplication', () => {
       // ENFORCEMENT: the loader JSON endpoint inherits the page's .secure() and
       // must reject an unauthenticated request with 401, not leak loader data.
       const ctx = createHttpContext('http://localhost/secure.json');
-      const response = await runInContext(ctx, async () => jsonCall[1](ctx));
+      const response = await runInContext(ctx, async () => jsonCall?.[1](ctx));
       expect(response.status).toBe(401);
     });
 
@@ -566,7 +567,7 @@ describe('ReactApplication', () => {
       const calls = httpPluginMock.get.mock.calls;
       const pageCall = calls.find((c: unknown[]) => c[0] === '/normal');
       expect(pageCall).toBeDefined();
-      expect(pageCall[2]).toMatchObject({ statusCode: 200 });
+      expect(pageCall?.[2]).toMatchObject({ statusCode: 200 });
     });
 
     it('renders lazy pages and reuses the loaded module across requests', async () => {
@@ -596,8 +597,8 @@ describe('ReactApplication', () => {
 
       const firstCtx = createHttpContext('http://localhost/lazy');
       const secondCtx = createHttpContext('http://localhost/lazy');
-      const first = await runInContext(firstCtx, async () => pageCall[1](firstCtx));
-      const second = await runInContext(secondCtx, async () => pageCall[1](secondCtx));
+      const first = await runInContext(firstCtx, async () => pageCall?.[1](firstCtx));
+      const second = await runInContext(secondCtx, async () => pageCall?.[1](secondCtx));
 
       expect(lazyPageLoads).toBe(1);
       expect(first.status).toBe(202);
@@ -634,10 +635,10 @@ describe('ReactApplication', () => {
       const jsonCall = httpPluginMock.get.mock.calls.find((call: unknown[]) => call[0] === '/admin/reports.json');
       expect(jsonCall).toBeDefined();
 
-      const first = await jsonCall[1](
+      const first = await jsonCall?.[1](
         createHttpContext('http://localhost/admin/reports', { user: { roles: ['admin'] } }),
       );
-      const second = await jsonCall[1](
+      const second = await jsonCall?.[1](
         createHttpContext('http://localhost/admin/reports', { user: { roles: ['admin'] } }),
       );
 
@@ -662,7 +663,7 @@ describe('ReactApplication', () => {
       });
 
       const jsonCall = httpPluginMock.get.mock.calls.find((call: unknown[]) => call[0] === '/empty.json');
-      const response = await jsonCall[1](createHttpContext('http://localhost/empty'));
+      const response = await jsonCall?.[1](createHttpContext('http://localhost/empty'));
 
       expect(response.status).toBe(200);
       expect(await response.get().json()).toBeNull();
@@ -694,7 +695,7 @@ describe('ReactApplication', () => {
       });
 
       const actionCall = httpPluginMock.post.mock.calls.find((call: unknown[]) => call[0] === '/save');
-      const result = await actionCall[1](createHttpContext('http://localhost/save'));
+      const result = await actionCall?.[1](createHttpContext('http://localhost/save'));
       const after = await cache('loader')
         .ttl(60_000)
         .for('users')
@@ -706,7 +707,7 @@ describe('ReactApplication', () => {
 
     // `redirect()` throws its response and the action still succeeded; a 4xx or 5xx response failed.
     for (const mode of ['eager', 'lazy'] as const) {
-      const registerSave = (handle: () => unknown) => {
+      const registerSave = (handle: () => RouteHandlerResult) => {
         const httpPluginMock = { get: mock(), post: mock() };
         const appWithMock = new ReactApplication(
           undefined,
@@ -718,7 +719,7 @@ describe('ReactApplication', () => {
           action: mode === 'lazy' ? async () => actionModule : actionModule,
         });
         const actionCall = httpPluginMock.post.mock.calls.find((call: unknown[]) => call[0] === '/save');
-        return () => actionCall[1](createHttpContext('http://localhost/save'));
+        return () => actionCall?.[1](createHttpContext('http://localhost/save'));
       };
       const cachedUsers = (value: string) =>
         cache('loader')
@@ -799,7 +800,7 @@ describe('ReactApplication', () => {
       const jsonCall = calls.find((c: unknown[]) => c[0] === '/admin-layout.json');
       expect(jsonCall).toBeDefined();
       // Handler should be wrapped with middleware
-      expect(typeof jsonCall[1]).toBe('function');
+      expect(typeof jsonCall?.[1]).toBe('function');
     });
 
     it('propagates layout middleware to child pages (enforces 401 when unauthenticated)', async () => {
@@ -830,7 +831,7 @@ describe('ReactApplication', () => {
       // unauthenticated context must return 401 from the layout's SecurityMiddleware,
       // never the rendered page. A bare (unwrapped) renderer would 200 here.
       const ctx = createHttpContext('http://localhost/admin/settings');
-      const response = await runInContext(ctx, async () => pageCall[1](ctx));
+      const response = await runInContext(ctx, async () => pageCall?.[1](ctx));
       expect(response.status).toBe(401);
     });
 
@@ -872,7 +873,7 @@ describe('ReactApplication', () => {
       const calls = httpPluginMock.get.mock.calls;
       const pageCall = calls.find((c: unknown[]) => c[0] === '/admin/dashboard');
       expect(pageCall).toBeDefined();
-      expect(typeof pageCall[1]).toBe('function');
+      expect(typeof pageCall?.[1]).toBe('function');
     });
 
     it('propagates nested layout middleware in correct order (admin .secure() enforces 401)', async () => {
@@ -909,7 +910,7 @@ describe('ReactApplication', () => {
       const pageCall = calls.find((c: unknown[]) => c[0] === '/admin/users');
       expect(pageCall).toBeDefined();
       const ctx = createHttpContext('http://localhost/admin/users');
-      const response = await runInContext(ctx, async () => pageCall[1](ctx));
+      const response = await runInContext(ctx, async () => pageCall?.[1](ctx));
       expect(response.status).toBe(401);
     });
 
@@ -940,7 +941,7 @@ describe('ReactApplication', () => {
       // leak onto a sibling /public route. An unauthenticated request renders
       // normally (200) rather than 401 — confirming scoping, not just function-ness.
       const ctx = createHttpContext('http://localhost/public');
-      const response = await runInContext(ctx, async () => pageCall[1](ctx));
+      const response = await runInContext(ctx, async () => pageCall?.[1](ctx));
       expect(response.status).toBe(200);
     });
 
@@ -976,7 +977,7 @@ describe('ReactApplication', () => {
       const jsonCall = getCalls.find((c: unknown[]) => c[0] === '/admin/settings.json');
       expect(jsonCall).toBeDefined();
       const loaderCtx = createHttpContext('http://localhost/admin/settings.json');
-      const loaderResponse = await runInContext(loaderCtx, async () => jsonCall[1](loaderCtx));
+      const loaderResponse = await runInContext(loaderCtx, async () => jsonCall?.[1](loaderCtx));
       expect(loaderResponse.status).toBe(401);
 
       // ENFORCEMENT: the action POST endpoint must reject unauthenticated requests
@@ -985,7 +986,7 @@ describe('ReactApplication', () => {
       const actionCall = postCalls.find((c: unknown[]) => c[0] === '/admin/settings');
       expect(actionCall).toBeDefined();
       const actionCtx = createHttpContext('http://localhost/admin/settings');
-      const actionResponse = await runInContext(actionCtx, async () => actionCall[1](actionCtx));
+      const actionResponse = await runInContext(actionCtx, async () => actionCall?.[1](actionCtx));
       expect(actionResponse.status).toBe(401);
     });
   });
@@ -1027,7 +1028,7 @@ describe('ReactApplication', () => {
       const pageCall = httpPluginMock.get.mock.calls.find((c: unknown[]) => c[0] === '/admin/settings');
       expect(pageCall).toBeDefined();
       const ctx = createHttpContext('http://localhost/admin/settings');
-      const response = await runInContext(ctx, async () => pageCall[1](ctx));
+      const response = await runInContext(ctx, async () => pageCall?.[1](ctx));
       expect(response.status).toBe(401);
     });
 
@@ -1047,7 +1048,7 @@ describe('ReactApplication', () => {
       const jsonCall = httpPluginMock.get.mock.calls.find((c: unknown[]) => c[0] === '/admin/reports.json');
       expect(jsonCall).toBeDefined();
       const ctx = createHttpContext('http://localhost/admin/reports.json');
-      const response = await runInContext(ctx, async () => jsonCall[1](ctx));
+      const response = await runInContext(ctx, async () => jsonCall?.[1](ctx));
       expect(response.status).toBe(401);
     });
 
@@ -1067,7 +1068,7 @@ describe('ReactApplication', () => {
       const jsonCall = httpPluginMock.get.mock.calls.find((c: unknown[]) => c[0] === '/admin/reports.json');
       expect(jsonCall).toBeDefined();
       const ctx = createHttpContext('http://localhost/admin/reports.json');
-      const response = await runInContext(ctx, async () => jsonCall[1](ctx));
+      const response = await runInContext(ctx, async () => jsonCall?.[1](ctx));
       expect(response.status).toBe(401);
     });
 
@@ -1087,7 +1088,7 @@ describe('ReactApplication', () => {
       const actionCall = httpPluginMock.post.mock.calls.find((c: unknown[]) => c[0] === '/admin/save');
       expect(actionCall).toBeDefined();
       const ctx = createHttpContext('http://localhost/admin/save');
-      const response = await runInContext(ctx, async () => actionCall[1](ctx));
+      const response = await runInContext(ctx, async () => actionCall?.[1](ctx));
       expect((response as { status?: number }).status).toBe(401);
     });
 
@@ -1106,7 +1107,7 @@ describe('ReactApplication', () => {
       const pageCall = httpPluginMock.get.mock.calls.find((c: unknown[]) => c[0] === '/admin*');
       expect(pageCall).toBeDefined();
       const ctx = createHttpContext('http://localhost/admin/missing');
-      const response = await runInContext(ctx, async () => pageCall[1](ctx));
+      const response = await runInContext(ctx, async () => pageCall?.[1](ctx));
       expect(response.status).toBe(401);
     });
   });
@@ -1139,7 +1140,7 @@ describe('ReactApplication', () => {
 
       const pageCall = httpPluginMock.get.mock.calls.find((call: unknown[]) => call[0] === '/docs/item');
       const ctx = createHttpContext('http://localhost/docs/item');
-      const response = await runInContext(ctx, async () => pageCall[1](ctx));
+      const response = await runInContext(ctx, async () => pageCall?.[1](ctx));
       const html = await response.get().text();
 
       expect(response.status).toBe(404);
@@ -1173,7 +1174,7 @@ describe('ReactApplication', () => {
 
       const pageCall = httpPluginMock.get.mock.calls.find((call: unknown[]) => call[0] === '/guides/item');
       const ctx = createHttpContext('http://localhost/guides/item');
-      const response = await runInContext(ctx, async () => pageCall[1](ctx));
+      const response = await runInContext(ctx, async () => pageCall?.[1](ctx));
       const html = await response.get().text();
 
       expect(response.status).toBe(404);

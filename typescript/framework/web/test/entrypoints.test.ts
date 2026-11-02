@@ -78,11 +78,11 @@ describe('package entrypoints', () => {
       check: 'the-browser-entry-re-exports-the-client-modules',
     },
     async () => {
-      const client = await import('../src/client/index.ts');
+      const client = await import('../src/client/index');
       const browser = await import('../src/index.browser');
-      const document = await import('../src/client/document/index.ts');
-      const form = await import('../src/client/form/index.ts');
-      const router = await import('../src/client/router/index.ts');
+      const document = await import('../src/client/document/index');
+      const form = await import('../src/client/form/index');
+      const router = await import('../src/client/router/index');
 
       expect(browser.page).toBe(client.page);
       expect(document.PageMeta).toBeDefined();

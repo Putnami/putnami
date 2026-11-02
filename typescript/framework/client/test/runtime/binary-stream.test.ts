@@ -26,7 +26,12 @@ const successes = [
     status: 200,
     description: 'OK',
     content: [
-      { mediaType: '*/*', schema: { type: 'string' as const, format: 'binary' }, maxBytes: 4096, streamed: true },
+      {
+        mediaType: '*/*',
+        schema: { type: 'string' as const, format: 'binary' as const },
+        maxBytes: 4096,
+        streamed: true,
+      },
     ],
   },
 ];
@@ -110,7 +115,7 @@ describe('raw HTTP stream runtime', () => {
         const spans = collector.drainSpans();
         expect(spans).toHaveLength(1);
         expect(spans[0]?.attributes['http.response.status_code']).toBe(200);
-        expect(spans[0]?.attributes['error.type']).toBe(
+        expect<unknown>(spans[0]?.attributes['error.type']).toBe(
           terminal === 'failure' ? 'client.response' : terminal === 'abort' ? 'client.canceled' : undefined,
         );
         await reader.cancel().catch(() => {});

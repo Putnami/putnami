@@ -83,20 +83,20 @@ describe('generateOpenApiSpec', () => {
       defaultOptions,
     );
 
-    expect(spec.paths['/projection'].post.requestBody?.content['application/json'].schema).toEqual({
+    expect(spec.paths['/projection']['post'].requestBody?.content['application/json'].schema).toEqual({
       $ref: '#/components/schemas/ProjectionRequest',
     });
-    expect(spec.components?.schemas?.ProjectionStatus.enum).toEqual(['pending', 'applied']);
-    expect(spec.components?.schemas?.ProjectionChange.discriminator).toEqual({ propertyName: 'kind' });
-    expect(spec.components?.schemas?.ProjectionChange.oneOf).toHaveLength(2);
-    expect(spec.components?.schemas?.ProjectionChange.oneOf?.[0].properties?.kind).toEqual({
+    expect(spec.components?.schemas?.['ProjectionStatus'].enum).toEqual(['pending', 'applied']);
+    expect(spec.components?.schemas?.['ProjectionChange'].discriminator).toEqual({ propertyName: 'kind' });
+    expect(spec.components?.schemas?.['ProjectionChange'].oneOf).toHaveLength(2);
+    expect(spec.components?.schemas?.['ProjectionChange'].oneOf?.[0].properties?.['kind']).toEqual({
       type: 'string',
       enum: ['rename'],
     });
-    expect(spec.components?.schemas?.ProjectionRequest.properties?.change).toEqual({
+    expect(spec.components?.schemas?.['ProjectionRequest'].properties?.['change']).toEqual({
       $ref: '#/components/schemas/ProjectionChange',
     });
-    expect(spec.components?.schemas?.UnusedProjectionType).toBeUndefined();
+    expect(spec.components?.schemas?.['UnusedProjectionType']).toBeUndefined();
   });
 
   it('reserves contract names when assigning generated shared-model names', () => {
@@ -116,9 +116,9 @@ describe('generateOpenApiSpec', () => {
       defaultOptions,
     );
 
-    expect(spec.components?.schemas?.Model1.properties?.contractId).toEqual({ type: 'string' });
-    expect(spec.components?.schemas?.Model2.properties?.name).toEqual({ type: 'string' });
-    expect(spec.paths['/first'].get.responses['200'].content?.['application/json'].schema).toEqual({
+    expect(spec.components?.schemas?.['Model1'].properties?.['contractId']).toEqual({ type: 'string' });
+    expect(spec.components?.schemas?.['Model2'].properties?.['name']).toEqual({ type: 'string' });
+    expect(spec.paths['/first']['get'].responses['200'].content?.['application/json'].schema).toEqual({
       $ref: '#/components/schemas/Model2',
     });
   });
@@ -228,7 +228,7 @@ describe('generateOpenApiSpec', () => {
         ],
       }),
     });
-    expect(spec.paths['/events/{topic}'].get['x-putnami-client']).toEqual({
+    expect(spec.paths['/events/{topic}']['get']['x-putnami-client']).toEqual({
       stream: 'server',
       messages: { output: expect.any(Object) },
       transports: [
@@ -336,7 +336,7 @@ describe('generateOpenApiSpec', () => {
       },
     );
 
-    const operation = spec.paths['/documents'].post;
+    const operation = spec.paths['/documents']['post'];
     expect(operation['x-putnami-client']?.errors).toEqual([
       { status: 400, code: 'http.bad_request' },
       { status: 409, code: 'already_exists' },
@@ -371,7 +371,7 @@ describe('generateOpenApiSpec', () => {
       additionalProperties: false,
       required: ['reason'],
     };
-    expect(spec.paths['/documents'].post['x-putnami-client']?.errors).toEqual([
+    expect<unknown>(spec.paths['/documents']['post']['x-putnami-client']?.errors).toEqual([
       { status: 400, code: 'http.bad_request' },
       { status: 404, code: 'not_found' },
       { status: 409, code: 'already_exists', schema: details },
@@ -401,7 +401,7 @@ describe('generateOpenApiSpec', () => {
       },
     );
 
-    const operation = spec.paths['/documents'].post;
+    const operation = spec.paths['/documents']['post'];
     expect(operation['x-putnami-client']?.errors).toEqual([
       { status: 400, code: 'http.bad_request' },
       { status: 500, code: 'http.internal_server' },
@@ -428,7 +428,7 @@ describe('generateOpenApiSpec', () => {
       },
     );
 
-    expect(spec.paths['/documents'].post['x-putnami-client']?.errors).toEqual([
+    expect(spec.paths['/documents']['post']['x-putnami-client']?.errors).toEqual([
       { status: 400, code: 'http.bad_request' },
       {
         status: 400,
@@ -469,14 +469,14 @@ describe('generateOpenApiSpec', () => {
       },
     );
 
-    expect(Object.keys(spec.paths['/uploads'].post.responses).sort()).toEqual(['101', '400', '500']);
-    expect(spec.paths['/uploads'].post.responses['101']).toEqual({ description: 'WebSocket upgrade' });
-    expect(spec.paths['/uploads'].post.responses['200']).toBeUndefined();
-    expect(spec.paths['/uploads'].post['x-putnami-client']?.messages).toEqual({
+    expect(Object.keys(spec.paths['/uploads']['post'].responses).sort()).toEqual(['101', '400', '500']);
+    expect(spec.paths['/uploads']['post'].responses['101']).toEqual({ description: 'WebSocket upgrade' });
+    expect(spec.paths['/uploads']['post'].responses['200']).toBeUndefined();
+    expect(spec.paths['/uploads']['post']['x-putnami-client']?.messages).toEqual({
       input: expect.objectContaining({ type: 'object' }),
       output: expect.objectContaining({ type: 'object' }),
     });
-    expect(spec.paths['/chat'].post['x-putnami-client']?.messages).toEqual({
+    expect(spec.paths['/chat']['post']['x-putnami-client']?.messages).toEqual({
       input: expect.objectContaining({ type: 'object' }),
       output: expect.objectContaining({ type: 'object' }),
     });
@@ -521,8 +521,8 @@ describe('generateOpenApiSpec', () => {
     it('should map HTTP method to lowercase', () => {
       const routes: DiscoveredRoute[] = [{ method: 'GET', path: '/items' }];
       const spec = generateOpenApiSpec(routes, defaultOptions);
-      expect(spec.paths['/items'].get).toBeDefined();
-      expect(spec.paths['/items'].GET).toBeUndefined();
+      expect(spec.paths['/items']['get']).toBeDefined();
+      expect(spec.paths['/items']['GET']).toBeUndefined();
     });
 
     it('should group multiple methods under the same path', () => {
@@ -531,14 +531,14 @@ describe('generateOpenApiSpec', () => {
         { method: 'POST', path: '/items' },
       ];
       const spec = generateOpenApiSpec(routes, defaultOptions);
-      expect(spec.paths['/items'].get).toBeDefined();
-      expect(spec.paths['/items'].post).toBeDefined();
+      expect(spec.paths['/items']['get']).toBeDefined();
+      expect(spec.paths['/items']['post']).toBeDefined();
     });
 
     it('should generate operationId', () => {
       const routes: DiscoveredRoute[] = [{ method: 'GET', path: '/users/[id]' }];
       const spec = generateOpenApiSpec(routes, defaultOptions);
-      expect(spec.paths['/users/{id}'].get.operationId).toBe('getUsers_id');
+      expect(spec.paths['/users/{id}']['get'].operationId).toBe('getUsers_id');
     });
   });
 
@@ -552,7 +552,7 @@ describe('generateOpenApiSpec', () => {
         },
       ];
       const spec = generateOpenApiSpec(routes, defaultOptions);
-      const params = spec.paths['/users/{id}'].get.parameters;
+      const params = spec.paths['/users/{id}']['get'].parameters;
       expect(params).toHaveLength(1);
       expect(params?.[0]).toEqual({
         name: 'id',
@@ -571,7 +571,7 @@ describe('generateOpenApiSpec', () => {
         },
       ];
       const spec = generateOpenApiSpec(routes, defaultOptions);
-      expect(spec.paths['/users/{id}'].get.parameters?.[0].required).toBe(false);
+      expect(spec.paths['/users/{id}']['get'].parameters?.[0].required).toBe(false);
     });
   });
 
@@ -585,7 +585,7 @@ describe('generateOpenApiSpec', () => {
         },
       ];
       const spec = generateOpenApiSpec(routes, defaultOptions);
-      const params = spec.paths['/users'].get.parameters;
+      const params = spec.paths['/users']['get'].parameters;
       expect(params).toHaveLength(2);
       expect(params?.[0]).toEqual({ name: 'page', in: 'query', required: true, schema: { type: 'number' } });
       expect(params?.[1]).toEqual({ name: 'search', in: 'query', required: false, schema: { type: 'string' } });
@@ -602,7 +602,7 @@ describe('generateOpenApiSpec', () => {
         },
       ];
       const spec = generateOpenApiSpec(routes, defaultOptions);
-      const params = spec.paths['/traced'].get.parameters;
+      const params = spec.paths['/traced']['get'].parameters;
       expect(params).toHaveLength(2);
       expect(params?.[0]).toEqual({
         name: 'x-request-id',
@@ -629,7 +629,7 @@ describe('generateOpenApiSpec', () => {
         },
       ];
       const spec = generateOpenApiSpec(routes, defaultOptions);
-      const body = spec.paths['/users'].post.requestBody;
+      const body = spec.paths['/users']['post'].requestBody;
       expect(body).toBeDefined();
       expect(body?.required).toBe(true);
       expect(body?.content['application/json'].schema).toEqual({
@@ -652,8 +652,8 @@ describe('generateOpenApiSpec', () => {
         },
       ];
       const spec = generateOpenApiSpec(routes, defaultOptions);
-      const schema = spec.paths['/users/{id}'].put.requestBody?.content['application/json'].schema;
-      expect(schema.required).toBeUndefined();
+      const schema = spec.paths['/users/{id}']['put'].requestBody?.content['application/json'].schema;
+      expect(schema?.required).toBeUndefined();
     });
 
     it('should use application/x-www-form-urlencoded when bodyContentType is set', () => {
@@ -668,7 +668,7 @@ describe('generateOpenApiSpec', () => {
         },
       ];
       const spec = generateOpenApiSpec(routes, defaultOptions);
-      const body = spec.paths['/token'].post.requestBody;
+      const body = spec.paths['/token']['post'].requestBody;
       expect(body).toBeDefined();
       expect(body?.required).toBe(true);
       expect(body?.content['application/x-www-form-urlencoded']).toBeDefined();
@@ -695,7 +695,7 @@ describe('generateOpenApiSpec', () => {
         },
       ];
       const spec = generateOpenApiSpec(routes, defaultOptions);
-      const response = spec.paths['/users'].get.responses['200'];
+      const response = spec.paths['/users']['get'].responses['200'];
       expect(response.description).toBe('Successful response');
       expect(response.content?.['application/json'].schema).toEqual({
         type: 'object',
@@ -712,7 +712,7 @@ describe('generateOpenApiSpec', () => {
     it('should generate generic 200 response when no returns schema', () => {
       const routes: DiscoveredRoute[] = [{ method: 'DELETE', path: '/users/[id]' }];
       const spec = generateOpenApiSpec(routes, defaultOptions);
-      const response = spec.paths['/users/{id}'].delete.responses['200'];
+      const response = spec.paths['/users/{id}']['delete'].responses['200'];
       expect(response).toEqual({ description: 'Successful response' });
       expect(response.content).toBeUndefined();
     });
@@ -730,10 +730,10 @@ describe('generateOpenApiSpec', () => {
         },
       ];
       const spec = generateOpenApiSpec(routes, defaultOptions);
-      const props = spec.paths['/test'].post.requestBody?.content['application/json'].schema.properties;
-      expect(props?.str).toEqual({ type: 'string' });
-      expect(props?.num).toEqual({ type: 'number' });
-      expect(props?.bool).toEqual({ type: 'boolean' });
+      const props = spec.paths['/test']['post'].requestBody?.content['application/json'].schema.properties;
+      expect(props?.['str']).toEqual({ type: 'string' });
+      expect(props?.['num']).toEqual({ type: 'number' });
+      expect(props?.['bool']).toEqual({ type: 'boolean' });
     });
 
     it('should map constrained types with format', () => {
@@ -745,12 +745,12 @@ describe('generateOpenApiSpec', () => {
         },
       ];
       const spec = generateOpenApiSpec(routes, defaultOptions);
-      const props = spec.paths['/test'].post.requestBody?.content['application/json'].schema.properties;
-      expect(props?.id).toEqual({ type: 'string', format: 'uuid' });
-      expect(props?.email).toEqual({ type: 'string', format: 'email' });
+      const props = spec.paths['/test']['post'].requestBody?.content['application/json'].schema.properties;
+      expect(props?.['id']).toEqual({ type: 'string', format: 'uuid' });
+      expect(props?.['email']).toEqual({ type: 'string', format: 'email' });
       // ADR 0004: an integer carries its declared width, not the JavaScript
       // runtime's safe-integer range.
-      expect(props?.count).toEqual({ type: 'integer', format: 'int64' });
+      expect(props?.['count']).toEqual({ type: 'integer', format: 'int64' });
     });
 
     it('declares an integer width and its natural range, and projects nullability', () => {
@@ -771,21 +771,21 @@ describe('generateOpenApiSpec', () => {
         },
       ];
       const spec = generateOpenApiSpec(routes, defaultOptions);
-      const props = spec.paths['/test'].post.requestBody?.content['application/json'].schema.properties;
+      const props = spec.paths['/test']['post'].requestBody?.content['application/json'].schema.properties;
       // A 64-bit range cannot survive `JSON.stringify`, so the width carries it
       // and no rounded bound is written.
-      expect(props?.wide).toEqual({ type: 'integer', format: 'uint64' });
-      expect(props?.narrow).toEqual({
+      expect(props?.['wide']).toEqual({ type: 'integer', format: 'uint64' });
+      expect(props?.['narrow']).toEqual({
         type: 'integer',
         format: 'int32',
         minimum: -2_147_483_648,
         maximum: 2_147_483_647,
       });
-      expect(props?.unsigned).toEqual({ type: 'integer', format: 'uint32', minimum: 0, maximum: 4_294_967_295 });
+      expect(props?.['unsigned']).toEqual({ type: 'integer', format: 'uint32', minimum: 0, maximum: 4_294_967_295 });
       // An author bound is narrower than the natural range and wins.
-      expect(props?.bounded).toEqual({ type: 'integer', format: 'int32', minimum: 1, maximum: 100 });
-      expect(props?.nickname).toEqual({ type: 'string', nullable: true });
-      expect(props?.score).toEqual({
+      expect(props?.['bounded']).toEqual({ type: 'integer', format: 'int32', minimum: 1, maximum: 100 });
+      expect(props?.['nickname']).toEqual({ type: 'string', nullable: true });
+      expect(props?.['score']).toEqual({
         type: 'integer',
         format: 'int32',
         minimum: -2_147_483_648,
@@ -807,9 +807,9 @@ describe('generateOpenApiSpec', () => {
         },
       ];
       const spec = generateOpenApiSpec(routes, defaultOptions);
-      const props = spec.paths['/test'].post.requestBody?.content['application/json'].schema.properties;
-      expect(props?.tags).toEqual({ type: 'array', items: { type: 'string' } });
-      expect(props?.ids).toEqual({ type: 'array', items: { type: 'string', format: 'uuid' } });
+      const props = spec.paths['/test']['post'].requestBody?.content['application/json'].schema.properties;
+      expect(props?.['tags']).toEqual({ type: 'array', items: { type: 'string' } });
+      expect(props?.['ids']).toEqual({ type: 'array', items: { type: 'string', format: 'uuid' } });
     });
   });
 
@@ -857,10 +857,10 @@ describe('generateOpenApiSpec', () => {
       expect(spec.openapi).toBe('3.0.3');
       expect(spec.info.description).toBe('User management');
       expect(Object.keys(spec.paths)).toHaveLength(2); // /users and /users/{id}
-      expect(spec.paths['/users'].get).toBeDefined();
-      expect(spec.paths['/users'].post).toBeDefined();
-      expect(spec.paths['/users/{id}'].get).toBeDefined();
-      expect(spec.paths['/users/{id}'].delete).toBeDefined();
+      expect(spec.paths['/users']['get']).toBeDefined();
+      expect(spec.paths['/users']['post']).toBeDefined();
+      expect(spec.paths['/users/{id}']['get']).toBeDefined();
+      expect(spec.paths['/users/{id}']['delete']).toBeDefined();
     });
   });
 
@@ -880,7 +880,7 @@ describe('generateOpenApiSpec', () => {
         },
       ];
       const spec = generateOpenApiSpec(routes, defaultOptions);
-      const responses = spec.paths['/users'].post.responses;
+      const responses = spec.paths['/users']['post'].responses;
       expect(responses['200']).toBeDefined();
       expect(responses['200'].description).toBe('Already exists');
       expect(responses['200'].content?.['application/json'].schema).toEqual({
@@ -905,7 +905,7 @@ describe('generateOpenApiSpec', () => {
         },
       ];
       const spec = generateOpenApiSpec(routes, defaultOptions);
-      const responses = spec.paths['/users'].post.responses;
+      const responses = spec.paths['/users']['post'].responses;
       expect(responses['200']).toBeDefined();
       expect(responses['200'].description).toBe('Successful response');
       expect(responses['201']).toBeDefined();
@@ -923,7 +923,7 @@ describe('generateOpenApiSpec', () => {
         },
       ];
       const spec = generateOpenApiSpec(routes, defaultOptions);
-      const response = spec.paths['/users/{id}'].delete.responses['204'];
+      const response = spec.paths['/users/{id}']['delete'].responses['204'];
       expect(response.description).toBe('No content');
       expect(response.content).toBeUndefined();
     });
@@ -937,8 +937,8 @@ describe('generateOpenApiSpec', () => {
         },
       ];
       const spec = generateOpenApiSpec(routes, defaultOptions);
-      expect(spec.paths['/health'].get.responses['200']).toBeDefined();
-      expect(spec.paths['/health'].get.responses['200'].description).toBe('Successful response');
+      expect(spec.paths['/health']['get'].responses['200']).toBeDefined();
+      expect(spec.paths['/health']['get'].responses['200'].description).toBe('Successful response');
     });
   });
 
@@ -946,12 +946,12 @@ describe('generateOpenApiSpec', () => {
     it('should add default framework error responses to every operation', () => {
       const routes: DiscoveredRoute[] = [{ method: 'GET', path: '/health' }];
       const spec = generateOpenApiSpec(routes, defaultOptions);
-      const responses = spec.paths['/health'].get.responses;
+      const responses = spec.paths['/health']['get'].responses;
 
       expect(responses['400'].description).toBe('Bad Request');
-      expect(responses['400'].content?.['application/json'].schema.properties?.message).toEqual({ type: 'string' });
+      expect(responses['400'].content?.['application/json'].schema.properties?.['message']).toEqual({ type: 'string' });
       expect(responses['500'].description).toBe('Internal Server Error');
-      expect(responses['500'].content?.['application/json'].schema.properties?.error).toEqual({ type: 'string' });
+      expect(responses['500'].content?.['application/json'].schema.properties?.['error']).toEqual({ type: 'string' });
     });
 
     it('should map response error codes to standard error responses', () => {
@@ -965,12 +965,12 @@ describe('generateOpenApiSpec', () => {
         },
       ];
       const spec = generateOpenApiSpec(routes, defaultOptions);
-      const responses = spec.paths['/users/{id}'].get.responses;
+      const responses = spec.paths['/users/{id}']['get'].responses;
 
       expect(responses['404'].description).toBe('Not Found');
-      expect(responses['404'].content?.['application/json'].schema.properties?.message).toEqual({ type: 'string' });
+      expect(responses['404'].content?.['application/json'].schema.properties?.['message']).toEqual({ type: 'string' });
       expect(responses['409'].description).toBe('Conflict');
-      expect(responses['409'].content?.['application/json'].schema.properties?.error).toEqual({ type: 'string' });
+      expect(responses['409'].content?.['application/json'].schema.properties?.['error']).toEqual({ type: 'string' });
     });
 
     it('should let explicit throws override generated error responses for the same status', () => {
@@ -985,7 +985,7 @@ describe('generateOpenApiSpec', () => {
         },
       ];
       const spec = generateOpenApiSpec(routes, defaultOptions);
-      const response = spec.paths['/users/{id}'].get.responses['404'];
+      const response = spec.paths['/users/{id}']['get'].responses['404'];
 
       expect(response.description).toBe('User not found');
       expect(response.content?.['application/json'].schema).toEqual({
@@ -1010,7 +1010,7 @@ describe('generateOpenApiSpec', () => {
         },
       ];
       const spec = generateOpenApiSpec(routes, defaultOptions);
-      const responses = spec.paths['/users'].get.responses;
+      const responses = spec.paths['/users']['get'].responses;
       expect(responses['401'].description).toBe('Unauthorized');
       expect(responses['401'].content?.['application/json'].schema).toEqual({
         type: 'object',
@@ -1041,7 +1041,7 @@ describe('generateOpenApiSpec', () => {
         },
       ];
       const spec = generateOpenApiSpec(routes, defaultOptions);
-      const responses = spec.paths['/users'].post.responses;
+      const responses = spec.paths['/users']['post'].responses;
       expect(responses['200']).toBeDefined();
       expect(responses['201']).toBeDefined();
       expect(responses['400']).toBeDefined();
@@ -1061,7 +1061,7 @@ describe('generateOpenApiSpec', () => {
         },
       ];
       const spec = generateOpenApiSpec(routes, defaultOptions);
-      const responses = spec.paths['/events'].get.responses;
+      const responses = spec.paths['/events']['get'].responses;
       expect(responses['200']).toBeDefined(); // SSE stream
       expect(responses['401']).toBeDefined(); // throws
       expect(responses['401'].description).toBe('Unauthorized');
@@ -1072,7 +1072,7 @@ describe('generateOpenApiSpec', () => {
     it('should add securitySchemes when any route has security', () => {
       const routes: DiscoveredRoute[] = [{ method: 'GET', path: '/users', meta: { security: {} } }];
       const spec = generateOpenApiSpec(routes, defaultOptions);
-      expect(spec.components?.securitySchemes?.bearerAuth).toEqual({
+      expect(spec.components?.securitySchemes?.['bearerAuth']).toEqual({
         type: 'http',
         scheme: 'bearer',
         bearerFormat: 'JWT',
@@ -1082,7 +1082,7 @@ describe('generateOpenApiSpec', () => {
     it('should add per-operation security with empty scopes for basic auth', () => {
       const routes: DiscoveredRoute[] = [{ method: 'GET', path: '/users', meta: { security: {} } }];
       const spec = generateOpenApiSpec(routes, defaultOptions);
-      expect(spec.paths['/users'].get.security).toEqual([{ bearerAuth: [] }]);
+      expect(spec.paths['/users']['get'].security).toEqual([{ bearerAuth: [] }]);
     });
 
     it('keeps the bearerAuth requirement scope-array empty (OpenAPI 3.0.3: http schemes carry no scopes)', () => {
@@ -1094,12 +1094,12 @@ describe('generateOpenApiSpec', () => {
         },
       ];
       const spec = generateOpenApiSpec(routes, defaultOptions);
-      const security = spec.paths['/users/{id}'].delete.security;
+      const security = spec.paths['/users/{id}']['delete'].security;
       expect(security).toHaveLength(1);
       // The bearer scheme is type `http`; OpenAPI 3.0.3 requires its scope array
       // to be empty. Required scopes are surfaced in the operation description
       // (see the "document roles/scopes in operation description" test).
-      expect(security?.[0].bearerAuth).toEqual([]);
+      expect(security?.[0]['bearerAuth']).toEqual([]);
     });
 
     it('should derive an apiKey scheme and requirement for api-key-only routes', () => {
@@ -1107,14 +1107,14 @@ describe('generateOpenApiSpec', () => {
         { method: 'POST', path: '/ingest', meta: { security: { principalKind: 'apikey' } } },
       ];
       const spec = generateOpenApiSpec(routes, defaultOptions);
-      expect(spec.components?.securitySchemes?.apiKey).toEqual({
+      expect(spec.components?.securitySchemes?.['apiKey']).toEqual({
         type: 'apiKey',
         in: 'header',
         name: 'X-Api-Key',
       });
       // No bearer scheme when the route only accepts api keys.
-      expect(spec.components?.securitySchemes?.bearerAuth).toBeUndefined();
-      expect(spec.paths['/ingest'].post.security).toEqual([{ apiKey: [] }]);
+      expect(spec.components?.securitySchemes?.['bearerAuth']).toBeUndefined();
+      expect(spec.paths['/ingest']['post'].security).toEqual([{ apiKey: [] }]);
     });
 
     it('should emit both schemes as alternatives when either kind is accepted', () => {
@@ -1126,12 +1126,12 @@ describe('generateOpenApiSpec', () => {
         },
       ];
       const spec = generateOpenApiSpec(routes, defaultOptions);
-      expect(spec.components?.securitySchemes?.bearerAuth).toBeDefined();
-      expect(spec.components?.securitySchemes?.apiKey).toBeDefined();
+      expect(spec.components?.securitySchemes?.['bearerAuth']).toBeDefined();
+      expect(spec.components?.securitySchemes?.['apiKey']).toBeDefined();
       // Alternatives (logical OR). Both schemes carry an empty scope array —
       // OpenAPI 3.0.3 forbids scopes on non-oauth2 schemes — so required scopes
       // live in the operation description, not the requirement.
-      expect(spec.paths['/ingest'].post.security).toEqual([{ bearerAuth: [] }, { apiKey: [] }]);
+      expect(spec.paths['/ingest']['post'].security).toEqual([{ bearerAuth: [] }, { apiKey: [] }]);
     });
 
     it('should document roles/scopes in operation description', () => {
@@ -1143,7 +1143,7 @@ describe('generateOpenApiSpec', () => {
         },
       ];
       const spec = generateOpenApiSpec(routes, defaultOptions);
-      const description = spec.paths['/users/{id}'].delete.description;
+      const description = spec.paths['/users/{id}']['delete'].description;
       expect(description).toContain('Required roles: admin');
       expect(description).toContain('Required scopes: users:delete');
     });
@@ -1157,7 +1157,7 @@ describe('generateOpenApiSpec', () => {
         },
       ];
       const spec = generateOpenApiSpec(routes, defaultOptions);
-      const description = spec.paths['/users/{id}'].delete.description;
+      const description = spec.paths['/users/{id}']['delete'].description;
       expect(description).toContain('Delete a user');
       expect(description).toContain('Required roles: admin');
     });
@@ -1165,7 +1165,7 @@ describe('generateOpenApiSpec', () => {
     it('should not add notes when security has no specific roles/scopes', () => {
       const routes: DiscoveredRoute[] = [{ method: 'GET', path: '/me', meta: { security: {} } }];
       const spec = generateOpenApiSpec(routes, defaultOptions);
-      expect(spec.paths['/me'].get.description).toBeUndefined();
+      expect(spec.paths['/me']['get'].description).toBeUndefined();
     });
 
     it('should not add security to operations without meta.security', () => {
@@ -1174,8 +1174,8 @@ describe('generateOpenApiSpec', () => {
         { method: 'GET', path: '/users', meta: { security: {} } },
       ];
       const spec = generateOpenApiSpec(routes, defaultOptions);
-      expect(spec.paths['/health'].get.security).toBeUndefined();
-      expect(spec.paths['/users'].get.security).toBeDefined();
+      expect(spec.paths['/health']['get'].security).toBeUndefined();
+      expect(spec.paths['/users']['get'].security).toBeDefined();
     });
 
     it('should not add security schemes when no routes have security', () => {
@@ -1189,13 +1189,13 @@ describe('generateOpenApiSpec', () => {
     it('should add description from meta.description', () => {
       const routes: DiscoveredRoute[] = [{ method: 'GET', path: '/users', meta: { description: 'List all users' } }];
       const spec = generateOpenApiSpec(routes, defaultOptions);
-      expect(spec.paths['/users'].get.description).toBe('List all users');
+      expect(spec.paths['/users']['get'].description).toBe('List all users');
     });
 
     it('should not set description when meta has no description', () => {
       const routes: DiscoveredRoute[] = [{ method: 'GET', path: '/users' }];
       const spec = generateOpenApiSpec(routes, defaultOptions);
-      expect(spec.paths['/users'].get.description).toBeUndefined();
+      expect(spec.paths['/users']['get'].description).toBeUndefined();
     });
 
     it('should use user description for stream endpoints instead of auto-generated', () => {
@@ -1208,7 +1208,7 @@ describe('generateOpenApiSpec', () => {
         },
       ];
       const spec = generateOpenApiSpec(routes, defaultOptions);
-      expect(spec.paths['/events'].get.description).toBe('Real-time event feed');
+      expect(spec.paths['/events']['get'].description).toBe('Real-time event feed');
     });
   });
 
@@ -1227,10 +1227,10 @@ describe('generateOpenApiSpec', () => {
         },
       ];
       const spec = generateOpenApiSpec(routes, defaultOptions);
-      const props = spec.paths['/users'].post.requestBody?.content['application/json'].schema.properties;
-      expect(props?.name.description).toBe('Full name of the user');
-      expect(props?.email.description).toBe('Primary email address');
-      expect(props?.email.format).toBe('email');
+      const props = spec.paths['/users']['post'].requestBody?.content['application/json'].schema.properties;
+      expect(props?.['name'].description).toBe('Full name of the user');
+      expect(props?.['email'].description).toBe('Primary email address');
+      expect(props?.['email'].format).toBe('email');
     });
 
     it('should include description from Desc() in response schema properties', () => {
@@ -1247,10 +1247,10 @@ describe('generateOpenApiSpec', () => {
         },
       ];
       const spec = generateOpenApiSpec(routes, defaultOptions);
-      const props = spec.paths['/users'].get.responses['200'].content?.['application/json'].schema.properties;
-      expect(props?.id.description).toBe('Unique identifier');
-      expect(props?.id.format).toBe('uuid');
-      expect(props?.name.description).toBe('Display name');
+      const props = spec.paths['/users']['get'].responses['200'].content?.['application/json'].schema.properties;
+      expect(props?.['id'].description).toBe('Unique identifier');
+      expect(props?.['id'].format).toBe('uuid');
+      expect(props?.['name'].description).toBe('Display name');
     });
 
     it('should not add description when Desc() is not used', () => {
@@ -1262,9 +1262,9 @@ describe('generateOpenApiSpec', () => {
         },
       ];
       const spec = generateOpenApiSpec(routes, defaultOptions);
-      const props = spec.paths['/test'].post.requestBody?.content['application/json'].schema.properties;
-      expect(props?.name.description).toBeUndefined();
-      expect(props?.count.description).toBeUndefined();
+      const props = spec.paths['/test']['post'].requestBody?.content['application/json'].schema.properties;
+      expect(props?.['name'].description).toBeUndefined();
+      expect(props?.['count'].description).toBeUndefined();
     });
   });
 
@@ -1278,8 +1278,8 @@ describe('generateOpenApiSpec', () => {
         },
       ];
       const spec = generateOpenApiSpec(routes, defaultOptions);
-      const props = spec.paths['/things'].post.requestBody?.content['application/json'].schema.properties;
-      expect(props?.meta).toEqual({
+      const props = spec.paths['/things']['post'].requestBody?.content['application/json'].schema.properties;
+      expect(props?.['meta']).toEqual({
         type: 'object',
         properties: { a: { type: 'string' }, b: { type: 'number' } },
         required: ['a', 'b'],
@@ -1296,7 +1296,8 @@ describe('generateOpenApiSpec', () => {
         },
       ];
       const spec = generateOpenApiSpec(routes, defaultOptions);
-      const address = spec.paths['/things'].post.requestBody?.content['application/json'].schema.properties?.address;
+      const address =
+        spec.paths['/things']['post'].requestBody?.content['application/json'].schema.properties?.['address'];
       expect(address).toEqual({
         type: 'object',
         properties: { street: { type: 'string' }, zip: { type: 'string' } },
@@ -1315,8 +1316,8 @@ describe('generateOpenApiSpec', () => {
         },
       ];
       const spec = generateOpenApiSpec(routes, defaultOptions);
-      const props = spec.paths['/things'].post.requestBody?.content['application/json'].schema.properties;
-      expect(props?.labels).toEqual({ type: 'object', additionalProperties: { type: 'string' } });
+      const props = spec.paths['/things']['post'].requestBody?.content['application/json'].schema.properties;
+      expect(props?.['labels']).toEqual({ type: 'object', additionalProperties: { type: 'string' } });
     });
 
     it('preserves supported validation constraints and defaults for first-party clients', () => {
@@ -1343,7 +1344,7 @@ describe('generateOpenApiSpec', () => {
         },
       );
 
-      expect(spec.paths['/things'].post.requestBody?.content['application/json'].schema).toEqual({
+      expect(spec.paths['/things']['post'].requestBody?.content['application/json'].schema).toEqual({
         type: 'object',
         properties: {
           count: { type: 'number', minimum: 1, maximum: 10, default: 3 },
@@ -1385,11 +1386,11 @@ describe('generateOpenApiSpec', () => {
           client: { service: { id: 'events', audience: 'api://events' }, credentials: {} },
         },
       );
-      const props = spec.paths['/events'].post.requestBody?.content['application/json'].schema.properties;
+      const props = spec.paths['/events']['post'].requestBody?.content['application/json'].schema.properties;
       // Both strict emitters refuse `{"type":"integer"}` without a format, so a
       // first-party provider that exposes an integer used to be ungeneratable.
-      expect(props?.sequence).toEqual({ type: 'integer', format: 'uint64' });
-      expect(props?.retries).toEqual({ type: 'integer', format: 'int64' });
+      expect(props?.['sequence']).toEqual({ type: 'integer', format: 'uint64' });
+      expect(props?.['retries']).toEqual({ type: 'integer', format: 'int64' });
     });
 
     it('refuses a first-party integer bound the projection cannot write exactly', () => {
@@ -1416,7 +1417,7 @@ describe('generateOpenApiSpec', () => {
       const routes: DiscoveredRoute[] = [{ method: 'POST', path: '/things', schemas: { body: { unique: String } } }];
       const spec = generateOpenApiSpec(routes, defaultOptions);
       expect(spec.components?.schemas).toBeUndefined();
-      expect(spec.paths['/things'].post.requestBody?.content['application/json'].schema).toEqual({
+      expect(spec.paths['/things']['post'].requestBody?.content['application/json'].schema).toEqual({
         type: 'object',
         properties: { unique: { type: 'string' } },
         required: ['unique'],
@@ -1439,7 +1440,7 @@ describe('generateOpenApiSpec', () => {
       ];
       const spec = generateOpenApiSpec(routes, defaultOptions);
 
-      expect(spec.components?.schemas?.Model1).toEqual({
+      expect(spec.components?.schemas?.['Model1']).toEqual({
         type: 'object',
         properties: { id: { type: 'string' }, name: { type: 'string' } },
         required: ['id', 'name'],
@@ -1447,8 +1448,8 @@ describe('generateOpenApiSpec', () => {
       });
 
       const ref = { $ref: '#/components/schemas/Model1' };
-      expect(spec.paths['/users/{id}'].get.responses['200'].content?.['application/json'].schema).toEqual(ref);
-      expect(spec.paths['/accounts/{id}'].get.responses['200'].content?.['application/json'].schema).toEqual(ref);
+      expect(spec.paths['/users/{id}']['get'].responses['200'].content?.['application/json'].schema).toEqual(ref);
+      expect(spec.paths['/accounts/{id}']['get'].responses['200'].content?.['application/json'].schema).toEqual(ref);
     });
 
     it('should assign component names deterministically by sorted signature', () => {
@@ -1460,13 +1461,13 @@ describe('generateOpenApiSpec', () => {
       ];
       const spec = generateOpenApiSpec(routes, defaultOptions);
       // Signature for {x} sorts before {y}, so it is Model1 regardless of route order.
-      expect(spec.components?.schemas?.Model1).toEqual({
+      expect(spec.components?.schemas?.['Model1']).toEqual({
         type: 'object',
         properties: { x: { type: 'string' } },
         required: ['x'],
         additionalProperties: false,
       });
-      expect(spec.components?.schemas?.Model2).toEqual({
+      expect(spec.components?.schemas?.['Model2']).toEqual({
         type: 'object',
         properties: { y: { type: 'number' } },
         required: ['y'],
@@ -1483,15 +1484,15 @@ describe('generateOpenApiSpec', () => {
         },
       ];
       const spec = generateOpenApiSpec(routes, defaultOptions);
-      expect(spec.components?.schemas?.Model1).toEqual({
+      expect(spec.components?.schemas?.['Model1']).toEqual({
         type: 'object',
         properties: { city: { type: 'string' } },
         required: ['city'],
         additionalProperties: false,
       });
-      const bodySchema = spec.paths['/orgs'].post.requestBody?.content['application/json'].schema;
-      expect(bodySchema?.properties?.home).toEqual({ $ref: '#/components/schemas/Model1' });
-      expect(bodySchema?.properties?.work).toEqual({ $ref: '#/components/schemas/Model1' });
+      const bodySchema = spec.paths['/orgs']['post'].requestBody?.content['application/json'].schema;
+      expect(bodySchema?.properties?.['home']).toEqual({ $ref: '#/components/schemas/Model1' });
+      expect(bodySchema?.properties?.['work']).toEqual({ $ref: '#/components/schemas/Model1' });
     });
 
     it('should keep objects that differ only in a constraint or a map value as separate components', () => {
@@ -1510,17 +1511,17 @@ describe('generateOpenApiSpec', () => {
         { method: 'GET', path: '/d', schemas: { returns: { name: String, tags: MapOf(String, Int) } } },
       ];
       const spec = generateOpenApiSpec(routes, defaultOptions);
-      const returned = (path: string) => spec.paths[path].get.responses['200'].content?.['application/json'].schema;
+      const returned = (path: string) => spec.paths[path]['get'].responses['200'].content?.['application/json'].schema;
       // Each pair shares one component; the two pairs never share one, so neither
       // route publishes the other's constraint or map values.
       expect(returned('/a')).toEqual(returned('/b') as never);
       expect(returned('/c')).toEqual(returned('/d') as never);
       expect(returned('/a')).not.toEqual(returned('/c') as never);
       const named = (path: string) => spec.components?.schemas?.[(returned(path)?.$ref ?? '').split('/').pop() ?? ''];
-      expect(named('/a')?.properties?.name).toEqual({ type: 'string', minLength: 3 });
-      expect(named('/c')?.properties?.name).toEqual({ type: 'string' });
-      expect(named('/a')?.properties?.tags).toEqual({ type: 'object', additionalProperties: { type: 'string' } });
-      expect(named('/c')?.properties?.tags).toMatchObject({
+      expect(named('/a')?.properties?.['name']).toEqual({ type: 'string', minLength: 3 });
+      expect(named('/c')?.properties?.['name']).toEqual({ type: 'string' });
+      expect(named('/a')?.properties?.['tags']).toEqual({ type: 'object', additionalProperties: { type: 'string' } });
+      expect(named('/c')?.properties?.['tags']).toMatchObject({
         type: 'object',
         additionalProperties: { type: 'integer' },
       });
@@ -1532,8 +1533,8 @@ describe('generateOpenApiSpec', () => {
         { method: 'GET', path: '/b', schemas: { returns: { id: String } } },
       ];
       const spec = generateOpenApiSpec(routes, defaultOptions);
-      expect(spec.components?.schemas?.Model1).toBeDefined();
-      expect(spec.components?.securitySchemes?.bearerAuth).toBeDefined();
+      expect(spec.components?.schemas?.['Model1']).toBeDefined();
+      expect(spec.components?.securitySchemes?.['bearerAuth']).toBeDefined();
     });
   });
 });

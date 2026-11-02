@@ -26,10 +26,10 @@ describe('Table builders', () => {
 
     it('should accept transform functions', () => {
       const toDb = (val: string[]) => JSON.stringify(val);
-      const fromDb = (val: string) => JSON.parse(val);
+      const fromDb = (val: unknown) => JSON.parse(val as string);
       const col = Column(String, { toDatabase: toDb, fromDatabase: fromDb });
       expect(col.options.toDatabase).toBe(toDb);
-      expect(col.options.fromDatabase).toBe(fromDb);
+      expect<unknown>(col.options.fromDatabase).toBe(fromDb);
     });
 
     it('should accept schema descriptors', () => {

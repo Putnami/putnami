@@ -67,8 +67,8 @@ describe('register() activation contract', () => {
     },
     () => {
       process.env.CONFIG_SERVER_URL = 'https://config.putnami.test';
-      process.env.CONFIG_SERVER_TOKEN = 'unit-token';
-      process.env.APP_NAME = 'task-api';
+      process.env['CONFIG_SERVER_TOKEN'] = 'unit-token';
+      process.env['APP_NAME'] = 'task-api';
 
       const sources = discoveredSources();
       expect(sources.map((s) => s.name)).toEqual(['config-server', 'secrets-server']);
@@ -78,8 +78,8 @@ describe('register() activation contract', () => {
 
   it('places config(50) and secrets(55) between the .secrets(35) and CONFIG_DATA(60) built-ins', () => {
     process.env.CONFIG_SERVER_URL = 'https://config.putnami.test';
-    process.env.CONFIG_SERVER_TOKEN = 'unit-token';
-    process.env.APP_NAME = 'task-api';
+    process.env['CONFIG_SERVER_TOKEN'] = 'unit-token';
+    process.env['APP_NAME'] = 'task-api';
 
     const builtinPriorities = [10, 20, 30, 35, 60]; // the 5 framework file/env sources
     const merged = [...builtinPriorities, ...discoveredSources().map((s) => s.priority)].sort((a, b) => a - b);
@@ -96,8 +96,8 @@ describe('register() activation contract', () => {
     () => {
       process.env.CONFIG_SERVER_URL =
         'https://api.putnami.test/api/configs/resolve?appName=auth%2Fserver&environment=prod&secretsMode=reveal';
-      process.env.CONFIG_SERVER_TOKEN = 'unit-token';
-      process.env.APP_NAME = 'auth/server';
+      process.env['CONFIG_SERVER_TOKEN'] = 'unit-token';
+      process.env['APP_NAME'] = 'auth/server';
 
       expect(discoveredSources().map((s) => s.name)).toEqual(['config-server']);
     },

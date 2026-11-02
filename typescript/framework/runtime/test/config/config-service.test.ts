@@ -39,14 +39,14 @@ describe('ConfigService', () => {
   beforeEach(() => {
     resetConfigLoader();
     delete process.env.CONFIG_DATA;
-    delete process.env.TEST_CONFIG_SVC_URL;
+    Reflect.deleteProperty(process.env, 'TEST_CONFIG_SVC_URL');
   });
 
   afterEach(() => {
     service?.close();
     resetConfigLoader();
     delete process.env.CONFIG_DATA;
-    delete process.env.TEST_CONFIG_SVC_URL;
+    Reflect.deleteProperty(process.env, 'TEST_CONFIG_SVC_URL');
   });
 
   describe('get()', () => {
@@ -142,7 +142,7 @@ describe('ConfigService', () => {
     });
 
     it('resolves Env() descriptors from process.env', () => {
-      process.env.TEST_CONFIG_SVC_URL = 'https://prod.api.com';
+      process.env['TEST_CONFIG_SVC_URL'] = 'https://prod.api.com';
       service = new ConfigService([createInMemorySource('empty', 80, {})]);
 
       const config = service.get(EnvConfig);
@@ -245,7 +245,7 @@ describe('ConfigService', () => {
     });
 
     it('tracks env variable origins', () => {
-      process.env.TEST_CONFIG_SVC_URL = 'https://env.com';
+      process.env['TEST_CONFIG_SVC_URL'] = 'https://env.com';
       service = new ConfigService([createInMemorySource('empty', 80, {})]);
 
       const desc = service.describe(EnvConfig);
@@ -256,7 +256,7 @@ describe('ConfigService', () => {
     });
 
     it('reports an Env(...) value over confInit, as get() resolves it', () => {
-      process.env.TEST_CONFIG_SVC_URL = 'https://env.com';
+      process.env['TEST_CONFIG_SVC_URL'] = 'https://env.com';
       service = new ConfigService([]);
 
       const confInit = { url: 'https://init.com' };

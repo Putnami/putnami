@@ -74,7 +74,7 @@ function scriptedProvider(options: {
     markClosed = resolve;
   });
   const echoed = options.subprotocol === undefined ? SERVICE_WEBSOCKET_SUBPROTOCOL : options.subprotocol;
-  const server = Bun.serve<{ index: number }, Record<string, never>>({
+  const server = Bun.serve<{ index: number }>({
     port: 0,
     fetch(request, target) {
       const upgraded = target.upgrade(request, {
@@ -245,7 +245,7 @@ describe('first-party websocket client, corpus conformance', () => {
     // `cancel-before-init`: the conversation refuses a cancel that precedes the
     // operation identity, so the client has nothing to cancel and never writes it.
     const conversation = new WebSocketConversationV1({ stream: 'server', encoding: 'json', resumeDeclared: false });
-    expect(conversation.accept({ v: 1, type: 'cancel', code: 'canceled' }, 'client-to-server')[0]?.code).toBe(
+    expect<unknown>(conversation.accept({ v: 1, type: 'cancel', code: 'canceled' }, 'client-to-server')[0]?.code).toBe(
       expectations().invalid['cancel-before-init.json'],
     );
 
@@ -307,7 +307,7 @@ describe('first-party websocket client, admission', () => {
         ),
       );
       const init = provider.received[0] as { credentials: { value: string }[]; headers: unknown[] };
-      expect(init.credentials).toEqual([{ profile: 'service', value: 'Bearer secret-token' }]);
+      expect<unknown>(init.credentials).toEqual([{ profile: 'service', value: 'Bearer secret-token' }]);
       expect(JSON.stringify(init.headers)).not.toContain('secret-token');
       expect(provider.url).not.toContain('secret-token');
     },

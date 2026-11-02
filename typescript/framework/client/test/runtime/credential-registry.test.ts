@@ -938,8 +938,10 @@ describe('L09 — case 13: alternatives, secondaries and forwarding', () => {
       });
       await app.start();
       try {
-        const failure = await runInContext({ __authorizationHeader: 'Bearer stale-user-token' }, () =>
-          app.context.get(WidgetsClient).list(),
+        const failure = await Promise.resolve(
+          runInContext({ __authorizationHeader: 'Bearer stale-user-token' }, () =>
+            app.context.get(WidgetsClient).list(),
+          ),
         ).catch((error: unknown) => error);
         expect(failure).toBeInstanceOf(ClientFrameworkError);
         expect((failure as ClientFrameworkError).status).toBe(401);
@@ -979,8 +981,10 @@ describe('L09 — case 13: alternatives, secondaries and forwarding', () => {
       });
       await app.start();
       try {
-        const failure = await runInContext({ __authorizationHeader: 'Bearer stale-user-token' }, () =>
-          app.context.get(WidgetsClient).list(),
+        const failure = await Promise.resolve(
+          runInContext({ __authorizationHeader: 'Bearer stale-user-token' }, () =>
+            app.context.get(WidgetsClient).list(),
+          ),
         ).catch((error: unknown) => error);
         expect(failure).toBeInstanceOf(ClientFrameworkError);
         expect(attempts).toBe(1);

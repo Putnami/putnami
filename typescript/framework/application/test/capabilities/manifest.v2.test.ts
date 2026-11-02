@@ -216,7 +216,9 @@ describe('capability manifest v2', () => {
     },
     () => {
       for (const value of ['{"protocolVersion":1,"project":"p"}', '{"protocolVersion":2,"project":"p"}']) {
-        expect(parseCapabilityManifestDocument(value).protocolVersion).toBe(Number(JSON.parse(value).protocolVersion));
+        expect<unknown>(parseCapabilityManifestDocument(value).protocolVersion).toBe(
+          Number(JSON.parse(value).protocolVersion),
+        );
       }
       for (const value of [
         '{"project":"p"}',

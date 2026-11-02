@@ -395,8 +395,8 @@ function hasCompleteRouteEvaluation(output: string): boolean {
       typeof evaluation === 'object' &&
       !Array.isArray(evaluation) &&
       Object.keys(evaluation).length === 2 &&
-      evaluation.v === 1 &&
-      evaluation.state === 'complete'
+      evaluation['v'] === 1 &&
+      evaluation['state'] === 'complete'
     );
   }
   return false;

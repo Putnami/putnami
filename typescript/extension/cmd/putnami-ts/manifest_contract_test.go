@@ -411,6 +411,9 @@ func TestTaskEffectTable(t *testing.T) {
 		"run-app":             {"process"},
 		"serve-app":           {"network", "process"},
 		"test-run":            {"toolchain-cache"},
+		// The test type-check keeps its incremental build info in the ts-types
+		// scratch, as build-types does.
+		"test-types": {"toolchain-cache"},
 		// The database test environment runs a container (process) and may pull
 		// its pinned image (network). Both are external effects a cache hit
 		// could not reproduce, which is also why the pair is uncacheable — and

@@ -145,7 +145,7 @@ describe('service-to-service raw octet payloads', () => {
       client as unknown as {
         operationContracts: Record<string, { errors: { status: number; code: string; retryable?: boolean }[] }>;
       }
-    ).operationContracts.postBlobsEcho.errors;
+    ).operationContracts['postBlobsEcho'].errors;
     expect(declared).toContainEqual({ status: 413, code: 'http.payload_too_large', retryable: false });
     expect(declared).toContainEqual({ status: 415, code: 'http.unsupported_media_type', retryable: false });
   });

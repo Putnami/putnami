@@ -2,6 +2,7 @@ import { describe, expect, it } from 'bun:test';
 import { DateIso, Email, Int, Optional, Uuid } from '@putnami/runtime';
 import { entityHelper } from '../src/metadata/entity.helper';
 import { Column, Key, PgArray, Table } from '../src/table';
+import type { DatabaseValue } from '../src/type.type';
 
 describe('EntityHelper', () => {
   describe('tableName', () => {
@@ -86,8 +87,8 @@ describe('EntityHelper', () => {
       const helper = entityHelper(table);
       const keys = helper.extractKeys({ id: 'test-123', name: 'Test' });
 
-      expect(keys.id).toBe('test-123');
-      expect(keys.name).toBeUndefined();
+      expect(keys['id']).toBe('test-123');
+      expect(keys['name']).toBeUndefined();
     });
 
     it('should extract composite keys', () => {
@@ -103,9 +104,9 @@ describe('EntityHelper', () => {
         name: 'Test',
       });
 
-      expect(keys.userId).toBe('user-123');
-      expect(keys.roleId).toBe('role-456');
-      expect(keys.name).toBeUndefined();
+      expect(keys['userId']).toBe('user-123');
+      expect(keys['roleId']).toBe('role-456');
+      expect(keys['name']).toBeUndefined();
     });
 
     it('should handle custom key column names', () => {
@@ -115,7 +116,7 @@ describe('EntityHelper', () => {
       const helper = entityHelper(table);
       const keys = helper.extractKeys({ id: 'test-123' });
 
-      expect(keys.entity_id).toBe('test-123');
+      expect(keys['entity_id']).toBe('test-123');
     });
 
     it('should return empty object when no keys', () => {
@@ -210,7 +211,7 @@ describe('EntityHelper', () => {
       const table = Table('test_table', {
         id: Key(String),
         tags: Column(String, {
-          fromDatabase: (value: string) => JSON.parse(value as string),
+          fromDatabase: (value) => JSON.parse(value as string),
         }),
       });
       const helper = entityHelper(table);
@@ -584,10 +585,9 @@ describe('EntityHelper', () => {
         tags: PgArray(String, { columnName: 'tag_list' }),
       });
       const helper = entityHelper(table);
-      const entity = helper.toEntity<{ id: string; tags: string[] }>({
-        id: 'test-1',
-        tag_list: ['x', 'y'],
-      });
+      // The driver hands an array column back as an array, outside DatabaseValue.
+      const row = { id: 'test-1', tag_list: ['x', 'y'] } as unknown as Record<string, DatabaseValue>;
+      const entity = helper.toEntity<{ id: string; tags: string[] }>(row);
       expect(entity.tags).toEqual(['x', 'y']);
     });
 

@@ -26,6 +26,9 @@ const MAX_ERROR_RESPONSE_BYTES = 65_536;
 export const EVENT_SERVER_TRANSPORT_KIND = 'eventserver' as const;
 
 /** Input passed to the provider-owned credential adapter before any HTTP request. */
+/** The HTTP call the transport makes: `globalThis.fetch` or any function with its call signature. */
+export type EventServerFetch = (input: string | URL | Request, init?: RequestInit) => Promise<Response>;
+
 export interface EventServerTokenRequest {
   /** Exact configured token audience. The framework never normalizes it. */
   audience: string;
@@ -74,7 +77,7 @@ export interface EventServerTransportConfig {
   maxRequestBytes?: number;
   retry?: EventServerRetryConfig;
   /** @internal Deterministic HTTP seam for tests and non-standard runtimes. */
-  fetch?: typeof globalThis.fetch;
+  fetch?: EventServerFetch;
   /** @internal Deterministic jitter seam for tests. */
   random?: () => number;
   /** @internal Deterministic wait seam for tests. */
@@ -146,7 +149,7 @@ interface ResolvedConfig {
   maxAttempts: number;
   baseDelayMs: number;
   maxDelayMs: number;
-  fetch: typeof globalThis.fetch;
+  fetch: EventServerFetch;
   random: () => number;
   sleep: (delayMs: number, signal: AbortSignal) => Promise<void>;
 }

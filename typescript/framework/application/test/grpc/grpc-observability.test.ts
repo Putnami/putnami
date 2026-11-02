@@ -2,7 +2,7 @@ import { afterEach, describe, expect } from 'bun:test';
 import { type Context, useContext } from '@putnami/runtime';
 import { specTest } from '@putnami/runtime/spectest';
 import { api, endpoint } from '../../src/api';
-import { application } from '../../src/application';
+import { type Application, application } from '../../src/application';
 import { grpc } from '../../src/grpc/grpc.plugin';
 import { createGrpcTestClient, type GrpcTestClient } from '../../src/grpc/grpc-testing';
 import { http, type HttpPlugin } from '../../src/http/http.plugin';

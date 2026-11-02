@@ -582,14 +582,16 @@ describe('channel-pointer client', () => {
   it('parses a {version,digest} pointer document', async () => {
     const digest = sha256Hex(bytes('head'));
     globalThis.fetch = (async () =>
-      new Response(JSON.stringify({ version: '2026.2.0', digest }), { status: 200 })) as typeof fetch;
+      new Response(JSON.stringify({ version: '2026.2.0', digest }), { status: 200 })) as unknown as typeof fetch;
     const pointer = await fetchChannelPointerFromRegistry('site-content/cloud', 'stable', REGISTRY, anonymous);
     expect(pointer).toEqual({ version: '2026.2.0', digest });
   });
 
   it('rejects a pointer whose digest is not sha256 bare-hex', async () => {
     globalThis.fetch = (async () =>
-      new Response(JSON.stringify({ version: '2026.2.0', digest: 'not-a-digest' }), { status: 200 })) as typeof fetch;
+      new Response(JSON.stringify({ version: '2026.2.0', digest: 'not-a-digest' }), {
+        status: 200,
+      })) as unknown as typeof fetch;
     await expect(fetchChannelPointerFromRegistry('site-content/cloud', 'stable', REGISTRY, anonymous)).rejects.toThrow(
       /sha256/,
     );
@@ -600,7 +602,7 @@ describe('channel-pointer client', () => {
     globalThis.fetch = (async () => {
       fetched = true;
       return new Response('{}', { status: 200 });
-    }) as typeof fetch;
+    }) as unknown as typeof fetch;
     await expect(
       fetchChannelPointerFromRegistry('site-content/cloud', 'stable', 'http://evil.example', anonymous),
     ).rejects.toThrow(/plaintext http/);

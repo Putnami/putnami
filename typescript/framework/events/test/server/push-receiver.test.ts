@@ -95,7 +95,11 @@ describe('push receiver auth', () => {
           return { email: ALLOWED };
         },
       },
-      [makeHandler('order.created', () => (called = true))],
+      [
+        makeHandler('order.created', () => {
+          called = true;
+        }),
+      ],
     );
 
     const res = await receiver(ctx({ token: 'good', body: pushBody() }));
@@ -122,7 +126,11 @@ describe('push receiver auth', () => {
       verify: async () => ({ email: 'intruder@evil.example', email_verified: true }),
     });
     let called = false;
-    const receiver = createPushReceiver(config, [makeHandler('order.created', () => (called = true))]);
+    const receiver = createPushReceiver(config, [
+      makeHandler('order.created', () => {
+        called = true;
+      }),
+    ]);
     const res = await receiver(ctx({ token: 'good', body: pushBody() }));
     expect(res.status).toBe(403);
     expect(called).toBe(false);
@@ -141,7 +149,11 @@ describe('push receiver dispatch + status mapping', () => {
     let called = false;
     const receiver = createPushReceiver(
       baseConfig(),
-      [makeHandler('order.created', () => (called = true))],
+      [
+        makeHandler('order.created', () => {
+          called = true;
+        }),
+      ],
       async () => undefined,
     );
     const res = await receiver(ctx({ token: 'good', body: pushBody() }));
@@ -173,7 +185,11 @@ describe('push receiver dispatch + status mapping', () => {
 
   specTest('acknowledges (204) a push with no matching handler', STATUS_OUTCOME, async () => {
     let called = false;
-    const receiver = createPushReceiver(baseConfig(), [makeHandler('billing.charged', () => (called = true))]);
+    const receiver = createPushReceiver(baseConfig(), [
+      makeHandler('billing.charged', () => {
+        called = true;
+      }),
+    ]);
     const res = await receiver(ctx({ token: 'good', body: pushBody({ topic: 'unhandled.topic' }) }));
     expect(res.status).toBe(204);
     expect(called).toBe(false);

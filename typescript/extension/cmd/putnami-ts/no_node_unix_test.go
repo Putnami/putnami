@@ -207,7 +207,7 @@ func freePort(t *testing.T) int {
 	return listener.Addr().(*net.TCPAddr).Port
 }
 
-// TestJobsRunWithNoNodeOnPath runs lint, test, build and serve on a starter
+// TestJobsRunWithNoNodeOnPath runs lint, test, its type-check, build and serve on a starter
 // project with the real bun, Biome and TypeScript, on a PATH that holds bun
 // and nothing else.
 func TestJobsRunWithNoNodeOnPath(t *testing.T) {
@@ -246,6 +246,7 @@ func TestJobsRunWithNoNodeOnPath(t *testing.T) {
 		{"lint~format", func() (string, map[string]any, error) { return runLintFormat(ctx, jsonl.New(), nil) }},
 		{"lint~check", func() (string, map[string]any, error) { return runLintCheck(ctx, jsonl.New(), nil) }},
 		{"test", func() (string, map[string]any, error) { return runTest(ctx, jsonl.New(), nil) }},
+		{"test~types", func() (string, map[string]any, error) { return runTestTypes(ctx, jsonl.New(), nil) }},
 		{"build", func() (string, map[string]any, error) {
 			return runBuild(withParams(ctx, map[string]any{"transpile": true, "types": true}), jsonl.New(), nil)
 		}},

@@ -78,8 +78,8 @@ function loadManifestContract(): {
 describe('schema manifest contract vocabulary', () => {
   specTest('matches the protocol JSON Schema field type enums', VOCABULARY, () => {
     const contract = loadManifestContract();
-    expect([...FIELD_TYPE_VALUES]).toEqual(contract.$defs.fieldType.enum);
-    expect([...MAP_KEY_TYPE_VALUES]).toEqual(contract.$defs.mapKeyType.enum);
+    expect<unknown>([...FIELD_TYPE_VALUES]).toEqual(contract.$defs.fieldType.enum);
+    expect<unknown>([...MAP_KEY_TYPE_VALUES]).toEqual(contract.$defs.mapKeyType.enum);
   });
 });
 

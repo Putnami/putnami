@@ -32,7 +32,7 @@ function quoteRoute(client: ClientOperationPolicy): DiscoveredRoute {
 
 function publishedWires(client: ClientOperationPolicy, connect: OpenApiOptions['connect'] = CONNECT): string[] {
   const spec = generateOpenApiSpec([quoteRoute(client)], { ...OPTIONS, connect });
-  const transports = spec.paths['/quotes/{id}'].get['x-putnami-client']?.transports ?? [];
+  const transports = spec.paths['/quotes/{id}']['get']['x-putnami-client']?.transports ?? [];
   for (const transport of transports) {
     if (transport.protocol === 'connect') {
       expect(transport).toMatchObject({ path: METHOD, protobufMethod: METHOD });

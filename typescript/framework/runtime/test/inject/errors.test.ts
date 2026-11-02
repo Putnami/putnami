@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'bun:test';
 import { ContainerValidationError, RequirementNotMetError, ScopeViolationError } from '../../src/inject/errors';
 import { named } from '../../src/inject/token';
+import type { ValidationIssue } from '../../src/inject/inject.type';
 
 describe('ScopeViolationError', () => {
   it('should include singleton and scoped token names in message', () => {
@@ -41,9 +42,9 @@ describe('RequirementNotMetError', () => {
 
 describe('ContainerValidationError', () => {
   it('should format multiple issues', () => {
-    const issues = [
-      { type: 'missing-dep' as const, message: 'Database not found', token: named('Database') },
-      { type: 'circular' as const, message: 'A → B → A', token: named('A') },
+    const issues: ValidationIssue[] = [
+      { type: 'missing-dependency', message: 'Database not found', tokens: [named('Database')], container: 'root' },
+      { type: 'circular-dependency', message: 'A → B → A', tokens: [named('A'), named('B')], container: 'root' },
     ];
     const error = new ContainerValidationError(issues);
 

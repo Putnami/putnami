@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'bun:test';
-import { ApiPlugin, application, HttpPlugin, http } from '@putnami/application';
+import { type Application, ApiPlugin, application, HttpPlugin, http } from '@putnami/application';
 import releaseEndpoint from '../src/api/release.json/get';
 import {
   type PointerFetch,

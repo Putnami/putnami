@@ -126,7 +126,7 @@ describe('RemoteConfigSource', () => {
 
       expect(captured?.url).toBe('https://config.putnami.test/api/configs/resolve');
       expect(captured?.method).toBe('POST');
-      expect(captured?.headers?.Authorization).toBe('Bearer test-token');
+      expect(captured?.headers?.['Authorization']).toBe('Bearer test-token');
     },
   );
 
@@ -157,7 +157,7 @@ describe('RemoteConfigSource', () => {
         tokenSource: { token: () => 'from-token-source' },
       }).load();
 
-      expect(captured?.headers?.Authorization).toBe('Bearer from-token-source');
+      expect(captured?.headers?.['Authorization']).toBe('Bearer from-token-source');
     },
   );
 
@@ -184,7 +184,7 @@ describe('RemoteConfigSource', () => {
         environment: 'production',
       }).load();
 
-      expect(captured?.headers?.Authorization).toBeUndefined();
+      expect(captured?.headers?.['Authorization']).toBeUndefined();
     },
   );
 
@@ -201,21 +201,21 @@ describe('RemoteConfigSource', () => {
 
     const original = {
       url: process.env.CONFIG_SERVER_URL,
-      token: process.env.CONFIG_SERVER_TOKEN,
-      app: process.env.APP_NAME,
+      token: process.env['CONFIG_SERVER_TOKEN'],
+      app: process.env['APP_NAME'],
     };
     process.env.CONFIG_SERVER_URL = 'https://config.putnami.test';
-    process.env.CONFIG_SERVER_TOKEN = 'discovered-token';
-    process.env.APP_NAME = 'task-api';
+    process.env['CONFIG_SERVER_TOKEN'] = 'discovered-token';
+    process.env['APP_NAME'] = 'task-api';
     try {
       const source = discoverRemoteSource();
       expect(source).toBeDefined();
       source?.load();
-      expect(captured?.headers?.Authorization).toBe('Bearer discovered-token');
+      expect(captured?.headers?.['Authorization']).toBe('Bearer discovered-token');
     } finally {
       process.env.CONFIG_SERVER_URL = original.url;
-      process.env.CONFIG_SERVER_TOKEN = original.token;
-      process.env.APP_NAME = original.app;
+      process.env['CONFIG_SERVER_TOKEN'] = original.token;
+      process.env['APP_NAME'] = original.app;
     }
   });
 
@@ -283,15 +283,15 @@ describe('RemoteConfigSource', () => {
         throw new Error(`unexpected request: ${request.url}`);
       });
       process.env.CONFIG_SERVER_URL = staleURL;
-      process.env.CONFIG_SERVER_AUDIENCE = 'https://api.putnami.test';
-      process.env.CONFIG_SERVER_TOKEN = 'discovered-token';
-      process.env.APP_NAME = 'orders/api';
+      process.env['CONFIG_SERVER_AUDIENCE'] = 'https://api.putnami.test';
+      process.env['CONFIG_SERVER_TOKEN'] = 'discovered-token';
+      process.env['APP_NAME'] = 'orders/api';
 
       expect(discoverRemoteSource()?.load()).toEqual({ database: { name: 'marketing' } });
       expect(requests).toHaveLength(2);
       expect(requests.map((request) => request.url)).toEqual([staleURL, expectedFallback]);
       expect(requests.map((request) => request.method)).toEqual(['GET', 'GET']);
-      expect(requests[1]?.headers?.Authorization).toBe('Bearer discovered-token');
+      expect(requests[1]?.headers?.['Authorization']).toBe('Bearer discovered-token');
     },
   );
 
@@ -374,15 +374,15 @@ describe('RemoteConfigSource', () => {
 
       const original = {
         url: process.env.CONFIG_SERVER_URL,
-        app: process.env.APP_NAME,
-        configVersion: process.env.CONFIG_VERSION,
-        appVersion: process.env.APP_VERSION,
+        app: process.env['APP_NAME'],
+        configVersion: process.env['CONFIG_VERSION'],
+        appVersion: process.env['APP_VERSION'],
       };
       process.env.CONFIG_SERVER_URL = 'https://config.putnami.test';
-      process.env.APP_NAME = 'auth';
-      process.env.APP_VERSION = '1.2.3';
+      process.env['APP_NAME'] = 'auth';
+      process.env['APP_VERSION'] = '1.2.3';
       try {
-        process.env.CONFIG_VERSION = 'rel_pin';
+        process.env['CONFIG_VERSION'] = 'rel_pin';
         discoverRemoteSource()?.load();
         {
           const body = JSON.parse(captured?.body ?? '{}');
@@ -390,22 +390,23 @@ describe('RemoteConfigSource', () => {
           expect(body.pinned).toBe(true);
         }
 
-        delete process.env.CONFIG_VERSION;
+        Reflect.deleteProperty(process.env, 'CONFIG_VERSION');
         captured = undefined;
         resetRemoteConfigSourceCacheForTest();
         discoverRemoteSource()?.load();
         {
-          const body = JSON.parse(captured?.body ?? '{}');
+          // The fetch callback reassigns `captured`; the compiler cannot see it.
+          const body = JSON.parse((captured as SyncFetchRequest | undefined)?.body ?? '{}');
           expect(body.version).toBeUndefined();
           expect(body.pinned).toBeUndefined();
         }
       } finally {
         process.env.CONFIG_SERVER_URL = original.url;
-        process.env.APP_NAME = original.app;
-        if (original.configVersion === undefined) delete process.env.CONFIG_VERSION;
-        else process.env.CONFIG_VERSION = original.configVersion;
-        if (original.appVersion === undefined) delete process.env.APP_VERSION;
-        else process.env.APP_VERSION = original.appVersion;
+        process.env['APP_NAME'] = original.app;
+        if (original.configVersion === undefined) Reflect.deleteProperty(process.env, 'CONFIG_VERSION');
+        else process.env['CONFIG_VERSION'] = original.configVersion;
+        if (original.appVersion === undefined) Reflect.deleteProperty(process.env, 'APP_VERSION');
+        else process.env['APP_VERSION'] = original.appVersion;
       }
     },
   );
@@ -423,8 +424,8 @@ describe('RemoteConfigSource', () => {
     const exactURL =
       'https://api.putnami.test/api/configs/resolve?appName=auth%2Fserver&environment=prod&secretsMode=reveal';
     process.env.CONFIG_SERVER_URL = exactURL;
-    process.env.CONFIG_SERVER_TOKEN = 'discovered-token';
-    process.env.APP_NAME = 'auth/server';
+    process.env['CONFIG_SERVER_TOKEN'] = 'discovered-token';
+    process.env['APP_NAME'] = 'auth/server';
 
     const source = discoverRemoteSource();
     expect(source).toBeDefined();
@@ -603,9 +604,9 @@ describe('RemoteConfigSource', () => {
     },
     () => {
       process.env.CONFIG_SERVER_URL = 'https://config.putnami.test';
-      process.env.CONFIG_SERVER_TOKEN = 'discovered-token';
-      process.env.CONFIG_SERVER_TIMEOUT = '1500ms';
-      process.env.CONFIG_SERVER_RETRY_BUDGET = '2s';
+      process.env['CONFIG_SERVER_TOKEN'] = 'discovered-token';
+      process.env['CONFIG_SERVER_TIMEOUT'] = '1500ms';
+      process.env['CONFIG_SERVER_RETRY_BUDGET'] = '2s';
 
       let captured: SyncFetchRequest | undefined;
       setSyncFetchForTest((request) => {
@@ -638,8 +639,8 @@ describe('RemoteConfigSource', () => {
       });
       process.env.CONFIG_SERVER_URL =
         'https://api.putnami.test/api/configs/resolve?appName=auth%2Fserver&environment=prod&secretsMode=reveal';
-      process.env.CONFIG_SERVER_TOKEN = 'discovered-token';
-      process.env.CONFIG_SERVER_RETRY_BUDGET = '0';
+      process.env['CONFIG_SERVER_TOKEN'] = 'discovered-token';
+      process.env['CONFIG_SERVER_RETRY_BUDGET'] = '0';
       process.env.K_SERVICE = 'auth-server';
 
       const source = discoverRemoteSource();
@@ -664,8 +665,8 @@ describe('RemoteConfigSource', () => {
       });
       process.env.CONFIG_SERVER_URL =
         'https://api.putnami.test/api/configs/resolve?appName=auth%2Fserver&environment=prod&secretsMode=reveal';
-      process.env.CONFIG_SERVER_TOKEN = 'discovered-token';
-      process.env.CONFIG_SERVER_RETRY_BUDGET = '0';
+      process.env['CONFIG_SERVER_TOKEN'] = 'discovered-token';
+      process.env['CONFIG_SERVER_RETRY_BUDGET'] = '0';
       process.env.NODE_ENV = 'production';
 
       const source = discoverRemoteSource();

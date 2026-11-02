@@ -39,6 +39,9 @@ function reservePort(): number {
   const reservation = Bun.serve({ port: 0, fetch: () => new Response(null, { status: 503 }) });
   const port = reservation.port;
   reservation.stop(true);
+  if (port === undefined) {
+    throw new Error('the reservation server has no port');
+  }
   return port;
 }
 

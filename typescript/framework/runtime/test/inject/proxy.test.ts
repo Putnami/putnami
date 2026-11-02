@@ -219,8 +219,8 @@ describe('proxy', () => {
       const proxy = createScopeProxy(Box, () => scope);
 
       // No own toPrimitive → coercion uses delegated valueOf().
-      expect(proxy[Symbol.toPrimitive as keyof Box]).toBeUndefined();
-      expect(proxy + 1).toBe(8);
+      expect(Reflect.get(proxy, Symbol.toPrimitive)).toBeUndefined();
+      expect((proxy as unknown as number) + 1).toBe(8);
     });
 
     it('should throw when scope resolver returns a container without the token', () => {

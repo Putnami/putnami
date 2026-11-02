@@ -365,7 +365,7 @@ TSC is called with:
 
 Source files are discovered from `src/` and `bin/` directories (excluding `.d.ts` and test files).
 
-When the project has a tsconfig, tsc runs with a temporary config that extends it and includes only `src/`, `bin/` and `.gen/`, without test files. That config lives in the task's cache directory, never in the project, because a project directory can lie inside another task's declared output, such as a generated client inside its provider's `clientgen` output. It resolves as it would from the project directory: its paths are absolute, `${configDir}` in the extends chain means the project directory, and type roots are the chain's own or the `node_modules/@types` directories of the project and its ancestors. A `tsconfig.types.*.json` an earlier release left in the project is removed.
+When the project has a tsconfig, tsc runs with a temporary config that extends it and includes only `src/`, `bin/` and `.gen/`, without test files; `putnami test` type-checks those (see [Test](./03-test.md#type-check)). That config lives in the task's cache directory, never in the project, because a project directory can lie inside another task's declared output, such as a generated client inside its provider's `clientgen` output. It resolves as it would from the project directory: its paths are absolute, `${configDir}` in the extends chain means the project directory, and type roots are the chain's own or the `node_modules/@types` directories of the project and its ancestors. A `tsconfig.types.*.json` an earlier release left in the project is removed.
 
 Output is written to `output/types/`.
 

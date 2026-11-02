@@ -411,8 +411,8 @@ describe('strict emitter refusals', () => {
         {
           mediaType: 'application/json',
           schema: {
-            type: 'object',
-            properties: { note: { type: 'string', nullable: true } },
+            type: 'object' as const,
+            properties: { note: { type: 'string' as const, nullable: true } },
             required: ['note'],
           },
         },
@@ -772,7 +772,7 @@ describe('websocket stream emission', () => {
       check: 'a-duplex-stream-without-both-message-schemas-is-refused',
     },
     () => {
-      for (const messages of [{ output: { type: 'string' } }, { input: { type: 'string' } }]) {
+      for (const messages of [{ output: { type: 'string' as const } }, { input: { type: 'string' as const } }]) {
         expect(() =>
           emit([
             method({

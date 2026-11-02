@@ -196,8 +196,8 @@ describe('workspace.utils', () => {
 
     beforeEach(() => {
       resetBuildInfoCache();
-      delete process.env.PUTNAMI_VERSION;
-      delete process.env.PUTNAMI_REVISION;
+      Reflect.deleteProperty(process.env, 'PUTNAMI_VERSION');
+      Reflect.deleteProperty(process.env, 'PUTNAMI_REVISION');
     });
 
     afterAll(() => {

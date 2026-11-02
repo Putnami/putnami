@@ -41,7 +41,7 @@ describe('classifyUserAgent', () => {
 
   for (const fixture of FIXTURES) {
     specTest(`classifies ${fixture.ua.slice(0, 60) || '(empty)'}`, USER_AGENT_CORPUS, () => {
-      expect(classifyUserAgent(fixture.ua)).toEqual({
+      expect<unknown>(classifyUserAgent(fixture.ua)).toEqual({
         browser: fixture.browser,
         browserMajor: fixture.browserMajor,
         os: fixture.os,
@@ -62,9 +62,11 @@ describe('classifyUserAgent', () => {
   it('treats an absent or oversized User-Agent as unknown', () => {
     const unknown = { browser: 'other', browserMajor: null, os: 'other', deviceType: 'other' };
 
-    expect(classifyUserAgent(null)).toEqual(unknown);
-    expect(classifyUserAgent('')).toEqual(unknown);
-    expect(classifyUserAgent(`Mozilla/5.0 ${'x'.repeat(MAX_USER_AGENT_LEN)} Chrome/126.0.0.0`)).toEqual(unknown);
+    expect<unknown>(classifyUserAgent(null)).toEqual(unknown);
+    expect<unknown>(classifyUserAgent('')).toEqual(unknown);
+    expect<unknown>(classifyUserAgent(`Mozilla/5.0 ${'x'.repeat(MAX_USER_AGENT_LEN)} Chrome/126.0.0.0`)).toEqual(
+      unknown,
+    );
   });
 
   // Ordering rule of protocols/analytics/README.md: an iPad sends `Mobile/15E148`,

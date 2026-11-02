@@ -280,7 +280,7 @@ describe('FileBackend', () => {
   describe('validateToken', () => {
     it('should validate a correctly signed token', async () => {
       const { url } = await backend.signedUploadUrl('test', 'file.txt', { expiresIn: '15m' });
-      const token = url.match(/token=([^&]+)/)?.[1];
+      const token = url.match(/token=([^&]+)/)?.[1] ?? '';
       expect(backend.validateToken('PUT', token, 'test', 'file.txt')).toBe(true);
     });
 
@@ -312,7 +312,7 @@ describe('FileBackend', () => {
 
         try {
           const { url } = await backend.signedUploadUrl('test', 'file.txt', { expiresIn: '1s' });
-          const token = url.match(/token=([^&]+)/)?.[1];
+          const token = url.match(/token=([^&]+)/)?.[1] ?? '';
 
           Date.now = () => issuedAt + 1100;
           expect(backend.validateToken('PUT', token, 'test', 'file.txt')).toBe(false);
@@ -324,7 +324,7 @@ describe('FileBackend', () => {
 
     it('should reject tokens for different bucket/key', async () => {
       const { url } = await backend.signedUploadUrl('test', 'file.txt', { expiresIn: '15m' });
-      const token = url.match(/token=([^&]+)/)?.[1];
+      const token = url.match(/token=([^&]+)/)?.[1] ?? '';
 
       expect(backend.validateToken('PUT', token, 'other-bucket', 'file.txt')).toBe(false);
       expect(backend.validateToken('PUT', token, 'test', 'other-file.txt')).toBe(false);
@@ -334,19 +334,19 @@ describe('FileBackend', () => {
       // The method is part of the signed payload: a download (GET) token must
       // never authorize an upload (PUT), and vice-versa.
       const downloadUrl = await backend.signedDownloadUrl('test', 'file.txt', { expiresIn: '15m' });
-      const downloadToken = downloadUrl.url.match(/token=([^&]+)/)?.[1];
+      const downloadToken = downloadUrl.url.match(/token=([^&]+)/)?.[1] ?? '';
       expect(backend.validateToken('GET', downloadToken, 'test', 'file.txt')).toBe(true);
       expect(backend.validateToken('PUT', downloadToken, 'test', 'file.txt')).toBe(false);
 
       const uploadUrl = await backend.signedUploadUrl('test', 'file.txt', { expiresIn: '15m' });
-      const uploadToken = uploadUrl.url.match(/token=([^&]+)/)?.[1];
+      const uploadToken = uploadUrl.url.match(/token=([^&]+)/)?.[1] ?? '';
       expect(backend.validateToken('PUT', uploadToken, 'test', 'file.txt')).toBe(true);
       expect(backend.validateToken('GET', uploadToken, 'test', 'file.txt')).toBe(false);
     });
 
     it('should handle keys containing colons', async () => {
       const { url } = await backend.signedUploadUrl('test', 'path:with:colons.txt', { expiresIn: '15m' });
-      const token = url.match(/token=([^&]+)/)?.[1];
+      const token = url.match(/token=([^&]+)/)?.[1] ?? '';
       expect(backend.validateToken('PUT', token, 'test', 'path:with:colons.txt')).toBe(true);
     });
   });

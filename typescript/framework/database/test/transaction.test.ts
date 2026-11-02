@@ -102,7 +102,7 @@ describe.skipIf(!dockerAvailable)('Transaction support', () => {
       // Verify outside context
       const rows = await sql`SELECT * FROM tx_test_items WHERE id = '1'`;
       expect(rows.length).toBe(1);
-      expect(rows[0].name).toBe('item-1');
+      expect(rows[0]['name']).toBe('item-1');
     });
 
     it('should read normally', async () => {
@@ -153,8 +153,8 @@ describe.skipIf(!dockerAvailable)('Transaction support', () => {
       // After commit — visible
       const rows = await sql`SELECT * FROM tx_test_items WHERE id IN ('tx-1', 'tx-2') ORDER BY id`;
       expect(rows.length).toBe(2);
-      expect(rows[0].name).toBe('tx-item-1');
-      expect(rows[1].name).toBe('tx-item-2');
+      expect(rows[0]['name']).toBe('tx-item-1');
+      expect(rows[1]['name']).toBe('tx-item-2');
     });
 
     it('should support read-your-writes within a transaction', async () => {
@@ -303,8 +303,8 @@ describe.skipIf(!dockerAvailable)('Transaction support', () => {
       // After auto-commit — visible
       const rows = await sql`SELECT * FROM tx_test_items WHERE id IN ('rit-1', 'rit-2') ORDER BY id`;
       expect(rows.length).toBe(2);
-      expect(rows[0].name).toBe('auto-commit-1');
-      expect(rows[1].name).toBe('auto-commit-2');
+      expect(rows[0]['name']).toBe('auto-commit-1');
+      expect(rows[1]['name']).toBe('auto-commit-2');
     });
 
     it('should auto-rollback on error and rethrow', async () => {
@@ -418,17 +418,19 @@ describe.skipIf(!dockerAvailable)('Transaction support', () => {
 
   describe('transaction timeout', () => {
     it('should auto-rollback after timeout', async () => {
-      await runInContext({}, async () => {
-        await runInTransaction(
-          async () => {
-            await repository.save({ id: 'timeout-1', name: 'will-timeout', value: 42 });
+      await Promise.resolve(
+        runInContext({}, async () => {
+          await runInTransaction(
+            async () => {
+              await repository.save({ id: 'timeout-1', name: 'will-timeout', value: 42 });
 
-            // Wait longer than the timeout
-            await new Promise((resolve) => setTimeout(resolve, 150));
-          },
-          { timeoutMs: 50 },
-        );
-      }).catch(() => {
+              // Wait longer than the timeout
+              await new Promise((resolve) => setTimeout(resolve, 150));
+            },
+            { timeoutMs: 50 },
+          );
+        }),
+      ).catch(() => {
         // Expected: either the timeout triggers rollback before commit,
         // or the transaction state is already timed out
       });

@@ -20,7 +20,7 @@ class FakeWindow {
   }
 }
 
-type BrowserGlobals = typeof globalThis & { window?: FakeWindow };
+type BrowserGlobals = { window?: FakeWindow };
 
 interface StateOptions {
   pathname: string;
@@ -39,12 +39,12 @@ const state = (options: StateOptions): RouterState =>
 
 function installWindow(): FakeWindow {
   const fake = new FakeWindow();
-  (globalThis as BrowserGlobals).window = fake;
+  (globalThis as unknown as BrowserGlobals).window = fake;
   return fake;
 }
 
 function clearWindow(): void {
-  (globalThis as BrowserGlobals).window = undefined;
+  (globalThis as unknown as BrowserGlobals).window = undefined;
 }
 
 describe('routeOf', () => {

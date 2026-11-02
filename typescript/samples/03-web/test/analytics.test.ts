@@ -63,8 +63,8 @@ describe('web sample analytics', () => {
       const bootstrap = readBootstrap(html);
       expect(bootstrap.analytics.pv).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
       expect(bootstrap.analytics.route).toBe('/tasks');
-      expect(bootstrap.analytics.endpoint).toBe(INGEST);
-      expect(bootstrap.analytics.declared).toEqual(['counter_click']);
+      expect(bootstrap.analytics['endpoint']).toBe(INGEST);
+      expect(bootstrap.analytics['declared']).toEqual(['counter_click']);
       // The browser is never told who the visitor is.
       expect(Object.keys(bootstrap.analytics).sort()).toEqual([
         'app',

@@ -11,6 +11,7 @@ export {
   managedPublishFrame,
 } from './event-server.transport';
 export type {
+  EventServerFetch,
   EventServerTokenRequest,
   EventServerTokenSource,
   EventServerRetryConfig,

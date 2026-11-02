@@ -64,7 +64,7 @@ function loadSecretVectors(): SecretVector[] {
 // Decodes a vector's standard-base64 (no padding) salt to its raw bytes. Node's
 // Buffer accepts unpadded standard base64, matching Go's base64.RawStdEncoding
 // for the canonical fixtures.
-function decodeSalt(b64: string): Uint8Array {
+function decodeSalt(b64: string): Uint8Array<ArrayBuffer> {
   return new Uint8Array(Buffer.from(b64, 'base64'));
 }
 

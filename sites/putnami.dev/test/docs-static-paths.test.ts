@@ -21,7 +21,7 @@ describe('docs static paths', () => {
           return { assets: {}, mounted: [], skipped: [] };
         },
         publishSupport: (options) => {
-          calls.push(`publishSupport:${options.projectRoot}:${options.workspaceRoot}`);
+          calls.push(`publishSupport:${options?.projectRoot}:${options?.workspaceRoot}`);
           return { assets: {}, genPath: '/project/.gen/public/docs/10-support/index.md' };
         },
         invalidate: () => calls.push('invalidate'),

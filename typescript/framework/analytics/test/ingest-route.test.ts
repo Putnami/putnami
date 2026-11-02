@@ -125,8 +125,8 @@ describe('the ingest route', () => {
     });
     await flush();
 
-    expect(response.status).toBe(202);
-    expect(await response.text()).toBe('');
+    expect(response?.status).toBe(202);
+    expect(await response?.text()).toBe('');
     expect(sink.rows).toHaveLength(2);
     expect(sink.rows.every((row) => row.source === 'client')).toBe(true);
     const view = sink.named('page_view')[0]!;
@@ -157,7 +157,7 @@ describe('the ingest route', () => {
     });
     await flush();
 
-    expect(response.status).toBe(202);
+    expect(response?.status).toBe(202);
     expect(sink.rows).toHaveLength(1);
   });
 
@@ -171,7 +171,7 @@ describe('the ingest route', () => {
     });
     await flush();
 
-    expect(response.status).toBe(400);
+    expect(response?.status).toBe(400);
     expect(sink.batches).toHaveLength(0);
   });
 
@@ -200,8 +200,8 @@ describe('the ingest route', () => {
 
       // Byte-identical: an ingest that answered differently would be an oracle
       // for the declared vocabulary and the protocol version.
-      expect([accepted.status, wrongVersion.status, undeclared.status]).toEqual([202, 202, 202]);
-      expect([await accepted.text(), await wrongVersion.text(), await undeclared.text()]).toEqual(['', '', '']);
+      expect([accepted?.status, wrongVersion?.status, undeclared?.status]).toEqual([202, 202, 202]);
+      expect([await accepted?.text(), await wrongVersion?.text(), await undeclared?.text()]).toEqual(['', '', '']);
       // Only the first batch reached the sink.
       expect(sink.batches).toHaveLength(1);
       expect(sink.rows).toHaveLength(1);
@@ -221,8 +221,8 @@ describe('the ingest route', () => {
       });
       await flush();
 
-      expect(response.status).toBe(400);
-      expect(await response.text()).toBe('');
+      expect(response?.status).toBe(400);
+      expect(await response?.text()).toBe('');
       expect(sink.batches).toHaveLength(0);
     },
   );
@@ -274,7 +274,7 @@ describe('the ingest route', () => {
       });
       await flush();
 
-      expect(response.status).toBe(202);
+      expect(response?.status).toBe(202);
       expect(sink.batches).toHaveLength(0);
       expect(counters()['analytics.ingest.dropped.bot']).toBe(1);
     },
@@ -333,8 +333,8 @@ describe('the ingest route', () => {
     });
     await flush();
 
-    expect(guarded.status).toBe(403);
-    expect(beacon.status).toBe(202);
+    expect(guarded?.status).toBe(403);
+    expect(beacon?.status).toBe(202);
     expect(sink.rows).toHaveLength(1);
   });
 
@@ -352,9 +352,9 @@ describe('the ingest route', () => {
     const third = await send();
     await flush();
 
-    expect([first.status, second.status]).toEqual([202, 202]);
-    expect(third.status).toBe(429);
-    expect(first.headers.get('ratelimit-remaining')).toBeNull();
+    expect([first?.status, second?.status]).toEqual([202, 202]);
+    expect(third?.status).toBe(429);
+    expect(first?.headers.get('ratelimit-remaining')).toBeNull();
     // Two accepted batches, one drained write: the queue is what turns a burst
     // into one round trip instead of one transaction per beacon.
     expect(sink.rows).toHaveLength(2);
@@ -400,8 +400,8 @@ describe('the ingest route', () => {
       // Accepted, queued, answered — with the sink still unsettled and this
       // batch never handed to it. A burst of beacons therefore costs bounded
       // memory, not one open transaction per request.
-      expect(response.status).toBe(202);
-      expect(await response.text()).toBe('');
+      expect(response?.status).toBe(202);
+      expect(await response?.text()).toBe('');
       expect(sink.pending()).toBe(1);
       expect(sink.rows).toHaveLength(0);
       expect(sink.batches).toHaveLength(1);
@@ -418,7 +418,7 @@ describe('the ingest route', () => {
 
     const response = await testApp?.fetch(ENDPOINT, { method: 'GET' });
 
-    expect(response.status).toBe(405);
+    expect(response?.status).toBe(405);
   });
 });
 

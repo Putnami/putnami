@@ -105,16 +105,16 @@ function normalizeRegex(source: string): string {
 
 describe('vocabulary parity with protocols/analytics/analytics.go', () => {
   it('copies every closed enum, member for member and in order', () => {
-    expect(VIEWPORT_CLASSES).toEqual(goStrings('ViewportClasses'));
-    expect(REFERRER_TYPES).toEqual(goStrings('ReferrerTypes'));
-    expect(DEVICE_TYPES).toEqual(goStrings('DeviceTypes'));
-    expect(BROWSERS).toEqual(goStrings('Browsers'));
-    expect(OPERATING_SYSTEMS).toEqual(goStrings('OperatingSystems'));
-    expect(SOURCES).toEqual(goStrings('Sources'));
-    expect(VISITOR_KINDS).toEqual(goStrings('VisitorKinds'));
-    expect(OUTCOMES).toEqual(goStrings('Outcomes'));
-    expect(UTM_KEYS).toEqual(goStrings('UTMKeys'));
-    expect(DIMENSIONS).toEqual(goStrings('Dimensions'));
+    expect<unknown>(VIEWPORT_CLASSES).toEqual(goStrings('ViewportClasses'));
+    expect<unknown>(REFERRER_TYPES).toEqual(goStrings('ReferrerTypes'));
+    expect<unknown>(DEVICE_TYPES).toEqual(goStrings('DeviceTypes'));
+    expect<unknown>(BROWSERS).toEqual(goStrings('Browsers'));
+    expect<unknown>(OPERATING_SYSTEMS).toEqual(goStrings('OperatingSystems'));
+    expect<unknown>(SOURCES).toEqual(goStrings('Sources'));
+    expect<unknown>(VISITOR_KINDS).toEqual(goStrings('VisitorKinds'));
+    expect<unknown>(OUTCOMES).toEqual(goStrings('Outcomes'));
+    expect<unknown>(UTM_KEYS).toEqual(goStrings('UTMKeys'));
+    expect<unknown>(DIMENSIONS).toEqual(goStrings('Dimensions'));
   });
 
   it('copies every bound', () => {
@@ -162,7 +162,7 @@ describe('vocabulary parity with protocols/analytics/analytics.go', () => {
     expect([...goCodes].sort()).toEqual(DROP_REASONS.filter((reason) => !serverOnly.includes(reason)).sort());
     for (const reason of serverOnly) {
       expect(goCodes.has(reason)).toBe(false);
-      expect(DROP_REASONS).toContain(reason);
+      expect<unknown>(DROP_REASONS).toContain(reason);
     }
   });
 });
@@ -278,7 +278,7 @@ describe('the persisted vocabulary', () => {
       // The derived list is exact: a column that leaves the protocol must be
       // added to it deliberately, not silently.
       for (const column of Object.keys(DERIVED_COLUMNS)) {
-        expect(EVENT_COLUMNS).toContain(column);
+        expect<unknown>(EVENT_COLUMNS).toContain(column);
       }
     },
   );

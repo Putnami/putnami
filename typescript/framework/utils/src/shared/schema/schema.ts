@@ -78,12 +78,25 @@ export type InferPrimitive<P> = P extends typeof String
           ? InferSchema<P>
           : never;
 
+/**
+ * Whether a field holds an Optional() value: Optional() types its descriptor
+ * `SchemaDescriptor<T | undefined>`, and its `optional` flag only as `boolean`.
+ * A descriptor of unknown type admits undefined too, but stays required.
+ */
+type IsOptionalField<P> = P extends SchemaDescriptor
+  ? unknown extends InferPrimitive<P>
+    ? false
+    : undefined extends InferPrimitive<P>
+      ? true
+      : false
+  : false;
+
 type RequiredKeys<S extends SchemaDefinition> = {
-  [K in keyof S]: S[K] extends { optional: true } ? never : K;
+  [K in keyof S]: IsOptionalField<S[K]> extends true ? never : K;
 }[keyof S];
 
 type OptionalKeys<S extends SchemaDefinition> = {
-  [K in keyof S]: S[K] extends { optional: true } ? K : never;
+  [K in keyof S]: IsOptionalField<S[K]> extends true ? K : never;
 }[keyof S];
 
 /** Flatten an intersection to a clean object type */

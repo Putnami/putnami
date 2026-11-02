@@ -138,12 +138,12 @@ describe('actionHandler internal logic', () => {
       const arrayWrapped = actionHandler(() => [1, 2, 3]);
 
       const emptyResponse = await runInContext(createContext(), async () => emptyWrapped());
-      const objectResponse = await runInContext(createContext(), async () => objectWrapped());
-      const arrayResponse = await runInContext(createContext(), async () => arrayWrapped());
+      const objectResponse = await runInContext(createContext(), async () => (await objectWrapped()) as HttpResponse);
+      const arrayResponse = await runInContext(createContext(), async () => (await arrayWrapped()) as HttpResponse);
 
-      expect(emptyResponse.status).toBe(204);
-      expect(await objectResponse.get().json()).toEqual({ ok: true });
-      expect(await arrayResponse.get().json()).toEqual([1, 2, 3]);
+      expect(emptyResponse?.status).toBe(204);
+      expect(await objectResponse?.get().json()).toEqual({ ok: true });
+      expect(await arrayResponse?.get().json()).toEqual([1, 2, 3]);
     },
   );
 
@@ -167,9 +167,9 @@ describe('actionHandler internal logic', () => {
         throw new Error('boom');
       });
 
-      const response = await runInContext(createContext(), async () => httpWrapped());
-      expect(response.status).toBe(404);
-      expect(await response.get().json()).toEqual({ error: 'missing' });
+      const response = await runInContext(createContext(), async () => (await httpWrapped()) as HttpResponse);
+      expect(response?.status).toBe(404);
+      expect(await response?.get().json()).toEqual({ error: 'missing' });
 
       await expect(runInContext(createContext(), async () => unknownWrapped())).rejects.toThrow('boom');
     },

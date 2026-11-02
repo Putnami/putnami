@@ -254,7 +254,7 @@ class RecordingSql {
 
   make(): postgres.ReservedSql {
     const tag = (strings: TemplateStringsArray, ...values: unknown[]) => this.record(strings, values);
-    const withUnsafe = tag as unknown as postgres.ReservedSql & { unsafe: (query: string) => Promise<unknown[]> };
+    const withUnsafe = tag as unknown as { unsafe: (query: string) => Promise<unknown[]> };
     withUnsafe.unsafe = (query: string) => {
       const failure = this.failures.get(query);
       if (failure) {
@@ -263,7 +263,7 @@ class RecordingSql {
       this.statements.push(query.trim().replace(/\s+/g, ' '));
       return Promise.resolve([]);
     };
-    return withUnsafe as postgres.ReservedSql;
+    return withUnsafe as unknown as postgres.ReservedSql;
   }
 }
 

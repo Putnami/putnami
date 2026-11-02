@@ -28,7 +28,7 @@ class FakeWindow {
   }
 }
 
-type BrowserGlobals = typeof globalThis & { window?: FakeWindow };
+type BrowserGlobals = { window?: FakeWindow };
 
 const detail = (pathname: string): NavigationDetail => ({
   pathname,
@@ -40,12 +40,12 @@ const detail = (pathname: string): NavigationDetail => ({
 
 function installWindow(): FakeWindow {
   const fake = new FakeWindow();
-  (globalThis as BrowserGlobals).window = fake;
+  (globalThis as unknown as BrowserGlobals).window = fake;
   return fake;
 }
 
 function clearWindow(): void {
-  (globalThis as BrowserGlobals).window = undefined;
+  (globalThis as unknown as BrowserGlobals).window = undefined;
 }
 
 describe('navigation event seam', () => {
@@ -97,7 +97,7 @@ describe('navigation event seam', () => {
   });
 
   it('does not dispatch when the window cannot dispatch events', () => {
-    (globalThis as BrowserGlobals).window = {} as FakeWindow;
+    (globalThis as unknown as BrowserGlobals).window = {} as FakeWindow;
 
     expect(() => dispatchNavigation(detail('/tasks'))).not.toThrow();
   });

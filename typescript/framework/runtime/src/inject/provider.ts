@@ -38,12 +38,14 @@ import { isClassToken, isNamedToken } from './token';
  * provide(named<string>('version'), () => '2.0.0')
  * ```
  */
+// The factory overloads come before `(classRef, options)`: tried first, they give
+// a two-argument factory's `resolve` parameter its contextual type.
 export function provide<T extends object>(classRef: Type<T>): Registration<T>;
-export function provide<T extends object>(classRef: Type<T>, options: ProvideOptions<T>): Registration<T>;
 export function provide<T>(token: Token<T>, factory: SyncFactory<T>): Registration<T>;
 export function provide<T>(token: Token<T>, factory: SyncFactory<T>, options: ProvideOptions<T>): Registration<T>;
 export function provide<T>(token: Token<T>, factory: AsyncFactory<T>): Registration<T>;
 export function provide<T>(token: Token<T>, factory: AsyncFactory<T>, options: ProvideOptions<T>): Registration<T>;
+export function provide<T extends object>(classRef: Type<T>, options: ProvideOptions<T>): Registration<T>;
 export function provide<T>(
   tokenOrClass: Token<T>,
   factoryOrOptions?: Factory<T> | ProvideOptions<T>,

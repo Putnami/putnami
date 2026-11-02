@@ -71,10 +71,10 @@ describe('EventsPlugin', () => {
   beforeEach(() => {
     registerModuleLoader(
       'events-loader',
-      mock(async () => undefined),
+      mock(async () => undefined as unknown as Record<string, unknown>),
     );
     process.env.PUTNAMI_PROJECT_ROOT = projectRoot;
-    delete process.env.EVENTS_ENDPOINT;
+    Reflect.deleteProperty(process.env, 'EVENTS_ENDPOINT');
     delete process.env.CONFIG_DATA;
     resetConfigLoader();
     (globalThis as { __generatedEvents?: string[] }).__generatedEvents = undefined;
@@ -88,7 +88,7 @@ describe('EventsPlugin', () => {
     }
     cleanupPaths.clear();
     delete process.env.PUTNAMI_PROJECT_ROOT;
-    delete process.env.EVENTS_ENDPOINT;
+    Reflect.deleteProperty(process.env, 'EVENTS_ENDPOINT');
     delete process.env.CONFIG_DATA;
     resetConfigLoader();
     (globalThis as { __generatedEvents?: string[] }).__generatedEvents = undefined;

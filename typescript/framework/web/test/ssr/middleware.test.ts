@@ -48,7 +48,7 @@ describe('MiddlewareBuilder', () => {
       .build();
 
     expect(def.stack).toHaveLength(1);
-    expect(def.stack[0]).toBe(customMw);
+    expect<unknown>(def.stack[0]).toBe(customMw);
   });
 
   specTest(

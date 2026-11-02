@@ -150,7 +150,7 @@ function writeAscii(block: Uint8Array, start: number, text: string): void {
 }
 
 /** Build an uncompressed USTAR archive (test double for a producer payload). */
-export function writeTarEntries(entries: TarWriteEntry[]): Uint8Array {
+export function writeTarEntries(entries: TarWriteEntry[]): Uint8Array<ArrayBuffer> {
   const chunks: Uint8Array[] = [];
   for (const entry of entries) {
     const data =

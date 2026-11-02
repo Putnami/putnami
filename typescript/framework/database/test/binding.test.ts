@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from 'bun:test';
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { resetConfigLoader } from '@putnami/runtime';
+import { type InferConfig, resetConfigLoader } from '@putnami/runtime';
 import { specTest } from '@putnami/spectest';
 import {
   ENV_DATABASE_BINDINGS,
@@ -10,9 +10,10 @@ import {
   resolveDatabaseBinding,
   setDatabaseBindingOverride,
 } from '../src/postgres/binding';
+import type { PostgresConfig } from '../src/postgres/config';
 import { __setIdentityResolverForTests, applyConnectionParams, buildOptions } from '../src/postgres/options';
 
-const baseConfig = {
+const baseConfig: InferConfig<typeof PostgresConfig> = {
   host: 'localhost',
   port: 5432,
   database: 'app',

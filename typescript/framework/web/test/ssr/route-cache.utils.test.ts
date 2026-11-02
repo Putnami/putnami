@@ -141,7 +141,7 @@ describe('route-cache.utils', () => {
       },
       async () => {
         const loader = mock((ctx: { queryParams: () => Record<string, string> }) => ({
-          page: ctx.queryParams().page,
+          page: ctx.queryParams()['page'],
         }));
         const page2 = createMockContext({ queryParams: () => ({ page: '2' }) });
         const page3 = createMockContext({ queryParams: () => ({ page: '3' }) });
@@ -159,11 +159,11 @@ describe('route-cache.utils', () => {
 
       await executeLoaderWithCache(loader, ctx, '/users/[id]', {
         ttl: 60_000,
-        key: (requestContext) => `user:${requestContext.params.id}`,
+        key: (requestContext) => `user:${requestContext.params?.['id']}`,
       });
       await executeLoaderWithCache(loader, ctx, '/users/[id]', {
         ttl: 60_000,
-        key: (requestContext) => `user:${requestContext.params.id}`,
+        key: (requestContext) => `user:${requestContext.params?.['id']}`,
       });
 
       expect(loader).toHaveBeenCalledTimes(1);
@@ -221,14 +221,14 @@ describe('route-cache.utils', () => {
       const wrapped = wrapPageWithCache(renderer, '/users', { ttl: 60_000 });
       const ctx = createMockContext({ params: { page: '1' } });
 
-      const first = await wrapped(ctx);
-      const second = await wrapped(ctx);
+      const first = (await wrapped(ctx)) as HttpResponse;
+      const second = (await wrapped(ctx)) as HttpResponse;
 
       expect(renderer).toHaveBeenCalledTimes(1);
-      expect(first.status).toBe(201);
-      expect(second.status).toBe(201);
-      const firstNative = first.get();
-      const secondNative = second.get();
+      expect(first?.status).toBe(201);
+      expect(second?.status).toBe(201);
+      const firstNative = first?.get();
+      const secondNative = second?.get();
       expect(await firstNative.text()).toBe('<h1>Users</h1>');
       expect(await secondNative.text()).toBe('<h1>Users</h1>');
       expect(firstNative.headers.get('content-type')).toBe('text/html;charset=utf-8');
@@ -238,7 +238,7 @@ describe('route-cache.utils', () => {
       const renderer = mock(async () => new HttpResponse('<h1>User</h1>'));
       const wrapped = wrapPageWithCache(renderer, '/users/[id]', {
         ttl: 60_000,
-        key: (ctx) => `profile:${ctx.params.id}`,
+        key: (ctx) => `profile:${ctx.params?.['id']}`,
       });
       const ctx = createMockContext({ params: { id: '42' } });
 
@@ -263,19 +263,19 @@ describe('route-cache.utils', () => {
         const alice = createMockContext({ user: { sub: 'alice', roles: ['admin'] } });
         const bob = createMockContext({ user: { sub: 'bob', roles: ['user'] } });
 
-        const aliceRes = await wrapped(alice);
-        const bobRes = await wrapped(bob);
+        const aliceRes = (await wrapped(alice)) as HttpResponse;
+        const bobRes = (await wrapped(bob)) as HttpResponse;
 
         // Different users must not share a cache entry: the renderer runs again
         // for Bob and he never receives Alice's cached HTML.
         expect(renderer).toHaveBeenCalledTimes(2);
-        expect(await aliceRes.get().text()).toBe('<h1>render-1</h1>');
-        expect(await bobRes.get().text()).toBe('<h1>render-2</h1>');
+        expect(await aliceRes?.get().text()).toBe('<h1>render-1</h1>');
+        expect(await bobRes?.get().text()).toBe('<h1>render-2</h1>');
 
         // The same user reuses their own cache entry.
-        const aliceAgain = await wrapped(alice);
+        const aliceAgain = (await wrapped(alice)) as HttpResponse;
         expect(renderer).toHaveBeenCalledTimes(2);
-        expect(await aliceAgain.get().text()).toBe('<h1>render-1</h1>');
+        expect(await aliceAgain?.get().text()).toBe('<h1>render-1</h1>');
       },
     );
 
@@ -298,12 +298,12 @@ describe('route-cache.utils', () => {
           user: { profile: { a: 1, b: 2 }, roles: ['admin'], sub: 'alice' },
         });
 
-        const firstRes = await wrapped(first);
-        const secondRes = await wrapped(sameClaimsDifferentOrder);
+        const firstRes = (await wrapped(first)) as HttpResponse;
+        const secondRes = (await wrapped(sameClaimsDifferentOrder)) as HttpResponse;
 
         expect(renderer).toHaveBeenCalledTimes(1);
-        expect(await firstRes.get().text()).toBe('<h1>render-1</h1>');
-        expect(await secondRes.get().text()).toBe('<h1>render-1</h1>');
+        expect(await firstRes?.get().text()).toBe('<h1>render-1</h1>');
+        expect(await secondRes?.get().text()).toBe('<h1>render-1</h1>');
       },
     );
 
@@ -322,12 +322,12 @@ describe('route-cache.utils', () => {
         const alpha = createMockContext({ queryParams: () => ({ q: 'alpha' }) });
         const beta = createMockContext({ queryParams: () => ({ q: 'beta' }) });
 
-        const alphaRes = await wrapped(alpha);
-        const betaRes = await wrapped(beta);
+        const alphaRes = (await wrapped(alpha)) as HttpResponse;
+        const betaRes = (await wrapped(beta)) as HttpResponse;
 
         expect(renderer).toHaveBeenCalledTimes(2);
-        expect(await alphaRes.get().text()).toBe('<h1>render-1</h1>');
-        expect(await betaRes.get().text()).toBe('<h1>render-2</h1>');
+        expect(await alphaRes?.get().text()).toBe('<h1>render-1</h1>');
+        expect(await betaRes?.get().text()).toBe('<h1>render-2</h1>');
       },
     );
 
@@ -343,12 +343,12 @@ describe('route-cache.utils', () => {
         const wrapped = wrapPageWithCache(renderer, '/private', { ttl: 60_000 });
         const ctx = createMockContext();
 
-        const first = await wrapped(ctx);
-        const second = await wrapped(ctx);
+        const first = (await wrapped(ctx)) as HttpResponse;
+        const second = (await wrapped(ctx)) as HttpResponse;
 
         expect(renderer).toHaveBeenCalledTimes(2);
-        expect(first.redirected).toBe(true);
-        expect(second.redirected).toBe(true);
+        expect(first?.redirected).toBe(true);
+        expect(second?.redirected).toBe(true);
       },
     );
   });

@@ -51,7 +51,7 @@ describe('OtlpLogSink', () => {
         url = u;
         body = init.body as string;
         return Promise.resolve(new Response(null, { status: 200 }));
-      }) as typeof fetch;
+      }) as unknown as typeof fetch;
 
       const sink = new OtlpLogSink({
         endpoint: 'https://collector:4318',
@@ -100,7 +100,7 @@ describe('OtlpLogSink', () => {
       globalThis.fetch = mock((_u: string, init: RequestInit) => {
         body = init.body as string;
         return Promise.resolve(new Response(null, { status: 200 }));
-      }) as typeof fetch;
+      }) as unknown as typeof fetch;
 
       const sink = new OtlpLogSink({
         endpoint: 'https://collector:4318',
@@ -145,7 +145,7 @@ describe('OtlpLogSink', () => {
       globalThis.fetch = mock((_u: string, init: RequestInit) => {
         body = init.body as string;
         return Promise.resolve(new Response(null, { status: 200 }));
-      }) as typeof fetch;
+      }) as unknown as typeof fetch;
 
       const sink = new OtlpLogSink({
         endpoint: 'https://collector:4318',
@@ -183,7 +183,7 @@ describe('OtlpLogSink', () => {
       globalThis.fetch = mock((_u: string, init: RequestInit) => {
         body = init.body as string;
         return Promise.resolve(new Response(null, { status: 200 }));
-      }) as typeof fetch;
+      }) as unknown as typeof fetch;
       const cyclic: { self?: unknown } = {};
       cyclic.self = cyclic;
 
@@ -212,7 +212,7 @@ describe('OtlpLogSink', () => {
     },
     async () => {
       const fetchMock = mock(() => Promise.resolve(new Response(null, { status: 200 })));
-      globalThis.fetch = fetchMock as typeof fetch;
+      globalThis.fetch = fetchMock as unknown as typeof fetch;
       const sink = new OtlpLogSink({
         endpoint: 'https://collector:4318',
         serviceName: 's',
@@ -235,7 +235,7 @@ describe('OtlpLogSink', () => {
       globalThis.fetch = mock((_u: string, init: RequestInit) => {
         body = init.body as string;
         return Promise.resolve(new Response(null, { status: 200 }));
-      }) as typeof fetch;
+      }) as unknown as typeof fetch;
 
       const sink = new OtlpLogSink({
         endpoint: 'https://collector:4318',
@@ -262,7 +262,7 @@ describe('OtlpLogSink', () => {
       check: 'a-collector-error-never-rejects-close',
     },
     async () => {
-      globalThis.fetch = mock(() => Promise.reject(new Error('down'))) as typeof fetch;
+      globalThis.fetch = mock(() => Promise.reject(new Error('down'))) as unknown as typeof fetch;
       const sink = new OtlpLogSink({
         endpoint: 'https://collector:4318',
         serviceName: 's',

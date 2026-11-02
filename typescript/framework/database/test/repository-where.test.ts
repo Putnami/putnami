@@ -191,8 +191,8 @@ describe('parseConditionValue', () => {
     expect(parseConditionValue({ lte: 9 })).toEqual([{ operator: '<=', value: 9 }]);
     expect(parseConditionValue({ not: 'x' })).toEqual([{ operator: '!=', value: 'x' }]);
     expect(parseConditionValue({ equals: 'y' })).toEqual([{ operator: '=', value: 'y' }]);
-    expect(parseConditionValue({ like: '%a%' })).toEqual([{ operator: 'LIKE', value: '%a%' }]);
-    expect(parseConditionValue({ ilike: '%b%' })).toEqual([{ operator: 'ILIKE', value: '%b%' }]);
+    expect<unknown>(parseConditionValue({ like: '%a%' })).toEqual([{ operator: 'LIKE', value: '%a%' }]);
+    expect<unknown>(parseConditionValue({ ilike: '%b%' })).toEqual([{ operator: 'ILIKE', value: '%b%' }]);
     expect(parseConditionValue({ in: [1, 2] })).toEqual([{ operator: 'IN', value: [1, 2] }]);
     expect(parseConditionValue({ notIn: [3] })).toEqual([{ operator: 'NOT IN', value: [3] }]);
   });
@@ -202,7 +202,7 @@ describe('parseConditionValue', () => {
     expect(parseConditionValue({ isNotNull: true })).toEqual([{ operator: 'IS NOT NULL', value: null }]);
     // isNull: false contributes no condition; with no other keys it degrades to equality on the object.
     const res = parseConditionValue({ isNull: false } as never);
-    expect(res).toEqual([{ operator: '=', value: { isNull: false } }]);
+    expect<unknown>(res).toEqual([{ operator: '=', value: { isNull: false } }]);
   });
 
   it('produces multiple conditions for a range object (AND-composed by the caller)', () => {
@@ -214,11 +214,11 @@ describe('parseConditionValue', () => {
 
   it('treats a plain object with no operator keys as an equality value', () => {
     const obj = { nested: 1 };
-    expect(parseConditionValue(obj as never)).toEqual([{ operator: '=', value: obj }]);
+    expect<unknown>(parseConditionValue(obj as never)).toEqual([{ operator: '=', value: obj }]);
   });
 
   it('treats an array value as equality (not an operator object)', () => {
-    expect(parseConditionValue([1, 2, 3] as never)).toEqual([{ operator: '=', value: [1, 2, 3] }]);
+    expect<unknown>(parseConditionValue([1, 2, 3] as never)).toEqual([{ operator: '=', value: [1, 2, 3] }]);
   });
 });
 

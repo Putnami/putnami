@@ -82,12 +82,12 @@ describe('a pre-rendered page', () => {
       await startApp();
 
       const response = await testApp?.fetch('/pre-rendered', { headers: { 'user-agent': CHROME_UA } });
-      const html = await response.text();
+      const html = await response?.text();
 
       expect(html).toContain(`<script type="module" src="${TRACKER}"`);
       // Before the closing tag, so the parser reaches the content first and a
       // deferred module script finds the document it measures already parsed.
-      expect(html.indexOf('<script type="module"')).toBeLessThan(html.indexOf('</body>'));
+      expect(html?.indexOf('<script type="module"') ?? -1).toBeLessThan(html?.indexOf('</body>') ?? -1);
       expect(html).toContain('<h1>Docs</h1>');
     },
   );
@@ -99,7 +99,7 @@ describe('a pre-rendered page', () => {
       const sink = await startApp();
 
       const response = await testApp?.fetch('/pre-rendered', { headers: { 'user-agent': CHROME_UA } });
-      const bootstrap = injectedBootstrap(await response.text());
+      const bootstrap = injectedBootstrap((await response?.text()) ?? '');
       await runtime?.queue.drain(1000);
 
       // One page view per load: the browser enriches the row that already
@@ -153,7 +153,7 @@ describe('a rendered page', () => {
 
       // The renderer already emitted the bootstrap and the script tag; a
       // second one would install a second tracker on the same document.
-      expect(await response.text()).toBe('<html lang="en"><body>rendered</body></html>');
+      expect(await response?.text()).toBe('<html lang="en"><body>rendered</body></html>');
     },
   );
 });
@@ -188,7 +188,7 @@ describe('injectTrackerTag', () => {
 
     const response = await testApp?.fetch('/headless', { headers: { 'user-agent': CHROME_UA } });
 
-    expect(await response.text()).toBe('<html lang="en"><p>no body tag</p></html>');
+    expect(await response?.text()).toBe('<html lang="en"><p>no body tag</p></html>');
   });
 });
 

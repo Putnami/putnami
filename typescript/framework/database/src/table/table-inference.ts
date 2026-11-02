@@ -9,15 +9,26 @@ export type InferField<F extends TableField> =
       ? InferPrimitive<P>
       : never;
 
+/**
+ * Whether a column holds an Optional() value: Optional() types its descriptor
+ * `SchemaDescriptor<T | undefined>`, and its `optional` flag only as `boolean`.
+ * A descriptor of unknown type admits undefined too, but stays required.
+ */
+type IsOptionalColumn<P> = P extends SchemaDescriptor
+  ? unknown extends InferPrimitive<P>
+    ? false
+    : undefined extends InferPrimitive<P>
+      ? true
+      : false
+  : false;
+
 /** Property names of required fields (keys are always required, columns without Optional) */
 type RequiredFieldKeys<S extends TableSchema> = {
   [K in keyof S]: S[K] extends KeyDefinition
     ? K
     : S[K] extends ColumnDefinition<infer P>
-      ? P extends SchemaDescriptor
-        ? P extends { optional: true }
-          ? never
-          : K
+      ? IsOptionalColumn<P> extends true
+        ? never
         : K
       : K;
 }[keyof S];
@@ -27,10 +38,8 @@ type OptionalFieldKeys<S extends TableSchema> = {
   [K in keyof S]: S[K] extends KeyDefinition
     ? never
     : S[K] extends ColumnDefinition<infer P>
-      ? P extends SchemaDescriptor
-        ? P extends { optional: true }
-          ? K
-          : never
+      ? IsOptionalColumn<P> extends true
+        ? K
         : never
       : never;
 }[keyof S];

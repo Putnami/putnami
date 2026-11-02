@@ -61,22 +61,22 @@ describe('resolveApplicationFromModule', () => {
   it('invokes an `app()` factory when present', () => {
     const app = makeApp();
     const mod = { app: () => app };
-    expect(resolveApplicationFromModule(mod)).toBe(app);
+    expect<unknown>(resolveApplicationFromModule(mod)).toBe(app);
   });
 
   it('returns a default export that is itself application-like', () => {
     const app = makeApp();
-    expect(resolveApplicationFromModule({ default: app })).toBe(app);
+    expect<unknown>(resolveApplicationFromModule({ default: app })).toBe(app);
   });
 
   it('invokes a default-exported factory', () => {
     const app = makeApp();
-    expect(resolveApplicationFromModule({ default: () => app })).toBe(app);
+    expect<unknown>(resolveApplicationFromModule({ default: () => app })).toBe(app);
   });
 
   it('accepts a direct `Application` named export', () => {
     const app = makeApp();
-    expect(resolveApplicationFromModule({ Application: app })).toBe(app);
+    expect<unknown>(resolveApplicationFromModule({ Application: app })).toBe(app);
   });
 
   it('returns null when no export matches', () => {

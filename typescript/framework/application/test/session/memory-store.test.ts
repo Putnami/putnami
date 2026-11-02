@@ -35,7 +35,7 @@ describe('MemorySessionStore', () => {
   it('set and get a value', () => {
     const store = new MemorySessionStore();
     store.set('s1', 'userId', 42);
-    expect(store.get('s1', 'userId')).toBe(42);
+    expect<unknown>(store.get('s1', 'userId')).toBe(42);
     store.dispose();
   });
 
@@ -49,7 +49,7 @@ describe('MemorySessionStore', () => {
     const store = new MemorySessionStore();
     store.set('s1', 'a', 1);
     store.set('s1', 'b', 2);
-    expect(store.getAll('s1')).toEqual({ a: 1, b: 2 });
+    expect<unknown>(store.getAll('s1')).toEqual({ a: 1, b: 2 });
     store.dispose();
   });
 
@@ -57,7 +57,7 @@ describe('MemorySessionStore', () => {
     const store = new MemorySessionStore();
     store.set('s1', 'keep', true);
     store.setAll('s1', { replaced: true });
-    expect(store.getAll('s1')).toEqual({ replaced: true });
+    expect<unknown>(store.getAll('s1')).toEqual({ replaced: true });
     store.dispose();
   });
 
@@ -67,7 +67,7 @@ describe('MemorySessionStore', () => {
     store.set('s1', 'b', 2);
     store.delete('s1', 'a');
     expect(store.get('s1', 'a')).toBeUndefined();
-    expect(store.get('s1', 'b')).toBe(2);
+    expect<unknown>(store.get('s1', 'b')).toBe(2);
     store.dispose();
   });
 
@@ -76,7 +76,7 @@ describe('MemorySessionStore', () => {
     store.set('s1', 'a', 1);
     store.deleteAll('s1');
     expect(store.exists('s1')).toBe(false);
-    expect(store.getAll('s1')).toEqual({});
+    expect<unknown>(store.getAll('s1')).toEqual({});
     store.dispose();
   });
 
@@ -104,8 +104,8 @@ describe('MemorySessionStore', () => {
     const store = new MemorySessionStore();
     store.set('s1', 'key', 'one');
     store.set('s2', 'key', 'two');
-    expect(store.get('s1', 'key')).toBe('one');
-    expect(store.get('s2', 'key')).toBe('two');
+    expect<unknown>(store.get('s1', 'key')).toBe('one');
+    expect<unknown>(store.get('s2', 'key')).toBe('two');
     store.dispose();
   });
 

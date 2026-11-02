@@ -225,7 +225,7 @@ function assertScene(scene: Scene, reconnect: boolean, run: Run): void {
   expect(run.requests.length, label).toBeGreaterThan(0);
   const first = run.requests[0] as Seen;
   expect(negotiatesSseWire(first.wire), `${label}: the runtime asked for the negotiated wire`).toBe(scene.requested);
-  expect(run.messages, label).toEqual(scene.expect.messages);
+  expect<unknown>(run.messages, label).toEqual(scene.expect.messages);
   if (scene.requested && scene.continuation === 'cursor') {
     const last = run.messages.at(-1);
     expect(last === undefined ? null : last['cursor'], `${label}: delivered cursor`).toBe(scene.expect.deliveredCursor);
@@ -241,13 +241,15 @@ function assertScene(scene: Scene, reconnect: boolean, run: Run): void {
       break;
     case 'contract-error':
       expect(run.failure, label).toBeInstanceOf(ClientError);
-      expect((run.failure as ClientError).code, label).toBe('client.response');
+      expect((run.failure as ClientError & { code: string }).code, label).toBe('client.response');
       break;
     case 'transport-error':
       // Legacy framing only: the reader that predates ADR 0013 keeps its
       // reading of a broken socket, the opaque remote failure.
       expect(run.failure, label).toBeInstanceOf(ClientError);
-      expect(['client.response', 'client.remote'], label).toContain((run.failure as ClientError).code);
+      expect(['client.response', 'client.remote'], label).toContain(
+        (run.failure as ClientError & { code: string }).code,
+      );
       break;
     case 'interrupted': {
       if (!reconnect) {
@@ -258,7 +260,7 @@ function assertScene(scene: Scene, reconnect: boolean, run: Run): void {
       expect(run.failure, label).toBeUndefined();
       expect(run.requests.length, `${label}: the first connection and one reopening`).toBe(2);
       const reopened = run.requests[1] as Seen;
-      expect(reopened.query, `${label}: reopened query`).toEqual(scene.expect.reopen?.query ?? {});
+      expect<unknown>(reopened.query, `${label}: reopened query`).toEqual(scene.expect.reopen?.query ?? {});
       expect(negotiatesSseWire(reopened.wire), `${label}: the reopening asked for the negotiated wire`).toBe(true);
       return;
     }
@@ -780,16 +782,22 @@ describe('a declared SSE continuation over real provider instances', () => {
         },
       });
       servers.push(() => server.stop(true));
-      const operation = logOperation(CURSOR, 4096, true);
+      const replayable = logOperation(CURSOR, 4096, true);
       // A declared-replayable operation that also declares a WebSocket: the
       // dispatcher may fall back, but only when the provider says a wire is
       // absent. A missing acknowledgment says the provider is too old.
-      operation.transports.push({
-        protocol: 'websocket',
-        path: '/logs/tail',
-        encoding: 'json',
-        websocket: { subprotocol: 'putnami.service.v1', resume: false },
-      });
+      const operation: ClientContractOperation = {
+        ...replayable,
+        transports: [
+          ...replayable.transports,
+          {
+            protocol: 'websocket',
+            path: '/logs/tail',
+            encoding: 'json',
+            websocket: { subprotocol: 'putnami.service.v1', resume: false },
+          },
+        ],
+      };
       const client = logsClient(`http://localhost:${server.port}`, operation);
       const stream = client.tail({});
       const messages: unknown[] = [];

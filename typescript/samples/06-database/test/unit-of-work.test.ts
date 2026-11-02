@@ -36,7 +36,7 @@ describe.skipIf(!dbAvailable)('unit-of-work + consume-once proof', () => {
 
   const count = async (table: string, where: string, params: unknown[]): Promise<number> => {
     const rows = await client.unsafe(`SELECT COUNT(*)::int AS count FROM ${table} WHERE ${where}`, params as never[]);
-    return Number((rows[0] as { count: number }).count);
+    return Number(rows[0]?.['count']);
   };
 
   beforeAll(async () => {

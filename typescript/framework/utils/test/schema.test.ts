@@ -10,6 +10,8 @@ import {
   Email,
   Env,
   type InferPrimitive,
+  type InferSchema,
+  type SchemaDescriptor,
   Int,
   isNestedSchema,
   isSchemaDescriptor,
@@ -52,6 +54,20 @@ describe('schema utilities', () => {
     expect(baseTypeName(Uuid)).toBe('string');
     expect(baseTypeName({ nested: String })).toBe('object');
     expect(baseTypeName('unexpected' as unknown as typeof String)).toBe('unknown');
+  });
+
+  it('makes an Optional field an optional key of the inferred type', () => {
+    const definition = schema({ name: String, nickname: Optional(String), retries: Default(Int, 3) });
+    // test~types checks these assignments: the Optional key may be left out,
+    // the others may not.
+    const minimal: InferSchema<typeof definition> = { name: 'a', retries: 3 };
+    // @ts-expect-error `retries` has a default, not an Optional: the key stays required.
+    const missingDefault: InferSchema<typeof definition> = { name: 'a' };
+    // @ts-expect-error a descriptor of unknown type admits undefined, but is no Optional.
+    const missingUnknown: InferSchema<{ value: SchemaDescriptor }> = {};
+    expect<unknown>(minimal).toEqual({ name: 'a', retries: 3 });
+    expect<unknown>(missingDefault).toEqual({ name: 'a' });
+    expect<unknown>(missingUnknown).toEqual({});
   });
 
   it('builds descriptor combinators', async () => {
@@ -119,7 +135,7 @@ describe('schema utilities', () => {
     for (const entry of decorated) {
       expect(entry.baseType).toBe('object');
       expect(entry.schema).toBe(nested);
-      expect(entry.schema?.child).toBe(nested.child);
+      expect(entry.schema?.['child']).toBe(nested.child);
     }
 
     const composed = Sensitive(Optional(Env('NESTED_CONFIG', Desc('Nested settings', nested))));

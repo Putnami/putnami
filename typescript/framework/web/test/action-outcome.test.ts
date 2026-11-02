@@ -29,9 +29,9 @@ describe('action outcome slot', () => {
     const ctx = createContext(ROUTE);
     const wrapped = actionHandler(() => ({ id: 7 }));
 
-    const response = await runInContext(ctx as never, async () => await wrapped());
+    const response = await runInContext(ctx as never, async () => (await wrapped()) as HttpResponse);
 
-    expect(await response.get().json()).toEqual({ id: 7 });
+    expect(await response?.get().json()).toEqual({ id: 7 });
     expect(outcomeOf(ctx)).toEqual({ route: '/tasks/[id]', outcome: 'ok' });
   });
 
@@ -39,9 +39,9 @@ describe('action outcome slot', () => {
     const ctx = createContext();
     const wrapped = actionHandler(() => undefined);
 
-    const response = await runInContext(ctx as never, async () => await wrapped());
+    const response = await runInContext(ctx as never, async () => (await wrapped()) as HttpResponse);
 
-    expect(response.status).toBe(204);
+    expect(response?.status).toBe(204);
     expect(outcomeOf(ctx)).toEqual({ route: undefined, outcome: 'ok' });
   });
 
@@ -52,9 +52,9 @@ describe('action outcome slot', () => {
         throw new HttpException({ error: 'bad input' }, status);
       });
 
-      const response = await runInContext(ctx as never, async () => await wrapped());
+      const response = await runInContext(ctx as never, async () => (await wrapped()) as HttpResponse);
 
-      expect(response.status).toBe(status);
+      expect(response?.status).toBe(status);
       expect(outcomeOf(ctx)).toEqual({ route: '/tasks/[id]', outcome: 'validation_error' });
     }
   });
@@ -65,9 +65,9 @@ describe('action outcome slot', () => {
       throw new HttpException({ error: 'missing' }, 404);
     });
 
-    const response = await runInContext(ctx as never, async () => await wrapped());
+    const response = await runInContext(ctx as never, async () => (await wrapped()) as HttpResponse);
 
-    expect(response.status).toBe(404);
+    expect(response?.status).toBe(404);
     expect(outcomeOf(ctx)).toEqual({ route: '/tasks/[id]', outcome: 'error' });
   });
 
@@ -75,7 +75,9 @@ describe('action outcome slot', () => {
     const ctx = createContext(ROUTE);
     const wrapped = actionHandler(() => redirect('/tasks'));
 
-    await expect(runInContext(ctx as never, async () => await wrapped())).rejects.toBeInstanceOf(HttpResponse);
+    await expect(runInContext(ctx as never, async () => (await wrapped()) as HttpResponse)).rejects.toBeInstanceOf(
+      HttpResponse,
+    );
     expect(outcomeOf(ctx)?.outcome).toBe('ok');
   });
 
@@ -85,7 +87,7 @@ describe('action outcome slot', () => {
       throw new Error('boom');
     });
 
-    await expect(runInContext(ctx as never, async () => await wrapped())).rejects.toThrow('boom');
+    await expect(runInContext(ctx as never, async () => (await wrapped()) as HttpResponse)).rejects.toThrow('boom');
     expect(outcomeOf(ctx)).toEqual({ route: '/tasks/[id]', outcome: 'error' });
   });
 });
@@ -134,12 +136,12 @@ describe('action outcome slot — returned responses', () => {
       const built = testCase.build();
       const wrapped = actionHandler(() => built);
 
-      const response = await runInContext(ctx as never, async () => await wrapped());
+      const response = await runInContext(ctx as never, async () => (await wrapped()) as HttpResponse);
 
       expect(outcomeOf(ctx)?.outcome).toBe(testCase.want);
       // Recording the outcome must not change what the action answers with:
       // the caller gets back the exact response object the handler built.
-      expect(response).toBe(built);
+      expect<unknown>(response).toBe(built);
     });
   }
 });

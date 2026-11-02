@@ -31,7 +31,7 @@ describe('sanitizeRemoteEnvelope', () => {
     expect(envelope.attributes['auth.azp']).toBeUndefined();
     expect(envelope.attributes['auth.client_id']).toBeUndefined();
     // Non-reserved attributes are preserved.
-    expect(envelope.attributes.region).toBe('eu');
+    expect(envelope.attributes['region']).toBe('eu');
   });
 
   it('drops non-string attribute values (untrusted wire shape)', () => {
@@ -44,10 +44,10 @@ describe('sanitizeRemoteEnvelope', () => {
 
     sanitizeRemoteEnvelope(envelope);
 
-    expect(envelope.attributes.region).toBe('eu');
-    expect(envelope.attributes.count).toBeUndefined();
-    expect(envelope.attributes.nested).toBeUndefined();
-    expect(envelope.attributes.flag).toBeUndefined();
+    expect(envelope.attributes['region']).toBe('eu');
+    expect(envelope.attributes['count']).toBeUndefined();
+    expect(envelope.attributes['nested']).toBeUndefined();
+    expect(envelope.attributes['flag']).toBeUndefined();
   });
 
   it('mutates and returns the same envelope with a clean string-only bag', () => {

@@ -12,6 +12,7 @@
  */
 
 import React from 'react';
+import type { HttpResponse } from '@putnami/application';
 import { runInContext } from '../../runtime/src/context/context.utils';
 import RootHtml from '../src/ssr/default.html';
 import { pageRenderer } from '../src/ssr/page.renderer';
@@ -98,9 +99,10 @@ async function renderToCompletion(route: Record<string, unknown>): Promise<void>
     () => 'hydrate.js',
     5000,
   );
-  const response = await runInContext(createMockContext(), async () => await handler());
+  const ctx = createMockContext();
+  const response = await runInContext(ctx, async () => (await handler(ctx)) as HttpResponse);
   // Drain the streamed body so we measure render-to-completion, not just TTFB.
-  await response.get().text();
+  await response?.get().text();
 }
 
 /** A component that re-executes per render (representative of a real page). */

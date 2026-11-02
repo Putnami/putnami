@@ -65,7 +65,7 @@ describe('DocumentHelper', () => {
       name: 'Launch',
     });
 
-    expect(helper.toEntity(raw)).toEqual({
+    expect<unknown>(helper.toEntity(raw)).toEqual({
       id: 'evt-1',
       createdAt: createdAt.toISOString(),
       name: 'Launch',
@@ -84,7 +84,7 @@ describe('DocumentHelper', () => {
     // Adapters normally store DateIso fields as ISO strings; reading one back
     // must not re-stringify or otherwise mutate it.
     const stored = { id: 'evt-1', created_at: '2026-04-24T12:00:00.000Z', name: 'Launch' };
-    expect(helper.toEntity(stored)).toEqual({
+    expect<unknown>(helper.toEntity(stored)).toEqual({
       id: 'evt-1',
       createdAt: '2026-04-24T12:00:00.000Z',
       name: 'Launch',
@@ -103,7 +103,7 @@ describe('DocumentHelper', () => {
     // Some backends hydrate a date field as a native Date (e.g. a Firestore
     // Timestamp via .toDate()); the entity-facing DateIso value is an ISO string.
     const createdAt = new Date('2026-04-24T12:00:00.000Z');
-    expect(helper.toEntity({ id: 'evt-1', created_at: createdAt, name: 'Launch' })).toEqual({
+    expect<unknown>(helper.toEntity({ id: 'evt-1', created_at: createdAt, name: 'Launch' })).toEqual({
       id: 'evt-1',
       createdAt: createdAt.toISOString(),
       name: 'Launch',

@@ -18,9 +18,9 @@ function ctxWithHeaders(headers: Record<string, string>): HttpRequestContext {
 }
 
 describe('apiKeyStrategy', () => {
-  specTest('authenticates a valid key', configuredKey, () => {
+  specTest('authenticates a valid key', configuredKey, async () => {
     const strategy = apiKeyStrategy({ keys: ['key-1', 'key-2'] });
-    const principal = strategy(ctxWithHeaders({ 'X-Api-Key': 'key-1' }));
+    const principal = await strategy(ctxWithHeaders({ 'X-Api-Key': 'key-1' }));
     expect(principal).toBeDefined();
     expect(principal?.sub).toBe('apikey');
     expect(principal?.kind).toBe(PrincipalKind.ApiKey);
@@ -43,15 +43,15 @@ describe('apiKeyStrategy', () => {
     expect(strategy(ctxWithHeaders({ 'X-Api-Key': 'secret' }))).toBeUndefined();
   });
 
-  it('honors a custom subject', () => {
+  it('honors a custom subject', async () => {
     const strategy = apiKeyStrategy({ keys: ['key-1'], subject: 'service-account' });
-    const principal = strategy(ctxWithHeaders({ 'X-Api-Key': 'key-1' }));
+    const principal = await strategy(ctxWithHeaders({ 'X-Api-Key': 'key-1' }));
     expect(principal?.sub).toBe('service-account');
   });
 
-  it('grants configured scopes', () => {
+  it('grants configured scopes', async () => {
     const strategy = apiKeyStrategy({ keys: ['key-1'], scopes: ['ingest', 'read'] });
-    const principal = strategy(ctxWithHeaders({ 'X-Api-Key': 'key-1' }));
+    const principal = await strategy(ctxWithHeaders({ 'X-Api-Key': 'key-1' }));
     expect(principal).toBeDefined();
     // Scopes surface through the standard `scope` claim resolution, like a JWT.
     expect(resolveScopes(principal ?? {}, {})).toEqual(['ingest', 'read']);

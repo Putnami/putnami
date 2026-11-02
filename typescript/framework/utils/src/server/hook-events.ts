@@ -192,12 +192,15 @@ export interface HookContext {
 /**
  * Helper to create a timestamped event
  */
-export function createEvent<T extends HookEvent>(event: Omit<T, 'v' | 'time'>): T {
+/** `Omit` applied to each member of a union, so each event keeps its own fields. */
+type DistributiveOmit<T, K extends PropertyKey> = T extends unknown ? Omit<T, K> : never;
+
+export function createEvent<T extends HookEvent>(event: DistributiveOmit<T, 'v' | 'time'>): T {
   return {
     v: 1,
     time: new Date().toISOString(),
     ...event,
-  } as T;
+  } as unknown as T;
 }
 
 /**

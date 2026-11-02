@@ -313,7 +313,7 @@ describe('specTest', () => {
     fragmentContract('a-typescript-binding-records-the-verdict-the-runner-recorded'),
     () => {
       const run = recorded();
-      const byCheck = new Map(run.fragments.map((fragment) => [fragment.check, fragment]));
+      const byCheck = new Map(run.fragments.map((fragment) => [fragment['check'], fragment]));
       // The failing and skipped measuring cases publish nothing: a measurement
       // fragment has no verdict to carry, so absence is the only honest report.
       expect([...byCheck.keys()].sort()).toEqual([
@@ -324,22 +324,22 @@ describe('specTest', () => {
         'passing-check',
         'skipped-check',
       ]);
-      expect(byCheck.get('passing-check')?.status).toBe('passed');
-      expect(byCheck.get('failing-check')?.status).toBe('failed');
-      expect(byCheck.get('skipped-check')?.status).toBe('skipped');
-      expect(byCheck.get('done-check')?.status).toBe('passed');
+      expect(byCheck.get('passing-check')?.['status']).toBe('passed');
+      expect(byCheck.get('failing-check')?.['status']).toBe('failed');
+      expect(byCheck.get('skipped-check')?.['status']).toBe('skipped');
+      expect(byCheck.get('done-check')?.['status']).toBe('passed');
 
       for (const fragment of run.fragments) {
         expectOnTheWire(fragment);
-        expect(fragment.feature).toBe('ts/spectest-demo');
-        expect(fragment.requirement).toBe('lifecycle');
+        expect(fragment['feature']).toBe('ts/spectest-demo');
+        expect(fragment['requirement']).toBe('lifecycle');
         // The declaration site is the absolute path of the registering file,
         // and the symbol is the test name a reader can find in it.
-        expect(fragment.file).toBe(run.suitePath);
-        expect(typeof fragment.symbol).toBe('string');
-        expect((fragment.symbol as string).length).toBeGreaterThan(0);
+        expect(fragment['file']).toBe(run.suitePath);
+        expect(typeof fragment['symbol']).toBe('string');
+        expect((fragment['symbol'] as string).length).toBeGreaterThan(0);
       }
-      expect(run.fragments.map((fragment) => fragment.symbol).sort()).toEqual([
+      expect(run.fragments.map((fragment) => fragment['symbol']).sort()).toEqual([
         'async measuring case',
         'done style case',
         'failing case',
@@ -355,12 +355,12 @@ describe('specTest', () => {
     fragmentContract('a-typescript-measurement-carries-its-window-and-no-verdict'),
     () => {
       const run = recorded();
-      const byCheck = new Map(run.fragments.map((fragment) => [fragment.check, fragment]));
+      const byCheck = new Map(run.fragments.map((fragment) => [fragment['check'], fragment]));
 
       for (const check of ['passing-check', 'failing-check', 'skipped-check', 'done-check']) {
         const fragment = byCheck.get(check);
-        expect(fragment?.measurement).toBeUndefined();
-        expect(fragment?.window).toBeUndefined();
+        expect(fragment?.['measurement']).toBeUndefined();
+        expect(fragment?.['window']).toBeUndefined();
       }
 
       for (const check of ['measured-check', 'async-measured-check']) {
@@ -368,8 +368,8 @@ describe('specTest', () => {
         expectOnTheWire(fragment as Record<string, unknown>);
         // The wire refuses an observation carrying both, so the measured
         // producer must state no verdict of its own.
-        expect(fragment?.status).toBeUndefined();
-        expect(fragment?.measurement).toEqual({
+        expect(fragment?.['status']).toBeUndefined();
+        expect(fragment?.['measurement']).toEqual({
           name: 'demo.flush.duration',
           aggregation: 'p95',
           value: 12.5,
@@ -377,7 +377,7 @@ describe('specTest', () => {
         });
         // The window is the invocation span the body covered, in the same
         // second-precision RFC 3339 shape Go writes.
-        const window = fragment?.window as { start: string; end: string };
+        const window = fragment?.['window'] as { start: string; end: string };
         expect(window.start).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/);
         expect(window.end).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/);
         expect(Date.parse(window.end)).toBeGreaterThanOrEqual(Date.parse(window.start));

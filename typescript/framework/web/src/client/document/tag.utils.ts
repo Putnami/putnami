@@ -1,5 +1,5 @@
 import { escapeHtml } from '@putnami/utils';
-import type { HtmlHTMLAttributes } from 'react';
+import type { AllHTMLAttributes } from 'react';
 
 // Re-exported for existing call sites and tests that import the escaper from
 // this module; backed by the shared `Bun.escapeHTML`-accelerated helper.
@@ -26,7 +26,7 @@ export const escapeCssAttrValue = (value: string) => value.replace(/\\/g, '\\\\'
 export const escapeRawText = (value: string) =>
   value.replace(/<\/(script|style)/gi, '<\\/$1').replace(/<!--/g, '<\\!--');
 
-export const asHtml = <A>(tag: string, attr: HtmlHTMLAttributes<A>) => {
+export const asHtml = <A>(tag: string, attr: AllHTMLAttributes<A>) => {
   const buf: string[] = [];
   buf.push(`<${tag}`);
   for (const [k, v] of Object.entries(attr)) {

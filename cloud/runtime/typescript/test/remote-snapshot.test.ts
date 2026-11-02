@@ -140,9 +140,9 @@ describe('loadConfigSnapshot', () => {
 
       const gcs = seen.find((r) => r.url.includes('storage.googleapis.com'));
       const kms = seen.find((r) => r.url.includes('cloudkms.googleapis.com'));
-      expect(gcs?.headers?.Authorization).toBe('Bearer ya29.access-token');
+      expect(gcs?.headers?.['Authorization']).toBe('Bearer ya29.access-token');
       expect(gcs?.url).toContain('/b/snapshots/o/o.enc?alt=media');
-      expect(kms?.headers?.Authorization).toBe('Bearer ya29.access-token');
+      expect(kms?.headers?.['Authorization']).toBe('Bearer ya29.access-token');
       expect(kms?.url).toBe(
         'https://cloudkms.googleapis.com/v1/projects/p/locations/l/keyRings/r/cryptoKeys/k:decrypt',
       );
@@ -233,7 +233,7 @@ describe('RemoteConfigSource snapshot fallback', () => {
         .map((line) => JSON.parse(line) as Record<string, unknown>)
         .find(
           (entry) =>
-            entry.message === 'config server unreachable; booting on durable config snapshot (stale-config mode)',
+            entry['message'] === 'config server unreachable; booting on durable config snapshot (stale-config mode)',
         );
       expect(staleWarn).toBeDefined();
       expect(staleWarn).toMatchObject({
@@ -459,7 +459,7 @@ describe('RemoteConfigSource snapshot fallback', () => {
       expect(() => source.load()).toThrow(RemoteConfigError);
       const quietWarn = lines
         .map((line) => JSON.parse(line) as Record<string, unknown>)
-        .find((entry) => entry.message === 'config snapshot fallback failed; no durable config available');
+        .find((entry) => entry['message'] === 'config snapshot fallback failed; no durable config available');
       expect(quietWarn).toBeDefined();
       expect(quietWarn).toMatchObject({ severity: 'WARNING', logger: 'config-server', snapshotUri });
     },

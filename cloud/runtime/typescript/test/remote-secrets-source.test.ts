@@ -86,7 +86,7 @@ describe('RemoteSecretsSource', () => {
 
       expect(captured?.url).toBe('https://config.putnami.test/api/secrets/resolve');
       expect(captured?.method).toBe('POST');
-      expect(captured?.headers?.Authorization).toBe('Bearer test-token');
+      expect(captured?.headers?.['Authorization']).toBe('Bearer test-token');
       expect(captured?.body).toContain('sha256:abcdef0123456789');
     },
   );
@@ -219,9 +219,9 @@ describe('RemoteSecretsSource', () => {
     },
     () => {
       process.env.CONFIG_SERVER_URL = 'https://config.putnami.test';
-      process.env.CONFIG_SERVER_TOKEN = 'discovered-token';
-      process.env.CONFIG_SERVER_TIMEOUT = '2s';
-      process.env.CONFIG_SERVER_RETRY_BUDGET = '0ms';
+      process.env['CONFIG_SERVER_TOKEN'] = 'discovered-token';
+      process.env['CONFIG_SERVER_TIMEOUT'] = '2s';
+      process.env['CONFIG_SERVER_RETRY_BUDGET'] = '0ms';
       process.env.APP_ENV = 'prod';
 
       let captured: SyncFetchRequest | undefined;
@@ -272,8 +272,8 @@ describe('RemoteSecretsSource', () => {
         throw new Error('network down');
       });
       process.env.CONFIG_SERVER_URL = 'https://config.putnami.test';
-      process.env.CONFIG_SERVER_TOKEN = 'discovered-token';
-      process.env.CONFIG_SERVER_RETRY_BUDGET = '0';
+      process.env['CONFIG_SERVER_TOKEN'] = 'discovered-token';
+      process.env['CONFIG_SERVER_RETRY_BUDGET'] = '0';
       process.env.NODE_ENV = 'production';
 
       const source = discoverRemoteSecretsSource();

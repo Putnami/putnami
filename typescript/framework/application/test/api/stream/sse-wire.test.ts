@@ -65,8 +65,11 @@ function sseContext(lines: readonly string[] = [], drain?: AbortSignal): HttpReq
   } as unknown as HttpRequestContext;
 }
 
+/** One line of the log stream the provider under test serves. */
+type LogLine = { cursor: string; line: string };
+
 async function serve(
-  handler: (ctx: { send: (value: unknown) => void; signal: AbortSignal }) => Promise<void>,
+  handler: (ctx: { send: (value: LogLine) => void; signal: AbortSignal }) => Promise<void>,
   lines: readonly string[],
   options: Parameters<typeof createSseHandler>[1] & { readonly drain?: AbortSignal } = { negotiatesWire: true },
 ): Promise<{ acknowledgment: string | null; body: string }> {
@@ -76,7 +79,7 @@ async function serve(
   return { acknowledgment: response.headers.get(SSE_WIRE_HEADER), body: await response.text() };
 }
 
-const sendTwo = async (ctx: { send: (value: unknown) => void }) => {
+const sendTwo = async (ctx: { send: (value: LogLine) => void }) => {
   ctx.send({ cursor: 'c1', line: 'one' });
   ctx.send({ cursor: 'c2', line: 'two' });
 };
@@ -144,7 +147,7 @@ describe('the negotiated SSE wire', () => {
       check: 'a-failed-or-canceled-negotiated-stream-never-ends-with-complete',
     },
     async () => {
-      const failing = async (ctx: { send: (value: unknown) => void }) => {
+      const failing = async (ctx: { send: (value: LogLine) => void }) => {
         ctx.send({ cursor: 'c1', line: 'one' });
         throw new Error('the log store is gone');
       };
@@ -154,7 +157,7 @@ describe('the negotiated SSE wire', () => {
       });
       // A handler that swallows the bound it hit returns normally, and the
       // message it could not queue never left: no success is claimed.
-      const swallowing = async (ctx: { send: (value: unknown) => void }) => {
+      const swallowing = async (ctx: { send: (value: LogLine) => void }) => {
         ctx.send({ cursor: 'c1', line: 'one' });
         try {
           ctx.send({ cursor: 'c2', line: 'two' });
@@ -178,7 +181,7 @@ describe('the negotiated SSE wire', () => {
     },
     async () => {
       const drain = new AbortController();
-      const draining = async (ctx: { send: (value: unknown) => void }) => {
+      const draining = async (ctx: { send: (value: LogLine) => void }) => {
         ctx.send({ cursor: 'c1', line: 'one' });
         drain.abort(); // the handler returns before it could observe the drain
       };
@@ -187,7 +190,7 @@ describe('the negotiated SSE wire', () => {
         body: FIRST,
       });
       const legacyDrain = new AbortController();
-      const legacy = async (ctx: { send: (value: unknown) => void }) => {
+      const legacy = async (ctx: { send: (value: LogLine) => void }) => {
         await sendTwo(ctx);
         legacyDrain.abort();
       };
@@ -250,11 +253,11 @@ async function startLogProvider(): Promise<string> {
   });
   const handlers = {
     returns: sendTwo,
-    drains: async (ctx: { send: (value: unknown) => void; signal: AbortSignal }) => {
+    drains: async (ctx: { send: (value: LogLine) => void; signal: AbortSignal }) => {
       ctx.send({ cursor: 'c1', line: 'one' });
       await new Promise((resolve) => ctx.signal.addEventListener('abort', resolve, { once: true }));
     },
-    fails: async (ctx: { send: (value: unknown) => void }) => {
+    fails: async (ctx: { send: (value: LogLine) => void }) => {
       ctx.send({ cursor: 'c1', line: 'one' });
       throw new Error('the log store is gone');
     },

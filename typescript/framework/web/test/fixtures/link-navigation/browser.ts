@@ -39,6 +39,9 @@ Object.assign(globalThis, {
 const { createRoot } = await import('react-dom/client');
 const { createMemoryRouter, createPath, RouterProvider, useLocation } = await import('react-router');
 const { Link } = await import('../../../src/client/components');
+// A spread attribute escapes the excess-property check that rejects
+// data-testid in a Link props literal.
+const testId = (id: string) => ({ 'data-testid': id });
 
 let loads = 0;
 const errors: string[] = [];
@@ -50,11 +53,11 @@ const Page = () =>
     'nav',
     null,
     React.createElement('output', { 'data-testid': 'rendered' }, createPath(useLocation())),
-    React.createElement(Link, { 'data-testid': 'query', to: { pathname: '/tasks', search: '?env=qa' } }, 'QA'),
-    React.createElement(Link, { 'data-testid': 'clear', to: '/tasks' }, 'All'),
+    React.createElement(Link, { ...testId('query'), to: { pathname: '/tasks', search: '?env=qa' } }, 'QA'),
+    React.createElement(Link, { ...testId('clear'), to: '/tasks' }, 'All'),
     React.createElement(
       Link,
-      { 'data-testid': 'hash', to: { pathname: '/tasks', search: '?page=2', hash: '#details' } },
+      { ...testId('hash'), to: { pathname: '/tasks', search: '?page=2', hash: '#details' } },
       'Details',
     ),
   );

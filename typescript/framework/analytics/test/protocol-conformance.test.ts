@@ -88,7 +88,7 @@ describe('protocol conformance: invalid corpus', () => {
       // Four fixtures legitimately report two reasons: putting an action or a
       // property on a page view is both misplaced and still checked for shape,
       // exactly as the Go validator reports it. The stem must be among them.
-      expect(reasons).toContain(stem);
+      expect<unknown>(reasons).toContain(stem);
       expect(result.events).toHaveLength(0);
     });
   }

@@ -21,21 +21,21 @@ function jwtWithExp(exp: number): string {
 
 describe('EnvVarTokenSource', () => {
   afterEach(() => {
-    delete process.env.CONFIG_TEST_TOKEN;
+    Reflect.deleteProperty(process.env, 'CONFIG_TEST_TOKEN');
   });
 
   it('returns the env value, trimmed', () => {
-    process.env.CONFIG_TEST_TOKEN = '  abc123  ';
+    process.env['CONFIG_TEST_TOKEN'] = '  abc123  ';
     expect(new EnvVarTokenSource('CONFIG_TEST_TOKEN').token()).toBe('abc123');
   });
 
   it('returns undefined when env is unset', () => {
-    delete process.env.CONFIG_TEST_TOKEN;
+    Reflect.deleteProperty(process.env, 'CONFIG_TEST_TOKEN');
     expect(new EnvVarTokenSource('CONFIG_TEST_TOKEN').token()).toBeUndefined();
   });
 
   it('returns undefined when env is empty whitespace', () => {
-    process.env.CONFIG_TEST_TOKEN = '   ';
+    process.env['CONFIG_TEST_TOKEN'] = '   ';
     expect(new EnvVarTokenSource('CONFIG_TEST_TOKEN').token()).toBeUndefined();
   });
 });
@@ -209,7 +209,7 @@ describe('discoverTokenSource', () => {
     },
     () => {
       // An operator override always wins.
-      process.env.CONFIG_SERVER_TOKEN = 'operator-override';
+      process.env['CONFIG_SERVER_TOKEN'] = 'operator-override';
       process.env.K_SERVICE = 'task-api'; // pretend Cloud Run
       const src = discoverTokenSource('https://control.putnami.test');
       expect(src).toBeInstanceOf(EnvVarTokenSource);
@@ -247,7 +247,7 @@ describe('discoverTokenSource', () => {
         };
       });
       process.env.K_SERVICE = 'task-api';
-      process.env.CONFIG_SERVER_AUDIENCE = 'https://api.putnami.test';
+      process.env['CONFIG_SERVER_AUDIENCE'] = 'https://api.putnami.test';
       const src = discoverTokenSource(
         'https://api.putnami.test/api/configs/resolve?appName=auth%2Fserver&environment=prod&secretsMode=reveal',
       );
@@ -265,7 +265,7 @@ describe('discoverTokenSource', () => {
       check: 'google-cloud-project-selects-workload-identity',
     },
     () => {
-      process.env.GOOGLE_CLOUD_PROJECT = 'my-project';
+      process.env['GOOGLE_CLOUD_PROJECT'] = 'my-project';
       const src = discoverTokenSource('https://control.putnami.test');
       expect(src).toBeInstanceOf(GcpMetadataTokenSource);
     },

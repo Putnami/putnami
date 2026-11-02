@@ -192,13 +192,15 @@ export class ApiPlugin implements Plugin {
    */
   register(
     path: string,
-    handler: Record<string, unknown>,
+    handler: object,
     method?: HttpMethod,
     aot?: AotValidators,
     provenance?: DiscoveredRoute['provenance'],
   ): this {
+    // A definition or a module namespace: both are read by export name.
+    const exports = handler as Record<string, unknown>;
     // Resolve default export if present
-    const target = handler?.['default'] ?? handler;
+    const target = exports['default'] ?? handler;
 
     // Stream endpoint (WebSocket / SSE)
     if (isStreamEndpointDefinition(target)) {
@@ -212,7 +214,7 @@ export class ApiPlugin implements Plugin {
 
     if (method) {
       // Single-method file (get.ts, post.ts, etc.)
-      const endpointTarget = handler[method] ?? handler['default'] ?? handler;
+      const endpointTarget = exports[method] ?? exports['default'] ?? handler;
       // A file-based route file exports its definition under the method name,
       // so a stream declared in `get.ts` arrives here rather than as the
       // module's default export. Streams negotiate SSE and WebSocket on GET.
@@ -241,7 +243,7 @@ export class ApiPlugin implements Plugin {
     } else {
       // Multi-method file (route.ts / routes.ts)
       for (const m of HTTP_METHODS) {
-        const ep = handler[m];
+        const ep = exports[m];
         if (isEndpointDefinition(ep)) {
           this.assertExternalContract(m, prefixedPath, ep.meta?.client);
           this.httpPlugin.route(m, prefixedPath, ep.handler, {

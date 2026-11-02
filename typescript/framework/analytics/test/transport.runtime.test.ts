@@ -99,7 +99,7 @@ describe('send', () => {
     ])('answers %p with %p', async (status, expected) => {
       fake.responses.push(status as number);
 
-      expect(await send(ENDPOINT, EVENTS, { unload: false })).toBe(expected);
+      expect<unknown>(await send(ENDPOINT, EVENTS, { unload: false })).toBe(expected);
     });
 
     it('retries a network error', async () => {

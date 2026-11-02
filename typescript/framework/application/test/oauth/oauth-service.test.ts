@@ -150,7 +150,7 @@ describe('OAuthService', () => {
     it('fetches and returns access token', async () => {
       globalThis.fetch = mock(() =>
         Promise.resolve(new Response(JSON.stringify({ access_token: 'tok-123', expires_in: 3600 }), { status: 200 })),
-      ) as typeof fetch;
+      ) as unknown as typeof fetch;
 
       const service = new OAuthService();
       service.confInit = { clientId: 'test-client', clientSecret: 'test-secret', tokenUri: TOKEN_URI };
@@ -165,7 +165,7 @@ describe('OAuthService', () => {
         return Promise.resolve(
           new Response(JSON.stringify({ access_token: 'cached', expires_in: 3600 }), { status: 200 }),
         );
-      }) as typeof fetch;
+      }) as unknown as typeof fetch;
 
       const service = new OAuthService();
       service.confInit = { clientId: 'c', clientSecret: 's', tokenUri: TOKEN_URI };
@@ -175,7 +175,7 @@ describe('OAuthService', () => {
     });
 
     it('returns undefined when token request fails', async () => {
-      globalThis.fetch = mock(() => Promise.resolve(new Response('error', { status: 401 }))) as typeof fetch;
+      globalThis.fetch = mock(() => Promise.resolve(new Response('error', { status: 401 }))) as unknown as typeof fetch;
 
       const service = new OAuthService();
       service.confInit = { clientId: 'c', clientSecret: 's', tokenUri: TOKEN_URI };
@@ -193,7 +193,7 @@ describe('OAuthService', () => {
             status: 200,
           }),
         ),
-      ) as typeof fetch;
+      ) as unknown as typeof fetch;
 
       const service = new OAuthService();
       service.confInit = { clientId: 'c', clientSecret: 's', tokenUri: TOKEN_URI };
@@ -217,7 +217,7 @@ describe('OAuthService', () => {
 
   describe('verify', () => {
     it('returns undefined when keys fetch fails', async () => {
-      globalThis.fetch = mock(() => Promise.resolve(new Response('', { status: 500 }))) as typeof fetch;
+      globalThis.fetch = mock(() => Promise.resolve(new Response('', { status: 500 }))) as unknown as typeof fetch;
 
       const service = new OAuthService();
       service.confInit = { keysUri: KEYS_URI };
@@ -238,7 +238,7 @@ describe('OAuthService', () => {
             status: 200,
           }),
         );
-      }) as typeof fetch;
+      }) as unknown as typeof fetch;
 
       const service = new OAuthService();
       service.confInit = { keysUri: KEYS_URI };
@@ -255,7 +255,7 @@ describe('OAuthService', () => {
 
       // Expire the cache by manipulating the internal state
       const cacheField = '_publicKeys' as keyof OAuthService;
-      const cache = (service as Record<string, unknown>)[cacheField] as { keys: string[]; cachedAt: number };
+      const cache = (service as unknown as Record<string, unknown>)[cacheField] as { keys: string[]; cachedAt: number };
       cache.cachedAt = Date.now() - 61 * 60 * 1000; // 61 minutes ago
 
       // Third call re-fetches
@@ -266,13 +266,15 @@ describe('OAuthService', () => {
 
   describe('fetchToken error handling', () => {
     it('logs error on non-200 response', async () => {
-      globalThis.fetch = mock(() => Promise.resolve(new Response('Unauthorized', { status: 401 }))) as typeof fetch;
+      globalThis.fetch = mock(() =>
+        Promise.resolve(new Response('Unauthorized', { status: 401 })),
+      ) as unknown as typeof fetch;
 
       const service = new OAuthService();
       service.confInit = { clientId: 'c', clientSecret: 's', tokenUri: TOKEN_URI };
       const logger = new MemoryLogger();
       const context = createHttpContext();
-      (context as Record<string, unknown>).logger = logger;
+      (context as Record<string, unknown>)['logger'] = logger;
 
       const result = await runInContext(context, () => service.clientToken());
       expect(result).toBeUndefined();
@@ -283,12 +285,12 @@ describe('OAuthService', () => {
       respond: () => Promise<Response>,
       call: (service: OAuthService) => Promise<unknown>,
     ): Promise<LogEntry[]> {
-      globalThis.fetch = mock(respond) as typeof fetch;
+      globalThis.fetch = mock(respond) as unknown as typeof fetch;
       const service = new OAuthService();
       service.confInit = { clientId: 'c', clientSecret: 's', tokenUri: TOKEN_URI };
       const logger = new MemoryLogger();
       const context = createHttpContext();
-      (context as Record<string, unknown>).logger = logger;
+      (context as Record<string, unknown>)['logger'] = logger;
       expect(await runInContext(context, () => call(service))).toBeUndefined();
       return logger.entries.filter((e) => e.level === 'warn' || e.level === 'error');
     }
