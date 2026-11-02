@@ -161,6 +161,41 @@
         }
       }
     },
+    "epic": {
+      "description": "The epic: issues of one outcome run in waves, each in its own build session.",
+      "subcommands": {
+        "plan": {
+          "description": "Check an epic plan, size each issue and order the issues in waves.",
+          "command": "epic-plan",
+          "interactive": true,
+          "examples": [
+            {
+              "command": "putnami epic plan --epic 42",
+              "description": "Check and order the plan in .putnami/42/epic.json"
+            },
+            {
+              "command": "putnami epic plan --plan-file epic.json --output=json",
+              "description": "Print the waves of an epic plan file as JSON"
+            }
+          ]
+        },
+        "status": {
+          "description": "Show each issue's task, proposal and sessions, the tokens spent and the issues that may launch.",
+          "command": "epic-status",
+          "interactive": true,
+          "examples": [
+            {
+              "command": "putnami epic status --epic 42",
+              "description": "Show the epic in .putnami/42/epic.json and what may launch now"
+            },
+            {
+              "command": "putnami epic status --epic 42 --output=json",
+              "description": "Print the status as JSON"
+            }
+          ]
+        }
+      }
+    },
     "agent": {
       "description": "Agent sessions: publish a session to its mission through the host hooks, and ask or reply through the missions contract.",
       "subcommands": {
@@ -389,6 +424,50 @@
         }
       ]
     },
+    "epic-plan": {
+      "activationFiles": [
+        "putnami.extension.json"
+      ],
+      "description": "Read an epic plan, check it against the epic plan format, size each issue from its slices with the change estimate table, and order the issues in waves: an issue's wave is one more than the latest wave of its dependencies. The plan is .putnami/<epic>/epic.json under the workspace root, or the file --plan-file names. It refuses an unknown or repeated key, a dependency on an unknown issue or on itself, and a cycle. --output=json prints the result document; otherwise it prints the epic, its envelope and each wave. A usage error exits 2, and a plan or a policy it refuses exits 1 with the path of the first value it refuses.",
+      "flags": {
+        "epic": {
+          "type": "string",
+          "description": "Epic id: read .putnami/<epic>/epic.json, and check that the plan names that epic."
+        },
+        "plan-file": {
+          "type": "string",
+          "description": "Epic plan file to read instead of .putnami/<epic>/epic.json."
+        }
+      },
+      "run": [
+        {
+          "id": "plan",
+          "task": "epic-plan"
+        }
+      ]
+    },
+    "epic-status": {
+      "activationFiles": [
+        "putnami.extension.json"
+      ],
+      "description": "Read an epic plan and its launch records, .putnami/<epic>/launches.json, then each issue's task with tasks.get, its proposal with proposals.find and proposals.status, and its sessions with missions.status. It prints each issue's state and tokens against its share, the epic's tokens against its envelope, the issues that may launch now and the rebase a stacked issue runs once its parent merged. An answer a provider could not give is listed, not guessed. --output=json prints the result document. A usage error exits 2; a plan or launch record it refuses, or a provider it cannot reach, exits 1.",
+      "flags": {
+        "epic": {
+          "type": "string",
+          "description": "Epic id: read .putnami/<epic>/epic.json, and check that the plan names that epic."
+        },
+        "plan-file": {
+          "type": "string",
+          "description": "Epic plan file to read instead of .putnami/<epic>/epic.json."
+        }
+      },
+      "run": [
+        {
+          "id": "status",
+          "task": "epic-status"
+        }
+      ]
+    },
     "agent-hook": {
       "activationFiles": [
         "putnami.extension.json"
@@ -525,6 +604,28 @@
       "cache": false,
       "description": "Size a change plan.",
       "timeoutMs": 60000
+    },
+    "epic-plan": {
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": [
+        "epic-plan"
+      ],
+      "cwd": "{workspaceRoot}",
+      "cache": false,
+      "description": "Check and order an epic plan.",
+      "timeoutMs": 60000
+    },
+    "epic-status": {
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": [
+        "epic-status"
+      ],
+      "cwd": "{workspaceRoot}",
+      "cache": false,
+      "description": "Read the state of an epic's issues.",
+      "timeoutMs": 600000
     },
     "agent-hook": {
       "kind": "command",

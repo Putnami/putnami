@@ -142,6 +142,8 @@ var Commands = []string{
 	"config-extract",
 	"config-merge",
 	"credential-provider",
+	"epic-plan",
+	"epic-status",
 	"log-reporter",
 	"qualify",
 	"qualify-run",

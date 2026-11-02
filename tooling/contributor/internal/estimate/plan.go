@@ -1,4 +1,6 @@
 // Package estimate reads a change plan and sizes it: putnami change estimate.
+// It also reads an epic plan, whose issues each carry the slices of a change
+// plan, and sizes and orders its issues for putnami epic plan.
 //
 // A plan names the issue a change delivers and its slices in order. Each
 // slice states the projects it changes, the files it touches, the endpoints
@@ -108,4 +110,10 @@ func ParsePlan(data []byte) (Plan, error) {
 		keys[slice.Key] = i
 	}
 	return plan, nil
+}
+
+// ValidID reports whether id is an issue or epic id the plan formats
+// accept: letters, digits, '.', '_' and '-', at most 64.
+func ValidID(id string) bool {
+	return re2(issuePattern).MatchString(id)
 }

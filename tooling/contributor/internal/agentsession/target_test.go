@@ -35,8 +35,8 @@ func TestTheRepositoryComesFromOriginWithoutHostOrCredential(t *testing.T) {
 		"https://example.com/acme/wid gets":                    "",
 		"git@example.com:acme/" + string(rune(0x7f)) + "x.git": "",
 	} {
-		if got := repositoryFromRemote(remote); got != want {
-			t.Errorf("repositoryFromRemote(%q) = %q, want %q", remote, got, want)
+		if got := RepositoryFromRemote(remote); got != want {
+			t.Errorf("RepositoryFromRemote(%q) = %q, want %q", remote, got, want)
 		}
 	}
 }

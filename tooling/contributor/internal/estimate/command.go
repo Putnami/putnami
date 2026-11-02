@@ -62,7 +62,7 @@ func (c Command) Run(args []string) int {
 		fmt.Fprintf(c.Stderr, "change estimate: %v\n", err)
 		return 1
 	}
-	if launch != nil && structuredOutput(launch.Params.String("output")) {
+	if launch != nil && StructuredOutput(launch.Params.String("output")) {
 		data, err := json.Marshal(result)
 		if err != nil {
 			fmt.Fprintf(c.Stderr, "change estimate: %v\n", err)
@@ -76,7 +76,7 @@ func (c Command) Run(args []string) int {
 }
 
 func (c Command) estimate(opts options, shown, file string) (Result, error) {
-	data, err := readBounded(file)
+	data, err := ReadBounded(file)
 	if err != nil {
 		return Result{}, fmt.Errorf("%s: %w", shown, err)
 	}
@@ -94,8 +94,8 @@ func (c Command) estimate(opts options, shown, file string) (Result, error) {
 	return Estimate(plan, table, shown), nil
 }
 
-// readBounded reads a file of at most maxDocumentBytes.
-func readBounded(path string) ([]byte, error) {
+// ReadBounded reads a plan file of at most 1 MiB.
+func ReadBounded(path string) ([]byte, error) {
 	f, err := os.Open(path)
 	if errors.Is(err, os.ErrNotExist) {
 		return nil, errors.New("no plan file")
@@ -145,7 +145,7 @@ func parseOptions(args []string) (options, error) {
 			continue
 		}
 		issue := strings.TrimPrefix(value, "#")
-		if !re2(issuePattern).MatchString(issue) {
+		if !ValidID(issue) {
 			return opts, errors.New("--issue must be an issue id: letters, digits, '.', '_' and '-'")
 		}
 		opts.issue = issue
@@ -163,9 +163,9 @@ func bounded(text string) string {
 	return text
 }
 
-// structuredOutput reports whether the output mode putnami forwards is one
-// the change commands answer with the JSON result.
-func structuredOutput(mode string) bool {
+// StructuredOutput reports whether the output mode putnami forwards is one
+// the change and epic commands answer with the JSON result.
+func StructuredOutput(mode string) bool {
 	switch mode {
 	case "json", "jsonl", "cloud-logging":
 		return true
@@ -177,21 +177,24 @@ func structuredOutput(mode string) bool {
 // slice.
 func writeText(w io.Writer, result Result) {
 	fmt.Fprintf(w, "Plan %s: %s, %s tokens, %s minutes\n", result.Plan, result.Size,
-		tokens(result.Tokens), minutes(result.Minutes))
+		result.Tokens.TokenText(), result.Minutes.MinuteText())
 	for i, slice := range result.Slices {
 		fmt.Fprintf(w, "  %d. %s: %s, %s tokens, %s minutes, %d files counted\n", i+1, slice.Key, slice.Size,
-			tokens(slice.Tokens), minutes(slice.Minutes), slice.Files)
+			slice.Tokens.TokenText(), slice.Minutes.MinuteText(), slice.Files)
 	}
 }
 
-func tokens(r Range) string {
-	return millions(r.Low) + " to " + millions(r.High)
+// TokenText writes a token range for a reader, in millions.
+func (r Range) TokenText() string {
+	return Millions(r.Low) + " to " + Millions(r.High)
 }
 
-func millions(n int) string {
+// Millions writes a token count in millions with one decimal.
+func Millions(n int) string {
 	return strconv.FormatFloat(float64(n)/1e6, 'f', 1, 64) + "M"
 }
 
-func minutes(r Range) string {
+// MinuteText writes a minute range for a reader.
+func (r Range) MinuteText() string {
 	return strconv.Itoa(r.Low) + " to " + strconv.Itoa(r.High)
 }

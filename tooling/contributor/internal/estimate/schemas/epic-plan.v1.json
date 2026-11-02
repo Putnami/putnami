@@ -1,0 +1,257 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Putnami epic plan",
+  "description": "The plan putnami epic plan and putnami epic status read: the issues of one outcome, their dependencies, the slices of each change plan, and the envelope the owner approves. The contributor's strict decoder applies the same members and bounds, and refuses a repeated member, a repeated key, an unknown dependency and a cycle.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "protocolVersion",
+    "epic",
+    "title",
+    "base",
+    "envelope",
+    "issues"
+  ],
+  "properties": {
+    "protocolVersion": {
+      "description": "Version of this format.",
+      "type": "integer",
+      "const": 1
+    },
+    "epic": {
+      "description": "Id of the epic, as its tracker writes it; it names the folder .putnami/<epic>.",
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$"
+    },
+    "title": {
+      "description": "One line that states the outcome of the epic.",
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 200,
+      "pattern": "^[^\\u0000-\\u001F\\u007F]+$"
+    },
+    "base": {
+      "description": "Branch every child starts from, unless it stacks on a parent.",
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 255,
+      "pattern": "^[!-~]+$"
+    },
+    "envelope": {
+      "$ref": "#/$defs/envelope"
+    },
+    "issues": {
+      "description": "The issues of the epic, in plan order.",
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 50,
+      "items": {
+        "$ref": "#/$defs/issue"
+      }
+    }
+  },
+  "$defs": {
+    "envelope": {
+      "description": "What every child session of the epic may spend, and how many run at once.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "tokens",
+        "activeMinutes",
+        "sessions"
+      ],
+      "properties": {
+        "tokens": {
+          "description": "Tokens every child session may read and write in total.",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1000000000000
+        },
+        "activeMinutes": {
+          "description": "Active minutes every child session may spend in total.",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100000
+        },
+        "sessions": {
+          "description": "Child sessions that run at once.",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 20
+        }
+      }
+    },
+    "issue": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "key",
+        "title",
+        "dependsOn",
+        "slices"
+      ],
+      "properties": {
+        "key": {
+          "description": "Token that names the issue, unique in the epic.",
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[a-z0-9][a-z0-9-]{0,63}$"
+        },
+        "title": {
+          "description": "One line that says what the issue delivers.",
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200,
+          "pattern": "^[^\\u0000-\\u001F\\u007F]+$"
+        },
+        "task": {
+          "$ref": "#/$defs/task"
+        },
+        "dependsOn": {
+          "description": "Keys of the issues that must merge first, or whose ready proposal this one stacks on.",
+          "type": "array",
+          "minItems": 0,
+          "maxItems": 50,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64,
+            "pattern": "^[a-z0-9][a-z0-9-]{0,63}$"
+          }
+        },
+        "slices": {
+          "description": "The slices of the issue's change plan, in the order they run.",
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 50,
+          "items": {
+            "$ref": "#/$defs/slice"
+          }
+        }
+      }
+    },
+    "task": {
+      "description": "Whole reference of the issue's task, as the tasks provider answers it; absent until the task exists.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "source",
+        "id"
+      ],
+      "properties": {
+        "source": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200,
+          "pattern": "^[!-~]+$"
+        },
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200,
+          "pattern": "^[!-~]+$"
+        }
+      }
+    },
+    "slice": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "key",
+        "title",
+        "projects",
+        "files",
+        "endpoints",
+        "screens",
+        "sensitiveZones"
+      ],
+      "properties": {
+        "key": {
+          "description": "Token that names the slice, unique in the plan.",
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[a-z0-9][a-z0-9-]{0,63}$"
+        },
+        "title": {
+          "description": "One line that says what the slice delivers.",
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200,
+          "pattern": "^[^\\u0000-\\u001F\\u007F]+$"
+        },
+        "projects": {
+          "description": "Ids of the workspace projects the slice changes.",
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 50,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 214,
+            "pattern": "^[!-~]+$"
+          }
+        },
+        "files": {
+          "description": "Expected count of files the slice touches.",
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 10000
+        },
+        "endpoints": {
+          "description": "Count of HTTP or RPC endpoints the slice adds or changes.",
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000
+        },
+        "screens": {
+          "description": "Count of user interface screens the slice adds or changes.",
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000
+        },
+        "sensitiveZones": {
+          "description": "Sensitive zones the slice touches, such as a data migration or a public API.",
+          "type": "array",
+          "minItems": 0,
+          "maxItems": 20,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100,
+            "pattern": "^[^\\u0000-\\u001F\\u007F]+$"
+          }
+        },
+        "effort": {
+          "description": "Model and reasoning level the slice is planned for.",
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "model",
+            "reasoning"
+          ],
+          "properties": {
+            "model": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,63}$"
+            },
+            "reasoning": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,63}$"
+            }
+          }
+        }
+      }
+    }
+  }
+}

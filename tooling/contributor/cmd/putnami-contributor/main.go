@@ -8,19 +8,21 @@
 //	putnami-contributor verify [flags]            (putnami change verify)
 //	putnami-contributor finalize [flags]          (putnami change finalize)
 //	putnami-contributor estimate [flags]          (putnami change estimate)
+//	putnami-contributor epic-plan [flags]         (putnami epic plan)
+//	putnami-contributor epic-status [flags]       (putnami epic status)
 //	putnami-contributor agent-hook [flags]        (putnami agent hook)
 //	putnami-contributor agent-attach [flags]      (putnami agent attach)
 //	putnami-contributor agent-stage <name>        (putnami agent stage)
 //	putnami-contributor agent-ask [flags]         (putnami agent ask)
 //	putnami-contributor agent-reply [flags]       (putnami agent reply)
 //
-// It answers the runtime handshake, serves the change and agent commands, and
-// refuses every other invocation. putnami launches each command as an
-// interactive subcommand and appends --putnamiContext <file>. finalize reads
-// the output mode and the project selection from that job context, estimate
-// its output mode and invocation directory, agent ask and agent reply their
-// output mode, and agent ask the invocation directory; the other commands
-// ignore it.
+// It answers the runtime handshake, serves the change, epic and agent
+// commands, and refuses every other invocation. putnami launches each command
+// as an interactive subcommand and appends --putnamiContext <file>. finalize
+// reads the output mode and the project selection from that job context;
+// estimate, epic plan and epic status their output mode and invocation
+// directory; agent ask and agent reply their output mode, and agent ask the
+// invocation directory. The other commands ignore it.
 package main
 
 import (
@@ -29,14 +31,17 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
 	"os/signal"
 	"syscall"
+	"time"
 
 	job "go.putnami.dev/protocol/job"
 	sdkcontext "go.putnami.dev/sdk/extension/context"
 	"go.putnami.dev/sdk/extension/runtimeinfo"
 
 	"go.putnami.dev/tooling/contributor/internal/agentsession"
+	"go.putnami.dev/tooling/contributor/internal/epic"
 	"go.putnami.dev/tooling/contributor/internal/estimate"
 	"go.putnami.dev/tooling/contributor/internal/finalize"
 	"go.putnami.dev/tooling/contributor/internal/host"
@@ -57,13 +62,14 @@ var runtimeVersion string
 const contextFlag = "--putnamiContext"
 
 // agentHookRemedy, agentStageRemedy, agentAskRemedy, agentReplyRemedy,
-// languageRemedy and finalizeRemedy name the launch that opens the host
-// channel, for a run that needs the channel and has none.
+// epicStatusRemedy, languageRemedy and finalizeRemedy name the launch that
+// opens the host channel, for a run that needs the channel and has none.
 const (
 	agentHookRemedy  = "the hook reaches the missions provider only when putnami launches it as `putnami agent hook`"
 	agentStageRemedy = "the stage reaches the missions provider only when putnami launches it as `putnami agent stage`"
 	agentAskRemedy   = "the decision reaches the missions provider only when putnami launches it as `putnami agent ask`"
 	agentReplyRemedy = "the reply reaches the missions provider only when putnami launches it as `putnami agent reply`"
+	epicStatusRemedy = "the status reaches the tasks, proposals and missions providers only when putnami launches it as `putnami epic status`"
 	languageRemedy   = "the tasks mode needs an interactive launch by putnami, which opens the host channel it reads the tasks provider through; run `putnami change language tasks`"
 	finalizeRemedy   = "this command needs an interactive launch by putnami, which opens the host channel it reaches the collaboration providers and the workspace through; run `putnami change finalize`"
 )
@@ -98,6 +104,12 @@ func runIn(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	if len(args) > 0 && args[0] == "estimate" {
 		return runEstimate(args[1:], contextFile, stdout, stderr)
 	}
+	if len(args) > 0 && args[0] == "epic-plan" {
+		return runEpicPlan(args[1:], contextFile, stdout, stderr)
+	}
+	if len(args) > 0 && args[0] == "epic-status" {
+		return runEpicStatus(args[1:], contextFile, stdout, stderr)
+	}
 	if len(args) > 0 && args[0] == "agent-hook" {
 		return runAgentHook(args[1:], stdin, stdout, stderr)
 	}
@@ -113,7 +125,7 @@ func runIn(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	if len(args) > 0 && args[0] == "agent-reply" {
 		return runAgentReply(args[1:], contextFile, stdin, stdout, stderr)
 	}
-	fmt.Fprintln(stderr, "putnami-contributor: unknown invocation; this runtime answers the Putnami runtime handshake and the language, verify, finalize, estimate, agent-hook, agent-attach, agent-stage, agent-ask and agent-reply commands")
+	fmt.Fprintln(stderr, "putnami-contributor: unknown invocation; this runtime answers the Putnami runtime handshake and the language, verify, finalize, estimate, epic-plan, epic-status, agent-hook, agent-attach, agent-stage, agent-ask and agent-reply commands")
 	return 2
 }
 
@@ -239,6 +251,53 @@ func runEstimate(args []string, contextFile string, stdout, stderr io.Writer) in
 		return 1
 	}
 	return estimate.Command{Root: root, ContextFile: contextFile, Stdout: stdout, Stderr: stderr}.Run(args)
+}
+
+// runEpicPlan runs putnami epic plan in the workspace root, which is the
+// working directory putnami launches the command in. It reads an epic plan
+// and the workspace policy, and reaches no provider.
+func runEpicPlan(args []string, contextFile string, stdout, stderr io.Writer) int {
+	channel := host.Take("")
+	defer func() { _ = channel.Close() }()
+	root, err := os.Getwd()
+	if err != nil {
+		fmt.Fprintf(stderr, "epic plan: %v\n", err)
+		return 1
+	}
+	return epic.PlanCommand{Root: root, ContextFile: contextFile, Stdout: stdout, Stderr: stderr}.Run(args)
+}
+
+// runEpicStatus runs putnami epic status in the workspace root, which is the
+// working directory putnami launches the command in. It reads the epic's
+// children through the host channel, and the repository of their missions
+// from the origin remote. SIGINT and SIGTERM cancel the run.
+func runEpicStatus(args []string, contextFile string, stdout, stderr io.Writer) int {
+	channel := host.Take(epicStatusRemedy)
+	defer func() { _ = channel.Close() }()
+	root, err := os.Getwd()
+	if err != nil {
+		fmt.Fprintf(stderr, "epic status: %v\n", err)
+		return 1
+	}
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+	command := epic.StatusCommand{Root: root, ContextFile: contextFile, Repository: originRepository(ctx, root),
+		Call: channel.Call, Stdout: stdout, Stderr: stderr}
+	return command.Run(ctx, args)
+}
+
+// originRepository is the lowercase owner/name of root's origin remote, or
+// "" when git or the remote cannot answer.
+func originRepository(ctx context.Context, root string) string {
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, "git", "remote", "get-url", "origin")
+	cmd.Dir = root
+	out, err := cmd.Output()
+	if err != nil {
+		return ""
+	}
+	return agentsession.RepositoryFromRemote(string(out))
 }
 
 // runAgentHook runs putnami agent hook in the workspace root, which is the

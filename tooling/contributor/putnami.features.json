@@ -451,7 +451,13 @@
             ]
           }
         }
-      ]
+      ],
+      "surface": {
+        "commands": [
+          "epic plan",
+          "epic status"
+        ]
+      }
     }
   ]
 }

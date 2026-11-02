@@ -1,0 +1,84 @@
+{
+  "protocolVersion": 1,
+  "epic": "40",
+  "title": "Plans are sized and launched in waves",
+  "base": "main",
+  "envelope": { "tokens": 330000000, "activeMinutes": 640, "sessions": 2 },
+  "issues": [
+    {
+      "key": "read-contract",
+      "title": "The missions contract gains a read operation",
+      "task": { "source": "github:acme/app", "id": "41" },
+      "dependsOn": [],
+      "slices": [
+        {
+          "key": "status-operation",
+          "title": "missions.status reads a mission's sessions",
+          "projects": ["go.putnami.dev/protocol/collaboration"],
+          "files": 9,
+          "endpoints": 1,
+          "screens": 0,
+          "sensitiveZones": ["public API"]
+        }
+      ]
+    },
+    {
+      "key": "plan-command",
+      "title": "putnami epic plan orders the issues",
+      "task": { "source": "github:acme/app", "id": "42" },
+      "dependsOn": [],
+      "slices": [
+        {
+          "key": "plan-format",
+          "title": "The epic plan format",
+          "projects": ["@putnami/contributor"],
+          "files": 4,
+          "endpoints": 0,
+          "screens": 0,
+          "sensitiveZones": []
+        }
+      ]
+    },
+    {
+      "key": "status-command",
+      "title": "putnami epic status reads the children",
+      "dependsOn": ["read-contract", "plan-command"],
+      "slices": [
+        {
+          "key": "status",
+          "title": "The status command",
+          "projects": ["@putnami/contributor"],
+          "files": 12,
+          "endpoints": 0,
+          "screens": 0,
+          "sensitiveZones": []
+        },
+        {
+          "key": "docs",
+          "title": "The status documentation",
+          "projects": ["@putnami/contributor"],
+          "files": 2,
+          "endpoints": 0,
+          "screens": 0,
+          "sensitiveZones": []
+        }
+      ]
+    },
+    {
+      "key": "skill",
+      "title": "The epic skill launches the children",
+      "dependsOn": ["status-command"],
+      "slices": [
+        {
+          "key": "skill",
+          "title": "The epic skill",
+          "projects": ["@putnami/contributor"],
+          "files": 5,
+          "endpoints": 0,
+          "screens": 0,
+          "sensitiveZones": []
+        }
+      ]
+    }
+  ]
+}
