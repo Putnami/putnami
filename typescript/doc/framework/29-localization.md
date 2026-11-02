@@ -172,7 +172,7 @@ A reader can ask for something that does not exist in their locale at three leve
 | A message's translation | The default text, in serve and test, with a warning. A production build fails instead, so a published locale never shows it. |
 | A message's translation is stale | The old translation, with a warning, until someone revises it. |
 | A page in the reader's locale (an excluded route) | `/fr/docs/intro` redirects with `308` to `/docs/intro`, query kept. Links from a French page to it point to `/docs/intro` directly. |
-| The reader's locale on the site | At `/`, the closest published locale: `fr-CA` gets `fr`. With no match, the default locale. |
+| The reader's locale on the site | At `/`, the locale chosen in the switcher (its cookie), else the closest `Accept-Language` match (`fr-CA` gets `fr`), else the default locale. |
 
 A page never mixes locales by surprise: either every message of a published locale has a translation, or the build stops. The one page that shows another locale's text on purpose is an excluded route, and its URL says so.
 

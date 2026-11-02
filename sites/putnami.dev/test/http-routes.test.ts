@@ -265,6 +265,17 @@ describe('putnami.dev canonical HTTP route inventory', () => {
       },
     );
 
+    it('admits the redirect of each docs page under the French prefix', () => {
+      // The docs stay English; /fr/docs/x answers 308 to /docs/x, and the edge
+      // must let that request reach the app.
+      const docs = routes().filter((route) => route.match === 'exact' && route.path.startsWith('/docs/'));
+      expect(docs.length).toBeGreaterThan(0);
+      for (const route of docs) {
+        expect(admits(`/fr${route.path}`, 'GET')).toBe(true);
+      }
+      expect(admits('/fr/docs/getting-started', 'POST')).toBe(false);
+    });
+
     it('admits the docs catch-all subtree at any depth', () => {
       for (const path of ['/docs/getting-started', '/docs/frameworks/go/caching', '/docs/a/b/c/d']) {
         expect(admits(path, 'GET')).toBe(true);

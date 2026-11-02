@@ -53,7 +53,13 @@ import {
   type ManifestRoute,
   serializeManifest,
 } from '../src/ssr/manifest';
-import { formatDiagnostic, type I18nBuild, localizeRows, resolveI18nBuild } from '../src/ssr/i18n/build';
+import {
+  excludedRedirectRows,
+  formatDiagnostic,
+  type I18nBuild,
+  localizeRows,
+  resolveI18nBuild,
+} from '../src/ssr/i18n/build';
 import type { ReactApplication } from '../src/ssr/react-application';
 import { buildWebAssetHttpRoutes, buildWebPageHttpRoutes, type WebPageRouteFact } from '../src/ssr/http-routes';
 import { PutnamiReactConfig } from '../src/ssr/react-ssr.config';
@@ -334,7 +340,10 @@ async function runGenerate(_options: unknown, context: HookContext): Promise<Hoo
     projectJson?.name ||
     basename(projectRoot);
   const httpRoutesFragment = writeHttpRoutesFragment(projectRoot, 'web', projectName, [
-    ...buildWebPageHttpRoutes(localizeRows(i18n?.settings, httpPageRoutes)),
+    ...buildWebPageHttpRoutes([
+      ...localizeRows(i18n?.settings, httpPageRoutes),
+      ...excludedRedirectRows(i18n?.settings, httpPageRoutes),
+    ]),
     ...buildWebAssetHttpRoutes(
       config.publicFolder,
       [...addClientScripts, ...islandScripts].map((script) => script.route),

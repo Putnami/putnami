@@ -10,6 +10,7 @@ import {
   splitLocalePath,
 } from '../../shared/i18n/locale';
 import { definitionText, type LocaleMessages, type Messages } from '../../shared/i18n/messages';
+import type { WebPageRouteFact } from '../http-routes';
 import {
   type Catalog,
   type CatalogDiagnostic,
@@ -215,4 +216,31 @@ export function localizeRows<T extends { route: string; expandedPaths?: string[]
       return { ...row, route, ...(expandedPaths ? { expandedPaths } : {}) };
     });
   });
+}
+
+/**
+ * The page routes outside the localized set, once per other locale prefix:
+ * `/fr/docs/intro` answers a 308 to `/docs/intro`, so the HTTP route
+ * inventory lists it, with a catch-all's expanded paths. A redirect takes no
+ * action.
+ */
+export function excludedRedirectRows(
+  settings: LocaleSettings | undefined,
+  rows: readonly WebPageRouteFact[],
+): WebPageRouteFact[] {
+  if (!settings) return [];
+  const prefixes = settings.locales
+    .filter((locale) => locale !== settings.defaultLocale)
+    .map((locale) => localePrefix(settings, locale));
+  const under = (prefix: string, path: string) => (path === '/' ? prefix : `${prefix}${path}`);
+  return rows
+    .filter((row) => !isLocalizedPath(settings, row.route))
+    .flatMap((row) =>
+      prefixes.map((prefix) => ({
+        route: under(prefix, row.route),
+        evidencePath: row.evidencePath,
+        hasAction: false,
+        ...(row.expandedPaths ? { expandedPaths: row.expandedPaths.map((p) => under(prefix, p)) } : {}),
+      })),
+    );
 }
