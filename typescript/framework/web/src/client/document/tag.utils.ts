@@ -28,13 +28,13 @@ export const escapeRawText = (value: string) =>
 
 export const asHtml = <A>(tag: string, attr: HtmlHTMLAttributes<A>) => {
   const buf: string[] = [];
-  buf.push(`<${tag} `);
+  buf.push(`<${tag}`);
   for (const [k, v] of Object.entries(attr)) {
     if (k === 'children' || k === 'dangerouslySetInnerHTML') {
       continue;
     }
     if (v !== undefined && v !== null) {
-      buf.push(`${k.toLowerCase()}="${escapeHtml(String(v))}"`);
+      buf.push(` ${k.toLowerCase()}="${escapeHtml(String(v))}"`);
     }
   }
 

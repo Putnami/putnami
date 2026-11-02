@@ -28,8 +28,8 @@
     },
     {
       "id": "D-003",
-      "statement": "every GitHub artifact, code comment and document is written in English",
-      "settled": "2026-09-11",
+      "statement": "every GitHub artifact, code comment and document is written in English, the default locale of every site; only a translation catalog of another locale holds that locale's text",
+      "settled": "2026-11-01",
       "settledBy": "fdumay",
       "reviewOnly": true
     },

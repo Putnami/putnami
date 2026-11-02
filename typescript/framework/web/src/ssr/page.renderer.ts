@@ -16,10 +16,23 @@ import { type ReactDOMServerReadableStream, renderToReadableStream } from 'react
 import type { RouteObject, StaticHandlerContext } from 'react-router';
 import { createStaticHandler, createStaticRouter, isRouteErrorResponse, StaticRouterProvider } from 'react-router';
 import { DocumentMetaContext } from '../client/document/document-context';
+import type { DocumentMeta } from '../client/document/document.types';
 import { escapeHtml } from '../client/document/tag.utils';
 import { SsrDocumentHelper } from '../client/document/document-ssr.helper';
 import { CsrfTokenContext } from '../shared/csrf-context';
+import { I18nProvider, type I18nState } from '../shared/i18n/messages';
 import { generateCspNonce } from './csp';
+import {
+  applyLocaleHead,
+  createI18nState,
+  htmlAttributes,
+  type I18nRuntimeOptions,
+  i18nPayloadScript,
+  localeBasename,
+  pathBelowBase,
+  seedDocumentLocale,
+} from './i18n/runtime';
+import { safeJsonForScript } from './safe-json';
 import { PutnamiReactConfig } from './react-ssr.config';
 import {
   contextSlots,
@@ -30,6 +43,8 @@ import {
   setContextSlot,
 } from '../shared/context-slots';
 
+export { safeJsonForScript };
+
 export const pageRenderer =
   (
     routes: () => RouteObject[],
@@ -38,6 +53,7 @@ export const pageRenderer =
     ssrTimeout = 3000,
     basename?: () => string | undefined,
     clientFetchTimeout?: number,
+    i18n?: () => I18nRuntimeOptions | undefined,
   ): RouteHandler =>
   async () => {
     const logger = useLogger();
@@ -51,7 +67,14 @@ export const pageRenderer =
     const nonce = generateCspNonce();
     setContextSlot(reqContext, CSP_NONCE_CONTEXT_KEY, nonce);
 
-    const resolvedBasename = basename?.();
+    // With i18n, the locale prefix extends the router basename for this request
+    // only: one route tree serves every locale.
+    const i18nOptions = i18n?.();
+    const moduleBase = basename?.();
+    const i18nState: I18nState | undefined = i18nOptions
+      ? createI18nState(i18nOptions, pathBelowBase(new URL(req.url).pathname, moduleBase), false)
+      : undefined;
+    const resolvedBasename = i18nState ? localeBasename(i18nState, moduleBase) : moduleBase;
     const staticOpts = resolvedBasename ? { basename: resolvedBasename } : undefined;
     const reactStaticHandler = createStaticHandler(routes(), staticOpts);
     const reactStaticContext = await reactStaticHandler.query(req);
@@ -72,6 +95,7 @@ export const pageRenderer =
     // No globalThis fallback: shared mutable SSR state would bleed/clear
     // between concurrent requests.
     const documentMeta = ensureDocumentMeta(reqContext);
+    if (i18nState) seedDocumentLocale(documentMeta, i18nState);
 
     // The CSRF token for SSR components (<CsrfInput />). Prefer the token the
     // CSRF middleware published on the request context: on a first visit the
@@ -94,7 +118,7 @@ export const pageRenderer =
 
     // Wrap the router with context providers to ensure all components
     // (including lazy-loaded ones) can access shared state during SSR
-    const staticRouter = React.createElement(
+    const routerTree = React.createElement(
       CsrfTokenContext.Provider,
       { value: csrfToken },
       React.createElement(
@@ -111,6 +135,7 @@ export const pageRenderer =
         }),
       ),
     );
+    const staticRouter = i18nState ? React.createElement(I18nProvider, { value: i18nState }, routerTree) : routerTree;
 
     // Declared in the function scope so the catch can clear it, but the timer
     // itself is only created inside the try below — a throw before that leaves
@@ -162,15 +187,15 @@ export const pageRenderer =
         clientFetchTimeout,
         bootstrap: readClientBootstrap(reqContext),
         clientScripts: readClientScripts(reqContext),
+        i18n: i18nOptions && i18nState ? { options: i18nOptions, state: i18nState, documentMeta } : undefined,
       });
 
       // Use React Router's computed status code (e.g. 404 from a loader-thrown Response),
       // falling back to the HTTP route's status code or 200.
       const status = context.statusCode !== 200 ? context.statusCode : reqContext.statusCode || 200;
-      const response = new HttpResponse(readable, {
-        status,
-        headers: { 'content-type': 'text/html;charset=utf-8' },
-      });
+      const headers: Record<string, string> = { 'content-type': 'text/html;charset=utf-8' };
+      if (i18nState) headers['content-language'] = i18nState.locale;
+      const response = new HttpResponse(readable, { status, headers });
 
       return response;
     } catch (error) {
@@ -201,21 +226,6 @@ async function createReactStream(
     nonce: options.nonce,
     onError: options.onError,
   });
-}
-
-/**
- * Serialize a value to JSON safe for embedding inside an HTML `<script>` block.
- *
- * Escapes sequences that would otherwise allow content to break out of the
- * script context (`</script>`, `<!--`) or trigger charset-based XSS
- * (`\u2028`, `\u2029`).
- */
-export function safeJsonForScript(value: unknown): string {
-  return JSON.stringify(value)
-    .replace(/</g, '\\u003c')
-    .replace(/>/g, '\\u003e')
-    .replace(/\u2028/g, '\\u2028')
-    .replace(/\u2029/g, '\\u2029');
 }
 
 export function sanitizeErrors(
@@ -250,6 +260,8 @@ export async function wrapInHtmlDocument(
     bootstrap?: Record<string, unknown>;
     /** Plugin-owned module script URLs emitted after the hydrate script. */
     clientScripts?: readonly string[];
+    /** The locale of the render, when the application is localized. */
+    i18n?: { options: I18nRuntimeOptions; state: I18nState; documentMeta: DocumentMeta };
     // biome-ignore lint/suspicious/noExplicitAny: logger type
     logger?: any;
   },
@@ -305,13 +317,17 @@ export async function wrapInHtmlDocument(
       // the reader loop below starts immediately after the head is flushed.
       await reactStream.allReady;
 
+      // A page's own canonical link and `<Lang>` are known only now.
+      const i18n = options.i18n;
+      if (i18n) applyLocaleHead(i18n.documentMeta, i18n.state);
       const headHtml = docHelper.headHtml || '';
+      const i18nScript = i18n ? i18nPayloadScript(i18n.options, i18n.state, true) : '';
 
       // Send HTML prefix — TTFB is after allReady but the body streams
       // chunk-by-chunk from here.
       await writer.write(
         encoder.encode(
-          `<!DOCTYPE html><html lang="${escapeHtml(docHelper.lang)}">${headHtml}<body>${hydrationScript}<div id="root">`,
+          `<!DOCTYPE html><html ${htmlAttributes(docHelper.lang, i18n?.state)}>${headHtml}<body>${i18nScript}${hydrationScript}<div id="root">`,
         ),
       );
 

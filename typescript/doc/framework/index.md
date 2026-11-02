@@ -16,6 +16,7 @@ TypeScript is Putnami's most complete application surface: React SSR, API routes
 | Add async and realtime behavior | [Events](/docs/frameworks/typescript/events) | [WebSockets & streaming](/docs/frameworks/typescript/websockets), [Caching](/docs/frameworks/typescript/caching) |
 | Make it production-readable | [Health checks](/docs/frameworks/typescript/health-checks) | [Telemetry](/docs/frameworks/typescript/telemetry), [Logging](/docs/frameworks/typescript/logging), [Platform endpoints](/docs/frameworks/typescript/platform-endpoints) |
 | Measure your own audience | [Analytics](/docs/frameworks/typescript/analytics) | [Web](/docs/frameworks/typescript/web), [Persistence](/docs/frameworks/typescript/persistence), [Add web analytics](/docs/how-to/add-web-analytics) |
+| Serve a site in several languages | [Localization](/docs/frameworks/typescript/localization) | [Web](/docs/frameworks/typescript/web), [React routing](/docs/frameworks/typescript/react-routing) |
 
 ## The application model
 
@@ -45,6 +46,7 @@ application()
 | Contracts | [Schema](/docs/frameworks/typescript/schema), [Proto & gRPC](/docs/frameworks/typescript/proto-grpc), [Smart client](/docs/frameworks/typescript/smart-client) | Typed boundaries between services and clients |
 | Operations | [Testing](/docs/frameworks/typescript/testing), [Health checks](/docs/frameworks/typescript/health-checks), [Telemetry](/docs/frameworks/typescript/telemetry) | Confidence before deploy and signals after deploy |
 | Audience measurement | [Analytics](/docs/frameworks/typescript/analytics) | Cookieless page views, declared actions, and daily aggregates in your own database |
+| Localization | [Localization](/docs/frameworks/typescript/localization) | Locale routes, typed messages, reviewed catalogs, alternates for search engines |
 | Domain boundaries | [Domain access contracts](/docs/frameworks/typescript/domain-access-contracts) | A declared DARC import enforced at runtime: freshness bounds, ordering, one writer, rebuild (experimental) |
 
 ## Recommended first hour

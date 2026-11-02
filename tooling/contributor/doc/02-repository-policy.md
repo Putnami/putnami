@@ -110,7 +110,9 @@ How the pieces combine for one delivery:
 - `claimAssignees: ["@me"]` is the GitHub provider's notation for the
   credential's account; another provider documents its own.
 - `verification.language: "en"` makes `check` and native finalization run the
-  English-only detector on everything a change publishes.
+  English-only detector on everything a change publishes. A translation
+  catalog of another locale (`locales/fr.json`) holds that locale's text and
+  is skipped; `locales/en.json` and every default message stay in scope.
 - The repository squash-merges with the proposal title and body as the commit
   title and message, the merge button included. `bodyMaxBytes: 1500` keeps
   that body a commit message; native finalization posts the verification record as

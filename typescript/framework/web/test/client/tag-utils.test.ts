@@ -51,6 +51,13 @@ describe('asHtml', () => {
     expect(html).toContain('/>');
   });
 
+  it('separates every attribute with a space', () => {
+    expect(asHtml('link', { rel: 'alternate', hrefLang: 'fr', href: '/fr' })).toBe(
+      '<link rel="alternate" hreflang="fr" href="/fr"/>',
+    );
+    expect(asHtml('title', { children: 'Hi' })).toBe('<title>Hi</title>');
+  });
+
   it('renders a tag with text children', () => {
     const html = asHtml('title', { children: 'Hello World' });
     expect(html).toContain('>');

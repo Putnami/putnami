@@ -17,6 +17,7 @@ import type {
   PageModule,
 } from './module.types';
 import type { PageCacheOptions } from './page';
+import type { I18nRuntimeOptions } from './i18n/runtime';
 import { pageRenderer } from './page.renderer';
 import type { LazyPageData, MiddlewareResolver, ReactModuleCache } from './react-module-cache';
 import type { ReactPluginConfig } from './react-plugin';
@@ -80,12 +81,15 @@ export interface PageRenderContext {
   routes: () => RouteObject[];
   basename: () => string | undefined;
   hydrateScript: () => string;
+  /** The application's locales and catalogs, when it is localized. */
+  i18n?: () => I18nRuntimeOptions | undefined;
 }
 
 /**
  * Build the SSR page renderer for a route, wrapped with server-side caching
  * when the page sets a TTL. Shared by eager pages and the lazy first-request
- * renderer.
+ * renderer. `route` keys the page cache, so a localized registration passes
+ * its locale-prefixed route.
  */
 export function createPageRenderer(
   ctx: PageRenderContext,
@@ -99,6 +103,7 @@ export function createPageRenderer(
     ctx.config.ssrTimeout,
     ctx.basename,
     ctx.config.clientFetchTimeout,
+    ctx.i18n,
   );
   return wrapPageWithCache(baseRenderer, route, cacheOpts);
 }
@@ -122,6 +127,7 @@ export function resolveLazyPageData(
 /**
  * Create a renderer that loads a lazy page module on first request, caching the
  * resolved renderer, middleware, and status code for subsequent requests.
+ * `cacheRoute` keys the page cache (see {@link createPageRenderer}).
  */
 export function createLazyPageRenderer(
   ctx: PageRenderContext,
@@ -130,6 +136,7 @@ export function createLazyPageRenderer(
   route: string,
   lazyPage: LazyPageModule,
   notFoundMiddleware?: HttpMiddleware[],
+  cacheRoute = route,
 ): RouteHandler {
   let cachedRenderer: RouteHandler | undefined;
   let cachedMiddleware: HttpMiddleware[] | undefined;
@@ -146,7 +153,7 @@ export function createLazyPageRenderer(
       );
       cachedMiddleware = middleware;
       cachedStatusCode = statusCode;
-      cachedRenderer = createPageRenderer(ctx, route, pageDef?.cache);
+      cachedRenderer = createPageRenderer(ctx, cacheRoute, pageDef?.cache);
     }
 
     if (cachedStatusCode !== undefined) {

@@ -31,6 +31,16 @@ func TestLanguageFileExclusions(t *testing.T) {
 			t.Errorf("unrelated source %s was excluded", path)
 		}
 	}
+	for _, path := range []string{"sites/putnami.dev/locales/fr.json", "app/locales/pt-BR.json", `app\locales\de.json`} {
+		if !ExcludedLanguagePath(path) {
+			t.Errorf("translation catalog %s was scanned as English prose", path)
+		}
+	}
+	for _, path := range []string{"app/locales/en.json", "app/locales/en-GB.json", "app/locales/fr.md", "app/fr.json", "app/locales/notes.json"} {
+		if ExcludedLanguagePath(path) {
+			t.Errorf("%s left the English rule", path)
+		}
+	}
 }
 
 func TestTaskLanguageFollowsPagesThroughProvider(t *testing.T) {

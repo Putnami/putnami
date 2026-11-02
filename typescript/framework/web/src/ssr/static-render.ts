@@ -10,6 +10,16 @@ import { escapeHtml } from '../client/document/tag.utils';
 import { IslandModeContext } from '../client/island/island';
 import { ISLAND_TAG } from '../client/island/island-types';
 import { CsrfTokenContext } from '../shared/csrf-context';
+import { I18nProvider } from '../shared/i18n/messages';
+import {
+  applyLocaleHead,
+  createI18nState,
+  htmlAttributes,
+  type I18nRuntimeOptions,
+  i18nPayloadScript,
+  localeBasename,
+  seedDocumentLocale,
+} from './i18n/runtime';
 import { createStaticRenderContext, isStaticRenderViolation, type StaticPathParams } from './static';
 import { ensureDocumentMeta } from '../shared/context-slots';
 
@@ -45,6 +55,8 @@ interface StaticRenderOptions {
    * stays zero-JavaScript.
    */
   islandsScript?: string;
+  /** The application's locales and catalogs, when it is localized. */
+  i18n?: I18nRuntimeOptions;
 }
 
 /** Reads the inner HTML of a `<div>` whose open tag ended at `from`, honouring nested `<div>`s. */
@@ -145,7 +157,10 @@ export function inlineDeferredBoundaries(html: string): string {
  * {@link StaticRenderViolation} on any request-scoped access.
  */
 export async function renderStaticDocument(options: StaticRenderOptions): Promise<StaticRenderResult> {
-  const { routes, route, pathname, params = {}, basename, timeoutMs = 10_000 } = options;
+  const { routes, route, pathname, params = {}, timeoutMs = 10_000 } = options;
+  // The pathname carries the locale prefix; the router basename takes it off.
+  const i18nState = options.i18n ? createI18nState(options.i18n, pathname, true) : undefined;
+  const basename = i18nState ? localeBasename(i18nState, options.basename) : options.basename;
 
   const staticHandler = createStaticHandler(routes, basename ? { basename } : undefined);
   const url = new URL(pathname, 'http://localhost');
@@ -184,8 +199,9 @@ export async function renderStaticDocument(options: StaticRenderOptions): Promis
 
   const router = createStaticRouter(staticHandler.dataRoutes, context);
   const documentMeta = ensureDocumentMeta(ctx);
+  if (i18nState) seedDocumentLocale(documentMeta, i18nState);
 
-  const tree = React.createElement(
+  const pageTree = React.createElement(
     IslandModeContext.Provider,
     { value: 'static' as const },
     React.createElement(
@@ -198,6 +214,7 @@ export async function renderStaticDocument(options: StaticRenderOptions): Promis
       ),
     ),
   );
+  const tree = i18nState ? React.createElement(I18nProvider, { value: i18nState }, pageTree) : pageTree;
 
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
@@ -233,6 +250,7 @@ export async function renderStaticDocument(options: StaticRenderOptions): Promis
   // at build time so the document is complete, in-order and zero-JavaScript.
   bodyHtml = inlineDeferredBoundaries(bodyHtml);
 
+  if (i18nState) applyLocaleHead(documentMeta, i18nState);
   const docHelper = new SsrDocumentHelper(documentMeta);
   const headHtml = docHelper.headHtml || '<head></head>';
   const headWithExtra = options.headExtra ? headHtml.replace('</head>', `${options.headExtra}</head>`) : headHtml;
@@ -244,10 +262,13 @@ export async function renderStaticDocument(options: StaticRenderOptions): Promis
     hasIslands && options.islandsScript
       ? `<script type="module" src="${escapeHtml(options.islandsScript)}"></script>`
       : '';
-  const bodyExtra = `${options.bodyExtra ?? ''}${islandScriptTag}`;
+  // Islands read their locale from a data block, which a strict CSP allows:
+  // the browser never runs it. A page without islands ships none.
+  const i18nScript = hasIslands && options.i18n && i18nState ? i18nPayloadScript(options.i18n, i18nState, false) : '';
+  const bodyExtra = `${options.bodyExtra ?? ''}${i18nScript}${islandScriptTag}`;
 
   const html =
-    `<!DOCTYPE html><html lang="${escapeHtml(docHelper.lang)}">${headWithExtra}` +
+    `<!DOCTYPE html><html ${htmlAttributes(docHelper.lang, i18nState)}>${headWithExtra}` +
     `<body><div id="root">${bodyHtml}</div>${bodyExtra}</body></html>`;
 
   const status = context.statusCode && context.statusCode !== 200 ? context.statusCode : 200;

@@ -1,0 +1,64 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-spec.json",
+  "protocolVersion": 1,
+  "feature": "typescript/web-localization",
+  "outcomes": [
+    "An application lists its locales once and every localized route exists at a stable URL per published locale, with the default locale unprefixed",
+    "Default text lives next to the code as typed messages, and each locale's catalog records which default text each translation was made from",
+    "A published locale is complete: the build refuses a missing, malformed or placeholder-mismatched translation, and reports translations made from a changed default text",
+    "Search engines and assistive technology read the language of every page and the address of each of its translations"
+  ],
+  "nonGoals": [
+    "Translating text at request time or calling a translation service from the build",
+    "Redirecting a content page because of the reader's browser language or stored preference",
+    "Storing the reader's locale preference in browser storage the server cannot read",
+    "Agent translation, human validation commands, sitemaps, per-locale domains and translated slugs, which later phases deliver"
+  ],
+  "requirements": [
+    {
+      "id": "locale-configuration",
+      "text": "The generation configuration's i18n block names well-formed, unique BCP 47 locales that include the default locale; an invalid block fails generation before any route or artifact is written."
+    },
+    {
+      "id": "locale-routes",
+      "text": "Generation registers every layout, page, error and not-found route once per published locale, unprefixed for the default locale and under /<locale> otherwise, except routes matching an excluded pattern, which stay in the default locale only; the render manifest and the HTTP route inventory list each registered route."
+    },
+    {
+      "id": "locale-document",
+      "text": "A rendered page carries its route's locale in the html lang attribute, the matching text direction in the dir attribute, and the Content-Language response header when it is rendered per request."
+    },
+    {
+      "id": "typed-messages",
+      "text": "A messages declaration names a namespace and default ICU MessageFormat strings; formatting in a locale uses that locale's catalog text, supports arguments, plural, selectordinal, select, number and date arguments through Intl, and falls back to the default text when the catalog holds no translation, which a production build refuses for a published locale."
+    },
+    {
+      "id": "message-payload",
+      "text": "A static page's islands receive the catalog entries of the namespaces the page rendered, and a hydrated page receives its locale's whole catalog because client navigation can render any namespace; both receive their locale only, through script-safe serialization, and the default locale ships no catalog."
+    },
+    {
+      "id": "catalog-sync",
+      "text": "Generation keeps each non-default locale catalog aligned with the declared messages: it adds a missing key, removes a key no declaration holds, records the source hash a translation was made from, and marks a translation stale when its source hash changes, without altering its text."
+    },
+    {
+      "id": "catalog-check",
+      "text": "Generation fails when a published locale lacks a translation, when a message is not valid ICU MessageFormat, or when a translation's arguments differ from its default text's arguments, and warns for each stale translation."
+    },
+    {
+      "id": "alternate-links",
+      "text": "A localized page's head lists an absolute alternate link per published locale with its hreflang, an x-default alternate to the default locale, a canonical link to itself and its og:locale; a route outside the localized set emits its canonical link only, and a page marked noindex emits none of them."
+    },
+    {
+      "id": "locale-switcher",
+      "text": "The locale switcher renders one link per published locale to the same route in that locale, with hreflang and lang attributes and the locale's own name as its text, marks the current locale with aria-current, and records an explicit choice in the locale preference cookie."
+    },
+    {
+      "id": "localized-links",
+      "text": "A Link to an absolute path inside the application resolves under the current page's locale prefix unless it names another locale."
+    },
+    {
+      "id": "entry-negotiation",
+      "text": "A request for the application root without a locale prefix redirects with 302 and Vary: Accept-Language, Cookie to the locale named by the preference cookie, else the best Accept-Language match, when that locale is not the default; every other path is served in the locale its URL names."
+    }
+  ],
+  "decisions": ["typescript/framework/web/doc/adr/0001-rendering-is-explicit-across-separate-runtime-graphs.md"]
+}

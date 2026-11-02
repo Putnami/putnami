@@ -3,6 +3,7 @@ import { getBuildInfo, getProjectRoot, joinPath } from '@putnami/utils';
 import type { RouteObject } from 'react-router';
 import type { ReactPluginConfig } from './react-plugin';
 import type { PutnamiReactConfigExtras } from './react-ssr.config';
+import type { I18nRuntimeOptions } from './i18n/runtime';
 import { renderStaticDocument, type StaticRenderResult } from './static-render';
 import { staticServeHandler } from './static-serve.utils';
 import { type StaticPathParams, type StaticRouteMeta, toStaticConfig } from './static';
@@ -20,6 +21,7 @@ export class ReactStaticServer {
     private readonly routes: () => RouteObject[],
     private readonly basename: () => string | undefined,
     private readonly islandsScript: () => string | undefined,
+    private readonly i18n: () => I18nRuntimeOptions | undefined = () => undefined,
   ) {}
 
   /**
@@ -67,6 +69,7 @@ export class ReactStaticServer {
       basename: this.basename(),
       timeoutMs: this.config.ssrTimeout,
       islandsScript: this.islandsScript(),
+      i18n: this.i18n(),
     });
   }
 }

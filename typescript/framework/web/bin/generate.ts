@@ -53,6 +53,7 @@ import {
   type ManifestRoute,
   serializeManifest,
 } from '../src/ssr/manifest';
+import { formatDiagnostic, type I18nBuild, localizeRows, resolveI18nBuild } from '../src/ssr/i18n/build';
 import type { ReactApplication } from '../src/ssr/react-application';
 import { buildWebAssetHttpRoutes, buildWebPageHttpRoutes, type WebPageRouteFact } from '../src/ssr/http-routes';
 import { PutnamiReactConfig } from '../src/ssr/react-ssr.config';
@@ -96,6 +97,7 @@ async function runGenerate(_options: unknown, context: HookContext): Promise<Hoo
     confInit: generationConfig.react,
   });
   const config = { ...putnami, ...reactConf };
+  const i18n = await resolveI18n(projectRoot, configuredPutnamiBlock, context);
   const scanRoots = resolveScanRoots(projectRoot, config);
   if (scanRoots.length === 0) {
     emitLog('info', 'No React app directory found, skipping generation');
@@ -120,6 +122,7 @@ async function runGenerate(_options: unknown, context: HookContext): Promise<Hoo
   const appGenerator = new ReactApplicationGenerator(reactApplicationPath, outputRelatifScanDir, outputScanPath);
   const clientGenerator = new ReactClientGenerator(reactClientPath, outputRelatifScanDir, outputScanPath);
   const islandGenerator = new IslandClientGenerator(islandsEntryPath, outputRelatifScanDir);
+  if (i18n) appGenerator.setI18n({ settings: i18n.settings, messages: i18n.messages });
 
   // Scan for React files
   const layouts: string[] = [];
@@ -306,7 +309,7 @@ async function runGenerate(_options: unknown, context: HookContext): Promise<Hoo
     }, 0);
 
   const manifest = buildManifest({
-    routes: [...manifestRoutes.values()],
+    routes: localizeRows(i18n?.settings, [...manifestRoutes.values()]),
     islands: manifestIslands,
     hydrateBytes: sumGzBytes(addClientScripts),
     islandsBytes: sumGzBytes(islandScripts),
@@ -331,7 +334,7 @@ async function runGenerate(_options: unknown, context: HookContext): Promise<Hoo
     projectJson?.name ||
     basename(projectRoot);
   const httpRoutesFragment = writeHttpRoutesFragment(projectRoot, 'web', projectName, [
-    ...buildWebPageHttpRoutes(httpPageRoutes),
+    ...buildWebPageHttpRoutes(localizeRows(i18n?.settings, httpPageRoutes)),
     ...buildWebAssetHttpRoutes(
       config.publicFolder,
       [...addClientScripts, ...islandScripts].map((script) => script.route),
@@ -349,6 +352,35 @@ async function runGenerate(_options: unknown, context: HookContext): Promise<Hoo
     assets,
     data: { httpRoutes: completeHttpRoutesEvaluation() },
   };
+}
+
+/**
+ * Read and check the project's localization before anything is written. An
+ * error in a catalog or a message fails generation; so does a missing
+ * translation when the build is a production one. Everything else is logged.
+ */
+async function resolveI18n(
+  projectRoot: string,
+  configuredPutnamiBlock: unknown,
+  context: HookContext,
+): Promise<I18nBuild | undefined> {
+  const raw = (configuredPutnamiBlock as { i18n?: unknown } | undefined)?.i18n;
+  if (raw === undefined) return undefined;
+  const i18n = await resolveI18nBuild(projectRoot, raw, context.mode === 'build');
+  const errors = i18n.diagnostics.filter((d) => d.level === 'error');
+  for (const warning of i18n.diagnostics.filter((d) => d.level === 'warning')) {
+    emitLog('warn', formatDiagnostic(warning));
+  }
+  if (errors.length > 0) {
+    throw new Error(
+      `${errors.length} localization error(s); run \`putnami i18n sync\` and translate:\n${errors.map(formatDiagnostic).join('\n')}`,
+    );
+  }
+  const stale = i18n.catalogs.filter((c) => c.outOfSync).map((c) => c.locale);
+  if (stale.length > 0) {
+    emitLog('info', `Catalogs out of sync with the messages (${stale.join(', ')}); run \`putnami i18n sync\``);
+  }
+  return i18n;
 }
 
 // Only run when executed directly, not when imported

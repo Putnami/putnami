@@ -1,24 +1,28 @@
 import type { ReactNode } from 'react';
-import { Link } from '@putnami/web';
+import { Link, useT } from '@putnami/web';
 import { styled } from '@putnami/ui';
+import footer from './footer.messages';
 
 // `release` is the island that shows the latest Putnami version (see
 // app/release-version.island.tsx); the footer itself stays server-rendered.
-export const Footer = ({ release }: { release?: ReactNode }) => (
-  <StyledFooter as='footer'>
-    <FooterLicense>
-      {release}
-      Licensed under{' '}
-      <Link to='/LICENSE.md' target='_blank' rel='noopener noreferrer'>
-        FSL-1.1-MIT
-      </Link>
-      {' — '}
-      {/* The site measures its own audience without cookies. That is exempt
-          from consent, never from telling people about it. */}
-      <Link to='/privacy'>Privacy</Link>
-    </FooterLicense>
-  </StyledFooter>
-);
+export const Footer = ({ release }: { release?: ReactNode }) => {
+  const t = useT(footer);
+  return (
+    <StyledFooter as='footer'>
+      <FooterLicense>
+        {release}
+        {t.licensedUnder()} {/* A file, not a page: a plain anchor, so no locale prefix is added. */}
+        <a href='/LICENSE.md' target='_blank' rel='noopener noreferrer'>
+          FSL-1.1-MIT
+        </a>
+        {' — '}
+        {/* The site measures its own audience without cookies. That is exempt
+            from consent, never from telling people about it. */}
+        <Link to='/privacy'>{t.privacy()}</Link>
+      </FooterLicense>
+    </StyledFooter>
+  );
+};
 
 const StyledFooter = styled.footer`
   text-align: center;

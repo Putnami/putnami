@@ -14,10 +14,12 @@ import {
   ThemeToggle,
   Tooltip,
 } from '@putnami/ui';
+import { LocaleSwitcher, useLocale, useT } from '@putnami/web';
 import { useState } from 'react';
 import type { NavItem } from '../lib/docs/navigation';
 import { SITE_MAX_WIDTH } from '../theme';
 import { frameworkStartList, TOOLS, toolList } from '../lib/tools';
+import navbar from './navbar.messages';
 import { PutnamiLogo } from './putnami-logo';
 import { Sidebar } from './sidebar';
 import { ToolGlyph } from './tool-glyph';
@@ -53,16 +55,19 @@ const GUIDE_LINKS = [
 // from the live location rather than a router hook.
 export function Navbar({ navItems }: { navItems?: NavItem[] }) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const t = useT(navbar);
+  const { localize } = useLocale();
   const mobileMenuId = 'mobile-nav-drawer';
   const currentPath = typeof window !== 'undefined' ? window.location.pathname : '';
 
   return (
     <StyledNav>
       <Container maxWidth={SITE_MAX_WIDTH}>
-        <Flex as='nav' aria-label='Navigation' alignItems='center' style={{ height: '64px' }}>
+        <Flex as='nav' aria-label={t.navigation()} alignItems='center' style={{ height: '64px' }}>
           <Flex alignItems='center' gap='sm'>
             <a
-              href='/'
+              href={localize('/')}
+              aria-label={t.home()}
               style={{ display: 'flex', alignItems: 'center', color: 'var(--color-text)', textDecoration: 'none' }}
               onClick={() => setIsMobileMenuOpen(false)}
             >
@@ -74,15 +79,15 @@ export function Navbar({ navItems }: { navItems?: NavItem[] }) {
                 only appears from the lg breakpoint; below that the drawer
                 carries the same links. */}
             <Flex display={['none', 'none', 'none', 'flex']} alignItems='center' gap='md'>
-              <StyledNavLink href='/docs/why'>Why</StyledNavLink>
+              <StyledNavLink href='/docs/why'>{t.why()}</StyledNavLink>
               <NavDropdown>
                 <summary>
-                  Docs
+                  {t.docs()}
                   <ChevronDownIcon />
                 </summary>
                 <div className='docs-menu-panel'>
                   <div className='menu-section'>
-                    <span className='menu-heading'>Start</span>
+                    <span className='menu-heading'>{t.start()}</span>
                     {START_LINKS.map((link) => (
                       <a key={link.href} href={link.href} className='menu-link'>
                         <span className='menu-title'>{link.label}</span>
@@ -97,7 +102,7 @@ export function Navbar({ navItems }: { navItems?: NavItem[] }) {
                     ))}
                   </div>
                   <div className='menu-section'>
-                    <span className='menu-heading'>Choose a surface</span>
+                    <span className='menu-heading'>{t.chooseSurface()}</span>
                     {toolList().map((tool) => (
                       <a key={tool.id} href={tool.href} className='menu-link surface-row'>
                         <ToolGlyph tool={tool} size={28} />
@@ -109,13 +114,13 @@ export function Navbar({ navItems }: { navItems?: NavItem[] }) {
                     ))}
                   </div>
                   <div className='menu-section'>
-                    <span className='menu-heading'>Common guides</span>
+                    <span className='menu-heading'>{t.commonGuides()}</span>
                     {GUIDE_LINKS.map((link) => (
                       <a key={link.href} href={link.href} className='menu-link compact'>
                         {link.label}
                       </a>
                     ))}
-                    <span className='menu-heading menu-heading-stacked'>The system model</span>
+                    <span className='menu-heading menu-heading-stacked'>{t.systemModel()}</span>
                     {SYSTEM_LINKS.map((link) => (
                       <a key={link.href} href={link.href} className='menu-link compact'>
                         {link.label}
@@ -133,7 +138,7 @@ export function Navbar({ navItems }: { navItems?: NavItem[] }) {
                   not offer: `python-is-browseable-not-anchored` in the spec. */}
               <NavDropdown>
                 <summary>
-                  Frameworks
+                  {t.frameworks()}
                   <ChevronDownIcon />
                 </summary>
                 <div className='fw-menu-panel'>
@@ -147,7 +152,7 @@ export function Navbar({ navItems }: { navItems?: NavItem[] }) {
                     </a>
                   ))}
                   <a href='/docs/frameworks' className='menu-link compact'>
-                    All frameworks →
+                    {t.allFrameworks()}
                   </a>
                 </div>
               </NavDropdown>
@@ -155,17 +160,18 @@ export function Navbar({ navItems }: { navItems?: NavItem[] }) {
               <SearchButton
                 type='button'
                 onClick={() => document.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', metaKey: true }))}
-                aria-label='Search documentation'
+                aria-label={t.searchDocs()}
               >
                 <SearchNavIcon />
-                <span>Search</span>
+                <span>{t.search()}</span>
                 <SearchKbd>
                   <kbd>⌘</kbd>
                   <kbd>K</kbd>
                 </SearchKbd>
               </SearchButton>
               <ThemeToggle />
-              <Tooltip label='View on GitHub'>
+              <LocaleSwitcher label={t.language()} className='locale-switcher' />
+              <Tooltip label={t.viewOnGithub()}>
                 <a
                   href='https://github.com/putnami/putnami'
                   target='_blank'
@@ -184,7 +190,7 @@ export function Navbar({ navItems }: { navItems?: NavItem[] }) {
                 variant='ghost'
                 size='sm'
                 type='button'
-                aria-label='Search'
+                aria-label={t.search()}
                 onClick={() => document.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', metaKey: true }))}
               >
                 <SearchNavIcon />
@@ -193,7 +199,7 @@ export function Navbar({ navItems }: { navItems?: NavItem[] }) {
                 variant='ghost'
                 size='sm'
                 type='button'
-                aria-label='Open Menu'
+                aria-label={t.openMenu()}
                 aria-expanded={isMobileMenuOpen}
                 aria-controls={mobileMenuId}
                 onClick={() => setIsMobileMenuOpen(true)}
@@ -208,7 +214,7 @@ export function Navbar({ navItems }: { navItems?: NavItem[] }) {
       <Drawer isOpen={isMobileMenuOpen} onClose={() => setIsMobileMenuOpen(false)} placement='right' size='xs'>
         <DrawerHeader>
           <Flex justifyContent='space-between' alignItems='center' width='100%'>
-            <span style={{ fontWeight: 700 }}>Menu</span>
+            <span style={{ fontWeight: 700 }}>{t.menu()}</span>
             <DrawerCloseButton onClose={() => setIsMobileMenuOpen(false)} />
           </Flex>
         </DrawerHeader>
@@ -231,7 +237,7 @@ export function Navbar({ navItems }: { navItems?: NavItem[] }) {
                 {TOOLS['tooling'].short}
               </StyledMobileNavLink>
               <StyledMobileNavLink href='/docs/frameworks' onClick={() => setIsMobileMenuOpen(false)}>
-                Frameworks
+                {t.frameworks()}
               </StyledMobileNavLink>
               <StyledMobileNavLink href={TOOLS['cloud'].href} onClick={() => setIsMobileMenuOpen(false)}>
                 {TOOLS['cloud'].short}
@@ -256,6 +262,7 @@ export function Navbar({ navItems }: { navItems?: NavItem[] }) {
               Docs
             </StyledMobileNavLink>
             <Flex alignItems='center' gap='md'>
+              <LocaleSwitcher label={t.language()} className='locale-switcher' />
               <a
                 href='https://github.com/putnami/putnami'
                 target='_blank'
@@ -286,6 +293,36 @@ const StyledNav = styled.header`
   }
   backdrop-filter: blur(12px);
   border-bottom: 1px solid var(--color-border);
+
+  /* The locale switcher is a list of links, one per locale; the current one
+     carries aria-current and is not a call to action. */
+  .locale-switcher ul {
+    display: flex;
+    gap: 2px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .locale-switcher a {
+    display: block;
+    padding: 2px 6px;
+    border-radius: var(--radius-sm);
+    color: var(--color-text-muted);
+    font-size: 0.8rem;
+    font-weight: 500;
+    text-decoration: none;
+  }
+
+  .locale-switcher a:hover {
+    color: var(--color-text);
+    background: var(--color-surface-hover);
+  }
+
+  .locale-switcher a[aria-current='page'] {
+    color: var(--color-text);
+    background: var(--color-surface-hover);
+  }
 `;
 
 const StyledNavLink = styled.a`

@@ -1295,6 +1295,21 @@
     },
     {
       "match": "exact",
+      "path": "/docs/frameworks/typescript/localization",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "publicEdge": true,
+      "provenance": {
+        "project": "putnami.dev",
+        "package": "@putnami/web",
+        "sourceKind": "file-route",
+        "evidencePath": "src/app/docs/[...page]/page.tsx"
+      }
+    },
+    {
+      "match": "exact",
       "path": "/docs/frameworks/typescript/logging",
       "methods": [
         "GET",
@@ -2480,6 +2495,21 @@
     },
     {
       "match": "exact",
+      "path": "/fr",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "publicEdge": true,
+      "provenance": {
+        "project": "putnami.dev",
+        "package": "@putnami/web",
+        "sourceKind": "file-route",
+        "evidencePath": "src/app/page.tsx"
+      }
+    },
+    {
+      "match": "exact",
       "path": "/install-commands.txt",
       "methods": [
         "GET",
@@ -2682,5 +2712,5 @@
       }
     }
   ],
-  "digest": "sha256:a394ca5b236489620820e82ed6515a16b2ca75aa8a3109ba472b72ec1d2d1c54"
+  "digest": "sha256:20d3063b64f96c09d4cbb03c9b31733d944e845065a3a41aed3becba24718aba"
 }

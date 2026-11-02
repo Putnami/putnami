@@ -156,8 +156,10 @@ export async function prerenderStaticRoutes(
       paramSets = [{}];
     }
 
-    for (const params of paramSets) {
-      const pathname = dynamic ? fillRoutePath(route, params) : route;
+    const pathnames = paramSets.flatMap((params) =>
+      app.localizedPathnames(dynamic ? fillRoutePath(route, params) : route).map((pathname) => ({ pathname, params })),
+    );
+    for (const { pathname, params } of pathnames) {
       try {
         const result = await app.prerender(pathname, params, route);
         if (result.redirectLocation || !result.html) {

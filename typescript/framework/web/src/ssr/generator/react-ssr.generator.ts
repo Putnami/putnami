@@ -7,6 +7,8 @@ import {
   relativePath,
   toPosixPath,
 } from '@putnami/utils';
+import type { LocaleSettings } from '../../shared/i18n/locale';
+import type { LocaleMessages } from '../../shared/i18n/messages';
 import { applyRoutePrefix, asRoute } from '../react-ssr.utils';
 import type { StaticRouteMeta } from '../static';
 import type { CompilationResult } from './build';
@@ -36,6 +38,14 @@ export class ReactApplicationGenerator {
       .appendHead(`import { ReactApplication } from '@putnami/web';`);
 
     this.generator.append('export default new ReactApplication()');
+  }
+
+  /**
+   * Localize the application. Must run before any route is added: the
+   * generated `.i18n()` call has to precede every registration it multiplies.
+   */
+  setI18n(i18n: { settings: LocaleSettings; messages: Readonly<Record<string, LocaleMessages>> }) {
+    this.generator.append(`  .i18n(${JSON.stringify(i18n)})`);
   }
 
   addLayout(layoutFile: string, options?: ReactGeneratorFileOptions) {

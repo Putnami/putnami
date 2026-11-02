@@ -1,4 +1,4 @@
-import { HeaderLink, PageMeta as BasePageMeta, Script, type PageMetaProps as BasePageMetaProps } from '@putnami/web';
+import { PageMeta as BasePageMeta, Script, type PageMetaProps as BasePageMetaProps, useLocale } from '@putnami/web';
 
 export interface PageMetaProps extends Omit<BasePageMetaProps, 'siteName' | 'baseUrl' | 'image'> {
   image?: string;
@@ -12,16 +12,22 @@ export const BASE_URL = 'https://putnami.dev';
 
 /**
  * Page meta component with Putnami.dev defaults.
- * Wraps @putnami/web PageMeta with site-specific configuration.
- * Adds canonical link and optional JSON-LD structured data.
+ * Wraps @putnami/web PageMeta with site-specific configuration and optional
+ * JSON-LD structured data. The framework writes the canonical link and the
+ * alternates of each locale; `url` is the page's path in the default locale.
  */
-export function PageMeta({ image, jsonLd, ...props }: PageMetaProps) {
-  const canonicalUrl = props.url ? `${BASE_URL}${props.url.startsWith('/') ? props.url : `/${props.url}`}` : undefined;
+export function PageMeta({ image, jsonLd, url, ...props }: PageMetaProps) {
+  const { localize } = useLocale();
 
   return (
     <>
-      <BasePageMeta {...props} siteName={SITE_NAME} baseUrl={BASE_URL} image={image || DEFAULT_IMAGE} />
-      {canonicalUrl && <HeaderLink rel='canonical' href={canonicalUrl} />}
+      <BasePageMeta
+        {...props}
+        url={url ? localize(url) : undefined}
+        siteName={SITE_NAME}
+        baseUrl={BASE_URL}
+        image={image || DEFAULT_IMAGE}
+      />
       {jsonLd && <Script type='application/ld+json'>{JSON.stringify(jsonLd)}</Script>}
     </>
   );

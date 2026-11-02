@@ -4,6 +4,7 @@ export * from './error';
 export * from './event';
 export * from './form';
 export * from './hooks';
+export * from './i18n';
 export * from './island';
 export * from './page';
 export * from './router';

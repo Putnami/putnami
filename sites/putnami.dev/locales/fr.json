@@ -1,0 +1,607 @@
+{
+  "footer": {
+    "licensedUnder": {
+      "text": "Sous licence",
+      "source": "6c09ec564736f285",
+      "state": "draft"
+    },
+    "privacy": {
+      "text": "Confidentialité",
+      "source": "54a57c3147c49f33",
+      "state": "draft"
+    }
+  },
+  "home": {
+    "branchBody": {
+      "text": "Git porte l’intention — ce qui a changé, par qui, par rapport à quoi — et chaque document ci-dessus en est dérivé : une seule structure de workspace, un seul jeu de commandes et un seul jeu de contrats tiennent de votre poste à la CI, jusqu’à ce qui l’exécute. Les prévisualisations et déploiements gérés par branche sont la suite ; rien dans la chaîne n’exige de compte.",
+      "source": "9844de1e7f95c45f",
+      "state": "draft"
+    },
+    "branchLead": {
+      "text": "Votre branche est déjà un environnement.",
+      "source": "d175cb46a3fdbc8a",
+      "state": "draft"
+    },
+    "chain1Derives": {
+      "text": "le graphe du workspace",
+      "source": "3676d034e320b2dc",
+      "state": "draft"
+    },
+    "chain1Reads": {
+      "text": "la CLI, chaque extension, chaque tâche",
+      "source": "67f282cd2d199574",
+      "state": "draft"
+    },
+    "chain2Declare": {
+      "text": "un handler HTTP",
+      "source": "635f928ffd441fad",
+      "state": "draft"
+    },
+    "chain2Derives": {
+      "text": "un inventaire des routes",
+      "source": "d8b192b257c1aac4",
+      "state": "draft"
+    },
+    "chain2Reads": {
+      "text": "votre edge, sous forme d’une liste d’autorisation générée qui refuse par défaut",
+      "source": "15223ddfb7e0103f",
+      "state": "draft"
+    },
+    "chain3Declare": {
+      "text": "un besoin d’infrastructure, à côté du code",
+      "source": "f1ff3efaac8eab12",
+      "state": "draft"
+    },
+    "chain3Derives": {
+      "text": "un manifeste fusionné, avec sa provenance",
+      "source": "4a0baa6e17f805cd",
+      "state": "draft"
+    },
+    "chain3Reads": {
+      "text": "votre cible de déploiement",
+      "source": "ddaa167240f0dee4",
+      "state": "draft"
+    },
+    "chain4Derives": {
+      "text": "un graphe de jobs validé",
+      "source": "9a0e9436b57e8926",
+      "state": "draft"
+    },
+    "chain4Reads": {
+      "text": "tout plan d’exécution — il lit le document, il ne l’élargit jamais",
+      "source": "52a9d5b61b7d566c",
+      "state": "draft"
+    },
+    "chain5Declare": {
+      "text": "une migration, un repository",
+      "source": "ba5706ded6446404",
+      "state": "draft"
+    },
+    "chain5Derives": {
+      "text": "l’empreinte d’un bundle",
+      "source": "f42c56ef293b1db4",
+      "state": "draft"
+    },
+    "chain5Reads": {
+      "text": "les adaptateurs Go et TypeScript, le provisionneur de tests",
+      "source": "bec63b1617828400",
+      "state": "draft"
+    },
+    "chain6Declare": {
+      "text": "— rien. c’est dérivé",
+      "source": "96dc975960488d1d",
+      "state": "draft"
+    },
+    "chain6Derives": {
+      "text": "le contexte de l’agent",
+      "source": "71579f05e0d0e94f",
+      "state": "draft"
+    },
+    "chain6Reads": {
+      "text": "votre agent, à travers la CLI",
+      "source": "078792a12603ad0b",
+      "state": "draft"
+    },
+    "chainCaption": {
+      "text": "Chaque ligne ci-dessus est un protocole filaire : un schéma publié, un corpus d’exemples valides et invalides, et un analyseur strict dans chaque langage qui l’implémente.",
+      "source": "af11a5aa0783cc24",
+      "state": "draft"
+    },
+    "chainDeclare": {
+      "text": "Vous déclarez",
+      "source": "0b08a6a4a02a05b7",
+      "state": "draft"
+    },
+    "chainDerives": {
+      "text": "Putnami dérive",
+      "source": "1061f3d1b4157222",
+      "state": "draft"
+    },
+    "chainLabel": {
+      "text": "Comment ça marche",
+      "source": "9c870aa6e5e93270",
+      "state": "draft"
+    },
+    "chainLede": {
+      "text": "Vous écrivez l’intention à côté du code qu’elle décrit. Putnami dérive le reste, de façon déterministe, et le publie comme un contrat que tout le monde peut analyser — y compris les outils que vous n’avez pas écrits.",
+      "source": "16ab363c26bee66f",
+      "state": "draft"
+    },
+    "chainReads": {
+      "text": "Qui le lit",
+      "source": "7b68c4d40b7046c5",
+      "state": "draft"
+    },
+    "chainTitle": {
+      "text": "Une déclaration. Tout ce qui suit la lit.",
+      "source": "a89751d97b4eb839",
+      "state": "draft"
+    },
+    "contextPackAfter": {
+      "text": "— chemins, empreintes et plages, jamais le contenu des fichiers — derrière un contrôle de publication qui échoue fermé. Affiché en lecture seule par la CLI.",
+      "source": "e9f8c5cecfe51cfe",
+      "state": "draft"
+    },
+    "contextPackBefore": {
+      "text": "Un document d’orientation déterministe par projet : identité et graphe de dépendances, racines de composition, références de capacités et de contrats, plages de code représentatives, tests, documentation, provenance. Agrégé",
+      "source": "008a0bb2d5e2c3cd",
+      "state": "draft"
+    },
+    "contextPackStrong": {
+      "text": "par référence",
+      "source": "b288a65caffdae32",
+      "state": "draft"
+    },
+    "ctaLede": {
+      "text": "Tout ce qui précède tourne sur votre machine, sans compte. La plateforme est là quand l’opérer cesse d’être votre travail.",
+      "source": "48ba5bead8ca5a88",
+      "state": "draft"
+    },
+    "ctaTitle": {
+      "text": "Commencez par un workspace.",
+      "source": "14cd19cc78694459",
+      "state": "draft"
+    },
+    "description": {
+      "text": "Un modèle de workspace, des primitives de framework pour Go et TypeScript, et une couche de protocoles filaires en dessous. Votre build, votre CI, votre infrastructure et vos agents lisent les mêmes contrats.",
+      "source": "d0e0d853879a1b60",
+      "state": "draft"
+    },
+    "docsLabel": {
+      "text": "Un modèle de documentation, chaque surface",
+      "source": "99442faaebd33995",
+      "state": "draft"
+    },
+    "docsTitle": {
+      "text": "L’outillage d’abord. La profondeur du langage quand vous en avez besoin.",
+      "source": "91cd15f5b32d7311",
+      "state": "draft"
+    },
+    "doctor": {
+      "text": "Des constats de préparation à la production selon un profil de déploiement, une taxonomie figée des codes de contrôle, et une remédiation intégrée à chaque contrôle. « Qu’est-ce qui ne va pas et que dois-je faire » est une donnée, pas de la prose.",
+      "source": "2bb248d93569e59e",
+      "state": "draft"
+    },
+    "getStarted": {
+      "text": "Commencer",
+      "source": "61e8d44ad423a4a0",
+      "state": "draft"
+    },
+    "heroLede": {
+      "text": "Putnami est un modèle de workspace, des primitives de framework pour Go et TypeScript, et une couche de protocoles filaires en dessous. Votre build, votre CI, votre infrastructure et vos agents lisent tous les mêmes contrats — de votre poste jusqu’à la production.",
+      "source": "2c2715ae96cd61f9",
+      "state": "draft"
+    },
+    "heroPill": {
+      "text": "Workspace · Protocoles · Opérable par des agents",
+      "source": "1507b858b196615e",
+      "state": "draft"
+    },
+    "heroTitle": {
+      "text": "Déclarez le système une seule fois. Les humains le relisent. Les agents l’opèrent.",
+      "source": "a37a98e128c627e3",
+      "state": "draft"
+    },
+    "impacted": {
+      "text": "Le rayon d’impact d’un changement, avant que quoi que ce soit n’agisse. Un agent qui sait ce qu’il va toucher est un agent que vous pouvez laisser travailler.",
+      "source": "4cc49f4134a17e78",
+      "state": "draft"
+    },
+    "matrixAfter": {
+      "text": ". Une matrice toujours au vert serait du marketing.",
+      "source": "45df21d08e99f5fb",
+      "state": "draft"
+    },
+    "matrixAligned": {
+      "text": "aligné à la main",
+      "source": "e60b240f964d94d3",
+      "state": "draft"
+    },
+    "matrixAlignedNote": {
+      "text": "(dérive possible), et",
+      "source": "2091680ac28daf41",
+      "state": "draft"
+    },
+    "matrixBefore": {
+      "text": "Le dépôt publie une matrice de conformité — qui implémente ou consomme chaque contrat, et comment c’est vérifié. Elle a trois états, et celui du milieu est publié exprès :",
+      "source": "53ea691e4e20200a",
+      "state": "draft"
+    },
+    "matrixNotConsumer": {
+      "text": "non consommateur",
+      "source": "fba36d30a6b83219",
+      "state": "draft"
+    },
+    "matrixTested": {
+      "text": "testé",
+      "source": "c29a4b42073219ba",
+      "state": "draft"
+    },
+    "metaTitle": {
+      "text": "Putnami — Déclarez le système une seule fois",
+      "source": "2036e24eb7fd6aea",
+      "state": "draft"
+    },
+    "openDocs": {
+      "text": "Ouvrir le hub de documentation →",
+      "source": "9e21834b72418b9d",
+      "state": "draft"
+    },
+    "operateCaption": {
+      "text": "Un flux d’événements JSONL par job : l’agent qui surveille un build et l’humain qui lit le journal analysent les mêmes lignes.",
+      "source": "cec00621af649434",
+      "state": "draft"
+    },
+    "operateLabel": {
+      "text": "Conçu pour être opéré",
+      "source": "72868c1541bfb654",
+      "state": "draft"
+    },
+    "operateLede": {
+      "text": "Il lit les mêmes contrats que votre build.",
+      "source": "b1bff390e9e2991b",
+      "state": "draft"
+    },
+    "operateTitle": {
+      "text": "Un agent n’a pas besoin qu’on lui explique votre dépôt.",
+      "source": "ff28bba98c72f8f4",
+      "state": "draft"
+    },
+    "outputModes": {
+      "text": "Codes de sortie, modes de sortie et documents machine forment un contrat versionné, pas un détail d’implémentation qui bouge sous un analyseur. Le même corpus valide la CLI Go et la CLI TypeScript.",
+      "source": "53742b6103f94281",
+      "state": "draft"
+    },
+    "pageCount": {
+      "text": "{count, plural, one {# page} other {# pages}}",
+      "source": "09e1ce4ae931f8ce",
+      "state": "draft"
+    },
+    "pain1Desc": {
+      "text": "De la configuration en cinq dialectes, l’infrastructure dans un autre dépôt, la CI dans le YAML d’un fournisseur. Rien dans git ne dit ce qu’est le système — seulement des fragments de la façon de le reconstruire, si vous la connaissez déjà.",
+      "source": "8595e7b884153153",
+      "state": "draft"
+    },
+    "pain1Title": {
+      "text": "Le système n’existe qu’à l’exécution",
+      "source": "54c115d6798d7a9f",
+      "state": "draft"
+    },
+    "pain2Desc": {
+      "text": "La CLI sait ce que le framework émet parce que la même personne a écrit les deux. Ajoutez un langage, un second consommateur ou un agent, et la convention ne vit plus que dans la tête de quelqu’un.",
+      "source": "b92f543da43c5a7f",
+      "state": "draft"
+    },
+    "pain2Title": {
+      "text": "Chaque frontière est une convention",
+      "source": "9e61fe553e5d9f4d",
+      "state": "draft"
+    },
+    "pain3Desc": {
+      "text": "Le local, la CI et la production divergent sans bruit, car rien dans le système ne les compare. Vous l’apprenez au pire moment.",
+      "source": "efbcde4df9d8c179",
+      "state": "draft"
+    },
+    "pain3Title": {
+      "text": "La dérive n’est pas non corrigée. Elle est invisible.",
+      "source": "17d6ddfd63ddb292",
+      "state": "draft"
+    },
+    "pain4Desc": {
+      "text": "Un agent peut écrire du code dans votre dépôt. Opérer votre système — connaître le rayon d’impact, lire l’état, annuler une erreur — demande un contrat, et vous n’en avez aucun à lui confier.",
+      "source": "a96bd37c6bb6dcca",
+      "state": "draft"
+    },
+    "pain4Title": {
+      "text": "Les agents savent modifier. Pas opérer.",
+      "source": "12bf51e3b0602ec1",
+      "state": "draft"
+    },
+    "principle1Desc": {
+      "text": "Chaque runtime émet des signaux structurés par défaut. Le local, la prévisualisation et la production exposent la même forme.",
+      "source": "feaeffdb4ddd2b01",
+      "state": "draft"
+    },
+    "principle1Title": {
+      "text": "Observable par construction",
+      "source": "0ab117b708db0b6c",
+      "state": "draft"
+    },
+    "principle2Desc": {
+      "text": "Les valeurs par défaut doivent tenir la charge de production. Les régressions sont détectables en CI. Les abstractions exposent leur coût.",
+      "source": "6e748f030cb3cb03",
+      "state": "draft"
+    },
+    "principle2Title": {
+      "text": "La performance est une contrainte",
+      "source": "101cb4382cdb7843",
+      "state": "draft"
+    },
+    "principle3Desc": {
+      "text": "Git définit l’intention du système. Les déploiements sont des fonctions pures d’un état versionné. La dérive est détectable.",
+      "source": "b2372df4a766da5a",
+      "state": "draft"
+    },
+    "principle3Title": {
+      "text": "Déterministe et relisible",
+      "source": "8d87ce1a8a85f7fb",
+      "state": "draft"
+    },
+    "principle4Desc": {
+      "text": "Les valeurs par défaut sûres sont imposées. Le système échoue fermé. Les chemins dangereux exigent une acceptation explicite.",
+      "source": "dff364941c049ab5",
+      "state": "draft"
+    },
+    "principle4Title": {
+      "text": "La sécurité est fondamentale",
+      "source": "140b36c319f1c966",
+      "state": "draft"
+    },
+    "principle5Desc": {
+      "text": "Les données vivent dans des stockages que vous contrôlez. Les schémas sont versionnés, portables et font partie du contrat.",
+      "source": "e108f6eec9b363b5",
+      "state": "draft"
+    },
+    "principle5Title": {
+      "text": "La propriété des données n’est pas négociable",
+      "source": "e3370cac907fb290",
+      "state": "draft"
+    },
+    "principle6Desc": {
+      "text": "La CLI est l’interface principale. Sa sortie est déterministe et lisible par une machine : humains et machines suivent les mêmes règles.",
+      "source": "c629700b486655a9",
+      "state": "draft"
+    },
+    "principle6Title": {
+      "text": "L’automatisation est un utilisateur de premier rang",
+      "source": "2a432209772898d8",
+      "state": "draft"
+    },
+    "principlesLabel": {
+      "text": "Principes",
+      "source": "0be561015c991b10",
+      "state": "draft"
+    },
+    "principlesTitle": {
+      "text": "Des contraintes, pas des aspirations. Une violation est un bug.",
+      "source": "3032ac3b4b8f8af1",
+      "state": "draft"
+    },
+    "problemLabel": {
+      "text": "Pourquoi ce projet existe",
+      "source": "54e879ed145cf24c",
+      "state": "draft"
+    },
+    "problemTitle": {
+      "text": "Votre système est réel. Sa description ne l’est pas.",
+      "source": "1aee06922ec94706",
+      "state": "draft"
+    },
+    "protocolsLabel": {
+      "text": "Pourquoi vous pouvez tout vérifier",
+      "source": "ae4b585a7a905401",
+      "state": "draft"
+    },
+    "protocolsLede": {
+      "text": "Les frameworks, l’outillage et la plateforme ne s’intègrent pas par du code partagé. Ils s’intègrent par des protocoles : un schéma publié, un corpus d’exemples valides et invalides, un analyseur strict dans chaque langage qui l’implémente, et au moins un vrai consommateur.",
+      "source": "b0a6c612d40d6609",
+      "state": "draft"
+    },
+    "protocolsQuote": {
+      "text": "Un protocole sans consommateur est une spécification, pas un contrat.",
+      "source": "725c70dc9b577a36",
+      "state": "draft"
+    },
+    "protocolsTitle": {
+      "text": "Un paquet par frontière. Aucune hypothèse partagée.",
+      "source": "abf05fda8326cc10",
+      "state": "draft"
+    },
+    "readPrinciples": {
+      "text": "Lire tous les principes →",
+      "source": "0cfde472781dc954",
+      "state": "draft"
+    },
+    "readProtocols": {
+      "text": "Lire les protocoles →",
+      "source": "61559b22b783c2f9",
+      "state": "draft"
+    },
+    "supportStatus": {
+      "text": "État du support →",
+      "source": "a03e343c79eca95a",
+      "state": "draft"
+    },
+    "surfaceCloud": {
+      "text": "La profondeur opérationnelle sur les mêmes documents : provenance des releases, corrélation à l’exécution, contexte d’incident, protection des déploiements. Il lit votre inventaire de routes pour construire une liste d’autorisation, votre manifeste d’infrastructure pour provisionner, votre document de CI pour exécuter. Il n’a droit à aucun dialecte privé.",
+      "source": "64b067c5f81284be",
+      "state": "draft"
+    },
+    "surfaceDev": {
+      "text": "La précision structurelle. Le modèle de workspace, les primitives de framework, la CLI et la couche de protocoles en dessous. Complet en local, sans compte. FSL-1.1-MIT.",
+      "source": "ad7692a25540b12d",
+      "state": "draft"
+    },
+    "surfaceIntelligence": {
+      "text": "Ce qui est livré aujourd’hui : l’orientation des agents par la CLI, un index versionné du workspace, et le développement piloté par les spécifications — fonctionnalités, specs et architecture enregistrées à côté du code. La boucle de revue et d’audit, avec fraîcheur et preuves sur chaque constat, est la suite. Il fonctionne seul : utile sans les frameworks Putnami comme sans Putnami Cloud.",
+      "source": "b5a0d365bfcf641c",
+      "state": "draft"
+    },
+    "surfacesCaption": {
+      "text": "Adopter putnami.dev affine ce qu’Intelligence sait de votre structure. Adopter Cloud approfondit ce qu’il sait de vos opérations. Aucun n’est un prérequis — et Cloud s’intègre par les mêmes contrats publiés que n’importe quel adaptateur tiers. Son avantage est une corrélation sans configuration, pas un canal privé.",
+      "source": "b005bfde9fad8601",
+      "state": "draft"
+    },
+    "surfacesLabel": {
+      "text": "La forme du produit",
+      "source": "add89d4c2723ad76",
+      "state": "draft"
+    },
+    "surfacesTitle": {
+      "text": "Trois surfaces. Une déclaration.",
+      "source": "6e06ed4e83d43a43",
+      "state": "draft"
+    },
+    "viewOnGithub": {
+      "text": "Voir sur GitHub",
+      "source": "20672423d7169088",
+      "state": "draft"
+    },
+    "whyPutnami": {
+      "text": "Pourquoi Putnami →",
+      "source": "8215e2ad55f0127b",
+      "state": "draft"
+    }
+  },
+  "layout": {
+    "description": {
+      "text": "Un outillage de monorepo local d’abord, où chaque branche est un environnement exécutable. Orchestration du workspace, frameworks polyglottes et déploiements de prévisualisation — conçu pour les humains et les agents IA.",
+      "source": "937526e64a39b61b",
+      "state": "draft"
+    },
+    "metaTitle": {
+      "text": "Putnami — L’outillage de workspace natif aux branches pour TypeScript",
+      "source": "386fe077ea2d6f89",
+      "state": "draft"
+    }
+  },
+  "navbar": {
+    "allFrameworks": {
+      "text": "Tous les frameworks →",
+      "source": "668287fc391257f3",
+      "state": "draft"
+    },
+    "chooseSurface": {
+      "text": "Choisir une surface",
+      "source": "6e3261bb60678613",
+      "state": "draft"
+    },
+    "commonGuides": {
+      "text": "Guides courants",
+      "source": "6e684cdba36f6700",
+      "state": "draft"
+    },
+    "docs": {
+      "text": "Docs",
+      "source": "7af023c43013b9a5",
+      "state": "draft"
+    },
+    "frameworks": {
+      "text": "Frameworks",
+      "source": "cafd6b725820bd8e",
+      "state": "draft"
+    },
+    "home": {
+      "text": "Accueil Putnami",
+      "source": "d246c416aa5bda9e",
+      "state": "draft"
+    },
+    "language": {
+      "text": "Langue",
+      "source": "a4fe65264ef7dbb3",
+      "state": "draft"
+    },
+    "menu": {
+      "text": "Menu",
+      "source": "99af6606ff9d6cd5",
+      "state": "draft"
+    },
+    "navigation": {
+      "text": "Navigation",
+      "source": "3db65f8c2a7d1861",
+      "state": "draft"
+    },
+    "openMenu": {
+      "text": "Ouvrir le menu",
+      "source": "c219bbd71512525e",
+      "state": "draft"
+    },
+    "search": {
+      "text": "Rechercher",
+      "source": "49c266baaaa70981",
+      "state": "draft"
+    },
+    "searchDocs": {
+      "text": "Rechercher dans la documentation",
+      "source": "ea582e69cce77d67",
+      "state": "draft"
+    },
+    "start": {
+      "text": "Démarrer",
+      "source": "e4bb9f1ece9af926",
+      "state": "draft"
+    },
+    "systemModel": {
+      "text": "Le modèle du système",
+      "source": "0efd58bdac8b3836",
+      "state": "draft"
+    },
+    "viewOnGithub": {
+      "text": "Voir sur GitHub",
+      "source": "20672423d7169088",
+      "state": "draft"
+    },
+    "why": {
+      "text": "Pourquoi",
+      "source": "d3ae14a50bfe463f",
+      "state": "draft"
+    }
+  },
+  "status": {
+    "backHome": {
+      "text": "← Retour à l’accueil",
+      "source": "248d73477b661c52",
+      "state": "draft"
+    },
+    "error": {
+      "text": "Une erreur est survenue",
+      "source": "ab827e3fe17da220",
+      "state": "draft"
+    },
+    "errorDescription": {
+      "text": "Une erreur inattendue s’est produite.",
+      "source": "7053d12aceb59a1f",
+      "state": "draft"
+    },
+    "errorTitle": {
+      "text": "Une erreur est survenue — Putnami",
+      "source": "5b2e646cf2f03a10",
+      "state": "draft"
+    },
+    "notFound": {
+      "text": "Page introuvable",
+      "source": "a469ab4ca4e55bf5",
+      "state": "draft"
+    },
+    "notFoundDescription": {
+      "text": "La page que vous cherchez n’existe pas.",
+      "source": "74b78a922b993abc",
+      "state": "draft"
+    },
+    "notFoundTitle": {
+      "text": "Page introuvable — Putnami",
+      "source": "707cea469128542f",
+      "state": "draft"
+    }
+  }
+}
