@@ -11,6 +11,8 @@
   "extensions": [
     "/go/extension",
     "/typescript/extension",
+    "/typescript/framework/application",
+    "/typescript/framework/web",
     "/python/extension",
     "/tooling/scaffold",
     "/tooling/sdd-extension",
@@ -22,7 +24,8 @@
   ],
   "agentArtifacts": [
     "extension:@putnami/contributor",
-    "extension:@putnami/intelligence"
+    "extension:@putnami/intelligence",
+    "extension:@putnami/web"
   ],
   "includes": [
     "cloud",

@@ -1,0 +1,6 @@
+interface:
+  display_name: "Translate messages"
+  short_description: "Draft the missing and stale translations of a localized web project"
+  default_prompt: "Use $i18n-translate to draft the translations the build reports."
+policy:
+  allow_implicit_invocation: true

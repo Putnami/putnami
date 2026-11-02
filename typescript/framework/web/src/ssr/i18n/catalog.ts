@@ -163,8 +163,8 @@ export interface CatalogDiagnostic {
   message: string;
 }
 
-/** The arguments and tags a message uses, written `{name}` and `<name>`, sorted. */
-function argumentNames(text: string): string[] {
+/** The arguments and tags a message uses, written `{name}` and `<name>`, sorted. Throws on invalid ICU. */
+export function messageArguments(text: string): string[] {
   return [...icuArguments(parseIcu(text))].map(([name, kind]) => (kind === 'tag' ? `<${name}>` : `{${name}}`)).sort();
 }
 
@@ -186,7 +186,7 @@ export function checkCatalog(
       const id = `${namespace}.${key}`;
       let expected: string[];
       try {
-        expected = argumentNames(defaultText);
+        expected = messageArguments(defaultText);
       } catch (error) {
         diagnostics.push({
           level: 'error',
@@ -210,7 +210,7 @@ export function checkCatalog(
       }
       let actual: string[];
       try {
-        actual = argumentNames(entry.text);
+        actual = messageArguments(entry.text);
       } catch (error) {
         const detail = error instanceof IcuSyntaxError ? error.message : String(error);
         diagnostics.push({

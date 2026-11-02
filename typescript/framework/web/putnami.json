@@ -20,6 +20,10 @@
     },
     "test": {
       "filePatterns": ["../../../protocols/i18n/fixtures/**", "../../../protocols/i18n/schemas/**"]
+    },
+    "agent-artifact": {
+      "forbiddenContent": ["password", "access token", "api key", "github.com"],
+      "requiredSkills": ["i18n-translate"]
     }
   }
 }

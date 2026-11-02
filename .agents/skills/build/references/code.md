@@ -6,7 +6,10 @@ several issues of an epic, each in its own session, never slices of one issue.
 ## One slice
 
 1. Start from the slice contract: goal, done criteria, files, proof command.
-2. Edit, then format and finish the edits.
+2. Edit, then format and finish the edits. When a gate or a command names a
+   command that brings derived sources in step with the edit, such as a
+   catalog sync or a translation draft, run it and the skill it names before
+   the commit.
 3. Run the gate over the touched projects:
    `"$PUTNAMI_CLI" lint,test,build,validate --projects <a>,<b> --enforce-coverage`.
    Run it again only after a new edit. On a failure, iterate while the

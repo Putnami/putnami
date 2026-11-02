@@ -23,6 +23,40 @@
           "task": "web-i18n-sync-exec"
         }
       ]
+    },
+    "web-i18n-translate": {
+      "description": "Write the missing and stale translations of a localized web application to a work file, or apply the filled file as drafts",
+      "visibility": "internal",
+      "activationFiles": ["src/**/*.messages.ts", "src/**/*.messages.tsx"],
+      "flags": {
+        "apply": {
+          "type": "boolean",
+          "description": "Write the answers of .putnami/i18n/translate.json as drafts instead of writing a new work file."
+        }
+      },
+      "run": [
+        {
+          "id": "translate",
+          "task": "web-i18n-translate-exec"
+        }
+      ]
+    },
+    "web-i18n-validate": {
+      "description": "Let a person lock the draft and stale translations of a localized web application they accept",
+      "visibility": "internal",
+      "activation": "workspace-once",
+      "flags": {
+        "locale": {
+          "type": "string",
+          "description": "Validate this locale only (default: every published locale)."
+        }
+      },
+      "run": [
+        {
+          "id": "validate",
+          "task": "web-i18n-validate-exec"
+        }
+      ]
     }
   },
   "commandGroups": {
@@ -35,6 +69,28 @@
           "examples": [
             {
               "command": "putnami i18n sync --projects /sites/putnami.dev"
+            }
+          ]
+        },
+        "translate": {
+          "description": "Write .putnami/i18n/translate.json with every missing and stale entry of each published locale and its context: the default text, the old default text and translation of a stale entry, the glossary terms and the namespace's other translations. An agent fills it; --apply checks each answer (valid ICU, same arguments and tags, no validated entry) and writes them as drafts, or writes nothing when one is refused. Calls no model",
+          "command": "web-i18n-translate",
+          "examples": [
+            {
+              "command": "putnami i18n translate --projects /sites/putnami.dev"
+            },
+            {
+              "command": "putnami i18n translate --apply --projects /sites/putnami.dev"
+            }
+          ]
+        },
+        "validate": {
+          "description": "Show a person each draft and stale translation next to its default text, and lock as validated the ones they accept, with their git user.name and user.email and the day. Needs an interactive terminal, refuses inside an agent session, and skips a translation whose ICU or arguments are wrong",
+          "command": "web-i18n-validate",
+          "interactive": true,
+          "examples": [
+            {
+              "command": "putnami i18n validate --projects /sites/putnami.dev --locale fr"
             }
           ]
         }
@@ -74,6 +130,63 @@
       "declares": {
         "mutatesSources": true
       }
+    },
+    "web-i18n-translate-exec": {
+      "description": "Write the translation work file, or apply its answers to locales/<locale>/<namespace>.json as drafts",
+      "kind": "command",
+      "command": "bun",
+      "args": ["run", "{extensionRoot}/bin/i18n.ts", "translate"],
+      "cwd": "{projectRoot}",
+      "timeoutMs": 120000,
+      "inputs": {
+        "messages": {
+          "from": "project",
+          "files": ["src/**/*.messages.ts", "src/**/*.messages.tsx"]
+        },
+        "catalogs": {
+          "from": "project",
+          "files": ["locales/**/*.json"]
+        },
+        "config": {
+          "from": "project",
+          "files": ["putnami.json"]
+        },
+        "extensionVersion": {
+          "from": "runtime"
+        },
+        "glossaries": {
+          "from": "project",
+          "files": ["locales/*.glossary.json"]
+        }
+      },
+      "writes": ["sources"],
+      "cache": {
+        "enabled": false
+      },
+      "declares": {
+        "mutatesSources": true,
+        "effects": ["workspace-files"]
+      }
+    },
+    "web-i18n-validate-exec": {
+      "description": "Ask a person about each draft and stale translation and write the validated entries. Interactive: it reads the terminal and writes its own output.",
+      "kind": "command",
+      "command": "bun",
+      "args": ["run", "{extensionRoot}/bin/i18n.ts", "validate"],
+      "cwd": "{workspaceRoot}",
+      "timeoutMs": 3600000,
+      "writes": ["sources"],
+      "cache": {
+        "enabled": false
+      },
+      "declares": {
+        "mutatesSources": true,
+        "effects": ["workspace-files"]
+      }
     }
+  },
+  "agentContent": {
+    "path": "agent-content",
+    "source": "agent-src"
   }
 }

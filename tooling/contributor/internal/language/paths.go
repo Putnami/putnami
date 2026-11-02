@@ -29,7 +29,8 @@ func ExcludedLanguagePath(path string) bool {
 	return isForeignCatalog(parts)
 }
 
-// isForeignCatalog matches `<project>/locales/<tag>.json` and
+// isForeignCatalog matches `<project>/locales/<tag>.json`,
+// `<project>/locales/<tag>.glossary.json` and
 // `<project>/locales/<tag>/<namespace path>.json` where the language subtag of
 // <tag> is not `en`.
 func isForeignCatalog(parts []string) bool {
@@ -43,7 +44,7 @@ func isForeignCatalog(parts []string) bool {
 		}
 		tag := parts[i+1]
 		if i+1 == len(parts)-1 {
-			tag = strings.TrimSuffix(tag, ".json")
+			tag = strings.TrimSuffix(strings.TrimSuffix(tag, ".json"), ".glossary")
 		}
 		return isForeignTag(tag)
 	}
