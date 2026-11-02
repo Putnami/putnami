@@ -13,7 +13,7 @@ import {
   openapi,
   Stream,
 } from '@putnami/application';
-import { resetConfigLoader } from '@putnami/runtime';
+import { resetConfigLoader, type Type } from '@putnami/runtime';
 import { specTest } from '@putnami/runtime/spectest';
 import { readOpenApiSource } from '../../src/generator/openapi-reader';
 import { generateTypeScriptClient } from '../../src/generator/ts/ts-generator';
@@ -182,11 +182,7 @@ describe('provider-owned websocket wires, provider to generated TypeScript consu
         await consumer.stop();
       });
       const instances = classes.map(
-        ([, value]) =>
-          consumer.context.get(value as new (...args: never[]) => object) as Record<
-            string,
-            (...args: unknown[]) => unknown
-          >,
+        ([, value]) => consumer.context.get(value as Type<object>) as Record<string, (...args: unknown[]) => unknown>,
       );
       // One bound client that owns every operation name, for the calls below.
       const gateway: Record<string, (...args: unknown[]) => unknown> = {};

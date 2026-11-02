@@ -134,8 +134,8 @@ describe('ContainerContext', () => {
         class B {}
 
         const ctx = new ContainerContext('test');
-        ctx.register(provide(A, () => new A(), { onClose: () => order.push('A') }));
-        ctx.register(provide(B, () => new B(), { onClose: () => order.push('B') }));
+        ctx.register(provide(A, () => new A(), { onClose: () => void order.push('A') }));
+        ctx.register(provide(B, () => new B(), { onClose: () => void order.push('B') }));
 
         await ctx.start();
         // Force resolution
@@ -486,7 +486,7 @@ describe('ContainerContext', () => {
         await ctx.scope(async (scope) => {
           id1 = scope.get(RequestId).id;
           // Same within scope
-          expect(scope.get(RequestId).id).toBe(id1);
+          expect<unknown>(scope.get(RequestId).id).toBe(id1);
         });
 
         await ctx.scope(async (scope) => {
@@ -697,7 +697,7 @@ describe('ContainerContext', () => {
       ctx.register(provide(UserService, { deps: [Database] }));
 
       class MockDatabase extends Database {
-        query() {
+        override query() {
           return 'mock-data';
         }
       }
@@ -760,7 +760,7 @@ describe('ContainerContext', () => {
         constructor(readonly db: Database) {}
       }
       class MockDatabase extends Database {
-        query() {
+        override query() {
           return 'mock-data';
         }
       }

@@ -278,7 +278,7 @@ describe('first-party Connect: a TypeScript provider answers a generated TypeScr
         ] as (error: unknown) => boolean;
         expect(guard(failure)).toBe(true);
 
-        client.dispose?.();
+        client['dispose']?.();
       } finally {
         await provider.stop();
       }
@@ -348,8 +348,8 @@ describe('first-party Connect: a TypeScript provider answers a generated TypeScr
       const delivered = new TextDecoder().decode(sink.bytes);
       expect(JSON.parse(delivered)).toEqual({ id: 'g-8', name: 'json-only' });
       const connectPath = transports.find((entry) => entry.protocol === 'connect')?.path ?? '';
-      expect(delivered).toBe(await providerJsonAnswer(server.port, connectPath, 'g-8'));
-      client.dispose?.();
+      expect(delivered).toBe(await providerJsonAnswer(server.port ?? 0, connectPath, 'g-8'));
+      client['dispose']?.();
     } finally {
       await provider.stop();
     }

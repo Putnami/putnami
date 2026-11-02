@@ -126,7 +126,7 @@ describe('runtime job event emitter', () => {
         error: { message: 'build failed', code: 'BUILD_ERROR' },
       });
 
-      expect(summary.tests).toBe(2);
+      expect(summary['tests']).toBe(2);
       expect(summary.message).toBe('2 tests');
     },
   );

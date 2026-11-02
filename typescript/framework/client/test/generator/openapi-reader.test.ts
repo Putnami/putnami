@@ -91,14 +91,14 @@ describe('readOpenApiSpec', () => {
 
     const spec = readOpenApiSpec(doc);
     expect(spec.enums).toEqual({ Status: ['pending', 'applied'] });
-    expect(spec.unions?.Change).toEqual({
+    expect(spec.unions?.['Change']).toEqual({
       discriminator: 'kind',
       variants: [
         { tag: 'rename', fields: [{ name: 'name', tsType: 'string', optional: false, array: false }] },
         { tag: 'archive', fields: [{ name: 'reason', tsType: 'string', optional: true, array: false }] },
       ],
     });
-    expect(spec.namedTypes?.ChangeRequest).toEqual([
+    expect(spec.namedTypes?.['ChangeRequest']).toEqual([
       { name: 'status', tsType: 'Status', optional: false, array: false },
       { name: 'change', tsType: 'Change', optional: false, array: false },
     ]);
@@ -257,9 +257,9 @@ describe('readOpenApiSpec', () => {
     const spec = readOpenApiSpec(doc);
     const field = spec.services[0].methods[0].response?.[0];
 
-    expect(field.name).toBe('tags');
-    expect(field.tsType).toBe('string');
-    expect(field.array).toBe(true);
+    expect(field?.name).toBe('tags');
+    expect(field?.tsType).toBe('string');
+    expect(field?.array).toBe(true);
   });
 
   test('generates operationId if missing', () => {

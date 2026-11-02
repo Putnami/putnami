@@ -77,7 +77,7 @@ describe('a provider that serves a standard protocol beside its own routes', () 
         if (!server) throw new Error('provider HTTP server did not start');
         const document = providerOpenApi.spec();
         if (!document) throw new Error('provider OpenAPI contract was not emitted');
-        expect(document.paths['/v2/{name}/manifests/{reference}']?.get['x-putnami-external-contract']).toBe(OCI);
+        expect(document.paths['/v2/{name}/manifests/{reference}']?.['get']['x-putnami-external-contract']).toBe(OCI);
 
         const ir = readOpenApiSource(JSON.stringify(document), { mode: 'firstParty' });
         const methods = ir.services.flatMap((service) => service.methods);

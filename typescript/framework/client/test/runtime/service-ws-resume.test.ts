@@ -42,7 +42,7 @@ function resumeProvider(
 ): ResumeProvider {
   const inits: Record<string, unknown>[] = [];
   let connections = 0;
-  const server = Bun.serve<{ connection: number }, Record<string, never>>({
+  const server = Bun.serve<{ connection: number }>({
     port: 0,
     fetch(request, target) {
       connections += 1;

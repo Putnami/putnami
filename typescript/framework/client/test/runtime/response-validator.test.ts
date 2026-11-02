@@ -52,7 +52,7 @@ describe('validateResponseShape', () => {
     // Server returns {} for a User — the headline failure mode.
     let caught: unknown;
     try {
-      validateResponseShape({}, MESSAGE_META.GetUserResponse, MESSAGE_META, SERVICE, METHOD);
+      validateResponseShape({}, MESSAGE_META['GetUserResponse'], MESSAGE_META, SERVICE, METHOD);
     } catch (e) {
       caught = e;
     }
@@ -67,11 +67,11 @@ describe('validateResponseShape', () => {
 
   test('(a) wrong-typed required field throws ClientResponseValidationError', () => {
     const body = { ...validUser(), name: 123 }; // name should be string
-    expect(() => validateResponseShape(body, MESSAGE_META.GetUserResponse, MESSAGE_META, SERVICE, METHOD)).toThrow(
+    expect(() => validateResponseShape(body, MESSAGE_META['GetUserResponse'], MESSAGE_META, SERVICE, METHOD)).toThrow(
       ClientResponseValidationError,
     );
     try {
-      validateResponseShape(body, MESSAGE_META.GetUserResponse, MESSAGE_META, SERVICE, METHOD);
+      validateResponseShape(body, MESSAGE_META['GetUserResponse'], MESSAGE_META, SERVICE, METHOD);
     } catch (e) {
       expect((e as ClientResponseValidationError).detail).toContain('name');
       expect((e as ClientResponseValidationError).detail).toContain('string');
@@ -81,7 +81,7 @@ describe('validateResponseShape', () => {
   test('(a) wrong-typed field inside a required nested message throws', () => {
     const body = { ...validUser(), address: {} }; // address.street missing
     try {
-      validateResponseShape(body, MESSAGE_META.GetUserResponse, MESSAGE_META, SERVICE, METHOD);
+      validateResponseShape(body, MESSAGE_META['GetUserResponse'], MESSAGE_META, SERVICE, METHOD);
       throw new Error('expected throw');
     } catch (e) {
       expect(e).toBeInstanceOf(ClientResponseValidationError);
@@ -91,16 +91,16 @@ describe('validateResponseShape', () => {
 
   test('(a) repeated field returned as a non-array throws', () => {
     const body = { ...validUser(), tags: 'not-an-array' };
-    expect(() => validateResponseShape(body, MESSAGE_META.GetUserResponse, MESSAGE_META, SERVICE, METHOD)).toThrow(
+    expect(() => validateResponseShape(body, MESSAGE_META['GetUserResponse'], MESSAGE_META, SERVICE, METHOD)).toThrow(
       /should be an array/,
     );
   });
 
   test('(a) a primitive/null response where a message is expected throws', () => {
-    expect(() => validateResponseShape(null, MESSAGE_META.GetUserResponse, MESSAGE_META, SERVICE, METHOD)).toThrow(
+    expect(() => validateResponseShape(null, MESSAGE_META['GetUserResponse'], MESSAGE_META, SERVICE, METHOD)).toThrow(
       ClientResponseValidationError,
     );
-    expect(() => validateResponseShape('oops', MESSAGE_META.GetUserResponse, MESSAGE_META, SERVICE, METHOD)).toThrow(
+    expect(() => validateResponseShape('oops', MESSAGE_META['GetUserResponse'], MESSAGE_META, SERVICE, METHOD)).toThrow(
       /expected response to be an object/,
     );
   });
@@ -108,10 +108,10 @@ describe('validateResponseShape', () => {
   test('(b) a correct response passes and is not mutated', () => {
     const body = validUser();
     expect(() =>
-      validateResponseShape(body, MESSAGE_META.GetUserResponse, MESSAGE_META, SERVICE, METHOD),
+      validateResponseShape(body, MESSAGE_META['GetUserResponse'], MESSAGE_META, SERVICE, METHOD),
     ).not.toThrow();
     // Optional fields legitimately absent (age, active) do not trigger a throw.
-    expect(body.age).toBeUndefined();
+    expect(body['age']).toBeUndefined();
   });
 
   test('(b) camelCase JSON keys are accepted for snake_case proto fields', () => {
@@ -119,21 +119,21 @@ describe('validateResponseShape', () => {
     const META: Record<string, ProtoFieldMeta[]> = {
       Resp: [{ name: 'user_id', number: 1, type: 'string', optional: false, repeated: false }],
     };
-    expect(() => validateResponseShape({ userId: 'u-9' }, META.Resp, META, SERVICE, METHOD)).not.toThrow();
+    expect(() => validateResponseShape({ userId: 'u-9' }, META['Resp'], META, SERVICE, METHOD)).not.toThrow();
     // And snake_case still works.
-    expect(() => validateResponseShape({ user_id: 'u-9' }, META.Resp, META, SERVICE, METHOD)).not.toThrow();
+    expect(() => validateResponseShape({ user_id: 'u-9' }, META['Resp'], META, SERVICE, METHOD)).not.toThrow();
   });
 
   test('(c) extra/unknown fields do NOT cause rejection', () => {
     const body = { ...validUser(), futureField: 'whatever', another: { nested: true } };
     expect(() =>
-      validateResponseShape(body, MESSAGE_META.GetUserResponse, MESSAGE_META, SERVICE, METHOD),
+      validateResponseShape(body, MESSAGE_META['GetUserResponse'], MESSAGE_META, SERVICE, METHOD),
     ).not.toThrow();
   });
 
   test('optional fields with wrong types are still rejected when present', () => {
     const body = { ...validUser(), age: 'thirty' }; // age is int32 → number
-    expect(() => validateResponseShape(body, MESSAGE_META.GetUserResponse, MESSAGE_META, SERVICE, METHOD)).toThrow(
+    expect(() => validateResponseShape(body, MESSAGE_META['GetUserResponse'], MESSAGE_META, SERVICE, METHOD)).toThrow(
       /should be a number/,
     );
   });
@@ -144,10 +144,10 @@ describe('validateResponseShape', () => {
     };
 
     expect(() =>
-      validateResponseShape({ count: BigInt('18446744073709551615') }, META.CounterResponse, META, SERVICE, METHOD),
+      validateResponseShape({ count: BigInt('18446744073709551615') }, META['CounterResponse'], META, SERVICE, METHOD),
     ).not.toThrow();
-    expect(() => validateResponseShape({ count: 42 }, META.CounterResponse, META, SERVICE, METHOD)).not.toThrow();
-    expect(() => validateResponseShape({ count: '42' }, META.CounterResponse, META, SERVICE, METHOD)).toThrow(
+    expect(() => validateResponseShape({ count: 42 }, META['CounterResponse'], META, SERVICE, METHOD)).not.toThrow();
+    expect(() => validateResponseShape({ count: '42' }, META['CounterResponse'], META, SERVICE, METHOD)).toThrow(
       /number or bigint/,
     );
   });
@@ -181,7 +181,7 @@ const ROUTES: Record<string, () => Response> = {
 const TRANSPORT_META = {
   messageMeta: {
     ...MESSAGE_META,
-    GetBadUserResponse: MESSAGE_META.GetUserResponse,
+    GetBadUserResponse: MESSAGE_META['GetUserResponse'],
     GetCounterResponse: [{ name: 'count', number: 1, type: 'uint64', optional: false, repeated: false }],
     // Note: no `GetThingResponse` key on purpose.
   },

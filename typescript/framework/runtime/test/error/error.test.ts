@@ -218,7 +218,7 @@ describe('Error Module', () => {
       it('should parse options input', () => {
         const result = extractDescriptionAndOptionsFrom({ description: 'opt desc' });
         expect(result.description).toBe('opt desc');
-        expect(result.httpExceptionOptions.description).toBe('opt desc');
+        expect(result.httpExceptionOptions?.description).toBe('opt desc');
       });
     });
 

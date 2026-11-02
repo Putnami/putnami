@@ -175,10 +175,10 @@ describe('opaque JSON in a strict first-party contract', () => {
     const spec = readOpenApiSource(readFileSync(join(CORPUS, 'valid', 'full.openapi.json'), 'utf8'), {
       mode: 'firstParty',
     });
-    const audit = spec.schemas?.WidgetAudit;
-    expect(audit?.properties?.attributes).toEqual(FREE_FORM);
-    expect(audit?.properties?.before?.['x-putnami-json']).toBe('any');
-    expect(audit?.properties?.trail?.items).toEqual(OPAQUE);
+    const audit = spec.schemas?.['WidgetAudit'];
+    expect(audit?.properties?.['attributes']).toEqual(FREE_FORM);
+    expect(audit?.properties?.['before']?.['x-putnami-json']).toBe('any');
+    expect(audit?.properties?.['trail']?.items).toEqual(OPAQUE);
   });
 
   test('refuses the empty schema and every other opaque spelling with the Go reader codes', () => {
@@ -196,7 +196,7 @@ describe('opaque JSON in a strict first-party contract', () => {
         thrown = error;
       }
       expect(thrown, name).toBeInstanceOf(ClientGenerationError);
-      expect((thrown as ClientGenerationError).contractCode, name).toBe(code);
+      expect<unknown>((thrown as ClientGenerationError).contractCode, name).toBe(code);
     }
   });
 });

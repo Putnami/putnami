@@ -106,8 +106,11 @@ export interface ProvideOptions<T = unknown> {
   visibility?: Visibility;
   /** Tags for grouped resolution via `list({ tags: '...' })` */
   tags?: string[];
-  /** Dispose hook called during container `close()` */
-  onClose?: (instance: T) => void | Promise<void>;
+  /**
+   * Dispose hook called during container `close()`. A method signature, so a
+   * `Registration<T>` stays assignable to `Registration<unknown>`.
+   */
+  onClose?(instance: T): void | Promise<void>;
   /** Force proxy wrapping for tracing/telemetry */
   proxy?: boolean | ProxyOptions;
   /**
@@ -214,8 +217,8 @@ export interface Provider<T = unknown> {
   visibility: Visibility;
   /** Tags for grouped resolution */
   tags: string[];
-  /** Dispose hook */
-  onClose?: (instance: T) => void | Promise<void>;
+  /** Dispose hook; a method signature, as in `ProvideOptions` */
+  onClose?(instance: T): void | Promise<void>;
   /** Proxy options */
   proxy?: boolean | ProxyOptions;
   /** Whether this provider can be refreshed at runtime */

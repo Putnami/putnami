@@ -67,7 +67,7 @@ function dualProvider(options: DualProviderOptions): DualProvider {
   let upgradeCount = 0;
   const inits: Record<string, unknown>[] = [];
   const echoed = options.subprotocol === undefined ? SERVICE_WEBSOCKET_SUBPROTOCOL : options.subprotocol;
-  const server = Bun.serve<{ connection: number }, Record<string, never>>({
+  const server = Bun.serve<{ connection: number }>({
     port: 0,
     fetch(request, target) {
       if (request.headers.get('upgrade')?.toLowerCase() !== 'websocket') {

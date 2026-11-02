@@ -36,7 +36,7 @@ describe('Desc()', () => {
     };
     const { data, errors } = validateSchema(schema, { profile: { age: 30, name: 'Alice' } });
     expect(errors).toHaveLength(0);
-    expect(data.profile).toEqual({ age: 30, name: 'Alice' });
+    expect(data['profile']).toEqual({ age: 30, name: 'Alice' });
   });
 
   it('should not break validation when used on scalar fields', () => {
@@ -53,9 +53,9 @@ describe('Desc()', () => {
     });
 
     expect(errors).toHaveLength(0);
-    expect(data.name).toBe('Alice');
-    expect(data.age).toBe(30);
-    expect(data.email).toBe('alice@example.com');
+    expect(data['name']).toBe('Alice');
+    expect(data['age']).toBe(30);
+    expect(data['email']).toBe('alice@example.com');
   });
 
   it('should validate type correctly with Desc() wrapping', () => {

@@ -198,7 +198,7 @@ describe('retryInterceptor', () => {
     await expect(promise).rejects.toBeInstanceOf(ClientRetryExhaustedError);
     expect(callCount).toBe(3); // 1 initial + 2 retries
 
-    const error = await promise.catch((e: unknown) => e as ClientRetryExhaustedError);
+    const error = (await promise.catch((e: unknown) => e)) as ClientRetryExhaustedError;
     expect(error.attempts).toBe(3);
     expect(error.lastError).toBeInstanceOf(TypeError);
     expect(error.service).toBe('users-service');

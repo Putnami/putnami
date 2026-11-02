@@ -134,17 +134,17 @@ describe('canonicalizeGeneratedFiles', () => {
       }),
     });
     const source = `const values: Array<string> = ["one"];\nconst payload = "${'x'.repeat(128 * 1024)}";\n`;
-    const originalPath = process.env.PATH;
+    const originalPath = process.env['PATH'];
 
     let generated: GeneratedFile[];
     try {
-      process.env.PATH = '';
+      process.env['PATH'] = '';
       generated = canonicalizeGeneratedFiles(root, join(root, 'clients/ts'), [
         { path: 'src/client.ts', content: source },
       ]);
     } finally {
-      if (originalPath === undefined) delete process.env.PATH;
-      else process.env.PATH = originalPath;
+      if (originalPath === undefined) Reflect.deleteProperty(process.env, 'PATH');
+      else process.env['PATH'] = originalPath;
     }
 
     expect(generated[0].content).toContain("const values: string[] = ['one'];");

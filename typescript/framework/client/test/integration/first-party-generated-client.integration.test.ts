@@ -15,7 +15,15 @@ import {
   Stream,
   telemetry,
 } from '@putnami/application';
-import { ConflictException, NotFoundException, OneOf, Optional, Pattern, resetConfigLoader } from '@putnami/runtime';
+import {
+  ConflictException,
+  NotFoundException,
+  OneOf,
+  Optional,
+  Pattern,
+  resetConfigLoader,
+  type Type,
+} from '@putnami/runtime';
 import { specTest } from '@putnami/runtime/spectest';
 import { readOpenApiSource } from '../../src/generator/openapi-reader';
 import { generateTypeScriptClient } from '../../src/generator/ts/ts-generator';
@@ -217,7 +225,7 @@ describe('first-party provider to generated consumer', () => {
 
       const generated = await import(join(directory, 'src', 'index.ts'));
       type GeneratedWidgetsClient = Record<string, (...args: never[]) => Promise<unknown>>;
-      const WidgetsClient = generated.WidgetsClient as new (...args: never[]) => GeneratedWidgetsClient;
+      const WidgetsClient = generated.WidgetsClient as Type<GeneratedWidgetsClient>;
       const registerWidgetsClient = generated.registerWidgetsClient as (target: typeof consumer) => typeof consumer;
       process.env.CONFIG_DATA = JSON.stringify({
         clients: {
@@ -245,11 +253,11 @@ describe('first-party provider to generated consumer', () => {
         options?: { endpoint?: string; signal?: AbortSignal; successBody?: SuccessBody },
       ) => Promise<{ id: string; name: string }>;
       proxyCall = (id) => getWidget.call(first, { path: { id } });
-      const watchWidgets = first[watchMethod.name] as (options?: {
+      const watchWidgets = first[watchMethod.name] as unknown as (options?: {
         signal?: AbortSignal;
         endpoint?: string;
       }) => StreamObserver<{ id: string }>;
-      const failingWatch = first[failingWatchMethod.name] as (options?: {
+      const failingWatch = first[failingWatchMethod.name] as unknown as (options?: {
         signal?: AbortSignal;
       }) => StreamObserver<{ id: string }>;
       const getConflict = first[conflictMethod.name] as (input: {
@@ -384,7 +392,7 @@ describe('first-party provider to generated consumer', () => {
       expect(serverSpan).toMatchObject({ traceId: incomingTraceId, parentSpanId: incomingSpanId });
       expect(callSpan).toMatchObject({ traceId: incomingTraceId, parentSpanId: serverSpan?.spanId, statusCode: 1 });
       expect(attemptSpan).toMatchObject({ traceId: incomingTraceId, parentSpanId: callSpan?.spanId, statusCode: 1 });
-      expect(providerTraceparent).toBe(`00-${incomingTraceId}-${attemptSpan?.spanId}-01`);
+      expect<unknown>(providerTraceparent).toBe(`00-${incomingTraceId}-${attemptSpan?.spanId}-01`);
 
       const buckets = collector?.drainAll() ?? [];
       const counterSeries = buckets.flatMap((bucket) => bucket.counterSeries ?? []);

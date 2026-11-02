@@ -11,8 +11,8 @@ describe('schema validation', () => {
 
       const { data, errors } = validateSchema(schema, { name: 'myapp', port: 8080 });
       expect(errors).toHaveLength(0);
-      expect(data.name).toBe('myapp');
-      expect(data.port).toBe(8080);
+      expect(data['name']).toBe('myapp');
+      expect(data['port']).toBe(8080);
     });
 
     it('reports errors for invalid types', () => {
@@ -32,8 +32,8 @@ describe('schema validation', () => {
 
       const { data, errors } = validateSchema(schema, {});
       expect(errors).toHaveLength(0);
-      expect(data.name).toBe('test');
-      expect(data.port).toBe(3000);
+      expect(data['name']).toBe('test');
+      expect(data['port']).toBe(3000);
     });
 
     it('allows optional fields to be missing', () => {
@@ -44,8 +44,8 @@ describe('schema validation', () => {
 
       const { data, errors } = validateSchema(schema, { name: 'hello' });
       expect(errors).toHaveLength(0);
-      expect(data.name).toBe('hello');
-      expect(data.extra).toBeUndefined();
+      expect(data['name']).toBe('hello');
+      expect(data['extra']).toBeUndefined();
     });
 
     it('requires non-optional fields', () => {
@@ -65,7 +65,7 @@ describe('schema validation', () => {
 
       const { data, errors } = validateSchema(schema, { port: '8080' }, { coerce: true });
       expect(errors).toHaveLength(0);
-      expect(data.port).toBe(8080);
+      expect(data['port']).toBe(8080);
     });
   });
 
@@ -74,21 +74,21 @@ describe('schema validation', () => {
       const schema = { labels: MapOf(String, String) };
       const { data, errors } = validateSchema(schema, { labels: { env: 'prod', region: 'us-east' } });
       expect(errors).toHaveLength(0);
-      expect(data.labels).toEqual({ env: 'prod', region: 'us-east' });
+      expect(data['labels']).toEqual({ env: 'prod', region: 'us-east' });
     });
 
     it('validates a map with number values', () => {
       const schema = { prices: MapOf(String, Number) };
       const { data, errors } = validateSchema(schema, { prices: { apple: 1.5, banana: 0.75 } });
       expect(errors).toHaveLength(0);
-      expect(data.prices).toEqual({ apple: 1.5, banana: 0.75 });
+      expect(data['prices']).toEqual({ apple: 1.5, banana: 0.75 });
     });
 
     it('validates a map with Int values', () => {
       const schema = { counts: MapOf(String, Int) };
       const { data, errors } = validateSchema(schema, { counts: { a: 10, b: 20 } });
       expect(errors).toHaveLength(0);
-      expect(data.counts).toEqual({ a: 10, b: 20 });
+      expect(data['counts']).toEqual({ a: 10, b: 20 });
     });
 
     it('rejects non-object values for maps', () => {
@@ -114,7 +114,7 @@ describe('schema validation', () => {
       const schema = { labels: MapOf(String, String) };
       const { data, errors } = validateSchema(schema, { labels: {} });
       expect(errors).toHaveLength(0);
-      expect(data.labels).toEqual({});
+      expect(data['labels']).toEqual({});
     });
   });
 });

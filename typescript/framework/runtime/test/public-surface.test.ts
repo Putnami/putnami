@@ -25,11 +25,11 @@ describe('@putnami/runtime public surface', () => {
     },
     () => {
       const root = rootSurface as unknown as Record<string, unknown>;
-      expect(root.MemoryLogger).toBeUndefined();
-      expect(root.MemorySink).toBeUndefined();
-      expect(root.buildEntry).toBeUndefined();
-      expect(root.syncFetch).toBeUndefined();
-      expect(root.setSyncFetchForTest).toBeUndefined();
+      expect(root['MemoryLogger']).toBeUndefined();
+      expect(root['MemorySink']).toBeUndefined();
+      expect(root['buildEntry']).toBeUndefined();
+      expect(root['syncFetch']).toBeUndefined();
+      expect(root['setSyncFetchForTest']).toBeUndefined();
     },
   );
 
@@ -42,11 +42,11 @@ describe('@putnami/runtime public surface', () => {
     },
     () => {
       const root = rootSurface as unknown as Record<string, unknown>;
-      expect(root.useContainer).toBeUndefined();
-      expect(root.resolve).toBeUndefined();
-      expect(root.resolveInjection).toBeUndefined();
-      expect(root.SCOPE_CONTAINER_KEY).toBeUndefined();
-      expect(root.createScopeProxy).toBeUndefined();
+      expect(root['useContainer']).toBeUndefined();
+      expect(root['resolve']).toBeUndefined();
+      expect(root['resolveInjection']).toBeUndefined();
+      expect(root['SCOPE_CONTAINER_KEY']).toBeUndefined();
+      expect(root['createScopeProxy']).toBeUndefined();
     },
   );
 
@@ -59,27 +59,27 @@ describe('@putnami/runtime public surface', () => {
     },
     () => {
       const root = rootSurface as unknown as Record<string, unknown>;
-      expect(root.Container).toBeDefined();
-      expect(root.ScopedContainer).toBeDefined();
-      expect(root.ContainerContext).toBeDefined();
-      expect(root.createTracingProxy).toBeDefined();
-      expect(root.noopTraceSink).toBeDefined();
+      expect(root['Container']).toBeDefined();
+      expect(root['ScopedContainer']).toBeDefined();
+      expect(root['ContainerContext']).toBeDefined();
+      expect(root['createTracingProxy']).toBeDefined();
+      expect(root['noopTraceSink']).toBeDefined();
     },
   );
 
   it('exposes the config source registration seam from the root barrel', () => {
     const root = rootSurface as unknown as Record<string, unknown>;
-    expect(root.registerSourceDiscoverer).toBeFunction();
-    expect(root.registerConfigLoaderResetHook).toBeFunction();
+    expect(root['registerSourceDiscoverer']).toBeFunction();
+    expect(root['registerConfigLoaderResetHook']).toBeFunction();
   });
 
   it('keeps cloud-owned runtime symbols off the core package surface', () => {
     const root = rootSurface as unknown as Record<string, unknown>;
-    expect(root.RemoteConfigSource).toBeUndefined();
-    expect(root.RemoteSecretsSource).toBeUndefined();
-    expect(root.EnvVarTokenSource).toBeUndefined();
-    expect(root.GcpMetadataTokenSource).toBeUndefined();
-    expect(root.discoverTokenSource).toBeUndefined();
+    expect(root['RemoteConfigSource']).toBeUndefined();
+    expect(root['RemoteSecretsSource']).toBeUndefined();
+    expect(root['EnvVarTokenSource']).toBeUndefined();
+    expect(root['GcpMetadataTokenSource']).toBeUndefined();
+    expect(root['discoverTokenSource']).toBeUndefined();
   });
 
   specTest(
@@ -91,15 +91,15 @@ describe('@putnami/runtime public surface', () => {
     },
     () => {
       const testing = testingSurface as unknown as Record<string, unknown>;
-      expect(testing.MemoryLogger).toBeDefined();
-      expect(testing.MemorySink).toBeDefined();
+      expect(testing['MemoryLogger']).toBeDefined();
+      expect(testing['MemorySink']).toBeDefined();
       // The cross-runtime log conformance harness ships beside MemoryLogger: the
       // boundary tests of application / events / database drive it from here.
-      expect(testing.loadCases).toBeFunction();
-      expect(testing.findCase).toBeFunction();
-      expect(testing.findRecord).toBeFunction();
-      expect(testing.assertRecord).toBeFunction();
-      expect(testing.compareRecord).toBeFunction();
+      expect(testing['loadCases']).toBeFunction();
+      expect(testing['findCase']).toBeFunction();
+      expect(testing['findRecord']).toBeFunction();
+      expect(testing['assertRecord']).toBeFunction();
+      expect(testing['compareRecord']).toBeFunction();
     },
   );
 
@@ -114,8 +114,8 @@ describe('@putnami/runtime public surface', () => {
 
   it('does not expose the log conformance harness from the root barrel', () => {
     const root = rootSurface as unknown as Record<string, unknown>;
-    expect(root.loadCases).toBeUndefined();
-    expect(root.assertRecord).toBeUndefined();
+    expect(root['loadCases']).toBeUndefined();
+    expect(root['assertRecord']).toBeUndefined();
   });
 
   it('keeps the executable-spec binding off every barrel but its own subpath', () => {
@@ -125,8 +125,8 @@ describe('@putnami/runtime public surface', () => {
     // non-test consumers of those barrels.
     const root = rootSurface as unknown as Record<string, unknown>;
     const testing = testingSurface as unknown as Record<string, unknown>;
-    expect(root.specTest).toBeUndefined();
-    expect(testing.specTest).toBeUndefined();
+    expect(root['specTest']).toBeUndefined();
+    expect(testing['specTest']).toBeUndefined();
   });
 
   specTest(
@@ -138,11 +138,11 @@ describe('@putnami/runtime public surface', () => {
     },
     () => {
       const inject = injectSurface as unknown as Record<string, unknown>;
-      expect(inject.useContainer).toBeDefined();
-      expect(inject.resolve).toBeDefined();
-      expect(inject.resolveInjection).toBeDefined();
-      expect(inject.SCOPE_CONTAINER_KEY).toBeDefined();
-      expect(inject.createScopeProxy).toBeDefined();
+      expect(inject['useContainer']).toBeDefined();
+      expect(inject['resolve']).toBeDefined();
+      expect(inject['resolveInjection']).toBeDefined();
+      expect(inject['SCOPE_CONTAINER_KEY']).toBeDefined();
+      expect(inject['createScopeProxy']).toBeDefined();
     },
   );
 });

@@ -5,6 +5,7 @@ import { dirname, join, resolve } from 'node:path';
 import { apiKeyStrategy, application, api, authenticate, endpoint, http, openapi } from '@putnami/application';
 import { readOpenApiSource } from '../../src/generator/openapi-reader';
 import { generateTypeScriptClient } from '../../src/generator/ts/ts-generator';
+import type { Type } from '@putnami/runtime';
 
 const CLIENT_ENTRY = resolve(import.meta.dir, '..', '..', 'src', 'index.ts');
 const temporaryDirectories: string[] = [];
@@ -81,7 +82,7 @@ describe('first-party optional credential', () => {
       if (!registerName || !className || typeof generated[className] !== 'function')
         throw new Error(`the generated package exports no client: ${Object.keys(generated).join(', ')}`);
       type Generated = Record<string, (input: { path: { name: string } }) => Promise<{ name: string; caller: string }>>;
-      const Client = generated[className] as new (...args: never[]) => Generated;
+      const Client = generated[className] as Type<Generated>;
       const register = generated[registerName] as (
         target: ReturnType<typeof application>,
         binding: Record<string, unknown>,

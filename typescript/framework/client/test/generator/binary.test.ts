@@ -140,7 +140,6 @@ describe('raw octet generation', () => {
     () => {
       const files = generateStrictTypeScriptClient(readOpenApiSpec(BINARY_DOCUMENT), {
         packageName: '@example/blobs-client',
-        outputDir: 'clients/ts',
       });
       const source = files.map((file) => file.content).join('\n');
       expect(source).toContain("export type PutBlobBody = import('@putnami/client').BinarySource;");
@@ -174,9 +173,9 @@ describe('raw octet generation', () => {
         ...spec.services[0].methods[0],
         client: { ...client, transports: [{ protocol: 'connect', path: '/blobs.v1.Blobs/Put', encoding: 'json' }] },
       };
-      expect(() =>
-        generateStrictTypeScriptClient(spec, { packageName: '@example/blobs-client', outputDir: 'clients/ts' }),
-      ).toThrow(/only rest-json carries octets unchanged/);
+      expect(() => generateStrictTypeScriptClient(spec, { packageName: '@example/blobs-client' })).toThrow(
+        /only rest-json carries octets unchanged/,
+      );
     },
   );
 });

@@ -33,10 +33,10 @@ describe('opaque JSON codec', () => {
       const wire =
         '{"attributes":{"z":{"b":1,"a":[18446744073709551616,-9007199254740993,0.5]},"n":null},"value":{"z":true,"a":"x","m":{}},"optional":null,"snapshot":[{"k":"v"},12]}';
       const decoded = decodeJsonBody(wire, audit, schemas) as Record<string, Record<string, unknown>>;
-      expect(decoded.attributes?.z).toEqual({ b: 1, a: [18446744073709551616n, -9007199254740993n, 0.5] });
-      expect(decoded.attributes?.n).toBeNull();
-      expect(decoded.optional).toBeNull();
-      expect(Object.keys(decoded.value ?? {})).toEqual(['z', 'a', 'm']);
+      expect(decoded['attributes']?.['z']).toEqual({ b: 1, a: [18446744073709551616n, -9007199254740993n, 0.5] });
+      expect(decoded['attributes']?.['n']).toBeNull();
+      expect(decoded['optional']).toBeNull();
+      expect(Object.keys(decoded['value'] ?? {})).toEqual(['z', 'a', 'm']);
       // Writing the decoded value back yields the same JSON text, key order and
       // wide digits included.
       expect(encodeJsonBody(decoded, audit, schemas)).toBe(wire);
@@ -61,7 +61,7 @@ describe('opaque JSON codec', () => {
       expect(() => encodeJsonBody(body(value), audit, schemas)).toThrow(ClientRequestEncodingError);
     }
     const cyclic: Record<string, unknown> = {};
-    cyclic.self = cyclic;
+    cyclic['self'] = cyclic;
     expect(() => encodeJsonBody(body(cyclic), audit, schemas)).toThrow(ClientRequestEncodingError);
     // A required opaque member is still required, and a free-form object is still an object.
     expect(() => encodeJsonBody({ attributes: {} }, audit, schemas)).toThrow(ClientRequestEncodingError);

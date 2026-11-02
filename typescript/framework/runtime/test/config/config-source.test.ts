@@ -105,7 +105,7 @@ describe('ConfigSource', () => {
 
     it('fails loudly when CONFIG_SERVER_URL is set and no registered source serves it', () => {
       process.env.CONFIG_SERVER_URL = 'http://127.0.0.1:1/unreachable';
-      process.env.CONFIG_SERVER_TOKEN = 'must-not-be-read-by-core';
+      process.env['CONFIG_SERVER_TOKEN'] = 'must-not-be-read-by-core';
       process.env.CONFIG_DATA = JSON.stringify({ server: { port: 8080 } });
 
       expect(() => getDefaultSources()).toThrow(/CONFIG_SERVER_URL is set but no registered config source serves it/);
@@ -263,31 +263,31 @@ describe('ConfigSource', () => {
     ];
 
     it('replaces ${VAR} with process.env value', () => {
-      process.env.TEST_HOST = 'db.example.com';
+      process.env['TEST_HOST'] = 'db.example.com';
       const result = loadGlobalConfig(source({ database: { host: '${TEST_HOST}' } }));
       expect(result).toEqual({ database: { host: 'db.example.com' } });
-      delete process.env.TEST_HOST;
+      Reflect.deleteProperty(process.env, 'TEST_HOST');
     });
 
     it('supports ${VAR:-default} fallback', () => {
-      delete process.env.TEST_MISSING;
+      Reflect.deleteProperty(process.env, 'TEST_MISSING');
       const result = loadGlobalConfig(source({ db: { host: '${TEST_MISSING:-localhost}' } }));
       expect(result).toEqual({ db: { host: 'localhost' } });
     });
 
     it('leaves unresolved ${VAR} as-is when no default', () => {
-      delete process.env.TEST_NOPE;
+      Reflect.deleteProperty(process.env, 'TEST_NOPE');
       const result = loadGlobalConfig(source({ db: { host: '${TEST_NOPE}' } }));
       expect(result).toEqual({ db: { host: '${TEST_NOPE}' } });
     });
 
     it('interpolates embedded references in a string', () => {
-      process.env.TEST_SCHEME = 'https';
-      process.env.TEST_DOMAIN = 'api.example.com';
+      process.env['TEST_SCHEME'] = 'https';
+      process.env['TEST_DOMAIN'] = 'api.example.com';
       const result = loadGlobalConfig(source({ url: '${TEST_SCHEME}://${TEST_DOMAIN}/v1' }));
       expect(result).toEqual({ url: 'https://api.example.com/v1' });
-      delete process.env.TEST_SCHEME;
-      delete process.env.TEST_DOMAIN;
+      Reflect.deleteProperty(process.env, 'TEST_SCHEME');
+      Reflect.deleteProperty(process.env, 'TEST_DOMAIN');
     });
 
     it('does not touch non-string values', () => {
@@ -296,10 +296,10 @@ describe('ConfigSource', () => {
     });
 
     it('interpolates inside arrays', () => {
-      process.env.TEST_TAG = 'prod';
+      process.env['TEST_TAG'] = 'prod';
       const result = loadGlobalConfig(source({ tags: ['${TEST_TAG}', 'static'] }));
       expect(result).toEqual({ tags: ['prod', 'static'] });
-      delete process.env.TEST_TAG;
+      Reflect.deleteProperty(process.env, 'TEST_TAG');
     });
   });
 
@@ -333,7 +333,7 @@ describe('ConfigSource', () => {
 
         const sources = [...getDefaultSources(), customSource];
         const result = loadGlobalConfig(sources);
-        expect(result?.shared).toEqual({ value: 'from-custom' });
+        expect(result?.['shared']).toEqual({ value: 'from-custom' });
       },
     );
   });

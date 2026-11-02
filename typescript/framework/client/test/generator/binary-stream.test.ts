@@ -63,7 +63,6 @@ describe('raw HTTP stream generation', () => {
       ]);
       const source = generateStrictTypeScriptClient(spec, {
         packageName: '@test/stream-client',
-        outputDir: 'clients/ts',
       })
         .map((file) => file.content)
         .join('\n');
@@ -92,9 +91,7 @@ describe('raw HTTP stream generation', () => {
       const request = ir.services[0].methods[0].request;
       if (!request) throw new Error('fixture requires a request contract');
       request.content[0].maxBytes = bound;
-      expect(() =>
-        generateStrictTypeScriptClient(ir, { packageName: '@test/streams', outputDir: 'clients/ts' }),
-      ).toThrow(/positive byte bound/);
+      expect(() => generateStrictTypeScriptClient(ir, { packageName: '@test/streams' })).toThrow(/positive byte bound/);
     }
     const unbounded = document();
     unbounded.paths['/stream'].post.requestBody.content['*/*']['x-putnami-max-bytes'] = undefined;

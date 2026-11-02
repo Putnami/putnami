@@ -25,8 +25,8 @@ describe('Config and useConfig', () => {
     resetConfigLoader();
     delete process.env.CONFIG_DATA;
     // Clean up env vars used in tests
-    delete process.env.TEST_PORT;
-    delete process.env.TEST_SECRET;
+    Reflect.deleteProperty(process.env, 'TEST_PORT');
+    Reflect.deleteProperty(process.env, 'TEST_SECRET');
   });
 
   describe('Config()', () => {
@@ -240,8 +240,8 @@ describe('Config and useConfig', () => {
         const config = useConfig(AppConfig);
 
         expect(config.name).toBe('safe');
-        expect((Object.prototype as Record<string, unknown>).polluted).toBeUndefined();
-        expect(({} as Record<string, unknown>).polluted).toBeUndefined();
+        expect((Object.prototype as Record<string, unknown>)['polluted']).toBeUndefined();
+        expect(({} as Record<string, unknown>)['polluted']).toBeUndefined();
       },
     );
 
@@ -260,8 +260,8 @@ describe('Config and useConfig', () => {
         const config = useConfig(AppConfig);
 
         expect(config.name).toBe('safe');
-        expect(({} as Record<string, unknown>).polluted).toBeUndefined();
-        expect((Object.prototype as Record<string, unknown>).polluted).toBeUndefined();
+        expect(({} as Record<string, unknown>)['polluted']).toBeUndefined();
+        expect((Object.prototype as Record<string, unknown>)['polluted']).toBeUndefined();
       },
     );
   });
@@ -279,7 +279,7 @@ describe('Config and useConfig', () => {
           port: Env('TEST_PORT', Int),
         });
 
-        process.env.TEST_PORT = '9090';
+        process.env['TEST_PORT'] = '9090';
         process.env.CONFIG_DATA = JSON.stringify({});
 
         const config = useConfig(EnvConfig);
@@ -299,7 +299,7 @@ describe('Config and useConfig', () => {
           port: Env('TEST_PORT', Int),
         });
 
-        process.env.TEST_PORT = '9090';
+        process.env['TEST_PORT'] = '9090';
         process.env.CONFIG_DATA = JSON.stringify({
           env: { test: { port: 8080 } },
         });

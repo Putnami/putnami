@@ -43,7 +43,7 @@ afterEach(() => {
 /** A provider serving one path over SSE and the first-party WebSocket wire. */
 function provider(options: { sseStatus?: number } = {}): { url: string; received: Received } {
   const received: Received = { sse: [], inits: [] };
-  const server = Bun.serve<Record<string, never>, Record<string, never>>({
+  const server = Bun.serve<Record<string, never>>({
     port: 0,
     fetch(request, target) {
       if (request.headers.get('upgrade')?.toLowerCase() !== 'websocket') {

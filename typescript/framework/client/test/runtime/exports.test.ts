@@ -7,29 +7,29 @@ import { computeSpecHash as generatorHash } from '../../src/generator/string-uti
 describe('public API surface split', () => {
   test('runtime root export does NOT include the build-time generator', () => {
     const root = rootEntry as Record<string, unknown>;
-    expect(root.clientGenerator).toBeUndefined();
-    expect(root.generateTypeScriptClient).toBeUndefined();
-    expect(root.readOpenApiSpec).toBeUndefined();
-    expect(root.readProtoSpec).toBeUndefined();
-    expect(root.ClientGeneratorPlugin).toBeUndefined();
+    expect(root['clientGenerator']).toBeUndefined();
+    expect(root['generateTypeScriptClient']).toBeUndefined();
+    expect(root['readOpenApiSpec']).toBeUndefined();
+    expect(root['readProtoSpec']).toBeUndefined();
+    expect(root['ClientGeneratorPlugin']).toBeUndefined();
   });
 
   test('runtime root export still includes the runtime API', () => {
     const root = rootEntry as Record<string, unknown>;
-    expect(root.BaseClient).toBeDefined();
-    expect(root.ClientBuilder).toBeDefined();
-    expect(root.HttpTransport).toBeDefined();
-    expect(root.circuitBreakerInterceptor).toBeDefined();
-    expect(root.authInterceptor).toBeDefined();
-    expect(root.resolveServiceUrl).toBeDefined();
+    expect(root['BaseClient']).toBeDefined();
+    expect(root['ClientBuilder']).toBeDefined();
+    expect(root['HttpTransport']).toBeDefined();
+    expect(root['circuitBreakerInterceptor']).toBeDefined();
+    expect(root['authInterceptor']).toBeDefined();
+    expect(root['resolveServiceUrl']).toBeDefined();
   });
 
   test('generator subpath exposes the build-time API', () => {
     const gen = generatorEntry as Record<string, unknown>;
-    expect(gen.clientGenerator).toBeDefined();
-    expect(gen.generateTypeScriptClient).toBeDefined();
-    expect(gen.readOpenApiSpec).toBeDefined();
-    expect(gen.readProtoSpec).toBeDefined();
+    expect(gen['clientGenerator']).toBeDefined();
+    expect(gen['generateTypeScriptClient']).toBeDefined();
+    expect(gen['readOpenApiSpec']).toBeDefined();
+    expect(gen['readProtoSpec']).toBeDefined();
   });
 });
 
