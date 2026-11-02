@@ -34,8 +34,12 @@ func writeAnalysis(b *strings.Builder, a analyze.Result) {
 		}
 		listed++
 		line := fmt.Sprintf("    %-9s %s", c.Impact, componentLabel(c))
-		if c.Impact == evidence.ImpactDependent {
-			line += ", depends on " + strings.Join(c.DependsOn, ", ")
+		dependsOn := c.DependsOn
+		if c.Impact == evidence.ImpactChanged {
+			dependsOn = changedDependencies(a.Components, c.ID)
+		}
+		if len(dependsOn) > 0 {
+			line += ", depends on " + strings.Join(dependsOn, ", ")
 		}
 		fmt.Fprintln(b, line)
 	}
@@ -49,6 +53,35 @@ func writeAnalysis(b *strings.Builder, a analyze.Result) {
 		}
 		fmt.Fprintf(b, "    %-10s %s %s, in %s\n", d.Change, d.Name, versions(d), d.Lockfile)
 	}
+}
+
+// changedDependencies returns the changed components other than id that id
+// reaches through the edges, directly or through other components, in the
+// order of the components. A change that edits a component and one that
+// depends on it marks both changed; this keeps the edge between them in the
+// summary.
+func changedDependencies(components []evidence.Component, id string) []string {
+	edges := make(map[string][]string, len(components))
+	for _, c := range components {
+		edges[c.ID] = c.DependsOn
+	}
+	seen := map[string]bool{id: true}
+	queue := slices.Clone(edges[id])
+	for len(queue) > 0 {
+		next := queue[0]
+		queue = queue[1:]
+		if !seen[next] {
+			seen[next] = true
+			queue = append(queue, edges[next]...)
+		}
+	}
+	var out []string
+	for _, c := range components {
+		if c.ID != id && c.Impact == evidence.ImpactChanged && seen[c.ID] {
+			out = append(out, c.ID)
+		}
+	}
+	return out
 }
 
 func componentLabel(c evidence.Component) string {

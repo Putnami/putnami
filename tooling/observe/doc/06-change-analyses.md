@@ -27,6 +27,21 @@ to none. A component is `changed` when one of its files changed, `dependent`
 when it reaches a changed component through its edges, and `unaffected`
 otherwise.
 
+"Changed" wins over "dependent": a change that edits a component and one that
+depends on it marks both changed. The summary keeps the edge between them. A
+dependent component's line names the components it depends on; a changed
+component's line names the other changed components it reaches through its
+edges, directly or through other components:
+
+```
+  components  2 changed, 0 dependent, 0 unaffected
+    changed   api (example.com/shop/api) [go, workspace], depends on pricing
+    changed   pricing (example.com/shop/pricing) [go, workspace]
+```
+
+The evidence document writes the direct edges of every component, whatever
+its impact.
+
 ## Tests and coverage
 
 A JUnit case goes to the first of:
