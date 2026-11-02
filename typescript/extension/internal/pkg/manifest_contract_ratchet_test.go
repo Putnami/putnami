@@ -187,7 +187,9 @@ func TestFirstPartyNpmManifestsPackageAndLoad(t *testing.T) {
 				t.Fatalf("the packaged form of %s does not load: %v", rel, err)
 			}
 			if proto.DeclaresContractSurface(loaded) {
-				if want := proto.RequiredCLIContract(loaded); loaded.CLIContract != want {
+				// An npm package carries the load floor: the dependency rung binds
+				// only a manifest loaded from the artifact store or a declared path.
+				if want := proto.RequiredLoadContract(loaded); loaded.CLIContract != want {
 					t.Errorf("%s packages at cliContract %d, want %d", rel, loaded.CLIContract, want)
 				}
 			} else if loaded.CLIContract != 0 {
