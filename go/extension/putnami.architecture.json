@@ -649,6 +649,11 @@
         },
         {
           "kind": "project-dependency",
+          "consumerProject": "/tooling/jira-collaboration",
+          "producerProject": "/protocols/workspace"
+        },
+        {
+          "kind": "project-dependency",
           "consumerProject": "/tooling/local-collaboration",
           "producerProject": "/protocols/architecture"
         },

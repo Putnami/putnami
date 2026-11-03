@@ -214,6 +214,7 @@ func authoredExtensionProvidersDomain() *arch.Builder {
 				arch.Bind("/tooling/jira-collaboration", "/protocols/features"),
 				arch.Bind("/tooling/jira-collaboration", "/protocols/job"),
 				arch.Bind("/tooling/jira-collaboration", "/protocols/runtime"),
+				arch.Bind("/tooling/jira-collaboration", "/protocols/workspace"),
 				arch.Bind("/tooling/local-collaboration", "/protocols/architecture"),
 				arch.Bind("/tooling/local-collaboration", "/protocols/capabilities"),
 				arch.Bind("/tooling/local-collaboration", "/protocols/cli"),
