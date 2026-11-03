@@ -204,6 +204,7 @@
         "@putnami/contributor",
         "@putnami/github-collaboration",
         "@putnami/jira-collaboration",
+        "@putnami/linear-collaboration",
         "@putnami/local-collaboration",
         "@putnami/memory-store"
       ],

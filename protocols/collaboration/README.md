@@ -108,9 +108,11 @@ semantics. Every diagnostic code carries the `collaboration.` prefix;
   [`@putnami/local-collaboration`](../../tooling/local-collaboration/README.md)
   as the worked example;
   [`@putnami/github-collaboration`](../../tooling/github-collaboration/README.md)
-  implements the same contracts on GitHub, and
+  implements the same contracts on GitHub,
   [`@putnami/jira-collaboration`](../../tooling/jira-collaboration/README.md)
-  implements tasks on Jira Cloud.
+  implements tasks on Jira Cloud, and
+  [`@putnami/linear-collaboration`](../../tooling/linear-collaboration/README.md)
+  implements tasks on Linear.
 - [`providertest`](providertest/providertest.go) holds the tasks, proposals,
   memory and missions scenarios every provider runs (`RunTasks`,
   `RunProposals`, `RunMemory`, `RunMissions`); it names nothing a particular
@@ -146,8 +148,9 @@ implementation proves the rest in its own tests:
   capabilities, the two entry paths, the routed providers, host-only operations
   and contract names that never shadow a command.
 - `@putnami/local-collaboration` and `@putnami/github-collaboration` pass the
-  task and proposal scenarios, `@putnami/jira-collaboration` passes the task
-  scenarios, and their manifests draw no diagnostic.
+  task and proposal scenarios, `@putnami/jira-collaboration` and
+  `@putnami/linear-collaboration` pass the task scenarios, and their manifests
+  draw no diagnostic.
   `@putnami/local-collaboration` also passes the missions scenarios, the
   status scenario included, across concurrent processes on one store.
 - `@putnami/memory-store` passes the memory scenarios on every backend, and
@@ -180,8 +183,8 @@ implementation proves the rest in its own tests:
 - **Owner:** the Putnami maintainers, as repository owners of `protocols/`.
 - **Evidence:** the CLI routes every collaboration call through this module;
   `@putnami/local-collaboration`, `@putnami/github-collaboration`,
-  `@putnami/jira-collaboration` and `@putnami/memory-store` run the shared
-  `providertest` scenarios; the fixture corpus, the drift tests and the
+  `@putnami/jira-collaboration`, `@putnami/linear-collaboration` and
+  `@putnami/memory-store` run the shared `providertest` scenarios; the fixture corpus, the drift tests and the
   catalog tests pin every document.
 - **What may still change:** new optional operations, the Go helpers (`Serve`,
   `ReadProviderOffer`, `providertest`) and the guides. The version 1 documents
