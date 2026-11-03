@@ -113,14 +113,20 @@ func RefusesAUsableGraph(failure *wsproto.ProbeFailure) bool {
 	return failure.Kind == wsproto.ProbeFailureVisibility || failure.Kind == wsproto.ProbeFailureDeclaredEdge
 }
 
-// ReadableRefusal answers a read-only graph preparation that synchronization
-// refused. A refused graph is still a complete, recorded answer: a reader
-// serves it with the refusal's findings, and only planning over it is refused.
+// ReadableRefusal answers a read-only graph preparation of ws that
+// synchronization refused. A refused graph is still a complete, recorded
+// answer: a reader serves it with the refusal's findings and the merged view
+// the refused synchronization recorded, and only planning over it is refused.
 // Any other failure stays an error.
-func ReadableRefusal(err error) (*SyncOutcome, error) {
+func ReadableRefusal(ws *Workspace, err error) (*SyncOutcome, error) {
 	failure := &wsproto.ProbeFailure{}
 	if errors.As(err, &failure) && RefusesAUsableGraph(failure) {
-		return &SyncOutcome{Diagnostics: failure.Diagnostics}, nil
+		snapshot, _ := LoadSnapshot(ws.Root)
+		return &SyncOutcome{
+			Snapshot:    snapshot,
+			Merged:      mergeRecordedResults(snapshot, ws),
+			Diagnostics: failure.Diagnostics,
+		}, nil
 	}
 	return nil, err
 }

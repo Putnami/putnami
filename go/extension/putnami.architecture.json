@@ -604,6 +604,11 @@
         },
         {
           "kind": "project-dependency",
+          "consumerProject": "/tooling/github-collaboration",
+          "producerProject": "/protocols/workspace"
+        },
+        {
+          "kind": "project-dependency",
           "consumerProject": "/tooling/jira-collaboration",
           "producerProject": "/protocols/capabilities"
         },
@@ -641,6 +646,11 @@
           "kind": "project-dependency",
           "consumerProject": "/tooling/jira-collaboration",
           "producerProject": "/protocols/runtime"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/jira-collaboration",
+          "producerProject": "/protocols/workspace"
         },
         {
           "kind": "project-dependency",

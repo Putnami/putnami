@@ -9,6 +9,9 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	diag "go.putnami.dev/protocol/diagnostic"
+	wsproto "go.putnami.dev/protocol/workspace"
 )
 
 func TestReadFrameSplitsOnNewlines(t *testing.T) {
@@ -131,7 +134,7 @@ func TestMethodsAreSortedAndComplete(t *testing.T) {
 	if !slices.IsSorted(methods) {
 		t.Errorf("Methods() = %v, not sorted", methods)
 	}
-	want := []string{"collaboration.call", "host.hello", "verification.report", "version.lines", "workspace.owners"}
+	want := []string{"collaboration.call", "host.hello", "verification.report", "version.lines", "workspace.owners", "workspace.probe"}
 	if !slices.Equal(methods, want) {
 		t.Errorf("Methods() = %v, want %v", methods, want)
 	}
@@ -163,6 +166,19 @@ func TestAPathWithoutOwnersTravelsAsAnEmptyArray(t *testing.T) {
 	}
 	if want := `{"owners":[{"path":"a.go","projects":[]}]}`; string(encoded) != want {
 		t.Fatalf("encoded %s, want %s", encoded, want)
+	}
+}
+
+func TestAnEmptyProbeAnswerTravelsWithEmptyArrays(t *testing.T) {
+	encoded, err := json.Marshal(WorkspaceProbeResult{Root: "/repo", Projects: []wsproto.MergedProject{}, Diagnostics: []diag.Diagnostic{}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := `{"root":"/repo","projects":[],"diagnostics":[]}`; string(encoded) != want {
+		t.Fatalf("encoded %s, want %s", encoded, want)
+	}
+	if err := DecodeStrict([]byte(`{"paths":[]}`), &WorkspaceProbeParams{}); err == nil {
+		t.Fatal("DecodeStrict accepted a member workspace.probe does not take")
 	}
 }
 

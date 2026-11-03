@@ -14,8 +14,10 @@ import (
 	"testing"
 	"time"
 
+	diag "go.putnami.dev/protocol/diagnostic"
 	wire "go.putnami.dev/protocol/extension/hostrpc"
 	"go.putnami.dev/protocol/features/spectest"
+	wsproto "go.putnami.dev/protocol/workspace"
 )
 
 const (
@@ -25,7 +27,9 @@ const (
 	ownersRequirement = "host-rpc-workspace-owners-client"
 	// versionRequirement is the requirement of the version.lines client.
 	versionRequirement = "host-rpc-version-lines-client"
-	testToken          = "test-token"
+	// probeRequirement is the requirement of the workspace.probe client.
+	probeRequirement = "host-rpc-workspace-probe-client"
+	testToken        = "test-token"
 )
 
 // fakeHost serves one end of a pipe: answer receives each request and returns
@@ -513,5 +517,72 @@ func TestACallWithAnEndedContextSendsNothing(t *testing.T) {
 	}
 	if request := <-received; string(request.ID) != "1" || len(received) != 0 {
 		t.Fatalf("the host received request %s and %d more, want only request 1", request.ID, len(received))
+	}
+}
+
+func TestWorkspaceProbeReturnsTheHostsAnswer(t *testing.T) {
+	t.Parallel()
+	spectest.Proves(t, feature, probeRequirement, "workspace-probe-returns-the-hosts-answer")
+	answer := wire.WorkspaceProbeResult{
+		Root: "/repo",
+		Projects: []wsproto.MergedProject{
+			{Path: "apps/web", SourceName: "web", Dependencies: []string{"libs/ui"}},
+			{Path: "libs/ui", SourceName: "ui"},
+		},
+		Diagnostics: []diag.Diagnostic{diag.Errorf("transport", "@acme/go", "probe exited with an error")},
+	}
+	client := fakeHost(t, func(request wire.Request) []byte {
+		if err := wire.DecodeStrict(request.Params, &wire.WorkspaceProbeParams{}); err != nil || request.Method != wire.MethodWorkspaceProbe {
+			t.Errorf("%s params %s, %v", request.Method, request.Params, err)
+		}
+		return result(t, request, answer)
+	})
+	got, err := client.WorkspaceProbe(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Root != "/repo" || len(got.Projects) != 2 || got.Projects[0].Path != "apps/web" ||
+		!slices.Equal(got.Projects[0].Dependencies, []string{"libs/ui"}) || len(got.Diagnostics) != 1 || got.Diagnostics[0].Code != "transport" {
+		t.Fatalf("WorkspaceProbe = %+v, want the host's answer", got)
+	}
+
+	empty := fakeHost(t, func(request wire.Request) []byte {
+		return result(t, request, wire.WorkspaceProbeResult{Root: "/empty"}) // encodes null lists
+	})
+	none, err := empty.WorkspaceProbe(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if none.Projects == nil || len(none.Projects) != 0 || none.Diagnostics == nil || len(none.Diagnostics) != 0 {
+		t.Fatalf("WorkspaceProbe of an empty answer = %+v, want empty lists", none)
+	}
+}
+
+func TestWorkspaceProbeRejectsAnAnswerItCannotUseAndStaysUsable(t *testing.T) {
+	t.Parallel()
+	spectest.Proves(t, feature, probeRequirement, "workspace-probe-rejects-an-answer-it-cannot-use-and-stays-usable")
+	for _, tc := range []struct {
+		name   string
+		answer wire.WorkspaceProbeResult
+	}{
+		{"no root", wire.WorkspaceProbeResult{Projects: []wsproto.MergedProject{{Path: "a"}}}},
+		{"projects out of path order", wire.WorkspaceProbeResult{Root: "/repo", Projects: []wsproto.MergedProject{{Path: "b"}, {Path: "a"}}}},
+		{"a path twice", wire.WorkspaceProbeResult{Root: "/repo", Projects: []wsproto.MergedProject{{Path: "a"}, {Path: "a"}}}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			client := fakeHost(t, func(request wire.Request) []byte {
+				if request.Method == wire.MethodHello {
+					return result(t, request, wire.HelloResult{Protocol: wire.ProtocolVersion, Methods: wire.Methods()})
+				}
+				return result(t, request, tc.answer)
+			})
+			if got, err := client.WorkspaceProbe(t.Context()); err == nil {
+				t.Fatalf("WorkspaceProbe accepted %+v", got)
+			}
+			if _, err := client.Hello(t.Context()); err != nil {
+				t.Fatalf("the call after the rejected answer = %v, want the client usable", err)
+			}
+		})
 	}
 }

@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	collab "go.putnami.dev/protocol/collaboration"
+	diag "go.putnami.dev/protocol/diagnostic"
 	hostrpcproto "go.putnami.dev/protocol/extension/hostrpc"
 	features "go.putnami.dev/protocol/features"
 	wsproto "go.putnami.dev/protocol/workspace"
@@ -30,11 +31,15 @@ import (
 
 // hostRPCBinding is what the methods of one launch's channel answer from: the
 // workspace the command runs in, its configuration, and the extensions the
-// dispatch discovered. A launch outside any workspace has an empty root.
+// dispatch discovered. A launch outside any workspace has an empty root; its
+// extensions are the user scope's, callerDir is the directory it runs in, and
+// userScope is the synthetic workspace its runtimes are prepared in.
 type hostRPCBinding struct {
 	root       string
 	config     *wsproto.Config
 	extensions []*extension.ExtensionDescription
+	callerDir  string
+	userScope  *workspace.Workspace
 }
 
 // startHostRPC opens the channel of one launch. It returns the variables the
@@ -48,6 +53,7 @@ func startHostRPC(ctx context.Context, binding hostRPCBinding, stderr io.Writer)
 		VerificationReport: binding.verificationReport,
 		VersionLines:       binding.versionLines,
 		WorkspaceOwners:    binding.workspaceOwners,
+		WorkspaceProbe:     binding.workspaceProbe,
 	})
 	return hostRPCLaunch(server, err, stderr)
 }
@@ -150,6 +156,114 @@ func (b hostRPCBinding) workspaceOwners(_ context.Context, params hostrpcproto.W
 		result.Owners = append(result.Owners, hostrpcproto.PathOwners{Path: path, Projects: projects})
 	}
 	return result, nil
+}
+
+// workspaceProbe answers workspace.probe. Inside a workspace it answers the
+// workspace's synchronized view, as every command prepares it. Outside one it
+// runs the probes of the user scope's extensions on the caller's directory
+// (probeDirectory). A probe failure is an error diagnostic of the
+// answer, never a refused call.
+func (b hostRPCBinding) workspaceProbe(ctx context.Context, _ hostrpcproto.WorkspaceProbeParams) (hostrpcproto.WorkspaceProbeResult, error) {
+	switch {
+	case b.root != "":
+		return workspaceViewProbe(ctx, b.root, b.extensions)
+	case b.callerDir != "" && b.userScope != nil:
+		return probeDirectory(ctx, b.userScope, b.callerDir, b.extensions)
+	default:
+		return hostrpcproto.WorkspaceProbeResult{}, &hostrpcproto.Error{Code: hostrpcproto.CodeUnavailable,
+			Message: "this launch names neither a workspace nor a caller directory to probe"}
+	}
+}
+
+// workspaceViewProbe answers workspace.probe from the synchronized view of the
+// workspace at root, whose extensions are the ones the dispatch discovered.
+func workspaceViewProbe(ctx context.Context, root string, extensions []*extension.ExtensionDescription) (hostrpcproto.WorkspaceProbeResult, error) {
+	ws, err := workspace.Load(root)
+	if err != nil {
+		return hostrpcproto.WorkspaceProbeResult{}, err
+	}
+	result := hostrpcproto.WorkspaceProbeResult{Root: root, Projects: []wsproto.MergedProject{}, Diagnostics: []diag.Diagnostic{}}
+	outcome, err := engine.PrepareWorkspaceGraph(ctx, ws, &extension.DiscoveryResult{Extensions: extensions})
+	if err != nil {
+		failure := &wsproto.ProbeFailure{}
+		if !errors.As(err, &failure) {
+			return hostrpcproto.WorkspaceProbeResult{}, err
+		}
+		result.Diagnostics = append(append(result.Diagnostics, failure.Diagnostic()), failure.Diagnostics...)
+		return result, nil
+	}
+	result.Projects = sortedMergedProjects(outcome.Merged)
+	result.Diagnostics = append(result.Diagnostics, outcome.Diagnostics...)
+	return result, nil
+}
+
+// probeDirectory answers workspace.probe for dir, a directory in no
+// workspace: it runs the workspace probes of extensions there and merges their
+// answers as a workspace view merges them, with no explicit project. ws is the
+// user scope's synthetic workspace, where the providers' runtimes are
+// prepared.
+//
+// The candidates are dir itself, as a workspace sync always asks about its
+// root, and the directories under dir that carry one of the providers'
+// markers. Nothing is written in dir: no snapshot and no lock. A provider that
+// fails or answers outside its contract is an error diagnostic, and the other
+// providers' projects stay in the answer; a merge conflict is an error
+// diagnostic on the field it leaves empty. Only a directory that cannot be
+// read fails the call.
+func probeDirectory(
+	ctx context.Context,
+	ws *workspace.Workspace,
+	dir string,
+	extensions []*extension.ExtensionDescription,
+) (hostrpcproto.WorkspaceProbeResult, error) {
+	bindings := engine.WorkspaceProviderBindings(ctx, ws, dir, &extension.DiscoveryResult{Extensions: extensions}, nil)
+	scopes := make([]workspace.ProviderScope, len(bindings))
+	for i, binding := range bindings {
+		scopes[i] = binding.Scope
+	}
+	if _, err := os.ReadDir(dir); err != nil {
+		return hostrpcproto.WorkspaceProbeResult{}, err
+	}
+	scanned, err := workspace.ScanProjectPathsWithProviders(dir, scopes)
+	if err != nil {
+		return hostrpcproto.WorkspaceProbeResult{}, err
+	}
+	candidates := append([]string{wsproto.ProbeRootPath}, scanned...)
+	slices.Sort(candidates)
+	result := hostrpcproto.WorkspaceProbeResult{Root: dir, Diagnostics: []diag.Diagnostic{}}
+	answers := make([]wsproto.ProbeResult, 0, len(bindings))
+	for _, binding := range bindings {
+		outcome, err := workspace.RunProbe([]workspace.ProbeProvider{binding.Provider}, wsproto.ProbeRequest{
+			Reason:            wsproto.ProbeReasonLoad,
+			Paths:             candidates,
+			DependencySources: binding.Scope.DependencySources,
+		}, nil)
+		if err != nil {
+			failure := &wsproto.ProbeFailure{}
+			if !errors.As(err, &failure) {
+				failure = wsproto.NewProbeFailure(wsproto.ProbeFailureTransport, binding.Scope.Extension, "%v", err)
+			}
+			result.Diagnostics = append(append(result.Diagnostics, failure.Diagnostic()), failure.Diagnostics...)
+			continue
+		}
+		answers = append(answers, outcome.Results...)
+		result.Diagnostics = append(result.Diagnostics, outcome.Diagnostics...)
+	}
+	merged, conflicts := wsproto.MergeProbeResults(answers, nil)
+	result.Projects = sortedMergedProjects(merged)
+	result.Diagnostics = append(result.Diagnostics, conflicts...)
+	return result, nil
+}
+
+// sortedMergedProjects lists a merged view's projects sorted by path, as an
+// empty slice for an empty view.
+func sortedMergedProjects(merged map[string]wsproto.MergedProject) []wsproto.MergedProject {
+	projects := make([]wsproto.MergedProject, 0, len(merged))
+	for _, project := range merged {
+		projects = append(projects, project)
+	}
+	slices.SortFunc(projects, func(a, b wsproto.MergedProject) int { return strings.Compare(a.Path, b.Path) })
+	return projects
 }
 
 // versionLines answers version.lines for the launch's workspace. It first
