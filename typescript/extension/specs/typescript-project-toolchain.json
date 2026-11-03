@@ -112,6 +112,10 @@
       "text": "Each log event a pre-build or config-extract hook emits reaches the task's event stream, in order, at its level, with trace shown as debug, whether the hook succeeds or fails; in a batched generate, each log names the member project it belongs to."
     },
     {
+      "id": "test-rerun-each",
+      "text": "putnami test --rerun-each N runs each test file of the project N times, solo or batched, so a stress run reports every run; without the flag each file runs once."
+    },
+    {
       "id": "structured-reports",
       "text": "Test and coverage results are parsed into structured per-file and per-project reports, uncovered project sources are counted, external dependencies are excluded, and a missing report file is an empty result rather than a crash."
     },
