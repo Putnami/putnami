@@ -1,0 +1,37 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-project.json",
+  "name": "@putnami/jira-collaboration",
+  "tags": [
+    "go",
+    "extension"
+  ],
+  "extensions": [
+    "/go/extension",
+    "/tooling/sdd-extension"
+  ],
+  "publish": [
+    "archives"
+  ],
+  "options": {
+    "@putnami/go": {
+      "entrypoint": "./cmd/putnami-jira-collaboration",
+      "version-var": "main.runtimeVersion"
+    },
+    "test": {
+      "filePatterns": [
+        "putnami.extension.json"
+      ]
+    },
+    "sdd": {
+      "verification": {
+        "specs": "enforce"
+      }
+    },
+    "package": {
+      "archives": true
+    },
+    "publish": {
+      "archives": true
+    }
+  }
+}

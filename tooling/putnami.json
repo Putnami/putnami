@@ -11,6 +11,7 @@
     "extension-sdk",
     "github-collaboration",
     "install-scripts",
+    "jira-collaboration",
     "local-collaboration",
     "memory-store",
     "observe",

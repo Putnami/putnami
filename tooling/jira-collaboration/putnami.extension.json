@@ -1,0 +1,103 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-extension.json",
+  "name": "@putnami/jira-collaboration",
+  "cliContract": 19,
+  "runtime": {
+    "executable": "compiled/putnami-jira-collaboration",
+    "toolchains": {
+      "runtimeCompiler": {
+        "lock": "go",
+        "candidates": [
+          {
+            "from": "environment",
+            "environment": "GOROOT",
+            "path": "bin/go"
+          },
+          {
+            "from": "path",
+            "path": "go"
+          },
+          {
+            "from": "putnami-home",
+            "path": "toolchains/go/go-{version}/go/bin/go"
+          }
+        ],
+        "probe": {
+          "args": [
+            "env",
+            "GOVERSION"
+          ],
+          "expect": "go{version}",
+          "unset": [
+            "GOROOT"
+          ],
+          "environment": {
+            "GOTOOLCHAIN": "local"
+          }
+        },
+        "environment": {
+          "GOROOT": {
+            "from": "ancestor",
+            "levels": 2
+          },
+          "GOTOOLCHAIN": {
+            "from": "literal",
+            "value": "local"
+          }
+        },
+        "prependPath": true
+      }
+    },
+    "prepare": {
+      "command": "{extensionRoot}/bin/prepare",
+      "args": [
+        "--output",
+        "{runtimeOutput}"
+      ],
+      "inputs": [
+        "bin/prepare",
+        "cmd/**",
+        "go.mod",
+        "internal/**"
+      ],
+      "toolchains": [
+        "runtimeCompiler"
+      ]
+    }
+  },
+  "providers": {
+    "tasks": {
+      "version": 1,
+      "command": "{extensionRuntime}",
+      "args": [
+        "provider"
+      ],
+      "cwd": "{workspaceRoot}",
+      "timeoutMs": 120000,
+      "operations": {
+        "find": {
+          "description": "Find issues of the bound Jira project by text, semantic state and labels, in key order, one bounded page at a time, with JQL the provider builds; caller text never adds a clause. States map to status categories: To Do is open, In Progress is in_progress, Done is done, and Done resolved Won't Do or Duplicate is canceled. Jira's search index trails recent writes by seconds; blocked matches nothing.",
+          "openWorld": true
+        },
+        "get": {
+          "description": "Read one issue of the bound Jira site by its numeric id. providerState is the status name.",
+          "openWorld": true
+        },
+        "create": {
+          "description": "Open an issue of settings.issueType (Task unless set) in the bound Jira project. The idempotency key is recorded as a hidden label and the request digest as an issue property: a repeated key returns the issue it opened, even before Jira's search shows it, the same key with other content is a conflict, and a create whose outcome is unknown is read back and answered unresolved rather than opened twice. Only an issue the credential's account opened answers for a key; two concurrent calls with one key are not detected.",
+          "openWorld": true
+        },
+        "update": {
+          "description": "Change an issue's summary, description or labels. Labels replace the task's labels; the hidden idempotency label stays. expectedRevision is compared with the issue read just before the write: Jira has no conditional issue write, so a writer between the two is not detected.",
+          "openWorld": true,
+          "preconditions": "checked"
+        },
+        "transition": {
+          "description": "Move an issue to a semantic state through the first workflow transition Jira offers into the target status category; canceled also sets the resolution Won't Do. blocked, and a state the workflow offers no transition into, are unsupported. expectedRevision is compared with the issue read just before the write.",
+          "openWorld": true,
+          "preconditions": "checked"
+        }
+      }
+    }
+  }
+}

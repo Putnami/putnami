@@ -86,6 +86,12 @@
       "status": "stable"
     },
     {
+      "id": "@putnami/jira-collaboration",
+      "kind": "package",
+      "status": "preview",
+      "parity": "unsupported"
+    },
+    {
       "id": "@putnami/local-collaboration",
       "kind": "package",
       "status": "preview",

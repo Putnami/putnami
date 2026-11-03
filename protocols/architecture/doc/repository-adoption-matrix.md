@@ -1,6 +1,6 @@
 # Repository adoption matrix
 
-This repository maps **100 of its 159 projects** to **10 architecture domains**.
+This repository maps **101 of its 160 projects** to **10 architecture domains**.
 The other **59 are excluded on purpose**: 28 samples, 7 templates, 2 template
 proofs, 2 protocol proofs, the standalone area detector, the 2 Cloud runtime
 destinations, the Cloud CLI extension with its 14 generated clients, the new
@@ -32,7 +32,7 @@ an unmapped project is simply invisible to it. This file is that second half.
 | `protocols` | `protocols` | 43 | `protocols/putnami.architecture.json` |
 | `go-framework` | `framework` | 24 | `go/framework/putnami.architecture.json` |
 | `typescript-framework` | `framework` | 14 | `typescript/framework/putnami.architecture.json` |
-| `extension-providers` | `extension-providers` | 9 | `go/extension/putnami.architecture.json` |
+| `extension-providers` | `extension-providers` | 10 | `go/extension/putnami.architecture.json` |
 | `cli` | `cli` | 5 | `tooling/cli/putnami.architecture.json` |
 | `sdd` | `sdd` | 1 | `tooling/sdd-extension/putnami.architecture.json` |
 | `extension-sdk` | `tooling` | 1 | `tooling/extension-sdk/putnami.architecture.json` |
@@ -159,7 +159,7 @@ tenant TypeScript application links, with the same authority relationship as
 | `/typescript/framework/utils` | `@putnami/utils` | The shared primitives the other packages build on. |
 | `/typescript/framework/web` | `@putnami/web` | Routing, rendering, islands, and the web pipeline. |
 
-### `extension-providers` — 9 projects
+### `extension-providers` — 10 projects
 
 **Membership test:** the project is an extension binary that *answers the
 orchestrator* — it owns the probe answers, the lifecycle jobs, the verification
@@ -174,6 +174,7 @@ authority is what it reports, not what it builds.
 | `/tooling/scaffold` | `@putnami/scaffold` | The template-archive job: it decides what a packaged template contains. |
 | `/tooling/clientgen-extension` | `@putnami/clientgen` | The cross-language client-generation job and the shape of what it emits. |
 | `/tooling/github-collaboration` | `@putnami/github-collaboration` | The task and proposal provider results for GitHub: how a GitHub issue or pull request maps onto the collaboration contracts. |
+| `/tooling/jira-collaboration` | `@putnami/jira-collaboration` | The task provider results for Jira Cloud: how a Jira issue, its status category and its resolution map onto the tasks contract. |
 | `/tooling/local-collaboration` | `@putnami/local-collaboration` | The task and proposal provider results for the local file-backed store. |
 | `/tooling/memory-store` | `@putnami/memory-store` | The memory provider results for the file and Git stores: context selection and compare-and-set checkpoints. |
 | `/tooling/observe` | `@putnami/observe` | What a CI job reports about its change: the repository key, the diff base, the changed files, the reports it found, and the change evidence document. |
