@@ -109,6 +109,7 @@ use (
 	./tooling/extension-sdk
 	./tooling/github-collaboration
 	./tooling/install-scripts
+	./tooling/jira-collaboration
 	./tooling/local-collaboration
 	./tooling/memory-store
 	./tooling/observe
