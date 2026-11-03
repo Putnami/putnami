@@ -151,7 +151,9 @@ counts too. When no mission could be read, every launched, in-progress or
 ready issue counts. A stacked issue whose parent merged gets its rebase,
 `git rebase --onto <base> <parent's last head>`, with the head commit
 `proposals.status` reports for the parent; its proposal then targets the
-epic's base.
+epic's base. A dependency closed without a merge blocks the issues that need
+it: each shows `blocked: <key> closed without a merge` until the owner
+replans it.
 
 ```text
 Epic .putnami/42/epic.json: Plans are sized and launched in waves
@@ -169,8 +171,12 @@ A contract whose provider answers `unsupported` or `denied` is called once,
 and listed under `Not read`; any other answer that is not `ok` is listed with
 its issue. A workspace whose `origin` remote names no repository reads no
 mission, and `Not read` says so; a mission with more than 1000 sessions is
-read up to that bound, and listed with its issue. Without the host channel, as when the executable runs by hand, the
+read up to that bound, and listed with its issue. The whole read stops after
+9 minutes, within the 10 the task allows: the status then shows what it read
+and lists the call where it stopped as `unavailable`. A provider that cannot
+be reached exits 1, since a partial read would look complete. Without the
+host channel, as when the executable runs by hand, the
 command exits 1 and names `putnami epic status`. `--output=json` prints the
 result document: `tokens`, `envelopeSpent`, `running`, `issues` (each with
-its `sessions`, `live` and `sessionsRead`),
+its `sessions`, `live`, `sessionsRead` and `blockedBy`),
 `launchable` and `unavailable`.

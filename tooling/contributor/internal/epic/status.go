@@ -31,8 +31,10 @@ type StatusCommand struct {
 	// command then reads no mission.
 	Repository string
 	Call       Provider
-	Stdout     io.Writer
-	Stderr     io.Writer
+	// Budget bounds the whole read; zero means StatusBudget.
+	Budget time.Duration
+	Stdout io.Writer
+	Stderr io.Writer
 }
 
 // Issue states, from the first a planned issue holds to the last.
@@ -93,6 +95,9 @@ type IssueStatus struct {
 	Rebase string `json:"rebase,omitempty"`
 	// SessionsRead is true when the issue's mission was read.
 	SessionsRead bool `json:"sessionsRead"`
+	// BlockedBy names the dependencies closed without a merge: the issue
+	// cannot launch until the owner replans them.
+	BlockedBy []string `json:"blockedBy,omitempty"`
 }
 
 // ProposalView is the part of a proposal the status shows.
@@ -124,6 +129,11 @@ type Unavailable struct {
 // callTimeout bounds one provider call.
 const callTimeout = 30 * time.Second
 
+// StatusBudget bounds the whole read of the children, below the 10 minutes
+// the epic-status task allows. Past it, the status lists what it read and
+// names where it stopped.
+const StatusBudget = 9 * time.Minute
+
 // maxSessionPages bounds the pages of sessions read for one mission.
 const maxSessionPages = 10
 
@@ -141,7 +151,13 @@ func (c StatusCommand) Run(ctx context.Context, args []string) int {
 		fmt.Fprintf(c.Stderr, "epic status: %v\n", err)
 		return 1
 	}
-	reader := &statusReader{call: c.Call, repository: c.Repository, disabled: map[string]bool{}}
+	budget := c.Budget
+	if budget <= 0 {
+		budget = StatusBudget
+	}
+	ctx, cancel := context.WithTimeout(ctx, budget)
+	defer cancel()
+	reader := &statusReader{call: c.Call, repository: c.Repository, budget: budget, disabled: map[string]bool{}}
 	result, err := reader.status(ctx, loaded, launches)
 	if err != nil {
 		fmt.Fprintf(c.Stderr, "epic status: %v\n", err)
@@ -159,8 +175,24 @@ func (c StatusCommand) Run(ctx context.Context, args []string) int {
 type statusReader struct {
 	call        Provider
 	repository  string
+	budget      time.Duration
+	spent       bool
 	disabled    map[string]bool
 	unavailable []Unavailable
+}
+
+// outOfBudget reports whether the read's budget ran out, and records it once
+// with the call where the read stopped.
+func (r *statusReader) outOfBudget(ctx context.Context, issue, contract, operation string) bool {
+	if !errors.Is(ctx.Err(), context.DeadlineExceeded) {
+		return false
+	}
+	if !r.spent {
+		r.spent = true
+		r.unavailable = append(r.unavailable, Unavailable{Contract: contract, Operation: operation, Issue: issue,
+			Outcome: string(collab.OutcomeUnavailable), Message: fmt.Sprintf("the status stopped reading after %s", r.budget)})
+	}
+	return true
 }
 
 // errSkipped reports a call the reader did not make, or whose answer it
@@ -168,7 +200,7 @@ type statusReader struct {
 var errSkipped = errors.New("skipped")
 
 func (r *statusReader) do(ctx context.Context, issue, contract, operation string, input, output any) error {
-	if r.disabled[contract] {
+	if r.disabled[contract] || r.outOfBudget(ctx, issue, contract, operation) {
 		return errSkipped
 	}
 	if r.call == nil {
@@ -182,6 +214,9 @@ func (r *statusReader) do(ctx context.Context, issue, contract, operation string
 	defer cancel()
 	envelope, err := r.call(callCtx, contract, operation, request)
 	if err != nil {
+		if r.outOfBudget(ctx, issue, contract, operation) {
+			return errSkipped
+		}
 		return fmt.Errorf("%s.%s: %w", contract, operation, err)
 	}
 	if envelope.Outcome != collab.OutcomeOK {
@@ -225,6 +260,7 @@ func (r *statusReader) status(ctx context.Context, loaded loaded, launches map[s
 		if err := r.rebase(ctx, plan, &result.Issues[i], result.Issues, byKey); err != nil {
 			return StatusResult{}, err
 		}
+		result.Issues[i].BlockedBy = blockedBy(result.Issues[i], result.Issues, byKey)
 	}
 	result.EnvelopeSpent = result.Tokens >= int64(plan.Envelope.Tokens)
 	result.Launchable = launchable(plan, result)
@@ -400,6 +436,21 @@ func (r *statusReader) rebase(ctx context.Context, plan estimate.EpicPlan, statu
 		return nil
 	}
 	return nil
+}
+
+// blockedBy names the dependencies of an issue still to deliver that closed
+// without a merge.
+func blockedBy(status IssueStatus, issues []IssueStatus, byKey map[string]int) []string {
+	if status.State == StateMerged || status.State == StateClosed {
+		return nil
+	}
+	var closed []string
+	for _, key := range status.DependsOn {
+		if issues[byKey[key]].State == StateClosed {
+			closed = append(closed, key)
+		}
+	}
+	return closed
 }
 
 // running reports whether the issue's session takes one of the envelope's
@@ -664,6 +715,9 @@ func issueText(issue IssueStatus) string {
 	}
 	if issue.OverShare {
 		parts = append(parts, "more than 50 % over its share")
+	}
+	if len(issue.BlockedBy) > 0 {
+		parts = append(parts, "blocked: "+strings.Join(issue.BlockedBy, ", ")+" closed without a merge")
 	}
 	return strings.Join(parts, ", ")
 }
