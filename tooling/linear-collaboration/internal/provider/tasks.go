@@ -489,7 +489,6 @@ func (s *session) createLabel(name string) (label, *collab.Failure) {
 	return label{}, failure
 }
 
-// sameSet reports whether two lists hold the same values, ignoring order.
 // labelKeys is the set of label names as label resolution sees it: case
 // folded, sorted, without repeats, and empty rather than absent.
 func labelKeys(names []string) []string {
@@ -501,6 +500,7 @@ func labelKeys(names []string) []string {
 	return slices.Compact(keys)
 }
 
+// sameSet reports whether two lists hold the same values, ignoring order.
 func sameSet(a, b []string) bool {
 	a, b = slices.Clone(a), slices.Clone(b)
 	sort.Strings(a)

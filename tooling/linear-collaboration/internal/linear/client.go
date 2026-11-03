@@ -157,9 +157,10 @@ func (c *Client) Query(ctx context.Context, name, query string, variables map[st
 }
 
 // Mutate sends one GraphQL mutation exactly once and decodes its data into
-// out. A failure's Kind says whether the mutation can have happened: an answer
-// that reports an error is a definite refusal, since Linear applies a mutation
-// completely or not at all.
+// out. A failure's Kind says whether the mutation can have happened: an error
+// Linear reports is a definite refusal, since Linear applies a mutation
+// completely or not at all, except a 5xx answer or a transient code, which
+// is Uncertain.
 func (c *Client) Mutate(ctx context.Context, name, mutation string, variables map[string]any, out any) *Error {
 	payload, failure := encode(name, mutation, variables)
 	if failure != nil {
