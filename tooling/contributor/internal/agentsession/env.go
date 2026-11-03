@@ -211,5 +211,11 @@ const gitTimeout = 2 * time.Second
 func (e *Env) git(ctx context.Context, dir string, args ...string) (string, error) {
 	gitContext, cancel := context.WithTimeout(ctx, gitTimeout)
 	defer cancel()
-	return e.Git(gitContext, dir, args...)
+	out, err := e.Git(gitContext, dir, args...)
+	if err != nil && gitContext.Err() != nil {
+		// A git stopped at its deadline is a timeout, whatever status the
+		// platform gave the killed process.
+		return "", gitContext.Err()
+	}
+	return out, err
 }

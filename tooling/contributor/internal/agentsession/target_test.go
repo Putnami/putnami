@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"go.putnami.dev/protocol/features/spectest"
@@ -124,8 +125,7 @@ func TestAttachDeclaresTheMissionOfTheBranch(t *testing.T) {
 }
 
 // A git that fails other than with status 1 is not a detached HEAD: attach
-// fails and declares nothing, and a session leaves its identity unknown, so
-// its next event reads it again.
+// fails and declares nothing.
 func TestAttachFailsWhenGitFails(t *testing.T) {
 	spectest.Proves(t, sessionFeature, targetRequirement, "a-git-failure-is-not-a-detached-head")
 	h := newHarness(t)
@@ -140,8 +140,34 @@ func TestAttachFailsWhenGitFails(t *testing.T) {
 	if entries, _ := os.ReadDir(filepath.Join(h.env.sessionsDir(), declaredDir)); len(entries) != 0 {
 		t.Errorf("a failed git declared %d issues", len(entries))
 	}
-	if identity := h.env.readSessionIdentity(context.Background(), h.root); identity != (sessionIdentity{}) {
-		t.Errorf("identity %+v, want unknown", identity)
+}
+
+// A session whose git fails at SessionStart, on the branch or on the origin,
+// logs the failure, syncs nothing and keeps no identity; its next event reads
+// the identity again and reports to the mission of the branch.
+func TestASessionRereadsAnIdentityGitFailedToRead(t *testing.T) {
+	spectest.Proves(t, sessionFeature, targetRequirement, "a-git-failure-is-not-a-detached-head")
+	for _, failing := range []string{"symbolic-ref --short -q HEAD", "remote get-url origin"} {
+		h := newHarness(t)
+		working := h.env.Git
+		h.env.Git = func(ctx context.Context, dir string, args ...string) (string, error) {
+			if strings.Join(args, " ") == failing {
+				return "", context.DeadlineExceeded
+			}
+			return working(ctx, dir, args...)
+		}
+		h.hook(claude, "session-start", claudeSession, nil)
+		if syncs := h.provider.recordedSyncs(); len(syncs) != 0 {
+			t.Errorf("%s: SessionStart synced %d times without an identity", failing, len(syncs))
+		}
+		if !logSays(h.hookLog(), "context deadline exceeded") {
+			t.Errorf("%s: hook.log %v", failing, h.hookLog())
+		}
+		h.env.Git = working
+		h.hook(claude, "stop", claudeSession, nil)
+		if sync := h.provider.lastSync(t); sync.Mission.Key != "branch:"+sessionBranch {
+			t.Errorf("%s: mission %+v after Stop", failing, sync.Mission)
+		}
 	}
 }
 

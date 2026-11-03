@@ -116,13 +116,19 @@ func (e *Env) checkoutBranch(ctx context.Context, root string) (string, error) {
 }
 
 // originRepository is the lowercase owner/name of the checkout's origin
-// remote, or "" when origin names no such repository, such as a local path.
-func (e *Env) originRepository(ctx context.Context, root string) string {
+// remote, or "" when origin names no such repository, such as a local path,
+// or when git answers that there is no origin. A git that fails otherwise,
+// such as one past gitTimeout, is an error.
+func (e *Env) originRepository(ctx context.Context, root string) (string, error) {
 	remote, err := e.git(ctx, root, "remote", "get-url", "origin")
-	if err != nil {
-		return ""
+	var exit gitExit
+	switch {
+	case err == nil:
+		return RepositoryFromRemote(remote), nil
+	case errors.As(err, &exit):
+		return "", nil
 	}
-	return RepositoryFromRemote(remote)
+	return "", fmt.Errorf("read the origin remote: %w", err)
 }
 
 // RepositoryFromRemote reads owner/name from a remote URL: scp-like

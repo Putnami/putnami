@@ -81,7 +81,7 @@ func TestAGitPastItsTimeoutIsNotADetachedHEAD(t *testing.T) {
 
 	// The same checkout behind a git that sleeps past gitTimeout.
 	bin := t.TempDir()
-	if err := os.WriteFile(filepath.Join(bin, "git"), []byte("#!/bin/sh\n/bin/sleep 3\nexit 1\n"), 0o700); err != nil {
+	if err := os.WriteFile(filepath.Join(bin, "git"), []byte("#!/bin/sh\nexec /bin/sleep 3\n"), 0o700); err != nil {
 		t.Fatal(err)
 	}
 	t.Setenv("PATH", bin)
