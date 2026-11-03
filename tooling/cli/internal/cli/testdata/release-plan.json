@@ -203,6 +203,7 @@
       "artifacts": [
         "@putnami/contributor",
         "@putnami/github-collaboration",
+        "@putnami/jira-collaboration",
         "@putnami/local-collaboration",
         "@putnami/memory-store"
       ],

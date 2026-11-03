@@ -1,0 +1,28 @@
+#!/usr/bin/env bash
+# Runs the Jira collaboration provider's contract scenarios against a real
+# Jira Cloud project, with the credential JIRA_EMAIL and JIRA_API_TOKEN hold.
+#
+# The project must be a disposable test project whose description carries
+# putnami-collaboration-live-test: the run opens, edits and moves issues
+# there, and deletes the issues it created when it ends. The test refuses any
+# project without that marker.
+set -euo pipefail
+
+if [ "$#" -ne 2 ] || [ "$1" = "--help" ] || [ "$1" = "-h" ]; then
+  printf '%s\n' "usage: live-test <site host> <project key>" \
+    "Runs TestLiveJira against the named disposable project (description carries putnami-collaboration-live-test)." >&2
+  [ "$#" -eq 1 ] && { [ "$1" = "--help" ] || [ "$1" = "-h" ]; } && exit 0
+  exit 2
+fi
+for variable in JIRA_EMAIL JIRA_API_TOKEN; do
+  [ -n "${!variable:-}" ] || { printf 'live-test: %s is not set\n' "$variable" >&2; exit 2; }
+done
+
+root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
+cli=putnami
+if [ -x "$root/putnamiw" ]; then
+  cli="$root/putnamiw"
+fi
+cd "$root"
+PUTNAMI_JIRA_COLLAB_LIVE_SITE="$1" PUTNAMI_JIRA_COLLAB_LIVE_PROJECT="$2" exec "$cli" test --projects @putnami/jira-collaboration \
+  --no-cache --count 1 --run '^TestLiveJira$' --no-enforce-coverage --test-verbose

@@ -155,3 +155,9 @@ implements **tasks** and **proposals** on GitHub issues and pull requests. It
 reads the credential the way `gh` does, maps task states to labels through its
 binding settings, lists what people wrote on a pull request through
 `proposals comments`, and offers merge only as an optional capability.
+
+[`@putnami/jira-collaboration`](../../jira-collaboration/README.md)
+implements **tasks** on the issues of one Jira Cloud project. It reads
+`JIRA_EMAIL` and `JIRA_API_TOKEN`, maps task states to status categories, so a
+workflow's statuses need no configuration, and finds tasks with JQL it builds
+itself.

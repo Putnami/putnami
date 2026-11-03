@@ -8,6 +8,7 @@
     "/python/extension",
     "/tooling/clientgen-extension",
     "/tooling/github-collaboration",
+    "/tooling/jira-collaboration",
     "/tooling/local-collaboration",
     "/tooling/memory-store",
     "/tooling/observe",
@@ -599,6 +600,46 @@
         {
           "kind": "project-dependency",
           "consumerProject": "/tooling/github-collaboration",
+          "producerProject": "/protocols/runtime"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/jira-collaboration",
+          "producerProject": "/protocols/capabilities"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/jira-collaboration",
+          "producerProject": "/protocols/cli"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/jira-collaboration",
+          "producerProject": "/protocols/collaboration"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/jira-collaboration",
+          "producerProject": "/protocols/diagnostic"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/jira-collaboration",
+          "producerProject": "/protocols/extension"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/jira-collaboration",
+          "producerProject": "/protocols/features"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/jira-collaboration",
+          "producerProject": "/protocols/job"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/jira-collaboration",
           "producerProject": "/protocols/runtime"
         },
         {

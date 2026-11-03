@@ -1,0 +1,29 @@
+{
+  "protocolVersion": 2,
+  "contracts": [
+    {
+      "authority": "Jira Cloud REST API v2 (developer.atlassian.com/cloud/jira/platform/rest/v2)",
+      "adapter": "tooling/jira-collaboration/internal/jira/client.go",
+      "callsites": [
+        {
+          "path": "tooling/jira-collaboration/internal/jira/client.go",
+          "transport": "http",
+          "symbol": "http.Client",
+          "fingerprint": "2910ec7982d88e1021225f3a7ef9305d1538b520e4358d972590b4eae6794614"
+        },
+        {
+          "path": "tooling/jira-collaboration/internal/jira/client.go",
+          "transport": "http",
+          "symbol": "http.NewRequestWithContext",
+          "fingerprint": "1faa24fa00363f93c4ff2387b3be97b0331ef29c120350904458208c8b73df16"
+        }
+      ],
+      "owner": "@putnami/jira-collaboration",
+      "tests": [
+        "tooling/jira-collaboration/internal/jira/client_test.go",
+        "tooling/jira-collaboration/internal/provider/conformance_test.go"
+      ],
+      "reason": "Implements the tasks collaboration contract on the issues of one Jira Cloud project."
+    }
+  ]
+}

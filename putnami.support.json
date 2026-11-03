@@ -81,6 +81,12 @@
       "parity": "unsupported"
     },
     {
+      "id": "@putnami/jira-collaboration",
+      "kind": "package",
+      "status": "preview",
+      "parity": "unsupported"
+    },
+    {
       "id": "@putnami/go",
       "kind": "package",
       "status": "stable"
