@@ -25,6 +25,8 @@ const EXPECTED_ISLANDS: Record<string, string> = {
   'hero-terminal': 'visible',
   // The footer's latest Putnami version, fetched once the page is idle.
   'release-version': 'idle',
+  // The offer of the page in the reader's language, decided once the page is idle.
+  'locale-suggestion': 'idle',
   'docs/[...page]/doc-toc': 'idle',
   'docs/[...page]/doc-enhancer': 'idle',
   // Redesign islands: the docs-hub search trigger and the per-page

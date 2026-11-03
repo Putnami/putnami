@@ -7,14 +7,30 @@ import {
   SecurityHeadersMiddleware,
 } from '@putnami/application';
 import { useConfig } from '@putnami/runtime';
+import { joinPath } from '@putnami/utils';
 import React, { type ReactNode } from 'react';
 import type { RouteObject } from 'react-router';
-import { isLocalizedPath, localePrefix, localizePath, parseLocaleSettings } from '../shared/i18n/locale';
+import {
+  isLocalizedPath,
+  type LocaleSettings,
+  localePrefix,
+  localizePath,
+  parseLocaleSettings,
+  translatePath,
+} from '../shared/i18n/locale';
 import type { LocaleMessages } from '../shared/i18n/messages';
 import { createPageElement } from '../shared/page-element';
 import { RouteTreeHelper } from '../shared/route-tree.utils';
 import type { I18nRuntimeOptions } from './i18n/runtime';
-import { excludedRouteRedirect, negotiatingEntry } from './i18n/negotiation';
+import {
+  excludedRouteRedirect,
+  localeDomainRewrite,
+  movedTo,
+  negotiatingEntry,
+  recordingChoice,
+  servingOnDomain,
+} from './i18n/negotiation';
+import { SITEMAP_FILE, sitemapHandler } from './i18n/sitemap';
 import type {
   ErrorModule,
   LayoutModule,
@@ -169,15 +185,30 @@ export class ReactApplication {
   /**
    * Localize the application: every page, loader and action outside
    * `settings.exclude` is served once per locale, the default locale
-   * unprefixed and every other one under `/<locale>`. Called by the generated
-   * module before any route, with the catalogs of the non-default locales.
+   * unprefixed and every other one under `/<locale>`. A locale with a domain
+   * is served at the root of that domain too. Called by the generated module
+   * before any route, with the catalogs of the non-default locales.
    */
   i18n(options: { settings: unknown; messages?: Readonly<Record<string, LocaleMessages>> }) {
     if (this.reactRouter[0]?.children?.length || this.reactRouter[0]?.element) {
       throw new Error('ReactApplication.i18n() must be called before any route is registered');
     }
     this._i18n = { settings: parseLocaleSettings(options.settings), messages: options.messages ?? {} };
+    this.httpPlugin.get(
+      '/sitemap.xml',
+      sitemapHandler(joinPath(this.statics.getPublicOutputDir(), SITEMAP_FILE)),
+      this.routeOptions(),
+    );
+    if (Object.keys(this._i18n.settings.domains).length > 0) {
+      this.httpPlugin.rewrite(localeDomainRewrite(this._i18n.settings));
+    }
     return this;
+  }
+
+  /** The locale settings of a localized application; only called once i18n is set. */
+  private i18nSettings(): LocaleSettings {
+    if (!this._i18n) throw new Error('ReactApplication i18n settings read before i18n()');
+    return this._i18n.settings;
   }
 
   /** The locales and catalogs of a localized application. */
@@ -200,6 +231,19 @@ export class ReactApplication {
     const i18n = this._i18n;
     if (!i18n || !isLocalizedPath(i18n.settings, route)) return [''];
     return i18n.settings.locales.map((locale) => localePrefix(i18n.settings, locale));
+  }
+
+  /**
+   * The locales a page is registered under: each one's prefix and the route as
+   * that locale names it, translated when `i18n.paths` translates it.
+   */
+  private localizedPages(route: string): { prefix: string; route: string }[] {
+    const i18n = this._i18n;
+    if (!i18n || !isLocalizedPath(i18n.settings, route)) return [{ prefix: '', route }];
+    return i18n.settings.locales.map((locale) => ({
+      prefix: localePrefix(i18n.settings, locale),
+      route: translatePath(i18n.settings, route, locale),
+    }));
   }
 
   /** The locale prefixes under which an excluded route redirects to its one URL. */
@@ -251,10 +295,15 @@ export class ReactApplication {
    * invariant in one place; behavior is identical to inlining the options.
    */
   private registerPageGet(httpRoute: string, handler: RouteHandler, statusCode: number): void {
-    // The unprefixed root is the one URL that negotiates the reader's locale.
+    // Every page records a locale link's choice; the unprefixed root is the one
+    // URL that negotiates the reader's locale.
     const settings = this._i18n?.settings;
-    const served =
-      settings && httpRoute === '/' && settings.locales.length > 1 ? negotiatingEntry(handler, settings) : handler;
+    let served = handler;
+    if (settings && settings.locales.length > 1) {
+      served = recordingChoice(httpRoute === '/' ? negotiatingEntry(handler, settings) : handler, settings);
+    }
+    // A locale with a domain is served there: its prefix on the site moves to it.
+    if (settings && Object.keys(settings.domains).length > 0) served = servingOnDomain(served, settings);
     this.httpPlugin.get(httpRoute, served, {
       ...this.routeOptions(),
       accept: ['text/html', '*/*'],
@@ -365,9 +414,10 @@ export class ReactApplication {
    */
   reactPage(route: string, options: ReactPageOptions) {
     const pageNode = ensurePageNode(this.routeHelper, route);
-    // Each HTTP registration below repeats once per locale prefix; the React
-    // route tree stays single, and the request's prefix becomes its basename.
-    const prefixes = this.localePrefixes(route);
+    // Each HTTP registration below repeats once per locale, at the route as the
+    // locale names it; the request's prefix becomes the router basename, and
+    // a translated path matches its locale's alias in the route tree.
+    const pages = this.localizedPages(route);
     const staticMeta = options.static;
     const notFoundMiddleware = options.notFoundMiddleware;
 
@@ -415,7 +465,7 @@ export class ReactApplication {
       // The lazy renderer resolves and applies its own middleware on first
       // request, so it is registered directly. Skipped for static routes (below).
       if (!staticMeta) {
-        for (const prefix of prefixes) {
+        for (const { prefix, route: localeRoute } of pages) {
           const lazyRenderer = createLazyPageRenderer(
             this.renderContext(),
             this.cache,
@@ -423,9 +473,9 @@ export class ReactApplication {
             route,
             lazyPage,
             notFoundMiddleware,
-            `${prefix}${route}`,
+            `${prefix}${localeRoute}`,
           );
-          this.registerPageGet(localizedHttpRoute(prefix, route), lazyRenderer, statusCode);
+          this.registerPageGet(localizedHttpRoute(prefix, localeRoute), lazyRenderer, statusCode);
         }
       }
     } else {
@@ -439,10 +489,10 @@ export class ReactApplication {
       if (pageElement) {
         pageNode.element = pageElement;
         if (!staticMeta) {
-          for (const prefix of prefixes) {
-            const renderer = createPageRenderer(this.renderContext(), `${prefix}${route}`, pageDef?.cache);
+          for (const { prefix, route: localeRoute } of pages) {
+            const renderer = createPageRenderer(this.renderContext(), `${prefix}${localeRoute}`, pageDef?.cache);
             this.registerPageGet(
-              localizedHttpRoute(prefix, route),
+              localizedHttpRoute(prefix, localeRoute),
               applyMiddlewareSource(renderer, pageMiddleware),
               statusCode,
             );
@@ -452,13 +502,25 @@ export class ReactApplication {
     }
 
     for (const prefix of this.excludedPrefixes(route)) {
-      this.httpPlugin.get(localizedHttpRoute(prefix, route), excludedRouteRedirect(prefix), this.routeOptions());
+      this.httpPlugin.get(
+        localizedHttpRoute(prefix, route),
+        excludedRouteRedirect(prefix, this.i18nSettings()),
+        this.routeOptions(),
+      );
     }
 
     // Static routes (SSG/ISR) serve pre-rendered, zero-JS HTML from the build
     // output instead of rendering per request.
-    for (const prefix of prefixes) {
-      const httpRoute = localizedHttpRoute(prefix, route);
+    for (const { prefix, route: localeRoute } of pages) {
+      // The path a locale translates answers its untranslated one with a 308.
+      if (localeRoute !== route) {
+        this.httpPlugin.get(
+          localizedHttpRoute(prefix, route),
+          movedTo(localizedHttpRoute(prefix, localeRoute), this.i18nSettings()),
+          this.routeOptions(),
+        );
+      }
+      const httpRoute = localizedHttpRoute(prefix, localeRoute);
       if (staticMeta) {
         this.registerPageGet(httpRoute, this.statics.buildStaticServe(route, staticMeta), statusCode);
       }

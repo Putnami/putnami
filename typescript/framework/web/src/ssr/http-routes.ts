@@ -65,6 +65,23 @@ export function buildWebAssetHttpRoutes(publicFolder: string, assetRoutes: reado
   }));
 }
 
+/** The sitemap a localized application serves from its public output. */
+export function buildWebSitemapHttpRoutes(publicFolder: string): GeneratedHttpRoute[] {
+  return [
+    {
+      match: 'exact',
+      path: '/sitemap.xml',
+      methods: ['GET', 'HEAD'],
+      publicEdge: true,
+      provenance: {
+        package: '@putnami/web',
+        sourceKind: 'public-file',
+        evidencePath: `.gen/${publicFolder.replace(/^\/+|\/+$/g, '')}/sitemap.xml`,
+      },
+    },
+  ];
+}
+
 /** The action module beside the page at `pageEvidencePath`, a slash-separated path. */
 function actionEvidencePath(pageEvidencePath: string): string {
   const slash = pageEvidencePath.lastIndexOf('/');

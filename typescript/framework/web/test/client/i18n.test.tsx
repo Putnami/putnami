@@ -14,7 +14,13 @@ const settings = parseLocaleSettings({
   exclude: ['/docs/**'],
 });
 
-const fr: I18nState = { settings, locale: 'fr', path: '/pricing', messages: { home: { title: 'Tarifs' } } };
+const fr: I18nState = {
+  settings,
+  locale: 'fr',
+  path: '/pricing',
+  served: 'prefix',
+  messages: { home: { title: 'Tarifs' } },
+};
 
 const inFrench = (node: React.ReactNode) =>
   renderToStaticMarkup(React.createElement(I18nProvider, { value: fr }, node));
@@ -27,13 +33,23 @@ function documentWith(text: string | undefined): Document {
 
 describe('readI18nPayload', () => {
   it('reads the locale state the server rendered', () => {
-    const payload = { settings, locale: 'fr', path: '/pricing', messages: { home: { title: 'Tarifs' } } };
+    const payload = {
+      settings,
+      locale: 'fr',
+      path: '/pricing',
+      served: 'prefix' as const,
+      messages: { home: { title: 'Tarifs' } },
+    };
     expect(readI18nPayload(documentWith(JSON.stringify(payload)))).toEqual(payload);
   });
 
   it('returns nothing for a page without a payload or with a broken one', () => {
     expect(readI18nPayload(documentWith(undefined))).toBeUndefined();
     expect(readI18nPayload(documentWith('{'))).toBeUndefined();
+    // A payload that does not say where the page is served is not this build's.
+    expect(
+      readI18nPayload(documentWith(JSON.stringify({ settings, locale: 'fr', path: '/', messages: {} }))),
+    ).toBeUndefined();
     expect(readI18nPayload(undefined)).toBeUndefined();
   });
 });
@@ -93,8 +109,8 @@ describe('locale hooks', () => {
     const html = renderToStaticMarkup(
       React.createElement(I18nProvider, { value: docs }, React.createElement(LocaleSwitcher, { label: 'Language' })),
     );
-    expect(html).toContain('href="/docs/intro" hrefLang="en"');
-    expect(html).toContain('href="/fr" hrefLang="fr"');
+    expect(html).toContain('href="/docs/intro?locale=en" hrefLang="en"');
+    expect(html).toContain('href="/fr?locale=fr" hrefLang="fr"');
   });
 
   it('passes the links to a custom render function', () => {
@@ -103,7 +119,7 @@ describe('locale hooks', () => {
         {(links) => links.map((l) => `${l.locale}:${l.href}:${l.current}`).join(' ')}
       </LocaleSwitcher>,
     );
-    expect(html).toBe('en:/pricing:false fr:/fr/pricing:true');
+    expect(html).toBe('en:/pricing?locale=en:false fr:/fr/pricing?locale=fr:true');
   });
 });
 

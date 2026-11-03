@@ -1,14 +1,20 @@
 import type { RouteHandler } from '@putnami/application';
 import { getBuildInfo, getProjectRoot, joinPath } from '@putnami/utils';
+import { useLogger } from '@putnami/runtime';
 import type { RouteObject } from 'react-router';
+import type { LocaleServing } from '../shared/i18n/locale';
 import type { ReactPluginConfig } from './react-plugin';
 import type { PutnamiReactConfigExtras } from './react-ssr.config';
+import { serving } from './i18n/negotiation';
 import type { I18nRuntimeOptions } from './i18n/runtime';
 import { renderStaticDocument, type StaticRenderResult } from './static-render';
 import { staticServeHandler } from './static-serve.utils';
 import { type StaticPathParams, type StaticRouteMeta, toStaticConfig } from './static';
 
 type ReactRuntimeConfig = ReactPluginConfig & PutnamiReactConfigExtras;
+
+/** The hosts reported as rendering static pages under their prefix, at most. */
+const MAX_REPORTED_HOSTS = 16;
 
 /**
  * Serves and pre-renders static (SSG/ISR) routes for a ReactApplication. Owns
@@ -24,13 +30,20 @@ export class ReactStaticServer {
     private readonly i18n: () => I18nRuntimeOptions | undefined = () => undefined,
   ) {}
 
+  /** The hosts already reported as serving every locale under its prefix. */
+  private readonly prefixHosts = new Set<string>();
+
   /**
    * Absolute directory holding pre-rendered static HTML files
    * (`.gen/<public>/static`).
    */
   getStaticOutputDir(): string {
-    const base = this.config.assetsDir ?? joinPath(getProjectRoot(), '.gen', this.config.publicFolder);
-    return joinPath(base, 'static');
+    return joinPath(this.getPublicOutputDir(), 'static');
+  }
+
+  /** Absolute directory of the build's public output (`.gen/<public>`). */
+  getPublicOutputDir(): string {
+    return this.config.assetsDir ?? joinPath(getProjectRoot(), '.gen', this.config.publicFolder);
   }
 
   /**
@@ -56,11 +69,30 @@ export class ReactStaticServer {
       staticDir: this.getStaticOutputDir(),
       basename: this.basename(),
       render: (pathname, params) => this.render(pathname, params, route),
+      // The build renders a localized application's pages as its site and its
+      // domains serve them; another host serves every locale under its prefix.
+      renderLive: (ctx) => {
+        const i18n = this.i18n();
+        if (!i18n || Object.keys(i18n.settings.domains).length === 0) return undefined;
+        if (serving(ctx, i18n.settings) !== 'prefix') return undefined;
+        const host = ctx.host();
+        // The Host header is the client's: report a bounded number of hosts.
+        if (this.prefixHosts.size < MAX_REPORTED_HOSTS && !this.prefixHosts.has(host)) {
+          this.prefixHosts.add(host);
+          useLogger('@putnami/web').warn(`'${host}' renders static pages under their locale prefix, once per page`);
+        }
+        return (pathname, params) => this.render(pathname, params, route, 'prefix');
+      },
       currentVersion: () => getBuildInfo()?.version,
     });
   }
 
-  private render(pathname: string, params: StaticPathParams, route: string): Promise<StaticRenderResult> {
+  private render(
+    pathname: string,
+    params: StaticPathParams,
+    route: string,
+    served?: LocaleServing,
+  ): Promise<StaticRenderResult> {
     return renderStaticDocument({
       routes: this.routes(),
       route,
@@ -70,6 +102,7 @@ export class ReactStaticServer {
       timeoutMs: this.config.ssrTimeout,
       islandsScript: this.islandsScript(),
       i18n: this.i18n(),
+      served,
     });
   }
 }

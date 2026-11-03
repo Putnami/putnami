@@ -21,6 +21,7 @@ import { escapeHtml } from '../client/document/tag.utils';
 import { SsrDocumentHelper } from '../client/document/document-ssr.helper';
 import { CsrfTokenContext } from '../shared/csrf-context';
 import { I18nProvider, type I18nState } from '../shared/i18n/messages';
+import { localeRoutes } from '../shared/i18n/route-aliases';
 import { generateCspNonce } from './csp';
 import {
   applyLocaleHead,
@@ -32,6 +33,7 @@ import {
   pathBelowBase,
   seedDocumentLocale,
 } from './i18n/runtime';
+import { serving } from './i18n/negotiation';
 import { safeJsonForScript } from './safe-json';
 import { PutnamiReactConfig } from './react-ssr.config';
 import {
@@ -68,15 +70,23 @@ export const pageRenderer =
     setContextSlot(reqContext, CSP_NONCE_CONTEXT_KEY, nonce);
 
     // With i18n, the locale prefix extends the router basename for this request
-    // only: one route tree serves every locale.
+    // only: one route tree serves every locale. The routed URL names the locale;
+    // on the locale's domain, the client's URL has no prefix and the router
+    // matches it as it is.
     const i18nOptions = i18n?.();
     const moduleBase = basename?.();
     const i18nState: I18nState | undefined = i18nOptions
-      ? createI18nState(i18nOptions, pathBelowBase(new URL(req.url).pathname, moduleBase), false)
+      ? createI18nState(
+          i18nOptions,
+          pathBelowBase(new URL(reqContext.url).pathname, moduleBase),
+          false,
+          serving(reqContext, i18nOptions.settings),
+        )
       : undefined;
     const resolvedBasename = i18nState ? localeBasename(i18nState, moduleBase) : moduleBase;
     const staticOpts = resolvedBasename ? { basename: resolvedBasename } : undefined;
-    const reactStaticHandler = createStaticHandler(routes(), staticOpts);
+    const tree = i18nState ? localeRoutes(routes(), i18nState.settings, i18nState.locale) : routes();
+    const reactStaticHandler = createStaticHandler(tree, staticOpts);
     const reactStaticContext = await reactStaticHandler.query(req);
     reportLoaderErrors(reactStaticContext, reqContext, logger);
 

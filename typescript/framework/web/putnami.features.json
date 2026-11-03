@@ -487,7 +487,8 @@
             "kind": "acceptance",
             "checks": [
               "the-switcher-links-each-locale-with-hreflang-lang-and-endonym",
-              "the-current-locale-carries-aria-current"
+              "the-current-locale-carries-aria-current",
+              "each-switcher-link-carries-its-locale-choice"
             ]
           }
         },
@@ -510,6 +511,69 @@
           "verification": {
             "kind": "acceptance",
             "checks": ["the-root-redirects-to-the-preferred-locale-with-vary", "a-content-path-is-never-redirected"]
+          }
+        },
+        {
+          "id": "locale-choice",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-locale-query-sets-the-cookie-and-redirects-to-the-clean-url",
+              "an-unpublished-locale-query-is-served-as-is"
+            ]
+          }
+        },
+        {
+          "id": "sitemap",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-sitemap-lists-each-url-with-its-alternates",
+              "a-route-with-parameters-and-no-prerendered-path-is-left-out"
+            ]
+          }
+        },
+        {
+          "id": "translated-paths",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-translated-path-serves-the-page-and-the-untranslated-one-redirects",
+              "links-alternates-and-the-switcher-use-the-translated-path",
+              "an-invalid-translated-path-fails-generation"
+            ]
+          }
+        },
+        {
+          "id": "locale-domains",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-request-to-a-locale-domain-is-served-in-its-locale",
+              "the-urls-of-a-domain-locale-use-its-origin",
+              "the-prefix-on-the-site-redirects-to-the-domain"
+            ]
+          }
+        },
+        {
+          "id": "locale-suggestion",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-suggestion-offers-the-page-in-the-preferred-locale",
+              "dismissing-the-suggestion-records-the-page-locale",
+              "the-payload-carries-the-suggestion-namespace-in-every-locale"
+            ]
           }
         }
       ]

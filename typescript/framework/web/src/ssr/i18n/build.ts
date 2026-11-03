@@ -6,8 +6,10 @@ import {
   isLocalizedPath,
   type LocaleSettings,
   localePrefix,
+  normalizePath,
   parseLocaleSettings,
   splitLocalePath,
+  translatePath,
 } from '../../shared/i18n/locale';
 import { definitionText, type LocaleMessages, type Messages } from '../../shared/i18n/messages';
 import type { WebPageRouteFact } from '../http-routes';
@@ -211,7 +213,8 @@ export function localizeRows<T extends { route: string; expandedPaths?: string[]
     if (!isLocalizedPath(settings, row.route)) return [row];
     return settings.locales.map((locale) => {
       const prefix = localePrefix(settings, locale);
-      const route = prefix ? (row.route === '/' ? prefix : `${prefix}${row.route}`) : row.route;
+      const translated = translatePath(settings, row.route, locale);
+      const route = prefix ? (translated === '/' ? prefix : `${prefix}${translated}`) : row.route;
       const expandedPaths = ofLocale(row.expandedPaths, locale);
       return { ...row, route, ...(expandedPaths ? { expandedPaths } : {}) };
     });
@@ -243,4 +246,66 @@ export function excludedRedirectRows(
         ...(row.expandedPaths ? { expandedPaths: row.expandedPaths.map((p) => under(prefix, p)) } : {}),
       })),
     );
+}
+
+/**
+ * The untranslated path of each translated page, once per locale that
+ * translates it: `/fr/privacy` answers a 308 to `/fr/confidentialite`, so the
+ * HTTP route inventory lists it. A redirect takes no action.
+ */
+export function translatedRedirectRows(
+  settings: LocaleSettings | undefined,
+  rows: readonly WebPageRouteFact[],
+): WebPageRouteFact[] {
+  if (!settings) return [];
+  return rows.flatMap((row) =>
+    Object.entries(settings.paths)
+      .filter(([, translations]) => translations[normalizePath(row.route)])
+      .map(([locale]) => ({
+        route: `${localePrefix(settings, locale)}${normalizePath(row.route)}`,
+        evidencePath: row.evidencePath,
+        hasAction: false,
+      })),
+  );
+}
+
+/** The path segments of a path: `/a/b` reads `['a', 'b']`. */
+function segments(path: string): string[] {
+  return normalizePath(path).split('/').filter(Boolean);
+}
+
+/**
+ * Check `i18n.paths` against the application's routes: each translated route
+ * is a page, a translated path is no other page, and it keeps the path of the
+ * nearest layout above its page, because the page renders inside that
+ * layout in every locale. Returns one message per defect.
+ */
+export function translatedPathErrors(
+  settings: LocaleSettings,
+  pageRoutes: readonly string[],
+  layoutRoutes: readonly string[],
+): string[] {
+  const pages = new Set(pageRoutes.map(normalizePath));
+  const errors: string[] = [];
+  for (const [locale, translations] of Object.entries(settings.paths)) {
+    for (const [route, translated] of Object.entries(translations)) {
+      const where = `i18n.paths.${locale}['${route}']`;
+      if (!pages.has(route)) {
+        errors.push(`${where}: no page is served at '${route}'`);
+        continue;
+      }
+      if (pages.has(translated)) errors.push(`${where}: '${translated}' is the path of another page`);
+      const layout = layoutRoutes
+        .map(segments)
+        .filter((l) => l.every((segment, i) => segments(route)[i] === segment) && l.length <= segments(route).length)
+        .reduce<string[]>((deepest, l) => (l.length > deepest.length ? l : deepest), []);
+      if (
+        !layout.every((segment, i) => segments(translated)[i] === segment) ||
+        segments(translated).length <= layout.length
+      ) {
+        errors.push(`${where}: '${translated}' must stay under '/${layout.join('/')}', the layout of '${route}'`);
+      }
+    }
+  }
+  return errors;
 }

@@ -29,6 +29,7 @@ Declare the locales in the project's `putnami.json`:
 | `defaultLocale` | The locale served without a prefix. It must be listed in `locales`. |
 | `siteUrl` | The absolute origin the alternate links are built from. |
 | `exclude` | Route patterns served in the default locale only. `/docs/**` covers `/docs` and everything below it; `*` matches one segment. |
+| `paths` | Translated paths, per locale: `{"fr": {"/privacy": "/confidentialite"}}`. See [Translated paths](#translated-paths). |
 
 Declare the text of a component in a `*.messages.ts` file under `src/`:
 
@@ -218,6 +219,39 @@ Use `<Link>` for pages and a plain `<a>` for files such as `/LICENSE.md`: a link
 
 `useLocale()` returns the current locale, its direction and a `localize(path, locale?)` helper for the cases a `Link` does not cover.
 
+## Translated paths
+
+`i18n.paths` gives a page its own path in a locale:
+
+```json
+"paths": { "fr": { "/privacy": "/confidentialite" } }
+```
+
+The French page is served at `/fr/confidentialite`. `/fr/privacy` redirects with `308` to it, with the query. `<Link to="/privacy">`, the alternate links, the switcher and the sitemap all use the translated path. Keep writing `/privacy` in your code: the framework translates it.
+
+A person writes this block, not an agent: a translated path is a public URL, and changing it breaks every link to it.
+
+Generation fails when a translated path:
+
+- translates a route with parameters (`/blog/:slug`), or the locale's home;
+- names a locale (`/fr/x`), or is the path of another page;
+- leaves the localized set (`/docs/x` when `/docs/**` is excluded);
+- leaves the layout of its page: `/blog/post` can become `/blog/billet`, not `/billet`, because the page renders inside the `/blog` layout.
+
+## Locale domains
+
+`i18n.domains` serves a locale at the root of its own origin:
+
+```json
+"domains": { "fr": "https://example.fr" }
+```
+
+A request to `example.fr` gets the French pages: `https://example.fr/confidentialite` serves what `/fr/confidentialite` serves on the site. Every URL built for French uses the domain, without the prefix: links, the canonical and alternate links, the switcher and the sitemap. A link to another origin is absolute; the switcher on `example.fr` links English to `https://example.com/privacy?locale=en`.
+
+On the host of `siteUrl` or of a domain, `/fr/x` redirects with `308` to `https://example.fr/x`, with the query, and the root of the site sends a French reader to `https://example.fr/`. Any other host, such as your development server or a preview, serves French under `/fr` and links every locale there. Its static pages render under the prefix, once per page, and the server logs the host once. A path the domain does not serve in French, such as an excluded `/docs/x`, redirects to the site.
+
+Each domain is an `http` or `https` origin, without a path, a query or a fragment, and serves one locale other than the default. Point the domain's DNS at the same deployment as the site. The sitemap on the site lists the domain's URLs; search engines accept them because the `robots.txt` every domain serves names the site's sitemap, `Sitemap: https://example.com/sitemap.xml`.
+
 ## Locale switcher
 
 ```tsx
@@ -228,7 +262,39 @@ import { LocaleSwitcher } from '@putnami/web';
 
 It renders a `<nav>` of plain links, one per locale, to the current page in that locale, or to the locale's home when the page exists in the default locale only. Each link carries `hreflang` and `lang`, shows the locale's own name (`Français`), and the current one carries `aria-current="page"`. It renders nothing when one locale is published.
 
-A click records the choice in the `putnami-locale` cookie. Pass a render function as `children` for your own markup, and call each link's `select()` on click.
+Each link carries the choice in its query: `/pricing?locale=en`. The server records it in the `putnami-locale` cookie for a year and redirects with `302` to `/pricing`. The choice persists without JavaScript, on a static page as well. A `locale` value that names no published locale is ignored.
+
+Pass a render function as `children` for your own markup: each link's `href` already carries the choice. To record a choice from your own browser code, call `rememberLocale(locale)`.
+
+## Language suggestion
+
+`LocaleSuggestion` offers the current page in the reader's language, written in that language:
+
+```tsx
+// src/app/locale-suggestion.messages.ts
+export default messages('locale-suggestion', {
+  message: 'Read this page in <link>English</link>.',
+  dismiss: 'Dismiss',
+});
+
+// src/app/locale-suggestion.island.tsx
+function Suggestion() {
+  return <LocaleSuggestion messages={suggestion} />;
+}
+export default island().load('idle').render(Suggestion);
+```
+
+Name the namespace in `i18n.suggestion`:
+
+```json
+"suggestion": "locale-suggestion"
+```
+
+Every page's payload then carries that namespace in every locale, so a French reader on an English page reads French. Write the text as the suggested locale says it: the English text shows on a French page.
+
+The component renders nothing on the server. In the browser, it picks the locale the reader chose (the `putnami-locale` cookie), else the first published locale their browser languages match. When that locale is not the page's, it shows one line with a link to the page in that locale, with `?locale=`, and a dismiss button. Dismissing records the page's locale as the reader's choice, so the line does not come back. A page served in the default locale only shows nothing.
+
+Put it in an island: a pre-rendered page stays the same bytes for every reader and every cache.
 
 ## Locale detection
 
@@ -248,6 +314,8 @@ On every localized page, the framework writes:
 
 A page outside the localized set gets its canonical link only. A page with `<Meta name='robots' content='noindex' />`, such as a not-found page, gets none of these links.
 
+The build writes `/sitemap.xml`: one URL per page without parameters and per pre-rendered path, in each locale the page is served in, each with the same alternates as its page. A route with parameters and no pre-rendered path is left out. Point `robots.txt` to it with `Sitemap: https://example.com/sitemap.xml`.
+
 ## What the browser receives
 
 | Page | Catalog shipped |
@@ -262,5 +330,5 @@ The payload is a `<script type="application/json">` data block, which a strict C
 ## Limits
 
 - An application served below the site root (a module path such as `/app`) cannot be localized yet.
-- Paths are not translated: `/fr/pricing`, not `/fr/tarifs`.
-- One domain serves every locale.
+- A route with parameters keeps its path in every locale, and a translated path stays under the layout of its page.
+- A locale with a domain is served at the root of that domain, and its prefix moves there from the site only.

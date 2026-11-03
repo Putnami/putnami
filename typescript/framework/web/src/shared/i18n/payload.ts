@@ -1,4 +1,4 @@
-import type { LocaleSettings } from './locale';
+import type { LocaleServing, LocaleSettings } from './locale';
 import type { I18nState, LocaleMessages } from './messages';
 
 /** Id of the `<script type="application/json">` element that carries the payload. */
@@ -9,7 +9,10 @@ export interface I18nPayload {
   settings: LocaleSettings;
   locale: string;
   path: string;
+  served: LocaleServing;
   messages: LocaleMessages;
+  /** The `i18n.suggestion` namespace's translations, by non-default locale. */
+  suggestions?: Readonly<Record<string, Readonly<Record<string, string>>>>;
 }
 
 /**
@@ -22,7 +25,15 @@ export function readI18nPayload(doc: Document | undefined = globalThis.document)
   if (!element?.textContent) return undefined;
   try {
     const payload = JSON.parse(element.textContent) as I18nPayload;
-    return { settings: payload.settings, locale: payload.locale, path: payload.path, messages: payload.messages };
+    if (!payload.served) return undefined;
+    return {
+      settings: payload.settings,
+      locale: payload.locale,
+      path: payload.path,
+      served: payload.served,
+      messages: payload.messages,
+      ...(payload.suggestions ? { suggestions: payload.suggestions } : {}),
+    };
   } catch {
     return undefined;
   }

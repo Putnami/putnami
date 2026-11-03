@@ -59,3 +59,11 @@ export type RouteOptions = {
    */
   firstPartyErrors?: boolean;
 };
+
+/**
+ * A request rewrite: the path to route and handle the request at, or
+ * `undefined` to keep the client's. It sees the client's request and the path
+ * it names. A path no route serves is ignored, so a rewrite never turns a
+ * served page into a 404.
+ */
+export type RequestRewrite = (req: Request, path: string) => string | undefined;

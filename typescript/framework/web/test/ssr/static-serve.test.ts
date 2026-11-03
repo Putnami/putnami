@@ -10,7 +10,11 @@ import type { StaticRenderResult } from '../../src/ssr/static-render';
 import { STATIC_BUILD_VERSION_FILE } from '../../src/ssr/static-build-version';
 
 function ctxFor(pathname: string, params: Record<string, string> = {}): HttpRequestContext {
-  return { req: { url: `http://localhost${pathname}` }, params } as unknown as HttpRequestContext;
+  return {
+    url: `http://localhost${pathname}`,
+    req: { url: `http://localhost${pathname}` },
+    params,
+  } as unknown as HttpRequestContext;
 }
 
 function tempStaticDir(files: Record<string, string>): string {
@@ -56,6 +60,50 @@ describe('staticServeHandler — SSG', () => {
     const res = (await handler(ctxFor('/tasks/99', { id: '99' }))) as { get: () => Response };
     const text = await res.get().text();
     expect(text).toContain('LIVE /tasks/99');
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it('renders a request the build output does not apply to once, apart from the build output', async () => {
+    const dir = tempStaticDir({ 'fr.html': '<html>PREBUILT</html>' });
+    let renders = 0;
+    const handler = staticServeHandler({
+      route: '/fr',
+      staticConfig: { mode: 'ssg' },
+      staticDir: dir,
+      render: async () => ({ html: 'BUILD', status: 200 }) as StaticRenderResult,
+      renderLive: () => async (pathname) => {
+        renders++;
+        return { html: `PREFIX ${pathname}`, status: 200 } as StaticRenderResult;
+      },
+    });
+
+    for (let i = 0; i < 2; i++) {
+      const res = (await handler(ctxFor('/fr'))) as { get: () => Response };
+      expect(await res.get().text()).toBe('PREFIX /fr');
+    }
+    expect(renders).toBe(1);
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it('keeps no live render that is not a page', async () => {
+    const dir = tempStaticDir({});
+    let renders = 0;
+    const handler = staticServeHandler({
+      route: '/docs/*',
+      staticConfig: { mode: 'ssg' },
+      staticDir: dir,
+      render: async () => ({ html: 'BUILD', status: 200 }) as StaticRenderResult,
+      renderLive: () => async () => {
+        renders++;
+        return { html: 'missing', status: 404 } as StaticRenderResult;
+      },
+    });
+
+    for (let i = 0; i < 2; i++) {
+      const res = (await handler(ctxFor('/docs/picked-by-the-client'))) as { get: () => Response };
+      expect(res.get().status).toBe(404);
+    }
+    expect(renders).toBe(2);
     rmSync(dir, { recursive: true, force: true });
   });
 

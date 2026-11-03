@@ -63,6 +63,10 @@
     {
       "id": "route-fragments",
       "text": "build() reports each pipeline route with GET and HEAD, or GET alone under secure false, and each native route with its own method, or every method when it names none. A static folder reports its root files as exact routes and its directories as bounded prefixes, never a root prefix; a declared mount reports one prefix; and framework assets already in the generated public output are not claimed."
+    },
+    {
+      "id": "request-rewrite",
+      "text": "A request rewrite registered on the HTTP plugin runs before route matching, in registration order, and may replace the request's path; the first rewrite whose path a route serves wins and the query stays. Route matching, middleware and the handler then see the rewritten URL while the client's request keeps its own, a path no route serves is ignored, and a rewrite merged from another plugin runs in the root plugin."
     }
   ]
 }

@@ -283,7 +283,7 @@ src/
 ├── main.ts      # App definition (http + react + static + search index + analytics)
 ├── analytics.ts # The declared action vocabulary, and all of it
 ├── app/         # Website routes (React pages)
-├── api/         # API routes (e.g. sitemap)
+├── api/         # API routes (e.g. llms.txt)
 ├── components/  # Shared UI components
 └── lib/
     ├── darc/    # The public-docs domain's declared imports, as components

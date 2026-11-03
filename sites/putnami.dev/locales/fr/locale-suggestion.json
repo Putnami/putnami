@@ -1,0 +1,13 @@
+{
+  "$schema": "https://putnami.dev/schemas/i18n/catalog.json",
+  "dismiss": {
+    "text": "Fermer",
+    "source": "Dismiss",
+    "state": "draft"
+  },
+  "message": {
+    "text": "Lire cette page en <link>français</link>.",
+    "source": "Read this page in <link>English</link>.",
+    "state": "draft"
+  }
+}

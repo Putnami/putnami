@@ -6,13 +6,13 @@
     "An application lists its locales once and every localized route exists at a stable URL per published locale, with the default locale unprefixed",
     "Default text lives next to the code as typed messages, and each locale's catalog records which default text each translation was made from",
     "A published locale is complete: the build refuses a missing, malformed or placeholder-mismatched translation, and reports translations made from a changed default text",
-    "Search engines and assistive technology read the language of every page and the address of each of its translations"
+    "Search engines and assistive technology read the language of every page and the address of each of its translations",
+    "A locale can have its own paths and its own domain, and a reader who lands on another language than theirs is offered their own"
   ],
   "nonGoals": [
     "Translating text at request time or calling a translation service from the build",
     "Redirecting a content page because of the reader's browser language or stored preference",
     "Storing the reader's locale preference in browser storage the server cannot read",
-    "Sitemaps, per-locale domains, translated paths and a language suggestion banner, which a later phase delivers",
     "Calling a model from a Putnami command: the agent of the session translates"
   ],
   "requirements": [
@@ -66,7 +66,7 @@
     },
     {
       "id": "locale-switcher",
-      "text": "The locale switcher renders one link per published locale to the same route in that locale, with hreflang and lang attributes and the locale's own name as its text, marks the current locale with aria-current, and records an explicit choice in the locale preference cookie."
+      "text": "The locale switcher renders one link per published locale to the same route in that locale, with hreflang and lang attributes and the locale's own name as its text, marks the current locale with aria-current, and carries the choice in a locale query parameter so that following it records the choice without JavaScript."
     },
     {
       "id": "localized-links",
@@ -75,6 +75,26 @@
     {
       "id": "entry-negotiation",
       "text": "A request for the application root without a locale prefix redirects with 302 and Vary: Accept-Language, Cookie to the locale named by the preference cookie, else the best Accept-Language match, when that locale is not the default; every other path is served in the locale its URL names."
+    },
+    {
+      "id": "locale-choice",
+      "text": "A GET request for a page route whose query names a published locale in its locale parameter sets the locale preference cookie for a year and redirects with 302 and Cache-Control: no-store to the same URL without that parameter; a locale parameter that names no published locale is ignored."
+    },
+    {
+      "id": "sitemap",
+      "text": "The build writes the sitemap the application serves at /sitemap.xml: one absolute URL per page route without parameters and per pre-rendered path, for each locale a localized route is served in, each with an alternate link per published locale and x-default; a not-found page and a route with parameters but no pre-rendered path are left out."
+    },
+    {
+      "id": "translated-paths",
+      "text": "The i18n.paths block maps a route to its path in a non-default locale: the page is served at the translated path under that locale, its untranslated path under that locale redirects with 308 to the translated one with the query, and links, alternates, the switcher and the sitemap use the translated path; a translated route with parameters, and a translated path that names a locale, is another page's path, leaves the localized set or leaves the layout of its page, fails generation."
+    },
+    {
+      "id": "locale-domains",
+      "text": "The i18n.domains block maps a non-default locale to an origin: a request to that host is served as the locale's prefixed route, every URL built for that locale uses that origin without the prefix, a request under the locale's prefix on the site's host or a locale domain redirects with 308 to the same path and query on the locale's origin, and any other host, such as a development server or a preview, serves the locale under its prefix."
+    },
+    {
+      "id": "locale-suggestion",
+      "text": "LocaleSuggestion renders nothing on the server; in the browser it shows one line, in the reader's preferred locale, linking to the current page in that locale when the page is published in a locale the reader prefers more than the page's own (the preference cookie, then the browser languages); dismissing it records the page's locale as the choice, and the payload carries its namespace, named by i18n.suggestion, in every published locale."
     }
   ],
   "decisions": ["typescript/framework/web/doc/adr/0001-rendering-is-explicit-across-separate-runtime-graphs.md"]

@@ -34,7 +34,8 @@ export interface PageCacheOptions extends HttpCacheOptions {
    * data (security context roles/scopes and loader data); without it, one
    * request's rendered page could be served to another. Provide a custom key
    * only if you understand this hazard — e.g. for pages whose output never
-   * varies by user or query string.
+   * varies by user or query string. With `i18n.domains`, the framework
+   * appends the origin the page is served at to every key, this one included.
    *
    * @example
    * key: (ctx) => `page:${ctx.params.slug}`

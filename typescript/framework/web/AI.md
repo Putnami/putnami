@@ -299,8 +299,21 @@ t.terms({ link: (chunks) => <Link to='/terms'>{chunks}</Link> });
   test show the default text for a missing one, with a warning.
 - `<Link to="/x">` keeps the current locale prefix; a path that names a
   locale (`/fr/x`) or is excluded stays as written. Exclude whole subtrees
-  (`/blog/**`); `/fr/blog/x` redirects with 308 to `/blog/x`. Use a plain `<a>` for files. `<LocaleSwitcher label="…" />` renders the locale links;
+  (`/blog/**`); `/fr/blog/x` redirects with 308 to `/blog/x`. Use a plain `<a>` for files. `<LocaleSwitcher label="…" />` renders the locale links,
+  each with `?locale=<tag>`: the server records the choice in the
+  `putnami-locale` cookie and redirects to the URL without it.
   `useLocale()` gives the locale and `localize(path, locale?)`.
+- `i18n.paths` (`{"fr": {"/privacy": "/confidentialite"}}`) serves a page at
+  its translated path; the untranslated one redirects with 308. Code keeps
+  writing `/privacy`. The build writes `/sitemap.xml` with the alternates.
+- `i18n.domains` (`{"fr": "https://example.fr"}`) serves a locale at the
+  root of its origin; its URLs use that origin. On the `siteUrl` host,
+  `/fr/x` redirects with 308 to `https://example.fr/x`; other hosts (dev,
+  preview) keep `/fr`. The routing uses `HttpPlugin.rewrite()`: `ctx.url` is
+  the routed URL, `ctx.req.url` the client's.
+- `<LocaleSuggestion messages={…} />`, in an island, offers the page in the
+  reader's language (cookie, then browser languages); its namespace, named by
+  `i18n.suggestion`, ships in every locale. Dismiss records the page locale.
 - Only `/` negotiates the locale (cookie `putnami-locale`, then
   `Accept-Language`). The framework writes `<html lang dir>`, the canonical
   link, hreflang alternates with `x-default`, and `og:locale`.

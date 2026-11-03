@@ -2,11 +2,13 @@ import { type ReactNode, useContext } from 'react';
 import { useInRouterContext, useLocation } from 'react-router';
 import {
   isLocalizedPath,
-  LOCALE_COOKIE,
+  LOCALE_PARAM,
+  localeCookie,
   localeEndonym,
-  localizePath,
+  localeHref,
   normalizePath,
   textDirection,
+  untranslatePath,
 } from '../../shared/i18n/locale';
 import { I18nContext } from '../../shared/i18n/messages';
 
@@ -20,35 +22,40 @@ export interface LocaleInfo {
   path: string;
   /** Whether the current path exists in every locale. */
   localized: boolean;
-  /** The path of a locale-free path in the current locale, or in `locale`. */
+  /**
+   * The href of a locale-free path in the current locale, or in `locale`: a
+   * path, or an absolute URL when the locale is served at another origin.
+   */
   localize: (path: string, locale?: string) => string;
 }
 
-function useCurrentPath(fallback: string): string {
-  // Inside a router the location is already relative to the locale basename.
-  // The payload path is normalized, so the router path is too: an island
-  // hydrates without a router and must render the same links.
+/** The router's path, relative to the locale basename; `undefined` outside a router. */
+function useRouterPath(): string | undefined {
+  // An island hydrates without a router and reads the payload path instead,
+  // which is normalized like this one, so both render the same links.
   const inRouter = useInRouterContext();
   // biome-ignore lint/correctness/useHookAtTopLevel: the router context of a tree never changes
-  return normalizePath(inRouter ? useLocation().pathname : fallback);
+  return inRouter ? normalizePath(useLocation().pathname) : undefined;
 }
 
 /** The locale of the current page and helpers to build links in other locales. */
 export function useLocale(): LocaleInfo {
   const state = useContext(I18nContext);
-  const path = useCurrentPath(state?.path ?? '/');
+  const routerPath = useRouterPath();
   if (!state) {
     return {
       locale: 'en',
       defaultLocale: 'en',
       locales: ['en'],
       dir: 'ltr',
-      path,
+      path: routerPath ?? '/',
       localized: false,
       localize: (target) => target,
     };
   }
   const { settings, locale } = state;
+  // The router path is the page's path as its locale names it: `/tarifs` reads `/pricing`.
+  const path = routerPath === undefined ? state.path : untranslatePath(settings, routerPath, locale);
   return {
     locale,
     defaultLocale: settings.defaultLocale,
@@ -56,26 +63,29 @@ export function useLocale(): LocaleInfo {
     dir: textDirection(locale),
     path,
     localized: isLocalizedPath(settings, path),
-    localize: (target, targetLocale = locale) => localizePath(settings, target, targetLocale),
+    localize: (target, targetLocale = locale) => localeHref(settings, target, targetLocale, state),
   };
 }
 
-/** Record an explicit locale choice; the server reads it when a reader opens `/`. */
+/**
+ * Record an explicit locale choice from the browser; the server reads it when a
+ * reader opens `/`. A locale link needs none of this: its `?locale=` query
+ * records the choice on the server.
+ */
 export function rememberLocale(locale: string): void {
   if (typeof document === 'undefined') return;
-  const secure = typeof location !== 'undefined' && location.protocol === 'https:' ? '; Secure' : '';
+  const secure = typeof location !== 'undefined' && location.protocol === 'https:';
   // biome-ignore lint/suspicious/noDocumentCookie: a first-party preference cookie the server must read
-  document.cookie = `${LOCALE_COOKIE}=${encodeURIComponent(locale)}; Path=/; Max-Age=31536000; SameSite=Lax${secure}`;
+  document.cookie = localeCookie(locale, secure);
 }
 
 export interface LocaleLink {
   locale: string;
   /** The locale's own name: `Français`. */
   label: string;
+  /** The page in that locale, with the `?locale=` query that records the choice. */
   href: string;
   current: boolean;
-  /** Records the choice; call it from the link's click handler. */
-  select: () => void;
 }
 
 /**
@@ -89,9 +99,8 @@ export function useLocaleLinks(): LocaleLink[] {
   return info.locales.map((locale) => ({
     locale,
     label: localeEndonym(locale),
-    href: info.localize(target(locale), locale),
+    href: `${info.localize(target(locale), locale)}?${LOCALE_PARAM}=${encodeURIComponent(locale)}`,
     current: locale === info.locale,
-    select: () => rememberLocale(locale),
   }));
 }
 
@@ -104,9 +113,10 @@ export interface LocaleSwitcherProps {
 }
 
 /**
- * Plain links to the current page in every published locale: they work without
- * JavaScript, crawlers follow them, and each one carries its language so a
- * screen reader pronounces the locale's name correctly. Renders nothing when
+ * Plain links to the current page in every published locale: each one records
+ * the reader's choice through its query, with or without JavaScript, and
+ * carries its language so a screen reader pronounces the locale's name
+ * correctly. Renders nothing when
  * the application publishes a single locale.
  */
 export function LocaleSwitcher({ label, className, children }: LocaleSwitcherProps) {
@@ -124,7 +134,6 @@ export function LocaleSwitcher({ label, className, children }: LocaleSwitcherPro
               hrefLang={link.locale}
               lang={link.locale}
               aria-current={link.current ? 'page' : undefined}
-              onClick={link.select}
             >
               {link.label}
             </a>

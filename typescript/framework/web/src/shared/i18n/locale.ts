@@ -14,10 +14,24 @@ export interface LocaleSettings {
   readonly siteUrl: string;
   /** Route patterns served in the default locale only (`/docs/**`). */
   readonly exclude: readonly string[];
+  /** Translated paths by locale, then by route: `{ fr: { '/privacy': '/confidentialite' } }`. */
+  readonly paths: Readonly<Record<string, Readonly<Record<string, string>>>>;
+  /** The origin a locale is served at, by non-default locale: `{ fr: 'https://example.fr' }`. */
+  readonly domains: Readonly<Record<string, string>>;
+  /** The messages namespace of `LocaleSuggestion`, sent to the browser in every locale. */
+  readonly suggestion?: string;
 }
 
-/** The cookie an explicit choice in the locale switcher writes. */
+/** The cookie that records a reader's explicit locale choice. */
 export const LOCALE_COOKIE = 'putnami-locale';
+
+/** The query parameter a locale link carries its choice in: `/?locale=en`. */
+export const LOCALE_PARAM = 'locale';
+
+/** The `Set-Cookie` and `document.cookie` value that records a locale choice for a year. */
+export function localeCookie(locale: string, secure: boolean): string {
+  return `${LOCALE_COOKIE}=${encodeURIComponent(locale)}; Path=/; Max-Age=31536000; SameSite=Lax${secure ? '; Secure' : ''}`;
+}
 
 const RTL_LANGUAGES = new Set(['ar', 'arc', 'ckb', 'dv', 'fa', 'he', 'ks', 'ku', 'ps', 'sd', 'ug', 'ur', 'yi']);
 
@@ -51,7 +65,7 @@ export function parseLocaleSettings(raw: unknown): LocaleSettings {
     throw new LocaleSettingsError('i18n must be an object');
   }
   const block = raw as Record<string, unknown>;
-  const known = new Set(['locales', 'defaultLocale', 'siteUrl', 'exclude']);
+  const known = new Set(['locales', 'defaultLocale', 'siteUrl', 'exclude', 'paths', 'domains', 'suggestion']);
   for (const key of Object.keys(block)) {
     if (!known.has(key)) throw new LocaleSettingsError(`unknown key i18n.${key}`);
   }
@@ -90,12 +104,120 @@ export function parseLocaleSettings(raw: unknown): LocaleSettings {
     throw new LocaleSettingsError('i18n.exclude must list route patterns that start with /');
   }
 
-  return {
+  const settings: LocaleSettings = {
     locales: [defaultLocale, ...locales.filter((l) => l !== defaultLocale)],
     defaultLocale,
     siteUrl: siteUrl.toString().replace(/\/$/, ''),
     exclude: [...(excludeRaw as string[])].sort(),
+    paths: {},
+    domains: {},
   };
+  const suggestion = block['suggestion'];
+  if (suggestion !== undefined && (typeof suggestion !== 'string' || !SUGGESTION_NAMESPACE.test(suggestion))) {
+    throw new LocaleSettingsError("i18n.suggestion must name a messages namespace, such as 'locale-suggestion'");
+  }
+  return {
+    ...settings,
+    paths: parseTranslatedPaths(settings, block['paths'] ?? {}),
+    domains: parseDomains(settings, block['domains'] ?? {}),
+    ...(suggestion === undefined ? {} : { suggestion }),
+  };
+}
+
+/** A namespace as `messages()` accepts it. */
+const SUGGESTION_NAMESPACE = /^[a-z0-9]+(?:[-./][a-z0-9]+)*$/;
+
+/**
+ * Validate `i18n.domains`: per non-default locale, the http or https origin
+ * it is served at, without a path, a query or a fragment. Each origin serves
+ * one locale, and none is the site's.
+ */
+function parseDomains(settings: LocaleSettings, raw: unknown): LocaleSettings['domains'] {
+  if (raw === null || typeof raw !== 'object' || Array.isArray(raw)) {
+    throw new LocaleSettingsError('i18n.domains must map a locale to the origin it is served at');
+  }
+  const domains: Record<string, string> = {};
+  const used = new Map<string, string>([[new URL(settings.siteUrl).host, 'i18n.siteUrl']]);
+  for (const [locale, value] of Object.entries(raw as Record<string, unknown>)) {
+    const where = `i18n.domains.${locale}`;
+    if (!settings.locales.includes(locale) || locale === settings.defaultLocale) {
+      throw new LocaleSettingsError(`${where}: '${locale}' is not a published locale other than the default`);
+    }
+    let url: URL | undefined;
+    try {
+      url = typeof value === 'string' ? new URL(value) : undefined;
+    } catch {
+      url = undefined;
+    }
+    if (
+      !url ||
+      (url.protocol !== 'https:' && url.protocol !== 'http:') ||
+      url.pathname !== '/' ||
+      url.search ||
+      url.hash ||
+      url.username
+    ) {
+      throw new LocaleSettingsError(`${where} must be an http or https origin, such as https://example.fr`);
+    }
+    const other = used.get(url.host);
+    if (other) throw new LocaleSettingsError(`${where}: '${url.host}' is already the host of ${other}`);
+    used.set(url.host, where);
+    domains[locale] = url.origin;
+  }
+  return domains;
+}
+
+/** Whether a path matches more than one URL: `/blog/:slug`, `/docs/*`, `/blog/[slug]`. */
+function hasParameters(path: string): boolean {
+  return /[:*[]/.test(path);
+}
+
+/**
+ * Validate `i18n.paths`: per non-default locale, a map from a localized route
+ * without parameters to its path in that locale. A translated path names no
+ * locale and is unique in its locale. Whether each route exists, and whether a
+ * translated path collides with another route, is checked against the routes
+ * at generation.
+ */
+function parseTranslatedPaths(settings: LocaleSettings, raw: unknown): LocaleSettings['paths'] {
+  if (raw === null || typeof raw !== 'object' || Array.isArray(raw)) {
+    throw new LocaleSettingsError('i18n.paths must map a locale to its translated paths');
+  }
+  const paths: Record<string, Record<string, string>> = {};
+  for (const [locale, entries] of Object.entries(raw as Record<string, unknown>)) {
+    const where = `i18n.paths.${locale}`;
+    if (!settings.locales.includes(locale) || locale === settings.defaultLocale) {
+      throw new LocaleSettingsError(`${where}: '${locale}' is not a published locale other than the default`);
+    }
+    if (entries === null || typeof entries !== 'object' || Array.isArray(entries)) {
+      throw new LocaleSettingsError(`${where} must map a route to its path in ${locale}`);
+    }
+    const translated: Record<string, string> = {};
+    const used = new Map<string, string>();
+    for (const [route, path] of Object.entries(entries as Record<string, unknown>)) {
+      if (typeof path !== 'string' || !route.startsWith('/') || !path.startsWith('/')) {
+        throw new LocaleSettingsError(`${where} must map a route that starts with / to a path that starts with /`);
+      }
+      const from = normalizePath(route);
+      const to = normalizePath(path);
+      if (from === '/' || to === '/') throw new LocaleSettingsError(`${where}: the locale's home is not translated`);
+      if (hasParameters(from) || hasParameters(to)) {
+        throw new LocaleSettingsError(`${where}['${route}']: a route with parameters is not translated`);
+      }
+      if (settings.locales.includes(to.split('/')[1] ?? '')) {
+        throw new LocaleSettingsError(`${where}['${route}']: '${to}' names a locale`);
+      }
+      if (!isLocalizedPath(settings, from) || !isLocalizedPath(settings, to)) {
+        throw new LocaleSettingsError(`${where}['${route}']: '${from}' and '${to}' must both be localized`);
+      }
+      const other = used.get(to);
+      if (other) throw new LocaleSettingsError(`${where}: '${other}' and '${from}' both translate to '${to}'`);
+      used.set(to, from);
+      if (to !== from) translated[from] = to;
+    }
+    if (Object.keys(translated).length > 0) paths[locale] = translated;
+  }
+  return paths;
 }
 
 /** `''` for the default locale, `/<locale>` otherwise. */
@@ -124,8 +246,16 @@ export function splitLocalePath(settings: LocaleSettings, pathname: string): Loc
   const segment = path.split('/')[1] ?? '';
   const locale = settings.locales.find((l) => l !== settings.defaultLocale && l === segment);
   if (!locale) return { locale: settings.defaultLocale, path };
-  const rest = path.slice(segment.length + 1);
-  return { locale, path: rest === '' ? '/' : rest };
+  const rest = path.slice(segment.length + 1) || '/';
+  // A translated path reads as the route it translates.
+  return { locale, path: untranslatePath(settings, rest, locale) };
+}
+
+/** The route a locale's path translates: `/confidentialite` reads `/privacy` in French. */
+export function untranslatePath(settings: LocaleSettings, path: string, locale: string): string {
+  const target = normalizePath(path);
+  const translations = settings.paths[locale] ?? {};
+  return Object.keys(translations).find((r) => translations[r] === target) ?? target;
 }
 
 function patternToRegExp(pattern: string): RegExp {
@@ -165,19 +295,80 @@ export function isLocalizedPath(settings: LocaleSettings, path: string): boolean
   });
 }
 
-/** The path of a locale-free path in a given locale. */
+/** A locale-free path as a locale names it, without the locale prefix: `/privacy` reads `/confidentialite` in French. */
+export function translatePath(settings: LocaleSettings, path: string, locale: string): string {
+  const target = normalizePath(path);
+  return settings.paths[locale]?.[target] ?? target;
+}
+
+/** The path of a locale-free path in a given locale, translated when the locale translates it. */
 export function localizePath(settings: LocaleSettings, path: string, locale: string): string {
   const target = normalizePath(path);
   if (!isLocalizedPath(settings, target)) return target;
   const prefix = localePrefix(settings, locale);
   if (!prefix) return target;
-  return target === '/' ? prefix : `${prefix}${target}`;
+  return target === '/' ? prefix : `${prefix}${translatePath(settings, target, locale)}`;
+}
+
+/** Whether a locale-free path is served in a locale at the locale's own origin. */
+function onLocaleDomain(settings: LocaleSettings, path: string, locale: string): boolean {
+  return settings.domains[locale] !== undefined && isLocalizedPath(settings, path);
+}
+
+/** The site URL a locale-free path is served under in a locale: its domain, else `siteUrl`. */
+function siteRoot(settings: LocaleSettings, path: string, locale: string): string {
+  const domain = settings.domains[locale];
+  if (!domain || !onLocaleDomain(settings, path, locale)) return settings.siteUrl;
+  return `${domain}${new URL(settings.siteUrl).pathname.replace(/\/$/, '')}`;
+}
+
+/**
+ * The path of a locale-free path in a locale, on the origin that serves it: a
+ * locale with a domain is served at the root of that domain, every other one
+ * under its prefix.
+ */
+export function localePagePath(settings: LocaleSettings, path: string, locale: string): string {
+  return onLocaleDomain(settings, path, locale)
+    ? translatePath(settings, path, locale)
+    : localizePath(settings, path, locale);
 }
 
 /** The absolute URL of a locale-free path in a given locale. */
 export function localizedUrl(settings: LocaleSettings, path: string, locale: string): string {
-  const localized = localizePath(settings, path, locale);
-  return `${settings.siteUrl}${localized === '/' ? '/' : localized}`;
+  const localized = localePagePath(settings, path, locale);
+  return `${siteRoot(settings, path, locale)}${localized === '/' ? '/' : localized}`;
+}
+
+/**
+ * Where a page is served: `domain` at the root of its locale's domain, `site`
+ * on the host of `siteUrl`, `prefix` on any other host, such as a development
+ * server or a preview, which serves every locale under its prefix.
+ */
+export type LocaleServing = 'domain' | 'site' | 'prefix';
+
+/** The page a link sits on. */
+export interface LocaleOrigin {
+  locale: string;
+  served: LocaleServing;
+}
+
+/**
+ * The href of a locale-free path in a locale, from a page: a path when the
+ * page's origin serves it, the absolute URL when another origin does. On a
+ * host that is neither the site nor a domain, every href is a path.
+ */
+export function localeHref(settings: LocaleSettings, path: string, locale: string, from: LocaleOrigin): string {
+  const target = normalizePath(path);
+  if (from.served === 'prefix') return localizePath(settings, target, locale);
+  const targetDomain = onLocaleDomain(settings, target, locale) ? settings.domains[locale] : undefined;
+  const fromDomain = from.served === 'domain' ? settings.domains[from.locale] : undefined;
+  if (targetDomain !== fromDomain) return localizedUrl(settings, target, locale);
+  return localePagePath(settings, target, locale);
+}
+
+/** The locale whose domain a host names, such as `example.fr`. */
+export function domainLocale(settings: LocaleSettings, host: string): string | undefined {
+  return Object.keys(settings.domains).find((locale) => new URL(settings.domains[locale] as string).host === host);
 }
 
 export function textDirection(locale: string): 'ltr' | 'rtl' {
@@ -227,19 +418,40 @@ export function negotiateLocale(settings: LocaleSettings, acceptLanguage: string
   return undefined;
 }
 
+/** The published locale a tag names, whatever its case. */
+export function publishedLocale(settings: LocaleSettings, tag: string): string | undefined {
+  const lowered = tag.toLowerCase();
+  return settings.locales.find((l) => l.toLowerCase() === lowered);
+}
+
+/**
+ * The locale to suggest a page in: the reader's choice, from the preference
+ * cookie, else the published locale their browser languages match first,
+ * when it is not the page's own. A page served in the default locale only
+ * suggests nothing.
+ */
+export function suggestedLocale(
+  settings: LocaleSettings,
+  page: { locale: string; path: string },
+  cookieHeader: string | null,
+  languages: readonly string[],
+): string | undefined {
+  if (!isLocalizedPath(settings, page.path)) return undefined;
+  const preferred = preferredLocale(settings, cookieHeader) ?? negotiateLocale(settings, languages.join(','));
+  return preferred === page.locale ? undefined : preferred;
+}
+
 /** Read the locale preference cookie, when it names a published locale. */
 export function preferredLocale(settings: LocaleSettings, cookieHeader: string | null): string | undefined {
   if (!cookieHeader) return undefined;
   for (const part of cookieHeader.split(';')) {
     const [name, ...value] = part.trim().split('=');
     if (name === LOCALE_COOKIE) {
-      let tag: string;
       try {
-        tag = decodeURIComponent(value.join('=')).toLowerCase();
+        return publishedLocale(settings, decodeURIComponent(value.join('=')));
       } catch {
         return undefined;
       }
-      return settings.locales.find((l) => l.toLowerCase() === tag);
     }
   }
   return undefined;

@@ -105,6 +105,13 @@ interface StaticServeOptions {
   /** Live (re-)render used for ISR refresh and for paths missing from the build. */
   render: (pathname: string, params: StaticPathParams) => Promise<StaticRenderResult>;
   /**
+   * The live render of a request the build output does not apply to, such as
+   * a localized page on a preview host; `undefined` when the output applies.
+   */
+  renderLive?: (
+    ctx: HttpRequestContext,
+  ) => ((pathname: string, params: StaticPathParams) => Promise<StaticRenderResult>) | undefined;
+  /**
    * Version of the running build. A pre-rendered page is served with the
    * version it was rendered with replaced by this one; without it, the page is
    * served as rendered.
@@ -115,7 +122,8 @@ interface StaticServeOptions {
 function pathnameFromContext(ctx: HttpRequestContext, basename?: string): string {
   let pathname: string;
   try {
-    pathname = new URL(ctx.req.url).pathname;
+    // The routed URL: on a locale's domain, the page's path with its prefix.
+    pathname = new URL(ctx.url).pathname;
   } catch {
     pathname = '/';
   }
@@ -154,8 +162,13 @@ async function readPrebuilt(
  *
  * Static output is always zero-JavaScript (the same render path as the build).
  */
+/** A live render the cache does not keep, answered as it is. */
+class UncachedPage {
+  constructor(readonly page: ServedPage) {}
+}
+
 export function staticServeHandler(options: StaticServeOptions): RouteHandler {
-  const { route, staticConfig, staticDir, basename, render, currentVersion } = options;
+  const { route, staticConfig, staticDir, basename, render, renderLive, currentVersion } = options;
   const isIsr = staticConfig.mode === 'isr';
   const ttlMs = staticConfig.revalidate?.seconds ? staticConfig.revalidate.seconds * 1000 : undefined;
   const tags = staticConfig.revalidate?.tags;
@@ -175,6 +188,30 @@ export function staticServeHandler(options: StaticServeOptions): RouteHandler {
   return async (ctx) => {
     const pathname = pathnameFromContext(ctx, basename);
     const params = (ctx.params ?? {}) as StaticPathParams;
+
+    // A request the build output does not apply to is rendered once and kept
+    // apart from the build output, with the same lifetime and tags. Only a
+    // page is kept: a path that answers anything else would let a client
+    // fill the cache with the paths it picks.
+    const live = renderLive?.(ctx);
+    if (live) {
+      const liveKey = `live:${route}:${pathname}`;
+      let liveBuilder = cache(CACHE_NAME).for(liveKey);
+      if (ttlMs) liveBuilder = liveBuilder.ttl(ttlMs);
+      try {
+        const served = await liveBuilder.fetch<ServedPage>(async () => {
+          const result = await live(pathname, params);
+          const page = { html: result.html, status: result.status, redirect: result.redirectLocation };
+          if (page.status !== 200 || page.redirect !== undefined) throw new UncachedPage(page);
+          registerTags(tags, liveKey);
+          return page;
+        });
+        return toResponse(served);
+      } catch (error) {
+        if (error instanceof UncachedPage) return toResponse(error.page);
+        throw error;
+      }
+    }
 
     const produce = async (): Promise<ServedPage> => {
       const prebuilt = await readPrebuilt(staticDir, pathname, restamp);

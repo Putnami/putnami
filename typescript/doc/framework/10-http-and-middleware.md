@@ -108,6 +108,16 @@ httpPlugin.merge('/api', apiRoutes);
 // Results in: GET /api/users, POST /api/users
 ```
 
+### Request rewrites
+
+A rewrite routes a request at another path, before route matching:
+
+```ts
+http().rewrite((req, path) => (new URL(req.url).hostname === 'fr.example.com' ? `/fr${path}` : undefined));
+```
+
+The first rewrite, in registration order, that returns a path a route serves wins; the query stays. A path no route serves is ignored, so `/assets/app.js` on `fr.example.com` keeps its own route. Route matching, middleware and the handler see the rewritten URL in `ctx.url` and `ctx.path()`; `ctx.req.url` keeps the client's. A merged plugin's rewrites run in the plugin it is merged into. Native routes are not rewritten.
+
 ## Middleware
 
 Middleware functions process requests before they reach route handlers.
@@ -453,10 +463,10 @@ export default endpoint(() => {
 ```ts
 export async function handler(ctx: HttpRequestContext) {
   // Request information
-  ctx.url;        // URL object
+  ctx.url;        // The routed URL; a rewrite replaces its path
   ctx.method;     // HTTP method
   ctx.headers;    // Headers object
-  ctx.req;        // Raw Bun Request
+  ctx.req;        // Raw Bun Request, with the client's URL
 
   // Route information
   ctx.route;      // Matched route pattern
