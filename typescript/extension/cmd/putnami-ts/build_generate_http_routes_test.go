@@ -280,7 +280,7 @@ func assertGenerateFailsWithoutPublishing(t *testing.T, ctx *pctx.Context, proje
 		t.Fatal(infraBeforeErr)
 	}
 
-	result, err := doGenerate(ctx, jsonl.New(), projectPath)
+	result, err := doGenerate(ctx, jsonl.New(), projectPath, nil)
 	if err == nil || result != nil {
 		t.Fatalf("doGenerate = (%+v, %v), want a failure and no result", result, err)
 	}
@@ -397,7 +397,7 @@ func TestDoGenerate_CommitsTheRouteInventoryVerbatim(t *testing.T) {
 	ctx, projectPath := newInfraHookProject(t)
 	mockRouteHook(t, projectPath, map[string]string{"web": webRoutesFragment, "application": applicationRoutesFragment})
 
-	result, err := doGenerate(ctx, jsonl.New(), projectPath)
+	result, err := doGenerate(ctx, jsonl.New(), projectPath, nil)
 	if err != nil {
 		t.Fatalf("doGenerate: %v", err)
 	}
@@ -442,14 +442,14 @@ func TestDoGenerate_RewritesTheRouteInventoryOnlyWhenItChanges(t *testing.T) {
 	ctx, projectPath := newInfraHookProject(t)
 	mockRouteHook(t, projectPath, map[string]string{"web": webRoutesFragment, "application": applicationRoutesFragment})
 
-	if _, err := doGenerate(ctx, jsonl.New(), projectPath); err != nil {
+	if _, err := doGenerate(ctx, jsonl.New(), projectPath, nil); err != nil {
 		t.Fatalf("first doGenerate: %v", err)
 	}
 	past := time.Now().Add(-time.Hour).Truncate(time.Second)
 	if err := os.Chtimes(committedRoutesPath(projectPath), past, past); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := doGenerate(ctx, jsonl.New(), projectPath); err != nil {
+	if _, err := doGenerate(ctx, jsonl.New(), projectPath, nil); err != nil {
 		t.Fatalf("second doGenerate: %v", err)
 	}
 	info, err := os.Stat(committedRoutesPath(projectPath))
@@ -461,7 +461,7 @@ func TestDoGenerate_RewritesTheRouteInventoryOnlyWhenItChanges(t *testing.T) {
 	}
 
 	mockRouteHook(t, projectPath, map[string]string{"web": webRoutesFragment})
-	if _, err := doGenerate(ctx, jsonl.New(), projectPath); err != nil {
+	if _, err := doGenerate(ctx, jsonl.New(), projectPath, nil); err != nil {
 		t.Fatalf("third doGenerate: %v", err)
 	}
 	if got, want := readCommittedRoutes(t, projectPath), canonicalRouteInventory(t, webRoutesFragment); string(got) != string(want) {
@@ -491,7 +491,7 @@ func TestDoGenerate_CommitsAKnownEmptyRouteInventory(t *testing.T) {
 	writeCommittedRoutes(t, projectPath, canonicalRouteInventory(t, webRoutesFragment))
 	mockRouteHook(t, projectPath, map[string]string{"application": emptyRoutesFragment})
 
-	result, err := doGenerate(ctx, jsonl.New(), projectPath)
+	result, err := doGenerate(ctx, jsonl.New(), projectPath, nil)
 	if err != nil {
 		t.Fatalf("doGenerate: %v", err)
 	}
@@ -511,7 +511,7 @@ func TestDoGenerate_CommitsAKnownEmptyRouteInventory(t *testing.T) {
 	}
 
 	mockRouteHook(t, projectPath, map[string]string{})
-	if _, err := doGenerate(ctx, jsonl.New(), projectPath); err != nil {
+	if _, err := doGenerate(ctx, jsonl.New(), projectPath, nil); err != nil {
 		t.Fatalf("doGenerate without a fragment: %v", err)
 	}
 	assertNoCommittedRoutes(t, projectPath)
@@ -529,13 +529,13 @@ func TestDoGenerate_RemovesTheRouteInventoryWithoutAProducer(t *testing.T) {
 		mockBunResolution(t)
 		ctx, projectPath := newInfraHookProject(t)
 		mockRouteHook(t, projectPath, map[string]string{"web": webRoutesFragment})
-		if _, err := doGenerate(ctx, jsonl.New(), projectPath); err != nil {
+		if _, err := doGenerate(ctx, jsonl.New(), projectPath, nil); err != nil {
 			t.Fatalf("first doGenerate: %v", err)
 		}
 		readCommittedRoutes(t, projectPath)
 
 		mockRouteHook(t, projectPath, map[string]string{})
-		if _, err := doGenerate(ctx, jsonl.New(), projectPath); err != nil {
+		if _, err := doGenerate(ctx, jsonl.New(), projectPath, nil); err != nil {
 			t.Fatalf("second doGenerate: %v", err)
 		}
 		assertNoCommittedRoutes(t, projectPath)
@@ -553,7 +553,7 @@ func TestDoGenerate_RemovesTheRouteInventoryWithoutAProducer(t *testing.T) {
 		projectPath := filepath.Join(root, "project")
 		writeCommittedRoutes(t, projectPath, canonicalRouteInventory(t, webRoutesFragment))
 
-		if _, err := doGenerate(ctx, jsonl.New(), projectPath); err != nil {
+		if _, err := doGenerate(ctx, jsonl.New(), projectPath, nil); err != nil {
 			t.Fatalf("doGenerate: %v", err)
 		}
 		assertNoCommittedRoutes(t, projectPath)
@@ -572,7 +572,7 @@ func TestDoGenerate_RemovesTheRouteInventoryWithoutAProducer(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		if _, err := doGenerate(ctx, jsonl.New(), projectPath); err != nil {
+		if _, err := doGenerate(ctx, jsonl.New(), projectPath, nil); err != nil {
 			t.Fatalf("doGenerate: %v", err)
 		}
 		assertNoCommittedRoutes(t, projectPath)
@@ -582,7 +582,7 @@ func TestDoGenerate_RemovesTheRouteInventoryWithoutAProducer(t *testing.T) {
 		mockBunResolution(t)
 		ctx, projectPath := newInfraHookProject(t)
 		mockRouteHook(t, projectPath, map[string]string{"application": applicationRoutesFragment})
-		if _, err := doGenerate(ctx, jsonl.New(), projectPath); err != nil {
+		if _, err := doGenerate(ctx, jsonl.New(), projectPath, nil); err != nil {
 			t.Fatalf("first doGenerate: %v", err)
 		}
 		readCommittedRoutes(t, projectPath)
@@ -591,7 +591,7 @@ func TestDoGenerate_RemovesTheRouteInventoryWithoutAProducer(t *testing.T) {
 			t.Fatal(err)
 		}
 		refuseProcesses(t)
-		if _, err := doGenerate(ctx, jsonl.New(), projectPath); err != nil {
+		if _, err := doGenerate(ctx, jsonl.New(), projectPath, nil); err != nil {
 			t.Fatalf("second doGenerate: %v", err)
 		}
 		assertNoCommittedRoutes(t, projectPath)
@@ -963,7 +963,7 @@ func TestDoGenerate_PreservesTheRouteInventoryWhenHooksFailOrDoNotRun(t *testing
 		writeCommittedRoutes(t, projectPath, prior)
 		mockRouteHook(t, projectPath, map[string]string{"web": unsupportedRoutesFragment})
 
-		_, err := doGenerate(ctx, jsonl.New(), projectPath)
+		_, err := doGenerate(ctx, jsonl.New(), projectPath, nil)
 		if err == nil || !strings.Contains(err.Error(), httproutes.ErrorCodeUnsupportedPattern) {
 			t.Fatalf("doGenerate error = %v, want %s", err, httproutes.ErrorCodeUnsupportedPattern)
 		}
@@ -976,7 +976,7 @@ func TestDoGenerate_PreservesTheRouteInventoryWhenHooksFailOrDoNotRun(t *testing
 			resolveBun(t)
 			writeCommittedRoutes(t, projectPath, prior)
 
-			if _, err := doGenerate(ctx, jsonl.New(), projectPath); err == nil || !strings.Contains(err.Error(), "@putnami/application") {
+			if _, err := doGenerate(ctx, jsonl.New(), projectPath, nil); err == nil || !strings.Contains(err.Error(), "@putnami/application") {
 				t.Fatalf("doGenerate error = %v, want one naming the uninstalled @putnami/application", err)
 			}
 			assertPreserved(t, projectPath)

@@ -1906,7 +1906,7 @@ func TestDoGenerate_Success(t *testing.T) {
 	os.WriteFile(filepath.Join(projectPath, "src", "index.ts"), []byte("const x = 1;"), 0644)
 
 	emit := jsonl.New()
-	result, err := doGenerate(ctx, emit, projectPath)
+	result, err := doGenerate(ctx, emit, projectPath, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -1933,7 +1933,7 @@ func TestDoGenerate_WithMode(t *testing.T) {
 	os.WriteFile(filepath.Join(projectPath, "src", "index.ts"), []byte("const x = 1;"), 0644)
 
 	emit := jsonl.New()
-	result, err := doGenerate(ctx, emit, projectPath)
+	result, err := doGenerate(ctx, emit, projectPath, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -1981,7 +1981,7 @@ func TestDoGenerate_SyncsCommittedInfraRequirements(t *testing.T) {
 	})
 
 	emit := jsonl.New()
-	if _, err := doGenerate(ctx, emit, projectPath); err != nil {
+	if _, err := doGenerate(ctx, emit, projectPath, nil); err != nil {
 		t.Fatalf("doGenerate: %v", err)
 	}
 
@@ -2094,7 +2094,7 @@ func TestDoGenerate_CommitsSecretNamesAlongsideOtherProducers(t *testing.T) {
 		"secrets":   secretsFragment("analytics.secret", "billing.api_key"),
 	})
 
-	if _, err := doGenerate(ctx, jsonl.New(), projectPath); err != nil {
+	if _, err := doGenerate(ctx, jsonl.New(), projectPath, nil); err != nil {
 		t.Fatalf("doGenerate: %v", err)
 	}
 
@@ -2127,7 +2127,7 @@ func TestDoGenerate_DropsOnlyTheRemovedSecret(t *testing.T) {
 		"database": databaseFragment,
 		"secrets":  secretsFragment("analytics.secret", "billing.api_key"),
 	})
-	if _, err := doGenerate(ctx, jsonl.New(), projectPath); err != nil {
+	if _, err := doGenerate(ctx, jsonl.New(), projectPath, nil); err != nil {
 		t.Fatalf("first doGenerate: %v", err)
 	}
 
@@ -2135,7 +2135,7 @@ func TestDoGenerate_DropsOnlyTheRemovedSecret(t *testing.T) {
 		"database": databaseFragment,
 		"secrets":  secretsFragment("analytics.secret"),
 	})
-	if _, err := doGenerate(ctx, jsonl.New(), projectPath); err != nil {
+	if _, err := doGenerate(ctx, jsonl.New(), projectPath, nil); err != nil {
 		t.Fatalf("second doGenerate: %v", err)
 	}
 
@@ -2161,12 +2161,12 @@ func TestDoGenerate_DropsSecretsWhenTheProducerStops(t *testing.T) {
 		"database": databaseFragment,
 		"secrets":  secretsFragment("analytics.secret"),
 	})
-	if _, err := doGenerate(ctx, jsonl.New(), projectPath); err != nil {
+	if _, err := doGenerate(ctx, jsonl.New(), projectPath, nil); err != nil {
 		t.Fatalf("first doGenerate: %v", err)
 	}
 
 	mockInfraFragmentHook(t, projectPath, map[string]string{"database": databaseFragment})
-	if _, err := doGenerate(ctx, jsonl.New(), projectPath); err != nil {
+	if _, err := doGenerate(ctx, jsonl.New(), projectPath, nil); err != nil {
 		t.Fatalf("second doGenerate: %v", err)
 	}
 
@@ -2194,7 +2194,7 @@ func TestDoGenerate_CommittedInfraIsBatchEqualToSolo(t *testing.T) {
 
 	soloCtx, soloPath := newInfraHookProject(t)
 	mockInfraFragmentHook(t, soloPath, fragments)
-	if _, err := doGenerate(soloCtx, jsonl.New(), soloPath); err != nil {
+	if _, err := doGenerate(soloCtx, jsonl.New(), soloPath, nil); err != nil {
 		t.Fatalf("solo doGenerate: %v", err)
 	}
 	solo, err := os.ReadFile(infra.ProjectRequirementsPath(soloPath))

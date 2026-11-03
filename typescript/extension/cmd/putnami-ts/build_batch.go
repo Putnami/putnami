@@ -4,10 +4,12 @@ import (
 	"fmt"
 	"path/filepath"
 
+	protocolcli "go.putnami.dev/protocol/cli"
 	pctx "go.putnami.dev/sdk/extension/context"
 	"go.putnami.dev/sdk/extension/jsonl"
 	"go.putnami.dev/typescript/extension/internal/build"
 	"go.putnami.dev/typescript/extension/internal/errs"
+	"go.putnami.dev/typescript/extension/internal/hooks"
 	"go.putnami.dev/typescript/extension/internal/project"
 )
 
@@ -73,6 +75,14 @@ func perProjectContext(ctx *pctx.Context, proj pctx.ProjectRef) *pctx.Context {
 	member.Project.Path = proj.Path
 	member.Project.FullPath = proj.FullPath
 	return &member
+}
+
+// batchMemberLogs emits each log through emit, tagged with the batch member it
+// belongs to, so the CLI's batch split records it under that project.
+func batchMemberLogs(emit *jsonl.Emitter, projectID string) hooks.LogSink {
+	return func(level, message string) {
+		emit.LogEvent(level, message, map[string]any{protocolcli.BatchProjectLogContextKey: projectID}, nil)
+	}
 }
 
 // runBuildTranspileBatch transpiles every selected project inside one shared
@@ -275,8 +285,10 @@ func runBuildGenerateBatch(ctx *pctx.Context) (string, map[string]any, error) {
 		// Params/FilePatterns/WorkspaceRoot are shared and identical across
 		// same-kind peers. Progress emissions are discarded (a batch subprocess
 		// reports one aggregate result); failure diagnostics are recomputed from
-		// the returned error, matching solo.
-		genResult, err := doGenerate(perProjectContext(ctx, proj), jsonl.New(), projectPath)
+		// the returned error, matching solo. The hooks' logs name the member, so
+		// the CLI records them under that project, not under the batch.
+		emit := jsonl.New()
+		genResult, err := doGenerate(perProjectContext(ctx, proj), emit, projectPath, batchMemberLogs(emit, proj.ID))
 		if err != nil {
 			res.Status = "FAILED"
 			for _, d := range generateDiagnostics(err) {

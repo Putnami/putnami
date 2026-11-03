@@ -914,6 +914,7 @@ func TestInvokeHook_Success(t *testing.T) {
 // levels, whether the hook succeeds or fails; its other events and its noise
 // do not.
 func TestInvokeHookForwardsTheHookLogs(t *testing.T) {
+	spectest.Proves(t, "typescript/typescript-project-toolchain", "hook-logs-reach-the-task-output", "a-hook-log-reaches-the-task-in-order-even-when-the-hook-fails")
 	stdout := strings.Join([]string{
 		`{"v":1,"type":"log","level":"warn","message":"no React app directory"}`,
 		`not json`,

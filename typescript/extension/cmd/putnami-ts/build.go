@@ -29,7 +29,7 @@ func runBuild(ctx *pctx.Context, emit *jsonl.Emitter, args []string) (string, ma
 	var genResult *build.GenerateResult
 	if flags.RunGenerate {
 		emit.PhaseStart("generate")
-		genResult, err = doGenerate(ctx, emit, projectPath)
+		genResult, err = doGenerate(ctx, emit, projectPath, emit.Log)
 		if err != nil {
 			emit.PhaseEnd("generate", "failed")
 			if !emitCapabilityDiagnostics(emit, err.Error()) {
