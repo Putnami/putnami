@@ -151,7 +151,7 @@ func doGenerate(ctx *pctx.Context, emit *jsonl.Emitter, projectPath string) (*bu
 	if err := infra.ClearGeneratedRequirementSidecars(projectPath); err != nil {
 		return nil, errs.Wrapf(err, errs.CodeGenerateFailed, "clearing generated infra requirements")
 	}
-	hookResult, err := hooks.RunHooks(ctx.WorkspaceRoot, projectPath, ctx.Project.Name, hooks.HookPreBuild, mode, bunBin, ctx.Params.Bool("debug", false), nil)
+	hookResult, err := hooks.RunHooks(ctx.WorkspaceRoot, projectPath, ctx.Project.Name, hooks.HookPreBuild, mode, bunBin, ctx.Params.Bool("debug", false), nil, emit.Log)
 	if err != nil {
 		return nil, errs.Wrapf(err, errs.CodeGenerateFailed, "pre-build hooks")
 	}

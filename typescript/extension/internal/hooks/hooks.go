@@ -189,8 +189,9 @@ func (h discoveredHook) order() int {
 // output. hookConfig is forwarded to each hook subprocess as its `config`; pass nil
 // when the hook kind carries no project configuration. projectName is the
 // putnami project identity (see hookContext.ProjectName); pass "" when the
-// caller has no project identity to forward.
-func RunHooks(workspaceRoot, projectPath, projectName, hookKind, mode, bunBin string, debug bool, hookConfig map[string]any) (*Result, error) {
+// caller has no project identity to forward. logs receives each log event of
+// each hook, a failed hook's included; pass nil to drop them.
+func RunHooks(workspaceRoot, projectPath, projectName, hookKind, mode, bunBin string, debug bool, hookConfig map[string]any, logs LogSink) (*Result, error) {
 	hooks, unavailable, err := discoverHooks(workspaceRoot, projectPath, hookKind)
 	if err != nil {
 		return nil, err
@@ -204,7 +205,7 @@ func RunHooks(workspaceRoot, projectPath, projectName, hookKind, mode, bunBin st
 	}
 
 	for _, h := range hooks {
-		exports, assets, report, err := invokeHook(workspaceRoot, projectPath, projectName, mode, bunBin, h, debug, hookConfig)
+		exports, assets, report, err := invokeHook(workspaceRoot, projectPath, projectName, mode, bunBin, h, debug, hookConfig, logs)
 		if err != nil {
 			return nil, fmt.Errorf("hook %s: %w", h.name, err)
 		}
@@ -594,8 +595,10 @@ func resolutionDirs(workspaceRoot, projectPath string) []string {
 // hook kind in `h.kind` is forwarded through the context so the bun-side
 // runner can dispatch on it. A hook declaring `preBuild` receives that exact
 // kind. The third return value is what the summary reports about the run: its
-// status and its raw route evaluation.
-func invokeHook(workspaceRoot, projectPath, projectName, mode, bunBin string, h discoveredHook, debug bool, hookConfig map[string]any) (map[string]string, map[string]string, hookReport, error) {
+// status and its raw route evaluation. Each log event of the hook goes to logs,
+// before its exit status is checked, so a failed hook's logs still reach the
+// user.
+func invokeHook(workspaceRoot, projectPath, projectName, mode, bunBin string, h discoveredHook, debug bool, hookConfig map[string]any, logs LogSink) (map[string]string, map[string]string, hookReport, error) {
 	// Write context file
 	ctx := hookContext{
 		WorkspaceRoot: workspaceRoot,
@@ -661,6 +664,7 @@ func invokeHook(workspaceRoot, projectPath, projectName, mode, bunBin string, h 
 	if err != nil {
 		return nil, nil, hookReport{}, fmt.Errorf("executing hook: %w", err)
 	}
+	forwardLogs(result.Stdout, logs)
 
 	if !result.Success {
 		return nil, nil, hookReport{}, fmt.Errorf("hook exited with code %d: %s", result.ExitCode, formatFailure(result.Stdout, result.Stderr))
@@ -691,6 +695,41 @@ func formatFailure(stdout, stderr string) string {
 		return truncateTail(stderr, 2000)
 	default:
 		return "no diagnostic output (hook crashed without emitting an error event — try re-running with debug logging)"
+	}
+}
+
+// LogSink receives the level and the message of one log event a hook emitted.
+type LogSink func(level, message string)
+
+// forwardLogs passes each log event of a hook's JSONL stdout to logs, in
+// order. The hook protocol's trace level becomes debug, the lowest level of the
+// runtime event protocol; a line with another level is not a hook event and is
+// skipped, as is any line that is not JSON.
+func forwardLogs(output string, logs LogSink) {
+	if logs == nil {
+		return
+	}
+	scanner := bufio.NewScanner(strings.NewReader(output))
+	scanner.Buffer(make([]byte, 0, 64*1024), maxHookEventBytes)
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		if line == "" || line[0] != '{' {
+			continue
+		}
+		var ev struct {
+			Type    string `json:"type"`
+			Level   string `json:"level"`
+			Message string `json:"message"`
+		}
+		if json.Unmarshal([]byte(line), &ev) != nil || ev.Type != "log" {
+			continue
+		}
+		switch ev.Level {
+		case "trace":
+			logs("debug", ev.Message)
+		case "debug", "info", "warn", "error":
+			logs(ev.Level, ev.Message)
+		}
 	}
 }
 

@@ -750,7 +750,7 @@ func TestRunHooks_InvokesInDiscoveredOrder(t *testing.T) {
 		}, nil
 	})
 
-	if _, err := RunHooks("", dir, "test", HookPreBuild, "build", "bun", false, nil); err != nil {
+	if _, err := RunHooks("", dir, "test", HookPreBuild, "build", "bun", false, nil, nil); err != nil {
 		t.Fatalf("RunHooks: %v", err)
 	}
 	want := []string{"@putnami/web", "@putnami/application"}
@@ -789,7 +789,7 @@ func TestRunHooks_UninstalledDependencyFails(t *testing.T) {
 	}
 	failOnHookExec(t)
 
-	result, err := RunHooks(root, projectDir, "api", HookPreBuild, "build", "bun", false, nil)
+	result, err := RunHooks(root, projectDir, "api", HookPreBuild, "build", "bun", false, nil, nil)
 	if err == nil {
 		t.Fatalf("RunHooks = %+v, nil; want an error naming the uninstalled dependency", result)
 	}
@@ -819,7 +819,7 @@ func TestRunHooks_DanglingWorkspaceLinkFails(t *testing.T) {
 	}
 	failOnHookExec(t)
 
-	if _, err := RunHooks(root, projectDir, "api", HookPreBuild, "build", "bun", false, nil); err == nil ||
+	if _, err := RunHooks(root, projectDir, "api", HookPreBuild, "build", "bun", false, nil, nil); err == nil ||
 		!strings.Contains(err.Error(), "@acme/gen") {
 		t.Fatalf("RunHooks error = %v, want one naming @acme/gen", err)
 	}
@@ -855,7 +855,7 @@ func TestRunHooks_DependencyInstalledAtWorkspaceRootRuns(t *testing.T) {
 		return &exec.Result{Success: true, Stdout: `{"type":"summary","data":{"exports":{},"assets":{}}}`}, nil
 	})
 
-	if _, err := RunHooks(root, projectDir, "api", HookPreBuild, "build", "bun", false, nil); err != nil {
+	if _, err := RunHooks(root, projectDir, "api", HookPreBuild, "build", "bun", false, nil, nil); err != nil {
 		t.Fatalf("RunHooks: %v", err)
 	}
 	if len(invoked) != 1 || invoked[0] != "@putnami/application" {
@@ -898,7 +898,7 @@ func TestInvokeHook_Success(t *testing.T) {
 		},
 	}
 
-	exports, assets, _, err := invokeHook(dir, dir, "", "build", "bun", h, false, nil)
+	exports, assets, _, err := invokeHook(dir, dir, "", "build", "bun", h, false, nil, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -907,6 +907,50 @@ func TestInvokeHook_Success(t *testing.T) {
 	}
 	if assets["style.css"] != "./dist/style.css" {
 		t.Errorf("expected asset style.css=./dist/style.css, got %v", assets)
+	}
+}
+
+// A hook's log events reach the sink in order, mapped onto the runtime event
+// levels, whether the hook succeeds or fails; its other events and its noise
+// do not.
+func TestInvokeHookForwardsTheHookLogs(t *testing.T) {
+	stdout := strings.Join([]string{
+		`{"v":1,"type":"log","level":"warn","message":"no React app directory"}`,
+		`not json`,
+		`{"v":1,"type":"progress","level":"info","message":"Scanning"}`,
+		`{"v":1,"type":"log","level":"trace","message":"resolved"}`,
+		`{"v":1,"type":"log","level":"fatal","message":"unknown level"}`,
+		`{"v":1,"type":"log","level":"error","message":"probe"}`,
+		`{"type":"summary","data":{"exports":{}}}`,
+	}, "\n") + "\n"
+	want := []string{"warn: no React app directory", "debug: resolved", "error: probe"}
+
+	for _, success := range []bool{true, false} {
+		dir := t.TempDir()
+		withMockExec(t, func(name string, args []string, opts ...exec.Option) (*exec.Result, error) {
+			exitCode := 0
+			if !success {
+				exitCode = 1
+			}
+			return &exec.Result{Success: success, ExitCode: exitCode, Stdout: stdout}, nil
+		})
+		h := discoveredHook{
+			kind:          HookPreBuild,
+			name:          "@test/ext",
+			extensionRoot: dir,
+			hook:          &hookDefinition{Kind: "command", Command: "bun", Args: []string{"generate.ts"}},
+		}
+
+		var got []string
+		_, _, _, err := invokeHook(dir, dir, "", "build", "bun", h, false, nil, func(level, message string) {
+			got = append(got, level+": "+message)
+		})
+		if success != (err == nil) {
+			t.Fatalf("success %v: invokeHook error %v", success, err)
+		}
+		if !slices.Equal(got, want) {
+			t.Errorf("success %v: forwarded %q, want %q", success, got, want)
+		}
 	}
 }
 
@@ -930,7 +974,7 @@ func TestInvokeHook_Failure(t *testing.T) {
 		},
 	}
 
-	_, _, _, err := invokeHook(dir, dir, "", "build", "bun", h, false, nil)
+	_, _, _, err := invokeHook(dir, dir, "", "build", "bun", h, false, nil, nil)
 	if err == nil {
 		t.Error("expected error on hook failure")
 	}
@@ -959,7 +1003,7 @@ func TestInvokeHook_ExecError(t *testing.T) {
 		},
 	}
 
-	_, _, _, err := invokeHook(dir, dir, "", "build", "bun", h, false, nil)
+	_, _, _, err := invokeHook(dir, dir, "", "build", "bun", h, false, nil, nil)
 	if err == nil {
 		t.Error("expected error on exec failure")
 	}
@@ -987,7 +1031,7 @@ func TestInvokeHook_BunCommand(t *testing.T) {
 		},
 	}
 
-	_, _, _, _ = invokeHook(dir, dir, "", "build", "/usr/bin/bun", h, false, nil)
+	_, _, _, _ = invokeHook(dir, dir, "", "build", "/usr/bin/bun", h, false, nil, nil)
 	if calledCommand != "/usr/bin/bun" {
 		t.Errorf("expected bun to be replaced with bunBin, got %q", calledCommand)
 	}
@@ -1015,7 +1059,7 @@ func TestInvokeHook_CustomCommand(t *testing.T) {
 		},
 	}
 
-	_, _, _, _ = invokeHook(dir, dir, "", "build", "/usr/bin/bun", h, false, nil)
+	_, _, _, _ = invokeHook(dir, dir, "", "build", "/usr/bin/bun", h, false, nil, nil)
 	if calledCommand != "node" {
 		t.Errorf("expected custom command 'node', got %q", calledCommand)
 	}
@@ -1042,7 +1086,7 @@ func TestInvokeHook_CustomTimeout(t *testing.T) {
 		},
 	}
 
-	_, _, _, err := invokeHook(dir, dir, "", "build", "bun", h, true, nil)
+	_, _, _, err := invokeHook(dir, dir, "", "build", "bun", h, true, nil, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -1064,7 +1108,7 @@ func TestInvokeHook_SuccessWithoutSummaryFails(t *testing.T) {
 		hook:          &hookDefinition{Kind: "command", Command: "bun", Args: []string{"gen.ts"}},
 	}
 
-	_, _, _, err := invokeHook(dir, dir, "", "build", "bun", h, false, nil)
+	_, _, _, err := invokeHook(dir, dir, "", "build", "bun", h, false, nil, nil)
 	if err == nil {
 		t.Fatal("expected error when a successful hook emits no summary")
 	}
@@ -1092,7 +1136,7 @@ func TestInvokeHook_TruncatedSummaryFails(t *testing.T) {
 		hook:          &hookDefinition{Kind: "command", Command: "bun", Args: []string{"gen.ts"}},
 	}
 
-	_, _, _, err := invokeHook(dir, dir, "", "build", "bun", h, false, nil)
+	_, _, _, err := invokeHook(dir, dir, "", "build", "bun", h, false, nil, nil)
 	if err == nil {
 		t.Fatal("expected error for truncated summary output")
 	}
@@ -1123,7 +1167,7 @@ func TestInvokeHook_TemplateExpansionInArgs(t *testing.T) {
 		},
 	}
 
-	_, _, _, _ = invokeHook(dir, dir, "", "build", "bun", h, false, nil)
+	_, _, _, _ = invokeHook(dir, dir, "", "build", "bun", h, false, nil, nil)
 	// Check that templates were expanded
 	foundExpandedExt := false
 	for _, a := range calledArgs {
@@ -1160,7 +1204,7 @@ func TestInvokeHook_LongStderrTruncated(t *testing.T) {
 		},
 	}
 
-	_, _, _, err := invokeHook(dir, dir, "", "build", "bun", h, false, nil)
+	_, _, _, err := invokeHook(dir, dir, "", "build", "bun", h, false, nil, nil)
 	if err == nil {
 		t.Fatal("expected error on failure")
 	}
@@ -1194,7 +1238,7 @@ func TestInvokeHook_FailureSurfacesStdoutErrorEvent(t *testing.T) {
 		hook:          &hookDefinition{Kind: "command", Command: "bun", Args: []string{"gen.ts"}},
 	}
 
-	_, _, _, err := invokeHook(dir, dir, "", "build", "bun", h, false, nil)
+	_, _, _, err := invokeHook(dir, dir, "", "build", "bun", h, false, nil, nil)
 	if err == nil {
 		t.Fatal("expected error on hook failure")
 	}
@@ -1228,7 +1272,7 @@ func TestInvokeHook_FailureFallsBackToStderrWhenNoErrorEvent(t *testing.T) {
 		hook:          &hookDefinition{Kind: "command", Command: "bun", Args: []string{"gen.ts"}},
 	}
 
-	_, _, _, err := invokeHook(dir, dir, "", "build", "bun", h, false, nil)
+	_, _, _, err := invokeHook(dir, dir, "", "build", "bun", h, false, nil, nil)
 	if err == nil {
 		t.Fatal("expected error")
 	}
@@ -1254,7 +1298,7 @@ func TestInvokeHook_FailureSurfacesBothStdoutErrorAndStderr(t *testing.T) {
 		hook:          &hookDefinition{Kind: "command", Command: "bun", Args: []string{"gen.ts"}},
 	}
 
-	_, _, _, err := invokeHook(dir, dir, "", "build", "bun", h, false, nil)
+	_, _, _, err := invokeHook(dir, dir, "", "build", "bun", h, false, nil, nil)
 	if err == nil {
 		t.Fatal("expected error")
 	}
@@ -1283,7 +1327,7 @@ func TestInvokeHook_FailureNoOutputAtAll(t *testing.T) {
 		hook:          &hookDefinition{Kind: "command", Command: "bun", Args: []string{"gen.ts"}},
 	}
 
-	_, _, _, err := invokeHook(dir, dir, "", "build", "bun", h, false, nil)
+	_, _, _, err := invokeHook(dir, dir, "", "build", "bun", h, false, nil, nil)
 	if err == nil {
 		t.Fatal("expected error")
 	}
@@ -1311,7 +1355,7 @@ func TestInvokeHook_FailureMultipleErrorEvents(t *testing.T) {
 		hook:          &hookDefinition{Kind: "command", Command: "bun", Args: []string{"gen.ts"}},
 	}
 
-	_, _, _, err := invokeHook(dir, dir, "", "build", "bun", h, false, nil)
+	_, _, _, err := invokeHook(dir, dir, "", "build", "bun", h, false, nil, nil)
 	if err == nil {
 		t.Fatal("expected error")
 	}
@@ -1338,7 +1382,7 @@ func TestRunHooksPreBuild_WithHookSuccess(t *testing.T) {
 		return &exec.Result{Success: true, ExitCode: 0, Stdout: summaryJSON + "\n"}, nil
 	})
 
-	result, err := RunHooks(dir, dir, "", HookPreBuild, "build", "bun", false, nil)
+	result, err := RunHooks(dir, dir, "", HookPreBuild, "build", "bun", false, nil, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -1363,7 +1407,7 @@ func TestRunHooksPreBuild_HookError(t *testing.T) {
 		return nil, os.ErrPermission
 	})
 
-	_, err := RunHooks(dir, dir, "", HookPreBuild, "build", "bun", false, nil)
+	_, err := RunHooks(dir, dir, "", HookPreBuild, "build", "bun", false, nil, nil)
 	if err == nil {
 		t.Error("expected error when hook fails")
 	}
@@ -1396,7 +1440,7 @@ func TestRunHooksPreBuild_MergesMultipleHooks(t *testing.T) {
 		return &exec.Result{Success: true, ExitCode: 0, Stdout: summary + "\n"}, nil
 	})
 
-	result, err := RunHooks(dir, dir, "", HookPreBuild, "build", "bun", false, nil)
+	result, err := RunHooks(dir, dir, "", HookPreBuild, "build", "bun", false, nil, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -1432,7 +1476,7 @@ func TestRunHooksPreBuild_RejectsConflictingExportKeys(t *testing.T) {
 		return &exec.Result{Success: true, ExitCode: 0, Stdout: summary + "\n"}, nil
 	})
 
-	_, err := RunHooks(dir, dir, "", HookPreBuild, "build", "bun", false, nil)
+	_, err := RunHooks(dir, dir, "", HookPreBuild, "build", "bun", false, nil, nil)
 	if err == nil || !strings.Contains(err.Error(), `export "api-loader" conflicts`) {
 		t.Fatalf("expected conflicting export error, got %v", err)
 	}
@@ -1442,7 +1486,7 @@ func TestRunHooksPreBuild_NoHooks(t *testing.T) {
 	dir := t.TempDir()
 	os.WriteFile(filepath.Join(dir, "package.json"), []byte(`{"name":"test"}`), 0644)
 
-	result, err := RunHooks("", dir, "", HookPreBuild, "", "bun", false, nil)
+	result, err := RunHooks("", dir, "", HookPreBuild, "", "bun", false, nil, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -1549,7 +1593,7 @@ func TestRunHooks_ConfigExtractForwardsKind(t *testing.T) {
 		return &exec.Result{Success: true, ExitCode: 0, Stdout: `{"type":"summary","data":{"exports":{},"assets":{}}}` + "\n"}, nil
 	})
 
-	result, err := RunHooks(dir, dir, "", HookConfigExtract, "config-extract", "bun", false, nil)
+	result, err := RunHooks(dir, dir, "", HookConfigExtract, "config-extract", "bun", false, nil, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -1590,7 +1634,7 @@ func TestRunHooks_ForwardsProjectName(t *testing.T) {
 	})
 
 	const projectName = "identity/workloads/auth-server"
-	if _, err := RunHooks(dir, dir, projectName, HookConfigExtract, "config-extract", "bun", false, nil); err != nil {
+	if _, err := RunHooks(dir, dir, projectName, HookConfigExtract, "config-extract", "bun", false, nil, nil); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if got, _ := rawContext["projectName"].(string); got != projectName {
@@ -1623,7 +1667,7 @@ func TestRunHooks_OmitsEmptyProjectName(t *testing.T) {
 		return &exec.Result{Success: true, ExitCode: 0, Stdout: `{"type":"summary","data":{"exports":{},"assets":{}}}` + "\n"}, nil
 	})
 
-	if _, err := RunHooks(dir, dir, "", HookConfigExtract, "config-extract", "bun", false, nil); err != nil {
+	if _, err := RunHooks(dir, dir, "", HookConfigExtract, "config-extract", "bun", false, nil, nil); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if _, present := rawContext["projectName"]; present {
@@ -1648,7 +1692,7 @@ func TestRunHooks_CollectsSummaryStatus(t *testing.T) {
 			Stdout: `{"type":"summary","data":{"exports":{},"assets":{},"status":"empty"}}` + "\n"}, nil
 	})
 
-	result, err := RunHooks(dir, dir, "", HookConfigExtract, "config-extract", "bun", false, nil)
+	result, err := RunHooks(dir, dir, "", HookConfigExtract, "config-extract", "bun", false, nil, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -1747,7 +1791,7 @@ func TestRunHooks_CollectsEveryRouteEvaluationCause(t *testing.T) {
 		return &exec.Result{Success: true, ExitCode: 0, Stdout: summaries[calls-1]}, nil
 	})
 
-	result, err := RunHooks(dir, dir, "", HookPreBuild, "build", "bun", false, nil)
+	result, err := RunHooks(dir, dir, "", HookPreBuild, "build", "bun", false, nil, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -1811,7 +1855,7 @@ func TestRunHooks_MalformedRouteEvaluationNamesTheHook(t *testing.T) {
 				return &exec.Result{Success: true, ExitCode: 0, Stdout: summary}, nil
 			})
 
-			result, err := RunHooks(dir, dir, "", HookPreBuild, "build", "bun", false, nil)
+			result, err := RunHooks(dir, dir, "", HookPreBuild, "build", "bun", false, nil, nil)
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
@@ -1835,7 +1879,7 @@ func TestRunHooks_ACompleteRouteEvaluationIsNoCauseWhateverTheStatus(t *testing.
 				return &exec.Result{Success: true, ExitCode: 0, Stdout: summary}, nil
 			})
 
-			result, err := RunHooks(dir, dir, "", HookPreBuild, "build", "bun", false, nil)
+			result, err := RunHooks(dir, dir, "", HookPreBuild, "build", "bun", false, nil, nil)
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
@@ -1866,7 +1910,7 @@ func TestRunHooks_RouteEvaluationIsAPreBuildContract(t *testing.T) {
 				return &exec.Result{Success: true, ExitCode: 0, Stdout: summary}, nil
 			})
 
-			result, err := RunHooks(dir, dir, "", HookConfigExtract, "config-extract", "bun", false, nil)
+			result, err := RunHooks(dir, dir, "", HookConfigExtract, "config-extract", "bun", false, nil, nil)
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
@@ -1893,7 +1937,7 @@ func TestRunHooks_DiscoveryGapIsRecordedAndOtherHooksRun(t *testing.T) {
 		return &exec.Result{Success: true, ExitCode: 0, Stdout: preBuildSummary(`{"a":"a.js"}`, "", completeRouteEvaluation)}, nil
 	})
 
-	result, err := RunHooks(dir, dir, "", HookPreBuild, "build", "bun", false, nil)
+	result, err := RunHooks(dir, dir, "", HookPreBuild, "build", "bun", false, nil, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -1908,7 +1952,7 @@ func TestRunHooks_DiscoveryGapIsRecordedAndOtherHooksRun(t *testing.T) {
 // A missing package.json reaches the caller as a gap even though no hook runs.
 func TestRunHooks_MissingPackageJSONIsAGap(t *testing.T) {
 	dir := t.TempDir()
-	result, err := RunHooks("", dir, "", HookPreBuild, "", "bun", false, nil)
+	result, err := RunHooks("", dir, "", HookPreBuild, "", "bun", false, nil, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

@@ -47,7 +47,7 @@ func runConfigExtract(ctx *pctx.Context, emit *jsonl.Emitter, _ []string) (strin
 
 	emit.Progress(1, 3, "Discovering configExtract hooks")
 	debug := ctx.Params.Bool("debug", false)
-	result, err := hooks.RunHooks(ctx.WorkspaceRoot, projectPath, ctx.Project.Name, hooks.HookConfigExtract, "config-extract", bunBin, debug, configExtractHookConfig(ctx))
+	result, err := hooks.RunHooks(ctx.WorkspaceRoot, projectPath, ctx.Project.Name, hooks.HookConfigExtract, "config-extract", bunBin, debug, configExtractHookConfig(ctx), emit.Log)
 	if err != nil {
 		emit.PhaseEnd("config-extract", "failed")
 		return "FAILED", nil, fmt.Errorf("config-extract hook: %w", err)
