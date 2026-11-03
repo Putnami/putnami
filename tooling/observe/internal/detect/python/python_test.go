@@ -347,3 +347,57 @@ func TestTheHelpersTolerateEdgeInputs(t *testing.T) {
 		t.Error("malformed metadata reads")
 	}
 }
+
+func TestNestedMembersMatchADoubleStarGlob(t *testing.T) {
+	spectest.Proves(t, feature, "python-projects-are-components", "uv-workspace-members-are-workspace-components")
+	root := writeTree(t, map[string]string{
+		"pyproject.toml":                           "[tool.uv.workspace]\nmembers = [\"./packages/**\", \"libs/*\"]\nexclude = [\"packages/**/experimental\"]\n\n[tool.uv.sources]\ncore = { workspace = true }\n",
+		"packages/grp/b/pyproject.toml":            "[project]\nname = \"b\"\ndependencies = [\"core\"]\n",
+		"packages/grp/experimental/pyproject.toml": "[project]\nname = \"experimental\"\ndependencies = [\"core\"]\n",
+		"packages/.hidden/pyproject.toml":          "[project]\nname = \"hidden\"\n",
+		"libs/core/pyproject.toml":                 "[project]\nname = \"core\"\n",
+		"libs/core/deep/pyproject.toml":            "[project]\nname = \"deep\"\n",
+	})
+	result := Detect(root)
+	noDiagnostics(t, result)
+	projects := byPath(t, result)
+	for dir, source := range map[string]string{
+		"packages/grp/b": SourceWorkspace, "libs/core": SourceWorkspace,
+		"packages/grp/experimental": SourceManifest, "libs/core/deep": SourceManifest,
+	} {
+		if got := metadata(t, projects[dir]).Source; got != source {
+			t.Errorf("%s source %q, want %q", dir, got, source)
+		}
+	}
+	if got := projects["packages/grp/b"].Dependencies; !reflect.DeepEqual(got, []string{"libs/core"}) {
+		t.Errorf("b depends on %v", got)
+	}
+	if _, found := projects["packages/.hidden"]; found {
+		t.Error("a hidden directory is a member")
+	}
+}
+
+func TestAnInvalidWorkspacePatternIsADiagnostic(t *testing.T) {
+	spectest.Proves(t, feature, "python-projects-are-components", "a-malformed-pyproject-is-a-diagnostic")
+	root := writeTree(t, map[string]string{
+		"pyproject.toml":   "\uFEFF[tool.uv.workspace]\nmembers = [\"a\", \"../outside\", \"/abs\"]\nexclude = [\"[\"]\n",
+		"a/pyproject.toml": "[project]\nname = \"a\"\n",
+	})
+	result := Detect(root)
+	if got := paths(result); !reflect.DeepEqual(got, []string{"a"}) || metadata(t, result.Projects[0]).Source != SourceWorkspace {
+		t.Fatalf("components %v", result.Projects)
+	}
+	if len(result.Diagnostics) != 3 {
+		t.Errorf("diagnostics %v", result.Diagnostics)
+	}
+	for _, d := range result.Diagnostics {
+		if d.Code != CodeManifestInvalid || d.Field != "pyproject.toml" {
+			t.Errorf("diagnostic %s %s: %s", d.Code, d.Field, d.Message)
+		}
+	}
+	for pattern, want := range map[string]bool{"a/**": true, "./a/": true, "": false, "a//b": false, "a/../b": false} {
+		if _, ok := patternSegments(pattern); ok != want {
+			t.Errorf("patternSegments(%q) = %v, want %v", pattern, ok, want)
+		}
+	}
+}

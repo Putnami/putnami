@@ -12,7 +12,10 @@ Each Python project is a component of ecosystem `python`:
 
 - When the root `pyproject.toml` has a `[tool.uv.workspace]` table, each
   directory its `members` globs match, less those its `exclude` globs match,
-  that holds a `pyproject.toml` is a component of source `workspace`. The root
+  that holds a `pyproject.toml` is a component of source `workspace`. A glob
+  segment is `*`, `?` or `[…]`, or `**` for any number of directories.
+  Only the root's workspace is read: a `[tool.uv.workspace]` in a
+  subdirectory makes its projects manifest components, without its sources. The root
   is one too when it has a `[project]` table; a virtual workspace root, with
   no `[project]`, is none.
 - Any other `pyproject.toml` with a `[project]` or a `[tool.poetry]` table is
@@ -75,9 +78,14 @@ project:
 uv run --all-packages pytest --junitxml=junit.xml --cov --cov-report=xml
 ```
 
-pytest writes each case's class name from its test file's path, such as
-`api.tests.test_api.TestQuote` for `api/tests/test_api.py`, and the change
-analyses read it as that file. pytest-cov writes `coverage.xml` with the
+pytest writes each case's class name from its test file's path relative to
+its `rootdir`, such as `api.tests.test_api.TestQuote` for
+`api/tests/test_api.py`, and the change analyses read it as that file,
+relative to the repository root, to the report's project or to the report's
+directory. pytest picks its `rootdir` from its arguments and configuration
+files: when it differs from those directories, as with `pytest api` run at
+the root of a repository whose `api` holds the pytest configuration, pass
+`--rootdir=.`, or write the report in the `rootdir`. pytest-cov writes `coverage.xml` with the
 directory pytest ran in as its source root. See
 [tests and coverage](06-change-analyses.md#tests-and-coverage).
 
@@ -85,5 +93,5 @@ directory pytest ran in as its source root. See
 
 | Code | Meaning |
 |---|---|
-| `observe.python_manifest_invalid` | A `pyproject.toml` cannot be parsed, or a `members` pattern of the uv workspace is invalid. That file is no component. |
-| `observe.python_walk_bounded` | The search for `pyproject.toml` stopped after 200,000 entries. |
+| `observe.python_manifest_invalid` | A `pyproject.toml` cannot be parsed: that file is no component. Or a `members` or `exclude` pattern of the uv workspace is not a repository-relative glob: it is ignored. |
+| `observe.python_walk_bounded` | The search for `pyproject.toml`, or for the uv workspace members, stopped after 200,000 entries or could not walk the repository. |

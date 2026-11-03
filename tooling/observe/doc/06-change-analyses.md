@@ -54,7 +54,9 @@ A JUnit case goes to the first of:
    dotted class name read as a Python module (pytest). pytest writes
    `tests.test_api.TestLogin` for the class `TestLogin` of `tests/test_api.py`,
    and its default `xunit2` report has no `file`: the longest leading part
-   that names a `.py` file is the test file.
+   that names a `.py` file is the test file. The class name is relative to
+   pytest's `rootdir`; see
+   [the Python detector](07-python.md#reports).
 2. The component of the Go package its class or suite names
    (`gotestsum --junitfile`).
 3. The component that holds the report.
@@ -121,9 +123,11 @@ osv-scanner writes no vulnerability in SPDX: use CycloneDX for them.
 
 A package of the SBOM matches a dependency change by the ecosystem its
 package URL names (`npm`, `composer`, `golang` is `go`, `pypi`), its name,
-normalized for `pypi`, and its version, a leading `v` ignored; a package without a package URL matches by
-name and version. For each change, the base SBOM gives the `before` state,
-unless the package was added, and the head SBOM the `after` state, unless it
+normalized for `pypi`, and its version, a leading `v` ignored. A package
+without a package URL matches by its name as written and its version, so a
+Python package without one matches only when the SBOM writes its normalized
+name. For each change, the base SBOM gives the `before` state, unless the
+package was added, and the head SBOM the `after` state, unless it
 was removed: its licences and its vulnerabilities, each an id and a severity,
 the most severe first. A package the SBOM does not list gets no state, and
 the summary says so. Without a base SBOM, every base state is unknown.

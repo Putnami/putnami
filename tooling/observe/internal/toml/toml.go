@@ -19,7 +19,8 @@ type Table = map[string]any
 
 // Parse reads a TOML document.
 func Parse(data []byte) (Table, error) {
-	p := &parser{s: string(data), line: 1}
+	// A UTF-8 byte order mark, which some Windows editors write, is no content.
+	p := &parser{s: strings.TrimPrefix(string(data), "\uFEFF"), line: 1}
 	root := Table{}
 	current := root
 	for {
