@@ -205,6 +205,7 @@ func authoredExtensionProvidersDomain() *arch.Builder {
 				arch.Bind("/tooling/github-collaboration", "/protocols/features"),
 				arch.Bind("/tooling/github-collaboration", "/protocols/job"),
 				arch.Bind("/tooling/github-collaboration", "/protocols/runtime"),
+				arch.Bind("/tooling/github-collaboration", "/protocols/workspace"),
 				arch.Bind("/tooling/jira-collaboration", "/protocols/capabilities"),
 				arch.Bind("/tooling/jira-collaboration", "/protocols/cli"),
 				arch.Bind("/tooling/jira-collaboration", "/protocols/collaboration"),
