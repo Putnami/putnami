@@ -1,0 +1,28 @@
+#!/usr/bin/env bash
+# Runs the Linear collaboration provider's task scenarios against a real
+# Linear team, with the key LINEAR_API_KEY holds.
+#
+# The team must be a disposable test team whose description carries
+# putnami-collaboration-live-test: the run opens issues and labels there, and
+# deletes what it opened when it ends. The test refuses any other team.
+set -euo pipefail
+
+if [ "$#" -ne 1 ] || [ "$1" = "--help" ] || [ "$1" = "-h" ]; then
+  printf '%s\n' "usage: live-test <team key>" \
+    "Runs TestLiveLinear against the named disposable team (description carries putnami-collaboration-live-test)." >&2
+  [ "$#" -eq 1 ] && exit 0
+  exit 2
+fi
+case "$1" in
+  *[!A-Za-z0-9_-]*) printf 'live-test: %s is not a team key\n' "$1" >&2; exit 2 ;;
+esac
+[ -n "${LINEAR_API_KEY:-}" ] || { printf '%s\n' 'live-test: set LINEAR_API_KEY to a Linear API key' >&2; exit 2; }
+
+root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
+cli=putnami
+if [ -x "$root/putnamiw" ]; then
+  cli="$root/putnamiw"
+fi
+cd "$root"
+PUTNAMI_LINEAR_COLLAB_LIVE_TEAM="$1" exec "$cli" test --projects @putnami/linear-collaboration \
+  --no-cache --count 1 --run '^TestLiveLinear$' --no-enforce-coverage --test-verbose

@@ -161,3 +161,9 @@ implements **tasks** on the issues of one Jira Cloud project. It reads
 `JIRA_EMAIL` and `JIRA_API_TOKEN`, maps task states to status categories, so a
 workflow's statuses need no configuration, and finds tasks with JQL it builds
 itself.
+
+[`@putnami/linear-collaboration`](../../linear-collaboration/README.md)
+implements **tasks** on the issues of one Linear team. It reads its key from
+`LINEAR_API_KEY`, maps task states from Linear's workflow state types without
+configuration, and names a task by its issue UUID, with the identifier
+(`ENG-42`) as its key.
