@@ -20,7 +20,7 @@
     },
     {
       "id": "python-project-edges",
-      "text": "A component depends on another when its [tool.uv.sources], or the root's for a dependency the component declares, gives a dependency workspace = true, matched by normalized project name, or a local path resolved against its directory; or when a Poetry dependency table, main, dev or group, gives a dependency a local path. A registry, git or URL dependency, a path outside the repository or to no component, and the component itself are no edge."
+      "text": "A component depends on another when, for a dependency it declares in [project], its dependency groups or Poetry, its [tool.uv.sources], else the root's for a workspace member, gives workspace = true, matched by normalized project name, or a local path resolved against the file declaring it; or when a Poetry dependency table, main, dev or group, gives one a local path. A registry, git or URL source, a path outside the repository or to no component, and the component itself are no edge."
     },
     {
       "id": "python-probe-answer",
