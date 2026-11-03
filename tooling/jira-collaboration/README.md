@@ -105,20 +105,21 @@ Before it creates, `create` looks for its key:
 
 1. With JQL, among the issues the credential's account created that carry
    the label. The label's hash covers the project, so it names one binding.
-2. By key, among the issues of the project opened in the last 30 minutes.
-   Jira's search shows an issue seconds after its create, and not in key
-   order; a read by key shows it at once. So the lookup lists those recent
-   issues, reads by key each recent key the list misses, then reads every key
-   above the newest one until 3 keys in a row hold nothing. A repeat right
-   after a create finds it.
+2. By key, above the newest key neither created nor updated in the last 30
+   minutes. Jira's search shows an issue seconds after its create, and not in
+   key order; a read by key shows it at once. So the lookup lists the issues
+   above that key, reads by key each key the list misses, then reads every
+   key above the newest one until 3 keys in a row hold nothing. A repeat
+   right after a create finds it.
 
 The same request digest returns the issue (`created: false`); another digest
 is a `conflict`. Labels are a set: their order does not change the request.
 A lookup that needs more than 50 reads by key is refused, retryable
-(`unavailable`, `idempotency.unverifiable`); so is one in a project that
-opened more than 500 issues in 30 minutes, not retryable. The label never appears
-in a task's `labels`, `update` keeps it, and a request that names a label
-with its prefix is `invalid`. Two concurrent creates with one key are not
+(`unavailable`, `idempotency.unverifiable`); deleted keys and keys hidden
+from the account count as reads. A lookup in a project that created or
+updated more than 500 issues in 30 minutes is refused, not retryable. The
+label never appears in a task's `labels`, `update` keeps it, and a request
+that names a label with its prefix is `invalid`. Two concurrent creates with one key are not
 detected; sequential repeats are.
 
 | Failure | Outcome |

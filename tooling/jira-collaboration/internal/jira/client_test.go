@@ -194,3 +194,17 @@ func TestAnUnsentRequestIsNotSent(t *testing.T) {
 		t.Fatalf("a missing credential is %+v", err)
 	}
 }
+
+func TestAnExpiredBudgetSaysSo(t *testing.T) {
+	release := make(chan struct{})
+	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		<-release
+	})
+	t.Cleanup(func() { close(release) })
+	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
+	defer cancel()
+	err := client.Write(ctx, http.MethodPut, Path("issue", "10001"), map[string]any{}, nil)
+	if err == nil || err.Kind != Uncertain || !strings.Contains(err.Message, "time budget ran out") {
+		t.Fatalf("an expired budget answered %+v", err)
+	}
+}

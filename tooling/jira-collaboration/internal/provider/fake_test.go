@@ -532,13 +532,15 @@ type jqlQuery struct {
 	descending bool
 	// createdBefore keeps issues created at or before it, by the fake's clock.
 	createdBefore *time.Time
+	// updatedBefore keeps issues updated at or before it.
+	updatedBefore *time.Time
 	// above keeps issues whose key number is above it.
 	above int
 }
 
 var (
 	jqlString   = `"((?:[^"\\]|\\.)*)"`
-	jqlClause   = regexp.MustCompile(`^(?:project = ` + jqlString + `|labels = ` + jqlString + `|statusCategory IN \(([0-9, ]+)\)|creator = currentUser\(\)|\(summary ~ ` + jqlString + ` OR description ~ ` + jqlString + `\)|created <= "-([0-9]+)m"|key > "[A-Z][A-Z0-9_]*-([0-9]+)")`)
+	jqlClause   = regexp.MustCompile(`^(?:project = ` + jqlString + `|labels = ` + jqlString + `|statusCategory IN \(([0-9, ]+)\)|creator = currentUser\(\)|\(summary ~ ` + jqlString + ` OR description ~ ` + jqlString + `\)|created <= "-([0-9]+)m"|key > "[A-Z][A-Z0-9_]*-([0-9]+)"|updated <= "-([0-9]+)m")`)
 	jqlOrder    = regexp.MustCompile(`^ ORDER BY key (ASC|DESC)$`)
 	jqlUnescape = strings.NewReplacer(`\\`, `\`, `\"`, `"`)
 )
@@ -570,6 +572,10 @@ func parseJQL(text string, now time.Time) (*jqlQuery, error) {
 			minutes, _ := strconv.Atoi(match[6])
 			before := now.Add(-time.Duration(minutes) * time.Minute)
 			query.createdBefore = &before
+		case strings.HasPrefix(match[0], "updated"):
+			minutes, _ := strconv.Atoi(match[8])
+			before := now.Add(-time.Duration(minutes) * time.Minute)
+			query.updatedBefore = &before
 		case strings.HasPrefix(match[0], "key"):
 			query.above, _ = strconv.Atoi(match[7])
 		default:
@@ -613,6 +619,9 @@ func (q *jqlQuery) matches(issue *fakeIssue, account string) bool {
 		return false
 	}
 	if q.createdBefore != nil && issue.created.After(*q.createdBefore) {
+		return false
+	}
+	if q.updatedBefore != nil && issue.updated.After(*q.updatedBefore) {
 		return false
 	}
 	if issue.number <= q.above {

@@ -66,9 +66,12 @@ proposals, so the provider implements `tasks` alone.
    site never share a key. A repeat looks the label up with JQL among the
    issues the credential's account created. Jira's search index trails a
    create by seconds, and not in key order, while a read by key does not. So
-   the repeat then lists the issues of the project opened in the last 30
-   minutes, reads by key each recent key that list misses, and reads every
-   key above the newest one until three keys in a row hold nothing. The same digest returns the ticket (`created: false`), another
+   the repeat then takes as its floor the newest key neither created nor
+   updated in the last 30 minutes, lists the issues above it, reads by key
+   each key that list misses, and reads every key above the newest one until
+   three keys in a row hold nothing. An issue moved into the project keeps its
+   creation date and takes a new key; the move updates it, so it never sets
+   the floor. The same digest returns the ticket (`created: false`), another
    digest is a conflict. The label never appears in a task's `labels`,
    `update` keeps it, and a request that names one is `invalid`.
 
@@ -94,11 +97,12 @@ proposals, so the provider implements `tasks` alone.
   needs no other configuration for its workflow's statuses.
 - Two concurrent creates with one key can each open a ticket. A lookup also
   misses a ticket created above three deleted, hidden or moved keys in a row
-  that the search does not show yet, and one the search still does not show
-  after 30 minutes.
-- A keyed create in a project that opens more than 500 issues in 30 minutes,
-  or that needs more than 50 reads by key, is refused rather than risk a
-  duplicate.
+  that the search does not show yet, one the search still does not show
+  after 30 minutes, and one below an issue imported with a creation and an
+  update date older than 30 minutes.
+- A keyed create in a project that creates or updates more than 500 issues
+  in 30 minutes, or that needs more than 50 reads by key, is refused rather
+  than risk a duplicate.
 - `assign`, `link` and `claim` are not offered: a Jira issue has one assignee
   and no exclusive lease the contract can use.
 - `bin/live-test` runs the contract scenarios against a real Jira Cloud

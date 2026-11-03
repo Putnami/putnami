@@ -140,3 +140,21 @@ func TestCursorsCarryJiraTokens(t *testing.T) {
 		t.Fatal("a cursor beyond the contract's bound was issued")
 	}
 }
+
+// TestAFullPageEndsAtAJiraPageBoundary: a page that fills with the last issue
+// of a Jira page answers without reading the next one.
+func TestAFullPageEndsAtAJiraPageBoundary(t *testing.T) {
+	h := newHarness(t)
+	for range jiraPageSize + 1 {
+		h.seed("Paged", "")
+	}
+	var page collab.TaskListResult
+	h.ok("find", `{"page":{"size":100}}`, &page)
+	if len(page.Items) != jiraPageSize || page.Page.Next == "" || h.fake.count("POST /rest/api/2/search/jql") != 1 {
+		t.Fatalf("a full page read %d search pages: %d items, next %q", h.fake.count("POST /rest/api/2/search/jql"), len(page.Items), page.Page.Next)
+	}
+	h.ok("find", `{"page":{"size":100,"cursor":"`+page.Page.Next+`"}}`, &page)
+	if len(page.Items) != 1 || page.Page.Next != "" {
+		t.Fatalf("the next page carried %d items, next %q", len(page.Items), page.Page.Next)
+	}
+}

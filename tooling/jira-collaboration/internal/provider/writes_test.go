@@ -204,3 +204,49 @@ func TestLabelsAreASetToTheKey(t *testing.T) {
 		t.Fatalf("empty labels answered %+v", again)
 	}
 }
+
+// TestAMovedIssueDoesNotHideAnUnindexedOne: an issue moved into the project
+// takes the newest key and keeps its creation date, so the creation date
+// alone does not make it a floor.
+func TestAMovedIssueDoesNotHideAnUnindexedOne(t *testing.T) {
+	spectest.Proves(t, feature, "reconciled-writes", "a-repeat-before-the-search-shows-the-issue-returns-it")
+	h := newHarness(t)
+	h.fake.searchLag = time.Hour
+	first := h.create(`{"title":"Before the move","idempotencyKey":"moved"}`)
+	h.fake.searchLag = 0
+	moved := h.seed("Moved in from another project", "")
+	h.fake.mu.Lock()
+	moved.created = h.fake.clock.Add(-2 * time.Hour)
+	h.fake.mu.Unlock()
+	again := h.create(`{"title":"Before the move","idempotencyKey":"moved"}`)
+	if again.Created || again.Task.Ref != first.Task.Ref || h.issueCount() != 2 {
+		t.Fatalf("a repeat after a move answered %+v; %d issues", again, h.issueCount())
+	}
+}
+
+func TestABusyProjectRefusesAKeyItCannotCheck(t *testing.T) {
+	h := newHarness(t)
+	for range maxRecentPages*jiraPageSize + 1 {
+		h.seed("Busy", "")
+	}
+	failure := h.fails("create", `{"title":"Too busy","idempotencyKey":"busy"}`, collab.OutcomeUnavailable)
+	if failure.Retryable || failure.Reason != reasonKeyUnverifiable || h.fake.count("POST /rest/api/2/issue") != 0 {
+		t.Fatalf("a busy project answered %+v", failure)
+	}
+	mustContain(t, failure.Message, "500")
+}
+
+func TestTooManyMissingKeysRefuseTheCreate(t *testing.T) {
+	h := newHarness(t)
+	h.fake.mu.Lock()
+	for range maxKeyReads + 1 {
+		h.fake.newIssue("Deleted", "", nil, "557058:someone-else").deleted = true
+	}
+	h.fake.mu.Unlock()
+	h.seed("Shown", "")
+	failure := h.fails("create", `{"title":"Gaps","idempotencyKey":"gaps"}`, collab.OutcomeUnavailable)
+	if !failure.Retryable || failure.Reason != reasonKeyUnverifiable || h.fake.count("POST /rest/api/2/issue") != 0 {
+		t.Fatalf("too many gaps answered %+v", failure)
+	}
+	mustContain(t, failure.Message, "deleted")
+}
