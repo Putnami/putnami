@@ -4,6 +4,7 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	collab "go.putnami.dev/protocol/collaboration"
 	"go.putnami.dev/protocol/features/spectest"
@@ -22,7 +23,7 @@ func TestCallerTextCannotChangeTheJQL(t *testing.T) {
 	if !ok || jql != want {
 		t.Fatalf("jql\n%s\nwant\n%s", jql, want)
 	}
-	query, err := parseJQL(jql)
+	query, err := parseJQL(jql, time.Now())
 	if err != nil || query.project != "ENG" || len(query.labels) != 2 || query.labels[0] != `a"b` || query.labels[1] != `c\` {
 		t.Fatalf("the JQL reads as %+v, %v", query, err)
 	}

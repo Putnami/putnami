@@ -261,7 +261,7 @@ func (c *Client) send(ctx context.Context, method, target string, payload []byte
 		if written.Load() {
 			kind = Uncertain
 		}
-		return nil, &Error{Kind: kind, Message: c.redact(describe(method, err, requestCtx, c.options.Timeout))}
+		return nil, &Error{Kind: kind, Message: c.redact(describe(method, err, ctx, requestCtx, c.options.Timeout))}
 	}
 	defer response.Body.Close()
 	data, err := io.ReadAll(io.LimitReader(response.Body, maxResponseBytes+1))
@@ -273,7 +273,10 @@ func (c *Client) send(ctx context.Context, method, target string, payload []byte
 }
 
 // describe explains a transport failure without the request URL.
-func describe(method string, err error, requestCtx context.Context, timeout time.Duration) string {
+func describe(method string, err error, ctx, requestCtx context.Context, timeout time.Duration) string {
+	if errors.Is(ctx.Err(), context.DeadlineExceeded) {
+		return method + ": the operation's time budget ran out before Jira answered"
+	}
 	if errors.Is(requestCtx.Err(), context.DeadlineExceeded) {
 		return fmt.Sprintf("%s: Jira did not answer within %s", method, timeout)
 	}

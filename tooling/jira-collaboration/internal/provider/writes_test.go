@@ -53,6 +53,41 @@ func TestARepeatBeforeTheSearchShowsTheIssueReturnsIt(t *testing.T) {
 	}
 }
 
+// TestARepeatFindsAnIssueTheSearchSkipped: Jira's search does not show new
+// issues in key order, so a newer issue it shows does not prove an older one
+// is shown too.
+func TestARepeatFindsAnIssueTheSearchSkipped(t *testing.T) {
+	spectest.Proves(t, feature, "reconciled-writes", "a-repeat-before-the-search-shows-the-issue-returns-it")
+	h := newHarness(t)
+	h.fake.searchLag = time.Hour
+	first := h.create(`{"title":"Skipped","idempotencyKey":"skipped"}`)
+	h.fake.searchLag = 0
+	h.seed("Newer and already shown", "")
+	again := h.create(`{"title":"Skipped","idempotencyKey":"skipped"}`)
+	if again.Created || again.Task.Ref != first.Task.Ref || h.issueCount() != 2 {
+		t.Fatalf("a repeat answered %+v; %d issues", again, h.issueCount())
+	}
+}
+
+// TestAKeyLookupReadsOnlyRecentIssues: an issue older than the search's
+// margin is taken as shown, so a lookup does not read it by key.
+func TestAKeyLookupReadsOnlyRecentIssues(t *testing.T) {
+	h := newHarness(t)
+	for range 3 {
+		h.seed("Old", "")
+	}
+	h.fake.mu.Lock()
+	h.fake.issues["10001"].deleted = true
+	h.fake.clock = h.fake.clock.Add(time.Hour)
+	h.fake.mu.Unlock()
+	h.create(`{"title":"Recent","idempotencyKey":"recent"}`)
+	for _, key := range []string{"ENG-1", "ENG-2", "ENG-3"} {
+		if h.fake.count("GET /rest/api/2/issue/"+key) != 0 {
+			t.Fatalf("the lookup read %s, older than the search's margin: %v", key, h.fake.calls)
+		}
+	}
+}
+
 func TestALostCreateResponseReturnsTheIssueWithoutADuplicate(t *testing.T) {
 	spectest.Proves(t, feature, "reconciled-writes", "a-lost-create-response-returns-the-issue-without-a-duplicate")
 	h := newHarness(t)
@@ -155,5 +190,17 @@ func TestUpdateChangesWhatItNames(t *testing.T) {
 	h.ok("update", `{"ref":`+h.ref(issue)+`,"title":"Title","labels":["a"]}`, &updated)
 	if h.fake.count("PUT ") != puts {
 		t.Fatal("an update that changes nothing was sent")
+	}
+}
+
+func TestLabelsAreASetToTheKey(t *testing.T) {
+	h := newHarness(t)
+	first := h.create(`{"title":"Set","labels":["b","a"],"idempotencyKey":"set"}`)
+	if again := h.create(`{"title":"Set","labels":["a","b"],"idempotencyKey":"set"}`); again.Created || again.Task.Ref != first.Task.Ref {
+		t.Fatalf("reordered labels answered %+v", again)
+	}
+	bare := h.create(`{"title":"Bare","idempotencyKey":"bare"}`)
+	if again := h.create(`{"title":"Bare","labels":[],"idempotencyKey":"bare"}`); again.Created || again.Task.Ref != bare.Task.Ref {
+		t.Fatalf("empty labels answered %+v", again)
 	}
 }

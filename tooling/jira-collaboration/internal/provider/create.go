@@ -33,6 +33,11 @@ type recorded struct {
 }
 
 func newIdempotency(project, key string, request createRequest) idempotency {
+	// Labels are a set: absent, empty and reordered labels are one request.
+	request.Labels = slices.Sorted(slices.Values(request.Labels))
+	if request.Labels == nil {
+		request.Labels = []string{}
+	}
 	return idempotency{label: reservedLabelPrefix + digest([]string{"tasks.create", project, key}), digest: digest(request)}
 }
 
@@ -46,8 +51,16 @@ func recordOf(issue *jiraIssue) string {
 	return ""
 }
 
-// Bounds of the reads by key one key lookup makes.
+// Bounds of one key lookup.
 const (
+	// indexedAge is how old an issue is, by Jira's clock, when the lookup
+	// takes it as shown by Jira's search. The search trails a create by
+	// seconds; the margin covers an index that falls minutes behind.
+	indexedAge = "-30m"
+	// maxRecentPages bounds the search pages of 100 that list the issues
+	// opened within indexedAge. A project busier than that cannot tell
+	// whether a key opened an issue.
+	maxRecentPages = 5
 	// maxKeyReads bounds the reads by key of one lookup. A lookup that needs
 	// more cannot tell whether its key opened an issue.
 	maxKeyReads = 50
@@ -58,9 +71,10 @@ const (
 
 // findKey looks for the issue a create key opened, among the issues the
 // credential's account created. Jira's search shows a new issue only seconds
-// after its create was answered, while a read by key shows it at once. So the
-// lookup searches the label, then reads by key every issue of the project
-// above the newest key the search shows.
+// after its create was answered, and not in key order, while a read by key
+// shows it at once. So the lookup searches the label, then lists the issues
+// of the project opened within indexedAge, and reads by key every recent key
+// that list misses and every key above its newest one.
 func (s *session) findKey(marker idempotency) (*jiraIssue, *collab.Failure) {
 	account, failure := s.myself()
 	if failure != nil {
@@ -80,28 +94,74 @@ func (s *session) findKey(marker idempotency) (*jiraIssue, *collab.Failure) {
 	if issue := carrying(found, marker, account); issue != nil {
 		return issue, nil
 	}
-	newest, _, err := s.search("project = "+quote(s.settings.Project)+" ORDER BY key DESC", "", 1)
+	project := "project = " + quote(s.settings.Project)
+	older, _, err := s.search(project+" AND created <= "+quote(indexedAge)+" ORDER BY key DESC", "", 1)
 	if err != nil {
-		return nil, unverifiable(err, "look for idempotency key among the newest issues of project %s", s.settings.Project)
+		return nil, unverifiable(err, "look for idempotency key among the issues of project %s", s.settings.Project)
 	}
-	top := 0
-	if len(newest) > 0 {
-		top = keyNumber(newest[0].Key)
+	floor := 0
+	recent := project + " ORDER BY key ASC"
+	if len(older) > 0 {
+		floor = keyNumber(older[0].Key)
+		recent = project + " AND key > " + quote(older[0].Key) + " ORDER BY key ASC"
 	}
-	misses := 0
-	for number, reads := top+1, 0; misses < notGivenRun; number++ {
+	listed := map[int]bool{}
+	top := floor
+	for page, token := 0, ""; ; page++ {
+		if page == maxRecentPages {
+			return nil, collab.Fail(collab.OutcomeUnavailable, reasonKeyUnverifiable,
+				"checking the idempotency key needs more than %d search pages of the issues project %s opened within %s; nothing was created",
+				maxRecentPages, s.settings.Project, strings.TrimPrefix(indexedAge, "-"))
+		}
+		issues, next, err := s.search(recent, token, jiraPageSize)
+		if err != nil {
+			return nil, unverifiable(err, "look for idempotency key among the recent issues of project %s", s.settings.Project)
+		}
+		for i := range issues {
+			number := keyNumber(issues[i].Key)
+			listed[number] = true
+			top = max(top, number)
+		}
+		if token = next; token == "" || len(issues) == 0 {
+			break
+		}
+	}
+	reads := 0
+	readKey := func(number int) (*jiraIssue, bool, *collab.Failure) {
 		if reads == maxKeyReads {
-			return nil, retryable(collab.Fail(collab.OutcomeUnavailable, reasonKeyUnverifiable,
-				"checking the idempotency key needs more than %d reads by key in project %s, whose newest issues Jira's search does not show yet; nothing was created: retry once it shows them",
+			return nil, false, retryable(collab.Fail(collab.OutcomeUnavailable, reasonKeyUnverifiable,
+				"checking the idempotency key needs more than %d reads by key in project %s, whose recent issues Jira's search does not show yet; nothing was created: retry once it shows them",
 				maxKeyReads, s.settings.Project))
 		}
 		reads++
 		issue, err := s.read(s.settings.Project + "-" + strconv.Itoa(number))
 		switch {
 		case err != nil && err.Kind == jira.Answered && err.Status == http.StatusNotFound:
-			misses++
+			return nil, false, nil
 		case err != nil:
-			return nil, unverifiable(err, "look for idempotency key in issue %s-%d", s.settings.Project, number)
+			return nil, false, unverifiable(err, "look for idempotency key in issue %s-%d", s.settings.Project, number)
+		}
+		return issue, true, nil
+	}
+	for number := floor + 1; number <= top; number++ {
+		if listed[number] {
+			continue
+		}
+		issue, given, failure := readKey(number)
+		if failure != nil {
+			return nil, failure
+		}
+		if given && carries(issue, marker, account) {
+			return issue, nil
+		}
+	}
+	for number, misses := top+1, 0; misses < notGivenRun; number++ {
+		issue, given, failure := readKey(number)
+		switch {
+		case failure != nil:
+			return nil, failure
+		case !given:
+			misses++
 		default:
 			misses = 0
 			if carries(issue, marker, account) {

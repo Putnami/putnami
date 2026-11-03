@@ -229,6 +229,9 @@ func (s *session) find(input any) (any, *collab.Failure) {
 			return result, nil
 		}
 		at.token = next
+		if len(result.Items) == size {
+			return paged(result, at)
+		}
 	}
 }
 

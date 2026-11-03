@@ -64,10 +64,11 @@ proposals, so the provider implements `tasks` alone.
    `putnami.idempotency` holding the digest of the request, both in the create
    call itself; the key's hash also covers the project, so two bindings of one
    site never share a key. A repeat looks the label up with JQL among the
-   issues the credential's account created, then reads by key every issue
-   above the newest key the search shows, until three keys in a row hold
-   nothing: Jira's search index trails a create by seconds, and a read by key
-   does not. The same digest returns the ticket (`created: false`), another
+   issues the credential's account created. Jira's search index trails a
+   create by seconds, and not in key order, while a read by key does not. So
+   the repeat then lists the issues of the project opened in the last 30
+   minutes, reads by key each recent key that list misses, and reads every
+   key above the newest one until three keys in a row hold nothing. The same digest returns the ticket (`created: false`), another
    digest is a conflict. The label never appears in a task's `labels`,
    `update` keeps it, and a request that names one is `invalid`.
 
@@ -93,7 +94,11 @@ proposals, so the provider implements `tasks` alone.
   needs no other configuration for its workflow's statuses.
 - Two concurrent creates with one key can each open a ticket. A lookup also
   misses a ticket created above three deleted, hidden or moved keys in a row
-  that the search does not show yet.
+  that the search does not show yet, and one the search still does not show
+  after 30 minutes.
+- A keyed create in a project that opens more than 500 issues in 30 minutes,
+  or that needs more than 50 reads by key, is refused rather than risk a
+  duplicate.
 - `assign`, `link` and `claim` are not offered: a Jira issue has one assignee
   and no exclusive lease the contract can use.
 - `bin/live-test` runs the contract scenarios against a real Jira Cloud
