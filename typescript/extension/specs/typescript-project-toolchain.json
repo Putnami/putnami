@@ -108,6 +108,10 @@
       "text": "Hook discovery fails, before any hook runs, when a dependency the project declares is not installed in the node_modules of the project or of a directory above it up to the workspace root, so generate never succeeds without the hooks its dependencies contribute and never caches an incomplete .gen under the key of a complete one."
     },
     {
+      "id": "hook-logs-reach-the-task-output",
+      "text": "Each log event a pre-build or config-extract hook emits reaches the task's event stream, in order, at its level, with trace shown as debug, whether the hook succeeds or fails; in a batched generate, each log names the member project it belongs to."
+    },
+    {
       "id": "structured-reports",
       "text": "Test and coverage results are parsed into structured per-file and per-project reports, uncovered project sources are counted, external dependencies are excluded, and a missing report file is an empty result rather than a crash."
     },

@@ -379,6 +379,20 @@
           }
         },
         {
+          "id": "hook-logs-reach-the-task-output",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-hook-log-reaches-the-task-in-order-even-when-the-hook-fails",
+              "a-batched-hook-log-names-its-member"
+            ]
+          }
+        },
+        {
           "id": "structured-reports",
           "stage": "coded",
           "evidenceKinds": [
