@@ -114,13 +114,13 @@ Before it creates, `create` looks for its key:
 
 The same request digest returns the issue (`created: false`); another digest
 is a `conflict`. Labels are a set: their order does not change the request.
-A lookup that needs more than 50 reads by key is refused, retryable
-(`unavailable`, `idempotency.unverifiable`); deleted keys and keys hidden
-from the account count as reads. A lookup in a project that created or
-updated more than 500 issues in 30 minutes is refused, not retryable. The
-label never appears in a task's `labels`, `update` keeps it, and a request
-that names a label with its prefix is `invalid`. Two concurrent creates with one key are not
-detected; sequential repeats are.
+A lookup is refused, retryable (`unavailable`, `idempotency.unverifiable`),
+when it needs more than 50 reads by key, deleted keys and keys hidden from
+the account included, or when the project created or updated more than 500
+issues in 30 minutes, a bulk edit included. The label never appears in a
+task's `labels`, `update` keeps it, and a request that names a label with its
+prefix is `invalid`. Two concurrent creates with one key are not detected;
+sequential repeats are.
 
 | Failure | Outcome |
 |---|---|

@@ -70,8 +70,8 @@ proposals, so the provider implements `tasks` alone.
    updated in the last 30 minutes, lists the issues above it, reads by key
    each key that list misses, and reads every key above the newest one until
    three keys in a row hold nothing. An issue moved into the project keeps its
-   creation date and takes a new key; the move updates it, so it never sets
-   the floor. The same digest returns the ticket (`created: false`), another
+   creation date and takes a new key; the move updates it, so it sets the
+   floor only 30 minutes later, once the search shows what lies below it. The same digest returns the ticket (`created: false`), another
    digest is a conflict. The label never appears in a task's `labels`,
    `update` keeps it, and a request that names one is `invalid`.
 
@@ -100,9 +100,10 @@ proposals, so the provider implements `tasks` alone.
   that the search does not show yet, one the search still does not show
   after 30 minutes, and one below an issue imported with a creation and an
   update date older than 30 minutes.
-- A keyed create in a project that creates or updates more than 500 issues
-  in 30 minutes, or that needs more than 50 reads by key, is refused rather
-  than risk a duplicate.
+- A keyed create is refused, retryable, rather than risk a duplicate when the
+  project created or updated more than 500 issues in 30 minutes, a bulk edit
+  included, or when the lookup needs more than 50 reads by key; deleted keys
+  and keys hidden from the account count as reads.
 - `assign`, `link` and `claim` are not offered: a Jira issue has one assignee
   and no exclusive lease the contract can use.
 - `bin/live-test` runs the contract scenarios against a real Jira Cloud

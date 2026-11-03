@@ -230,7 +230,7 @@ func TestABusyProjectRefusesAKeyItCannotCheck(t *testing.T) {
 		h.seed("Busy", "")
 	}
 	failure := h.fails("create", `{"title":"Too busy","idempotencyKey":"busy"}`, collab.OutcomeUnavailable)
-	if failure.Retryable || failure.Reason != reasonKeyUnverifiable || h.fake.count("POST /rest/api/2/issue") != 0 {
+	if !failure.Retryable || failure.Reason != reasonKeyUnverifiable || h.fake.count("POST /rest/api/2/issue") != 0 {
 		t.Fatalf("a busy project answered %+v", failure)
 	}
 	mustContain(t, failure.Message, "500")
