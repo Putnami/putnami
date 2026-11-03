@@ -32,6 +32,9 @@ func TestLiveLinear(t *testing.T) {
 	if teamKey == "" {
 		t.Skip(liveTeamVariable + " names no team; the live Linear proof runs only on request (bin/live-test)")
 	}
+	if !teamKeyPattern.MatchString(teamKey) || linear.Redact(teamKey, nil) != teamKey {
+		t.Fatal(liveTeamVariable + " holds no team key; the message does not repeat it, since it may be a credential")
+	}
 	endpoint, err := linear.ResolveEndpoint(os.Getenv)
 	if err != nil {
 		t.Fatal(err)

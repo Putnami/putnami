@@ -13,9 +13,15 @@ if [ "$#" -ne 1 ] || [ "$1" = "--help" ] || [ "$1" = "-h" ]; then
   [ "$#" -eq 1 ] && exit 0
   exit 2
 fi
+# The message never repeats the argument: it may be a key given by mistake.
 case "$1" in
-  *[!A-Za-z0-9_-]*) printf 'live-test: %s is not a team key\n' "$1" >&2; exit 2 ;;
+  lin_api_*|lin_oauth_*) printf '%s\n' 'live-test: the argument is an API key, not a team key: revoke that key, then set LINEAR_API_KEY to a new one and pass the team key' >&2; exit 2 ;;
+  *[!A-Za-z0-9_-]*) printf '%s\n' 'live-test: the argument is not a team key, such as ENG' >&2; exit 2 ;;
 esac
+if [ "${#1}" -gt 32 ]; then
+  printf '%s\n' 'live-test: the argument is not a team key, such as ENG' >&2
+  exit 2
+fi
 [ -n "${LINEAR_API_KEY:-}" ] || { printf '%s\n' 'live-test: set LINEAR_API_KEY to a Linear API key' >&2; exit 2; }
 
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
