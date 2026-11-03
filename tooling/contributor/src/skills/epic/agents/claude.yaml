@@ -1,0 +1,5 @@
+name: epic
+description: Plan several issues in dependency order under one approved envelope and launch one build session per issue in waves, without coding
+disable-model-invocation: true
+allowed-tools: Bash, Read, Grep, Glob, TodoWrite, Edit, Write
+argument-hint: <intention|task> [--dry-run]

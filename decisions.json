@@ -276,6 +276,22 @@
       "settledBy": "fdumay",
       "adr": "tooling/contributor/doc/adr/0009-one-contribution-loop-from-talk-to-merge.md",
       "check": {"kind": "json-value", "files": ["putnami.workspace.json"], "pointer": "/options/@putnami~1contributor/profiles/default/review/runs", "rule": "equals", "value": "agent", "whenMissing": "violated"}
+    },
+    {
+      "id": "D-036",
+      "statement": "an epic session plans issues in dependency order, launches one build session per issue in waves under one epic envelope the owner approves, and never codes",
+      "settled": "2026-11-02",
+      "settledBy": "fdumay",
+      "adr": "tooling/contributor/doc/adr/0010-an-epic-session-runs-issues-in-waves.md",
+      "reviewOnly": true
+    },
+    {
+      "id": "D-037",
+      "statement": "a child issue stacks on at most one unmerged parent whose proposal is ready, and after the parent's squash merge rebases with git rebase --onto <base> <parent's last head>",
+      "settled": "2026-11-02",
+      "settledBy": "fdumay",
+      "adr": "tooling/contributor/doc/adr/0010-an-epic-session-runs-issues-in-waves.md",
+      "reviewOnly": true
     }
   ]
 }

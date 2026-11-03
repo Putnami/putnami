@@ -1,0 +1,32 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-spec.json",
+  "protocolVersion": 1,
+  "feature": "tooling/epic",
+  "outcomes": [
+    "An epic plan has one format: the epic, its envelope, and its issues with their dependencies and the slices of each change plan",
+    "putnami epic plan checks an epic plan, sizes each issue and the epic, and orders the issues in waves, the same answer for the same plan and policy",
+    "putnami epic status shows, for each issue, its task, its proposal and its sessions, the tokens the epic spent against its envelope, and the issues that may launch now"
+  ],
+  "nonGoals": [
+    "Writing the epic plan or creating its issues: the epic skill does",
+    "Opening a session: the owner opens each local workspace the epic skill names",
+    "Stopping a child session: each child stops itself against its share"
+  ],
+  "requirements": [
+    {
+      "id": "epic-plan-validation",
+      "text": "putnami epic plan reads .putnami/<epic>/epic.json, or the file --plan-file names, as protocolVersion 1 of the epic plan format. It refuses invalid UTF-8, a repeated or unknown member, a missing member, a value of the wrong type or out of its bounds, an issue key two issues share, a dependency on an unknown key or on the issue itself, and a cycle, with exit 1 and the path of the first value it refuses. The JSON Schema of the format states the members and bounds the decoder applies."
+    },
+    {
+      "id": "epic-waves",
+      "text": "Each issue is sized from its slices with the change estimate table, and the epic's ranges are the sums of its issues'. An issue's wave is 1 when it has no dependency, else one more than the latest wave of its dependencies; issues of a wave keep plan order. The command prints the epic, its envelope and one line per issue by wave, or with --output=json the result document."
+    },
+    {
+      "id": "epic-status",
+      "text": "putnami epic status reads the epic plan, its launch records, and each issue's task, proposal and sessions through tasks, proposals and missions. It reports each issue's state and tokens, the epic's tokens against its envelope, and the issues that may launch: all dependencies merged, or one not merged with a ready proposal, while the envelope is not spent and fewer issues run than its parallel sessions. A contract the workspace does not bind is reported, not guessed."
+    }
+  ],
+  "decisions": [
+    "tooling/contributor/doc/adr/0010-an-epic-session-runs-issues-in-waves.md"
+  ]
+}

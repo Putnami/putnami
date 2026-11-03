@@ -17,7 +17,8 @@ several issues of an epic, each in its own session, never slices of one issue.
    `--retry-failed` once.
 4. Commit the slice. Before the push, rebase the branch when its parent branch
    moved or merged; after the parent's squash merge, run
-   `git rebase --onto <base> <parent's old tip>`.
+   `git rebase --onto <base> <parent's last head>`, the head commit
+   `proposals status` reports for the parent's proposal.
 5. Push the checkpoint with `change finalize --draft` again: it pushes the
    committed HEAD and refreshes the title and body, so rewrite the body when
    the net change moved. Never push a failing or half-edited tree.

@@ -114,15 +114,15 @@ func (e *Env) originRepository(ctx context.Context, root string) string {
 	if err != nil {
 		return ""
 	}
-	return repositoryFromRemote(remote)
+	return RepositoryFromRemote(remote)
 }
 
-// repositoryFromRemote reads owner/name from a remote URL: scp-like
+// RepositoryFromRemote reads owner/name from a remote URL: scp-like
 // (git@host:owner/name.git), ssh:// or https://. It answers the last two
 // path segments in lowercase, without .git, and "" for a local path, a file:
 // URL or a URL with fewer segments. Only the repository is kept: no host and
 // no credential.
-func repositoryFromRemote(remote string) string {
+func RepositoryFromRemote(remote string) string {
 	r := strings.TrimSpace(remote)
 	lower := strings.ToLower(r)
 	if r == "" || strings.HasPrefix(r, "/") || strings.HasPrefix(r, ".") || strings.HasPrefix(r, "~") || strings.HasPrefix(lower, "file:") {

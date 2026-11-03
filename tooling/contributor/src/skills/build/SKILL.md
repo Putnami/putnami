@@ -70,9 +70,12 @@ plan S, M or L.
   touches a sensitive zone: the owner approves the study and a cost envelope
   (tokens, minutes, slices) before code.
 
-A decision the owner settled in talk or in the task counts as approved. After
-approval, stop only when the work exceeds the envelope, must change the
-approved design, or contradicts an ADR. Slice reports inform; they do not ask.
+A decision the owner settled in talk or in the task counts as approved, and
+so does a child of an approved [epic](../epic/SKILL.md): its envelope is the
+share its mandate names, and it also stops past 150 % of that share or at a
+sensitive zone its plan did not name. After approval, stop only when the work
+exceeds the envelope, must change the approved design, or contradicts an
+ADR. Slice reports inform; they do not ask.
 
 ## Who runs each stage
 

@@ -3231,6 +3231,15 @@
             "kind": "acceptance",
             "checks": ["the-review-cycle-blocks-on-p1-and-p2"]
           }
+        },
+        {
+          "id": "epic-orchestration",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": ["the-epic-skill-launches-children-and-never-codes"]
+          }
         }
       ]
     },

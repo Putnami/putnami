@@ -12,8 +12,8 @@ and materializes for Claude Code (`.claude/skills`, `.claude/agents`) and Codex
 (`.agents/skills`, `.codex/agents`) under the extension's own version. It also
 declares a compiled runtime, `compiled/putnami-contributor`, which serves
 `putnami change language`, `change verify`, `change finalize`,
-`change estimate`, `agent hook`, `agent attach`, `agent stage`, `agent ask`
-and `agent reply`
+`change estimate`, `epic plan`, `epic status`, `agent hook`, `agent attach`,
+`agent stage`, `agent ask` and `agent reply`
 ([ADR 0004](doc/adr/0004-the-contributor-extension-ships-a-compiled-executable.md),
 [ADR 0005](doc/adr/0005-the-contributor-executable-serves-the-change-noun.md),
 [ADR 0006](doc/adr/0006-the-contributor-executable-serves-change-finalize.md)).
@@ -48,9 +48,10 @@ state the repository's conventions in its [policy](doc/02-repository-policy.md).
 | `design` | Resolve a material technical choice, with a bounded prototype or an ADR when it needs one | implicit |
 | `review` | Independently challenge a material artifact or frozen candidate | implicit |
 | `check` | Run the gate, applicable local proof, the documentation audit and the language rule | implicit |
+| `epic` | Plan several issues in waves under one envelope and launch one `build` session per issue, without coding | explicit only |
 | `content-bump` | Refresh a pinned-content lock the policy declares | explicit only |
 
-The former `plan`, `execute`, `fix`, `epic`, `code-review`, `adr`,
+The former `plan`, `execute`, `fix`, `code-review`, `adr`,
 `prototype`, four `putnami-*` aliases and `fix-loop` entries are removed. This intentional breaking change
 is documented in the [migration guide](doc/03-entry-point-migration.md).
 `build` handles named tasks and coordinated units only within its mandate;
@@ -85,6 +86,11 @@ thin relay to the native language command; it carries no separate evaluator.
 `putnami change estimate` reads a change plan, `.putnami/<issue>/plan.json`
 by default, checks it against the plan format, and sizes it S, M or L with a
 token and a duration range ([Estimate a change plan](doc/07-change-estimate.md)).
+`putnami epic plan` checks an epic plan, `.putnami/<epic>/epic.json`, sizes
+each issue and orders the issues in waves; `putnami epic status` reads each
+issue's task, proposal and sessions and names the issues that may launch now
+([Run an epic](doc/08-epic.md),
+[ADR 0010](doc/adr/0010-an-epic-session-runs-issues-in-waves.md)).
 
 The build skill's dossier and workflow checker is `putnami change verify`,
 which this extension's executable serves. Its standalone `--workflow` validates a local progress
@@ -170,6 +176,7 @@ session:
 - [Workflow records and handoffs](doc/04-workflow-contract.md)
 - [Publish a proposal](doc/06-change-finalize.md)
 - [Estimate a change plan](doc/07-change-estimate.md)
+- [Run an epic](doc/08-epic.md)
 - [ADR 0001](doc/adr/0001-one-contributor-extension.md)
 - [ADR 0002](doc/adr/0002-build-and-versioned-workflow-record.md)
 - [ADR 0004](doc/adr/0004-the-contributor-extension-ships-a-compiled-executable.md)
@@ -177,6 +184,7 @@ session:
 - [ADR 0007](doc/adr/0007-the-contributor-declares-agent-session-hooks.md)
 - [ADR 0008](doc/adr/0008-build-pushes-its-intent-before-its-code.md)
 - [ADR 0009](doc/adr/0009-one-contribution-loop-from-talk-to-merge.md)
+- [ADR 0010](doc/adr/0010-an-epic-session-runs-issues-in-waves.md)
 
 ## Publication
 

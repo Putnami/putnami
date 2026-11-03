@@ -18,7 +18,8 @@ The block holds conventions only:
 A workspace without the block gets the defaults: claimed and delivered state
 `in_progress`, the shipped default workflow profile, no language rule,
 no hosted gate, proposals ready at finalization, no body limit beyond the
-contract's, no task reference line, no integration, the default estimate table.
+contract's, no task reference line, no integration, the default estimate table,
+and epics that run 3 children at once in local workspaces.
 
 ## Reference: this repository's configuration
 
@@ -124,6 +125,8 @@ How the pieces combine for one delivery:
 - The block sets no `estimate`, so `putnami change estimate` sizes plans with
   the contributor's default table
   ([Estimate a change plan](07-change-estimate.md)).
+- The block sets no `epic`, so the `epic` workflow runs 3 children at once,
+  each in a local workspace the owner opens ([Run an epic](08-epic.md)).
 - `verification.ciGate` names `Putnami CI` as the hosted check that stands for
   the gate. When the machine's load ratio exceeds `0.7`, build selects
   `change finalize --gate ci` instead of running a local impacted gate;
