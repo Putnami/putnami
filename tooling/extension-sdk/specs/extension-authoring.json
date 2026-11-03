@@ -125,6 +125,10 @@
       "text": "The Go client's VersionLines sends the scope and returns the host's answer, with an empty commit list for a line without commits. An answer without a source revision or a line, with another line than the scope names, or with a tagged line that lacks its tag or has a release, or an untagged line without one, is an error that leaves the client usable."
     },
     {
+      "id": "host-rpc-workspace-probe-client",
+      "text": "The Go client's WorkspaceProbe sends workspace.probe and returns the host's root, projects and diagnostics, with empty lists where the host found none. An answer without a root, or with projects out of path order or repeated, is an error that leaves the client usable."
+    },
+    {
       "id": "resolve-a-path-against-the-typed-directory",
       "text": "The context package's ResolvePath resolves a path argument as the user typed it. An empty or absolute path is returned unchanged. A relative path is joined to the context's InvocationDir, else to UserScope.CallerDir, and is returned unchanged when the context has neither or is nil, so it resolves against the process directory as before. The function reads no file and no environment variable."
     }

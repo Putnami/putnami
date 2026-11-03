@@ -1440,6 +1440,22 @@
           }
         },
         {
+          "id": "host-rpc-workspace-probe",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "workspace-probe-answers-the-user-scope-probes-outside-a-workspace",
+              "workspace-probe-writes-nothing-in-the-callers-directory",
+              "workspace-probe-reports-a-failed-probe-as-a-diagnostic",
+              "workspace-probe-answers-the-workspace-view-inside-a-workspace"
+            ]
+          }
+        },
+        {
           "id": "source-bound-cache",
           "stage": "coded",
           "evidenceKinds": [

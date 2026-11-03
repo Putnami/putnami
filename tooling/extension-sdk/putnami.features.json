@@ -465,6 +465,20 @@
           }
         },
         {
+          "id": "host-rpc-workspace-probe-client",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "workspace-probe-returns-the-hosts-answer",
+              "workspace-probe-rejects-an-answer-it-cannot-use-and-stays-usable"
+            ]
+          }
+        },
+        {
           "id": "resolve-a-path-against-the-typed-directory",
           "stage": "coded",
           "evidenceKinds": [
