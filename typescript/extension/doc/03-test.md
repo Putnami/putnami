@@ -242,7 +242,7 @@ Unhandled errors between tests (module-level crashes) are extracted and reported
 | `--timeout` | `number` | `5000` | Per-test timeout in milliseconds |
 | `--timeout-budget` | `number` | `600000` | Wall-clock timeout for the test subprocess in milliseconds |
 | `--update-snapshots` | `boolean` | `false` | Update snapshot files instead of comparing |
-| `--rerun-each` | `number` | — | Re-run each test file N times |
+| `--rerun-each` | `number` | — | Re-run each test file N times; raise `--timeout-budget` to cover N runs of the suite |
 | `--only` | `boolean` | — | Only run tests marked with `test.only()` |
 | `--todo` | `boolean` | — | Include tests marked with `test.todo()` |
 | `--enforce-coverage` | `boolean` | `false` | Validation/CI cadence switch: collect an LCOV report and enforce each project's `coverage-threshold`. The inner loop (no `--enforce-coverage`) skips instrumentation. Distinct from `--coverage`, so it never overrides a project's `coverage: false` opt-out |

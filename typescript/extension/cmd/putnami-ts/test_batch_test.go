@@ -339,14 +339,6 @@ func TestRunTestBatchSurfacesUnhandledErrors(t *testing.T) {
 	}
 }
 
-// TestTestParamsFromContextCoverageCadence pins the coverage switches at the TS
-// param-resolution seam that BOTH solo (test.go:runTest) and batch
-// (test_batch.go:runProjectTest) share verbatim. Two independent axes:
-// `coverage` decides whether the run measures, `enforce-coverage` decides
-// whether the threshold may fail it. Only `coverage:false` turns measurement
-// off, and enforce-coverage never overrides that opt-out. This is the TS twin of
-// the Go TestGoCoverageCadenceSoloBatchParity and must stay row-for-row
-// identical to it.
 // --rerun-each reaches the test parameters under its flag and its option name,
 // and is 0, one run, when absent.
 func TestTestParamsFromContextReadsRerunEach(t *testing.T) {
@@ -365,6 +357,14 @@ func TestTestParamsFromContextReadsRerunEach(t *testing.T) {
 	}
 }
 
+// TestTestParamsFromContextCoverageCadence pins the coverage switches at the TS
+// param-resolution seam that BOTH solo (test.go:runTest) and batch
+// (test_batch.go:runProjectTest) share verbatim. Two independent axes:
+// `coverage` decides whether the run measures, `enforce-coverage` decides
+// whether the threshold may fail it. Only `coverage:false` turns measurement
+// off, and enforce-coverage never overrides that opt-out. This is the TS twin of
+// the Go TestGoCoverageCadenceSoloBatchParity and must stay row-for-row
+// identical to it.
 func TestTestParamsFromContextCoverageCadence(t *testing.T) {
 	cases := []struct {
 		name          string
