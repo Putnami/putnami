@@ -28,7 +28,8 @@ const (
 	// or Linear answered 5xx. A mutation may have happened.
 	Uncertain
 	// Answered: Linear answered a definite refusal, an HTTP 4xx status or a
-	// GraphQL error. A mutation did not happen.
+	// GraphQL error other than INTERNAL_ERROR and LOCK_TIMEOUT. A mutation did
+	// not happen.
 	Answered
 	// NoCredential: no API key could be resolved, so nothing was sent.
 	NoCredential
@@ -199,9 +200,6 @@ func (c *Client) exchange(ctx context.Context, payload []byte, out any) *Error {
 	if len(envelope.Errors) > 0 {
 		return c.refusal(answer, envelope.Errors[0])
 	}
-	if answer.status >= 500 {
-		return &Error{Kind: Uncertain, Status: answer.status, Message: fmt.Sprintf("Linear answered %d", answer.status)}
-	}
 	if answer.status < 200 || answer.status >= 300 {
 		return c.refusal(answer, graphQLError{})
 	}
@@ -216,7 +214,12 @@ func (c *Client) exchange(ctx context.Context, payload []byte, out any) *Error {
 	return nil
 }
 
-// refusal classifies an answer that reports an error or a non-2xx status.
+// transientCodes are the GraphQL error codes with which Linear reports a
+// failure on its side: the request may or may not have taken effect.
+var transientCodes = map[string]bool{"INTERNAL_ERROR": true, "LOCK_TIMEOUT": true}
+
+// refusal classifies an answer that reports an error or a non-2xx status. A
+// 5xx status or a transient code is Uncertain whatever the body says.
 func (c *Client) refusal(a *answer, reported graphQLError) *Error {
 	code := strings.ToUpper(reported.Extensions.Code)
 	message := reported.Extensions.UserPresentableMessage
@@ -228,8 +231,9 @@ func (c *Client) refusal(a *answer, reported graphQLError) *Error {
 		text = "Linear refused the request: " + message
 	}
 	failure := &Error{Kind: Answered, Status: a.status, Code: code, Message: c.redact(bounded(text))}
-	if a.status >= 500 && code == "" {
+	if a.status >= 500 || transientCodes[code] {
 		failure.Kind = Uncertain
+		return failure
 	}
 	lowered := strings.ToLower(reported.Message + " " + reported.Extensions.Type)
 	switch {
@@ -276,7 +280,7 @@ func (c *Client) send(ctx context.Context, payload []byte) (*answer, *Error) {
 		if written.Load() {
 			kind = Uncertain
 		}
-		return nil, &Error{Kind: kind, Message: c.redact(describe(err, requestCtx, c.options.Timeout))}
+		return nil, &Error{Kind: kind, Message: c.redact(describe(err, ctx, requestCtx, c.options.Timeout))}
 	}
 	defer response.Body.Close()
 	data, err := io.ReadAll(io.LimitReader(response.Body, maxResponseBytes+1))
@@ -288,7 +292,10 @@ func (c *Client) send(ctx context.Context, payload []byte) (*answer, *Error) {
 }
 
 // describe explains a transport failure without the request URL.
-func describe(err error, requestCtx context.Context, timeout time.Duration) string {
+func describe(err error, ctx, requestCtx context.Context, timeout time.Duration) string {
+	if errors.Is(ctx.Err(), context.DeadlineExceeded) {
+		return "the operation's time budget ran out before Linear answered"
+	}
 	if errors.Is(requestCtx.Err(), context.DeadlineExceeded) {
 		return fmt.Sprintf("Linear did not answer within %s", timeout)
 	}

@@ -88,6 +88,29 @@ func TestAQueryWithoutADefiniteAnswerIsRepeatedAndAMutationIsNot(t *testing.T) {
 	}
 }
 
+func TestAServerSideErrorIsUncertainWhateverItsBody(t *testing.T) {
+	answers := []struct {
+		status int
+		body   string
+	}{
+		{502, `{"errors":[{"message":"upstream","extensions":{"code":"INTERNAL_ERROR"}}]}`},
+		{503, `{"errors":[{"message":"Invalid input","extensions":{"code":"INVALID_INPUT"}}]}`},
+		{200, `{"errors":[{"message":"lock timeout","extensions":{"code":"LOCK_TIMEOUT"}}]}`},
+	}
+	for _, answer := range answers {
+		var calls atomic.Int32
+		client := newTestClient(t, testKey, func(w http.ResponseWriter, _ *http.Request) {
+			calls.Add(1)
+			w.WriteHeader(answer.status)
+			_, _ = io.WriteString(w, answer.body)
+		})
+		err := client.Mutate(context.Background(), "M", "mutation M { ok }", nil, nil)
+		if err == nil || err.Kind != Uncertain || calls.Load() != 1 {
+			t.Errorf("a mutation answered %d %s: %+v after %d calls", answer.status, answer.body, err, calls.Load())
+		}
+	}
+}
+
 func TestARefusalIsDefiniteAndRedacted(t *testing.T) {
 	var calls atomic.Int32
 	client := newTestClient(t, testKey, func(w http.ResponseWriter, _ *http.Request) {

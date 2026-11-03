@@ -109,6 +109,10 @@ func TestARepeatedKeyReturnsTheFirstIssue(t *testing.T) {
 	if again.Created || again.Task.Ref != first.Ref || again.Task.Revision != first.Revision {
 		t.Fatalf("a repeat answered %+v after %+v", again, first)
 	}
+	h.ok("create", `{"title":"Once","body":"Only once.","labels":["bug","Bug"],"idempotencyKey":"once"}`, &again)
+	if again.Created || again.Task.Ref != first.Ref {
+		t.Fatalf("a repeat that names the label in another case answered %+v", again)
+	}
 	if h.fake.count("PutnamiCreateIssue") != 1 || h.issueCount() != 1 {
 		t.Fatalf("a repeat sent %d creates for %d issues", h.fake.count("PutnamiCreateIssue"), h.issueCount())
 	}

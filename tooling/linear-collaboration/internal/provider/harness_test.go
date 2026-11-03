@@ -144,8 +144,8 @@ func (h *harness) issueCount() int {
 	return len(h.fake.issues)
 }
 
-// seedIssue adds an issue directly to the fake, as another client would.
-// seedIssue stores an issue in the team its state belongs to.
+// seedIssue adds an issue directly to the fake, as another client would, in
+// the team its state belongs to.
 func (h *harness) seedIssue(id, title, state string, labels ...string) {
 	h.fake.mu.Lock()
 	defer h.fake.mu.Unlock()

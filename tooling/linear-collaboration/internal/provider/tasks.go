@@ -177,7 +177,7 @@ func (s *session) create(input any) (any, *collab.Failure) {
 		return nil, collab.Fail(collab.OutcomeUnsupported, reasonStateUnmapped, "Linear has no workflow state type for %s", state)
 	}
 	id := keyedID(s.team.ID, in.IdempotencyKey)
-	requestDigest := digest(createRequest{in.Title, in.Body, in.Labels, state})
+	requestDigest := digest(createRequest{in.Title, in.Body, labelKeys(in.Labels), state})
 
 	existing, failure := s.lookup(id)
 	if failure != nil {
@@ -490,6 +490,17 @@ func (s *session) createLabel(name string) (label, *collab.Failure) {
 }
 
 // sameSet reports whether two lists hold the same values, ignoring order.
+// labelKeys is the set of label names as label resolution sees it: case
+// folded, sorted, without repeats, and empty rather than absent.
+func labelKeys(names []string) []string {
+	keys := make([]string, 0, len(names))
+	for _, name := range names {
+		keys = append(keys, strings.ToLower(name))
+	}
+	sort.Strings(keys)
+	return slices.Compact(keys)
+}
+
 func sameSet(a, b []string) bool {
 	a, b = slices.Clone(a), slices.Clone(b)
 	sort.Strings(a)
