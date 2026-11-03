@@ -1,0 +1,53 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-spec.json",
+  "protocolVersion": 1,
+  "feature": "tooling/linear-collaboration",
+  "outcomes": [
+    "A workspace keeps its work items in one Linear team and its skills speak only the tasks contract",
+    "Linear's workflow states read as the contract's semantic states without any mapping in the binding",
+    "A retry after a lost answer finds the issue the first attempt created instead of creating it again, and an outcome the provider cannot establish is reported as unresolved",
+    "A Linear API key is read from the provider's environment only and appears in no answer, message or log"
+  ],
+  "nonGoals": [
+    "The proposals, memory and missions contracts: Linear holds no change proposals",
+    "The assign, link and claim operations: the tasks contract makes them optional, and this provider leaves them for a later change",
+    "A blocked state: Linear has no workflow state type for it, so a transition to blocked is unsupported",
+    "Detecting a concurrent writer between the read and the write of a checked precondition: Linear has no conditional write",
+    "Serving several teams from one binding",
+    "Running the live proof in the ordinary gate: it mutates a real Linear team and runs only on request"
+  ],
+  "requirements": [
+    {
+      "id": "workflow-state-mapping",
+      "text": "A workflow state of type triage, backlog or unstarted reads as open, started as in_progress, completed as done, and canceled or duplicate as canceled; providerState is the workflow state's name. A transition moves the issue to the first workflow state, by position, of its team that has the target type: unstarted for open, started for in_progress, completed for done and canceled for canceled. A transition to blocked, or to a type the team has no state of, is unsupported, and a task already in the target state is left as it is."
+    },
+    {
+      "id": "idempotent-create",
+      "text": "create gives the issue an id derived from the team and the idempotency key, and records a digest of the request at the end of the description. A repeat with the same key returns the issue it created with created false; the same key with other content is a conflict, idempotency.mismatch. Each write is sent once: after a lost answer or a server error, the provider reads the issue back by its id, and answers unresolved, never retryable, when the read does not establish the outcome. update keeps the recorded digest, and a task's body never shows it."
+    },
+    {
+      "id": "checked-revision",
+      "text": "A task's revision is v and the first 32 hex digits of the SHA-256 of the JSON array of its title, description, workflow state name, sorted label names and sorted assignee ids. update and transition compare expectedRevision with the issue read just before the write and answer conflict, with the current revision, before anything is written; the manifest declares them preconditions checked."
+    },
+    {
+      "id": "named-labels",
+      "text": "Labels are names. A create or update resolves each name, ignoring case, among the labels the team can apply, its own and the workspace's, never a label group; a name no label carries creates that label in the team. labels on update replace the issue's whole label set. find matches tasks that carry every listed label, in the listed states, and whose title or description contains the query, ignoring case."
+    },
+    {
+      "id": "honest-failures",
+      "text": "Failures keep their meaning: a reference another source issued, an id that is not a UUID and an issue Linear does not know are not found; pages follow Linear's cursors, so a traversal lists every issue present throughout it exactly once; a request that never left the process is unavailable and retryable; a rate limit is unavailable, retryable and never repeated; a refused credential is denied; a refused write writes nothing."
+    },
+    {
+      "id": "credential-safety",
+      "text": "The provider reads its API key from LINEAR_API_KEY and from nowhere else; a binding carries no credential. It sends the key only to Linear's API or to a loopback stand-in named by PUTNAMI_LINEAR_API_URL, and removes it, and every string shaped like a Linear key, from everything it writes, including Linear's error messages."
+    },
+    {
+      "id": "truthful-manifest",
+      "text": "The manifest passes the extension protocol's strict validation, offers exactly the tasks operations the runtime answers (find, get, create, update and transition), declares preconditions checked where Linear cannot compare and write in one step, and marks every operation as reaching outside the machine."
+    }
+  ],
+  "decisions": [
+    "tooling/linear-collaboration/doc/adr/0001-linear-collaboration-provider.md",
+    "protocols/collaboration/doc/adr/0001-collaboration-provider-contracts.md"
+  ]
+}

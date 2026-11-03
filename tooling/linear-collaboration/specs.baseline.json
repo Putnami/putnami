@@ -1,0 +1,13 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-specs-baseline.json",
+  "protocolVersion": 2,
+  "executableRequirements": [
+    "tooling/linear-collaboration#checked-revision",
+    "tooling/linear-collaboration#credential-safety",
+    "tooling/linear-collaboration#honest-failures",
+    "tooling/linear-collaboration#idempotent-create",
+    "tooling/linear-collaboration#named-labels",
+    "tooling/linear-collaboration#truthful-manifest",
+    "tooling/linear-collaboration#workflow-state-mapping"
+  ]
+}
