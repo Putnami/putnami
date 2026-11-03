@@ -31,7 +31,7 @@
     },
     {
       "id": "reconciled-writes",
-      "text": "create records the idempotency key as a hidden label and the request's digest as an issue property, in the create call itself. A repeated key returns the ticket it created, even before Jira's search shows it, and the key with other content is a conflict. Every write is sent once; after a lost answer or a 5xx the provider reads Jira back and answers from what it finds, never with a second ticket, and an outcome it cannot establish is unresolved, never retryable, and names what settles it. The idempotency label never appears in a task's labels and a request carrying one is refused."
+      "text": "create records the key as a hidden label and the request digest as an issue property. A repeated key returns its ticket, even before Jira's search shows it; the key with other content is a conflict. Every write is sent once; after a lost answer or a 5xx the provider reads Jira back, never opens a second ticket, and answers an outcome it cannot establish unresolved, naming what settles it. The label never appears in a task's labels, and a request carrying one is refused."
     },
     {
       "id": "honest-failures",
