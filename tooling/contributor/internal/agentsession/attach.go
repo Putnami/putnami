@@ -25,7 +25,11 @@ func Attach(ctx context.Context, e *Env, args []string, stdout, stderr io.Writer
 		_, _ = fmt.Fprintln(stderr, "agent attach: no workspace root")
 		return 2
 	}
-	branch := e.checkoutBranch(ctx, root)
+	branch, err := e.checkoutBranch(ctx, root)
+	if err != nil {
+		_, _ = fmt.Fprintf(stderr, "agent attach: %v\n", err)
+		return 1
+	}
 	if err := declareMissionIssue(e.sessionsDir(), root, branch, issue, e.Now()); err != nil {
 		_, _ = fmt.Fprintf(stderr, "agent attach: %v\n", err)
 		return 1

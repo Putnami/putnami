@@ -150,7 +150,10 @@ func (e *Env) currentSession(ctx context.Context) (files sessionFiles, inSession
 	if root == "" {
 		return files, false, false
 	}
-	branch := e.checkoutBranch(ctx, root)
+	branch, err := e.checkoutBranch(ctx, root)
+	if err != nil {
+		return files, false, false
+	}
 	entries, err := os.ReadDir(e.sessionsDir())
 	if err != nil {
 		return files, false, false

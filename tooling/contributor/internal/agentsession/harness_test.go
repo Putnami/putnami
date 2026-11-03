@@ -5,7 +5,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"errors"
 	"os"
 	"path/filepath"
 	"slices"
@@ -293,7 +292,7 @@ func newHarness(t *testing.T) *harness {
 			case command == "symbolic-ref --short -q HEAD" && h.branch != "":
 				return h.branch, nil
 			}
-			return "", errors.New("exit status 1")
+			return "", gitExit{code: 1}
 		},
 		Now: func() time.Time { return h.now },
 		Sleep: func(_ context.Context, d time.Duration) error {

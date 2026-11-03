@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -98,23 +99,36 @@ func missionTitle(key string) string {
 	return strings.TrimPrefix(key, "branch:")
 }
 
-// checkoutBranch reads the branch of the checkout, or "" on a detached HEAD.
-func (e *Env) checkoutBranch(ctx context.Context, root string) string {
+// checkoutBranch reads the branch of the checkout, or "" on a detached HEAD:
+// the one case where `git symbolic-ref -q` exits with status 1. Any other
+// failure, such as a git that outlives gitTimeout, is an error, never a
+// detached HEAD.
+func (e *Env) checkoutBranch(ctx context.Context, root string) (string, error) {
 	branch, err := e.git(ctx, root, "symbolic-ref", "--short", "-q", "HEAD")
-	if err != nil {
-		return ""
+	var exit gitExit
+	switch {
+	case err == nil:
+		return strings.TrimSpace(branch), nil
+	case errors.As(err, &exit) && exit.code == 1:
+		return "", nil
 	}
-	return strings.TrimSpace(branch)
+	return "", fmt.Errorf("read the branch: %w", err)
 }
 
 // originRepository is the lowercase owner/name of the checkout's origin
-// remote, or "" when origin names no such repository, such as a local path.
-func (e *Env) originRepository(ctx context.Context, root string) string {
+// remote, or "" when origin names no such repository, such as a local path,
+// or when git answers that there is no origin. A git that fails otherwise,
+// such as one past gitTimeout, is an error.
+func (e *Env) originRepository(ctx context.Context, root string) (string, error) {
 	remote, err := e.git(ctx, root, "remote", "get-url", "origin")
-	if err != nil {
-		return ""
+	var exit gitExit
+	switch {
+	case err == nil:
+		return RepositoryFromRemote(remote), nil
+	case errors.As(err, &exit):
+		return "", nil
 	}
-	return RepositoryFromRemote(remote)
+	return "", fmt.Errorf("read the origin remote: %w", err)
 }
 
 // RepositoryFromRemote reads owner/name from a remote URL: scp-like

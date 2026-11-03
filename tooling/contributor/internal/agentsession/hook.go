@@ -327,24 +327,32 @@ type sessionIdentity struct {
 	root, repository, branch string
 }
 
-func (e *Env) readSessionIdentity(ctx context.Context, cwd string) sessionIdentity {
-	root := canonicalRoot(sessionWorkspaceRoot(cwd, e.Root))
-	identity := sessionIdentity{root: root}
+func (e *Env) readSessionIdentity(ctx context.Context, engine string, input hookInput) sessionIdentity {
+	root := canonicalRoot(sessionWorkspaceRoot(input.Cwd, e.Root))
 	if root == "" {
-		return identity
+		return sessionIdentity{}
 	}
-	identity.repository = e.originRepository(ctx, root)
-	identity.branch = e.checkoutBranch(ctx, root)
-	return identity
+	branch, err := e.checkoutBranch(ctx, root)
+	var repository string
+	if err == nil {
+		repository, err = e.originRepository(ctx, root)
+	}
+	if err != nil {
+		// A git that failed leaves the identity unknown: the next event reads
+		// it again.
+		e.log(engine, input.Event, err)
+		return sessionIdentity{}
+	}
+	return sessionIdentity{root: root, repository: repository, branch: branch}
 }
 
 // peekIdentity reads the identity only when the cache has none yet: Stop and
 // StopFailure keep the one SessionStart read.
-func (e *Env) peekIdentity(ctx context.Context, files sessionFiles, input hookInput) *sessionIdentity {
+func (e *Env) peekIdentity(ctx context.Context, engine string, files sessionFiles, input hookInput) *sessionIdentity {
 	if peek, _ := files.read(); peek != nil && peek.Root != "" {
 		return nil
 	}
-	identity := e.readSessionIdentity(ctx, input.Cwd)
+	identity := e.readSessionIdentity(ctx, engine, input)
 	return &identity
 }
 
@@ -401,7 +409,7 @@ func setSessionState(cache *sessionCache, state collab.SessionState, event strin
 // The messages count as delivered once Hook wrote the text.
 func (e *Env) hookSessionStart(ctx context.Context, engine string, input hookInput) (*hookOutput, pendingDelivery, error) {
 	files := e.files(engine, input.SessionID)
-	identity := e.readSessionIdentity(ctx, input.Cwd)
+	identity := e.readSessionIdentity(ctx, engine, input)
 	now := e.Now()
 	if err := lockedUpdate(files, func(cache *sessionCache) (*sessionCache, error) {
 		cache = e.openSession(cache, engine, input, &identity)
@@ -537,7 +545,7 @@ func (e *Env) hookPostToolUse(engine string, input hookInput) error {
 // the next sync reports them.
 func (e *Env) hookStop(ctx context.Context, engine string, input hookInput) (*hookOutput, pendingDelivery, error) {
 	files := e.files(engine, input.SessionID)
-	identity := e.peekIdentity(ctx, files, input)
+	identity := e.peekIdentity(ctx, engine, files, input)
 	now := e.Now()
 	dir := e.sessionsDir()
 	var reason string
@@ -632,7 +640,7 @@ func ownDecisionOpen(cache *sessionCache) bool {
 // error. Claude Code ignores its output and exit code.
 func (e *Env) hookStopFailure(ctx context.Context, engine string, input hookInput) error {
 	files := e.files(engine, input.SessionID)
-	identity := e.peekIdentity(ctx, files, input)
+	identity := e.peekIdentity(ctx, engine, files, input)
 	now := e.Now()
 	if err := lockedUpdate(files, func(cache *sessionCache) (*sessionCache, error) {
 		cache = e.openSession(cache, engine, input, identity)
@@ -652,7 +660,7 @@ func (e *Env) hookStopFailure(ctx context.Context, engine string, input hookInpu
 // exit code.
 func (e *Env) hookSessionEnd(ctx context.Context, engine string, input hookInput) error {
 	files := e.files(engine, input.SessionID)
-	identity := e.peekIdentity(ctx, files, input)
+	identity := e.peekIdentity(ctx, engine, files, input)
 	now := e.Now()
 	if err := lockedUpdate(files, func(cache *sessionCache) (*sessionCache, error) {
 		cache = e.openSession(cache, engine, input, identity)

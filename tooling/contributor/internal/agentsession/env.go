@@ -19,6 +19,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -173,11 +174,21 @@ func runGit(ctx context.Context, dir string, args ...string) (string, error) {
 	command := exec.CommandContext(ctx, "git", append([]string{"-C", dir}, args...)...) // #nosec G204 -- fixed git subcommands.
 	command.Env = childenv.Repository(os.Environ())
 	out, err := command.Output()
+	var exit *exec.ExitError
+	if errors.As(err, &exit) && exit.Exited() {
+		return "", gitExit{code: exit.ExitCode()}
+	}
 	if err != nil {
 		return "", err
 	}
 	return strings.TrimSpace(string(out)), nil
 }
+
+// gitExit is the status of a git command that ran to its end and failed. A
+// git killed at its timeout is not one: it reports the context's error.
+type gitExit struct{ code int }
+
+func (e gitExit) Error() string { return "git exited with status " + strconv.Itoa(e.code) }
 
 func sleepContext(ctx context.Context, d time.Duration) error {
 	if d <= 0 {
@@ -200,5 +211,11 @@ const gitTimeout = 2 * time.Second
 func (e *Env) git(ctx context.Context, dir string, args ...string) (string, error) {
 	gitContext, cancel := context.WithTimeout(ctx, gitTimeout)
 	defer cancel()
-	return e.Git(gitContext, dir, args...)
+	out, err := e.Git(gitContext, dir, args...)
+	if err != nil && gitContext.Err() != nil {
+		// A git stopped at its deadline is a timeout, whatever status the
+		// platform gave the killed process.
+		return "", gitContext.Err()
+	}
+	return out, err
 }

@@ -42,7 +42,7 @@
     },
     {
       "id": "mission-target",
-      "text": "A session reports to issue-<n> once agent attach --issue <n> declared it for the checkout and branch, else to branch:<branch>. The repository is the lowercase owner/name of the origin remote, without host or credential; a local path or a remote without an owner names none. The session store lives under the Putnami home, never in the checkout."
+      "text": "A session reports to issue-<n> once agent attach --issue <n> declared it for the checkout and branch, else to branch:<branch>. The repository is the lowercase owner/name of the origin remote, without host or credential; a local path or a remote without an owner names none. The session store lives under the Putnami home, never in the checkout. A git failure, such as a timeout, is never a detached HEAD: attach fails and the session rereads its identity."
     },
     {
       "id": "host-channel",
