@@ -4,11 +4,13 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"os"
 	"path/filepath"
 	"reflect"
 	"strings"
 	"testing"
+	"time"
 
 	collab "go.putnami.dev/protocol/collaboration"
 	"go.putnami.dev/protocol/features/spectest"
@@ -141,13 +143,39 @@ type provider struct {
 	proposals   map[string]collab.Proposal
 	heads       map[string]string
 	unsupported map[string]bool
-	calls       map[string]int
+	// outcomes answers a call with an outcome other than ok, by
+	// contract.operation, or by tasks.get:<id> for one task.
+	outcomes map[string]collab.Outcome
+	// broken fails a contract.operation with a transport error; hang blocks
+	// it until its context ends.
+	broken map[string]bool
+	hang   map[string]bool
+	calls  map[string]int
 }
 
-func (p *provider) call(_ context.Context, contract, operation string, input json.RawMessage) (collab.Envelope, error) {
-	p.calls[contract+"."+operation]++
+func (p *provider) call(ctx context.Context, contract, operation string, input json.RawMessage) (collab.Envelope, error) {
+	name := contract + "." + operation
+	p.calls[name]++
 	if p.unsupported[contract] {
 		return collab.Envelope{Outcome: collab.OutcomeUnsupported, Error: &collab.Error{Message: contract + " is not bound"}}, nil
+	}
+	if p.broken[name] {
+		return collab.Envelope{}, errors.New("connection reset")
+	}
+	if p.hang[name] {
+		<-ctx.Done()
+		return collab.Envelope{}, ctx.Err()
+	}
+	key := name
+	if name == "tasks.get" {
+		var in collab.TaskRefInput
+		_ = json.Unmarshal(input, &in)
+		if _, one := p.outcomes[name+":"+in.Ref.ID]; one {
+			key = name + ":" + in.Ref.ID
+		}
+	}
+	if outcome, set := p.outcomes[key]; set {
+		return collab.Envelope{Outcome: outcome, Error: &collab.Error{Message: key + " answered " + string(outcome)}}, nil
 	}
 	var result any
 	switch contract + "." + operation {
@@ -203,7 +231,8 @@ func session(stage collab.LoopStage, branch string, tokens int64) collab.Mission
 
 func newProvider() *provider {
 	return &provider{tasks: map[string]collab.TaskState{}, sessions: map[string][]collab.MissionSession{},
-		proposals: map[string]collab.Proposal{}, heads: map[string]string{}, unsupported: map[string]bool{}, calls: map[string]int{}}
+		proposals: map[string]collab.Proposal{}, heads: map[string]string{}, unsupported: map[string]bool{},
+		outcomes: map[string]collab.Outcome{}, broken: map[string]bool{}, hang: map[string]bool{}, calls: map[string]int{}}
 }
 
 func runStatus(t *testing.T, root string, p *provider) (StatusResult, string) {
@@ -418,6 +447,91 @@ func TestASpentEnvelopeLaunchesNothing(t *testing.T) {
 		t.Fatalf("running %d, launchable %+v, text %q; want the ended session to free its slot", result.Running, result.Launchable, text)
 	}
 	spectest.Proves(t, epicFeature, epicStatus, "a-spent-envelope-launches-nothing")
+}
+
+// TestADeniedOrMissingAnswerIsListed stops calling a contract that answered
+// denied, and lists a per-issue not_found with its issue while the other
+// issues are still read.
+func TestADeniedOrMissingAnswerIsListed(t *testing.T) {
+	t.Parallel()
+	root := workspace(t, 2, launch("read-contract", "b/read", "main"))
+	p := newProvider()
+	p.outcomes["proposals.find"] = collab.OutcomeDenied
+	p.outcomes["tasks.get:42"] = collab.OutcomeNotFound
+	result, text := runStatus(t, root, p)
+	if p.calls["proposals.find"] != 1 || p.calls["tasks.get"] != 4 {
+		t.Fatalf("calls %v; want one proposals.find and every task read", p.calls)
+	}
+	want := []Unavailable{
+		{Contract: collab.ContractProposals, Operation: collab.OperationFind, Outcome: string(collab.OutcomeDenied), Message: "proposals.find answered denied"},
+		{Contract: collab.ContractTasks, Operation: collab.OperationGet, Issue: "plan-command", Outcome: string(collab.OutcomeNotFound), Message: "tasks.get:42 answered not_found"},
+	}
+	if !reflect.DeepEqual(result.Unavailable, want) {
+		t.Fatalf("unavailable %+v, want %+v", result.Unavailable, want)
+	}
+	for _, line := range []string{
+		"  proposals.find answered denied: proposals.find answered denied\n",
+		"  tasks.get for plan-command answered not_found: tasks.get:42 answered not_found\n",
+	} {
+		if !strings.Contains(text, line) {
+			t.Errorf("text %q lacks %q", text, line)
+		}
+	}
+}
+
+// TestATransportErrorStopsTheStatus exits 1 when a provider cannot be
+// reached: a status built on a partial read would look complete.
+func TestATransportErrorStopsTheStatus(t *testing.T) {
+	t.Parallel()
+	root := workspace(t, 2)
+	p := newProvider()
+	p.broken["missions.status"] = true
+	var stdout, stderr bytes.Buffer
+	command := StatusCommand{Root: root, Repository: "acme/app", Call: p.call, Stdout: &stdout, Stderr: &stderr}
+	if code := command.Run(context.Background(), []string{"--epic", "40"}); code != 1 || stdout.Len() != 0 ||
+		!strings.Contains(stderr.String(), "missions.status: connection reset") {
+		t.Fatalf("exit %d, stdout %q, stderr %q", code, stdout.String(), stderr.String())
+	}
+}
+
+// TestTheReadStopsAtItsBudget lists what it read once the budget runs out,
+// and names the call where it stopped.
+func TestTheReadStopsAtItsBudget(t *testing.T) {
+	t.Parallel()
+	root := workspace(t, 2, launch("read-contract", "b/read", "main"))
+	p := newProvider()
+	p.hang["proposals.find"] = true
+	var stdout, stderr bytes.Buffer
+	command := StatusCommand{Root: root, Repository: "acme/app", Call: p.call, Budget: 200 * time.Millisecond, Stdout: &stdout, Stderr: &stderr}
+	if code := command.Run(context.Background(), []string{"--epic", "40"}); code != 0 {
+		t.Fatalf("exit %d, stderr %q", code, stderr.String())
+	}
+	if !strings.Contains(stdout.String(), "Not read\n  proposals.find for read-contract answered unavailable: the status stopped reading after 200ms\n") {
+		t.Fatalf("stdout %q", stdout.String())
+	}
+	if p.calls["proposals.find"] != 1 {
+		t.Fatalf("calls %v; want no call after the budget ran out", p.calls)
+	}
+}
+
+// TestAClosedDependencyBlocksItsDependents names the dependency closed
+// without a merge on each issue that waits for it, and launches none of them.
+func TestAClosedDependencyBlocksItsDependents(t *testing.T) {
+	t.Parallel()
+	root := workspace(t, 2, launch("read-contract", "b/read", "main"), launch("plan-command", "b/plan", "main"))
+	p := newProvider()
+	p.proposals["b/read"] = proposal("101", "b/read", collab.ProposalStateClosed)
+	p.proposals["b/plan"] = proposal("102", "b/plan", collab.ProposalStateMerged)
+	result, text := runStatus(t, root, p)
+	if status := issueByKey(t, result, "status-command"); !reflect.DeepEqual(status.BlockedBy, []string{"read-contract"}) {
+		t.Fatalf("status-command %+v", status)
+	}
+	if len(result.Launchable) != 0 || !strings.Contains(text, "blocked: read-contract closed without a merge") {
+		t.Fatalf("launchable %+v, text %q", result.Launchable, text)
+	}
+	if skill := issueByKey(t, result, "skill"); skill.BlockedBy != nil {
+		t.Fatalf("skill %+v; only a direct dependency blocks", skill)
+	}
 }
 
 // TestALaunchRecordIsChecked refuses a launch record that names an unknown
