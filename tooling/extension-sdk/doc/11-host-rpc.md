@@ -54,8 +54,9 @@ path is relative to. `Projects` are `wsproto.MergedProject` values sorted by
 `Path`, each with its `SourceName`, its `SourceFile` and its `Dependencies` as
 project paths. A probe that fails or answers outside its contract is an error
 in `Diagnostics`, with the failure kind as `Code` and the extension as
-`Field`, and the other probes' projects stay in the answer: report it, and do
-not fail the command for it. `Projects` and `Diagnostics` are empty slices,
+`Field`: report it, and do not fail the command for it. Outside a workspace
+the other probes' projects stay in the answer; inside one, a failed probe
+leaves no project, because the workspace view is complete or absent. `Projects` and `Diagnostics` are empty slices,
 never nil. If the answer names no root, or lists a path twice or out of order,
 `WorkspaceProbe` returns an error and the client stays usable.
 

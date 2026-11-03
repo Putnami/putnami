@@ -113,7 +113,7 @@ func PrepareWorkspaceGraph(
 	})
 	if err != nil {
 		// A reader serves a graph the workspace refuses to plan over.
-		return workspace.ReadableRefusal(err)
+		return workspace.ReadableRefusal(ws, err)
 	}
 	ws.AdoptProbeView(outcome.Merged)
 	return outcome, nil

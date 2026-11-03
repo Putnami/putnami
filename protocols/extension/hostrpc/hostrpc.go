@@ -327,9 +327,10 @@ type WorkspaceProbeResult struct {
 	// is an empty array, never null.
 	Projects []wsproto.MergedProject `json:"projects"`
 	// Diagnostics are the probes' findings. A probe that fails or answers
-	// outside its contract, and a merge conflict, are Error diagnostics here:
-	// the call still answers, with the projects of the other probes. It is an
-	// empty array, never null.
+	// outside its contract, and a merge conflict, are Error diagnostics here,
+	// never a refused call. Outside a workspace the other probes' projects
+	// stay in the answer; inside one, the workspace view is complete or
+	// absent. It is an empty array, never null.
 	Diagnostics []diag.Diagnostic `json:"diagnostics"`
 }
 

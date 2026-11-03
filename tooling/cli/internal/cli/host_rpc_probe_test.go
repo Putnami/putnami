@@ -186,3 +186,29 @@ func TestHostRPC_WorkspaceProbeIsUnavailableWithoutADirectory(t *testing.T) {
 		t.Fatalf("workspace.probe without a directory = %v, want unavailable", err)
 	}
 }
+
+func TestHostRPC_WorkspaceProbeAsksAboutTheCallersDirectoryItself(t *testing.T) {
+	t.Parallel()
+	spectest.Proves(t, hostRPCFeature, hostRPCWorkspaceProbe, "workspace-probe-answers-the-user-scope-probes-outside-a-workspace")
+	callerDir := t.TempDir()
+	writeParityFile(t, callerDir, "go.mod", "module example.com/single\n")
+	module := probeFixtureExtension(t, "@acme/go", "go.mod",
+		`{"version":1,"extension":"@acme/go","projects":[{"path":".","sourceName":"example.com/single","sourceFile":"go.mod"}]}`)
+	// The probe answers only a request whose candidates hold the caller's
+	// directory itself.
+	script := "#!/bin/sh\ncase \"$(cat)\" in *'\"paths\":[\".\"]'*) exec " + module.RuntimeExecutable + " </dev/null ;; esac\n" +
+		"echo 'the request names no root candidate' >&2\nexit 4\n"
+	gate := filepath.Join(t.TempDir(), "probe")
+	if err := os.WriteFile(gate, []byte(script), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	module.RuntimeExecutable = gate
+	result, err := dialHostRPC(t, userScopeProbeBinding(t, callerDir, module)).WorkspaceProbe(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(result.Diagnostics) != 0 || len(result.Projects) != 1 || result.Projects[0].Path != "." ||
+		result.Projects[0].SourceName != "example.com/single" {
+		t.Fatalf("WorkspaceProbe = %+v, want the module rooted at the caller's directory", result)
+	}
+}

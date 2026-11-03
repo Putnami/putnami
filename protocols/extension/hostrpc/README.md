@@ -104,16 +104,20 @@ merges them.
 - Outside a workspace, `root` is the directory the command runs in. The host
   scans it for the markers of the extensions pinned in the user scope, runs
   each one's probe there over the probe transport, and merges the answers with
-  no explicit project. It writes nothing in that directory: no index and no
-  lock. A directory with no marker gets no project and runs no probe.
+  no explicit project. The candidates are that directory itself, as `.`, and
+  every directory below it that holds a marker. The host writes nothing in that
+  directory: no index and no lock.
 
-A probe that fails, times out or answers outside its contract is an error
-diagnostic of the answer, whose `code` is the failure kind (such as
-`transport`) and whose `field` names the extension, and the other probes'
-projects stay in the answer. A merge conflict is an error diagnostic too, and
-the field the providers disagree on stays empty. The call itself fails only
-when the host cannot read the directory (`-32603`). Both `projects` and
-`diagnostics` are `[]` when empty.
+Outside a workspace, a probe that fails, times out or answers outside its
+contract is an error diagnostic of the answer, whose `code` is the failure kind
+(such as `transport`) and whose `field` names the extension, and the other
+probes' projects stay in the answer. A merge conflict is an error diagnostic
+too, and the field the providers disagree on stays empty. Inside a workspace,
+the workspace view is complete or absent: a failed probe or a merge conflict
+is an error diagnostic with no project, while an import-visibility or
+declared-edge refusal answers the recorded view with its findings. The call
+itself fails only when the host cannot read the directory (`-32603`). Both
+`projects` and `diagnostics` are `[]` when empty.
 
 `version.lines` reports the workspace's version lines as the core computes
 them. The `putnami version get` and `putnami version tag` commands of

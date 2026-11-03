@@ -203,12 +203,13 @@ func workspaceViewProbe(ctx context.Context, root string, extensions []*extensio
 // user scope's synthetic workspace, where the providers' runtimes are
 // prepared.
 //
-// The candidates are the directories under dir that carry one of the
-// providers' markers. Nothing is written in dir: no snapshot and no lock. A
-// provider that fails or answers outside its contract is an error diagnostic,
-// and the other providers' projects stay in the answer; a merge conflict is an
-// error diagnostic on the field it leaves empty. Only a failed scan of dir
-// fails the call.
+// The candidates are dir itself, as a workspace sync always asks about its
+// root, and the directories under dir that carry one of the providers'
+// markers. Nothing is written in dir: no snapshot and no lock. A provider that
+// fails or answers outside its contract is an error diagnostic, and the other
+// providers' projects stay in the answer; a merge conflict is an error
+// diagnostic on the field it leaves empty. Only a directory that cannot be
+// read fails the call.
 func probeDirectory(
 	ctx context.Context,
 	ws *workspace.Workspace,
@@ -220,16 +221,18 @@ func probeDirectory(
 	for i, binding := range bindings {
 		scopes[i] = binding.Scope
 	}
-	candidates, err := workspace.ScanProjectPathsWithProviders(dir, scopes)
+	if _, err := os.ReadDir(dir); err != nil {
+		return hostrpcproto.WorkspaceProbeResult{}, err
+	}
+	scanned, err := workspace.ScanProjectPathsWithProviders(dir, scopes)
 	if err != nil {
 		return hostrpcproto.WorkspaceProbeResult{}, err
 	}
+	candidates := append([]string{wsproto.ProbeRootPath}, scanned...)
+	slices.Sort(candidates)
 	result := hostrpcproto.WorkspaceProbeResult{Root: dir, Diagnostics: []diag.Diagnostic{}}
 	answers := make([]wsproto.ProbeResult, 0, len(bindings))
 	for _, binding := range bindings {
-		if len(candidates) == 0 {
-			break
-		}
 		outcome, err := workspace.RunProbe([]workspace.ProbeProvider{binding.Provider}, wsproto.ProbeRequest{
 			Reason:            wsproto.ProbeReasonLoad,
 			Paths:             candidates,
