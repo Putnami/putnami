@@ -295,9 +295,10 @@ func projectVersion(manifest toml.Table) string {
 	return firstNonEmpty(toml.String(manifest, "project", "version"), toml.String(manifest, "tool", "poetry", "version"))
 }
 
-// edges returns the directories of the components c depends on: through its
-// own uv sources, through the workspace root's for a dependency it declares,
-// and through its Poetry path dependencies.
+// edges returns the directories of the components c depends on: for each
+// dependency it declares, through its own uv source, else through the
+// workspace root's for a member, as uv applies them; and through its Poetry
+// path dependencies.
 func edges(c *component, ws workspace, byDir map[string]*component, byName map[string]string) []string {
 	var deps []string
 	add := func(dir string) {
@@ -305,16 +306,21 @@ func edges(c *component, ws workspace, byDir map[string]*component, byName map[s
 			deps = append(deps, dir)
 		}
 	}
+	declared := declaredDependencies(c.manifest)
 	own, _ := toml.Get(c.manifest, "tool", "uv", "sources").(toml.Table)
+	ownNames := map[string]bool{}
 	for name, value := range own {
+		ownNames[normalize(name)] = true
+		if !declared[normalize(name)] {
+			continue
+		}
 		for _, source := range sourceTables(value) {
 			add(resolveSource(c.dir, name, source, byName))
 		}
 	}
-	if c.meta.Source == SourceWorkspace && c.dir != wsproto.ProbeRootPath {
-		declared := declaredDependencies(c.manifest)
+	if c.meta.Source == SourceWorkspace {
 		for name, value := range ws.sources {
-			if _, overridden := own[name]; overridden || !declared[normalize(name)] {
+			if ownNames[normalize(name)] || !declared[normalize(name)] {
 				continue
 			}
 			for _, source := range sourceTables(value) {

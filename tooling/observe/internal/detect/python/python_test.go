@@ -81,7 +81,7 @@ shared = { workspace = true }
 	"services/legacy/pyproject.toml":         "[project]\nname = \"legacy\"\ndependencies = [\"shared\"]\n",
 	"services/notes.md":                      "not a member\n",
 	"libs/shared/pyproject.toml":             "[project]\nname = \"shared\"\nversion = \"0.2.0\"\n",
-	"tools/pyproject.toml":                   "[project]\nname = \"tools\"\n\n[tool.uv.sources]\nshared = { path = \"../libs/shared\", editable = true }\n",
+	"tools/pyproject.toml":                   "[project]\nname = \"tools\"\ndependencies = [\"shared\"]\n\n[tool.uv.sources]\nshared = { path = \"../libs/shared\", editable = true }\n",
 	".venv/lib/pyproject.toml":               "[project]\nname = \"venv-copy\"\n",
 	"node_modules/x/pyproject.toml":          "[project]\nname = \"node-copy\"\n",
 	"libs/shared/__pycache__/pyproject.toml": "[project]\nname = \"cache\"\n",
@@ -219,15 +219,20 @@ func TestAUVWorkspaceSourceIsAnEdge(t *testing.T) {
 		"pyproject.toml":         "[tool.uv.workspace]\nmembers = [\"*\"]\n",
 		"app/pyproject.toml":     "[project]\nname = \"app\"\ndependencies = [\"core-lib\"]\n\n[tool.uv.sources]\nCore_Lib = [\n  { workspace = true, marker = \"sys_platform == 'linux'\" },\n]\n",
 		"core/pyproject.toml":    "[project]\nname = \"core.lib\"\n",
-		"self/pyproject.toml":    "[project]\nname = \"self\"\n\n[tool.uv.sources]\nself = { workspace = true }\n",
-		"unknown/pyproject.toml": "[project]\nname = \"unknown\"\n\n[tool.uv.sources]\nmissing = { workspace = true }\n",
+		"self/pyproject.toml":    "[project]\nname = \"self\"\ndependencies = [\"self\"]\n\n[tool.uv.sources]\nself = { workspace = true }\n",
+		"unknown/pyproject.toml": "[project]\nname = \"unknown\"\ndependencies = [\"missing\"]\n\n[tool.uv.sources]\nmissing = { workspace = true }\n",
+		// A source for a dependency the project does not declare is no edge.
+		"undeclared/pyproject.toml": "[project]\nname = \"undeclared\"\n\n[tool.uv.sources]\ncore-lib = { workspace = true }\n",
 	})
 	projects = byPath(t, Detect(root))
 	if got := projects["app"].Dependencies; !reflect.DeepEqual(got, []string{"core"}) {
 		t.Errorf("app depends on %v", got)
 	}
-	if projects["self"].Dependencies != nil || projects["unknown"].Dependencies != nil {
-		t.Errorf("self %v, unknown %v", projects["self"].Dependencies, projects["unknown"].Dependencies)
+	for _, dir := range []string{"self", "unknown", "undeclared"} {
+		if projects[dir].Dependencies != nil {
+			t.Errorf("%s depends on %v", dir, projects[dir].Dependencies)
+		}
+
 	}
 }
 
@@ -275,7 +280,7 @@ func TestARegistryDependencyIsNoEdge(t *testing.T) {
 	root := writeTree(t, map[string]string{
 		"app/pyproject.toml": `[project]
 name = "app"
-dependencies = ["requests>=2", "lib"]
+dependencies = ["requests>=2", "lib", "outside", "absolute", "nothing"]
 
 [tool.uv.sources]
 requests = { index = "internal" }

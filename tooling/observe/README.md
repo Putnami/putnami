@@ -59,6 +59,8 @@ See [doc/04-node-workspaces.md](doc/04-node-workspaces.md) for how it reads the
 packages of an npm, pnpm or yarn workspace.
 See [doc/05-go-modules.md](doc/05-go-modules.md) for how it reads the modules,
 edges and dependency versions of a Go repository.
+See [doc/07-python.md](doc/07-python.md) for how it reads the projects and
+edges of a Python repository, from a uv workspace or `pyproject.toml` files.
 See [doc/06-change-analyses.md](doc/06-change-analyses.md) for how it maps a
 change to components, tests, coverage and dependencies.
 
