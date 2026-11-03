@@ -136,12 +136,12 @@
   },
   "extensions": {
     "@putnami/intelligence": {
-      "version": "0.0.0-20261102101325-5db6b5b44",
+      "version": "0.0.0-20261103122210-de57820b5",
       "integrities": {
-        "darwin/arm64": "9f385736c693ca413bf26aeac8b8f4e50c37628adb5ca8e6dc625c1c4c98ebb9"
+        "darwin/arm64": "996add0695cb5d992f01909e54fa9c20348adfc19ac072f26f7cbb891a85a5fe"
       },
-      "manifestHash": "862ed6f667e01ffc3bf8074045c9e0d512b10d3fa60b60a0e7dc640784bcb3f0",
-      "source": "https://put.putnami.dev/putnami/intelligence/download?channel=0.0.0-20261102101325-5db6b5b44"
+      "manifestHash": "87bea632c635cda4a7e6b3460a7f1c26da062d04af3695d4ef9f1477b402ffbb",
+      "source": "https://put.putnami.dev/putnami/intelligence/download?channel=0.0.0-20261103122210-de57820b5"
     }
   },
   "templates": {}
