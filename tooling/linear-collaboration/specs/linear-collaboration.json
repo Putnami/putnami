@@ -19,11 +19,11 @@
   "requirements": [
     {
       "id": "workflow-state-mapping",
-      "text": "A workflow state of type triage, backlog or unstarted reads as open, started as in_progress, completed as done, and canceled or duplicate as canceled; providerState is the workflow state's name. A transition moves the issue to the first workflow state, by position, of its team that has the target type: unstarted for open, started for in_progress, completed for done and canceled for canceled. A transition to blocked, or to a type the team has no state of, is unsupported, and a task already in the target state is left as it is."
+      "text": "Workflow state types triage, backlog and unstarted read as open, started as in_progress, completed as done, and canceled or duplicate as canceled; providerState is the state's name. A transition moves the issue to its team's first state, by position, of the target type: unstarted for open, started for in_progress, completed for done, canceled for canceled. A transition to blocked, or to a type the team has no state of, is unsupported, and a task already in the target state is left as it is."
     },
     {
       "id": "idempotent-create",
-      "text": "create gives the issue an id derived from the team and the idempotency key, and records a digest of the request at the end of the description. A repeat with the same key returns the issue it created with created false; the same key with other content is a conflict, idempotency.mismatch. Each write is sent once: after a lost answer or a server error, the provider reads the issue back by its id, and answers unresolved, never retryable, when the read does not establish the outcome. update keeps the recorded digest, and a task's body never shows it."
+      "text": "create derives the issue id from the team and the idempotency key, and records a digest of the request at the end of the description. A repeat with the same key returns that issue, created false; the same key with other content is a conflict, idempotency.mismatch. Each write is sent once: after a lost answer or a server error, the provider reads the issue back by id, and answers unresolved, never retryable, when that read settles nothing. update keeps the digest; a task's body never shows it."
     },
     {
       "id": "checked-revision",
