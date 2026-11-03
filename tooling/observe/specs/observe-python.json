@@ -1,0 +1,38 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-spec.json",
+  "protocolVersion": 1,
+  "feature": "tooling/observe-python",
+  "outcomes": [
+    "In a Python repository, each project of the uv workspace and each other pyproject.toml project is a component, named by its directory and its project name, without a Putnami file",
+    "Each changed file maps to the project that holds it, and each project lists the repository projects its local sources name, so a change to a shared library marks the services that use it as dependent",
+    "In a repository that mixes a uv workspace with a pnpm front end, the Python and Node components sit side by side in one analysis"
+  ],
+  "nonGoals": [
+    "Running uv, Poetry, pip or pytest, or reading a virtual environment",
+    "Computing the changed and dependent components, the tests and coverage per component, the changed-line coverage and the lockfile diff: the change analyses own them",
+    "Serving the probe from its own extension: the detector lives in @putnami/observe until the CLI can run a workspace probe outside a workspace",
+    "Projects that only setup.py, setup.cfg, requirements.txt or a Pipfile declare, and edges that a PEP 508 direct reference such as name @ file:///path declares"
+  ],
+  "requirements": [
+    {
+      "id": "python-projects-are-components",
+      "text": "Walking past .git, node_modules, vendor, __pycache__, site-packages and hidden directories, each directory the root [tool.uv.workspace] members globs match, less its exclude globs, that holds a pyproject.toml is a component of source workspace, and so is a root with a [project] table. Each other pyproject.toml with a [project] or [tool.poetry] table is one of source manifest. Its id is its directory, its name the project name, its ecosystem python. A pyproject.toml that does not parse is a diagnostic."
+    },
+    {
+      "id": "python-project-edges",
+      "text": "A component depends on another when its [tool.uv.sources], or the root's for a dependency the component declares, gives a dependency workspace = true, matched by normalized project name, or a local path resolved against its directory; or when a Poetry dependency table, main, dev or group, gives a dependency a local path. A registry, git or URL dependency, a path outside the repository or to no component, and the component itself are no edge."
+    },
+    {
+      "id": "python-probe-answer",
+      "text": "The detection is a workspace probe answer under the @putnami/observe extension name: one project per component in path order, its project name and pyproject.toml as source name and source file, its dependencies as component paths, and as watched files its pyproject.toml and the uv.lock or poetry.lock beside it, else the workspace's uv.lock at the root. The answer passes the probe protocol's strict validation, so the detector can move to its own extension without a contract change."
+    },
+    {
+      "id": "python-change-analysis",
+      "text": "On a repository whose uv workspace holds an api and a worker that depend on a shared library, beside a pnpm front end, the analyses list the four components with the edges to shared; a change to shared marks api and worker dependent; the pytest JUnit cases and the lines of the pytest-cov coverage.xml land on the Python components, with no unattributed case and no unmapped file; and a uv.lock bump is a pypi dependency change that carries its state from a CycloneDX SBOM."
+    }
+  ],
+  "decisions": [
+    "tooling/cli/doc/adr/0051-user-scope-extensions-run-without-a-workspace.md",
+    "protocols/evidence/doc/adr/0001-one-self-reported-change-evidence-document.md"
+  ]
+}

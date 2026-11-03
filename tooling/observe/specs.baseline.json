@@ -37,6 +37,10 @@
     "tooling/observe-nx#configuration",
     "tooling/observe-nx#graph-export",
     "tooling/observe-nx#probe-wire",
+    "tooling/observe-python#python-change-analysis",
+    "tooling/observe-python#python-probe-answer",
+    "tooling/observe-python#python-project-edges",
+    "tooling/observe-python#python-projects-are-components",
     "tooling/observe-upload#upload-fails-open",
     "tooling/observe-upload#upload-hands-the-document-to-the-reporter"
   ]
