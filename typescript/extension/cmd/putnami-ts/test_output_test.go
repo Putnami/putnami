@@ -125,6 +125,22 @@ func TestEmitTestTranscriptVerboseChangesVisibilityOnly(t *testing.T) {
 	}
 }
 
+// A batched generate tags each hook log with its member project, so the CLI's
+// batch split records it under that project.
+func TestBatchMemberLogsNameTheMember(t *testing.T) {
+	spectest.Proves(t, "typescript/typescript-project-toolchain", "hook-logs-reach-the-task-output", "a-batched-hook-log-names-its-member")
+	events := captureEvents(t, func() {
+		batchMemberLogs(jsonl.New(), "/a")("warn", "no React app directory")
+	})
+	if len(events) != 1 || events[0]["type"] != "log" || events[0]["level"] != "warn" || events[0]["message"] != "no React app directory" {
+		t.Fatalf("events = %+v, want one warn log", events)
+	}
+	contextData, ok := events[0]["context"].(map[string]any)
+	if !ok || len(contextData) != 1 || contextData[protocolcli.BatchProjectLogContextKey] != "/a" {
+		t.Fatalf("context = %#v, want exact %s=/a", events[0]["context"], protocolcli.BatchProjectLogContextKey)
+	}
+}
+
 func TestBoundTestFailureDiagnosticsKeepsRuneSafeAccounting(t *testing.T) {
 	spectest.Proves(t, "typescript/typescript-project-toolchain", "bounded-test-output", "failure-diagnostics-are-bounded-with-omission-accounting")
 	t.Parallel()

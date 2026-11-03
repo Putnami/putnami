@@ -35,7 +35,7 @@ func runBuildGenerate(ctx *pctx.Context, emit *jsonl.Emitter, args []string) (st
 	projectPath := filepath.Join(ctx.WorkspaceRoot, ctx.Project.Path)
 
 	emit.PhaseStart("generate")
-	genResult, err := doGenerate(ctx, emit, projectPath)
+	genResult, err := doGenerate(ctx, emit, projectPath, emit.Log)
 	if err != nil {
 		emit.PhaseEnd("generate", "failed")
 		for _, d := range generateDiagnostics(err) {
@@ -106,8 +106,9 @@ func generatedClientOutput(projectPath string) (string, bool) {
 	return cfg.TS.Output, true
 }
 
-// doGenerate runs the full generate phase.
-func doGenerate(ctx *pctx.Context, emit *jsonl.Emitter, projectPath string) (*build.GenerateResult, error) {
+// doGenerate runs the full generate phase. hookLogs receives the log events of
+// the pre-build hooks.
+func doGenerate(ctx *pctx.Context, emit *jsonl.Emitter, projectPath string, hookLogs hooks.LogSink) (*build.GenerateResult, error) {
 	mode := ctx.Params.String("mode")
 	if mode == "" {
 		mode = "build"
@@ -151,7 +152,7 @@ func doGenerate(ctx *pctx.Context, emit *jsonl.Emitter, projectPath string) (*bu
 	if err := infra.ClearGeneratedRequirementSidecars(projectPath); err != nil {
 		return nil, errs.Wrapf(err, errs.CodeGenerateFailed, "clearing generated infra requirements")
 	}
-	hookResult, err := hooks.RunHooks(ctx.WorkspaceRoot, projectPath, ctx.Project.Name, hooks.HookPreBuild, mode, bunBin, ctx.Params.Bool("debug", false), nil)
+	hookResult, err := hooks.RunHooks(ctx.WorkspaceRoot, projectPath, ctx.Project.Name, hooks.HookPreBuild, mode, bunBin, ctx.Params.Bool("debug", false), nil, hookLogs)
 	if err != nil {
 		return nil, errs.Wrapf(err, errs.CodeGenerateFailed, "pre-build hooks")
 	}
