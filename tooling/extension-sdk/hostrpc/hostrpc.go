@@ -29,7 +29,9 @@ import (
 	"sync"
 	"time"
 
+	diag "go.putnami.dev/protocol/diagnostic"
 	wire "go.putnami.dev/protocol/extension/hostrpc"
+	wsproto "go.putnami.dev/protocol/workspace"
 )
 
 // NoHostError is the error of Dial when the environment names no channel.
@@ -210,6 +212,39 @@ func (c *Client) WorkspaceOwners(ctx context.Context, paths []string) ([]wire.Pa
 		}
 	}
 	return result.Owners, nil
+}
+
+// WorkspaceProbe returns the projects and dependency edges the workspace
+// probes declare, merged as the workspace view merges them and sorted by path,
+// relative to the result's Root. Inside a workspace the host answers the
+// workspace's synchronized view; outside one it runs the probes of the user
+// scope's extensions on the caller's directory and writes nothing there. A
+// probe that fails or answers outside its contract, and a merge conflict, are
+// error diagnostics of the result, not an error of the call. Projects and
+// Diagnostics are empty slices, never nil, when the host found none. The
+// client returns an error, leaving the client usable, when the answer names no
+// root, or holds projects out of path order or a path twice.
+func (c *Client) WorkspaceProbe(ctx context.Context) (wire.WorkspaceProbeResult, error) {
+	var result wire.WorkspaceProbeResult
+	if err := c.call(ctx, wire.MethodWorkspaceProbe, wire.WorkspaceProbeParams{}, &result); err != nil {
+		return wire.WorkspaceProbeResult{}, err
+	}
+	if result.Root == "" {
+		return wire.WorkspaceProbeResult{}, errors.New("putnami host RPC workspace.probe answered no root")
+	}
+	for i := 1; i < len(result.Projects); i++ {
+		if result.Projects[i-1].Path >= result.Projects[i].Path {
+			return wire.WorkspaceProbeResult{}, fmt.Errorf("putnami host RPC workspace.probe answered the project %q after %q, out of path order",
+				result.Projects[i].Path, result.Projects[i-1].Path)
+		}
+	}
+	if result.Projects == nil {
+		result.Projects = []wsproto.MergedProject{}
+	}
+	if result.Diagnostics == nil {
+		result.Diagnostics = []diag.Diagnostic{}
+	}
+	return result, nil
 }
 
 // call sends one request and decodes its result into result. The host's

@@ -373,7 +373,7 @@ func TestVerifyStagedExtensionContentRefusesAnyDrift(t *testing.T) {
 }
 
 func TestWriteExtensionArchiveWritesThePackagedBytes(t *testing.T) {
-	spectest.Proves(t, "tooling/extension-authoring", "agent-content-packaging", "a-content-only-extension-packages-with-the-additive-stamp")
+	spectest.Proves(t, "tooling/extension-authoring", "agent-content-packaging", "a-content-only-extension-packages-the-built-tree-and-the-contribution-form")
 	pkg, err := PackageExtension(newContentExtension(t, ""), "1.0.0")
 	if err != nil {
 		t.Fatal(err)

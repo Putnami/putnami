@@ -8,6 +8,7 @@ require (
 	// features is TEST-ONLY: spectest binds the conformance tests to the
 	// requirements of extension/manifest-contract.
 	go.putnami.dev/protocol/features v0.0.0
+	go.putnami.dev/protocol/workspace v0.0.0
 )
 
 replace go.putnami.dev/protocol/capabilities => ../capabilities
@@ -23,3 +24,5 @@ replace go.putnami.dev/protocol/features => ../features
 // The range starts at the -0 prerelease floor so the v0.1.x-<sha> candidate
 // versions are covered too (a prerelease sorts below its release).
 retract [v0.1.0-0, v0.1.99999] // Pre-open-source builds; public history starts at v0.2.0.
+
+replace go.putnami.dev/protocol/workspace => ../workspace

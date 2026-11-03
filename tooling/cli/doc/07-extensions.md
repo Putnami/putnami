@@ -1100,6 +1100,14 @@ context carries `userScope.callerDir`, and the environment carries
 `PUTNAMI_CALLER_DIR`. Either tells the extension that no workspace exists; see
 [Process Setup](04-job-execution.md#process-setup).
 
+The command's host RPC channel has no workspace to answer from, so its
+workspace methods are unavailable, except `workspace.probe`: it scans the
+invoking directory for the markers of the user scope's extensions, runs their
+workspace probes there, and returns the projects and dependency edges they
+declare, merged. It writes nothing in that directory, and a failed probe is a
+diagnostic of the answer
+([host RPC protocol](../../../protocols/extension/hostrpc/README.md)).
+
 Any interactive launch, in a workspace or not, also carries `invocationDir` and
 `PUTNAMI_INVOCATION_DIR`, the directory the command was typed in; an extension
 resolves a relative path argument against it with `context.ResolvePath` of the

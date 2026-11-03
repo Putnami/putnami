@@ -56,7 +56,7 @@ func TestWorkspaceProviderBindings_OnlyAdapterDeclaringExtensions(t *testing.T) 
 		nil,
 	}}
 
-	bindings := workspaceProviderBindings(context.Background(), ws, discovered, nil)
+	bindings := WorkspaceProviderBindings(context.Background(), ws, ws.Root, discovered, nil)
 	if len(bindings) != 1 {
 		t.Fatalf("bindings = %d, want only the adapter-declaring, well-formed extension: %+v", len(bindings), bindings)
 	}
@@ -77,7 +77,7 @@ func TestWorkspaceProviderBindings_DeferRuntimePreparation(t *testing.T) {
 		}},
 	}}
 
-	bindings := workspaceProviderBindings(context.Background(), ws, discovered, nil)
+	bindings := WorkspaceProviderBindings(context.Background(), ws, ws.Root, discovered, nil)
 	provider, ok := bindings[0].Provider.(*workspace.ExecProbeProvider)
 	if !ok {
 		t.Fatalf("provider = %T, want the exec-backed one", bindings[0].Provider)

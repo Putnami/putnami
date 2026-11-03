@@ -12,6 +12,7 @@ a Unix socket. It does not start `putnami` again.
 | `collaboration.call` | `CallCollaboration(ctx, contract, operation, input)` | The envelope `putnami <contract> <operation> --output=json` prints for the same input, byte for byte. |
 | `verification.report` | `VerificationReport(ctx, ref)` | The bytes of a verification report a successful cached test run produced, once the host's cache corroborates them. |
 | `workspace.owners` | `WorkspaceOwners(ctx, paths)` | One entry for each path, in the order you gave, with the projects that own it. |
+| `workspace.probe` | `WorkspaceProbe(ctx)` | The projects and dependency edges the workspace probes declare, merged, with the probes' diagnostics. It also works outside a workspace. |
 | `version.lines` | `VersionLines(ctx, scope)` | The workspace's version lines as the core computes them, and the commit the run is bound to. |
 
 That is the whole list. The host answers any other method with
@@ -42,6 +43,25 @@ returns an error and the client stays usable.
 
 ```go
 owners, err := client.WorkspaceOwners(ctx, []string{"tooling/cli/main.go", "README.md"})
+```
+
+`workspace.probe` gives an extension the project graph the workspace probes
+declare, without parsing a manifest itself. Inside a workspace it is the
+workspace's own view. Outside one, in a user-scope command, the host runs the
+probes of the extensions pinned in the user scope on the directory the command
+runs in, and writes nothing there. `Root` is the absolute directory every
+path is relative to. `Projects` are `wsproto.MergedProject` values sorted by
+`Path`, each with its `SourceName`, its `SourceFile` and its `Dependencies` as
+project paths. A probe that fails or answers outside its contract is an error
+in `Diagnostics`, with the failure kind as `Code` and the extension as
+`Field`: report it, and do not fail the command for it. Outside a workspace
+the other probes' projects stay in the answer; inside one, a failed probe
+leaves no project, because the workspace view is complete or absent. `Projects` and `Diagnostics` are empty slices,
+never nil. If the answer names no root, or lists a path twice or out of order,
+`WorkspaceProbe` returns an error and the client stays usable.
+
+```go
+probed, err := client.WorkspaceProbe(ctx)
 ```
 
 `version.lines` gives an extension the versions the core computes, so it never

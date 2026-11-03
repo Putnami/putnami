@@ -238,6 +238,10 @@
       "text": "version.lines answers the bound source revision and, for each version line or the one its scope names, the line's version at HEAD, whether HEAD carries the line's tag, the line's next release and the commits since the last release. After a failed graph refresh it names the recorded graph it used. A scope naming no line is invalid params, an invalid catalog or source revision is an invalid configuration, outside a workspace it is unavailable, and a git failure is a host error."
     },
     {
+      "id": "host-rpc-workspace-probe",
+      "text": "workspace.probe answers a root and the projects and edges the workspace probes declare under it, merged as the workspace view merges them, sorted by path. In a workspace it answers the workspace's synchronized view. Outside one it runs the probes of the user scope's extensions on the caller's directory and writes nothing there. A failed or invalid probe answer, and a merge conflict, are error diagnostics of the answer, never a refused call."
+    },
+    {
       "id": "source-bound-cache",
       "text": "A task that declares cache.sourceBound stores and looks up its entry, locally and remotely, at a key derived from its cache key and its project's source binding: the stamped binding when storing, the current one when looking up, the empty one in an unmanaged workspace. A binding the CLI cannot compute inside a repository gives no hit and no store. Dependents fold the unchanged cache key, so a test-only edit keeps every key. A source-bound failure is never replayed, and its entry prunes no producer."
     },

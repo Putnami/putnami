@@ -71,6 +71,9 @@ type Methods struct {
 	// each path. The server has already checked that the paths are not empty
 	// and are valid workspace paths.
 	WorkspaceOwners func(context.Context, wire.WorkspaceOwnersParams) (wire.WorkspaceOwnersResult, error)
+	// WorkspaceProbe answers workspace.probe with the projects and edges the
+	// workspace probes declare.
+	WorkspaceProbe func(context.Context, wire.WorkspaceProbeParams) (wire.WorkspaceProbeResult, error)
 }
 
 // Server is one open host RPC channel.
@@ -439,6 +442,21 @@ func (s *Server) dispatch(method string, params json.RawMessage) (json.RawMessag
 		}
 		return s.call(func(ctx context.Context) (json.RawMessage, error) {
 			result, err := s.methods.WorkspaceOwners(ctx, owners)
+			if err != nil {
+				return nil, err
+			}
+			return json.Marshal(result)
+		})
+	case wire.MethodWorkspaceProbe:
+		var probe wire.WorkspaceProbeParams
+		if err := decodeParams(params, &probe); err != nil {
+			return nil, err
+		}
+		if s.methods.WorkspaceProbe == nil {
+			return nil, unavailable(method)
+		}
+		return s.call(func(ctx context.Context) (json.RawMessage, error) {
+			result, err := s.methods.WorkspaceProbe(ctx, probe)
 			if err != nil {
 				return nil, err
 			}

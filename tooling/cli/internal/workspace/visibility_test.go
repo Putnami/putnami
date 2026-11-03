@@ -338,12 +338,15 @@ func TestReadableRefusalServesARefusedGraphOnly(t *testing.T) {
 	_, err := Synchronize(SyncRequest{
 		Workspace: ws, Providers: visibilityProvider(t), Reason: wsproto.ProbeReasonLoad,
 	})
-	outcome, readErr := ReadableRefusal(err)
+	outcome, readErr := ReadableRefusal(ws, err)
 	if readErr != nil || outcome == nil || len(visibilityFindingsIn(outcome.Diagnostics)) != 1 {
 		t.Fatalf("ReadableRefusal(visibility) = (%v, %v), want the findings and no error", outcome, readErr)
 	}
+	if len(outcome.Merged) == 0 || outcome.Snapshot == nil {
+		t.Fatalf("ReadableRefusal(visibility) merged %v, want the view the refused synchronization recorded", outcome.Merged)
+	}
 	unavailable := wsproto.NewProbeFailure(wsproto.ProbeFailureUnavailable, "@acme/go", "runtime missing")
-	if outcome, readErr := ReadableRefusal(unavailable); readErr == nil || outcome != nil {
+	if outcome, readErr := ReadableRefusal(ws, unavailable); readErr == nil || outcome != nil {
 		t.Fatalf("ReadableRefusal(unavailable) = (%v, %v), want the error", outcome, readErr)
 	}
 }
