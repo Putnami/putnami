@@ -26,3 +26,5 @@ replace go.putnami.dev/protocol/extension => ../extension
 replace go.putnami.dev/protocol/features => ../features
 
 replace go.putnami.dev/protocol/job => ../job
+
+replace go.putnami.dev/protocol/workspace => ../workspace

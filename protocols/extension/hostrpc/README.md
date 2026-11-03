@@ -53,7 +53,7 @@ the channel, the child receives no variable and the host prints a warning.
 
 ```json
 {"jsonrpc":"2.0","id":1,"method":"host.hello","token":"<64 hex characters>"}
-{"jsonrpc":"2.0","id":1,"result":{"protocol":1,"methods":["collaboration.call","host.hello","verification.report","version.lines","workspace.owners"]}}
+{"jsonrpc":"2.0","id":1,"result":{"protocol":1,"methods":["collaboration.call","host.hello","verification.report","version.lines","workspace.owners","workspace.probe"]}}
 ```
 
 ## Methods
@@ -64,6 +64,7 @@ the channel, the child receives no variable and the host prints a warning.
 | `collaboration.call` | `{"contract", "operation", "input"}` (`CollaborationCallParams`) | The envelope `putnami <contract> <operation> --output=json` prints for the same request, byte for byte. |
 | `verification.report` | `{"project", "task", "path", "digest"}` (`VerificationReportParams`) | `{"report": "<base64>"}` (`VerificationReportResult`): the bytes a successful cached test run produced, after the cache corroborated them. |
 | `workspace.owners` | `{"paths": [...]}` (`WorkspaceOwnersParams`) | `{"owners": [{"path", "projects": [{"id", "path"}]}]}` (`WorkspaceOwnersResult`): the projects that own each path. |
+| `workspace.probe` | `{}` (`WorkspaceProbeParams`) | `{"root", "projects": [...], "diagnostics": [...]}` (`WorkspaceProbeResult`): the projects and dependency edges the workspace probes declare, merged. |
 | `version.lines` | `{"scope"}` (`VersionLinesParams`), `scope` optional | `{"sourceRevision", "recordedGraph" (optional), "lines": [{"line", "tagPattern", "version", "tagged", "tag", "release": {"version", "tag"}, "commits": [{"sha", "subject", "body"}]}]}` (`VersionLinesResult`): each version line as the core computes it. |
 
 Params are strict: an unknown member is `-32602`. `collaboration.call` routes
@@ -88,6 +89,31 @@ workspace-relative directory. A path that no project owns gets an empty
 `projects` array. An empty `paths` array, or a path
 that is not in `io/fs` form, is `-32602`. Outside a workspace the method
 answers `-32002`.
+
+`workspace.probe` answers the projects and dependency edges that the
+workspace probes declare. The params object is `{}`. The result names a
+`root`, the absolute directory every path is relative to, and lists the
+`projects` sorted by path, each a merged project of the workspace protocol
+(`wsproto.MergedProject`): its `path`, the `sourceName` and `sourceFile` its
+manifest declares, its `dependencies` as project paths, and the other members
+a workspace view holds. The probes' answers are merged as the workspace view
+merges them.
+
+- Inside a workspace, `root` is the workspace root and the projects are the
+  workspace's synchronized view, the one every command prepares.
+- Outside a workspace, `root` is the directory the command runs in. The host
+  scans it for the markers of the extensions pinned in the user scope, runs
+  each one's probe there over the probe transport, and merges the answers with
+  no explicit project. It writes nothing in that directory: no index and no
+  lock. A directory with no marker gets no project and runs no probe.
+
+A probe that fails, times out or answers outside its contract is an error
+diagnostic of the answer, whose `code` is the failure kind (such as
+`transport`) and whose `field` names the extension, and the other probes'
+projects stay in the answer. A merge conflict is an error diagnostic too, and
+the field the providers disagree on stays empty. The call itself fails only
+when the host cannot read the directory (`-32603`). Both `projects` and
+`diagnostics` are `[]` when empty.
 
 `version.lines` reports the workspace's version lines as the core computes
 them. The `putnami version get` and `putnami version tag` commands of
@@ -124,7 +150,7 @@ cannot parse, and a `PUTNAMI_SOURCE_REVISION` that is not a full lowercase
 commit ID, are `-32004`. A Git failure, such as a shallow clone, which holds
 too little history to compute a version, is `-32603`.
 
-`workspace.owners`, `version.lines` and the code `-32004` are additive, so the
+`workspace.owners`, `version.lines`, `workspace.probe` and the code `-32004` are additive, so the
 protocol version stays 1. A client finds the methods in the list `host.hello`
 returns.
 
@@ -138,7 +164,7 @@ returns.
 | `-32602` | The params are not the method's. |
 | `-32603` | The host failed. |
 | `-32001` | The token is not this launch's. |
-| `-32002` | This launch cannot serve the method, for example `collaboration.call` outside a workspace that declares `options.collaboration`, or `workspace.owners` and `version.lines` outside any workspace. |
+| `-32002` | This launch cannot serve the method, for example `collaboration.call` outside a workspace that declares `options.collaboration`, or `workspace.owners` and `version.lines` outside any workspace. `workspace.probe` answers outside a workspace too. |
 | `-32003` | The cache does not corroborate the requested verification report. |
 | `-32004` | The workspace's configuration or the host's environment is invalid, for example `version.lines` with an unparsable `putnami.support.json` or a malformed `PUTNAMI_SOURCE_REVISION`. The message is the one the core prints, and the core exits 2 for it where it exits 1 for `-32603`. |
 

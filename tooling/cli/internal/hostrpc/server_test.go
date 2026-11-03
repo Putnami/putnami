@@ -301,6 +301,9 @@ func TestParamsAreStrict(t *testing.T) {
 		VersionLines: func(context.Context, wire.VersionLinesParams) (wire.VersionLinesResult, error) {
 			return wire.VersionLinesResult{}, nil
 		},
+		WorkspaceProbe: func(context.Context, wire.WorkspaceProbeParams) (wire.WorkspaceProbeResult, error) {
+			return wire.WorkspaceProbeResult{}, nil
+		},
 	})
 	right := token(t, server)
 	conn := dialRaw(t, server)
@@ -319,6 +322,9 @@ func TestParamsAreStrict(t *testing.T) {
 		{wire.MethodVersionLines, ``},
 		{wire.MethodVersionLines, `{"scope":"a","extra":1}`},
 		{wire.MethodVersionLines, `{"scope":1}`},
+		{wire.MethodWorkspaceProbe, ``},
+		{wire.MethodWorkspaceProbe, `{"extra":1}`},
+		{wire.MethodWorkspaceProbe, `[]`},
 	} {
 		id := strconv.Quote("p" + strconv.Itoa(i))
 		conn.send(t, request(id, tc.method, right, tc.params))
@@ -345,6 +351,10 @@ func TestAMethodTheLaunchDoesNotServeIsUnavailable(t *testing.T) {
 	_, err = c.VersionLines(t.Context(), "")
 	if !errors.As(err, &refusal) || refusal.Code != wire.CodeUnavailable {
 		t.Fatalf("version.lines = %v, want %d", err, wire.CodeUnavailable)
+	}
+	_, err = c.WorkspaceProbe(t.Context())
+	if !errors.As(err, &refusal) || refusal.Code != wire.CodeUnavailable {
+		t.Fatalf("workspace.probe = %v, want %d", err, wire.CodeUnavailable)
 	}
 }
 

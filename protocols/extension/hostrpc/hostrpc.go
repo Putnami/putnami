@@ -25,6 +25,9 @@ import (
 	"io"
 	"io/fs"
 	"slices"
+
+	diag "go.putnami.dev/protocol/diagnostic"
+	wsproto "go.putnami.dev/protocol/workspace"
 )
 
 const (
@@ -74,11 +77,17 @@ const (
 	// rule to a changed file before it follows the dependency graph. Params:
 	// WorkspaceOwnersParams. Result: WorkspaceOwnersResult.
 	MethodWorkspaceOwners = "workspace.owners"
+	// MethodWorkspaceProbe answers the projects and dependency edges the
+	// workspace probes declare. Inside a workspace it answers the workspace's
+	// synchronized view. Outside one it runs the probes of the user scope's
+	// extensions on the caller's directory, and writes nothing there. Params:
+	// WorkspaceProbeParams. Result: WorkspaceProbeResult.
+	MethodWorkspaceProbe = "workspace.probe"
 )
 
 // Methods lists every method the host serves, sorted.
 func Methods() []string {
-	methods := []string{MethodHello, MethodCollaborationCall, MethodVerificationReport, MethodVersionLines, MethodWorkspaceOwners}
+	methods := []string{MethodHello, MethodCollaborationCall, MethodVerificationReport, MethodVersionLines, MethodWorkspaceOwners, MethodWorkspaceProbe}
 	slices.Sort(methods)
 	return methods
 }
@@ -302,6 +311,26 @@ type OwningProject struct {
 	// Path is the project's workspace-relative directory, as the workspace
 	// model holds it.
 	Path string `json:"path"`
+}
+
+// WorkspaceProbeParams are the params of workspace.probe: the empty object.
+type WorkspaceProbeParams struct{}
+
+// WorkspaceProbeResult is the result of workspace.probe.
+type WorkspaceProbeResult struct {
+	// Root is the absolute directory every path of the answer is relative to:
+	// the workspace root inside a workspace, else the caller's directory.
+	Root string `json:"root"`
+	// Projects are the projects the probes declare, merged as the workspace
+	// view merges them (wsproto.MergeProbeResults), sorted by Path. Each
+	// project's Dependencies are the paths of the projects it depends on. It
+	// is an empty array, never null.
+	Projects []wsproto.MergedProject `json:"projects"`
+	// Diagnostics are the probes' findings. A probe that fails or answers
+	// outside its contract, and a merge conflict, are Error diagnostics here:
+	// the call still answers, with the projects of the other probes. It is an
+	// empty array, never null.
+	Diagnostics []diag.Diagnostic `json:"diagnostics"`
 }
 
 // ValidWorkspacePath reports whether p is a workspace-relative path in io/fs

@@ -22,3 +22,5 @@ replace (
 	go.putnami.dev/protocol/job => ../../protocols/job
 	go.putnami.dev/protocol/runtime => ../../protocols/runtime
 )
+
+replace go.putnami.dev/protocol/workspace => ../../protocols/workspace

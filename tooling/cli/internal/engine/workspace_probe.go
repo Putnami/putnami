@@ -50,7 +50,7 @@ func synchronizeWorkspaceProbe(
 	ws *workspace.Workspace,
 	discovered *extension.DiscoveryResult,
 ) int {
-	bindings := workspaceProviderBindings(ctx, ws, discovered, req.preparation)
+	bindings := WorkspaceProviderBindings(ctx, ws, ws.Root, discovered, req.preparation)
 	if len(bindings) == 0 {
 		return ExitSuccess
 	}
@@ -108,7 +108,7 @@ func PrepareWorkspaceGraph(
 			iox.Fprintf(os.Stderr, "putnami: %s\n", message)
 		},
 		Workspace: ws,
-		Providers: workspaceProviderBindings(ctx, ws, discovered, nil),
+		Providers: WorkspaceProviderBindings(ctx, ws, ws.Root, discovered, nil),
 		Reason:    wsproto.ProbeReasonLoad,
 	})
 	if err != nil {
@@ -130,17 +130,20 @@ func probeReasonFor(req *Request) wsproto.ProbeReason {
 	return wsproto.ProbeReasonLoad
 }
 
-// workspaceProviderBindings builds one lazily-resolved provider per
-// adapter-declaring extension.
+// WorkspaceProviderBindings builds one lazily-resolved provider per
+// adapter-declaring extension, each probing dir. Their runtimes are prepared
+// in ws: dir's workspace, whose root dir is, or the user scope's synthetic
+// workspace when dir is in no workspace.
 //
 // Runtime preparation is deferred into the provider's own Resolve hook. A
 // workspace whose snapshot validates therefore never enters
 // SynchronizeExtensionRuntimes at all — which matters because preparation for a
 // local extension compiles it, and paying a compile to discover that nothing
 // changed is precisely the cost the snapshot exists to avoid.
-func workspaceProviderBindings(
+func WorkspaceProviderBindings(
 	ctx context.Context,
 	ws *workspace.Workspace,
+	dir string,
 	discovered *extension.DiscoveryResult,
 	preparation *scheduler.PreparationReport,
 ) []workspace.ProviderBinding {
@@ -161,7 +164,7 @@ func workspaceProviderBindings(
 			Implementation: scheduler.ExtensionImplementationIdentity(ext),
 			Provider: &workspace.ExecProbeProvider{
 				Extension:         ext.Name,
-				Dir:               ws.Root,
+				Dir:               dir,
 				Context:           ctx,
 				Resolve:           runtimeResolverFor(ctx, ws, ext, preparation),
 				PreparedBeforeRun: !extension.StartsRepositoryCode(ws.Root, ext),
