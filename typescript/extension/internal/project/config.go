@@ -27,6 +27,46 @@ func readPutnamiRC(path string) (*putnamiRC, error) {
 	return &rc, nil
 }
 
+// ConfigPath returns the path to the project config file in dir, preferring
+// putnami.json and falling back to .putnamirc.json.
+func ConfigPath(dir string) string {
+	p := filepath.Join(dir, "putnami.json")
+	if FileExists(p) {
+		return p
+	}
+	legacy := filepath.Join(dir, ".putnamirc.json")
+	if FileExists(legacy) {
+		return legacy
+	}
+	return p
+}
+
+// CommitsCapabilityManifest reports whether the project config at rcPath sets
+// options.generate.capabilities to true. A missing file, a missing block and a
+// block that does not decode answer false; a file that cannot be read or
+// parsed is an error, because the answer decides whether a build removes a
+// tracked file.
+func CommitsCapabilityManifest(rcPath string) (bool, error) {
+	rc, err := readPutnamiRC(rcPath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return false, nil
+		}
+		return false, err
+	}
+	raw, ok := rc.Options["generate"]
+	if !ok {
+		return false, nil
+	}
+	var opts struct {
+		Capabilities *bool `json:"capabilities"`
+	}
+	if json.Unmarshal(raw, &opts) != nil || opts.Capabilities == nil {
+		return false, nil
+	}
+	return *opts.Capabilities, nil
+}
+
 // GenerateAsset represents a {from, to} entry in options.generate.assets.
 type GenerateAsset struct {
 	From string `json:"from"`

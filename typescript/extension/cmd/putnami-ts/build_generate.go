@@ -16,6 +16,7 @@ import (
 	"go.putnami.dev/typescript/extension/internal/build"
 	"go.putnami.dev/typescript/extension/internal/errs"
 	"go.putnami.dev/typescript/extension/internal/hooks"
+	"go.putnami.dev/typescript/extension/internal/project"
 )
 
 // GeneratedClientOutputPort is the data output port build-generate reports the
@@ -239,7 +240,11 @@ func doGenerate(ctx *pctx.Context, emit *jsonl.Emitter, projectPath string, hook
 	// committed copy and runs no build, so an application whose contracts are
 	// enforced at run time has to commit what it emitted or its evidence is
 	// invisible.
-	if err := commitCapabilityManifest(projectPath, capabilitiesPath, projectCommitsCapabilityManifest(ctx)); err != nil {
+	optedIn, err := projectCommitsCapabilityManifest(projectPath)
+	if err != nil {
+		return nil, errs.Wrapf(err, errs.CodeGenerateFailed, "reading the capability manifest option")
+	}
+	if err := commitCapabilityManifest(projectPath, capabilitiesPath, optedIn); err != nil {
 		return nil, errs.Wrapf(err, errs.CodeGenerateFailed, "committing capability manifest")
 	}
 
@@ -357,21 +362,12 @@ const CapabilityManifestRelPath = "schema/capabilities.json"
 // `schema` defaults to true and covers the config and OpenAPI documents. A
 // committed capability manifest is a reviewed artifact — `putnami architecture
 // validate` reads it as DARC evidence — so a project takes it deliberately.
-func projectCommitsCapabilityManifest(ctx *pctx.Context) bool {
-	if ctx == nil {
-		return false
-	}
-	raw, ok := ctx.Project.Options["generate"]
-	if !ok {
-		return false
-	}
-	var opts struct {
-		Capabilities *bool `json:"capabilities"`
-	}
-	if json.Unmarshal(raw, &opts) != nil || opts.Capabilities == nil {
-		return false
-	}
-	return *opts.Capabilities
+//
+// It reads the project's own config file, not ctx.Project.Options: a batched
+// generate hands every member the leader's options (perProjectContext), and
+// the answer decides whether the build removes the member's tracked manifest.
+func projectCommitsCapabilityManifest(projectPath string) (bool, error) {
+	return project.CommitsCapabilityManifest(project.ConfigPath(projectPath))
 }
 
 // promoteCapabilityManifest copies the emitted capability manifest from .gen

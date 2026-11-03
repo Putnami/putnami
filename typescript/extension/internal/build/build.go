@@ -388,15 +388,7 @@ func CopyProjectGenerateAssets(workspaceRoot, projectPath, genDir string, emit *
 // resolveProjectConfig returns the path to the project config file,
 // preferring putnami.json and falling back to .putnamirc.json.
 func resolveProjectConfig(dir string) string {
-	p := filepath.Join(dir, "putnami.json")
-	if project.FileExists(p) {
-		return p
-	}
-	legacy := filepath.Join(dir, ".putnamirc.json")
-	if project.FileExists(legacy) {
-		return legacy
-	}
-	return p
+	return project.ConfigPath(dir)
 }
 
 // CopyDir recursively copies a directory.
