@@ -233,7 +233,9 @@ evidence must be visible has to track it. Ask for that in `putnami.json`:
 The build then copies what the producer emitted under `.gen/schema/` to
 `schema/capabilities.json`. It is opt-in because a tracked capability manifest is
 a reviewed artifact; without it the rows still exist for the build and stay
-invisible to the gate.
+invisible to the gate. Without the option, or when the producer emits no
+manifest, the build removes any file at `schema/capabilities.json`, so a copy
+an earlier build left there is neither kept nor cached.
 
 A row is **evidence, never authority**. Emitting one cannot create a cross-domain
 permission; only a reviewed manifest edit can. That is the anti-pattern

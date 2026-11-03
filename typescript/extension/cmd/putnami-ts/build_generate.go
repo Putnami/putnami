@@ -16,6 +16,7 @@ import (
 	"go.putnami.dev/typescript/extension/internal/build"
 	"go.putnami.dev/typescript/extension/internal/errs"
 	"go.putnami.dev/typescript/extension/internal/hooks"
+	"go.putnami.dev/typescript/extension/internal/project"
 )
 
 // GeneratedClientOutputPort is the data output port build-generate reports the
@@ -234,14 +235,17 @@ func doGenerate(ctx *pctx.Context, emit *jsonl.Emitter, projectPath string, hook
 	}
 
 	// 5b. Promote the capability manifest into the tracked tree when the project
-	// asked for it. The producer wrote it under .gen; `architecture validate`
-	// reads DARC evidence from the committed copy and runs no build, so an
-	// application whose contracts are enforced at run time has to commit what it
-	// emitted or its evidence is invisible.
-	if projectCommitsCapabilityManifest(ctx) {
-		if _, err := promoteCapabilityManifest(projectPath, capabilitiesPath); err != nil {
-			return nil, errs.Wrapf(err, errs.CodeGenerateFailed, "promoting capability manifest")
-		}
+	// asked for it, and remove any other file at that path. The producer wrote
+	// it under .gen; `architecture validate` reads DARC evidence from the
+	// committed copy and runs no build, so an application whose contracts are
+	// enforced at run time has to commit what it emitted or its evidence is
+	// invisible.
+	optedIn, err := projectCommitsCapabilityManifest(projectPath)
+	if err != nil {
+		return nil, errs.Wrapf(err, errs.CodeGenerateFailed, "reading the capability manifest option")
+	}
+	if err := commitCapabilityManifest(projectPath, capabilitiesPath, optedIn); err != nil {
+		return nil, errs.Wrapf(err, errs.CodeGenerateFailed, "committing capability manifest")
 	}
 
 	// 5c. Commit the HTTP route inventory. It is committed by default, with no
@@ -358,21 +362,12 @@ const CapabilityManifestRelPath = "schema/capabilities.json"
 // `schema` defaults to true and covers the config and OpenAPI documents. A
 // committed capability manifest is a reviewed artifact — `putnami architecture
 // validate` reads it as DARC evidence — so a project takes it deliberately.
-func projectCommitsCapabilityManifest(ctx *pctx.Context) bool {
-	if ctx == nil {
-		return false
-	}
-	raw, ok := ctx.Project.Options["generate"]
-	if !ok {
-		return false
-	}
-	var opts struct {
-		Capabilities *bool `json:"capabilities"`
-	}
-	if json.Unmarshal(raw, &opts) != nil || opts.Capabilities == nil {
-		return false
-	}
-	return *opts.Capabilities
+//
+// It reads the project's own config file, not ctx.Project.Options: a batched
+// generate hands every member the leader's options (perProjectContext), and
+// the answer decides whether the build removes the member's tracked manifest.
+func projectCommitsCapabilityManifest(projectPath string) (bool, error) {
+	return project.CommitsCapabilityManifest(project.ConfigPath(projectPath))
 }
 
 // promoteCapabilityManifest copies the emitted capability manifest from .gen
@@ -385,6 +380,26 @@ func projectCommitsCapabilityManifest(ctx *pctx.Context) bool {
 // DARC evidence from a committed file without running a build.
 func promoteCapabilityManifest(projectPath, emittedPath string) (string, error) {
 	return promoteSchemaArtifact(projectPath, emittedPath, CapabilityManifestRelPath)
+}
+
+// commitCapabilityManifest makes the committed capability manifest equal what
+// this run produced: the emitted manifest when the project opted in, and no
+// file otherwise. The path is a declared output of this task, and no cache key
+// covers its bytes (the source binding leaves it out), so a file this run did
+// not write, left by an earlier build or by hand, would be captured under the
+// key of the clean sources and restored into every checkout at that key.
+func commitCapabilityManifest(projectPath, emittedPath string, optedIn bool) error {
+	if optedIn {
+		committed, err := promoteCapabilityManifest(projectPath, emittedPath)
+		if err != nil || committed != "" {
+			return err
+		}
+	}
+	committed := filepath.Join(projectPath, filepath.FromSlash(CapabilityManifestRelPath))
+	if err := os.Remove(committed); err != nil && !os.IsNotExist(err) {
+		return fmt.Errorf("remove committed %s: %w", CapabilityManifestRelPath, err)
+	}
+	return nil
 }
 
 // HTTPRoutesRelPath is the project-relative path of the committed
