@@ -1128,7 +1128,7 @@
             "root": "project",
             "path": "schema/capabilities.json",
             "optionalEmpty": true,
-            "description": "The project's capability manifest, promoted out of .gen into the tracked tree when the project sets options.generate.capabilities. The framework producer is its sole author; this task only copies what it wrote, the same split the Go extension keeps between describe and promotion. Absent for every project that does not opt in."
+            "description": "The project's capability manifest, promoted out of .gen into the tracked tree when the project sets options.generate.capabilities. The framework producer is its sole author; this task only copies what it wrote, the same split the Go extension keeps between describe and promotion. This task removes a file at this path that it did not promote, so the output is absent for every project that does not opt in or emits no manifest."
           },
           "openapi": {
             "kind": "file",

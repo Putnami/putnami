@@ -234,14 +234,13 @@ func doGenerate(ctx *pctx.Context, emit *jsonl.Emitter, projectPath string, hook
 	}
 
 	// 5b. Promote the capability manifest into the tracked tree when the project
-	// asked for it. The producer wrote it under .gen; `architecture validate`
-	// reads DARC evidence from the committed copy and runs no build, so an
-	// application whose contracts are enforced at run time has to commit what it
-	// emitted or its evidence is invisible.
-	if projectCommitsCapabilityManifest(ctx) {
-		if _, err := promoteCapabilityManifest(projectPath, capabilitiesPath); err != nil {
-			return nil, errs.Wrapf(err, errs.CodeGenerateFailed, "promoting capability manifest")
-		}
+	// asked for it, and remove any other file at that path. The producer wrote
+	// it under .gen; `architecture validate` reads DARC evidence from the
+	// committed copy and runs no build, so an application whose contracts are
+	// enforced at run time has to commit what it emitted or its evidence is
+	// invisible.
+	if err := commitCapabilityManifest(projectPath, capabilitiesPath, projectCommitsCapabilityManifest(ctx)); err != nil {
+		return nil, errs.Wrapf(err, errs.CodeGenerateFailed, "committing capability manifest")
 	}
 
 	// 5c. Commit the HTTP route inventory. It is committed by default, with no
@@ -385,6 +384,26 @@ func projectCommitsCapabilityManifest(ctx *pctx.Context) bool {
 // DARC evidence from a committed file without running a build.
 func promoteCapabilityManifest(projectPath, emittedPath string) (string, error) {
 	return promoteSchemaArtifact(projectPath, emittedPath, CapabilityManifestRelPath)
+}
+
+// commitCapabilityManifest makes the committed capability manifest equal what
+// this run produced: the emitted manifest when the project opted in, and no
+// file otherwise. The path is a declared output of this task, and no cache key
+// covers its bytes (the source binding leaves it out), so a file this run did
+// not write, left by an earlier build or by hand, would be captured under the
+// key of the clean sources and restored into every checkout at that key.
+func commitCapabilityManifest(projectPath, emittedPath string, optedIn bool) error {
+	if optedIn {
+		committed, err := promoteCapabilityManifest(projectPath, emittedPath)
+		if err != nil || committed != "" {
+			return err
+		}
+	}
+	committed := filepath.Join(projectPath, filepath.FromSlash(CapabilityManifestRelPath))
+	if err := os.Remove(committed); err != nil && !os.IsNotExist(err) {
+		return fmt.Errorf("remove committed %s: %w", CapabilityManifestRelPath, err)
+	}
+	return nil
 }
 
 // HTTPRoutesRelPath is the project-relative path of the committed

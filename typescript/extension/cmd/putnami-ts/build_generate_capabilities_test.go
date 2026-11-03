@@ -118,3 +118,71 @@ func TestPromoteCapabilityManifestWritesNothingWithoutAnEmittedManifest(t *testi
 		t.Errorf("stat committed manifest = %v, want it to be absent", err)
 	}
 }
+
+// No cache key covers the bytes at schema/capabilities.json, so a file there
+// that this run did not produce would be captured under the key of the clean
+// sources and restored into every checkout at that key (#791). The task removes
+// it unless the project opted in and the application emitted a manifest.
+func TestCommitCapabilityManifestRemovesAFileThisRunDidNotProduce(t *testing.T) {
+	cases := []struct {
+		name    string
+		optedIn bool
+		emitted bool
+		want    string
+	}{
+		{"not opted in, manifest emitted", false, true, ""},
+		{"not opted in, no manifest emitted", false, false, ""},
+		{"opted in, no manifest emitted", true, false, ""},
+		{"opted in, manifest emitted", true, true, "{\"emitted\":true}\n"},
+	}
+	for _, testCase := range cases {
+		t.Run(testCase.name, func(t *testing.T) {
+			projectPath := t.TempDir()
+			committed := filepath.Join(projectPath, "schema", "capabilities.json")
+			if err := os.MkdirAll(filepath.Dir(committed), 0o755); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.WriteFile(committed, []byte("{\"leftover\":true}\n"), 0o644); err != nil {
+				t.Fatal(err)
+			}
+			emittedPath := ""
+			if testCase.emitted {
+				emittedPath = filepath.Join(projectPath, ".gen", "schema", "capabilities.json")
+				if err := os.MkdirAll(filepath.Dir(emittedPath), 0o755); err != nil {
+					t.Fatal(err)
+				}
+				if err := os.WriteFile(emittedPath, []byte("{\"emitted\":true}\n"), 0o644); err != nil {
+					t.Fatal(err)
+				}
+			}
+
+			if err := commitCapabilityManifest(projectPath, emittedPath, testCase.optedIn); err != nil {
+				t.Fatalf("commit: %v", err)
+			}
+			got, err := os.ReadFile(committed)
+			if testCase.want == "" {
+				if !os.IsNotExist(err) {
+					t.Errorf("read committed manifest = %q, %v; want it to be absent", got, err)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("read committed manifest: %v", err)
+			}
+			if string(got) != testCase.want {
+				t.Errorf("committed bytes = %q, want %q", got, testCase.want)
+			}
+		})
+	}
+}
+
+// A project with no file at the path and nothing to commit stays as it is.
+func TestCommitCapabilityManifestWithNothingToRemove(t *testing.T) {
+	projectPath := t.TempDir()
+	if err := commitCapabilityManifest(projectPath, "", false); err != nil {
+		t.Fatalf("commit: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(projectPath, "schema")); !os.IsNotExist(err) {
+		t.Errorf("stat schema = %v, want no directory created", err)
+	}
+}
