@@ -113,7 +113,7 @@
     },
     {
       "id": "test-rerun-each",
-      "text": "putnami test --rerun-each N runs each test file of the project N times, solo or batched, so a stress run reports every run; without the flag each file runs once."
+      "text": "putnami test --rerun-each N, under its flag or its rerunEach option, passes --rerun-each=N to bun test, so each test file of the project runs N times; without it each file runs once."
     },
     {
       "id": "structured-reports",
