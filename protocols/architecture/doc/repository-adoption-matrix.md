@@ -175,6 +175,7 @@ authority is what it reports, not what it builds.
 | `/tooling/clientgen-extension` | `@putnami/clientgen` | The cross-language client-generation job and the shape of what it emits. |
 | `/tooling/github-collaboration` | `@putnami/github-collaboration` | The task and proposal provider results for GitHub: how a GitHub issue or pull request maps onto the collaboration contracts. |
 | `/tooling/jira-collaboration` | `@putnami/jira-collaboration` | The task provider results for Jira Cloud: how a Jira issue, its status category and its resolution map onto the tasks contract. |
+| `/tooling/linear-collaboration` | `@putnami/linear-collaboration` | The task provider results for Linear: how a Linear issue maps onto the tasks contract. |
 | `/tooling/local-collaboration` | `@putnami/local-collaboration` | The task and proposal provider results for the local file-backed store. |
 | `/tooling/memory-store` | `@putnami/memory-store` | The memory provider results for the file and Git stores: context selection and compare-and-set checkpoints. |
 | `/tooling/observe` | `@putnami/observe` | What a CI job reports about its change: the repository key, the diff base, the changed files, the reports it found, and the change evidence document. |
