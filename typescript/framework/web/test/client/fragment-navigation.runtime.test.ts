@@ -5,6 +5,7 @@ import type { FragmentNavigationReport } from '../fixtures/fragment-navigation/b
 
 const packageRoot = resolve(import.meta.dir, '..', '..');
 const BROWSER_TIMEOUT_MS = 20_000;
+const HOOK_TIMEOUT_MS = BROWSER_TIMEOUT_MS + 5000;
 
 /**
  * Hydrates a page with `hydratePage` in a DOM, in a separate browser process,
@@ -14,6 +15,8 @@ const BROWSER_TIMEOUT_MS = 20_000;
 describe('fragment navigation in a hydrated page', () => {
   let report: FragmentNavigationReport;
 
+  // The hook outlasts the spawn, so a browser process that runs out of time
+  // reports its own error.
   beforeAll(() => {
     const child = Bun.spawnSync({
       cmd: [process.execPath, resolve(packageRoot, 'test/fixtures/fragment-navigation/browser.ts')],
@@ -26,7 +29,7 @@ describe('fragment navigation in a hydrated page', () => {
       throw new Error(`the browser process failed:\n${child.stderr.toString()}`);
     }
     report = JSON.parse(child.stdout.toString()) as FragmentNavigationReport;
-  });
+  }, HOOK_TIMEOUT_MS);
 
   specTest(
     'keeps the browser scroll to the target of a fragment link',
