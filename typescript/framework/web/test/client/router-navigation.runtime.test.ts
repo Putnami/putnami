@@ -5,6 +5,7 @@ import type { RouterNavigationReport } from '../fixtures/router-navigation/brows
 
 const packageRoot = resolve(import.meta.dir, '..', '..');
 const BROWSER_TIMEOUT_MS = 20_000;
+const HOOK_TIMEOUT_MS = BROWSER_TIMEOUT_MS + 5000;
 const scroll = {
   feature: 'typescript/web-application-delivery',
   requirement: 'navigation-scroll',
@@ -18,6 +19,8 @@ const scroll = {
 describe('client navigation in a router', () => {
   let report: RouterNavigationReport;
 
+  // The hook outlasts the spawn, so a browser process that runs out of time
+  // reports its own error.
   beforeAll(() => {
     const child = Bun.spawnSync({
       cmd: [process.execPath, resolve(packageRoot, 'test/fixtures/router-navigation/browser.ts')],
@@ -30,7 +33,7 @@ describe('client navigation in a router', () => {
       throw new Error(`the browser process failed:\n${child.stderr.toString()}`);
     }
     report = JSON.parse(child.stdout.toString()) as RouterNavigationReport;
-  });
+  }, HOOK_TIMEOUT_MS);
 
   specTest('scrolls a new page to the top', { ...scroll, check: 'a-new-location-scrolls-to-the-top' }, () => {
     expect(report.errors).toEqual([]);
