@@ -241,6 +241,7 @@ func testParamsFromContext(ctx *pctx.Context) testjob.TestParams {
 		Coverage:          coverageEnabled,
 		CoverageThreshold: coverageThreshold,
 		Bail:              ctx.Params.Int("bail", 0),
+		RerunEach:         ctx.Params.Int("rerun-each", 0, "rerunEach"),
 		Test:              ctx.Params.String("test"),
 		Concurrent:        ctx.Params.String("concurrent"),
 		Parallel:          ctx.Params.String("parallel"),

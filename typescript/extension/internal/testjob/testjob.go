@@ -119,6 +119,9 @@ func buildTestArgs(outputPath string, params TestParams) []string {
 	if params.Bail > 0 {
 		args = append(args, fmt.Sprintf("--bail=%d", params.Bail))
 	}
+	if params.RerunEach > 0 {
+		args = append(args, fmt.Sprintf("--rerun-each=%d", params.RerunEach))
+	}
 	args = append(args, "--reporter=junit", "--reporter-outfile="+filepath.Join(outputPath, "results.junit.xml"))
 	return args
 }
@@ -256,9 +259,11 @@ type TestParams struct {
 	Coverage          bool
 	CoverageThreshold float64
 	Bail              int
-	TestNamePattern   string
-	Test              string
-	Concurrent        string
+	// RerunEach runs each test file this many times; 0 runs it once.
+	RerunEach       int
+	TestNamePattern string
+	Test            string
+	Concurrent      string
 	// Parallel opts a project's suite into bun test's worker processes
 	// (Bun 1.4): "" or "false" = off (default), "true" = --parallel,
 	// a number = --parallel=N. Off by default because the putnami DAG

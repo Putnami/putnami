@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -529,6 +530,18 @@ func TestBuildTestArgs_WithBail(t *testing.T) {
 	}
 	if !found {
 		t.Error("expected --bail=3")
+	}
+}
+
+func TestBuildTestArgs_WithRerunEach(t *testing.T) {
+	spectest.Proves(t, "typescript/typescript-project-toolchain", "test-rerun-each", "the-parameter-reaches-bun-test")
+	if args := buildTestArgs("/out", TestParams{RerunEach: 20}); !slices.Contains(args, "--rerun-each=20") {
+		t.Errorf("args = %v, want --rerun-each=20", args)
+	}
+	for _, a := range buildTestArgs("/out", TestParams{}) {
+		if strings.HasPrefix(a, "--rerun-each") {
+			t.Errorf("args without RerunEach contain %q", a)
+		}
 	}
 }
 

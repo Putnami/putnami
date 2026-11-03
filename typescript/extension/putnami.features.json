@@ -393,6 +393,20 @@
           }
         },
         {
+          "id": "test-rerun-each",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-flag-reaches-the-test-parameters",
+              "the-parameter-reaches-bun-test"
+            ]
+          }
+        },
+        {
           "id": "structured-reports",
           "stage": "coded",
           "evidenceKinds": [
