@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	protocolcli "go.putnami.dev/protocol/cli"
+	"go.putnami.dev/protocol/features/spectest"
 	pctx "go.putnami.dev/sdk/extension/context"
 	"go.putnami.dev/sdk/extension/exec"
 	"go.putnami.dev/sdk/extension/jsonl"
@@ -346,6 +347,24 @@ func TestRunTestBatchSurfacesUnhandledErrors(t *testing.T) {
 // off, and enforce-coverage never overrides that opt-out. This is the TS twin of
 // the Go TestGoCoverageCadenceSoloBatchParity and must stay row-for-row
 // identical to it.
+// --rerun-each reaches the test parameters under its flag and its option name,
+// and is 0, one run, when absent.
+func TestTestParamsFromContextReadsRerunEach(t *testing.T) {
+	spectest.Proves(t, "typescript/typescript-project-toolchain", "test-rerun-each", "the-flag-reaches-the-test-parameters")
+	for _, tc := range []struct {
+		params pctx.Params
+		want   int
+	}{
+		{pctx.Params{}, 0},
+		{pctx.Params{"rerun-each": json.RawMessage("20")}, 20},
+		{pctx.Params{"rerunEach": json.RawMessage("3")}, 3},
+	} {
+		if got := testParamsFromContext(&pctx.Context{Params: tc.params}).RerunEach; got != tc.want {
+			t.Errorf("params %v: RerunEach = %d, want %d", tc.params, got, tc.want)
+		}
+	}
+}
+
 func TestTestParamsFromContextCoverageCadence(t *testing.T) {
 	cases := []struct {
 		name          string
