@@ -71,9 +71,10 @@ proposals, so the provider implements `tasks` alone.
    each key that list misses, and reads every key above the newest one until
    three keys in a row hold nothing. An issue moved into the project keeps its
    creation date and takes a new key; the move updates it, so it sets the
-   floor only 30 minutes later, once the search shows what lies below it. The same digest returns the ticket (`created: false`), another
-   digest is a conflict. The label never appears in a task's `labels`,
-   `update` keeps it, and a request that names one is `invalid`.
+   floor only 30 minutes later, once the search shows what lies below it.
+   The same digest returns the ticket (`created: false`), another digest is
+   a conflict. The label never appears in a task's `labels`, `update` keeps
+   it, and a request that names one is `invalid`.
 
 7. **A write is sent once and read back when its outcome is unknown.** After a
    lost answer or a 5xx, `create` looks its key up again and `update` and

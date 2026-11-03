@@ -111,9 +111,8 @@ func (s *session) findKey(marker idempotency) (*jiraIssue, *collab.Failure) {
 	top := floor
 	for page, token := 0, ""; ; page++ {
 		if page == maxRecentPages {
-			// Retryable: a bulk edit passes, and the window moves with it.
 			return nil, retryable(collab.Fail(collab.OutcomeUnavailable, reasonKeyUnverifiable,
-				"checking the idempotency key needs to list more than %d issues project %s created or updated within %s; nothing was created: retry once fewer are",
+				"checking the idempotency key needs to list more than %d issues project %s created or updated within %s; nothing was created: retry once fewer are listed",
 				maxRecentPages*jiraPageSize, s.settings.Project, strings.TrimPrefix(indexedAge, "-")))
 		}
 		issues, next, err := s.search(recent, token, jiraPageSize)
