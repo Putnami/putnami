@@ -338,8 +338,8 @@ func (e *Env) readSessionIdentity(ctx context.Context, engine string, input hook
 		repository, err = e.originRepository(ctx, root)
 	}
 	if err != nil {
-		// A git that failed leaves the identity unknown, so the next event
-		// reads it again instead of keying the session on a wrong one.
+		// A git that failed leaves the identity unknown: the next event reads
+		// it again.
 		e.log(engine, input.Event, err)
 		return sessionIdentity{}
 	}
