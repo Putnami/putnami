@@ -51,7 +51,7 @@ proposals, so the provider implements `tasks` alone.
 5. **A revision covers what a task shows.** It is `v` and the first 32 hex
    digits of the SHA-256 of the JSON array of summary, description, status
    name, status category, resolution, sorted labels and sorted assignee account
-   ids. Issue #796 listed the status alone; the category and the resolution
+   ids. The status alone is not enough; the category and the resolution
    join it because a done ticket that becomes canceled can keep its status,
    and the contract requires the revision to change whenever the state does.
    `updated` is not used: a comment moves it. Jira has no conditional write, so
