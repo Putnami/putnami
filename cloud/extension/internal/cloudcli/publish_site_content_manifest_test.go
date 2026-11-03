@@ -217,3 +217,30 @@ func TestRunPublishDocNamesTheOperatorCommand(t *testing.T) {
 	}
 	assertContains(t, strings.Join(output, "\n"), "putnami operator publish-doc")
 }
+
+// TestPublishReadsOnlyTheBuildStepsItsJobsRead pins publish's prerequisites.
+// Its jobs read the config schema, which a language build's generate or
+// describe step writes, the migration bundle, which describe stages, and the
+// members the package command assembles: the deployment declaration, the
+// archives and the site-content bundles. No job reads the executable that
+// build~compile writes, so publish names the two build steps it reads, not the
+// whole build (protocols/extension ADR 0017). The planner still plans the whole
+// build and runs publish after it, and in a minimal cache session a compile hit
+// no longer has to bring its files.
+func TestPublishReadsOnlyTheBuildStepsItsJobsRead(t *testing.T) {
+	data, err := os.ReadFile(filepath.Join("..", "..", "putnami.extension.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var manifest struct {
+		Commands map[string]struct {
+			DependsOn []string `json:"dependsOn"`
+		} `json:"commands"`
+	}
+	if err := json.Unmarshal(data, &manifest); err != nil {
+		t.Fatal(err)
+	}
+	if got, want := manifest.Commands["publish"].DependsOn, []string{"build~generate", "build~describe", "package"}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("publish dependsOn = %v, want %v", got, want)
+	}
+}

@@ -429,8 +429,9 @@ runs every time and reads the disk, where it refuses an empty section
 directory. Like the Config step, it checks only the project in its working
 directory and refuses `--app` naming another project.
 
-The Git candidate input needs a CLI that implements CLI contract 7, so the
-extension is stamped at contract 7 and an older CLI refuses it.
+The Git candidate input needs a CLI that implements CLI contract 7. The
+extension is stamped at the highest contract its manifest requires, contract 18
+for the step dependencies of `publish`, and an older CLI refuses it.
 
 Every other task of this extension is uncached, except the image-layer check
 described below. Tasks that call Putnami Cloud, such as login, token, publish,
@@ -473,6 +474,17 @@ emits a migration bundle (`.gen/migration-bundle`) likewise get a
 registry (put-server). It does nothing when no bundle was built; pass
 `--skip-publish-migration` to skip it. Migrations run only through the
 continuous deploy, where Data's migration job applies them.
+
+`publish` depends on `build~generate`, `build~describe` and `package`
+([ADR 0017 of the extension protocol](../../protocols/extension/doc/adr/0017-a-command-may-depend-on-one-step-of-another-command.md)).
+Its steps read the config schema that `generate` or `describe` writes, the
+migration bundle that `describe` stages, and the deployment declaration,
+archives and site-content bundles that `package` assembles. No step reads the
+executable that `build~compile` writes. The planner still plans the whole
+build and runs `publish` after it, but in a `minimal` cache session a
+`compile` hit no longer restores its files for `publish`. A failed `compile`
+alone no longer skips the publish steps; the run still fails. The manifest is
+stamped at CLI contract 18, which this form requires.
 
 A docs project (a `putnami.json` declaring `publish: ["site-content"]`) gets
 one `put` release-set member per section, `cloud/doc-contents-<section>`, in
@@ -1123,14 +1135,16 @@ never contains a token, only a token *source*:
 {
   "enabled": true,
   "url": "https://cache.putnami.cloud",
-  "mode": "full",
   "token": { "command": ["putnami", "cloud", "token", "--for", "cache"] }
 }
 ```
 
 - `enabled` (default `true`) plus a non-empty `url` makes the cache active.
-- `mode` is one of `minimal`, `toplevel`, or `full` (default `full`). Override at
-  setup time with `--cache-mode`; override the endpoint with `--cache-url`.
+- `mode` is one of `minimal`, `toplevel`, or `full`. Setup and install write it
+  only when `--cache-mode` or `PUTNAMI_CACHE_MODE` requests one. Without it, the
+  cache provider picks the mode per run: `minimal` on a hosted run, `full` on a
+  developer machine. A file that already records a mode keeps it. Override the
+  endpoint with `--cache-url`.
 - `token` is a non-secret *source*, never a bearer:
   - `{ "command": [argv...] }`: the CLI runs the argv and uses trimmed stdout as
     the bearer.
@@ -1255,7 +1269,7 @@ and presence in core. All of them use the shared `protocol/cache` vocabulary.
 | **Presence** (`.putnami/cache-present.json`) | **Core** | Core owns its CAS, so it passes the digests it already has in `InitializeParams.KnownDigests`. The provider only *consumes* that set: it skips re-staging those blobs on restore, and keeps no presence file. The provider-owned-presence path via `SummaryResult.KnownDigests` (for very large warm sets) is a deferred optimization; the seam exists, unused. |
 | **Eligibility** (`SideEffectingTask`) | **Core** | Core shares every key whose task is not side-effecting, whatever its duration or size. The provider's restore, prefetch and upload params carry only keys, so it serves exactly what core asks and never re-filters. |
 | **Capabilities discovery** | **Provider**, per run | The provider's client probes the cache server's capabilities (find-missing, commit-batch, direct-CAS-PUT, and others) on the batch write path and memoizes per session: one client per run, not per job. |
-| **Materialization mode** (`minimal`/`toplevel`/`full`) | **Provider** resolves, core applies | Core lists `provider-configuration` and sends no mode. The provider resolves core's intent when one is sent, else the configured `mode`, else `full`, and returns it with the echo. It passes the mode to the server on every negotiate and materializes exactly the blobs the server returns for that mode (minus `KnownDigests`). |
+| **Materialization mode** (`minimal`/`toplevel`/`full`) | **Provider** resolves, core applies | Core lists `provider-configuration` and sends no mode. The provider resolves core's intent when one is sent, else the configured `mode`, else `minimal` on a hosted run and `full` on a developer machine, and returns it with the echo. With the remote cache on, it prints the mode once per run on stderr, for example `cache-provider: session mode minimal (the hosted run default)`. It passes the mode to the server on every negotiate and materializes exactly the blobs the server returns for that mode (minus `KnownDigests`). |
 | **gzip by uncompressed digest** | **Provider**, internal | The client transparently gzips on upload and decompresses on download; the CAS digest always addresses the *uncompressed* content, so core only ever sees uncompressed, content-addressed blobs in the exchange directory. |
 
 CAS here means content-addressed storage.
@@ -1343,7 +1357,7 @@ Defaults can be overridden with flags or environment variables:
 | Control-plane URL | `--control-plane-url` | `PUTNAMI_CLOUD_API_URL` | `https://api.putnami.cloud` |
 | OAuth client ID | `--client-id` | - | `putnami-cli` |
 | Build cache URL | `--cache-url` | `PUTNAMI_CACHE_URL` | `https://cache.putnami.cloud` |
-| Build cache mode | `--cache-mode` | `PUTNAMI_CACHE_MODE` | `full` |
+| Build cache mode | `--cache-mode` | `PUTNAMI_CACHE_MODE` | none: `minimal` on a hosted run, `full` on a developer machine |
 
 All commands avoid direct Google Cloud calls and use the control-plane API for
 cloud workspace and status data.

@@ -1,6 +1,6 @@
 {
   "$schema": "https://putnami.dev/schemas/putnami-extension.json",
-  "cliContract": 12,
+  "cliContract": 18,
   "name": "@putnami/cloud",
   "version": "0.1.0",
   "ecosystems": [
@@ -750,8 +750,7 @@
         },
         "cache-mode": {
           "type": "string",
-          "default": "full",
-          "description": "Build cache negotiate mode: minimal, toplevel, or full."
+          "description": "Build cache negotiate mode: minimal, toplevel, or full. Without it the file records no mode, and each run picks minimal when hosted and full on a developer machine."
         },
         "cache-url": {
           "type": "string",
@@ -1584,7 +1583,8 @@
       "activation": "workspace",
       "traits": {"injectPublishChannels": true, "sideEffects": "registry"},
       "dependsOn": [
-        "build",
+        "build~generate",
+        "build~describe",
         "package"
       ],
       "description": "Publish Putnami Cloud config schema, environment values, migration bundles, a workload's deployment declaration, immutable archives, and the site-content bundles of a docs project. Archive, deployment and site-content publication emit a native release-set member only after Put accepts or byte-confirms the exact manifest.",

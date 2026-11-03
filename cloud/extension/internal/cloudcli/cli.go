@@ -717,7 +717,7 @@ func setup(params map[string]any, workspaceRoot string, env map[string]string, i
 		}
 		cache := deliverycli.CacheSummary(cacheCfg, deliverycli.CachePath(workspaceRoot))
 		result["cache"] = cache
-		message += fmt.Sprintf(" Build cache enabled at %s (mode %s).", cache["url"], cache["mode"])
+		message += fmt.Sprintf(" Build cache enabled at %s (%s).", cache["url"], setupCacheModeText(cacheCfg.Mode))
 	} else {
 		result["cache"] = map[string]any{"enabled": false, "skipped": true}
 	}
@@ -729,6 +729,15 @@ func setup(params map[string]any, workspaceRoot string, env map[string]string, i
 
 	writeResult(result, params, ioctx, message)
 	return nil
+}
+
+// setupCacheModeText names the mode setup recorded, or the per-run default when
+// it recorded none.
+func setupCacheModeText(mode string) string {
+	if mode == "" {
+		return "mode per run: minimal when hosted, full on this machine"
+	}
+	return "mode " + mode
 }
 
 func install(params map[string]any, workspaceRoot string, env map[string]string, ioctx IO) error {

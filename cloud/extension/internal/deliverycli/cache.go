@@ -23,10 +23,6 @@ const CacheFileRelative = ".putnami/cache.json"
 // cache-server's configured JWT audience host (cache.putnami.cloud).
 const DefaultCacheURL = "https://cache.putnami.cloud"
 
-// DefaultCacheMode is the negotiate mode written when none is requested. It
-// mirrors the native CLI's own default (full transfer of hits).
-const DefaultCacheMode = "full"
-
 // CacheConfig is the on-disk shape of .putnami/cache.json. It carries no
 // secret — only a token *source* the native CLI runs to obtain a bearer. The
 // token recipe shares the registry keys' tokenSource shape (see registries.go).
@@ -46,7 +42,7 @@ const DefaultCacheMode = "full"
 type CacheConfig struct {
 	Enabled bool                 `json:"enabled"`
 	URL     string               `json:"url"`
-	Mode    string               `json:"mode"`
+	Mode    string               `json:"mode,omitempty"`
 	Token   *clicore.TokenSource `json:"token,omitempty"`
 
 	// urlOrigin and noFile describe a config the cache status built the way a
@@ -65,13 +61,15 @@ func cacheTokenCommand() []string {
 	return []string{"putnami", "cloud", "token", "--for", "cache"}
 }
 
-// cacheModeOrDefault resolves and validates the negotiate mode from flags,
-// environment, then the built-in default. An unknown mode is a usage error so
-// a typo never silently writes an inert cache config.
-func cacheModeOrDefault(params map[string]any, env map[string]string) (string, error) {
-	mode := clicore.FirstString(clicore.StringParam(params, "cache-mode", "cacheMode"), clicore.EnvGet(env, "PUTNAMI_CACHE_MODE"), DefaultCacheMode)
+// requestedCacheMode resolves and validates the negotiate mode from flags, then
+// environment. It returns "" when neither requests one: the file then records
+// no mode, and the cache provider picks one per run (resolveSessionMode),
+// minimal on a hosted run and full on a developer machine. An unknown mode is a
+// usage error so a typo never silently writes an inert cache config.
+func requestedCacheMode(params map[string]any, env map[string]string) (string, error) {
+	mode := clicore.FirstString(clicore.StringParam(params, "cache-mode", "cacheMode"), clicore.EnvGet(env, "PUTNAMI_CACHE_MODE"))
 	switch mode {
-	case "minimal", "toplevel", "full":
+	case "", "minimal", "toplevel", "full":
 		return mode, nil
 	default:
 		return "", clicore.NewError(fmt.Sprintf("invalid cache mode %q; expected one of minimal, toplevel, full", mode), clicore.ExitUsage)
@@ -87,8 +85,9 @@ func cacheURLOrDefault(params map[string]any, env map[string]string) string {
 
 // BuildCacheConfig assembles the cache config `cloud setup` persists. The
 // token is always a source (never a raw bearer), so the file is safe to commit.
+// The mode is set only when one is requested.
 func BuildCacheConfig(params map[string]any, env map[string]string) (*CacheConfig, error) {
-	mode, err := cacheModeOrDefault(params, env)
+	mode, err := requestedCacheMode(params, env)
 	if err != nil {
 		return nil, err
 	}
@@ -101,13 +100,16 @@ func BuildCacheConfig(params map[string]any, env map[string]string) (*CacheConfi
 }
 
 // CacheSummary projects a cache config to the fields safe for command output:
-// the token *source* is shown, never a token.
+// the token *source* is shown, never a token. It carries a mode only when the
+// config records one.
 func CacheSummary(cfg *CacheConfig, path string) map[string]any {
 	out := map[string]any{
 		"enabled": cfg.Enabled,
 		"url":     cfg.URL,
-		"mode":    cfg.Mode,
 		"path":    path,
+	}
+	if cfg.Mode != "" {
+		out["mode"] = cfg.Mode
 	}
 	if token := cfg.tokenSummary(); token != nil {
 		out["token"] = token
