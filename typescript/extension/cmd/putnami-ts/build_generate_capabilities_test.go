@@ -171,7 +171,7 @@ func TestPromoteCapabilityManifestWritesNothingWithoutAnEmittedManifest(t *testi
 
 // No cache key covers the bytes at schema/capabilities.json, so a file there
 // that this run did not produce would be captured under the key of the clean
-// sources and restored into every checkout at that key (#791). The task removes
+// sources and restored into every checkout at that key. The task removes
 // it unless the project opted in and the application emitted a manifest.
 func TestCommitCapabilityManifestRemovesAFileThisRunDidNotProduce(t *testing.T) {
 	cases := []struct {
