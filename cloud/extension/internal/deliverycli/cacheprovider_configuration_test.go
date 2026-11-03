@@ -1,6 +1,7 @@
 package deliverycli
 
 import (
+	"bytes"
 	"io"
 	"slices"
 	"testing"
@@ -114,6 +115,47 @@ func TestInitialize_ProviderConfigurationEcho(t *testing.T) {
 			}
 			if res.Mode != wantResultMode {
 				t.Errorf("result mode = %q, want %q", res.Mode, wantResultMode)
+			}
+		})
+	}
+}
+
+// TestInitialize_LogsTheSessionModeOnce pins the run log line: a session with
+// an active remote cache prints the mode it negotiates, and its source, once.
+// A session with the cache off prints none.
+func TestInitialize_LogsTheSessionModeOnce(t *testing.T) {
+	spectest.Proves(t, "cloud/cache-provider-configuration", "the-run-log-names-the-session-mode", "an-active-session-prints-its-mode-once")
+	t.Setenv(cloudTokenEnv, "")
+	t.Setenv(remotecache.URLEnv, "")
+	t.Setenv(remotecache.ModeEnv, "")
+	for _, tc := range []struct {
+		name       string
+		configured string
+		hosted     bool
+		enabled    bool
+		want       string
+	}{
+		{name: "hosted, no mode", hosted: true, enabled: true, want: "cache-provider: session mode minimal (the hosted run default)\n"},
+		{name: "developer machine, no mode", enabled: true, want: "cache-provider: session mode full (the developer machine default)\n"},
+		{name: "hosted, configured mode", configured: "full", hosted: true, enabled: true, want: "cache-provider: session mode full (configured in .putnami/cache.json or PUTNAMI_CACHE_MODE)\n"},
+		{name: "cache off", hosted: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if tc.hosted {
+				t.Setenv(SessionReporterIngestURLEnv, "https://ingest.invalid")
+			} else {
+				t.Setenv(SessionReporterIngestURLEnv, "")
+			}
+			root := t.TempDir()
+			if err := WriteCacheConfig(root, &CacheConfig{Enabled: tc.enabled, URL: "https://cache.invalid", Mode: tc.configured}); err != nil {
+				t.Fatal(err)
+			}
+			var logw bytes.Buffer
+			s := newProviderSession(root, &logw)
+			t.Cleanup(s.close)
+			mustInit(t, s, &cache.InitializeParams{BlobExchangeDir: t.TempDir()})
+			if got := logw.String(); got != tc.want {
+				t.Fatalf("log = %q, want %q", got, tc.want)
 			}
 		})
 	}

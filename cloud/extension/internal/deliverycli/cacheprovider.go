@@ -640,6 +640,9 @@ func (s *providerSession) initialize(req *cache.ProviderRequest, p *cache.Initia
 
 	mode := resolveSessionMode(p.Mode, cfg.Mode, s.hosted)
 	s.mode = mode
+	if cfg.Active() {
+		s.log(sessionModeLine(mode, p.Mode, cfg.Mode, s.hosted))
+	}
 	s.providerProtocolVersion = cache.ProviderProtocolMinVersion
 	for _, capability := range p.Capabilities {
 		if capability == cache.CapabilityProviderProtocolV2 {
@@ -710,6 +713,22 @@ func resolveSessionMode(intent, configured cache.Mode, hosted bool) cache.Mode {
 	default:
 		return cache.ModeFull
 	}
+}
+
+// sessionModeLine is the line the provider prints once per run, when the remote
+// cache is on: the mode the session negotiates and where it comes from, so a
+// run log shows which mode a hosted run used.
+func sessionModeLine(mode, intent, configured cache.Mode, hosted bool) string {
+	source := "the developer machine default"
+	switch {
+	case intent.Valid():
+		source = "requested by the run"
+	case configured.Valid():
+		source = "configured in " + CacheFileRelative + " or " + remotecache.ModeEnv
+	case hosted:
+		source = "the hosted run default"
+	}
+	return fmt.Sprintf("session mode %s (%s)", mode, source)
 }
 
 // acceptRunCredential decides whether to echo cache.CapabilityRunCredential,

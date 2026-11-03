@@ -288,6 +288,32 @@
               "a-minimal-session-negotiates-the-keys-core-reads-in-full"
             ]
           }
+        },
+        {
+          "id": "an-unrequested-mode-is-left-to-the-run",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "install-writes-no-mode-and-the-run-picks-minimal-when-hosted-else-full"
+            ]
+          }
+        },
+        {
+          "id": "the-run-log-names-the-session-mode",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "an-active-session-prints-its-mode-once"
+            ]
+          }
         }
       ]
     },

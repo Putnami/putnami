@@ -54,8 +54,8 @@ func runSetup(t *testing.T, home, workspaceRoot string, args ...string) []string
 }
 
 // TestSetupProvisionsBuildCacheConfig proves `cloud setup` writes a committable
-// .putnami/cache.json with the default endpoint, mode, and a token *source* —
-// never a raw bearer.
+// .putnami/cache.json with the default endpoint and a token *source*, never a
+// raw bearer. With no mode requested it records none: each run picks its own.
 func TestSetupProvisionsBuildCacheConfig(t *testing.T) {
 	home, workspaceRoot := setupCacheEnv(t)
 	output := runSetup(t, home, workspaceRoot, "--json")
@@ -68,8 +68,8 @@ func TestSetupProvisionsBuildCacheConfig(t *testing.T) {
 	if cache["url"] != deliverycli.DefaultCacheURL {
 		t.Fatalf("url = %v, want %s", cache["url"], deliverycli.DefaultCacheURL)
 	}
-	if cache["mode"] != "full" {
-		t.Fatalf("mode = %v, want full", cache["mode"])
+	if mode, recorded := cache["mode"]; recorded {
+		t.Fatalf("mode = %v, want none: without a requested mode each run picks its own", mode)
 	}
 	token, ok := cache["token"].(map[string]any)
 	if !ok {
@@ -89,7 +89,7 @@ func TestSetupProvisionsBuildCacheConfig(t *testing.T) {
 	var got map[string]any
 	decodeJSON(t, strings.Join(output, "\n"), &got)
 	gotCache, ok := got["cache"].(map[string]any)
-	if !ok || gotCache["url"] != deliverycli.DefaultCacheURL || gotCache["mode"] != "full" {
+	if _, recorded := gotCache["mode"]; !ok || gotCache["url"] != deliverycli.DefaultCacheURL || recorded {
 		t.Fatalf("result cache = %v", got["cache"])
 	}
 }
@@ -139,8 +139,8 @@ func TestInstallInitializesLocalCloudStateFromManifest(t *testing.T) {
 
 	var cache map[string]any
 	readJSONFile(t, filepath.Join(workspaceRoot, deliverycli.CacheFileRelative), &cache)
-	if cache["enabled"] != true || cache["url"] != deliverycli.DefaultCacheURL || cache["mode"] != deliverycli.DefaultCacheMode {
-		t.Fatalf("cache = %v", cache)
+	if _, recorded := cache["mode"]; cache["enabled"] != true || cache["url"] != deliverycli.DefaultCacheURL || recorded {
+		t.Fatalf("cache = %v, want enabled at the default URL with no mode", cache)
 	}
 
 	var state distributioncli.RegistriesState
@@ -596,7 +596,7 @@ func TestCacheStatusReportsConfig(t *testing.T) {
 		t.Fatalf("status = %+v, want an ok cache node", got)
 	}
 	config, _ := got.Child("cache.config")
-	if config.State != clicore.StatusOK || !strings.HasPrefix(config.Detail, "enabled in ") || !strings.HasSuffix(config.Detail, "(mode full)") {
+	if config.State != clicore.StatusOK || !strings.HasPrefix(config.Detail, "enabled in ") || strings.Contains(config.Detail, "(mode ") {
 		t.Fatalf("config = %+v", config)
 	}
 	identity, _ := got.Child("cache.identity")

@@ -17,6 +17,14 @@
     {
       "id": "a-files-restore-receives-downloads",
       "text": "A restore of a hit's files negotiates its key in a mode that names downloads: the session mode, or full when the session is minimal. Only the keys core restores result-only are negotiated in minimal."
+    },
+    {
+      "id": "an-unrequested-mode-is-left-to-the-run",
+      "text": "Setup and install write a mode into .putnami/cache.json only when --cache-mode or PUTNAMI_CACHE_MODE requests one. A run whose file records no mode resolves minimal when hosted and full otherwise. A file that records a mode keeps it."
+    },
+    {
+      "id": "the-run-log-names-the-session-mode",
+      "text": "A session with an active remote cache prints the mode it resolved, and where the mode comes from, once on stderr."
     }
   ]
 }
