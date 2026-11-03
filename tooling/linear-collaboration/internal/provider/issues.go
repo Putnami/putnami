@@ -243,10 +243,10 @@ func keyedID(teamID, key string) string {
 
 // A digest marker records, at the end of the description of the issue a
 // keyed create produced, a digest of what the request asked for. It is an
-// HTML comment whose payload sits in a code span, so Linear renders nothing
-// and its markdown normalization leaves the payload as it is. The issue's id
-// records the key; the marker tells a repeat from another request under the
-// same key.
+// HTML comment whose payload sits in a code span, so Linear's markdown
+// normalization leaves the payload as it is. Linear displays the line in the
+// issue. The issue's id records the key; the marker tells a repeat from
+// another request under the same key.
 //
 //	<!-- `putnami-idempotency d=<sha256 of the request>` -->
 

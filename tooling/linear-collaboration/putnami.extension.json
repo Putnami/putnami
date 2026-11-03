@@ -84,7 +84,7 @@
           "openWorld": true
         },
         "create": {
-          "description": "Open an issue in the bound Linear team. Its id derives from the team and the idempotency key, and a digest of the request is recorded in the description as a hidden comment: a repeated key returns the issue it opened, the same key with other content is a conflict, and a create whose outcome is unknown is read back by its id and answered unresolved rather than opened twice. A label name no team or workspace label carries creates a team label.",
+          "description": "Open an issue in the bound Linear team. Its id derives from the team and the idempotency key, and a digest of the request is recorded in the description as a comment that Linear displays: a repeated key returns the issue it opened, the same key with other content is a conflict, and a create whose outcome is unknown is read back by its id and answered unresolved rather than opened twice. A label name no team or workspace label carries creates a team label.",
           "openWorld": true
         },
         "update": {

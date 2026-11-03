@@ -65,8 +65,9 @@ from every answer.
   `in_progress`, `completed` for `done`, `canceled` for `canceled`. Linear has
   no type for `blocked`, so a transition to it is `unsupported`.
 - `create` names the issue by an id derived from the team and the idempotency
-  key, and records a digest of the request in a hidden comment at the end of
-  the description. A repeat returns the same issue; the same key with other
+  key, and records a digest of the request in an HTML comment at the end of
+  the description. Linear displays that line in the issue; a task's body does
+  not carry it. A repeat returns the same issue; the same key with other
   content is a conflict.
 - A label name no team or workspace label carries creates a team label. A
   label group is never applied.
