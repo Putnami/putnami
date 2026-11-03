@@ -4,12 +4,13 @@ import (
 	"go.putnami.dev/protocol/evidence"
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/tooling/observe/internal/detect/composer"
+	"go.putnami.dev/tooling/observe/internal/detect/python"
 	"go.putnami.dev/tooling/observe/internal/detectors/nx"
 )
 
 // Default returns the detectors observe runs, orchestrators first.
 func Default() []Detector {
-	return []Detector{NxDetector{}, NodeDetector{}, ComposerDetector{}, GoDetector{}}
+	return []Detector{NxDetector{}, NodeDetector{}, ComposerDetector{}, GoDetector{}, PythonDetector{}}
 }
 
 // fromProbe turns the projects of a probe answer into components.
@@ -69,6 +70,28 @@ func (ComposerDetector) Detect(root string) Found {
 		Diagnostics: result.Diagnostics,
 		Components: fromProbe(result.Projects, func(wsproto.ProbeProject) (Component, bool) {
 			return Component{Ecosystem: composer.Ecosystem, Source: evidence.SourceManifest}, true
+		}),
+	}
+}
+
+// PythonDetector adapts the Python detector: each uv workspace member is a
+// workspace component, each other pyproject.toml project a manifest one.
+type PythonDetector struct{}
+
+// Name implements Detector.
+func (PythonDetector) Name() string { return "python" }
+
+// Detect implements Detector.
+func (PythonDetector) Detect(root string) Found {
+	result := python.Detect(root)
+	return Found{
+		Diagnostics: result.Diagnostics,
+		Components: fromProbe(result.Projects, func(p wsproto.ProbeProject) (Component, bool) {
+			source := evidence.SourceManifest
+			if meta, err := python.ReadMetadata(p); err == nil && meta.Source == python.SourceWorkspace {
+				source = evidence.SourceWorkspace
+			}
+			return Component{Ecosystem: python.Ecosystem, Source: source}, true
 		}),
 	}
 }
