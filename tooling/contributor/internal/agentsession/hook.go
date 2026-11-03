@@ -333,8 +333,14 @@ func (e *Env) readSessionIdentity(ctx context.Context, cwd string) sessionIdenti
 	if root == "" {
 		return identity
 	}
+	branch, err := e.checkoutBranch(ctx, root)
+	if err != nil {
+		// An unread branch leaves the identity unknown, so the next event
+		// reads it again instead of keying the session on a detached HEAD.
+		return sessionIdentity{}
+	}
 	identity.repository = e.originRepository(ctx, root)
-	identity.branch = e.checkoutBranch(ctx, root)
+	identity.branch = branch
 	return identity
 }
 

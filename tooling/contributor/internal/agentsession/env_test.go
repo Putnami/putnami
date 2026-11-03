@@ -3,6 +3,7 @@ package agentsession
 import (
 	"context"
 	"errors"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"testing"
@@ -53,5 +54,40 @@ func TestSleepEndsWithItsContext(t *testing.T) {
 	cancel()
 	if err := sleepContext(ctx, time.Hour); !errors.Is(err, context.Canceled) {
 		t.Errorf("a canceled sleep answered %v", err)
+	}
+}
+
+// A real git tells a detached HEAD, its status 1, from a git that outlives
+// gitTimeout: the first is no branch, the second an error.
+func TestAGitPastItsTimeoutIsNotADetachedHEAD(t *testing.T) {
+	spectest.Proves(t, sessionFeature, targetRequirement, "a-git-failure-is-not-a-detached-head")
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Fatalf("git is not installed: %v", err)
+	}
+	dir := t.TempDir()
+	for _, args := range [][]string{
+		{"init", "-q", "-b", "feat/x"},
+		{"-c", "user.name=t", "-c", "user.email=t@example.com", "commit", "-q", "--allow-empty", "-m", "x"},
+		{"checkout", "-q", "--detach"},
+	} {
+		if _, err := runGit(context.Background(), dir, args...); err != nil {
+			t.Fatalf("git %v: %v", args, err)
+		}
+	}
+	env := NewEnv(dir, nil)
+	if branch, err := env.checkoutBranch(context.Background(), dir); branch != "" || err != nil {
+		t.Errorf("detached HEAD: branch %q, %v", branch, err)
+	}
+
+	// The same checkout behind a git that sleeps past gitTimeout.
+	bin := t.TempDir()
+	if err := os.WriteFile(filepath.Join(bin, "git"), []byte("#!/bin/sh\n/bin/sleep 3\nexit 1\n"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", bin)
+	branch, err := env.checkoutBranch(context.Background(), dir)
+	var exit gitExit
+	if branch != "" || err == nil || errors.As(err, &exit) {
+		t.Errorf("slow git: branch %q, %v, want a timeout error", branch, err)
 	}
 }

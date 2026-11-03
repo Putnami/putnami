@@ -123,6 +123,28 @@ func TestAttachDeclaresTheMissionOfTheBranch(t *testing.T) {
 	}
 }
 
+// A git that fails other than with status 1 is not a detached HEAD: attach
+// fails and declares nothing, and a session leaves its identity unknown, so
+// its next event reads it again.
+func TestAttachFailsWhenGitFails(t *testing.T) {
+	spectest.Proves(t, sessionFeature, targetRequirement, "a-git-failure-is-not-a-detached-head")
+	h := newHarness(t)
+	h.env.Git = func(context.Context, string, ...string) (string, error) {
+		return "", context.DeadlineExceeded
+	}
+	var stdout, stderr bytes.Buffer
+	if code := Attach(context.Background(), h.env, []string{"--issue", "7"}, &stdout, &stderr); code != 1 || stdout.Len() != 0 ||
+		stderr.String() != "agent attach: read the branch: context deadline exceeded\n" {
+		t.Errorf("exit %d, stdout %q, stderr %q", code, stdout.String(), stderr.String())
+	}
+	if entries, _ := os.ReadDir(filepath.Join(h.env.sessionsDir(), declaredDir)); len(entries) != 0 {
+		t.Errorf("a failed git declared %d issues", len(entries))
+	}
+	if identity := h.env.readSessionIdentity(context.Background(), h.root); identity != (sessionIdentity{}) {
+		t.Errorf("identity %+v, want unknown", identity)
+	}
+}
+
 func TestAttachRefusesAUsageError(t *testing.T) {
 	spectest.Proves(t, sessionFeature, targetRequirement, "attach-declares-the-mission-of-the-branch")
 	h := newHarness(t)
