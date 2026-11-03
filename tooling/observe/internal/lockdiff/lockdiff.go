@@ -1,5 +1,6 @@
 // Package lockdiff compares the packages a lockfile pins at two commits:
-// package-lock.json, pnpm-lock.yaml, yarn.lock, composer.lock and go.mod.
+// package-lock.json, pnpm-lock.yaml, yarn.lock, composer.lock, go.mod, uv.lock
+// and poetry.lock.
 //
 // A reader turns a lockfile's content into the versions it pins per package
 // name. Workspace links, path packages and the repository's own modules are
@@ -22,6 +23,7 @@ const (
 	EcosystemNPM      = "npm"
 	EcosystemComposer = "composer"
 	EcosystemGo       = "go"
+	EcosystemPyPI     = "pypi"
 )
 
 // Lockfile names the readers know.
@@ -31,6 +33,8 @@ const (
 	YarnLock     = "yarn.lock"
 	ComposerLock = "composer.lock"
 	GoMod        = "go.mod"
+	UVLock       = "uv.lock"
+	PoetryLock   = "poetry.lock"
 )
 
 // Packages maps a package name to the versions a lockfile pins for it.
@@ -67,6 +71,10 @@ func KindOf(file string) (Kind, bool) {
 		return Kind{EcosystemNPM, ReadYarnLock}, true
 	case ComposerLock:
 		return Kind{EcosystemComposer, ReadComposerLock}, true
+	case UVLock:
+		return Kind{EcosystemPyPI, ReadUVLock}, true
+	case PoetryLock:
+		return Kind{EcosystemPyPI, ReadPoetryLock}, true
 	}
 	return Kind{}, false
 }

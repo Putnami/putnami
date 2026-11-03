@@ -5,8 +5,11 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"regexp"
 	"slices"
 	"strings"
+
+	"go.putnami.dev/tooling/observe/internal/toml"
 )
 
 // ReadPackageLock reads an npm package-lock.json: the packages map of
@@ -197,4 +200,53 @@ func ReadComposerLock(data []byte) (Packages, error) {
 		out.add(p.Name, p.Version)
 	}
 	return out, nil
+}
+
+// ReadUVLock reads the [[package]] entries of a uv.lock. A package whose
+// source is editable, virtual, a directory or a path, such as a workspace
+// member, is the repository's own code and is left out.
+func ReadUVLock(data []byte) (Packages, error) {
+	return readPythonLock(UVLock, data, func(p toml.Table) bool {
+		source, _ := p["source"].(toml.Table)
+		for _, local := range []string{"editable", "virtual", "directory", "path"} {
+			if _, ok := source[local]; ok {
+				return true
+			}
+		}
+		return false
+	})
+}
+
+// ReadPoetryLock reads the [[package]] entries of a poetry.lock. A package
+// whose [package.source] is a directory or a local file, or that is installed
+// in develop mode, is the repository's own code and is left out.
+func ReadPoetryLock(data []byte) (Packages, error) {
+	return readPythonLock(PoetryLock, data, func(p toml.Table) bool {
+		typ := toml.String(p, "source", "type")
+		return typ == "directory" || typ == "file" || p["develop"] == true
+	})
+}
+
+func readPythonLock(file string, data []byte, local func(toml.Table) bool) (Packages, error) {
+	doc, err := toml.Parse(data)
+	if err != nil {
+		return nil, fmt.Errorf("%s is not TOML: %w", file, err)
+	}
+	out := Packages{}
+	for _, p := range toml.Tables(doc["package"]) {
+		if local(p) {
+			continue
+		}
+		out.add(PyPIName(toml.String(p, "name")), toml.String(p, "version"))
+	}
+	return out, nil
+}
+
+var pypiSeparators = regexp.MustCompile(`[-_.]+`)
+
+// PyPIName is a Python package name in its normalized form (PEP 503): lower
+// case, each run of -, _ and . replaced by one -. Two spellings of one
+// package, such as Flask_Login and flask-login, compare equal.
+func PyPIName(name string) string {
+	return pypiSeparators.ReplaceAllString(strings.ToLower(strings.TrimSpace(name)), "-")
 }
