@@ -224,7 +224,8 @@
             "checks": [
               "the-task-scenarios-pass-against-a-correct-provider",
               "the-local-provider-passes-the-task-scenarios",
-              "the-github-provider-passes-the-task-scenarios"
+              "the-github-provider-passes-the-task-scenarios",
+              "the-jira-provider-passes-the-task-scenarios"
             ]
           }
         },

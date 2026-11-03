@@ -1,0 +1,129 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-features.json",
+  "protocolVersion": 2,
+  "namespace": "tooling",
+  "features": [
+    {
+      "id": "tooling/jira-collaboration",
+      "type": "feature",
+      "name": "Jira collaboration provider",
+      "outcome": "A workspace binds its tasks to one Jira Cloud project and calls the tasks contract without knowing Jira's statuses, JQL or identifiers, while a lost answer never duplicates a ticket and a credential never leaves the provider",
+      "owner": "tooling",
+      "target": "modeled",
+      "requirements": [
+        {
+          "id": "state-by-category",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-canceled-transition-sets-the-wont-do-resolution",
+              "a-done-issue-resolved-wont-do-or-duplicate-is-canceled",
+              "a-status-category-maps-to-a-state",
+              "a-task-already-in-the-state-is-left-as-it-is",
+              "a-transition-takes-the-first-transition-into-the-target-category",
+              "blocked-is-unsupported"
+            ]
+          }
+        },
+        {
+          "id": "content-revision",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-cancel-changes-the-revision",
+              "the-revision-covers-what-a-task-shows"
+            ]
+          }
+        },
+        {
+          "id": "jql-find",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "caller-text-cannot-change-the-jql",
+              "find-filters-by-state-label-and-text",
+              "pages-cover-the-project-exactly-once"
+            ]
+          }
+        },
+        {
+          "id": "reconciled-writes",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-lost-create-response-returns-the-issue-without-a-duplicate",
+              "a-lost-transition-response-is-read-back",
+              "a-repeat-before-the-search-shows-the-issue-returns-it",
+              "a-repeated-key-returns-the-issue-it-created",
+              "a-reused-key-with-other-content-is-a-conflict",
+              "an-unestablished-write-is-unresolved-and-sent-once",
+              "the-idempotency-label-is-hidden-and-refused"
+            ]
+          }
+        },
+        {
+          "id": "honest-failures",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-missing-item-is-not-found",
+              "a-rate-limit-is-retryable-and-never-repeated",
+              "a-refused-credential-is-denied",
+              "a-stale-revision-is-a-conflict",
+              "an-outage-is-unavailable-and-writes-nothing"
+            ]
+          }
+        },
+        {
+          "id": "credential-safety",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-credential-never-reaches-an-answer",
+              "a-missing-credential-is-denied",
+              "the-override-reaches-only-the-loopback-interface"
+            ]
+          }
+        },
+        {
+          "id": "truthful-manifest",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "every-operation-reaches-outside-the-machine-and-says-so",
+              "the-manifest-passes-both-gates"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

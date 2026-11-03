@@ -1,0 +1,13 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-specs-baseline.json",
+  "protocolVersion": 2,
+  "executableRequirements": [
+    "tooling/jira-collaboration#content-revision",
+    "tooling/jira-collaboration#credential-safety",
+    "tooling/jira-collaboration#honest-failures",
+    "tooling/jira-collaboration#jql-find",
+    "tooling/jira-collaboration#reconciled-writes",
+    "tooling/jira-collaboration#state-by-category",
+    "tooling/jira-collaboration#truthful-manifest"
+  ]
+}

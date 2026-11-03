@@ -1,0 +1,54 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-spec.json",
+  "protocolVersion": 1,
+  "feature": "tooling/jira-collaboration",
+  "outcomes": [
+    "A workspace keeps its work items in one Jira Cloud project and its skills speak only the tasks contract",
+    "A Jira workflow's own statuses map to the contract's states by status category, so no status name is configured",
+    "A retry after a lost answer finds the ticket the first attempt created instead of creating it again, and an outcome the provider cannot establish is reported as unresolved",
+    "A Jira credential is sent only to the bound site and appears in no answer, message or log"
+  ],
+  "nonGoals": [
+    "The proposals, memory and missions contracts: Jira holds no change proposals",
+    "Assignment, hierarchy and exclusive claims: tasks assign, link and claim are not offered",
+    "Jira Data Center and Server: only Jira Cloud's REST API v2 is spoken",
+    "Rich text: a description is the plain string REST API v2 serves, never Atlassian Document Format",
+    "Detecting a concurrent writer between the read and the write of a checked precondition, or two concurrent creates with one idempotency key",
+    "Running the live proof in the ordinary gate: it mutates a real Jira project and runs only on request"
+  ],
+  "requirements": [
+    {
+      "id": "state-by-category",
+      "text": "A task's state is read from its status category: To Do is open, In Progress is in_progress, Done is done, and Done with the resolution Won't Do or Duplicate is canceled; providerState is the status name. A transition takes the first transition Jira offers into the target category, sets the resolution Won't Do for canceled, and leaves a task already in the state as it is. blocked has no category: a transition or create to it is unsupported, and find matches nothing for it."
+    },
+    {
+      "id": "content-revision",
+      "text": "A revision is v and the first 32 hex digits of the SHA-256 of the JSON array of summary, description, status name, status category, resolution, sorted labels and sorted assignee account ids, so it changes whenever anything a task shows changes, a done task becoming canceled included."
+    },
+    {
+      "id": "jql-find",
+      "text": "find reads the bound project with JQL built from the request's text, states and labels, oldest key first. The caller's text and labels are quoted and cannot add a clause. Pages cover every issue present throughout a traversal exactly once, whatever page sizes the caller asks for."
+    },
+    {
+      "id": "reconciled-writes",
+      "text": "create records the idempotency key as a hidden label and the request's digest as an issue property, in the create call itself. A repeated key returns the ticket it created, even before Jira's search shows it, and the key with other content is a conflict. Every write is sent once; after a lost answer or a 5xx the provider reads Jira back and answers from what it finds, never with a second ticket, and an outcome it cannot establish is unresolved, never retryable, and names what settles it. The idempotency label never appears in a task's labels and a request carrying one is refused."
+    },
+    {
+      "id": "honest-failures",
+      "text": "Failures keep their meaning: a missing issue or a reference another source issued is not found, an outage is unavailable and writes nothing, a rate limit is retryable and never repeated, a refused credential is denied, and a stale expectedRevision is a conflict that names the current revision."
+    },
+    {
+      "id": "credential-safety",
+      "text": "The provider reads JIRA_EMAIL and JIRA_API_TOKEN itself, sends them only to the bound site over https or to a loopback stand-in, and removes the token, its Basic form and every string shaped like an Atlassian API token from everything it writes, Jira error messages included."
+    },
+    {
+      "id": "truthful-manifest",
+      "text": "The manifest passes the extension protocol's strict validation, declares preconditions checked where Jira cannot compare and write in one step, and marks every operation as reaching outside the machine."
+    }
+  ],
+  "decisions": [
+    "tooling/jira-collaboration/doc/adr/0001-jira-collaboration-provider.md",
+    "protocols/collaboration/doc/adr/0001-collaboration-provider-contracts.md",
+    "tooling/contributor/doc/adr/0008-build-pushes-its-intent-before-its-code.md"
+  ]
+}
