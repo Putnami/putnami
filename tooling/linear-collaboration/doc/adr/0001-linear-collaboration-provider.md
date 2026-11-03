@@ -60,6 +60,10 @@ GitHub issues through `@putnami/github-collaboration`.
    when the read cannot settle it. `update` keeps the comment, and a task's
    body never shows it. An issue whose description lost the comment still
    answers for its key, since its id names the key, and is returned as it is.
+   Linear stores the comment but displays it as text, as a check in a real
+   team showed, so every issue this provider creates shows that line. The
+   owner accepted the visible line over a Linear attachment, which would take
+   a second write for each create.
 
 7. **Labels are names, and a missing name is created.** The contract carries
    label names. A create or update resolves each name, ignoring case, among the
