@@ -269,8 +269,12 @@ func readWorkspace(root string) (workspace, []diag.Diagnostic) {
 // segment is a path.Match pattern, or ** for any number of directories. An
 // absolute pattern, a .. segment or an invalid segment is refused.
 func patternSegments(pattern string) ([]string, bool) {
-	pattern = strings.TrimSuffix(strings.TrimPrefix(strings.TrimSpace(pattern), "./"), "/")
-	if pattern == "" || strings.HasPrefix(pattern, "/") || filepath.IsAbs(pattern) {
+	pattern = strings.TrimSpace(pattern)
+	if pattern == "" || strings.HasPrefix(pattern, "/") || filepath.IsAbs(pattern) || strings.Contains(pattern, "//") {
+		return nil, false
+	}
+	pattern = path.Clean(pattern)
+	if pattern == "." || pattern == ".." || strings.HasPrefix(pattern, "../") {
 		return nil, false
 	}
 	segments := strings.Split(pattern, "/")

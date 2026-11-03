@@ -395,7 +395,7 @@ func TestAnInvalidWorkspacePatternIsADiagnostic(t *testing.T) {
 			t.Errorf("diagnostic %s %s: %s", d.Code, d.Field, d.Message)
 		}
 	}
-	for pattern, want := range map[string]bool{"a/**": true, "./a/": true, "": false, "a//b": false, "a/../b": false} {
+	for pattern, want := range map[string]bool{"a/**": true, "./a/": true, "packages/./a": true, "x/../packages/a": true, "": false, ".": false, "a//b": false, "../a": false, "a/../../b": false} {
 		if _, ok := patternSegments(pattern); ok != want {
 			t.Errorf("patternSegments(%q) = %v, want %v", pattern, ok, want)
 		}
