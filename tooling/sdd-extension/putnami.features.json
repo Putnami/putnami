@@ -330,6 +330,64 @@
               "an-unknown-provider-fails"
             ]
           }
+        },
+        {
+          "id": "external-specs-share-one-discovery",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-feature-with-native-and-external-specs-fails",
+              "an-external-spec-is-projected-by-its-reader",
+              "two-features-cannot-share-a-spec-path",
+              "a-workspace-with-no-reference-reads-no-external-file"
+            ]
+          }
+        },
+        {
+          "id": "a-spec-format-needs-an-opt-in",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-format-the-project-did-not-opt-into-fails",
+              "a-format-with-no-reader-fails-and-says-so"
+            ]
+          }
+        },
+        {
+          "id": "enforce-needs-anchors",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "enforce-fails-an-unanchored-positional-requirement",
+              "report-projects-an-unanchored-positional-requirement"
+            ]
+          }
+        },
+        {
+          "id": "external-spec-files-key-the-spec-tasks",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-spec-tasks-key-every-extension-a-reader-reads",
+              "an-ignored-external-spec-is-absent"
+            ]
+          }
         }
       ],
       "surface": {

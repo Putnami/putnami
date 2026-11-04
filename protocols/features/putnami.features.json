@@ -177,6 +177,79 @@
               "a-decision-check-judges-one-file-and-fails-closed"
             ]
           }
+        },
+        {
+          "id": "external-spec-reference",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-version-3-manifest-carries-a-closed-spec-reference",
+              "an-older-manifest-refuses-the-spec-reference",
+              "a-spec-reference-cannot-leave-the-workspace"
+            ]
+          }
+        },
+        {
+          "id": "spec-reader-contract",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-reader-finding-names-its-file-and-line",
+              "an-over-long-requirement-names-a-split",
+              "two-requirements-with-one-id-name-both-positions",
+              "a-reader-is-deterministic"
+            ]
+          }
+        },
+        {
+          "id": "requirement-identity-mapping",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-requirement-name-normalizes-to-one-id",
+              "a-non-ascii-name-has-no-id",
+              "an-anchor-follows-the-segment-grammar"
+            ]
+          }
+        },
+        {
+          "id": "spec-format-policy",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-spec-format-policy-refuses-a-bad-list",
+              "a-project-list-replaces-the-workspace-list"
+            ]
+          }
+        },
+        {
+          "id": "scenarios-never-change-checks",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-scenario-mismatch-is-a-warning-either-way"
+            ]
+          }
         }
       ]
     }
