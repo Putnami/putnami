@@ -343,7 +343,9 @@
               "a-feature-with-native-and-external-specs-fails",
               "an-external-spec-is-projected-by-its-reader",
               "two-features-cannot-share-a-spec-path",
-              "a-workspace-with-no-reference-reads-no-external-file"
+              "a-workspace-with-no-reference-reads-no-external-file",
+              "an-external-spec-reaches-the-gate",
+              "a-scoped-run-keeps-its-external-spec"
             ]
           }
         },

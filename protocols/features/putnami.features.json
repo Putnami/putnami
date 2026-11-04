@@ -189,7 +189,8 @@
             "checks": [
               "a-version-3-manifest-carries-a-closed-spec-reference",
               "an-older-manifest-refuses-the-spec-reference",
-              "a-spec-reference-cannot-leave-the-workspace"
+              "a-spec-reference-cannot-leave-the-workspace",
+              "a-criteria-group-names-the-format-of-an-external-path"
             ]
           }
         },
@@ -247,7 +248,8 @@
           "verification": {
             "kind": "acceptance",
             "checks": [
-              "a-scenario-mismatch-is-a-warning-either-way"
+              "a-scenario-mismatch-is-a-warning-either-way",
+              "a-format-with-no-scenarios-is-not-compared"
             ]
           }
         }

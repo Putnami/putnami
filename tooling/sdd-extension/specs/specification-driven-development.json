@@ -100,7 +100,7 @@
     },
     {
       "id": "external-specs-share-one-discovery",
-      "text": "Discovery reads native specs and the external specs manifests name through one result, so one spec per feature covers both and a feature with both fails specs validate. Two features cannot name one path. A workspace with no reference reads no external file and keeps its outputs."
+      "text": "Discovery reads native specs and the external specs manifests name through one result, so one spec per feature covers both and a feature with both fails specs validate. Two features cannot name one path or overlapping paths. The criteria projection carries the format, so the spec gate accepts an external path. A scoped run keeps the external spec of a feature it selects. A workspace with no reference reads no external file and keeps its outputs."
     },
     {
       "id": "a-spec-format-needs-an-opt-in",

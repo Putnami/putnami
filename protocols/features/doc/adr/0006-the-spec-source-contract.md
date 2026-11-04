@@ -58,7 +58,17 @@ task input is a static pattern, so it cannot depend on a manifest value.
    external files are read through the Git candidate cut, so the key holds
    every byte a reader sees. A new extension needs a new task input, and a test
    pins the two together. (D-050)
-10. **An unanchored positional requirement fails only in `enforce`.** In
+10. **The criteria projection names the format.** A `SpecCriteriaGroup` for an
+    external spec carries `format`, and its `spec` is the reference path. A
+    native group omits `format` and keeps the `specs/*.json` rule, so its bytes
+    do not change and the projection stays version 1.
+11. **Scenarios are compared only where a format has them.** A reader sets
+    `Scenarios` to a list, empty or not, on a requirement its format can attach
+    scenarios to. It leaves `Scenarios` nil otherwise, and that requirement is
+    not compared. Kiro has no scenarios, so D-041 has nothing to compare there.
+12. **Two references cannot overlap.** A path that equals, contains or lies
+    inside another feature's path is an error: a spec details one feature.
+13. **An unanchored positional requirement fails only in `enforce`.** In
     `report` it is projected and `specs validate` adds no finding about it.
 
 ## Rejected alternatives

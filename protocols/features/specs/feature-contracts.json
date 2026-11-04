@@ -54,7 +54,7 @@
     },
     {
       "id": "external-spec-reference",
-      "text": "A version 3 manifest entry may name an external spec with a closed {format, path} object. The format is openspec, speckit, kiro or gherkin. The path is workspace-relative and cannot escape the workspace. Versions 1 and 2 refuse the member as an unknown field."
+      "text": "A version 3 manifest entry may name an external spec with a closed {format, path} object. The format is openspec, speckit, kiro or gherkin. The path is workspace-relative and cannot escape the workspace. Versions 1 and 2 refuse the member as an unknown field. A criteria group for an external spec carries its format, and a group with no format keeps the specs/*.json path rule."
     },
     {
       "id": "spec-reader-contract",
@@ -70,7 +70,7 @@
     },
     {
       "id": "scenarios-never-change-checks",
-      "text": "Comparing a requirement's scenarios with its declared checks gives one warning per scenario with no check and per check with no scenario. The comparison never adds, removes or changes a check."
+      "text": "Where a reader attaches scenarios to a requirement, comparing them with its declared checks gives one warning per scenario with no check and per check with no scenario. A requirement with no scenario list is not compared. The comparison never adds, removes or changes a check."
     }
   ],
   "decisions": [
