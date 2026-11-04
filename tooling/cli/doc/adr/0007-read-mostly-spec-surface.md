@@ -54,11 +54,14 @@ declaration can derive.
 
 *Amended 2026-11-04.* With `--from`, the draft also carries the outcomes,
 non-goals, requirement texts and `doc/adr/*.md` decision links of the source
-file. Each is text a human already agreed to in that file, copied as it
-stands. The command writes no text the source does not hold. One spec per
-feature covers native and external specs together, so the same change drops
-the declaration's reference to the external spec, and the native file becomes
-the one home of that prose.
+file. Each is text a human already agreed to in that file. The command
+copies the text as it stands; it only normalizes requirement IDs and makes
+decision links workspace-relative, as the native contract requires. It writes
+no text the source does not hold. One spec per feature covers native and
+external specs together, so the pull request that adds the native file also
+drops the manifest's reference to the external spec, and the native file
+becomes the one home of that prose. The command itself edits no
+declaration.
 
 ### 3. Both MCP tools are read-only
 

@@ -42,10 +42,13 @@ because `specs.baseline.json` records `feature#requirement` pairs.
    projects the external file in memory into `protocols/features.Spec`. No
    command commits that projection as a JSON file. (D-039)
 2. **A feature exists only through its declaration.** The declaration stays
-   in `putnami.features.json` or `Module.Feature`. It names its external
-   spec, for example
+   in `putnami.features.json` or `Module.Feature`. The reference to an
+   external spec is written on the feature's entry in
+   `putnami.features.json`, for example
    `"spec": {"format": "openspec", "path": "openspec/specs/invoice-export"}`.
-   A Markdown folder never creates a feature. D-025 is unchanged. (D-040)
+   Specs resolve against committed manifests only, never the design graph
+   (ADR 0007 §6), so `Module.Feature` names no spec. A Markdown folder never
+   creates a feature. D-025 is unchanged. (D-040)
 3. **Executable criteria stay in the manifest.** `verification` (checks,
    thresholds, windows) is authored in `putnami.features.json`. The reader
    compares the scenarios of the external file with the declared checks. A
@@ -54,7 +57,9 @@ because `specs.baseline.json` records `feature#requirement` pairs.
    (D-041)
 4. **A requirement ID survives reordering.** A name-based ID, such as the
    name in an OpenSpec `### Requirement: <name>` heading, is accepted after
-   kebab normalization: lowercase words joined by hyphens. A positional ID,
+   kebab normalization: lowercase words joined by hyphens, in the ID grammar
+   of the native spec. The spec source contract defines the exact mapping. A
+   positional ID,
    such as `FR-001` or `1.1`, needs an explicit anchor before its project can
    set `options.sdd.verification.specs` to `enforce`. An anchor is a stable
    ID the author assigns to the requirement; the spec source contract in
@@ -96,8 +101,9 @@ interpretation of each format, as ADR 0007 §4 requires. `tasks.md` and
   not checks. A deleted scenario would then shrink the check set and turn a
   requirement green with less proof, and no gate would see it.
 - **A Markdown folder that declares a feature.** Feature identity would then
-  depend on a directory layout. D-025 and the feature coverage step read
-  identity from declarations only.
+  depend on a directory layout. Under D-025, features come from
+  declarations only; a hosted spec details a declared feature and never
+  mints one.
 - **Parsing in the extension.** A second parser outside the protocol gives a
   second opinion on what a valid spec is.
 
@@ -109,11 +115,18 @@ interpretation of each format, as ADR 0007 §4 requires. `tasks.md` and
   renamed requirement is a removed requirement, and the gate fails until the
   baseline is updated.
 - The native format stays the strongest guarantee. `specs init --from` moves
-  one feature to it at a time, after a review. The change that adds the
-  native file also drops the declaration's reference to the external spec;
+  one feature to it at a time, after a review. The pull request that adds
+  the native file also drops the manifest's reference to the external spec;
   otherwise decision 7 fails it.
 - `protocols/features` gains a spec source contract and the
   `{format, path}` reference on a feature declaration. That reference is
   hard to undo once released.
+- An external spec file becomes an input of the cached spec tasks.
+  `specs-validate` and `specs-ratchet-validate` key today on
+  `**/specs/*.json` and `**/putnami.features.json`, so a changed Markdown
+  spec would serve a stale verdict. The readers must declare the external
+  files their opted-in formats read as task inputs, and
+  [ADR 0015](../../../cli/doc/adr/0015-specs-ratchet-keeps-its-own-discovery.md) follows
+  that change.
 - Each reader must keep pace with its upstream format. A format change
   upstream can turn a passing spec into a warning or an error.
