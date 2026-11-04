@@ -823,7 +823,11 @@ if ! (
   tail -n 200 "$observe_log" || true
   exit 1
 fi
-observe_head="$(git -C "$observe_dir" rev-parse HEAD)"
+if ! observe_head="$(git -C "$observe_dir" rev-parse HEAD 2>>"$observe_log")"; then
+  echo "::error::observe leg: cannot create the observed repository"
+  tail -n 200 "$observe_log" || true
+  exit 1
+fi
 observe_args=(observe --base HEAD~1 --evidence observe-evidence.json)
 echo "smoke: putnami ${observe_args[*]}"
 if ! (cd "$observe_dir" && "$bin" "${observe_args[@]}") >>"$observe_log" 2>&1; then

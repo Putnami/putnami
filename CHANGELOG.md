@@ -17,8 +17,8 @@ its commits.
 - `@putnami/web` localizes an application: locale routes, typed messages,
   per-namespace catalogs, translated paths, locale domains, a localized sitemap,
   and `putnami i18n` to keep the catalogs in step with the messages.
-- `@putnami/jira-collaboration` is a new tasks provider over Jira Cloud,
-  `preview`.
+- `@putnami/jira-collaboration` and `@putnami/linear-collaboration` are new tasks
+  providers over Jira Cloud and Linear, both `preview`.
 - `putnami projects owner|deps|why`, `putnami context map|pack` and
   `putnami <verb> --impacted --dry-run` answer what the MCP server answered.
   Putnami no longer serves one.
@@ -88,7 +88,7 @@ Commands that moved. The old spellings exit 2, with no alias.
 | `putnami proposals finalize` | `putnami change finalize` | `@putnami/contributor` |
 | `putnami contributor language` | `putnami change language` | `@putnami/contributor` |
 | `putnami contributor machine-load` | `putnami doctor --machine` | core |
-| `putnami migrate agent-content` | Removed. The refusal names each successor. | — |
+| `putnami migrate agent-content` | Removed. To add the skills and agents, run `putnami extensions install @putnami/contributor`. | `@putnami/contributor` |
 
 #### Agents
 

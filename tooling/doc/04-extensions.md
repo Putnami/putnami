@@ -89,7 +89,7 @@ Every extension is defined by a `putnami.extension.json` file. The manifest decl
 | Field | Required | Description |
 |-------|----------|-------------|
 | `$schema` | no | JSON Schema reference for editor support |
-| `commands` | **yes** | Public commands exposed to users |
+| `commands` | yes, unless the manifest declares a provider, agent content or a verb vocabulary | Public commands exposed to users |
 | `tasks` | no | Atomic executable units referenced by commands |
 | `hooks` | no | Lifecycle hooks (e.g., `preBuild`) |
 | `templates` | no | Project templates (see [Templates](/docs/tooling-&-workspace/templates)) |
@@ -367,7 +367,7 @@ A collaboration provider declares its contract under `providers`, with one comma
 }
 ```
 
-`@putnami/github-collaboration`, `@putnami/jira-collaboration`, `@putnami/local-collaboration` and `@putnami/memory-store` are providers. A workspace binds them in `options.collaboration` of `putnami.workspace.json`, and `putnami tasks` and `putnami proposals` call them.
+`@putnami/github-collaboration`, `@putnami/jira-collaboration`, `@putnami/linear-collaboration`, `@putnami/local-collaboration` and `@putnami/memory-store` are providers. A workspace binds them in `options.collaboration` of `putnami.workspace.json`, and `putnami tasks` and `putnami proposals` call them.
 
 ## The JSONL event protocol
 

@@ -745,7 +745,7 @@ no channel. The argument is a channel; `init` refuses an exact version. See
 | `channel` | `GET /putnami/cli/download` returns 200, an `X-Resolved-Version`, and a SHA-256 that describes the bytes streamed. | An earlier release skipped upload, or advertised a digest for the wrong bytes. |
 | `install` | The public installer URL installs from that channel, reports `Integrity verified`, never takes the unverified path, and invokes no `sudo`/`doas`/`pkexec`/`run0`. | The installer escalated privileges, or reported "verified" without checking. |
 | `discovery` | `command -v putnami` resolves, inside the smoke's workdir. | The installer escalated privileges, or reported "verified" without checking. |
-| `prerequisites` + `platform` + `stamp` | The actual runner has Bun v1.4.0 or later; the installed path is executable, hashes to the selected host asset, executes on that runner, and reports the resolved version. | A stale cross-compile cache hit shipped a binary with the wrong embedded version stamp. |
+| `prerequisites` + `platform` + `stamp` | The actual runner has Bun v1.4.0 or later and git; the installed path is executable, hashes to the selected host asset, executes on that runner, and reports the resolved version. | A stale cross-compile cache hit shipped a binary with the wrong embedded version stamp. |
 | `init` | With `PUTNAMI_CHANNEL` set to the smoke's channel, the exact TypeScript command creates readable workspace/project state, extension/template locks, dependency lock/config, the assistant guidance block in `AGENTS.md`/`CLAUDE.md`, with no `.mcp.json`. Root `.npmrc` maps `@putnami` to the public registry and contains no auth directive; no generated config/package manifest names the private cloud dependency; an installed-CLI build plan validates the generated graph. | Init reported success after a required setup step actually failed. |
 | `serve` + `http` | The exact serve command emits canonical nested v2 typed readiness on an OS-assigned port and answers one non-empty explicit 2xx HTTP response. | Init reported success after a required setup step actually failed. |
 | `shutdown` | The CLI and starter exit within the graceful budget without the hard fallback, and no process whose command line names the smoke workdir, or whose working directory is below it, still runs. A host Bun serves `./src/serve.ts`, so only its directory names the tree; it is read from `/proc` on Linux and with `lsof` on macOS. On Windows the Job Object of ADR 0052 is the guarantee and this check is a sanity check. An answer on the freed port does not fail the leg: an unrelated listener can take the port, and the page of a webapp changes on every request. The answer is reported. | The CLI or starter failed to exit within the graceful budget. |
@@ -842,8 +842,7 @@ all of these hold:
 
 The command must be listed in the command map and must not wait for input. An
 automated runner has no terminal, so the command's stdin is `/dev/null`. An
-invalid name fails before the channel is fetched, and the leg needs `git` on
-the runner.
+invalid name fails before the channel is fetched.
 With `SMOKE_INSTALL_URL` set, the leg reads the map served next to that
 installer through `PUTNAMI_COMMAND_MAP_URL`, so a candidate site is tested with
 its own map.
