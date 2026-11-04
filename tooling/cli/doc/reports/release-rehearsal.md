@@ -86,7 +86,7 @@ addition. Re-read them from the test's log output at any time.
 | Quantity | Value |
 | --- | --- |
 | Candidate files scanned | 9222 |
-| Release series | 0.3.0 (from `tooling/CHANGELOG.md`) |
+| Release series | 0.4.0 (from `tooling/CHANGELOG.md`) |
 | Builder archive matrix | `darwin/amd64 darwin/arm64 linux/amd64 linux/arm64 windows/amd64` |
 | Publishable artifacts | 102 across `archives=19 docker=4 go=64 npm=15 template-archives=7` |
 | Publish order | protocols → extension-sdk → go-framework → cloud-runtime → typescript-framework → language-extensions → cloud-extensions → cli → contributor-extensions → templates |
