@@ -92,6 +92,12 @@
       "parity": "unsupported"
     },
     {
+      "id": "@putnami/linear-collaboration",
+      "kind": "package",
+      "status": "preview",
+      "parity": "unsupported"
+    },
+    {
       "id": "@putnami/local-collaboration",
       "kind": "package",
       "status": "preview",

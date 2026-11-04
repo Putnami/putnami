@@ -74,6 +74,13 @@ from every answer.
 - `update` and `transition` check `expectedRevision` against the issue read
   just before the write: Linear has no conditional write.
 
+## Support
+
+This package is `preview` in [`putnami.support.json`](../../putnami.support.json):
+it can break in a minor release, and the release notes then state the change
+you must make. For `stable`, it needs a consumer in this repository, a page on
+the site, and a version gate that fails a release on an undeclared break.
+
 ## Live proof
 
 `bin/live-test <team key>` runs the shared task scenarios against a real team
