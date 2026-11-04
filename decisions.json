@@ -299,6 +299,78 @@
       "settled": "2026-11-04",
       "settledBy": "fdumay",
       "reviewOnly": true
+    },
+    {
+      "id": "D-039",
+      "statement": "an external spec file in a market format (OpenSpec, Spec Kit, Kiro, Gherkin) can be the one home of a feature's outcomes, non-goals and requirement texts; a reader projects it in memory into the native spec, and no command commits that projection as JSON",
+      "settled": "2026-11-04",
+      "settledBy": "fdumay",
+      "adr": "tooling/sdd-extension/doc/adr/0004-a-spec-may-live-in-an-external-market-format.md",
+      "reviewOnly": true
+    },
+    {
+      "id": "D-040",
+      "statement": "a feature exists only through its declaration in putnami.features.json or Module.Feature; its putnami.features.json entry names its external spec by format and path, and a spec folder never creates a feature",
+      "settled": "2026-11-04",
+      "settledBy": "fdumay",
+      "adr": "tooling/sdd-extension/doc/adr/0004-a-spec-may-live-in-an-external-market-format.md",
+      "reviewOnly": true
+    },
+    {
+      "id": "D-041",
+      "statement": "verification checks, thresholds and windows are authored in putnami.features.json; scenarios in an external spec are compared with the declared checks and a mismatch either way is a warning, never a change to the check set",
+      "settled": "2026-11-04",
+      "settledBy": "fdumay",
+      "adr": "tooling/sdd-extension/doc/adr/0004-a-spec-may-live-in-an-external-market-format.md",
+      "reviewOnly": true
+    },
+    {
+      "id": "D-042",
+      "statement": "a requirement ID survives reordering: a name-based ID is accepted after kebab normalization, and a positional ID such as FR-001 or 1.1 needs an explicit anchor before its project can enforce specs",
+      "settled": "2026-11-04",
+      "settledBy": "fdumay",
+      "adr": "tooling/sdd-extension/doc/adr/0004-a-spec-may-live-in-an-external-market-format.md",
+      "reviewOnly": true
+    },
+    {
+      "id": "D-043",
+      "statement": "a spec reader ignores an unknown section, warns on a section that restates a derived fact, and fails a requirement text over the 512-byte bound with an error that names a split",
+      "settled": "2026-11-04",
+      "settledBy": "fdumay",
+      "adr": "tooling/sdd-extension/doc/adr/0004-a-spec-may-live-in-an-external-market-format.md",
+      "reviewOnly": true
+    },
+    {
+      "id": "D-044",
+      "statement": "only doc/adr/*.md links are decisions; design.md and plan.md are context, never decision links",
+      "settled": "2026-11-04",
+      "settledBy": "fdumay",
+      "adr": "tooling/sdd-extension/doc/adr/0004-a-spec-may-live-in-an-external-market-format.md",
+      "reviewOnly": true
+    },
+    {
+      "id": "D-045",
+      "statement": "native and external specs are discovered together, so one spec per feature covers both and a feature with both fails specs validate",
+      "settled": "2026-11-04",
+      "settledBy": "fdumay",
+      "adr": "tooling/sdd-extension/doc/adr/0004-a-spec-may-live-in-an-external-market-format.md",
+      "reviewOnly": true
+    },
+    {
+      "id": "D-046",
+      "statement": "specs init <feature> --from <format>:<path> writes one new native spec with O_EXCL, supports --dry-run, carries only text copied from the source, and has no --all and no --force; there is no specs migrate",
+      "settled": "2026-11-04",
+      "settledBy": "fdumay",
+      "adr": "tooling/sdd-extension/doc/adr/0004-a-spec-may-live-in-an-external-market-format.md",
+      "reviewOnly": true
+    },
+    {
+      "id": "D-047",
+      "statement": "a project lists the market spec formats it reads in options.sdd.specFormats, empty by default",
+      "settled": "2026-11-04",
+      "settledBy": "fdumay",
+      "adr": "tooling/sdd-extension/doc/adr/0004-a-spec-may-live-in-an-external-market-format.md",
+      "reviewOnly": true
     }
   ]
 }
