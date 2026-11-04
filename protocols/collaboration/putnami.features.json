@@ -146,6 +146,7 @@
               "a-version-nobody-speaks-draws-one-warning",
               "the-local-provider-manifest-draws-no-diagnostic",
               "the-github-provider-manifest-draws-no-diagnostic",
+              "the-linear-provider-manifest-draws-no-diagnostic",
               "the-memory-store-manifest-draws-no-diagnostic",
               "the-cli-refuses-a-call-to-a-withdrawn-contract-version"
             ]
@@ -225,7 +226,8 @@
               "the-task-scenarios-pass-against-a-correct-provider",
               "the-local-provider-passes-the-task-scenarios",
               "the-github-provider-passes-the-task-scenarios",
-              "the-jira-provider-passes-the-task-scenarios"
+              "the-jira-provider-passes-the-task-scenarios",
+              "the-linear-provider-passes-the-task-scenarios"
             ]
           }
         },

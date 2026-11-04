@@ -1,0 +1,29 @@
+{
+  "protocolVersion": 2,
+  "contracts": [
+    {
+      "authority": "Linear GraphQL API (linear.app/developers/graphql)",
+      "adapter": "tooling/linear-collaboration/internal/linear/client.go",
+      "callsites": [
+        {
+          "path": "tooling/linear-collaboration/internal/linear/client.go",
+          "transport": "http",
+          "symbol": "http.Client",
+          "fingerprint": "2910ec7982d88e1021225f3a7ef9305d1538b520e4358d972590b4eae6794614"
+        },
+        {
+          "path": "tooling/linear-collaboration/internal/linear/client.go",
+          "transport": "http",
+          "symbol": "http.NewRequestWithContext",
+          "fingerprint": "2a88ac04b03331786400e4ecd2bf3d70f428556e61c4a40eadd1ca487c226930"
+        }
+      ],
+      "owner": "@putnami/linear-collaboration",
+      "tests": [
+        "tooling/linear-collaboration/internal/linear/client_test.go",
+        "tooling/linear-collaboration/internal/provider/conformance_test.go"
+      ],
+      "reason": "Implements the tasks collaboration contract on the issues of one Linear team."
+    }
+  ]
+}

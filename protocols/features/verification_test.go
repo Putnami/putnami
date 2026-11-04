@@ -184,6 +184,7 @@ func TestCommittedRepositoryContentStaysOnTheLegacyManifestWire(t *testing.T) {
 		filepath.Join("tooling", "extension-sdk", ManifestFilename):               true,
 		filepath.Join("tooling", "github-collaboration", ManifestFilename):        true,
 		filepath.Join("tooling", "jira-collaboration", ManifestFilename):          true,
+		filepath.Join("tooling", "linear-collaboration", ManifestFilename):        true,
 		filepath.Join("tooling", "memory-store", ManifestFilename):                true,
 		filepath.Join("tooling", "scaffold", ManifestFilename):                    true,
 		filepath.Join("typescript", "extension", ManifestFilename):                true,

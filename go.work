@@ -110,6 +110,7 @@ use (
 	./tooling/github-collaboration
 	./tooling/install-scripts
 	./tooling/jira-collaboration
+	./tooling/linear-collaboration
 	./tooling/local-collaboration
 	./tooling/memory-store
 	./tooling/observe

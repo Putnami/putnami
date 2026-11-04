@@ -1,0 +1,103 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-extension.json",
+  "name": "@putnami/linear-collaboration",
+  "cliContract": 19,
+  "runtime": {
+    "executable": "compiled/putnami-linear-collaboration",
+    "toolchains": {
+      "runtimeCompiler": {
+        "lock": "go",
+        "candidates": [
+          {
+            "from": "environment",
+            "environment": "GOROOT",
+            "path": "bin/go"
+          },
+          {
+            "from": "path",
+            "path": "go"
+          },
+          {
+            "from": "putnami-home",
+            "path": "toolchains/go/go-{version}/go/bin/go"
+          }
+        ],
+        "probe": {
+          "args": [
+            "env",
+            "GOVERSION"
+          ],
+          "expect": "go{version}",
+          "unset": [
+            "GOROOT"
+          ],
+          "environment": {
+            "GOTOOLCHAIN": "local"
+          }
+        },
+        "environment": {
+          "GOROOT": {
+            "from": "ancestor",
+            "levels": 2
+          },
+          "GOTOOLCHAIN": {
+            "from": "literal",
+            "value": "local"
+          }
+        },
+        "prependPath": true
+      }
+    },
+    "prepare": {
+      "command": "{extensionRoot}/bin/prepare",
+      "args": [
+        "--output",
+        "{runtimeOutput}"
+      ],
+      "inputs": [
+        "bin/prepare",
+        "cmd/**",
+        "go.mod",
+        "internal/**"
+      ],
+      "toolchains": [
+        "runtimeCompiler"
+      ]
+    }
+  },
+  "providers": {
+    "tasks": {
+      "version": 1,
+      "command": "{extensionRuntime}",
+      "args": [
+        "provider"
+      ],
+      "cwd": "{workspaceRoot}",
+      "timeoutMs": 120000,
+      "operations": {
+        "find": {
+          "description": "Find issues of the bound Linear team by text in the title or description, semantic state and labels, in Linear's creation order, one page of Linear's cursor pagination at a time. Every listed label must be on the issue. States map from workflow state types; find does not report parents.",
+          "openWorld": true
+        },
+        "get": {
+          "description": "Read one issue of the bound Linear organization by its UUID. An issue Linear deleted is not found.",
+          "openWorld": true
+        },
+        "create": {
+          "description": "Open an issue in the bound Linear team. Its id derives from the team and the idempotency key, and a digest of the request is recorded in the description as a comment that Linear displays: a repeated key returns the issue it opened, the same key with other content is a conflict, and a create whose outcome is unknown is read back by its id and answered unresolved rather than opened twice. A label name no team or workspace label carries creates a team label.",
+          "openWorld": true
+        },
+        "update": {
+          "description": "Change an issue's title, description or labels. Labels replace the issue's whole label set; a name no label carries creates a team label. expectedRevision is compared with the issue read just before the write: Linear has no conditional write, so a writer between the two is not detected.",
+          "openWorld": true,
+          "preconditions": "checked"
+        },
+        "transition": {
+          "description": "Move an issue to the first workflow state, by position, of its team that has the target type: unstarted for open, started for in_progress, completed for done, canceled for canceled. Linear has no type for blocked, so blocked is unsupported. expectedRevision is compared with the issue read just before the write.",
+          "openWorld": true,
+          "preconditions": "checked"
+        }
+      }
+    }
+  }
+}

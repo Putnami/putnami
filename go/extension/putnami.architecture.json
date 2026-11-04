@@ -9,6 +9,7 @@
     "/tooling/clientgen-extension",
     "/tooling/github-collaboration",
     "/tooling/jira-collaboration",
+    "/tooling/linear-collaboration",
     "/tooling/local-collaboration",
     "/tooling/memory-store",
     "/tooling/observe",
@@ -650,6 +651,51 @@
         {
           "kind": "project-dependency",
           "consumerProject": "/tooling/jira-collaboration",
+          "producerProject": "/protocols/workspace"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/linear-collaboration",
+          "producerProject": "/protocols/capabilities"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/linear-collaboration",
+          "producerProject": "/protocols/cli"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/linear-collaboration",
+          "producerProject": "/protocols/collaboration"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/linear-collaboration",
+          "producerProject": "/protocols/diagnostic"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/linear-collaboration",
+          "producerProject": "/protocols/extension"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/linear-collaboration",
+          "producerProject": "/protocols/features"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/linear-collaboration",
+          "producerProject": "/protocols/job"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/linear-collaboration",
+          "producerProject": "/protocols/runtime"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/linear-collaboration",
           "producerProject": "/protocols/workspace"
         },
         {

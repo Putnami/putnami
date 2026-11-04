@@ -1,0 +1,125 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-features.json",
+  "protocolVersion": 2,
+  "namespace": "tooling",
+  "features": [
+    {
+      "id": "tooling/linear-collaboration",
+      "type": "feature",
+      "name": "Linear collaboration provider",
+      "outcome": "A workspace binds its tasks to one Linear team and calls the tasks contract without knowing Linear's workflow states, labels or identifiers, while a lost answer never duplicates an issue and the API key never leaves the provider",
+      "owner": "tooling",
+      "target": "modeled",
+      "requirements": [
+        {
+          "id": "workflow-state-mapping",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "each-workflow-state-type-reads-as-its-semantic-state",
+              "a-transition-takes-the-first-state-of-the-target-type",
+              "blocked-is-unsupported",
+              "a-task-already-in-the-state-is-left-as-it-is"
+            ]
+          }
+        },
+        {
+          "id": "idempotent-create",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-repeated-key-returns-the-first-issue",
+              "a-key-with-other-content-is-a-conflict",
+              "a-lost-create-answer-is-read-back-by-id",
+              "an-unestablished-create-is-unresolved-and-sent-once",
+              "update-keeps-the-recorded-digest"
+            ]
+          }
+        },
+        {
+          "id": "checked-revision",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-revision-covers-what-a-task-shows",
+              "a-stale-revision-is-a-conflict-before-any-write"
+            ]
+          }
+        },
+        {
+          "id": "named-labels",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-missing-label-is-created-in-the-team",
+              "a-label-group-is-never-applied",
+              "find-requires-every-label-the-states-and-the-query"
+            ]
+          }
+        },
+        {
+          "id": "honest-failures",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-missing-item-is-not-found",
+              "pages-follow-linear-cursors-exactly-once",
+              "an-outage-is-unavailable-and-writes-nothing",
+              "a-rate-limit-is-retryable-and-never-repeated",
+              "a-refused-credential-is-denied"
+            ]
+          }
+        },
+        {
+          "id": "credential-safety",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-credential-never-reaches-an-answer",
+              "the-key-comes-from-linear-api-key-only",
+              "the-override-reaches-only-the-loopback-interface"
+            ]
+          }
+        },
+        {
+          "id": "truthful-manifest",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-manifest-passes-both-gates",
+              "every-operation-reaches-outside-the-machine-and-says-so"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}
