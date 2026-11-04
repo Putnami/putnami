@@ -53,6 +53,13 @@ correction reuses existing intent and design. Focused `spec`, `design`,
 `review` and `check` entries remain available for direct interventions;
 `design` covers a prototype and an ADR. `content-bump` remains an explicit-only utility.
 
+`putnami change estimate --issue <id>` sizes a plan S, M or L before code
+starts. An S plan starts at once; a plan with important design decisions or a
+sensitive slice waits for the owner to approve the study and a cost envelope.
+When one outcome needs several issues, `epic` plans them in dependency order,
+has the owner approve one envelope, and runs one `build` session per issue,
+wave by wave.
+
 The default progress view shows the promised outcome, demonstrated results,
 each unit's required delivery stage, blockers, unresolved decisions and next
 inspectable result. Tasks and prototypes can finish while a delivery unit

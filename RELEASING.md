@@ -141,14 +141,16 @@ private history and is never published.
 
 A version is derived from git, per **version line** — a scope whose
 `putnami.json` declares a `line` block with the pattern of its tags
-(`protocols/workspace` ADR 0002). This repository has six:
+(`protocols/workspace` ADR 0002). This repository has eight:
 `typescript` (`ts/v{version}`), `go` (`go/v{version}`), `tooling`,
-`protocols`, `python`, and `sites` (each `<scope>/v{version}`).
+`protocols`, `python`, `sites`, `cloud` and `intelligence` (each
+`<scope>/v{version}`).
 
 ```sh
 putnami version get                        # what every line is at, right now
 putnami version tag --scope tooling        # print the proposal, write nothing
 putnami version tag --scope tooling --yes --push
+putnami version tag protocols/v0.4.0 --scope protocols --yes --push   # name the tag
 ```
 
 `putnami version get` and `putnami version tag` are commands of

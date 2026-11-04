@@ -26,11 +26,10 @@ later.
 
 ## Use it
 
-Install the extension in the user scope, then run it in the job. As of
-November 2026 it is published on the `canary` channel only:
+Install the extension in the user scope, then run it in the job:
 
 ```bash
-putnami extensions install --user @putnami/observe@canary
+putnami extensions install --user @putnami/observe
 putnami observe
 ```
 

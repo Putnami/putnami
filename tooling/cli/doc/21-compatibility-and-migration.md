@@ -18,7 +18,7 @@ document fails the build.
 
 | Format | Where it lives | Read window | Outside the window |
 |---|---|---|---|
-| Lock file | `putnami.lock.json` | 2 – 4 | Older: migrate. Newer: upgrade the CLI. |
+| Lock file | `putnami.lock.json` | 2 – 5 | Older: migrate. Newer: upgrade the CLI. |
 | Machine result envelope | `--output=json` / `--output=jsonl`, session files | 2 emitted, 1 readable | No downgrade. Pin a pre-removal CLI build. |
 | Extension contract stamp | `cliContract` in `putnami.extension.json` | 4 – 5, at least what the manifest's vocabulary requires (5 for agent content) | Re-package the extension, or upgrade the CLI. |
 | Support catalog | `putnami.support.json` | exactly 1 | Author the file at version 1. |

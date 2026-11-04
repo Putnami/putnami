@@ -382,6 +382,21 @@ func TestSmokeCLIHelperProcess(t *testing.T) {
 			t.Fatal(err)
 		}
 		return
+	case "extensions\x00install\x00--user\x00@putnami/observe@" + os.Getenv(smokeChannelEnv):
+		if os.Getenv("SMOKE_TEST_OBSERVE_INSTALL_EXIT") != "" {
+			_, _ = os.Stdout.WriteString("the channel does not hold @putnami/observe\n")
+			os.Exit(1)
+		}
+		return
+	case "extensions\x00install\x00--user\x00@putnami/cloud@" + os.Getenv(smokeChannelEnv):
+		return
+	case "observe\x00--base\x00HEAD~1\x00--evidence\x00observe-evidence.json":
+		if os.Getenv("SMOKE_TEST_OBSERVE_EXIT") != "" {
+			_, _ = os.Stdout.WriteString("observe cannot read the repository\n")
+			os.Exit(1)
+		}
+		writeSmokeObserveEvidence(t)
+		return
 	case "extensions\x00install\x00--user\x00--latest\x00" + smokeRunExtension:
 		_, _ = os.Stdout.WriteString("  ✓ Pinned " + smokeRunExtension + " for this user\n")
 		return
@@ -406,6 +421,25 @@ func TestSmokeCLIHelperProcess(t *testing.T) {
 		return
 	default:
 		t.Fatalf("unexpected golden-path argv: %q", args)
+	}
+}
+
+// writeSmokeObserveEvidence writes what `putnami observe --evidence` writes for
+// the head commit, or a document of another commit under
+// SMOKE_TEST_OBSERVE_WRONG_HEAD.
+func writeSmokeObserveEvidence(t *testing.T) {
+	t.Helper()
+	head, err := exec.Command("git", "rev-parse", "HEAD").Output()
+	if err != nil {
+		t.Fatal(err)
+	}
+	sha := strings.TrimSpace(string(head))
+	if os.Getenv("SMOKE_TEST_OBSERVE_WRONG_HEAD") != "" {
+		sha = strings.Repeat("0", len(sha))
+	}
+	document := fmt.Sprintf("{\n  \"subject\": {\n    \"sha\": %q\n  }\n}\n", sha)
+	if err := os.WriteFile("observe-evidence.json", []byte(document), 0o644); err != nil {
+		t.Fatal(err)
 	}
 }
 
@@ -557,6 +591,7 @@ func TestSmokeInstallsThroughTheInstallerAndDiscoversTheCommand(t *testing.T) {
 
 func TestSmokeRunsExactTypeScriptGoldenPathThroughHTTPAndCleanStop(t *testing.T) {
 	requireBash(t)
+	requireGit(t)
 	t.Setenv("GO_WANT_SMOKE_CLI_HELPER", "1")
 	hook := filepath.Join(t.TempDir(), "shell-hook")
 	if err := os.WriteFile(hook, []byte(":\n"), 0o600); err != nil {
@@ -941,6 +976,75 @@ const (
 	smokeRunExtension = "@putnami-test/smoke-run"
 )
 
+// runSmokeThroughObserveLeg runs the whole golden path, which ends with the
+// observe leg. Each run takes seconds, so the observe tests run in parallel and
+// pass their settings through extra.
+func runSmokeThroughObserveLeg(t *testing.T, extra ...string) result {
+	t.Helper()
+	requireBash(t)
+	requireGit(t)
+	body := fullGoldenPathStub(t)
+	server := newRegistry(t, registryOptions{
+		body:      body,
+		integrity: "sha256:" + sha256Hex(body),
+		resolved:  stubVersion,
+	})
+	env := append([]string{"GO_WANT_SMOKE_CLI_HELPER=1"}, extra...)
+	return runSmokeFrom(t, server.URL, server.URL+"/install.sh", "", t.TempDir(), env...)
+}
+
+func TestSmokeObservesAChangeInARepositoryWithoutAWorkspace(t *testing.T) {
+	t.Parallel()
+	res := runSmokeThroughObserveLeg(t)
+	if res.exitCode != 0 {
+		t.Fatalf("observe leg failed (exit %d):\n%s", res.exitCode, res.output)
+	}
+	for _, want := range []string{
+		"smoke: putnami extensions install --user @putnami/observe@",
+		"smoke: putnami extensions install --user @putnami/cloud@",
+		"smoke: putnami observe --base HEAD~1 --evidence observe-evidence.json",
+		"smoke: putnami observe wrote the evidence of ",
+		"clean stop → observe on ",
+	} {
+		if !res.contains(want) {
+			t.Fatalf("observe leg did not report %q:\n%s", want, res.output)
+		}
+	}
+}
+
+func TestSmokeFailsTheObserveLegWhenTheChannelLacksTheExtension(t *testing.T) {
+	t.Parallel()
+	res := runSmokeThroughObserveLeg(t, "SMOKE_TEST_OBSERVE_INSTALL_EXIT=1")
+	if res.exitCode == 0 {
+		t.Fatalf("smoke passed a channel without @putnami/observe:\n%s", res.output)
+	}
+	if !res.contains("::error::observe leg: the stable path cannot install @putnami/observe") {
+		t.Fatalf("smoke did not name the missing extension at the observe leg:\n%s", res.output)
+	}
+}
+
+func TestSmokeFailsTheObserveLegWhenObserveFails(t *testing.T) {
+	t.Parallel()
+	res := runSmokeThroughObserveLeg(t, "SMOKE_TEST_OBSERVE_EXIT=1")
+	if res.exitCode == 0 {
+		t.Fatalf("smoke passed a failing putnami observe:\n%s", res.output)
+	}
+	if !res.contains("::error::observe leg: putnami observe failed") {
+		t.Fatalf("smoke did not name the failure at the observe leg:\n%s", res.output)
+	}
+}
+
+func TestSmokeFailsTheObserveLegWhenTheEvidenceNamesAnotherCommit(t *testing.T) {
+	t.Parallel()
+	res := runSmokeThroughObserveLeg(t, "SMOKE_TEST_OBSERVE_WRONG_HEAD=1")
+	if res.exitCode == 0 {
+		t.Fatalf("smoke passed the evidence of another commit:\n%s", res.output)
+	}
+	if !res.contains("::error::observe leg: the evidence document does not name the head commit") {
+		t.Fatalf("smoke did not name the wrong evidence at the observe leg:\n%s", res.output)
+	}
+}
+
 // runSmokeWithRunLeg runs the whole golden path plus the run leg for
 // smokeRunCommand, against a registry whose command map lists it. Each run
 // takes seconds, so the run-leg tests run in parallel and pass their settings
@@ -970,7 +1074,7 @@ func TestSmokeRunsTheOptionalRunScenarioInAnUntouchedDirectory(t *testing.T) {
 		"no process of the smoke runs after clean stop",
 		`smoke: curl -fsSL "` + server.URL + `/install.sh?run=` + smokeRunCommand + `" | bash`,
 		"putnami " + smokeRunCommand + " exited 0 and left ",
-		"clean stop → run " + smokeRunCommand + " on ",
+		"clean stop → observe → run " + smokeRunCommand + " on ",
 	} {
 		if !res.contains(want) {
 			t.Fatalf("run leg did not report %q:\n%s", want, res.output)

@@ -13,6 +13,10 @@
 # plus the Windows contract of ADR 0052: the LF policy file
 # init writes, and a stop request that ends the served starter.
 #
+# The observe leg installs @putnami/observe and @putnami/cloud in the user scope
+# from the same channel, then runs `putnami observe` on a two-commit repository
+# that is not a workspace. It requires the evidence document of the head commit.
+#
 # With SMOKE_RUN_COMMAND set, a last leg runs the run form of the installer,
 # irm "<installer URL>?run=<command>" | iex, as script text in a fresh
 # `git init` directory that is not a workspace. It requires exit status 0 and a
@@ -1140,6 +1144,52 @@ function Invoke-Smoke {
     }
     Write-Smoke 'smoke: no process of the smoke runs after clean stop'
 
+    # -- Observe leg: observe a change in a repository without a workspace --
+    #
+    # The path of the how-to "Observe a change in your CI": the extensions come
+    # from the channel of the CLI, in the user scope, because the repository
+    # holds no workspace.
+    $observeDir = Join-Path $Workdir 'observe-scenario'
+    $null = [IO.Directory]::CreateDirectory($observeDir)
+    foreach ($observeExtension in @('@putnami/observe', '@putnami/cloud')) {
+        $observeInstallLog = Join-Path $Workdir ('observe-install-' + ($observeExtension -replace '^@putnami/', '') + '.log')
+        Write-Smoke "smoke: putnami extensions install --user ${observeExtension}@${Channel}"
+        if ((Invoke-SmokeCommand $bin "putnami extensions install --user ${observeExtension}@${Channel}" $observeDir $observeInstallLog) -ne 0) {
+            Stop-Smoke "observe leg: the stable path cannot install $observeExtension from channel '$Channel'" $observeInstallLog
+        }
+    }
+    $observeGit = [string](Get-Command -Name git -CommandType Application | Select-Object -First 1).Path
+    $observeGitLog = Join-Path $Workdir 'observe-git.log'
+    $observeAuthor = '-c user.name=smoke -c user.email=smoke@putnami.dev'
+    [IO.File]::WriteAllText((Join-Path $observeDir 'change.txt'), "observed`n")
+    $observeRepository = @(
+        'git init -q',
+        "git $observeAuthor commit -q --allow-empty -m base",
+        'git add change.txt',
+        "git $observeAuthor commit -q -m change"
+    )
+    foreach ($observeCommand in $observeRepository) {
+        if ((Invoke-SmokeCommand $observeGit $observeCommand $observeDir $observeGitLog) -ne 0) {
+            Stop-Smoke 'observe leg: cannot create the observed repository' $observeGitLog
+        }
+    }
+    $observeHeadLog = Join-Path $Workdir 'observe-head.log'
+    if ((Invoke-SmokeCommand $observeGit 'git rev-parse HEAD' $observeDir $observeHeadLog) -ne 0) {
+        Stop-Smoke 'observe leg: cannot create the observed repository' $observeHeadLog
+    }
+    $observeHead = ([IO.File]::ReadAllText($observeHeadLog)).Trim()
+    $observeLog = Join-Path $Workdir 'observe.log'
+    Write-Smoke 'smoke: putnami observe --base HEAD~1 --evidence observe-evidence.json'
+    if ((Invoke-SmokeCommand $bin 'putnami observe --base HEAD~1 --evidence observe-evidence.json' $observeDir $observeLog) -ne 0) {
+        Stop-Smoke 'observe leg: putnami observe failed' $observeLog
+    }
+    $observeEvidence = Join-Path $observeDir 'observe-evidence.json'
+    if (-not (Test-Path -LiteralPath $observeEvidence -PathType Leaf) -or
+        ([IO.File]::ReadAllText($observeEvidence) -notmatch ('"sha": *"' + $observeHead + '"'))) {
+        Stop-Smoke "observe leg: the evidence document does not name the head commit $observeHead" $observeLog
+    }
+    Write-Smoke "smoke: putnami observe wrote the evidence of $observeHead"
+
     # -- Optional leg: run one command without a workspace --
     #
     # The run form installs the CLI, pins the extension the command map names
@@ -1204,10 +1254,10 @@ function Invoke-Smoke {
             throw $SmokeFailed
         }
         Write-Smoke "smoke: putnami $RunCommand exited 0 and left $runDir untouched"
-        Write-Smoke "smoke: OK - channel '$Channel' passes irm install -> TypeScript init -> serve -> HTTP -> clean stop -> run $RunCommand on windows/amd64"
+        Write-Smoke "smoke: OK - channel '$Channel' passes irm install -> TypeScript init -> serve -> HTTP -> clean stop -> observe -> run $RunCommand on windows/amd64"
         return
     }
-    Write-Smoke "smoke: OK - channel '$Channel' passes irm install -> TypeScript init -> serve -> HTTP -> clean stop on windows/amd64"
+    Write-Smoke "smoke: OK - channel '$Channel' passes irm install -> TypeScript init -> serve -> HTTP -> clean stop -> observe on windows/amd64"
 }
 
 # -- Inputs --

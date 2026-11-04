@@ -2,16 +2,16 @@
 
 You will add one step to a GitHub Actions workflow, or one job to a GitLab CI pipeline, that reads what your tests already produced and writes a change evidence document: which commit was built, what it is measured against, which files changed, and which test and coverage reports the job wrote. Your repository needs no Putnami workspace, and your pipeline keeps its own build and test commands.
 
-`putnami observe` comes with the `@putnami/observe` extension. It is `experimental` and, as of November 2026, published on the `canary` channel only, so every command below names `canary`.
+`putnami observe` comes with the `@putnami/observe` extension. It is `experimental`: being on the stable channel is not a compatibility promise.
 
 ## What the snippets install
 
 | Line | What it does |
 |---|---|
-| `curl -fsSL https://putnami.dev/install.sh \| bash -s -- --version canary` | Installs the canary Putnami CLI into `~/.putnami/bin`. The stable CLI 0.3.0 cannot load the canary `@putnami/cloud`. |
+| `curl -fsSL https://putnami.dev/install.sh \| bash` | Installs the stable Putnami CLI into `~/.putnami/bin`. |
 | `export PATH="$HOME/.putnami/bin:$PATH"` | Makes `putnami` reachable in the rest of the step. A script piped into `bash` cannot change the `PATH` of the shell that runs it. |
-| `putnami extensions install --user @putnami/observe@canary` | Installs the extension in the user scope, so its command runs outside any workspace. `--user` takes one extension per command. |
-| `putnami extensions install --user @putnami/cloud@canary` | Installs the extension that uploads the evidence to Putnami Cloud. |
+| `putnami extensions install --user @putnami/observe` | Installs the extension in the user scope, so its command runs outside any workspace. `--user` takes one extension per command. |
+| `putnami extensions install --user @putnami/cloud` | Installs the extension that uploads the evidence to Putnami Cloud. |
 | `putnami observe --evidence observe-evidence.json --publish` | Prints the summary, writes the evidence document, and posts a commit status and a summary note on the pull or merge request. It exits `0` whatever it observes: only a usage error, or an evidence file it cannot write, fails it. |
 
 `putnami observe` finds the base of the change from the CI: the pull request base on GitHub, the merge request diff base on GitLab, and on a branch push the commit before the push. It deepens a shallow clone itself, so you do not change `fetch-depth` or `GIT_DEPTH`. It finds JUnit, LCOV, Cobertura, Clover and Go cover reports by their content, anywhere in the checkout except `.git`, `node_modules` and `vendor`.
@@ -49,10 +49,10 @@ Then add these two steps to that job, after the step that writes the reports:
           # Uncomment once an ingest token is set, to upload the evidence to Putnami Cloud.
           # PUTNAMI_CLOUD_TOKEN: ${{ secrets.PUTNAMI_CLOUD_TOKEN }}
         run: |
-          curl -fsSL https://putnami.dev/install.sh | bash -s -- --version canary
+          curl -fsSL https://putnami.dev/install.sh | bash
           export PATH="$HOME/.putnami/bin:$PATH"
-          putnami extensions install --user @putnami/observe@canary
-          putnami extensions install --user @putnami/cloud@canary
+          putnami extensions install --user @putnami/observe
+          putnami extensions install --user @putnami/cloud
           putnami observe --evidence observe-evidence.json --publish
           # putnami observe --evidence observe-evidence.json --publish --upload
       - uses: actions/upload-artifact@v4
@@ -79,10 +79,10 @@ observe:
   before_script: []
   cache: []
   script:
-    - curl -fsSL https://putnami.dev/install.sh | bash -s -- --version canary
+    - curl -fsSL https://putnami.dev/install.sh | bash
     - export PATH="$HOME/.putnami/bin:$PATH"
-    - putnami extensions install --user @putnami/observe@canary
-    - putnami extensions install --user @putnami/cloud@canary
+    - putnami extensions install --user @putnami/observe
+    - putnami extensions install --user @putnami/cloud
     - putnami observe --evidence observe-evidence.json --publish
     # With PUTNAMI_CLOUD_TOKEN set as a masked CI/CD variable, this line uploads the evidence to Putnami Cloud:
     # - putnami observe --evidence observe-evidence.json --publish --upload
