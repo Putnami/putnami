@@ -232,3 +232,78 @@ func TestScopedRunKeepsItsExternalSpec(t *testing.T) {
 		t.Fatalf("selected = %#v, findings = %s", result.Selected, findingCodes(result.Diagnostics))
 	}
 }
+
+const specKitManifest = `{"protocolVersion":3,"namespace":"billing","features":[` +
+	`{"id":"billing/invoice-export","type":"feature","name":"Export","outcome":"O","owner":"o","target":"modeled",` +
+	`"spec":{"format":"speckit","path":"app/specs/001-invoice-export"}},` +
+	`{"id":"billing/checkout","type":"feature","name":"Checkout","outcome":"O","owner":"o","target":"modeled"}]}`
+
+const specKitAnchored = "## Functional Requirements\n\n<!-- putnami:id export-it -->\n- **FR-001**: System MUST export.\n\n## Success Criteria\n\n- **SC-001**: Done.\n"
+
+// specKitWorkspace holds one project whose specs/ carries a native spec and a
+// Spec Kit feature directory side by side, read by the reader that ships.
+func specKitWorkspace(t *testing.T, mode, spec string) *workspace.Workspace {
+	t.Helper()
+	root := t.TempDir()
+	writeDiscoveryFixture(t, filepath.Join(root, "app", "putnami.features.json"), specKitManifest)
+	writeDiscoveryFixture(t, filepath.Join(root, "app", "specs", "checkout.json"), specJSON("billing/checkout"))
+	writeDiscoveryFixture(t, filepath.Join(root, "app", "specs", "001-invoice-export", "spec.md"), spec)
+	options := map[string]map[string]any{"sdd": {"specFormats": []any{"speckit"}}}
+	if mode != "" {
+		options["sdd"]["verification"] = map[string]any{"specs": mode}
+	}
+	return workspace.NewWorkspace(root, &workspaceproto.Config{Name: "fixture"}, []*workspace.Project{
+		{Name: "app", Path: "app", Config: &workspaceproto.ProjectConfig{Name: "app", Options: options}},
+	})
+}
+
+func discoverSpecKit(t *testing.T, ws *workspace.Workspace) SpecDiscoveryResult {
+	t.Helper()
+	reader, err := NewOSReader(ws.Root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return discoverSpecs(ws, nil, reader, func() (Reader, error) { return reader, nil }, featureproto.SpecReaderFor)
+}
+
+func TestNativeAndSpecKitSpecsCoexistWithoutAFinding(t *testing.T) {
+	spectest.Proves(t, "tooling/specification-driven-development", "external-specs-share-one-discovery", "native-and-speckit-specs-coexist-without-a-finding")
+	ws := specKitWorkspace(t, "", specKitAnchored)
+	// JSON below a Spec Kit directory stays out of native discovery, which reads
+	// only the direct children of specs/.
+	writeDiscoveryFixture(t, filepath.Join(ws.Root, "app", "specs", "001-invoice-export", "contracts", "api.json"), `{"not":"a spec"}`)
+	writeDiscoveryFixture(t, filepath.Join(ws.Root, "app", "specs", "001-invoice-export", "stray.json"), specJSON("billing/invoice-export"))
+	result := discoverSpecKit(t, ws)
+	if len(result.Diagnostics) != 0 || len(result.Specs) != 2 {
+		t.Fatalf("specs = %d, diagnostics = %s", len(result.Specs), findingCodes(result.Diagnostics))
+	}
+	if findings := featureproto.ValidateSpecRepository(result.Sources(), []string{"billing/checkout", "billing/invoice-export"}); len(findings) != 0 {
+		t.Fatalf("repository findings = %s", findingCodes(findings))
+	}
+}
+
+func TestEnforceFailsAnInsertedSpecKitRequirementWithoutAnAnchor(t *testing.T) {
+	spectest.Proves(t, "tooling/specification-driven-development", "enforce-needs-anchors", "enforce-fails-an-inserted-speckit-requirement-without-an-anchor")
+	if result := discoverSpecKit(t, specKitWorkspace(t, "enforce", specKitAnchored)); len(result.Diagnostics) != 0 {
+		t.Fatalf("anchored diagnostics = %s", findingCodes(result.Diagnostics))
+	}
+	inserted := strings.Replace(specKitAnchored, "<!-- putnami:id export-it -->", "- **FR-002**: System MUST log.\n<!-- putnami:id export-it -->", 1)
+	want := featureproto.ErrorCodeSpecRequirementUnanchored + "@app/specs/001-invoice-export/spec.md#L3"
+	if got := findingCodes(discoverSpecKit(t, specKitWorkspace(t, "enforce", inserted)).Diagnostics); got != want {
+		t.Fatalf("findings = %s", got)
+	}
+}
+
+func TestEnforceFailsANeedsClarificationMarker(t *testing.T) {
+	spectest.Proves(t, "tooling/specification-driven-development", "enforce-needs-anchors", "enforce-fails-a-needs-clarification-marker")
+	spec := strings.Replace(specKitAnchored, "export.", "export [NEEDS CLARIFICATION: where?].", 1)
+	want := featureproto.WarningCodeSpecNeedsClarification + "@app/specs/001-invoice-export/spec.md#L4"
+	enforce := discoverSpecKit(t, specKitWorkspace(t, "enforce", spec)).Diagnostics
+	if findingCodes(enforce) != want || !diag.HasErrors(enforce) {
+		t.Fatalf("enforce = %v", enforce)
+	}
+	report := discoverSpecKit(t, specKitWorkspace(t, "report", spec)).Diagnostics
+	if findingCodes(report) != want || diag.HasErrors(report) {
+		t.Fatalf("report = %v", report)
+	}
+}

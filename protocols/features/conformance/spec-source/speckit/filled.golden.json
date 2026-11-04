@@ -1,0 +1,21 @@
+{
+  "protocolVersion": 1,
+  "feature": "billing/invoice-export",
+  "outcomes": [
+    "An accountant exports a closed month in under 30 seconds.",
+    "Each export row matches its invoice."
+  ],
+  "nonGoals": [
+    "Exporting to a spreadsheet format other than CSV."
+  ],
+  "requirements": [
+    {
+      "id": "export-a-month",
+      "text": "System MUST export the invoices of one calendar month as a CSV file with one row per invoice."
+    },
+    {
+      "id": "refuse-an-open-month",
+      "text": "System MUST refuse a month that has not closed."
+    }
+  ]
+}
