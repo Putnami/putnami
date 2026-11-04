@@ -206,7 +206,8 @@
               "a-reader-finding-names-its-file-and-line",
               "an-over-long-requirement-names-a-split",
               "two-requirements-with-one-id-name-both-positions",
-              "a-reader-is-deterministic"
+              "a-reader-is-deterministic",
+              "an-outcome-finding-names-its-line"
             ]
           }
         },
@@ -249,7 +250,69 @@
             "kind": "acceptance",
             "checks": [
               "a-scenario-mismatch-is-a-warning-either-way",
-              "a-format-with-no-scenarios-is-not-compared"
+              "a-format-with-no-scenarios-is-not-compared",
+              "file-scenarios-are-compared-with-every-declared-check"
+            ]
+          }
+        },
+        {
+          "id": "enforce-only-findings",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "an-enforce-finding-is-a-warning-in-report-and-an-error-in-enforce",
+              "report-says-nothing-about-an-unanchored-requirement"
+            ]
+          }
+        },
+        {
+          "id": "speckit-projection",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-speckit-template-projects-with-positioned-findings",
+              "a-filled-speckit-spec-reproduces-its-golden",
+              "speckit-process-files-change-nothing",
+              "a-speckit-reference-with-no-spec-md-is-an-error",
+              "comments-and-code-are-not-spec-text"
+            ]
+          }
+        },
+        {
+          "id": "speckit-requirement-identity",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-speckit-anchor-names-the-requirement",
+              "an-unanchored-speckit-requirement-is-positional",
+              "a-speckit-anchor-names-a-scenario-check",
+              "a-stray-speckit-anchor-is-an-error"
+            ]
+          }
+        },
+        {
+          "id": "speckit-findings",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "each-clarification-marker-is-one-enforce-finding",
+              "derived-facts-are-warnings"
             ]
           }
         }

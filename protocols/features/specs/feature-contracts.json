@@ -58,7 +58,7 @@
     },
     {
       "id": "spec-reader-contract",
-      "text": "A reader turns the bytes of one external spec into a spec, a record per requirement and findings, with no network, model, clock or filesystem. The contract wraps every reader: a finding names its file and line, a requirement over 512 bytes is an error that names a split, two requirements with one ID name both positions, and the same bytes give the same result."
+      "text": "A reader turns the bytes of one external spec into a spec, a record per requirement and findings, with no network, model, clock or filesystem. The contract wraps every reader: a finding names its file and line, also on an outcome or a non-goal the reader located, a requirement over 512 bytes is an error that names a split, two requirements with one ID name both positions, and the same bytes give the same result."
     },
     {
       "id": "requirement-identity-mapping",
@@ -70,7 +70,23 @@
     },
     {
       "id": "scenarios-never-change-checks",
-      "text": "Where a reader attaches scenarios to a requirement, comparing them with its declared checks gives one warning per scenario with no check and per check with no scenario. A requirement with no scenario list is not compared. The comparison never adds, removes or changes a check."
+      "text": "Where a reader attaches scenarios to a requirement, comparing them with its declared checks gives one warning per scenario with no check and per check with no scenario. Where a format's scenarios belong to the file, they are compared with every check its requirements declare. With neither list, nothing is compared. The comparison never adds, removes or changes a check."
+    },
+    {
+      "id": "enforce-only-findings",
+      "text": "Reading does not depend on the verification mode. A reader marks what blocks only in enforce: an unanchored requirement, which report does not mention, and an enforce finding, which report keeps as a warning and enforce raises to an error at the same position."
+    },
+    {
+      "id": "speckit-projection",
+      "text": "The Spec Kit reader reads only the spec.md its reference names. SC items become outcomes, Out of Scope items non-goals and Functional Requirements items requirements, in file order. It skips HTML comments, fenced code and unknown sections. User story scenarios belong to the file. plan.md, tasks.md, research.md, data-model.md and contracts/ change nothing, and a reference with no spec.md is an error."
+    },
+    {
+      "id": "speckit-requirement-identity",
+      "text": "A Spec Kit requirement takes the ID of the anchor on the line above it. Without one it takes its lowercased label, such as fr-001, and is unanchored. An anchor above a user story scenario names its check. An anchor above neither, or one that breaks the segment grammar, is an error at its line."
+    },
+    {
+      "id": "speckit-findings",
+      "text": "Each NEEDS CLARIFICATION marker outside a comment or code is an enforce finding at its line. A Feature Branch, Created or Status line and a Key Entities section are one derived-fact warning each, and project nothing."
     }
   ],
   "decisions": [

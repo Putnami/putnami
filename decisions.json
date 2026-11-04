@@ -275,7 +275,16 @@
       "settled": "2026-10-28",
       "settledBy": "fdumay",
       "adr": "tooling/contributor/doc/adr/0009-one-contribution-loop-from-talk-to-merge.md",
-      "check": {"kind": "json-value", "files": ["putnami.workspace.json"], "pointer": "/options/@putnami~1contributor/profiles/default/review/runs", "rule": "equals", "value": "agent", "whenMissing": "violated"}
+      "check": {
+        "kind": "json-value",
+        "files": [
+          "putnami.workspace.json"
+        ],
+        "pointer": "/options/@putnami~1contributor/profiles/default/review/runs",
+        "rule": "equals",
+        "value": "agent",
+        "whenMissing": "violated"
+      }
     },
     {
       "id": "D-036",
@@ -391,6 +400,14 @@
     {
       "id": "D-050",
       "statement": "a spec reader reads only .md and .feature files, and the spec tasks key them through git:**/*.md and git:**/*.feature",
+      "settled": "2026-11-04",
+      "settledBy": "a build session, for the owner to review on its proposal",
+      "adr": "protocols/features/doc/adr/0006-the-spec-source-contract.md",
+      "reviewOnly": true
+    },
+    {
+      "id": "D-051",
+      "statement": "a format whose scenarios belong to the file, not to one requirement, compares them with every check its requirements declare; a mismatch either way stays a warning",
       "settled": "2026-11-04",
       "settledBy": "a build session, for the owner to review on its proposal",
       "adr": "protocols/features/doc/adr/0006-the-spec-source-contract.md",

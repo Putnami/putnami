@@ -5,8 +5,8 @@
   `@putnami/sdd` (`tooling/sdd-extension`)
 - **Implements**:
   [ADR 0004 of `@putnami/sdd`](../../../../tooling/sdd-extension/doc/adr/0004-a-spec-may-live-in-an-external-market-format.md),
-  decisions D-039 to D-047. It records D-048 to D-050 of the root
-  `decisions.json`, which a build session took and the owner has not reviewed
+  decisions D-039 to D-047. It records D-048 to D-051 of the root
+  `decisions.json`, which build sessions took and the owner has not reviewed
 - **One-way door**: the `spec` reference is authored in committed manifests,
   and the format names are public wire values. A release can add to them but
   cannot change them without a new manifest version and a move of every
@@ -70,6 +70,23 @@ task input is a static pattern, so it cannot depend on a manifest value.
     inside another feature's path is an error: a spec details one feature.
 13. **An unanchored positional requirement fails only in `enforce`.** In
     `report` it is projected and `specs validate` adds no finding about it.
+14. **A format's scenarios may belong to the file.** A Spec Kit scenario sits
+    under a user story, and nothing ties a story to a requirement. A reader of
+    such a format sets `SpecReading.Scenarios` to a list, empty or not. Those
+    scenarios are compared with every check the projected requirements declare.
+    A mismatch either way stays a warning, as D-041 says. (D-051)
+15. **An anchor above a scenario names its check.** The anchor keeps the form of
+    §6. A scenario sentence does not normalize to a check ID a person would
+    write, so an anchor is how an author joins the two. Without one, the
+    scenario's check is its normalized text, or none.
+16. **A finding can block only in `enforce`.** A reader stays independent of the
+    mode. It lists such findings in `SpecReading.EnforceFindings`, as warnings.
+    `SpecProjection.EnforceOnly` gives them for one mode: warnings in `report`,
+    errors in `enforce`, with the unanchored requirements of §13 as errors. A
+    Spec Kit `[NEEDS CLARIFICATION]` marker is the first such finding.
+17. **A reader can locate an outcome or a non-goal.** `SpecReading.TextPositions`
+    maps a field such as `outcomes[0]` to its line, so a validation finding on
+    that text follows §4. A field with no position stays at the reference.
 
 ## Rejected alternatives
 

@@ -9,11 +9,11 @@
     "A terminal and a script asking the same question get the same answer, because both modes render the result of one engine builder rather than two evaluations"
   ],
   "nonGoals": [
-    "Owning what a feature, a spec or an architecture declaration MEANS \u2014 that stays in protocols/features and protocols/architecture, and this extension adds no second opinion about any of it",
+    "Owning what a feature, a spec or an architecture declaration MEANS — that stays in protocols/features and protocols/architecture, and this extension adds no second opinion about any of it",
     "Knowing anything about the workspace that the job context or the command request did not carry: no directory scan, no putnami subprocess, no copied loader",
     "Authoring durable prose on a human's behalf; specs init writes a skeleton that restates only the declaration and never invents a requirement or a decision",
     "Making contracts generate or contracts check part of the validation jobs while check owns a distinct exit-2 drift verdict and generate writes into the source tree",
-    "Owning the extraction-parity recording and the wire-only boundary claim, which cli/sdd-extraction owns \u2014 the parity harness and the boundary observer live in tooling/cli",
+    "Owning the extraction-parity recording and the wire-only boundary claim, which cli/sdd-extraction owns — the parity harness and the boundary observer live in tooling/cli",
     "Turning an observed dependency into a permission: architecture sync proposes a binding only for a relation a human already declared, never writes an import, and leaves an undeclared edge as a failing architecture finding",
     "Changing explicit interactive architecture validate, snapshot or inspect commands when automatic DAG evaluation is off"
   ],
@@ -100,7 +100,7 @@
     },
     {
       "id": "external-specs-share-one-discovery",
-      "text": "Discovery reads native specs and the external specs manifests name through one result, so one spec per feature covers both and a feature with both fails specs validate. Two features cannot name one path or overlapping paths. The criteria projection carries the format, so the spec gate accepts an external path. A scoped run keeps the external spec of a feature it selects. A workspace with no reference reads no external file and keeps its outputs."
+      "text": "Discovery reads native specs and the external specs manifests name through one result, so one spec per feature covers both and a feature with both fails specs validate. Two features cannot name overlapping paths. The criteria projection carries the format, so the spec gate accepts an external path. A scoped run keeps the external spec of a feature it selects. A workspace with no reference reads no external file and keeps its outputs. Native and Spec Kit specs coexist under specs/ without a finding."
     },
     {
       "id": "a-spec-format-needs-an-opt-in",
@@ -108,7 +108,7 @@
     },
     {
       "id": "enforce-needs-anchors",
-      "text": "A project in enforce fails on each positional requirement with no anchor, at the requirement's file and line. A project in report projects the requirement and gets no finding about it."
+      "text": "A project in enforce fails on each positional requirement with no anchor, and on each finding a reader marks for enforce, such as a NEEDS CLARIFICATION marker, at its file and line. A project in report projects the requirement with no finding about it, and keeps the marker a warning."
     },
     {
       "id": "external-spec-files-key-the-spec-tasks",
