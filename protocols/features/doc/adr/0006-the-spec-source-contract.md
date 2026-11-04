@@ -84,9 +84,10 @@ task input is a static pattern, so it cannot depend on a manifest value.
     `SpecProjection.EnforceOnly` gives them for one mode: warnings in `report`,
     errors in `enforce`, with the unanchored requirements of §13 as errors. A
     Spec Kit `[NEEDS CLARIFICATION]` marker is the first such finding.
-17. **A reader can locate an outcome or a non-goal.** `SpecReading.TextPositions`
-    maps a field such as `outcomes[0]` to its line, so a validation finding on
-    that text follows §4. A field with no position stays at the reference.
+17. **A reader can locate an outcome or a non-goal.** `SpecReading` carries
+    `OutcomePositions` and `NonGoalPositions`, parallel to the spec's lists, so
+    a validation finding on that text follows §4. A text with no position stays
+    at the reference.
 
 ## Rejected alternatives
 

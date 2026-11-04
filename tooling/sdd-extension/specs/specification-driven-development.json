@@ -9,11 +9,11 @@
     "A terminal and a script asking the same question get the same answer, because both modes render the result of one engine builder rather than two evaluations"
   ],
   "nonGoals": [
-    "Owning what a feature, a spec or an architecture declaration MEANS — that stays in protocols/features and protocols/architecture, and this extension adds no second opinion about any of it",
+    "Owning what a feature, a spec or an architecture declaration MEANS \u2014 that stays in protocols/features and protocols/architecture, and this extension adds no second opinion about any of it",
     "Knowing anything about the workspace that the job context or the command request did not carry: no directory scan, no putnami subprocess, no copied loader",
     "Authoring durable prose on a human's behalf; specs init writes a skeleton that restates only the declaration and never invents a requirement or a decision",
     "Making contracts generate or contracts check part of the validation jobs while check owns a distinct exit-2 drift verdict and generate writes into the source tree",
-    "Owning the extraction-parity recording and the wire-only boundary claim, which cli/sdd-extraction owns — the parity harness and the boundary observer live in tooling/cli",
+    "Owning the extraction-parity recording and the wire-only boundary claim, which cli/sdd-extraction owns \u2014 the parity harness and the boundary observer live in tooling/cli",
     "Turning an observed dependency into a permission: architecture sync proposes a binding only for a relation a human already declared, never writes an import, and leaves an undeclared edge as a failing architecture finding",
     "Changing explicit interactive architecture validate, snapshot or inspect commands when automatic DAG evaluation is off"
   ],

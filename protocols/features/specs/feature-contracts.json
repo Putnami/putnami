@@ -78,7 +78,7 @@
     },
     {
       "id": "speckit-projection",
-      "text": "The Spec Kit reader reads only the spec.md its reference names. SC items become outcomes, Out of Scope items non-goals and Functional Requirements items requirements, in file order. It skips HTML comments, fenced code and unknown sections. User story scenarios belong to the file. plan.md, tasks.md, research.md, data-model.md and contracts/ change nothing, and a reference with no spec.md is an error."
+      "text": "The Spec Kit reader reads only the spec.md its reference names. SC items become outcomes, Out of Scope items non-goals and FR items of the requirements section requirements, in file order, with a nested item in its parent's text. It skips HTML comments, fenced code and unknown sections. User story scenarios belong to the file. Other files change nothing. A reference with no spec.md, a spec with no SC item, or an unclosed comment or fence is an error."
     },
     {
       "id": "speckit-requirement-identity",
@@ -86,7 +86,7 @@
     },
     {
       "id": "speckit-findings",
-      "text": "Each NEEDS CLARIFICATION marker outside a comment or code is an enforce finding at its line. A Feature Branch, Created or Status line and a Key Entities section are one derived-fact warning each, and project nothing."
+      "text": "Each NEEDS CLARIFICATION marker outside a comment or code is an enforce finding at its line. A Feature Branch, Created or Status line and a Key Entities section are one derived-fact warning each, and project nothing. An FR label outside the requirements section, or in a form the reader does not take, is a warning at its line."
     }
   ],
   "decisions": [
