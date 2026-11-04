@@ -136,6 +136,16 @@ var demos = map[string]demoExpectation{
 		lineFile:   "packages/pricing/src/index.ts",
 		dependency: evidence.DependencyChange{Ecosystem: "npm", Lockfile: "package-lock.json", Name: "decimal.js", Change: evidence.DependencyUpgraded, From: "10.4.3", To: "10.5.0"},
 	},
+	"python": {
+		env:       map[string]string{"GITHUB_ACTIONS": "true", "GITHUB_SERVER_URL": "https://github.com", "GITHUB_REPOSITORY": "Putnami/demo-observe-python", "GITHUB_REPOSITORY_ID": "1107", "GITHUB_RUN_ID": "41335512001", "GITHUB_JOB": "test", "GITHUB_REF": "refs/pull/1/merge"},
+		changed:   []string{"shared"},
+		dependent: []string{"api", "worker"},
+		tests:     map[string]int{"api": 2, "shared": 4, "worker": 1},
+		covered:   []string{"api", "shared", "worker"},
+		// uv.lock lies in the virtual workspace root, which is no component.
+		lineFile:   "shared/src/shared/money.py",
+		dependency: evidence.DependencyChange{Ecosystem: "pypi", Lockfile: "uv.lock", Name: "fastapi", Change: evidence.DependencyUpgraded, From: "0.115.5", To: "0.115.6"},
+	},
 	"symfony": {
 		env: map[string]string{"GITLAB_CI": "true", "CI_SERVER_HOST": "gitlab.com", "CI_PROJECT_ID": "88373184", "CI_PROJECT_PATH": "putnami/demo-observe-symfony", "CI_PIPELINE_ID": "3015177948", "CI_JOB_ID": "17647015000", "CI_MERGE_REQUEST_IID": "1"},
 		// composer.lock lies in the application at the root, which the

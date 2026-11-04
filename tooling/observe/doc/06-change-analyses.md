@@ -7,7 +7,7 @@ queries no vulnerability database.
 
 ## Components
 
-Four detectors read the repository:
+Five detectors read the repository:
 
 | Detector | Reads | Source |
 |---|---|---|
@@ -15,6 +15,7 @@ Four detectors read the repository:
 | Node workspaces | `package.json` `workspaces`, `pnpm-workspace.yaml` | `workspace` |
 | Composer | each `composer.json` | `manifest` |
 | Go | `go.work`, each `go.mod` | `workspace` for a `go.work` member, `manifest` otherwise |
+| Python | each `pyproject.toml`, with the root's `[tool.uv.workspace]` | `workspace` for a uv workspace member, `manifest` otherwise |
 
 A component is a directory. When two detectors name one directory, the higher
 source wins: `orchestrator`, then `workspace`, then `manifest`. On a tie, the
@@ -49,7 +50,13 @@ its impact.
 A JUnit case goes to the first of:
 
 1. The component that holds its test file: the case's `file`, else its
-   suite's, else its class name when that names a file (Vitest).
+   suite's, else its class name when that names a file (Vitest), else its
+   dotted class name read as a Python module (pytest). pytest writes
+   `tests.test_api.TestLogin` for the class `TestLogin` of `tests/test_api.py`,
+   and its default `xunit2` report has no `file`: the longest leading part
+   that names a `.py` file is the test file. The class name is relative to
+   pytest's `rootdir`; see
+   [the Python detector](07-python.md#reports).
 2. The component of the Go package its class or suite names
    (`gotestsum --junitfile`).
 3. The component that holds the report.
@@ -61,7 +68,10 @@ the repository; absolute from another checkout, by its trailing segments;
 relative to a Cobertura source root; relative to the report's component, to
 the repository root, then to the report's directory; and, for a Go cover
 profile, as an import path. A file that is none of them is counted in
-`observe.coverage_unmapped`. When two reports instrument one line, the line
+`observe.coverage_unmapped`. A pytest-cov report (`pytest --cov
+--cov-report=xml`) names the directory pytest ran in as its `<source>` and
+each file relative to it, so it maps whether pytest ran at the repository root
+or in one project's directory. When two reports instrument one line, the line
 keeps its largest count. A component's coverage is the sum of its files'
 covered and instrumented lines.
 
@@ -85,8 +95,12 @@ Each changed lockfile is read at the merge base and at the head:
 | `yarn.lock` | `npm` | classic and Berry entries; `workspace:`, `link:`, `portal:` and `file:` left out |
 | `composer.lock` | `composer` | `packages` and `packages-dev`; path packages left out |
 | `go.mod` | `go` | the requires, after the `go.mod` replace directives; modules of the repository and local replacements left out |
+| `uv.lock` | `pypi` | each `[[package]]`; `editable`, `virtual`, `directory` and `path` sources left out |
+| `poetry.lock` | `pypi` | each `[[package]]`; `directory` and `file` sources and `develop` packages left out |
 
-`go.sum` holds checksums, not versions, and is not read. A package found on
+`go.sum` holds checksums, not versions, and is not read. A Python package
+name is read in its normalized form (PEP 503): lower case, with each run of
+`-`, `_` and `.` as one `-`, so `Typing_Extensions` is `typing-extensions`. A package found on
 one side only is `added` or `removed`. A package whose versions differ is
 `upgraded` or `downgraded`, or `changed` when the versions do not compare or
 the package has several versions. A lockfile that cannot be read gets
@@ -108,10 +122,12 @@ discovered) and one for the base (`--base-sbom`):
 osv-scanner writes no vulnerability in SPDX: use CycloneDX for them.
 
 A package of the SBOM matches a dependency change by the ecosystem its
-package URL names (`npm`, `composer`, `golang` is `go`), its name and its
-version, a leading `v` ignored; a package without a package URL matches by
-name and version. For each change, the base SBOM gives the `before` state,
-unless the package was added, and the head SBOM the `after` state, unless it
+package URL names (`npm`, `composer`, `golang` is `go`, `pypi`), its name,
+normalized for `pypi`, and its version, a leading `v` ignored. A package
+without a package URL matches by its name as written and its version, so a
+Python package without one matches only when the SBOM writes its normalized
+name. For each change, the base SBOM gives the `before` state, unless the
+package was added, and the head SBOM the `after` state, unless it
 was removed: its licences and its vulnerabilities, each an id and a severity,
 the most severe first. A package the SBOM does not list gets no state, and
 the summary says so. Without a base SBOM, every base state is unknown.

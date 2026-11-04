@@ -2,6 +2,8 @@ package analyze
 
 import (
 	"path/filepath"
+	"regexp"
+	"strings"
 	"unicode/utf8"
 
 	readers "go.putnami.dev/evidence/readers"
@@ -160,6 +162,11 @@ func joinDir(base, dir string) string {
 // attributeTests gives each case of a JUnit report to a component: the one
 // that holds its test file, else the one of the Go package its suite names,
 // else the one that holds the report.
+//
+// The test file is the case's file, else its class name read as a path
+// (Vitest), else its dotted class name read as a Python module: pytest writes
+// tests.test_api.TestLogin for a case of tests/test_api.py, and its default
+// xunit2 report has no file attribute.
 func (r *Result) attributeTests(report reports.Report, result readers.TestReport, m *mapper, tests map[string]*evidence.ComponentTests) {
 	bases := m.bases(report.Path)
 	reportOwner, reportOwned := m.set.Owner(report.Path)
@@ -169,7 +176,7 @@ func (r *Result) attributeTests(report reports.Report, result readers.TestReport
 	unattributed := 0
 	for _, c := range result.Cases {
 		owner, file, ok := "", "", false
-		for _, candidate := range []string{c.File, c.Classname} {
+		for _, candidate := range append([]string{c.File, c.Classname}, moduleFiles(c.Classname)...) {
 			if rel, found := m.resolve(candidate, bases); found {
 				file = rel
 				owner, ok = m.set.Owner(rel)
@@ -231,6 +238,25 @@ func (r *Result) attributeTests(report reports.Report, result readers.TestReport
 	if unattributed > 0 {
 		r.warn(CodeTestsUnattributed, report.Path, "%d test cases of %s belong to no component: neither their file nor the report lies in one", unattributed, report.Path)
 	}
+}
+
+// dottedName is a class name that can name a Python module: dot-separated
+// names, as pytest writes them from the test file's path.
+var dottedName = regexp.MustCompile(`^[A-Za-z0-9_-]+(\.[A-Za-z0-9_-]+)*$`)
+
+// moduleFiles returns the files a dotted class name may name, longest first:
+// tests.test_api.TestLogin may be tests/test_api/TestLogin.py,
+// tests/test_api.py or tests.py.
+func moduleFiles(classname string) []string {
+	if !dottedName.MatchString(classname) {
+		return nil
+	}
+	parts := strings.Split(classname, ".")
+	out := make([]string, 0, len(parts))
+	for n := len(parts); n > 0; n-- {
+		out = append(out, strings.Join(parts[:n], "/")+".py")
+	}
+	return out
 }
 
 // bounded cuts s to the evidence string bound, on a rune boundary.

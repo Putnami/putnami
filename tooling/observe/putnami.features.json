@@ -267,6 +267,7 @@
             "kind": "acceptance",
             "checks": [
               "a-test-goes-to-the-component-of-its-file-else-of-its-report",
+              "a-pytest-case-goes-to-the-component-of-its-module-file",
               "coverage-goes-to-the-component-of-each-file"
             ]
           }
@@ -335,6 +336,7 @@
             "kind": "acceptance",
             "checks": [
               "a-cyclonedx-pair-gives-each-changed-dependency-its-facts",
+              "a-pypi-package-url-matches-a-python-lockfile-change",
               "an-spdx-document-gives-licenses-and-advisories",
               "without-a-base-sbom-the-base-is-unknown",
               "the-summary-counts-the-vulnerabilities-per-dependency"
@@ -503,6 +505,72 @@
             "kind": "acceptance",
             "checks": [
               "the-detection-is-a-valid-probe-answer"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "tooling/observe-python",
+      "type": "feature",
+      "name": "Find the Python projects of a repository that keeps its own CI",
+      "outcome": "putnami observe, in a Python repository without a Putnami workspace, knows its projects from the uv workspace and the pyproject.toml manifests, which project owns each file and which projects depend on which through their local sources, without running uv, Poetry or pip, so a change to a shared library marks the services that use it",
+      "owner": "tooling",
+      "target": "modeled",
+      "requirements": [
+        {
+          "id": "python-projects-are-components",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "uv-workspace-members-are-workspace-components",
+              "a-pyproject-outside-the-workspace-is-a-manifest-component",
+              "a-malformed-pyproject-is-a-diagnostic"
+            ]
+          }
+        },
+        {
+          "id": "python-project-edges",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-uv-workspace-source-is-an-edge",
+              "a-local-path-dependency-is-an-edge",
+              "a-registry-dependency-is-no-edge"
+            ]
+          }
+        },
+        {
+          "id": "python-probe-answer",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-answer-is-a-valid-probe-result"
+            ]
+          }
+        },
+        {
+          "id": "python-change-analysis",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-uv-workspace-demo-is-explained"
             ]
           }
         }

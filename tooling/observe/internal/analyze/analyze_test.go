@@ -118,6 +118,62 @@ func TestATestGoesToTheComponentOfItsFileElseOfItsReport(t *testing.T) {
 	}
 }
 
+func TestAPytestCaseGoesToTheComponentOfItsModuleFile(t *testing.T) {
+	spectest.Proves(t, feature, "tests-and-coverage", "a-pytest-case-goes-to-the-component-of-its-module-file")
+	root := t.TempDir()
+	write(t, root, map[string]string{
+		"services/api/tests/test_api.py":  "def test_ok(): pass\n",
+		"services/api/tests/__init__.py":  "",
+		"libs/shared/tests/test_money.py": "def test_sum(): pass\n",
+	})
+	set := components.Detect(root, []components.Detector{fake{components.Found{Components: []components.Component{
+		{ID: "services/api", Ecosystem: "python", Source: evidence.SourceWorkspace},
+		{ID: "libs/shared", Ecosystem: "python", Source: evidence.SourceWorkspace},
+	}}}})
+	write(t, root, map[string]string{
+		// pytest run at the root: the class names the module from the root,
+		// with the test class when there is one.
+		"junit.xml": `<testsuites><testsuite name="pytest">
+			<testcase classname="services.api.tests.test_api.TestLogin" name="test_ok" time="0.5"/>
+			<testcase classname="services.api.tests.test_api" name="test_module_level"/>
+			<testcase classname="services.api.tests.test_api.TestLogin" name="test_bad"><failure message="assert 1 == 2"/></testcase>
+			<testcase classname="services.api.tests.test_gone" name="test_orphan"/>
+			<testcase classname="Some.Class" name="orphan"/>
+		</testsuite></testsuites>`,
+		// pytest run in a component: the class names the module from there.
+		"libs/shared/junit.xml": `<testsuites><testsuite name="pytest">
+			<testcase classname="tests.test_money" name="test_sum"/>
+		</testsuite></testsuites>`,
+	})
+	r := Run(Input{Root: root, Set: set, Reports: []reports.Report{
+		{Path: "junit.xml", Kind: reports.KindJUnit, Format: reports.FormatJUnit},
+		{Path: "libs/shared/junit.xml", Kind: reports.KindJUnit, Format: reports.FormatJUnit},
+	}})
+	got := tests(r)
+	api := got["services/api"]
+	if api.Passed != 2 || api.Failed != 1 || len(api.FailingCases) != 1 || api.FailingCases[0].File != "services/api/tests/test_api.py" {
+		t.Errorf("api tests %+v", api)
+	}
+	if got["libs/shared"].Passed != 1 {
+		t.Errorf("shared tests %+v", got["libs/shared"])
+	}
+	if len(r.Diagnostics) != 1 || r.Diagnostics[0].Code != CodeTestsUnattributed || !strings.HasPrefix(r.Diagnostics[0].Message, "2 test cases") {
+		t.Errorf("diagnostics %v", r.Diagnostics)
+	}
+	for classname, want := range map[string][]string{
+		"tests.test_api.TestLogin": {"tests/test_api/TestLogin.py", "tests/test_api.py", "tests.py"},
+		"test_api":                 {"test_api.py"},
+		"src/index.test.ts":        nil,
+		"example.com/svc":          nil,
+		"":                         nil,
+		"a..b":                     nil,
+	} {
+		if got := moduleFiles(classname); !slices.Equal(got, want) {
+			t.Errorf("moduleFiles(%q) = %v, want %v", classname, got, want)
+		}
+	}
+}
+
 func TestCoverageGoesToTheComponentOfEachFile(t *testing.T) {
 	spectest.Proves(t, feature, "tests-and-coverage", "coverage-goes-to-the-component-of-each-file")
 	root, set := repository(t)
