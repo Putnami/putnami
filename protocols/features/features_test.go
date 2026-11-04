@@ -93,7 +93,7 @@ func TestStrictVersionDispatchUnknownFieldsAndNulls(t *testing.T) {
 		`{"protocolVersion":"1","namespace":"billing","features":[]}`,
 		`{"protocolVersion":1.0,"namespace":"billing","features":[]}`,
 		`{"protocolVersion":1e0,"namespace":"billing","features":[]}`,
-		`{"protocolVersion":3,"namespace":"billing","features":[]}`,
+		`{"protocolVersion":4,"namespace":"billing","features":[]}`,
 		`{"protocolVersion":1,"protocolVersion":1,"namespace":"billing","features":[]}`,
 	}
 	for _, input := range invalidVersions {

@@ -32,6 +32,12 @@ const (
 	ErrorCodeDuplicateSpec                = "features.duplicate_spec"
 	ErrorCodeInvalidVerification          = "features.invalid_verification"
 	ErrorCodeInvalidSurface               = "features.invalid_surface"
+	ErrorCodeInvalidSpecReference         = "features.invalid_spec_reference"
+	ErrorCodeSpecFormatNotEnabled         = "features.spec_format_not_enabled"
+	ErrorCodeSpecFormatUnavailable        = "features.spec_format_unavailable"
+	ErrorCodeSpecRead                     = "features.spec_read"
+	ErrorCodeSpecRequirementTooLong       = "features.spec_requirement_too_long"
+	ErrorCodeSpecRequirementUnanchored    = "features.spec_requirement_unanchored"
 	ErrorCodeUnresolvedSurface            = "features.unresolved_surface"
 	ErrorCodeInvalidObservation           = "features.invalid_observation"
 	ErrorCodeDuplicateObservation         = "features.duplicate_observation"
@@ -54,6 +60,7 @@ const (
 	ErrorCodeUnresolvedRequirement        = "features.unresolved_requirement"
 	ErrorCodeVerificationUnreadable       = "features.verification_unreadable"
 	WarningCodeRatchetGrowth              = "features.ratchet_growth"
+	WarningCodeSpecScenarioMismatch       = "features.spec_scenario_mismatch"
 	WarningCodeMisplacedBaseline          = "features.misplaced_baseline"
 	WarningCodeMissingEvidence            = "features.missing_evidence"
 	WarningCodeStaleEvidence              = "features.stale_evidence"
@@ -84,7 +91,7 @@ var ValidDiagnosticCodes = map[string]bool{
 	WarningCodeMissingEvidence:      true, WarningCodeStaleEvidence: true,
 	WarningCodeContradictedEvidence: true, WarningCodeMissingHumanAuthority: true,
 	WarningCodeUnclassifiedContribution: true, WarningCodeUnresolvedFeatureAuthority: true,
-	WarningCodeUnobservedRequirement: true,
+	WarningCodeUnobservedRequirement: true, WarningCodeSpecScenarioMismatch: true,
 }
 
 type protocolVersionError struct{ message string }
@@ -92,10 +99,10 @@ type protocolVersionError struct{ message string }
 func (err protocolVersionError) Error() string { return err.message }
 
 // ParseManifest strictly parses an authored feature manifest. Both manifest
-// versions are accepted; a version 1 document may not carry the version 2
+// versions are accepted; an older document may not carry a later version's
 // verification criterion, which is refused on the wire rather than ignored.
 func ParseManifest(data []byte) (*Manifest, []diag.Diagnostic) {
-	if err := requireExactProtocolVersion(data, MinimumManifestProtocolVersion, ManifestProtocolVersion); err != nil {
+	if err := requireExactProtocolVersion(data, MinimumManifestProtocolVersion, ManifestCriteriaProtocolVersion, ManifestProtocolVersion); err != nil {
 		return nil, []diag.Diagnostic{versionOrParseDiagnostic(err)}
 	}
 	var manifest Manifest
@@ -156,18 +163,26 @@ func ParseVerificationReport(data []byte) (*VerificationReport, []diag.Diagnosti
 	return &report, nil
 }
 
-// rejectForwardManifestFields refuses a version 1 manifest that carries a field
-// only the current version defines. The strict decoder cannot see this on its
-// own, because both versions share one Go wire type; reporting the exact
-// authored location keeps the failure as actionable as an unknown field.
+// rejectForwardManifestFields refuses a manifest that carries a field only a
+// later version defines. The strict decoder cannot see this on its own, because
+// every version shares one Go wire type; reporting the exact authored location
+// keeps the failure as actionable as an unknown field.
 func rejectForwardManifestFields(manifest *Manifest) *diag.Diagnostic {
 	if manifest.ProtocolVersion >= ManifestProtocolVersion {
 		return nil
 	}
 	for i, feature := range manifest.Features {
+		if feature.Spec != nil {
+			finding := diag.Errorf(ErrorCodeUnknownField, fmt.Sprintf("features[%d].spec", i),
+				"spec requires feature manifest protocolVersion %d", ManifestProtocolVersion)
+			return &finding
+		}
+		if manifest.ProtocolVersion >= ManifestCriteriaProtocolVersion {
+			continue
+		}
 		if feature.Surface != nil {
 			finding := diag.Errorf(ErrorCodeUnknownField, fmt.Sprintf("features[%d].surface", i),
-				"surface requires feature manifest protocolVersion %d", ManifestProtocolVersion)
+				"surface requires feature manifest protocolVersion %d", ManifestCriteriaProtocolVersion)
 			return &finding
 		}
 		for j, requirement := range feature.Requirements {
@@ -176,7 +191,7 @@ func rejectForwardManifestFields(manifest *Manifest) *diag.Diagnostic {
 			}
 			field := fmt.Sprintf("features[%d].requirements[%d].verification", i, j)
 			finding := diag.Errorf(ErrorCodeUnknownField, field,
-				"verification requires feature manifest protocolVersion %d", ManifestProtocolVersion)
+				"verification requires feature manifest protocolVersion %d", ManifestCriteriaProtocolVersion)
 			return &finding
 		}
 	}

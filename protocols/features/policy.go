@@ -176,3 +176,69 @@ func ResolveWorkspaceVerificationMode(domain VerificationDomain, workspaceScope 
 	}
 	return DefaultVerificationMode, VerificationModeSourceDefault, nil
 }
+
+// SpecFormatsOptionsMember is the options.sdd member that lists the market spec
+// formats a project reads.
+const SpecFormatsOptionsMember = "specFormats"
+
+// DecodeSpecFormats extracts and strictly validates the options.sdd.specFormats
+// member of one decoded options map. declared says whether the member is
+// present, because an empty list overrides an inherited one. A wrong type, an
+// unknown format or a repeated format is an error, never a fallback: this list
+// decides which files the gate reads.
+func DecodeSpecFormats(scope string, options map[string]map[string]any) (formats []SpecFormat, declared bool, err error) {
+	block, exists := options[VerificationOptionsBlock]
+	if !exists || block == nil {
+		return nil, false, nil
+	}
+	raw, exists := block[SpecFormatsOptionsMember]
+	if !exists {
+		return nil, false, nil
+	}
+	values, ok := raw.([]any)
+	if !ok {
+		return nil, false, fmt.Errorf("%s options.%s.%s must be an array of formats, got %T",
+			scope, VerificationOptionsBlock, SpecFormatsOptionsMember, raw)
+	}
+	seen := make(map[SpecFormat]bool, len(values))
+	formats = make([]SpecFormat, 0, len(values))
+	for _, value := range values {
+		name, ok := value.(string)
+		if !ok {
+			return nil, false, fmt.Errorf("%s options.%s.%s entries must be strings, got %T",
+				scope, VerificationOptionsBlock, SpecFormatsOptionsMember, value)
+		}
+		format := SpecFormat(name)
+		if !validSpecFormats[format] {
+			return nil, false, fmt.Errorf("%s options.%s.%s names unknown format %q (want one of %v)",
+				scope, VerificationOptionsBlock, SpecFormatsOptionsMember, name, SpecFormats())
+		}
+		if seen[format] {
+			return nil, false, fmt.Errorf("%s options.%s.%s repeats format %q",
+				scope, VerificationOptionsBlock, SpecFormatsOptionsMember, name)
+		}
+		seen[format] = true
+		formats = append(formats, format)
+	}
+	sort.Slice(formats, func(i, j int) bool { return formats[i] < formats[j] })
+	return formats, true, nil
+}
+
+// ResolveSpecFormats resolves the formats one project reads: its own list, then
+// the workspace's, then none. A project's list replaces the workspace's, so a
+// project can narrow or clear what it inherits.
+func ResolveSpecFormats(workspaceScope string, workspaceOptions map[string]map[string]any,
+	projectScope string, projectOptions map[string]map[string]any) ([]SpecFormat, error) {
+	project, declared, err := DecodeSpecFormats(projectScope, projectOptions)
+	if err != nil {
+		return nil, err
+	}
+	if declared {
+		return project, nil
+	}
+	workspace, _, err := DecodeSpecFormats(workspaceScope, workspaceOptions)
+	if err != nil {
+		return nil, err
+	}
+	return workspace, nil
+}

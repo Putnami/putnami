@@ -8,14 +8,26 @@
   "properties": {
     "$schema": { "type": "string" },
     "protocolVersion": {
-      "$comment": "Readers require an exact JSON integer token, 1 or 2; 1.0 and 1e0 are invalid. Only version 2 may carry a requirement verification criterion or a feature surface.",
+      "$comment": "Readers require an exact JSON integer token, 1, 2 or 3; 1.0 and 1e0 are invalid. Only version 2 or later may carry a requirement verification criterion or a feature surface. Only version 3 may carry an external spec reference.",
       "type": "integer",
-      "enum": [1, 2]
+      "enum": [1, 2, 3]
     },
     "namespace": { "$ref": "#/$defs/segmentID" },
     "features": { "type": "array", "items": { "$ref": "#/$defs/feature" } }
   },
   "allOf": [
+    {
+      "$comment": "A version 1 or 2 manifest cannot carry the version 3 external spec reference.",
+      "if": {
+        "required": ["protocolVersion"],
+        "properties": { "protocolVersion": { "enum": [1, 2] } }
+      },
+      "then": {
+        "properties": {
+          "features": { "items": { "not": { "required": ["spec"] } } }
+        }
+      }
+    },
     {
       "$comment": "A version 1 manifest cannot carry the version 2 verification criterion or feature surface.",
       "if": {
@@ -70,6 +82,21 @@
       "type": "string",
       "maxLength": 128,
       "pattern": "^[a-z][a-z0-9-]*( [a-z][a-z0-9-]*)*$"
+    },
+    "specReference": {
+      "$comment": "The one external spec of a feature. The path is a workspace-relative file or directory: no leading slash, no backslash, no scheme, and no empty, dot or dot-dot segment. Whether it exists and whether its project opted into the format are decided against the workspace.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["format", "path"],
+      "properties": {
+        "format": { "type": "string", "enum": ["gherkin", "kiro", "openspec", "speckit"] },
+        "path": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4096,
+          "not": { "pattern": "(^/|\\\\|^[A-Za-z][A-Za-z0-9+.-]*:|(^|/)\\.{1,2}(/|$)|//|/$)" }
+        }
+      }
     },
     "surface": {
       "$comment": "The command paths that carry one feature. The protocol checks the shape; whether a name is served is decided against the declaring project.",
@@ -240,7 +267,8 @@
         "target": { "$ref": "#/$defs/maturityStage" },
         "relations": { "type": "array", "items": { "$ref": "#/$defs/relation" } },
         "requirements": { "type": "array", "items": { "$ref": "#/$defs/requirement" } },
-        "surface": { "$ref": "#/$defs/surface" }
+        "surface": { "$ref": "#/$defs/surface" },
+        "spec": { "$ref": "#/$defs/specReference" }
       }
     }
   }

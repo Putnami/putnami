@@ -1,0 +1,6 @@
+outcome A team reads its spec in place
+requirement Export an invoice! | The export writes one file per invoice.
+scenario One file per invoice
+<!-- putnami:id numbered-entry -->
+positional FR-001 | A positional requirement with an anchor keeps its ID.
+positional FR-002 | A positional requirement with no anchor stays unanchored.

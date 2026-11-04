@@ -9,9 +9,13 @@ import "go.putnami.dev/protocol/capabilities"
 const (
 	// ManifestProtocolVersion is the current authored feature-manifest wire
 	// version. Manifest readers also accept version 1, which cannot carry a
-	// verification criterion; evidence and spec documents keep their own exact
-	// versions so adding an executable criterion never reopens their wires.
-	ManifestProtocolVersion = 2
+	// verification criterion, and version 2, which cannot name an external spec;
+	// evidence and spec documents keep their own exact versions so a new
+	// manifest member never reopens their wires.
+	ManifestProtocolVersion = 3
+	// ManifestCriteriaProtocolVersion is the first feature-manifest wire version
+	// that may carry a verification criterion or a feature surface.
+	ManifestCriteriaProtocolVersion = 2
 	// MinimumManifestProtocolVersion is the oldest authored feature-manifest
 	// wire version readers still accept.
 	MinimumManifestProtocolVersion = 1
@@ -243,7 +247,34 @@ type Feature struct {
 	Requirements []Requirement `json:"requirements,omitempty"`
 	// Surface optionally names the commands that carry the feature. It exists only from manifest version 2.
 	Surface *FeatureSurface `json:"surface,omitempty"`
+	// Spec optionally names the external spec that holds this feature's prose.
+	// It exists only from manifest version 3 and only in this manifest: the
+	// design graph and Module.Feature never carry it.
+	Spec *SpecReference `json:"spec,omitempty"`
 }
+
+// SpecReference is the closed manifest pointer to one external spec.
+type SpecReference struct {
+	// Format names the market format the external spec is written in.
+	Format SpecFormat `json:"format"`
+	// Path is the workspace-relative file or directory that holds the spec.
+	Path string `json:"path"`
+}
+
+// SpecFormat is the closed vocabulary of market spec formats. A value is a
+// public wire value: it can be added to, not changed.
+type SpecFormat string
+
+const (
+	// SpecFormatOpenSpec is one OpenSpec capability folder.
+	SpecFormatOpenSpec SpecFormat = "openspec"
+	// SpecFormatSpecKit is one GitHub Spec Kit feature.
+	SpecFormatSpecKit SpecFormat = "speckit"
+	// SpecFormatKiro is one Kiro requirements file.
+	SpecFormatKiro SpecFormat = "kiro"
+	// SpecFormatGherkin is one Gherkin feature file.
+	SpecFormatGherkin SpecFormat = "gherkin"
+)
 
 // FeatureSurface lists the command paths that carry one feature. The list is a
 // set of keyed identities and is present. Whether a name resolves is a fact of

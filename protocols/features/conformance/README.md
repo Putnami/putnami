@@ -13,6 +13,9 @@ JSON escaping, and one trailing newline.
 
 `human-authored-features-v2.golden.json` pins the current manifest wire, the one
 that may carry an executable `verification` criterion and a feature `surface`.
+`spec-source/` holds a line format no product ships. `MinimalSpecReader` reads it,
+so `RunSpecSource` can pin the reader contract apart from any market format.
+
 The version 1 vector is kept beside it unchanged, because manifest readers must keep accepting both and
 the repository has not migrated a single committed manifest.
 
