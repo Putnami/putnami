@@ -23,14 +23,22 @@ const MaxSpecFiles = 1024
 // that owns it. The filename never participates in identity — Spec.Feature does
 // — so Path locates the document without naming it.
 type DiscoveredSpec struct {
-	// Path is the canonical workspace-relative spec path ("app/specs/x.json").
+	// Path is the canonical workspace-relative spec path ("app/specs/x.json"),
+	// or an external spec's reference path.
 	Path string
 	// Root is the owning discovery root; "" is the workspace root itself.
 	Root string
 	// Project is the owning project's name, empty at the workspace root.
 	Project string
-	// Spec is the strictly parsed document found at Path.
+	// Spec is the strictly parsed document found at Path, or the in-memory
+	// projection of an external spec.
 	Spec *featureproto.Spec
+	// Format names the market format of an external spec, empty for a native one.
+	Format featureproto.SpecFormat
+	// Files lists the external spec's files, empty for a native one.
+	Files []string
+	// Projection carries an external spec's requirement records and findings.
+	Projection featureproto.SpecProjection
 }
 
 // SpecDiscoveryResult carries every readable spec plus the sorted diagnostics
@@ -68,7 +76,9 @@ func (result SpecDiscoveryResult) InScope(specPath string) bool {
 func (result SpecDiscoveryResult) Sources() []featureproto.SpecSource {
 	sources := make([]featureproto.SpecSource, 0, len(result.Specs))
 	for _, discovered := range result.Specs {
-		sources = append(sources, featureproto.SpecSource{Path: discovered.Path, Spec: discovered.Spec})
+		sources = append(sources, featureproto.SpecSource{
+			Path: discovered.Path, Spec: discovered.Spec, External: discovered.Format != "",
+		})
 	}
 	return sources
 }
@@ -100,13 +110,24 @@ func DiscoverSpecs(ws *workspace.Workspace, scope *Scope) SpecDiscoveryResult {
 			diag.Errorf(featureproto.ErrorCodeParseError, "workspace", "workspace root is unavailable"),
 		}}
 	}
-	return DiscoverSpecsWith(ws, scope, reader)
+	external := func() (Reader, error) { return NewTaskReader(ws.Root) }
+	return discoverSpecs(ws, scope, reader, external, featureproto.SpecReaderFor)
 }
 
 // DiscoverSpecsWith is DiscoverSpecs through reader. A step cached on the input
 // `git:**` passes the candidate cut (NewTaskReader), so a spec its key does
 // not hold is never read.
 func DiscoverSpecsWith(ws *workspace.Workspace, scope *Scope, reader Reader) SpecDiscoveryResult {
+	external := func() (Reader, error) { return reader, nil }
+	return discoverSpecs(ws, scope, reader, external, featureproto.SpecReaderFor)
+}
+
+// discoverSpecs reads native specs through reader and external ones through the
+// reader openExternal returns. An external file is read through the Git
+// candidate cut, because that is what the spec tasks key: a file the key does
+// not hold is never read.
+func discoverSpecs(ws *workspace.Workspace, scope *Scope, reader Reader, openExternal func() (Reader, error),
+	lookup specReaderLookup) SpecDiscoveryResult {
 	if ws == nil {
 		return SpecDiscoveryResult{Diagnostics: []diag.Diagnostic{
 			diag.Errorf(featureproto.ErrorCodeParseError, "workspace", "workspace is required"),
@@ -174,6 +195,12 @@ func DiscoverSpecsWith(ws *workspace.Workspace, scope *Scope, reader Reader) Spe
 				Spec:    spec,
 			})
 		}
+	}
+	external := discoverExternalSpecs(ws, scope, DiscoverAuthoredManifestsWith(ws, reader).Manifests, openExternal, lookup)
+	specs = append(specs, external.specs...)
+	diagnostics = append(diagnostics, external.diagnostics...)
+	for reference := range external.outOfScope {
+		outOfScope[reference] = true
 	}
 	sort.Slice(specs, func(i, j int) bool { return specs[i].Path < specs[j].Path })
 

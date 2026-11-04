@@ -1333,6 +1333,13 @@
       "cwd": "{workspaceRoot}",
       "timeoutMs": 120000,
       "inputs": {
+        "externalSpecs": {
+          "from": "workspace",
+          "files": [
+            "git:**/*.md",
+            "git:**/*.feature"
+          ]
+        },
         "floor": {
           "from": "workspace",
           "files": [
@@ -1366,11 +1373,21 @@
       "cwd": "{projectRoot}",
       "timeoutMs": 120000,
       "inputs": {
+        "externalSpecs": {
+          "from": "workspace",
+          "files": [
+            "git:**/*.md",
+            "git:**/*.feature"
+          ]
+        },
         "identity": {
           "from": "workspace",
           "files": [
             "**/putnami.features.json",
-            "**/specs/*.json"
+            "**/specs/*.json",
+            "**/putnami.json",
+            "putnami.workspace.json",
+            "!**/.gen/**"
           ]
         },
         "manifest": {
