@@ -292,6 +292,13 @@
       "settledBy": "fdumay",
       "adr": "tooling/contributor/doc/adr/0010-an-epic-session-runs-issues-in-waves.md",
       "reviewOnly": true
+    },
+    {
+      "id": "D-038",
+      "statement": "the 0.4.0 release tags every version line at 0.4.0, each with its explicit tag, whatever version the line computes; D-004 and D-005 keep deciding every later release",
+      "settled": "2026-11-04",
+      "settledBy": "fdumay",
+      "reviewOnly": true
     }
   ]
 }

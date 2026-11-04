@@ -1880,6 +1880,21 @@
     },
     {
       "match": "exact",
+      "path": "/docs/platform/agent-environments",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "publicEdge": true,
+      "provenance": {
+        "project": "putnami.dev",
+        "package": "@putnami/web",
+        "sourceKind": "file-route",
+        "evidencePath": "src/app/docs/[...page]/page.tsx"
+      }
+    },
+    {
+      "match": "exact",
       "path": "/docs/platform/build-cache",
       "methods": [
         "GET",
@@ -2045,7 +2060,7 @@
     },
     {
       "match": "exact",
-      "path": "/docs/platform/intelligence/agent-readiness-method",
+      "path": "/docs/platform/login",
       "methods": [
         "GET",
         "HEAD"
@@ -2060,7 +2075,22 @@
     },
     {
       "match": "exact",
-      "path": "/docs/platform/login",
+      "path": "/docs/platform/mcp",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "publicEdge": true,
+      "provenance": {
+        "project": "putnami.dev",
+        "package": "@putnami/web",
+        "sourceKind": "file-route",
+        "evidencePath": "src/app/docs/[...page]/page.tsx"
+      }
+    },
+    {
+      "match": "exact",
+      "path": "/docs/platform/notifications",
       "methods": [
         "GET",
         "HEAD"
@@ -2136,6 +2166,21 @@
     {
       "match": "exact",
       "path": "/docs/platform/setup",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "publicEdge": true,
+      "provenance": {
+        "project": "putnami.dev",
+        "package": "@putnami/web",
+        "sourceKind": "file-route",
+        "evidencePath": "src/app/docs/[...page]/page.tsx"
+      }
+    },
+    {
+      "match": "exact",
+      "path": "/docs/platform/source",
       "methods": [
         "GET",
         "HEAD"
@@ -4234,6 +4279,21 @@
     },
     {
       "match": "exact",
+      "path": "/fr/docs/platform/agent-environments",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "publicEdge": true,
+      "provenance": {
+        "project": "putnami.dev",
+        "package": "@putnami/web",
+        "sourceKind": "file-route",
+        "evidencePath": "src/app/docs/[...page]/page.tsx"
+      }
+    },
+    {
+      "match": "exact",
       "path": "/fr/docs/platform/build-cache",
       "methods": [
         "GET",
@@ -4399,7 +4459,7 @@
     },
     {
       "match": "exact",
-      "path": "/fr/docs/platform/intelligence/agent-readiness-method",
+      "path": "/fr/docs/platform/login",
       "methods": [
         "GET",
         "HEAD"
@@ -4414,7 +4474,22 @@
     },
     {
       "match": "exact",
-      "path": "/fr/docs/platform/login",
+      "path": "/fr/docs/platform/mcp",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "publicEdge": true,
+      "provenance": {
+        "project": "putnami.dev",
+        "package": "@putnami/web",
+        "sourceKind": "file-route",
+        "evidencePath": "src/app/docs/[...page]/page.tsx"
+      }
+    },
+    {
+      "match": "exact",
+      "path": "/fr/docs/platform/notifications",
       "methods": [
         "GET",
         "HEAD"
@@ -4490,6 +4565,21 @@
     {
       "match": "exact",
       "path": "/fr/docs/platform/setup",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "publicEdge": true,
+      "provenance": {
+        "project": "putnami.dev",
+        "package": "@putnami/web",
+        "sourceKind": "file-route",
+        "evidencePath": "src/app/docs/[...page]/page.tsx"
+      }
+    },
+    {
+      "match": "exact",
+      "path": "/fr/docs/platform/source",
       "methods": [
         "GET",
         "HEAD"
@@ -5036,5 +5126,5 @@
       }
     }
   ],
-  "digest": "sha256:5bc2bd635b531733432c09c22b2fcb9dc63e48a291af6d3d80d1b6ca2458ba61"
+  "digest": "sha256:3860cb0892f6477b764ee5dca34e37e0e73f1ff898e083949daa8ca9da206e34"
 }

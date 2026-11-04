@@ -45,6 +45,9 @@ Behavior:
 - returns `SKIP` when no tests are found
 - produces JUnit output
 - can produce LCOV coverage
+- type-checks every TypeScript file of the project, tests included
+
+Bun strips types when it runs a test, so the `test~types` step runs `tsc --noEmit` over the project, dot-directories such as `.gen` included. It uses the tsconfig and the compiler options of `build~types`. A type error in a test fails `putnami test`. `node_modules`, `dist`, `.putnami` and nested projects stay out.
 
 Useful options:
 

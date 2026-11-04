@@ -86,7 +86,8 @@ satisfied is either fixed or waived through the
 5. **The public-cut gate is green,** and neither of its registers grew.
 6. **Release notes exist,** naming every breaking change, its migration, the
    security fixes that are now public, and any exception this release carries.
-   [CHANGELOG.md](CHANGELOG.md) is updated in the same change.
+   [CHANGELOG.md](CHANGELOG.md) is updated in the same change, and the tagging
+   change sets the date of its release heading.
 7. **A rollback plan is named before the release,** not after: the version users
    pin to if this one is bad, and who is on the hook to say so.
 8. **The CLI provenance record is complete.** It follows the
@@ -141,14 +142,16 @@ private history and is never published.
 
 A version is derived from git, per **version line** — a scope whose
 `putnami.json` declares a `line` block with the pattern of its tags
-(`protocols/workspace` ADR 0002). This repository has six:
+(`protocols/workspace` ADR 0002). This repository has eight:
 `typescript` (`ts/v{version}`), `go` (`go/v{version}`), `tooling`,
-`protocols`, `python`, and `sites` (each `<scope>/v{version}`).
+`protocols`, `python`, `sites`, `cloud` and `intelligence` (each
+`<scope>/v{version}`).
 
 ```sh
 putnami version get                        # what every line is at, right now
 putnami version tag --scope tooling        # print the proposal, write nothing
 putnami version tag --scope tooling --yes --push
+putnami version tag protocols/v0.4.0 --scope protocols --yes --push   # name the tag
 ```
 
 `putnami version get` and `putnami version tag` are commands of
@@ -191,6 +194,9 @@ After the tagged publish succeeds, push the six tags by name. Never run
 ```sh
 git push origin ts/v0.2.0 go/v0.2.0 tooling/v0.2.0 protocols/v0.2.0 python/v0.2.0 sites/v0.2.0
 ```
+
+`cloud` and `intelligence` joined later. Each takes its first tag with the
+explicit form of `putnami version tag`.
 
 ## Publication
 

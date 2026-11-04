@@ -34,9 +34,12 @@ import (
 
 const smokeHelperEnv = "GO_WANT_SMOKE_CLI_HELPER"
 
-const smokeOKLine = "smoke: OK - channel 'latest' passes irm install -> TypeScript init -> serve -> HTTP -> clean stop on windows/amd64"
+const smokeOKLine = "smoke: OK - channel 'latest' passes irm install -> TypeScript init -> serve -> HTTP -> clean stop -> observe on windows/amd64"
 
-const smokeRunOKLine = "smoke: OK - channel 'latest' passes irm install -> TypeScript init -> serve -> HTTP -> clean stop -> run " + smokeRunCommand + " on windows/amd64"
+// smokeObserveHead is the commit fake git reports and the stub observes.
+const smokeObserveHead = "e41c4d1df07105d3f305a51e9ee438a7b286f253"
+
+const smokeRunOKLine = "smoke: OK - channel 'latest' passes irm install -> TypeScript init -> serve -> HTTP -> clean stop -> observe -> run " + smokeRunCommand + " on windows/amd64"
 
 // smokeWindowsEnvironment is what the Windows smoke sets for every program it
 // runs, in place of the shell smoke's smokeExpectedEnvironment: Git's long
@@ -117,6 +120,15 @@ func runSmokeStubPutnami(args []string) int {
 		return 0
 	case "serve\x00webapp":
 		return runSmokeStubServe()
+	case "extensions\x00install\x00--user\x00@putnami/observe@latest", "extensions\x00install\x00--user\x00@putnami/cloud@latest":
+		return 0
+	case "observe\x00--base\x00HEAD~1\x00--evidence\x00observe-evidence.json":
+		document := fmt.Sprintf("{\n  \"subject\": {\n    \"sha\": %q\n  }\n}\n", smokeObserveHead)
+		if err := os.WriteFile("observe-evidence.json", []byte(document), 0o644); err != nil {
+			fmt.Fprintln(os.Stderr, "smoke stub: "+err.Error())
+			return 4
+		}
+		return 0
 	case "extensions\x00install\x00--user\x00--latest\x00" + smokeRunExtension:
 		fmt.Println("  Pinned " + smokeRunExtension + " for this user")
 		return 0
@@ -219,6 +231,8 @@ func runSmokePrerequisite(name string, args []string) int {
 			fmt.Fprintln(os.Stderr, "fake git: "+err.Error())
 			return 1
 		}
+	case "rev-parse HEAD":
+		fmt.Println(smokeObserveHead)
 	case "status --porcelain --untracked-files=all --ignored":
 		entries, err := os.ReadDir(".")
 		if err != nil {

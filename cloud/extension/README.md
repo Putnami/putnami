@@ -248,7 +248,8 @@ or GitLab CI job, set `PUTNAMI_CLOUD_TOKEN` to a workspace token of scope
 `delivery.ingest`; the token names the workspace.
 
 ```sh
-putnami extensions install --user @putnami/observe @putnami/cloud
+putnami extensions install --user @putnami/observe
+putnami extensions install --user @putnami/cloud
 PUTNAMI_CLOUD_TOKEN=pkt_... putnami observe --upload
 ```
 

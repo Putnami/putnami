@@ -89,7 +89,7 @@ Every extension is defined by a `putnami.extension.json` file. The manifest decl
 | Field | Required | Description |
 |-------|----------|-------------|
 | `$schema` | no | JSON Schema reference for editor support |
-| `commands` | **yes** | Public commands exposed to users |
+| `commands` | yes, unless the manifest declares a provider, agent content or a verb vocabulary | Public commands exposed to users |
 | `tasks` | no | Atomic executable units referenced by commands |
 | `hooks` | no | Lifecycle hooks (e.g., `preBuild`) |
 | `templates` | no | Project templates (see [Templates](/docs/tooling-&-workspace/templates)) |
@@ -98,6 +98,7 @@ Every extension is defined by a `putnami.extension.json` file. The manifest decl
 | `verbs` | no | A verb vocabulary: the verbs this extension gives meaning to, each with a description, aliases, default traits and related commands. Help, completion and alias resolution read it, and a job whose command declares no traits takes its verb's. The manifest then requires CLI contract 9 wherever it loads from |
 | `workspaceDevDependencies` | no | NPM devDependencies required at workspace root |
 | `autoServe` | no | Whether `serve` auto-discovers projects with this extension |
+| `providers` | no | Collaboration providers, keyed by contract (see [Providers](#providers)). The manifest then requires CLI contract 19 |
 | `runtime` | no | The extension's own executable and how to prepare it (see [Lifecycle primitives](#lifecycle-primitives)) |
 | `workspace` | no | Project discovery and metadata this extension owns (see [Lifecycle primitives](#lifecycle-primitives)) |
 
@@ -327,6 +328,46 @@ key the step. A run that measured no diff (`--all`, `--projects`) plans the
 step nowhere. `context` is the only `from` source and `selection.changedFiles`
 its only path: packaging refuses any other, and so does loading a manifest
 stamped 16.
+
+### Command traits
+
+From CLI contract 11, a command declares `traits`, and the core reads them instead of command names. A command that declares none takes the default traits of its verb, which `@putnami/dev` declares for the development verbs.
+
+| Trait | Value | What the core reads |
+|---|---|---|
+| `kind` | `verification` | The verification report, coverage and the spec gate |
+| `kind` | `criteria` | The criteria projection. A task scope never narrows the command |
+| `kind` | `diagnostics` | A tally of errors and warnings |
+| `kind` | `files` | A count of produced files |
+| `workload` | `serve` | A workload that streams until interrupted |
+| `workload` | `once` | A workload that streams once and forwards its exit code |
+| `rewritesSources` | `true` | The command rewrites the source tree |
+| `consumesReleaseSet` | `true` | The command binds a release set and an environment |
+| `sideEffects` | `registry` or `cloud` | What the command mutates outside the workspace |
+
+A command without `kind` reports its status only. A third-party command with no traits, in a workspace that loads no `@putnami/dev`, keeps its steps and loses the behaviors above.
+
+### Providers
+
+A collaboration provider declares its contract under `providers`, with one command and the operations it implements. The CLI runs that command for each operation: it writes one provider request on stdin and reads one response on stdout.
+
+```json
+{
+  "cliContract": 19,
+  "providers": {
+    "tasks": {
+      "version": 1,
+      "command": "{extensionRuntime}",
+      "args": ["provider"],
+      "operations": {
+        "get": { "description": "Read one issue by its id.", "openWorld": true }
+      }
+    }
+  }
+}
+```
+
+`@putnami/github-collaboration`, `@putnami/jira-collaboration`, `@putnami/linear-collaboration`, `@putnami/local-collaboration` and `@putnami/memory-store` are providers. A workspace binds them in `options.collaboration` of `putnami.workspace.json`, and `putnami tasks` and `putnami proposals` call them.
 
 ## The JSONL event protocol
 

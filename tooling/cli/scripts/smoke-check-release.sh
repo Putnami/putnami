@@ -22,6 +22,10 @@
 #     describe the bytes served, if the installer stops checking it, or if the
 #     installer tries to escalate privileges.
 #
+# The observe leg installs @putnami/observe and @putnami/cloud in the user scope
+# from the same channel, then runs `putnami observe` on a two-commit repository
+# that is not a workspace. It requires the evidence document of the head commit.
+#
 # With SMOKE_RUN_COMMAND set, a last leg runs the run form of the installer,
 # `curl -fsSL "<installer URL>?run=<command>" | bash`, in a fresh `git init`
 # directory that is not a workspace. It requires exit status 0 and a directory
@@ -78,10 +82,6 @@ run_command_pattern='^[abcdefghijklmnopqrstuvwxyz][abcdefghijklmnopqrstuvwxyz012
 if [ -n "$run_command" ]; then
   if ! [[ "$run_command" =~ $run_command_pattern ]]; then
     echo "::error::SMOKE_RUN_COMMAND must match ^[a-z][a-z0-9-]{0,63}\$, got '${run_command}'"
-    exit 1
-  fi
-  if ! command -v git >/dev/null 2>&1; then
-    echo "::error::prerequisites leg: SMOKE_RUN_COMMAND needs git to prove the run leg leaves its directory untouched"
     exit 1
   fi
 fi
@@ -391,6 +391,10 @@ esac
 if [ "$bun_major" -lt 1 ] || \
   { [ "$bun_major" -eq 1 ] && [ "$bun_minor" -lt 4 ]; }; then
   echo "::error::prerequisites leg: ${bun_path} reports unsupported version '${bun_version}'; Bun v1.4.0 or later is required"
+  exit 1
+fi
+if ! command -v git >/dev/null 2>&1; then
+  echo "::error::prerequisites leg: git is required for the observe and run legs"
   exit 1
 fi
 echo "smoke: prerequisites include Bun ${bun_version} at ${bun_path}"
@@ -791,6 +795,53 @@ else
 fi
 echo "smoke: no process of the smoke runs after clean stop"
 
+# ── Observe leg: observe a change in a repository without a workspace ───────
+#
+# The path of the how-to "Observe a change in your CI": the extensions come from
+# the channel of the CLI, in the user scope, because the repository holds no
+# workspace.
+observe_dir="$workdir/observe-scenario"
+observe_log="$workdir/observe.log"
+mkdir -p "$observe_dir"
+for observe_extension in @putnami/observe @putnami/cloud; do
+  echo "smoke: putnami extensions install --user ${observe_extension}@${channel}"
+  if ! (cd "$observe_dir" && "$bin" extensions install --user "${observe_extension}@${channel}") >>"$observe_log" 2>&1; then
+    echo "::error::observe leg: the stable path cannot install ${observe_extension} from channel '${channel}'"
+    tail -n 200 "$observe_log" || true
+    exit 1
+  fi
+done
+if ! (
+  cd "$observe_dir"
+  git init -q
+  git -c user.name=smoke -c user.email=smoke@putnami.dev commit -q --allow-empty -m base
+  printf 'observed\n' >change.txt
+  git add change.txt
+  git -c user.name=smoke -c user.email=smoke@putnami.dev commit -q -m change
+) >>"$observe_log" 2>&1; then
+  echo "::error::observe leg: cannot create the observed repository"
+  tail -n 200 "$observe_log" || true
+  exit 1
+fi
+if ! observe_head="$(git -C "$observe_dir" rev-parse HEAD 2>>"$observe_log")"; then
+  echo "::error::observe leg: cannot create the observed repository"
+  tail -n 200 "$observe_log" || true
+  exit 1
+fi
+observe_args=(observe --base HEAD~1 --evidence observe-evidence.json)
+echo "smoke: putnami ${observe_args[*]}"
+if ! (cd "$observe_dir" && "$bin" "${observe_args[@]}") >>"$observe_log" 2>&1; then
+  echo "::error::observe leg: putnami observe failed"
+  tail -n 200 "$observe_log" || true
+  exit 1
+fi
+if ! grep -Eq "\"sha\": *\"${observe_head}\"" "$observe_dir/observe-evidence.json" 2>/dev/null; then
+  echo "::error::observe leg: the evidence document does not name the head commit ${observe_head}"
+  tail -n 200 "$observe_log" || true
+  exit 1
+fi
+echo "smoke: putnami observe wrote the evidence of ${observe_head}"
+
 # ── Optional leg: run one command without a workspace ───────────────────────
 #
 # The run form installs the CLI, pins the extension the command map names for
@@ -849,7 +900,7 @@ if [ -n "$run_command" ]; then
     exit 1
   fi
   echo "smoke: putnami ${run_command} exited 0 and left ${run_dir} untouched"
-  echo "smoke: OK — channel '${channel}' passes curl install → TypeScript init → serve → HTTP → clean stop → run ${run_command} on ${os}/${arch}"
+  echo "smoke: OK — channel '${channel}' passes curl install → TypeScript init → serve → HTTP → clean stop → observe → run ${run_command} on ${os}/${arch}"
   exit 0
 fi
-echo "smoke: OK — channel '${channel}' passes curl install → TypeScript init → serve → HTTP → clean stop on ${os}/${arch}"
+echo "smoke: OK — channel '${channel}' passes curl install → TypeScript init → serve → HTTP → clean stop → observe on ${os}/${arch}"

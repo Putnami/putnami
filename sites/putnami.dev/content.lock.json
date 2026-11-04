@@ -4,8 +4,8 @@
       "name": "platform",
       "package": "cloud/doc-contents-platform",
       "channelHint": "canary",
-      "version": "0.0.0-20260929051531-8339b50e2",
-      "digest": "37d3e84a5d52ba8ff7b2c51fb2c0274bca5334b556dc6fb52d8ffbfff00e2ad2",
+      "version": "0.0.0-20261103161854-2a7a1d476",
+      "digest": "68eb0b6a03293c9242d979fe95e352f6b24310b832a186a914386dad3d3578b6",
       "registry": "https://put.putnami.dev"
     }
   ]

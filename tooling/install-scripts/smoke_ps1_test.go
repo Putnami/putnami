@@ -333,7 +333,7 @@ func TestSmokePS1NamesTheLegsOfTheShellSmoke(t *testing.T) {
 	sh := readSmokeSh(t)
 	shLegs := errorLegs(sh)
 	ps1Legs := errorLegs(src)
-	want := []string{"channel", "cleanup", "discovery", "http", "init", "install", "platform", "prerequisites", "run", "serve", "shutdown", "stamp"}
+	want := []string{"channel", "cleanup", "discovery", "http", "init", "install", "observe", "platform", "prerequisites", "run", "serve", "shutdown", "stamp"}
 	if strings.Join(shLegs, ",") != strings.Join(want, ",") {
 		t.Fatalf("smoke-check-release.sh names legs %v, want %v; update this test and the Windows port", shLegs, want)
 	}
@@ -356,6 +356,10 @@ func TestSmokePS1NamesTheLegsOfTheShellSmoke(t *testing.T) {
 		"http leg: webapp returned an empty successful response",
 		"shutdown leg: webapp did not stop within the graceful shutdown budget",
 		"shutdown leg: a process of the smoke still runs after the CLI exited; the starter may be orphaned",
+		"observe leg: the stable path cannot install $observeExtension from channel '$Channel'",
+		"observe leg: cannot create the observed repository",
+		"observe leg: putnami observe failed",
+		"observe leg: the evidence document does not name the head commit $observeHead",
 		"run leg: git init failed in $runDir",
 		"run leg: putnami $RunCommand through ${InstallerUrl}?run=$RunCommand exited $runStatus",
 		"run leg: the installer escalated privileges - a one-line install must never ask for elevation",
@@ -476,7 +480,7 @@ func TestSmokePS1StopsTheServerTheWayCtrlCDoes(t *testing.T) {
 			t.Fatalf("the native helper does not contain %q", pin)
 		}
 	}
-	final := `Write-Smoke "smoke: OK - channel '$Channel' passes irm install -> TypeScript init -> serve -> HTTP -> clean stop on windows/amd64"`
+	final := `Write-Smoke "smoke: OK - channel '$Channel' passes irm install -> TypeScript init -> serve -> HTTP -> clean stop -> observe on windows/amd64"`
 	if !strings.Contains(src, final) {
 		t.Fatalf("smoke-check-release.ps1 does not end with %q", final)
 	}
