@@ -113,6 +113,10 @@
     {
       "id": "external-spec-files-key-the-spec-tasks",
       "text": "specs-validate and specs-ratchet-validate declare git inputs for every extension a reader reads, and read external files through the Git candidate cut, so an ignored file is absent and a changed file reruns them."
+    },
+    {
+      "id": "openspec-specs-reach-the-gate",
+      "text": "A project that lists openspec in options.sdd.specFormats has the spec.md its manifest entry names read as that feature's spec by specs validate, with no native file. A renamed requirement whose ID is in the baseline fails the ratchet, exactly as for a native spec."
     }
   ],
   "decisions": [

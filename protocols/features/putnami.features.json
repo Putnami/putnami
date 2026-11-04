@@ -320,6 +320,57 @@
               "an-fr-label-that-projects-nothing-is-a-warning"
             ]
           }
+        },
+        {
+          "id": "openspec-projection",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "real-openspec-specs-reproduce-their-goldens",
+              "openspec-reads-only-its-spec-file",
+              "an-openspec-change-is-not-read",
+              "openspec-comments-and-code-are-not-spec-text",
+              "only-adr-links-become-openspec-decisions"
+            ]
+          }
+        },
+        {
+          "id": "openspec-requirement-identity",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "an-openspec-name-gives-the-id",
+              "an-openspec-anchor-names-the-requirement",
+              "two-openspec-names-with-one-id-fail-with-both-positions",
+              "a-stray-openspec-anchor-is-an-error"
+            ]
+          }
+        },
+        {
+          "id": "openspec-findings",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "brownfield-openspec-specs-parse-with-positioned-findings",
+              "an-openspec-spec-with-no-purpose-is-an-error-at-a-line",
+              "a-placeholder-purpose-is-a-warning-and-stays-the-outcome",
+              "an-over-long-purpose-paragraph-names-a-split",
+              "a-derived-openspec-section-is-a-warning",
+              "the-same-openspec-bytes-give-the-same-result"
+            ]
+          }
         }
       ]
     }

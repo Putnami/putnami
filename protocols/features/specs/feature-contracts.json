@@ -87,6 +87,18 @@
     {
       "id": "speckit-findings",
       "text": "Each NEEDS CLARIFICATION marker outside a comment or code is an enforce finding at its line. A Feature Branch, Created or Status line and a Key Entities section are one derived-fact warning each, and project nothing. An FR label outside the requirements section, or in a form the reader does not take, is a warning at its line."
+    },
+    {
+      "id": "openspec-projection",
+      "text": "The OpenSpec reader reads only the spec.md at its reference, or the file its reference names, and refuses a reference under openspec/changes. Purpose paragraphs, or the leading prose without a Purpose, become outcomes. Each Requirement heading under Requirements becomes a requirement with its body on one line, without metadata lines. Scenarios attach to their requirement. Links to doc/adr/*.md become decisions. HTML comments, fenced code and unknown sections project nothing."
+    },
+    {
+      "id": "openspec-requirement-identity",
+      "text": "An OpenSpec requirement takes the ID of the anchor on the line above it, otherwise its normalized name, so it is never unanchored. A name with no ID and no anchor is an error at its line. Two requirements with one ID fail with both positions. An anchor above no requirement, or one that breaks the segment grammar, is an error at its line."
+    },
+    {
+      "id": "openspec-findings",
+      "text": "Real OpenSpec specs, brownfield ones included, parse with findings at file and line. No Purpose and no leading prose is an error. A Purpose paragraph over 512 bytes is an error that names a split. A placeholder Purpose stays the outcome with a warning. A Status, Dates, Branch, Routes or Entities section is one derived-fact warning each and projects nothing. The same bytes give the same result."
     }
   ],
   "decisions": [
