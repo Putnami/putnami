@@ -160,7 +160,9 @@ after every prerequisite leaf. Constant bindings use `{ "value": ... }`;
 command's parameters for that project. The bindings do not alter a separate,
 explicit invocation of the prerequisite command. If that invocation, an
 ordinary `dependsOn`, or another relation already planned the same command with
-different local parameters, planning fails; keys are never first-wins.
+different local parameters, planning fails; keys are never first-wins. A plan
+that holds only some of the command's contributors, because a dependency asked
+for those steps, gains the others.
 Relation-local params cannot overwrite literal `run[].with` bindings, and a
 missing `fromProjectParam` path also fails closed. Workspace-once contributors
 accept shared constants and merge compatible project selections, but reject a
