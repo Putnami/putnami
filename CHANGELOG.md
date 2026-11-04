@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.4.0 — <release date>
+## 0.4.0 — 2026-11-04
 
 Every version line moves to 0.4.0: the `putnami` CLI and its extensions, the Go,
 TypeScript and Python frameworks, the protocols and the sites. The `cloud` and
