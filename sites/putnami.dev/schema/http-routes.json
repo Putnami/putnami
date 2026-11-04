@@ -2255,6 +2255,21 @@
     },
     {
       "match": "exact",
+      "path": "/docs/spec-driven-development/adr/a-spec-may-live-in-an-external-market-format",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "publicEdge": true,
+      "provenance": {
+        "project": "putnami.dev",
+        "package": "@putnami/web",
+        "sourceKind": "file-route",
+        "evidencePath": "src/app/docs/[...page]/page.tsx"
+      }
+    },
+    {
+      "match": "exact",
       "path": "/docs/spec-driven-development/adr/every-project-carries-a-feature-a-spec-or-a-feature-authority",
       "methods": [
         "GET",
@@ -4654,6 +4669,21 @@
     },
     {
       "match": "exact",
+      "path": "/fr/docs/spec-driven-development/adr/a-spec-may-live-in-an-external-market-format",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "publicEdge": true,
+      "provenance": {
+        "project": "putnami.dev",
+        "package": "@putnami/web",
+        "sourceKind": "file-route",
+        "evidencePath": "src/app/docs/[...page]/page.tsx"
+      }
+    },
+    {
+      "match": "exact",
       "path": "/fr/docs/spec-driven-development/adr/every-project-carries-a-feature-a-spec-or-a-feature-authority",
       "methods": [
         "GET",
@@ -5126,5 +5156,5 @@
       }
     }
   ],
-  "digest": "sha256:3860cb0892f6477b764ee5dca34e37e0e73f1ff898e083949daa8ca9da206e34"
+  "digest": "sha256:0ead5e60df27e0e7fb97a8c2e3e6135d402468dced73c5b03e0bd49d8c0483cb"
 }
