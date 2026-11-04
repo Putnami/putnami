@@ -173,7 +173,9 @@ var ValidOutputDriftPolicies = []string{
 // emits when a drift-policed output differs from the bytes present before the
 // task wrote it. It is an ordinary task diagnostic, so it reaches the session
 // record, machine output and the terminal like any other; under
-// OutputDriftFail it is also the failed task's error code.
+// OutputDriftFail it is also the failed task's error code. An output that held
+// no bytes before the run is a first generation: under OutputDriftFail it stays
+// a warning unless the CI environment variable is set.
 const OutputDriftDiagnosticCode = "generated-output-drift"
 
 // HostUnsupportedFailureCode is the error code of a failed task result that

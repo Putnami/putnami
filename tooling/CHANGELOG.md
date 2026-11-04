@@ -157,6 +157,7 @@
 
 ### Fixes
 
+- fix(cli): a first generation of a policed output warns outside CI and fails in CI
 - fix(contributor): epic status keeps to a budget and names a closed dependency (16b81b2)
 - fix(contributor): a git failure is not a detached HEAD in attach and the session hooks (69a51ed)
 - fix(observe): start no automatic Git maintenance from observe's fetches (332295a)

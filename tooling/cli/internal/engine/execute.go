@@ -315,6 +315,8 @@ func (e *Engine) executeSession(
 
 	// Build scheduler config
 	schedCfg := scheduler.SchedulerConfig{
+		FirstGenerationFails: strings.TrimSpace(os.Getenv("CI")) != "",
+
 		MaxParallel:       req.Global.MaxParallel,
 		MaxParallelMode:   req.Global.MaxParallelMode,
 		ResourceBudgets:   req.Global.ResourceBudgets,

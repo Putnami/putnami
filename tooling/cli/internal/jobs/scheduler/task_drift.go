@@ -31,6 +31,14 @@
 // exclusions are skipped on BOTH sides of the comparison, so the two walks see
 // the same set.
 //
+// # A first generation
+//
+// An output that held no bytes before the run has nothing to drift from: it is
+// a new project's first generation, or an output nobody committed. Only the
+// run's context tells them apart, so on a developer's machine it is a warning
+// that asks for the commit, and in CI (SchedulerConfig.FirstGenerationFails),
+// where the checkout is what the repository holds, `fail` keeps failing.
+//
 // # What never happens here
 //
 // The reference and the verdict are facts about the worktree the task ran in,
@@ -398,6 +406,8 @@ func digestDriftEntry(path string, info fs.FileInfo) (string, error) {
 // driftDiff is the difference between two trees, each list sorted.
 type driftDiff struct {
 	added, removed, changed []string
+	// first reports that the output held no bytes before the task wrote.
+	first bool
 }
 
 func (d driftDiff) empty() bool {
@@ -405,7 +415,7 @@ func (d driftDiff) empty() bool {
 }
 
 func compareDriftTrees(before, after driftTree) driftDiff {
-	var diff driftDiff
+	diff := driftDiff{first: len(before) == 0 && len(after) > 0}
 	for rel, digest := range after {
 		previous, existed := before[rel]
 		switch {
@@ -428,7 +438,8 @@ func compareDriftTrees(before, after driftTree) driftDiff {
 
 // applyDriftVerdict turns one output's diff into the declared consequence: no
 // diff, nothing; `warn`, one warning diagnostic; `fail`, one error diagnostic
-// and a failed result whose error carries the same code.
+// and a failed result whose error carries the same code. Outside CI, a first
+// generation under `fail` is treated as `warn`.
 func (s *Scheduler) applyDriftVerdict(
 	job *ScheduledJob,
 	result *JobResult,
@@ -441,8 +452,9 @@ func (s *Scheduler) applyDriftVerdict(
 	}
 	location := driftOutputLocation(job, root, rel)
 	message := driftMessage(id, location, diff)
+	fails := output.Drift == extension.OutputDriftFail && (!diff.first || s.cfg.FirstGenerationFails)
 	severity := runtimeproto.SeverityWarning
-	if output.Drift == extension.OutputDriftFail {
+	if fails {
 		severity = runtimeproto.SeverityError
 	}
 	result.Events = append(result.Events, driftDiagnosticEvent(severity, message, location, id, diff))
@@ -451,7 +463,7 @@ func (s *Scheduler) applyDriftVerdict(
 			Severity: string(severity), Code: extension.OutputDriftDiagnosticCode, Message: message, File: location,
 		})
 	}
-	if output.Drift != extension.OutputDriftFail {
+	if !fails {
 		return result
 	}
 	result.Status = string(TaskStatusFailed)
@@ -482,8 +494,12 @@ func driftOutputLocation(job *ScheduledJob, root, rel string) string {
 // remedy. The path list is bounded; the counts are not.
 func driftMessage(id, location string, diff driftDiff) string {
 	var b strings.Builder
-	fmt.Fprintf(&b, "generated output %q at %s differs from the bytes present before the task ran: %d added, %d removed, %d changed",
-		id, location, len(diff.added), len(diff.removed), len(diff.changed))
+	if diff.first {
+		fmt.Fprintf(&b, "generated output %q at %s held no bytes before the task ran: %d added", id, location, len(diff.added))
+	} else {
+		fmt.Fprintf(&b, "generated output %q at %s differs from the bytes present before the task ran: %d added, %d removed, %d changed",
+			id, location, len(diff.added), len(diff.removed), len(diff.changed))
+	}
 	listed := 0
 	for _, group := range []struct {
 		label string
@@ -509,6 +525,10 @@ func driftMessage(id, location string, diff driftDiff) string {
 		// path the files are already removed; on a restore of an empty entry
 		// they are still on disk, so the remedy names both.
 		b.WriteString(" — the task produces nothing at this path now; delete the stale files if they remain, and commit")
+		return b.String()
+	}
+	if diff.first {
+		b.WriteString(" — commit the generated files; a CI run fails until the repository holds them")
 		return b.String()
 	}
 	b.WriteString(" — the worktree now holds the regenerated files; commit them")

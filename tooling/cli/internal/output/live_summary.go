@@ -2,6 +2,7 @@ package output
 
 import (
 	"fmt"
+	"io"
 	"sort"
 	"strings"
 	"time"
@@ -23,7 +24,7 @@ func (r *LiveRenderer) Finish(results map[string]*jobs.JobResult, outcome jobs.S
 	if r.lifecycleMode {
 		r.clearLiveZone()
 		iox.Fprint(r.errOut, ShowCursor)
-		r.printLifecycleDiagnostics(results)
+		renderSuccessDiagnostics(r.errOut, results, false)
 		// A lifecycle job's dry-run plan, such as the edit of deps add
 		// --dry-run, is the one success output the user asked to see.
 		renderVisibleSummaries(r.errOut, results)
@@ -38,19 +39,25 @@ func (r *LiveRenderer) Finish(results map[string]*jobs.JobResult, outcome jobs.S
 	for _, row := range r.sortedRows() {
 		iox.Fprint(r.errOut, r.renderRow(row)+"\n")
 	}
+	renderSuccessDiagnostics(r.errOut, results, true)
 
 	iox.Fprint(r.errOut, ShowCursor)
 
 	r.printFinalSummary(results, outcome)
 }
 
-func (r *LiveRenderer) printLifecycleDiagnostics(results map[string]*jobs.JobResult) {
+// renderSuccessDiagnostics prints the warnings and errors of the tasks that did
+// not fail. Lifecycle mode shows them all. The ordinary modes show no diagnostic
+// of a successful task, except a generated-output-drift warning (driftOnly): it
+// asks for a commit, so it must reach the person who makes it. Both an executed
+// task and a restored hit leave the verdict on the result.
+func renderSuccessDiagnostics(errOut io.Writer, results map[string]*jobs.JobResult, driftOnly bool) {
 	keys := make([]string, 0, len(results))
 	for key := range results {
 		keys = append(keys, key)
 	}
 	sort.Strings(keys)
-	text := NewTextRenderer(r.out, r.errOut, TextRendererConfig{})
+	text := NewTextRenderer(errOut, errOut, TextRendererConfig{})
 	for _, key := range keys {
 		result := results[key]
 		if result == nil || result.Status == string(jobs.TaskStatusFailed) {
@@ -58,6 +65,9 @@ func (r *LiveRenderer) printLifecycleDiagnostics(results map[string]*jobs.JobRes
 		}
 		for _, event := range result.Events {
 			if event.Type != jobs.EventTypeDiagnostic {
+				continue
+			}
+			if code, _ := event.Data["code"].(string); driftOnly && code != extensionproto.OutputDriftDiagnosticCode {
 				continue
 			}
 			severity, _ := event.Data["severity"].(string)

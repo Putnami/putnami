@@ -967,6 +967,7 @@
           "verification": {
             "kind": "acceptance",
             "checks": [
+              "a-first-generation-warns-locally-and-fails-in-ci",
               "a-path-from-output-is-judged-inside-the-project-reference",
               "a-restored-entry-is-judged-against-the-checkout-it-lands-in",
               "an-executed-task-fails-on-stale-bytes-and-passes-on-equal-bytes",

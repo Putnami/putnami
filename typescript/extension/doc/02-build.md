@@ -268,7 +268,8 @@ the task's cache key needs no extra input. The declared `httpRoutes` output
 carries `drift: "fail"`: when the regenerated, removed or restored inventory
 differs from the committed one, the task fails with `generated-output-drift`,
 and the worktree holds the new inventory to commit. The first build of an
-application that has never committed its inventory fails this way once.
+application that has never committed its inventory warns and asks for the
+commit; in CI it fails.
 
 A consumer tells pages from actions with the rule the protocol states: a
 `file-route` route with methods `GET` and `HEAD` is a page, and a `file-route`
