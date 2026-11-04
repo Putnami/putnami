@@ -220,3 +220,56 @@ func TestSpecReferenceCannotLeaveTheWorkspace(t *testing.T) {
 		}
 	}
 }
+
+type noScenarioReader struct{}
+
+func (noScenarioReader) Read(input features.SpecInput) features.SpecReading {
+	reading := conformance.MinimalSpecReader{}.Read(input)
+	for i := range reading.Requirements {
+		reading.Requirements[i].Scenarios = nil
+	}
+	return reading
+}
+
+func TestFormatWithNoScenariosIsNotCompared(t *testing.T) {
+	t.Parallel()
+	spectest.Proves(t, "features/feature-contracts", "scenarios-never-change-checks", "a-format-with-no-scenarios-is-not-compared")
+	projection := features.ReadSpecSource(noScenarioReader{}, minimalInput("outcome O\nrequirement A | x\n"))
+	feature := features.Feature{ID: contractFeature, Requirements: []features.Requirement{{
+		ID: "a", Verification: &features.VerificationCriterion{Kind: features.VerificationKindAcceptance, Checks: []string{"declared"}},
+	}}}
+	if findings := features.CompareSpecScenarios(projection, feature); len(findings) != 0 {
+		t.Fatalf("got %v", findings)
+	}
+}
+
+func TestCriteriaGroupNamesTheFormatOfAnExternalPath(t *testing.T) {
+	t.Parallel()
+	spectest.Proves(t, "features/feature-contracts", "external-spec-reference", "a-criteria-group-names-the-format-of-an-external-path")
+	projection := func(group string) []byte {
+		return []byte(`{"protocolVersion":1,"groups":[{"feature":"billing/a",` + group + `,"specRequirements":["r"]}]}`)
+	}
+	for _, valid := range []string{`"spec":"specs/a.json"`, `"spec":"openspec/specs/a","format":"openspec"`} {
+		if _, findings := features.ParseAndValidateSpecCriteriaProjection(projection(valid)); diag.HasErrors(findings) {
+			t.Errorf("%s: %v", valid, findings)
+		}
+	}
+	for _, invalid := range []string{`"spec":"openspec/specs/a"`, `"spec":"openspec/specs/a","format":"asciidoc"`, `"spec":"../a","format":"kiro"`} {
+		if _, findings := features.ParseAndValidateSpecCriteriaProjection(projection(invalid)); !diag.HasErrors(findings) {
+			t.Errorf("%s must be refused", invalid)
+		}
+	}
+}
+
+func TestEveryDiagnosticCodeOfTheContractIsReserved(t *testing.T) {
+	t.Parallel()
+	for _, code := range []string{
+		features.ErrorCodeInvalidSpecReference, features.ErrorCodeSpecFormatNotEnabled, features.ErrorCodeSpecFormatUnavailable,
+		features.ErrorCodeSpecRead, features.ErrorCodeSpecRequirementTooLong, features.ErrorCodeSpecRequirementUnanchored,
+		features.WarningCodeSpecScenarioMismatch,
+	} {
+		if !features.ValidDiagnosticCodes[code] {
+			t.Errorf("%s is not reserved", code)
+		}
+	}
+}

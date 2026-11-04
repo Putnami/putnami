@@ -165,7 +165,7 @@ func ValidateManifest(input *Manifest) []diag.Diagnostic {
 		diagnostics = append(diagnostics, diag.Errorf(ErrorCodeParseError, "features", "features is required and must be an array"))
 	}
 	if !supportedManifestVersions[input.ProtocolVersion] {
-		diagnostics = append(diagnostics, diag.Errorf(ErrorCodeInvalidProtocolVersion, "protocolVersion", "protocolVersion %d is not supported (want %d or %d)", input.ProtocolVersion, MinimumManifestProtocolVersion, ManifestProtocolVersion))
+		diagnostics = append(diagnostics, diag.Errorf(ErrorCodeInvalidProtocolVersion, "protocolVersion", "protocolVersion %d is not supported (want %d, %d or %d)", input.ProtocolVersion, MinimumManifestProtocolVersion, ManifestCriteriaProtocolVersion, ManifestProtocolVersion))
 	}
 	if !segmentIDPattern.MatchString(input.Namespace) {
 		diagnostics = append(diagnostics, diag.Errorf(ErrorCodeInvalidID, "namespace", "namespace %q must be one lower-case ASCII ID segment", input.Namespace))

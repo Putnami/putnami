@@ -202,3 +202,33 @@ func TestSpecReferenceToOneFileAndToNothing(t *testing.T) {
 		t.Fatalf("missing directory: %s", got)
 	}
 }
+
+func TestOverlappingSpecPathsFail(t *testing.T) {
+	ws := externalWorkspace(t, "", "openspec")
+	writeDiscoveryFixture(t, filepath.Join(ws.Root, "app", "openspec", "invoice", "spec.md"), "outcome O\n")
+	second := strings.TrimSuffix(externalManifest, `]}`) + `,{"id":"billing/other","type":"feature","name":"Other","outcome":"O","owner":"o","target":"modeled",` +
+		`"spec":{"format":"openspec","path":"app/openspec/invoice/spec.md"}}]}`
+	writeDiscoveryFixture(t, filepath.Join(ws.Root, "app", "putnami.features.json"), second)
+	if got := findingCodes(discoverExternal(t, ws).Diagnostics); got != featureproto.ErrorCodeDuplicateSpec+"@app/putnami.features.json#features[1].spec" {
+		t.Fatalf("findings = %s", got)
+	}
+}
+
+func TestScopedRunKeepsItsExternalSpec(t *testing.T) {
+	spectest.Proves(t, "tooling/specification-driven-development", "external-specs-share-one-discovery", "a-scoped-run-keeps-its-external-spec")
+	ws := externalWorkspace(t, "", "openspec")
+	writeDiscoveryFixture(t, filepath.Join(ws.Root, "app", "openspec", "invoice", "spec.md"), "outcome O\nrequirement A | x\n")
+	// A feature the selection does not own names the same path after the owner.
+	writeDiscoveryFixture(t, filepath.Join(ws.Root, "zed", "putnami.features.json"),
+		strings.ReplaceAll(strings.ReplaceAll(externalManifest, "billing", "other"), "other/invoice-export", "other/late"))
+	ws.Projects = append(ws.Projects, &workspace.Project{Name: "zed", Path: "zed", Config: ws.Projects[0].Config})
+	scope := NewScope([]string{"app"})
+	reader, err := NewOSReader(ws.Root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	result := discoverSpecs(ws, scope, reader, func() (Reader, error) { return reader, nil }, minimalLookup)
+	if len(result.Selected) != 1 || result.Selected[0].Spec.Feature != "billing/invoice-export" || len(result.Diagnostics) != 0 {
+		t.Fatalf("selected = %#v, findings = %s", result.Selected, findingCodes(result.Diagnostics))
+	}
+}

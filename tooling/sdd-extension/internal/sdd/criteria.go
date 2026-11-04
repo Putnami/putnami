@@ -57,6 +57,7 @@ func criteriaProjectionFromRepository(repository *specRepository) *featureproto.
 		group := featureproto.SpecCriteriaGroup{
 			Feature:          spec.Feature,
 			Spec:             discovered.Path,
+			Format:           discovered.Format,
 			SpecRequirements: identities,
 		}
 		if feature, exists := authored[spec.Feature]; exists {

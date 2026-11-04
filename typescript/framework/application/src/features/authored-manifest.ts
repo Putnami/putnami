@@ -60,7 +60,7 @@ export function readAuthoredFeatureManifest(projectRoot: string): AuthoredFeatur
     throw new Error(`authored feature manifest ${FEATURE_MANIFEST_FILENAME} is not a JSON object`);
   }
   const document = raw as { protocolVersion?: unknown; features?: unknown };
-  if (document.protocolVersion !== 1 && document.protocolVersion !== 2) {
+  if (document.protocolVersion !== 1 && document.protocolVersion !== 2 && document.protocolVersion !== 3) {
     throw new Error(
       `authored feature manifest ${FEATURE_MANIFEST_FILENAME} declares unsupported protocolVersion ${JSON.stringify(document.protocolVersion)}`,
     );

@@ -92,6 +92,8 @@ var ValidDiagnosticCodes = map[string]bool{
 	WarningCodeContradictedEvidence: true, WarningCodeMissingHumanAuthority: true,
 	WarningCodeUnclassifiedContribution: true, WarningCodeUnresolvedFeatureAuthority: true,
 	WarningCodeUnobservedRequirement: true, WarningCodeSpecScenarioMismatch: true,
+	ErrorCodeInvalidSpecReference: true, ErrorCodeSpecFormatNotEnabled: true, ErrorCodeSpecFormatUnavailable: true,
+	ErrorCodeSpecRead: true, ErrorCodeSpecRequirementTooLong: true, ErrorCodeSpecRequirementUnanchored: true,
 }
 
 type protocolVersionError struct{ message string }

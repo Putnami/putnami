@@ -114,7 +114,9 @@ type SpecRequirementRecord struct {
 	// Unanchored says the ID comes from the requirement's position, such as
 	// FR-001, and no anchor pins it. A project in enforce refuses it.
 	Unanchored bool
-	// Scenarios lists the requirement's scenarios in file order.
+	// Scenarios lists the requirement's scenarios in file order. Nil says the
+	// format attaches no scenarios to this requirement, so it is not compared;
+	// an empty list says it can and has none.
 	Scenarios []SpecScenario
 }
 
@@ -229,7 +231,8 @@ func specFindingField(field, referencePath string, records []SpecRequirementReco
 }
 
 // CompareSpecScenarios compares a projection's scenarios with the checks its
-// feature declares. A scenario with no declared check and a declared check with
+// feature declares, for each requirement whose format attaches scenarios. A
+// scenario with no declared check and a declared check with
 // no scenario are warnings. The comparison only reads: scenarios never define
 // or shrink the check set.
 func CompareSpecScenarios(projection SpecProjection, feature Feature) []diag.Diagnostic {
@@ -245,6 +248,9 @@ func CompareSpecScenarios(projection SpecProjection, feature Feature) []diag.Dia
 	var findings []diag.Diagnostic
 	for i, requirement := range projection.Spec.Requirements {
 		record := projection.Requirements[i]
+		if record.Scenarios == nil {
+			continue
+		}
 		checks := make(map[string]bool, len(declared[requirement.ID]))
 		for _, check := range declared[requirement.ID] {
 			checks[check] = true

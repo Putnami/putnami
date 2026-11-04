@@ -11,8 +11,10 @@ consume the same files listed in `vectors.json` and must reproduce each golden
 byte-for-byte: declared field order, two-space indentation, UTF-8-compatible
 JSON escaping, and one trailing newline.
 
-`human-authored-features-v2.golden.json` pins the current manifest wire, the one
-that may carry an executable `verification` criterion and a feature `surface`.
+`human-authored-features-v3.golden.json` pins the current manifest wire, the one
+that may also name an external spec. `human-authored-features-v2.golden.json`
+pins the wire that may carry an executable `verification` criterion and a
+feature `surface`.
 `spec-source/` holds a line format no product ships. `MinimalSpecReader` reads it,
 so `RunSpecSource` can pin the reader contract apart from any market format.
 

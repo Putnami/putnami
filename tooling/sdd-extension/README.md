@@ -207,7 +207,8 @@ default is empty, and a project's list replaces the workspace's.
 - A format with no shipped reader fails and says so.
 - A feature with a native and an external spec fails `specs validate`.
 - In `enforce`, a positional requirement such as `FR-001` needs an anchor on the
-  line above it: `<!-- putnami:id <segment-id> -->`.
+  line above it: `<!-- putnami:id <segment-id> -->`, or the tag
+  `@putnami-id:<segment-id>` in a Gherkin file.
 
 ## The validation jobs
 

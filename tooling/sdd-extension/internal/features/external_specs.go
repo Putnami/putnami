@@ -47,15 +47,17 @@ func discoverExternalSpecs(ws *workspace.Workspace, scope *Scope, manifests []fe
 					result.diagnostics = append(result.diagnostics, findings...)
 				}
 			}
-			if !selected {
-				result.outOfScope[feature.Spec.Path] = true
-			}
-			if first, taken := owners[feature.Spec.Path]; taken {
+			// Ownership comes first: a feature that loses a path must not mark
+			// the winner's spec as out of scope.
+			if first := overlappingSpecOwner(owners, feature.Spec.Path); first != "" {
 				report(diag.Errorf(featureproto.ErrorCodeDuplicateSpec, field,
-					"feature %q names the spec path of feature %q; a spec details one feature", feature.ID, first))
+					"feature %q names a spec path that overlaps the one of feature %q; a spec details one feature", feature.ID, first))
 				continue
 			}
 			owners[feature.Spec.Path] = feature.ID
+			if !selected {
+				result.outOfScope[feature.Spec.Path] = true
+			}
 			specReader, refusal := resolveSpecReader(ws, root, feature.Spec.Format, field, lookup)
 			if refusal != nil {
 				report(*refusal)
@@ -101,6 +103,23 @@ func discoverExternalSpecs(ws *workspace.Workspace, scope *Scope, manifests []fe
 	return result
 }
 
+// overlappingSpecOwner returns the feature whose path equals, contains or lies
+// inside candidate, empty when none does. The sorted walk keeps the answer
+// stable when several overlap.
+func overlappingSpecOwner(owners map[string]string, candidate string) string {
+	taken := make([]string, 0, len(owners))
+	for owned := range owners {
+		taken = append(taken, owned)
+	}
+	sort.Strings(taken)
+	for _, owned := range taken {
+		if owned == candidate || strings.HasPrefix(candidate, owned+"/") || strings.HasPrefix(owned, candidate+"/") {
+			return owners[owned]
+		}
+	}
+	return ""
+}
+
 // resolveSpecReader refuses a format the owning project did not opt into and a
 // format no release can read yet. Neither depends on the verification mode:
 // either way the gate would pass over prose nobody read.
@@ -108,7 +127,7 @@ func resolveSpecReader(ws *workspace.Workspace, root string, format featureproto
 	lookup specReaderLookup) (featureproto.SpecReader, *diag.Diagnostic) {
 	enabled, err := resolveProjectSpecFormats(ws, root)
 	if err != nil {
-		finding := diag.Errorf(featureproto.ErrorCodeSpecFormatNotEnabled, field+".format", "%v", err)
+		finding := diag.Errorf(featureproto.ErrorCodeParseError, field+".format", "%v", err)
 		return nil, &finding
 	}
 	opted := false

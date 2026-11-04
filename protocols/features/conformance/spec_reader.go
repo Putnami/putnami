@@ -53,7 +53,7 @@ func (MinimalSpecReader) Read(input features.SpecInput) features.SpecReading {
 					continue
 				}
 				reading.Spec.Requirements = append(reading.Spec.Requirements, features.SpecRequirement{ID: id, Text: text})
-				reading.Requirements = append(reading.Requirements, features.SpecRequirementRecord{Position: position, Unanchored: unanchored})
+				reading.Requirements = append(reading.Requirements, features.SpecRequirementRecord{Position: position, Unanchored: unanchored, Scenarios: []features.SpecScenario{}})
 				anchor = ""
 			case "scenario":
 				if last := len(reading.Requirements) - 1; last >= 0 {
