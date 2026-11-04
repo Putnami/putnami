@@ -89,7 +89,7 @@ caches is the worktree.
 
 | Refusal | What to do |
 |---|---|
-| A generator task reports `generated-output-drift` | The worktree already holds the regenerated files: commit them |
+| A generator task reports `generated-output-drift` | The worktree already holds the regenerated files: commit them. A first generation is a warning outside CI, and fails in CI until they are committed |
 | A generated file was hand-edited (its hash no longer matches the manifest), or an extra file sits in a generated directory | Revert it; the directory is a Putnami-owned output |
 | A committed manifest was cut from a contract other than the committed one | Select the provider (`putnami validate --projects <provider>`) or run `putnami clientgen-sync`, then commit |
 | A first-party operation has no generated client | Declare the target on the provider, then sync |

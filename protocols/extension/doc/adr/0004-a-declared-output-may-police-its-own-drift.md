@@ -5,6 +5,9 @@
   `drift` member of a declared output, and the CLI's declared capture and
   restore paths
 
+An output with no bytes before the run no longer fails outside CI: see
+[`@putnami/cli` ADR 0084](../../../../tooling/cli/doc/adr/0084-a-first-generation-warns-outside-ci.md).
+
 ## Context
 
 Some declared outputs are bytes the repository commits: a generated client, a

@@ -55,7 +55,12 @@ type SchedulerConfig struct {
 	// --no-cache already covers the blunt case, because it disables the whole
 	// cache-enabled path the negative entry hangs off.
 	RetryFailed bool
-	Debug       bool
+	// FirstGenerationFails fails a task under a `fail` drift policy when its
+	// output held no bytes before the run. A CI or hosted run sets it: there, a
+	// missing output is one nobody committed. On a developer's machine it is a new
+	// project's first generation, which warns (task_drift.go).
+	FirstGenerationFails bool
+	Debug                bool
 	// CacheVerification enables observation-only cache checks. Verification
 	// forces singleton execution at the engine boundary and records each task's
 	// project-tree writes; it never changes cache identity or entry formats.

@@ -48,6 +48,7 @@ func (r *TextRenderer) Finish(results map[string]*jobs.JobResult, outcome jobs.S
 	// Some successful jobs deliberately expose complete dry-run payloads.
 	if !r.cfg.Quiet && !r.cfg.Verbose && !r.cfg.Debug {
 		renderVisibleSummaries(r.errOut, results)
+		renderSuccessDiagnostics(r.errOut, results, true)
 	}
 
 	// List any artifacts published during this session and their versions.

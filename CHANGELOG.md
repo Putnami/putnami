@@ -22,6 +22,9 @@ its commits.
 - `putnami projects owner|deps|why`, `putnami context map|pack` and
   `putnami <verb> --impacted --dry-run` answer what the MCP server answered.
   Putnami no longer serves one.
+- A new project's first `build` or `serve` succeeds. A generated output with
+  nothing committed yet is a warning that says to commit it, and a failure when
+  `CI` is set.
 - `putnami test` type-checks every TypeScript file of a project, tests included.
   On a change, it runs `go test -race` on the Go packages the change touches.
 - The contributor workflows run one `build` loop. Workflow profiles replace

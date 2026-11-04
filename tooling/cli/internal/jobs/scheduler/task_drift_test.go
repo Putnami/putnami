@@ -100,6 +100,96 @@ func TestExecutedDriftFailsOnStaleBytesAndPassesOnEqualBytes(t *testing.T) {
 	}
 }
 
+// TestDriftOnAFirstGenerationWarnsLocallyAndFailsInCI is a new project's first
+// run: the output held nothing, so outside CI it is a warning that asks for the
+// commit, and in CI, where a missing output is one nobody committed, it fails.
+// An executed task and a restored hit reach the same verdict, and a directory
+// that already held a file is not a first generation.
+func TestDriftOnAFirstGenerationWarnsLocallyAndFailsInCI(t *testing.T) {
+	spectest.Proves(t, "cli/job-planning-execution", driftRequirement, "a-first-generation-warns-locally-and-fails-in-ci")
+	for _, test := range []struct {
+		name       string
+		ci         bool
+		wantStatus string
+		wantLevel  string
+	}{
+		{"local", false, "success", "warning"},
+		{"ci", true, "failed", "error"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			job := driftJob(extension.OutputDriftFail, "schema", "")
+			f := newCaptureFixture(t, job)
+			f.sched.cfg.FirstGenerationFails = test.ci
+			spec := filepath.Join(f.ws.Root, captureTestProject, "schema", "http-routes.json")
+
+			reference := f.sched.snapshotExecutedDrift(job)
+			writeFileAt(t, spec, `{"v":1}`)
+			result := f.sched.judgeExecutedDrift(job, capturedResult(nil), reference)
+
+			if result.Status != test.wantStatus {
+				t.Fatalf("status = %s, want %s: %+v", result.Status, test.wantStatus, result.Error)
+			}
+			events := driftDiagnostics(result)
+			if len(events) != 1 || events[0].Data["severity"] != test.wantLevel {
+				t.Fatalf("want one %s diagnostic, got %+v", test.wantLevel, events)
+			}
+			if !strings.Contains(events[0].Message, "commit the generated files") {
+				t.Errorf("message does not ask for the commit: %q", events[0].Message)
+			}
+
+			// A checkout without the file, served from the cache.
+			if !f.sched.storeDeclaredCapture(job, capturedResult(nil), captureHashA) {
+				t.Fatal("declared capture did not publish an entry")
+			}
+			if err := os.Remove(spec); err != nil {
+				t.Fatal(err)
+			}
+			result = f.hitOrFail(t, job, captureHashA)
+			if result.Status != test.wantStatus || !result.CacheHit {
+				t.Fatalf("restored: status=%s hit=%t, want %s", result.Status, result.CacheHit, test.wantStatus)
+			}
+			if events := driftDiagnostics(result); len(events) != 1 || events[0].Data["severity"] != test.wantLevel {
+				t.Fatalf("restored: want one %s diagnostic, got %+v", test.wantLevel, events)
+			}
+		})
+	}
+	t.Run("a pathFrom output absent from the project reference", func(t *testing.T) {
+		job := driftJob(extension.OutputDriftFail, "", "clientOutput")
+		f := newCaptureFixture(t, job)
+		reference := f.sched.snapshotExecutedDrift(job)
+		writeFileAt(t, filepath.Join(f.ws.Root, captureTestProject, "src", "clients", "api.ts"), "export const api = 1\n")
+		result := f.sched.judgeExecutedDrift(job, portResult("clientOutput", "src/clients"), reference)
+		if events := driftDiagnostics(result); result.Status != "success" || len(events) != 1 || events[0].Data["severity"] != "warning" {
+			t.Fatalf("status=%s events=%+v", result.Status, events)
+		}
+	})
+	t.Run("the warn policy is unchanged", func(t *testing.T) {
+		job := driftJob(extension.OutputDriftWarn, "schema", "")
+		f := newCaptureFixture(t, job)
+		f.sched.cfg.FirstGenerationFails = true
+		reference := f.sched.snapshotExecutedDrift(job)
+		writeFileAt(t, filepath.Join(f.ws.Root, captureTestProject, "schema", "http-routes.json"), `{"v":1}`)
+		result := f.sched.judgeExecutedDrift(job, capturedResult(nil), reference)
+		if events := driftDiagnostics(result); result.Status != "success" || len(events) != 1 || events[0].Data["severity"] != "warning" {
+			t.Fatalf("status=%s events=%+v", result.Status, events)
+		}
+	})
+	t.Run("a sibling of a committed file still drifts", func(t *testing.T) {
+		job := driftJob(extension.OutputDriftFail, "schema", "")
+		f := newCaptureFixture(t, job)
+		schema := filepath.Join(f.ws.Root, captureTestProject, "schema")
+		writeFileAt(t, filepath.Join(schema, "openapi.json"), `{"v":1}`)
+
+		reference := f.sched.snapshotExecutedDrift(job)
+		writeFileAt(t, filepath.Join(schema, "http-routes.json"), `{"v":1}`)
+		result := f.sched.judgeExecutedDrift(job, capturedResult(nil), reference)
+
+		if result.Status != "failed" {
+			t.Fatalf("an added file beside committed ones must fail: %s", result.Status)
+		}
+	})
+}
+
 // TestExecutedDriftWarnReportsWithoutFailing pins the `warn` policy: the
 // diagnostic is emitted at warning severity and the task keeps its status.
 func TestExecutedDriftWarnReportsWithoutFailing(t *testing.T) {
