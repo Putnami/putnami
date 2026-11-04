@@ -1,6 +1,10 @@
 # ADR 0007 — The spec surface stays read-mostly and non-destructive
 
 - **Status**: accepted
+- **Amended**: 2026-11-04, §1 and §2, by
+  [ADR 0004 of `@putnami/sdd`](../../../sdd-extension/doc/adr/0004-a-spec-may-live-in-an-external-market-format.md):
+  `specs init <feature> --from <format>:<path>` drafts one native spec from
+  an external one
 - **Scope**: `putnami specs *` and the `sdd.list_specs` / `sdd.spec_context`
   MCP tools, served by `@putnami/sdd` (`tooling/sdd-extension`)
 
@@ -30,6 +34,13 @@ There is no `specs migrate`, no `--all` on `init`, and no `--force`. `init`
 refuses an unknown feature and a feature that already has a spec, naming the
 existing document.
 
+*Amended 2026-11-04.* `specs init <feature> --from <format>:<path>` is
+allowed. It reads one external spec in a market format, such as OpenSpec or
+GitHub Spec Kit, and writes exactly one new native file with the same
+`O_EXCL` open. It supports `--dry-run`, and refuses a feature that already has
+a native spec. It has no `--all` and no `--force`. There is still no
+`specs migrate`.
+
 No spec command writes a feature declaration, evidence, or maturity. Feature
 Evidence comes only from build and test producers, and support status stays a
 separate declaration from feature maturity.
@@ -40,6 +51,14 @@ separate declaration from feature maturity.
 the single intended outcome, and an empty `requirements` array. It writes no
 non-goal, requirement, or decision link: each is an agreement or prose that no
 declaration can derive.
+
+*Amended 2026-11-04.* With `--from`, the draft also carries the outcomes,
+non-goals, requirement texts and `doc/adr/*.md` decision links of the source
+file. Each is text a human already agreed to in that file, copied as it
+stands. The command writes no text the source does not hold. One spec per
+feature covers native and external specs together, so the same change drops
+the declaration's reference to the external spec, and the native file becomes
+the one home of that prose.
 
 ### 3. Both MCP tools are read-only
 
