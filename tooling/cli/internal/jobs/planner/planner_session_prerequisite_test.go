@@ -251,6 +251,64 @@ func TestPlan_SessionPrerequisiteInvocationCollisions(t *testing.T) {
 	})
 }
 
+func TestPlan_SessionPrerequisiteCompletesADependencyNarrowedCommand(t *testing.T) {
+	t.Parallel()
+	projects := []*workspace.Project{
+		{ID: "/lib", Name: "lib", Path: "lib", Extensions: []string{"@test/go"}},
+		{ID: "/app", Name: "app", Path: "app", Dependencies: []string{"lib"}, Extensions: []string{"@test/go"}},
+	}
+	ws := workspace.NewWorkspace("/workspace", nil, projects)
+	ws.Name = "test-workspace"
+	ext := func(buildParams map[string]extension.SessionPrerequisiteParamBinding) *extension.ExtensionDescription {
+		return &extension.ExtensionDescription{
+			Name: "@test/go",
+			Jobs: map[string]*extension.JobDefinition{
+				"build": {
+					ExtensionName: "@test/go", Name: "build", Activation: "workspace",
+					Flags: map[string]extension.FlagDefinition{"docker": {Type: "boolean", Default: false}},
+					PipelineSteps: []extension.PipelineStep{
+						{ID: "generate", Task: "build-generate", DependsOn: []string{"^generate"}},
+						{ID: "compile", Task: "build-compile", DependsOn: []string{"generate"}},
+					},
+				},
+				"deploy": {
+					ExtensionName: "@test/go", Name: "deploy", Activation: "workspace",
+					Flags: map[string]extension.FlagDefinition{"apps": {Type: "string", Default: ""}},
+					SessionPrerequisites: []extension.SessionPrerequisiteDefinition{{
+						Command: "build", ProjectsFromParam: "apps", Params: buildParams,
+					}},
+					PipelineSteps: []extension.PipelineStep{{ID: "apply", Task: "deploy-apply"}},
+				},
+			},
+			Tasks: map[string]extension.TaskDefinition{
+				"build-generate": {Kind: "command", Command: "run"},
+				"build-compile":  {Kind: "command", Command: "run"},
+				"deploy-apply":   {Kind: "command", Command: "run"},
+			},
+		}
+	}
+
+	t.Run("the missing contributors join the planned subset", func(t *testing.T) {
+		planned, err := Plan(ws, []string{"build", "deploy"}, projects[1:],
+			[]*extension.ExtensionDescription{ext(nil)},
+			extension.ParamMap{"apps": "/lib"}, nil, nil, nil)
+		if err != nil {
+			t.Fatalf("Plan rejected a subset of the prerequisite's contributors: %v", err)
+		}
+		if findSessionPrerequisiteJob(planned, "/lib", "@test/go", "build", "compile") == nil {
+			t.Fatalf("the prerequisite did not add the missing contributor; jobs=%v", jobKeys(planned))
+		}
+	})
+
+	t.Run("other local params on the subset fail closed", func(t *testing.T) {
+		params := map[string]extension.SessionPrerequisiteParamBinding{"docker": {Value: true}}
+		_, err := Plan(ws, []string{"deploy", "build"}, projects[1:],
+			[]*extension.ExtensionDescription{ext(params)},
+			extension.ParamMap{"apps": "/lib"}, nil, nil, nil)
+		assertSessionPrerequisiteError(t, err, "build")
+	})
+}
+
 func TestPlan_SessionPrerequisiteWorkspaceOnceReuse(t *testing.T) {
 	t.Parallel()
 	ws, orchestrator, publisher := workspaceOnceSessionPrerequisiteFixture()

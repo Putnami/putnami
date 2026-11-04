@@ -792,9 +792,10 @@ func emitCommandForSelection(
 }
 
 // mergeSessionPrerequisiteCandidates enforces one representation for one
-// command invocation. Reuse is permitted only when the complete job set and
-// task-local parameters agree; workspace selections are then unioned rather
-// than discarded by first-wins key de-duplication.
+// command invocation. Reuse is permitted only when every planned job belongs to
+// the invocation and task-local parameters agree; the invocation's other jobs
+// are then added, and workspace selections are unioned rather than discarded by
+// first-wins key de-duplication.
 func mergeSessionPrerequisiteCandidates(
 	allJobs *[]*jobmodel.ScheduledJob,
 	command, projectID string,
@@ -847,7 +848,7 @@ func mergeSessionPrerequisiteCandidates(
 		candidateByKey[candidate.Key()] = candidate
 	}
 	if len(existing) > 0 {
-		return mergeExistingSessionPrerequisiteCandidates(existing, candidateByKey, command, projectID, paramNames, selectedProjects)
+		return mergeExistingSessionPrerequisiteCandidates(allJobs, existing, candidateByKey, command, projectID, paramNames, selectedProjects)
 	}
 
 	if len(selectedProjects) > 0 {
@@ -857,7 +858,12 @@ func mergeSessionPrerequisiteCandidates(
 	return len(candidates) > 0, nil
 }
 
+// mergeExistingSessionPrerequisiteCandidates adds the candidates the plan does
+// not hold yet: a dependency-narrowed plan may hold a subset of the command's
+// contributors. A planned job outside the candidates, or one with other local
+// parameters, is a different invocation.
 func mergeExistingSessionPrerequisiteCandidates(
+	allJobs *[]*jobmodel.ScheduledJob,
 	existing, candidates map[string]*jobmodel.ScheduledJob,
 	command, projectID string,
 	paramNames []string,
@@ -868,12 +874,9 @@ func mergeExistingSessionPrerequisiteCandidates(
 		detail = fmt.Sprintf(" local parameters %s", strings.Join(paramNames, ","))
 	}
 	incompatible := fmt.Errorf("session prerequisite command %q is already planned with an incompatible%s invocation for %q", command, detail, projectID)
-	if len(existing) != len(candidates) {
-		return false, incompatible
-	}
-	for key, candidate := range candidates {
-		planned := existing[key]
-		if planned == nil {
+	for key, planned := range existing {
+		candidate := candidates[key]
+		if candidate == nil {
 			return false, incompatible
 		}
 		plannedParams, _ := cachekey.ProjectParamAliases(planned.JobDef.BoundParams)
@@ -882,10 +885,25 @@ func mergeExistingSessionPrerequisiteCandidates(
 			return false, incompatible
 		}
 	}
-	if len(selectedProjects) == 0 {
-		return false, nil
+	keys := make([]string, 0, len(candidates))
+	for key := range candidates {
+		if existing[key] == nil {
+			keys = append(keys, key)
+		}
 	}
-	changed := false
+	sort.Strings(keys)
+	missing := make([]*jobmodel.ScheduledJob, 0, len(keys))
+	for _, key := range keys {
+		missing = append(missing, candidates[key])
+	}
+	if len(selectedProjects) > 0 {
+		attachSelectedProjects(missing, selectedProjects)
+	}
+	*allJobs = append(*allJobs, missing...)
+	if len(selectedProjects) == 0 {
+		return len(missing) > 0, nil
+	}
+	changed := len(missing) > 0
 	for _, job := range existing {
 		byID := make(map[string]*workspace.Project)
 		for _, project := range append(job.SelectedProjects, selectedProjects...) {
