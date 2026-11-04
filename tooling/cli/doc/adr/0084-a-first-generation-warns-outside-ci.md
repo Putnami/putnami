@@ -2,7 +2,8 @@
 
 - **Status**: accepted
 - **Date**: 2026-11-04
-- **Amends**: [ADR 0034](0034-a-declared-output-polices-its-own-drift.md)
+- **Amends**: [ADR 0034](0034-a-declared-output-polices-its-own-drift.md),
+  [`protocols/extension` ADR 0004](../../../../protocols/extension/doc/adr/0004-a-declared-output-may-police-its-own-drift.md)
 - **Scope**: `@putnami/cli` (`internal/jobs/scheduler`, `internal/engine`),
   requirement `generated-output-drift` of feature
   `cli/job-planning-execution`
@@ -28,22 +29,25 @@ An output whose reference is empty and that holds bytes after the task is a
 
 - Outside CI, the verdict is a warning that says to commit the output. The task
   keeps its status.
-- When the `CI` environment variable is set to a non-blank value, the verdict is
-  the error ADR 0034 defines. A CI checkout is what the repository holds, so the
-  output is one nobody committed.
+- In CI or a hosted run, the verdict is the error ADR 0034 defines. That
+  checkout is what the repository holds, so the output is one nobody committed.
 
 The rule holds for an executed task and for a restored hit. `warn` is unchanged.
 An output that held any file before the run is not a first generation: a file
 added beside committed ones stays drift.
 
-The engine reads `CI` once and passes it as
-`SchedulerConfig.FirstGenerationFails`. `CI` is the variable
-`tooling/cli/internal/cli/cache_trust.go` reads, and the hosted runner sets it.
+The engine computes `cachekey.InCI() || runcredential.Hosted()` once and passes
+it as `SchedulerConfig.FirstGenerationFails`. `InCI` reads a non-blank `CI`
+environment variable. `Hosted` reports a run that holds the hosted credential,
+so the rule does not depend on what a runner exports.
 
 ## Consequences
 
 - A new project builds and serves on the first run, on a developer's machine.
 - A generated output missing from a pull request still fails its CI run.
+- The default renderers print a drift warning at the end of the session, so a
+  `warn` verdict is visible too. In a terminal, `putnami serve` prints it when
+  the session ends; until then its row shows the warning count.
 - A CI job that scaffolds a project and builds it without committing fails on
   that build. It has no committed bytes to compare with, and the verdict says to
   commit them.

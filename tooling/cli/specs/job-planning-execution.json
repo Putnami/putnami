@@ -127,7 +127,7 @@
     },
     {
       "id": "generated-output-drift",
-      "text": "A declared output with a drift policy is compared with the bytes at its path immediately before the task wrote it, on execution and on a hit. A difference is the diagnostic generated-output-drift naming the paths; fail fails the task with its outputs still written, warn keeps its status. Under fail, an output with no prior bytes warns, and fails when CI is set. A pathFrom output is judged inside a digest of its project root. Neither reference nor verdict reaches a key, an entry or the failure cache."
+      "text": "A declared output with a drift policy is compared with the bytes at its path immediately before the task wrote it, on execution and on a hit. A difference is the diagnostic generated-output-drift naming the paths; fail fails the task with its outputs still written, warn keeps its status. Under fail, an output with no prior bytes warns, and fails in CI or a hosted run. A pathFrom output is judged inside a digest of its project root. Neither reference nor verdict reaches a key, an entry or the failure cache."
     },
     {
       "id": "spec-gate-records-an-empty-evaluation",

@@ -36,8 +36,9 @@
 // An output that held no bytes before the run has nothing to drift from: it is
 // a new project's first generation, or an output nobody committed. Only the
 // run's context tells them apart, so on a developer's machine it is a warning
-// that asks for the commit, and in CI (SchedulerConfig.FirstGenerationFails),
-// where the checkout is what the repository holds, `fail` keeps failing.
+// that asks for the commit, and in CI or a hosted run
+// (SchedulerConfig.FirstGenerationFails), where the checkout is what the
+// repository holds, `fail` keeps failing.
 //
 // # What never happens here
 //
@@ -528,7 +529,7 @@ func driftMessage(id, location string, diff driftDiff) string {
 		return b.String()
 	}
 	if diff.first {
-		b.WriteString(" — commit the generated files; a CI run fails until the repository holds them")
+		b.WriteString(" — commit the generated files so the repository holds them")
 		return b.String()
 	}
 	b.WriteString(" — the worktree now holds the regenerated files; commit them")

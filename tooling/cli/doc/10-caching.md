@@ -877,9 +877,9 @@ to commit.
 
 An output that held no bytes before the run is a **first generation**: a new
 project has nothing to drift from. Under `fail` it is a warning that says to
-commit the output, and the task keeps its status. When the `CI` environment
-variable is set, the checkout is what the repository holds, so the output is
-one nobody committed and the task fails
+commit the output, and the task keeps its status. In a run with the `CI`
+environment variable set or a hosted run, the checkout is what the repository
+holds, so the output is one nobody committed and the task fails
 ([ADR 0084](adr/0084-a-first-generation-warns-outside-ci.md)). A `warn` output
 is unchanged.
 

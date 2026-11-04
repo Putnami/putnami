@@ -663,7 +663,8 @@ output:
 
 An output that held no bytes before the run is a first generation. Under `fail`
 it is a warning that says to commit the output, and the task keeps its status.
-When the `CI` environment variable is set, it fails like any other difference.
+In a run with the `CI` environment variable set or a hosted run, it fails like
+any other difference.
 
 The engine takes the reference **immediately before the task writes**: for an
 executed task, before its process starts; for a cache hit, before the recorded

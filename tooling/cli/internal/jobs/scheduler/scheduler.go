@@ -56,8 +56,8 @@ type SchedulerConfig struct {
 	// cache-enabled path the negative entry hangs off.
 	RetryFailed bool
 	// FirstGenerationFails fails a task under a `fail` drift policy when its
-	// output held no bytes before the run. A CI run sets it: there, a missing
-	// output is one nobody committed. On a developer's machine it is a new
+	// output held no bytes before the run. A CI or hosted run sets it: there, a
+	// missing output is one nobody committed. On a developer's machine it is a new
 	// project's first generation, which warns (task_drift.go).
 	FirstGenerationFails bool
 	Debug                bool

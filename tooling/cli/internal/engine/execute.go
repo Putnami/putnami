@@ -16,6 +16,7 @@ import (
 	"go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/hooks"
 	"go.putnami.dev/tooling/cli/internal/iox"
+	"go.putnami.dev/tooling/cli/internal/jobs/cachekey"
 	"go.putnami.dev/tooling/cli/internal/jobs/remotecache"
 	"go.putnami.dev/tooling/cli/internal/jobs/scheduler"
 	"go.putnami.dev/tooling/cli/internal/machine"
@@ -315,7 +316,7 @@ func (e *Engine) executeSession(
 
 	// Build scheduler config
 	schedCfg := scheduler.SchedulerConfig{
-		FirstGenerationFails: strings.TrimSpace(os.Getenv("CI")) != "",
+		FirstGenerationFails: cachekey.InCI() || runcredential.Hosted(),
 
 		MaxParallel:       req.Global.MaxParallel,
 		MaxParallelMode:   req.Global.MaxParallelMode,
