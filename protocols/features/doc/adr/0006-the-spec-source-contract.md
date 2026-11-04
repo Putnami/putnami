@@ -40,8 +40,8 @@ task input is a static pattern, so it cannot depend on a manifest value.
 5. **A name becomes an ID by one mapping.** `NormalizeRequirementName`
    lowercases ASCII letters, keeps ASCII digits, and turns each other run of
    ASCII characters into one hyphen. It trims the hyphens at both ends. A name
-   with a non-ASCII character, or with nothing left, has no ID and needs an
-   anchor.
+   with a non-ASCII character, with nothing left, or longer than 128 bytes after
+   mapping has no ID and needs an anchor.
 6. **An anchor stands alone on the line above its requirement.** It reads
    `<!-- putnami:id <segment-id> -->`. In a Gherkin file it is the tag
    `@putnami-id:<segment-id>` on the line above the `Rule:`. The ID follows the
