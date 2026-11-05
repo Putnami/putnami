@@ -400,7 +400,7 @@ func compareFileScenarios(projection SpecProjection, declared map[string][]strin
 // NormalizeRequirementName maps a name-based requirement to its ID. It
 // lowercases ASCII letters, keeps ASCII digits, turns each other run of
 // characters, non-ASCII ones included, into one hyphen and trims the ends. A
-// name with nothing left, or longer than the bound, has no ID. (D-056)
+// name with nothing left, or longer than the bound, has no ID. (D-057)
 func NormalizeRequirementName(name string) (string, bool) {
 	var out strings.Builder
 	pending := false
@@ -430,7 +430,7 @@ func NormalizeRequirementName(name string) (string, bool) {
 // requirementIDFromName gives a requirement with no anchor the ID its name maps
 // to. A name that maps to none takes requirement-<ordinal>, its 1-based place
 // among the requirements, so the ID comes from its position: the requirement is
-// unanchored, report reads it and enforce asks for an anchor. (D-056)
+// unanchored, report reads it and enforce asks for an anchor. (D-057)
 func requirementIDFromName(name string, ordinal int) (id string, unanchored bool) {
 	if id, ok := NormalizeRequirementName(name); ok {
 		return id, false
