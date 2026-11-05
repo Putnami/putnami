@@ -1,0 +1,21 @@
+{
+  "protocolVersion": 1,
+  "feature": "billing/invoice-export",
+  "outcomes": [
+    "Installable CLI distribution: PyPI extras, pipx/uv paths, man page, shell completion, and release binaries."
+  ],
+  "requirements": [
+    {
+      "id": "first-class-tool-install-documentation",
+      "text": "Project documentation SHALL present `uv tool install undatum` and `pipx install undatum` as first-class installation methods in the README install section."
+    },
+    {
+      "id": "official-macos-install-path",
+      "text": "The project SHALL provide an official macOS installation path that either ships a Homebrew formula or documents an honest supported alternative and closes the long-standing Homebrew request accordingly."
+    },
+    {
+      "id": "single-binary-release-artifacts",
+      "text": "Release publishing SHALL include single-binary (or equivalent self-contained) artifacts for major platforms so ops users can install without a pre-existing Python environment where feasible."
+    }
+  ]
+}

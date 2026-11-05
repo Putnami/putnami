@@ -63,6 +63,7 @@ const (
 	WarningCodeSpecScenarioMismatch       = "features.spec_scenario_mismatch"
 	WarningCodeSpecDerivedFact            = "features.spec_derived_fact"
 	WarningCodeSpecRequirementIgnored     = "features.spec_requirement_ignored"
+	WarningCodeSpecPlaceholderPurpose     = "features.spec_placeholder_purpose"
 	WarningCodeMisplacedBaseline          = "features.misplaced_baseline"
 	WarningCodeMissingEvidence            = "features.missing_evidence"
 	WarningCodeStaleEvidence              = "features.stale_evidence"
@@ -100,7 +101,7 @@ var ValidDiagnosticCodes = map[string]bool{
 	WarningCodeUnobservedRequirement: true, WarningCodeSpecScenarioMismatch: true,
 	ErrorCodeInvalidSpecReference: true, ErrorCodeSpecFormatNotEnabled: true, ErrorCodeSpecFormatUnavailable: true,
 	ErrorCodeSpecRead: true, ErrorCodeSpecRequirementTooLong: true, ErrorCodeSpecRequirementUnanchored: true,
-	WarningCodeSpecDerivedFact: true, WarningCodeSpecRequirementIgnored: true, FindingCodeSpecNeedsClarification: true,
+	WarningCodeSpecDerivedFact: true, WarningCodeSpecPlaceholderPurpose: true, WarningCodeSpecRequirementIgnored: true, FindingCodeSpecNeedsClarification: true,
 }
 
 type protocolVersionError struct{ message string }

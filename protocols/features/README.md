@@ -113,6 +113,24 @@ blocks only in `enforce` goes through `SpecProjection.EnforceOnly`.
 `conformance.RunSpecSource` pins a reader against a golden spec. See
 [ADR 0006](doc/adr/0006-the-spec-source-contract.md).
 
+The `openspec` format reads one capability, the `spec.md` at the reference or
+the file the reference names:
+
+| OpenSpec | Native `Spec` |
+|---|---|
+| `## Purpose` paragraphs and list items, or the leading prose without one | `outcomes` |
+| `### Requirement: <name>` under `## Requirements` | `requirements[].id`, from the anchor above it or the normalized name |
+| The requirement's body, on one line, without `**Key**:` metadata lines | `requirements[].text` |
+| `#### Scenario: <name>` | Compared with the requirement's declared checks; a mismatch is a warning |
+| A `doc/adr/*.md` link in the Purpose or a body | `decisions` |
+
+A reference under `openspec/changes/` is an error: a change is a proposal in
+flight, not the current spec. HTML comments, fenced code and unknown sections
+project nothing. A placeholder Purpose stays the outcome with
+`features.spec_placeholder_purpose`, and a Status, Dates, Branch, Routes or
+Entities section gives `features.spec_derived_fact`. A Purpose paragraph or a
+requirement body over 512 bytes is an error at its line that names a split.
+
 A feature may carry an optional `surface` object that lists the command paths
 that carry it, for example
 `"surface": {"commands": ["features validate"]}`.

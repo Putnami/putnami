@@ -1,0 +1,37 @@
+{
+  "protocolVersion": 1,
+  "feature": "billing/invoice-export",
+  "outcomes": [
+    "Define `openspec feedback` behavior for creating GitHub issues safely via `gh`, with a manual fallback when automation is unavailable."
+  ],
+  "requirements": [
+    {
+      "id": "error-handling",
+      "text": "The system SHALL handle feedback submission errors gracefully."
+    },
+    {
+      "id": "feedback-always-works",
+      "text": "The system SHALL allow feedback submission regardless of telemetry settings."
+    },
+    {
+      "id": "feedback-command",
+      "text": "The system SHALL provide an `openspec feedback` command that creates a GitHub Issue in the openspec repository using the `gh` CLI. The system SHALL use `execFileSync` with argument arrays to prevent shell injection vulnerabilities."
+    },
+    {
+      "id": "feedback-skill-for-agents",
+      "text": "The system SHALL provide a `/feedback` skill that guides agents through collecting and submitting user feedback."
+    },
+    {
+      "id": "github-cli-dependency",
+      "text": "The system SHALL use `gh` CLI for automatic feedback submission when available, and provide a manual submission fallback when `gh` is not installed or not authenticated. The system SHALL use platform-appropriate commands to detect `gh` CLI availability."
+    },
+    {
+      "id": "issue-metadata",
+      "text": "The system SHALL include relevant metadata in the GitHub Issue body."
+    },
+    {
+      "id": "shell-completions",
+      "text": "The system SHALL provide shell completions for the feedback command."
+    }
+  ]
+}

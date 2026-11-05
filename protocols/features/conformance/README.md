@@ -42,6 +42,10 @@ well as what it must: the unmapped contribution stays unclassified and the
 dependency-owned one is unclaimable, so a language that widened its association
 rule fails here rather than in a repository count.
 
+`spec-source/openspec/` holds real OpenSpec files, copied unchanged, and the
+spec the reader projects from each. Its `README.md` names their sources and
+licenses.
+
 The provisional `go-typescript-native-design` vector is produced by real Go
 and TypeScript module composition. Its tests remove only language-specific
 source provenance after asserting that provenance separately, then compare the
