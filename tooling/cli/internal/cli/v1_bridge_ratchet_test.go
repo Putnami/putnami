@@ -134,94 +134,7 @@ func qualifiedSelectors(fset *token.FileSet, file *ast.File, path, defaultName s
 	return found
 }
 
-// --- Ratchet 1: the retired machine-output selection cannot select again ---
-
-// machineOutputEnvLiteral is the retired contract-selection variable, spelled
-// here as a literal because the ratchet is about who may spell it.
-const machineOutputEnvLiteral = "PUTNAMI_MACHINE_OUTPUT"
-
-// machineEnvDeclFile is the ONE production file allowed to name the variable:
-// internal/machine owns the retired lever and the notice printed for it.
-const machineEnvDeclFile = "internal/machine/machine.go"
-
-// machineEnvReaderFile is the ONE production file allowed to READ it, and it
-// may only hand the value to the warning.
-const machineEnvReaderFile = "internal/cli/app.go"
-
-// TestV1Ratchet_MachineOutputSelectionStaysRetired fails if any production code
-// but internal/machine spells PUTNAMI_MACHINE_OUTPUT, or if any file but the
-// CLI shell reads it.
-//
-// Why this predicate: the v1 emitters are deleted, so the variable cannot
-// select a renderer today — but the FIRST step back to two output contracts is
-// a second reader of this value, and it reads as a harmless feature flag at the
-// review. machine.RetiredSelectionEnv deliberately survives as the warn (a CI
-// runner still exporting the canary's lever is told its request is ignored
-// rather than discovering it by parsing an unexpected document), and this test
-// is what keeps "the warn" from quietly becoming "the switch" again.
-//
-// It asserts on string literals and selectors, so the several doc comments that
-// name the variable — including the one directly above app.go's warn call — do
-// not count. Prose about a retired lever is exactly what should be free.
-func TestV1Ratchet_MachineOutputSelectionStaysRetired(t *testing.T) {
-	t.Parallel()
-	root := moduleRoot(t)
-	fset, files := productionASTs(t, root)
-
-	declSites := 0
-	readerFiles := map[string]bool{}
-	warnCalls := 0
-	for rel, file := range files {
-		ast.Inspect(file, func(node ast.Node) bool {
-			if lit, ok := node.(*ast.BasicLit); ok && lit.Kind == token.STRING {
-				if value, err := strconv.Unquote(lit.Value); err == nil && value == machineOutputEnvLiteral {
-					if rel != machineEnvDeclFile {
-						t.Errorf("%s:%d spells %q — only %s may name the retired machine-output "+
-							"selector, and only to warn that it selects nothing (an earlier change deleted "+
-							"the v1 emitters; a later change pinned that).",
-							rel, fset.Position(lit.Pos()).Line, machineOutputEnvLiteral, machineEnvDeclFile)
-					}
-					declSites++
-				}
-			}
-			selector, ok := node.(*ast.SelectorExpr)
-			if !ok {
-				return true
-			}
-			switch selector.Sel.Name {
-			case "RetiredSelectionEnv":
-				readerFiles[rel] = true
-			case "WarnRetiredSelection":
-				warnCalls++
-			}
-			return true
-		})
-	}
-
-	if declSites == 0 {
-		t.Fatalf("no production file spells %q — the scan is broken, or the constant moved without "+
-			"this pin. Move the pin with it.", machineOutputEnvLiteral)
-	}
-	for rel := range readerFiles {
-		if rel != machineEnvReaderFile && rel != machineEnvDeclFile {
-			t.Errorf("%s reads machine.RetiredSelectionEnv — the value has exactly one production "+
-				"reader (%s), which passes it straight to WarnRetiredSelection. A second reader is a "+
-				"contract SELECTION coming back; rolling back to v1 documents means pinning an older "+
-				"published build, not setting a variable.", rel, machineEnvReaderFile)
-		}
-	}
-	if !readerFiles[machineEnvReaderFile] {
-		t.Errorf("%s no longer reads machine.RetiredSelectionEnv; if the warn moved, move this pin "+
-			"with it — otherwise the check above passes vacuously", machineEnvReaderFile)
-	}
-	if warnCalls != 1 {
-		t.Errorf("production calls WarnRetiredSelection %d times, want exactly 1 (the CLI shell, once "+
-			"per process). More than one is a per-surface notice; none means the lever is silently "+
-			"ignored again.", warnCalls)
-	}
-}
-
-// --- Ratchet 2: nothing can emit a versionless machine document ---
+// --- Ratchet 1: nothing can emit a versionless machine document ---
 
 // deletedV1ResultSymbols are the protocols/cli exports B1b left unreachable and
 // B7a deleted. Naming one from production code is a versionless document being
@@ -315,7 +228,7 @@ func TestV1Ratchet_NoVersionlessMachineDocument(t *testing.T) {
 	}
 }
 
-// --- Ratchet 3: manifest adaptation does not come back ---
+// --- Ratchet 2: manifest adaptation does not come back ---
 
 // extensionPackageDir is where the CLI loads and validates extension manifests.
 // Its twin ratchet lives in protocols/extension (adaptation_ratchet_test.go),
@@ -369,7 +282,7 @@ func TestV1Ratchet_NoManifestAdaptation(t *testing.T) {
 	}
 }
 
-// --- Ratchet 4: the runtime-event reader accepts exactly one version ---
+// --- Ratchet 3: the runtime-event reader accepts exactly one version ---
 
 // jobsPackageNames are the Go packages the runtime-event reader lives in. The
 // forbidden-symbol scan below is scoped by PACKAGE rather than by directory

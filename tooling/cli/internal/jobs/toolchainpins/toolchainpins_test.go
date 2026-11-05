@@ -171,8 +171,8 @@ func readLock(t *testing.T, root string) *lockfile.LockFile {
 	return lf
 }
 
-// v3Pin is a lock version 3 toolchain entry: a source and no archives.
-func v3Pin(version string) lockfile.LockEntry {
+// v4Pin is a lock version 4 toolchain entry: a source and no archives.
+func v4Pin(version string) lockfile.LockEntry {
 	return lockfile.LockEntry{
 		Version:     version,
 		Integrities: map[string]string{hostPlatform: strings.Repeat("d", 64)},
@@ -191,8 +191,8 @@ func TestAnExplicitRunRecordsExactlyTheAnsweredPins(t *testing.T) {
 		fixtureExtension{name: "@acme/ts", resolves: []string{"bun"}},
 		fixtureExtension{name: "@acme/plain"},
 	)
-	writeLock(t, root, lockfile.FormatVersionV3, map[string]lockfile.LockEntry{
-		"go": v3Pin("1.26.0"), "gopls": v3Pin("0.18.0"), "node": v3Pin("22.0.0"),
+	writeLock(t, root, lockfile.FormatVersionV4, map[string]lockfile.LockEntry{
+		"go": v4Pin("1.26.0"), "gopls": v4Pin("0.18.0"), "node": v4Pin("22.0.0"),
 	})
 	providers := &fakeProviders{answers: map[string]map[string]wsproto.ToolchainResolution{
 		"@acme/go": {"go": {Pin: pin("1.26.1", "a")}},
@@ -325,10 +325,10 @@ func TestTheImplicitRunWritesNoLockItCannotKeep(t *testing.T) {
 	}
 
 	root = writeWorkspace(t, fixtureExtension{name: "@acme/go", resolves: []string{"go"}})
-	before := writeLock(t, root, lockfile.FormatVersionV3, map[string]lockfile.LockEntry{"uv": v3Pin("0.11.0")})
+	before := writeLock(t, root, lockfile.FormatVersionV4, map[string]lockfile.LockEntry{"uv": v4Pin("0.11.0")})
 	result, err = resolve(context.Background(), root, Options{Implicit: true}, providers.provider)
 	if err != nil || result.Written || !slices.Equal(result.Added, []string{"go"}) || result.Toolchains["uv"].Version != "0.11.0" {
-		t.Fatalf("implicit resolve over a version 3 uv pin = %+v, %v; want go added in memory, uv kept, no write", result, err)
+		t.Fatalf("implicit resolve over a version 4 uv pin = %+v, %v; want go added in memory, uv kept, no write", result, err)
 	}
 	if after := readLockBytes(t, root); string(after) != string(before) {
 		t.Fatalf("the implicit run rewrote the lock:\n%s", after)
@@ -340,7 +340,7 @@ func TestTheImplicitRunWritesNoLockItCannotKeep(t *testing.T) {
 func TestAHostedRunWritesNothing(t *testing.T) {
 	t.Parallel()
 	root := writeWorkspace(t, fixtureExtension{name: "@acme/go", resolves: []string{"go"}})
-	before := writeLock(t, root, lockfile.FormatVersionV3, map[string]lockfile.LockEntry{"go": v3Pin("1.26.0")})
+	before := writeLock(t, root, lockfile.FormatVersionV4, map[string]lockfile.LockEntry{"go": v4Pin("1.26.0")})
 	providers := &fakeProviders{answers: map[string]map[string]wsproto.ToolchainResolution{
 		"@acme/go": {"go": {Pin: pin("1.26.1", "a")}},
 	}}

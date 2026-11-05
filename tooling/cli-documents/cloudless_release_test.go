@@ -247,7 +247,7 @@ func writeCloudlessReleaseFixture(t *testing.T) string {
   "includes": ["apps/go", "apps/typescript"],
   "extensions": ["/extensions/go", "/extensions/typescript", "/extensions/sdd"]
 }`+"\n", 0o644)
-	writeCloudlessFile(t, root, "putnami.lock.json", "{\n  \"version\": 3,\n  \"toolchains\": {},\n  \"extensions\": {},\n  \"templates\": {}\n}\n", 0o644)
+	writeCloudlessFile(t, root, "putnami.lock.json", "{\n  \"version\": 5,\n  \"toolchains\": {},\n  \"extensions\": {},\n  \"templates\": {}\n}\n", 0o644)
 
 	writeCloudlessFile(t, root, "apps/go/putnami.json",
 		`{"name":"go-app","type":"application","extensions":["@putnami/go","@putnami/sdd"]}`+"\n", 0o644)

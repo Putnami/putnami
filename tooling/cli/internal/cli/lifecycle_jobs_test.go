@@ -363,7 +363,7 @@ func TestEnsureWorkspaceBootstrap_ColdCheckoutInstallsThroughTheEngine(t *testin
 	t.Setenv("PUTNAMI_NO_AUTO_INSTALL", "")
 	// A lock file is what makes the workspace "installable"; with no recorded
 	// install state beside it, this is exactly a fresh checkout.
-	if err := os.WriteFile(filepath.Join(wsRoot, "putnami.lock.json"), []byte(`{"version": 2}`), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(wsRoot, "putnami.lock.json"), []byte(`{"version": 4}`), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -408,7 +408,7 @@ func TestEnsureWorkspaceBootstrap_StructuredColdBootstrapKeepsStdoutClean(t *tes
 	hometest.Temp(t)
 	t.Setenv("PUTNAMI_WORKSPACE_BOOTSTRAPPED", "")
 	t.Setenv("PUTNAMI_NO_AUTO_INSTALL", "")
-	if err := os.WriteFile(filepath.Join(wsRoot, "putnami.lock.json"), []byte(`{"version": 2}`), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(wsRoot, "putnami.lock.json"), []byte(`{"version": 4}`), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -433,7 +433,7 @@ func TestEnsureWorkspaceBootstrap_StructuredColdBootstrapKeepsStdoutClean(t *tes
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := string(lockBytes); got != `{"version": 2}` {
+	if got := string(lockBytes); got != `{"version": 4}` {
 		t.Errorf("implicit bootstrap rewrote committed lock: %q", got)
 	}
 }

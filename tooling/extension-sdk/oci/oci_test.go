@@ -251,40 +251,43 @@ func TestWriteLayerTar_DeterministicAndShaped(t *testing.T) {
 	}
 }
 
-func TestContentHash_SkipsStampContentButNotShape(t *testing.T) {
+func TestImagePlanIdentity_SkipsDerivedContentButNotShape(t *testing.T) {
 	dir := t.TempDir()
 	binary := writeFile(t, dir, "my-app", "binary")
 	stamp := writeFile(t, dir, "stamp.json", `{"contentHash":"first"}`)
 
 	spec := testSpec(binary)
 	spec.Layers = append(spec.Layers, Layer{Files: []File{{Source: stamp, Path: "/app/.gen/version.json", Mode: 0o644}}})
+	derived := PlanOptions{DerivedFiles: map[string]string{
+		"/app/.gen/version.json": "putnami/test/content-stamp/v1",
+	}}
 
-	hashA, err := ContentHash(spec, "/app/.gen/version.json")
+	planA, err := NewImagePlan(spec, derived)
 	if err != nil {
 		t.Fatal(err)
 	}
 	// Stamp content changes (it embeds this very hash) — hash must not.
 	writeFile(t, dir, "stamp.json", `{"contentHash":"second"}`)
-	hashB, err := ContentHash(spec, "/app/.gen/version.json")
+	planB, err := NewImagePlan(spec, derived)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if hashA != hashB {
+	if planA.Identity != planB.Identity {
 		t.Error("expected stamp content to be excluded from the content hash")
 	}
 
 	// But removing the stamp from the spec changes the image shape → hash.
 	noStamp := testSpec(binary)
-	hashC, err := ContentHash(noStamp)
+	planC, err := NewImagePlan(noStamp, PlanOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if hashC == hashA {
+	if planC.Identity == planA.Identity {
 		t.Error("expected spec shape (stamp path) to affect the content hash")
 	}
 }
 
-func TestContentHash_FramesFileContents(t *testing.T) {
+func TestImagePlanIdentity_FramesFileContents(t *testing.T) {
 	dirA := t.TempDir()
 	dirB := t.TempDir()
 
@@ -297,14 +300,16 @@ func TestContentHash_FramesFileContents(t *testing.T) {
 		{Source: writeFile(t, dirB, "two", "/two\x00y"), Path: "/two", Mode: 0o644},
 	}}}}
 
-	hashA, err := ContentHash(specA)
+	hashAPlan, err := NewImagePlan(specA, PlanOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
-	hashB, err := ContentHash(specB)
+	hashA := hashAPlan.Identity
+	hashBPlan, err := NewImagePlan(specB, PlanOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
+	hashB := hashBPlan.Identity
 	if hashA == hashB {
 		t.Error("expected different file splits to produce different content hashes")
 	}
@@ -334,15 +339,17 @@ func TestTarballLayer_IsContentAddressedAndAssembles(t *testing.T) {
 	}
 	writeTar("first")
 	spec := Spec{BaseRef: testSpec("").BaseRef, Platform: "linux/amd64", Layers: []Layer{{Tarball: tarPath}}}
-	hashA, err := ContentHash(spec)
+	hashAPlan, err := NewImagePlan(spec, PlanOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
+	hashA := hashAPlan.Identity
 	writeTar("second")
-	hashB, err := ContentHash(spec)
+	hashBPlan, err := NewImagePlan(spec, PlanOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
+	hashB := hashBPlan.Identity
 	if hashA == hashB {
 		t.Fatal("tarball byte change did not change the complete content hash")
 	}

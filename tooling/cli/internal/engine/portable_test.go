@@ -235,7 +235,7 @@ func TestRejectUnsupportedRemoteShapeFollowsTheDeclaredTraits(t *testing.T) {
 
 func TestPortableRequestFreezesInvocationSelectionAndEnvironment(t *testing.T) {
 	root := t.TempDir()
-	if err := os.WriteFile(filepath.Join(root, "putnami.lock.json"), []byte(`{"version":3,"cli":{"source":"workspace"},"toolchains":{"zz":{"version":"9.9.9","integrities":{},"source":"x"}},"extensions":{},"templates":{}}`), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(root, "putnami.lock.json"), []byte(`{"version":4,"cli":{"source":"workspace"},"toolchains":{"zz":{"version":"9.9.9","integrities":{},"source":"x"}},"extensions":{},"templates":{}}`), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	req := &Request{

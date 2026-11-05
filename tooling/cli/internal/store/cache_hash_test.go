@@ -704,7 +704,7 @@ func TestHashFiles_UnreadableVersionStampIsNotAbsent(t *testing.T) {
 }
 
 func TestHashFiles_ProjectConfigIgnoresTaskTuning(t *testing.T) {
-	for _, filename := range []string{wsproto.ConfigFilename, wsproto.LegacyConfigFilename} {
+	for _, filename := range []string{wsproto.ConfigFilename} {
 		t.Run(filename, func(t *testing.T) {
 			dir := t.TempDir()
 			path := filepath.Join(dir, filename)

@@ -33,11 +33,10 @@ func DiscoverTemplates(workspaceRoot string, projectPaths []string) ([]*Template
 	// Load lock file for installed template version resolution.
 	//
 	// Tolerated, but not silent: with no lock the installed templates resolve no
-	// version, so they render blank or drop out of the listing entirely. Since
-	// the format floor moved to v2 a v1 lock produces exactly
-	// that in every unmigrated workspace, and the error names the conversion
-	// (B6r/F6). Discovery runs from several call sites per invocation, so the
-	// notice is deduped per workspace+reason.
+	// version, so they render blank or drop out of the listing entirely. A lock
+	// below the format floor produces exactly that, and the error names the
+	// remedy (B6r/F6). Discovery runs from several call sites per invocation,
+	// so the notice is deduped per workspace+reason.
 	lockFile, lockErr := lockfile.ReadLockFile(workspaceRoot)
 	if lockErr != nil {
 		warnLockOnce(workspaceRoot, lockErr)

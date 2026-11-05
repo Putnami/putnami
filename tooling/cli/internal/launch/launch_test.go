@@ -606,8 +606,8 @@ func TestRelaunchUnreadableLockFailsClosed(t *testing.T) {
 	}
 }
 
-// A lock written by a NEWER CLI (B0d's FormatVersionV2 and beyond) may carry a
-// pin whose vocabulary this binary does not understand. Its recovery is the
+// A lock written by a NEWER CLI may carry a pin whose vocabulary this binary
+// does not understand. Its recovery is the
 // opposite of the generic one — upgrade the CLI — and plain `putnami upgrade`
 // would re-enter the launcher and hit this same wall, so the suggestion is the
 // opt-out form.
@@ -630,13 +630,13 @@ func TestRelaunchUnsupportedLockVersionFailsClosed(t *testing.T) {
 	}
 }
 
-// A lock written by an OLDER CLI is the mirror case, and since the vNext floor
-// every v1 lock lands here on the FIRST command run in the workspace. Its
-// recovery is not the generic "opt out of the pin for this run" — that would
-// ignore the pin forever, one command at a time — but the one conversion that
-// fixes the workspace. `migrate vnext` is exempt from the launcher, so the
-// plain form is safe to suggest.
-func TestRelaunchOutdatedLockVersionSuggestsMigration(t *testing.T) {
+// A lock below the format floor is the mirror case: it lands here on the FIRST
+// command run in the workspace. Its recovery is not the generic "opt out of the
+// pin for this run" — that would ignore the pin forever, one command at a time —
+// but writing a current lock. The refusal says to delete the lock first, and
+// without a lock there is no pin, so the plain `putnami install` is safe to
+// suggest.
+func TestRelaunchOutdatedLockVersionSuggestsInstall(t *testing.T) {
 	ws := t.TempDir()
 	if err := os.WriteFile(filepath.Join(ws, lockfile.LockFilename),
 		fmt.Appendf(nil, `{"version": %d}`, lockfile.MinSupportedVersion-1), 0o644); err != nil {
@@ -648,15 +648,15 @@ func TestRelaunchOutdatedLockVersionSuggestsMigration(t *testing.T) {
 		t.Fatal("resolve must not be called on a lock below the format floor")
 		return "", nil
 	}
-	err := mustFailClosed(t, ws, c, &cap, protocolcli.ExitUsage, "putnami migrate vnext --apply")
+	err := mustFailClosed(t, ws, c, &cap, protocolcli.ExitUsage, "putnami install")
 	var outdated *lockfile.OutdatedVersionError
 	if !errors.As(err, &outdated) {
 		t.Fatalf("error %v must wrap *lockfile.OutdatedVersionError", err)
 	}
-	// The suggestion must name a command the launcher lets through, or the
-	// remedy would re-enter this same wall.
-	if !IsExemptInvocation([]string{"migrate", "vnext", "--apply"}) {
-		t.Error("the suggested migration is not exempt from the launcher")
+	// The suggestion runs only once the lock is gone, so the refusal must say
+	// to delete it.
+	if !strings.Contains(err.Error(), "delete it") {
+		t.Errorf("message %q must say to delete the outdated lock", err)
 	}
 }
 

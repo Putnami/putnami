@@ -10,10 +10,9 @@ import (
 
 // RefreshLockMetadataWithResult stamps the workspace lock's CLI pin with the
 // running binary's output protocol version when the pin names that binary's
-// version, and reports whether the lock file was replaced. A lock below
-// format version 3, which records no protocol version, is stamped at version
-// 3. Without a lock it writes a new one. It skips the atomic rewrite when the
-// canonical bytes already match the file on disk.
+// version, and reports whether the lock file was replaced. Without a lock it
+// writes a new one. It skips the atomic rewrite when the canonical bytes
+// already match the file on disk.
 func RefreshLockMetadataWithResult(_ context.Context, wsRoot, runningVersion string) (bool, error) {
 	lf, err := lockfile.ReadLockFile(wsRoot)
 	if err != nil {
@@ -32,9 +31,6 @@ func RefreshLockMetadataWithResult(_ context.Context, wsRoot, runningVersion str
 	if cli, ok := lf.GetCLI(); ok && !cli.IsWorkspaceSource() && sameCLIVersion(cli.Version, runningVersion) {
 		cli.ProtocolVersion = protocolcli.ResultProtocolVersion
 		lf.SetCLI(cli)
-		if lf.Version < lockfile.FormatVersionV3 {
-			lf.Version = lockfile.FormatVersionV3
-		}
 	}
 	return lockfile.WriteLockFileIfChanged(wsRoot, lf)
 }

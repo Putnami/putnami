@@ -300,48 +300,6 @@ func TestPublishImageProjectUsesGenericDockerRegistryEnvironment(t *testing.T) {
 	}
 }
 
-func TestPublishImageProjectPreservesNestedGenericRegistryPrecedence(t *testing.T) {
-	digest := "sha256:" + strings.Repeat("a", 64)
-	hash := strings.Repeat("b", 64)
-	root := t.TempDir()
-	projectPath := "delivery/images/ci-runner"
-	dockerDir := pkgmeta.PackageOutputDir(root, projectPath, "docker")
-	if err := os.MkdirAll(dockerDir, 0o755); err != nil {
-		t.Fatal(err)
-	}
-	writeJSONFile(t, filepath.Join(dockerDir, "manifest.json"), pkgmeta.DockerManifest{
-		Image: "delivery-images-ci-runner", Tags: []string{"delivery-images-ci-runner:c-" + hash},
-		Version: "c-" + hash, ContentHash: hash, Digest: digest, Layout: "oci", Platform: "linux/amd64",
-	})
-	t.Setenv("DOCKER_REGISTRY", "registry.example.com/environment")
-	stubResolveToken(t, "")
-	stubManifestHead(t, &transport.Error{StatusCode: http.StatusNotFound})
-	ctx := &pctx.Context{
-		WorkspaceRoot: root,
-		Project:       pctx.Project{Name: "delivery/images/ci-runner", Path: projectPath, Type: "image"},
-		Params: pctx.Params{
-			"image": json.RawMessage(`{"registry":"registry.example.com/legacy"}`),
-		},
-	}
-	status, data, err := Publish(ctx, jsonl.New(), []string{"--dry-run"})
-	if err != nil || status != "OK" {
-		t.Fatalf("Publish() = (%q, %+v, %v), want nested generic dry run", status, data, err)
-	}
-	wantLegacy := "registry.example.com/legacy/delivery-images-ci-runner@" + digest
-	if data["image"] != wantLegacy {
-		t.Fatalf("image = %v, want nested compatibility target %q", data["image"], wantLegacy)
-	}
-
-	status, data, err = Publish(ctx, jsonl.New(), []string{"--dry-run", "--docker-registry=registry.example.com/explicit"})
-	if err != nil || status != "OK" {
-		t.Fatalf("explicit Publish() = (%q, %+v, %v), want OK", status, data, err)
-	}
-	wantExplicit := "registry.example.com/explicit/delivery-images-ci-runner@" + digest
-	if data["image"] != wantExplicit {
-		t.Fatalf("image = %v, want explicit target %q", data["image"], wantExplicit)
-	}
-}
-
 // A dry-run package may write no manifest: the dry-run publish that follows it
 // succeeds and pushes nothing. Without --dry-run the missing manifest still
 // fails.

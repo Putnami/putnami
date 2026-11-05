@@ -41,7 +41,7 @@ func TestExtensionsList_TextWithConfigAndLock(t *testing.T) {
 		Extensions: wsproto.ExtensionsConfig{List: map[string]string{"@putnami/go": "^1.0.0"}},
 	}
 	sharedtest.WriteJSONConfig(t, filepath.Join(dir, "putnami.lock.json"), map[string]any{
-		"version":    2,
+		"version":    4,
 		"extensions": map[string]any{"@putnami/go": map[string]any{"version": "1.2.3"}},
 	})
 
@@ -104,7 +104,7 @@ func TestExtensionsRemove_RequiresName(t *testing.T) {
 func TestExtensionsRemove_RemovesLockEntry(t *testing.T) {
 	dir := t.TempDir()
 	sharedtest.WriteJSONConfig(t, filepath.Join(dir, "putnami.lock.json"), map[string]any{
-		"version":    2,
+		"version":    4,
 		"extensions": map[string]any{"@putnami/go": map[string]any{"version": "1.0.0"}},
 	})
 
@@ -126,19 +126,19 @@ func TestExtensionsRemove_RemovesLockEntry(t *testing.T) {
 // TestExtensionsList_UnreadableLockIsExplained pins the unreadable-lock notice.
 // The listing stays tolerant — it still renders every configured extension — but a
 // lock it cannot read makes the INSTALLED column blank, which is the SAME table
-// a workspace with nothing installed produces. Since the format floor moved to
-// v2, a v1 lock is the common way to reach that state, so the
-// reason must appear rather than be inferred from a dash.
+// a workspace with nothing installed produces. A lock below the format floor is
+// the common way to reach that state, so the reason must appear rather than be
+// inferred from a dash.
 func TestExtensionsList_UnreadableLockIsExplained(t *testing.T) {
 	dir := t.TempDir()
 	cfg := &wsproto.Config{
 		Extensions: wsproto.ExtensionsConfig{List: map[string]string{"@fake/ext": "^1.0.0"}},
 	}
-	// legacyV1Lock (artifacts_test.go) is written verbatim rather than built
+	// belowFloorLock (artifacts_test.go) is written verbatim rather than built
 	// from a map: the point is a lock this CLI's reader rejects, so the bytes
 	// must not go through the current writer. It pins @fake/ext at 1.0.0 — the
 	// version that must NOT surface below.
-	sharedtest.WriteLock(t, dir, "putnami.lock.json", legacyV1Lock)
+	sharedtest.WriteLock(t, dir, "putnami.lock.json", belowFloorLock)
 
 	var out string
 	var listErr error
@@ -160,14 +160,14 @@ func TestExtensionsList_UnreadableLockIsExplained(t *testing.T) {
 		t.Fatalf("listing dropped the configured extension:\n%s", out)
 	}
 	// NAME CONSTRAINT INSTALLED SOURCE — the blank INSTALLED is the symptom the
-	// notice explains, and it must still be blank (the v1 lock is not read).
+	// notice explains, and it must still be blank (the outdated lock is not read).
 	if fields := strings.Fields(row); len(fields) < 4 || fields[2] != "-" {
-		t.Errorf("row = %q, want the INSTALLED column blank (a v1 lock must not be read)", row)
+		t.Errorf("row = %q, want the INSTALLED column blank (an outdated lock must not be read)", row)
 	}
 	if !strings.Contains(stderr, "putnami.lock.json") {
 		t.Errorf("stderr does not name the lock file:\n%s", stderr)
 	}
-	if !strings.Contains(stderr, "putnami migrate vnext --apply") {
+	if !strings.Contains(stderr, "putnami install") {
 		t.Errorf("stderr does not carry the lock error's remedy:\n%s", stderr)
 	}
 }

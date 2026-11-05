@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"math"
 	"os"
 	"path/filepath"
 	"time"
@@ -34,67 +33,53 @@ type sessionDiagnostic struct {
 
 // --- Helpers ---
 
-// readSessionMeta reads session.json in either recorded contract.
-//
-// The dual read is the RETAINED half of an earlier format change: the v1 writer is deleted
-// and every new session is recorded as the v2 document, but sessions written by
-// an older CLI are still on disk in a workspace that upgraded across the flip,
-// and `putnami sessions show` must keep opening them. Both shapes are
-// projected onto the v1 in-memory view so every consumer (inspect, list)
-// reads one shape.
-//
-// A later cleanup deleted the bridge's WRITE side everywhere it still had one and
-// deliberately left this READ. Recorded sessions are user data with no
-// migration command: dropping the fallback would make a developer's own history
-// unreadable on the build that upgraded them. It retires when the recorded
-// events.jsonl wire is versioned (B2a) and old sessions have aged out of the
-// stores that matter, not on a slice boundary.
+// readSessionMeta reads session.json: a session document is the versioned
+// cli.SessionFile.
 func readSessionMeta(store *workspace_state.SessionStore, id string) (*workspace_state.SessionMetadata, error) {
 	path := filepath.Join(store.Root(), id, "session.json")
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return nil, err
 	}
-
-	if recordedProtocolVersion(data) >= 2 {
-		var doc protocolcli.SessionFile
-		if err := json.Unmarshal(data, &doc); err != nil {
-			return nil, err
-		}
-		return sessionMetaFromV2(&doc), nil
-	}
-	var meta workspace_state.SessionMetadata
-	if err := json.Unmarshal(data, &meta); err != nil {
+	if err := requireRecordedProtocolVersion(path, data); err != nil {
 		return nil, err
 	}
-	return &meta, nil
+	var doc protocolcli.SessionFile
+	if err := json.Unmarshal(data, &doc); err != nil {
+		return nil, err
+	}
+	return sessionMetaFromV2(&doc), nil
 }
 
-// readSessionPlan reads plan.json in either recorded contract; see
-// readSessionMeta.
+// readSessionPlan reads plan.json: a plan document is the versioned
+// cli.SessionPlanFile.
 func readSessionPlan(store *workspace_state.SessionStore, id string) (*workspace_state.PlanSnapshot, error) {
 	path := filepath.Join(store.Root(), id, "plan.json")
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return nil, err
 	}
-
-	if recordedProtocolVersion(data) >= 2 {
-		var doc protocolcli.SessionPlanFile
-		if err := json.Unmarshal(data, &doc); err != nil {
-			return nil, err
-		}
-		return planSnapshotFromV2(&doc), nil
-	}
-	var plan workspace_state.PlanSnapshot
-	if err := json.Unmarshal(data, &plan); err != nil {
+	if err := requireRecordedProtocolVersion(path, data); err != nil {
 		return nil, err
 	}
-	return &plan, nil
+	var doc protocolcli.SessionPlanFile
+	if err := json.Unmarshal(data, &doc); err != nil {
+		return nil, err
+	}
+	return planSnapshotFromV2(&doc), nil
 }
 
-// recordedProtocolVersion sniffs the document's own version claim. v1 files
-// carry no protocolVersion member and report 0.
+// requireRecordedProtocolVersion refuses a recorded document that does not
+// claim the version-2 contract.
+func requireRecordedProtocolVersion(path string, data []byte) error {
+	if version := recordedProtocolVersion(data); version < protocolcli.ResultProtocolVersion {
+		return fmt.Errorf("%s records protocolVersion %d, want %d", path, version, protocolcli.ResultProtocolVersion)
+	}
+	return nil
+}
+
+// recordedProtocolVersion sniffs the document's own version claim. A document
+// without the protocolVersion member reports 0.
 func recordedProtocolVersion(data []byte) int {
 	var probe struct {
 		ProtocolVersion int `json:"protocolVersion"`
@@ -105,7 +90,7 @@ func recordedProtocolVersion(data []byte) int {
 	return probe.ProtocolVersion
 }
 
-// sessionMetaFromV2 projects the v2 session document onto the v1 in-memory
+// sessionMetaFromV2 projects the v2 session document onto the in-memory reader
 // view. The verdict mapping mirrors machine.Run exactly in reverse: counts are
 // the strict histogram (reuse included), Cached folds local+remote provenance,
 // and per-task rows recover the v1 outcome vocabulary from status × reuse.
@@ -178,7 +163,8 @@ func v1OutcomeOf(status, reuse string) string {
 	}
 }
 
-// planSnapshotFromV2 projects the v2 plan document onto the v1 snapshot view.
+// planSnapshotFromV2 projects the v2 plan document onto the in-memory snapshot
+// view.
 func planSnapshotFromV2(doc *protocolcli.SessionPlanFile) *workspace_state.PlanSnapshot {
 	plan := &workspace_state.PlanSnapshot{
 		SessionID: doc.SessionID,
@@ -278,57 +264,34 @@ type recordedTaskEnd struct {
 	reused     bool
 }
 
-// taskEndFromSessionEvent is the migration boundary for events.jsonl. New
-// sessions persist the v2 task:end contract; sessions written before this
-// change retain the legacy job:end shape and remain inspectable/gateable.
+// taskEndFromSessionEvent reads a recorded task:end record.
 func taskEndFromSessionEvent(event workspace_state.SessionEvent) (recordedTaskEnd, bool) {
-	if event.Record == protocolcli.RecordTaskEnd && event.Task != nil {
-		task := event.Task
-		row := recordedTaskEnd{
-			key:        task.Identity.Key,
-			project:    task.Identity.Project.Name,
-			job:        task.Identity.Task.Name,
-			status:     task.Status,
-			durationMs: task.DurationMs,
-			reused:     task.Reuse != protocolcli.TaskReuseNone,
-		}
-		if task.Error != nil {
-			row.error = task.Error.Message
-		}
-		return row, true
-	}
-	if event.Type != "job:end" {
+	if event.Record != protocolcli.RecordTaskEnd || event.Task == nil {
 		return recordedTaskEnd{}, false
 	}
-	duration, _ := recordedDurationMs(event.Data["duration"])
+	task := event.Task
 	row := recordedTaskEnd{
-		key:        event.JobKey,
-		durationMs: duration,
-		reused:     boolValue(event.Data["cache"]) || boolValue(event.Data["coalesced"]),
+		key:        task.Identity.Key,
+		project:    task.Identity.Project.Name,
+		job:        task.Identity.Task.Name,
+		status:     task.Status,
+		durationMs: task.DurationMs,
+		reused:     task.Reuse != protocolcli.TaskReuseNone,
 	}
-	row.project, _ = event.Data["project"].(string)
-	row.job, _ = event.Data["job"].(string)
-	row.status, _ = event.Data["status"].(string)
-	row.error, _ = event.Data["error"].(string)
+	if task.Error != nil {
+		row.error = task.Error.Message
+	}
 	return row, true
 }
 
 func diagnosticFromSessionEvent(event workspace_state.SessionEvent) (sessionDiagnostic, bool) {
-	if event.Record == protocolcli.RecordTaskEvent && event.Event != nil {
-		if eventType, _ := event.Event["type"].(string); eventType != "diagnostic" {
-			return sessionDiagnostic{}, false
-		}
-		return sessionDiagnosticFromData(event.Event, identityKey(event.Identity)), true
-	}
-	if event.Type != "job:event" {
+	if event.Record != protocolcli.RecordTaskEvent || event.Event == nil {
 		return sessionDiagnostic{}, false
 	}
-	eventType, _ := event.Data["type"].(string)
-	data, _ := event.Data["data"].(map[string]any)
-	if eventType != "diagnostic" || data == nil {
+	if eventType, _ := event.Event["type"].(string); eventType != "diagnostic" {
 		return sessionDiagnostic{}, false
 	}
-	return sessionDiagnosticFromData(data, event.JobKey), true
+	return sessionDiagnosticFromData(event.Event, identityKey(event.Identity)), true
 }
 
 func sessionDiagnosticFromData(data map[string]any, jobKey string) sessionDiagnostic {
@@ -440,35 +403,4 @@ func formatTimestamp(ts string) string {
 		return ts
 	}
 	return t.Format("2006-01-02 15:04:05")
-}
-
-func boolValue(value any) bool {
-	b, _ := value.(bool)
-	return b
-}
-
-// recordedDurationMs reads a legacy job:end duration, a whole non-negative
-// number of milliseconds.
-func recordedDurationMs(value any) (int64, error) {
-	var number float64
-	switch value := value.(type) {
-	case float64:
-		number = value
-	case int:
-		number = float64(value)
-	case int64:
-		number = float64(value)
-	case json.Number:
-		parsed, err := value.Float64()
-		if err != nil {
-			return 0, fmt.Errorf("invalid number: %w", err)
-		}
-		number = parsed
-	default:
-		return 0, fmt.Errorf("missing or non-numeric value %v", value)
-	}
-	if number < 0 || math.IsNaN(number) || math.IsInf(number, 0) || math.Trunc(number) != number {
-		return 0, fmt.Errorf("invalid millisecond value %v", number)
-	}
-	return int64(number), nil
 }

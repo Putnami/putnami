@@ -339,9 +339,8 @@ func (c *Client) track(event Event) {
 	c.events = append(c.events, event)
 }
 
-// Flush appends collected events to the local buffer file. Despite the name
-// (kept for API compatibility), there is no network flush: events are only
-// persisted locally. After appending, the buffer is trimmed to its size bound.
+// Flush appends collected events to the local buffer file and trims it to its
+// size bound; nothing is sent over the network.
 func (c *Client) Flush() error {
 	if !c.CanCollect() {
 		return nil

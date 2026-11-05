@@ -346,7 +346,7 @@ func TestTemplatesList_TextWithConfigAndLock(t *testing.T) {
 	dir := t.TempDir()
 	cfg := &wsproto.Config{Templates: []string{"alpha:1.0.0"}}
 	sharedtest.WriteJSONConfig(t, filepath.Join(dir, "putnami.lock.json"), map[string]any{
-		"version":   2,
+		"version":   4,
 		"templates": map[string]any{"alpha": map[string]any{"version": "1.0.0"}},
 	})
 
@@ -391,7 +391,7 @@ func TestTemplatesRemove_RequiresName(t *testing.T) {
 func TestTemplatesRemove_RemovesLockEntry(t *testing.T) {
 	dir := t.TempDir()
 	sharedtest.WriteJSONConfig(t, filepath.Join(dir, "putnami.lock.json"), map[string]any{
-		"version":   2,
+		"version":   4,
 		"templates": map[string]any{"alpha": map[string]any{"version": "1.0.0"}},
 	})
 

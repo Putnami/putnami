@@ -28,7 +28,7 @@ type configCase struct {
 // away.
 func TestProjectConfigScope_KeepsWhatTheTaskReads(t *testing.T) {
 	t.Parallel()
-	for _, filename := range []string{wsproto.ConfigFilename, wsproto.LegacyConfigFilename} {
+	for _, filename := range []string{wsproto.ConfigFilename} {
 		t.Run(filename, func(t *testing.T) {
 			t.Parallel()
 			dir := t.TempDir()

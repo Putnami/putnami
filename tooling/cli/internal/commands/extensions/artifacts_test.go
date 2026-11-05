@@ -45,8 +45,8 @@ func TestLockEntryForMergesSameVersionPlatformDigests(t *testing.T) {
 	}
 }
 
-// A same-version reinstall must not erase the lock-v2 task-contract record —
-// erasing it would flap the `migrate vnext --check` CI gate after every
+// A same-version reinstall must not erase the task-contract record — erasing it
+// would flap the `migrate vnext --check` CI gate after every
 // install. A version bump resets it
 // to "not recorded" on purpose: the new manifest may declare a different
 // contract, and --check prompting a re-record is the gate working.
@@ -220,7 +220,7 @@ func TestInstallArtifactsParallelWorkersCommitAndReportInStableOrder(t *testing.
 // A committed lock listing only darwin/arm64; the "current host" resolves a new
 // linux/amd64 digest that would otherwise be appended on install.
 const committedDarwinOnlyLock = `{
-  "version": 2,
+  "version": 4,
   "extensions": {
     "@fake/ext": {
       "version": "1.0.0",
@@ -310,7 +310,7 @@ func TestInstallArtifacts_ExplicitInstallDoesNotWriteAMachineLocalRefresh(t *tes
 func TestInstallArtifacts_ExplicitInstallRecordsTheHostDigestBesideARequestedChange(t *testing.T) {
 	ws := t.TempDir()
 	sharedtest.WriteLock(t, ws, "putnami.lock.json", `{
-  "version": 2,
+  "version": 4,
   "extensions": {
     "@fake/ext": {
       "version": "1.0.0",
@@ -495,7 +495,7 @@ func runUpdateArtifacts(t *testing.T, ws string, ops artifactOps, outputFormat s
 // A committed lock pinning two platforms at 1.0.0 — the shape a shared repo
 // accumulates and that a framework bump used to shrink to one platform.
 const committedTwoPlatformLock = `{
-  "version": 2,
+  "version": 4,
   "extensions": {
     "@fake/ext": {
       "version": "1.0.0",
@@ -665,7 +665,7 @@ func TestUpdateArtifacts_NoExtraRequestsWithoutForeignPlatforms(t *testing.T) {
 		name string
 		lock string
 	}{
-		{"no prior entry", `{"version":2,"extensions":{},"templates":{}}` + "\n"},
+		{"no prior entry", `{"version":4,"extensions":{},"templates":{}}` + "\n"},
 		{"host-only prior", committedDarwinOnlyLock},
 	}
 	for _, tc := range tests {
@@ -728,7 +728,7 @@ func TestUpdateArtifacts_NeverResolvesHostPlatformFromRegistry(t *testing.T) {
 func TestUpdateArtifacts_MalformedPlatformKeyIsDroppedWithoutRequest(t *testing.T) {
 	ws := t.TempDir()
 	sharedtest.WriteLock(t, ws, "putnami.lock.json", `{
-  "version": 2,
+  "version": 4,
   "extensions": {
     "@fake/ext": {
       "version": "1.0.0",
@@ -950,9 +950,9 @@ func TestInstallArtifacts_ImplicitBootstrapMakesNoRequests(t *testing.T) {
 
 // --- removal under an unreadable lock ---
 
-// legacyV1Lock is a lock in the format the vNext floor no longer reads. Every
-// ReadLockFile over it returns an *OutdatedVersionError.
-const legacyV1Lock = `{
+// belowFloorLock is a lock below the read floor. Every ReadLockFile over it
+// returns an *OutdatedVersionError.
+const belowFloorLock = `{
   "version": 1,
   "extensions": {
     "@fake/ext": {
@@ -966,13 +966,12 @@ const legacyV1Lock = `{
 
 // TestRemoveArtifact_UnreadableLockRemovesNothing pins removal's atomicity: the
 // lock read is checked BEFORE any deletion, so a lock this CLI cannot read
-// aborts the command whole rather than half. Before B6r the read error was
-// swallowed, which on a v1 lock skipped the lock edit, deleted the installed
-// bytes anyway, and printed "✓ Removed" — leaving the artifact gone from disk
-// and still pinned in the lock.
+// aborts the command whole rather than half. Skipping the lock edit and
+// deleting the installed bytes would leave the artifact gone from disk and
+// still pinned in the lock.
 func TestRemoveArtifact_UnreadableLockRemovesNothing(t *testing.T) {
 	ws := t.TempDir()
-	lockPath := sharedtest.WriteLock(t, ws, "putnami.lock.json", legacyV1Lock)
+	lockPath := sharedtest.WriteLock(t, ws, "putnami.lock.json", belowFloorLock)
 	before, err := os.ReadFile(lockPath)
 	if err != nil {
 		t.Fatal(err)
@@ -989,13 +988,13 @@ func TestRemoveArtifact_UnreadableLockRemovesNothing(t *testing.T) {
 
 	err = removeArtifact(ws, []string{"@fake/ext"}, ops)
 	if err == nil {
-		t.Fatal("removeArtifact over a v1 lock returned nil; the half-removal it hides is the bug")
+		t.Fatal("removeArtifact over a lock below the floor returned nil; the half-removal it hides is the bug")
 	}
 	var outdated *lockfile.OutdatedVersionError
 	if !errors.As(err, &outdated) {
 		t.Fatalf("removeArtifact error = %v, want an *OutdatedVersionError", err)
 	}
-	if !strings.Contains(err.Error(), "putnami migrate vnext --apply") {
+	if !strings.Contains(err.Error(), "putnami install") {
 		t.Errorf("error does not name the remedy: %v", err)
 	}
 	if removed != 0 {

@@ -99,11 +99,7 @@ func (ss *SessionStore) readLastBuildState() (*lastBuildState, error) {
 
 	var state lastBuildState
 	if err := json.Unmarshal(data, &state); err != nil {
-		state, migrateErr := migrateLegacyLastBuildState(data)
-		if migrateErr != nil {
-			return nil, fmt.Errorf("read last build state: %w", err)
-		}
-		return state, nil
+		return nil, fmt.Errorf("read last build state: %w", err)
 	}
 	if state.Branches == nil {
 		state.Branches = make(map[string]map[string]lastBuildEntry)
@@ -117,20 +113,6 @@ func newLastBuildState() *lastBuildState {
 		Version:  2,
 		Branches: make(map[string]map[string]lastBuildEntry),
 	}
-}
-
-func migrateLegacyLastBuildState(data []byte) (*lastBuildState, error) {
-	var legacy struct {
-		Branches map[string]lastBuildEntry `json:"branches"`
-	}
-	if err := json.Unmarshal(data, &legacy); err != nil {
-		return nil, err
-	}
-	state := newLastBuildState()
-	// Branch-only legacy entries were ambiguous across command sets, so do not
-	// reuse them as a baseline. Return an empty v2 state so the next successful
-	// command-specific run records a precise marker.
-	return state, nil
 }
 
 func lastBuildCommandKey(commands []string, params map[string]any) string {

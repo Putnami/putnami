@@ -607,9 +607,6 @@ The resolution order is `--docker-registry` on the command line, then
 `registries.oci.publish`, then `DOCKER_REGISTRY`, then the managed target
 `oci.putnami.dev/<workspace>/<flattened-project>`. `--docker-registry` is an
 override for a one-off push, not the place a workspace declares its registry.
-Older projects may keep a generic target at `options.package.image.registry`;
-package still does not resolve, authenticate to, contact, or serialize an
-output registry.
 
 A workload can consume that local candidate artifact as its base:
 

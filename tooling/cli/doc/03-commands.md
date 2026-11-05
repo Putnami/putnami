@@ -1115,9 +1115,9 @@ putnami migrate vnext --check       # Report the pending putnami.lock.json migra
 putnami migrate vnext --apply       # Perform it
 ```
 
-`vnext` migrates `putnami.lock.json` to the current format (currently v4). For a v1 input it records the task-contract version each installed extension manifest already declares; for v2 and v3 it performs the explicit projection that initializes current-format dimensions such as `agentArtifacts`. It never changes a pin, resolves a version, or contacts a registry.
+`vnext` migrates a v4 `putnami.lock.json` to the current format, version 5. It records the task-contract version each installed extension manifest already declares, then performs the explicit projection that initializes current-format dimensions such as `toolchains` and `agentArtifacts`. It never changes a pin, resolves a version, or contacts a registry. No lifecycle command migrates a committed lock as a side effect.
 
-Since 0.3.0 every other command **refuses** a v1 lock, so this is the command that unblocks such a workspace. Two consequences follow, both deliberate: `migrate vnext` is the only reader allowed below the format floor, and no lifecycle command migrates a committed lock as a side effect.
+Every command, `migrate vnext` included, **refuses** a lock below version 4: delete it and run `putnami install` to write a current one.
 
 - `--check` (the default) writes nothing. It exits `0` when the lock is already migrated and `2` when a migration is pending, so CI can gate on it. `--output=json` emits the plan in the standard result envelope.
 - `--apply` performs the conversion atomically (temp file + rename) and is idempotent — running it twice leaves identical bytes.

@@ -18,12 +18,11 @@ const (
 	// LayerPlanVersion versions the reusable compressed-layer key contract.
 	LayerPlanVersion = 1
 
-	imagePlanDomain       = "putnami/oci/image-plan"
-	layerPlanDomain       = "putnami/oci/layer-plan"
-	sha256Algorithm       = "sha256"
-	compressionAlgorithm  = "gzip"
-	compressionImpl       = "putnami/go-gzip/v1"
-	legacyDerivedIdentity = "putnami/oci/derived-from-image-plan/v1"
+	imagePlanDomain      = "putnami/oci/image-plan"
+	layerPlanDomain      = "putnami/oci/layer-plan"
+	sha256Algorithm      = "sha256"
+	compressionAlgorithm = "gzip"
+	compressionImpl      = "putnami/go-gzip/v1"
 )
 
 // SourceFingerprint is the immutable identity of source bytes. Algorithm and

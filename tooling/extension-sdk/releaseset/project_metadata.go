@@ -198,9 +198,6 @@ func ProjectReleaseMetadata(metadata map[string]json.RawMessage) (ProjectMetadat
 		if !declared {
 			continue
 		}
-		if err := refuseLegacyProjectMetadata(extension, releaseRaw); err != nil {
-			return ProjectMetadata{}, false, err
-		}
 		var projection ProjectMetadata
 		decoder := json.NewDecoder(bytes.NewReader(releaseRaw))
 		decoder.DisallowUnknownFields()
@@ -237,22 +234,6 @@ func ProjectReleaseMetadata(metadata map[string]json.RawMessage) (ProjectMetadat
 			MemberKey(answer.Ecosystems[j].Ecosystem, answer.Ecosystems[j].Coordinate)
 	})
 	return answer, found, nil
-}
-
-// refuseLegacyProjectMetadata names the exact remedy for a workspace index
-// written by an older CLI. The previous shape carried one ecosystem at the top
-// level of the releaseSet block; decoding it against the new shape would report
-// "unknown field", which says nothing about how to fix a stale index.
-func refuseLegacyProjectMetadata(extension string, raw json.RawMessage) error {
-	var block map[string]json.RawMessage
-	if err := json.Unmarshal(raw, &block); err != nil {
-		return nil
-	}
-	if _, legacy := block["ecosystem"]; !legacy {
-		return nil
-	}
-	return fmt.Errorf("%s project metadata from %q declares one top-level ecosystem, the shape a release set no longer uses; run `putnami projects sync` to re-probe the workspace",
-		ProjectMetadataKey, extension)
 }
 
 func validateMemberDeclaration(extension string, index int, declaration MemberDeclaration) error {

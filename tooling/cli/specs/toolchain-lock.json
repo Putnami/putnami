@@ -21,7 +21,7 @@
     },
     {
       "id": "install-pins-before-installers",
-      "text": "An explicit putnami install, putnami init or putnami projects create sets the lock's toolchains to exactly the answered pins: an identity an answer omits, or that no installed extension answers for, is removed. A lock whose toolchains change is written at format 5 and its other entries keep their content, so a format 3 or 4 lock that pins toolchains becomes format 5."
+      "text": "An explicit putnami install, putnami init or putnami projects create sets the lock's toolchains to exactly the answered pins: an identity an answer omits, or that no installed extension answers for, is removed. A lock whose toolchains change is written at format 5 and its other entries keep their content, so a format 4 lock that pins toolchains becomes format 5."
     },
     {
       "id": "implicit-install-fills-missing-pins",

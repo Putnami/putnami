@@ -13,14 +13,13 @@ import (
 )
 
 // A CLI pin that names the running binary's version, with or without a
-// leading "v", is stamped with that binary's output protocol version. A lock
-// below format version 3 records no protocol version, so the stamp writes it
-// at version 3.
+// leading "v", is stamped with that binary's output protocol version, and the
+// lock keeps the format version it records.
 func TestRefreshLockMetadataStampsTheCLIProtocolOfTheRunningVersion(t *testing.T) {
 	const cliVersion = "1.2.3"
 	ws := t.TempDir()
 	lf := &lockfile.LockFile{
-		Version:    lockfile.FormatVersionV2,
+		Version:    lockfile.FormatVersionV4,
 		Extensions: map[string]lockfile.LockEntry{},
 		Templates:  map[string]lockfile.LockEntry{},
 	}
@@ -37,8 +36,8 @@ func TestRefreshLockMetadataStampsTheCLIProtocolOfTheRunningVersion(t *testing.T
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got.Version != lockfile.FormatVersionV3 {
-		t.Fatalf("lock version = %d, want 3", got.Version)
+	if got.Version != lockfile.FormatVersionV4 {
+		t.Fatalf("lock version = %d, want 4", got.Version)
 	}
 	if cli, _ := got.GetCLI(); cli.ProtocolVersion != protocolcli.ResultProtocolVersion {
 		t.Fatalf("cli.protocolVersion = %d, want %d", cli.ProtocolVersion, protocolcli.ResultProtocolVersion)
@@ -85,7 +84,7 @@ func TestRefreshLockMetadataLeavesTheSourceWorkspaceSentinelIntact(t *testing.T)
 	spectest.Proves(t, "cli/engine-provenance", "source-workspace-declaration", "a-metadata-refresh-stamps-no-protocol-version-on-the-source-sentinel-and-keeps-it")
 	ws := t.TempDir()
 	lf := &lockfile.LockFile{
-		Version:    lockfile.FormatVersionV3,
+		Version:    lockfile.FormatVersionV4,
 		Extensions: map[string]lockfile.LockEntry{},
 		Templates:  map[string]lockfile.LockEntry{},
 	}

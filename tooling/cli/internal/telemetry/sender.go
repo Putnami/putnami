@@ -80,7 +80,7 @@ func DrainContext(ctx context.Context) {
 	// can append while a slow collector request is in flight.
 	defer consentLock.Release() //nolint:errcheck // background draining is best-effort
 
-	data, deviceID, deviceIDMonth, ok := drainSnapshot(ctx, bufferPath)
+	data, ok := drainSnapshot(ctx, bufferPath)
 	if !ok {
 		return
 	}
@@ -89,7 +89,7 @@ func DrainContext(ctx context.Context) {
 	if len(events) == 0 {
 		return
 	}
-	body, err := encodeBufferedLogs(events, deviceID, deviceIDMonth, currentCLIVersion())
+	body, err := encodeBufferedLogs(events, currentCLIVersion())
 	if err != nil {
 		return
 	}
@@ -138,10 +138,10 @@ func telemetryEndpoint() string {
 // drainSnapshot takes a stable buffer snapshot while holding the same lock as
 // Flush and Disable. The caller holds the consent lock across snapshot, local
 // handoff, and request dispatch, so an opt-out cannot complete between them.
-func drainSnapshot(ctx context.Context, bufferPath string) ([]byte, string, string, bool) {
+func drainSnapshot(ctx context.Context, bufferPath string) ([]byte, bool) {
 	lock, err := acquireBufferLockContext(ctx, bufferPath)
 	if err != nil {
-		return nil, "", "", false
+		return nil, false
 	}
 	defer lock.Release() //nolint:errcheck // a read-only snapshot is best-effort
 
@@ -153,18 +153,16 @@ func drainSnapshot(ctx context.Context, bufferPath string) ([]byte, string, stri
 
 	client := NewClient()
 	if !client.IsEnabled() || client.config == nil || client.config.NoticeShownAt == "" {
-		return nil, "", "", false
+		return nil, false
 	}
-	now := time.Now().UTC()
-	deviceID := client.deviceIDWithFreshConsentAt(now)
-	if deviceID == "" {
-		return nil, "", "", false
+	if client.deviceIDWithFreshConsentAt(time.Now().UTC()) == "" {
+		return nil, false
 	}
 	data, err := os.ReadFile(bufferPath)
 	if err != nil || len(data) == 0 {
-		return nil, "", "", false
+		return nil, false
 	}
-	return data, deviceID, now.Format("2006-01"), true
+	return data, true
 }
 
 func handoffSentBufferContext(ctx context.Context, bufferPath string, sent []byte) bool {

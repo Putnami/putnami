@@ -169,9 +169,6 @@ func setCLIPin(ctx context.Context, wsRoot, version, runningVersion string) erro
 
 	if sameCLIVersion(version, runningVersion) {
 		entry.ProtocolVersion = protocolcli.ResultProtocolVersion
-		if lf.Version < lockfile.FormatVersionV3 {
-			lf.Version = lockfile.FormatVersionV3
-		}
 	}
 	lf.SetCLI(entry)
 	if err := lockfile.WriteLockFile(wsRoot, lf); err != nil {

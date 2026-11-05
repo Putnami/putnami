@@ -24,6 +24,7 @@ const otlpLogsGoldenDigest = "317c957b3218a63f8cfdb5adf5c21f91fad14ce7b9dc5b4909
 func TestEncodeLogsGolden(t *testing.T) {
 	spectest.Proves(t, "telemetry/otlp-push-contract", "the-cli-and-the-receiver-share-one-record-shape", "the-cli-encodes-the-golden-bytes")
 	request := encodeLogs([]Event{{
+		DeviceID:  "device-123",
 		Name:      cliusage.EventSessionEnd,
 		Timestamp: "2026-01-02T03:04:05Z",
 		Data: map[string]any{
@@ -32,7 +33,7 @@ func TestEncodeLogsGolden(t *testing.T) {
 			cliusage.AttrErrorCategory: cliusage.ErrorCategoryFailure,
 			cliusage.AttrInteractive:   false,
 		},
-	}}, "device-123", "2026-01", "v1.2.3", "darwin", "arm64")
+	}}, "v1.2.3", "darwin", "arm64")
 
 	got, err := otlp.MarshalCanonical(request)
 	if err != nil {
@@ -49,10 +50,11 @@ func TestEncodeLogsGolden(t *testing.T) {
 
 func TestEncodeLogsPreservesCommandList(t *testing.T) {
 	request := encodeLogs([]Event{{
+		DeviceID:  "device-123",
 		Name:      cliusage.EventSessionStart,
 		Timestamp: "2026-01-02T03:04:05Z",
 		Data:      map[string]any{cliusage.AttrCommands: []string{"build", "test"}},
-	}}, "device-123", "2026-01", "v1.2.3", "linux", "amd64")
+	}}, "v1.2.3", "linux", "amd64")
 
 	attributes := request.ResourceLogs[0].ScopeLogs[0].LogRecords[0].Attributes
 	for _, attribute := range attributes {
@@ -68,7 +70,7 @@ func TestEncodeLogsPreservesCommandList(t *testing.T) {
 }
 
 func TestEncodeLogsIncludesRequiredResourceMetadata(t *testing.T) {
-	request := encodeLogs(nil, "device-123", "2026-01", "v1.2.3", "darwin", "arm64")
+	request := encodeLogs(nil, "v1.2.3", "darwin", "arm64")
 	attributes := request.ResourceLogs[0].Resource.Attributes
 	if got := otlpStringAttribute(t, attributes, otlp.AttrServiceName); got != "putnami-cli" {
 		t.Errorf("service.name = %q, want putnami-cli", got)
@@ -82,7 +84,7 @@ func TestEncodeLogsIncludesRequiredResourceMetadata(t *testing.T) {
 }
 
 func TestEncodeLogsUsesDevResourceVersionWhenUnset(t *testing.T) {
-	request := encodeLogs(nil, "device-123", "2026-01", "", "darwin", "arm64")
+	request := encodeLogs(nil, "", "darwin", "arm64")
 	attributes := request.ResourceLogs[0].Resource.Attributes
 	if got := otlpStringAttribute(t, attributes, otlp.AttrServiceVersion); got != "dev" {
 		t.Errorf("service.version = %q, want dev", got)
@@ -95,32 +97,13 @@ func TestEncodeLogsPreservesDeviceIDForEachEventMonth(t *testing.T) {
 	request := encodeLogs([]Event{
 		{Name: cliusage.EventSessionEnd, Timestamp: "2026-01-31T23:59:59Z", DeviceID: janID},
 		{Name: cliusage.EventSessionEnd, Timestamp: "2026-02-01T00:00:00Z", DeviceID: febID},
-	}, "33333333333333333333333333333333", "2026-03", "v1.2.3", "darwin", "arm64")
+	}, "v1.2.3", "darwin", "arm64")
 	records := request.ResourceLogs[0].ScopeLogs[0].LogRecords
 	if got := otlpStringAttribute(t, records[0].Attributes, "device.id"); got != janID {
 		t.Errorf("January device ID = %q, want %q", got, janID)
 	}
 	if got := otlpStringAttribute(t, records[1].Attributes, "device.id"); got != febID {
 		t.Errorf("February device ID = %q, want %q", got, febID)
-	}
-}
-
-func TestEncodeLogsDerivesDistinctLegacyDeviceIDsByMonth(t *testing.T) {
-	currentID := "33333333333333333333333333333333"
-	request := encodeLogs([]Event{
-		{Name: cliusage.EventSessionEnd, Timestamp: "2026-01-01T00:00:00Z"},
-		{Name: cliusage.EventSessionEnd, Timestamp: "2026-01-02T00:00:00Z"},
-		{Name: cliusage.EventSessionEnd, Timestamp: "2026-02-01T00:00:00Z"},
-	}, currentID, "2026-03", "v1.2.3", "darwin", "arm64")
-	records := request.ResourceLogs[0].ScopeLogs[0].LogRecords
-	janFirst := otlpStringAttribute(t, records[0].Attributes, "device.id")
-	janSecond := otlpStringAttribute(t, records[1].Attributes, "device.id")
-	february := otlpStringAttribute(t, records[2].Attributes, "device.id")
-	if janFirst == "" || janFirst != janSecond {
-		t.Errorf("January legacy IDs = %q, %q; want one non-empty monthly ID", janFirst, janSecond)
-	}
-	if february == "" || february == janFirst || february == currentID {
-		t.Errorf("February legacy ID = %q, want an ID distinct from January and current month", february)
 	}
 }
 

@@ -583,6 +583,19 @@ func TestWriteContentStamp_Deterministic(t *testing.T) {
 	}
 }
 
+// stampedIdentity returns the image plan identity of spec with the version
+// stamp as a derived file, the way the docker recipe plans it: the stamp's
+// recipe is identity material, its bytes are not.
+func stampedIdentity(spec oci.Spec) (string, error) {
+	plan, err := oci.NewImagePlan(spec, oci.PlanOptions{DerivedFiles: map[string]string{
+		stampImagePath: contentStampPlanIdentity + ":app",
+	}})
+	if err != nil {
+		return "", err
+	}
+	return plan.Identity, nil
+}
+
 func TestDockerSpec_HashStableAndInputSensitive(t *testing.T) {
 	dir := t.TempDir()
 	if err := os.WriteFile(filepath.Join(dir, "app-linux-x64"), []byte("binary-v1"), 0o755); err != nil {
@@ -595,9 +608,9 @@ func TestDockerSpec_HashStableAndInputSensitive(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		full, err := oci.ContentHash(spec, stampImagePath)
+		full, err := stampedIdentity(spec)
 		if err != nil {
-			t.Fatalf("ContentHash: %v", err)
+			t.Fatalf("image identity: %v", err)
 		}
 		return full[:12]
 	}
@@ -653,9 +666,9 @@ func TestDockerSpec_AssetsAffectHash(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		full, err := oci.ContentHash(spec, stampImagePath)
+		full, err := stampedIdentity(spec)
 		if err != nil {
-			t.Fatalf("ContentHash: %v", err)
+			t.Fatalf("image identity: %v", err)
 		}
 		return full[:12]
 	}

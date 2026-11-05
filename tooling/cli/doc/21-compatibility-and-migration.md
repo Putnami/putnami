@@ -88,7 +88,7 @@ rejected; they are ratchets, not compatibility support.
 | `@putnami/web` flat React block in package.json `putnami` | The web generate hook (`bin/generate-config.ts`, `resolveGenerationConfig`) still reads the flat React keys from package.json `putnami`, while project `putnami.json` requires the nested `options["@putnami/web:generate"].react` shape and rejects misplaced keys. `typescript/framework/web/test/ssr/generate-config.test.ts` pins both. | **Retain temporarily, read-only.** | `@putnami/web`. Remove with the other package.json configuration readers, once a recovered prior-workspace fixture proves the migration or an explicit rejection. |
 | `putnami.dev` legacy framework-doc redirects | Public requests under `/docs/framework/*` are redirected to the current `/docs/frameworks/{typescript,go}/*` routes and are pinned by route tests. | **Retain temporarily.** | Documentation site. Remove after the published redirect support window expires and route analytics show no supported inbound links. |
 | Extension-local `.putnamirc.json` and workspace `projects` readers | Go install/upgrade shell jobs, Go/TypeScript project config helpers, and the experimental Python workspace sync still read authored pre-canonical workspaces directly instead of receiving fully resolved job context. | **Retain temporarily.** These readers protect persisted workspace inputs, and deleting them independently would make extension behavior disagree. | `@putnami/go`, `@putnami/typescript`, and experimental `@putnami/python`. Remove as one change when every extension consumer receives canonical `workspaceProjects` / `putnami*.json` data and a recovered prior-workspace fixture proves the migration or explicit rejection path. |
-| Lock v2–v5, result v1 reads, extension contract 4 with the additive contract 5, and support catalog 1 | Persisted artifacts and prior-release fixtures described below exercise the readers or rejection boundaries. | **Retained by budget.** | Protocol and CLI owners below; change only with a versioned migration and prior-release evidence. |
+| Lock v4–v5, result v1 reads, extension contract 4 with the additive contract 5, and support catalog 1 | Persisted artifacts and prior-release fixtures described below exercise the readers or rejection boundaries. | **Retained by budget.** | Protocol and CLI owners below; change only with a versioned migration and prior-release evidence. |
 | Python extension | Explicitly installed in this workspace but marked experimental and omitted from the supported public core. | **Canonical experimental behavior.** No Go/TypeScript parity promise. | `@putnami/python`; remove from the workspace only through an explicit maturity decision. |
 
 A removal migrates every owned consumer in the same change. It never
@@ -96,23 +96,25 @@ renumbers earned wire, lock, extension-contract, or cache identifiers.
 
 ## Lock file — `putnami.lock.json`
 
-This CLI accepts lock format versions 2 – 5 and writes new locks at version 5.
+This CLI accepts lock format versions 4 – 5 and writes new locks at version 5.
+Each version adds to the one before it, so a version 4 lock carries every
+field versions 1 – 3 introduced.
 
 | Version | Added |
 |---|---|
-| 1 | Resolved versions, archive integrity digests, manifest hashes, source URLs. **No longer read.** |
+| 1 | Resolved versions, archive integrity digests, manifest hashes, source URLs. |
 | 2 | `taskContract` per entry — the pinned extension's task-contract level, readable without resolving the manifest. |
 | 3 | The `toolchains` section, and `cli.protocolVersion` — the machine-output protocol the pinned CLI emits. |
-| 4 | The `agentArtifacts` section — platform-independent pins of separately declared agent workflows. No current command adds one. |
+| 4 | The `agentArtifacts` section — platform-independent pins of separately declared agent workflows. No current command adds one. **The read floor.** |
 | 5 | `archives` per toolchain entry — each platform's archive URL, format, and executable path, beside the digest that binds its bytes. A toolchain entry records no `source`, and the `toolchains` section keys any lock identity. Extension, CLI, and template entries keep `source`. |
 
 ### What migrates
 
-- **v1 through v4 → v5** is the migration a user runs by hand:
-  `putnami migrate vnext --apply`. It is mechanical and idempotent. For v1 it
-  records the task contract each *installed* manifest already declares; for
-  v2 through v4 it preserves the existing vocabulary and initializes the
-  current `agentArtifacts` and `toolchains` maps. It never resolves a version,
+- **v4 → v5** is the migration a user runs by hand:
+  `putnami migrate vnext --apply`. It is mechanical and idempotent. It records
+  the task contract each *installed* manifest already declares, preserves the
+  existing vocabulary, and initializes the current `agentArtifacts` and
+  `toolchains` maps. It never resolves a version,
   contacts a registry, or changes a pin. An extension that is not installed is
   *reported*, not guessed at. `putnami migrate vnext` (without `--apply`) is the
   CI check: exit 0 when clean, exit 2 when a migration is pending.
@@ -146,18 +148,19 @@ until a verified install supplies the map.
 
 | Your lock | What happens | What you run |
 |---|---|---|
-| version 1, or no `version` member | `putnami.lock.json is lock format version 1, but this putnami requires version 2` | `putnami migrate vnext --apply` |
+| below version 4, or no `version` member | ``putnami.lock.json is lock format version 3, but this putnami reads version 4 or later: delete it and run `putnami install` to write a current one`` | delete the lock, then `putnami install` |
 | version 6 or higher | `putnami.lock.json is lock format version 6, but this putnami reads at most version 5` | `putnami upgrade` |
 | below version 5 with `archives` on an entry, or version 5 with a toolchain entry that records a `source` or lacks an archive | `putnami.lock.json is lock format version N and breaks its rules: <field>: <reason>` | Restore the lock the CLI wrote, for example from version control |
 | below version 5 with toolchain pins, under `putnami migrate vnext`, with or without `--apply` | ``putnami.lock.json is lock format version N and pins toolchains without archives (<identities>): only `putnami install` can pin them at lock format version 5, …`` | `putnami install` |
 
 Refusal never rewrites the file. A reader that silently upgraded a lock would
-convert your workspace as a side effect of an unrelated command, and a reader
-that treated a v1 lock as v2 would have to invent the one thing v2 adds.
+convert your workspace as a side effect of an unrelated command.
 
-`putnami migrate vnext` is the single reader allowed below the floor — it is
-what moves a workspace onto the floor, so it is also exempt from the
-workspace-pin relaunch (relaunching would read the lock it exists to repair).
+No command reads a lock below the floor, `putnami migrate vnext` included.
+`putnami install` resolves the pins again and writes a current lock.
+`putnami migrate vnext` projects an in-window lock onto the format this CLI
+writes, so it is exempt from the workspace-pin relaunch: the pinned engine may
+predate that format.
 
 ## Machine result envelope
 
@@ -174,11 +177,10 @@ repository can produce one. See
 § Migrating from version 1 for the field-by-field mapping.
 
 **The rollback is a version pin, not a flag.** There is no environment variable
-or option that re-enables the v1 wire; `PUTNAMI_MACHINE_OUTPUT` is inert and
-selects nothing. A consumer that cannot move yet pins a pre-removal CLI build
-with `putnami pin <version>`, which is exact, honored by the launcher, and ages
-out on its own. A second machine renderer is a rejected design, not a missing
-feature.
+or option that re-enables the v1 wire. A consumer that cannot move yet pins a
+pre-removal CLI build with `putnami pin <version>`, which is exact, honored by
+the launcher, and ages out on its own. A second machine renderer is a rejected
+design, not a missing feature.
 
 ## Extension contract stamp — `cliContract`
 
@@ -241,12 +243,9 @@ version exists, you edit the file. See
 
 Work down this list; each row is self-contained.
 
-1. **"lock format version 1, but this putnami requires version 2"** — run
-   `putnami migrate vnext` to see the pending changes, then
-   `putnami migrate vnext --apply`. Commit the result. If the report lists
-   extensions under *Not recorded*, run `putnami install` first so their
-   manifests are on disk, then re-run `--apply`; the migration records what an
-   installed manifest declares rather than guessing.
+1. **"lock format version N, but this putnami reads version 4 or later"** —
+   the lock is below the read floor. Delete `putnami.lock.json`, run
+   `putnami install`, review the versions the new lock records, and commit it.
 2. **"lock format version N, but this putnami reads at most version M"** — the
    lock was written by a newer CLI than the one you are running. Run
    `putnami upgrade`. If a workspace pin is what is blocking you, prefix the
@@ -281,8 +280,8 @@ fail-closed on every launch — see
 
 Two rollbacks are **not** available, and both absences are decisions:
 
-- there is no way to make this CLI read a v1 lock; the migration is the way
-  forward, and it is idempotent, so re-running it costs nothing;
+- there is no way to make this CLI read a lock below version 4;
+  `putnami install` writes a current one;
 - there is no way to make this CLI emit a v1 machine document.
 
 ## Agent artifacts superseded by extension content

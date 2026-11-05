@@ -24,9 +24,9 @@ func ExtensionsListPrepared(wsRoot string, cfg *wsproto.Config, outputFormat str
 		// The listing is deliberately tolerant — it still reports what config
 		// declares — but the INSTALLED column is read from the lock alone, so an
 		// unreadable one renders every row as "-": the same output as a
-		// workspace where nothing is installed. Since the format floor moved to
-		// v2, a v1 lock produces exactly that, so the reason is
-		// named on stderr, out of the table's and the JSONL stream's way.
+		// workspace where nothing is installed. A lock below the format floor
+		// produces exactly that, so the reason is named on stderr, out of the
+		// table's and the JSONL stream's way.
 		noteUnreadableLock(lockErr)
 	}
 

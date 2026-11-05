@@ -54,20 +54,3 @@ type Spec struct {
 	// ExposedPorts are added to the base config, e.g. "3000/tcp".
 	ExposedPorts []string `json:"exposedPorts,omitempty"`
 }
-
-// ContentHash returns the versioned ImagePlan identity. New callers that also
-// assemble the image should retain the plan returned by NewImagePlan so source
-// fingerprints are not recomputed. Files listed in skipContent are treated as
-// deterministic outputs derived from this identity; prefer an explicit,
-// recipe-specific PlanOptions.DerivedFiles identity in new code.
-func ContentHash(s Spec, skipContent ...string) (string, error) {
-	derived := make(map[string]string, len(skipContent))
-	for _, p := range skipContent {
-		derived[p] = legacyDerivedIdentity
-	}
-	plan, err := NewImagePlan(s, PlanOptions{DerivedFiles: derived})
-	if err != nil {
-		return "", err
-	}
-	return plan.Identity, nil
-}

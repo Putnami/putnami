@@ -54,15 +54,21 @@ func v5Lock() *LockFile {
 	return lf
 }
 
-// The read window is exactly 2 through 5: a newer file names the upgrade.
-func TestLockFileReadWindowAcceptsV2ThroughV5(t *testing.T) {
-	for _, version := range []int{FormatVersionV2, FormatVersionV3, FormatVersionV4, FormatVersionV5} {
+// The read window is exactly 4 through 5: an older file names its remedy, and
+// a newer file names the upgrade.
+func TestLockFileReadWindowAcceptsV4ThroughV5(t *testing.T) {
+	for _, version := range []int{FormatVersionV4, FormatVersionV5} {
 		data := []byte(fmt.Sprintf(`{"version":%d,"extensions":{},"templates":{}}`, version))
 		if _, err := ParseLockFile(data); err != nil {
 			t.Errorf("ParseLockFile(v%d): %v", version, err)
 		}
 	}
-	_, err := ParseLockFile([]byte(`{"version":6,"extensions":{},"templates":{}}`))
+	_, err := ParseLockFile([]byte(`{"version":3,"extensions":{},"templates":{}}`))
+	var outdated *OutdatedVersionError
+	if !errors.As(err, &outdated) || outdated.Found != 3 || outdated.Min != FormatVersionV4 {
+		t.Fatalf("ParseLockFile(v3) error = %v, want min v4", err)
+	}
+	_, err = ParseLockFile([]byte(`{"version":6,"extensions":{},"templates":{}}`))
 	var unsupported *UnsupportedVersionError
 	if !errors.As(err, &unsupported) || unsupported.Max != FormatVersionV5 {
 		t.Fatalf("ParseLockFile(v6) error = %v, want max v5", err)
@@ -201,8 +207,8 @@ func TestLockFileBelowV5RefusesArchives(t *testing.T) {
 		field string
 	}{
 		{"a v4 toolchain", `{"version":4,"toolchains":{"go":{"version":"1.26.9","archives":{"linux/amd64":{"url":"https://go.dev/dl/go.tar.gz","format":"tar.gz","executable":"go/bin/go"}},"integrities":{"linux/amd64":"x"},"source":"https://go.dev/dl/"}},"extensions":{},"templates":{}}`, "toolchains.go.archives"},
-		{"a v3 extension", `{"version":3,"extensions":{"@putnami/go":{"version":"2.0.0","archives":{}}},"templates":{}}`, "extensions.@putnami/go.archives"},
-		{"a v2 cli", `{"version":2,"cli":{"version":"1.0.0","archives":{}},"extensions":{},"templates":{}}`, "cli.archives"},
+		{"a v4 extension", `{"version":4,"extensions":{"@putnami/go":{"version":"2.0.0","archives":{}}},"templates":{}}`, "extensions.@putnami/go.archives"},
+		{"a v4 cli", `{"version":4,"cli":{"version":"1.0.0","archives":{}},"extensions":{},"templates":{}}`, "cli.archives"},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			_, err := ParseLockFile([]byte(test.lock))
@@ -294,7 +300,7 @@ func TestWriteLockFileRefusesAV5ToolchainWithoutArchives(t *testing.T) {
 // toolchain is refused with every identity it pins, and the remedy is
 // `putnami install`.
 func TestMigrateLockFileToCurrentRefusesToolchainsWithoutArchives(t *testing.T) {
-	for _, version := range []int{FormatVersionV3, FormatVersionV4} {
+	for _, version := range []int{FormatVersionV4} {
 		t.Run(fmt.Sprintf("v%d", version), func(t *testing.T) {
 			legacy, err := ParseLockFile([]byte(fmt.Sprintf(`{
   "version": %d,

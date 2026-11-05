@@ -141,6 +141,16 @@ func specIdentity(t *testing.T, spec oci.Spec) string {
 	return plan.Identity
 }
 
+// imageIdentity returns the image plan identity of spec with its sources read
+// from disk, the way the docker recipe plans it.
+func imageIdentity(spec oci.Spec) (string, error) {
+	plan, err := oci.NewImagePlan(spec, oci.PlanOptions{})
+	if err != nil {
+		return "", err
+	}
+	return plan.Identity, nil
+}
+
 func TestDockerSpec_HashSensitivity(t *testing.T) {
 	dir := t.TempDir()
 	binaryPath := filepath.Join(dir, "app")
@@ -149,11 +159,11 @@ func TestDockerSpec_HashSensitivity(t *testing.T) {
 	}
 
 	specA := dockerSpec(dockerBaseImagePinned, "linux/amd64", binaryPath, "3000")
-	hashA, err := oci.ContentHash(specA)
+	hashA, err := imageIdentity(specA)
 	if err != nil {
 		t.Fatal(err)
 	}
-	hashB, err := oci.ContentHash(specA)
+	hashB, err := imageIdentity(specA)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -162,7 +172,7 @@ func TestDockerSpec_HashSensitivity(t *testing.T) {
 	}
 
 	// Port change must change the image identity.
-	hashC, err := oci.ContentHash(dockerSpec(dockerBaseImagePinned, "linux/amd64", binaryPath, "8080"))
+	hashC, err := imageIdentity(dockerSpec(dockerBaseImagePinned, "linux/amd64", binaryPath, "8080"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -171,7 +181,7 @@ func TestDockerSpec_HashSensitivity(t *testing.T) {
 	}
 
 	// Base pin bump must change the image identity.
-	hashD, err := oci.ContentHash(dockerSpec("gcr.io/distroless/static@sha256:1111111111111111111111111111111111111111111111111111111111111111", "linux/amd64", binaryPath, "3000"))
+	hashD, err := imageIdentity(dockerSpec("gcr.io/distroless/static@sha256:1111111111111111111111111111111111111111111111111111111111111111", "linux/amd64", binaryPath, "3000"))
 	if err != nil {
 		t.Fatal(err)
 	}

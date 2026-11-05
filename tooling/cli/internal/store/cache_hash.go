@@ -1255,13 +1255,12 @@ func versionStampDigest(path string, dropped []string) []byte {
 	return sum256(normalized)
 }
 
-// isProjectConfig recognizes the project-config filenames extension manifests
-// declare as config inputs. Per-task tuning is execution-only, so its JSON
-// block needs a semantic digest instead of raw byte hashing whenever either
-// spelling reaches a cache key.
+// isProjectConfig recognizes the project-config filename extension manifests
+// declare as a config input. Per-task tuning is execution-only, so its JSON
+// block needs a semantic digest instead of raw byte hashing whenever the file
+// reaches a cache key.
 func isProjectConfig(path string) bool {
-	name := filepath.Base(path)
-	return name == wsproto.ConfigFilename || name == wsproto.LegacyConfigFilename
+	return filepath.Base(path) == wsproto.ConfigFilename
 }
 
 // ProjectConfigScope names the extension whose option layers a project config

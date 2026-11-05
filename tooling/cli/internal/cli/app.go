@@ -20,7 +20,6 @@ import (
 	"go.putnami.dev/tooling/cli/internal/iox"
 	"go.putnami.dev/tooling/cli/internal/jobs/scheduler"
 	"go.putnami.dev/tooling/cli/internal/launch"
-	"go.putnami.dev/tooling/cli/internal/machine"
 	"go.putnami.dev/tooling/cli/internal/output"
 	"go.putnami.dev/tooling/cli/internal/runcredential"
 	"go.putnami.dev/tooling/cli/internal/runnerprovider"
@@ -250,15 +249,6 @@ func (a *App) Run(ctx context.Context, args []string) int {
 		return ExitSuccess
 	}
 	printParseWarnings(os.Stderr, parsed.Global, append(aliasWarnings, parsed.Warnings...))
-
-	// PUTNAMI_MACHINE_OUTPUT=v1 no longer selects anything: an earlier change deleted
-	// the v1 emitters, so a run still carrying the canary's rollback lever
-	// silently receives v2 documents. Say so ONCE on stderr rather than let a
-	// consumer discover it by parsing an unexpected shape — and only warn, never
-	// fail, because the variable was a documented lever and a CI runner that
-	// still exports it must keep working. Stderr, and after the parse, so it
-	// cannot corrupt a machine stdout stream.
-	machine.WarnRetiredSelection(os.Stderr, os.Getenv(machine.RetiredSelectionEnv))
 
 	// Resolve --output / --json into a single canonical output mode, validating
 	// the value and rejecting a --json/--output conflict. Done once here so every

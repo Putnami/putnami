@@ -18,7 +18,7 @@ import (
 // recordedStreamFixture holds every shape a recorded events.jsonl can take: a
 // record, a blank line, a malformed line, a CRLF record, and torn trailing
 // bytes no LF ends.
-const recordedStreamFixture = "{\"type\":\"job:end\",\"jobKey\":\"a\"}\n\n{not-json}\n{\"type\":\"job:end\",\"jobKey\":\"b\"}\r\n{\"type\":\"job:end\",\"jobKey\":\"torn\"}"
+const recordedStreamFixture = "{\"protocolVersion\":2,\"record\":\"task:end\",\"time\":\"a\"}\n\n{not-json}\n{\"protocolVersion\":2,\"record\":\"task:end\",\"time\":\"b\"}\r\n{\"protocolVersion\":2,\"record\":\"task:end\",\"time\":\"torn\"}"
 
 func writeRecordedStream(t *testing.T, content string) (*workspace_state.SessionStore, string) {
 	t.Helper()
@@ -64,8 +64,9 @@ func TestSessionsInspectPrintsSubscriberEvidence(t *testing.T) {
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	meta, _ := json.Marshal(&workspace_state.SessionMetadata{ID: id, Commands: []string{"build"}})
-	_ = os.WriteFile(filepath.Join(dir, "session.json"), meta, 0o644)
+	writeSessionDocument(t, dir, "session.json", &protocolcli.SessionFile{
+		ProtocolVersion: protocolcli.ResultProtocolVersion, SessionID: id, Commands: []string{"build"},
+	})
 	_ = os.WriteFile(filepath.Join(dir, "events.jsonl"), []byte("{}\n{}\n"), 0o644)
 
 	out, err := sharedtest.CaptureStdout(t, func() error { return SessionsInspect(root, []string{id}, "") })

@@ -170,10 +170,9 @@ func TestPackageAlwaysProducesLocalCandidateWithoutOutputRegistryRequests(t *tes
 		t.Fatal(err)
 	}
 	cfg := Config{
-		Base:     baseRef,
-		Registry: outputHost,
-		Layers:   []layerConfig{{Files: []fileConfig{{Source: "entrypoint", Path: "/entrypoint", Mode: 0o755}}}},
-		Env:      []string{"TOOL_MODE=hermetic"}, Entrypoint: []string{"/entrypoint"},
+		Base:   baseRef,
+		Layers: []layerConfig{{Files: []fileConfig{{Source: "entrypoint", Path: "/entrypoint", Mode: 0o755}}}},
+		Env:    []string{"TOOL_MODE=hermetic"}, Entrypoint: []string{"/entrypoint"},
 	}
 	ctx := &pctx.Context{
 		WorkspaceRoot: root,
@@ -230,25 +229,28 @@ func TestResolveSpecHashIncludesFileBytesAndRuntimeConfig(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	first, err := oci.ContentHash(spec)
+	firstPlan, err := oci.NewImagePlan(spec, oci.PlanOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
+	first := firstPlan.Identity
 	if err := os.WriteFile(file, []byte("two"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	second, err := oci.ContentHash(spec)
+	secondPlan, err := oci.NewImagePlan(spec, oci.PlanOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
+	second := secondPlan.Identity
 	if first == second {
 		t.Fatal("file byte change did not change image content hash")
 	}
 	spec.Env = []string{"A=2"}
-	third, err := oci.ContentHash(spec)
+	thirdPlan, err := oci.NewImagePlan(spec, oci.PlanOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
+	third := thirdPlan.Identity
 	if second == third {
 		t.Fatal("runtime config change did not change image content hash")
 	}

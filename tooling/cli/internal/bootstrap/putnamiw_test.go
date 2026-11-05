@@ -1639,7 +1639,7 @@ func writeGoLock(t *testing.T, repo, version, digest string) {
 		Toolchains map[string]goPin `json:"toolchains"`
 	}
 	lock, err := json.MarshalIndent(lockFile{
-		Version: 3,
+		Version: 4,
 		Toolchains: map[string]goPin{"go": {
 			Version:     version,
 			Integrities: map[string]string{runtime.GOOS + "/" + runtime.GOARCH: digest},

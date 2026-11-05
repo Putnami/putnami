@@ -14,7 +14,6 @@ import (
 	runtimeproto "go.putnami.dev/protocol/runtime"
 	"go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/jobs/scheduler"
-	"go.putnami.dev/tooling/cli/internal/machine"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
 
@@ -531,23 +530,16 @@ func TestTextRenderer_DebugEvents(t *testing.T) {
 
 // --- NewRenderer factory ---
 
-// TestNewRenderer_MachineFormatsAreV2Only pins the selection point once the v1
-// renderers were gone: both machine formats are the v2 renderer, and the
-// retired PUTNAMI_MACHINE_OUTPUT variable selects nothing — a run that still sets it to
-// "v1" gets v2 documents like every other run, because there is no v1 emitter
-// left to select.
+// TestNewRenderer_MachineFormatsAreV2Only pins the selection point: both
+// machine formats are the v2 renderer.
 func TestNewRenderer_MachineFormatsAreV2Only(t *testing.T) {
 	for _, format := range []string{"json", "jsonl"} {
-		for _, value := range []string{"", "v1", "V1", "v2"} {
-			t.Run(format+"/"+machine.RetiredSelectionEnv+"="+value, func(t *testing.T) {
-				t.Setenv(machine.RetiredSelectionEnv, value)
-				r := NewRenderer(Config{Output: format})
-				if _, ok := r.(*machineV2Renderer); !ok {
-					t.Errorf("NewRenderer(%s) with %s=%q = %T, want the v2 machine renderer",
-						format, machine.RetiredSelectionEnv, value, r)
-				}
-			})
-		}
+		t.Run(format, func(t *testing.T) {
+			r := NewRenderer(Config{Output: format})
+			if _, ok := r.(*machineV2Renderer); !ok {
+				t.Errorf("NewRenderer(%s) = %T, want the v2 machine renderer", format, r)
+			}
+		})
 	}
 }
 

@@ -14,8 +14,6 @@ import (
 
 const (
 	taskStatsVersion            = 3
-	previousTaskStatsVersion    = 2
-	legacyTaskStatsVersion      = 1
 	maxTaskResourceObservations = 8
 
 	// taskStatsAlpha is the EMA smoothing factor: half the estimate renews on
@@ -71,8 +69,8 @@ func taskStatsPath(workspaceRoot string) string {
 	return filepath.Join(workspaceRoot, ".putnami", "stats", "tasks.json")
 }
 
-// loadTaskStats reads the workspace's task history. Missing or corrupt files
-// yield an empty store.
+// loadTaskStats reads the workspace's task history. Missing, corrupt or
+// other-version files yield an empty store.
 func loadTaskStats(workspaceRoot string) *taskStatsStore {
 	store := &taskStatsStore{
 		path:    taskStatsPath(workspaceRoot),
@@ -83,34 +81,19 @@ func loadTaskStats(workspaceRoot string) *taskStatsStore {
 		return store
 	}
 	var file taskStatsFile
-	if err := json.Unmarshal(data, &file); err != nil ||
-		(file.Version != taskStatsVersion && file.Version != previousTaskStatsVersion && file.Version != legacyTaskStatsVersion) {
+	if err := json.Unmarshal(data, &file); err != nil || file.Version != taskStatsVersion {
 		return store
 	}
-	migratingLegacy := file.Version == legacyTaskStatsVersion
-	migratingPrevious := file.Version == previousTaskStatsVersion
 	for key, stat := range file.Tasks {
 		if stat == nil || stat.Samples <= 0 || !validResourceFloat(stat.WallMs) || !validResourceFloat(stat.CPUMs) {
 			continue
 		}
-		if migratingLegacy {
-			// Version 1 persisted the post-weight grant as maxConcurrency. Its
-			// configured/learned multiplier cannot be reconstructed, so retain the
-			// measured EMAs but deliberately drop the ambiguous floor.
-			stat.MaxUnweightedConcurrency = 0
-		} else if stat.MaxUnweightedConcurrency < 0 {
+		if stat.MaxUnweightedConcurrency < 0 {
 			stat.MaxUnweightedConcurrency = 0
 		}
-		if migratingLegacy || migratingPrevious {
-			// v1/v2 did not retain RSS with its observation ceiling. Keep their
-			// useful CPU/wall evidence, but do not fabricate a memory profile.
-			stat.Observations = nil
-		} else {
-			stat.Observations = sanitizeTaskObservations(stat.Observations)
-		}
+		stat.Observations = sanitizeTaskObservations(stat.Observations)
 		store.entries[key] = stat
 	}
-	store.dirty = migratingLegacy || migratingPrevious
 	return store
 }
 

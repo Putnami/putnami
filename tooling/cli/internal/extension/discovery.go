@@ -118,11 +118,10 @@ func DiscoverExtensionsDetailed(workspaceRoot string, cfg *wsproto.Config, proje
 	//
 	// Tolerated, but not silent: without a lock the installed (.putnami/…) probe
 	// resolves nothing, so every lock-pinned registry extension quietly drops
-	// out of discovery and the run's only symptom is a shorter plan. Since the
-	// format floor moved to v2, a v1 lock produces exactly
-	// that, so the reason is logged — once per process, like the other discovery
-	// warnings, because discovery runs from ~5 call sites per invocation
-	// (B6r/F6).
+	// out of discovery and the run's only symptom is a shorter plan. A lock
+	// below the format floor produces exactly that, so the reason is logged —
+	// once per process, like the other discovery warnings, because discovery
+	// runs from ~5 call sites per invocation (B6r/F6).
 	lockFile, lockErr := lockfile.ReadLockFile(workspaceRoot)
 	if lockErr != nil {
 		warnOnce("lockfile:"+workspaceRoot+":"+lockErr.Error(),

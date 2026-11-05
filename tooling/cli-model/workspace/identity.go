@@ -124,11 +124,10 @@ func ProbePathOf(projectPath string) string {
 //     resolve at all contributes no path and would otherwise vanish from the
 //     key entirely.
 //   - The PROVIDER-OWNED metadata blocks, in extension order, each canonicalized.
-//     This is the half that moved to provider ownership: those blocks
-//     are delivered to every task as `project.metadata[<extension>]`, replacing
-//     the npm-shaped members job context v2 used to carry, so a task's answer can
-//     depend on them and a key that ignored them would serve a stale hit after a
-//     `bin`/`exports` edit. Canonicalization is what keeps a provider's own
+//     This is the half that moved to provider ownership: those blocks are
+//     delivered to every task as `project.metadata[<extension>]`, so a task's
+//     answer can depend on them and a key that ignored them would serve a stale
+//     hit after a `bin`/`exports` edit. Canonicalization is what keeps a provider's own
 //     re-ordering of its JSON object keys from moving the key.
 //   - For a generated client target, its CONTRACT BINDING: the service it was
 //     generated from and the digest of the contract bytes it was generated at.

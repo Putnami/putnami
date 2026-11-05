@@ -1160,25 +1160,25 @@ The top-level `version` field is the lock **format** version, and it is load-bea
 
 | Version | Adds |
 |---------|------|
-| `1` | Resolved versions, `integrity`/`integrities`, `manifestHash`, `source`. **No longer read** since 0.3.0. |
-| `2` | `taskContract` per entry — the task-contract protocol version the pinned extension's manifest declares (`2`, or `3` when any of its tasks carries a `declares` block). The current read floor. |
+| `1` | Resolved versions, `integrity`/`integrities`, `manifestHash`, `source`. |
+| `2` | `taskContract` per entry — the task-contract protocol version the pinned extension's manifest declares (`2`, or `3` when any of its tasks carries a `declares` block). |
 | `3` | Top-level `toolchains` pins, plus `cli.protocolVersion` for machine-output preflight. |
-| `4` | Platform-independent `agentArtifacts` pins of separately declared agent workflows, which no current command adds. |
+| `4` | Platform-independent `agentArtifacts` pins of separately declared agent workflows, which no current command adds. The current read floor. |
 | `5` | `archives` per toolchain entry: each platform's archive URL, format and executable path, beside the digest that binds its bytes. A toolchain entry records no `source`, and `toolchains` keys any lock identity. The current write default. |
 
-The read window is `[2, 5]`. Existing v2 to v4 locks remain readable; ordinary
-reads and writes preserve the recorded version, and a command that writes
-toolchain pins writes v5. `putnami migrate vnext --apply` is the explicit
-projection to v5. It refuses a lock below v5 that pins toolchains, because
-only the extension that answers for a toolchain supplies its archives: run
-`putnami install` instead. A v1 lock — including a file that records no
-`version` at all, which is how v1 spells itself — is refused with:
+The read window is `[4, 5]`. Each version adds to the one before it, so a v4
+lock carries every field of v1 to v3. Ordinary reads and writes preserve the
+recorded version, and a command that writes toolchain pins writes v5.
+`putnami migrate vnext --apply` is the explicit projection to v5. It refuses a
+lock below v5 that pins toolchains, because only the extension that answers
+for a toolchain supplies its archives: run `putnami install` instead. A lock
+below v4 — including a file that records no `version` at all — is refused with:
 
 ```
-putnami.lock.json is lock format version 1, but this putnami requires version 2: run `putnami migrate vnext --apply` to convert it
+putnami.lock.json is lock format version 3, but this putnami reads version 4 or later: delete it and run `putnami install` to write a current one
 ```
 
-It is refused rather than silently upgraded: an unrelated command must not convert a committed lock as a side effect, and reading a v1 file as v2 would mean inventing the task-contract records v2 exists to carry. `putnami migrate vnext --apply` (see [03-commands.md](03-commands.md#migrate)) is the ONLY reader allowed below the floor, and `migrate vnext` is exempt from the workspace-pin launcher for the same reason — relaunching reads the lock. It records what the installed manifests already declare, then projects to the current format:
+It is refused rather than silently upgraded: an unrelated command must not convert a committed lock as a side effect. No command reads a lock below the floor; `putnami install` resolves the pins again and writes a current lock. `putnami migrate vnext --apply` (see [03-commands.md](03-commands.md#migrate)) is exempt from the workspace-pin launcher because it projects onto the format this CLI writes, which the pinned engine may predate. It records what the installed manifests already declare, then projects to the current format:
 
 ```json
 {

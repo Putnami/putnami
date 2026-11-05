@@ -110,13 +110,13 @@ func TestPriorReleaseFixturesAreImmutable(t *testing.T) {
 	for _, fixture := range corpus.Fixtures {
 		versions[fixture.FormatVersion] = true
 	}
-	for _, want := range []int{FormatVersionV1, FormatVersionV2, FormatVersionV3} {
+	for want := 1; want < MinSupportedVersion; want++ {
 		if !versions[want] {
 			t.Errorf("no prior-release fixture for lock format v%d; the corpus must cover every "+
 				"version this reader has an opinion about", want)
 		}
 	}
-	if !versions[FormatVersionV1] {
+	if !versions[MinSupportedVersion-1] {
 		t.Error("without a below-floor fixture the rejection arm is untested")
 	}
 
@@ -152,7 +152,7 @@ func TestPriorReleaseFixturesAreImmutable(t *testing.T) {
 			t.Errorf("fixture %s is not JSON: %v", fixture.File, err)
 			continue
 		}
-		if effectiveVersion(declared.Version) != fixture.FormatVersion {
+		if declared.Version != fixture.FormatVersion {
 			t.Errorf("fixture %s declares version %d but provenance says v%d",
 				fixture.File, declared.Version, fixture.FormatVersion)
 		}
@@ -201,11 +201,11 @@ func priorReleaseDigest(corpus priorReleaseCorpus) string {
 	return hex.EncodeToString(hash.Sum(nil))
 }
 
-// TestPriorReleaseLocksMeetTheCompatibilityBudget drives the real readers over
+// TestPriorReleaseLocksMeetTheCompatibilityBudget drives the real reader over
 // the recovered bytes and asserts exactly what the budget document promises: a
-// below-floor lock is refused with a typed error naming the migration, an
-// in-window lock loads at the version it records, and neither reader nor writer
-// promotes a version behind the workspace's back.
+// below-floor lock is refused with a typed error naming the remedy and is left
+// untouched, an in-window lock loads at the version it records, and neither
+// reader nor writer promotes a version behind the workspace's back.
 func TestPriorReleaseLocksMeetTheCompatibilityBudget(t *testing.T) {
 	for _, fixture := range loadPriorReleaseCorpus(t).Fixtures {
 		t.Run(fixture.File, func(t *testing.T) {
@@ -233,7 +233,7 @@ func TestPriorReleaseLocksMeetTheCompatibilityBudget(t *testing.T) {
 					LockFilename,
 					fmt.Sprintf("version %d", fixture.FormatVersion),
 					fmt.Sprintf("version %d", MinSupportedVersion),
-					"putnami migrate vnext --apply",
+					"putnami install",
 				} {
 					if !strings.Contains(outdated.Error(), want) {
 						t.Errorf("refusal %q does not name %q", outdated.Error(), want)
@@ -250,17 +250,6 @@ func TestPriorReleaseLocksMeetTheCompatibilityBudget(t *testing.T) {
 				if string(after) != string(data) {
 					t.Error("refusing a below-floor lock modified it on disk")
 				}
-
-				// The migration path is the single exception, and it is the
-				// reason the refusal is actionable at all.
-				migratable, err := ReadMigratableLockFile(dir)
-				if err != nil {
-					t.Fatalf("ReadMigratableLockFile: %v", err)
-				}
-				if migratable.Version != declaredVersionMember(fixture) {
-					t.Errorf("migration reader promoted the version: got %d, want %d",
-						migratable.Version, declaredVersionMember(fixture))
-				}
 				return
 			}
 
@@ -274,8 +263,7 @@ func TestPriorReleaseLocksMeetTheCompatibilityBudget(t *testing.T) {
 			}
 
 			// An ordinary write preserves the workspace's version too, so
-			// `putnami install` on a v2 workspace never emits v3 or later
-			// vocabulary.
+			// `putnami install` on a v4 workspace never emits v5 vocabulary.
 			if err := WriteLockFile(dir, lf); err != nil {
 				t.Fatalf("WriteLockFile: %v", err)
 			}
@@ -291,125 +279,11 @@ func TestPriorReleaseLocksMeetTheCompatibilityBudget(t *testing.T) {
 	}
 }
 
-// declaredVersionMember is the raw `version` member a v1 file carries: 1 when it
-// records one, 0 when it records none. Both spell v1.
-func declaredVersionMember(fixture priorReleaseFixture) int {
-	if fixture.FormatVersion == FormatVersionV1 {
-		return FormatVersionV1
-	}
-	return fixture.FormatVersion
-}
-
-// TestPriorReleaseMigrationPreservesEveryPlatformDigest is the security row of
-// the budget.
-//
-// A lock's `integrities` maps are the only thing between a download and
-// execution, and the CLI verifies them fail-closed. A migration that rebuilt the
-// map from the machine it ran on would drop every other platform's digest, and
-// nothing would say so until a teammate on that platform ran a command. The
-// inventory below is read from the RAW bytes rather than through the typed
-// reader, so a reader that silently dropped a field cannot hide behind itself.
-func TestPriorReleaseMigrationPreservesEveryPlatformDigest(t *testing.T) {
-	for _, fixture := range loadPriorReleaseCorpus(t).Fixtures {
-		t.Run(fixture.File, func(t *testing.T) {
-			data := priorReleaseBytes(t, fixture)
-			before := rawDigestInventory(t, data)
-			if len(before) == 0 {
-				t.Fatal("fixture records no digests, so this test would pass vacuously")
-			}
-
-			migrated := migratePriorRelease(t, fixture, data)
-			after := rawDigestInventory(t, migrated)
-
-			for key, digest := range before {
-				got, ok := after[key]
-				if !ok {
-					t.Errorf("migration dropped %s (%s)", key, digest)
-					continue
-				}
-				if got != digest {
-					t.Errorf("migration changed %s: %s → %s", key, digest, got)
-				}
-			}
-		})
-	}
-}
-
-// migratePriorRelease runs the migration the budget promises for this fixture's
-// version and returns the migrated bytes.
-func migratePriorRelease(t *testing.T, fixture priorReleaseFixture, data []byte) []byte {
-	t.Helper()
-	dir := t.TempDir()
-	if err := os.WriteFile(filepath.Join(dir, LockFilename), data, 0o644); err != nil {
-		t.Fatalf("seed lock: %v", err)
-	}
-
-	if fixture.FormatVersion < MinSupportedVersion {
-		// v1 → v2: the `putnami migrate vnext --apply` seam.
-		lf, err := ReadMigratableLockFile(dir)
-		if err != nil {
-			t.Fatalf("ReadMigratableLockFile: %v", err)
-		}
-		if err := WriteLockFileV2(dir, lf); err != nil {
-			t.Fatalf("WriteLockFileV2: %v", err)
-		}
-		migrated, err := os.ReadFile(filepath.Join(dir, LockFilename))
-		if err != nil {
-			t.Fatalf("read migrated lock: %v", err)
-		}
-		if got, err := ParseLockFile(migrated); err != nil || got.Version != FormatVersionV2 {
-			t.Fatalf("migrated lock does not read at v2: version=%v err=%v", got, err)
-		}
-		return migrated
-	}
-
-	// v2–v4 → v5: the explicit projection onto the current format.
-	lf, err := ReadLockFile(dir)
-	if err != nil {
-		t.Fatalf("ReadLockFile: %v", err)
-	}
-	current, err := MigrateLockFileToCurrent(lf)
-	var needsResolution *ToolchainsNeedResolutionError
-	if errors.As(err, &needsResolution) {
-		// A lock that pins toolchains does not project: only `putnami install`
-		// can supply a version 5 toolchain entry's archives. The refusal names
-		// every pinned identity, and the workspace keeps its lock at its own
-		// version, which is what an ordinary write renders.
-		want := make([]string, 0, len(lf.Toolchains))
-		for identity := range lf.Toolchains {
-			want = append(want, identity)
-		}
-		sort.Strings(want)
-		if strings.Join(needsResolution.Identities, ",") != strings.Join(want, ",") || len(want) == 0 {
-			t.Fatalf("refused identities = %v, want the pinned toolchains %v", needsResolution.Identities, want)
-		}
-		if !strings.Contains(needsResolution.Error(), "putnami install") {
-			t.Fatalf("refusal %q does not name `putnami install`", needsResolution.Error())
-		}
-		kept, err := MarshalLockFile(lf)
-		if err != nil {
-			t.Fatalf("MarshalLockFile: %v", err)
-		}
-		return kept
-	}
-	if err != nil {
-		t.Fatalf("MigrateLockFileToCurrent: %v", err)
-	}
-	if current.Version != MaxSupportedVersion {
-		t.Fatalf("migrated to v%d, want v%d", current.Version, MaxSupportedVersion)
-	}
-	migrated, err := MarshalLockFile(current)
-	if err != nil {
-		t.Fatalf("MarshalLockFile: %v", err)
-	}
-	return migrated
-}
-
 // rawDigestInventory walks the lock's JSON and returns every field a verifier
 // depends on, keyed by its path: per-platform archive digests and manifest
-// hashes. The legacy scalar `integrity` is deliberately excluded — the v2
-// canonicalization drops it when a per-platform map exists, which
-// TestPriorReleaseScalarIntegrityRuleIsDeliberate covers on its own.
+// hashes. The legacy scalar `integrity` is deliberately excluded — the
+// canonical form drops it when a per-platform map exists, which
+// TestMarshalLockFileOmitsLegacyExtensionScalarIntegrity covers on its own.
 func rawDigestInventory(t *testing.T, data []byte) map[string]string {
 	t.Helper()
 	var doc map[string]json.RawMessage
@@ -453,137 +327,93 @@ func rawDigestInventory(t *testing.T, data []byte) map[string]string {
 	return inventory
 }
 
-// TestPriorReleaseScalarIntegrityRuleIsDeliberate pins the one field a migration
-// is allowed to drop, and the case where dropping it would be a security
-// regression instead of a cleanup.
+// v4Golden is a synthetic v4 lock: a
+// two-platform CLI pin, an extension pinned by manifest hash alone, and
+// a scalar-plus-map extension. The recovered corpus holds no in-window lock and
+// no CLI pin, which testdata/prior-releases/provenance.json records as gaps.
+const v4Golden = `{
+  "version": 4,
+  "cli": {
+    "version": "1.4.2",
+    "integrities": {
+      "darwin/arm64": "climachash",
+      "linux/amd64": "clilinuxhash"
+    },
+    "source": "https://put.putnami.dev/putnami/cli/download?channel=1.4.2"
+  },
+  "extensions": {
+    "@putnami/go": {
+      "version": "2.0.0",
+      "manifestHash": "gomanifest",
+      "taskContract": 2
+    },
+    "@putnami/typescript": {
+      "version": "3.1.0",
+      "integrity": "legacydigest",
+      "integrities": {
+        "darwin/arm64": "tsmachash"
+      },
+      "manifestHash": "tsmanifest",
+      "source": "https://put.putnami.dev/putnami/typescript/download?channel=3.1.0",
+      "taskContract": 3
+    }
+  },
+  "templates": {
+    "typescript-web": {
+      "version": "1.0.0"
+    }
+  }
+}
+`
+
+// TestMigrationPreservesEveryPlatformDigest is the security row of the budget.
 //
-// An extension archive is per-os/arch, so the legacy scalar only ever matched
-// the platform that wrote it: keeping it beside a per-platform map makes an
-// otherwise complete lock platform-dependent. An entry that has ONLY the scalar
-// is different — that scalar is its sole verification datum, and dropping it
-// would leave the entry unverifiable.
-func TestPriorReleaseScalarIntegrityRuleIsDeliberate(t *testing.T) {
-	corpus := loadPriorReleaseCorpus(t)
-	sawScalarOnly, sawBoth := false, false
-
-	for _, fixture := range corpus.Fixtures {
-		if fixture.FormatVersion >= MinSupportedVersion {
-			continue // the rule applies to what the v1→v2 migration writes
-		}
-		data := priorReleaseBytes(t, fixture)
-		migrated := migratePriorRelease(t, fixture, data)
-
-		for name, source := range rawExtensionEntries(t, data) {
-			result, ok := rawExtensionEntries(t, migrated)[name]
-			if !ok {
-				t.Fatalf("%s: migration dropped extension %s", fixture.File, name)
-			}
-			switch {
-			case source.Integrity != "" && len(source.Integrities) == 0:
-				sawScalarOnly = true
-				if result.Integrity != source.Integrity {
-					t.Errorf("%s: scalar-only entry %s lost its only verification datum: %q → %q",
-						fixture.File, name, source.Integrity, result.Integrity)
-				}
-			case source.Integrity != "" && len(source.Integrities) > 0:
-				sawBoth = true
-				if result.Integrity != "" {
-					t.Errorf("%s: entry %s kept the platform-dependent scalar %q beside a per-platform map",
-						fixture.File, name, result.Integrity)
-				}
-				if len(result.Integrities) != len(source.Integrities) {
-					t.Errorf("%s: entry %s lost per-platform digests: %v → %v",
-						fixture.File, name, source.Integrities, result.Integrities)
-				}
-			}
-		}
-	}
-
-	if !sawScalarOnly {
-		t.Error("no recovered fixture exercises the scalar-only entry; the preservation arm is unproven")
-	}
-	if !sawBoth {
-		t.Error("no recovered fixture exercises scalar + map; the drop arm is unproven")
-	}
-}
-
-type rawExtensionEntry struct {
-	Integrity   string            `json:"integrity"`
-	Integrities map[string]string `json:"integrities"`
-}
-
-func rawExtensionEntries(t *testing.T, data []byte) map[string]rawExtensionEntry {
-	t.Helper()
-	var doc struct {
-		Extensions map[string]rawExtensionEntry `json:"extensions"`
-	}
-	if err := json.Unmarshal(data, &doc); err != nil {
-		t.Fatalf("parse lock bytes: %v", err)
-	}
-	return doc.Extensions
-}
-
-// TestMigrationPreservesTheCLIPinDigests covers the one shape the recovered
-// corpus cannot: no lock ever committed to this repository pins the CLI (this
-// workspace builds the CLI from source), which testdata/prior-releases/
-// provenance.json records as an explicit gap. The input is therefore the
-// package's synthetic v1Golden — the same bytes the rest of this package uses —
-// and what it proves is the field the launcher verifies fail-closed before
-// exec'ing a downloaded binary.
-func TestMigrationPreservesTheCLIPinDigests(t *testing.T) {
-	dir := t.TempDir()
-	if err := os.WriteFile(filepath.Join(dir, LockFilename), []byte(v1Golden), 0o644); err != nil {
-		t.Fatalf("seed lock: %v", err)
-	}
-	source := rawDigestInventory(t, []byte(v1Golden))
+// A lock's `integrities` maps are the only thing between a download and
+// execution, and the CLI verifies them fail-closed: the CLI pin before the
+// launcher execs a downloaded binary, an extension pin before install. A
+// projection that rebuilt a map from the machine it ran on would drop every
+// other platform's digest, and nothing would say so until a teammate on that
+// platform ran a command. The inventory is read from the RAW bytes rather than
+// through the typed reader, so a reader that silently dropped a field cannot
+// hide behind itself. The input is the synthetic v4Golden.
+func TestMigrationPreservesEveryPlatformDigest(t *testing.T) {
+	source := rawDigestInventory(t, []byte(v4Golden))
 	if source["cli..integrities.darwin/arm64"] == "" || source["cli..integrities.linux/amd64"] == "" {
-		t.Fatal("v1Golden no longer carries a two-platform CLI pin; this test would pass vacuously")
+		t.Fatal("v4Golden does not carry a two-platform CLI pin; this test would pass vacuously")
+	}
+	if source["extensions.@putnami/typescript.integrities.darwin/arm64"] == "" {
+		t.Fatal("v4Golden does not carry an extension platform digest; this test would pass vacuously")
 	}
 
-	lf, err := ReadMigratableLockFile(dir)
+	parsed, err := ParseLockFile([]byte(v4Golden))
 	if err != nil {
-		t.Fatalf("ReadMigratableLockFile: %v", err)
-	}
-	if err := WriteLockFileV2(dir, lf); err != nil {
-		t.Fatalf("WriteLockFileV2: %v", err)
-	}
-	v2Bytes, err := os.ReadFile(filepath.Join(dir, LockFilename))
-	if err != nil {
-		t.Fatalf("read migrated lock: %v", err)
-	}
-	assertCLIDigestsSurvive(t, "v1→v2", source, rawDigestInventory(t, v2Bytes))
-
-	// …and again across the explicit projection onto the current format, so a
-	// workspace that migrates twice does not lose a platform on the second hop.
-	parsed, err := ParseLockFile(v2Bytes)
-	if err != nil {
-		t.Fatalf("ParseLockFile(migrated): %v", err)
+		t.Fatalf("ParseLockFile(v4Golden): %v", err)
 	}
 	current, err := MigrateLockFileToCurrent(parsed)
 	if err != nil {
 		t.Fatalf("MigrateLockFileToCurrent: %v", err)
 	}
+	if current.Version != MaxSupportedVersion {
+		t.Fatalf("migrated to v%d, want v%d", current.Version, MaxSupportedVersion)
+	}
 	currentBytes, err := MarshalLockFile(current)
 	if err != nil {
 		t.Fatalf("MarshalLockFile: %v", err)
 	}
-	assertCLIDigestsSurvive(t, "v2→v5", source, rawDigestInventory(t, currentBytes))
+	assertDigestsSurvive(t, fmt.Sprintf("v4→v%d", MaxSupportedVersion), source, rawDigestInventory(t, currentBytes))
 }
 
-func assertCLIDigestsSurvive(t *testing.T, step string, before, after map[string]string) {
+func assertDigestsSurvive(t *testing.T, step string, before, after map[string]string) {
 	t.Helper()
 	for key, digest := range before {
-		if !strings.HasPrefix(key, "cli.") {
-			continue
-		}
 		got, ok := after[key]
 		if !ok {
-			t.Errorf("%s dropped the CLI pin digest %s (%s); the launcher verifies it fail-closed",
+			t.Errorf("%s dropped the pin digest %s (%s); the CLI verifies it fail-closed",
 				step, key, digest)
 			continue
 		}
 		if got != digest {
-			t.Errorf("%s changed the CLI pin digest %s: %s → %s", step, key, digest, got)
+			t.Errorf("%s changed the pin digest %s: %s → %s", step, key, digest, got)
 		}
 	}
 }

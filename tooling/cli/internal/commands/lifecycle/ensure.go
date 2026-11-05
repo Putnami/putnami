@@ -65,11 +65,10 @@ func EnsureArtifactsServing(ctx context.Context, wsRoot string, cfg *wsproto.Con
 	lf, lockErr := lockfile.ReadLockFile(wsRoot)
 	if lockErr != nil {
 		// Tolerant, not silent. A lock this CLI cannot read materializes
-		// NOTHING — every entry below resolves to nil and is skipped — and since
-		// the format floor moved to v2, a v1 lock reaches this
-		// line in every workspace that has not migrated. Without the notice a
+		// NOTHING — every entry below resolves to nil and is skipped — and a lock
+		// below the format floor reaches this line. Without the notice a
 		// zero-init worktree just comes up with no extensions, which reads as an
-		// empty workspace rather than as a lock that needs converting. Warn, not
+		// empty workspace rather than as a lock that needs replacing. Warn, not
 		// the Debug the per-artifact `note` below uses: this is the whole pass
 		// failing, not one artifact, and it names its own remedy (B6r/F6).
 		slog.Warn("lock file could not be read; no artifacts were materialized", "error", lockErr)

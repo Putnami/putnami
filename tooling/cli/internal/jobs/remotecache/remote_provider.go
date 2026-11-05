@@ -102,11 +102,9 @@ func newProviderRemoteCache(wsRoot string, launch cacheprovider.LaunchSpec, trus
 // hard resolution failure (two extensions claiming the provider command, or a
 // provider runtime that cannot be prepared) the caller turns into a notice too.
 //
-// Resolution is by the protocol's reserved command name only. An earlier
-// cleanup deleted the product name and the extension-version floor that used
-// to sit beside it: compatibility is established by the extension contract
-// version at discovery and by provider-RPC negotiation at the initialize
-// handshake, neither of which needs to know which vendor ships the provider.
+// Resolution is by the protocol's reserved command name only; compatibility is
+// established by the extension contract version at discovery and by
+// provider-RPC negotiation at initialize.
 func loadProviderRemoteCache(ctx context.Context, wsRoot string, exts []*extension.ExtensionDescription, discovered *extension.DiscoveryResult, trust store.CacheTrust, launcher Launcher) (*RemoteCache, string, error) {
 	provider, err := extension.ResolveReservedProvider(exts, cache.ProviderCommandName)
 	if err != nil {

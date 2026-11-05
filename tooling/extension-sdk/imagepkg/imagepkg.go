@@ -23,12 +23,7 @@ import (
 // Config is options.package.image. Sources are project-relative regular files;
 // layer order and runtime config order are intentional OCI inputs.
 type Config struct {
-	Base string `json:"base"`
-	// Registry is accepted for compatibility with older project documents but
-	// is intentionally not consumed by package. Docker publish reads it only as
-	// a lower-precedence compatibility target after the publish command's own
-	// registry option; it never enters candidate identity or package I/O.
-	Registry     string        `json:"registry"`
+	Base         string        `json:"base"`
 	Platform     string        `json:"platform"`
 	Layers       []layerConfig `json:"layers"`
 	Env          []string      `json:"env,omitempty"`

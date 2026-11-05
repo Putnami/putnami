@@ -272,9 +272,10 @@ func BenchmarkFileLayerCacheMiss32MiB(b *testing.B) {
 }
 
 // BenchmarkImagePlanCacheHit32MiB measures the complete identity+layer lookup
-// boundary. The legacy composition hashes the source once for ContentHash and
-// again to discover the layer key. ImagePlan shares the first fingerprint;
-// a trustworthy upstream fingerprint removes the source read entirely.
+// boundary. The unshared composition hashes the source once for the image
+// identity and again to discover the layer key. ImagePlan shares the first
+// fingerprint; a trustworthy upstream fingerprint removes the source read
+// entirely.
 func BenchmarkImagePlanCacheHit32MiB(b *testing.B) {
 	const fixtureSize = int64(32 << 20)
 	dir := b.TempDir()
@@ -306,7 +307,7 @@ func BenchmarkImagePlanCacheHit32MiB(b *testing.B) {
 		b.ReportAllocs()
 		b.ReportMetric(2, "source-passes/op")
 		for i := 0; i < b.N; i++ {
-			if _, err := ContentHash(spec); err != nil {
+			if _, err := NewImagePlan(spec, PlanOptions{}); err != nil {
 				b.Fatal(err)
 			}
 			if _, hit, err := loadOrBuildFileLayer(spec.Layers[0], filepath.Join(dir, "legacy-hit.tar.gz"), cacheRoot, types.DockerLayer); err != nil {
@@ -380,7 +381,7 @@ func BenchmarkImagePlanCacheMiss32MiB(b *testing.B) {
 		b.ReportMetric(3, "source-passes/op")
 		for i := 0; i < b.N; i++ {
 			suffix := strconv.Itoa(i)
-			if _, err := ContentHash(spec); err != nil {
+			if _, err := NewImagePlan(spec, PlanOptions{}); err != nil {
 				b.Fatal(err)
 			}
 			if _, hit, err := loadOrBuildFileLayer(spec.Layers[0], filepath.Join(runDir, "legacy-miss-"+suffix+".tar.gz"), filepath.Join(runDir, "legacy-cache-"+suffix), types.DockerLayer); err != nil {
