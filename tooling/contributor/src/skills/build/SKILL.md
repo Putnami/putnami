@@ -41,8 +41,8 @@ A change runs eight stages, in order. On entering a stage, run
 `"$PUTNAMI_CLI" agent stage <stage>`, then read that stage's reference, and
 only that one. A stage that does not apply passes with one line that says why.
 When `agent stage` reports that the workspace writes no session hooks, the
-session has no mission to report to: go on, and give the stage and the tokens
-as unavailable in the end report.
+session has no mission to report to: go on, and the end report gives the
+stage reached and the tokens as unavailable.
 
 | Stage | What it produces | Reference |
 |---|---|---|

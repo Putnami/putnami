@@ -162,8 +162,9 @@ func (e *Env) noSessionCause() string {
 const (
 	// contributorExtension is this extension, and contributorArtifact the
 	// agentArtifacts entry that opts a workspace into its agent content.
-	contributorExtension = "@putnami/contributor"
-	contributorArtifact  = "extension:" + contributorExtension
+	contributorExtension      = "@putnami/contributor"
+	contributorArtifactPrefix = "extension:"
+	contributorArtifact       = contributorArtifactPrefix + contributorExtension
 	// sessionHookCommand is the command every Putnami session hook runs.
 	sessionHookCommand = "agent hook --engine "
 )
@@ -194,7 +195,12 @@ func hookConditions(root string) (missions, optedIn bool) {
 		bindings, _ := collab.ParseBindings(block)
 		_, missions = bindings[collab.ContractMissions]
 	}
-	return missions, slices.Contains(document.AgentArtifacts, contributorArtifact)
+	optedIn = slices.ContainsFunc(document.AgentArtifacts, func(entry string) bool {
+		// The core trims the entry and the name after its prefix.
+		name, ok := strings.CutPrefix(strings.TrimSpace(entry), contributorArtifactPrefix)
+		return ok && strings.TrimSpace(name) == contributorExtension
+	})
+	return missions, optedIn
 }
 
 // holdsSessionHook reports whether the host file at path holds a Putnami

@@ -167,7 +167,8 @@ func (h *harness) writeWorkspace(missions, optedIn bool) {
 		}}
 	}
 	if optedIn {
-		document["agentArtifacts"] = []string{"extension:@putnami/contributor"}
+		// The core trims the entry, so a padded one opts in too.
+		document["agentArtifacts"] = []string{" extension: @putnami/contributor "}
 	}
 	data, err := json.Marshal(document)
 	if err != nil {
