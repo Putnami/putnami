@@ -135,6 +135,10 @@ A requirement body over 512 bytes is an error that names its line: split it.
 is a warning. `openspec/changes/` is never read. The mapping is in the
 [`protocols/features` README](../../../protocols/features/README.md).
 
+The how-to
+[Bring your Spec Kit, OpenSpec, Kiro or Gherkin specs](/docs/how-to/bring-your-external-specs)
+takes a team from its existing specs to an enforced gate, for every format.
+
 ## If the commands are missing
 
 `putnami features` on a workspace that has not declared the extension is not a

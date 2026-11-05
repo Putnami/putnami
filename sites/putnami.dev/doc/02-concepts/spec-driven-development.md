@@ -29,6 +29,8 @@ Five steps, each owned by a different artifact:
    home of the prose; no JSON copy exists. To move one feature to the native
    format, `putnami specs init <feature> --from <format>:<path>` drafts its
    `specs/*.json` from that Markdown, copying the text and adding none.
+   [Bring your Spec Kit, OpenSpec, Kiro or Gherkin specs](/docs/how-to/bring-your-external-specs)
+   walks the whole path.
 3. **Prove.** Tests bind themselves to requirements in their runtime's native
    way — `spectest.Proves` in Go, `specTest` in TypeScript, the
    `putnami_proves` marker in Python. Every test run records which requirements
