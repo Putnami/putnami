@@ -47,9 +47,14 @@ task input is a static pattern, so it cannot depend on a manifest value.
    decomposition, such as `ß`, `ø` or a CJK character, stays a separator. A
    name with nothing left, or longer than 128 bytes after mapping, has no ID:
    §23 says what it gets. Go has no NFKD in its standard library, so the
-   protocol embeds `unicode/ascii-fold.json`: what NFKD less its marks gives
-   for each code point that it drops or turns into ASCII letters or digits.
-   The TypeScript test derives the same table from the runtime's
+   protocol embeds `unicode/ascii-fold.json`. It lists the code points NFKD
+   less its marks drops, and, for each code point whose decomposition holds an
+   ASCII letter or digit, the whole decomposition, non-ASCII characters
+   included, which the mapping then treats as separators: `½` is `1⁄2`, so
+   `½ cup` is `1-2-cup`. Its `unicode` member pins the Unicode version. A
+   version bump adds code points and never changes an entry, and it is
+   reviewed as a change to this mapping. The TypeScript test of
+   `@putnami/application` derives the table from the runtime's
    `String.prototype.normalize`, and both languages reproduce the golden
    `fixtures/equivalence/requirement-ids.golden.json`. (D-057)
 6. **An anchor stands alone on the line above its requirement.** It reads
@@ -130,9 +135,9 @@ task input is a static pattern, so it cannot depend on a manifest value.
     a projection is never written as a native document, so the 512-byte bound
     of `putnami-spec.json` still holds for every file on disk. (D-043)
 23. **A name with no ID is unanchored.** A requirement whose name leaves no ID
-    under §5, such as `ß` or `数据`, and has no anchor, takes the positional ID `requirement-<n>`,
-    with `n` its 1-based place among the projected requirements, and is
-    unanchored. `report` reads it, and `enforce` fails on it under §13 with a
+    under §5, such as `ß` or `数据`, and has no anchor, takes the positional ID
+    `requirement-<n>`, with `n` its 1-based place among the projected
+    requirements, and is unanchored. `report` reads it, and `enforce` fails on it under §13 with a
     finding that asks for an anchor. A Kiro group in that case takes
     `requirement-<n>` from its place among the groups. A name with an accented
     Latin letter keeps that letter as its base letter under §5, so it needs no
