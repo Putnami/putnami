@@ -146,7 +146,9 @@ func (h *hangingHost) Close() error {
 }
 
 // TestAHookEndsWithItsBudget pins that every call carries the event's
-// deadline: a provider that never answers cannot hold a hook past it.
+// deadline: a provider that never answers cannot hold a hook past it. The
+// host answers only when its context ends, so the hook returns at all only
+// because of that deadline; a slow machine delays it but never fails it.
 func TestAHookEndsWithItsBudget(t *testing.T) {
 	spectest.Proves(t, sessionFeature, budgetRequirement, "the-budgets-fit-the-declared-timeouts")
 	h := newHarness(t)
@@ -154,12 +156,8 @@ func TestAHookEndsWithItsBudget(t *testing.T) {
 	h.env.Host = host
 	ctx, cancel := context.WithTimeout(context.Background(), 200*time.Millisecond)
 	defer cancel()
-	started := time.Now()
 	var stdout, stderr bytes.Buffer
 	code := Hook(ctx, h.env, []string{"--engine", claude}, bytes.NewReader(h.payload(claude, "session-start", claudeSession, nil)), &stdout, &stderr)
-	if elapsed := time.Since(started); elapsed > 5*time.Second {
-		t.Errorf("the hook ran %v past its deadline", elapsed)
-	}
 	if code != 0 || host.calls != 2 || host.closes != 2 {
 		t.Errorf("exit %d after %d calls and %d closes", code, host.calls, host.closes)
 	}

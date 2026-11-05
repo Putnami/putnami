@@ -90,10 +90,10 @@ func (e *Env) log(engine, event string, failure error) {
 // one HTTP request: the hook cannot keep a short fixed bound per call.
 // Instead each event gets a budget that stays inside the timeout its hook
 // entry declares, and each call takes at most callTimeout of what is left.
-// The common longest path of each event fits its budget: two git commands
-// and two calls for an ordinary hook. A rare third call, the plan retry,
-// runs on what is left; when nothing is left, the next sync sends what it
-// would have sent.
+// The calls and waits of the common longest path of each event fit its
+// budget: two calls for an ordinary hook, and its git commands take what is
+// left. A rare third call, the plan retry, runs on what is left; when
+// nothing is left, the next sync sends what it would have sent.
 const (
 	// callTimeout bounds one call. It leaves room for a provider that starts
 	// cold, and two calls still fit the budget of an ordinary hook.
@@ -205,9 +205,9 @@ func sleepContext(ctx context.Context, d time.Duration) error {
 	}
 }
 
-// git runs one git command of the hook within what is left of ctx. A git
-// has no bound of its own: on a loaded machine a correct git can take
-// seconds, and the caller's budget already ends a git that hangs.
+// git runs one git command within what is left of ctx, with no bound of its
+// own. In a hook, the event's budget ends a git that hangs; attach and stage
+// end at the deadline of the command that runs them.
 func (e *Env) git(ctx context.Context, dir string, args ...string) (string, error) {
 	out, err := e.Git(ctx, dir, args...)
 	if err != nil && ctx.Err() != nil {
