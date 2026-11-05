@@ -76,8 +76,8 @@ const (
 
 // openSpecParagraph is one block of prose and the line it starts on.
 type openSpecParagraph struct {
-	text string
-	line int
+	lines []string
+	line  int
 }
 
 type openSpecParser struct {
@@ -204,10 +204,10 @@ func (parser *openSpecParser) appendProse(paragraphs []openSpecParagraph, trimme
 	}
 	if !parser.inParagraph || item {
 		parser.inParagraph = true
-		return append(paragraphs, openSpecParagraph{text: trimmed, line: number})
+		return append(paragraphs, openSpecParagraph{lines: []string{trimmed}, line: number})
 	}
 	last := len(paragraphs) - 1
-	paragraphs[last].text += " " + trimmed
+	paragraphs[last].lines = append(paragraphs[last].lines, trimmed)
 	return paragraphs
 }
 
@@ -305,7 +305,7 @@ func (parser *openSpecParser) outcomes() (outcomes []string, refused bool) {
 	}
 	for _, paragraph := range paragraphs {
 		position := parser.position(paragraph.line)
-		text := strings.Join(strings.Fields(paragraph.text), " ")
+		text := strings.Join(strings.Fields(strings.Join(paragraph.lines, " ")), " ")
 		if len(text) > specTextMaxLength {
 			refused = true
 			parser.findings = append(parser.findings, diag.Errorf(ErrorCodeSpecRead, position.Field(),
@@ -313,7 +313,7 @@ func (parser *openSpecParser) outcomes() (outcomes []string, refused bool) {
 			continue
 		}
 		if isOpenSpecPlaceholder(text) {
-			parser.findings = append(parser.findings, diag.Warningf(WarningCodeSpecPlaceholderPurpose, position.Field(),
+			parser.findings = append(parser.findings, diag.Warningf(WarningCodeSpecPlaceholderOutcome, position.Field(),
 				"this Purpose is a placeholder: write what the capability is for"))
 		}
 		outcomes = append(outcomes, text)

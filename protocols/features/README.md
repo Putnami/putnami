@@ -126,8 +126,10 @@ the file the reference names:
 
 A reference under `openspec/changes/` is an error: a change is a proposal in
 flight, not the current spec. HTML comments, fenced code and unknown sections
-project nothing. A placeholder Purpose stays the outcome with
-`features.spec_placeholder_purpose`, and a Status, Dates, Branch, Routes or
+project nothing. A decision link that starts with a dot is relative to the spec
+file; any other is workspace-relative. A scenario name with a non-ASCII
+character maps to no check, so it gives a mismatch warning. A placeholder
+Purpose stays the outcome with `features.spec_placeholder_outcome`, and a Status, Dates, Branch, Routes or
 Entities section gives `features.spec_derived_fact`. A Purpose paragraph or a
 requirement body over 512 bytes is an error at its line that names a split.
 

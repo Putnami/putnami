@@ -70,9 +70,9 @@ func TestBrownfieldOpenSpecSpecsParseWithPositionedFindings(t *testing.T) {
 	t.Parallel()
 	spectest.Proves(t, "features/feature-contracts", "openspec-findings", "brownfield-openspec-specs-parse-with-positioned-findings")
 	cases := []struct{ name, want string }{
-		{"runtime-env-ci-cd", features.WarningCodeSpecPlaceholderPurpose + "@" + openSpecFile + "#L5"},
+		{"runtime-env-ci-cd", features.WarningCodeSpecPlaceholderOutcome + "@" + openSpecFile + "#L5"},
 		{"editorjs-bundle", features.ErrorCodeSpecRead + "@" + openSpecFile + "#L4"},
-		{"nano-brain-embed-queue", features.ErrorCodeSpecRequirementTooLong + "@" + openSpecFile + "#L6," + features.WarningCodeSpecPlaceholderPurpose + "@" + openSpecFile + "#L4"},
+		{"nano-brain-embed-queue", features.ErrorCodeSpecRequirementTooLong + "@" + openSpecFile + "#L6," + features.WarningCodeSpecPlaceholderOutcome + "@" + openSpecFile + "#L4"},
 	}
 	for _, testCase := range cases {
 		projection := features.ReadSpecSource(openSpecReader(t), openSpecFixture(t, testCase.name))
@@ -239,7 +239,7 @@ func TestPlaceholderPurposeIsAWarningAndStaysTheOutcome(t *testing.T) {
 	for _, text := range []string{"TBD - created by archiving change add-x. Update Purpose after archive.", "TODO write this", "tbd.", "todo: later"} {
 		projection := readOpenSpec(t, "## Purpose\n"+text+"\n")
 		if projection.Spec == nil || projection.Spec.Outcomes[0] != text ||
-			codes(projection.Findings) != features.WarningCodeSpecPlaceholderPurpose+"@"+openSpecFile+"#L2" {
+			codes(projection.Findings) != features.WarningCodeSpecPlaceholderOutcome+"@"+openSpecFile+"#L2" {
 			t.Errorf("%q: got %s", text, codes(projection.Findings))
 		}
 	}
@@ -257,6 +257,16 @@ func TestOverLongPurposeParagraphNamesASplit(t *testing.T) {
 	if projection.Spec != nil || codes(projection.Findings) != features.ErrorCodeSpecRead+"@"+openSpecFile+"#L4" ||
 		!strings.Contains(projection.Findings[0].Message, "split it") {
 		t.Fatalf("got %+v", projection.Findings)
+	}
+}
+
+func TestManyShortPurposeLinesReadInLinearTime(t *testing.T) {
+	input := openSpecInput("## Purpose\n" + strings.Repeat("a\n", 200_000))
+	allocated := testing.AllocsPerRun(1, func() {
+		features.ReadSpecSource(openSpecReader(t), input)
+	})
+	if allocated > 1_000 {
+		t.Fatalf("%.0f allocations for one paragraph", allocated)
 	}
 }
 
