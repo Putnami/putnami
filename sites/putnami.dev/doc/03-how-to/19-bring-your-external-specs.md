@@ -1,6 +1,6 @@
 # Bring your Spec Kit, OpenSpec, Kiro or Gherkin specs
 
-You will connect the specs your team already writes with GitHub Spec Kit, OpenSpec, Kiro or Gherkin to the Putnami spec-driven development (SDD) gate, without rewriting them. The Markdown or `.feature` file stays the one home of the prose. Putnami reads it in memory, shows what each requirement still lacks, and then holds the line once you decide to enforce.
+You will connect the specs your team already writes with GitHub Spec Kit, OpenSpec, Kiro or Gherkin to the Putnami spec-driven development (SDD) gate, without rewriting them. The Markdown or `.feature` file stays the one home of the prose. Putnami reads it in memory, shows what each requirement still lacks, and fails the build on a lost requirement once you decide to enforce.
 
 You move in three steps: read the specs and change no exit code, make each requirement provable, then enforce. Moving a feature to the native JSON format comes last and is optional.
 
@@ -62,9 +62,9 @@ What each format reads at `path`:
 | `speckit` | a feature directory, or its `spec.md` | `spec.md`: Success Criteria (`SC-xxx`) as outcomes, Out of Scope as non-goals, Functional Requirements (`FR-xxx`) as requirements, acceptance scenarios |
 | `openspec` | a capability directory, or its `spec.md` | `## Purpose` as outcomes, each `### Requirement:` as a requirement, each `#### Scenario:` |
 | `kiro` | a spec directory, or its `requirements.md` | the Introduction as outcomes, each acceptance criterion as one requirement |
-| `gherkin` | a `.feature` file, or a directory of them | the `Feature:` description as outcomes, each `Rule:` as a requirement, each `Scenario:` |
+| `gherkin` | a `.feature` file, or a directory of them | the `Feature:` description as outcomes, each `Rule:` as a requirement (a `Feature:` with no `Rule:` is itself the requirement), each `Scenario:` |
 
-Putnami never reads `plan.md`, `tasks.md` or `design.md`: they are process state or context. Only links to `doc/adr/*.md` records become decision links. Two features cannot name the same path, or a path inside another's.
+Putnami never reads `plan.md`, `tasks.md` or `design.md`: they are process state or context. The OpenSpec reader turns links to `doc/adr/*.md` records into decision links; no other link becomes a decision. Two features cannot name the same path, or a path inside another's.
 
 ## Run the gate in `report` mode
 
@@ -95,7 +95,7 @@ A requirement is proven when the feature declares checks for it and a test passe
 ]
 ```
 
-Raise the feature's `target` to `coded` or later when you add a requirement, because `modeled` allows none. A test then names the check, here in TypeScript:
+A requirement's `stage` must be later than `modeled`. A test then names the check, here in TypeScript:
 
 ```ts
 import { specTest } from '@putnami/spectest';
@@ -122,7 +122,7 @@ A Spec Kit or Kiro requirement is numbered by its position: `FR-001`, or criteri
 - **FR-001**: An export MUST state its format in the response content type.
 ```
 
-An OpenSpec requirement or a Gherkin `Rule:` needs no anchor, because its ID is its name in kebab case: `### Requirement: Export as PDF` is `export-as-pdf`. Anchor it when you rename it, or when its name holds a non-ASCII character. In a Gherkin file, the anchor is a tag among the tags above the `Rule:`: `@putnami-id:export-format`.
+An OpenSpec requirement or a Gherkin requirement needs no anchor, because its ID is its name in kebab case: `### Requirement: Export as PDF` is `export-as-pdf`. Anchor it when you rename it, or when its name holds a non-ASCII character. In a Gherkin file, the anchor is the tag `@putnami-id:export-format` among the tags above the `Rule:`, or above the `Feature:` when the file has no `Rule:`.
 
 An anchor above a scenario names the check it stands for. In a Gherkin file, that tag is `@putnami-check:<id>` on the `Scenario:`. Without one, the scenario's check is its text in kebab case. A scenario only ever produces a warning: it never adds a check and never removes one.
 
@@ -141,7 +141,7 @@ Once every requirement has its checks and a passing test, enforce in the project
 }
 ```
 
-From now on, the gate fails on an unproven requirement, on a positional requirement with no anchor, and on a requirement text over 512 bytes: split a long one into two. Record the floor in the same change:
+From now on, the gate fails on an unproven requirement and on a positional requirement with no anchor. `enforce` also refuses a requirement text over 512 bytes: split a long one into two. In the same change, record the baseline, the list of requirements the gate must keep proving:
 
 ```bash
 putnami lint,test,build,validate --impacted
