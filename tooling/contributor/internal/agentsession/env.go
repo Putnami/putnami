@@ -185,7 +185,8 @@ func runGit(ctx context.Context, dir string, args ...string) (string, error) {
 }
 
 // gitExit is the status of a git command that ran to its end and failed. A
-// git killed at its timeout is not one: it reports the context's error.
+// git killed at its caller's deadline is not one: it reports the context's
+// error.
 type gitExit struct{ code int }
 
 func (e gitExit) Error() string { return "git exited with status " + strconv.Itoa(e.code) }
@@ -204,18 +205,15 @@ func sleepContext(ctx context.Context, d time.Duration) error {
 	}
 }
 
-// gitTimeout bounds one git command of the hook. The hook runs only git
-// commands that read local files: the branch and the origin URL.
-const gitTimeout = 2 * time.Second
-
+// git runs one git command of the hook within what is left of ctx. A git
+// has no bound of its own: on a loaded machine a correct git can take
+// seconds, and the caller's budget already ends a git that hangs.
 func (e *Env) git(ctx context.Context, dir string, args ...string) (string, error) {
-	gitContext, cancel := context.WithTimeout(ctx, gitTimeout)
-	defer cancel()
-	out, err := e.Git(gitContext, dir, args...)
-	if err != nil && gitContext.Err() != nil {
-		// A git stopped at its deadline is a timeout, whatever status the
-		// platform gave the killed process.
-		return "", gitContext.Err()
+	out, err := e.Git(ctx, dir, args...)
+	if err != nil && ctx.Err() != nil {
+		// A git stopped at its caller's deadline is a timeout, whatever
+		// status the platform gave the killed process.
+		return "", ctx.Err()
 	}
 	return out, err
 }

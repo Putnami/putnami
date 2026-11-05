@@ -71,23 +71,23 @@ func TestTheBudgetsFitTheDeclaredTimeouts(t *testing.T) {
 		t.Errorf("%d wake entries, want the Claude Code idle wake only", wakes)
 	}
 	// The longest path of each event: the calls it makes, each bounded by
-	// callTimeout, and the waits.
+	// callTimeout, and the waits. Its git commands take what is left.
 	for _, path := range []struct {
 		name   string
 		budget time.Duration
 		cost   time.Duration
 	}{
 		// the branch, the origin, sync and memory.mission.
-		{"session start", eventBudget(claude, hookEventSessionStart, false), 2*gitTimeout + 2*callTimeout},
+		{"session start", eventBudget(claude, hookEventSessionStart, false), 2 * callTimeout},
 		// the identity of a session no start opened, sync and the
 		// republish after a message the sync answered.
-		{"stop", eventBudget(claude, hookEventStop, false), 2*gitTimeout + 2*callTimeout},
-		{"stop failure", eventBudget(claude, hookEventStopFailure, false), 2*gitTimeout + callTimeout},
+		{"stop", eventBudget(claude, hookEventStop, false), 2 * callTimeout},
+		{"stop failure", eventBudget(claude, hookEventStopFailure, false), callTimeout},
 		// the identity of a session no start opened and sync.
-		{"session end", eventBudget(claude, hookEventSessionEnd, false), 2*gitTimeout + callTimeout},
+		{"session end", eventBudget(claude, hookEventSessionEnd, false), callTimeout},
 		// the identity, sync, the wait, the sync in flight at its end and
 		// the sync that publishes the working state.
-		{"codex stop", eventBudget(codex, hookEventStop, false), 2*gitTimeout + callTimeout + sessionDecisionWait + 2*callTimeout},
+		{"codex stop", eventBudget(codex, hookEventStop, false), callTimeout + sessionDecisionWait + 2*callTimeout},
 		// the wait for the Stop, the window, the sync in flight at its end
 		// and the sync that publishes the working state.
 		{"idle wake", eventBudget(claude, hookEventStop, true), idleWakeStopWait + sessionIdleWakeWindow + 2*callTimeout},

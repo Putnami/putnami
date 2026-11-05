@@ -3,6 +3,7 @@ package agentsession
 import (
 	"context"
 	"errors"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -57,9 +58,9 @@ func TestSleepEndsWithItsContext(t *testing.T) {
 	}
 }
 
-// A real git tells a detached HEAD, its status 1, from a git that outlives
-// gitTimeout: the first is no branch, the second an error.
-func TestAGitPastItsTimeoutIsNotADetachedHEAD(t *testing.T) {
+// A real git tells a detached HEAD, its status 1, from a git stopped at its
+// caller's deadline: the first is no branch, the second an error.
+func TestAGitStoppedByItsCallerIsNotADetachedHEAD(t *testing.T) {
 	spectest.Proves(t, sessionFeature, targetRequirement, "a-git-failure-is-not-a-detached-head")
 	if _, err := exec.LookPath("git"); err != nil {
 		t.Fatalf("git is not installed: %v", err)
@@ -79,15 +80,31 @@ func TestAGitPastItsTimeoutIsNotADetachedHEAD(t *testing.T) {
 		t.Errorf("detached HEAD: branch %q, %v", branch, err)
 	}
 
-	// The same checkout behind a git that sleeps past gitTimeout.
+	// The same checkout behind a git that says it started, then never ends:
+	// its caller ends while it runs.
 	bin := t.TempDir()
-	if err := os.WriteFile(filepath.Join(bin, "git"), []byte("#!/bin/sh\nexec /bin/sleep 3\n"), 0o700); err != nil {
+	started := filepath.Join(bin, "started")
+	if out, err := exec.Command("mkfifo", started).CombinedOutput(); err != nil {
+		t.Fatalf("mkfifo: %v: %s", err, out)
+	}
+	script := "#!/bin/sh\necho started > '" + started + "'\nexec /bin/sleep 3600\n"
+	if err := os.WriteFile(filepath.Join(bin, "git"), []byte(script), 0o700); err != nil {
 		t.Fatal(err)
 	}
 	t.Setenv("PATH", bin)
-	branch, err := env.checkoutBranch(context.Background(), dir)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	go func() {
+		// Opening the FIFO waits for the git to open it for writing.
+		if fifo, err := os.Open(started); err == nil {
+			_, _ = io.ReadAll(fifo)
+			_ = fifo.Close()
+		}
+		cancel()
+	}()
+	branch, err := env.checkoutBranch(ctx, dir)
 	var exit gitExit
-	if branch != "" || err == nil || errors.As(err, &exit) {
-		t.Errorf("slow git: branch %q, %v, want a timeout error", branch, err)
+	if branch != "" || !errors.Is(err, context.Canceled) || errors.As(err, &exit) {
+		t.Errorf("stopped git: branch %q, %v, want the caller's error", branch, err)
 	}
 }
