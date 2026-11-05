@@ -9,6 +9,7 @@ import (
 
 	protocolcli "go.putnami.dev/protocol/cli"
 	"go.putnami.dev/protocol/features/spectest"
+	"go.putnami.dev/tooling/sdd/extension/internal/gittest"
 )
 
 const breakingMarkerFeature = "tooling/specification-driven-development"
@@ -25,9 +26,6 @@ func branchWithCommits(t *testing.T, messages ...string) (string, []string) {
 	dir := decisionsWorkspace(t)
 	for _, args := range [][]string{
 		{"init", "-q"},
-		{"config", "user.email", "test@test.com"},
-		{"config", "user.name", "Test"},
-		{"config", "commit.gpgsign", "false"},
 		{"checkout", "-q", "-b", "main"},
 	} {
 		gitIn(t, dir, args...)
@@ -48,8 +46,7 @@ func commitFile(t *testing.T, dir, name, content, message string) string {
 	writeFixtureFile(t, filepath.Join(dir, name), content)
 	gitIn(t, dir, "add", "-A")
 	gitIn(t, dir, "commit", "-q", "-m", message)
-	cmd := exec.Command("git", "rev-parse", "HEAD")
-	cmd.Dir = dir
+	cmd := gittest.Command(dir, "rev-parse", "HEAD")
 	out, err := cmd.Output()
 	if err != nil {
 		t.Fatalf("git rev-parse HEAD: %v", err)
@@ -240,8 +237,7 @@ func TestBreakingMarkerRefusesAShallowClone(t *testing.T) {
 
 	// The fixture proves something only if the clone really lacks the
 	// breaking commit: read it as an unguarded reader would.
-	log := exec.Command("git", "log", "--format=%H", "origin/main..HEAD")
-	log.Dir = clone
+	log := gittest.Command(clone, "log", "--format=%H", "origin/main..HEAD")
 	out, err := log.Output()
 	if err != nil {
 		t.Fatalf("git log in the shallow clone: %v", err)

@@ -10,6 +10,7 @@ import (
 	protocolcli "go.putnami.dev/protocol/cli"
 	"go.putnami.dev/protocol/features/spectest"
 	pctx "go.putnami.dev/sdk/extension/context"
+	"go.putnami.dev/tooling/sdd/extension/internal/gittest"
 	"go.putnami.dev/tooling/sdd/extension/internal/sdd"
 )
 
@@ -27,8 +28,7 @@ func breakingMarkerRepository(t *testing.T, message string) (string, string) {
 	}
 	git := func(args ...string) string {
 		t.Helper()
-		cmd := exec.Command("git", args...)
-		cmd.Dir = root
+		cmd := gittest.Command(root, args...)
 		out, err := cmd.CombinedOutput()
 		if err != nil {
 			t.Fatalf("git %v: %v\n%s", args, err, out)
@@ -36,9 +36,6 @@ func breakingMarkerRepository(t *testing.T, message string) (string, string) {
 		return strings.TrimSpace(string(out))
 	}
 	git("init", "-q")
-	git("config", "user.email", "test@test.com")
-	git("config", "user.name", "Test")
-	git("config", "commit.gpgsign", "false")
 	git("checkout", "-q", "-b", "main")
 	git("commit", "-q", "--allow-empty", "-m", "chore: start")
 	git("checkout", "-q", "-b", "change")

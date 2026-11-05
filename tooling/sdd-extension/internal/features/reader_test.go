@@ -4,19 +4,19 @@ import (
 	"errors"
 	"io/fs"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
 
 	featureproto "go.putnami.dev/protocol/features"
 	workspaceproto "go.putnami.dev/protocol/workspace"
+	"go.putnami.dev/tooling/sdd/extension/internal/gittest"
 	workspace "go.putnami.dev/tooling/sdd/extension/internal/wsview"
 )
 
 func TestOSReaderReadsOnlyContainedBoundedFilesAndComputesBindings(t *testing.T) {
 	root := t.TempDir()
-	if output, err := exec.Command("git", "init", "-q", root).CombinedOutput(); err != nil {
+	if output, err := gittest.Command("", "init", "-q", root).CombinedOutput(); err != nil {
 		t.Fatalf("git init: %v: %s", err, output)
 	}
 	projectRoot := filepath.Join(root, "project")

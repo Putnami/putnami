@@ -3,13 +3,13 @@ package features
 import (
 	"bytes"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
 
 	featureproto "go.putnami.dev/protocol/features"
 	internalgit "go.putnami.dev/tooling/sdd/extension/internal/gitread"
+	"go.putnami.dev/tooling/sdd/extension/internal/gittest"
 )
 
 func TestEvaluateGitRevisionLoadsEachTreesOwnMembershipWithoutWorktreeMutation(t *testing.T) {
@@ -214,9 +214,7 @@ func pathLeaf(value string) string {
 func initFeatureGitRepo(t *testing.T) string {
 	t.Helper()
 	repo := t.TempDir()
-	for _, args := range [][]string{{"init", "-q"}, {"config", "user.email", "test@test.com"}, {"config", "user.name", "Test"}, {"config", "commit.gpgsign", "false"}} {
-		runFeatureGit(t, repo, args...)
-	}
+	runFeatureGit(t, repo, "init", "-q")
 	return repo
 }
 
@@ -228,8 +226,7 @@ func commitFeatureRepo(t *testing.T, repo, message string) {
 
 func runFeatureGit(t *testing.T, repo string, args ...string) string {
 	t.Helper()
-	command := exec.Command("git", args...)
-	command.Dir = repo
+	command := gittest.Command(repo, args...)
 	output, err := command.CombinedOutput()
 	if err != nil {
 		t.Fatalf("git %v: %v\n%s", args, err, output)

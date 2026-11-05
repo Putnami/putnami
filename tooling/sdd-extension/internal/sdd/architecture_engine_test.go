@@ -2,7 +2,6 @@ package sdd
 
 import (
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -11,6 +10,7 @@ import (
 	archproto "go.putnami.dev/protocol/architecture"
 	"go.putnami.dev/protocol/features/spectest"
 	wsproto "go.putnami.dev/protocol/workspace"
+	"go.putnami.dev/tooling/sdd/extension/internal/gittest"
 	workspace "go.putnami.dev/tooling/sdd/extension/internal/wsview"
 )
 
@@ -153,9 +153,6 @@ func TestEvaluateWorkspaceLoadsPriorBaselineFromImmutableGitObjects(t *testing.T
 	writeArchitectureTestFile(t, filepath.Join(root, archproto.BaselineFilename), `{"protocolVersion":1,"findings":[]}`)
 	for _, arguments := range [][]string{
 		{"init", "-q"},
-		{"config", "user.email", "architecture-test@putnami.dev"},
-		{"config", "user.name", "Architecture Test"},
-		{"config", "commit.gpgsign", "false"},
 		{"add", "-A"},
 		{"commit", "-q", "-m", "initial empty architecture baseline"},
 	} {
@@ -219,8 +216,7 @@ func writeArchitectureTestFile(t *testing.T, path, contents string) {
 
 func runArchitectureTestGit(t *testing.T, root string, arguments ...string) string {
 	t.Helper()
-	command := exec.Command("git", arguments...)
-	command.Dir = root
+	command := gittest.Command(root, arguments...)
 	output, err := command.CombinedOutput()
 	if err != nil {
 		t.Fatalf("git %v: %v\n%s", arguments, err, output)

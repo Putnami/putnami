@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -16,6 +15,7 @@ import (
 	"go.putnami.dev/protocol/features/spectest"
 	wsproto "go.putnami.dev/protocol/workspace"
 	featureengine "go.putnami.dev/tooling/sdd/extension/internal/features"
+	"go.putnami.dev/tooling/sdd/extension/internal/gittest"
 	workspace "go.putnami.dev/tooling/sdd/extension/internal/wsview"
 )
 
@@ -1145,14 +1145,7 @@ func featureCommandsWorkspace(t *testing.T, invalid bool) *workspace.Workspace {
 
 func initFeatureCommandsGit(t *testing.T, root string) {
 	t.Helper()
-	for _, args := range [][]string{
-		{"init", "-q"},
-		{"config", "user.email", "test@test.com"},
-		{"config", "user.name", "Test"},
-		{"config", "commit.gpgsign", "false"},
-	} {
-		runFeatureCommandsGit(t, root, args...)
-	}
+	runFeatureCommandsGit(t, root, "init", "-q")
 }
 
 func commitFeatureCommandsGit(t *testing.T, root, message string) {
@@ -1163,8 +1156,7 @@ func commitFeatureCommandsGit(t *testing.T, root, message string) {
 
 func runFeatureCommandsGit(t *testing.T, root string, args ...string) string {
 	t.Helper()
-	command := exec.Command("git", args...)
-	command.Dir = root
+	command := gittest.Command(root, args...)
 	output, err := command.CombinedOutput()
 	if err != nil {
 		t.Fatalf("git %v: %v\n%s", args, err, output)

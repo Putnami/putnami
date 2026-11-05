@@ -1,13 +1,13 @@
 package features
 
 import (
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
 
 	featureproto "go.putnami.dev/protocol/features"
 	"go.putnami.dev/protocol/features/spectest"
+	"go.putnami.dev/tooling/sdd/extension/internal/gittest"
 )
 
 func TestTrackedKiroSpecIsReadThroughTheCandidateCut(t *testing.T) {
@@ -18,7 +18,7 @@ func TestTrackedKiroSpecIsReadThroughTheCandidateCut(t *testing.T) {
 	writeDiscoveryFixture(t, filepath.Join(ws.Root, ".kiro", "specs", "invoice", "requirements.md"),
 		"## Introduction\n\nWhy.\n\n### Requirement 1\n\n#### Acceptance Criteria\n\n1. THE system SHALL run\n")
 	for _, arguments := range [][]string{{"init", "-q"}, {"add", "-A"}} {
-		command := exec.Command("git", append([]string{"-C", ws.Root}, arguments...)...) //nolint:gosec // a fixture directory
+		command := gittest.Command(ws.Root, arguments...)
 		if output, err := command.CombinedOutput(); err != nil {
 			t.Fatalf("git %v: %v: %s", arguments, err, output)
 		}
