@@ -62,6 +62,9 @@ const (
 	specListOutcomeLimit = 4
 	// specSelectorMaxBytes bounds an accepted feature selector.
 	specSelectorMaxBytes = 512
+	// SpecSourceNative is the source of a specs/*.json document. An external
+	// spec's source is its format.
+	SpecSourceNative = "native"
 )
 
 // SpecSummary is one compact catalog row: the feature a spec details, where the
@@ -72,6 +75,8 @@ type SpecSummary struct {
 	Feature string `json:"feature"`
 	// Path is the exact workspace-relative document path.
 	Path string `json:"path"`
+	// Source is SpecSourceNative, or the market format of an external spec.
+	Source string `json:"source"`
 	// Project is the owning project's name, empty at the workspace root.
 	Project string `json:"project,omitempty"`
 	// Outcomes are the first specListOutcomeLimit authored outcomes.
@@ -123,15 +128,20 @@ type SpecContextReport struct {
 	// Declarations are the durable authored declarations that mint the feature.
 	Declarations []FeatureAuthorityDeclaration `json:"declarations"`
 	// Spec is the canonical parsed document, absent when the feature has none.
-	Spec        *featureproto.Spec `json:"spec,omitempty"`
-	Decisions   []SpecDecisionLink `json:"decisions"`
-	Diagnostics []diag.Diagnostic  `json:"diagnostics"`
+	Spec      *featureproto.Spec `json:"spec,omitempty"`
+	Decisions []SpecDecisionLink `json:"decisions"`
+	// NativeGaps lists what a native rewrite of an external spec adds. They
+	// are information: they never change the exit code. A native spec has none.
+	NativeGaps  []featureproto.SpecGap `json:"nativeGaps,omitempty"`
+	Diagnostics []diag.Diagnostic      `json:"diagnostics"`
 }
 
 // SpecSourceRef is the exact provenance of one spec document.
 type SpecSourceRef struct {
 	Path    string `json:"path,omitempty"`
 	Project string `json:"project,omitempty"`
+	// Format is the market format of an external spec, omitted for a native one.
+	Format featureproto.SpecFormat `json:"format,omitempty"`
 }
 
 // SpecValidationSummary counts the subjects validation considered, so a clean
@@ -319,14 +329,39 @@ func (repository *specRepository) declarationsFor(feature string) []FeatureAutho
 // scopedDiagnostics returns the findings attributed to one exact document.
 // Fields are "<path>" or "<path>#<field>", the convention both discovery and
 // the protocol validator already use, so scoping never needs a second index.
-func (repository *specRepository) scopedDiagnostics(specPath string) []diag.Diagnostic {
+// An external spec's findings name its files, so a directory reference also
+// owns the findings on the files below it.
+func (repository *specRepository) scopedDiagnostics(discovered featureengine.DiscoveredSpec) []diag.Diagnostic {
 	scoped := make([]diag.Diagnostic, 0)
 	for _, finding := range repository.diagnostics {
-		if diagnosticNamesPath(finding, specPath) {
+		artifact, _, _ := strings.Cut(finding.Field, "#")
+		if diagnosticNamesPath(finding, discovered.Path) ||
+			(discovered.Format != "" && strings.HasPrefix(artifact, discovered.Path+"/")) {
 			scoped = append(scoped, finding)
 		}
 	}
 	return scoped
+}
+
+// specSource names where a spec's prose lives: native, or its format.
+func specSource(discovered featureengine.DiscoveredSpec) string {
+	if discovered.Format == "" {
+		return SpecSourceNative
+	}
+	return string(discovered.Format)
+}
+
+// manifestFeature returns the authored declaration of one feature, from the
+// first manifest in discovery order that declares it.
+func (repository *specRepository) manifestFeature(id string) (featureproto.Feature, bool) {
+	for _, source := range repository.manifests {
+		for _, feature := range source.Manifest.Features {
+			if feature.ID == id {
+				return feature, true
+			}
+		}
+	}
+	return featureproto.Feature{}, false
 }
 
 func diagnosticNamesPath(finding diag.Diagnostic, target string) bool {
@@ -351,10 +386,11 @@ func BuildSpecCatalogResult(ws *workspace.Workspace, selection Selection) (SpecC
 		if spec == nil {
 			continue
 		}
-		scoped := repository.scopedDiagnostics(discovered.Path)
+		scoped := repository.scopedDiagnostics(discovered)
 		summaries = append(summaries, SpecSummary{
 			Feature:      spec.Feature,
 			Path:         discovered.Path,
+			Source:       specSource(discovered),
 			Project:      discovered.Project,
 			Outcomes:     boundedStatements(spec.Outcomes, specListOutcomeLimit),
 			OutcomeCount: len(spec.Outcomes),
@@ -416,11 +452,14 @@ func BuildSpecContextResult(ws *workspace.Workspace, selector string) (SpecConte
 		return report, WithResultData(
 			protocolcli.NotFoundf("feature %q has no spec under %s/", selector, featureproto.SpecDirectory), report)
 	}
-	report.Source = SpecSourceRef{Path: discovered.Path, Project: discovered.Project}
+	report.Source = SpecSourceRef{Path: discovered.Path, Project: discovered.Project, Format: discovered.Format}
 	report.Spec = featureproto.CanonicalSpec(discovered.Spec)
+	if feature, declared := repository.manifestFeature(selector); declared && discovered.Format != "" {
+		report.NativeGaps = featureproto.SpecNativeGaps(discovered.Projection, feature)
+	}
 	links, findings := resolveSpecDecisions(repository.workspace, discovered)
 	report.Decisions = links
-	report.Diagnostics = featureDiagnostics(append(repository.scopedDiagnostics(discovered.Path), findings...))
+	report.Diagnostics = featureDiagnostics(append(repository.scopedDiagnostics(discovered), findings...))
 	return report, specContractError("specs inspect", report.Diagnostics, report)
 }
 
