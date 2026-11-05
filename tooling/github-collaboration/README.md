@@ -246,6 +246,7 @@ sequential repeats are.
 | No credential | `denied`, `github.unauthenticated` |
 | 401 | `denied`, `github.unauthorized` |
 | 403 | `denied`, `github.forbidden` |
+| 403 to a draft change through GraphQL | one `POST` to `pulls/{number}/ccr/ready_for_review` or `.../ccr/convert_to_draft`, the routes a Claude Code cloud session's GitHub proxy serves; a 404 there answers the GraphQL refusal |
 | 403 or 429 reporting a rate limit | `unavailable`, retryable, `github.rate_limited` |
 | 404, 410, or a reference from another source | `not_found` |
 | 409, 412, a stale revision, a moved head | `conflict` |

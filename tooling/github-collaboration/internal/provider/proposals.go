@@ -488,11 +488,10 @@ func (s *proposalSession) edit(pull *ghPull, in *collab.ProposalUpsertInput) (*g
 	return pull, nil
 }
 
-// proxyDraft changes the draft flag through the REST routes a Claude Code
-// cloud session's GitHub proxy serves, after that proxy refused the GraphQL
-// mutation with 403. The routes are the proxy's, not GitHub's: GitHub answers
-// 404 for them, and then the GraphQL refusal stays the answer. The refused
-// mutation changed nothing, so this is still the only write of the change.
+// proxyDraft sends the draft change once to the REST route a Claude Code
+// cloud session's GitHub proxy serves under pulls/{number}/ccr/, and answers
+// that route's failure. A 404, the answer of a host that does not serve the
+// route, answers refused, the 403 GraphQL gave.
 func (s *proposalSession) proxyDraft(number int, draft bool, refused *github.Error) *github.Error {
 	route := "ready_for_review"
 	if draft {
