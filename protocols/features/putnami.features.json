@@ -386,7 +386,9 @@
               "a-kiro-reference-with-no-requirements-md-is-an-error",
               "a-wrapped-or-nested-criterion-stays-whole",
               "kiro-comments-and-code-are-not-spec-text",
-              "a-design-link-is-never-a-decision"
+              "a-design-link-is-never-a-decision",
+              "a-long-introduction-paragraph-splits-at-sentences",
+              "a-dotted-criterion-number-opens-a-criterion"
             ]
           }
         },
@@ -420,7 +422,7 @@
               "a-group-with-no-criterion-is-a-warning",
               "kiro-derived-facts-are-warnings",
               "a-kiro-spec-with-no-outcome-or-requirement-is-an-error-at-a-line",
-              "a-long-introduction-paragraph-names-its-line",
+              "a-long-introduction-sentence-names-its-line",
               "an-unclosed-kiro-comment-or-fence-is-an-error"
             ]
           }

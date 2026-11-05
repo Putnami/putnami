@@ -102,7 +102,7 @@
     },
     {
       "id": "kiro-projection",
-      "text": "The Kiro reader reads only the requirements.md its reference names. Each Introduction paragraph becomes an outcome. Each acceptance criterion under a Requirement N heading becomes one requirement, in file order, with its wrapped and nested lines. A user story, design.md, tasks.md and a steering file project nothing, and no link becomes a decision."
+      "text": "The Kiro reader reads only the requirements.md its reference names. Each Introduction paragraph becomes an outcome, cut at sentence ends when over 512 bytes. Each acceptance criterion under a Requirement N heading becomes one requirement, in file order, with its wrapped and nested lines. A user story, design.md, tasks.md and a steering file project nothing, and no link becomes a decision."
     },
     {
       "id": "kiro-requirement-identity",
@@ -110,7 +110,7 @@
     },
     {
       "id": "kiro-findings",
-      "text": "A criterion in an EARS form or a FOR ALL property has no finding. Any other criterion is projected with a warning at its line, so a parse never drops or crashes on text. A group with no criterion and a section that restates a derived fact are one warning each. A missing outcome, a file with no group, an Introduction paragraph over 512 bytes and an unclosed comment or fence are errors at a line."
+      "text": "A criterion in an EARS form or a FOR ALL property has no finding. Any other criterion is projected with a warning at its line, so a parse never drops or crashes on text. A group with no criterion and a section that restates a derived fact are one warning each. A missing outcome, a file with no group, an Introduction sentence over 512 bytes and an unclosed comment or fence are errors at a line."
     }
   ],
   "decisions": [

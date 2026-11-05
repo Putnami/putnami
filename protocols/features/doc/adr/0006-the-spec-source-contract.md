@@ -104,6 +104,11 @@ is not a native requirement.
   ordinals below it and hide a stated requirement from the gate.
 - **The `FOR ALL` property is a recognized form.** Kiro writes it beside the
   five EARS forms, so warning on it would flag the tool's own output.
+- **A long Introduction paragraph is cut at sentence ends.** An Introduction is
+  free prose that Kiro does not bound. In a sample of 186 public files, 39
+  paragraphs exceed 512 bytes, and an error would fail those projects on their
+  first `report` run. The outcomes keep the text unchanged. Only a single
+  sentence over the bound is an error.
 - **A user story projects nothing.** It is context for the group, and adding it
   to each criterion would spend the 512-byte bound on repeated text.
 
