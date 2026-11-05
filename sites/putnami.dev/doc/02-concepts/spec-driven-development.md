@@ -23,7 +23,10 @@ Five steps, each owned by a different artifact:
 2. **Specify.** One spec per feature (`specs/*.json`) records the prose no tool
    can derive: outcomes, non-goals, and links to the decision records the
    feature rests on. Specs are strict JSON — a malformed spec, a duplicate, or
-   a reference to an undeclared feature fails the build.
+   a reference to an undeclared feature fails the build. A project that keeps
+   its specs in OpenSpec opts in with `options.sdd.specFormats`, and the
+   feature's manifest entry names the capability. The Markdown stays the one
+   home of the prose; no JSON copy exists.
 3. **Prove.** Tests bind themselves to requirements in their runtime's native
    way — `spectest.Proves` in Go, `specTest` in TypeScript, the
    `putnami_proves` marker in Python. Every test run records which requirements
