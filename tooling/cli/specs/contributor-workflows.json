@@ -70,6 +70,10 @@
     {
       "id": "review-cycle",
       "text": "A fresh reviewer agent reviews the frozen candidate. P1 and P2 findings block, P3 findings are listed in the proposal, and a contradiction with an ADR blocks. The main session fixes, a fresh reviewer checks only the P1 and P2 fixes, and after two rounds a disagreement goes to the owner with both positions."
+    },
+    {
+      "id": "external-spec-authoring",
+      "text": "In a project whose feature names an external spec, the spec skill edits the file that `specs inspect` resolves, in its format's conventions, and starts no native spec. It anchors each requirement it creates or renumbers, keeps checks in `putnami.features.json`, and proposes `specs init --from` only when the owner asks."
     }
   ],
   "decisions": [
