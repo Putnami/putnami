@@ -160,11 +160,11 @@ func (scan *specKitScan) line(raw string, number int) {
 		scan.settleAnchor()
 		scan.extend(strings.TrimSpace(text))
 	case scan.section == specKitOutOfScope && item != nil:
-		scan.ignoredLabel(text, item, position)
+		scan.ignoredLabel(text, item, position, "this requirement reads as a non-goal here: move it under Functional Requirements")
 		scan.nonGoal(item[1], position)
 	default:
 		scan.settleAnchor()
-		scan.ignoredLabel(text, item, position)
+		scan.ignoredLabel(text, item, position, "this requirement projects nothing: write it as **FR-xxx**: under Functional Requirements")
 		if item != nil || specKitBreak.MatchString(text) {
 			scan.endItem()
 		} else if scan.extend != nil {
@@ -186,16 +186,15 @@ func specKitIndented(text string) bool {
 	return text[0] == ' ' || text[0] == '\t'
 }
 
-// ignoredLabel warns on a line that looks like a requirement and projects
-// nothing, because the requirement would otherwise vanish in silence.
-func (scan *specKitScan) ignoredLabel(text string, item []string, position SpecPosition) {
+// ignoredLabel warns on a line that looks like a requirement and is not read as
+// one, because the requirement would otherwise vanish in silence.
+func (scan *specKitScan) ignoredLabel(text string, item []string, position SpecPosition, message string) {
 	body := strings.TrimSpace(text)
 	if item != nil {
 		body = item[1]
 	}
 	if specKitLooseLabel.MatchString(body) {
-		scan.reading.Findings = append(scan.reading.Findings, diag.Warningf(WarningCodeSpecRequirementIgnored, position.Field(),
-			"this requirement projects nothing: write it as **FR-xxx**: under Functional Requirements"))
+		scan.reading.Findings = append(scan.reading.Findings, diag.Warningf(WarningCodeSpecRequirementIgnored, position.Field(), "%s", message))
 	}
 }
 

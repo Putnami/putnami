@@ -359,8 +359,8 @@ func TestAnFRLabelThatProjectsNothingIsAWarning(t *testing.T) {
 
 func TestABOMDoesNotHideTheFirstHeading(t *testing.T) {
 	t.Parallel()
-	projection := readSpecKit(t, "\ufeff"+specKitMinimal)
-	if projection.Spec == nil || len(projection.Spec.Requirements) != 1 || len(projection.Spec.Outcomes) != 1 {
+	projection := readSpecKit(t, "\ufeff## Functional Requirements\n\n- **FR-001**: One.\n\n## Success Criteria\n\n- **SC-001**: Done.\n")
+	if projection.Spec == nil || len(projection.Spec.Requirements) != 1 || len(projection.Findings) != 0 {
 		t.Fatalf("got %+v", projection)
 	}
 }
@@ -393,5 +393,8 @@ func TestLabelsTheReaderDoesNotTakeWarnInEverySection(t *testing.T) {
 	code := features.WarningCodeSpecRequirementIgnored + "@" + specKitPath + "/spec.md#L"
 	if projection.Spec == nil || codes(projection.Findings) != code+"12,"+code+"3" {
 		t.Fatalf("got %s", codes(projection.Findings))
+	}
+	if !strings.Contains(projection.Findings[0].Message, "non-goal") {
+		t.Fatalf("message = %s", projection.Findings[0].Message)
 	}
 }
