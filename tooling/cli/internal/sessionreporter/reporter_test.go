@@ -323,25 +323,33 @@ func TestReportingRefusalNamesTheChunkAndTheReportersCode(t *testing.T) {
 		t.Run(code, func(t *testing.T) {
 			p, remote := pipeProcess()
 			defer func() { _ = remote.Close(); _ = p.stdin.Close() }()
+			calls := make(chan int, 1)
 			go func() {
 				scanner := bufio.NewScanner(remote)
-				if !scanner.Scan() {
-					return
+				count := 0
+				for scanner.Scan() {
+					count++
+					chunk, err := protocolcli.ParseSessionReportingChunk(scanner.Bytes())
+					if err != nil {
+						break
+					}
+					ack := chunk.Ack()
+					ack.OK = false
+					ack.Code = code
+					_ = json.NewEncoder(remote).Encode(ack)
 				}
-				chunk, err := protocolcli.ParseSessionReportingChunk(scanner.Bytes())
-				if err != nil {
-					return
-				}
-				ack := chunk.Ack()
-				ack.OK = false
-				ack.Code = code
-				_ = json.NewEncoder(remote).Encode(ack)
+				calls <- count
 			}()
 			r := &Run{ctx: context.Background(), process: p, opTimeout: time.Second}
 			err := r.send(protocolcli.NewSessionReportingChunk("session", "events.jsonl", 128, 3, []byte("abc"), false))
 			want := "reporter refused events.jsonl chunk 3: " + code
 			if err == nil || err.Error() != want {
 				t.Fatalf("error = %v, want %q", err, want)
+			}
+			// A refusal without retry ends the attempts at the first one.
+			_ = p.stdin.Close()
+			if count := <-calls; count != 1 {
+				t.Fatalf("attempts = %d, want 1", count)
 			}
 		})
 	}
