@@ -552,7 +552,7 @@
       "activationFiles": [
         "putnami.extension.json"
       ],
-      "description": "Record the loop stage of the current session's change: talk, declare, show, code, check, prove, validate or merge. Every later sync of the session carries it, and the command syncs at once when the session reports to a mission. The current session is the one the host names in CLAUDE_CODE_SESSION_ID or CODEX_THREAD_ID, else the session of this checkout and branch that was active last. A usage error exits 2; no session found, or a sync that fails, exits 1.",
+      "description": "Record the loop stage of the current session's change: talk, declare, show, code, check, prove, validate or merge. Every later sync of the session carries it, and the command syncs at once when the session reports to a mission. The current session is the one the host names in CLAUDE_CODE_SESSION_ID or CODEX_THREAD_ID, else the session of this checkout and branch that was active last. A usage error exits 2; a sync that fails exits 1; no session found exits 1 and says why.",
       "run": [
         {
           "id": "stage",

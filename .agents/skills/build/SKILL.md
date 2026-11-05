@@ -40,9 +40,9 @@ the same. `--dry-run` projects the work without edits or external writes.
 A change runs eight stages, in order. On entering a stage, run
 `"$PUTNAMI_CLI" agent stage <stage>`, then read that stage's reference, and
 only that one. A stage that does not apply passes with one line that says why.
-When `agent stage` reports that the workspace binds no `missions` provider,
-the session has no mission to report to: go on, and give the tokens you spent
-in the end report.
+When `agent stage` reports that the workspace writes no session hooks, the
+session has no mission to report to: go on, and give the stage and the tokens
+as unavailable in the end report.
 
 | Stage | What it produces | Reference |
 |---|---|---|
