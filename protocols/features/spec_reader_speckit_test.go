@@ -327,7 +327,7 @@ func TestSpecKitSpecWithNoOutcomeIsAnErrorAtALine(t *testing.T) {
 	if got := codes(readSpecKit(t, "# Feature\n\n## Success Criteria\n\nProse only.\n").Findings); got != file+"3" {
 		t.Fatalf("got %s", got)
 	}
-	if got := codes(readSpecKit(t, "\ufeff# Feature\n").Findings); got != file+"1" {
+	if got := codes(readSpecKit(t, "# Feature\n").Findings); got != file+"1" {
 		t.Fatalf("got %s", got)
 	}
 }
@@ -353,6 +353,45 @@ func TestAnFRLabelThatProjectsNothingIsAWarning(t *testing.T) {
 	projection := readSpecKit(t, text)
 	code := features.WarningCodeSpecRequirementIgnored + "@" + specKitPath + "/spec.md#L"
 	if projection.Spec == nil || codes(projection.Findings) != code+"13,"+code+"14" {
+		t.Fatalf("got %s", codes(projection.Findings))
+	}
+}
+
+func TestABOMDoesNotHideTheFirstHeading(t *testing.T) {
+	t.Parallel()
+	projection := readSpecKit(t, "\ufeff"+specKitMinimal)
+	if projection.Spec == nil || len(projection.Spec.Requirements) != 1 || len(projection.Spec.Outcomes) != 1 {
+		t.Fatalf("got %+v", projection)
+	}
+}
+
+func TestAnIndentedScenarioIsItsOwnScenario(t *testing.T) {
+	t.Parallel()
+	text := "### User Story 1 - A (Priority: P1)\n\n- **Acceptance Scenarios**:\n  1. **Given** a, **Then** b\n     - and c\n  2. **Given** d, **Then** e\n\n" + specKitMinimal
+	projection := readSpecKit(t, text)
+	if projection.Spec == nil || len(projection.Scenarios) != 2 || projection.Scenarios[0].Name != "Given a, Then b - and c" {
+		t.Fatalf("scenarios = %+v", projection.Scenarios)
+	}
+}
+
+func TestSiblingSubsectionsStayInTheRequirements(t *testing.T) {
+	t.Parallel()
+	body := "### Functional Requirements\n\n- **FR-001**: One.\n\n### Non-Functional Requirements\n\n- **FR-002**: Two.\n\n"
+	other := "### Non-Functional Requirements\n\n- **FR-002**: Two.\n\n### Functional Requirements\n\n- **FR-001**: One.\n\n"
+	for _, text := range []string{body, other} {
+		projection := readSpecKit(t, "## Requirements\n\n"+text+"## Success Criteria\n\n- **SC-001**: Done.\n")
+		if projection.Spec == nil || len(projection.Spec.Requirements) != 2 || len(projection.Findings) != 0 {
+			t.Fatalf("got %+v", projection)
+		}
+	}
+}
+
+func TestLabelsTheReaderDoesNotTakeWarnInEverySection(t *testing.T) {
+	t.Parallel()
+	text := "## Functional Requirements\n\n- **fr-001**: Lower case.\n- **FR-001**: Taken.\n\n## Success Criteria\n\n- **SC-001**: Done.\n\n## Out of Scope\n\n- **FR-002**: Dropped.\n"
+	projection := readSpecKit(t, text)
+	code := features.WarningCodeSpecRequirementIgnored + "@" + specKitPath + "/spec.md#L"
+	if projection.Spec == nil || codes(projection.Findings) != code+"12,"+code+"3" {
 		t.Fatalf("got %s", codes(projection.Findings))
 	}
 }

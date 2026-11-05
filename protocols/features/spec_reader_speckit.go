@@ -30,7 +30,7 @@ var (
 	specKitBreak       = regexp.MustCompile(`^ {0,3}(?:-{3,}|\*{3,}|_{3,})[ \t]*$`)
 	specKitListItem    = regexp.MustCompile(`^[ \t]*(?:[-*+]|[0-9]+[.)])[ \t]+(.*)$`)
 	specKitLabel       = regexp.MustCompile(`^\*\*((?:FR|SC)-[0-9]+[A-Za-z]?)(?::\*\*|\*\*[ \t]*:?)[ \t]*(.*)$`)
-	specKitLooseLabel  = regexp.MustCompile(`^(?:\*\*FR-[0-9]+[A-Za-z]?(?:\*\*|:)|FR-[0-9]+[A-Za-z]?:)`)
+	specKitLooseLabel  = regexp.MustCompile(`(?i)^(?:\*\*FR-[0-9]+[A-Za-z]?(?:\*\*|:)|FR-[0-9]+[A-Za-z]?:)`)
 	specKitScenario    = regexp.MustCompile(`(?i)^(?:\*\*)?given\b`)
 	specKitMetadata    = regexp.MustCompile(`^\*\*(Feature Branch|Created|Status)\*\*:`)
 	specKitMarker      = regexp.MustCompile(`\[NEEDS CLARIFICATION(?::[^\]]*)?\]`)
@@ -154,12 +154,13 @@ func (scan *specKitScan) line(raw string, number int) {
 	switch {
 	case scan.section == specKitRequirements && scan.requirement(text, position):
 	case scan.section == specKitSuccessCriteria && scan.outcome(text, position):
+	case scan.section == specKitUserStory && item != nil && specKitScenario.MatchString(item[1]):
+		scan.scenario(item[1], position)
 	case item != nil && indented && scan.extend != nil:
 		scan.settleAnchor()
 		scan.extend(strings.TrimSpace(text))
-	case scan.section == specKitUserStory && item != nil && specKitScenario.MatchString(item[1]):
-		scan.scenario(item[1], position)
 	case scan.section == specKitOutOfScope && item != nil:
+		scan.ignoredLabel(text, item, position)
 		scan.nonGoal(item[1], position)
 	default:
 		scan.settleAnchor()
@@ -295,6 +296,9 @@ func (scan *specKitScan) heading(level int, title string, position SpecPosition)
 	}
 	section := specKitSectionOf(title)
 	switch {
+	case section == specKitRequirements && scan.section == specKitRequirements:
+		// Functional Requirements below Requirements: the section keeps its level,
+		// so a sibling subsection does not end it whatever the order.
 	case section != specKitNoSection:
 		scan.section, scan.sectionLevel = section, level
 		switch section {
