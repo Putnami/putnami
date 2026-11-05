@@ -120,8 +120,13 @@ var gitRepositoryEnv = []string{
 // directory is never read as part of an enclosing checkout. It unsets
 // gitRepositoryEnv first: a test run by `git bisect run` or a hook inherits
 // GIT_DIR, and without this `git init` in dir rewrites that repository.
+// ON MAIN runs its git with no deadline, so an answer never depends on the
+// machine load.
 func hermeticGit(t *testing.T, dir string) {
 	t.Helper()
+	budget := statusGitBudget
+	statusGitBudget = context.WithCancel
+	t.Cleanup(func() { statusGitBudget = budget })
 	for _, key := range gitRepositoryEnv {
 		t.Setenv(key, "") // restores the inherited value at cleanup
 		if err := os.Unsetenv(key); err != nil {
@@ -728,4 +733,26 @@ func TestStatusOnMainTriState(t *testing.T) {
 			t.Fatalf("git processes = %d (%+v), want none", got, answers)
 		}
 	})
+}
+
+// TestStatusOnMainGitTimeout answers unknown, "git timed out", for the main
+// ref and every commit once the git budget has expired.
+func TestStatusOnMainGitTimeout(t *testing.T) {
+	root, onMain, offMain := statusGitFixture(t)
+	statusGitBudget = func(ctx context.Context) (context.Context, context.CancelFunc) {
+		return context.WithDeadline(ctx, time.Unix(0, 0))
+	}
+	answers := statusOnMain(context.Background(), root, []deploymentSummaryEntry{
+		{Project: "a", CommitSHA: onMain},
+		{Project: "c", CommitSHA: offMain},
+	})
+	if answers.Ref != "" || answers.RefUnavailable != "git timed out" {
+		t.Fatalf("main ref = (%q, %q), want none for want of time", answers.Ref, answers.RefUnavailable)
+	}
+	timedOut := statusOnMainAnswer{State: "unknown", Reason: "git timed out"}
+	for _, sha := range []string{onMain, offMain} {
+		if got := answers.answer(sha); got != timedOut {
+			t.Errorf("answer(%s) = %+v, want %+v", sha, got, timedOut)
+		}
+	}
 }
