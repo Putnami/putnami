@@ -53,6 +53,10 @@ func SpecNativeGaps(projection SpecProjection, feature Feature) []SpecGap {
 		return nil
 	}
 	reference := *feature.Spec
+	// A native spec has no section, no context link and no scenario, so the
+	// rewrite removes those gaps. It refuses an unanchored requirement, whose
+	// one step is the anchor.
+	rewrite := fmt.Sprintf("; or draft a native spec with `putnami specs init %s --from %s:%s`", feature.ID, reference.Format, reference.Path)
 	var gaps []SpecGap
 	for i, record := range projection.Requirements {
 		if record.Unanchored {
@@ -66,12 +70,15 @@ func SpecNativeGaps(projection SpecProjection, feature Feature) []SpecGap {
 	}
 	for _, finding := range projection.Findings {
 		if finding.Code == WarningCodeSpecDerivedFact {
-			gaps = append(gaps, SpecGap{Kind: SpecGapDerivedSection, Field: finding.Field, Message: finding.Message, Step: specGapDerivedStep})
+			gaps = append(gaps, SpecGap{Kind: SpecGapDerivedSection, Field: finding.Field, Message: finding.Message, Step: specGapDerivedStep + rewrite})
 		}
 	}
-	gaps = append(gaps, specContextLinkGaps(projection, reference)...)
+	for _, gap := range specContextLinkGaps(projection, reference) {
+		gap.Step += rewrite
+		gaps = append(gaps, gap)
+	}
 	for _, finding := range CompareSpecScenarios(projection, feature) {
-		gaps = append(gaps, SpecGap{Kind: SpecGapScenarioMismatch, Field: finding.Field, Message: finding.Message, Step: specGapScenarioStep})
+		gaps = append(gaps, SpecGap{Kind: SpecGapScenarioMismatch, Field: finding.Field, Message: finding.Message, Step: specGapScenarioStep + rewrite})
 	}
 	sortSpecGaps(gaps)
 	return gaps

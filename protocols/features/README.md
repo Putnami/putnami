@@ -158,7 +158,10 @@ Every reader shares two rules, which `ReadSpecSource` applies:
 | `context_link` | A link in the projected prose that is not a `doc/adr/*.md` record |
 | `scenario_mismatch` | A scenario with no declared check, or a declared check with no scenario |
 
-A gap is information, never a finding: no verification mode makes it block. A
+Every step but the anchor also names `putnami specs init <feature> --from
+<format>:<path>`, the native rewrite that removes the gap; that command refuses
+an unanchored requirement. A gap is information, never a finding: no
+verification mode makes it block. A
 text the reader gave no position keeps the reference path as its field.
 
 A feature may carry an optional `surface` object that lists the command paths

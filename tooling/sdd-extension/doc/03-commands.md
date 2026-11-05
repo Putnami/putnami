@@ -277,6 +277,10 @@ the line, a `message`, and the `step` that removes it:
 | `context_link` | A link that is not a `doc/adr/*.md` decision record | Record the decision in an ADR and link it |
 | `scenario_mismatch` | A scenario with no declared check, or a check with no scenario | Anchor the scenario with its check, or change `verification.checks` |
 
+Each step but the anchor also names the native rewrite, `putnami specs init
+<feature> --from <format>:<path>`, which removes the gap. That command refuses
+an unanchored requirement, so write its anchor first.
+
 Gaps are information. They never change the exit code, and `validate` never
 reports them. `inspect` omits `nativeGaps` when there is no gap. A native spec
 has none, and its `inspect` output omits `source.format`, so a missing format

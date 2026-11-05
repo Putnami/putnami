@@ -79,10 +79,10 @@ func TestSpecsInspectListsTheNativeGaps(t *testing.T) {
 	const file = "app/openspec/specs/invoice-export/spec.md"
 	want := `[{"kind":"derived_section","field":"` + file + `#L6",` +
 		`"message":"section \"Status\" restates a fact Putnami derives: remove it",` +
-		`"step":"delete the section: Putnami derives this fact, and a native spec has no place for it"},` +
+		`"step":"delete the section: Putnami derives this fact, and a native spec has no place for it; or draft a native spec with ` + "`putnami specs init billing/invoicing --from openspec:app/openspec/specs/invoice-export`" + `"},` +
 		`{"kind":"context_link","field":"` + file + `#L10",` +
 		`"message":"link \"./design.md\" is context, not a decision: a native spec links only doc/adr/*.md records",` +
-		`"step":"record the decision in a doc/adr/*.md file and link that file; any other link stays context, and a native spec drops it from its decisions"}]`
+		`"step":"record the decision in a doc/adr/*.md file and link that file; any other link stays context, and a native spec drops it from its decisions; or draft a native spec with ` + "`putnami specs init billing/invoicing --from openspec:app/openspec/specs/invoice-export`" + `"}]`
 	if gaps := mustJSON(t, report.NativeGaps); gaps != want {
 		t.Fatalf("nativeGaps =\n%s\nwant\n%s", gaps, want)
 	}

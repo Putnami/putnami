@@ -55,6 +55,9 @@ func TestEachGapKindNamesItsPositionAndStep(t *testing.T) {
 			t.Fatalf("gap without a message or a step: %+v", gap)
 		}
 		summary = append(summary, got{gap.Kind, gap.Field})
+		if !strings.HasSuffix(gap.Step, "`putnami specs init "+contractFeature+" --from openspec:"+openSpecReference+"`") {
+			t.Fatalf("a %s gap does not name the native rewrite: %q", gap.Kind, gap.Step)
+		}
 	}
 	want := []got{
 		{features.SpecGapContextLink, openSpecFile + "#L4"},
@@ -76,7 +79,7 @@ func TestEachGapKindNamesItsPositionAndStep(t *testing.T) {
 	}
 	gaps = features.SpecNativeGaps(specKit, gapFeature(features.SpecFormatSpecKit, specKitPath))
 	if len(gaps) != 1 || gaps[0].Kind != features.SpecGapUnanchoredRequirement ||
-		gaps[0].Field != specKitPath+"/spec.md#L5" || !strings.Contains(gaps[0].Step, "<!-- putnami:id fr-001 -->") {
+		gaps[0].Field != specKitPath+"/spec.md#L5" || !strings.Contains(gaps[0].Step, "<!-- putnami:id fr-001 -->") || strings.Contains(gaps[0].Step, "specs init") {
 		t.Fatalf("gaps = %+v, want the unanchored FR-001 at line 5 with its anchor", gaps)
 	}
 }
