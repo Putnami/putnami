@@ -718,3 +718,30 @@ func TestContributorReviewCycleBlocksOnP1AndP2(t *testing.T) {
 		t.Error("the review skill does not block on P1 and P2 only")
 	}
 }
+
+// TestContributorSpecSkillEditsTheExternalSpec pins the spec skill on a
+// feature whose spec is external: it edits the file `specs inspect` resolves,
+// anchors the requirements it creates or renumbers, keeps checks in the
+// manifest, and proposes the native rewrite only on the owner's request.
+func TestContributorSpecSkillEditsTheExternalSpec(t *testing.T) {
+	t.Parallel()
+	spectest.Proves(t, "cli/contributor-workflows", "external-spec-authoring", "the-spec-skill-edits-the-external-spec-it-resolves")
+	result := buildContributorContent(t)
+	skill := string(result.Files[".agents/skills/spec/SKILL.md"])
+	section := strings.Join(strings.Fields(markdownSection(t, skill, "Find the spec the feature reads")), " ")
+	for _, want := range []string{
+		"`\"$PUTNAMI_CLI\" specs inspect <feature-id>`", "`source.path`",
+		`"spec": {"format": "<format>", "path": "<path>"}`,
+		"`openspec`, `speckit`, `kiro` or `gherkin`",
+		"Do not create a native `specs/*.json` for the feature",
+		"Give every requirement you create or renumber an anchor",
+		"`<!-- putnami:id <segment-id> -->`", "`@putnami-id:<segment-id>`",
+		"Keep checks, thresholds and windows in `putnami.features.json`",
+		"`specs init <feature> --from <format>:<path>`",
+		"only when the owner asks for it",
+	} {
+		if !strings.Contains(section, want) {
+			t.Errorf("the spec skill's external-spec section lacks %q", want)
+		}
+	}
+}

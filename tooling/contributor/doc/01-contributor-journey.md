@@ -41,6 +41,11 @@ agent, with its worker profile, model and effort. The default profile runs
 only review in a separate agent, the `reviewer` worker. `spec` and `design`
 stay callable on their own; `design` also records an ADR and runs a bounded
 prototype when the choice needs one.
+`spec` edits the spec that `putnami specs inspect` resolves for the feature.
+When the feature's manifest entry names an external spec, such as an OpenSpec
+or Spec Kit file, `spec` edits that file in its own format and anchors each
+requirement it creates or renumbers. It starts no native spec, and it proposes
+`specs init --from` only when the owner asks.
 
 The [workflow contract](04-workflow-contract.md) gives the versioned fields and
 stage rules. The [repository policy](02-repository-policy.md) gives conventions;
