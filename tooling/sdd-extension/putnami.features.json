@@ -407,6 +407,22 @@
               "a-renamed-openspec-requirement-fails-the-ratchet"
             ]
           }
+        },
+        {
+          "id": "kiro-specs-reach-the-gate",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-kiro-project-reaches-specs-validate",
+              "enforce-fails-each-unanchored-kiro-criterion",
+              "a-reordered-anchored-kiro-spec-keeps-the-ratchet",
+              "a-tracked-kiro-spec-is-read-through-the-candidate-cut"
+            ]
+          }
         }
       ],
       "surface": {

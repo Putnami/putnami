@@ -117,6 +117,10 @@
     {
       "id": "openspec-specs-reach-the-gate",
       "text": "A project that lists openspec in options.sdd.specFormats has the spec.md its manifest entry names read as that feature's spec by specs validate, with no native file. A renamed requirement whose ID is in the baseline fails the ratchet, exactly as for a native spec."
+    },
+    {
+      "id": "kiro-specs-reach-the-gate",
+      "text": "A project that lists kiro reads a feature's .kiro/specs/<feature> directory through the same discovery and candidate cut as any spec. Under enforce each unanchored criterion fails at its line, and anchored criteria keep their IDs when the file is reordered, so the ratchet holds."
     }
   ],
   "decisions": [

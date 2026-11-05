@@ -371,6 +371,59 @@
               "the-same-openspec-bytes-give-the-same-result"
             ]
           }
+        },
+        {
+          "id": "kiro-projection",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "real-kiro-specs-reproduce-their-goldens",
+              "kiro-process-files-change-nothing",
+              "a-kiro-reference-with-no-requirements-md-is-an-error",
+              "a-wrapped-or-nested-criterion-stays-whole",
+              "kiro-comments-and-code-are-not-spec-text",
+              "a-design-link-is-never-a-decision"
+            ]
+          }
+        },
+        {
+          "id": "kiro-requirement-identity",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-kiro-anchor-names-the-criterion",
+              "an-unanchored-criterion-is-positional",
+              "a-kiro-group-anchor-names-its-positional-criteria",
+              "a-stray-kiro-anchor-is-an-error"
+            ]
+          }
+        },
+        {
+          "id": "kiro-findings",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "every-ears-form-parses",
+              "a-malformed-criterion-is-a-positioned-warning",
+              "a-group-with-no-criterion-is-a-warning",
+              "kiro-derived-facts-are-warnings",
+              "a-kiro-spec-with-no-outcome-or-requirement-is-an-error-at-a-line",
+              "a-long-introduction-paragraph-names-its-line",
+              "an-unclosed-kiro-comment-or-fence-is-an-error"
+            ]
+          }
         }
       ]
     }

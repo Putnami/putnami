@@ -89,6 +89,24 @@ task input is a static pattern, so it cannot depend on a manifest value.
     a validation finding on that text follows §4. A text with no position stays
     at the reference.
 
+### The Kiro reader
+
+Kiro numbers its requirements by position, and one `### Requirement N` holds
+many criteria. Each criterion has its own bound and its own proof, so the group
+is not a native requirement.
+
+- **A criterion is one requirement.** Its ID is its anchor, else
+  `<group>-<ordinal>`. The group's ID is the anchor above its heading, else
+  `requirement-<n>`. A group anchor names its criteria but does not pin them:
+  reordering them changes the ordinal, so each stays unanchored under §13.
+- **A malformed criterion stays in the projection.** It gets the warning
+  `features.spec_criterion_malformed` at its line. Dropping it would shift the
+  ordinals below it and hide a stated requirement from the gate.
+- **The `FOR ALL` property is a recognized form.** Kiro writes it beside the
+  five EARS forms, so warning on it would flag the tool's own output.
+- **A user story projects nothing.** It is context for the group, and adding it
+  to each criterion would spend the 512-byte bound on repeated text.
+
 ## Rejected alternatives
 
 - **The `surface` rung, version 2.** Readers of the released version 2 refuse
