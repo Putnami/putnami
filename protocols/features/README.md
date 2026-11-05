@@ -419,10 +419,10 @@ pure and shrink-only — a recorded project that regressed out of `enforce`, or
 lost a recorded requirement while still enforced, is a
 `features.ratchet_regression` error naming the baseline edit as the reviewed
 policy change; growth in either direction never produces a finding and is only
-counted, so a consumer decides (the `@putnami/sdd` extension fails a
+counted, so a consumer decides. The `@putnami/sdd` extension fails a
 committed file that `putnami specs baseline --update` would rewrite, and
-warns with `features.ratchet_growth` only when no baseline is committed). The `@putnami/sdd` extension runs the
-comparison as the `specs-ratchet-validate` step of `validate-workspace` and
+warns with `features.ratchet_growth` only when no baseline is committed. It
+runs the comparison as the `specs-ratchet-validate` step of `validate-workspace` and
 maintains the file with `putnami specs baseline --update`; both sides of the
 judgment are the committed worktree, so the check stays cacheable and no git
 history enters the verdict.
