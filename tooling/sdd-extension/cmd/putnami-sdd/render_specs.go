@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	diag "go.putnami.dev/protocol/diagnostic"
+	featureproto "go.putnami.dev/protocol/features"
 	"go.putnami.dev/tooling/sdd/extension/internal/sdd"
 )
 
@@ -31,7 +32,7 @@ func printSpecCatalogHuman(w io.Writer, report sdd.SpecCatalogReport) {
 			state = " · invalid"
 		}
 		fmt.Fprintf(w, "\n  %s%s\n", summary.Feature, state)
-		fmt.Fprintf(w, "    source: %s\n", specSourceLabel(summary.Path, summary.Project))
+		fmt.Fprintf(w, "    source: %s%s\n", specSourceLabel(summary.Path, summary.Project), specFormatSuffix(summary.Source))
 		for _, outcome := range summary.Outcomes {
 			fmt.Fprintf(w, "    outcome: %s\n", outcome)
 		}
@@ -59,7 +60,7 @@ func printSpecContextHuman(w io.Writer, report sdd.SpecContextReport) {
 		fmt.Fprintln(w)
 		return
 	}
-	fmt.Fprintf(w, "  Spec: %s\n", specSourceLabel(report.Source.Path, report.Source.Project))
+	fmt.Fprintf(w, "  Spec: %s%s\n", specSourceLabel(report.Source.Path, report.Source.Project), specFormatSuffix(string(report.Source.Format)))
 	fmt.Fprintln(w, "  Outcomes:")
 	for _, outcome := range report.Spec.Outcomes {
 		fmt.Fprintf(w, "    %s\n", outcome)
@@ -87,6 +88,7 @@ func printSpecContextHuman(w io.Writer, report sdd.SpecContextReport) {
 			fmt.Fprintf(w, "    [%s] %s\n", state, decision.Path)
 		}
 	}
+	printSpecNativeGaps(w, report.NativeGaps)
 	printSpecDiagnostics(w, report.Diagnostics)
 	fmt.Fprintln(w)
 }
@@ -237,6 +239,29 @@ func printSpecInitHuman(w io.Writer, report sdd.SpecInitReport) {
 	}
 	printSpecDiagnostics(w, report.Diagnostics)
 	fmt.Fprintln(w)
+}
+
+// specFormatSuffix names an external spec's format after its path. A native
+// spec prints nothing, so a native workspace keeps its human output.
+func specFormatSuffix(source string) string {
+	if source == "" || source == sdd.SpecSourceNative {
+		return ""
+	}
+	return " · " + source
+}
+
+// printSpecNativeGaps prints what a native rewrite adds, one gap with its
+// position and step each. The lines are information, never a finding.
+func printSpecNativeGaps(w io.Writer, gaps []featureproto.SpecGap) {
+	if len(gaps) == 0 {
+		return
+	}
+	fmt.Fprintf(w, "  Native gaps (%d), information only:\n", len(gaps))
+	for _, gap := range gaps {
+		fmt.Fprintf(w, "    [%s] %s\n", gap.Kind, gap.Field)
+		fmt.Fprintf(w, "      %s\n", gap.Message)
+		fmt.Fprintf(w, "      step: %s\n", gap.Step)
+	}
 }
 
 // printSpecDiagnostics prints every error and a bounded number of warnings.

@@ -78,6 +78,8 @@ putnami specs verify
 
 `specs validate` lists each finding at its file and line, such as `specs/001-invoice-export/spec.md#L42`. Fix every error it names. Warnings point at what is still loose: a scenario with no declared check, a declared check with no scenario, or a section that restates a fact Putnami already derives, such as a status or a branch. `specs verify` shows each requirement and whether a test proved it. On this first run, no requirement has a check yet, so none is proven, and `report` changes no exit code for it.
 
+`putnami specs list` shows each spec's source format, such as `speckit`. `putnami specs inspect billing/invoice-export` lists the native gaps: what a native spec would add, each at its line with the step that removes it. Gaps are information and never fail a run.
+
 Nothing in your spec files changes. Your team can stay in `report` as long as it wants.
 
 ## Make each requirement provable

@@ -248,9 +248,13 @@ ignoring them. There is no filename filter on any of them: identity is the
 `feature` field.
 
 `list` is the compact catalog: for every document, the feature it details, its
-exact path and owning project, its first intended outcomes, and its non-goal,
-requirement, and decision counts. A filename never mints identity — the
-`feature` field does — so a path is provenance only. Discovery degrades rather
+exact path and owning project, its source, its first intended outcomes, and its
+non-goal, requirement, and decision counts. The source is `native` for a
+`specs/*.json` document, or the market format of an external spec: `openspec`,
+`speckit`, `kiro` or `gherkin`. JSON output carries it as `source` on each row;
+human output prints a format after the path and prints nothing for `native`.
+A filename never mints identity — the `feature` field does — so a path is
+provenance only. Discovery degrades rather
 than fails: a document that cannot be parsed is reported as a diagnostic and a
 document that does not resolve is marked `valid: false`, instead of hiding every
 healthy spec.
@@ -261,6 +265,28 @@ sentences, every linked `doc/adr/*.md` record with whether that record exists in
 this worktree, the source path and owning project, and the diagnostics scoped to
 that document. It loads no design graph, evidence document, or capability
 manifest.
+
+For an external spec, `inspect` also gives `source.format` and `nativeGaps`:
+what a native spec would add. Each gap has a `kind`, a `field` that points at
+the line, a `message`, and the `step` that removes it:
+
+| Kind | What it is | Step |
+|---|---|---|
+| `unanchored_requirement` | A requirement whose ID comes from its position, such as `FR-001` | Write an anchor on the line above it |
+| `derived_section` | A section that restates a fact Putnami derives, such as Status | Delete the section |
+| `context_link` | A link that is not a `doc/adr/*.md` decision record | Record the decision in an ADR and link it |
+| `scenario_mismatch` | A scenario with no declared check, or a check with no scenario | Anchor the scenario with its check, or change `verification.checks` |
+
+Each step but the anchor also names the native rewrite, `putnami specs init
+<feature> --from <format>:<path>`, which removes the gap. That command refuses
+a spec that `enforce` refuses, such as one with an unanchored requirement or a
+text over 512 bytes. While the spec has one, the step says the rewrite waits
+for it.
+
+Gaps are information. They never change the exit code, and `validate` never
+reports them. `inspect` omits `nativeGaps` when there is no gap. A native spec
+has none, and its `inspect` output omits `source.format`, so a missing format
+means `native`.
 
 `validate` reuses the protocol's own parser and repository validator — a second
 interpretation of these bytes would be a defect — and **fails** on an invalid

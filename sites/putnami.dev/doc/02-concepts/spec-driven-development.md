@@ -26,9 +26,11 @@ Five steps, each owned by a different artifact:
    a reference to an undeclared feature fails the build. A project that keeps
    its specs in OpenSpec opts in with `options.sdd.specFormats`, and the
    feature's manifest entry names the capability. The Markdown stays the one
-   home of the prose; no JSON copy exists. To move one feature to the native
-   format, `putnami specs init <feature> --from <format>:<path>` drafts its
-   `specs/*.json` from that Markdown, copying the text and adding none.
+   home of the prose; no JSON copy exists. `putnami specs list` names each
+   spec's source, and `putnami specs inspect` lists what a native spec would
+   add, as information that never fails a run. To move one feature to the
+   native format, `putnami specs init <feature> --from <format>:<path>` drafts
+   its `specs/*.json` from that Markdown, copying the text and adding none.
    [Bring your Spec Kit, OpenSpec, Kiro or Gherkin specs](/docs/how-to/bring-your-external-specs)
    walks the whole path.
 3. **Prove.** Tests bind themselves to requirements in their runtime's native

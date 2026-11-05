@@ -129,6 +129,10 @@
     {
       "id": "init-from-copies-the-external-spec",
       "text": "specs init <feature> --from <format>:<path> writes one new native spec whose outcomes, non-goals, requirement IDs and texts, and decision links are copied from the external spec that feature's manifest entry names, with no other text. It refuses a --from that is not that reference, a feature with a native spec, an unanchored positional requirement and a text over the bound, at the source file and line. The native spec and its source give one specs verify verdict."
+    },
+    {
+      "id": "specs-surface-names-the-source",
+      "text": "specs list names each spec's source: native, or its market format, as the source member in JSON and after the path in human output. specs inspect of an external spec gives source.format and lists its native gaps with their positions and steps. Gaps never change an exit code and are never validate findings. A workspace with only native specs keeps its output, apart from source: native on each specs list row."
     }
   ],
   "decisions": [

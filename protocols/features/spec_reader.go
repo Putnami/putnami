@@ -167,6 +167,10 @@ type SpecProjection struct {
 	// enforceFindings are the reading's enforce findings, nil when Spec is nil.
 	// EnforceOnly is their one reader, so no caller forgets the mode.
 	enforceFindings []diag.Diagnostic
+	// outcomePositions and nonGoalPositions are the reading's, so
+	// SpecNativeGaps can locate a link in that text.
+	outcomePositions []SpecPosition
+	nonGoalPositions []SpecPosition
 }
 
 // EnforceOnly returns what depends on the verification mode. In enforce, an
@@ -282,6 +286,7 @@ func finishProjection(spec *Spec, reading SpecReading, findings []diag.Diagnosti
 	return SpecProjection{
 		Spec: spec, Requirements: reading.Requirements, Scenarios: reading.Scenarios,
 		Findings: findings, enforceFindings: reading.EnforceFindings,
+		outcomePositions: reading.OutcomePositions, nonGoalPositions: reading.NonGoalPositions,
 	}
 }
 

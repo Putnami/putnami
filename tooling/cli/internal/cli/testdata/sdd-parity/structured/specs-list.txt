@@ -39,6 +39,7 @@ exit 0
         "path": "billing/specs/billing.invoice.json",
         "project": "@acme/billing",
         "requirements": 0,
+        "source": "native",
         "valid": true
       }
     ]

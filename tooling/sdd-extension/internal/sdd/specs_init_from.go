@@ -140,12 +140,13 @@ func (repository *specRepository) externalSpecOf(feature string, reference featu
 }
 
 // externalSpecFindings keeps the repository findings on the source: those on
-// the manifest entry and those inside the reference path.
+// the manifest entry and its members, and those inside the reference path. The
+// member test keeps features[1].spec from owning features[10].spec.
 func (repository *specRepository) externalSpecFindings(reference featureproto.SpecReference, field string) []diag.Diagnostic {
 	var findings []diag.Diagnostic
 	for _, finding := range repository.diagnostics {
 		artifact, _, _ := strings.Cut(finding.Field, "#")
-		if strings.HasPrefix(finding.Field, field) || artifact == reference.Path ||
+		if finding.Field == field || strings.HasPrefix(finding.Field, field+".") || artifact == reference.Path ||
 			strings.HasPrefix(artifact, reference.Path+"/") {
 			findings = append(findings, finding)
 		}

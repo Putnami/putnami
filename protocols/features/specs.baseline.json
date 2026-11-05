@@ -16,6 +16,7 @@
     "features/feature-contracts#kiro-findings",
     "features/feature-contracts#kiro-projection",
     "features/feature-contracts#kiro-requirement-identity",
+    "features/feature-contracts#native-gaps",
     "features/feature-contracts#objective-verdicts",
     "features/feature-contracts#one-report-per-project",
     "features/feature-contracts#only-enforce-blocks",
