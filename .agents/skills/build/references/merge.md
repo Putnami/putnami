@@ -72,6 +72,12 @@ No commit, proposal, comment, code comment or document names an agent: no
 co-author trailer for a model, no generated-with line, no model name. The
 models that worked on a mission belong in its memory checkpoint.
 
+A host that appends an attribution footer to the proposal body after each
+write, such as a Claude Code cloud session, fails the readback of
+`change finalize`, and the error names the footer. Do not edit the body again
+from that host: it appends the footer to each write. Publish from a local
+session.
+
 ## After ready
 
 A merge or a deployment needs the mandate's authority; then go through the
