@@ -28,7 +28,12 @@ idempotent creation, and a truthful answer when a write's outcome is unknown.
    `github.com`; `GH_ENTERPRISE_TOKEN`, then `GITHUB_ENTERPRISE_TOKEN` only for
    the host `GH_HOST` names; otherwise `gh auth token --hostname`. Changing a
    pull request's draft flag and the discussion lookup of decision 8 use
-   GraphQL, because REST cannot. No dependency is added.
+   GraphQL, because GitHub's REST API cannot. The draft flag tries GraphQL
+   first. When GraphQL answers a 403 that is not a rate limit, the provider
+   sends the change once to the route a Claude Code cloud session's GitHub
+   proxy serves, `pulls/{number}/ccr/ready_for_review` or
+   `pulls/{number}/ccr/convert_to_draft`; a 404 there, GitHub's answer, keeps
+   the GraphQL refusal as the answer. No dependency is added.
 
 3. **A credential goes only to its own host and never into an answer.** The API
    root is derived from `settings.host`; settings cannot name a URL. The only
@@ -172,3 +177,7 @@ idempotent creation, and a truthful answer when a write's outcome is unknown.
 - A keyed create needs a GraphQL schema with repository discussions; a GitHub
   Enterprise Server release without them refuses every keyed create.
 - A concurrent writer between a read and a write is not detected.
+- The draft flag in a cloud session relies on routes GitHub does not
+  document: the session proxy serves them, and the provider follows that
+  proxy's refusal text and its client's hints. A proxy that drops them makes
+  the draft change fail with the GraphQL refusal again.
