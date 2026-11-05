@@ -69,6 +69,11 @@ type fakeGitHub struct {
 	// discussionsForbidden is a credential that cannot read discussions:
 	// every discussion field answers FORBIDDEN.
 	discussionsForbidden bool
+	// sessionProxy is the GitHub proxy of a Claude Code cloud session: it
+	// answers every GraphQL request 403, and serves the draft flag of a pull
+	// request on REST routes under pulls/{number}/ccr/. Without it, those
+	// routes answer 404, as GitHub does.
+	sessionProxy bool
 }
 
 type fakeIssue struct {
@@ -309,6 +314,7 @@ var routes = []struct {
 	{"GET", regexp.MustCompile(`^/repos/([^/]+)/([^/]+)/pulls/([0-9]+)/comments$`), (*fakeGitHub).listLineComments},
 	{"GET", regexp.MustCompile(`^/repos/([^/]+)/([^/]+)/issues/([0-9]+)/comments$`), (*fakeGitHub).listConversation},
 	{"PUT", regexp.MustCompile(`^/repos/([^/]+)/([^/]+)/pulls/([0-9]+)/merge$`), (*fakeGitHub).mergePull},
+	{"POST", regexp.MustCompile(`^/repos/([^/]+)/([^/]+)/pulls/([0-9]+)/ccr/(ready_for_review|convert_to_draft)$`), (*fakeGitHub).proxyDraft},
 	{"GET", regexp.MustCompile(`^/repos/([^/]+)/([^/]+)/git/ref/heads/(.+)$`), (*fakeGitHub).getRef},
 	{"GET", regexp.MustCompile(`^/repos/([^/]+)/([^/]+)/commits/([0-9a-f]+)/check-runs$`), (*fakeGitHub).listCheckRuns},
 	{"GET", regexp.MustCompile(`^/repos/([^/]+)/([^/]+)/commits/([0-9a-f]+)/status$`), (*fakeGitHub).combinedStatus},
@@ -1023,7 +1029,30 @@ func (f *fakeGitHub) combinedStatus(w http.ResponseWriter, r *http.Request, matc
 	writeJSON(w, http.StatusOK, map[string]any{"state": "pending", "total_count": len(statuses), "statuses": orEmpty(paginate(w, r, statuses))})
 }
 
+// sessionProxyGraphQL is the refusal a Claude Code cloud session's GitHub
+// proxy answers to every GraphQL request.
+const sessionProxyGraphQL = "GitHub GraphQL is not available through this session's GitHub proxy; use the REST API (gh api repos/{owner}/{repo}/...). " +
+	"For review threads, auto-merge and draft or ready, the proxy serves repos/{owner}/{repo}/pulls/<number>/ccr/review_threads, " +
+	".../ccr/comments/<comment-id>/resolve, .../ccr/auto_merge, .../ccr/ready_for_review and .../ccr/convert_to_draft."
+
+// proxyDraft serves the draft routes of a session proxy: ready_for_review
+// clears the draft flag, convert_to_draft sets it.
+func (f *fakeGitHub) proxyDraft(w http.ResponseWriter, _ *http.Request, match []string) {
+	number := f.number(match[3])
+	if !f.sessionProxy || f.pulls[number] == nil {
+		writeJSON(w, http.StatusNotFound, map[string]any{"message": "Not Found"})
+		return
+	}
+	f.pulls[number].draft = match[4] == "convert_to_draft"
+	f.issues[number].updated = f.tick()
+	writeJSON(w, http.StatusOK, f.pullJSON(number))
+}
+
 func (f *fakeGitHub) graphql(w http.ResponseWriter, r *http.Request, _ []string) {
+	if f.sessionProxy {
+		writeJSON(w, http.StatusForbidden, map[string]any{"message": sessionProxyGraphQL})
+		return
+	}
 	var request struct {
 		Query     string         `json:"query"`
 		Variables map[string]any `json:"variables"`

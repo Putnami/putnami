@@ -263,6 +263,44 @@ func TestAnotherRepositoryIsRefused(t *testing.T) {
 	}
 }
 
+// A Claude Code cloud session's proxy refuses GraphQL and serves the draft
+// flag on pulls/{number}/ccr/ routes: upsert moves a proposal to ready and
+// back to draft through them, and reconciles a lost answer by reading back.
+func TestUpsertTogglesDraftThroughASessionProxy(t *testing.T) {
+	h := newHarness(t)
+	h.fake.sessionProxy = true
+	var created collab.ProposalUpsertResult
+	h.ok("proposals", "upsert", `{"change":{"base":"main","head":"topic-a"},"title":"Draft","draft":true}`, &created)
+	var ready collab.ProposalUpsertResult
+	h.ok("proposals", "upsert", `{"change":{"base":"main","head":"topic-a"},"title":"Draft","draft":false}`, &ready)
+	if ready.Proposal.State != collab.ProposalStateOpen || h.fake.count("POST", `/ccr/ready_for_review$`) != 1 {
+		t.Fatalf("marked ready through the proxy: %+v after %d calls", ready.Proposal, h.fake.count("POST", `/ccr/ready_for_review$`))
+	}
+	var draft collab.ProposalUpsertResult
+	h.fake.fail("POST", `/ccr/convert_to_draft$`, fault{drop: true})
+	h.ok("proposals", "upsert", `{"change":{"base":"main","head":"topic-a"},"title":"Draft","draft":true}`, &draft)
+	if draft.Proposal.State != collab.ProposalStateDraft || h.fake.count("POST", `/ccr/convert_to_draft$`) != 1 {
+		t.Fatalf("back to draft, with the answer lost, sent once: %+v after %d calls", draft.Proposal, h.fake.count("POST", `/ccr/convert_to_draft$`))
+	}
+	h.fake.fail("POST", `/ccr/ready_for_review$`, fault{before: true, status: 403, body: `{"message":"Resource not accessible by integration"}`})
+	if failure := h.fails("proposals", "upsert", `{"change":{"base":"main","head":"topic-a"},"title":"Draft","draft":false}`,
+		collab.OutcomeDenied); failure.Reason != reasonForbidden || !strings.Contains(failure.Message, "not accessible") {
+		t.Fatalf("the proxy's own refusal is the answer: %+v", failure)
+	}
+}
+
+// Outside a session proxy, a refused GraphQL draft change is answered with
+// GitHub's refusal, not with the 404 of the proxy route.
+func TestUpsertReportsAGraphQLRefusalOutsideASessionProxy(t *testing.T) {
+	h := newHarness(t)
+	h.ok("proposals", "upsert", `{"change":{"base":"main","head":"topic-a"},"title":"Draft","draft":true}`, &collab.ProposalUpsertResult{})
+	h.fake.fail("POST", `^/graphql$`, fault{before: true, status: 403, body: `{"message":"Resource protected by organization SAML enforcement"}`})
+	failure := h.fails("proposals", "upsert", `{"change":{"base":"main","head":"topic-a"},"title":"Draft","draft":false}`, collab.OutcomeDenied)
+	if failure.Reason != reasonForbidden || !strings.Contains(failure.Message, "SAML") {
+		t.Fatalf("GitHub's refusal is the answer: %+v", failure)
+	}
+}
+
 func TestUpsertEditsAndTogglesDraft(t *testing.T) {
 	h := newHarness(t)
 	var created collab.ProposalUpsertResult
