@@ -731,11 +731,15 @@ func TestContributorSpecSkillEditsTheExternalSpec(t *testing.T) {
 	section := strings.Join(strings.Fields(markdownSection(t, skill, "Find the spec the feature reads")), " ")
 	for _, want := range []string{
 		"`\"$PUTNAMI_CLI\" specs inspect <feature-id>`", "`source.path`",
+		"a file or a folder", "`spec.md` for `openspec` and `speckit`", "`requirements.md` for `kiro`",
+		"`features.spec_format_not_enabled`",
 		`"spec": {"format": "<format>", "path": "<path>"}`,
 		"`openspec`, `speckit`, `kiro` or `gherkin`",
 		"Do not create a native `specs/*.json` for the feature",
 		"Give every requirement you create or renumber an anchor",
 		"`<!-- putnami:id <segment-id> -->`", "`@putnami-id:<segment-id>`",
+		"in `speckit`, put the check's anchor on the line above the scenario",
+		"in `openspec`, the check is the normalized `#### Scenario:` name, and an anchor there is an error",
 		"Keep checks, thresholds and windows in `putnami.features.json`",
 		"`specs init <feature> --from <format>:<path>`",
 		"only when the owner asks for it",

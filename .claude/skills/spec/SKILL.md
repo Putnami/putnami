@@ -32,14 +32,22 @@ creation, publication, merge or delivery authority.
 
 ## Find the spec the feature reads
 
-Run `"$PUTNAMI_CLI" specs inspect <feature-id>` and edit the file it names in
+Run `"$PUTNAMI_CLI" specs validate`, then
+`"$PUTNAMI_CLI" specs inspect <feature-id>`, which names the spec in
 `source.path`. A feature's entry in `putnami.features.json` either has no
 `spec` member, and its spec is the native `specs/*.json` file, or names an
 external spec as `"spec": {"format": "<format>", "path": "<path>"}`. An
-external spec is a file in a market format: `openspec`, `speckit`, `kiro` or
-`gherkin`. Its `path` is relative to the workspace root, and the external file
+external spec is written in a market format: `openspec`, `speckit`, `kiro` or
+`gherkin`. Its `path` is relative to the workspace root, and the external spec
 is then the one home of the feature's outcomes, non-goals and requirement
-texts.
+texts. A `features.spec_format_not_enabled` finding means the project must
+list the format in `options.sdd.specFormats`; it never means writing a native
+spec.
+
+`source.path` is the manifest's `path`, a file or a folder. In a folder, edit
+only the file the format reads: `spec.md` for `openspec` and `speckit`,
+`requirements.md` for `kiro`, the `.feature` files for `gherkin`. Other files
+beside it, such as `plan.md`, `tasks.md` or `design.md`, are not the spec.
 
 For an external spec:
 
@@ -58,8 +66,10 @@ For an external spec:
   the criteria below it.
 - Keep checks, thresholds and windows in `putnami.features.json`. A scenario
   in the file is compared with the declared checks and never adds or removes
-  one. To join a scenario to its check, put the anchor of that check on the
-  line above the scenario.
+  one. Each format joins a scenario to its check in its own way: in `speckit`,
+  put the check's anchor on the line above the scenario; in `openspec`, the
+  check is the normalized `#### Scenario:` name, and an anchor there is an
+  error. `kiro` has no scenarios.
 - Do not restate derived facts, such as status, dates, branches, routes or
   entities, and keep each requirement text within 512 bytes.
 - Propose `specs init <feature> --from <format>:<path>`, the rewrite to a
