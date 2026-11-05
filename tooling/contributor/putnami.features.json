@@ -326,7 +326,8 @@
               "agent-stage-falls-back-to-the-session-of-the-checkout",
               "agent-stage-records-the-stage-for-the-first-sync",
               "agent-stage-refuses-an-unknown-stage-and-a-missing-session",
-              "agent-stage-prints-the-tokens-so-far"
+              "agent-stage-prints-the-tokens-so-far",
+              "agent-stage-says-why-no-session-is-found"
             ]
           }
         }
