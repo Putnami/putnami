@@ -402,36 +402,6 @@ func compareFileScenarios(projection SpecProjection, declared map[string][]strin
 	return findings
 }
 
-// NormalizeRequirementName maps a name-based requirement to its ID. It
-// lowercases ASCII letters, keeps ASCII digits, turns each other run of
-// characters, non-ASCII ones included, into one hyphen and trims the ends. A
-// name with nothing left, or longer than the bound, has no ID. (D-057)
-func NormalizeRequirementName(name string) (string, bool) {
-	var out strings.Builder
-	pending := false
-	for i := 0; i < len(name); i++ {
-		c := name[i]
-		switch {
-		case c >= 'A' && c <= 'Z':
-			c += 'a' - 'A'
-		case c >= 'a' && c <= 'z', c >= '0' && c <= '9':
-		default:
-			pending = true
-			continue
-		}
-		if pending && out.Len() > 0 {
-			out.WriteByte('-')
-		}
-		pending = false
-		out.WriteByte(c)
-	}
-	id := out.String()
-	if id == "" || len(id) > requirementNameMaxLength {
-		return "", false
-	}
-	return id, true
-}
-
 // requirementIDFromName gives a requirement with no anchor the ID its name maps
 // to. A name that maps to none takes requirement-<ordinal>, its 1-based place
 // among the requirements, so the ID comes from its position: the requirement is

@@ -124,7 +124,7 @@ A Spec Kit or Kiro requirement is numbered by its position: `FR-001`, or criteri
 - **FR-001**: An export MUST state its format in the response content type.
 ```
 
-An OpenSpec requirement or a Gherkin requirement needs no anchor, because its ID is its name in kebab case: `### Requirement: Export as PDF` is `export-as-pdf`. Anchor it when you rename it, or when its name holds a non-ASCII character. In a Gherkin file, the anchor is the tag `@putnami-id:export-format` among the tags above the `Rule:`, or above the `Feature:` when the file has no `Rule:`.
+An OpenSpec requirement or a Gherkin requirement needs no anchor, because its ID is its name in kebab case: `### Requirement: Export as PDF` is `export-as-pdf`. An accented letter keeps its base letter: `Überprüfung` is `uberprufung`. A letter with no ASCII form, such as `ß` or a CJK character, counts as a separator: `Straße` is `stra-e`. Anchor a requirement when you rename it, or when its name leaves nothing, such as `日本語`, because `enforce` refuses its positional ID `requirement-<n>`. In a Gherkin file, the anchor is the tag `@putnami-id:export-format` among the tags above the `Rule:`, or above the `Feature:` when the file has no `Rule:`.
 
 An anchor above a scenario names the check it stands for. In a Gherkin file, that tag is `@putnami-check:<id>` on the `Scenario:`. Without one, the scenario's check is its text in kebab case. A scenario only ever produces a warning: it never adds a check and never removes one.
 

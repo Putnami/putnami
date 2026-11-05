@@ -137,9 +137,13 @@ Entities section gives `features.spec_derived_fact`.
 
 Every reader shares two rules, which `ReadSpecSource` applies:
 
-- A name maps to an ID with each run of characters other than ASCII letters and
-  digits, non-ASCII ones included, turned into one hyphen: `Règle d'or` is
-  `r-gle-d-or`. A name with nothing left, such as `日本語`, takes
+- A name maps to an ID through Unicode NFKD less its combining marks, then
+  with each run of characters other than ASCII letters and digits turned into
+  one hyphen: `Règle d'or` is `regle-d-or`, and `Straße` is `stra-e`, because
+  `ß` has no ASCII decomposition. `unicode/ascii-fold.json` holds the NFKD
+  table, since Go has none in its standard library, and
+  `fixtures/equivalence/requirement-ids.golden.json` pins the IDs Go and
+  TypeScript give. A name with nothing left, such as `日本語`, takes
   `requirement-<n>` from its place and is unanchored, so `enforce` asks for an
   anchor. A scenario name maps to its check by the same rule, and a scenario
   whose name maps to nothing has no check, so it gives a mismatch warning.

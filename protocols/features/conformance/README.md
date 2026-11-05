@@ -27,6 +27,15 @@ accepts, the same bytes before any of them can gate on one. It also pins what an
 observation may *not* say — no issuer, project, source binding, threshold, or
 objective verdict.
 
+`requirement-ids.golden.json` pins the ID each name maps to under D-057, or
+none. Go reads it in `TestGoldenNamesMapToGoldenIDs`, through the committed
+NFKD table `unicode/ascii-fold.json`. The TypeScript test of
+`@putnami/application` maps the same names with the runtime's NFKD, and derives
+the table from it, so a table that drifts from Unicode fails there. That test,
+run with `PUTNAMI_UPDATE_GOLDEN=1`, is the only writer of the table. The
+table's `unicode` member pins its Unicode version: a bump adds code points,
+never changes an entry, and is reviewed as a change to D-057.
+
 `human-authored-spec.golden.json` has no producer on purpose: nothing mints a
 spec, because a spec only details a feature some other declaration already
 authored. Its `authors` value is therefore `human`, and the vector exists so

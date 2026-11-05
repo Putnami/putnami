@@ -62,7 +62,7 @@
     },
     {
       "id": "requirement-identity-mapping",
-      "text": "A requirement name becomes an ID by one mapping: lowercase ASCII letters, keep ASCII digits, turn each other run, non-ASCII included, into one hyphen, trim the ends. A name with nothing left or over 128 bytes has no ID: it takes requirement-<ordinal> and is unanchored. An anchor stands alone above its requirement, and its ID follows the native segment grammar."
+      "text": "A requirement name becomes an ID by one mapping: decompose it to Unicode NFKD and drop combining marks, lowercase ASCII letters, keep ASCII digits, turn each other run into one hyphen, trim the ends. A name with nothing left or over 128 bytes has no ID: it takes requirement-<ordinal> and is unanchored. An anchor stands alone above its requirement, and its ID follows the native segment grammar."
     },
     {
       "id": "spec-format-policy",
