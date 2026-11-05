@@ -101,7 +101,7 @@ func missionTitle(key string) string {
 
 // checkoutBranch reads the branch of the checkout, or "" on a detached HEAD:
 // the one case where `git symbolic-ref -q` exits with status 1. Any other
-// failure, such as a git that outlives gitTimeout, is an error, never a
+// failure, such as a git stopped at its caller's deadline, is an error, never a
 // detached HEAD.
 func (e *Env) checkoutBranch(ctx context.Context, root string) (string, error) {
 	branch, err := e.git(ctx, root, "symbolic-ref", "--short", "-q", "HEAD")
@@ -118,7 +118,7 @@ func (e *Env) checkoutBranch(ctx context.Context, root string) (string, error) {
 // originRepository is the lowercase owner/name of the checkout's origin
 // remote, or "" when origin names no such repository, such as a local path,
 // or when git answers that there is no origin. A git that fails otherwise,
-// such as one past gitTimeout, is an error.
+// such as one stopped at its caller's deadline, is an error.
 func (e *Env) originRepository(ctx context.Context, root string) (string, error) {
 	remote, err := e.git(ctx, root, "remote", "get-url", "origin")
 	var exit gitExit

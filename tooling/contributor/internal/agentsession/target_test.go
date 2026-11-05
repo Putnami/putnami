@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"go.putnami.dev/protocol/features/spectest"
 )
@@ -215,5 +216,44 @@ func TestTheWorkspaceRootIsTheNearestManifest(t *testing.T) {
 	}
 	if canonicalRoot(" ") != "" {
 		t.Error("a blank root resolved")
+	}
+}
+
+// A git takes what is left of its caller's budget, never a shorter bound of
+// its own: a git that a loaded machine slows down still answers the branch
+// and the origin, and attach, with no budget, waits for it.
+func TestAGitRunsWithinItsCallersBudget(t *testing.T) {
+	spectest.Proves(t, sessionFeature, budgetRequirement, "the-budgets-fit-the-declared-timeouts")
+	h := newHarness(t)
+	working := h.env.Git
+	var deadlines []time.Time
+	var bounded []bool
+	h.env.Git = func(ctx context.Context, dir string, args ...string) (string, error) {
+		deadline, ok := ctx.Deadline()
+		deadlines, bounded = append(deadlines, deadline), append(bounded, ok)
+		return working(ctx, dir, args...)
+	}
+	budget := time.Date(2100, 1, 1, 0, 0, 0, 0, time.UTC)
+	ctx, cancel := context.WithDeadline(context.Background(), budget)
+	defer cancel()
+	if branch, err := h.env.checkoutBranch(ctx, h.root); branch != sessionBranch || err != nil {
+		t.Fatalf("branch %q, %v", branch, err)
+	}
+	if repository, err := h.env.originRepository(ctx, h.root); repository == "" || err != nil {
+		t.Fatalf("repository %q, %v", repository, err)
+	}
+	for i, deadline := range deadlines {
+		if !bounded[i] || !deadline.Equal(budget) {
+			t.Errorf("git %d ran with deadline %v (%v), want the caller's %v", i, deadline, bounded[i], budget)
+		}
+	}
+
+	deadlines, bounded = nil, nil
+	var stdout, stderr bytes.Buffer
+	if code := Attach(context.Background(), h.env, []string{"--issue", "7"}, &stdout, &stderr); code != 0 {
+		t.Fatalf("attach exit %d, stderr %q", code, stderr.String())
+	}
+	if len(bounded) != 1 || bounded[0] {
+		t.Errorf("attach ran git with deadlines %v (%v), want none", deadlines, bounded)
 	}
 }

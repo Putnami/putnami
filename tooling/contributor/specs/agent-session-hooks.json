@@ -38,7 +38,7 @@
     },
     {
       "id": "bounded-calls",
-      "text": "Each event stops 5 s before the timeout its manifest entry declares, each call takes at most 10 s of what is left, and the common longest path of each event, its git commands, calls and waits, fits that budget."
+      "text": "Each event stops 5 s before the timeout its manifest entry declares, each call takes at most 10 s of what is left, a git command takes what is left with no bound of its own, and the calls and waits of the common longest path of each event fit that budget."
     },
     {
       "id": "mission-target",
