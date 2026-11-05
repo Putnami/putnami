@@ -297,7 +297,7 @@ func TestEnforceFailsAnInsertedSpecKitRequirementWithoutAnAnchor(t *testing.T) {
 func TestEnforceFailsANeedsClarificationMarker(t *testing.T) {
 	spectest.Proves(t, "tooling/specification-driven-development", "enforce-needs-anchors", "enforce-fails-a-needs-clarification-marker")
 	spec := strings.Replace(specKitAnchored, "export.", "export [NEEDS CLARIFICATION: where?].", 1)
-	want := featureproto.WarningCodeSpecNeedsClarification + "@app/specs/001-invoice-export/spec.md#L4"
+	want := featureproto.FindingCodeSpecNeedsClarification + "@app/specs/001-invoice-export/spec.md#L4"
 	enforce := discoverSpecKit(t, specKitWorkspace(t, "enforce", spec)).Diagnostics
 	if findingCodes(enforce) != want || !diag.HasErrors(enforce) {
 		t.Fatalf("enforce = %v", enforce)

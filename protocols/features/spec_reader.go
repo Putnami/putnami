@@ -132,9 +132,11 @@ type SpecReading struct {
 	// Scenarios lists, in file order, the scenarios that belong to the file and
 	// not to one requirement. Nil says the format has none.
 	Scenarios []SpecScenario
-	// TextPositions locates a spec field the records do not, such as
-	// "outcomes[0]" or "nonGoals[1]", so a finding on it points at its line.
-	TextPositions map[string]SpecPosition
+	// OutcomePositions is parallel to Spec.Outcomes and NonGoalPositions to
+	// Spec.NonGoals, so a finding on that text points at its line. A format that
+	// does not locate them leaves them nil.
+	OutcomePositions []SpecPosition
+	NonGoalPositions []SpecPosition
 	// Findings are positioned diagnostics; build them with SpecPosition.Field.
 	Findings []diag.Diagnostic
 	// EnforceFindings are warnings that block only in enforce. A reader does not
@@ -159,9 +161,9 @@ type SpecProjection struct {
 	Scenarios []SpecScenario
 	// Findings are the sorted reader and contract findings.
 	Findings []diag.Diagnostic
-	// EnforceFindings are the reading's enforce findings, nil when Spec is nil.
-	// Read them through EnforceOnly.
-	EnforceFindings []diag.Diagnostic
+	// enforceFindings are the reading's enforce findings, nil when Spec is nil.
+	// EnforceOnly is their one reader, so no caller forgets the mode.
+	enforceFindings []diag.Diagnostic
 }
 
 // EnforceOnly returns what depends on the verification mode. In enforce, an
@@ -170,8 +172,8 @@ type SpecProjection struct {
 // enforce finding stays a warning and an unanchored requirement has no finding.
 func (projection SpecProjection) EnforceOnly(mode VerificationMode) []diag.Diagnostic {
 	enforce := mode == VerificationModeEnforce
-	findings := make([]diag.Diagnostic, 0, len(projection.EnforceFindings))
-	for _, finding := range projection.EnforceFindings {
+	findings := make([]diag.Diagnostic, 0, len(projection.enforceFindings))
+	for _, finding := range projection.enforceFindings {
 		if enforce {
 			finding.Severity = diag.Error
 		}
@@ -255,7 +257,7 @@ func finishProjection(spec *Spec, reading SpecReading, findings []diag.Diagnosti
 	sortDiagnostics(findings)
 	return SpecProjection{
 		Spec: spec, Requirements: reading.Requirements, Scenarios: reading.Scenarios,
-		Findings: findings, EnforceFindings: reading.EnforceFindings,
+		Findings: findings, enforceFindings: reading.EnforceFindings,
 	}
 }
 
@@ -263,21 +265,33 @@ func finishProjection(spec *Spec, reading SpecReading, findings []diag.Diagnosti
 // finding on a requirement or a located text to its line, and any other to the
 // reference.
 func specFindingField(field, referencePath string, reading SpecReading) string {
-	if position, located := reading.TextPositions[field]; located {
-		return position.Field()
+	if index, found := specFieldIndex(field, "requirements["); found && index < len(reading.Requirements) {
+		return reading.Requirements[index].Position.Field()
 	}
-	records := reading.Requirements
-	if rest, found := strings.CutPrefix(field, "requirements["); found {
-		if digits, _, closed := strings.Cut(rest, "]"); closed {
-			if index, err := strconv.Atoi(digits); err == nil && index >= 0 && index < len(records) {
-				return records[index].Position.Field()
-			}
-		}
+	if index, found := specFieldIndex(field, "outcomes["); found && index < len(reading.OutcomePositions) {
+		return reading.OutcomePositions[index].Field()
+	}
+	if index, found := specFieldIndex(field, "nonGoals["); found && index < len(reading.NonGoalPositions) {
+		return reading.NonGoalPositions[index].Field()
 	}
 	if field == "" {
 		return referencePath
 	}
 	return referencePath + "#" + field
+}
+
+// specFieldIndex reads the index of a field such as "outcomes[2]".
+func specFieldIndex(field, prefix string) (int, bool) {
+	rest, found := strings.CutPrefix(field, prefix)
+	if !found {
+		return 0, false
+	}
+	digits, _, closed := strings.Cut(rest, "]")
+	if !closed {
+		return 0, false
+	}
+	index, err := strconv.Atoi(digits)
+	return index, err == nil && index >= 0
 }
 
 // CompareSpecScenarios compares a projection's scenarios with the checks its

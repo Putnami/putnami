@@ -1,7 +1,6 @@
 package features
 
 import (
-	"fmt"
 	"path"
 	"regexp"
 	"strings"
@@ -27,10 +26,11 @@ const (
 
 var (
 	specKitHeading     = regexp.MustCompile(`^ {0,3}(#{1,6})[ \t]+(.*?)[ \t]*#*[ \t]*$`)
-	specKitFence       = regexp.MustCompile("^ {0,3}(`{3,}|~{3,})")
+	specKitFence       = regexp.MustCompile("^[ \\t]*(`{3,}|~{3,})")
 	specKitBreak       = regexp.MustCompile(`^ {0,3}(?:-{3,}|\*{3,}|_{3,})[ \t]*$`)
-	specKitListItem    = regexp.MustCompile(`^ {0,3}(?:[-*+]|[0-9]+[.)])[ \t]+(.*)$`)
+	specKitListItem    = regexp.MustCompile(`^[ \t]*(?:[-*+]|[0-9]+[.)])[ \t]+(.*)$`)
 	specKitLabel       = regexp.MustCompile(`^\*\*((?:FR|SC)-[0-9]+[A-Za-z]?)(?::\*\*|\*\*[ \t]*:?)[ \t]*(.*)$`)
+	specKitLooseLabel  = regexp.MustCompile(`^(?:\*\*FR-[0-9]+[A-Za-z]?(?:\*\*|:)|FR-[0-9]+[A-Za-z]?:)`)
 	specKitScenario    = regexp.MustCompile(`(?i)^(?:\*\*)?given\b`)
 	specKitMetadata    = regexp.MustCompile(`^\*\*(Feature Branch|Created|Status)\*\*:`)
 	specKitMarker      = regexp.MustCompile(`\[NEEDS CLARIFICATION(?::[^\]]*)?\]`)
@@ -53,12 +53,16 @@ func (specKitReader) Read(input SpecInput) SpecReading {
 	}
 	scan := specKitScan{
 		file:    file.Path,
-		reading: SpecReading{Spec: &Spec{}, Scenarios: []SpecScenario{}, TextPositions: map[string]SpecPosition{}},
+		reading: SpecReading{Spec: &Spec{}, Scenarios: []SpecScenario{}},
 	}
-	for index, line := range strings.Split(string(file.Data), "\n") {
+	text := strings.TrimPrefix(string(file.Data), "\ufeff")
+	for index, line := range strings.Split(text, "\n") {
 		scan.line(strings.TrimRight(line, "\r"), index+1)
 	}
-	scan.settleAnchor()
+	scan.finish()
+	if scan.reading.Spec == nil {
+		return scan.reading
+	}
 	for i := range scan.reading.Scenarios {
 		if scenario := &scan.reading.Scenarios[i]; scenario.Check == "" {
 			scenario.Check, _ = NormalizeRequirementName(scenario.Name)
@@ -88,12 +92,16 @@ type specKitScan struct {
 	file    string
 	reading SpecReading
 
-	inComment    bool
-	fence        string
-	section      specKitSection
-	sectionLevel int
-	pastHeader   bool
-	anchor       *specKitAnchor
+	inComment       bool
+	commentStart    SpecPosition
+	fence           string
+	fenceStart      SpecPosition
+	section         specKitSection
+	sectionLevel    int
+	criteriaHeading SpecPosition
+	pastHeader      bool
+	afterBlank      bool
+	anchor          *specKitAnchor
 	// extend appends a continuation line to the list item above, nil when the
 	// line above ended it.
 	extend func(text string)
@@ -101,7 +109,7 @@ type specKitScan struct {
 
 func (scan *specKitScan) line(raw string, number int) {
 	position := SpecPosition{File: scan.file, Line: number}
-	if scan.fenced(raw) {
+	if scan.fenced(raw, position) {
 		scan.endItem()
 		return
 	}
@@ -117,9 +125,18 @@ func (scan *specKitScan) line(raw string, number int) {
 			return
 		}
 	}
-	text := scan.stripComments(raw)
+	text := scan.stripComments(raw, position)
+	if strings.TrimSpace(text) == "" {
+		scan.blank()
+		return
+	}
+	indented := specKitIndented(text)
+	if scan.afterBlank && !indented {
+		scan.endItem()
+	}
+	scan.afterBlank = false
 	for _, marker := range specKitMarker.FindAllString(specKitInlineCode.ReplaceAllString(text, ""), -1) {
-		scan.reading.EnforceFindings = append(scan.reading.EnforceFindings, diag.Warningf(WarningCodeSpecNeedsClarification, position.Field(),
+		scan.reading.EnforceFindings = append(scan.reading.EnforceFindings, diag.Warningf(FindingCodeSpecNeedsClarification, position.Field(),
 			"%s is open: answer it before this project can enforce specs", marker))
 	}
 	if heading := specKitHeading.FindStringSubmatch(text); heading != nil {
@@ -136,25 +153,74 @@ func (scan *specKitScan) line(raw string, number int) {
 	item := specKitListItem.FindStringSubmatch(text)
 	switch {
 	case scan.section == specKitRequirements && scan.requirement(text, position):
+	case scan.section == specKitSuccessCriteria && scan.outcome(text, position):
+	case item != nil && indented && scan.extend != nil:
+		scan.settleAnchor()
+		scan.extend(strings.TrimSpace(text))
 	case scan.section == specKitUserStory && item != nil && specKitScenario.MatchString(item[1]):
 		scan.scenario(item[1], position)
-	case scan.section == specKitSuccessCriteria && scan.outcome(text, position):
 	case scan.section == specKitOutOfScope && item != nil:
 		scan.nonGoal(item[1], position)
 	default:
 		scan.settleAnchor()
-		trimmed := strings.TrimSpace(text)
-		if trimmed == "" || item != nil || specKitBreak.MatchString(text) {
+		scan.ignoredLabel(text, item, position)
+		if item != nil || specKitBreak.MatchString(text) {
 			scan.endItem()
 		} else if scan.extend != nil {
-			scan.extend(trimmed)
+			scan.extend(strings.TrimSpace(text))
 		}
+	}
+}
+
+// blank handles an empty line: it settles an anchor, and leaves a list item open
+// for an indented continuation.
+func (scan *specKitScan) blank() {
+	scan.settleAnchor()
+	scan.afterBlank = true
+}
+
+// specKitIndented reports whether a line starts with white space, which keeps
+// it inside the list item above it.
+func specKitIndented(text string) bool {
+	return text[0] == ' ' || text[0] == '\t'
+}
+
+// ignoredLabel warns on a line that looks like a requirement and projects
+// nothing, because the requirement would otherwise vanish in silence.
+func (scan *specKitScan) ignoredLabel(text string, item []string, position SpecPosition) {
+	body := strings.TrimSpace(text)
+	if item != nil {
+		body = item[1]
+	}
+	if specKitLooseLabel.MatchString(body) {
+		scan.reading.Findings = append(scan.reading.Findings, diag.Warningf(WarningCodeSpecRequirementIgnored, position.Field(),
+			"this requirement projects nothing: write it as **FR-xxx**: under Functional Requirements"))
+	}
+}
+
+// finish refuses what would otherwise hide text in silence: an anchor still
+// waiting, a comment or a fence that never closes, and a spec with no outcome.
+func (scan *specKitScan) finish() {
+	scan.settleAnchor()
+	if scan.inComment {
+		scan.fail(scan.commentStart, "this HTML comment never closes, and it hides the rest of the file")
+	}
+	if scan.fence != "" {
+		scan.fail(scan.fenceStart, "this code fence never closes, and it hides the rest of the file")
+	}
+	if len(scan.reading.Spec.Outcomes) == 0 {
+		position := scan.criteriaHeading
+		if position.File == "" {
+			position = SpecPosition{File: scan.file, Line: 1}
+		}
+		scan.fail(position, "a Spec Kit spec needs a **SC-xxx** item under Success Criteria: no outcome was found")
+		scan.reading.Spec = nil
 	}
 }
 
 // fenced reports whether the line opens, closes or lies inside a code fence. A
 // comment that is still open hides a fence.
-func (scan *specKitScan) fenced(raw string) bool {
+func (scan *specKitScan) fenced(raw string, position SpecPosition) bool {
 	if scan.inComment {
 		return false
 	}
@@ -163,7 +229,7 @@ func (scan *specKitScan) fenced(raw string) bool {
 		if match == nil {
 			return false
 		}
-		scan.fence = match[1]
+		scan.fence, scan.fenceStart = match[1], position
 		scan.settleAnchor()
 		return true
 	}
@@ -174,8 +240,8 @@ func (scan *specKitScan) fenced(raw string) bool {
 }
 
 // stripComments removes HTML comments from one line and tracks one that spans
-// lines.
-func (scan *specKitScan) stripComments(line string) string {
+// lines. An opening inside inline code is text.
+func (scan *specKitScan) stripComments(line string, position SpecPosition) string {
 	var kept strings.Builder
 	for line != "" {
 		if scan.inComment {
@@ -187,15 +253,40 @@ func (scan *specKitScan) stripComments(line string) string {
 			line = after
 			continue
 		}
-		before, after, opened := strings.Cut(line, "<!--")
-		kept.WriteString(before)
-		if !opened {
+		start := specKitCommentOpening(line)
+		if start < 0 {
+			kept.WriteString(line)
 			break
 		}
-		scan.inComment = true
-		line = after
+		kept.WriteString(line[:start])
+		scan.inComment, scan.commentStart = true, position
+		line = line[start+len("<!--"):]
 	}
 	return kept.String()
+}
+
+// specKitCommentOpening returns the offset of the first "<!--" outside inline
+// code, or -1.
+func specKitCommentOpening(line string) int {
+	spans := specKitInlineCode.FindAllStringIndex(line, -1)
+	from := 0
+	for {
+		found := strings.Index(line[from:], "<!--")
+		if found < 0 {
+			return -1
+		}
+		start := from + found
+		inside := false
+		for _, span := range spans {
+			if start >= span[0] && start < span[1] {
+				from, inside = span[1], true
+				break
+			}
+		}
+		if !inside {
+			return start
+		}
+	}
 }
 
 func (scan *specKitScan) heading(level int, title string, position SpecPosition) {
@@ -206,8 +297,11 @@ func (scan *specKitScan) heading(level int, title string, position SpecPosition)
 	switch {
 	case section != specKitNoSection:
 		scan.section, scan.sectionLevel = section, level
-		if section == specKitKeyEntities {
+		switch section {
+		case specKitKeyEntities:
 			scan.derivedFact(position, "Key Entities")
+		case specKitSuccessCriteria:
+			scan.criteriaHeading = position
 		}
 	case level <= scan.sectionLevel:
 		scan.section, scan.sectionLevel = specKitNoSection, 0
@@ -227,7 +321,7 @@ func specKitSectionOf(title string) specKitSection {
 		return specKitSuccessCriteria
 	case name == "out of scope":
 		return specKitOutOfScope
-	case name == "functional requirements":
+	case name == "requirements", name == "functional requirements":
 		return specKitRequirements
 	case name == "key entities":
 		return specKitKeyEntities
@@ -294,7 +388,7 @@ func (scan *specKitScan) outcome(text string, position SpecPosition) bool {
 	spec := scan.reading.Spec
 	spec.Outcomes = append(spec.Outcomes, body)
 	index := len(spec.Outcomes) - 1
-	scan.reading.TextPositions[fmt.Sprintf("outcomes[%d]", index)] = position
+	scan.reading.OutcomePositions = append(scan.reading.OutcomePositions, position)
 	scan.extend = func(more string) {
 		spec.Outcomes[index] = strings.TrimSpace(spec.Outcomes[index] + " " + more)
 	}
@@ -307,7 +401,7 @@ func (scan *specKitScan) nonGoal(text string, position SpecPosition) {
 	spec := scan.reading.Spec
 	spec.NonGoals = append(spec.NonGoals, strings.TrimSpace(text))
 	index := len(spec.NonGoals) - 1
-	scan.reading.TextPositions[fmt.Sprintf("nonGoals[%d]", index)] = position
+	scan.reading.NonGoalPositions = append(scan.reading.NonGoalPositions, position)
 	scan.extend = func(more string) {
 		spec.NonGoals[index] = strings.TrimSpace(spec.NonGoals[index] + " " + more)
 	}

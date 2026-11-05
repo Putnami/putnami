@@ -72,7 +72,8 @@ func TestSpecKitTemplateProjectsWithPositionedFindings(t *testing.T) {
 		t.Fatalf("requirements = %d, outcomes = %d, scenarios = %d", len(projection.Spec.Requirements), len(projection.Spec.Outcomes), len(projection.Scenarios))
 	}
 	file := specKitPath + "/spec.md#L"
-	for _, finding := range append(append([]diag.Diagnostic{}, projection.Findings...), projection.EnforceFindings...) {
+	markers := projection.EnforceOnly(features.VerificationModeReport)
+	for _, finding := range append(append([]diag.Diagnostic{}, projection.Findings...), markers...) {
 		if !strings.HasPrefix(finding.Field, file) {
 			t.Fatalf("unpositioned finding %v", finding)
 		}
@@ -80,8 +81,8 @@ func TestSpecKitTemplateProjectsWithPositionedFindings(t *testing.T) {
 	if got := len(projection.Findings); got != 4 {
 		t.Fatalf("derived facts = %v", projection.Findings)
 	}
-	if got := len(projection.EnforceFindings); got != 2 {
-		t.Fatalf("markers = %v", projection.EnforceFindings)
+	if got := len(markers); got != 2 {
+		t.Fatalf("markers = %v", markers)
 	}
 }
 
@@ -101,7 +102,7 @@ func TestSpecKitProcessFilesChangeNothing(t *testing.T) {
 	}))
 	first, _ := features.MarshalSpec(alone.Spec)
 	second, err := features.MarshalSpec(withProcess.Spec)
-	if err != nil || string(first) != string(second) || len(withProcess.Findings)+len(withProcess.EnforceFindings) != 0 {
+	if err != nil || string(first) != string(second) || len(withProcess.Findings) != 0 {
 		t.Fatalf("err = %v, spec = %s, findings = %v", err, second, withProcess.Findings)
 	}
 }
@@ -131,9 +132,9 @@ func TestCommentsAndCodeAreNotSpecText(t *testing.T) {
 		"```markdown\n## Functional Requirements\n- **FR-101**: Hidden. [NEEDS CLARIFICATION]\n```\n" +
 		"The `[NEEDS CLARIFICATION]` marker is documented here.\n\n" + specKitMinimal
 	projection := readSpecKit(t, text)
-	if projection.Spec == nil || len(projection.Spec.Requirements) != 1 || projection.Spec.Requirements[0].ID != "fr-001" ||
-		len(projection.EnforceFindings) != 0 {
-		t.Fatalf("spec = %+v, enforce = %v, findings = %v", projection.Spec, projection.EnforceFindings, projection.Findings)
+	markers := projection.EnforceOnly(features.VerificationModeReport)
+	if projection.Spec == nil || len(projection.Spec.Requirements) != 1 || projection.Spec.Requirements[0].ID != "fr-001" || len(markers) != 0 {
+		t.Fatalf("spec = %+v, markers = %v, findings = %v", projection.Spec, markers, projection.Findings)
 	}
 }
 
@@ -141,7 +142,7 @@ func TestSpecKitListItemsContinueAndSectionsEnd(t *testing.T) {
 	t.Parallel()
 	text := "## Out of Scope\n\n- First\n  goal.\n* Second goal.\n\n## Assumptions\n\n- Not a goal.\n\n" +
 		"## Functional Requirements\n\n### Export\n\n- **FR-001:** Bold colon\n  wraps.\n\n**FR-002**: No bullet.\n- Not labeled.\n\n" +
-		"## Notes\n\n- **FR-003**: Outside the section.\n\n## Success Criteria\r\n\r\n- **SC-001**: Windows line.\r\n"
+		"## Notes\n\n- A note.\n\n## Success Criteria\r\n\r\n- **SC-001**: Windows line.\r\n"
 	projection := readSpecKit(t, text)
 	if projection.Spec == nil {
 		t.Fatalf("findings = %v", projection.Findings)
@@ -198,7 +199,7 @@ func TestStraySpecKitAnchorIsAnError(t *testing.T) {
 		"a blank line":      {"<!-- putnami:id a -->\n\n" + specKitMinimal, file + "1"},
 		"above a paragraph": {"<!-- putnami:id a -->\nProse.\n\n" + specKitMinimal, file + "1"},
 		"at the end":        {specKitMinimal + "<!-- putnami:id a -->\n", file + "10"},
-		"two in a row":      {"<!-- putnami:id a -->\n<!-- putnami:id b -->\n", file + "1"},
+		"two in a row":      {"<!-- putnami:id a -->\n<!-- putnami:id b -->\n" + specKitMinimal, file + "1"},
 		"a bad grammar":     {"<!-- putnami:id Not_An_ID -->\n" + specKitMinimal, file + "1"},
 	}
 	for name, test := range cases {
@@ -217,7 +218,7 @@ func TestEachClarificationMarkerIsOneEnforceFinding(t *testing.T) {
 	if projection.Spec == nil || len(projection.Findings) != 0 {
 		t.Fatalf("got %+v", projection)
 	}
-	marker := features.WarningCodeSpecNeedsClarification + "@" + specKitPath + "/spec.md#L5"
+	marker := features.FindingCodeSpecNeedsClarification + "@" + specKitPath + "/spec.md#L5"
 	if got := codes(projection.EnforceOnly(features.VerificationModeReport)); got != marker+","+marker {
 		t.Fatalf("got %s", got)
 	}
@@ -281,7 +282,7 @@ func TestAnEnforceFindingFollowsTheMode(t *testing.T) {
 	if len(report) != 1 || report[0].Severity != diag.Warning || len(enforce) != 1 || enforce[0].Severity != diag.Error || enforce[0].Field != report[0].Field {
 		t.Fatalf("report = %v, enforce = %v", report, enforce)
 	}
-	if projection.EnforceFindings[0].Severity != diag.Warning {
+	if again := projection.EnforceOnly(features.VerificationModeReport); again[0].Severity != diag.Warning {
 		t.Fatal("EnforceOnly changed the projection")
 	}
 }
@@ -291,5 +292,67 @@ func TestReportSaysNothingAboutAnUnanchoredRequirement(t *testing.T) {
 	spectest.Proves(t, "features/feature-contracts", "enforce-only-findings", "report-says-nothing-about-an-unanchored-requirement")
 	if findings := readSpecKit(t, specKitMinimal).EnforceOnly(features.VerificationModeReport); len(findings) != 0 {
 		t.Fatalf("got %v", findings)
+	}
+}
+
+func TestANonGoalFindingNamesItsLine(t *testing.T) {
+	t.Parallel()
+	spectest.Proves(t, "features/feature-contracts", "spec-reader-contract", "a-non-goal-finding-names-its-line")
+	projection := readSpecKit(t, specKitMinimal+"\n## Out of Scope\n\n- "+strings.Repeat("a", 513)+"\n")
+	if projection.Spec != nil || len(projection.Findings) != 1 || projection.Findings[0].Field != specKitPath+"/spec.md#L13" {
+		t.Fatalf("got %s", codes(projection.Findings))
+	}
+}
+
+func TestANestedItemStaysInItsRequirement(t *testing.T) {
+	t.Parallel()
+	spectest.Proves(t, "features/feature-contracts", "speckit-projection", "a-nested-item-stays-in-its-requirement")
+	text := "## Requirements\n\n- **FR-001**: System MUST export in:\n  - CSV\n  - JSON\n\n    Both are UTF-8.\n- **FR-002**: Second.\n\t- **FR-003**: Tab indented.\n\n" +
+		"## Success Criteria\n\n- **SC-001**: Done.\n\n## Out of Scope\n\n- Goal:\n  - detail\n- Other.\n"
+	projection := readSpecKit(t, text)
+	if projection.Spec == nil {
+		t.Fatalf("findings = %v", projection.Findings)
+	}
+	spec := projection.Spec
+	if len(spec.Requirements) != 3 || spec.Requirements[0].Text != "System MUST export in: - CSV - JSON Both are UTF-8." ||
+		spec.Requirements[2].ID != "fr-003" || strings.Join(spec.NonGoals, "|") != "Goal: - detail|Other." {
+		t.Fatalf("spec = %+v", spec)
+	}
+}
+
+func TestSpecKitSpecWithNoOutcomeIsAnErrorAtALine(t *testing.T) {
+	t.Parallel()
+	spectest.Proves(t, "features/feature-contracts", "speckit-projection", "a-speckit-spec-with-no-outcome-is-an-error-at-a-line")
+	file := features.ErrorCodeSpecRead + "@" + specKitPath + "/spec.md#L"
+	if got := codes(readSpecKit(t, "# Feature\n\n## Success Criteria\n\nProse only.\n").Findings); got != file+"3" {
+		t.Fatalf("got %s", got)
+	}
+	if got := codes(readSpecKit(t, "\ufeff# Feature\n").Findings); got != file+"1" {
+		t.Fatalf("got %s", got)
+	}
+}
+
+func TestAnUnclosedCommentOrFenceIsAnError(t *testing.T) {
+	t.Parallel()
+	spectest.Proves(t, "features/feature-contracts", "speckit-projection", "an-unclosed-comment-or-fence-is-an-error")
+	file := features.ErrorCodeSpecRead + "@" + specKitPath + "/spec.md#L"
+	for name, opening := range map[string]string{"comment": "<!-- open", "fence": "```"} {
+		if got := codes(readSpecKit(t, specKitMinimal+"\n"+opening+"\nHidden.\n").Findings); got != file+"11" {
+			t.Fatalf("%s: got %s", name, got)
+		}
+	}
+	if projection := readSpecKit(t, "Write `<!--` to open a comment.\n\n"+specKitMinimal); projection.Spec == nil {
+		t.Fatalf("inline code: %s", codes(projection.Findings))
+	}
+}
+
+func TestAnFRLabelThatProjectsNothingIsAWarning(t *testing.T) {
+	t.Parallel()
+	spectest.Proves(t, "features/feature-contracts", "speckit-findings", "an-fr-label-that-projects-nothing-is-a-warning")
+	text := specKitMinimal + "\n## Notes\n\n- **FR-002**: Outside the section.\n- FR-003: Unbolded.\n- FR-001 is mentioned in prose.\n"
+	projection := readSpecKit(t, text)
+	code := features.WarningCodeSpecRequirementIgnored + "@" + specKitPath + "/spec.md#L"
+	if projection.Spec == nil || codes(projection.Findings) != code+"13,"+code+"14" {
+		t.Fatalf("got %s", codes(projection.Findings))
 	}
 }
