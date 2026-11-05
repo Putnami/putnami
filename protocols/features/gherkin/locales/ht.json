@@ -1,0 +1,28 @@
+{
+  "feature": [
+    "Karakteristik",
+    "Mak",
+    "Fonksyonalite"
+  ],
+  "rule": [
+    "Rule"
+  ],
+  "background": [
+    "Kontèks",
+    "Istorik"
+  ],
+  "scenario": [
+    "Senaryo"
+  ],
+  "scenarioOutline": [
+    "Plan senaryo",
+    "Plan Senaryo",
+    "Senaryo deskripsyon",
+    "Senaryo Deskripsyon",
+    "Dyagram senaryo",
+    "Dyagram Senaryo"
+  ],
+  "examples": [
+    "Egzanp"
+  ]
+}

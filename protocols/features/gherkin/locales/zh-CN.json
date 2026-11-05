@@ -1,0 +1,23 @@
+{
+  "feature": [
+    "功能"
+  ],
+  "rule": [
+    "Rule",
+    "规则"
+  ],
+  "background": [
+    "背景"
+  ],
+  "scenario": [
+    "场景",
+    "剧本"
+  ],
+  "scenarioOutline": [
+    "场景大纲",
+    "剧本大纲"
+  ],
+  "examples": [
+    "例子"
+  ]
+}

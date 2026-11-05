@@ -1,0 +1,22 @@
+{
+  "feature": [
+    "Fonctionnalité"
+  ],
+  "rule": [
+    "Règle"
+  ],
+  "background": [
+    "Contexte"
+  ],
+  "scenario": [
+    "Exemple",
+    "Scénario"
+  ],
+  "scenarioOutline": [
+    "Plan du scénario",
+    "Plan du Scénario"
+  ],
+  "examples": [
+    "Exemples"
+  ]
+}

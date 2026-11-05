@@ -230,6 +230,17 @@ default is empty, and a project's list replaces the workspace's.
   <response>`.
 - A localized Kiro file fails with an error at line 1: the reader recognizes
   only the English `Introduction` and `Requirement N` headings.
+- A `gherkin` reference names a `.feature` file, or a directory whose `.feature`
+  files it reads in path order. Each paragraph of a `Feature:` description
+  becomes an outcome, else the Feature name. Each `Rule:` becomes a
+  requirement. So does a Feature with no rule, or with scenarios outside its
+  rules. Steps, `Background:` and `Examples:` project nothing.
+- A Gherkin scenario belongs to its Rule, else its Feature, and is compared with
+  that requirement's declared checks. Its check is its `@putnami-check:<id>`
+  tag, else its normalized name. A Rule's ID is its `@putnami-id:<id>` tag, else
+  its normalized name. A tag may share its line with other tags.
+- A `# language:` header reads the file in that language, such as
+  `# language: fr`.
 
 ## The validation jobs
 

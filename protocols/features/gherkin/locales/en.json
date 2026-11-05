@@ -1,0 +1,25 @@
+{
+  "feature": [
+    "Feature",
+    "Business Need",
+    "Ability"
+  ],
+  "rule": [
+    "Rule"
+  ],
+  "background": [
+    "Background"
+  ],
+  "scenario": [
+    "Example",
+    "Scenario"
+  ],
+  "scenarioOutline": [
+    "Scenario Outline",
+    "Scenario Template"
+  ],
+  "examples": [
+    "Examples",
+    "Scenarios"
+  ]
+}

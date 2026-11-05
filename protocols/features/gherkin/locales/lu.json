@@ -1,0 +1,21 @@
+{
+  "feature": [
+    "Funktionalitéit"
+  ],
+  "rule": [
+    "Rule"
+  ],
+  "background": [
+    "Hannergrond"
+  ],
+  "scenario": [
+    "Beispill",
+    "Szenario"
+  ],
+  "scenarioOutline": [
+    "Plang vum Szenario"
+  ],
+  "examples": [
+    "Beispiller"
+  ]
+}

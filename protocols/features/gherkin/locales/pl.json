@@ -1,0 +1,25 @@
+{
+  "feature": [
+    "Właściwość",
+    "Funkcja",
+    "Aspekt",
+    "Potrzeba biznesowa"
+  ],
+  "rule": [
+    "Zasada",
+    "Reguła"
+  ],
+  "background": [
+    "Założenia"
+  ],
+  "scenario": [
+    "Przykład",
+    "Scenariusz"
+  ],
+  "scenarioOutline": [
+    "Szablon scenariusza"
+  ],
+  "examples": [
+    "Przykłady"
+  ]
+}

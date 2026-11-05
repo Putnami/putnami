@@ -1,0 +1,24 @@
+{
+  "feature": [
+    "Característica",
+    "Necesidad del negocio",
+    "Requisito"
+  ],
+  "rule": [
+    "Regla",
+    "Regla de negocio"
+  ],
+  "background": [
+    "Antecedentes"
+  ],
+  "scenario": [
+    "Ejemplo",
+    "Escenario"
+  ],
+  "scenarioOutline": [
+    "Esquema del escenario"
+  ],
+  "examples": [
+    "Ejemplos"
+  ]
+}

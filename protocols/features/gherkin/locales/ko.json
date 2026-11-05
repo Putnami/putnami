@@ -1,0 +1,20 @@
+{
+  "feature": [
+    "기능"
+  ],
+  "rule": [
+    "규칙"
+  ],
+  "background": [
+    "배경"
+  ],
+  "scenario": [
+    "시나리오"
+  ],
+  "scenarioOutline": [
+    "시나리오 개요"
+  ],
+  "examples": [
+    "예"
+  ]
+}

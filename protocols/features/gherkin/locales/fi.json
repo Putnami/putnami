@@ -1,0 +1,20 @@
+{
+  "feature": [
+    "Ominaisuus"
+  ],
+  "rule": [
+    "Rule"
+  ],
+  "background": [
+    "Tausta"
+  ],
+  "scenario": [
+    "Tapaus"
+  ],
+  "scenarioOutline": [
+    "Tapausaihio"
+  ],
+  "examples": [
+    "Tapaukset"
+  ]
+}

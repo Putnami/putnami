@@ -1,0 +1,21 @@
+{
+  "feature": [
+    "Fitur"
+  ],
+  "rule": [
+    "Rule"
+  ],
+  "background": [
+    "Dasar"
+  ],
+  "scenario": [
+    "Skenario"
+  ],
+  "scenarioOutline": [
+    "Konsep skenario"
+  ],
+  "examples": [
+    "Conto",
+    "Contone"
+  ]
+}

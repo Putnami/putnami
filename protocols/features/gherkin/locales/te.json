@@ -1,0 +1,21 @@
+{
+  "feature": [
+    "గుణము"
+  ],
+  "rule": [
+    "Rule"
+  ],
+  "background": [
+    "నేపథ్యం"
+  ],
+  "scenario": [
+    "ఉదాహరణ",
+    "సన్నివేశం"
+  ],
+  "scenarioOutline": [
+    "కథనం"
+  ],
+  "examples": [
+    "ఉదాహరణలు"
+  ]
+}

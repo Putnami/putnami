@@ -1,0 +1,21 @@
+{
+  "feature": [
+    "Egenskap"
+  ],
+  "rule": [
+    "Regel"
+  ],
+  "background": [
+    "Bakgrund"
+  ],
+  "scenario": [
+    "Scenario"
+  ],
+  "scenarioOutline": [
+    "Abstrakt Scenario",
+    "Scenariomall"
+  ],
+  "examples": [
+    "Exempel"
+  ]
+}

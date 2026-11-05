@@ -1,0 +1,29 @@
+{
+  "feature": [
+    "Funkcionalnost",
+    "Mogućnost",
+    "Mogucnost",
+    "Osobina"
+  ],
+  "rule": [
+    "Pravilo"
+  ],
+  "background": [
+    "Kontekst",
+    "Osnova",
+    "Pozadina"
+  ],
+  "scenario": [
+    "Scenario",
+    "Primer"
+  ],
+  "scenarioOutline": [
+    "Struktura scenarija",
+    "Skica",
+    "Koncept"
+  ],
+  "examples": [
+    "Primeri",
+    "Scenariji"
+  ]
+}

@@ -1,0 +1,24 @@
+{
+  "feature": [
+    "Funkcionalitāte",
+    "Fīča"
+  ],
+  "rule": [
+    "Rule"
+  ],
+  "background": [
+    "Konteksts",
+    "Situācija"
+  ],
+  "scenario": [
+    "Piemērs",
+    "Scenārijs"
+  ],
+  "scenarioOutline": [
+    "Scenārijs pēc parauga"
+  ],
+  "examples": [
+    "Piemēri",
+    "Paraugs"
+  ]
+}

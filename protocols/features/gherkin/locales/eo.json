@@ -1,0 +1,24 @@
+{
+  "feature": [
+    "Trajto"
+  ],
+  "rule": [
+    "Regulo"
+  ],
+  "background": [
+    "Fono"
+  ],
+  "scenario": [
+    "Ekzemplo",
+    "Scenaro",
+    "Kazo"
+  ],
+  "scenarioOutline": [
+    "Konturo de la scenaro",
+    "Skizo",
+    "Kazo-skizo"
+  ],
+  "examples": [
+    "Ekzemploj"
+  ]
+}

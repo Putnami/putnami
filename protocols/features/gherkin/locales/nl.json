@@ -1,0 +1,21 @@
+{
+  "feature": [
+    "Functionaliteit"
+  ],
+  "rule": [
+    "Regel"
+  ],
+  "background": [
+    "Achtergrond"
+  ],
+  "scenario": [
+    "Voorbeeld",
+    "Scenario"
+  ],
+  "scenarioOutline": [
+    "Abstract Scenario"
+  ],
+  "examples": [
+    "Voorbeelden"
+  ]
+}

@@ -1,0 +1,24 @@
+{
+  "feature": [
+    "Funksie",
+    "Besigheid Behoefte",
+    "Vermoë"
+  ],
+  "rule": [
+    "Reël",
+    "Reel"
+  ],
+  "background": [
+    "Agtergrond"
+  ],
+  "scenario": [
+    "Voorbeeld",
+    "Situasie"
+  ],
+  "scenarioOutline": [
+    "Situasie Uiteensetting"
+  ],
+  "examples": [
+    "Voorbeelde"
+  ]
+}

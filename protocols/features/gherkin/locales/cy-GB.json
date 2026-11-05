@@ -1,0 +1,21 @@
+{
+  "feature": [
+    "Arwedd"
+  ],
+  "rule": [
+    "Rule"
+  ],
+  "background": [
+    "Cefndir"
+  ],
+  "scenario": [
+    "Enghraifft",
+    "Scenario"
+  ],
+  "scenarioOutline": [
+    "Scenario Amlinellol"
+  ],
+  "examples": [
+    "Enghreifftiau"
+  ]
+}

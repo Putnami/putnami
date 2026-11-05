@@ -1,0 +1,21 @@
+{
+  "feature": [
+    "Jellemző"
+  ],
+  "rule": [
+    "Szabály"
+  ],
+  "background": [
+    "Háttér"
+  ],
+  "scenario": [
+    "Példa",
+    "Forgatókönyv"
+  ],
+  "scenarioOutline": [
+    "Forgatókönyv vázlat"
+  ],
+  "examples": [
+    "Példák"
+  ]
+}

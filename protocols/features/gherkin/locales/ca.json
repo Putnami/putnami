@@ -1,0 +1,23 @@
+{
+  "feature": [
+    "Característica",
+    "Funcionalitat"
+  ],
+  "rule": [
+    "Rule"
+  ],
+  "background": [
+    "Rerefons",
+    "Antecedents"
+  ],
+  "scenario": [
+    "Exemple",
+    "Escenari"
+  ],
+  "scenarioOutline": [
+    "Esquema de l'escenari"
+  ],
+  "examples": [
+    "Exemples"
+  ]
+}

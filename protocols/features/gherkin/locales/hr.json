@@ -1,0 +1,25 @@
+{
+  "feature": [
+    "Osobina",
+    "Mogućnost",
+    "Mogucnost"
+  ],
+  "rule": [
+    "Rule"
+  ],
+  "background": [
+    "Pozadina"
+  ],
+  "scenario": [
+    "Primjer",
+    "Scenarij"
+  ],
+  "scenarioOutline": [
+    "Skica",
+    "Koncept"
+  ],
+  "examples": [
+    "Primjeri",
+    "Scenariji"
+  ]
+}

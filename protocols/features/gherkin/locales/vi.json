@@ -1,0 +1,22 @@
+{
+  "feature": [
+    "Tính năng"
+  ],
+  "rule": [
+    "Quy tắc"
+  ],
+  "background": [
+    "Bối cảnh"
+  ],
+  "scenario": [
+    "Tình huống",
+    "Kịch bản"
+  ],
+  "scenarioOutline": [
+    "Khung tình huống",
+    "Khung kịch bản"
+  ],
+  "examples": [
+    "Dữ liệu"
+  ]
+}

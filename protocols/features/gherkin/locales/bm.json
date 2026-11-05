@@ -1,0 +1,25 @@
+{
+  "feature": [
+    "Fungsi"
+  ],
+  "rule": [
+    "Rule"
+  ],
+  "background": [
+    "Latar Belakang"
+  ],
+  "scenario": [
+    "Senario",
+    "Situasi",
+    "Keadaan"
+  ],
+  "scenarioOutline": [
+    "Kerangka Senario",
+    "Kerangka Situasi",
+    "Kerangka Keadaan",
+    "Garis Panduan Senario"
+  ],
+  "examples": [
+    "Contoh"
+  ]
+}

@@ -1,0 +1,27 @@
+{
+  "feature": [
+    "Funkcionalnost",
+    "Biznis potreba",
+    "Mozhnost"
+  ],
+  "rule": [
+    "Rule"
+  ],
+  "background": [
+    "Kontekst",
+    "Sodrzhina"
+  ],
+  "scenario": [
+    "Scenario",
+    "Na primer"
+  ],
+  "scenarioOutline": [
+    "Pregled na scenarija",
+    "Skica",
+    "Koncept"
+  ],
+  "examples": [
+    "Primeri",
+    "Scenaria"
+  ]
+}

@@ -1,0 +1,32 @@
+{
+  "feature": [
+    "Funcionalidade",
+    "Característica",
+    "Caracteristica"
+  ],
+  "rule": [
+    "Regra"
+  ],
+  "background": [
+    "Contexto",
+    "Cenário de Fundo",
+    "Cenario de Fundo",
+    "Fundo"
+  ],
+  "scenario": [
+    "Exemplo",
+    "Cenário",
+    "Cenario"
+  ],
+  "scenarioOutline": [
+    "Esquema do Cenário",
+    "Esquema do Cenario",
+    "Delineação do Cenário",
+    "Delineacao do Cenario"
+  ],
+  "examples": [
+    "Exemplos",
+    "Cenários",
+    "Cenarios"
+  ]
+}

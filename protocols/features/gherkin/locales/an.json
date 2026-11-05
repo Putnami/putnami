@@ -1,0 +1,21 @@
+{
+  "feature": [
+    "Caracteristica"
+  ],
+  "rule": [
+    "Rule"
+  ],
+  "background": [
+    "Antecedents"
+  ],
+  "scenario": [
+    "Eixemplo",
+    "Caso"
+  ],
+  "scenarioOutline": [
+    "Esquema del caso"
+  ],
+  "examples": [
+    "Eixemplos"
+  ]
+}

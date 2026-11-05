@@ -1,0 +1,22 @@
+{
+  "feature": [
+    "Özəllik"
+  ],
+  "rule": [
+    "Rule"
+  ],
+  "background": [
+    "Keçmiş",
+    "Kontekst"
+  ],
+  "scenario": [
+    "Nümunə",
+    "Ssenari"
+  ],
+  "scenarioOutline": [
+    "Ssenarinin strukturu"
+  ],
+  "examples": [
+    "Nümunələr"
+  ]
+}

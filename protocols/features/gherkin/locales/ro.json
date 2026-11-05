@@ -1,0 +1,24 @@
+{
+  "feature": [
+    "Functionalitate",
+    "Funcționalitate",
+    "Funcţionalitate"
+  ],
+  "rule": [
+    "Rule"
+  ],
+  "background": [
+    "Context"
+  ],
+  "scenario": [
+    "Exemplu",
+    "Scenariu"
+  ],
+  "scenarioOutline": [
+    "Structura scenariu",
+    "Structură scenariu"
+  ],
+  "examples": [
+    "Exemple"
+  ]
+}

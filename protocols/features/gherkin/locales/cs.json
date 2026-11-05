@@ -1,0 +1,23 @@
+{
+  "feature": [
+    "Požadavek"
+  ],
+  "rule": [
+    "Pravidlo"
+  ],
+  "background": [
+    "Pozadí",
+    "Kontext"
+  ],
+  "scenario": [
+    "Příklad",
+    "Scénář"
+  ],
+  "scenarioOutline": [
+    "Náčrt Scénáře",
+    "Osnova scénáře"
+  ],
+  "examples": [
+    "Příklady"
+  ]
+}

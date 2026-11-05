@@ -1,0 +1,24 @@
+{
+  "feature": [
+    "Fitur"
+  ],
+  "rule": [
+    "Rule",
+    "Aturan"
+  ],
+  "background": [
+    "Dasar",
+    "Latar Belakang"
+  ],
+  "scenario": [
+    "Skenario"
+  ],
+  "scenarioOutline": [
+    "Skenario konsep",
+    "Garis-Besar Skenario"
+  ],
+  "examples": [
+    "Contoh",
+    "Misal"
+  ]
+}

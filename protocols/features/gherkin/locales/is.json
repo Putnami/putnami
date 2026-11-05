@@ -1,0 +1,22 @@
+{
+  "feature": [
+    "Eiginleiki"
+  ],
+  "rule": [
+    "Rule"
+  ],
+  "background": [
+    "Bakgrunnur"
+  ],
+  "scenario": [
+    "Atburðarás"
+  ],
+  "scenarioOutline": [
+    "Lýsing Atburðarásar",
+    "Lýsing Dæma"
+  ],
+  "examples": [
+    "Dæmi",
+    "Atburðarásir"
+  ]
+}

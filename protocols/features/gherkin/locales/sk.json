@@ -1,0 +1,25 @@
+{
+  "feature": [
+    "Požiadavka",
+    "Funkcia",
+    "Vlastnosť"
+  ],
+  "rule": [
+    "Rule"
+  ],
+  "background": [
+    "Pozadie"
+  ],
+  "scenario": [
+    "Príklad",
+    "Scenár"
+  ],
+  "scenarioOutline": [
+    "Náčrt Scenáru",
+    "Náčrt Scenára",
+    "Osnova Scenára"
+  ],
+  "examples": [
+    "Príklady"
+  ]
+}
