@@ -141,7 +141,8 @@ Every reader shares two rules, which `ReadSpecSource` applies:
   digits, non-ASCII ones included, turned into one hyphen: `Règle d'or` is
   `r-gle-d-or`. A name with nothing left, such as `日本語`, takes
   `requirement-<n>` from its place and is unanchored, so `enforce` asks for an
-  anchor.
+  anchor. A scenario name maps to its check by the same rule, and a scenario
+  whose name maps to nothing has no check, so it gives a mismatch warning.
 - An outcome, a non-goal or a requirement text over 512 bytes stays whole. It
   gets `features.spec_text_too_long` at its line, which names a split: a
   warning in `report`, an error in `enforce`. A native spec keeps the bound as

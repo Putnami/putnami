@@ -233,7 +233,7 @@ func ReadSpecSource(reader SpecReader, input SpecInput) SpecProjection {
 		if earlier, seen := first[requirement.ID]; seen {
 			refused[fmt.Sprintf("requirements[%d].id", i)] = true
 			findings = append(findings, diag.Errorf(ErrorCodeInvalidRequirement, position.Field(),
-				"requirement ID %q at %s is also the ID at %s", requirement.ID, position, earlier))
+				"requirement ID %q at %s is also the ID at %s: write an anchor above one of them", requirement.ID, position, earlier))
 		} else {
 			first[requirement.ID] = position
 		}

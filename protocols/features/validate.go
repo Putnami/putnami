@@ -765,7 +765,7 @@ func validateSpec(input *Spec, textBound int) []diag.Diagnostic {
 			seenRequirements[requirement.ID] = field
 		}
 		if !boundedText(requirement.Text, textBound) {
-			diagnostics = append(diagnostics, diag.Errorf(ErrorCodeInvalidRequirement, field+".text", "requirement %q text must be non-blank, at most %d bytes, without control characters", requirement.ID, specTextMaxLength))
+			diagnostics = append(diagnostics, diag.Errorf(ErrorCodeInvalidRequirement, field+".text", "requirement %q text must be %s", requirement.ID, textRule(textBound)))
 		}
 	}
 
@@ -783,11 +783,19 @@ func validateSpec(input *Spec, textBound int) []diag.Diagnostic {
 	return diagnostics
 }
 
+// textRule states what a spec text must be, with the bound only when one holds.
+func textRule(textBound int) string {
+	if textBound == math.MaxInt {
+		return "non-blank, without control characters"
+	}
+	return fmt.Sprintf("non-blank, at most %d bytes, without control characters", textBound)
+}
+
 func validateSpecStatements(field string, statements []string, textBound int) []diag.Diagnostic {
 	var diagnostics []diag.Diagnostic
 	for i, statement := range statements {
 		if !boundedText(statement, textBound) {
-			diagnostics = append(diagnostics, diag.Errorf(ErrorCodeInvalidID, fmt.Sprintf("%s[%d]", field, i), "%s statements must be non-blank, at most %d bytes, without control characters", field, specTextMaxLength))
+			diagnostics = append(diagnostics, diag.Errorf(ErrorCodeInvalidID, fmt.Sprintf("%s[%d]", field, i), "%s statements must be %s", field, textRule(textBound)))
 		}
 	}
 	return diagnostics
