@@ -97,6 +97,10 @@ For each issue it lists, in plan order:
 
 `epic status` counts the children launched or in progress against
 `envelope.sessions`; it lists nothing once their tokens reach the envelope.
+A child reports its stage and tokens only when the workspace binds
+`missions`: without it, the core writes no session hooks, `agent stage` says
+so in every child, and `epic status` reads no session. Track each child's
+tokens from its end report instead.
 
 ## 5. Follow
 

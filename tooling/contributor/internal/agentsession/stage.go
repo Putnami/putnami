@@ -2,10 +2,12 @@ package agentsession
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"regexp"
 	"slices"
 	"strings"
@@ -52,7 +54,7 @@ func Stage(ctx context.Context, e *Env, args []string, stdout, stderr io.Writer)
 	}
 	files, inSession, found := e.currentSession(ctx)
 	if !found {
-		_, _ = fmt.Fprintln(stderr, "agent stage: no agent session found for this checkout: run it from a Claude Code or Codex session that runs the Putnami session hooks")
+		_, _ = fmt.Fprintf(stderr, "agent stage: no agent session found for this checkout: %s\n", e.noSessionCause())
 		return 1
 	}
 	now := e.Now()
@@ -125,6 +127,45 @@ func parseStageArgs(args []string) (collab.LoopStage, error) {
 		return "", fmt.Errorf("unknown stage %q; %s", boundedLine(args[0], 64), usage)
 	}
 	return stage, nil
+}
+
+// noSessionCause says why `agent stage` finds no session, and what the
+// operator does. The core writes the session hooks only for a workspace that
+// binds missions, so without that binding no session ever opens a cache.
+func (e *Env) noSessionCause() string {
+	if !bindsMissions(e.Root) {
+		return "this workspace binds no missions provider, so putnami writes no session hooks and no session reaches agent stage: " +
+			"bind missions under options.collaboration in " + workspaceManifest + " and run putnami install"
+	}
+	for _, named := range sessionEnvironment {
+		if id := e.Getenv(named.variable); sessionIDPattern.MatchString(id) {
+			return fmt.Sprintf("the host names session %s, but no Putnami session hook recorded it: "+
+				"the host did not run this workspace's hooks; run putnami install to write them, and check that the host runs them", id)
+		}
+	}
+	return "run it from a Claude Code or Codex session that runs the Putnami session hooks"
+}
+
+// bindsMissions reports whether the workspace at root binds the missions
+// contract, the one the session hooks require.
+func bindsMissions(root string) bool {
+	data, err := os.ReadFile(filepath.Join(root, workspaceManifest))
+	if err != nil {
+		return false
+	}
+	var document struct {
+		Options map[string]json.RawMessage `json:"options"`
+	}
+	if json.Unmarshal(data, &document) != nil {
+		return false
+	}
+	block := document.Options[collab.BindingOptionNamespace]
+	if len(block) == 0 {
+		return false
+	}
+	bindings, _ := collab.ParseBindings(block)
+	_, bound := bindings[collab.ContractMissions]
+	return bound
 }
 
 // currentSession finds the session `agent stage` runs in. A session the host

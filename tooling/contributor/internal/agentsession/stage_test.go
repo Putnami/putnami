@@ -3,6 +3,7 @@ package agentsession
 import (
 	"bytes"
 	"context"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -97,13 +98,53 @@ func TestAgentStageRefusesAnUnknownStageAndAMissingSession(t *testing.T) {
 		}
 	}
 	// A session id the hooks never opened names no session.
+	h.bindMissions()
 	h.environ["CLAUDE_CODE_SESSION_ID"] = claudeSession
 	code, stdout, stderr := h.stage("code")
-	if code != 1 || stdout != "" || stderr != "agent stage: no agent session found for this checkout: run it from a Claude Code or Codex session that runs the Putnami session hooks\n" {
+	if code != 1 || stdout != "" || !strings.HasPrefix(stderr, "agent stage: no agent session found for this checkout: ") {
 		t.Errorf("exit %d, stdout %q, stderr %q", code, stdout, stderr)
 	}
 	if len(h.provider.recordedSyncs()) != 0 {
 		t.Errorf("syncs %+v", h.provider.recordedSyncs())
+	}
+}
+
+func TestAgentStageSaysWhyItFindsNoSession(t *testing.T) {
+	spectest.Proves(t, sessionFeature, stageRequirement, "agent-stage-says-why-no-session-is-found")
+	h := newHarness(t)
+	h.environ["CLAUDE_CODE_SESSION_ID"] = claudeSession
+	// A workspace that binds no missions provider gets no session hooks, so
+	// no session of it ever opens a cache, headless or not.
+	code, stdout, stderr := h.stage("code")
+	want := "agent stage: no agent session found for this checkout: this workspace binds no missions provider, " +
+		"so putnami writes no session hooks and no session reaches agent stage: " +
+		"bind missions under options.collaboration in putnami.workspace.json and run putnami install\n"
+	if code != 1 || stdout != "" || stderr != want {
+		t.Errorf("unbound: exit %d, stdout %q, stderr %q", code, stdout, stderr)
+	}
+	// With missions bound, a session the host names that no hook recorded
+	// did not run the workspace hooks.
+	h.bindMissions()
+	code, stdout, stderr = h.stage("code")
+	want = "agent stage: no agent session found for this checkout: the host names session " + claudeSession +
+		", but no Putnami session hook recorded it: the host did not run this workspace's hooks; " +
+		"run putnami install to write them, and check that the host runs them\n"
+	if code != 1 || stdout != "" || stderr != want {
+		t.Errorf("bound: exit %d, stdout %q, stderr %q", code, stdout, stderr)
+	}
+	// Once a hook opened the session, the same command records the stage.
+	h.hook(claude, "session-start", claudeSession, nil)
+	if code, _, stderr := h.stage("code"); code != 0 || stderr != "" {
+		t.Errorf("recorded: exit %d, stderr %q", code, stderr)
+	}
+}
+
+// bindMissions makes the harness workspace bind the missions contract.
+func (h *harness) bindMissions() {
+	h.t.Helper()
+	manifest := `{"options":{"collaboration":{"missions":{"provider":"@putnami/intelligence","version":1}}}}` + "\n"
+	if err := os.WriteFile(filepath.Join(h.root, workspaceManifest), []byte(manifest), 0o600); err != nil {
+		h.t.Fatal(err)
 	}
 }
 
