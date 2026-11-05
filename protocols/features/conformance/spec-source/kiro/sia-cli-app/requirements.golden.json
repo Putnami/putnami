@@ -1,0 +1,45 @@
+{
+  "protocolVersion": 1,
+  "feature": "billing/invoice-export",
+  "outcomes": [
+    "This document specifies the requirements for the SIA CLI (`apps/cli`). The CLI provides a command-line interface for developers to interact with the SIA platform from their terminal."
+  ],
+  "requirements": [
+    {
+      "id": "requirement-1-1",
+      "text": "WHEN running `sia login` THEN the CLI SHALL open a browser for authentication"
+    },
+    {
+      "id": "requirement-1-2",
+      "text": "WHEN authentication succeeds THEN the CLI SHALL store the token securely"
+    },
+    {
+      "id": "requirement-1-3",
+      "text": "WHEN running `sia logout` THEN the CLI SHALL remove stored credentials"
+    },
+    {
+      "id": "requirement-2-1",
+      "text": "WHEN running `sia job create` THEN the CLI SHALL prompt for job details"
+    },
+    {
+      "id": "requirement-2-2",
+      "text": "WHEN running `sia job list` THEN the CLI SHALL display jobs in a table"
+    },
+    {
+      "id": "requirement-2-3",
+      "text": "WHEN running `sia job status \u003cid\u003e` THEN the CLI SHALL show job details and logs"
+    },
+    {
+      "id": "requirement-3-1",
+      "text": "WHEN running `sia config set` THEN the CLI SHALL update configuration"
+    },
+    {
+      "id": "requirement-3-2",
+      "text": "WHEN running `sia config get` THEN the CLI SHALL display current settings"
+    },
+    {
+      "id": "requirement-3-3",
+      "text": "WHEN no configuration exists THEN the CLI SHALL use sensible defaults"
+    }
+  ]
+}

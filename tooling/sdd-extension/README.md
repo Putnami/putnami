@@ -218,6 +218,18 @@ default is empty, and a project's list replaces the workspace's.
   with every check the feature's requirements declare. An anchor above a
   scenario names its check. A mismatch is a warning.
 - A `[NEEDS CLARIFICATION]` marker is a warning, and an error in `enforce`.
+- A `kiro` reference names a spec directory, such as
+  `.kiro/specs/invoice-export`, or its `requirements.md`. Each Introduction
+  paragraph becomes an outcome, and each acceptance criterion becomes one
+  requirement. The reader does not use a user story, `design.md`, `tasks.md` or
+  `.kiro/steering/`.
+- A Kiro criterion takes the anchor above it, else an ID from its position, such
+  as `requirement-2-3`. In `enforce`, each criterion needs its own anchor.
+- A criterion in no EARS form stays a requirement, with a warning at its line.
+  EARS is a sentence template such as `WHEN <trigger> THE <system> SHALL
+  <response>`.
+- A localized Kiro file fails with an error at line 1: the reader recognizes
+  only the English `Introduction` and `Requirement N` headings.
 
 ## The validation jobs
 

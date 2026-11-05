@@ -5,7 +5,7 @@
   `@putnami/sdd` (`tooling/sdd-extension`)
 - **Implements**:
   [ADR 0004 of `@putnami/sdd`](../../../../tooling/sdd-extension/doc/adr/0004-a-spec-may-live-in-an-external-market-format.md),
-  decisions D-039 to D-047. It records D-048 to D-051 of the root
+  decisions D-039 to D-047. It records D-048 to D-054 of the root
   `decisions.json`, which build sessions took and the owner has not reviewed
 - **One-way door**: the `spec` reference is authored in committed manifests,
   and the format names are public wire values. A release can add to them but
@@ -88,6 +88,25 @@ task input is a static pattern, so it cannot depend on a manifest value.
     `OutcomePositions` and `NonGoalPositions`, parallel to the spec's lists, so
     a validation finding on that text follows §4. A text with no position stays
     at the reference.
+18. **A Kiro criterion is one requirement.** Kiro numbers its requirements by
+    position, and one `### Requirement N` holds many criteria, each with its own
+    bound and proof, so the group is not a native requirement. A criterion's ID
+    is its anchor, else `<group>-<ordinal>`. The group's ID is the anchor above
+    its heading, else `requirement-<n>`. A group anchor names its criteria but
+    does not pin them: reordering them changes the ordinal, so each stays
+    unanchored under §13. (D-052)
+19. **A malformed criterion stays in the projection.** It gets the warning
+    `features.spec_criterion_malformed` at its line. Dropping it would shift the
+    ordinals below it and hide a stated requirement from the gate. The `FOR ALL`
+    property is a recognized form: Kiro writes it beside the five EARS forms, so
+    a warning would flag the tool's own output. (D-053)
+20. **A long Introduction paragraph is cut at sentence ends.** An Introduction
+    is free prose that Kiro does not bound. In a sample of 186 public files, 39
+    paragraphs exceed 512 bytes, and an error would fail those projects on their
+    first `report` run. The outcomes keep the text. Only a single sentence over
+    the bound is an error. (D-054)
+21. **A Kiro user story projects nothing.** It is context for its group, and
+    adding it to each criterion would spend the 512-byte bound on repeated text.
 
 ## Rejected alternatives
 

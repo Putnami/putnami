@@ -110,6 +110,8 @@ workspace-relative file or directory. A project opts in through
 native `Spec`, and `ReadSpecSource` applies the contract every format shares.
 The `speckit` reader ships: it reads one feature's `spec.md`. A finding that
 blocks only in `enforce` goes through `SpecProjection.EnforceOnly`.
+The `kiro` reader ships: it reads one spec's `requirements.md`, with one native
+requirement per acceptance criterion.
 `conformance.RunSpecSource` pins a reader against a golden spec. See
 [ADR 0006](doc/adr/0006-the-spec-source-contract.md).
 

@@ -1,0 +1,153 @@
+{
+  "protocolVersion": 1,
+  "feature": "billing/invoice-export",
+  "outcomes": [
+    "Holo-Board is a gesture-controlled transparent whiteboard recording application that enables users to draw in mid-air while recording video. The application combines real-time webcam feed with a transparent drawing overlay, creating the illusion of drawing on glass in front of the camera. Users control drawing, color selection, and canvas clearing through hand gestures, while the application captures the combined video output with audio."
+  ],
+  "requirements": [
+    {
+      "id": "requirement-1-1",
+      "text": "WHEN the user performs a pinch gesture, THEN the Holo-Board System SHALL activate the pen state and begin drawing"
+    },
+    {
+      "id": "requirement-1-2",
+      "text": "WHILE the pen state is active, THE Holo-Board System SHALL render continuous line segments following the index fingertip position"
+    },
+    {
+      "id": "requirement-1-3",
+      "text": "WHEN the index fingertip moves during active pen state, THEN the Holo-Board System SHALL connect the previous position to the current position with a visible line"
+    },
+    {
+      "id": "requirement-1-4",
+      "text": "WHEN the user releases the pinch gesture, THEN the Holo-Board System SHALL deactivate the pen state and cease drawing operations"
+    },
+    {
+      "id": "requirement-1-5",
+      "text": "WHEN the user performs an open hand gesture, THEN the Holo-Board System SHALL deactivate the pen state and cease drawing operations"
+    },
+    {
+      "id": "requirement-2-1",
+      "text": "WHILE the pen state is inactive, THE Holo-Board System SHALL allow index fingertip movement without rendering any marks on the drawing layer"
+    },
+    {
+      "id": "requirement-2-2",
+      "text": "WHEN the pen state transitions from active to inactive, THEN the Holo-Board System SHALL terminate the current stroke and prevent connection to subsequent positions"
+    },
+    {
+      "id": "requirement-2-3",
+      "text": "WHILE the pen state is inactive, THE Holo-Board System SHALL maintain the existing drawing layer content without modification"
+    },
+    {
+      "id": "requirement-3-1",
+      "text": "WHEN the user performs a fist gesture, THEN the Holo-Board System SHALL remove all rendered content from the drawing layer immediately"
+    },
+    {
+      "id": "requirement-3-2",
+      "text": "WHEN the drawing layer is cleared, THEN the Holo-Board System SHALL preserve the webcam feed visibility"
+    },
+    {
+      "id": "requirement-3-3",
+      "text": "WHEN a fist gesture is detected during active pen state, THEN the Holo-Board System SHALL clear the drawing layer and deactivate the pen state"
+    },
+    {
+      "id": "requirement-4-1",
+      "text": "WHEN the user performs a peace gesture, THEN the Holo-Board System SHALL advance to the next color in the predefined color sequence"
+    },
+    {
+      "id": "requirement-4-2",
+      "text": "WHEN the Holo-Board System reaches the final color in the sequence, THEN the Holo-Board System SHALL cycle back to the first color upon the next peace gesture"
+    },
+    {
+      "id": "requirement-4-3",
+      "text": "WHEN the pen color changes, THEN the Holo-Board System SHALL apply the new color to all subsequent pen strokes"
+    },
+    {
+      "id": "requirement-4-4",
+      "text": "WHEN the pen color changes, THEN the Holo-Board System SHALL preserve the colors of previously rendered strokes"
+    },
+    {
+      "id": "requirement-5-1",
+      "text": "WHEN the Holo-Board System starts, THEN the Holo-Board System SHALL display the live webcam feed as the background layer"
+    },
+    {
+      "id": "requirement-5-2",
+      "text": "WHILE the Holo-Board System is running, THE Holo-Board System SHALL continuously update the webcam feed at a minimum rate of 24 frames per second"
+    },
+    {
+      "id": "requirement-5-3",
+      "text": "WHEN the drawing layer is rendered, THEN the Holo-Board System SHALL position it above the webcam feed with transparency preserved"
+    },
+    {
+      "id": "requirement-5-4",
+      "text": "WHEN no drawing content exists, THEN the Holo-Board System SHALL display the unobstructed webcam feed"
+    },
+    {
+      "id": "requirement-6-1",
+      "text": "WHEN the user clicks the record button while not recording, THEN the Holo-Board System SHALL initiate a recording session"
+    },
+    {
+      "id": "requirement-6-2",
+      "text": "WHEN a recording session is initiated, THEN the Holo-Board System SHALL capture the combined webcam feed and drawing layer at a minimum rate of 24 frames per second"
+    },
+    {
+      "id": "requirement-6-3",
+      "text": "WHEN the user clicks the record button during an active recording session, THEN the Holo-Board System SHALL terminate the recording session and finalize the output video"
+    },
+    {
+      "id": "requirement-6-4",
+      "text": "WHEN a recording session is active, THEN the Holo-Board System SHALL display the vinyl indicator in a corner of the screen"
+    },
+    {
+      "id": "requirement-6-5",
+      "text": "WHEN the vinyl indicator is displayed, THEN the Holo-Board System SHALL rotate it continuously to indicate active recording"
+    },
+    {
+      "id": "requirement-7-1",
+      "text": "WHEN a recording session is initiated, THEN the Holo-Board System SHALL begin capturing audio from the default microphone input"
+    },
+    {
+      "id": "requirement-7-2",
+      "text": "WHILE a recording session is active, THE Holo-Board System SHALL synchronize audio capture with video frame capture"
+    },
+    {
+      "id": "requirement-7-3",
+      "text": "WHEN a recording session terminates, THEN the Holo-Board System SHALL encode the captured audio into the output video file"
+    },
+    {
+      "id": "requirement-7-4",
+      "text": "WHEN no microphone is available, THEN the Holo-Board System SHALL create an output video without audio track"
+    },
+    {
+      "id": "requirement-8-1",
+      "text": "WHEN a recording session terminates, THEN the Holo-Board System SHALL write the output video to a file on the local filesystem"
+    },
+    {
+      "id": "requirement-8-2",
+      "text": "WHEN the output video is written, THEN the Holo-Board System SHALL use a standard video format compatible with common media players"
+    },
+    {
+      "id": "requirement-8-3",
+      "text": "WHEN the output video is finalized, THEN the Holo-Board System SHALL make the file accessible to the user for download or playback"
+    },
+    {
+      "id": "requirement-8-4",
+      "text": "WHEN multiple recording sessions occur, THEN the Holo-Board System SHALL generate unique filenames to prevent overwriting previous recordings"
+    },
+    {
+      "id": "requirement-9-1",
+      "text": "WHEN pen strokes are rendered, THEN the Holo-Board System SHALL display them with sufficient opacity to be clearly visible against the webcam feed"
+    },
+    {
+      "id": "requirement-9-2",
+      "text": "WHEN the drawing layer is composited with the webcam feed, THEN the Holo-Board System SHALL preserve the transparency of undrawn areas"
+    },
+    {
+      "id": "requirement-9-3",
+      "text": "WHEN viewing the combined output, THEN the Holo-Board System SHALL maintain the spatial relationship where drawings appear in front of the user"
+    },
+    {
+      "id": "requirement-9-4",
+      "text": "WHEN pen strokes overlap, THEN the Holo-Board System SHALL render them with consistent visual blending"
+    }
+  ]
+}

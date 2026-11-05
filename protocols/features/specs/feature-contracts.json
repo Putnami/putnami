@@ -99,6 +99,18 @@
     {
       "id": "openspec-findings",
       "text": "Real OpenSpec specs, brownfield ones included, parse with findings at file and line. No Purpose and no leading prose is an error. A Purpose paragraph over 512 bytes is an error that names a split. A placeholder Purpose stays the outcome with a warning. A Status, Dates, Branch, Routes or Entities section is one derived-fact warning each and projects nothing. The same bytes give the same result."
+    },
+    {
+      "id": "kiro-projection",
+      "text": "The Kiro reader reads only the requirements.md its reference names. Each Introduction paragraph becomes an outcome, cut at sentence ends when over 512 bytes. Each acceptance criterion under a Requirement N heading becomes one requirement, in file order, with its wrapped and nested lines. A user story, design.md, tasks.md and a steering file project nothing, and no link becomes a decision."
+    },
+    {
+      "id": "kiro-requirement-identity",
+      "text": "A Kiro criterion takes the ID of the anchor on the line above it. Without one it takes its group's ID and its ordinal, such as requirement-2-3, and is unanchored, even under an anchored group. A group takes the anchor above its heading, else requirement-n in the heading's label. An anchor that stands above neither is an error."
+    },
+    {
+      "id": "kiro-findings",
+      "text": "A criterion in an EARS form or a FOR ALL property has no finding. Any other criterion is projected with a warning at its line, so a parse never drops or crashes on text. A group with no criterion and a section that restates a derived fact are one warning each. A missing outcome, a file with no group, an Introduction sentence over 512 bytes and an unclosed comment or fence are errors at a line."
     }
   ],
   "decisions": [
