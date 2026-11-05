@@ -148,6 +148,19 @@ Every reader shares two rules, which `ReadSpecSource` applies:
   warning in `report`, an error in `enforce`. A native spec keeps the bound as
   an error.
 
+`SpecNativeGaps` lists what a native rewrite of an external spec adds. Each
+`SpecGap` names its kind, its position and the step that removes it:
+
+| Kind | What it is |
+|---|---|
+| `unanchored_requirement` | A requirement whose ID comes from its position, such as `FR-001` |
+| `derived_section` | A section that restates a fact Putnami derives |
+| `context_link` | A link in the projected prose that is not a `doc/adr/*.md` record |
+| `scenario_mismatch` | A scenario with no declared check, or a declared check with no scenario |
+
+A gap is information, never a finding: no verification mode makes it block. A
+text the reader gave no position keeps the reference path as its field.
+
 A feature may carry an optional `surface` object that lists the command paths
 that carry it, for example
 `"surface": {"commands": ["features validate"]}`.
