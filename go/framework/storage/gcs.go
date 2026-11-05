@@ -31,10 +31,13 @@ type GCSConfig struct {
 	// environment variable if set, otherwise the GCP metadata server (Workload
 	// Identity on Cloud Run / GKE), which needs no static secret.
 	CredentialsFile string
-	// RequestTimeout bounds non-streaming control-plane operations (Put, Delete,
+	// RequestTimeout bounds non-streaming control-plane operations (Delete,
 	// List, Exists, Stat) and the auth token fetches they trigger. Default: 60s. It does
 	// NOT cap a streaming Get — that body read is bounded only by the caller's
-	// context. Set to a negative value to disable the per-op cap.
+	// context. On Put it bounds the storage side only: GCS must take each part
+	// of the body the caller's reader hands over, and answer once the body ends,
+	// within it; the time the reader takes to deliver the body is bounded only by
+	// the caller's context. Set to a negative value to disable the per-op cap.
 	RequestTimeout time.Duration
 }
 
@@ -184,10 +187,13 @@ type gcsListResponse struct {
 }
 
 // Put stores an object in GCS using a streaming multipart upload, so the body is
-// never buffered fully in memory.
+// never buffered fully in memory. The request timeout bounds the token fetch
+// and the storage side of the upload: GCS must take each part of the body data
+// hands over, and answer once the body ends, within it. The time data takes to
+// deliver the body is bounded only by ctx.
 func (b *GCSBackend) Put(ctx context.Context, bucket, key string, data io.Reader, meta *ObjectMetadata) (_ *PutResult, retErr error) {
-	ctx, cancel := ctxutil.WithRequestTimeout(ctx, b.requestTimeout)
-	defer cancel()
+	ctx, deadline := withUploadDeadline(ctx, b.requestTimeout)
+	defer deadline.stop()
 
 	resource := map[string]any{"name": key}
 	contentType := "application/octet-stream"
@@ -216,12 +222,15 @@ func (b *GCSBackend) Put(ctx context.Context, bucket, key string, data io.Reader
 		return nil, errors.Wrap(err, CodeStorageRequest, errors.String("backend", "gcs"), errors.String("method", "POST"))
 	}
 	req.Header.Set("Content-Type", "multipart/related; boundary="+boundary)
-	if err := b.authorize(ctx, req); err != nil {
+	authCtx, cancelAuth := ctxutil.WithRequestTimeout(ctx, b.requestTimeout)
+	err = b.authorize(authCtx, req)
+	cancelAuth()
+	if err != nil {
 		return nil, err
 	}
 
 	go func() {
-		writeErr := streamMultipartUpload(multipartWriter, resource, contentType, data)
+		writeErr := streamMultipartUpload(multipartWriter, resource, contentType, &sentReader{r: data, deadline: deadline})
 		if writeErr != nil {
 			_ = writer.CloseWithError(writeErr) //nolint:errcheck // io.PipeWriter.CloseWithError always returns nil
 			return
@@ -231,7 +240,7 @@ func (b *GCSBackend) Put(ctx context.Context, bucket, key string, data io.Reader
 
 	resp, err := b.httpClient.Do(req)
 	if err != nil {
-		return nil, errors.Wrap(err, CodeStorageWrite,
+		return nil, errors.Wrap(deadline.cause(ctx, err), CodeStorageWrite,
 			errors.String("backend", "gcs"), errors.String("bucket", bucket), errors.String("key", key))
 	}
 	defer func() {
@@ -246,7 +255,7 @@ func (b *GCSBackend) Put(ctx context.Context, bucket, key string, data io.Reader
 
 	var obj gcsObject
 	if err := json.NewDecoder(resp.Body).Decode(&obj); err != nil {
-		return nil, errors.Wrap(err, CodeStorageWrite,
+		return nil, errors.Wrap(deadline.cause(ctx, err), CodeStorageWrite,
 			errors.String("backend", "gcs"), errors.String("bucket", bucket), errors.String("key", key))
 	}
 	return &PutResult{Key: key, Size: obj.size(), ETag: obj.Etag}, nil

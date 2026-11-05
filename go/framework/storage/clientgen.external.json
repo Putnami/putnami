@@ -114,7 +114,7 @@
           "path": "go/framework/storage/s3.go",
           "transport": "http",
           "symbol": "http.NewRequestWithContext",
-          "fingerprint": "77b25287e06033a1aa0bddbb7b7858ca978355f8b4a70b683c41f828429cab16"
+          "fingerprint": "7159c7542a2e265bdbcb2cf9247edaa744ecb1bf296dbf85bfc15576a7cd408e"
         },
         {
           "path": "go/framework/storage/s3.go",
