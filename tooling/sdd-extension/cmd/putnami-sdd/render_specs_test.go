@@ -10,8 +10,8 @@ import (
 
 // TestSpecsRenderTheSourceAndTheNativeGaps pins the human lines of specs list
 // and specs inspect: an external spec names its format after its path, and
-// inspect lists each gap with its position and step. A native spec prints the
-// lines it printed before the source existed.
+// inspect lists each gap with its position and step. A native spec prints no
+// format and no gap.
 func TestSpecsRenderTheSourceAndTheNativeGaps(t *testing.T) {
 	var list strings.Builder
 	printSpecCatalogHuman(&list, sdd.SpecCatalogReport{Specs: []sdd.SpecSummary{

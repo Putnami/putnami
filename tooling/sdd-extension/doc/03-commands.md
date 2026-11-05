@@ -252,8 +252,9 @@ exact path and owning project, its source, its first intended outcomes, and its
 non-goal, requirement, and decision counts. The source is `native` for a
 `specs/*.json` document, or the market format of an external spec: `openspec`,
 `speckit`, `kiro` or `gherkin`. JSON output carries it as `source` on each row;
-human output prints a format after the path and prints nothing for `native`. A filename never mints identity — the
-`feature` field does — so a path is provenance only. Discovery degrades rather
+human output prints a format after the path and prints nothing for `native`.
+A filename never mints identity — the `feature` field does — so a path is
+provenance only. Discovery degrades rather
 than fails: a document that cannot be parsed is reported as a diagnostic and a
 document that does not resolve is marked `valid: false`, instead of hiding every
 healthy spec.
@@ -277,8 +278,9 @@ the line, a `message`, and the `step` that removes it:
 | `scenario_mismatch` | A scenario with no declared check, or a check with no scenario | Anchor the scenario with its check, or change `verification.checks` |
 
 Gaps are information. They never change the exit code, and `validate` never
-reports them. A native spec has none, and its `inspect` output carries neither
-member.
+reports them. `inspect` omits `nativeGaps` when there is no gap. A native spec
+has none, and its `inspect` output omits `source.format`, so a missing format
+means `native`.
 
 `validate` reuses the protocol's own parser and repository validator — a second
 interpretation of these bytes would be a defect — and **fails** on an invalid

@@ -57,7 +57,7 @@ func TestEachGapKindNamesItsPositionAndStep(t *testing.T) {
 		summary = append(summary, got{gap.Kind, gap.Field})
 	}
 	want := []got{
-		{features.SpecGapContextLink, openSpecReference},
+		{features.SpecGapContextLink, openSpecFile + "#L4"},
 		{features.SpecGapDerivedSection, openSpecFile + "#L6"},
 		{features.SpecGapContextLink, openSpecFile + "#L10"},
 		{features.SpecGapScenarioMismatch, openSpecFile + "#L10"},

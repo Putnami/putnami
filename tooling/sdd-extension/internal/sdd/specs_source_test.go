@@ -104,12 +104,11 @@ func TestNativeGapsNeverChangeTheExitCode(t *testing.T) {
 	if err != nil || !validated.Valid {
 		t.Fatalf("specs validate: %v, %+v", err, validated.Diagnostics)
 	}
-	for _, finding := range validated.Diagnostics {
-		for _, gap := range inspected.NativeGaps {
-			if finding.Code == string(gap.Kind) {
-				t.Fatalf("a gap became a validate finding: %+v", finding)
-			}
-		}
+	// Two gaps, one finding: the derived-fact warning is the reader's own, and
+	// the context link adds nothing to the diagnostics.
+	if len(inspected.NativeGaps) != 2 || len(inspected.Diagnostics) != 1 {
+		t.Fatalf("gaps = %+v, diagnostics = %+v, want two gaps and only the derived-fact warning",
+			inspected.NativeGaps, inspected.Diagnostics)
 	}
 }
 
