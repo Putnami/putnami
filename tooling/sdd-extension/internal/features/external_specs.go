@@ -84,7 +84,7 @@ func discoverExternalSpecs(ws *workspace.Workspace, scope *Scope, manifests []fe
 				continue
 			}
 			report(featureproto.CompareSpecScenarios(projection, feature)...)
-			report(unanchoredRequirementFindings(ws, root, field, projection)...)
+			report(enforceOnlyFindings(ws, root, field, projection)...)
 			paths := make([]string, 0, len(files))
 			for _, file := range files {
 				paths = append(paths, file.Path)
@@ -177,27 +177,15 @@ func resolveProjectSpecFormats(ws *workspace.Workspace, root string) ([]featurep
 	return featureproto.ResolveSpecFormats("workspace", workspaceOptionsOf(ws), scope, options)
 }
 
-// unanchoredRequirementFindings refuses, in enforce only, a requirement whose ID
-// comes from its position: reordering the file would change the ID the baseline
-// records. In report the requirement is projected with no finding.
-func unanchoredRequirementFindings(ws *workspace.Workspace, root, field string, projection featureproto.SpecProjection) []diag.Diagnostic {
+// enforceOnlyFindings applies the owning project's verification mode to what
+// the projection left mode-dependent.
+func enforceOnlyFindings(ws *workspace.Workspace, root, field string, projection featureproto.SpecProjection) []diag.Diagnostic {
 	scope, options := projectOptionsAt(ws, root)
 	mode, _, err := featureproto.ResolveVerificationMode(featureproto.VerificationDomainSpecs, "workspace", workspaceOptionsOf(ws), scope, options)
 	if err != nil {
 		return []diag.Diagnostic{diag.Errorf(featureproto.ErrorCodeParseError, field, "%v", err)}
 	}
-	if mode != featureproto.VerificationModeEnforce {
-		return nil
-	}
-	var findings []diag.Diagnostic
-	for index, record := range projection.Requirements {
-		if record.Unanchored {
-			findings = append(findings, diag.Errorf(featureproto.ErrorCodeSpecRequirementUnanchored, record.Position.Field(),
-				"requirement %q takes its ID from its position: write an anchor above it before this project can enforce specs",
-				projection.Spec.Requirements[index].ID))
-		}
-	}
-	return findings
+	return projection.EnforceOnly(mode)
 }
 
 // readSpecFiles reads the one file a reference names, or the files with the

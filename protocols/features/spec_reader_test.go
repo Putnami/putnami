@@ -266,7 +266,7 @@ func TestEveryDiagnosticCodeOfTheContractIsReserved(t *testing.T) {
 	for _, code := range []string{
 		features.ErrorCodeInvalidSpecReference, features.ErrorCodeSpecFormatNotEnabled, features.ErrorCodeSpecFormatUnavailable,
 		features.ErrorCodeSpecRead, features.ErrorCodeSpecRequirementTooLong, features.ErrorCodeSpecRequirementUnanchored,
-		features.WarningCodeSpecScenarioMismatch,
+		features.WarningCodeSpecScenarioMismatch, features.WarningCodeSpecDerivedFact, features.WarningCodeSpecRequirementIgnored, features.FindingCodeSpecNeedsClarification,
 	} {
 		if !features.ValidDiagnosticCodes[code] {
 			t.Errorf("%s is not reserved", code)

@@ -108,6 +108,8 @@ format is `openspec`, `speckit`, `kiro` or `gherkin`, and the path is a
 workspace-relative file or directory. A project opts in through
 `options.sdd.specFormats`. A `SpecReader` projects the file in memory into a
 native `Spec`, and `ReadSpecSource` applies the contract every format shares.
+The `speckit` reader ships: it reads one feature's `spec.md`. A finding that
+blocks only in `enforce` goes through `SpecProjection.EnforceOnly`.
 `conformance.RunSpecSource` pins a reader against a golden spec. See
 [ADR 0006](doc/adr/0006-the-spec-source-contract.md).
 

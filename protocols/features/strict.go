@@ -61,6 +61,8 @@ const (
 	ErrorCodeVerificationUnreadable       = "features.verification_unreadable"
 	WarningCodeRatchetGrowth              = "features.ratchet_growth"
 	WarningCodeSpecScenarioMismatch       = "features.spec_scenario_mismatch"
+	WarningCodeSpecDerivedFact            = "features.spec_derived_fact"
+	WarningCodeSpecRequirementIgnored     = "features.spec_requirement_ignored"
 	WarningCodeMisplacedBaseline          = "features.misplaced_baseline"
 	WarningCodeMissingEvidence            = "features.missing_evidence"
 	WarningCodeStaleEvidence              = "features.stale_evidence"
@@ -69,6 +71,10 @@ const (
 	WarningCodeUnclassifiedContribution   = "features.unclassified_contribution"
 	WarningCodeUnresolvedFeatureAuthority = "features.unresolved_feature_authority"
 	WarningCodeUnobservedRequirement      = "features.unobserved_requirement"
+
+	// FindingCodeSpecNeedsClarification is a warning in report and an error in
+	// enforce, so its name claims no severity.
+	FindingCodeSpecNeedsClarification = "features.spec_needs_clarification"
 )
 
 // ValidDiagnosticCodes enumerates the reserved automation vocabulary.
@@ -94,6 +100,7 @@ var ValidDiagnosticCodes = map[string]bool{
 	WarningCodeUnobservedRequirement: true, WarningCodeSpecScenarioMismatch: true,
 	ErrorCodeInvalidSpecReference: true, ErrorCodeSpecFormatNotEnabled: true, ErrorCodeSpecFormatUnavailable: true,
 	ErrorCodeSpecRead: true, ErrorCodeSpecRequirementTooLong: true, ErrorCodeSpecRequirementUnanchored: true,
+	WarningCodeSpecDerivedFact: true, WarningCodeSpecRequirementIgnored: true, FindingCodeSpecNeedsClarification: true,
 }
 
 type protocolVersionError struct{ message string }

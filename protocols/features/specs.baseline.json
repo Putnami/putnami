@@ -5,6 +5,7 @@
     "features/feature-contracts#acceptance-verdicts",
     "features/feature-contracts#canonical-bytes-across-languages",
     "features/feature-contracts#conformance-corpus",
+    "features/feature-contracts#enforce-only-findings",
     "features/feature-contracts#external-spec-reference",
     "features/feature-contracts#findings-name-file-positions",
     "features/feature-contracts#objective-verdicts",
@@ -16,6 +17,9 @@
     "features/feature-contracts#scenarios-never-change-checks",
     "features/feature-contracts#spec-format-policy",
     "features/feature-contracts#spec-reader-contract",
+    "features/feature-contracts#speckit-findings",
+    "features/feature-contracts#speckit-projection",
+    "features/feature-contracts#speckit-requirement-identity",
     "features/feature-contracts#strict-versioned-documents"
   ]
 }

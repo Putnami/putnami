@@ -30,7 +30,9 @@ var specFileExtensions = map[SpecFormat][]string{
 
 // specReaders holds the reader each format ships. A format with no entry is a
 // valid wire value that no release can read yet.
-var specReaders = map[SpecFormat]SpecReader{}
+var specReaders = map[SpecFormat]SpecReader{
+	SpecFormatSpecKit: specKitReader{},
+}
 
 var (
 	specAnchorComment = regexp.MustCompile(`^<!--\s*putnami:id\s+(\S+)\s*-->$`)
@@ -127,8 +129,19 @@ type SpecReading struct {
 	Spec *Spec
 	// Requirements holds one record per Spec.Requirements entry, in order.
 	Requirements []SpecRequirementRecord
+	// Scenarios lists, in file order, the scenarios that belong to the file and
+	// not to one requirement. Nil says the format has none.
+	Scenarios []SpecScenario
+	// OutcomePositions is parallel to Spec.Outcomes and NonGoalPositions to
+	// Spec.NonGoals, so a finding on that text points at its line. A format that
+	// does not locate them leaves them nil.
+	OutcomePositions []SpecPosition
+	NonGoalPositions []SpecPosition
 	// Findings are positioned diagnostics; build them with SpecPosition.Field.
 	Findings []diag.Diagnostic
+	// EnforceFindings are warnings that block only in enforce. A reader does not
+	// know the mode: SpecProjection.EnforceOnly applies it.
+	EnforceFindings []diag.Diagnostic
 }
 
 // SpecReader turns the bytes of one external spec into a native spec. An
@@ -144,8 +157,39 @@ type SpecProjection struct {
 	Spec *Spec
 	// Requirements is parallel to Spec.Requirements, nil when Spec is nil.
 	Requirements []SpecRequirementRecord
+	// Scenarios are the reading's file scenarios, nil when Spec is nil.
+	Scenarios []SpecScenario
 	// Findings are the sorted reader and contract findings.
 	Findings []diag.Diagnostic
+	// enforceFindings are the reading's enforce findings, nil when Spec is nil.
+	// EnforceOnly is their one reader, so no caller forgets the mode.
+	enforceFindings []diag.Diagnostic
+}
+
+// EnforceOnly returns what depends on the verification mode. In enforce, an
+// enforce finding is an error and so is each unanchored requirement, because
+// reordering the file would change the ID the baseline records. Otherwise an
+// enforce finding stays a warning and an unanchored requirement has no finding.
+func (projection SpecProjection) EnforceOnly(mode VerificationMode) []diag.Diagnostic {
+	enforce := mode == VerificationModeEnforce
+	findings := make([]diag.Diagnostic, 0, len(projection.enforceFindings))
+	for _, finding := range projection.enforceFindings {
+		if enforce {
+			finding.Severity = diag.Error
+		}
+		findings = append(findings, finding)
+	}
+	if enforce && projection.Spec != nil {
+		for index, record := range projection.Requirements {
+			if record.Unanchored {
+				findings = append(findings, diag.Errorf(ErrorCodeSpecRequirementUnanchored, record.Position.Field(),
+					"requirement %q takes its ID from its position: write an anchor above it before this project can enforce specs",
+					projection.Spec.Requirements[index].ID))
+			}
+		}
+	}
+	sortDiagnostics(findings)
+	return findings
 }
 
 // ReadSpecSource runs reader under the contract every format shares: the
@@ -162,7 +206,7 @@ func ReadSpecSource(reader SpecReader, input SpecInput) SpecProjection {
 		if !diag.HasErrors(findings) {
 			findings = append(findings, diag.Errorf(ErrorCodeSpecRead, input.Reference.Path, "the %s reader found no spec here", input.Reference.Format))
 		}
-		return finishProjection(nil, nil, findings)
+		return finishProjection(nil, SpecReading{}, findings)
 	}
 	spec := *reading.Spec
 	spec.Feature = input.Feature
@@ -176,7 +220,7 @@ func ReadSpecSource(reader SpecReader, input SpecInput) SpecProjection {
 	if len(reading.Requirements) != len(spec.Requirements) {
 		findings = append(findings, diag.Errorf(ErrorCodeSpecRead, input.Reference.Path,
 			"the %s reader returned %d records for %d requirements", input.Reference.Format, len(reading.Requirements), len(spec.Requirements)))
-		return finishProjection(nil, nil, findings)
+		return finishProjection(nil, SpecReading{}, findings)
 	}
 
 	first := make(map[string]SpecPosition, len(spec.Requirements))
@@ -200,29 +244,35 @@ func ReadSpecSource(reader SpecReader, input SpecInput) SpecProjection {
 		if refused[finding.Field] {
 			continue
 		}
-		finding.Field = specFindingField(finding.Field, input.Reference.Path, reading.Requirements)
+		finding.Field = specFindingField(finding.Field, input.Reference.Path, reading)
 		findings = append(findings, finding)
 	}
 	if diag.HasErrors(findings) {
-		return finishProjection(nil, nil, findings)
+		return finishProjection(nil, SpecReading{}, findings)
 	}
-	return finishProjection(&spec, reading.Requirements, findings)
+	return finishProjection(&spec, reading, findings)
 }
 
-func finishProjection(spec *Spec, records []SpecRequirementRecord, findings []diag.Diagnostic) SpecProjection {
+func finishProjection(spec *Spec, reading SpecReading, findings []diag.Diagnostic) SpecProjection {
 	sortDiagnostics(findings)
-	return SpecProjection{Spec: spec, Requirements: records, Findings: findings}
+	return SpecProjection{
+		Spec: spec, Requirements: reading.Requirements, Scenarios: reading.Scenarios,
+		Findings: findings, enforceFindings: reading.EnforceFindings,
+	}
 }
 
 // specFindingField moves a field of the projected spec to the external file: a
-// requirement's finding to its line, and any other to the reference.
-func specFindingField(field, referencePath string, records []SpecRequirementRecord) string {
-	if rest, found := strings.CutPrefix(field, "requirements["); found {
-		if digits, _, closed := strings.Cut(rest, "]"); closed {
-			if index, err := strconv.Atoi(digits); err == nil && index >= 0 && index < len(records) {
-				return records[index].Position.Field()
-			}
-		}
+// finding on a requirement or a located text to its line, and any other to the
+// reference.
+func specFindingField(field, referencePath string, reading SpecReading) string {
+	if index, found := specFieldIndex(field, "requirements["); found && index < len(reading.Requirements) {
+		return reading.Requirements[index].Position.Field()
+	}
+	if index, found := specFieldIndex(field, "outcomes["); found && index < len(reading.OutcomePositions) {
+		return reading.OutcomePositions[index].Field()
+	}
+	if index, found := specFieldIndex(field, "nonGoals["); found && index < len(reading.NonGoalPositions) {
+		return reading.NonGoalPositions[index].Field()
 	}
 	if field == "" {
 		return referencePath
@@ -230,11 +280,26 @@ func specFindingField(field, referencePath string, records []SpecRequirementReco
 	return referencePath + "#" + field
 }
 
+// specFieldIndex reads the index of a field such as "outcomes[2]".
+func specFieldIndex(field, prefix string) (int, bool) {
+	rest, found := strings.CutPrefix(field, prefix)
+	if !found {
+		return 0, false
+	}
+	digits, _, closed := strings.Cut(rest, "]")
+	if !closed {
+		return 0, false
+	}
+	index, err := strconv.Atoi(digits)
+	return index, err == nil && index >= 0
+}
+
 // CompareSpecScenarios compares a projection's scenarios with the checks its
-// feature declares, for each requirement whose format attaches scenarios. A
-// scenario with no declared check and a declared check with
-// no scenario are warnings. The comparison only reads: scenarios never define
-// or shrink the check set.
+// feature declares, for each requirement whose format attaches scenarios, and
+// for the file's own scenarios against every check its requirements declare. A
+// scenario with no declared check and a declared check with no scenario are
+// warnings. The comparison only reads: scenarios never define or shrink the
+// check set.
 func CompareSpecScenarios(projection SpecProjection, feature Feature) []diag.Diagnostic {
 	if projection.Spec == nil {
 		return nil
@@ -271,7 +336,40 @@ func CompareSpecScenarios(projection SpecProjection, feature Feature) []diag.Dia
 			}
 		}
 	}
+	if projection.Scenarios != nil {
+		findings = append(findings, compareFileScenarios(projection, declared)...)
+	}
 	sortDiagnostics(findings)
+	return findings
+}
+
+// compareFileScenarios compares scenarios that belong to no requirement with
+// the union of the projected requirements' checks.
+func compareFileScenarios(projection SpecProjection, declared map[string][]string) []diag.Diagnostic {
+	checks := make(map[string]bool)
+	for _, requirement := range projection.Spec.Requirements {
+		for _, check := range declared[requirement.ID] {
+			checks[check] = true
+		}
+	}
+	var findings []diag.Diagnostic
+	matched := make(map[string]bool, len(projection.Scenarios))
+	for _, scenario := range projection.Scenarios {
+		if scenario.Check != "" && checks[scenario.Check] {
+			matched[scenario.Check] = true
+			continue
+		}
+		findings = append(findings, diag.Warningf(WarningCodeSpecScenarioMismatch, scenario.Position.Field(),
+			"scenario %q matches no declared check", scenario.Name))
+	}
+	for i, requirement := range projection.Spec.Requirements {
+		for _, check := range declared[requirement.ID] {
+			if !matched[check] {
+				findings = append(findings, diag.Warningf(WarningCodeSpecScenarioMismatch, projection.Requirements[i].Position.Field(),
+					"declared check %q of requirement %q has no scenario", check, requirement.ID))
+			}
+		}
+	}
 	return findings
 }
 

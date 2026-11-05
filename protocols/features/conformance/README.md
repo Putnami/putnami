@@ -57,3 +57,8 @@ Aggregate semantics are checked by `features.ValidateRepository`, because a
 single fragment cannot decide workspace-wide feature/evidence uniqueness or
 resolve cross-project relations and requirements. Spec aggregation is checked
 the same way by `features.ValidateSpecRepository`.
+
+`spec-source/speckit/template/spec.md` is `templates/spec-template.md` of
+[GitHub Spec Kit](https://github.com/github/spec-kit) v1.3.0 (MIT), unchanged.
+`spec-source/speckit/filled/` is that template filled in, with a `plan.md` no
+reader may read, and `filled.golden.json` is its projection.

@@ -209,6 +209,15 @@ default is empty, and a project's list replaces the workspace's.
 - In `enforce`, a positional requirement such as `FR-001` needs an anchor on the
   line above it: `<!-- putnami:id <segment-id> -->`, or the tag
   `@putnami-id:<segment-id>` in a Gherkin file.
+- A `speckit` reference names a feature directory, such as
+  `specs/001-invoice-export`, or its `spec.md`. The reader takes `SC-xxx` items
+  as outcomes, `Out of Scope` items as non-goals and `FR-xxx` items as
+  requirements. It does not use `plan.md`, `tasks.md`, `research.md`,
+  `data-model.md` or `contracts/`.
+- A Spec Kit user story belongs to no requirement, so its scenarios are compared
+  with every check the feature's requirements declare. An anchor above a
+  scenario names its check. A mismatch is a warning.
+- A `[NEEDS CLARIFICATION]` marker is a warning, and an error in `enforce`.
 
 ## The validation jobs
 

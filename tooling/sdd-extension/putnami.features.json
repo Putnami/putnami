@@ -345,7 +345,8 @@
               "two-features-cannot-share-a-spec-path",
               "a-workspace-with-no-reference-reads-no-external-file",
               "an-external-spec-reaches-the-gate",
-              "a-scoped-run-keeps-its-external-spec"
+              "a-scoped-run-keeps-its-external-spec",
+              "native-and-speckit-specs-coexist-without-a-finding"
             ]
           }
         },
@@ -373,7 +374,9 @@
             "kind": "acceptance",
             "checks": [
               "enforce-fails-an-unanchored-positional-requirement",
-              "report-projects-an-unanchored-positional-requirement"
+              "report-projects-an-unanchored-positional-requirement",
+              "enforce-fails-an-inserted-speckit-requirement-without-an-anchor",
+              "enforce-fails-a-needs-clarification-marker"
             ]
           }
         },
