@@ -222,7 +222,7 @@
             "kind": "acceptance",
             "checks": [
               "a-requirement-name-normalizes-to-one-id",
-              "a-non-ascii-name-has-no-id",
+              "a-non-ascii-run-is-a-separator",
               "an-anchor-follows-the-segment-grammar"
             ]
           }
