@@ -313,6 +313,40 @@ func TestReportingRetryBudgetAndAckIdentity(t *testing.T) {
 	}
 }
 
+// A reporter that refuses a chunk without retry answers a machine code, as the
+// cloud reporter answers a receiver's 403 with unauthorized. The diagnostic
+// names the refused chunk and that code, so the warning says why delivery
+// stopped.
+func TestReportingRefusalNamesTheChunkAndTheReportersCode(t *testing.T) {
+	spectest.Proves(t, "cli/native-session-reporting", "bounded-transport", "writes-reads-retries-and-finalization-are-bounded")
+	for _, code := range []string{"unauthorized", "sequence_gap", "chunk_too_large", "reporter_not_configured"} {
+		t.Run(code, func(t *testing.T) {
+			p, remote := pipeProcess()
+			defer func() { _ = remote.Close(); _ = p.stdin.Close() }()
+			go func() {
+				scanner := bufio.NewScanner(remote)
+				if !scanner.Scan() {
+					return
+				}
+				chunk, err := protocolcli.ParseSessionReportingChunk(scanner.Bytes())
+				if err != nil {
+					return
+				}
+				ack := chunk.Ack()
+				ack.OK = false
+				ack.Code = code
+				_ = json.NewEncoder(remote).Encode(ack)
+			}()
+			r := &Run{ctx: context.Background(), process: p, opTimeout: time.Second}
+			err := r.send(protocolcli.NewSessionReportingChunk("session", "events.jsonl", 128, 3, []byte("abc"), false))
+			want := "reporter refused events.jsonl chunk 3: " + code
+			if err == nil || err.Error() != want {
+				t.Fatalf("error = %v, want %q", err, want)
+			}
+		})
+	}
+}
+
 func TestReportingArtifactChunkBoundaries(t *testing.T) {
 	dir := t.TempDir()
 	data := bytes.Repeat([]byte("x"), protocolcli.SessionReportingChunkBytes+7)

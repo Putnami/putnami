@@ -940,6 +940,13 @@ type chunkFailure struct {
 
 func (f *chunkFailure) Error() string { return f.reason }
 
+// refusal names the chunk a reporter answered ok:false without retry, and the
+// machine code it gave. ParseSessionReportingAck bounds that code to
+// [a-z][a-z0-9_]{0,63}, so it carries no provider text or credential.
+func refusal(chunk protocolcli.SessionReportingChunk, code string) string {
+	return fmt.Sprintf("reporter refused %s chunk %d: %s", chunk.Artifact, chunk.Sequence, code)
+}
+
 // errRetryBudget is a chunk the reporter answered ok:false with retry on its
 // last attempt.
 var errRetryBudget = errors.New("reporter retry budget exhausted")
@@ -974,7 +981,7 @@ func (r *Run) send(chunk protocolcli.SessionReportingChunk) error {
 				return nil
 			}
 			if !ack.Retryable {
-				return &chunkFailure{refused: true, reason: "reporter refused chunk"}
+				return &chunkFailure{refused: true, reason: refusal(chunk, ack.Code)}
 			}
 			retryable = true
 		} else {
