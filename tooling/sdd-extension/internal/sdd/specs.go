@@ -519,16 +519,17 @@ func BuildSpecInitResult(ws *workspace.Workspace, selector string, options SpecI
 			return report, WithResultData(
 				protocolcli.Usagef("feature %q already has a native spec at %s", selector, existing.Path), report)
 		}
-	} else if existing, found := repository.byFeature[selector]; found && existing.Format != "" {
-		report.Path = existing.Path
-		report.Project = existing.Project
-		report.Diagnostics = append(report.Diagnostics, diag.Errorf(featureproto.ErrorCodeDuplicateSpec, existing.Path,
+	} else if reference, field, _, named := repository.specReferenceOf(selector); named {
+		// The manifest entry decides, not the projection: a reference the
+		// discovery could not read (a format not opted into, or with no reader)
+		// still makes the feature specified, so a skeleton would be a second spec.
+		report.Diagnostics = append(report.Diagnostics, diag.Errorf(featureproto.ErrorCodeDuplicateSpec, field,
 			"feature %q names the external spec %s:%s; run `putnami specs init %s --from %s:%s` to draft its native spec",
-			selector, existing.Format, existing.Path, selector, existing.Format, existing.Path))
+			selector, reference.Format, reference.Path, selector, reference.Format, reference.Path))
 		return report, WithResultData(
 			protocolcli.Usagef("feature %q already has the external spec %s:%s; draft the native spec with --from %s:%s",
-				selector, existing.Format, existing.Path, existing.Format, existing.Path), report)
-	} else if found {
+				selector, reference.Format, reference.Path, reference.Format, reference.Path), report)
+	} else if existing, found := repository.byFeature[selector]; found {
 		report.Path = existing.Path
 		report.Project = existing.Project
 		report.Diagnostics = append(report.Diagnostics, diag.Errorf(featureproto.ErrorCodeDuplicateSpec, existing.Path,

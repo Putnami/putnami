@@ -281,6 +281,18 @@ func TestSpecsInitFromRefusesAtTheSourcePosition(t *testing.T) {
 		!hasDiagnostic(report.Diagnostics, featureproto.ErrorCodeDuplicateSpec, "--from openspec:app/openspec/specs/invoice-export") {
 		t.Fatalf("plain init on an external spec = %v, %+v, want a pointer to --from", err, report.Diagnostics)
 	}
+
+	// The same holds when the discovery could not read the reference: a format
+	// the project did not opt into still makes the feature specified.
+	unread := openSpecWorkspace(t)
+	unread.Projects[0].Config.Options["sdd"]["specFormats"] = []any{}
+	report, err = BuildSpecInitResult(unread, "billing/invoicing", SpecInitOptions{})
+	if !errors.Is(err, protocolcli.ErrUsage) || report.Created {
+		t.Fatalf("plain init on an unread external spec = %v, %+v, want a refusal", err, report)
+	}
+	if _, statErr := os.Stat(filepath.Join(unread.Root, "app", "specs", "invoicing.json")); !os.IsNotExist(statErr) {
+		t.Fatal("plain init wrote a skeleton beside an unread external spec")
+	}
 }
 
 func TestSpecsInitFromKeepsTheSpecsVerifyVerdict(t *testing.T) {
