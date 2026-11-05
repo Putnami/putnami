@@ -7,8 +7,8 @@
   [ADR 0004 of `@putnami/sdd`](../../../../tooling/sdd-extension/doc/adr/0004-a-spec-may-live-in-an-external-market-format.md),
   decisions D-039 to D-047. It records D-048 to D-055 and D-057 of the root
   `decisions.json`, which build sessions took and the owner has not reviewed,
-  and D-043 as the epic session of #805 revised it under the owner's
-  delegation of 2026-11-05
+  and D-043 as the epic session revised it under the owner's delegation of
+  2026-11-05
 - **One-way door**: the `spec` reference is authored in committed manifests,
   and the format names are public wire values. A release can add to them but
   cannot change them without a new manifest version and a move of every

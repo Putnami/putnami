@@ -345,7 +345,7 @@
       "id": "D-043",
       "statement": "a spec reader ignores an unknown section and warns on a derived-fact section; an external text over the 512-byte bound is still read, with a finding that names a split and blocks only in enforce; a native spec keeps the bound as an error",
       "settled": "2026-11-05",
-      "settledBy": "the epic session of #805, under the owner's delegation of 2026-11-05",
+      "settledBy": "the epic session, under the owner's delegation of 2026-11-05",
       "adr": "protocols/features/doc/adr/0006-the-spec-source-contract.md",
       "reviewOnly": true
     },
