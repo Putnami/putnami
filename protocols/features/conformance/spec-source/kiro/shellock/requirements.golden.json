@@ -1,0 +1,221 @@
+{
+  "protocolVersion": 1,
+  "feature": "billing/invoice-export",
+  "outcomes": [
+    "Shellock is a Python-native tool for encrypting and decrypting configuration files (e.g., `.env`) using strong symmetric cryptography. It provides both a CLI and a Python API, using modern cryptography defaults (Argon2id for key derivation and AES-256-GCM for encryption)."
+  ],
+  "requirements": [
+    {
+      "id": "requirement-1-1",
+      "text": "WHEN a passphrase and salt are provided, THE KDF SHALL derive a 32-byte key using Argon2id"
+    },
+    {
+      "id": "requirement-1-2",
+      "text": "WHEN deriving a key, THE KDF SHALL use memory_cost of 65536 (64 MB), time_cost of 2, and parallelism of 4"
+    },
+    {
+      "id": "requirement-1-3",
+      "text": "WHEN the same passphrase and salt are provided, THE KDF SHALL produce the same derived key"
+    },
+    {
+      "id": "requirement-1-4",
+      "text": "WHEN different salts are provided with the same passphrase, THE KDF SHALL produce different derived keys"
+    },
+    {
+      "id": "requirement-11-1",
+      "text": "WHEN `shellock encrypt-key INPUT --key KEY_FILE --out OUTPUT` is executed, THE CLI SHALL encrypt using the symmetric key from the file"
+    },
+    {
+      "id": "requirement-11-2",
+      "text": "WHEN `shellock decrypt-key INPUT --key KEY_FILE --out OUTPUT` is executed, THE CLI SHALL decrypt using the symmetric key from the file"
+    },
+    {
+      "id": "requirement-11-3",
+      "text": "WHEN encrypting with symmetric key file, THE Encryptor SHALL read the base64-encoded key and use it directly for AES-256-GCM encryption"
+    },
+    {
+      "id": "requirement-11-4",
+      "text": "WHEN decrypting with symmetric key file, THE Decryptor SHALL read the base64-encoded key and use it directly for AES-256-GCM decryption"
+    },
+    {
+      "id": "requirement-11-5",
+      "text": "IF the key file does not exist or is invalid, THEN THE CLI SHALL exit with a non-zero code and display an error message"
+    },
+    {
+      "id": "requirement-12-1",
+      "text": "WHEN `shellock --help` is executed, THE CLI SHALL display usage information for all commands"
+    },
+    {
+      "id": "requirement-12-2",
+      "text": "WHEN `shellock encrypt --help` is executed, THE CLI SHALL display usage information for the encrypt command"
+    },
+    {
+      "id": "requirement-12-3",
+      "text": "WHEN `shellock decrypt --help` is executed, THE CLI SHALL display usage information for the decrypt command"
+    },
+    {
+      "id": "requirement-12-4",
+      "text": "WHEN `shellock generate-key --help` is executed, THE CLI SHALL display usage information for the generate-key command"
+    },
+    {
+      "id": "requirement-12-5",
+      "text": "WHEN `shellock encrypt-public --help` is executed, THE CLI SHALL display usage information for the encrypt-public command"
+    },
+    {
+      "id": "requirement-12-6",
+      "text": "WHEN `shellock decrypt-private --help` is executed, THE CLI SHALL display usage information for the decrypt-private command"
+    },
+    {
+      "id": "requirement-12-7",
+      "text": "WHEN `shellock encrypt-key --help` is executed, THE CLI SHALL display usage information for the encrypt-key command"
+    },
+    {
+      "id": "requirement-12-8",
+      "text": "WHEN `shellock decrypt-key --help` is executed, THE CLI SHALL display usage information for the decrypt-key command"
+    },
+    {
+      "id": "requirement-2-1",
+      "text": "WHEN plaintext bytes and a passphrase are provided, THE Encryptor SHALL produce an encrypted envelope"
+    },
+    {
+      "id": "requirement-2-2",
+      "text": "WHEN encrypting, THE Encryptor SHALL generate a random 16-byte salt for key derivation"
+    },
+    {
+      "id": "requirement-2-3",
+      "text": "WHEN encrypting, THE Encryptor SHALL generate a random 12-byte nonce for AES-GCM"
+    },
+    {
+      "id": "requirement-2-4",
+      "text": "WHEN encrypting, THE Encryptor SHALL use AES-256-GCM to produce ciphertext and a 16-byte authentication tag"
+    },
+    {
+      "id": "requirement-2-5",
+      "text": "WHEN producing the envelope, THE Encryptor SHALL format it as: magic header (10 bytes) + salt (16 bytes) + nonce (12 bytes) + tag (16 bytes) + ciphertext"
+    },
+    {
+      "id": "requirement-2-6",
+      "text": "THE Encryptor SHALL use the magic header value `b\"ENVCRYPTv1\"` (10 bytes)"
+    },
+    {
+      "id": "requirement-3-1",
+      "text": "WHEN an encrypted envelope and correct passphrase are provided, THE Decryptor SHALL return the original plaintext bytes"
+    },
+    {
+      "id": "requirement-3-2",
+      "text": "WHEN parsing the envelope, THE Decryptor SHALL extract the magic header, salt, nonce, tag, and ciphertext"
+    },
+    {
+      "id": "requirement-3-3",
+      "text": "IF the magic header does not match `b\"ENVCRYPTv1\"`, THEN THE Decryptor SHALL raise an InvalidFileFormat error"
+    },
+    {
+      "id": "requirement-3-4",
+      "text": "IF the passphrase is incorrect, THEN THE Decryptor SHALL raise an AuthenticationError"
+    },
+    {
+      "id": "requirement-3-5",
+      "text": "IF the ciphertext has been tampered with, THEN THE Decryptor SHALL raise an AuthenticationError"
+    },
+    {
+      "id": "requirement-4-1",
+      "text": "FOR ALL valid plaintext bytes and passphrases, encrypting then decrypting SHALL produce the original plaintext"
+    },
+    {
+      "id": "requirement-4-2",
+      "text": "FOR ALL valid plaintext bytes, encrypting with the same passphrase twice SHALL produce different ciphertexts (due to random salt and nonce)"
+    },
+    {
+      "id": "requirement-5-1",
+      "text": "WHEN `encrypt_file(in_path, out_path, passphrase)` is called, THE API SHALL read the input file, encrypt its contents, and write the envelope to the output path"
+    },
+    {
+      "id": "requirement-5-2",
+      "text": "WHEN `decrypt_file(in_path, out_path, passphrase)` is called, THE API SHALL read the encrypted file, decrypt its contents, and write the plaintext to the output path"
+    },
+    {
+      "id": "requirement-5-3",
+      "text": "IF the input file does not exist, THEN THE API SHALL raise a FileNotFoundError"
+    },
+    {
+      "id": "requirement-5-4",
+      "text": "IF the output directory does not exist, THEN THE API SHALL raise a FileNotFoundError"
+    },
+    {
+      "id": "requirement-6-1",
+      "text": "WHEN `shellock encrypt INPUT --out OUTPUT --passphrase PASS` is executed, THE CLI SHALL encrypt the input file and write to the output path"
+    },
+    {
+      "id": "requirement-6-2",
+      "text": "WHEN the `--passphrase` flag is omitted, THE CLI SHALL prompt for the passphrase using secure input (no echo)"
+    },
+    {
+      "id": "requirement-6-3",
+      "text": "IF the input file does not exist, THEN THE CLI SHALL exit with a non-zero code and display an error message"
+    },
+    {
+      "id": "requirement-6-4",
+      "text": "WHEN encryption succeeds, THE CLI SHALL exit with code 0"
+    },
+    {
+      "id": "requirement-7-1",
+      "text": "WHEN `shellock decrypt INPUT --out OUTPUT --passphrase PASS` is executed, THE CLI SHALL decrypt the input file and write to the output path"
+    },
+    {
+      "id": "requirement-7-2",
+      "text": "WHEN the `--passphrase` flag is omitted, THE CLI SHALL prompt for the passphrase using secure input (no echo)"
+    },
+    {
+      "id": "requirement-7-3",
+      "text": "IF the passphrase is incorrect or the file is tampered, THEN THE CLI SHALL exit with a non-zero code and display an error message"
+    },
+    {
+      "id": "requirement-7-4",
+      "text": "IF the file format is invalid, THEN THE CLI SHALL exit with a non-zero code and display an error message"
+    },
+    {
+      "id": "requirement-7-5",
+      "text": "WHEN decryption succeeds, THE CLI SHALL exit with code 0"
+    },
+    {
+      "id": "requirement-8-1",
+      "text": "WHEN `shellock generate-key --type symmetric --out PATH` is executed, THE CLI SHALL generate 32 random bytes"
+    },
+    {
+      "id": "requirement-8-2",
+      "text": "WHEN `shellock generate-key --type asymmetric --out PATH` is executed, THE CLI SHALL generate an Ed25519 keypair"
+    },
+    {
+      "id": "requirement-8-3",
+      "text": "WHEN writing symmetric keys, THE CLI SHALL encode them as base64 and write to the specified path"
+    },
+    {
+      "id": "requirement-8-4",
+      "text": "WHEN writing asymmetric keys, THE CLI SHALL write the private key in PEM format and display the public key"
+    },
+    {
+      "id": "requirement-8-5",
+      "text": "WHEN key generation succeeds, THE CLI SHALL exit with code 0"
+    },
+    {
+      "id": "requirement-9-1",
+      "text": "WHEN `shellock encrypt-public INPUT --key PUBLIC_KEY --out OUTPUT` is executed, THE CLI SHALL encrypt using hybrid encryption"
+    },
+    {
+      "id": "requirement-9-2",
+      "text": "WHEN encrypting with public key, THE Encryptor SHALL generate a random symmetric key and encrypt data with AES-256-GCM"
+    },
+    {
+      "id": "requirement-9-3",
+      "text": "WHEN encrypting with public key, THE Encryptor SHALL encrypt the symmetric key with the recipient's Ed25519 public key"
+    },
+    {
+      "id": "requirement-9-4",
+      "text": "WHEN `shellock decrypt-private INPUT --key PRIVATE_KEY --out OUTPUT` is executed, THE CLI SHALL decrypt using the private key"
+    },
+    {
+      "id": "requirement-9-5",
+      "text": "WHEN decrypting with private key, THE Decryptor SHALL first decrypt the symmetric key, then decrypt the data"
+    }
+  ]
+}

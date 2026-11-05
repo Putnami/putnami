@@ -1,0 +1,122 @@
+{
+  "protocolVersion": 1,
+  "feature": "billing/invoice-export",
+  "outcomes": [
+    "This feature adds a dedicated Air Quality Dialog accessible from the View menu, providing comprehensive air quality information including hourly forecasts, pollutant details, and health guidance. Additionally, this feature addresses the duplicate air quality information currently displayed in the main window's Current Conditions section by consolidating the display logic.",
+    "The Air Quality Dialog is a separate modal window from the main application. The Current Conditions section in the main window will show a brief air quality overview, while the dialog provides detailed information."
+  ],
+  "requirements": [
+    {
+      "id": "requirement-1-1",
+      "text": "WHEN a user opens the View menu, THE AccessiWeather application SHALL display an \"Air Quality\" menu item"
+    },
+    {
+      "id": "requirement-1-2",
+      "text": "WHEN a user selects the Air Quality menu item, THE AccessiWeather application SHALL open a modal dialog window titled \"Air Quality\""
+    },
+    {
+      "id": "requirement-1-3",
+      "text": "WHEN the Air Quality dialog opens, THE AccessiWeather application SHALL display the current location name in the dialog title or header"
+    },
+    {
+      "id": "requirement-1-4",
+      "text": "WHEN no location is selected, THE AccessiWeather application SHALL display an informative message prompting the user to select a location first"
+    },
+    {
+      "id": "requirement-2-1",
+      "text": "WHEN the Air Quality dialog displays the summary section, THE AccessiWeather application SHALL show the current AQI value and category"
+    },
+    {
+      "id": "requirement-2-2",
+      "text": "WHEN the Air Quality dialog displays the summary section, THE AccessiWeather application SHALL show the dominant pollutant if available"
+    },
+    {
+      "id": "requirement-2-3",
+      "text": "WHEN the Air Quality dialog displays the summary section, THE AccessiWeather application SHALL show health guidance appropriate to the current AQI category"
+    },
+    {
+      "id": "requirement-2-4",
+      "text": "WHEN the Air Quality dialog displays the summary section, THE AccessiWeather application SHALL show the data update timestamp"
+    },
+    {
+      "id": "requirement-2-5",
+      "text": "WHEN no air quality data is available, THE AccessiWeather application SHALL display a message indicating data is unavailable"
+    },
+    {
+      "id": "requirement-3-1",
+      "text": "WHEN hourly forecast data is available, THE AccessiWeather application SHALL display forecast entries for up to 24 hours"
+    },
+    {
+      "id": "requirement-3-2",
+      "text": "WHEN displaying hourly forecasts, THE AccessiWeather application SHALL show the time, AQI value, and category for each hour"
+    },
+    {
+      "id": "requirement-3-3",
+      "text": "WHEN displaying hourly forecasts, THE AccessiWeather application SHALL indicate the trend (improving, worsening, or stable)"
+    },
+    {
+      "id": "requirement-3-4",
+      "text": "WHEN displaying hourly forecasts, THE AccessiWeather application SHALL highlight the peak AQI time and value"
+    },
+    {
+      "id": "requirement-3-5",
+      "text": "WHEN displaying hourly forecasts, THE AccessiWeather application SHALL highlight the best time for outdoor activities if AQI is below 100"
+    },
+    {
+      "id": "requirement-4-1",
+      "text": "WHEN pollutant data is available, THE AccessiWeather application SHALL display individual pollutant measurements (PM2.5, PM10, Ozone, NO2, SO2, CO)"
+    },
+    {
+      "id": "requirement-4-2",
+      "text": "WHEN displaying pollutant data, THE AccessiWeather application SHALL show human-readable pollutant names"
+    },
+    {
+      "id": "requirement-4-3",
+      "text": "WHEN displaying pollutant data, THE AccessiWeather application SHALL indicate which pollutant is the dominant contributor to the AQI"
+    },
+    {
+      "id": "requirement-5-1",
+      "text": "WHEN the Air Quality dialog is created, THE AccessiWeather application SHALL assign appropriate aria_label attributes to all interactive elements"
+    },
+    {
+      "id": "requirement-5-2",
+      "text": "WHEN the Air Quality dialog is created, THE AccessiWeather application SHALL assign appropriate aria_description attributes providing context for screen reader users"
+    },
+    {
+      "id": "requirement-5-3",
+      "text": "WHEN the Air Quality dialog displays data, THE AccessiWeather application SHALL present information in a logical reading order"
+    },
+    {
+      "id": "requirement-6-1",
+      "text": "WHEN the Air Quality dialog is open, THE AccessiWeather application SHALL provide a Close button to dismiss the dialog"
+    },
+    {
+      "id": "requirement-6-2",
+      "text": "WHEN the user presses the Close button, THE AccessiWeather application SHALL close the dialog and return focus to the main window"
+    },
+    {
+      "id": "requirement-6-3",
+      "text": "WHEN the user presses the Escape key, THE AccessiWeather application SHALL close the dialog"
+    },
+    {
+      "id": "requirement-7-1",
+      "text": "WHEN displaying air quality in Current Conditions, THE AccessiWeather application SHALL show air quality information in exactly one location"
+    },
+    {
+      "id": "requirement-7-2",
+      "text": "WHEN displaying air quality in Current Conditions, THE AccessiWeather application SHALL show a brief summary (AQI value, category, and trend)"
+    },
+    {
+      "id": "requirement-7-3",
+      "text": "WHEN displaying air quality in Current Conditions, THE AccessiWeather application SHALL NOT display both the air quality update section and the hourly forecast section simultaneously with overlapping information"
+    },
+    {
+      "id": "requirement-8-1",
+      "text": "WHEN formatting air quality data for display, THE AccessiWeather application SHALL use a pure function that accepts data and settings and returns formatted text"
+    },
+    {
+      "id": "requirement-8-2",
+      "text": "WHEN formatting air quality data, THE AccessiWeather application SHALL produce consistent output for the same input data and settings"
+    }
+  ]
+}
