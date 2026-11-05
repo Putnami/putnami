@@ -55,8 +55,8 @@ import (
 // Provenance: captured from tooling/cli/internal/commands/sdd at the parent of
 // the Task 8 commit, through App.runStructuredCommand, over the fixture
 // parityWorkspace builds below. The fixture's git commit is byte-deterministic
-// (parityCommitDate), so the revision each answer carries is compared verbatim
-// rather than normalized away.
+// (parityCommitDate, parityGitEnv), so the revision each answer carries is
+// compared verbatim rather than normalized away.
 //
 // # How the extension side runs
 //
@@ -131,10 +131,10 @@ func assertRecordedParityAnswer(t *testing.T, name, root string, wantExit, code 
 		t.Errorf("exit code: extension %d, recorded built-in %d", code, recorded.exit)
 	}
 	if got := normalizeParityBytes(stdout, root); got != recorded.stdout {
-		t.Errorf("stdout differs from the recorded built-in answer.\n--- recorded ---\n%s\n--- extension ---\n%s", recorded.stdout, got)
+		t.Errorf("stdout differs from the recorded built-in answer: %s\n--- recorded ---\n%s\n--- extension ---\n%s", firstParityDifference(recorded.stdout, got), recorded.stdout, got)
 	}
 	if got := normalizeParityBytes(stderr, root); got != recorded.stderr {
-		t.Errorf("stderr differs from the recorded built-in answer.\n--- recorded ---\n%s\n--- extension ---\n%s", recorded.stderr, got)
+		t.Errorf("stderr differs from the recorded built-in answer: %s\n--- recorded ---\n%s\n--- extension ---\n%s", firstParityDifference(recorded.stderr, got), recorded.stderr, got)
 	}
 }
 
@@ -308,10 +308,10 @@ func TestSDDHumanOutputMatchesTheRecordedBuiltIn(t *testing.T) {
 				t.Errorf("exit code: extension %d, recorded built-in %d", code, recorded.exit)
 			}
 			if got := normalizeParityBytes(out, root); got != recorded.stdout {
-				t.Errorf("human stdout differs from the recorded built-in answer.\n--- recorded ---\n%s\n--- extension ---\n%s", recorded.stdout, got)
+				t.Errorf("human stdout differs from the recorded built-in answer: %s\n--- recorded ---\n%s\n--- extension ---\n%s", firstParityDifference(recorded.stdout, got), recorded.stdout, got)
 			}
 			if got := normalizeParityBytes(errOut, root); got != recorded.stderr {
-				t.Errorf("human stderr differs from the recorded built-in answer.\n--- recorded ---\n%s\n--- extension ---\n%s", recorded.stderr, got)
+				t.Errorf("human stderr differs from the recorded built-in answer: %s\n--- recorded ---\n%s\n--- extension ---\n%s", firstParityDifference(recorded.stderr, got), recorded.stderr, got)
 			}
 		})
 	}
@@ -503,7 +503,7 @@ func parityWorkspaceTemplate(t *testing.T) string {
 		if err := os.Mkdir(parityWorkspaceTemplateDir, 0o755); err != nil {
 			t.Fatalf("create parity workspace template: %v", err)
 		}
-		populateParityWorkspace(t, parityWorkspaceTemplateDir)
+		populateParityWorkspace(t, parityWorkspaceTemplateDir, os.Environ())
 	})
 	if parityWorkspaceTemplateDir == "" {
 		t.Fatal("parity workspace template was not created")
@@ -546,7 +546,7 @@ func copyParityTree(t *testing.T, source, destination string) {
 	}
 }
 
-func populateParityWorkspace(t *testing.T, root string) {
+func populateParityWorkspace(t *testing.T, root string, environ []string) {
 	t.Helper()
 
 	writeParityFile(t, root, "putnami.workspace.json",
@@ -646,7 +646,7 @@ func populateParityWorkspace(t *testing.T, root string) {
   "claims": [ { "name": "sub", "type": "string", "required": true } ]
 }`)
 
-	commitParityWorkspace(t, root)
+	commitParityWorkspace(t, root, environ)
 }
 
 func writeParityFile(t *testing.T, root, rel, contents string) {
@@ -851,7 +851,8 @@ func paritySlug(name string) string {
 // a per-run temporary directory, with a stable token.
 //
 // It is the ONLY normalization applied. The commit SHA every answer carries is
-// deterministic by construction (parityCommitDate), so it is compared verbatim:
+// deterministic by construction (parityCommitDate, parityGitEnv), so it is
+// compared verbatim:
 // a normalized revision would let an answer about the wrong tree compare equal.
 func normalizeParityBytes(body, root string) string {
 	if root == "" {
@@ -861,6 +862,34 @@ func normalizeParityBytes(body, root string) string {
 }
 
 const parityRootToken = "{{WORKSPACE_ROOT}}"
+
+// firstParityDifference names where two answers first diverge: the line, the
+// byte offset, and both lines quoted, so an invisible difference (a control
+// sequence, a trailing space, another revision) is readable in the failure.
+func firstParityDifference(recorded, got string) string {
+	offset := 0
+	for offset < len(recorded) && offset < len(got) && recorded[offset] == got[offset] {
+		offset++
+	}
+	line := strings.Count(recorded[:offset], "\n") + 1
+	start := strings.LastIndexByte(recorded[:offset], '\n') + 1
+	recordedLine, gotLine := parityLineAt(recorded, start), parityLineAt(got, start)
+	if recordedLine == gotLine {
+		// The lines agree, so the difference is a newline: quote what remains.
+		recordedLine, gotLine = recorded[offset:], got[offset:]
+	}
+	return "first difference at byte " + strconv.Itoa(offset) + ", line " + strconv.Itoa(line) +
+		": recorded " + strconv.Quote(recordedLine) + ", extension " + strconv.Quote(gotLine)
+}
+
+// parityLineAt returns the line of body that starts at start.
+func parityLineAt(body string, start int) string {
+	if start >= len(body) {
+		return ""
+	}
+	line, _, _ := strings.Cut(body[start:], "\n")
+	return line
+}
 
 // driftParityContracts corrupts one GENERATED artifact — never the authored
 // manifest — so `check` reports drift and exits 2, which is the exit-code
@@ -880,18 +909,24 @@ func driftParityContracts(t *testing.T, root string) {
 // parityCommitDate pins the fixture commit's author and committer timestamps.
 //
 // A git commit's SHA is a hash of its tree, parents, message, and the two
-// identity+timestamp lines. Everything but the timestamps was already fixed, so
-// pinning these makes the fixture repository's HEAD the SAME 40 hex digits on
+// identity+timestamp lines. parityGitEnv fixes everything but the timestamps,
+// so pinning these makes the fixture repository's HEAD the SAME 40 hex digits on
 // every machine and every run — which is what lets the recorded answers below
 // carry the revision they were produced under verbatim, instead of being
 // normalized past the one field that proves which tree they describe.
 const parityCommitDate = "2026-01-01T00:00:00+00:00"
 
+// parityFixtureCommit is the commit every recorded answer names: the fixture's
+// HEAD on any machine, whatever git environment the test inherits.
+const parityFixtureCommit = "7c5122267ea7854954d543e1eda0a15c7cc56b08"
+
 // commitParityWorkspace makes the fixture a git repository with one commit, so
 // `features diff` and `contracts check`'s prior-IR loader have history to read.
 // Automatic maintenance is off: `git commit` otherwise starts it in the
 // background, and its lock file can vanish while a test copies the template.
-func commitParityWorkspace(t *testing.T, root string) {
+// environ is the environment the test inherits; parityGitEnv keeps git from
+// reading it.
+func commitParityWorkspace(t *testing.T, root string, environ []string) {
 	t.Helper()
 	for _, args := range [][]string{
 		{"init", "--initial-branch=main"},
@@ -905,12 +940,59 @@ func commitParityWorkspace(t *testing.T, root string) {
 	} {
 		cmd := exec.Command(gitread.Executable(), args...)
 		cmd.Dir = root
-		cmd.Env = append(os.Environ(),
-			"GIT_CONFIG_GLOBAL=/dev/null", "GIT_CONFIG_SYSTEM=/dev/null",
-			"GIT_AUTHOR_DATE="+parityCommitDate, "GIT_COMMITTER_DATE="+parityCommitDate)
+		cmd.Env = parityGitEnv(environ)
 		if out, err := cmd.CombinedOutput(); err != nil {
 			t.Fatalf("git %v: %v\n%s", args, err, out)
 		}
+	}
+}
+
+// parityGitEnv is the environment of a fixture git command: environ without
+// its GIT_ variables, plus no global or system configuration, no
+// global ignore or attributes file, and the pinned commit dates. Every input of
+// the commit SHA comes from the fixture.
+func parityGitEnv(environ []string) []string {
+	var env []string
+	for _, entry := range environ {
+		if !strings.HasPrefix(entry, "GIT_") {
+			env = append(env, entry)
+		}
+	}
+	return append(env,
+		"GIT_CONFIG_GLOBAL="+os.DevNull, "GIT_CONFIG_SYSTEM="+os.DevNull, "GIT_CONFIG_NOSYSTEM=1",
+		"GIT_CONFIG_COUNT=2",
+		"GIT_CONFIG_KEY_0=core.excludesFile", "GIT_CONFIG_VALUE_0="+os.DevNull,
+		"GIT_CONFIG_KEY_1=core.attributesFile", "GIT_CONFIG_VALUE_1="+os.DevNull,
+		"GIT_AUTHOR_DATE="+parityCommitDate, "GIT_COMMITTER_DATE="+parityCommitDate)
+}
+
+// TestParityFixtureCommitIgnoresTheCallerGitEnvironment pins the fixture's
+// HEAD, and the commit the recorded answers name, under the git environment a
+// cloud sandbox or a developer machine sets: another identity, another user
+// configuration and a global ignore file.
+func TestParityFixtureCommitIgnoresTheCallerGitEnvironment(t *testing.T) {
+	t.Parallel()
+	config := t.TempDir()
+	writeParityFile(t, config, "git/ignore", "billing/\n")
+	environ := append(os.Environ(),
+		"XDG_CONFIG_HOME="+config,
+		"GIT_AUTHOR_NAME=Sandbox", "GIT_AUTHOR_EMAIL=sandbox@example.test",
+		"GIT_COMMITTER_NAME=Sandbox", "GIT_COMMITTER_EMAIL=sandbox@example.test",
+		"GIT_CONFIG_COUNT=1", "GIT_CONFIG_KEY_0=user.name", "GIT_CONFIG_VALUE_0=Sandbox")
+
+	root := t.TempDir()
+	populateParityWorkspace(t, root, environ)
+
+	head, err := gitread.HeadSHA(root)
+	if err != nil {
+		t.Fatalf("read the fixture HEAD: %v", err)
+	}
+	if head != parityFixtureCommit {
+		t.Errorf("the fixture commit is %s, the recorded answers name %s: the fixture took an input from the caller's git environment",
+			head, parityFixtureCommit)
+	}
+	if recorded := readRecordedParityAnswer(t, filepath.Join("structured", paritySlug("features list"))); !strings.Contains(recorded.stdout, "git:"+parityFixtureCommit) {
+		t.Errorf("the recorded answer of \"features list\" does not name the fixture commit %s", parityFixtureCommit)
 	}
 }
 
