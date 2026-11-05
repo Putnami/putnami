@@ -426,6 +426,16 @@ func TestHostedWorkflowRefusesAUnitWithNoRequirementThatEditsIntent(t *testing.T
 			f.head = f.git("rev-parse", "HEAD")
 			f.write("app/features/export.feature", "Feature: Export\n")
 		}},
+		{"external spec of the workspace root", "features/export.feature", func(f *verifyFixture) {
+			f.write("putnami.features.json", fxObj{"protocolVersion": 3, "namespace": "root", "features": fxArr{fxObj{
+				"id": "root/export", "type": "feature", "name": "Export", "outcome": "Data exports",
+				"owner": "root", "target": "modeled",
+				"spec": fxObj{"format": "gherkin", "path": "features/export.feature"}}}})
+			f.git("add", "putnami.features.json")
+			f.git("commit", "-q", "-m", "Root manifest naming an external spec")
+			f.head = f.git("rev-parse", "HEAD")
+			f.write("features/export.feature", "Feature: Export\n")
+		}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()

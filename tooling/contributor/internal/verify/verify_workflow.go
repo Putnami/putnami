@@ -1199,10 +1199,11 @@ func (r *verifyRun) workflowIntentEdit(base string) string {
 }
 
 // workflowExternalSpecPaths lists the external spec paths that the feature
-// manifests of the tree name. Like feature discovery, it reads a manifest only
-// at a project root: beside a tracked putnami.json.
+// manifests of the tree name. Like feature discovery, it reads the manifest at
+// the workspace root and a manifest at a project root, beside a tracked
+// putnami.json.
 func (r *verifyRun) workflowExternalSpecPaths() []string {
-	projects := map[string]bool{}
+	projects := map[string]bool{".": true}
 	for _, project := range r.fileList("ls-files", "-z", "--", "putnami.json", "**/putnami.json") {
 		projects[path.Dir(project)] = true
 	}
