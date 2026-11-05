@@ -118,8 +118,9 @@ task input is a static pattern, so it cannot depend on a manifest value.
     native spec keeps the bound as an error, and `ValidateSpecRepository` does
     not check it again on an external spec. On 127 public OpenSpec files, 27
     failed their first `report` run on this bound or on §5, which broke the
-    promise of ADR 0004 that a market spec gives results with no rewrite.
-    (D-043)
+    promise of ADR 0004 that a market spec gives results with no rewrite. Such
+    a projection is never written as a native document, so the 512-byte bound
+    of `putnami-spec.json` still holds for every file on disk. (D-043)
 23. **A name with no ID is unanchored.** A requirement whose name leaves no ID
     under §5, and has no anchor, takes the positional ID `requirement-<n>`,
     with `n` its 1-based place among the projected requirements, and is
