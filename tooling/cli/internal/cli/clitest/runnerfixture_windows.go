@@ -24,3 +24,6 @@ func RequireRunnerFixture(t *testing.T) {
 func startDetachedSupervisor(*exec.Cmd) error { return errFixtureNeedsUnix }
 
 func stopSupervisor(int) error { return errFixtureNeedsUnix }
+
+// ProcessExited never reports an exit: no fixture supervisor runs on Windows.
+func ProcessExited(int) bool { return false }

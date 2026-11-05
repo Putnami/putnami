@@ -9,7 +9,6 @@ package lifecycle
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -106,26 +105,17 @@ func providerAttempts(t *testing.T, providerRoot string) []string {
 	return names
 }
 
-// processGone reports whether pid no longer exists, waiting a bounded time
-// for the kernel to reap it. The bound covers a negative only.
+// processGone reports whether pid has exited, waiting a bounded time for it.
+// The bound covers a negative only.
 func processGone(pid int, deadline time.Duration) bool {
 	start := time.Now()
-	for {
-		err := syscall.Kill(pid, 0)
-		if errors.Is(err, syscall.ESRCH) {
-			return true
-		}
-		if err == nil {
-			// A zombie answers kill(0) until reaped; ask the kernel for its state.
-			if out, err := exec.Command("ps", "-o", "stat=", "-p", strconv.Itoa(pid)).Output(); err != nil || strings.HasPrefix(strings.TrimSpace(string(out)), "Z") {
-				return true
-			}
-		}
+	for !clitest.ProcessExited(pid) {
 		if time.Since(start) > deadline {
 			return false
 		}
 		time.Sleep(50 * time.Millisecond)
 	}
+	return true
 }
 
 func TestPortableLostAcknowledgementResolvesByKeyBeforeResubmitting(t *testing.T) {
@@ -189,31 +179,9 @@ func TestPortableLostAcknowledgementResolvesByKeyBeforeResubmitting(t *testing.T
 func TestPortableProviderSubmitIsIdempotentByKey(t *testing.T) {
 	spectest.Proves(t, "cli/portable-runner", "durable-lifecycle", "duplicate-submit-is-one-attempt")
 	providerRoot := t.TempDir()
-	executable, err := os.Executable()
-	if err != nil {
-		t.Fatal(err)
-	}
 	ctx := context.Background()
-	session, err := runnerprovider.Spawn(ctx, runnerprovider.LaunchSpec{Command: executable, Dir: providerRoot,
-		Env: append(os.Environ(), clitest.RunnerFixtureRoleEnv+"=provider", clitest.RunnerFixtureRootEnv+"="+providerRoot)}, os.Stderr)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer func() { _ = session.Close() }()
-	if _, err := session.Initialize(ctx, &runner.InitializeParams{ProtocolVersion: runner.ProviderProtocolVersion, ExchangeDir: t.TempDir(),
-		Capabilities: []string{runner.CapabilityExecutionRequestV1, runner.CapabilitySessionBundleV1}}); err != nil {
-		t.Fatal(err)
-	}
-	manifest := runner.SourceManifest{Version: runner.SourceManifestVersion, Entries: []runner.SourceEntry{}}
-	digest, err := runner.SourceDigest(manifest)
-	if err != nil {
-		t.Fatal(err)
-	}
-	var request runner.ExecutionRequest
-	if err := json.Unmarshal(clitest.BoundFixtureRequest(t, portableFixtureRepo(t), "/app:build~check"), &request); err != nil {
-		t.Fatal(err)
-	}
-	request.Source.Digest = digest
+	session := spawnFixtureProvider(t, providerRoot)
+	request, manifest := fixtureSubmission(t)
 	missed, err := session.Lookup(ctx, &runner.LookupParams{IdempotencyKey: request.Control.IdempotencyKey})
 	if err != nil || missed.Attempt != "" {
 		t.Fatalf("lookup before submit = %+v, %v", missed, err)
@@ -246,23 +214,115 @@ func TestPortableProviderSubmitIsIdempotentByKey(t *testing.T) {
 	}
 }
 
-// awaitAttemptSettled waits until the attempt is terminal and its supervisor
-// has exited. A cancel answers after a bounded wait, so without this the
-// supervisor can still write into the attempt while the test's temporary
-// directory is removed.
+// A cancel that claims an attempt before its supervisor does ends the attempt,
+// but the supervisor process the provider launched still runs until it finds
+// the claim taken. The attempt is settled only once that process exited:
+// earlier, it can claim the attempt again in a directory the test is removing
+// and write into it.
+func TestFixtureCancelBeforeSupervisionSettlesOnceTheLaunchedSupervisorExited(t *testing.T) {
+	providerRoot := t.TempDir()
+	hold := filepath.Join(t.TempDir(), "claim-hold")
+	ctx := context.Background()
+	session := spawnFixtureProvider(t, providerRoot, clitest.RunnerFixtureClaimHoldEnv+"="+hold)
+	request, manifest := fixtureSubmission(t)
+	submitted, err := session.Submit(ctx, &runner.SubmitParams{Request: request, Manifest: manifest})
+	if err != nil {
+		t.Fatal(err)
+	}
+	waitForFile(t, hold+".waiting", 60*time.Second)
+	canceled, err := session.Cancel(ctx, &runner.CancelParams{Attempt: submitted.Attempt})
+	if err != nil || canceled.State != runner.StateCanceled {
+		t.Fatalf("cancel before supervision = %+v, %v", canceled, err)
+	}
+	dir := filepath.Join(providerRoot, "attempts", submitted.Attempt)
+	if clitest.FixtureAttemptSettled(dir) {
+		t.Fatal("the attempt reads as settled while the supervisor the provider launched for it still runs")
+	}
+	clitest.WriteFile(t, hold, "")
+	awaitAttemptSettled(t, dir)
+	if state := clitest.ReadFixtureState(dir); state.State != runner.StateCanceled || state.Supervisor != 0 || state.Engine != 0 {
+		t.Fatalf("the late supervisor took over the canceled attempt: %+v", state)
+	}
+}
+
+// A supervisor held before its claim waits for a release a failing test never
+// writes. It exits once its attempt is removed, so a failed run leaves no
+// detached process behind.
+func TestFixtureHeldSupervisorExitsOnceItsAttemptIsRemoved(t *testing.T) {
+	providerRoot := t.TempDir()
+	hold := filepath.Join(t.TempDir(), "claim-hold")
+	ctx := context.Background()
+	session := spawnFixtureProvider(t, providerRoot, clitest.RunnerFixtureClaimHoldEnv+"="+hold)
+	request, manifest := fixtureSubmission(t)
+	submitted, err := session.Submit(ctx, &runner.SubmitParams{Request: request, Manifest: manifest})
+	if err != nil {
+		t.Fatal(err)
+	}
+	waitForFile(t, hold+".waiting", 60*time.Second)
+	dir := filepath.Join(providerRoot, "attempts", submitted.Attempt)
+	pid, ok := clitest.FixtureLaunchedSupervisor(dir)
+	if !ok {
+		t.Fatal("the provider recorded no launched supervisor")
+	}
+	if err := os.RemoveAll(dir); err != nil {
+		t.Fatal(err)
+	}
+	if !processGone(pid, 30*time.Second) {
+		_ = syscall.Kill(pid, syscall.SIGKILL)
+		t.Fatalf("the held supervisor %d outlived its removed attempt", pid)
+	}
+}
+
+// spawnFixtureProvider starts the fixture provider over providerRoot with the
+// extra environment entries, and initializes it.
+func spawnFixtureProvider(t *testing.T, providerRoot string, env ...string) *runnerprovider.Session {
+	t.Helper()
+	executable, err := os.Executable()
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx := context.Background()
+	env = append(append(os.Environ(), clitest.RunnerFixtureRoleEnv+"=provider", clitest.RunnerFixtureRootEnv+"="+providerRoot), env...)
+	session, err := runnerprovider.Spawn(ctx, runnerprovider.LaunchSpec{Command: executable, Dir: providerRoot, Env: env}, os.Stderr)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = session.Close() })
+	if _, err := session.Initialize(ctx, &runner.InitializeParams{ProtocolVersion: runner.ProviderProtocolVersion, ExchangeDir: t.TempDir(),
+		Capabilities: []string{runner.CapabilityExecutionRequestV1, runner.CapabilitySessionBundleV1}}); err != nil {
+		t.Fatal(err)
+	}
+	return session
+}
+
+// fixtureSubmission returns a request for /app:build~check over an empty
+// source manifest, under the idempotency key BoundFixtureRequest sets.
+func fixtureSubmission(t *testing.T) (runner.ExecutionRequest, runner.SourceManifest) {
+	t.Helper()
+	manifest := runner.SourceManifest{Version: runner.SourceManifestVersion, Entries: []runner.SourceEntry{}}
+	digest, err := runner.SourceDigest(manifest)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var request runner.ExecutionRequest
+	if err := json.Unmarshal(clitest.BoundFixtureRequest(t, portableFixtureRepo(t), "/app:build~check"), &request); err != nil {
+		t.Fatal(err)
+	}
+	request.Source.Digest = digest
+	return request, manifest
+}
+
+// awaitAttemptSettled waits until clitest.FixtureAttemptSettled holds. A
+// cancel answers after a bounded wait, so without this a supervisor can still
+// write into the attempt while the test's temporary directory is removed.
 func awaitAttemptSettled(t *testing.T, dir string) {
 	t.Helper()
 	deadline := time.Now().Add(30 * time.Second)
-	state := clitest.ReadFixtureState(dir)
-	for !runner.TerminalState(state.State) {
+	for !clitest.FixtureAttemptSettled(dir) {
 		if time.Now().After(deadline) {
-			t.Fatalf("attempt %s did not reach a terminal state: %+v", filepath.Base(dir), state)
+			t.Fatalf("attempt %s did not settle: %+v", filepath.Base(dir), clitest.ReadFixtureState(dir))
 		}
 		time.Sleep(20 * time.Millisecond)
-		state = clitest.ReadFixtureState(dir)
-	}
-	if state.Supervisor != 0 && !processGone(state.Supervisor, time.Until(deadline)) {
-		t.Fatalf("attempt %s supervisor %d did not exit", filepath.Base(dir), state.Supervisor)
 	}
 }
 

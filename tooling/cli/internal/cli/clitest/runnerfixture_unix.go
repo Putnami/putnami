@@ -3,7 +3,10 @@
 package clitest
 
 import (
+	"errors"
 	"os/exec"
+	"strconv"
+	"strings"
 	"syscall"
 	"testing"
 )
@@ -23,4 +26,23 @@ func startDetachedSupervisor(cmd *exec.Cmd) error {
 // SIGTERM and terminates the engine's process tree itself.
 func stopSupervisor(pid int) error {
 	return syscall.Kill(pid, syscall.SIGTERM)
+}
+
+// ProcessExited reports whether pid has exited: it no longer exists, or it is
+// a zombie its parent has not reaped yet. A ps that cannot run reports no exit.
+func ProcessExited(pid int) bool {
+	err := syscall.Kill(pid, 0)
+	if errors.Is(err, syscall.ESRCH) {
+		return true
+	}
+	if err != nil {
+		return false
+	}
+	out, err := exec.Command("ps", "-o", "stat=", "-p", strconv.Itoa(pid)).Output()
+	var exit *exec.ExitError
+	if errors.As(err, &exit) {
+		// ps exits non-zero when the pid is gone.
+		return true
+	}
+	return err == nil && strings.HasPrefix(strings.TrimSpace(string(out)), "Z")
 }

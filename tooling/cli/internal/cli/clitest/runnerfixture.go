@@ -99,6 +99,11 @@ const (
 	// engine's environment: the task reports it is running beside a background
 	// child and waits for the named file before it finishes.
 	RunnerFixtureTaskHoldEnv = "RUNNER_FIXTURE_TASK_HOLD"
+	// RunnerFixtureClaimHoldEnv names a file the supervisor waits for before it
+	// claims its attempt, and beside which it writes "<file>.waiting" once it
+	// waits: a test lets a cancel claim the attempt first, whatever the
+	// machine's load.
+	RunnerFixtureClaimHoldEnv = "RUNNER_FIXTURE_CLAIM_HOLD"
 )
 
 // RunnerFixtureMain is Main for a package whose tests drive the runner fixture
@@ -152,6 +157,9 @@ const (
 	// fixtureClaimFile is created exclusively by whichever comes first: the
 	// supervisor starting the attempt, or a cancel that arrives before it.
 	fixtureClaimFile = "claim"
+	// fixtureLaunchFile holds the pid of the supervisor process the provider
+	// launched, written before the submit answers.
+	fixtureLaunchFile = "launched"
 )
 
 // fixtureMeta is written once at submission.
@@ -198,6 +206,35 @@ func writeFixtureJSON(path string, value any) error {
 	return os.Rename(temp, path)
 }
 
+// FixtureAttemptSettled reports whether the attempt is terminal and the
+// supervisor process the provider launched for it has exited. The state alone
+// does not say it: a cancel that claims the attempt first records no
+// supervisor, while the launched one still runs until it finds the claim taken.
+func FixtureAttemptSettled(dir string) bool {
+	if !runner.TerminalState(ReadFixtureState(dir).State) {
+		return false
+	}
+	// Without a pid, the submit that launches the supervisor is in flight.
+	pid, ok := FixtureLaunchedSupervisor(dir)
+	return ok && ProcessExited(pid)
+}
+
+// FixtureLaunchedSupervisor returns the pid of the supervisor process the
+// provider launched for the attempt, once the provider recorded it.
+func FixtureLaunchedSupervisor(dir string) (int, bool) {
+	data, err := os.ReadFile(filepath.Join(dir, fixtureLaunchFile))
+	if err != nil {
+		return 0, false
+	}
+	pid, err := strconv.Atoi(strings.TrimSpace(string(data)))
+	return pid, err == nil
+}
+
+func fileExists(path string) bool {
+	_, err := os.Stat(path)
+	return err == nil
+}
+
 // ---------------------------------------------------------------------------
 // The supervisor role: one detached process per attempt.
 
@@ -211,6 +248,16 @@ func superviseFixtureAttempt(dir string, getenv func(string) string) int {
 		state.State, state.Reason = runner.StateFailed, err.Error()
 		_ = writeFixtureJSON(filepath.Join(dir, fixtureStateFile), state)
 		return 1
+	}
+	if hold := getenv(RunnerFixtureClaimHoldEnv); hold != "" {
+		_ = os.WriteFile(hold+".waiting", nil, 0o600)
+		for !fileExists(hold) {
+			if !fileExists(filepath.Join(dir, fixtureMetaFile)) {
+				// The test that held this supervisor removed the attempt.
+				return 1
+			}
+			time.Sleep(20 * time.Millisecond)
+		}
 	}
 	// A cancellation that claimed the attempt before supervision started
 	// wins: the attempt is terminal and nothing may run for it.
@@ -227,9 +274,10 @@ func superviseFixtureAttempt(dir string, getenv func(string) string) int {
 
 	if hold := getenv(RunnerFixtureHoldEnv); hold != "" {
 		_ = os.WriteFile(hold+".ready", []byte(meta.Snapshot), 0o600)
-		for {
-			if _, err := os.Stat(hold); err == nil {
-				break
+		for !fileExists(hold) {
+			if !fileExists(filepath.Join(dir, fixtureMetaFile)) {
+				// The test that held this supervisor removed the attempt.
+				return 1
 			}
 			select {
 			case <-interrupt:
@@ -261,7 +309,7 @@ func superviseFixtureAttempt(dir string, getenv func(string) string) int {
 	for _, entry := range os.Environ() {
 		key := strings.SplitN(entry, "=", 2)[0]
 		switch {
-		case key == protocolcli.ParentSessionEnv, key == runnerprovider.BoundRequestEnv, key == RunnerFixtureRoleEnv, key == RunnerFixtureHoldEnv, key == RunnerFixtureAckHoldEnv,
+		case key == protocolcli.ParentSessionEnv, key == runnerprovider.BoundRequestEnv, key == RunnerFixtureRoleEnv, key == RunnerFixtureHoldEnv, key == RunnerFixtureAckHoldEnv, key == RunnerFixtureClaimHoldEnv,
 			key == protocolcli.SessionReporterEnv, key == protocolcli.SessionReporterTokenEnv,
 			key == protocolcli.LogReporterEnv, key == protocolcli.LogReporterTokenEnv,
 			strings.HasPrefix(key, "PUTNAMI_CACHE_"), key == "PUTNAMI_SPEC_FRAGMENTS":
@@ -747,6 +795,9 @@ func (p *fixtureProvider) startSupervisor(attemptRoot string) error {
 	cmd.Stdin, cmd.Stdout, cmd.Stderr = nil, log, log
 	if err := startDetachedSupervisor(cmd); err != nil {
 		return fmt.Errorf("start supervisor: %w", err)
+	}
+	if err := writeFixtureJSON(filepath.Join(attemptRoot, fixtureLaunchFile), cmd.Process.Pid); err != nil {
+		return err
 	}
 	// The supervisor is reaped by init once this process ends; releasing it
 	// here keeps this process from holding a handle it never waits on.
