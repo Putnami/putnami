@@ -376,7 +376,8 @@
               "enforce-fails-an-unanchored-positional-requirement",
               "report-projects-an-unanchored-positional-requirement",
               "enforce-fails-an-inserted-speckit-requirement-without-an-anchor",
-              "enforce-fails-a-needs-clarification-marker"
+              "enforce-fails-a-needs-clarification-marker",
+              "enforce-fails-a-text-over-the-bound"
             ]
           }
         },
