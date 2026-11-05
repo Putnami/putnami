@@ -410,7 +410,7 @@ func TestSpecsInitCreatesCanonicalSkeletonAndNeverOverwrites(t *testing.T) {
 	root := ws.Root
 	target := filepath.Join(root, "app", "specs", "invoice-export.json")
 
-	dryRun, err := BuildSpecInitResult(ws, "billing/invoice-export", true)
+	dryRun, err := BuildSpecInitResult(ws, "billing/invoice-export", SpecInitOptions{DryRun: true})
 	if err != nil {
 		t.Fatalf("dry run: %v", err)
 	}
@@ -421,7 +421,7 @@ func TestSpecsInitCreatesCanonicalSkeletonAndNeverOverwrites(t *testing.T) {
 		t.Fatalf("--dry-run wrote %s", target)
 	}
 
-	created, err := BuildSpecInitResult(ws, "billing/invoice-export", false)
+	created, err := BuildSpecInitResult(ws, "billing/invoice-export", SpecInitOptions{DryRun: false})
 	if err != nil {
 		t.Fatalf("create: %v", err)
 	}
@@ -454,7 +454,7 @@ func TestSpecsInitCreatesCanonicalSkeletonAndNeverOverwrites(t *testing.T) {
 	}
 
 	// A second init for the same feature refuses rather than replacing it.
-	duplicate, err := BuildSpecInitResult(ws, "billing/invoice-export", false)
+	duplicate, err := BuildSpecInitResult(ws, "billing/invoice-export", SpecInitOptions{DryRun: false})
 	if !errors.Is(err, protocolcli.ErrUsage) {
 		t.Fatalf("duplicate init error = %v, want ErrUsage", err)
 	}
@@ -465,7 +465,7 @@ func TestSpecsInitCreatesCanonicalSkeletonAndNeverOverwrites(t *testing.T) {
 	// A file already sitting at the target path is never overwritten, even when
 	// no valid spec claims the feature yet.
 	writeFixtureFile(t, filepath.Join(root, "app", "specs", "refunds.json"), "hand-written notes, not JSON\n")
-	blocked, err := BuildSpecInitResult(ws, "billing/refunds", false)
+	blocked, err := BuildSpecInitResult(ws, "billing/refunds", SpecInitOptions{DryRun: false})
 	if !errors.Is(err, protocolcli.ErrUsage) {
 		t.Fatalf("no-overwrite error = %v, want ErrUsage", err)
 	}
@@ -507,7 +507,7 @@ func TestSpecsInitRefusesALeafCollision(t *testing.T) {
   }]
 }`)
 
-	created, err := BuildSpecInitResult(ws, "billing/archive/refunds", false)
+	created, err := BuildSpecInitResult(ws, "billing/archive/refunds", SpecInitOptions{DryRun: false})
 	if err != nil {
 		t.Fatalf("create first leaf: %v", err)
 	}
@@ -515,7 +515,7 @@ func TestSpecsInitRefusesALeafCollision(t *testing.T) {
 		t.Fatalf("first init report = %+v", created)
 	}
 
-	blocked, err := BuildSpecInitResult(ws, "billing/refunds", false)
+	blocked, err := BuildSpecInitResult(ws, "billing/refunds", SpecInitOptions{DryRun: false})
 	if !errors.Is(err, protocolcli.ErrUsage) {
 		t.Fatalf("leaf collision error = %v, want ErrUsage", err)
 	}
@@ -544,7 +544,7 @@ func TestSpecsInitRefusesASymlinkedParent(t *testing.T) {
 		t.Skipf("symlinks are unavailable: %v", err)
 	}
 
-	report, err := BuildSpecInitResult(ws, "billing/refunds", false)
+	report, err := BuildSpecInitResult(ws, "billing/refunds", SpecInitOptions{DryRun: false})
 	if err == nil {
 		t.Fatal("specs init followed a symlinked parent")
 	}
@@ -563,7 +563,7 @@ func TestSpecsInitRefusesASymlinkedParent(t *testing.T) {
 func TestSpecsInitRefusesAnUnknownFeature(t *testing.T) {
 	ws := specWorkspace(t)
 	root := ws.Root
-	report, err := BuildSpecInitResult(ws, "billing/never-declared", false)
+	report, err := BuildSpecInitResult(ws, "billing/never-declared", SpecInitOptions{DryRun: false})
 	if !errors.Is(err, protocolcli.ErrNotFound) {
 		t.Fatalf("unknown feature error = %v, want ErrNotFound", err)
 	}
@@ -683,7 +683,7 @@ func TestSpecSelectorsRejectUnboundedInputWithoutEchoingIt(t *testing.T) {
 		err  error
 	}{
 		{"inspect", secondValue(BuildSpecContextResult(ws, selector))},
-		{"init", secondValue(BuildSpecInitResult(ws, selector, true))},
+		{"init", secondValue(BuildSpecInitResult(ws, selector, SpecInitOptions{DryRun: true}))},
 	} {
 		if !errors.Is(run.err, protocolcli.ErrUsage) {
 			t.Errorf("%s error = %v, want ErrUsage", run.name, run.err)

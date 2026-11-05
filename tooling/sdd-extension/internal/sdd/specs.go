@@ -172,7 +172,10 @@ type SpecInitReport struct {
 	Project  string                 `json:"project,omitempty"`
 	Created  bool                   `json:"created"`
 	DryRun   bool                   `json:"dryRun"`
-	Contents string                 `json:"contents,omitempty"`
+	// From is the external spec --from drafted the document from, nil for a
+	// skeleton.
+	From     *featureproto.SpecReference `json:"from,omitempty"`
+	Contents string                      `json:"contents,omitempty"`
 	// Declarations are the durable declarations the skeleton was derived from.
 	Declarations []FeatureAuthorityDeclaration `json:"declarations"`
 	Diagnostics  []diag.Diagnostic             `json:"diagnostics"`
@@ -457,14 +460,33 @@ func buildSpecValidationFromRepository(repository *specRepository) (SpecValidati
 	return report, specContractError("specs validate", report.Diagnostics, report)
 }
 
-// buildSpecInitResult derives the skeleton from the feature declaration and
-// nothing else. It states the feature's own authored outcome, an empty
-// requirement list, and no decisions: inventing a requirement sentence or an
-// ADR link would put words the team never agreed to into a durable artifact.
-func BuildSpecInitResult(ws *workspace.Workspace, selector string, dryRun bool) (SpecInitReport, error) {
+// SpecInitOptions are the flags of `specs init`.
+type SpecInitOptions struct {
+	// DryRun reports the path and bytes without writing.
+	DryRun bool
+	// From is the raw `--from <format>:<path>` value, empty for a skeleton.
+	From string
+}
+
+// BuildSpecInitResult writes one new native spec. Without --from it derives a
+// skeleton from the feature declaration and nothing else: the feature's own
+// authored outcome, an empty requirement list, and no decisions, because
+// inventing a requirement sentence or an ADR link would put words the team
+// never agreed to into a durable artifact. With --from it copies the text of
+// the external spec the feature's manifest entry names (D-046, D-056).
+func BuildSpecInitResult(ws *workspace.Workspace, selector string, options SpecInitOptions) (SpecInitReport, error) {
 	if !validSpecSelector(selector) {
 		return SpecInitReport{}, protocolcli.Usagef("specs init requires a valid <feature-id>")
 	}
+	var from *featureproto.SpecReference
+	if options.From != "" {
+		parsed, err := parseSpecInitFrom(options.From)
+		if err != nil {
+			return SpecInitReport{}, err
+		}
+		from = &parsed
+	}
+	dryRun := options.DryRun
 	repository, err := loadSpecRepository(ws, Selection{})
 	if err != nil {
 		return SpecInitReport{}, err
@@ -473,6 +495,7 @@ func BuildSpecInitResult(ws *workspace.Workspace, selector string, dryRun bool) 
 		Revision:     repository.revision,
 		Feature:      selector,
 		DryRun:       dryRun,
+		From:         from,
 		Declarations: repository.declarationsFor(selector),
 		Diagnostics:  []diag.Diagnostic{},
 	}
@@ -483,7 +506,16 @@ func BuildSpecInitResult(ws *workspace.Workspace, selector string, dryRun bool) 
 		return report, WithResultData(
 			protocolcli.NotFoundf("no authored feature declaration mints %q", selector), report)
 	}
-	if existing, found := repository.byFeature[selector]; found {
+	if from != nil {
+		if existing, found := repository.nativeSpecOf(selector); found {
+			report.Path = existing.Path
+			report.Project = existing.Project
+			report.Diagnostics = append(report.Diagnostics, diag.Errorf(featureproto.ErrorCodeDuplicateSpec, existing.Path,
+				"feature %q already has a native spec; edit that document instead", selector))
+			return report, WithResultData(
+				protocolcli.Usagef("feature %q already has a native spec at %s", selector, existing.Path), report)
+		}
+	} else if existing, found := repository.byFeature[selector]; found {
 		report.Path = existing.Path
 		report.Project = existing.Project
 		report.Diagnostics = append(report.Diagnostics, diag.Errorf(featureproto.ErrorCodeDuplicateSpec, existing.Path,
@@ -492,8 +524,18 @@ func BuildSpecInitResult(ws *workspace.Workspace, selector string, dryRun bool) 
 			protocolcli.Usagef("feature %q already has a spec at %s", selector, existing.Path), report)
 	}
 
+	manifestPath := report.Declarations[0].Source
+	var drafted *featureproto.Spec
+	if from != nil {
+		draft, findings, refusal := repository.draftFromExternalSpec(selector, *from)
+		report.Diagnostics = append(report.Diagnostics, findings...)
+		if refusal != nil {
+			return report, WithResultData(refusal, report)
+		}
+		drafted, manifestPath = draft.spec, draft.manifest
+	}
 	declaration := report.Declarations[0]
-	root := specInitRoot(repository.workspace, declaration.Source)
+	root := specInitRoot(repository.workspace, manifestPath)
 	relative := path.Join(featureproto.SpecDirectory, specFilename(selector))
 	report.Path = joinSpecPath(root, relative)
 	report.Project = specProjectName(repository.workspace, root)
@@ -504,6 +546,9 @@ func BuildSpecInitResult(ws *workspace.Workspace, selector string, dryRun bool) 
 		Feature:         selector,
 		Outcomes:        []string{declaration.Outcome},
 		Requirements:    []featureproto.SpecRequirement{},
+	}
+	if drafted != nil {
+		spec = drafted
 	}
 	if findings := featureproto.ValidateSpec(spec); len(findings) > 0 {
 		report.Diagnostics = featureDiagnostics(findings)

@@ -601,13 +601,17 @@
           ]
         },
         "init": {
-          "description": "Create one canonical spec skeleton next to the declaration of an already-authored feature, carrying only what that declaration states. It refuses an unknown feature, refuses a feature that already has a spec, and never overwrites an existing file; --dry-run prints the target path and the exact canonical bytes without writing. Requirements, non-goals, and decision links stay for you to author. The feature is an exact target, so project selection flags are rejected rather than silently ignored",
+          "description": "Create one canonical spec next to the declaration of an already-authored feature, carrying only what that declaration states, or with --from only the text of the external spec its manifest entry names. It refuses an unknown feature, refuses a feature that already has a spec, and never overwrites an existing file; --dry-run prints the target path and the exact canonical bytes without writing. Without --from, requirements, non-goals, and decision links stay for you to author. The feature is an exact target, so project selection flags are rejected rather than silently ignored",
           "command": "sdd-specs-init",
           "interactive": true,
           "flags": {
             "dry-run": {
               "type": "boolean",
               "description": "Print the target path and the exact canonical bytes without writing the file."
+            },
+            "from": {
+              "type": "string",
+              "description": "Draft the spec from the external spec the feature's manifest entry names, given as <format>:<path>. Copies its outcomes, non-goals, requirements and decision links, and refuses what enforce would refuse."
             }
           },
           "positionals": [
@@ -622,6 +626,9 @@
             },
             {
               "command": "putnami specs init billing/invoice-export"
+            },
+            {
+              "command": "putnami specs init billing/invoice-export --from openspec:openspec/specs/invoice-export --dry-run"
             }
           ]
         },
