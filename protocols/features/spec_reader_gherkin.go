@@ -14,9 +14,9 @@ import (
 // gherkinDefaultLanguage is the language of a file with no language header.
 const gherkinDefaultLanguage = "en"
 
-// gherkinCatalogs holds one keyword catalog per language: the structural
-// keywords of gherkin-languages.json of cucumber/gherkin, whose version
-// gherkin/README.md names.
+// gherkinCatalogs holds one keyword catalog per language, from
+// gherkin-languages.json of cucumber/gherkin, whose version gherkin/README.md
+// names.
 //
 //go:embed gherkin/locales/*.json
 var gherkinCatalogs embed.FS
@@ -32,14 +32,21 @@ const (
 	gherkinExamples
 )
 
-// gherkinLanguages maps each language to its keywords. Scenario and Scenario
+// gherkinLanguage is the keywords of one language. Scenario and Scenario
 // Outline share a meaning here: each is one scenario.
-var gherkinLanguages = sync.OnceValue(func() map[string]map[string]gherkinKeyword {
+type gherkinLanguage struct {
+	keywords map[string]gherkinKeyword
+	// steps are the step keywords, each with the space that follows it, if any.
+	steps []string
+}
+
+// gherkinLanguages maps each language code to its keywords.
+var gherkinLanguages = sync.OnceValue(func() map[string]gherkinLanguage {
 	entries, err := gherkinCatalogs.ReadDir("gherkin/locales")
 	if err != nil {
 		panic("features: the embedded Gherkin catalogs are missing: " + err.Error())
 	}
-	languages := make(map[string]map[string]gherkinKeyword, len(entries))
+	languages := make(map[string]gherkinLanguage, len(entries))
 	for _, entry := range entries {
 		var words struct {
 			Feature         []string `json:"feature"`
@@ -48,6 +55,11 @@ var gherkinLanguages = sync.OnceValue(func() map[string]map[string]gherkinKeywor
 			Scenario        []string `json:"scenario"`
 			ScenarioOutline []string `json:"scenarioOutline"`
 			Examples        []string `json:"examples"`
+			Given           []string `json:"given"`
+			When            []string `json:"when"`
+			Then            []string `json:"then"`
+			And             []string `json:"and"`
+			But             []string `json:"but"`
 		}
 		data, err := gherkinCatalogs.ReadFile("gherkin/locales/" + entry.Name())
 		if err == nil {
@@ -73,7 +85,12 @@ var gherkinLanguages = sync.OnceValue(func() map[string]map[string]gherkinKeywor
 				keywords[word] = group.keyword
 			}
 		}
-		languages[language] = keywords
+		groups := [][]string{words.Given, words.When, words.Then, words.And, words.But}
+		steps := make([]string, 0, len(words.Given)*len(groups))
+		for _, group := range groups {
+			steps = append(steps, group...)
+		}
+		languages[language] = gherkinLanguage{keywords: keywords, steps: steps}
 	}
 	return languages
 })
@@ -82,15 +99,6 @@ var (
 	gherkinLanguageHeader = regexp.MustCompile(`^#\s*language\s*:\s*([a-zA-Z0-9_-]+)\s*$`)
 	gherkinTagComment     = regexp.MustCompile(`\s#.*$`)
 )
-
-// GherkinLanguages returns the language codes the reader takes, in no order.
-func GherkinLanguages() []string {
-	languages := make([]string, 0, len(gherkinLanguages()))
-	for language := range gherkinLanguages() {
-		languages = append(languages, language)
-	}
-	return languages
-}
 
 // gherkinReader projects the .feature files of one reference.
 //
@@ -102,7 +110,7 @@ type gherkinReader struct{}
 func (gherkinReader) Read(input SpecInput) SpecReading {
 	reading := SpecReading{Spec: &Spec{}}
 	for _, file := range input.Files {
-		scan := gherkinScan{file: file.Path, keywords: gherkinLanguages()[gherkinDefaultLanguage], reading: &reading}
+		scan := gherkinScan{file: file.Path, language: gherkinLanguages()[gherkinDefaultLanguage], reading: &reading}
 		scan.read(strings.TrimPrefix(string(file.Data), "\ufeff"))
 	}
 	// An error leaves part of a file unread, so a projection would hide it.
@@ -142,10 +150,10 @@ type gherkinBlock struct {
 
 // gherkinScan is the state of one pass over a file. It keeps the keywords in
 // Cucumber's sense: a description runs up to the next keyword or tag, and only
-// a step section can open a doc string.
+// the line after a step can open a doc string.
 type gherkinScan struct {
 	file     string
-	keywords map[string]gherkinKeyword
+	language gherkinLanguage
 	reading  *SpecReading
 
 	feature *gherkinBlock
@@ -154,10 +162,13 @@ type gherkinScan struct {
 	owner      *gherkinBlock
 	describing *gherkinBlock
 	blank      bool
-	steps      bool
-	tags       gherkinTags
-	docString  string
-	docStart   SpecPosition
+	// steps says a Scenario, Background or Examples line opened a step section,
+	// and afterStep that the last line with content was a step.
+	steps     bool
+	afterStep bool
+	tags      gherkinTags
+	docString string
+	docStart  SpecPosition
 }
 
 func (scan *gherkinScan) read(text string) {
@@ -181,10 +192,10 @@ func (scan *gherkinScan) line(text string, position SpecPosition) bool {
 	case strings.HasPrefix(text, "#"):
 		return scan.comment(text, position)
 	case strings.HasPrefix(text, "@"):
-		scan.describing = nil
+		scan.describing, scan.afterStep = nil, false
 		scan.tagLine(text, position)
 	default:
-		scan.content(text, position)
+		return scan.content(text, position)
 	}
 	return true
 }
@@ -195,23 +206,28 @@ func (scan *gherkinScan) comment(text string, position SpecPosition) bool {
 	if match == nil || scan.feature != nil {
 		return true
 	}
-	keywords, known := gherkinLanguages()[match[1]]
+	language, known := gherkinLanguages()[match[1]]
 	if !known {
 		scan.fail(position, "Gherkin has no language %q, so this file's keywords cannot be read", match[1])
 		return false
 	}
-	scan.keywords = keywords
+	scan.language = language
 	return true
 }
 
-func (scan *gherkinScan) content(text string, position SpecPosition) {
+// content reads a line that is no comment, tag or blank, and reports whether
+// the scan can go on.
+func (scan *gherkinScan) content(text string, position SpecPosition) bool {
 	keyword, name := scan.keywordOf(text)
+	afterStep := scan.afterStep
+	scan.afterStep = false
 	if keyword == gherkinFeature {
 		scan.openFeature(name, position)
-		return
+		return true
 	}
 	if scan.feature == nil {
-		return
+		scan.fail(position, "this line comes before the Feature line, and Cucumber refuses it: start the file with Feature:")
+		return false
 	}
 	switch keyword {
 	case gherkinRule:
@@ -222,11 +238,12 @@ func (scan *gherkinScan) content(text string, position SpecPosition) {
 	case gherkinScenario:
 		scan.openScenario(name, position)
 	case gherkinBackground, gherkinExamples:
-		scan.refuseTags("a tag here")
+		scan.refuseTags("a Background or an Examples line")
 		scan.describing, scan.steps = nil, true
 	default:
-		scan.other(text, position)
+		scan.other(text, position, afterStep)
 	}
+	return true
 }
 
 // keywordOf splits a line at the first colon, which no keyword contains.
@@ -235,7 +252,7 @@ func (scan *gherkinScan) keywordOf(text string) (gherkinKeyword, string) {
 	if !found {
 		return gherkinNoKeyword, ""
 	}
-	return scan.keywords[word], strings.TrimSpace(name)
+	return scan.language.keywords[word], strings.TrimSpace(name)
 }
 
 func (scan *gherkinScan) openFeature(name string, position SpecPosition) {
@@ -267,7 +284,8 @@ func (scan *gherkinScan) openScenario(name string, position SpecPosition) {
 
 // other handles a line that is no keyword: description text, a doc string
 // opening, or a step and its table, which project nothing.
-func (scan *gherkinScan) other(text string, position SpecPosition) {
+func (scan *gherkinScan) other(text string, position SpecPosition, afterStep bool) {
+	scan.refuseTags("a line that is no Gherkin keyword")
 	if scan.describing != nil {
 		scan.describe(text, position)
 		return
@@ -276,8 +294,15 @@ func (scan *gherkinScan) other(text string, position SpecPosition) {
 		return
 	}
 	for _, separator := range []string{`"""`, "```"} {
-		if strings.HasPrefix(text, separator) {
+		if afterStep && strings.HasPrefix(text, separator) {
 			scan.docString, scan.docStart = separator, position
+			return
+		}
+	}
+	for _, step := range scan.language.steps {
+		if strings.HasPrefix(text, step) || text == strings.TrimSpace(step) {
+			scan.afterStep = true
+			return
 		}
 	}
 }
@@ -349,7 +374,7 @@ func (scan *gherkinScan) takeRequirementTag() *gherkinAnchor {
 func (scan *gherkinScan) refuseTags(place string) {
 	for _, anchor := range []*gherkinAnchor{scan.tags.id, scan.tags.check} {
 		if anchor != nil {
-			scan.fail(anchor.position, "an anchor tag belongs above a Rule, a Feature or a Scenario, not on %s", place)
+			scan.fail(anchor.position, "an anchor tag belongs above a Rule, a Feature or a Scenario, and this one stands above %s", place)
 		}
 	}
 	scan.tags = gherkinTags{}
@@ -361,7 +386,7 @@ func (scan *gherkinScan) finish() {
 		scan.fail(SpecPosition{File: scan.file, Line: 1}, "this file holds no Feature line in its language")
 		return
 	}
-	scan.refuseTags("the end of the file")
+	scan.refuseTags("nothing")
 	if scan.docString != "" {
 		scan.fail(scan.docStart, "this doc string never closes, and it hides the rest of the file")
 	}
@@ -396,12 +421,15 @@ func (scan *gherkinScan) outcomes() {
 
 // ruleText joins a Rule's name and its description, all paragraphs included.
 func ruleText(rule *gherkinBlock) string {
-	if len(rule.description) == 0 {
-		return rule.name
-	}
 	paragraphs := make([]string, 0, len(rule.description))
 	for _, paragraph := range rule.description {
 		paragraphs = append(paragraphs, paragraph.text)
+	}
+	switch {
+	case len(paragraphs) == 0:
+		return rule.name
+	case rule.name == "":
+		return strings.Join(paragraphs, " ")
 	}
 	return strings.TrimRight(rule.name, ".:") + ": " + strings.Join(paragraphs, " ")
 }

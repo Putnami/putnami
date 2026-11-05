@@ -19,5 +19,25 @@
     "Pavyzdžiai",
     "Scenarijai",
     "Variantai"
+  ],
+  "given": [
+    "* ",
+    "Duota "
+  ],
+  "when": [
+    "* ",
+    "Kai "
+  ],
+  "then": [
+    "* ",
+    "Tada "
+  ],
+  "and": [
+    "* ",
+    "Ir "
+  ],
+  "but": [
+    "* ",
+    "Bet "
   ]
 }

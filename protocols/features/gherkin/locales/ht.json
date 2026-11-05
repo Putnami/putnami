@@ -24,5 +24,31 @@
   ],
   "examples": [
     "Egzanp"
+  ],
+  "given": [
+    "* ",
+    "Sipoze ",
+    "Sipoze ke ",
+    "Sipoze Ke "
+  ],
+  "when": [
+    "* ",
+    "Lè ",
+    "Le "
+  ],
+  "then": [
+    "* ",
+    "Lè sa a ",
+    "Le sa a "
+  ],
+  "and": [
+    "* ",
+    "Ak ",
+    "Epi ",
+    "E "
+  ],
+  "but": [
+    "* ",
+    "Men "
   ]
 }

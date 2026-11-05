@@ -19,5 +19,29 @@
   ],
   "examples": [
     "Esempi"
+  ],
+  "given": [
+    "* ",
+    "Dato ",
+    "Data ",
+    "Dati ",
+    "Date "
+  ],
+  "when": [
+    "* ",
+    "Quando "
+  ],
+  "then": [
+    "* ",
+    "Allora "
+  ],
+  "and": [
+    "* ",
+    "E ",
+    "Ed "
+  ],
+  "but": [
+    "* ",
+    "Ma "
   ]
 }

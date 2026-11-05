@@ -16,5 +16,28 @@
   ],
   "examples": [
     "Examples"
+  ],
+  "given": [
+    "* ",
+    "Givun ",
+    "Youse know when youse got "
+  ],
+  "when": [
+    "* ",
+    "Wun ",
+    "Youse know like when "
+  ],
+  "then": [
+    "* ",
+    "Dun ",
+    "Den youse gotta "
+  ],
+  "and": [
+    "* ",
+    "An "
+  ],
+  "but": [
+    "* ",
+    "Buh "
   ]
 }

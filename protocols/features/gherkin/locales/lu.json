@@ -17,5 +17,27 @@
   ],
   "examples": [
     "Beispiller"
+  ],
+  "given": [
+    "* ",
+    "ugeholl "
+  ],
+  "when": [
+    "* ",
+    "wann "
+  ],
+  "then": [
+    "* ",
+    "dann "
+  ],
+  "and": [
+    "* ",
+    "an ",
+    "a "
+  ],
+  "but": [
+    "* ",
+    "awer ",
+    "mä "
   ]
 }

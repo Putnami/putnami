@@ -20,5 +20,25 @@
   ],
   "examples": [
     "Voorbeelde"
+  ],
+  "given": [
+    "* ",
+    "Gegewe "
+  ],
+  "when": [
+    "* ",
+    "Wanneer "
+  ],
+  "then": [
+    "* ",
+    "Dan "
+  ],
+  "and": [
+    "* ",
+    "En "
+  ],
+  "but": [
+    "* ",
+    "Maar "
   ]
 }

@@ -19,5 +19,26 @@
   ],
   "examples": [
     "Primjeri"
+  ],
+  "given": [
+    "* ",
+    "Dato "
+  ],
+  "when": [
+    "* ",
+    "Kada "
+  ],
+  "then": [
+    "* ",
+    "Zatim "
+  ],
+  "and": [
+    "* ",
+    "I ",
+    "A "
+  ],
+  "but": [
+    "* ",
+    "Ali "
   ]
 }

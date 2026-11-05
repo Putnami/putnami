@@ -23,5 +23,26 @@
   "examples": [
     "Primeri",
     "Scenaria"
+  ],
+  "given": [
+    "* ",
+    "Dadeno ",
+    "Dadena "
+  ],
+  "when": [
+    "* ",
+    "Koga "
+  ],
+  "then": [
+    "* ",
+    "Togash "
+  ],
+  "and": [
+    "* ",
+    "I "
+  ],
+  "but": [
+    "* ",
+    "No "
   ]
 }

@@ -70,26 +70,6 @@
       ]
     }
   },
-  "descriptions.crlf.feature": {
-    "feature": {
-      "description": [
-        "This is a single line description"
-      ],
-      "line": 1,
-      "name": "Descriptions everywhere",
-      "rules": [],
-      "scenarios": [
-        4,
-        9,
-        13,
-        19,
-        26,
-        33,
-        40,
-        45
-      ]
-    }
-  },
   "descriptions.feature": {
     "feature": {
       "description": [
@@ -126,17 +106,6 @@
         38,
         56,
         60
-      ]
-    }
-  },
-  "docstrings.crlf.feature": {
-    "feature": {
-      "description": [],
-      "line": 1,
-      "name": "DocString variations",
-      "rules": [],
-      "scenarios": [
-        3
       ]
     }
   },
@@ -333,17 +302,6 @@
       "description": [],
       "line": 1,
       "name": "Minimal",
-      "rules": [],
-      "scenarios": [
-        3
-      ]
-    }
-  },
-  "minimal.crlf.feature": {
-    "feature": {
-      "description": [],
-      "line": 1,
-      "name": "Minimal with CRLF line endings",
       "rules": [],
       "scenarios": [
         3

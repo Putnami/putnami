@@ -16,5 +16,25 @@
   ],
   "examples": [
     "EXAMPLZ"
+  ],
+  "given": [
+    "* ",
+    "I CAN HAZ "
+  ],
+  "when": [
+    "* ",
+    "WEN "
+  ],
+  "then": [
+    "* ",
+    "DEN "
+  ],
+  "and": [
+    "* ",
+    "AN "
+  ],
+  "but": [
+    "* ",
+    "BUT "
   ]
 }

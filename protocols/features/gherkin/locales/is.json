@@ -18,5 +18,25 @@
   "examples": [
     "Dæmi",
     "Atburðarásir"
+  ],
+  "given": [
+    "* ",
+    "Ef "
+  ],
+  "when": [
+    "* ",
+    "Þegar "
+  ],
+  "then": [
+    "* ",
+    "Þá "
+  ],
+  "and": [
+    "* ",
+    "Og "
+  ],
+  "but": [
+    "* ",
+    "En "
   ]
 }

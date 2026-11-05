@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
-	"sort"
 	"strings"
 	"testing"
 
@@ -129,7 +128,7 @@ func TestFeatureWithNoRuleIsItsOwnRequirement(t *testing.T) {
 		t.Fatalf("got %s", got)
 	}
 	if got := gherkinRequirements(readGherkin(t, "Feature: F\n  Rule: R\n")); got != "r@2:" {
-		t.Fatalf("a Feature with rules and no own scenario is a requirement: %s", got)
+		t.Fatalf("a Feature with rules and no own scenario is no requirement: %s", got)
 	}
 }
 
@@ -188,10 +187,11 @@ func TestReaderAgreesWithTheUpstreamCorpus(t *testing.T) {
 		if len(outcomes) == 0 && expected.Feature.Name != "" {
 			outcomes = []string{expected.Feature.Name}
 		}
-		named := true
-		owner := func(line int, name string, scenarios []int) {
-			_, ok := features.NormalizeRequirementName(name)
-			named = named && ok
+		refusedAt := map[string]bool{}
+		owner := func(line int, ownerName string, scenarios []int) {
+			if _, ok := features.NormalizeRequirementName(ownerName); !ok {
+				refusedAt[features.SpecPosition{File: name, Line: line}.Field()] = true
+			}
 			want = append(want, upstreamOwner(line, scenarios))
 		}
 		if len(expected.Feature.Rules) == 0 || len(expected.Feature.Scenarios) > 0 {
@@ -200,10 +200,18 @@ func TestReaderAgreesWithTheUpstreamCorpus(t *testing.T) {
 		for _, rule := range expected.Feature.Rules {
 			owner(rule.Line, rule.Name, rule.Scenarios)
 		}
-		if !named || len(outcomes) == 0 {
-			// A name with no ID, or a Feature with nothing to state, is refused.
-			if reading.Spec != nil || !diag.HasErrors(reading.Findings) {
-				t.Errorf("%s: projected a name with no ID", name)
+		if len(outcomes) == 0 {
+			refusedAt[features.SpecPosition{File: name, Line: expected.Feature.Line}.Field()] = true
+		}
+		if len(refusedAt) > 0 {
+			// A name with no ID, or a Feature with nothing to state, is refused
+			// at its line.
+			fields := map[string]bool{}
+			for _, finding := range reading.Findings {
+				fields[finding.Field] = true
+			}
+			if reading.Spec != nil || len(fields) == 0 || !subset(fields, refusedAt) {
+				t.Errorf("%s: findings %v, want errors at %v", name, reading.Findings, refusedAt)
 			}
 			continue
 		}
@@ -223,6 +231,15 @@ func TestReaderAgreesWithTheUpstreamCorpus(t *testing.T) {
 			t.Errorf("%s:\n requirements %v, want %v\n outcomes %q, want %q", name, got, want, gotOutcomes, outcomes)
 		}
 	}
+}
+
+func subset(fields, allowed map[string]bool) bool {
+	for field := range fields {
+		if !allowed[field] {
+			return false
+		}
+	}
+	return true
 }
 
 func upstreamOwner(line int, scenarios []int) string {
@@ -256,7 +273,7 @@ func TestPutnamiCheckTagNamesTheScenarioCheck(t *testing.T) {
 	}
 }
 
-func TestAnchorTagMaySharesItsLine(t *testing.T) {
+func TestAnchorTagMayShareItsLine(t *testing.T) {
 	t.Parallel()
 	spectest.Proves(t, "features/feature-contracts", "gherkin-identity", "an-anchor-tag-may-share-its-line")
 	text := "Feature: F\n  @slow @putnami-id:totals @wip # a comment\n  @owner:billing\n  Rule: R\n    @smoke @putnami-check:month-exported\n    Example: E\n"
@@ -293,6 +310,7 @@ func TestMisplacedAnchorTagIsAnError(t *testing.T) {
 		"id above a background":      {"Feature: F\n  @putnami-id:setup\n  Background:\n", "2"},
 		"id at the end of the file":  {"Feature: F\n  Scenario: S\n  @putnami-id:late\n", "3"},
 		"id on a Feature with rules": {"@putnami-id:whole\nFeature: F\n  Rule: R\n", "1"},
+		"check above a step":         {"Feature: F\n  Scenario: A\n    @putnami-check:x\n    Given a\n  Scenario: B\n", "3"},
 	} {
 		projection := readGherkin(t, test.text)
 		if want := features.ErrorCodeSpecRead + "@" + gherkinPath + "#L" + test.line; codes(projection.Findings) != want {
@@ -358,14 +376,9 @@ func TestGherkinMismatchIsAPositionedWarningEitherWay(t *testing.T) {
 func TestEveryGherkinLanguageParses(t *testing.T) {
 	t.Parallel()
 	spectest.Proves(t, "features/feature-contracts", "gherkin-languages", "every-gherkin-language-parses")
-	languages := features.GherkinLanguages()
-	sort.Strings(languages)
-	if len(languages) < 80 {
-		t.Fatalf("languages = %d", len(languages))
-	}
 	catalogs, err := filepath.Glob(filepath.Join("gherkin", "locales", "*.json"))
-	if err != nil || len(catalogs) != len(languages) {
-		t.Fatalf("catalogs = %d, languages = %d, err = %v", len(catalogs), len(languages), err)
+	if err != nil || len(catalogs) < 80 {
+		t.Fatalf("catalogs = %d, err = %v", len(catalogs), err)
 	}
 	for _, catalog := range catalogs {
 		var words map[string][]string
@@ -439,6 +452,24 @@ func TestSecondFeatureInOneFileIsAnError(t *testing.T) {
 	projection := readGherkin(t, "Feature: A\n  Scenario: S\n\nFeature: B\n  Scenario: T\n")
 	if projection.Spec != nil || codes(projection.Findings) != features.ErrorCodeSpecRead+"@"+gherkinPath+"#L4" {
 		t.Fatalf("findings = %s", codes(projection.Findings))
+	}
+}
+
+func TestTextBeforeTheFeatureIsAnError(t *testing.T) {
+	t.Parallel()
+	spectest.Proves(t, "features/feature-contracts", "gherkin-malformed-files", "a-file-with-no-feature-is-an-error")
+	projection := readGherkin(t, "# a comment\n@tag\nRule: Early\nFeature: F\n")
+	if projection.Spec != nil || codes(projection.Findings) != features.ErrorCodeSpecRead+"@"+gherkinPath+"#L3" {
+		t.Fatalf("findings = %s", codes(projection.Findings))
+	}
+}
+
+func TestADescriptionDocStringOpensNothing(t *testing.T) {
+	t.Parallel()
+	spectest.Proves(t, "features/feature-contracts", "gherkin-projection", "a-doc-string-hides-no-keyword-and-adds-no-text")
+	text := "Feature: F\n  Scenario: One\n    \"\"\"\n    Given a\n  Scenario: Two\n  Rule: R\n    Described.\n    \"\"\"\n    Scenario: Three\n"
+	if got := gherkinRequirements(readGherkin(t, text)); got != "f@1:one@2,two@5 r@6:three@9" {
+		t.Fatalf("got %s", got)
 	}
 }
 

@@ -137,10 +137,11 @@ keywords.
   its grammar is an error at its line, because a tag that does nothing looks
   like one that works. Neither tag is inherited, unlike Cucumber's own tags.
 - **Layout stays Cucumber's problem.** The reader ignores steps, tables,
-  `Background:` and `Examples:`. It refuses only what would hide or misplace
-  text: no `Feature:`, a second `Feature:` in one file, an unclosed doc string or
-  a `# language:` the table does not hold. An error in one file of a directory
-  refuses the whole projection, as a native spec that fails to parse does.
+  `Background:` and `Examples:`. It refuses what would hide or misplace text: no
+  `Feature:`, a line before it, a second `Feature:` in one file, a Feature with
+  no name and no description, an unclosed doc string, or a `# language:` the
+  catalogs do not hold. An error in one file of a directory refuses the whole
+  projection, as a native spec that fails to parse does.
 
 ## Rejected alternatives
 

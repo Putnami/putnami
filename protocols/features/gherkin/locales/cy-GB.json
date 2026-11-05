@@ -17,5 +17,25 @@
   ],
   "examples": [
     "Enghreifftiau"
+  ],
+  "given": [
+    "* ",
+    "Anrhegedig a "
+  ],
+  "when": [
+    "* ",
+    "Pryd "
+  ],
+  "then": [
+    "* ",
+    "Yna "
+  ],
+  "and": [
+    "* ",
+    "A "
+  ],
+  "but": [
+    "* ",
+    "Ond "
   ]
 }

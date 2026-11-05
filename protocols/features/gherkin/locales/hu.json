@@ -17,5 +17,28 @@
   ],
   "examples": [
     "Példák"
+  ],
+  "given": [
+    "* ",
+    "Amennyiben ",
+    "Adott "
+  ],
+  "when": [
+    "* ",
+    "Majd ",
+    "Ha ",
+    "Amikor "
+  ],
+  "then": [
+    "* ",
+    "Akkor "
+  ],
+  "and": [
+    "* ",
+    "És "
+  ],
+  "but": [
+    "* ",
+    "De "
   ]
 }

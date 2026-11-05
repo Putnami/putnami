@@ -19,5 +19,27 @@
   ],
   "examples": [
     "Příklady"
+  ],
+  "given": [
+    "* ",
+    "Pokud ",
+    "Za předpokladu "
+  ],
+  "when": [
+    "* ",
+    "Když "
+  ],
+  "then": [
+    "* ",
+    "Pak "
+  ],
+  "and": [
+    "* ",
+    "A také ",
+    "A "
+  ],
+  "but": [
+    "* ",
+    "Ale "
   ]
 }

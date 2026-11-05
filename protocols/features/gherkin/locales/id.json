@@ -20,5 +20,31 @@
   "examples": [
     "Contoh",
     "Misal"
+  ],
+  "given": [
+    "* ",
+    "Dengan ",
+    "Diketahui ",
+    "Diasumsikan ",
+    "Bila ",
+    "Jika "
+  ],
+  "when": [
+    "* ",
+    "Ketika "
+  ],
+  "then": [
+    "* ",
+    "Maka ",
+    "Kemudian "
+  ],
+  "and": [
+    "* ",
+    "Dan "
+  ],
+  "but": [
+    "* ",
+    "Tapi ",
+    "Tetapi "
   ]
 }

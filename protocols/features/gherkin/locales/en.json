@@ -21,5 +21,25 @@
   "examples": [
     "Examples",
     "Scenarios"
+  ],
+  "given": [
+    "* ",
+    "Given "
+  ],
+  "when": [
+    "* ",
+    "When "
+  ],
+  "then": [
+    "* ",
+    "Then "
+  ],
+  "and": [
+    "* ",
+    "And "
+  ],
+  "but": [
+    "* ",
+    "But "
   ]
 }

@@ -20,5 +20,26 @@
   ],
   "examples": [
     "Ekzemploj"
+  ],
+  "given": [
+    "* ",
+    "Donitaĵo ",
+    "Komence "
+  ],
+  "when": [
+    "* ",
+    "Se "
+  ],
+  "then": [
+    "* ",
+    "Do "
+  ],
+  "and": [
+    "* ",
+    "Kaj "
+  ],
+  "but": [
+    "* ",
+    "Sed "
   ]
 }

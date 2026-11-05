@@ -21,5 +21,29 @@
   "examples": [
     "Primjeri",
     "Scenariji"
+  ],
+  "given": [
+    "* ",
+    "Zadan ",
+    "Zadani ",
+    "Zadano ",
+    "Ukoliko "
+  ],
+  "when": [
+    "* ",
+    "Kada ",
+    "Kad "
+  ],
+  "then": [
+    "* ",
+    "Onda "
+  ],
+  "and": [
+    "* ",
+    "I "
+  ],
+  "but": [
+    "* ",
+    "Ali "
   ]
 }

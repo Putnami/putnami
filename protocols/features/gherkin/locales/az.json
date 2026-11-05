@@ -18,5 +18,29 @@
   ],
   "examples": [
     "Nümunələr"
+  ],
+  "given": [
+    "* ",
+    "Tutaq ki ",
+    "Verilir "
+  ],
+  "when": [
+    "* ",
+    "Əgər ",
+    "Nə vaxt ki "
+  ],
+  "then": [
+    "* ",
+    "O halda "
+  ],
+  "and": [
+    "* ",
+    "Və ",
+    "Həm "
+  ],
+  "but": [
+    "* ",
+    "Amma ",
+    "Ancaq "
   ]
 }

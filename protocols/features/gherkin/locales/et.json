@@ -18,5 +18,25 @@
   ],
   "examples": [
     "Juhtumid"
+  ],
+  "given": [
+    "* ",
+    "Eeldades "
+  ],
+  "when": [
+    "* ",
+    "Kui "
+  ],
+  "then": [
+    "* ",
+    "Siis "
+  ],
+  "and": [
+    "* ",
+    "Ja "
+  ],
+  "but": [
+    "* ",
+    "Kuid "
   ]
 }

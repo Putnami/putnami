@@ -21,5 +21,28 @@
   "examples": [
     "ghantoH",
     "lutmey"
+  ],
+  "given": [
+    "* ",
+    "ghu' noblu' ",
+    "DaH ghu' bejlu' "
+  ],
+  "when": [
+    "* ",
+    "qaSDI' "
+  ],
+  "then": [
+    "* ",
+    "vaj "
+  ],
+  "and": [
+    "* ",
+    "'ej ",
+    "latlh "
+  ],
+  "but": [
+    "* ",
+    "'ach ",
+    "'a "
   ]
 }

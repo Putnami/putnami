@@ -21,5 +21,28 @@
   ],
   "examples": [
     "Contoh"
+  ],
+  "given": [
+    "* ",
+    "Diberi ",
+    "Bagi "
+  ],
+  "when": [
+    "* ",
+    "Apabila "
+  ],
+  "then": [
+    "* ",
+    "Maka ",
+    "Kemudian "
+  ],
+  "and": [
+    "* ",
+    "Dan "
+  ],
+  "but": [
+    "* ",
+    "Tetapi ",
+    "Tapi "
   ]
 }

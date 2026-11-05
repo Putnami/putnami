@@ -17,5 +17,30 @@
   ],
   "examples": [
     "Exemplos"
+  ],
+  "given": [
+    "* ",
+    "Dado ",
+    "Dada ",
+    "Dados ",
+    "Dadas "
+  ],
+  "when": [
+    "* ",
+    "Cando "
+  ],
+  "then": [
+    "* ",
+    "Entón ",
+    "Logo "
+  ],
+  "and": [
+    "* ",
+    "E "
+  ],
+  "but": [
+    "* ",
+    "Mais ",
+    "Pero "
   ]
 }

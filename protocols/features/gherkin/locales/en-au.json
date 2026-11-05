@@ -16,5 +16,25 @@
   ],
   "examples": [
     "You'll wanna"
+  ],
+  "given": [
+    "* ",
+    "Y'know "
+  ],
+  "when": [
+    "* ",
+    "It's just unbelievable "
+  ],
+  "then": [
+    "* ",
+    "But at the end of the day I reckon "
+  ],
+  "and": [
+    "* ",
+    "Too right "
+  ],
+  "but": [
+    "* ",
+    "Yeah nah "
   ]
 }

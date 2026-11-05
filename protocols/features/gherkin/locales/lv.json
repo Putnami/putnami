@@ -20,5 +20,25 @@
   "examples": [
     "Piemēri",
     "Paraugs"
+  ],
+  "given": [
+    "* ",
+    "Kad "
+  ],
+  "when": [
+    "* ",
+    "Ja "
+  ],
+  "then": [
+    "* ",
+    "Tad "
+  ],
+  "and": [
+    "* ",
+    "Un "
+  ],
+  "but": [
+    "* ",
+    "Bet "
   ]
 }

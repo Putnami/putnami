@@ -237,8 +237,9 @@ default is empty, and a project's list replaces the workspace's.
   rules. Steps, `Background:` and `Examples:` project nothing.
 - A Gherkin scenario belongs to its Rule, else its Feature, and is compared with
   that requirement's declared checks. Its check is its `@putnami-check:<id>`
-  tag, else its normalized name. A Rule's ID is its `@putnami-id:<id>` tag, else
-  its normalized name. A tag may share its line with other tags.
+  tag, else its normalized name. The ID of a Rule, or of a Feature that is a
+  requirement, is its `@putnami-id:<id>` tag, else its normalized name. A tag
+  may share its line with other tags.
 - A `# language:` header reads the file in that language, such as
   `# language: fr`.
 

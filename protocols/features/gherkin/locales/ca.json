@@ -19,5 +19,29 @@
   ],
   "examples": [
     "Exemples"
+  ],
+  "given": [
+    "* ",
+    "Donat ",
+    "Donada ",
+    "Atès ",
+    "Atesa "
+  ],
+  "when": [
+    "* ",
+    "Quan "
+  ],
+  "then": [
+    "* ",
+    "Aleshores ",
+    "Cal "
+  ],
+  "and": [
+    "* ",
+    "I "
+  ],
+  "but": [
+    "* ",
+    "Però "
   ]
 }

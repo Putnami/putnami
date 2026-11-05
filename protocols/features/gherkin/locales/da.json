@@ -17,5 +17,25 @@
   ],
   "examples": [
     "Eksempler"
+  ],
+  "given": [
+    "* ",
+    "Givet "
+  ],
+  "when": [
+    "* ",
+    "Når "
+  ],
+  "then": [
+    "* ",
+    "Så "
+  ],
+  "and": [
+    "* ",
+    "Og "
+  ],
+  "but": [
+    "* ",
+    "Men "
   ]
 }

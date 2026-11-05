@@ -29,5 +29,31 @@
   "examples": [
     "Primeri",
     "Scenariji"
+  ],
+  "given": [
+    "Dano ",
+    "Podano ",
+    "Zaradi ",
+    "Privzeto "
+  ],
+  "when": [
+    "Ko ",
+    "Ce ",
+    "Če ",
+    "Kadar "
+  ],
+  "then": [
+    "Nato ",
+    "Potem ",
+    "Takrat "
+  ],
+  "and": [
+    "In ",
+    "Ter "
+  ],
+  "but": [
+    "Toda ",
+    "Ampak ",
+    "Vendar "
   ]
 }

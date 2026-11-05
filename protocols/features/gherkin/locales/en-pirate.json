@@ -16,5 +16,25 @@
   ],
   "examples": [
     "Dead men tell no tales"
+  ],
+  "given": [
+    "* ",
+    "Gangway! "
+  ],
+  "when": [
+    "* ",
+    "Blimey! "
+  ],
+  "then": [
+    "* ",
+    "Let go and haul "
+  ],
+  "and": [
+    "* ",
+    "Aye "
+  ],
+  "but": [
+    "* ",
+    "Avast! "
   ]
 }

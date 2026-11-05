@@ -28,5 +28,29 @@
     "Exemplos",
     "Cenários",
     "Cenarios"
+  ],
+  "given": [
+    "* ",
+    "Dado ",
+    "Dada ",
+    "Dados ",
+    "Dadas "
+  ],
+  "when": [
+    "* ",
+    "Quando "
+  ],
+  "then": [
+    "* ",
+    "Então ",
+    "Entao "
+  ],
+  "and": [
+    "* ",
+    "E "
+  ],
+  "but": [
+    "* ",
+    "Mas "
   ]
 }
