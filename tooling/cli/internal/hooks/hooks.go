@@ -209,20 +209,10 @@ func RunPreBuildHook(
 	return hookResult, nil
 }
 
-// RunOnInstallHook executes an extension's workspace-scoped install hook.
-// The hook runs once when the extension is installed through the CLI.
-func RunOnInstallHook(
-	ctx context.Context,
-	ws *workspace.Workspace,
-	ext *extension.ExtensionDescription,
-	debug bool,
-) error {
-	return RunOnInstallHookWithWriters(ctx, ws, ext, debug, os.Stdout, os.Stderr)
-}
-
-// RunOnInstallHookWithWriters executes an install hook with explicit output
-// streams. Commands that reserve stdout for structured output can route hook
-// chatter elsewhere while preserving the hook behavior.
+// RunOnInstallHookWithWriters executes an extension's workspace-scoped install
+// hook with explicit output streams. The hook runs once when the extension is
+// installed through the CLI. Commands that reserve stdout for structured output
+// can route hook chatter elsewhere while preserving the hook behavior.
 func RunOnInstallHookWithWriters(
 	ctx context.Context,
 	ws *workspace.Workspace,

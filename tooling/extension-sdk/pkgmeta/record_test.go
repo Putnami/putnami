@@ -19,7 +19,7 @@ import (
 
 func readRecord(t *testing.T, outputDir string) map[string]any {
 	t.Helper()
-	data, err := os.ReadFile(filepath.Join(outputDir, ChannelRecordFile))
+	data, err := os.ReadFile(filepath.Join(outputDir, channelRecordFile))
 	if err != nil {
 		t.Fatalf("read channel record: %v", err)
 	}
@@ -150,7 +150,7 @@ func TestReadChannelIndexSkipsADamagedRecord(t *testing.T) {
 	if err := os.MkdirAll(damaged, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(damaged, ChannelRecordFile), []byte("not json at all"), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(damaged, channelRecordFile), []byte("not json at all"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	writeRecordOrFail(t, root, "npm", ChannelRecord{Channels: []string{"npm"}})
@@ -221,9 +221,9 @@ func TestWritePackageMetadataOverwritesTheArchiveManifest(t *testing.T) {
 		t.Fatalf("WritePackageMetadata: %v", err)
 	}
 
-	meta, err := ReadPackageMetadata(root, "app")
+	meta, err := readJSON[PackageMetadata](MetadataPath(root, "app"))
 	if err != nil {
-		t.Fatalf("ReadPackageMetadata: %v", err)
+		t.Fatalf("read package metadata: %v", err)
 	}
 	if meta.Version != "2.0.0" || !meta.Stable || !meta.Template {
 		t.Fatalf("manifest = %+v, want the second run's whole document", meta)

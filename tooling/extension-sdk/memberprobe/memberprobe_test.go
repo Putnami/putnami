@@ -154,14 +154,14 @@ func TestIdenticalNamesAStagedArtifact(t *testing.T) {
 func TestUnreachableReasonNamesTheCauseWithoutTheRequestURL(t *testing.T) {
 	cause := errors.New("dial tcp 127.0.0.1:9: connect: connection refused")
 	wrapped := &url.Error{Op: "Head", URL: "https://registry.example.test/secret/path?channel=1", Err: cause}
-	if got := UnreachableReason(wrapped); got != "the registry could not be reached: "+cause.Error() {
-		t.Fatalf("UnreachableReason() = %q", got)
+	if got := unreachableReason(wrapped); got != "the registry could not be reached: "+cause.Error() {
+		t.Fatalf("unreachableReason() = %q", got)
 	}
-	if got := UnreachableReason(fmt.Errorf("probe: %w", context.DeadlineExceeded)); got != "the registry did not answer in time" {
-		t.Fatalf("UnreachableReason(deadline) = %q", got)
+	if got := unreachableReason(fmt.Errorf("probe: %w", context.DeadlineExceeded)); got != "the registry did not answer in time" {
+		t.Fatalf("unreachableReason(deadline) = %q", got)
 	}
-	if got := UnreachableReason(nil); got != "the registry could not be reached" {
-		t.Fatalf("UnreachableReason(nil) = %q", got)
+	if got := unreachableReason(nil); got != "the registry could not be reached" {
+		t.Fatalf("unreachableReason(nil) = %q", got)
 	}
 }
 
@@ -177,8 +177,8 @@ func TestRefusedReasonSaysWhatToDo(t *testing.T) {
 		"refused credential": {http.StatusForbidden, false, ": token expired", "the registry refused the credential with 403 Forbidden: token expired"},
 		"server error":       {http.StatusBadGateway, true, "upstream reset", "the registry answered 502 Bad Gateway: upstream reset"},
 	} {
-		if got := RefusedReason(tc.status, tc.anonymous, tc.excerpt); got != tc.want {
-			t.Errorf("%s: RefusedReason() = %q, want %q", name, got, tc.want)
+		if got := refusedReason(tc.status, tc.anonymous, tc.excerpt); got != tc.want {
+			t.Errorf("%s: refusedReason() = %q, want %q", name, got, tc.want)
 		}
 	}
 }

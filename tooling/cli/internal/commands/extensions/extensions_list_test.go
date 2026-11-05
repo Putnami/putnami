@@ -26,9 +26,9 @@ func TestSortedStringKeys(t *testing.T) {
 
 func TestExtensionsList_TextEmpty(t *testing.T) {
 	dir := t.TempDir()
-	out, err := sharedtest.CaptureStdout(t, func() error { return ExtensionsList(dir, &wsproto.Config{}, "") })
+	out, err := sharedtest.CaptureStdout(t, func() error { return ExtensionsListPrepared(dir, &wsproto.Config{}, "", nil) })
 	if err != nil {
-		t.Fatalf("ExtensionsList: %v", err)
+		t.Fatalf("ExtensionsListPrepared: %v", err)
 	}
 	if !strings.Contains(out, "EXTENSION") || !strings.Contains(out, "CONSTRAINT") {
 		t.Errorf("output = %q, want table header", out)
@@ -45,9 +45,9 @@ func TestExtensionsList_TextWithConfigAndLock(t *testing.T) {
 		"extensions": map[string]any{"@putnami/go": map[string]any{"version": "1.2.3"}},
 	})
 
-	out, err := sharedtest.CaptureStdout(t, func() error { return ExtensionsList(dir, cfg, "") })
+	out, err := sharedtest.CaptureStdout(t, func() error { return ExtensionsListPrepared(dir, cfg, "", nil) })
 	if err != nil {
-		t.Fatalf("ExtensionsList: %v", err)
+		t.Fatalf("ExtensionsListPrepared: %v", err)
 	}
 	if !strings.Contains(out, "@putnami/go") {
 		t.Errorf("output = %q, want extension name", out)
@@ -69,9 +69,9 @@ func TestExtensionsList_JSONLSortedAndShapes(t *testing.T) {
 		}},
 	}
 
-	out, err := sharedtest.CaptureStdout(t, func() error { return ExtensionsList(dir, cfg, "jsonl") })
+	out, err := sharedtest.CaptureStdout(t, func() error { return ExtensionsListPrepared(dir, cfg, "jsonl", nil) })
 	if err != nil {
-		t.Fatalf("ExtensionsList: %v", err)
+		t.Fatalf("ExtensionsListPrepared: %v", err)
 	}
 	lines := strings.Split(strings.TrimSpace(out), "\n")
 	if len(lines) != 2 {
@@ -143,12 +143,12 @@ func TestExtensionsList_UnreadableLockIsExplained(t *testing.T) {
 	var out string
 	var listErr error
 	stderr := sharedtest.CaptureStderr(t, func() {
-		out, listErr = sharedtest.CaptureStdout(t, func() error { return ExtensionsList(dir, cfg, "") })
+		out, listErr = sharedtest.CaptureStdout(t, func() error { return ExtensionsListPrepared(dir, cfg, "", nil) })
 	})
 	// Control flow is deliberately unchanged: the command still succeeds and
 	// still lists what config declares.
 	if listErr != nil {
-		t.Fatalf("ExtensionsList must stay tolerant of an unreadable lock, got: %v", listErr)
+		t.Fatalf("ExtensionsListPrepared must stay tolerant of an unreadable lock, got: %v", listErr)
 	}
 	row := ""
 	for _, line := range strings.Split(out, "\n") {

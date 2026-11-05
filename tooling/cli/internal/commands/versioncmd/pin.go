@@ -19,21 +19,6 @@ import (
 	"go.putnami.dev/tooling/cli/internal/store"
 )
 
-// CLIPin implements `putnami pin`: pin, show, or remove the workspace's CLI
-// version pin in putnami.lock.json.
-//
-//   - `putnami pin <version>` downloads that version's binary for the current
-//     platform (and every platform in defaultPinPlatforms, plus any platform a
-//     previous pin already carried) from the same endpoint the launcher uses,
-//     records each one's SHA-256 as the pin (so the launcher resolves and
-//     verifies the exact binary on any of those machines), and warms the
-//     machine-global store for the current platform.
-//   - `putnami pin` prints the current pin.
-//   - `putnami pin --remove` clears it.
-func CLIPin(ctx context.Context, wsRoot string, args []string) error {
-	return CLIPinForVersion(ctx, wsRoot, args, "")
-}
-
 // defaultPinPlatforms are the platforms `putnami pin` records without being
 // asked: the archive matrix the release pipeline builds for the CLI, which is
 // the extension SDK's distribution matrix (pkgmeta.ArchivePlatforms). A
@@ -50,9 +35,21 @@ func distributionPinPlatforms() []string {
 	return keys
 }
 
-// CLIPinForVersion is CLIPin with the running binary version supplied by the
-// CLI adapter. Keeping the value explicit prevents a lock from claiming that
-// an arbitrary older target emits this binary's machine protocol.
+// CLIPinForVersion implements `putnami pin`: pin, show, or remove the
+// workspace's CLI version pin in putnami.lock.json.
+//
+//   - `putnami pin <version>` downloads that version's binary for the current
+//     platform (and every platform in defaultPinPlatforms, plus any platform a
+//     previous pin already carried) from the same endpoint the launcher uses,
+//     records each one's SHA-256 as the pin (so the launcher resolves and
+//     verifies the exact binary on any of those machines), and warms the
+//     machine-global store for the current platform.
+//   - `putnami pin` prints the current pin.
+//   - `putnami pin --remove` clears it.
+//
+// runningVersion is the running binary version, supplied by the CLI adapter.
+// Keeping the value explicit prevents a lock from claiming that an arbitrary
+// older target emits this binary's machine protocol.
 func CLIPinForVersion(ctx context.Context, wsRoot string, args []string, runningVersion string) error {
 	version, remove, err := parsePinArgs(args)
 	if err != nil {

@@ -248,8 +248,8 @@ func (r *SessionReducer) observeTask(task *TaskResult) {
 	r.result.Failures = append(r.result.Failures, failure)
 }
 
-// SetOutcome folds the session's own fate in.
-func (r *SessionReducer) SetOutcome(outcome SessionOutcome) {
+// setOutcome folds the session's own fate in.
+func (r *SessionReducer) setOutcome(outcome SessionOutcome) {
 	if !outcome.Aborted {
 		return
 	}
@@ -308,7 +308,7 @@ func reduceSession(
 		}
 		reducer.Observe(TaskEndEvent(&tasks[i].Task))
 	}
-	reducer.SetOutcome(outcome)
+	reducer.setOutcome(outcome)
 	result := reducer.Result()
 	result.Duration = duration
 	result.Cache = cache

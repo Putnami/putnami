@@ -66,13 +66,13 @@ func TestWriteChannelRecordWaitsForAReaderOfTheRecord(t *testing.T) {
 	if err := WriteChannelRecord(outputDir, ChannelRecord{Version: "1.0.0", Channels: []string{"npm"}}); err != nil {
 		t.Fatal(err)
 	}
-	closed := holdOpen(t, filepath.Join(outputDir, ChannelRecordFile))
+	closed := holdOpen(t, filepath.Join(outputDir, channelRecordFile))
 	err := WriteChannelRecord(outputDir, ChannelRecord{Version: "1.0.1", Channels: []string{"npm"}})
 	<-closed
 	if err != nil {
 		t.Fatalf("WriteChannelRecord after the reader closed: %v", err)
 	}
-	record, err := readJSON[ChannelRecord](filepath.Join(outputDir, ChannelRecordFile))
+	record, err := readJSON[ChannelRecord](filepath.Join(outputDir, channelRecordFile))
 	if err != nil || record.Version != "1.0.1" {
 		t.Fatalf("the record holds %+v, %v; want version 1.0.1", record, err)
 	}
@@ -92,7 +92,7 @@ func TestWritePublishedImageManifestWaitsForAReaderOfTheManifest(t *testing.T) {
 	if err != nil {
 		t.Fatalf("WritePublishedImageManifest after the reader closed: %v", err)
 	}
-	got, err := ReadPublishedImageManifest(outputDir)
+	got, err := readJSON[PublishedImageManifest](PublishedImageManifestPath(outputDir))
 	if err != nil || got.Digest != "sha256:2" {
 		t.Fatalf("the manifest holds %+v, %v; want digest sha256:2", got, err)
 	}

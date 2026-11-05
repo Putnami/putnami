@@ -12,6 +12,9 @@ import (
 
 	"github.com/google/go-containerregistry/pkg/name"
 	"github.com/google/go-containerregistry/pkg/registry"
+	v1 "github.com/google/go-containerregistry/pkg/v1"
+	"github.com/google/go-containerregistry/pkg/v1/empty"
+	"github.com/google/go-containerregistry/pkg/v1/layout"
 	"github.com/google/go-containerregistry/pkg/v1/random"
 	"github.com/google/go-containerregistry/pkg/v1/remote"
 
@@ -24,7 +27,7 @@ import (
 	"go.putnami.dev/sdk/extension/registrycred"
 )
 
-func TestResolveBaseReferenceUsesOnlyDependencyClosureArtifact(t *testing.T) {
+func TestResolveBaseArtifactUsesOnlyDependencyClosureArtifact(t *testing.T) {
 	spectest.Proves(t, "tooling/extension-authoring", "local-image-publication-boundary", "project-bases-consume-local-candidates")
 	root := t.TempDir()
 	basePath := "images/runtime"
@@ -33,10 +36,7 @@ func TestResolveBaseReferenceUsesOnlyDependencyClosureArtifact(t *testing.T) {
 		t.Fatal(err)
 	}
 	layout := filepath.Join(pkgmeta.PackageOutputDir(root, basePath, "docker"), "oci")
-	digest, err := oci.WriteLayout(layout, baseImage)
-	if err != nil {
-		t.Fatal(err)
-	}
+	digest := writeTestLayout(t, layout, baseImage)
 	writeTestJSON(t, filepath.Join(pkgmeta.PackageOutputDir(root, basePath, "docker"), "manifest.json"), pkgmeta.DockerManifest{
 		Image: "runtime", Digest: digest, Layout: "oci", Platform: "linux/amd64",
 	})
@@ -49,19 +49,19 @@ func TestResolveBaseReferenceUsesOnlyDependencyClosureArtifact(t *testing.T) {
 
 	got, err := ResolveBaseArtifact(ctx, "", "/images/runtime", "linux/amd64")
 	if err != nil {
-		t.Fatalf("ResolveBaseReference() error = %v", err)
+		t.Fatalf("ResolveBaseArtifact() error = %v", err)
 	}
 	if got.Reference != "putnami.local/runtime@"+digest || got.Digest != digest || got.Layout != layout {
 		t.Fatalf("ResolveBaseArtifact() = %+v, want typed local candidate", got)
 	}
-	if _, err := ResolveBaseReference(ctx, "", "/images/outside-closure", "linux/amd64"); err == nil {
-		t.Fatal("ResolveBaseReference() accepted a project outside the dependency closure")
+	if _, err := ResolveBaseArtifact(ctx, "", "/images/outside-closure", "linux/amd64"); err == nil {
+		t.Fatal("ResolveBaseArtifact() accepted a project outside the dependency closure")
 	}
-	if _, err := ResolveBaseReference(ctx, "busybox@"+digest, "/images/runtime", "linux/amd64"); err == nil {
-		t.Fatal("ResolveBaseReference() accepted both literal and project bases")
+	if _, err := ResolveBaseArtifact(ctx, "busybox@"+digest, "/images/runtime", "linux/amd64"); err == nil {
+		t.Fatal("ResolveBaseArtifact() accepted both literal and project bases")
 	}
-	if _, err := ResolveBaseReference(ctx, "", "/images/runtime", "linux/arm64"); err == nil {
-		t.Fatal("ResolveBaseReference() accepted the wrong platform")
+	if _, err := ResolveBaseArtifact(ctx, "", "/images/runtime", "linux/arm64"); err == nil {
+		t.Fatal("ResolveBaseArtifact() accepted the wrong platform")
 	}
 }
 
@@ -77,9 +77,7 @@ func TestPackageConsumesProjectBaseLocallyWithoutRegistryCredentials(t *testing.
 
 	root := t.TempDir()
 	basePath := "images/private-base"
-	if _, err := oci.WriteLayout(filepath.Join(pkgmeta.PackageOutputDir(root, basePath, "docker"), "oci"), baseImage); err != nil {
-		t.Fatal(err)
-	}
+	writeTestLayout(t, filepath.Join(pkgmeta.PackageOutputDir(root, basePath, "docker"), "oci"), baseImage)
 	writeTestJSON(t, filepath.Join(pkgmeta.PackageOutputDir(root, basePath, "docker"), "manifest.json"), pkgmeta.DockerManifest{
 		Image: "private-base", Digest: baseDigest.String(), Layout: "oci", Platform: "linux/amd64",
 	})
@@ -91,7 +89,7 @@ func TestPackageConsumesProjectBaseLocallyWithoutRegistryCredentials(t *testing.
 	if err := os.WriteFile(filepath.Join(projectRoot, "entrypoint"), []byte("#!/bin/sh\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	cfg := Config{Layers: []LayerConfig{{Files: []FileConfig{{Source: "entrypoint", Path: "/entrypoint", Mode: 0o755}}}}}
+	cfg := Config{Layers: []layerConfig{{Files: []fileConfig{{Source: "entrypoint", Path: "/entrypoint", Mode: 0o755}}}}}
 	ctx := &pctx.Context{
 		WorkspaceRoot: root,
 		Project: pctx.Project{
@@ -174,7 +172,7 @@ func TestPackageAlwaysProducesLocalCandidateWithoutOutputRegistryRequests(t *tes
 	cfg := Config{
 		Base:     baseRef,
 		Registry: outputHost,
-		Layers:   []LayerConfig{{Files: []FileConfig{{Source: "entrypoint", Path: "/entrypoint", Mode: 0o755}}}},
+		Layers:   []layerConfig{{Files: []fileConfig{{Source: "entrypoint", Path: "/entrypoint", Mode: 0o755}}}},
 		Env:      []string{"TOOL_MODE=hermetic"}, Entrypoint: []string{"/entrypoint"},
 	}
 	ctx := &pctx.Context{
@@ -227,7 +225,7 @@ func TestResolveSpecHashIncludesFileBytesAndRuntimeConfig(t *testing.T) {
 	if err := os.WriteFile(file, []byte("one"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	cfg := Config{Layers: []LayerConfig{{Files: []FileConfig{{Source: "tool", Path: "/tool", Mode: 0o755}}}}, Env: []string{"A=1"}}
+	cfg := Config{Layers: []layerConfig{{Files: []fileConfig{{Source: "tool", Path: "/tool", Mode: 0o755}}}}, Env: []string{"A=1"}}
 	spec, err := resolveSpec(root, "example.com/base@sha256:"+strings.Repeat("b", 64), "linux/amd64", cfg)
 	if err != nil {
 		t.Fatal(err)
@@ -277,4 +275,22 @@ func writeTestJSON(t *testing.T, filename string, value any) {
 	if err := os.WriteFile(filename, data, 0o644); err != nil {
 		t.Fatal(err)
 	}
+}
+
+// writeTestLayout writes img as a one-image OCI layout at dir and returns the
+// image digest.
+func writeTestLayout(t testing.TB, dir string, img v1.Image) string {
+	t.Helper()
+	lp, err := layout.Write(dir, empty.Index)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := lp.AppendImage(img); err != nil {
+		t.Fatal(err)
+	}
+	digest, err := img.Digest()
+	if err != nil {
+		t.Fatal(err)
+	}
+	return digest.String()
 }

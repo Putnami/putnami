@@ -383,7 +383,7 @@ func TestVersionUpdate_FailsClosedWithoutIntegrity(t *testing.T) {
 	defer srv.Close()
 	t.Setenv("PUTNAMI_REGISTRY_URL", srv.URL)
 
-	err := VersionUpdate(context.Background(), "1.0.0", t.TempDir())
+	_, err := VersionUpdateWithOptions(context.Background(), "1.0.0", t.TempDir(), VersionUpdateOptions{Channel: "latest"})
 	if err == nil {
 		t.Fatal("expected fail-closed error when resolver lacks integrity, got nil")
 	}
@@ -395,7 +395,7 @@ func TestVersionUpdate_FailsClosedWithoutIntegrity(t *testing.T) {
 func TestVersionUpdate_AcceptsValidIntegrity(t *testing.T) {
 	// Build a tar.gz containing a fake putnami binary, compute its sha256,
 	// serve it through a fake resolver that advertises that integrity, and
-	// verify VersionUpdate installs the binary.
+	// verify VersionUpdateWithOptions installs the binary.
 	t.Setenv("PUTNAMI_UNSAFE_UPDATE", "")
 	t.Setenv("PUTNAMI_REGISTRY_URL", "")
 
@@ -422,8 +422,8 @@ func TestVersionUpdate_AcceptsValidIntegrity(t *testing.T) {
 	defer srv.Close()
 	t.Setenv("PUTNAMI_REGISTRY_URL", srv.URL)
 
-	if err := VersionUpdate(context.Background(), "1.0.0", binDir); err != nil {
-		t.Fatalf("VersionUpdate: %v", err)
+	if _, err := VersionUpdateWithOptions(context.Background(), "1.0.0", binDir, VersionUpdateOptions{Channel: "latest"}); err != nil {
+		t.Fatalf("VersionUpdateWithOptions: %v", err)
 	}
 	// The installed binary should exist.
 	target := filepath.Join(binDir, hostExecutable("putnami-go-9.9.9"))
@@ -463,7 +463,7 @@ func TestVersionUpdate_RejectsStaleStamp(t *testing.T) {
 	defer srv.Close()
 	t.Setenv("PUTNAMI_REGISTRY_URL", srv.URL)
 
-	err = VersionUpdate(context.Background(), "1.0.0", binDir)
+	_, err = VersionUpdateWithOptions(context.Background(), "1.0.0", binDir, VersionUpdateOptions{Channel: "latest"})
 	if err == nil {
 		t.Fatal("expected stale-stamp rejection, got nil")
 	}
@@ -641,7 +641,7 @@ func TestVersionUpdate_RejectsBadIntegrity(t *testing.T) {
 	defer srv.Close()
 	t.Setenv("PUTNAMI_REGISTRY_URL", srv.URL)
 
-	err = VersionUpdate(context.Background(), "1.0.0", t.TempDir())
+	_, err = VersionUpdateWithOptions(context.Background(), "1.0.0", t.TempDir(), VersionUpdateOptions{Channel: "latest"})
 	if err == nil {
 		t.Fatal("expected integrity failure, got nil")
 	}

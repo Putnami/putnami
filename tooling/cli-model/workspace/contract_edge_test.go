@@ -43,8 +43,8 @@ const contractEdgeDigest = "1111111111111111111111111111111111111111111111111111
 func TestBuildGraph_ContractEdgeResolvesServiceToProvider(t *testing.T) {
 	g := contractWorkspace(contractEdgeDigest).Graph
 
-	if got := g.ContractClientsOf("/services/catalog"); !reflect.DeepEqual(got, []string{"/clients/catalog-ts"}) {
-		t.Errorf("ContractClientsOf(provider) = %v, want [/clients/catalog-ts]", got)
+	if got := g.contractClientsOf("/services/catalog"); !reflect.DeepEqual(got, []string{"/clients/catalog-ts"}) {
+		t.Errorf("contractClientsOf(provider) = %v, want [/clients/catalog-ts]", got)
 	}
 	if got := g.ContractProviderOf("/clients/catalog-ts"); got != "/services/catalog" {
 		t.Errorf("ContractProviderOf(client) = %q, want /services/catalog", got)
@@ -91,11 +91,11 @@ func TestBuildGraph_ContractEdgeRefusesAnAmbiguousService(t *testing.T) {
 	if got := g.ContractProviderOf("/clients/ts"); got != "" {
 		t.Errorf("ContractProviderOf(client) = %q, want no provider for an ambiguous service", got)
 	}
-	if got := g.ContractClientsOf("/services/a"); len(got) != 0 {
-		t.Errorf("ContractClientsOf(/services/a) = %v, want none", got)
+	if got := g.contractClientsOf("/services/a"); len(got) != 0 {
+		t.Errorf("contractClientsOf(/services/a) = %v, want none", got)
 	}
-	if got := g.ContractClientsOf("/services/b"); len(got) != 0 {
-		t.Errorf("ContractClientsOf(/services/b) = %v, want none", got)
+	if got := g.contractClientsOf("/services/b"); len(got) != 0 {
+		t.Errorf("contractClientsOf(/services/b) = %v, want none", got)
 	}
 }
 

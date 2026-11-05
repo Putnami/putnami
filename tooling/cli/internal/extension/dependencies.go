@@ -257,12 +257,6 @@ func dependencyNotLoaded(name, requiredBy string, reason error) error {
 	return fmt.Errorf("%s requires %s: %w", requiredBy, name, reason)
 }
 
-// IsDependencyNotPinned reports whether err says that the lock does not pin a
-// dependency.
-func IsDependencyNotPinned(err error) bool {
-	return errors.Is(err, errDependencyNotPinned)
-}
-
 // withoutDependencyProviders removes every reserved provider command from ext,
 // a dependency the workspace does not declare, and records the dependent.
 func withoutDependencyProviders(ext *ExtensionDescription, requiredBy string) []RemovedCapability {

@@ -1,6 +1,7 @@
 package toolchain
 
 import (
+	"context"
 	"testing"
 
 	extensionproto "go.putnami.dev/protocol/extension"
@@ -18,7 +19,7 @@ func TestRuntimeToolchainUnexpandedCandidatesNameWhatIsMissing(t *testing.T) {
 		{From: extensionproto.RuntimeToolchainCandidatePath, Path: "compiler"},
 	}
 	ext := runtimeToolchainExtension(requirement)
-	err := ResolveRuntimeToolchains(workspaceRoot, ext, []string{"compiler"},
+	err := resolveRuntimeToolchainsContext(context.Background(), workspaceRoot, ext, []string{"compiler"},
 		[]string{"PATH=" + t.TempDir(), "COMPILER_HOME= "})
 	want := `resolve extension "example" runtime toolchain "compiler": no candidate matched locked version "1.2.3"; run ` + "`putnami install`" + ` to install it: ` +
 		`candidate 1 (environment COMPILER_HOME "bin/compiler"): environment variable COMPILER_HOME is not set; ` +

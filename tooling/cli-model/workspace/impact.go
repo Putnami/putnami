@@ -158,7 +158,7 @@ const (
 	// task-scoped (ImpactTrace.Scopes), and nothing propagates out of it.
 	ImpactEdgeExtensionConsumer ImpactEdgeKind = "extension-consumer"
 	// ImpactEdgeContract is the derived edge from a provider to a generated
-	// client of its contract (DependencyGraph.ContractClientsOf). The contract
+	// client of its contract (DependencyGraph.contractClientsOf). The contract
 	// is the client's whole provider-side input, so a change reaches the
 	// client over this edge only when it moved the provider's COMMITTED
 	// contract (Project.ContractPath is one of the changed files); an
@@ -363,12 +363,9 @@ func TraceChangeImpact(ws *Workspace, changedFiles []string, opts ChangeImpactOp
 // of every project in it: the same propagation TraceChangeImpact runs, seeded
 // with from alone and fully. Empty when from is unknown.
 //
-// It is what `why_impacted` answers from. An earlier version of that tool walked
-// DependencyGraph.DependentPath, which has no extension-consumer edges, so a
-// pair whose only path crossed one was reported as "does not transitively
-// impact" while `impacted` listed the very same project. Sharing the one
-// propagation, rather than a second walk over the same edges, is what makes
-// the two tools agree on the reach AND on the scope by construction.
+// It is what `why_impacted` answers from. Sharing the one propagation with
+// `impacted`, rather than a second walk over the same edges, is what makes the
+// two tools agree on the reach AND on the scope by construction.
 func ImpactReach(ws *Workspace, from string) ImpactResult {
 	return ImpactReachWithTasks(ws, from, nil)
 }
@@ -401,11 +398,11 @@ func ImpactReachWithTasks(ws *Workspace, from string, index TaskImpactIndex) Imp
 // another, with each hop's kind. [{from, ""}] when from == to; nil when either
 // project is unknown or no path exists.
 func ImpactPath(ws *Workspace, from, to string) []ImpactStep {
-	return ImpactPathWithTasks(ws, from, to, nil)
+	return impactPathWithTasks(ws, from, to, nil)
 }
 
-// ImpactPathWithTasks is ImpactPath over the task-level reach.
-func ImpactPathWithTasks(ws *Workspace, from, to string, index TaskImpactIndex) []ImpactStep {
+// impactPathWithTasks is ImpactPath over the task-level reach.
+func impactPathWithTasks(ws *Workspace, from, to string, index TaskImpactIndex) []ImpactStep {
 	if ws == nil || ws.ProjectByID(to) == nil {
 		return nil
 	}
@@ -899,7 +896,7 @@ func (w *impactWalk) run() {
 				w.reach(next, ImpactEdge{From: current, Kind: ImpactEdgeDependency}, carried, cause)
 			}
 			if edge, fires := w.contractEdgeFrom(current); fires {
-				for _, next := range w.ws.Graph.ContractClientsOf(current) {
+				for _, next := range w.ws.Graph.contractClientsOf(current) {
 					w.reach(next, edge, carried, cause)
 				}
 			}

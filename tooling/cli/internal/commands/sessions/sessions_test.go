@@ -14,9 +14,9 @@ import (
 func TestSessionsList(t *testing.T) {
 	t.Run("shows empty message when no sessions", func(t *testing.T) {
 		dir := t.TempDir()
-		err := SessionsList(dir, "")
+		err := SessionsListRevision(dir, "", "")
 		if err != nil {
-			t.Fatalf("SessionsList() error: %v", err)
+			t.Fatalf("SessionsListRevision() error: %v", err)
 		}
 	})
 
@@ -39,9 +39,9 @@ func TestSessionsList(t *testing.T) {
 		data, _ := json.MarshalIndent(meta, "", "  ")
 		os.WriteFile(filepath.Join(sessDir, "session.json"), data, 0o644)
 
-		err := SessionsList(dir, "")
+		err := SessionsListRevision(dir, "", "")
 		if err != nil {
-			t.Fatalf("SessionsList() error: %v", err)
+			t.Fatalf("SessionsListRevision() error: %v", err)
 		}
 	})
 
@@ -61,9 +61,9 @@ func TestSessionsList(t *testing.T) {
 		data, _ := json.MarshalIndent(meta, "", "  ")
 		os.WriteFile(filepath.Join(sessDir, "session.json"), data, 0o644)
 
-		out, err := sharedtest.CaptureStdout(t, func() error { return SessionsList(dir, "jsonl") })
+		out, err := sharedtest.CaptureStdout(t, func() error { return SessionsListRevision(dir, "jsonl", "") })
 		if err != nil {
-			t.Fatalf("SessionsList() jsonl error: %v", err)
+			t.Fatalf("SessionsListRevision() jsonl error: %v", err)
 		}
 		var rows []struct {
 			ID string `json:"id"`

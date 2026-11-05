@@ -16,6 +16,12 @@ import (
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
 
+// runJobInteractive runs a job as an interactive subprocess that inherits the
+// test process's stdin, stdout and stderr, with no params, defaults or versions.
+func runJobInteractive(ctx context.Context, ws *workspace.Workspace, job *ScheduledJob) (*JobResult, error) {
+	return RunJobInteractiveWithStreams(ctx, ws, job, nil, nil, nil, os.Stdin, os.Stdout, os.Stderr)
+}
+
 func TestRunJobInteractiveWithStreams_UsesExplicitStreams(t *testing.T) {
 	t.Parallel()
 	if _, err := os.Stat("/bin/sh"); err != nil {
@@ -88,9 +94,9 @@ func TestRunJobInteractive_DirectAdapterCannotReceiveCloudCapability(t *testing.
 		{"exit-unless", "15", "unset:" + extensionproto.CloudCapabilityAfterEnv},
 	})
 
-	result, err := RunJobInteractive(context.Background(), ws, job, nil, nil, nil)
+	result, err := runJobInteractive(context.Background(), ws, job)
 	if err != nil {
-		t.Fatalf("RunJobInteractive: %v", err)
+		t.Fatalf("runJobInteractive: %v", err)
 	}
 	if result.Status != "success" {
 		t.Fatalf("status = %q, want direct interactive adapter to remain unarmed", result.Status)
@@ -98,7 +104,7 @@ func TestRunJobInteractive_DirectAdapterCannotReceiveCloudCapability(t *testing.
 }
 
 // TestRunJobInteractive_InheritsStdioAndSetsEnv runs a tiny shell script via
-// RunJobInteractive and asserts that the environment carries PUTNAMI_INTERACTIVE,
+// runJobInteractive and asserts that the environment carries PUTNAMI_INTERACTIVE,
 // the context file is passed through, and the exit code is reported back.
 func TestRunJobInteractive_InheritsStdioAndSetsEnv(t *testing.T) {
 	if _, err := os.Stat("/bin/sh"); err != nil {
@@ -108,7 +114,7 @@ func TestRunJobInteractive_InheritsStdioAndSetsEnv(t *testing.T) {
 	wsRoot := t.TempDir()
 	// The script verifies that PUTNAMI_INTERACTIVE=1 is set, --putnamiContext
 	// is passed, and that stdout/stderr are inherited (we don't assert on
-	// captured stdout here because RunJobInteractive intentionally inherits
+	// captured stdout here because runJobInteractive intentionally inherits
 	// the parent stdout — the assertion is only that the script's exit code
 	// flows through).
 	//
@@ -159,9 +165,9 @@ exit 0
 		JobDef:    jobDef,
 	}
 
-	res, err := RunJobInteractive(t.Context(), ws, job, nil, nil, nil)
+	res, err := runJobInteractive(t.Context(), ws, job)
 	if err != nil {
-		t.Fatalf("RunJobInteractive: %v", err)
+		t.Fatalf("runJobInteractive: %v", err)
 	}
 	if res.Status != "success" {
 		t.Fatalf("status = %q, want success (exit=%d, error=%v)", res.Status, res.ExitCode, res.Error)
@@ -197,9 +203,9 @@ func TestRunJobInteractive_PropagatesNonZeroExit(t *testing.T) {
 		},
 	}
 
-	res, err := RunJobInteractive(t.Context(), ws, job, nil, nil, nil)
+	res, err := runJobInteractive(t.Context(), ws, job)
 	if err != nil {
-		t.Fatalf("RunJobInteractive: %v", err)
+		t.Fatalf("runJobInteractive: %v", err)
 	}
 	if res.Status != "failed" {
 		t.Errorf("status = %q, want failed", res.Status)

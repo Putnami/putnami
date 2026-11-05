@@ -13,8 +13,8 @@ import (
 	"go.putnami.dev/sdk/extension/pinnedarchive"
 )
 
-// PutEcosystem is the ecosystem id of an archive member on the put registry.
-const PutEcosystem = "put"
+// putEcosystem is the ecosystem id of an archive member on the put registry.
+const putEcosystem = "put"
 
 // Archive is one archive of a put member: the registry it is published to, its
 // coordinate and version, and the platform it was built for. The put registry
@@ -49,7 +49,7 @@ type Archive struct {
 // and the orchestrator says that the verdict is weaker.
 func ProbeArchive(ctx context.Context, archive Archive) extproto.MemberProbe {
 	subject := Subject{
-		Ecosystem:      PutEcosystem,
+		Ecosystem:      putEcosystem,
 		Coordinate:     archive.Coordinate,
 		Version:        archive.Version,
 		Platform:       archive.OS + "/" + archive.Arch,

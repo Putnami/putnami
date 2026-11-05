@@ -168,7 +168,7 @@ func clampWallToFirstEvent(wall, spawnToFirstEvent time.Duration, firstEventObse
 }
 
 // jobInvocation is the resolved subprocess setup shared by RunJob and
-// RunJobInteractive: the serialized context file, the template-expanded
+// RunJobInteractiveWithStreams: the serialized context file, the template-expanded
 // command line, and the assembled environment.
 type jobInvocation struct {
 	jobCtx       *JobCommandContext
@@ -388,7 +388,7 @@ func buildJobInvocation(
 // contextFile when done and defer cancel.
 //
 // extraEnv carries ONLY facts about how the CLI is spawning the process:
-// RunJobInteractive's PUTNAMI_INTERACTIVE=1 and host RPC channel, and the
+// RunJobInteractiveWithStreams's PUTNAMI_INTERACTIVE=1 and host RPC channel, and the
 // scheduler's object-cache socket + trust policy (remotecache/remote_provider.go).
 // None describes the work, so none belongs in a cache key. The one entry that
 // DID describe the work is gone: a cleanup deleted the synthesized DATABASE_TEST_BINDINGS the

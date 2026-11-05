@@ -328,9 +328,9 @@ func TestScanProjectPaths_CoreKnowsOnlyItsOwnMarker(t *testing.T) {
 	writeFile(t, filepath.Join(dir, "scope", wsproto.ConfigFilename), `{"tags":["scope"]}`)
 	writeFile(t, filepath.Join(dir, "autonomous", wsproto.ConfigFilename), `{"includes":["app"]}`)
 
-	bare, err := ScanProjectPaths(dir)
+	bare, err := ScanProjectPathsWithProviders(dir, nil)
 	if err != nil {
-		t.Fatalf("ScanProjectPaths: %v", err)
+		t.Fatalf("ScanProjectPathsWithProviders: %v", err)
 	}
 	if !slices.Equal(bare, []string{"svc"}) {
 		t.Fatalf("bare scan = %v, want only the putnami.json project", bare)
@@ -374,9 +374,9 @@ func TestScanProjectPaths_HonorsCoreAndAdapterExclusions(t *testing.T) {
 }
 
 func TestScanProjectPaths_Empty(t *testing.T) {
-	paths, err := ScanProjectPaths(t.TempDir())
+	paths, err := ScanProjectPathsWithProviders(t.TempDir(), nil)
 	if err != nil {
-		t.Fatalf("ScanProjectPaths: %v", err)
+		t.Fatalf("ScanProjectPathsWithProviders: %v", err)
 	}
 	if len(paths) != 0 {
 		t.Errorf("paths = %v, want empty", paths)

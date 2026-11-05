@@ -199,7 +199,7 @@ func TestScanProjectPathsWithProviders_MarkersAreTheOnlyLanguageTable(t *testing
 
 	// Without the adapters, NEITHER directory is visible — core knows only its
 	// own putnami.json, and a go.mod is no more privileged than a .csproj.
-	bare, err := ScanProjectPaths(root)
+	bare, err := ScanProjectPathsWithProviders(root, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

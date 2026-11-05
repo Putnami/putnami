@@ -13,6 +13,7 @@ import (
 
 	distribution "go.putnami.dev/protocol/distribution"
 	"go.putnami.dev/protocol/features/spectest"
+	runtimeproto "go.putnami.dev/protocol/runtime"
 )
 
 func testResolveRequest() *distribution.ResolveRequest {
@@ -293,7 +294,7 @@ func TestClientReleaseCarriesOnlyFrameworkPublishedImagesInPrivateFile(t *testin
 		"FAKE_RESPONSE="+string(encodedResponse),
 		"FAKE_OBSERVATION="+observation,
 		"FAKE_PATH_OBSERVATION="+pathObservation,
-		PublishedImagesFileEnv+"="+hostile,
+		publishedImagesFileEnv+"="+hostile,
 	)
 	want := []PublishedImage{
 		{Project: "svc/alpha", Digest: testDigest('a')},
@@ -303,7 +304,7 @@ func TestClientReleaseCarriesOnlyFrameworkPublishedImagesInPrivateFile(t *testin
 	if _, err := client.Release(ctx, request); err != nil {
 		t.Fatalf("Release: %v", err)
 	}
-	got, err := ParsePublishedImages([]byte(mustRead(t, observation)))
+	got, err := runtimeproto.ParseReleaseSetPublishedImages([]byte(mustRead(t, observation)))
 	if err != nil || len(got) != len(want) || got[0] != want[0] || got[1] != want[1] {
 		t.Fatalf("published images = %+v, err=%v, want %+v", got, err, want)
 	}
@@ -320,7 +321,7 @@ func TestClientNeverInheritsPublishedImagesFileFromAmbientEnvironment(t *testing
 	tempDir := t.TempDir()
 	observation := filepath.Join(tempDir, "ambient-observation")
 	hostile := filepath.Join(tempDir, "hostile.json")
-	t.Setenv(PublishedImagesFileEnv, hostile)
+	t.Setenv(publishedImagesFileEnv, hostile)
 	response := testResolveResponse(t)
 	encodedResponse, err := json.Marshal(response)
 	if err != nil {
@@ -549,7 +550,7 @@ func TestClientMemberEvidenceIsPrivateOwnedAndRemoved(t *testing.T) {
 	response, _ := json.Marshal(distribution.ReleaseResponse{ProtocolVersion: distribution.ProtocolVersion, Outcome: distribution.ReleaseOutcomeReleased, Current: map[string]*distribution.ChannelHead{"canary": {Ref: ref, Generation: 1}}})
 	client := NewClient(fakeProviderExecutable(t))
 	client.TempDir = tempDir
-	client.Env = append(os.Environ(), fakeProviderEnv+"="+fakeMembers, "FAKE_RESPONSE="+string(response), "FAKE_OBSERVATION="+observation, "FAKE_PATH_OBSERVATION="+pathObservation, MemberEvidenceFileEnv+"=/hostile")
+	client.Env = append(os.Environ(), fakeProviderEnv+"="+fakeMembers, "FAKE_RESPONSE="+string(response), "FAKE_OBSERVATION="+observation, "FAKE_PATH_OBSERVATION="+pathObservation, memberEvidenceFileEnv+"=/hostile")
 	members := []MemberEvidence{{Project: "apps/service", Ecosystem: "put", Coordinate: "workspace/config", Version: "v1", Digest: testDigest('a'), Publisher: "@putnami/cloud", Command: "publish", Step: "cloud-publish-config"}}
 	ctx := WithMemberEvidence(t.Context(), members)
 	members[0].Project = "mutated"

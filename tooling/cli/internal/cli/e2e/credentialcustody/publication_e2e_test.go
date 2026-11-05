@@ -238,7 +238,7 @@ func packNPMDirectory(destination string) error {
 	}
 	files := map[string][]byte{}
 	err = filepath.WalkDir(dir, func(path string, entry fs.DirEntry, err error) error {
-		if err != nil || entry.IsDir() || entry.Name() == pkgmeta.ChannelRecordFile {
+		if err != nil || entry.IsDir() || entry.Name() == "channel.json" {
 			return err
 		}
 		rel, err := filepath.Rel(dir, path)

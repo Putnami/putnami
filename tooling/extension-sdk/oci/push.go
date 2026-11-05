@@ -43,8 +43,8 @@ func BuildRef(registry, imageName, tag string) string {
 	return ref
 }
 
-// UniqueStrings returns s with duplicates removed, preserving first-seen order.
-func UniqueStrings(s []string) []string {
+// uniqueStrings returns s with duplicates removed, preserving first-seen order.
+func uniqueStrings(s []string) []string {
 	seen := make(map[string]bool)
 	result := make([]string, 0, len(s))
 	for _, v := range s {
@@ -192,7 +192,7 @@ func PushContentWithDigest(emit *jsonl.Emitter, wsRoot, dockerDir, layout, local
 		return "", nil
 	}
 	if layout != "" {
-		img, err := LoadFromLayout(filepath.Join(dockerDir, layout))
+		img, err := loadFromLayout(filepath.Join(dockerDir, layout))
 		if err != nil {
 			emit.Diagnostic("error", "Failed to read OCI layout: "+err.Error(), "", 0)
 			emit.PhaseEnd("docker-push", "failed")
@@ -308,7 +308,7 @@ func ApplySessionRefs(emit *jsonl.Emitter, registry, imageName, srcRef, contentD
 		return err
 	}
 	tagsToApply := make([]string, 0, len(sessionTags))
-	for _, tag := range UniqueStrings(sessionTags) {
+	for _, tag := range uniqueStrings(sessionTags) {
 		if BuildRef(registry, imageName, tag) == srcRef {
 			continue
 		}

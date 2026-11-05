@@ -54,9 +54,9 @@ func TestRunJobInteractive_SharesParentProcessGroup(t *testing.T) {
 		},
 	}
 
-	res, err := RunJobInteractive(t.Context(), ws, job, nil, nil, nil)
+	res, err := runJobInteractive(t.Context(), ws, job)
 	if err != nil {
-		t.Fatalf("RunJobInteractive: %v", err)
+		t.Fatalf("runJobInteractive: %v", err)
 	}
 	if res.Status != "success" {
 		t.Fatalf("status = %q, want success (exit=%d, error=%v)", res.Status, res.ExitCode, res.Error)
@@ -113,9 +113,9 @@ func TestRunJobInteractive_ChildEndedBySIGINTIsCanceled(t *testing.T) {
 		},
 	}
 
-	res, err := RunJobInteractive(t.Context(), ws, job, nil, nil, nil)
+	res, err := runJobInteractive(t.Context(), ws, job)
 	if err != nil {
-		t.Fatalf("RunJobInteractive: %v", err)
+		t.Fatalf("runJobInteractive: %v", err)
 	}
 	if res.Status != "canceled" || res.Error != nil {
 		t.Fatalf("status = %q, error = %v, want canceled with no error", res.Status, res.Error)

@@ -6,20 +6,20 @@ import (
 	"go.putnami.dev/sdk/extension/jsonl"
 )
 
-// CommonFlags holds the flags shared by all publish channels.
+// commonFlags holds the flags shared by all publish channels.
 //
 // A channel is not a publish input: the release set names the channels it moves
 // and moves them once, after every member has a verified digest. A publisher
 // only decides whether it uploads.
-type CommonFlags struct {
+type commonFlags struct {
 	DryRun bool
 }
 
 // resolveCommonFlags parses the shared publish flags from CLI args (argv) and
 // context params, so the same orchestration works whether the caller passes flags
 // as argv (CI) or via ctx.Params (the ecosystem extensions' planner).
-func resolveCommonFlags(flags map[string]string, params pctx.Params) CommonFlags {
-	return CommonFlags{
+func resolveCommonFlags(flags map[string]string, params pctx.Params) commonFlags {
+	return commonFlags{
 		DryRun: resolveFlagBool(flags, "dry-run", params, false, "dryRun"),
 	}
 }

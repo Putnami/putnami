@@ -119,8 +119,8 @@ func TestVisibilityViolationsIgnoresADeclaredEdgeWithNoImport(t *testing.T) {
 	if got := VisibilityViolations(ws); len(got) != 0 {
 		t.Fatalf("violations = %v, want none: a declared edge is not an import", got)
 	}
-	if source := ws.Graph.EdgeSource("/tooling/cli", "/go/framework/logger"); source != wsproto.DependencySourceDeclared {
-		t.Fatalf("EdgeSource = %q, want %q", source, wsproto.DependencySourceDeclared)
+	if source := ws.Graph.edgeSource("/tooling/cli", "/go/framework/logger"); source != wsproto.DependencySourceDeclared {
+		t.Fatalf("edgeSource = %q, want %q", source, wsproto.DependencySourceDeclared)
 	}
 }
 
@@ -140,8 +140,8 @@ func TestVisibilityViolationsAllowsAContractEdgeAcrossScopes(t *testing.T) {
 	if got := VisibilityViolations(ws); len(got) != 0 {
 		t.Fatalf("violations = %v, want none: a contract is a service's public surface", got)
 	}
-	if source := ws.Graph.EdgeSource("/tooling/clients/catalog", "/go/samples/catalog"); source != wsproto.DependencySourceContract {
-		t.Fatalf("EdgeSource = %q, want %q", source, wsproto.DependencySourceContract)
+	if source := ws.Graph.edgeSource("/tooling/clients/catalog", "/go/samples/catalog"); source != wsproto.DependencySourceContract {
+		t.Fatalf("edgeSource = %q, want %q", source, wsproto.DependencySourceContract)
 	}
 }
 
@@ -222,8 +222,8 @@ func TestVisibilityViolationsIgnoresAnImplicitScopeOrderingEdge(t *testing.T) {
 	if got := VisibilityViolations(ws); len(got) != 0 {
 		t.Fatalf("violations = %v, want none: an implicit scope edge orders and reads nothing", got)
 	}
-	if source := ws.Graph.EdgeSource("/tooling/cli", "/tooling"); source != wsproto.DependencySourceDeclared {
-		t.Fatalf("EdgeSource = %q, want %q", source, wsproto.DependencySourceDeclared)
+	if source := ws.Graph.edgeSource("/tooling/cli", "/tooling"); source != wsproto.DependencySourceDeclared {
+		t.Fatalf("edgeSource = %q, want %q", source, wsproto.DependencySourceDeclared)
 	}
 }
 
@@ -255,8 +255,8 @@ func TestEdgeSourceIsEmptyWithoutAnEdge(t *testing.T) {
 		scoped("/a", "a", "a"),
 		scoped("/b", "b", "b"),
 	})
-	if source := ws.Graph.EdgeSource("/a", "/b"); source != "" {
-		t.Fatalf("EdgeSource = %q, want empty: there is no edge", source)
+	if source := ws.Graph.edgeSource("/a", "/b"); source != "" {
+		t.Fatalf("edgeSource = %q, want empty: there is no edge", source)
 	}
 }
 
@@ -274,8 +274,8 @@ func TestEdgeSourceKeepsTheImportWhenAnEdgeIsAlsoDeclared(t *testing.T) {
 		scoped("/go/framework/logger", "go.putnami.dev/logger", "go/framework/logger", "go/putnami.json"),
 	})
 
-	if source := ws.Graph.EdgeSource("/tooling/cli", "/go/framework/logger"); source != wsproto.DependencySourceGoModule {
-		t.Fatalf("EdgeSource = %q, want %q", source, wsproto.DependencySourceGoModule)
+	if source := ws.Graph.edgeSource("/tooling/cli", "/go/framework/logger"); source != wsproto.DependencySourceGoModule {
+		t.Fatalf("edgeSource = %q, want %q", source, wsproto.DependencySourceGoModule)
 	}
 	if got := ws.Graph.DependenciesOf("/tooling/cli"); !reflect.DeepEqual(got, []string{"/go/framework/logger"}) {
 		t.Fatalf("DependenciesOf = %v, want exactly one edge", got)
@@ -283,13 +283,13 @@ func TestEdgeSourceKeepsTheImportWhenAnEdgeIsAlsoDeclared(t *testing.T) {
 }
 
 func TestEffectiveVisibilityDefaultsToScope(t *testing.T) {
-	if got := EffectiveVisibility(nil); got != wsproto.VisibilityScope {
-		t.Fatalf("EffectiveVisibility(nil) = %q, want %q", got, wsproto.VisibilityScope)
+	if got := effectiveVisibility(nil); got != wsproto.VisibilityScope {
+		t.Fatalf("effectiveVisibility(nil) = %q, want %q", got, wsproto.VisibilityScope)
 	}
-	if got := EffectiveVisibility(&Project{}); got != wsproto.VisibilityScope {
-		t.Fatalf("EffectiveVisibility(undeclared) = %q, want %q", got, wsproto.VisibilityScope)
+	if got := effectiveVisibility(&Project{}); got != wsproto.VisibilityScope {
+		t.Fatalf("effectiveVisibility(undeclared) = %q, want %q", got, wsproto.VisibilityScope)
 	}
-	if got := EffectiveVisibility(&Project{Visibility: wsproto.VisibilityPublic}); got != wsproto.VisibilityPublic {
-		t.Fatalf("EffectiveVisibility(public) = %q, want %q", got, wsproto.VisibilityPublic)
+	if got := effectiveVisibility(&Project{Visibility: wsproto.VisibilityPublic}); got != wsproto.VisibilityPublic {
+		t.Fatalf("effectiveVisibility(public) = %q, want %q", got, wsproto.VisibilityPublic)
 	}
 }

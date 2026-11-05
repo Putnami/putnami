@@ -87,12 +87,12 @@
 // decided: ValidateOutputOwnership in the manifest, validatePlanContract
 // across the plan.
 //
-// # The CAS-symlink all-hit fast path is RETIRED for task-owned entries
+// # A task-owned entry is materialized, never symlinked
 //
-// The legacy all-hit fast path points .putnami/out/<project>/<command> at one
-// blob's files/ tree (out.go, OutManager), so a fully cached command materializes
-// zero bytes. It does not survive the task-owned model, and that is a decision,
-// not an oversight:
+// A CAS-symlink all-hit fast path would point .putnami/out/<project>/<command>
+// at one blob's files/ tree, so a fully cached command would materialize zero
+// bytes. It does not fit the task-owned model, and that is a decision, not an
+// oversight:
 //
 //  1. STRUCTURAL — a task-owned entry contains exactly one task's outputs, while
 //     that directory is the union of every step of the command. One symlink can
@@ -109,7 +109,7 @@
 //  3. COST — measured by BenchmarkTaskOutputMaterializeVsSymlink (darwin/arm64,
 //     Apple M1 Pro, APFS; 256 files / 4 MiB; 3×60 iterations):
 //
-//     symlink (retired fast path)     ~0.05 ms/op
+//     symlink (rejected fast path)    ~0.05 ms/op
 //     atomic materialize (this file)  ~66–84 ms/op
 //     legacy RestoreDir (status quo)  ~91–108 ms/op
 //
@@ -117,15 +117,14 @@
 //     bound. The number that decides it is the THIRD one: whenever the fast path
 //     did not apply — any mixed run, any command with two partial snapshots —
 //     the scheduler already pays replaceDirPreserving, and the new primitive is
-//     ~20% CHEAPER than that. Retirement therefore does not introduce a copy the
-//     CLI was not already doing on most runs; it removes the special case where
-//     one snapshot happened to cover the whole shared directory. The copy is also
+//     ~20% CHEAPER than that. Skipping the fast path therefore adds no copy the
+//     CLI was not already doing on most runs; it has no special case for one
+//     snapshot covering the whole shared directory. The copy is also
 //     bounded by the DECLARED outputs rather than by everything the directory
 //     accumulated, which is the direction that shrinks with adoption.
 //
-// OutManager therefore refuses to link a task-owned blob (ErrFastPathRetired)
-// rather than producing a link that is structurally wrong. The legacy path is
-// untouched: the scheduler keeps using it for legacy entries until B4b.
+// A task-owned blob is therefore always materialized, never linked, rather than
+// producing a link that is structurally wrong.
 package store
 
 import (
@@ -163,7 +162,7 @@ const (
 
 // entryDescriptorFilename is the per-blob file whose presence identifies a
 // task-owned entry. A legacy blob never has one; that asymmetry is what lets
-// Get() and OutManager recognize (and refuse) an entry they cannot interpret.
+// Get() recognizes (and refuses) an entry it cannot interpret.
 const entryDescriptorFilename = "entry.json"
 
 // taskEntryAddressDomain namespaces the address derivation so a task cache key

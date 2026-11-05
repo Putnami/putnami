@@ -2,17 +2,11 @@ package cli
 
 import (
 	"io"
-	"os"
 	"strings"
 
 	"go.putnami.dev/tooling/cli/internal/commandmeta"
 	"go.putnami.dev/tooling/cli/internal/iox"
 )
-
-// PrintHelpMan prints the full help as a man page, with no extension loaded.
-func PrintHelpMan() {
-	printHelpMan(os.Stdout, nil)
-}
 
 // printHelpMan writes the full help of scope to w as a man page: the job
 // commands and aliases the loaded extensions declare, every core command, and

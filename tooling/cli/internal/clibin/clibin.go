@@ -88,24 +88,6 @@ type Resolver struct {
 // Option configures a Resolver.
 type Option func(*Resolver)
 
-// WithBaseURL overrides a legacy /dl resolver endpoint.
-func WithBaseURL(u string) Option {
-	return func(r *Resolver) {
-		if u != "" {
-			r.baseURL = u
-		}
-	}
-}
-
-// WithFetcher overrides the byte source (used in tests).
-func WithFetcher(f Fetcher) Option {
-	return func(r *Resolver) {
-		if f != nil {
-			r.fetch = f
-		}
-	}
-}
-
 // newLegacyResolver resolves the historical /dl archive endpoint. It remains
 // reachable only through NewWorkspace when PUTNAMI_REGISTRY_URL explicitly
 // names a /dl mirror, preserving putnamiw compatibility for existing mirrors.

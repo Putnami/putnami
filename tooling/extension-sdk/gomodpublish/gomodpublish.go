@@ -33,9 +33,9 @@ import (
 // MaxResponseBytes bounds a blob-upload or version-PUT response body.
 const MaxResponseBytes = 1 << 20
 
-// MaxZipBytes is the largest module zip the Go toolchain accepts. A served zip
+// maxZipBytes is the largest module zip the Go toolchain accepts. A served zip
 // is hashed up to one byte past it, so a longer body never matches a digest.
-const MaxZipBytes = 500 << 20
+const maxZipBytes = 500 << 20
 
 // retryPolicy is how a blob upload, a version PUT that may find the version
 // stored, and a verification read retry a transient failure.
@@ -396,7 +396,7 @@ func VerifyZip(ctx context.Context, client *http.Client, registryURL, token, mod
 	}
 	return download(ctx, client, target, token, "module zip", func(body io.Reader) error {
 		hash := sha256.New()
-		if _, err := io.Copy(hash, io.LimitReader(body, MaxZipBytes+1)); err != nil {
+		if _, err := io.Copy(hash, io.LimitReader(body, maxZipBytes+1)); err != nil {
 			return fmt.Errorf("hash downloaded module zip: %w", err)
 		}
 		gotDigest := fmt.Sprintf("sha256:%x", hash.Sum(nil))

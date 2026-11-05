@@ -124,7 +124,7 @@ func TestProbeArchiveReportsWhatTheRegistryHolds(t *testing.T) {
 			if probe.State != tc.wantState {
 				t.Fatalf("state = %q (%s), want %q", probe.State, probe.Reason, tc.wantState)
 			}
-			if probe.Ecosystem != PutEcosystem || probe.Coordinate != "acme/widget" || probe.Version != version ||
+			if probe.Ecosystem != putEcosystem || probe.Coordinate != "acme/widget" || probe.Version != version ||
 				probe.Platform != "linux/amd64" || probe.Registry != server.URL {
 				t.Fatalf("probe = %+v, want the member, the platform, the registry and the version", probe)
 			}

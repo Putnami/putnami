@@ -18,7 +18,6 @@ import (
 	"go.putnami.dev/tooling/cli/internal/cli/clitest"
 	"go.putnami.dev/tooling/cli/internal/engine"
 	"go.putnami.dev/tooling/cli/internal/workspace"
-	"go.putnami.dev/tooling/cli/internal/workspace_state"
 )
 
 // The midpoint matrix, end to end: a synthetic workspace whose fixture
@@ -181,17 +180,12 @@ func runGateSession(t *testing.T, wsRoot string) (int, string) {
 
 func latestGateRecord(t *testing.T, wsRoot string) (*features.SpecVerificationRecord, string) {
 	t.Helper()
-	store := workspace_state.NewSessionStore(wsRoot)
-	target, err := os.Readlink(filepath.Join(wsRoot, ".putnami", "sessions", "latest"))
-	if err != nil {
-		t.Fatalf("no latest session: %v", err)
+	sessionDir := latestSessionDir(t, wsRoot)
+	record, found := readGateRecord(t, sessionDir)
+	if !found {
+		t.Fatalf("latest session %s carries no record", filepath.Base(sessionDir))
 	}
-	sessionID := filepath.Base(target)
-	record, found, err := store.ReadSpecVerification(sessionID)
-	if err != nil || !found {
-		t.Fatalf("latest session %s carries no record (found %v, err %v)", sessionID, found, err)
-	}
-	return record, sessionID
+	return record, filepath.Base(sessionDir)
 }
 
 // optionalLatestGateRecord is latestGateRecord for the one case where absence
@@ -199,16 +193,35 @@ func latestGateRecord(t *testing.T, wsRoot string) (*features.SpecVerificationRe
 // and the persistence seam contracts a missing record as exactly that.
 func optionalLatestGateRecord(t *testing.T, wsRoot string) (*features.SpecVerificationRecord, bool) {
 	t.Helper()
-	store := workspace_state.NewSessionStore(wsRoot)
+	return readGateRecord(t, latestSessionDir(t, wsRoot))
+}
+
+// latestSessionDir is the directory of the session the `latest` link names.
+func latestSessionDir(t *testing.T, wsRoot string) string {
+	t.Helper()
 	target, err := os.Readlink(filepath.Join(wsRoot, ".putnami", "sessions", "latest"))
 	if err != nil {
 		t.Fatalf("no latest session: %v", err)
 	}
-	record, found, err := store.ReadSpecVerification(filepath.Base(target))
-	if err != nil {
-		t.Fatalf("reading the latest session's record: %v", err)
+	return filepath.Join(wsRoot, ".putnami", "sessions", filepath.Base(target))
+}
+
+// readGateRecord parses the spec-verification record in sessionDir. Absence is
+// (nil, false): the session carried no gate.
+func readGateRecord(t *testing.T, sessionDir string) (*features.SpecVerificationRecord, bool) {
+	t.Helper()
+	data, err := os.ReadFile(filepath.Join(sessionDir, features.SpecVerificationRecordFilename))
+	if os.IsNotExist(err) {
+		return nil, false
 	}
-	return record, found
+	if err != nil {
+		t.Fatalf("reading the session's record: %v", err)
+	}
+	record, diagnostics := features.ParseSpecVerificationRecord(data)
+	if record == nil {
+		t.Fatalf("session %s carries an unreadable record: %v", filepath.Base(sessionDir), diagnostics)
+	}
+	return record, true
 }
 
 func gateState(t *testing.T, record *features.SpecVerificationRecord, feature string) features.SpecVerificationGroup {

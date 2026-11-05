@@ -604,7 +604,7 @@ func (cm *CacheManager) Lookup(hash string) (*Entry, error) {
 // LookupAndTouch is Lookup plus an atomic lastUsed stamp under the store's
 // shared lock, so a concurrent GC cannot evict the entry between the read and
 // the stamp (closing the cold-entry hit-vs-evict race). Use on the cache-hit
-// path instead of Lookup+MarkUsed.
+// path instead of Lookup.
 func (cm *CacheManager) LookupAndTouch(hash string) (*Entry, error) {
 	return cm.store.getAndTouch(hash)
 }
@@ -803,15 +803,9 @@ func (cm *CacheManager) Store() *LocalStore {
 }
 
 // StoreRoot returns the absolute CAS root backing this manager, so callers
-// (e.g. the scheduler's OutManager) resolve blob paths into the same store.
+// resolve blob paths into the same store.
 func (cm *CacheManager) StoreRoot() string {
 	return cm.store.Root()
-}
-
-// MarkUsed stamps an entry's lastUsed time on a cache hit so GC's recency
-// ordering and grace window account for it. Best-effort and cheap.
-func (cm *CacheManager) MarkUsed(hash string) {
-	cm.store.markUsed(hash)
 }
 
 // BuildCacheKey constructs a CacheKey from job execution parameters.

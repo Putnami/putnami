@@ -36,27 +36,6 @@ func Assemble(spec Spec, base v1.Image, workDir string) (v1.Image, error) {
 	return assemble(spec, nil, base, workDir, "")
 }
 
-// AssembleWithLayerCache is Assemble with a shared, content-addressed cache for
-// generated file layers. Tarball layers keep their existing path. An empty
-// cache root is equivalent to Assemble.
-func AssembleWithLayerCache(spec Spec, base v1.Image, workDir, layerCacheRoot string) (v1.Image, error) {
-	return assemble(spec, nil, base, workDir, layerCacheRoot)
-}
-
-// AssemblePlan builds a previously fingerprinted plan without reopening
-// sources to rediscover layer identities.
-func AssemblePlan(plan *ImagePlan, base v1.Image, workDir string) (v1.Image, error) {
-	return AssemblePlanWithLayerCache(plan, base, workDir, "")
-}
-
-// AssemblePlanWithLayerCache is AssemblePlan with shared layer reuse.
-func AssemblePlanWithLayerCache(plan *ImagePlan, base v1.Image, workDir, layerCacheRoot string) (v1.Image, error) {
-	if err := plan.BindDerivedFiles(); err != nil {
-		return nil, err
-	}
-	return assemble(plan.spec, plan, base, workDir, layerCacheRoot)
-}
-
 func assemble(spec Spec, plan *ImagePlan, base v1.Image, workDir, layerCacheRoot string) (v1.Image, error) {
 	baseMediaType, err := base.MediaType()
 	if err != nil {
@@ -180,13 +159,6 @@ type LayoutOptions struct {
 	BaseDigest string
 }
 
-// AssembleToLayout assembles the image and writes it as a self-contained OCI
-// layout (base blobs included) at layoutDir, replacing any previous layout
-// there. It returns the image digest — known before any push.
-func AssembleToLayout(spec Spec, layoutDir string, opts LayoutOptions) (string, error) {
-	return assembleToLayout(spec, nil, layoutDir, opts)
-}
-
 func assembleToLayout(spec Spec, plan *ImagePlan, layoutDir string, opts LayoutOptions) (string, error) {
 	keychain := opts.Keychain
 	if keychain == nil {
@@ -195,7 +167,7 @@ func assembleToLayout(spec Spec, plan *ImagePlan, layoutDir string, opts LayoutO
 	var base v1.Image
 	var err error
 	if opts.BaseLayout != "" {
-		base, err = LoadFromLayout(opts.BaseLayout)
+		base, err = loadFromLayout(opts.BaseLayout)
 		if err == nil && opts.BaseDigest != "" {
 			var digest v1.Hash
 			digest, err = base.Digest()
@@ -207,7 +179,7 @@ func assembleToLayout(spec Spec, plan *ImagePlan, layoutDir string, opts LayoutO
 			return "", fmt.Errorf("loading local base candidate: %w", err)
 		}
 	} else {
-		base, err = FetchBaseWithKeychain(spec.BaseRef, spec.Platform, opts.BaseCacheDir, keychain)
+		base, err = fetchBase(spec.BaseRef, spec.Platform, opts.BaseCacheDir, keychain)
 		if err != nil {
 			return "", fmt.Errorf("fetching base %s: %w", spec.BaseRef, err)
 		}
@@ -223,22 +195,22 @@ func assembleToLayout(spec Spec, plan *ImagePlan, layoutDir string, opts LayoutO
 	if err != nil {
 		return "", err
 	}
-	return WriteLayout(layoutDir, img)
+	return writeLayout(layoutDir, img)
 }
 
 // AssemblePlanToLayout resolves the base and materializes a previously
 // fingerprinted image plan. It is the preferred package path when callers need
 // the content identity before assembly.
 func AssemblePlanToLayout(plan *ImagePlan, layoutDir string, opts LayoutOptions) (string, error) {
-	if err := plan.BindDerivedFiles(); err != nil {
+	if err := plan.bindDerivedFiles(); err != nil {
 		return "", err
 	}
 	return assembleToLayout(plan.spec, plan, layoutDir, opts)
 }
 
-// WriteLayout writes img as a self-contained OCI layout at dir (replacing any
+// writeLayout writes img as a self-contained OCI layout at dir (replacing any
 // existing layout) and returns the image digest.
-func WriteLayout(dir string, img v1.Image) (string, error) {
+func writeLayout(dir string, img v1.Image) (string, error) {
 	if err := os.RemoveAll(dir); err != nil {
 		return "", err
 	}
@@ -256,9 +228,9 @@ func WriteLayout(dir string, img v1.Image) (string, error) {
 	return digest.String(), nil
 }
 
-// LoadFromLayout reads the single image back from an OCI layout written by
-// WriteLayout.
-func LoadFromLayout(dir string) (v1.Image, error) {
+// loadFromLayout reads the single image back from an OCI layout written by
+// writeLayout.
+func loadFromLayout(dir string) (v1.Image, error) {
 	idx, err := layout.ImageIndexFromPath(dir)
 	if err != nil {
 		return nil, fmt.Errorf("reading layout %s: %w", dir, err)
@@ -296,7 +268,7 @@ func ExportDaemonImageToLayout(ref, dir string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("reading exported runtime image: %w", err)
 	}
-	return WriteLayout(dir, image)
+	return writeLayout(dir, image)
 }
 
 // WriteDockerTarball writes the layout's image as a docker-load compatible
@@ -304,7 +276,7 @@ func ExportDaemonImageToLayout(ref, dir string) (string, error) {
 // layer blob it opened before it returns, so the layout can be removed at
 // once: Windows refuses to remove a file that is still open.
 func WriteDockerTarball(layoutDir, ref, tarPath string) error {
-	img, err := LoadFromLayout(layoutDir)
+	img, err := loadFromLayout(layoutDir)
 	if err != nil {
 		return err
 	}

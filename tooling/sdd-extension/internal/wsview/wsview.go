@@ -397,21 +397,6 @@ func decodeProjectOptions(raw map[string]json.RawMessage) map[string]map[string]
 	return options
 }
 
-// SeedRoots returns the workspace-relative roots of the view's projects, in
-// wire order. It is what a caller hands to the feature engine's scope builder.
-func (ws *Workspace) SeedRoots() []string {
-	if ws == nil {
-		return nil
-	}
-	roots := make([]string, 0, len(ws.Projects))
-	for _, project := range ws.Projects {
-		if project != nil {
-			roots = append(roots, project.Path)
-		}
-	}
-	return roots
-}
-
 // decodeProjectConfig parses the authored putnami.json the wire carries raw.
 //
 // A config that will not decode is dropped rather than reported: its members are

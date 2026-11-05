@@ -37,14 +37,6 @@ func templatesInstall(ctx context.Context, wsRoot string, cfg *wsproto.Config, a
 	return TemplatesInstallWithOptions(ctx, wsRoot, cfg, args, InstallOptions{OutputFormat: outputFormat, Out: out})
 }
 
-// TemplatesInstallWithWriter is TemplatesInstall with the human progress
-// stream chosen by the caller. It exists for internal/commands' combined
-// `install` lifecycle command (install.go), which is outside this vertical and
-// threads its own writer through — see ExtensionsInstallWithWriter for why.
-func TemplatesInstallWithWriter(ctx context.Context, wsRoot string, cfg *wsproto.Config, args []string, outputFormat string, out io.Writer) error {
-	return templatesInstall(ctx, wsRoot, cfg, args, outputFormat, out)
-}
-
 // TemplatesInstallWithOptions installs templates and reports typed outcomes in
 // the same stable order as extension installs.
 func TemplatesInstallWithOptions(ctx context.Context, wsRoot string, cfg *wsproto.Config, args []string, opts InstallOptions) error {
@@ -65,7 +57,7 @@ func TemplatesUpdateWithOptions(ctx context.Context, wsRoot string, cfg *wsproto
 func TemplatesList(wsRoot string, cfg *wsproto.Config, outputFormat string) error {
 	lockFile, lockErr := lockfile.ReadLockFile(wsRoot)
 	if lockErr != nil {
-		noteUnreadableLock(lockErr) // see ExtensionsList for why
+		noteUnreadableLock(lockErr) // see ExtensionsListPrepared for why
 	}
 
 	tplMap := shared.BuildTemplateMap(cfg)

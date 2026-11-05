@@ -35,17 +35,12 @@ import (
 // that excludes `node_modules` must stop the walk from descending into it, or
 // the cost of not-matching a million files is paid on every `projects sync`.
 
-// ScanProjectPaths walks the workspace root and discovers the directories core
-// itself recognizes as projects: those carrying a `putnami.json` that is more
-// than a scope declaration. With no adapters, that is the whole answer — a
-// language manifest alone marks nothing.
-func ScanProjectPaths(root string) ([]string, error) {
-	return ScanProjectPathsWithProviders(root, nil)
-}
-
-// ScanProjectPathsWithProviders is the scan widened by the markers extensions
-// declare. A provider's markers make its directories discoverable; a provider's
-// excludes stop the walk from descending into the directories it names.
+// ScanProjectPathsWithProviders walks the workspace root and discovers the
+// directories core itself recognizes as projects: those carrying a
+// `putnami.json` that is more than a scope declaration. With no scopes, that is
+// the whole answer — a language manifest alone marks nothing. A provider's
+// markers make its directories discoverable; a provider's excludes stop the
+// walk from descending into the directories it names.
 func ScanProjectPathsWithProviders(root string, scopes []ProviderScope) ([]string, error) {
 	// Core-owned exclusions. They are not configurable, and the protocol reports
 	// an adapter that declares them as redundant precisely because core already

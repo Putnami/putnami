@@ -84,12 +84,12 @@ func TestWorkspace_ProjectsByPattern_Exact(t *testing.T) {
 		ws.projectByID[p.ID] = p
 	}
 
-	result := ws.ProjectsByPattern("/typescript/frameworks/application")
+	result := ws.projectsByPattern("/typescript/frameworks/application")
 	if len(result) != 1 || result[0].ID != "/typescript/frameworks/application" {
 		t.Errorf("exact match: got %d projects, want 1", len(result))
 	}
 
-	result = ws.ProjectsByPattern("/nonexistent")
+	result = ws.projectsByPattern("/nonexistent")
 	if len(result) != 0 {
 		t.Errorf("nonexistent: got %d projects, want 0", len(result))
 	}
@@ -107,25 +107,25 @@ func TestWorkspace_ProjectsByPattern_Recursive(t *testing.T) {
 	}
 
 	// /typescript/frameworks/... should match all 3 TS frameworks
-	result := ws.ProjectsByPattern("/typescript/frameworks/...")
+	result := ws.projectsByPattern("/typescript/frameworks/...")
 	if len(result) != 3 {
 		t.Errorf("/typescript/frameworks/...: got %d projects, want 3", len(result))
 	}
 
 	// /typescript/... should match all 4 TS projects
-	result = ws.ProjectsByPattern("/typescript/...")
+	result = ws.projectsByPattern("/typescript/...")
 	if len(result) != 4 {
 		t.Errorf("/typescript/...: got %d projects, want 4", len(result))
 	}
 
 	// /go/... should match 1 Go project
-	result = ws.ProjectsByPattern("/go/...")
+	result = ws.projectsByPattern("/go/...")
 	if len(result) != 1 {
 		t.Errorf("/go/...: got %d projects, want 1", len(result))
 	}
 
 	// /nonexistent/... should match nothing
-	result = ws.ProjectsByPattern("/nonexistent/...")
+	result = ws.projectsByPattern("/nonexistent/...")
 	if len(result) != 0 {
 		t.Errorf("/nonexistent/...: got %d projects, want 0", len(result))
 	}
@@ -140,7 +140,7 @@ func TestWorkspace_ProjectsByPattern_RecursiveSelf(t *testing.T) {
 		},
 	}
 
-	result := ws.ProjectsByPattern("/typescript/...")
+	result := ws.projectsByPattern("/typescript/...")
 	if len(result) != 2 {
 		t.Errorf("/typescript/...: got %d projects, want 2 (including /typescript itself)", len(result))
 	}
@@ -157,7 +157,7 @@ func TestWorkspace_ProjectsByPattern_SuffixWildcard(t *testing.T) {
 	}
 
 	// .../web should match projects ending in /web
-	result := ws.ProjectsByPattern(".../web")
+	result := ws.projectsByPattern(".../web")
 	if len(result) != 2 {
 		t.Errorf(".../web: got %d projects, want 2", len(result))
 	}
@@ -168,13 +168,13 @@ func TestWorkspace_ProjectsByPattern_SuffixWildcard(t *testing.T) {
 	}
 
 	// .../frameworks/web should match more specifically
-	result = ws.ProjectsByPattern(".../frameworks/web")
+	result = ws.projectsByPattern(".../frameworks/web")
 	if len(result) != 1 || result[0].ID != "/typescript/frameworks/web" {
 		t.Errorf(".../frameworks/web: got %v, want [/typescript/frameworks/web]", result)
 	}
 
 	// .../nonexistent should match nothing
-	result = ws.ProjectsByPattern(".../nonexistent")
+	result = ws.projectsByPattern(".../nonexistent")
 	if len(result) != 0 {
 		t.Errorf(".../nonexistent: got %d projects, want 0", len(result))
 	}
@@ -193,7 +193,7 @@ func TestWorkspace_ProjectsByPattern_InfixWildcard(t *testing.T) {
 	}
 
 	// .../frameworks/... should match all projects under any frameworks/ dir
-	result := ws.ProjectsByPattern(".../frameworks/...")
+	result := ws.projectsByPattern(".../frameworks/...")
 	if len(result) != 4 {
 		t.Errorf(".../frameworks/...: got %d projects, want 4", len(result))
 	}
@@ -204,13 +204,13 @@ func TestWorkspace_ProjectsByPattern_InfixWildcard(t *testing.T) {
 	}
 
 	// .../samples/... should match only the samples project
-	result = ws.ProjectsByPattern(".../samples/...")
+	result = ws.projectsByPattern(".../samples/...")
 	if len(result) != 1 || result[0].ID != "/typescript/samples/hello" {
 		t.Errorf(".../samples/...: got %v, want [/typescript/samples/hello]", result)
 	}
 
 	// .../nonexistent/... should match nothing
-	result = ws.ProjectsByPattern(".../nonexistent/...")
+	result = ws.projectsByPattern(".../nonexistent/...")
 	if len(result) != 0 {
 		t.Errorf(".../nonexistent/...: got %d projects, want 0", len(result))
 	}

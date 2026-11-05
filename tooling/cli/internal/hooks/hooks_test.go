@@ -190,8 +190,8 @@ func TestRunOnInstallHookWorkspaceScoped(t *testing.T) {
 		},
 	}
 
-	if err := RunOnInstallHook(context.Background(), ws, ext, false); err != nil {
-		t.Fatalf("RunOnInstallHook: %v", err)
+	if err := RunOnInstallHookWithWriters(context.Background(), ws, ext, false, os.Stdout, os.Stderr); err != nil {
+		t.Fatalf("RunOnInstallHookWithWriters: %v", err)
 	}
 
 	run := onlyRun(t, record)
@@ -368,7 +368,7 @@ func TestRunPreBuildHook_NoHook(t *testing.T) {
 
 // TestRunPreBuildHook_Summary exercises the concurrent stdout/stderr goroutine
 // wiring and the exports/assets propagation into HookResult — the delta over
-// its tested sibling RunOnInstallHook that had no direct coverage.
+// its tested sibling RunOnInstallHookWithWriters that had no direct coverage.
 func TestRunPreBuildHook_Summary(t *testing.T) {
 	record := filepath.Join(t.TempDir(), "runs.jsonl")
 	ws, ext, proj := preBuildFixture(t, fixtureproc.Program{

@@ -18,8 +18,7 @@ import (
 // have found. Everything a test then asserts is the engine's answer over that
 // membership, which is the point of the split.
 
-// writeFixtureFile writes one fixture file, creating its parents. Same body as
-// `sharedtest.WriteFeatureFixture`, which lives in the CLI's test-only package.
+// writeFixtureFile writes one fixture file, creating its parents.
 func writeFixtureFile(t *testing.T, path, contents string) {
 	t.Helper()
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {

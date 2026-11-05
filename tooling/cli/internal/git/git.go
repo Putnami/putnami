@@ -254,7 +254,7 @@ func WorktreeClean(repoRoot string) (bool, error) {
 }
 
 // DiffCommitFiles returns the tracked file paths changed directly between two
-// immutable commits. Unlike DiffFiles it deliberately excludes staged and
+// immutable commits. Unlike DiffWorkingTree it deliberately excludes staged and
 // untracked worktree changes, making its answer reproducible from base and
 // head alone. Rename detection is disabled so Git configuration cannot change
 // which source and destination paths are reported.
@@ -280,16 +280,6 @@ func splitNUL(output string) []string {
 		parts = parts[:len(parts)-1]
 	}
 	return parts
-}
-
-// CommitExists reports whether sha is a plausible git object ID and resolves
-// to a commit in repoRoot.
-func CommitExists(repoRoot, sha string) bool {
-	sha = strings.TrimSpace(sha)
-	if !validObjectID(sha) {
-		return false
-	}
-	return refExists(repoRoot, sha)
 }
 
 // CommitReachableFromHead reports whether sha resolves to a commit that is an
@@ -620,14 +610,6 @@ func currentBranchName(repoRoot string) string {
 	return branch
 }
 
-// DiffFiles returns the list of files changed between HEAD and the given baseline branch.
-// It disables rename detection for the committed and staged diffs so its path
-// set follows the same policy as DiffCommitFiles regardless of Git config.
-func DiffFiles(repoRoot, baseline string) ([]string, error) {
-	diff, err := DiffWorkingTree(repoRoot, baseline)
-	return diff.Files, err
-}
-
 // WorkingTreeDiff is one baseline diff of the working tree, with the evidence a
 // reader needs to reproduce it: the commit it was measured against, and which
 // of its paths no commit records yet.
@@ -646,8 +628,11 @@ type WorkingTreeDiff struct {
 	Uncommitted []string
 }
 
-// DiffWorkingTree is DiffFiles plus its evidence. It exists so a selection
-// computed on one machine can be compared with one computed on another: the
+// DiffWorkingTree returns the files changed between HEAD and the given baseline
+// branch, with the evidence for them. Rename detection is disabled for the
+// committed and staged diffs so the path set follows the same policy as
+// DiffCommitFiles regardless of Git config. The evidence lets a selection
+// computed on one machine be compared with one computed on another: the
 // same Base and the same Files are the same diff, and a path listed in
 // Uncommitted is one a commit alone would not reproduce — a file the run's own
 // bootstrap rewrote, for example.
@@ -834,16 +819,6 @@ func CurrentBranch(repoRoot string) (string, error) {
 		return "", err
 	}
 	return strings.TrimSpace(output), nil
-}
-
-// IsMainBranch returns true if the current branch is "main" or "master".
-// Returns false if not on a main branch or if git operations fail.
-func IsMainBranch(repoRoot string) bool {
-	branch, err := CurrentBranch(repoRoot)
-	if err != nil {
-		return false
-	}
-	return branch == "main" || branch == "master"
 }
 
 // gitTimeout is the default timeout for git subprocess calls.

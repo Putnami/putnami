@@ -2,7 +2,6 @@ package extension
 
 import (
 	"fmt"
-	"sort"
 	"strconv"
 	"strings"
 )
@@ -162,16 +161,4 @@ func comparePrerelease(a, b string) int {
 		}
 	}
 	return 0
-}
-
-// SortVersions sorts version strings in ascending order.
-func SortVersions(versions []string) {
-	sort.Slice(versions, func(i, j int) bool {
-		vi, errI := ParseVersion(versions[i])
-		vj, errJ := ParseVersion(versions[j])
-		if errI != nil || errJ != nil {
-			return versions[i] < versions[j]
-		}
-		return vi.LessThan(vj)
-	})
 }

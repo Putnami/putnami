@@ -258,12 +258,11 @@ func TestTheCoreExpandsNoInputSelector(t *testing.T) {
 // callers landed there; GoCommandEnv/FindGoWork, EnsureProjectExtension,
 // IsImplicitInstall/WithImplicitInstall, BuildExtensionMap/BuildTemplateMap).
 // sharedtest grew the same way for test-only helpers (CaptureStderr,
-// WriteLock, WriteJSONConfig, WriteFeatureFixture). Two symbols resisted a
-// clean shared/vertical split — extensionsInstall and templatesInstall are
-// entry points into a private call graph that stays in internal/commands/
-// extensions, so ExtensionsInstallWithWriter/TemplatesInstallWithWriter are
-// new thin exported wrappers rather than a move — logged here because they
-// are the one place this commit was not a pure file move.
+// WriteLock, WriteJSONConfig). Two symbols resisted a clean shared/vertical
+// split — extensionsInstall and templatesInstall are entry points into a
+// private call graph that stays in internal/commands/extensions, so
+// ExtensionsInstall/TemplatesInstall are exported wrappers over them rather
+// than a move.
 //
 // RAISED to 51, which moves the last two (and
 // largest) verticals out of the flat internal/commands package:
@@ -279,7 +278,7 @@ func TestTheCoreExpandsNoInputSelector(t *testing.T) {
 // table anticipated — upgrade/install/init all regenerate the AI context and
 // materialize agent workflows as one of their phases — so agentctx exports
 // grew accordingly (WriteAgentEntrypoints, DeclaredAgentArtifacts,
-// InstallAgentWorkflows, AdoptAgentWorkflows, DescribeAgentWorkflowPlan,
+// InstallAgentWorkflowsWithResult, AdoptAgentWorkflows, DescribeAgentWorkflowPlan,
 // SplitAgentArtifactReference, SanitizeArtifactSource, ClaudeEntrypointPath,
 // and the
 // AgentArtifactRef/AgentArtifactResolution/ResolveAgentArtifactPin/

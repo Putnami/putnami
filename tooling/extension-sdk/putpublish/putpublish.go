@@ -53,14 +53,6 @@ type Blob struct {
 	Read func() ([]byte, error)
 }
 
-// BytesBlob is the blob of data, uploaded with mediaType.
-func BytesBlob(mediaType string, data []byte) Blob {
-	return Blob{
-		MediaType: mediaType, Digest: put.Digest(data), Size: int64(len(data)),
-		Read: func() ([]byte, error) { return data, nil },
-	}
-}
-
 // Member is one packed Put registry member version.
 type Member struct {
 	// Kind is the release-set member kind. It selects the media types the
@@ -280,7 +272,7 @@ func UploadBlob(ctx context.Context, client *http.Client, registryURL, token, co
 	return nil
 }
 
-// PublishManifest publishes member's manifest without a channel and returns
+// publishManifest publishes member's manifest without a channel and returns
 // the manifest the registry stores. A 409 means the version is already
 // published: the stored manifest is read back, and the version is a reuse only
 // when its media type and payload bytes equal member's; another manifest is
@@ -288,7 +280,7 @@ func UploadBlob(ctx context.Context, client *http.Client, registryURL, token, co
 // (package retry) sends the publish again, up to retry.Attempts times in all,
 // and a 409 after a lost answer is accepted by the same rule. A registryURL
 // that ValidateRegistryURL refuses is refused before any request.
-func PublishManifest(ctx context.Context, client *http.Client, registryURL, token string, member Member) (stored *put.Manifest, reused bool, err error) {
+func publishManifest(ctx context.Context, client *http.Client, registryURL, token string, member Member) (stored *put.Manifest, reused bool, err error) {
 	registryURL, err = ValidateRegistryURL(registryURL)
 	if err != nil {
 		return nil, false, err
@@ -382,7 +374,7 @@ func Publish(ctx context.Context, client *http.Client, registryURL, token string
 			return Published{}, fmt.Errorf("upload blob %d: %w", index, err)
 		}
 	}
-	stored, reused, err := PublishManifest(ctx, client, registryURL, token, member)
+	stored, reused, err := publishManifest(ctx, client, registryURL, token, member)
 	if err != nil {
 		return Published{}, err
 	}

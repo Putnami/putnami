@@ -432,7 +432,7 @@ func TestTheTurborepoDemoLayout(t *testing.T) {
 	if pricing.SourceName != "@demo/pricing" || len(pricing.Dependencies) != 0 {
 		t.Fatalf("pricing %+v", pricing)
 	}
-	meta, err := DecodeMetadata(pricing.Metadata)
+	meta, err := decodeMetadata(pricing.Metadata)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -487,7 +487,7 @@ func TestStandardReportLocationsAreNamed(t *testing.T) {
 		"package.json":   `{"workspaces":["a"]}`,
 		"a/package.json": pkg("a", "1.0.0", nil),
 	}))
-	meta, err := DecodeMetadata(projects["a"].Metadata)
+	meta, err := decodeMetadata(projects["a"].Metadata)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -586,4 +586,10 @@ func TestABoundedWalkIsADiagnostic(t *testing.T) {
 	if !ok || len(ws.Members) >= 4 || !hasCode(diags, CodeWalkBounded) {
 		t.Fatalf("members %v, diagnostics %v", ws.Members, diags)
 	}
+}
+
+func decodeMetadata(raw json.RawMessage) (Metadata, error) {
+	var m Metadata
+	err := json.Unmarshal(raw, &m)
+	return m, err
 }

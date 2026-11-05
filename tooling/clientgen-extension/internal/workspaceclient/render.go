@@ -191,7 +191,7 @@ func copyProviderInputs(workspaceRoot, tempRoot string, provider provider) error
 	// provider root, so Biome's package, configuration, overrides and
 	// EditorConfig are resolved against the provider's own identity. Copying
 	// them here would create a second, silently divergent copy of the same
-	// inputs. FormatterInputs derives that same resolution for the cache key.
+	// inputs. The clientgen-ts cache key declares those same files.
 	inputs := []string{
 		joinRel(provider.rel, builtConfigFile),
 		joinRel(provider.rel, committedConfigFile),

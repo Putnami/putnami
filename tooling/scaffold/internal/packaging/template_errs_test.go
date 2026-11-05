@@ -256,7 +256,7 @@ func TestTemplate_EncodesAScopedName(t *testing.T) {
 	if result["name"] != "@acme/svc" {
 		t.Fatalf("result name = %v, want the manifest name @acme/svc", result["name"])
 	}
-	meta, err := pkgmeta.ReadPackageMetadata(tmp, ctx.Project.Path)
+	meta, err := readPackageMetadata(tmp, ctx.Project.Path)
 	if err != nil {
 		t.Fatalf("read archive publication manifest: %v", err)
 	}

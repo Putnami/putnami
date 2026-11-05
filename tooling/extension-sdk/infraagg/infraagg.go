@@ -62,15 +62,15 @@ import (
 	"go.putnami.dev/sdk/extension/robustio"
 )
 
-// AggregatedSchemaURL is written into the emitted .gen/requirements.json so
+// aggregatedSchemaURL is written into the emitted .gen/requirements.json so
 // editors validate the aggregated artifact against the published schema.
-const AggregatedSchemaURL = "https://putnami.dev/schemas/putnami-infra.json"
+const aggregatedSchemaURL = "https://putnami.dev/schemas/putnami-infra.json"
 
-// RuntimeManifestFilename is the workload-only runtime block, sourced from
+// runtimeManifestFilename is the workload-only runtime block, sourced from
 // <workload>/infra/runtime.json. It is kept separate from the per-project
 // requirements manifest because the per-project schema rejects a top-level
 // runtime block (it is a workload-root concern).
-const RuntimeManifestFilename = "runtime.json"
+const runtimeManifestFilename = "runtime.json"
 
 // AggregatedManifestFile is the project-relative, slash-separated path of a
 // workload's aggregated manifest: <project>/.gen/requirements.json.
@@ -81,7 +81,7 @@ const AggregatedManifestFile = infra.AggregatedManifestDir + "/" + infra.Aggrega
 // Aggregate writes it when the workload authors no infra/runtime.json and
 // removes it when the workload does. Nothing reads it back: it shows operators
 // the values the workload runs under.
-const RuntimeDefaultsFile = infra.AggregatedManifestDir + "/" + infra.PerProjectManifestDir + "/" + RuntimeManifestFilename
+const RuntimeDefaultsFile = infra.AggregatedManifestDir + "/" + infra.PerProjectManifestDir + "/" + runtimeManifestFilename
 
 // projectTypeApplication is the classification of a deployable workload.
 // Libraries are consumed, never deployed, so they never receive an aggregated
@@ -171,7 +171,7 @@ func Aggregate(ctx *pctx.Context, opts Options) Result {
 		return Result{Outcome: OutcomeSkipped}
 	}
 	workloadRoot := projectRoot(ctx.WorkspaceRoot, ctx.Project.Path, ctx.Project.FullPath)
-	manifestPath := AggregatedManifestPath(workloadRoot)
+	manifestPath := aggregatedManifestPath(workloadRoot)
 
 	if !IsWorkload(ctx.Project.Type) {
 		return Result{Outcome: OutcomeSkipped}
@@ -202,7 +202,7 @@ func Aggregate(ctx *pctx.Context, opts Options) Result {
 
 	merged, assembleDiags := assemble(workloadID(ctx), workloadRoot, contributions, runtime)
 	diags = append(diags, assembleDiags...)
-	merged.Schema = AggregatedSchemaURL
+	merged.Schema = aggregatedSchemaURL
 
 	var writeErr error
 	if err := writeAggregatedManifest(manifestPath, merged); err != nil {
@@ -243,8 +243,8 @@ func assemble(workload, workloadRoot string, contributions []infra.ProjectContri
 	return merged, diags
 }
 
-// AggregatedManifestPath is the workload's aggregated manifest location.
-func AggregatedManifestPath(workloadRoot string) string {
+// aggregatedManifestPath is the workload's aggregated manifest location.
+func aggregatedManifestPath(workloadRoot string) string {
 	return filepath.Join(workloadRoot, filepath.FromSlash(AggregatedManifestFile))
 }
 
@@ -253,7 +253,7 @@ func AggregatedManifestPath(workloadRoot string) string {
 // artifact from a prior build cannot mislead deployers. Best-effort: a missing
 // file is not an error.
 func RemoveAggregatedManifest(workloadRoot string) []diag.Diagnostic {
-	if err := removeAggregatedManifest(AggregatedManifestPath(workloadRoot)); err != nil {
+	if err := removeAggregatedManifest(aggregatedManifestPath(workloadRoot)); err != nil {
 		return []diag.Diagnostic{diag.Errorf(infra.ErrorCodeParseError, "", "%v", err)}
 	}
 	return nil
@@ -423,7 +423,7 @@ func sourceRuntime(workloadRoot string, opts Options) (*infra.Runtime, []diag.Di
 // and no block. Scaling-range validation happens later via
 // ValidateAggregatedManifest on the assembled artifact.
 func resolveRuntime(workloadRoot string, opts Options) (*infra.Runtime, bool, []diag.Diagnostic) {
-	developerPath := filepath.Join(workloadRoot, infra.PerProjectManifestDir, RuntimeManifestFilename)
+	developerPath := filepath.Join(workloadRoot, infra.PerProjectManifestDir, runtimeManifestFilename)
 	if _, err := os.Stat(developerPath); err == nil {
 		rt, diags := readRuntimeFile(developerPath)
 		applyRuntimeCompatibility(rt, opts)

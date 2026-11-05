@@ -166,22 +166,6 @@ func TestNewWorkspaceTakesIdentityFromTheConfigWhenThereIsOne(t *testing.T) {
 	}
 }
 
-func TestSeedRootsReturnsProjectPathsInWireOrder(t *testing.T) {
-	ws := NewWorkspace("/repo", nil, []*Project{
-		{Path: "shipping"},
-		nil,
-		{Path: "billing"},
-	})
-	roots := ws.SeedRoots()
-	if len(roots) != 2 || roots[0] != "shipping" || roots[1] != "billing" {
-		t.Fatalf("seed roots = %v, want the non-nil paths in order", roots)
-	}
-	var absent *Workspace
-	if absent.SeedRoots() != nil {
-		t.Fatal("a nil workspace must yield no roots")
-	}
-}
-
 func TestProjectIDFromPathMatchesTheCoreIdentityFold(t *testing.T) {
 	cases := map[string]string{
 		"":                     "/",

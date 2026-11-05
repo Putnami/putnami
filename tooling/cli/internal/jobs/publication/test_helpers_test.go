@@ -32,6 +32,9 @@ func TestMain(m *testing.M) {
 	if script := os.Getenv(fixtureScriptEnv); script != "" {
 		os.Exit(runFixtureScript(script, os.Args[1:]))
 	}
+	if dir := os.Getenv(evidenceProviderEnv); dir != "" {
+		os.Exit(runEvidenceProvider(dir))
+	}
 	os.Exit(m.Run())
 }
 

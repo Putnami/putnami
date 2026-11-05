@@ -7,9 +7,9 @@ import (
 	wsproto "go.putnami.dev/protocol/workspace"
 )
 
-// EffectiveVisibility is a project's import boundary with the default applied.
+// effectiveVisibility is a project's import boundary with the default applied.
 // A project that declares none is wsproto.DefaultVisibility.
-func EffectiveVisibility(p *Project) wsproto.Visibility {
+func effectiveVisibility(p *Project) wsproto.Visibility {
 	if p == nil {
 		return wsproto.DefaultVisibility
 	}
@@ -39,8 +39,8 @@ func ScopeKeyOf(p *Project) string {
 	return dir
 }
 
-// SameScope reports whether two projects sit in one scope.
-func SameScope(a, b *Project) bool {
+// sameScope reports whether two projects sit in one scope.
+func sameScope(a, b *Project) bool {
 	return ScopeKeyOf(a) == ScopeKeyOf(b)
 }
 
@@ -94,14 +94,14 @@ func VisibilityViolations(ws *Workspace) []VisibilityViolation {
 			if imported == nil {
 				continue
 			}
-			source := ws.Graph.EdgeSource(importer.ID, dependencyID)
+			source := ws.Graph.edgeSource(importer.ID, dependencyID)
 			if !source.IsImport() {
 				continue
 			}
-			if EffectiveVisibility(imported) == wsproto.VisibilityPublic || publishedClient(ws, imported) {
+			if effectiveVisibility(imported) == wsproto.VisibilityPublic || publishedClient(ws, imported) {
 				continue
 			}
-			if SameScope(importer, imported) {
+			if sameScope(importer, imported) {
 				continue
 			}
 			violations = append(violations, VisibilityViolation{

@@ -115,12 +115,6 @@ func MetadataPath(workspaceRoot, projectPath string) string {
 	return filepath.Join(workspaceRoot, ".putnami", "out", projectPath, "package", "metadata.json")
 }
 
-// ReadPackageMetadata reads and parses the archive publication manifest.
-func ReadPackageMetadata(workspaceRoot, projectPath string) (*PackageMetadata, error) {
-	path := MetadataPath(workspaceRoot, projectPath)
-	return readJSON[PackageMetadata](path)
-}
-
 // WritePackageMetadata writes the archive publication manifest atomically.
 //
 // It OVERWRITES: the archive packager is the manifest's only writer and states
@@ -131,10 +125,10 @@ func WritePackageMetadata(workspaceRoot, projectPath string, metadata PackageMet
 	return writeJSONAtomic(MetadataPath(workspaceRoot, projectPath), metadata)
 }
 
-// ChannelRecordFile is the name of the record a packager writes inside the
+// channelRecordFile is the name of the record a packager writes inside the
 // output directory it owns. One name, defined once, so every ecosystem writes
 // and every reader derives the index from the same file.
-const ChannelRecordFile = "channel.json"
+const channelRecordFile = "channel.json"
 
 // ChannelRecord is what one packager states about the output it owns: the
 // release identity it packaged under, the channels it produced there, and any
@@ -173,7 +167,7 @@ func (i *ChannelIndex) HasChannel(channel string) bool {
 // same declared output, so a restore cannot leave the artifact present and the
 // channel unrecorded.
 func WriteChannelRecord(outputDir string, record ChannelRecord) error {
-	return writeJSONAtomic(filepath.Join(outputDir, ChannelRecordFile), record)
+	return writeJSONAtomic(filepath.Join(outputDir, channelRecordFile), record)
 }
 
 // ReadChannelIndex derives the project's channel index from every
@@ -206,7 +200,7 @@ func ReadChannelIndex(workspaceRoot, projectPath string) (*ChannelIndex, error) 
 	}
 	sort.Strings(names)
 	for _, name := range names {
-		record, err := readJSON[ChannelRecord](filepath.Join(packageDir, name, ChannelRecordFile))
+		record, err := readJSON[ChannelRecord](filepath.Join(packageDir, name, channelRecordFile))
 		if err != nil {
 			continue
 		}
@@ -271,11 +265,6 @@ func WritePublishedImageManifest(publishOutputDir string, manifest PublishedImag
 		return err
 	}
 	return robustio.Rename(tmpName, filename)
-}
-
-// ReadPublishedImageManifest reads the publish-owned verified image record.
-func ReadPublishedImageManifest(publishOutputDir string) (*PublishedImageManifest, error) {
-	return readJSON[PublishedImageManifest](PublishedImageManifestPath(publishOutputDir))
 }
 
 // ReadGoModuleMetadata reads and parses the Go module metadata.

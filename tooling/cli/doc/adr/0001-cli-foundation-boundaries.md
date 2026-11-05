@@ -109,7 +109,9 @@ in-process equivalent. Do not delete them as recursion.
 
 ## Consequences
 
-- The surface goldens (`surface_golden_test.go`, `testdata/surface/`) and the
+- The surface goldens (`internal/cli/surface_golden_test.go` and
+  `internal/commands/completion/surface_golden_test.go`, with their
+  `testdata/surface/`) and the
   parse-acceptance table pin help, man, Markdown, structured help, completion
   and valid invocations. They run in-process only: one subprocess re-exec
   per golden would add its start-up cost to every golden.

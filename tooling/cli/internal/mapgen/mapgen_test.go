@@ -2,6 +2,7 @@ package mapgen
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -10,6 +11,16 @@ import (
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
+
+// RenderJSON encodes the map as two-space indented JSON with a trailing
+// newline: the canonical byte form of the document.
+func RenderJSON(m *RepoMap) ([]byte, error) {
+	data, err := json.MarshalIndent(m, "", "  ")
+	if err != nil {
+		return nil, fmt.Errorf("serialize repo map: %w", err)
+	}
+	return append(data, '\n'), nil
+}
 
 // fixtureOpenAPI exercises the endpoint extractor's whole surface: two methods
 // on one path, a second path, and a non-operation key ("parameters") that must

@@ -27,12 +27,12 @@ import (
 	"go.putnami.dev/sdk/extension/internal/retry"
 )
 
-// ErrorExcerptLimit bounds, in characters, how much of a registry error body
+// errorExcerptLimit bounds, in characters, how much of a registry error body
 // an error carries.
-const ErrorExcerptLimit = 300
+const errorExcerptLimit = 300
 
 // errorReadLimit bounds how much of an error body is read. It is far above
-// ErrorExcerptLimit, so a credential cut by the read bound always lies past
+// errorExcerptLimit, so a credential cut by the read bound always lies past
 // the excerpt and never shows partially.
 const errorReadLimit = 4096
 
@@ -74,10 +74,10 @@ func Digest(data []byte) string {
 	return fmt.Sprintf("sha256:%x", sha256.Sum256(data))
 }
 
-// BuildPayload returns the publish document for artifact. The manifest's
+// buildPayload returns the publish document for artifact. The manifest's
 // publishConfig is removed: it is npm-client authority, not package identity.
 // The dist-tags map is empty.
-func BuildPayload(artifact Artifact) (Payload, error) {
+func buildPayload(artifact Artifact) (Payload, error) {
 	var wireManifest map[string]json.RawMessage
 	if err := json.Unmarshal(artifact.Manifest, &wireManifest); err != nil {
 		return Payload{}, fmt.Errorf("parse managed npm manifest: %w", err)
@@ -257,10 +257,10 @@ func probe(ctx context.Context, client *http.Client, registry, token, packageNam
 	return true, answer, nil
 }
 
-// CheckIdentity refuses an artifact whose manifest does not name exactly its
+// checkIdentity refuses an artifact whose manifest does not name exactly its
 // Name and Version, so the version document and the attachment describe one
 // package version.
-func CheckIdentity(artifact Artifact) error {
+func checkIdentity(artifact Artifact) error {
 	var manifest map[string]json.RawMessage
 	if err := json.Unmarshal(artifact.Manifest, &manifest); err != nil {
 		return fmt.Errorf("parse managed npm manifest: %w", err)
@@ -275,7 +275,7 @@ func CheckIdentity(artifact Artifact) error {
 
 // Publish uploads artifact to registry unless the registry already serves
 // the same tarball, then reads the tarball back. It reports whether the
-// version already existed at the artifact's digest. An artifact CheckIdentity
+// version already existed at the artifact's digest. An artifact checkIdentity
 // refuses is an error before any request, and a version the registry holds
 // with other bytes is an error, before and after the upload. A transient
 // failure (package retry) sends a probe again, up to retry.Attempts times in
@@ -286,10 +286,10 @@ func CheckIdentity(artifact Artifact) error {
 // transient is followed by one more probe, and a registry that serves the
 // artifact's digest and size then holds the version.
 func Publish(ctx context.Context, client *http.Client, registry, token string, artifact Artifact) (reused bool, err error) {
-	if err := CheckIdentity(artifact); err != nil {
+	if err := checkIdentity(artifact); err != nil {
 		return false, err
 	}
-	payload, err := BuildPayload(artifact)
+	payload, err := buildPayload(artifact)
 	if err != nil {
 		return false, err
 	}
@@ -365,7 +365,7 @@ var bearerCredential = regexp.MustCompile(`(?i)bearer\s+[^\s"',;]+`)
 // is empty. The body is upstream-controlled and may echo the request's
 // Authorization: token, its query escaping and every bearer value are redacted
 // before control characters are replaced and the text is cut to
-// ErrorExcerptLimit characters.
+// errorExcerptLimit characters.
 func ErrorExcerpt(body io.Reader, token string) string {
 	raw, _ := io.ReadAll(io.LimitReader(body, errorReadLimit))
 	text := string(raw)
@@ -385,8 +385,8 @@ func ErrorExcerpt(body io.Reader, token string) string {
 	if text == "" {
 		return ""
 	}
-	if runes := []rune(text); len(runes) > ErrorExcerptLimit {
-		text = string(runes[:ErrorExcerptLimit]) + "..."
+	if runes := []rune(text); len(runes) > errorExcerptLimit {
+		text = string(runes[:errorExcerptLimit]) + "..."
 	}
 	return ": " + text
 }

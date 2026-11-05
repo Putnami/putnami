@@ -85,8 +85,8 @@ func TestCollect_GraceProtectsRecentEntries(t *testing.T) {
 	if res.EvictedEntries != 0 || res.FreedBytes != 0 {
 		t.Fatalf("evicted %d entries (%d bytes) inside the grace window", res.EvictedEntries, res.FreedBytes)
 	}
-	if !res.OverBudget(500) {
-		t.Fatal("a cache left over budget by grace protection must report OverBudget")
+	if res.RemainingBytes <= 500 {
+		t.Fatalf("a cache left over budget by grace protection must keep more than 500 bytes, kept %d", res.RemainingBytes)
 	}
 }
 

@@ -12,18 +12,12 @@ import (
 	"github.com/google/go-containerregistry/pkg/v1/remote"
 )
 
-// FetchBase resolves the platform image for a digest-pinned base ref, caching
+// fetchBase resolves the platform image for a digest-pinned base ref, caching
 // it as a self-contained OCI layout under cacheDir so repeat packaging works
 // offline. The cache key is the base digest plus platform — content-addressed,
-// so entries are immutable and never stale.
-func FetchBase(refStr, platformStr, cacheDir string) (v1.Image, error) {
-	return FetchBaseWithKeychain(refStr, platformStr, cacheDir, authn.DefaultKeychain)
-}
-
-// FetchBaseWithKeychain resolves and caches a digest-pinned base using the
-// caller's registry credentials. A nil keychain preserves FetchBase's Docker
-// default-keychain behavior.
-func FetchBaseWithKeychain(refStr, platformStr, cacheDir string, keychain authn.Keychain) (v1.Image, error) {
+// so entries are immutable and never stale. A nil keychain selects the Docker
+// default keychain.
+func fetchBase(refStr, platformStr, cacheDir string, keychain authn.Keychain) (v1.Image, error) {
 	ref, err := ParseDigestReference(refStr)
 	if err != nil {
 		return nil, fmt.Errorf("parsing base ref: %w", err)
@@ -37,14 +31,14 @@ func FetchBaseWithKeychain(refStr, platformStr, cacheDir string, keychain authn.
 	cacheKey := strings.TrimPrefix(digestRef.DigestStr(), "sha256:") + "-" + platform.OS + "-" + platform.Architecture
 	dir := filepath.Join(cacheDir, cacheKey)
 	if _, err := os.Stat(filepath.Join(dir, "index.json")); err == nil {
-		return LoadFromLayout(dir)
+		return loadFromLayout(dir)
 	}
 	if keychain == nil {
 		keychain = authn.DefaultKeychain
 	}
 
 	// The pull runs on no deadline: the manifest GET here and every lazy
-	// layer fetch WriteLayout triggers below run on the registry transport,
+	// layer fetch writeLayout triggers below run on the registry transport,
 	// whose RegistryResponseHeaderTimeout bounds a registry that accepts the
 	// connection and never answers. The library default has no such bound.
 	desc, err := remote.Get(ref,
@@ -69,7 +63,7 @@ func FetchBaseWithKeychain(refStr, platformStr, cacheDir string, keychain authn.
 		return nil, err
 	}
 	defer os.RemoveAll(tmp)
-	if _, err := WriteLayout(tmp, img); err != nil {
+	if _, err := writeLayout(tmp, img); err != nil {
 		return nil, fmt.Errorf("caching base image: %w", err)
 	}
 	if err := os.Rename(tmp, dir); err != nil {
@@ -78,7 +72,7 @@ func FetchBaseWithKeychain(refStr, platformStr, cacheDir string, keychain authn.
 		}
 		// A concurrent run won the rename; use its (identical) entry.
 	}
-	return LoadFromLayout(dir)
+	return loadFromLayout(dir)
 }
 
 // ParseDigestReference accepts only immutable sha256 OCI references. Package

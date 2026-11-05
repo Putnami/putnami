@@ -153,8 +153,8 @@ func TestAggregate_SingleContribution(t *testing.T) {
 	if m.Workload != "app" {
 		t.Errorf("workload = %q, want the project id app", m.Workload)
 	}
-	if m.Schema != AggregatedSchemaURL {
-		t.Errorf("$schema = %q, want %q", m.Schema, AggregatedSchemaURL)
+	if m.Schema != aggregatedSchemaURL {
+		t.Errorf("$schema = %q, want %q", m.Schema, aggregatedSchemaURL)
 	}
 	if len(m.Databases) != 1 {
 		t.Fatalf("databases = %d, want 1", len(m.Databases))
@@ -837,8 +837,8 @@ func TestAggregatedFiles_AreWhereAggregateWrites(t *testing.T) {
 		t.Errorf("RuntimeDefaultsFile = %q", RuntimeDefaultsFile)
 	}
 	root := filepath.Join(t.TempDir(), "app")
-	if got, want := AggregatedManifestPath(root), filepath.Join(root, ".gen", "requirements.json"); got != want {
-		t.Errorf("AggregatedManifestPath = %q, want %q", got, want)
+	if got, want := aggregatedManifestPath(root), filepath.Join(root, ".gen", "requirements.json"); got != want {
+		t.Errorf("aggregatedManifestPath = %q, want %q", got, want)
 	}
 	if got, want := runtimeDefaultsPath(root), filepath.Join(root, ".gen", "infra", "runtime.json"); got != want {
 		t.Errorf("runtimeDefaultsPath = %q, want %q", got, want)

@@ -159,7 +159,7 @@ func TestCLIPinSetShowRemove(t *testing.T) {
 	}
 
 	// pin --remove
-	if err := CLIPin(context.Background(), ws, []string{"--remove"}); err != nil {
+	if err := CLIPinForVersion(context.Background(), ws, []string{"--remove"}, ""); err != nil {
 		t.Fatalf("CLIPin remove: %v", err)
 	}
 	lf2, _ := lockfile.ReadLockFile(ws)
@@ -184,7 +184,7 @@ func TestCLIPinRecordsEveryDefaultPlatform(t *testing.T) {
 	defer srv.Close()
 	t.Setenv("PUTNAMI_REGISTRY_URL", srv.URL)
 
-	if err := CLIPin(context.Background(), ws, []string{"3.0.0"}); err != nil {
+	if err := CLIPinForVersion(context.Background(), ws, []string{"3.0.0"}, ""); err != nil {
 		t.Fatalf("CLIPin: %v", err)
 	}
 
@@ -258,7 +258,7 @@ func TestCLIPinRepinNewVersionDropsUnpublishedPlatform(t *testing.T) {
 	t.Setenv("PUTNAMI_REGISTRY_URL", srv.URL)
 
 	stderr := sharedtest.CaptureStderr(t, func() {
-		if err := CLIPin(context.Background(), ws, []string{"2.0.0"}); err != nil {
+		if err := CLIPinForVersion(context.Background(), ws, []string{"2.0.0"}, ""); err != nil {
 			t.Errorf("CLIPin: %v", err)
 		}
 	})
@@ -376,7 +376,7 @@ func TestCLIPinShowsTheSourceWorkspaceSentinel(t *testing.T) {
 	ws := t.TempDir()
 	writeSourceWorkspaceLock(t, ws)
 	out := captureCLIPinStdout(t, func() error {
-		return CLIPin(context.Background(), ws, nil)
+		return CLIPinForVersion(context.Background(), ws, nil, "")
 	})
 	for _, want := range []string{"built from this workspace", lockfile.SourceWorkspace, "./putnamiw"} {
 		if !strings.Contains(out, want) {
@@ -394,7 +394,7 @@ func TestCLIPinRemoveClearsTheSourceWorkspaceSentinel(t *testing.T) {
 	ws := t.TempDir()
 	writeSourceWorkspaceLock(t, ws)
 	out := captureCLIPinStdout(t, func() error {
-		return CLIPin(context.Background(), ws, []string{"--remove"})
+		return CLIPinForVersion(context.Background(), ws, []string{"--remove"}, "")
 	})
 	if !strings.Contains(out, "source-workspace") {
 		t.Errorf("removal output %q must say what it removed", out)

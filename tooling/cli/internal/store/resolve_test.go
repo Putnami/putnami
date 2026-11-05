@@ -220,29 +220,6 @@ func TestResolveArtifactStoreRoot_HomeUnavailableFallback(t *testing.T) {
 	}
 }
 
-func TestArtifactRootsForGC(t *testing.T) {
-	// Override → exactly one root (never a per-repo enumeration).
-	t.Setenv(artifactDirEnv, "/custom/artifacts")
-	if got := ArtifactRootsForGC(); len(got) != 1 || got[0] != "/custom/artifacts" {
-		t.Errorf("ArtifactRootsForGC under override = %v, want [/custom/artifacts]", got)
-	}
-	if got := ArtifactRootsForGCIncluding("/ws"); len(got) != 1 || got[0] != "/custom/artifacts" {
-		t.Errorf("ArtifactRootsForGCIncluding under override = %v, want [/custom/artifacts]", got)
-	}
-
-	// Under HOME → single flat root; Including a workspace that resolves to the
-	// same flat root adds nothing (dedup).
-	t.Setenv(artifactDirEnv, "")
-	home := hometest.Temp(t)
-	flat := filepath.Join(home, ".putnami", "artifacts")
-	if got := ArtifactRootsForGC(); len(got) != 1 || got[0] != flat {
-		t.Errorf("ArtifactRootsForGC under HOME = %v, want [%s]", got, flat)
-	}
-	if got := ArtifactRootsForGCIncluding("/some/ws"); len(got) != 1 || got[0] != flat {
-		t.Errorf("ArtifactRootsForGCIncluding (flat resolves to global) = %v, want [%s]", got, flat)
-	}
-}
-
 func TestResolveArtifactStoreRoot_DistinctFromStoreAndScratch(t *testing.T) {
 	t.Setenv(artifactDirEnv, "")
 	t.Setenv("PUTNAMI_STORE_DIR", "")

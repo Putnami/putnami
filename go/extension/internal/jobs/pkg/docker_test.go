@@ -108,12 +108,37 @@ func TestDockerSpec_ContentPureAndPinned(t *testing.T) {
 		t.Errorf("entrypoint = %v", spec.Entrypoint)
 	}
 	// No git-derived bytes: nothing version-shaped may reach the spec.
-	canonical := spec.CanonicalString()
+	encoded, err := json.Marshal(spec)
+	if err != nil {
+		t.Fatal(err)
+	}
+	canonical := string(encoded)
 	for _, forbidden := range []string{"0.0.0", "revision", "branch"} {
 		if strings.Contains(canonical, forbidden) {
 			t.Errorf("spec must not carry %q, got: %s", forbidden, canonical)
 		}
 	}
+	again := dockerSpec(dockerBaseImagePinned, "linux/amd64", "/ws/.putnami/out/app/bin/app", "3000")
+	if got, want := specIdentity(t, again), specIdentity(t, spec); got != want {
+		t.Errorf("identical inputs gave identities %s and %s", got, want)
+	}
+}
+
+// specIdentity returns the image plan identity of spec, treating every file as
+// derived so no source needs to exist on disk.
+func specIdentity(t *testing.T, spec oci.Spec) string {
+	t.Helper()
+	derived := map[string]string{}
+	for _, layer := range spec.Layers {
+		for _, file := range layer.Files {
+			derived[file.Path] = "test-recipe"
+		}
+	}
+	plan, err := oci.NewImagePlan(spec, oci.PlanOptions{DerivedFiles: derived})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return plan.Identity
 }
 
 func TestDockerSpec_HashSensitivity(t *testing.T) {

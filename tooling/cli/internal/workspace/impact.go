@@ -495,17 +495,11 @@ func ImpactedSelectionForBaselineWithTasks(
 	}, nil
 }
 
-// ResolveImpactedBaseline applies Putnami's --impacted baseline precedence:
-// explicit flag, workspace config baseline, nearest configured epic branch,
-// trunk (origin/HEAD, origin/main), local main/master, then the upstream
-// tracking ref — never the current branch itself.
-func ResolveImpactedBaseline(ws *Workspace, explicit string) (string, error) {
-	resolved, err := ResolveImpactedBaselineDetailed(ws, explicit)
-	return resolved.Ref, err
-}
-
-// ResolveImpactedBaselineDetailed is ResolveImpactedBaseline plus the
-// resolution tier, for callers that explain fallback choices.
+// ResolveImpactedBaselineDetailed applies Putnami's --impacted baseline
+// precedence: explicit flag, workspace config baseline, nearest configured epic
+// branch, trunk (origin/HEAD, origin/main), local main/master, then the upstream
+// tracking ref — never the current branch itself. It returns the resolution
+// tier too, for callers that explain fallback choices.
 func ResolveImpactedBaselineDetailed(ws *Workspace, explicit string) (git.ResolvedBaseline, error) {
 	if ws == nil {
 		return git.ResolvedBaseline{}, fmt.Errorf("workspace is nil")

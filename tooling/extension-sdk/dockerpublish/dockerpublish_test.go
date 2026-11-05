@@ -11,6 +11,9 @@ import (
 
 	"github.com/google/go-containerregistry/pkg/name"
 	"github.com/google/go-containerregistry/pkg/registry"
+	v1 "github.com/google/go-containerregistry/pkg/v1"
+	"github.com/google/go-containerregistry/pkg/v1/empty"
+	"github.com/google/go-containerregistry/pkg/v1/layout"
 	"github.com/google/go-containerregistry/pkg/v1/random"
 	"github.com/google/go-containerregistry/pkg/v1/remote"
 	"github.com/google/go-containerregistry/pkg/v1/remote/transport"
@@ -20,7 +23,6 @@ import (
 	"go.putnami.dev/sdk/extension/cli"
 	pctx "go.putnami.dev/sdk/extension/context"
 	"go.putnami.dev/sdk/extension/jsonl"
-	"go.putnami.dev/sdk/extension/oci"
 	"go.putnami.dev/sdk/extension/pkgmeta"
 	"go.putnami.dev/sdk/extension/registrycred"
 	"go.putnami.dev/sdk/extension/scratch"
@@ -192,9 +194,7 @@ func TestPublish_ImageProjectVerifiesImmutableContentWithoutSessionTags(t *testi
 	if err := os.MkdirAll(filepath.Join(packageDir, "docker"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := oci.WriteLayout(filepath.Join(packageDir, "docker", "oci"), img); err != nil {
-		t.Fatal(err)
-	}
+	writeTestLayout(t, filepath.Join(packageDir, "docker", "oci"), img)
 	writeJSONFile(t, filepath.Join(packageDir, "docker", "manifest.json"), pkgmeta.DockerManifest{
 		Image: "team/base", Tags: []string{"team/base:" + contentTag}, Version: contentTag,
 		ContentHash: contentHash, Digest: digest.String(), Layout: "oci", Platform: "linux/amd64",
@@ -236,7 +236,7 @@ func TestPublish_ImageProjectVerifiesImmutableContentWithoutSessionTags(t *testi
 	if string(packageBytesAfter) != string(packageBytesBefore) {
 		t.Fatal("publish rewrote package-owned candidate bytes")
 	}
-	published, err := pkgmeta.ReadPublishedImageManifest(ctx.OutputPath)
+	published, err := readPublishedImageManifest(ctx.OutputPath)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -530,9 +530,7 @@ func newDockerPublishFixture(t *testing.T) dockerPublishFixture {
 	if err := os.MkdirAll(packageDir, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := oci.WriteLayout(filepath.Join(packageDir, "oci"), img); err != nil {
-		t.Fatal(err)
-	}
+	writeTestLayout(t, filepath.Join(packageDir, "oci"), img)
 	writeJSONFile(t, filepath.Join(packageDir, "manifest.json"), pkgmeta.DockerManifest{
 		Image: "team/app", Tags: []string{"team/app:" + contentTag}, Version: "0.0.0-stale",
 		ContentHash: contentHash, Digest: digest.String(), Layout: "oci", Platform: "linux/amd64",
@@ -813,4 +811,29 @@ func TestDockerPublishMemberCoordinateIncludesTheRegistryNamespace(t *testing.T)
 	if got := eventString(t, members[0], "coordinate"); got != "team/"+fixture.repository {
 		t.Fatalf("coordinate = %q, want %q", got, "team/"+fixture.repository)
 	}
+}
+
+// writeTestLayout writes img as a one-image OCI layout at dir.
+func writeTestLayout(t testing.TB, dir string, img v1.Image) {
+	t.Helper()
+	lp, err := layout.Write(dir, empty.Index)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := lp.AppendImage(img); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// readPublishedImageManifest decodes the publish-owned verified image record.
+func readPublishedImageManifest(publishOutputDir string) (*pkgmeta.PublishedImageManifest, error) {
+	data, err := os.ReadFile(pkgmeta.PublishedImageManifestPath(publishOutputDir))
+	if err != nil {
+		return nil, err
+	}
+	var manifest pkgmeta.PublishedImageManifest
+	if err := json.Unmarshal(data, &manifest); err != nil {
+		return nil, err
+	}
+	return &manifest, nil
 }

@@ -127,7 +127,7 @@ func TestContentExtensionIsWrittenOncePerPlatformKeyWithIdenticalBytes(t *testin
 		}
 	}
 
-	metadata, err := pkgmeta.ReadPackageMetadata(tmp, "mycontent")
+	metadata, err := readPackageMetadata(tmp, "mycontent")
 	if err != nil || metadata == nil {
 		t.Fatalf("metadata = %+v, err = %v", metadata, err)
 	}

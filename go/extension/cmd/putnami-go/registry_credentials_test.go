@@ -108,7 +108,7 @@ func TestWithRegistryCredential_RefreshesBeforeAFetchingJobAndNeverBlocksIt(t *t
 	root := declaringWorkspace(t)
 	hosts := stubGoCredential(t, registrycred.Outcome{
 		Kind: registrycred.KindNotSignedIn, Level: "warn",
-		Message: "not signed in for " + declaredOriginHost + "; " + registrycred.SignInHint,
+		Message: "not signed in for " + declaredOriginHost + "; " + "run putnami cloud login",
 	})
 	t.Setenv("NETRC", "")
 	t.Setenv("GO_REGISTRY_URL", "")

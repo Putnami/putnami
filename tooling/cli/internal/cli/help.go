@@ -137,7 +137,7 @@ func jobCommandNames(scope *helpScope) string {
 
 // relatedCommands maps each command to related commands. It is DERIVED from the
 // command catalog: the keys are catalog paths, which is what the help renderers
-// look up (PrintSubcommandHelp joins command and subcommand the same way).
+// look up (printSubcommandHelp joins command and subcommand the same way).
 var relatedCommands = relatedCommandsFromCatalog()
 
 func relatedCommandsFromCatalog() map[string][]string {
@@ -150,12 +150,6 @@ func relatedCommandsFromCatalog() map[string][]string {
 		out[command.Path] = append([]string(nil), command.Related...)
 	}
 	return out
-}
-
-// PrintHelp prints the top-level help with no extension loaded: the core's
-// commands and flags, and how to add an extension.
-func PrintHelp() {
-	printHelp(nil)
 }
 
 // printHelp prints the top-level help of scope to the process's standard
@@ -288,11 +282,6 @@ func printCommandHelp(command string, flags map[string]extension.FlagDefinition,
 
 	printGlobalOptions(scope.flagCategories())
 	printRelatedCommands(command, scope)
-}
-
-// PrintSubcommandHelp prints help for a structured command subcommand.
-func PrintSubcommandHelp(command, subcommand string) {
-	printSubcommandHelp(command, subcommand, nil)
 }
 
 // printSubcommandHelp prints the help of a built-in command, listing the

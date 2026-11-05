@@ -301,7 +301,7 @@ func TestDeployment_NeverLeavesAStaleDeclaration(t *testing.T) {
 			writeProjectFile(t, root, "app", DeploymentFile, stale)
 
 			result, err := Deployment(ctx, Options{})
-			if err != nil || result.Outcome != OutcomeWithheld {
+			if err != nil || result.Outcome != outcomeWithheld {
 				t.Fatalf("Deployment = %q %v %v", result.Outcome, result.Diagnostics, err)
 			}
 			if !diag.HasErrors(result.Diagnostics) || !hasDiagCode(result.Diagnostics, tc.code) {
@@ -349,7 +349,7 @@ func TestDeploymentJob_ReportsEveryOutcome(t *testing.T) {
 		if err != nil || status != "OK" || data["outcome"] != string(OutcomeEmitted) {
 			t.Fatalf("job = %q %v %v", status, data, err)
 		}
-		if !strings.Contains(out, DeploymentPhaseName) || !strings.Contains(out, infra.DeploymentFilename) {
+		if !strings.Contains(out, deploymentPhaseName) || !strings.Contains(out, infra.DeploymentFilename) {
 			t.Errorf("event stream does not report the phase and the artifact:\n%s", out)
 		}
 	})
@@ -377,7 +377,7 @@ func TestDeploymentJob_ReportsEveryOutcome(t *testing.T) {
 		out := captureStdout(t, func() {
 			status, data, err = DeploymentJob(Options{})(ctx, jsonl.NewForVersion(1), nil)
 		})
-		if err != nil || status != "SKIP" || data["outcome"] != string(OutcomeWithheld) {
+		if err != nil || status != "SKIP" || data["outcome"] != string(outcomeWithheld) {
 			t.Fatalf("job = %q %v %v, want a SKIP that does not fail", status, data, err)
 		}
 		if !strings.Contains(out, `"warn"`) || !strings.Contains(out, "deployment declaration:") {

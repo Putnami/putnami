@@ -172,21 +172,15 @@ type VersionUpdateResult struct {
 	BinaryPath string
 }
 
-// VersionUpdate downloads the latest CLI binary from the resolver, verifies
-// integrity, and installs it to .putnami/bin/putnami-go-<version> (with .exe
-// on Windows).
+// VersionUpdateWithOptions resolves a CLI release from a registry channel or
+// exact version, downloads the binary, verifies integrity, and installs it to
+// .putnami/bin/putnami-go-<version> (with .exe on Windows). In dry-run mode it
+// only reports the resolved version.
 //
 // The update is fail-closed: if the resolver does not advertise an integrity
 // hash (via the X-Integrity header or RFC 9530 Digest header), the install
 // is refused. Set PUTNAMI_UNSAFE_UPDATE=1 to bypass — but doing so removes
 // the only protection against a MITM or tampered mirror.
-func VersionUpdate(ctx context.Context, currentVersion string, binDir string) error {
-	_, err := VersionUpdateWithOptions(ctx, currentVersion, binDir, VersionUpdateOptions{Channel: "latest"})
-	return err
-}
-
-// VersionUpdateWithOptions resolves a CLI release from a registry channel or
-// exact version. In dry-run mode it only reports the resolved version.
 func VersionUpdateWithOptions(ctx context.Context, currentVersion string, binDir string, opts VersionUpdateOptions) (VersionUpdateResult, error) {
 	resolverURL := extension.ResolvePutRegistryURL(opts.Registries)
 	if err := extension.ValidateRegistryURL(resolverURL); err != nil {

@@ -6,11 +6,6 @@
 // config timestamps vary per build). No docker daemon is involved.
 package oci
 
-import (
-	"encoding/json"
-	"fmt"
-)
-
 // File is one file copied into the image.
 type File struct {
 	// Source is the local path of the file content. It is machine-specific
@@ -58,19 +53,6 @@ type Spec struct {
 	User string `json:"user,omitempty"`
 	// ExposedPorts are added to the base config, e.g. "3000/tcp".
 	ExposedPorts []string `json:"exposedPorts,omitempty"`
-}
-
-// CanonicalString returns the deterministic serialization of everything that
-// shapes the image except file contents (and machine-specific source paths).
-// It plays the role the generated Dockerfile played for content hashing
-// before in-process assembly.
-func (s Spec) CanonicalString() string {
-	data, err := json.Marshal(s)
-	if err != nil {
-		// Spec is plain data; Marshal cannot fail on it.
-		panic(fmt.Sprintf("oci: marshal spec: %v", err))
-	}
-	return string(data)
 }
 
 // ContentHash returns the versioned ImagePlan identity. New callers that also

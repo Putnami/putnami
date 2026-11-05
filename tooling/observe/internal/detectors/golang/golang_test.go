@@ -373,11 +373,12 @@ func TestAnImportPathNamesItsFileAndModule(t *testing.T) {
 func TestGoModRequiresAreTheLockedVersions(t *testing.T) {
 	spectest.Proves(t, feature, "go-locked-versions", "go-mod-requires-are-the-locked-versions")
 	d := Detect(tree(t, demo))
-	if got := d.Lockfiles(); !reflect.DeepEqual(got, []Lockfile{
-		{Path: "api/go.mod", Component: "api", Ecosystem: "go"},
-		{Path: "pricing/go.mod", Component: "pricing", Ecosystem: "go"},
-	}) {
-		t.Fatalf("lockfiles %+v", got)
+	goMods := make([]string, 0, len(d.Modules))
+	for _, m := range d.Modules {
+		goMods = append(goMods, m.GoMod)
+	}
+	if !reflect.DeepEqual(goMods, []string{"api/go.mod", "pricing/go.mod"}) {
+		t.Fatalf("go.mod files %v", goMods)
 	}
 	base := []byte("module github.com/Putnami/demo-observe-go/api\nrequire (\n\tgithub.com/Putnami/demo-observe-go/pricing v0.0.0\n\tgithub.com/google/uuid v1.5.0\n)\nrequire golang.org/x/text v0.20.0 // indirect\nreplace github.com/Putnami/demo-observe-go/pricing => ../pricing\n")
 	locked, err := d.ReadLock("api/go.mod", base, nil)
@@ -390,15 +391,6 @@ func TestGoModRequiresAreTheLockedVersions(t *testing.T) {
 	}
 	if !reflect.DeepEqual(locked, want) {
 		t.Fatalf("locked %+v, want %+v", locked, want)
-	}
-	if CompareVersions("v0.20.0", "v0.21.0") >= 0 || CompareVersions("v0.21.0", "v0.20.0") <= 0 || CompareVersions("v1.0.0", "v1.0.0") != 0 {
-		t.Fatal("semantic order")
-	}
-	if CompareVersions("v0.0.0-20240101000000-abcdefabcdef", "v0.1.0") >= 0 {
-		t.Fatal("a pseudo version sorts below the release")
-	}
-	if CompareVersions("latest", "v1.0.0") != 0 {
-		t.Fatal("an invalid version compares as equal")
 	}
 }
 

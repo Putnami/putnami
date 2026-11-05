@@ -62,9 +62,9 @@ func Job(opts Options) cli.JobFunc {
 	}
 }
 
-// DeploymentPhaseName is the phase every language's deployment declaration
+// deploymentPhaseName is the phase every language's deployment declaration
 // task reports under.
-const DeploymentPhaseName = "deployment"
+const deploymentPhaseName = "deployment"
 
 // DeploymentJob adapts Deployment to an extension job entry point, the whole
 // body of a language's deployment package step, with the language supplying
@@ -80,18 +80,18 @@ const DeploymentPhaseName = "deployment"
 // in place.
 func DeploymentJob(opts Options) cli.JobFunc {
 	return func(ctx *pctx.Context, emit *jsonl.Emitter, _ []string) (string, map[string]any, error) {
-		emit.PhaseStart(DeploymentPhaseName)
+		emit.PhaseStart(deploymentPhaseName)
 		result, err := Deployment(ctx, opts)
 		reportDiagnosticsWithPrefix(emit, "deployment declaration: ", result.Diagnostics)
 		if err != nil {
-			emit.PhaseEnd(DeploymentPhaseName, "failed")
+			emit.PhaseEnd(deploymentPhaseName, "failed")
 			return "FAILED", result.Data(), err
 		}
 		if result.Outcome != OutcomeEmitted {
-			emit.PhaseEnd(DeploymentPhaseName, "skipped")
+			emit.PhaseEnd(deploymentPhaseName, "skipped")
 			return "SKIP", result.Data(), nil
 		}
-		emit.PhaseEnd(DeploymentPhaseName, "success")
+		emit.PhaseEnd(deploymentPhaseName, "success")
 		emit.Artifact("deployment-declaration", infra.DeploymentFilename, "manifest", result.ManifestPath)
 		return "OK", result.Data(), nil
 	}

@@ -44,7 +44,7 @@ type Project struct {
 	// workspace one WHOLE. The entry's shape belongs to the ecosystem profile.
 	Registries map[string]json.RawMessage
 	// Visibility is the project's declared import boundary, unresolved: empty
-	// means the project declared none. Read it through EffectiveVisibility,
+	// means the project declared none. Read it through effectiveVisibility,
 	// which applies wsproto.DefaultVisibility.
 	Visibility wsproto.Visibility
 	// Line is the scope path of this project's nearest ancestor version line,

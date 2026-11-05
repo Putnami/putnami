@@ -23,7 +23,7 @@ func impactNameSet(ps []*Project) map[string]bool {
 }
 
 // gitInitWithBaseline creates a git repo at dir with one committed file and a
-// "main" branch, so git.DiffFiles has a valid baseline to diff against.
+// "main" branch, so git.DiffWorkingTree has a valid baseline to diff against.
 // Untracked files created afterwards are reported as changes.
 func gitInitWithBaseline(t *testing.T, dir string) {
 	t.Helper()

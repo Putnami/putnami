@@ -106,7 +106,7 @@ func TestWriteFileAtomicWaitsForAReaderOfTheManifest(t *testing.T) {
 // Removing a stale aggregated manifest waits for its reader the same way.
 func TestRemoveAggregatedManifestWaitsForAReaderOfTheManifest(t *testing.T) {
 	root := t.TempDir()
-	path := AggregatedManifestPath(root)
+	path := aggregatedManifestPath(root)
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		t.Fatal(err)
 	}

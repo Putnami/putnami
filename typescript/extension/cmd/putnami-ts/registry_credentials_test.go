@@ -129,7 +129,7 @@ func TestRefreshPutnamiNpmCredential_AsksForTheScopeHostAndHoldsTheWarning(t *te
 	withRegistries(t, ctx, `{"npm":{"scopes":{"@putnami":"https://npm.putnami.dev"}}}`)
 	hosts := stubNpmCredential(t, registrycred.Outcome{
 		Kind: registrycred.KindNotSignedIn, Level: "warn",
-		Message: "not signed in for npm.putnami.dev; " + registrycred.SignInHint,
+		Message: "not signed in for npm.putnami.dev; " + "run putnami cloud login",
 	})
 
 	events := captureEvents(t, func() { refreshPutnamiNpmCredential(ctx, jsonl.New()) })

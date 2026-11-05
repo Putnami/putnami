@@ -76,11 +76,11 @@ func runFakeProvider(fake string, args []string) int {
 	case fakeProtocol:
 		return runProtocolFake(args)
 	case fakePublished:
-		recordEvidence(os.Getenv(PublishedImagesFileEnv)+"\n", os.Getenv("FAKE_PATH_OBSERVATION"), true)
+		recordEvidence(os.Getenv(publishedImagesFileEnv)+"\n", os.Getenv("FAKE_PATH_OBSERVATION"), true)
 	case fakeAmbient:
-		recordEvidence(os.Getenv(PublishedImagesFileEnv)+"\n", os.Getenv("FAKE_OBSERVATION"), false)
+		recordEvidence(os.Getenv(publishedImagesFileEnv)+"\n", os.Getenv("FAKE_OBSERVATION"), false)
 	case fakeMembers:
-		recordEvidence(os.Getenv(MemberEvidenceFileEnv), os.Getenv("FAKE_PATH_OBSERVATION"), true)
+		recordEvidence(os.Getenv(memberEvidenceFileEnv), os.Getenv("FAKE_PATH_OBSERVATION"), true)
 	default:
 		fmt.Fprintf(os.Stderr, "unknown fake provider %q\n", fake)
 		return 125

@@ -54,7 +54,6 @@
             "kind": "acceptance",
             "checks": [
               "transitive-closures-are-deterministic",
-              "topological-order-is-stable",
               "a-declared-cycle-is-reported"
             ]
           }

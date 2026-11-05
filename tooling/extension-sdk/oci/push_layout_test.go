@@ -47,9 +47,9 @@ func writeRandomLayout(t *testing.T) (string, string) {
 		t.Fatal(err)
 	}
 	dir := filepath.Join(t.TempDir(), "layout")
-	digest, err := WriteLayout(dir, img)
+	digest, err := writeLayout(dir, img)
 	if err != nil {
-		t.Fatalf("WriteLayout: %v", err)
+		t.Fatalf("writeLayout: %v", err)
 	}
 	return dir, digest
 }

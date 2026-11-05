@@ -29,9 +29,9 @@ func seedLayout(t *testing.T, dockerDir string) string {
 	if err != nil {
 		t.Fatal(err)
 	}
-	digest, err := WriteLayout(filepath.Join(dockerDir, "oci"), img)
+	digest, err := writeLayout(filepath.Join(dockerDir, "oci"), img)
 	if err != nil {
-		t.Fatalf("WriteLayout: %v", err)
+		t.Fatalf("writeLayout: %v", err)
 	}
 	return digest
 }
@@ -147,7 +147,7 @@ func TestPushContent_SkipsWhenExists(t *testing.T) {
 }
 
 func TestPushContent_BadLayoutFails(t *testing.T) {
-	// dockerDir has no "oci" layout → LoadFromLayout fails.
+	// dockerDir has no "oci" layout → loadFromLayout fails.
 	err := PushContent(jsonl.New(), t.TempDir(), t.TempDir(), "oci", "", "example.com/app:c-x", false, authn.NewMultiKeychain(), "")
 	if err == nil {
 		t.Fatal("expected error for missing OCI layout, got nil")

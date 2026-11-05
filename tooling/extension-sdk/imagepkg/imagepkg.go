@@ -30,7 +30,7 @@ type Config struct {
 	// registry option; it never enters candidate identity or package I/O.
 	Registry     string        `json:"registry"`
 	Platform     string        `json:"platform"`
-	Layers       []LayerConfig `json:"layers"`
+	Layers       []layerConfig `json:"layers"`
 	Env          []string      `json:"env,omitempty"`
 	Entrypoint   []string      `json:"entrypoint,omitempty"`
 	WorkingDir   string        `json:"workingDir,omitempty"`
@@ -38,15 +38,15 @@ type Config struct {
 	ExposedPorts []string      `json:"exposedPorts,omitempty"`
 }
 
-// LayerConfig declares either a project-relative tar layer or a set of files
+// layerConfig declares either a project-relative tar layer or a set of files
 // to place in one deterministic layer.
-type LayerConfig struct {
-	Files   []FileConfig `json:"files,omitempty"`
+type layerConfig struct {
+	Files   []fileConfig `json:"files,omitempty"`
 	Tarball string       `json:"tarball,omitempty"`
 }
 
-// FileConfig maps one project-relative regular file to an absolute image path.
-type FileConfig struct {
+// fileConfig maps one project-relative regular file to an absolute image path.
+type fileConfig struct {
 	Source string `json:"source"`
 	Path   string `json:"path"`
 	Mode   int64  `json:"mode,omitempty"`
@@ -233,14 +233,6 @@ func ResolveBaseArtifact(ctx *pctx.Context, literal, projectRef, platform string
 	}
 	layout = filepath.Join(pkgmeta.PackageOutputDir(ctx.WorkspaceRoot, base.Path, "docker"), layout)
 	return BaseArtifact{Reference: localRef, Digest: manifest.Digest, Layout: layout}, nil
-}
-
-// ResolveBaseReference is the compatibility projection for callers that need
-// only the digest-pinned plan identity. New packagers should consume the full
-// BaseArtifact so a project dependency stays local.
-func ResolveBaseReference(ctx *pctx.Context, literal, projectRef, platform string) (string, error) {
-	artifact, err := ResolveBaseArtifact(ctx, literal, projectRef, platform)
-	return artifact.Reference, err
 }
 
 func configFromParams(params pctx.Params) (Config, error) {

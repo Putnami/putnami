@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"crypto/sha256"
 	"encoding/hex"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io/fs"
@@ -507,14 +506,4 @@ func adaptationSortKey(value Adaptation) string {
 func findingSortKey(value Finding) string {
 	return fmt.Sprintf("%s\x00%s\x00%09d\x00%09d\x00%s\x00%s", value.Code, value.Path,
 		value.Line, value.Column, value.ServiceID, value.Message)
-}
-
-// MarshalReport renders a deterministic machine-readable report.
-func MarshalReport(report Report) ([]byte, error) {
-	canonicalizeReport(&report)
-	data, err := json.MarshalIndent(report, "", "  ")
-	if err != nil {
-		return nil, err
-	}
-	return append(data, '\n'), nil
 }

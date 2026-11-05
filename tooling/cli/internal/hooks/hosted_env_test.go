@@ -71,8 +71,8 @@ func TestExtensionHooksSeeTheOfflineSignalOfTheirRun(t *testing.T) {
 			Path:  filepath.Join(dir, "ext"),
 			Hooks: &extension.ManifestHooks{OnInstall: &extension.HookDefinition{Kind: "command", Command: script, Cwd: "{workspaceRoot}"}},
 		}
-		if err := RunOnInstallHook(context.Background(), workspace.NewWorkspace(dir, &wsproto.Config{Name: "test-ws"}, nil), ext, false); err != nil {
-			t.Fatalf("RunOnInstallHook: %v", err)
+		if err := RunOnInstallHookWithWriters(context.Background(), workspace.NewWorkspace(dir, &wsproto.Config{Name: "test-ws"}, nil), ext, false, os.Stdout, os.Stderr); err != nil {
+			t.Fatalf("RunOnInstallHookWithWriters: %v", err)
 		}
 		wantHostedEnv(t, hosted, onlyRun(t, record).LookupEnv)
 

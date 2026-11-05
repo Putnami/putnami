@@ -254,21 +254,6 @@ func TestDiffCommitFiles_DisablesRenameDetection(t *testing.T) {
 	}
 }
 
-func TestCommitExists(t *testing.T) {
-	t.Parallel()
-	dir := initGitRepo(t)
-	sha := strings.TrimSpace(runGit(t, dir, "rev-parse", "HEAD"))
-	if !CommitExists(dir, sha) {
-		t.Fatalf("CommitExists(%q) = false, want true", sha)
-	}
-	if CommitExists(dir, strings.Repeat("f", 40)) {
-		t.Fatal("CommitExists(nonexistent sha) = true, want false")
-	}
-	if CommitExists(dir, "main") {
-		t.Fatal("CommitExists(branch name) = true, want false")
-	}
-}
-
 func TestCommitReachableFromHead(t *testing.T) {
 	t.Parallel()
 	dir := initGitRepo(t)
@@ -319,34 +304,6 @@ func TestCurrentBranch_OtherBranch(t *testing.T) {
 	}
 	if branch != "feature" {
 		t.Errorf("CurrentBranch = %q, want %q", branch, "feature")
-	}
-}
-
-func TestIsMainBranch_Main(t *testing.T) {
-	t.Parallel()
-	dir := initGitRepo(t)
-	if !IsMainBranch(dir) {
-		t.Error("IsMainBranch = false, want true")
-	}
-}
-
-func TestIsMainBranch_Feature(t *testing.T) {
-	t.Parallel()
-	dir := initGitRepo(t)
-
-	cmd := exec.Command(Executable(), "checkout", "-b", "feature")
-	cmd.Dir = dir
-	cmd.CombinedOutput()
-
-	if IsMainBranch(dir) {
-		t.Error("IsMainBranch = true, want false")
-	}
-}
-
-func TestIsMainBranch_InvalidRepo(t *testing.T) {
-	t.Parallel()
-	if IsMainBranch(t.TempDir()) {
-		t.Error("IsMainBranch on non-repo should return false")
 	}
 }
 
@@ -984,7 +941,7 @@ func TestResolveTrunk_ErrorWhenNoCandidateExists(t *testing.T) {
 	}
 }
 
-func TestDiffFiles(t *testing.T) {
+func TestDiffWorkingTree(t *testing.T) {
 	t.Parallel()
 	dir := initGitRepo(t)
 
@@ -1008,10 +965,11 @@ func TestDiffFiles(t *testing.T) {
 		t.Fatalf("git commit: %v\n%s", err, out)
 	}
 
-	files, err := DiffFiles(dir, "main")
+	diff, err := DiffWorkingTree(dir, "main")
 	if err != nil {
-		t.Fatalf("DiffFiles: %v", err)
+		t.Fatalf("DiffWorkingTree: %v", err)
 	}
+	files := diff.Files
 	found := false
 	for _, f := range files {
 		if f == "new.go" {
@@ -1020,11 +978,11 @@ func TestDiffFiles(t *testing.T) {
 		}
 	}
 	if !found {
-		t.Errorf("DiffFiles = %v, expected to contain 'new.go'", files)
+		t.Errorf("DiffWorkingTree = %v, expected to contain 'new.go'", files)
 	}
 }
 
-func TestDiffFiles_DisablesRenameDetection(t *testing.T) {
+func TestDiffWorkingTree_DisablesRenameDetection(t *testing.T) {
 	t.Parallel()
 	dir := initGitRepo(t)
 
@@ -1049,17 +1007,18 @@ func TestDiffFiles_DisablesRenameDetection(t *testing.T) {
 	want := []string{from, to}
 	for _, configuredRenames := range []string{"true", "false"} {
 		runGit(t, dir, "config", "diff.renames", configuredRenames)
-		files, err := DiffFiles(dir, "main")
+		diff, err := DiffWorkingTree(dir, "main")
 		if err != nil {
-			t.Fatalf("DiffFiles with diff.renames=%s: %v", configuredRenames, err)
+			t.Fatalf("DiffWorkingTree with diff.renames=%s: %v", configuredRenames, err)
 		}
+		files := diff.Files
 		if !reflect.DeepEqual(files, want) {
-			t.Errorf("DiffFiles with diff.renames=%s = %#v, want %#v", configuredRenames, files, want)
+			t.Errorf("DiffWorkingTree with diff.renames=%s = %#v, want %#v", configuredRenames, files, want)
 		}
 	}
 }
 
-func TestDiffFiles_FallsBackToOriginBranchForBareBaseline(t *testing.T) {
+func TestDiffWorkingTree_FallsBackToOriginBranchForBareBaseline(t *testing.T) {
 	t.Parallel()
 	dir := initGitRepo(t)
 	addOriginMainRef(t, dir)
@@ -1073,10 +1032,11 @@ func TestDiffFiles_FallsBackToOriginBranchForBareBaseline(t *testing.T) {
 	runGit(t, dir, "add", "new.go")
 	runGit(t, dir, "commit", "-m", "add new.go")
 
-	files, err := DiffFiles(dir, "main")
+	diff, err := DiffWorkingTree(dir, "main")
 	if err != nil {
-		t.Fatalf("DiffFiles: %v", err)
+		t.Fatalf("DiffWorkingTree: %v", err)
 	}
+	files := diff.Files
 	found := false
 	for _, f := range files {
 		if f == "new.go" {
@@ -1085,11 +1045,11 @@ func TestDiffFiles_FallsBackToOriginBranchForBareBaseline(t *testing.T) {
 		}
 	}
 	if !found {
-		t.Errorf("DiffFiles = %v, expected to contain 'new.go'", files)
+		t.Errorf("DiffWorkingTree = %v, expected to contain 'new.go'", files)
 	}
 }
 
-func TestDiffFiles_UntrackedFiles(t *testing.T) {
+func TestDiffWorkingTree_UntrackedFiles(t *testing.T) {
 	t.Parallel()
 	dir := initGitRepo(t)
 
@@ -1098,10 +1058,11 @@ func TestDiffFiles_UntrackedFiles(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	files, err := DiffFiles(dir, "main")
+	diff, err := DiffWorkingTree(dir, "main")
 	if err != nil {
-		t.Fatalf("DiffFiles: %v", err)
+		t.Fatalf("DiffWorkingTree: %v", err)
 	}
+	files := diff.Files
 
 	found := false
 	for _, f := range files {
@@ -1111,7 +1072,7 @@ func TestDiffFiles_UntrackedFiles(t *testing.T) {
 		}
 	}
 	if !found {
-		t.Errorf("DiffFiles = %v, expected to contain 'untracked.txt'", files)
+		t.Errorf("DiffWorkingTree = %v, expected to contain 'untracked.txt'", files)
 	}
 }
 
@@ -1157,10 +1118,6 @@ func TestDiffWorkingTree_NamesTheBaseAndTheUncommittedPaths(t *testing.T) {
 	slices.Sort(uncommitted)
 	if want := []string{"staged.txt", "tracked.txt", "untracked.txt"}; !slices.Equal(uncommitted, want) {
 		t.Errorf("uncommitted = %v, want %v", diff.Uncommitted, want)
-	}
-	files, err := DiffFiles(dir, "main")
-	if err != nil || !slices.Equal(files, diff.Files) {
-		t.Errorf("DiffFiles = %v, %v; want DiffWorkingTree's files %v", files, err, diff.Files)
 	}
 
 	// A clean tree has no uncommitted paths.

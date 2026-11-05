@@ -173,8 +173,8 @@ func (c *Client) call(ctx context.Context, operation string, request any, consum
 	} else {
 		commandEnv = append(make([]string, 0, len(c.Env)), c.Env...)
 	}
-	commandEnv = removeEnvironmentKey(commandEnv, PublishedImagesFileEnv)
-	commandEnv = removeEnvironmentKey(commandEnv, MemberEvidenceFileEnv)
+	commandEnv = removeEnvironmentKey(commandEnv, publishedImagesFileEnv)
+	commandEnv = removeEnvironmentKey(commandEnv, memberEvidenceFileEnv)
 	if operation == distribution.ReleaseCommand {
 		if data, present, evidenceErr := memberEvidenceBytes(ctx); evidenceErr != nil {
 			return evidenceErr
@@ -184,9 +184,9 @@ func (c *Client) call(ctx context.Context, operation string, request any, consum
 				return writeErr
 			}
 			defer cleanup()
-			commandEnv = append(commandEnv, MemberEvidenceFileEnv+"="+path)
+			commandEnv = append(commandEnv, memberEvidenceFileEnv+"="+path)
 		}
-		if images, present := PublishedImagesFromContext(ctx); present {
+		if images, present := publishedImagesFromContext(ctx); present {
 			publishedBytes, marshalErr := marshalPublishedImages(images)
 			if marshalErr != nil {
 				return marshalErr
@@ -196,7 +196,7 @@ func (c *Client) call(ctx context.Context, operation string, request any, consum
 				return fmt.Errorf("prepare release-set published images: %w", writeErr)
 			}
 			defer publishedCleanup()
-			commandEnv = append(commandEnv, PublishedImagesFileEnv+"="+publishedPath)
+			commandEnv = append(commandEnv, publishedImagesFileEnv+"="+publishedPath)
 		}
 	}
 

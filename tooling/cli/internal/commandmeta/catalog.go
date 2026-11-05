@@ -496,18 +496,6 @@ func PositionalLeaf(root string) bool {
 	return true
 }
 
-// RecoveryCommands returns, in declaration order, every command that stays
-// available when the workspace probe fails.
-func RecoveryCommands() []Command {
-	out := make([]Command, 0, 8)
-	for _, command := range catalog {
-		if command.Recovery {
-			out = append(out, command)
-		}
-	}
-	return out
-}
-
 // IsRecoveryCommand reports whether an invocation path survives a probe
 // failure. A bare structured root is expanded through DefaultSub first, so
 // `putnami extensions` is answered the same way as the `extensions install` it

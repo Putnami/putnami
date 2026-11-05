@@ -59,13 +59,6 @@ type Metadata struct {
 	Reports Reports `json:"reports"`
 }
 
-// DecodeMetadata reads the metadata of a probe project this detector answered.
-func DecodeMetadata(raw json.RawMessage) (Metadata, error) {
-	var m Metadata
-	err := json.Unmarshal(raw, &m)
-	return m, err
-}
-
 // Detect reads the workspace rooted at root and answers for all its members.
 // ok is false when root declares no Node workspace.
 func Detect(root string) (result wsproto.ProbeResult, ok bool) {

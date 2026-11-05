@@ -62,7 +62,7 @@ import (
 	pdb "go.putnami.dev/protocol/database"
 )
 
-// EnvProvidedServer names the externally managed Postgres a run's test
+// envProvidedServer names the externally managed Postgres a run's test
 // environments are built on. It is the pipeline's whole side of the contract:
 // start a server, export this, and run the ordinary command.
 //
@@ -70,7 +70,7 @@ import (
 // per-project — it names datasources, schemas and policy this package derives
 // from each project's own committed requirements closure — while a server is one
 // fact about the machine.
-const EnvProvidedServer = "PUTNAMI_TEST_PG_URL"
+const envProvidedServer = "PUTNAMI_TEST_PG_URL"
 
 // providedProviderID names the resource kind a provided-server lease reclaims.
 // It exists so a lease stays self-describing; there is nothing to reclaim,
@@ -103,7 +103,7 @@ const (
 // surfaces. net/url echoes its whole input in the error it returns, and that
 // input carries the password, so nothing derived from a parse failure is ever
 // returned to a caller.
-var errProvidedURLUnparseable = errors.New(EnvProvidedServer + " is not a parseable postgres:// URL")
+var errProvidedURLUnparseable = errors.New(envProvidedServer + " is not a parseable postgres:// URL")
 
 // providedConfig is the digest-affecting, NON-SECRET identity of a provided
 // server: the coordinates two runs would have to share for their environments
@@ -139,7 +139,7 @@ type ProvidedServer struct {
 // probing reachability with a bounded TCP dial.
 func NewProvidedServer() *ProvidedServer {
 	return &ProvidedServer{
-		url:              os.Getenv(EnvProvidedServer),
+		url:              os.Getenv(envProvidedServer),
 		dial:             dialTCP,
 		reachableTimeout: DefaultProvidedReachableTimeout,
 	}
@@ -230,7 +230,7 @@ func (s *ProvidedServer) waitReachable(ctx context.Context, host string, port in
 func parseProvidedURL(raw string) (pdb.Connection, providedConfig, error) {
 	value := strings.TrimSpace(raw)
 	if value == "" {
-		return pdb.Connection{}, providedConfig{}, fmt.Errorf("%s is empty", EnvProvidedServer)
+		return pdb.Connection{}, providedConfig{}, fmt.Errorf("%s is empty", envProvidedServer)
 	}
 	u, err := url.Parse(value)
 	if err != nil {
@@ -240,18 +240,18 @@ func parseProvidedURL(raw string) (pdb.Connection, providedConfig, error) {
 	case "postgres", "postgresql":
 	default:
 		return pdb.Connection{}, providedConfig{}, fmt.Errorf(
-			"%s must be a postgres:// URL, not %q", EnvProvidedServer, u.Scheme)
+			"%s must be a postgres:// URL, not %q", envProvidedServer, u.Scheme)
 	}
 	host := u.Hostname()
 	if host == "" {
-		return pdb.Connection{}, providedConfig{}, fmt.Errorf("%s names no host", EnvProvidedServer)
+		return pdb.Connection{}, providedConfig{}, fmt.Errorf("%s names no host", envProvidedServer)
 	}
 	port := defaultProvidedPort
 	if text := u.Port(); text != "" {
 		parsed, err := strconv.Atoi(text)
 		if err != nil || parsed <= 0 || parsed > 65535 {
 			return pdb.Connection{}, providedConfig{}, fmt.Errorf(
-				"%s port %q is not a TCP port", EnvProvidedServer, text)
+				"%s port %q is not a TCP port", envProvidedServer, text)
 		}
 		port = parsed
 	}

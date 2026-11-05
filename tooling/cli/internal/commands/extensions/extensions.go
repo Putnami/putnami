@@ -30,15 +30,6 @@ func ExtensionsInstall(ctx context.Context, wsRoot string, cfg *wsproto.Config, 
 	return extensionsInstall(ctx, wsRoot, cfg, args, outputFormat, os.Stdout)
 }
 
-// ExtensionsInstallWithWriter is ExtensionsInstall with the human progress
-// stream chosen by the caller. It exists for internal/commands' combined
-// `install` lifecycle command (install.go), which is outside this vertical and
-// threads its own writer through so an implicit install under
-// --output=json|jsonl never writes to the real stdout (slice A5a).
-func ExtensionsInstallWithWriter(ctx context.Context, wsRoot string, cfg *wsproto.Config, args []string, outputFormat string, out io.Writer) error {
-	return ExtensionsInstallWithOptions(ctx, wsRoot, cfg, args, InstallOptions{OutputFormat: outputFormat, Out: out})
-}
-
 // ExtensionsInstallWithOptions installs extensions and reports typed outcomes
 // without requiring lifecycle callers to parse the human progress stream.
 func ExtensionsInstallWithOptions(ctx context.Context, wsRoot string, cfg *wsproto.Config, args []string, opts InstallOptions) error {
@@ -370,13 +361,6 @@ func printLocalExtension(w io.Writer, ref string, ext *extension.ExtensionDescri
 	iox.Fprintf(w, "  ✓ %s (local)\n", ref)
 }
 
-// RunExtensionInstallHooks runs workspace-scoped hooks declared by installed
-// extensions. The args parameter mirrors ExtensionsInstall so a specifically
-// installed extension can run its hook even before the config has been reloaded.
-func RunExtensionInstallHooks(ctx context.Context, wsRoot string, cfg *wsproto.Config, args []string, outputFormat string) error {
-	return runExtensionInstallHooks(ctx, wsRoot, cfg, args, outputFormat, os.Stdout)
-}
-
 // RunExtensionInstallHooksTo runs the hooks an install deferred
 // (InstallOptions.DeferInstallHooks), with the human stream that install used.
 func RunExtensionInstallHooksTo(ctx context.Context, wsRoot string, cfg *wsproto.Config, args []string, out io.Writer) error {
@@ -386,10 +370,12 @@ func RunExtensionInstallHooksTo(ctx context.Context, wsRoot string, cfg *wsproto
 	return nil
 }
 
-// runExtensionInstallHooks is RunExtensionInstallHooks with the caller's human
-// stream. A structured outputFormat still forces stderr: an onInstall hook's own
-// stdout would corrupt the JSONL stream regardless of which writer the status
-// lines use.
+// runExtensionInstallHooks runs workspace-scoped hooks declared by installed
+// extensions, with the caller's human stream. The args parameter mirrors
+// ExtensionsInstall so a specifically installed extension can run its hook even
+// before the config has been reloaded. A structured outputFormat still forces
+// stderr: an onInstall hook's own stdout would corrupt the JSONL stream
+// regardless of which writer the status lines use.
 func runExtensionInstallHooks(ctx context.Context, wsRoot string, cfg *wsproto.Config, args []string, outputFormat string, out io.Writer) error {
 	if wsRoot == "" {
 		return nil

@@ -10,12 +10,12 @@ import (
 func TestLockFileV4AgentArtifactRoundTrip(t *testing.T) {
 	lf := NewLockFile()
 	lf.Version = FormatVersionV4
-	lf.SetAgentArtifact("@putnami/agent-workflows", AgentArtifactLockEntry{
+	lf.AgentArtifacts = map[string]AgentArtifactLockEntry{"@putnami/agent-workflows": {
 		Version:      "1.0.0",
 		Integrity:    strings.Repeat("1", 64),
 		ManifestHash: strings.Repeat("2", 64),
 		Source:       "https://put.putnami.dev/agents/download?channel=1.0.0",
-	})
+	}}
 
 	data, err := MarshalLockFile(lf)
 	if err != nil {
@@ -25,7 +25,7 @@ func TestLockFileV4AgentArtifactRoundTrip(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	entry, ok := got.GetAgentArtifact("@putnami/agent-workflows")
+	entry, ok := got.AgentArtifacts["@putnami/agent-workflows"]
 	if !ok || entry.Version != "1.0.0" || entry.Integrity != strings.Repeat("1", 64) || entry.ManifestHash != strings.Repeat("2", 64) {
 		t.Fatalf("agent artifact pin did not round-trip: %+v (ok=%v)", entry, ok)
 	}
@@ -37,11 +37,11 @@ func TestLockFileV4AgentArtifactRoundTrip(t *testing.T) {
 func TestLockFileV3ProjectionDropsV4VocabularyWithoutMutation(t *testing.T) {
 	lf := NewLockFile()
 	lf.Version = FormatVersionV3
-	lf.SetAgentArtifact("workflows", AgentArtifactLockEntry{
+	lf.AgentArtifacts = map[string]AgentArtifactLockEntry{"workflows": {
 		Version:      "1.0.0",
 		Integrity:    strings.Repeat("1", 64),
 		ManifestHash: strings.Repeat("2", 64),
-	})
+	}}
 
 	data, err := MarshalLockFile(lf)
 	if err != nil {
@@ -50,7 +50,7 @@ func TestLockFileV3ProjectionDropsV4VocabularyWithoutMutation(t *testing.T) {
 	if strings.Contains(string(data), "agentArtifacts") {
 		t.Fatalf("v3 projection emitted v4 vocabulary:\n%s", data)
 	}
-	if _, ok := lf.GetAgentArtifact("workflows"); !ok {
+	if _, ok := lf.AgentArtifacts["workflows"]; !ok {
 		t.Fatal("v3 projection mutated the caller's agent artifact map")
 	}
 }

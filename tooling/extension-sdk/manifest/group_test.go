@@ -98,61 +98,6 @@ func commandGroupsBuilder() *Builder {
 		})
 }
 
-// TestCommandGroup_RoundTripsTheWorkspaceFixture builds the protocol's
-// workspace-requirement fixture through the builder and asserts the result is
-// that document, with the same canonicalization as the command-groups round
-// trip above.
-func TestCommandGroup_RoundTripsTheWorkspaceFixture(t *testing.T) {
-	built, err := New("sample/command-groups-without-workspace", "").
-		CommandGroup("audit", "Audit a repository, with or without a workspace",
-			DefaultSubcommand("run"),
-			Subcommand("run", "Audit the current directory.",
-				Runs("audit-run"),
-				Interactive(),
-				WorkspaceRequirement(proto.SubcommandWorkspaceOptional),
-			),
-			Subcommand("report", "Summarize the last audit of this workspace.",
-				Runs("audit-report"),
-				WorkspaceRequirement(proto.SubcommandWorkspaceRequired),
-			),
-		).
-		Command("audit-run", proto.CommandDefinition{
-			Description: "Audit the current directory.",
-			Run:         []proto.PipelineStep{{ID: "run", Task: "audit-exec"}},
-		}).
-		Command("audit-report", proto.CommandDefinition{
-			Description: "Summarize the last audit.",
-			Run:         []proto.PipelineStep{{ID: "report", Task: "audit-exec"}},
-		}).
-		Task("audit-exec", proto.TaskDefinition{Kind: "command", Command: "echo", Args: []string{"audit"}}).
-		Build()
-	if err != nil {
-		t.Fatalf("the fixture manifest was rejected at authoring time: %v", err)
-	}
-	if built.CLIContract != protocolcli.CurrentContract {
-		t.Errorf("built cliContract = %d, want %d: the workspace members need no contract increment",
-			built.CLIContract, protocolcli.CurrentContract)
-	}
-	fixture, err := os.ReadFile(workspaceFixture)
-	if err != nil {
-		t.Fatalf("read the protocol fixture: %v", err)
-	}
-	encoded, err := json.Marshal(built)
-	if err != nil {
-		t.Fatal(err)
-	}
-	gotDoc := canonicalDocument(t, encoded)
-	wantDoc := canonicalDocument(t, fixture)
-	delete(gotDoc, "cliContract")
-	if got, want := canonical(t, gotDoc), canonical(t, wantDoc); got != want {
-		t.Errorf("built manifest is not the fixture document.\n got:\n%s\nwant:\n%s", got, want)
-	}
-}
-
-// workspaceFixture is the protocol's valid manifest for a group default and a
-// subcommand that runs without a workspace.
-const workspaceFixture = "../../../protocols/extension/fixtures/valid/command-groups-without-workspace.json"
-
 // TestCommandGroup_AuthoringFeatures pins what the constructors produce beyond
 // the fixture's own surface: the interactive flag D6 makes every SDD subcommand
 // carry, and positionals, whose ORDER is the argument order and therefore the
@@ -285,24 +230,6 @@ func TestCommandGroup_RejectsProtocolViolations(t *testing.T) {
 					Example("", "no command")))
 			},
 			code: "required-field",
-		},
-		{
-			name: "an optional workspace on a subcommand that is not interactive",
-			mutate: func(b *Builder) {
-				b.CommandGroup("cloud", "", Subcommand("status", "",
-					Runs("cloud-status"),
-					WorkspaceRequirement(proto.SubcommandWorkspaceOptional)))
-			},
-			code: "invalid-workspace-requirement",
-		},
-		{
-			name: "a group default that names no subcommand",
-			mutate: func(b *Builder) {
-				b.CommandGroup("cloud", "",
-					DefaultSubcommand("stats"),
-					Subcommand("status", "", Runs("cloud-status")))
-			},
-			code: "unresolved-default-subcommand",
 		},
 		{
 			name: "a positional without a name",

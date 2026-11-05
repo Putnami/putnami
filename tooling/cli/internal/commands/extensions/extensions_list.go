@@ -13,14 +13,10 @@ import (
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
 
-// ExtensionsList shows all installed extensions with their versions.
-func ExtensionsList(wsRoot string, cfg *wsproto.Config, outputFormat string) error {
-	return ExtensionsListPrepared(wsRoot, cfg, outputFormat, nil)
-}
-
-// ExtensionsListPrepared lists extensions while honoring the exact roots (or
-// explicit unavailability) chosen by bounded read preparation. Config and lock
-// rows still render normally; ambient manifests cannot be substituted as a
+// ExtensionsListPrepared shows all installed extensions with their versions,
+// honoring the exact roots (or explicit unavailability) chosen by bounded read
+// preparation; a nil prepared map leaves ambient discovery in place. Config and
+// lock rows still render normally; ambient manifests cannot be substituted as a
 // workspace discovery result when their registry ref failed preparation.
 func ExtensionsListPrepared(wsRoot string, cfg *wsproto.Config, outputFormat string, prepared map[string]string) error {
 	lockFile, lockErr := lockfile.ReadLockFile(wsRoot)

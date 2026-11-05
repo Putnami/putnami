@@ -59,9 +59,8 @@ the same answer.
 `internal/commands` is a container directory (documented in its `doc.go`)
 with one package per command surface: `agentctx`, `cachecmd`, `ci`,
 `completion`, `composecmd`, `configcmd`, `doctor`, `extensions`,
-`lifecycle`, `migrate`, `proposals`, `qualifycmd`, `sessions`, `treecmd`, `versioncmd`. Only the
-surface golden (`surface_golden_test.go`, `testdata/surface/`) stays at the
-root.
+`lifecycle`, `migrate`, `proposals`, `qualifycmd`, `sessions`, `treecmd`, `versioncmd`. Only `doc.go`
+stays at the root.
 
 A helper two or more verticals need moves to `internal/commands/shared` when
 its callers are production code, and to `internal/commands/sharedtest` when

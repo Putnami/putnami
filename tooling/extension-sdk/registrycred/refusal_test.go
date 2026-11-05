@@ -7,7 +7,7 @@ import (
 
 const (
 	npmMissing = "no registry credential for npm.putnami.dev: needs a signed-in user; PUTNAMI_CLOUD_TOKEN cannot read it; continuing with the existing credential"
-	goMissing  = "not signed in for go.putnami.dev; " + SignInHint
+	goMissing  = "not signed in for go.putnami.dev; " + signInHint
 )
 
 func resetHeldForTest() {
@@ -82,7 +82,7 @@ func TestReportRefusal_ReadsTheHostOfTheRefusedURL(t *testing.T) {
 	}
 	// The Go origin refused: only its warning is logged, and the npm one stays held.
 	lines := report(t, "go: x@v1.0.0: reading https://go.putnami.dev:443/x/@v/v1.0.0.mod: 403 Forbidden")
-	if len(lines) != 1 || !strings.Contains(lines[0], "go.putnami.dev") || !strings.Contains(lines[0], SignInHint) {
+	if len(lines) != 1 || !strings.Contains(lines[0], "go.putnami.dev") || !strings.Contains(lines[0], signInHint) {
 		t.Fatalf("lines = %q, want the Go origin warning only", lines)
 	}
 	if lines := report(t, "error: 401"); len(lines) != 1 || !strings.Contains(lines[0], "npm.putnami.dev") {

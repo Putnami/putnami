@@ -81,7 +81,7 @@ func TestSelectProviderPrefersTheNamedServer(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			t.Setenv(EnvProvidedServer, tc.env)
+			t.Setenv(envProvidedServer, tc.env)
 			prov := SelectProvider()
 			_, isProvided := prov.(*ProvidedServer)
 			if isProvided != tc.provided {
@@ -244,8 +244,8 @@ func TestProvidedURLErrorsAreCredentialFree(t *testing.T) {
 			if strings.Contains(err.Error(), providedPassword) {
 				t.Errorf("the failure leaked the credential: %v", err)
 			}
-			if !strings.Contains(err.Error(), EnvProvidedServer) {
-				t.Errorf("the failure does not name %s, so a reader cannot fix it: %v", EnvProvidedServer, err)
+			if !strings.Contains(err.Error(), envProvidedServer) {
+				t.Errorf("the failure does not name %s, so a reader cannot fix it: %v", envProvidedServer, err)
 			}
 		})
 	}

@@ -216,36 +216,6 @@ func GlobalArtifactRoot() (string, bool) {
 	return filepath.Join(home, putnamiDir, artifactsDirName), true
 }
 
-// ArtifactRootsForGC returns the set of artifact store roots GC should manage.
-// The artifact store is FLAT, so this is at most ONE root (the override or the
-// global ~/.putnami/artifacts) — never a per-repo enumeration like
-// StoreRootsForGC. Returns nil when $HOME is unavailable and no override is set
-// (the per-worktree fallback is reachable only with a workspace; see
-// ArtifactRootsForGCIncluding).
-func ArtifactRootsForGC() []string {
-	if root, ok := GlobalArtifactRoot(); ok {
-		return []string{root}
-	}
-	return nil
-}
-
-// ArtifactRootsForGCIncluding unions the GC root set with the artifact root the
-// given workspace actually resolves to, guaranteeing the $HOME-unavailable
-// per-worktree fallback (<workspaceRoot>/.putnami/artifacts) — which lives
-// outside ~/.putnami and so is not covered by ArtifactRootsForGC alone — is
-// swept too.
-func ArtifactRootsForGCIncluding(workspaceRoot string) []string {
-	roots := ArtifactRootsForGC()
-	if workspaceRoot == "" {
-		return roots
-	}
-	resolved := ResolveArtifactStoreRoot(workspaceRoot)
-	if slices.Contains(roots, resolved) {
-		return roots
-	}
-	return append(roots, resolved)
-}
-
 // Config is the config-file layer for the store's GC settings. Env vars still
 // override these, and defaults fill any field left unset (a nil pointer / unset
 // value). It is built from the merged workspace config via ConfigFromWorkspace.

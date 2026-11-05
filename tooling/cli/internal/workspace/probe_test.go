@@ -22,7 +22,7 @@ func identityWorkspace() *Workspace {
 
 func TestProbeViewOf_KeysDependenciesOnPaths(t *testing.T) {
 	ws := identityWorkspace()
-	view := ProbeViewOf(ws.ProjectByID("/app"), ws.DependencyPathResolver())
+	view := ws.ProbeView(ws.ProjectByID("/app"))
 
 	if view.Path != "app" {
 		t.Errorf("path = %q", view.Path)
@@ -46,7 +46,7 @@ func TestProbeViewOf_KeysDependenciesOnPaths(t *testing.T) {
 func TestProbeViewOf_WorkspaceRootUsesProtocolSpelling(t *testing.T) {
 	root := &Project{ID: "/", Name: "root", Path: ""}
 	ws := NewWorkspace("/ws", nil, []*Project{root})
-	if got := ProbeViewOf(root, ws.DependencyPathResolver()).Path; got != wsproto.ProbeRootPath {
+	if got := ws.ProbeView(root).Path; got != wsproto.ProbeRootPath {
 		t.Errorf("root path = %q, want %q", got, wsproto.ProbeRootPath)
 	}
 }
@@ -56,7 +56,7 @@ func TestProbeViewOf_UnresolvableDependencyIsNotAPath(t *testing.T) {
 	app := ws.ProjectByID("/app")
 	app.Dependencies = []string{"lib", "some-external-package"}
 
-	view := ProbeViewOf(app, ws.DependencyPathResolver())
+	view := ws.ProbeView(app)
 	if len(view.Dependencies) != 1 || view.Dependencies[0] != "lib" {
 		t.Fatalf("dependencies = %v — an unresolvable name must not be recorded as a path", view.Dependencies)
 	}
@@ -377,12 +377,17 @@ func TestCommandmetaRecoveryAllowlist(t *testing.T) {
 	if commandmeta.IsRecoveryCommand("cache gc") {
 		t.Error("cache gc is not a recovery command")
 	}
-	if len(commandmeta.RecoveryCommands()) == 0 {
-		t.Fatal("the recovery allowlist is empty; a probe failure would be unrecoverable")
-	}
-	for _, command := range commandmeta.RecoveryCommands() {
+	recovery := 0
+	for _, command := range commandmeta.Commands() {
+		if !command.Recovery {
+			continue
+		}
+		recovery++
 		if !commandmeta.IsRecoveryCommand(command.Path) {
 			t.Errorf("%q is marked Recovery but IsRecoveryCommand says otherwise", command.Path)
 		}
+	}
+	if recovery == 0 {
+		t.Fatal("the recovery allowlist is empty; a probe failure would be unrecoverable")
 	}
 }

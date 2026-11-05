@@ -163,7 +163,7 @@ func archiveMember() Member {
 	return Member{
 		Kind: distribution.KindArchive, Coordinate: "acme/cli", Version: "1.2.3",
 		MediaType: put.ArchiveManifestMediaType, Manifest: []byte(payload),
-		Blobs: []Blob{BytesBlob(put.GzipBlobMediaType, linux), BytesBlob(put.BinaryBlobMediaType, darwin)},
+		Blobs: []Blob{bytesBlob(put.GzipBlobMediaType, linux), bytesBlob(put.BinaryBlobMediaType, darwin)},
 	}
 }
 
@@ -191,12 +191,12 @@ func members() map[distribution.MemberKind]Member {
 		distribution.KindMigration: {
 			Kind: distribution.KindMigration, Coordinate: "acme/orders-db", Version: "0007",
 			MediaType: put.MigrationManifestMediaType, Manifest: []byte(fmt.Sprintf(`{"blob_digest":%q,"database":"orders"}`, put.Digest(bundle))),
-			Blobs: []Blob{BytesBlob(put.MigrationBundleBlobMediaType, bundle)},
+			Blobs: []Blob{bytesBlob(put.MigrationBundleBlobMediaType, bundle)},
 		},
 		distribution.KindDoc: {
 			Kind: distribution.KindDoc, Coordinate: "acme/doc-contents", Version: "1.0.0+build.7",
 			MediaType: put.DocManifestMediaType, Manifest: []byte(fmt.Sprintf(`{"artifact":{"blob":%q},"site":"docs"}`, put.Digest(site))),
-			Blobs: []Blob{BytesBlob(put.GzipBlobMediaType, site)},
+			Blobs: []Blob{bytesBlob(put.GzipBlobMediaType, site)},
 		},
 		distribution.KindDeployment: {
 			Kind: distribution.KindDeployment, Coordinate: "acme/orders-deployment", Version: "1.4.0",
@@ -308,8 +308,8 @@ func TestCheckRefusesAMemberBeforeAnyRequest(t *testing.T) {
 		"a spaced payload":                  {edit(archive, func(m *Member) { m.Manifest = append([]byte(" "), m.Manifest...) }), "manifest"},
 		"an unescaped payload":              {edit(members()[distribution.KindConfig], func(m *Member) { m.Manifest = []byte(`{"note":"<default>"}`) }), "canonical form"},
 		"a blob media type of another kind": {edit(archive, func(m *Member) { m.Blobs[0].MediaType = put.MigrationBundleBlobMediaType }), "uploads no"},
-		"a config blob":                     {edit(members()[distribution.KindConfig], func(m *Member) { m.Blobs = []Blob{BytesBlob(put.GzipBlobMediaType, []byte("x"))} }), "uploads no"},
-		"a deployment blob":                 {edit(members()[distribution.KindDeployment], func(m *Member) { m.Blobs = []Blob{BytesBlob(put.GzipBlobMediaType, []byte("x"))} }), "uploads no"},
+		"a config blob":                     {edit(members()[distribution.KindConfig], func(m *Member) { m.Blobs = []Blob{bytesBlob(put.GzipBlobMediaType, []byte("x"))} }), "uploads no"},
+		"a deployment blob":                 {edit(members()[distribution.KindDeployment], func(m *Member) { m.Blobs = []Blob{bytesBlob(put.GzipBlobMediaType, []byte("x"))} }), "uploads no"},
 		"a deployment of another protocol version": {edit(members()[distribution.KindDeployment], func(m *Member) {
 			m.Manifest = []byte(strings.Replace(string(m.Manifest), `"protocolVersion":2`, `"protocolVersion":3`, 1))
 		}), "deployment manifest"},
@@ -320,10 +320,10 @@ func TestCheckRefusesAMemberBeforeAnyRequest(t *testing.T) {
 		"a repeated blob":                        {edit(archive, func(m *Member) { m.Blobs[1] = m.Blobs[0] }), "repeats"},
 		"a missing blob":                         {edit(archive, func(m *Member) { m.Blobs = m.Blobs[:1] }), "must be the same blobs"},
 		"an unreferenced blob": {edit(members()[distribution.KindDoc], func(m *Member) {
-			m.Blobs = append(m.Blobs, BytesBlob(put.GzipBlobMediaType, []byte("extra")))
+			m.Blobs = append(m.Blobs, bytesBlob(put.GzipBlobMediaType, []byte("extra")))
 		}), "must be the same blobs"},
 		"an archive size that is not the blob's": {edit(archive, func(m *Member) {
-			m.Blobs[0] = BytesBlob(put.GzipBlobMediaType, []byte("linux archive bytez"))
+			m.Blobs[0] = bytesBlob(put.GzipBlobMediaType, []byte("linux archive bytez"))
 			m.Manifest = []byte(strings.Replace(string(m.Manifest), put.Digest([]byte("linux archive bytes")), m.Blobs[0].Digest, 1))
 			m.Manifest = []byte(strings.Replace(string(m.Manifest), `"size":19}`, `"size":20}`, 1))
 		}), "names a blob of 20 bytes"},
@@ -471,7 +471,7 @@ func TestPublishSendsTheBearerAndReadsTheVersionManifest(t *testing.T) {
 	if _, err := Publish(context.Background(), testClient(t), registry.server.URL, testToken, member); err != nil {
 		t.Fatal(err)
 	}
-	if _, _, err := PublishManifest(context.Background(), testClient(t), registry.server.URL, testToken, member); err != nil {
+	if _, _, err := publishManifest(context.Background(), testClient(t), registry.server.URL, testToken, member); err != nil {
 		t.Fatal(err)
 	}
 	registry.mu.Lock()
@@ -480,7 +480,7 @@ func TestPublishSendsTheBearerAndReadsTheVersionManifest(t *testing.T) {
 	if last != "GET /acme/doc-contents/versions/1.0.0+build.7/manifest" {
 		t.Fatalf("the manifest read was %q", last)
 	}
-	if _, _, err := PublishManifest(context.Background(), nil, registry.server.URL, testToken, member); err == nil {
+	if _, _, err := publishManifest(context.Background(), nil, registry.server.URL, testToken, member); err == nil {
 		t.Fatal("a publish without a client was accepted")
 	}
 }
@@ -498,8 +498,8 @@ func TestEveryCallValidatesTheRegistryURLBeforeAnyRequest(t *testing.T) {
 		"UploadBlob": func(registryURL string) error {
 			return UploadBlob(context.Background(), testClient(t), registryURL, testToken, member.Coordinate, member.Blobs[0])
 		},
-		"PublishManifest": func(registryURL string) error {
-			_, _, err := PublishManifest(context.Background(), testClient(t), registryURL, testToken, member)
+		"publishManifest": func(registryURL string) error {
+			_, _, err := publishManifest(context.Background(), testClient(t), registryURL, testToken, member)
 			return err
 		},
 		"ReadManifest": func(registryURL string) error {
@@ -943,4 +943,12 @@ func TestPublishManifestRetriesATransientFailure(t *testing.T) {
 			t.Fatalf("%d reads answered %+v after %v, want 2 reads and a reuse", reads, published, *waits)
 		}
 	})
+}
+
+// bytesBlob is the blob of data, uploaded with mediaType.
+func bytesBlob(mediaType string, data []byte) Blob {
+	return Blob{
+		MediaType: mediaType, Digest: put.Digest(data), Size: int64(len(data)),
+		Read: func() ([]byte, error) { return data, nil },
+	}
 }

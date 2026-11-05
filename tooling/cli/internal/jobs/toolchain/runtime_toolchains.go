@@ -290,13 +290,9 @@ func refuseProvisioningRuntimeToolchains(workspaceRoot string, ext *model.Extens
 		ext.Name, ref, ext.Runtime.Toolchains[ref].Lock, extensionproto.WorkspaceFetchCommand, ToolchainProvisioningCommand)
 }
 
-// ResolveRuntimeToolchains resolves refs of ext strictly against the workspace
-// lock of workspaceRoot, probing candidates with base, and records each
-// resolution on ext.
-func ResolveRuntimeToolchains(workspaceRoot string, ext *model.ExtensionDescription, refs []string, base []string) error {
-	return resolveRuntimeToolchainsContext(context.Background(), workspaceRoot, ext, refs, base)
-}
-
+// resolveRuntimeToolchainsContext resolves refs of ext strictly against the
+// workspace lock of workspaceRoot, probing candidates with base, and records
+// each resolution on ext.
 func resolveRuntimeToolchainsContext(ctx context.Context, workspaceRoot string, ext *model.ExtensionDescription, refs []string, base []string) error {
 	return resolveRuntimeToolchainRefs(ctx, workspaceRoot, ext, refs, base, ResolveStrict)
 }
@@ -902,14 +898,6 @@ var ErrToolchainProbeTimeout = errors.New("probe timed out")
 
 // toolchainProbeTimeoutKey is the context key WithToolchainProbeTimeout sets.
 type toolchainProbeTimeoutKey struct{}
-
-// WithToolchainProbeTimeout returns ctx with every runtime toolchain probe that
-// runs under it bounded by timeout instead of toolVersionProbeTimeout. A test
-// uses it to prove how a caller reports a probe that timed out without waiting
-// out the production deadline.
-func WithToolchainProbeTimeout(ctx context.Context, timeout time.Duration) context.Context {
-	return context.WithValue(ctx, toolchainProbeTimeoutKey{}, timeout)
-}
 
 // runtimeToolchainProbeTimeout is the deadline of a runtime toolchain probe
 // that runs under ctx: the one WithToolchainProbeTimeout set, else

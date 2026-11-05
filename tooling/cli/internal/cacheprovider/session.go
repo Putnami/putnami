@@ -89,11 +89,6 @@ type Option func(*Session)
 // carries no deadline. A non-positive value disables the default.
 func WithOpTimeout(d time.Duration) Option { return func(s *Session) { s.opTimeout = d } }
 
-// WithShutdownTimeout bounds the graceful close before the provider is killed.
-func WithShutdownTimeout(d time.Duration) Option {
-	return func(s *Session) { s.shutdownTimeout = d }
-}
-
 // WithStderr forwards the provider subprocess's stderr to w (default: discarded).
 func WithStderr(w io.Writer) Option { return func(s *Session) { s.stderr = w } }
 

@@ -30,9 +30,9 @@ func TestReadGoModuleMetadata_ParseErrorAndReadError(t *testing.T) {
 	}
 }
 
-// TestReadPackageMetadata_ParsesValid exercises the success path of readJSON so
+// TestReadJSON_ParsesPackageMetadata exercises the success path of readJSON so
 // the non-error return is covered too.
-func TestReadPackageMetadata_ParsesValid(t *testing.T) {
+func TestReadJSON_ParsesPackageMetadata(t *testing.T) {
 	wsRoot := t.TempDir()
 	projectPath := "services/api"
 	pkgDir := filepath.Join(PackageOutputDir(wsRoot, projectPath, "x"), "..")
@@ -43,9 +43,9 @@ func TestReadPackageMetadata_ParsesValid(t *testing.T) {
 		[]byte(`{"version":"1.0.0","artifact":"api","channels":["go"]}`), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	meta, err := ReadPackageMetadata(wsRoot, projectPath)
+	meta, err := readJSON[PackageMetadata](MetadataPath(wsRoot, projectPath))
 	if err != nil {
-		t.Fatalf("ReadPackageMetadata: %v", err)
+		t.Fatalf("read package metadata: %v", err)
 	}
 	if meta.Version != "1.0.0" || meta.Artifact != "api" {
 		t.Fatalf("unexpected metadata: %+v", meta)

@@ -263,7 +263,7 @@ func TestReleaseSetPlanSelectsChangedMembersAndTheirDependents(t *testing.T) {
 	t.Run("--all republishes unchanged members", func(t *testing.T) {
 		useReleaseSetProvenance(t, nil)
 		run := prepareReleaseSetWithHead(t, releaseSetAllOptions(), ws, head)
-		if !run.plan.SelectsEveryMember() || len(run.plan.Members) != 2 || run.plan.Baseline() == nil {
+		if !selectsEveryMember(run.plan) || len(run.plan.Members) != 2 || run.plan.Baseline() == nil {
 			t.Fatalf("--all plan = %+v", run.plan)
 		}
 		for _, member := range run.plan.Members {
@@ -308,14 +308,14 @@ func TestReleaseSetPlanRedefinesMembershipAgainstTheHead(t *testing.T) {
 		}
 		refreshHeadRef(t, head["canary"])
 		run := prepareReleaseSetWithHead(t, releaseSetRequest(), ws, head)
-		if !run.plan.SelectsEveryMember() || run.HeadRef() == nil || *run.HeadRef() != head["canary"].Ref {
+		if !selectsEveryMember(run.plan) || run.HeadRef() == nil || *run.HeadRef() != head["canary"].Ref {
 			t.Fatalf("plan over a head with foreign fingerprints = %+v", run.plan)
 		}
 	})
 
 	t.Run("empty channel selects everything without a base", func(t *testing.T) {
 		run := prepareReleaseSetWithHead(t, releaseSetRequest(), ws, emptyHead("canary"))
-		if !run.plan.SelectsEveryMember() || run.plan.Baseline() != nil || run.HeadRef() != nil {
+		if !selectsEveryMember(run.plan) || run.plan.Baseline() != nil || run.HeadRef() != nil {
 			t.Fatalf("plan over an empty channel = %+v", run.plan)
 		}
 	})
@@ -1071,7 +1071,7 @@ func TestOneProjectYieldsSeveralMembers(t *testing.T) {
 	ws := workspace.NewWorkspace(t.TempDir(), &wsproto.Config{Name: "putnami"}, []*workspace.Project{project})
 	useReleaseSetProvenance(t, nil)
 	run := prepareReleaseSetWithHead(t, releaseSetAllOptions(), ws, emptyHead("canary"))
-	if len(run.plan.Members) != 3 || !run.plan.SelectsEveryMember() {
+	if len(run.plan.Members) != 3 || !selectsEveryMember(run.plan) {
 		t.Fatalf("one-project plan = %+v, want three selected members", run.plan.Members)
 	}
 	for _, want := range []struct {
@@ -1478,7 +1478,7 @@ func TestPrepareReleaseSetEmptyChannelReleasesWithNullExpectation(t *testing.T) 
 		t.Run(name, func(t *testing.T) {
 			provider.resolveCalls, provider.releaseCalls, provider.releaseRequest = 0, 0, nil
 			run, err := prepareReleaseSet(t, options, ws, ws.Projects, providerDiscovery())
-			if err != nil || run == nil || run.plan.Baseline() != nil || !run.plan.SelectsEveryMember() {
+			if err != nil || run == nil || run.plan.Baseline() != nil || !selectsEveryMember(run.plan) {
 				t.Fatalf("empty-channel preparation = %+v, %v", run, err)
 			}
 			if provider.resolveCalls != 1 {
@@ -1540,7 +1540,7 @@ func TestPrepareReleaseSetOnExistingHeadReleasesFromResolvedRef(t *testing.T) {
 	if run.HeadRef() == nil || *run.HeadRef() != head["canary"].Ref || run.plan.Baseline() == nil {
 		t.Fatalf("full plan over an existing head = %+v; want the resolved ref as its CAS base", run.plan)
 	}
-	if !run.plan.SelectsEveryMember() || len(run.plan.Members) != 2 {
+	if !selectsEveryMember(run.plan) || len(run.plan.Members) != 2 {
 		t.Fatalf("full plan members = %+v; want every member selected", run.plan.Members)
 	}
 	for _, member := range run.plan.Members {
@@ -3091,7 +3091,7 @@ func TestPrepareReleaseSetPrefersTheAdvancedChannelsOwnHead(t *testing.T) {
 		if err != nil || run == nil {
 			t.Fatalf("empty-baseline preparation = %+v, %v", run, err)
 		}
-		if !run.plan.SelectsEveryMember() || run.HeadRef() != nil || run.plan.BaselineChannelName() != "" {
+		if !selectsEveryMember(run.plan) || run.HeadRef() != nil || run.plan.BaselineChannelName() != "" {
 			t.Fatalf("plan over two empty channels = %+v", run.plan)
 		}
 		// A plan names a baseline channel exactly when that channel IS the
@@ -3832,7 +3832,21 @@ func TestReleaseSetReuseChannelIsRefusedWhereItCannotApply(t *testing.T) {
 	heads["pr-7"] = reuseChannelHead(t, headRecord(t, heads["canary"], upstream.Name), pullRequestDownstream())
 	all := releaseSetAllOptions()
 	all.ReuseChannel, all.ReuseSourceRevision = "pr-7", reuseTestRevision
-	if plan := buildTestPlan(t, all, ws, heads); plan.Reused != nil || !plan.SelectsEveryMember() {
+	if plan := buildTestPlan(t, all, ws, heads); plan.Reused != nil || !selectsEveryMember(plan) {
 		t.Fatalf("an --all plan reused %+v", plan.Reused)
 	}
+}
+
+// selectsEveryMember reports whether the plan is a full publication of its
+// snapshot: every member is selected. It is false for an empty plan.
+func selectsEveryMember(plan *releaseset.Plan) bool {
+	if plan == nil || len(plan.Members) == 0 {
+		return false
+	}
+	for _, member := range plan.Members {
+		if !member.Selected {
+			return false
+		}
+	}
+	return true
 }

@@ -563,3 +563,14 @@ func TestPublicationResolveAnswersTheSessionHeads(t *testing.T) {
 		t.Fatal("resolve did not reach the provider session")
 	}
 }
+
+// WithReleaseTimeout replaces DefaultReleaseTimeout.
+func WithReleaseTimeout(timeout time.Duration) Option {
+	return func(b *Broker) { b.releaseTimeout = timeout }
+}
+
+// WithUploadTimeout replaces DefaultUploadTimeout, the base bound of one
+// upload.
+func WithUploadTimeout(timeout time.Duration) Option {
+	return func(b *Broker) { b.uploadTimeout = timeout }
+}

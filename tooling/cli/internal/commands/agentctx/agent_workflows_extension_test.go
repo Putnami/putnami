@@ -78,8 +78,9 @@ func TestLegacyEntriesFailClearly(t *testing.T) {
 
 		_, phaseErr := AgentWorkflowPhaseApplies(root, cfg)
 		_, generateErr := MaterializeLocalAgentContent(root, cfg, nil)
+		_, installErr := InstallAgentWorkflowsWithResult(context.Background(), root, cfg, nil)
 		passes := map[string]error{
-			"install":          InstallAgentWorkflows(context.Background(), root, cfg, nil),
+			"install":          installErr,
 			"upgrade":          AdoptAgentWorkflows(context.Background(), root, cfg, nil),
 			"phase":            phaseErr,
 			"ensure":           EnsureAgentWorkflows(context.Background(), root, cfg),

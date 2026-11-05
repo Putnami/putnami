@@ -230,10 +230,10 @@ func NewImagePlan(spec Spec, opts PlanOptions) (*ImagePlan, error) {
 	return plan, nil
 }
 
-// BindDerivedFiles fingerprints outputs staged after the image identity was
+// bindDerivedFiles fingerprints outputs staged after the image identity was
 // computed. Their recipe identity remains in the image hash while their exact
 // bytes become part of the layer cache key and are verified during a miss.
-func (p *ImagePlan) BindDerivedFiles() error {
+func (p *ImagePlan) bindDerivedFiles() error {
 	if err := p.validate(false); err != nil {
 		return err
 	}

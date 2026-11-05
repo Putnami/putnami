@@ -3,6 +3,7 @@ package hooks
 import (
 	"context"
 	"errors"
+	"os"
 	"path/filepath"
 	"testing"
 
@@ -42,7 +43,7 @@ func TestEveryHookRecordsRepositoryCodeOnAHostedRun(t *testing.T) {
 				Path:  filepath.Join(dir, "ext"),
 				Hooks: &extension.ManifestHooks{OnInstall: &extension.HookDefinition{Kind: "command", Command: script, Cwd: "{workspaceRoot}"}},
 			}
-			return RunOnInstallHook(ctx, workspace.NewWorkspace(dir, &wsproto.Config{Name: "test-ws"}, nil), ext, false)
+			return RunOnInstallHookWithWriters(ctx, workspace.NewWorkspace(dir, &wsproto.Config{Name: "test-ws"}, nil), ext, false, os.Stdout, os.Stderr)
 		}},
 		{"job @test/custody cache-clean", func(t *testing.T) error {
 			ext := cacheCommandExtension(t, "@test/custody", summary)

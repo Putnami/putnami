@@ -1043,24 +1043,6 @@ func (lf *LockFile) RemoveTemplate(name string) {
 	delete(lf.Templates, name)
 }
 
-// GetAgentArtifact returns the lock entry for the given agent-workflow
-// artifact, or false.
-func (lf *LockFile) GetAgentArtifact(name string) (AgentArtifactLockEntry, bool) {
-	entry, ok := lf.AgentArtifacts[name]
-	return entry, ok
-}
-
-// SetAgentArtifact adds or updates a legacy agent-workflow artifact pin. No
-// command adds one; it reproduces the lock an earlier release wrote. Callers
-// migrating an older lock must invoke MigrateLockFileToCurrent first; an older
-// format's canonical projection deliberately omits this v4-only vocabulary.
-func (lf *LockFile) SetAgentArtifact(name string, entry AgentArtifactLockEntry) {
-	if lf.AgentArtifacts == nil {
-		lf.AgentArtifacts = make(map[string]AgentArtifactLockEntry)
-	}
-	lf.AgentArtifacts[name] = entry
-}
-
 // RemoveAgentArtifact removes an agent-workflow artifact pin.
 func (lf *LockFile) RemoveAgentArtifact(name string) {
 	delete(lf.AgentArtifacts, name)

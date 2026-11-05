@@ -25,9 +25,6 @@ const (
 	TestSelector = "go-embed:test"
 )
 
-// IsSelector reports whether a file input names a supported Go embed selector.
-func IsSelector(pattern string) bool { return pattern == BuildSelector || pattern == TestSelector }
-
 // Patterns parses actual directives, excluding only source that no ordinary
 // build can compile (notably //go:build ignore).
 func Patterns(filename string, src []byte) ([]string, error) {

@@ -209,21 +209,6 @@ func (p *Plan) SelectedMembers() []PlannedMember {
 	return selected
 }
 
-// SelectsEveryMember reports whether the plan is a full publication of its
-// snapshot: every member is selected and none inherits from a head. It is
-// false for an empty plan, which selects nothing.
-func (p *Plan) SelectsEveryMember() bool {
-	if p == nil || len(p.Members) == 0 {
-		return false
-	}
-	for _, member := range p.Members {
-		if !member.Selected {
-			return false
-		}
-	}
-	return true
-}
-
 // Member resolves one member by its protocol identity and returns a copy.
 func (p *Plan) Member(ecosystem distribution.Ecosystem, coordinate string) (PlannedMember, bool) {
 	if p == nil {

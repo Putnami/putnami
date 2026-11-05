@@ -9,14 +9,10 @@ import (
 	"go.putnami.dev/tooling/cli/internal/workspace_state"
 )
 
-// SessionsList lists recent sessions with timestamp, command, outcome, and duration.
-func SessionsList(wsRoot string, outputFormat string) error {
-	return SessionsListRevision(wsRoot, outputFormat, "")
-}
-
-// SessionsListRevision is SessionsList narrowed to the sessions whose recorded
-// tree sat on the commit revision names (a lowercase hex prefix of its id), so
-// a new CLI session can find what judged a given commit. A session that
+// SessionsListRevision lists recent sessions with timestamp, command, outcome,
+// and duration. A non-empty revision narrows the list to the sessions whose
+// recorded tree sat on the commit it names (a lowercase hex prefix of its id),
+// so a new CLI session can find what judged a given commit. A session that
 // recorded no tree never matches a revision: it cannot say which commit it
 // judged, and the listing does not guess. With a revision the rows also show
 // the head commit and the actual placement, because a judged revision is only

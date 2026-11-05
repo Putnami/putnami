@@ -14,6 +14,7 @@ import (
 	"sync/atomic"
 	"testing"
 
+	"github.com/google/go-containerregistry/pkg/authn"
 	"github.com/google/go-containerregistry/pkg/crane"
 	"github.com/google/go-containerregistry/pkg/name"
 	"github.com/google/go-containerregistry/pkg/registry"
@@ -375,17 +376,17 @@ func TestLayoutRoundTripAndDockerTarball(t *testing.T) {
 	wantDigest, _ := img.Digest()
 
 	layoutDir := filepath.Join(t.TempDir(), "oci")
-	digest, err := WriteLayout(layoutDir, img)
+	digest, err := writeLayout(layoutDir, img)
 	if err != nil {
-		t.Fatalf("WriteLayout: %v", err)
+		t.Fatalf("writeLayout: %v", err)
 	}
 	if digest != wantDigest.String() {
-		t.Errorf("WriteLayout digest = %s, want %s", digest, wantDigest)
+		t.Errorf("writeLayout digest = %s, want %s", digest, wantDigest)
 	}
 
-	loaded, err := LoadFromLayout(layoutDir)
+	loaded, err := loadFromLayout(layoutDir)
 	if err != nil {
-		t.Fatalf("LoadFromLayout: %v", err)
+		t.Fatalf("loadFromLayout: %v", err)
 	}
 	loadedDigest, _ := loaded.Digest()
 	if loadedDigest != wantDigest {
@@ -437,9 +438,9 @@ func TestFetchBase_PlatformSelectionAndOfflineCache(t *testing.T) {
 	pinnedRef := host + "/base@" + indexDigest.String()
 
 	cacheDir := t.TempDir()
-	got, err := FetchBase(pinnedRef, "linux/arm64", cacheDir)
+	got, err := fetchBase(pinnedRef, "linux/arm64", cacheDir, authn.DefaultKeychain)
 	if err != nil {
-		t.Fatalf("FetchBase: %v", err)
+		t.Fatalf("fetchBase: %v", err)
 	}
 	gotDigest, _ := got.Digest()
 	wantDigest, _ := arm64.Digest()
@@ -449,9 +450,9 @@ func TestFetchBase_PlatformSelectionAndOfflineCache(t *testing.T) {
 
 	// The registry goes away; the cached base must keep working (offline).
 	srv.Close()
-	cached, err := FetchBase(pinnedRef, "linux/arm64", cacheDir)
+	cached, err := fetchBase(pinnedRef, "linux/arm64", cacheDir, authn.DefaultKeychain)
 	if err != nil {
-		t.Fatalf("FetchBase from cache: %v", err)
+		t.Fatalf("fetchBase from cache: %v", err)
 	}
 	cachedDigest, _ := cached.Digest()
 	if cachedDigest != wantDigest {
@@ -509,12 +510,12 @@ func TestFetchBase_PullRunsOnTheBoundedTransport(t *testing.T) {
 		return dialer.DialContext(ctx, network, addr)
 	}
 
-	got, err := FetchBase(pinnedRef, "linux/amd64", t.TempDir())
+	got, err := fetchBase(pinnedRef, "linux/amd64", t.TempDir(), authn.DefaultKeychain)
 	if err != nil {
-		t.Fatalf("FetchBase: %v", err)
+		t.Fatalf("fetchBase: %v", err)
 	}
 	if gotDigest, _ := got.Digest(); gotDigest != digest {
-		t.Errorf("FetchBase digest = %s, want %s", gotDigest, digest)
+		t.Errorf("fetchBase digest = %s, want %s", gotDigest, digest)
 	}
 	if boundedDials.Load() == 0 {
 		t.Error("the base pull did not dial through DefaultRegistryTransport")
@@ -528,7 +529,7 @@ func TestFetchBase_PullRunsOnTheBoundedTransport(t *testing.T) {
 }
 
 func TestFetchBase_RejectsUnpinnedRef(t *testing.T) {
-	if _, err := FetchBase("gcr.io/distroless/static:nonroot", "linux/amd64", t.TempDir()); err == nil {
+	if _, err := fetchBase("gcr.io/distroless/static:nonroot", "linux/amd64", t.TempDir(), authn.DefaultKeychain); err == nil {
 		t.Error("expected error for a base ref without a digest pin")
 	}
 }

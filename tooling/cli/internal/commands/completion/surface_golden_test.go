@@ -1,4 +1,4 @@
-package commands
+package completion
 
 import (
 	"bytes"
@@ -12,7 +12,6 @@ import (
 	"testing"
 
 	wsproto "go.putnami.dev/protocol/workspace"
-	"go.putnami.dev/tooling/cli/internal/commands/completion"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
 
@@ -31,7 +30,7 @@ import (
 
 // The environment opt-in reaches this existing generator through ./putnamiw.
 var updateSurfaceGoldens = flag.Bool("update-surface-goldens", os.Getenv("PUTNAMI_UPDATE_SURFACE_GOLDENS") == "1",
-	"rewrite internal/commands/testdata/surface/*.golden from the current generators")
+	"rewrite internal/commands/completion/testdata/surface/*.golden from the current generators")
 
 // assertSurfaceGolden compares got against testdata/surface/<name>.golden,
 // rewriting the file instead when -update-surface-goldens is set.
@@ -83,9 +82,9 @@ func TestGoldenCompletionScripts(t *testing.T) {
 		name     string
 		generate func(io.Writer, string, *wsproto.Config, *workspace.WarningReport)
 	}{
-		{"completion-bash", completion.CompletionBash},
-		{"completion-zsh", completion.CompletionZsh},
-		{"completion-fish", completion.CompletionFish},
+		{"completion-bash", CompletionBash},
+		{"completion-zsh", CompletionZsh},
+		{"completion-fish", CompletionFish},
 	}
 	for _, generator := range generators {
 		t.Run(generator.name, func(t *testing.T) {
@@ -101,7 +100,7 @@ func TestGoldenCompletionScripts(t *testing.T) {
 // line, flag, and example from the catalog. The renderer layout is pinned
 // separately by internal/cli/testdata/surface/help-structured-commands.golden.
 func TestGoldenStructuredHelpTable(t *testing.T) {
-	table := completion.StructuredCommandHelpTable()
+	table := structuredCommandHelp
 	keys := make([]string, 0, len(table))
 	for key := range table {
 		keys = append(keys, key)

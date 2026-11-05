@@ -131,7 +131,7 @@ func TestGoldenTaskKey(t *testing.T) {
 	}
 
 	// The parts first, so a moved key names the input that moved it.
-	if got := wsproto.ProbeProjectDigest(workspace.ProbeViewOf(project, ws.DependencyPathResolver())); got != goldenProbeDigest {
+	if got := wsproto.ProbeProjectDigest(ws.ProbeView(project)); got != goldenProbeDigest {
 		t.Errorf("probe digest = %s, want %s", got, goldenProbeDigest)
 	}
 	if got := ws.MetadataDigestFor(project); got != goldenMetadataDigest {

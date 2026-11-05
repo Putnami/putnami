@@ -14,7 +14,7 @@ import (
 // committedRuntimeRelPath is the workload-relative location sourceRuntime reads
 // authored runtime intent from, built from the same constants so a rename moves
 // the guard with it.
-const committedRuntimeRelPath = infra.PerProjectManifestDir + "/" + RuntimeManifestFilename
+const committedRuntimeRelPath = infra.PerProjectManifestDir + "/" + runtimeManifestFilename
 
 // Every committed <workload>/infra/runtime.json in the repository must parse
 // under the infra protocol this SDK ships against.

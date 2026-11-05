@@ -8,8 +8,8 @@ import (
 	runtimeproto "go.putnami.dev/protocol/runtime"
 )
 
-// MemberEvidenceFileEnv is private framework-to-provider provenance transport.
-const MemberEvidenceFileEnv = runtimeproto.ReleaseSetMembersFileEnv
+// memberEvidenceFileEnv is private framework-to-provider provenance transport.
+const memberEvidenceFileEnv = runtimeproto.ReleaseSetMembersFileEnv
 
 // MemberEvidence names a selected publication and its frozen producer route.
 // Provider consumers still verify immutable owner facts; these are assertions.
@@ -34,7 +34,7 @@ func WithMemberEvidence(ctx context.Context, members []MemberEvidence) context.C
 }
 
 func memberEvidenceBytes(ctx context.Context) ([]byte, bool, error) {
-	members, present := MemberEvidenceFromContext(ctx)
+	members, present := memberEvidenceFromContext(ctx)
 	if !present {
 		return nil, false, nil
 	}
@@ -51,8 +51,8 @@ func memberEvidenceBytes(ctx context.Context) ([]byte, bool, error) {
 	return data, true, nil
 }
 
-// MemberEvidenceFromContext returns an owned copy for reserved provider adapters.
-func MemberEvidenceFromContext(ctx context.Context) ([]MemberEvidence, bool) {
+// memberEvidenceFromContext returns an owned copy for reserved provider adapters.
+func memberEvidenceFromContext(ctx context.Context) ([]MemberEvidence, bool) {
 	if ctx == nil {
 		return nil, false
 	}
