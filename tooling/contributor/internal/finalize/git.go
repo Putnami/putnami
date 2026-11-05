@@ -166,8 +166,47 @@ func (g NativeGit) CommitMessages(base string) ([]CommitMessage, error) {
 func (g NativeGit) Seed(ctx context.Context, title string) error {
 	return g.runWrite(ctx, "commit", "--allow-empty", "-m", title)
 }
+
+// Push publishes the branch to origin. Once this checkout has pushed the
+// branch, the push carries a lease pinned to the head it last pushed: it
+// replaces a rebased branch only while origin still holds that head, and
+// refuses when someone else pushed since, even after a fetch moved the
+// remote-tracking ref. Before the first push, it only fast-forwards.
 func (g NativeGit) Push(ctx context.Context, branch string) error {
-	return g.runWrite(ctx, "push", "-u", "origin", branch)
+	pushed, err := g.lastPushed(branch)
+	if err != nil {
+		return err
+	}
+	if pushed == "" {
+		return g.runWrite(ctx, "push", "-u", "origin", branch)
+	}
+	err = g.runWrite(ctx, "push", "--force-with-lease=refs/heads/"+branch+":"+pushed, "-u", "origin", branch)
+	if err != nil && strings.Contains(err.Error(), "(stale info)") {
+		return fmt.Errorf("origin's %s is no longer %s, the head this checkout last pushed: someone else pushed it; integrate their commits before publishing: %w", branch, pushed, err)
+	}
+	return err
+}
+
+// lastPushed is the head this checkout last pushed to origin's branch, read
+// from the reflog of its remote-tracking ref: git records each push there as
+// "update by push", and a fetch under another subject. It is empty when this
+// checkout never pushed the branch, or when its reflog no longer holds a push.
+func (g NativeGit) lastPushed(branch string) (string, error) {
+	tracking := "refs/remotes/origin/" + branch
+	if _, err := g.run("rev-parse", "--verify", "-q", tracking); err != nil {
+		return "", nil
+	}
+	entries, err := g.one("log", "-g", "--format=%H%x09%gs", tracking, "--")
+	if err != nil {
+		return "", err
+	}
+	for _, entry := range strings.Split(entries, "\n") {
+		sha, subject, found := strings.Cut(entry, "\t")
+		if found && subject == "update by push" {
+			return sha, nil
+		}
+	}
+	return "", nil
 }
 func (g NativeGit) Fingerprint() (string, error) {
 	result, err := treefingerprint.Compute(g.Root)

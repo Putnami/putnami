@@ -133,3 +133,83 @@ func TestGitEnvironmentDropsTheHostChannel(t *testing.T) {
 		t.Errorf("gitEnvironment = %q, want %q", got, want)
 	}
 }
+
+// rebaseFixture is a checkout that pushed fix/rebase to a bare origin, then
+// rebased it onto a base that moved: its head no longer contains the commit
+// it pushed.
+func rebaseFixture(t *testing.T) (root, origin, pushed string, run func(string, ...string) string) {
+	t.Helper()
+	root, origin = t.TempDir(), t.TempDir()
+	run = func(dir string, args ...string) string {
+		t.Helper()
+		cmd := exec.Command("git", append([]string{"-C", dir}, args...)...)
+		cmd.Env = append(os.Environ(), "GIT_CONFIG_GLOBAL=/dev/null", "GIT_CONFIG_NOSYSTEM=1")
+		output, err := cmd.CombinedOutput()
+		if err != nil {
+			t.Fatalf("git %v: %v: %s", args, err, output)
+		}
+		return strings.TrimSpace(string(output))
+	}
+	run(origin, "init", "-q", "--bare", "-b", "main")
+	run(root, "init", "-q", "-b", "main")
+	run(root, "config", "user.name", "Test")
+	run(root, "config", "user.email", "test@example.invalid")
+	run(root, "config", "commit.gpgsign", "false")
+	run(root, "remote", "add", "origin", origin)
+	run(root, "commit", "-q", "--allow-empty", "-m", "chore: base")
+	run(root, "push", "-q", "origin", "main")
+	run(root, "switch", "-q", "-c", "fix/rebase")
+	run(root, "commit", "-q", "--allow-empty", "-m", "fix: first slice")
+	if err := (NativeGit{Root: root}).Push(context.Background(), "fix/rebase"); err != nil {
+		t.Fatalf("first push: %v", err)
+	}
+	pushed = run(root, "rev-parse", "HEAD")
+	// main moves, and the branch rebases onto it.
+	run(root, "switch", "-q", "main")
+	run(root, "commit", "-q", "--allow-empty", "-m", "chore: main moved")
+	run(root, "push", "-q", "origin", "main")
+	run(root, "switch", "-q", "fix/rebase")
+	run(root, "rebase", "-q", "--keep-empty", "main")
+	if head := run(root, "rev-parse", "HEAD"); head == pushed {
+		t.Fatal("the rebase kept the pushed head")
+	}
+	return root, origin, pushed, run
+}
+
+func TestNativeGitPushPublishesARebasedBranch(t *testing.T) {
+	t.Parallel()
+	root, origin, _, run := rebaseFixture(t)
+	if err := (NativeGit{Root: root}).Push(context.Background(), "fix/rebase"); err != nil {
+		t.Fatalf("push of the rebased branch: %v", err)
+	}
+	if got, want := run(origin, "rev-parse", "refs/heads/fix/rebase"), run(root, "rev-parse", "HEAD"); got != want {
+		t.Fatalf("origin head = %s, want the rebased head %s", got, want)
+	}
+}
+
+func TestNativeGitPushRefusesToReplaceAnotherPush(t *testing.T) {
+	t.Parallel()
+	for _, fetched := range []bool{false, true} {
+		root, origin, pushed, run := rebaseFixture(t)
+		// Someone else pushes on top of the head this checkout pushed.
+		other := t.TempDir()
+		run(other, "clone", "-q", "-b", "fix/rebase", origin, ".")
+		run(other, "-c", "user.name=Other", "-c", "user.email=other@example.invalid", "commit", "-q", "--allow-empty", "-m", "fix: another push")
+		run(other, "push", "-q", "origin", "fix/rebase")
+		theirs := run(other, "rev-parse", "HEAD")
+		if theirs == pushed {
+			t.Fatal("the other push kept the pushed head")
+		}
+		if fetched {
+			// A fetch moves the remote-tracking ref without a push from here.
+			run(root, "fetch", "-q", "origin")
+		}
+		err := (NativeGit{Root: root}).Push(context.Background(), "fix/rebase")
+		if err == nil || !strings.Contains(err.Error(), "someone else pushed it") {
+			t.Fatalf("fetched=%v: the push did not refuse another push: %v", fetched, err)
+		}
+		if got := run(origin, "rev-parse", "refs/heads/fix/rebase"); got != theirs {
+			t.Fatalf("fetched=%v: origin head = %s, want the other push %s", fetched, got, theirs)
+		}
+	}
+}

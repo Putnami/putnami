@@ -18,6 +18,13 @@ must be the current branch. The command pushes it to the `origin` remote and
 resolves the base from `origin/<base>`, so `origin` must be the repository the
 proposals provider manages.
 
+A branch you rebased after a push publishes like any other. Once the checkout
+has pushed the branch, each push carries a lease on the head it last pushed:
+the command replaces the remote branch only while `origin` still holds that
+head. When someone else pushed the branch since, the command refuses and
+names the head it expected, even after a fetch. Integrate their commits, then
+run it again. Before its first push, the command only fast-forwards.
+
 ## Modes
 
 - **Draft.** `--draft` publishes a draft and accepts no proof. A branch with
