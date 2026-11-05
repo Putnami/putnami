@@ -461,13 +461,29 @@ func TestAMissingItemIsNotFound(t *testing.T) {
 	h.fails("proposals", "review", `{"ref":{"source":"github:acme/app","id":"999"},"verdict":"comment","body":"x","idempotencyKey":"k"}`, collab.OutcomeNotFound)
 }
 
-func TestAReferenceSourceIgnoresCase(t *testing.T) {
+func TestASourceInAnotherCasingIsNotFound(t *testing.T) {
+	spectest.Proves(t, feature, "honest-failures", "a-missing-item-is-not-found")
 	h := newHarness(t)
 	task := h.createTask("Mixed case", "mixed-case")
+	parent := h.createTask("Parent", "parent")
+	proposal := h.openProposal("Mixed case")
+	// The provider issues lowercase sources only. A source in another casing
+	// is a reference it never issued: answering about the lowercase one would
+	// give one item two references.
+	for _, call := range []struct{ contract, operation, arguments string }{
+		{"tasks", "get", `{"ref":{"source":"github:ACME/App","id":"` + task.Ref.ID + `"}}`},
+		{"tasks", "transition", `{"ref":{"source":"github:Acme/app","id":"` + task.Ref.ID + `"},"state":"done"}`},
+		{"tasks", "link", `{"ref":` + refJSON(task.Ref) + `,"parent":{"source":"github:Acme/App","id":"` + parent.Ref.ID + `"}}`},
+		{"proposals", "status", `{"ref":{"source":"github:ACME/APP","id":"` + proposal.Ref.ID + `"}}`},
+		{"proposals", "comments", `{"ref":{"source":"github:Acme/App","id":"` + proposal.Ref.ID + `"}}`},
+	} {
+		failure := h.fails(call.contract, call.operation, call.arguments, collab.OutcomeNotFound)
+		mustContain(t, failure.Message, "github:acme/app")
+	}
 	var got collab.TaskResult
-	h.ok("tasks", "get", `{"ref":{"source":"github:ACME/App","id":"`+task.Ref.ID+`"}}`, &got)
-	if got.Task.Ref != task.Ref {
-		t.Fatalf("a mixed-case source reads the same task under its canonical reference: %+v", got.Task.Ref)
+	h.ok("tasks", "get", `{"ref":`+refJSON(task.Ref)+`}`, &got)
+	if got.Task.Ref != task.Ref || got.Task.State == collab.TaskStateDone || got.Task.Parent != nil {
+		t.Fatalf("the lowercase reference reads the untouched task: %+v", got.Task)
 	}
 	h.fails("tasks", "get", `{"ref":{"source":"github:acme/other","id":"`+task.Ref.ID+`"}}`, collab.OutcomeNotFound)
 }

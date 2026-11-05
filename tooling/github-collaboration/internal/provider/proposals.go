@@ -160,7 +160,7 @@ func pullRevision(pull *ghPull) string {
 func (s *proposalSession) pull(ref collab.Ref) (*ghPull, *collab.Failure) {
 	number, ours := s.repo.number(ref)
 	if !ours {
-		return nil, collab.Fail(collab.OutcomeNotFound, "proposal.missing", "no proposal %s in source %s", ref.ID, ref.Source)
+		return nil, collab.Fail(collab.OutcomeNotFound, "proposal.missing", "%s", s.repo.missing("proposal", ref))
 	}
 	var pull ghPull
 	if _, err := s.client.Get(s.ctx, s.repo.path("pulls", strconv.Itoa(number)), nil, &pull); err != nil {

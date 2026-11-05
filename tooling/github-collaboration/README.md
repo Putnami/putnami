@@ -154,9 +154,10 @@ credential never leaves its own host or this machine.
   lowercase, with the host before the owner on another host
   (`github:ghe.example.com/acme/app`). A review is `review-<id>`. A comment is
   its review's `review-<id>` for a review body, `line-<id>` for a line
-  comment and `comment-<id>` for a conversation comment. A source is
-  compared case-insensitively, and results always carry the lowercase form. A
-  reference from another source is `not_found`.
+  comment and `comment-<id>` for a conversation comment. A reference from
+  another source is `not_found`, and so is a source in any casing but
+  lowercase: the provider never issues it, and the message names the
+  lowercase form.
 - A revision is a digest of what a task or proposal shows and a caller can
   change — title, body, state, labels and assignees; for a proposal also the
   draft flag, base, head and head commit. A comment does not move it, and
