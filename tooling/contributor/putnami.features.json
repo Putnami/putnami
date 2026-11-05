@@ -78,6 +78,21 @@
           }
         },
         {
+          "id": "requirementless-delivery",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-requirementless-delivery-closes-its-task",
+              "a-requirementless-unit-passes-every-final-check",
+              "a-spec-or-manifest-edit-refuses-a-requirementless-unit"
+            ]
+          }
+        },
+        {
           "id": "change-language-parity",
           "stage": "coded",
           "evidenceKinds": [

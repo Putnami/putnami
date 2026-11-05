@@ -106,6 +106,17 @@ Amended 2026-10-25: a partial delivery whose valid workflow has no eligible
 unit, such as a unit still at `building`, publishes with its non-closing task
 reference, names no ready unit and emits no receipt. The hosted checks never
 stand for a unit's native proof.
+Amended 2026-11-05: a change that carries no feature requirement, such as an
+ADR with `decisions.json`, delivers a whole task through a workflow that names
+no feature source or through a unit with an empty `requirements` list. Such a
+unit is current: it passes every final check of a current unit (stage at least
+`candidate`, no unresolved decision, no stage blocker, its required receipt)
+and needs no producer proof, since it has nothing to prove. The hosted checks
+on its head advance it to ready, and its complete delivery closes the task.
+Whenever the verifier knows the change's base, it refuses a unit with no
+requirement if the change edits a native spec, an external spec a feature
+manifest names, or a feature manifest. A unit that carries requirements keeps
+every check, and a workflow with a current requirement still needs its proof.
 The native result retains a typed hosted receipt referencing the original
 workflow and raw provider status. A new workflow revision can replay that
 receipt; rewriting the original makes it stale. Standalone planning validation
