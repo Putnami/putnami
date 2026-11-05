@@ -71,6 +71,14 @@ models that worked on a mission belong in its memory checkpoint.
 
 ## After ready
 
+The ready finalization ends with a verification review on the head commit,
+whose first line is `Verification of <head sha>`. It is the change's
+completion attestation: a Putnami Cloud workspace turns on auto-merge for
+that head only, and a later push leaves the new head unattested until the
+next ready finalization. Open a proposal ready only through `change
+finalize`, after review fixes are pushed; a proposal opened ready by hand
+carries no attestation and waits for a person.
+
 A merge or a deployment needs the mandate's authority; then go through the
 normal required checks and provider operations, and re-evaluate after a head
 or base change. A provider that offers no `merge` leaves it to the

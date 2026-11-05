@@ -59,17 +59,21 @@ type finalizerProvider struct {
 	checks                                     collab.Checks
 	proposalRepository                         string
 	upserts, transitions, reviews, statusReads int
-	findReads                                  int
-	findHeadCommits                            []string
-	findStates                                 [][]collab.ProposalState
-	settled                                    []collab.Proposal
-	findPageSize                               int
-	findExisting                               bool
-	rejectRevision                             bool
-	upsertRevision                             string
-	unresolved                                 bool
-	dropLabels                                 bool
-	statusHook                                 func(*collab.Proposal)
+	// reviewable lists proposals.review among the capabilities; lastReview
+	// is the last review the finalizer published.
+	reviewable      bool
+	lastReview      collab.ProposalReviewInput
+	findReads       int
+	findHeadCommits []string
+	findStates      [][]collab.ProposalState
+	settled         []collab.Proposal
+	findPageSize    int
+	findExisting    bool
+	rejectRevision  bool
+	upsertRevision  string
+	unresolved      bool
+	dropLabels      bool
+	statusHook      func(*collab.Proposal)
 }
 
 // call is a Provider: every operation reaches the fake provider.
@@ -87,6 +91,9 @@ func (p *finalizerProvider) envelope(_ context.Context, contract, operation stri
 		operations := make([]collab.OperationCapability, 0, len(names))
 		for _, name := range names {
 			operations = append(operations, collab.OperationCapability{Name: name, Supported: true, Preconditions: collab.PreconditionsChecked})
+		}
+		if contract == collab.ContractProposals && p.reviewable {
+			operations = append(operations, collab.OperationCapability{Name: collab.OperationReview, Supported: true, Preconditions: collab.PreconditionsChecked})
 		}
 		capabilities := collab.Capabilities{Status: collab.BindingStatusBound, Operations: operations}
 		if contract == collab.ContractProposals {
@@ -172,6 +179,7 @@ func (p *finalizerProvider) envelope(_ context.Context, contract, operation stri
 		return answer(collab.ProposalStatusResult{Proposal: read, Checks: p.checks})
 	case "proposals.review":
 		p.reviews++
+		_ = json.Unmarshal(input, &p.lastReview)
 		return answer(collab.ProposalReviewResult{})
 	default:
 		return collab.Envelope{Outcome: collab.OutcomeUnsupported, Error: &collab.Error{Message: "unexpected call"}}
@@ -1066,5 +1074,24 @@ func TestACallThatNeverReachesTheProviderStopsTheRun(t *testing.T) {
 	}
 	if _, err := f.Run(context.Background(), opts); err == nil || err.Error() != "no host channel" || git.pushes != 0 || git.seeds != 0 {
 		t.Fatalf("error %v, pushes %d, seeds %d; want the call error before any write", err, git.pushes, git.seeds)
+	}
+}
+
+// The ready finalization publishes the completion attestation Source reads:
+// a comment review on the full head commit whose first line is the stamp of
+// that commit.
+func TestReadyFinalizationAttestsTheHead(t *testing.T) {
+	f, git, provider, opts := finalizerFixture(t)
+	provider.reviewable = true
+	if _, err := f.Run(context.Background(), opts); err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	if provider.reviews != 1 {
+		t.Fatalf("reviews = %d, want 1", provider.reviews)
+	}
+	review := provider.lastReview
+	first, _, _ := strings.Cut(review.Body, "\n")
+	if review.Verdict != collab.ReviewVerdictComment || review.Commit != git.head || first != CompletionStampPrefix+git.head {
+		t.Fatalf("review = %+v, want a comment on %s opening with the stamp", review, git.head)
 	}
 }

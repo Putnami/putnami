@@ -605,6 +605,13 @@ func (f Finalizer) publicationEvidence(ctx context.Context, c *publicationCandid
 	return nil
 }
 
+// CompletionStampPrefix opens the first line of the verification review, and
+// the full head commit follows it. The review is the completion attestation
+// of that commit: Putnami Cloud's Source turns on auto-merge for a pull
+// request only while its author's review on its current head opens with this
+// line. Keep the line stable.
+const CompletionStampPrefix = "Verification of "
+
 func (f Finalizer) reviewProof(ctx context.Context, c *publicationCandidate, result Result) error {
 	if !operationSupported(c.proposalCaps, collab.OperationReview) {
 		return nil
@@ -615,7 +622,7 @@ func (f Finalizer) reviewProof(ctx context.Context, c *publicationCandidate, res
 	if _, err := c.recheck(ctx, f); err != nil {
 		return err
 	}
-	comment := fmt.Sprintf("Verification of %s\n\n- ordinary gate: %s\n- local proof: %s", c.head, result.Gate, c.opts.Proof)
+	comment := fmt.Sprintf("%s%s\n\n- ordinary gate: %s\n- local proof: %s", CompletionStampPrefix, c.head, result.Gate, c.opts.Proof)
 	digest := sha256.Sum256([]byte(comment))
 	key := "verification:" + c.head + ":" + hex.EncodeToString(digest[:])[:12]
 	var review collab.ProposalReviewResult
