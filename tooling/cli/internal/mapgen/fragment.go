@@ -80,7 +80,7 @@ func readInputs(projDir string) (map[string][]byte, []string, error) {
 func readSchemaListing(projDir string) ([]string, error) {
 	dir := filepath.Join(projDir, filepath.FromSlash(SchemaDir))
 	if info, err := os.Stat(dir); err != nil || !info.IsDir() {
-		return nil, nil //nolint:nilerr // no schema/ directory lists nothing, it is not a failure
+		return nil, nil
 	}
 	entries, err := os.ReadDir(dir)
 	if err != nil {

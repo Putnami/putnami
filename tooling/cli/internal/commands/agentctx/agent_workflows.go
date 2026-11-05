@@ -227,15 +227,6 @@ func agentArtifactPlanChanges(plan *agentartifacts.Plan) bool {
 	return false
 }
 
-// InstallAgentWorkflows materializes the agent content of every opted-in
-// extension at the release the COMMITTED lock pins. It resolves nothing and
-// writes no lock entry, so running it twice over an unchanged workspace changes
-// not one byte.
-func InstallAgentWorkflows(ctx context.Context, wsRoot string, cfg *wsproto.Config, out io.Writer) error {
-	_, err := InstallAgentWorkflowsWithResult(ctx, wsRoot, cfg, out)
-	return err
-}
-
 // AgentWorkflowInstallAction identifies one contribution whose workspace files
 // changed during a successful install.
 type AgentWorkflowInstallAction struct {
@@ -243,10 +234,12 @@ type AgentWorkflowInstallAction struct {
 	Version string
 }
 
-// InstallAgentWorkflowsWithResult performs the lock-authoritative install and
-// returns only contributions whose plan created, updated, or removed files. The
-// result lets a composed lifecycle omit verified no-ops without inspecting the
-// filesystem or parsing human output.
+// InstallAgentWorkflowsWithResult materializes the agent content of every
+// opted-in extension at the release the COMMITTED lock pins. It resolves
+// nothing and writes no lock entry, so running it twice over an unchanged
+// workspace changes not one byte. It returns only contributions whose plan
+// created, updated, or removed files. The result lets a composed lifecycle omit
+// verified no-ops without inspecting the filesystem or parsing human output.
 func InstallAgentWorkflowsWithResult(_ context.Context, wsRoot string, cfg *wsproto.Config, out io.Writer) ([]AgentWorkflowInstallAction, error) {
 	refs, err := DeclaredAgentArtifacts(wsRoot, cfg)
 	if err != nil {

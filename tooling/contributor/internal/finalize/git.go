@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"go.putnami.dev/sdk/extension/gitread"
 	"go.putnami.dev/sdk/extension/treefingerprint"
 
 	"go.putnami.dev/tooling/contributor/internal/childenv"
@@ -141,7 +142,7 @@ func (g NativeGit) ChangedPaths(base string) ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	return splitNUL(answer), nil
+	return gitread.SplitNUL(string(answer)), nil
 }
 func (g NativeGit) CommitMessages(base string) ([]CommitMessage, error) {
 	answer, err := g.one("rev-list", "--no-merges", base+"..HEAD")
@@ -171,11 +172,4 @@ func (g NativeGit) Push(ctx context.Context, branch string) error {
 func (g NativeGit) Fingerprint() (string, error) {
 	result, err := treefingerprint.Compute(g.Root)
 	return result.Fingerprint, err
-}
-
-func splitNUL(data []byte) []string {
-	if len(data) == 0 {
-		return nil
-	}
-	return strings.Split(strings.TrimSuffix(string(data), "\x00"), "\x00")
 }

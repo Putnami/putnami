@@ -17,6 +17,7 @@ import (
 	"go.putnami.dev/protocol/features/spectest"
 	supportproto "go.putnami.dev/protocol/support"
 	wsproto "go.putnami.dev/protocol/workspace"
+	"go.putnami.dev/sdk/extension/gitread"
 	"go.putnami.dev/tooling/cli/internal/cmderr"
 	"go.putnami.dev/tooling/cli/internal/commands/versioncmd"
 	"go.putnami.dev/tooling/cli/internal/git"
@@ -31,7 +32,7 @@ const hostRPCVersionLines = "host-rpc-version-lines"
 // returns its trimmed output.
 func hostRPCGit(t *testing.T, dir string, args ...string) string {
 	t.Helper()
-	cmd := exec.Command(git.Executable(), args...)
+	cmd := exec.Command(gitread.Executable(), args...)
 	cmd.Dir = dir
 	cmd.Env = append(os.Environ(), "GIT_CONFIG_GLOBAL=/dev/null", "GIT_CONFIG_SYSTEM=/dev/null")
 	out, err := cmd.CombinedOutput()

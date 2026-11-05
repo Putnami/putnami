@@ -64,8 +64,9 @@ func TestAHandoffAfterAPathExtensionRuntimeIsRefused(t *testing.T) {
 				return func(t *testing.T) {
 					wsRoot, ext := pathExtension(t)
 					ext.Runtime.Toolchains = map[string]extensionproto.RuntimeToolchain{"compiler": runtimeToolchainFixture("compiler")}
+					ext.Runtime.Prepare = &extensionproto.RuntimePrepare{Toolchains: []string{"compiler"}}
 					writeRuntimeToolchainLock(t, wsRoot, "compiler", "1.2.3", "integrity-a")
-					if err := toolchain.ResolveRuntimeToolchains(wsRoot, ext, []string{"compiler"}, []string{"PATH=" + bin}); err != nil {
+					if err := toolchain.ResolveRuntimeToolchainsForPreparation(t.Context(), wsRoot, []*extension.ExtensionDescription{ext}, []string{"PATH=" + bin}, false); err != nil {
 						t.Fatal(err)
 					}
 					if runs := fixtureproc.Runs(t, record); len(runs) != 1 {
@@ -152,7 +153,13 @@ func TestAStoreExtensionToolchainProbeAndRuntimeKeepCustody(t *testing.T) {
 	}
 	ext.Runtime.Toolchains = map[string]extensionproto.RuntimeToolchain{"compiler": runtimeToolchainFixture("compiler")}
 	writeRuntimeToolchainLock(t, wsRoot, "compiler", "1.2.3", "integrity-a")
-	if err := toolchain.ResolveRuntimeToolchains(wsRoot, ext, []string{"compiler"}, []string{"PATH=" + bin}); err != nil {
+	// A command that requires the compiler makes the strict resolution probe
+	// it; the extension's own jobs are restored afterwards.
+	jobs := ext.Jobs
+	ext.Jobs = map[string]*extension.JobDefinition{"probe": {Toolchains: []string{"compiler"}}}
+	err := toolchain.ResolveRuntimeToolchainsForCommandsMode(t.Context(), wsRoot, []*extension.ExtensionDescription{ext}, map[string]bool{"probe": true}, []string{"PATH=" + bin}, toolchain.ResolveStrict)
+	ext.Jobs = jobs
+	if err != nil {
 		t.Fatal(err)
 	}
 	if runs := fixtureproc.Runs(t, probeRecord); len(runs) != 1 {

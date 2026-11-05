@@ -319,9 +319,8 @@ func PrepareDeployTargets(
 
 // requireReleaseSetProvider refuses an environment in a workspace with no
 // release-set provider. A channel, and therefore an environment that follows
-// one, exists only through a provider (A13): without one there is no set to
-// synchronize on and the command would otherwise deploy whatever the last
-// build happened to leave behind.
+// one, exists only through a provider (A13), so without one there is no set to
+// synchronize on.
 func requireReleaseSetProvider(discovered *extension.DiscoveryResult, name string) error {
 	provider, err := extension.ResolveReservedProvider(discovered.Extensions, distribution.ProviderCommandName)
 	if err != nil {

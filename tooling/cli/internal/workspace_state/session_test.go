@@ -62,7 +62,7 @@ func TestSession_IDFormat(t *testing.T) {
 }
 
 // TestSession_EventStreamIsTheRecordedFile pins the recorder half of the contract: the
-// session is its stream's only producer, both writers put exactly the record and
+// session is its stream's only producer, its writer puts exactly the record and
 // one LF on disk, and FinalizeV2 sets the stream's final marker before
 // session.json exists.
 func TestSession_EventStreamIsTheRecordedFile(t *testing.T) {
@@ -76,16 +76,14 @@ func TestSession_EventStreamIsTheRecordedFile(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer func() { _ = sub.Close() }()
-	machine := []byte(`{"protocolVersion":2,"record":"task:start"}`)
-	if err := sess.AppendMachineOutputLine(machine); err != nil {
-		t.Fatal(err)
+	taskStart := []byte(`{"protocolVersion":2,"record":"task:start"}`)
+	taskEnd := []byte(`{"protocolVersion":2,"record":"task:end"}`)
+	for _, line := range [][]byte{taskStart, taskEnd} {
+		if err := sess.AppendMachineOutputLine(line); err != nil {
+			t.Fatal(err)
+		}
 	}
-	event := SessionEvent{Time: "2026-09-17T12:00:00Z", Type: "job:end", JobKey: "proj:build"}
-	if err := sess.AppendEvent(event); err != nil {
-		t.Fatal(err)
-	}
-	legacy, _ := json.Marshal(event)
-	want := append(append(append(append([]byte(nil), machine...), '\n'), legacy...), '\n')
+	want := append(append(append(append([]byte(nil), taskStart...), '\n'), taskEnd...), '\n')
 
 	if _, final := sess.Events().Extent(); final {
 		t.Fatal("the stream was final before the session finalized")
@@ -111,60 +109,6 @@ func TestSession_EventStreamIsTheRecordedFile(t *testing.T) {
 		t.Fatal("a record was appended after the final marker")
 	}
 }
-
-func TestSession_AppendEvent(t *testing.T) {
-	root := t.TempDir()
-	sess, err := NewSession(root)
-	if err != nil {
-		t.Fatalf("NewSession failed: %v", err)
-	}
-
-	// Append multiple events
-	for i := 0; i < 3; i++ {
-		err := sess.AppendEvent(SessionEvent{
-			Type:   "job:end",
-			JobKey: "proj:build",
-			Data:   map[string]any{"status": "success", "index": i},
-		})
-		if err != nil {
-			t.Fatalf("AppendEvent %d failed: %v", i, err)
-		}
-	}
-
-	sess.Close()
-
-	// Read events file and verify
-	data, err := os.ReadFile(filepath.Join(sess.Dir(), "events.jsonl"))
-	if err != nil {
-		t.Fatalf("read events.jsonl: %v", err)
-	}
-
-	lines := strings.Split(strings.TrimSpace(string(data)), "\n")
-	if len(lines) != 3 {
-		t.Errorf("expected 3 event lines, got %d", len(lines))
-	}
-
-	// Verify each line is valid JSON
-	for i, line := range lines {
-		var event SessionEvent
-		if err := json.Unmarshal([]byte(line), &event); err != nil {
-			t.Errorf("line %d is not valid JSON: %v", i, err)
-		}
-		if event.Type != "job:end" {
-			t.Errorf("line %d type = %q, want job:end", i, event.Type)
-		}
-		if event.Time == "" {
-			t.Errorf("line %d time is empty", i)
-		}
-	}
-}
-
-// The recording writers, version 2 — the only ones left after a later change
-// deleted WritePlan/Finalize. What these pin is the split the writers own: the
-// CALLER supplies the document, and the session stamps exactly the members it
-// alone knows (id, start/end times, the run's wall duration, the git block).
-// The reader's v1 fallback is pinned in internal/commands, on documents already
-// on disk.
 
 func TestSession_WritePlanV2(t *testing.T) {
 	root := t.TempDir()
@@ -719,7 +663,7 @@ func TestSessionStore_PrunePreservesLatestTarget(t *testing.T) {
 	}
 }
 
-func TestSession_ConcurrentAppendEvent(t *testing.T) {
+func TestSession_ConcurrentAppendMachineOutputLine(t *testing.T) {
 	root := t.TempDir()
 	sess, err := NewSession(root)
 	if err != nil {
@@ -735,13 +679,9 @@ func TestSession_ConcurrentAppendEvent(t *testing.T) {
 		go func(id int) {
 			defer wg.Done()
 			for j := 0; j < eventsPerGoroutine; j++ {
-				err := sess.AppendEvent(SessionEvent{
-					Type:   "job:event",
-					JobKey: fmt.Sprintf("proj-%d:build", id),
-					Data:   map[string]any{"step": j},
-				})
-				if err != nil {
-					t.Errorf("AppendEvent goroutine %d step %d: %v", id, j, err)
+				line := fmt.Sprintf(`{"protocolVersion":2,"record":"task:event","time":"proj-%d:%d"}`, id, j)
+				if err := sess.AppendMachineOutputLine([]byte(line)); err != nil {
+					t.Errorf("AppendMachineOutputLine goroutine %d step %d: %v", id, j, err)
 				}
 			}
 		}(i)

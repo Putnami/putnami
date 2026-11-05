@@ -46,7 +46,7 @@ type DependencyGraph struct {
 	contractProvider map[string]string
 	// edgeSources records each edge's PROVENANCE: dependent ID → dependency ID
 	// → the manifest family the edge was derived from. Every edge of deps and
-	// of the contract family has an entry, so EdgeSource is total over the
+	// of the contract family has an entry, so edgeSource is total over the
 	// graph's edges and an absent entry means "no edge", never "unknown
 	// origin".
 	//
@@ -126,7 +126,7 @@ func BuildGraph(projects []*Project) *DependencyGraph {
 			if !g.nodes[childID] {
 				continue
 			}
-			if containsString(g.deps[childID], p.ID) {
+			if slices.Contains(g.deps[childID], p.ID) {
 				continue
 			}
 			g.deps[childID] = append(g.deps[childID], p.ID)
@@ -197,7 +197,7 @@ func (g *DependencyGraph) deriveContractEdges(projects []*Project) {
 		if !ok || providerID == p.ID || !g.nodes[providerID] {
 			continue
 		}
-		if containsString(g.contractClients[providerID], p.ID) {
+		if slices.Contains(g.contractClients[providerID], p.ID) {
 			continue
 		}
 		g.contractClients[providerID] = append(g.contractClients[providerID], p.ID)
@@ -228,22 +228,22 @@ func dependencySourceOf(p *Project, dependency string) wsproto.DependencySource 
 	return wsproto.DependencySourceDeclared
 }
 
-// EdgeSource is the provenance of one edge: the manifest family it was derived
+// edgeSource is the provenance of one edge: the manifest family it was derived
 // from, or "" when the graph carries no edge from dependent to dependency.
 //
 // It covers the contract family too, which is not in deps: a generated client
 // answers DependencySourceContract for its provider.
-func (g *DependencyGraph) EdgeSource(dependent, dependency string) wsproto.DependencySource {
+func (g *DependencyGraph) edgeSource(dependent, dependency string) wsproto.DependencySource {
 	if g == nil {
 		return ""
 	}
 	return g.edgeSources[dependent][dependency]
 }
 
-// ContractClientsOf returns the generated client targets derived from a
+// contractClientsOf returns the generated client targets derived from a
 // project's contract, in project-input order. Empty for a project that provides
 // none.
-func (g *DependencyGraph) ContractClientsOf(providerID string) []string {
+func (g *DependencyGraph) contractClientsOf(providerID string) []string {
 	if g == nil {
 		return nil
 	}
@@ -347,15 +347,6 @@ func findCycle(nodes map[string]bool, deps map[string][]string) []string {
 	return path
 }
 
-func containsString(slice []string, item string) bool {
-	for _, s := range slice {
-		if s == item {
-			return true
-		}
-	}
-	return false
-}
-
 // DependenciesOf returns the direct dependencies of a project.
 func (g *DependencyGraph) DependenciesOf(name string) []string {
 	return g.deps[name]
@@ -386,48 +377,6 @@ func (g *DependencyGraph) ImpactDependentsOf(name string) []string {
 	return g.impactDependents[name]
 }
 
-// TopologicalOrder returns projects in dependency-first order: every project
-// appears after the workspace projects it depends on. The boolean is false if a
-// cycle prevents a complete order.
-func (g *DependencyGraph) TopologicalOrder() ([]string, bool) {
-	if g == nil {
-		return nil, true
-	}
-	indegree := make(map[string]int, len(g.nodes))
-	for id := range g.nodes {
-		indegree[id] = 0
-		for _, dep := range g.deps[id] {
-			if g.nodes[dep] {
-				indegree[id]++
-			}
-		}
-	}
-	ready := make([]string, 0, len(g.nodes))
-	for id, degree := range indegree {
-		if degree == 0 {
-			ready = append(ready, id)
-		}
-	}
-	sort.Strings(ready)
-
-	var order []string
-	for len(ready) > 0 {
-		current := ready[0]
-		ready = ready[1:]
-		order = append(order, current)
-		dependents := append([]string(nil), g.dependents[current]...)
-		sort.Strings(dependents)
-		for _, dependent := range dependents {
-			indegree[dependent]--
-			if indegree[dependent] == 0 {
-				ready = append(ready, dependent)
-			}
-		}
-		sort.Strings(ready)
-	}
-	return order, len(order) == len(g.nodes)
-}
-
 // DependencyPath returns the shortest path from one project to another by
 // following dependency edges (project -> projects it depends on). The returned
 // slice includes both endpoints. Nil means no path, or either endpoint is
@@ -437,19 +386,6 @@ func (g *DependencyGraph) DependencyPath(from, to string) []string {
 		return nil
 	}
 	return graphPath(g.nodes, g.deps, from, to)
-}
-
-// DependentPath returns the shortest path from one project to another by
-// following dependent edges (changed project -> projects impacted by it). The
-// returned slice includes both endpoints. Nil means no impact path, or either
-// endpoint is unknown. It follows IMPACT edges (ImpactDependentsOf), so its
-// answer agrees with --impacted: an implicit include→scope-self edge is never
-// reported as a reason for an impact that selection does not perform.
-func (g *DependencyGraph) DependentPath(from, to string) []string {
-	if g == nil {
-		return nil
-	}
-	return graphPath(g.nodes, g.impactDependents, from, to)
 }
 
 func graphPath(nodes map[string]bool, edges map[string][]string, from, to string) []string {
@@ -587,7 +523,7 @@ func DeclaredInputRoots(p *Project) []string {
 	if p == nil {
 		return nil
 	}
-	base := CleanWorkspacePath(p.Path)
+	base := wsproto.CleanWorkspacePath(p.Path)
 	var roots []string
 	for _, set := range declaredFilePatterns(p) {
 		for _, pattern := range set {
@@ -640,7 +576,7 @@ func InputRootReadsProject(root, projectPath string) bool {
 	if root == "" {
 		return false
 	}
-	target := CleanWorkspacePath(projectPath)
+	target := wsproto.CleanWorkspacePath(projectPath)
 	if root == "." || target == "" {
 		return true
 	}

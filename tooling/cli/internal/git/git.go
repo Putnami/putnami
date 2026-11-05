@@ -2,12 +2,9 @@
 package git
 
 import (
-	"bytes"
-	"context"
 	"crypto/sha256"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"sort"
 	"strconv"
@@ -16,6 +13,7 @@ import (
 
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/sdk/extension/dirlink"
+	"go.putnami.dev/sdk/extension/gitread"
 	"go.putnami.dev/sdk/extension/linetag"
 )
 
@@ -90,7 +88,7 @@ func OrderedSuffix(committedAt time.Time, sha, dirtyHash string) string {
 //  4. An untagged commit carries the ordered suffix, which is what makes two
 //     builds of one base version comparable and unique.
 func GetVersionInfo(repoRoot string, line LineSpec) (*VersionInfo, error) {
-	shallow, err := IsShallow(repoRoot)
+	shallow, err := gitread.IsShallow(repoRoot)
 	if err != nil {
 		return nil, err
 	}
@@ -140,7 +138,7 @@ func GetVersionInfo(repoRoot string, line LineSpec) (*VersionInfo, error) {
 		info.Full = info.Base + "-" + info.Suffix
 		return info, nil
 	}
-	commits, err := CommitsSince(repoRoot, last.Commit, line.Pathspecs)
+	commits, err := gitread.CommitsSince(repoRoot, last.Commit, line.Pathspecs)
 	if err != nil {
 		return nil, err
 	}
@@ -163,7 +161,7 @@ func GetVersionInfo(repoRoot string, line LineSpec) (*VersionInfo, error) {
 // pull request runner dates its squash commit there so that one base and one
 // tree always give one commit, and refusing it left that run with no version.
 func commitTime(repoRoot, revision string) (time.Time, bool) {
-	output, err := run(repoRoot, "show", "-s", "--format=%ct", "--end-of-options", revision)
+	output, err := gitread.Run(repoRoot, "show", "-s", "--format=%ct", "--end-of-options", revision)
 	if err != nil {
 		return time.Time{}, false
 	}
@@ -175,69 +173,21 @@ func commitTime(repoRoot, revision string) (time.Time, bool) {
 }
 
 func shortSHA(repoRoot string) string {
-	output, err := run(repoRoot, "rev-parse", "--short", "HEAD")
+	output, err := gitread.Run(repoRoot, "rev-parse", "--short", "HEAD")
 	if err != nil {
 		return ""
 	}
 	return strings.TrimSpace(output)
 }
 
-// HeadSHA returns the full SHA for HEAD.
-func HeadSHA(repoRoot string) (string, error) {
-	output, err := run(repoRoot, "rev-parse", "HEAD")
-	if err != nil {
-		return "", err
-	}
-	return strings.TrimSpace(output), nil
-}
-
 // HeadTree returns the full ID of the tree HEAD records: the content of the
 // commit, which a squash-merge or a rebase keeps when it rewrites the commit.
 func HeadTree(repoRoot string) (string, error) {
-	output, err := run(repoRoot, "rev-parse", "--verify", "HEAD^{tree}")
+	output, err := gitread.Run(repoRoot, "rev-parse", "--verify", "HEAD^{tree}")
 	if err != nil {
 		return "", err
 	}
 	return strings.ToLower(strings.TrimSpace(output)), nil
-}
-
-// ResolveCommit resolves ref to its full immutable commit ID. Callers that
-// publish a revision use this rather than carrying a branch or tag name, whose
-// meaning can move after the document was emitted.
-func ResolveCommit(repoRoot, ref string) (string, error) {
-	if !validRevisionArgument(ref) {
-		return "", fmt.Errorf("resolve commit: invalid revision argument")
-	}
-	output, stderr, err := runCapture(repoRoot, "rev-parse", "--verify", "--end-of-options", ref+"^{commit}")
-	if err != nil || strings.TrimSpace(stderr) != "" {
-		// Name what git said, so a failure that is not an ambiguity (a
-		// warning, a killed process) can be told apart from one.
-		detail := strings.TrimSpace(stderr)
-		if detail == "" && err != nil {
-			detail = err.Error()
-		}
-		if len(detail) > 512 {
-			detail = detail[:512]
-		}
-		return "", fmt.Errorf("resolve commit: revision does not identify one unambiguous commit: %s", detail)
-	}
-	sha := strings.ToLower(strings.TrimSpace(output))
-	if !validObjectID(sha) {
-		return "", fmt.Errorf("resolve commit: git returned invalid object ID")
-	}
-	return sha, nil
-}
-
-func validRevisionArgument(ref string) bool {
-	if ref == "" || len(ref) > 1024 || ref != strings.TrimSpace(ref) || strings.HasPrefix(ref, "-") {
-		return false
-	}
-	for _, character := range ref {
-		if character < 0x20 || character == 0x7f {
-			return false
-		}
-	}
-	return true
 }
 
 // WorktreeClean reports whether the checkout has no staged, unstaged, or
@@ -246,7 +196,7 @@ func validRevisionArgument(ref string) bool {
 // It takes no optional lock, so it never contends for the index with a task
 // that writes to the same repository while it runs.
 func WorktreeClean(repoRoot string) (bool, error) {
-	output, err := run(repoRoot, "--no-optional-locks", "status", "--porcelain", "--untracked-files=all")
+	output, err := gitread.Run(repoRoot, "--no-optional-locks", "status", "--porcelain", "--untracked-files=all")
 	if err != nil {
 		return false, fmt.Errorf("inspect worktree status: %w", err)
 	}
@@ -254,42 +204,24 @@ func WorktreeClean(repoRoot string) (bool, error) {
 }
 
 // DiffCommitFiles returns the tracked file paths changed directly between two
-// immutable commits. Unlike DiffFiles it deliberately excludes staged and
+// immutable commits. Unlike DiffWorkingTree it deliberately excludes staged and
 // untracked worktree changes, making its answer reproducible from base and
 // head alone. Rename detection is disabled so Git configuration cannot change
 // which source and destination paths are reported.
 func DiffCommitFiles(repoRoot, base, head string) ([]string, error) {
-	base, err := ResolveCommit(repoRoot, base)
+	base, err := gitread.ResolveCommit(repoRoot, base)
 	if err != nil {
 		return nil, err
 	}
-	head, err = ResolveCommit(repoRoot, head)
+	head, err = gitread.ResolveCommit(repoRoot, head)
 	if err != nil {
 		return nil, err
 	}
-	output, err := run(repoRoot, "diff", "--no-ext-diff", "--no-renames", "--name-only", "-z", base, head)
+	output, err := gitread.Run(repoRoot, "diff", "--no-ext-diff", "--no-renames", "--name-only", "-z", base, head)
 	if err != nil {
 		return nil, fmt.Errorf("diff commits %s..%s: %w", base, head, err)
 	}
-	return dedupStrings(splitNUL(output)), nil
-}
-
-func splitNUL(output string) []string {
-	parts := strings.Split(output, "\x00")
-	if len(parts) > 0 && parts[len(parts)-1] == "" {
-		parts = parts[:len(parts)-1]
-	}
-	return parts
-}
-
-// CommitExists reports whether sha is a plausible git object ID and resolves
-// to a commit in repoRoot.
-func CommitExists(repoRoot, sha string) bool {
-	sha = strings.TrimSpace(sha)
-	if !validObjectID(sha) {
-		return false
-	}
-	return refExists(repoRoot, sha)
+	return dedupStrings(gitread.SplitNUL(output)), nil
 }
 
 // CommitReachableFromHead reports whether sha resolves to a commit that is an
@@ -297,10 +229,10 @@ func CommitExists(repoRoot, sha string) bool {
 // are not safe impacted baselines for the current checkout.
 func CommitReachableFromHead(repoRoot, sha string) bool {
 	sha = strings.TrimSpace(sha)
-	if !validObjectID(sha) || !refExists(repoRoot, sha) {
+	if !gitread.ValidObjectID(sha) || !gitread.RefExists(repoRoot, sha) {
 		return false
 	}
-	_, err := run(repoRoot, "merge-base", "--is-ancestor", sha, "HEAD")
+	_, err := gitread.Run(repoRoot, "merge-base", "--is-ancestor", sha, "HEAD")
 	return err == nil
 }
 
@@ -319,7 +251,7 @@ func RevList(repoRoot, revision string, maxCount int) ([]string, error) {
 		return nil, fmt.Errorf("list the ancestry: the commit limit %d is not positive", maxCount)
 	}
 	env := append(os.Environ(), "GIT_GRAFT_FILE="+filepath.Join(os.DevNull, "grafts"))
-	stdout, stderr, err := runCaptureEnv(repoRoot, env,
+	stdout, stderr, err := gitread.RunCaptureEnv(repoRoot, env,
 		"--no-replace-objects", "-c", "core.commitGraph=false",
 		"rev-list", "--max-count="+strconv.Itoa(maxCount), revision, "--")
 	if err != nil {
@@ -334,19 +266,6 @@ func RevList(repoRoot, revision string, maxCount int) ([]string, error) {
 	return commits, nil
 }
 
-func validObjectID(s string) bool {
-	if len(s) < 7 || len(s) > 64 {
-		return false
-	}
-	for _, r := range s {
-		if (r >= '0' && r <= '9') || (r >= 'a' && r <= 'f') || (r >= 'A' && r <= 'F') {
-			continue
-		}
-		return false
-	}
-	return true
-}
-
 // RemoteURL returns the configured URL for a git remote, or an empty string
 // when the remote is missing or git cannot read it.
 func RemoteURL(repoRoot, remote string) string {
@@ -354,7 +273,7 @@ func RemoteURL(repoRoot, remote string) string {
 	if remote == "" {
 		return ""
 	}
-	output, err := run(repoRoot, "config", "--get", "remote."+remote+".url")
+	output, err := gitread.Run(repoRoot, "config", "--get", "remote."+remote+".url")
 	if err != nil {
 		return ""
 	}
@@ -363,11 +282,11 @@ func RemoteURL(repoRoot, remote string) string {
 
 // dirtyHash returns a short hash of uncommitted changes, or "" if clean.
 func dirtyHash(repoRoot string) string {
-	status, err := run(repoRoot, "status", "--porcelain")
+	status, err := gitread.Run(repoRoot, "status", "--porcelain")
 	if err != nil || strings.TrimSpace(status) == "" {
 		return ""
 	}
-	diff, _ := run(repoRoot, "diff", "HEAD", "--no-color")
+	diff, _ := gitread.Run(repoRoot, "diff", "HEAD", "--no-color")
 	h := sha256.Sum256([]byte(diff))
 	return fmt.Sprintf("%x", h[:4])[:7]
 }
@@ -423,8 +342,8 @@ func ResolveBaselineDetailed(repoRoot, explicit string, epicBranches []string) (
 		return ResolvedBaseline{Ref: ref, Source: BaselineSourceExplicit}, nil
 	}
 
-	currentBranch := currentBranchName(repoRoot)
-	trunk := trunkRef(repoRoot)
+	currentBranch := gitread.CurrentBranchName(repoRoot)
+	trunk := gitread.TrunkRef(repoRoot)
 
 	if epic, ok := nearestEpicBaseline(repoRoot, epicBranches, trunk, currentBranch); ok {
 		return ResolvedBaseline{Ref: epic, Source: BaselineSourceEpic}, nil
@@ -436,7 +355,7 @@ func ResolveBaselineDetailed(repoRoot, explicit string, epicBranches []string) (
 		}
 		return ResolvedBaseline{Ref: trunk, Source: source}, nil
 	}
-	if ref := upstreamRef(repoRoot); ref != "" && !upstreamIsSelfCounterpart(repoRoot, ref, currentBranch) {
+	if ref := gitread.UpstreamRef(repoRoot); ref != "" && !gitread.UpstreamIsSelfCounterpart(repoRoot, ref, currentBranch) {
 		return ResolvedBaseline{Ref: ref, Source: BaselineSourceUpstream}, nil
 	}
 	return ResolvedBaseline{}, fmt.Errorf("resolve git baseline: no explicit baseline, origin/HEAD, origin/main, local main/master, or usable upstream tracking ref was found (a branch is never measured against itself) — pass --baseline or set the workspace config baseline")
@@ -446,28 +365,10 @@ func ResolveBaselineDetailed(repoRoot, explicit string, epicBranches []string) (
 // selection. It intentionally ignores the current branch's upstream because a
 // feature branch may track a same-named remote branch rather than trunk.
 func ResolveTrunk(repoRoot string) (string, error) {
-	if ref := trunkRef(repoRoot); ref != "" {
+	if ref := gitread.TrunkRef(repoRoot); ref != "" {
 		return ref, nil
 	}
 	return "", fmt.Errorf("resolve git trunk: no origin/HEAD, origin/main, local main, or local master ref was found")
-}
-
-// trunkRef finds the repository trunk: origin/HEAD, origin/main, then a local
-// main/master. Shared by baseline resolution and ResolveTrunk so the two
-// surfaces cannot disagree about what the trunk is.
-func trunkRef(repoRoot string) string {
-	if ref := originHeadRef(repoRoot); ref != "" {
-		return ref
-	}
-	if refExists(repoRoot, "origin/main") {
-		return "origin/main"
-	}
-	for _, ref := range []string{"main", "master"} {
-		if refExists(repoRoot, ref) {
-			return ref
-		}
-	}
-	return ""
 }
 
 // nearestEpicBaseline picks the candidate whose merge-base with HEAD is the
@@ -487,7 +388,7 @@ func nearestEpicBaseline(repoRoot string, epicBranches []string, trunk, currentB
 	}
 	best, bestBase := "", ""
 	for _, candidate := range candidates {
-		output, err := run(repoRoot, "merge-base", candidate, "HEAD")
+		output, err := gitread.Run(repoRoot, "merge-base", candidate, "HEAD")
 		if err != nil {
 			continue // unrelated history or unresolvable candidate: not a baseline
 		}
@@ -496,7 +397,7 @@ func nearestEpicBaseline(repoRoot string, epicBranches []string, trunk, currentB
 			best, bestBase = candidate, base
 			continue
 		}
-		if base != bestBase && isAncestorOf(repoRoot, bestBase, base) {
+		if base != bestBase && gitread.IsAncestorOf(repoRoot, bestBase, base) {
 			best, bestBase = candidate, base
 		}
 	}
@@ -515,7 +416,7 @@ func OnEpicBranch(repoRoot string, epicBranches []string) bool {
 	if len(epicBranches) == 0 {
 		return false
 	}
-	branch := currentBranchName(repoRoot)
+	branch := gitread.CurrentBranchName(repoRoot)
 	if branch != "" {
 		for _, ref := range epicCandidateRefs(repoRoot, epicBranches, "") {
 			if strings.TrimPrefix(ref, "origin/") == branch {
@@ -523,7 +424,7 @@ func OnEpicBranch(repoRoot string, epicBranches []string) bool {
 			}
 		}
 	}
-	_, ok := nearestEpicBaseline(repoRoot, epicBranches, trunkRef(repoRoot), branch)
+	_, ok := nearestEpicBaseline(repoRoot, epicBranches, gitread.TrunkRef(repoRoot), branch)
 	return ok
 }
 
@@ -543,7 +444,7 @@ func epicCandidateRefs(repoRoot string, patterns []string, currentBranch string)
 	if len(refArgs) == 0 {
 		return nil
 	}
-	output, err := run(repoRoot, append([]string{"for-each-ref", "--format=%(refname:short)"}, refArgs...)...)
+	output, err := gitread.Run(repoRoot, append([]string{"for-each-ref", "--format=%(refname:short)"}, refArgs...)...)
 	if err != nil {
 		return nil
 	}
@@ -569,65 +470,6 @@ func epicCandidateRefs(repoRoot string, patterns []string, currentBranch string)
 	return refs
 }
 
-// isAncestorOf reports whether ancestor is an ancestor of descendant.
-func isAncestorOf(repoRoot, ancestor, descendant string) bool {
-	_, err := run(repoRoot, "merge-base", "--is-ancestor", ancestor, descendant)
-	return err == nil
-}
-
-// upstreamIsSelfCounterpart reports whether the upstream tracking ref is this
-// branch's own published counterpart rather than a base branch it forked from.
-// Any of three signals disqualifies it as a baseline:
-//
-//   - it names the branch (origin/<branch>);
-//   - it is the branch's push destination (@{push}) — catches a local branch
-//     renamed away from its remote name (alice/topic pushing to origin/topic);
-//   - it already contains HEAD, so the committed diff would be empty — catches
-//     counterparts no git config can see (explicit-refspec pushes), which is
-//     the exact silent no-op this resolution order exists to remove.
-//
-// The ancestry signal also fires on a freshly forked branch with no work yet,
-// where the resulting loud "set a baseline" error beats an empty answer that
-// cannot be told apart from self-measurement.
-func upstreamIsSelfCounterpart(repoRoot, ref, currentBranch string) bool {
-	if refNamesBranch(ref, currentBranch) {
-		return true
-	}
-	if push := symbolicAbbrevRef(repoRoot, "@{push}"); push != "" && push == ref {
-		return true
-	}
-	return isAncestorOf(repoRoot, "HEAD", ref)
-}
-
-// refNamesBranch reports whether a remote-tracking ref (e.g. "origin/feat")
-// points at the given local branch name. Branch names may contain slashes, so
-// only the remote segment is stripped before comparing.
-func refNamesBranch(ref, branch string) bool {
-	if branch == "" {
-		return false
-	}
-	parts := strings.SplitN(ref, "/", 2)
-	return len(parts) == 2 && parts[1] == branch
-}
-
-// currentBranchName is CurrentBranch minus the error: resolution tiers that
-// exclude "the branch itself" treat detached HEAD as no branch at all.
-func currentBranchName(repoRoot string) string {
-	branch, err := CurrentBranch(repoRoot)
-	if err != nil || branch == "HEAD" {
-		return ""
-	}
-	return branch
-}
-
-// DiffFiles returns the list of files changed between HEAD and the given baseline branch.
-// It disables rename detection for the committed and staged diffs so its path
-// set follows the same policy as DiffCommitFiles regardless of Git config.
-func DiffFiles(repoRoot, baseline string) ([]string, error) {
-	diff, err := DiffWorkingTree(repoRoot, baseline)
-	return diff.Files, err
-}
-
 // WorkingTreeDiff is one baseline diff of the working tree, with the evidence a
 // reader needs to reproduce it: the commit it was measured against, and which
 // of its paths no commit records yet.
@@ -646,8 +488,11 @@ type WorkingTreeDiff struct {
 	Uncommitted []string
 }
 
-// DiffWorkingTree is DiffFiles plus its evidence. It exists so a selection
-// computed on one machine can be compared with one computed on another: the
+// DiffWorkingTree returns the files changed between HEAD and the given baseline
+// branch, with the evidence for them. Rename detection is disabled for the
+// committed and staged diffs so the path set follows the same policy as
+// DiffCommitFiles regardless of Git config. The evidence lets a selection
+// computed on one machine be compared with one computed on another: the
 // same Base and the same Files are the same diff, and a path listed in
 // Uncommitted is one a commit alone would not reproduce — a file the run's own
 // bootstrap rewrote, for example.
@@ -662,27 +507,27 @@ func DiffWorkingTree(repoRoot, baseline string) (WorkingTreeDiff, error) {
 		return WorkingTreeDiff{}, err
 	}
 
-	output, err := run(repoRoot, "diff", "--no-ext-diff", "--no-renames", "--name-only", "-z", diffBase)
+	output, err := gitread.Run(repoRoot, "diff", "--no-ext-diff", "--no-renames", "--name-only", "-z", diffBase)
 	if err != nil {
 		return WorkingTreeDiff{}, fmt.Errorf("git diff baseline %q: %w", baseline, err)
 	}
 
-	files := splitNUL(output)
+	files := gitread.SplitNUL(output)
 
 	// Also include untracked and staged files
-	staged, _ := run(repoRoot, "diff", "--no-ext-diff", "--no-renames", "--name-only", "-z", "--cached")
-	files = append(files, splitNUL(staged)...)
+	staged, _ := gitread.Run(repoRoot, "diff", "--no-ext-diff", "--no-renames", "--name-only", "-z", "--cached")
+	files = append(files, gitread.SplitNUL(staged)...)
 
-	untracked, _ := run(repoRoot, "ls-files", "-z", "--others", "--exclude-standard")
-	files = append(files, splitNUL(untracked)...)
+	untracked, _ := gitread.Run(repoRoot, "ls-files", "-z", "--others", "--exclude-standard")
+	files = append(files, gitread.SplitNUL(untracked)...)
 	files = dedupStrings(files)
 
 	// The index and the working tree against HEAD, staged changes included:
 	// together with the untracked files, exactly what a clean checkout of HEAD
 	// would not have.
-	dirty, _ := run(repoRoot, "diff", "--no-ext-diff", "--no-renames", "--name-only", "-z", "HEAD")
+	dirty, _ := gitread.Run(repoRoot, "diff", "--no-ext-diff", "--no-renames", "--name-only", "-z", "HEAD")
 	local := make(map[string]bool)
-	for _, path := range append(splitNUL(dirty), splitNUL(untracked)...) {
+	for _, path := range append(gitread.SplitNUL(dirty), gitread.SplitNUL(untracked)...) {
 		local[path] = true
 	}
 	var uncommitted []string
@@ -694,8 +539,8 @@ func DiffWorkingTree(repoRoot, baseline string) (WorkingTreeDiff, error) {
 
 	// merge-base prints a full object id; the fallbacks return a ref.
 	base := diffBase
-	if full := len(base) == 40 || len(base) == 64; !full || !validObjectID(base) {
-		if sha, err := ResolveCommit(repoRoot, base); err == nil {
+	if full := len(base) == 40 || len(base) == 64; !full || !gitread.ValidObjectID(base) {
+		if sha, err := gitread.ResolveCommit(repoRoot, base); err == nil {
 			base = sha
 		}
 	}
@@ -703,49 +548,22 @@ func DiffWorkingTree(repoRoot, baseline string) (WorkingTreeDiff, error) {
 }
 
 func diffBase(repoRoot, baseline string) (string, error) {
-	mergeBase, mergeErr := run(repoRoot, "merge-base", baseline, "HEAD")
+	mergeBase, mergeErr := gitread.Run(repoRoot, "merge-base", baseline, "HEAD")
 	if mergeErr == nil {
 		return strings.TrimSpace(mergeBase), nil
 	}
 
 	tried := []string{baseline}
 	if remoteRef, ok := remoteFallbackRef(repoRoot, baseline); ok {
-		if mergeBase, err := run(repoRoot, "merge-base", remoteRef, "HEAD"); err == nil {
+		if mergeBase, err := gitread.Run(repoRoot, "merge-base", remoteRef, "HEAD"); err == nil {
 			return strings.TrimSpace(mergeBase), nil
 		}
 		return remoteRef, nil
 	}
-	if refExists(repoRoot, baseline) {
+	if gitread.RefExists(repoRoot, baseline) {
 		return baseline, nil
 	}
 	return "", fmt.Errorf("git baseline %q could not be resolved (tried %s): %w", baseline, strings.Join(tried, ", "), mergeErr)
-}
-
-func upstreamRef(repoRoot string) string {
-	return symbolicAbbrevRef(repoRoot, "@{u}")
-}
-
-func originHeadRef(repoRoot string) string {
-	if ref := symbolicAbbrevRef(repoRoot, "origin/HEAD"); ref != "" && ref != "origin/HEAD" {
-		return ref
-	}
-	output, err := run(repoRoot, "symbolic-ref", "refs/remotes/origin/HEAD")
-	if err != nil {
-		return ""
-	}
-	ref := strings.TrimPrefix(strings.TrimSpace(output), "refs/remotes/")
-	if ref == "" || ref == "origin/HEAD" {
-		return ""
-	}
-	return ref
-}
-
-func symbolicAbbrevRef(repoRoot, ref string) string {
-	output, err := run(repoRoot, "rev-parse", "--abbrev-ref", "--symbolic-full-name", ref)
-	if err != nil {
-		return ""
-	}
-	return strings.TrimSpace(output)
 }
 
 func remoteFallbackRef(repoRoot, baseline string) (string, bool) {
@@ -755,15 +573,10 @@ func remoteFallbackRef(repoRoot, baseline string) (string, bool) {
 	}
 	branch = strings.TrimPrefix(branch, "refs/heads/")
 	candidate := "origin/" + branch
-	if refExists(repoRoot, candidate) {
+	if gitread.RefExists(repoRoot, candidate) {
 		return candidate, true
 	}
 	return "", false
-}
-
-func refExists(repoRoot, ref string) bool {
-	_, err := run(repoRoot, "rev-parse", "--verify", "--quiet", ref+"^{commit}")
-	return err == nil
 }
 
 // IgnoredDirs returns the set of directories under repoRoot that git ignores
@@ -776,7 +589,7 @@ func refExists(repoRoot, ref string) bool {
 func IgnoredDirs(repoRoot string) map[string]bool {
 	// --directory collapses fully-ignored directories to a single entry with a
 	// trailing slash; partially-tracked directories are left expanded.
-	output, err := run(repoRoot, "ls-files", "--others", "--ignored", "--exclude-standard", "--directory")
+	output, err := gitread.Run(repoRoot, "ls-files", "--others", "--ignored", "--exclude-standard", "--directory")
 	if err != nil {
 		return nil
 	}
@@ -796,7 +609,7 @@ func IgnoredDirs(repoRoot string) map[string]bool {
 // keying a machine-global, per-repo build store shared across all worktrees.
 // Returns "" when git is unavailable or repoRoot is not inside a work tree.
 func CommonDir(repoRoot string) string {
-	output, err := run(repoRoot, "rev-parse", "--git-common-dir")
+	output, err := gitread.Run(repoRoot, "rev-parse", "--git-common-dir")
 	if err != nil {
 		return ""
 	}
@@ -822,88 +635,6 @@ func CommonDir(repoRoot string) string {
 		abs = resolved
 	}
 	return abs
-}
-
-// CurrentBranch returns the current git branch name.
-func CurrentBranch(repoRoot string) (string, error) {
-	if output, err := run(repoRoot, "symbolic-ref", "--short", "HEAD"); err == nil {
-		return strings.TrimSpace(output), nil
-	}
-	output, err := run(repoRoot, "rev-parse", "--abbrev-ref", "HEAD")
-	if err != nil {
-		return "", err
-	}
-	return strings.TrimSpace(output), nil
-}
-
-// IsMainBranch returns true if the current branch is "main" or "master".
-// Returns false if not on a main branch or if git operations fail.
-func IsMainBranch(repoRoot string) bool {
-	branch, err := CurrentBranch(repoRoot)
-	if err != nil {
-		return false
-	}
-	return branch == "main" || branch == "master"
-}
-
-// gitTimeout is the default timeout for git subprocess calls.
-const gitTimeout = 30 * time.Second
-
-func run(repoRoot string, args ...string) (string, error) {
-	stdout, stderr, err := runCapture(repoRoot, args...)
-	if err != nil {
-		return "", fmt.Errorf("git %s (in %s): %w: %s", args[0], repoRoot, err, strings.TrimSpace(stderr))
-	}
-	return stdout, nil
-}
-
-func runCapture(repoRoot string, args ...string) (string, string, error) {
-	return runCaptureEnv(repoRoot, nil, args...)
-}
-
-// runCaptureEnv is runCapture with env as git's environment; nil inherits this
-// process's.
-func runCaptureEnv(repoRoot string, env []string, args ...string) (string, string, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), gitTimeout)
-	defer cancel()
-
-	cmd := exec.CommandContext(ctx, Executable(), args...)
-	cmd.Dir = repoRoot
-	if env == nil {
-		env = os.Environ()
-	}
-	cmd.Env = RepositoryEnvironment(env)
-	var stdout, stderr bytes.Buffer
-	cmd.Stdout = &stdout
-	cmd.Stderr = &stderr
-	if err := cmd.Run(); err != nil {
-		if ctx.Err() == context.DeadlineExceeded {
-			return "", stderr.String(), fmt.Errorf("timed out after %s", gitTimeout)
-		}
-		return "", stderr.String(), err
-	}
-	return stdout.String(), stderr.String(), nil
-}
-
-// RepositoryEnvironment removes selectors that could redirect a Git command
-// away from its explicit working directory. Transport credentials and tracing
-// (including GIT_SSH_COMMAND and GIT_ASKPASS) pass through unchanged.
-func RepositoryEnvironment(environ []string) []string {
-	cleaned := make([]string, 0, len(environ))
-	for _, entry := range environ {
-		name, _, _ := strings.Cut(entry, "=")
-		if strings.HasPrefix(name, "GIT_CONFIG") {
-			continue
-		}
-		switch name {
-		case "GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_COMMON_DIR", "GIT_OBJECT_DIRECTORY",
-			"GIT_ALTERNATE_OBJECT_DIRECTORIES", "GIT_PREFIX", "GIT_CEILING_DIRECTORIES",
-			"GIT_DISCOVERY_ACROSS_FILESYSTEM", "GIT_NAMESPACE":
-			continue
-		}
-		cleaned = append(cleaned, entry)
-	}
-	return cleaned
 }
 
 func splitLines(s string) []string {

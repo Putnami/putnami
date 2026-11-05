@@ -14,6 +14,7 @@ import (
 	"sync/atomic"
 	"testing"
 
+	"github.com/google/go-containerregistry/pkg/authn"
 	"github.com/google/go-containerregistry/pkg/crane"
 	"github.com/google/go-containerregistry/pkg/name"
 	"github.com/google/go-containerregistry/pkg/registry"
@@ -250,40 +251,43 @@ func TestWriteLayerTar_DeterministicAndShaped(t *testing.T) {
 	}
 }
 
-func TestContentHash_SkipsStampContentButNotShape(t *testing.T) {
+func TestImagePlanIdentity_SkipsDerivedContentButNotShape(t *testing.T) {
 	dir := t.TempDir()
 	binary := writeFile(t, dir, "my-app", "binary")
 	stamp := writeFile(t, dir, "stamp.json", `{"contentHash":"first"}`)
 
 	spec := testSpec(binary)
 	spec.Layers = append(spec.Layers, Layer{Files: []File{{Source: stamp, Path: "/app/.gen/version.json", Mode: 0o644}}})
+	derived := PlanOptions{DerivedFiles: map[string]string{
+		"/app/.gen/version.json": "putnami/test/content-stamp/v1",
+	}}
 
-	hashA, err := ContentHash(spec, "/app/.gen/version.json")
+	planA, err := NewImagePlan(spec, derived)
 	if err != nil {
 		t.Fatal(err)
 	}
 	// Stamp content changes (it embeds this very hash) — hash must not.
 	writeFile(t, dir, "stamp.json", `{"contentHash":"second"}`)
-	hashB, err := ContentHash(spec, "/app/.gen/version.json")
+	planB, err := NewImagePlan(spec, derived)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if hashA != hashB {
+	if planA.Identity != planB.Identity {
 		t.Error("expected stamp content to be excluded from the content hash")
 	}
 
 	// But removing the stamp from the spec changes the image shape → hash.
 	noStamp := testSpec(binary)
-	hashC, err := ContentHash(noStamp)
+	planC, err := NewImagePlan(noStamp, PlanOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if hashC == hashA {
+	if planC.Identity == planA.Identity {
 		t.Error("expected spec shape (stamp path) to affect the content hash")
 	}
 }
 
-func TestContentHash_FramesFileContents(t *testing.T) {
+func TestImagePlanIdentity_FramesFileContents(t *testing.T) {
 	dirA := t.TempDir()
 	dirB := t.TempDir()
 
@@ -296,14 +300,16 @@ func TestContentHash_FramesFileContents(t *testing.T) {
 		{Source: writeFile(t, dirB, "two", "/two\x00y"), Path: "/two", Mode: 0o644},
 	}}}}
 
-	hashA, err := ContentHash(specA)
+	hashAPlan, err := NewImagePlan(specA, PlanOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
-	hashB, err := ContentHash(specB)
+	hashA := hashAPlan.Identity
+	hashBPlan, err := NewImagePlan(specB, PlanOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
+	hashB := hashBPlan.Identity
 	if hashA == hashB {
 		t.Error("expected different file splits to produce different content hashes")
 	}
@@ -333,15 +339,17 @@ func TestTarballLayer_IsContentAddressedAndAssembles(t *testing.T) {
 	}
 	writeTar("first")
 	spec := Spec{BaseRef: testSpec("").BaseRef, Platform: "linux/amd64", Layers: []Layer{{Tarball: tarPath}}}
-	hashA, err := ContentHash(spec)
+	hashAPlan, err := NewImagePlan(spec, PlanOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
+	hashA := hashAPlan.Identity
 	writeTar("second")
-	hashB, err := ContentHash(spec)
+	hashBPlan, err := NewImagePlan(spec, PlanOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
+	hashB := hashBPlan.Identity
 	if hashA == hashB {
 		t.Fatal("tarball byte change did not change the complete content hash")
 	}
@@ -375,17 +383,17 @@ func TestLayoutRoundTripAndDockerTarball(t *testing.T) {
 	wantDigest, _ := img.Digest()
 
 	layoutDir := filepath.Join(t.TempDir(), "oci")
-	digest, err := WriteLayout(layoutDir, img)
+	digest, err := writeLayout(layoutDir, img)
 	if err != nil {
-		t.Fatalf("WriteLayout: %v", err)
+		t.Fatalf("writeLayout: %v", err)
 	}
 	if digest != wantDigest.String() {
-		t.Errorf("WriteLayout digest = %s, want %s", digest, wantDigest)
+		t.Errorf("writeLayout digest = %s, want %s", digest, wantDigest)
 	}
 
-	loaded, err := LoadFromLayout(layoutDir)
+	loaded, err := loadFromLayout(layoutDir)
 	if err != nil {
-		t.Fatalf("LoadFromLayout: %v", err)
+		t.Fatalf("loadFromLayout: %v", err)
 	}
 	loadedDigest, _ := loaded.Digest()
 	if loadedDigest != wantDigest {
@@ -437,9 +445,9 @@ func TestFetchBase_PlatformSelectionAndOfflineCache(t *testing.T) {
 	pinnedRef := host + "/base@" + indexDigest.String()
 
 	cacheDir := t.TempDir()
-	got, err := FetchBase(pinnedRef, "linux/arm64", cacheDir)
+	got, err := fetchBase(pinnedRef, "linux/arm64", cacheDir, authn.DefaultKeychain)
 	if err != nil {
-		t.Fatalf("FetchBase: %v", err)
+		t.Fatalf("fetchBase: %v", err)
 	}
 	gotDigest, _ := got.Digest()
 	wantDigest, _ := arm64.Digest()
@@ -449,9 +457,9 @@ func TestFetchBase_PlatformSelectionAndOfflineCache(t *testing.T) {
 
 	// The registry goes away; the cached base must keep working (offline).
 	srv.Close()
-	cached, err := FetchBase(pinnedRef, "linux/arm64", cacheDir)
+	cached, err := fetchBase(pinnedRef, "linux/arm64", cacheDir, authn.DefaultKeychain)
 	if err != nil {
-		t.Fatalf("FetchBase from cache: %v", err)
+		t.Fatalf("fetchBase from cache: %v", err)
 	}
 	cachedDigest, _ := cached.Digest()
 	if cachedDigest != wantDigest {
@@ -509,12 +517,12 @@ func TestFetchBase_PullRunsOnTheBoundedTransport(t *testing.T) {
 		return dialer.DialContext(ctx, network, addr)
 	}
 
-	got, err := FetchBase(pinnedRef, "linux/amd64", t.TempDir())
+	got, err := fetchBase(pinnedRef, "linux/amd64", t.TempDir(), authn.DefaultKeychain)
 	if err != nil {
-		t.Fatalf("FetchBase: %v", err)
+		t.Fatalf("fetchBase: %v", err)
 	}
 	if gotDigest, _ := got.Digest(); gotDigest != digest {
-		t.Errorf("FetchBase digest = %s, want %s", gotDigest, digest)
+		t.Errorf("fetchBase digest = %s, want %s", gotDigest, digest)
 	}
 	if boundedDials.Load() == 0 {
 		t.Error("the base pull did not dial through DefaultRegistryTransport")
@@ -528,7 +536,7 @@ func TestFetchBase_PullRunsOnTheBoundedTransport(t *testing.T) {
 }
 
 func TestFetchBase_RejectsUnpinnedRef(t *testing.T) {
-	if _, err := FetchBase("gcr.io/distroless/static:nonroot", "linux/amd64", t.TempDir()); err == nil {
+	if _, err := fetchBase("gcr.io/distroless/static:nonroot", "linux/amd64", t.TempDir(), authn.DefaultKeychain); err == nil {
 		t.Error("expected error for a base ref without a digest pin")
 	}
 }

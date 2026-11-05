@@ -8,6 +8,7 @@ import (
 	protocolcli "go.putnami.dev/protocol/cli"
 	diag "go.putnami.dev/protocol/diagnostic"
 	wsproto "go.putnami.dev/protocol/workspace"
+	sdkgit "go.putnami.dev/sdk/extension/gitread"
 	"go.putnami.dev/tooling/sdd/extension/internal/gitread"
 )
 
@@ -67,7 +68,7 @@ func BuildFeatureCoverageRatchetResult(root string, workspaceOptions map[string]
 	debt, adopted, findings := featureCoverageDebt(workspaceOptions["sdd"])
 	if len(findings) > 0 {
 		report.Diagnostics = findings
-		return report, WithResultData(protocolcli.Classify(
+		return report, protocolcli.WithResultData(protocolcli.Classify(
 			fmt.Errorf("feature coverage ratchet: options.sdd.%s is invalid", FeatureCoverageOption),
 			protocolcli.ErrInvalidConfig), report)
 	}
@@ -84,18 +85,18 @@ func BuildFeatureCoverageRatchetResult(root string, workspaceOptions map[string]
 	}
 	report.Baseline = baseline
 
-	shallow, err := gitread.IsShallow(root)
+	shallow, err := sdkgit.IsShallow(root)
 	if err != nil {
-		return report, WithResultData(fmt.Errorf("feature coverage ratchet: %w", err), report)
+		return report, protocolcli.WithResultData(fmt.Errorf("feature coverage ratchet: %w", err), report)
 	}
 	if shallow {
-		return report, WithResultData(protocolcli.Classify(fmt.Errorf(
+		return report, protocolcli.WithResultData(protocolcli.Classify(fmt.Errorf(
 			"feature coverage ratchet: the repository is a shallow clone, so its history may stop before the merge base with %s; fetch the whole history",
 			baseline), protocolcli.ErrInvalidConfig), report)
 	}
 	mergeBase, err := gitread.MergeBase(root, baseline)
 	if err != nil {
-		return report, WithResultData(fmt.Errorf("feature coverage ratchet: %w", err), report)
+		return report, protocolcli.WithResultData(fmt.Errorf("feature coverage ratchet: %w", err), report)
 	}
 	report.MergeBase = mergeBase
 
@@ -103,7 +104,7 @@ func BuildFeatureCoverageRatchetResult(root string, workspaceOptions map[string]
 	if err != nil {
 		report.Diagnostics = []diag.Diagnostic{diag.Errorf(ErrorCodeCoverageDebtBaselineUnavailable,
 			wsproto.WorkspaceConfigFilename, "read the debt list at the merge base %s: %v", shortCommit(mergeBase), err)}
-		return report, WithResultData(protocolcli.Classify(
+		return report, protocolcli.WithResultData(protocolcli.Classify(
 			fmt.Errorf("feature coverage ratchet: %w", err), protocolcli.ErrInvalidConfig), report)
 	}
 	baselineDebt, baselineAdopted, baselineFindings := featureCoverageDebt(block)
@@ -111,7 +112,7 @@ func BuildFeatureCoverageRatchetResult(root string, workspaceOptions map[string]
 		report.Diagnostics = []diag.Diagnostic{diag.Errorf(ErrorCodeCoverageDebtBaselineUnavailable,
 			wsproto.WorkspaceConfigFilename, "the debt list at the merge base %s is invalid: %s",
 			shortCommit(mergeBase), baselineFindings[0].Message)}
-		return report, WithResultData(protocolcli.Classify(
+		return report, protocolcli.WithResultData(protocolcli.Classify(
 			fmt.Errorf("feature coverage ratchet: the debt list at the merge base %s is invalid", shortCommit(mergeBase)),
 			protocolcli.ErrInvalidConfig), report)
 	}
@@ -138,7 +139,7 @@ func BuildFeatureCoverageRatchetResult(root string, workspaceOptions map[string]
 			id, shortCommit(mergeBase), baseline))
 	}
 	if len(report.Diagnostics) > 0 {
-		return report, WithResultData(protocolcli.Classify(
+		return report, protocolcli.WithResultData(protocolcli.Classify(
 			fmt.Errorf("feature coverage ratchet: %d new debt entr%s", len(report.Grown), pluralY(len(report.Grown))),
 			protocolcli.ErrInvalidConfig), report)
 	}

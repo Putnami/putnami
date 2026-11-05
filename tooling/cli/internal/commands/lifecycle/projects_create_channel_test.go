@@ -55,7 +55,7 @@ func newTemplateRegistry(t *testing.T, versions map[string]string) *templateRegi
 	t.Cleanup(registry.Close)
 	hometest.Temp(t)
 	t.Setenv(extension.PutRegistryURLEnv, registry.URL)
-	t.Setenv(extension.HTTPRetryBackoffEnv, "0")
+	t.Cleanup(extension.SetHTTPRetryBackoff(0))
 	t.Setenv("PUTNAMI_ARTIFACT_DIR", t.TempDir())
 	t.Setenv("PUTNAMI_STORE_DIR", t.TempDir())
 	original := extension.ResolveRegistryToken

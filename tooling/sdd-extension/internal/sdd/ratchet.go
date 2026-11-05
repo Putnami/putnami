@@ -13,6 +13,7 @@ import (
 	protocolcli "go.putnami.dev/protocol/cli"
 	diag "go.putnami.dev/protocol/diagnostic"
 	featureproto "go.putnami.dev/protocol/features"
+	wsproto "go.putnami.dev/protocol/workspace"
 	featureengine "go.putnami.dev/tooling/sdd/extension/internal/features"
 	workspace "go.putnami.dev/tooling/sdd/extension/internal/wsview"
 )
@@ -184,7 +185,7 @@ func specsBaselineScopes(ws *workspace.Workspace) ([]string, map[string]string) 
 		if project == nil {
 			continue
 		}
-		owners[workspace.CleanWorkspacePath(project.Path)] = project.ID
+		owners[wsproto.CleanWorkspacePath(project.Path)] = project.ID
 	}
 	scopes := make([]string, 0, len(owners))
 	for scope := range owners {
@@ -300,7 +301,7 @@ func BuildSpecsRatchetResult(ws *workspace.Workspace) (SpecsRatchetReport, error
 	report.BaselinePresent = present
 	report.Diagnostics = append(report.Diagnostics, findings...)
 	if diag.HasErrors(findings) {
-		return report, WithResultData(protocolcli.Classify(
+		return report, protocolcli.WithResultData(protocolcli.Classify(
 			fmt.Errorf("specs ratchet: a committed %s is unreadable", featureproto.SpecsBaselineFilename),
 			protocolcli.ErrInvalidConfig), report)
 	}
@@ -332,7 +333,7 @@ func BuildSpecsRatchetResult(ws *workspace.Workspace) (SpecsRatchetReport, error
 		for _, finding := range comparison {
 			projects = append(projects, finding.Field)
 		}
-		return report, WithResultData(protocolcli.Classify(
+		return report, protocolcli.WithResultData(protocolcli.Classify(
 			fmt.Errorf("specs ratchet: %d regression(s) against the committed %s files (%s)",
 				len(comparison), featureproto.SpecsBaselineFilename, strings.Join(dedupeSorted(projects), ", ")),
 			protocolcli.ErrInvalidConfig), report)
@@ -364,7 +365,7 @@ func BuildSpecsBaselineResult(ws *workspace.Workspace, update bool) (SpecsBaseli
 		if member == nil {
 			return report, fmt.Errorf("specs baseline: enforced project %s is not a workspace member", project.Project)
 		}
-		file := featureproto.SpecsBaselinePath(workspace.CleanWorkspacePath(member.Path))
+		file := featureproto.SpecsBaselinePath(wsproto.CleanWorkspacePath(member.Path))
 		data, err := featureproto.MarshalProjectSpecsBaseline(&featureproto.ProjectSpecsBaseline{
 			ProtocolVersion:        featureproto.SpecsBaselineProtocolVersion,
 			ExecutableRequirements: project.ExecutableRequirements,

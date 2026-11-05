@@ -16,9 +16,9 @@ import (
 	"testing"
 
 	wsproto "go.putnami.dev/protocol/workspace"
+	"go.putnami.dev/sdk/extension/gitread"
 	"go.putnami.dev/sdk/extension/pkgmeta"
 	"go.putnami.dev/tooling/cli/internal/commands/sharedtest"
-	gitexec "go.putnami.dev/tooling/cli/internal/git"
 )
 
 func TestVersionList_Empty(t *testing.T) {
@@ -111,7 +111,7 @@ func versionLineRepo(t *testing.T) string {
 
 func gitInRepo(t *testing.T, dir string, args ...string) {
 	t.Helper()
-	cmd := exec.Command(gitexec.Executable(), args...)
+	cmd := exec.Command(gitread.Executable(), args...)
 	cmd.Dir = dir
 	cmd.Env = append(os.Environ(), "GIT_COMMITTER_DATE=2026-01-02T03:04:05Z", "GIT_AUTHOR_DATE=2026-01-02T03:04:05Z")
 	if out, err := cmd.CombinedOutput(); err != nil {
@@ -373,7 +373,6 @@ func TestFetchRelease_SendsHead(t *testing.T) {
 
 func TestVersionUpdate_FailsClosedWithoutIntegrity(t *testing.T) {
 	// Ensure no global env from another test leaks in.
-	t.Setenv("PUTNAMI_UNSAFE_UPDATE", "")
 	t.Setenv("PUTNAMI_REGISTRY_URL", "")
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
@@ -383,7 +382,7 @@ func TestVersionUpdate_FailsClosedWithoutIntegrity(t *testing.T) {
 	defer srv.Close()
 	t.Setenv("PUTNAMI_REGISTRY_URL", srv.URL)
 
-	err := VersionUpdate(context.Background(), "1.0.0", t.TempDir())
+	_, err := VersionUpdateWithOptions(context.Background(), "1.0.0", t.TempDir(), VersionUpdateOptions{Channel: "latest"})
 	if err == nil {
 		t.Fatal("expected fail-closed error when resolver lacks integrity, got nil")
 	}
@@ -395,8 +394,7 @@ func TestVersionUpdate_FailsClosedWithoutIntegrity(t *testing.T) {
 func TestVersionUpdate_AcceptsValidIntegrity(t *testing.T) {
 	// Build a tar.gz containing a fake putnami binary, compute its sha256,
 	// serve it through a fake resolver that advertises that integrity, and
-	// verify VersionUpdate installs the binary.
-	t.Setenv("PUTNAMI_UNSAFE_UPDATE", "")
+	// verify VersionUpdateWithOptions installs the binary.
 	t.Setenv("PUTNAMI_REGISTRY_URL", "")
 
 	binDir := t.TempDir()
@@ -422,8 +420,8 @@ func TestVersionUpdate_AcceptsValidIntegrity(t *testing.T) {
 	defer srv.Close()
 	t.Setenv("PUTNAMI_REGISTRY_URL", srv.URL)
 
-	if err := VersionUpdate(context.Background(), "1.0.0", binDir); err != nil {
-		t.Fatalf("VersionUpdate: %v", err)
+	if _, err := VersionUpdateWithOptions(context.Background(), "1.0.0", binDir, VersionUpdateOptions{Channel: "latest"}); err != nil {
+		t.Fatalf("VersionUpdateWithOptions: %v", err)
 	}
 	// The installed binary should exist.
 	target := filepath.Join(binDir, hostExecutable("putnami-go-9.9.9"))
@@ -437,7 +435,6 @@ func TestVersionUpdate_RejectsStaleStamp(t *testing.T) {
 	// version must not be installed. This is the
 	// publish/upgrade split: the channel resolved a new version, but
 	// the downloaded archive still contains an older CLI.
-	t.Setenv("PUTNAMI_UNSAFE_UPDATE", "")
 	t.Setenv("PUTNAMI_REGISTRY_URL", "")
 
 	binDir := t.TempDir()
@@ -463,7 +460,7 @@ func TestVersionUpdate_RejectsStaleStamp(t *testing.T) {
 	defer srv.Close()
 	t.Setenv("PUTNAMI_REGISTRY_URL", srv.URL)
 
-	err = VersionUpdate(context.Background(), "1.0.0", binDir)
+	_, err = VersionUpdateWithOptions(context.Background(), "1.0.0", binDir, VersionUpdateOptions{Channel: "latest"})
 	if err == nil {
 		t.Fatal("expected stale-stamp rejection, got nil")
 	}
@@ -478,7 +475,6 @@ func TestVersionUpdate_RejectsStaleStamp(t *testing.T) {
 }
 
 func TestVersionUpdate_AcceptsMatchingStamp(t *testing.T) {
-	t.Setenv("PUTNAMI_UNSAFE_UPDATE", "")
 	t.Setenv("PUTNAMI_REGISTRY_URL", "")
 
 	binDir := t.TempDir()
@@ -517,7 +513,6 @@ func TestVersionUpdate_AcceptsMatchingStamp(t *testing.T) {
 }
 
 func TestVersionUpdate_ActivationFailureReturnsError(t *testing.T) {
-	t.Setenv("PUTNAMI_UNSAFE_UPDATE", "")
 	t.Setenv("PUTNAMI_REGISTRY_URL", "")
 
 	binDir := t.TempDir()
@@ -571,7 +566,6 @@ func TestVersionUpdate_RefusesAResolvedVersionThatIsNotAVersion(t *testing.T) {
 	// stamp check would not catch it.
 	for _, resolved := range []string{"../evil", "x/../../evil", "1.2.3/../../evil"} {
 		t.Run(resolved, func(t *testing.T) {
-			t.Setenv("PUTNAMI_UNSAFE_UPDATE", "")
 			t.Setenv("PUTNAMI_REGISTRY_URL", "")
 
 			root := t.TempDir()
@@ -618,7 +612,6 @@ func TestVersionUpdate_RefusesAResolvedVersionThatIsNotAVersion(t *testing.T) {
 }
 
 func TestVersionUpdate_RejectsBadIntegrity(t *testing.T) {
-	t.Setenv("PUTNAMI_UNSAFE_UPDATE", "")
 	t.Setenv("PUTNAMI_REGISTRY_URL", "")
 
 	stagingDir := t.TempDir()
@@ -641,7 +634,7 @@ func TestVersionUpdate_RejectsBadIntegrity(t *testing.T) {
 	defer srv.Close()
 	t.Setenv("PUTNAMI_REGISTRY_URL", srv.URL)
 
-	err = VersionUpdate(context.Background(), "1.0.0", t.TempDir())
+	_, err = VersionUpdateWithOptions(context.Background(), "1.0.0", t.TempDir(), VersionUpdateOptions{Channel: "latest"})
 	if err == nil {
 		t.Fatal("expected integrity failure, got nil")
 	}

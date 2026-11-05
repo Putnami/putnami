@@ -601,9 +601,7 @@ func classify(item string, contracts []cachekey.VerificationContract, opts overr
 // `package-deployment`, and `.gen/requirements.json` and
 // `.gen/infra/runtime.json` to `build-infra`, which declare them), while
 // `build-describe`'s staging and `config-extract`'s fallback write inside it
-// and declare nothing (go/extension/putnami.extension.json). Scoring each
-// task against only its own outputs contradicted that and made this check fail
-// by construction on every Go project.
+// and declare nothing (go/extension/putnami.extension.json).
 //
 // What it still catches, which is the point of the check: a write that lands
 // outside every declared output of the project — an undeclared path nobody

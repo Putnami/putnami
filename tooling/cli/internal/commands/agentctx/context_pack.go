@@ -48,10 +48,10 @@ import (
 	contracts "go.putnami.dev/protocol/contracts"
 	diag "go.putnami.dev/protocol/diagnostic"
 	"go.putnami.dev/protocol/infra"
+	"go.putnami.dev/sdk/extension/gitread"
 	"go.putnami.dev/tooling/cli/internal/cmderr"
 	"go.putnami.dev/tooling/cli/internal/commands/shared"
 	"go.putnami.dev/tooling/cli/internal/extension"
-	"go.putnami.dev/tooling/cli/internal/git"
 	"go.putnami.dev/tooling/cli/internal/iox"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
@@ -251,10 +251,8 @@ func buildCompositionRoots(ws *workspace.Workspace, p *workspace.Project, projDi
 // The declared entrypoint is looked up as a CONVENTION rather than as identity:
 // the project's own putnami.json wins, and otherwise the workspace probe's
 // provider-owned metadata is consulted for a `main` key (the TypeScript adapter
-// publishes package.json's). An earlier change deleted core's package.json
-// parser, so this is the only remaining path to a TypeScript entrypoint — and it
-// is deliberately confined to this human-facing document, never to identity or a
-// cache key. When nothing declares one — as for every Go project — it falls back
+// publishes package.json's). The lookup is
+// confined to this human-facing document, never to identity or a cache key. When nothing declares one — as for every Go project — it falls back
 // to a conventional root main.go that declares `package main`, so a Go
 // application's composition root is not silently absent. The `package main`
 // check keeps a Go library that happens to have a main.go from being misreported
@@ -952,7 +950,7 @@ func contextDocumentError(label, what string, diags []diag.Diagnostic) error {
 	if len(errs) > 0 {
 		msg = fmt.Sprintf("%s: %s", msg, errs[0].Message)
 	}
-	return shared.WithResultData(protocolcli.Classify(errors.New(msg), protocolcli.ErrInvalidConfig), report)
+	return protocolcli.WithResultData(protocolcli.Classify(errors.New(msg), protocolcli.ErrInvalidConfig), report)
 }
 
 // buildPackedDocument builds one project's document and runs it through the
@@ -1066,7 +1064,7 @@ func selectContextProjects(ws *workspace.Workspace, args []string) ([]*workspace
 // commits, or not a git checkout). The value is stable across a fixed tree and
 // still resolves outside a repository.
 func resolveWorkspaceRevision(wsRoot string) string {
-	out, err := exec.Command(git.Executable(), "-C", wsRoot, "rev-parse", "HEAD").Output()
+	out, err := exec.Command(gitread.Executable(), "-C", wsRoot, "rev-parse", "HEAD").Output()
 	if err != nil {
 		return "unknown"
 	}

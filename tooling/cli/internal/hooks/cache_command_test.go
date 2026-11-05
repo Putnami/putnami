@@ -130,9 +130,6 @@ func TestRunCacheCommand_DeliversTheContractRoots(t *testing.T) {
 	if got, want := read("PUTNAMI_CACHE_ROOT"), filepath.Join(ws.Root, ".putnami", "cache"); got != want {
 		t.Errorf("PUTNAMI_CACHE_ROOT = %q, want %q", got, want)
 	}
-	if got := read("PUTNAMI_CACHE_COMMAND"); got != extensionproto.CommandCacheGC {
-		t.Errorf("PUTNAMI_CACHE_COMMAND = %q, want %q", got, extensionproto.CommandCacheGC)
-	}
 	if got := read("PUTNAMI_EXTENSION_NAME"); got != "@test/roots" {
 		t.Errorf("PUTNAMI_EXTENSION_NAME = %q, want @test/roots", got)
 	}

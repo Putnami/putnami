@@ -98,7 +98,7 @@ func BuildArchitectureInitResult(ws *workspace.Workspace, domain string, options
 		if ws.ProjectByID(project) == nil {
 			report.Diagnostics = append(report.Diagnostics, diag.Errorf(archproto.ErrorCodeUnknownProject, "projects",
 				"project %q is not present in the resolved Putnami workspace", project))
-			return report, WithResultData(
+			return report, protocolcli.WithResultData(
 				protocolcli.NotFoundf("project %q is not a member of this workspace", project), report)
 		}
 	}
@@ -109,7 +109,7 @@ func BuildArchitectureInitResult(ws *workspace.Workspace, domain string, options
 			report.Existing = source.Path
 			report.Diagnostics = append(report.Diagnostics, diag.Errorf(archproto.ErrorCodeDuplicateDomain, source.Path,
 				"domain %q is already declared; edit that manifest instead", report.Domain))
-			return report, WithResultData(
+			return report, protocolcli.WithResultData(
 				protocolcli.Usagef("domain %q is already declared by %s", report.Domain, source.Path), report)
 		}
 	}
@@ -118,14 +118,14 @@ func BuildArchitectureInitResult(ws *workspace.Workspace, domain string, options
 	contents, err := builder.CanonicalBytes()
 	if err != nil {
 		report.Diagnostics = append(report.Diagnostics, architectureAuthoringDiagnostics(err)...)
-		return report, WithResultData(
+		return report, protocolcli.WithResultData(
 			protocolcli.InvalidConfigf("the requested domain cannot produce a valid manifest"), report)
 	}
 	report.Contents = string(contents)
 
 	root, err := architectureInitRoot(ws, options.At, report.Projects)
 	if err != nil {
-		return report, WithResultData(err, report)
+		return report, protocolcli.WithResultData(err, report)
 	}
 	report.Path = joinArchitecturePath(root, archproto.ManifestFilename)
 	if options.DryRun {
@@ -135,7 +135,7 @@ func BuildArchitectureInitResult(ws *workspace.Workspace, domain string, options
 		if os.IsExist(err) {
 			report.Diagnostics = append(report.Diagnostics, diag.Errorf(archproto.ErrorCodeParseError, report.Path,
 				"a file already exists at the target path; architecture init never overwrites user content"))
-			return report, WithResultData(
+			return report, protocolcli.WithResultData(
 				protocolcli.Usagef("%s already exists; architecture init never overwrites a file", report.Path), report)
 		}
 		return report, protocolcli.Classify(fmt.Errorf("write %s: %w", report.Path, err), protocolcli.ErrInvalidConfig)
@@ -147,10 +147,8 @@ func BuildArchitectureInitResult(ws *workspace.Workspace, domain string, options
 // architectureInitRoot decides where a scaffold lands.
 //
 // An explicit --at wins and is checked for containment. Otherwise the manifest
-// goes beside the FIRST project the domain maps, in canonical order — a rule
-// that is deterministic and easy to correct, rather than a guess at a common
-// parent directory that would be right for some domain shapes and wrong for
-// others. A domain that maps no project yet lands at the workspace root.
+// goes beside the FIRST project the domain maps, in canonical order. A domain
+// that maps no project yet lands at the workspace root.
 func architectureInitRoot(ws *workspace.Workspace, at string, projects []string) (string, error) {
 	if trimmed := strings.TrimSpace(at); trimmed != "" {
 		cleaned := path.Clean(filepath.ToSlash(trimmed))
@@ -218,7 +216,7 @@ func createArchitectureManifest(wsRoot, relative string, contents []byte) error 
 	if err != nil {
 		return err
 	}
-	defer root.Close() //nolint:errcheck // the write result is reported below
+	defer root.Close()
 
 	target := filepath.FromSlash(relative)
 	if parent := filepath.Dir(target); parent != "." {
@@ -233,7 +231,7 @@ func createArchitectureManifest(wsRoot, relative string, contents []byte) error 
 		return err
 	}
 	if _, err := file.Write(contents); err != nil {
-		file.Close() //nolint:errcheck // the write error is the one to report
+		file.Close()
 		return err
 	}
 	return file.Close()

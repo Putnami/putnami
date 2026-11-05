@@ -78,11 +78,10 @@ type subcommand struct {
 //
 // human is nil for the cases where the CLI handler returned its error WITHOUT
 // rendering anything — a workspace that would not load, a selector that was
-// rejected before any report existed. Those handlers guarded on
-// `report.Revision.Kind == ""`: a report with no resolved revision describes
-// nothing, and printing its hollow "… failed" block would bury the real error.
-// Each body below states its own guard rather than inferring one, because the
-// guard is per command in core too.
+// rejected before any report existed: a report with no resolved revision
+// describes nothing, and printing its hollow "… failed" block would bury the
+// real error. Each body below states its own guard, because the guard is per
+// command in core too.
 type outcome struct {
 	data  any
 	human func(w io.Writer)
@@ -283,14 +282,14 @@ func dispatchInteractive(sub subcommand, ctx *pctx.Context, positionals []string
 // renderer owns stdout while the error line goes to stderr. The FAILURE
 // envelope's payload is the data attached to the error — never the report the
 // body happened to build — because that is what writeStructuredFailure reads
-// (shared.ResultData) and a body that failed early has none.
+// (protocolcli.ResultData) and a body that failed early has none.
 func (run *interactiveRun) emit(sub subcommand, result outcome) int {
 	if !run.mode.IsStructured() && result.human != nil {
 		result.human(run.stdout)
 	}
 	data := result.data
 	if result.err != nil {
-		data = sdd.ResultData(result.err)
+		data = protocolcli.ResultData(result.err)
 	} else {
 		data = capturedPayload(data)
 	}
@@ -310,7 +309,7 @@ func (run *interactiveRun) emit(sub subcommand, result outcome) int {
 // no consumer asked for.
 //
 // A FAILURE takes the other path and must not be round-tripped:
-// writeStructuredFailure passes shared.ResultData(err) — the attached value
+// writeStructuredFailure passes protocolcli.ResultData(err) — the attached value
 // itself — straight to NewResultV2 (commands.go:186), so a failure payload keeps
 // struct order. That asymmetry is core's, not a choice made here, and
 // sdd_extraction_parity_test.go in tooling/cli pins both halves against the
@@ -560,7 +559,7 @@ func runFeaturesList(run *interactiveRun) outcome {
 
 func runFeaturesValidateCommand(run *interactiveRun) outcome {
 	report, verdict := sdd.BuildFeatureValidationResult(run.ws, run.selection)
-	if verdict != nil && sdd.ResultData(verdict) == nil {
+	if verdict != nil && protocolcli.ResultData(verdict) == nil {
 		// The evaluation could not start (no workspace on the wire). Core
 		// returned that error without rendering.
 		return outcome{err: verdict}
@@ -574,7 +573,7 @@ func runFeaturesValidateCommand(run *interactiveRun) outcome {
 
 func runFeaturesSnapshot(run *interactiveRun) outcome {
 	report, verdict := sdd.BuildFeatureSnapshotResult(run.ws, run.selection)
-	if verdict != nil && sdd.ResultData(verdict) == nil {
+	if verdict != nil && protocolcli.ResultData(verdict) == nil {
 		return outcome{err: verdict}
 	}
 	return outcome{
@@ -719,7 +718,7 @@ func runSpecsInit(run *interactiveRun) outcome {
 
 func runArchitectureValidateCommand(run *interactiveRun) outcome {
 	report, verdict := sdd.BuildArchitectureValidationResult(run.ws, run.baseline())
-	if verdict != nil && sdd.ResultData(verdict) == nil {
+	if verdict != nil && protocolcli.ResultData(verdict) == nil {
 		return outcome{err: verdict}
 	}
 	return outcome{
@@ -731,7 +730,7 @@ func runArchitectureValidateCommand(run *interactiveRun) outcome {
 
 func runArchitectureSnapshot(run *interactiveRun) outcome {
 	report, verdict := sdd.BuildArchitectureSnapshotResult(run.ws, run.baseline())
-	if verdict != nil && sdd.ResultData(verdict) == nil {
+	if verdict != nil && protocolcli.ResultData(verdict) == nil {
 		return outcome{err: verdict}
 	}
 	return outcome{
@@ -743,7 +742,7 @@ func runArchitectureSnapshot(run *interactiveRun) outcome {
 
 func runArchitectureInspect(run *interactiveRun) outcome {
 	report, verdict := sdd.BuildArchitectureInspectionResult(run.ws, positionalArgs(run.args)[0], run.baseline())
-	if verdict != nil && sdd.ResultData(verdict) == nil {
+	if verdict != nil && protocolcli.ResultData(verdict) == nil {
 		return outcome{err: verdict}
 	}
 	return outcome{

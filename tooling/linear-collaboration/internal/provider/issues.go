@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	collab "go.putnami.dev/protocol/collaboration"
+	"go.putnami.dev/sdk/extension/collabhelper"
 )
 
 // The GraphQL documents this provider sends. Each names its operation, which
@@ -138,7 +139,7 @@ func (i *issue) revision() string {
 	sort.Strings(labels)
 	assignees := i.assigneeIDs()
 	sort.Strings(assignees)
-	return "v" + digest([]any{i.Title, i.description(), i.State.Name, labels, assignees})[:32]
+	return "v" + collabhelper.Digest([]any{i.Title, i.description(), i.State.Name, labels, assignees})[:32]
 }
 
 // stateOf maps a workflow state type onto the contract's states. A type this
@@ -204,15 +205,15 @@ func (s *session) task(i *issue) collab.Task {
 		Ref:           s.ref(i.ID),
 		Key:           token(i.Identifier),
 		Revision:      i.revision(),
-		URL:           displayURL(i.URL),
-		Title:         oneLine(i.Title, collab.MaxTitleLength, i.Identifier),
-		Body:          boundedBody(body),
+		URL:           collabhelper.DisplayURL(i.URL, collab.MaxURLLength),
+		Title:         collabhelper.OneLine(i.Title, collab.MaxTitleLength, i.Identifier),
+		Body:          collabhelper.BoundedBody(body, collab.MaxBodyBytes),
 		State:         state,
-		ProviderState: oneLine(i.State.Name, collab.MaxLabelLength, string(state)),
-		Labels:        boundedLabels(i.labelNames()),
+		ProviderState: collabhelper.OneLine(i.State.Name, collab.MaxLabelLength, string(state)),
+		Labels:        collabhelper.BoundedLabels(i.labelNames(), collab.MaxLabels, collab.MaxLabelLength),
 		Assignees:     assignees,
-		CreatedAt:     timestamp(i.CreatedAt),
-		UpdatedAt:     timestamp(i.UpdatedAt),
+		CreatedAt:     collabhelper.Timestamp(i.CreatedAt),
+		UpdatedAt:     collabhelper.Timestamp(i.UpdatedAt),
 	}
 }
 

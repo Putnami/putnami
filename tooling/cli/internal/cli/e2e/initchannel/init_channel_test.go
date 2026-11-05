@@ -25,6 +25,7 @@ import (
 	runtimeproto "go.putnami.dev/protocol/runtime"
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/tooling/cli/internal/cli/clitest"
+	"go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/hometest"
 	"go.putnami.dev/tooling/cli/internal/lockfile"
 )
@@ -313,7 +314,7 @@ func newHarness(t *testing.T, channels map[string]releaseSet) *harness {
 	t.Setenv("PUTNAMI_WORKSPACE_BOOTSTRAPPED", "")
 	t.Setenv("PUTNAMI_ARTIFACTS_ENSURED", "")
 	t.Setenv("PUTNAMI_NO_AUTO_INSTALL", "")
-	t.Setenv("PUTNAMI_HTTP_RETRY_BACKOFF", "0")
+	t.Cleanup(extension.SetHTTPRetryBackoff(0))
 	t.Setenv("DO_NOT_TRACK", "1")
 
 	h := &harness{root: root, records: t.TempDir(), archives: map[releaseSet]map[string]release{}}

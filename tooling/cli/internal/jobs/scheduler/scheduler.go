@@ -214,10 +214,10 @@ type Scheduler struct {
 	sharedMu    sync.Mutex
 
 	// executions is the run's PHYSICAL ledger: every subprocess this scheduler
-	// spawned, appended as each attempt finishes. It is deliberately NOT derived
-	// from the surviving results — those keep only their final attempt, so a
-	// superseded retry (and a whole batch leader whose members all retried solo)
-	// would otherwise disappear from the run's measured cost. See execution.go.
+	// spawned, appended as each attempt finishes. Results keep only their final
+	// attempt, so deriving the ledger from them would drop a superseded retry
+	// (and a whole batch leader whose members all retried solo) from the run's
+	// measured cost. See execution.go.
 	executions executionLedger
 
 	// environmentBegin is the opening reading of the runner's cumulative
@@ -249,15 +249,6 @@ type Scheduler struct {
 	// survives a kill, the exactly-once finalizer, and the fail-closed guard
 	// that keeps a sensitive artifact's path and bytes off every published
 	// surface. Nil for every plan with no finalizer.
-	//
-	// It is the ONLY provisioning machinery left in the scheduler, and it is
-	// generic: an earlier version deleted the database test-infra planner that
-	// used to sit beside it — a core component that walked each test project's
-	// requirements closure, shelled out to docker, synthesized a connection
-	// string and injected it through a private env seam. Database test
-	// environments are one PROVIDER of this shape now
-	// (go.putnami.dev/sdk/extension/dbtestenv), not a second implementation of
-	// it.
 	invocations *invocationRuntime
 
 	// metrics records per-job ready/start timing so Run can report ready wait
@@ -518,14 +509,6 @@ func (s *Scheduler) setRemoteCache(remote cachekey.RemoteCache) {
 // prepareRun performs the pre-execution setup that must complete before any
 // cache key is computed and workers start: it generates each project's
 // version.json.
-//
-// It used to do a second thing — export a per-project fixture digest into the
-// cache-key environment for every test job about to receive a provisioned
-// database — and the ordering constraint was the whole reason this function
-// exists. That is gone with the test-infra planner: a
-// consumer of an invocation-scoped resource folds in the PRODUCING ACTION's
-// digest (cachekey/executor.go), which is derived from the producer's declared inputs
-// and needs no process-global side effect to be visible to the key.
 func (s *Scheduler) prepareRun() {
 	s.versionBuildTime = time.Now().UTC().Format(time.RFC3339)
 	started := time.Now()
@@ -749,8 +732,8 @@ func (s *Scheduler) Run(ctx context.Context) *SchedulerResult {
 			break
 		}
 
-		// If we have pending jobs but all workers are busy, or no pending jobs
-		// and we need to wait for completions — use a blocking select.
+		// With pending jobs but all workers busy, or no pending jobs and
+		// completions to wait for, use a blocking select.
 		var completed jobGroupDone
 		if len(pending) > 0 && inFlight > 0 {
 			wait := s.waitForWorker(ctx, pending, inFlight, maxWorkers, readyCh, doneCh)
@@ -830,8 +813,8 @@ finish:
 	wg.Wait()
 
 	// Workers can no longer run, so every armed finalizer that never saw its
-	// frontier close runs here, and its terminal row lands in results BEFORE
-	// finalizeRun would otherwise synthesize a bare "canceled" over it.
+	// frontier close runs here; its terminal row lands in results before
+	// finalizeRun can synthesize a bare "canceled" over it.
 	s.closeInvocations(ctx, results, &mu)
 
 	s.drainRemote()

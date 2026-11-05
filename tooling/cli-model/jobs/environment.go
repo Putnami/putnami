@@ -51,6 +51,10 @@ type HostCPUTime struct {
 	TotalTicks  int64
 }
 
+// MemoryCapacityPhysical and MemoryCapacityCgroupLimit name the source of a
+// memory capacity, CgroupMemoryV1 and CgroupMemoryV2 the controller layout of
+// a cgroup reading, and MemoryPressureHost and MemoryPressureCgroup the scope
+// of a pressure reading.
 const (
 	MemoryCapacityPhysical    = "physical"
 	MemoryCapacityCgroupLimit = "cgroup-limit"

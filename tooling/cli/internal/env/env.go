@@ -8,11 +8,7 @@
 // exactly one place.
 //
 // It is a leaf: nothing here knows what a flag means, only how its name is
-// spelled in the environment. It moved out of
-// internal/config, which was otherwise a pure alias of the
-// go.putnami.dev/protocol/workspace types and was deleted; carrying the config
-// loader's name over a process-environment reader was the only thing that had
-// ever tied the two together.
+// spelled in the environment.
 package env
 
 import (

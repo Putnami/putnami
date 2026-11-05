@@ -15,6 +15,7 @@ import (
 
 	clicore "go.putnami.dev/cloud/extension/internal/clicore"
 	"go.putnami.dev/protocol/config/authoredmember"
+	wsproto "go.putnami.dev/protocol/workspace"
 )
 
 const (
@@ -517,7 +518,7 @@ func memberProject(projectPath, name string) string {
 // workspaceProjectPath returns the project id the framework's release-set
 // plan records for a project directory: "/" + its path relative to the
 // workspace root without grouping folders such as "(web)", "/" for the root
-// project (clicore.ProjectIDFromPath). Symlinked roots resolve first so a
+// project (wsproto.ProjectIDFromPath). Symlinked roots resolve first so a
 // checkout reached through an alias yields the same id as the real path.
 func workspaceProjectPath(workspaceRoot, projectDir string) (string, error) {
 	resolvedRoot := workspaceRoot
@@ -528,5 +529,5 @@ func workspaceProjectPath(workspaceRoot, projectDir string) (string, error) {
 	if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
 		return "", clicore.NewError("Config project is outside the workspace", clicore.ExitUsage)
 	}
-	return clicore.ProjectIDFromPath(filepath.ToSlash(rel)), nil
+	return wsproto.ProjectIDFromPath(filepath.ToSlash(rel)), nil
 }

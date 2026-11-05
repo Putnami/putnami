@@ -170,8 +170,3 @@ func (inst *Installer) Ensure(ctx context.Context, name, constraint string, lock
 func (inst *Installer) Remove(name, _ string) error {
 	return layout.UnlinkArtifact(inst.WorkspaceRoot, layout.Templates, name)
 }
-
-// InstalledVersions returns the list of installed versions for a template.
-func (inst *Installer) InstalledVersions(name string) ([]string, error) {
-	return layout.ListVersions(inst.WorkspaceRoot, layout.Templates, name)
-}

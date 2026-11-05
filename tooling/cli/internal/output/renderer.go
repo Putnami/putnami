@@ -46,8 +46,7 @@ type Config struct {
 	// They let a caller choose the DESTINATION without changing which renderer
 	// this constructor selects. The first-use bootstrap runs an implicit
 	// `putnami install` whose job rendering must land on stderr under
-	// --output=json|jsonl; that used to be achieved by swapping the
-	// process-global os.Stdout for the duration of the install.
+	// --output=json|jsonl.
 	Out io.Writer
 	Err io.Writer
 
@@ -75,23 +74,6 @@ func (c Config) err() io.Writer {
 		return c.Err
 	}
 	return os.Stderr
-}
-
-// StructuredOutput reports whether the given --output selector produces a
-// machine-readable stream on stdout ("json", "jsonl", or "cloud-logging"). Commands
-// that stream human-readable progress must gate it on !StructuredOutput so
-// the stdout stream stays a single, uncorrupted terminal object that an agent
-// can parse.
-//
-// It reflects the explicit --output selector only. The auto-detected JSONL
-// fallback for non-TTY runs (see autoDetectRenderer) is deliberately excluded
-// so this matches the gating long-running commands already rely on.
-func StructuredOutput(output string) bool {
-	switch output {
-	case "json", "jsonl", "cloud-logging":
-		return true
-	}
-	return false
 }
 
 // NewRenderer creates the appropriate renderer based on config and environment.

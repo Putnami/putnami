@@ -98,19 +98,6 @@ func TestProjectReleaseMetadataRejectsAmbiguousOrMalformedProjection(t *testing.
 	}
 }
 
-// The old shape carried one ecosystem at the top level of the releaseSet block.
-// A workspace index written before this change decodes into an empty member
-// list, so the release would silently publish nothing for that project; the
-// error has to name the command that re-probes the workspace.
-func TestProjectReleaseMetadataNamesProjectsSyncForTheOldShape(t *testing.T) {
-	_, _, err := ProjectReleaseMetadata(map[string]json.RawMessage{
-		"@putnami/go": json.RawMessage(`{"releaseSet":{"ecosystem":"go","dependencies":["go.putnami.dev/config"]}}`),
-	})
-	if err == nil || !strings.Contains(err.Error(), "putnami projects sync") {
-		t.Fatalf("error = %v, want the projects sync remedy", err)
-	}
-}
-
 func TestProjectReleaseMetadataDistinguishesAuthoritativeEmptyFromAbsent(t *testing.T) {
 	projection, found, err := ProjectReleaseMetadata(map[string]json.RawMessage{
 		"go": json.RawMessage(`{"releaseSet":{"ecosystems":[]}}`),

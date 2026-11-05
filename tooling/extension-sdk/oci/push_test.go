@@ -85,13 +85,13 @@ func TestUniqueStrings(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := UniqueStrings(tt.input)
+			got := uniqueStrings(tt.input)
 			if len(got) != len(tt.want) {
-				t.Fatalf("UniqueStrings(%v) = %v (len %d), want %v (len %d)", tt.input, got, len(got), tt.want, len(tt.want))
+				t.Fatalf("uniqueStrings(%v) = %v (len %d), want %v (len %d)", tt.input, got, len(got), tt.want, len(tt.want))
 			}
 			for i := range got {
 				if got[i] != tt.want[i] {
-					t.Errorf("UniqueStrings(%v)[%d] = %q, want %q", tt.input, i, got[i], tt.want[i])
+					t.Errorf("uniqueStrings(%v)[%d] = %q, want %q", tt.input, i, got[i], tt.want[i])
 				}
 			}
 		})

@@ -118,14 +118,12 @@ func (ws *Workspace) currentProbeView() map[string]wsproto.MergedProject {
 // produces is one core can load; otherwise the previous view is restored and the
 // reason is returned.
 //
-// This is the guard that makes a poisoned view recoverable instead of permanent.
-// The failure it exists for: a run persists a merged view that resolves two
-// projects to one name (or introduces a cycle), and every later Load adopts the
-// RECORDED view before it runs its own fatal checks — so the workspace stops
-// loading, and every command that could repair it must load first. Validating
-// the candidate BEFORE it is adopted or persisted closes both halves: Load falls
-// back to the un-adopted resolution with a warning, and the creating run refuses
-// to write it.
+// A candidate that resolves two projects to one name, or introduces a cycle, is
+// refused: every later Load adopts the RECORDED view before its own fatal
+// checks, so a persisted bad view would stop the workspace loading and block
+// every command that could repair it. Validating BEFORE adoption or persistence
+// makes Load fall back to the un-adopted resolution with a warning, and the
+// creating run refuses to write it.
 //
 // Application is all-or-nothing because applyProbeView is a pure function of
 // (authored config, scope contribution, view): re-applying the previous view
@@ -201,7 +199,7 @@ func applyProbeView(ws *Workspace, merged map[string]wsproto.MergedProject) {
 
 	byPath := make(map[string]*Project, len(ws.Projects))
 	for _, project := range ws.Projects {
-		byPath[CleanWorkspacePath(project.Path)] = project
+		byPath[wsproto.CleanWorkspacePath(project.Path)] = project
 	}
 	for _, project := range ws.Projects {
 		view, ok := merged[ProbePathOf(project.Path)]
@@ -389,7 +387,7 @@ func resolveDependencyNames(p *Project, entries []string, byPath map[string]*Pro
 		set[declared] = true
 	}
 	for _, entry := range entries {
-		if target, ok := byPath[CleanWorkspacePath(entry)]; ok {
+		if target, ok := byPath[wsproto.CleanWorkspacePath(entry)]; ok {
 			if target == p {
 				continue // a project never depends on itself
 			}
@@ -433,7 +431,7 @@ func resolveDependencySources(p *Project, entries map[string]wsproto.DependencyS
 	out := make(map[string]wsproto.DependencySource, len(entries))
 	for entry, source := range entries {
 		name := entry
-		if target, ok := byPath[CleanWorkspacePath(entry)]; ok {
+		if target, ok := byPath[wsproto.CleanWorkspacePath(entry)]; ok {
 			if target == p {
 				continue
 			}

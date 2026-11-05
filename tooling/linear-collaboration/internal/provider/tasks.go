@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	collab "go.putnami.dev/protocol/collaboration"
+	"go.putnami.dev/sdk/extension/collabhelper"
 	"go.putnami.dev/tooling/linear-collaboration/internal/linear"
 )
 
@@ -177,7 +178,7 @@ func (s *session) create(input any) (any, *collab.Failure) {
 		return nil, collab.Fail(collab.OutcomeUnsupported, reasonStateUnmapped, "Linear has no workflow state type for %s", state)
 	}
 	id := keyedID(s.team.ID, in.IdempotencyKey)
-	requestDigest := digest(createRequest{in.Title, in.Body, labelKeys(in.Labels), state})
+	requestDigest := collabhelper.Digest(createRequest{in.Title, in.Body, labelKeys(in.Labels), state})
 
 	existing, failure := s.lookup(id)
 	if failure != nil {
@@ -323,7 +324,7 @@ func (s *session) update(input any) (any, *collab.Failure) {
 		if failure != nil {
 			return nil, failure
 		}
-		if !sameSet(ids, found.labelIDs()) {
+		if !collabhelper.SameSet(ids, found.labelIDs()) {
 			wanted = ids
 			patch["labelIds"] = ids
 		}
@@ -335,7 +336,7 @@ func (s *session) update(input any) (any, *collab.Failure) {
 		body, _ := splitMarker(current.description())
 		return current.Title == title &&
 			(in.Body == nil || strings.TrimSpace(body) == strings.TrimSpace(text)) &&
-			(wanted == nil || sameSet(current.labelIDs(), wanted))
+			(wanted == nil || collabhelper.SameSet(current.labelIDs(), wanted))
 	})
 	if failure != nil {
 		return nil, failure
@@ -498,12 +499,4 @@ func labelKeys(names []string) []string {
 	}
 	sort.Strings(keys)
 	return slices.Compact(keys)
-}
-
-// sameSet reports whether two lists hold the same values, ignoring order.
-func sameSet(a, b []string) bool {
-	a, b = slices.Clone(a), slices.Clone(b)
-	sort.Strings(a)
-	sort.Strings(b)
-	return slices.Equal(slices.Compact(a), slices.Compact(b))
 }

@@ -23,7 +23,7 @@ func TestWriteDockerTarballClosesTheLayoutBlobs(t *testing.T) {
 		t.Fatal(err)
 	}
 	layoutDir := filepath.Join(t.TempDir(), "oci")
-	if _, err := WriteLayout(layoutDir, img); err != nil {
+	if _, err := writeLayout(layoutDir, img); err != nil {
 		t.Fatal(err)
 	}
 	tarPath := filepath.Join(t.TempDir(), "image.tar")
@@ -46,7 +46,7 @@ func TestWriteDockerTarballBytesMatchTheUnwrappedImage(t *testing.T) {
 		t.Fatal(err)
 	}
 	layoutDir := filepath.Join(t.TempDir(), "oci")
-	if _, err := WriteLayout(layoutDir, img); err != nil {
+	if _, err := writeLayout(layoutDir, img); err != nil {
 		t.Fatal(err)
 	}
 	tarPath := filepath.Join(t.TempDir(), "image.tar")
@@ -58,7 +58,7 @@ func TestWriteDockerTarballBytesMatchTheUnwrappedImage(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	loaded, err := LoadFromLayout(layoutDir)
+	loaded, err := loadFromLayout(layoutDir)
 	if err != nil {
 		t.Fatal(err)
 	}

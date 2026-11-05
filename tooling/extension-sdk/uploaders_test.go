@@ -11,6 +11,9 @@ import (
 	"sync"
 	"testing"
 
+	v1 "github.com/google/go-containerregistry/pkg/v1"
+	"github.com/google/go-containerregistry/pkg/v1/empty"
+	"github.com/google/go-containerregistry/pkg/v1/layout"
 	"github.com/google/go-containerregistry/pkg/v1/random"
 
 	distribution "go.putnami.dev/protocol/distribution"
@@ -96,10 +99,7 @@ func writeLayout(t *testing.T) (string, string) {
 		t.Fatal(err)
 	}
 	dir := filepath.Join(t.TempDir(), "layout")
-	digest, err := oci.WriteLayout(dir, img)
-	if err != nil {
-		t.Fatal(err)
-	}
+	digest := writeTestLayout(t, dir, img)
 	return dir, digest
 }
 
@@ -109,7 +109,10 @@ func putMember() putpublish.Member {
 	return putpublish.Member{
 		Kind: distribution.KindMigration, Coordinate: "acme/orders-db", Version: "0007",
 		MediaType: put.MigrationManifestMediaType, Manifest: []byte(fmt.Sprintf(`{"blob_digest":%q}`, put.Digest(bundle))),
-		Blobs: []putpublish.Blob{putpublish.BytesBlob(put.MigrationBundleBlobMediaType, bundle)},
+		Blobs: []putpublish.Blob{{
+			MediaType: put.MigrationBundleBlobMediaType, Digest: put.Digest(bundle), Size: int64(len(bundle)),
+			Read: func() ([]byte, error) { return bundle, nil },
+		}},
 	}
 }
 
@@ -135,11 +138,6 @@ func uploads(t *testing.T, registry string) map[string]string {
 	results := map[string]string{}
 
 	artifact := npmpublish.Artifact{Name: "@acme/web", Version: "1.0.0", Manifest: []byte(`{"name":"@acme/web","version":"1.0.0"}`), Tarball: []byte("tgz")}
-	payload, err := npmpublish.BuildPayload(artifact)
-	if err != nil {
-		t.Fatal(err)
-	}
-	results["npm put"] = text(npmpublish.Put(ctx, npmClient, registry, testBearer, payload))
 	_, probeErr := npmpublish.Probe(ctx, npmClient, registry, testBearer, "@acme/web", "1.0.0", npmpublish.Digest([]byte("tgz")), 3)
 	results["npm probe"] = text(probeErr)
 	_, publishErr := npmpublish.Publish(ctx, npmClient, registry, testBearer, artifact)
@@ -152,11 +150,11 @@ func uploads(t *testing.T, registry string) map[string]string {
 			return err
 		},
 		"go version": func(reporter gomodpublish.Reporter) error {
-			_, err := gomodpublish.PublishVersion(ctx, goClient, reporter, registry, testBearer, module.Path, module.Version, module.Mod, gomodpublish.Digest(module.Zip), true)
+			_, err := gomodpublish.PublishVersion(ctx, goClient, reporter, registry, testBearer, module.Path, module.Version, module.Mod, put.Digest(module.Zip), true)
 			return err
 		},
 		"go verify zip": func(gomodpublish.Reporter) error {
-			return gomodpublish.VerifyZip(ctx, goClient, registry, testBearer, module.Path, module.Version, gomodpublish.Digest(module.Zip))
+			return gomodpublish.VerifyZip(ctx, goClient, registry, testBearer, module.Path, module.Version, put.Digest(module.Zip))
 		},
 		"go verify mod": func(gomodpublish.Reporter) error {
 			return gomodpublish.VerifyMod(ctx, goClient, registry, testBearer, module.Path, module.Version, module.Mod)
@@ -177,8 +175,6 @@ func uploads(t *testing.T, registry string) map[string]string {
 	}
 	member := putMember()
 	results["put blob"] = text(putpublish.UploadBlob(ctx, putClient, registry, testBearer, member.Coordinate, member.Blobs[0]))
-	_, _, manifestErr := putpublish.PublishManifest(ctx, putClient, registry, testBearer, member)
-	results["put manifest"] = text(manifestErr)
 	_, readErr := putpublish.ReadManifest(ctx, putClient, registry, testBearer, member.Coordinate, member.Version)
 	results["put read"] = text(readErr)
 	_, putErr := putpublish.Publish(ctx, putClient, registry, testBearer, member)
@@ -246,4 +242,22 @@ func TestUploadersNeverFormatTheBearer(t *testing.T) {
 			t.Fatalf("another host received the bearer: %v", leaked)
 		}
 	})
+}
+
+// writeTestLayout writes img as a one-image OCI layout at dir and returns the
+// image digest.
+func writeTestLayout(t testing.TB, dir string, img v1.Image) string {
+	t.Helper()
+	lp, err := layout.Write(dir, empty.Index)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := lp.AppendImage(img); err != nil {
+		t.Fatal(err)
+	}
+	digest, err := img.Digest()
+	if err != nil {
+		t.Fatal(err)
+	}
+	return digest.String()
 }

@@ -35,17 +35,12 @@ import (
 // that excludes `node_modules` must stop the walk from descending into it, or
 // the cost of not-matching a million files is paid on every `projects sync`.
 
-// ScanProjectPaths walks the workspace root and discovers the directories core
-// itself recognizes as projects: those carrying a `putnami.json` that is more
-// than a scope declaration. With no adapters, that is the whole answer — a
-// language manifest alone marks nothing.
-func ScanProjectPaths(root string) ([]string, error) {
-	return ScanProjectPathsWithProviders(root, nil)
-}
-
-// ScanProjectPathsWithProviders is the scan widened by the markers extensions
-// declare. A provider's markers make its directories discoverable; a provider's
-// excludes stop the walk from descending into the directories it names.
+// ScanProjectPathsWithProviders walks the workspace root and discovers the
+// directories core itself recognizes as projects: those carrying a
+// `putnami.json` that is more than a scope declaration. With no scopes, that is
+// the whole answer — a language manifest alone marks nothing. A provider's
+// markers make its directories discoverable; a provider's excludes stop the
+// walk from descending into the directories it names.
 func ScanProjectPathsWithProviders(root string, scopes []ProviderScope) ([]string, error) {
 	// Core-owned exclusions. They are not configurable, and the protocol reports
 	// an adapter that declares them as redundant precisely because core already
@@ -90,16 +85,14 @@ func ScanProjectPathsWithProviders(root string, scopes []ProviderScope) ([]strin
 		// adapter is, none is discoverable under `testdata` or `vendor` — whatever
 		// language that project is written in.
 		//
-		// The alternative — an exclude silencing only its own declarer's markers,
-		// with the walk descending whenever some other adapter still wants to look
-		// — was considered and rejected. It cannot be had without also descending
-		// into the install trees and fixture corpora those excludes exist to keep
-		// out: `node_modules` is excluded by the TypeScript adapter alone, so a
-		// workspace that also has the Go adapter would start walking it, and the
-		// putnami.json shipped inside an installed @putnami package would become a
-		// discovered project. Union-excluding is the conservative direction — it
-		// can only make the scan MISS a project, never invent one — and a missed
-		// project is visible (`projects sync` does not add it) rather than silent.
+		// An exclude silencing only its own declarer's markers cannot be had
+		// without also descending into the install trees and fixture corpora those
+		// excludes exist to keep out: `node_modules` is excluded by the TypeScript
+		// adapter alone, so a workspace that also has the Go adapter would walk it
+		// and an installed @putnami package's putnami.json would become a
+		// discovered project. Union-excluding can only make the scan MISS a
+		// project, never invent one, and a missed project is visible (`projects
+		// sync` does not add it) rather than silent.
 		//
 		// The one destructive consequence is closed at the other end: `--prune`
 		// refuses to remove a member the scan could not have seen, because the
@@ -151,7 +144,7 @@ func ScanProjectPathsWithProviders(root string, scopes []ProviderScope) ([]strin
 // membership for every declared project the scan did not return, and an excluded
 // directory is precisely the one the scan was told not to enter.
 func ExcludedByProviderScopes(scopes []ProviderScope, rel string) bool {
-	rel = cleanWorkspacePath(rel)
+	rel = wsproto.CleanWorkspacePath(rel)
 	if rel == "" {
 		return false
 	}

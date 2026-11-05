@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	protocaps "go.putnami.dev/protocol/capabilities"
+	"go.putnami.dev/sdk/extension/gitread"
 	"go.putnami.dev/sdk/extension/sourcebinding"
 )
 
@@ -70,18 +71,18 @@ func ReadSourceBindingSnapshot(repoRoot string) (*SourceBindingSnapshot, SourceB
 		return nil, metrics, fmt.Errorf("resolve repository root: %w", err)
 	}
 	metrics.SpawnedProcesses++
-	tracked, err := run(repoRoot, "ls-files", "--stage", "-z")
+	tracked, err := gitread.Run(repoRoot, "ls-files", "--stage", "-z")
 	if err != nil {
 		return nil, metrics, fmt.Errorf("enumerate tracked project source: %w", err)
 	}
 	metrics.SpawnedProcesses++
-	untracked, err := run(repoRoot, "ls-files", "--others", "--exclude-standard", "-z")
+	untracked, err := gitread.Run(repoRoot, "ls-files", "--others", "--exclude-standard", "-z")
 	if err != nil {
 		return nil, metrics, fmt.Errorf("enumerate untracked project source: %w", err)
 	}
-	snapshot := &SourceBindingSnapshot{repoRoot: repoRoot, untracked: splitNUL(untracked)}
-	for _, entry := range splitNUL(tracked) {
-		mode, objectID, stage, repoPath, ok := parseStageEntry(entry)
+	snapshot := &SourceBindingSnapshot{repoRoot: repoRoot, untracked: gitread.SplitNUL(untracked)}
+	for _, entry := range gitread.SplitNUL(tracked) {
+		mode, objectID, stage, repoPath, ok := gitread.ParseStageEntry(entry)
 		if !ok {
 			return nil, metrics, fmt.Errorf("enumerate tracked project source: malformed ls-files stage entry")
 		}
@@ -97,7 +98,7 @@ func (snapshot *SourceBindingSnapshot) ProjectSourceBindingMeasured(projectRoot 
 	metrics := SourceBindingMetrics{}
 	runMeasured := func(root string, args ...string) (string, error) {
 		metrics.SpawnedProcesses++
-		return run(root, args...)
+		return gitread.Run(root, args...)
 	}
 	projectRoot, projectRel, err := sourceBindingRoots(snapshot.repoRoot, projectRoot)
 	if err != nil {
@@ -162,18 +163,6 @@ func sourceBindingRoots(repoRoot, projectRoot string) (string, string, error) {
 		return "", "", fmt.Errorf("inspect project root: %w", err)
 	}
 	return projectRoot, filepath.ToSlash(projectRel), nil
-}
-
-func parseStageEntry(entry string) (mode, objectID, stage, repoPath string, ok bool) {
-	metadata, repoPath, found := strings.Cut(entry, "\t")
-	if !found {
-		return "", "", "", "", false
-	}
-	fields := strings.Fields(metadata)
-	if len(fields) != 3 {
-		return "", "", "", "", false
-	}
-	return fields[0], fields[1], fields[2], repoPath, true
 }
 
 // SourceBindingExcludes reports whether source-v1 leaves the slash-separated,

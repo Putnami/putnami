@@ -9,9 +9,7 @@ import (
 )
 
 // The tests below pin the argument hardening this package's doc comment claims.
-// Core exercises the same guards across tooling/cli/internal/git's own suite,
-// which is not copied wholesale; these keep the guards provable HERE, because a
-// widened read does not fail loudly — it silently produces a source binding
+// A widened read does not fail loudly: it silently produces a source binding
 // over the wrong file set, and a binding is what evidence freshness compares.
 
 func TestTreeEntryAtRefusesArgumentsItCannotPassSafely(t *testing.T) {

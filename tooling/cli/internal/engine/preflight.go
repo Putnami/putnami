@@ -16,13 +16,11 @@ import (
 // malformed, an exit-2 error carrying that report. It is exactly the signature
 // of commands.DoctorPreflight, which is the only production implementation.
 //
-// It is INJECTED (Request.Preflight) rather than called directly, which is what
-// a later change made. The doctor evaluator lives in
-// internal/commands next to the `putnami doctor` command that also renders it,
-// and the single call from here was the ONLY reason the engine — the package
-// every adapter routes through — reached into the command subtree. Inverting
-// it leaves the engine depending on nothing but the workspace model, the job
-// layer and the protocols.
+// It is INJECTED (Request.Preflight) rather than called directly: the doctor
+// evaluator lives in internal/commands next to the `putnami doctor` command that
+// renders it, and a direct call would make the engine reach into the command
+// subtree. Injection leaves the engine depending on nothing but the workspace
+// model, the job layer and the protocols.
 //
 // A nil gate FAILS CLOSED under the production profile (see
 // runProductionPreflight): an adapter that forgets to wire it gets a loud,

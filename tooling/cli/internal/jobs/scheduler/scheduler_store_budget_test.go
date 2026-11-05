@@ -72,7 +72,7 @@ func TestRunPlan_StoreBudgetCollectsAtABatchBoundaryAndSparesInFlightEntries(t *
 	holding := make(chan struct{})
 	internal := map[string]InternalJobRunner{
 		holdJob.Key(): func(ctx context.Context, _ map[string]*JobResult) *JobResult {
-			cache.MarkUsed(held)
+			_, _ = cache.LookupAndTouch(held)
 			close(holding)
 			deadline := time.Now().Add(20 * time.Second)
 			for {

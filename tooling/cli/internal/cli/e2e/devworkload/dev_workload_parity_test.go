@@ -55,8 +55,8 @@ import (
 	"testing"
 	"time"
 
+	"go.putnami.dev/sdk/extension/gitread"
 	"go.putnami.dev/tooling/cli/internal/fixtureproc"
-	gitexec "go.putnami.dev/tooling/cli/internal/git"
 )
 
 // devWorkloadCase is one invocation, compared against its recorded answer.
@@ -640,7 +640,7 @@ func writeFixtureFile(t *testing.T, root, rel, content string) {
 func commitFixture(t *testing.T, root, message string) {
 	t.Helper()
 	git(t, root, "add", "-A")
-	cmd := exec.Command(gitexec.Executable(), "commit", "-q", "-m", message)
+	cmd := exec.Command(gitread.Executable(), "commit", "-q", "-m", message)
 	cmd.Dir = root
 	cmd.Env = append(gitEnv(),
 		"GIT_AUTHOR_NAME=Fixture", "GIT_AUTHOR_EMAIL=fixture@example.invalid", "GIT_AUTHOR_DATE=2026-01-01T00:00:00Z",
@@ -652,7 +652,7 @@ func commitFixture(t *testing.T, root, message string) {
 
 func git(t *testing.T, dir string, args ...string) {
 	t.Helper()
-	cmd := exec.Command(gitexec.Executable(), args...)
+	cmd := exec.Command(gitread.Executable(), args...)
 	cmd.Dir = dir
 	cmd.Env = gitEnv()
 	if out, err := cmd.CombinedOutput(); err != nil {

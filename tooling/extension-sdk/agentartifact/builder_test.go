@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"compress/gzip"
 	"errors"
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -74,7 +75,7 @@ func TestBuildHasOnlyTheDeclaredMembers(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	members, err := ReadArchive(result.Archive)
+	members, err := readArchive(result.Archive)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -504,20 +505,20 @@ func TestReadArchiveRejectsUndeclaredMember(t *testing.T) {
 		t.Fatal(err)
 	}
 	members[".codex/config.toml"] = []byte("model = \"host-policy\"\n")
-	if _, err := ReadArchive(rawArchive(t, members)); err == nil || !strings.Contains(err.Error(), "undeclared archive member") {
-		t.Fatalf("ReadArchive error = %v, want undeclared member rejection", err)
+	if _, err := readArchive(rawArchive(t, members)); err == nil || !strings.Contains(err.Error(), "undeclared archive member") {
+		t.Fatalf("readArchive error = %v, want undeclared member rejection", err)
 	}
 }
 
 func TestReadArchiveRejectsMalformedAndIncompleteArtifacts(t *testing.T) {
-	if _, err := ReadArchive([]byte("not a gzip archive")); err == nil || !strings.Contains(err.Error(), "open gzip archive") {
-		t.Fatalf("ReadArchive error = %v, want invalid gzip rejection", err)
+	if _, err := readArchive([]byte("not a gzip archive")); err == nil || !strings.Contains(err.Error(), "open gzip archive") {
+		t.Fatalf("readArchive error = %v, want invalid gzip rejection", err)
 	}
-	if _, err := ReadArchive(rawArchive(t, map[string][]byte{"README.md": []byte("missing manifest\n")})); err == nil || !strings.Contains(err.Error(), "has no") {
-		t.Fatalf("ReadArchive error = %v, want missing manifest rejection", err)
+	if _, err := readArchive(rawArchive(t, map[string][]byte{"README.md": []byte("missing manifest\n")})); err == nil || !strings.Contains(err.Error(), "has no") {
+		t.Fatalf("readArchive error = %v, want missing manifest rejection", err)
 	}
-	if _, err := ReadArchive(rawArchive(t, map[string][]byte{wsproto.AgentArtifactManifestFilename: []byte("{}\n")})); err == nil || !strings.Contains(err.Error(), "invalid agent artifact manifest") {
-		t.Fatalf("ReadArchive error = %v, want invalid manifest rejection", err)
+	if _, err := readArchive(rawArchive(t, map[string][]byte{wsproto.AgentArtifactManifestFilename: []byte("{}\n")})); err == nil || !strings.Contains(err.Error(), "invalid agent artifact manifest") {
+		t.Fatalf("readArchive error = %v, want invalid manifest rejection", err)
 	}
 
 	result, err := Build(newArtifactProject(t, "@acme/agent-workflows"), "0.1.0")
@@ -530,8 +531,8 @@ func TestReadArchiveRejectsMalformedAndIncompleteArtifacts(t *testing.T) {
 	}
 	missingMember := ".agents/skills/acme-change/SKILL.md"
 	delete(members, missingMember)
-	if _, err := ReadArchive(rawArchive(t, members)); err == nil || !strings.Contains(err.Error(), "manifest declares") {
-		t.Fatalf("ReadArchive error = %v, want missing declared member rejection", err)
+	if _, err := readArchive(rawArchive(t, members)); err == nil || !strings.Contains(err.Error(), "manifest declares") {
+		t.Fatalf("readArchive error = %v, want missing declared member rejection", err)
 	}
 
 	members, err = rawArchiveMembers(result.Archive)
@@ -539,8 +540,8 @@ func TestReadArchiveRejectsMalformedAndIncompleteArtifacts(t *testing.T) {
 		t.Fatal(err)
 	}
 	members[missingMember] = append(members[missingMember], []byte("tampered\n")...)
-	if _, err := ReadArchive(rawArchive(t, members)); err == nil || !strings.Contains(err.Error(), "hashes to") {
-		t.Fatalf("ReadArchive error = %v, want hash mismatch rejection", err)
+	if _, err := readArchive(rawArchive(t, members)); err == nil || !strings.Contains(err.Error(), "hashes to") {
+		t.Fatalf("readArchive error = %v, want hash mismatch rejection", err)
 	}
 }
 
@@ -701,4 +702,63 @@ func TestBuildReviewHardening(t *testing.T) {
 			t.Fatalf("Build error = %v, want a CRLF rejection", err)
 		}
 	})
+}
+
+// readArchive reads a built archive back. It rejects duplicate, non-regular, and undeclared members.
+func readArchive(content []byte) (map[string][]byte, error) {
+	gzipReader, err := gzip.NewReader(bytes.NewReader(content))
+	if err != nil {
+		return nil, fmt.Errorf("open gzip archive: %w", err)
+	}
+	defer func() { _ = gzipReader.Close() }()
+	tarReader := tar.NewReader(gzipReader)
+	members := make(map[string][]byte)
+	for {
+		header, err := tarReader.Next()
+		if errors.Is(err, io.EOF) {
+			break
+		}
+		if err != nil {
+			return nil, fmt.Errorf("read tar archive: %w", err)
+		}
+		if !header.FileInfo().Mode().IsRegular() {
+			return nil, fmt.Errorf("archive member %q is not a regular file", header.Name)
+		}
+		if _, exists := members[header.Name]; exists {
+			return nil, fmt.Errorf("duplicate archive member %q", header.Name)
+		}
+		member, err := io.ReadAll(tarReader)
+		if err != nil {
+			return nil, fmt.Errorf("read archive member %q: %w", header.Name, err)
+		}
+		members[header.Name] = member
+	}
+	manifestBytes, ok := members[wsproto.AgentArtifactManifestFilename]
+	if !ok {
+		return nil, fmt.Errorf("archive has no %s", wsproto.AgentArtifactManifestFilename)
+	}
+	manifest, diags := wsproto.ParseAndValidateAgentArtifactManifest(manifestBytes)
+	if len(diags) > 0 {
+		return nil, fmt.Errorf("archive has an invalid agent artifact manifest: %v", diags)
+	}
+	declared := make(map[string]string, len(manifest.Files))
+	for _, file := range manifest.Files {
+		declared[file.Path] = file.SHA256
+	}
+	for name, member := range members {
+		if name == wsproto.AgentArtifactManifestFilename {
+			continue
+		}
+		want, ok := declared[name]
+		if !ok {
+			return nil, fmt.Errorf("undeclared archive member %q", name)
+		}
+		if got := hash(member); got != want {
+			return nil, fmt.Errorf("archive member %q hashes to %s, manifest declares %s", name, got, want)
+		}
+	}
+	if len(members)-1 != len(declared) {
+		return nil, fmt.Errorf("archive contains %d workflow files, manifest declares %d", len(members)-1, len(declared))
+	}
+	return members, nil
 }

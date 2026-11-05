@@ -14,6 +14,7 @@ import (
 	diag "go.putnami.dev/protocol/diagnostic"
 	featureproto "go.putnami.dev/protocol/features"
 	workspaceproto "go.putnami.dev/protocol/workspace"
+	sdkgit "go.putnami.dev/sdk/extension/gitread"
 	internalgit "go.putnami.dev/tooling/sdd/extension/internal/gitread"
 	workspace "go.putnami.dev/tooling/sdd/extension/internal/wsview"
 )
@@ -43,7 +44,7 @@ func NewGitTreeReader(repoRoot, revision string) (*GitTreeReader, error) {
 	if err != nil || !info.IsDir() {
 		return nil, fmt.Errorf("repository root is unavailable")
 	}
-	commit, err := internalgit.ResolveCommit(resolvedRoot, revision)
+	commit, err := sdkgit.ResolveCommit(resolvedRoot, revision)
 	if err != nil {
 		return nil, err
 	}
@@ -378,7 +379,7 @@ func (loader *revisionWorkspaceLoader) configAt(directory string) revisionPutnam
 
 func (loader *revisionWorkspaceLoader) projectAt(projectPath string) *workspace.Project {
 	putnami := loader.configAt(projectPath)
-	project := &workspace.Project{Path: projectPath, ID: workspace.ProjectIDFromPath(projectPath), Config: putnami.project}
+	project := &workspace.Project{Path: projectPath, ID: workspaceproto.ProjectIDFromPath(projectPath), Config: putnami.project}
 	if putnami.project != nil {
 		project.Name = putnami.project.Name
 		project.Type = putnami.project.Type

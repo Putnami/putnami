@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	protocaps "go.putnami.dev/protocol/capabilities"
+	"go.putnami.dev/sdk/extension/gitread"
 	"go.putnami.dev/sdk/extension/sourcebinding"
 )
 
@@ -64,7 +65,7 @@ func TestSourceBindingRecordTakesTheExecutableBitFromTheIndexWithoutAHostExecBit
 		t.Fatalf("index mode of tool.sh = %q, want %s", indexMode, protocaps.SourceModeExecutable)
 	}
 	mode := func(repoPath, indexMode string, statsExecBit bool) protocaps.SourceFileMode {
-		record, exists, err := sourcebinding.Record(run, snapshot.repoRoot, snapshot.repoRoot, repoPath, indexMode, "", statsExecBit)
+		record, exists, err := sourcebinding.Record(gitread.Run, snapshot.repoRoot, snapshot.repoRoot, repoPath, indexMode, "", statsExecBit)
 		if err != nil || !exists {
 			t.Fatalf("sourcebinding.Record(%s): exists %v, %v", repoPath, exists, err)
 		}

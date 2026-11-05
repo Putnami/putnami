@@ -195,7 +195,7 @@ func switchOpposite(long string, opts flagParseOptions) (string, bool) {
 // flag it bound out (a switch spelled `--x=false` binds nothing and is not
 // listed). A value-taking flag with no
 // value, an unparseable --retry and an unrecognized --max-parallel mode are
-// hard usage errors here; before this change all three were silently dropped.
+// hard usage errors here.
 // So is a switch with an inline value other than true or false
 // (resolveSwitchValues).
 // Unknown flags are NOT rejected here — only the command-scoped pass in
@@ -248,12 +248,7 @@ func parseGlobalFlags(args []string, opts flagParseOptions) (GlobalFlags, []stri
 	return g, append(remaining, payload...), bound, nil
 }
 
-// applyGlobalFlag binds one recognized global flag onto g. It is a cohesive
-// linear dispatch with one branch per flag; the high cyclomatic count reflects
-// the breadth of the flag table, not nested logic, so splitting it would scatter
-// the binding without reducing real complexity.
-//
-//nolint:gocyclo // breadth of the flag table, not nested complexity
+// applyGlobalFlag binds one recognized global flag onto g, one branch per flag.
 func applyGlobalFlag(g *GlobalFlags, arg, value string) error {
 	switch arg {
 	case "--where":
@@ -362,9 +357,7 @@ func applyGlobalFlag(g *GlobalFlags, arg, value string) error {
 }
 
 // applyMaxParallel binds --max-parallel, which accepts either a worker count or
-// one of the named modes. An unrecognized value used to fall through with no
-// default and normalize to "auto" in internal/jobs/scheduler/parallel.go, so a user who
-// asked for something specific silently got auto.
+// one of the named modes.
 func applyMaxParallel(g *GlobalFlags, value string) error {
 	if workers, err := strconv.Atoi(value); err == nil {
 		g.MaxParallel = workers
@@ -384,10 +377,9 @@ func applyMaxParallel(g *GlobalFlags, value string) error {
 // of a named external resource this run has, which the scheduler admits
 // claiming tasks against beside the worker count.
 //
-// The flag is REPEATABLE — one occurrence per resource — because the set of
-// scarce things a runner owns is open-ended and a single comma-joined value
-// would need its own escaping rules. A repeated name is last-wins, matching
-// every other global flag's override behavior.
+// The flag is REPEATABLE, one occurrence per resource, so a single
+// comma-joined value needs no escaping rules. A repeated name is last-wins,
+// matching every other global flag's override behavior.
 func applyResourceBudget(g *GlobalFlags, value string) error {
 	name, units, split := strings.Cut(value, "=")
 	name = strings.TrimSpace(name)

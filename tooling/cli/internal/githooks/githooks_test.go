@@ -11,8 +11,8 @@ import (
 	"strings"
 	"testing"
 
+	"go.putnami.dev/sdk/extension/gitread"
 	"go.putnami.dev/sdk/extension/pkgmeta"
-	"go.putnami.dev/tooling/cli/internal/git"
 )
 
 func TestValidate(t *testing.T) {
@@ -71,7 +71,7 @@ func TestInstall_WritesHooks(t *testing.T) {
 	t.Setenv("CI", "") // Install is a no-op when CI=true
 
 	repo := t.TempDir()
-	if out, err := exec.Command(git.Executable(), "-C", repo, "init").CombinedOutput(); err != nil {
+	if out, err := exec.Command(gitread.Executable(), "-C", repo, "init").CombinedOutput(); err != nil {
 		t.Fatalf("git init: %v\n%s", err, out)
 	}
 	t.Chdir(repo)
@@ -112,7 +112,7 @@ func TestInstall_PreCommitHookChecksEveryStagedFileName(t *testing.T) {
 	repo := t.TempDir()
 	run := func(args ...string) {
 		t.Helper()
-		if out, err := exec.Command(git.Executable(), append([]string{"-C", repo}, args...)...).CombinedOutput(); err != nil {
+		if out, err := exec.Command(gitread.Executable(), append([]string{"-C", repo}, args...)...).CombinedOutput(); err != nil {
 			t.Fatalf("git %s: %v\n%s", strings.Join(args, " "), err, out)
 		}
 	}
@@ -163,7 +163,7 @@ func TestInstall_CommitMsgHookPrefersTheWorkspaceEngineLink(t *testing.T) {
 	t.Setenv("CI", "")
 
 	repo := t.TempDir()
-	if out, err := exec.Command(git.Executable(), "-C", repo, "init").CombinedOutput(); err != nil {
+	if out, err := exec.Command(gitread.Executable(), "-C", repo, "init").CombinedOutput(); err != nil {
 		t.Fatalf("git init: %v\n%s", err, out)
 	}
 	binDir := filepath.Join(repo, ".putnami", "bin")
@@ -199,7 +199,7 @@ func TestInstall_CommitMsgHookFallsBackToTheRunningBinary(t *testing.T) {
 	t.Setenv("CI", "")
 
 	repo := t.TempDir()
-	if out, err := exec.Command(git.Executable(), "-C", repo, "init").CombinedOutput(); err != nil {
+	if out, err := exec.Command(gitread.Executable(), "-C", repo, "init").CombinedOutput(); err != nil {
 		t.Fatalf("git init: %v\n%s", err, out)
 	}
 	t.Chdir(repo)

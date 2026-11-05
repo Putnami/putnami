@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"go.putnami.dev/protocol/features/spectest"
+	"go.putnami.dev/sdk/extension/collabhelper"
 )
 
 const (
@@ -101,7 +102,7 @@ func TestTheCredentialIsBasicFromTheEnvironment(t *testing.T) {
 func TestRedactRemovesSecretsAndAtlassianTokens(t *testing.T) {
 	text := "sent " + testToken + " and Basic Zm9vOmJhcg== and ATATT3xOTHERtokenOTHERtokenOTHER99"
 	redacted := Redact(text, []string{testToken, "Zm9vOmJhcg=="})
-	if strings.Contains(redacted, "ATATT") || strings.Contains(redacted, "Zm9vOmJhcg==") || strings.Count(redacted, RedactedMarker) != 3 {
+	if strings.Contains(redacted, "ATATT") || strings.Contains(redacted, "Zm9vOmJhcg==") || strings.Count(redacted, collabhelper.RedactedMarker) != 3 {
 		t.Fatalf("redacted %q", redacted)
 	}
 }

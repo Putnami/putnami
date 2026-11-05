@@ -13,14 +13,10 @@ import (
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
 
-// ExtensionsList shows all installed extensions with their versions.
-func ExtensionsList(wsRoot string, cfg *wsproto.Config, outputFormat string) error {
-	return ExtensionsListPrepared(wsRoot, cfg, outputFormat, nil)
-}
-
-// ExtensionsListPrepared lists extensions while honoring the exact roots (or
-// explicit unavailability) chosen by bounded read preparation. Config and lock
-// rows still render normally; ambient manifests cannot be substituted as a
+// ExtensionsListPrepared shows all installed extensions with their versions,
+// honoring the exact roots (or explicit unavailability) chosen by bounded read
+// preparation; a nil prepared map leaves ambient discovery in place. Config and
+// lock rows still render normally; ambient manifests cannot be substituted as a
 // workspace discovery result when their registry ref failed preparation.
 func ExtensionsListPrepared(wsRoot string, cfg *wsproto.Config, outputFormat string, prepared map[string]string) error {
 	lockFile, lockErr := lockfile.ReadLockFile(wsRoot)
@@ -28,9 +24,9 @@ func ExtensionsListPrepared(wsRoot string, cfg *wsproto.Config, outputFormat str
 		// The listing is deliberately tolerant — it still reports what config
 		// declares — but the INSTALLED column is read from the lock alone, so an
 		// unreadable one renders every row as "-": the same output as a
-		// workspace where nothing is installed. Since the format floor moved to
-		// v2, a v1 lock produces exactly that, so the reason is
-		// named on stderr, out of the table's and the JSONL stream's way.
+		// workspace where nothing is installed. A lock below the format floor
+		// produces exactly that, so the reason is named on stderr, out of the
+		// table's and the JSONL stream's way.
 		noteUnreadableLock(lockErr)
 	}
 

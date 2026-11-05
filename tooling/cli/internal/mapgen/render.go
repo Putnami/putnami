@@ -1,20 +1,9 @@
 package mapgen
 
 import (
-	"encoding/json"
 	"fmt"
 	"strings"
 )
-
-// RenderJSON encodes the map as two-space indented JSON with a trailing
-// newline: the canonical byte form of the document.
-func RenderJSON(m *RepoMap) ([]byte, error) {
-	data, err := json.MarshalIndent(m, "", "  ")
-	if err != nil {
-		return nil, fmt.Errorf("serialize repo map: %w", err)
-	}
-	return append(data, '\n'), nil
-}
 
 // RenderMarkdown renders the map as Markdown, what `putnami context map`
 // prints by default. The layout follows the questions an agent asks before it starts shelling around:

@@ -28,10 +28,10 @@ import (
 // contract without duplicating check or waiver logic — a thin composition over
 // DoctorRun.
 //
-// Its signature IS engine.PreflightGate: since an earlier change,
-// every adapter injects this function into engine.Request.Preflight rather than
-// the engine importing this package, so the one build-gate implementation is
-// still this one — it is now handed over instead of reached for.
+// Its signature IS engine.PreflightGate: every adapter injects this function
+// into engine.Request.Preflight rather than the engine importing this package,
+// so the one build-gate implementation is this one, handed over instead of
+// reached for.
 //
 // The clock is injected here at the single top-level seam the engine defines —
 // DoctorRun's now parameter — exactly as DoctorCommand does: real time.Now()

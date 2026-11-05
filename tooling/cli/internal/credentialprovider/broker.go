@@ -106,17 +106,6 @@ func WithClock(now func() time.Time) Option { return func(b *Broker) { b.now = n
 // WithOpTimeout replaces DefaultOpTimeout.
 func WithOpTimeout(timeout time.Duration) Option { return func(b *Broker) { b.timeout = timeout } }
 
-// WithReleaseTimeout replaces DefaultReleaseTimeout.
-func WithReleaseTimeout(timeout time.Duration) Option {
-	return func(b *Broker) { b.releaseTimeout = timeout }
-}
-
-// WithUploadTimeout replaces DefaultUploadTimeout, the base bound of one
-// upload.
-func WithUploadTimeout(timeout time.Duration) Option {
-	return func(b *Broker) { b.uploadTimeout = timeout }
-}
-
 // WithSource names where the enabled purposes came from — `--providers`,
 // PUTNAMI_PROVIDERS or the execution request — in every error Bearer returns.
 func WithSource(source string) Option { return func(b *Broker) { b.source = source } }

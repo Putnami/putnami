@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"sort"
 	"strings"
 	"time"
@@ -227,7 +228,7 @@ func (d pendingDelivery) confirm() error {
 		}
 		for _, message := range d.messages {
 			cache.Inbox = withoutMessage(cache.Inbox, message.ID)
-			if !containsString(cache.Seen, message.ID) {
+			if !slices.Contains(cache.Seen, message.ID) {
 				markDelivered(cache, message)
 			}
 			if d.continues {
@@ -629,7 +630,7 @@ func (e *Env) hookStop(ctx context.Context, engine string, input hookInput) (*ho
 // the mission's view.
 func ownDecisionOpen(cache *sessionCache) bool {
 	for _, decision := range cache.Mission.OpenDecisions {
-		if containsString(cache.Asked, decision.ID) {
+		if slices.Contains(cache.Asked, decision.ID) {
 			return true
 		}
 	}
@@ -692,7 +693,7 @@ func stopFailureError(input hookInput) string {
 func recordAckLines(cache *sessionCache, message, dir string) {
 	for _, match := range ackLinePattern.FindAllStringSubmatch(message, -1) {
 		id, reply := match[1], boundedText(match[2], collab.MaxReplyLength)
-		if reply == "" || !containsString(cache.Seen, id) || containsString(cache.Replied, id) || replyQueued(cache.Replies, id) {
+		if reply == "" || !slices.Contains(cache.Seen, id) || slices.Contains(cache.Replied, id) || replyQueued(cache.Replies, id) {
 			continue
 		}
 		if _, err := os.Stat(repliedMarkerPath(dir, id)); err == nil {
@@ -767,7 +768,7 @@ func stopReason(cache *sessionCache, stopHookActive, newOnly bool) (string, []in
 	var reminders []string
 	size := len(sessionReplyWays)
 	for _, prompt := range cache.Prompts {
-		if containsString(cache.ContinuedFor, prompt.ID) {
+		if slices.Contains(cache.ContinuedFor, prompt.ID) {
 			continue
 		}
 		reminder := fmt.Sprintf("The owner's message %s (\"%s\") has no recorded reply yet.", prompt.ID, prompt.Text)

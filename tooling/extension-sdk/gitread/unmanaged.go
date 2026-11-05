@@ -1,11 +1,10 @@
-package git
+package gitread
 
 import (
 	"errors"
 	"fmt"
 	"os"
 	"os/exec"
-	"path/filepath"
 	"strings"
 )
 
@@ -43,8 +42,7 @@ func (e *UnmanagedError) Unwrap() error { return e.Cause }
 // repository, a refused ownership check, a timeout — because reporting those as
 // "no repository" would hide the real cause. A caller that asks after a git
 // command failed keeps that command's error when the answer is nil. A caller
-// that asks before any git command, as a run's cache-key source state does
-// when the run captured no tree state, reads nil as "Git manages dir": the git
+// that asks before any git command reads nil as "Git manages dir": the git
 // commands that follow fail with their own detail.
 func Unmanaged(dir string) error {
 	if _, err := exec.LookPath("git"); err != nil {
@@ -52,7 +50,7 @@ func Unmanaged(dir string) error {
 	}
 	// LC_ALL=C pins the wording of git's refusal, which is the only signal that
 	// separates "not a repository" from every other exit 128.
-	_, stderr, err := runCaptureEnv(dir, append(os.Environ(), "LC_ALL=C"), "rev-parse", "--git-dir")
+	_, stderr, err := RunCaptureEnv(dir, append(os.Environ(), "LC_ALL=C"), "rev-parse", "--git-dir")
 	if err == nil {
 		return nil
 	}
@@ -70,39 +68,6 @@ func Unmanaged(dir string) error {
 		return &UnmanagedError{Dir: dir, Cause: ErrNoProgram}
 	}
 	return nil
-}
-
-// WorkTreeEntry returns the nearest Git entry at or above dir: $GIT_DIR when it
-// is set, else the first .git directory or gitfile on the way up, which is
-// where Git's own discovery looks. Like Git, it never walks up into a
-// directory GIT_CEILING_DIRECTORIES names. It reads the filesystem alone, so it
-// answers when no git program can: a caller that must not take a repository
-// for a plain directory when git is missing asks it.
-func WorkTreeEntry(dir string) (string, bool) {
-	if gitDir := os.Getenv("GIT_DIR"); gitDir != "" {
-		return gitDir, true
-	}
-	ceilings := map[string]bool{}
-	for _, ceiling := range filepath.SplitList(os.Getenv("GIT_CEILING_DIRECTORIES")) {
-		if ceiling != "" {
-			ceilings[filepath.Clean(ceiling)] = true
-		}
-	}
-	current, err := filepath.Abs(dir)
-	if err != nil {
-		current = filepath.Clean(dir)
-	}
-	for {
-		entry := filepath.Join(current, ".git")
-		if _, err := os.Lstat(entry); err == nil {
-			return entry, true
-		}
-		parent := filepath.Dir(current)
-		if parent == current || ceilings[parent] {
-			return "", false
-		}
-		current = parent
-	}
 }
 
 // isDeveloperToolsStub recognizes the placeholder macOS installs at

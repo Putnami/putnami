@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"go.putnami.dev/protocol/features/spectest"
-	"go.putnami.dev/tooling/cli/internal/flock"
+	"go.putnami.dev/sdk/extension/filelock"
 )
 
 // TestReportingCheckpointsNameEveryCapability pins the checkpoint and lock of
@@ -50,12 +50,12 @@ func testRetentionPreservesActiveReplay(t *testing.T, stateFile, lockFile string
 		}
 	}
 	active := filepath.Join(store.Root(), sessionIDForTest(0), lockFile)
-	lock, err := flock.OpenFile(active, os.O_CREATE|os.O_RDWR, 0o600)
+	lock, err := filelock.OpenFile(active, os.O_CREATE|os.O_RDWR, 0o600)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer func() { _ = lock.Close() }()
-	if err := flock.LockFile(lock, true, true); err != nil {
+	if err := filelock.LockFile(lock, true, true); err != nil {
 		t.Fatal(err)
 	}
 	// Model the lock-to-first-checkpoint window of a newly started reporter.
@@ -75,7 +75,7 @@ func testRetentionPreservesActiveReplay(t *testing.T, stateFile, lockFile string
 	if _, err := os.Stat(filepath.Dir(active)); err != nil {
 		t.Fatal("active replay was pruned")
 	}
-	if err := flock.UnlockFile(lock); err != nil {
+	if err := filelock.UnlockFile(lock); err != nil {
 		t.Fatal(err)
 	}
 	store.maxSessions = 1

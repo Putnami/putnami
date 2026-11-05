@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 
+	"go.putnami.dev/sdk/extension/gitread"
 	"go.putnami.dev/tooling/cli/internal/cmderr"
 	"go.putnami.dev/tooling/cli/internal/git"
 )
@@ -22,7 +23,7 @@ type LineReport struct {
 	Release *ProposedRelease
 	// Commits are the commits the release's changelog renders (lineCommits),
 	// newest first.
-	Commits []git.Commit
+	Commits []gitread.Commit
 }
 
 // ProposedRelease is the version and tag a line's next release takes.
@@ -86,7 +87,7 @@ func BoundRevision(wsRoot string) (string, error) {
 	if set {
 		return revision, nil
 	}
-	head, err := git.HeadSHA(wsRoot)
+	head, err := gitread.HeadSHA(wsRoot)
 	if err != nil {
 		return "", fmt.Errorf("read HEAD: %w", err)
 	}

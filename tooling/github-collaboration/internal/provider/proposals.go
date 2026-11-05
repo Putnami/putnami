@@ -12,6 +12,7 @@ import (
 	"strings"
 
 	collab "go.putnami.dev/protocol/collaboration"
+	"go.putnami.dev/sdk/extension/collabhelper"
 	"go.putnami.dev/tooling/github-collaboration/internal/github"
 )
 
@@ -118,16 +119,16 @@ func (s *proposalSession) proposal(pull *ghPull, repository, headSpelling string
 	return collab.Proposal{
 		Ref:      s.repo.ref(pull.Number),
 		Revision: pullRevision(pull),
-		URL:      displayURL(pull.HTMLURL),
+		URL:      collabhelper.DisplayURL(pull.HTMLURL, collab.MaxURLLength),
 		Change: collab.Change{Repository: repository, Base: pull.Base.Ref, Head: headSpelling,
 			HeadCommit: commit(pull.Head.SHA)},
-		Title:         oneLine(pull.Title, collab.MaxTitleLength, "#"+strconv.Itoa(pull.Number)),
-		Body:          boundedBody(body),
+		Title:         collabhelper.OneLine(pull.Title, collab.MaxTitleLength, "#"+strconv.Itoa(pull.Number)),
+		Body:          collabhelper.BoundedBody(body, collab.MaxBodyBytes),
 		State:         state,
 		ProviderState: string(state),
-		Labels:        boundedLabels(pull.labelNames()),
+		Labels:        collabhelper.BoundedLabels(pull.labelNames(), collab.MaxLabels, collab.MaxLabelLength),
 		Assignees:     boundedLogins(pull.assigneeLogins()),
-		UpdatedAt:     timestamp(pull.UpdatedAt),
+		UpdatedAt:     collabhelper.Timestamp(pull.UpdatedAt),
 	}
 }
 
@@ -368,7 +369,7 @@ func (s *proposalSession) awaitHead(h head, pull *ghPull, commit string) (_ *ghP
 	}
 	pause := s.p.HeadLagPause
 	if pause == nil {
-		pause = reconcilePause
+		pause = collabhelper.ReconcilePause
 	}
 	for attempt := 1; attempt <= headLagReads; attempt++ {
 		if pause(s.ctx, attempt) != nil {
@@ -698,10 +699,10 @@ func (s *proposalSession) renderReview(review *ghReview) (collab.Review, bool) {
 	}
 	result := collab.Review{
 		Ref:         s.reviewRef(review.ID),
-		URL:         displayURL(review.HTMLURL),
+		URL:         collabhelper.DisplayURL(review.HTMLURL, collab.MaxURLLength),
 		Verdict:     verdict,
 		Commit:      commit(review.CommitID),
-		SubmittedAt: timestamp(review.SubmittedAt),
+		SubmittedAt: collabhelper.Timestamp(review.SubmittedAt),
 	}
 	if review.User != nil {
 		result.Author = token(review.User.Login)
@@ -970,13 +971,13 @@ func (s *proposalSession) reviewBodies(number, size int, from string) ([]collab.
 // review whose body is empty are no comment.
 func (s *proposalSession) reviewComment(review *ghReview) (collab.ProposalComment, bool) {
 	text, _ := splitMarker(review.Body)
-	body := boundedBody(text)
+	body := collabhelper.BoundedBody(text, collab.MaxBodyBytes)
 	if review.State == "PENDING" || strings.TrimSpace(body) == "" {
 		return collab.ProposalComment{}, false
 	}
 	ref, belongsTo := s.reviewRef(review.ID), s.reviewRef(review.ID)
-	return collab.ProposalComment{Ref: ref, URL: displayURL(review.HTMLURL), Author: author(review.User),
-		SubmittedAt: timestamp(review.SubmittedAt), Review: &belongsTo, Commit: commit(review.CommitID), Body: body}, true
+	return collab.ProposalComment{Ref: ref, URL: collabhelper.DisplayURL(review.HTMLURL, collab.MaxURLLength), Author: author(review.User),
+		SubmittedAt: collabhelper.Timestamp(review.SubmittedAt), Review: &belongsTo, Commit: commit(review.CommitID), Body: body}, true
 }
 
 // lineComment renders a comment on a file of the diff or on one of its lines.
@@ -984,12 +985,12 @@ func (s *proposalSession) reviewComment(review *ghReview) (collab.ProposalCommen
 // the whole file, on a deleted line (whose number is in the old file) or on a
 // line that left the diff keeps its path without a line.
 func (s *proposalSession) lineComment(comment *ghReviewComment) (collab.ProposalComment, bool) {
-	body := boundedBody(comment.Body)
+	body := collabhelper.BoundedBody(comment.Body, collab.MaxBodyBytes)
 	if strings.TrimSpace(body) == "" {
 		return collab.ProposalComment{}, false
 	}
 	result := collab.ProposalComment{Ref: collab.Ref{Source: s.repo.source, ID: "line-" + strconv.FormatInt(comment.ID, 10)},
-		URL: displayURL(comment.HTMLURL), Author: author(comment.User), SubmittedAt: timestamp(comment.CreatedAt),
+		URL: collabhelper.DisplayURL(comment.HTMLURL, collab.MaxURLLength), Author: author(comment.User), SubmittedAt: collabhelper.Timestamp(comment.CreatedAt),
 		Commit: commit(comment.CommitID), Body: body}
 	if comment.PullRequestReviewID != nil && *comment.PullRequestReviewID > 0 {
 		review := s.reviewRef(*comment.PullRequestReviewID)
@@ -1006,12 +1007,12 @@ func (s *proposalSession) lineComment(comment *ghReviewComment) (collab.Proposal
 // conversationComment renders a comment on the conversation of a pull
 // request: it belongs to no review and no file.
 func (s *proposalSession) conversationComment(comment *ghIssueComment) (collab.ProposalComment, bool) {
-	body := boundedBody(comment.Body)
+	body := collabhelper.BoundedBody(comment.Body, collab.MaxBodyBytes)
 	if strings.TrimSpace(body) == "" {
 		return collab.ProposalComment{}, false
 	}
 	return collab.ProposalComment{Ref: collab.Ref{Source: s.repo.source, ID: "comment-" + strconv.FormatInt(comment.ID, 10)},
-		URL: displayURL(comment.HTMLURL), Author: author(comment.User), SubmittedAt: timestamp(comment.CreatedAt), Body: body}, true
+		URL: collabhelper.DisplayURL(comment.HTMLURL, collab.MaxURLLength), Author: author(comment.User), SubmittedAt: collabhelper.Timestamp(comment.CreatedAt), Body: body}, true
 }
 
 // merge merges a pull request whose head is still the expected commit, only

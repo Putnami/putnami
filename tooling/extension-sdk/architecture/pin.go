@@ -78,7 +78,7 @@ func pin(t reporter, path string, author func() *Builder) {
 		return
 	}
 
-	data, err := os.ReadFile(path) //nolint:gosec // the path is a test's own literal
+	data, err := os.ReadFile(path)
 	if err != nil {
 		t.Fatalf("read the committed architecture manifest %s: %v", path, err)
 		return

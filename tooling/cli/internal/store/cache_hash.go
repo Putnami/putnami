@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"hash"
 	"io"
 	"os"
 	"os/exec"
@@ -19,6 +20,7 @@ import (
 	extensionproto "go.putnami.dev/protocol/extension"
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/sdk/extension/dirlink"
+	"go.putnami.dev/sdk/extension/gitread"
 	"go.putnami.dev/sdk/extension/sourcebinding"
 	gitutil "go.putnami.dev/tooling/cli/internal/git"
 )
@@ -26,9 +28,9 @@ import (
 // --- hash helpers ---
 
 // writeField writes a string field to a hash, separated by a null byte.
-func writeField(h io.Writer, s string) {
-	h.Write([]byte(s)) //nolint:errcheck // hash.Hash.Write never errors
-	h.Write([]byte{0}) //nolint:errcheck // hash.Hash.Write never errors
+func writeField(h hash.Hash, s string) {
+	h.Write([]byte(s))
+	h.Write([]byte{0})
 }
 
 // hashParams computes a deterministic hash of the task parameters its caller
@@ -436,7 +438,7 @@ func gitInputDirectory(dir string, patterns []string) (string, error) {
 // whole one would select, so the key reads the same files and hashes the same
 // bytes; a pattern such as `git:**` has no prefix and lists the whole cut.
 func collectGitFiles(dir string, includes, excludes []string) ([]fileEntry, error) {
-	cmd := exec.Command(gitutil.Executable(), "rev-parse", "--show-toplevel")
+	cmd := exec.Command(gitread.Executable(), "rev-parse", "--show-toplevel")
 	cmd.Dir = dir
 	out, err := cmd.Output()
 	if err != nil {
@@ -1080,11 +1082,11 @@ func hashFiles(dir string, patterns []string, expander InputExpander, scope Proj
 			// Unreadable, per fileContentDigest — including the .gen stamp path,
 			// whose versionStampDigest returns nil on the same failures and
 			// reaches this same fold, so it needs no sentinel of its own.
-			h.Write([]byte(unreadableSentinel)) //nolint:errcheck // hash.Hash.Write never errors
+			h.Write([]byte(unreadableSentinel))
 		} else {
-			h.Write(digests[i]) //nolint:errcheck // hash.Hash.Write never errors
+			h.Write(digests[i])
 		}
-		h.Write([]byte{0}) //nolint:errcheck // hash.Hash.Write never errors
+		h.Write([]byte{0})
 	}
 
 	return hex.EncodeToString(h.Sum(nil)), nil
@@ -1255,13 +1257,12 @@ func versionStampDigest(path string, dropped []string) []byte {
 	return sum256(normalized)
 }
 
-// isProjectConfig recognizes the project-config filenames extension manifests
-// declare as config inputs. Per-task tuning is execution-only, so its JSON
-// block needs a semantic digest instead of raw byte hashing whenever either
-// spelling reaches a cache key.
+// isProjectConfig recognizes the project-config filename extension manifests
+// declare as a config input. Per-task tuning is execution-only, so its JSON
+// block needs a semantic digest instead of raw byte hashing whenever the file
+// reaches a cache key.
 func isProjectConfig(path string) bool {
-	name := filepath.Base(path)
-	return name == wsproto.ConfigFilename || name == wsproto.LegacyConfigFilename
+	return filepath.Base(path) == wsproto.ConfigFilename
 }
 
 // ProjectConfigScope names the extension whose option layers a project config
@@ -1429,12 +1430,12 @@ func hashExtraFiles(workspaceRoot string, paths []string) string {
 
 	h := sha256.New()
 	for _, entry := range named {
-		h.Write([]byte(entry.name)) //nolint:errcheck // hash.Hash.Write never errors
-		h.Write([]byte{0})          //nolint:errcheck // hash.Hash.Write never errors
+		h.Write([]byte(entry.name))
+		h.Write([]byte{0})
 
 		hashPathContent(h, entry.path)
 
-		h.Write([]byte{0}) //nolint:errcheck // hash.Hash.Write never errors
+		h.Write([]byte{0})
 	}
 
 	return hex.EncodeToString(h.Sum(nil))
@@ -1447,10 +1448,10 @@ func hashExtraFiles(workspaceRoot string, paths []string) string {
 // (slashPathLess) so the result does not depend on the host separator. A path
 // that does not exist contributes the stable "__missing__" sentinel, matching
 // the prior behavior so its absence stays distinguishable from an empty file.
-func hashPathContent(h io.Writer, p string) {
+func hashPathContent(h hash.Hash, p string) {
 	info, err := os.Stat(p)
 	if err != nil {
-		h.Write([]byte("__missing__")) //nolint:errcheck // hash.Hash.Write never errors
+		h.Write([]byte("__missing__"))
 		return
 	}
 	if !info.IsDir() {
@@ -1474,32 +1475,32 @@ func hashPathContent(h io.Writer, p string) {
 		}
 		writeField(h, filepath.ToSlash(rel))
 		hashFileBytes(h, f)
-		h.Write([]byte{0}) //nolint:errcheck // hash.Hash.Write never errors
+		h.Write([]byte{0})
 	}
 }
 
 // hashFileBytes folds a file's bytes into h. A file that exists (per a prior
 // stat) but cannot be opened contributes the stable unreadableSentinel so the
 // hash stays defined rather than silently treating it as empty.
-func hashFileBytes(h io.Writer, p string) {
+func hashFileBytes(h hash.Hash, p string) {
 	// A declared asset directory can carry another project's build stamp. The
 	// asset copies it into the task's output, so it contributes everything but
 	// the fields that change between invocations over one commit.
 	if isVersionStamp(p) {
 		digest := versionStampDigest(p, versionStampInvocationFields)
 		if digest == nil {
-			h.Write([]byte(unreadableSentinel)) //nolint:errcheck // hash.Hash.Write never errors
+			h.Write([]byte(unreadableSentinel))
 			return
 		}
-		h.Write(digest) //nolint:errcheck // hash.Hash.Write never errors
+		h.Write(digest)
 		return
 	}
 
 	file, err := os.Open(p)
 	if err != nil {
-		h.Write([]byte(unreadableSentinel)) //nolint:errcheck // hash.Hash.Write never errors
+		h.Write([]byte(unreadableSentinel))
 		return
 	}
 	defer file.Close()
-	io.Copy(h, file) //nolint:errcheck // hashing best-effort
+	_, _ = io.Copy(h, file)
 }

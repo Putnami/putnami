@@ -11,6 +11,7 @@ import (
 	"sort"
 	"strings"
 
+	protocolcli "go.putnami.dev/protocol/cli"
 	collab "go.putnami.dev/protocol/collaboration"
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/tooling/cli/internal/collaboration"
@@ -18,7 +19,6 @@ import (
 	"go.putnami.dev/tooling/cli/internal/commands/shared"
 	"go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/iox"
-	"go.putnami.dev/tooling/cli/internal/output"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
 
@@ -135,7 +135,7 @@ func (a *App) runCollaborationCommand(
 	}
 	envelope := collaborationEnvelope(ctx, wsRoot, cfg, extensions, contract, parsed.Subcommand, arguments)
 
-	text, err := collaboration.EnvelopeText(envelope, !output.StructuredOutput(parsed.Global.Output))
+	text, err := collaboration.EnvelopeText(envelope, !protocolcli.OutputMode(parsed.Global.Output).IsMachineReadable())
 	if err != nil {
 		iox.Fprintf(stderr, "putnami: %v\n", err)
 		return ExitError

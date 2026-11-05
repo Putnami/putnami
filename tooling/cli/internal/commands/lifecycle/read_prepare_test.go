@@ -48,7 +48,7 @@ func TestPrepareReadOnlyColdWarmAndNewWorktreePreserveOwnedFiles(t *testing.T) {
 	}))
 	defer registry.Close()
 	t.Setenv(extension.PutRegistryURLEnv, registry.URL)
-	t.Setenv(extension.HTTPRetryBackoffEnv, "0")
+	t.Cleanup(extension.SetHTTPRetryBackoff(0))
 	t.Setenv("PUTNAMI_ARTIFACT_DIR", t.TempDir())
 	credentialCalls := 0
 	originalCredentialResolver := extension.ResolveRegistryToken
@@ -151,7 +151,7 @@ func TestPrepareReadOnlyMissingLockAndOfflineArtifactAreExplicit(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Setenv(extension.PutRegistryURLEnv, "http://127.0.0.1:1")
-	t.Setenv(extension.HTTPRetryBackoffEnv, "0")
+	t.Cleanup(extension.SetHTTPRetryBackoff(0))
 	t.Setenv("PUTNAMI_ARTIFACT_DIR", t.TempDir())
 	offline := PrepareReadOnly(context.Background(), root, cfg)
 	if len(offline.Extensions) != 0 || len(offline.Issues) != 1 {
@@ -209,7 +209,7 @@ func TestPrepareReadOnlyUnsafeInstallCannotPublishUnverifiedArtifact(t *testing.
 	}
 	cfg := &wsproto.Config{Extensions: wsproto.ExtensionsConfig{List: map[string]string{name: "stable"}}}
 	t.Setenv(extension.PutRegistryURLEnv, registry.URL)
-	t.Setenv(extension.HTTPRetryBackoffEnv, "0")
+	t.Cleanup(extension.SetHTTPRetryBackoff(0))
 	t.Setenv(extension.UnsafeInstallEnv, "1")
 	t.Setenv("PUTNAMI_ARTIFACT_DIR", storeRoot)
 

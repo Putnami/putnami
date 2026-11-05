@@ -23,7 +23,6 @@ import (
 	diag "go.putnami.dev/protocol/diagnostic"
 	"go.putnami.dev/protocol/evidence"
 	"golang.org/x/mod/modfile"
-	"golang.org/x/mod/semver"
 )
 
 // Ecosystem is the ecosystem slug of a Go component and of its locked
@@ -435,28 +434,6 @@ func (d Detection) Components() []evidence.Component {
 	return out
 }
 
-// Lockfile is a file whose change can change the versions a component locks.
-type Lockfile struct {
-	// Path is the repository-relative lockfile.
-	Path string `json:"path"`
-	// Component is the id of the component that locks with it.
-	Component string `json:"component"`
-	// Ecosystem is the ecosystem of the packages it locks.
-	Ecosystem string `json:"ecosystem"`
-}
-
-// Lockfiles returns each component's go.mod, which holds the versions it
-// selects. go.sum holds checksums, not a selection, so it is not one, and
-// go.work belongs to no component: a change made only in its replace
-// directives shows in no lockfile.
-func (d Detection) Lockfiles() []Lockfile {
-	out := make([]Lockfile, 0, len(d.Modules))
-	for _, m := range d.Modules {
-		out = append(out, Lockfile{Path: m.GoMod, Component: m.Dir, Ecosystem: Ecosystem})
-	}
-	return out
-}
-
 // Locked is one dependency version a go.mod selects.
 type Locked struct {
 	// Name is the required module path.
@@ -516,14 +493,4 @@ func (d Detection) ReadLock(goModPath string, goMod, goWork []byte) ([]Locked, e
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].Name < out[j].Name })
 	return out, nil
-}
-
-// CompareVersions orders two Go module versions by semantic version, pseudo
-// versions included: negative when a is older, positive when newer, 0 when
-// equal or when either is not a valid version.
-func CompareVersions(a, b string) int {
-	if !semver.IsValid(a) || !semver.IsValid(b) {
-		return 0
-	}
-	return semver.Compare(a, b)
 }

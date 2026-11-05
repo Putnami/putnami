@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 
+	"go.putnami.dev/sdk/extension/gitread"
 	"go.putnami.dev/tooling/cli/internal/git"
 )
 
@@ -18,9 +19,9 @@ func ResolveAutoSelection(ws *Workspace, commands []string, lastBuild LastBuildL
 	if ws == nil {
 		return AutoSelection{}, fmt.Errorf("workspace is nil")
 	}
-	branch, err := git.CurrentBranch(ws.Root)
+	branch, err := gitread.CurrentBranch(ws.Root)
 	if err != nil {
-		if git.Unmanaged(ws.Root) != nil {
+		if gitread.Unmanaged(ws.Root) != nil {
 			return AutoSelection{
 				Mode:   AutoSelectionAll,
 				Reason: AutoSelectionReasonNoRepository,

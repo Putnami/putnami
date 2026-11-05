@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"go.putnami.dev/sdk/extension/gitread"
 )
 
 // The index read keeps the mode the index records for each merged path, the
@@ -16,7 +18,7 @@ func TestReadIndexModes(t *testing.T) {
 	repo := indexExecutableRepo(t)
 	write(t, filepath.Join(repo, "conflict.md"), "# conflict\n")
 	blob := strings.TrimSpace(runGit(t, repo, "hash-object", "-w", "conflict.md"))
-	stages := exec.Command(Executable(), "update-index", "--index-info")
+	stages := exec.Command(gitread.Executable(), "update-index", "--index-info")
 	stages.Dir = repo
 	stages.Stdin = strings.NewReader("100644 " + blob + " 1\tconflict.md\n100644 " + blob + " 2\tconflict.md\n")
 	if out, err := stages.CombinedOutput(); err != nil {
@@ -78,8 +80,8 @@ func TestTrackedUnderListsWhatTheIndexTracksBelowAPath(t *testing.T) {
 	}
 
 	_, err := TrackedUnder(t.TempDir(), "out")
-	var unmanaged *UnmanagedError
+	var unmanaged *gitread.UnmanagedError
 	if !errors.As(err, &unmanaged) {
-		t.Fatalf("TrackedUnder outside a repository = %v, want an *UnmanagedError", err)
+		t.Fatalf("TrackedUnder outside a repository = %v, want an *gitread.UnmanagedError", err)
 	}
 }

@@ -210,7 +210,7 @@ func (idx *taskIndex) addExtension(
 		for _, scope := range idx.addCommand(ext, command, job, successors) {
 			register(idx.byCommand, command, scope)
 			register(idx.byExtension, ext.Name, scope)
-			register(idx.byExtension, cleanWorkspacePath(ext.RelPath), scope)
+			register(idx.byExtension, wsproto.CleanWorkspacePath(ext.RelPath), scope)
 		}
 		// A session barrier ("!cmd") orders two commands across the session
 		// and carries no data, so it is not an impact edge. A dependency on
@@ -400,21 +400,21 @@ func (idx *taskIndex) buildClosure(successors map[string]map[string]bool) {
 func (idx *taskIndex) bindExtensionProjects(extensions []*extension.ExtensionDescription) {
 	byPath := make(map[string]string, len(idx.ws.Projects))
 	for _, p := range idx.ws.Projects {
-		byPath[cleanWorkspacePath(p.Path)] = p.ID
+		byPath[wsproto.CleanWorkspacePath(p.Path)] = p.ID
 	}
 	pinned := make(map[string]bool)
 	for _, ext := range extensions {
 		if ext == nil {
 			continue
 		}
-		projectPath, declared := ext.RelPath, cleanWorkspacePath(ext.RelPath)
+		projectPath, declared := ext.RelPath, wsproto.CleanWorkspacePath(ext.RelPath)
 		if projectPath == "" {
 			projectPath, declared = ext.PinnedOver, ext.Name
 		}
 		if projectPath == "" {
 			continue
 		}
-		id, ok := byPath[cleanWorkspacePath(projectPath)]
+		id, ok := byPath[wsproto.CleanWorkspacePath(projectPath)]
 		if !ok {
 			continue
 		}
@@ -644,11 +644,11 @@ func (idx *taskIndex) extensionRefTasks(ref string) []string {
 	if scopes, ok := idx.byExtension[ref]; ok {
 		return scopes
 	}
-	if scopes, ok := idx.byExtension[cleanWorkspacePath(strings.TrimPrefix(ref, "./"))]; ok {
+	if scopes, ok := idx.byExtension[wsproto.CleanWorkspacePath(strings.TrimPrefix(ref, "./"))]; ok {
 		return scopes
 	}
 	if p := idx.ws.ProjectByID(ref); p != nil {
-		return idx.byExtension[cleanWorkspacePath(p.Path)]
+		return idx.byExtension[wsproto.CleanWorkspacePath(p.Path)]
 	}
 	return nil
 }
@@ -751,7 +751,7 @@ func taskScope(command, step string) string {
 // "../../**/putnami.json" is written against. It reports false only when no
 // relative form exists.
 func projectRelative(p *Project, path string) (string, bool) {
-	base := cleanWorkspacePath(p.Path)
+	base := wsproto.CleanWorkspacePath(p.Path)
 	if base == "" || base == "." {
 		return path, true
 	}

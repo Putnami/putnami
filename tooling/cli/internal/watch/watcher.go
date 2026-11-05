@@ -5,8 +5,7 @@
 // It runs nothing itself. Each iteration goes back through the engine via
 // the injected SessionConfig.RunIteration seam, and the
 // change→project mapping is the shared workspace.ProjectsForChangedFiles that
-// --impacted uses; the private planner, scheduler, session writer and impact
-// classifier this package used to carry are gone.
+// --impacted uses.
 package watch
 
 import (

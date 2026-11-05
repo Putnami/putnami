@@ -15,8 +15,8 @@ import (
 	"time"
 
 	protocolcli "go.putnami.dev/protocol/cli"
+	"go.putnami.dev/sdk/extension/filelock"
 	"go.putnami.dev/sdk/extension/robustio"
-	"go.putnami.dev/tooling/cli/internal/flock"
 	"go.putnami.dev/tooling/cli/internal/runcredential"
 	"go.putnami.dev/tooling/cli/internal/sessionstream"
 )
@@ -278,11 +278,11 @@ func startRun(ctx context.Context, capability Capability, events *sessionstream.
 }
 
 func openRun(ctx context.Context, capability Capability, dir, sessionID, provider string) (*Run, error) {
-	lock, err := flock.OpenFile(filepath.Join(dir, capability.LockFile), os.O_CREATE|os.O_RDWR, 0o600)
+	lock, err := filelock.OpenFile(filepath.Join(dir, capability.LockFile), os.O_CREATE|os.O_RDWR, 0o600)
 	if err != nil {
 		return nil, fmt.Errorf("open reporting lock")
 	}
-	if err := flock.LockFile(lock, true, true); err != nil {
+	if err := filelock.LockFile(lock, true, true); err != nil {
 		_ = lock.Close()
 		return nil, fmt.Errorf("already active")
 	}
@@ -513,7 +513,7 @@ func (r *Run) save() error {
 	if err := robustio.Rename(name, filepath.Join(r.dir, r.capability.StateFile)); err != nil {
 		return fmt.Errorf("publish reporting checkpoint")
 	}
-	if err := flock.SyncDir(r.dir); err != nil {
+	if err := filelock.SyncDir(r.dir); err != nil {
 		return fmt.Errorf("sync reporting checkpoint directory")
 	}
 	return nil
@@ -525,7 +525,7 @@ func (r *Run) release() {
 		r.process.close()
 	}
 	if r.lock != nil {
-		_ = flock.UnlockFile(r.lock)
+		_ = filelock.UnlockFile(r.lock)
 		_ = r.lock.Close()
 	}
 }

@@ -258,14 +258,10 @@ func primaryCommandPath(req *Request) string {
 // reportProbeDiagnostics surfaces provider findings and the name divergences
 // `projects sync` exists to align.
 //
-// Until slice C4b this also ran the old/new equivalence guard, comparing each
-// provider's answer against the core parser it was scheduled to replace. That
-// guard did its job and deleted itself with its subject: with the parsers gone
-// there is nothing left to compare to, and keeping it would be comparing the
-// probe to itself. What remains worth reporting is the divergence that made core
-// align names in the first place — a manifest on disk spelling the project
-// differently from the name the workspace resolved for it — which is a warning,
-// never an error, because the resolved name is what this run uses either way.
+// It reports the divergence that made core align names in the first place — a
+// manifest on disk spelling the project differently from the name the workspace
+// resolved for it — as a warning, never an error, because the resolved name is
+// what this run uses either way.
 func reportProbeDiagnostics(req *Request, ws *workspace.Workspace, outcome *workspace.SyncOutcome) {
 	if req.Global.Quiet {
 		return

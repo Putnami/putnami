@@ -52,7 +52,7 @@ func TestReleaseSetE2EEmptyChannelReleaseAndCloudlessCompatibility(t *testing.T)
 	// The channel has no head yet: the one plan-time resolve answers a null
 	// head and the release expects none.
 	run = releaseSetE2EPrepare(t, ctx, options, ws, []*workspace.Project{upstream, downstream})
-	if run.plan.Baseline() != nil || !run.plan.SelectsEveryMember() {
+	if run.plan.Baseline() != nil || !selectsEveryMember(run.plan) {
 		t.Fatalf("empty-channel plan = %+v", run.plan)
 	}
 	if got := ledger.counts().resolve; got != 1 {
@@ -641,7 +641,7 @@ func TestReleaseSetE2ERepeatedAllPublishReleasesFromExistingHead(t *testing.T) {
 	if got := ledger.counts().resolve - resolvesAfterBootstrap; got != 1 {
 		t.Fatalf("second full publish resolved the channel %d time(s), want exactly once", got)
 	}
-	if !run.plan.SelectsEveryMember() || len(run.plan.Members) != 2 {
+	if !selectsEveryMember(run.plan) || len(run.plan.Members) != 2 {
 		t.Fatalf("second full plan members = %+v; want every member selected", run.plan.Members)
 	}
 

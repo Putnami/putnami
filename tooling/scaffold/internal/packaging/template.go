@@ -186,7 +186,7 @@ func Template(ctx *pctx.Context, emit *jsonl.Emitter, args []string) (string, ma
 // source manifest, so an unreadable or unparseable staged copy means the stage
 // step produced something the archive must not ship.
 func stampManifestVersion(path, version string) error {
-	data, err := os.ReadFile(path) //nolint:gosec // a caller-staged path inside the job's own temp directory
+	data, err := os.ReadFile(path)
 	if err != nil {
 		return fmt.Errorf("read staged manifest: %w", err)
 	}

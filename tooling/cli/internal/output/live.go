@@ -201,7 +201,7 @@ func (c *commandState) settled() bool {
 // liveTally is the histogram both end-of-run summary blocks build. It is the
 // single place a display status is mapped to a summary bucket, so the Projects
 // block and the Tasks block cannot disagree about — say — whether a coalesced
-// command passed. Each block used to carry its own switch.
+// command passed.
 //
 // Each caller feeds it from one vocabulary: projectStatus yields done/failed/
 // skipped/aborted/blocked, a settled command yields success/cached/coalesced/

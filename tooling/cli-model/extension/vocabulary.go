@@ -128,10 +128,10 @@ func (v Vocabulary) AliasMap() map[string]string {
 	return aliases
 }
 
-// DefaultTraits returns the traits a job of command takes when its manifest
+// defaultTraits returns the traits a job of command takes when its manifest
 // declares none: the default traits of its verb in the vocabulary, or no trait
 // when the vocabulary does not name the verb or gives it none.
-func (v Vocabulary) DefaultTraits(command string) CommandTraits {
+func (v Vocabulary) defaultTraits(command string) CommandTraits {
 	if verb, ok := v.Verb(proto.BaseCommandName(command)); ok && verb.Traits != nil {
 		return *verb.Traits
 	}
@@ -154,7 +154,7 @@ func ApplyVocabularyTraits(extensions []*ExtensionDescription) []string {
 		}
 		for _, job := range ext.Jobs {
 			if job != nil && !job.TraitsDeclared {
-				job.Traits = vocabulary.DefaultTraits(job.Name)
+				job.Traits = vocabulary.defaultTraits(job.Name)
 			}
 		}
 	}

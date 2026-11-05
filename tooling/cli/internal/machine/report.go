@@ -19,11 +19,8 @@ import (
 // Tasks list the reduction was folded from, so no number here is recovered by
 // re-walking events.jsonl and coercing its untyped event.Data["duration"].
 //
-// The file is deliberately SECTIONED — the run block, the per-command block,
-// the per-job block, the measurements, then the typed cache and scheduler
-// subsets — because the contract's optional members landed separately: one
-// change edited the per-job diagnostics and another the measurements, neither
-// touching the other's region.
+// The file is sectioned: the run block, the per-command block, the per-job
+// block, the measurements, then the typed cache and scheduler subsets.
 //
 // Two rules from the contract govern what is NOT here. Absent is not zero: a
 // member the run did not measure is omitted rather than reported as a measured
@@ -411,8 +408,7 @@ func knownGranularity(granularity string) bool {
 }
 
 // boundedPercentage keeps a covered share inside [0,100]. It is the only
-// non-integer member the contract carries, and a producer that computed one out
-// of range would otherwise cost the whole document.
+// non-integer member the contract carries.
 func boundedPercentage(percentage float64) float64 {
 	switch {
 	case percentage < 0 || math.IsNaN(percentage):

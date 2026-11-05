@@ -205,11 +205,8 @@ func (inst *Installer) openArtifact(ctx context.Context, name, constraint string
 // line: the extension, the channel that was asked for, the platform, the status,
 // the URL, and whether the request carried a credential.
 //
-// That last fact is the one that used to cost a whole investigation. A pinned
-// version that a credentialed reader downloads fine and an anonymous one cannot
-// breaks only the credential-free gate, so the failure reads as "the
-// registry is broken" to whoever holds a token and as "the repository is broken"
-// to whoever does not.
+// Whether a credential was sent is named because a pinned version that only a
+// credentialed reader can download fails differently for the two.
 //
 // The URL is rebuilt from a redacted resolver base rather than reusing the
 // request URL, so no userinfo or signed query in PUTNAMI_REGISTRY_URL can reach

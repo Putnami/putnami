@@ -110,10 +110,10 @@ func captureStructuredHelp(t *testing.T, fn func()) string {
 
 func TestStructuredHelpCaptureMatchesProcessStdout(t *testing.T) {
 	want := captureStdout(t, func() {
-		PrintSubcommandHelp("workspace", "init")
+		printSubcommandHelp("workspace", "init", nil)
 	})
 	got := captureStructuredHelp(t, func() {
-		PrintSubcommandHelp("workspace", "init")
+		printSubcommandHelp("workspace", "init", nil)
 	})
 	if got != want {
 		t.Fatalf("in-memory structured-help capture changed rendered bytes:\n%s", firstGoldenDiff(want, got))
@@ -123,19 +123,19 @@ func TestStructuredHelpCaptureMatchesProcessStdout(t *testing.T) {
 func TestGoldenTopLevelHelp(t *testing.T) {
 	spectest.Proves(t, "cli/canonical-workspace-guidance", "generated-help", "the-rendered-help-surface-is-pinned")
 	withGoldenVersion(t)
-	assertGolden(t, "help-top-level", captureStructuredHelp(t, PrintHelp))
+	assertGolden(t, "help-top-level", captureStructuredHelp(t, func() { printHelp(nil) }))
 }
 
 func TestGoldenHelpMan(t *testing.T) {
 	spectest.Proves(t, "cli/canonical-workspace-guidance", "generated-help", "the-rendered-help-surface-is-pinned")
 	withGoldenVersion(t)
-	assertGolden(t, "help-man", captureStructuredHelp(t, PrintHelpMan))
+	assertGolden(t, "help-man", captureStructuredHelp(t, func() { printHelpMan(os.Stdout, nil) }))
 }
 
 func TestGoldenHelpMarkdown(t *testing.T) {
 	spectest.Proves(t, "cli/canonical-workspace-guidance", "generated-help", "the-rendered-help-surface-is-pinned")
 	withGoldenVersion(t)
-	assertGolden(t, "help-markdown", captureStructuredHelp(t, PrintHelpMarkdown))
+	assertGolden(t, "help-markdown", captureStructuredHelp(t, func() { printHelpMarkdown(os.Stdout, nil) }))
 }
 
 // TestGoldenJobCommandHelp pins the per-command help layout for a job command,
@@ -168,7 +168,7 @@ func TestGoldenJobCommandHelp(t *testing.T) {
 // structuredHelpSubcommands lists the (command, subcommand) pairs the
 // structured-help renderer must keep covering. It mirrors the keys of
 // commands.structuredCommandHelp; the commands-side data golden
-// (internal/commands/testdata/surface/structured-help-table.golden) is what
+// (internal/commands/completion/testdata/surface/structured-help-table.golden) is what
 // pins the table content itself.
 var structuredHelpSubcommands = []string{
 	"architecture inspect",
@@ -245,7 +245,7 @@ func TestGoldenStructuredCommandHelp(t *testing.T) {
 				label = command + " " + subcommand
 			}
 			iox.Fprintln(os.Stdout, "═══ "+label+" ═══")
-			PrintSubcommandHelp(command, subcommand)
+			printSubcommandHelp(command, subcommand, nil)
 		}
 
 		for _, root := range roots {

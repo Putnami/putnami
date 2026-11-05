@@ -8,7 +8,6 @@ import (
 
 	"go.putnami.dev/cli/model/extension"
 	protocolcli "go.putnami.dev/protocol/cli"
-	"go.putnami.dev/tooling/cli/internal/commands/shared"
 	"go.putnami.dev/tooling/cli/internal/iox"
 	"go.putnami.dev/tooling/cli/internal/layout"
 	"go.putnami.dev/tooling/cli/internal/lockfile"
@@ -16,8 +15,8 @@ import (
 
 // `putnami migrate vnext` migrates putnami.lock.json to the current lock format.
 //
-// For v1 inputs it also records v2's per-extension TaskContract field from the
-// already-installed manifest. It then performs the explicit, non-mutating
+// It records each pinned extension's TaskContract field from the
+// already-installed manifest, then performs the explicit, non-mutating
 // projection onto lock format version 5, which adds empty current-format
 // dimensions without inventing pins. A lock that pins toolchains without
 // archives does not project: the command refuses it, with or without --apply,
@@ -65,8 +64,7 @@ const (
 type VNextReport struct {
 	// Lock is the lock file name this report describes.
 	Lock string `json:"lock"`
-	// LockVersion is the format version the lock carries on disk (0 when the
-	// file records none, which reads as v1).
+	// LockVersion is the format version the lock carries on disk.
 	LockVersion int `json:"lockVersion"`
 	// TargetVersion is the format version the migration targets.
 	TargetVersion int `json:"targetVersion"`
@@ -115,9 +113,7 @@ type VNextDrift struct {
 // `contracts check` uses for drift, so CI can gate on it. --apply exits 0 when
 // it converts and 0 again when there is nothing left to do.
 func MigrateVNext(root string, apply bool, outputFormat string) error {
-	// The one reader allowed below the format floor: this command IS how a
-	// workspace reaches it (lockfile.ReadMigratableLockFile).
-	lf, err := lockfile.ReadMigratableLockFile(root)
+	lf, err := lockfile.ReadLockFile(root)
 	if err != nil {
 		// A version this CLI cannot read, or a corrupt file: both are the
 		// lock's problem, not the invocation's.
@@ -142,12 +138,6 @@ func MigrateVNext(root string, apply bool, outputFormat string) error {
 
 	if len(report.Changes) > 0 {
 		applyVNextMigration(lf, report)
-		// MigrateLockFileToCurrent intentionally accepts only the ordinary read
-		// window (v2+). v1 reaches that floor here, after its task-contract
-		// records have been derived, and never through an ordinary reader.
-		if lf.Version < lockfile.FormatVersionV2 {
-			lf.Version = lockfile.FormatVersionV2
-		}
 		current, err := lockfile.MigrateLockFileToCurrent(lf)
 		if err != nil {
 			return err
@@ -304,7 +294,7 @@ func vnextCheckError(report VNextReport) error {
 		fmt.Errorf("%s needs migration to lock format v%d: %d pending change(s)",
 			report.Lock, report.TargetVersion, len(report.Changes)),
 		protocolcli.ErrInvalidConfig)
-	return shared.WithResultData(protocolcli.WithNext(err, "putnami migrate vnext --apply"), report)
+	return protocolcli.WithResultData(protocolcli.WithNext(err, "putnami migrate vnext --apply"), report)
 }
 
 // printVNextReport prints the human-readable summary.

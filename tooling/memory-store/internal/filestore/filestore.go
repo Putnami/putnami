@@ -218,38 +218,27 @@ func (e *landedError) Error() string { return e.err.Error() }
 
 func (e *landedError) Unwrap() error { return e.err }
 
-// writeAtomically writes a temporary file, syncs it, renames it over name,
-// and syncs the directory. A failure before the rename leaves the old
-// document; a failure to sync the directory after it is a *landedError.
+// writeAtomically writes data to name in dir through robustio.WriteFile,
+// durably and readable by the store's user only. A failure before the rename
+// leaves the old document; a failure to sync the directory after it is a
+// *landedError.
 func writeAtomically(dir, name string, data []byte) error {
-	temp, err := os.CreateTemp(dir, "."+name+".*.tmp")
-	if err != nil {
-		return fmt.Errorf("write %s: %w", name, err)
-	}
-	tempName := temp.Name()
-	fail := func(stage string, err error) error {
-		_ = temp.Close()
-		_ = os.Remove(tempName)
-		return fmt.Errorf("%s %s: %w", stage, name, err)
-	}
-	if _, err := temp.Write(data); err != nil {
-		return fail("write", err)
-	}
-	if err := temp.Sync(); err != nil {
-		return fail("sync", err)
-	}
-	if err := temp.Close(); err != nil {
-		_ = os.Remove(tempName)
-		return fmt.Errorf("close %s: %w", name, err)
-	}
 	// A reader of the document holds it open without sharing delete access;
-	// on Windows the rename over it fails until that reader closes it.
-	if err := robustio.Rename(tempName, filepath.Join(dir, name)); err != nil {
-		_ = os.Remove(tempName)
-		return fmt.Errorf("replace %s: %w", name, err)
+	// on Windows the rename over it fails until that reader closes it, and
+	// robustio.WriteFile waits for that reader.
+	err := robustio.WriteFile(filepath.Join(dir, name), data, 0o600, syncDirectory)
+	var failure *robustio.WriteError
+	if !errors.As(err, &failure) {
+		return err
 	}
-	if err := syncDirectory(dir); err != nil {
-		return &landedError{err: fmt.Errorf("sync the directory of %s: %w", name, err)}
+	switch failure.Op {
+	case robustio.OpSync, robustio.OpClose:
+		return fmt.Errorf("%s %s: %w", failure.Op, name, failure.Err)
+	case robustio.OpRename:
+		return fmt.Errorf("replace %s: %w", name, failure.Err)
+	case robustio.OpSyncDir:
+		return &landedError{err: fmt.Errorf("sync the directory of %s: %w", name, failure.Err)}
+	default:
+		return fmt.Errorf("write %s: %w", name, failure.Err)
 	}
-	return nil
 }

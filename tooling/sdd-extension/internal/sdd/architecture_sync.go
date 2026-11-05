@@ -157,7 +157,7 @@ func BuildArchitectureSyncResult(ws *workspace.Workspace, apply bool) (Architect
 	sortDiagnostics(diagnostics)
 	report.Diagnostics = copyArchitectureDiagnostics(diagnostics)
 	if diag.HasErrors(diagnostics) {
-		return report, WithResultData(protocolcli.InvalidConfigf(
+		return report, protocolcli.WithResultData(protocolcli.InvalidConfigf(
 			"architecture sync needs valid declarations; fix the reported errors first"), report)
 	}
 
@@ -169,7 +169,7 @@ func BuildArchitectureSyncResult(ws *workspace.Workspace, apply bool) (Architect
 		}
 		row, refusals, err := syncOneManifest(ws, source, observed, authorized, apply)
 		if err != nil {
-			return report, WithResultData(err, report)
+			return report, protocolcli.WithResultData(err, report)
 		}
 		report.Refusals = append(report.Refusals, refusals...)
 		report.Manifests = append(report.Manifests, row)
@@ -409,7 +409,7 @@ func rewriteArchitectureManifest(wsRoot, relative string, contents []byte) error
 	if err != nil {
 		return err
 	}
-	defer root.Close() //nolint:errcheck // the write result is reported below
+	defer root.Close()
 
 	target := filepath.FromSlash(relative)
 	staged := target + ".putnami-sync"
@@ -418,16 +418,16 @@ func rewriteArchitectureManifest(wsRoot, relative string, contents []byte) error
 		return err
 	}
 	if _, err := file.Write(contents); err != nil {
-		file.Close()            //nolint:errcheck // the write error is the one to report
-		_ = root.Remove(staged) //nolint:errcheck // best-effort cleanup of a failed stage
+		file.Close()
+		_ = root.Remove(staged)
 		return err
 	}
 	if err := file.Close(); err != nil {
-		_ = root.Remove(staged) //nolint:errcheck // best-effort cleanup of a failed stage
+		_ = root.Remove(staged)
 		return err
 	}
 	if err := root.Rename(staged, target); err != nil {
-		_ = root.Remove(staged) //nolint:errcheck // best-effort cleanup of a failed stage
+		_ = root.Remove(staged)
 		return err
 	}
 	return nil

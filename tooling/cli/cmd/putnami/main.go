@@ -48,11 +48,6 @@ func runMain() int {
 	// Git hooks are invoked directly by git (not through the workspace command
 	// pipeline), so handle them before the App, which expects a workspace.
 	//
-	// The private out-of-process Bun cache collector used to be handled here
-	// too. It is gone with the rest of core's Bun knowledge: a detached
-	// collection is now the owning extension's own `cache-gc` command, so the
-	// CLI no longer re-execs itself into a language-specific worker mode.
-	//
 	// A CLI inside the workspace-fetch of a hosted run refuses every command,
 	// the git hooks included; App.Run refuses the others the same way.
 	if err := runcredential.RefuseInHostedFetch(os.Getenv); err != nil {

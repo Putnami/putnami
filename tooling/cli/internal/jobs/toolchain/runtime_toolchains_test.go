@@ -49,7 +49,7 @@ func TestRuntimeToolchainResolvesExactManagedCandidateWithFalseAmbientRoot(t *te
 	requirement.Probe.Unset = []string{"FALSE_ROOT"}
 	ext := runtimeToolchainExtension(requirement)
 	base := []string{"HOME=" + home, "PUTNAMI_HOME=" + storeRoot, "PATH=/usr/bin:/bin", "FALSE_ROOT=/wrong/root"}
-	if err := ResolveRuntimeToolchains(workspaceRoot, ext, []string{"compiler"}, base); err != nil {
+	if err := resolveRuntimeToolchainsContext(context.Background(), workspaceRoot, ext, []string{"compiler"}, base); err != nil {
 		t.Fatal(err)
 	}
 	resolved := ext.RuntimeToolchains["compiler"]
@@ -80,7 +80,7 @@ func TestRuntimeToolchainRequiredMismatchFailsClosed(t *testing.T) {
 	compiler := writeRuntimeTool(t, filepath.Join(bin, "compiler"), "1.2.2")
 	writeRuntimeToolchainLock(t, workspaceRoot, "compiler", "1.2.3", "integrity-a")
 	ext := runtimeToolchainExtension(runtimeToolchainFixture("compiler"))
-	err := ResolveRuntimeToolchains(workspaceRoot, ext, []string{"compiler"}, []string{"PATH=" + bin})
+	err := resolveRuntimeToolchainsContext(context.Background(), workspaceRoot, ext, []string{"compiler"}, []string{"PATH=" + bin})
 	want := `no candidate matched locked version "1.2.3"; run ` + "`putnami install`" + ` to install it: candidate 1 (path "compiler") at ` +
 		compiler + `: version "1.2.2" does not match locked "1.2.3"`
 	if err == nil || !strings.HasSuffix(err.Error(), want) {
@@ -107,7 +107,7 @@ func TestRuntimeToolchainRequiredFailureNamesEveryCandidateInDeclarationOrder(t 
 		{From: extensionproto.RuntimeToolchainCandidatePath, Path: "compiler"},
 	}
 	ext := runtimeToolchainExtension(requirement)
-	err := ResolveRuntimeToolchains(workspaceRoot, ext, []string{"compiler"},
+	err := resolveRuntimeToolchainsContext(context.Background(), workspaceRoot, ext, []string{"compiler"},
 		[]string{"PATH=" + bin, "PUTNAMI_HOME=" + putnamiHome})
 	want := `resolve extension "example" runtime toolchain "compiler": no candidate matched locked version "1.2.3"; run ` + "`putnami install`" + ` to install it: ` +
 		`candidate 1 (environment COMPILER_HOME "bin/compiler"): environment variable COMPILER_HOME is not set; ` +
@@ -419,7 +419,7 @@ func TestOptionalRuntimeToolchainPublishesUnavailableBindingWithoutAmbientFallba
 	previous := slog.Default()
 	slog.SetDefault(slog.New(slog.NewTextHandler(&logs, nil)))
 	t.Cleanup(func() { slog.SetDefault(previous) })
-	if err := ResolveRuntimeToolchains(workspaceRoot, ext, []string{"compiler"}, base); err != nil {
+	if err := resolveRuntimeToolchainsContext(context.Background(), workspaceRoot, ext, []string{"compiler"}, base); err != nil {
 		t.Fatal(err)
 	}
 	resolution := ext.RuntimeToolchains["compiler"]
@@ -453,7 +453,7 @@ func TestRuntimeToolchainLockChangeInvalidatesPortableIdentity(t *testing.T) {
 		fixtureproc.Write(t, filepath.Join(bin, "compiler"), fixtureproc.Program{Record: probes, Stdout: version + "\n"})
 		writeRuntimeToolchainLock(t, workspaceRoot, "compiler", version, integrity)
 		ext := runtimeToolchainExtension(requirement)
-		if err := ResolveRuntimeToolchains(workspaceRoot, ext, []string{"compiler"}, []string{"PATH=" + bin}); err != nil {
+		if err := resolveRuntimeToolchainsContext(context.Background(), workspaceRoot, ext, []string{"compiler"}, []string{"PATH=" + bin}); err != nil {
 			t.Fatal(err)
 		}
 		runs := fixtureproc.Runs(t, probes)
@@ -590,7 +590,7 @@ func TestRuntimeToolchainEnvironmentCandidateFindsAToolInsideTheWorkspace(t *tes
 	}}
 	ext := runtimeToolchainExtension(requirement)
 	inherited := runtimeToolchainWorkspaceRootEnv + "=" + t.TempDir()
-	if err := ResolveRuntimeToolchains(workspaceRoot, ext, []string{"compiler"}, []string{"PATH=/usr/bin:/bin", inherited}); err != nil {
+	if err := resolveRuntimeToolchainsContext(context.Background(), workspaceRoot, ext, []string{"compiler"}, []string{"PATH=/usr/bin:/bin", inherited}); err != nil {
 		t.Fatal(err)
 	}
 	if resolved := ext.RuntimeToolchains["compiler"]; !resolved.Available || resolved.Executable != binary {
@@ -626,7 +626,7 @@ func TestRuntimeToolchainHomeCandidateResolvesWithoutHomeInTheChildEnvironment(t
 		Path: filepath.ToSlash(filepath.Join(relative, "bin", "compiler")),
 	}}
 	ext := runtimeToolchainExtension(requirement)
-	if err := ResolveRuntimeToolchains(workspaceRoot, ext, []string{"compiler"}, []string{"PATH=/usr/bin:/bin"}); err != nil {
+	if err := resolveRuntimeToolchainsContext(context.Background(), workspaceRoot, ext, []string{"compiler"}, []string{"PATH=/usr/bin:/bin"}); err != nil {
 		t.Fatal(err)
 	}
 	if !ext.RuntimeToolchains["compiler"].Available {
@@ -668,7 +668,7 @@ func TestRuntimeToolchainWithoutALockResolvesUnavailableAndKeysApart(t *testing.
 	base := []string{"PATH=" + bin}
 
 	bootstrap := runtimeToolchainExtension(runtimeToolchainFixture("compiler"))
-	if err := ResolveRuntimeToolchains(workspaceRoot, bootstrap, []string{"compiler"}, base); err != nil {
+	if err := resolveRuntimeToolchainsContext(context.Background(), workspaceRoot, bootstrap, []string{"compiler"}, base); err != nil {
 		t.Fatalf("a workspace with no lock refused to bootstrap: %v", err)
 	}
 	unpinned := bootstrap.RuntimeToolchains["compiler"]
@@ -678,7 +678,7 @@ func TestRuntimeToolchainWithoutALockResolvesUnavailableAndKeysApart(t *testing.
 
 	writeRuntimeToolchainLock(t, workspaceRoot, "compiler", "1.2.3", "integrity-a")
 	pinnedExt := runtimeToolchainExtension(runtimeToolchainFixture("compiler"))
-	if err := ResolveRuntimeToolchains(workspaceRoot, pinnedExt, []string{"compiler"}, base); err != nil {
+	if err := resolveRuntimeToolchainsContext(context.Background(), workspaceRoot, pinnedExt, []string{"compiler"}, base); err != nil {
 		t.Fatal(err)
 	}
 	if pinned := pinnedExt.RuntimeToolchains["compiler"]; !pinned.Available || pinned.Identity == unpinned.Identity {
@@ -693,7 +693,7 @@ func TestRuntimeToolchainWithALockButNoPinFailsClosed(t *testing.T) {
 	workspaceRoot := t.TempDir()
 	writeRuntimeToolchainLock(t, workspaceRoot, "other", "1.2.3", "integrity-a")
 	ext := runtimeToolchainExtension(runtimeToolchainFixture("compiler"))
-	err := ResolveRuntimeToolchains(workspaceRoot, ext, []string{"compiler"}, []string{"PATH=" + t.TempDir()})
+	err := resolveRuntimeToolchainsContext(context.Background(), workspaceRoot, ext, []string{"compiler"}, []string{"PATH=" + t.TempDir()})
 	if err == nil || !strings.Contains(err.Error(), `workspace lock has no exact "compiler" pin`) {
 		t.Fatalf("missing-pin error = %v", err)
 	}
@@ -710,7 +710,7 @@ func TestRuntimeToolchainMissingPinNamesTheInstall(t *testing.T) {
 		t.Fatal(err)
 	}
 	ext := runtimeToolchainExtension(runtimeToolchainFixture("uv"))
-	err := ResolveRuntimeToolchains(workspaceRoot, ext, []string{"compiler"}, []string{"PATH=" + t.TempDir()})
+	err := resolveRuntimeToolchainsContext(context.Background(), workspaceRoot, ext, []string{"compiler"}, []string{"PATH=" + t.TempDir()})
 	want := `resolve extension "example" runtime toolchain "compiler": workspace lock has no exact "uv" pin: run ` + "`putnami install`"
 	if err == nil || err.Error() != want {
 		t.Fatalf("missing-pin error = %v\nwant %s", err, want)
@@ -779,4 +779,12 @@ func writeNotExecutable(t *testing.T, path string) string {
 		t.Fatal(err)
 	}
 	return path
+}
+
+// WithToolchainProbeTimeout returns ctx with every runtime toolchain probe that
+// runs under it bounded by timeout instead of toolVersionProbeTimeout. A test
+// uses it to prove how a caller reports a probe that timed out without waiting
+// out the production deadline.
+func WithToolchainProbeTimeout(ctx context.Context, timeout time.Duration) context.Context {
+	return context.WithValue(ctx, toolchainProbeTimeoutKey{}, timeout)
 }

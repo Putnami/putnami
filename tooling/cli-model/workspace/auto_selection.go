@@ -3,6 +3,8 @@ package workspace
 // AutoSelectionMode describes the project selector chosen for a bare job run.
 type AutoSelectionMode string
 
+// AutoSelectionAll selects every project and AutoSelectionImpacted the projects
+// a change since the baseline impacts.
 const (
 	AutoSelectionAll      AutoSelectionMode = "all"
 	AutoSelectionImpacted AutoSelectionMode = "impacted"
@@ -11,6 +13,9 @@ const (
 // AutoSelectionReason explains why a bare job run chose its mode.
 type AutoSelectionReason string
 
+// AutoSelectionReasonFirstBuild is a main branch with no successful build yet,
+// AutoSelectionReasonLastBuild a main branch compared with its last successful
+// build, and AutoSelectionReasonTrunk any other branch compared with the trunk.
 const (
 	AutoSelectionReasonFirstBuild AutoSelectionReason = "first-build"
 	AutoSelectionReasonLastBuild  AutoSelectionReason = "last-build"

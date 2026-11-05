@@ -14,6 +14,7 @@ import (
 	"time"
 
 	collab "go.putnami.dev/protocol/collaboration"
+	"go.putnami.dev/sdk/extension/robustio"
 )
 
 const (
@@ -201,28 +202,14 @@ func (f sessionFiles) write(cache *sessionCache) error {
 	return nil
 }
 
-// writeFileAtomic writes data to a temporary file beside path, then renames
-// it over path, so a reader sees the old file or the new one, never a part.
-// The temporary name does not end in .json, so a spool reader skips it.
+// writeFileAtomic creates path's directory, readable by the user only, and
+// writes data to path through robustio.WriteFile, readable by the user only.
+// The temporary name ends in .tmp, so a spool reader skips it.
 func writeFileAtomic(path string, data []byte) error {
-	dir := filepath.Dir(path)
-	if err := os.MkdirAll(dir, 0o700); err != nil {
+	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
 		return err
 	}
-	temp, err := os.CreateTemp(dir, filepath.Base(path)+"-*.tmp")
-	if err != nil {
-		return err
-	}
-	name := temp.Name()
-	defer func() { _ = os.Remove(name) }()
-	if _, err := temp.Write(data); err != nil {
-		_ = temp.Close()
-		return err
-	}
-	if err := temp.Close(); err != nil {
-		return err
-	}
-	return os.Rename(name, path)
+	return robustio.WriteFile(path, data, 0o600, nil)
 }
 
 // pruneRepliedMarkers removes the replied markers older than
@@ -370,15 +357,6 @@ func appendBounded(values []string, value string, limit int) []string {
 		values = append([]string(nil), values[len(values)-limit:]...)
 	}
 	return values
-}
-
-func containsString(values []string, wanted string) bool {
-	for _, value := range values {
-		if value == wanted {
-			return true
-		}
-	}
-	return false
 }
 
 // logHookFailure appends one line to hook.log. The hook never reports a

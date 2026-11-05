@@ -103,7 +103,7 @@ func Run(ctx context.Context, req Request) []diag.Diagnostic {
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 	executable, args, env := Command(req.Getenv, os.Environ(), group, req.Path)
-	cmd := exec.CommandContext(ctx, executable, args...) //nolint:gosec // G204: argv form; the group matches extensionName and the path is observe's own file
+	cmd := exec.CommandContext(ctx, executable, args...)
 	cmd.Env = env
 	cmd.Stdout = req.Output
 	cmd.Stderr = req.Output

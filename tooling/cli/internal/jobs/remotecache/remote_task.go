@@ -165,7 +165,6 @@ func (r *RemoteCache) restoreTaskEntry(
 	r.recordLookup(restoreFailure(restore, err))
 	if err != nil {
 		if planned {
-			//nolint:gosec // G706 false positive: dynamic values are structured slog attributes, not a format string.
 			slog.Warn("remote cache: provider restore failed; building locally",
 				"project", job.Project.Name, "job", job.JobDef.Name, "error", err)
 		}
@@ -195,7 +194,6 @@ func (r *RemoteCache) restoreTaskEntry(
 		// teaching the prefetch path to know about entry formats.
 		start := time.Now()
 		if err := cm.PrefetchBlobs(restore.Manifest, exchangeBlobFetcher(r.providerExchangeDir())); err != nil {
-			//nolint:gosec // G706 false positive: dynamic values are structured slog attributes, not a format string.
 			slog.Warn("remote cache: provider hint prefetch failed; building locally",
 				"project", job.Project.Name, "job", job.JobDef.Name, "error", err)
 			return nil, jobmodel.ReuseNone, err
@@ -226,7 +224,6 @@ func (r *RemoteCache) restoreTaskEntry(
 		// rejection self-heals by rebuilding, and per-key noise helps only when
 		// actively tracing a rebuild loop.
 		if planned {
-			//nolint:gosec // G706 false positive: dynamic values are structured slog attributes, not a format string.
 			slog.Debug("remote cache: task-owned hit is not interpretable; building locally",
 				"project", job.Project.Name, "job", job.JobDef.Name, "error", err)
 		}

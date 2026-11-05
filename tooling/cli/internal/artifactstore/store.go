@@ -34,7 +34,7 @@ import (
 	"strings"
 	"time"
 
-	"go.putnami.dev/tooling/cli/internal/flock"
+	"go.putnami.dev/sdk/extension/filelock"
 )
 
 const (
@@ -216,7 +216,7 @@ func (s *Store) lockDigestContext(ctx context.Context, digest string) (func(), e
 	return func() { _ = l.Release() }, nil
 }
 
-func acquireFlockContext(ctx context.Context, path string, exclusive bool) (*flock.Lock, error) {
+func acquireFlockContext(ctx context.Context, path string, exclusive bool) (*filelock.Lock, error) {
 	if ctx == nil {
 		ctx = context.Background()
 	}
@@ -224,17 +224,17 @@ func acquireFlockContext(ctx context.Context, path string, exclusive bool) (*flo
 	// process in flock(2) as it always did, instead of waking every 10ms to ask
 	// again while GC holds the store.
 	if ctx.Done() == nil {
-		return flock.Acquire(path, exclusive, false)
+		return filelock.Acquire(path, exclusive, false)
 	}
 	for {
 		if err := ctx.Err(); err != nil {
 			return nil, err
 		}
-		lock, err := flock.Acquire(path, exclusive, true)
+		lock, err := filelock.Acquire(path, exclusive, true)
 		if err == nil {
 			return lock, nil
 		}
-		if !errors.Is(err, flock.ErrBusy) {
+		if !errors.Is(err, filelock.ErrBusy) {
 			return nil, err
 		}
 		timer := time.NewTimer(10 * time.Millisecond)

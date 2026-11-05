@@ -153,7 +153,7 @@ func pushLayout(ctx context.Context, layoutDir string, target LayoutTarget, bear
 // layoutTags returns tags without duplicates, refusing one that is not a valid
 // tag of repo.
 func layoutTags(repo name.Repository, tags []string) ([]string, error) {
-	unique := UniqueStrings(tags)
+	unique := uniqueStrings(tags)
 	for _, tag := range unique {
 		if _, err := name.NewTag(repo.Name()+":"+tag, name.StrictValidation); err != nil || !layoutTagPattern.MatchString(tag) {
 			return nil, fmt.Errorf("OCI tag %q is invalid", tag)

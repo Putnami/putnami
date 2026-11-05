@@ -119,20 +119,9 @@ func heavyJobPermille(planned []*ScheduledJob) int {
 	return heavy * 1000 / len(planned)
 }
 
-// isHeavyJob answers from the DECLARATION only.
-//
-// It used to fall back to matching the job's display name against a list of
-// substrings — "golangci-lint", "build~types", "staticcheck", "build~
-// cross-compile", "lint~check", plus test~test by command/step name. Every one
-// of those is now declared as `heavy: true` on the owning manifest's step, so
-// the fallback bought nothing but the failure mode it always had: a THIRD-PARTY
-// extension whose expensive step happened to be called "lint~check" was tuned
-// for as heavy, while one called "lint~vet" was not, and neither author could
-// discover why. Scheduling reads what the manifest says.
-//
-// This deletes only the NAME heuristic. Declared per-step `heavy`, the command's
-// heavy trait, the project's cpuWeight overrides and the measured EMA history in
-// task_stats.go are all untouched — they are evidence, not guesswork.
+// isHeavyJob answers from the declaration only: the step's heavy flag, the
+// command's heavy trait, the project's cpuWeight overrides and the measured EMA
+// history; a job's display name is never consulted.
 func isHeavyJob(job *ScheduledJob) bool {
 	if job == nil || job.JobDef == nil {
 		return false

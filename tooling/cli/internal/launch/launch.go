@@ -151,7 +151,7 @@ func IsExemptCommand(name string) bool {
 //
 //   - `cli list` / `cli use`     — inspect or switch installed binaries
 //   - `upgrade --from-source`            — build and adopt a local CLI
-//   - `migrate vnext`                    — convert a lock this engine cannot read
+//   - `migrate vnext`                    — project the lock onto this engine's format
 //   - `extensions … --user`              — manage the user scope, not the workspace
 //
 // These must not relaunch: the pinned binary may be the very thing being
@@ -161,13 +161,9 @@ func IsExemptCommand(name string) bool {
 // for its from-source builds; this covers the global `putnami` entrypoint, which
 // does not.)
 //
-// `migrate vnext` joined the set later.
-// Relaunching READS the lock to resolve the pin, and a lock below the format
-// floor no longer parses — so a non-exempt migration would fail on the very
-// file it exists to convert, in the one state where it is the only way out. The
-// earlier argument for keeping it non-exempt (a pinned pre-v2 engine would
-// strip the field the migration writes, finding F2) is void now that such an
-// engine cannot run a migrated workspace at all.
+// `migrate vnext` projects the lock onto the format THIS engine writes: a
+// relaunch would hand the projection to the pinned engine, which may predate
+// that format.
 func IsExemptInvocation(args []string) bool {
 	if len(args) == 0 {
 		return false
@@ -742,8 +738,8 @@ func resolvePath(p string) string {
 // lockError reports a putnami.lock.json this binary could not read. The two
 // version errors are called out separately because neither recovery is the
 // generic one: for a lock written by a NEWER CLI the file is fine and this
-// binary is too old, and for one written by an OLDER CLI the binary is fine and
-// the file needs converting. Only a genuinely unreadable lock — corrupt,
+// binary is too old, and for one below the format floor the binary is fine and
+// the file needs replacing. Only a genuinely unreadable lock — corrupt,
 // unreadable bytes — falls through to "opt out of the pin for this run".
 func lockError(c config, err error) error {
 	var unsupported *lockfile.UnsupportedVersionError
@@ -756,13 +752,13 @@ func lockError(c config, err error) error {
 	}
 	var outdated *lockfile.OutdatedVersionError
 	if errors.As(err, &outdated) {
-		// `migrate vnext` is exempt from the launcher (IsExemptInvocation), so
-		// this next step runs instead of re-entering the same wall — and unlike
-		// the generic opt-out it actually repairs the workspace rather than
-		// running one command with the pin ignored.
+		// The refusal says to delete the lock first. Without a lock there is no
+		// pin to honor, so this next step runs as this binary instead of
+		// re-entering the same wall — and unlike the generic opt-out it repairs
+		// the workspace rather than running one command with the pin ignored.
 		return protocolcli.WithNext(
 			protocolcli.InvalidConfigf("cannot honor the workspace CLI pin: %w", err),
-			"putnami migrate vnext --apply")
+			"putnami install")
 	}
 	return protocolcli.WithNext(
 		protocolcli.InvalidConfigf(
@@ -836,17 +832,16 @@ func execError(c config, version, path string, err error) error {
 }
 
 // testBinaryExecError reports a Go test binary that reached the exec. It is a
-// hard error rather than a silent skip because the caller is a test that would
-// otherwise be measuring the wrong process, and rather than an exec because
-// syscall.Exec would end the suite. See isTestBinary for why that is worse than
-// any failure: the run exits 0 and prints "ok" with most tests never executed.
+// hard error, not a silent skip and not an exec: syscall.Exec would end the
+// suite, and the run would exit 0 and print "ok" with most tests never executed
+// (see isTestBinary).
 //
 // The fix belongs in the test, not here: give it its own workspace with
 // t.Chdir(t.TempDir()) so no pin applies, or set NoRelaunchEnv when the test
-// genuinely means to run against a pinned workspace.
-// It is InvalidConfig, not a generic error, so it stays distinguishable from a
-// genuine exec failure (execError) when triaging a CI log: this one is always a
-// defect in the test, never in the machine.
+// means to run against a pinned workspace.
+//
+// The error is InvalidConfig, so it stays distinguishable from a genuine exec
+// failure (execError): this one is always a defect in the test.
 func testBinaryExecError(c config, version, path string) error {
 	return protocolcli.WithNext(
 		protocolcli.InvalidConfigf(

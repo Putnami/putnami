@@ -110,7 +110,7 @@ func (reader *OSReader) ReadFile(root, relative string) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	file, err := os.Open(resolved) //nolint:gosec // resolve enforces the selected root
+	file, err := os.Open(resolved)
 	if err != nil {
 		return nil, err
 	}

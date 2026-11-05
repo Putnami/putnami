@@ -449,7 +449,7 @@ func TestTemplate_RecordsItsChannelInsideItsOwnedOutput(t *testing.T) {
 
 	// The archive publication manifest is this task's own declared output and
 	// carries what the archive uploader reads.
-	meta, err := pkgmeta.ReadPackageMetadata(tmp, ctx.Project.Path)
+	meta, err := readPackageMetadata(tmp, ctx.Project.Path)
 	if err != nil {
 		t.Fatalf("read archive publication manifest: %v", err)
 	}
@@ -496,4 +496,17 @@ func stagingDirs(t *testing.T) map[string]bool {
 		found[m] = true
 	}
 	return found
+}
+
+// readPackageMetadata decodes the archive publication manifest a packager wrote.
+func readPackageMetadata(workspaceRoot, projectPath string) (*pkgmeta.PackageMetadata, error) {
+	data, err := os.ReadFile(pkgmeta.MetadataPath(workspaceRoot, projectPath))
+	if err != nil {
+		return nil, err
+	}
+	var metadata pkgmeta.PackageMetadata
+	if err := json.Unmarshal(data, &metadata); err != nil {
+		return nil, err
+	}
+	return &metadata, nil
 }

@@ -7,11 +7,9 @@ import (
 	wsproto "go.putnami.dev/protocol/workspace"
 )
 
-// Project discovery after the core parsers were deleted.
+// Project discovery.
 //
-// This file used to parse package.json and go.mod, derive Go module edges, and
-// read a pyproject name. All three are gone. What is left is the half core can
-// own in a language-neutral orchestrator: Putnami membership (includes, scopes),
+// Core owns what a language-neutral orchestrator can: Putnami membership (includes, scopes),
 // explicitly authored putnami.json identity, canonical paths and IDs, and the
 // scope conventions (namePattern, inherited tags/extensions/version).
 //
@@ -29,20 +27,15 @@ import (
 // the workspace config's includes (scopes and direct project paths) and each
 // scope's own includes.
 //
-// It returns projects and nothing else. It used to thread a `warnings *[]string`
-// down to discoverProject so a malformed package.json / go.mod could be surfaced
-// through Workspace.Warnings; a later change deleted the parsers that
-// produced those warnings, and the finding now belongs to the provider that owns
-// the manifest — it arrives as an `invalid-manifest` diagnostic on that
-// provider's probe result and is replayed from the snapshot on every later run
-// (sync.go, replayRecordedDiagnostics). The pointer that survived the deletion
-// had no writer left anywhere in this package, so it was carrying the promise of
-// a warning nothing could emit.
+// It returns projects and nothing else. A malformed manifest is the finding of
+// the provider that owns it: it arrives as an `invalid-manifest` diagnostic on
+// that provider's probe result and is replayed from the snapshot on every later
+// run (sync.go, replayRecordedDiagnostics).
 //
-// There is deliberately no language-manifest discovery source left here. The
-// root package.json `workspaces` array used to be one; it is npm membership, it
-// is written by the TypeScript adapter's own sync task, and reading
-// it back in a neutral core is the same layering mistake in the other direction.
+// There is deliberately no language-manifest discovery source here. The root
+// package.json `workspaces` array is npm membership, written by the TypeScript
+// adapter's own sync task; reading it back in a neutral core is a layering
+// mistake.
 // A directory that is not yet a member becomes one through `projects sync`,
 // which walks the tree with the markers extensions declare.
 func discoverProjects(root string, cfg *wsproto.Config) []*Project {
@@ -82,7 +75,7 @@ func appendScopeProjects(root, scopePath string, seen map[string]bool, projects 
 		}
 	}
 	for _, relProj := range scopeIncludes {
-		fullRel := cleanWorkspacePath(filepath.Join(scopePath, relProj))
+		fullRel := wsproto.CleanWorkspacePath(filepath.Join(scopePath, relProj))
 		if fullRel == "" {
 			continue
 		}
@@ -91,7 +84,7 @@ func appendScopeProjects(root, scopePath string, seen map[string]bool, projects 
 			continue
 		}
 		if scopeSelf != nil {
-			scopeSelf.ScopeIncludes = append(scopeSelf.ScopeIncludes, ProjectIDFromPath(fullRel))
+			scopeSelf.ScopeIncludes = append(scopeSelf.ScopeIncludes, wsproto.ProjectIDFromPath(fullRel))
 		}
 		if seen[fullRel] {
 			continue
@@ -152,7 +145,7 @@ func discoverProject(workspaceRoot, relPath string) *Project {
 	}
 	proj.Line = nearestAncestorLine(workspaceRoot, absPath)
 
-	proj.ID = ProjectIDFromPath(proj.Path)
+	proj.ID = wsproto.ProjectIDFromPath(proj.Path)
 	resolveProjectIdentity(proj, nil)
 	return proj
 }

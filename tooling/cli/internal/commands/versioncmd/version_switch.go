@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"go.putnami.dev/tooling/cli/internal/flock"
+	"go.putnami.dev/sdk/extension/filelock"
 )
 
 // fileOps is the part of the filesystem the rename-aside switch changes.
@@ -60,7 +60,7 @@ func (s asideSwitch) activate(targetName, link string) error {
 // file stays at its moved-aside path, and the error names that path.
 func (s asideSwitch) replace(stagingPath, dst string) error {
 	dir := filepath.Dir(dst)
-	lock, err := flock.Acquire(filepath.Join(dir, switchLockName), true, false)
+	lock, err := filelock.Acquire(filepath.Join(dir, switchLockName), true, false)
 	if err != nil {
 		return fmt.Errorf("lock %s: %w", dir, err)
 	}

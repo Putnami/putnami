@@ -5,7 +5,6 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
-	"slices"
 	"strings"
 	"testing"
 
@@ -506,29 +505,6 @@ func TestTrackedChangesTakesTheExecutableBitFromGitWithoutAHostExecBit(t *testin
 	}
 	if got := kinds(true); got["tool.sh"] != treeEntryFile || got["plain.txt"] != treeEntryFile {
 		t.Errorf("with a host executable bit: kinds = %v, want both file, as the disk says", got)
-	}
-}
-
-// git's environment loses every variable that selects another repository or
-// injects configuration, and keeps transport credentials, tracing and the
-// remaining settings.
-func TestRepositoryEnvironmentKeepsTransportAndRemovesForeignRepository(t *testing.T) {
-	spectest.Proves(t, "tooling/extension-authoring", "tree-fingerprint",
-		"the-environment-cannot-redirect-the-repository")
-	selectors := []string{"GIT_DIR=/tmp/foreign.git", "GIT_WORK_TREE=/tmp/foreign", "GIT_CONFIG_COUNT=1",
-		"GIT_CONFIG_KEY_0=core.worktree", "GIT_CONFIG_VALUE_0=/tmp/foreign", "GIT_CONFIG_GLOBAL=/tmp/gitconfig",
-		"GIT_CONFIG_NOSYSTEM=1", "GIT_INDEX_FILE=/tmp/foreign.index", "GIT_COMMON_DIR=/tmp/foreign.git",
-		"GIT_OBJECT_DIRECTORY=/tmp/objects", "GIT_ALTERNATE_OBJECT_DIRECTORIES=/tmp/alternates", "GIT_PREFIX=sub/",
-		"GIT_CEILING_DIRECTORIES=/tmp", "GIT_DISCOVERY_ACROSS_FILESYSTEM=1", "GIT_NAMESPACE=other"}
-	kept := []string{"GIT_SSH_COMMAND=ssh -i /tmp/key", "GIT_ASKPASS=/tmp/askpass", "GIT_LITERAL_PATHSPECS=1", "PATH=/bin"}
-	got := repositoryEnvironment(append(slices.Clone(selectors), kept...))
-	for _, selector := range selectors {
-		if slices.Contains(got, selector) {
-			t.Errorf("selector survived: %q", selector)
-		}
-	}
-	if !slices.Equal(got, kept) {
-		t.Errorf("repositoryEnvironment kept %q, want %q", got, kept)
 	}
 }
 

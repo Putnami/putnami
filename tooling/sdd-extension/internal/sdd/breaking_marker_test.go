@@ -87,7 +87,7 @@ func TestBreakingMarkerFailsATitleThatDropsTheMarkerAndNamesTheCommit(t *testing
 		!strings.Contains(report.Diagnostics[0].Message, shas[1][:12]) {
 		t.Errorf("diagnostics = %+v, want one %s finding naming the commit", report.Diagnostics, ErrorCodeBreakingMarkerDropped)
 	}
-	if ResultData(err) == nil {
+	if protocolcli.ResultData(err) == nil {
 		t.Error("the failure carries no report")
 	}
 }

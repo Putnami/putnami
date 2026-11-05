@@ -89,3 +89,37 @@ func TestRemoveWaitsForAReaderOfTheFile(t *testing.T) {
 		t.Fatalf("the file survived Remove: %v", err)
 	}
 }
+
+// A reader holds the destination open the way os.Open does, without sharing
+// delete access. WriteFile renames over it once the reader closes it, instead
+// of failing with access denied.
+func TestWriteFileWaitsForAReaderOfTheDestination(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "requirements.json")
+	if err := os.WriteFile(path, []byte("old\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	reader, err := os.Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	probe := filepath.Join(t.TempDir(), "probe")
+	if err := os.WriteFile(probe, []byte("probe\n"), 0o600); err != nil {
+		_ = reader.Close()
+		t.Fatal(err)
+	}
+	requireRefused(t, "a rename over an open file", os.Rename(probe, path), func() { _ = reader.Close() })
+	closed := make(chan struct{})
+	go func() {
+		defer close(closed)
+		time.Sleep(100 * time.Millisecond)
+		_ = reader.Close()
+	}()
+	err = WriteFile(path, []byte("new\n"), 0o644, nil)
+	<-closed
+	if err != nil {
+		t.Fatalf("WriteFile after the reader closed: %v", err)
+	}
+	if got, err := os.ReadFile(path); err != nil || string(got) != "new\n" {
+		t.Fatalf("the destination holds %q, %v; want the new bytes", got, err)
+	}
+}

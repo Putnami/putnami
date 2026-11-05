@@ -166,61 +166,6 @@ func TestNewWorkspaceTakesIdentityFromTheConfigWhenThereIsOne(t *testing.T) {
 	}
 }
 
-func TestSeedRootsReturnsProjectPathsInWireOrder(t *testing.T) {
-	ws := NewWorkspace("/repo", nil, []*Project{
-		{Path: "shipping"},
-		nil,
-		{Path: "billing"},
-	})
-	roots := ws.SeedRoots()
-	if len(roots) != 2 || roots[0] != "shipping" || roots[1] != "billing" {
-		t.Fatalf("seed roots = %v, want the non-nil paths in order", roots)
-	}
-	var absent *Workspace
-	if absent.SeedRoots() != nil {
-		t.Fatal("a nil workspace must yield no roots")
-	}
-}
-
-func TestProjectIDFromPathMatchesTheCoreIdentityFold(t *testing.T) {
-	cases := map[string]string{
-		"":                     "/",
-		".":                    "/",
-		"/":                    "/",
-		"tooling/cli":          "/tooling/cli",
-		"/tooling/cli":         "/tooling/cli",
-		"(group)/cli":          "/cli",
-		"tooling/(group)/cli":  "/tooling/cli",
-		"tooling/()/cli":       "/tooling/()/cli",
-		"tooling/cli/":         "/tooling/cli",
-		"tooling//cli":         "/tooling/cli",
-		"typescript/framework": "/typescript/framework",
-	}
-	for input, want := range cases {
-		if got := ProjectIDFromPath(input); got != want {
-			t.Errorf("ProjectIDFromPath(%q) = %q, want %q", input, got, want)
-		}
-	}
-}
-
-func TestCleanWorkspacePathCanonicalizesToSlashForm(t *testing.T) {
-	cases := map[string]string{
-		"":               "",
-		"  ":             "",
-		"/":              "",
-		".":              "",
-		"a/./b":          "a/b",
-		"a//b":           "a/b",
-		"/tooling/cli/":  "tooling/cli",
-		" tooling/cli  ": "tooling/cli",
-	}
-	for input, want := range cases {
-		if got := CleanWorkspacePath(input); got != want {
-			t.Errorf("CleanWorkspacePath(%q) = %q, want %q", input, got, want)
-		}
-	}
-}
-
 // TestFromContextPrefersTheCompleteMembership pins the member order. A
 // workspace-scoped job receives BOTH collections, and reading the selection
 // when the membership is there would answer a workspace-wide question with a

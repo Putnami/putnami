@@ -9,7 +9,6 @@ import (
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/tooling/cli/internal/cmderr"
 	"go.putnami.dev/tooling/cli/internal/commandmeta"
-	"go.putnami.dev/tooling/cli/internal/output"
 	"go.putnami.dev/tooling/cli/internal/progress"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
@@ -66,7 +65,7 @@ func (e *CommandEnv) envelopeWarnings() []protocolcli.WorkspaceWarning {
 // the returned Reporter is inert, so a handler can report progress
 // unconditionally without risking corruption of a machine stdout stream.
 func (e *CommandEnv) Progress() *progress.Reporter {
-	return progress.New(os.Stderr, output.StructuredOutput(e.OutputFormat))
+	return progress.New(os.Stderr, protocolcli.OutputMode(e.OutputFormat).IsMachineReadable())
 }
 
 // requireWorkspace returns cmderr.ErrNoWorkspace when no workspace was found.

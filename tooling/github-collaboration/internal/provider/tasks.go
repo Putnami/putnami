@@ -12,6 +12,7 @@ import (
 	"time"
 
 	collab "go.putnami.dev/protocol/collaboration"
+	"go.putnami.dev/sdk/extension/collabhelper"
 	"go.putnami.dev/tooling/github-collaboration/internal/github"
 )
 
@@ -57,15 +58,15 @@ func (s *taskSession) task(issue *ghIssue) collab.Task {
 		Ref:           s.repo.ref(issue.Number),
 		Key:           "#" + strconv.Itoa(issue.Number),
 		Revision:      issueRevision(issue),
-		URL:           displayURL(issue.HTMLURL),
-		Title:         oneLine(issue.Title, collab.MaxTitleLength, "#"+strconv.Itoa(issue.Number)),
-		Body:          boundedBody(body),
+		URL:           collabhelper.DisplayURL(issue.HTMLURL, collab.MaxURLLength),
+		Title:         collabhelper.OneLine(issue.Title, collab.MaxTitleLength, "#"+strconv.Itoa(issue.Number)),
+		Body:          collabhelper.BoundedBody(body, collab.MaxBodyBytes),
 		State:         state,
-		ProviderState: oneLine(providerState, collab.MaxLabelLength, string(state)),
-		CreatedAt:     timestamp(issue.CreatedAt),
-		UpdatedAt:     timestamp(issue.UpdatedAt),
+		ProviderState: collabhelper.OneLine(providerState, collab.MaxLabelLength, string(state)),
+		CreatedAt:     collabhelper.Timestamp(issue.CreatedAt),
+		UpdatedAt:     collabhelper.Timestamp(issue.UpdatedAt),
 	}
-	task.Labels = boundedLabels(s.states.visibleLabels(issue.labelNames()))
+	task.Labels = collabhelper.BoundedLabels(s.states.visibleLabels(issue.labelNames()), collab.MaxLabels, collab.MaxLabelLength)
 	task.Assignees = boundedLogins(issue.assigneeLogins())
 	return task
 }

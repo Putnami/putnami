@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+	"go.putnami.dev/sdk/extension/gitread"
 	putnamigit "go.putnami.dev/tooling/cli/internal/git"
 	"go.putnami.dev/tooling/cli/internal/jobs/cachekey"
 	"go.putnami.dev/tooling/cli/internal/workspace"
@@ -111,7 +112,7 @@ func TestBuildRunVersionsDegradesOutsideAGitRepository(t *testing.T) {
 	}
 	// The degraded stamp alone cannot say why; the error names the line and
 	// says the root is outside every repository.
-	if err == nil || !strings.Contains(err.Error(), `version line ""`) || !errors.Is(err, putnamigit.ErrNotRepository) {
+	if err == nil || !strings.Contains(err.Error(), `version line ""`) || !errors.Is(err, gitread.ErrNotRepository) {
 		t.Fatalf("degradation error = %v, want the line and the missing repository", err)
 	}
 	// Without a snapshot the line is left out, and the error still says why.
@@ -132,7 +133,7 @@ func TestRequireFullClone(t *testing.T) {
 		t.Fatalf("RequireFullClone on a full clone = %v", err)
 	}
 	shallow := filepath.Join(t.TempDir(), "shallow")
-	cmd := exec.Command(putnamigit.Executable(), "clone", "--depth", "1", "file://"+ws.Root, shallow)
+	cmd := exec.Command(gitread.Executable(), "clone", "--depth", "1", "file://"+ws.Root, shallow)
 	if out, err := cmd.CombinedOutput(); err != nil {
 		t.Skipf("shallow clone unavailable in this environment: %v\n%s", err, out)
 	}
@@ -144,7 +145,7 @@ func TestRequireFullClone(t *testing.T) {
 
 func runVersionsGit(t *testing.T, dir string, args ...string) {
 	t.Helper()
-	cmd := exec.Command(putnamigit.Executable(), args...)
+	cmd := exec.Command(gitread.Executable(), args...)
 	cmd.Dir = dir
 	cmd.Env = append(os.Environ(), "GIT_COMMITTER_DATE=2026-01-02T03:04:05Z", "GIT_AUTHOR_DATE=2026-01-02T03:04:05Z")
 	if out, err := cmd.CombinedOutput(); err != nil {

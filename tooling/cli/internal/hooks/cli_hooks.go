@@ -29,7 +29,7 @@ import (
 const AbortCleanupBudget = 5 * time.Second
 
 // getwd is os.Getwd behind a package variable so the no-workspace fallback in
-// resolveHookRoot can be tested. Its error used to be discarded.
+// resolveHookRoot can be tested.
 var getwd = os.Getwd
 
 // workspaceHook is one shell command from putnami.workspace.json together with

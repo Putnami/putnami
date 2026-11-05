@@ -929,3 +929,8 @@ func TestRestoreResultOnly_EchoSendsTheFields(t *testing.T) {
 		t.Fatalf("a result-only restore placed a blob: %v", err)
 	}
 }
+
+// WithShutdownTimeout bounds the graceful close before the provider is killed.
+func WithShutdownTimeout(d time.Duration) Option {
+	return func(s *Session) { s.shutdownTimeout = d }
+}

@@ -1,8 +1,12 @@
 package lockfile
 
 import (
+	"bytes"
+	"errors"
 	"os"
 	"path/filepath"
+	"runtime"
+	"strings"
 	"testing"
 )
 
@@ -409,4 +413,336 @@ func TestDiffersFromDiskAgreesWithWriteLockFileIfChanged(t *testing.T) {
 	if changed, err := DiffersFromDisk(dir, edited); err != nil || !changed {
 		t.Fatalf("DiffersFromDisk after an edit = %t, %v; want true", changed, err)
 	}
+}
+
+// TestLockFileCompatibilityMatrix states the (client, lock) pairs at the
+// window's edges that the read-window and prior-release tests leave out: a
+// lock that records no version is refused as outdated, and a reader whose
+// window ends one version lower refuses a newer lock with an error that names
+// both numbers.
+func TestLockFileCompatibilityMatrix(t *testing.T) {
+	t.Run("current client refuses a lock that records no version", func(t *testing.T) {
+		_, err := ParseLockFile([]byte(`{"extensions": {}, "templates": {}}`))
+		var outdated *OutdatedVersionError
+		if !errors.As(err, &outdated) || outdated.Found != 0 {
+			t.Fatalf("ParseLockFile(versionless) error = %v, want *OutdatedVersionError with Found=0", err)
+		}
+	})
+
+	t.Run("v4-only client rejects a v5 lock with a versioned error", func(t *testing.T) {
+		// parseLockFile with maxVersion=v4 is a v4-only reader on the real code
+		// path: same parser, one supported version lower. A reader that meets a
+		// newer lock refuses it and names both numbers, so the operator learns
+		// which side to move.
+		_, err := parseLockFile(mustMarshal(t, NewLockFile()), FormatVersionV4, FormatVersionV4)
+		var versionErr *UnsupportedVersionError
+		if !errors.As(err, &versionErr) {
+			t.Fatalf("parseLockFile(v5, max=v4) error = %v, want *UnsupportedVersionError", err)
+		}
+		if versionErr.Found != FormatVersionV5 || versionErr.Max != FormatVersionV4 {
+			t.Errorf("UnsupportedVersionError = %+v, want Found=5 Max=4", versionErr)
+		}
+		for _, want := range []string{LockFilename, "version 5", "version 4"} {
+			if !strings.Contains(versionErr.Error(), want) {
+				t.Errorf("error message %q does not mention %q", versionErr.Error(), want)
+			}
+		}
+	})
+}
+
+// TestWriteLockFilePreservesAnExistingV4Lock pins that a default write keeps
+// the version the file already declares: an install never promotes a lock as a
+// side effect.
+func TestWriteLockFilePreservesAnExistingV4Lock(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, LockFilename), mustMarshal(t, v4Fixture()), 0o644); err != nil {
+		t.Fatalf("seed lock file: %v", err)
+	}
+
+	lf, err := ReadLockFile(dir)
+	if err != nil {
+		t.Fatalf("ReadLockFile: %v", err)
+	}
+	lf.SetExtension("@putnami/python", LockEntry{Version: "1.0.0"})
+	if err := WriteLockFile(dir, lf); err != nil {
+		t.Fatalf("WriteLockFile: %v", err)
+	}
+
+	got, err := ReadLockFile(dir)
+	if err != nil {
+		t.Fatalf("re-read: %v", err)
+	}
+	if got.Version != FormatVersionV4 {
+		t.Fatalf("WriteLockFile moved a v4 lock to v%d", got.Version)
+	}
+	if entry, _ := got.GetExtension("@putnami/typescript"); entry.TaskContract != 3 {
+		t.Errorf("contract record lost through a default write: %+v", entry)
+	}
+}
+
+// TestMarshalLockFileIsCanonical pins the determinism B0e's digests depend on:
+// the same content marshals to the same bytes regardless of how the maps were
+// populated, and repeated marshaling never varies with map iteration order.
+func TestMarshalLockFileIsCanonical(t *testing.T) {
+	forward := NewLockFile()
+	for _, name := range []string{"@putnami/ci", "@putnami/go", "@putnami/typescript"} {
+		forward.SetExtension(name, LockEntry{
+			Version:      "1.0.0",
+			TaskContract: 3,
+			Integrities:  map[string]string{"darwin/arm64": "mac", "linux/amd64": "linux"},
+		})
+	}
+	reverse := NewLockFile()
+	for _, name := range []string{"@putnami/typescript", "@putnami/go", "@putnami/ci"} {
+		reverse.SetExtension(name, LockEntry{
+			Version:      "1.0.0",
+			TaskContract: 3,
+			Integrities:  map[string]string{"linux/amd64": "linux", "darwin/arm64": "mac"},
+		})
+	}
+
+	want := string(mustMarshal(t, forward))
+	for i := 0; i < 20; i++ {
+		if got := string(mustMarshal(t, forward)); got != want {
+			t.Fatalf("repeated marshal of the same lock differed on iteration %d", i)
+		}
+		if got := string(mustMarshal(t, reverse)); got != want {
+			t.Fatalf("insertion order changed the bytes on iteration %d:\n--- got ---\n%s\n--- want ---\n%s", i, got, want)
+		}
+	}
+}
+
+// downloadURLWithAmpersand is a CLI download URL shaped like the one the
+// registry actually issues: multiple query parameters joined by '&'. It is the
+// reproduction case for the HTML-escaping papercut — encoding/json's default
+// escapes '&' to \u0026, which turns a byte-identical "read, then write back
+// unchanged" into a diff on every `putnami install`.
+const downloadURLWithAmpersand = "https://put.putnami.dev/putnami/cli/download?channel=1.4.2&os=darwin&arch=arm64"
+
+// TestMarshalLockFileDoesNotEscapeHTMLCharacters pins the fix directly: a
+// source URL containing '&' comes out of MarshalLockFile with the plain byte,
+// never encoding/json's default \u0026 escape (or an HTML-entity &amp;, in case
+// a future change routes the value through a template instead). encoding/json's
+// escaping exists for values embedded in an HTML <script> tag, which this
+// on-disk lock file never is.
+func TestMarshalLockFileDoesNotEscapeHTMLCharacters(t *testing.T) {
+	lf := v4Fixture()
+	cli, _ := lf.GetCLI()
+	cli.Source = downloadURLWithAmpersand
+	lf.SetCLI(cli)
+
+	data := mustMarshal(t, lf)
+
+	if strings.Contains(string(data), `\u0026`) {
+		t.Errorf("marshaled lock still HTML-escapes '&' as \\u0026:\n%s", data)
+	}
+	if strings.Contains(string(data), "&amp;") {
+		t.Errorf("marshaled lock HTML-entity-escapes '&' as &amp;:\n%s", data)
+	}
+	if !strings.Contains(string(data), downloadURLWithAmpersand) {
+		t.Errorf("marshaled lock does not contain the source URL verbatim:\n%s", data)
+	}
+}
+
+// TestMarshalLockFileIsIdempotentAcrossAmpersandURL is the write half of the
+// dirty-tree reproduction: write a lock whose CLI source carries a '&', read it
+// back, and marshal it again. The second marshal must be byte-identical to the
+// first, because that identity is what makes `putnami install` a no-op on a
+// workspace whose lock the install did not actually need to change — the
+// precondition for a clean git tree and a version stamp with no
+// `-<dirtyhash>` suffix.
+func TestMarshalLockFileIsIdempotentAcrossAmpersandURL(t *testing.T) {
+	lf := v4Fixture()
+	cli, _ := lf.GetCLI()
+	cli.Source = downloadURLWithAmpersand
+	lf.SetCLI(cli)
+
+	first := mustMarshal(t, lf)
+
+	reparsed, err := ParseLockFile(first)
+	if err != nil {
+		t.Fatalf("ParseLockFile: %v", err)
+	}
+	second := mustMarshal(t, reparsed)
+
+	if !bytes.Equal(first, second) {
+		t.Fatalf("marshal was not idempotent across a read/write round trip:\n--- first ---\n%s\n--- second ---\n%s", first, second)
+	}
+}
+
+// TestRewritingAnHTMLEscapedLockConvergesInOneWrite is the convergence half of
+// the dirty-tree reproduction: a lock an HTML-escaping writer produced has
+// \u0026 on disk. Reading it and writing it back must both drop the escape (so
+// the working tree goes clean on the very next install, not after N more of
+// them) and reach a fixed point (so that first rewrite is the last one this
+// file ever needs for that reason).
+func TestRewritingAnHTMLEscapedLockConvergesInOneWrite(t *testing.T) {
+	const escaped = `{
+  "version": 4,
+  "cli": {
+    "version": "1.4.2",
+    "source": "https://put.putnami.dev/putnami/cli/download?channel=1.4.2\u0026os=darwin\u0026arch=arm64"
+  },
+  "extensions": {},
+  "templates": {}
+}
+`
+	lf, err := ParseLockFile([]byte(escaped))
+	if err != nil {
+		t.Fatalf("ParseLockFile(escaped): %v", err)
+	}
+	if lf.CLI == nil || lf.CLI.Source != downloadURLWithAmpersand {
+		t.Fatalf("reader did not decode the \\u0026 escape back to '&': %+v", lf.CLI)
+	}
+
+	rewritten := mustMarshal(t, lf)
+	if strings.Contains(string(rewritten), `\u0026`) {
+		t.Fatalf("rewrite of an escaped lock kept the \\u0026 escape:\n%s", rewritten)
+	}
+	if !strings.Contains(string(rewritten), downloadURLWithAmpersand) {
+		t.Fatalf("rewrite of an escaped lock does not contain the plain URL:\n%s", rewritten)
+	}
+
+	reparsed, err := ParseLockFile(rewritten)
+	if err != nil {
+		t.Fatalf("ParseLockFile(rewritten): %v", err)
+	}
+	again := mustMarshal(t, reparsed)
+	if !bytes.Equal(rewritten, again) {
+		t.Fatalf("second write after convergence was not a no-op:\n--- rewritten ---\n%s\n--- again ---\n%s", rewritten, again)
+	}
+}
+
+// TestMarshalLockFileOmitsLegacyExtensionScalarIntegrity pins the
+// cross-platform canonical form. A reader must still accept the scalar a
+// committed v4 lock may carry alone, but writing a platform-mapped entry drops
+// its redundant scalar and never mutates the parsed value in memory. A
+// scalar-only entry retains its sole verification datum. This is what makes a
+// complete lock authored on one OS byte-stable on another.
+func TestMarshalLockFileOmitsLegacyExtensionScalarIntegrity(t *testing.T) {
+	const legacy = `{
+  "version": 4,
+  "extensions": {
+    "@putnami/legacy": {
+      "version": "1.0.0",
+      "integrity": "only-verification-datum"
+    },
+    "@putnami/typescript": {
+      "version": "3.1.0",
+      "integrity": "last-writer-platform",
+      "integrities": {
+        "darwin/arm64": "machash",
+        "linux/amd64": "linuxhash"
+      }
+    }
+  },
+  "templates": {}
+}
+`
+	lf, err := ParseLockFile([]byte(legacy))
+	if err != nil {
+		t.Fatalf("ParseLockFile(legacy v4): %v", err)
+	}
+	before, _ := lf.GetExtension("@putnami/typescript")
+	if before.Integrity != "last-writer-platform" {
+		t.Fatalf("legacy scalar was not retained on read: %+v", before)
+	}
+
+	data := mustMarshal(t, lf)
+	canonical, err := ParseLockFile(data)
+	if err != nil {
+		t.Fatalf("ParseLockFile(canonical v4): %v", err)
+	}
+	entry, _ := canonical.GetExtension("@putnami/typescript")
+	if entry.Integrity != "" {
+		t.Errorf("canonical extension scalar = %q, want empty", entry.Integrity)
+	}
+	if entry.IntegrityFor("darwin", "arm64") != "machash" || entry.IntegrityFor("linux", "amd64") != "linuxhash" {
+		t.Errorf("canonical projection changed the authoritative platform map: %+v", entry.Integrities)
+	}
+	legacyEntry, _ := canonical.GetExtension("@putnami/legacy")
+	if legacyEntry.Integrity != "only-verification-datum" {
+		t.Errorf("canonical projection dropped a scalar-only legacy pin: %+v", legacyEntry)
+	}
+	after, _ := lf.GetExtension("@putnami/typescript")
+	if after.Integrity != "last-writer-platform" {
+		t.Errorf("canonical rendering mutated the parsed legacy value: %+v", after)
+	}
+}
+
+// TestWriteLockFileIsAtomic pins the write's crash behavior: the bytes arrive
+// by rename, so no reader ever sees a half-written lock and no temp file is
+// left behind.
+func TestWriteLockFileIsAtomic(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, LockFilename), []byte(`{"version": 4}`), 0o644); err != nil {
+		t.Fatalf("seed lock file: %v", err)
+	}
+
+	if err := WriteLockFile(dir, v4Fixture()); err != nil {
+		t.Fatalf("WriteLockFile: %v", err)
+	}
+
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		t.Fatalf("read dir: %v", err)
+	}
+	for _, entry := range entries {
+		if entry.Name() != LockFilename {
+			t.Errorf("write left a stray file behind: %s", entry.Name())
+		}
+	}
+
+	info, err := os.Stat(filepath.Join(dir, LockFilename))
+	if err != nil {
+		t.Fatalf("stat lock file: %v", err)
+	}
+	// On Windows the permission bits reduce to a read-only attribute, and a
+	// readable, writable file reports 0666.
+	wantPerm := os.FileMode(0o644)
+	if runtime.GOOS == "windows" {
+		wantPerm = 0o666
+	}
+	if perm := info.Mode().Perm(); perm != wantPerm {
+		t.Errorf("lock file mode = %v, want %v", perm, wantPerm)
+	}
+}
+
+// v4Fixture is a v4 lock with a two-platform CLI pin, a scalar-plus-map
+// extension entry and contract records.
+func v4Fixture() *LockFile {
+	lf := &LockFile{
+		Version:    FormatVersionV4,
+		Extensions: make(map[string]LockEntry),
+		Templates:  make(map[string]LockEntry),
+	}
+	lf.SetCLI(LockEntry{
+		Version:     "1.4.2",
+		Integrities: map[string]string{"darwin/arm64": "climachash", "linux/amd64": "clilinuxhash"},
+		Source:      "https://put.putnami.dev/putnami/cli/download?channel=1.4.2",
+	})
+	lf.SetExtension("@putnami/go", LockEntry{
+		Version:      "2.0.0",
+		ManifestHash: "gomanifest",
+		TaskContract: 2,
+	})
+	lf.SetExtension("@putnami/typescript", LockEntry{
+		Version:      "3.1.0",
+		Integrity:    "legacydigest",
+		Integrities:  map[string]string{"darwin/arm64": "tsmachash"},
+		ManifestHash: "tsmanifest",
+		Source:       "https://put.putnami.dev/putnami/typescript/download?channel=3.1.0",
+		TaskContract: 3,
+	})
+	lf.SetTemplate("typescript-web", LockEntry{Version: "1.0.0"})
+	return lf
+}
+
+func mustMarshal(t *testing.T, lf *LockFile) []byte {
+	t.Helper()
+	data, err := MarshalLockFile(lf)
+	if err != nil {
+		t.Fatalf("MarshalLockFile: %v", err)
+	}
+	return data
 }

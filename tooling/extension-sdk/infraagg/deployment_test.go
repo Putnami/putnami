@@ -137,8 +137,8 @@ func TestDeployment_WritesTheCanonicalAggregate(t *testing.T) {
 	if first != pinnedDeployment {
 		t.Fatalf("deployment declaration = %s\nwant %s", first, pinnedDeployment)
 	}
-	if _, err := os.Stat(result.ManifestPath + ".tmp"); err == nil {
-		t.Error("temp file left behind after the atomic write")
+	if leftovers, _ := filepath.Glob(filepath.Join(filepath.Dir(result.ManifestPath), ".*.tmp")); len(leftovers) != 0 {
+		t.Errorf("temp files left behind after the atomic write: %v", leftovers)
 	}
 
 	if _, err := Deployment(ctx, Options{RuntimeCompatibility: noHTTP2}); err != nil {
@@ -301,7 +301,7 @@ func TestDeployment_NeverLeavesAStaleDeclaration(t *testing.T) {
 			writeProjectFile(t, root, "app", DeploymentFile, stale)
 
 			result, err := Deployment(ctx, Options{})
-			if err != nil || result.Outcome != OutcomeWithheld {
+			if err != nil || result.Outcome != outcomeWithheld {
 				t.Fatalf("Deployment = %q %v %v", result.Outcome, result.Diagnostics, err)
 			}
 			if !diag.HasErrors(result.Diagnostics) || !hasDiagCode(result.Diagnostics, tc.code) {
@@ -349,7 +349,7 @@ func TestDeploymentJob_ReportsEveryOutcome(t *testing.T) {
 		if err != nil || status != "OK" || data["outcome"] != string(OutcomeEmitted) {
 			t.Fatalf("job = %q %v %v", status, data, err)
 		}
-		if !strings.Contains(out, DeploymentPhaseName) || !strings.Contains(out, infra.DeploymentFilename) {
+		if !strings.Contains(out, deploymentPhaseName) || !strings.Contains(out, infra.DeploymentFilename) {
 			t.Errorf("event stream does not report the phase and the artifact:\n%s", out)
 		}
 	})
@@ -377,7 +377,7 @@ func TestDeploymentJob_ReportsEveryOutcome(t *testing.T) {
 		out := captureStdout(t, func() {
 			status, data, err = DeploymentJob(Options{})(ctx, jsonl.NewForVersion(1), nil)
 		})
-		if err != nil || status != "SKIP" || data["outcome"] != string(OutcomeWithheld) {
+		if err != nil || status != "SKIP" || data["outcome"] != string(outcomeWithheld) {
 			t.Fatalf("job = %q %v %v, want a SKIP that does not fail", status, data, err)
 		}
 		if !strings.Contains(out, `"warn"`) || !strings.Contains(out, "deployment declaration:") {

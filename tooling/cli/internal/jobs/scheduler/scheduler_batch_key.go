@@ -311,10 +311,6 @@ func projectPathsOverlap(a, b string) bool {
 // time (planner.ResolveInvocationRelations), long before the locator exists: a
 // batch key computed at dispatch must not depend on whether the producer has
 // already run.
-//
-// This is also what the deleted extraEnv term used to do by accident — the
-// synthesized DATABASE_TEST_BINDINGS differed per project, so a provisioned test
-// job could never share a key with anything.
 func invocationBatchKey(job *ScheduledJob) string {
 	if job == nil || job.InvocationProducer == nil {
 		return ""

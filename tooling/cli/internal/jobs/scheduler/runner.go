@@ -20,9 +20,9 @@ import (
 	runner "go.putnami.dev/protocol/runner"
 	runtimeproto "go.putnami.dev/protocol/runtime"
 	"go.putnami.dev/sdk/extension/envkeys"
+	"go.putnami.dev/sdk/extension/filelock"
 	"go.putnami.dev/sdk/extension/proctree"
 	"go.putnami.dev/tooling/cli/internal/extension"
-	"go.putnami.dev/tooling/cli/internal/flock"
 	"go.putnami.dev/tooling/cli/internal/git"
 	"go.putnami.dev/tooling/cli/internal/iox"
 	"go.putnami.dev/tooling/cli/internal/jobs/cachekey"
@@ -168,7 +168,7 @@ func clampWallToFirstEvent(wall, spawnToFirstEvent time.Duration, firstEventObse
 }
 
 // jobInvocation is the resolved subprocess setup shared by RunJob and
-// RunJobInteractive: the serialized context file, the template-expanded
+// RunJobInteractiveWithStreams: the serialized context file, the template-expanded
 // command line, and the assembled environment.
 type jobInvocation struct {
 	jobCtx       *JobCommandContext
@@ -178,7 +178,7 @@ type jobInvocation struct {
 	cwd          string
 	projRoot     string
 	env          []string
-	scratchLease *flock.Lock
+	scratchLease *filelock.Lock
 	// extensionRuntime is the resolved {extensionRuntime}, or "" when the job
 	// does not reference it.
 	extensionRuntime string
@@ -191,7 +191,7 @@ type jobInvocation struct {
 // closes only the parent's descriptor, so a surviving child stays protected.
 func (inv *jobInvocation) execCommand(ctx context.Context) *exec.Cmd {
 	cmd := exec.CommandContext(ctx, inv.command, inv.args...)
-	if flock.Inheritable && inv.scratchLease != nil {
+	if filelock.Inheritable && inv.scratchLease != nil {
 		cmd.ExtraFiles = append(cmd.ExtraFiles, inv.scratchLease.File())
 	}
 	return cmd
@@ -388,7 +388,7 @@ func buildJobInvocation(
 // contextFile when done and defer cancel.
 //
 // extraEnv carries ONLY facts about how the CLI is spawning the process:
-// RunJobInteractive's PUTNAMI_INTERACTIVE=1 and host RPC channel, and the
+// RunJobInteractiveWithStreams's PUTNAMI_INTERACTIVE=1 and host RPC channel, and the
 // scheduler's object-cache socket + trust policy (remotecache/remote_provider.go).
 // None describes the work, so none belongs in a cache key. The one entry that
 // DID describe the work is gone: a cleanup deleted the synthesized DATABASE_TEST_BINDINGS the
@@ -570,9 +570,9 @@ func runJob(
 	extraEnv []string,
 	onEvent EventHandler,
 ) (*JobResult, error) {
-	// Production reaches this point with App/Engine already captured. Keep this
-	// direct API fail-closed too: package tests and the interactive adapter may
-	// invoke a job without going through the scheduler.
+	// Production reaches this point with App/Engine already captured; a direct
+	// call, as package tests and the interactive adapter make, is captured here
+	// so the API fails closed too.
 	ctx = CaptureProcessCapabilities(ctx)
 	onEvent = processCapabilityEventSink(ctx, job, onEvent)
 	start := time.Now()
@@ -728,12 +728,11 @@ func runJob(
 	result.Duration = clampWallToFirstEvent(duration, spawnToFirstEvent, firstEventObserved)
 	result.SpawnToFirstEvent = spawnToFirstEvent
 	result.FirstEventObserved = firstEventObserved
-	// The ONE spawn site is the only place a process's resource accounting still
-	// exists, so it is where the physical execution is recorded — id, wall, CPU
-	// split into user and system, peak RSS, block IO, and the concurrency this
-	// process was granted. CPUTime keeps its own field because the learned task
-	// weights read it per task; the execution is what a cost roll-up reads,
-	// exactly once per subprocess however many task records it produces.
+	// The spawn site records the physical execution — id, wall, CPU split into
+	// user and system, peak RSS, block IO, and the concurrency this process was
+	// granted — exactly once per subprocess however many task records it
+	// produces. CPUTime keeps its own field because the learned task weights
+	// read it per task.
 	if ps := cmd.ProcessState; ps != nil {
 		result.Execution = captureExecution(ps, spawnWall, job.CPUBudget)
 		result.CPUTime = result.Execution.CPUTime()

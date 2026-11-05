@@ -18,7 +18,6 @@ import (
 	"go.putnami.dev/protocol/features/spectest"
 	pctx "go.putnami.dev/sdk/extension/context"
 	"go.putnami.dev/sdk/extension/jsonl"
-	"go.putnami.dev/sdk/extension/oci"
 	"go.putnami.dev/sdk/extension/pkgmeta"
 	"go.putnami.dev/sdk/extension/registrycred"
 )
@@ -50,7 +49,7 @@ func TestPublishImageProjectRoutesPrivateBrokerWithoutChangingLogicalEvidence(t 
 	if data["image"] != wantImmutable {
 		t.Fatalf("published image = %v, want logical immutable ref %q", data["image"], wantImmutable)
 	}
-	published, err := pkgmeta.ReadPublishedImageManifest(ctx.OutputPath)
+	published, err := readPublishedImageManifest(ctx.OutputPath)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -92,7 +91,7 @@ func TestPublishImageProjectRefusesHostilePrivateBrokerLocation(t *testing.T) {
 	if strings.Contains(err.Error(), privateOCITestToken) {
 		t.Fatal("private capability appeared in the publication error")
 	}
-	if _, readErr := pkgmeta.ReadPublishedImageManifest(ctx.OutputPath); readErr == nil {
+	if _, readErr := readPublishedImageManifest(ctx.OutputPath); readErr == nil {
 		t.Fatal("failed private publication wrote verified evidence")
 	}
 }
@@ -399,9 +398,7 @@ func newManagedImagePublishFixture(t *testing.T) (*pctx.Context, *pkgmeta.Docker
 	root := t.TempDir()
 	projectPath := "delivery/images/ci-runner"
 	dockerDir := pkgmeta.PackageOutputDir(root, projectPath, "docker")
-	if _, err := oci.WriteLayout(filepath.Join(dockerDir, manifest.Layout), image); err != nil {
-		t.Fatal(err)
-	}
+	writeTestLayout(t, filepath.Join(dockerDir, manifest.Layout), image)
 	return &pctx.Context{
 		WorkspaceRoot: root,
 		Workspace:     pctx.Workspace{Name: "team"},

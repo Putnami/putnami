@@ -67,7 +67,7 @@ func lockEntryFor(prior lockfile.LockEntry, hadPrior bool, result *artifactInsta
 			for platform, digest := range prior.Integrities {
 				entry.SetPlatformIntegrity(platform, digest)
 			}
-			// The task-contract record (lock v2, `migrate vnext --apply`) is
+			// The task-contract record (`migrate vnext --apply` writes it) is
 			// version-bound exactly like the digests: the same version means the
 			// same manifest bytes, so the record stays true and a reinstall must
 			// not erase it — erasing would flap the `migrate vnext --check` CI
@@ -91,12 +91,9 @@ func lockEntryFor(prior lockfile.LockEntry, hadPrior bool, result *artifactInsta
 // the version, the manifest hash, the task-contract record, every digest the
 // prior already recorded — is equal.
 //
-// Such an entry is not a change anybody requested. A hosted runner on
-// linux/amd64 that installs from a lock recorded on darwin/arm64 used to write
-// its own digest, and the loopback registry broker it downloaded through, into
-// the committed lock; `--impacted` then read the rewritten lock as a change and
-// selected every project that declares it as an input, so the hosted plan
-// differed from the local plan for the same commit.
+// Such an entry is not a change anybody requested. A hosted runner that
+// rewrote the committed lock would make --impacted select every project that
+// declares it.
 //
 // A prior entry with no per-platform map is never a refresh: its legacy scalar
 // digest migrates into the map on the next install, which is a change to the
@@ -538,9 +535,8 @@ func localArtifactWriter(jsonlOut bool) io.Writer {
 // tolerate. Those commands keep working without a lock — they still show what
 // config declares — but the INSTALLED column comes from the lock alone, so a
 // read failure renders it blank, which is indistinguishable from "nothing is
-// installed". Since the format floor moved to v2, a v1 lock
-// makes that the DEFAULT rendering in an unmigrated workspace, so the reason is
-// printed rather than inferred.
+// installed". A lock below the format floor makes that the DEFAULT rendering,
+// so the reason is printed rather than inferred.
 //
 // It writes to stderr so a `--output=jsonl` stream on stdout stays machine-clean,
 // and it never changes control flow: the caller carries on with a nil lock.
@@ -559,8 +555,7 @@ func noteUnreadableLock(err error) {
 // object per line instead of the human-readable progress lines.
 //
 // out is the human progress stream. It is a parameter because the first-use
-// bootstrap installs with it pointed at stderr under --output=json|jsonl, which
-// an earlier design required doing by reassigning the process-global os.Stdout.
+// bootstrap installs with it pointed at stderr under --output=json|jsonl.
 // The JSONL stream is deliberately NOT routed through it: that one is the
 // caller's own machine contract on the real stdout.
 func installArtifacts(ctx context.Context, wsRoot string, cfg *wsproto.Config, args []string, ops artifactOps, outputFormat string, out io.Writer) error {
@@ -993,8 +988,9 @@ func updateArtifacts(ctx context.Context, wsRoot string, cfg *wsproto.Config, ar
 		}
 
 		entry := lockEntryFor(prior, hadPrior, result)
-		// A version bump starts a fresh per-platform map, which would otherwise
-		// leave the lock pinning only the platform that ran the upgrade.
+		// A version bump starts a fresh per-platform map; carry the other
+		// platforms' integrities forward so the lock pins more than the platform
+		// that ran the upgrade.
 		carryPlatformIntegrities(ctx, ops, name, prior, hadPrior, &entry, jsonlOut)
 		ops.lockSet(lockFile, name, entry)
 
@@ -1224,9 +1220,8 @@ func previewArtifactUpdates(ctx context.Context, wsRoot string, cfg *wsproto.Con
 // BEFORE anything is deleted. Removal is a two-sided edit — drop the lock entry,
 // then drop the bytes — and swallowing the read error performed only the second
 // side: the artifact vanished from disk while the lock kept pinning it, and the
-// command printed success. Since the lock floor moved to v2,
-// that is not a corner case, because every v1 lock now fails this read with an
-// *OutdatedVersionError.
+// command printed success. That is not a corner case: every lock below the
+// format floor fails this read with an *OutdatedVersionError.
 func removeArtifact(wsRoot string, args []string, ops artifactOps) error {
 	if len(args) == 0 {
 		return fmt.Errorf("%s name required", ops.label)

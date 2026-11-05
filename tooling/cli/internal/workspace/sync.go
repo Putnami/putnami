@@ -47,8 +47,8 @@ import (
 
 // ProviderBinding pairs a declared adapter with the provider that answers for
 // it. The two are separate because the scope comes from a manifest and the
-// provider comes from a prepared runtime; tests supply a fixture provider with
-// the real scope, and that is the same code path production takes.
+// provider from a prepared runtime; tests supply a fixture provider with the
+// real scope.
 type ProviderBinding struct {
 	Scope    ProviderScope
 	Provider ProbeProvider
@@ -827,20 +827,7 @@ func workspaceCandidatePaths(ws *Workspace) []string {
 		paths = append(paths, probePathOf(project.Path))
 	}
 	sort.Strings(paths)
-	return dedupeSorted(paths)
-}
-
-func dedupeSorted(values []string) []string {
-	out := values[:0]
-	previous := ""
-	for i, value := range values {
-		if i > 0 && value == previous {
-			continue
-		}
-		previous = value
-		out = append(out, value)
-	}
-	return out
+	return slices.Compact(paths)
 }
 
 // explicitProjects projects each resolved project's EXPLICIT configuration onto

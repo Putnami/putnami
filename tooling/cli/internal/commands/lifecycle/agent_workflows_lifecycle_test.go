@@ -251,7 +251,10 @@ func seedLegacyArtifact(t *testing.T, root, name, version string, files map[stri
 		if lock == nil {
 			lock = lockfile.NewLockFile()
 		}
-		lock.SetAgentArtifact(name, entry)
+		if lock.AgentArtifacts == nil {
+			lock.AgentArtifacts = make(map[string]lockfile.AgentArtifactLockEntry)
+		}
+		lock.AgentArtifacts[name] = entry
 		if err := lockfile.WriteLockFile(root, lock); err != nil {
 			t.Fatal(err)
 		}
@@ -268,7 +271,8 @@ func agentPinNamed(t *testing.T, root, name string) (lockfile.AgentArtifactLockE
 	if lf == nil {
 		return lockfile.AgentArtifactLockEntry{}, false
 	}
-	return lf.GetAgentArtifact(name)
+	entry, ok := lf.AgentArtifacts[name]
+	return entry, ok
 }
 
 // starterOptsInto points one built-in starter at exactly this extension's
@@ -713,7 +717,7 @@ func newContentRegistry(t *testing.T) *contentRegistry {
 	server := httptest.NewServer(http.HandlerFunc(registry.serve))
 	t.Cleanup(server.Close)
 	t.Setenv(extension.PutRegistryURLEnv, server.URL)
-	t.Setenv(extension.HTTPRetryBackoffEnv, "0")
+	t.Cleanup(extension.SetHTTPRetryBackoff(0))
 	t.Setenv("PUTNAMI_ARTIFACT_DIR", t.TempDir())
 	t.Setenv(artifactsEnsuredEnv, "")
 	hometest.Temp(t)
@@ -1156,7 +1160,7 @@ func TestExtensionAgentContent_VerifiedPinsRefuseTamperedBytes(t *testing.T) {
 		}
 		tamper(t, root, "agent-content/.agents/skills/fixture-review/SKILL.md", "tampered\n")
 		before := snapshotContentSurface(t, root)
-		err := agentctx.InstallAgentWorkflows(context.Background(), root, wsproto.Load(root), nil)
+		_, err := agentctx.InstallAgentWorkflowsWithResult(context.Background(), root, wsproto.Load(root), nil)
 		if err == nil || !strings.Contains(err.Error(), "drifted from its manifest") {
 			t.Fatalf("error = %v, want the digest mismatch", err)
 		}
@@ -1169,7 +1173,7 @@ func TestExtensionAgentContent_VerifiedPinsRefuseTamperedBytes(t *testing.T) {
 			`{"name":%q,"version":"1.0.0","cliContract":%d,"agentContent":{"path":"agent-content","manifestSha256":%q}}`,
 			contentExtensionName, protocolcli.AgentContentContract, strings.Repeat("0", 64)))
 		before := snapshotContentSurface(t, root)
-		err := agentctx.InstallAgentWorkflows(context.Background(), root, wsproto.Load(root), nil)
+		_, err := agentctx.InstallAgentWorkflowsWithResult(context.Background(), root, wsproto.Load(root), nil)
 		if err == nil || !strings.Contains(err.Error(), "does not match its pin") {
 			t.Fatalf("error = %v, want the pin mismatch", err)
 		}
@@ -1213,14 +1217,14 @@ func TestExtensionAgentContent_InterruptedRunConvergesOnRerun(t *testing.T) {
 	if err := os.Chmod(stateDir, 0o555); err != nil {
 		t.Fatal(err)
 	}
-	err = agentctx.InstallAgentWorkflows(context.Background(), root, wsproto.Load(root), nil)
+	_, err = agentctx.InstallAgentWorkflowsWithResult(context.Background(), root, wsproto.Load(root), nil)
 	_ = os.Chmod(stateDir, 0o755)
 	if err == nil || !strings.Contains(err.Error(), "rerun") {
 		t.Fatalf("error = %v, want the convergent-failure report", err)
 	}
 	readAgentFile(t, root, ".codex/agents/fixture-reviewer.toml")
 
-	if err := agentctx.InstallAgentWorkflows(context.Background(), root, wsproto.Load(root), nil); err != nil {
+	if _, err := agentctx.InstallAgentWorkflowsWithResult(context.Background(), root, wsproto.Load(root), nil); err != nil {
 		t.Fatalf("rerun must converge: %v", err)
 	}
 	if state, err := agentartifacts.LoadState(root, contentExtensionName); err != nil || state == nil || state.ArtifactVersion != "1.0.0" {
@@ -1262,7 +1266,7 @@ func TestExtensionAgentContent_LocalSourceIsBuiltAndNeverPinned(t *testing.T) {
 		contentExtensionName, protocolcli.AgentContentContract)
 	writeTree(t, filepath.Join(root, "tools", "contributor"), files)
 
-	if err := agentctx.InstallAgentWorkflows(context.Background(), root, wsproto.Load(root), nil); err != nil {
+	if _, err := agentctx.InstallAgentWorkflowsWithResult(context.Background(), root, wsproto.Load(root), nil); err != nil {
 		t.Fatalf("install: %v", err)
 	}
 	if got := readAgentFile(t, root, ".claude/skills/fixture-review/SKILL.md"); !strings.Contains(got, "Review revision local.") {
@@ -1312,7 +1316,7 @@ func TestExtensionAgentContent_OptInReferences(t *testing.T) {
 	}
 	// An opt-in naming an extension the workspace does not declare fails.
 	undeclared := contentWorkspace(t, nil, []string{contentExtensionOptIn})
-	if err := agentctx.InstallAgentWorkflows(context.Background(), undeclared, wsproto.Load(undeclared), nil); err == nil ||
+	if _, err := agentctx.InstallAgentWorkflowsWithResult(context.Background(), undeclared, wsproto.Load(undeclared), nil); err == nil ||
 		!strings.Contains(err.Error(), "declares no extension "+contentExtensionName) {
 		t.Fatalf("error = %v, want the undeclared extension named", err)
 	}

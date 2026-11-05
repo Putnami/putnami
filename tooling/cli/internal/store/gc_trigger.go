@@ -9,7 +9,7 @@ import (
 	"sync"
 	"time"
 
-	"go.putnami.dev/tooling/cli/internal/flock"
+	"go.putnami.dev/sdk/extension/filelock"
 )
 
 const (
@@ -297,7 +297,7 @@ func updateGCUsage(stamp string, next func(prev int64, ok bool) (int64, bool)) {
 	if os.MkdirAll(dir, 0o755) != nil {
 		return
 	}
-	lock, err := flock.Acquire(filepath.Join(dir, gcUsageFile+".lock"), true, false)
+	lock, err := filelock.Acquire(filepath.Join(dir, gcUsageFile+".lock"), true, false)
 	if err != nil {
 		return
 	}

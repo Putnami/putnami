@@ -250,12 +250,12 @@ import (
 	"time"
 
 	"go.putnami.dev/sdk/extension/dirlink"
+	"go.putnami.dev/sdk/extension/filelock"
+	"go.putnami.dev/sdk/extension/proctree"
 	"go.putnami.dev/tooling/cli/internal/extension"
-	"go.putnami.dev/tooling/cli/internal/flock"
 	"go.putnami.dev/tooling/cli/internal/iox"
 	"go.putnami.dev/tooling/cli/internal/jobs/cachekey"
 	"go.putnami.dev/tooling/cli/internal/jobs/planner"
-	"go.putnami.dev/tooling/cli/internal/store"
 )
 
 // heldOutputLocksEnv carries the comma-separated ids of the task-output locks
@@ -345,7 +345,7 @@ type outputLockEntry struct {
 	// exclusive is the mode the entry locks its file in.
 	exclusive bool
 	// lock is nil until acquired.
-	lock *flock.Lock
+	lock *filelock.Lock
 	// tasks has one element per reference the session holds on the acquired
 	// lock, in acquisition order: its length is the reference count.
 	tasks []string
@@ -885,7 +885,7 @@ func (m *taskOutputLocks) releaseOne(id, task string) {
 
 // lockFile locks key's file, exclusively or shared, polling while another
 // session holds it in a conflicting mode, until it is acquired or ctx ends.
-func (m *taskOutputLocks) lockFile(ctx context.Context, key outputLockKey, exclusive bool, task string) (*flock.Lock, error) {
+func (m *taskOutputLocks) lockFile(ctx context.Context, key outputLockKey, exclusive bool, task string) (*filelock.Lock, error) {
 	if err := os.MkdirAll(m.dir, 0o755); err != nil {
 		return nil, fmt.Errorf("prepare task-output locks: %w", err)
 	}
@@ -898,18 +898,18 @@ func (m *taskOutputLocks) lockFile(ctx context.Context, key outputLockKey, exclu
 		if err := ctx.Err(); err != nil {
 			return nil, err
 		}
-		lock, err := flock.Acquire(lockPath, exclusive, true)
+		lock, err := filelock.Acquire(lockPath, exclusive, true)
 		if err == nil {
 			return lock, nil
 		}
-		if !errors.Is(err, flock.ErrBusy) {
+		if !errors.Is(err, filelock.ErrBusy) {
 			return nil, fmt.Errorf("lock %s: %w", key.subject, err)
 		}
 		if !announced {
 			if exclusive && heldForReading(lockPath) {
 				// Readers held the key a moment ago. When the last of them has
 				// released since, the key is free: take it without a line.
-				if lock, err := flock.Acquire(lockPath, true, true); err == nil {
+				if lock, err := filelock.Acquire(lockPath, true, true); err == nil {
 					return lock, nil
 				}
 				m.announce(outputLockReadWaitMessage(task, key))
@@ -935,7 +935,7 @@ func (m *taskOutputLocks) lockFile(ctx context.Context, key outputLockKey, exclu
 // shared right now. After an exclusive request found it busy, that means
 // readers hold it. The probe releases its lock at once.
 func heldForReading(lockPath string) bool {
-	lock, err := flock.Acquire(lockPath, false, true)
+	lock, err := filelock.Acquire(lockPath, false, true)
 	if err != nil {
 		return false
 	}
@@ -994,7 +994,7 @@ func readOutputLockHolder(lockPath string) (outputLockHolder, bool) {
 		return outputLockHolder{}, false
 	}
 	var holder outputLockHolder
-	if err := json.NewDecoder(bytes.NewReader(data)).Decode(&holder); err != nil || !store.ProcessAlive(holder.PID) {
+	if err := json.NewDecoder(bytes.NewReader(data)).Decode(&holder); err != nil || !proctree.ProcessAlive(holder.PID) {
 		return outputLockHolder{}, false
 	}
 	return holder, true

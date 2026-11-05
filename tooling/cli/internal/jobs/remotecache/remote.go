@@ -598,7 +598,6 @@ func (r *RemoteCache) Restore(ctx context.Context, hash string, job *jobmodel.Sc
 	restore, err := sess.Restore(ctx, &cache.RestoreParams{Key: hash})
 	r.recordLookup(restoreFailure(restore, err))
 	if err != nil {
-		//nolint:gosec // G706 false positive: dynamic values are structured slog attributes, not a format string.
 		slog.Warn("remote cache: provider restore failed; building locally",
 			"project", job.Project.Name, "job", job.JobDef.Name, "error", err)
 		return nil
@@ -614,7 +613,6 @@ func (r *RemoteCache) Restore(ctx context.Context, hash string, job *jobmodel.Sc
 		// worker nor a later local lookup can mistake the hint for a green result.
 		start := time.Now()
 		if err := cm.PrefetchBlobs(restore.Manifest, exchangeBlobFetcher(r.providerExchangeDir())); err != nil {
-			//nolint:gosec // G706 false positive: dynamic values are structured slog attributes, not a format string.
 			slog.Warn("remote cache: provider hint prefetch failed; building locally",
 				"project", job.Project.Name, "job", job.JobDef.Name, "error", err)
 			return nil
@@ -638,7 +636,6 @@ func (r *RemoteCache) Restore(ctx context.Context, hash string, job *jobmodel.Sc
 	if r.requiresMaterializedInput(hash) && len(restore.Manifest.Files) == 0 &&
 		!statusOnlyOptionalCaptureHit(job, restore.Result) && !skippedFilesLessHit(restore.Result) &&
 		!taskDeclaresNoOutput(job) {
-		//nolint:gosec // G706 false positive: dynamic values are structured slog attributes, not a format string.
 		slog.Debug("remote cache: provider hit has no output files for a required dependency; building locally",
 			"project", job.Project.Name, "job", job.JobDef.Name)
 		return nil
@@ -652,20 +649,6 @@ func (r *RemoteCache) Restore(ctx context.Context, hash string, job *jobmodel.Sc
 	entry := entryFromProviderRestore(restore, job)
 	materializeStart := time.Now()
 	if err := cm.Materialize(hash, entry, exchangeBlobFetcher(r.providerExchangeDir())); err != nil {
-		// nolint:gosec // G706: the three logged values are workspace-manifest data,
-		// not user input — job.Project.Name comes from package.json/go.mod,
-		// job.JobDef.Name from an extension manifest, and err from a local
-		// filesystem materialize. That is the same trust boundary .golangci.yml
-		// already documents for G204 ("CLI spawns build tools from extension
-		// manifests — not user input"), so the finding is a false positive of that
-		// class rather than a new exposure.
-		//
-		// It first appeared when routing the watch loop through Engine.Run gave
-		// gosec's INTERPROCEDURAL taint analysis a fresh path from the file
-		// watcher into this call, without touching this file directly. The
-		// values and their provenance are unchanged. Suppressed at the site rather
-		// than added to the global gosec excludes, because disabling G706
-		// tree-wide would give up the rule exactly where it earns its keep.
 		slog.Warn("remote cache: provider materialize failed; building locally",
 			"project", job.Project.Name, "job", job.JobDef.Name, "error", err)
 		return nil

@@ -59,9 +59,9 @@ func TestArchitectureValidateCarriesRatchetedFailureData(t *testing.T) {
 	if !errors.Is(err, protocolcli.ErrInvalidConfig) {
 		t.Fatalf("architecture validate error = %v, want ErrInvalidConfig", err)
 	}
-	attached, ok := ResultData(err).(ArchitectureValidationReport)
+	attached, ok := protocolcli.ResultData(err).(ArchitectureValidationReport)
 	if !ok {
-		t.Fatalf("failure data = %T, want ArchitectureValidationReport", ResultData(err))
+		t.Fatalf("failure data = %T, want ArchitectureValidationReport", protocolcli.ResultData(err))
 	}
 	if report.Valid || len(report.Findings) != 1 || report.Findings[0].Code != archproto.ErrorCodeUndeclaredProjectDependency {
 		t.Fatalf("failure report = %+v", report)
@@ -78,9 +78,9 @@ func TestArchitectureInspectRequiresAnExactDeclaredDomain(t *testing.T) {
 	if !errors.Is(err, protocolcli.ErrNoMatch) {
 		t.Fatalf("architecture inspect error = %v, want ErrNoMatch", err)
 	}
-	attached, ok := ResultData(err).(ArchitectureInspectionReport)
+	attached, ok := protocolcli.ResultData(err).(ArchitectureInspectionReport)
 	if !ok || attached.Domain != nil || len(attached.Diagnostics) != 1 || attached.Diagnostics[0].Code != archproto.ErrorCodeUnknownDomain {
-		t.Fatalf("inspection failure = %+v", ResultData(err))
+		t.Fatalf("inspection failure = %+v", protocolcli.ResultData(err))
 	}
 	if report.Domain != nil {
 		t.Fatalf("inspection report = %+v, want no domain", report)

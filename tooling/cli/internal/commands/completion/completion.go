@@ -24,11 +24,9 @@ type completionValue struct {
 //
 // The built-in half — structured command names, their descriptions, their
 // subcommands, their flags, and the global flags — is SEEDED FROM THE COMMAND
-// CATALOG (internal/commandmeta) rather than retyped here. Before that change
-// it was a hand-maintained copy of the registry that had stopped
-// being updated: eight registered commands never tab-completed in any shell and
-// eleven documented subcommands were never offered, and each of the three
-// generators carried its own wording of the same flag descriptions.
+// CATALOG (internal/commandmeta) rather than retyped here, so every registered
+// command completes and each flag description has one wording across the three
+// generators.
 //
 // The maps stay mutable because the DYNAMIC half is layered on top: extension
 // command groups add structured names and nested subcommand paths, and extension

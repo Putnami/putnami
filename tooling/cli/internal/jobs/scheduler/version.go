@@ -13,6 +13,7 @@ import (
 	"sort"
 	"strings"
 
+	"go.putnami.dev/sdk/extension/gitread"
 	"go.putnami.dev/tooling/cli/internal/extension"
 	putnamigit "go.putnami.dev/tooling/cli/internal/git"
 	"go.putnami.dev/tooling/cli/internal/jobs/cachekey"
@@ -227,7 +228,7 @@ func runVersionLines(ws *workspace.Workspace) []string {
 // carries. Publishing from one would stamp a number computed from the fraction
 // of history that happened to be fetched.
 func RequireFullClone(repoRoot string) error {
-	shallow, err := putnamigit.IsShallow(repoRoot)
+	shallow, err := gitread.IsShallow(repoRoot)
 	if err != nil {
 		return err
 	}
@@ -256,17 +257,12 @@ func RequireFullClone(repoRoot string) error {
 //
 // Against store.versionStampDigest, which is how the file reaches a cache key:
 // that digest re-marshals the document as a MAP without the fields that do not
-// describe the tree, so it is already key-order independent and the reordering
-// here cannot move it.
-// What the merge does change is that a carried tree field, such as contentHash,
-// now contributes to the digest instead of being deleted on the next scheduler
-// write — which is correct (it is real content) and strictly MORE stable than
-// before, because the lossy write made a value flip between present and absent
-// depending on which writer touched the file last. A project whose .gen starts
-// empty still settles in one run — the restore introduces the field after that
-// run's keys were computed — but that is the same one-time settle a real
-// generate execution always had, not a loop: the next run seeds, keys and
-// re-stamps on the identical document.
+// describe the tree, so it is key-order independent and the reordering here
+// cannot move it. A carried tree field, such as contentHash, contributes to the
+// digest instead of being deleted on the next scheduler write, so a value does
+// not flip between present and absent depending on which writer touched the
+// file last. A project whose .gen starts empty settles in one run: the next run
+// seeds, keys and re-stamps on the identical document.
 func writeVersionStamp(path string, info VersionInfo) error {
 	owned, err := json.Marshal(info)
 	if err != nil {
@@ -492,7 +488,7 @@ func newCapabilitySourceBindingMemo() *capabilitySourceBindingMemo {
 		results:     make(map[string]capabilitySourceBindingResult),
 		snapshots:   make(map[string]*putnamigit.SourceBindingSnapshot),
 		unmanaged:   make(map[string]bool),
-		isUnmanaged: func(repoRoot string) bool { return putnamigit.Unmanaged(repoRoot) != nil },
+		isUnmanaged: func(repoRoot string) bool { return gitread.Unmanaged(repoRoot) != nil },
 	}
 	memo.resolve = func(repoRoot, projectRoot string) (string, int, error) {
 		key := filepath.Clean(repoRoot)

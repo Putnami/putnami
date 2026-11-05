@@ -4,6 +4,8 @@ import (
 	"errors"
 	"strings"
 	"testing"
+
+	protocolcli "go.putnami.dev/protocol/cli"
 )
 
 func TestWorstStatusOrdersTheVocabulary(t *testing.T) {
@@ -143,8 +145,8 @@ func TestWriteStatusExitsOnFailingOrStrict(t *testing.T) {
 	if err == nil || ExitCode(err) != ExitFailure || err.Error() != "secrets is failing: 2 required secrets missing" {
 		t.Fatalf("failing = %v", err)
 	}
-	if data, isNode := resultData(err).(StatusNode); !isNode || data.ID != "secrets" {
-		t.Fatalf("failure carries %#v, want the node", resultData(err))
+	if data, isNode := protocolcli.ResultData(err).(StatusNode); !isNode || data.ID != "secrets" {
+		t.Fatalf("failure carries %#v, want the node", protocolcli.ResultData(err))
 	}
 	if len(out) != 3 || !strings.HasPrefix(out[2], "secrets  failing") {
 		t.Fatalf("text output = %q", out)

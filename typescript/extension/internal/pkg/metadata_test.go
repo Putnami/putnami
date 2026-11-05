@@ -12,7 +12,7 @@ import (
 
 func readChannelRecord(t *testing.T, outputDir string) map[string]any {
 	t.Helper()
-	data, err := os.ReadFile(filepath.Join(outputDir, pkgmeta.ChannelRecordFile))
+	data, err := os.ReadFile(filepath.Join(outputDir, "channel.json"))
 	if err != nil {
 		t.Fatalf("failed to read channel record: %v", err)
 	}

@@ -274,7 +274,7 @@ func toolArchive(version string) []byte {
 	return buf.Bytes()
 }
 
-// sourcePin is a lock version 3 or 4 pin of version: an integrity and the
+// sourcePin is a lock version 4 pin of version: an integrity and the
 // release's base URL, and no archive.
 func sourcePin(version string) lockfile.LockEntry {
 	return lockfile.LockEntry{
@@ -347,7 +347,7 @@ func TestInstall_RecordsTheAnsweredPinsBeforeTheInstallers(t *testing.T) {
 	spectest.Proves(t, "cli/toolchain-lock", "extensions-answer-pins", "the-request-carries-the-committed-entries")
 	spectest.Proves(t, "cli/toolchain-lock", "install-pins-before-installers", "explicit-install-writes-the-answered-pins-at-format-5")
 	spectest.Proves(t, "cli/toolchain-lock", "install-pins-before-installers", "an-identity-no-answer-pins-is-removed")
-	spectest.Proves(t, "cli/toolchain-lock", "install-pins-before-installers", "a-format-3-lock-is-rewritten-at-format-5")
+	spectest.Proves(t, "cli/toolchain-lock", "install-pins-before-installers", "a-format-4-lock-is-rewritten-at-format-5")
 	wsRoot := setUpPinsTest(t)
 	exts := writePinsWorkspace(t, wsRoot,
 		pinsExtension{name: "@acme/go-pins", resolves: []string{"go", "gofmt"}},
@@ -360,7 +360,7 @@ func TestInstall_RecordsTheAnsweredPinsBeforeTheInstallers(t *testing.T) {
 	nodeExt.answer(t, pinsAnswer{Toolchains: map[string]wsproto.ToolchainResolution{"node": {Pin: nodePin}}})
 
 	committed := &lockfile.LockFile{
-		Version:    lockfile.FormatVersionV3,
+		Version:    lockfile.FormatVersionV4,
 		Extensions: map[string]lockfile.LockEntry{},
 		Templates:  map[string]lockfile.LockEntry{},
 		Toolchains: map[string]lockfile.LockEntry{

@@ -273,9 +273,9 @@ stamp into the task's output, so the key follows the commit that copy names.
 
 ### A project config is hashed through the reading task's scope
 
-`putnami.json` (and its `.putnamirc.json` spelling) is one file addressed to
-several readers. A task that reads it as configuration hashes it semantically
-rather than byte for byte. That task's key reads:
+`putnami.json` is one file addressed to several readers. A task that reads it
+as configuration hashes it semantically rather than byte for byte. That task's
+key reads:
 
 | Part of the file | In the key | Why |
 |---|---|---|
@@ -1883,6 +1883,12 @@ Core's whole knowledge of them is two declarations:
   `PUTNAMI_EXTENSION_CACHE_ROOT`. It defaults to
   `~/.putnami/cache/extensions/<extension>` (override the parent with
   `PUTNAMI_EXTENSION_CACHE_DIR`). Core creates it and never looks inside.
+- **The shared OCI layer cache** — core resolves one directory per repository,
+  `oci` under the build store, and exports it to every job as
+  `PUTNAMI_OCI_CACHE_ROOT`. Unlike `PUTNAMI_EXTENSION_CACHE_ROOT`, image
+  extensions and every worktree of the repository share it, and core owns it:
+  `putnami cache gc` and `putnami cache clean` collect it. Extensions read the
+  variable; you do not set it.
 - **The reserved `cache-clean` / `cache-gc` commands** — hidden commands an
   extension declares in its manifest. `putnami cache clean` and `putnami cache
   gc` fan out to every installed extension that declares them, in name order,

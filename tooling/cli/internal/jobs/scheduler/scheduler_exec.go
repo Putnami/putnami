@@ -23,11 +23,8 @@ var runPreBuildHookFunc = hooks.RunPreBuildHook
 
 // ONE runner, 1..n work items.
 //
-// A batched dispatch used to run an ALTERNATE lifecycle — whole-batch retry, a
-// deadline widened ×n for everyone, per-project results reconstructed from an
-// aggregate, and a rejoin with the ordinary path only at finalizeExecutedJob.
-// There is now ONE lifecycle for every scheduled task, and the size of the
-// dispatch group is the only thing batching changes:
+// ONE lifecycle for every scheduled task; the size of the dispatch group is the
+// only thing batching changes:
 //
 //	openTask     (per task) cache lookup / restore / claim, shared-execution
 //	                        rendezvous
@@ -895,8 +892,7 @@ func (s *Scheduler) lookupRestoreOrClaim(
 
 	// cachekey.ComputeJobCacheHash only mixes in the cache keys of this job's direct
 	// dependencies, so copy just those entries under the lock rather than the
-	// whole (growing) hashes map. This keeps the per-job copy O(deps) instead
-	// of O(N) and shortens the critical section every worker contends on.
+	// whole (growing) hashes map, keeping the critical section short.
 	mu.Lock()
 	hashCopy := make(map[string]string, len(job.DependsOn))
 	for _, depKey := range cachekey.CacheKeyDependencies(job) {

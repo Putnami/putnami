@@ -46,7 +46,7 @@ func RenderDir(src, dst string, vars RenderVars) error {
 	if err != nil {
 		return err
 	}
-	defer root.Close() //nolint:errcheck // best-effort cleanup
+	defer root.Close()
 
 	return filepath.WalkDir(src, func(path string, d fs.DirEntry, walkErr error) error {
 		if walkErr != nil {

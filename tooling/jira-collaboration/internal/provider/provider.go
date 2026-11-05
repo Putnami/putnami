@@ -13,13 +13,10 @@ package provider
 import (
 	"bytes"
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"os"
 	"regexp"
-	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -27,6 +24,7 @@ import (
 	"unicode/utf8"
 
 	collab "go.putnami.dev/protocol/collaboration"
+	"go.putnami.dev/sdk/extension/collabhelper"
 	"go.putnami.dev/tooling/jira-collaboration/internal/jira"
 )
 
@@ -136,7 +134,7 @@ func decodeSettings(raw json.RawMessage, into *Settings) *collab.Failure {
 		return collab.Fail(collab.OutcomeInvalid, reasonSettings, "the Jira provider's settings are %s: %v", settingNames, err)
 	}
 	switch {
-	case !jira.ValidHost(into.Site):
+	case !collabhelper.ValidHost(into.Site):
 		return collab.Fail(collab.OutcomeInvalid, reasonSettings, "settings.site must name the Jira Cloud host, such as acme.atlassian.net, got %q", into.Site)
 	case !projectPattern.MatchString(into.Project):
 		return collab.Fail(collab.OutcomeInvalid, reasonSettings, "settings.project must be a Jira project key, such as ENG, got %q", into.Project)
@@ -262,7 +260,7 @@ func (s *session) reconcile(settled func() (bool, *collab.Failure)) bool {
 	}
 	pause := s.p.ReconcilePause
 	if pause == nil {
-		pause = reconcilePause
+		pause = collabhelper.ReconcilePause
 	}
 	for attempt := 1; attempt <= attempts; attempt++ {
 		if attempt > 1 && pause(s.ctx, attempt-1) != nil {
@@ -273,17 +271,6 @@ func (s *session) reconcile(settled func() (bool, *collab.Failure)) bool {
 		}
 	}
 	return false
-}
-
-func reconcilePause(ctx context.Context, attempt int) error {
-	timer := time.NewTimer(time.Duration(attempt) * time.Second)
-	defer timer.Stop()
-	select {
-	case <-ctx.Done():
-		return ctx.Err()
-	case <-timer.C:
-		return nil
-	}
 }
 
 // myself returns the account id of the credential's account.
@@ -313,56 +300,6 @@ func (s *session) id(ref collab.Ref) (string, bool) {
 		return "", false
 	}
 	return ref.ID, true
-}
-
-// digest is the hex SHA-256 of a value's JSON encoding.
-func digest(value any) string {
-	encoded, err := json.Marshal(value)
-	if err != nil {
-		encoded = []byte(fmt.Sprint(value))
-	}
-	sum := sha256.Sum256(encoded)
-	return hex.EncodeToString(sum[:])
-}
-
-// oneLine fits a title into the contract: one line of at most limit
-// characters, never empty.
-func oneLine(value string, limit int, fallback string) string {
-	value = strings.Join(strings.Fields(value), " ")
-	if value == "" {
-		value = fallback
-	}
-	if utf8.RuneCountInString(value) > limit {
-		runes := []rune(value)
-		value = string(runes[:limit-1]) + "…"
-	}
-	return value
-}
-
-// boundedBody cuts a body to the contract's limit on a character boundary.
-func boundedBody(value string) string {
-	value = strings.ReplaceAll(value, "\x00", "")
-	if len(value) <= collab.MaxBodyBytes {
-		return value
-	}
-	cut := collab.MaxBodyBytes
-	for cut > 0 && !utf8.RuneStart(value[cut]) {
-		cut--
-	}
-	return value[:cut]
-}
-
-// boundedLabels keeps the labels the contract carries, in order: at most
-// MaxLabels distinct, non-empty names of at most MaxLabelLength characters.
-// The list is never nil, so an answer reports a label-less item as [].
-func boundedLabels(names []string) []string {
-	labels := []string{}
-	for _, label := range names {
-		if len(labels) < collab.MaxLabels && label != "" && utf8.RuneCountInString(label) <= collab.MaxLabelLength && !slices.Contains(labels, label) {
-			labels = append(labels, label)
-		}
-	}
-	return labels
 }
 
 // token keeps a value the contract accepts as a token: printable, without

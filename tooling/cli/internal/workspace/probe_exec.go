@@ -225,7 +225,7 @@ func (p *ExecProbeProvider) exchange(executable string, controlArgs []string, pa
 	if !p.PreparedBeforeRun {
 		runcredential.MarkRepositoryCodeStarted(custody + p.Extension)
 	}
-	cmd := exec.CommandContext(ctx, executable, args...) //nolint:gosec // executable is a resolved extension runtime
+	cmd := exec.CommandContext(ctx, executable, args...)
 	cmd.Dir = p.Dir
 	cmd.Env = p.Env
 	cmd.Stdin = payload

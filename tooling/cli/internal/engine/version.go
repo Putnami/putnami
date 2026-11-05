@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 
+	"go.putnami.dev/sdk/extension/gitread"
 	internalextension "go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/git"
 	"go.putnami.dev/tooling/cli/internal/iox"
@@ -81,7 +82,7 @@ func requireRepository(req *Request) (*internalextension.DiscoveryResult, error)
 		if len(internalextension.CommandSideEffects(extensions, command)) == 0 {
 			continue
 		}
-		if unmanaged := git.Unmanaged(req.WorkspaceRoot); unmanaged != nil {
+		if unmanaged := gitread.Unmanaged(req.WorkspaceRoot); unmanaged != nil {
 			return discovered, fmt.Errorf("%s needs git history: %w", command, unmanaged)
 		}
 		return discovered, nil

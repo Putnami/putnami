@@ -60,12 +60,6 @@ func StableDir(wsRoot string, kind Kind, name string) string {
 	return filepath.Join(wsRoot, ".putnami", "bin", string(kind), EncodeName(name))
 }
 
-// ArtifactsBaseDir returns the base directory for all artifacts of a kind:
-// .putnami/bin/artifacts/{kind}/
-func ArtifactsBaseDir(wsRoot string, kind Kind) string {
-	return filepath.Join(wsRoot, ".putnami", "bin", "artifacts", string(kind))
-}
-
 // StableBaseDir returns the base directory for all stable symlinks of a kind:
 // .putnami/bin/{kind}/
 func StableBaseDir(wsRoot string, kind Kind) string {
@@ -148,52 +142,4 @@ func UnlinkArtifact(wsRoot string, kind Kind, name string) error {
 		return err
 	}
 	return nil
-}
-
-// RemoveArtifact removes the versioned artifact directory and its stable symlink.
-// If version is empty, removes all versions matching the name.
-func RemoveArtifact(wsRoot string, kind Kind, name, version string) error {
-	// Remove symlink
-	os.Remove(StableDir(wsRoot, kind, name))
-
-	if version != "" {
-		return os.RemoveAll(ArtifactDir(wsRoot, kind, name, version))
-	}
-
-	// Remove all versions: scan artifacts dir for name@ prefix
-	base := ArtifactsBaseDir(wsRoot, kind)
-	prefix := EncodeName(name) + "@"
-	entries, err := os.ReadDir(base)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return nil
-		}
-		return err
-	}
-	for _, e := range entries {
-		if strings.HasPrefix(e.Name(), prefix) {
-			os.RemoveAll(filepath.Join(base, e.Name()))
-		}
-	}
-	return nil
-}
-
-// ListVersions returns all installed versions for a given name and kind.
-func ListVersions(wsRoot string, kind Kind, name string) ([]string, error) {
-	base := ArtifactsBaseDir(wsRoot, kind)
-	prefix := EncodeName(name) + "@"
-	entries, err := os.ReadDir(base)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return nil, nil
-		}
-		return nil, err
-	}
-	var versions []string
-	for _, e := range entries {
-		if e.IsDir() && strings.HasPrefix(e.Name(), prefix) {
-			versions = append(versions, strings.TrimPrefix(e.Name(), prefix))
-		}
-	}
-	return versions, nil
 }

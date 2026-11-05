@@ -88,7 +88,7 @@ type TestPolicy struct {
 // of Provision, with a diagnostic naming it, rather than silently falling back
 // to a container the pipeline did not ask for.
 func SelectProvider() Provider {
-	if strings.TrimSpace(os.Getenv(EnvProvidedServer)) != "" {
+	if strings.TrimSpace(os.Getenv(envProvidedServer)) != "" {
 		return NewProvidedServer()
 	}
 	return NewProvisioner()

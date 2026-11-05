@@ -8,7 +8,6 @@ import (
 
 	protocolcli "go.putnami.dev/protocol/cli"
 	doctor "go.putnami.dev/protocol/doctor"
-	"go.putnami.dev/tooling/cli/internal/commands/shared"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
 
@@ -27,9 +26,9 @@ func TestDoctorPreflight_ProductionBlocksUnwaived(t *testing.T) {
 	if got := protocolcli.ExitCodeForError(err); got != protocolcli.ExitUsage {
 		t.Fatalf("exit code = %d, want %d", got, protocolcli.ExitUsage)
 	}
-	data, ok := shared.ResultData(err).(doctor.Report)
+	data, ok := protocolcli.ResultData(err).(doctor.Report)
 	if !ok || data.Summary.Findings != report.Summary.Findings {
-		t.Fatalf("blocking error must carry the report as ResultData: %#v", shared.ResultData(err))
+		t.Fatalf("blocking error must carry the report as ResultData: %#v", protocolcli.ResultData(err))
 	}
 	// missing-config commits a required sensitive value (critical) and a required
 	// non-sensitive value (high).

@@ -37,14 +37,6 @@ func templatesInstall(ctx context.Context, wsRoot string, cfg *wsproto.Config, a
 	return TemplatesInstallWithOptions(ctx, wsRoot, cfg, args, InstallOptions{OutputFormat: outputFormat, Out: out})
 }
 
-// TemplatesInstallWithWriter is TemplatesInstall with the human progress
-// stream chosen by the caller. It exists for internal/commands' combined
-// `install` lifecycle command (install.go), which is outside this vertical and
-// threads its own writer through — see ExtensionsInstallWithWriter for why.
-func TemplatesInstallWithWriter(ctx context.Context, wsRoot string, cfg *wsproto.Config, args []string, outputFormat string, out io.Writer) error {
-	return templatesInstall(ctx, wsRoot, cfg, args, outputFormat, out)
-}
-
 // TemplatesInstallWithOptions installs templates and reports typed outcomes in
 // the same stable order as extension installs.
 func TemplatesInstallWithOptions(ctx context.Context, wsRoot string, cfg *wsproto.Config, args []string, opts InstallOptions) error {
@@ -65,7 +57,7 @@ func TemplatesUpdateWithOptions(ctx context.Context, wsRoot string, cfg *wsproto
 func TemplatesList(wsRoot string, cfg *wsproto.Config, outputFormat string) error {
 	lockFile, lockErr := lockfile.ReadLockFile(wsRoot)
 	if lockErr != nil {
-		noteUnreadableLock(lockErr) // see ExtensionsList for why
+		noteUnreadableLock(lockErr) // see ExtensionsListPrepared for why
 	}
 
 	tplMap := shared.BuildTemplateMap(cfg)
@@ -325,7 +317,7 @@ func TemplatesTest(ctx context.Context, args []string, channel string) error {
 	// grandchildren (job runner subprocesses), so spawn them in their own
 	// process group under ctx — a canceled `templates test` then tears down
 	// the whole tree instead of orphaning it.
-	env := append(os.Environ(), "PUTNAMI_NO_PROGRESS=true")
+	env := os.Environ()
 
 	// Install the template's extension by name, on the channel the run chose.
 	// The workspace config keeps the bare name, as init leaves it.

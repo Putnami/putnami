@@ -36,29 +36,6 @@ func TestResolveHTTPTimeout(t *testing.T) {
 	}
 }
 
-func TestResolveRetryBackoff(t *testing.T) {
-	tests := []struct {
-		name string
-		in   string
-		want time.Duration
-	}{
-		{"empty falls back to default", "", HTTPRetryBackoff},
-		{"duration string", "500ms", 500 * time.Millisecond},
-		{"bare integer = seconds", "2", 2 * time.Second},
-		{"zero is honored (disables sleep)", "0", 0},
-		{"zero duration is honored", "0s", 0},
-		{"invalid input falls back", "not-a-duration", HTTPRetryBackoff},
-		{"negative falls back", "-5", HTTPRetryBackoff},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if got := resolveRetryBackoff(tt.in); got != tt.want {
-				t.Errorf("resolveRetryBackoff(%q) = %v, want %v", tt.in, got, tt.want)
-			}
-		})
-	}
-}
-
 func TestIsTransientStatus(t *testing.T) {
 	transient := []int{408, 429, 500, 502, 503, 504, 599}
 	for _, code := range transient {
@@ -79,7 +56,7 @@ func TestIsTransientStatus(t *testing.T) {
 // main-branch run. DoWithRetry must observe it, drain+close it, sleep the
 // backoff, and return the 200.
 func TestDoWithRetry_RetriesOn5xx(t *testing.T) {
-	t.Setenv(HTTPRetryBackoffEnv, "0") // assert call count, not wall-clock
+	t.Cleanup(SetHTTPRetryBackoff(0)) // assert call count, not wall-clock
 	srv := recorded.NewServer(t, http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte("ok"))
@@ -126,7 +103,7 @@ func TestDoWithRetrySetsUserAgent(t *testing.T) {
 // bounded — 3 attempts that all meet the recorded gateway reset return the last
 // error and stop.
 func TestDoWithRetry_StopsAfterMaxAttempts(t *testing.T) {
-	t.Setenv(HTTPRetryBackoffEnv, "0") // assert call count, not wall-clock
+	t.Cleanup(SetHTTPRetryBackoff(0)) // assert call count, not wall-clock
 	srv := recorded.NewServer(t, nil, putRegistryRecording(t, "gateway-reset-before-headers.502.http"))
 
 	req, _ := http.NewRequest(http.MethodGet, srv.URL, nil)
@@ -212,7 +189,7 @@ func TestRegistryTransportSendsAMappedHostToItsOrigin(t *testing.T) {
 
 func TestRegistryHTTPClientRefusesAMalformedOriginsValueWithoutRetrying(t *testing.T) {
 	t.Setenv("PUTNAMI_REGISTRY_ORIGINS", "put.example.dev=http://plain.example.net")
-	t.Setenv(HTTPRetryBackoffEnv, "0")
+	t.Cleanup(SetHTTPRetryBackoff(0))
 	base := &recordingTransport{}
 	client := &http.Client{Transport: registryTransport(base)}
 

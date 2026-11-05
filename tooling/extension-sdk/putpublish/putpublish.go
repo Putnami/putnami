@@ -15,18 +15,15 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"net"
 	"net/http"
-	"net/url"
 	"slices"
-	"strings"
-	"time"
 
 	diag "go.putnami.dev/protocol/diagnostic"
 	distribution "go.putnami.dev/protocol/distribution"
 	infra "go.putnami.dev/protocol/infra"
 	put "go.putnami.dev/protocol/put"
 	"go.putnami.dev/sdk/extension/internal/artifacterr"
+	"go.putnami.dev/sdk/extension/internal/registryhttp"
 	"go.putnami.dev/sdk/extension/internal/retry"
 	"go.putnami.dev/sdk/extension/registryorigin"
 )
@@ -51,14 +48,6 @@ type Blob struct {
 	// Read returns the blob bytes. Bytes whose digest or size is not the
 	// blob's are refused before they are sent.
 	Read func() ([]byte, error)
-}
-
-// BytesBlob is the blob of data, uploaded with mediaType.
-func BytesBlob(mediaType string, data []byte) Blob {
-	return Blob{
-		MediaType: mediaType, Digest: put.Digest(data), Size: int64(len(data)),
-		Read: func() ([]byte, error) { return data, nil },
-	}
 }
 
 // Member is one packed Put registry member version.
@@ -96,29 +85,7 @@ type Published struct {
 // loopback host, with no trailing slash. A URL that carries userinfo, a query
 // or a fragment is refused, so no credential travels in a URL.
 func ValidateRegistryURL(raw string) (string, error) {
-	u, err := url.Parse(strings.TrimSpace(raw))
-	if err != nil || u.Opaque != "" || u.Host == "" || u.Hostname() == "" {
-		return "", errors.New("put registry URL must be an absolute HTTP(S) URL without credentials")
-	}
-	if u.User != nil || u.RawQuery != "" || u.ForceQuery || u.Fragment != "" {
-		return "", errors.New("put registry URL must be an absolute HTTP(S) URL without credentials, query, or fragment")
-	}
-	u.Scheme = strings.ToLower(u.Scheme)
-	switch u.Scheme {
-	case "https":
-	case "http":
-		hostname := strings.TrimSuffix(strings.ToLower(u.Hostname()), ".")
-		ip := net.ParseIP(hostname)
-		loopback := hostname == "localhost" || strings.HasSuffix(hostname, ".localhost") || (ip != nil && ip.IsLoopback())
-		if !loopback {
-			return "", errors.New("put registry URL must use HTTPS (HTTP is allowed only for loopback)")
-		}
-	default:
-		return "", errors.New("put registry URL must use HTTP(S)")
-	}
-	u.Path = strings.TrimRight(u.Path, "/")
-	u.RawPath = ""
-	return u.String(), nil
+	return registryhttp.ValidateURL("put", raw)
 }
 
 // NewHTTPClient returns the client a publication sends through: no proxy, so
@@ -130,31 +97,7 @@ func NewHTTPClient() (*http.Client, error) {
 	if err != nil {
 		return nil, err
 	}
-	baseTransport, ok := http.DefaultTransport.(*http.Transport)
-	if !ok {
-		return nil, errors.New("put registry transport is unavailable")
-	}
-	direct := baseTransport.Clone()
-	direct.Proxy = nil
-	transport := registryorigin.Transport(direct, origins)
-	return &http.Client{
-		Timeout:       5 * time.Minute,
-		Transport:     transport,
-		CheckRedirect: refuseRedirect,
-	}, nil
-}
-
-func refuseRedirect(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
-
-// withoutRedirects returns a copy of client that never follows a redirect, so
-// a request carrying the bearer reaches the registry it names and no other.
-func withoutRedirects(client *http.Client) (*http.Client, error) {
-	if client == nil {
-		return nil, errors.New("put publication requires an HTTP client")
-	}
-	bounded := *client
-	bounded.CheckRedirect = refuseRedirect
-	return &bounded, nil
+	return registryhttp.NewClient("put registry transport", origins)
 }
 
 // Check validates member before any request and returns the platforms of an
@@ -280,7 +223,7 @@ func UploadBlob(ctx context.Context, client *http.Client, registryURL, token, co
 	return nil
 }
 
-// PublishManifest publishes member's manifest without a channel and returns
+// publishManifest publishes member's manifest without a channel and returns
 // the manifest the registry stores. A 409 means the version is already
 // published: the stored manifest is read back, and the version is a reuse only
 // when its media type and payload bytes equal member's; another manifest is
@@ -288,7 +231,7 @@ func UploadBlob(ctx context.Context, client *http.Client, registryURL, token, co
 // (package retry) sends the publish again, up to retry.Attempts times in all,
 // and a 409 after a lost answer is accepted by the same rule. A registryURL
 // that ValidateRegistryURL refuses is refused before any request.
-func PublishManifest(ctx context.Context, client *http.Client, registryURL, token string, member Member) (stored *put.Manifest, reused bool, err error) {
+func publishManifest(ctx context.Context, client *http.Client, registryURL, token string, member Member) (stored *put.Manifest, reused bool, err error) {
 	registryURL, err = ValidateRegistryURL(registryURL)
 	if err != nil {
 		return nil, false, err
@@ -382,7 +325,7 @@ func Publish(ctx context.Context, client *http.Client, registryURL, token string
 			return Published{}, fmt.Errorf("upload blob %d: %w", index, err)
 		}
 	}
-	stored, reused, err := PublishManifest(ctx, client, registryURL, token, member)
+	stored, reused, err := publishManifest(ctx, client, registryURL, token, member)
 	if err != nil {
 		return Published{}, err
 	}
@@ -413,7 +356,7 @@ func sendRetrying(ctx context.Context, client *http.Client, method, target, cont
 // failure or an unreadable answer is marked with retry.Again when package
 // retry counts it as transient.
 func send(ctx context.Context, client *http.Client, method, target, contentType, token string, body []byte) (reply, error) {
-	client, err := withoutRedirects(client)
+	client, err := registryhttp.WithoutRedirects(client, "put publication")
 	if err != nil {
 		return reply{}, err
 	}

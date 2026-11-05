@@ -10,7 +10,7 @@ import (
 
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/sdk/extension/dirlink"
-	"go.putnami.dev/tooling/cli/internal/flock"
+	"go.putnami.dev/sdk/extension/filelock"
 )
 
 // DefaultMaxSessions is the default number of sessions to retain.
@@ -158,7 +158,7 @@ func pruneRecordedSession(dir string, expirePending bool) (bool, error) {
 	var locks []*os.File
 	release := func() error {
 		for _, lock := range locks {
-			_ = flock.UnlockFile(lock)
+			_ = filelock.UnlockFile(lock)
 			_ = lock.Close()
 		}
 		locks = nil
@@ -167,12 +167,12 @@ func pruneRecordedSession(dir string, expirePending bool) (bool, error) {
 	pending := false
 	lockNames := make([]string, 0, len(reportingCheckpoints))
 	for _, checkpoint := range reportingCheckpoints {
-		lock, err := flock.OpenFile(filepath.Join(dir, checkpoint.lock), os.O_CREATE|os.O_RDWR, 0o600)
+		lock, err := filelock.OpenFile(filepath.Join(dir, checkpoint.lock), os.O_CREATE|os.O_RDWR, 0o600)
 		if err != nil {
 			_ = release()
 			return false, nil
 		}
-		if flock.LockFile(lock, true, true) != nil {
+		if filelock.LockFile(lock, true, true) != nil {
 			_ = lock.Close()
 			_ = release()
 			return false, nil
@@ -187,7 +187,7 @@ func pruneRecordedSession(dir string, expirePending bool) (bool, error) {
 	}
 	// The locks are released before their files go: Windows before version
 	// 1809 cannot remove a directory that holds an open file.
-	if err := flock.RemoveDirLocks(dir, lockNames, release); err != nil {
+	if err := filelock.RemoveDirLocks(dir, lockNames, release); err != nil {
 		return false, err
 	}
 	return true, nil

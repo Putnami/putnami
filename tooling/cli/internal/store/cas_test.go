@@ -90,7 +90,7 @@ func TestCAS_IngestThroughSymlinkRoot(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(real, "coverage.out"), []byte("mode: set\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	// ...reached through a symlink, as OutManager.Link leaves it.
+	// ...reached through a symlink.
 	link := filepath.Join(t.TempDir(), "out-link")
 	if err := os.Symlink(real, link); err != nil {
 		t.Fatal(err)

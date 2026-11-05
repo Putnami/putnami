@@ -20,7 +20,7 @@ import (
 // When fetchHTTP makes a single attempt, Pin fails with "clibin: resolver
 // returned 502 Bad Gateway".
 func TestCLIPinDownloadSurvivesAGatewayResetBeforeHeaders(t *testing.T) {
-	t.Setenv(extension.HTTPRetryBackoffEnv, "0")
+	t.Cleanup(extension.SetHTTPRetryBackoff(0))
 	const binary = "the-pinned-cli"
 	previous := extension.ResolveRegistryTokenWithCLI
 	extension.ResolveRegistryTokenWithCLI = func(context.Context, string, string) (string, string) { return "", "" }

@@ -1479,8 +1479,7 @@ func TestTraceChangeImpact_ParentIsStableAcrossRuns(t *testing.T) {
 }
 
 // ImpactPath walks the union `impacted` widens through, so it crosses the
-// extension-consumer edge DependentPath does not know about — the gap that let
-// `why_impacted` deny a pair `impacted` had selected.
+// extension-consumer edge and never denies a pair `impacted` selected.
 func TestImpactPath_CrossesExtensionConsumerEdges(t *testing.T) {
 	spectest.Proves(t, "cli/workspace-model", "change-impact", "impact-path-walks-the-same-edges-as-the-closure")
 	ws := extensionImpactWorkspace()
@@ -1491,9 +1490,6 @@ func TestImpactPath_CrossesExtensionConsumerEdges(t *testing.T) {
 	}
 	if got := ImpactPath(ws, "/go/extension", "/apps/web"); !reflect.DeepEqual(got, want) {
 		t.Errorf("ImpactPath = %+v, want %+v", got, want)
-	}
-	if got := ws.Graph.DependentPath("/go/extension", "/apps/web"); got != nil {
-		t.Errorf("DependentPath = %v, want nil: the scheduling graph has no extension edges", got)
 	}
 	// A library the extension imports rebuilds the extension, which reaches its
 	// consumers for its tasks: the path crosses both edge kinds, and the reach

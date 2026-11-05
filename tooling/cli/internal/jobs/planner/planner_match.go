@@ -4,6 +4,7 @@ import (
 	"path/filepath"
 	"sort"
 
+	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
@@ -202,7 +203,7 @@ func isProjectExtensionDep(proj *workspace.Project, job *extension.JobDefinition
 	extName := job.ExtensionName
 	extID := ""
 	if job.ExtensionPath != "" {
-		extID = workspace.ProjectIDFromPath(job.ExtensionPath)
+		extID = wsproto.ProjectIDFromPath(job.ExtensionPath)
 	}
 	cmdName := job.Name
 

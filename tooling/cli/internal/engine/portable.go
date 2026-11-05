@@ -22,9 +22,9 @@ import (
 	extensionproto "go.putnami.dev/protocol/extension"
 	protocoljob "go.putnami.dev/protocol/job"
 	runner "go.putnami.dev/protocol/runner"
+	"go.putnami.dev/sdk/extension/gitread"
 	"go.putnami.dev/tooling/cli/internal/changeplan"
 	internalextension "go.putnami.dev/tooling/cli/internal/extension"
-	"go.putnami.dev/tooling/cli/internal/git"
 	"go.putnami.dev/tooling/cli/internal/iox"
 	"go.putnami.dev/tooling/cli/internal/jobs/cachekey"
 	"go.putnami.dev/tooling/cli/internal/jobs/publication"
@@ -366,7 +366,7 @@ func portableRequest(req *Request, ws *workspace.Workspace, discovered *internal
 	// ran, never the ref: a moving ref cannot change admitted work later.
 	baseline, diagnostics := "", append([]string{}, req.selectionEvidence.diagnostics...)
 	if req.selection.Mode == protocoljob.SelectionModeImpacted && req.selection.Baseline != "" {
-		sha, err := git.ResolveCommit(req.WorkspaceRoot, req.selection.Baseline)
+		sha, err := gitread.ResolveCommit(req.WorkspaceRoot, req.selection.Baseline)
 		if err != nil {
 			return runner.ExecutionRequest{}, fmt.Errorf("freeze baseline %q: %w", req.selection.Baseline, err)
 		}

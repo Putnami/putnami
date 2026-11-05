@@ -6,6 +6,7 @@ import (
 
 	archproto "go.putnami.dev/protocol/architecture"
 	diag "go.putnami.dev/protocol/diagnostic"
+	sdkgit "go.putnami.dev/sdk/extension/gitread"
 	internalgit "go.putnami.dev/tooling/sdd/extension/internal/gitread"
 	workspace "go.putnami.dev/tooling/sdd/extension/internal/wsview"
 )
@@ -110,7 +111,7 @@ func loadPreviousBaseline(root string, current *archproto.Baseline, options Eval
 			diag.Errorf(ErrorCodeBaselineUnavailable, archproto.BaselineFilename, "resolve architecture comparison baseline: %v", err),
 		}
 	}
-	commit, err := internalgit.ResolveCommit(root, ref)
+	commit, err := sdkgit.ResolveCommit(root, ref)
 	if err != nil {
 		return nil, archproto.RatchetOptions{}, status, []diag.Diagnostic{
 			diag.Errorf(ErrorCodeBaselineUnavailable, archproto.BaselineFilename, "resolve architecture comparison commit: %v", err),

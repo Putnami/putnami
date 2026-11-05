@@ -7,7 +7,7 @@ import (
 
 	protocolcli "go.putnami.dev/protocol/cli"
 	diag "go.putnami.dev/protocol/diagnostic"
-	"go.putnami.dev/tooling/sdd/extension/internal/gitread"
+	"go.putnami.dev/sdk/extension/gitread"
 )
 
 // The breaking-marker gate of `validate-workspace`.
@@ -87,23 +87,23 @@ func BuildBreakingMarkerResult(root, message, baseline string) (BreakingMarkerRe
 
 	baseline = strings.TrimSpace(baseline)
 	if baseline == "" {
-		return report, WithResultData(protocolcli.Classify(fmt.Errorf(
+		return report, protocolcli.WithResultData(protocolcli.Classify(fmt.Errorf(
 			"breaking marker: %s is set, but the run has no impacted baseline to read the commits of the change from; "+
 				"run with --impacted against a base branch this clone holds", ProposalMessageEnv), protocolcli.ErrInvalidConfig), report)
 	}
 	report.Baseline = baseline
 	shallow, err := gitread.IsShallow(root)
 	if err != nil {
-		return report, WithResultData(fmt.Errorf("breaking marker: %w", err), report)
+		return report, protocolcli.WithResultData(fmt.Errorf("breaking marker: %w", err), report)
 	}
 	if shallow {
-		return report, WithResultData(protocolcli.Classify(fmt.Errorf(
+		return report, protocolcli.WithResultData(protocolcli.Classify(fmt.Errorf(
 			"breaking marker: the repository is a shallow clone, so the commits since %s may stop at the clone depth "+
 				"and hide a breaking change; fetch the whole history", baseline), protocolcli.ErrInvalidConfig), report)
 	}
-	commits, err := gitread.CommitsSince(root, baseline)
+	commits, err := gitread.CommitsSince(root, baseline, nil)
 	if err != nil {
-		return report, WithResultData(fmt.Errorf("breaking marker: %w", err), report)
+		return report, protocolcli.WithResultData(fmt.Errorf("breaking marker: %w", err), report)
 	}
 	report.Commits = len(commits)
 	for _, commit := range commits {
@@ -129,7 +129,7 @@ func BuildBreakingMarkerResult(root, message, baseline string) (BreakingMarkerRe
 		failure.WriteString(`The title is not a conventional commit, so nothing in the body counts: write it as "type(scope)!: summary".`)
 	}
 	failure.WriteString(" If the change breaks nothing, reword the commit.")
-	return report, WithResultData(protocolcli.Classify(errors.New(failure.String()), protocolcli.ErrInvalidConfig), report)
+	return report, protocolcli.WithResultData(protocolcli.Classify(errors.New(failure.String()), protocolcli.ErrInvalidConfig), report)
 }
 
 // splitCommitMessage splits a message the way Git reads a commit message: the

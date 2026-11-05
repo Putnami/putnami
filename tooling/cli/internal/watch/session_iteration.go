@@ -56,14 +56,9 @@ func (s *Session) runJobLoop(ctx context.Context) int {
 // affectedProjects maps a batch of changed files onto the projects to replan.
 //
 // It is the SHARED change→project calculation (workspace.ProjectsForChangedFiles),
-// the same one `--impacted` runs over its git diff. This used to be
-// internal/watch/classifier.go, a second algorithm whose comment said it
-// "mirrors --impacted"; what the merge was about is the one rule the shared path
-// lacked — workspace-scoped task inputs. That rule moved into the shared function
-// as ChangeImpactOptions rather than being deleted, so watch still re-runs
-// everything on a lockfile edit. The ownership width the two algorithms once
-// differed on is no longer a difference: the classifier's nearest-owner rule
-// moved into the shared path, so a file inside a nested project again
+// the same one `--impacted` runs over its git diff;
+// ChangeImpactOptions carries the workspace-scoped task-input rule, so watch
+// re-runs everything on a lockfile edit. A file inside a nested project
 // attributes to that project only, on both surfaces.
 func (s *Session) affectedProjects(changedFiles []string) []*workspace.Project {
 	return workspace.ProjectsForChangedFiles(s.cfg.Workspace, changedFiles, workspace.ChangeImpactOptions{
@@ -83,9 +78,7 @@ func (s *Session) runIteration(ctx context.Context, changedFiles []string) {
 // runIterationForProjects runs one iteration through the engine seam and renders
 // its verdict.
 //
-// Exit codes are the protocol/cli taxonomy. This used to return raw
-// ints — 0 success, 1 plan failure, 2 job failure — where 2 is ExitUsage, so a
-// failing final iteration made `putnami build --watch` exit "bad usage".
+// Exit codes are the protocol/cli taxonomy.
 func (s *Session) runIterationForProjects(ctx context.Context, projects []*workspace.Project, _ []string) int {
 	start := time.Now()
 

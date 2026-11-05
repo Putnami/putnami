@@ -118,11 +118,11 @@ func SynchronizeTarget(workspaceRoot, projectRoot string, language clientcontrac
 // projectRoot in the order discovery reads it: the one a build wrote, else the
 // committed one. When neither exists, the error satisfies os.IsNotExist.
 func readProjectGenerationConfig(projectRoot string) ([]byte, error) {
-	data, err := os.ReadFile(filepath.Join(projectRoot, filepath.FromSlash(builtConfigFile))) //nolint:gosec // fixed project-relative path
+	data, err := os.ReadFile(filepath.Join(projectRoot, filepath.FromSlash(builtConfigFile)))
 	if err == nil || !os.IsNotExist(err) {
 		return data, err
 	}
-	return os.ReadFile(filepath.Join(projectRoot, committedConfigFile)) //nolint:gosec // fixed project-relative path
+	return os.ReadFile(filepath.Join(projectRoot, committedConfigFile))
 }
 
 // requireNoCommittedTarget fails when the provider commits a generated client
@@ -191,7 +191,7 @@ func copyProviderInputs(workspaceRoot, tempRoot string, provider provider) error
 	// provider root, so Biome's package, configuration, overrides and
 	// EditorConfig are resolved against the provider's own identity. Copying
 	// them here would create a second, silently divergent copy of the same
-	// inputs. FormatterInputs derives that same resolution for the cache key.
+	// inputs. The clientgen-ts cache key declares those same files.
 	inputs := []string{
 		joinRel(provider.rel, builtConfigFile),
 		joinRel(provider.rel, committedConfigFile),
@@ -234,7 +234,7 @@ func hasConfiguredTarget(values []string, want string) bool {
 }
 
 func copyOptional(source, destination string) error {
-	input, err := os.Open(source) //nolint:gosec // paths are workspace-derived
+	input, err := os.Open(source)
 	if err != nil {
 		if os.IsNotExist(err) {
 			return nil
@@ -245,7 +245,7 @@ func copyOptional(source, destination string) error {
 	if err := os.MkdirAll(filepath.Dir(destination), 0o750); err != nil {
 		return err
 	}
-	output, err := os.OpenFile(destination, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0o600) //nolint:gosec
+	output, err := os.OpenFile(destination, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0o600)
 	if err != nil {
 		return err
 	}
@@ -300,7 +300,7 @@ func sourceProjectForCommandRoot(workspaceRoot, commandRoot, projectRoot string)
 
 func runResolvedGenerators(workspaceRoot, projectRoot, formatProjectRoot, goExecutable, typescriptExecutable string) error {
 	if goExecutable != "" {
-		command := exec.Command(goExecutable, "--project", projectRoot) //nolint:gosec // executable is the extension-packaged framework emitter
+		command := exec.Command(goExecutable, "--project", projectRoot)
 		command.Dir = projectRoot
 		command.Env = replaceEnvironmentValue(os.Environ(), "PUTNAMI_WORKSPACE_ROOT", workspaceRoot)
 		if output, err := command.CombinedOutput(); err != nil {
@@ -370,9 +370,9 @@ func typescriptGeneratorCommand(shim, projectRoot, formatProjectRoot string) (*e
 		if strings.TrimSpace(executable) == "" {
 			return nil, fmt.Errorf("typescript client generation requires the exact runtime pinned by the workspace lock")
 		}
-		return exec.Command(executable, arguments...), nil //nolint:gosec // both executable paths are resolved from typed runtime/package declarations
+		return exec.Command(executable, arguments...), nil
 	}
-	return exec.Command(shim, arguments[1:]...), nil //nolint:gosec // compatibility for direct low-level/test invocation
+	return exec.Command(shim, arguments[1:]...), nil
 }
 
 func goGeneratorExecutable() (string, error) {

@@ -88,7 +88,7 @@ func BuildDocsLinksResult(ws *workspace.Workspace, workspaceOptions map[string]m
 		})
 	}
 	if len(findings) > 0 {
-		return report, findings, WithResultData(protocolcli.Classify(
+		return report, findings, protocolcli.WithResultData(protocolcli.Classify(
 			fmt.Errorf("docs-links: %d broken link(s) in the workspace documents", len(findings)),
 			protocolcli.ErrInvalidConfig), report)
 	}

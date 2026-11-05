@@ -311,7 +311,7 @@ func TestImpactReachWithTasks_NamesTheTaskScopeOfEveryProjectItReaches(t *testin
 	if got := reach.Trace.ScopeOf("/apps/service"); !slices.Equal(got, want) {
 		t.Errorf("the reach scoped /apps/service to %v, want %v", got, want)
 	}
-	steps := ImpactPathWithTasks(ws, "/libs/http", "/apps/service", index)
+	steps := impactPathWithTasks(ws, "/libs/http", "/apps/service", index)
 	if len(steps) != 3 || steps[2].Kind != ImpactEdgeDependency {
 		t.Errorf("the path is %+v, want three hops ending on a dependency edge", steps)
 	}

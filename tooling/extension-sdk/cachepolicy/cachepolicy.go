@@ -98,13 +98,6 @@ type Result struct {
 	Skipped bool
 }
 
-// OverBudget reports whether the cache is still above its budget after the
-// pass — the honest signal that grace-protected or unevictable bytes are what
-// remain, rather than a silent "collected, all good".
-func (r *Result) OverBudget(maxBytes int64) bool {
-	return r != nil && maxBytes > 0 && r.RemainingBytes > maxBytes
-}
-
 // LockFileName is the advisory lock file every collector for a given root
 // takes. It lives inside the root so two collectors of the same cache contend
 // and collectors of different caches never do.

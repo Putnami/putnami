@@ -80,7 +80,7 @@ func providerServiceIDs(workspaceRoot string, provider *Project) ([]string, erro
 }
 
 func readContract(path string) ([]byte, error) {
-	data, err := os.ReadFile(path) //nolint:gosec // a fixed path under a workspace project
+	data, err := os.ReadFile(path)
 	if err != nil {
 		return nil, err
 	}

@@ -9,7 +9,6 @@ import (
 	"sync"
 	"testing"
 
-	"go.putnami.dev/protocol/features/spectest"
 	"go.putnami.dev/sdk/extension/scratch"
 )
 
@@ -77,21 +76,6 @@ func CLIEnv() []string {
 		}
 	}
 	return append(env, "DO_NOT_TRACK=1")
-}
-
-// IsolateCLIEnv applies CLIEnv's rule to this process's own environment, for
-// a test whose code under test starts the CLI with that environment, as a
-// composition starts each member's serve run. It keeps spectest's fragment
-// directory, which the test process itself writes its evidence to. A TestMain
-// calls it before m.Run.
-func IsolateCLIEnv() {
-	for _, entry := range os.Environ() {
-		name, _, _ := strings.Cut(entry, "=")
-		if !reachesCLI(name) && name != spectest.FragmentDirEnv {
-			_ = os.Unsetenv(name)
-		}
-	}
-	_ = os.Setenv("DO_NOT_TRACK", "1")
 }
 
 // reachesCLI reports whether the variable name reaches a CLI a test starts.

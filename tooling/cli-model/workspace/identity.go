@@ -4,36 +4,11 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"hash"
 	"sort"
-	"strings"
 
 	wsproto "go.putnami.dev/protocol/workspace"
 )
-
-// ProjectIDFromPath derives a project's canonical logical ID from its physical
-// workspace-relative path. Complete, non-empty parenthesized segments are
-// transparent grouping folders: they remain in Project.Path but are omitted
-// from Project.ID.
-func ProjectIDFromPath(projectPath string) string {
-	physicalPath := CleanWorkspacePath(projectPath)
-	if physicalPath == "" {
-		return "/"
-	}
-
-	segments := strings.Split(physicalPath, "/")
-	logicalSegments := make([]string, 0, len(segments))
-	for _, segment := range segments {
-		if isTransparentGroupSegment(segment) {
-			continue
-		}
-		logicalSegments = append(logicalSegments, segment)
-	}
-	return "/" + strings.Join(logicalSegments, "/")
-}
-
-func isTransparentGroupSegment(segment string) bool {
-	return len(segment) > 2 && segment[0] == '(' && segment[len(segment)-1] == ')'
-}
 
 // identityDigestFormat versions the CLI-side identity fold. It is hashed with
 // the payload, so bumping it moves every identity and every cache key that
@@ -103,7 +78,7 @@ func ProbeViewOf(p *Project, resolveDependency func(string) (string, bool)) wspr
 // ProbePathOf translates the CLI's workspace-relative path spelling (where the
 // workspace root is "") into the probe protocol's ("." for the root).
 func ProbePathOf(projectPath string) string {
-	cleaned := CleanWorkspacePath(projectPath)
+	cleaned := wsproto.CleanWorkspacePath(projectPath)
 	if cleaned == "" {
 		return wsproto.ProbeRootPath
 	}
@@ -124,11 +99,10 @@ func ProbePathOf(projectPath string) string {
 //     resolve at all contributes no path and would otherwise vanish from the
 //     key entirely.
 //   - The PROVIDER-OWNED metadata blocks, in extension order, each canonicalized.
-//     This is the half that moved to provider ownership: those blocks
-//     are delivered to every task as `project.metadata[<extension>]`, replacing
-//     the npm-shaped members job context v2 used to carry, so a task's answer can
-//     depend on them and a key that ignored them would serve a stale hit after a
-//     `bin`/`exports` edit. Canonicalization is what keeps a provider's own
+//     This is the half that moved to provider ownership: those blocks are
+//     delivered to every task as `project.metadata[<extension>]`, so a task's
+//     answer can depend on them and a key that ignored them would serve a stale
+//     hit after a `bin`/`exports` edit. Canonicalization is what keeps a provider's own
 //     re-ordering of its JSON object keys from moving the key.
 //   - For a generated client target, its CONTRACT BINDING: the service it was
 //     generated from and the digest of the contract bytes it was generated at.
@@ -188,7 +162,7 @@ func ProjectMetadataDigest(
 	return identityDigestFormat + ":" + hex.EncodeToString(h.Sum(nil))
 }
 
-func writeIdentityField(h interface{ Write([]byte) (int, error) }, s string) {
-	h.Write([]byte(s)) //nolint:errcheck // hash.Hash.Write never errors
-	h.Write([]byte{0}) //nolint:errcheck // hash.Hash.Write never errors
+func writeIdentityField(h hash.Hash, s string) {
+	h.Write([]byte(s))
+	h.Write([]byte{0})
 }

@@ -17,6 +17,7 @@ import (
 
 	diag "go.putnami.dev/protocol/diagnostic"
 	wsproto "go.putnami.dev/protocol/workspace"
+	"go.putnami.dev/sdk/extension/robustio"
 )
 
 const LockFilename = "putnami.lock.json"
@@ -29,30 +30,19 @@ const LockFilename = "putnami.lock.json"
 // target version defines. That is what lets a file answer "which fields may I
 // trust?" about itself.
 //
-// Since the vNext core, the window's floor is v2: v1 is READ-REJECTED, not
-// silently upgraded. Silently upgrading would rewrite a
-// committed lock as a side effect of an unrelated command, and reading a v1
-// lock as v2 would mean inventing the one thing v2 adds — the pinned
-// extension's task-contract level, which this CLI now requires to be recorded.
-// `putnami migrate vnext --apply` is the one seam that performs the conversion,
-// and OutdatedVersionError names it.
+// The window's floor is v4: an older lock is READ-REJECTED, not silently
+// upgraded, because silently upgrading would rewrite a committed lock as a side
+// effect of an unrelated command. OutdatedVersionError names the remedy.
 const (
-	// FormatVersionV1 is the original format: per-entry resolved version,
-	// archive integrity digests, manifest hash, and source URL. No longer read.
-	FormatVersionV1 = 1
-	// FormatVersionV2 adds LockEntry.TaskContract — the task-contract protocol
-	// version the pinned extension's manifest declares — so a pinned
-	// extension's contract level is readable from the lock alone, without
-	// resolving and parsing the installed manifest.
-	FormatVersionV2 = 2
-	// FormatVersionV3 adds the top-level Toolchains dimension and records the
-	// pinned CLI's machine-output protocol version. Both are preflight metadata:
-	// a runner can decide what to materialize and whether it understands the
-	// CLI stream before starting a gate.
-	FormatVersionV3 = 3
-	// FormatVersionV4 adds the platform-independent AgentArtifacts dimension.
-	// Each entry binds both the registry archive and its file manifest; ordinary
-	// reads and writes preserve v2/v3 instead of silently promoting them.
+	// FormatVersionV4 is the oldest format this CLI reads. Each entry records
+	// its resolved version, per-platform archive integrity digests, manifest
+	// hash, source URL and LockEntry.TaskContract, the task-contract protocol
+	// version the pinned extension's manifest declares. The Toolchains
+	// dimension and the pinned CLI's machine-output protocol version are
+	// preflight metadata: a runner can decide what to materialize and whether
+	// it understands the CLI stream before starting a gate. The
+	// platform-independent AgentArtifacts dimension binds each registry archive
+	// and its file manifest.
 	FormatVersionV4 = 4
 	// FormatVersionV5 records, in each toolchain entry, every platform's
 	// archive (LockEntry.Archives: its URL, format and executable) beside the
@@ -66,7 +56,7 @@ const (
 	// DefaultWriteVersion is the version stamped on a lock that records none.
 	DefaultWriteVersion = FormatVersionV5
 	// MinSupportedVersion is the oldest format version this CLI reads.
-	MinSupportedVersion = FormatVersionV2
+	MinSupportedVersion = FormatVersionV4
 	// MaxSupportedVersion is the newest format version this CLI reads.
 	MaxSupportedVersion = FormatVersionV5
 )
@@ -90,24 +80,21 @@ func (e *UnsupportedVersionError) Error() string {
 
 // OutdatedVersionError reports a lock file older than this reader's floor. It is
 // the mirror of UnsupportedVersionError — same two numbers, opposite direction —
-// and it names the command that converts the file, because the fix belongs to
-// the workspace rather than to the binary.
+// and it names the remedy, because the fix belongs to the workspace rather than
+// to the binary: no command of this CLI reads the file, so the remedy writes a
+// new one.
 type OutdatedVersionError struct {
 	// Found is the format version recorded in the file (0 when it records
-	// none, which is how a v1 lock spells v1).
+	// none).
 	Found int
 	// Min is the oldest format version the reader supports.
 	Min int
 }
 
 func (e *OutdatedVersionError) Error() string {
-	found := e.Found
-	if found == 0 {
-		found = FormatVersionV1
-	}
 	return fmt.Sprintf(
-		"%s is lock format version %d, but this putnami requires version %d: run `putnami migrate vnext --apply` to convert it",
-		LockFilename, found, e.Min)
+		"%s is lock format version %d, but this putnami reads version %d or later: delete it and run `putnami install` to write a current one",
+		LockFilename, e.Found, e.Min)
 }
 
 // VocabularyError reports a lock file whose members break the vocabulary of
@@ -154,8 +141,9 @@ func (e *ToolchainsNeedResolutionError) Error() string {
 // It records the exact resolved versions and integrity hashes of the
 // pinned CLI binary and the installed extensions and templates.
 type LockFile struct {
-	// Version is the lock file format version. Zero means the file recorded none,
-	// which reads as v1.
+	// Version is the lock file format version. A file that records none is
+	// refused like any version below MinSupportedVersion; an in-memory lock that
+	// carries none is written at DefaultWriteVersion.
 	Version int `json:"version"`
 	// CLI declares which putnami engine this workspace runs. It has exactly
 	// three legal shapes, and a reader must distinguish all three:
@@ -178,10 +166,10 @@ type LockFile struct {
 	// is of its download archive.
 	CLI *LockEntry `json:"cli,omitempty"`
 	// Toolchains maps toolchain identities to exact, independently
-	// materializable release entries. It is lock format v3 vocabulary. A v3 or
-	// v4 lock keys it by runtime name (go, bun, uv, and node in older locks)
-	// and records each release's Source; a v5 lock keys it by any lock
-	// identity and records each platform's archive in Archives instead.
+	// materializable release entries. A v4 lock keys it by runtime name (go,
+	// bun, uv or node) and records each release's Source; a v5 lock keys it by
+	// any lock identity and records each platform's archive in Archives
+	// instead.
 	Toolchains map[string]LockEntry `json:"toolchains,omitempty"`
 	// Extensions maps extension names to their resolved entries.
 	Extensions map[string]LockEntry `json:"extensions"`
@@ -238,7 +226,7 @@ type LockEntry struct {
 	// Download archives are per-os/arch, so this single digest only ever
 	// matches the platform that generated it; Integrities supersedes it for
 	// cross-platform verification. Readers retain it for backward compatibility;
-	// canonical v2 extension writes omit it once Integrities is available.
+	// canonical extension writes omit it once Integrities is available.
 	Integrity string `json:"integrity,omitempty"`
 	// Archives maps a platform key ("os/arch") to the archive a version 5
 	// toolchain pin downloads for that platform. It is lock format v5
@@ -264,16 +252,13 @@ type LockEntry struct {
 	// extension manifest declares: 2 for a manifest whose tasks carry no
 	// `declares` block, 3 for one that does (protocol/extension's
 	// ManifestProtocolVersion is the sole authority — this field only RECORDS
-	// its answer). Zero means "not recorded", which is what every v1 lock and
-	// every entry whose manifest was not installed at migration time carries.
-	//
-	// LOCK FORMAT v2 ONLY. Reading a v1 lock discards it and writing at v1
-	// omits it, so the field can never appear in a file that does not declare
-	// the version defining it. It is recorded for extensions; the CLI pin and
-	// template entries have no task contract and leave it zero.
+	// its answer). Zero means "not recorded", which is what an entry whose
+	// manifest was not installed at migration time carries. It is recorded for
+	// extensions; the CLI pin and template entries have no task contract and
+	// leave it zero.
 	TaskContract int `json:"taskContract,omitempty"`
 	// ProtocolVersion is the machine-output protocol emitted by the pinned CLI.
-	// It is recorded only on the CLI entry and is lock format v3 vocabulary.
+	// It is recorded only on the CLI entry.
 	ProtocolVersion int `json:"protocolVersion,omitempty"`
 }
 
@@ -343,7 +328,7 @@ func (e *LockEntry) SetPlatformIntegrity(platform, digest string) {
 //
 // It accepts exactly [MinSupportedVersion, MaxSupportedVersion]: a newer file
 // is an *UnsupportedVersionError, an older one an *OutdatedVersionError naming
-// `putnami migrate vnext --apply`.
+// its remedy.
 func ReadLockFile(workspaceRoot string) (*LockFile, error) {
 	path := filepath.Join(workspaceRoot, LockFilename)
 	data, err := os.ReadFile(path)
@@ -361,32 +346,10 @@ func ParseLockFile(data []byte) (*LockFile, error) {
 	return parseLockFile(data, MinSupportedVersion, MaxSupportedVersion)
 }
 
-// ReadMigratableLockFile reads a lock file for the migration path, accepting
-// formats BELOW this CLI's floor. It is the single exception to the read window
-// and exists because `putnami migrate vnext --apply` is what moves a workspace
-// onto that floor: a migration that could not read the file it converts would
-// leave the workspace with no way forward.
-//
-// Everything else must go through ReadLockFile. The distinction is a function
-// name rather than a flag so a reviewer can see, at each call site, whether the
-// caller is the migration or a consumer that requires a migrated lock.
-func ReadMigratableLockFile(workspaceRoot string) (*LockFile, error) {
-	path := filepath.Join(workspaceRoot, LockFilename)
-	data, err := os.ReadFile(path)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return nil, nil
-		}
-		return nil, fmt.Errorf("read lock file: %w", err)
-	}
-	return parseLockFile(data, FormatVersionV1, MaxSupportedVersion)
-}
-
 // parseLockFile is the single reader, parameterized by the format-version
 // window the reader accepts. The bounds are parameters rather than constants so
-// the compatibility matrix can exercise a NARROWER reader (a v1-only client)
-// against a newer file, and the migration a WIDER one, on exactly this code
-// path.
+// the compatibility matrix can exercise a NARROWER reader (a v4-only client)
+// against a newer file on exactly this code path.
 //
 // Three rules make the version field mean something:
 //   - a version above maxVersion is refused, so a reader never acts on a file
@@ -394,8 +357,9 @@ func ReadMigratableLockFile(workspaceRoot string) (*LockFile, error) {
 //   - a version below minVersion is refused too, so a reader never acts on a
 //     file that is MISSING vocabulary it requires — the symmetric failure, and
 //     the one a silent upgrade would hide;
-//   - vocabulary a version does not define is discarded, so a hand-edited v1
-//     lock carrying a v2 field cannot smuggle a contract record into a v1 read.
+//   - vocabulary a version does not define is discarded, so a hand-edited
+//     lock carrying a newer version's field cannot smuggle it into an older
+//     read.
 //
 // Archives are the exception to the third rule, because a reader acts on them:
 // an entry below FormatVersionV5 that carries archives, a version 5 extension,
@@ -409,27 +373,14 @@ func parseLockFile(data []byte, minVersion, maxVersion int) (*LockFile, error) {
 	if lf.Version > maxVersion {
 		return nil, &UnsupportedVersionError{Found: lf.Version, Max: maxVersion}
 	}
-	// A file that records no version is v1: that absence is how v1 spells
-	// itself, so it is compared like any other version rather than defaulted.
-	if effectiveVersion(lf.Version) < minVersion {
+	if lf.Version < minVersion {
 		return nil, &OutdatedVersionError{Found: lf.Version, Min: minVersion}
 	}
 	if diags := lf.vocabularyDiagnostics(); len(diags) > 0 {
-		return nil, &VocabularyError{Version: effectiveVersion(lf.Version), Diagnostics: diags}
+		return nil, &VocabularyError{Version: lf.Version, Diagnostics: diags}
 	}
 
-	if lf.Extensions == nil {
-		lf.Extensions = make(map[string]LockEntry)
-	}
-	if lf.Templates == nil {
-		lf.Templates = make(map[string]LockEntry)
-	}
-	if lf.Version >= FormatVersionV3 && lf.Toolchains == nil {
-		lf.Toolchains = make(map[string]LockEntry)
-	}
-	if lf.Version >= FormatVersionV4 && lf.AgentArtifacts == nil {
-		lf.AgentArtifacts = make(map[string]AgentArtifactLockEntry)
-	}
+	initEntryMaps(&lf)
 	lf.dropFieldsAbove(lf.Version)
 
 	return &lf, nil
@@ -440,9 +391,9 @@ func parseLockFile(data []byte, minVersion, maxVersion int) (*LockFile, error) {
 // lock keeps its own version instead of being silently up- or down-graded by an
 // unrelated install.
 //
-// Existing v2 locks remain v2 under ordinary extension/template updates; the
-// explicit install/pin metadata refresh is what promotes one to v3. New locks
-// start at DefaultWriteVersion.
+// An existing v4 lock remains v4 under ordinary extension/template updates;
+// MigrateLockFileToCurrent and a command that writes toolchain pins promote it
+// to v5. New locks start at DefaultWriteVersion.
 //
 // The output is deterministic: entries are sorted by name within each section
 // (encoding/json sorts map keys), and vocabulary above the written version is
@@ -460,8 +411,8 @@ func WriteLockFileIfChanged(workspaceRoot string, lf *LockFile) (bool, error) {
 	if err != nil || !changed {
 		return false, err
 	}
-	if err := writeFileAtomic(filepath.Join(workspaceRoot, LockFilename), data, 0o644); err != nil {
-		return false, err
+	if err := robustio.WriteFile(filepath.Join(workspaceRoot, LockFilename), data, 0o644, nil); err != nil {
+		return false, fmt.Errorf("write lock file: %w", err)
 	}
 	return true, nil
 }
@@ -517,16 +468,22 @@ func prepareLockFileForWrite(lf *LockFile) {
 	if lf.Version == 0 {
 		lf.Version = DefaultWriteVersion
 	}
+	initEntryMaps(lf)
+}
+
+// initEntryMaps allocates every nil entry map of lf, so a read or a write
+// renders each section of the format.
+func initEntryMaps(lf *LockFile) {
 	if lf.Extensions == nil {
 		lf.Extensions = make(map[string]LockEntry)
 	}
 	if lf.Templates == nil {
 		lf.Templates = make(map[string]LockEntry)
 	}
-	if lf.Version >= FormatVersionV3 && lf.Toolchains == nil {
+	if lf.Toolchains == nil {
 		lf.Toolchains = make(map[string]LockEntry)
 	}
-	if lf.Version >= FormatVersionV4 && lf.AgentArtifacts == nil {
+	if lf.AgentArtifacts == nil {
 		lf.AgentArtifacts = make(map[string]AgentArtifactLockEntry)
 	}
 }
@@ -536,15 +493,14 @@ func prepareLockFileForWrite(lf *LockFile) {
 // below FormatVersionV5 whose own vocabulary pins any toolchain needs
 // `putnami install`.
 func (lf *LockFile) ToolchainsNeedResolution() *ToolchainsNeedResolutionError {
-	version := effectiveVersion(lf.Version)
-	if version >= FormatVersionV5 {
+	if lf.Version >= FormatVersionV5 {
 		return nil
 	}
 	pinned := lf.canonicalFor(lf.Version).Toolchains
 	if len(pinned) == 0 {
 		return nil
 	}
-	return &ToolchainsNeedResolutionError{Found: version, Identities: sortedEntryNames(pinned)}
+	return &ToolchainsNeedResolutionError{Found: lf.Version, Identities: sortedEntryNames(pinned)}
 }
 
 // MigrateLockFileToCurrent explicitly projects a supported lock onto
@@ -560,11 +516,10 @@ func MigrateLockFileToCurrent(lf *LockFile) (*LockFile, error) {
 	if lf == nil {
 		return nil, fmt.Errorf("migrate lock file: lock file is nil")
 	}
-	version := effectiveVersion(lf.Version)
-	if version < MinSupportedVersion {
+	if lf.Version < MinSupportedVersion {
 		return nil, &OutdatedVersionError{Found: lf.Version, Min: MinSupportedVersion}
 	}
-	if version > MaxSupportedVersion {
+	if lf.Version > MaxSupportedVersion {
 		return nil, &UnsupportedVersionError{Found: lf.Version, Max: MaxSupportedVersion}
 	}
 	if needsResolution := lf.ToolchainsNeedResolution(); needsResolution != nil {
@@ -581,34 +536,18 @@ func MigrateLockFileToCurrent(lf *LockFile) (*LockFile, error) {
 	return &out, nil
 }
 
-// WriteLockFileV2 writes the lock file at format v2, upgrading a lock the
-// migration read below the floor.
-//
-// This is the seam `putnami migrate vnext --apply` writes through. It writes
-// atomically (temp file + rename in the destination directory) so an
-// interrupted migration leaves the previous lock intact rather than a truncated
-// one; WriteLockFile inherits that, because every write is at v2 or later now.
-func WriteLockFileV2(workspaceRoot string, lf *LockFile) error {
-	lf.Version = FormatVersionV2
-	if lf.Extensions == nil {
-		lf.Extensions = make(map[string]LockEntry)
-	}
-	if lf.Templates == nil {
-		lf.Templates = make(map[string]LockEntry)
-	}
-	return writeLockFile(workspaceRoot, lf)
-}
-
 // writeLockFile renders and writes the canonical bytes. Every write is atomic
-// (temp file + rename in the destination directory): the historical in-place v1
-// write went out with the v1 read, so a reader never observes a partially
-// written lock regardless of which caller produced it.
+// (temp file + rename in the destination directory), so a reader never
+// observes a partially written lock regardless of which caller produced it.
 func writeLockFile(workspaceRoot string, lf *LockFile) error {
 	data, err := MarshalLockFile(lf)
 	if err != nil {
 		return err
 	}
-	return writeFileAtomic(filepath.Join(workspaceRoot, LockFilename), data, 0o644)
+	if err := robustio.WriteFile(filepath.Join(workspaceRoot, LockFilename), data, 0o644, nil); err != nil {
+		return fmt.Errorf("write lock file: %w", err)
+	}
+	return nil
 }
 
 // MarshalLockFile renders the canonical on-disk bytes of a lock file: two-space
@@ -638,7 +577,7 @@ func writeLockFile(workspaceRoot string, lf *LockFile) error {
 func MarshalLockFile(lf *LockFile) ([]byte, error) {
 	out := lf.canonicalFor(lf.Version)
 	if diags := out.vocabularyDiagnostics(); len(diags) > 0 {
-		return nil, &VocabularyError{Version: effectiveVersion(out.Version), Diagnostics: diags}
+		return nil, &VocabularyError{Version: out.Version, Diagnostics: diags}
 	}
 	var buf bytes.Buffer
 	enc := json.NewEncoder(&buf)
@@ -654,9 +593,9 @@ func MarshalLockFile(lf *LockFile) ([]byte, error) {
 
 // canonicalFor returns a copy of lf carrying only the canonical representation
 // defined at or below version. The copy makes every projection non-destructive:
-// writing a v2 lock at v1 must not erase the caller's in-memory contract
-// records, and omitting a legacy extension scalar must not erase the
-// backward-compatible value a reader loaded.
+// writing a lock at v4 must not erase the caller's in-memory archives, and
+// omitting a legacy extension scalar must not erase the backward-compatible
+// value a reader loaded.
 func (lf *LockFile) canonicalFor(version int) LockFile {
 	out := LockFile{
 		Version:        lf.Version,
@@ -675,24 +614,20 @@ func (lf *LockFile) canonicalFor(version int) LockFile {
 	if out.Templates == nil {
 		out.Templates = make(map[string]LockEntry)
 	}
-	if version >= FormatVersionV4 && out.AgentArtifacts == nil {
+	if out.AgentArtifacts == nil {
 		out.AgentArtifacts = make(map[string]AgentArtifactLockEntry)
 	}
-	if version >= FormatVersionV2 {
-		// Extension archives vary by os/arch. Persisting the last installer's
-		// scalar makes otherwise complete locks platform-dependent; the
-		// per-platform map is the sole canonical v2 representation. A scalar-only
-		// legacy entry keeps its sole verification datum until a verified install
-		// supplies the map. Keep v1 rendering unchanged for the migration bridge,
-		// and leave CLI/template entries alone because this compatibility cleanup
-		// is extension-only.
-		for name, entry := range out.Extensions {
-			if len(entry.Integrities) == 0 {
-				continue
-			}
-			entry.Integrity = ""
-			out.Extensions[name] = entry
+	// Extension archives vary by os/arch. Persisting the last installer's scalar
+	// makes otherwise complete locks platform-dependent; the per-platform map is
+	// the sole canonical representation. A scalar-only legacy entry keeps its
+	// sole verification datum until a verified install supplies the map. CLI and
+	// template entries are left alone: the rule is extension-only.
+	for name, entry := range out.Extensions {
+		if len(entry.Integrities) == 0 {
+			continue
 		}
+		entry.Integrity = ""
+		out.Extensions[name] = entry
 	}
 	if version >= FormatVersionV5 {
 		// A version 5 toolchain entry names each archive's URL instead of a
@@ -716,7 +651,7 @@ func (lf *LockFile) canonicalFor(version int) LockFile {
 }
 
 // dropFieldsAbove clears every field introduced after version, in place. It is
-// the one place the version→vocabulary mapping is stated, so a v3 field has
+// the one place the version→vocabulary mapping is stated, so a v6 field has
 // exactly one line to add here.
 func (lf *LockFile) dropFieldsAbove(version int) {
 	if version >= FormatVersionV5 {
@@ -735,44 +670,6 @@ func (lf *LockFile) dropFieldsAbove(version int) {
 			entries[name] = entry
 		}
 	}
-	if version >= FormatVersionV4 {
-		return
-	}
-	// v4 vocabulary: platform-independent agent-workflow artifact pins.
-	lf.AgentArtifacts = nil
-	if version >= FormatVersionV3 {
-		return
-	}
-	// v3 vocabulary: the toolchain dimension and the CLI output protocol.
-	lf.Toolchains = nil
-	if lf.CLI != nil {
-		lf.CLI.ProtocolVersion = (LockEntry{}).ProtocolVersion
-	}
-	if version >= FormatVersionV2 {
-		return
-	}
-	// v2 vocabulary: LockEntry.TaskContract.
-	if lf.CLI != nil {
-		lf.CLI.TaskContract = 0
-	}
-	for _, entries := range []map[string]LockEntry{lf.Extensions, lf.Templates} {
-		for name, entry := range entries {
-			if entry.TaskContract == 0 {
-				continue
-			}
-			entry.TaskContract = 0
-			entries[name] = entry
-		}
-	}
-}
-
-// effectiveVersion resolves the version a file's `version` member MEANS: an
-// absent member (0) is v1, which is the only way a v1 file identifies itself.
-func effectiveVersion(recorded int) int {
-	if recorded == 0 {
-		return FormatVersionV1
-	}
-	return recorded
 }
 
 // copyEntries deeply copies an entry map so canonical projections and explicit
@@ -814,7 +711,7 @@ func (e LockEntry) clone() LockEntry {
 // entry breaks. The order is fixed: the CLI entry, then toolchains, extensions
 // and templates, each by name.
 func (lf *LockFile) vocabularyDiagnostics() []diag.Diagnostic {
-	version := effectiveVersion(lf.Version)
+	version := lf.Version
 	var diags []diag.Diagnostic
 	archivesOutsideToolchains := func(section string, entry LockEntry) {
 		if entry.Archives == nil {
@@ -910,35 +807,6 @@ func copyAgentArtifactEntries(entries map[string]AgentArtifactLockEntry) map[str
 		out[name] = entry
 	}
 	return out
-}
-
-// writeFileAtomic writes data to path via a temporary file in the same
-// directory followed by a rename, so a reader never observes a partially
-// written lock and an interrupted write leaves the previous file intact.
-func writeFileAtomic(path string, data []byte, perm os.FileMode) error {
-	dir := filepath.Dir(path)
-	tmp, err := os.CreateTemp(dir, "."+filepath.Base(path)+".tmp*")
-	if err != nil {
-		return fmt.Errorf("write lock file: %w", err)
-	}
-	tmpName := tmp.Name()
-	defer os.Remove(tmpName) //nolint:errcheck // best-effort cleanup of an already-renamed or failed temp
-
-	if _, err := tmp.Write(data); err != nil {
-		tmp.Close() //nolint:errcheck // write error is the one being reported
-		return fmt.Errorf("write lock file: %w", err)
-	}
-	if err := tmp.Chmod(perm); err != nil {
-		tmp.Close() //nolint:errcheck // chmod error is the one being reported
-		return fmt.Errorf("write lock file: %w", err)
-	}
-	if err := tmp.Close(); err != nil {
-		return fmt.Errorf("write lock file: %w", err)
-	}
-	if err := os.Rename(tmpName, path); err != nil {
-		return fmt.Errorf("write lock file: %w", err)
-	}
-	return nil
 }
 
 // NewLockFile creates a new empty lock file at the default write version.
@@ -1041,24 +909,6 @@ func (lf *LockFile) SetTemplate(name string, entry LockEntry) {
 // RemoveTemplate removes a template from the lock file.
 func (lf *LockFile) RemoveTemplate(name string) {
 	delete(lf.Templates, name)
-}
-
-// GetAgentArtifact returns the lock entry for the given agent-workflow
-// artifact, or false.
-func (lf *LockFile) GetAgentArtifact(name string) (AgentArtifactLockEntry, bool) {
-	entry, ok := lf.AgentArtifacts[name]
-	return entry, ok
-}
-
-// SetAgentArtifact adds or updates a legacy agent-workflow artifact pin. No
-// command adds one; it reproduces the lock an earlier release wrote. Callers
-// migrating an older lock must invoke MigrateLockFileToCurrent first; an older
-// format's canonical projection deliberately omits this v4-only vocabulary.
-func (lf *LockFile) SetAgentArtifact(name string, entry AgentArtifactLockEntry) {
-	if lf.AgentArtifacts == nil {
-		lf.AgentArtifacts = make(map[string]AgentArtifactLockEntry)
-	}
-	lf.AgentArtifacts[name] = entry
 }
 
 // RemoveAgentArtifact removes an agent-workflow artifact pin.

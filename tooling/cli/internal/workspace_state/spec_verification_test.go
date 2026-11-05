@@ -35,9 +35,14 @@ func TestWriteSpecVerificationPersistsBesideTheSessionAndReplays(t *testing.T) {
 		t.Errorf("WriteSpecVerification stamped the caller's record: %q", record.SessionID)
 	}
 
-	replayed, found, err := store.ReadSpecVerification(session.ID)
-	if err != nil || !found {
-		t.Fatalf("replay = (%v, %v)", found, err)
+	sessionsDir := filepath.Join(root, ".putnami", "sessions")
+	data, err := os.ReadFile(filepath.Join(sessionsDir, session.ID, features.SpecVerificationRecordFilename))
+	if err != nil {
+		t.Fatalf("replay: %v", err)
+	}
+	replayed, diagnostics := features.ParseSpecVerificationRecord(data)
+	if replayed == nil {
+		t.Fatalf("replay parse: %v", diagnostics)
 	}
 	if replayed.SessionID != session.ID {
 		t.Errorf("replayed sessionId = %q, want %q", replayed.SessionID, session.ID)
@@ -55,20 +60,7 @@ func TestWriteSpecVerificationPersistsBesideTheSessionAndReplays(t *testing.T) {
 	if err := empty.WriteSpecVerification(nil); err != nil {
 		t.Fatalf("nil record: %v", err)
 	}
-	if _, found, err := store.ReadSpecVerification(empty.ID); found || err != nil {
-		t.Errorf("a gate-free session reported a record (found %v, err %v)", found, err)
-	}
-
-	// A record claiming another session is refused on read.
-	forged := filepath.Join(root, ".putnami", "sessions", empty.ID, features.SpecVerificationRecordFilename)
-	data, err := os.ReadFile(filepath.Join(root, ".putnami", "sessions", session.ID, features.SpecVerificationRecordFilename))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(forged, data, 0o644); err != nil {
-		t.Fatal(err)
-	}
-	if _, found, err := store.ReadSpecVerification(empty.ID); !found || err == nil {
-		t.Errorf("a record claiming another session was accepted (found %v, err %v)", found, err)
+	if _, err := os.Stat(filepath.Join(sessionsDir, empty.ID, features.SpecVerificationRecordFilename)); !os.IsNotExist(err) {
+		t.Errorf("a gate-free session carries a record file (err %v)", err)
 	}
 }

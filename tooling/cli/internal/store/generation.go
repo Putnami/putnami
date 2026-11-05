@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"strconv"
 
-	"go.putnami.dev/tooling/cli/internal/flock"
+	"go.putnami.dev/sdk/extension/filelock"
 )
 
 // The store keeps a monotonic "generation" counter, bumped once per cache-using
@@ -37,7 +37,7 @@ func (s *LocalStore) bumpGeneration() int64 {
 	if err := os.MkdirAll(s.root, 0o755); err != nil {
 		return 0
 	}
-	if l, err := flock.Acquire(filepath.Join(s.root, genLockFile), true, false); err == nil {
+	if l, err := filelock.Acquire(filepath.Join(s.root, genLockFile), true, false); err == nil {
 		defer func() { _ = l.Release() }()
 	}
 	next := readGenerationFile(s.root) + 1

@@ -6,7 +6,7 @@ import (
 	"strings"
 
 	protocolcli "go.putnami.dev/protocol/cli"
-	"go.putnami.dev/tooling/cli/internal/git"
+	"go.putnami.dev/sdk/extension/gitread"
 	"go.putnami.dev/tooling/cli/internal/iox"
 	"go.putnami.dev/tooling/cli/internal/jobs/scheduler"
 	"go.putnami.dev/tooling/cli/internal/machine"
@@ -14,21 +14,11 @@ import (
 	"go.putnami.dev/tooling/cli/internal/workspace_state"
 )
 
-// The two v1 session-file projections that used to live here — SessionStats and
-// sessionJobEntry — were deleted with the v1 session writer. The
-// recorded session is the versioned cli.SessionFile now, projected by
-// internal/machine from the same canonical reduction, so nothing derives a
-// second stats vocabulary on the way to disk.
-
 // recordProfilerSessionEvent projects scheduler session records into the trace.
 // Coalesced work keeps its successful DAG status, but the trace end event and
 // instant marker expose the distinct outcome for direct counting.
 //
-// It reads the record's TYPED task. It used to re-read "status",
-// "outcome", "duration" and "cache" back out of the untyped payload and
-// re-derived the reuse classification from them — including a fallback for a
-// producer that had not filled "outcome" in. jobs.ReuseKind makes both the
-// re-derivation and that fallback structurally impossible.
+// It reads the record's TYPED task.
 func recordProfilerSessionEvent(prof *profiler.Profiler, record scheduler.SessionRecord) {
 	if record.Type != scheduler.SessionRecordJobEnd || record.Task == nil {
 		return
@@ -304,7 +294,7 @@ func reportGit(wsRoot string, req *Request) *protocolcli.ReportGit {
 	if wsRoot == "" {
 		return nil
 	}
-	sha, err := git.HeadSHA(wsRoot)
+	sha, err := gitread.HeadSHA(wsRoot)
 	if err != nil || sha == "" {
 		return nil
 	}
@@ -316,7 +306,7 @@ func reportGit(wsRoot string, req *Request) *protocolcli.ReportGit {
 		state.Branch = attachedBranch(snapshot.Branch)
 		dirty := snapshot.IsDirty
 		state.Dirty = &dirty
-	} else if branch, branchErr := git.CurrentBranch(wsRoot); branchErr == nil {
+	} else if branch, branchErr := gitread.CurrentBranch(wsRoot); branchErr == nil {
 		state.Branch = attachedBranch(branch)
 	}
 	return state

@@ -10,8 +10,8 @@ import (
 	"strconv"
 	"strings"
 
+	protocolcli "go.putnami.dev/protocol/cli"
 	"go.putnami.dev/tooling/cli/internal/iox"
-	"go.putnami.dev/tooling/cli/internal/output"
 )
 
 // LoadSample is a read-only measurement; unavailable hosts report Known=false.
@@ -97,7 +97,7 @@ func MachineCommand(outputFormat string, reader LoadReader) error {
 
 // WriteMachineLoad prints one sample to out.
 func WriteMachineLoad(out io.Writer, outputFormat string, sample LoadSample) error {
-	if output.StructuredOutput(outputFormat) {
+	if protocolcli.OutputMode(outputFormat).IsMachineReadable() {
 		data, _ := json.Marshal(sample)
 		iox.Fprintln(out, string(data))
 	} else {

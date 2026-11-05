@@ -33,7 +33,7 @@
     "prepare": {
       "command": "{extensionRoot}/bin/prepare",
       "args": ["--output", "{runtimeOutput}"],
-      "inputs": ["bin/prepare", "cmd/**", "go.mod", "go.sum", "internal/**", "tools/**"],
+      "inputs": ["bin/prepare", "cmd/**", "config/**", "go.mod", "go.sum", "internal/**", "tools/**"],
       "toolchains": ["runtimeCompiler"]
     }
   },

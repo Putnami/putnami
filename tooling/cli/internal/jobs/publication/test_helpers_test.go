@@ -32,6 +32,9 @@ func TestMain(m *testing.M) {
 	if script := os.Getenv(fixtureScriptEnv); script != "" {
 		os.Exit(runFixtureScript(script, os.Args[1:]))
 	}
+	if dir := os.Getenv(evidenceProviderEnv); dir != "" {
+		os.Exit(runEvidenceProvider(dir))
+	}
 	os.Exit(m.Run())
 }
 
@@ -146,7 +149,7 @@ func isSelector(expr ast.Expr, names ...string) bool {
 // fixtureScriptEnv hands a re-executed test binary the steps it runs as a
 // fixture task. It is the portable stand-in for a #! shell script, which
 // Windows cannot run: TestMain runs the steps and exits.
-const fixtureScriptEnv = "PUTNAMI_JOBS_FIXTURE_SCRIPT"
+const fixtureScriptEnv = "JOBS_FIXTURE_SCRIPT"
 
 // fixtureScript is what a fixture task does, one step per entry: an operation
 // and its operands. An operand "$1" to "$9" names the task's argument. See

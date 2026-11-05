@@ -77,8 +77,8 @@ COMMAND_MAP_MAX_BYTES=1048576
 # the moment the user first runs it, with no evidence of why.
 SUPPORTED_MATRIX="darwin (macOS) and linux, on amd64 or arm64"
 
-# Opt-out for the fail-closed integrity check. Mirrors PUTNAMI_UNSAFE_UPDATE on
-# the in-binary `putnami upgrade` path; routine use removes the only defense
+# Opt-out for the fail-closed integrity check. The in-binary `putnami upgrade`
+# path has no such override; routine use removes the only defense
 # against a tampered download.
 UNSAFE_INSTALL_ENV="PUTNAMI_UNSAFE_INSTALL"
 ALLOW_INSECURE_REGISTRY_ENV="PUTNAMI_ALLOW_INSECURE_REGISTRY"

@@ -8,6 +8,7 @@ import (
 	"sort"
 	"strings"
 
+	protocolcli "go.putnami.dev/protocol/cli"
 	extensionproto "go.putnami.dev/protocol/extension"
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/tooling/cli/internal/commands/doctor"
@@ -29,7 +30,7 @@ import (
 // under --output=json|jsonl an implicit install's chatter must go to stderr.
 func lifecycleEnv(env *CommandEnv) lifecycle.LifecycleEnv {
 	out := io.Writer(os.Stdout)
-	if output.StructuredOutput(env.OutputFormat) {
+	if protocolcli.OutputMode(env.OutputFormat).IsMachineReadable() {
 		out = os.Stderr
 	}
 	noColor := env.Global.Color != nil && !*env.Global.Color
@@ -38,7 +39,7 @@ func lifecycleEnv(env *CommandEnv) lifecycle.LifecycleEnv {
 		Debug:       env.Global.Debug,
 		Quiet:       env.Global.Quiet,
 		NoColor:     noColor,
-		Interactive: !output.StructuredOutput(env.OutputFormat) && output.ShouldUseLiveRenderer(out) && !noColor,
+		Interactive: !protocolcli.OutputMode(env.OutputFormat).IsMachineReadable() && output.ShouldUseLiveRenderer(out) && !noColor,
 	}
 	return lifecycle.LifecycleEnv{
 		Out:        out,

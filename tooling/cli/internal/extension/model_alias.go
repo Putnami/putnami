@@ -4,9 +4,7 @@
 //
 // This file is that re-export layer. Every symbol below is declared in the
 // model package and named here under its exact original name, so acquisition
-// code and every CLI consumer keep a single spelling for one concept. It is
-// the same shape internal/extension already used to re-export
-// go.putnami.dev/protocol/extension.
+// code and every CLI consumer keep a single spelling for one concept.
 package extension
 
 import (

@@ -9,6 +9,8 @@ import (
 	"regexp"
 	"slices"
 
+	"go.putnami.dev/cli/model/workspace"
+
 	extproto "go.putnami.dev/protocol/extension"
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/tooling/cli/internal/layout"
@@ -257,12 +259,6 @@ func dependencyNotLoaded(name, requiredBy string, reason error) error {
 	return fmt.Errorf("%s requires %s: %w", requiredBy, name, reason)
 }
 
-// IsDependencyNotPinned reports whether err says that the lock does not pin a
-// dependency.
-func IsDependencyNotPinned(err error) bool {
-	return errors.Is(err, errDependencyNotPinned)
-}
-
 // withoutDependencyProviders removes every reserved provider command from ext,
 // a dependency the workspace does not declare, and records the dependent.
 func withoutDependencyProviders(ext *ExtensionDescription, requiredBy string) []RemovedCapability {
@@ -480,7 +476,7 @@ func (d *dependencyDiscovery) loadedByPath(extensions []*ExtensionDescription, k
 			}
 		}
 	}
-	rel, ok := normalizeWorkspaceExtensionPath(key)
+	rel, ok := workspace.NormalizeWorkspaceExtensionPath(key)
 	if !ok || (d.hosted && !declaredByPath(key)) {
 		return nil
 	}
@@ -693,7 +689,7 @@ func locateRoot(workspaceRoot, key string, lf *lockfile.LockFile, hosted bool) r
 	if filepath.VolumeName(key) != "" {
 		return rootLocation{}
 	}
-	if rel, ok := normalizeWorkspaceExtensionPath(key); ok && (!hosted || declaredByPath(key)) {
+	if rel, ok := workspace.NormalizeWorkspaceExtensionPath(key); ok && (!hosted || declaredByPath(key)) {
 		if dir := filepath.Join(workspaceRoot, rel); holds(dir) {
 			return rootLocation{dir: dir, byPath: true}
 		}

@@ -10,20 +10,19 @@ import (
 )
 
 const (
-	// ImagePlanVersion is intentionally v2: the former implicit v1 identity
-	// streamed source bytes into one whole-image hash and could not reuse a
-	// trustworthy fingerprint already computed upstream. V2 hashes explicit,
-	// versioned source and compression identities instead.
+	// ImagePlanVersion is 2: the identity hashes explicit, versioned source
+	// and compression identities, so a trustworthy fingerprint already computed
+	// upstream is reused instead of streaming source bytes into one whole-image
+	// hash.
 	ImagePlanVersion = 2
 	// LayerPlanVersion versions the reusable compressed-layer key contract.
 	LayerPlanVersion = 1
 
-	imagePlanDomain       = "putnami/oci/image-plan"
-	layerPlanDomain       = "putnami/oci/layer-plan"
-	sha256Algorithm       = "sha256"
-	compressionAlgorithm  = "gzip"
-	compressionImpl       = "putnami/go-gzip/v1"
-	legacyDerivedIdentity = "putnami/oci/derived-from-image-plan/v1"
+	imagePlanDomain      = "putnami/oci/image-plan"
+	layerPlanDomain      = "putnami/oci/layer-plan"
+	sha256Algorithm      = "sha256"
+	compressionAlgorithm = "gzip"
+	compressionImpl      = "putnami/go-gzip/v1"
 )
 
 // SourceFingerprint is the immutable identity of source bytes. Algorithm and
@@ -230,10 +229,10 @@ func NewImagePlan(spec Spec, opts PlanOptions) (*ImagePlan, error) {
 	return plan, nil
 }
 
-// BindDerivedFiles fingerprints outputs staged after the image identity was
+// bindDerivedFiles fingerprints outputs staged after the image identity was
 // computed. Their recipe identity remains in the image hash while their exact
 // bytes become part of the layer cache key and are verified during a miss.
-func (p *ImagePlan) BindDerivedFiles() error {
+func (p *ImagePlan) bindDerivedFiles() error {
 	if err := p.validate(false); err != nil {
 		return err
 	}

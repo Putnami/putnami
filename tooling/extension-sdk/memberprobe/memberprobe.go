@@ -174,20 +174,20 @@ func (s Subject) Unverified(reason string) extproto.MemberProbe {
 // Unreachable is the unverified verdict for a request that got no response: a
 // refused connection, a failed name lookup, a timeout.
 func (s Subject) Unreachable(err error) extproto.MemberProbe {
-	return s.Unverified(UnreachableReason(err))
+	return s.Unverified(unreachableReason(err))
 }
 
 // Refused is the unverified verdict for an HTTP status that states neither a
 // held version nor an absent one. excerpt is the part of the response body
 // worth showing, already free of the request's credential, or empty.
 func (s Subject) Refused(status int, excerpt string) extproto.MemberProbe {
-	return s.Unverified(RefusedReason(status, s.Anonymous, excerpt))
+	return s.Unverified(refusedReason(status, s.Anonymous, excerpt))
 }
 
-// UnreachableReason says that a registry could not be reached and why. It keeps
+// unreachableReason says that a registry could not be reached and why. It keeps
 // the cause and drops the request URL an HTTP client wraps it in: the probe
 // already names the registry.
-func UnreachableReason(err error) string {
+func unreachableReason(err error) string {
 	if err == nil {
 		return "the registry could not be reached"
 	}
@@ -204,10 +204,10 @@ func UnreachableReason(err error) string {
 	return "the registry could not be reached: " + err.Error()
 }
 
-// RefusedReason says which HTTP status a registry answered and what to do about
+// refusedReason says which HTTP status a registry answered and what to do about
 // it. For a 401 or a 403 it names the credential: an anonymous request is told
 // to sign in or supply the registry token.
-func RefusedReason(status int, anonymous bool, excerpt string) string {
+func refusedReason(status int, anonymous bool, excerpt string) string {
 	answer := fmt.Sprintf("%d %s", status, http.StatusText(status))
 	if excerpt = strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(excerpt), ":")); excerpt != "" {
 		answer += ": " + excerpt

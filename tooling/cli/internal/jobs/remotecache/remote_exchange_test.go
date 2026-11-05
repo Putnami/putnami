@@ -9,9 +9,9 @@ import (
 	"testing"
 	"time"
 
+	"go.putnami.dev/sdk/extension/filelock"
 	"go.putnami.dev/tooling/cli/internal/cacheprovider"
 	"go.putnami.dev/tooling/cli/internal/extension"
-	"go.putnami.dev/tooling/cli/internal/flock"
 	"go.putnami.dev/tooling/cli/internal/store"
 )
 
@@ -49,7 +49,7 @@ func makeExchangeDir(t *testing.T, parent, name string, age time.Duration, state
 		t.Fatal(err)
 	}
 	if state != ownerNone {
-		owner, err := flock.Acquire(filepath.Join(dir, exchangeOwnerLockName), true, true)
+		owner, err := filelock.Acquire(filepath.Join(dir, exchangeOwnerLockName), true, true)
 		if err != nil {
 			t.Fatalf("take %s owner lock: %v", name, err)
 		}
@@ -104,13 +104,13 @@ func exchangeDirsUnder(t *testing.T, parent string) []string {
 // holder, which is what a concurrent run's sweep is, cannot take it.
 func requireOwnerLockHeld(t *testing.T, dir string) {
 	t.Helper()
-	l, err := flock.Acquire(filepath.Join(dir, exchangeOwnerLockName), true, true)
+	l, err := filelock.Acquire(filepath.Join(dir, exchangeOwnerLockName), true, true)
 	if err == nil {
 		_ = l.Release()
 		t.Fatalf("%s owner lock is free while its session lives; a sweep would delete it", filepath.Base(dir))
 	}
-	if !errors.Is(err, flock.ErrBusy) {
-		t.Fatalf("%s owner lock: err = %v, want flock.ErrBusy", filepath.Base(dir), err)
+	if !errors.Is(err, filelock.ErrBusy) {
+		t.Fatalf("%s owner lock: err = %v, want filelock.ErrBusy", filepath.Base(dir), err)
 	}
 }
 
@@ -120,7 +120,7 @@ func neverStop() bool { return false }
 // TestSweepStaleExchangeDirsDeletesOnlyProvablyDeadDirs pins both liveness
 // signals: a directory goes only when it is older than the grace AND its owner
 // lock is free. The live owner past the grace is the case age alone gets wrong.
-// A directory with no owner.lock is swept too, because flock.Acquire creates
+// A directory with no owner.lock is swept too, because filelock.Acquire creates
 // the file: that is both an older CLI's directory and one whose deletion a
 // killed process cut short.
 func TestSweepStaleExchangeDirsDeletesOnlyProvablyDeadDirs(t *testing.T) {

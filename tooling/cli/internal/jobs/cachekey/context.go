@@ -84,8 +84,7 @@ type JobContextVersion struct {
 //
 // A repository releases its lines separately (D26), so there is no single "the
 // version of this run": a TypeScript project and a Go module built by one
-// command carry the versions of their own lines. Everything that used to take
-// one *JobContextVersion takes this map and resolves it per project.
+// command carry the versions of their own lines.
 type RunVersions map[string]*JobContextVersion
 
 // VersionInfoForProject returns the version of the line a project belongs to.

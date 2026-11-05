@@ -21,8 +21,7 @@ import (
 	"go.putnami.dev/tooling/cli/internal/workspace_state"
 )
 
-// END-TO-END WIRE GOLDENS: the shared fixture harness and the retained
-// version-1 session-event reader fixture.
+// END-TO-END WIRE GOLDENS: the shared fixture harness.
 //
 // An earlier change captured this corpus from the code it was migrating,
 // so the tally-loop migration had to land with the v1 bytes unmodified. That
@@ -32,15 +31,10 @@ import (
 // unreachable — no emitter can produce them — so keeping the files would pin
 // nothing.
 //
-// What is left here is:
-//
-//   - the FIXTURE HARNESS the v2 corpus drives (wire_golden_v2_test.go):
-//     decoding, materializing a run into the exact values production passes to
-//     the renderers, the replay order, and the normalization/golden IO;
-//   - the historical events.jsonl golden. New writers use the complete
-//     sanitized v2 task stream, while sessions inspect/gate retain this
-//     v1 job:end shape as an on-disk compatibility fixture. It is written
-//     through AppendEvent, which remains only for that reader evidence.
+// What is left here is the FIXTURE HARNESS the v2 corpus drives
+// (wire_golden_v2_test.go): decoding, materializing a run into the exact values
+// production passes to the renderers, the replay order, and the
+// normalization/golden IO.
 //
 // A real CLI subprocess was rejected on purpose: the suite runs with race
 // (tooling/cli/putnami.json) where a re-exec costs ≈1s, and a
@@ -59,15 +53,13 @@ import (
 // hide behind the placeholder; and each must match EXACTLY ONCE, so a field
 // that disappears or forks fails the count instead of silently passing. The
 // surviving list lives in wire_golden_v2_test.go's header, beside the documents
-// that still carry them. Per-task durations, per-event times, taskWallMs and
-// events.jsonl timestamps are NOT normalized: they come from the fixture and
-// are pinned byte-for-byte.
+// that still carry them. Per-task durations, per-event times and taskWallMs
+// are NOT normalized: they come from the fixture and are pinned byte-for-byte.
 //
 // # What this corpus does NOT pin (state it, do not discover it in review)
 //
 //   - The current v2 session-event PRODUCER. Its complete live/artifact pair is
-//     pinned in internal/output; this corpus reproduces only the retired v1 key
-//     set so an existing session remains readable.
+//     pinned in internal/output.
 //   - Cache-hit / coalesced BRANCH PRECEDENCE. jobs.JobResult.MarkReuse makes
 //     CacheHit and Coalesced mutually exclusive, and loadWireRun asserts the
 //     fixture honors that, so no fixture task can set both.
@@ -92,7 +84,7 @@ const (
 // The fixture is a committed JSON document rather than Go literals for two
 // reasons: the inputs of the proof are then bytes too (they cannot drift as a
 // side effect of an unrelated edit), and the untyped payload maps
-// (RawJobEvent.Data, SessionEvent.Data) are decoded rather than spelled out,
+// (RawJobEvent.Data) are decoded rather than spelled out,
 // which keeps this file clear of the untyped-map occurrences
 // structural_baseline_test.go counts — including in comments, so this one
 // deliberately does not name the type.
@@ -131,19 +123,18 @@ type wireFixtureTask struct {
 	// ever being announced to the renderer — the case output/json.go handles in
 	// appendMissingResultEntries, and which the jsonl stream reports only in its
 	// session:end counts.
-	ReportedToRenderer  bool                     `json:"reportedToRenderer"`
-	Status              string                   `json:"status"`
-	DurationMs          int64                    `json:"durationMs"`
-	TaskWallMs          int64                    `json:"taskWallMs"`
-	CPUTimeMs           int64                    `json:"cpuTimeMs"`
-	SpawnToFirstEventMs int64                    `json:"spawnToFirstEventMs"`
-	FirstEventObserved  bool                     `json:"firstEventObserved"`
-	CacheHit            bool                     `json:"cacheHit"`
-	Coalesced           bool                     `json:"coalesced"`
-	Reuse               scheduler.ReuseKind      `json:"reuse"`
-	Error               *wireFixtureError        `json:"error"`
-	Events              []wireFixtureEvent       `json:"events"`
-	SessionEvent        *wireFixtureSessionEvent `json:"sessionEvent"`
+	ReportedToRenderer  bool                `json:"reportedToRenderer"`
+	Status              string              `json:"status"`
+	DurationMs          int64               `json:"durationMs"`
+	TaskWallMs          int64               `json:"taskWallMs"`
+	CPUTimeMs           int64               `json:"cpuTimeMs"`
+	SpawnToFirstEventMs int64               `json:"spawnToFirstEventMs"`
+	FirstEventObserved  bool                `json:"firstEventObserved"`
+	CacheHit            bool                `json:"cacheHit"`
+	Coalesced           bool                `json:"coalesced"`
+	Reuse               scheduler.ReuseKind `json:"reuse"`
+	Error               *wireFixtureError   `json:"error"`
+	Events              []wireFixtureEvent  `json:"events"`
 }
 
 type wireFixtureError struct {
@@ -172,15 +163,6 @@ type wireFixtureEvent struct {
 	Data    json.RawMessage `json:"data"`
 }
 
-// wireFixtureSessionEvent is one recorded session event. Its Data mirrors
-// scheduler.Scheduler.emitSessionJobEnd key-for-key; that method is unexported in
-// internal/jobs/scheduler, so this corpus pins the session WRITER, not the producer.
-type wireFixtureSessionEvent struct {
-	Time string          `json:"time"`
-	Type string          `json:"type"`
-	Data json.RawMessage `json:"data"`
-}
-
 // wireRun is a fixture materialized into the exact values production passes to
 // the renderers and the session writer.
 type wireRun struct {
@@ -190,7 +172,6 @@ type wireRun struct {
 	outcome   scheduler.SessionOutcome
 	startTime time.Time
 	events    map[string][]scheduler.RawJobEvent
-	session   []workspace_state.SessionEvent
 }
 
 func loadWireRun(t *testing.T, name string) *wireRun {
@@ -286,19 +267,6 @@ func loadWireRun(t *testing.T, name string) *wireRun {
 		if task.ReportedToRenderer {
 			run.events[task.Key] = events
 		}
-		if task.SessionEvent != nil {
-			event := workspace_state.SessionEvent{
-				Time:   task.SessionEvent.Time,
-				Type:   task.SessionEvent.Type,
-				JobKey: task.Key,
-			}
-			if len(task.SessionEvent.Data) > 0 {
-				if err := json.Unmarshal(task.SessionEvent.Data, &event.Data); err != nil {
-					t.Fatalf("fixture task %q session event data: %v", task.Key, err)
-				}
-			}
-			run.session = append(run.session, event)
-		}
 	}
 	return run
 }
@@ -357,36 +325,6 @@ func (r *wireRun) drive(renderer scheduler.Renderer) {
 // Goldens
 // ---------------------------------------------------------------------------
 
-// TestWireGoldenSessionEvents pins the historical version-1 events.jsonl shape.
-// internal/commands/sessions/sessions_helpers.go still parses it, so a drift
-// here either breaks an existing session or silently reads it differently.
-//
-// plan.json and session.json used to be pinned beside it; they are v2 documents
-// now and their goldens live in wire_golden_v2_test.go.
-func TestWireGoldenSessionEvents(t *testing.T) {
-	t.Parallel()
-	run := loadWireRun(t, "mixed")
-
-	session, err := workspace_state.NewSession(t.TempDir())
-	if err != nil {
-		t.Fatalf("new session: %v", err)
-	}
-	t.Cleanup(session.Close)
-	// The id and start time are generated from time.Now plus crypto/rand.
-	// Overwriting them before anything is written is injection, not scrubbing:
-	// the bytes below are the writer's own formatting of these exact values.
-	session.ID = run.fixture.SessionID
-	session.StartTime = run.startTime
-
-	for _, event := range run.session {
-		if err := session.AppendEvent(event); err != nil {
-			t.Fatalf("append event %q: %v", event.JobKey, err)
-		}
-	}
-
-	assertWireGolden(t, "mixed.events.jsonl", readSessionFile(t, session, "events.jsonl"))
-}
-
 // TestWireGoldenFixtureCoverage keeps the corpus honest: the mixed fixture must
 // keep exercising every outcome class and record type the issue names, so a
 // later edit cannot quietly reduce the goldens to a warm all-success run.
@@ -395,20 +333,19 @@ func TestWireGoldenFixtureCoverage(t *testing.T) {
 	run := loadWireRun(t, "mixed")
 
 	required := map[string]bool{
-		"fresh success":         false,
-		"fresh failure":         false,
-		"failure error":         false,
-		"diagnostic event":      false,
-		"artifact event":        false,
-		"metric event":          false,
-		"local cache hit":       false,
-		"remote cache hit":      false,
-		"coalesced":             false,
-		"skipped":               false,
-		"canceled":              false,
-		"result-only task":      false,
-		"multiple projects":     false,
-		"session event payload": false,
+		"fresh success":     false,
+		"fresh failure":     false,
+		"failure error":     false,
+		"diagnostic event":  false,
+		"artifact event":    false,
+		"metric event":      false,
+		"local cache hit":   false,
+		"remote cache hit":  false,
+		"coalesced":         false,
+		"skipped":           false,
+		"canceled":          false,
+		"result-only task":  false,
+		"multiple projects": false,
 	}
 	projects := make(map[string]bool)
 
@@ -435,9 +372,6 @@ func TestWireGoldenFixtureCoverage(t *testing.T) {
 		}
 		if !task.ReportedToRenderer {
 			required["result-only task"] = true
-		}
-		if task.SessionEvent != nil && len(task.SessionEvent.Data) > 0 {
-			required["session event payload"] = true
 		}
 		for _, event := range task.Events {
 			switch event.Type {
@@ -588,34 +522,6 @@ func assertWallMillis(value string) error {
 // ---------------------------------------------------------------------------
 // Golden IO
 // ---------------------------------------------------------------------------
-
-func assertWireGolden(t *testing.T, name string, got []byte) {
-	t.Helper()
-
-	path := filepath.Join("testdata", "wire", "golden", name)
-	if *updateWireGoldens {
-		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-			t.Fatalf("create golden dir: %v", err)
-		}
-		if err := os.WriteFile(path, got, 0o644); err != nil {
-			t.Fatalf("write golden %s: %v", path, err)
-		}
-		return
-	}
-
-	want, err := os.ReadFile(path)
-	if err != nil {
-		t.Fatalf("read golden %s: %v (create with: go test ./internal/cli/ -run WireGolden -update-wire-goldens)", path, err)
-	}
-	if bytes.Equal(want, got) {
-		return
-	}
-	t.Errorf("%s drifted from its golden %s.\n%s\n\n"+
-		"This is persisted version-1 session history that `putnami sessions` still reads.\n"+
-		"A failure means the compatibility projection moved; do not update it until the\n"+
-		"sessions readers still read the historical session identically.\n",
-		name, path, firstWireDiff(want, got))
-}
 
 // firstWireDiff reports the first differing line so a failure names the drift
 // instead of dumping two whole wire captures into the test log.

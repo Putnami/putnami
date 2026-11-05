@@ -29,6 +29,14 @@ func (m OutputMode) IsStructured() bool {
 	return m == OutputJSON || m == OutputJSONL
 }
 
+// IsMachineReadable reports whether a parser reads the command's stdout in
+// mode m: json, jsonl or cloud-logging. A command writes no human progress to
+// stdout in such a mode. OutputAuto is not machine-readable: the renderer
+// picks its form from the environment.
+func (m OutputMode) IsMachineReadable() bool {
+	return m.IsStructured() || m == OutputCloudLogging
+}
+
 // Valid reports whether m is a known output mode. OutputAuto (empty) is valid.
 func (m OutputMode) Valid() bool {
 	switch m {

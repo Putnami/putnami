@@ -77,11 +77,11 @@ func resolveSingleTarget(ws *Workspace, pattern string, cwd string, index *wspro
 
 	case strings.HasPrefix(pattern, "/"):
 		// Absolute workspace path: exact or wildcard
-		return ws.ProjectsByPattern(pattern)
+		return ws.projectsByPattern(pattern)
 
 	case strings.HasPrefix(pattern, ".../"):
 		// Suffix/infix wildcard: .../web, .../frameworks/...
-		return ws.ProjectsByPattern(pattern)
+		return ws.projectsByPattern(pattern)
 
 	case strings.HasPrefix(pattern, "./") || strings.HasPrefix(pattern, "../"):
 		// Relative filesystem paths resolve through physical Project.Path, then
@@ -92,7 +92,7 @@ func resolveSingleTarget(ws *Workspace, pattern string, cwd string, index *wspro
 		// Bare word: try alias → group → legacy name match
 		if index != nil {
 			if target, ok := index.ProjectAliases[pattern]; ok {
-				return ws.ProjectsByPattern(target)
+				return ws.projectsByPattern(target)
 			}
 			if groupPattern, ok := index.Groups[pattern]; ok {
 				return resolveGroupPattern(ws, groupPattern)
@@ -102,7 +102,7 @@ func resolveSingleTarget(ws *Workspace, pattern string, cwd string, index *wspro
 		// Also check workspace-level projectAliases and groups
 		if ws.Config != nil {
 			if target, ok := ws.Config.ProjectAliases[pattern]; ok {
-				return ws.ProjectsByPattern(target)
+				return ws.projectsByPattern(target)
 			}
 			if groupPattern, ok := ws.Config.Groups[pattern]; ok {
 				return resolveGroupPattern(ws, groupPattern)
@@ -136,7 +136,7 @@ func resolveRelativeTarget(ws *Workspace, relPath string, cwd string) []*Project
 	if err != nil || !isRelativeToWorkspace(physicalPath) {
 		return nil
 	}
-	physicalPath = CleanWorkspacePath(physicalPath)
+	physicalPath = wsproto.CleanWorkspacePath(physicalPath)
 
 	if !wildcard {
 		if p := ws.ProjectByPath(physicalPath); p != nil {
@@ -150,7 +150,7 @@ func resolveRelativeTarget(ws *Workspace, relPath string, cwd string) []*Project
 
 	var result []*Project
 	for _, p := range ws.Projects {
-		path := CleanWorkspacePath(p.Path)
+		path := wsproto.CleanWorkspacePath(p.Path)
 		if path == physicalPath || strings.HasPrefix(path, physicalPath+"/") {
 			result = append(result, p)
 		}
@@ -168,7 +168,7 @@ func resolveGroupPattern(ws *Workspace, pattern string) []*Project {
 		if part == "" {
 			continue
 		}
-		for _, p := range ws.ProjectsByPattern(part) {
+		for _, p := range ws.projectsByPattern(part) {
 			if !seen[p.ID] {
 				seen[p.ID] = true
 				result = append(result, p)

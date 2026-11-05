@@ -15,10 +15,10 @@ import (
 // deployment declaration: <project>/.gen/deployment.json.
 const DeploymentFile = infra.AggregatedManifestDir + "/" + infra.DeploymentFilename
 
-// OutcomeWithheld means the workload's aggregate has an error finding, so no
+// outcomeWithheld means the workload's aggregate has an error finding, so no
 // deployment declaration was written and any declaration left by an earlier
 // run was removed.
-const OutcomeWithheld Outcome = "withheld"
+const outcomeWithheld Outcome = "withheld"
 
 // DeploymentPath is the workload's deployment declaration location.
 func DeploymentPath(workloadRoot string) string {
@@ -66,7 +66,7 @@ func Deployment(ctx *pctx.Context, opts Options) (Result, error) {
 	diags = append(diags, assembleDiags...)
 
 	withheld := Result{
-		Outcome:       OutcomeWithheld,
+		Outcome:       outcomeWithheld,
 		ManifestPath:  declarationPath,
 		ManifestFile:  DeploymentFile,
 		Contributions: len(contributions),
@@ -84,7 +84,7 @@ func Deployment(ctx *pctx.Context, opts Options) (Result, error) {
 	if err := os.MkdirAll(filepath.Dir(declarationPath), 0o755); err != nil {
 		return withheld, fmt.Errorf("write deployment declaration %s: %w", declarationPath, err)
 	}
-	if err := writeFileAtomic(declarationPath, data); err != nil {
+	if err := robustio.WriteFile(declarationPath, data, 0o644, nil); err != nil {
 		return withheld, fmt.Errorf("write deployment declaration %s: %w", declarationPath, err)
 	}
 	return Result{

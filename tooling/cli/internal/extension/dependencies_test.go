@@ -196,7 +196,7 @@ func TestARootPackageDevDependencyDoesNotLoad(t *testing.T) {
 	if dev := FindExtensionByName(result.Extensions, "@acme/dev"); dev == nil || dev.Path != layout.StableDir(f.ws, layout.Extensions, "@acme/dev") {
 		t.Fatalf("@acme/dev = %+v, want the locked build, not the development dependency", dev)
 	}
-	if !IsDependencyNotPinned(skipFor(result, "@acme/lint")) {
+	if !errors.Is(skipFor(result, "@acme/lint"), errDependencyNotPinned) {
 		t.Errorf("@acme/lint skip = %v, want the unpinned dependency", skipFor(result, "@acme/lint"))
 	}
 
@@ -326,7 +326,7 @@ func TestThePrePassSetsAsideAnUnpinnedDependencyName(t *testing.T) {
 	if dev := FindExtensionByName(result.Extensions, "@acme/dev"); dev != nil {
 		t.Fatalf("the project of an unpinned dependency name loaded from %s", dev.Path)
 	}
-	if reason := skipFor(result, "@acme/dev"); !IsDependencyNotPinned(reason) || !strings.HasPrefix(reason.Error(), "@acme/app requires @acme/dev: ") {
+	if reason := skipFor(result, "@acme/dev"); !errors.Is(reason, errDependencyNotPinned) || !strings.HasPrefix(reason.Error(), "@acme/app requires @acme/dev: ") {
 		t.Errorf("@acme/dev skip = %v, want the unpinned dependency of @acme/app", reason)
 	}
 	if got := result.MissingDependencies(); !slices.Equal(got, []string{"@acme/dev"}) {
@@ -644,7 +644,9 @@ func TestTheShippedDevExtensionSatisfiesALanguageDependencyByPath(t *testing.T) 
 			t.Errorf("%s = %q aliases %v related %v, want a description, aliases %v and related %v",
 				w.name, got.Description, got.Aliases, got.Related, w.aliases, w.related)
 		}
-		if traits := vocabulary.DefaultTraits(w.name); traits != w.traits {
+		probe := &ExtensionDescription{Name: "probe", Jobs: map[string]*JobDefinition{w.name: {Name: w.name}}}
+		ApplyVocabularyTraits(append(slices.Clone(result.Extensions), probe))
+		if traits := probe.Jobs[w.name].Traits; traits != w.traits {
 			t.Errorf("%s default traits = %+v, want %+v", w.name, traits, w.traits)
 		}
 	}

@@ -1,6 +1,7 @@
 package extension
 
 import (
+	"sort"
 	"testing"
 )
 
@@ -141,4 +142,16 @@ func TestSortVersions(t *testing.T) {
 			t.Errorf("SortVersions[%d] = %q, want %q", i, v, want[i])
 		}
 	}
+}
+
+// SortVersions sorts version strings in ascending order.
+func SortVersions(versions []string) {
+	sort.Slice(versions, func(i, j int) bool {
+		vi, errI := ParseVersion(versions[i])
+		vj, errJ := ParseVersion(versions[j])
+		if errI != nil || errJ != nil {
+			return versions[i] < versions[j]
+		}
+		return vi.LessThan(vj)
+	})
 }

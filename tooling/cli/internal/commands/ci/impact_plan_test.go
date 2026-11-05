@@ -15,9 +15,9 @@ import (
 	ciproto "go.putnami.dev/protocol/ci"
 	protocolcli "go.putnami.dev/protocol/cli"
 	"go.putnami.dev/protocol/features/spectest"
+	"go.putnami.dev/sdk/extension/gitread"
 	"go.putnami.dev/tooling/cli/internal/cmderr"
 	"go.putnami.dev/tooling/cli/internal/extension"
-	"go.putnami.dev/tooling/cli/internal/git"
 	"go.putnami.dev/tooling/cli/internal/iox"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
@@ -279,14 +279,14 @@ func writeImpactPlanRepository(t *testing.T) (root, baseSHA, headSHA string, pro
 	runImpactPlanGit(t, root, "add", ".")
 	runImpactPlanGit(t, root, "commit", "-m", "base")
 	var err error
-	baseSHA, err = git.HeadSHA(root)
+	baseSHA, err = gitread.HeadSHA(root)
 	if err != nil {
 		t.Fatalf("base HEAD: %v", err)
 	}
 	writeImpactPlanFile(t, filepath.Join(root, "app", "source.txt"), "head\n")
 	runImpactPlanGit(t, root, "add", "app/source.txt")
 	runImpactPlanGit(t, root, "commit", "-m", "head")
-	headSHA, err = git.HeadSHA(root)
+	headSHA, err = gitread.HeadSHA(root)
 	if err != nil {
 		t.Fatalf("head HEAD: %v", err)
 	}
@@ -326,7 +326,7 @@ func writeImpactPlanFile(t *testing.T, path, contents string) {
 
 func runImpactPlanGit(t *testing.T, dir string, args ...string) {
 	t.Helper()
-	command := exec.Command(git.Executable(), args...)
+	command := exec.Command(gitread.Executable(), args...)
 	command.Dir = dir
 	if output, err := command.CombinedOutput(); err != nil {
 		t.Fatalf("git %s: %v\n%s", strings.Join(args, " "), err, output)
@@ -335,7 +335,7 @@ func runImpactPlanGit(t *testing.T, dir string, args ...string) {
 
 func impactPlanGitOutput(t *testing.T, dir string, args ...string) string {
 	t.Helper()
-	command := exec.Command(git.Executable(), args...)
+	command := exec.Command(gitread.Executable(), args...)
 	command.Dir = dir
 	output, err := command.Output()
 	if err != nil {

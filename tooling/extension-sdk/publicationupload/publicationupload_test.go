@@ -16,6 +16,9 @@ import (
 	"testing"
 
 	"github.com/google/go-containerregistry/pkg/registry"
+	v1 "github.com/google/go-containerregistry/pkg/v1"
+	"github.com/google/go-containerregistry/pkg/v1/empty"
+	"github.com/google/go-containerregistry/pkg/v1/layout"
 	"github.com/google/go-containerregistry/pkg/v1/random"
 
 	distribution "go.putnami.dev/protocol/distribution"
@@ -23,7 +26,6 @@ import (
 	"go.putnami.dev/protocol/features/spectest"
 	put "go.putnami.dev/protocol/put"
 	"go.putnami.dev/sdk/extension/npmpublish"
-	"go.putnami.dev/sdk/extension/oci"
 	"go.putnami.dev/sdk/extension/publicationoutbox"
 	"go.putnami.dev/sdk/extension/publicationupload"
 	"go.putnami.dev/sdk/extension/publicationupload/publicationuploadtest"
@@ -172,10 +174,7 @@ func ociMember(t *testing.T, host string) packed {
 		t.Fatal(err)
 	}
 	layout := filepath.Join(t.TempDir(), "layout")
-	digest, err := oci.WriteLayout(layout, image)
-	if err != nil {
-		t.Fatal(err)
-	}
+	digest := writeTestLayout(t, layout, image)
 	root, member := stage(t, func(w *publicationoutbox.Writer) extproto.OutboxMember {
 		if err := w.CopyLayout("oci/layout", layout); err != nil {
 			t.Fatal(err)
@@ -606,4 +605,22 @@ func TestUploadErrorsNeverCarryTheBearer(t *testing.T) {
 			}
 		}
 	}
+}
+
+// writeTestLayout writes img as a one-image OCI layout at dir and returns the
+// image digest.
+func writeTestLayout(t testing.TB, dir string, img v1.Image) string {
+	t.Helper()
+	lp, err := layout.Write(dir, empty.Index)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := lp.AppendImage(img); err != nil {
+		t.Fatal(err)
+	}
+	digest, err := img.Digest()
+	if err != nil {
+		t.Fatal(err)
+	}
+	return digest.String()
 }

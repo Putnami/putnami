@@ -70,7 +70,7 @@ func dependencyGraphWorkspace(t *testing.T) (string, *wsproto.Config, *dependenc
 	}))
 	t.Cleanup(server.Close)
 	t.Setenv(extension.PutRegistryURLEnv, server.URL)
-	t.Setenv(extension.HTTPRetryBackoffEnv, "0")
+	t.Cleanup(extension.SetHTTPRetryBackoff(0))
 	t.Setenv("PUTNAMI_ARTIFACT_DIR", t.TempDir())
 	t.Setenv("HOME", t.TempDir())
 	resolveToken := extension.ResolveRegistryToken

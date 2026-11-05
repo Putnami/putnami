@@ -81,28 +81,6 @@ func TestCommitSourceBindingMatchesCleanWorktreeAndTracksOnlyBoundSource(t *test
 	}
 }
 
-func TestResolveCommitRejectsUnsafeAndAmbiguousRevisionArguments(t *testing.T) {
-	t.Parallel()
-	repo := initGitRepo(t)
-	sha := strings.TrimSpace(runGit(t, repo, "rev-parse", "HEAD"))
-	resolved, err := ResolveCommit(repo, sha)
-	if err != nil || resolved != strings.ToLower(sha) {
-		t.Fatalf("ResolveCommit(full SHA) = %q, %v", resolved, err)
-	}
-
-	runGit(t, repo, "branch", "shared", sha)
-	runGit(t, repo, "tag", "shared", sha)
-	if _, err := ResolveCommit(repo, "shared"); err == nil {
-		t.Fatal("ambiguous short ref resolved without an error")
-	}
-
-	for _, revision := range []string{"", " HEAD", "HEAD ", "-c", "HEAD\nmain", strings.Repeat("x", 1025)} {
-		if _, err := ResolveCommit(repo, revision); err == nil {
-			t.Errorf("unsafe revision %q resolved without an error", revision)
-		}
-	}
-}
-
 func TestTreeEntryAtTreatsGitPathspecSyntaxLiterally(t *testing.T) {
 	t.Parallel()
 	repo := initGitRepo(t)

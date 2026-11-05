@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	collab "go.putnami.dev/protocol/collaboration"
+	"go.putnami.dev/sdk/extension/collabhelper"
 	"go.putnami.dev/tooling/jira-collaboration/internal/jira"
 )
 
@@ -147,7 +148,7 @@ func (i *jiraIssue) revision() string {
 	sort.Strings(labels)
 	assignees := i.assigneeIDs()
 	sort.Strings(assignees)
-	return "v" + digest([]any{i.Fields.Summary, deref(i.Fields.Description), i.statusName(), i.category(), i.resolution(), labels, assignees})[:32]
+	return "v" + collabhelper.Digest([]any{i.Fields.Summary, deref(i.Fields.Description), i.statusName(), i.category(), i.resolution(), labels, assignees})[:32]
 }
 
 // keyNumber is the number of an issue key, PROJ-123 → 123; 0 when the key
@@ -201,11 +202,11 @@ func (s *session) task(issue *jiraIssue) collab.Task {
 		Ref:           collab.Ref{Source: s.source, ID: issue.ID},
 		Key:           token(issue.Key),
 		Revision:      issue.revision(),
-		Title:         oneLine(issue.Fields.Summary, collab.MaxTitleLength, issue.Key),
-		Body:          boundedBody(deref(issue.Fields.Description)),
+		Title:         collabhelper.OneLine(issue.Fields.Summary, collab.MaxTitleLength, issue.Key),
+		Body:          collabhelper.BoundedBody(deref(issue.Fields.Description), collab.MaxBodyBytes),
 		State:         state,
-		ProviderState: oneLine(issue.statusName(), collab.MaxLabelLength, string(state)),
-		Labels:        boundedLabels(visible),
+		ProviderState: collabhelper.OneLine(issue.statusName(), collab.MaxLabelLength, string(state)),
+		Labels:        collabhelper.BoundedLabels(visible, collab.MaxLabels, collab.MaxLabelLength),
 		Assignees:     assignees,
 		CreatedAt:     timestamp(issue.Fields.Created),
 		UpdatedAt:     timestamp(issue.Fields.Updated),

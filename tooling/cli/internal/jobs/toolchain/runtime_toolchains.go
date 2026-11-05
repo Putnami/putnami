@@ -290,13 +290,9 @@ func refuseProvisioningRuntimeToolchains(workspaceRoot string, ext *model.Extens
 		ext.Name, ref, ext.Runtime.Toolchains[ref].Lock, extensionproto.WorkspaceFetchCommand, ToolchainProvisioningCommand)
 }
 
-// ResolveRuntimeToolchains resolves refs of ext strictly against the workspace
-// lock of workspaceRoot, probing candidates with base, and records each
-// resolution on ext.
-func ResolveRuntimeToolchains(workspaceRoot string, ext *model.ExtensionDescription, refs []string, base []string) error {
-	return resolveRuntimeToolchainsContext(context.Background(), workspaceRoot, ext, refs, base)
-}
-
+// resolveRuntimeToolchainsContext resolves refs of ext strictly against the
+// workspace lock of workspaceRoot, probing candidates with base, and records
+// each resolution on ext.
 func resolveRuntimeToolchainsContext(ctx context.Context, workspaceRoot string, ext *model.ExtensionDescription, refs []string, base []string) error {
 	return resolveRuntimeToolchainRefs(ctx, workspaceRoot, ext, refs, base, ResolveStrict)
 }
@@ -432,7 +428,6 @@ func resolveRuntimeToolchainRefs(ctx context.Context, workspaceRoot string, ext 
 				// rejection reasons reach the user only through this warning. They
 				// never enter the resolution or its identity.
 				if requirement.Optional {
-					//nolint:gosec // G706 false positive: dynamic values are structured slog attributes, not a format string.
 					slog.Warn("runtime toolchain: optional toolchain is unavailable; no candidate matched the locked version",
 						"extension", ext.Name, "toolchain", ref, "version", entry.Version, "rejections", detail)
 				} else {
@@ -440,7 +435,6 @@ func resolveRuntimeToolchainRefs(ctx context.Context, workspaceRoot string, ext 
 					// run is about to do, so nothing is wrong yet. Once the run
 					// ended, ReportProvisionedRuntimeToolchains probes again and
 					// warns only about a toolchain that is still missing.
-					//nolint:gosec // G706 false positive: dynamic values are structured slog attributes, not a format string.
 					slog.Debug("runtime toolchain: "+ToolchainProvisioningCommand+" starts before the pinned toolchain is installed; no candidate matched the locked version",
 						"extension", ext.Name, "toolchain", ref, "version", entry.Version, "rejections", detail)
 				}
@@ -529,7 +523,6 @@ func ReportProvisionedRuntimeToolchains(ctx context.Context, workspaceRoot strin
 				"extension", probe.extension, "toolchain", probe.ref, "version", probe.entry.Version)
 			continue
 		}
-		//nolint:gosec // G706 false positive: dynamic values are structured slog attributes, not a format string.
 		slog.Warn("runtime toolchain: the pinned toolchain is still unavailable after "+ToolchainProvisioningCommand+"; no candidate matched the locked version",
 			"extension", probe.extension, "toolchain", probe.ref, "version", probe.entry.Version,
 			"rejections", runtimeToolchainRejectionText(rejections))
@@ -903,14 +896,6 @@ var ErrToolchainProbeTimeout = errors.New("probe timed out")
 // toolchainProbeTimeoutKey is the context key WithToolchainProbeTimeout sets.
 type toolchainProbeTimeoutKey struct{}
 
-// WithToolchainProbeTimeout returns ctx with every runtime toolchain probe that
-// runs under it bounded by timeout instead of toolVersionProbeTimeout. A test
-// uses it to prove how a caller reports a probe that timed out without waiting
-// out the production deadline.
-func WithToolchainProbeTimeout(ctx context.Context, timeout time.Duration) context.Context {
-	return context.WithValue(ctx, toolchainProbeTimeoutKey{}, timeout)
-}
-
 // runtimeToolchainProbeTimeout is the deadline of a runtime toolchain probe
 // that runs under ctx: the one WithToolchainProbeTimeout set, else
 // toolVersionProbeTimeout.
@@ -934,7 +919,6 @@ func probeRuntimeToolchain(ctx context.Context, path string, args, env []string,
 	defer cancel(nil)
 	stdout := &boundedBuffer{limit: toolVersionProbeOutputLimit}
 	stderr := &boundedBuffer{limit: toolVersionProbeOutputLimit}
-	//nolint:gosec // G702: path is an executable candidate from the validated extension manifest; probing it is the resolver's purpose.
 	cmd := exec.CommandContext(probeCtx, path, args...)
 	cmd.Env = env
 	cmd.Stdout = stdout

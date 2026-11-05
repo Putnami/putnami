@@ -199,40 +199,31 @@ func (s *Store) locked(run func() error) error {
 	return run()
 }
 
-// writeAtomically writes a temporary file, syncs it, and renames it over
-// name. A failure before the rename leaves the old state; a failure to sync
-// the directory after it is reported as landed.
+// writeAtomically writes data to name in dir through robustio.WriteFile,
+// durably and readable by the store's user only. A failure before the rename
+// leaves the old state; a failure to sync the directory after it is reported
+// as landed.
 func writeAtomically(dir, name string, data []byte) error {
-	temp, err := os.CreateTemp(dir, name+".*.tmp")
-	if err != nil {
-		return &WriteError{Err: fmt.Errorf("write the local store: %w", err)}
-	}
-	tempName := temp.Name()
-	cleanup := func() { _ = os.Remove(tempName) }
-	if _, err := temp.Write(data); err != nil {
-		_ = temp.Close()
-		cleanup()
-		return &WriteError{Err: fmt.Errorf("write the local store: %w", err)}
-	}
-	if err := temp.Sync(); err != nil {
-		_ = temp.Close()
-		cleanup()
-		return &WriteError{Err: fmt.Errorf("sync the local store: %w", err)}
-	}
-	if err := temp.Close(); err != nil {
-		cleanup()
-		return &WriteError{Err: fmt.Errorf("close the local store: %w", err)}
-	}
 	// A reader of the state file holds it open without sharing delete access;
-	// on Windows the rename over it fails until that reader closes it.
-	if err := robustio.Rename(tempName, filepath.Join(dir, name)); err != nil {
-		cleanup()
-		return &WriteError{Err: fmt.Errorf("replace the local store: %w", err)}
+	// on Windows the rename over it fails until that reader closes it, and
+	// robustio.WriteFile waits for that reader.
+	err := robustio.WriteFile(filepath.Join(dir, name), data, 0o600, filelock.SyncDir)
+	var failure *robustio.WriteError
+	if !errors.As(err, &failure) {
+		return err
 	}
-	if err := filelock.SyncDir(dir); err != nil {
-		return &WriteError{Landed: true, Err: fmt.Errorf("sync the local store directory: %w", err)}
+	stage := "write the local store"
+	switch failure.Op {
+	case robustio.OpSync:
+		stage = "sync the local store"
+	case robustio.OpClose:
+		stage = "close the local store"
+	case robustio.OpRename:
+		stage = "replace the local store"
+	case robustio.OpSyncDir:
+		stage = "sync the local store directory"
 	}
-	return nil
+	return &WriteError{Landed: failure.Landed(), Err: fmt.Errorf("%s: %w", stage, failure.Err)}
 }
 
 func newStoreID() (string, error) {

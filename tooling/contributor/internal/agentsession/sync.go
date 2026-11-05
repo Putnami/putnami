@@ -141,7 +141,7 @@ func mergeSyncAnswer(cache *sessionCache, snapshot syncSnapshot, answer collab.M
 	for _, reply := range cache.Replies {
 		status, answered := statuses[reply.Message]
 		switch {
-		case !containsString(snapshot.replies, reply.Message) || !answered:
+		case !slices.Contains(snapshot.replies, reply.Message) || !answered:
 			keptReplies = append(keptReplies, reply)
 		case status.State == collab.ReplyStateReplied:
 			cache.Replied = appendBounded(cache.Replied, reply.Message, sessionSeenMax)
@@ -205,7 +205,7 @@ func mergeInbox(cache *sessionCache, inbox []inboxMessage) {
 		if len(cache.Inbox) >= sessionInboxMax {
 			break
 		}
-		if !missionIDPattern.MatchString(message.ID) || containsString(cache.Seen, message.ID) || inboxHolds(cache.Inbox, message.ID) {
+		if !missionIDPattern.MatchString(message.ID) || slices.Contains(cache.Seen, message.ID) || inboxHolds(cache.Inbox, message.ID) {
 			continue
 		}
 		boundInboxMessage(&message)
@@ -257,7 +257,7 @@ func inboxHolds(inbox []inboxMessage, id string) bool {
 func without(values, drop []string) []string {
 	kept := make([]string, 0, len(values))
 	for _, value := range values {
-		if !containsString(drop, value) {
+		if !slices.Contains(drop, value) {
 			kept = append(kept, value)
 		}
 	}

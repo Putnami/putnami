@@ -12,6 +12,7 @@ import (
 	featureproto "go.putnami.dev/protocol/features"
 	"go.putnami.dev/protocol/features/spectest"
 	pctx "go.putnami.dev/sdk/extension/context"
+	sdkgit "go.putnami.dev/sdk/extension/gitread"
 	internalgit "go.putnami.dev/tooling/sdd/extension/internal/gitread"
 	workspace "go.putnami.dev/tooling/sdd/extension/internal/wsview"
 )
@@ -222,7 +223,7 @@ func TestFeatureTaskReportNamesNoCommitAndReadsNoVersion(t *testing.T) {
 
 func gitHead(t *testing.T, root string) string {
 	t.Helper()
-	head, err := internalgit.HeadSHA(root)
+	head, err := sdkgit.HeadSHA(root)
 	if err != nil {
 		t.Fatal(err)
 	}

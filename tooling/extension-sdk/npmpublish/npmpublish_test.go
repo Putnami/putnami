@@ -397,8 +397,8 @@ func TestRegistryErrorsShowBoundedRedactedBody(t *testing.T) {
 			t.Fatalf("%s error = %q, want redacted bearers and no control characters", name, message)
 		}
 		_, excerpt, _ := strings.Cut(message, "Service Unavailable: ")
-		if got := len([]rune(excerpt)); got > ErrorExcerptLimit+len("...") {
-			t.Fatalf("%s excerpt has %d characters, want at most %d", name, got, ErrorExcerptLimit)
+		if got := len([]rune(excerpt)); got > errorExcerptLimit+len("...") {
+			t.Fatalf("%s excerpt has %d characters, want at most %d", name, got, errorExcerptLimit)
 		}
 	}
 }
@@ -472,7 +472,7 @@ func TestNewHTTPClientDisablesProxyAndRedirects(t *testing.T) {
 }
 
 func TestBuildPayloadStripsPublishConfig(t *testing.T) {
-	payload, err := BuildPayload(testArtifact("tgz"))
+	payload, err := buildPayload(testArtifact("tgz"))
 	if err != nil {
 		t.Fatalf("build payload: %v", err)
 	}

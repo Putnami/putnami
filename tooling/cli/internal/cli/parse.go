@@ -440,9 +440,8 @@ func jobFlagTokens(rawArgs []string) []string {
 // conflictingTaskFlags rejects a comma-composed invocation in which two of the
 // selected tasks declare the SAME supplied flag with different behavior, naming
 // the conflicting tasks. One token cannot carry two meanings, and
-// extension.MergeCommandFlags only ever compared declarations WITHIN a single
-// command, so `putnami build,publish --stable` used to bind two different flags
-// from one spelling with no diagnostic.
+// extension.MergeCommandFlags only compares declarations within a single
+// command.
 func conflictingTaskFlags(commands []string, jobMap map[string][]*extension.JobDefinition, rawArgs []string) error {
 	if len(commands) < 2 {
 		return nil

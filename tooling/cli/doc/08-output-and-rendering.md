@@ -393,10 +393,8 @@ Suppresses all non-essential output. Only errors and the final summary are shown
 Both machine formats speak the **version-2 machine contract**
 ([`protocols/cli/doc/02-result-v2.md`](../../../protocols/cli/doc/02-result-v2.md)).
 Every document carries `protocolVersion: 2`; a document without the member is
-version 1 and can only come from a CLI build published before the v1 emitters
-were removed. There is no way to ask a current build for version 1 —
-`PUTNAMI_MACHINE_OUTPUT` is inert and warns once on stderr when it is set to
-`v1`; the rollback is to pin an older published build.
+version 1, which no current build emits. There is no way to ask a current
+build for version 1; the rollback is to pin an older published build.
 
 `--output=json` writes exactly one aggregated envelope when the run ends;
 `--output=jsonl` streams a bounded selection of records as tasks execute. Both

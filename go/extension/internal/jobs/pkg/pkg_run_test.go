@@ -479,9 +479,9 @@ func TestRunDryRunDispatchesEveryExplicitChannelAndRecordsEachInsideItsOwnOutput
 
 	// The archive publication manifest is the archive packager's own output and
 	// carries the identity the archive uploader reads.
-	meta, err := pkgmeta.ReadPackageMetadata(workspaceRoot, "project")
+	meta, err := readPackageMetadata(workspaceRoot, "project")
 	if err != nil {
-		t.Fatalf("ReadPackageMetadata: %v", err)
+		t.Fatalf("read package metadata: %v", err)
 	}
 	if meta.Version != "1.2.3" || meta.Artifact != "scope-demo" {
 		t.Fatalf("archive publication manifest identity = %+v", meta)
@@ -562,9 +562,9 @@ func TestPackageWritesOnlyInsideDeclaredOutputs(t *testing.T) {
 
 	// Each channel is recorded where its own packager owns the bytes.
 	for channel, dir := range map[string]string{"archives": "archives", "go": "go"} {
-		record, err := os.ReadFile(filepath.Join(outputPath, dir, pkgmeta.ChannelRecordFile))
+		record, err := os.ReadFile(filepath.Join(outputPath, dir, "channel.json"))
 		if err != nil {
-			t.Fatalf("read %s/%s: %v", dir, pkgmeta.ChannelRecordFile, err)
+			t.Fatalf("read %s/%s: %v", dir, "channel.json", err)
 		}
 		var decoded pkgmeta.ChannelRecord
 		if err := json.Unmarshal(record, &decoded); err != nil {
@@ -648,9 +648,9 @@ func TestRunFallsBackToDeclaredPublishChannels(t *testing.T) {
 	if got := index.Records["archives"].Version; got != "2.3.4-abc1234" {
 		t.Fatalf("archives record version = %q, want the resolved version", got)
 	}
-	meta, err := pkgmeta.ReadPackageMetadata(workspaceRoot, "project")
+	meta, err := readPackageMetadata(workspaceRoot, "project")
 	if err != nil {
-		t.Fatalf("ReadPackageMetadata: %v", err)
+		t.Fatalf("read package metadata: %v", err)
 	}
 	if meta.Version != "2.3.4-abc1234" {
 		t.Fatalf("archive publication manifest = %+v", meta)
@@ -695,4 +695,17 @@ func TestRunReturnsFailedWhenSelectedPackagerFails(t *testing.T) {
 	if _, err := os.Stat(metadataPath); !os.IsNotExist(err) {
 		t.Fatalf("failed package dispatch wrote the archive publication manifest: %v", err)
 	}
+}
+
+// readPackageMetadata decodes the archive publication manifest a packager wrote.
+func readPackageMetadata(workspaceRoot, projectPath string) (*pkgmeta.PackageMetadata, error) {
+	data, err := os.ReadFile(pkgmeta.MetadataPath(workspaceRoot, projectPath))
+	if err != nil {
+		return nil, err
+	}
+	var metadata pkgmeta.PackageMetadata
+	if err := json.Unmarshal(data, &metadata); err != nil {
+		return nil, err
+	}
+	return &metadata, nil
 }

@@ -85,7 +85,7 @@ func TestImagePlanV2_DerivedFileBindsAfterIdentity(t *testing.T) {
 	if err := os.WriteFile(stamp, []byte(`{"contentHash":"`+identity[:12]+`"}`), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if err := plan.BindDerivedFiles(); err != nil {
+	if err := plan.bindDerivedFiles(); err != nil {
 		t.Fatal(err)
 	}
 	if plan.Identity != identity {

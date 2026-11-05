@@ -93,8 +93,8 @@ func (s *LocalStore) ensureBlobLocked(srcPath, digest string) error {
 		return closeErr
 	}
 
-	// Another writer in this process is serialized by s.mu, but this keeps the
-	// write idempotent if an external process populated the same store path.
+	// Writers in this process are serialized by s.mu; the write stays idempotent
+	// when an external process populated the same store path.
 	if s.hasBlob(digest) {
 		return nil
 	}

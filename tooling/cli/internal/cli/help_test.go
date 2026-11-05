@@ -142,7 +142,7 @@ func TestRelatedCommands_NonexistentCommand(t *testing.T) {
 func TestPrintSubcommandHelp_IncludesStructuredFlags(t *testing.T) {
 	spectest.Proves(t, "cli/canonical-workspace-guidance", "generated-help", "command-help-includes-structured-and-extension-flags")
 	output := captureStructuredHelp(t, func() {
-		PrintSubcommandHelp("workspace", "init")
+		printSubcommandHelp("workspace", "init", nil)
 	})
 
 	if !strings.Contains(output, "putnami workspace init") {
@@ -241,7 +241,7 @@ func TestPrintSubcommandHelp_IncludesRootStructuredCommandHelp(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.command, func(t *testing.T) {
 			output := captureStructuredHelp(t, func() {
-				PrintSubcommandHelp(tt.command, "")
+				printSubcommandHelp(tt.command, "", nil)
 			})
 			if !strings.Contains(output, tt.want) {
 				t.Fatalf("expected root help for %q to contain %q, got:\n%s", tt.command, tt.want, output)
@@ -271,7 +271,7 @@ func TestPrintSubcommandHelp_RootListsItsSubcommands(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.command, func(t *testing.T) {
 			output := captureStructuredHelp(t, func() {
-				PrintSubcommandHelp(tt.command, "")
+				printSubcommandHelp(tt.command, "", nil)
 			})
 			for _, want := range tt.want {
 				if !strings.Contains(output, want) {
@@ -281,7 +281,7 @@ func TestPrintSubcommandHelp_RootListsItsSubcommands(t *testing.T) {
 		})
 	}
 	leaf := captureStructuredHelp(t, func() {
-		PrintSubcommandHelp("cache", "clean")
+		printSubcommandHelp("cache", "clean", nil)
 	})
 	if strings.Contains(leaf, "Subcommands:") {
 		t.Errorf("putnami cache clean --help lists subcommands, got:\n%s", leaf)
@@ -319,7 +319,7 @@ func TestPrintHelpMarkdown_IncludesStructuredCommandDetails(t *testing.T) {
 	if !strings.Contains(output, "| `putnami deploy` | Deploy the project |") {
 		t.Error("expected the vocabulary's deploy verb in markdown help")
 	}
-	bare := captureStructuredHelp(t, PrintHelpMarkdown)
+	bare := captureStructuredHelp(t, func() { printHelpMarkdown(os.Stdout, nil) })
 	if strings.Contains(bare, "## Aliases") || strings.Contains(bare, "`putnami deploy`") || !strings.Contains(bare, "No extension is loaded.") {
 		t.Errorf("markdown help without an extension lists a job command or an alias:\n%s", bare)
 	}
@@ -327,7 +327,7 @@ func TestPrintHelpMarkdown_IncludesStructuredCommandDetails(t *testing.T) {
 
 func TestPrintHelpMan_IncludesStructuredCommandDetails(t *testing.T) {
 	output := captureStructuredHelp(t, func() {
-		PrintHelpMan()
+		printHelpMan(os.Stdout, nil)
 	})
 
 	if !strings.Contains(output, ".SS workspace init") {

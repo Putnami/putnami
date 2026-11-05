@@ -394,7 +394,7 @@ func TestProvisionedCandidateResolvesTheArchiveExecutable(t *testing.T) {
 		{From: extensionproto.RuntimeToolchainCandidateProvisioned},
 	}
 	ext := runtimeToolchainExtension(requirement)
-	if err := ResolveRuntimeToolchains(workspaceRoot, ext, []string{"compiler"}, []string{"PATH=" + bin, "PUTNAMI_HOME=" + home}); err != nil {
+	if err := resolveRuntimeToolchainsContext(context.Background(), workspaceRoot, ext, []string{"compiler"}, []string{"PATH=" + bin, "PUTNAMI_HOME=" + home}); err != nil {
 		t.Fatal(err)
 	}
 	resolved := ext.RuntimeToolchains["compiler"]
@@ -429,14 +429,14 @@ func TestProvisionedCandidateWithoutItsFolderNamesTheInstall(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = ResolveRuntimeToolchains(missing, runtimeToolchainExtension(requirement), []string{"compiler"}, base)
+	err = resolveRuntimeToolchainsContext(context.Background(), missing, runtimeToolchainExtension(requirement), []string{"compiler"}, base)
 	if want := header + remedy + `: candidate 1 (provisioned) at ` + executable + `: path missing`; err == nil || err.Error() != want {
 		t.Fatalf("missing folder: error = %v\nwant %s", err, want)
 	}
 
 	format4 := t.TempDir()
 	writeRuntimeToolchainLock(t, format4, "compiler", "1.2.3", "integrity-a")
-	err = ResolveRuntimeToolchains(format4, runtimeToolchainExtension(requirement), []string{"compiler"}, base)
+	err = resolveRuntimeToolchainsContext(context.Background(), format4, runtimeToolchainExtension(requirement), []string{"compiler"}, base)
 	if want := header + remedy + `: candidate 1 (provisioned): the lock pin records no archives (lock format below 5)`; err == nil || err.Error() != want {
 		t.Fatalf("pin below format 5: error = %v\nwant %s", err, want)
 	}
@@ -444,14 +444,14 @@ func TestProvisionedCandidateWithoutItsFolderNamesTheInstall(t *testing.T) {
 	bin := t.TempDir()
 	host := writeRuntimeTool(t, filepath.Join(bin, "compiler"), "1.2.3")
 	t.Cleanup(runcredential.SetForTest("run-bearer"))
-	err = ResolveRuntimeToolchains(missing, runtimeToolchainExtension(requirement), []string{"compiler"}, base)
+	err = resolveRuntimeToolchainsContext(context.Background(), missing, runtimeToolchainExtension(requirement), []string{"compiler"}, base)
 	if err == nil || strings.Contains(err.Error(), "putnami install") || !strings.Contains(err.Error(), "path missing") {
 		t.Fatalf("hosted run with a missing folder: error = %v, want no install named", err)
 	}
 	withPath := requirement
 	withPath.Candidates = append(slices.Clone(requirement.Candidates), extensionproto.RuntimeToolchainCandidate{From: extensionproto.RuntimeToolchainCandidatePath, Path: "compiler"})
 	ext := runtimeToolchainExtension(withPath)
-	if err := ResolveRuntimeToolchains(missing, ext, []string{"compiler"}, []string{"PATH=" + bin, "PUTNAMI_HOME=" + home}); err != nil {
+	if err := resolveRuntimeToolchainsContext(context.Background(), missing, ext, []string{"compiler"}, []string{"PATH=" + bin, "PUTNAMI_HOME=" + home}); err != nil {
 		t.Fatalf("hosted run with a path candidate after the provisioned one: %v", err)
 	}
 	if got := ext.RuntimeToolchains["compiler"].Executable; !sameResolvedPath(t, got, host) {

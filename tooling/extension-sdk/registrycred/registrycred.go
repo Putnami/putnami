@@ -121,7 +121,7 @@ func resolveTokenWithCLI(parent context.Context, host, executable string, noRela
 	// The host is a discrete argv element of a fixed command (no shell is
 	// involved), so it cannot inject a command. The executable is the CLI-owned
 	// absolute path or the package-owned fallback, never caller input.
-	cmd := exec.CommandContext(ctx, executable, //nolint:gosec // G702: argv-form exec of a CLI-owned absolute path or fixed fallback
+	cmd := exec.CommandContext(ctx, executable,
 		registry.SeamParentCommand,
 		registry.SeamSubcommand,
 		"--"+registry.SeamHostFlag, host,

@@ -625,13 +625,10 @@ func batchWireMetrics(job *ScheduledJob, wire batchWireResult) []TaskMetric {
 //
 // All twelve projections stamp MaxKnownProtocolVersion — the version the CLI
 // advertises to every subprocess (runner.go) and the only one it accepts back
-// (parseRawEvent rejects anything else since the CLI started requiring v2).
-// They stamped v1 as a deliberate normalization until an earlier change
-// stopped that: harmless, because
-// every consumer was traced version-blind and renderers switch on type, but a
-// synthesized stream claiming a version the same process refuses to READ is a
-// contradiction the "one stream, v2 only" contract cannot keep. Nothing about
-// the events' shape changes with the stamp.
+// (parseRawEvent rejects anything else).
+// A synthesized stream claiming a version the same process refuses to READ
+// would contradict the "one stream, v2 only" contract. Nothing about the
+// events' shape changes with the stamp.
 func canonicalTaskEvents(job *ScheduledJob, task TaskResult, data map[string]any) []RawJobEvent {
 	status := task.Status
 	phaseName := batchPhaseName(job)

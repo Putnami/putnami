@@ -9,6 +9,7 @@ import (
 	"slices"
 
 	extproto "go.putnami.dev/protocol/extension"
+	wsproto "go.putnami.dev/protocol/workspace"
 )
 
 // ManifestBaseline reads a workspace-relative file as the diff's base records
@@ -58,8 +59,8 @@ func (idx *taskIndex) TasksOfManifestChange(extensionProjectID, path string) ([]
 	if project == nil || idx.baseline == nil || !idx.ownManifests[extensionProjectID] {
 		return nil, false
 	}
-	manifest := cleanWorkspacePath(path)
-	if manifest != cleanWorkspacePath(filepath.Join(project.Path, extproto.ManifestFilename)) {
+	manifest := wsproto.CleanWorkspacePath(path)
+	if manifest != wsproto.CleanWorkspacePath(filepath.Join(project.Path, extproto.ManifestFilename)) {
 		return nil, false
 	}
 	before, recorded := idx.baseline(manifest)

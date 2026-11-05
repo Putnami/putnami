@@ -8,6 +8,7 @@ import (
 
 	collab "go.putnami.dev/protocol/collaboration"
 	"go.putnami.dev/protocol/features/spectest"
+	"go.putnami.dev/sdk/extension/collabhelper"
 )
 
 func TestEachWorkflowStateTypeReadsAsItsSemanticState(t *testing.T) {
@@ -186,7 +187,7 @@ func TestTheRevisionCoversWhatATaskShows(t *testing.T) {
 	h := newHarness(t)
 	task := h.createTask(`{"title":"Revised","body":"Body.","labels":["zeta","Bug"],"idempotencyKey":"revised"}`)
 	stored := h.stored(task.Ref)
-	want := "v" + digest([]any{"Revised", stored.description, "Backlog", []string{"Bug", "zeta"}, []string{}})[:32]
+	want := "v" + collabhelper.Digest([]any{"Revised", stored.description, "Backlog", []string{"Bug", "zeta"}, []string{}})[:32]
 	if task.Revision != want {
 		t.Fatalf("revision %s, want %s", task.Revision, want)
 	}
@@ -195,7 +196,7 @@ func TestTheRevisionCoversWhatATaskShows(t *testing.T) {
 	h.fake.mu.Unlock()
 	var got collab.TaskResult
 	h.ok("get", `{"ref":`+refJSON(task.Ref)+`}`, &got)
-	assigned := "v" + digest([]any{"Revised", stored.description, "Backlog", []string{"Bug", "zeta"}, []string{"33333333-3333-4333-8333-333333333333"}})[:32]
+	assigned := "v" + collabhelper.Digest([]any{"Revised", stored.description, "Backlog", []string{"Bug", "zeta"}, []string{"33333333-3333-4333-8333-333333333333"}})[:32]
 	if got.Task.Revision != assigned || !slices.Equal(got.Task.Assignees, []string{"user-3333"}) {
 		t.Fatalf("after an assignment: revision %s assignees %v, want %s", got.Task.Revision, got.Task.Assignees, assigned)
 	}

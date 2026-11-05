@@ -62,10 +62,10 @@ func isLoopbackHost(host string) bool {
 // carry credentials — PUTNAMI_REGISTRY_URL may embed `user:token@`, and a
 // private registry may sign the query.
 //
-// It exists because the two things a reader needs to diagnose a failed fetch —
-// which endpoint answered, and with what — sit next to the one thing they must
-// never see. Dropping rather than marking keeps the printed value a URL a
-// reader can paste into curl.
+// It keeps the endpoint and what answered, the two things a reader needs to
+// diagnose a failed fetch, and drops the one thing they must never see.
+// Dropping rather than marking keeps the printed value a URL a reader can paste
+// into curl.
 //
 // A value that does not parse returns the empty string rather than itself: a
 // URL that cannot be parsed cannot be proven credential-free, so callers print

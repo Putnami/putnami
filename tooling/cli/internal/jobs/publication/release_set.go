@@ -22,6 +22,7 @@ import (
 	protocoljob "go.putnami.dev/protocol/job"
 	registryproto "go.putnami.dev/protocol/registry"
 	runtimeproto "go.putnami.dev/protocol/runtime"
+	"go.putnami.dev/sdk/extension/gitread"
 	"go.putnami.dev/sdk/extension/releaseset"
 	"go.putnami.dev/tooling/cli/internal/cmderr"
 	"go.putnami.dev/tooling/cli/internal/extension"
@@ -114,7 +115,7 @@ var newReleaseSetProvenance = func(ws *workspace.Workspace, withTree bool) (*rel
 		return nil, fmt.Errorf("release-set publish requires a full commit revision: %w", err)
 	}
 	if !set {
-		revision, err = git.HeadSHA(ws.Root)
+		revision, err = gitread.HeadSHA(ws.Root)
 		if err != nil {
 			return nil, fmt.Errorf("release-set publish requires a git checkout to record the source revision: %w", err)
 		}
@@ -672,10 +673,9 @@ func releaseSetResolveChannels(options ReleaseSetOptions, channels []string) []s
 //  2. otherwise the named baseline channel's head, when it has one;
 //  3. otherwise nothing: every member is selected.
 //
-// Own-head-first is what keeps this a pure fallback. Every publication that
-// already has a head behaves exactly as it did before a baseline could be
-// named, so the second push of a pull request still measures against what the
-// first one published rather than against a channel that moved meanwhile.
+// A channel that already has a head keeps measuring against it, so the second
+// push of a pull request compares with what the first one published, not with a
+// channel that moved meanwhile.
 func releaseSetBaselineHead(
 	options ReleaseSetOptions,
 	channels []string,
@@ -700,15 +700,7 @@ func releaseSetBaselineHead(
 // release-set coordinator owns but a selection the coordinator cannot serve.
 //
 // A named channel only enters release-set coordination through --all or
-// --impacted. With any other selection the run used to fall through to the
-// legacy per-package path, publish the artifacts, and only then have the
-// registry refuse the channel write:
-//
-//	409 Conflict - dist-tag canary is managed by the canonical release-set channel
-//
-// That answer arrives after the upload, names a concept the caller never asked
-// for, and leaves the version published but unreferenced. Refusing up front
-// costs nothing and says which flag is missing.
+// --impacted. Refusing up front costs nothing and says which flag is missing.
 //
 // A tagged publish is accepted with no selection flag at all, and with no
 // --channel: the tag itself names the cohort (its line) and the immutable
@@ -2153,15 +2145,10 @@ func buildReleaseSetPlan(
 		// An unchanged member inherits its artifact record from the baseline
 		// verbatim: version, digest, dependencies, provenance (source tree
 		// included, opted in or not) and platforms belong to the publication
-		// that produced them. Its attribution does not: which project
-		// declares a member and what kind of artifact it is are what the
-		// workspace states, whether or not this run republishes the member,
-		// so an opted-in plan stamps every member it declares. A
-		// head published before the opt-in would otherwise keep its members
-		// unattributed until each one happened to change, and a consumer that
-		// binds a workload's image, config and migrations by project could
-		// bind nothing for the workloads that stood still. Off, inheritance
-		// stays verbatim, attribution included.
+		// that produced them. Its attribution does not: which project declares a
+		// member and what kind of artifact it is come from the workspace, whether or
+		// not this run republishes the member, so an opted-in plan stamps every member
+		// it declares. Off, inheritance stays verbatim, attribution included.
 		baseMember := baseMembers[key]
 		member := releaseset.PlannedMember{
 			Ecosystem: baseMember.Ecosystem, Coordinate: baseMember.Coordinate, Version: baseMember.Version,
@@ -2459,13 +2446,9 @@ func releaseMemberSourceTree(policy *ciproto.Distribution) bool {
 // project's canonical logical id without its leading slash, the same identity
 // the private member-evidence handoff already carries.
 //
-// It is Project.ID and NOT Project.Path on purpose. A transparent group folder
-// lives in the path and is absent from the id, and identity is what a consumer
-// matches against: a ci document selects `apps/service`, never
-// `apps/(internal)/service`, and the protocol grammar cannot even express the
-// second. Recording the physical path would attribute the member to a name no
-// selector can name — and, because the grammar rejects a parenthesis, would
-// record nothing at all for exactly the grouped projects it meant to serve.
+// It is Project.ID, not Project.Path: a transparent group folder lives in the
+// path and is absent from the id, and a ci document selects `apps/service`,
+// never `apps/(internal)/service`, which the protocol grammar cannot express.
 // Workspace loading already refuses two paths that collapse to one id, so the
 // id it yields is unique.
 //
@@ -3188,8 +3171,7 @@ func reconcilePublishedReleaseSet(plan *releaseset.Plan, results map[string]*job
 
 // parsePublishedMemberEvent reads one published-member event through the
 // protocol's own strict reader. Everything left after the envelope belongs to
-// the protocol, which rejects an unknown field — a publish job that emitted a
-// field this build does not know would otherwise have its member silently
+// the protocol, which rejects an unknown field, so a member is never silently
 // truncated into the release set.
 func parsePublishedMemberEvent(data map[string]any) (*extproto.PublishedMember, error) {
 	encoded, err := extproto.ArtifactEventPayload(data)

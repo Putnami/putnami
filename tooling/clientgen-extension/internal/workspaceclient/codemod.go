@@ -287,7 +287,7 @@ func generatedGoPackageName(root, manifestPath string, manifest *clientcontract.
 		if !strings.HasSuffix(file.Path, ".go") {
 			continue
 		}
-		content, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(joinRel(base, file.Path)))) //nolint:gosec // validated generated manifest path
+		content, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(joinRel(base, file.Path))))
 		if err != nil {
 			continue
 		}
@@ -321,7 +321,7 @@ func validGeneratedManifests(root string) (map[string]bool, map[string]*clientco
 		if entry.Name() != clientcontract.GeneratedManifestFile {
 			return nil
 		}
-		data, readErr := os.ReadFile(path) //nolint:gosec // workspace or private snapshot traversal
+		data, readErr := os.ReadFile(path)
 		if readErr != nil {
 			return readErr
 		}

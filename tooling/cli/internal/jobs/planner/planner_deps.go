@@ -106,10 +106,10 @@ func emitUpstreamJobs(
 					continue
 				}
 
-				// Collect the target step and all its intra-pipeline dependencies.
-				// When an upstream step like "npm" depends on "types" within the same
-				// pipeline, we must also emit "types" or it will be an unresolvable
-				// dependency that causes the step to be canceled.
+				// Collect the target step and all its intra-pipeline dependencies:
+				// when an upstream step like "npm" depends on "types" within the same
+				// pipeline, "types" is emitted too, or the step is canceled on an
+				// unresolvable dependency.
 				stepsToExpand := collectPipelineStepClosure(jobDef, n.cmdName, n.depName, n.stepID, ext, namespace, existing)
 				if len(stepsToExpand) == 0 {
 					continue
@@ -1745,7 +1745,7 @@ type plannedIndex struct {
 	byStepName map[string][]*jobmodel.ScheduledJob
 	// byLegacyName indexes each job under its DERIVED spellings (display name,
 	// plan name). Nothing resolves through it — it exists so a reference that
-	// used to bind through one of those spellings can be reported instead of
+	// names one of those spellings can be reported instead of
 	// silently losing its edge.
 	byLegacyName map[string][]*jobmodel.ScheduledJob
 }

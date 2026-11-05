@@ -383,7 +383,7 @@ func walkDriftTree(root string, excludes []string) (driftTree, error) {
 func digestDriftEntry(path string, info fs.FileInfo) (string, error) {
 	switch {
 	case info.Mode().IsRegular():
-		file, err := os.Open(path) //nolint:gosec // a declared output the task owns
+		file, err := os.Open(path)
 		if err != nil {
 			return "", err
 		}

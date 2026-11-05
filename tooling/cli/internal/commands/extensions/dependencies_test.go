@@ -138,7 +138,19 @@ func (r *graphRegistry) resolve(name, request string, lockEntry *lockfile.LockEn
 	for version := range releases {
 		versions = append(versions, version)
 	}
-	extension.SortVersions(versions)
+	slices.SortFunc(versions, func(a, b string) int {
+		va, errA := extension.ParseVersion(a)
+		vb, errB := extension.ParseVersion(b)
+		switch {
+		case errA != nil || errB != nil:
+			return strings.Compare(a, b)
+		case va.LessThan(vb):
+			return -1
+		case vb.LessThan(va):
+			return 1
+		}
+		return 0
+	})
 	if request == "" || request == "latest" || request == "*" {
 		return versions[len(versions)-1], false, nil
 	}
@@ -1557,7 +1569,7 @@ func TestListShowsTheRequiringExtension(t *testing.T) {
 	cfg, _ := r.declare(map[string]string{"@acme/app": "", "@acme/tool": ""})
 	r.mustRun(cfg)
 
-	out, err := sharedtest.CaptureStdout(t, func() error { return ExtensionsList(r.ws, cfg, "") })
+	out, err := sharedtest.CaptureStdout(t, func() error { return ExtensionsListPrepared(r.ws, cfg, "", nil) })
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1574,7 +1586,7 @@ func TestListShowsTheRequiringExtension(t *testing.T) {
 		t.Errorf("output lacks the removed provider:\n%s", out)
 	}
 
-	jsonl, err := sharedtest.CaptureStdout(t, func() error { return ExtensionsList(r.ws, cfg, "jsonl") })
+	jsonl, err := sharedtest.CaptureStdout(t, func() error { return ExtensionsListPrepared(r.ws, cfg, "jsonl", nil) })
 	if err != nil {
 		t.Fatal(err)
 	}

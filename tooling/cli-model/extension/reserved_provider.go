@@ -13,22 +13,6 @@ import (
 // serves one is found by the RESERVED COMMAND NAME the protocol owns, exactly
 // as `cache clean`/`cache gc` fan out to ReservedCacheCommands: core asks "does
 // this extension declare the command the protocol names?" and nothing else.
-//
-// An earlier design deleted what used to sit around that question. The
-// old gate also knew a PRODUCT NAME ("@putnami/cloud") and an extension-VERSION
-// floor, and it turned "the extension I expected is loaded but does not declare
-// the command" into a bespoke upgrade error. Both were provider knowledge in a
-// neutral core, and both were unsound as compatibility signals: the cloud
-// extension publishes SHA-stamped prereleases whose identifiers admit no semver
-// order, so a floor rejected NEWER builds as older, and the name made a
-// third-party provider a second-class citizen for no reason. What actually
-// establishes compatibility is the extension contract version (rejected at
-// discovery) plus the provider RPC version negotiated at the initialize
-// handshake — neither of which needs to know who ships the provider.
-//
-// The publish gate is gone outright rather than made neutral: @putnami/cloud
-// retired its `publish-provider` marker command, so nothing declares one and
-// advanced publishing is selected by the tasks a manifest declares.
 
 // ErrProviderAmbiguous is the sentinel for the one resolution failure that
 // remains: two loaded extensions both declaring the same reserved provider

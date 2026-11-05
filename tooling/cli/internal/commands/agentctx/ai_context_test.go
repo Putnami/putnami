@@ -248,7 +248,7 @@ func TestContextGenerateLockStoreMismatchLeavesGuidanceUntouched(t *testing.T) {
 	}
 
 	t.Setenv("PUTNAMI_REGISTRY_URL", "http://127.0.0.1:1")
-	t.Setenv(extension.HTTPRetryBackoffEnv, "0")
+	t.Cleanup(extension.SetHTTPRetryBackoff(0))
 	err := ContextGenerateWithWriter(dir, cfg, nil)
 	if err == nil || !strings.Contains(err.Error(), "lock/store mismatch") || !strings.Contains(err.Error(), name) {
 		t.Fatalf("ContextGenerateWithWriter error = %v, want useful lock/store mismatch", err)

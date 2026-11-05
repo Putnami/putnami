@@ -57,9 +57,9 @@ func startInteractive(t *testing.T, ctx context.Context, ws *workspace.Workspace
 	t.Helper()
 	done := make(chan *JobResult, 1)
 	go func() {
-		res, err := RunJobInteractive(ctx, ws, job, nil, nil, nil)
+		res, err := runJobInteractive(ctx, ws, job)
 		if err != nil {
-			t.Errorf("RunJobInteractive: %v", err)
+			t.Errorf("runJobInteractive: %v", err)
 		}
 		done <- res
 	}()
@@ -81,7 +81,7 @@ func awaitResult(t *testing.T, done <-chan *JobResult, limit time.Duration) *Job
 	select {
 	case res := <-done:
 		if res == nil {
-			t.Fatal("RunJobInteractive returned no result")
+			t.Fatal("runJobInteractive returned no result")
 		}
 		return res
 	case <-time.After(limit):

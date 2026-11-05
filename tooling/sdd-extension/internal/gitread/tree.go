@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
 	"os/exec"
 	"path"
 	"sort"
@@ -16,6 +17,7 @@ import (
 	"strings"
 
 	capabilityproto "go.putnami.dev/protocol/capabilities"
+	sdkgit "go.putnami.dev/sdk/extension/gitread"
 )
 
 // ErrTreeObjectTooLarge identifies a bounded historical blob read that would
@@ -33,16 +35,16 @@ type TreeEntry struct {
 // TreeEntryAt resolves one literal repository-relative path in commit. An
 // absent entry returns (TreeEntry{}, false, nil).
 func TreeEntryAt(repoRoot, commit, repoPath string) (TreeEntry, bool, error) {
-	if !validObjectID(commit) {
+	if !sdkgit.ValidObjectID(commit) {
 		return TreeEntry{}, false, fmt.Errorf("inspect tree entry: invalid commit object ID")
 	}
 	if repoPath == "" {
-		output, err := run(repoRoot, "rev-parse", "--verify", "--end-of-options", commit+"^{tree}")
+		output, err := sdkgit.Run(repoRoot, "rev-parse", "--verify", "--end-of-options", commit+"^{tree}")
 		if err != nil {
 			return TreeEntry{}, false, fmt.Errorf("inspect repository tree: %w", err)
 		}
 		objectID := strings.ToLower(strings.TrimSpace(output))
-		if !validObjectID(objectID) {
+		if !sdkgit.ValidObjectID(objectID) {
 			return TreeEntry{}, false, fmt.Errorf("inspect repository tree: invalid tree object ID")
 		}
 		return TreeEntry{Mode: "040000", Type: "tree", ObjectID: objectID}, true, nil
@@ -50,11 +52,11 @@ func TreeEntryAt(repoRoot, commit, repoPath string) (TreeEntry, bool, error) {
 	if !validTreePath(repoPath) {
 		return TreeEntry{}, false, fmt.Errorf("inspect tree entry: invalid repository path")
 	}
-	output, err := run(repoRoot, "ls-tree", "-z", "--full-name", commit, "--", ":(literal)"+repoPath)
+	output, err := sdkgit.Run(repoRoot, "ls-tree", "-z", "--full-name", commit, "--", ":(literal)"+repoPath)
 	if err != nil {
 		return TreeEntry{}, false, fmt.Errorf("inspect tree entry: %w", err)
 	}
-	entries := splitNUL(output)
+	entries := sdkgit.SplitNUL(output)
 	if len(entries) == 0 {
 		return TreeEntry{}, false, nil
 	}
@@ -73,14 +75,14 @@ func TreeEntryAt(repoRoot, commit, repoPath string) (TreeEntry, bool, error) {
 
 // TreeEntries lists the direct entries of one immutable tree object.
 func TreeEntries(repoRoot, treeObjectID string) ([]TreeEntry, error) {
-	if !validObjectID(treeObjectID) {
+	if !sdkgit.ValidObjectID(treeObjectID) {
 		return nil, fmt.Errorf("list tree entries: invalid tree object ID")
 	}
-	output, err := run(repoRoot, "ls-tree", "-z", treeObjectID)
+	output, err := sdkgit.Run(repoRoot, "ls-tree", "-z", treeObjectID)
 	if err != nil {
 		return nil, fmt.Errorf("list tree entries: %w", err)
 	}
-	items := splitNUL(output)
+	items := sdkgit.SplitNUL(output)
 	entries := make([]TreeEntry, 0, len(items))
 	for _, item := range items {
 		entry, parseErr := parseTreeEntry(item)
@@ -96,17 +98,17 @@ func TreeEntries(repoRoot, treeObjectID string) ([]TreeEntry, error) {
 // ReadTreeBlob returns one bounded blob's exact bytes without interpreting a
 // revision:path expression supplied by a caller.
 func ReadTreeBlob(repoRoot, objectID string, maximum int64) ([]byte, error) {
-	if !validObjectID(objectID) || maximum < 0 {
+	if !sdkgit.ValidObjectID(objectID) || maximum < 0 {
 		return nil, fmt.Errorf("read tree blob: invalid input")
 	}
-	typeOutput, err := run(repoRoot, "cat-file", "-t", objectID)
+	typeOutput, err := sdkgit.Run(repoRoot, "cat-file", "-t", objectID)
 	if err != nil {
 		return nil, fmt.Errorf("read tree blob type: %w", err)
 	}
 	if strings.TrimSpace(typeOutput) != "blob" {
 		return nil, fmt.Errorf("read tree blob: object is not a blob")
 	}
-	sizeOutput, err := run(repoRoot, "cat-file", "-s", objectID)
+	sizeOutput, err := sdkgit.Run(repoRoot, "cat-file", "-s", objectID)
 	if err != nil {
 		return nil, fmt.Errorf("read tree blob size: %w", err)
 	}
@@ -117,7 +119,7 @@ func ReadTreeBlob(repoRoot, objectID string, maximum int64) ([]byte, error) {
 	if size > maximum {
 		return nil, ErrTreeObjectTooLarge
 	}
-	output, err := run(repoRoot, "cat-file", "blob", objectID)
+	output, err := sdkgit.Run(repoRoot, "cat-file", "blob", objectID)
 	if err != nil {
 		return nil, fmt.Errorf("read tree blob: %w", err)
 	}
@@ -131,7 +133,7 @@ func ReadTreeBlob(repoRoot, objectID string, maximum int64) ([]byte, error) {
 // immutable commit. It uses Git modes and object bytes only; no index or
 // worktree path participates.
 func CommitSourceBinding(repoRoot, commit, projectRoot string) (string, error) {
-	resolved, err := ResolveCommit(repoRoot, commit)
+	resolved, err := sdkgit.ResolveCommit(repoRoot, commit)
 	if err != nil {
 		return "", err
 	}
@@ -150,12 +152,12 @@ func CommitSourceBinding(repoRoot, commit, projectRoot string) (string, error) {
 	if projectRoot != "" {
 		args = append(args, "--", ":(literal)"+projectRoot)
 	}
-	output, err := run(repoRoot, args...)
+	output, err := sdkgit.Run(repoRoot, args...)
 	if err != nil {
 		return "", fmt.Errorf("enumerate commit source: %w", err)
 	}
 
-	entries := splitNUL(output)
+	entries := sdkgit.SplitNUL(output)
 	records := make([]capabilityproto.SourceBindingFile, 0, len(entries))
 	blobs := make([]string, 0, len(entries))
 	for _, item := range entries {
@@ -214,7 +216,7 @@ func parseTreeEntry(value string) (TreeEntry, error) {
 		return TreeEntry{}, fmt.Errorf("parse tree entry: missing path separator")
 	}
 	fields := strings.Fields(metadata)
-	if len(fields) != 3 || !validObjectID(fields[2]) || entryPath == "" {
+	if len(fields) != 3 || !sdkgit.ValidObjectID(fields[2]) || entryPath == "" {
 		return TreeEntry{}, fmt.Errorf("parse tree entry: malformed metadata")
 	}
 	return TreeEntry{Mode: fields[0], Type: fields[1], ObjectID: strings.ToLower(fields[2]), Path: entryPath}, nil
@@ -241,7 +243,7 @@ func treeBlobDigests(repoRoot string, objectIDs []string) (map[string]string, er
 	unique := make(map[string]bool, len(objectIDs))
 	ids := make([]string, 0, len(objectIDs))
 	for _, objectID := range objectIDs {
-		if !validObjectID(objectID) {
+		if !sdkgit.ValidObjectID(objectID) {
 			return nil, fmt.Errorf("hash tree blobs: invalid object ID")
 		}
 		if !unique[objectID] {
@@ -255,10 +257,11 @@ func treeBlobDigests(repoRoot string, objectIDs []string) (map[string]string, er
 		return digests, nil
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), gitTimeout)
+	ctx, cancel := context.WithTimeout(context.Background(), sdkgit.Timeout)
 	defer cancel()
-	cmd := exec.CommandContext(ctx, "git", "cat-file", "--batch")
+	cmd := exec.CommandContext(ctx, sdkgit.Executable(), "cat-file", "--batch")
 	cmd.Dir = repoRoot
+	cmd.Env = sdkgit.RepositoryEnvironment(os.Environ())
 	cmd.Stdin = strings.NewReader(strings.Join(ids, "\n") + "\n")
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
@@ -306,7 +309,7 @@ func treeBlobDigests(repoRoot string, objectIDs []string) (map[string]string, er
 	waited = true
 	if err != nil {
 		if ctx.Err() == context.DeadlineExceeded {
-			return nil, fmt.Errorf("hash tree blobs: timed out after %s", gitTimeout)
+			return nil, fmt.Errorf("hash tree blobs: timed out after %s", sdkgit.Timeout)
 		}
 		return nil, fmt.Errorf("hash tree blobs: git failed: %w: %s", err, strings.TrimSpace(stderr.String()))
 	}

@@ -6,6 +6,8 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+
+	"go.putnami.dev/sdk/extension/gitread"
 )
 
 // deletedTrackedDigest marks a tracked file the working tree no longer has.
@@ -22,15 +24,15 @@ const deletedTrackedDigest = "deleted"
 // asks of itself, because a committed file it rewrites is a diff `--impacted`
 // then plans from on this machine alone.
 func TrackedDirtyDigests(repoRoot string) (map[string]string, error) {
-	if _, err := run(repoRoot, "rev-parse", "--git-dir"); err != nil {
+	if _, err := gitread.Run(repoRoot, "rev-parse", "--git-dir"); err != nil {
 		return nil, nil
 	}
-	dirty, err := run(repoRoot, "diff", "--no-ext-diff", "--no-renames", "--name-only", "-z", "HEAD")
+	dirty, err := gitread.Run(repoRoot, "diff", "--no-ext-diff", "--no-renames", "--name-only", "-z", "HEAD")
 	if err != nil {
 		return nil, err
 	}
 	digests := make(map[string]string)
-	for _, path := range splitNUL(dirty) {
+	for _, path := range gitread.SplitNUL(dirty) {
 		content, err := os.ReadFile(filepath.Join(repoRoot, filepath.FromSlash(path)))
 		if err != nil {
 			if os.IsNotExist(err) {

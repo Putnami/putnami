@@ -161,7 +161,7 @@ func writeEntry(tw *tar.Writer, path, rel string, d fs.DirEntry) error {
 	if err != nil {
 		return err
 	}
-	defer f.Close() //nolint:errcheck // read-only handle
+	defer f.Close()
 	n, err := io.Copy(tw, f)
 	if err != nil {
 		return err
@@ -177,7 +177,7 @@ func copyFile(src, dst string, perm fs.FileMode) (err error) {
 	if err != nil {
 		return err
 	}
-	defer in.Close() //nolint:errcheck // read-only handle
+	defer in.Close()
 	if err := os.MkdirAll(filepath.Dir(dst), 0o755); err != nil {
 		return err
 	}

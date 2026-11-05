@@ -112,10 +112,8 @@ func Publish(ctx *pctx.Context, emit *jsonl.Emitter, args []string) (string, map
 	imageName := dockerManifest.Image
 	localRef := dockerManifest.Tags[0]
 
-	// Identity comes from the session, not from the cached package manifest: the
-	// manifest version is stamped when the package job actually runs, so a
-	// cache-restored package would otherwise publish a release id from an earlier
-	// session.
+	// Identity comes from the session, not from the cached package manifest,
+	// whose version is stamped when the package job runs.
 	version := sessionVersion(ctx, dockerManifest.Version)
 
 	registry := dockerRegistry
@@ -328,8 +326,8 @@ func Publish(ctx *pctx.Context, emit *jsonl.Emitter, args []string) (string, map
 }
 
 // resolveDockerRegistry keeps every output-target decision in publish. Image
-// packaging parses its spec for local assembly but never consumes Registry,
-// reads DOCKER_REGISTRY, or performs output-registry work.
+// packaging parses its spec for local assembly but never reads DOCKER_REGISTRY
+// or performs output-registry work.
 //
 // The chain is: the `--docker-registry` argument, then the workspace's
 // `registries.oci` entry, then DOCKER_REGISTRY, then nothing — which the image
@@ -346,19 +344,6 @@ func resolveDockerRegistry(flags map[string]string, ctx *pctx.Context) (string, 
 	}
 	if declared != "" {
 		return declared, nil
-	}
-	if ctx.Project.Type == "image" {
-		if raw, ok := ctx.Params["image"]; ok && len(raw) > 0 {
-			var compatibility struct {
-				Registry string `json:"registry"`
-			}
-			if err := json.Unmarshal(raw, &compatibility); err != nil {
-				return "", fmt.Errorf("parsing options.package.image for publish registry compatibility: %w", err)
-			}
-			if compatibility.Registry != "" {
-				return compatibility.Registry, nil
-			}
-		}
 	}
 	return os.Getenv("DOCKER_REGISTRY"), nil
 }

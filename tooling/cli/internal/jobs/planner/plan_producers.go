@@ -1,21 +1,12 @@
 // Plan-time enforcement of typed producer requirements.
 //
-// A task that needs another task's output used to be expressed two ways, both
-// of them core's guesses about somebody else's workload:
-//
-//   - `traits.preflight: config-schema`, which made core stat a project's infra
-//     markers, parse its Go imports looking for `config.Config[…]`, and fail the
-//     job when it could not find a schema artifact core does not own; and
-//   - a fallback on the COMMAND NAME for the cloud commands that had not
-//     declared the trait.
-//
-// Both are deleted. The replacement is the declaration that was already in the
-// contract and never enforced: a `from: "task"` input port. Not `optional`
-// means "I cannot run without this", and the consuming pipeline step names its
-// producer in `with`. This file is what makes that statement true — a required
-// port whose producer is missing from the PLAN fails planning, naming the
-// consumer (job key, extension, task, port) and the producer that is absent,
-// instead of letting the task discover mid-run that a file was never written.
+// A task that needs another task's output declares a required `from: "task"`
+// input port. Not `optional` means "I cannot run without this", and the
+// consuming pipeline step names its producer in `with`. This file is what makes
+// that statement true — a required port whose producer is missing from the
+// PLAN fails planning, naming the consumer (job key, extension, task, port) and
+// the producer that is absent, instead of letting the task discover mid-run
+// that a file was never written.
 //
 // Why the plan and not the manifest: a manifest is static, a plan is not. `if`
 // conditions and activation gates splice steps out per project and per

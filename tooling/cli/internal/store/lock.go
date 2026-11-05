@@ -4,10 +4,9 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
-	"strconv"
 	"time"
 
-	"go.putnami.dev/tooling/cli/internal/flock"
+	"go.putnami.dev/sdk/extension/filelock"
 )
 
 // storeLockFile is the advisory lock file at the store root that serializes
@@ -16,8 +15,8 @@ import (
 // its own lock.
 const storeLockFile = ".lock"
 
-// lastUsedFile is a per-entry sidecar holding the unix-nano timestamp of the
-// last cache hit. GC evicts by ascending lastUsed; the sidecar is written
+// lastUsedFile is a per-entry sidecar holding the lastUsedRecord of the last
+// cache hit. GC evicts by ascending lastUsed; the sidecar is written
 // atomically and never mutates the otherwise-immutable entry payload (meta /
 // result / manifest), so a hit cannot corrupt an entry a sibling is reading.
 const lastUsedFile = "lastused"
@@ -58,7 +57,7 @@ func (s *LocalStore) acquireLock(exclusive, nonBlocking bool) (func(), bool) {
 	if err := os.MkdirAll(s.root, 0o755); err != nil {
 		return func() {}, !nonBlocking
 	}
-	l, err := flock.Acquire(filepath.Join(s.root, storeLockFile), exclusive, nonBlocking)
+	l, err := filelock.Acquire(filepath.Join(s.root, storeLockFile), exclusive, nonBlocking)
 	if err != nil {
 		return func() {}, !nonBlocking
 	}
@@ -131,18 +130,14 @@ func writeLastUsed(blobDir string, t time.Time, gen int64) {
 
 // readLastUsed returns the entry's last-used time and the generation it was last
 // hit in. The time falls back to CreatedAt (meta.json) then the blob dir mtime
-// so legacy entries still have a sane recency; the generation is -1 when unknown
-// (legacy entries / never stamped), which excludes them from idle reclaim.
+// for an entry never stamped; the generation is then -1, which excludes the
+// entry from idle reclaim.
 func readLastUsed(blobDir string) (time.Time, int64) {
 	if data, err := os.ReadFile(filepath.Join(blobDir, lastUsedFile)); err == nil {
 		trimmed := trimSpaceBytes(data)
 		var rec lastUsedRecord
 		if json.Unmarshal(trimmed, &rec) == nil && rec.UsedAtNano != 0 {
 			return time.Unix(0, rec.UsedAtNano), rec.Generation
-		}
-		// Legacy format: a bare unix-nano integer (no generation).
-		if n, err := strconv.ParseInt(string(trimmed), 10, 64); err == nil {
-			return time.Unix(0, n), -1
 		}
 	}
 	if data, err := os.ReadFile(filepath.Join(blobDir, "meta.json")); err == nil {

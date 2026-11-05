@@ -17,8 +17,8 @@ import (
 	"go.putnami.dev/cli/model/workspace"
 	extensionproto "go.putnami.dev/protocol/extension"
 	"go.putnami.dev/protocol/features/spectest"
+	"go.putnami.dev/sdk/extension/filelock"
 	"go.putnami.dev/tooling/cli/internal/extension"
-	"go.putnami.dev/tooling/cli/internal/flock"
 	"go.putnami.dev/tooling/cli/internal/jobs/cachekey"
 	"go.putnami.dev/tooling/cli/internal/store"
 )
@@ -42,8 +42,8 @@ func probeFree(t *testing.T, m *taskOutputLocks, key outputLockKey) bool {
 	if err := os.MkdirAll(m.dir, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	lock, err := flock.Acquire(filepath.Join(m.dir, key.id+".lock"), true, true)
-	if errors.Is(err, flock.ErrBusy) {
+	lock, err := filelock.Acquire(filepath.Join(m.dir, key.id+".lock"), true, true)
+	if errors.Is(err, filelock.ErrBusy) {
 		return false
 	}
 	if err != nil {
@@ -367,7 +367,7 @@ func TestTaskOutputLockWaitLineWithoutALiveHolderRecord(t *testing.T) {
 			if err := os.MkdirAll(waiter.dir, 0o755); err != nil {
 				t.Fatal(err)
 			}
-			bare, err := flock.Acquire(filepath.Join(waiter.dir, key.id+".lock"), true, true)
+			bare, err := filelock.Acquire(filepath.Join(waiter.dir, key.id+".lock"), true, true)
 			if err != nil {
 				t.Fatalf("hold bare lock: %v", err)
 			}
@@ -906,8 +906,8 @@ func probeShared(t *testing.T, m *taskOutputLocks, key outputLockKey) bool {
 	if err := os.MkdirAll(m.dir, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	lock, err := flock.Acquire(filepath.Join(m.dir, key.id+".lock"), false, true)
-	if errors.Is(err, flock.ErrBusy) {
+	lock, err := filelock.Acquire(filepath.Join(m.dir, key.id+".lock"), false, true)
+	if errors.Is(err, filelock.ErrBusy) {
 		return false
 	}
 	if err != nil {

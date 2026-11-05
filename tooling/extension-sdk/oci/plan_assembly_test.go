@@ -68,7 +68,9 @@ func TestImagePlanV2_TarballMutationFailsClosed(t *testing.T) {
 	if err := os.WriteFile(tarball, []byte("after!"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	_, err = AssemblePlan(plan, syntheticBase(t), t.TempDir())
+	if err = plan.bindDerivedFiles(); err == nil {
+		_, err = assemble(plan.spec, plan, syntheticBase(t), t.TempDir(), "")
+	}
 	if err == nil || !strings.Contains(err.Error(), "changed since image plan") {
 		t.Fatalf("changed tarball error = %v", err)
 	}

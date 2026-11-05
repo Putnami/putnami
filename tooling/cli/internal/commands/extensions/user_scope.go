@@ -10,10 +10,10 @@ import (
 	"strings"
 
 	wsproto "go.putnami.dev/protocol/workspace"
+	"go.putnami.dev/sdk/extension/filelock"
 	"go.putnami.dev/tooling/cli/internal/cmderr"
 	"go.putnami.dev/tooling/cli/internal/commands/shared"
 	"go.putnami.dev/tooling/cli/internal/extension"
-	"go.putnami.dev/tooling/cli/internal/flock"
 	"go.putnami.dev/tooling/cli/internal/iox"
 	"go.putnami.dev/tooling/cli/internal/lockfile"
 )
@@ -191,7 +191,7 @@ func lockUserScope(userRoot string) (func(), error) {
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return nil, fmt.Errorf("create the user scope: %w", err)
 	}
-	lock, err := flock.Acquire(filepath.Join(dir, userScopeLockFilename), true, false)
+	lock, err := filelock.Acquire(filepath.Join(dir, userScopeLockFilename), true, false)
 	if err != nil {
 		return nil, fmt.Errorf("lock the user scope: %w", err)
 	}

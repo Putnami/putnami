@@ -4,6 +4,8 @@ import (
 	"regexp"
 	"strings"
 	"sync"
+
+	"go.putnami.dev/sdk/extension/collabhelper"
 )
 
 // KeyVariable names the only place the API key is read from.
@@ -76,15 +78,7 @@ func (c *Credential) Secrets() []string {
 // redacted wherever they appear, whoever's they are.
 var knownKeyPattern = regexp.MustCompile(`\blin_(?:api|oauth)_[A-Za-z0-9]{16,255}\b`)
 
-// RedactedMarker replaces every redacted credential.
-const RedactedMarker = "[redacted]"
-
 // Redact removes secrets and every string shaped like a Linear key from text.
 func Redact(text string, secrets []string) string {
-	for _, secret := range secrets {
-		if len(secret) >= 4 {
-			text = strings.ReplaceAll(text, secret, RedactedMarker)
-		}
-	}
-	return knownKeyPattern.ReplaceAllString(text, RedactedMarker)
+	return collabhelper.Redact(text, secrets, knownKeyPattern)
 }

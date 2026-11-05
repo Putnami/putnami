@@ -247,8 +247,7 @@ func ResolvedRunSelection(
 // that run once for the workspace: a project-scoped task reporting on the
 // workspace has to know the run was narrowed just as much as a workspace-scoped
 // one does. It runs after the plan is final because the selection is a fact
-// about the RUN, not about the node — identical on all of them, so threading it
-// through every construction site would buy nothing.
+// about the RUN, not about the node: identical on all of them.
 //
 // Nothing stamped here reaches a cache key: the key builder reads named job
 // fields, and this is not one of them (TestCacheKeyIgnoresTheRunSelection).

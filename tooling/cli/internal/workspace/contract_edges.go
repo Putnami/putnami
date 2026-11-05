@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 
 	clientcontract "go.putnami.dev/protocol/clientcontract"
+	wsproto "go.putnami.dev/protocol/workspace"
 )
 
 // The contract edge: a generated client target and the provider whose contract
@@ -66,7 +67,7 @@ func resolveContractBindings(root string, projects []*Project) {
 // one's.
 func readGeneratedClientBinding(root string, project *Project) *GeneratedClientBinding {
 	rel := projectRelativePath(project, clientcontract.GeneratedManifestFile)
-	data, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(rel))) //nolint:gosec // fixed name under an indexed project
+	data, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(rel)))
 	if err != nil {
 		return nil
 	}
@@ -102,7 +103,7 @@ type committedContract struct {
 // service a generated client can name.
 func readCommittedContract(root string, project *Project) committedContract {
 	rel := projectRelativePath(project, committedContractFile)
-	data, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(rel))) //nolint:gosec // fixed name under an indexed project
+	data, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(rel)))
 	if err != nil {
 		return committedContract{}
 	}
@@ -117,7 +118,7 @@ func readCommittedContract(root string, project *Project) committedContract {
 // projectRelativePath joins a project-relative slash path onto the project's
 // workspace-relative directory.
 func projectRelativePath(project *Project, name string) string {
-	base := cleanWorkspacePath(project.Path)
+	base := wsproto.CleanWorkspacePath(project.Path)
 	if base == "" {
 		return name
 	}

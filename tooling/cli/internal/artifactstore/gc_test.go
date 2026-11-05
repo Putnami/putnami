@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"go.putnami.dev/tooling/cli/internal/flock"
+	"go.putnami.dev/sdk/extension/filelock"
 )
 
 // admitDir admits a digest derived from key whose payload is size bytes, and
@@ -402,7 +402,7 @@ func TestGC_NonBlockingSkipsBusyStore(t *testing.T) {
 	if err := os.MkdirAll(s.root, dirPerm); err != nil {
 		t.Fatal(err)
 	}
-	held, err := flock.Acquire(filepath.Join(s.root, lockFile), true, false)
+	held, err := filelock.Acquire(filepath.Join(s.root, lockFile), true, false)
 	if err != nil {
 		t.Fatal(err)
 	}

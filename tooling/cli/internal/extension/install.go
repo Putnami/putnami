@@ -117,10 +117,9 @@ func NewInstaller(workspaceRoot string) *Installer {
 
 // artifactStore returns the content-addressed artifact store this installer
 // writes to: Target.StoreRoot when a materialization named one, otherwise the
-// machine-global store for this installer's workspace. It is built from
-// WorkspaceRoot (not held as a struct field) so it works whether the Installer
-// came from NewInstaller or was constructed directly — as the template
-// installer does.
+// machine-global store for this installer's workspace. It derives from
+// WorkspaceRoot, so an Installer built directly, as the template installer is,
+// resolves it too.
 func (inst *Installer) artifactStore() *artifactstore.Store {
 	if inst.Target.StoreRoot != "" {
 		return artifactstore.New(inst.Target.StoreRoot)
@@ -289,19 +288,16 @@ func (inst *Installer) InstallArtifact(ctx context.Context, name, constraint str
 	}
 
 	// Lock-first: when the lock pins a concrete version, install that exact
-	// version from a version-pinned channel instead of re-resolving the
-	// workspace constraint (e.g. "latest"), which would otherwise drift the
-	// moment the channel moves ahead of the lock — breaking installs even on
-	// the platform that generated it. Only `update`/`--latest`, which
-	// pass a nil lock entry, advance the pin.
+	// version from a version-pinned channel; the workspace constraint (e.g.
+	// "latest") is not re-resolved. Only `update`/`--latest`, which pass a nil lock
+	// entry, advance the pin.
 	downloadChannel := constraint
 	if lockEntry != nil && isPinnableVersion(lockEntry.Version) {
 		downloadChannel = lockEntry.Version
 	}
 
 	// Not wrapped with the artifact name: every error `download` returns already
-	// carries it, and this frame used to produce "download X: download X at ..."
-	// once the fetch failure started naming its own pin.
+	// carries it.
 	archivePath, resolvedVersion, advertisedIntegrity, err := inst.download(ctx, name, downloadChannel, spec)
 	if err != nil {
 		return nil, err

@@ -333,7 +333,7 @@ func (t *Tree) ReadFile(rel string) ([]byte, error) {
 	if kind != File {
 		return nil, &fs.PathError{Op: "read", Path: rel, Err: fs.ErrNotExist}
 	}
-	return os.ReadFile(filepath.Join(t.root, filepath.FromSlash(resolved))) //nolint:gosec // a candidate path inside the root
+	return os.ReadFile(filepath.Join(t.root, filepath.FromSlash(resolved)))
 }
 
 // Fingerprint digests the cut as a `git:` cache input reads it: each
@@ -380,7 +380,7 @@ func (t *Tree) Fingerprint() (string, error) {
 		if err != nil {
 			return "", err
 		}
-		data, err := os.ReadFile(full) //nolint:gosec // a candidate path inside the root
+		data, err := os.ReadFile(full)
 		if err != nil {
 			return "", err
 		}
@@ -396,8 +396,8 @@ func (t *Tree) Fingerprint() (string, error) {
 func writeField(h hash.Hash, value string) {
 	var size [8]byte
 	binary.BigEndian.PutUint64(size[:], uint64(len(value)))
-	h.Write(size[:])       //nolint:errcheck // hash.Hash.Write never errors
-	h.Write([]byte(value)) //nolint:errcheck // hash.Hash.Write never errors
+	h.Write(size[:])
+	h.Write([]byte(value))
 }
 
 // readlink returns a candidate link's target text, read once.

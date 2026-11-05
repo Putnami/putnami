@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"go.putnami.dev/protocol/features/spectest"
+	wsproto "go.putnami.dev/protocol/workspace"
 )
 
 func TestBuildGraph(t *testing.T) {
@@ -33,8 +34,8 @@ func TestBuildGraph(t *testing.T) {
 
 func TestBuildGraph_UsesLogicalIDsForGroupedPaths(t *testing.T) {
 	spectest.Proves(t, "cli/workspace-model", "canonical-identity", "grouped-paths-resolve-to-logical-ids")
-	clientID := ProjectIDFromPath("identity/(libs)/identity-client")
-	authID := ProjectIDFromPath("identity/(workloads)/auth-server")
+	clientID := wsproto.ProjectIDFromPath("identity/(libs)/identity-client")
+	authID := wsproto.ProjectIDFromPath("identity/(workloads)/auth-server")
 	g := BuildGraph([]*Project{
 		{ID: clientID, Name: "identity-client", Path: "identity/(libs)/identity-client"},
 		{ID: authID, Name: "auth-server", Path: "identity/(workloads)/auth-server", Dependencies: []string{"identity-client"}},
@@ -130,79 +131,8 @@ func TestDependencyGraph_Paths(t *testing.T) {
 		}
 	}
 
-	impactPath := g.DependentPath("/core", "/app")
-	if got, want := impactPath, []string{"/core", "/lib", "/app"}; len(got) != len(want) {
-		t.Fatalf("DependentPath = %v, want %v", got, want)
-	} else {
-		for i := range want {
-			if got[i] != want[i] {
-				t.Fatalf("DependentPath = %v, want %v", got, want)
-			}
-		}
-	}
-
-	if path := g.DependentPath("/docs", "/app"); path != nil {
-		t.Fatalf("DependentPath unrelated = %v, want nil", path)
-	}
 	if path := g.DependencyPath("/app", "/app"); len(path) != 1 || path[0] != "/app" {
 		t.Fatalf("self DependencyPath = %v, want [/app]", path)
-	}
-}
-
-func TestDependencyGraph_TopologicalOrder(t *testing.T) {
-	spectest.Proves(t, "cli/workspace-model", "dependency-graph", "topological-order-is-stable")
-	g := BuildGraph([]*Project{
-		{ID: "/app", Name: "app", Dependencies: []string{"lib-a", "lib-b"}},
-		{ID: "/lib-a", Name: "lib-a", Dependencies: []string{"core"}},
-		{ID: "/lib-b", Name: "lib-b", Dependencies: []string{"core"}},
-		{ID: "/core", Name: "core"},
-	})
-
-	order, ok := g.TopologicalOrder()
-	if !ok {
-		t.Fatal("TopologicalOrder reported a cycle for an acyclic graph")
-	}
-	pos := make(map[string]int, len(order))
-	for i, id := range order {
-		pos[id] = i
-	}
-	for project, deps := range map[string][]string{
-		"/app":   {"/lib-a", "/lib-b"},
-		"/lib-a": {"/core"},
-		"/lib-b": {"/core"},
-	} {
-		for _, dep := range deps {
-			if pos[dep] >= pos[project] {
-				t.Fatalf("order = %v; dependency %s must appear before %s", order, dep, project)
-			}
-		}
-	}
-}
-
-func TestDependencyGraph_TopologicalOrderIgnoresExternalPathDeps(t *testing.T) {
-	spectest.Proves(t, "cli/workspace-model", "dependency-graph", "topological-order-is-stable")
-	g := BuildGraph([]*Project{
-		{ID: "/app", Name: "app", Dependencies: []string{"/external/project", "lib"}},
-		{ID: "/lib", Name: "lib"},
-	})
-
-	order, ok := g.TopologicalOrder()
-	if !ok {
-		t.Fatal("TopologicalOrder reported a cycle for a graph with an external path dependency")
-	}
-	if len(order) != 2 || order[0] != "/lib" || order[1] != "/app" {
-		t.Fatalf("order = %v, want [/lib /app]", order)
-	}
-}
-
-func TestDependencyGraph_TopologicalOrderCycle(t *testing.T) {
-	spectest.Proves(t, "cli/workspace-model", "dependency-graph", "a-declared-cycle-is-reported")
-	g := BuildGraph([]*Project{
-		{ID: "/a", Name: "a", Dependencies: []string{"b"}},
-		{ID: "/b", Name: "b", Dependencies: []string{"a"}},
-	})
-	if _, ok := g.TopologicalOrder(); ok {
-		t.Fatal("TopologicalOrder ok = true, want false for a cycle")
 	}
 }
 
@@ -269,9 +199,6 @@ func TestBuildGraph_ActivatedScopeImplicitEdge(t *testing.T) {
 	if impact := g.ImpactDependentsOf("/cloud"); impact != nil {
 		t.Errorf("scope impact dependents = %v; want nil (implicit edges carry no impact)", impact)
 	}
-	if path := g.DependentPath("/cloud", "/cloud/workloads/api"); path != nil {
-		t.Errorf("DependentPath(scope, include) = %v; want nil (implicit edges carry no impact)", path)
-	}
 }
 
 // An implicit scope edge and a declared dependency are indistinguishable in
@@ -332,9 +259,6 @@ func TestBuildGraph_ActivatedScopeIdempotentWithDeclaredDep(t *testing.T) {
 	// scope-self changes, and why_impacted can explain it.
 	if impact := g.ImpactDependentsOf("/cloud"); len(impact) != 1 || impact[0] != "/cloud/api" {
 		t.Errorf("scope impact dependents = %v; want [/cloud/api] (declared edge carries impact)", impact)
-	}
-	if path := g.DependentPath("/cloud", "/cloud/api"); len(path) != 2 || path[0] != "/cloud" || path[1] != "/cloud/api" {
-		t.Errorf("DependentPath(scope, declared dependent) = %v; want [/cloud /cloud/api]", path)
 	}
 }
 

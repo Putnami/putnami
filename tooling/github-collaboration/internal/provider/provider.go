@@ -14,8 +14,6 @@ package provider
 import (
 	"bytes"
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"net/url"
@@ -29,6 +27,7 @@ import (
 	"unicode/utf8"
 
 	collab "go.putnami.dev/protocol/collaboration"
+	"go.putnami.dev/sdk/extension/collabhelper"
 	"go.putnami.dev/tooling/github-collaboration/internal/github"
 )
 
@@ -240,7 +239,7 @@ func (s *session) reconcile(settled func() (bool, *collab.Failure)) bool {
 	}
 	pause := s.p.ReconcilePause
 	if pause == nil {
-		pause = reconcilePause
+		pause = collabhelper.ReconcilePause
 	}
 	for attempt := 1; attempt <= attempts; attempt++ {
 		if attempt > 1 && pause(s.ctx, attempt-1) != nil {
@@ -251,17 +250,6 @@ func (s *session) reconcile(settled func() (bool, *collab.Failure)) bool {
 		}
 	}
 	return false
-}
-
-func reconcilePause(ctx context.Context, attempt int) error {
-	timer := time.NewTimer(time.Duration(attempt) * time.Second)
-	defer timer.Stop()
-	select {
-	case <-ctx.Done():
-		return ctx.Err()
-	case <-timer.C:
-		return nil
-	}
 }
 
 // authenticated returns the login of the credential's account.
@@ -324,7 +312,7 @@ func parseRepository(value, host string) (repository, *collab.Failure) {
 	if host == "" {
 		host = github.DefaultHost
 	}
-	if !github.ValidHost(host) {
+	if !collabhelper.ValidHost(host) {
 		return repository{}, collab.Fail(collab.OutcomeInvalid, reasonSettings, "settings.host %q is not a bare host name", host)
 	}
 	locator := strings.ToLower(value)
@@ -380,41 +368,11 @@ func (r repository) sameRepository(apiURL string) bool {
 	return strings.HasSuffix(strings.ToLower(parsed.Path), strings.ToLower("/repos/"+r.owner+"/"+r.name))
 }
 
-// digest is the hex SHA-256 of a value's JSON encoding.
-func digest(value any) string {
-	encoded, err := json.Marshal(value)
-	if err != nil {
-		encoded = []byte(fmt.Sprint(value))
-	}
-	sum := sha256.Sum256(encoded)
-	return hex.EncodeToString(sum[:])
-}
-
 // revisionOf is a revision token over the content a caller can see and
 // change: it changes whenever that content changes, and not when only
 // comments or reactions do.
 func revisionOf(value any) string {
-	return "v" + digest(value)[:32]
-}
-
-// displayURL keeps a link only when it is an absolute http or https URL
-// without credentials.
-func displayURL(value string) string {
-	parsed, err := url.Parse(value)
-	if err != nil || (parsed.Scheme != "https" && parsed.Scheme != "http") || parsed.Host == "" || parsed.User != nil ||
-		len(value) > collab.MaxURLLength {
-		return ""
-	}
-	return value
-}
-
-var timestampPattern = regexp.MustCompile(`^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\.[0-9]+)?(Z|[+-][0-9]{2}:[0-9]{2})$`)
-
-func timestamp(value string) string {
-	if timestampPattern.MatchString(value) {
-		return value
-	}
-	return ""
+	return "v" + collabhelper.Digest(value)[:32]
 }
 
 var commitPattern = regexp.MustCompile(`^[0-9a-f]{7,64}$`)
@@ -429,33 +387,6 @@ func commit(value string) string {
 // sameCommit compares two commits where either may be abbreviated.
 func sameCommit(a, b string) bool {
 	return a != "" && b != "" && (strings.HasPrefix(a, b) || strings.HasPrefix(b, a))
-}
-
-// oneLine fits a title into the contract: one line of at most limit
-// characters, never empty.
-func oneLine(value string, limit int, fallback string) string {
-	value = strings.Join(strings.Fields(value), " ")
-	if value == "" {
-		value = fallback
-	}
-	if utf8.RuneCountInString(value) > limit {
-		runes := []rune(value)
-		value = string(runes[:limit-1]) + "…"
-	}
-	return value
-}
-
-// boundedBody cuts a body to the contract's limit on a character boundary.
-func boundedBody(value string) string {
-	value = strings.ReplaceAll(value, "\x00", "")
-	if len(value) <= collab.MaxBodyBytes {
-		return value
-	}
-	cut := collab.MaxBodyBytes
-	for cut > 0 && !utf8.RuneStart(value[cut]) {
-		cut--
-	}
-	return value[:cut]
 }
 
 // filePath keeps a path the contract accepts as the file of a comment: one
@@ -482,19 +413,6 @@ func token(value string) string {
 		return ""
 	}
 	return value
-}
-
-// boundedLabels keeps the labels the contract carries, in order: at most
-// MaxLabels distinct, non-empty names of at most MaxLabelLength characters.
-// The list is never nil, so an answer reports a label-less item as [].
-func boundedLabels(names []string) []string {
-	labels := []string{}
-	for _, label := range names {
-		if len(labels) < collab.MaxLabels && label != "" && utf8.RuneCountInString(label) <= collab.MaxLabelLength && !slices.Contains(labels, label) {
-			labels = append(labels, label)
-		}
-	}
-	return labels
 }
 
 // boundedLogins keeps the logins the contract carries as assignees, in

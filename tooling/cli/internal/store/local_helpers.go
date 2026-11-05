@@ -101,12 +101,10 @@ func copyDir(src, dst string) error {
 
 // copyDirUnsynced recursively copies a directory tree without fsyncing each
 // file. Use it when dst is a workspace materialization of bytes the CAS still
-// holds — restoring a cached output tree, detaching a CAS symlink — because the
+// holds — restoring a cached output tree, detaching a CAS symlink — where the
 // fsync buys only crash durability for a tree any later run rebuilds from the
-// blob, and it is expensive: on macOS os.File.Sync issues F_FULLFSYNC (a full
-// device cache flush) costing ~5ms per file regardless of size, so a few hundred
-// small files turn a 90ms copy into 2s. Torn-read safety is unaffected — that
-// comes from copyFile's stage-then-rename, not from the fsync.
+// blob. Torn-read safety comes from copyFile's stage-then-rename, not from the
+// fsync.
 func copyDirUnsynced(src, dst string) error {
 	return copyDirOpts(src, dst, nil, false)
 }
@@ -481,15 +479,10 @@ func uncacheableArtifact(rel string) bool {
 	return strings.HasPrefix(base, "lcov.info.") && strings.HasSuffix(base, ".tmp")
 }
 
-// copyFile copies a single file to dst atomically. Rather than truncating the
-// live dst in place (open+O_TRUNC), it stages the bytes into a unique temp file
-// in dst's own directory, fsyncs and chmods it to the source mode, then renames
-// it over dst. Because the temp is a sibling of dst the rename stays intra-
-// filesystem and is atomic: a concurrent reader/exec of dst (a downstream run
-// launching its task binary straight from the restored bin/ tree) sees either
-// the old inode or the fully-written new one, never torn bytes. Mirrors the
-// replaceDir stage-then-rename idiom above. os.CreateTemp creates the temp 0600,
-// so the explicit chmod-to-source-mode is required to preserve the exec bit.
+// copyFile copies a single file to dst atomically: it stages the bytes into a
+// unique temp file in dst's directory, fsyncs and chmods it to the source mode,
+// then renames it over dst. A concurrent reader or exec of dst sees either the
+// old inode or the fully written new one, never torn bytes.
 func copyFile(src, dst string) error {
 	return copyFileOpts(src, dst, true)
 }

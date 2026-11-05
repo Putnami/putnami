@@ -214,11 +214,7 @@ func (rt *invocationRuntime) relationFor(job *ScheduledJob) *invocationRelation 
 // precisely because every consumer's entry is already in the local store, so a
 // consumer that reached this check must be allowed to fall through to
 // lookupRestoreOrClaim and be SERVED that entry — its stored verdict replayed
-// and its declared outputs materialized. Matching through the participants map
-// (producer + consumers + finalizer) instead reported every consumer of every
-// relation "skipped" on each warm run: the cached verdict was never served and
-// the declared outputs were never restored, for exactly the runs the pruning
-// exists to make cheap.
+// and its declared outputs materialized.
 //
 // A producer about to start confirms, once, a pruning decided on a consumer key
 // that may have moved since (prune): present answers for each consumer from the

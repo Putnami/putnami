@@ -168,19 +168,15 @@ func (a *App) runExtensionStructuredCommand(
 			return ExitError
 		}
 		warnings := launchWarnings(ws, parsed.Global.Quiet, stderr)
-		// And the runtime it is about to exec, for the same reason: the
-		// scheduler bypass skips Engine.Run, which is where
-		// SynchronizeExtensionRuntimesForCommands would otherwise have prepared
-		// it (engine.go). Without this, a local extension whose runtime has never
-		// been built answers every interactive subcommand with
-		// `runtime.executable_missing` until an unrelated command — install,
-		// projects sync, a planned job — happens to prepare it.
+		// And the runtime it is about to exec: the scheduler bypass skips
+		// Engine.Run, which prepares it (engine.go), so a local extension whose
+		// runtime has never been built would answer every interactive subcommand
+		// with `runtime.executable_missing`.
 		//
-		// This is the same repair internal/collaboration makes for provider
-		// tools (invoke.go), and it is written the same way: a
-		// no-op when the executable is already resolved, so a caller that
-		// supplied one is untouched, and silent when the extension declares no
-		// runtime at all, because that case has its own named failure downstream.
+		// Like internal/collaboration for provider tools (invoke.go), this is a
+		// no-op when the executable is already resolved and silent when the
+		// extension declares no runtime, a case with its own named failure
+		// downstream.
 		if resolved.Extension != nil && resolved.Extension.Runtime != nil &&
 			resolved.Extension.RuntimeExecutable == "" {
 			if err := scheduler.SynchronizeExtensionRuntimes(
@@ -190,9 +186,8 @@ func (a *App) runExtensionStructuredCommand(
 			}
 		}
 		// The selection flags the user typed, resolved here because this path
-		// plans nothing and would otherwise hand the subprocess a context with no
-		// answer at all — the state that made `--projects` on an interactive
-		// extension subcommand a flag the CLI parsed and dropped.
+		// plans nothing; the subprocess receives a context that carries the
+		// answer.
 		selection, err := shared.ResolveProjectSelection(ws, shared.ProjectSelection{
 			Projects:   parsed.Global.Projects,
 			All:        parsed.Global.All,
@@ -551,14 +546,13 @@ func interactiveExitCode(result *scheduler.JobResult, commandPath string, deadli
 // `putnami <command>` gets: session file, remote cache, opportunistic GC,
 // successful-run markers, signal/Aborted handling (Ctrl-C is 130, not 1),
 // forwarded run exit codes, lifecycle hooks, and the production preflight gate.
-// Before this adapter it ran on a private scheduler construction that had none of them.
 //
 // Two seams are deliberately NOT the terminal path's:
 //
 //   - Observer stays nil (ADR 0001 §4). The alias dispatches from App.Run before
 //     runTerminalSession, so no telemetry client and no consent notice exist at
 //     this point; supplying an observer here would report a session the user was
-//     never told about, which an earlier design settled against. Only the terminal
+//     never told about. Only the terminal
 //     adapter observes.
 //   - ValidateCommandFlags stays nil because the alias already ran the
 //     equivalent, at the finer granularity only it can compute: the undeclared

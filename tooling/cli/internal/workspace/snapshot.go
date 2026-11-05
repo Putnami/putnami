@@ -201,12 +201,9 @@ type SnapshotValidity struct {
 // set would make an "ordinary load" walk the tree, which is exactly the cost the
 // snapshot exists to avoid.
 //
-// It is one file since a prior change dropped core's own parsers. It used to also list
-// package.json, go.mod and pyproject.toml, because discoverProject parsed them;
-// it no longer does, and those files are recorded — per project, with their
-// content digests — by the ADAPTERS that declare them (providerInputs). Leaving
-// them here as well would record the same file twice under two owners and, worse,
-// would attribute a language manifest's change to core, which invalidates EVERY
+// It is one file: the adapters that declare a language manifest record it, per
+// project and with its content digest (providerInputs). Recording a language
+// manifest here too would attribute its change to core, which invalidates EVERY
 // provider instead of the one that owns it (planProbe).
 var projectMetadataInputNames = []string{
 	wsproto.ConfigFilename, // putnami.json
@@ -249,7 +246,7 @@ func newSnapshotAt(ws *Workspace, probeDigest string, providers []SnapshotProvid
 	for _, project := range ws.Projects {
 		snapshot.Projects = append(snapshot.Projects, SnapshotProject{
 			ID:             project.ID,
-			Path:           cleanWorkspacePath(project.Path),
+			Path:           wsproto.CleanWorkspacePath(project.Path),
 			Name:           project.Name,
 			MetadataDigest: ws.MetadataDigestFor(project),
 			Inputs:         projectMetadataInputs(ws.Root, project),
@@ -264,11 +261,9 @@ func newSnapshotAt(ws *Workspace, probeDigest string, providers []SnapshotProvid
 // (membership, scopes, version) and each scope's putnami.json (namePattern,
 // tags and extensions reach projects).
 //
-// The root package.json is no longer one of them. It was here because its
-// "workspaces" patterns were a discovery source; slice C4b deleted that source,
-// and the file is now recorded — with the same content digest — by whichever
-// adapter declares it, which is what makes a change to it re-probe that one
-// provider instead of invalidating every provider at once.
+// The root package.json is not one of them: whichever adapter declares it
+// records it, with its content digest, which is what makes a change to it
+// re-probe that one provider instead of invalidating every provider at once.
 func workspaceMetadataInputs(ws *Workspace) []SnapshotInput {
 	names := []string{wsproto.WorkspaceConfigFilename}
 	inputs := make([]SnapshotInput, 0, len(names)+8)
@@ -283,7 +278,7 @@ func workspaceMetadataInputs(ws *Workspace) []SnapshotInput {
 }
 
 func projectMetadataInputs(root string, project *Project) []SnapshotInput {
-	base := cleanWorkspacePath(project.Path)
+	base := wsproto.CleanWorkspacePath(project.Path)
 	inputs := make([]SnapshotInput, 0, len(projectMetadataInputNames))
 	for _, name := range projectMetadataInputNames {
 		rel := name
@@ -518,15 +513,7 @@ func fileContentDigest(absolute string) (string, error) {
 // changed file to the provider that declared it, so stopping at the first
 // disagreement would mis-attribute the rest and re-probe the wrong providers.
 //
-// This used to order the work with the advisory stat data first, on the
-// reasoning that "a stale snapshot is usually rejected after one read" — a
-// short-circuit the loop below does not implement and cannot, for the reason
-// above. Ordering work that all has to happen is not free: on a 108-project
-// workspace (1,314 inputs) the extra os.Stat pass, map build and sort cost
-// 2.26 ms of a 9.46 ms Validate — 24% — paid once per fresh command and twice
-// per probing command, to reorder a list whose every element is read anyway.
-//
-// Stat data is still what statDisagrees exists for elsewhere; it is simply
+// Stat data is what statDisagrees exists for elsewhere; it is
 // never consulted to decide validity. An input is only accepted after its
 // CONTENT hashes to the recorded digest, which is what makes a same-size,
 // same-second rewrite detectable.

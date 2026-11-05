@@ -373,9 +373,9 @@ hierarchy — so a `staticcheck.conf` next to a package narrows only that subtre
 
 ## Default Configuration
 
-The bundled `config/.golangci.yml` enables 15 linters (`linters.default: none` plus the
+The bundled `config/.golangci.yml` enables 14 linters (`linters.default: none` plus the
 list below). `golangci-lint run -v` prints the resolved set as
-`[lintersdb] Active 15 linters: …` if you need to confirm it for a given project.
+`[lintersdb] Active 14 linters: …` if you need to confirm it for a given project.
 
 **Correctness & bugs:**
 - `govet` — a named subset of Go vet checks, not all of them: `assign`, `atomic`, `bools`,
@@ -393,7 +393,6 @@ list below). `golangci-lint run -v` prints the resolved set as
 - `misspell` — spelling mistakes in comments and strings
 - `unconvert` — unnecessary type conversions
 - `unparam` — parameters that are always called with the same value
-- `prealloc` — slice preallocation suggestions
 
 **Security:**
 - `gosec` — security issues (tuned for application context)
@@ -491,7 +490,7 @@ project config recreates that trade for that project, and does not stop the stan
 |--|--|--|
 | Auto-fix | Yes (`--fix`) | No |
 | Configuration | `.golangci.yml` | Optional `staticcheck.conf`, resolved per package |
-| Scope | Meta-linter — 15 linters in the bundled config | 141 checks (`S1*`, `SA*`, `ST1*`, `U1000`) |
+| Scope | Meta-linter — 14 linters in the bundled config | 141 checks (`S1*`, `SA*`, `ST1*`, `U1000`) |
 | Strength | Breadth — style, hygiene, security, and correctness | Depth — subtle correctness bugs and deprecations |
 
 Use both together (the default) for maximum coverage. They are genuinely complementary, and

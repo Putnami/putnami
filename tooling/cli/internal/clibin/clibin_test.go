@@ -384,3 +384,21 @@ func TestDownloadURL(t *testing.T) {
 		t.Errorf("downloadURL = %q, want %q", got, want)
 	}
 }
+
+// WithBaseURL overrides a legacy /dl resolver endpoint.
+func WithBaseURL(u string) Option {
+	return func(r *Resolver) {
+		if u != "" {
+			r.baseURL = u
+		}
+	}
+}
+
+// WithFetcher overrides the byte source (used in tests).
+func WithFetcher(f Fetcher) Option {
+	return func(r *Resolver) {
+		if f != nil {
+			r.fetch = f
+		}
+	}
+}

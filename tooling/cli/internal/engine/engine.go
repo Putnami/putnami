@@ -230,9 +230,8 @@ type Request struct {
 	//
 	// `latest` names the user's last build: `putnami sessions inspect latest`
 	// and every `--session latest` reader resolve it. `cache verify` is the
-	// caller — its audit run landing after a human's build would otherwise
-	// become the session those readers open, and session metadata has no origin
-	// field, so nobody could tell afterwards.
+	// caller; session metadata has no origin field, so its audit run must not
+	// take that slot.
 	EphemeralSession bool
 	// ExecutesUnderDryRun keeps --dry-run from short-circuiting into the engine's
 	// plan-only preview, so the jobs actually run.
@@ -388,9 +387,7 @@ type Request struct {
 	// Observer receives run observations. Nil is a total no-op (ADR 0001 §4).
 	Observer Observer
 	// Preflight is the production doctor gate the engine runs between plan and
-	// execute. It is injected because the doctor evaluator lives beside the
-	// `putnami doctor` command, and the single call site here was the only edge
-	// from the engine into the command subtree.
+	// execute, injected by the command layer.
 	//
 	// Unlike Observer and Hooks, nil is NOT a no-op: it fails the run closed
 	// under the production profile and is ignored under every other one. See
@@ -831,15 +828,13 @@ func (e *Engine) run(ctx context.Context, req *Request, sink EventSink) (Session
 		iox.Fprintf(os.Stderr, "putnami: release-set publish: %v\n", err)
 		return SessionResult{ExitCode: protocolcli.ExitCodeForError(err), Projects: selectedProjects}, nil
 	}
-	// sessionProjects is the selection as the SESSION made it, bound at the same
-	// seam because the next statement narrows selectedProjects to the owners of
-	// the release-set plan's members. A project that declares a publish channel
-	// and owns no member disappears there, so the publication guard below
-	// would never see its missing publish step. The guard reads THIS list;
-	// every other stage keeps reading the narrowed one, because that is what
-	// the run plans and executes. A deploy session WIDENS instead of narrowing,
-	// and every project it adds owns a member the coordinator accounts for, so
-	// the guard's answer there is unchanged.
+	// sessionProjects is the selection as the SESSION made it, bound before the
+	// next statement narrows selectedProjects to the owners of the release-set
+	// plan's members. The publication guard below reads THIS list, so a project
+	// that declares a publish channel and owns no member still has its missing
+	// publish step seen; every other stage reads the narrowed one. A deploy
+	// session widens instead, and every project it adds owns a member the
+	// coordinator accounts for.
 	releaseSetRun, sessionProjects := preparation.Run, selectedProjects
 	if releaseSetRun != nil {
 		selectedProjects, planningExtensions = preparation.Projects, preparation.Extensions
@@ -1181,7 +1176,7 @@ var abortCleanupBudget = hooks.AbortCleanupBudget
 // checkout — and cleanup that only happens on the happy path is not cleanup. So
 // once the run context is done, the remaining after-hooks are detached from it
 // with context.WithoutCancel; passing the canceled context straight through
-// killed every after-hook on the first Ctrl-C, a state a past regression found.
+// would kill every after-hook on the first Ctrl-C.
 //
 // Detaching is paired with a hard bound: both after-hook calls share ONE
 // abortCleanupBudget, well inside the 10s deadline cmd/putnami's signal handler

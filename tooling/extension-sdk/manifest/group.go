@@ -65,13 +65,6 @@ func GroupFlag(name string, flag proto.FlagDefinition) GroupOption {
 	}
 }
 
-// DefaultSubcommand names the subcommand `putnami <group>` runs when no
-// subcommand word follows; `putnami <group> --help` still prints the group
-// help. Build rejects a name the group does not declare.
-func DefaultSubcommand(name string) GroupOption {
-	return func(g *proto.CommandGroupDefinition) { g.Default = name }
-}
-
 // Subcommand adds one subcommand to the group. The description is its one-line
 // help text; leaving it "" falls back to the description of the flat command it
 // runs.
@@ -107,15 +100,6 @@ func Runs(command string) SubcommandOption {
 // result document — or prompts — needs, since a renderer-driven run owns stdout.
 func Interactive() SubcommandOption {
 	return func(s *proto.SubcommandDefinition) { s.Interactive = true }
-}
-
-// WorkspaceRequirement states whether the subcommand needs a workspace:
-// proto.SubcommandWorkspaceRequired, the meaning of an absent value, or
-// proto.SubcommandWorkspaceOptional, which also runs it outside any workspace
-// from an extension pinned in the user scope. Build rejects optional on a
-// subcommand that is not Interactive, and any other value.
-func WorkspaceRequirement(requirement string) SubcommandOption {
-	return func(s *proto.SubcommandDefinition) { s.Workspace = requirement }
 }
 
 // SubcommandFlag declares a flag owned by this subcommand. It overrides a group

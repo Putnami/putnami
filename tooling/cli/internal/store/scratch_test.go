@@ -15,7 +15,7 @@ import (
 	"time"
 
 	"go.putnami.dev/protocol/features/spectest"
-	"go.putnami.dev/tooling/cli/internal/flock"
+	"go.putnami.dev/sdk/extension/filelock"
 )
 
 func scratchFile(t *testing.T, ws, name string) string {
@@ -58,7 +58,7 @@ func awaitScratchRelease(t *testing.T, ws string) {
 	t.Helper()
 	released := make(chan error, 1)
 	go func() {
-		lease, err := flock.Acquire(filepath.Join(ws, putnamiDir, scratchLockName), true, false)
+		lease, err := filelock.Acquire(filepath.Join(ws, putnamiDir, scratchLockName), true, false)
 		if err != nil {
 			released <- err
 			return
@@ -80,7 +80,7 @@ func awaitScratchRelease(t *testing.T, ws string) {
 func failScratchProbe(t *testing.T, err error) {
 	t.Helper()
 	previous := acquireScratchLease
-	acquireScratchLease = func(path string, exclusive, nonBlocking bool) (*flock.Lock, error) {
+	acquireScratchLease = func(path string, exclusive, nonBlocking bool) (*filelock.Lock, error) {
 		if exclusive {
 			return nil, err
 		}
@@ -203,7 +203,7 @@ func TestScratchOnlyAnActiveConsumerSkipsReclamationSilently(t *testing.T) {
 		err      error
 		reported bool
 	}{
-		{name: "active-consumer", err: flock.ErrBusy},
+		{name: "active-consumer", err: filelock.ErrBusy},
 		{name: "unusable-lease", err: errors.New("scratch lease is unusable"), reported: true},
 	} {
 		t.Run(probe.name, func(t *testing.T) {

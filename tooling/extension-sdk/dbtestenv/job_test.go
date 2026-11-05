@@ -50,7 +50,7 @@ func TestUpJob_ReportsSuccessWhenItProvisionsNothing(t *testing.T) {
 	// The job wrapper is the one path that SELECTS a provider from the
 	// environment, so the ambient one must be neutralized or a developer's own
 	// PUTNAMI_TEST_PG_URL would decide this case.
-	t.Setenv(EnvProvidedServer, "")
+	t.Setenv(envProvidedServer, "")
 	f := newFixture(t, nil)
 
 	var status string
@@ -80,7 +80,7 @@ func TestUpJob_ReportsSuccessWhenItProvisionsNothing(t *testing.T) {
 func TestUpJob_AdvisoryNeverFailsTheTask(t *testing.T) {
 	t.Setenv(EnvCI, "")
 	t.Setenv(EnvBindings, "")
-	t.Setenv(EnvProvidedServer, "")
+	t.Setenv(envProvidedServer, "")
 	f := newFixture(t, map[string]any{ParamInfra: "require"})
 	f.declareDatabases(t, "svc", postgresRequirements)
 

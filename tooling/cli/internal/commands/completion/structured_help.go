@@ -76,12 +76,3 @@ func StructuredCommandHelp(command, subcommand string) (StructuredCommandInfo, b
 	info, ok := structuredCommandHelp[key]
 	return info, ok
 }
-
-// StructuredCommandHelpTable returns the full derived help table, keyed by
-// command path. Exposed for internal/commands/surface_golden_test.go, which
-// pins the table's CONTENT independent of any renderer; ordinary callers
-// should use StructuredCommandHelp instead. The returned map is shared with
-// the table, so callers must not mutate it.
-func StructuredCommandHelpTable() map[string]StructuredCommandInfo {
-	return structuredCommandHelp
-}

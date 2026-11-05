@@ -513,12 +513,40 @@ func TestDockerSpec_NoGitBytes(t *testing.T) {
 	}
 	// No git-derived bytes: nothing version-shaped may reach the spec, or the
 	// image digest would change per release id for identical content.
-	canonical := spec.CanonicalString()
+	encoded, err := json.Marshal(spec)
+	if err != nil {
+		t.Fatal(err)
+	}
+	canonical := string(encoded)
 	for _, forbidden := range []string{"0.0.0", "revision", "branch", "org.opencontainers.image"} {
 		if strings.Contains(canonical, forbidden) {
 			t.Errorf("spec must not carry %q, got: %s", forbidden, canonical)
 		}
 	}
+	again, err := dockerSpec(dockerBaseImagePinned, "linux/amd64", "/out", "bin", "app", "/out/stamp.json", 3000, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, want := specIdentity(t, again), specIdentity(t, spec); got != want {
+		t.Errorf("identical inputs gave identities %s and %s", got, want)
+	}
+}
+
+// specIdentity returns the image plan identity of spec, treating every file as
+// derived so no source needs to exist on disk.
+func specIdentity(t *testing.T, spec oci.Spec) string {
+	t.Helper()
+	derived := map[string]string{}
+	for _, layer := range spec.Layers {
+		for _, file := range layer.Files {
+			derived[file.Path] = "test-recipe"
+		}
+	}
+	plan, err := oci.NewImagePlan(spec, oci.PlanOptions{DerivedFiles: derived})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return plan.Identity
 }
 
 func TestWriteContentStamp_Deterministic(t *testing.T) {
@@ -555,6 +583,19 @@ func TestWriteContentStamp_Deterministic(t *testing.T) {
 	}
 }
 
+// stampedIdentity returns the image plan identity of spec with the version
+// stamp as a derived file, the way the docker recipe plans it: the stamp's
+// recipe is identity material, its bytes are not.
+func stampedIdentity(spec oci.Spec) (string, error) {
+	plan, err := oci.NewImagePlan(spec, oci.PlanOptions{DerivedFiles: map[string]string{
+		stampImagePath: contentStampPlanIdentity + ":app",
+	}})
+	if err != nil {
+		return "", err
+	}
+	return plan.Identity, nil
+}
+
 func TestDockerSpec_HashStableAndInputSensitive(t *testing.T) {
 	dir := t.TempDir()
 	if err := os.WriteFile(filepath.Join(dir, "app-linux-x64"), []byte("binary-v1"), 0o755); err != nil {
@@ -567,9 +608,9 @@ func TestDockerSpec_HashStableAndInputSensitive(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		full, err := oci.ContentHash(spec, stampImagePath)
+		full, err := stampedIdentity(spec)
 		if err != nil {
-			t.Fatalf("ContentHash: %v", err)
+			t.Fatalf("image identity: %v", err)
 		}
 		return full[:12]
 	}
@@ -625,9 +666,9 @@ func TestDockerSpec_AssetsAffectHash(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		full, err := oci.ContentHash(spec, stampImagePath)
+		full, err := stampedIdentity(spec)
 		if err != nil {
-			t.Fatalf("ContentHash: %v", err)
+			t.Fatalf("image identity: %v", err)
 		}
 		return full[:12]
 	}

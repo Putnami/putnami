@@ -6,11 +6,6 @@
 // config timestamps vary per build). No docker daemon is involved.
 package oci
 
-import (
-	"encoding/json"
-	"fmt"
-)
-
 // File is one file copied into the image.
 type File struct {
 	// Source is the local path of the file content. It is machine-specific
@@ -58,34 +53,4 @@ type Spec struct {
 	User string `json:"user,omitempty"`
 	// ExposedPorts are added to the base config, e.g. "3000/tcp".
 	ExposedPorts []string `json:"exposedPorts,omitempty"`
-}
-
-// CanonicalString returns the deterministic serialization of everything that
-// shapes the image except file contents (and machine-specific source paths).
-// It plays the role the generated Dockerfile played for content hashing
-// before in-process assembly.
-func (s Spec) CanonicalString() string {
-	data, err := json.Marshal(s)
-	if err != nil {
-		// Spec is plain data; Marshal cannot fail on it.
-		panic(fmt.Sprintf("oci: marshal spec: %v", err))
-	}
-	return string(data)
-}
-
-// ContentHash returns the versioned ImagePlan identity. New callers that also
-// assemble the image should retain the plan returned by NewImagePlan so source
-// fingerprints are not recomputed. Files listed in skipContent are treated as
-// deterministic outputs derived from this identity; prefer an explicit,
-// recipe-specific PlanOptions.DerivedFiles identity in new code.
-func ContentHash(s Spec, skipContent ...string) (string, error) {
-	derived := make(map[string]string, len(skipContent))
-	for _, p := range skipContent {
-		derived[p] = legacyDerivedIdentity
-	}
-	plan, err := NewImagePlan(s, PlanOptions{DerivedFiles: derived})
-	if err != nil {
-		return "", err
-	}
-	return plan.Identity, nil
 }

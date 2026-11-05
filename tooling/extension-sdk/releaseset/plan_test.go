@@ -300,7 +300,7 @@ func TestValidatePlanFullPublishOverExistingHeadMayChangeMembership(t *testing.T
 			plan := testFullPlanOverHead(t)
 			tc.edit(plan)
 			plan = NormalizePlan(plan)
-			if !plan.SelectsEveryMember() {
+			if !selectsEveryMember(plan) {
 				t.Fatalf("fixture must select every member: %+v", plan.Members)
 			}
 			if err := ValidatePlan(plan); err != nil {
@@ -334,7 +334,7 @@ func TestValidatePlanConfirmsHeadWhenNothingIsSelected(t *testing.T) {
 		plan.Members[i] = inheritedMember(baseMembers[i], "/"+strings.TrimPrefix(baseMembers[i].Coordinate, "@putnami/"))
 	}
 	plan = NormalizePlan(plan)
-	if plan.SelectsEveryMember() || len(plan.SelectedMembers()) != 0 {
+	if selectsEveryMember(plan) || len(plan.SelectedMembers()) != 0 {
 		t.Fatalf("fixture must select nothing: %+v", plan.Members)
 	}
 	if err := ValidatePlan(plan); err != nil {
@@ -344,7 +344,7 @@ func TestValidatePlanConfirmsHeadWhenNothingIsSelected(t *testing.T) {
 	if err := ValidatePlan(plan); err == nil {
 		t.Fatal("no-impact plan without a head accepted")
 	}
-	if (&Plan{}).SelectsEveryMember() {
+	if selectsEveryMember(&Plan{}) {
 		t.Fatal("an empty plan must not count as a full publication")
 	}
 }
@@ -1041,4 +1041,18 @@ func TestAPlanWithoutReuseEmitsNoReuseField(t *testing.T) {
 	if clone := ClonePlan(testPlan(t)); clone.Reused != nil {
 		t.Fatalf("clone of a plan without reuse grew a reused list: %+v", clone.Reused)
 	}
+}
+
+// selectsEveryMember reports whether the plan is a full publication of its
+// snapshot: every member is selected. It is false for an empty plan.
+func selectsEveryMember(plan *Plan) bool {
+	if plan == nil || len(plan.Members) == 0 {
+		return false
+	}
+	for _, member := range plan.Members {
+		if !member.Selected {
+			return false
+		}
+	}
+	return true
 }

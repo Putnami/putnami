@@ -262,42 +262,6 @@ func TestMaterializeTaskOutput_RejectsUndeclaredOutputs(t *testing.T) {
 	}
 }
 
-// TestOutManager_RefusesTaskOwnedBlobs pins the retirement of the CAS-symlink
-// all-hit fast path for task-owned entries (see the decision in task_entry.go).
-// Linking a task-owned blob would point a shared, writable command directory at
-// an immutable hardlink tree, so it fails loudly instead.
-func TestOutManager_RefusesTaskOwnedBlobs(t *testing.T) {
-	wsRoot := t.TempDir()
-	storeRoot := filepath.Join(wsRoot, ".putnami", "store")
-	s := NewLocalStore(storeRoot)
-	om := NewOutManager(wsRoot, storeRoot)
-
-	entry := ingestTree(t, s, "fastpath-key", map[string]string{"main.js": "built"})
-
-	if err := om.Link("pkg", "build", "", entry.Address); !errors.Is(err, ErrFastPathRetired) {
-		t.Errorf("Link error = %v, want ErrFastPathRetired", err)
-	}
-	if err := om.ReplaceLink("pkg", "build", "", entry.Address); !errors.Is(err, ErrFastPathRetired) {
-		t.Errorf("ReplaceLink error = %v, want ErrFastPathRetired", err)
-	}
-	if _, err := os.Lstat(filepath.Join(wsRoot, ".putnami", "out", "pkg", "build")); err == nil {
-		t.Error("a link was created for a task-owned blob")
-	}
-
-	// Positive control: the legacy fast path is untouched — the scheduler keeps
-	// using it until B4b.
-	legacyHash := "cccc000000000000000000000000000000000000000000000000000000000000"
-	if err := s.Put(legacyHash, entryWith(makeSource(t, "legacy"))); err != nil {
-		t.Fatal(err)
-	}
-	if err := om.Link("pkg", "test", "", legacyHash); err != nil {
-		t.Fatalf("legacy Link broke: %v", err)
-	}
-	if _, err := os.Readlink(filepath.Join(wsRoot, ".putnami", "out", "pkg", "test")); err != nil {
-		t.Errorf("legacy link missing: %v", err)
-	}
-}
-
 // TestMaterializeTaskOutput_CededSubtreeSurvivesTheSwap pins the
 // restore half of a carve-out (protocol ADR 0003). A directory output that
 // cedes a subpath never captured it, so its entry has nothing to put there —

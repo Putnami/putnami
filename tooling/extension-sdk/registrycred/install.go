@@ -23,16 +23,16 @@ import (
 // host can take longer than that to start their fake CLI.
 var materializeTimeout = 10 * time.Second
 
-// SignInHint is the exact instruction shown when the machine has a cloud but no
+// signInHint is the exact instruction shown when the machine has a cloud but no
 // session. It is a constant so every caller prints the same words.
-const SignInHint = "run putnami cloud login"
+const signInHint = "run putnami cloud login"
 
-// OutcomeKind classifies what EnsureNativeCredential managed to do.
-type OutcomeKind int
+// outcomeKind classifies what EnsureNativeCredential managed to do.
+type outcomeKind int
 
 const (
 	// KindSkipped means nothing was attempted: there was no host to ask about.
-	KindSkipped OutcomeKind = iota
+	KindSkipped outcomeKind = iota
 	// KindMaterialized means the cloud wrote the host's native credential.
 	KindMaterialized
 	// KindCloudAbsent means there is no cloud extension to ask. A core-only
@@ -56,7 +56,7 @@ const (
 // writes `if o.Message != "" { emit.Log(o.Level, o.Message) }` and gets
 // at-most-once reporting for free.
 type Outcome struct {
-	Kind OutcomeKind
+	Kind outcomeKind
 	// Level is the log level the message belongs at: "debug" or "warn".
 	Level string
 	// Message is the human line to log, or "" to log nothing.
@@ -134,7 +134,7 @@ func materializeNativeCredential(ctx context.Context, workspaceRoot, host string
 	// The host is a discrete argv element of a fixed command; no shell is
 	// involved, and the executable is the CLI-owned absolute path or the
 	// package-owned fallback, never caller input.
-	cmd := exec.CommandContext(ctx, executable, //nolint:gosec // G702: argv-form exec of a CLI-owned absolute path or fixed fallback
+	cmd := exec.CommandContext(ctx, executable,
 		registry.SeamParentCommand,
 		registry.SeamSubcommand,
 		"--"+registry.SeamHostFlag, host,
@@ -223,7 +223,7 @@ func classifyMaterializeFailure(err error, host, stderr string) Outcome {
 		return Outcome{
 			Kind:    KindNotSignedIn,
 			Level:   "warn",
-			Message: "not signed in for " + host + "; " + SignInHint,
+			Message: "not signed in for " + host + "; " + signInHint,
 		}
 	case mentionsUnknownCommand(strings.ToLower(stderr)):
 		return Outcome{

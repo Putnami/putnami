@@ -718,7 +718,7 @@ func (rt *memberRuntime) waitStartup(ctx context.Context) error {
 // Production mode selects the build, not the configuration: a composition runs
 // on this machine, so a production member still reads its local config files
 // (conf/.env.local.yaml, conf/.secrets.local.yaml), as a watched one does.
-// APP_ENV names that config environment; a TypeScript runtime would otherwise
+// APP_ENV names that config environment, so a TypeScript runtime does not
 // derive it from NODE_ENV. An APP_ENV the caller exported is kept: the serve
 // run inherits it.
 func memberEnv(production bool, document []byte) map[string]string {

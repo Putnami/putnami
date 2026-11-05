@@ -4,6 +4,8 @@ import (
 	"path"
 	"path/filepath"
 	"strings"
+
+	"go.putnami.dev/sdk/extension/gitread"
 )
 
 // FileAtRevision returns the bytes a commit records for a path relative to
@@ -16,14 +18,14 @@ import (
 // that is absolute, climbs out of repoRoot, or carries a control character
 // reads nothing.
 func FileAtRevision(repoRoot, revision, file string) ([]byte, bool) {
-	if !validRevisionArgument(revision) || strings.Contains(revision, ":") {
+	if !gitread.ValidRevisionArgument(revision) || strings.Contains(revision, ":") {
 		return nil, false
 	}
 	rel, ok := revisionRelativePath(file)
 	if !ok {
 		return nil, false
 	}
-	output, err := run(repoRoot, "cat-file", "blob", revision+":./"+rel)
+	output, err := gitread.Run(repoRoot, "cat-file", "blob", revision+":./"+rel)
 	if err != nil {
 		return nil, false
 	}

@@ -60,7 +60,7 @@ import (
 //   - lifecycle → agentctx: install, upgrade and workspace-init regenerate
 //     the AI context and materialize agent workflows as one of their phases
 //     (ContextGenerate/ContextGenerateWithWriter, DeclaredAgentArtifacts,
-//     InstallAgentWorkflows, AdoptAgentWorkflows, DescribeAgentWorkflowPlan).
+//     InstallAgentWorkflowsWithResult, AdoptAgentWorkflows, DescribeAgentWorkflowPlan).
 //     lifecycle orchestrates agentctx's setup; it does not reimplement it.
 //   - lifecycle → extensions: install, upgrade, workspace-init and project
 //     creation install extensions and templates as part of their own flow
@@ -127,8 +127,7 @@ func parseCommandsASTs(t *testing.T, root string) map[string]*ast.File {
 // commandsSubpackage returns the first path segment after
 // internal/commands/ (a vertical's directory name, or "shared"/
 // "sharedtest"), and whether rel was nested that deep at all. A file
-// directly under internal/commands/ (doc.go, surface_golden_test.go)
-// reports "", false.
+// directly under internal/commands/ (doc.go) reports "", false.
 func commandsSubpackage(rel string) (string, bool) {
 	rest := strings.TrimPrefix(rel, commandsDirPrefix)
 	if rest == rel {
@@ -203,7 +202,7 @@ type verticalCrossImportException struct {
 const (
 	whyLifecycleAgentctx = "install, upgrade and workspace-init regenerate the AI context and " +
 		"materialize agent workflows as one of their phases (ContextGenerate/ContextGenerateWithWriter, " +
-		"DeclaredAgentArtifacts, InstallAgentWorkflows, AdoptAgentWorkflows, DescribeAgentWorkflowPlan, " +
+		"DeclaredAgentArtifacts, InstallAgentWorkflowsWithResult, AdoptAgentWorkflows, DescribeAgentWorkflowPlan, " +
 		"AgentWorkflowPhaseApplies), and the zero-init ensure pass materializes lock-pinned agent " +
 		"workflows beside extensions and templates (EnsureAgentWorkflows) " +
 		"— lifecycle orchestrates agentctx's setup, it does not reimplement it"

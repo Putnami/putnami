@@ -2428,7 +2428,7 @@
             "checks": [
               "explicit-install-writes-the-answered-pins-at-format-5",
               "an-identity-no-answer-pins-is-removed",
-              "a-format-3-lock-is-rewritten-at-format-5"
+              "a-format-4-lock-is-rewritten-at-format-5"
             ]
           }
         },

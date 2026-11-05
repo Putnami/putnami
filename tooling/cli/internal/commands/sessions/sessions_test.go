@@ -7,63 +7,50 @@ import (
 	"strings"
 	"testing"
 
+	protocolcli "go.putnami.dev/protocol/cli"
 	"go.putnami.dev/tooling/cli/internal/commands/sharedtest"
 	"go.putnami.dev/tooling/cli/internal/workspace_state"
 )
 
+// writeSessionDocument records doc as sessDir/name, the bytes a session
+// writes.
+func writeSessionDocument(t *testing.T, sessDir, name string, doc any) {
+	t.Helper()
+	data, err := json.MarshalIndent(doc, "", "  ")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(sessDir, name), data, 0o644); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestSessionsList(t *testing.T) {
 	t.Run("shows empty message when no sessions", func(t *testing.T) {
 		dir := t.TempDir()
-		err := SessionsList(dir, "")
+		err := SessionsListRevision(dir, "", "")
 		if err != nil {
-			t.Fatalf("SessionsList() error: %v", err)
+			t.Fatalf("SessionsListRevision() error: %v", err)
 		}
 	})
 
 	t.Run("lists sessions with metadata", func(t *testing.T) {
 		dir := t.TempDir()
-		sessDir := filepath.Join(dir, ".putnami", "sessions", "20260101-120000-abc123")
-		os.MkdirAll(sessDir, 0o755)
+		writeRecordedSession(t, dir, "20260101-120000-abc123", recordedV2(t, "20260101-120000-abc123", "2026-01-01T12:00:00Z", 0, 0))
 
-		meta := &workspace_state.SessionMetadata{
-			ID:        "20260101-120000-abc123",
-			StartTime: "2026-01-01T12:00:00Z",
-			EndTime:   "2026-01-01T12:00:05Z",
-			Duration:  5000,
-			Commands:  []string{"build"},
-			Stats: &workspace_state.SessionStats{
-				Total:     3,
-				Succeeded: 3,
-			},
-		}
-		data, _ := json.MarshalIndent(meta, "", "  ")
-		os.WriteFile(filepath.Join(sessDir, "session.json"), data, 0o644)
-
-		err := SessionsList(dir, "")
+		err := SessionsListRevision(dir, "", "")
 		if err != nil {
-			t.Fatalf("SessionsList() error: %v", err)
+			t.Fatalf("SessionsListRevision() error: %v", err)
 		}
 	})
 
 	t.Run("outputs jsonl format", func(t *testing.T) {
 		dir := t.TempDir()
-		sessDir := filepath.Join(dir, ".putnami", "sessions", "20260101-120000-abc123")
-		os.MkdirAll(sessDir, 0o755)
+		writeRecordedSession(t, dir, "20260101-120000-abc123", recordedV2(t, "20260101-120000-abc123", "2026-01-01T12:00:00Z", 0, 0))
 
-		meta := &workspace_state.SessionMetadata{
-			ID:        "20260101-120000-abc123",
-			StartTime: "2026-01-01T12:00:00Z",
-			EndTime:   "2026-01-01T12:00:05Z",
-			Duration:  5000,
-			Commands:  []string{"build"},
-			Stats:     &workspace_state.SessionStats{Total: 1, Succeeded: 1},
-		}
-		data, _ := json.MarshalIndent(meta, "", "  ")
-		os.WriteFile(filepath.Join(sessDir, "session.json"), data, 0o644)
-
-		out, err := sharedtest.CaptureStdout(t, func() error { return SessionsList(dir, "jsonl") })
+		out, err := sharedtest.CaptureStdout(t, func() error { return SessionsListRevision(dir, "jsonl", "") })
 		if err != nil {
-			t.Fatalf("SessionsList() jsonl error: %v", err)
+			t.Fatalf("SessionsListRevision() jsonl error: %v", err)
 		}
 		var rows []struct {
 			ID string `json:"id"`
@@ -117,39 +104,47 @@ func TestSessionsInspect(t *testing.T) {
 		sessDir := filepath.Join(dir, ".putnami", "sessions", sessID)
 		os.MkdirAll(sessDir, 0o755)
 
-		meta := &workspace_state.SessionMetadata{
-			ID:        sessID,
-			StartTime: "2026-01-01T12:00:00Z",
-			EndTime:   "2026-01-01T12:00:05Z",
-			Duration:  5000,
-			Commands:  []string{"build"},
-			Stats: &workspace_state.SessionStats{
-				Total:     2,
-				Succeeded: 1,
-				Failed:    1,
+		app := v2Identity("/app", "app", "build", "build", "@putnami/typescript")
+		lib := v2Identity("/lib", "lib", "build", "build", "@putnami/typescript")
+		writeSessionDocument(t, sessDir, "session.json", &protocolcli.SessionFile{
+			ProtocolVersion: protocolcli.ResultProtocolVersion,
+			SessionID:       sessID,
+			StartTime:       "2026-01-01T12:00:00Z",
+			EndTime:         "2026-01-01T12:00:05Z",
+			Commands:        []string{"build"},
+			Git:             &protocolcli.SessionGit{Branch: "main"},
+			Run: protocolcli.RunSummary{
+				Outcome:    protocolcli.RunOutcomeFailure,
+				ExitCode:   protocolcli.ExitFailure,
+				Counts:     protocolcli.RunCounts{Total: 2, Succeeded: 1, Failed: 1},
+				DurationMs: 5000,
 			},
-			Git: &workspace_state.SessionGitInfo{
-				Branch: "main",
-			},
-		}
-		data, _ := json.MarshalIndent(meta, "", "  ")
-		os.WriteFile(filepath.Join(sessDir, "session.json"), data, 0o644)
+		})
+		writeSessionDocument(t, sessDir, "plan.json", &protocolcli.SessionPlanFile{
+			ProtocolVersion: protocolcli.ResultProtocolVersion,
+			SessionID:       sessID,
+			Commands:        []string{"build"},
+			Tasks:           []protocolcli.PlannedTask{{Identity: app, Cache: true}},
+		})
 
-		plan := &workspace_state.PlanSnapshot{
-			SessionID: sessID,
-			Commands:  []string{"build"},
-			Jobs: []workspace_state.PlanJobEntry{
-				{Key: "app:build", Project: "app", Job: "build", Extension: "@putnami/typescript", Cache: true},
-			},
+		var events []byte
+		for _, task := range []protocolcli.TaskRecord{
+			{Identity: app, Status: protocolcli.TaskStatusSuccess, Reuse: protocolcli.TaskReuseNone},
+			{Identity: lib, Status: protocolcli.TaskStatusFailed, Reuse: protocolcli.TaskReuseNone,
+				Error: &protocolcli.ResultError{Code: "failure", Message: "compilation failed"}},
+		} {
+			line, err := json.Marshal(workspace_state.SessionEvent{
+				ProtocolVersion: protocolcli.ResultProtocolVersion,
+				Record:          protocolcli.RecordTaskEnd,
+				Time:            "2026-01-01T12:00:04Z",
+				Task:            &task,
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			events = append(append(events, line...), '\n')
 		}
-		planData, _ := json.MarshalIndent(plan, "", "  ")
-		os.WriteFile(filepath.Join(sessDir, "plan.json"), planData, 0o644)
-
-		// Write some events
-		events := `{"type":"job:end","jobKey":"app:build","data":{"status":"success","project":"app","job":"build"}}
-{"type":"job:end","jobKey":"lib:build","data":{"status":"failed","project":"lib","job":"build","error":"compilation failed"}}
-`
-		os.WriteFile(filepath.Join(sessDir, "events.jsonl"), []byte(events), 0o644)
+		os.WriteFile(filepath.Join(sessDir, "events.jsonl"), events, 0o644)
 
 		err := SessionsInspect(dir, []string{sessID}, "")
 		if err != nil {
@@ -161,18 +156,7 @@ func TestSessionsInspect(t *testing.T) {
 		dir := t.TempDir()
 		sessID := "20260101-120000-abc123"
 		sessDir := filepath.Join(dir, ".putnami", "sessions", sessID)
-		os.MkdirAll(sessDir, 0o755)
-
-		meta := &workspace_state.SessionMetadata{
-			ID:        sessID,
-			StartTime: "2026-01-01T12:00:00Z",
-			EndTime:   "2026-01-01T12:00:05Z",
-			Duration:  5000,
-			Commands:  []string{"test"},
-			Stats:     &workspace_state.SessionStats{Total: 1, Succeeded: 1},
-		}
-		data, _ := json.MarshalIndent(meta, "", "  ")
-		os.WriteFile(filepath.Join(sessDir, "session.json"), data, 0o644)
+		writeRecordedSession(t, dir, sessID, recordedV2(t, sessID, "2026-01-01T12:00:00Z", 0, 0))
 
 		// Create latest symlink
 		latestLink := filepath.Join(dir, ".putnami", "sessions", "latest")
@@ -189,28 +173,25 @@ func TestSessionsInspect(t *testing.T) {
 		sessID := "20260101-120000-abc123"
 		sessDir := filepath.Join(dir, ".putnami", "sessions", sessID)
 		os.MkdirAll(sessDir, 0o755)
-		latency := int64(14)
-		meta := &workspace_state.SessionMetadata{
-			ID:        sessID,
-			StartTime: "2026-01-01T12:00:00Z",
-			EndTime:   "2026-01-01T12:00:01Z",
-			Duration:  1000,
-			Commands:  []string{"lint"},
-			Stats:     &workspace_state.SessionStats{Total: 1, Succeeded: 1},
-			Jobs: []workspace_state.SessionJobEntry{{
-				Key:                 "/app:lint~format",
-				Project:             "app",
-				Job:                 "lint~format",
-				TaskKind:            "lint-format",
-				Extension:           "@putnami/typescript",
-				Status:              "success",
-				Outcome:             "success",
+		writeSessionDocument(t, sessDir, "session.json", &protocolcli.SessionFile{
+			ProtocolVersion: protocolcli.ResultProtocolVersion,
+			SessionID:       sessID,
+			StartTime:       "2026-01-01T12:00:00Z",
+			EndTime:         "2026-01-01T12:00:01Z",
+			Commands:        []string{"lint"},
+			Run: protocolcli.RunSummary{
+				Outcome:    protocolcli.RunOutcomeSuccess,
+				Counts:     protocolcli.RunCounts{Total: 1, Succeeded: 1},
+				DurationMs: 1000,
+			},
+			Tasks: []protocolcli.TaskRecord{{
+				Identity:            v2Identity("/app", "app", "lint~format", "lint-format", "@putnami/typescript"),
+				Status:              protocolcli.TaskStatusSuccess,
+				Reuse:               protocolcli.TaskReuseNone,
 				TaskWallMs:          40,
-				SpawnToFirstEventMs: &latency,
+				SpawnToFirstEventMs: 14,
 			}},
-		}
-		data, _ := json.MarshalIndent(meta, "", "  ")
-		os.WriteFile(filepath.Join(sessDir, "session.json"), data, 0o644)
+		})
 
 		out, err := sharedtest.CaptureStdout(t, func() error {
 			return SessionsInspect(dir, []string{sessID}, "jsonl")

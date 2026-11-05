@@ -9,9 +9,9 @@ import (
 	"syscall"
 	"testing"
 
+	"go.putnami.dev/sdk/extension/gitread"
 	"go.putnami.dev/tooling/cli/internal/abort"
 	"go.putnami.dev/tooling/cli/internal/commands/sessions"
-	"go.putnami.dev/tooling/cli/internal/git"
 	"go.putnami.dev/tooling/cli/internal/workspace_state"
 )
 
@@ -86,7 +86,7 @@ func TestAppRun_ExtensionAlias_RunMarkerPolicyAndKey(t *testing.T) {
 	t.Setenv("PUTNAMI_STORE_DIR", filepath.Join(t.TempDir(), "store"))
 
 	sessStore := workspace_state.NewSessionStore(wsRoot)
-	head, err := git.HeadSHA(wsRoot)
+	head, err := gitread.HeadSHA(wsRoot)
 	if err != nil {
 		t.Fatalf("head sha: %v", err)
 	}
@@ -471,7 +471,7 @@ func initAliasGitRepo(t *testing.T, dir string) {
 
 func runAliasGit(t *testing.T, dir string, args ...string) {
 	t.Helper()
-	cmd := exec.Command(git.Executable(), args...)
+	cmd := exec.Command(gitread.Executable(), args...)
 	cmd.Dir = dir
 	cmd.Env = append(os.Environ(),
 		"GIT_AUTHOR_NAME=test", "GIT_AUTHOR_EMAIL=test@example.com",

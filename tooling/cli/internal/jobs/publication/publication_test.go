@@ -743,7 +743,7 @@ func TestEngineUploadsManagedMembersAndEmitsPublishedMembers(t *testing.T) {
 			t.Fatalf("released %s/%s at %s", member.Ecosystem, member.Coordinate, member.ArtifactDigest)
 		}
 	}
-	published, err := pkgmeta.ReadPublishedImageManifest(filepath.Join(h.root, ".putnami", "out", "app", "publish"))
+	published, err := readPublishedImageManifest(filepath.Join(h.root, ".putnami", "out", "app", "publish"))
 	if err != nil || published.Digest != imageDigest || !published.Verified || published.ImmutableRef != testOCIHost+"/team/app@"+imageDigest ||
 		published.TargetRegistry != testOCIHost {
 		t.Fatalf("published image %+v, %v", published, err)
@@ -1447,4 +1447,17 @@ func TestLegacyPathIsUnchangedWhenTheCapabilityIsNotEchoed(t *testing.T) {
 	if err != nil || strings.Contains(string(dump), extensionproto.PublicationOutboxEnv+"=") {
 		t.Fatalf("the legacy publication job received an outbox (%v)", err)
 	}
+}
+
+// readPublishedImageManifest decodes the publish-owned verified image record.
+func readPublishedImageManifest(publishOutputDir string) (*pkgmeta.PublishedImageManifest, error) {
+	data, err := os.ReadFile(pkgmeta.PublishedImageManifestPath(publishOutputDir))
+	if err != nil {
+		return nil, err
+	}
+	var manifest pkgmeta.PublishedImageManifest
+	if err := json.Unmarshal(data, &manifest); err != nil {
+		return nil, err
+	}
+	return &manifest, nil
 }

@@ -76,32 +76,17 @@ func (h *interactiveHold) forced() bool {
 	return h.killed
 }
 
-// RunJobInteractive runs a job as an interactive subprocess, inheriting the
-// parent's stdin/stdout/stderr. Unlike RunJob, no JSONL parsing happens — the
+// RunJobInteractiveWithStreams runs a job as an interactive subprocess on the
+// given process streams. Unlike RunJob, no JSONL parsing happens — the
 // extension is expected to render its own human-readable UI directly to the
-// terminal. The PUTNAMI_INTERACTIVE=1 environment variable is set so the
+// streams. The PUTNAMI_INTERACTIVE=1 environment variable is set so the
 // extension can detect this mode and avoid emitting JSONL events that would
-// otherwise leak into the user's terminal.
+// otherwise leak into the user's terminal. Production callers pass the
+// terminal streams; in-process adapters and tests can keep independent output
+// without swapping the process-wide os.Stdout/os.Stderr variables.
 //
 // The context file is still written and passed via --putnamiContext so the
 // extension has access to workspace, project, params, and version metadata.
-func RunJobInteractive(
-	ctx context.Context,
-	ws *workspace.Workspace,
-	job *ScheduledJob,
-	commandParams, configDefaults map[string]any,
-	versions cachekey.RunVersions,
-) (*JobResult, error) {
-	return RunJobInteractiveWithStreams(
-		ctx, ws, job, commandParams, configDefaults, versions,
-		os.Stdin, os.Stdout, os.Stderr,
-	)
-}
-
-// RunJobInteractiveWithStreams is RunJobInteractive with explicit process
-// streams. Production callers pass the terminal streams through
-// RunJobInteractive; in-process adapters and tests can keep independent output
-// without swapping the process-wide os.Stdout/os.Stderr variables.
 //
 // processEnv states facts about this spawn that the process receives on top
 // of its environment, such as the host RPC channel the caller opened for it

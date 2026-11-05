@@ -126,7 +126,7 @@ func TestEnsureNativeCredential_MachineTokenSessionIsNotToldToSignIn(t *testing.
 	if outcome.Kind != KindNotSignedIn || outcome.Level != "warn" {
 		t.Fatalf("outcome = %+v, want a KindNotSignedIn warning", outcome)
 	}
-	if strings.Contains(outcome.Message, SignInHint) {
+	if strings.Contains(outcome.Message, signInHint) {
 		t.Errorf("Message = %q, want no sign-in hint", outcome.Message)
 	}
 	if !strings.Contains(outcome.Message, "PUTNAMI_CLOUD_TOKEN") || !strings.Contains(outcome.Message, "continuing") {
@@ -141,7 +141,7 @@ func TestEnsureNativeCredential_UnclassifiedAuthTextStillWarnsWithTheHint(t *tes
 	if outcome.Kind != KindNotSignedIn {
 		t.Fatalf("Kind = %v, want KindNotSignedIn", outcome.Kind)
 	}
-	if !strings.Contains(outcome.Message, SignInHint) {
+	if !strings.Contains(outcome.Message, signInHint) {
 		t.Errorf("Message = %q, want the exact sign-in hint", outcome.Message)
 	}
 }

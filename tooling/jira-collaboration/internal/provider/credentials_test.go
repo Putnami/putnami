@@ -8,6 +8,7 @@ import (
 
 	collab "go.putnami.dev/protocol/collaboration"
 	"go.putnami.dev/protocol/features/spectest"
+	"go.putnami.dev/sdk/extension/collabhelper"
 	"go.putnami.dev/tooling/jira-collaboration/internal/jira"
 )
 
@@ -21,7 +22,7 @@ func TestACredentialNeverReachesAnAnswer(t *testing.T) {
 	if strings.Contains(text, fakeToken) || strings.Contains(text, basic) || strings.Contains(text, "ATATT") {
 		t.Fatalf("an answer carries a credential: %s", text)
 	}
-	mustContain(t, text, jira.RedactedMarker)
+	mustContain(t, text, collabhelper.RedactedMarker)
 }
 
 func TestAMissingCredentialIsDenied(t *testing.T) {

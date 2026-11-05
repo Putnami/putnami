@@ -556,7 +556,7 @@ func TestSessionStartWithoutRecordableCommandConformsOnTheWire(t *testing.T) {
 	if len(events) != 1 {
 		t.Fatalf("buffered events = %d, want 1", len(events))
 	}
-	body, err := otlp.MarshalCanonical(encodeLogs(events, "", "", "v1.2.3", "linux", "amd64"))
+	body, err := otlp.MarshalCanonical(encodeLogs(events, "v1.2.3", "linux", "amd64"))
 	if err != nil {
 		t.Fatalf("marshal OTLP logs: %v", err)
 	}

@@ -20,13 +20,10 @@ import (
 // The cache commands after the split that moved language caches to their extensions.
 //
 // Core collects the caches core OWNS: the content-addressed per-repo stores and
-// the machine-global artifact store. It no longer knows that Go or Bun exist —
-// the language caches are collected by the extensions that create them, through
-// the reserved `cache-clean` / `cache-gc` commands, and core's only knowledge of
-// them is "this extension declares one".
-//
-// What that buys, concretely: a fourth ecosystem bounds its own cache by adding
-// two commands to its manifest, with no patch to this file.
+// the machine-global artifact store. Extension-owned caches are collected by each
+// extension's `cache-clean` / `cache-gc` commands, and core's only knowledge of
+// them is "this extension declares one". An ecosystem bounds its own cache by
+// adding two commands to its manifest, with no patch to this file.
 
 // CacheClean removes cached build artifacts. The store is now machine-global and
 // per-repo (shared across all worktrees of the repo), so a plain clean clears
@@ -152,9 +149,7 @@ func CacheGC(ctx context.Context, wsRoot string, cfg *wsproto.Config, outputForm
 
 	gcArtifactStore(wsRoot)
 
-	// The language caches used to be collected here by name. They are now the
-	// owning extensions' `cache-gc` commands, and this is the only place core
-	// mentions them at all.
+	// Extension-owned caches are collected by each extension's `cache-gc` command.
 	return runExtensionCacheCommands(ctx, wsRoot, cfg, extensionproto.CommandCacheGC, outputFormat)
 }
 

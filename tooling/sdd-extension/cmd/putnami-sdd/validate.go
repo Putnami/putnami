@@ -9,6 +9,7 @@ import (
 	protocolcli "go.putnami.dev/protocol/cli"
 	diag "go.putnami.dev/protocol/diagnostic"
 	featureproto "go.putnami.dev/protocol/features"
+	wsproto "go.putnami.dev/protocol/workspace"
 	pctx "go.putnami.dev/sdk/extension/context"
 	"go.putnami.dev/sdk/extension/docslinks"
 	"go.putnami.dev/sdk/extension/jsonl"
@@ -485,7 +486,7 @@ func projectValidationView(ctx *pctx.Context) (*wsview.Workspace, sdd.Selection,
 			protocolcli.ErrInvalidConfig,
 		)
 	}
-	own := wsview.ProjectIDFromPath(ctx.Project.Path)
+	own := wsproto.ProjectIDFromPath(ctx.Project.Path)
 	if ws.ProjectByID(own) == nil {
 		return nil, sdd.Selection{}, protocolcli.Classify(
 			fmt.Errorf("the job runs for project %q, which the workspace membership on the wire does not contain", own),

@@ -11,8 +11,8 @@ import (
 
 	"go.putnami.dev/cli/model/jobs"
 	protocolcli "go.putnami.dev/protocol/cli"
+	"go.putnami.dev/sdk/extension/gitread"
 	"go.putnami.dev/tooling/cli/internal/cmderr"
-	"go.putnami.dev/tooling/cli/internal/commands/shared"
 	"go.putnami.dev/tooling/cli/internal/git"
 	"go.putnami.dev/tooling/cli/internal/iox"
 	"go.putnami.dev/tooling/cli/internal/runcredential"
@@ -56,7 +56,7 @@ func CacheVerifyCommand(
 	if !clean {
 		return cmderr.InvalidConfigf("cache verify requires a clean worktree")
 	}
-	head, err := git.HeadSHA(wsRoot)
+	head, err := gitread.HeadSHA(wsRoot)
 	if err != nil {
 		return fmt.Errorf("cache verify cannot resolve HEAD: %w", err)
 	}
@@ -99,7 +99,7 @@ func CacheVerifyCommand(
 	report := Analyze(commands, first, second, hit)
 	runErr := error(nil)
 	if report.Status != "passed" {
-		runErr = shared.WithResultData(cmderr.InvalidConfigf(
+		runErr = protocolcli.WithResultData(cmderr.InvalidConfigf(
 			"cache verification found %d blocking determinism issue(s)", report.Summary.Blocking), report)
 	}
 	return renderCacheVerify(outputFormat, report, runErr)
@@ -180,7 +180,7 @@ func failedTaskSuffix(results map[string]*jobs.JobResult) string {
 // repository code (runcredential.MarkRepositoryCodeStarted).
 func addDetachedWorktree(ctx context.Context, repoRoot, target, head string) error {
 	runcredential.MarkRepositoryCodeStarted("git worktree add")
-	// "git", not git.Executable: the checkout runs repository hooks and
+	// "git", not gitread.Executable: the checkout runs repository hooks and
 	// filters, which keep the environment the macOS trampoline gives them.
 	command := exec.CommandContext(ctx, "git", "-C", repoRoot, "worktree", "add", "--detach", target, head)
 	if output, err := command.CombinedOutput(); err != nil {
@@ -191,7 +191,7 @@ func addDetachedWorktree(ctx context.Context, repoRoot, target, head string) err
 
 func removeDetachedWorktrees(ctx context.Context, repoRoot string, targets []string) {
 	for _, target := range targets {
-		command := exec.CommandContext(ctx, git.Executable(), "-C", repoRoot, "worktree", "remove", "--force", target)
+		command := exec.CommandContext(ctx, gitread.Executable(), "-C", repoRoot, "worktree", "remove", "--force", target)
 		_ = command.Run()
 	}
 }

@@ -50,7 +50,7 @@ func apiCheckTagged(
 			t.Fatalf("the context of %s violates the job context protocol: %v\n%s", job.Key(), diags, encoded)
 		}
 		// The key's project metadata digest hashes this view.
-		digested := workspace.ProbeViewOf(job.Project, lane.ws.DependencyPathResolver()).Tags
+		digested := lane.ws.ProbeView(job.Project).Tags
 		if !slices.Equal(parsed.Project.Tags, digested) {
 			t.Errorf("the context of %s carries the tags %q; the view its key digests holds %q",
 				job.Key(), parsed.Project.Tags, digested)

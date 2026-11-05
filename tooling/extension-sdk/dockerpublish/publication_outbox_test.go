@@ -12,6 +12,7 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/google/go-containerregistry/pkg/v1/layout"
 	"github.com/google/go-containerregistry/pkg/v1/remote"
 
 	extproto "go.putnami.dev/protocol/extension"
@@ -97,7 +98,15 @@ func assertLayoutHolds(t *testing.T, outbox *publicationoutbox.Outbox, member ex
 	if err != nil {
 		t.Fatalf("outbox layout: %v", err)
 	}
-	image, err := oci.LoadFromLayout(layoutDir)
+	index, err := layout.ImageIndexFromPath(layoutDir)
+	if err != nil {
+		t.Fatalf("load the outbox layout: %v", err)
+	}
+	indexManifest, err := index.IndexManifest()
+	if err != nil || len(indexManifest.Manifests) == 0 {
+		t.Fatalf("outbox layout index manifest: %v", err)
+	}
+	image, err := index.Image(indexManifest.Manifests[0].Digest)
 	if err != nil {
 		t.Fatalf("load the outbox layout: %v", err)
 	}

@@ -7,10 +7,9 @@
 //
 // # What executes where, per declaration root
 //
-// The original design was "run the task in an isolated staging root and
-// ingest whatever lands there". That is not implementable for this workspace
-// today, and the reason is worth recording because it is a property of the
-// extensions, not of the store:
+// Capture reads each output from where it lives, not from a redirected staging
+// root. The extensions do not take the path from the job context, so a
+// redirect would be ignored:
 //
 //   - COMMAND-OUTPUT — captured FROM the real .putnami/out/<project>/<command>
 //     directory, NOT redirected into staging. Two facts forbid the redirect.
@@ -82,13 +81,7 @@
 // a format-qualified store address (task_entry.go), so an undeclared task cannot
 // accidentally consume one.
 //
-// No command is excluded. The `package` command used to be: its shared output
-// directory hosted a channel index that every packager read-merge-wrote and
-// publish read back, so a cache hit restored one packager's artifact and skipped
-// the merge, and publish silently skipped a channel that had really been built.
-// A later fix moved each packager's record inside the
-// output that packager owns, which removed the write outside a declaration
-// rather than working around it — so the ordinary rule covers `package` too.
+// No command is excluded.
 //
 // Source rewriters use the same task-owned status entry, plus a cache-private
 // result marker. The scheduler captures the keyed project-source digest before
@@ -407,13 +400,8 @@ func (s *Scheduler) storeDeclaredEntry(job *ScheduledJob, result *JobResult, has
 //
 // The RESTORE side honors the same carve-outs (materializeDeclaredOutputs):
 // the ceding task's restore leaves whatever the destination holds at a ceded
-// subpath exactly as it is, the way its execution would. It used to swap a
-// staged tree over the whole destination, which deleted the ceded subtree and
-// relied on the owning task being restored right after — but "right after" is
-// not a window other commands respect: a `package` describe that executed and a
-// `publish` step reading the contract path both run concurrently with a `test`
-// generate served from cache, and the bundle was gone in between — a
-// remote-cache recurrence of the same race. What the owning task's restore then does is
+// subpath exactly as it is, the way its execution would. What the owning task's
+// restore then does is
 // unchanged — a PRESENT output swaps the current sources' bytes in, and an
 // optionalEmpty absence leaves a project or workspace path alone and empties a
 // command-output one (materializeDeclaredOutputs).

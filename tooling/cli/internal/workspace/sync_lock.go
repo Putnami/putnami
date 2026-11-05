@@ -9,7 +9,7 @@ import (
 	"sync"
 	"time"
 
-	"go.putnami.dev/tooling/cli/internal/flock"
+	"go.putnami.dev/sdk/extension/filelock"
 )
 
 // workspaceSyncLockFilename is deliberately adjacent to the index it guards.
@@ -116,7 +116,7 @@ func acquireWorkspaceSyncLockWithOptions(
 			releaseGate()
 			return nil, waitError()
 		}
-		lock, err := flock.Acquire(lockPath, true, true)
+		lock, err := filelock.Acquire(lockPath, true, true)
 		if contextErr := waitCtx.Err(); contextErr != nil {
 			_ = lock.Release()
 			releaseGate()
@@ -128,7 +128,7 @@ func acquireWorkspaceSyncLockWithOptions(
 				_ = lock.Release()
 				releaseGate()
 			}, nil
-		case !errors.Is(err, flock.ErrBusy):
+		case !errors.Is(err, filelock.ErrBusy):
 			releaseGate()
 			return nil, fmt.Errorf("lock workspace index preparation: %w", err)
 		}

@@ -225,8 +225,8 @@ func TestInstall_IdempotentCachedInstall(t *testing.T) {
 	}
 }
 
-// TestInstaller_RemoveAndInstalledVersions covers the simple wrappers.
-func TestInstaller_RemoveAndInstalledVersions(t *testing.T) {
+// TestInstaller_Remove covers the unlink-only removal.
+func TestInstaller_Remove(t *testing.T) {
 	wsRoot := t.TempDir()
 	inst := &Installer{WorkspaceRoot: wsRoot}
 
@@ -244,15 +244,7 @@ func TestInstaller_RemoveAndInstalledVersions(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	versions, err := inst.InstalledVersions("@putnami/tpl")
-	if err != nil {
-		t.Fatalf("InstalledVersions: %v", err)
-	}
-	if len(versions) != 2 {
-		t.Errorf("expected 2 installed versions, got %d: %v", len(versions), versions)
-	}
-
-	// Remove now unlinks only: the stable symlink is removed, but the on-disk
+	// Remove unlinks only: the stable symlink is removed, but the on-disk
 	// version dirs survive (reclaiming shared bytes is the artifact GC's job).
 	if err := inst.Remove("@putnami/tpl", "1.0.0"); err != nil {
 		t.Fatalf("Remove: %v", err)
@@ -260,9 +252,10 @@ func TestInstaller_RemoveAndInstalledVersions(t *testing.T) {
 	if _, err := os.Lstat(layout.StableDir(wsRoot, layout.Templates, "@putnami/tpl")); !os.IsNotExist(err) {
 		t.Error("Remove should unlink the stable symlink")
 	}
-	versions, _ = inst.InstalledVersions("@putnami/tpl")
-	if len(versions) != 2 {
-		t.Errorf("Remove unlinks only; both version dirs should remain, got %v", versions)
+	for _, v := range []string{"1.0.0", "1.1.0"} {
+		if _, err := os.Stat(layout.ArtifactDir(wsRoot, layout.Templates, "@putnami/tpl", v)); err != nil {
+			t.Errorf("Remove unlinks only; version dir %s should remain: %v", v, err)
+		}
 	}
 }
 

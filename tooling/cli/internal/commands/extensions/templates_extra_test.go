@@ -346,7 +346,7 @@ func TestTemplatesList_TextWithConfigAndLock(t *testing.T) {
 	dir := t.TempDir()
 	cfg := &wsproto.Config{Templates: []string{"alpha:1.0.0"}}
 	sharedtest.WriteJSONConfig(t, filepath.Join(dir, "putnami.lock.json"), map[string]any{
-		"version":   2,
+		"version":   4,
 		"templates": map[string]any{"alpha": map[string]any{"version": "1.0.0"}},
 	})
 
@@ -391,7 +391,7 @@ func TestTemplatesRemove_RequiresName(t *testing.T) {
 func TestTemplatesRemove_RemovesLockEntry(t *testing.T) {
 	dir := t.TempDir()
 	sharedtest.WriteJSONConfig(t, filepath.Join(dir, "putnami.lock.json"), map[string]any{
-		"version":   2,
+		"version":   4,
 		"templates": map[string]any{"alpha": map[string]any{"version": "1.0.0"}},
 	})
 
@@ -852,7 +852,7 @@ func TestTemplatesInstall_FailureReported(t *testing.T) {
 	t.Setenv("PUTNAMI_REGISTRY_URL", "http://127.0.0.1:1")
 	// Dead registry refuses instantly; skip the retry backoff so the test
 	// doesn't pay the full (1s+2s) budget waiting on a host that won't recover.
-	t.Setenv(extension.HTTPRetryBackoffEnv, "0")
+	t.Cleanup(extension.SetHTTPRetryBackoff(0))
 	cfg := &wsproto.Config{Templates: []string{"alpha:1.0.0"}}
 
 	out, err := sharedtest.CaptureStdout(t, func() error {
@@ -871,7 +871,7 @@ func TestTemplatesInstall_JSONLEmitsFailureEntry(t *testing.T) {
 	// Dead registry → install fails fast; assert the JSONL failure entry is
 	// emitted and the human progress/summary lines are suppressed.
 	t.Setenv("PUTNAMI_REGISTRY_URL", "http://127.0.0.1:1")
-	t.Setenv(extension.HTTPRetryBackoffEnv, "0")
+	t.Cleanup(extension.SetHTTPRetryBackoff(0))
 	cfg := &wsproto.Config{Templates: []string{"alpha:1.0.0"}}
 
 	out, err := sharedtest.CaptureStdout(t, func() error {
@@ -924,7 +924,7 @@ func TestTemplatesUpdate_FailureSkipsButReturnsNil(t *testing.T) {
 	t.Setenv("PUTNAMI_REGISTRY_URL", "http://127.0.0.1:1")
 	// Dead registry refuses instantly; skip the retry backoff so the test
 	// doesn't pay the full (1s+2s) budget waiting on a host that won't recover.
-	t.Setenv(extension.HTTPRetryBackoffEnv, "0")
+	t.Cleanup(extension.SetHTTPRetryBackoff(0))
 	cfg := &wsproto.Config{Templates: []string{"alpha:1.0.0"}}
 
 	out, err := sharedtest.CaptureStdout(t, func() error {

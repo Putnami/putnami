@@ -47,7 +47,7 @@ func TestDocsLinksFailsNamingTheBrokenLink(t *testing.T) {
 	if err == nil {
 		t.Fatal("a broken anchor passed the task")
 	}
-	if !errors.Is(err, protocolcli.ErrInvalidConfig) || ResultData(err) == nil {
+	if !errors.Is(err, protocolcli.ErrInvalidConfig) || protocolcli.ResultData(err) == nil {
 		t.Fatalf("err = %v, want an invalid-configuration verdict carrying the report", err)
 	}
 	if len(findings) != 1 || len(report.Findings) != 1 {

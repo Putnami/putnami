@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	extproto "go.putnami.dev/protocol/extension"
+	wsproto "go.putnami.dev/protocol/workspace"
 )
 
 // The core-owned half of the workspace adapter.
@@ -233,7 +234,7 @@ func providerInputs(root string, dirs []string, patterns []string) []SnapshotInp
 	inputs := make([]SnapshotInput, 0, len(dirs)*len(patterns))
 	seen := make(map[string]bool, len(dirs)*len(patterns))
 	for _, dir := range dirs {
-		base := cleanWorkspacePath(dir)
+		base := wsproto.CleanWorkspacePath(dir)
 		for _, pattern := range patterns {
 			rel := pattern
 			if base != "" {

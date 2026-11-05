@@ -210,7 +210,7 @@ func doctorError(report doctor.Report) error {
 	err := protocolcli.Classify(
 		fmt.Errorf("doctor found %d production-readiness issue(s) that block the %s profile", blocking, report.Profile),
 		protocolcli.ErrInvalidConfig)
-	return shared.WithResultData(err, report)
+	return protocolcli.WithResultData(err, report)
 }
 
 // selectDoctorProjects resolves the projects doctor evaluates. An empty, "*", or
@@ -260,9 +260,7 @@ func selectDoctorProjects(ws *workspace.Workspace, args []string, globalProjects
 //
 // The writer is a parameter rather than os.Stdout so the envelope this command
 // actually emits is what its test reads. A test that rebuilt the document beside
-// this function proved only that the test could build one — which is how
-// doctor's envelope kept asserting the retired v1 shape after a later change moved
-// the command to v2.
+// this function proved only that the test could build one.
 func renderDoctor(out io.Writer, outputFormat string, report doctor.Report, runErr error) error {
 	if protocolcli.OutputMode(outputFormat).IsStructured() {
 		if runErr == nil {

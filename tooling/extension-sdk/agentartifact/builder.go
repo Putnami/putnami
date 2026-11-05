@@ -16,9 +16,7 @@ import (
 	"compress/gzip"
 	"crypto/sha256"
 	"encoding/hex"
-	"errors"
 	"fmt"
-	"io"
 	"os"
 	"path/filepath"
 	"sort"
@@ -222,64 +220,4 @@ func cloneFiles(files map[string][]byte) map[string][]byte {
 func hash(content []byte) string {
 	sum := sha256.Sum256(content)
 	return hex.EncodeToString(sum[:])
-}
-
-// ReadArchive is kept small and deterministic for release tooling and tests.
-// It rejects duplicate, non-regular, and undeclared members.
-func ReadArchive(content []byte) (map[string][]byte, error) {
-	gzipReader, err := gzip.NewReader(bytes.NewReader(content))
-	if err != nil {
-		return nil, fmt.Errorf("open gzip archive: %w", err)
-	}
-	defer func() { _ = gzipReader.Close() }()
-	tarReader := tar.NewReader(gzipReader)
-	members := make(map[string][]byte)
-	for {
-		header, err := tarReader.Next()
-		if errors.Is(err, io.EOF) {
-			break
-		}
-		if err != nil {
-			return nil, fmt.Errorf("read tar archive: %w", err)
-		}
-		if !header.FileInfo().Mode().IsRegular() {
-			return nil, fmt.Errorf("archive member %q is not a regular file", header.Name)
-		}
-		if _, exists := members[header.Name]; exists {
-			return nil, fmt.Errorf("duplicate archive member %q", header.Name)
-		}
-		member, err := io.ReadAll(tarReader)
-		if err != nil {
-			return nil, fmt.Errorf("read archive member %q: %w", header.Name, err)
-		}
-		members[header.Name] = member
-	}
-	manifestBytes, ok := members[wsproto.AgentArtifactManifestFilename]
-	if !ok {
-		return nil, fmt.Errorf("archive has no %s", wsproto.AgentArtifactManifestFilename)
-	}
-	manifest, diags := wsproto.ParseAndValidateAgentArtifactManifest(manifestBytes)
-	if len(diags) > 0 {
-		return nil, fmt.Errorf("archive has an invalid agent artifact manifest: %v", diags)
-	}
-	declared := make(map[string]string, len(manifest.Files))
-	for _, file := range manifest.Files {
-		declared[file.Path] = file.SHA256
-	}
-	for name, member := range members {
-		if name == wsproto.AgentArtifactManifestFilename {
-			continue
-		}
-		want, ok := declared[name]
-		if !ok {
-			return nil, fmt.Errorf("undeclared archive member %q", name)
-		}
-		if got := hash(member); got != want {
-			return nil, fmt.Errorf("archive member %q hashes to %s, manifest declares %s", name, got, want)
-		}
-	}
-	if len(members)-1 != len(declared) {
-		return nil, fmt.Errorf("archive contains %d workflow files, manifest declares %d", len(members)-1, len(declared))
-	}
-	return members, nil
 }

@@ -13,8 +13,8 @@ import (
 	"go.putnami.dev/cli/model/extension"
 	"go.putnami.dev/cli/model/workspace"
 	extensionproto "go.putnami.dev/protocol/extension"
+	"go.putnami.dev/sdk/extension/filelock"
 	"go.putnami.dev/sdk/extension/proctree"
-	"go.putnami.dev/tooling/cli/internal/flock"
 	"go.putnami.dev/tooling/cli/internal/iox"
 	"go.putnami.dev/tooling/cli/internal/runcredential"
 	"go.putnami.dev/tooling/cli/internal/store"
@@ -22,19 +22,15 @@ import (
 
 // The cache lifecycle.
 //
-// `putnami cache clean` and `putnami cache gc` used to know the caches: the CLI
-// shipped a Go collector and a Bun collector and ran them by name. They are now
-// fan-outs to the extensions that own those caches, and an extension declares
-// its participation the same way it declares everything else — a hidden command
+// `putnami cache clean` and `putnami cache gc` fan out to the extensions that
+// own the caches; an extension declares its participation as a hidden command
 // running a typed task, not a hook.
 //
 // Three properties of this fan-out are load-bearing:
 //
 //   - COMPLETE AGGREGATION. Every declaring extension is asked, and every
-//     failure is reported. The pre-C5 fan-out returned on the first error, so
-//     one broken extension meant the caches of every extension sorted after it
-//     were silently never collected — while the command still looked like it
-//     had done its job for them.
+//     failure is reported, so one broken extension never stops the collection of
+//     the extensions sorted after it.
 //
 //   - DETERMINISTIC ORDER. Extensions are asked in name order, so two runs on
 //     one machine print the same lines in the same order.
@@ -42,11 +38,6 @@ import (
 //   - NO PARTIAL SUCCESS CLAIM. An extension that exits non-zero contributes an
 //     error, never a byte count. A purge that failed must not be counted as
 //     bytes freed.
-
-// CacheCommandEnv names the environment variable carrying the phase to the
-// subprocess, so an extension whose runtime dispatches on argv can also branch
-// on the environment.
-const CacheCommandEnv = "PUTNAMI_CACHE_COMMAND"
 
 // CacheCommandOutcome is one extension's answer for one cache phase.
 type CacheCommandOutcome struct {
@@ -178,7 +169,7 @@ func RunCacheCommand(
 	}
 	defer func() { _ = childLease.Close() }()
 	cmd.Dir = resolvedCwd
-	cmd.Env = cacheCommandEnv(ws, ext, def, command, scratchRoot, machineRoot, tmplVars)
+	cmd.Env = cacheCommandEnv(ws, ext, def, scratchRoot, machineRoot, tmplVars)
 
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
@@ -251,7 +242,7 @@ func StartDetachedCacheGC(
 	}
 	defer func() { _ = childLease.Close() }()
 	cmd.Dir = ws.Root
-	cmd.Env = cacheCommandEnv(ws, ext, def, extensionproto.CommandCacheGC, scratchRoot, machineRoot, tmplVars)
+	cmd.Env = cacheCommandEnv(ws, ext, def, scratchRoot, machineRoot, tmplVars)
 	// A hosted run hands its credential to no process started after this one.
 	runcredential.MarkRepositoryCodeStarted("job " + ext.Name + " " + extensionproto.CommandCacheGC)
 	// Outside every process tree this CLI runs in: on Windows a tree's Job
@@ -383,7 +374,7 @@ func OpportunisticCacheGCDue(
 	// sibling worktree may have reserved the interval just before this lock was
 	// acquired. Holding the lock only for this check-and-write makes exactly one
 	// caller return true for a window without blocking the detached collector.
-	lock, err := flock.Acquire(filepath.Join(root, opportunisticGCStampLockFile), true, false)
+	lock, err := filelock.Acquire(filepath.Join(root, opportunisticGCStampLockFile), true, false)
 	if err != nil {
 		return false
 	}
@@ -402,7 +393,6 @@ func cacheCommandEnv(
 	ws *workspace.Workspace,
 	ext *extension.ExtensionDescription,
 	def *extension.JobDefinition,
-	command string,
 	scratchRoot string,
 	machineRoot string,
 	tmplVars map[string]string,
@@ -414,7 +404,6 @@ func cacheCommandEnv(
 		"PUTNAMI_EXTENSION_NAME="+ext.Name,
 		"PUTNAMI_CACHE_ROOT="+scratchRoot,
 		extensionproto.MachineCacheRootEnv+"="+machineRoot,
-		CacheCommandEnv+"="+command,
 	)
 	for k, v := range def.Env {
 		env = append(env, k+"="+extension.ExpandTemplateVars(v, tmplVars))

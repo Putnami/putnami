@@ -7,13 +7,13 @@ import (
 	"testing"
 	"time"
 
+	"go.putnami.dev/sdk/extension/filelock"
 	"go.putnami.dev/tooling/cli/internal/extension"
-	"go.putnami.dev/tooling/cli/internal/flock"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
 
 func TestExecuteReclaimsExpiredScratchGeneration(t *testing.T) {
-	if !flock.Inheritable {
+	if !filelock.Inheritable {
 		t.Skip("scratch reaping requires a lease that passes to child processes")
 	}
 	f := newExecuteFixture(t)

@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"go.putnami.dev/protocol/features/spectest"
+	"go.putnami.dev/sdk/extension/gitread"
 )
 
 func initGitRepo(t *testing.T) string {
@@ -39,12 +40,12 @@ func initGitRepo(t *testing.T) string {
 	if err := os.WriteFile(file, []byte("# Test"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	cmd := exec.Command(Executable(), "add", ".")
+	cmd := exec.Command(gitread.Executable(), "add", ".")
 	cmd.Dir = dir
 	if out, err := cmd.CombinedOutput(); err != nil {
 		t.Fatalf("git add: %v\n%s", err, out)
 	}
-	cmd = exec.Command(Executable(), "commit", "-m", "initial")
+	cmd = exec.Command(gitread.Executable(), "commit", "-m", "initial")
 	cmd.Dir = dir
 	if out, err := cmd.CombinedOutput(); err != nil {
 		t.Fatalf("git commit: %v\n%s", err, out)
@@ -55,7 +56,7 @@ func initGitRepo(t *testing.T) string {
 
 func runGit(t *testing.T, dir string, args ...string) string {
 	t.Helper()
-	cmd := exec.Command(Executable(), args...)
+	cmd := exec.Command(gitread.Executable(), args...)
 	cmd.Dir = dir
 	out, err := cmd.CombinedOutput()
 	if err != nil {
@@ -89,47 +90,6 @@ func commitNewFile(t *testing.T, dir, name string) {
 	runGit(t, dir, "commit", "-m", "add "+name)
 }
 
-func TestCurrentBranch(t *testing.T) {
-	t.Parallel()
-	dir := initGitRepo(t)
-	branch, err := CurrentBranch(dir)
-	if err != nil {
-		t.Fatalf("CurrentBranch: %v", err)
-	}
-	if branch != "main" {
-		t.Errorf("CurrentBranch = %q, want %q", branch, "main")
-	}
-}
-
-func TestCurrentBranch_UnbornRepo(t *testing.T) {
-	t.Parallel()
-	dir := t.TempDir()
-	runGit(t, dir, "init")
-	runGit(t, dir, "symbolic-ref", "HEAD", "refs/heads/main")
-
-	branch, err := CurrentBranch(dir)
-	if err != nil {
-		t.Fatalf("CurrentBranch: %v", err)
-	}
-	if branch != "main" {
-		t.Errorf("CurrentBranch = %q, want %q", branch, "main")
-	}
-}
-
-func TestHeadSHA(t *testing.T) {
-	t.Parallel()
-	dir := initGitRepo(t)
-
-	got, err := HeadSHA(dir)
-	if err != nil {
-		t.Fatalf("HeadSHA: %v", err)
-	}
-	want := strings.TrimSpace(runGit(t, dir, "rev-parse", "HEAD"))
-	if got != want {
-		t.Errorf("HeadSHA = %q, want %q", got, want)
-	}
-}
-
 func TestHeadTree(t *testing.T) {
 	t.Parallel()
 	dir := initGitRepo(t)
@@ -154,9 +114,9 @@ func TestHeadTree(t *testing.T) {
 func TestResolveCommitWorktreeCleanAndDiffCommitFiles(t *testing.T) {
 	t.Parallel()
 	dir := initGitRepo(t)
-	base, err := ResolveCommit(dir, "HEAD")
+	base, err := gitread.ResolveCommit(dir, "HEAD")
 	if err != nil {
-		t.Fatalf("ResolveCommit(base): %v", err)
+		t.Fatalf("gitread.ResolveCommit(base): %v", err)
 	}
 	clean, err := WorktreeClean(dir)
 	if err != nil || !clean {
@@ -175,9 +135,9 @@ func TestResolveCommitWorktreeCleanAndDiffCommitFiles(t *testing.T) {
 	}
 	runGit(t, dir, "add", "--", name)
 	runGit(t, dir, "commit", "-m", "change")
-	head, err := ResolveCommit(dir, "HEAD")
+	head, err := gitread.ResolveCommit(dir, "HEAD")
 	if err != nil {
-		t.Fatalf("ResolveCommit(head): %v", err)
+		t.Fatalf("gitread.ResolveCommit(head): %v", err)
 	}
 	files, err := DiffCommitFiles(dir, base, head)
 	if err != nil {
@@ -193,28 +153,6 @@ func TestResolveCommitWorktreeCleanAndDiffCommitFiles(t *testing.T) {
 	clean, err = WorktreeClean(dir)
 	if err != nil || clean {
 		t.Fatalf("WorktreeClean dirty = %t, %v; want dirty", clean, err)
-	}
-}
-
-func TestResolveCommitRejectsUnsafeAndAmbiguousRevisionArguments(t *testing.T) {
-	t.Parallel()
-	repo := initGitRepo(t)
-	sha := strings.TrimSpace(runGit(t, repo, "rev-parse", "HEAD"))
-	resolved, err := ResolveCommit(repo, sha)
-	if err != nil || resolved != strings.ToLower(sha) {
-		t.Fatalf("ResolveCommit(full SHA) = %q, %v", resolved, err)
-	}
-
-	runGit(t, repo, "branch", "shared", sha)
-	runGit(t, repo, "tag", "shared", sha)
-	if _, err := ResolveCommit(repo, "shared"); err == nil {
-		t.Fatal("ambiguous short ref resolved without an error")
-	}
-
-	for _, revision := range []string{"", " HEAD", "HEAD ", "-c", "HEAD\nmain", strings.Repeat("x", 1025)} {
-		if _, err := ResolveCommit(repo, revision); err == nil {
-			t.Errorf("unsafe revision %q resolved without an error", revision)
-		}
 	}
 }
 
@@ -254,21 +192,6 @@ func TestDiffCommitFiles_DisablesRenameDetection(t *testing.T) {
 	}
 }
 
-func TestCommitExists(t *testing.T) {
-	t.Parallel()
-	dir := initGitRepo(t)
-	sha := strings.TrimSpace(runGit(t, dir, "rev-parse", "HEAD"))
-	if !CommitExists(dir, sha) {
-		t.Fatalf("CommitExists(%q) = false, want true", sha)
-	}
-	if CommitExists(dir, strings.Repeat("f", 40)) {
-		t.Fatal("CommitExists(nonexistent sha) = true, want false")
-	}
-	if CommitExists(dir, "main") {
-		t.Fatal("CommitExists(branch name) = true, want false")
-	}
-}
-
 func TestCommitReachableFromHead(t *testing.T) {
 	t.Parallel()
 	dir := initGitRepo(t)
@@ -305,51 +228,6 @@ func TestRemoteURL(t *testing.T) {
 	}
 }
 
-func TestCurrentBranch_OtherBranch(t *testing.T) {
-	t.Parallel()
-	dir := initGitRepo(t)
-
-	cmd := exec.Command(Executable(), "checkout", "-b", "feature")
-	cmd.Dir = dir
-	cmd.CombinedOutput()
-
-	branch, err := CurrentBranch(dir)
-	if err != nil {
-		t.Fatalf("CurrentBranch: %v", err)
-	}
-	if branch != "feature" {
-		t.Errorf("CurrentBranch = %q, want %q", branch, "feature")
-	}
-}
-
-func TestIsMainBranch_Main(t *testing.T) {
-	t.Parallel()
-	dir := initGitRepo(t)
-	if !IsMainBranch(dir) {
-		t.Error("IsMainBranch = false, want true")
-	}
-}
-
-func TestIsMainBranch_Feature(t *testing.T) {
-	t.Parallel()
-	dir := initGitRepo(t)
-
-	cmd := exec.Command(Executable(), "checkout", "-b", "feature")
-	cmd.Dir = dir
-	cmd.CombinedOutput()
-
-	if IsMainBranch(dir) {
-		t.Error("IsMainBranch = true, want false")
-	}
-}
-
-func TestIsMainBranch_InvalidRepo(t *testing.T) {
-	t.Parallel()
-	if IsMainBranch(t.TempDir()) {
-		t.Error("IsMainBranch on non-repo should return false")
-	}
-}
-
 func TestCommonDir(t *testing.T) {
 	t.Parallel()
 	dir := initGitRepo(t)
@@ -372,7 +250,7 @@ func TestCommonDir_WorktreesAgree(t *testing.T) {
 	// A linked worktree must resolve to the SAME common dir as the main
 	// checkout — this is what lets every worktree of a repo share one store.
 	wt := filepath.Join(t.TempDir(), "linked")
-	cmd := exec.Command(Executable(), "worktree", "add", "-b", "wt-branch", wt)
+	cmd := exec.Command(gitread.Executable(), "worktree", "add", "-b", "wt-branch", wt)
 	cmd.Dir = dir
 	if out, err := cmd.CombinedOutput(); err != nil {
 		t.Fatalf("git worktree add: %v\n%s", err, out)
@@ -626,7 +504,7 @@ func TestGetVersionInfo_ShallowCloneIsRefused(t *testing.T) {
 	origin := initGitRepo(t)
 	writeCommit(t, origin, "second.txt", "chore: second")
 	shallow := filepath.Join(t.TempDir(), "shallow")
-	cmd := exec.Command(Executable(), "clone", "--depth", "1", "file://"+origin, shallow)
+	cmd := exec.Command(gitread.Executable(), "clone", "--depth", "1", "file://"+origin, shallow)
 	if out, err := cmd.CombinedOutput(); err != nil {
 		t.Skipf("shallow clone unavailable in this environment: %v\n%s", err, out)
 	}
@@ -647,7 +525,7 @@ func TestGetVersionInfo_InvalidRepo(t *testing.T) {
 // gitDo runs one git command in dir and fails the test when it does not.
 func gitDo(t *testing.T, dir string, args ...string) {
 	t.Helper()
-	cmd := exec.Command(Executable(), args...)
+	cmd := exec.Command(gitread.Executable(), args...)
 	cmd.Dir = dir
 	cmd.Env = append(os.Environ(), "GIT_COMMITTER_DATE=2026-01-02T03:04:05Z", "GIT_AUTHOR_DATE=2026-01-02T03:04:05Z")
 	if out, err := cmd.CombinedOutput(); err != nil {
@@ -984,12 +862,12 @@ func TestResolveTrunk_ErrorWhenNoCandidateExists(t *testing.T) {
 	}
 }
 
-func TestDiffFiles(t *testing.T) {
+func TestDiffWorkingTree(t *testing.T) {
 	t.Parallel()
 	dir := initGitRepo(t)
 
 	// Create a feature branch and add a file
-	cmd := exec.Command(Executable(), "checkout", "-b", "feature")
+	cmd := exec.Command(gitread.Executable(), "checkout", "-b", "feature")
 	cmd.Dir = dir
 	cmd.CombinedOutput()
 
@@ -997,21 +875,22 @@ func TestDiffFiles(t *testing.T) {
 	if err := os.WriteFile(newFile, []byte("package main"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	cmd = exec.Command(Executable(), "add", "new.go")
+	cmd = exec.Command(gitread.Executable(), "add", "new.go")
 	cmd.Dir = dir
 	if out, err := cmd.CombinedOutput(); err != nil {
 		t.Fatalf("git add: %v\n%s", err, out)
 	}
-	cmd = exec.Command(Executable(), "commit", "-m", "add new.go")
+	cmd = exec.Command(gitread.Executable(), "commit", "-m", "add new.go")
 	cmd.Dir = dir
 	if out, err := cmd.CombinedOutput(); err != nil {
 		t.Fatalf("git commit: %v\n%s", err, out)
 	}
 
-	files, err := DiffFiles(dir, "main")
+	diff, err := DiffWorkingTree(dir, "main")
 	if err != nil {
-		t.Fatalf("DiffFiles: %v", err)
+		t.Fatalf("DiffWorkingTree: %v", err)
 	}
+	files := diff.Files
 	found := false
 	for _, f := range files {
 		if f == "new.go" {
@@ -1020,11 +899,11 @@ func TestDiffFiles(t *testing.T) {
 		}
 	}
 	if !found {
-		t.Errorf("DiffFiles = %v, expected to contain 'new.go'", files)
+		t.Errorf("DiffWorkingTree = %v, expected to contain 'new.go'", files)
 	}
 }
 
-func TestDiffFiles_DisablesRenameDetection(t *testing.T) {
+func TestDiffWorkingTree_DisablesRenameDetection(t *testing.T) {
 	t.Parallel()
 	dir := initGitRepo(t)
 
@@ -1049,17 +928,18 @@ func TestDiffFiles_DisablesRenameDetection(t *testing.T) {
 	want := []string{from, to}
 	for _, configuredRenames := range []string{"true", "false"} {
 		runGit(t, dir, "config", "diff.renames", configuredRenames)
-		files, err := DiffFiles(dir, "main")
+		diff, err := DiffWorkingTree(dir, "main")
 		if err != nil {
-			t.Fatalf("DiffFiles with diff.renames=%s: %v", configuredRenames, err)
+			t.Fatalf("DiffWorkingTree with diff.renames=%s: %v", configuredRenames, err)
 		}
+		files := diff.Files
 		if !reflect.DeepEqual(files, want) {
-			t.Errorf("DiffFiles with diff.renames=%s = %#v, want %#v", configuredRenames, files, want)
+			t.Errorf("DiffWorkingTree with diff.renames=%s = %#v, want %#v", configuredRenames, files, want)
 		}
 	}
 }
 
-func TestDiffFiles_FallsBackToOriginBranchForBareBaseline(t *testing.T) {
+func TestDiffWorkingTree_FallsBackToOriginBranchForBareBaseline(t *testing.T) {
 	t.Parallel()
 	dir := initGitRepo(t)
 	addOriginMainRef(t, dir)
@@ -1073,10 +953,11 @@ func TestDiffFiles_FallsBackToOriginBranchForBareBaseline(t *testing.T) {
 	runGit(t, dir, "add", "new.go")
 	runGit(t, dir, "commit", "-m", "add new.go")
 
-	files, err := DiffFiles(dir, "main")
+	diff, err := DiffWorkingTree(dir, "main")
 	if err != nil {
-		t.Fatalf("DiffFiles: %v", err)
+		t.Fatalf("DiffWorkingTree: %v", err)
 	}
+	files := diff.Files
 	found := false
 	for _, f := range files {
 		if f == "new.go" {
@@ -1085,11 +966,11 @@ func TestDiffFiles_FallsBackToOriginBranchForBareBaseline(t *testing.T) {
 		}
 	}
 	if !found {
-		t.Errorf("DiffFiles = %v, expected to contain 'new.go'", files)
+		t.Errorf("DiffWorkingTree = %v, expected to contain 'new.go'", files)
 	}
 }
 
-func TestDiffFiles_UntrackedFiles(t *testing.T) {
+func TestDiffWorkingTree_UntrackedFiles(t *testing.T) {
 	t.Parallel()
 	dir := initGitRepo(t)
 
@@ -1098,10 +979,11 @@ func TestDiffFiles_UntrackedFiles(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	files, err := DiffFiles(dir, "main")
+	diff, err := DiffWorkingTree(dir, "main")
 	if err != nil {
-		t.Fatalf("DiffFiles: %v", err)
+		t.Fatalf("DiffWorkingTree: %v", err)
 	}
+	files := diff.Files
 
 	found := false
 	for _, f := range files {
@@ -1111,7 +993,7 @@ func TestDiffFiles_UntrackedFiles(t *testing.T) {
 		}
 	}
 	if !found {
-		t.Errorf("DiffFiles = %v, expected to contain 'untracked.txt'", files)
+		t.Errorf("DiffWorkingTree = %v, expected to contain 'untracked.txt'", files)
 	}
 }
 
@@ -1157,10 +1039,6 @@ func TestDiffWorkingTree_NamesTheBaseAndTheUncommittedPaths(t *testing.T) {
 	slices.Sort(uncommitted)
 	if want := []string{"staged.txt", "tracked.txt", "untracked.txt"}; !slices.Equal(uncommitted, want) {
 		t.Errorf("uncommitted = %v, want %v", diff.Uncommitted, want)
-	}
-	files, err := DiffFiles(dir, "main")
-	if err != nil || !slices.Equal(files, diff.Files) {
-		t.Errorf("DiffFiles = %v, %v; want DiffWorkingTree's files %v", files, err, diff.Files)
 	}
 
 	// A clean tree has no uncommitted paths.

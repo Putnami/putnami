@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"go.putnami.dev/protocol/cli"
+	"go.putnami.dev/sdk/extension/gitread"
 	"go.putnami.dev/tooling/cli/internal/git"
 	"go.putnami.dev/tooling/cli/internal/sessionstream"
 )
@@ -42,13 +43,8 @@ type Session struct {
 	declarations *cli.SessionDeclarations
 }
 
-// SessionMetadata is the READER's view of a recorded session.json.
-//
-// It was also the v1 writer's document until a later change deleted that writer:
-// recording is now the versioned cli.SessionFile. The shape survives because
-// sessions already on disk are v1 and must keep opening, and because every
-// consumer (gate metrics, inspect, list) reads this one view — the v2 document
-// is projected onto it by internal/commands/sessions_helpers.go.
+// SessionMetadata is the in-memory reader view a recorded cli.SessionFile is
+// projected onto.
 type SessionMetadata struct {
 	ID        string          `json:"id"`
 	StartTime string          `json:"startTime"`
@@ -102,12 +98,8 @@ type SessionJobEntry struct {
 	SpawnToFirstEventMs *int64 `json:"spawnToFirstEventMs,omitempty"`
 }
 
-// SessionEvent is a single event recorded during a session.
-//
-// Data is the on-disk payload and is written verbatim; its keys are a persisted
-// wire (internal/commands/sessions/sessions_helpers.go reads them back).
+// SessionEvent is a single record of a session's version-2 event stream.
 type SessionEvent struct {
-	// Version-2 machine/session stream. New writers use only these members.
 	ProtocolVersion int                       `json:"protocolVersion,omitempty"`
 	Record          string                    `json:"record,omitempty"`
 	Time            string                    `json:"time"`
@@ -117,15 +109,10 @@ type SessionEvent struct {
 	TestCase        *cli.TestCase             `json:"testCase,omitempty"`
 	Run             *cli.StreamRunSummary     `json:"run,omitempty"`
 	MachineOutput   *cli.MachineOutputSummary `json:"machineOutput,omitempty"`
-
-	// Version-1 recorded stream. Readers retain these fields for sessions
-	// already on disk; AppendEvent is the compatibility-fixture writer only.
-	Type   string         `json:"type,omitempty"`
-	JobKey string         `json:"jobKey,omitempty"`
-	Data   map[string]any `json:"data,omitempty"`
 }
 
-// PlanSnapshot captures the execution plan at the start of a session.
+// PlanSnapshot is the in-memory reader view a recorded cli.SessionPlanFile is
+// projected onto.
 type PlanSnapshot struct {
 	SessionID string         `json:"sessionId"`
 	Commands  []string       `json:"commands"`
@@ -200,19 +187,6 @@ func (s *Session) CaptureTree(repoRoot string) {
 	}
 }
 
-// AppendEvent writes a single event to events.jsonl incrementally.
-func (s *Session) AppendEvent(event SessionEvent) error {
-	if event.Time == "" {
-		event.Time = time.Now().Format(time.RFC3339Nano)
-	}
-
-	line, err := json.Marshal(event)
-	if err != nil || s.events == nil {
-		return err
-	}
-	return s.events.Append(line)
-}
-
 // AppendMachineOutputLine appends one already-sanitized compact v2 session
 // stream record to events.jsonl. The caller supplies the record without its LF
 // so the exact bytes measured for the live machine-output budget are the bytes
@@ -232,11 +206,8 @@ func (s *Session) Events() *sessionstream.Log {
 	return s.events
 }
 
-// WritePlanV2 writes plan.json as the version-2 sessionPlanFile document. It is
-// the ONLY plan writer since a later change deleted the v1 WritePlan: a recorded
-// plan says which contract it speaks through its protocolVersion, and the
-// readers keep a v1 fallback for snapshots already on disk
-// (internal/commands/sessions_helpers.go).
+// WritePlanV2 writes plan.json as the version-2 sessionPlanFile document; a
+// recorded plan says which contract it speaks through its protocolVersion.
 func (s *Session) WritePlanV2(snapshot *cli.SessionPlanFile) error {
 	if snapshot == nil {
 		return nil
@@ -250,8 +221,7 @@ func (s *Session) WritePlanV2(snapshot *cli.SessionPlanFile) error {
 }
 
 // FinalizeV2 writes session.json as the version-2 sessionFile document, then
-// closes the events file. It is the ONLY session writer since a later change
-// deleted the v1 Finalize.
+// closes the events file.
 //
 // The caller supplies the run: this stamps only what the session itself owns
 // and the caller cannot know — the id, the start and end times, the run's wall
@@ -262,8 +232,7 @@ func (s *Session) WritePlanV2(snapshot *cli.SessionPlanFile) error {
 //
 // The recorded event log is written incrementally by the renderer as the
 // complete sanitized v2 task stream. Finalize closes it before publishing the
-// summary; session readers retain the legacy event-shape fallback for history
-// written by earlier CLI builds.
+// summary.
 func (s *Session) FinalizeV2(meta *cli.SessionFile, wsRoot string, baseline string) error {
 	s.EndTime = time.Now()
 
@@ -291,7 +260,7 @@ func (s *Session) FinalizeV2(meta *cli.SessionFile, wsRoot string, baseline stri
 	}
 
 	if wsRoot != "" {
-		branch, err := git.CurrentBranch(wsRoot)
+		branch, err := gitread.CurrentBranch(wsRoot)
 		if err == nil {
 			meta.Git = &cli.SessionGit{Branch: branch, Baseline: baseline}
 		}

@@ -14,6 +14,7 @@ import (
 	"go.putnami.dev/cli/model/jobs"
 	ciproto "go.putnami.dev/protocol/ci"
 	protocolcli "go.putnami.dev/protocol/cli"
+	"go.putnami.dev/sdk/extension/gitread"
 	"go.putnami.dev/tooling/cli/internal/changeplan"
 	"go.putnami.dev/tooling/cli/internal/cmderr"
 	"go.putnami.dev/tooling/cli/internal/commands/shared"
@@ -93,18 +94,18 @@ func resolvePlanRange(wsRoot string, opts PlanOptions) (baseSHA, headSHA string,
 	if headRef == "" {
 		headRef = "HEAD"
 	}
-	headSHA, err = git.ResolveCommit(wsRoot, headRef)
+	headSHA, err = gitread.ResolveCommit(wsRoot, headRef)
 	if err != nil {
 		return "", "", cmderr.InvalidConfigf("impact-plan cannot resolve --head: %v", err)
 	}
-	checkedOutSHA, err := git.HeadSHA(wsRoot)
+	checkedOutSHA, err := gitread.HeadSHA(wsRoot)
 	if err != nil {
 		return "", "", cmderr.InvalidConfigf("impact-plan cannot resolve checked-out HEAD: %v", err)
 	}
 	if headSHA != checkedOutSHA {
 		return "", "", cmderr.InvalidConfigf("impact-plan --head must resolve to the checked-out HEAD")
 	}
-	baseSHA, err = git.ResolveCommit(wsRoot, opts.Base)
+	baseSHA, err = gitread.ResolveCommit(wsRoot, opts.Base)
 	if err != nil {
 		return "", "", cmderr.InvalidConfigf("impact-plan cannot resolve --base: %v", err)
 	}
@@ -141,7 +142,7 @@ func planRange(ctx context.Context, wsRoot, baseSHA, headSHA string, opts PlanOp
 	if err != nil {
 		return changeplan.Input{}, cmderr.InvalidConfigf("impact-plan cannot recheck the worktree: %v", err)
 	}
-	currentHead, err := git.HeadSHA(wsRoot)
+	currentHead, err := gitread.HeadSHA(wsRoot)
 	if err != nil {
 		return changeplan.Input{}, cmderr.InvalidConfigf("impact-plan cannot recheck HEAD: %v", err)
 	}

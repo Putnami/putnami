@@ -18,19 +18,15 @@ import (
 	"go.putnami.dev/sdk/extension/oci"
 	"go.putnami.dev/sdk/extension/pkgmeta"
 	"go.putnami.dev/sdk/extension/registrycred"
+	"go.putnami.dev/sdk/extension/robustio"
 )
 
 // Config is options.package.image. Sources are project-relative regular files;
 // layer order and runtime config order are intentional OCI inputs.
 type Config struct {
-	Base string `json:"base"`
-	// Registry is accepted for compatibility with older project documents but
-	// is intentionally not consumed by package. Docker publish reads it only as
-	// a lower-precedence compatibility target after the publish command's own
-	// registry option; it never enters candidate identity or package I/O.
-	Registry     string        `json:"registry"`
+	Base         string        `json:"base"`
 	Platform     string        `json:"platform"`
-	Layers       []LayerConfig `json:"layers"`
+	Layers       []layerConfig `json:"layers"`
 	Env          []string      `json:"env,omitempty"`
 	Entrypoint   []string      `json:"entrypoint,omitempty"`
 	WorkingDir   string        `json:"workingDir,omitempty"`
@@ -38,15 +34,15 @@ type Config struct {
 	ExposedPorts []string      `json:"exposedPorts,omitempty"`
 }
 
-// LayerConfig declares either a project-relative tar layer or a set of files
+// layerConfig declares either a project-relative tar layer or a set of files
 // to place in one deterministic layer.
-type LayerConfig struct {
-	Files   []FileConfig `json:"files,omitempty"`
+type layerConfig struct {
+	Files   []fileConfig `json:"files,omitempty"`
 	Tarball string       `json:"tarball,omitempty"`
 }
 
-// FileConfig maps one project-relative regular file to an absolute image path.
-type FileConfig struct {
+// fileConfig maps one project-relative regular file to an absolute image path.
+type fileConfig struct {
 	Source string `json:"source"`
 	Path   string `json:"path"`
 	Mode   int64  `json:"mode,omitempty"`
@@ -149,7 +145,11 @@ func Package(ctx *pctx.Context, emit *jsonl.Emitter) (string, map[string]any, er
 		ContentHash: fullHash, Digest: digest, Layout: layout,
 		Platform: platform,
 	}
-	if err := writeJSONAtomic(filepath.Join(dockerDir, "manifest.json"), manifest); err != nil {
+	manifestJSON, err := json.MarshalIndent(manifest, "", "  ")
+	if err == nil {
+		err = robustio.WriteFile(filepath.Join(dockerDir, "manifest.json"), append(manifestJSON, '\n'), 0o644, nil)
+	}
+	if err != nil {
 		return "FAILED", nil, fmt.Errorf("writing image manifest: %w", err)
 	}
 	// The channel record goes INSIDE the docker directory this task owns, so it
@@ -233,14 +233,6 @@ func ResolveBaseArtifact(ctx *pctx.Context, literal, projectRef, platform string
 	}
 	layout = filepath.Join(pkgmeta.PackageOutputDir(ctx.WorkspaceRoot, base.Path, "docker"), layout)
 	return BaseArtifact{Reference: localRef, Digest: manifest.Digest, Layout: layout}, nil
-}
-
-// ResolveBaseReference is the compatibility projection for callers that need
-// only the digest-pinned plan identity. New packagers should consume the full
-// BaseArtifact so a project dependency stays local.
-func ResolveBaseReference(ctx *pctx.Context, literal, projectRef, platform string) (string, error) {
-	artifact, err := ResolveBaseArtifact(ctx, literal, projectRef, platform)
-	return artifact.Reference, err
 }
 
 func configFromParams(params pctx.Params) (Config, error) {
@@ -358,32 +350,4 @@ func unique(values []string) []string {
 		}
 	}
 	return out
-}
-
-func writeJSONAtomic(filename string, value any) error {
-	if err := os.MkdirAll(filepath.Dir(filename), 0o755); err != nil {
-		return err
-	}
-	data, err := json.MarshalIndent(value, "", "  ")
-	if err != nil {
-		return err
-	}
-	tmp, err := os.CreateTemp(filepath.Dir(filename), ".putnami-image-*.tmp")
-	if err != nil {
-		return err
-	}
-	tmpName := tmp.Name()
-	defer os.Remove(tmpName)
-	if err := tmp.Chmod(0o644); err != nil {
-		tmp.Close()
-		return err
-	}
-	if _, err := tmp.Write(append(data, '\n')); err != nil {
-		tmp.Close()
-		return err
-	}
-	if err := tmp.Close(); err != nil {
-		return err
-	}
-	return os.Rename(tmpName, filename)
 }

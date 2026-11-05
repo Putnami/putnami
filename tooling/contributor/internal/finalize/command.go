@@ -7,6 +7,7 @@ import (
 	"io"
 	"time"
 
+	protocolcli "go.putnami.dev/protocol/cli"
 	collab "go.putnami.dev/protocol/collaboration"
 	wire "go.putnami.dev/protocol/extension/hostrpc"
 	features "go.putnami.dev/protocol/features"
@@ -74,7 +75,7 @@ func (c Command) Run(ctx context.Context, args []string) int {
 	if merged {
 		fmt.Fprintf(c.Stderr, "change finalize: proposal %s/%s is already merged; nothing was published\n", result.ProposalRef.Source, result.ProposalRef.ID)
 	}
-	if structuredOutput(output) {
+	if protocolcli.OutputMode(output).IsMachineReadable() {
 		data, err := json.Marshal(result)
 		if err != nil {
 			fmt.Fprintf(c.Stderr, "change finalize: %v\n", err)
@@ -114,14 +115,4 @@ func refusedSelection(launch *job.Context) string {
 		return "--tag, --exclude-tag or --exclude"
 	}
 	return ""
-}
-
-// structuredOutput reports whether the output mode putnami forwards is one
-// the core answers with the JSON result.
-func structuredOutput(mode string) bool {
-	switch mode {
-	case "json", "jsonl", "cloud-logging":
-		return true
-	}
-	return false
 }

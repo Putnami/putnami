@@ -1,17 +1,7 @@
 // Package infraagg aggregates one workload's deployability requirements into
 // the artifact a deployer reads: <workload>/.gen/requirements.json.
 //
-// An earlier migration moved this out of the CLI. Core used to gate the
-// emission itself: it watched every build~describe / build~generate completion,
-// walked the workload's dependency closure, merged the committed per-project
-// manifests, decided what a workload's DEFAULT runtime looked like — and, to do
-// that last part, matched project tags and extension names to recognize a
-// TypeScript application so it could turn HTTP/2 off for it. That is language
-// policy living in the orchestrator, and it is the class of knowledge the extension model
-// exists to move.
-//
-// The split this package draws is the same one that was drawn for machine
-// caches:
+// The work splits three ways:
 //
 //   - The ORCHESTRATOR owns the graph. Which projects a workload depends on,
 //     what a project is classified as, and which build steps must finish before
@@ -62,15 +52,15 @@ import (
 	"go.putnami.dev/sdk/extension/robustio"
 )
 
-// AggregatedSchemaURL is written into the emitted .gen/requirements.json so
+// aggregatedSchemaURL is written into the emitted .gen/requirements.json so
 // editors validate the aggregated artifact against the published schema.
-const AggregatedSchemaURL = "https://putnami.dev/schemas/putnami-infra.json"
+const aggregatedSchemaURL = "https://putnami.dev/schemas/putnami-infra.json"
 
-// RuntimeManifestFilename is the workload-only runtime block, sourced from
+// runtimeManifestFilename is the workload-only runtime block, sourced from
 // <workload>/infra/runtime.json. It is kept separate from the per-project
 // requirements manifest because the per-project schema rejects a top-level
 // runtime block (it is a workload-root concern).
-const RuntimeManifestFilename = "runtime.json"
+const runtimeManifestFilename = "runtime.json"
 
 // AggregatedManifestFile is the project-relative, slash-separated path of a
 // workload's aggregated manifest: <project>/.gen/requirements.json.
@@ -81,7 +71,7 @@ const AggregatedManifestFile = infra.AggregatedManifestDir + "/" + infra.Aggrega
 // Aggregate writes it when the workload authors no infra/runtime.json and
 // removes it when the workload does. Nothing reads it back: it shows operators
 // the values the workload runs under.
-const RuntimeDefaultsFile = infra.AggregatedManifestDir + "/" + infra.PerProjectManifestDir + "/" + RuntimeManifestFilename
+const RuntimeDefaultsFile = infra.AggregatedManifestDir + "/" + infra.PerProjectManifestDir + "/" + runtimeManifestFilename
 
 // projectTypeApplication is the classification of a deployable workload.
 // Libraries are consumed, never deployed, so they never receive an aggregated
@@ -171,7 +161,7 @@ func Aggregate(ctx *pctx.Context, opts Options) Result {
 		return Result{Outcome: OutcomeSkipped}
 	}
 	workloadRoot := projectRoot(ctx.WorkspaceRoot, ctx.Project.Path, ctx.Project.FullPath)
-	manifestPath := AggregatedManifestPath(workloadRoot)
+	manifestPath := aggregatedManifestPath(workloadRoot)
 
 	if !IsWorkload(ctx.Project.Type) {
 		return Result{Outcome: OutcomeSkipped}
@@ -202,7 +192,7 @@ func Aggregate(ctx *pctx.Context, opts Options) Result {
 
 	merged, assembleDiags := assemble(workloadID(ctx), workloadRoot, contributions, runtime)
 	diags = append(diags, assembleDiags...)
-	merged.Schema = AggregatedSchemaURL
+	merged.Schema = aggregatedSchemaURL
 
 	var writeErr error
 	if err := writeAggregatedManifest(manifestPath, merged); err != nil {
@@ -243,8 +233,8 @@ func assemble(workload, workloadRoot string, contributions []infra.ProjectContri
 	return merged, diags
 }
 
-// AggregatedManifestPath is the workload's aggregated manifest location.
-func AggregatedManifestPath(workloadRoot string) string {
+// aggregatedManifestPath is the workload's aggregated manifest location.
+func aggregatedManifestPath(workloadRoot string) string {
 	return filepath.Join(workloadRoot, filepath.FromSlash(AggregatedManifestFile))
 }
 
@@ -253,7 +243,7 @@ func AggregatedManifestPath(workloadRoot string) string {
 // artifact from a prior build cannot mislead deployers. Best-effort: a missing
 // file is not an error.
 func RemoveAggregatedManifest(workloadRoot string) []diag.Diagnostic {
-	if err := removeAggregatedManifest(AggregatedManifestPath(workloadRoot)); err != nil {
+	if err := removeAggregatedManifest(aggregatedManifestPath(workloadRoot)); err != nil {
 		return []diag.Diagnostic{diag.Errorf(infra.ErrorCodeParseError, "", "%v", err)}
 	}
 	return nil
@@ -423,7 +413,7 @@ func sourceRuntime(workloadRoot string, opts Options) (*infra.Runtime, []diag.Di
 // and no block. Scaling-range validation happens later via
 // ValidateAggregatedManifest on the assembled artifact.
 func resolveRuntime(workloadRoot string, opts Options) (*infra.Runtime, bool, []diag.Diagnostic) {
-	developerPath := filepath.Join(workloadRoot, infra.PerProjectManifestDir, RuntimeManifestFilename)
+	developerPath := filepath.Join(workloadRoot, infra.PerProjectManifestDir, runtimeManifestFilename)
 	if _, err := os.Stat(developerPath); err == nil {
 		rt, diags := readRuntimeFile(developerPath)
 		applyRuntimeCompatibility(rt, opts)
@@ -484,7 +474,7 @@ func writeRuntimeDefaults(path string, rt *infra.Runtime) error {
 	if err != nil {
 		return err
 	}
-	return writeFileAtomic(path, append(data, '\n'))
+	return robustio.WriteFile(path, append(data, '\n'), 0o644, nil)
 }
 
 // applyWorkloadOverrides reads the workload's optional overrides file
@@ -517,23 +507,7 @@ func writeAggregatedManifest(path string, m infra.AggregatedManifest) error {
 	if err != nil {
 		return err
 	}
-	return writeFileAtomic(path, append(data, '\n'))
-}
-
-// writeFileAtomic writes data to path through a temp file and a rename, so a
-// concurrent reader observes either the previous file or the complete new one.
-// The rename goes through robustio because on Windows it fails while a reader
-// holds path open.
-func writeFileAtomic(path string, data []byte) error {
-	tmpPath := path + ".tmp"
-	if err := os.WriteFile(tmpPath, data, 0o644); err != nil {
-		return err
-	}
-	if err := robustio.Rename(tmpPath, path); err != nil {
-		_ = os.Remove(tmpPath)
-		return err
-	}
-	return nil
+	return robustio.WriteFile(path, append(data, '\n'), 0o644, nil)
 }
 
 // projectRoot resolves a project reference to an absolute directory. The

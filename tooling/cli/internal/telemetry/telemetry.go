@@ -26,7 +26,7 @@ import (
 	"sync"
 	"time"
 
-	"go.putnami.dev/tooling/cli/internal/flock"
+	"go.putnami.dev/sdk/extension/filelock"
 )
 
 // configFileName is stored in the user's home config directory.
@@ -192,14 +192,14 @@ func (c *Client) PrepareRun(interactive bool) bool {
 		c.disablePreparedRun()
 		return false
 	}
-	defer consentLock.Release() //nolint:errcheck // telemetry is fail-silent
+	defer consentLock.Release()
 
 	bufferLock, err := acquireBufferLock(c.bufferPath)
 	if err != nil {
 		c.disablePreparedRun()
 		return false
 	}
-	defer bufferLock.Release() //nolint:errcheck // telemetry is fail-silent
+	defer bufferLock.Release()
 
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -285,7 +285,7 @@ func (c *Client) deviceIDAtTimestamp(now time.Time) string {
 	if err != nil {
 		return ""
 	}
-	defer lock.Release() //nolint:errcheck // telemetry is best-effort
+	defer lock.Release()
 	return c.deviceIDWithFreshConsentAt(now)
 }
 
@@ -339,9 +339,8 @@ func (c *Client) track(event Event) {
 	c.events = append(c.events, event)
 }
 
-// Flush appends collected events to the local buffer file. Despite the name
-// (kept for API compatibility), there is no network flush: events are only
-// persisted locally. After appending, the buffer is trimmed to its size bound.
+// Flush appends collected events to the local buffer file and trims it to its
+// size bound; nothing is sent over the network.
 func (c *Client) Flush() error {
 	if !c.CanCollect() {
 		return nil
@@ -350,7 +349,7 @@ func (c *Client) Flush() error {
 	if err != nil {
 		return err
 	}
-	defer lock.Release() //nolint:errcheck // write errors are returned below
+	defer lock.Release()
 	if !c.CanCollect() {
 		c.Discard()
 		return nil
@@ -374,7 +373,7 @@ func (c *Client) Flush() error {
 	enc := json.NewEncoder(f)
 	for _, ev := range events {
 		if err := enc.Encode(ev); err != nil {
-			f.Close() //nolint:errcheck // returning the encode error, which is primary
+			f.Close()
 			return err
 		}
 	}
@@ -425,35 +424,35 @@ func enforceBufferLimit(path string) {
 	_ = os.Rename(tmp, path)
 }
 
-func acquireBufferLock(bufferPath string) (*flock.Lock, error) {
-	return flock.Acquire(filepath.Join(filepath.Dir(bufferPath), bufferLockFileName), true, false)
+func acquireBufferLock(bufferPath string) (*filelock.Lock, error) {
+	return filelock.Acquire(filepath.Join(filepath.Dir(bufferPath), bufferLockFileName), true, false)
 }
 
-func acquireConsentLock(bufferPath string) (*flock.Lock, error) {
-	return flock.Acquire(filepath.Join(filepath.Dir(bufferPath), consentLockFileName), true, false)
+func acquireConsentLock(bufferPath string) (*filelock.Lock, error) {
+	return filelock.Acquire(filepath.Join(filepath.Dir(bufferPath), consentLockFileName), true, false)
 }
 
 // acquireBufferLockContext waits for the shared buffer lock only while ctx is
 // active. Flush and Disable intentionally use the unbounded variant above;
 // background draining must instead stop with its owning CLI run.
-func acquireBufferLockContext(ctx context.Context, bufferPath string) (*flock.Lock, error) {
+func acquireBufferLockContext(ctx context.Context, bufferPath string) (*filelock.Lock, error) {
 	return acquireLockContext(ctx, filepath.Join(filepath.Dir(bufferPath), bufferLockFileName))
 }
 
-func acquireConsentLockContext(ctx context.Context, bufferPath string) (*flock.Lock, error) {
+func acquireConsentLockContext(ctx context.Context, bufferPath string) (*filelock.Lock, error) {
 	return acquireLockContext(ctx, filepath.Join(filepath.Dir(bufferPath), consentLockFileName))
 }
 
-func acquireLockContext(ctx context.Context, lockPath string) (*flock.Lock, error) {
+func acquireLockContext(ctx context.Context, lockPath string) (*filelock.Lock, error) {
 	for {
 		if err := ctx.Err(); err != nil {
 			return nil, err
 		}
-		lock, err := flock.Acquire(lockPath, true, true)
+		lock, err := filelock.Acquire(lockPath, true, true)
 		if err == nil {
 			return lock, nil
 		}
-		if !errors.Is(err, flock.ErrBusy) {
+		if !errors.Is(err, filelock.ErrBusy) {
 			return nil, err
 		}
 		timer := time.NewTimer(10 * time.Millisecond)
@@ -494,13 +493,13 @@ func Disable() error {
 	if err != nil {
 		return fmt.Errorf("lock telemetry consent: %w", err)
 	}
-	defer consentLock.Release() //nolint:errcheck // disable errors are reported below
+	defer consentLock.Release()
 
 	lock, err := acquireBufferLock(bufferPath)
 	if err != nil {
 		return fmt.Errorf("lock telemetry buffer: %w", err)
 	}
-	defer lock.Release() //nolint:errcheck // disable errors are reported below
+	defer lock.Release()
 
 	configPath := filepath.Join(homeDir, configFileName)
 	cfg := readConfig(configPath)

@@ -63,7 +63,7 @@ func (reader *CutReader) ReadFile(root, relative string) ([]byte, error) {
 	if kind != gitcandidate.File {
 		return nil, newReaderError(ReaderErrorUnsupportedFile, nil)
 	}
-	file, err := os.Open(filepath.Join(reader.root, filepath.FromSlash(target))) //nolint:gosec // a candidate path inside the root
+	file, err := os.Open(filepath.Join(reader.root, filepath.FromSlash(target)))
 	if err != nil {
 		return nil, err
 	}

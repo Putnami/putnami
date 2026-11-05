@@ -156,7 +156,6 @@ func (r *RemoteCache) RestoreTaskResult(
 	restore, err := sess.Restore(ctx, &cache.RestoreParams{Key: store.RemoteTaskEntryKey(hash), ResultOnly: true})
 	r.recordLookup(restoreFailure(restore, err))
 	if err != nil {
-		//nolint:gosec // G706 false positive: dynamic values are structured slog attributes, not a format string.
 		slog.Warn("remote cache: provider restore failed; building locally",
 			"project", job.Project.Name, "job", job.JobDef.Name, "error", err)
 		return nil, jobmodel.ReuseNone
@@ -177,7 +176,6 @@ func (r *RemoteCache) RestoreTaskResult(
 		Manifest: restore.Manifest,
 	})
 	if err != nil {
-		//nolint:gosec // G706 false positive: dynamic values are structured slog attributes, not a format string.
 		slog.Debug("remote cache: result-only hit is not interpretable; building locally",
 			"project", job.Project.Name, "job", job.JobDef.Name, "error", err)
 		return nil, jobmodel.ReuseNone

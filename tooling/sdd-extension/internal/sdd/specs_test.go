@@ -45,9 +45,9 @@ func TestSpecsValidateFailsOnlyOnBrokenContract(t *testing.T) {
 	if !errors.Is(err, protocolcli.ErrInvalidConfig) {
 		t.Fatalf("specs validate error = %v, want ErrInvalidConfig", err)
 	}
-	report, ok := ResultData(err).(SpecValidationReport)
+	report, ok := protocolcli.ResultData(err).(SpecValidationReport)
 	if !ok {
-		t.Fatalf("failure data = %T, want SpecValidationReport", ResultData(err))
+		t.Fatalf("failure data = %T, want SpecValidationReport", protocolcli.ResultData(err))
 	}
 	if report.Valid || report.Counts.Errors == 0 {
 		t.Fatalf("failure report = %+v", report)
@@ -105,9 +105,9 @@ func TestSpecsValidateNamesAnEntryByItsFilePosition(t *testing.T) {
 	if !errors.Is(err, protocolcli.ErrInvalidConfig) {
 		t.Fatalf("specs validate error = %v, want ErrInvalidConfig", err)
 	}
-	report, ok := ResultData(err).(SpecValidationReport)
+	report, ok := protocolcli.ResultData(err).(SpecValidationReport)
 	if !ok {
-		t.Fatalf("failure data = %T, want SpecValidationReport", ResultData(err))
+		t.Fatalf("failure data = %T, want SpecValidationReport", protocolcli.ResultData(err))
 	}
 	for _, finding := range report.Diagnostics {
 		if finding.Code != featureproto.ErrorCodeInvalidRequirement {

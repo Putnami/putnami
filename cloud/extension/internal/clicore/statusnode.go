@@ -6,6 +6,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	protocolcli "go.putnami.dev/protocol/cli"
 )
 
 // The status contract. Every `putnami cloud <entry> status` command
@@ -404,5 +406,5 @@ func writeStatusDocument(params map[string]any, ioctx IO, title string, state St
 	if detail != "" {
 		message += ": " + detail
 	}
-	return WithResultData(NewError(message, ExitFailure), data)
+	return protocolcli.WithResultData(NewError(message, ExitFailure), data)
 }

@@ -72,9 +72,9 @@ func TestFeaturesDiffCarriesSafeTypedRevisionAndStructuralFailures(t *testing.T)
 	if !errors.Is(err, protocolcli.ErrUsage) {
 		t.Fatalf("unsafe ref result = %v", err)
 	}
-	revisionFailure, ok := ResultData(err).(FeatureDiffReport)
+	revisionFailure, ok := protocolcli.ResultData(err).(FeatureDiffReport)
 	if !ok || len(revisionFailure.BaseDiagnostics) != 1 || revisionFailure.BaseDiagnostics[0].Field != "baseRevision" {
-		t.Fatalf("revision failure = %#v", ResultData(err))
+		t.Fatalf("revision failure = %#v", protocolcli.ResultData(err))
 	}
 	encoded, marshalErr := json.Marshal(revisionFailure)
 	if marshalErr != nil {
@@ -91,9 +91,9 @@ func TestFeaturesDiffCarriesSafeTypedRevisionAndStructuralFailures(t *testing.T)
 	if !errors.Is(err, protocolcli.ErrInvalidConfig) {
 		t.Fatalf("structural failure = %v", err)
 	}
-	structuralFailure, ok := ResultData(err).(FeatureDiffReport)
+	structuralFailure, ok := protocolcli.ResultData(err).(FeatureDiffReport)
 	if !ok || len(structuralFailure.HeadDiagnostics) == 0 {
-		t.Fatalf("structural failure data = %#v", ResultData(err))
+		t.Fatalf("structural failure data = %#v", protocolcli.ResultData(err))
 	}
 	if structuralFailure.Compatibility != featureengine.SnapshotCompatibility {
 		t.Fatalf("failure compatibility = %q", structuralFailure.Compatibility)
@@ -140,9 +140,9 @@ func TestFeaturesValidateCarriesTypedFailureData(t *testing.T) {
 	if !errors.Is(err, protocolcli.ErrInvalidConfig) {
 		t.Fatalf("features validate error = %v, want ErrInvalidConfig", err)
 	}
-	report, ok := ResultData(err).(FeatureValidationReport)
+	report, ok := protocolcli.ResultData(err).(FeatureValidationReport)
 	if !ok {
-		t.Fatalf("failure data = %T, want FeatureValidationReport", ResultData(err))
+		t.Fatalf("failure data = %T, want FeatureValidationReport", protocolcli.ResultData(err))
 	}
 	if report.Valid || report.Counts.Errors == 0 || len(report.Diagnostics) == 0 {
 		t.Fatalf("failure report = %+v", report)
@@ -192,9 +192,9 @@ func TestFeaturesValidateNamesAnEntryByItsFilePosition(t *testing.T) {
 	if !errors.Is(err, protocolcli.ErrInvalidConfig) {
 		t.Fatalf("features validate error = %v, want ErrInvalidConfig", err)
 	}
-	report, ok := ResultData(err).(FeatureValidationReport)
+	report, ok := protocolcli.ResultData(err).(FeatureValidationReport)
 	if !ok {
-		t.Fatalf("failure data = %T, want FeatureValidationReport", ResultData(err))
+		t.Fatalf("failure data = %T, want FeatureValidationReport", protocolcli.ResultData(err))
 	}
 	byField := make(map[string]string)
 	for _, finding := range report.Diagnostics {
@@ -278,9 +278,9 @@ func TestFeaturesInspectUsesExactIDsAndReportsAmbiguousLeafCandidates(t *testing
 	if !errors.Is(err, protocolcli.ErrUsage) {
 		t.Fatalf("ambiguous inspection error = %v, want ErrUsage", err)
 	}
-	failure, ok := ResultData(err).(FeatureInspectionReport)
+	failure, ok := protocolcli.ResultData(err).(FeatureInspectionReport)
 	if !ok {
-		t.Fatalf("ambiguous failure data = %T", ResultData(err))
+		t.Fatalf("ambiguous failure data = %T", protocolcli.ResultData(err))
 	}
 	wantCandidates := []string{"billing/checkout", "orders/checkout"}
 	if strings.Join(failure.Candidates, ",") != strings.Join(wantCandidates, ",") || failure.CandidateCount != 2 {
@@ -311,9 +311,9 @@ func TestFeaturesInspectReportsNativeLeafAmbiguityWithoutLegacyFallback(t *testi
 	if len(report.Diagnostics) != 1 || !strings.Contains(report.Diagnostics[0].Message, "ambiguous") {
 		t.Fatalf("native ambiguity diagnostics = %+v", report.Diagnostics)
 	}
-	failure, ok := ResultData(err).(FeatureInspectionReport)
+	failure, ok := protocolcli.ResultData(err).(FeatureInspectionReport)
 	if !ok || strings.Join(failure.Candidates, ",") != "admin/manage,tasks/manage" {
-		t.Fatalf("native ambiguity result data = %#v", ResultData(err))
+		t.Fatalf("native ambiguity result data = %#v", protocolcli.ResultData(err))
 	}
 }
 
@@ -1089,9 +1089,9 @@ func TestFeaturesInspectRejectsUnboundedSelectorWithoutEchoingIt(t *testing.T) {
 	if !errors.Is(err, protocolcli.ErrUsage) {
 		t.Fatalf("features inspect error = %v, want ErrUsage", err)
 	}
-	report, ok := ResultData(err).(FeatureInspectionReport)
+	report, ok := protocolcli.ResultData(err).(FeatureInspectionReport)
 	if !ok {
-		t.Fatalf("failure data = %T, want FeatureInspectionReport", ResultData(err))
+		t.Fatalf("failure data = %T, want FeatureInspectionReport", protocolcli.ResultData(err))
 	}
 	encoded, marshalErr := json.Marshal(report)
 	if marshalErr != nil {

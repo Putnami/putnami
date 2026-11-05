@@ -18,9 +18,9 @@ import (
 // object with nothing but the sentinel source. `version` and `integrities` are
 // absent by construction — a workspace that builds its own engine pins no
 // published artifact, and recording an empty version would claim one. The
-// `toolchains` member is omitempty, so an empty one is not rendered at v3.
+// `toolchains` member is omitempty, so an empty one is not rendered at v4.
 const sentinelLock = `{
-  "version": 3,
+  "version": 4,
   "cli": {
     "source": "workspace"
   },
@@ -73,8 +73,8 @@ func TestWorkspaceSourceSentinelRoundTripsByteForByte(t *testing.T) {
 	if !ok || !entry.IsWorkspaceSource() {
 		t.Fatalf("GetCLI() = %+v, %v; want the source-workspace sentinel", entry, ok)
 	}
-	if lf.Version != FormatVersionV3 {
-		t.Errorf("the sentinel must not promote the format: version = %d, want %d", lf.Version, FormatVersionV3)
+	if lf.Version != FormatVersionV4 {
+		t.Errorf("the sentinel must not promote the format: version = %d, want %d", lf.Version, FormatVersionV4)
 	}
 
 	data, err := MarshalLockFile(lf)

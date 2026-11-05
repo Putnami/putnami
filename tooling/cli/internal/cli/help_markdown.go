@@ -2,18 +2,11 @@ package cli
 
 import (
 	"io"
-	"os"
 	"strings"
 
 	"go.putnami.dev/tooling/cli/internal/commandmeta"
 	"go.putnami.dev/tooling/cli/internal/iox"
 )
-
-// PrintHelpMarkdown prints the full help as Markdown, with no extension
-// loaded.
-func PrintHelpMarkdown() {
-	printHelpMarkdown(os.Stdout, nil)
-}
 
 // printHelpMarkdown writes the full help of scope to w as Markdown: the job
 // commands and aliases the loaded extensions declare, every core command, and

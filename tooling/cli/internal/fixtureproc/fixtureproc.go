@@ -120,7 +120,7 @@ const waitForBound = 3 * time.Minute
 
 // holdOutputEnv names, in the environment of the copy a program starts for
 // Program.HoldOutput, the file that releases the copy.
-const holdOutputEnv = "PUTNAMI_FIXTUREPROC_HOLD_OUTPUT"
+const holdOutputEnv = "FIXTUREPROC_HOLD_OUTPUT"
 
 // The copy a program starts for Program.HoldOutput writes two files beside
 // the release file: its process ID when it starts, and one line with its exit
@@ -128,8 +128,7 @@ const holdOutputEnv = "PUTNAMI_FIXTUREPROC_HOLD_OUTPUT"
 // and names both when the copy fails. Neither side ever removes or renames a
 // file the other may hold open: Windows refuses to delete a file another
 // handle holds open without delete sharing, and os.WriteFile opens files that
-// way, so the copy that used to remove the release file lost that race to
-// Release's own write and exited with no trace.
+// way.
 const (
 	holderStartedSuffix = ".holder-pid"
 	holderExitSuffix    = ".holder-exit"
@@ -137,7 +136,7 @@ const (
 
 // warmEnv, set in a program's environment, makes it exit 0 before it does
 // anything else (Warm).
-const warmEnv = "PUTNAMI_FIXTUREPROC_WARM"
+const warmEnv = "FIXTUREPROC_WARM"
 
 // Write places the helper program at path, with ".exe" appended on Windows,
 // as a program that does p, warms it (Warm), and returns the program's path.

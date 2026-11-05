@@ -9,13 +9,6 @@ import (
 	"go.putnami.dev/tooling/cli/internal/env"
 )
 
-// buildPlanSnapshot and buildSessionStats used to live here: the CLI shell's
-// names for the two v1 session-file projections, kept beside the frozen wire
-// golden that asserted the persisted plan.json and session.json bytes through
-// them. B1b deleted both with the v1 session writer — a recorded
-// session is the versioned cli.SessionFile now, projected by internal/machine
-// from the same canonical reduction every other machine surface reads.
-
 // resolveProfile resolves the deployment profile onto g.EnvProfile with
 // precedence --profile flag > PUTNAMI_PROFILE env > workspace config > dev, and
 // validates the result against the frozen protocols/doctor enum. It returns a

@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 	"time"
 
@@ -309,78 +308,6 @@ func TestTaskStats_LearnedWeightChangeDoesNotRatchetHistoricalDemand(t *testing.
 	scheduler.acquireGroupCPUBudget([]taskWork{{job: job}})
 	if job.CPUBudget != 1 {
 		t.Fatalf("budget after learned weight 4 -> 1 = %d, want unweighted demand 1", job.CPUBudget)
-	}
-}
-
-func TestTaskStats_LoadMigratesV1WithoutAmbiguousWeightedFloor(t *testing.T) {
-	t.Parallel()
-	root := t.TempDir()
-	path := taskStatsPath(root)
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	legacy := `{"version":1,"tasks":{"/cli|lint":{"cpuMs":1000,"wallMs":1000,"maxConcurrency":4,"samples":2}}}`
-	if err := os.WriteFile(path, []byte(legacy), 0o644); err != nil {
-		t.Fatal(err)
-	}
-
-	store := loadTaskStats(root)
-	stat := store.entries["/cli|lint"]
-	if stat == nil || stat.CPUMs != 1_000 || stat.WallMs != 1_000 || stat.Samples != 2 {
-		t.Fatalf("migrated stat = %+v, want measured history retained", stat)
-	}
-	if stat.MaxUnweightedConcurrency != 0 {
-		t.Fatalf("migrated unweighted ceiling = %d, want ambiguous v1 weighted floor dropped", stat.MaxUnweightedConcurrency)
-	}
-	store.save()
-	data, err := os.ReadFile(path)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if strings.Contains(string(data), "maxConcurrency") {
-		t.Fatalf("migrated stats retain legacy weighted floor: %s", data)
-	}
-	var migrated taskStatsFile
-	if err := json.Unmarshal(data, &migrated); err != nil {
-		t.Fatal(err)
-	}
-	if migrated.Version != taskStatsVersion {
-		t.Fatalf("migrated version = %d, want %d", migrated.Version, taskStatsVersion)
-	}
-}
-
-func TestTaskStats_LoadMigratesV2WithoutInventingResourceContext(t *testing.T) {
-	t.Parallel()
-	root := t.TempDir()
-	path := taskStatsPath(root)
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	v2 := `{"version":2,"tasks":{"/cli|test":{"cpuMs":65000,"wallMs":88000,"maxUnweightedConcurrency":8,"samples":3}}}`
-	if err := os.WriteFile(path, []byte(v2), 0o644); err != nil {
-		t.Fatal(err)
-	}
-
-	store := loadTaskStats(root)
-	stat := store.entries["/cli|test"]
-	if stat == nil || stat.CPUMs != 65000 || stat.WallMs != 88000 ||
-		stat.MaxUnweightedConcurrency != 8 || stat.Samples != 3 {
-		t.Fatalf("migrated v2 stat = %+v, want usable CPU/wall/ceiling evidence", stat)
-	}
-	if len(stat.Observations) != 0 {
-		t.Fatalf("v2 migration fabricated RSS/concurrency observations: %+v", stat.Observations)
-	}
-	store.save()
-	var migrated taskStatsFile
-	data, err := os.ReadFile(path)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := json.Unmarshal(data, &migrated); err != nil {
-		t.Fatal(err)
-	}
-	if migrated.Version != taskStatsVersion {
-		t.Fatalf("migrated version = %d, want %d", migrated.Version, taskStatsVersion)
 	}
 }
 

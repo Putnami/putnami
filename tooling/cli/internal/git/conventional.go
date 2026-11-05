@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	protocolcli "go.putnami.dev/protocol/cli"
+	"go.putnami.dev/sdk/extension/gitread"
 )
 
 // Bump is how far a version advances. The zero value is BumpNone, and the
@@ -47,7 +48,7 @@ type StableTest func(files []string) bool
 
 // CommitStableTest is StableTest asked of a commit: reading its files is a git
 // call, so it can fail.
-type CommitStableTest func(commit Commit) (bool, error)
+type CommitStableTest func(commit gitread.Commit) (bool, error)
 
 // LineStableTest asks line.Stable of each commit, reading the commit's files
 // inside the line's pathspecs. It is nil when line.Stable is, so a workspace
@@ -56,7 +57,7 @@ func LineStableTest(repoRoot string, line LineSpec) CommitStableTest {
 	if line.Stable == nil {
 		return nil
 	}
-	return func(commit Commit) (bool, error) {
+	return func(commit gitread.Commit) (bool, error) {
 		files, err := CommitFiles(repoRoot, commit.SHA, line.Pathspecs)
 		if err != nil {
 			return false, err
@@ -81,7 +82,7 @@ func LineStableTest(repoRoot string, line LineSpec) CommitStableTest {
 // documentation commit does not make a release. A pre-release still floors at a
 // patch, but that floor belongs to NextVersion, not here — a caller on a
 // docs-only range must be able to see BumpNone and say so.
-func BumpFor(commits []Commit, preOne bool, stable CommitStableTest) (Bump, error) {
+func BumpFor(commits []gitread.Commit, preOne bool, stable CommitStableTest) (Bump, error) {
 	ceiling := BumpMajor
 	if preOne {
 		ceiling = BumpMinor

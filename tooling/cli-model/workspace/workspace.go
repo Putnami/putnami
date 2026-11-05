@@ -255,7 +255,7 @@ func (ws *Workspace) MetadataDigestFor(project *Project) string {
 	}
 	ws.digestMu.Unlock()
 
-	view := ProbeViewOf(project, ws.DependencyPathResolver())
+	view := ws.ProbeView(project)
 	// Provenance is read by the graph checks at synchronization and by no
 	// task. In a key it re-keys every dependent for an edit no task reads:
 	// removing the last test-only import of a workspace module flips that edge
@@ -287,22 +287,22 @@ func (ws *Workspace) ProjectByID(id string) *Project {
 // Paths and IDs deliberately have separate lookup semantics because transparent
 // group folders are present only in paths.
 func (ws *Workspace) ProjectByPath(projectPath string) *Project {
-	projectPath = CleanWorkspacePath(projectPath)
+	projectPath = wsproto.CleanWorkspacePath(projectPath)
 	for _, p := range ws.Projects {
-		if CleanWorkspacePath(p.Path) == projectPath {
+		if wsproto.CleanWorkspacePath(p.Path) == projectPath {
 			return p
 		}
 	}
 	return nil
 }
 
-// ProjectsByPattern returns projects matching a path pattern.
+// projectsByPattern returns projects matching a path pattern.
 // Supports:
 //   - "/path/to/project" — exact match by ID
 //   - "/path/to/..." — prefix wildcard (all projects under /path/to/)
 //   - ".../suffix" — suffix wildcard (all projects whose ID ends with /suffix)
 //   - ".../infix/..." — infix wildcard (all projects whose ID contains /infix/)
-func (ws *Workspace) ProjectsByPattern(pattern string) []*Project {
+func (ws *Workspace) projectsByPattern(pattern string) []*Project {
 	hasPrefixWild := strings.HasPrefix(pattern, ".../")
 	hasSuffixWild := strings.HasSuffix(pattern, "/...")
 
@@ -363,7 +363,7 @@ func (ws *Workspace) ProbeResultView() wsproto.ProbeResult {
 		Projects:  make([]wsproto.ProbeProject, 0, len(ws.Projects)),
 	}
 	for _, project := range ws.Projects {
-		result.Projects = append(result.Projects, ProbeViewOf(project, ws.DependencyPathResolver()))
+		result.Projects = append(result.Projects, ws.ProbeView(project))
 	}
 	wsproto.NormalizeProbeResult(&result)
 	return result
@@ -374,17 +374,23 @@ func (ws *Workspace) ProbeResultView() wsproto.ProbeResult {
 // attribute every claim.
 const coreProbeExtension = "core"
 
-// DependencyPathResolver maps a declared dependency name (or ID) to the
+// ProbeView projects a discovered project onto the probe protocol's project
+// shape, keying each dependency on the depended-on project's path.
+func (ws *Workspace) ProbeView(project *Project) wsproto.ProbeProject {
+	return ProbeViewOf(project, ws.dependencyPathResolver())
+}
+
+// dependencyPathResolver maps a declared dependency name (or ID) to the
 // depended-on project's workspace-relative path. Keying dependency edges on
 // PATHS — never on a module path and never assuming a project root is a Go
 // module root — is the accepted contract wording for this slice.
-func (ws *Workspace) DependencyPathResolver() func(string) (string, bool) {
+func (ws *Workspace) dependencyPathResolver() func(string) (string, bool) {
 	return func(dependency string) (string, bool) {
 		if project := ws.ProjectByName(dependency); project != nil {
-			return CleanWorkspacePath(project.Path), true
+			return wsproto.CleanWorkspacePath(project.Path), true
 		}
 		if project := ws.ProjectByID(dependency); project != nil {
-			return CleanWorkspacePath(project.Path), true
+			return wsproto.CleanWorkspacePath(project.Path), true
 		}
 		return "", false
 	}

@@ -7,11 +7,11 @@ import (
 	"os"
 	"sync"
 
+	protocolcli "go.putnami.dev/protocol/cli"
 	registryproto "go.putnami.dev/protocol/registry"
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/tooling/cli/internal/commands/shared"
 	"go.putnami.dev/tooling/cli/internal/iox"
-	"go.putnami.dev/tooling/cli/internal/output"
 	"go.putnami.dev/tooling/cli/internal/runcredential"
 )
 
@@ -90,11 +90,9 @@ type BootstrapOptions struct {
 //   - Inert under --plan/--dry-run (read-only) and when PUTNAMI_NO_AUTO_INSTALL
 //     is set.
 //
-// It deliberately runs the full `putnami install` rather than a narrower step:
-// for the common cases (worktree development, CI) the next command is a
-// build/test that needs the full install anyway, and reusing install means an
-// extension's existing workspace-install provider (e.g. Cloud's) restores its
-// own state with no new protocol.
+// It runs the full `putnami install`, so an extension's existing
+// workspace-install provider (e.g. Cloud's) restores its own state with no new
+// protocol.
 func EnsureWorkspaceBootstrap(ctx context.Context, wsRoot string, cfg *wsproto.Config, opts BootstrapOptions) error {
 	if cfg == nil || wsRoot == "" {
 		return nil
@@ -171,7 +169,7 @@ func EnsureWorkspaceBootstrap(ctx context.Context, wsRoot string, cfg *wsproto.C
 func runBootstrapInstall(ctx context.Context, wsRoot string, cfg *wsproto.Config, opts BootstrapOptions) error {
 	ctx = shared.WithImplicitInstall(ctx)
 	out := io.Writer(os.Stdout)
-	if output.StructuredOutput(opts.Output) {
+	if protocolcli.OutputMode(opts.Output).IsMachineReadable() {
 		out = os.Stderr
 	}
 	// NoCache stays false even when the triggering command typed --no-cache; see

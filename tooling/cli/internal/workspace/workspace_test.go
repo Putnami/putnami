@@ -241,7 +241,7 @@ func TestProject_ID(t *testing.T) {
 
 	// Simulate what discoverProject does.
 	for _, p := range projects {
-		p.ID = ProjectIDFromPath(p.Path)
+		p.ID = wsproto.ProjectIDFromPath(p.Path)
 	}
 
 	tests := []struct {

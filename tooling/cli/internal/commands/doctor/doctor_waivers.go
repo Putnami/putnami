@@ -37,7 +37,6 @@ import (
 	protocolcli "go.putnami.dev/protocol/cli"
 	diag "go.putnami.dev/protocol/diagnostic"
 	doctor "go.putnami.dev/protocol/doctor"
-	"go.putnami.dev/tooling/cli/internal/commands/shared"
 )
 
 // doctorWorkspaceScope is the Finding.Project value stamped on a waiver-hygiene
@@ -260,5 +259,5 @@ func malformedWaiverFileError(fatal []diag.Diagnostic) error {
 // doctorError uses, so a malformed waiver file blocks even when the underlying
 // findings alone would not.
 func waiverMalformedError(report doctor.Report, cause error) error {
-	return shared.WithResultData(protocolcli.Classify(cause, protocolcli.ErrInvalidConfig), report)
+	return protocolcli.WithResultData(protocolcli.Classify(cause, protocolcli.ErrInvalidConfig), report)
 }

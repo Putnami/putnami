@@ -8,8 +8,8 @@ import (
 	"runtime"
 	"strings"
 
+	"go.putnami.dev/sdk/extension/gitread"
 	"go.putnami.dev/sdk/extension/pkgmeta"
-	"go.putnami.dev/tooling/cli/internal/git"
 )
 
 // Install writes putnami's git hook scripts to .git/hooks/. selfBinary is the
@@ -21,7 +21,7 @@ func Install(selfBinary string) {
 		return
 	}
 
-	out, err := exec.Command(git.Executable(), "rev-parse", "--show-toplevel").Output()
+	out, err := exec.Command(gitread.Executable(), "rev-parse", "--show-toplevel").Output()
 	if err != nil {
 		return // not a git repo
 	}
@@ -73,7 +73,7 @@ func hookTarget(gitRoot, selfBinary, goos string) string {
 
 func writeHook(dir, name, content string) {
 	path := filepath.Join(dir, name)
-	if err := os.WriteFile(path, []byte(content), 0o755); err != nil { //nolint:gosec // hook scripts are intentionally executable
+	if err := os.WriteFile(path, []byte(content), 0o755); err != nil {
 		fmt.Fprintf(os.Stderr, "Warning: failed to write hook %s: %v\n", name, err)
 	}
 }

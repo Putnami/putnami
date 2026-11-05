@@ -10,15 +10,12 @@ import (
 
 // The label vocabulary every human renderer in this package shares.
 //
-// Ported verbatim from `tooling/cli/internal/commands/sdd/features.go` — the
-// rendering half the engine move deliberately left behind. These are pure
-// projections of a value onto one line of text: they read nothing, decide
-// nothing, and are the reason a revision or a source selector reads the same in
-// `features inspect` and in `specs list`.
+// These are pure projections of a value onto one line of text: they read
+// nothing, decide nothing, and make a revision or a source selector read the
+// same in `features inspect` and in `specs list`.
 //
-// They live in the COMMAND layer rather than beside the engine because the
-// engine's answer is a value, and how a value is spelled for a person is not
-// part of that answer.
+// They live in the COMMAND layer, not beside the engine: the engine's answer is
+// a value, and how a value is spelled for a person is not part of that answer.
 
 // featureRevisionLabel names the revision an answer was derived from: the
 // worktree with its HEAD when git could resolve one, an exact commit for a

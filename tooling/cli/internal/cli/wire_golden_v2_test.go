@@ -19,22 +19,15 @@ import (
 	"go.putnami.dev/tooling/cli/internal/workspace_state"
 )
 
-// The v2 wire goldens: the ONLY machine documents the CLI emits since an
-// earlier change deleted the v1 emitters.
+// The v2 wire goldens: the ONLY machine documents the CLI emits.
 //
-// They were captured by B0g beside the v1 corpus, generated from the same two
-// fixtures through the same production emission paths, differing only in whether
-// the (now retired) PUTNAMI_MACHINE_OUTPUT opt-in was set. Both halves of that
-// proof have since become unconditional: B1a made v2 the default, and B1b
-// removed the alternative, so these goldens are driven through the SELECTION
-// POINT (output.NewRenderer, not the concrete renderer) and each document is
-// validated against the contract's own validator (protocolcli.ValidateDocument)
-// BEFORE normalization — a golden can never pin a document the contract would
-// reject.
+// They are driven through the SELECTION POINT (output.NewRenderer, not the
+// concrete renderer), and each document is validated against the contract's
+// own validator (protocolcli.ValidateDocument) BEFORE normalization — a golden
+// can never pin a document the contract would reject.
 //
-// The ".v2" segment in the file names is historical: it distinguished a golden
-// from its v1 sibling, and the names are kept so the corpus stays greppable
-// against the slices that produced it.
+// The ".v2" segment in the file names names the machine contract version each
+// golden pins.
 //
 // # Normalization
 //
@@ -80,37 +73,26 @@ var (
 // ---------------------------------------------------------------------------
 
 // TestWireGoldenV2_IsTheOnlyContract drives the SELECTION POINT
-// (output.NewRenderer) with the retired variable in every state that used to
-// mean something, and asserts the same v2 bytes each time. It replaces B0g's
-// opt-in gate, whose second half compared against the v1 goldens B1b
-// deleted.
-//
-// The value table is the retired opt-out's, deliberately: a rollback lever that
-// quietly came back — or a residual branch that fired on one spelling — would
-// produce a versionless document for exactly these inputs and nothing else.
+// (output.NewRenderer) for both machine formats and asserts the v2 bytes.
 func TestWireGoldenV2_IsTheOnlyContract(t *testing.T) {
 	spectest.Proves(t, "cli/machine-contract", "the-cli-emits-conforming-documents", "version-2-is-the-only-contract-the-cli-writes")
 	for _, format := range []string{"json", "jsonl"} {
-		for _, value := range []string{"", "v1", "V1 ", "v2", "latest"} {
-			t.Run(format+"/"+machine.RetiredSelectionEnv+"="+value, func(t *testing.T) {
-				t.Setenv(machine.RetiredSelectionEnv, value)
-				run := loadWireRun(t, "mixed")
-				got := renderWireRun(t, run, format)
-				if !bytes.Contains(got, []byte(`"protocolVersion"`)) {
-					t.Fatalf("%s=%q produced a document with no protocolVersion — a document WITHOUT it is version 1:\n%s",
-						machine.RetiredSelectionEnv, value, got)
-				}
-				var normalized []byte
-				if format == "json" {
-					assertValidV2Document(t, protocolcli.DocumentResultEnvelope, got)
-					normalized = normalizeMachineV2JSON(t, got)
-				} else {
-					assertValidV2Stream(t, got)
-					normalized = normalizeMachineV2JSONL(t, got)
-				}
-				assertWireGoldenV2(t, v2GoldenName("mixed.output."+format), normalized)
-			})
-		}
+		t.Run(format, func(t *testing.T) {
+			run := loadWireRun(t, "mixed")
+			got := renderWireRun(t, run, format)
+			if !bytes.Contains(got, []byte(`"protocolVersion"`)) {
+				t.Fatalf("%s produced a document with no protocolVersion:\n%s", format, got)
+			}
+			var normalized []byte
+			if format == "json" {
+				assertValidV2Document(t, protocolcli.DocumentResultEnvelope, got)
+				normalized = normalizeMachineV2JSON(t, got)
+			} else {
+				assertValidV2Stream(t, got)
+				normalized = normalizeMachineV2JSONL(t, got)
+			}
+			assertWireGoldenV2(t, v2GoldenName("mixed.output."+format), normalized)
+		})
 	}
 }
 
@@ -157,8 +139,7 @@ func TestWireGoldenV2_OutputJSONL(t *testing.T) {
 // through the real workspace_state writer — the only session writer left.
 // events.jsonl is written incrementally through renderer callbacks rather than
 // by FinalizeV2; each JSONL golden above validates its live bytes against that
-// real artifact. Historical v1 session-event goldens remain reader compatibility
-// fixtures.
+// real artifact.
 func TestWireGoldenV2_SessionFiles(t *testing.T) {
 	spectest.Proves(t, "cli/machine-contract", "the-cli-emits-conforming-documents", "the-cli-machine-surfaces-validate-and-match-their-goldens")
 	t.Parallel()

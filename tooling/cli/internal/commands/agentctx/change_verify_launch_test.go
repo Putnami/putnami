@@ -12,7 +12,7 @@ import (
 	"testing"
 
 	wire "go.putnami.dev/protocol/extension/hostrpc"
-	gitexec "go.putnami.dev/tooling/cli/internal/git"
+	"go.putnami.dev/sdk/extension/gitread"
 )
 
 // The build skill runs `putnami change verify`, which the installed
@@ -47,7 +47,7 @@ func TestChangeVerifyThroughPutnamiRunsTheContributorExecutable(t *testing.T) {
 	env := append(os.Environ(), "PATH="+harness+string(os.PathListSeparator)+os.Getenv("PATH"))
 	git := func(args ...string) {
 		t.Helper()
-		cmd := exec.Command(gitexec.Executable(), args...)
+		cmd := exec.Command(gitread.Executable(), args...)
 		cmd.Dir = root
 		cmd.Env = env
 		if out, err := cmd.CombinedOutput(); err != nil {
