@@ -128,3 +128,35 @@ func TestANativeWorkspaceKeepsItsOutput(t *testing.T) {
 		t.Fatalf("source = %s", source)
 	}
 }
+
+func TestSpecsInspectKeepsTheReasonAnExternalSpecWasNotRead(t *testing.T) {
+	ws := openSpecWorkspace(t)
+	ws.Projects[0].Config.Options["sdd"]["specFormats"] = []any{"speckit"}
+	report, err := BuildSpecContextResult(ws, "billing/invoicing")
+	if err == nil {
+		t.Fatal("specs inspect passed over an external spec it did not read")
+	}
+	finding, found := findDiagnostic(report.Diagnostics, "features.spec_format_not_enabled")
+	if !found || finding.Field != "app/putnami.features.json#features[0].spec.format" {
+		t.Fatalf("diagnostics = %+v, want the opt-in error on the manifest entry", report.Diagnostics)
+	}
+	for _, finding := range report.Diagnostics {
+		if strings.Contains(finding.Message, "specs init") {
+			t.Fatalf("inspect suggests specs init for a feature that names an external spec: %+v", finding)
+		}
+	}
+}
+
+func TestSpecsInspectKeepsTheReaderErrorOfAnUnreadSpec(t *testing.T) {
+	ws := openSpecWorkspace(t)
+	writeFixtureFile(t, filepath.Join(ws.Root, "app", "openspec", "specs", "invoice-export", "spec.md"), "## Requirements\n")
+	report, err := BuildSpecContextResult(ws, "billing/invoicing")
+	if err == nil || len(report.Diagnostics) == 0 {
+		t.Fatalf("specs inspect: %v, %+v, want the reader error", err, report.Diagnostics)
+	}
+	for _, finding := range report.Diagnostics {
+		if !strings.HasPrefix(finding.Field, "app/openspec/specs/invoice-export") {
+			t.Fatalf("finding %+v does not name the spec", finding)
+		}
+	}
+}

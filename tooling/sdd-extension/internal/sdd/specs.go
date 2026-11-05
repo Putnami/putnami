@@ -343,6 +343,34 @@ func (repository *specRepository) scopedDiagnostics(discovered featureengine.Dis
 	return scoped
 }
 
+// externalReference returns the manifest field of one feature's spec
+// reference, such as "app/putnami.features.json#features[0].spec", and the
+// reference path. Both are empty when the feature names no external spec.
+func (repository *specRepository) externalReference(id string) (field, specPath string) {
+	for _, source := range repository.manifests {
+		for index, feature := range source.Manifest.Features {
+			if feature.ID == id && feature.Spec != nil {
+				return fmt.Sprintf("%s#features[%d].spec", source.Path, index), feature.Spec.Path
+			}
+		}
+	}
+	return "", ""
+}
+
+// diagnosticsUnder returns the findings on a manifest reference field and its
+// members, and the findings on the spec path and the files below it.
+func (repository *specRepository) diagnosticsUnder(field, specPath string) []diag.Diagnostic {
+	scoped := make([]diag.Diagnostic, 0)
+	for _, finding := range repository.diagnostics {
+		artifact, _, _ := strings.Cut(finding.Field, "#")
+		if finding.Field == field || strings.HasPrefix(finding.Field, field+".") ||
+			artifact == specPath || strings.HasPrefix(artifact, specPath+"/") {
+			scoped = append(scoped, finding)
+		}
+	}
+	return scoped
+}
+
 // specSource names where a spec's prose lives: native, or its format.
 func specSource(discovered featureengine.DiscoveredSpec) string {
 	if discovered.Format == "" {
@@ -446,6 +474,14 @@ func BuildSpecContextResult(ws *workspace.Workspace, selector string) (SpecConte
 	}
 
 	discovered, found := repository.byFeature[selector]
+	if field, specPath := repository.externalReference(selector); !found && field != "" {
+		// The feature names an external spec that discovery could not read: the
+		// reason sits on the manifest entry or on the file, and specs init would
+		// only add a second spec for the feature.
+		report.Diagnostics = featureDiagnostics(repository.diagnosticsUnder(field, specPath))
+		return report, WithResultData(
+			protocolcli.NotFoundf("feature %q names an external spec that was not read", selector), report)
+	}
 	if !found {
 		report.Diagnostics = append(report.Diagnostics, diag.Warningf(SpecCodeMissingSpec, "feature",
 			"feature %q has no durable spec; create one with `putnami specs init %s`", selector, selector))
