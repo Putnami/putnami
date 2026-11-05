@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"go.putnami.dev/tooling/cli/internal/flock"
+	"go.putnami.dev/sdk/extension/filelock"
 	"go.putnami.dev/tooling/cli/internal/store"
 )
 
@@ -43,7 +43,7 @@ import (
 // shutdown asks it to stop, so shutdown waits for one directory at most. The
 // next run's sweep takes the rest. A deletion cut short by a killed process can
 // leave a directory without its owner.lock and with a fresh mtime. Once the grace
-// has passed, the next sweep recreates owner.lock (flock.Acquire creates the
+// has passed, the next sweep recreates owner.lock (filelock.Acquire creates the
 // file), takes the lock, and deletes what is left.
 //
 // Exported blobs stay until shutdown. An UploadResult only means the provider
@@ -73,12 +73,12 @@ func exchangeSweepGrace() time.Duration {
 // it before returning. A directory whose lock cannot be taken is deleted and
 // reported as an error: a session never runs with a directory a sweep could
 // take for dead.
-func newExchangeDir(parent string) (string, *flock.Lock, error) {
+func newExchangeDir(parent string) (string, *filelock.Lock, error) {
 	dir, err := os.MkdirTemp(parent, exchangeDirPrefix)
 	if err != nil {
 		return "", nil, err
 	}
-	owner, err := flock.Acquire(filepath.Join(dir, exchangeOwnerLockName), true, true)
+	owner, err := filelock.Acquire(filepath.Join(dir, exchangeOwnerLockName), true, true)
 	if err != nil {
 		_ = os.RemoveAll(dir)
 		return "", nil, fmt.Errorf("lock %s: %w", dir, err)
@@ -91,12 +91,12 @@ func newExchangeDir(parent string) (string, *flock.Lock, error) {
 // outlives its owner's hold; the lock file goes after the release, because
 // Windows before version 1809 cannot remove a directory that holds an open
 // file. It is safe to call twice and on a nil lock.
-func removeExchangeDir(dir string, owner *flock.Lock) {
+func removeExchangeDir(dir string, owner *filelock.Lock) {
 	if dir == "" {
 		_ = owner.Release()
 		return
 	}
-	_ = flock.RemoveDir(dir, exchangeOwnerLockName, owner.Release)
+	_ = filelock.RemoveDir(dir, exchangeOwnerLockName, owner.Release)
 }
 
 // sweepStaleExchangeDirs deletes the exchange directories under parent that
@@ -133,9 +133,9 @@ func sweepStaleExchangeDirs(parent string, now time.Time, grace time.Duration, s
 // holds that lock until everything but the lock file is gone. A busy lock is a
 // live owner; any other error leaves the directory alone.
 func removeDeadExchangeDir(dir string) bool {
-	owner, err := flock.Acquire(filepath.Join(dir, exchangeOwnerLockName), true, true)
+	owner, err := filelock.Acquire(filepath.Join(dir, exchangeOwnerLockName), true, true)
 	if err != nil {
 		return false
 	}
-	return flock.RemoveDir(dir, exchangeOwnerLockName, owner.Release) == nil
+	return filelock.RemoveDir(dir, exchangeOwnerLockName, owner.Release) == nil
 }

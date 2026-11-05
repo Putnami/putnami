@@ -14,6 +14,7 @@ import (
 	distribution "go.putnami.dev/protocol/distribution"
 	"go.putnami.dev/protocol/features/spectest"
 	wsproto "go.putnami.dev/protocol/workspace"
+	"go.putnami.dev/sdk/extension/gitread"
 	"go.putnami.dev/sdk/extension/releaseset"
 	putnamigit "go.putnami.dev/tooling/cli/internal/git"
 )
@@ -200,7 +201,7 @@ func TestReleaseSetProvenanceReadsTheHeadTree(t *testing.T) {
 	root := t.TempDir()
 	git := func(args ...string) string {
 		t.Helper()
-		cmd := exec.Command(putnamigit.Executable(), append([]string{"-c", "user.name=test", "-c", "user.email=test@example.invalid", "-c", "commit.gpgsign=false"}, args...)...)
+		cmd := exec.Command(gitread.Executable(), append([]string{"-c", "user.name=test", "-c", "user.email=test@example.invalid", "-c", "commit.gpgsign=false"}, args...)...)
 		cmd.Dir = root
 		out, err := cmd.CombinedOutput()
 		if err != nil {

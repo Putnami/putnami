@@ -35,9 +35,9 @@ func TestNormalizeWorkspaceExtensionPathRefusesAVolume(t *testing.T) {
 		if windows && tc.onlyWin {
 			want, wantOK = "", false
 		}
-		got, ok := normalizeWorkspaceExtensionPath(tc.ref)
+		got, ok := NormalizeWorkspaceExtensionPath(tc.ref)
 		if got != want || ok != wantOK {
-			t.Errorf("normalizeWorkspaceExtensionPath(%q) = %q, %v; want %q, %v", tc.ref, got, ok, want, wantOK)
+			t.Errorf("NormalizeWorkspaceExtensionPath(%q) = %q, %v; want %q, %v", tc.ref, got, ok, want, wantOK)
 		}
 	}
 }

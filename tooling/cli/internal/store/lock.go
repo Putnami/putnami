@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"time"
 
-	"go.putnami.dev/tooling/cli/internal/flock"
+	"go.putnami.dev/sdk/extension/filelock"
 )
 
 // storeLockFile is the advisory lock file at the store root that serializes
@@ -57,7 +57,7 @@ func (s *LocalStore) acquireLock(exclusive, nonBlocking bool) (func(), bool) {
 	if err := os.MkdirAll(s.root, 0o755); err != nil {
 		return func() {}, !nonBlocking
 	}
-	l, err := flock.Acquire(filepath.Join(s.root, storeLockFile), exclusive, nonBlocking)
+	l, err := filelock.Acquire(filepath.Join(s.root, storeLockFile), exclusive, nonBlocking)
 	if err != nil {
 		return func() {}, !nonBlocking
 	}

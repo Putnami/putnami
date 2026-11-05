@@ -18,6 +18,7 @@ import (
 	"go.putnami.dev/sdk/extension/oci"
 	"go.putnami.dev/sdk/extension/pkgmeta"
 	"go.putnami.dev/sdk/extension/registrycred"
+	"go.putnami.dev/sdk/extension/robustio"
 )
 
 // Config is options.package.image. Sources are project-relative regular files;
@@ -144,7 +145,11 @@ func Package(ctx *pctx.Context, emit *jsonl.Emitter) (string, map[string]any, er
 		ContentHash: fullHash, Digest: digest, Layout: layout,
 		Platform: platform,
 	}
-	if err := writeJSONAtomic(filepath.Join(dockerDir, "manifest.json"), manifest); err != nil {
+	manifestJSON, err := json.MarshalIndent(manifest, "", "  ")
+	if err == nil {
+		err = robustio.WriteFile(filepath.Join(dockerDir, "manifest.json"), append(manifestJSON, '\n'), 0o644, nil)
+	}
+	if err != nil {
 		return "FAILED", nil, fmt.Errorf("writing image manifest: %w", err)
 	}
 	// The channel record goes INSIDE the docker directory this task owns, so it
@@ -345,32 +350,4 @@ func unique(values []string) []string {
 		}
 	}
 	return out
-}
-
-func writeJSONAtomic(filename string, value any) error {
-	if err := os.MkdirAll(filepath.Dir(filename), 0o755); err != nil {
-		return err
-	}
-	data, err := json.MarshalIndent(value, "", "  ")
-	if err != nil {
-		return err
-	}
-	tmp, err := os.CreateTemp(filepath.Dir(filename), ".putnami-image-*.tmp")
-	if err != nil {
-		return err
-	}
-	tmpName := tmp.Name()
-	defer os.Remove(tmpName)
-	if err := tmp.Chmod(0o644); err != nil {
-		tmp.Close()
-		return err
-	}
-	if _, err := tmp.Write(append(data, '\n')); err != nil {
-		tmp.Close()
-		return err
-	}
-	if err := tmp.Close(); err != nil {
-		return err
-	}
-	return os.Rename(tmpName, filename)
 }

@@ -14,7 +14,7 @@ import (
 	"sync"
 	"time"
 
-	"go.putnami.dev/tooling/cli/internal/flock"
+	"go.putnami.dev/sdk/extension/filelock"
 )
 
 const (
@@ -414,7 +414,7 @@ func newLeaseOwner() string {
 
 func acquireLeaseFileLock(path string) (func(), error) {
 	releaseProcess := acquireProcessLeaseLock(path)
-	l, err := flock.Acquire(path, true, false)
+	l, err := filelock.Acquire(path, true, false)
 	if err != nil {
 		releaseProcess()
 		return nil, err

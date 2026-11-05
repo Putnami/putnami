@@ -7,6 +7,8 @@ import (
 	"slices"
 	"sort"
 	"strings"
+
+	"go.putnami.dev/sdk/extension/gitread"
 )
 
 // CandidatePaths lists the current cut: tracked paths plus non-ignored new
@@ -18,7 +20,7 @@ import (
 // a slash path relative to root, matched literally, as a file or a directory.
 func CandidatePaths(root string, prefixes ...string) ([]string, error) {
 	args := append([]string{"ls-files", "-z", "--cached", "--others", "--exclude-standard"}, literalPathspecs(prefixes)...)
-	cmd := exec.Command(Executable(), args...)
+	cmd := exec.Command(gitread.Executable(), args...)
 	cmd.Dir = root
 	data, err := cmd.Output()
 	if err != nil {
@@ -56,14 +58,14 @@ func CandidatePaths(root string, prefixes ...string) ([]string, error) {
 // index can spell a path another way than rel, and that path is listed too.
 // When Git does not manage dir, the error is an *UnmanagedError.
 func TrackedUnder(dir, rel string) ([]string, error) {
-	stdout, stderr, err := runCapture(dir, "ls-files", "-z", "--cached", "--", ":(literal,icase)"+rel)
+	stdout, stderr, err := gitread.RunCapture(dir, "ls-files", "-z", "--cached", "--", ":(literal,icase)"+rel)
 	if err != nil {
-		if unmanaged := Unmanaged(dir); unmanaged != nil {
+		if unmanaged := gitread.Unmanaged(dir); unmanaged != nil {
 			return nil, unmanaged
 		}
 		return nil, fmt.Errorf("git ls-files (in %s): %w: %s", dir, err, strings.TrimSpace(stderr))
 	}
-	paths := splitNUL(stdout)
+	paths := gitread.SplitNUL(stdout)
 	sort.Strings(paths)
 	return slices.Compact(paths), nil
 }
@@ -96,13 +98,13 @@ type IndexModes struct {
 // is refused (ADR 0063). With prefixes, it reads only the entries at or below
 // one of them, as CandidatePaths lists them.
 func ReadIndexModes(root string, prefixes ...string) (IndexModes, error) {
-	output, err := run(root, append([]string{"ls-files", "--stage", "-z"}, literalPathspecs(prefixes)...)...)
+	output, err := gitread.Run(root, append([]string{"ls-files", "--stage", "-z"}, literalPathspecs(prefixes)...)...)
 	if err != nil {
 		return IndexModes{}, fmt.Errorf("read the index modes: %w", err)
 	}
 	index := IndexModes{Modes: map[string]string{}, Unmerged: map[string]bool{}}
-	for _, entry := range splitNUL(output) {
-		mode, _, stage, path, ok := parseStageEntry(entry)
+	for _, entry := range gitread.SplitNUL(output) {
+		mode, _, stage, path, ok := gitread.ParseStageEntry(entry)
 		if !ok {
 			return IndexModes{}, fmt.Errorf("read the index modes: malformed ls-files stage entry")
 		}

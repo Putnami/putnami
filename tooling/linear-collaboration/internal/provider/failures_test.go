@@ -8,6 +8,7 @@ import (
 
 	collab "go.putnami.dev/protocol/collaboration"
 	"go.putnami.dev/protocol/features/spectest"
+	"go.putnami.dev/sdk/extension/collabhelper"
 	"go.putnami.dev/tooling/linear-collaboration/internal/linear"
 )
 
@@ -137,7 +138,7 @@ func TestACredentialNeverReachesAnAnswer(t *testing.T) {
 	const stranger = "lin_api_strangerSTRANGERstrangerSTRANGER"
 	h.fake.inject("PutnamiIssue", statusFault(400, "Key "+fakeKey+" and "+stranger+" refused", "INVALID_INPUT", true))
 	text := h.serve("get", `{"ref":{"source":"linear:acme","id":"ffffffff-0000-4000-8000-000000000001"}}`)
-	if strings.Contains(text, fakeKey) || strings.Contains(text, stranger) || !strings.Contains(text, linear.RedactedMarker) {
+	if strings.Contains(text, fakeKey) || strings.Contains(text, stranger) || !strings.Contains(text, collabhelper.RedactedMarker) {
 		t.Fatalf("the answer carries a key: %s", text)
 	}
 }

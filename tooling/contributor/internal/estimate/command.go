@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"strings"
 
+	protocolcli "go.putnami.dev/protocol/cli"
 	job "go.putnami.dev/protocol/job"
 )
 
@@ -62,7 +63,7 @@ func (c Command) Run(args []string) int {
 		fmt.Fprintf(c.Stderr, "change estimate: %v\n", err)
 		return 1
 	}
-	if launch != nil && StructuredOutput(launch.Params.String("output")) {
+	if launch != nil && protocolcli.OutputMode(launch.Params.String("output")).IsMachineReadable() {
 		data, err := json.Marshal(result)
 		if err != nil {
 			fmt.Fprintf(c.Stderr, "change estimate: %v\n", err)
@@ -125,7 +126,7 @@ func parseOptions(args []string) (options, error) {
 		args = args[1:]
 		name, value, hasValue := strings.Cut(raw, "=")
 		if name != "--issue" && name != "--plan-file" {
-			return opts, fmt.Errorf("unexpected argument %q; use --issue <id> or --plan-file <file>", bounded(raw))
+			return opts, fmt.Errorf("unexpected argument %q; use --issue <id> or --plan-file <file>", Bounded(raw))
 		}
 		if seen[name] {
 			return opts, fmt.Errorf("%s given twice", name)
@@ -156,21 +157,13 @@ func parseOptions(args []string) (options, error) {
 	return opts, nil
 }
 
-func bounded(text string) string {
+// Bounded cuts text to its first 64 bytes, marking the cut with "...", so an
+// error message quotes an argument in bounded space.
+func Bounded(text string) string {
 	if len(text) > 64 {
 		return text[:64] + "..."
 	}
 	return text
-}
-
-// StructuredOutput reports whether the output mode putnami forwards is one
-// the change and epic commands answer with the JSON result.
-func StructuredOutput(mode string) bool {
-	switch mode {
-	case "json", "jsonl", "cloud-logging":
-		return true
-	}
-	return false
 }
 
 // writeText writes the estimate for a reader: the plan, then one line per

@@ -210,7 +210,7 @@ func doctorError(report doctor.Report) error {
 	err := protocolcli.Classify(
 		fmt.Errorf("doctor found %d production-readiness issue(s) that block the %s profile", blocking, report.Profile),
 		protocolcli.ErrInvalidConfig)
-	return shared.WithResultData(err, report)
+	return protocolcli.WithResultData(err, report)
 }
 
 // selectDoctorProjects resolves the projects doctor evaluates. An empty, "*", or

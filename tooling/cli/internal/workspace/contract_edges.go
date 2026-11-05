@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 
 	clientcontract "go.putnami.dev/protocol/clientcontract"
+	wsproto "go.putnami.dev/protocol/workspace"
 )
 
 // The contract edge: a generated client target and the provider whose contract
@@ -117,7 +118,7 @@ func readCommittedContract(root string, project *Project) committedContract {
 // projectRelativePath joins a project-relative slash path onto the project's
 // workspace-relative directory.
 func projectRelativePath(project *Project, name string) string {
-	base := cleanWorkspacePath(project.Path)
+	base := wsproto.CleanWorkspacePath(project.Path)
 	if base == "" {
 		return name
 	}

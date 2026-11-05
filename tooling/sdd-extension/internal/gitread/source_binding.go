@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	protocaps "go.putnami.dev/protocol/capabilities"
+	sdkgit "go.putnami.dev/sdk/extension/gitread"
 	"go.putnami.dev/sdk/extension/sourcebinding"
 )
 
@@ -16,11 +17,9 @@ import (
 // absent. The capabilities protocol owns exclusions, canonical ordering, and
 // hashing.
 //
-// Copied from tooling/cli/internal/git/source_binding.go. The measured variant
-// core also exports is omitted: no SDD engine reads the subprocess count. What
-// one path contributes is not copied: both read it through the SDK's
-// sourcebinding package, which also decides where a regular file's executable
-// bit comes from on a host that does not store one.
+// It reports no subprocess count. What one path contributes comes from the
+// SDK's sourcebinding package, as it does in the CLI, which also decides where
+// a regular file's executable bit comes from on a host that does not store one.
 func ProjectSourceBinding(repoRoot, projectRoot string) (string, error) {
 	return projectSourceBinding(repoRoot, projectRoot, sourcebinding.HostStatsExecBit)
 }
@@ -45,26 +44,26 @@ func projectSourceBinding(repoRoot, projectRoot string, statsExecBit bool) (stri
 	}
 
 	pathspec := ":(literal)" + filepath.ToSlash(projectRel)
-	tracked, err := run(repoRoot, "ls-files", "--stage", "-z", "--", pathspec)
+	tracked, err := sdkgit.Run(repoRoot, "ls-files", "--stage", "-z", "--", pathspec)
 	if err != nil {
 		return "", fmt.Errorf("enumerate tracked project source: %w", err)
 	}
-	untracked, err := run(repoRoot, "ls-files", "--others", "--exclude-standard", "-z", "--", pathspec)
+	untracked, err := sdkgit.Run(repoRoot, "ls-files", "--others", "--exclude-standard", "-z", "--", pathspec)
 	if err != nil {
 		return "", fmt.Errorf("enumerate untracked project source: %w", err)
 	}
 
 	records := make([]protocaps.SourceBindingFile, 0)
 	seen := make(map[string]bool)
-	for _, entry := range splitNUL(tracked) {
-		mode, objectID, stage, repoPath, ok := parseStageEntry(entry)
+	for _, entry := range sdkgit.SplitNUL(tracked) {
+		mode, objectID, stage, repoPath, ok := sdkgit.ParseStageEntry(entry)
 		if !ok {
 			return "", fmt.Errorf("enumerate tracked project source: malformed ls-files stage entry")
 		}
 		if stage != "0" {
 			return "", fmt.Errorf("enumerate tracked project source: unmerged index stage %s for %q", stage, repoPath)
 		}
-		record, exists, recordErr := sourcebinding.Record(run, repoRoot, projectRoot, repoPath, mode, objectID, statsExecBit)
+		record, exists, recordErr := sourcebinding.Record(sdkgit.Run, repoRoot, projectRoot, repoPath, mode, objectID, statsExecBit)
 		if recordErr != nil {
 			return "", recordErr
 		}
@@ -73,8 +72,8 @@ func projectSourceBinding(repoRoot, projectRoot string, statsExecBit bool) (stri
 			seen[record.Path] = true
 		}
 	}
-	for _, repoPath := range splitNUL(untracked) {
-		record, exists, recordErr := sourcebinding.Record(run, repoRoot, projectRoot, repoPath, "", "", statsExecBit)
+	for _, repoPath := range sdkgit.SplitNUL(untracked) {
+		record, exists, recordErr := sourcebinding.Record(sdkgit.Run, repoRoot, projectRoot, repoPath, "", "", statsExecBit)
 		if recordErr != nil {
 			return "", recordErr
 		}
@@ -88,16 +87,4 @@ func projectSourceBinding(repoRoot, projectRoot string, statsExecBit bool) (stri
 		return "", fmt.Errorf("compute project source binding: %w", err)
 	}
 	return binding, nil
-}
-
-func parseStageEntry(entry string) (mode, objectID, stage, repoPath string, ok bool) {
-	metadata, repoPath, found := strings.Cut(entry, "\t")
-	if !found {
-		return "", "", "", "", false
-	}
-	fields := strings.Fields(metadata)
-	if len(fields) != 3 {
-		return "", "", "", "", false
-	}
-	return fields[0], fields[1], fields[2], repoPath, true
 }

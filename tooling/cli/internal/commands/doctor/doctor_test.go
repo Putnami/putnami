@@ -14,7 +14,6 @@ import (
 
 	protocolcli "go.putnami.dev/protocol/cli"
 	doctor "go.putnami.dev/protocol/doctor"
-	"go.putnami.dev/tooling/cli/internal/commands/shared"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
 
@@ -107,8 +106,8 @@ func TestDoctorRun_ProductionBlocks(t *testing.T) {
 		t.Fatalf("exit code = %d, want %d", got, protocolcli.ExitUsage)
 	}
 	// The report must ride along on the error for the failure envelope.
-	if data, ok := shared.ResultData(err).(doctor.Report); !ok || data.Summary.Findings != report.Summary.Findings {
-		t.Fatalf("blocking error does not carry the report as ResultData: %#v", shared.ResultData(err))
+	if data, ok := protocolcli.ResultData(err).(doctor.Report); !ok || data.Summary.Findings != report.Summary.Findings {
+		t.Fatalf("blocking error does not carry the report as ResultData: %#v", protocolcli.ResultData(err))
 	}
 
 	byCode := findingsByCode(report.Findings)
@@ -504,7 +503,7 @@ func TestDoctorJSONLEnvelope(t *testing.T) {
 	// attached as data via ResultData on the classified error.
 	buf.Reset()
 	code, err := protocolcli.WriteResultV2(&buf, protocolcli.OutputJSONL,
-		protocolcli.NewResultV2("doctor", shared.ResultData(failErr), failErr))
+		protocolcli.NewResultV2("doctor", protocolcli.ResultData(failErr), failErr))
 	if err != nil {
 		t.Fatalf("write failure result: %v", err)
 	}

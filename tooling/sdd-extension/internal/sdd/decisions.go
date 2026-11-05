@@ -12,6 +12,7 @@ import (
 	protocolcli "go.putnami.dev/protocol/cli"
 	diag "go.putnami.dev/protocol/diagnostic"
 	featureproto "go.putnami.dev/protocol/features"
+	wsproto "go.putnami.dev/protocol/workspace"
 	workspace "go.putnami.dev/tooling/sdd/extension/internal/wsview"
 )
 
@@ -126,7 +127,7 @@ func decisionScopes(ws *workspace.Workspace) []string {
 		if project == nil {
 			continue
 		}
-		scope := workspace.CleanWorkspacePath(project.Path)
+		scope := wsproto.CleanWorkspacePath(project.Path)
 		if seen[scope] {
 			continue
 		}
@@ -168,7 +169,7 @@ func documentField(document, member string) string {
 }
 
 func unusableDecisions(report DecisionsReport) (DecisionsReport, error) {
-	return report, WithResultData(protocolcli.Classify(
+	return report, protocolcli.WithResultData(protocolcli.Classify(
 		fmt.Errorf("decisions: a committed %s is unusable", featureproto.DecisionsFilename),
 		protocolcli.ErrInvalidConfig), report)
 }
@@ -299,7 +300,7 @@ func BuildDecisionsResult(ws *workspace.Workspace) (DecisionsReport, error) {
 		for _, finding := range report.Findings {
 			violated = append(violated, finding.Decision)
 		}
-		return report, WithResultData(protocolcli.Classify(
+		return report, protocolcli.WithResultData(protocolcli.Classify(
 			fmt.Errorf("decisions: %d violation(s) of settled decisions (%s)",
 				len(report.Findings), strings.Join(dedupeSorted(violated), ", ")),
 			protocolcli.ErrInvalidConfig), report)

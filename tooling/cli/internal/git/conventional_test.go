@@ -3,6 +3,8 @@ package git
 import (
 	"errors"
 	"testing"
+
+	"go.putnami.dev/sdk/extension/gitread"
 )
 
 // BumpFor reduces a range to its strongest advance. The pre-1.0 reading makes
@@ -11,7 +13,7 @@ import (
 // migration.
 func TestBumpFor(t *testing.T) {
 	t.Parallel()
-	commits := []Commit{
+	commits := []gitread.Commit{
 		{Subject: "docs: rewrite"},
 		{Subject: "fix: stop"},
 		{Subject: "feat: add"},
@@ -22,14 +24,14 @@ func TestBumpFor(t *testing.T) {
 	if got, _ := BumpFor(commits, false, nil); got != BumpMinor {
 		t.Errorf("BumpFor(feat+fix+docs, post 1.0) = %v, want minor", got)
 	}
-	breaking := append(append([]Commit(nil), commits...), Commit{Subject: "refactor!: move"})
+	breaking := append(append([]gitread.Commit(nil), commits...), gitread.Commit{Subject: "refactor!: move"})
 	if got, _ := BumpFor(breaking, true, nil); got != BumpMinor {
 		t.Errorf("BumpFor(breaking, preOne) = %v, want minor before 1.0", got)
 	}
 	if got, _ := BumpFor(breaking, false, nil); got != BumpMajor {
 		t.Errorf("BumpFor(breaking, post 1.0) = %v, want major", got)
 	}
-	if got, _ := BumpFor([]Commit{{Subject: "docs: rewrite"}, {Subject: "chore: tidy"}}, true, nil); got != BumpNone {
+	if got, _ := BumpFor([]gitread.Commit{{Subject: "docs: rewrite"}, {Subject: "chore: tidy"}}, true, nil); got != BumpNone {
 		t.Errorf("BumpFor(docs+chore) = %v, want none", got)
 	}
 	if got, _ := BumpFor(nil, true, nil); got != BumpNone {
@@ -43,11 +45,11 @@ func TestBumpFor(t *testing.T) {
 func TestBumpForCapsACommitThatTouchesNoStableProject(t *testing.T) {
 	t.Parallel()
 	var asked []string
-	stable := func(commit Commit) (bool, error) {
+	stable := func(commit gitread.Commit) (bool, error) {
 		asked = append(asked, commit.SHA)
 		return commit.SHA == "stable", nil
 	}
-	bump := func(preOne bool, commits ...Commit) Bump {
+	bump := func(preOne bool, commits ...gitread.Commit) Bump {
 		t.Helper()
 		got, err := BumpFor(commits, preOne, stable)
 		if err != nil {
@@ -55,18 +57,18 @@ func TestBumpForCapsACommitThatTouchesNoStableProject(t *testing.T) {
 		}
 		return got
 	}
-	if got := bump(true, Commit{SHA: "lab", Subject: "feat!: drop"}); got != BumpPatch {
+	if got := bump(true, gitread.Commit{SHA: "lab", Subject: "feat!: drop"}); got != BumpPatch {
 		t.Errorf("BumpFor(breaking, unstable) = %v, want patch", got)
 	}
-	if got := bump(false, Commit{SHA: "lab", Subject: "feat: add"}); got != BumpPatch {
+	if got := bump(false, gitread.Commit{SHA: "lab", Subject: "feat: add"}); got != BumpPatch {
 		t.Errorf("BumpFor(feat post 1.0, unstable) = %v, want patch", got)
 	}
-	if got := bump(false, Commit{SHA: "stable", Subject: "feat!: drop"}); got != BumpMajor {
+	if got := bump(false, gitread.Commit{SHA: "stable", Subject: "feat!: drop"}); got != BumpMajor {
 		t.Errorf("BumpFor(breaking post 1.0, stable) = %v, want major", got)
 	}
 
 	asked = nil
-	if got := bump(true, Commit{SHA: "a", Subject: "feat: add"}, Commit{SHA: "b", Subject: "fix: stop"}); got != BumpPatch {
+	if got := bump(true, gitread.Commit{SHA: "a", Subject: "feat: add"}, gitread.Commit{SHA: "b", Subject: "fix: stop"}); got != BumpPatch {
 		t.Errorf("BumpFor(feat+fix, preOne) = %v, want patch", got)
 	}
 	if len(asked) != 0 {
@@ -74,15 +76,15 @@ func TestBumpForCapsACommitThatTouchesNoStableProject(t *testing.T) {
 	}
 
 	asked = nil
-	if got := bump(true, Commit{SHA: "stable", Subject: "fix!: rename"}, Commit{SHA: "later", Subject: "feat!: drop"}); got != BumpMinor {
+	if got := bump(true, gitread.Commit{SHA: "stable", Subject: "fix!: rename"}, gitread.Commit{SHA: "later", Subject: "feat!: drop"}); got != BumpMinor {
 		t.Errorf("BumpFor(two breaking, preOne) = %v, want minor", got)
 	}
 	if len(asked) != 1 {
 		t.Errorf("the stability test was asked for %v; the walk stops at the pre-1.0 ceiling", asked)
 	}
 
-	failing := func(Commit) (bool, error) { return false, errors.New("git failed") }
-	if _, err := BumpFor([]Commit{{Subject: "feat!: drop"}}, true, failing); err == nil {
+	failing := func(gitread.Commit) (bool, error) { return false, errors.New("git failed") }
+	if _, err := BumpFor([]gitread.Commit{{Subject: "feat!: drop"}}, true, failing); err == nil {
 		t.Error("BumpFor swallowed the stability test's error")
 	}
 }

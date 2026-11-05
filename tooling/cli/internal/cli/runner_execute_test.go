@@ -9,7 +9,7 @@ import (
 	"testing"
 
 	runner "go.putnami.dev/protocol/runner"
-	"go.putnami.dev/tooling/cli/internal/git"
+	"go.putnami.dev/sdk/extension/gitread"
 )
 
 // verifyCommitCheckout binds a version 2 request to the checkout of its
@@ -89,7 +89,7 @@ func writeTestFile(t *testing.T, path, content string) {
 
 func gitTestOutput(t *testing.T, dir string, args ...string) string {
 	t.Helper()
-	command := exec.Command(git.Executable(), args...)
+	command := exec.Command(gitread.Executable(), args...)
 	command.Dir = dir
 	out, err := command.Output()
 	if err != nil {

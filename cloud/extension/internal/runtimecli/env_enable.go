@@ -56,6 +56,7 @@ import (
 	distributionapiclient "go.putnami.dev/cloud/clients/distribution-api/go"
 	runtimeapiclient "go.putnami.dev/cloud/clients/runtime-api/go"
 	clicore "go.putnami.dev/cloud/extension/internal/clicore"
+	protocolcli "go.putnami.dev/protocol/cli"
 )
 
 // Step statuses.
@@ -176,7 +177,7 @@ func envEnable(params map[string]any, positional, workspaceRoot string, env map[
 		steps, refused := run.converge(row)
 		result.Steps = append(result.Steps, steps...)
 		if refused {
-			return clicore.WithResultData(envEnableRefusal(wctx.WorkspaceID), envEnableCount(result))
+			return protocolcli.WithResultData(envEnableRefusal(wctx.WorkspaceID), envEnableCount(result))
 		}
 	}
 	after := fetchEnvReadiness(reqCtx, wctx, environment, workloads, false)
@@ -558,7 +559,7 @@ func writeEnvEnable(params map[string]any, ioctx clicore.IO, result EnvEnableRes
 	if !clicore.StructuredOutput(params) {
 		clicore.WriteTextLines(ioctx, renderEnvEnable(result))
 	}
-	return clicore.WithResultData(clicore.NewError(fmt.Sprintf("environment %s is not enabled: %d step(s) failed; %s",
+	return protocolcli.WithResultData(clicore.NewError(fmt.Sprintf("environment %s is not enabled: %d step(s) failed; %s",
 		result.Environment, result.Failed, envDoctorCounts(result.Readiness)), clicore.ExitFailure), result)
 }
 

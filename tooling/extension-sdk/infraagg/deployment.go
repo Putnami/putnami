@@ -84,7 +84,7 @@ func Deployment(ctx *pctx.Context, opts Options) (Result, error) {
 	if err := os.MkdirAll(filepath.Dir(declarationPath), 0o755); err != nil {
 		return withheld, fmt.Errorf("write deployment declaration %s: %w", declarationPath, err)
 	}
-	if err := writeFileAtomic(declarationPath, data); err != nil {
+	if err := robustio.WriteFile(declarationPath, data, 0o644, nil); err != nil {
 		return withheld, fmt.Errorf("write deployment declaration %s: %w", declarationPath, err)
 	}
 	return Result{

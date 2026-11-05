@@ -6,7 +6,7 @@ import (
 	"strings"
 
 	protocolcli "go.putnami.dev/protocol/cli"
-	"go.putnami.dev/tooling/cli/internal/git"
+	"go.putnami.dev/sdk/extension/gitread"
 	"go.putnami.dev/tooling/cli/internal/iox"
 	"go.putnami.dev/tooling/cli/internal/jobs/scheduler"
 	"go.putnami.dev/tooling/cli/internal/machine"
@@ -304,7 +304,7 @@ func reportGit(wsRoot string, req *Request) *protocolcli.ReportGit {
 	if wsRoot == "" {
 		return nil
 	}
-	sha, err := git.HeadSHA(wsRoot)
+	sha, err := gitread.HeadSHA(wsRoot)
 	if err != nil || sha == "" {
 		return nil
 	}
@@ -316,7 +316,7 @@ func reportGit(wsRoot string, req *Request) *protocolcli.ReportGit {
 		state.Branch = attachedBranch(snapshot.Branch)
 		dirty := snapshot.IsDirty
 		state.Dirty = &dirty
-	} else if branch, branchErr := git.CurrentBranch(wsRoot); branchErr == nil {
+	} else if branch, branchErr := gitread.CurrentBranch(wsRoot); branchErr == nil {
 		state.Branch = attachedBranch(branch)
 	}
 	return state

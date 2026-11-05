@@ -102,7 +102,7 @@ func BuildAgentAttributionResult(message string, sddOptions map[string]any) (Age
 		if !ok || (value != AgentAttributionAllow && value != AgentAttributionForbid) {
 			report.Diagnostics = append(report.Diagnostics, diag.Errorf(ErrorCodeInvalidAgentAttribution, field,
 				"must be %q or %q, got %v", AgentAttributionAllow, AgentAttributionForbid, raw))
-			return report, WithResultData(protocolcli.Classify(fmt.Errorf(
+			return report, protocolcli.WithResultData(protocolcli.Classify(fmt.Errorf(
 				"agent attribution: %s must be %q or %q, got %v", field, AgentAttributionAllow, AgentAttributionForbid, raw),
 				protocolcli.ErrInvalidConfig), report)
 		}
@@ -140,5 +140,5 @@ func BuildAgentAttributionResult(message string, sddOptions map[string]any) (Age
 	}
 	failure.WriteString("Remove each line from the title or the body: the workspace sets options.sdd." + AgentAttributionOption +
 		" to \"forbid\". A path such as .claude/ and a human co-author stay allowed.")
-	return report, WithResultData(protocolcli.Classify(errors.New(failure.String()), protocolcli.ErrInvalidConfig), report)
+	return report, protocolcli.WithResultData(protocolcli.Classify(errors.New(failure.String()), protocolcli.ErrInvalidConfig), report)
 }

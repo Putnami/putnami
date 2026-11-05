@@ -157,7 +157,7 @@ func BuildArchitectureSyncResult(ws *workspace.Workspace, apply bool) (Architect
 	sortDiagnostics(diagnostics)
 	report.Diagnostics = copyArchitectureDiagnostics(diagnostics)
 	if diag.HasErrors(diagnostics) {
-		return report, WithResultData(protocolcli.InvalidConfigf(
+		return report, protocolcli.WithResultData(protocolcli.InvalidConfigf(
 			"architecture sync needs valid declarations; fix the reported errors first"), report)
 	}
 
@@ -169,7 +169,7 @@ func BuildArchitectureSyncResult(ws *workspace.Workspace, apply bool) (Architect
 		}
 		row, refusals, err := syncOneManifest(ws, source, observed, authorized, apply)
 		if err != nil {
-			return report, WithResultData(err, report)
+			return report, protocolcli.WithResultData(err, report)
 		}
 		report.Refusals = append(report.Refusals, refusals...)
 		report.Manifests = append(report.Manifests, row)

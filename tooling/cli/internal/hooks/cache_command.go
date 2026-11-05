@@ -13,8 +13,8 @@ import (
 	"go.putnami.dev/cli/model/extension"
 	"go.putnami.dev/cli/model/workspace"
 	extensionproto "go.putnami.dev/protocol/extension"
+	"go.putnami.dev/sdk/extension/filelock"
 	"go.putnami.dev/sdk/extension/proctree"
-	"go.putnami.dev/tooling/cli/internal/flock"
 	"go.putnami.dev/tooling/cli/internal/iox"
 	"go.putnami.dev/tooling/cli/internal/runcredential"
 	"go.putnami.dev/tooling/cli/internal/store"
@@ -383,7 +383,7 @@ func OpportunisticCacheGCDue(
 	// sibling worktree may have reserved the interval just before this lock was
 	// acquired. Holding the lock only for this check-and-write makes exactly one
 	// caller return true for a window without blocking the detached collector.
-	lock, err := flock.Acquire(filepath.Join(root, opportunisticGCStampLockFile), true, false)
+	lock, err := filelock.Acquire(filepath.Join(root, opportunisticGCStampLockFile), true, false)
 	if err != nil {
 		return false
 	}

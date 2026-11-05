@@ -9,6 +9,8 @@ import (
 	"regexp"
 	"slices"
 
+	"go.putnami.dev/cli/model/workspace"
+
 	extproto "go.putnami.dev/protocol/extension"
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/tooling/cli/internal/layout"
@@ -474,7 +476,7 @@ func (d *dependencyDiscovery) loadedByPath(extensions []*ExtensionDescription, k
 			}
 		}
 	}
-	rel, ok := normalizeWorkspaceExtensionPath(key)
+	rel, ok := workspace.NormalizeWorkspaceExtensionPath(key)
 	if !ok || (d.hosted && !declaredByPath(key)) {
 		return nil
 	}
@@ -687,7 +689,7 @@ func locateRoot(workspaceRoot, key string, lf *lockfile.LockFile, hosted bool) r
 	if filepath.VolumeName(key) != "" {
 		return rootLocation{}
 	}
-	if rel, ok := normalizeWorkspaceExtensionPath(key); ok && (!hosted || declaredByPath(key)) {
+	if rel, ok := workspace.NormalizeWorkspaceExtensionPath(key); ok && (!hosted || declaredByPath(key)) {
 		if dir := filepath.Join(workspaceRoot, rel); holds(dir) {
 			return rootLocation{dir: dir, byPath: true}
 		}

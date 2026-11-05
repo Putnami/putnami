@@ -14,6 +14,7 @@ import (
 	extensionproto "go.putnami.dev/protocol/extension"
 	"go.putnami.dev/protocol/infra"
 	"go.putnami.dev/protocol/put"
+	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/sdk/extension/releaseset"
 )
 
@@ -176,7 +177,7 @@ func deploymentMemberCoordinate(namespace, project string) (string, error) {
 // names no Config namespace or its name maps to no Put package: the probe then
 // declares no deployment member for it, or fails the plan before this step.
 type deploymentTarget struct {
-	ProjectID   string // the plan's ProjectID: "/" + the path without grouping folders (projectIDFromPath)
+	ProjectID   string // the plan's ProjectID: "/" + the path without grouping folders (wsproto.ProjectIDFromPath)
 	Name        string
 	Namespace   string
 	Package     string
@@ -310,7 +311,7 @@ func resolveDeploymentTarget(params map[string]any, args []string, workspaceRoot
 		return deploymentTarget{}, newError("deployment project "+project.Name+" is outside the workspace", ExitUsage)
 	}
 	target := deploymentTarget{
-		ProjectID: projectIDFromPath(filepath.ToSlash(rel)), Name: project.Name,
+		ProjectID: wsproto.ProjectIDFromPath(filepath.ToSlash(rel)), Name: project.Name,
 		Declaration: filepath.Join(dir, infra.AggregatedManifestDir, infra.DeploymentFilename),
 	}
 	namespace, declared, err := project.configNamespace()

@@ -4,6 +4,8 @@ import (
 	"path/filepath"
 	"runtime"
 	"testing"
+
+	"go.putnami.dev/cli/model/workspace"
 )
 
 // TestNormalizeWorkspaceExtensionPathRefusesAVolume pins the workspace-relative
@@ -34,9 +36,9 @@ func TestNormalizeWorkspaceExtensionPathRefusesAVolume(t *testing.T) {
 		if windows && tc.onlyWin {
 			want, wantOK = "", false
 		}
-		got, ok := normalizeWorkspaceExtensionPath(tc.ref)
+		got, ok := workspace.NormalizeWorkspaceExtensionPath(tc.ref)
 		if got != want || ok != wantOK {
-			t.Errorf("normalizeWorkspaceExtensionPath(%q) = %q, %v; want %q, %v", tc.ref, got, ok, want, wantOK)
+			t.Errorf("workspace.NormalizeWorkspaceExtensionPath(%q) = %q, %v; want %q, %v", tc.ref, got, ok, want, wantOK)
 		}
 	}
 }

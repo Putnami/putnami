@@ -105,7 +105,7 @@ func BuildRecipesResult(ws *workspace.Workspace) (RecipesReport, error) {
 	}
 	sortDiagnostics(report.Diagnostics)
 	if diag.HasErrors(report.Diagnostics) {
-		return report, WithResultData(protocolcli.Classify(
+		return report, protocolcli.WithResultData(protocolcli.Classify(
 			fmt.Errorf("recipes: %d error(s) in the committed recipe indexes", len(report.Diagnostics)),
 			protocolcli.ErrInvalidConfig), report)
 	}

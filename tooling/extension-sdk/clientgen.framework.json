@@ -3,6 +3,24 @@
   "transports": [
     {
       "runtime": "putnami-extension-sdk",
+      "status": "transport-primitive",
+      "adapter": "tooling/extension-sdk/internal/registryhttp/registryhttp.go",
+      "callsites": [
+        {
+          "path": "tooling/extension-sdk/internal/registryhttp/registryhttp.go",
+          "transport": "http",
+          "symbol": "http.Client",
+          "fingerprint": "d31ac81a4fff364dc724ed1b44e70aaedbdf9912ce3ed4c18ff1e5691d59935d"
+        }
+      ],
+      "owner": "putnami-extension-sdk",
+      "tests": [
+        "tooling/extension-sdk/internal/registryhttp/registryhttp_test.go"
+      ],
+      "reason": "Builds the HTTP client a publication sends through: no ambient proxy, no redirect followed, a five-minute timeout, and a registry host reached at its mapped origin. The put, npm and Go module publishers supply the registry endpoint and speak that registry's protocol; their own callsites are the request constructions in their adapters."
+    },
+    {
+      "runtime": "putnami-extension-sdk",
       "status": "pending-provider-contract",
       "adapter": "tooling/extension-sdk/memberprobe/archive.go",
       "callsites": [
@@ -46,12 +64,6 @@
       "status": "pending-provider-contract",
       "adapter": "tooling/extension-sdk/putpublish/putpublish.go",
       "callsites": [
-        {
-          "path": "tooling/extension-sdk/putpublish/putpublish.go",
-          "transport": "http",
-          "symbol": "http.Client",
-          "fingerprint": "99de0a95b8d00f9bebd31b7cecf9bbdf69d171c863e61da20776c05e3db4b574"
-        },
         {
           "path": "tooling/extension-sdk/putpublish/putpublish.go",
           "transport": "http",

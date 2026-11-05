@@ -137,8 +137,8 @@ func TestDeployment_WritesTheCanonicalAggregate(t *testing.T) {
 	if first != pinnedDeployment {
 		t.Fatalf("deployment declaration = %s\nwant %s", first, pinnedDeployment)
 	}
-	if _, err := os.Stat(result.ManifestPath + ".tmp"); err == nil {
-		t.Error("temp file left behind after the atomic write")
+	if leftovers, _ := filepath.Glob(filepath.Join(filepath.Dir(result.ManifestPath), ".*.tmp")); len(leftovers) != 0 {
+		t.Errorf("temp files left behind after the atomic write: %v", leftovers)
 	}
 
 	if _, err := Deployment(ctx, Options{RuntimeCompatibility: noHTTP2}); err != nil {

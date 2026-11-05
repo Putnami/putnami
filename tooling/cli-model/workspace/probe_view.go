@@ -201,7 +201,7 @@ func applyProbeView(ws *Workspace, merged map[string]wsproto.MergedProject) {
 
 	byPath := make(map[string]*Project, len(ws.Projects))
 	for _, project := range ws.Projects {
-		byPath[CleanWorkspacePath(project.Path)] = project
+		byPath[wsproto.CleanWorkspacePath(project.Path)] = project
 	}
 	for _, project := range ws.Projects {
 		view, ok := merged[ProbePathOf(project.Path)]
@@ -389,7 +389,7 @@ func resolveDependencyNames(p *Project, entries []string, byPath map[string]*Pro
 		set[declared] = true
 	}
 	for _, entry := range entries {
-		if target, ok := byPath[CleanWorkspacePath(entry)]; ok {
+		if target, ok := byPath[wsproto.CleanWorkspacePath(entry)]; ok {
 			if target == p {
 				continue // a project never depends on itself
 			}
@@ -433,7 +433,7 @@ func resolveDependencySources(p *Project, entries map[string]wsproto.DependencyS
 	out := make(map[string]wsproto.DependencySource, len(entries))
 	for entry, source := range entries {
 		name := entry
-		if target, ok := byPath[CleanWorkspacePath(entry)]; ok {
+		if target, ok := byPath[wsproto.CleanWorkspacePath(entry)]; ok {
 			if target == p {
 				continue
 			}

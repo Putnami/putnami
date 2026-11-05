@@ -13,6 +13,7 @@ import (
 	"sort"
 	"strings"
 
+	"go.putnami.dev/sdk/extension/gitread"
 	"go.putnami.dev/tooling/cli/internal/extension"
 	putnamigit "go.putnami.dev/tooling/cli/internal/git"
 	"go.putnami.dev/tooling/cli/internal/jobs/cachekey"
@@ -227,7 +228,7 @@ func runVersionLines(ws *workspace.Workspace) []string {
 // carries. Publishing from one would stamp a number computed from the fraction
 // of history that happened to be fetched.
 func RequireFullClone(repoRoot string) error {
-	shallow, err := putnamigit.IsShallow(repoRoot)
+	shallow, err := gitread.IsShallow(repoRoot)
 	if err != nil {
 		return err
 	}
@@ -492,7 +493,7 @@ func newCapabilitySourceBindingMemo() *capabilitySourceBindingMemo {
 		results:     make(map[string]capabilitySourceBindingResult),
 		snapshots:   make(map[string]*putnamigit.SourceBindingSnapshot),
 		unmanaged:   make(map[string]bool),
-		isUnmanaged: func(repoRoot string) bool { return putnamigit.Unmanaged(repoRoot) != nil },
+		isUnmanaged: func(repoRoot string) bool { return gitread.Unmanaged(repoRoot) != nil },
 	}
 	memo.resolve = func(repoRoot, projectRoot string) (string, int, error) {
 		key := filepath.Clean(repoRoot)

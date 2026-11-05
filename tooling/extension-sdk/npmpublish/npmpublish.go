@@ -13,17 +13,16 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"net/url"
 	"regexp"
 	"strings"
-	"time"
 	"unicode"
 
 	"go.putnami.dev/sdk/extension/internal/artifacterr"
+	"go.putnami.dev/sdk/extension/internal/registryhttp"
 	"go.putnami.dev/sdk/extension/internal/retry"
 )
 
@@ -110,30 +109,7 @@ func buildPayload(artifact Artifact) (Payload, error) {
 // proxy, so the bearer has no second recipient, no redirect, and a five-minute
 // timeout.
 func NewHTTPClient() (*http.Client, error) {
-	baseTransport, ok := http.DefaultTransport.(*http.Transport)
-	if !ok {
-		return nil, fmt.Errorf("managed npm transport is unavailable")
-	}
-	transport := baseTransport.Clone()
-	transport.Proxy = nil
-	return &http.Client{
-		Timeout:       5 * time.Minute,
-		Transport:     transport,
-		CheckRedirect: refuseRedirect,
-	}, nil
-}
-
-func refuseRedirect(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
-
-// withoutRedirects returns a copy of client that never follows a redirect, so
-// a request carrying the bearer reaches the registry it names and no other.
-func withoutRedirects(client *http.Client) (*http.Client, error) {
-	if client == nil {
-		return nil, errors.New("managed npm publication requires an HTTP client")
-	}
-	bounded := *client
-	bounded.CheckRedirect = refuseRedirect
-	return &bounded, nil
+	return registryhttp.NewClient("managed npm transport", nil)
 }
 
 // Put sends payload to registry with token as its bearer, once. Any status
@@ -147,7 +123,7 @@ func Put(ctx context.Context, client *http.Client, registry, token string, paylo
 // put sends one PUT of payload and returns its answer. A transient failure
 // (package retry) is marked with retry.Again.
 func put(ctx context.Context, client *http.Client, registry, token string, payload Payload) (retry.Answer, error) {
-	client, err := withoutRedirects(client)
+	client, err := registryhttp.WithoutRedirects(client, "managed npm publication")
 	if err != nil {
 		return retry.Answer{}, err
 	}
@@ -213,7 +189,7 @@ func probeRetrying(ctx context.Context, client *http.Client, registry, token, pa
 // (package retry) is marked with retry.Again, and a tarball of another size or
 // digest with artifacterr.ErrConflict.
 func probe(ctx context.Context, client *http.Client, registry, token, packageName, version, wantDigest string, wantSize int64) (bool, retry.Answer, error) {
-	client, err := withoutRedirects(client)
+	client, err := registryhttp.WithoutRedirects(client, "managed npm publication")
 	if err != nil {
 		return false, retry.Answer{}, err
 	}

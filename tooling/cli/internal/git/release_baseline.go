@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	protocolcli "go.putnami.dev/protocol/cli"
+	"go.putnami.dev/sdk/extension/gitread"
 	"go.putnami.dev/sdk/extension/linetag"
 )
 
@@ -74,7 +75,7 @@ func (b ReleaseBaseline) Value() string {
 // from a failure would key the check's verdict to a baseline it did not see.
 func ReadReleaseBaseline(dir, tagPattern string) (ReleaseBaseline, error) {
 	baseline := ReleaseBaseline{Pattern: tagPattern}
-	output, stderr, err := runCapture(dir, "rev-parse", "--is-inside-work-tree", "--is-shallow-repository", "--show-prefix")
+	output, stderr, err := gitread.RunCapture(dir, "rev-parse", "--is-inside-work-tree", "--is-shallow-repository", "--show-prefix")
 	if err != nil {
 		var exit *exec.ExitError
 		if errors.As(err, &exit) {
@@ -95,7 +96,7 @@ func ReadReleaseBaseline(dir, tagPattern string) (ReleaseBaseline, error) {
 	}
 	shallow, prefix := lines[1] == "true", strings.TrimSuffix(lines[2], "/")
 
-	if _, _, err := runCapture(dir, "rev-parse", "--verify", "--quiet", "HEAD^{commit}"); err != nil {
+	if _, _, err := gitread.RunCapture(dir, "rev-parse", "--verify", "--quiet", "HEAD^{commit}"); err != nil {
 		var exit *exec.ExitError
 		if !errors.As(err, &exit) {
 			return ReleaseBaseline{}, fmt.Errorf("read HEAD of %s: %w", dir, err)
@@ -113,7 +114,7 @@ func ReadReleaseBaseline(dir, tagPattern string) (ReleaseBaseline, error) {
 		return ReleaseBaseline{}, err
 	}
 	if !ok {
-		refs, err := run(dir, "for-each-ref", "--count=1", "--format=%(refname)", "refs/tags")
+		refs, err := gitread.Run(dir, "for-each-ref", "--count=1", "--format=%(refname)", "refs/tags")
 		if err != nil {
 			return ReleaseBaseline{}, fmt.Errorf("read the tags: %w", err)
 		}
@@ -125,7 +126,7 @@ func ReadReleaseBaseline(dir, tagPattern string) (ReleaseBaseline, error) {
 	if baseline.Object, err = objectAtTag(dir, last.Tag, prefix); err != nil {
 		return ReleaseBaseline{}, err
 	}
-	commits, err := CommitsSince(dir, last.Commit, []string{"."})
+	commits, err := gitread.CommitsSince(dir, last.Commit, []string{"."})
 	if err != nil {
 		return ReleaseBaseline{}, err
 	}
@@ -145,13 +146,13 @@ func ReadReleaseBaseline(dir, tagPattern string) (ReleaseBaseline, error) {
 func objectAtTag(dir, tag, prefix string) (string, error) {
 	ref := "refs/tags/" + tag
 	if prefix == "" {
-		output, err := run(dir, "rev-parse", "--verify", "--end-of-options", ref+"^{tree}")
+		output, err := gitread.Run(dir, "rev-parse", "--verify", "--end-of-options", ref+"^{tree}")
 		if err != nil {
 			return "", fmt.Errorf("read the tree of %s: %w", tag, err)
 		}
 		return "tree " + strings.TrimSpace(output), nil
 	}
-	output, stderr, err := runCaptureEnv(dir, append(os.Environ(), "GIT_LITERAL_PATHSPECS=1"),
+	output, stderr, err := gitread.RunCaptureEnv(dir, append(os.Environ(), "GIT_LITERAL_PATHSPECS=1"),
 		"ls-tree", "-z", "--full-tree", ref, "--", prefix)
 	if err != nil {
 		return "", fmt.Errorf("git ls-tree (in %s): %w: %s", dir, err, strings.TrimSpace(stderr))

@@ -104,7 +104,7 @@ func BuildFeatureCoverageResult(ws *workspace.Workspace, workspaceOptions map[st
 	debt, adopted, findings := featureCoverageDebt(workspaceOptions["sdd"])
 	if len(findings) > 0 {
 		report.Diagnostics = findings
-		return report, WithResultData(protocolcli.Classify(
+		return report, protocolcli.WithResultData(protocolcli.Classify(
 			fmt.Errorf("feature coverage: options.sdd.%s is invalid", FeatureCoverageOption),
 			protocolcli.ErrInvalidConfig), report)
 	}
@@ -172,7 +172,7 @@ func BuildFeatureCoverageResult(ws *workspace.Workspace, workspaceOptions map[st
 	}
 	sortDiagnostics(report.Diagnostics)
 	if diag.HasErrors(report.Diagnostics) {
-		return report, WithResultData(protocolcli.Classify(
+		return report, protocolcli.WithResultData(protocolcli.Classify(
 			fmt.Errorf("feature coverage: %d finding(s)", len(report.Diagnostics)),
 			protocolcli.ErrInvalidConfig), report)
 	}

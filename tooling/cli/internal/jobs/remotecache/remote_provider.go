@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -15,9 +16,9 @@ import (
 
 	jobmodel "go.putnami.dev/cli/model/jobs"
 	cache "go.putnami.dev/protocol/cache"
+	"go.putnami.dev/sdk/extension/filelock"
 	"go.putnami.dev/tooling/cli/internal/cacheprovider"
 	"go.putnami.dev/tooling/cli/internal/extension"
-	"go.putnami.dev/tooling/cli/internal/flock"
 	"go.putnami.dev/tooling/cli/internal/jobs/cachekey"
 	"go.putnami.dev/tooling/cli/internal/runcredential"
 	"go.putnami.dev/tooling/cli/internal/store"
@@ -51,7 +52,7 @@ type providerRemote struct {
 	// exchangeOwner is the flock on exchangeDir's owner.lock that marks the
 	// directory live for other runs' sweeps (see remote_exchange.go). It is
 	// released only after the directory is deleted.
-	exchangeOwner *flock.Lock
+	exchangeOwner *filelock.Lock
 	// sweep tracks the stale-sibling sweep a session start launches.
 	// closeProvider stops it and waits for it, so it never outlives the cache.
 	sweep sync.WaitGroup
@@ -284,7 +285,7 @@ func (r *RemoteCache) ensureProvider(ctx context.Context, ws *workspace.Workspac
 		return nil, false
 	}
 
-	r.actionEvents = containsString(init.Capabilities, cache.CapabilityActionEvents)
+	r.actionEvents = slices.Contains(init.Capabilities, cache.CapabilityActionEvents)
 	p.mode = providerMode(init)
 	// The session checked the socket the provider offered (echoed capability,
 	// absolute path, really a socket); record only what it accepted.
@@ -379,7 +380,7 @@ func (r *RemoteCache) recordUnavailable() {
 // returns only with the cache.CapabilityProviderConfiguration echo, else
 // cache.ModeFull.
 func providerMode(init *cache.InitializeResult) cache.Mode {
-	if init.Mode.Valid() && containsString(init.Capabilities, cache.CapabilityProviderConfiguration) {
+	if init.Mode.Valid() && slices.Contains(init.Capabilities, cache.CapabilityProviderConfiguration) {
 		return init.Mode
 	}
 	return cache.ModeFull
@@ -556,15 +557,6 @@ func ManifestBytes(manifest *cache.Manifest) int64 {
 		total += f.Size
 	}
 	return total
-}
-
-func containsString(values []string, target string) bool {
-	for _, value := range values {
-		if value == target {
-			return true
-		}
-	}
-	return false
 }
 
 func (r *RemoteCache) providerDrain(ctx context.Context) {

@@ -169,8 +169,8 @@ func TestAggregate_SingleContribution(t *testing.T) {
 	}
 
 	// Atomic write must not leave its temp file behind.
-	if _, err := os.Stat(aggregatedPath(root, "app") + ".tmp"); err == nil {
-		t.Error("temp file left behind after atomic write")
+	if leftovers, _ := filepath.Glob(filepath.Join(filepath.Dir(aggregatedPath(root, "app")), ".*.tmp")); len(leftovers) != 0 {
+		t.Errorf("temp files left behind after atomic write: %v", leftovers)
 	}
 }
 

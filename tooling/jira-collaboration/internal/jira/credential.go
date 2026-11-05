@@ -5,6 +5,8 @@ import (
 	"regexp"
 	"strings"
 	"sync"
+
+	"go.putnami.dev/sdk/extension/collabhelper"
 )
 
 // The environment variables the credential is read from. The binding never
@@ -85,16 +87,8 @@ func (c *Credential) Secrets() []string {
 // is redacted wherever it appears, whoever's it is.
 var knownTokenPattern = regexp.MustCompile(`\bATATT[A-Za-z0-9_\-=+/]{20,1000}`)
 
-// RedactedMarker replaces every redacted credential.
-const RedactedMarker = "[redacted]"
-
 // Redact removes secrets and every string shaped like an Atlassian API token
 // from text.
 func Redact(text string, secrets []string) string {
-	for _, secret := range secrets {
-		if len(secret) >= 4 {
-			text = strings.ReplaceAll(text, secret, RedactedMarker)
-		}
-	}
-	return knownTokenPattern.ReplaceAllString(text, RedactedMarker)
+	return collabhelper.Redact(text, secrets, knownTokenPattern)
 }

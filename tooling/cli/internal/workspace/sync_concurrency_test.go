@@ -17,7 +17,7 @@ import (
 	extproto "go.putnami.dev/protocol/extension"
 	"go.putnami.dev/protocol/features/spectest"
 	wsproto "go.putnami.dev/protocol/workspace"
-	"go.putnami.dev/tooling/cli/internal/flock"
+	"go.putnami.dev/sdk/extension/filelock"
 )
 
 type rendezvousProbeProvider struct {
@@ -290,7 +290,7 @@ func TestWorkspaceSyncLockContentionNotifiesAndTimesOut(t *testing.T) {
 	if err := os.MkdirAll(filepath.Dir(lockPath), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	held, err := flock.Acquire(lockPath, true, false)
+	held, err := filelock.Acquire(lockPath, true, false)
 	if err != nil {
 		t.Fatal(err)
 	}

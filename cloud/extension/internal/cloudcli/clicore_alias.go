@@ -68,7 +68,6 @@ var (
 	readManifestLink     = clicore.ReadManifestLink
 	findActiveProject    = clicore.FindActiveProject
 	linkPath             = clicore.LinkPath
-	projectIDFromPath    = clicore.ProjectIDFromPath
 
 	activeAuth                      = clicore.ActiveAuth
 	workspaceAuth                   = clicore.WorkspaceAuth

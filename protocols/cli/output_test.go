@@ -22,6 +22,23 @@ func TestOutputModeIsStructured(t *testing.T) {
 	}
 }
 
+func TestOutputModeIsMachineReadable(t *testing.T) {
+	spectest.Proves(t, "cli/machine-contract", "output-modes-and-the-result-envelope", "output-modes-resolve-one-way")
+	cases := map[OutputMode]bool{
+		OutputJSON:         true,
+		OutputJSONL:        true,
+		OutputCloudLogging: true,
+		OutputAuto:         false,
+		OutputText:         false,
+		OutputMode("yaml"): false,
+	}
+	for m, want := range cases {
+		if got := m.IsMachineReadable(); got != want {
+			t.Errorf("%q.IsMachineReadable() = %v, want %v", m, got, want)
+		}
+	}
+}
+
 func TestResolveOutputMode(t *testing.T) {
 	spectest.Proves(t, "cli/machine-contract", "output-modes-and-the-result-envelope", "output-modes-resolve-one-way")
 	cases := []struct {

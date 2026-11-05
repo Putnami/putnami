@@ -10,18 +10,9 @@ import (
 	"strings"
 	"testing"
 	"time"
-)
 
-func TestIsShallowOnAFullClone(t *testing.T) {
-	t.Parallel()
-	shallow, err := IsShallow(initGitRepo(t))
-	if err != nil {
-		t.Fatalf("IsShallow: %v", err)
-	}
-	if shallow {
-		t.Error("a freshly initialized repository reported as shallow")
-	}
-}
+	"go.putnami.dev/sdk/extension/gitread"
+)
 
 func TestTagsAtHead(t *testing.T) {
 	t.Parallel()
@@ -40,44 +31,6 @@ func TestTagsAtHead(t *testing.T) {
 	}
 }
 
-func TestCommitsSinceReadsSubjectBodyAndPathspec(t *testing.T) {
-	t.Parallel()
-	dir := initGitRepo(t)
-	base, err := HeadSHA(dir)
-	if err != nil {
-		t.Fatal(err)
-	}
-	writeCommitWithBody(t, dir, "typescript/a.ts", "feat(ts): add", "why\n\nBREAKING CHANGE: gone")
-	writeCommit(t, dir, "go/a.go", "fix(go): stop")
-
-	all, err := CommitsSince(dir, base, nil)
-	if err != nil {
-		t.Fatalf("CommitsSince: %v", err)
-	}
-	if len(all) != 2 {
-		t.Fatalf("CommitsSince(whole tree) = %d commits, want 2", len(all))
-	}
-	if all[0].Subject != "fix(go): stop" {
-		t.Errorf("first commit = %q, want the newest first", all[0].Subject)
-	}
-	scoped, err := CommitsSince(dir, base, []string{"typescript"})
-	if err != nil {
-		t.Fatalf("CommitsSince(typescript): %v", err)
-	}
-	if len(scoped) != 1 || scoped[0].Subject != "feat(ts): add" {
-		t.Fatalf("CommitsSince(typescript) = %+v, want only the typescript commit", scoped)
-	}
-	if !strings.Contains(scoped[0].Body, "BREAKING CHANGE:") || len(scoped[0].SHA) != 40 {
-		t.Errorf("commit = %+v, want the body and the full SHA", scoped[0])
-	}
-
-	// An empty fromCommit walks the whole history, which is the untagged line.
-	whole, err := CommitsSince(dir, "", nil)
-	if err != nil || len(whole) != 3 {
-		t.Fatalf("CommitsSince(whole history) = %d/%v, want 3 commits", len(whole), err)
-	}
-}
-
 // A rename lists both of its paths, so a file moved out of a project still
 // counts as a change to it; the pathspec limits the files; a path git would
 // quote keeps its bytes.
@@ -90,7 +43,7 @@ func TestCommitFilesListsBothPathsOfARename(t *testing.T) {
 	}
 	gitDo(t, dir, "mv", "typescript/é \"q\".ts", "go/é \"q\".ts")
 	gitDo(t, dir, "commit", "-m", "refactor!: move")
-	head, err := HeadSHA(dir)
+	head, err := gitread.HeadSHA(dir)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -170,7 +123,7 @@ func commitAt(t *testing.T, dir, relPath, subject, date string) string {
 		t.Fatal(err)
 	}
 	for _, args := range [][]string{{"add", "."}, {"commit", "-m", subject}} {
-		cmd := exec.Command(Executable(), args...)
+		cmd := exec.Command(gitread.Executable(), args...)
 		cmd.Dir = dir
 		cmd.Env = append(os.Environ(), "GIT_COMMITTER_DATE="+date, "GIT_AUTHOR_DATE="+date)
 		if out, err := cmd.CombinedOutput(); err != nil {

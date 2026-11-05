@@ -11,6 +11,7 @@ import (
 	"go.putnami.dev/protocol/features/spectest"
 
 	wsproto "go.putnami.dev/protocol/workspace"
+	"go.putnami.dev/sdk/extension/gitread"
 	"go.putnami.dev/tooling/cli/internal/git"
 )
 
@@ -43,7 +44,7 @@ func runGitForImpact(t *testing.T, dir string, args ...string) {
 		"GIT_AUTHOR_NAME=test", "GIT_AUTHOR_EMAIL=test@example.com",
 		"GIT_COMMITTER_NAME=test", "GIT_COMMITTER_EMAIL=test@example.com",
 	)
-	cmd := exec.Command(git.Executable(), args...)
+	cmd := exec.Command(gitread.Executable(), args...)
 	cmd.Dir = dir
 	cmd.Env = env
 	if out, err := cmd.CombinedOutput(); err != nil {
@@ -177,7 +178,7 @@ func TestImpactedSelection_TraceRecordStatesTheDiffAndEveryReason(t *testing.T) 
 	if err := json.Unmarshal(encoded, &got); err != nil {
 		t.Fatalf("decode record %s: %v", encoded, err)
 	}
-	mergeBase, err := git.ResolveCommit(tmp, "main")
+	mergeBase, err := gitread.ResolveCommit(tmp, "main")
 	if err != nil {
 		t.Fatal(err)
 	}

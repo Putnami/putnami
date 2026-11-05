@@ -20,9 +20,9 @@ import (
 	runner "go.putnami.dev/protocol/runner"
 	runtimeproto "go.putnami.dev/protocol/runtime"
 	"go.putnami.dev/sdk/extension/envkeys"
+	"go.putnami.dev/sdk/extension/filelock"
 	"go.putnami.dev/sdk/extension/proctree"
 	"go.putnami.dev/tooling/cli/internal/extension"
-	"go.putnami.dev/tooling/cli/internal/flock"
 	"go.putnami.dev/tooling/cli/internal/git"
 	"go.putnami.dev/tooling/cli/internal/iox"
 	"go.putnami.dev/tooling/cli/internal/jobs/cachekey"
@@ -178,7 +178,7 @@ type jobInvocation struct {
 	cwd          string
 	projRoot     string
 	env          []string
-	scratchLease *flock.Lock
+	scratchLease *filelock.Lock
 	// extensionRuntime is the resolved {extensionRuntime}, or "" when the job
 	// does not reference it.
 	extensionRuntime string
@@ -191,7 +191,7 @@ type jobInvocation struct {
 // closes only the parent's descriptor, so a surviving child stays protected.
 func (inv *jobInvocation) execCommand(ctx context.Context) *exec.Cmd {
 	cmd := exec.CommandContext(ctx, inv.command, inv.args...)
-	if flock.Inheritable && inv.scratchLease != nil {
+	if filelock.Inheritable && inv.scratchLease != nil {
 		cmd.ExtraFiles = append(cmd.ExtraFiles, inv.scratchLease.File())
 	}
 	return cmd

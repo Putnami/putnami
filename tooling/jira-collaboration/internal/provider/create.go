@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	collab "go.putnami.dev/protocol/collaboration"
+	"go.putnami.dev/sdk/extension/collabhelper"
 	"go.putnami.dev/tooling/jira-collaboration/internal/jira"
 )
 
@@ -38,7 +39,7 @@ func newIdempotency(project, key string, request createRequest) idempotency {
 	if request.Labels == nil {
 		request.Labels = []string{}
 	}
-	return idempotency{label: reservedLabelPrefix + digest([]string{"tasks.create", project, key}), digest: digest(request)}
+	return idempotency{label: reservedLabelPrefix + collabhelper.Digest([]string{"tasks.create", project, key}), digest: collabhelper.Digest(request)}
 }
 
 // recordOf reads the request digest an issue's property records; empty when

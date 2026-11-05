@@ -13,8 +13,8 @@ import (
 	"sync"
 
 	protocolcli "go.putnami.dev/protocol/cli"
+	"go.putnami.dev/sdk/extension/filelock"
 	"go.putnami.dev/sdk/extension/robustio"
-	"go.putnami.dev/tooling/cli/internal/flock"
 )
 
 // Subscription is one declared subscriber of a Log.
@@ -242,7 +242,7 @@ func ReadEvidence(dir string) (*protocolcli.SessionSubscribersFile, error) {
 const subscribersLockName = "subscribers.lock"
 
 func mergeEvidence(dir, sessionID string, stream Position, evidence protocolcli.SessionSubscriberEvidence) error {
-	lock, err := flock.Acquire(filepath.Join(dir, subscribersLockName), true, false)
+	lock, err := filelock.Acquire(filepath.Join(dir, subscribersLockName), true, false)
 	if err != nil {
 		return err
 	}
@@ -298,5 +298,5 @@ func writeAtomic(dir, name string, data []byte) error {
 	if err := robustio.Rename(tmp, filepath.Join(dir, name)); err != nil {
 		return err
 	}
-	return flock.SyncDir(dir)
+	return filelock.SyncDir(dir)
 }

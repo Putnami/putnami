@@ -136,7 +136,7 @@ func resolveRelativeTarget(ws *Workspace, relPath string, cwd string) []*Project
 	if err != nil || !isRelativeToWorkspace(physicalPath) {
 		return nil
 	}
-	physicalPath = CleanWorkspacePath(physicalPath)
+	physicalPath = wsproto.CleanWorkspacePath(physicalPath)
 
 	if !wildcard {
 		if p := ws.ProjectByPath(physicalPath); p != nil {
@@ -150,7 +150,7 @@ func resolveRelativeTarget(ws *Workspace, relPath string, cwd string) []*Project
 
 	var result []*Project
 	for _, p := range ws.Projects {
-		path := CleanWorkspacePath(p.Path)
+		path := wsproto.CleanWorkspacePath(p.Path)
 		if path == physicalPath || strings.HasPrefix(path, physicalPath+"/") {
 			result = append(result, p)
 		}

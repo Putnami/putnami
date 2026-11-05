@@ -16,7 +16,6 @@ import (
 	providerext "go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/iox"
 	"go.putnami.dev/tooling/cli/internal/jobs/remotecache"
-	"go.putnami.dev/tooling/cli/internal/output"
 	"go.putnami.dev/tooling/cli/internal/runnerprovider"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 	"go.putnami.dev/tooling/cli/internal/workspace_state"
@@ -43,7 +42,7 @@ func SessionsInspectRun(ctx context.Context, wsRoot string, cfg *wsproto.Config,
 		}
 		return err
 	}
-	structured := output.StructuredOutput(outputFormat)
+	structured := protocolcli.OutputMode(outputFormat).IsMachineReadable()
 	if !record.Imported {
 		// Resume through the provider the record names. Forwarded engine output
 		// keeps its streams in text mode; a structured stdout belongs to the

@@ -55,9 +55,7 @@ package wsview
 import (
 	"encoding/json"
 	"fmt"
-	"path/filepath"
 	"sort"
-	"strings"
 
 	workspaceproto "go.putnami.dev/protocol/workspace"
 	pctx "go.putnami.dev/sdk/extension/context"
@@ -266,7 +264,7 @@ func FromContext(ctx *pctx.Context) (ws *Workspace, scoped bool) {
 	for _, ref := range refs {
 		id := ref.ID
 		if id == "" {
-			id = ProjectIDFromPath(ref.Path)
+			id = workspaceproto.ProjectIDFromPath(ref.Path)
 		}
 		projects = append(projects, &Project{
 			ID:         id,
@@ -278,7 +276,7 @@ func FromContext(ctx *pctx.Context) (ws *Workspace, scoped bool) {
 			// version-qualified binding to "source unavailable" while the
 			// versionless ones beside it kept resolving.
 			Version: ref.Version,
-			Path:    CleanWorkspacePath(ref.Path),
+			Path:    workspaceproto.CleanWorkspacePath(ref.Path),
 			// The RESOLVED direct edges, already translated from declared names
 			// to workspace ids. BuildGraph keeps an id verbatim, so the graph
 			// this view indexes is core's graph rather than a second reading of
@@ -330,12 +328,12 @@ func FromContext(ctx *pctx.Context) (ws *Workspace, scoped bool) {
 // putnami.json declares. Discovery already treats the workspace root as a root,
 // so the answer is the same either way.
 func projectFromOwnContext(ctx *pctx.Context) *Project {
-	path := CleanWorkspacePath(ctx.Project.Path)
+	path := workspaceproto.CleanWorkspacePath(ctx.Project.Path)
 	if path == "" {
 		return nil
 	}
 	return &Project{
-		ID:   ProjectIDFromPath(path),
+		ID:   workspaceproto.ProjectIDFromPath(path),
 		Name: ctx.Project.Name,
 		Type: ctx.Project.Type,
 		Path: path,
@@ -353,7 +351,7 @@ func projectFromOwnContext(ctx *pctx.Context) *Project {
 // publishable project reads as unpublished and its completeness gap is never
 // assessed.
 func adoptOwnProjectFacts(ctx *pctx.Context, projects []*Project) {
-	path := CleanWorkspacePath(ctx.Project.Path)
+	path := workspaceproto.CleanWorkspacePath(ctx.Project.Path)
 	publish := ctx.PublishChannels()
 	options := decodeProjectOptions(ctx.Project.Options)
 	if len(publish) == 0 && len(options) == 0 {
@@ -412,46 +410,4 @@ func decodeProjectConfig(raw json.RawMessage) *workspaceproto.ProjectConfig {
 		return nil
 	}
 	return &config
-}
-
-// ProjectIDFromPath derives a project's canonical logical ID from its physical
-// workspace-relative path, dropping transparent "(group)" folders.
-//
-// Copied from `go.putnami.dev/cli/model/workspace`.ProjectIDFromPath: the
-// revision reader mints ids for projects it discovered in a historical commit,
-// and an id that disagreed with core's would make two runs over the same tree
-// report different features.
-func ProjectIDFromPath(projectPath string) string {
-	physicalPath := CleanWorkspacePath(projectPath)
-	if physicalPath == "" {
-		return "/"
-	}
-
-	segments := strings.Split(physicalPath, "/")
-	logicalSegments := make([]string, 0, len(segments))
-	for _, segment := range segments {
-		if isTransparentGroupSegment(segment) {
-			continue
-		}
-		logicalSegments = append(logicalSegments, segment)
-	}
-	return "/" + strings.Join(logicalSegments, "/")
-}
-
-func isTransparentGroupSegment(segment string) bool {
-	return len(segment) > 2 && segment[0] == '(' && segment[len(segment)-1] == ')'
-}
-
-// CleanWorkspacePath normalizes a workspace-relative path to its canonical
-// slash form. Copied from `go.putnami.dev/cli/model/workspace`.
-func CleanWorkspacePath(path string) string {
-	path = strings.TrimSpace(strings.TrimPrefix(path, "/"))
-	if path == "" {
-		return ""
-	}
-	path = filepath.Clean(filepath.FromSlash(path))
-	if path == "." {
-		return ""
-	}
-	return filepath.ToSlash(path)
 }

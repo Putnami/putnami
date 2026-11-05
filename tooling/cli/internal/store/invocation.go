@@ -15,7 +15,7 @@
 //     LEASE — is a store artifact with the same "written by one process, read by
 //     another" contract as every other file in this package.
 //   - Liveness is decided the way this package already decides it everywhere
-//     else: an advisory whole-file lock (internal/flock). A lock the owner holds
+//     else: an advisory whole-file lock (sdk/extension/filelock). A lock the owner holds
 //     for its whole life is released by the kernel when the owner dies, however
 //     it died, which is a stronger statement than any heartbeat could make.
 //
@@ -39,8 +39,9 @@ import (
 	"strings"
 	"time"
 
+	"go.putnami.dev/sdk/extension/filelock"
 	"go.putnami.dev/sdk/extension/ownerperm"
-	"go.putnami.dev/tooling/cli/internal/flock"
+	"go.putnami.dev/sdk/extension/proctree"
 )
 
 const (
@@ -109,7 +110,7 @@ type InvocationScratch struct {
 	root         string
 	artifactRoot string
 	lease        InvocationLease
-	owner        *flock.Lock
+	owner        *filelock.Lock
 }
 
 // InvocationsRoot is the directory holding every invocation scratch of a
@@ -146,7 +147,7 @@ func NewInvocationScratch(workspaceRoot, provider, actionDigest string) (*Invoca
 		}
 	}
 
-	owner, err := flock.Acquire(filepath.Join(root, invocationOwnerLockName), true, true)
+	owner, err := filelock.Acquire(filepath.Join(root, invocationOwnerLockName), true, true)
 	if err != nil {
 		_ = os.RemoveAll(root)
 		return nil, fmt.Errorf("claim invocation scratch: %w", err)
@@ -313,7 +314,7 @@ func (s *InvocationScratch) Discard() error {
 	s.owner = nil
 	// The owner lock is released before its file goes: Windows before
 	// version 1809 cannot remove a directory that holds an open file.
-	return flock.RemoveDir(s.root, invocationOwnerLockName, func() error {
+	return filelock.RemoveDir(s.root, invocationOwnerLockName, func() error {
 		_ = owner.Release()
 		return nil
 	})
@@ -371,10 +372,10 @@ func ReapOrphanInvocations(workspaceRoot string) []InvocationLease {
 
 // invocationOwnerGone reports whether nothing is alive that owns dir.
 func invocationOwnerGone(dir string, lease InvocationLease) bool {
-	if ProcessAlive(lease.PID) {
+	if proctree.ProcessAlive(lease.PID) {
 		return false
 	}
-	lock, err := flock.Acquire(filepath.Join(dir, invocationOwnerLockName), true, true)
+	lock, err := filelock.Acquire(filepath.Join(dir, invocationOwnerLockName), true, true)
 	if err != nil {
 		return false // busy (a live owner) or unreadable: leave it alone
 	}

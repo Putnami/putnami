@@ -50,7 +50,7 @@ func BuildFeatureDiffResult(wsRoot, baseRef, headRef string) (FeatureDiffReport,
 
 	switch {
 	case baseErr != nil || headErr != nil:
-		return report, WithResultData(
+		return report, protocolcli.WithResultData(
 			protocolcli.Usagef("features diff requires two resolvable, unambiguous repository revisions"),
 			report,
 		)
@@ -60,7 +60,7 @@ func BuildFeatureDiffResult(wsRoot, baseRef, headRef string) (FeatureDiffReport,
 		if errorCount == 0 {
 			errorCount = 1
 		}
-		return report, WithResultData(protocolcli.Classify(
+		return report, protocolcli.WithResultData(protocolcli.Classify(
 			fmt.Errorf("features diff failed with %d structural diagnostic(s)", errorCount),
 			protocolcli.ErrInvalidConfig,
 		), report)

@@ -7,7 +7,7 @@ import (
 	"testing"
 
 	"go.putnami.dev/protocol/features/spectest"
-	"go.putnami.dev/tooling/cli/internal/git"
+	"go.putnami.dev/sdk/extension/gitread"
 )
 
 // An empty source state writes zero bytes, so every key computed inside a
@@ -69,7 +69,7 @@ func TestCacheManager_SourceState(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	if out, err := exec.Command(git.Executable(), "-C", repository, "init").CombinedOutput(); err != nil {
+	if out, err := exec.Command(gitread.Executable(), "-C", repository, "init").CombinedOutput(); err != nil {
 		t.Fatalf("git init: %v\n%s", err, out)
 	}
 
@@ -83,7 +83,7 @@ func TestCacheManager_SourceState(t *testing.T) {
 
 	// The answer holds for the life of the manager: every key of one
 	// invocation agrees even when the root changes state under it.
-	if out, err := exec.Command(git.Executable(), "-C", plain, "init").CombinedOutput(); err != nil {
+	if out, err := exec.Command(gitread.Executable(), "-C", plain, "init").CombinedOutput(); err != nil {
 		t.Fatalf("git init: %v\n%s", err, out)
 	}
 	if got := cm.SourceState(plain); got != SourceStateUnmanaged {

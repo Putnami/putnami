@@ -13,8 +13,8 @@ import (
 	protocolcli "go.putnami.dev/protocol/cli"
 	diag "go.putnami.dev/protocol/diagnostic"
 	featureproto "go.putnami.dev/protocol/features"
+	sdkgit "go.putnami.dev/sdk/extension/gitread"
 	featureengine "go.putnami.dev/tooling/sdd/extension/internal/features"
-	internalgit "go.putnami.dev/tooling/sdd/extension/internal/gitread"
 	workspace "go.putnami.dev/tooling/sdd/extension/internal/wsview"
 )
 
@@ -372,7 +372,7 @@ func BuildFeatureContextResult(ws *workspace.Workspace, selector string) (Featur
 				"feature selector must be non-empty bounded text without control characters",
 			)},
 		}
-		runErr := WithResultData(protocolcli.Usagef("features inspect requires a valid <feature-id>"), report)
+		runErr := protocolcli.WithResultData(protocolcli.Usagef("features inspect requires a valid <feature-id>"), report)
 		return report, runErr
 	}
 
@@ -400,7 +400,7 @@ func BuildFeatureContextResult(ws *workspace.Workspace, selector string) (Featur
 				"feature selector is ambiguous; use one exact candidate ID",
 			))
 			sortFeatureDiagnostics(report.Diagnostics)
-			return report, WithResultData(protocolcli.Usagef("feature selector is ambiguous"), report)
+			return report, protocolcli.WithResultData(protocolcli.Usagef("feature selector is ambiguous"), report)
 		}
 		return FeatureInspectionReport{}, designErr
 	}
@@ -453,7 +453,7 @@ func BuildFeatureContextResult(ws *workspace.Workspace, selector string) (Featur
 			message,
 		))
 		sortFeatureDiagnostics(report.Diagnostics)
-		runErr = WithResultData(runErr, report)
+		runErr = protocolcli.WithResultData(runErr, report)
 		return report, runErr
 	}
 
@@ -544,7 +544,7 @@ func evaluateWorkspaceFeatures(ws *workspace.Workspace, selection Selection) (
 
 func worktreeFeatureRevision(wsRoot string) featureengine.Revision {
 	revision := featureengine.Revision{Kind: featureengine.RevisionKindWorktree}
-	if head, err := internalgit.HeadSHA(wsRoot); err == nil {
+	if head, err := sdkgit.HeadSHA(wsRoot); err == nil {
 		revision.Head = "git:" + strings.ToLower(head)
 	}
 	return revision
@@ -562,7 +562,7 @@ func featureEvaluationError(command string, snapshot *featureengine.Snapshot, di
 		fmt.Errorf("%s failed with %d structural diagnostic(s)", command, errors),
 		protocolcli.ErrInvalidConfig,
 	)
-	return WithResultData(err, data)
+	return protocolcli.WithResultData(err, data)
 }
 
 func generatedClientOperationDetails(implementation FeatureDesignImplementation, clientID string) string {

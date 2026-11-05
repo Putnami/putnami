@@ -484,7 +484,7 @@ func writeRuntimeDefaults(path string, rt *infra.Runtime) error {
 	if err != nil {
 		return err
 	}
-	return writeFileAtomic(path, append(data, '\n'))
+	return robustio.WriteFile(path, append(data, '\n'), 0o644, nil)
 }
 
 // applyWorkloadOverrides reads the workload's optional overrides file
@@ -517,23 +517,7 @@ func writeAggregatedManifest(path string, m infra.AggregatedManifest) error {
 	if err != nil {
 		return err
 	}
-	return writeFileAtomic(path, append(data, '\n'))
-}
-
-// writeFileAtomic writes data to path through a temp file and a rename, so a
-// concurrent reader observes either the previous file or the complete new one.
-// The rename goes through robustio because on Windows it fails while a reader
-// holds path open.
-func writeFileAtomic(path string, data []byte) error {
-	tmpPath := path + ".tmp"
-	if err := os.WriteFile(tmpPath, data, 0o644); err != nil {
-		return err
-	}
-	if err := robustio.Rename(tmpPath, path); err != nil {
-		_ = os.Remove(tmpPath)
-		return err
-	}
-	return nil
+	return robustio.WriteFile(path, append(data, '\n'), 0o644, nil)
 }
 
 // projectRoot resolves a project reference to an absolute directory. The

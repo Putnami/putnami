@@ -17,6 +17,7 @@ import (
 
 	diag "go.putnami.dev/protocol/diagnostic"
 	wsproto "go.putnami.dev/protocol/workspace"
+	"go.putnami.dev/sdk/extension/robustio"
 )
 
 const LockFilename = "putnami.lock.json"
@@ -410,8 +411,8 @@ func WriteLockFileIfChanged(workspaceRoot string, lf *LockFile) (bool, error) {
 	if err != nil || !changed {
 		return false, err
 	}
-	if err := writeFileAtomic(filepath.Join(workspaceRoot, LockFilename), data, 0o644); err != nil {
-		return false, err
+	if err := robustio.WriteFile(filepath.Join(workspaceRoot, LockFilename), data, 0o644, nil); err != nil {
+		return false, fmt.Errorf("write lock file: %w", err)
 	}
 	return true, nil
 }
@@ -543,7 +544,10 @@ func writeLockFile(workspaceRoot string, lf *LockFile) error {
 	if err != nil {
 		return err
 	}
-	return writeFileAtomic(filepath.Join(workspaceRoot, LockFilename), data, 0o644)
+	if err := robustio.WriteFile(filepath.Join(workspaceRoot, LockFilename), data, 0o644, nil); err != nil {
+		return fmt.Errorf("write lock file: %w", err)
+	}
+	return nil
 }
 
 // MarshalLockFile renders the canonical on-disk bytes of a lock file: two-space
@@ -803,35 +807,6 @@ func copyAgentArtifactEntries(entries map[string]AgentArtifactLockEntry) map[str
 		out[name] = entry
 	}
 	return out
-}
-
-// writeFileAtomic writes data to path via a temporary file in the same
-// directory followed by a rename, so a reader never observes a partially
-// written lock and an interrupted write leaves the previous file intact.
-func writeFileAtomic(path string, data []byte, perm os.FileMode) error {
-	dir := filepath.Dir(path)
-	tmp, err := os.CreateTemp(dir, "."+filepath.Base(path)+".tmp*")
-	if err != nil {
-		return fmt.Errorf("write lock file: %w", err)
-	}
-	tmpName := tmp.Name()
-	defer os.Remove(tmpName) //nolint:errcheck // best-effort cleanup of an already-renamed or failed temp
-
-	if _, err := tmp.Write(data); err != nil {
-		tmp.Close() //nolint:errcheck // write error is the one being reported
-		return fmt.Errorf("write lock file: %w", err)
-	}
-	if err := tmp.Chmod(perm); err != nil {
-		tmp.Close() //nolint:errcheck // chmod error is the one being reported
-		return fmt.Errorf("write lock file: %w", err)
-	}
-	if err := tmp.Close(); err != nil {
-		return fmt.Errorf("write lock file: %w", err)
-	}
-	if err := os.Rename(tmpName, path); err != nil {
-		return fmt.Errorf("write lock file: %w", err)
-	}
-	return nil
 }
 
 // NewLockFile creates a new empty lock file at the default write version.

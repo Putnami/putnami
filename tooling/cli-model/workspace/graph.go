@@ -126,7 +126,7 @@ func BuildGraph(projects []*Project) *DependencyGraph {
 			if !g.nodes[childID] {
 				continue
 			}
-			if containsString(g.deps[childID], p.ID) {
+			if slices.Contains(g.deps[childID], p.ID) {
 				continue
 			}
 			g.deps[childID] = append(g.deps[childID], p.ID)
@@ -197,7 +197,7 @@ func (g *DependencyGraph) deriveContractEdges(projects []*Project) {
 		if !ok || providerID == p.ID || !g.nodes[providerID] {
 			continue
 		}
-		if containsString(g.contractClients[providerID], p.ID) {
+		if slices.Contains(g.contractClients[providerID], p.ID) {
 			continue
 		}
 		g.contractClients[providerID] = append(g.contractClients[providerID], p.ID)
@@ -345,15 +345,6 @@ func findCycle(nodes map[string]bool, deps map[string][]string) []string {
 	}
 	path = append(path, cycleStart)
 	return path
-}
-
-func containsString(slice []string, item string) bool {
-	for _, s := range slice {
-		if s == item {
-			return true
-		}
-	}
-	return false
 }
 
 // DependenciesOf returns the direct dependencies of a project.
@@ -532,7 +523,7 @@ func DeclaredInputRoots(p *Project) []string {
 	if p == nil {
 		return nil
 	}
-	base := CleanWorkspacePath(p.Path)
+	base := wsproto.CleanWorkspacePath(p.Path)
 	var roots []string
 	for _, set := range declaredFilePatterns(p) {
 		for _, pattern := range set {
@@ -585,7 +576,7 @@ func InputRootReadsProject(root, projectPath string) bool {
 	if root == "" {
 		return false
 	}
-	target := CleanWorkspacePath(projectPath)
+	target := wsproto.CleanWorkspacePath(projectPath)
 	if root == "." || target == "" {
 		return true
 	}

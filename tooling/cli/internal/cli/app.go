@@ -455,7 +455,7 @@ func bootstrapLifecycleDisplay(global GlobalFlags) lifecycle.LifecycleDisplay {
 		Debug:       global.Debug,
 		Quiet:       global.Quiet,
 		NoColor:     !colorEnabled,
-		Interactive: colorEnabled && !output.StructuredOutput(global.Output) && output.ShouldUseLiveRenderer(os.Stdout),
+		Interactive: colorEnabled && !protocolcli.OutputMode(global.Output).IsMachineReadable() && output.ShouldUseLiveRenderer(os.Stdout),
 	}
 }
 

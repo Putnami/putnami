@@ -38,7 +38,7 @@ func TestTheIdleWakeExitsOnlyOnAWaitingMessage(t *testing.T) {
 	if last := syncs[len(syncs)-1]; last.State != collab.SessionStateWorking || last.Delivered != nil {
 		t.Errorf("the wake published %+v", last)
 	}
-	if cache := h.cache(claude, claudeSession); !containsString(cache.ContinuedFor, infoID) || cache.Waiter != "" || !slices.Equal(cache.Acks, []string{infoID}) {
+	if cache := h.cache(claude, claudeSession); !slices.Contains(cache.ContinuedFor, infoID) || cache.Waiter != "" || !slices.Equal(cache.Acks, []string{infoID}) {
 		t.Errorf("continued for %v, waiter %q, acks %v", cache.ContinuedFor, cache.Waiter, cache.Acks)
 	}
 }

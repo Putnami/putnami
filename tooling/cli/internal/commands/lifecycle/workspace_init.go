@@ -13,6 +13,7 @@ import (
 
 	protocolcli "go.putnami.dev/protocol/cli"
 	wsproto "go.putnami.dev/protocol/workspace"
+	"go.putnami.dev/sdk/extension/gitread"
 	"go.putnami.dev/tooling/cli/internal/cmderr"
 	"go.putnami.dev/tooling/cli/internal/commands/agentctx"
 	"go.putnami.dev/tooling/cli/internal/commands/extensions"
@@ -250,7 +251,7 @@ func WorkspaceInit(ctx context.Context, wsRoot string, args []string, env Lifecy
 	if _, err := exec.LookPath("git"); err == nil {
 		gitDir := filepath.Join(cwd, ".git")
 		if _, err := os.Stat(gitDir); os.IsNotExist(err) {
-			cmd := exec.CommandContext(ctx, git.Executable(), "init")
+			cmd := exec.CommandContext(ctx, gitread.Executable(), "init")
 			cmd.Dir = cwd
 			cmd.Stdout = nil
 			cmd.Stderr = nil

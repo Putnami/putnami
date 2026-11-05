@@ -13,6 +13,8 @@ import (
 	"strings"
 	"sync/atomic"
 	"time"
+
+	"go.putnami.dev/sdk/extension/collabhelper"
 )
 
 // Kind classifies a failed request by what it proves about the remote state.
@@ -106,27 +108,12 @@ func New(endpoint *url.URL, credential *Credential, options Options) *Client {
 		options.ReadAttempts = 3
 	}
 	if options.Pause == nil {
-		options.Pause = backoff
+		options.Pause = collabhelper.Backoff
 	}
 	if options.UserAgent == "" {
 		options.UserAgent = "putnami-linear-collaboration"
 	}
 	return &Client{endpoint: endpoint, credential: credential, options: options}
-}
-
-func backoff(ctx context.Context, attempt int) error {
-	delay := time.Second
-	if attempt > 1 {
-		delay = 3 * time.Second
-	}
-	timer := time.NewTimer(delay)
-	defer timer.Stop()
-	select {
-	case <-ctx.Done():
-		return ctx.Err()
-	case <-timer.C:
-		return nil
-	}
 }
 
 // Secrets lists the credential values to redact from anything the provider
@@ -231,7 +218,7 @@ func (c *Client) refusal(a *answer, reported graphQLError) *Error {
 	if message != "" {
 		text = "Linear refused the request: " + message
 	}
-	failure := &Error{Kind: Answered, Status: a.status, Code: code, Message: c.redact(bounded(text))}
+	failure := &Error{Kind: Answered, Status: a.status, Code: code, Message: c.redact(collabhelper.Bounded(text, maxMessageRunes))}
 	if a.status >= 500 || transientCodes[code] {
 		failure.Kind = Uncertain
 		return failure
@@ -309,13 +296,4 @@ func describe(err error, ctx, requestCtx context.Context, timeout time.Duration)
 
 func (c *Client) redact(message string) string {
 	return Redact(message, c.credential.Secrets())
-}
-
-func bounded(text string) string {
-	text = strings.Join(strings.Fields(text), " ")
-	runes := []rune(text)
-	if len(runes) > maxMessageRunes {
-		return string(runes[:maxMessageRunes]) + "…"
-	}
-	return text
 }

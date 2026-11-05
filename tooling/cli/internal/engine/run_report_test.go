@@ -9,6 +9,7 @@ import (
 
 	"go.putnami.dev/cli/model/jobs"
 	protocolcli "go.putnami.dev/protocol/cli"
+	"go.putnami.dev/sdk/extension/gitread"
 	"go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/git"
 	"go.putnami.dev/tooling/cli/internal/machine"
@@ -270,7 +271,7 @@ func TestReportGit_DetachedHeadNamesNoBranch(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
 	initCLISelectionGitRepo(t, root)
-	sha, err := git.HeadSHA(root)
+	sha, err := gitread.HeadSHA(root)
 	if err != nil {
 		t.Fatalf("head sha: %v", err)
 	}

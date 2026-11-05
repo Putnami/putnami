@@ -5,18 +5,6 @@ import (
 	"testing"
 )
 
-func TestHeadSHAReturnsTheFullCommitID(t *testing.T) {
-	repo := initGitRepo(t)
-	head, err := HeadSHA(repo)
-	if err != nil {
-		t.Fatalf("HeadSHA: %v", err)
-	}
-	want := strings.TrimSpace(runGit(t, repo, "rev-parse", "HEAD"))
-	if head != want {
-		t.Fatalf("HeadSHA = %q, want %q", head, want)
-	}
-}
-
 // TestResolveBaselineReturnsAnExplicitRefUnchanged pins the first tier: a ref
 // the caller named is never substituted, so a typo surfaces from the later read
 // rather than from a silent fallback.
@@ -64,39 +52,5 @@ func TestResolveBaselineFailsLoudlyWithNoTrunkAndNoUpstream(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "a branch is never measured against itself") {
 		t.Fatalf("ResolveBaseline error = %v, want the operator-facing explanation", err)
-	}
-}
-
-// TestRefNamesBranchStripsOnlyTheRemoteSegment pins the containment rule that
-// keeps a slashed branch name comparable: `origin/fix/3214` names `fix/3214`.
-func TestRefNamesBranchStripsOnlyTheRemoteSegment(t *testing.T) {
-	for _, test := range []struct {
-		ref    string
-		branch string
-		want   bool
-	}{
-		{"origin/fix/3214", "fix/3214", true},
-		{"origin/main", "main", true},
-		{"origin/main", "other", false},
-		{"main", "main", false},
-		{"origin/main", "", false},
-	} {
-		if got := refNamesBranch(test.ref, test.branch); got != test.want {
-			t.Errorf("refNamesBranch(%q, %q) = %t, want %t", test.ref, test.branch, got, test.want)
-		}
-	}
-}
-
-// TestCurrentBranchNameReportsNoBranchOnDetachedHEAD pins the tier guard: a
-// detached HEAD has no branch to exclude, so the upstream tier must not treat
-// the literal "HEAD" as one.
-func TestCurrentBranchNameReportsNoBranchOnDetachedHEAD(t *testing.T) {
-	repo := initGitRepo(t)
-	if got := currentBranchName(repo); got != "main" {
-		t.Fatalf("currentBranchName = %q, want main", got)
-	}
-	runGit(t, repo, "checkout", "-q", "--detach", "HEAD")
-	if got := currentBranchName(repo); got != "" {
-		t.Fatalf("currentBranchName on a detached HEAD = %q, want empty", got)
 	}
 }

@@ -19,6 +19,7 @@ import (
 	"strings"
 
 	protocaps "go.putnami.dev/protocol/capabilities"
+	"go.putnami.dev/sdk/extension/gitread"
 )
 
 // HostStatsExecBit reports whether the host file system stores the executable
@@ -75,7 +76,7 @@ func Record(runGit RunGit, repoRoot, projectRoot, repoPath, indexMode, objectID 
 				return protocaps.SourceBindingFile{Path: path, Mode: protocaps.SourceModeGitlink, Digest: "git:" + visibleObjectID}, true, nil
 			}
 			head, headErr := runGit(absPath, "rev-parse", "HEAD")
-			if headErr != nil || !validObjectID(strings.TrimSpace(head)) {
+			if headErr != nil || !gitread.ValidObjectID(strings.TrimSpace(head)) {
 				return protocaps.SourceBindingFile{}, false, fmt.Errorf("resolve visible gitlink commit %q", repoPath)
 			}
 			visibleObjectID = strings.ToLower(strings.TrimSpace(head))
@@ -137,18 +138,4 @@ func sameResolvedPath(left, right string) bool {
 		return filepath.Clean(leftResolved) == filepath.Clean(rightResolved)
 	}
 	return filepath.Clean(left) == filepath.Clean(right)
-}
-
-// validObjectID accepts an abbreviated or full SHA-1 or SHA-256 object name.
-func validObjectID(s string) bool {
-	if len(s) < 7 || len(s) > 64 {
-		return false
-	}
-	for _, r := range s {
-		if (r >= '0' && r <= '9') || (r >= 'a' && r <= 'f') || (r >= 'A' && r <= 'F') {
-			continue
-		}
-		return false
-	}
-	return true
 }

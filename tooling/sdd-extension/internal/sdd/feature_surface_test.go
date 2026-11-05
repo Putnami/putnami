@@ -122,9 +122,9 @@ func TestAnUnservedSurfaceNameFailsFeaturesValidate(t *testing.T) {
 			if !errors.Is(err, protocolcli.ErrInvalidConfig) {
 				t.Fatalf("unserved surface error = %v, want ErrInvalidConfig", err)
 			}
-			failed, ok := ResultData(err).(FeatureValidationReport)
+			failed, ok := protocolcli.ResultData(err).(FeatureValidationReport)
 			if !ok {
-				t.Fatalf("failure data = %T", ResultData(err))
+				t.Fatalf("failure data = %T", protocolcli.ResultData(err))
 			}
 			got := make(map[string]string)
 			for _, finding := range failed.Diagnostics {

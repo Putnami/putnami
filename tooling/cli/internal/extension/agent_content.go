@@ -9,6 +9,8 @@ import (
 	"sort"
 	"strings"
 
+	"go.putnami.dev/cli/model/workspace"
+
 	diag "go.putnami.dev/protocol/diagnostic"
 	extproto "go.putnami.dev/protocol/extension"
 	wsproto "go.putnami.dev/protocol/workspace"
@@ -184,7 +186,7 @@ func localExtensionReferenceDir(wsRoot, ref string) string {
 			return filepath.Clean(native)
 		}
 	}
-	if rel, ok := normalizeWorkspaceExtensionPath(ref); ok {
+	if rel, ok := workspace.NormalizeWorkspaceExtensionPath(ref); ok {
 		return filepath.Join(wsRoot, rel)
 	}
 	return ""

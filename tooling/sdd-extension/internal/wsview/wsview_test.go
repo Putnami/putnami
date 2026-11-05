@@ -166,45 +166,6 @@ func TestNewWorkspaceTakesIdentityFromTheConfigWhenThereIsOne(t *testing.T) {
 	}
 }
 
-func TestProjectIDFromPathMatchesTheCoreIdentityFold(t *testing.T) {
-	cases := map[string]string{
-		"":                     "/",
-		".":                    "/",
-		"/":                    "/",
-		"tooling/cli":          "/tooling/cli",
-		"/tooling/cli":         "/tooling/cli",
-		"(group)/cli":          "/cli",
-		"tooling/(group)/cli":  "/tooling/cli",
-		"tooling/()/cli":       "/tooling/()/cli",
-		"tooling/cli/":         "/tooling/cli",
-		"tooling//cli":         "/tooling/cli",
-		"typescript/framework": "/typescript/framework",
-	}
-	for input, want := range cases {
-		if got := ProjectIDFromPath(input); got != want {
-			t.Errorf("ProjectIDFromPath(%q) = %q, want %q", input, got, want)
-		}
-	}
-}
-
-func TestCleanWorkspacePathCanonicalizesToSlashForm(t *testing.T) {
-	cases := map[string]string{
-		"":               "",
-		"  ":             "",
-		"/":              "",
-		".":              "",
-		"a/./b":          "a/b",
-		"a//b":           "a/b",
-		"/tooling/cli/":  "tooling/cli",
-		" tooling/cli  ": "tooling/cli",
-	}
-	for input, want := range cases {
-		if got := CleanWorkspacePath(input); got != want {
-			t.Errorf("CleanWorkspacePath(%q) = %q, want %q", input, got, want)
-		}
-	}
-}
-
 // TestFromContextPrefersTheCompleteMembership pins the member order. A
 // workspace-scoped job receives BOTH collections, and reading the selection
 // when the membership is there would answer a workspace-wide question with a

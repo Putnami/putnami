@@ -15,7 +15,7 @@ import (
 	"testing"
 	"time"
 
-	"go.putnami.dev/tooling/cli/internal/flock"
+	"go.putnami.dev/sdk/extension/filelock"
 )
 
 // hexDigest returns the 64-char lowercase-hex SHA-256 of s — the exact shape a
@@ -164,7 +164,7 @@ func TestWithSharedContext_ContentionHonorsDeadline(t *testing.T) {
 	if err := os.MkdirAll(root, dirPerm); err != nil {
 		t.Fatal(err)
 	}
-	held, err := flock.Acquire(filepath.Join(root, lockFile), true, false)
+	held, err := filelock.Acquire(filepath.Join(root, lockFile), true, false)
 	if err != nil {
 		t.Fatal(err)
 	}

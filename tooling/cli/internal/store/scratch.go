@@ -9,7 +9,7 @@ import (
 	"path/filepath"
 	"time"
 
-	"go.putnami.dev/tooling/cli/internal/flock"
+	"go.putnami.dev/sdk/extension/filelock"
 )
 
 const (
@@ -20,7 +20,7 @@ const (
 
 // acquireScratchLease takes the scratch lease. Tests replace it to produce the
 // probe outcomes a real filesystem cannot be asked for on demand.
-var acquireScratchLease = flock.Acquire
+var acquireScratchLease = filelock.Acquire
 
 // AcquireScratch protects the mutable workspace cache for a complete consumer
 // lifetime. Call Close after its last filesystem access, including task capture.
@@ -30,15 +30,15 @@ var acquireScratchLease = flock.Acquire
 // An active consumer is the only silent reason to skip reclamation; a probe
 // that fails for any other reason is reported and still admits the consumer.
 // Reclamation runs only where the lease passes to child processes
-// (flock.Inheritable): elsewhere a child that outlives its CLI would hold no
+// (filelock.Inheritable): elsewhere a child that outlives its CLI would hold no
 // lease, so the consumer takes the shared lease and never reaps.
-func AcquireScratch(workspaceRoot string) (*flock.Lock, error) {
+func AcquireScratch(workspaceRoot string) (*filelock.Lock, error) {
 	parent := filepath.Join(workspaceRoot, putnamiDir)
 	if err := os.MkdirAll(parent, 0o755); err != nil {
 		return nil, fmt.Errorf("prepare scratch lease: %w", err)
 	}
 	lockPath := filepath.Join(parent, scratchLockName)
-	if flock.Inheritable {
+	if filelock.Inheritable {
 		exclusive, err := acquireScratchLease(lockPath, true, true)
 		switch {
 		case err == nil:
@@ -46,7 +46,7 @@ func AcquireScratch(workspaceRoot string) (*flock.Lock, error) {
 				slog.Warn("scratch reclamation deferred", "error", err)
 			}
 			_ = exclusive.Close()
-		case !errors.Is(err, flock.ErrBusy):
+		case !errors.Is(err, filelock.ErrBusy):
 			slog.Warn("scratch reclamation skipped", "error", err)
 		}
 	}
@@ -58,19 +58,19 @@ func AcquireScratch(workspaceRoot string) (*flock.Lock, error) {
 }
 
 // AttachScratch protects a subprocess even if the spawning CLI exits or is
-// killed. Where flock.Inheritable, the child receives one explicitly inherited
+// killed. Where filelock.Inheritable, the child receives one explicitly inherited
 // descriptor; unrelated descriptors keep Go's close-on-exec default. Close the
 // returned parent copy after Start (or its failure), never Release it. Descendants that retain the
 // descriptor also retain protection; an active consumer never expires by age.
 // A descendant's descriptors close asynchronously with respect to the wait that
 // reaps it, so the lease alone — never a child's exit status — states that the
 // generation is idle.
-func AttachScratch(cmd *exec.Cmd, workspaceRoot string) (*flock.Lock, error) {
+func AttachScratch(cmd *exec.Cmd, workspaceRoot string) (*filelock.Lock, error) {
 	lease, err := AcquireScratch(workspaceRoot)
 	if err != nil {
 		return nil, err
 	}
-	if flock.Inheritable {
+	if filelock.Inheritable {
 		cmd.ExtraFiles = append(cmd.ExtraFiles, lease.File())
 	}
 	return lease, nil

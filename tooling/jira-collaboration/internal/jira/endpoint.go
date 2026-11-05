@@ -7,10 +7,10 @@ package jira
 
 import (
 	"fmt"
-	"net"
 	"net/url"
-	"regexp"
 	"strings"
+
+	"go.putnami.dev/sdk/extension/collabhelper"
 )
 
 // OverrideVariable names the environment variable that points the client at
@@ -18,14 +18,6 @@ import (
 // accepted, so the variable can reach a local stand-in and nothing else: the
 // credential is never sent anywhere but the bound site or this machine.
 const OverrideVariable = "PUTNAMI_JIRA_API_URL"
-
-var hostPattern = regexp.MustCompile(`^[A-Za-z0-9](?:[A-Za-z0-9.-]{0,251}[A-Za-z0-9])?(?::[0-9]{1,5})?$`)
-
-// ValidHost reports whether host is a bare host name, optionally with a port:
-// no scheme, path, query or user information.
-func ValidHost(host string) bool {
-	return hostPattern.MatchString(host)
-}
 
 // Endpoint is where one site's REST API answers.
 type Endpoint struct {
@@ -39,15 +31,14 @@ type Endpoint struct {
 // https://<site>/rest/api/2, or the loopback root OverrideVariable names.
 // getenv reads OverrideVariable.
 func ResolveEndpoint(site string, getenv func(string) string) (Endpoint, error) {
-	if !ValidHost(site) {
+	if !collabhelper.ValidHost(site) {
 		return Endpoint{}, fmt.Errorf("site %q is not a bare host name", site)
 	}
 	root := "https://" + site
 	if override := getenv(OverrideVariable); override != "" {
-		parsed, err := url.Parse(override)
-		if err != nil || (parsed.Scheme != "http" && parsed.Scheme != "https") || parsed.User != nil ||
-			parsed.RawQuery != "" || parsed.Fragment != "" || !loopback(parsed.Hostname()) {
-			return Endpoint{}, fmt.Errorf("%s must be an http or https URL on the loopback interface, without credentials or query", OverrideVariable)
+		parsed, err := collabhelper.LoopbackOverride(OverrideVariable, override)
+		if err != nil {
+			return Endpoint{}, err
 		}
 		root = strings.TrimSuffix(parsed.String(), "/")
 	}
@@ -56,14 +47,6 @@ func ResolveEndpoint(site string, getenv func(string) string) (Endpoint, error) 
 		return Endpoint{}, fmt.Errorf("parse the REST root: %w", err)
 	}
 	return Endpoint{Site: site, REST: rest}, nil
-}
-
-func loopback(host string) bool {
-	if strings.EqualFold(host, "localhost") {
-		return true
-	}
-	ip := net.ParseIP(host)
-	return ip != nil && ip.IsLoopback()
 }
 
 // Path builds a REST path from segments, escaping each one, so an issue id or

@@ -14,7 +14,6 @@ import (
 	diag "go.putnami.dev/protocol/diagnostic"
 	doctor "go.putnami.dev/protocol/doctor"
 	"go.putnami.dev/protocol/features/spectest"
-	"go.putnami.dev/tooling/cli/internal/commands/shared"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
 
@@ -236,8 +235,8 @@ func TestDoctorWaivers_MalformedFailsClosed(t *testing.T) {
 			t.Errorf("profile %s: error message must name %s, got %q", profile, doctor.WaiverFilename, err.Error())
 		}
 		// The report rides along on the error for the structured failure envelope.
-		if _, ok := shared.ResultData(err).(doctor.Report); !ok {
-			t.Errorf("profile %s: malformed error must carry the report as ResultData, got %#v", profile, shared.ResultData(err))
+		if _, ok := protocolcli.ResultData(err).(doctor.Report); !ok {
+			t.Errorf("profile %s: malformed error must carry the report as ResultData, got %#v", profile, protocolcli.ResultData(err))
 		}
 		// Fail closed: nothing waived, and no hygiene finding derived from the
 		// tainted file.

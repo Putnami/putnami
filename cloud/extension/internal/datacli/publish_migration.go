@@ -16,6 +16,7 @@ import (
 	dataapiclient "go.putnami.dev/cloud/clients/data-api/go"
 	clicore "go.putnami.dev/cloud/extension/internal/clicore"
 	perrors "go.putnami.dev/errors"
+	wsproto "go.putnami.dev/protocol/workspace"
 )
 
 const (
@@ -94,7 +95,7 @@ type MigrationTarget struct {
 	Application string
 	AppDir      string
 	// ProjectPath is the release-set plan's project ID: "/" + the workspace
-	// path without grouping folders such as "(web)" (clicore.ProjectIDFromPath).
+	// path without grouping folders such as "(web)" (wsproto.ProjectIDFromPath).
 	ProjectPath string
 	BundleDir   string
 }
@@ -122,7 +123,7 @@ func ResolveMigrationTarget(params map[string]any, args []string, workspaceRoot 
 	}
 	// projectPath is the plan's project ID, which drops grouping folders such
 	// as "(web)"; relPath stays the physical path the Put package derives from.
-	projectPath, relPath := clicore.ProjectIDFromPath(filepath.ToSlash(rel)), filepath.ToSlash(rel)
+	projectPath, relPath := wsproto.ProjectIDFromPath(filepath.ToSlash(rel)), filepath.ToSlash(rel)
 	if rel == "." {
 		relPath = ""
 	}

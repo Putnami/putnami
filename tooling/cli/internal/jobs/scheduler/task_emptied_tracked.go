@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"go.putnami.dev/sdk/extension/gitread"
 	putnamigit "go.putnami.dev/tooling/cli/internal/git"
 	"go.putnami.dev/tooling/cli/internal/jobs/cachekey"
 )
@@ -55,9 +56,9 @@ func (s *Scheduler) refuseTrackedEmptiedOutputs(job *ScheduledJob) error {
 		}
 		rel = filepath.ToSlash(rel)
 		tracked, err := trackedUnder(roots.Root, rel)
-		var unmanaged *putnamigit.UnmanagedError
+		var unmanaged *gitread.UnmanagedError
 		if errors.As(err, &unmanaged) {
-			if entry, inside := putnamigit.WorkTreeEntry(roots.Root); inside && errors.Is(err, putnamigit.ErrNoProgram) {
+			if entry, inside := putnamigit.WorkTreeEntry(roots.Root); inside && errors.Is(err, gitread.ErrNoProgram) {
 				return fmt.Errorf("declared output %q (%s): %s marks a Git work tree, but no git program is on PATH, so the engine cannot tell whether the output holds a Git-tracked file: install git",
 					declared.ID, rel, entry)
 			}

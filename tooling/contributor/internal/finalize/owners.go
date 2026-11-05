@@ -19,6 +19,7 @@ import (
 	wire "go.putnami.dev/protocol/extension/hostrpc"
 	features "go.putnami.dev/protocol/features"
 	wsproto "go.putnami.dev/protocol/workspace"
+	"go.putnami.dev/sdk/extension/gitread"
 )
 
 // WorkspaceOwners answers, for each workspace-relative path, the projects
@@ -140,7 +141,7 @@ func workspacePrefix(dir string) (string, error) {
 // fileAt returns the bytes of file, relative to dir, at revision. found is
 // false when revision has no such file.
 func fileAt(dir, revision, file string) (content []byte, found bool, err error) {
-	if !validRevisionArgument(revision) {
+	if !gitread.ValidRevisionArgument(revision) {
 		return nil, false, fmt.Errorf("invalid revision %q", revision)
 	}
 	listed, err := gitOutput(dir, "ls-tree", "-z", "--name-only", revision, "--", file)
@@ -152,18 +153,6 @@ func fileAt(dir, revision, file string) (content []byte, found bool, err error) 
 		return nil, false, err
 	}
 	return []byte(output), true, nil
-}
-
-func validRevisionArgument(ref string) bool {
-	if ref == "" || len(ref) > 1024 || ref != strings.TrimSpace(ref) || strings.HasPrefix(ref, "-") {
-		return false
-	}
-	for _, character := range ref {
-		if character < 0x20 || character == 0x7f {
-			return false
-		}
-	}
-	return true
 }
 
 // gitOutput runs git in dir and returns its stdout.

@@ -2,7 +2,6 @@ package workspace
 
 import (
 	"path/filepath"
-	"strings"
 
 	wsproto "go.putnami.dev/protocol/workspace"
 )
@@ -17,7 +16,7 @@ func ScopePaths(root string, cfg *wsproto.Config) []string {
 	paths := make([]string, 0, len(cfg.Includes))
 
 	for _, entry := range cfg.Includes {
-		path := CleanWorkspacePath(entry)
+		path := wsproto.CleanWorkspacePath(entry)
 		if path == "" || seen[path] || !isAutonomousScope(root, path) {
 			continue
 		}
@@ -39,7 +38,7 @@ func RootProjectPaths(root string, cfg *wsproto.Config) []string {
 	paths := make([]string, 0, len(cfg.Includes))
 
 	for _, entry := range cfg.Includes {
-		path := CleanWorkspacePath(entry)
+		path := wsproto.CleanWorkspacePath(entry)
 		if path == "" || seen[path] || isAutonomousScope(root, path) {
 			continue
 		}
@@ -48,18 +47,6 @@ func RootProjectPaths(root string, cfg *wsproto.Config) []string {
 	}
 
 	return paths
-}
-
-func CleanWorkspacePath(path string) string {
-	path = strings.TrimSpace(strings.TrimPrefix(path, "/"))
-	if path == "" {
-		return ""
-	}
-	path = filepath.Clean(filepath.FromSlash(path))
-	if path == "." {
-		return ""
-	}
-	return filepath.ToSlash(path)
 }
 
 func isAutonomousScope(root, path string) bool {

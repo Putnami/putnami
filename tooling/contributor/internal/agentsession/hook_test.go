@@ -620,7 +620,7 @@ func TestARefusedReplyIsDropped(t *testing.T) {
 	h.provider.refuse[promptID] = collab.ReasonMessageClosed
 	h.hook(claude, "stop", claudeSession, lastMessage("[ack msg-prompt] Done."))
 	// A refused reply is final: the message takes no other reply.
-	if cache := h.cache(claude, claudeSession); cache.Replies != nil || !containsString(cache.Replied, promptID) {
+	if cache := h.cache(claude, claudeSession); cache.Replies != nil || !slices.Contains(cache.Replied, promptID) {
 		t.Errorf("replies %v, replied %v", cache.Replies, cache.Replied)
 	}
 	if !logSays(h.hookLog(), "refused the reply to msg-prompt (message.closed)") {

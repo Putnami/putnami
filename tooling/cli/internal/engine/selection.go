@@ -12,6 +12,7 @@ import (
 	"go.putnami.dev/cli/model/extension"
 	protocolcli "go.putnami.dev/protocol/cli"
 	protocoljob "go.putnami.dev/protocol/job"
+	"go.putnami.dev/sdk/extension/gitread"
 	"go.putnami.dev/tooling/cli/internal/agentartifacts"
 	internalextension "go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/git"
@@ -407,7 +408,7 @@ func resolveNoCacheProjects(req *Request, ws *workspace.Workspace) int {
 // not resolve, and there is no repository to resolve one in. Inside a
 // repository it does under --impacted-strict only.
 func impactedFailureEndsRun(req *Request, wsRoot string, err error) bool {
-	if unmanaged := git.Unmanaged(wsRoot); unmanaged != nil {
+	if unmanaged := gitread.Unmanaged(wsRoot); unmanaged != nil {
 		iox.Fprintf(os.Stderr, "putnami: --impacted needs git history: %v\n", unmanaged)
 		return true
 	}
@@ -437,7 +438,7 @@ func applyStandaloneBaseline(req *Request, ws *workspace.Workspace) int {
 	}
 	// Refused here rather than by --impacted's own check, so the one-line
 	// refusal names the flag the caller typed.
-	if unmanaged := git.Unmanaged(ws.Root); unmanaged != nil {
+	if unmanaged := gitread.Unmanaged(ws.Root); unmanaged != nil {
 		iox.Fprintf(os.Stderr, "putnami: --baseline needs git history: %v\n", unmanaged)
 		return ExitError
 	}

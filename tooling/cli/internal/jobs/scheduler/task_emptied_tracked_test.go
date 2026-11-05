@@ -9,8 +9,8 @@ import (
 	"testing"
 
 	"go.putnami.dev/protocol/features/spectest"
+	"go.putnami.dev/sdk/extension/gitread"
 	"go.putnami.dev/tooling/cli/internal/extension"
-	putnamigit "go.putnami.dev/tooling/cli/internal/git"
 )
 
 // An output that declares emptied owns its path whole, so the engine never
@@ -164,14 +164,14 @@ func TestAHitOverATrackedFileInAnEmptiedOutputIsNotServed(t *testing.T) {
 func TestOutsideAGitWorkTreeAnEmptiedOutputIsEmptied(t *testing.T) {
 	spectest.Proves(t, emptyingFeature, "emptied-output-keeps-tracked-files", "outside-a-git-work-tree-an-emptied-output-is-emptied")
 	f, clientgen := newTrackedEmptiedFixture(t, false)
-	if err := putnamigit.Unmanaged(f.ws.Root); err == nil {
+	if err := gitread.Unmanaged(f.ws.Root); err == nil {
 		t.Fatalf("the fixture workspace %s is inside a Git work tree", f.ws.Root)
 	}
 	var unmanaged []error
 	saved := trackedUnder
 	trackedUnder = func(dir, rel string) ([]string, error) {
 		paths, err := saved(dir, rel)
-		var outside *putnamigit.UnmanagedError
+		var outside *gitread.UnmanagedError
 		if errors.As(err, &outside) {
 			unmanaged = append(unmanaged, err)
 		}

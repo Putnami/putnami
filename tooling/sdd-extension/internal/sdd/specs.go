@@ -441,7 +441,7 @@ func BuildSpecContextResult(ws *workspace.Workspace, selector string) (SpecConte
 	if len(report.Declarations) == 0 {
 		report.Diagnostics = append(report.Diagnostics, diag.Errorf(featureproto.ErrorCodeUnknownFeature, "feature",
 			"no authored declaration mints feature %q", selector))
-		return report, WithResultData(
+		return report, protocolcli.WithResultData(
 			protocolcli.NotFoundf("no authored feature declaration mints %q", selector), report)
 	}
 
@@ -451,13 +451,13 @@ func BuildSpecContextResult(ws *workspace.Workspace, selector string) (SpecConte
 		// reason sits on the manifest entry or on the file, and specs init would
 		// only add a second spec for the feature.
 		report.Diagnostics = featureDiagnostics(repository.externalSpecFindings(reference, field))
-		return report, WithResultData(
+		return report, protocolcli.WithResultData(
 			protocolcli.NotFoundf("feature %q names an external spec that was not read", selector), report)
 	}
 	if !found {
 		report.Diagnostics = append(report.Diagnostics, diag.Warningf(SpecCodeMissingSpec, "feature",
 			"feature %q has no durable spec; create one with `putnami specs init %s`", selector, selector))
-		return report, WithResultData(
+		return report, protocolcli.WithResultData(
 			protocolcli.NotFoundf("feature %q has no spec under %s/", selector, featureproto.SpecDirectory), report)
 	}
 	report.Source = SpecSourceRef{Path: discovered.Path, Project: discovered.Project, Format: discovered.Format}
@@ -554,7 +554,7 @@ func BuildSpecInitResult(ws *workspace.Workspace, selector string, options SpecI
 		report.Diagnostics = append(report.Diagnostics, diag.Errorf(featureproto.ErrorCodeUnknownFeature, "feature",
 			"no authored declaration mints feature %q; declare it in %s first",
 			selector, featureproto.ManifestFilename))
-		return report, WithResultData(
+		return report, protocolcli.WithResultData(
 			protocolcli.NotFoundf("no authored feature declaration mints %q", selector), report)
 	}
 	if from != nil {
@@ -563,7 +563,7 @@ func BuildSpecInitResult(ws *workspace.Workspace, selector string, options SpecI
 			report.Project = existing.Project
 			report.Diagnostics = append(report.Diagnostics, diag.Errorf(featureproto.ErrorCodeDuplicateSpec, existing.Path,
 				"feature %q already has a native spec; edit that document instead", selector))
-			return report, WithResultData(
+			return report, protocolcli.WithResultData(
 				protocolcli.Usagef("feature %q already has a native spec at %s", selector, existing.Path), report)
 		}
 	} else if reference, field, _, named := repository.specReferenceOf(selector); named {
@@ -573,7 +573,7 @@ func BuildSpecInitResult(ws *workspace.Workspace, selector string, options SpecI
 		report.Diagnostics = append(report.Diagnostics, diag.Errorf(featureproto.ErrorCodeDuplicateSpec, field,
 			"feature %q names the external spec %s:%s; run `putnami specs init %s --from %s:%s` to draft its native spec",
 			selector, reference.Format, reference.Path, selector, reference.Format, reference.Path))
-		return report, WithResultData(
+		return report, protocolcli.WithResultData(
 			protocolcli.Usagef("feature %q already has the external spec %s:%s; draft the native spec with --from %s:%s",
 				selector, reference.Format, reference.Path, reference.Format, reference.Path), report)
 	} else if existing, found := repository.byFeature[selector]; found {
@@ -581,7 +581,7 @@ func BuildSpecInitResult(ws *workspace.Workspace, selector string, options SpecI
 		report.Project = existing.Project
 		report.Diagnostics = append(report.Diagnostics, diag.Errorf(featureproto.ErrorCodeDuplicateSpec, existing.Path,
 			"feature %q is already specified; edit that document instead", selector))
-		return report, WithResultData(
+		return report, protocolcli.WithResultData(
 			protocolcli.Usagef("feature %q already has a spec at %s", selector, existing.Path), report)
 	}
 
@@ -591,7 +591,7 @@ func BuildSpecInitResult(ws *workspace.Workspace, selector string, options SpecI
 		draft, findings, refusal := repository.draftFromExternalSpec(selector, *from)
 		report.Diagnostics = append(report.Diagnostics, findings...)
 		if refusal != nil {
-			return report, WithResultData(refusal, report)
+			return report, protocolcli.WithResultData(refusal, report)
 		}
 		drafted, manifestPath = draft.spec, draft.manifest
 	}
@@ -613,7 +613,7 @@ func BuildSpecInitResult(ws *workspace.Workspace, selector string, options SpecI
 	}
 	if findings := featureproto.ValidateSpec(spec); len(findings) > 0 {
 		report.Diagnostics = featureDiagnostics(findings)
-		return report, WithResultData(
+		return report, protocolcli.WithResultData(
 			protocolcli.InvalidConfigf("the feature declaration cannot produce a valid spec skeleton"), report)
 	}
 	contents, err := featureproto.MarshalSpec(spec)
@@ -628,7 +628,7 @@ func BuildSpecInitResult(ws *workspace.Workspace, selector string, options SpecI
 		if os.IsExist(err) {
 			report.Diagnostics = append(report.Diagnostics, diag.Errorf(featureproto.ErrorCodeInvalidPath, report.Path,
 				"a file already exists at the target path; specs init never overwrites user content"))
-			return report, WithResultData(
+			return report, protocolcli.WithResultData(
 				protocolcli.Usagef("%s already exists; specs init never overwrites a file", report.Path), report)
 		}
 		return report, protocolcli.Classify(fmt.Errorf("write %s: %w", report.Path, err), protocolcli.ErrInvalidConfig)
@@ -1025,7 +1025,7 @@ func specContractError(command string, diagnostics []diag.Diagnostic, data any) 
 		fmt.Errorf("%s failed with %d spec diagnostic(s)", command, errorCount),
 		protocolcli.ErrInvalidConfig,
 	)
-	return WithResultData(err, data)
+	return protocolcli.WithResultData(err, data)
 }
 
 func boundedStatements(statements []string, limit int) []string {

@@ -193,10 +193,6 @@ func TestProjectSourceBindingSupportsRepositoryRootProject(t *testing.T) {
 	}
 }
 
-// Core's TestProjectSourceBindingMeasuredCountsGitProcesses is deliberately not
-// copied: this package does not export ProjectSourceBindingMeasured, because no
-// SDD engine reads the subprocess count.
-
 func TestProjectSourceBindingUsesIndexOIDForEmptyUninitializedGitlink(t *testing.T) {
 	repo := initGitRepo(t)
 	dependency := initGitRepo(t)
@@ -233,9 +229,6 @@ func TestProjectSourceBindingUsesIndexOIDForEmptyUninitializedGitlink(t *testing
 }
 
 func TestProjectSourceBindingRejectsUnmergedAndMalformedStageEntries(t *testing.T) {
-	if _, _, _, _, ok := parseStageEntry("malformed"); ok {
-		t.Fatal("malformed stage entry accepted")
-	}
 	repo := initGitRepo(t)
 	project := filepath.Join(repo, "project")
 	if err := os.MkdirAll(project, 0o755); err != nil {

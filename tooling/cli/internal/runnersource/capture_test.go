@@ -14,7 +14,7 @@ import (
 
 	"go.putnami.dev/protocol/features/spectest"
 	runner "go.putnami.dev/protocol/runner"
-	"go.putnami.dev/tooling/cli/internal/git"
+	"go.putnami.dev/sdk/extension/gitread"
 )
 
 func sourceFixture(t *testing.T) (string, *Store) {
@@ -36,7 +36,7 @@ func sourceFixture(t *testing.T) (string, *Store) {
 
 func gitCmd(t *testing.T, repo string, args ...string) string {
 	t.Helper()
-	cmd := exec.Command(git.Executable(), append([]string{"-C", repo, "-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "-c", "commit.gpgsign=false", "-c", "core.hooksPath=/dev/null"}, args...)...)
+	cmd := exec.Command(gitread.Executable(), append([]string{"-C", repo, "-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "-c", "commit.gpgsign=false", "-c", "core.hooksPath=/dev/null"}, args...)...)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		t.Fatalf("git %v: %v: %s", args, err, out)

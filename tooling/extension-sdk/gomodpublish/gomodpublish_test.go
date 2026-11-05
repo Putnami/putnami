@@ -19,6 +19,7 @@ import (
 
 	"go.putnami.dev/protocol/features/spectest"
 	gomod "go.putnami.dev/protocol/gomod"
+	"go.putnami.dev/protocol/put"
 )
 
 const (
@@ -86,7 +87,7 @@ func (r *fakeRegistry) serve(w http.ResponseWriter, req *http.Request) {
 	case req.Method == http.MethodPost && req.URL.Path == gomod.BlobUploadPath(testModule):
 		data, _ := io.ReadAll(req.Body)
 		r.uploads++
-		digest := Digest(data)
+		digest := put.Digest(data)
 		r.blobs[digest] = data
 		w.WriteHeader(http.StatusCreated)
 		_, _ = fmt.Fprintf(w, `{"digest":%q}`, digest)
@@ -125,13 +126,13 @@ func TestGoModuleUploadReusesAnExistingVersionAtTheSameDigest(t *testing.T) {
 	ctx := context.Background()
 
 	digest, reused, err := Publish(ctx, client, nil, registry.server.URL, testToken, testModuleVersion("zip bytes"))
-	if err != nil || reused || digest != Digest([]byte("zip bytes")) {
+	if err != nil || reused || digest != put.Digest([]byte("zip bytes")) {
 		t.Fatalf("first publish digest=%q reused=%t err=%v, want a fresh version at the zip digest", digest, reused, err)
 	}
 
 	report := &recordedReport{}
 	digest, reused, err = Publish(ctx, client, report, registry.server.URL, testToken, testModuleVersion("zip bytes"))
-	if err != nil || !reused || digest != Digest([]byte("zip bytes")) {
+	if err != nil || !reused || digest != put.Digest([]byte("zip bytes")) {
 		t.Fatalf("second publish digest=%q reused=%t err=%v, want reuse at the same digest", digest, reused, err)
 	}
 	if registry.versions != 1 {
@@ -284,7 +285,7 @@ func TestUploadZipRetriesATransientFailure(t *testing.T) {
 	registry := newFakeRegistry(t)
 	server, sent := faultyRegistry(t, registry, 1, http.StatusBadGateway)
 	digest, err := UploadZip(context.Background(), testClient(t), nil, server.URL, testToken, testModule, []byte("zip bytes"))
-	if err != nil || digest != Digest([]byte("zip bytes")) {
+	if err != nil || digest != put.Digest([]byte("zip bytes")) {
 		t.Fatalf("UploadZip = %q, %v; want the zip digest from the second attempt", digest, err)
 	}
 	if len(*sent) != 2 || !bytes.Equal((*sent)[0], (*sent)[1]) || registry.uploads != 1 || fmt.Sprint(*waits) != "[1s]" {
@@ -332,7 +333,7 @@ func TestUploadZipDoesNotRetryAClientTimeout(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		if sent.Add(1) == 1 {
 			w.WriteHeader(http.StatusCreated)
-			_, _ = fmt.Fprintf(w, `{"digest":%q}`, Digest(zip))
+			_, _ = fmt.Fprintf(w, `{"digest":%q}`, put.Digest(zip))
 			return
 		}
 		<-release
@@ -393,7 +394,7 @@ func TestVerifyRetriesATransientDownloadFailure(t *testing.T) {
 	mod := []byte("module go.putnami.dev/mod\n")
 	for name, verify := range map[string]func(ctx context.Context, client *http.Client, registryURL string) error{
 		"zip": func(ctx context.Context, client *http.Client, registryURL string) error {
-			return VerifyZip(ctx, client, registryURL, testToken, testModule, testVersion, Digest(zip))
+			return VerifyZip(ctx, client, registryURL, testToken, testModule, testVersion, put.Digest(zip))
 		},
 		"mod": func(ctx context.Context, client *http.Client, registryURL string) error {
 			return VerifyMod(ctx, client, registryURL, testToken, testModule, testVersion, mod)
@@ -569,7 +570,7 @@ func TestVerifyRefusesOtherServedBytes(t *testing.T) {
 		_, _ = w.Write([]byte("module go.putnami.dev/other\n"))
 	}))
 	defer server.Close()
-	if err := VerifyZip(context.Background(), server.Client(), server.URL, "", testModule, testVersion, Digest([]byte("uploaded bytes"))); err == nil || !strings.Contains(err.Error(), "does not match uploaded digest") {
+	if err := VerifyZip(context.Background(), server.Client(), server.URL, "", testModule, testVersion, put.Digest([]byte("uploaded bytes"))); err == nil || !strings.Contains(err.Error(), "does not match uploaded digest") {
 		t.Fatalf("zip mismatch error = %v", err)
 	}
 	if err := VerifyMod(context.Background(), server.Client(), server.URL, "", testModule, testVersion, []byte("module go.putnami.dev/mod\n")); err == nil || !strings.Contains(err.Error(), "does not match submitted bytes") {

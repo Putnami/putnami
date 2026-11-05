@@ -11,6 +11,7 @@ import (
 	protocolcli "go.putnami.dev/protocol/cli"
 	diag "go.putnami.dev/protocol/diagnostic"
 	featureproto "go.putnami.dev/protocol/features"
+	wsproto "go.putnami.dev/protocol/workspace"
 	featureengine "go.putnami.dev/tooling/sdd/extension/internal/features"
 	workspace "go.putnami.dev/tooling/sdd/extension/internal/wsview"
 )
@@ -150,7 +151,7 @@ func BuildSpecVerifyResult(ws *workspace.Workspace, selection Selection, session
 		return report, specContractError("specs verify", report.Diagnostics, report)
 	}
 	if len(report.Blocked) > 0 {
-		return report, WithResultData(fmt.Errorf("specs verify: %d project(s) blocked under enforce: %s",
+		return report, protocolcli.WithResultData(fmt.Errorf("specs verify: %d project(s) blocked under enforce: %s",
 			len(report.Blocked), strings.Join(report.Blocked, ", ")), report)
 	}
 	return report, nil
@@ -212,7 +213,7 @@ func specOwnerPolicy(ws *workspace.Workspace, repository *specRepository, featur
 	if !found || discovered.Root == "" {
 		return "workspace", nil
 	}
-	project := ws.ProjectByID(workspace.ProjectIDFromPath(discovered.Root))
+	project := ws.ProjectByID(wsproto.ProjectIDFromPath(discovered.Root))
 	if project == nil {
 		project = ws.ProjectByName(discovered.Project)
 	}

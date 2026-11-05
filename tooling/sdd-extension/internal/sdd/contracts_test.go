@@ -254,8 +254,8 @@ func TestContractsCheck_Drift(t *testing.T) {
 	if protocolcli.ExitCodeForError(err) != protocolcli.ExitUsage {
 		t.Fatalf("drift exit code = %d, want %d", protocolcli.ExitCodeForError(err), protocolcli.ExitUsage)
 	}
-	if data, ok := ResultData(err).(CheckReport); !ok || data.Outcome != OutcomeDrift {
-		t.Fatalf("drift error does not carry the report as ResultData: %#v", ResultData(err))
+	if data, ok := protocolcli.ResultData(err).(CheckReport); !ok || data.Outcome != OutcomeDrift {
+		t.Fatalf("drift error does not carry the report as ResultData: %#v", protocolcli.ResultData(err))
 	}
 	assertGoldenReport(t, "check_drift.json", report)
 }

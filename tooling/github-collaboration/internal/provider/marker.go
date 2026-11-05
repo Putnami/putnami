@@ -3,6 +3,8 @@ package provider
 import (
 	"regexp"
 	"strings"
+
+	"go.putnami.dev/sdk/extension/collabhelper"
 )
 
 // An idempotency marker records, inside the body of the issue or review a
@@ -23,7 +25,7 @@ type idempotency struct {
 
 // newIdempotency hashes an operation's key and the request it carries.
 func newIdempotency(operation, key string, request any) idempotency {
-	return idempotency{key: digest([]string{operation, key}), digest: digest(request)}
+	return idempotency{key: collabhelper.Digest([]string{operation, key}), digest: collabhelper.Digest(request)}
 }
 
 func (m idempotency) comment() string {

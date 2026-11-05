@@ -206,7 +206,7 @@ func TestWriteErrorResultPreservesCustomExitErrorCode(t *testing.T) {
 // failure envelope holds both what the command found and why it exits 1.
 func TestWriteErrorResultCarriesAttachedData(t *testing.T) {
 	var stdoutLines []string
-	err := WithResultData(NewError("environment prod is not ready", ExitFailure), map[string]any{"ready": false})
+	err := protocolcli.WithResultData(NewError("environment prod is not ready", ExitFailure), map[string]any{"ready": false})
 	WriteErrorResult(err, map[string]any{"output": "jsonl", "command": "cloud env doctor"},
 		IO{Stdout: func(s string) { stdoutLines = append(stdoutLines, s) }})
 	var got map[string]any
@@ -224,8 +224,5 @@ func TestWriteErrorResultCarriesAttachedData(t *testing.T) {
 	}
 	if ExitCode(err) != ExitFailure || err.Error() != "environment prod is not ready" {
 		t.Fatalf("the carrier changed the error: %d %q", ExitCode(err), err.Error())
-	}
-	if WithResultData(nil, "data") != nil {
-		t.Fatal("WithResultData(nil) is not nil")
 	}
 }

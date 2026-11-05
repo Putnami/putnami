@@ -5,35 +5,9 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"sort"
-	"strings"
 
 	wsproto "go.putnami.dev/protocol/workspace"
 )
-
-// ProjectIDFromPath derives a project's canonical logical ID from its physical
-// workspace-relative path. Complete, non-empty parenthesized segments are
-// transparent grouping folders: they remain in Project.Path but are omitted
-// from Project.ID.
-func ProjectIDFromPath(projectPath string) string {
-	physicalPath := CleanWorkspacePath(projectPath)
-	if physicalPath == "" {
-		return "/"
-	}
-
-	segments := strings.Split(physicalPath, "/")
-	logicalSegments := make([]string, 0, len(segments))
-	for _, segment := range segments {
-		if isTransparentGroupSegment(segment) {
-			continue
-		}
-		logicalSegments = append(logicalSegments, segment)
-	}
-	return "/" + strings.Join(logicalSegments, "/")
-}
-
-func isTransparentGroupSegment(segment string) bool {
-	return len(segment) > 2 && segment[0] == '(' && segment[len(segment)-1] == ')'
-}
 
 // identityDigestFormat versions the CLI-side identity fold. It is hashed with
 // the payload, so bumping it moves every identity and every cache key that
@@ -103,7 +77,7 @@ func ProbeViewOf(p *Project, resolveDependency func(string) (string, bool)) wspr
 // ProbePathOf translates the CLI's workspace-relative path spelling (where the
 // workspace root is "") into the probe protocol's ("." for the root).
 func ProbePathOf(projectPath string) string {
-	cleaned := CleanWorkspacePath(projectPath)
+	cleaned := wsproto.CleanWorkspacePath(projectPath)
 	if cleaned == "" {
 		return wsproto.ProbeRootPath
 	}

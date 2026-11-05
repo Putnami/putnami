@@ -21,8 +21,9 @@ import protocolcli "go.putnami.dev/protocol/cli"
 | Symbol | Purpose |
 |--------|---------|
 | `ExitSuccess/Failure/Usage/Auth/API/Signal` | Exit-code taxonomy (`0/1/2/3/4/130`) |
-| `OutputMode` + `ResolveOutputMode` | `text \| json \| jsonl \| cloud-logging`; `--json` = `--output=json` |
+| `OutputMode` + `ResolveOutputMode` | `text \| json \| jsonl \| cloud-logging`; `--json` = `--output=json`; `IsStructured` is json and jsonl, `IsMachineReadable` adds cloud-logging |
 | `ResultV2` / `NewResultV2` / `WriteResultV2` | The `--output=json` envelope — the one every command emits |
+| `WithResultData` / `ResultData` | Attach a payload to a failure, so its envelope reports what the command found beside the error |
 | `SessionStreamRecord`, `BoundedSessionEndRecord`, `SessionFile`, `SessionPlanFile` | The other version-2 machine documents, including JSONL `plan:end` previews and the opt-in bounded session terminal |
 | `ReportFile` + `ReportMax*` | The run's bounded synthesis document (`report.json`) and the caps that bound it |
 | `TaskIdentity` / `RunSummary` / `TaskRecord` | The typed task identity and the one run verdict every v2 surface reports |

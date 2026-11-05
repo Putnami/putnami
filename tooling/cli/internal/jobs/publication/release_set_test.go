@@ -30,6 +30,7 @@ import (
 	protocoljob "go.putnami.dev/protocol/job"
 	runtimeproto "go.putnami.dev/protocol/runtime"
 	wsproto "go.putnami.dev/protocol/workspace"
+	"go.putnami.dev/sdk/extension/gitread"
 	"go.putnami.dev/sdk/extension/profiles"
 	"go.putnami.dev/sdk/extension/releaseset"
 	"go.putnami.dev/tooling/cli/internal/cmderr"
@@ -2082,7 +2083,7 @@ func TestReleaseSetProvenanceReadsGitRevision(t *testing.T) {
 	root := t.TempDir()
 	git := func(args ...string) string {
 		t.Helper()
-		cmd := exec.Command(putnamigit.Executable(), append([]string{"-c", "user.name=test", "-c", "user.email=test@example.invalid", "-c", "commit.gpgsign=false"}, args...)...)
+		cmd := exec.Command(gitread.Executable(), append([]string{"-c", "user.name=test", "-c", "user.email=test@example.invalid", "-c", "commit.gpgsign=false"}, args...)...)
 		cmd.Dir = root
 		out, err := cmd.CombinedOutput()
 		if err != nil {
@@ -2929,7 +2930,7 @@ func TestBuildReleaseSetOptionsReadsTheTagAndThePolicy(t *testing.T) {
 // projects attribution exists to serve.
 func TestReleaseMemberProjectRecordsTheLogicalIdentity(t *testing.T) {
 	grouped := &workspace.Project{
-		ID:   workspace.ProjectIDFromPath("apps/(internal)/service"),
+		ID:   wsproto.ProjectIDFromPath("apps/(internal)/service"),
 		Path: "apps/(internal)/service",
 	}
 	if grouped.ID != "/apps/service" {

@@ -136,6 +136,21 @@
         },
         {
           "kind": "project-dependency",
+          "consumerProject": "/tooling/github-collaboration",
+          "producerProject": "/tooling/extension-sdk"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/jira-collaboration",
+          "producerProject": "/tooling/extension-sdk"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/linear-collaboration",
+          "producerProject": "/tooling/extension-sdk"
+        },
+        {
+          "kind": "project-dependency",
           "consumerProject": "/tooling/local-collaboration",
           "producerProject": "/tooling/extension-sdk"
         },
@@ -160,7 +175,7 @@
           "producerProject": "/tooling/extension-sdk"
         }
       ],
-      "justification": "Every provider in this domain is an extension binary: it parses its job context, emits phases, progress, diagnostics and artifacts, and serves its workspace probe through the SDK runtime rather than writing the JSONL wire itself. One shared runtime is what keeps three language providers and the template packager answering the orchestrator identically. The collaboration and memory stores take their cross-process file lock from the same SDK, so every Putnami binary locks one way on every platform."
+      "justification": "Every provider in this domain is an extension binary: it parses its job context, emits phases, progress, diagnostics and artifacts, and serves its workspace probe through the SDK runtime rather than writing the JSONL wire itself. One shared runtime is what keeps three language providers and the template packager answering the orchestrator identically. The collaboration and memory stores take their cross-process file lock from the same SDK, so every Putnami binary locks one way on every platform. The GitHub, Jira and Linear providers take the answer bounds, the credential redaction, the pauses and the endpoint checks they share from it, so the three answer the collaboration contract one way."
     },
     {
       "id": "extension-providers.go-client-emitter.v1",
@@ -566,6 +581,11 @@
         {
           "kind": "project-dependency",
           "consumerProject": "/tooling/github-collaboration",
+          "producerProject": "/protocols/architecture"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/github-collaboration",
           "producerProject": "/protocols/capabilities"
         },
         {
@@ -581,7 +601,22 @@
         {
           "kind": "project-dependency",
           "consumerProject": "/tooling/github-collaboration",
+          "producerProject": "/protocols/database"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/github-collaboration",
           "producerProject": "/protocols/diagnostic"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/github-collaboration",
+          "producerProject": "/protocols/distribution"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/github-collaboration",
+          "producerProject": "/protocols/events"
         },
         {
           "kind": "project-dependency",
@@ -596,12 +631,42 @@
         {
           "kind": "project-dependency",
           "consumerProject": "/tooling/github-collaboration",
+          "producerProject": "/protocols/gomod"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/github-collaboration",
+          "producerProject": "/protocols/infra"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/github-collaboration",
           "producerProject": "/protocols/job"
         },
         {
           "kind": "project-dependency",
           "consumerProject": "/tooling/github-collaboration",
+          "producerProject": "/protocols/oci"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/github-collaboration",
+          "producerProject": "/protocols/put"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/github-collaboration",
+          "producerProject": "/protocols/registry"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/github-collaboration",
           "producerProject": "/protocols/runtime"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/github-collaboration",
+          "producerProject": "/protocols/storage"
         },
         {
           "kind": "project-dependency",
@@ -611,6 +676,11 @@
         {
           "kind": "project-dependency",
           "consumerProject": "/tooling/jira-collaboration",
+          "producerProject": "/protocols/architecture"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/jira-collaboration",
           "producerProject": "/protocols/capabilities"
         },
         {
@@ -626,7 +696,22 @@
         {
           "kind": "project-dependency",
           "consumerProject": "/tooling/jira-collaboration",
+          "producerProject": "/protocols/database"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/jira-collaboration",
           "producerProject": "/protocols/diagnostic"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/jira-collaboration",
+          "producerProject": "/protocols/distribution"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/jira-collaboration",
+          "producerProject": "/protocols/events"
         },
         {
           "kind": "project-dependency",
@@ -641,12 +726,42 @@
         {
           "kind": "project-dependency",
           "consumerProject": "/tooling/jira-collaboration",
+          "producerProject": "/protocols/gomod"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/jira-collaboration",
+          "producerProject": "/protocols/infra"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/jira-collaboration",
           "producerProject": "/protocols/job"
         },
         {
           "kind": "project-dependency",
           "consumerProject": "/tooling/jira-collaboration",
+          "producerProject": "/protocols/oci"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/jira-collaboration",
+          "producerProject": "/protocols/put"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/jira-collaboration",
+          "producerProject": "/protocols/registry"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/jira-collaboration",
           "producerProject": "/protocols/runtime"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/jira-collaboration",
+          "producerProject": "/protocols/storage"
         },
         {
           "kind": "project-dependency",
@@ -656,6 +771,11 @@
         {
           "kind": "project-dependency",
           "consumerProject": "/tooling/linear-collaboration",
+          "producerProject": "/protocols/architecture"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/linear-collaboration",
           "producerProject": "/protocols/capabilities"
         },
         {
@@ -671,7 +791,22 @@
         {
           "kind": "project-dependency",
           "consumerProject": "/tooling/linear-collaboration",
+          "producerProject": "/protocols/database"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/linear-collaboration",
           "producerProject": "/protocols/diagnostic"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/linear-collaboration",
+          "producerProject": "/protocols/distribution"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/linear-collaboration",
+          "producerProject": "/protocols/events"
         },
         {
           "kind": "project-dependency",
@@ -686,12 +821,42 @@
         {
           "kind": "project-dependency",
           "consumerProject": "/tooling/linear-collaboration",
+          "producerProject": "/protocols/gomod"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/linear-collaboration",
+          "producerProject": "/protocols/infra"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/linear-collaboration",
           "producerProject": "/protocols/job"
         },
         {
           "kind": "project-dependency",
           "consumerProject": "/tooling/linear-collaboration",
+          "producerProject": "/protocols/oci"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/linear-collaboration",
+          "producerProject": "/protocols/put"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/linear-collaboration",
+          "producerProject": "/protocols/registry"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/linear-collaboration",
           "producerProject": "/protocols/runtime"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/linear-collaboration",
+          "producerProject": "/protocols/storage"
         },
         {
           "kind": "project-dependency",

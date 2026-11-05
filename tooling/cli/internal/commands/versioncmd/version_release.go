@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	wsproto "go.putnami.dev/protocol/workspace"
+	"go.putnami.dev/sdk/extension/gitread"
 	"go.putnami.dev/sdk/extension/linetag"
 	"go.putnami.dev/tooling/cli/internal/cmderr"
 	"go.putnami.dev/tooling/cli/internal/git"
@@ -26,7 +27,7 @@ func proposedTag(wsRoot string, spec git.LineSpec) (version, tagName string, err
 	bump := git.BumpNone
 	if found {
 		last = release.Version
-		commits, commitsErr := git.CommitsSince(wsRoot, release.Commit, spec.Pathspecs)
+		commits, commitsErr := gitread.CommitsSince(wsRoot, release.Commit, spec.Pathspecs)
 		if commitsErr != nil {
 			return "", "", commitsErr
 		}
@@ -41,12 +42,12 @@ func proposedTag(wsRoot string, spec git.LineSpec) (version, tagName string, err
 
 // lineCommits are the commits the changelog renders: everything since the
 // line's last tag that touches it, or its whole history when it has none.
-func lineCommits(wsRoot string, spec git.LineSpec) ([]git.Commit, error) {
+func lineCommits(wsRoot string, spec git.LineSpec) ([]gitread.Commit, error) {
 	release, _, err := lastRelease(wsRoot, spec)
 	if err != nil {
 		return nil, err
 	}
-	return git.CommitsSince(wsRoot, release.Commit, spec.Pathspecs)
+	return gitread.CommitsSince(wsRoot, release.Commit, spec.Pathspecs)
 }
 
 // lastRelease is the line's last release (linetag.LastRelease).
@@ -127,7 +128,7 @@ func majorOf(version string) int {
 }
 
 func gitOutput(ctx context.Context, repoRoot string, args ...string) (string, error) {
-	cmd := exec.CommandContext(ctx, git.Executable(), append([]string{"-C", repoRoot}, args...)...)
+	cmd := exec.CommandContext(ctx, gitread.Executable(), append([]string{"-C", repoRoot}, args...)...)
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr

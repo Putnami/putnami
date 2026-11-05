@@ -214,7 +214,7 @@ func BuildCodeownersResult(ws *workspace.Workspace, workspaceOptions map[string]
 func codeownersVerdict(report CodeownersReport) (CodeownersReport, error) {
 	sortDiagnostics(report.Diagnostics)
 	if diag.HasErrors(report.Diagnostics) {
-		return report, WithResultData(protocolcli.Classify(
+		return report, protocolcli.WithResultData(protocolcli.Classify(
 			fmt.Errorf("codeowners: %d error(s) in the owner declarations", len(report.Diagnostics)),
 			protocolcli.ErrInvalidConfig), report)
 	}
@@ -228,7 +228,7 @@ func codeownersVerdict(report CodeownersReport) (CodeownersReport, error) {
 func ownerDirectories(ws *workspace.Workspace) []string {
 	seen := map[string]bool{}
 	for _, project := range ws.Projects {
-		for dir := workspace.CleanWorkspacePath(project.Path); dir != "" && dir != "." && !seen[dir]; dir = path.Dir(dir) {
+		for dir := wsproto.CleanWorkspacePath(project.Path); dir != "" && dir != "." && !seen[dir]; dir = path.Dir(dir) {
 			seen[dir] = true
 		}
 	}

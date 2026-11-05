@@ -8,7 +8,6 @@ import (
 
 	"go.putnami.dev/cli/model/extension"
 	protocolcli "go.putnami.dev/protocol/cli"
-	"go.putnami.dev/tooling/cli/internal/commands/shared"
 	"go.putnami.dev/tooling/cli/internal/iox"
 	"go.putnami.dev/tooling/cli/internal/layout"
 	"go.putnami.dev/tooling/cli/internal/lockfile"
@@ -295,7 +294,7 @@ func vnextCheckError(report VNextReport) error {
 		fmt.Errorf("%s needs migration to lock format v%d: %d pending change(s)",
 			report.Lock, report.TargetVersion, len(report.Changes)),
 		protocolcli.ErrInvalidConfig)
-	return shared.WithResultData(protocolcli.WithNext(err, "putnami migrate vnext --apply"), report)
+	return protocolcli.WithResultData(protocolcli.WithNext(err, "putnami migrate vnext --apply"), report)
 }
 
 // printVNextReport prints the human-readable summary.

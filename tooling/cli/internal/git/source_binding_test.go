@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	protocaps "go.putnami.dev/protocol/capabilities"
+	"go.putnami.dev/sdk/extension/gitread"
 )
 
 // projectSourceBinding drops the subprocess count these binding tests do not
@@ -269,9 +270,6 @@ func TestProjectSourceBindingUsesIndexOIDForEmptyUninitializedGitlink(t *testing
 }
 
 func TestProjectSourceBindingRejectsUnmergedAndMalformedStageEntries(t *testing.T) {
-	if _, _, _, _, ok := parseStageEntry("malformed"); ok {
-		t.Fatal("malformed stage entry accepted")
-	}
 	repo := initGitRepo(t)
 	project := filepath.Join(repo, "project")
 	if err := os.MkdirAll(project, 0o755); err != nil {
@@ -293,7 +291,7 @@ func TestProjectSourceBindingRejectsUnmergedAndMalformedStageEntries(t *testing.
 		t.Fatal(err)
 	}
 	runGit(t, repo, "commit", "-am", "main")
-	cmd := exec.Command(Executable(), "merge", "other")
+	cmd := exec.Command(gitread.Executable(), "merge", "other")
 	cmd.Dir = repo
 	if err := cmd.Run(); err == nil {
 		t.Fatal("expected merge conflict")

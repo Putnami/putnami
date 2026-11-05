@@ -36,6 +36,7 @@ require (
 	go.putnami.dev/protocol/capabilities v0.0.0 // indirect
 	go.putnami.dev/protocol/events v0.0.0 // indirect
 	go.putnami.dev/protocol/oci v0.0.0 // indirect
+	go.putnami.dev/protocol/put v0.0.0 // indirect
 	go.putnami.dev/protocol/storage v0.0.0 // indirect
 	golang.org/x/sync v0.20.0 // indirect
 	golang.org/x/sys v0.44.0 // indirect

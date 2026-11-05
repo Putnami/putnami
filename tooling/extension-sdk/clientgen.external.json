@@ -8,12 +8,6 @@
         {
           "path": "tooling/extension-sdk/gomodpublish/gomodpublish.go",
           "transport": "http",
-          "symbol": "http.Client",
-          "fingerprint": "62efef67fbf5b532305665e19efd5c700447e0433ff224f9b01bbce87c3bd505"
-        },
-        {
-          "path": "tooling/extension-sdk/gomodpublish/gomodpublish.go",
-          "transport": "http",
           "symbol": "http.NewRequestWithContext",
           "fingerprint": "422f6778f03bda12c21068553f37d287002794c6fb9478e523cdcdd77ebec7d9"
         },
@@ -41,12 +35,6 @@
       "authority": "npm registry API (github.com/npm/registry/blob/master/docs/REGISTRY-API.md)",
       "adapter": "tooling/extension-sdk/npmpublish/npmpublish.go",
       "callsites": [
-        {
-          "path": "tooling/extension-sdk/npmpublish/npmpublish.go",
-          "transport": "http",
-          "symbol": "http.Client",
-          "fingerprint": "62efef67fbf5b532305665e19efd5c700447e0433ff224f9b01bbce87c3bd505"
-        },
         {
           "path": "tooling/extension-sdk/npmpublish/npmpublish.go",
           "transport": "http",

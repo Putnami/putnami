@@ -7,10 +7,10 @@ package github
 
 import (
 	"fmt"
-	"net"
 	"net/url"
-	"regexp"
 	"strings"
+
+	"go.putnami.dev/sdk/extension/collabhelper"
 )
 
 // DefaultHost is the public GitHub host.
@@ -21,14 +21,6 @@ const DefaultHost = "github.com"
 // accepted, so the variable can reach a local stand-in and nothing else: a
 // resolved credential is never sent anywhere but its own host or this machine.
 const OverrideVariable = "PUTNAMI_GITHUB_API_URL"
-
-var hostPattern = regexp.MustCompile(`^[A-Za-z0-9](?:[A-Za-z0-9.-]{0,251}[A-Za-z0-9])?(?::[0-9]{1,5})?$`)
-
-// ValidHost reports whether host is a bare host name, optionally with a port:
-// no scheme, path, query or user information.
-func ValidHost(host string) bool {
-	return hostPattern.MatchString(host)
-}
 
 // Endpoint is where one host's API answers.
 type Endpoint struct {
@@ -47,14 +39,13 @@ func ResolveEndpoint(host string, getenv func(string) string) (Endpoint, error) 
 	if host == "" {
 		host = DefaultHost
 	}
-	if !ValidHost(host) {
+	if !collabhelper.ValidHost(host) {
 		return Endpoint{}, fmt.Errorf("host %q is not a bare host name", host)
 	}
 	if override := getenv(OverrideVariable); override != "" {
-		parsed, err := url.Parse(override)
-		if err != nil || (parsed.Scheme != "http" && parsed.Scheme != "https") || parsed.User != nil ||
-			parsed.RawQuery != "" || parsed.Fragment != "" || !loopback(parsed.Hostname()) {
-			return Endpoint{}, fmt.Errorf("%s must be an http or https URL on the loopback interface, without credentials or query", OverrideVariable)
+		parsed, err := collabhelper.LoopbackOverride(OverrideVariable, override)
+		if err != nil {
+			return Endpoint{}, err
 		}
 		root := strings.TrimSuffix(parsed.String(), "/")
 		return endpoint(host, root, root+"/graphql")
@@ -75,14 +66,6 @@ func endpoint(host, rest, graphQL string) (Endpoint, error) {
 		return Endpoint{}, fmt.Errorf("parse the GraphQL endpoint: %w", err)
 	}
 	return Endpoint{Host: host, REST: restURL, GraphQL: graphQLURL}, nil
-}
-
-func loopback(host string) bool {
-	if strings.EqualFold(host, "localhost") {
-		return true
-	}
-	ip := net.ParseIP(host)
-	return ip != nil && ip.IsLoopback()
 }
 
 // Path builds a REST path from segments, escaping each one, so a branch name

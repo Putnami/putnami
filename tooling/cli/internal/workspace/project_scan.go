@@ -146,7 +146,7 @@ func ScanProjectPathsWithProviders(root string, scopes []ProviderScope) ([]strin
 // membership for every declared project the scan did not return, and an excluded
 // directory is precisely the one the scan was told not to enter.
 func ExcludedByProviderScopes(scopes []ProviderScope, rel string) bool {
-	rel = cleanWorkspacePath(rel)
+	rel = wsproto.CleanWorkspacePath(rel)
 	if rel == "" {
 		return false
 	}

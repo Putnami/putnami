@@ -1,10 +1,14 @@
 // Package robustio retries the renames and removals Windows fails for a
-// moment: another process, such as a reader of the file, an antivirus scanner
-// or the search indexer, holds a handle on a file without sharing delete
-// access, and the rename or removal fails with ERROR_ACCESS_DENIED or
-// ERROR_SHARING_VIOLATION until that handle closes. It follows cmd/go's
-// internal robustio package: a bounded retry with a randomized, doubling
-// backoff. Unix renames and removes once, as os.Rename and os.Remove do.
+// moment, and writes a file through a temporary file and such a rename, so a
+// reader sees the previous file or the new one, never a part.
+//
+// Windows fails a rename or a removal while another process, such as a reader
+// of the file, an antivirus scanner or the search indexer, holds a handle on
+// the file without sharing delete access: the call fails with
+// ERROR_ACCESS_DENIED or ERROR_SHARING_VIOLATION until that handle closes.
+// Rename and Remove follow cmd/go's internal robustio package: a bounded retry
+// with a randomized, doubling backoff. Unix renames and removes once, as
+// os.Rename and os.Remove do.
 package robustio
 
 import (

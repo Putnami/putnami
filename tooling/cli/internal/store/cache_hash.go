@@ -19,6 +19,7 @@ import (
 	extensionproto "go.putnami.dev/protocol/extension"
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/sdk/extension/dirlink"
+	"go.putnami.dev/sdk/extension/gitread"
 	"go.putnami.dev/sdk/extension/sourcebinding"
 	gitutil "go.putnami.dev/tooling/cli/internal/git"
 )
@@ -436,7 +437,7 @@ func gitInputDirectory(dir string, patterns []string) (string, error) {
 // whole one would select, so the key reads the same files and hashes the same
 // bytes; a pattern such as `git:**` has no prefix and lists the whole cut.
 func collectGitFiles(dir string, includes, excludes []string) ([]fileEntry, error) {
-	cmd := exec.Command(gitutil.Executable(), "rev-parse", "--show-toplevel")
+	cmd := exec.Command(gitread.Executable(), "rev-parse", "--show-toplevel")
 	cmd.Dir = dir
 	out, err := cmd.Output()
 	if err != nil {

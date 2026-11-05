@@ -7,6 +7,7 @@ import (
 	"strconv"
 
 	collab "go.putnami.dev/protocol/collaboration"
+	"go.putnami.dev/sdk/extension/collabhelper"
 )
 
 // maxCheckPages bounds the pages of check runs, and of commit statuses, one
@@ -83,7 +84,7 @@ func (s *proposalSession) checkRuns(sha string) ([]collab.Check, *collab.Failure
 					state = collab.CheckStateFailing
 				}
 			}
-			checks = append(checks, collab.Check{Name: oneLine(run.Name, collab.MaxTitleLength, "check run"), State: state, URL: displayURL(run.HTMLURL)})
+			checks = append(checks, collab.Check{Name: collabhelper.OneLine(run.Name, collab.MaxTitleLength, "check run"), State: state, URL: collabhelper.DisplayURL(run.HTMLURL, collab.MaxURLLength)})
 		}
 		if len(answer.CheckRuns) < githubPageSize || page*githubPageSize >= answer.TotalCount {
 			return checks, nil
@@ -108,7 +109,7 @@ func (s *proposalSession) commitStatuses(sha string) ([]collab.Check, *collab.Fa
 			case "failure", "error":
 				state = collab.CheckStateFailing
 			}
-			checks = append(checks, collab.Check{Name: oneLine(status.Context, collab.MaxTitleLength, "status"), State: state, URL: displayURL(status.TargetURL)})
+			checks = append(checks, collab.Check{Name: collabhelper.OneLine(status.Context, collab.MaxTitleLength, "status"), State: state, URL: collabhelper.DisplayURL(status.TargetURL, collab.MaxURLLength)})
 		}
 		if len(answer.Statuses) < githubPageSize || page*githubPageSize >= answer.TotalCount {
 			return checks, nil

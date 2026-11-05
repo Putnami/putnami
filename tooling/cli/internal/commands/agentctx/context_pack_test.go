@@ -17,7 +17,6 @@ import (
 	diag "go.putnami.dev/protocol/diagnostic"
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/tooling/cli/internal/cmderr"
-	"go.putnami.dev/tooling/cli/internal/commands/shared"
 	"go.putnami.dev/tooling/cli/internal/iox"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
@@ -472,9 +471,9 @@ func TestCanonicalDocumentBytes_FailsClosedOnUnflaggedSensitive(t *testing.T) {
 	if code := protocolcli.ExitCodeForError(err); code != protocolcli.ExitUsage {
 		t.Fatalf("exit code = %d, want %d", code, protocolcli.ExitUsage)
 	}
-	report, ok := shared.ResultData(err).(ContextSafetyReport)
+	report, ok := protocolcli.ResultData(err).(ContextSafetyReport)
 	if !ok {
-		t.Fatalf("error does not carry a ContextSafetyReport: %#v", shared.ResultData(err))
+		t.Fatalf("error does not carry a ContextSafetyReport: %#v", protocolcli.ResultData(err))
 	}
 	found := false
 	for _, v := range report.Violations {

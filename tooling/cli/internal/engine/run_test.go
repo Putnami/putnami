@@ -23,11 +23,11 @@ import (
 	protocolcli "go.putnami.dev/protocol/cli"
 	extensionproto "go.putnami.dev/protocol/extension"
 	workspacepb "go.putnami.dev/protocol/workspace"
+	"go.putnami.dev/sdk/extension/gitread"
 	"go.putnami.dev/sdk/extension/scratch"
 	"go.putnami.dev/tooling/cli/internal/abort"
 	"go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/fixtureproc"
-	internalgit "go.putnami.dev/tooling/cli/internal/git"
 	"go.putnami.dev/tooling/cli/internal/jobs/scheduler"
 	"go.putnami.dev/tooling/cli/internal/profiler"
 	"go.putnami.dev/tooling/cli/internal/workspace"
@@ -468,7 +468,7 @@ func TestSelectProjects_BareMainIgnoresLastSHAForDifferentCommand(t *testing.T) 
 	t.Parallel()
 	wsRoot := t.TempDir()
 	initCLISelectionGitRepo(t, wsRoot)
-	head, err := internalgit.HeadSHA(wsRoot)
+	head, err := gitread.HeadSHA(wsRoot)
 	if err != nil {
 		t.Fatalf("HeadSHA: %v", err)
 	}
@@ -502,7 +502,7 @@ func TestSelectProjects_BareMainIgnoresLastSHAForDifferentParams(t *testing.T) {
 	t.Parallel()
 	wsRoot := t.TempDir()
 	initCLISelectionGitRepo(t, wsRoot)
-	head, err := internalgit.HeadSHA(wsRoot)
+	head, err := gitread.HeadSHA(wsRoot)
 	if err != nil {
 		t.Fatalf("HeadSHA: %v", err)
 	}
@@ -536,7 +536,7 @@ func TestSelectProjects_BareMainPrefersLocalMarkerBeforeRemote(t *testing.T) {
 	t.Parallel()
 	wsRoot := t.TempDir()
 	initCLISelectionGitRepo(t, wsRoot)
-	base, err := internalgit.HeadSHA(wsRoot)
+	base, err := gitread.HeadSHA(wsRoot)
 	if err != nil {
 		t.Fatalf("HeadSHA: %v", err)
 	}
@@ -574,7 +574,7 @@ func TestSelectProjects_BareMainRemoteMarkerRequiresProvider(t *testing.T) {
 	t.Parallel()
 	wsRoot := t.TempDir()
 	initCLISelectionGitRepo(t, wsRoot)
-	base, err := internalgit.HeadSHA(wsRoot)
+	base, err := gitread.HeadSHA(wsRoot)
 	if err != nil {
 		t.Fatalf("HeadSHA: %v", err)
 	}
@@ -660,12 +660,12 @@ func TestSelectProjects_BareMainFutureRemoteMarkerFallsBackToAll(t *testing.T) {
 	t.Parallel()
 	wsRoot := t.TempDir()
 	initCLISelectionGitRepo(t, wsRoot)
-	base, err := internalgit.HeadSHA(wsRoot)
+	base, err := gitread.HeadSHA(wsRoot)
 	if err != nil {
 		t.Fatalf("HeadSHA base: %v", err)
 	}
 	commitCLISelectionFile(t, wsRoot, "packages/lib/lib.go", "package lib\n", "future marker")
-	future, err := internalgit.HeadSHA(wsRoot)
+	future, err := gitread.HeadSHA(wsRoot)
 	if err != nil {
 		t.Fatalf("HeadSHA future: %v", err)
 	}
@@ -696,7 +696,7 @@ func TestSelectProjects_BareMainRemoteMarkerIsCommandSpecific(t *testing.T) {
 	t.Parallel()
 	wsRoot := t.TempDir()
 	initCLISelectionGitRepo(t, wsRoot)
-	base, err := internalgit.HeadSHA(wsRoot)
+	base, err := gitread.HeadSHA(wsRoot)
 	if err != nil {
 		t.Fatalf("HeadSHA: %v", err)
 	}
@@ -887,7 +887,7 @@ func TestExecute_SuccessfulRunRecordsLastBuildSHA(t *testing.T) {
 	f := newExecuteFixture(t)
 	f.req.Global.All = true
 	initCLISelectionGitRepo(t, f.wsRoot)
-	wantSHA, err := internalgit.HeadSHA(f.wsRoot)
+	wantSHA, err := gitread.HeadSHA(f.wsRoot)
 	if err != nil {
 		t.Fatalf("HeadSHA: %v", err)
 	}
@@ -914,7 +914,7 @@ func TestExecute_SuccessfulRunWithoutProviderDoesNotPublishRemoteRunMarker(t *te
 	f := newExecuteFixture(t)
 	f.req.Global.All = true
 	initCLISelectionGitRepo(t, f.wsRoot)
-	wantSHA, err := internalgit.HeadSHA(f.wsRoot)
+	wantSHA, err := gitread.HeadSHA(f.wsRoot)
 	if err != nil {
 		t.Fatalf("HeadSHA: %v", err)
 	}
@@ -1211,7 +1211,7 @@ func initCLISelectionGitRepo(t *testing.T, dir string) {
 
 func runCLISelectionGit(t *testing.T, dir string, args ...string) string {
 	t.Helper()
-	cmd := exec.Command(internalgit.Executable(), args...)
+	cmd := exec.Command(gitread.Executable(), args...)
 	cmd.Dir = dir
 	cmd.Env = append(os.Environ(),
 		"GIT_AUTHOR_NAME=test", "GIT_AUTHOR_EMAIL=test@example.com",

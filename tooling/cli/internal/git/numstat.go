@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+
+	"go.putnami.dev/sdk/extension/gitread"
 )
 
 // LineCount is the number of lines one path adds and deletes. Binary is set
@@ -28,16 +30,16 @@ func DiffLineCounts(repoRoot, base string) (map[string]LineCount, error) {
 	if base == "" {
 		return nil, fmt.Errorf("git diff line counts: empty base")
 	}
-	output, err := run(repoRoot, "diff", "--no-ext-diff", "--no-renames", "--numstat", "-z", base)
+	output, err := gitread.Run(repoRoot, "diff", "--no-ext-diff", "--no-renames", "--numstat", "-z", base)
 	if err != nil {
 		return nil, fmt.Errorf("git diff line counts against %q: %w", base, err)
 	}
 	counts := parseNumstat(output)
-	untracked, err := run(repoRoot, "ls-files", "-z", "--others", "--exclude-standard")
+	untracked, err := gitread.Run(repoRoot, "ls-files", "-z", "--others", "--exclude-standard")
 	if err != nil {
 		return nil, fmt.Errorf("git list untracked files: %w", err)
 	}
-	for _, path := range splitNUL(untracked) {
+	for _, path := range gitread.SplitNUL(untracked) {
 		counts[path] = LineCount{Untracked: true}
 	}
 	return counts, nil
@@ -48,7 +50,7 @@ func DiffLineCounts(repoRoot, base string) (map[string]LineCount, error) {
 // binary path.
 func parseNumstat(output string) map[string]LineCount {
 	counts := make(map[string]LineCount)
-	for _, record := range splitNUL(output) {
+	for _, record := range gitread.SplitNUL(output) {
 		fields := strings.SplitN(record, "\t", 3)
 		if len(fields) != 3 || fields[2] == "" {
 			continue

@@ -209,7 +209,7 @@ func discoverJobProviders(ctx context.Context, wsRoot string, ws *workspace.Work
 func listsExtension(project *workspace.Project, definition *extension.JobDefinition) bool {
 	id := ""
 	if definition.ExtensionPath != "" {
-		id = workspace.ProjectIDFromPath(definition.ExtensionPath)
+		id = wsproto.ProjectIDFromPath(definition.ExtensionPath)
 	}
 	for _, listed := range append(append([]string(nil), project.Dependencies...), project.Extensions...) {
 		if listed == definition.ExtensionName || (id != "" && listed == id) {

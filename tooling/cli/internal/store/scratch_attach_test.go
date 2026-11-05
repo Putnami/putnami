@@ -5,7 +5,7 @@ import (
 	"os/exec"
 	"testing"
 
-	"go.putnami.dev/tooling/cli/internal/flock"
+	"go.putnami.dev/sdk/extension/filelock"
 )
 
 // TestAttachScratchPassesTheLeaseOnlyWhereInheritable verifies that a child
@@ -17,10 +17,10 @@ func TestAttachScratchPassesTheLeaseOnlyWhereInheritable(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if flock.Inheritable && (len(cmd.ExtraFiles) != 1 || cmd.ExtraFiles[0] != lease.File()) {
+	if filelock.Inheritable && (len(cmd.ExtraFiles) != 1 || cmd.ExtraFiles[0] != lease.File()) {
 		t.Fatalf("the child does not inherit the scratch lease: %v", cmd.ExtraFiles)
 	}
-	if !flock.Inheritable && len(cmd.ExtraFiles) != 0 {
+	if !filelock.Inheritable && len(cmd.ExtraFiles) != 0 {
 		t.Fatalf("the child was given descriptors this platform cannot pass: %v", cmd.ExtraFiles)
 	}
 	startErr := cmd.Start()

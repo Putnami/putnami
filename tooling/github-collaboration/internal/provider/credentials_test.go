@@ -9,6 +9,7 @@ import (
 
 	collab "go.putnami.dev/protocol/collaboration"
 	"go.putnami.dev/protocol/features/spectest"
+	"go.putnami.dev/sdk/extension/collabhelper"
 	"go.putnami.dev/tooling/github-collaboration/internal/github"
 )
 
@@ -27,7 +28,7 @@ func TestACredentialNeverReachesAnAnswer(t *testing.T) {
 	echo := `{"message":"Not Found: token ` + fakeToken + ` was used","errors":["` + fakeToken + `"]}`
 	h.fake.fail("GET", `/issues/[0-9]+$`, fault{before: true, status: 404, body: echo})
 	text := h.serve("tasks", "get", `{"ref":{"source":"github:acme/app","id":"1"}}`)
-	if strings.Contains(text, fakeToken) || !strings.Contains(text, github.RedactedMarker) {
+	if strings.Contains(text, fakeToken) || !strings.Contains(text, collabhelper.RedactedMarker) {
 		t.Fatalf("a GitHub error echoing the credential reached the answer: %s", text)
 	}
 
@@ -39,7 +40,7 @@ func TestACredentialNeverReachesAnAnswer(t *testing.T) {
 	}
 	var task collab.TaskResult
 	h.ok("tasks", "get", `{"ref":{"source":"github:acme/app","id":"`+strconv.Itoa(seeded.number)+`"}}`, &task)
-	if task.Task.Title != "Leaked "+github.RedactedMarker {
+	if task.Task.Title != "Leaked "+collabhelper.RedactedMarker {
 		t.Fatalf("title %q", task.Task.Title)
 	}
 

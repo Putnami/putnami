@@ -18,6 +18,7 @@ import (
 	extension "go.putnami.dev/protocol/extension"
 	"go.putnami.dev/protocol/features/spectest"
 	runtimeproto "go.putnami.dev/protocol/runtime"
+	"go.putnami.dev/sdk/extension/collabhelper"
 	"go.putnami.dev/tooling/jira-collaboration/internal/jira"
 	"go.putnami.dev/tooling/jira-collaboration/internal/provider"
 )
@@ -141,7 +142,7 @@ func TestTheProviderRedactsItsAnswer(t *testing.T) {
 	if code := run([]string{providerArg}, p, bytes.NewReader(request), &out, &errOut); code != 0 {
 		t.Fatalf("code %d: %s", code, errOut.String())
 	}
-	if strings.Contains(out.String(), token) || !strings.Contains(out.String(), jira.RedactedMarker) {
+	if strings.Contains(out.String(), token) || !strings.Contains(out.String(), collabhelper.RedactedMarker) {
 		t.Fatalf("the answer carries the credential: %s", out.String())
 	}
 	if seen, _ := agent.Load().(string); !strings.HasPrefix(seen, "putnami-jira-collaboration/") {

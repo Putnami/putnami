@@ -2,7 +2,6 @@ package clicore
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"strings"
 
@@ -70,40 +69,10 @@ func WriteErrorResult(err error, params map[string]any, ioctx IO) {
 		mode = protocolcli.OutputJSON
 	}
 	if mode.IsStructured() {
-		result := protocolcli.NewResultV2(CommandPath(params), resultData(err), err)
+		result := protocolcli.NewResultV2(CommandPath(params), protocolcli.ResultData(err), err)
 		result.ExitCode = ExitCode(err)
 		WriteProtocolResult(result, mode, ioctx)
 	}
-}
-
-// resultDataError is a failure that still reports a result. A check command
-// that ran and found problems exits non-zero, and its one structured envelope
-// must carry what it found beside the error.
-type resultDataError struct {
-	err  error
-	data any
-}
-
-func (e *resultDataError) Error() string { return e.err.Error() }
-
-func (e *resultDataError) Unwrap() error { return e.err }
-
-// WithResultData attaches data to err, so the failure envelope
-// WriteErrorResult renders carries it as its data member. The exit code and
-// error class stay err's own. A nil err stays nil.
-func WithResultData(err error, data any) error {
-	if err == nil {
-		return nil
-	}
-	return &resultDataError{err: err, data: data}
-}
-
-func resultData(err error) any {
-	var carrier *resultDataError
-	if errors.As(err, &carrier) {
-		return carrier.data
-	}
-	return nil
 }
 
 // WriteProtocolResult renders the shared protocol CLI version-2 result envelope

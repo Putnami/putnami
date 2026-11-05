@@ -10,6 +10,8 @@ import (
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"go.putnami.dev/sdk/extension/collabhelper"
 )
 
 const testKey = "lin_api_testKEYtestKEYtestKEYtestKEY0000"
@@ -122,7 +124,7 @@ func TestARefusalIsDefiniteAndRedacted(t *testing.T) {
 	if err == nil || err.Kind != Answered || err.Code != "AUTHENTICATION_ERROR" || calls.Load() != 1 {
 		t.Fatalf("a refusal: %+v after %d calls", err, calls.Load())
 	}
-	if strings.Contains(err.Message, testKey) || !strings.Contains(err.Message, RedactedMarker) {
+	if strings.Contains(err.Message, testKey) || !strings.Contains(err.Message, collabhelper.RedactedMarker) {
 		t.Fatalf("the message carries the key: %q", err.Message)
 	}
 }

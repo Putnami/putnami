@@ -6,10 +6,9 @@
 package linear
 
 import (
-	"fmt"
-	"net"
 	"net/url"
-	"strings"
+
+	"go.putnami.dev/sdk/extension/collabhelper"
 )
 
 // DefaultEndpoint is Linear's GraphQL endpoint.
@@ -28,18 +27,5 @@ func ResolveEndpoint(getenv func(string) string) (*url.URL, error) {
 	if override == "" {
 		return url.Parse(DefaultEndpoint)
 	}
-	parsed, err := url.Parse(override)
-	if err != nil || (parsed.Scheme != "http" && parsed.Scheme != "https") || parsed.User != nil ||
-		parsed.RawQuery != "" || parsed.Fragment != "" || !loopback(parsed.Hostname()) {
-		return nil, fmt.Errorf("%s must be an http or https URL on the loopback interface, without credentials or query", OverrideVariable)
-	}
-	return parsed, nil
-}
-
-func loopback(host string) bool {
-	if strings.EqualFold(host, "localhost") {
-		return true
-	}
-	ip := net.ParseIP(host)
-	return ip != nil && ip.IsLoopback()
+	return collabhelper.LoopbackOverride(OverrideVariable, override)
 }

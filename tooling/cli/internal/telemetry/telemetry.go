@@ -26,7 +26,7 @@ import (
 	"sync"
 	"time"
 
-	"go.putnami.dev/tooling/cli/internal/flock"
+	"go.putnami.dev/sdk/extension/filelock"
 )
 
 // configFileName is stored in the user's home config directory.
@@ -424,35 +424,35 @@ func enforceBufferLimit(path string) {
 	_ = os.Rename(tmp, path)
 }
 
-func acquireBufferLock(bufferPath string) (*flock.Lock, error) {
-	return flock.Acquire(filepath.Join(filepath.Dir(bufferPath), bufferLockFileName), true, false)
+func acquireBufferLock(bufferPath string) (*filelock.Lock, error) {
+	return filelock.Acquire(filepath.Join(filepath.Dir(bufferPath), bufferLockFileName), true, false)
 }
 
-func acquireConsentLock(bufferPath string) (*flock.Lock, error) {
-	return flock.Acquire(filepath.Join(filepath.Dir(bufferPath), consentLockFileName), true, false)
+func acquireConsentLock(bufferPath string) (*filelock.Lock, error) {
+	return filelock.Acquire(filepath.Join(filepath.Dir(bufferPath), consentLockFileName), true, false)
 }
 
 // acquireBufferLockContext waits for the shared buffer lock only while ctx is
 // active. Flush and Disable intentionally use the unbounded variant above;
 // background draining must instead stop with its owning CLI run.
-func acquireBufferLockContext(ctx context.Context, bufferPath string) (*flock.Lock, error) {
+func acquireBufferLockContext(ctx context.Context, bufferPath string) (*filelock.Lock, error) {
 	return acquireLockContext(ctx, filepath.Join(filepath.Dir(bufferPath), bufferLockFileName))
 }
 
-func acquireConsentLockContext(ctx context.Context, bufferPath string) (*flock.Lock, error) {
+func acquireConsentLockContext(ctx context.Context, bufferPath string) (*filelock.Lock, error) {
 	return acquireLockContext(ctx, filepath.Join(filepath.Dir(bufferPath), consentLockFileName))
 }
 
-func acquireLockContext(ctx context.Context, lockPath string) (*flock.Lock, error) {
+func acquireLockContext(ctx context.Context, lockPath string) (*filelock.Lock, error) {
 	for {
 		if err := ctx.Err(); err != nil {
 			return nil, err
 		}
-		lock, err := flock.Acquire(lockPath, true, true)
+		lock, err := filelock.Acquire(lockPath, true, true)
 		if err == nil {
 			return lock, nil
 		}
-		if !errors.Is(err, flock.ErrBusy) {
+		if !errors.Is(err, filelock.ErrBusy) {
 			return nil, err
 		}
 		timer := time.NewTimer(10 * time.Millisecond)

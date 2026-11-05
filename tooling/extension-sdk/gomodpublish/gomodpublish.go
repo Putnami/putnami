@@ -17,16 +17,14 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"net"
 	"net/http"
-	"net/url"
-	"strings"
-	"time"
 
 	"golang.org/x/mod/module"
 
 	gomod "go.putnami.dev/protocol/gomod"
+	"go.putnami.dev/protocol/put"
 	"go.putnami.dev/sdk/extension/internal/artifacterr"
+	"go.putnami.dev/sdk/extension/internal/registryhttp"
 	"go.putnami.dev/sdk/extension/internal/retry"
 )
 
@@ -72,67 +70,18 @@ type Module struct {
 	Mod []byte
 }
 
-// Digest returns "sha256:" and the lowercase hex SHA-256 of data.
-func Digest(data []byte) string {
-	return fmt.Sprintf("sha256:%x", sha256.Sum256(data))
-}
-
 // ValidateRegistryURL returns raw as an absolute HTTPS URL, or an HTTP URL on a
 // loopback host, with no trailing slash. A URL that carries userinfo, a query
 // or a fragment is refused, so no credential travels in a URL.
 func ValidateRegistryURL(raw string) (string, error) {
-	u, err := url.Parse(strings.TrimSpace(raw))
-	if err != nil || u.Opaque != "" || u.Host == "" || u.Hostname() == "" {
-		return "", fmt.Errorf("go registry URL must be an absolute HTTP(S) URL without credentials")
-	}
-	if u.User != nil || u.RawQuery != "" || u.Fragment != "" {
-		return "", fmt.Errorf("go registry URL must be an absolute HTTP(S) URL without credentials, query, or fragment")
-	}
-	u.Scheme = strings.ToLower(u.Scheme)
-	switch u.Scheme {
-	case "https":
-	case "http":
-		hostname := strings.TrimSuffix(strings.ToLower(u.Hostname()), ".")
-		ip := net.ParseIP(hostname)
-		loopback := hostname == "localhost" || strings.HasSuffix(hostname, ".localhost") || (ip != nil && ip.IsLoopback())
-		if !loopback {
-			return "", fmt.Errorf("go registry URL must use HTTPS (HTTP is allowed only for loopback)")
-		}
-	default:
-		return "", fmt.Errorf("go registry URL must use HTTP(S)")
-	}
-	u.Path = strings.TrimRight(u.Path, "/")
-	return u.String(), nil
+	return registryhttp.ValidateURL("go", raw)
 }
 
 // NewHTTPClient returns the client a module publication sends through: no
 // proxy, so the bearer has no second recipient, no redirect, and a five-minute
 // timeout.
 func NewHTTPClient() (*http.Client, error) {
-	baseTransport, ok := http.DefaultTransport.(*http.Transport)
-	if !ok {
-		return nil, fmt.Errorf("go registry transport is unavailable")
-	}
-	transport := baseTransport.Clone()
-	transport.Proxy = nil
-	return &http.Client{
-		Timeout:       5 * time.Minute,
-		Transport:     transport,
-		CheckRedirect: refuseRedirect,
-	}, nil
-}
-
-func refuseRedirect(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
-
-// withoutRedirects returns a copy of client that never follows a redirect, so
-// a request carrying the bearer reaches the registry it names and no other.
-func withoutRedirects(client *http.Client) (*http.Client, error) {
-	if client == nil {
-		return nil, errors.New("go module publication requires an HTTP client")
-	}
-	bounded := *client
-	bounded.CheckRedirect = refuseRedirect
-	return &bounded, nil
+	return registryhttp.NewClient("go registry transport", nil)
 }
 
 func authorize(req *http.Request, token string) {
@@ -148,11 +97,11 @@ func authorize(req *http.Request, token string) {
 // times in all.
 func UploadZip(ctx context.Context, client *http.Client, reporter Reporter, registryURL, token, modulePath string, zip []byte) (string, error) {
 	reporter = reporterOrDiscard(reporter)
-	client, err := withoutRedirects(client)
+	client, err := registryhttp.WithoutRedirects(client, "go module publication")
 	if err != nil {
 		return "", err
 	}
-	localDigest := Digest(zip)
+	localDigest := put.Digest(zip)
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, registryURL+gomod.BlobUploadPath(modulePath), bytes.NewReader(zip))
 	if err != nil {
@@ -204,7 +153,7 @@ func UploadZip(ctx context.Context, client *http.Client, reporter Reporter, regi
 // the PUT is sent once.
 func PublishVersion(ctx context.Context, client *http.Client, reporter Reporter, registryURL, token, modulePath, version string, goMod []byte, zipDigest string, allowExisting bool) (reused bool, err error) {
 	reporter = reporterOrDiscard(reporter)
-	client, err = withoutRedirects(client)
+	client, err = registryhttp.WithoutRedirects(client, "go module publication")
 	if err != nil {
 		return false, err
 	}
@@ -331,7 +280,7 @@ func proxyURL(registryURL, modulePath, version, extension string) (string, error
 // that body included, sends the GET again, up to retry.Attempts times in
 // all. Any other error consume returns is final.
 func download(ctx context.Context, client *http.Client, target, token, name string, consume func(io.Reader) error) error {
-	client, err := withoutRedirects(client)
+	client, err := registryhttp.WithoutRedirects(client, "go module publication")
 	if err != nil {
 		return err
 	}

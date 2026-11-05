@@ -48,10 +48,10 @@ import (
 	contracts "go.putnami.dev/protocol/contracts"
 	diag "go.putnami.dev/protocol/diagnostic"
 	"go.putnami.dev/protocol/infra"
+	"go.putnami.dev/sdk/extension/gitread"
 	"go.putnami.dev/tooling/cli/internal/cmderr"
 	"go.putnami.dev/tooling/cli/internal/commands/shared"
 	"go.putnami.dev/tooling/cli/internal/extension"
-	"go.putnami.dev/tooling/cli/internal/git"
 	"go.putnami.dev/tooling/cli/internal/iox"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
@@ -952,7 +952,7 @@ func contextDocumentError(label, what string, diags []diag.Diagnostic) error {
 	if len(errs) > 0 {
 		msg = fmt.Sprintf("%s: %s", msg, errs[0].Message)
 	}
-	return shared.WithResultData(protocolcli.Classify(errors.New(msg), protocolcli.ErrInvalidConfig), report)
+	return protocolcli.WithResultData(protocolcli.Classify(errors.New(msg), protocolcli.ErrInvalidConfig), report)
 }
 
 // buildPackedDocument builds one project's document and runs it through the
@@ -1066,7 +1066,7 @@ func selectContextProjects(ws *workspace.Workspace, args []string) ([]*workspace
 // commits, or not a git checkout). The value is stable across a fixed tree and
 // still resolves outside a repository.
 func resolveWorkspaceRevision(wsRoot string) string {
-	out, err := exec.Command(git.Executable(), "-C", wsRoot, "rev-parse", "HEAD").Output()
+	out, err := exec.Command(gitread.Executable(), "-C", wsRoot, "rev-parse", "HEAD").Output()
 	if err != nil {
 		return "unknown"
 	}

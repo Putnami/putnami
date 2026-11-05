@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"go.putnami.dev/tooling/cli/internal/flock"
+	"go.putnami.dev/sdk/extension/filelock"
 )
 
 // GC knobs are deliberately separate from the build store's. Binaries are static
@@ -373,7 +373,7 @@ func (s *Store) lockExclusive(nonBlocking bool) (func(), bool) {
 	if err := os.MkdirAll(s.root, dirPerm); err != nil {
 		return func() {}, false
 	}
-	l, err := flock.Acquire(filepath.Join(s.root, lockFile), true, nonBlocking)
+	l, err := filelock.Acquire(filepath.Join(s.root, lockFile), true, nonBlocking)
 	if err != nil {
 		return func() {}, false
 	}

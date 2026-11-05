@@ -10,6 +10,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"go.putnami.dev/sdk/extension/collabhelper"
 )
 
 // TokenCommand asks an installed gh CLI for the token it stores for a host.
@@ -135,16 +137,8 @@ func (c *Credential) Secrets() []string {
 // redacted wherever they appear, whoever's they are.
 var knownTokenPattern = regexp.MustCompile(`\b(?:gh[pousr]_[A-Za-z0-9]{20,255}|github_pat_[A-Za-z0-9_]{20,255})\b`)
 
-// RedactedMarker replaces every redacted credential.
-const RedactedMarker = "[redacted]"
-
 // Redact removes secrets and every string shaped like a GitHub token from
 // text.
 func Redact(text string, secrets []string) string {
-	for _, secret := range secrets {
-		if len(secret) >= 4 {
-			text = strings.ReplaceAll(text, secret, RedactedMarker)
-		}
-	}
-	return knownTokenPattern.ReplaceAllString(text, RedactedMarker)
+	return collabhelper.Redact(text, secrets, knownTokenPattern)
 }

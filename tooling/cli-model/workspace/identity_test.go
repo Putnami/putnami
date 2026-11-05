@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"go.putnami.dev/protocol/features/spectest"
+	wsproto "go.putnami.dev/protocol/workspace"
 )
 
 func TestProjectIDFromPath(t *testing.T) {
@@ -24,8 +25,8 @@ func TestProjectIDFromPath(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.path, func(t *testing.T) {
-			if got := ProjectIDFromPath(tt.path); got != tt.want {
-				t.Errorf("ProjectIDFromPath(%q) = %q, want %q", tt.path, got, tt.want)
+			if got := wsproto.ProjectIDFromPath(tt.path); got != tt.want {
+				t.Errorf("wsproto.ProjectIDFromPath(%q) = %q, want %q", tt.path, got, tt.want)
 			}
 		})
 	}

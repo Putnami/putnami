@@ -249,7 +249,7 @@ func newSnapshotAt(ws *Workspace, probeDigest string, providers []SnapshotProvid
 	for _, project := range ws.Projects {
 		snapshot.Projects = append(snapshot.Projects, SnapshotProject{
 			ID:             project.ID,
-			Path:           cleanWorkspacePath(project.Path),
+			Path:           wsproto.CleanWorkspacePath(project.Path),
 			Name:           project.Name,
 			MetadataDigest: ws.MetadataDigestFor(project),
 			Inputs:         projectMetadataInputs(ws.Root, project),
@@ -283,7 +283,7 @@ func workspaceMetadataInputs(ws *Workspace) []SnapshotInput {
 }
 
 func projectMetadataInputs(root string, project *Project) []SnapshotInput {
-	base := cleanWorkspacePath(project.Path)
+	base := wsproto.CleanWorkspacePath(project.Path)
 	inputs := make([]SnapshotInput, 0, len(projectMetadataInputNames))
 	for _, name := range projectMetadataInputNames {
 		rel := name

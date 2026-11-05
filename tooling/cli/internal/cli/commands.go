@@ -14,7 +14,6 @@ import (
 	"go.putnami.dev/tooling/cli/internal/commandmeta"
 	"go.putnami.dev/tooling/cli/internal/commands/agentctx"
 	"go.putnami.dev/tooling/cli/internal/commands/lifecycle"
-	"go.putnami.dev/tooling/cli/internal/commands/shared"
 	"go.putnami.dev/tooling/cli/internal/iox"
 )
 
@@ -197,7 +196,7 @@ func writeStructuredFailure(stdout, stderr io.Writer, mode protocolcli.OutputMod
 		printCommandError(stderr, err)
 		return exitCodeForError(err)
 	}
-	result := protocolcli.NewResultV2(cmdPath, shared.ResultData(err), err)
+	result := protocolcli.NewResultV2(cmdPath, protocolcli.ResultData(err), err)
 	result.WorkspaceWarnings = warnings
 	code, _ := protocolcli.WriteResultV2(stdout, mode, result)
 	iox.Fprintf(stderr, "putnami: %v\n", err)

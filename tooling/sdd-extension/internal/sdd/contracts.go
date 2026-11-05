@@ -457,12 +457,12 @@ func outcomeError(r CheckReport) error {
 		err := protocolcli.Classify(
 			fmt.Errorf("contracts check found %d breaking change(s) since the committed contract", len(r.BreakingChanges)),
 			protocolcli.ErrInvalidConfig)
-		return WithResultData(err, r)
+		return protocolcli.WithResultData(err, r)
 	case OutcomeDrift:
 		err := protocolcli.Classify(
 			fmt.Errorf("contracts check found %d drifted artifact(s); run `putnami contracts generate`", len(r.Drift)),
 			protocolcli.ErrInvalidConfig)
-		return WithResultData(err, r)
+		return protocolcli.WithResultData(err, r)
 	default:
 		return nil
 	}

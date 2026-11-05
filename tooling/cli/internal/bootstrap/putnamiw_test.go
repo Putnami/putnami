@@ -21,7 +21,7 @@ import (
 	"time"
 
 	"go.putnami.dev/protocol/features/spectest"
-	gitexec "go.putnami.dev/tooling/cli/internal/git"
+	"go.putnami.dev/sdk/extension/gitread"
 )
 
 // findPutnamiw walks up from the test's working directory to the repo root that
@@ -843,7 +843,7 @@ func seedSourceTree(t *testing.T, repo string) {
 // depend on (or write to) the developer's git configuration.
 func git(t *testing.T, dir string, args ...string) {
 	t.Helper()
-	cmd := exec.Command(gitexec.Executable(), args...)
+	cmd := exec.Command(gitread.Executable(), args...)
 	cmd.Dir = dir
 	cmd.Env = append(os.Environ(),
 		"GIT_AUTHOR_NAME=putnami test", "GIT_AUTHOR_EMAIL=test@example.invalid",
@@ -1252,7 +1252,7 @@ func assertNotAGitWorkTree(t *testing.T, dir string) {
 	if _, err := exec.LookPath("git"); err != nil {
 		return
 	}
-	cmd := exec.Command(gitexec.Executable(), "-C", dir, "rev-parse", "--is-inside-work-tree")
+	cmd := exec.Command(gitread.Executable(), "-C", dir, "rev-parse", "--is-inside-work-tree")
 	if out, err := cmd.CombinedOutput(); err == nil {
 		t.Fatalf("fixture %s is inside a git work tree (%s), so it exercises the content-key path "+
 			"instead of the mtime gate these tests cover. Run the suite with TMPDIR outside a repository.",

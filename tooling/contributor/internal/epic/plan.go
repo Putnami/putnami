@@ -16,6 +16,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	protocolcli "go.putnami.dev/protocol/cli"
 	job "go.putnami.dev/protocol/job"
 
 	"go.putnami.dev/tooling/contributor/internal/estimate"
@@ -105,7 +106,7 @@ func load(name, root, contextFile string, args []string, stderr io.Writer) (load
 		plan:       plan,
 		result:     estimate.EstimateEpic(plan, table, shown),
 		file:       file,
-		structured: launch != nil && estimate.StructuredOutput(launch.Params.String("output")),
+		structured: launch != nil && protocolcli.OutputMode(launch.Params.String("output")).IsMachineReadable(),
 	}, 0
 }
 
@@ -126,7 +127,7 @@ func parseOptions(args []string) (options, error) {
 		args = args[1:]
 		name, value, hasValue := strings.Cut(raw, "=")
 		if name != "--epic" && name != "--plan-file" {
-			return opts, fmt.Errorf("unexpected argument %q; use --epic <id> or --plan-file <file>", bounded(raw))
+			return opts, fmt.Errorf("unexpected argument %q; use --epic <id> or --plan-file <file>", estimate.Bounded(raw))
 		}
 		if seen[name] {
 			return opts, fmt.Errorf("%s given twice", name)
@@ -155,13 +156,6 @@ func parseOptions(args []string) (options, error) {
 		return opts, errors.New("give --epic <id> to read .putnami/<id>/epic.json, or --plan-file <file>")
 	}
 	return opts, nil
-}
-
-func bounded(text string) string {
-	if len(text) > 64 {
-		return text[:64] + "..."
-	}
-	return text
 }
 
 func writeJSON(name string, stdout, stderr io.Writer, value any) int {

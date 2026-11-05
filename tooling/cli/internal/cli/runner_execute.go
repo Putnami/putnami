@@ -13,6 +13,7 @@ import (
 	protocolcli "go.putnami.dev/protocol/cli"
 	runner "go.putnami.dev/protocol/runner"
 	wsproto "go.putnami.dev/protocol/workspace"
+	"go.putnami.dev/sdk/extension/gitread"
 	"go.putnami.dev/tooling/cli/internal/commands/doctor"
 	"go.putnami.dev/tooling/cli/internal/commands/lifecycle"
 	"go.putnami.dev/tooling/cli/internal/engine"
@@ -162,7 +163,7 @@ func boundPortableExecution(request runner.BoundRequest) *engine.PortableExecuti
 // addresses the commit's content, so a checkout of other content is refused
 // rather than run under the request's name.
 func verifyCommitCheckout(wsRoot, commit string) error {
-	head, err := git.HeadSHA(wsRoot)
+	head, err := gitread.HeadSHA(wsRoot)
 	if err != nil {
 		return fmt.Errorf("source.commit %s needs a Git checkout at %s: %w", commit, wsRoot, err)
 	}

@@ -150,11 +150,11 @@ func uploads(t *testing.T, registry string) map[string]string {
 			return err
 		},
 		"go version": func(reporter gomodpublish.Reporter) error {
-			_, err := gomodpublish.PublishVersion(ctx, goClient, reporter, registry, testBearer, module.Path, module.Version, module.Mod, gomodpublish.Digest(module.Zip), true)
+			_, err := gomodpublish.PublishVersion(ctx, goClient, reporter, registry, testBearer, module.Path, module.Version, module.Mod, put.Digest(module.Zip), true)
 			return err
 		},
 		"go verify zip": func(gomodpublish.Reporter) error {
-			return gomodpublish.VerifyZip(ctx, goClient, registry, testBearer, module.Path, module.Version, gomodpublish.Digest(module.Zip))
+			return gomodpublish.VerifyZip(ctx, goClient, registry, testBearer, module.Path, module.Version, put.Digest(module.Zip))
 		},
 		"go verify mod": func(gomodpublish.Reporter) error {
 			return gomodpublish.VerifyMod(ctx, goClient, registry, testBearer, module.Path, module.Version, module.Mod)

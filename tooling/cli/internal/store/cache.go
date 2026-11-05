@@ -12,7 +12,7 @@ import (
 	"sync"
 	"time"
 
-	gitutil "go.putnami.dev/tooling/cli/internal/git"
+	"go.putnami.dev/sdk/extension/gitread"
 )
 
 // CacheManager integrates the LocalStore with job execution to provide
@@ -872,7 +872,7 @@ func (cm *CacheManager) SourceState(workspaceRoot string) string {
 		}
 	}
 	state := ""
-	if gitutil.Unmanaged(root) != nil {
+	if gitread.Unmanaged(root) != nil {
 		state = SourceStateUnmanaged
 	}
 	if cm != nil {

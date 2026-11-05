@@ -45,6 +45,10 @@ them identically. Only streaming **job** commands (`build`, `publish`,
 `deploy`, …) distinguish the two: `jsonl` streams per-job events, while `json`
 buffers and emits one aggregated result.
 
+`cloud-logging` is not structured, but it is machine-readable
+(`OutputMode.IsMachineReadable`), as `json` and `jsonl` are: a parser reads
+stdout, so a command writes no human progress there.
+
 For a one-result command, the single document is always a `ResultV2` envelope.
 Older commands whose implementation assembled their payload as JSONL records
 preserve those records, in order, in the envelope's `data` member; they do not

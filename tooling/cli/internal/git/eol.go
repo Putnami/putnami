@@ -7,6 +7,8 @@ import (
 	"slices"
 	"sort"
 	"strings"
+
+	"go.putnami.dev/sdk/extension/gitread"
 )
 
 // LFPolicyAttributes is the .gitattributes rule a new workspace carries
@@ -22,7 +24,7 @@ const LFPolicyAttributes = "* text=auto eol=lf"
 // Paths are relative to dir, in slash form, sorted. It fails when dir is not
 // inside a Git working tree.
 func CRLFCheckouts(dir string) ([]string, error) {
-	out, err := run(dir, "ls-files", "--eol", "-z")
+	out, err := gitread.Run(dir, "ls-files", "--eol", "-z")
 	if err != nil {
 		return nil, err
 	}
@@ -55,7 +57,7 @@ func CRLFCheckouts(dir string) ([]string, error) {
 // ConfigValue returns the value Git resolves for key in dir, and whether the
 // key is set at all. An unset key is not an error.
 func ConfigValue(dir, key string) (value string, set bool, err error) {
-	stdout, stderr, err := runCapture(dir, "config", "--get", key)
+	stdout, stderr, err := gitread.RunCapture(dir, "config", "--get", key)
 	if err != nil {
 		var exitErr *exec.ExitError
 		if errors.As(err, &exitErr) && exitErr.ExitCode() == 1 {
@@ -80,7 +82,7 @@ func ConfigBool(value string) bool {
 // HasLFPolicy reports whether the attributes Git applies to path (relative to
 // dir) check it out with LF endings, whichever .gitattributes file sets them.
 func HasLFPolicy(dir, path string) (bool, error) {
-	out, err := run(dir, "check-attr", "eol", "--", path)
+	out, err := gitread.Run(dir, "check-attr", "eol", "--", path)
 	if err != nil {
 		return false, err
 	}

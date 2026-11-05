@@ -65,9 +65,6 @@ var CheckDuplicateNames = model.CheckDuplicateNames
 // CanonicalRoot resolves a workspace root to its absolute, symlink-free form.
 var CanonicalRoot = model.CanonicalRoot
 
-// CleanWorkspacePath normalizes a workspace-relative path.
-var CleanWorkspacePath = model.CleanWorkspacePath
-
 // --- Dependency graph ---
 
 // DependencyGraph represents the project dependency graph.
@@ -77,10 +74,6 @@ type DependencyGraph = model.DependencyGraph
 var BuildGraph = model.BuildGraph
 
 // --- Identity ---
-
-// ProjectIDFromPath derives a project's canonical logical ID from its physical
-// workspace-relative path.
-var ProjectIDFromPath = model.ProjectIDFromPath
 
 // ProbeViewOf projects a discovered project onto the probe protocol's project
 // shape.
@@ -232,7 +225,6 @@ const (
 
 var (
 	canonicalRoot          = model.CanonicalRoot
-	cleanWorkspacePath     = model.CleanWorkspacePath
 	probePathOf            = model.ProbePathOf
 	checkDuplicateNames    = model.CheckDuplicateNames
 	resolveProjectIdentity = model.ResolveProjectIdentity

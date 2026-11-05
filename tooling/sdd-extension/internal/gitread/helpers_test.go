@@ -7,9 +7,8 @@ import (
 	"testing"
 )
 
-// initGitRepo and runGit are copied from tooling/cli/internal/git/git_test.go so
-// the copied tree and source-binding tests run against the same fixture shape
-// core asserts on.
+// initGitRepo creates a repository on main, with a test identity and one
+// commit of README.md, which the tree and source-binding tests read.
 
 func initGitRepo(t *testing.T) string {
 	t.Helper()

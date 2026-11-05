@@ -11,12 +11,12 @@
 // the CLI had just parsed. An extension gets both from the job context wire:
 //
 //	internal/workspace       -> internal/wsview   (the wire-derived view)
-//	internal/git             -> internal/gitread  (immutable git reads)
+//	internal/git             -> internal/gitread  (tree, baseline and source reads over the SDK gitread)
 //	internal/features        -> internal/features (this module's copy)
 //	shared.ResolvedSelection -> Selection         (the wire's `selection` block)
 //	shared.ProjectSelection  -> gone              (core parses and resolves it)
 //	cmderr                   -> protocol/cli      (cmderr re-exports it)
-//	shared.WithResultData     -> resultdata.go     (ported, two functions)
+//	shared.WithResultData     -> protocol/cli      (WithResultData, ResultData)
 //	shared.AtomicWriteFile    -> contracts.go      (ported, one function)
 //	iox                      -> gone              (output is the command layer's)
 //

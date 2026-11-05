@@ -707,7 +707,7 @@ var complexityCeilings = []complexityCeiling{
 			"declaring one must set cache.enabled to false). They live here because the property " +
 			"they need is this package's actual contract — durable state written by one process " +
 			"and read by another after it dies — and because the liveness primitive they decide " +
-			"orphan recovery with is the same internal/flock advisory lock lease.go and gc.go " +
+			"orphan recovery with is the same filelock advisory lock lease.go and gc.go " +
 			"already coordinate on. Splitting the liveness rule across two packages is what would " +
 			"be dangerous. The pair invocation_unix.go/invocation_other.go exists because signal-0 " +
 			"liveness is unavailable on non-unix hosts, where the fallback reports every owner as " +

@@ -601,18 +601,3 @@ func TestNewRenderer_AutoDetect_NoTTY(t *testing.T) {
 		t.Errorf("NewRenderer(auto) = %T, want *TextRenderer or *LiveRenderer", r)
 	}
 }
-
-func TestStructuredOutput(t *testing.T) {
-	cases := map[string]bool{
-		"jsonl":         true,
-		"cloud-logging": true,
-		"":              false, // auto — human renderers own stdout
-		"text":          false,
-		"json":          true,
-	}
-	for output, want := range cases {
-		if got := StructuredOutput(output); got != want {
-			t.Errorf("StructuredOutput(%q) = %v, want %v", output, got, want)
-		}
-	}
-}

@@ -93,6 +93,7 @@ var jobsSplitPackages = []jobsSplitPackage{
 			"go.putnami.dev/cli/model/workspace",
 			"go.putnami.dev/protocol/cli",
 			"go.putnami.dev/protocol/job",
+			"go.putnami.dev/sdk/extension/gitread",
 			"go.putnami.dev/sdk/extension/profiles",
 		},
 		why: "task cache keys: a key hashes the task's declared files and params, its project and " +
@@ -107,6 +108,7 @@ var jobsSplitPackages = []jobsSplitPackage{
 		allowed: []string{
 			"go.putnami.dev/cli/model/jobs",
 			"go.putnami.dev/protocol/job",
+			"go.putnami.dev/protocol/workspace",
 			"go.putnami.dev/tooling/cli/internal/extension",
 			"go.putnami.dev/tooling/cli/internal/jobs/cachekey",
 			"go.putnami.dev/tooling/cli/internal/jobs/toolchain",
@@ -116,11 +118,11 @@ var jobsSplitPackages = []jobsSplitPackage{
 			"go.putnami.dev/protocol/cli",
 			"go.putnami.dev/protocol/extension",
 			"go.putnami.dev/protocol/features/spectest",
-			"go.putnami.dev/protocol/workspace",
 			"go.putnami.dev/tooling/cli/internal/store",
 		},
 		why: "the planner: it turns a selection of projects and commands into the typed plan of a " +
-			"run, from the workspace and extension models, the job model and the task cache key " +
+			"run, from the workspace and extension models, the workspace protocol's project ids, " +
+			"the job model and the task cache key " +
 			"package (a plan stamps the identities and shared-execution digests the keys fold in, " +
 			"and reads the runtime toolchain identity). It never imports the scheduler or the " +
 			"runner: the scheduler reads the plan and the plan-time halves of the DAG state and the " +
@@ -165,9 +167,9 @@ var jobsSplitPackages = []jobsSplitPackage{
 			"go.putnami.dev/protocol/cache",
 			"go.putnami.dev/protocol/extension",
 			"go.putnami.dev/protocol/features",
+			"go.putnami.dev/sdk/extension/filelock",
 			"go.putnami.dev/tooling/cli/internal/cacheprovider",
 			"go.putnami.dev/tooling/cli/internal/extension",
-			"go.putnami.dev/tooling/cli/internal/flock",
 			"go.putnami.dev/tooling/cli/internal/git",
 			"go.putnami.dev/tooling/cli/internal/jobs/cachekey",
 			"go.putnami.dev/tooling/cli/internal/runcredential",
@@ -195,13 +197,14 @@ var jobsSplitPackages = []jobsSplitPackage{
 			"go.putnami.dev/protocol/runtime",
 			"go.putnami.dev/sdk/extension/dirlink",
 			"go.putnami.dev/sdk/extension/envkeys",
+			"go.putnami.dev/sdk/extension/filelock",
+			"go.putnami.dev/sdk/extension/gitread",
 			"go.putnami.dev/sdk/extension/pkgmeta",
 			"go.putnami.dev/sdk/extension/proctree",
 			"go.putnami.dev/sdk/extension/releaseset",
 			"go.putnami.dev/tooling/cli/internal/abort",
 			"go.putnami.dev/tooling/cli/internal/artifactstore",
 			"go.putnami.dev/tooling/cli/internal/extension",
-			"go.putnami.dev/tooling/cli/internal/flock",
 			"go.putnami.dev/tooling/cli/internal/git",
 			"go.putnami.dev/tooling/cli/internal/hooks",
 			"go.putnami.dev/tooling/cli/internal/iox",
@@ -252,6 +255,7 @@ var jobsSplitPackages = []jobsSplitPackage{
 			"go.putnami.dev/protocol/runner",
 			"go.putnami.dev/protocol/runtime",
 			"go.putnami.dev/protocol/workspace",
+			"go.putnami.dev/sdk/extension/gitread",
 			"go.putnami.dev/sdk/extension/gomodpublish",
 			"go.putnami.dev/sdk/extension/memberprobe",
 			"go.putnami.dev/sdk/extension/pkgmeta",

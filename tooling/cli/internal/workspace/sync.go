@@ -827,20 +827,7 @@ func workspaceCandidatePaths(ws *Workspace) []string {
 		paths = append(paths, probePathOf(project.Path))
 	}
 	sort.Strings(paths)
-	return dedupeSorted(paths)
-}
-
-func dedupeSorted(values []string) []string {
-	out := values[:0]
-	previous := ""
-	for i, value := range values {
-		if i > 0 && value == previous {
-			continue
-		}
-		previous = value
-		out = append(out, value)
-	}
-	return out
+	return slices.Compact(paths)
 }
 
 // explicitProjects projects each resolved project's EXPLICIT configuration onto

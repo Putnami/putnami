@@ -13,7 +13,6 @@ import (
 	"go.putnami.dev/protocol/features/spectest"
 
 	protocolcli "go.putnami.dev/protocol/cli"
-	"go.putnami.dev/tooling/cli/internal/commands/shared"
 	"go.putnami.dev/tooling/cli/internal/commands/sharedtest"
 	"go.putnami.dev/tooling/cli/internal/launch"
 	"go.putnami.dev/tooling/cli/internal/layout"
@@ -124,9 +123,9 @@ func TestMigrateVNextCheck_ReportsPendingMigration(t *testing.T) {
 		t.Errorf("suggested next = %q, want the apply command", next)
 	}
 
-	report, ok := shared.ResultData(runErr).(VNextReport)
+	report, ok := protocolcli.ResultData(runErr).(VNextReport)
 	if !ok {
-		t.Fatalf("check failure carried no VNextReport (data = %#v)", shared.ResultData(runErr))
+		t.Fatalf("check failure carried no VNextReport (data = %#v)", protocolcli.ResultData(runErr))
 	}
 	if report.Outcome != VNextOutcomeMigrate {
 		t.Errorf("outcome = %q, want %q", report.Outcome, VNextOutcomeMigrate)
@@ -249,9 +248,9 @@ func TestMigrateVNext_V4ProjectsToV5WithoutChangingPins(t *testing.T) {
 	if checkErr == nil {
 		t.Fatalf("v%d must report an explicit migration to v5", version)
 	}
-	report, ok := shared.ResultData(checkErr).(VNextReport)
+	report, ok := protocolcli.ResultData(checkErr).(VNextReport)
 	if !ok {
-		t.Fatalf("check carried no report: %#v", shared.ResultData(checkErr))
+		t.Fatalf("check carried no report: %#v", protocolcli.ResultData(checkErr))
 	}
 	assertChanges(t, report.Changes, []VNextChange{{
 		Kind: VNextChangeLockVersion, From: version, To: lockfile.FormatVersionV5,
@@ -385,9 +384,9 @@ func TestMigrateVNextCheck_StaleRecordIsAChange(t *testing.T) {
 	if err == nil {
 		t.Fatal("a stale contract record must fail the check")
 	}
-	report, ok := shared.ResultData(err).(VNextReport)
+	report, ok := protocolcli.ResultData(err).(VNextReport)
 	if !ok {
-		t.Fatalf("no report attached: %#v", shared.ResultData(err))
+		t.Fatalf("no report attached: %#v", protocolcli.ResultData(err))
 	}
 	assertChanges(t, report.Changes, []VNextChange{
 		{Kind: VNextChangeTaskContract, Extension: "@putnami/typescript", From: 2, To: 3},
@@ -493,8 +492,8 @@ func TestMigrateVNext_StructuredOutput(t *testing.T) {
 	if strings.TrimSpace(out) != "" {
 		t.Errorf("check failure wrote to the machine stream instead of leaving it to the dispatcher:\n%s", out)
 	}
-	if _, ok := shared.ResultData(err).(VNextReport); !ok {
-		t.Errorf("failure carries no report for the envelope: %#v", shared.ResultData(err))
+	if _, ok := protocolcli.ResultData(err).(VNextReport); !ok {
+		t.Errorf("failure carries no report for the envelope: %#v", protocolcli.ResultData(err))
 	}
 
 	// Apply mode: a single success envelope.

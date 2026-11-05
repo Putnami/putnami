@@ -287,9 +287,9 @@ func (ws *Workspace) ProjectByID(id string) *Project {
 // Paths and IDs deliberately have separate lookup semantics because transparent
 // group folders are present only in paths.
 func (ws *Workspace) ProjectByPath(projectPath string) *Project {
-	projectPath = CleanWorkspacePath(projectPath)
+	projectPath = wsproto.CleanWorkspacePath(projectPath)
 	for _, p := range ws.Projects {
-		if CleanWorkspacePath(p.Path) == projectPath {
+		if wsproto.CleanWorkspacePath(p.Path) == projectPath {
 			return p
 		}
 	}
@@ -387,10 +387,10 @@ func (ws *Workspace) ProbeView(project *Project) wsproto.ProbeProject {
 func (ws *Workspace) dependencyPathResolver() func(string) (string, bool) {
 	return func(dependency string) (string, bool) {
 		if project := ws.ProjectByName(dependency); project != nil {
-			return CleanWorkspacePath(project.Path), true
+			return wsproto.CleanWorkspacePath(project.Path), true
 		}
 		if project := ws.ProjectByID(dependency); project != nil {
-			return CleanWorkspacePath(project.Path), true
+			return wsproto.CleanWorkspacePath(project.Path), true
 		}
 		return "", false
 	}

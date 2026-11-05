@@ -7,8 +7,8 @@ import (
 	"sync"
 	"testing"
 
+	"go.putnami.dev/sdk/extension/filelock"
 	"go.putnami.dev/tooling/cli/internal/extension"
-	"go.putnami.dev/tooling/cli/internal/flock"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
 
@@ -27,10 +27,10 @@ func TestJobInvocationSharesScratchLeaseAndCancelsConcurrently(t *testing.T) {
 	defer cancel()
 	defer func() { _ = os.Remove(inv.contextFile) }()
 	cmd := inv.execCommand(ctx)
-	if flock.Inheritable && (len(cmd.ExtraFiles) != 1 || cmd.ExtraFiles[0] != inv.scratchLease.File()) {
+	if filelock.Inheritable && (len(cmd.ExtraFiles) != 1 || cmd.ExtraFiles[0] != inv.scratchLease.File()) {
 		t.Fatal("job child did not inherit its context's scratch lease")
 	}
-	if !flock.Inheritable && len(cmd.ExtraFiles) != 0 {
+	if !filelock.Inheritable && len(cmd.ExtraFiles) != 0 {
 		t.Fatal("job child was given descriptors this platform cannot pass")
 	}
 	var wg sync.WaitGroup
@@ -38,7 +38,7 @@ func TestJobInvocationSharesScratchLeaseAndCancelsConcurrently(t *testing.T) {
 		wg.Go(cancel)
 	}
 	wg.Wait()
-	lock, err := flock.Acquire(filepath.Join(root, ".putnami", "cache.lock"), true, true)
+	lock, err := filelock.Acquire(filepath.Join(root, ".putnami", "cache.lock"), true, true)
 	if err != nil {
 		t.Fatalf("invocation cleanup leaked its lease: %v", err)
 	}

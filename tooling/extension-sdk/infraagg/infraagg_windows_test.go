@@ -66,44 +66,8 @@ func holdForRemoval(t *testing.T, path string) *os.File {
 	return reader
 }
 
-// holdForRename opens path the way every Go reader does and requires that a
-// plain rename of another file over the held one fails, so the test proves the
-// retry and not a host that lets the rename through.
-func holdForRename(t *testing.T, path string) *os.File {
-	t.Helper()
-	reader, err := os.Open(path)
-	if err != nil {
-		t.Fatal(err)
-	}
-	probe := filepath.Join(t.TempDir(), "probe")
-	if err := os.WriteFile(probe, []byte("probe\n"), 0o600); err != nil {
-		_ = reader.Close()
-		t.Fatal(err)
-	}
-	requireRefused(t, "a rename over an open file", os.Rename(probe, path), func() { _ = reader.Close() })
-	return reader
-}
-
 // A deployer reading the aggregated manifest holds it open without sharing
-// delete access. writeFileAtomic waits for that reader instead of failing
-// the rename with access denied.
-func TestWriteFileAtomicWaitsForAReaderOfTheManifest(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "requirements.json")
-	if err := os.WriteFile(path, []byte("old\n"), 0o600); err != nil {
-		t.Fatal(err)
-	}
-	closed := closeAfter(holdForRename(t, path))
-	err := writeFileAtomic(path, []byte("new\n"))
-	<-closed
-	if err != nil {
-		t.Fatalf("writeFileAtomic after the reader closed: %v", err)
-	}
-	if got, err := os.ReadFile(path); err != nil || string(got) != "new\n" {
-		t.Fatalf("the manifest holds %q, %v; want the new bytes", got, err)
-	}
-}
-
-// Removing a stale aggregated manifest waits for its reader the same way.
+// delete access. Removing a stale aggregated manifest waits for that reader.
 func TestRemoveAggregatedManifestWaitsForAReaderOfTheManifest(t *testing.T) {
 	root := t.TempDir()
 	path := aggregatedManifestPath(root)

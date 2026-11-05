@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	collab "go.putnami.dev/protocol/collaboration"
+	"go.putnami.dev/sdk/extension/collabhelper"
 	"go.putnami.dev/tooling/jira-collaboration/internal/jira"
 )
 
@@ -34,14 +35,6 @@ func (s *session) write(issue *jiraIssue, method, path string, body any, operati
 	}
 	return nil, unresolved("read the task with tasks.get and compare it with the request before any retry",
 		"the %s of %s may have happened (%s), and reading it back did not show it", operation, issue.Key, err.Message)
-}
-
-// sameSet reports whether two label or id lists hold the same values.
-func sameSet(a, b []string) bool {
-	a, b = slices.Clone(a), slices.Clone(b)
-	slices.Sort(a)
-	slices.Sort(b)
-	return slices.Equal(slices.Compact(a), slices.Compact(b))
 }
 
 // update changes summary, description or labels. Labels replace the task's
@@ -83,7 +76,7 @@ func (s *session) update(input any) (any, *collab.Failure) {
 		if wanted == nil {
 			wanted = []string{}
 		}
-		if !sameSet(wanted, issue.Fields.Labels) {
+		if !collabhelper.SameSet(wanted, issue.Fields.Labels) {
 			labels = wanted
 			fields["labels"] = labels
 		}
@@ -92,7 +85,7 @@ func (s *session) update(input any) (any, *collab.Failure) {
 		return &collab.TaskResult{Task: s.task(issue)}, nil
 	}
 	updated, failure := s.write(issue, http.MethodPut, jira.Path("issue", issue.ID), map[string]any{"fields": fields}, "update", func(current *jiraIssue) bool {
-		return current.Fields.Summary == summary && deref(current.Fields.Description) == description && sameSet(current.Fields.Labels, labels)
+		return current.Fields.Summary == summary && deref(current.Fields.Description) == description && collabhelper.SameSet(current.Fields.Labels, labels)
 	})
 	if failure != nil {
 		return nil, failure

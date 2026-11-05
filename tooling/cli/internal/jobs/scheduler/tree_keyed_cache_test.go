@@ -16,6 +16,7 @@ import (
 	extproto "go.putnami.dev/protocol/extension"
 	"go.putnami.dev/protocol/features/spectest"
 	wsproto "go.putnami.dev/protocol/workspace"
+	"go.putnami.dev/sdk/extension/gitread"
 	"go.putnami.dev/tooling/cli/internal/extension"
 	putnamigit "go.putnami.dev/tooling/cli/internal/git"
 	"go.putnami.dev/tooling/cli/internal/jobs/cachekey"
@@ -95,7 +96,7 @@ func isolateTreeKeyedGit(t *testing.T) {
 // returns its trimmed output.
 func treeKeyedGit(t *testing.T, dir string, args ...string) string {
 	t.Helper()
-	cmd := exec.Command(putnamigit.Executable(), append([]string{
+	cmd := exec.Command(gitread.Executable(), append([]string{
 		"-c", "user.name=T", "-c", "user.email=t@t.com",
 		"-c", "commit.gpgsign=false", "-c", "tag.gpgsign=false",
 	}, args...)...)

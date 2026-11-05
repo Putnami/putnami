@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"go.putnami.dev/protocol/cli"
+	"go.putnami.dev/sdk/extension/gitread"
 	"go.putnami.dev/tooling/cli/internal/git"
 	"go.putnami.dev/tooling/cli/internal/sessionstream"
 )
@@ -259,7 +260,7 @@ func (s *Session) FinalizeV2(meta *cli.SessionFile, wsRoot string, baseline stri
 	}
 
 	if wsRoot != "" {
-		branch, err := git.CurrentBranch(wsRoot)
+		branch, err := gitread.CurrentBranch(wsRoot)
 		if err == nil {
 			meta.Git = &cli.SessionGit{Branch: branch, Baseline: baseline}
 		}

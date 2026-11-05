@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	protocolcli "go.putnami.dev/protocol/cli"
 	diag "go.putnami.dev/protocol/diagnostic"
 	featureproto "go.putnami.dev/protocol/features"
 	wsproto "go.putnami.dev/protocol/workspace"
@@ -376,7 +377,7 @@ func TestBuildSpecsRatchetResultFailsOnShrink(t *testing.T) {
 	if err == nil {
 		t.Fatal("a recorded project regressed out of enforce and the ratchet passed")
 	}
-	if ResultData(err) == nil {
+	if protocolcli.ResultData(err) == nil {
 		t.Fatalf("the failing verdict carries no report payload: %v", err)
 	}
 	if report.Summary.RegressedProjects != 1 {

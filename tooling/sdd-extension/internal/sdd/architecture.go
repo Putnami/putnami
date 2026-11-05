@@ -163,7 +163,7 @@ func architectureInspectionResult(command, domain string, result Result) (Archit
 			"domain %q is not declared; use an exact manifest domain ID",
 			domain,
 		))
-		return report, WithResultData(
+		return report, protocolcli.WithResultData(
 			protocolcli.Classify(fmt.Errorf("architecture domain %q was not found", domain), protocolcli.ErrNoMatch),
 			report,
 		)
@@ -256,7 +256,7 @@ func architectureEvaluationError(command string, result Result, data any) error 
 		fmt.Errorf("%s failed with %d blocking finding(s)", command, errorCount),
 		protocolcli.ErrInvalidConfig,
 	)
-	return WithResultData(err, data)
+	return protocolcli.WithResultData(err, data)
 }
 
 func summarizeArchitecture(snapshot *archproto.Snapshot) ArchitectureCounts {

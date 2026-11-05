@@ -22,6 +22,7 @@ import (
 	protocoljob "go.putnami.dev/protocol/job"
 	registryproto "go.putnami.dev/protocol/registry"
 	runtimeproto "go.putnami.dev/protocol/runtime"
+	"go.putnami.dev/sdk/extension/gitread"
 	"go.putnami.dev/sdk/extension/releaseset"
 	"go.putnami.dev/tooling/cli/internal/cmderr"
 	"go.putnami.dev/tooling/cli/internal/extension"
@@ -114,7 +115,7 @@ var newReleaseSetProvenance = func(ws *workspace.Workspace, withTree bool) (*rel
 		return nil, fmt.Errorf("release-set publish requires a full commit revision: %w", err)
 	}
 	if !set {
-		revision, err = git.HeadSHA(ws.Root)
+		revision, err = gitread.HeadSHA(ws.Root)
 		if err != nil {
 			return nil, fmt.Errorf("release-set publish requires a git checkout to record the source revision: %w", err)
 		}

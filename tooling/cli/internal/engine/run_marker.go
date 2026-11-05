@@ -6,7 +6,7 @@ import (
 	"strings"
 
 	"go.putnami.dev/cli/model/workspace"
-	"go.putnami.dev/tooling/cli/internal/git"
+	"go.putnami.dev/sdk/extension/gitread"
 	"go.putnami.dev/tooling/cli/internal/iox"
 	"go.putnami.dev/tooling/cli/internal/jobs/remotecache"
 	"go.putnami.dev/tooling/cli/internal/workspace_state"
@@ -30,7 +30,7 @@ func recordSuccessfulBuild(
 	if sessStore == nil || wsRoot == "" {
 		return
 	}
-	branch, err := git.CurrentBranch(wsRoot)
+	branch, err := gitread.CurrentBranch(wsRoot)
 	if err != nil {
 		if debug {
 			iox.Fprintf(os.Stderr, "[debug] last build state skipped: %v\n", err)
@@ -43,7 +43,7 @@ func recordSuccessfulBuild(
 			observedSHA = previousSHA
 		}
 	}
-	sha, err := git.HeadSHA(wsRoot)
+	sha, err := gitread.HeadSHA(wsRoot)
 	if err != nil {
 		if debug {
 			iox.Fprintf(os.Stderr, "[debug] last build state skipped: %v\n", err)

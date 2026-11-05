@@ -3,89 +3,19 @@ package git
 import (
 	"fmt"
 	"strings"
-)
 
-// IsShallow reports whether the repository is a shallow clone. A shallow clone
-// carries neither the whole commit history nor, usually, the tags, so the
-// version of a line cannot be derived from it: the answer would be a plausible
-// number computed from the fraction of history that happened to be fetched.
-//
-// Where Git does not manage repoRoot there is no history at all, and the error
-// is the one-line UnmanagedError naming what to run.
-func IsShallow(repoRoot string) (bool, error) {
-	output, err := run(repoRoot, "rev-parse", "--is-shallow-repository")
-	if err != nil {
-		if unmanaged := Unmanaged(repoRoot); unmanaged != nil {
-			return false, fmt.Errorf("version and publish need git history: %w", unmanaged)
-		}
-		return false, fmt.Errorf("read repository depth: %w", err)
-	}
-	return strings.TrimSpace(output) == "true", nil
-}
+	"go.putnami.dev/sdk/extension/gitread"
+)
 
 // TagsAtHead returns every tag that points at HEAD, in git's order. A commit
 // carrying its line's tag publishes that line's cohort, so this is the question
 // "is this commit a release of some line?" asked before any line is named.
 func TagsAtHead(repoRoot string) ([]string, error) {
-	output, err := run(repoRoot, "tag", "--points-at", "HEAD")
+	output, err := gitread.Run(repoRoot, "tag", "--points-at", "HEAD")
 	if err != nil {
 		return nil, fmt.Errorf("read the tags at HEAD: %w", err)
 	}
 	return splitLines(output), nil
-}
-
-// Commit is one commit of a line's history: what conventional-commit parsing
-// reads, plus the SHA a changelog bullet cites.
-type Commit struct {
-	SHA     string
-	Subject string
-	Body    string
-}
-
-// commitRecordSeparator is ASCII RS. A commit body is arbitrary text, newlines
-// included, so records are separated by a byte no message carries and fields by
-// NUL for the same reason.
-const commitRecordSeparator = "\x1e"
-
-// CommitsSince returns the commits between fromCommit (exclusive) and HEAD that
-// touch one of pathspecs, newest first. An empty fromCommit walks the whole
-// history, which is the untagged line's case; empty pathspecs walk the whole
-// tree, which is a line that owns the repository root.
-func CommitsSince(repoRoot, fromCommit string, pathspecs []string) ([]Commit, error) {
-	revision := "HEAD"
-	if trimmed := strings.TrimSpace(fromCommit); trimmed != "" {
-		resolved, err := ResolveCommit(repoRoot, trimmed)
-		if err != nil {
-			return nil, err
-		}
-		revision = resolved + "..HEAD"
-	}
-	args := []string{"log", "--format=%H%x00%s%x00%b" + commitRecordSeparator, "--no-show-signature", revision}
-	if len(pathspecs) > 0 {
-		args = append(args, "--")
-		args = append(args, pathspecs...)
-	}
-	output, err := run(repoRoot, args...)
-	if err != nil {
-		return nil, fmt.Errorf("read the commits of %s: %w", revision, err)
-	}
-	var commits []Commit
-	for _, record := range strings.Split(output, commitRecordSeparator) {
-		record = strings.TrimLeft(record, "\n")
-		if strings.TrimSpace(record) == "" {
-			continue
-		}
-		fields := strings.SplitN(record, "\x00", 3)
-		if len(fields) != 3 {
-			continue
-		}
-		commits = append(commits, Commit{
-			SHA:     strings.TrimSpace(fields[0]),
-			Subject: strings.TrimSpace(fields[1]),
-			Body:    strings.TrimRight(fields[2], "\n"),
-		})
-	}
-	return commits, nil
 }
 
 // CommitFiles returns the repository-relative paths one commit changes, limited
@@ -99,7 +29,7 @@ func CommitFiles(repoRoot, sha string, pathspecs []string) ([]string, error) {
 		args = append(args, "--")
 		args = append(args, pathspecs...)
 	}
-	output, err := run(repoRoot, args...)
+	output, err := gitread.Run(repoRoot, args...)
 	if err != nil {
 		return nil, fmt.Errorf("read the files of %s: %w", sha, err)
 	}
@@ -133,7 +63,7 @@ func CommitFiles(repoRoot, sha string, pathspecs []string) ([]string, error) {
 // abbreviation. Binding to HEAD itself keeps HEAD's time but carries the fixed
 // 12-character SHA, so it can differ from the unset output in length.
 func TreeState(repoRoot string) (*VersionInfo, error) {
-	branch, err := CurrentBranch(repoRoot)
+	branch, err := gitread.CurrentBranch(repoRoot)
 	if err != nil {
 		return nil, fmt.Errorf("read the current branch: %w", err)
 	}

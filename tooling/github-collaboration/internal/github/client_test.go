@@ -13,6 +13,8 @@ import (
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"go.putnami.dev/sdk/extension/collabhelper"
 )
 
 const testToken = "test-token-value"
@@ -271,7 +273,7 @@ func TestMessagesNeverCarryTheCredential(t *testing.T) {
 		_, _ = io.WriteString(w, `{"message":"no such thing for `+testToken+`"}`)
 	})
 	_, failure := client.Get(context.Background(), "/user", nil, nil)
-	if failure == nil || strings.Contains(failure.Message, testToken) || !strings.Contains(failure.Message, RedactedMarker) {
+	if failure == nil || strings.Contains(failure.Message, testToken) || !strings.Contains(failure.Message, collabhelper.RedactedMarker) {
 		t.Fatalf("read failure %+v", failure)
 	}
 	failure = client.Write(context.Background(), http.MethodPatch, "/user", map[string]any{}, nil)

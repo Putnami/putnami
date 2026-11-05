@@ -6,19 +6,16 @@
 package treefingerprint
 
 import (
-	"bytes"
-	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
 	"io"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"sort"
 	"strings"
-	"time"
 
+	"go.putnami.dev/sdk/extension/gitread"
 	"go.putnami.dev/sdk/extension/sourcebinding"
 )
 
@@ -160,7 +157,7 @@ func compute(dir string, depth int) (Tree, error) {
 	if err != nil {
 		return Tree{}, err
 	}
-	head, err := run(root, "rev-parse", "HEAD")
+	head, err := gitread.Run(root, "rev-parse", "HEAD")
 	if err != nil {
 		return Tree{}, fmt.Errorf("the repository has no commit, so there is no tree to fingerprint")
 	}
@@ -173,11 +170,11 @@ func compute(dir string, depth int) (Tree, error) {
 
 	// `git ls-files --others` emits its entries in sorted order, so the untracked
 	// section is stable across machines without a sort of its own.
-	listing, err := run(root, "ls-files", "--others", "--exclude-standard", "-z")
+	listing, err := gitread.Run(root, "ls-files", "--others", "--exclude-standard", "-z")
 	if err != nil {
 		return Tree{}, fmt.Errorf("list untracked files: %w", err)
 	}
-	untracked := splitNUL(listing)
+	untracked := gitread.SplitNUL(listing)
 
 	digest := sha256.New()
 	fmt.Fprintf(digest, "%s\n", treeFingerprintPreimageVersion)
@@ -234,12 +231,12 @@ type treeEntry struct {
 // permission bits (true) or from the worktree mode git reports (false); see
 // trackedKind.
 func trackedChanges(root string, depth int, statsExecBit bool) ([]treeEntry, error) {
-	listing, err := run(root, "status", "--porcelain=v2", "-z", "--no-renames", "--ignore-submodules=none", "-uno")
+	listing, err := gitread.Run(root, "status", "--porcelain=v2", "-z", "--no-renames", "--ignore-submodules=none", "-uno")
 	if err != nil {
 		return nil, fmt.Errorf("read the tracked changes: %w", err)
 	}
 
-	records := splitNUL(listing)
+	records := gitread.SplitNUL(listing)
 	entries := make([]treeEntry, 0, len(records))
 	for index := 0; index < len(records); index++ {
 		record := records[index]
@@ -354,7 +351,7 @@ func worktreeRoot(dir string) (string, error) {
 	if dir == "" {
 		dir = "."
 	}
-	output, err := run(dir, "rev-parse", "--show-toplevel")
+	output, err := gitread.Run(dir, "rev-parse", "--show-toplevel")
 	if err != nil {
 		return "", fmt.Errorf("%s is not inside a git worktree", dir)
 	}
@@ -416,63 +413,4 @@ func hashUntracked(path string) (kind string, content string, err error) {
 func hashBytes(data []byte) string {
 	sum := sha256.Sum256(data)
 	return hex.EncodeToString(sum[:])
-}
-
-// gitTimeout bounds one git call.
-const gitTimeout = 30 * time.Second
-
-// run runs git with args in repoRoot and returns its standard output. git
-// inherits this process's environment without the variables
-// repositoryEnvironment removes, so it reads the repository at repoRoot and
-// no other.
-func run(repoRoot string, args ...string) (string, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), gitTimeout)
-	defer cancel()
-
-	cmd := exec.CommandContext(ctx, "git", args...)
-	cmd.Dir = repoRoot
-	cmd.Env = repositoryEnvironment(os.Environ())
-	var stdout, stderr bytes.Buffer
-	cmd.Stdout = &stdout
-	cmd.Stderr = &stderr
-	if err := cmd.Run(); err != nil {
-		if ctx.Err() == context.DeadlineExceeded {
-			err = fmt.Errorf("timed out after %s", gitTimeout)
-		}
-		return "", fmt.Errorf("git %s (in %s): %w: %s", args[0], repoRoot, err, strings.TrimSpace(stderr.String()))
-	}
-	return stdout.String(), nil
-}
-
-// repositoryEnvironment removes from environ the variables that could
-// redirect a git command away from its working directory: every GIT_CONFIG*
-// variable and the repository, worktree, index, object and discovery
-// selectors. Transport credentials and tracing (including GIT_SSH_COMMAND and
-// GIT_ASKPASS) pass through unchanged. The CLI's own git calls apply the same
-// rule.
-func repositoryEnvironment(environ []string) []string {
-	cleaned := make([]string, 0, len(environ))
-	for _, entry := range environ {
-		name, _, _ := strings.Cut(entry, "=")
-		if strings.HasPrefix(name, "GIT_CONFIG") {
-			continue
-		}
-		switch name {
-		case "GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_COMMON_DIR", "GIT_OBJECT_DIRECTORY",
-			"GIT_ALTERNATE_OBJECT_DIRECTORIES", "GIT_PREFIX", "GIT_CEILING_DIRECTORIES",
-			"GIT_DISCOVERY_ACROSS_FILESYSTEM", "GIT_NAMESPACE":
-			continue
-		}
-		cleaned = append(cleaned, entry)
-	}
-	return cleaned
-}
-
-// splitNUL splits git's NUL-terminated output into its records.
-func splitNUL(output string) []string {
-	parts := strings.Split(output, "\x00")
-	if len(parts) > 0 && parts[len(parts)-1] == "" {
-		parts = parts[:len(parts)-1]
-	}
-	return parts
 }

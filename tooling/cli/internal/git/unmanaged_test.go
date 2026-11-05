@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"go.putnami.dev/protocol/features/spectest"
+	"go.putnami.dev/sdk/extension/gitread"
 )
 
 // outsideRepository returns a directory git discovery cannot escape, so the
@@ -36,28 +37,14 @@ func fakeGit(t *testing.T, stderr string, code int) {
 	t.Setenv("PATH", bin+string(os.PathListSeparator)+"/bin"+string(os.PathListSeparator)+"/usr/bin")
 }
 
-func TestUnmanaged_InsideRepositoryIsNil(t *testing.T) {
-	t.Parallel()
-	dir := initGitRepo(t)
-	if err := Unmanaged(dir); err != nil {
-		t.Fatalf("Unmanaged(repository) = %v, want nil", err)
-	}
-	// A repository with no commit is still one Git manages.
-	unborn := t.TempDir()
-	runGit(t, unborn, "init")
-	if err := Unmanaged(unborn); err != nil {
-		t.Fatalf("Unmanaged(repository with no commit) = %v, want nil", err)
-	}
-}
-
 func TestUnmanaged_NotRepository(t *testing.T) {
 	spectest.Proves(t, "cli/workspace-without-git", "git-history-is-refused-in-one-line",
 		"a-missing-repository-and-a-missing-program-are-told-apart")
 	dir := outsideRepository(t)
 
-	err := Unmanaged(dir)
-	if !errors.Is(err, ErrNotRepository) || errors.Is(err, ErrNoProgram) {
-		t.Fatalf("Unmanaged(plain directory) = %v, want ErrNotRepository", err)
+	err := gitread.Unmanaged(dir)
+	if !errors.Is(err, gitread.ErrNotRepository) || errors.Is(err, gitread.ErrNoProgram) {
+		t.Fatalf("gitread.Unmanaged(plain directory) = %v, want gitread.ErrNotRepository", err)
 	}
 	want := dir + " is not a git repository; run git init there and commit"
 	if err.Error() != want {
@@ -71,9 +58,9 @@ func TestUnmanaged_NoProgram(t *testing.T) {
 	dir := t.TempDir()
 	t.Setenv("PATH", t.TempDir())
 
-	err := Unmanaged(dir)
-	if !errors.Is(err, ErrNoProgram) || errors.Is(err, ErrNotRepository) {
-		t.Fatalf("Unmanaged(no git on PATH) = %v, want ErrNoProgram", err)
+	err := gitread.Unmanaged(dir)
+	if !errors.Is(err, gitread.ErrNoProgram) || errors.Is(err, gitread.ErrNotRepository) {
+		t.Fatalf("gitread.Unmanaged(no git on PATH) = %v, want gitread.ErrNoProgram", err)
 	}
 	want := "no git program is on PATH; install git, then run git init in " + dir + " and commit"
 	if err.Error() != want {
@@ -90,8 +77,8 @@ func TestUnmanaged_DeveloperToolsStubIsNoProgram(t *testing.T) {
 	} {
 		t.Run(strings.SplitN(notice, ":", 2)[0], func(t *testing.T) {
 			fakeGit(t, notice, 1)
-			if err := Unmanaged(t.TempDir()); !errors.Is(err, ErrNoProgram) {
-				t.Fatalf("Unmanaged(developer tools stub) = %v, want ErrNoProgram", err)
+			if err := gitread.Unmanaged(t.TempDir()); !errors.Is(err, gitread.ErrNoProgram) {
+				t.Fatalf("gitread.Unmanaged(developer tools stub) = %v, want gitread.ErrNoProgram", err)
 			}
 		})
 	}
@@ -108,26 +95,10 @@ func TestUnmanaged_OtherGitFailureIsNotClassified(t *testing.T) {
 	} {
 		t.Run(name, func(t *testing.T) {
 			fakeGit(t, stderr, 128)
-			if err := Unmanaged(t.TempDir()); err != nil {
-				t.Fatalf("Unmanaged(%s) = %v, want nil", name, err)
+			if err := gitread.Unmanaged(t.TempDir()); err != nil {
+				t.Fatalf("gitread.Unmanaged(%s) = %v, want nil", name, err)
 			}
 		})
-	}
-}
-
-func TestUnmanaged_MessageIsOneLine(t *testing.T) {
-	t.Parallel()
-	for _, cause := range []error{ErrNoProgram, ErrNotRepository} {
-		message := (&UnmanagedError{Dir: "/work/app", Cause: cause}).Error()
-		if strings.ContainsAny(message, "\r\n") {
-			t.Errorf("message for %v spans several lines: %q", cause, message)
-		}
-		if !strings.Contains(message, "git init") {
-			t.Errorf("message for %v does not name the command to run: %q", cause, message)
-		}
-		if strings.Contains(message, "exit status") {
-			t.Errorf("message for %v leaks the raw git failure: %q", cause, message)
-		}
 	}
 }
 
@@ -136,9 +107,9 @@ func TestIsShallow_OutsideRepositoryNamesGit(t *testing.T) {
 		"version-outside-a-repository-names-git")
 	dir := outsideRepository(t)
 
-	_, err := IsShallow(dir)
-	if !errors.Is(err, ErrNotRepository) {
-		t.Fatalf("IsShallow(plain directory) = %v, want ErrNotRepository", err)
+	_, err := gitread.IsShallow(dir)
+	if !errors.Is(err, gitread.ErrNotRepository) {
+		t.Fatalf("gitread.IsShallow(plain directory) = %v, want gitread.ErrNotRepository", err)
 	}
 	want := "version and publish need git history: " + dir + " is not a git repository; run git init there and commit"
 	if err.Error() != want {
@@ -152,9 +123,9 @@ func TestIsShallow_NoProgramNamesGit(t *testing.T) {
 	dir := t.TempDir()
 	t.Setenv("PATH", t.TempDir())
 
-	_, err := IsShallow(dir)
-	if !errors.Is(err, ErrNoProgram) {
-		t.Fatalf("IsShallow(no git on PATH) = %v, want ErrNoProgram", err)
+	_, err := gitread.IsShallow(dir)
+	if !errors.Is(err, gitread.ErrNoProgram) {
+		t.Fatalf("gitread.IsShallow(no git on PATH) = %v, want gitread.ErrNoProgram", err)
 	}
 	if strings.Contains(err.Error(), "exit status") || strings.Contains(err.Error(), "executable file not found") {
 		t.Fatalf("message leaks the raw failure: %q", err.Error())
@@ -167,9 +138,9 @@ func TestIsShallow_OtherGitFailureKeepsItsDetail(t *testing.T) {
 		"another-git-failure-keeps-its-detail")
 	fakeGit(t, "fatal: detected dubious ownership in repository at '/work'", 128)
 
-	_, err := IsShallow(t.TempDir())
-	if err == nil || errors.Is(err, ErrNotRepository) || errors.Is(err, ErrNoProgram) {
-		t.Fatalf("IsShallow(dubious ownership) = %v, want the git failure", err)
+	_, err := gitread.IsShallow(t.TempDir())
+	if err == nil || errors.Is(err, gitread.ErrNotRepository) || errors.Is(err, gitread.ErrNoProgram) {
+		t.Fatalf("gitread.IsShallow(dubious ownership) = %v, want the git failure", err)
 	}
 	if !strings.Contains(err.Error(), "dubious ownership") {
 		t.Fatalf("message dropped the git failure: %q", err.Error())

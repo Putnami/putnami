@@ -96,7 +96,7 @@ func TestEmit_MatchesTheCoreEnvelope(t *testing.T) {
 		{name: "failure", cmd: "features", sub: "inspect", err: failure},
 		{
 			// A failure may still carry a payload — the CLI attaches one to the
-			// error (shared.WithResultData) and reads it back in
+			// error (protocolcli.WithResultData) and reads it back in
 			// writeStructuredFailure; an extension passes it directly.
 			name: "failure with a payload",
 			cmd:  "contracts", sub: "check",

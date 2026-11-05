@@ -14,6 +14,8 @@ import (
 	"strings"
 	"sync/atomic"
 	"time"
+
+	"go.putnami.dev/sdk/extension/collabhelper"
 )
 
 // Kind classifies a failed request by what it proves about the remote state.
@@ -90,7 +92,7 @@ func New(endpoint Endpoint, credential *Credential, options Options) *Client {
 		}
 	}
 	httpClient := *base
-	httpClient.CheckRedirect = followReadsOnSameHost
+	httpClient.CheckRedirect = collabhelper.FollowReadsOnSameHost
 	options.HTTP = &httpClient
 	if options.Timeout <= 0 {
 		options.Timeout = 30 * time.Second
@@ -99,38 +101,12 @@ func New(endpoint Endpoint, credential *Credential, options Options) *Client {
 		options.ReadAttempts = 3
 	}
 	if options.Pause == nil {
-		options.Pause = backoff
+		options.Pause = collabhelper.Backoff
 	}
 	if options.UserAgent == "" {
 		options.UserAgent = "putnami-jira-collaboration"
 	}
 	return &Client{endpoint: endpoint, credential: credential, options: options}
-}
-
-// followReadsOnSameHost follows a redirect only for a GET that stays on the
-// host it started on. A write is never replayed at another location: its 3xx
-// answer is reported as a refusal, and nothing was written.
-func followReadsOnSameHost(request *http.Request, via []*http.Request) error {
-	first := via[0]
-	if len(via) >= 5 || first.Method != http.MethodGet || request.URL.Host != first.URL.Host {
-		return http.ErrUseLastResponse
-	}
-	return nil
-}
-
-func backoff(ctx context.Context, attempt int) error {
-	delay := time.Second
-	if attempt > 1 {
-		delay = 3 * time.Second
-	}
-	timer := time.NewTimer(delay)
-	defer timer.Stop()
-	select {
-	case <-ctx.Done():
-		return ctx.Err()
-	case <-timer.C:
-		return nil
-	}
 }
 
 // Secrets lists the credential values to redact from anything the provider
@@ -300,7 +276,7 @@ func (a *answer) failure() *Error {
 	if a.status == http.StatusTooManyRequests {
 		failure.RateLimited = true
 		if after := a.header.Get("Retry-After"); after != "" {
-			failure.Message += "; retry after " + bounded(after) + "s"
+			failure.Message += "; retry after " + collabhelper.Bounded(after, maxMessageRunes) + "s"
 		}
 	}
 	return failure
@@ -344,14 +320,5 @@ func jiraMessage(status int, body []byte) string {
 	if len(details) > 0 {
 		text += ": " + strings.Join(details, "; ")
 	}
-	return bounded(text)
-}
-
-func bounded(text string) string {
-	text = strings.Join(strings.Fields(text), " ")
-	runes := []rune(text)
-	if len(runes) > maxMessageRunes {
-		return string(runes[:maxMessageRunes]) + "…"
-	}
-	return text
+	return collabhelper.Bounded(text, maxMessageRunes)
 }

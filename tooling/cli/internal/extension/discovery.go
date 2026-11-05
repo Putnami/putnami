@@ -7,8 +7,9 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
-	"strings"
 	"sync"
+
+	"go.putnami.dev/cli/model/workspace"
 
 	model "go.putnami.dev/cli/model/extension"
 	wsproto "go.putnami.dev/protocol/workspace"
@@ -189,7 +190,7 @@ func DiscoverExtensionsDetailed(workspaceRoot string, cfg *wsproto.Config, proje
 		// path-shaped key as a path, so a key that names an extension loads
 		// its build from the artifact store, never a workspace directory of
 		// that name.
-		if relPath, ok := normalizeWorkspaceExtensionPath(extRef); ok && (!hosted || declaredByPath(extRef)) {
+		if relPath, ok := workspace.NormalizeWorkspaceExtensionPath(extRef); ok && (!hosted || declaredByPath(extRef)) {
 			absPath := filepath.Join(workspaceRoot, relPath)
 			var skip *SkippedExtension
 			ext, skip = tryLoadExtension(absPath, extRef, false)
@@ -253,7 +254,7 @@ func DiscoverExtensionsDetailed(workspaceRoot string, cfg *wsproto.Config, proje
 func scanProjectExtensions(workspaceRoot string, cfg *wsproto.Config, projectPaths []string) (loaded, pinned []*ExtensionDescription, skipped []SkippedExtension) {
 	names := make(map[string]bool)
 	for _, projPath := range projectPaths {
-		relPath, ok := normalizeWorkspaceExtensionPath(projPath)
+		relPath, ok := workspace.NormalizeWorkspaceExtensionPath(projPath)
 		if !ok {
 			continue
 		}
@@ -326,30 +327,10 @@ func pinnedByName(cfg *wsproto.Config, name, projectRelPath string) bool {
 	if runcredential.Hosted() && !declaredByPath(name) {
 		return true
 	}
-	if rel, ok := normalizeWorkspaceExtensionPath(name); ok && rel == filepath.Clean(projectRelPath) {
+	if rel, ok := workspace.NormalizeWorkspaceExtensionPath(name); ok && rel == filepath.Clean(projectRelPath) {
 		return false
 	}
 	return true
-}
-
-// normalizeWorkspaceExtensionPath returns ref as a clean workspace-relative
-// path. A leading separator is the repo-local shorthand ("/go/extension"). A ref
-// that escapes the workspace, or that names a volume (a Windows drive or UNC
-// share), has no workspace-relative form.
-func normalizeWorkspaceExtensionPath(ref string) (string, bool) {
-	if filepath.VolumeName(ref) != "" {
-		return "", false
-	}
-	rel := strings.TrimLeft(ref, `/\`)
-	if rel == "" {
-		return "", false
-	}
-	rel = filepath.FromSlash(strings.ReplaceAll(rel, `\`, `/`))
-	rel = filepath.Clean(rel)
-	if rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
-		return "", false
-	}
-	return rel, true
 }
 
 // tryLoadInstalledExtension attempts to load an extension from the symlink-based

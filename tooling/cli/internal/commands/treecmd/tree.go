@@ -14,7 +14,6 @@ import (
 	protocolcli "go.putnami.dev/protocol/cli"
 	"go.putnami.dev/tooling/cli/internal/git"
 	"go.putnami.dev/tooling/cli/internal/iox"
-	"go.putnami.dev/tooling/cli/internal/output"
 )
 
 // Fingerprint prints the digest identifying the worktree containing dir.
@@ -33,7 +32,7 @@ func Fingerprint(dir string, outputFormat string) error {
 	if err != nil {
 		return err
 	}
-	if !output.StructuredOutput(outputFormat) {
+	if !protocolcli.OutputMode(outputFormat).IsMachineReadable() {
 		iox.Fprintln(os.Stdout, tree.Fingerprint)
 		return nil
 	}

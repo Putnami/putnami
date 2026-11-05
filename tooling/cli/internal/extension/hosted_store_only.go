@@ -8,6 +8,8 @@ import (
 	"slices"
 	"strings"
 
+	"go.putnami.dev/cli/model/workspace"
+
 	cache "go.putnami.dev/protocol/cache"
 	protocolcli "go.putnami.dev/protocol/cli"
 	distribution "go.putnami.dev/protocol/distribution"
@@ -244,7 +246,7 @@ func LoadWorkspacePathExtension(workspaceRoot, ref string) *ExtensionDescription
 	if !declaredByPath(ref) {
 		return nil
 	}
-	relPath, ok := normalizeWorkspaceExtensionPath(ref)
+	relPath, ok := workspace.NormalizeWorkspaceExtensionPath(ref)
 	if !ok {
 		return nil
 	}

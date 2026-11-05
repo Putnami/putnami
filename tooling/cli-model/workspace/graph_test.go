@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"go.putnami.dev/protocol/features/spectest"
+	wsproto "go.putnami.dev/protocol/workspace"
 )
 
 func TestBuildGraph(t *testing.T) {
@@ -33,8 +34,8 @@ func TestBuildGraph(t *testing.T) {
 
 func TestBuildGraph_UsesLogicalIDsForGroupedPaths(t *testing.T) {
 	spectest.Proves(t, "cli/workspace-model", "canonical-identity", "grouped-paths-resolve-to-logical-ids")
-	clientID := ProjectIDFromPath("identity/(libs)/identity-client")
-	authID := ProjectIDFromPath("identity/(workloads)/auth-server")
+	clientID := wsproto.ProjectIDFromPath("identity/(libs)/identity-client")
+	authID := wsproto.ProjectIDFromPath("identity/(workloads)/auth-server")
 	g := BuildGraph([]*Project{
 		{ID: clientID, Name: "identity-client", Path: "identity/(libs)/identity-client"},
 		{ID: authID, Name: "auth-server", Path: "identity/(workloads)/auth-server", Dependencies: []string{"identity-client"}},

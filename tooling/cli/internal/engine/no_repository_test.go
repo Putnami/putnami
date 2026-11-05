@@ -15,6 +15,7 @@ import (
 	extensionproto "go.putnami.dev/protocol/extension"
 	"go.putnami.dev/protocol/features/spectest"
 	workspacepb "go.putnami.dev/protocol/workspace"
+	"go.putnami.dev/sdk/extension/gitread"
 	"go.putnami.dev/tooling/cli/internal/git"
 	"go.putnami.dev/tooling/cli/internal/jobs/scheduler"
 	"go.putnami.dev/tooling/cli/internal/store"
@@ -214,7 +215,7 @@ func TestRun_PublishAndDeployOutsideARepositoryNameGit(t *testing.T) {
 					WorkspaceRoot: root, Config: cfg, Commands: commands,
 				}, nil)
 			})
-			if result.ExitCode != ExitError || !errors.Is(err, git.ErrNotRepository) {
+			if result.ExitCode != ExitError || !errors.Is(err, gitread.ErrNotRepository) {
 				t.Fatalf("Run = exit %d, %v, want a refusal for a missing repository", result.ExitCode, err)
 			}
 			what := "publish"
@@ -391,7 +392,7 @@ func TestRun_PublishOutsideARepositoryReportsAMissingExtensionFirst(t *testing.T
 					t.Fatalf("Run = %v, stderr %q, want the missing @putnami/cloud with one install hint and no refusal", err, stderr)
 				}
 			} else {
-				if !errors.Is(err, git.ErrNotRepository) {
+				if !errors.Is(err, gitread.ErrNotRepository) {
 					t.Fatalf("Run = %v, want the refusal for a missing repository", err)
 				}
 				oneLineRefusal(t, stderr, "publish", root)
@@ -422,7 +423,7 @@ func TestRequireRepository(t *testing.T) {
 			t.Errorf("requireRepository(%v) = %v, want nil", commands, err)
 		}
 	}
-	if _, err := requireRepository(request("publish")); !errors.Is(err, git.ErrNotRepository) {
+	if _, err := requireRepository(request("publish")); !errors.Is(err, gitread.ErrNotRepository) {
 		t.Fatalf("requireRepository(publish) = %v, want ErrNotRepository", err)
 	}
 
@@ -439,7 +440,7 @@ func TestRequireRepository(t *testing.T) {
 	// A dry run the extension interprets executes its jobs, so it is refused.
 	rehearsal := request("publish")
 	rehearsal.Global.DryRun, rehearsal.ExecutesUnderDryRun = true, true
-	if _, err := requireRepository(rehearsal); !errors.Is(err, git.ErrNotRepository) {
+	if _, err := requireRepository(rehearsal); !errors.Is(err, gitread.ErrNotRepository) {
 		t.Errorf("requireRepository(executing dry run) = %v, want ErrNotRepository", err)
 	}
 
@@ -459,7 +460,7 @@ func TestRequireRepository(t *testing.T) {
 
 	t.Setenv("PATH", t.TempDir())
 	_, err := requireRepository(request("deploy"))
-	if !errors.Is(err, git.ErrNoProgram) {
+	if !errors.Is(err, gitread.ErrNoProgram) {
 		t.Fatalf("requireRepository without a git program = %v, want ErrNoProgram", err)
 	}
 	want := "deploy needs git history: no git program is on PATH; install git, then run git init in " + root + " and commit"
@@ -521,7 +522,7 @@ func TestRequireRepository_FollowsOnlyTheDeclaredSideEffects(t *testing.T) {
 	for _, commands := range [][]string{{"release"}, {"build", "release"}} {
 		_, err := requireRepository(request(commands...))
 		what := commands[len(commands)-1]
-		if !errors.Is(err, git.ErrNotRepository) || !strings.HasPrefix(err.Error(), what+" needs git history: ") {
+		if !errors.Is(err, gitread.ErrNotRepository) || !strings.HasPrefix(err.Error(), what+" needs git history: ") {
 			t.Errorf("requireRepository(%v) = %v, want the refusal naming %s", commands, err, what)
 		}
 	}

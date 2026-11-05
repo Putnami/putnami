@@ -1112,7 +1112,7 @@ func extensionConsumerIndex(ws *Workspace) map[string][]string {
 		if strings.HasPrefix(entry, "/") {
 			p = ws.ProjectByID(entry)
 		} else {
-			if path, ok := normalizeWorkspaceExtensionPath(entry); ok {
+			if path, ok := NormalizeWorkspaceExtensionPath(entry); ok {
 				p = ws.ProjectByPath(path)
 			}
 			if p == nil {
@@ -1130,7 +1130,7 @@ func extensionConsumerIndex(ws *Workspace) map[string][]string {
 		if extID == "" || extID == consumerID {
 			return
 		}
-		if !containsString(consumers[extID], consumerID) {
+		if !slices.Contains(consumers[extID], consumerID) {
 			consumers[extID] = append(consumers[extID], consumerID)
 		}
 	}
@@ -1154,11 +1154,12 @@ func extensionConsumerIndex(ws *Workspace) map[string][]string {
 	return consumers
 }
 
-// normalizeWorkspaceExtensionPath mirrors extension discovery's workspace-path
-// probe. Traversal and a ref that names a volume (a Windows drive or UNC share)
-// are rejected, while "./" and transparent physical project paths are cleaned
+// NormalizeWorkspaceExtensionPath returns ref as a clean workspace-relative
+// path, the form extension discovery probes. A leading separator is the
+// repo-local shorthand ("/go/extension"). Traversal and a ref that names a volume
+// (a Windows drive or UNC share) are rejected, while "./" and transparent physical project paths are cleaned
 // before ProjectByPath performs the lookup.
-func normalizeWorkspaceExtensionPath(ref string) (string, bool) {
+func NormalizeWorkspaceExtensionPath(ref string) (string, bool) {
 	if filepath.VolumeName(ref) != "" {
 		return "", false
 	}
@@ -1567,7 +1568,7 @@ func buildScopeConfigIndex(ws *Workspace) scopeConfigIndex {
 	for _, p := range ws.Projects {
 		for _, source := range p.Scope.ConfigPaths {
 			key := cleanIndexPath(filepath.FromSlash(source))
-			if !containsString(idx.inheritors[key], p.ID) {
+			if !slices.Contains(idx.inheritors[key], p.ID) {
 				idx.inheritors[key] = append(idx.inheritors[key], p.ID)
 			}
 		}
@@ -1612,7 +1613,7 @@ func buildProviderRootWatchedFileOwnerIndex(ws *Workspace) map[string][]string {
 			if !ok || cleaned == wsproto.ProbeRootPath || strings.Contains(cleaned, "/") {
 				continue
 			}
-			if !containsString(idx[cleaned], project.ID) {
+			if !slices.Contains(idx[cleaned], project.ID) {
 				idx[cleaned] = append(idx[cleaned], project.ID)
 			}
 		}

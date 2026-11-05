@@ -15,18 +15,15 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"net"
 	"net/http"
-	"net/url"
 	"slices"
-	"strings"
-	"time"
 
 	diag "go.putnami.dev/protocol/diagnostic"
 	distribution "go.putnami.dev/protocol/distribution"
 	infra "go.putnami.dev/protocol/infra"
 	put "go.putnami.dev/protocol/put"
 	"go.putnami.dev/sdk/extension/internal/artifacterr"
+	"go.putnami.dev/sdk/extension/internal/registryhttp"
 	"go.putnami.dev/sdk/extension/internal/retry"
 	"go.putnami.dev/sdk/extension/registryorigin"
 )
@@ -88,29 +85,7 @@ type Published struct {
 // loopback host, with no trailing slash. A URL that carries userinfo, a query
 // or a fragment is refused, so no credential travels in a URL.
 func ValidateRegistryURL(raw string) (string, error) {
-	u, err := url.Parse(strings.TrimSpace(raw))
-	if err != nil || u.Opaque != "" || u.Host == "" || u.Hostname() == "" {
-		return "", errors.New("put registry URL must be an absolute HTTP(S) URL without credentials")
-	}
-	if u.User != nil || u.RawQuery != "" || u.ForceQuery || u.Fragment != "" {
-		return "", errors.New("put registry URL must be an absolute HTTP(S) URL without credentials, query, or fragment")
-	}
-	u.Scheme = strings.ToLower(u.Scheme)
-	switch u.Scheme {
-	case "https":
-	case "http":
-		hostname := strings.TrimSuffix(strings.ToLower(u.Hostname()), ".")
-		ip := net.ParseIP(hostname)
-		loopback := hostname == "localhost" || strings.HasSuffix(hostname, ".localhost") || (ip != nil && ip.IsLoopback())
-		if !loopback {
-			return "", errors.New("put registry URL must use HTTPS (HTTP is allowed only for loopback)")
-		}
-	default:
-		return "", errors.New("put registry URL must use HTTP(S)")
-	}
-	u.Path = strings.TrimRight(u.Path, "/")
-	u.RawPath = ""
-	return u.String(), nil
+	return registryhttp.ValidateURL("put", raw)
 }
 
 // NewHTTPClient returns the client a publication sends through: no proxy, so
@@ -122,31 +97,7 @@ func NewHTTPClient() (*http.Client, error) {
 	if err != nil {
 		return nil, err
 	}
-	baseTransport, ok := http.DefaultTransport.(*http.Transport)
-	if !ok {
-		return nil, errors.New("put registry transport is unavailable")
-	}
-	direct := baseTransport.Clone()
-	direct.Proxy = nil
-	transport := registryorigin.Transport(direct, origins)
-	return &http.Client{
-		Timeout:       5 * time.Minute,
-		Transport:     transport,
-		CheckRedirect: refuseRedirect,
-	}, nil
-}
-
-func refuseRedirect(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
-
-// withoutRedirects returns a copy of client that never follows a redirect, so
-// a request carrying the bearer reaches the registry it names and no other.
-func withoutRedirects(client *http.Client) (*http.Client, error) {
-	if client == nil {
-		return nil, errors.New("put publication requires an HTTP client")
-	}
-	bounded := *client
-	bounded.CheckRedirect = refuseRedirect
-	return &bounded, nil
+	return registryhttp.NewClient("put registry transport", origins)
 }
 
 // Check validates member before any request and returns the platforms of an
@@ -405,7 +356,7 @@ func sendRetrying(ctx context.Context, client *http.Client, method, target, cont
 // failure or an unreadable answer is marked with retry.Again when package
 // retry counts it as transient.
 func send(ctx context.Context, client *http.Client, method, target, contentType, token string, body []byte) (reply, error) {
-	client, err := withoutRedirects(client)
+	client, err := registryhttp.WithoutRedirects(client, "put publication")
 	if err != nil {
 		return reply{}, err
 	}

@@ -1,4 +1,4 @@
-package git
+package gitread
 
 import (
 	"context"
@@ -18,8 +18,8 @@ const appleGitTrampoline = "/usr/bin/git"
 
 // Executable names the git program to run. When the PATH lookup lands on the
 // macOS trampoline, it returns the git the trampoline forwards to, found once
-// per developer directory. Otherwise it returns "git", found on PATH as
-// before, so a git placed earlier on PATH still wins.
+// per developer directory. Otherwise it returns "git", found on PATH, so a
+// git placed earlier on PATH still wins.
 //
 // The forwarded git runs without the variables the trampoline adds to its
 // environment (SDKROOT, CPATH, LIBRARY_PATH, MANPATH). A git verb that runs

@@ -82,7 +82,7 @@ func appendScopeProjects(root, scopePath string, seen map[string]bool, projects 
 		}
 	}
 	for _, relProj := range scopeIncludes {
-		fullRel := cleanWorkspacePath(filepath.Join(scopePath, relProj))
+		fullRel := wsproto.CleanWorkspacePath(filepath.Join(scopePath, relProj))
 		if fullRel == "" {
 			continue
 		}
@@ -91,7 +91,7 @@ func appendScopeProjects(root, scopePath string, seen map[string]bool, projects 
 			continue
 		}
 		if scopeSelf != nil {
-			scopeSelf.ScopeIncludes = append(scopeSelf.ScopeIncludes, ProjectIDFromPath(fullRel))
+			scopeSelf.ScopeIncludes = append(scopeSelf.ScopeIncludes, wsproto.ProjectIDFromPath(fullRel))
 		}
 		if seen[fullRel] {
 			continue
@@ -152,7 +152,7 @@ func discoverProject(workspaceRoot, relPath string) *Project {
 	}
 	proj.Line = nearestAncestorLine(workspaceRoot, absPath)
 
-	proj.ID = ProjectIDFromPath(proj.Path)
+	proj.ID = wsproto.ProjectIDFromPath(proj.Path)
 	resolveProjectIdentity(proj, nil)
 	return proj
 }
