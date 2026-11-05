@@ -3257,6 +3257,15 @@
             "kind": "acceptance",
             "checks": ["the-epic-skill-launches-children-and-never-codes"]
           }
+        },
+        {
+          "id": "external-spec-authoring",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": ["the-spec-skill-edits-the-external-spec-it-resolves"]
+          }
         }
       ]
     },
