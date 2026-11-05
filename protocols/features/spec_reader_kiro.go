@@ -14,18 +14,14 @@ import (
 const kiroFileName = "requirements.md"
 
 var (
-	kiroHeading    = regexp.MustCompile(`^ {0,3}(#{1,6})[ \t]+(.*?)[ \t]*#*[ \t]*$`)
-	kiroFence      = regexp.MustCompile("^[ \\t]*(`{3,}|~{3,})")
-	kiroBreak      = regexp.MustCompile(`^ {0,3}(?:-{3,}|\*{3,}|_{3,})[ \t]*$`)
-	kiroListItem   = regexp.MustCompile(`^([ \t]*)(?:[-*+]|[0-9]+(?:\.[0-9]+)+[.)]?|[0-9]+[.)])[ \t]+(?:\[[ xX]\][ \t]+)?(.*)$`)
-	kiroGroup      = regexp.MustCompile(`(?i)^requirement[ \t]+(r?[0-9]+(?:\.[0-9]+)*)(?:[^0-9A-Za-z.]|$)`)
-	kiroCriteria   = regexp.MustCompile(`(?i)^acceptance criteria\b`)
-	kiroBoldLabel  = regexp.MustCompile(`(?i)^[*_]*acceptance criteria[*_:]*[ \t]*$`)
-	kiroNumbering  = regexp.MustCompile(`^[0-9]+[.)][ \t]+`)
-	kiroInlineCode = regexp.MustCompile("`[^`]*`")
-	kiroOpener     = regexp.MustCompile(`(?i)^(when|while|where|if|the|for all)\b`)
-	kiroShall      = regexp.MustCompile(`(?i)\bshall\b`)
-	kiroThen       = regexp.MustCompile(`(?i)\bthen\b`)
+	kiroListItem  = regexp.MustCompile(`^([ \t]*)(?:[-*+]|[0-9]+(?:\.[0-9]+)+[.)]?|[0-9]+[.)])[ \t]+(?:\[[ xX]\][ \t]+)?(.*)$`)
+	kiroGroup     = regexp.MustCompile(`(?i)^requirement[ \t]+(r?[0-9]+(?:\.[0-9]+)*)(?:[^0-9A-Za-z.]|$)`)
+	kiroCriteria  = regexp.MustCompile(`(?i)^acceptance criteria\b`)
+	kiroBoldLabel = regexp.MustCompile(`(?i)^[*_]*acceptance criteria[*_:]*[ \t]*$`)
+	kiroNumbering = regexp.MustCompile(`^[0-9]+[.)][ \t]+`)
+	kiroOpener    = regexp.MustCompile(`(?i)^(when|while|where|if|the|for all)\b`)
+	kiroShall     = regexp.MustCompile(`(?i)\bshall\b`)
+	kiroThen      = regexp.MustCompile(`(?i)\bthen\b`)
 	// kiroSentenceEnd matches the space that ends a sentence of folded prose.
 	kiroSentenceEnd = regexp.MustCompile(`[.!?] `)
 )
@@ -34,10 +30,6 @@ var (
 // already derives.
 var kiroDerivedSections = map[string]bool{
 	"status": true, "date": true, "dates": true, "branch": true, "routes": true, "entities": true,
-}
-
-func init() {
-	specReaders[SpecFormatKiro] = kiroReader{}
 }
 
 // kiroReader projects the requirements.md of one Kiro spec: each Introduction
@@ -151,7 +143,7 @@ func (scan *kiroScan) line(raw string, number int) {
 		scan.extend = nil
 	}
 	scan.afterBlank = false
-	if heading := kiroHeading.FindStringSubmatch(text); heading != nil {
+	if heading := specKitHeading.FindStringSubmatch(text); heading != nil {
 		scan.endBlock()
 		scan.heading(len(heading[1]), heading[2], position)
 		return
@@ -178,7 +170,7 @@ func (scan *kiroScan) criterionLine(text string, item []string, position SpecPos
 	switch {
 	case item != nil && (scan.extend == nil || len(item[1]) <= scan.indent):
 		scan.criterion(item[2], len(item[1]), position)
-	case scan.extend != nil && !kiroBreak.MatchString(text):
+	case scan.extend != nil && !specKitBreak.MatchString(text):
 		scan.settleAnchor()
 		scan.extend(strings.TrimSpace(text))
 	default:
@@ -214,13 +206,15 @@ func (scan *kiroScan) heading(level int, title string, position SpecPosition) {
 	}
 	scan.settleAnchor()
 	if scan.group != nil {
+		criteria := kiroCriteria.MatchString(plain)
+		if criteria && (level > scan.group.level || scan.group.criteria == 0) {
+			scan.group.reading = true
+			return
+		}
 		if level <= scan.group.level {
 			scan.closeGroup()
 		} else {
-			scan.group.reading = kiroCriteria.MatchString(plain)
-			if scan.group.reading {
-				return
-			}
+			scan.group.reading = false
 		}
 	}
 	name := strings.ToLower(kiroNumbering.ReplaceAllString(plain, ""))
@@ -239,9 +233,11 @@ func (scan *kiroScan) openGroup(label string, level int, position SpecPosition) 
 	if scan.anchor != nil {
 		id = scan.anchor.id
 		scan.anchor = nil
-	} else {
-		normalized, _ := NormalizeRequirementName(label)
+	} else if normalized, ok := NormalizeRequirementName(label); ok {
 		id = "requirement-" + normalized
+	} else {
+		scan.fail(position, "this requirement label cannot become an ID: write an anchor above it")
+		id = "requirement"
 	}
 	scan.group = &kiroRequirementGroup{id: id, level: level, position: position}
 	scan.groups++
@@ -292,6 +288,7 @@ func (scan *kiroScan) finish() {
 				continue
 			}
 			spec.Outcomes = append(spec.Outcomes, outcome)
+			scan.reading.OutcomePositions = append(scan.reading.OutcomePositions, paragraph.position)
 		}
 	}
 	top := SpecPosition{File: scan.file, Line: 1}
@@ -309,7 +306,9 @@ func (scan *kiroScan) finish() {
 		scan.reading.Spec, scan.reading.Requirements = nil, nil
 		return
 	}
-	for index, requirement := range spec.Requirements {
+	for index := range spec.Requirements {
+		requirement := &spec.Requirements[index]
+		requirement.Text = strings.Join(strings.Fields(requirement.Text), " ")
 		if !isEARSCriterion(requirement.Text) {
 			scan.reading.Findings = append(scan.reading.Findings, diag.Warningf(WarningCodeSpecCriterionMalformed,
 				scan.reading.Requirements[index].Position.Field(),
@@ -367,7 +366,7 @@ func (scan *kiroScan) fenced(raw string, position SpecPosition) bool {
 	if scan.inComment {
 		return false
 	}
-	match := kiroFence.FindStringSubmatch(raw)
+	match := specKitFence.FindStringSubmatch(raw)
 	if scan.fence == "" {
 		if match == nil {
 			return false
@@ -396,7 +395,7 @@ func (scan *kiroScan) stripComments(line string, position SpecPosition) string {
 			line = after
 			continue
 		}
-		start := kiroCommentOpening(line)
+		start := specKitCommentOpening(line)
 		if start < 0 {
 			kept.WriteString(line)
 			break
@@ -406,30 +405,6 @@ func (scan *kiroScan) stripComments(line string, position SpecPosition) string {
 		line = line[start+len("<!--"):]
 	}
 	return kept.String()
-}
-
-// kiroCommentOpening returns the offset of the first "<!--" outside inline
-// code, or -1.
-func kiroCommentOpening(line string) int {
-	spans := kiroInlineCode.FindAllStringIndex(line, -1)
-	from := 0
-	for {
-		found := strings.Index(line[from:], "<!--")
-		if found < 0 {
-			return -1
-		}
-		start := from + found
-		inside := false
-		for _, span := range spans {
-			if start >= span[0] && start < span[1] {
-				from, inside = span[1], true
-				break
-			}
-		}
-		if !inside {
-			return start
-		}
-	}
 }
 
 // endBlock ends the open criterion and paragraph.

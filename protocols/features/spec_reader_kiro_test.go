@@ -152,6 +152,40 @@ func TestWrappedOrNestedCriterionStaysWhole(t *testing.T) {
 	}
 }
 
+func TestAcceptanceHeadingAtTheGroupLevelOpensItsCriteria(t *testing.T) {
+	t.Parallel()
+	spectest.Proves(t, "features/feature-contracts", "kiro-projection", "an-acceptance-heading-at-the-group-level-opens-its-criteria")
+	projection := readKiro(t, "## Introduction\n\nWhy.\n\n### Requirement 1\n\n### Acceptance Criteria\n\n1. THE system SHALL run\n\n### Glossary\n\n1. Not a criterion\n")
+	if got := kiroIDs(t, projection); got != "requirement-1-1" {
+		t.Fatalf("ids = %s", got)
+	}
+	if len(projection.Findings) != 0 {
+		t.Fatalf("findings = %v", projection.Findings)
+	}
+}
+
+func TestTabInACriterionFoldsToASpace(t *testing.T) {
+	t.Parallel()
+	spectest.Proves(t, "features/feature-contracts", "kiro-projection", "a-wrapped-or-nested-criterion-stays-whole")
+	projection := readKiro(t, "## Introduction\n\nWhy.\n\n### Requirement 1\n\n#### Acceptance Criteria\n\n1. THE system\tSHALL run\n")
+	if got := kiroIDs(t, projection); got != "requirement-1-1" || projection.Spec.Requirements[0].Text != "THE system SHALL run" {
+		t.Fatalf("spec = %+v", projection.Spec)
+	}
+}
+
+func TestUnmappableGroupLabelNeedsAnAnchor(t *testing.T) {
+	t.Parallel()
+	spectest.Proves(t, "features/feature-contracts", "kiro-requirement-identity", "a-group-label-with-no-id-needs-an-anchor")
+	heading := "### Requirement " + strings.Repeat("1", 129) + "\n\n#### Acceptance Criteria\n\n1. THE system SHALL run\n"
+	projection := readKiro(t, "## Introduction\n\nWhy.\n\n"+heading)
+	if got := kiroFindings(projection, features.ErrorCodeSpecRead); projection.Spec != nil || len(got) != 1 || got[0] != kiroFile+"#L5" {
+		t.Fatalf("findings = %v", projection.Findings)
+	}
+	if projection := readKiro(t, "## Introduction\n\nWhy.\n\n<!-- putnami:id export -->\n"+heading); kiroIDs(t, projection) != "export-1" {
+		t.Fatalf("an anchor did not name the group: %v", projection.Findings)
+	}
+}
+
 func TestDottedCriterionNumberOpensACriterion(t *testing.T) {
 	t.Parallel()
 	spectest.Proves(t, "features/feature-contracts", "kiro-projection", "a-dotted-criterion-number-opens-a-criterion")
@@ -172,7 +206,7 @@ func TestKiroCommentsAndCodeAreNotSpecText(t *testing.T) {
 	if got := kiroIDs(t, projection); got != "requirement-1-1" {
 		t.Fatalf("ids = %s", got)
 	}
-	if text := projection.Spec.Requirements[0].Text; text != "THE system SHALL run  now" || projection.Spec.Outcomes[0] != "Why." {
+	if text := projection.Spec.Requirements[0].Text; text != "THE system SHALL run now" || projection.Spec.Outcomes[0] != "Why." {
 		t.Fatalf("spec = %+v", projection.Spec)
 	}
 }
@@ -315,6 +349,9 @@ func TestLongIntroductionParagraphSplitsAtSentences(t *testing.T) {
 	projection := readKiro(t, "## Introduction\n\n"+strings.Repeat(sentence+" ", 4)+"\n\n### Requirement 1\n\n#### Acceptance Criteria\n\n1. THE system SHALL run\n")
 	if projection.Spec == nil || len(projection.Spec.Outcomes) != 2 {
 		t.Fatalf("spec = %+v, findings = %v", projection.Spec, projection.Findings)
+	}
+	if got := len(projection.Requirements); got != 1 {
+		t.Fatalf("records = %d", got)
 	}
 	if got := strings.Join(projection.Spec.Outcomes, " "); got != strings.TrimSpace(strings.Repeat(sentence+" ", 4)) {
 		t.Fatalf("the outcomes lost text: %q", got)

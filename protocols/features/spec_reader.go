@@ -32,6 +32,7 @@ var specFileExtensions = map[SpecFormat][]string{
 // valid wire value that no release can read yet.
 var specReaders = map[SpecFormat]SpecReader{
 	SpecFormatSpecKit: specKitReader{},
+	SpecFormatKiro:    kiroReader{},
 }
 
 var (
