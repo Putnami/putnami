@@ -202,7 +202,7 @@ func (ws *Workspace) ProjectByName(name string) *Project {
 }
 
 // AddWarning appends human prose and, when provided, its stable machine code.
-// Copied from `go.putnami.dev/cli/model/workspace`.
+// The code is the stable form core's workspace also carries.
 func (ws *Workspace) AddWarning(code WarningCode, message string) {
 	if ws == nil {
 		return

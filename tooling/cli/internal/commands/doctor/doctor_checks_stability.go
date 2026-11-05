@@ -22,8 +22,8 @@ var doctorGeneratedArtifacts = []string{
 
 // doctorSourceBindingPrefix is the source-v1 binding scheme. A binding hashes
 // every file of a project, so a committed artifact carrying one changes on every
-// source commit — the same instability class one layer down (an earlier change
-// removed it from the capability manifest; this keeps it out).
+// source commit — the same instability class one layer down (the capability
+// manifest carries none; this keeps it out).
 const doctorSourceBindingPrefix = "source-v1:sha256:"
 
 // checkCommittedManifestStability is the single-project stability contract:

@@ -1745,7 +1745,7 @@ type plannedIndex struct {
 	byStepName map[string][]*jobmodel.ScheduledJob
 	// byLegacyName indexes each job under its DERIVED spellings (display name,
 	// plan name). Nothing resolves through it — it exists so a reference that
-	// used to bind through one of those spellings can be reported instead of
+	// names one of those spellings can be reported instead of
 	// silently losing its edge.
 	byLegacyName map[string][]*jobmodel.ScheduledJob
 }

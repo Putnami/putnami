@@ -249,15 +249,6 @@ type Scheduler struct {
 	// survives a kill, the exactly-once finalizer, and the fail-closed guard
 	// that keeps a sensitive artifact's path and bytes off every published
 	// surface. Nil for every plan with no finalizer.
-	//
-	// It is the ONLY provisioning machinery left in the scheduler, and it is
-	// generic: an earlier version deleted the database test-infra planner that
-	// used to sit beside it — a core component that walked each test project's
-	// requirements closure, shelled out to docker, synthesized a connection
-	// string and injected it through a private env seam. Database test
-	// environments are one PROVIDER of this shape now
-	// (go.putnami.dev/sdk/extension/dbtestenv), not a second implementation of
-	// it.
 	invocations *invocationRuntime
 
 	// metrics records per-job ready/start timing so Run can report ready wait
@@ -518,14 +509,6 @@ func (s *Scheduler) setRemoteCache(remote cachekey.RemoteCache) {
 // prepareRun performs the pre-execution setup that must complete before any
 // cache key is computed and workers start: it generates each project's
 // version.json.
-//
-// It used to do a second thing — export a per-project fixture digest into the
-// cache-key environment for every test job about to receive a provisioned
-// database — and the ordering constraint was the whole reason this function
-// exists. That is gone with the test-infra planner: a
-// consumer of an invocation-scoped resource folds in the PRODUCING ACTION's
-// digest (cachekey/executor.go), which is derived from the producer's declared inputs
-// and needs no process-global side effect to be visible to the key.
 func (s *Scheduler) prepareRun() {
 	s.versionBuildTime = time.Now().UTC().Format(time.RFC3339)
 	started := time.Now()

@@ -13,17 +13,12 @@ import (
 //
 // A serve iteration must not arm the file watcher until the server is actually
 // listening, or the watcher's own startup writes restart the server it just
-// started. That fact used to be inferred from a substring of the workload's
-// LOG text ("listening http(s)://") — a compatibility seam that
-// read a human message as a machine signal, could not say WHAT became ready,
-// and discarded the address it had just matched. It is gone: readiness is now
-// the typed `ready` event of runtime event protocol v2
+// started. Readiness is the typed `ready` event of runtime event protocol v2
 // (protocols/runtime/doc/05-event-v2.md), which every first-party serve wrapper
 // emits through the extension SDK's shared forwarder.
 //
 // The consumer contract the protocol states is: arm on the FIRST `ready` event
-// of the serve iteration — exactly the semantics of the first-matching-line
-// probe it replaces. Restarts are covered because the forwarder holds no
+// of the serve iteration. Restarts are covered because the forwarder holds no
 // per-stream memory of having announced readiness: every serve iteration spawns
 // a fresh workload whose marker travels again, which is why more than one
 // `ready` per stream is legal (protocols/runtime fixtures/v2/valid/serve-restart.jsonl).

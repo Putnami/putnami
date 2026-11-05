@@ -46,8 +46,7 @@ type Config struct {
 	// They let a caller choose the DESTINATION without changing which renderer
 	// this constructor selects. The first-use bootstrap runs an implicit
 	// `putnami install` whose job rendering must land on stderr under
-	// --output=json|jsonl; that used to be achieved by swapping the
-	// process-global os.Stdout for the duration of the install.
+	// --output=json|jsonl.
 	Out io.Writer
 	Err io.Writer
 

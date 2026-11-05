@@ -556,10 +556,9 @@ func runWorkspaceSyncTasks(
 // including a probe failure — warns and continues: `projects sync` is the
 // command that REPAIRS a broken workspace, so it must never be the command a
 // broken extension takes down.
-// Every diagnostic the synchronization produced is printed. A run that kept a
-// stale index because no adapter resolved, or that refused a recorded view it
-// could not adopt, used to look exactly like a run that had nothing to do;
-// the outcome carries the reason, so this prints it.
+// Every diagnostic the synchronization produced is printed. The outcome
+// carries the reason a run kept a stale index or refused a recorded view, so
+// this prints it.
 //
 // `reported` is the divergence set the load-time report already printed. When
 // the load had no provider view, that set is empty on purpose and the real one

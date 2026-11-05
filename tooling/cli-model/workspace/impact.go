@@ -1176,10 +1176,8 @@ func NormalizeWorkspaceExtensionPath(ref string) (string, bool) {
 }
 
 // firstMatchingFilePattern returns the first file that matches any pattern,
-// and the pattern that matched it. The three probes are moved VERBATIM from the
-// deleted watch classifier, tolerant `**` handling included, because
-// narrowing them would silently stop watch from re-running on lockfile edits it
-// used to catch. The match is named rather than reported as a bool so the
+// and the pattern that matched it. The patterns tolerate `**` so watch
+// re-runs on lockfile edits. The match is named rather than reported as a bool so the
 // workspace-input seed can say which file and which pattern widened the
 // selection to every project.
 //

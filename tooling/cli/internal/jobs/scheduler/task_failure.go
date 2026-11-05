@@ -12,10 +12,7 @@ import (
 
 // The failure cache: replaying a failure whose inputs have not changed.
 //
-// Success has always been cached; failure was not. So the cheapest possible
-// outcome — "nothing changed since you last failed" — used to be the most
-// expensive one to observe: a full replan and a full re-execution to reach the
-// verdict the previous run already reached. A negative entry closes that gap.
+// A negative entry replays a failure whose inputs have not changed.
 //
 // # What is recorded, and what is refused
 //

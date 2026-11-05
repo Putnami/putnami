@@ -932,24 +932,9 @@ func ComputeJobCacheHashWith(
 	// leaking the signal into tasks that do not read it.
 	//
 	// Writing the project `gen` resource is deliberately NOT one of them.
-	// It used to be, on the grounds that the scheduler seeds .gen/version.json
-	// inside the tree a gen task captures — but generation OUTPUT is derived from
-	// declared content, and the one revision-bearing file in it is that seeded
-	// stamp, which restoreDeclaredCacheHit re-materializes at the CURRENT identity
-	// after every hit (task_capture.go). Keying generation on the commit instead
-	// made every gen task miss on every SHA and, because downstream keys mix
-	// upstream TASK KEYS, dragged the whole compile/test/describe closure cold with
-	// it — 54 generate, 18 cross-compile, 18 test and 18 lint misses on an
-	// otherwise-unchanged tree, while project-scoped tasks that do not depend on
-	// generation hit.
-	//
-	// Removing the signal needs NO store.cacheKeyVersion bump: EmbeddedVersion
-	// stays a positional field of the key, so a generation key simply moves to a
-	// new address. Every key that does move is new (no pre-change entry lives
-	// there), and every key that does NOT move belongs to a task whose semantics
-	// are unchanged, so no entry can be reinterpreted. Superseded generation
-	// entries age out through ordinary GC instead of costing every user and every
-	// CI namespace the whole-cache miss a bump would.
+	// Generation output is derived from declared content, and the seeded
+	// .gen/version.json is re-materialized at the current identity after every hit
+	// (task_capture.go).
 	var embeddedVersion string
 	if len(versions) > 0 && KeyEmbedsVersion(job, ParamHasVersionVar(cacheParams)) {
 		if projVersion := VersionInfoForProject(versions, job.Project); projVersion != nil {

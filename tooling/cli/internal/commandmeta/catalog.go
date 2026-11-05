@@ -16,32 +16,25 @@ import (
 // A second hand-maintained table describing commands is a defect, not an
 // addition: internal/cli/structural_baseline_test.go fails when one appears.
 //
-// The catalog grew in stages, each one extending rather than forking it:
+// What the catalog drives:
 //
-//   - The catalog was filled first, deriving structuredCommandCategories,
-//     relatedCommands, and structuredCommandHelp from it.
-//   - Shell completion was derived from Command.Path/Summary and the
-//     global-flag table, the structured-output capability check was derived
-//     from Command.StructuredOutput, and Command.DefaultSub was added — the
-//     bare-root default subcommand canonicalStructuredCommand used to
-//     hand-key.
-//   - Command.Flags and the GlobalFlag table were bound to the argument
-//     parser. Flag.Type/Short drive arity and alias resolution, Flag.Values is
-//     an ENFORCED enum (see Flag.Values), and ResolveFlags is the lookup the
-//     parser uses to decide whether it may reject a flag at all.
-//     Command.Positionals stays display-only: the catalog spells the usage
-//     line, the handlers still consume their own positionals.
-//   - The catalog became the sole VOCABULARY: IsStructuredRoot now answers
-//     "does this word take a subcommand" (internal/cli.commandRegistry used
-//     to), and internal/cli.registerCommand panics on a name this catalog
-//     does not declare, so the handler map cannot describe a command the
-//     catalog has never heard of. That change deliberately did NOT consume
-//     Command.Workspace in the dispatcher. The handlers still call
-//     env.requireWorkspace() themselves, and
-//     internal/cli.TestCatalog_WorkspaceRequirementMatchesHandlers proves the
-//     catalog's declaration matches what they do. Moving the check into
-//     dispatch changes WHEN the error fires relative to subcommand
-//     validation, which is a behavior change that belongs on its own.
+//   - Shell completion (Command.Path/Summary and the global-flag table), the
+//     structured-output capability check (Command.StructuredOutput) and the
+//     bare-root default subcommand (Command.DefaultSub).
+//   - The argument parser. Flag.Type/Short drive arity and alias resolution,
+//     Flag.Values is an ENFORCED enum (see Flag.Values), and ResolveFlags is the
+//     lookup the parser uses to decide whether it may reject a flag at all.
+//     Command.Positionals is display-only: the catalog spells the usage line,
+//     the handlers consume their own positionals.
+//   - The VOCABULARY. IsStructuredRoot answers "does this word take a
+//     subcommand", and internal/cli.registerCommand panics on a name this
+//     catalog does not declare, so the handler map cannot describe a command the
+//     catalog has never heard of.
+//
+// The dispatcher does not consume Command.Workspace. The handlers call
+// env.requireWorkspace() themselves, and
+// internal/cli.TestCatalog_WorkspaceRequirementMatchesHandlers proves the
+// catalog's declaration matches what they do.
 
 // Kind classifies a catalog command. The catalog declares only structured
 // commands: a job command, such as build, exists only where a loaded extension
@@ -456,8 +449,7 @@ func StructuredRoots() []Command {
 // child path "projects list").
 //
 // This is the CLI's answer to "does this word take a subcommand", asked on the
-// argument-parsing path. It moved here from internal/cli.commandRegistry so
-// the catalog is the only vocabulary and the
+// argument-parsing path. The catalog is the only vocabulary and the
 // handler registry is only dispatch (ADR 0001 §1). It scans rather than caching
 // a set: the catalog is a few dozen entries, and a package-level set built from
 // it would be a second copy of the vocabulary — precisely what §1 forbids.

@@ -4,12 +4,9 @@
 //
 // # There is one contract
 //
-// Version 2 is the ONLY machine contract the CLI emits. An early release added
-// it behind an opt-in, a later release made it the default, and the release
-// after that deleted the v1 emitters and the selection point along with them.
-// Every document this package produces carries protocolVersion: 2; a document
-// without the member is v1 and can now only come from a build published before
-// v1 was removed.
+// Version 2 is the ONLY machine contract the CLI emits. Every document this
+// package produces carries protocolVersion: 2; a document without the member is
+// not a v2 document.
 //
 // # What this package is
 //

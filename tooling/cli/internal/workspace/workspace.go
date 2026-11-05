@@ -196,13 +196,9 @@ func loadUncached(root string) (*Workspace, error) {
 	// The recorded view is VALIDATED before it is adopted.
 	//
 	// A recorded view that resolves two projects to one name, or that closes a
-	// dependency cycle, fails the checks below — and because adoption used to
-	// happen unconditionally and first, such an index made the workspace
-	// permanently unloadable: every repair command loads the workspace, and
-	// loading re-adopted the poisoned view before it could refuse it. Editing
-	// the manifests did not help; only hand-deleting a file nothing named could.
+	// dependency cycle, fails the checks below.
 	//
-	// So a rejected recorded view degrades to the un-adopted resolution — a
+	// A rejected recorded view degrades to the un-adopted resolution — a
 	// strictly smaller identity, the same one a fresh checkout has — and says so,
 	// naming the file to rebuild or remove.
 	if len(merged) > 0 {

@@ -91,12 +91,9 @@ func lockEntryFor(prior lockfile.LockEntry, hadPrior bool, result *artifactInsta
 // the version, the manifest hash, the task-contract record, every digest the
 // prior already recorded — is equal.
 //
-// Such an entry is not a change anybody requested. A hosted runner on
-// linux/amd64 that installs from a lock recorded on darwin/arm64 used to write
-// its own digest, and the loopback registry broker it downloaded through, into
-// the committed lock; `--impacted` then read the rewritten lock as a change and
-// selected every project that declares it as an input, so the hosted plan
-// differed from the local plan for the same commit.
+// Such an entry is not a change anybody requested. A hosted runner that
+// rewrote the committed lock would make --impacted select every project that
+// declares it.
 //
 // A prior entry with no per-platform map is never a refresh: its legacy scalar
 // digest migrates into the map on the next install, which is a change to the
@@ -558,8 +555,7 @@ func noteUnreadableLock(err error) {
 // object per line instead of the human-readable progress lines.
 //
 // out is the human progress stream. It is a parameter because the first-use
-// bootstrap installs with it pointed at stderr under --output=json|jsonl, which
-// an earlier design required doing by reassigning the process-global os.Stdout.
+// bootstrap installs with it pointed at stderr under --output=json|jsonl.
 // The JSONL stream is deliberately NOT routed through it: that one is the
 // caller's own machine contract on the real stdout.
 func installArtifacts(ctx context.Context, wsRoot string, cfg *wsproto.Config, args []string, ops artifactOps, outputFormat string, out io.Writer) error {

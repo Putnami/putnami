@@ -76,16 +76,8 @@
 // it never will: every declared output has exactly one owning task by
 // construction (ONE OWNER PER OUTPUT).
 //
-// This file used to also carry a CLOSED SET of known merge-point paths that
-// IngestTaskEntry refused to capture (ErrUnownedMergePoint), so that dropping
-// directory-wide capture for `package` could not quietly lose the channel
-// index publish depends on. A later change emptied that set at the source:
-// every packager now records its channel inside the output it owns, which
-// gives that path an owner and makes the refusal wrong — it would reject
-// exactly the declaration that fixes the problem it was guarding. The
-// invariant it defended is unchanged and is now enforced where ownership is
-// decided: ValidateOutputOwnership in the manifest, validatePlanContract
-// across the plan.
+// The invariant is enforced where ownership is decided: ValidateOutputOwnership
+// in the manifest, validatePlanContract across the plan.
 //
 // # A task-owned entry is materialized, never symlinked
 //

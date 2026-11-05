@@ -128,8 +128,7 @@ const holdOutputEnv = "PUTNAMI_FIXTUREPROC_HOLD_OUTPUT"
 // and names both when the copy fails. Neither side ever removes or renames a
 // file the other may hold open: Windows refuses to delete a file another
 // handle holds open without delete sharing, and os.WriteFile opens files that
-// way, so the copy that used to remove the release file lost that race to
-// Release's own write and exited with no trace.
+// way.
 const (
 	holderStartedSuffix = ".holder-pid"
 	holderExitSuffix    = ".holder-exit"

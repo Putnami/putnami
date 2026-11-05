@@ -166,17 +166,9 @@ func (r *SessionResult) BucketTotal() int {
 	return r.Fresh.Total() + r.Reuse.Total()
 }
 
-// Success is the ONE success predicate — the unified strict rule.
-//
-// History: an earlier migration shipped two predicates reading this reduction —
-// strict Success (exit code, recorded session, gates) and lenient
-// SuccessIgnoringReuse (the v1 JSONL session:end, whose legacy tally skipped
-// reused results before its failure branch). They disagreed on exactly one
-// input, a reused failure. A later change made the recorded
-// wire change that collapses them: every surface now reports the strict rule,
-// and the lenient spelling is gone.
-
-// Success reports whether the run reached a clean verdict. An aborted run never
+// Success reports whether the run reached a clean verdict. It is the ONE
+// success predicate: every surface (exit code, recorded session, gates)
+// reports this strict rule. An aborted run never
 // has one: its unfinished tasks were killed before they could produce it.
 // Reused failures count, which is why this reads Status and not Fresh.
 func (r *SessionResult) Success() bool {
@@ -279,10 +271,8 @@ type ScheduledTask struct {
 // count and the task list printed beside it cannot describe different task sets.
 //
 // It projects WITH the structured records (TaskResultOf), not the counting-only
-// summary. Its consumers report a task, and a reported failure that dropped its
-// diagnostics is a regression this would otherwise have shipped when it
-// deleted the v1 MCP result — that answer listed each failure's diagnostics, and
-// the v2 taskFailure/taskRecord members exist to carry exactly the same thing.
+// summary, so a reported failure keeps its diagnostics in the v2
+// taskFailure/taskRecord members.
 // The cost is nil where it would matter: a scheduler-produced result carries its
 // canonical task already (JobResult.Canonical), so this is a copy, and the event
 // walk only happens for results assembled by hand.

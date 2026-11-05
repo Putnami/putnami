@@ -701,15 +701,7 @@ func releaseSetBaselineHead(
 // release-set coordinator owns but a selection the coordinator cannot serve.
 //
 // A named channel only enters release-set coordination through --all or
-// --impacted. With any other selection the run used to fall through to the
-// legacy per-package path, publish the artifacts, and only then have the
-// registry refuse the channel write:
-//
-//	409 Conflict - dist-tag canary is managed by the canonical release-set channel
-//
-// That answer arrives after the upload, names a concept the caller never asked
-// for, and leaves the version published but unreferenced. Refusing up front
-// costs nothing and says which flag is missing.
+// --impacted. Refusing up front costs nothing and says which flag is missing.
 //
 // A tagged publish is accepted with no selection flag at all, and with no
 // --channel: the tag itself names the cohort (its line) and the immutable

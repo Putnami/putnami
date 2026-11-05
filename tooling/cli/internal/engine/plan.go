@@ -145,7 +145,7 @@ func buildPlan(
 		}
 		// Same contract as the empty-selection guard in selection.go: the stdout
 		// notice above is the human presentation and machine output suppresses
-		// it, so this failing exit used to carry no explanation on any stream.
+		// it, so the explanation goes to stderr.
 		// The counts are what separate the two ways to plan nothing —
 		// no extension served the command, or none of the selected projects
 		// activated a job — which a caller cannot tell from exit 2 alone.

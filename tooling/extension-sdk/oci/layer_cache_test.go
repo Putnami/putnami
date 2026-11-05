@@ -302,7 +302,7 @@ func BenchmarkImagePlanCacheHit32MiB(b *testing.B) {
 	}
 	fingerprint := *seedPlan.Layers[0].Files[0].Fingerprint
 
-	b.Run("legacy-content-hash", func(b *testing.B) {
+	b.Run("separate-plan-and-load", func(b *testing.B) {
 		b.SetBytes(fixtureSize)
 		b.ReportAllocs()
 		b.ReportMetric(2, "source-passes/op")
@@ -310,7 +310,7 @@ func BenchmarkImagePlanCacheHit32MiB(b *testing.B) {
 			if _, err := NewImagePlan(spec, PlanOptions{}); err != nil {
 				b.Fatal(err)
 			}
-			if _, hit, err := loadOrBuildFileLayer(spec.Layers[0], filepath.Join(dir, "legacy-hit.tar.gz"), cacheRoot, types.DockerLayer); err != nil {
+			if _, hit, err := loadOrBuildFileLayer(spec.Layers[0], filepath.Join(dir, "separate-hit.tar.gz"), cacheRoot, types.DockerLayer); err != nil {
 				b.Fatal(err)
 			} else if !hit {
 				b.Fatal("cache miss")
@@ -384,7 +384,7 @@ func BenchmarkImagePlanCacheMiss32MiB(b *testing.B) {
 			if _, err := NewImagePlan(spec, PlanOptions{}); err != nil {
 				b.Fatal(err)
 			}
-			if _, hit, err := loadOrBuildFileLayer(spec.Layers[0], filepath.Join(runDir, "legacy-miss-"+suffix+".tar.gz"), filepath.Join(runDir, "legacy-cache-"+suffix), types.DockerLayer); err != nil {
+			if _, hit, err := loadOrBuildFileLayer(spec.Layers[0], filepath.Join(runDir, "unshared-miss-"+suffix+".tar.gz"), filepath.Join(runDir, "unshared-cache-"+suffix), types.DockerLayer); err != nil {
 				b.Fatal(err)
 			} else if hit {
 				b.Fatal("cache hit")

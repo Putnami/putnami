@@ -251,10 +251,8 @@ func buildCompositionRoots(ws *workspace.Workspace, p *workspace.Project, projDi
 // The declared entrypoint is looked up as a CONVENTION rather than as identity:
 // the project's own putnami.json wins, and otherwise the workspace probe's
 // provider-owned metadata is consulted for a `main` key (the TypeScript adapter
-// publishes package.json's). An earlier change deleted core's package.json
-// parser, so this is the only remaining path to a TypeScript entrypoint — and it
-// is deliberately confined to this human-facing document, never to identity or a
-// cache key. When nothing declares one — as for every Go project — it falls back
+// publishes package.json's). The lookup is
+// confined to this human-facing document, never to identity or a cache key. When nothing declares one — as for every Go project — it falls back
 // to a conventional root main.go that declares `package main`, so a Go
 // application's composition root is not silently absent. The `package main`
 // check keeps a Go library that happens to have a main.go from being misreported

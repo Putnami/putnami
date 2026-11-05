@@ -197,8 +197,7 @@ func (rel *invocationRelation) needleSet() []string {
 // The artifact's KIND does not change any of that. A directory artifact is
 // sampled file by file under ONE shared budget, and an artifact larger than the
 // budget is sampled up to it: the cap bounds what the guard reads, never what
-// it guards. Both used to return the path alone, which meant the values inside
-// were never redacted from the event stream or the result, silently.
+// it guards.
 func sensitiveNeedles(scratch *store.InvocationScratch, rel string, public map[string]bool) []string {
 	path, err := scratch.Resolve(rel)
 	if err != nil {
@@ -393,9 +392,8 @@ func (c *needleCollector) sampleTree(root string) {
 // sampleFile reads at most the remaining budget from one regular file and
 // derives the artifact's byte needles from that sample.
 //
-// The read is bounded, not skipped, which is the whole point of the repair: an
-// artifact over the cap used to contribute no byte needle at all, so a task that
-// echoed the DSN embedded in a large credentials file was reported green.
+// The read is bounded, not skipped, so a large credentials file still
+// contributes its byte needles.
 func (c *needleCollector) sampleFile(path string) {
 	if c.budget <= 0 {
 		c.degrade("the artifact is larger than the guard's byte budget")

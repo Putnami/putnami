@@ -260,9 +260,7 @@ func selectDoctorProjects(ws *workspace.Workspace, args []string, globalProjects
 //
 // The writer is a parameter rather than os.Stdout so the envelope this command
 // actually emits is what its test reads. A test that rebuilt the document beside
-// this function proved only that the test could build one — which is how
-// doctor's envelope kept asserting the retired v1 shape after a later change moved
-// the command to v2.
+// this function proved only that the test could build one.
 func renderDoctor(out io.Writer, outputFormat string, report doctor.Report, runErr error) error {
 	if protocolcli.OutputMode(outputFormat).IsStructured() {
 		if runErr == nil {

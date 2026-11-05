@@ -264,7 +264,7 @@ func (a *App) Run(ctx context.Context, args []string) int {
 	// config > dev) once here, before dispatch, so every downstream path — job
 	// commands, structured commands, and extension commands — reads the same
 	// value off parsed.Global. A value outside dev|test|production is a hard usage
-	// error (it catches stale `--profile <trace-path>` calls, now --trace-profile).
+	// error.
 	if err := resolveProfile(&parsed.Global, cfg); err != nil {
 		iox.Fprintf(os.Stderr, "putnami: %v\n", err)
 		return ExitUsage
@@ -742,10 +742,7 @@ func projectPathsForRoot(wsRoot string) []string {
 }
 
 // runTerminalSession owns the once-per-process telemetry session around a job
-// command: the consent notice, the run gates, and the single session:end. It was
-// named runWithConfigHooks until a rework moved the lifecycle hooks it
-// used to bracket into Engine.Run, next to the version stamp that has to be read
-// before a hook can dirty the tree.
+// command: the consent notice, the run gates, and the single session:end.
 func (a *App) runTerminalSession(ctx context.Context, cfg *wsproto.Config, parsed *ParsedArgs, wsRoot string, hostedCache *engine.HostedRemoteCache, hostedReporters *engine.HostedReporters, extensions ...*extension.ExtensionDescription) (exitCode int) {
 	telemetryStartedAt := time.Now()
 	tc := telemetry.NewClient()
@@ -769,9 +766,5 @@ func (a *App) runTerminalSession(ctx context.Context, cfg *wsproto.Config, parse
 		_ = tc.Flush()
 	}()
 
-	// The version stamp and the CLI/command lifecycle hooks that used to bracket
-	// this call are engine stages now: the stamp has to be read before the
-	// before-hooks can dirty the tree, so the two belong to the same
-	// owner. What stays here is the once-per-process telemetry session above.
 	return a.runJobCommands(ctx, parsed, cfg, wsRoot, tc, interactive, hostedCache, hostedReporters, extensions...)
 }

@@ -1,17 +1,7 @@
 // Package infraagg aggregates one workload's deployability requirements into
 // the artifact a deployer reads: <workload>/.gen/requirements.json.
 //
-// An earlier migration moved this out of the CLI. Core used to gate the
-// emission itself: it watched every build~describe / build~generate completion,
-// walked the workload's dependency closure, merged the committed per-project
-// manifests, decided what a workload's DEFAULT runtime looked like — and, to do
-// that last part, matched project tags and extension names to recognize a
-// TypeScript application so it could turn HTTP/2 off for it. That is language
-// policy living in the orchestrator, and it is the class of knowledge the extension model
-// exists to move.
-//
-// The split this package draws is the same one that was drawn for machine
-// caches:
+// The work splits three ways:
 //
 //   - The ORCHESTRATOR owns the graph. Which projects a workload depends on,
 //     what a project is classified as, and which build steps must finish before

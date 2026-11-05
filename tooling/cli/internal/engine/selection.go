@@ -103,7 +103,7 @@ func selectProjects(req *Request, ws *workspace.Workspace, extensions ...*extens
 		default:
 			req.Global.Baseline = selection.Baseline
 			selectionBaseline = selection.Baseline
-			// The tier that produced the ref, which the engine used to discard.
+			// The tier that produced the ref.
 			// A consumer distrusts a fallback-tier baseline the same way the run
 			// does, and cannot do so from the ref alone.
 			selectionBaselineSource = string(selection.BaselineSource)
@@ -421,8 +421,7 @@ func impactedFailureEndsRun(req *Request, wsRoot string, err error) bool {
 
 // applyStandaloneBaseline turns a --baseline that names no other selection
 // into the --impacted run it asks for. The ref is only ever read by impact
-// analysis, so the default selection used to drop it without a word and
-// compare against its own baseline instead. Tag filters keep narrowing the
+// analysis. Tag filters keep narrowing the
 // impacted set. Beside named projects or --all the baseline still changes no
 // selection: those name their projects, and there is nothing to compare.
 //
@@ -602,11 +601,7 @@ const impactedProjectsSentinel = "[impacted]"
 //
 // That branch is not a selection: the change set could not be computed at all
 // (an unresolvable baseline, a diff git refused), so the engine runs everything
-// because running nothing would report a green gate over an unverified tree. It
-// used to be SILENT, which made it indistinguishable from a genuinely wide
-// change — the shape that gets diagnosed as "the selector treats a root file as
-// everything changed" long after the run, when the baseline evidence is gone.
-// The text names the cause, the consequence and the flag that turns the
+// because running nothing would report a green gate over an unverified tree. The text names the cause, the consequence and the flag that turns the
 // consequence into a failure, on stderr, which no adapter treats as a protocol
 // channel.
 const impactedFallbackExplanation = "putnami: --impacted could not compute the change set (%v) — " +
@@ -616,12 +611,7 @@ const impactedFallbackExplanation = "putnami: --impacted could not compute the c
 // notice stream to explain itself on: not quiet, not a machine channel, not a
 // hosted run.
 //
-// The machine channels are named, rather than "any --output at all". A
-// workspace that declares `"output": "text"` — the human mode, and the one this
-// repository declares — used to suppress every selection notice, because the
-// config value lands in Global.Output and the test was `!= ""`. Every notice
-// the selection stage owes an operator was silent in exactly the workspaces
-// that configured human output.
+// The machine channels are named, rather than "any --output at all".
 func shouldPrintAutoProjectSelectionNote(g GlobalFlags) bool {
 	if g.Quiet {
 		return false

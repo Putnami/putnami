@@ -253,12 +253,7 @@ func BuildJobContext(
 			Name:        job.Extension.Name,
 			Root:        cachekey.JobExtensionRoot(ws, job),
 			RuntimePath: job.Extension.RuntimeExecutable,
-			// The machine-global directory THIS extension owns. It replaces
-			// the per-ecosystem environment variables
-			// core used to export into every job regardless of which extension
-			// ran it: a Python task received PUTNAMI_GO_CACHE_DIR and
-			// BUN_INSTALL_CACHE_DIR because core, not the extension, decided
-			// where a language cache lives.
+			// The machine-global directory THIS extension owns.
 			CacheRoot: extensionproto.MachineCacheRoot(job.Extension.Name, ws.Root),
 		},
 		Job: JobContextJob{
@@ -493,10 +488,6 @@ const ProvidersEnv = "PUTNAMI_PROVIDERS"
 // scratch, PUTNAMI_EXTENSION_CACHE_ROOT is extension-owned machine state, and
 // PUTNAMI_OCI_CACHE_ROOT is core-owned content shared by image extensions and
 // worktrees of this repository.
-// The three language-specific variables that used to be here —
-// PUTNAMI_GO_CACHE_DIR, PUTNAMI_BUN_CACHE_DIR, BUN_INSTALL_CACHE_DIR — were
-// exported into every job of every extension, so core told a Python task where
-// the Bun cache was and a fourth ecosystem had no variable at all.
 func BuildEnvVars(ctx *JobCommandContext) []string {
 	vars := []string{
 		"PUTNAMI_WORKSPACE_ROOT=" + ctx.WorkspaceRoot,

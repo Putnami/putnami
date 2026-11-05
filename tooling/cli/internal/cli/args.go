@@ -370,13 +370,10 @@ func resolveAliasOrSelf(name string, aliases commandAliases) string {
 
 // isStructuredCommand returns true for commands that take a subcommand.
 //
-// The set is the COMMAND CATALOG (ADR 0001 §1), not the handler registry. Slice
-// A6a moved the answer here: commandRegistry used to be both the
-// vocabulary ("which names are structured commands") and the dispatch table,
-// which made it the last hand-maintained table describing commands. It is now
-// only the dispatch table, and registerCommand rejects a name the catalog does
-// not declare — so the two sets stay identical by construction rather than by
-// the consistency test A0 needed while six tables disagreed.
+// The set is the COMMAND CATALOG (ADR 0001 §1), not the handler registry.
+// commandRegistry is only the dispatch table, and registerCommand rejects a
+// name the catalog does not declare, so the two sets stay identical by
+// construction.
 func isStructuredCommand(cmd string) bool {
 	return commandmeta.IsStructuredRoot(cmd)
 }

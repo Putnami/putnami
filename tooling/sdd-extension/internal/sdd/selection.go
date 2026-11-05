@@ -11,16 +11,11 @@ import (
 // Selection is the resolved project selection the orchestrator wrote on the job
 // context wire.
 //
-// It replaces the pair the CLI engines used to take — `shared.ProjectSelection`
-// (the parsed flags) and `shared.ResolvedSelection` (what resolving them
-// produced). An extension never sees the first and never performs the
+// An extension never sees the parsed flags and never performs the
 // resolution: the orchestrator resolved the selection once, against the
 // workspace it loaded, and published the ANSWER. Re-resolving it here would be
 // a second selection contract, and a validator that disagreed with the run that
 // scheduled it about what was in scope is worse than one that cannot answer.
-//
-// The wire member marshals identically to `shared.ResolvedSelection`, which is
-// what makes the swap a type change and not a semantic one.
 type Selection = pctx.Selection
 
 // selectedScope builds the engine scope one evaluation runs under.

@@ -7,16 +7,6 @@
 // committed facts: each pack's <project>/conformance/pack.json, the project's
 // committed schema/capabilities.json, the project's committed test sources, and a
 // pack's committed corpus file (referenced by digest, never embedded).
-//
-// The discovery/match/opt-in convention used to have a twin in internal/jobs —
-// the test-infra planner emitted an ADVISORY for each applicable-but-unopted
-// pack it found while walking the same closure. A later change
-// deleted that planner, and the advisory with it: the nudge relied on
-// content-scanning a project's committed test SOURCES for runner tokens, which
-// is language knowledge core has no business having, and it rode on a run whose
-// only reason to walk the closure was database provisioning. This aggregation
-// survives because it is the agent-context DOCUMENT's own content, built from
-// committed facts alone — no subprocess, no runtime infra, no live database.
 package agentctx
 
 import (

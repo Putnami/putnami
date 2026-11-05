@@ -300,8 +300,7 @@ func (inst *Installer) InstallArtifact(ctx context.Context, name, constraint str
 	}
 
 	// Not wrapped with the artifact name: every error `download` returns already
-	// carries it, and this frame used to produce "download X: download X at ..."
-	// once the fetch failure started naming its own pin.
+	// carries it.
 	archivePath, resolvedVersion, advertisedIntegrity, err := inst.download(ctx, name, downloadChannel, spec)
 	if err != nil {
 		return nil, err

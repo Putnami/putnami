@@ -10,10 +10,10 @@ import (
 )
 
 const (
-	// ImagePlanVersion is intentionally v2: the former implicit v1 identity
-	// streamed source bytes into one whole-image hash and could not reuse a
-	// trustworthy fingerprint already computed upstream. V2 hashes explicit,
-	// versioned source and compression identities instead.
+	// ImagePlanVersion is 2: the identity hashes explicit, versioned source
+	// and compression identities, so a trustworthy fingerprint already computed
+	// upstream is reused instead of streaming source bytes into one whole-image
+	// hash.
 	ImagePlanVersion = 2
 	// LayerPlanVersion versions the reusable compressed-layer key contract.
 	LayerPlanVersion = 1

@@ -23,11 +23,8 @@ var runPreBuildHookFunc = hooks.RunPreBuildHook
 
 // ONE runner, 1..n work items.
 //
-// A batched dispatch used to run an ALTERNATE lifecycle — whole-batch retry, a
-// deadline widened ×n for everyone, per-project results reconstructed from an
-// aggregate, and a rejoin with the ordinary path only at finalizeExecutedJob.
-// There is now ONE lifecycle for every scheduled task, and the size of the
-// dispatch group is the only thing batching changes:
+// ONE lifecycle for every scheduled task; the size of the dispatch group is the
+// only thing batching changes:
 //
 //	openTask     (per task) cache lookup / restore / claim, shared-execution
 //	                        rendezvous

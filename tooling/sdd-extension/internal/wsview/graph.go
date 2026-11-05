@@ -8,9 +8,9 @@ import (
 // WarningCode is a stable machine-readable reason attached to a workspace
 // warning whose meaning must be consumed without matching human prose.
 //
-// Copied from `go.putnami.dev/cli/model/workspace`. The architecture engine
-// branches on the one code below, so the value must stay byte-identical to
-// core's: the two sides classify the same workspace.
+// The architecture engine branches on the one code below, so the value equals
+// the one in `go.putnami.dev/cli/model/workspace`: the two sides classify the
+// same workspace.
 type WarningCode string
 
 // WarningCodeProviderViewUnavailable means provider-derived project identity or
@@ -19,11 +19,10 @@ const WarningCodeProviderViewUnavailable WarningCode = "workspace.provider_view_
 
 // DependencyGraph is the resolved direct-dependency index over one membership.
 //
-// Copied from `go.putnami.dev/cli/model/workspace`.DependencyGraph, narrowed to
-// the one query the SDD engines make — DependenciesOf, which the architecture
-// detector uses to extract cross-domain edges. Cycle detection, topological
-// order, path search and the transitive closures were left behind: they belong
-// to the scheduler, not to a validator.
+// It answers the one query the SDD engines make — DependenciesOf, which the
+// architecture detector uses to extract cross-domain edges. Cycle detection,
+// topological order, path search and the transitive closures belong to the
+// scheduler, not to a validator.
 type DependencyGraph struct {
 	// deps maps a project ID to the IDs of the projects it depends on.
 	deps map[string][]string
@@ -39,8 +38,8 @@ type DependencyGraph struct {
 // because an out-of-workspace edge has no node to point at.
 //
 // For an activated scope, an implicit edge is added from each direct include to
-// the scope-self project. Copied from core's BuildGraph so a view assembled
-// here and a workspace loaded there answer DependenciesOf the same way.
+// the scope-self project. A view assembled here and a workspace loaded by core answer
+// DependenciesOf the same way.
 func BuildGraph(projects []*Project) *DependencyGraph {
 	nameToID := make(map[string]string, len(projects))
 	for _, project := range projects {

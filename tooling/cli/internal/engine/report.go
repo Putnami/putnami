@@ -14,21 +14,11 @@ import (
 	"go.putnami.dev/tooling/cli/internal/workspace_state"
 )
 
-// The two v1 session-file projections that used to live here — SessionStats and
-// sessionJobEntry — were deleted with the v1 session writer. The
-// recorded session is the versioned cli.SessionFile now, projected by
-// internal/machine from the same canonical reduction, so nothing derives a
-// second stats vocabulary on the way to disk.
-
 // recordProfilerSessionEvent projects scheduler session records into the trace.
 // Coalesced work keeps its successful DAG status, but the trace end event and
 // instant marker expose the distinct outcome for direct counting.
 //
-// It reads the record's TYPED task. It used to re-read "status",
-// "outcome", "duration" and "cache" back out of the untyped payload and
-// re-derived the reuse classification from them — including a fallback for a
-// producer that had not filled "outcome" in. jobs.ReuseKind makes both the
-// re-derivation and that fallback structurally impossible.
+// It reads the record's TYPED task.
 func recordProfilerSessionEvent(prof *profiler.Profiler, record scheduler.SessionRecord) {
 	if record.Type != scheduler.SessionRecordJobEnd || record.Task == nil {
 		return

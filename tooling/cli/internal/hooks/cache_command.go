@@ -22,19 +22,15 @@ import (
 
 // The cache lifecycle.
 //
-// `putnami cache clean` and `putnami cache gc` used to know the caches: the CLI
-// shipped a Go collector and a Bun collector and ran them by name. They are now
-// fan-outs to the extensions that own those caches, and an extension declares
-// its participation the same way it declares everything else — a hidden command
+// `putnami cache clean` and `putnami cache gc` fan out to the extensions that
+// own the caches; an extension declares its participation as a hidden command
 // running a typed task, not a hook.
 //
 // Three properties of this fan-out are load-bearing:
 //
 //   - COMPLETE AGGREGATION. Every declaring extension is asked, and every
-//     failure is reported. The pre-C5 fan-out returned on the first error, so
-//     one broken extension meant the caches of every extension sorted after it
-//     were silently never collected — while the command still looked like it
-//     had done its job for them.
+//     failure is reported, so one broken extension never stops the collection of
+//     the extensions sorted after it.
 //
 //   - DETERMINISTIC ORDER. Extensions are asked in name order, so two runs on
 //     one machine print the same lines in the same order.

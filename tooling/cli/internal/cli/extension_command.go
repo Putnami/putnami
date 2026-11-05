@@ -558,7 +558,7 @@ func interactiveExitCode(result *scheduler.JobResult, commandPath string, deadli
 //   - Observer stays nil (ADR 0001 §4). The alias dispatches from App.Run before
 //     runTerminalSession, so no telemetry client and no consent notice exist at
 //     this point; supplying an observer here would report a session the user was
-//     never told about, which an earlier design settled against. Only the terminal
+//     never told about. Only the terminal
 //     adapter observes.
 //   - ValidateCommandFlags stays nil because the alias already ran the
 //     equivalent, at the finer granularity only it can compute: the undeclared

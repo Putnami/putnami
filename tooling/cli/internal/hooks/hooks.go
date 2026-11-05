@@ -10,8 +10,7 @@
 // They run under ONE contract, which is the point of keeping them together:
 // bounded by a timeout (DefaultHookTimeoutMs unless the hook overrides it), from
 // an explicit working directory, with an environment the CLI states rather than
-// inherits wholesale. Workspace hooks used to run under a weaker one — no
-// timeout, a login shell, the invocation directory — until that gap closed.
+// inherits wholesale.
 package hooks
 
 import (

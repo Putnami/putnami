@@ -1181,7 +1181,7 @@ var abortCleanupBudget = hooks.AbortCleanupBudget
 // checkout — and cleanup that only happens on the happy path is not cleanup. So
 // once the run context is done, the remaining after-hooks are detached from it
 // with context.WithoutCancel; passing the canceled context straight through
-// killed every after-hook on the first Ctrl-C, a state a past regression found.
+// would kill every after-hook on the first Ctrl-C.
 //
 // Detaching is paired with a hard bound: both after-hook calls share ONE
 // abortCleanupBudget, well inside the 10s deadline cmd/putnami's signal handler

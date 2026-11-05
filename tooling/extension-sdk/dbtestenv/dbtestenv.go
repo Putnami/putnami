@@ -2,18 +2,7 @@
 // executes against: policy, discovery, provisioning, the binding artifact the
 // test task reads, and the crash-recovery lease a later invocation reclaims by.
 //
-// An earlier migration moved this out of the CLI. Core used to do all of it: it
-// walked each selected test project's committed requirements closure, resolved
-// the auto/require/skip policy, shelled out to the docker CLI to run Postgres,
-// synthesized a pdb.TestBinding, injected it into the test subprocess through a
-// private extraEnv seam, and folded a digest of that binding into the consuming
-// job's cache key. Two of those steps are language policy (what a project's
-// datasources are, what a test run needs), one is a provider (docker), and one
-// was a workaround for the credential traveling through an env var core had to
-// hide from its own cache key.
-//
-// The split this package draws is the one drawn for machine caches and
-// C6c drew for infra aggregation:
+// The package splits the work:
 //
 //   - The ORCHESTRATOR owns the lifecycle. Which projects a workload depends on
 //     arrives as the job context's project.dependencyClosure; the private
@@ -364,8 +353,7 @@ const (
 	DiagnosticLeaseFailed     = "test_env.lease_failed"
 )
 
-// ResolveMode resolves the pdb.TestMode policy with the precedence the CLI
-// planner used to apply:
+// ResolveMode resolves the pdb.TestMode policy with the precedence:
 //
 //	--infra flag  >  project/workspace `test.infra` option  >  default
 //

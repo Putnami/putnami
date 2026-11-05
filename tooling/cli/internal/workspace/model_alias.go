@@ -219,9 +219,8 @@ const (
 
 // --- Lowercase spellings kept for this package's own call sites ---
 //
-// These moved with the model and are still used by the loading, discovery,
-// syncing and snapshotting halves that stay here. Aliasing them under their
-// original lowercase names keeps those call sites untouched.
+// The loading, discovery, syncing and snapshotting halves of this package use
+// these under their lowercase names.
 
 var (
 	canonicalRoot          = model.CanonicalRoot
