@@ -73,7 +73,7 @@
     },
     {
       "id": "external-spec-authoring",
-      "text": "In a project whose feature names an external spec, the spec skill edits the file that `specs inspect` resolves, in its format's conventions, and starts no native spec. It anchors each requirement it creates or renumbers, keeps checks in `putnami.features.json`, and proposes `specs init --from` only when the owner asks."
+      "text": "In a project whose feature names an external spec, the spec skill edits the external spec that `specs inspect` resolves, in the file its format reads and in its conventions, and starts no native spec. It anchors each requirement it creates or renumbers, keeps checks in `putnami.features.json`, and proposes `specs init --from` only when the owner asks."
     }
   ],
   "decisions": [
