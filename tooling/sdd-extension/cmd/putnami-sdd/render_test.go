@@ -2,8 +2,6 @@ package main
 
 import (
 	"encoding/json"
-	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -12,6 +10,7 @@ import (
 	protocolcli "go.putnami.dev/protocol/cli"
 	featureproto "go.putnami.dev/protocol/features"
 	pctx "go.putnami.dev/sdk/extension/context"
+	"go.putnami.dev/tooling/sdd/extension/internal/gittest"
 	"go.putnami.dev/tooling/sdd/extension/internal/sdd"
 	"go.putnami.dev/tooling/sdd/extension/internal/wsview"
 )
@@ -459,15 +458,10 @@ func commitFixtureRepository(t *testing.T, root string) {
 	t.Helper()
 	for _, args := range [][]string{
 		{"init", "--initial-branch=main"},
-		{"config", "user.email", "fixture@example.test"},
-		{"config", "user.name", "Fixture"},
-		{"config", "commit.gpgsign", "false"},
 		{"add", "-A"},
 		{"commit", "-m", "fixture"},
 	} {
-		cmd := exec.Command("git", args...)
-		cmd.Dir = root
-		cmd.Env = append(os.Environ(), "GIT_CONFIG_GLOBAL=/dev/null", "GIT_CONFIG_SYSTEM=/dev/null")
+		cmd := gittest.Command(root, args...)
 		if out, err := cmd.CombinedOutput(); err != nil {
 			t.Fatalf("git %v: %v\n%s", args, err, out)
 		}

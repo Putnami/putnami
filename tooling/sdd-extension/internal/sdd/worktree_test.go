@@ -15,6 +15,7 @@ import (
 	featureproto "go.putnami.dev/protocol/features"
 	"go.putnami.dev/protocol/features/spectest"
 	"go.putnami.dev/sdk/extension/gitcandidate"
+	"go.putnami.dev/tooling/sdd/extension/internal/gittest"
 )
 
 // candidateWorkspace is a fixture workspace that is also a Git work tree, so
@@ -32,8 +33,7 @@ func candidateWorkspace(t *testing.T) string {
 
 func gitIn(t *testing.T, dir string, args ...string) {
 	t.Helper()
-	cmd := exec.Command("git", args...)
-	cmd.Dir = dir
+	cmd := gittest.Command(dir, args...)
 	if out, err := cmd.CombinedOutput(); err != nil {
 		t.Fatalf("git %v: %v\n%s", args, err, out)
 	}
@@ -197,7 +197,7 @@ func TestWorktreeOutsideAGitWorkTreeReadsTheDisk(t *testing.T) {
 		t.Skip("git is not installed")
 	}
 	root := decisionsWorkspace(t)
-	if err := exec.Command("git", "-C", root, "rev-parse", "--is-inside-work-tree").Run(); err == nil {
+	if err := gittest.Command(root, "rev-parse", "--is-inside-work-tree").Run(); err == nil {
 		t.Skip("the temporary directory lies inside a Git work tree")
 	}
 	writeFixtureFile(t, filepath.Join(root, "doc", "guide.md"), "# guide\n")

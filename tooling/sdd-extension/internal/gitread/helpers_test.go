@@ -2,9 +2,10 @@ package gitread
 
 import (
 	"os"
-	"os/exec"
 	"path/filepath"
 	"testing"
+
+	"go.putnami.dev/tooling/sdd/extension/internal/gittest"
 )
 
 // initGitRepo creates a repository on main, with a test identity and one
@@ -15,15 +16,11 @@ func initGitRepo(t *testing.T) string {
 	dir := t.TempDir()
 
 	cmds := [][]string{
-		{"git", "init"},
-		{"git", "config", "user.email", "test@test.com"},
-		{"git", "config", "user.name", "Test"},
-		{"git", "config", "commit.gpgsign", "false"},
-		{"git", "checkout", "-b", "main"},
+		{"init"},
+		{"checkout", "-b", "main"},
 	}
 	for _, args := range cmds {
-		cmd := exec.Command(args[0], args[1:]...)
-		cmd.Dir = dir
+		cmd := gittest.Command(dir, args...)
 		if out, err := cmd.CombinedOutput(); err != nil {
 			t.Fatalf("git %v: %v\n%s", args, err, out)
 		}
@@ -34,13 +31,11 @@ func initGitRepo(t *testing.T) string {
 	if err := os.WriteFile(file, []byte("# Test"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	cmd := exec.Command("git", "add", ".")
-	cmd.Dir = dir
+	cmd := gittest.Command(dir, "add", ".")
 	if out, err := cmd.CombinedOutput(); err != nil {
 		t.Fatalf("git add: %v\n%s", err, out)
 	}
-	cmd = exec.Command("git", "commit", "-m", "initial")
-	cmd.Dir = dir
+	cmd = gittest.Command(dir, "commit", "-m", "initial")
 	if out, err := cmd.CombinedOutput(); err != nil {
 		t.Fatalf("git commit: %v\n%s", err, out)
 	}
@@ -50,8 +45,7 @@ func initGitRepo(t *testing.T) string {
 
 func runGit(t *testing.T, dir string, args ...string) string {
 	t.Helper()
-	cmd := exec.Command("git", args...)
-	cmd.Dir = dir
+	cmd := gittest.Command(dir, args...)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		t.Fatalf("git %v: %v\n%s", args, err, out)

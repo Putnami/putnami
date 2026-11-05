@@ -2,11 +2,12 @@ package gitread
 
 import (
 	"os"
-	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strings"
 	"testing"
+
+	"go.putnami.dev/tooling/sdd/extension/internal/gittest"
 )
 
 func TestProjectSourceBindingTracksSourceAndExcludesGeneratedOutputs(t *testing.T) {
@@ -144,12 +145,7 @@ func TestProjectSourceBindingTracksSourceAndExcludesGeneratedOutputs(t *testing.
 		t.Fatal(err)
 	}
 	runGit(t, depPath, "add", "next.txt")
-	runGit(t, depPath,
-		"-c", "user.email=test@test.com",
-		"-c", "user.name=Test",
-		"-c", "commit.gpgsign=false",
-		"commit", "-m", "advance dependency",
-	)
+	runGit(t, depPath, "commit", "-m", "advance dependency")
 	gitlinkChanged, err := ProjectSourceBinding(repo, project)
 	if err != nil {
 		t.Fatal(err)
@@ -250,8 +246,7 @@ func TestProjectSourceBindingRejectsUnmergedAndMalformedStageEntries(t *testing.
 		t.Fatal(err)
 	}
 	runGit(t, repo, "commit", "-am", "main")
-	cmd := exec.Command("git", "merge", "other")
-	cmd.Dir = repo
+	cmd := gittest.Command(repo, "merge", "other")
 	if err := cmd.Run(); err == nil {
 		t.Fatal("expected merge conflict")
 	}

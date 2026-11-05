@@ -41,9 +41,6 @@ func coverageRatchetRepository(t *testing.T, dir string, base []string) (string,
 	repo := decisionsWorkspace(t)
 	for _, args := range [][]string{
 		{"init", "-q"},
-		{"config", "user.email", "test@test.com"},
-		{"config", "user.name", "Test"},
-		{"config", "commit.gpgsign", "false"},
 		{"checkout", "-q", "-b", "main"},
 	} {
 		gitIn(t, repo, args...)

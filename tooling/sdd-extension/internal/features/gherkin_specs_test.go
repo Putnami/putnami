@@ -1,13 +1,13 @@
 package features
 
 import (
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
 
 	featureproto "go.putnami.dev/protocol/features"
 	"go.putnami.dev/protocol/features/spectest"
+	"go.putnami.dev/tooling/sdd/extension/internal/gittest"
 )
 
 func TestTrackedGherkinSpecIsReadThroughTheCandidateCut(t *testing.T) {
@@ -17,7 +17,7 @@ func TestTrackedGherkinSpecIsReadThroughTheCandidateCut(t *testing.T) {
 		strings.NewReplacer(`"format":"openspec"`, `"format":"gherkin"`, "app/openspec/invoice", "app/features").Replace(externalManifest))
 	writeDiscoveryFixture(t, filepath.Join(ws.Root, "app", "features", "invoice.feature"), "Feature: Invoice export\n  Scenario: It runs\n")
 	writeDiscoveryFixture(t, filepath.Join(ws.Root, "app", "features", "notes.md"), "Feature: Not read\n")
-	if output, err := exec.Command("git", "-C", ws.Root, "init", "-q").CombinedOutput(); err != nil { //nolint:gosec // a fixture directory
+	if output, err := gittest.Command(ws.Root, "init", "-q").CombinedOutput(); err != nil {
 		t.Fatalf("git init: %v: %s", err, output)
 	}
 	native, err := NewOSReader(ws.Root)

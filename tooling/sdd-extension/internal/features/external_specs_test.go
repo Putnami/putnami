@@ -1,7 +1,6 @@
 package features
 
 import (
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -11,6 +10,7 @@ import (
 	"go.putnami.dev/protocol/features/conformance"
 	"go.putnami.dev/protocol/features/spectest"
 	workspaceproto "go.putnami.dev/protocol/workspace"
+	"go.putnami.dev/tooling/sdd/extension/internal/gittest"
 	workspace "go.putnami.dev/tooling/sdd/extension/internal/wsview"
 )
 
@@ -170,7 +170,7 @@ func TestIgnoredExternalSpecIsAbsent(t *testing.T) {
 	writeDiscoveryFixture(t, filepath.Join(ws.Root, ".gitignore"), "app/openspec/invoice/ignored.md\n")
 	writeDiscoveryFixture(t, filepath.Join(ws.Root, "app", "openspec", "invoice", "spec.md"), "outcome O\n")
 	writeDiscoveryFixture(t, filepath.Join(ws.Root, "app", "openspec", "invoice", "ignored.md"), "requirement Ignored | x\n")
-	if output, err := exec.Command("git", "-C", ws.Root, "init", "-q").CombinedOutput(); err != nil { //nolint:gosec // a fixture directory
+	if output, err := gittest.Command(ws.Root, "init", "-q").CombinedOutput(); err != nil {
 		t.Fatalf("git init: %v: %s", err, output)
 	}
 	native, err := NewOSReader(ws.Root)
