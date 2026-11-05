@@ -3,12 +3,22 @@
   "protocolVersion": 2,
   "executableRequirements": [
     "go/http-services#bounded-streams",
+    "go/http-services#caller-withdrawal",
+    "go/http-services#error-envelope",
+    "go/http-services#failed-writes",
     "go/http-services#graceful-shutdown",
+    "go/http-services#health-mounting",
+    "go/http-services#idle-connections",
     "go/http-services#method-fallbacks",
     "go/http-services#middleware-order",
     "go/http-services#readiness-marker",
+    "go/http-services#refusal-envelope",
+    "go/http-services#request-log-status",
     "go/http-services#request-scope",
+    "go/http-services#route-write-timeout",
     "go/http-services#routing",
+    "go/http-services#streamed-responses",
+    "go/http-services#upgrade-admitted-wires",
     "go/http-services#websocket-framing"
   ]
 }

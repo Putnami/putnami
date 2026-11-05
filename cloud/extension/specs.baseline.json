@@ -1,0 +1,31 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-specs-baseline.json",
+  "protocolVersion": 2,
+  "executableRequirements": [
+    "cloud/cache-provider-configuration#a-files-restore-receives-downloads",
+    "cloud/cache-provider-configuration#an-unrequested-mode-is-left-to-the-run",
+    "cloud/cache-provider-configuration#provider-resolves-its-configuration",
+    "cloud/cache-provider-configuration#the-run-log-names-the-session-mode",
+    "cloud/cli-archive-publication#member-only-after-accepted-put-response",
+    "cloud/cli-infra-plan#plan-lists-workloads-from-job-context",
+    "cloud/compressed-session-reporting#gzip-only-after-an-advertising-answer",
+    "cloud/compressed-session-reporting#the-chunk-bytes-are-what-the-receiver-stores",
+    "cloud/compressed-session-reporting#unadvertised-gzip-acceptance-fails-closed",
+    "cloud/env-definition-drift#doctor-reads-a-degraded-definition",
+    "cloud/env-definition-drift#enable-accepts-a-degraded-definition",
+    "cloud/env-definition-drift#enable-fails-on-a-definition-that-stays-degraded",
+    "cloud/env-definition-drift#status-names-enable-for-an-omitted-workload",
+    "cloud/evidence-upload#opens-the-external-run",
+    "cloud/evidence-upload#posts-the-reports-in-two-batches",
+    "cloud/evidence-upload#refuses-what-it-cannot-upload",
+    "cloud/evidence-upload#sends-the-dependency-states",
+    "cloud/evidence-upload#sends-the-tested-tree",
+    "cloud/local-session-reporting#hosted-credential-wins",
+    "cloud/local-session-reporting#local-session-fails-closed",
+    "cloud/local-session-reporting#local-session-under-developer-login",
+    "cloud/publication-uploader#cloud-uploads-its-registries-in-the-provider-session",
+    "cloud/publish-channels#publish-tasks-declare-their-channels",
+    "cloud/secret-config-key#declared-key-stored",
+    "cloud/secret-config-key#undeclared-key-stored-with-warning"
+  ]
+}

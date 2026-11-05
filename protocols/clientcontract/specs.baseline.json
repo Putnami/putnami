@@ -2,7 +2,13 @@
   "$schema": "https://putnami.dev/schemas/putnami-specs-baseline.json",
   "protocolVersion": 2,
   "executableRequirements": [
+    "client-contract/first-party-generated-clients#external-contract-operations",
     "client-contract/first-party-generated-clients#generated-inventory",
+    "client-contract/first-party-generated-clients#opaque-json-values",
+    "client-contract/first-party-generated-clients#provider-owned-websocket-wires",
+    "client-contract/first-party-generated-clients#response-cache-policy",
+    "client-contract/first-party-generated-clients#shared-page-transport",
+    "client-contract/first-party-generated-clients#sse-continuation",
     "client-contract/first-party-generated-clients#strict-provider-authority",
     "client-contract/first-party-generated-clients#websocket-state-machine"
   ]

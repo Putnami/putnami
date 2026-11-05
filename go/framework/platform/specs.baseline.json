@@ -8,6 +8,7 @@
     "go/platform-endpoints#liveness-is-trivial",
     "go/platform-endpoints#probe-names",
     "go/platform-endpoints#required-probes",
+    "go/platform-endpoints#self-mounting",
     "go/platform-endpoints#version-fallback"
   ]
 }

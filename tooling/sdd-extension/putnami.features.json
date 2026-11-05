@@ -316,6 +316,23 @@
           }
         },
         {
+          "id": "a-stale-specs-baseline-fails",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-grown-floor-fails-naming-the-file",
+              "an-enforced-project-without-its-file-fails",
+              "a-file-in-another-layout-fails",
+              "a-matching-floor-passes",
+              "a-workspace-without-a-baseline-is-adoption"
+            ]
+          }
+        },
+        {
           "id": "feature-authority-answers-resolve",
           "stage": "coded",
           "evidenceKinds": [

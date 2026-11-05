@@ -10,6 +10,7 @@
     "telemetry-putnami-dev/cli-usage-receiver#expiry-runs-without-the-service",
     "telemetry-putnami-dev/cli-usage-receiver#fields-are-allowlisted",
     "telemetry-putnami-dev/cli-usage-receiver#ingest-is-anonymous",
+    "telemetry-putnami-dev/cli-usage-receiver#sent-fields-are-aggregated",
     "telemetry-putnami-dev/cli-usage-receiver#small-groups-are-withheld",
     "telemetry-putnami-dev/cli-usage-receiver#undeclared-requests-are-rejected"
   ]

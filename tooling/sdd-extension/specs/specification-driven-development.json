@@ -95,6 +95,10 @@
       "text": "With options.sdd.featureCoverage declared and an impacted baseline, validate-workspace reads the debt list at the merge base of the baseline and HEAD, and fails each entry of the current list that the merge base does not list, named. A removed or kept entry passes. A run without an impacted baseline, or a merge base that declares no options.sdd.featureCoverage, passes with a note; a shallow clone fails. This step is never served from cache, and feature-coverage-validate keeps its key and reads no history."
     },
     {
+      "id": "a-stale-specs-baseline-fails",
+      "text": "Once any specs.baseline.json is committed, specs-ratchet-validate fails with sdd.stale_specs_baseline, naming each file, when a committed baseline differs from the bytes putnami specs baseline --update would write: a floor grown beyond the file, an enforced project without its file, or a file in another layout. A workspace that commits no baseline is initial adoption and passes with a warning."
+    },
+    {
       "id": "feature-authority-answers-resolve",
       "text": "A featureAuthority resolves when it is none with a reason, an owner that names an authored feature, dependents when a project that depends on it, directly or not, declares a feature or hosts a spec at its root, or a provider whose project id names a workspace member that passes on its own answer. A debt entry is no answer. A dependents or provider answer that does not resolve fails with sdd.uncovered_project, naming why."
     },
