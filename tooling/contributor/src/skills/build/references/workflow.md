@@ -14,7 +14,8 @@ never `Putnami verified` at stage `ready`.
 
 The v1 record has `version: 1`, a stable `outcome`, an exact `mandate` reference,
 and `sources: [{feature, manifest: ref, spec: ref}]`. `sources` points to
-native feature declarations and specs by exact bytes. Load their entire
+native feature declarations and specs by exact bytes. A change that carries no
+feature requirement, such as an ADR with `decisions.json`, names no source. Load their entire
 requirement inventory; identifiers are qualified as `feature#requirement`
 because requirement IDs are local to a spec. The manifest and spec paths
 must be Git-tracked in the consumer workspace;
@@ -37,7 +38,14 @@ has one. A merged claim also names the unit's opaque `proposal` reference,
 which the CLI checks against a native proposal-status receipt. Required stage is one of
 `candidate`, `ready`, `merged`, `published`, `deployed`, `adopted`; the current stage can
 also be `planned` or `building`. A unit's requirement list must equal its
-assigned requirement rows. Dependencies explain delivery order, while native
+assigned requirement rows. A unit with an empty list carries no requirement:
+it is current, passes every final check of a current unit and needs no
+producer proof. Use it only for a change that touches no file a feature's
+checks cover: a change to the implementation of a declared requirement lists
+that requirement and supplies its proof. The verifier refuses the whole record
+when the change from the base it knows edits a native spec, an external spec a
+feature manifest names, or a feature manifest; fold such a unit into the unit
+whose requirements it serves. Dependencies explain delivery order, while native
 project dependencies control builds. A milestone or task count is not a
 receipt. Unresolved `decisions` block that unit's ready claim. Each next-cycle
 task is either `{kind: "provider", ref: {source, id}, revision?, receipt?}`

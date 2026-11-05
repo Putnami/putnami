@@ -113,6 +113,20 @@ pass. A partial delivery whose valid workflow has no eligible unit, for example
 a unit still at `building`, still publishes with its non-closing task
 reference. It names no ready unit and produces no receipt, and the unit keeps
 its stage. The hosted checks never stand for a unit's native proof.
+
+A change that carries no feature requirement, such as an ADR with
+`decisions.json`, names no source, and its unit lists no requirement. That unit
+is current: it passes every final check of a current unit (stage at least
+`candidate`, no unresolved decision, no stage blocker, its required receipt)
+and needs no producer proof. The hosted checks advance it to ready, and a
+complete delivery closes the task. Such a unit is only for a change that
+touches no file a feature's checks cover: a change to the implementation of a
+declared requirement lists that requirement and supplies its proof. When the
+verifier knows the change's base, it refuses the whole record if the change
+edits a native spec, an external spec a feature manifest names, or a feature
+manifest; fold such a unit into the unit whose requirements it serves. The
+external specs it checks are those the manifest at the workspace root and the
+manifests at project roots, beside a tracked `putnami.json`, name.
 Keep its original workflow file immutable and append a new stage-ready revision
 using the native publisher result as the receipt. Native replay checks the
 original inputs and provider status; a rewritten original or stale tree fails.

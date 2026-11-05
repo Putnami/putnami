@@ -448,7 +448,7 @@ func TestWorkflowLaterScopeAndUnitReceipts(t *testing.T) {
 		"feature": workflowFeature, "id": "large-data", "disposition": "excluded",
 		"reason": f.note("exclusion-reason", "A proposed size limit."), "authority": f.note("exclusion-authority", "Actual scope authority approved exclusion.")}}
 	fxObjAt(w, "units", 1)["requirements"] = fxArr{}
-	f.workflow(w, false, "workflow unit has no requirements")
+	f.workflow(w, false, "")
 }
 
 // A gate whose selection did not plan an attester records the requirement

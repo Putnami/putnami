@@ -154,8 +154,9 @@ func workflowNativeError(kind string, diagnostics any) {
 }
 
 func (r *verifyRun) workflowSources(value any) map[string]workflowSource {
+	// A change that carries no feature requirement, such as an ADR, names no
+	// source; its units then carry no requirement either.
 	sources := workflowList(value, "workflow.sources")
-	require(len(sources) > 0, "workflow.sources must name native intent")
 	result := map[string]workflowSource{}
 	for _, item := range sources {
 		source := workflowObject(item, "workflow source", []string{"feature", "manifest", "spec"}, []string{"feature", "manifest", "spec"})
@@ -710,7 +711,7 @@ func workflowUnitRequirementStatuses(id string, members []string, requirements m
 	return statuses, current, verified, complete, unitCurrent
 }
 
-func (r *verifyRun) workflowUnits(value any, requirements map[string]workflowRequirement, verdicts map[string]features.SpecRequirementVerdict, reports map[string][]any, warnings map[string][]diag.Diagnostic, sources map[string]workflowSource, stageBlockers map[string][]any, final bool, expectedBaseSHA string) (int, int, map[string]bool, map[string]bool, map[string]bool, bool, []any) {
+func (r *verifyRun) workflowUnits(value any, requirements map[string]workflowRequirement, verdicts map[string]features.SpecRequirementVerdict, reports map[string][]any, warnings map[string][]diag.Diagnostic, sources map[string]workflowSource, stageBlockers map[string][]any, final bool, expectedBaseSHA string) (int, int, int, map[string]bool, map[string]bool, map[string]bool, bool, []any) {
 	items := workflowList(value, "workflow.units")
 	require(len(items) > 0, "workflow needs a delivery unit")
 	ids := map[string]bool{}
@@ -720,7 +721,7 @@ func (r *verifyRun) workflowUnits(value any, requirements map[string]workflowReq
 	currentUnits := map[string]bool{}
 	dependencies := map[string][]string{}
 	unitStatus := map[string]*jsObject{}
-	current, complete := 0, 0
+	current, complete, requirementless := 0, 0, 0
 	statuses := make([]any, 0, len(items))
 	for _, item := range items {
 		unit := workflowObject(item, "workflow unit", []string{"id", "outcome", "boundary", "exclusions", "projects", "requirements", "dependsOn", "requiredStage", "stage", "nextResult", "nextCycleTasks", "decisions"},
@@ -738,7 +739,9 @@ func (r *verifyRun) workflowUnits(value any, requirements map[string]workflowReq
 			projectIDs[project] = true
 		}
 		members := workflowStrings(unit.get("requirements"), "workflow unit requirements")
-		require(len(members) > 0, "workflow unit has no requirements")
+		if len(members) == 0 && expectedBaseSHA != "" {
+			r.workflowRequirementlessUnitEditsNoIntent(id, expectedBaseSHA)
+		}
 		dependencies[id] = workflowStrings(unit.get("dependsOn"), "workflow unit dependencies")
 		nextCycleTasks := r.workflowNextCycleTasks(unit.get("nextCycleTasks"))
 		decisions := workflowList(unit.get("decisions"), "workflow unit decisions")
@@ -751,6 +754,12 @@ func (r *verifyRun) workflowUnits(value any, requirements map[string]workflowReq
 		requiredStage, stage, reached := r.workflowDeliveryReceipt(unit, final, expectedBaseSHA)
 		requirementStatuses, unitRequirements, unitVerified, unitComplete, unitCurrent :=
 			workflowUnitRequirementStatuses(id, members, requirements, verdicts, reports, sources, projects, assigned)
+		if len(members) == 0 {
+			// A unit with no requirement has nothing to prove, so it is current
+			// and every final check of a current unit applies to it.
+			unitCurrent = true
+			requirementless++
+		}
 		current += unitRequirements
 		complete += unitVerified
 		if final && unitCurrent {
@@ -801,7 +810,7 @@ func (r *verifyRun) workflowUnits(value any, requirements map[string]workflowReq
 			require(assigned[key], "workflow requirement has no unit "+key)
 		}
 	}
-	return current, complete, ids, projectIDs, currentUnits, allReached, statuses
+	return current, complete, requirementless, ids, projectIDs, currentUnits, allReached, statuses
 }
 
 func workflowRefKey(value any, name string) string {
@@ -1059,8 +1068,9 @@ func (r *verifyRun) verifyWorkflow(value any, final bool, expectedBaseSHA string
 		proof, session = r.workflowProof(w.get("proof"), proofTree)
 	}
 	// A ready projection needs a local producer session: without one, no
-	// requirement is proven.
-	require(!final || proof != nil,
+	// requirement is proven. A workflow with no current requirement has
+	// nothing to prove.
+	require(!final || proof != nil || !workflowHasCurrentRequirement(rows),
 		"workflow ready needs native producer proof: set proof to the session of a local run on this tree and its spec-verification.json")
 	verdicts := r.workflowVerdicts(proof, session, sources)
 	reports := map[string][]any{}
@@ -1083,7 +1093,7 @@ func (r *verifyRun) verifyWorkflow(value any, final bool, expectedBaseSHA string
 		}
 	}
 	stageBlockers := r.workflowStages(w.get("stages"))
-	current, complete, units, projects, currentUnits, reached, statuses := r.workflowUnits(w.get("units"), rows, verdicts, reports, warnings, sources, stageBlockers, final, expectedBaseSHA)
+	current, complete, requirementless, units, projects, currentUnits, reached, statuses := r.workflowUnits(w.get("units"), rows, verdicts, reports, warnings, sources, stageBlockers, final, expectedBaseSHA)
 	r.workflowArtifacts(w.get("artifacts"), units, projects, currentUnits, final)
 	r.workflowExperiments(w.get("experiments"))
 	handoff := workflowObject(w.get("handoff"), "workflow handoff", []string{"mandate", "unit", "scopes", "receiver", "responsibility", "inputs", "expectedOutput", "acceptance", "nextAction", "unresolvedFindings"},
@@ -1124,7 +1134,7 @@ func (r *verifyRun) verifyWorkflow(value any, final bool, expectedBaseSHA string
 	}
 	workflowStrings(handoff.get("unresolvedFindings"), "workflow handoff unresolved findings")
 	if final {
-		require(current > 0, "workflow ready needs current requirements")
+		require(current > 0 || requirementless > 0, "workflow ready needs current requirements or a unit with none")
 		require(current == complete, "workflow current requirements are incomplete")
 	}
 	if proofTree != "" {
@@ -1132,5 +1142,92 @@ func (r *verifyRun) verifyWorkflow(value any, final bool, expectedBaseSHA string
 	}
 	return obj([]string{"verdict", "stage", "outcome", "currentRequirements", "verifiedRequirements", "laterRequirements", "outcomeComplete", "units", "nativeDiagnostics", "nextAction"},
 		"workflow valid", "progress", w.get("outcome"), float64(current), float64(complete), float64(later),
-		later == 0 && current > 0 && current == complete && reached, statuses, globalDiagnostics, handoff.get("nextAction"))
+		later == 0 && (current > 0 || requirementless > 0) && current == complete && reached, statuses, globalDiagnostics, handoff.get("nextAction"))
+}
+
+func workflowHasCurrentRequirement(rows map[string]workflowRequirement) bool {
+	for _, row := range rows {
+		if row.disposition == "current" {
+			return true
+		}
+	}
+	return false
+}
+
+// workflowRequirementlessUnitEditsNoIntent refuses a unit with no requirement
+// when the change from base edits feature intent: a native spec, an external
+// spec a feature manifest names, or a feature manifest. Such a change carries
+// requirements, so a unit without any would skip their proof.
+func (r *verifyRun) workflowRequirementlessUnitEditsNoIntent(unit, base string) {
+	if changed := r.workflowIntentEdit(base); changed != "" {
+		fail("workflow unit " + unit + " carries no requirement but the change edits feature intent: " + changed)
+	}
+}
+
+// workflowIntentEdit returns the first path changed from base that edits
+// feature intent, or "". A verifier run reads the change once per base.
+func (r *verifyRun) workflowIntentEdit(base string) string {
+	if changed, known := r.intentEdits[base]; known {
+		return changed
+	}
+	changes := r.changedFiles(base)
+	found := ""
+	for _, changed := range changes {
+		if path.Base(changed) == features.ManifestFilename ||
+			path.Ext(changed) == ".json" && path.Base(path.Dir(changed)) == features.SpecDirectory {
+			found = changed
+			break
+		}
+	}
+	if found == "" {
+		external := r.workflowExternalSpecPaths()
+	scan:
+		for _, changed := range changes {
+			for _, spec := range external {
+				if changed == spec || strings.HasPrefix(changed, spec+"/") {
+					found = changed
+					break scan
+				}
+			}
+		}
+	}
+	if r.intentEdits == nil {
+		r.intentEdits = map[string]string{}
+	}
+	r.intentEdits[base] = found
+	return found
+}
+
+// workflowExternalSpecPaths lists the external spec paths that the feature
+// manifests of the tree name. Like feature discovery, it reads the manifest at
+// the workspace root and a manifest at a project root, beside a tracked
+// putnami.json.
+func (r *verifyRun) workflowExternalSpecPaths() []string {
+	projects := map[string]bool{".": true}
+	for _, project := range r.fileList("ls-files", "-z", "--", "putnami.json", "**/putnami.json") {
+		projects[path.Dir(project)] = true
+	}
+	var specs []string
+	for _, manifestPath := range r.fileList("ls-files", "-z", "--", features.ManifestFilename, "**/"+features.ManifestFilename) {
+		if !projects[path.Dir(manifestPath)] {
+			continue
+		}
+		data, err := os.ReadFile(r.path(manifestPath))
+		if errors.Is(err, os.ErrNotExist) {
+			continue // A manifest the change deletes is itself an intent edit.
+		}
+		if err != nil {
+			failErr(err)
+		}
+		manifest, diagnostics := features.ParseAndValidateManifest(data)
+		if len(diagnostics) > 0 {
+			workflowNativeError("manifest "+manifestPath, diagnostics)
+		}
+		for _, feature := range manifest.Features {
+			if feature.Spec != nil {
+				specs = append(specs, path.Clean(feature.Spec.Path))
+			}
+		}
+	}
+	return specs
 }

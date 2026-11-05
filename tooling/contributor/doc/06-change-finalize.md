@@ -89,6 +89,13 @@ the branch and at the base. The hosted checks on its head are then its
 evidence. putnami names the projects that own each changed path, with the
 rules its impact analysis uses.
 
+A complete delivery of a change that carries no feature requirement, such as
+an ADR with `decisions.json`, passes a workflow record that names no source and
+one unit with no requirement, at `candidate`. The hosted checks complete that
+unit, and the command closes the task. The record is refused when the change
+edits a native spec, an external spec a feature manifest names, or a feature
+manifest.
+
 ## Text rules
 
 The title uses Conventional Commits. A `feat` or `fix` title is refused when
