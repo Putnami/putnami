@@ -12,6 +12,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"strings"
 	"time"
 
 	collab "go.putnami.dev/protocol/collaboration"
@@ -290,8 +291,11 @@ func validateProposal(proposal collab.Proposal, change collab.Change, draft bool
 	if proposal.Change.Base != change.Base || proposal.Change.Head != change.Head || proposal.Change.HeadCommit != change.HeadCommit {
 		return errors.New("proposal base, head or full head commit readback failed")
 	}
-	if proposal.Title != title || proposal.Body != body {
-		return errors.New("proposal title or body readback failed")
+	if proposal.Title != title {
+		return errors.New("proposal title readback failed")
+	}
+	if proposal.Body != body {
+		return bodyReadbackError(proposal.Body, body)
 	}
 	want := collab.ProposalStateOpen
 	if draft {
@@ -301,6 +305,20 @@ func validateProposal(proposal collab.Proposal, change collab.Change, draft bool
 		return fmt.Errorf("proposal state is %q, expected %q", proposal.State, want)
 	}
 	return nil
+}
+
+// bodyReadbackError names the text a provider or its host appended to the
+// sent body. The readback stays strict: the body is the squash commit.
+func bodyReadbackError(read, sent string) error {
+	appended, ok := strings.CutPrefix(read, sent)
+	if !ok || appended == "" {
+		return errors.New("proposal body readback failed")
+	}
+	appended = strings.TrimSpace(appended)
+	if agentMarker.MatchString(appended) {
+		return fmt.Errorf("proposal body readback failed: the host appended %q, which names an agent and would reach the squash commit; publish from a local session", truncateUTF8(appended, 512))
+	}
+	return fmt.Errorf("proposal body readback failed: the host appended %q", truncateUTF8(appended, 512))
 }
 
 func compareMembers(upsert, read collab.Proposal) error {

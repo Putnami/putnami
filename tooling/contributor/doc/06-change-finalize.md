@@ -107,6 +107,12 @@ title, body, proof or branch commit may name an agent. With
 `verification.language` set to `en`, the title, body and proof must carry no
 non-English signal.
 
+The command reads the proposal back and requires the exact title and body it
+sent. When the provider or its host appended text to the body, the error names
+that text. When the text names an agent, for example the attribution footer a
+Claude Code cloud session appends after each write, the error says to publish
+from a local session.
+
 ## Output and exit codes
 
 The command prints `PROPOSAL_REF=<json>`, then `PROPOSAL_URL=<url>` when the
