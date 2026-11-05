@@ -1,0 +1,21 @@
+{
+  "protocolVersion": 1,
+  "feature": "billing/invoice-export",
+  "outcomes": [
+    "A team reads its spec in place"
+  ],
+  "requirements": [
+    {
+      "id": "export-an-invoice",
+      "text": "The export writes one file per invoice."
+    },
+    {
+      "id": "fr-002",
+      "text": "A positional requirement with no anchor stays unanchored."
+    },
+    {
+      "id": "numbered-entry",
+      "text": "A positional requirement with an anchor keeps its ID."
+    }
+  ]
+}

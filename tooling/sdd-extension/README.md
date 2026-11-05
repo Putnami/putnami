@@ -196,6 +196,20 @@ every later SDD verdict depends on, because a validator told it ran over three
 projects cannot otherwise tell a deliberate `--projects` narrowing from a
 whole-workspace run of a three-project tree.
 
+## External specs
+
+A manifest version 3 entry can name a spec another tool wrote:
+`"spec": {"format": "openspec", "path": "openspec/specs/invoice-export"}`. List
+the format in `options.sdd.specFormats`, in the project or the workspace. The
+default is empty, and a project's list replaces the workspace's.
+
+- A format the project did not opt into fails `specs validate` in every mode.
+- A format with no shipped reader fails and says so.
+- A feature with a native and an external spec fails `specs validate`.
+- In `enforce`, a positional requirement such as `FR-001` needs an anchor on the
+  line above it: `<!-- putnami:id <segment-id> -->`, or the tag
+  `@putnami-id:<segment-id>` in a Gherkin file.
+
 ## The validation jobs
 
 Two commands, because their SUBJECTS differ and one command carries one

@@ -97,6 +97,22 @@
     {
       "id": "feature-authority-answers-resolve",
       "text": "A featureAuthority resolves when it is none with a reason, an owner that names an authored feature, dependents when a project that depends on it, directly or not, declares a feature or hosts a spec at its root, or a provider whose project id names a workspace member that passes on its own answer. A debt entry is no answer. A dependents or provider answer that does not resolve fails with sdd.uncovered_project, naming why."
+    },
+    {
+      "id": "external-specs-share-one-discovery",
+      "text": "Discovery reads native specs and the external specs manifests name through one result, so one spec per feature covers both and a feature with both fails specs validate. Two features cannot name one path or overlapping paths. The criteria projection carries the format, so the spec gate accepts an external path. A scoped run keeps the external spec of a feature it selects. A workspace with no reference reads no external file and keeps its outputs."
+    },
+    {
+      "id": "a-spec-format-needs-an-opt-in",
+      "text": "A manifest that names a format its project's specFormats omits fails specs validate in every verification mode, on the manifest entry, and the file is not read. A format with no shipped reader fails the same way and says so."
+    },
+    {
+      "id": "enforce-needs-anchors",
+      "text": "A project in enforce fails on each positional requirement with no anchor, at the requirement's file and line. A project in report projects the requirement and gets no finding about it."
+    },
+    {
+      "id": "external-spec-files-key-the-spec-tasks",
+      "text": "specs-validate and specs-ratchet-validate declare git inputs for every extension a reader reads, and read external files through the Git candidate cut, so an ignored file is absent and a changed file reruns them."
     }
   ],
   "decisions": [
@@ -108,6 +124,8 @@
     "tooling/sdd-extension/doc/adr/0001-the-squash-commit-keeps-the-breaking-marker.md",
     "tooling/sdd-extension/doc/adr/0002-the-squash-commit-names-no-agent.md",
     "tooling/sdd-extension/doc/adr/0003-every-project-carries-a-feature-a-spec-or-a-feature-authority.md",
-    "protocols/features/doc/adr/0005-a-feature-declaration-names-its-surface.md"
+    "protocols/features/doc/adr/0005-a-feature-declaration-names-its-surface.md",
+    "tooling/sdd-extension/doc/adr/0004-a-spec-may-live-in-an-external-market-format.md",
+    "protocols/features/doc/adr/0006-the-spec-source-contract.md"
   ]
 }

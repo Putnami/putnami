@@ -61,8 +61,12 @@ type SpecCriteriaProjection struct {
 type SpecCriteriaGroup struct {
 	// Feature is the exact feature identity the spec details.
 	Feature string `json:"feature"`
-	// Spec is the canonical workspace-relative path of the spec document.
+	// Spec is the canonical workspace-relative path of the spec document, or
+	// the reference path of an external spec.
 	Spec string `json:"spec"`
+	// Format names the market format of an external spec. A native group omits
+	// it, so its bytes stay those of the first projection version.
+	Format SpecFormat `json:"format,omitempty"`
 	// SpecRequirements lists the spec's textual requirement identities, sorted.
 	SpecRequirements []string `json:"specRequirements"`
 	// Requirements carries the authored feature requirements whose IDs match a
@@ -141,7 +145,12 @@ func validateSpecCriteriaGroup(field string, group SpecCriteriaGroup) []diag.Dia
 		diagnostics = append(diagnostics, diag.Errorf(ErrorCodeInvalidID, field+".feature",
 			"feature ID %q is not a canonical slash-separated identity", group.Feature))
 	}
-	if !specSourcePattern.MatchString(group.Spec) {
+	if group.Format != "" {
+		if !validSpecFormats[group.Format] {
+			diagnostics = append(diagnostics, diag.Errorf(ErrorCodeInvalidSpecReference, field+".format", "spec format %q is not supported", group.Format))
+		}
+		diagnostics = append(diagnostics, validateProtocolPath(field+".spec", group.Spec)...)
+	} else if !specSourcePattern.MatchString(group.Spec) {
 		diagnostics = append(diagnostics, diag.Errorf(ErrorCodeInvalidPath, field+".spec",
 			"spec path %q is not a canonical specs/ document path", group.Spec))
 	} else {

@@ -14,7 +14,7 @@
   "requirements": [
     {
       "id": "strict-versioned-documents",
-      "text": "The manifest reader accepts version 1 or 2, the spec and projection readers only 1, and the evidence and report readers refuse 2. The manifest and spec readers refuse a missing, null, string, decimal, exponent, duplicated or unknown version; the projection reader an unknown, decimal or exponent one. Each refuses an unknown field and an explicit null. A version 1 manifest refuses the verification field. A spec refuses the fields that would mint a feature, a stage, an owner, evidence or a graph node."
+      "text": "The manifest reader accepts versions 1 to 3, the spec and projection readers only 1, and the evidence and report readers refuse 2. The manifest and spec readers refuse a missing, null, string, decimal, exponent, duplicated or unknown version; the projection reader an unknown, decimal or exponent one. Each refuses an unknown field and an explicit null. A version 1 manifest refuses the verification field. A spec refuses the fields that would mint a feature, a stage, an owner, evidence or a graph node."
     },
     {
       "id": "canonical-bytes-across-languages",
@@ -51,10 +51,31 @@
     {
       "id": "ratchets-and-decisions",
       "text": "Against the committed specs baseline, a project that leaves enforce mode or loses a recorded executable requirement is an error naming the baseline file; growth is only counted, and a missing baseline is initial adoption. The decision registry reader refuses a wrong version, an unknown member, an explicit null and a trailing value. A decision that could not be enforced is a registry error. A decision check judges one JSON file, compares numbers by value and counts an unreadable file as a violation."
+    },
+    {
+      "id": "external-spec-reference",
+      "text": "A version 3 manifest entry may name an external spec with a closed {format, path} object. The format is openspec, speckit, kiro or gherkin. The path is workspace-relative and cannot escape the workspace. Versions 1 and 2 refuse the member as an unknown field. A criteria group for an external spec carries its format, and a group with no format keeps the specs/*.json path rule."
+    },
+    {
+      "id": "spec-reader-contract",
+      "text": "A reader turns the bytes of one external spec into a spec, a record per requirement and findings, with no network, model, clock or filesystem. The contract wraps every reader: a finding names its file and line, a requirement over 512 bytes is an error that names a split, two requirements with one ID name both positions, and the same bytes give the same result."
+    },
+    {
+      "id": "requirement-identity-mapping",
+      "text": "A requirement name becomes an ID by one mapping: lowercase ASCII letters, keep ASCII digits, turn each other run into one hyphen, trim the ends. A name with a non-ASCII character, nothing left or over 128 bytes has no ID. An anchor stands alone above its requirement, and its ID follows the native segment grammar."
+    },
+    {
+      "id": "spec-format-policy",
+      "text": "options.sdd.specFormats resolves as the project's list, then the workspace's, then empty, and a project's list replaces the workspace's. A wrong type, an unknown format or a repeated format is an error, never a fallback."
+    },
+    {
+      "id": "scenarios-never-change-checks",
+      "text": "Where a reader attaches scenarios to a requirement, comparing them with its declared checks gives one warning per scenario with no check and per check with no scenario. A requirement with no scenario list is not compared. The comparison never adds, removes or changes a check."
     }
   ],
   "decisions": [
     "protocols/features/doc/adr/0001-minimal-spec-contract.md",
-    "protocols/features/doc/adr/0002-executable-requirement-criteria.md"
+    "protocols/features/doc/adr/0002-executable-requirement-criteria.md",
+    "protocols/features/doc/adr/0006-the-spec-source-contract.md"
   ]
 }

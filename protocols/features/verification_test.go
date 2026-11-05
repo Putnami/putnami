@@ -315,7 +315,7 @@ func TestCommittedRepositoryContentStaysOnTheLegacyManifestWire(t *testing.T) {
 		}
 		wantVersion := MinimumManifestProtocolVersion
 		if migrated[relative] {
-			wantVersion = ManifestProtocolVersion
+			wantVersion = ManifestCriteriaProtocolVersion
 			pilots++
 		}
 		manifest, findings := ParseAndValidateManifest(data)

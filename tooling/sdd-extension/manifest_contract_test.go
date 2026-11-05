@@ -13,6 +13,7 @@ import (
 	protocolcli "go.putnami.dev/protocol/cli"
 	diag "go.putnami.dev/protocol/diagnostic"
 	proto "go.putnami.dev/protocol/extension"
+	featureproto "go.putnami.dev/protocol/features"
 	sdkmanifest "go.putnami.dev/sdk/extension/manifest"
 )
 
@@ -164,6 +165,16 @@ func authoredManifest(t *testing.T) *proto.Manifest {
 				"identity": {From: "workspace", Files: []string{
 					"**/putnami.features.json",
 					"**/specs/*.json",
+					"**/putnami.json",
+					"putnami.workspace.json",
+					"!**/.gen/**",
+				}},
+				// The files an external spec may live in. A manifest's path cannot
+				// key a task, so the port holds each extension a reader reads, and
+				// discovery reads those files through the same candidate cut.
+				"externalSpecs": {From: "workspace", Files: []string{
+					"git:**/*.md",
+					"git:**/*.feature",
 				}},
 			},
 			// Serialized after the project's source writers for the same reason
@@ -252,6 +263,13 @@ func authoredManifest(t *testing.T) *proto.Manifest {
 					"putnami.workspace.json",
 					"**/specs.baseline.json",
 					"!**/.gen/**",
+				}},
+				// The files an external spec may live in. A manifest's path cannot
+				// key a task, so the port holds each extension a reader reads, and
+				// discovery reads those files through the same candidate cut.
+				"externalSpecs": {From: "workspace", Files: []string{
+					"git:**/*.md",
+					"git:**/*.feature",
 				}},
 			},
 			// No `reads` resource for the same reason as architecture-validate:
@@ -857,6 +875,8 @@ func TestCachePolicyMatchesTheDeclaredReadSet(t *testing.T) {
 			// authored manifest, so a sibling's manifest changes this verdict; a
 			// project-scoped port would not move the key when it does.
 			"identity": "workspace",
+			// An external spec may live anywhere in the workspace.
+			"externalSpecs": "workspace",
 		},
 		// Project-rooted patterns here would key a workspace verdict on one
 		// project's files. The policy port covers the committed mode that changes
@@ -1124,5 +1144,45 @@ func TestCodeownersSyncDeclaresItWritesSources(t *testing.T) {
 	if !found || port.From != "project" || !reflect.DeepEqual(port.Files, []string{"git:**"}) {
 		t.Errorf("codeowners-sync inputs = %+v, want the project-scoped port repository on git:**, "+
 			"the patterns the CLI rehashes to prove a run left CODEOWNERS unchanged", task.Inputs)
+	}
+}
+
+// TestSpecTasksKeyEveryExtensionAReaderReads pins D-050: a task input cannot
+// depend on a manifest's path, so each extension a format's reader sees has a
+// static input on both cached spec tasks.
+func TestSpecTasksKeyEveryExtensionAReaderReads(t *testing.T) {
+	spectest.Proves(t, "tooling/specification-driven-development", "external-spec-files-key-the-spec-tasks", "the-spec-tasks-key-every-extension-a-reader-reads")
+	data, err := os.ReadFile("putnami.extension.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var manifest struct {
+		Tasks map[string]struct {
+			Inputs map[string]struct {
+				Files []string `json:"files"`
+			} `json:"inputs"`
+		} `json:"tasks"`
+	}
+	if err := json.Unmarshal(data, &manifest); err != nil {
+		t.Fatal(err)
+	}
+	for _, task := range []string{"specs-validate", "specs-ratchet-validate"} {
+		declared := make(map[string]bool)
+		for _, input := range manifest.Tasks[task].Inputs {
+			for _, file := range input.Files {
+				declared[file] = true
+			}
+		}
+		for _, format := range featureproto.SpecFormats() {
+			extensions := featureproto.SpecFileExtensions(format)
+			if len(extensions) == 0 {
+				t.Errorf("format %s lists no extension", format)
+			}
+			for _, extension := range extensions {
+				if !declared["git:**/*"+extension] {
+					t.Errorf("%s does not key git:**/*%s, which the %s reader reads", task, extension, format)
+				}
+			}
+		}
 	}
 }

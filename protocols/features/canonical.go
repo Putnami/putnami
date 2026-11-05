@@ -31,6 +31,10 @@ func CanonicalManifest(input *Manifest) *Manifest {
 			out.Features[i].Requirements[j].Verification = canonicalVerificationCriterion(out.Features[i].Requirements[j].Verification)
 		}
 		out.Features[i].Surface = canonicalFeatureSurface(out.Features[i].Surface)
+		if reference := out.Features[i].Spec; reference != nil {
+			copied := *reference
+			out.Features[i].Spec = &copied
+		}
 		sort.Slice(out.Features[i].Requirements, func(a, b int) bool {
 			left, lok := StageRank(out.Features[i].Requirements[a].Stage)
 			right, rok := StageRank(out.Features[i].Requirements[b].Stage)

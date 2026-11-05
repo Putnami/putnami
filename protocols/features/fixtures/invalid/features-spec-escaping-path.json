@@ -1,0 +1,18 @@
+{
+  "protocolVersion": 3,
+  "namespace": "billing",
+  "features": [
+    {
+      "id": "billing/invoice-export",
+      "type": "feature",
+      "name": "Invoice export",
+      "outcome": "Customers can export issued invoices",
+      "owner": "billing",
+      "target": "modeled",
+      "spec": {
+        "format": "openspec",
+        "path": "../outside"
+      }
+    }
+  ]
+}

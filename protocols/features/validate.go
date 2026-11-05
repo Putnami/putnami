@@ -75,7 +75,11 @@ var validEvidenceKinds = map[EvidenceKind]bool{
 }
 
 var supportedManifestVersions = map[int]bool{
-	MinimumManifestProtocolVersion: true, ManifestProtocolVersion: true,
+	MinimumManifestProtocolVersion: true, ManifestCriteriaProtocolVersion: true, ManifestProtocolVersion: true,
+}
+
+var validSpecFormats = map[SpecFormat]bool{
+	SpecFormatOpenSpec: true, SpecFormatSpecKit: true, SpecFormatKiro: true, SpecFormatGherkin: true,
 }
 
 var validVerificationKinds = map[VerificationKind]bool{
@@ -136,6 +140,9 @@ type EvidenceSource struct {
 // SpecSource associates a parsed spec with its canonical workspace-relative
 // discovery path. The path locates the document; it never names it.
 type SpecSource struct {
+	// External says Path is a manifest's external spec reference, projected in
+	// memory, so the specs/*.json location rule does not apply to it.
+	External bool
 	// Path is the canonical workspace-relative spec discovery path.
 	Path string
 	// Spec is the strictly parsed durable specification found at Path.
@@ -158,7 +165,7 @@ func ValidateManifest(input *Manifest) []diag.Diagnostic {
 		diagnostics = append(diagnostics, diag.Errorf(ErrorCodeParseError, "features", "features is required and must be an array"))
 	}
 	if !supportedManifestVersions[input.ProtocolVersion] {
-		diagnostics = append(diagnostics, diag.Errorf(ErrorCodeInvalidProtocolVersion, "protocolVersion", "protocolVersion %d is not supported (want %d or %d)", input.ProtocolVersion, MinimumManifestProtocolVersion, ManifestProtocolVersion))
+		diagnostics = append(diagnostics, diag.Errorf(ErrorCodeInvalidProtocolVersion, "protocolVersion", "protocolVersion %d is not supported (want %d, %d or %d)", input.ProtocolVersion, MinimumManifestProtocolVersion, ManifestCriteriaProtocolVersion, ManifestProtocolVersion))
 	}
 	if !segmentIDPattern.MatchString(input.Namespace) {
 		diagnostics = append(diagnostics, diag.Errorf(ErrorCodeInvalidID, "namespace", "namespace %q must be one lower-case ASCII ID segment", input.Namespace))
@@ -191,6 +198,7 @@ func validateFeature(field, namespace string, version int, feature Feature) []di
 		}
 	}
 	diagnostics = append(diagnostics, validateFeatureSurface(field+".surface", version, feature.Surface)...)
+	diagnostics = append(diagnostics, validateSpecReference(field+".spec", version, feature.Spec)...)
 	targetRank, validTarget := StageRank(feature.Target)
 	if !validTarget {
 		diagnostics = append(diagnostics, diag.Errorf(ErrorCodeInvalidStage, field+".target", "target %q is not in the maturity ladder", feature.Target))
@@ -259,6 +267,26 @@ func validateFeature(field, namespace string, version int, feature Feature) []di
 	return diagnostics
 }
 
+// validateSpecReference validates the shape of one optional external spec
+// reference. Whether the path exists and whether its project opted into the
+// format are facts of the workspace, decided outside the protocol.
+func validateSpecReference(field string, version int, reference *SpecReference) []diag.Diagnostic {
+	if reference == nil {
+		return nil
+	}
+	if version < ManifestProtocolVersion {
+		return []diag.Diagnostic{diag.Errorf(ErrorCodeUnknownField, field, "spec requires feature manifest protocolVersion %d", ManifestProtocolVersion)}
+	}
+	var diagnostics []diag.Diagnostic
+	if !validSpecFormats[reference.Format] {
+		diagnostics = append(diagnostics, diag.Errorf(ErrorCodeInvalidSpecReference, field+".format", "spec format %q is not supported", reference.Format))
+	}
+	if len(reference.Path) > specReferencePathMaxLength {
+		return append(diagnostics, diag.Errorf(ErrorCodeInvalidSpecReference, field+".path", "spec path must be at most %d characters", specReferencePathMaxLength))
+	}
+	return append(diagnostics, validateProtocolPath(field+".path", reference.Path)...)
+}
+
 // validateFeatureSurface validates the shape of one optional surface. Whether
 // a name is served is a fact of the declaring project and is decided outside
 // the protocol.
@@ -266,8 +294,8 @@ func validateFeatureSurface(field string, version int, surface *FeatureSurface) 
 	if surface == nil {
 		return nil
 	}
-	if version < ManifestProtocolVersion {
-		return []diag.Diagnostic{diag.Errorf(ErrorCodeUnknownField, field, "surface requires feature manifest protocolVersion %d", ManifestProtocolVersion)}
+	if version < ManifestCriteriaProtocolVersion {
+		return []diag.Diagnostic{diag.Errorf(ErrorCodeUnknownField, field, "surface requires feature manifest protocolVersion %d", ManifestCriteriaProtocolVersion)}
 	}
 	if len(surface.Commands) == 0 {
 		return []diag.Diagnostic{diag.Errorf(ErrorCodeInvalidSurface, field, "a surface must list at least one command")}
@@ -311,8 +339,8 @@ func validateVerificationCriterion(field string, version int, requirement Requir
 	if criterion == nil {
 		return nil
 	}
-	if version < ManifestProtocolVersion {
-		return []diag.Diagnostic{diag.Errorf(ErrorCodeUnknownField, field, "verification requires feature manifest protocolVersion %d", ManifestProtocolVersion)}
+	if version < ManifestCriteriaProtocolVersion {
+		return []diag.Diagnostic{diag.Errorf(ErrorCodeUnknownField, field, "verification requires feature manifest protocolVersion %d", ManifestCriteriaProtocolVersion)}
 	}
 	if !validVerificationKinds[criterion.Kind] {
 		return []diag.Diagnostic{diag.Errorf(ErrorCodeInvalidVerification, field+".kind", "verification kind %q is not supported", criterion.Kind)}
@@ -814,7 +842,7 @@ func ValidateSpecRepository(specSources []SpecSource, authoredFeatureIDs []strin
 		if finding := validateSourcePath(source.Path); finding != nil {
 			diagnostics = append(diagnostics, *finding)
 			canonicalSource = ""
-		} else if !specSourcePattern.MatchString(source.Path) {
+		} else if !source.External && !specSourcePattern.MatchString(source.Path) {
 			diagnostics = append(diagnostics, diag.Errorf(ErrorCodeOutsideDiscoveryRoot, "path", "a spec must be a direct JSON child of %s/ at a workspace or exact project root", SpecDirectory))
 			canonicalSource = ""
 		}

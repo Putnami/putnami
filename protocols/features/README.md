@@ -12,7 +12,7 @@ reopens another:
 
 | Document | Constant | Accepted `protocolVersion` |
 |---|---|---|
-| `putnami.features.json` | `ManifestProtocolVersion` | `1` or `2` |
+| `putnami.features.json` | `ManifestProtocolVersion` | `1`, `2` or `3` |
 | `schema/feature-evidence/*.json` | `EvidenceProtocolVersion` | exactly `1` |
 | `specs/*.json` | `SpecProtocolVersion` | exactly `1` |
 | verification report | `VerificationReportProtocolVersion` | exactly `1` |
@@ -101,6 +101,15 @@ at later stages. Every stage from `coded` through the authored target needs at
 least one requirement. Requirements above the target are valid: their evidence
 is reported as unclaimed by assessment tooling and cannot raise maturity past
 the authored target.
+
+A version 3 feature entry may name an external spec with a closed object:
+`"spec": {"format": "openspec", "path": "openspec/specs/invoice-export"}`. The
+format is `openspec`, `speckit`, `kiro` or `gherkin`, and the path is a
+workspace-relative file or directory. A project opts in through
+`options.sdd.specFormats`. A `SpecReader` projects the file in memory into a
+native `Spec`, and `ReadSpecSource` applies the contract every format shares.
+`conformance.RunSpecSource` pins a reader against a golden spec. See
+[ADR 0006](doc/adr/0006-the-spec-source-contract.md).
 
 A feature may carry an optional `surface` object that lists the command paths
 that carry it, for example

@@ -21,6 +21,7 @@ func TestConformanceRunners(t *testing.T) {
 	conformance.RunDesignGraphFile(t, filepath.Join("fixtures", "equivalence", "go-typescript-design.golden.json"))
 	conformance.RunSpecFile(t, filepath.Join("fixtures", "equivalence", "human-authored-spec.golden.json"))
 	conformance.RunManifestFile(t, filepath.Join("fixtures", "equivalence", "human-authored-features-v2.golden.json"))
+	conformance.RunManifestFile(t, filepath.Join("fixtures", "equivalence", "human-authored-features-v3.golden.json"))
 	conformance.RunVerificationReportFile(t, filepath.Join("fixtures", "equivalence", "go-typescript-verification.golden.json"))
 }
 
@@ -61,7 +62,7 @@ func TestConformancePackAndVectors(t *testing.T) {
 	if err := json.Unmarshal(vectorsData, &vectors); err != nil {
 		t.Fatal(err)
 	}
-	if vectors.ProtocolVersion != 1 || len(vectors.Vectors) != 8 {
+	if vectors.ProtocolVersion != 1 || len(vectors.Vectors) != 9 {
 		t.Fatalf("invalid vectors: %#v", vectors)
 	}
 	for _, vector := range vectors.Vectors {

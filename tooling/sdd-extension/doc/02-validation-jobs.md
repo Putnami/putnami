@@ -453,7 +453,8 @@ A task may be cacheable only when its declared inputs cover what it reads.
 "inputs": {
   "manifest": { "from": "project",   "files": ["putnami.features.json"] },
   "specs":    { "from": "project",   "files": ["specs/*.json"] },
-  "identity": { "from": "workspace", "files": ["**/putnami.features.json", "**/specs/*.json"] }
+  "identity": { "from": "workspace", "files": ["**/putnami.features.json", "**/specs/*.json", "**/putnami.json", "putnami.workspace.json", "!**/.gen/**"] },
+  "externalSpecs": { "from": "workspace", "files": ["git:**/*.md", "git:**/*.feature"] }
 }
 ```
 
@@ -462,6 +463,19 @@ identities, so the key follows the **read set**, not the ownership. A key that
 stopped at the project boundary would let a sibling's manifest change this
 verdict silently. Verified by measurement: touching a spec in another project
 produces a miss.
+
+### External specs key the spec tasks
+
+A manifest entry can name an external spec. A task input cannot depend on a
+manifest value, so `specs-validate` and `specs-ratchet-validate` declare
+`git:**/*.md` and `git:**/*.feature`, the only extensions a reader reads. Both
+also read external files through the Git candidate cut, so an ignored file is
+absent. Any Markdown or Gherkin edit therefore reruns these tasks, in every
+workspace.
+
+`specs-validate` also keys on `**/putnami.json` and `putnami.workspace.json`,
+because `options.sdd.specFormats` and the verification mode decide its verdict.
+See [ADR 0006 of `protocols/features`](../../../protocols/features/doc/adr/0006-the-spec-source-contract.md).
 
 ### `architecture-validate` — cached, and it never reads git
 
@@ -538,8 +552,9 @@ producer recorded what a component was configured with.
 "inputs": {
   "floor": {
     "from": "workspace",
-    "files": ["**/putnami.features.json", "**/specs/*.json", "**/putnami.json", "putnami.workspace.json", "**/specs.baseline.json"]
-  }
+    "files": ["**/putnami.features.json", "**/specs/*.json", "**/putnami.json", "putnami.workspace.json", "**/specs.baseline.json", "!**/.gen/**"]
+  },
+  "externalSpecs": { "from": "workspace", "files": ["git:**/*.md", "git:**/*.feature"] }
 }
 ```
 

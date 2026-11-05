@@ -27,7 +27,9 @@ deliberate: the two answer different questions over different scopes.
   would report every unselected enforced project as a regression.
 - **Merging with `architecture-validate` merges disjoint cache keys.** The
   ratchet keys on `**/putnami.features.json`, `**/specs/*.json`,
-  `**/putnami.json`, `putnami.workspace.json`, and `specs.baseline.json`;
+  `**/putnami.json`, `putnami.workspace.json`, `specs.baseline.json`, and,
+  because a manifest can name an external spec,
+  `git:**/*.md` and `git:**/*.feature`;
   architecture keys on its own declarations, debt files, and capability
   manifests. Editing either set would re-run both.
 - **The cost does not justify either.** On this workspace (47 spec-owning

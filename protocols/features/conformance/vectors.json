@@ -44,6 +44,12 @@
       "authors": ["human"]
     },
     {
+      "id": "human-authored-feature-spec-reference",
+      "kind": "feature-intent",
+      "canonical": "../fixtures/equivalence/human-authored-features-v3.golden.json",
+      "authors": ["human"]
+    },
+    {
       "id": "go-typescript-feature-verification",
       "kind": "verification-report",
       "canonical": "../fixtures/equivalence/go-typescript-verification.golden.json",
