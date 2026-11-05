@@ -1,0 +1,52 @@
+{
+  "feature": [
+    "Functionalitate",
+    "Funcționalitate",
+    "Funcţionalitate"
+  ],
+  "rule": [
+    "Rule"
+  ],
+  "background": [
+    "Context"
+  ],
+  "scenario": [
+    "Exemplu",
+    "Scenariu"
+  ],
+  "scenarioOutline": [
+    "Structura scenariu",
+    "Structură scenariu"
+  ],
+  "examples": [
+    "Exemple"
+  ],
+  "given": [
+    "* ",
+    "Date fiind ",
+    "Dat fiind ",
+    "Dată fiind",
+    "Dati fiind ",
+    "Dați fiind ",
+    "Daţi fiind "
+  ],
+  "when": [
+    "* ",
+    "Cand ",
+    "Când "
+  ],
+  "then": [
+    "* ",
+    "Atunci "
+  ],
+  "and": [
+    "* ",
+    "Si ",
+    "Și ",
+    "Şi "
+  ],
+  "but": [
+    "* ",
+    "Dar "
+  ]
+}

@@ -1,0 +1,593 @@
+{
+  "background.feature": {
+    "feature": {
+      "description": [],
+      "line": 1,
+      "name": "Background",
+      "rules": [],
+      "scenarios": [
+        7,
+        10
+      ]
+    }
+  },
+  "complex_background.feature": {
+    "feature": {
+      "description": [
+        "We want to ensure PickleStep all have different IDs"
+      ],
+      "line": 1,
+      "name": "Complex background",
+      "rules": [
+        {
+          "line": 13,
+          "name": "My Rule",
+          "scenarios": [
+            18
+          ]
+        }
+      ],
+      "scenarios": [
+        7,
+        10
+      ]
+    }
+  },
+  "conjunctions.feature": {
+    "feature": {
+      "description": [
+        "You can avoid repeating the same keyword by using a conjunction. The conjunction step will inherit the step type from the previous step."
+      ],
+      "line": 1,
+      "name": "Conjunctions",
+      "rules": [],
+      "scenarios": [
+        6,
+        17,
+        21
+      ]
+    }
+  },
+  "datatables.feature": {
+    "feature": {
+      "description": [],
+      "line": 1,
+      "name": "DataTables",
+      "rules": [],
+      "scenarios": [
+        3
+      ]
+    }
+  },
+  "datatables_with_new_lines.feature": {
+    "feature": {
+      "description": [],
+      "line": 1,
+      "name": "DataTables",
+      "rules": [],
+      "scenarios": [
+        3
+      ]
+    }
+  },
+  "descriptions.feature": {
+    "feature": {
+      "description": [
+        "This is a single line description"
+      ],
+      "line": 1,
+      "name": "Descriptions everywhere",
+      "rules": [],
+      "scenarios": [
+        4,
+        9,
+        13,
+        19,
+        26,
+        33,
+        40,
+        45
+      ]
+    }
+  },
+  "descriptions_with_comments.feature": {
+    "feature": {
+      "description": [
+        "This is a description with a comment in the middle and at the end"
+      ],
+      "line": 1,
+      "name": "Descriptions with comments everywhere",
+      "rules": [],
+      "scenarios": [
+        7,
+        14,
+        22,
+        29,
+        38,
+        56,
+        60
+      ]
+    }
+  },
+  "docstrings.feature": {
+    "feature": {
+      "description": [],
+      "line": 1,
+      "name": "DocString variations",
+      "rules": [],
+      "scenarios": [
+        3
+      ]
+    }
+  },
+  "empty.feature": {
+    "feature": null
+  },
+  "escaped_pipes.feature": {
+    "feature": {
+      "description": [
+        "The \\-character will be considered as an escape in table cell iff it is followed by a |-character, a \\-character or an n."
+      ],
+      "line": 1,
+      "name": "Escaped pipes",
+      "rules": [],
+      "scenarios": [
+        5
+      ]
+    }
+  },
+  "example_token_multiple.feature": {
+    "feature": {
+      "description": [],
+      "line": 1,
+      "name": "Example token used multiple times",
+      "rules": [],
+      "scenarios": [
+        3
+      ]
+    }
+  },
+  "example_tokens_everywhere.feature": {
+    "feature": {
+      "description": [],
+      "line": 1,
+      "name": "Example tokens everywhere",
+      "rules": [],
+      "scenarios": [
+        3
+      ]
+    }
+  },
+  "extra_table_content.feature": {
+    "feature": {
+      "description": [
+        "Tables are delimited by pipes on both sides. Anything that isn't enclosed is not part of the table.",
+        "It is not recommended to use this feature, but it is how the implementation currently works."
+      ],
+      "line": 1,
+      "name": "Extra table content",
+      "rules": [],
+      "scenarios": [
+        9
+      ]
+    }
+  },
+  "i18n_emoji.feature": {
+    "feature": {
+      "description": [],
+      "line": 2,
+      "name": "🙈🙉🙊",
+      "rules": [],
+      "scenarios": [
+        4
+      ]
+    }
+  },
+  "i18n_fr.feature": {
+    "feature": {
+      "description": [],
+      "line": 2,
+      "name": "i18n support",
+      "rules": [],
+      "scenarios": [
+        4,
+        9,
+        14,
+        19,
+        24,
+        29,
+        35,
+        41,
+        47,
+        53,
+        59
+      ]
+    }
+  },
+  "i18n_no.feature": {
+    "feature": {
+      "description": [],
+      "line": 2,
+      "name": "i18n support",
+      "rules": [],
+      "scenarios": [
+        4
+      ]
+    }
+  },
+  "incomplete_background_1.feature": {
+    "feature": {
+      "description": [],
+      "line": 1,
+      "name": "Incomplete backgrounds, Part 1",
+      "rules": [],
+      "scenarios": [
+        5
+      ]
+    }
+  },
+  "incomplete_background_2.feature": {
+    "feature": {
+      "description": [],
+      "line": 1,
+      "name": "Incomplete backgrounds, Part 2",
+      "rules": [],
+      "scenarios": [
+        6
+      ]
+    }
+  },
+  "incomplete_feature_1.feature": {
+    "feature": {
+      "description": [
+        "A short description"
+      ],
+      "line": 1,
+      "name": "Just a description",
+      "rules": [],
+      "scenarios": []
+    }
+  },
+  "incomplete_feature_2.feature": {
+    "feature": {
+      "description": [],
+      "line": 1,
+      "name": "Empty feature",
+      "rules": [],
+      "scenarios": []
+    }
+  },
+  "incomplete_feature_3.feature": {
+    "feature": null
+  },
+  "incomplete_scenario.feature": {
+    "feature": {
+      "description": [],
+      "line": 1,
+      "name": "Incomplete scenarios",
+      "rules": [],
+      "scenarios": [
+        6
+      ]
+    }
+  },
+  "incomplete_scenario_outline.feature": {
+    "feature": {
+      "description": [],
+      "line": 1,
+      "name": "Incomplete scenario outlines",
+      "rules": [],
+      "scenarios": [
+        6,
+        9,
+        11,
+        15,
+        20
+      ]
+    }
+  },
+  "language.feature": {
+    "feature": {
+      "description": [],
+      "line": 3,
+      "name": "Explicit language specification",
+      "rules": [],
+      "scenarios": [
+        5
+      ]
+    }
+  },
+  "minimal-example.feature": {
+    "feature": {
+      "description": [],
+      "line": 1,
+      "name": "Minimal",
+      "rules": [],
+      "scenarios": [
+        3
+      ]
+    }
+  },
+  "minimal.feature": {
+    "feature": {
+      "description": [],
+      "line": 1,
+      "name": "Minimal",
+      "rules": [],
+      "scenarios": [
+        3
+      ]
+    }
+  },
+  "padded_example.feature": {
+    "feature": {
+      "description": [],
+      "line": 1,
+      "name": "test",
+      "rules": [],
+      "scenarios": [
+        3
+      ]
+    }
+  },
+  "prefixed-keywords.feature": {
+    "feature": {
+      "description": [
+        "Some times keywords are a prefix of another keyword. In this scenario the parser should prefer the longest keyword."
+      ],
+      "line": 2,
+      "name": "Keywords can be a prefix of another",
+      "rules": [],
+      "scenarios": [
+        6
+      ]
+    }
+  },
+  "readme_example.feature": {
+    "feature": {
+      "description": [],
+      "line": 2,
+      "name": "",
+      "rules": [],
+      "scenarios": [
+        4,
+        12
+      ]
+    }
+  },
+  "rule.feature": {
+    "feature": {
+      "description": [],
+      "line": 1,
+      "name": "Some rules",
+      "rules": [
+        {
+          "line": 6,
+          "name": "A",
+          "scenarios": [
+            12
+          ]
+        },
+        {
+          "line": 15,
+          "name": "B",
+          "scenarios": [
+            18
+          ]
+        }
+      ],
+      "scenarios": []
+    }
+  },
+  "rule_with_tag.feature": {
+    "feature": {
+      "description": [],
+      "line": 2,
+      "name": "Some tagged rules",
+      "rules": [
+        {
+          "line": 4,
+          "name": "Untagged rule",
+          "scenarios": [
+            7
+          ]
+        },
+        {
+          "line": 11,
+          "name": "Tagged rule",
+          "scenarios": [
+            14,
+            18,
+            22
+          ]
+        }
+      ],
+      "scenarios": []
+    }
+  },
+  "rule_without_name_and_description.feature": {
+    "feature": {
+      "description": [],
+      "line": 1,
+      "name": "",
+      "rules": [
+        {
+          "line": 3,
+          "name": "",
+          "scenarios": [
+            4
+          ]
+        }
+      ],
+      "scenarios": []
+    }
+  },
+  "scenario_outline.feature": {
+    "feature": {
+      "description": [],
+      "line": 1,
+      "name": "Minimal Scenario Outline",
+      "rules": [],
+      "scenarios": [
+        3
+      ]
+    }
+  },
+  "scenario_outline_no_newline.feature": {
+    "feature": {
+      "description": [],
+      "line": 1,
+      "name": "Minimal Scenario Outline",
+      "rules": [],
+      "scenarios": [
+        3
+      ]
+    }
+  },
+  "scenario_outline_with_docstring.feature": {
+    "feature": {
+      "description": [],
+      "line": 1,
+      "name": "Scenario Outline with a docstring",
+      "rules": [],
+      "scenarios": [
+        3
+      ]
+    }
+  },
+  "scenario_outline_with_value_with_dollar_sign.feature": {
+    "feature": {
+      "description": [],
+      "line": 1,
+      "name": "Scenario Outline with a value with a dollar sign ($)",
+      "rules": [],
+      "scenarios": [
+        3
+      ]
+    }
+  },
+  "scenario_outline_with_value_with_trailing_backslash.feature": {
+    "feature": {
+      "description": [],
+      "line": 1,
+      "name": "Scenario Outline with values with trailing backslash",
+      "rules": [],
+      "scenarios": [
+        3
+      ]
+    }
+  },
+  "scenario_outlines_with_tags.feature": {
+    "feature": {
+      "description": [],
+      "line": 2,
+      "name": "",
+      "rules": [],
+      "scenarios": [
+        4,
+        12
+      ]
+    }
+  },
+  "several_examples.feature": {
+    "feature": {
+      "description": [],
+      "line": 1,
+      "name": "Tagged Examples",
+      "rules": [],
+      "scenarios": [
+        3,
+        17
+      ]
+    }
+  },
+  "spaces_in_language.feature": {
+    "feature": {
+      "description": [],
+      "line": 2,
+      "name": "STUFFING",
+      "rules": [],
+      "scenarios": []
+    }
+  },
+  "star-keywords.feature": {
+    "feature": {
+      "description": [
+        "Sometimes a keyword is not the right way to express a scenario, while a list of bullets points might be."
+      ],
+      "line": 1,
+      "name": "Star Keywords",
+      "rules": [],
+      "scenarios": [
+        6
+      ]
+    }
+  },
+  "step_with_datatable_and_docstring.feature": {
+    "feature": {
+      "description": [],
+      "line": 1,
+      "name": "Step with DataTable and DocString",
+      "rules": [],
+      "scenarios": [
+        3,
+        11
+      ]
+    }
+  },
+  "tagged_feature_with_scenario_outline.feature": {
+    "feature": {
+      "description": [],
+      "line": 2,
+      "name": "Foo",
+      "rules": [],
+      "scenarios": [
+        4
+      ]
+    }
+  },
+  "tags.feature": {
+    "feature": {
+      "description": [],
+      "line": 3,
+      "name": "Minimal Scenario Outline",
+      "rules": [
+        {
+          "line": 36,
+          "name": "",
+          "scenarios": [
+            39
+          ]
+        }
+      ],
+      "scenarios": [
+        7,
+        12,
+        28,
+        32
+      ]
+    }
+  },
+  "trim_space.feature": {
+    "feature": {
+      "description": [],
+      "line": 3,
+      "name": "Minimal",
+      "rules": [],
+      "scenarios": [
+        5
+      ]
+    }
+  },
+  "trim_tab.feature": {
+    "feature": {
+      "description": [],
+      "line": 3,
+      "name": "Minimal",
+      "rules": [],
+      "scenarios": [
+        5
+      ]
+    }
+  }
+}

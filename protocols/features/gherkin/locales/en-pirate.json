@@ -1,0 +1,40 @@
+{
+  "feature": [
+    "Ahoy matey!"
+  ],
+  "rule": [
+    "Rule"
+  ],
+  "background": [
+    "Yo-ho-ho"
+  ],
+  "scenario": [
+    "Heave to"
+  ],
+  "scenarioOutline": [
+    "Shiver me timbers"
+  ],
+  "examples": [
+    "Dead men tell no tales"
+  ],
+  "given": [
+    "* ",
+    "Gangway! "
+  ],
+  "when": [
+    "* ",
+    "Blimey! "
+  ],
+  "then": [
+    "* ",
+    "Let go and haul "
+  ],
+  "and": [
+    "* ",
+    "Aye "
+  ],
+  "but": [
+    "* ",
+    "Avast! "
+  ]
+}

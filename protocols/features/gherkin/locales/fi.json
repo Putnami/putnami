@@ -1,0 +1,40 @@
+{
+  "feature": [
+    "Ominaisuus"
+  ],
+  "rule": [
+    "Rule"
+  ],
+  "background": [
+    "Tausta"
+  ],
+  "scenario": [
+    "Tapaus"
+  ],
+  "scenarioOutline": [
+    "Tapausaihio"
+  ],
+  "examples": [
+    "Tapaukset"
+  ],
+  "given": [
+    "* ",
+    "Oletetaan "
+  ],
+  "when": [
+    "* ",
+    "Kun "
+  ],
+  "then": [
+    "* ",
+    "Niin "
+  ],
+  "and": [
+    "* ",
+    "Ja "
+  ],
+  "but": [
+    "* ",
+    "Mutta "
+  ]
+}

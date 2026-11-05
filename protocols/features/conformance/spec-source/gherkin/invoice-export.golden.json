@@ -1,0 +1,23 @@
+{
+  "protocolVersion": 1,
+  "feature": "billing/invoice-export",
+  "outcomes": [
+    "Export audit",
+    "An accountant exports a closed month in under 30 seconds.",
+    "Each export row matches its invoice."
+  ],
+  "requirements": [
+    {
+      "id": "each-row-matches-its-invoice",
+      "text": "Each row matches its invoice"
+    },
+    {
+      "id": "export-a-closed-month",
+      "text": "A closed month exports as one file: Only a closed month exports, so the totals cannot move."
+    },
+    {
+      "id": "export-audit",
+      "text": "Export audit"
+    }
+  ]
+}

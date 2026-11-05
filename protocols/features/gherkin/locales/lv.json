@@ -1,0 +1,44 @@
+{
+  "feature": [
+    "Funkcionalitāte",
+    "Fīča"
+  ],
+  "rule": [
+    "Rule"
+  ],
+  "background": [
+    "Konteksts",
+    "Situācija"
+  ],
+  "scenario": [
+    "Piemērs",
+    "Scenārijs"
+  ],
+  "scenarioOutline": [
+    "Scenārijs pēc parauga"
+  ],
+  "examples": [
+    "Piemēri",
+    "Paraugs"
+  ],
+  "given": [
+    "* ",
+    "Kad "
+  ],
+  "when": [
+    "* ",
+    "Ja "
+  ],
+  "then": [
+    "* ",
+    "Tad "
+  ],
+  "and": [
+    "* ",
+    "Un "
+  ],
+  "but": [
+    "* ",
+    "Bet "
+  ]
+}

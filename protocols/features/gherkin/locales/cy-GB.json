@@ -1,0 +1,41 @@
+{
+  "feature": [
+    "Arwedd"
+  ],
+  "rule": [
+    "Rule"
+  ],
+  "background": [
+    "Cefndir"
+  ],
+  "scenario": [
+    "Enghraifft",
+    "Scenario"
+  ],
+  "scenarioOutline": [
+    "Scenario Amlinellol"
+  ],
+  "examples": [
+    "Enghreifftiau"
+  ],
+  "given": [
+    "* ",
+    "Anrhegedig a "
+  ],
+  "when": [
+    "* ",
+    "Pryd "
+  ],
+  "then": [
+    "* ",
+    "Yna "
+  ],
+  "and": [
+    "* ",
+    "A "
+  ],
+  "but": [
+    "* ",
+    "Ond "
+  ]
+}

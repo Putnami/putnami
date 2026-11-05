@@ -69,3 +69,13 @@ reader may read, and `filled.golden.json` is its projection.
 
 `spec-source/kiro/` holds `requirements.md` files of public repositories,
 unchanged, with their source and license in its `README.md`.
+
+`spec-source/gherkin/invoice-export/` is a two-file Gherkin feature, and
+`invoice-export.golden.json` is its projection. `../fixtures/gherkin/upstream/`
+holds the `testdata/good` files of
+[cucumber/gherkin](https://github.com/cucumber/gherkin) v42.0.1 (MIT), unchanged,
+except `very_long.feature` and the `.crlf` files, which the repository stores
+with LF endings. `../fixtures/gherkin/upstream.golden.json` reduces each
+upstream parse tree (`<file>.ast.ndjson`) to what a reader projects: the
+Feature's line, name, description paragraphs and scenario lines, and each
+Rule's line, name and scenario lines.

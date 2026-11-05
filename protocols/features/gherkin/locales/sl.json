@@ -1,0 +1,59 @@
+{
+  "feature": [
+    "Funkcionalnost",
+    "Funkcija",
+    "Možnosti",
+    "Moznosti",
+    "Lastnost",
+    "Značilnost"
+  ],
+  "rule": [
+    "Rule"
+  ],
+  "background": [
+    "Kontekst",
+    "Osnova",
+    "Ozadje"
+  ],
+  "scenario": [
+    "Primer",
+    "Scenarij"
+  ],
+  "scenarioOutline": [
+    "Struktura scenarija",
+    "Skica",
+    "Koncept",
+    "Oris scenarija",
+    "Osnutek"
+  ],
+  "examples": [
+    "Primeri",
+    "Scenariji"
+  ],
+  "given": [
+    "Dano ",
+    "Podano ",
+    "Zaradi ",
+    "Privzeto "
+  ],
+  "when": [
+    "Ko ",
+    "Ce ",
+    "Če ",
+    "Kadar "
+  ],
+  "then": [
+    "Nato ",
+    "Potem ",
+    "Takrat "
+  ],
+  "and": [
+    "In ",
+    "Ter "
+  ],
+  "but": [
+    "Toda ",
+    "Ampak ",
+    "Vendar "
+  ]
+}

@@ -33,6 +33,7 @@ var specFileExtensions = map[SpecFormat][]string{
 var specReaders = map[SpecFormat]SpecReader{
 	SpecFormatSpecKit: specKitReader{},
 	SpecFormatKiro:    kiroReader{},
+	SpecFormatGherkin: gherkinReader{},
 }
 
 var (

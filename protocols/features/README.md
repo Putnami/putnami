@@ -108,7 +108,9 @@ format is `openspec`, `speckit`, `kiro` or `gherkin`, and the path is a
 workspace-relative file or directory. A project opts in through
 `options.sdd.specFormats`. A `SpecReader` projects the file in memory into a
 native `Spec`, and `ReadSpecSource` applies the contract every format shares.
-The `speckit` reader ships: it reads one feature's `spec.md`. A finding that
+The `speckit` reader ships: it reads one feature's `spec.md`. The `gherkin`
+reader ships too: it reads a `.feature` file or every one in a directory, in
+the 80 languages of the catalogs under `gherkin/locales/`. A finding that
 blocks only in `enforce` goes through `SpecProjection.EnforceOnly`.
 The `kiro` reader ships: it reads one spec's `requirements.md`, with one native
 requirement per acceptance criterion.

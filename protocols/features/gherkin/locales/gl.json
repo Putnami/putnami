@@ -1,0 +1,46 @@
+{
+  "feature": [
+    "Característica"
+  ],
+  "rule": [
+    "Rule"
+  ],
+  "background": [
+    "Contexto"
+  ],
+  "scenario": [
+    "Exemplo",
+    "Escenario"
+  ],
+  "scenarioOutline": [
+    "Esbozo do escenario"
+  ],
+  "examples": [
+    "Exemplos"
+  ],
+  "given": [
+    "* ",
+    "Dado ",
+    "Dada ",
+    "Dados ",
+    "Dadas "
+  ],
+  "when": [
+    "* ",
+    "Cando "
+  ],
+  "then": [
+    "* ",
+    "Entón ",
+    "Logo "
+  ],
+  "and": [
+    "* ",
+    "E "
+  ],
+  "but": [
+    "* ",
+    "Mais ",
+    "Pero "
+  ]
+}

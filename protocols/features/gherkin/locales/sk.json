@@ -1,0 +1,51 @@
+{
+  "feature": [
+    "Požiadavka",
+    "Funkcia",
+    "Vlastnosť"
+  ],
+  "rule": [
+    "Rule"
+  ],
+  "background": [
+    "Pozadie"
+  ],
+  "scenario": [
+    "Príklad",
+    "Scenár"
+  ],
+  "scenarioOutline": [
+    "Náčrt Scenáru",
+    "Náčrt Scenára",
+    "Osnova Scenára"
+  ],
+  "examples": [
+    "Príklady"
+  ],
+  "given": [
+    "* ",
+    "Pokiaľ ",
+    "Za predpokladu "
+  ],
+  "when": [
+    "* ",
+    "Keď ",
+    "Ak "
+  ],
+  "then": [
+    "* ",
+    "Tak ",
+    "Potom "
+  ],
+  "and": [
+    "* ",
+    "A ",
+    "A tiež ",
+    "A taktiež ",
+    "A zároveň "
+  ],
+  "but": [
+    "* ",
+    "Ale "
+  ]
+}

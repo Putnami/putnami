@@ -1,0 +1,48 @@
+{
+  "feature": [
+    "Característica",
+    "Necesidad del negocio",
+    "Requisito"
+  ],
+  "rule": [
+    "Regla",
+    "Regla de negocio"
+  ],
+  "background": [
+    "Antecedentes"
+  ],
+  "scenario": [
+    "Ejemplo",
+    "Escenario"
+  ],
+  "scenarioOutline": [
+    "Esquema del escenario"
+  ],
+  "examples": [
+    "Ejemplos"
+  ],
+  "given": [
+    "* ",
+    "Dado ",
+    "Dada ",
+    "Dados ",
+    "Dadas "
+  ],
+  "when": [
+    "* ",
+    "Cuando "
+  ],
+  "then": [
+    "* ",
+    "Entonces "
+  ],
+  "and": [
+    "* ",
+    "Y ",
+    "E "
+  ],
+  "but": [
+    "* ",
+    "Pero "
+  ]
+}

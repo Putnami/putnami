@@ -1,0 +1,47 @@
+{
+  "feature": [
+    "Funzionalità",
+    "Esigenza di Business",
+    "Abilità"
+  ],
+  "rule": [
+    "Regola"
+  ],
+  "background": [
+    "Contesto"
+  ],
+  "scenario": [
+    "Esempio",
+    "Scenario"
+  ],
+  "scenarioOutline": [
+    "Schema dello scenario"
+  ],
+  "examples": [
+    "Esempi"
+  ],
+  "given": [
+    "* ",
+    "Dato ",
+    "Data ",
+    "Dati ",
+    "Date "
+  ],
+  "when": [
+    "* ",
+    "Quando "
+  ],
+  "then": [
+    "* ",
+    "Allora "
+  ],
+  "and": [
+    "* ",
+    "E ",
+    "Ed "
+  ],
+  "but": [
+    "* ",
+    "Ma "
+  ]
+}

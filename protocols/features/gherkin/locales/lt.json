@@ -1,0 +1,43 @@
+{
+  "feature": [
+    "Savybė"
+  ],
+  "rule": [
+    "Rule"
+  ],
+  "background": [
+    "Kontekstas"
+  ],
+  "scenario": [
+    "Pavyzdys",
+    "Scenarijus"
+  ],
+  "scenarioOutline": [
+    "Scenarijaus šablonas"
+  ],
+  "examples": [
+    "Pavyzdžiai",
+    "Scenarijai",
+    "Variantai"
+  ],
+  "given": [
+    "* ",
+    "Duota "
+  ],
+  "when": [
+    "* ",
+    "Kai "
+  ],
+  "then": [
+    "* ",
+    "Tada "
+  ],
+  "and": [
+    "* ",
+    "Ir "
+  ],
+  "but": [
+    "* ",
+    "Bet "
+  ]
+}

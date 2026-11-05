@@ -1,0 +1,58 @@
+{
+  "feature": [
+    "Hwaet",
+    "Hwæt"
+  ],
+  "rule": [
+    "Rule"
+  ],
+  "background": [
+    "Aer",
+    "Ær"
+  ],
+  "scenario": [
+    "Swa"
+  ],
+  "scenarioOutline": [
+    "Swa hwaer swa",
+    "Swa hwær swa"
+  ],
+  "examples": [
+    "Se the",
+    "Se þe",
+    "Se ðe"
+  ],
+  "given": [
+    "* ",
+    "Thurh ",
+    "Þurh ",
+    "Ðurh "
+  ],
+  "when": [
+    "* ",
+    "Bæþsealf ",
+    "Bæþsealfa ",
+    "Bæþsealfe ",
+    "Ciricæw ",
+    "Ciricæwe ",
+    "Ciricæwa "
+  ],
+  "then": [
+    "* ",
+    "Tha ",
+    "Þa ",
+    "Ða ",
+    "Tha the ",
+    "Þa þe ",
+    "Ða ðe "
+  ],
+  "and": [
+    "* ",
+    "Ond ",
+    "7 "
+  ],
+  "but": [
+    "* ",
+    "Ac "
+  ]
+}

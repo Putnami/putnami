@@ -1,0 +1,40 @@
+{
+  "feature": [
+    "Pretty much"
+  ],
+  "rule": [
+    "Rule"
+  ],
+  "background": [
+    "First off"
+  ],
+  "scenario": [
+    "Awww, look mate"
+  ],
+  "scenarioOutline": [
+    "Reckon it's like"
+  ],
+  "examples": [
+    "You'll wanna"
+  ],
+  "given": [
+    "* ",
+    "Y'know "
+  ],
+  "when": [
+    "* ",
+    "It's just unbelievable "
+  ],
+  "then": [
+    "* ",
+    "But at the end of the day I reckon "
+  ],
+  "and": [
+    "* ",
+    "Too right "
+  ],
+  "but": [
+    "* ",
+    "Yeah nah "
+  ]
+}

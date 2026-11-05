@@ -1,0 +1,51 @@
+{
+  "feature": [
+    "Właściwość",
+    "Funkcja",
+    "Aspekt",
+    "Potrzeba biznesowa"
+  ],
+  "rule": [
+    "Zasada",
+    "Reguła"
+  ],
+  "background": [
+    "Założenia"
+  ],
+  "scenario": [
+    "Przykład",
+    "Scenariusz"
+  ],
+  "scenarioOutline": [
+    "Szablon scenariusza"
+  ],
+  "examples": [
+    "Przykłady"
+  ],
+  "given": [
+    "* ",
+    "Zakładając ",
+    "Mając ",
+    "Zakładając, że "
+  ],
+  "when": [
+    "* ",
+    "Jeżeli ",
+    "Jeśli ",
+    "Gdy ",
+    "Kiedy "
+  ],
+  "then": [
+    "* ",
+    "Wtedy "
+  ],
+  "and": [
+    "* ",
+    "Oraz ",
+    "I "
+  ],
+  "but": [
+    "* ",
+    "Ale "
+  ]
+}

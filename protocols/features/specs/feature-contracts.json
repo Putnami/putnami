@@ -111,6 +111,26 @@
     {
       "id": "kiro-findings",
       "text": "A criterion in an EARS form or a FOR ALL property has no finding. Any other criterion is projected with a warning at its line, so a parse never drops or crashes on text. A group with no criterion and a section that restates a derived fact are one warning each. A missing outcome, a file with no group, an Introduction sentence over 512 bytes and an unclosed comment or fence are errors at a line."
+    },
+    {
+      "id": "gherkin-projection",
+      "text": "The Gherkin reader reads every .feature file its reference names, in path order. Each paragraph of a Feature description is an outcome, else the Feature name. A Rule is a requirement of its name and description. A Feature with no Rule, or with scenarios outside its rules, is a requirement of its name. Background, steps, tables, doc strings and comments project nothing."
+    },
+    {
+      "id": "gherkin-identity",
+      "text": "A Rule or a requirement Feature takes the ID of its @putnami-id tag, else its normalized name, and a name with no ID is an error at its line. A scenario takes the check of its @putnami-check tag, else its normalized name. Such a tag may share its line with other tags. One that breaks its grammar, repeats, or stands above another keyword is an error at its line, and no tag is inherited."
+    },
+    {
+      "id": "gherkin-scenarios",
+      "text": "A Scenario or a Scenario Outline counts once, whatever its Examples rows, and belongs to its Rule, else to its Feature. A scenario with no declared check and a declared check with no scenario are warnings at their lines."
+    },
+    {
+      "id": "gherkin-languages",
+      "text": "A # language header selects that language's keywords for its file, from the upstream table, and a file without one is English. An unknown language is an error at its line."
+    },
+    {
+      "id": "gherkin-malformed-files",
+      "text": "A file with no Feature line, a second Feature line or an unclosed doc string is an error at a line, because each would hide or misplace text."
     }
   ],
   "decisions": [

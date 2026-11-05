@@ -1,0 +1,43 @@
+{
+  "feature": [
+    "Funktionalitéit"
+  ],
+  "rule": [
+    "Rule"
+  ],
+  "background": [
+    "Hannergrond"
+  ],
+  "scenario": [
+    "Beispill",
+    "Szenario"
+  ],
+  "scenarioOutline": [
+    "Plang vum Szenario"
+  ],
+  "examples": [
+    "Beispiller"
+  ],
+  "given": [
+    "* ",
+    "ugeholl "
+  ],
+  "when": [
+    "* ",
+    "wann "
+  ],
+  "then": [
+    "* ",
+    "dann "
+  ],
+  "and": [
+    "* ",
+    "an ",
+    "a "
+  ],
+  "but": [
+    "* ",
+    "awer ",
+    "mä "
+  ]
+}

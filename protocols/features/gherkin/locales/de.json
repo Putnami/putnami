@@ -1,0 +1,49 @@
+{
+  "feature": [
+    "Funktionalität",
+    "Funktion"
+  ],
+  "rule": [
+    "Rule",
+    "Regel"
+  ],
+  "background": [
+    "Grundlage",
+    "Hintergrund",
+    "Voraussetzungen",
+    "Vorbedingungen"
+  ],
+  "scenario": [
+    "Beispiel",
+    "Szenario"
+  ],
+  "scenarioOutline": [
+    "Szenariogrundriss",
+    "Szenarien"
+  ],
+  "examples": [
+    "Beispiele"
+  ],
+  "given": [
+    "* ",
+    "Angenommen ",
+    "Gegeben sei ",
+    "Gegeben seien "
+  ],
+  "when": [
+    "* ",
+    "Wenn "
+  ],
+  "then": [
+    "* ",
+    "Dann "
+  ],
+  "and": [
+    "* ",
+    "Und "
+  ],
+  "but": [
+    "* ",
+    "Aber "
+  ]
+}

@@ -1,0 +1,44 @@
+{
+  "feature": [
+    "Karakteristika"
+  ],
+  "rule": [
+    "Rule"
+  ],
+  "background": [
+    "Pozadina"
+  ],
+  "scenario": [
+    "Primjer",
+    "Scenariju",
+    "Scenario"
+  ],
+  "scenarioOutline": [
+    "Scenariju-obris",
+    "Scenario-outline"
+  ],
+  "examples": [
+    "Primjeri"
+  ],
+  "given": [
+    "* ",
+    "Dato "
+  ],
+  "when": [
+    "* ",
+    "Kada "
+  ],
+  "then": [
+    "* ",
+    "Zatim "
+  ],
+  "and": [
+    "* ",
+    "I ",
+    "A "
+  ],
+  "but": [
+    "* ",
+    "Ali "
+  ]
+}

@@ -1,0 +1,50 @@
+{
+  "feature": [
+    "Fitur"
+  ],
+  "rule": [
+    "Rule",
+    "Aturan"
+  ],
+  "background": [
+    "Dasar",
+    "Latar Belakang"
+  ],
+  "scenario": [
+    "Skenario"
+  ],
+  "scenarioOutline": [
+    "Skenario konsep",
+    "Garis-Besar Skenario"
+  ],
+  "examples": [
+    "Contoh",
+    "Misal"
+  ],
+  "given": [
+    "* ",
+    "Dengan ",
+    "Diketahui ",
+    "Diasumsikan ",
+    "Bila ",
+    "Jika "
+  ],
+  "when": [
+    "* ",
+    "Ketika "
+  ],
+  "then": [
+    "* ",
+    "Maka ",
+    "Kemudian "
+  ],
+  "and": [
+    "* ",
+    "Dan "
+  ],
+  "but": [
+    "* ",
+    "Tapi ",
+    "Tetapi "
+  ]
+}

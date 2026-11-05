@@ -1,0 +1,100 @@
+{
+  "feature": [
+    "Özellik",
+    "İş Gereksinimi",
+    "Gereksinim",
+    "İşlev",
+    "Kullanıcı Hikayesi",
+    "Yetenek",
+    "Teknik Gereksinim"
+  ],
+  "rule": [
+    "Kural",
+    "İş Kuralı",
+    "Kaide",
+    "Hüküm",
+    "Madde"
+  ],
+  "background": [
+    "Geçmiş",
+    "Arka Plan",
+    "Ön Koşul",
+    "Önkoşul",
+    "Önceki Durum",
+    "Giriş",
+    "Mukaddime",
+    "Mevcut Durum"
+  ],
+  "scenario": [
+    "Örnek",
+    "Senaryo",
+    "Durum",
+    "Vaka"
+  ],
+  "scenarioOutline": [
+    "Senaryo taslağı",
+    "Senaryo şablonu"
+  ],
+  "examples": [
+    "Örnekler",
+    "Değerler"
+  ],
+  "given": [
+    "* ",
+    "Mevcut ",
+    "Önceden ",
+    "Geçmişte ",
+    "Daha önce ",
+    "Halihazırda ",
+    "Zaten ",
+    "Sistemde ",
+    "Diyelim ki ",
+    "Varsayalım ki ",
+    "Farz edelim ki ",
+    "Kabul edelim ki ",
+    "Başlangıçta ",
+    "Varsayılan olarak ",
+    "Biliniyor ki "
+  ],
+  "when": [
+    "* ",
+    "Eğer ",
+    "Eğer ki ",
+    "Ne zaman ",
+    "Ne zaman ki ",
+    "Şayet "
+  ],
+  "then": [
+    "* ",
+    "Beklenen ",
+    "O zaman ",
+    "Sonuç olarak ",
+    "Böylece ",
+    "Bunun üzerine ",
+    "Bu durumda ",
+    "O takdirde ",
+    "Şu halde ",
+    "Netice itibariyle ",
+    "Buna binaen "
+  ],
+  "and": [
+    "* ",
+    "Ve ",
+    "Hem de ",
+    "Bir de ",
+    "Ayrıca ",
+    "İlaveten ",
+    "Buna ek olarak "
+  ],
+  "but": [
+    "* ",
+    "Fakat ",
+    "Ama ",
+    "Ancak ",
+    "Yalnız ",
+    "Lakin ",
+    "Meğer ki ",
+    "Buna mukabil ",
+    "Aksi halde "
+  ]
+}

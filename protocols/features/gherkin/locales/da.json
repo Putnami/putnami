@@ -1,0 +1,41 @@
+{
+  "feature": [
+    "Egenskab"
+  ],
+  "rule": [
+    "Regel"
+  ],
+  "background": [
+    "Baggrund"
+  ],
+  "scenario": [
+    "Eksempel",
+    "Scenarie"
+  ],
+  "scenarioOutline": [
+    "Abstrakt Scenario"
+  ],
+  "examples": [
+    "Eksempler"
+  ],
+  "given": [
+    "* ",
+    "Givet "
+  ],
+  "when": [
+    "* ",
+    "Når "
+  ],
+  "then": [
+    "* ",
+    "Så "
+  ],
+  "and": [
+    "* ",
+    "Og "
+  ],
+  "but": [
+    "* ",
+    "Men "
+  ]
+}

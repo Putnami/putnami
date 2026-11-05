@@ -1,0 +1,44 @@
+{
+  "feature": [
+    "Jellemző"
+  ],
+  "rule": [
+    "Szabály"
+  ],
+  "background": [
+    "Háttér"
+  ],
+  "scenario": [
+    "Példa",
+    "Forgatókönyv"
+  ],
+  "scenarioOutline": [
+    "Forgatókönyv vázlat"
+  ],
+  "examples": [
+    "Példák"
+  ],
+  "given": [
+    "* ",
+    "Amennyiben ",
+    "Adott "
+  ],
+  "when": [
+    "* ",
+    "Majd ",
+    "Ha ",
+    "Amikor "
+  ],
+  "then": [
+    "* ",
+    "Akkor "
+  ],
+  "and": [
+    "* ",
+    "És "
+  ],
+  "but": [
+    "* ",
+    "De "
+  ]
+}

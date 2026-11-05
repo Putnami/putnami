@@ -1,0 +1,46 @@
+{
+  "feature": [
+    "Fitur"
+  ],
+  "rule": [
+    "Rule"
+  ],
+  "background": [
+    "Dasar"
+  ],
+  "scenario": [
+    "Skenario"
+  ],
+  "scenarioOutline": [
+    "Konsep skenario"
+  ],
+  "examples": [
+    "Conto",
+    "Contone"
+  ],
+  "given": [
+    "* ",
+    "Nalika ",
+    "Nalikaning "
+  ],
+  "when": [
+    "* ",
+    "Manawa ",
+    "Menawa "
+  ],
+  "then": [
+    "* ",
+    "Njuk ",
+    "Banjur "
+  ],
+  "and": [
+    "* ",
+    "Lan "
+  ],
+  "but": [
+    "* ",
+    "Tapi ",
+    "Nanging ",
+    "Ananging "
+  ]
+}

@@ -1,0 +1,52 @@
+{
+  "feature": [
+    "Funkcionalnost",
+    "Mogućnost",
+    "Mogucnost",
+    "Osobina"
+  ],
+  "rule": [
+    "Pravilo"
+  ],
+  "background": [
+    "Kontekst",
+    "Osnova",
+    "Pozadina"
+  ],
+  "scenario": [
+    "Scenario",
+    "Primer"
+  ],
+  "scenarioOutline": [
+    "Struktura scenarija",
+    "Skica",
+    "Koncept"
+  ],
+  "examples": [
+    "Primeri",
+    "Scenariji"
+  ],
+  "given": [
+    "* ",
+    "Za dato ",
+    "Za date ",
+    "Za dati "
+  ],
+  "when": [
+    "* ",
+    "Kada ",
+    "Kad "
+  ],
+  "then": [
+    "* ",
+    "Onda "
+  ],
+  "and": [
+    "* ",
+    "I "
+  ],
+  "but": [
+    "* ",
+    "Ali "
+  ]
+}

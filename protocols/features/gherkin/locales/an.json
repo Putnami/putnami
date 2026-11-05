@@ -1,0 +1,47 @@
+{
+  "feature": [
+    "Caracteristica"
+  ],
+  "rule": [
+    "Rule"
+  ],
+  "background": [
+    "Antecedents"
+  ],
+  "scenario": [
+    "Eixemplo",
+    "Caso"
+  ],
+  "scenarioOutline": [
+    "Esquema del caso"
+  ],
+  "examples": [
+    "Eixemplos"
+  ],
+  "given": [
+    "* ",
+    "Dau ",
+    "Dada ",
+    "Daus ",
+    "Dadas "
+  ],
+  "when": [
+    "* ",
+    "Cuan "
+  ],
+  "then": [
+    "* ",
+    "Alavez ",
+    "Allora ",
+    "Antonces "
+  ],
+  "and": [
+    "* ",
+    "Y ",
+    "E "
+  ],
+  "but": [
+    "* ",
+    "Pero "
+  ]
+}

@@ -1,0 +1,44 @@
+{
+  "feature": [
+    "Funksie",
+    "Besigheid Behoefte",
+    "Vermoë"
+  ],
+  "rule": [
+    "Reël",
+    "Reel"
+  ],
+  "background": [
+    "Agtergrond"
+  ],
+  "scenario": [
+    "Voorbeeld",
+    "Situasie"
+  ],
+  "scenarioOutline": [
+    "Situasie Uiteensetting"
+  ],
+  "examples": [
+    "Voorbeelde"
+  ],
+  "given": [
+    "* ",
+    "Gegewe "
+  ],
+  "when": [
+    "* ",
+    "Wanneer "
+  ],
+  "then": [
+    "* ",
+    "Dan "
+  ],
+  "and": [
+    "* ",
+    "En "
+  ],
+  "but": [
+    "* ",
+    "Maar "
+  ]
+}

@@ -1,0 +1,43 @@
+{
+  "feature": [
+    "Functionaliteit"
+  ],
+  "rule": [
+    "Regel"
+  ],
+  "background": [
+    "Achtergrond"
+  ],
+  "scenario": [
+    "Voorbeeld",
+    "Scenario"
+  ],
+  "scenarioOutline": [
+    "Abstract Scenario"
+  ],
+  "examples": [
+    "Voorbeelden"
+  ],
+  "given": [
+    "* ",
+    "Gegeven ",
+    "Stel "
+  ],
+  "when": [
+    "* ",
+    "Als ",
+    "Wanneer "
+  ],
+  "then": [
+    "* ",
+    "Dan "
+  ],
+  "and": [
+    "* ",
+    "En "
+  ],
+  "but": [
+    "* ",
+    "Maar "
+  ]
+}

@@ -1,0 +1,40 @@
+{
+  "feature": [
+    "OH HAI"
+  ],
+  "rule": [
+    "Rule"
+  ],
+  "background": [
+    "B4"
+  ],
+  "scenario": [
+    "MISHUN"
+  ],
+  "scenarioOutline": [
+    "MISHUN SRSLY"
+  ],
+  "examples": [
+    "EXAMPLZ"
+  ],
+  "given": [
+    "* ",
+    "I CAN HAZ "
+  ],
+  "when": [
+    "* ",
+    "WEN "
+  ],
+  "then": [
+    "* ",
+    "DEN "
+  ],
+  "and": [
+    "* ",
+    "AN "
+  ],
+  "but": [
+    "* ",
+    "BUT "
+  ]
+}

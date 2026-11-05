@@ -121,6 +121,10 @@
     {
       "id": "kiro-specs-reach-the-gate",
       "text": "A project that lists kiro reads a feature's .kiro/specs/<feature> directory through the same discovery and candidate cut as any spec. Under enforce each unanchored criterion fails at its line, and anchored criteria keep their IDs when the file is reordered, so the ratchet holds."
+    },
+    {
+      "id": "gherkin-specs-reach-the-gate",
+      "text": "A project that lists gherkin reads a feature's .feature file or directory through the same discovery and candidate cut as any spec. Rules and scenarios line up with the declared requirements and checks, a mismatch stays a warning, and a tag-anchored spec keeps its IDs when the file is reordered, so the ratchet holds."
     }
   ],
   "decisions": [

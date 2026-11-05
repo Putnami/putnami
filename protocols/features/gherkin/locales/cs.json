@@ -1,0 +1,45 @@
+{
+  "feature": [
+    "Požadavek"
+  ],
+  "rule": [
+    "Pravidlo"
+  ],
+  "background": [
+    "Pozadí",
+    "Kontext"
+  ],
+  "scenario": [
+    "Příklad",
+    "Scénář"
+  ],
+  "scenarioOutline": [
+    "Náčrt Scénáře",
+    "Osnova scénáře"
+  ],
+  "examples": [
+    "Příklady"
+  ],
+  "given": [
+    "* ",
+    "Pokud ",
+    "Za předpokladu "
+  ],
+  "when": [
+    "* ",
+    "Když "
+  ],
+  "then": [
+    "* ",
+    "Pak "
+  ],
+  "and": [
+    "* ",
+    "A také ",
+    "A "
+  ],
+  "but": [
+    "* ",
+    "Ale "
+  ]
+}
