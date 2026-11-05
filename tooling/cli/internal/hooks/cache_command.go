@@ -39,11 +39,6 @@ import (
 //     error, never a byte count. A purge that failed must not be counted as
 //     bytes freed.
 
-// CacheCommandEnv names the environment variable carrying the phase to the
-// subprocess, so an extension whose runtime dispatches on argv can also branch
-// on the environment.
-const CacheCommandEnv = "PUTNAMI_CACHE_COMMAND"
-
 // CacheCommandOutcome is one extension's answer for one cache phase.
 type CacheCommandOutcome struct {
 	// Extension is the extension asked.
@@ -174,7 +169,7 @@ func RunCacheCommand(
 	}
 	defer func() { _ = childLease.Close() }()
 	cmd.Dir = resolvedCwd
-	cmd.Env = cacheCommandEnv(ws, ext, def, command, scratchRoot, machineRoot, tmplVars)
+	cmd.Env = cacheCommandEnv(ws, ext, def, scratchRoot, machineRoot, tmplVars)
 
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
@@ -247,7 +242,7 @@ func StartDetachedCacheGC(
 	}
 	defer func() { _ = childLease.Close() }()
 	cmd.Dir = ws.Root
-	cmd.Env = cacheCommandEnv(ws, ext, def, extensionproto.CommandCacheGC, scratchRoot, machineRoot, tmplVars)
+	cmd.Env = cacheCommandEnv(ws, ext, def, scratchRoot, machineRoot, tmplVars)
 	// A hosted run hands its credential to no process started after this one.
 	runcredential.MarkRepositoryCodeStarted("job " + ext.Name + " " + extensionproto.CommandCacheGC)
 	// Outside every process tree this CLI runs in: on Windows a tree's Job
@@ -398,7 +393,6 @@ func cacheCommandEnv(
 	ws *workspace.Workspace,
 	ext *extension.ExtensionDescription,
 	def *extension.JobDefinition,
-	command string,
 	scratchRoot string,
 	machineRoot string,
 	tmplVars map[string]string,
@@ -410,7 +404,6 @@ func cacheCommandEnv(
 		"PUTNAMI_EXTENSION_NAME="+ext.Name,
 		"PUTNAMI_CACHE_ROOT="+scratchRoot,
 		extensionproto.MachineCacheRootEnv+"="+machineRoot,
-		CacheCommandEnv+"="+command,
 	)
 	for k, v := range def.Env {
 		env = append(env, k+"="+extension.ExpandTemplateVars(v, tmplVars))

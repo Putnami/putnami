@@ -57,7 +57,7 @@ func TestEnsureArtifactsServingServesOnlyTheExtensionDownloads(t *testing.T) {
 	}
 	t.Setenv(extension.PutRegistryURLEnv, registry.URL)
 	t.Setenv("PUTNAMI_REGISTRY_URL", registry.URL)
-	t.Setenv(extension.HTTPRetryBackoffEnv, "0")
+	t.Cleanup(extension.SetHTTPRetryBackoff(0))
 	t.Setenv("PUTNAMI_ARTIFACT_DIR", t.TempDir())
 	t.Setenv(artifactsEnsuredEnv, "")
 	previous := extension.ResolveRegistryToken

@@ -540,8 +540,7 @@ func runInstall(t *testing.T, cli, ws, home, registryURL, credential string) (co
 	cmd.Dir = ws
 	cmd.Env = append(baseEnv(home),
 		"PUTNAMI_REGISTRY_URL="+registryURL,
-		"PUTNAMI_TELEMETRY=off", "DO_NOT_TRACK=1",
-		"PUTNAMI_HTTP_RETRY_BACKOFF=0")
+		"PUTNAMI_TELEMETRY=off", "DO_NOT_TRACK=1")
 	var out, errOut strings.Builder
 	cmd.Stdout, cmd.Stderr = &out, &errOut
 	err := cmd.Run()

@@ -142,9 +142,6 @@ func TestRunExtensionCacheCommands_IncludesWorkspaceExtensions(t *testing.T) {
 	if got, want := read("PUTNAMI_CACHE_ROOT"), filepath.Join(".putnami", "cache"); !strings.HasSuffix(got, want) {
 		t.Errorf("PUTNAMI_CACHE_ROOT = %q, want a path ending in %q", got, want)
 	}
-	if got := read("PUTNAMI_CACHE_COMMAND"); got != extensionproto.CommandCacheClean {
-		t.Errorf("PUTNAMI_CACHE_COMMAND = %q, want %q", got, extensionproto.CommandCacheClean)
-	}
 }
 
 // TestRunExtensionCacheCommands_AggregatesEveryFailure is the deliberate C5

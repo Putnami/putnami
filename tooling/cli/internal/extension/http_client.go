@@ -338,14 +338,18 @@ const HTTPRetryAttempts = 3
 // it after each transient failure (1×, 2×).
 const HTTPRetryBackoff = 1 * time.Second
 
-// HTTPRetryBackoffEnv overrides the base retry backoff. It mirrors
-// HTTPTimeoutEnv (a duration string or bare integer seconds), but unlike
-// the timeout a value of "0" is honored — it disables the inter-attempt
-// sleep entirely while still making all HTTPRetryAttempts. Failure-path
-// tests set it to "0" so they don't pay the full retry budget waiting on a
-// dead registry that refuses instantly. Negative or invalid values fall
-// back to HTTPRetryBackoff.
-const HTTPRetryBackoffEnv = "PUTNAMI_HTTP_RETRY_BACKOFF"
+// httpRetryBackoff is the base delay DoWithRetry uses. Failure-path tests lower
+// it through SetHTTPRetryBackoff so they do not pay the full retry budget
+// waiting on a dead registry that refuses instantly.
+var httpRetryBackoff = HTTPRetryBackoff
+
+// SetHTTPRetryBackoff sets the base retry delay and returns the function that
+// restores the previous one. A zero delay still makes every attempt.
+func SetHTTPRetryBackoff(d time.Duration) (restore func()) {
+	previous := httpRetryBackoff
+	httpRetryBackoff = d
+	return func() { httpRetryBackoff = previous }
+}
 
 // NewRegistryHTTPClient returns a *http.Client configured for registry
 // artifact downloads. Timeout is read from PUTNAMI_HTTP_TIMEOUT (env);
@@ -420,23 +424,6 @@ func resolveHTTPTimeout(raw string) time.Duration {
 	return DefaultHTTPTimeout
 }
 
-// resolveRetryBackoff parses raw into the base retry delay. Same format as
-// resolveHTTPTimeout, but zero is a valid (sleep-disabling) value; only
-// negative or unparseable input falls back to HTTPRetryBackoff.
-func resolveRetryBackoff(raw string) time.Duration {
-	if raw == "" {
-		return HTTPRetryBackoff
-	}
-	if d, err := time.ParseDuration(raw); err == nil && d >= 0 {
-		return d
-	}
-	// Allow bare integers interpreted as seconds: PUTNAMI_HTTP_RETRY_BACKOFF=2.
-	if n, err := strconv.Atoi(raw); err == nil && n >= 0 {
-		return time.Duration(n) * time.Second
-	}
-	return HTTPRetryBackoff
-}
-
 // DoWithRetry runs req via client, retrying on transient failures with
 // exponential backoff. Only safe for idempotent GETs and HEADs — the wrapper
 // rebuilds the request per attempt so a body cannot be consumed once.
@@ -450,7 +437,7 @@ func resolveRetryBackoff(raw string) time.Duration {
 // closed so the connection can be reused.
 func DoWithRetry(ctx context.Context, client *http.Client, req *http.Request) (*http.Response, error) {
 	var lastErr error
-	delay := resolveRetryBackoff(os.Getenv(HTTPRetryBackoffEnv))
+	delay := httpRetryBackoff
 	for attempt := range HTTPRetryAttempts {
 		// Re-clone with the loop's context so callers see the original ctx
 		// in the response and we don't pin a stale per-attempt context.

@@ -144,7 +144,7 @@ func userScopeTestEnv(t *testing.T) (userRoot, callerDir string) {
 	t.Setenv(extension.UserScopeRepairEnv, "")
 	t.Setenv(extension.UnsafeInstallEnv, "")
 	t.Setenv(extension.PrivatePutRegistryURLEnv, "")
-	t.Setenv(extension.HTTPRetryBackoffEnv, "0")
+	t.Cleanup(extension.SetHTTPRetryBackoff(0))
 	t.Setenv("PUTNAMI_ARTIFACT_DIR", filepath.Join(home, "artifacts"))
 	original := extension.ResolveRegistryToken
 	extension.ResolveRegistryToken = func(string) (string, string) { return "", "" }

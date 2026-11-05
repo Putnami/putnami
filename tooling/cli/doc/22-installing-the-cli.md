@@ -424,6 +424,7 @@ Every flag has an environment equivalent. The flag wins.
 | — | `PUTNAMI_COMMAND_MAP_URL` | `https://putnami.dev/install-commands.txt` | The command map `--run` reads. Validated like the registry URL. |
 | — | `PUTNAMI_ALLOW_INSECURE_REGISTRY=1` | off | Accept a plaintext non-loopback registry. |
 | — | `PUTNAMI_UNSAFE_INSTALL=1` | off | Install without integrity verification. The only override. |
+| — | `PUTNAMI_HTTP_TIMEOUT` | `60s` | Read by the `putnami` binary, not by `install.sh`. Sets the timeout of its registry downloads, such as `putnami upgrade --cli`. Takes a duration (`90s`, `2m`) or bare seconds (`90`). Raise it on a slow link or for a large CLI binary. |
 | — | `NO_COLOR` | off | Disable color. Color is already off when stdout is not a terminal. |
 
 Unknown options exit non-zero and point at `--help`.

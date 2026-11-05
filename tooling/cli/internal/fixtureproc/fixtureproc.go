@@ -120,7 +120,7 @@ const waitForBound = 3 * time.Minute
 
 // holdOutputEnv names, in the environment of the copy a program starts for
 // Program.HoldOutput, the file that releases the copy.
-const holdOutputEnv = "PUTNAMI_FIXTUREPROC_HOLD_OUTPUT"
+const holdOutputEnv = "FIXTUREPROC_HOLD_OUTPUT"
 
 // The copy a program starts for Program.HoldOutput writes two files beside
 // the release file: its process ID when it starts, and one line with its exit
@@ -136,7 +136,7 @@ const (
 
 // warmEnv, set in a program's environment, makes it exit 0 before it does
 // anything else (Warm).
-const warmEnv = "PUTNAMI_FIXTUREPROC_WARM"
+const warmEnv = "FIXTUREPROC_WARM"
 
 // Write places the helper program at path, with ".exe" appended on Windows,
 // as a program that does p, warms it (Warm), and returns the program's path.

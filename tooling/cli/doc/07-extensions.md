@@ -1061,6 +1061,7 @@ not downloaded again.
 
 - The registry comes from `PUTNAMI_REGISTRY_URL`, or the default registry. No
   workspace manifest is read.
+- Registry downloads time out after 60 seconds. `PUTNAMI_HTTP_TIMEOUT` changes the limit: a duration (`90s`, `2m`) or bare seconds (`90`). An invalid value keeps the 60 seconds. The same variable applies to every extension and template download.
 - The archive is verified against the SHA-256 digest the lock records or the
   registry advertises. An archive with no digest is refused unless
   `PUTNAMI_UNSAFE_INSTALL=1` is set, exactly as for a workspace.

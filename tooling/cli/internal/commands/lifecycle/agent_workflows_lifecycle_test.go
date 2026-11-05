@@ -717,7 +717,7 @@ func newContentRegistry(t *testing.T) *contentRegistry {
 	server := httptest.NewServer(http.HandlerFunc(registry.serve))
 	t.Cleanup(server.Close)
 	t.Setenv(extension.PutRegistryURLEnv, server.URL)
-	t.Setenv(extension.HTTPRetryBackoffEnv, "0")
+	t.Cleanup(extension.SetHTTPRetryBackoff(0))
 	t.Setenv("PUTNAMI_ARTIFACT_DIR", t.TempDir())
 	t.Setenv(artifactsEnsuredEnv, "")
 	hometest.Temp(t)

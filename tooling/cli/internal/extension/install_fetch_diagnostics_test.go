@@ -139,7 +139,7 @@ func TestArtifactFetchError_WithholdsResolverCredentials(t *testing.T) {
 // first line a contributor read said "@putnami/cloud" three times before saying
 // anything useful.
 func TestInstall_NamesTheArtifactOnceOnAFailedFetch(t *testing.T) {
-	t.Setenv(HTTPRetryBackoffEnv, "0")
+	t.Cleanup(SetHTTPRetryBackoff(0))
 	srv := notFoundRegistry(t)
 	inst := &Installer{WorkspaceRoot: t.TempDir(), ResolverURL: srv.URL, HTTPClient: srv.Client()}
 

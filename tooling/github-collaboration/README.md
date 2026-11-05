@@ -77,6 +77,12 @@ nothing. The token is sent only to the configured host's API. No answer, error
 or message carries it: the runtime removes it, and every string shaped like a
 GitHub token, from everything it writes.
 
+### Environment
+
+`PUTNAMI_GITHUB_API_URL` points the client at a loopback `http` or `https`
+stand-in for the GitHub API, and nothing else: any other URL is refused, so a
+credential never leaves its own host or this machine.
+
 ## What it offers
 
 | Contract | Offered | Not offered |

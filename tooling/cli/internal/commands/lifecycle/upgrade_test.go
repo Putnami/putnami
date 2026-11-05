@@ -618,11 +618,10 @@ func TestUpgrade_CLIPhaseFailurePropagates(t *testing.T) {
 
 	// Force the CLI update to fail-closed: resolver advertises a version with no
 	// integrity header.
-	t.Setenv("PUTNAMI_UNSAFE_UPDATE", "")
 	t.Setenv("PUTNAMI_REGISTRY_URL", "http://127.0.0.1:1")
 	// Dead registry refuses instantly; skip the retry backoff so the test
 	// doesn't pay the full (1s+2s) budget waiting on a host that won't recover.
-	t.Setenv(extension.HTTPRetryBackoffEnv, "0")
+	t.Cleanup(extension.SetHTTPRetryBackoff(0))
 
 	_, err := captureStdout(t, func() error {
 		return Upgrade(context.Background(), dir, cfg, "1.0.0", t.TempDir(), UpgradeFlags{CLI: true}, LifecycleEnv{})

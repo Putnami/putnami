@@ -317,7 +317,7 @@ func TemplatesTest(ctx context.Context, args []string, channel string) error {
 	// grandchildren (job runner subprocesses), so spawn them in their own
 	// process group under ctx — a canceled `templates test` then tears down
 	// the whole tree instead of orphaning it.
-	env := append(os.Environ(), "PUTNAMI_NO_PROGRESS=true")
+	env := os.Environ()
 
 	// Install the template's extension by name, on the channel the run chose.
 	// The workspace config keeps the bare name, as init leaves it.

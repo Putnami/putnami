@@ -17,7 +17,7 @@ import (
 // evidenceProviderEnv makes the test binary a release-set provider that
 // records the private evidence files it receives into the directory the
 // variable names, then answers with FAKE_RESPONSE.
-const evidenceProviderEnv = "PUTNAMI_PUBLICATION_EVIDENCE_PROVIDER"
+const evidenceProviderEnv = "PUBLICATION_EVIDENCE_PROVIDER"
 
 const (
 	observedImagesFile  = "images.json"

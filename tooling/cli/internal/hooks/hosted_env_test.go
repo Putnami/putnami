@@ -76,7 +76,7 @@ func TestExtensionHooksSeeTheOfflineSignalOfTheirRun(t *testing.T) {
 		}
 		wantHostedEnv(t, hosted, onlyRun(t, record).LookupEnv)
 
-		env := cacheCommandEnv(&workspace.Workspace{Root: dir}, ext, &extension.JobDefinition{}, "prepare", dir, dir, nil)
+		env := cacheCommandEnv(&workspace.Workspace{Root: dir}, ext, &extension.JobDefinition{}, dir, dir, nil)
 		wantHostedEnv(t, hosted, func(name string) (string, bool) {
 			for i := len(env) - 1; i >= 0; i-- {
 				if value, ok := strings.CutPrefix(env[i], name+"="); ok {

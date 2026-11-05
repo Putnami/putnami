@@ -149,7 +149,6 @@ func asideFiles(t *testing.T, dir string) []string {
 
 func TestVersionUpdate_ReplacesRunningCLIByRenameAside(t *testing.T) {
 	spectest.Proves(t, "cli/windows-consumers", "one-binary-switch-on-windows", "a-running-cli-is-replaced-by-a-rename-aside")
-	t.Setenv("PUTNAMI_UNSAFE_UPDATE", "")
 	t.Setenv("PUTNAMI_REGISTRY_URL", "")
 
 	// The Windows layout: putnami is a copy of the active versioned binary, and

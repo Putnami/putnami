@@ -35,7 +35,7 @@ func PortableFixture(t *testing.T, fail, provider bool) (root, providerRoot stri
 	// nested session or a hook would. It must run as an ordinary invocation:
 	// a leaked bound-request channel would hijack it.
 	WriteFile(t, filepath.Join(root, "extension", "gate.sh"), `echo "ran $(cat "$PUTNAMI_PROJECT_ROOT/marker")" >> "$PUTNAMI_PROJECT_ROOT/calls"
-if [ "${PUTNAMI_RUNNER_FIXTURE:-}" = cli ]; then
+if [ "${RUNNER_FIXTURE:-}" = cli ]; then
   if nested="$("$PUTNAMI_CLI_EXECUTABLE" --version 2>&1)"; then
     echo "nested $nested" >> "$PUTNAMI_PROJECT_ROOT/calls"
   else

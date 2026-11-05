@@ -182,7 +182,7 @@ func bootstrapTestEnv(t *testing.T) (userRoot string) {
 	t.Setenv("HOME", home)
 	t.Setenv("PUTNAMI_ARTIFACT_DIR", t.TempDir())
 	t.Setenv("PUTNAMI_ARTIFACTS_ENSURED", "")
-	t.Setenv(extension.HTTPRetryBackoffEnv, "0")
+	t.Cleanup(extension.SetHTTPRetryBackoff(0))
 	t.Setenv(credentialprovider.ProvidersEnv, "")
 	t.Setenv(runnerprovider.BoundRequestEnv, "")
 	resolve, resolveWithCLI := extension.ResolveRegistryToken, extension.ResolveRegistryTokenWithCLI

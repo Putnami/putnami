@@ -49,12 +49,12 @@ import (
 //
 // The test binary re-execs itself in three roles (see RunnerFixtureMain):
 //
-//   - PUTNAMI_RUNNER_FIXTURE=provider serves the RPC loop on stdio;
-//   - PUTNAMI_RUNNER_FIXTURE=supervise <attemptDir> launches the pinned
+//   - RUNNER_FIXTURE=provider serves the RPC loop on stdio;
+//   - RUNNER_FIXTURE=supervise <attemptDir> launches the pinned
 //     entrypoint for one attempt, forwards its output to the attempt's
 //     output log with cursors, terminates its process tree on SIGTERM and
 //     records the one terminal state;
-//   - PUTNAMI_RUNNER_FIXTURE=cli runs the real terminal adapter (App.Run) with
+//   - RUNNER_FIXTURE=cli runs the real terminal adapter (App.Run) with
 //     the process arguments, which is how a snapshot without its own pinned
 //     entrypoint is executed, and how a test drives a whole CLI process it can
 //     kill. It installs the same interrupt handling the shipped binary has, so
@@ -62,43 +62,43 @@ import (
 //     snapshot whose lock says `cli.source: workspace` is executed through its
 //     own ./putnamiw instead, never through this binary.
 //
-// PUTNAMI_RUNNER_FIXTURE_EXECUTABLE overrides the engine executable for
+// RUNNER_FIXTURE_EXECUTABLE overrides the engine executable for
 // manual proof runs with a real CLI build.
 const (
-	RunnerFixtureRoleEnv       = "PUTNAMI_RUNNER_FIXTURE"
-	RunnerFixtureExecutableEnv = "PUTNAMI_RUNNER_FIXTURE_EXECUTABLE"
-	RunnerFixtureRootEnv       = "PUTNAMI_RUNNER_FIXTURE_ROOT"
-	RunnerFixtureNotReadyEnv   = "PUTNAMI_RUNNER_FIXTURE_NOT_READY"
-	RunnerFixtureProtocolEnv   = "PUTNAMI_RUNNER_FIXTURE_PROTOCOL"
+	RunnerFixtureRoleEnv       = "RUNNER_FIXTURE"
+	RunnerFixtureExecutableEnv = "RUNNER_FIXTURE_EXECUTABLE"
+	RunnerFixtureRootEnv       = "RUNNER_FIXTURE_ROOT"
+	RunnerFixtureNotReadyEnv   = "RUNNER_FIXTURE_NOT_READY"
+	RunnerFixtureProtocolEnv   = "RUNNER_FIXTURE_PROTOCOL"
 	// RunnerFixtureHoldEnv names a file the supervisor waits for between
 	// materialization and launch, and beside which it writes "<file>.ready"
 	// once the snapshot is materialized. A test uses it to edit the original
 	// worktree after submission and prove the edit never reaches execution,
 	// and to interrupt an attempt before its engine ever starts.
-	RunnerFixtureHoldEnv = "PUTNAMI_RUNNER_FIXTURE_HOLD"
+	RunnerFixtureHoldEnv = "RUNNER_FIXTURE_HOLD"
 	// RunnerFixtureLoseAckEnv makes the provider process exit right after it
 	// accepted a submission, before the acknowledgement is written: the
 	// lost-acknowledgement case, with the attempt genuinely running.
-	RunnerFixtureLoseAckEnv = "PUTNAMI_RUNNER_FIXTURE_LOSE_ACK"
+	RunnerFixtureLoseAckEnv = "RUNNER_FIXTURE_LOSE_ACK"
 	// RunnerFixtureAckHoldEnv names a file the provider waits for after it
 	// accepted a submission and before it acknowledges it, and beside which it
 	// writes "<file>.accepted" once the attempt is accepted: a test interrupts
 	// the client while its submit is in flight, whatever the machine's load.
-	RunnerFixtureAckHoldEnv = "PUTNAMI_RUNNER_FIXTURE_ACK_HOLD"
+	RunnerFixtureAckHoldEnv = "RUNNER_FIXTURE_ACK_HOLD"
 	// RunnerFixtureDropFollowsEnv makes ONE provider process (the first to
 	// reach it, recorded under the root) exit abruptly on its Nth follow: a
 	// stream disconnect the client must reconnect from.
-	RunnerFixtureDropFollowsEnv = "PUTNAMI_RUNNER_FIXTURE_DROP_FOLLOWS"
+	RunnerFixtureDropFollowsEnv = "RUNNER_FIXTURE_DROP_FOLLOWS"
 	// RunnerFixtureExpireFetchEnv makes fetch answer that the attempt's
 	// artifacts expired.
-	RunnerFixtureExpireFetchEnv = "PUTNAMI_RUNNER_FIXTURE_EXPIRE_FETCH"
+	RunnerFixtureExpireFetchEnv = "RUNNER_FIXTURE_EXPIRE_FETCH"
 	// RunnerFixtureCorruptBundleEnv makes fetch serve a session.json whose
 	// bytes do not match the digest the bundle claims.
-	RunnerFixtureCorruptBundleEnv = "PUTNAMI_RUNNER_FIXTURE_CORRUPT_BUNDLE"
+	RunnerFixtureCorruptBundleEnv = "RUNNER_FIXTURE_CORRUPT_BUNDLE"
 	// RunnerFixtureTaskHoldEnv reaches the fixture's gate task through the
 	// engine's environment: the task reports it is running beside a background
 	// child and waits for the named file before it finishes.
-	RunnerFixtureTaskHoldEnv = "PUTNAMI_RUNNER_FIXTURE_TASK_HOLD"
+	RunnerFixtureTaskHoldEnv = "RUNNER_FIXTURE_TASK_HOLD"
 )
 
 // RunnerFixtureMain is Main for a package whose tests drive the runner fixture

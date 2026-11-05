@@ -46,11 +46,11 @@ func heldTaskFixture(t *testing.T) (root, providerRoot, hold string) {
 	t.Setenv(clitest.RunnerFixtureTaskHoldEnv, hold)
 	clitest.WriteFile(t, filepath.Join(root, "extension", "gate.sh"), `echo "ran $(cat "$PUTNAMI_PROJECT_ROOT/marker")" >> "$PUTNAMI_PROJECT_ROOT/calls"
 echo "task output line for $PUTNAMI_PROJECT_ROOT"
-if [ -n "${PUTNAMI_RUNNER_FIXTURE_TASK_HOLD:-}" ]; then
+if [ -n "${RUNNER_FIXTURE_TASK_HOLD:-}" ]; then
   sleep 300 &
-  echo $! > "$PUTNAMI_RUNNER_FIXTURE_TASK_HOLD.pid"
-  echo running > "$PUTNAMI_RUNNER_FIXTURE_TASK_HOLD.running"
-  while [ ! -f "$PUTNAMI_RUNNER_FIXTURE_TASK_HOLD" ]; do sleep 0.05; done
+  echo $! > "$RUNNER_FIXTURE_TASK_HOLD.pid"
+  echo running > "$RUNNER_FIXTURE_TASK_HOLD.running"
+  while [ ! -f "$RUNNER_FIXTURE_TASK_HOLD" ]; do sleep 0.05; done
 fi
 `)
 	clitest.RunGit(t, root, "add", "-A")
@@ -715,7 +715,7 @@ func TestPortableNestedSessionsAreImportedAndCountedOnce(t *testing.T) {
 	clitest.WriteFile(t, filepath.Join(root, "lib", "marker"), "nested\n")
 	clitest.WriteFile(t, filepath.Join(root, "putnami.workspace.json"), `{"name":"placement-fixture","includes":["extension","runner","app","lib"]}`)
 	clitest.WriteFile(t, filepath.Join(root, "extension", "gate.sh"), `echo "ran $(cat "$PUTNAMI_PROJECT_ROOT/marker")" >> "$PUTNAMI_PROJECT_ROOT/calls"
-if [ "$(basename "$PUTNAMI_PROJECT_ROOT")" = app ] && [ "${PUTNAMI_RUNNER_FIXTURE:-}" = cli ]; then
+if [ "$(basename "$PUTNAMI_PROJECT_ROOT")" = app ] && [ "${RUNNER_FIXTURE:-}" = cli ]; then
   "$PUTNAMI_CLI_EXECUTABLE" build --projects lib --no-cache || exit 9
 fi
 `)

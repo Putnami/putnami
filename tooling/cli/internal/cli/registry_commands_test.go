@@ -323,7 +323,7 @@ func TestCmdUpgrade_GlobalInsideWorkspaceRunsWorkspacePhases(t *testing.T) {
 	}))
 	defer srv.Close()
 	t.Setenv("PUTNAMI_REGISTRY_URL", srv.URL)
-	t.Setenv(extension.HTTPRetryBackoffEnv, "0")
+	t.Cleanup(extension.SetHTTPRetryBackoff(0))
 
 	cmd, ok := lookupCommand("upgrade")
 	if !ok {
@@ -367,7 +367,7 @@ func TestCmdUpgrade_GlobalNeedsNoWorkspace(t *testing.T) {
 	}))
 	defer srv.Close()
 	t.Setenv("PUTNAMI_REGISTRY_URL", srv.URL)
-	t.Setenv(extension.HTTPRetryBackoffEnv, "0")
+	t.Cleanup(extension.SetHTTPRetryBackoff(0))
 
 	cmd, ok := lookupCommand("upgrade")
 	if !ok {

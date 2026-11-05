@@ -147,12 +147,6 @@ func VersionUse(ctx context.Context, binDir string, name string, global bool) er
 	return nil
 }
 
-// unsafeUpdateEnv lets users opt in to installing an unverified binary
-// during the transition period before the resolver advertises an integrity
-// hash. It should never be used routinely — it disables the only defense
-// against a tampered download.
-const unsafeUpdateEnv = "PUTNAMI_UNSAFE_UPDATE"
-
 type VersionUpdateOptions struct {
 	Channel string
 	DryRun  bool
@@ -179,8 +173,7 @@ type VersionUpdateResult struct {
 //
 // The update is fail-closed: if the resolver does not advertise an integrity
 // hash (via the X-Integrity header or RFC 9530 Digest header), the install
-// is refused. Set PUTNAMI_UNSAFE_UPDATE=1 to bypass — but doing so removes
-// the only protection against a MITM or tampered mirror.
+// is refused, with no override.
 func VersionUpdateWithOptions(ctx context.Context, currentVersion string, binDir string, opts VersionUpdateOptions) (VersionUpdateResult, error) {
 	resolverURL := extension.ResolvePutRegistryURL(opts.Registries)
 	if err := extension.ValidateRegistryURL(resolverURL); err != nil {
@@ -221,11 +214,10 @@ func VersionUpdateWithOptions(ctx context.Context, currentVersion string, binDir
 		return VersionUpdateResult{}, nil
 	}
 
-	if integrity == "" && os.Getenv(unsafeUpdateEnv) != "1" {
+	if integrity == "" {
 		return VersionUpdateResult{}, fmt.Errorf(
-			"resolver did not advertise an integrity hash for %s; refusing to install unverified binary "+
-				"(set %s=1 to override)",
-			latestVersion, unsafeUpdateEnv,
+			"resolver did not advertise an integrity hash for %s; refusing to install unverified binary",
+			latestVersion,
 		)
 	}
 
@@ -238,22 +230,18 @@ func VersionUpdateWithOptions(ctx context.Context, currentVersion string, binDir
 	}
 	defer os.Remove(tmpPath)
 
-	if integrity == "" {
-		iox.Fprintf(os.Stderr, "  warning: installing %s without integrity verification (%s=1)\n", latestVersion, unsafeUpdateEnv)
-	} else {
-		expected, err := normalizeIntegrity(integrity)
-		if err != nil {
-			return VersionUpdateResult{}, cmderr.InvalidConfigf("invalid integrity %q: %w", integrity, err)
-		}
-		hash, err := hashFileSHA256(tmpPath)
-		if err != nil {
-			return VersionUpdateResult{}, fmt.Errorf("hash binary: %w", err)
-		}
-		if !strings.EqualFold(hash, expected) {
-			return VersionUpdateResult{}, fmt.Errorf("integrity check failed: expected %s, got %s", expected, hash)
-		}
-		iox.Fprintln(os.Stdout, "  Integrity verified")
+	expected, err := normalizeIntegrity(integrity)
+	if err != nil {
+		return VersionUpdateResult{}, cmderr.InvalidConfigf("invalid integrity %q: %w", integrity, err)
 	}
+	hash, err := hashFileSHA256(tmpPath)
+	if err != nil {
+		return VersionUpdateResult{}, fmt.Errorf("hash binary: %w", err)
+	}
+	if !strings.EqualFold(hash, expected) {
+		return VersionUpdateResult{}, fmt.Errorf("integrity check failed: expected %s, got %s", expected, hash)
+	}
+	iox.Fprintln(os.Stdout, "  Integrity verified")
 
 	binaryPath, cleanup, err := extractDownloadedBinary(tmpPath)
 	if err != nil {

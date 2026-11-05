@@ -100,7 +100,7 @@ func TestInstall_ExtensionsFailurePropagates(t *testing.T) {
 	t.Setenv("PUTNAMI_REGISTRY_URL", "http://127.0.0.1:1")
 	// Dead registry refuses instantly; skip the retry backoff so the test
 	// doesn't pay the full (1s+2s) budget waiting on a host that won't recover.
-	t.Setenv(extension.HTTPRetryBackoffEnv, "0")
+	t.Cleanup(extension.SetHTTPRetryBackoff(0))
 
 	var buf strings.Builder
 	testEnv := installTestEnv(&buf, WorkspaceJobOK)
@@ -261,7 +261,7 @@ func TestInstall_RunsTemplatesPhaseWhenConfigured(t *testing.T) {
 	t.Setenv("PUTNAMI_REGISTRY_URL", "http://127.0.0.1:1")
 	// Dead registry refuses instantly; skip the retry backoff so the test
 	// doesn't pay the full (1s+2s) budget waiting on a host that won't recover.
-	t.Setenv(extension.HTTPRetryBackoffEnv, "0")
+	t.Cleanup(extension.SetHTTPRetryBackoff(0))
 
 	var buf strings.Builder
 	testEnv := installTestEnv(&buf, WorkspaceJobOK)

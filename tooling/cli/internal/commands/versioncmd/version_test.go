@@ -373,7 +373,6 @@ func TestFetchRelease_SendsHead(t *testing.T) {
 
 func TestVersionUpdate_FailsClosedWithoutIntegrity(t *testing.T) {
 	// Ensure no global env from another test leaks in.
-	t.Setenv("PUTNAMI_UNSAFE_UPDATE", "")
 	t.Setenv("PUTNAMI_REGISTRY_URL", "")
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
@@ -396,7 +395,6 @@ func TestVersionUpdate_AcceptsValidIntegrity(t *testing.T) {
 	// Build a tar.gz containing a fake putnami binary, compute its sha256,
 	// serve it through a fake resolver that advertises that integrity, and
 	// verify VersionUpdateWithOptions installs the binary.
-	t.Setenv("PUTNAMI_UNSAFE_UPDATE", "")
 	t.Setenv("PUTNAMI_REGISTRY_URL", "")
 
 	binDir := t.TempDir()
@@ -437,7 +435,6 @@ func TestVersionUpdate_RejectsStaleStamp(t *testing.T) {
 	// version must not be installed. This is the
 	// publish/upgrade split: the channel resolved a new version, but
 	// the downloaded archive still contains an older CLI.
-	t.Setenv("PUTNAMI_UNSAFE_UPDATE", "")
 	t.Setenv("PUTNAMI_REGISTRY_URL", "")
 
 	binDir := t.TempDir()
@@ -478,7 +475,6 @@ func TestVersionUpdate_RejectsStaleStamp(t *testing.T) {
 }
 
 func TestVersionUpdate_AcceptsMatchingStamp(t *testing.T) {
-	t.Setenv("PUTNAMI_UNSAFE_UPDATE", "")
 	t.Setenv("PUTNAMI_REGISTRY_URL", "")
 
 	binDir := t.TempDir()
@@ -517,7 +513,6 @@ func TestVersionUpdate_AcceptsMatchingStamp(t *testing.T) {
 }
 
 func TestVersionUpdate_ActivationFailureReturnsError(t *testing.T) {
-	t.Setenv("PUTNAMI_UNSAFE_UPDATE", "")
 	t.Setenv("PUTNAMI_REGISTRY_URL", "")
 
 	binDir := t.TempDir()
@@ -571,7 +566,6 @@ func TestVersionUpdate_RefusesAResolvedVersionThatIsNotAVersion(t *testing.T) {
 	// stamp check would not catch it.
 	for _, resolved := range []string{"../evil", "x/../../evil", "1.2.3/../../evil"} {
 		t.Run(resolved, func(t *testing.T) {
-			t.Setenv("PUTNAMI_UNSAFE_UPDATE", "")
 			t.Setenv("PUTNAMI_REGISTRY_URL", "")
 
 			root := t.TempDir()
@@ -618,7 +612,6 @@ func TestVersionUpdate_RefusesAResolvedVersionThatIsNotAVersion(t *testing.T) {
 }
 
 func TestVersionUpdate_RejectsBadIntegrity(t *testing.T) {
-	t.Setenv("PUTNAMI_UNSAFE_UPDATE", "")
 	t.Setenv("PUTNAMI_REGISTRY_URL", "")
 
 	stagingDir := t.TempDir()
