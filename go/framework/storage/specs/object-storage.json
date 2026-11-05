@@ -6,7 +6,7 @@
     "Application code uses one object API while composition selects memory, filesystem, S3, GCS, or managed bindings",
     "Logical buckets and key prefixes isolate application data from provider bucket names",
     "The plugin-provided backend rejects disallowed or oversized uploads to registered buckets, and a rejected upload leaves the existing object intact",
-    "Control-plane deadlines do not truncate a streaming object body after Get returns"
+    "Control-plane deadlines do not truncate a streaming object body after Get returns, nor a Put body the caller delivers slowly"
   ],
   "nonGoals": [
     "Providing cross-backend transactions or automatic replication",
@@ -29,7 +29,7 @@
     },
     {
       "id": "deadlines-and-streams",
-      "text": "Remote control operations honor bounded request contexts, but Get returns a caller-owned body whose continued streaming is not cut off by a method-scoped timeout."
+      "text": "Remote control operations honor bounded request contexts, but Get returns a caller-owned body whose continued streaming is not cut off by a method-scoped timeout. On a remote Put, the request timeout bounds the token fetch and the storage side: storage must take each part of the body the caller has delivered, and answer once the body ends, within it. Only the caller's context bounds the time the caller takes to deliver the body, so a body delivered slower than the timeout is stored."
     },
     {
       "id": "signed-access",

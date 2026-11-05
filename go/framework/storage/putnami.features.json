@@ -64,6 +64,12 @@
             "kind": "acceptance",
             "checks": [
               "gcs-get-metadata-honors-request-timeout",
+              "gcs-put-request-timeout-bounds-a-storage-stall",
+              "gcs-put-request-timeout-bounds-answer-after-body",
+              "gcs-put-request-timeout-spares-a-slow-body",
+              "s3-put-request-timeout-bounds-a-storage-stall",
+              "s3-put-request-timeout-bounds-answer-after-body",
+              "s3-put-request-timeout-spares-a-slow-body",
               "s3-request-timeout-bounds-control-plane-not-get"
             ]
           }

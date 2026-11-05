@@ -30,10 +30,14 @@ type S3Config struct {
 	SecretKey string
 	// Bucket is the S3 bucket name. All logical buckets are mapped as key prefixes within this bucket.
 	Bucket string
-	// RequestTimeout bounds non-streaming control-plane operations (Put, Delete,
+	// RequestTimeout bounds non-streaming control-plane operations (Delete,
 	// List, Exists, Stat). Default: 30s. It does NOT cap a streaming Get — that body
 	// read is bounded only by the caller's context, so large/slow downloads are
-	// not aborted mid-stream. Set to a negative value to disable the per-op cap.
+	// not aborted mid-stream. On Put it bounds the storage side only: S3 must
+	// take each part of the body the caller's reader hands over, and answer once
+	// the body ends, within it; the time the reader takes to deliver the body is
+	// bounded only by the caller's context. Set to a negative value to disable
+	// the per-op cap.
 	RequestTimeout time.Duration
 }
 
@@ -75,8 +79,8 @@ func (b *S3Backend) objectURL(bucket, key string) string {
 // UNSIGNED-PAYLOAD and real S3 requires the separate aws-chunked SigV4 protocol
 // for chunked signed bodies.
 func (b *S3Backend) Put(ctx context.Context, bucket, key string, data io.Reader, meta *ObjectMetadata) (_ *PutResult, retErr error) {
-	ctx, cancel := ctxutil.WithRequestTimeout(ctx, b.config.RequestTimeout)
-	defer cancel()
+	ctx, deadline := withUploadDeadline(ctx, b.config.RequestTimeout)
+	defer deadline.stop()
 
 	body := data
 	contentLength, hasContentLength := readerContentLength(data)
@@ -103,7 +107,7 @@ func (b *S3Backend) Put(ctx context.Context, bucket, key string, data io.Reader,
 	counter := &countingReader{r: body}
 
 	url := b.objectURL(bucket, key)
-	req, err := http.NewRequestWithContext(ctx, http.MethodPut, url, counter)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPut, url, &sentReader{r: counter, deadline: deadline})
 	if err != nil {
 		return nil, errors.Wrap(err, CodeStorageRequest, errors.String("backend", "s3"), errors.String("method", "PUT"))
 	}
@@ -119,7 +123,7 @@ func (b *S3Backend) Put(ctx context.Context, bucket, key string, data io.Reader,
 
 	resp, err := b.client.Do(req)
 	if err != nil {
-		return nil, errors.Wrap(err, CodeStorageWrite, errors.String("backend", "s3"), errors.String("bucket", bucket), errors.String("key", key))
+		return nil, errors.Wrap(deadline.cause(ctx, err), CodeStorageWrite, errors.String("backend", "s3"), errors.String("bucket", bucket), errors.String("key", key))
 	}
 	defer func() {
 		if cerr := resp.Body.Close(); cerr != nil && retErr == nil {
@@ -130,7 +134,7 @@ func (b *S3Backend) Put(ctx context.Context, bucket, key string, data io.Reader,
 	if resp.StatusCode >= 400 {
 		body, err := io.ReadAll(resp.Body)
 		if err != nil {
-			return nil, errors.Wrapf(err, CodeStorageWrite, "put failed: read body", errors.String("backend", "s3"), errors.Int("status", resp.StatusCode))
+			return nil, errors.Wrapf(deadline.cause(ctx, err), CodeStorageWrite, "put failed: read body", errors.String("backend", "s3"), errors.Int("status", resp.StatusCode))
 		}
 		return nil, errors.New(CodeStorageWrite, "put failed", errors.String("backend", "s3"), errors.Int("status", resp.StatusCode), errors.String("body", string(body)))
 	}
