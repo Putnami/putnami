@@ -28,6 +28,7 @@ How-To is organized by user intent, not architecture.
 ### Plan
 
 - [Write a feature spec](/docs/how-to/write-a-feature-spec)
+- [Bring your Spec Kit, OpenSpec, Kiro or Gherkin specs](/docs/how-to/bring-your-external-specs)
 
 ### Build
 

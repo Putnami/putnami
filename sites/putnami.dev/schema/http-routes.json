@@ -1670,6 +1670,21 @@
     },
     {
       "match": "exact",
+      "path": "/docs/how-to/bring-your-external-specs",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "publicEdge": true,
+      "provenance": {
+        "project": "putnami.dev",
+        "package": "@putnami/web",
+        "sourceKind": "file-route",
+        "evidencePath": "src/app/docs/[...page]/page.tsx"
+      }
+    },
+    {
+      "match": "exact",
       "path": "/docs/how-to/build-a-web-app",
       "methods": [
         "GET",
@@ -4084,6 +4099,21 @@
     },
     {
       "match": "exact",
+      "path": "/fr/docs/how-to/bring-your-external-specs",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "publicEdge": true,
+      "provenance": {
+        "project": "putnami.dev",
+        "package": "@putnami/web",
+        "sourceKind": "file-route",
+        "evidencePath": "src/app/docs/[...page]/page.tsx"
+      }
+    },
+    {
+      "match": "exact",
       "path": "/fr/docs/how-to/build-a-web-app",
       "methods": [
         "GET",
@@ -5156,5 +5186,5 @@
       }
     }
   ],
-  "digest": "sha256:0ead5e60df27e0e7fb97a8c2e3e6135d402468dced73c5b03e0bd49d8c0483cb"
+  "digest": "sha256:cdc999924f1fa60382de997fb6707acf3389394bdbc264e4bbf534d29ec017b6"
 }
