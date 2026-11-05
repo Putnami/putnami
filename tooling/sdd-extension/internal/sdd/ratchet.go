@@ -28,6 +28,11 @@ import (
 // cacheable, and "the reviewed policy change" is literally an edit to the
 // project's committed baseline in the same diff.
 
+// ErrorCodeStaleSpecsBaseline names a committed specs.baseline.json that
+// differs from the bytes `putnami specs baseline --update` writes, once the
+// workspace commits any baseline.
+const ErrorCodeStaleSpecsBaseline = "sdd.stale_specs_baseline"
+
 // SpecsRatchetReport is the typed data of one ratchet judgment.
 type SpecsRatchetReport struct {
 	Revision featureengine.Revision `json:"revision"`
@@ -38,8 +43,11 @@ type SpecsRatchetReport struct {
 	Current *featureproto.SpecsBaseline `json:"current"`
 	// Summary is the protocol's deterministic accounting.
 	Summary featureproto.SpecsRatchetSummary `json:"summary"`
-	// Diagnostics carries the shrink findings (errors) and the growth nudge
-	// (warning).
+	// Stale are the workspace-relative baselines `putnami specs baseline
+	// --update` would write or remove, sorted.
+	Stale []string `json:"stale,omitempty"`
+	// Diagnostics carries the shrink and stale findings (errors) and the
+	// adoption nudge (warning).
 	Diagnostics []diag.Diagnostic `json:"diagnostics,omitempty"`
 }
 
@@ -282,9 +290,10 @@ func anchorDiagnostics(file string, findings []diag.Diagnostic) []diag.Diagnosti
 
 // BuildSpecsRatchetResult is the whole of the workspace-scoped ratchet check:
 // derive the current floor, read the committed one, and apply the protocol's
-// shrink-only comparison. Shrink findings are errors and fail the task; a
-// floor grown beyond the committed baseline draws one warning nudge, because
-// raising the floor is desirable and deliberate, never forced.
+// shrink-only comparison. Shrink findings are errors and fail the task. Once
+// any baseline is committed, a file that differs from the bytes
+// `putnami specs baseline --update` writes is stale and fails the task too; a
+// workspace that commits none draws one adoption warning.
 func BuildSpecsRatchetResult(ws *workspace.Workspace) (SpecsRatchetReport, error) {
 	revision, diagnostics, current, err := floorFromWorktree(ws)
 	report := SpecsRatchetReport{Revision: revision, Diagnostics: diagnostics}
@@ -316,17 +325,11 @@ func BuildSpecsRatchetResult(ws *workspace.Workspace) (SpecsRatchetReport, error
 	comparison, summary := featureproto.CompareSpecsBaseline(committed.floor, current)
 	report.Summary = summary
 	report.Diagnostics = append(report.Diagnostics, comparison...)
-	switch {
-	case !present && len(current.Projects) > 0:
+	if !present && len(current.Projects) > 0 {
 		report.Diagnostics = append(report.Diagnostics, diag.Warningf(featureproto.WarningCodeRatchetGrowth,
 			featureproto.SpecsBaselineFilename,
 			"no committed %s records the enforced floor yet; run `putnami specs baseline --update` to adopt the ratchet",
 			featureproto.SpecsBaselineFilename))
-	case present && (summary.GrownProjects > 0 || summary.GrownRequirements > 0):
-		report.Diagnostics = append(report.Diagnostics, diag.Warningf(featureproto.WarningCodeRatchetGrowth,
-			featureproto.SpecsBaselineFilename,
-			"the enforced floor grew beyond the committed baseline (%d project(s), %d requirement(s)); raise it with `putnami specs baseline --update`",
-			summary.GrownProjects, summary.GrownRequirements))
 	}
 	if diag.HasErrors(comparison) {
 		projects := make([]string, 0, len(comparison))
@@ -336,6 +339,38 @@ func BuildSpecsRatchetResult(ws *workspace.Workspace) (SpecsRatchetReport, error
 		return report, protocolcli.WithResultData(protocolcli.Classify(
 			fmt.Errorf("specs ratchet: %d regression(s) against the committed %s files (%s)",
 				len(comparison), featureproto.SpecsBaselineFilename, strings.Join(dedupeSorted(projects), ", ")),
+			protocolcli.ErrInvalidConfig), report)
+	}
+	if !present {
+		return report, nil
+	}
+	// A committed floor that differs from the derived one in any way — grown,
+	// missing a project's file, or in another layout — is stale: a change that
+	// makes a requirement executable carries its baseline edit, so
+	// `putnami specs baseline --update` on the merged tree changes nothing.
+	plan, err := planSpecsBaselines(ws, current)
+	if err != nil {
+		return report, err
+	}
+	for _, file := range plan.writes {
+		reason := "differs from the floor"
+		if !plan.existing[file] {
+			reason = "is missing for an enforced project"
+		}
+		report.Stale = append(report.Stale, file)
+		report.Diagnostics = append(report.Diagnostics, diag.Errorf(ErrorCodeStaleSpecsBaseline, file,
+			"%s %s; run `putnami specs baseline --update` and commit the result", file, reason))
+	}
+	for _, file := range plan.removed {
+		report.Stale = append(report.Stale, file)
+		report.Diagnostics = append(report.Diagnostics, diag.Errorf(ErrorCodeStaleSpecsBaseline, file,
+			"%s is no longer named by the floor; run `putnami specs baseline --update` and commit the result", file))
+	}
+	sort.Strings(report.Stale)
+	if len(report.Stale) > 0 {
+		return report, protocolcli.WithResultData(protocolcli.Classify(
+			fmt.Errorf("specs ratchet: %d stale %s file(s) (%s)",
+				len(report.Stale), featureproto.SpecsBaselineFilename, strings.Join(report.Stale, ", ")),
 			protocolcli.ErrInvalidConfig), report)
 	}
 	return report, nil
@@ -359,50 +394,13 @@ func BuildSpecsBaselineResult(ws *workspace.Workspace, update bool) (SpecsBaseli
 	}
 	report.Current = current
 
-	desired := make(map[string][]byte, len(current.Projects))
-	for _, project := range current.Projects {
-		member := ws.ProjectByID(project.Project)
-		if member == nil {
-			return report, fmt.Errorf("specs baseline: enforced project %s is not a workspace member", project.Project)
-		}
-		file := featureproto.SpecsBaselinePath(wsproto.CleanWorkspacePath(member.Path))
-		data, err := featureproto.MarshalProjectSpecsBaseline(&featureproto.ProjectSpecsBaseline{
-			ProtocolVersion:        featureproto.SpecsBaselineProtocolVersion,
-			ExecutableRequirements: project.ExecutableRequirements,
-		})
-		if err != nil {
-			return report, err
-		}
-		desired[file] = data
-		report.Paths = append(report.Paths, file)
+	plan, err := planSpecsBaselines(ws, current)
+	if err != nil {
+		return report, err
 	}
-	sort.Strings(report.Paths)
-
-	var writes []string
-	for _, file := range report.Paths {
-		committed, readErr := os.ReadFile(filepath.Join(ws.Root, filepath.FromSlash(file)))
-		if readErr != nil && !errors.Is(readErr, fs.ErrNotExist) {
-			// An unreadable committed file is a real failure, not "out of
-			// date": reporting Changed here would send --update to overwrite a
-			// file it never managed to read.
-			return report, fmt.Errorf("read %s: %w", file, readErr)
-		}
-		if readErr != nil || !bytes.Equal(committed, desired[file]) {
-			writes = append(writes, file)
-		}
-	}
-	scopes, _ := specsBaselineScopes(ws)
-	for _, scope := range scopes {
-		file := featureproto.SpecsBaselinePath(scope)
-		if _, wanted := desired[file]; wanted {
-			continue
-		}
-		if _, err := os.Lstat(filepath.Join(ws.Root, filepath.FromSlash(file))); err == nil {
-			report.Removed = append(report.Removed, file)
-		} else if !errors.Is(err, fs.ErrNotExist) {
-			return report, fmt.Errorf("check %s: %w", file, err)
-		}
-	}
+	report.Paths = plan.paths
+	report.Removed = plan.removed
+	desired, writes := plan.desired, plan.writes
 	report.Changed = len(writes) > 0 || len(report.Removed) > 0
 	if !update || !report.Changed {
 		return report, nil
@@ -419,4 +417,74 @@ func BuildSpecsBaselineResult(ws *workspace.Workspace, update bool) (SpecsBaseli
 	}
 	report.Updated = true
 	return report, nil
+}
+
+// specsBaselinePlan is what `putnami specs baseline --update` does to the
+// worktree: the bytes each enforced project's file must hold, the files whose
+// committed bytes differ or are absent, and the committed files the floor no
+// longer names.
+type specsBaselinePlan struct {
+	desired map[string][]byte
+	// paths are the files the floor names, sorted.
+	paths []string
+	// writes are the files whose committed bytes differ or are absent, sorted.
+	writes []string
+	// existing reports which written files are committed.
+	existing map[string]bool
+	// removed are the committed files the floor no longer names, sorted.
+	removed []string
+}
+
+// planSpecsBaselines compares the derived floor with the committed files,
+// byte for byte. Both the ratchet and `putnami specs baseline` read it, so a
+// tree the ratchet accepts is a tree --update leaves unchanged.
+func planSpecsBaselines(ws *workspace.Workspace, current *featureproto.SpecsBaseline) (specsBaselinePlan, error) {
+	plan := specsBaselinePlan{
+		desired:  make(map[string][]byte, len(current.Projects)),
+		existing: make(map[string]bool),
+	}
+	for _, project := range current.Projects {
+		member := ws.ProjectByID(project.Project)
+		if member == nil {
+			return plan, fmt.Errorf("specs baseline: enforced project %s is not a workspace member", project.Project)
+		}
+		file := featureproto.SpecsBaselinePath(wsproto.CleanWorkspacePath(member.Path))
+		data, err := featureproto.MarshalProjectSpecsBaseline(&featureproto.ProjectSpecsBaseline{
+			ProtocolVersion:        featureproto.SpecsBaselineProtocolVersion,
+			ExecutableRequirements: project.ExecutableRequirements,
+		})
+		if err != nil {
+			return plan, err
+		}
+		plan.desired[file] = data
+		plan.paths = append(plan.paths, file)
+	}
+	sort.Strings(plan.paths)
+
+	for _, file := range plan.paths {
+		committed, readErr := os.ReadFile(filepath.Join(ws.Root, filepath.FromSlash(file)))
+		if readErr != nil && !errors.Is(readErr, fs.ErrNotExist) {
+			// An unreadable committed file is a real failure, not "out of
+			// date": reporting it stale would send --update to overwrite a
+			// file it never managed to read.
+			return plan, fmt.Errorf("read %s: %w", file, readErr)
+		}
+		plan.existing[file] = readErr == nil
+		if readErr != nil || !bytes.Equal(committed, plan.desired[file]) {
+			plan.writes = append(plan.writes, file)
+		}
+	}
+	scopes, _ := specsBaselineScopes(ws)
+	for _, scope := range scopes {
+		file := featureproto.SpecsBaselinePath(scope)
+		if _, wanted := plan.desired[file]; wanted {
+			continue
+		}
+		if _, err := os.Lstat(filepath.Join(ws.Root, filepath.FromSlash(file))); err == nil {
+			plan.removed = append(plan.removed, file)
+		} else if !errors.Is(err, fs.ErrNotExist) {
+			return plan, fmt.Errorf("check %s: %w", file, err)
+		}
+	}
+	return plan, nil
 }

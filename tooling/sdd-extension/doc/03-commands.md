@@ -346,8 +346,9 @@ workspace-root file into each project's directory. It is the one place the
 baseline is raised or deliberately lowered; the `specs-ratchet-validate` step of
 `validate-workspace` only ever compares, and fails when an enforced project
 regressed to `report`/`off` or lost recorded requirement coverage without an
-edit to the project's committed baseline in the same change. Growth never requires an
-edit — the check passes and nudges you to raise the floor. The floor is
+edit to the project's committed baseline in the same change. It also fails a
+committed file that `--update` would rewrite, such as a floor that grew without
+its baseline edit. The floor is
 whole-workspace by construction, so project selection flags are rejected.
 
 `init` creates one minimal canonical skeleton next to the declaration of an

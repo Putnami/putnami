@@ -9,6 +9,7 @@ import (
 	protocolcli "go.putnami.dev/protocol/cli"
 	diag "go.putnami.dev/protocol/diagnostic"
 	featureproto "go.putnami.dev/protocol/features"
+	"go.putnami.dev/protocol/features/spectest"
 	wsproto "go.putnami.dev/protocol/workspace"
 	workspace "go.putnami.dev/tooling/sdd/extension/internal/wsview"
 )
@@ -333,6 +334,8 @@ func TestBuildSpecsBaselineResultLeavesAnUnresolvableOwnerOut(t *testing.T) {
 // an absent baseline is initial adoption (a warning nudge, never a failure),
 // and a committed baseline matching the derived floor is silence.
 func TestBuildSpecsRatchetResultAdoptsThenHoldsTheFloor(t *testing.T) {
+	spectest.Proves(t, coverageRatchetFeature, staleBaselineRequirement, "a-workspace-without-a-baseline-is-adoption")
+	spectest.Proves(t, coverageRatchetFeature, staleBaselineRequirement, "a-matching-floor-passes")
 	ws := verifyWorkspace(t, enforceOptions())
 
 	report, err := BuildSpecsRatchetResult(ws)
@@ -397,25 +400,130 @@ func TestBuildSpecsRatchetResultFailsOnShrink(t *testing.T) {
 	}
 }
 
-// TestBuildSpecsRatchetResultNudgesOnGrowth: a floor grown beyond the
-// committed baseline passes with one warning to raise it — growth is
-// desirable and never forced.
-func TestBuildSpecsRatchetResultNudgesOnGrowth(t *testing.T) {
+const staleBaselineRequirement = "a-stale-specs-baseline-fails"
+
+// canonicalAppBaseline is the bytes `putnami specs baseline --update` writes
+// for the fixture's /app project with requirements as its floor.
+func canonicalAppBaseline(t *testing.T, requirements ...string) string {
+	t.Helper()
+	data, err := featureproto.MarshalProjectSpecsBaseline(&featureproto.ProjectSpecsBaseline{
+		ProtocolVersion:        featureproto.SpecsBaselineProtocolVersion,
+		ExecutableRequirements: append([]string{}, requirements...),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return string(data)
+}
+
+// assertStaleBaseline asserts that the ratchet failed and named each file as
+// stale, with the command that refreshes it.
+func assertStaleBaseline(t *testing.T, report SpecsRatchetReport, err error, files ...string) {
+	t.Helper()
+	if err == nil {
+		t.Fatalf("a stale baseline passed the ratchet: %+v", report.Diagnostics)
+	}
+	if protocolcli.ResultData(err) == nil {
+		t.Fatalf("the failing verdict carries no report payload: %v", err)
+	}
+	for _, file := range files {
+		found := false
+		for _, finding := range report.Diagnostics {
+			if finding.Code == ErrorCodeStaleSpecsBaseline && finding.Severity == diag.Error &&
+				finding.Field == file && strings.Contains(finding.Message, "putnami specs baseline --update") {
+				found = true
+			}
+		}
+		if !found {
+			t.Fatalf("diagnostics = %+v, want %s named as stale", report.Diagnostics, file)
+		}
+	}
+	if len(report.Stale) != len(files) {
+		t.Fatalf("stale = %v, want %v", report.Stale, files)
+	}
+}
+
+// TestBuildSpecsRatchetResultFailsOnGrowth: a criterion that makes a
+// requirement executable without the baseline edit fails, naming the file,
+// so a pull request cannot leave main with a baseline that --update rewrites.
+func TestBuildSpecsRatchetResultFailsOnGrowth(t *testing.T) {
+	spectest.Proves(t, coverageRatchetFeature, staleBaselineRequirement, "a-grown-floor-fails-naming-the-file")
 	ws := verifyWorkspace(t, enforceOptions())
-	committedBaseline(t, ws.Root,
-		`{"$schema":"https://putnami.dev/schemas/putnami-specs-baseline.json","protocolVersion":2,"executableRequirements":[]}`)
+	committedBaseline(t, ws.Root, canonicalAppBaseline(t))
 
 	report, err := BuildSpecsRatchetResult(ws)
-	if err != nil {
-		t.Fatalf("growth failed the ratchet: %v", err)
-	}
 	if report.Summary.GrownRequirements != 1 {
 		t.Fatalf("summary = %+v", report.Summary)
 	}
-	nudge := findRatchetWarning(report.Diagnostics)
-	if nudge == nil || !strings.Contains(nudge.Message, "grew beyond the committed baseline") {
-		t.Fatalf("diagnostics = %+v, want the growth nudge", report.Diagnostics)
+	assertStaleBaseline(t, report, err, "app/"+featureproto.SpecsBaselineFilename)
+}
+
+// twoProjectRatchetWorkspace is the verify fixture with a second enforced
+// project, /shop, that owns one executable requirement.
+func twoProjectRatchetWorkspace(t *testing.T) *workspace.Workspace {
+	t.Helper()
+	ws := verifyWorkspace(t, enforceOptions())
+	writeFixtureFile(t, filepath.Join(ws.Root, "shop", "putnami.json"), `{"name":"shop","type":"application"}`)
+	writeFixtureFile(t, filepath.Join(ws.Root, "shop", featureproto.ManifestFilename), `{
+  "protocolVersion": 2,
+  "namespace": "shop",
+  "features": [{
+    "id": "shop/checkout",
+    "type": "feature",
+    "name": "Checkout",
+    "outcome": "Customers pay",
+    "owner": "shop",
+    "target": "coded",
+    "requirements": [
+      {"id": "pay", "stage": "coded", "evidenceKinds": ["attestation"],
+       "verification": {"kind": "acceptance", "checks": ["pay-check"]}}
+    ]
+  }]
+}`)
+	writeFixtureFile(t, filepath.Join(ws.Root, "shop", "specs", "checkout.json"), `{
+  "protocolVersion": 1,
+  "feature": "shop/checkout",
+  "outcomes": ["Customers pay"],
+  "requirements": [{"id": "pay", "text": "A customer pays."}]
+}`)
+	shop := appProject("shop", "shop")
+	shop.Config = &wsproto.ProjectConfig{Name: "shop", Type: "application", Options: enforceOptions()}
+	return fixtureWorkspace("verify-test", ws.Root, ws.ProjectByID("/app"), shop)
+}
+
+// TestBuildSpecsRatchetResultFailsOnAnEnforcedProjectWithoutItsFile: once
+// one baseline is committed, a project that enters enforce without its own
+// file is stale, not a second initial adoption.
+func TestBuildSpecsRatchetResultFailsOnAnEnforcedProjectWithoutItsFile(t *testing.T) {
+	spectest.Proves(t, coverageRatchetFeature, staleBaselineRequirement, "an-enforced-project-without-its-file-fails")
+	ws := twoProjectRatchetWorkspace(t)
+	committedBaseline(t, ws.Root, canonicalAppBaseline(t, "billing/invoicing#issue"))
+
+	report, err := BuildSpecsRatchetResult(ws)
+	if report.Summary.GrownProjects != 1 {
+		t.Fatalf("summary = %+v", report.Summary)
 	}
+	assertStaleBaseline(t, report, err, "shop/"+featureproto.SpecsBaselineFilename)
+}
+
+// TestBuildSpecsRatchetResultFailsOnAFileInAnotherLayout: a baseline that
+// records the right floor in bytes --update would rewrite fails, so
+// `putnami specs baseline --update` on main changes nothing. The older
+// workspace-root document is one such layout.
+func TestBuildSpecsRatchetResultFailsOnAFileInAnotherLayout(t *testing.T) {
+	spectest.Proves(t, coverageRatchetFeature, staleBaselineRequirement, "a-file-in-another-layout-fails")
+	t.Run("hand-formatted project file", func(t *testing.T) {
+		ws := verifyWorkspace(t, enforceOptions())
+		committedBaseline(t, ws.Root, appIssueBaseline)
+		report, err := BuildSpecsRatchetResult(ws)
+		assertStaleBaseline(t, report, err, "app/"+featureproto.SpecsBaselineFilename)
+	})
+	t.Run("workspace-root document", func(t *testing.T) {
+		ws := verifyWorkspace(t, enforceOptions())
+		writeFixtureFile(t, filepath.Join(ws.Root, featureproto.SpecsBaselineFilename), workspaceIssueBaseline)
+		report, err := BuildSpecsRatchetResult(ws)
+		assertStaleBaseline(t, report, err, "app/"+featureproto.SpecsBaselineFilename, featureproto.SpecsBaselineFilename)
+	})
 }
 
 // TestBuildSpecsRatchetResultRefusesABrokenBaseline: a committed baseline the

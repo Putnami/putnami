@@ -90,15 +90,20 @@ its existing admission gate; the shared absent-policy default remains `report`.
   `report`/`off`, or lost recorded requirement coverage, **fails** with
   `features.ratchet_regression`; the reviewed policy change is an edit to the
   project's committed baseline in the same diff, written with
-  `putnami specs baseline --update`. Growth passes and draws one
-  `features.ratchet_growth` warning nudge to raise the floor; an absent
-  baseline is initial adoption, never a failure. A project's file lists only
+  `putnami specs baseline --update`. Once any baseline is committed, a file
+  that differs from the bytes `--update` writes **fails** with
+  `sdd.stale_specs_baseline`, naming the file: a grown floor, an enforced
+  project without its file, or a file in another layout. A change that makes a
+  requirement executable commits its baseline edit, so `--update` on `main`
+  changes nothing. A workspace that commits no baseline is initial adoption: it
+  passes with one `features.ratchet_growth` warning. A project's file lists only
   its covered requirements (`protocolVersion: 2`); its directory names the
   project. A workspace-wide document in a project directory, or a project
   recorded twice, fails closed. The older workspace-root file
-  (`protocolVersion: 1`, naming every project) is still enforced, and draws a
-  `features.misplaced_baseline` warning until
-  `putnami specs baseline --update` moves each entry into its project.
+  (`protocolVersion: 1`, naming every project) is still read, so a regression
+  it records fails; it draws a `features.misplaced_baseline` warning and fails
+  as stale until `putnami specs baseline --update` moves each entry into its
+  project.
 
 - **`decisions-validate`** — the decision gate. It reads every
   committed `decisions.json`: the workspace-root one and the one in each

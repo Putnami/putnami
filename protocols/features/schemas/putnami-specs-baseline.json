@@ -2,7 +2,7 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://putnami.dev/schemas/putnami-specs-baseline.json",
   "title": "Putnami specs baseline v1 and v2",
-  "$comment": "The committed enforce floor of the executable-spec gate. Version 2 is one enforced project's file, in that project's directory: the directory names the project, the file's presence states enforce, and the file lists the executable requirements the project covers. Version 1 is the older single workspace-root file listing every enforced project; readers accept it only at the root, and `putnami specs baseline --update` moves it to version 2 files. Shrink-only: losing a listed requirement, or a project leaving enforce, without editing its file in the same change fails validate-workspace. Growth never requires an edit.",
+  "$comment": "The committed enforce floor of the executable-spec gate. Version 2 is one enforced project's file, in that project's directory: the directory names the project, the file's presence states enforce, and the file lists the executable requirements the project covers. Version 1 is the older single workspace-root file listing every enforced project; readers accept it only at the root, and `putnami specs baseline --update` moves it to version 2 files. Shrink-only: losing a listed requirement, or a project leaving enforce, without editing its file in the same change fails validate-workspace. The comparison only counts growth; the @putnami/sdd extension also fails a committed file that `putnami specs baseline --update` would rewrite.",
   "oneOf": [
     { "$ref": "#/$defs/project-v2" },
     { "$ref": "#/$defs/workspace-v1" }

@@ -19,8 +19,12 @@ const (
 	gherkinBaseline    = `{
   "$schema": "https://putnami.dev/schemas/putnami-specs-baseline.json",
   "protocolVersion": 2,
-  "executableRequirements": ["billing/invoicing#issue-an-invoice", "billing/invoicing#number-invoices"]
-}`
+  "executableRequirements": [
+    "billing/invoicing#issue-an-invoice",
+    "billing/invoicing#number-invoices"
+  ]
+}
+`
 )
 
 // gherkinWorkspace is one project in mode whose feature names a .feature file.

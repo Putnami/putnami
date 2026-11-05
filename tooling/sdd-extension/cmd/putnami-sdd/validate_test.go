@@ -1336,7 +1336,14 @@ func TestSpecsRatchetValidateFailsOnARecordedRegression(t *testing.T) {
 func TestSpecsRatchetValidateHoldsAMatchingBaseline(t *testing.T) {
 	root := ratchetFixture(t, "enforce")
 	writeFixture(t, filepath.Join(root, "app", featureproto.SpecsBaselineFilename),
-		`{"$schema":"https://putnami.dev/schemas/putnami-specs-baseline.json","protocolVersion":2,"executableRequirements":["billing/invoicing#issue"]}`)
+		`{
+  "$schema": "https://putnami.dev/schemas/putnami-specs-baseline.json",
+  "protocolVersion": 2,
+  "executableRequirements": [
+    "billing/invoicing#issue"
+  ]
+}
+`)
 	outcome := runJob(t, runSpecsRatchetValidate, workspaceJobContext(root, ratchetMembers(t, root, "enforce")))
 
 	if outcome.err != nil {

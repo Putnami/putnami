@@ -29,8 +29,11 @@ The system SHALL issue an invoice.
 	openSpecBaseline = `{
   "$schema": "https://putnami.dev/schemas/putnami-specs-baseline.json",
   "protocolVersion": 2,
-  "executableRequirements": ["billing/invoicing#issue-an-invoice"]
-}`
+  "executableRequirements": [
+    "billing/invoicing#issue-an-invoice"
+  ]
+}
+`
 )
 
 // openSpecWorkspace is one enforcing project whose feature names an OpenSpec
