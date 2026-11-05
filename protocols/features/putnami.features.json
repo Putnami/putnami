@@ -388,7 +388,8 @@
               "kiro-comments-and-code-are-not-spec-text",
               "a-design-link-is-never-a-decision",
               "a-long-introduction-paragraph-splits-at-sentences",
-              "a-dotted-criterion-number-opens-a-criterion"
+              "a-dotted-criterion-number-opens-a-criterion",
+              "an-acceptance-heading-at-the-group-level-opens-its-criteria"
             ]
           }
         },
@@ -404,7 +405,8 @@
               "a-kiro-anchor-names-the-criterion",
               "an-unanchored-criterion-is-positional",
               "a-kiro-group-anchor-names-its-positional-criteria",
-              "a-stray-kiro-anchor-is-an-error"
+              "a-stray-kiro-anchor-is-an-error",
+              "a-group-label-with-no-id-needs-an-anchor"
             ]
           }
         },
