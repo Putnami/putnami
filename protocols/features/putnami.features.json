@@ -223,7 +223,8 @@
             "checks": [
               "a-requirement-name-normalizes-to-one-id",
               "an-accented-letter-keeps-its-base-letter",
-              "go-and-typescript-give-one-id-per-name",
+              "the-go-mapping-gives-the-golden-ids",
+              "the-typescript-nfkd-gives-the-golden-ids-and-the-fold-table",
               "an-anchor-follows-the-segment-grammar"
             ]
           }
