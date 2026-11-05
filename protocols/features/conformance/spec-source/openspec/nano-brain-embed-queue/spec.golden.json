@@ -1,0 +1,13 @@
+{
+  "protocolVersion": 1,
+  "feature": "billing/invoice-export",
+  "outcomes": [
+    "TBD - created by archiving change fix-embed-queue-errnorows-race. Update Purpose after archive."
+  ],
+  "requirements": [
+    {
+      "id": "embed-worker-treats-deleted-chunk-as-benign-skip",
+      "text": "The embed queue worker SHALL treat `sql.ErrNoRows` from `GetChunkByID` as a benign skip condition, not an error. Chunks may be deleted between enqueue and pop via: 1. Document re-upsert (old chunks cascade-deleted) 2. Workspace deletion (FK CASCADE on `chunks.workspace_hash`) 3. `cleanup-orphan-workspaces` sweep In all three cases, the absence of the chunk is the correct DB state — the worker has nothing to do. When `sql.ErrNoRows` is detected: - A DEBUG-level log entry is emitted with the `chunk_id` for diagnostic purposes - The pending counter is decremented - The worker continues to the next item without retry All other DB errors (connection drop, timeout, encoding error, etc.) continue to emit ERROR-level logs with full error context, preserving existing behavior."
+    }
+  ]
+}

@@ -121,16 +121,20 @@ Then opt in on the project, in `putnami.json`:
 
 `putnami specs validate` reads `openspec/specs/invoice-export/spec.md` as the
 feature's spec. A requirement's ID is its normalized name:
-`### Requirement: Export as PDF` is `export-as-pdf`. To keep an ID through a
-rename, or to give one to a name with a non-ASCII character, write an anchor on
-the line above the heading:
+`### Requirement: Export as PDF` is `export-as-pdf`. A non-ASCII character
+counts as a separator, and a name with no ASCII letter or digit takes its
+position, such as `requirement-3`, which `enforce` refuses. To keep an ID
+through a rename, or to give one to such a name, write an anchor on the line
+above the heading:
 
 ```markdown
 <!-- putnami:id export-as-pdf -->
 ### Requirement: Export to PDF
 ```
 
-A requirement body over 512 bytes is an error that names its line: split it.
+A Purpose paragraph or a requirement body over 512 bytes is still read. Its
+finding names its line and a split: a warning in `report`, an error in
+`enforce`.
 `#### Scenario:` names are compared with the checks you declare, and a mismatch
 is a warning. `openspec/changes/` is never read. The mapping is in the
 [`protocols/features` README](../../../protocols/features/README.md).

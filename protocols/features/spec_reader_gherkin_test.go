@@ -188,24 +188,19 @@ func TestReaderAgreesWithTheUpstreamCorpus(t *testing.T) {
 			outcomes = []string{expected.Feature.Name}
 		}
 		refusedAt := map[string]bool{}
-		owner := func(line int, ownerName string, scenarios []int) {
-			if _, ok := features.NormalizeRequirementName(ownerName); !ok {
-				refusedAt[features.SpecPosition{File: name, Line: line}.Field()] = true
-			}
-			want = append(want, upstreamOwner(line, scenarios))
-		}
+		// A name with no ID takes its position, so only a Feature with nothing
+		// to state is refused.
 		if len(expected.Feature.Rules) == 0 || len(expected.Feature.Scenarios) > 0 {
-			owner(expected.Feature.Line, expected.Feature.Name, expected.Feature.Scenarios)
+			want = append(want, upstreamOwner(expected.Feature.Line, expected.Feature.Scenarios))
 		}
 		for _, rule := range expected.Feature.Rules {
-			owner(rule.Line, rule.Name, rule.Scenarios)
+			want = append(want, upstreamOwner(rule.Line, rule.Scenarios))
 		}
 		if len(outcomes) == 0 {
 			refusedAt[features.SpecPosition{File: name, Line: expected.Feature.Line}.Field()] = true
 		}
 		if len(refusedAt) > 0 {
-			// A name with no ID, or a Feature with nothing to state, is refused
-			// at its line.
+			// A Feature with nothing to state is refused at its line.
 			fields := map[string]bool{}
 			for _, finding := range reading.Findings {
 				fields[finding.Field] = true
@@ -268,7 +263,7 @@ func TestPutnamiCheckTagNamesTheScenarioCheck(t *testing.T) {
 	spectest.Proves(t, "features/feature-contracts", "gherkin-identity", "a-putnami-check-tag-names-the-scenario-check")
 	text := "Feature: F\n  @putnami-check:exported\n  Scenario: The accountant exports March\n  Scenario: Une exportation échoue\n  Scenario: It runs\n"
 	projection := readGherkin(t, text)
-	if got := gherkinRequirements(projection); got != "f@1:exported@3,@4,it-runs@5" {
+	if got := gherkinRequirements(projection); got != "f@1:exported@3,une-exportation-choue@4,it-runs@5" {
 		t.Fatalf("got %s", got)
 	}
 }
@@ -286,10 +281,12 @@ func TestAnchorTagMayShareItsLine(t *testing.T) {
 func TestNameWithNoIDNeedsATag(t *testing.T) {
 	t.Parallel()
 	spectest.Proves(t, "features/feature-contracts", "gherkin-identity", "a-name-with-no-id-needs-a-tag")
-	projection := readGherkin(t, "Feature: F\n  Rule: Règle d'or\n")
-	if projection.Spec != nil || codes(projection.Findings) != features.ErrorCodeSpecRead+"@"+gherkinPath+"#L2" ||
-		!strings.Contains(projection.Findings[0].Message, "@putnami-id:") {
-		t.Fatalf("findings = %v", projection.Findings)
+	projection := readGherkin(t, "Feature: F\n  Rule: 黄金律\n")
+	if got := gherkinRequirements(projection); got != "requirement-1@2:" || len(projection.Findings) != 0 {
+		t.Fatalf("got %s, findings = %v", got, projection.Findings)
+	}
+	if enforce := projection.EnforceOnly(features.VerificationModeEnforce); codes(enforce) != features.ErrorCodeSpecRequirementUnanchored+"@"+gherkinPath+"#L2" {
+		t.Fatalf("enforce = %v", enforce)
 	}
 	if got := gherkinRequirements(readGherkin(t, "Feature: F\n  @putnami-id:golden-rule\n  Rule: Règle d'or\n")); got != "golden-rule@3:" {
 		t.Fatalf("got %s", got)

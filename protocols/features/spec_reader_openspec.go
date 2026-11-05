@@ -264,17 +264,12 @@ func (parser *openSpecParser) requirementHeading(level int, title string, number
 }
 
 func (parser *openSpecParser) openRequirement(name string, number int, anchor string) {
-	id, ok := anchor, anchor != ""
-	if !ok {
-		id, ok = NormalizeRequirementName(name)
-	}
-	if !ok {
-		parser.findings = append(parser.findings, diag.Errorf(ErrorCodeSpecRead, parser.position(number).Field(),
-			"requirement %q has no ID: write an anchor on the line above it", name))
-		return
+	id, unanchored := anchor, false
+	if id == "" {
+		id, unanchored = requirementIDFromName(name, len(parser.spec.Requirements)+1)
 	}
 	parser.spec.Requirements = append(parser.spec.Requirements, SpecRequirement{ID: id})
-	parser.records = append(parser.records, SpecRequirementRecord{Position: parser.position(number), Scenarios: []SpecScenario{}})
+	parser.records = append(parser.records, SpecRequirementRecord{Position: parser.position(number), Unanchored: unanchored, Scenarios: []SpecScenario{}})
 	parser.inBody, parser.inRequirement = true, true
 }
 
@@ -296,9 +291,9 @@ func (parser *openSpecParser) closeRequirement() {
 	parser.inRequirement = false
 }
 
-// outcomes bounds the prose here, where its line is known: a validation finding
-// on an outcome would name only the reference.
-func (parser *openSpecParser) outcomes() (outcomes []string, refused bool) {
+// outcomes gives each Purpose paragraph and its line, so a finding on an
+// outcome, such as the bound ReadSpecSource checks, points at that line.
+func (parser *openSpecParser) outcomes() (outcomes []string, positions []SpecPosition) {
 	paragraphs := parser.purpose
 	if len(paragraphs) == 0 {
 		paragraphs = parser.leading
@@ -306,19 +301,14 @@ func (parser *openSpecParser) outcomes() (outcomes []string, refused bool) {
 	for _, paragraph := range paragraphs {
 		position := parser.position(paragraph.line)
 		text := strings.Join(strings.Fields(strings.Join(paragraph.lines, " ")), " ")
-		if len(text) > specTextMaxLength {
-			refused = true
-			parser.findings = append(parser.findings, diag.Errorf(ErrorCodeSpecRead, position.Field(),
-				"this Purpose paragraph has %d bytes, over the %d-byte bound: split it into two paragraphs", len(text), specTextMaxLength))
-			continue
-		}
 		if isOpenSpecPlaceholder(text) {
 			parser.findings = append(parser.findings, diag.Warningf(WarningCodeSpecPlaceholderOutcome, position.Field(),
 				"this Purpose is a placeholder: write what the capability is for"))
 		}
 		outcomes = append(outcomes, text)
+		positions = append(positions, position)
 	}
-	return outcomes, refused
+	return outcomes, positions
 }
 
 func isOpenSpecPlaceholder(text string) bool {
@@ -347,12 +337,10 @@ func (parser *openSpecParser) decisions(texts []string) []string {
 }
 
 func (parser *openSpecParser) reading() SpecReading {
-	outcomes, refused := parser.outcomes()
+	outcomes, positions := parser.outcomes()
 	if len(outcomes) == 0 {
-		if !refused {
-			parser.findings = append(parser.findings, diag.Errorf(ErrorCodeSpecRead, parser.position(max(parser.purposeLine, 1)).Field(),
-				"this spec states no outcome: write its Purpose"))
-		}
+		parser.findings = append(parser.findings, diag.Errorf(ErrorCodeSpecRead, parser.position(max(parser.purposeLine, 1)).Field(),
+			"this spec states no outcome: write its Purpose"))
 		return SpecReading{Findings: parser.findings}
 	}
 	texts := append([]string(nil), outcomes...)
@@ -362,5 +350,5 @@ func (parser *openSpecParser) reading() SpecReading {
 	spec := parser.spec
 	spec.Outcomes = outcomes
 	spec.Decisions = parser.decisions(texts)
-	return SpecReading{Spec: &spec, Requirements: parser.records, Findings: parser.findings}
+	return SpecReading{Spec: &spec, Requirements: parser.records, OutcomePositions: positions, Findings: parser.findings}
 }

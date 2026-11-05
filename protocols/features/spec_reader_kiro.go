@@ -233,11 +233,10 @@ func (scan *kiroScan) openGroup(label string, level int, position SpecPosition) 
 	if scan.anchor != nil {
 		id = scan.anchor.id
 		scan.anchor = nil
-	} else if normalized, ok := NormalizeRequirementName(label); ok {
-		id = "requirement-" + normalized
+	} else if mapped, positional := requirementIDFromName(label, scan.groups+1); positional {
+		id = mapped
 	} else {
-		scan.fail(position, "this requirement label cannot become an ID: write an anchor above it")
-		id = "requirement"
+		id = "requirement-" + mapped
 	}
 	scan.group = &kiroRequirementGroup{id: id, level: level, position: position}
 	scan.groups++
@@ -283,10 +282,6 @@ func (scan *kiroScan) finish() {
 	for _, paragraph := range scan.paragraphs {
 		text := strings.Join(strings.Fields(strings.Join(paragraph.lines, " ")), " ")
 		for _, outcome := range kiroOutcomes(text) {
-			if len(outcome) > specTextMaxLength {
-				scan.fail(paragraph.position, "this Introduction sentence has %d bytes, over the %d-byte bound: split it into two sentences", len(outcome), specTextMaxLength)
-				continue
-			}
 			spec.Outcomes = append(spec.Outcomes, outcome)
 			scan.reading.OutcomePositions = append(scan.reading.OutcomePositions, paragraph.position)
 		}
@@ -320,7 +315,7 @@ func (scan *kiroScan) finish() {
 // kiroOutcomes cuts a paragraph over the bound at sentence ends, keeping as many
 // sentences together as the bound allows. An Introduction is free prose that no
 // other tool bounds, so refusing a long one would fail a first report run. A
-// single sentence over the bound comes back whole, for the caller to refuse.
+// single sentence over the bound comes back whole, and ReadSpecSource marks it.
 func kiroOutcomes(text string) []string {
 	if len(text) <= specTextMaxLength {
 		return []string{text}

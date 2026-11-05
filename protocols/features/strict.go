@@ -36,7 +36,6 @@ const (
 	ErrorCodeSpecFormatNotEnabled         = "features.spec_format_not_enabled"
 	ErrorCodeSpecFormatUnavailable        = "features.spec_format_unavailable"
 	ErrorCodeSpecRead                     = "features.spec_read"
-	ErrorCodeSpecRequirementTooLong       = "features.spec_requirement_too_long"
 	ErrorCodeSpecRequirementUnanchored    = "features.spec_requirement_unanchored"
 	ErrorCodeUnresolvedSurface            = "features.unresolved_surface"
 	ErrorCodeInvalidObservation           = "features.invalid_observation"
@@ -77,6 +76,9 @@ const (
 	// FindingCodeSpecNeedsClarification is a warning in report and an error in
 	// enforce, so its name claims no severity.
 	FindingCodeSpecNeedsClarification = "features.spec_needs_clarification"
+	// FindingCodeSpecTextTooLong marks an external text over the native bound.
+	// The projection keeps the text, so only enforce refuses it.
+	FindingCodeSpecTextTooLong = "features.spec_text_too_long"
 )
 
 // ValidDiagnosticCodes enumerates the reserved automation vocabulary.
@@ -101,7 +103,7 @@ var ValidDiagnosticCodes = map[string]bool{
 	WarningCodeUnclassifiedContribution: true, WarningCodeUnresolvedFeatureAuthority: true,
 	WarningCodeUnobservedRequirement: true, WarningCodeSpecScenarioMismatch: true,
 	ErrorCodeInvalidSpecReference: true, ErrorCodeSpecFormatNotEnabled: true, ErrorCodeSpecFormatUnavailable: true,
-	ErrorCodeSpecRead: true, ErrorCodeSpecRequirementTooLong: true, ErrorCodeSpecRequirementUnanchored: true,
+	ErrorCodeSpecRead: true, FindingCodeSpecTextTooLong: true, ErrorCodeSpecRequirementUnanchored: true,
 	WarningCodeSpecDerivedFact: true, WarningCodeSpecPlaceholderOutcome: true, WarningCodeSpecRequirementIgnored: true, FindingCodeSpecNeedsClarification: true,
 	WarningCodeSpecCriterionMalformed: true,
 }
