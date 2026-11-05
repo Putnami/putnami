@@ -343,10 +343,10 @@
     },
     {
       "id": "D-043",
-      "statement": "a spec reader ignores an unknown section, warns on a section that restates a derived fact, and fails a requirement text over the 512-byte bound with an error that names a split",
-      "settled": "2026-11-04",
-      "settledBy": "fdumay",
-      "adr": "tooling/sdd-extension/doc/adr/0004-a-spec-may-live-in-an-external-market-format.md",
+      "statement": "a spec reader ignores an unknown section and warns on a derived-fact section; an external text over the 512-byte bound is still read, with a finding that names a split and blocks only in enforce; a native spec keeps the bound as an error",
+      "settled": "2026-11-05",
+      "settledBy": "the epic session, under the owner's delegation of 2026-11-05",
+      "adr": "protocols/features/doc/adr/0006-the-spec-source-contract.md",
       "reviewOnly": true
     },
     {
@@ -431,7 +431,7 @@
     },
     {
       "id": "D-054",
-      "statement": "a Kiro Introduction paragraph over the 512-byte bound is cut at sentence ends into several outcomes; only a single sentence over the bound is an error",
+      "statement": "a Kiro Introduction paragraph over the 512-byte bound is cut at sentence ends into several outcomes; a single sentence over the bound stays whole, under D-043",
       "settled": "2026-11-05",
       "settledBy": "a build session, for the owner to review on its proposal",
       "adr": "protocols/features/doc/adr/0006-the-spec-source-contract.md",
@@ -451,6 +451,14 @@
       "settled": "2026-11-05",
       "settledBy": "a build session, for the owner to review on its proposal",
       "adr": "tooling/sdd-extension/doc/adr/0004-a-spec-may-live-in-an-external-market-format.md",
+      "reviewOnly": true
+    },
+    {
+      "id": "D-057",
+      "statement": "a requirement name maps to an ID by turning each run of characters other than ASCII letters and digits, non-ASCII included, into one hyphen; a name with nothing left or over 128 bytes takes requirement-<ordinal> and is unanchored",
+      "settled": "2026-11-05",
+      "settledBy": "a build session, for the owner to review on its proposal",
+      "adr": "protocols/features/doc/adr/0006-the-spec-source-contract.md",
       "reviewOnly": true
     }
   ]

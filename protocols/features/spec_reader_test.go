@@ -53,7 +53,7 @@ func TestReaderProjectsTheConformanceFixture(t *testing.T) {
 func TestReaderFindingNamesItsFileAndLine(t *testing.T) {
 	t.Parallel()
 	spectest.Proves(t, "features/feature-contracts", "spec-reader-contract", "a-reader-finding-names-its-file-and-line")
-	projection := features.ReadSpecSource(conformance.MinimalSpecReader{}, minimalInput("outcome O\nrequirement Über | text\n"))
+	projection := features.ReadSpecSource(conformance.MinimalSpecReader{}, minimalInput("outcome O\nrequirement !!! | text\n"))
 	if projection.Spec != nil || codes(projection.Findings) != features.ErrorCodeSpecRead+"@spec/invoice/spec.txt#L2" {
 		t.Fatalf("got %s", codes(projection.Findings))
 	}
@@ -62,11 +62,27 @@ func TestReaderFindingNamesItsFileAndLine(t *testing.T) {
 func TestOverLongRequirementNamesASplit(t *testing.T) {
 	t.Parallel()
 	spectest.Proves(t, "features/feature-contracts", "spec-reader-contract", "an-over-long-requirement-names-a-split")
-	text := "outcome O\nrequirement Long | " + strings.Repeat("a", 513) + "\n"
-	projection := features.ReadSpecSource(conformance.MinimalSpecReader{}, minimalInput(text))
-	if len(projection.Findings) != 1 || projection.Findings[0].Code != features.ErrorCodeSpecRequirementTooLong ||
-		projection.Findings[0].Field != "spec/invoice/spec.txt#L2" || !strings.Contains(projection.Findings[0].Message, "split it") {
-		t.Fatalf("got %v", projection.Findings)
+	long := strings.Repeat("a", 513)
+	projection := features.ReadSpecSource(conformance.MinimalSpecReader{}, minimalInput("outcome "+long+"\nrequirement Long | "+long+"\n"))
+	if projection.Spec == nil || len(projection.Findings) != 0 || projection.Spec.Requirements[0].Text != long {
+		t.Fatalf("an external text over the bound must be read whole: %v", projection.Findings)
+	}
+	want := features.FindingCodeSpecTextTooLong + "@spec/invoice#outcomes[0]," + features.FindingCodeSpecTextTooLong + "@spec/invoice/spec.txt#L2"
+	report := projection.EnforceOnly(features.VerificationModeReport)
+	if codes(report) != want || diag.HasErrors(report) || !strings.Contains(report[1].Message, "split it into two requirements") {
+		t.Fatalf("report = %v", report)
+	}
+	if enforce := projection.EnforceOnly(features.VerificationModeEnforce); codes(enforce) != want || len(enforce) != 2 ||
+		enforce[0].Severity != diag.Error || enforce[1].Severity != diag.Error {
+		t.Fatalf("enforce = %v", enforce)
+	}
+	native := projection.Spec
+	external := []features.SpecSource{{Path: "spec/invoice", Spec: native, External: true}}
+	if findings := features.ValidateSpecRepository(external, []string{native.Feature}); len(findings) != 0 {
+		t.Fatalf("the repository check bounded an external text again: %v", findings)
+	}
+	if findings := features.ValidateSpec(native); !diag.HasErrors(findings) {
+		t.Fatal("a native spec keeps the bound as an error")
 	}
 }
 
@@ -96,10 +112,19 @@ func TestRequirementNameNormalizesToOneID(t *testing.T) {
 	}
 }
 
-func TestNonASCIINameHasNoID(t *testing.T) {
+func TestNonASCIIRunIsASeparator(t *testing.T) {
 	t.Parallel()
-	spectest.Proves(t, "features/feature-contracts", "requirement-identity-mapping", "a-non-ascii-name-has-no-id")
-	for _, name := range []string{"Überprüfung", "!!!", "", strings.Repeat("a", 129)} {
+	spectest.Proves(t, "features/feature-contracts", "requirement-identity-mapping", "a-non-ascii-run-is-a-separator")
+	for name, want := range map[string]string{
+		"Überprüfung":       "berpr-fung",
+		"Export für Kunden": "export-f-r-kunden",
+		"Règle 2 — totaux":  "r-gle-2-totaux",
+	} {
+		if got, ok := features.NormalizeRequirementName(name); !ok || got != want {
+			t.Errorf("%q = %q, %v", name, got, ok)
+		}
+	}
+	for _, name := range []string{"日本語", "é", "!!!", "", strings.Repeat("a", 129)} {
 		if got, ok := features.NormalizeRequirementName(name); ok {
 			t.Errorf("%q = %q", name, got)
 		}
@@ -265,7 +290,7 @@ func TestEveryDiagnosticCodeOfTheContractIsReserved(t *testing.T) {
 	t.Parallel()
 	for _, code := range []string{
 		features.ErrorCodeInvalidSpecReference, features.ErrorCodeSpecFormatNotEnabled, features.ErrorCodeSpecFormatUnavailable,
-		features.ErrorCodeSpecRead, features.ErrorCodeSpecRequirementTooLong, features.ErrorCodeSpecRequirementUnanchored,
+		features.ErrorCodeSpecRead, features.FindingCodeSpecTextTooLong, features.ErrorCodeSpecRequirementUnanchored,
 		features.WarningCodeSpecScenarioMismatch, features.WarningCodeSpecDerivedFact, features.WarningCodeSpecRequirementIgnored, features.FindingCodeSpecNeedsClarification,
 	} {
 		if !features.ValidDiagnosticCodes[code] {

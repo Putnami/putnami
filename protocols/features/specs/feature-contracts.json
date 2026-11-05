@@ -58,11 +58,11 @@
     },
     {
       "id": "spec-reader-contract",
-      "text": "A reader turns the bytes of one external spec into a spec, a record per requirement and findings, with no network, model, clock or filesystem. The contract wraps every reader: a finding names its file and line, also on an outcome or a non-goal the reader located, a requirement over 512 bytes is an error that names a split, two requirements with one ID name both positions, and the same bytes give the same result."
+      "text": "A reader turns the bytes of one external spec into a spec, a record per requirement and findings, with no network, model, clock or filesystem. The contract wraps every reader: a finding names its file and line, also on an outcome or a non-goal the reader located, a text over 512 bytes stays whole with an enforce finding that names a split, two requirements with one ID name both positions, and the same bytes give the same result."
     },
     {
       "id": "requirement-identity-mapping",
-      "text": "A requirement name becomes an ID by one mapping: lowercase ASCII letters, keep ASCII digits, turn each other run into one hyphen, trim the ends. A name with a non-ASCII character, nothing left or over 128 bytes has no ID. An anchor stands alone above its requirement, and its ID follows the native segment grammar."
+      "text": "A requirement name becomes an ID by one mapping: lowercase ASCII letters, keep ASCII digits, turn each other run, non-ASCII included, into one hyphen, trim the ends. A name with nothing left or over 128 bytes has no ID: it takes requirement-<ordinal> and is unanchored. An anchor stands alone above its requirement, and its ID follows the native segment grammar."
     },
     {
       "id": "spec-format-policy",
@@ -94,11 +94,11 @@
     },
     {
       "id": "openspec-requirement-identity",
-      "text": "An OpenSpec requirement takes the ID of the anchor on the line above it, otherwise its normalized name, so it is never unanchored. A name with no ID and no anchor is an error at its line. Two requirements with one ID fail with both positions. An anchor above no requirement, or one that breaks the segment grammar, is an error at its line."
+      "text": "An OpenSpec requirement takes the ID of the anchor on the line above it, otherwise its normalized name. A name with no ID and no anchor takes requirement-<ordinal> and is unanchored. Two requirements with one ID fail with both positions. An anchor above no requirement, or one that breaks the segment grammar, is an error at its line."
     },
     {
       "id": "openspec-findings",
-      "text": "Real OpenSpec specs, brownfield ones included, parse with findings at file and line. No Purpose and no leading prose is an error. A Purpose paragraph over 512 bytes is an error that names a split. A placeholder Purpose stays the outcome with a warning. A Status, Dates, Branch, Routes or Entities section is one derived-fact warning each and projects nothing. The same bytes give the same result."
+      "text": "Real OpenSpec specs, brownfield ones included, parse with findings at file and line. No Purpose and no leading prose is an error. A Purpose paragraph over 512 bytes stays whole with an enforce finding that names a split. A placeholder Purpose stays the outcome with a warning. A Status, Dates, Branch, Routes or Entities section is one derived-fact warning each and projects nothing. The same bytes give the same result."
     },
     {
       "id": "kiro-projection",
@@ -110,7 +110,7 @@
     },
     {
       "id": "kiro-findings",
-      "text": "A criterion in an EARS form or a FOR ALL property has no finding. Any other criterion is projected with a warning at its line, so a parse never drops or crashes on text. A group with no criterion and a section that restates a derived fact are one warning each. A missing outcome, a file with no group, an Introduction sentence over 512 bytes and an unclosed comment or fence are errors at a line."
+      "text": "A criterion in an EARS form or a FOR ALL property has no finding. Any other criterion is projected with a warning at its line, so a parse never drops or crashes on text. A group with no criterion and a section that restates a derived fact are one warning each. An Introduction sentence over 512 bytes stays whole with an enforce finding. A missing outcome, a file with no group and an unclosed comment or fence are errors at a line."
     },
     {
       "id": "gherkin-projection",
@@ -118,7 +118,7 @@
     },
     {
       "id": "gherkin-identity",
-      "text": "A Rule or a requirement Feature takes the ID of its @putnami-id tag, else its normalized name, and a name with no ID is an error at its line. A scenario takes the check of its @putnami-check tag, else its normalized name. Such a tag may share its line with other tags. One that breaks its grammar, repeats, or stands above another keyword is an error at its line, and no tag is inherited."
+      "text": "A Rule or a requirement Feature takes the ID of its @putnami-id tag, else its normalized name, and a name with no ID takes requirement-<ordinal> and is unanchored. A scenario takes the check of its @putnami-check tag, else its normalized name. Such a tag may share its line with other tags. One that breaks its grammar, repeats, or stands above another keyword is an error at its line, and no tag is inherited."
     },
     {
       "id": "gherkin-scenarios",

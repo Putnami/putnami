@@ -5,8 +5,10 @@
   `@putnami/sdd` (`tooling/sdd-extension`)
 - **Implements**:
   [ADR 0004 of `@putnami/sdd`](../../../../tooling/sdd-extension/doc/adr/0004-a-spec-may-live-in-an-external-market-format.md),
-  decisions D-039 to D-047. It records D-048 to D-055 of the root
-  `decisions.json`, which build sessions took and the owner has not reviewed
+  decisions D-039 to D-047. It records D-048 to D-055 and D-057 of the root
+  `decisions.json`, which build sessions took and the owner has not reviewed,
+  and D-043 as the epic session revised it under the owner's delegation of
+  2026-11-05
 - **One-way door**: the `spec` reference is authored in committed manifests,
   and the format names are public wire values. A release can add to them but
   cannot change them without a new manifest version and a move of every
@@ -39,9 +41,9 @@ task input is a static pattern, so it cannot depend on a manifest value.
    `<workspace path>#L<line>`.
 5. **A name becomes an ID by one mapping.** `NormalizeRequirementName`
    lowercases ASCII letters, keeps ASCII digits, and turns each other run of
-   ASCII characters into one hyphen. It trims the hyphens at both ends. A name
-   with a non-ASCII character, with nothing left, or longer than 128 bytes after
-   mapping has no ID and needs an anchor.
+   characters, non-ASCII ones included, into one hyphen. It trims the hyphens
+   at both ends. A name with nothing left, or longer than 128 bytes after
+   mapping, has no ID: §23 says what it gets. (D-057)
 6. **An anchor stands alone on the line above its requirement.** It reads
    `<!-- putnami:id <segment-id> -->`. In a Gherkin file it is the tag
    `@putnami-id:<segment-id>` on the line above the `Rule:`. The ID follows the
@@ -83,7 +85,8 @@ task input is a static pattern, so it cannot depend on a manifest value.
     mode. It lists such findings in `SpecReading.EnforceFindings`, as warnings.
     `SpecProjection.EnforceOnly` gives them for one mode: warnings in `report`,
     errors in `enforce`, with the unanchored requirements of §13 as errors. A
-    Spec Kit `[NEEDS CLARIFICATION]` marker is the first such finding.
+    Spec Kit `[NEEDS CLARIFICATION]` marker is the first such finding, and a
+    text over the bound (§22) is another.
 17. **A reader can locate an outcome or a non-goal.** `SpecReading` carries
     `OutcomePositions` and `NonGoalPositions`, parallel to the spec's lists, so
     a validation finding on that text follows §4. A text with no position stays
@@ -103,10 +106,27 @@ task input is a static pattern, so it cannot depend on a manifest value.
 20. **A long Introduction paragraph is cut at sentence ends.** An Introduction
     is free prose that Kiro does not bound. In a sample of 186 public files, 39
     paragraphs exceed 512 bytes, and an error would fail those projects on their
-    first `report` run. The outcomes keep the text. Only a single sentence over
-    the bound is an error. (D-054)
+    first `report` run. The outcomes keep the text. A single sentence over the
+    bound stays whole, and §22 applies to it. (D-054)
 21. **A Kiro user story projects nothing.** It is context for its group, and
     adding it to each criterion would spend the 512-byte bound on repeated text.
+22. **An external text over the bound is read.** A requirement, an outcome or a
+    non-goal over the 512-byte bound of the native spec stays whole in the
+    projection. `ReadSpecSource` adds the enforce finding
+    `features.spec_text_too_long` at its line, and the finding names a split.
+    No reader checks the bound itself, so the four formats follow one rule. A
+    native spec keeps the bound as an error, and `ValidateSpecRepository` does
+    not check it again on an external spec. On 127 public OpenSpec files, 27
+    failed their first `report` run on this bound or on §5, which broke the
+    promise of ADR 0004 that a market spec gives results with no rewrite. Such
+    a projection is never written as a native document, so the 512-byte bound
+    of `putnami-spec.json` still holds for every file on disk. (D-043)
+23. **A name with no ID is unanchored.** A requirement whose name leaves no ID
+    under §5, and has no anchor, takes the positional ID `requirement-<n>`,
+    with `n` its 1-based place among the projected requirements, and is
+    unanchored. `report` reads it, and `enforce` fails on it under §13 with a
+    finding that asks for an anchor. A Kiro group in that case takes
+    `requirement-<n>` from its place among the groups. (D-057)
 
 ### The Gherkin reader
 

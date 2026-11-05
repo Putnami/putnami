@@ -357,8 +357,8 @@ func (scan *specKitScan) requirement(text string, position SpecPosition) bool {
 	if scan.anchor != nil {
 		id, unanchored = scan.anchor.id, false
 		scan.anchor = nil
-	} else if normalized, ok := NormalizeRequirementName(label); ok {
-		id = normalized
+	} else {
+		id, _ = requirementIDFromName(label, len(scan.reading.Spec.Requirements)+1)
 	}
 	spec := scan.reading.Spec
 	spec.Requirements = append(spec.Requirements, SpecRequirement{ID: id, Text: body})

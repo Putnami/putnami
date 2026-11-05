@@ -72,6 +72,11 @@ because `specs.baseline.json` records `feature#requirement` pairs.
    restates a derived fact (status, dates, branch, routes, entities) is a
    warning. A requirement text over the 512-byte bound of the native spec is
    an error that names a split. (D-043)
+
+   Revised on 2026-11-05: an external text over the bound is read, and its
+   finding blocks only in `enforce`. [ADR 0006 of
+   `protocols/features`](../../../../protocols/features/doc/adr/0006-the-spec-source-contract.md)
+   §22 records the rule.
 6. **Only `doc/adr/*.md` links are decisions.** `design.md` and `plan.md` are
    context. The reader never projects them as decision links. (D-044)
 7. **Native and external specs share one discovery.** The rule "one spec per

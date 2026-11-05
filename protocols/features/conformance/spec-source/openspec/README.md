@@ -1,9 +1,9 @@
 # OpenSpec fixtures
 
 Each `spec.md` here is a file of a public repository, copied unchanged.
-`spec.golden.json`, where it exists, is the spec the reader projects from it.
-`editorjs-bundle` and `nano-brain-embed-queue` have no golden because each is
-refused with a positioned finding.
+`spec.golden.json` is the spec the reader projects from it.
+`editorjs-bundle` and `nano-brain-embed-queue` each hold a text over the
+512-byte bound: the projection keeps it whole, and `enforce` refuses it.
 
 | Fixture | Repository, file under `openspec/specs/` | Commit | License | Copyright |
 |---|---|---|---|---|

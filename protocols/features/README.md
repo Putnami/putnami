@@ -131,11 +131,22 @@ the file the reference names:
 A reference under `openspec/changes/` is an error: a change is a proposal in
 flight, not the current spec. HTML comments, fenced code and unknown sections
 project nothing. A decision link that starts with a dot is relative to the spec
-file; any other is workspace-relative. A scenario name with a non-ASCII
-character maps to no check, so it gives a mismatch warning. A placeholder
+file; any other is workspace-relative. A placeholder
 Purpose stays the outcome with `features.spec_placeholder_outcome`, and a Status, Dates, Branch, Routes or
-Entities section gives `features.spec_derived_fact`. A Purpose paragraph or a
-requirement body over 512 bytes is an error at its line that names a split.
+Entities section gives `features.spec_derived_fact`.
+
+Every reader shares two rules, which `ReadSpecSource` applies:
+
+- A name maps to an ID with each run of characters other than ASCII letters and
+  digits, non-ASCII ones included, turned into one hyphen: `Règle d'or` is
+  `r-gle-d-or`. A name with nothing left, such as `日本語`, takes
+  `requirement-<n>` from its place and is unanchored, so `enforce` asks for an
+  anchor. A scenario name maps to its check by the same rule, and a scenario
+  whose name maps to nothing has no check, so it gives a mismatch warning.
+- An outcome, a non-goal or a requirement text over 512 bytes stays whole. It
+  gets `features.spec_text_too_long` at its line, which names a split: a
+  warning in `report`, an error in `enforce`. A native spec keeps the bound as
+  an error.
 
 A feature may carry an optional `surface` object that lists the command paths
 that carry it, for example

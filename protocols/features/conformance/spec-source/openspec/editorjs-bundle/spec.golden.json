@@ -1,0 +1,21 @@
+{
+  "protocolVersion": 1,
+  "feature": "billing/invoice-export",
+  "outcomes": [
+    "`@editorjs/editorjs` is the batteries-included entry point for Editor.js: its default export `EditorJS` composes the headless `@editorjs/core` engine with `DOMAdapters`, `CollaborationManager`, a default set of tools (paragraph, bold, italic, link) and plugins (clipboard, shortcuts, default block settings), and the default UI, so a caller can get a fully functional editor from configuration alone. It auto-initializes from the constructor, exposes an `isReady` promise, and accepts a v2-style `config.tools` map merged over the defaults with override-by-name."
+  ],
+  "requirements": [
+    {
+      "id": "batteries-included-editor-entry-point",
+      "text": "The system SHALL provide `@editorjs/editorjs`, a package whose default export is an `EditorJS` class that composes `@editorjs/core` with a default set of tools, plugins, infrastructure, and UI so that a caller can construct a fully functional editor from configuration alone."
+    },
+    {
+      "id": "constructor-auto-initialization-with-readiness-promise",
+      "text": "The `EditorJS` class SHALL begin initialization from within its constructor and expose an `isReady` promise that resolves when the editor has finished initializing and rejects if initialization fails."
+    },
+    {
+      "id": "v2-style-tool-configuration-with-override-by-name",
+      "text": "The `EditorJS` class SHALL accept a v2-style `config.tools` map of tool name to tool constructor and merge it on top of the default tools, where a user-provided tool replaces a default tool that has the same name."
+    }
+  ]
+}

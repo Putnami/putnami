@@ -721,6 +721,12 @@ func validateEvidenceProvenance(field string, provenance EvidenceProvenance, sou
 // document already specifies it, are workspace facts and belong to
 // ValidateSpecRepository.
 func ValidateSpec(input *Spec) []diag.Diagnostic {
+	return validateSpec(input, specTextMaxLength)
+}
+
+// validateSpec bounds each text to textBound bytes. An external spec passes no
+// practical bound: ReadSpecSource reports its long texts as enforce findings.
+func validateSpec(input *Spec, textBound int) []diag.Diagnostic {
 	if input == nil {
 		return []diag.Diagnostic{diag.Errorf(ErrorCodeParseError, "", "spec is nil")}
 	}
@@ -741,8 +747,8 @@ func ValidateSpec(input *Spec) []diag.Diagnostic {
 	if input.Outcomes != nil && len(spec.Outcomes) == 0 {
 		diagnostics = append(diagnostics, diag.Errorf(ErrorCodeInvalidID, "outcomes", "a spec must state at least one intended outcome"))
 	}
-	diagnostics = append(diagnostics, validateSpecStatements("outcomes", spec.Outcomes)...)
-	diagnostics = append(diagnostics, validateSpecStatements("nonGoals", spec.NonGoals)...)
+	diagnostics = append(diagnostics, validateSpecStatements("outcomes", spec.Outcomes, textBound)...)
+	diagnostics = append(diagnostics, validateSpecStatements("nonGoals", spec.NonGoals, textBound)...)
 
 	// Requirements and decision links are walked in file order, not in the
 	// canonical ID order, so a field index names the entry an author can find
@@ -758,8 +764,8 @@ func ValidateSpec(input *Spec) []diag.Diagnostic {
 		} else {
 			seenRequirements[requirement.ID] = field
 		}
-		if !boundedText(requirement.Text, specTextMaxLength) {
-			diagnostics = append(diagnostics, diag.Errorf(ErrorCodeInvalidRequirement, field+".text", "requirement %q text must be non-blank, at most %d bytes, without control characters", requirement.ID, specTextMaxLength))
+		if !boundedText(requirement.Text, textBound) {
+			diagnostics = append(diagnostics, diag.Errorf(ErrorCodeInvalidRequirement, field+".text", "requirement %q text must be %s", requirement.ID, textRule(textBound)))
 		}
 	}
 
@@ -777,11 +783,19 @@ func ValidateSpec(input *Spec) []diag.Diagnostic {
 	return diagnostics
 }
 
-func validateSpecStatements(field string, statements []string) []diag.Diagnostic {
+// textRule states what a spec text must be, with the bound only when one holds.
+func textRule(textBound int) string {
+	if textBound == math.MaxInt {
+		return "non-blank, without control characters"
+	}
+	return fmt.Sprintf("non-blank, at most %d bytes, without control characters", textBound)
+}
+
+func validateSpecStatements(field string, statements []string, textBound int) []diag.Diagnostic {
 	var diagnostics []diag.Diagnostic
 	for i, statement := range statements {
-		if !boundedText(statement, specTextMaxLength) {
-			diagnostics = append(diagnostics, diag.Errorf(ErrorCodeInvalidID, fmt.Sprintf("%s[%d]", field, i), "%s statements must be non-blank, at most %d bytes, without control characters", field, specTextMaxLength))
+		if !boundedText(statement, textBound) {
+			diagnostics = append(diagnostics, diag.Errorf(ErrorCodeInvalidID, fmt.Sprintf("%s[%d]", field, i), "%s statements must be %s", field, textRule(textBound)))
 		}
 	}
 	return diagnostics
@@ -846,7 +860,11 @@ func ValidateSpecRepository(specSources []SpecSource, authoredFeatureIDs []strin
 			diagnostics = append(diagnostics, diag.Errorf(ErrorCodeOutsideDiscoveryRoot, "path", "a spec must be a direct JSON child of %s/ at a workspace or exact project root", SpecDirectory))
 			canonicalSource = ""
 		}
-		for _, finding := range ValidateSpec(source.Spec) {
+		textBound := specTextMaxLength
+		if source.External {
+			textBound = math.MaxInt
+		}
+		for _, finding := range validateSpec(source.Spec, textBound) {
 			diagnostics = append(diagnostics, withSource(canonicalSource, finding))
 		}
 		if source.Spec == nil {

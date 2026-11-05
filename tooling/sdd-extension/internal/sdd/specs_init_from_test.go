@@ -208,7 +208,7 @@ func TestSpecsInitFromRefusesAtTheSourcePosition(t *testing.T) {
 				return specKitFromWorkspace(t, "<!-- putnami:id export-a-month -->\n", "System MUST "+strings.Repeat("export ", 80))
 			},
 			feature: "billing/invoicing", from: "speckit:" + specKitFromPath, wantErr: protocolcli.ErrInvalidConfig,
-			code: featureproto.ErrorCodeSpecRequirementTooLong, field: source + "#L8", mentions: "split it",
+			code: featureproto.FindingCodeSpecTextTooLong, field: source + "#L8", mentions: "split it",
 		},
 		{
 			name:    "a --from that is not the feature's reference",

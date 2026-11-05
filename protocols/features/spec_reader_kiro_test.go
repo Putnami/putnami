@@ -178,8 +178,11 @@ func TestUnmappableGroupLabelNeedsAnAnchor(t *testing.T) {
 	spectest.Proves(t, "features/feature-contracts", "kiro-requirement-identity", "a-group-label-with-no-id-needs-an-anchor")
 	heading := "### Requirement " + strings.Repeat("1", 129) + "\n\n#### Acceptance Criteria\n\n1. THE system SHALL run\n"
 	projection := readKiro(t, "## Introduction\n\nWhy.\n\n"+heading)
-	if got := kiroFindings(projection, features.ErrorCodeSpecRead); projection.Spec != nil || len(got) != 1 || got[0] != kiroFile+"#L5" {
-		t.Fatalf("findings = %v", projection.Findings)
+	if projection.Spec == nil || diag.HasErrors(projection.Findings) || kiroIDs(t, projection) != "requirement-1-1" {
+		t.Fatalf("a label with no ID must project: %v", projection.Findings)
+	}
+	if enforce := projection.EnforceOnly(features.VerificationModeEnforce); codes(enforce) != features.ErrorCodeSpecRequirementUnanchored+"@"+kiroFile+"#L9" {
+		t.Fatalf("enforce = %v", enforce)
 	}
 	if projection := readKiro(t, "## Introduction\n\nWhy.\n\n<!-- putnami:id export -->\n"+heading); kiroIDs(t, projection) != "export-1" {
 		t.Fatalf("an anchor did not name the group: %v", projection.Findings)
@@ -362,8 +365,17 @@ func TestLongIntroductionSentenceNamesItsLine(t *testing.T) {
 	t.Parallel()
 	spectest.Proves(t, "features/feature-contracts", "kiro-findings", "a-long-introduction-sentence-names-its-line")
 	projection := readKiro(t, "## Introduction\n\n"+strings.Repeat("word ", 120)+"\n\n### Requirement 1\n\n#### Acceptance Criteria\n\n1. THE system SHALL run\n")
-	if got := kiroFindings(projection, features.ErrorCodeSpecRead); projection.Spec != nil || len(got) != 1 || got[0] != kiroFile+"#L3" {
-		t.Fatalf("findings = %v", projection.Findings)
+	if projection.Spec == nil || diag.HasErrors(projection.Findings) {
+		t.Fatalf("a long Introduction sentence must stay an outcome: %v", projection.Findings)
+	}
+	enforce := projection.EnforceOnly(features.VerificationModeEnforce)
+	found := false
+	for _, finding := range enforce {
+		found = found || (finding.Code == features.FindingCodeSpecTextTooLong && finding.Field == kiroFile+"#L3" &&
+			finding.Severity == diag.Error && strings.Contains(finding.Message, "split it"))
+	}
+	if !found {
+		t.Fatalf("enforce = %v", enforce)
 	}
 }
 

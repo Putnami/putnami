@@ -249,8 +249,9 @@ func TestAnOutcomeFindingNamesItsLine(t *testing.T) {
 	t.Parallel()
 	spectest.Proves(t, "features/feature-contracts", "spec-reader-contract", "an-outcome-finding-names-its-line")
 	projection := readSpecKit(t, strings.Replace(specKitMinimal, "Done.", strings.Repeat("a", 513), 1))
-	if projection.Spec != nil || len(projection.Findings) != 1 || projection.Findings[0].Field != specKitPath+"/spec.md#L9" {
-		t.Fatalf("got %s", codes(projection.Findings))
+	report := projection.EnforceOnly(features.VerificationModeReport)
+	if projection.Spec == nil || codes(report) != features.FindingCodeSpecTextTooLong+"@"+specKitPath+"/spec.md#L9" {
+		t.Fatalf("got %s, report %s", codes(projection.Findings), codes(report))
 	}
 }
 
@@ -299,8 +300,9 @@ func TestANonGoalFindingNamesItsLine(t *testing.T) {
 	t.Parallel()
 	spectest.Proves(t, "features/feature-contracts", "spec-reader-contract", "a-non-goal-finding-names-its-line")
 	projection := readSpecKit(t, specKitMinimal+"\n## Out of Scope\n\n- "+strings.Repeat("a", 513)+"\n")
-	if projection.Spec != nil || len(projection.Findings) != 1 || projection.Findings[0].Field != specKitPath+"/spec.md#L13" {
-		t.Fatalf("got %s", codes(projection.Findings))
+	report := projection.EnforceOnly(features.VerificationModeReport)
+	if projection.Spec == nil || codes(report) != features.FindingCodeSpecTextTooLong+"@"+specKitPath+"/spec.md#L13" {
+		t.Fatalf("got %s, report %s", codes(projection.Findings), codes(report))
 	}
 }
 

@@ -2,6 +2,7 @@ package features
 
 import (
 	"fmt"
+	"math"
 	"regexp"
 	"sort"
 	"strconv"
@@ -195,9 +196,9 @@ func (projection SpecProjection) EnforceOnly(mode VerificationMode) []diag.Diagn
 }
 
 // ReadSpecSource runs reader under the contract every format shares: the
-// projection is a valid native spec for input.Feature, a requirement over the
-// native bound is an error that names a split, two requirements with one ID
-// name both positions, and a validation finding points at the file.
+// projection is a native spec for input.Feature, a text over the native bound
+// stays whole with an enforce finding that names a split, two requirements with
+// one ID name both positions, and a validation finding points at the file.
 func ReadSpecSource(reader SpecReader, input SpecInput) SpecProjection {
 	input.Files = append([]SpecFile(nil), input.Files...)
 	sort.Slice(input.Files, func(i, j int) bool { return input.Files[i].Path < input.Files[j].Path })
@@ -229,20 +230,15 @@ func ReadSpecSource(reader SpecReader, input SpecInput) SpecProjection {
 	refused := make(map[string]bool)
 	for i, requirement := range spec.Requirements {
 		position := reading.Requirements[i].Position
-		if len(requirement.Text) > specTextMaxLength {
-			refused[fmt.Sprintf("requirements[%d].text", i)] = true
-			findings = append(findings, diag.Errorf(ErrorCodeSpecRequirementTooLong, position.Field(),
-				"requirement %q has %d bytes, over the %d-byte bound: split it into two requirements", requirement.ID, len(requirement.Text), specTextMaxLength))
-		}
 		if earlier, seen := first[requirement.ID]; seen {
 			refused[fmt.Sprintf("requirements[%d].id", i)] = true
 			findings = append(findings, diag.Errorf(ErrorCodeInvalidRequirement, position.Field(),
-				"requirement ID %q at %s is also the ID at %s", requirement.ID, position, earlier))
+				"requirement ID %q at %s is also the ID at %s: write an anchor above one of them", requirement.ID, position, earlier))
 		} else {
 			first[requirement.ID] = position
 		}
 	}
-	for _, finding := range ValidateSpec(&spec) {
+	for _, finding := range validateSpec(&spec, math.MaxInt) {
 		if refused[finding.Field] {
 			continue
 		}
@@ -252,7 +248,33 @@ func ReadSpecSource(reader SpecReader, input SpecInput) SpecProjection {
 	if diag.HasErrors(findings) {
 		return finishProjection(nil, SpecReading{}, findings)
 	}
+	reading.EnforceFindings = append(append([]diag.Diagnostic(nil), reading.EnforceFindings...),
+		specTextBoundFindings(&spec, input.Reference.Path, reading)...)
 	return finishProjection(&spec, reading, findings)
+}
+
+// specTextBoundFindings marks each text over the native bound. The projection
+// keeps the text whole, because a market format does not bound it and refusing
+// it would fail a first report run; only enforce asks for the split. (D-043)
+func specTextBoundFindings(spec *Spec, referencePath string, reading SpecReading) []diag.Diagnostic {
+	var findings []diag.Diagnostic
+	mark := func(field, kind, split string, text string) {
+		if len(text) <= specTextMaxLength {
+			return
+		}
+		findings = append(findings, diag.Warningf(FindingCodeSpecTextTooLong, specFindingField(field, referencePath, reading),
+			"this %s has %d bytes, over the %d-byte bound of a native spec: split it into %s", kind, len(text), specTextMaxLength, split))
+	}
+	for i, outcome := range spec.Outcomes {
+		mark(fmt.Sprintf("outcomes[%d]", i), "outcome", "two outcomes", outcome)
+	}
+	for i, nonGoal := range spec.NonGoals {
+		mark(fmt.Sprintf("nonGoals[%d]", i), "non-goal", "two non-goals", nonGoal)
+	}
+	for i, requirement := range spec.Requirements {
+		mark(fmt.Sprintf("requirements[%d]", i), fmt.Sprintf("requirement %q", requirement.ID), "two requirements", requirement.Text)
+	}
+	return findings
 }
 
 func finishProjection(spec *Spec, reading SpecReading, findings []diag.Diagnostic) SpecProjection {
@@ -376,18 +398,15 @@ func compareFileScenarios(projection SpecProjection, declared map[string][]strin
 }
 
 // NormalizeRequirementName maps a name-based requirement to its ID. It
-// lowercases ASCII letters, keeps ASCII digits, turns each other run of ASCII
-// characters into one hyphen and trims the ends. A name with a non-ASCII
-// character, with nothing left, or longer than the bound has no ID: its author
-// writes an anchor.
+// lowercases ASCII letters, keeps ASCII digits, turns each other run of
+// characters, non-ASCII ones included, into one hyphen and trims the ends. A
+// name with nothing left, or longer than the bound, has no ID. (D-057)
 func NormalizeRequirementName(name string) (string, bool) {
 	var out strings.Builder
 	pending := false
 	for i := 0; i < len(name); i++ {
 		c := name[i]
 		switch {
-		case c >= 0x80:
-			return "", false
 		case c >= 'A' && c <= 'Z':
 			c += 'a' - 'A'
 		case c >= 'a' && c <= 'z', c >= '0' && c <= '9':
@@ -406,6 +425,17 @@ func NormalizeRequirementName(name string) (string, bool) {
 		return "", false
 	}
 	return id, true
+}
+
+// requirementIDFromName gives a requirement with no anchor the ID its name maps
+// to. A name that maps to none takes requirement-<ordinal>, its 1-based place
+// among the requirements, so the ID comes from its position: the requirement is
+// unanchored, report reads it and enforce asks for an anchor. (D-057)
+func requirementIDFromName(name string, ordinal int) (id string, unanchored bool) {
+	if id, ok := NormalizeRequirementName(name); ok {
+		return id, false
+	}
+	return "requirement-" + strconv.Itoa(ordinal), true
 }
 
 // ParseSpecAnchor reads one line. isAnchor says the line is an anchor, and err

@@ -435,22 +435,18 @@ func ruleText(rule *gherkinBlock) string {
 }
 
 func (scan *gherkinScan) requirement(block *gherkinBlock, text string) {
-	id, ok := "", false
+	id, unanchored := "", false
 	if block.anchor != nil {
-		id, ok = block.anchor.id, true
+		id = block.anchor.id
 	} else {
-		id, ok = NormalizeRequirementName(block.name)
-	}
-	if !ok {
-		scan.fail(block.position, "%q gives no requirement ID: write @putnami-id:<id> on the line above it", block.name)
-		return
+		id, unanchored = requirementIDFromName(block.name, len(scan.reading.Spec.Requirements)+1)
 	}
 	scenarios := block.scenarios
 	if scenarios == nil {
 		scenarios = []SpecScenario{}
 	}
 	scan.reading.Spec.Requirements = append(scan.reading.Spec.Requirements, SpecRequirement{ID: id, Text: text})
-	scan.reading.Requirements = append(scan.reading.Requirements, SpecRequirementRecord{Position: block.position, Scenarios: scenarios})
+	scan.reading.Requirements = append(scan.reading.Requirements, SpecRequirementRecord{Position: block.position, Unanchored: unanchored, Scenarios: scenarios})
 }
 
 func (scan *gherkinScan) fail(position SpecPosition, format string, args ...any) {

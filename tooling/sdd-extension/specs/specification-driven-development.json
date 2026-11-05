@@ -108,7 +108,7 @@
     },
     {
       "id": "enforce-needs-anchors",
-      "text": "A project in enforce fails on each positional requirement with no anchor, and on each finding a reader marks for enforce, such as a NEEDS CLARIFICATION marker, at its file and line. A project in report projects the requirement with no finding about it, and keeps the marker a warning."
+      "text": "A project in enforce fails on each positional requirement with no anchor, and on each finding a reader marks for enforce, such as a NEEDS CLARIFICATION marker or a text over 512 bytes, at its file and line. A project in report projects the requirement with no finding about it, and keeps the marker a warning."
     },
     {
       "id": "external-spec-files-key-the-spec-tasks",

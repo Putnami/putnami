@@ -108,3 +108,27 @@ func TestRenamedOpenSpecRequirementFailsTheRatchet(t *testing.T) {
 		t.Fatalf("the anchor kept the ID: %v, %+v", err, report.Diagnostics)
 	}
 }
+
+func TestOpenSpecTextOverTheBoundBlocksOnlyInEnforce(t *testing.T) {
+	spectest.Proves(t, "tooling/specification-driven-development", "enforce-needs-anchors", "enforce-fails-a-text-over-the-bound")
+	ws := openSpecWorkspace(t)
+	text := strings.Replace(openSpecMarkdown, "{anchor}", "", 1)
+	text = strings.Replace(text, "The system SHALL issue an invoice.", "The system SHALL issue an invoice."+strings.Repeat(" Again.", 80), 1)
+	writeFixtureFile(t, filepath.Join(ws.Root, "app", "openspec", "specs", "invoice-export", "spec.md"), text)
+
+	report, err := BuildSpecValidationResult(ws, Selection{})
+	if err == nil || !hasDiagnostic(report.Diagnostics, featureproto.FindingCodeSpecTextTooLong, "split it") {
+		t.Fatalf("enforce passed over a text past the bound: %v, %+v", err, report.Diagnostics)
+	}
+	for _, finding := range report.Diagnostics {
+		if finding.Code == featureproto.FindingCodeSpecTextTooLong && finding.Field != "app/openspec/specs/invoice-export/spec.md#L7" {
+			t.Fatalf("the finding names %s, not the requirement's line", finding.Field)
+		}
+	}
+
+	ws.Projects[0].Config.Options["sdd"]["verification"] = map[string]any{"specs": "report"}
+	report, err = BuildSpecValidationResult(ws, Selection{})
+	if err != nil || diag.HasErrors(report.Diagnostics) || !hasDiagnostic(report.Diagnostics, featureproto.FindingCodeSpecTextTooLong, "split it") {
+		t.Fatalf("report must read the spec and warn: %v, %+v", err, report.Diagnostics)
+	}
+}

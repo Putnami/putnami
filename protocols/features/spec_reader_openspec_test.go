@@ -61,7 +61,7 @@ func TestRealOpenSpecSpecsReproduceTheirGoldens(t *testing.T) {
 	t.Parallel()
 	spectest.Proves(t, "features/feature-contracts", "openspec-projection", "real-openspec-specs-reproduce-their-goldens")
 	spectest.Proves(t, "features/feature-contracts", "openspec-findings", "the-same-openspec-bytes-give-the-same-result")
-	for _, name := range []string{"fission-cli-feedback", "nita-projects", "undatum-distribution", "runtime-env-ci-cd"} {
+	for _, name := range []string{"fission-cli-feedback", "nita-projects", "undatum-distribution", "runtime-env-ci-cd", "editorjs-bundle", "nano-brain-embed-queue"} {
 		conformance.RunSpecSource(t, openSpecReader(t), openSpecFixture(t, name), filepath.Join(openSpecFixtures, name, "spec.golden.json"))
 	}
 }
@@ -71,13 +71,35 @@ func TestBrownfieldOpenSpecSpecsParseWithPositionedFindings(t *testing.T) {
 	spectest.Proves(t, "features/feature-contracts", "openspec-findings", "brownfield-openspec-specs-parse-with-positioned-findings")
 	cases := []struct{ name, want string }{
 		{"runtime-env-ci-cd", features.WarningCodeSpecPlaceholderOutcome + "@" + openSpecFile + "#L5"},
-		{"editorjs-bundle", features.ErrorCodeSpecRead + "@" + openSpecFile + "#L4"},
-		{"nano-brain-embed-queue", features.ErrorCodeSpecRequirementTooLong + "@" + openSpecFile + "#L6," + features.WarningCodeSpecPlaceholderOutcome + "@" + openSpecFile + "#L4"},
+		{"editorjs-bundle", ""},
+		{"nano-brain-embed-queue", features.WarningCodeSpecPlaceholderOutcome + "@" + openSpecFile + "#L4"},
 	}
 	for _, testCase := range cases {
 		projection := features.ReadSpecSource(openSpecReader(t), openSpecFixture(t, testCase.name))
 		if got := codes(projection.Findings); got != testCase.want {
 			t.Errorf("%s: findings = %s, want %s", testCase.name, got, testCase.want)
+		}
+	}
+}
+
+// TestSampledSpecsOverABoundBlockOnlyInEnforce reads the sampled files that a
+// D-043 bound refused before: report reads them, and enforce fails each with a
+// finding that names the line and the split.
+func TestSampledSpecsOverABoundBlockOnlyInEnforce(t *testing.T) {
+	t.Parallel()
+	spectest.Proves(t, "features/feature-contracts", "openspec-findings", "brownfield-openspec-specs-parse-with-positioned-findings")
+	for name, want := range map[string]string{
+		"editorjs-bundle":        features.FindingCodeSpecTextTooLong + "@" + openSpecFile + "#L4",
+		"nano-brain-embed-queue": features.FindingCodeSpecTextTooLong + "@" + openSpecFile + "#L6",
+	} {
+		projection := features.ReadSpecSource(openSpecReader(t), openSpecFixture(t, name))
+		report := projection.EnforceOnly(features.VerificationModeReport)
+		if projection.Spec == nil || diag.HasErrors(projection.Findings) || diag.HasErrors(report) || codes(report) != want {
+			t.Errorf("%s: report = %s, findings %s", name, codes(report), codes(projection.Findings))
+		}
+		enforce := projection.EnforceOnly(features.VerificationModeEnforce)
+		if codes(enforce) != want || !diag.HasErrors(enforce) || !strings.Contains(enforce[0].Message, "split it") {
+			t.Errorf("%s: enforce = %v", name, enforce)
 		}
 	}
 }
@@ -169,10 +191,10 @@ func TestOpenSpecNameGivesTheID(t *testing.T) {
 	if requirementIDs(projection.Spec) != "export-as-pdf,lower" || projection.Requirements[0].Unanchored {
 		t.Fatalf("got %+v", projection)
 	}
-	refused := readOpenSpec(t, "## Purpose\nO.\n## Requirements\n### Requirement: Über\nThe text.\n### Requirement:\nThe text.\n")
-	want := features.ErrorCodeSpecRead + "@" + openSpecFile + "#L4," + features.ErrorCodeSpecRead + "@" + openSpecFile + "#L6"
-	if refused.Spec != nil || codes(refused.Findings) != want {
-		t.Fatalf("got %s", codes(refused.Findings))
+	unnamed := readOpenSpec(t, "## Purpose\nO.\n## Requirements\n### Requirement: Über\nThe text.\n### Requirement:\nThe text.\n")
+	if unnamed.Spec == nil || requirementIDs(unnamed.Spec) != "ber,requirement-2" || len(unnamed.Findings) != 0 ||
+		unnamed.Requirements[0].Unanchored || !unnamed.Requirements[1].Unanchored {
+		t.Fatalf("got %+v", unnamed)
 	}
 }
 
@@ -254,9 +276,28 @@ func TestOverLongPurposeParagraphNamesASplit(t *testing.T) {
 	t.Parallel()
 	spectest.Proves(t, "features/feature-contracts", "openspec-findings", "an-over-long-purpose-paragraph-names-a-split")
 	projection := readOpenSpec(t, "## Purpose\nShort.\n\n"+strings.Repeat("a", 513)+"\n")
-	if projection.Spec != nil || codes(projection.Findings) != features.ErrorCodeSpecRead+"@"+openSpecFile+"#L4" ||
-		!strings.Contains(projection.Findings[0].Message, "split it") {
-		t.Fatalf("got %+v", projection.Findings)
+	if projection.Spec == nil || len(projection.Findings) != 0 || len(projection.Spec.Outcomes) != 2 {
+		t.Fatalf("a long Purpose paragraph must stay an outcome: %+v", projection.Findings)
+	}
+	enforce := projection.EnforceOnly(features.VerificationModeEnforce)
+	if codes(enforce) != features.FindingCodeSpecTextTooLong+"@"+openSpecFile+"#L4" || !strings.Contains(enforce[0].Message, "split it into two outcomes") {
+		t.Fatalf("enforce = %+v", enforce)
+	}
+}
+
+func TestOpenSpecNameWithNoIDIsUnanchored(t *testing.T) {
+	t.Parallel()
+	spectest.Proves(t, "features/feature-contracts", "openspec-requirement-identity", "an-openspec-name-gives-the-id")
+	projection := readOpenSpec(t, "## Purpose\nO.\n## Requirements\n### Requirement: Überprüfung\nThe text.\n### Requirement: 日本語\nThe text.\n")
+	if projection.Spec == nil || requirementIDs(projection.Spec) != "berpr-fung,requirement-2" || len(projection.Findings) != 0 {
+		t.Fatalf("got %+v", projection)
+	}
+	if report := projection.EnforceOnly(features.VerificationModeReport); len(report) != 0 {
+		t.Fatalf("report = %v", report)
+	}
+	enforce := projection.EnforceOnly(features.VerificationModeEnforce)
+	if codes(enforce) != features.ErrorCodeSpecRequirementUnanchored+"@"+openSpecFile+"#L6" || !strings.Contains(enforce[0].Message, "anchor") {
+		t.Fatalf("enforce = %v", enforce)
 	}
 }
 
