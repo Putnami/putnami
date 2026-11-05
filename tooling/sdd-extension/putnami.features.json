@@ -393,6 +393,20 @@
               "an-ignored-external-spec-is-absent"
             ]
           }
+        },
+        {
+          "id": "openspec-specs-reach-the-gate",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "an-openspec-project-reaches-specs-validate",
+              "a-renamed-openspec-requirement-fails-the-ratchet"
+            ]
+          }
         }
       ],
       "surface": {
