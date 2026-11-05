@@ -344,10 +344,12 @@ func (r repository) path(segments ...string) string {
 }
 
 // number reads the issue or pull request number of a reference to this
-// repository; the source compares case-insensitively, as GitHub owner and
-// repository names do. ok is false for any other reference.
+// repository. The source must be exactly the lowercase one this repository
+// issues: a source in another casing names the same repository on GitHub, but
+// this provider never issued it, and answering about the lowercase reference
+// would give one item two references. ok is false for any other reference.
 func (r repository) number(ref collab.Ref) (int, bool) {
-	if !strings.EqualFold(ref.Source, r.source) {
+	if ref.Source != r.source {
 		return 0, false
 	}
 	number, err := strconv.Atoi(ref.ID)
@@ -355,6 +357,16 @@ func (r repository) number(ref collab.Ref) (int, bool) {
 		return 0, false
 	}
 	return number, true
+}
+
+// missing explains why a reference names nothing here, and names this
+// repository's source when the reference spells it in another casing.
+func (r repository) missing(what string, ref collab.Ref) string {
+	message := fmt.Sprintf("no %s %s in source %s", what, ref.ID, ref.Source)
+	if ref.Source != r.source && strings.EqualFold(ref.Source, r.source) {
+		message += fmt.Sprintf("; this provider issues the source as %s", r.source)
+	}
+	return message
 }
 
 func (r repository) ref(number int) collab.Ref {

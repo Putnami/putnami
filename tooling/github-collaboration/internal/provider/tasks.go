@@ -86,7 +86,7 @@ func issueRevision(issue *ghIssue) string {
 func (s *taskSession) issue(ref collab.Ref) (*ghIssue, *collab.Failure) {
 	number, ours := s.repo.number(ref)
 	if !ours {
-		return nil, collab.Fail(collab.OutcomeNotFound, "task.missing", "no task %s in source %s", ref.ID, ref.Source)
+		return nil, collab.Fail(collab.OutcomeNotFound, "task.missing", "%s", s.repo.missing("task", ref))
 	}
 	var issue ghIssue
 	if _, err := s.client.Get(s.ctx, s.repo.path("issues", strconv.Itoa(number)), nil, &issue); err != nil {
