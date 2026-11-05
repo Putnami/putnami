@@ -178,6 +178,8 @@ idempotent creation, and a truthful answer when a write's outcome is unknown.
   Enterprise Server release without them refuses every keyed create.
 - A concurrent writer between a read and a write is not detected.
 - The draft flag in a cloud session relies on routes GitHub does not
-  document: the session proxy serves them, and the provider follows that
-  proxy's refusal text and its client's hints. A proxy that drops them makes
-  the draft change fail with the GraphQL refusal again.
+  document: the session proxy serves them. Their names come from that proxy's
+  refusal text and from the Claude Code client's `gh pr ready` hint; the
+  provider reads neither at run time. A proxy that answers 404 there makes the
+  draft change fail with the GraphQL refusal again; any other answer from the
+  proxy is the answer.
