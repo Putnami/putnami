@@ -832,17 +832,16 @@ func execError(c config, version, path string, err error) error {
 }
 
 // testBinaryExecError reports a Go test binary that reached the exec. It is a
-// hard error rather than a silent skip because the caller is a test that would
-// otherwise be measuring the wrong process, and rather than an exec because
-// syscall.Exec would end the suite. See isTestBinary for why that is worse than
-// any failure: the run exits 0 and prints "ok" with most tests never executed.
+// hard error, not a silent skip and not an exec: syscall.Exec would end the
+// suite, and the run would exit 0 and print "ok" with most tests never executed
+// (see isTestBinary).
 //
 // The fix belongs in the test, not here: give it its own workspace with
 // t.Chdir(t.TempDir()) so no pin applies, or set NoRelaunchEnv when the test
-// genuinely means to run against a pinned workspace.
-// It is InvalidConfig, not a generic error, so it stays distinguishable from a
-// genuine exec failure (execError) when triaging a CI log: this one is always a
-// defect in the test, never in the machine.
+// means to run against a pinned workspace.
+//
+// The error is InvalidConfig, so it stays distinguishable from a genuine exec
+// failure (execError): this one is always a defect in the test.
 func testBinaryExecError(c config, version, path string) error {
 	return protocolcli.WithNext(
 		protocolcli.InvalidConfigf(

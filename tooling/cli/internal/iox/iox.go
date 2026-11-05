@@ -87,7 +87,7 @@ func Fprint(w io.Writer, a ...any) {
 // Write writes raw bytes to w, discarding any error.
 // CLI output writes are non-recoverable; see package doc.
 func Write(w io.Writer, b []byte) {
-	destination(w).Write(b) //nolint:errcheck // fire-and-forget CLI output
+	_, _ = destination(w).Write(b)
 }
 
 // DefaultReadCap is the maximum number of bytes ReadCapped retains before

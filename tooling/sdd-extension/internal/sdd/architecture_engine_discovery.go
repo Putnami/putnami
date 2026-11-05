@@ -158,7 +158,7 @@ func readBoundedFile(path string, info fs.FileInfo) ([]byte, error) {
 	if info.Size() > MaximumManifestBytes {
 		return nil, fmt.Errorf("file exceeds %d bytes", MaximumManifestBytes)
 	}
-	data, err := os.ReadFile(path) //nolint:gosec // path comes from a contained workspace walk or fixed root filename
+	data, err := os.ReadFile(path)
 	if err != nil {
 		return nil, err
 	}

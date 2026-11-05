@@ -123,11 +123,10 @@ func InstallTargetName(args []string) string {
 // argument list and validates them, returning the remaining arguments (the
 // optional artifact name, --latest, …) untouched.
 //
-// It is a hand-rolled pass rather than a catalog parse because the arguments
-// reach this package already stripped of global flags, and because the same
-// list is re-scanned downstream for the artifact name — leaving `--platform`
-// and its `linux/amd64` value in it would make the value look like an
-// extension name.
+// It is a hand-rolled pass, not a catalog parse: the arguments reach this
+// package already stripped of global flags, and the same list is re-scanned
+// downstream for the artifact name, so `--platform` and its `linux/amd64` value
+// must not remain in it.
 //
 // wsRoot may be empty for a pure validity check (ExtensionsInstallMaterializes);
 // the machine-global-store guard is then skipped.

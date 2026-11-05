@@ -171,8 +171,7 @@ var generatedContractHomes = map[string]string{
 // rules the cut is listed with decide: such a candidate is in the cut only
 // because Git tracks it, and its message names the git mv that moves it out.
 // Any other candidate is one a build's output can be too, and its message asks
-// first to ignore .gen and to drop a rule that re-includes the file, such as
-// the carve-out a provider once kept for .gen/clientgen/config.json.
+// first to ignore .gen and to drop a rule that re-includes the file.
 func committedGeneratedContracts(view workspaceView) []Finding {
 	if view.tree == nil {
 		return nil
@@ -458,7 +457,7 @@ func readGenerationConfig(view workspaceView, projectRel string) ([]byte, string
 
 func indexedProjectPaths(workspaceRoot string) ([]string, error) {
 	path := filepath.Join(workspaceRoot, ".putnami", "workspace-index.json")
-	data, err := os.ReadFile(path) //nolint:gosec // fixed Putnami workspace index
+	data, err := os.ReadFile(path)
 	if err != nil {
 		return nil, fmt.Errorf("read Putnami workspace project index: %w", err)
 	}

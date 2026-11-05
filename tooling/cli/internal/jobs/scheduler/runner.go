@@ -570,9 +570,9 @@ func runJob(
 	extraEnv []string,
 	onEvent EventHandler,
 ) (*JobResult, error) {
-	// Production reaches this point with App/Engine already captured. Keep this
-	// direct API fail-closed too: package tests and the interactive adapter may
-	// invoke a job without going through the scheduler.
+	// Production reaches this point with App/Engine already captured; a direct
+	// call, as package tests and the interactive adapter make, is captured here
+	// so the API fails closed too.
 	ctx = CaptureProcessCapabilities(ctx)
 	onEvent = processCapabilityEventSink(ctx, job, onEvent)
 	start := time.Now()
@@ -728,12 +728,11 @@ func runJob(
 	result.Duration = clampWallToFirstEvent(duration, spawnToFirstEvent, firstEventObserved)
 	result.SpawnToFirstEvent = spawnToFirstEvent
 	result.FirstEventObserved = firstEventObserved
-	// The ONE spawn site is the only place a process's resource accounting still
-	// exists, so it is where the physical execution is recorded — id, wall, CPU
-	// split into user and system, peak RSS, block IO, and the concurrency this
-	// process was granted. CPUTime keeps its own field because the learned task
-	// weights read it per task; the execution is what a cost roll-up reads,
-	// exactly once per subprocess however many task records it produces.
+	// The spawn site records the physical execution — id, wall, CPU split into
+	// user and system, peak RSS, block IO, and the concurrency this process was
+	// granted — exactly once per subprocess however many task records it
+	// produces. CPUTime keeps its own field because the learned task weights
+	// read it per task.
 	if ps := cmd.ProcessState; ps != nil {
 		result.Execution = captureExecution(ps, spawnWall, job.CPUBudget)
 		result.CPUTime = result.Execution.CPUTime()

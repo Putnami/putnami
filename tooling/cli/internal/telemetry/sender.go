@@ -78,7 +78,7 @@ func DrainContext(ctx context.Context) {
 	// Hold the same cross-process lock used by Disable through local handoff and
 	// request dispatch. Buffer locking remains short-lived, so a foreground Flush
 	// can append while a slow collector request is in flight.
-	defer consentLock.Release() //nolint:errcheck // background draining is best-effort
+	defer consentLock.Release()
 
 	data, ok := drainSnapshot(ctx, bufferPath)
 	if !ok {
@@ -122,7 +122,7 @@ func DrainContext(ctx context.Context) {
 	if err != nil {
 		return
 	}
-	defer response.Body.Close() //nolint:errcheck // telemetry is best-effort
+	defer response.Body.Close()
 	// The local handoff is the delivery boundary. Any HTTP status remains
 	// fail-silent and deliberately cannot restore the batch for replay.
 }
@@ -143,7 +143,7 @@ func drainSnapshot(ctx context.Context, bufferPath string) ([]byte, bool) {
 	if err != nil {
 		return nil, false
 	}
-	defer lock.Release() //nolint:errcheck // a read-only snapshot is best-effort
+	defer lock.Release()
 
 	// A stale handoff temporary can only be from a pre-rename process exit: the
 	// request dispatch happens after rename. Drop it before reading the retained
@@ -170,7 +170,7 @@ func handoffSentBufferContext(ctx context.Context, bufferPath string, sent []byt
 	if err != nil {
 		return false
 	}
-	defer lock.Release() //nolint:errcheck // handoff is best-effort
+	defer lock.Release()
 	return handoffSentBufferLocked(bufferPath, sent)
 }
 

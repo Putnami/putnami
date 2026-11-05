@@ -105,7 +105,7 @@ func Record(runGit RunGit, repoRoot, projectRoot, repoPath, indexMode, objectID 
 	if !info.Mode().IsRegular() {
 		return protocaps.SourceBindingFile{}, false, fmt.Errorf("source path %q has unsupported mode %s", repoPath, info.Mode())
 	}
-	data, err := readFile(absPath) //nolint:gosec // path is constrained to the exact project root
+	data, err := readFile(absPath)
 	if os.IsNotExist(err) {
 		return protocaps.SourceBindingFile{}, false, nil
 	}

@@ -69,8 +69,7 @@ func writeAnalysis(b *strings.Builder, a analyze.Result) {
 // changedDependencies returns the changed components other than id that id
 // reaches through the edges, directly or through other components, in the
 // order of the components. A change that edits a component and one that
-// depends on it marks both changed; this keeps the edge between them in the
-// summary.
+// depends on it marks both changed; the summary keeps the edge between them.
 func changedDependencies(components []evidence.Component, edges map[string][]string, id string) []string {
 	seen := map[string]bool{id: true}
 	queue := slices.Clone(edges[id])

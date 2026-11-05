@@ -376,11 +376,10 @@ func BuildFeatureContextResult(ws *workspace.Workspace, selector string) (Featur
 		return report, runErr
 	}
 
-	// Native design declarations are self-contained and intentionally bypass
-	// the legacy whole-workspace evidence evaluation. This keeps the common
-	// authoring path scoped to the requested feature and free of unrelated
-	// warnings. If no generated graph matches, the durable v1 path below remains
-	// fully compatible.
+	// Native design declarations are self-contained and bypass the legacy
+	// whole-workspace evidence evaluation, so the common authoring path stays
+	// scoped to the requested feature. If no generated graph matches, the durable
+	// v1 path below applies.
 	design, unreadable, designErr := inspectNativeFeatureDesign(ws, selector)
 	if designErr != nil {
 		var ambiguity *nativeFeatureSelectorAmbiguity

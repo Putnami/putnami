@@ -14,8 +14,8 @@
 // that only knows the legacy layout computes blobDir(key) and never sees it.
 // The remote cache is shared far more widely than the machine-global store —
 // across machines, branches and CLI versions at once — so it needs the same
-// property or it loses it for everyone: a pre-B4c binary asking the provider for
-// key K would receive a format-2 payload, materialize it as a legacy capture,
+// property or it loses it for everyone: an older binary asking the provider
+// for key K would receive a format-2 payload, materialize it as a legacy capture,
 // and restore a tree laid out by declared-output id into a directory that
 // expects the captured shape. That is silent corruption, and no amount of care
 // in THIS build can prevent it, because the old binary cannot be taught.

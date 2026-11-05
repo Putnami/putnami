@@ -321,16 +321,13 @@ func resolveRegistries(ws *Workspace) {
 // carries a top-level `jobs` object — the accepted-but-ignored surface the
 // loader warns about.
 //
-// Presence, not size: `{"jobs": {}}` declares the key just as much as a populated
-// one does, and the project-marker scan already treats it that way (it keys off
-// `Jobs != nil`). Testing len() here would let an empty block mark a directory as
-// a project and then say nothing about it — the same silent no-op this warning
-// exists to end. `"jobs": null` and an absent key both leave the map nil and are
-// correctly quiet.
+// Presence, not size: `{"jobs": {}}` declares the key just as much as a
+// populated one, and the project-marker scan already treats it that way (it
+// keys off `Jobs != nil`). `"jobs": null` and an absent key leave the map nil
+// and are quiet.
 //
-// Paths (not names) because the path is what the operator has to open to remove
-// the key, and because a project that has not been probed yet may not have a
-// name. Sorted so one tree produces one warning string, run after run.
+// Paths, not names: the path is what the operator has to open to remove the
+// key. Sorted so one tree produces one warning string, run after run.
 func projectsDeclaringJobs(ws *Workspace) []string {
 	if ws == nil {
 		return nil

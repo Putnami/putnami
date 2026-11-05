@@ -106,10 +106,10 @@ func emitUpstreamJobs(
 					continue
 				}
 
-				// Collect the target step and all its intra-pipeline dependencies.
-				// When an upstream step like "npm" depends on "types" within the same
-				// pipeline, we must also emit "types" or it will be an unresolvable
-				// dependency that causes the step to be canceled.
+				// Collect the target step and all its intra-pipeline dependencies:
+				// when an upstream step like "npm" depends on "types" within the same
+				// pipeline, "types" is emitted too, or the step is canceled on an
+				// unresolvable dependency.
 				stepsToExpand := collectPipelineStepClosure(jobDef, n.cmdName, n.depName, n.stepID, ext, namespace, existing)
 				if len(stepsToExpand) == 0 {
 					continue

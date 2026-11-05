@@ -293,19 +293,16 @@ func (e *Engine) executeSession(
 
 	// The cache manager arrives from Engine.run, which builds it before
 	// planning so this execution and a release-set publish's selection keys
-	// share one memoized file-hash pass. It is built even under --no-cache,
-	// because the memo is not a cache of RESULTS.
+	// share one memoized file-hash pass. It is built even under --no-cache:
+	// the memo is not a cache of RESULTS.
 	//
 	// --no-cache drops it for everything below that means "reuse is allowed" —
 	// the remote cache and the opportunistic store GC, both gated on `cache !=
-	// nil`. The SCHEDULER keeps it. The flag resolves into the per-job bypass
-	// (cachekey.NewCacheBypass), which already refuses every lookup, restore,
-	// lease, publication and failure replay one task at a time, while the
-	// scheduler still needs the local store for the one write a bypassed run
-	// may make: deleting a recorded failure its own SUCCESS has just disproved.
-	// Taking the store away made --no-cache — the flag a user reaches
-	// for precisely to get past a stuck verdict — the single path that provably
-	// could not clear it.
+	// nil`. The SCHEDULER keeps it: the flag resolves into the per-job bypass
+	// (cachekey.NewCacheBypass), which refuses every lookup, restore, lease,
+	// publication and failure replay, while the scheduler still needs the local
+	// store for the one write a bypassed run may make: deleting a recorded
+	// failure its own SUCCESS has disproved.
 	schedulerCache := cache
 	if req.Global.NoCache {
 		cache = nil
@@ -461,9 +458,9 @@ func (e *Engine) executeSession(
 	// StoreBudget is the in-run half of the store budget;
 	// boundMachineCachesAfterRun holds the post-build half, and both are off
 	// with caching (a nil cache, or a relocated verification store, arms no
-	// budget). It is armed in this literal, as the run starts, because the
-	// instant it is created is the run's protection boundary: an in-run
-	// collection pass spares every entry used at or after it.
+	// budget). It is armed in this literal, as the run starts: its creation is
+	// the run's protection boundary, and an in-run collection pass spares every
+	// entry used at or after it.
 	result := scheduler.RunPlan(ctx, scheduler.RunRequest{
 		Workspace:                      ws,
 		Plan:                           planned,
@@ -625,14 +622,11 @@ func cacheSummary(cache *scheduler.CacheStatsSnapshot) any {
 // forwarded supplies `putnami run`'s workload code, consulted only once the run
 // is already a failure.
 //
-// Note the ordering: an ABORT wins over a failure here, because the process code
-// has to say "someone stopped this" (130) rather than bucket a killed run with a
-// genuine build failure. That convergence has SHIPPED: the v1 envelope, which
-// deliberately ordered it the other way so a machine reading the object saw the
-// failures named, is gone, and the v2 envelope agrees
-// with this function — status "aborted", exitCode 130 — while still counting and
-// listing the failures the run collected (machine.Run.Summary). One reduction,
-// one precedence, on both the process and the wire.
+// An ABORT wins over a failure here: the process code has to say "someone
+// stopped this" (130) rather than bucket a killed run with a genuine build
+// failure. The v2 envelope agrees — status "aborted", exitCode 130 — while still
+// counting and listing the failures the run collected (machine.Run.Summary):
+// one reduction, one precedence, on both the process and the wire.
 func sessionExitCode(session *scheduler.SessionResult, forwarded func() (int, bool)) int {
 	if session.Aborted {
 		return ExitSignalReceived

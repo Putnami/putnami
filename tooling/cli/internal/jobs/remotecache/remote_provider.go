@@ -214,8 +214,8 @@ func (r *RemoteCache) ensureProvider(ctx context.Context, ws *workspace.Workspac
 		return nil, false
 	}
 	// Reclaim the directories killed runs left under this parent. The sweep runs
-	// beside the build, because the first one after a long leak can take a
-	// while; closeProvider stops it between directories and waits for it.
+	// beside the build; closeProvider stops it between directories and waits for
+	// it.
 	sweep, sweepNow, sweepGrace := sweepExchangeDirs, time.Now(), exchangeSweepGrace()
 	p.sweep.Add(1)
 	go func() {

@@ -21,15 +21,9 @@ type ChangeImpactOptions struct {
 	// the task. When a changed file matches one of these patterns, EVERY project is
 	// treated as directly affected.
 	//
-	// It exists because the watch loop's deleted classifier
-	// (internal/watch/classifier.go, removed by an earlier cleanup) covered this case
-	// and --impacted does not: a `bun.lock` edit re-ran every project under
-	// `--watch` and selected nothing under `--impacted`. The gap now lives in this
-	// one shared function as an explicit, opt-in option rather than in a second
-	// algorithm. `--impacted` deliberately passes it EMPTY. Its root-file widening
-	// comes from each provider's precise project-level watchedFiles answer instead;
-	// this coarse whole-workspace option remains for callers that explicitly
-	// declare task input patterns, such as watch.
+	// `--impacted` passes it empty: its root-file widening comes from each
+	// provider's project-level watchedFiles answer. Callers that declare task input
+	// patterns, such as watch, set it.
 	WorkspaceInputPatterns []string
 
 	// Tasks resolves a change onto the TASKS that read it. Nil keeps the
@@ -64,10 +58,8 @@ type TaskImpactIndex interface {
 	// reference to one of them, closed under the tasks that depend on those. A
 	// nil list stands for every task of the source project.
 	//
-	// It names no project because the `^` relation is declared by a manifest,
-	// not by a project: which pairs of projects it crosses — a dependency edge
-	// or a contract edge — is the graph's business, and the graph is the
-	// model's.
+	// It names no project: which pairs of projects the `^` relation crosses, a
+	// dependency edge or a contract edge, is the graph's business.
 	TasksReachedFrom(tasks []string) []string
 
 	// TasksOfExtension returns every task an in-workspace extension project's
@@ -605,8 +597,7 @@ func sortedKeys(set map[string]bool) []string {
 //   - root-watched-file is a provider's project-level answer over a
 //     workspace-root entry. The index narrows it when it can attribute the file
 //     to tasks — a `from: "workspace"` input declares exactly these paths — and
-//     the project stays full when it cannot, because the provider claimed the
-//     file for a reason it did not have to state per task.
+//     the project stays full when it cannot.
 //   - scope-config and workspace-input keep the project full. A scope's
 //     putnami.json decides which extensions apply and which tags fire, so it
 //     changes which tasks EXIST rather than what one of them reads; a
@@ -858,10 +849,8 @@ func propagateImpact(
 	return affected, w.edges, scopes
 }
 
-// impactWalk is propagateImpact's working state. It is a type rather than a
-// stack of closures because the queue, the scopes and the edges are read and
-// written by every edge family, and a closure capturing all three reads as a
-// hidden parameter list.
+// impactWalk is propagateImpact's working state: the queue, the scopes and the
+// edges every edge family reads and writes.
 type impactWalk struct {
 	ws        *Workspace
 	index     TaskImpactIndex
@@ -1386,13 +1375,6 @@ func classifyChangedPaths(ws *Workspace, paths []string, ownership pathOwnership
 // input of one of their commands — `options.<layer>.filePatterns` in their
 // putnami.json, the same declaration the build cache hashes.
 //
-// It exists because the two readings of that one declaration had drifted:
-// the cache keyed on the declared files while selection ignored them,
-// so a change to a file a project declares as a test input landed with that
-// project's tests unrun under `--impacted`. `@putnami/cli` declares the
-// agent-workflow sources and owns the only drift gate over them, so every skill
-// change shipped with its gate unrun on CI.
-//
 // Patterns stay in the project-relative form they are authored in, and each
 // changed path is made relative to the declaring project before matching, which
 // is exactly the coordinate system the cache hasher resolves them in
@@ -1535,15 +1517,10 @@ func (idx declaredInputIndex) readersForPath(path string) []inputClaim {
 // the files LoadScopeChain merged into each project's tags, extensions and name
 // pattern, recorded on Project.Scope.ConfigPaths at discovery.
 //
-// It exists because the inheritance is a real input relation that nothing
-// declared. A scope's tags decide which of a child's jobs fire and feed
-// its cache keys, its extensions decide which providers contribute jobs at all,
-// and its name pattern decides the child's identity: one line in the scope
-// file reconfigures every include, and until this index a diff touching only
-// that line selected the scope-self (when the scope is activated) or nothing
-// at all. Before this index, an activated scope hid the gap by accident, through the
-// implicit include→scope-self edge that ADR 0038 made ordering-only; this is
-// the relation that edge was being mistaken for.
+// A scope's tags decide which of a child's jobs fire and feed its cache keys,
+// its extensions decide which providers contribute jobs at all, and its name
+// pattern decides the child's identity: one line in the scope file reconfigures
+// every include.
 //
 // A child cannot say this itself: a `filePatterns` entry would have to name a
 // file above its own directory and repeat the scope layout in every include.
@@ -1815,14 +1792,9 @@ func buildAssetSources(build *wsproto.BuildConfig) []string {
 //
 //	options.generate.assets: [ { "from": "<non-empty string>" }, … ]
 //
-// It takes the raw value rather than the options map so the caller's index
-// expression states which key is being decoded, and so this function names the
-// decoded shape once instead of once per enclosing level.
-//
-// A malformed entry is skipped, not an error. This feeds --impacted selection,
-// where the alternative to skipping is failing every command in a workspace
-// over one bad extension option; a skipped entry only costs the selection an
-// edge it would otherwise have known about.
+// A malformed entry is skipped, not an error: this feeds --impacted selection,
+// which must not fail every command in a workspace over one bad extension
+// option.
 func generateAssetSources(assetsRaw any) []string {
 	entries, ok := assetsRaw.([]any)
 	if !ok {

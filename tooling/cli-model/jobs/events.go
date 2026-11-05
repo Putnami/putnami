@@ -13,6 +13,8 @@ import (
 	runtimeproto "go.putnami.dev/protocol/runtime"
 )
 
+// EventMapper rewrites each event ReadJSONLEvents parses before the event
+// handler receives it.
 type EventMapper func(RawJobEvent) RawJobEvent
 
 // SessionEventHandler receives scheduler records for session recording.
@@ -265,20 +267,13 @@ func oversizedEventLine() RawJobEvent {
 // Returns false if the line is not a valid event (its `v` must be the runtime
 // event protocol version this CLI requires, and it must have a type).
 //
-// RUNTIME EVENTS v2 IS REQUIRED. An earlier version of the reader
-// accepted v1 too, and had to: the CLI advertised v2 to every subprocess but
-// still loaded extensions that predated the advertisement, and since one stream
-// speaks ONE version, rejecting on version would have dropped a whole job's
-// output — logs and result included — rather than one unsupported event.
-//
-// That argument does not survive the require-v3 flip, because the manifest
-// loader now makes its premise false: an extension reaches this parser only if
-// its manifest declares CLI contract 3, and contract 3 requires an SDK that
-// reads the advertisement and answers at v2. A v1 line therefore no longer
-// means "an older extension"; it means the stream and the manifest disagree
-// about which contract the extension implements, and interpreting it would be
-// guessing which one is true. Unknown-to-the-renderer event TYPES stay
-// tolerated, as before: every renderer switches on type with no default branch.
+// RUNTIME EVENTS v2 IS REQUIRED. An extension reaches this parser only if its
+// manifest declares CLI contract 3, and contract 3 requires an SDK that reads
+// the advertisement and answers at v2. A v1 line therefore means the stream and
+// the manifest disagree about which contract the extension implements, and
+// interpreting it would be guessing which one is true. Unknown-to-the-renderer
+// event TYPES stay tolerated: every renderer switches on type with no default
+// branch.
 // The one exception is EventTypeProcess, which the job runner builds itself: a
 // line of that type is refused, so a producer cannot name a process group.
 //

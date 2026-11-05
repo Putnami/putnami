@@ -72,7 +72,7 @@ func (s *Session) runServeLoop(ctx context.Context) int {
 	// - an iteration completion channel
 	// - a watch stream that is armed only once serve reports readiness
 	startIteration := func(changedFiles []string) (context.CancelFunc, <-chan struct{}, watchStream) {
-		iterCtx, iterCancel := context.WithCancel(ctx) //nolint:gosec // G118: iterCancel is returned to caller
+		iterCtx, iterCancel := context.WithCancel(ctx)
 		iterDone := make(chan struct{})
 		serveReady := s.watchRend.ResetServeReadySignal()
 

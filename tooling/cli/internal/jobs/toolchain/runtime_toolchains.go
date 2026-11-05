@@ -428,7 +428,6 @@ func resolveRuntimeToolchainRefs(ctx context.Context, workspaceRoot string, ext 
 				// rejection reasons reach the user only through this warning. They
 				// never enter the resolution or its identity.
 				if requirement.Optional {
-					//nolint:gosec // G706 false positive: dynamic values are structured slog attributes, not a format string.
 					slog.Warn("runtime toolchain: optional toolchain is unavailable; no candidate matched the locked version",
 						"extension", ext.Name, "toolchain", ref, "version", entry.Version, "rejections", detail)
 				} else {
@@ -436,7 +435,6 @@ func resolveRuntimeToolchainRefs(ctx context.Context, workspaceRoot string, ext 
 					// run is about to do, so nothing is wrong yet. Once the run
 					// ended, ReportProvisionedRuntimeToolchains probes again and
 					// warns only about a toolchain that is still missing.
-					//nolint:gosec // G706 false positive: dynamic values are structured slog attributes, not a format string.
 					slog.Debug("runtime toolchain: "+ToolchainProvisioningCommand+" starts before the pinned toolchain is installed; no candidate matched the locked version",
 						"extension", ext.Name, "toolchain", ref, "version", entry.Version, "rejections", detail)
 				}
@@ -525,7 +523,6 @@ func ReportProvisionedRuntimeToolchains(ctx context.Context, workspaceRoot strin
 				"extension", probe.extension, "toolchain", probe.ref, "version", probe.entry.Version)
 			continue
 		}
-		//nolint:gosec // G706 false positive: dynamic values are structured slog attributes, not a format string.
 		slog.Warn("runtime toolchain: the pinned toolchain is still unavailable after "+ToolchainProvisioningCommand+"; no candidate matched the locked version",
 			"extension", probe.extension, "toolchain", probe.ref, "version", probe.entry.Version,
 			"rejections", runtimeToolchainRejectionText(rejections))
@@ -922,7 +919,6 @@ func probeRuntimeToolchain(ctx context.Context, path string, args, env []string,
 	defer cancel(nil)
 	stdout := &boundedBuffer{limit: toolVersionProbeOutputLimit}
 	stderr := &boundedBuffer{limit: toolVersionProbeOutputLimit}
-	//nolint:gosec // G702: path is an executable candidate from the validated extension manifest; probing it is the resolver's purpose.
 	cmd := exec.CommandContext(probeCtx, path, args...)
 	cmd.Env = env
 	cmd.Stdout = stdout

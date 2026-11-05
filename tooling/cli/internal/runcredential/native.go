@@ -94,7 +94,7 @@ func nativeImage(path, goos string) string {
 	if !info.Mode().IsRegular() {
 		return fmt.Sprintf("its runtime executable %s is not a regular file", path)
 	}
-	file, err := os.Open(path) //nolint:gosec // G304: the runtime executable the CLI prepared and verified
+	file, err := os.Open(path)
 	if err != nil {
 		return fmt.Sprintf("its runtime executable %s cannot be read: %v", path, err)
 	}

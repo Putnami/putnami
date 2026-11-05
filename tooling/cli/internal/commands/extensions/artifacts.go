@@ -988,8 +988,9 @@ func updateArtifacts(ctx context.Context, wsRoot string, cfg *wsproto.Config, ar
 		}
 
 		entry := lockEntryFor(prior, hadPrior, result)
-		// A version bump starts a fresh per-platform map, which would otherwise
-		// leave the lock pinning only the platform that ran the upgrade.
+		// A version bump starts a fresh per-platform map; carry the other
+		// platforms' integrities forward so the lock pins more than the platform
+		// that ran the upgrade.
 		carryPlatformIntegrities(ctx, ops, name, prior, hadPrior, &entry, jsonlOut)
 		ops.lockSet(lockFile, name, entry)
 

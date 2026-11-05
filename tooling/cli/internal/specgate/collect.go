@@ -198,8 +198,7 @@ func evaluateGroup(projectID string, criteria features.SpecCriteriaGroup, mode f
 // evaluateVerdicts is the one projection of the pure evaluator onto the record's
 // verdict rows. It is a function rather than inline code because the group may
 // be evaluated twice — once on the session's own observations, once on those
-// plus what the cache recovered — and two copies of this projection would be
-// two chances for the second pass to report something the first would not.
+// plus what the cache recovered — and both passes must project identically.
 func evaluateVerdicts(criteria features.SpecCriteriaGroup, specRequirements []features.SpecRequirement,
 	observations []features.VerificationObservation, at time.Time) ([]features.SpecRequirementVerdict, []diag.Diagnostic) {
 	evaluations := features.EvaluateSpecRequirements(criteria.Feature, specRequirements,

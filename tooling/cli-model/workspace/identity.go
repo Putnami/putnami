@@ -4,6 +4,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"hash"
 	"sort"
 
 	wsproto "go.putnami.dev/protocol/workspace"
@@ -161,7 +162,7 @@ func ProjectMetadataDigest(
 	return identityDigestFormat + ":" + hex.EncodeToString(h.Sum(nil))
 }
 
-func writeIdentityField(h interface{ Write([]byte) (int, error) }, s string) {
-	h.Write([]byte(s)) //nolint:errcheck // hash.Hash.Write never errors
-	h.Write([]byte{0}) //nolint:errcheck // hash.Hash.Write never errors
+func writeIdentityField(h hash.Hash, s string) {
+	h.Write([]byte(s))
+	h.Write([]byte{0})
 }

@@ -51,7 +51,7 @@ func SnapshotGeneratedArtifacts(workspaceRoot string) (string, func(), []Finding
 				return relErr
 			}
 			manifestRel = filepath.ToSlash(manifestRel)
-			manifestData, readErr := os.ReadFile(path) //nolint:gosec // discovered inside indexed project
+			manifestData, readErr := os.ReadFile(path)
 			if readErr != nil {
 				findings = append(findings, Finding{Code: "clientgen.unreadable-snapshot-manifest", Path: manifestRel,
 					Message: fmt.Sprintf("generated client manifest could not be read before the build: %v", readErr)})

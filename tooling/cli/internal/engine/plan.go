@@ -156,17 +156,14 @@ func buildPlan(
 		return nil, ExitUsage
 	}
 
-	// Defense-in-depth beyond the zero-jobs guard above: even when some jobs
-	// planned, a *selected* command can contribute zero jobs because the
-	// configured registry extension that serves it failed to load. That step
-	// silently vanishes while the run still reports success — the same
-	// green-on-broken-CI failure class, now at per-command granularity. A
-	// missing (unloaded) extension exposes no manifest, so we can't
-	// map it to the commands it would have served; instead we detect the symptom
-	// — a selected command that produced no jobs AND that no loaded extension
-	// even declares — and only fail while a required extension is in fact
-	// missing. A command a loaded extension declares but that merely matched no
-	// selected project is a legitimate no-op and does not trip this.
+	// Defense-in-depth beyond the zero-jobs guard above: a *selected* command can
+	// contribute zero jobs because the configured registry extension that serves
+	// it failed to load, and the step silently vanishes while the run reports
+	// success. An unloaded extension exposes no manifest, so detect the symptom —
+	// a selected command that produced no jobs AND that no loaded extension
+	// declares — and fail only while a required extension is missing. A command a
+	// loaded extension declares but that matched no selected project is a
+	// legitimate no-op and does not trip this.
 	if missing := missingExtensions(); len(missing) > 0 {
 		if starved := selectedCommandsWithoutJobs(req.Commands, planned, extensions); len(starved) > 0 {
 			reportMissingExtensions(missing, skipped,
@@ -394,8 +391,7 @@ func refuseUndeclaredCommands(req *Request, discovered *internalextension.Discov
 // nothing for it — which, paired with a missing required extension, is the
 // observable symptom of a configured+locked extension that failed to load.
 // A command a loaded extension declares but that merely matched no
-// selected project is a legitimate no-op and is excluded; that exclusion is what
-// keeps this guard from failing healthy partial plans.
+// selected project is a legitimate no-op and is excluded.
 func selectedCommandsWithoutJobs(commands []string, planned []*scheduler.ScheduledJob, extensions []*extension.ExtensionDescription) []string {
 	plannedCommands := make(map[string]bool, len(planned))
 	for _, job := range planned {
@@ -530,10 +526,8 @@ func renderPlan(req *Request, planned []*scheduler.ScheduledJob, selected []*wor
 	return ExitSuccess
 }
 
-// summarizeProjectIDsLimit bounds the empty-plan diagnostic's project list. The
-// line goes to a CI log, and a workspace-wide selection would otherwise print
-// hundreds of ids to say one thing; the count precedes the list, so the elision
-// loses nothing a reader needs to act.
+// summarizeProjectIDsLimit bounds the empty-plan diagnostic's project list,
+// which goes to a CI log; the count precedes the list.
 const summarizeProjectIDsLimit = 10
 
 func summarizeProjectIDs(projects []*workspace.Project) string {
@@ -578,8 +572,7 @@ func displayJobName(job *scheduler.ScheduledJob) string {
 // dry-run flag can be trusted to interpret it — a registry- or
 // cloud-side-effecting task without the declaration would drop the unknown
 // param and publish for real. Those jobs are excluded from the plan, loudly,
-// together with any job that functionally depends on an excluded one (a
-// dependent would otherwise wait on a dependency that never runs).
+// together with any job that functionally depends on an excluded one.
 //
 // Side-effect-free jobs (build, package) keep running: the publishers'
 // dry-run output is computed from real local artifacts, and the cache makes

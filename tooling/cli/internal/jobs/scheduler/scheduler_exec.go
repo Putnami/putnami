@@ -892,8 +892,7 @@ func (s *Scheduler) lookupRestoreOrClaim(
 
 	// cachekey.ComputeJobCacheHash only mixes in the cache keys of this job's direct
 	// dependencies, so copy just those entries under the lock rather than the
-	// whole (growing) hashes map. This keeps the per-job copy O(deps) instead
-	// of O(N) and shortens the critical section every worker contends on.
+	// whole (growing) hashes map, keeping the critical section short.
 	mu.Lock()
 	hashCopy := make(map[string]string, len(job.DependsOn))
 	for _, depKey := range cachekey.CacheKeyDependencies(job) {

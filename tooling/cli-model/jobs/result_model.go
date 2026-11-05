@@ -324,6 +324,8 @@ func eventInt(container any, key string) int {
 	}
 }
 
+// EventFloat returns the number EventField finds at key in container, and
+// whether it is one.
 func EventFloat(container any, key string) (float64, bool) {
 	return BatchNumber(EventField(container, key))
 }

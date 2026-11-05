@@ -614,12 +614,10 @@ func GlobalFlagValues(long string) []string {
 // flags ("init" ≡ "workspace init"). The second result reports whether the
 // catalog knows the path at all.
 //
-// Slice A1c binds this to the parser: a KNOWN path's flag list is authoritative,
-// so a flag it does not declare is a usage error. An UNKNOWN path — an extension
-// group, or a spelling whose subcommand is really a positional
-// (`upgrade 1.2.3`) — leaves the parser lenient, because the catalog cannot
-// prove such a flag wrong. That asymmetry is deliberate: rejecting on an
-// unknown path would turn every undocumented spelling into an outage.
+// The parser binds this: a KNOWN path's flag list is authoritative, so a flag it
+// does not declare is a usage error. An UNKNOWN path — an extension group, or a
+// spelling whose subcommand is really a positional (`upgrade 1.2.3`) — leaves
+// the parser lenient, because the catalog cannot prove such a flag wrong.
 func ResolveFlags(path string) ([]Flag, bool) {
 	command, ok := Lookup(path)
 	if !ok {

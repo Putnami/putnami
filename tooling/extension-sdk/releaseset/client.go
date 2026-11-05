@@ -214,7 +214,7 @@ func (c *Client) call(ctx context.Context, operation string, request any, consum
 		distribution.RequestFileFlag,
 		requestPath,
 	}
-	cmd := exec.CommandContext(callCtx, c.Executable, args...) //nolint:gosec // executable is SDK configuration; argv is fixed protocol vocabulary
+	cmd := exec.CommandContext(callCtx, c.Executable, args...)
 	cmd.WaitDelay = providerWaitDelay
 	cmd.Dir = c.Dir
 	cmd.Env = commandEnv

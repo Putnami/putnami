@@ -7,16 +7,13 @@ run:
   # TestGolangciToolDeadlineStaysBelowItsSchedulerDeadline in
   # cmd/putnami-go/manifest_contract_test.go.
   #
-  # Why it matters: this used to be 5m, exactly equal to the then-300s
-  # scheduler deadline. Equal deadlines cannot both win, and the scheduler
-  # always does — its clock starts at process spawn, golangci's only when `run`
-  # begins — so a slow lint died as an opaque `job timed out` instead of
-  # golangci's own "Timeout exceeded: try increasing it by passing --timeout".
-  # The 2m gap is the budget for everything inside the scheduler's clock but
-  # outside this one: runtime spawn and handshake, resolving/installing the
-  # pinned binary, the `fmt --diff` gate the fixing path runs first (7.7s cold
-  # on 10 cores, and CI runners are CPU-quota limited), diagnostic parsing and
-  # result reporting.
+  # The scheduler's clock starts at process spawn and golangci's only when `run`
+  # begins, so the scheduler wins whenever the two deadlines are equal. The 2m
+  # gap lets golangci's own "Timeout exceeded: try increasing it by passing
+  # --timeout" fire first, and budgets everything inside the scheduler's clock
+  # but outside this one: runtime spawn and handshake, resolving or installing
+  # the pinned binary, the `fmt --diff` gate the fixing path runs first,
+  # diagnostic parsing and result reporting.
   #
   # At runtime the CLI exports the resolved task deadline (including an n× batch
   # leader deadline) as PUTNAMI_TASK_DEADLINE_MS. Unless the user explicitly
@@ -60,7 +57,6 @@ linters:
     - misspell
     - unconvert
     - unparam
-    - prealloc
 
     # security (tuned below for application/CLI context)
     - gosec
@@ -104,9 +100,11 @@ linters:
         - fmt.Fprintln
         # Best-effort directory creation
         - os.MkdirAll
-        # Cleanup / close — errors are non-critical
+        # Cleanup / close / release — errors are non-critical
         - (*os.File).Close
+        - (*os.Root).Close
         - (io.Closer).Close
+        - (*go.putnami.dev/sdk/extension/filelock.Lock).Release
         # Removal / cleanup — best-effort
         - os.Remove
         - os.RemoveAll
@@ -117,6 +115,9 @@ linters:
         # File walking — errors handled via callback
         - path/filepath.Walk
         - path/filepath.WalkDir
+        # Never returns an error: the program crashes when the OS entropy
+        # source fails
+        - crypto/rand.Read
 
     revive:
       severity: warning
@@ -156,6 +157,12 @@ linters:
         - G703
         # G404: Non-crypto random is fine for non-security purposes
         - G404
+        # G103: CLI tools call unsafe to reach system interfaces such as terminal
+        #       ioctl and process introspection
+        - G103
+        # G115: system calls, hashes and archive headers convert between integer
+        #       widths whose values the caller bounds
+        - G115
 
     gocritic:
       disabled-checks:
@@ -170,12 +177,18 @@ linters:
           - gosec
           - errcheck
           - revive
+          - unparam
       - text: "var-naming:"
         linters:
           - revive
       # Internal packages don't need doc comments on exported symbols
       - path: internal/
         text: "exported:"
+        linters:
+          - revive
+      # extension.ExtensionDescription keeps its stuttering name, the one every CLI caller uses
+      - path: extension/types\.go$
+        text: 'exported: type name will be used as extension\.ExtensionDescription by other packages, and that stutters'
         linters:
           - revive
     # Each pattern matches a whole directory name below the run directory and

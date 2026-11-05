@@ -67,7 +67,7 @@ func resolveContractBindings(root string, projects []*Project) {
 // one's.
 func readGeneratedClientBinding(root string, project *Project) *GeneratedClientBinding {
 	rel := projectRelativePath(project, clientcontract.GeneratedManifestFile)
-	data, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(rel))) //nolint:gosec // fixed name under an indexed project
+	data, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(rel)))
 	if err != nil {
 		return nil
 	}
@@ -103,7 +103,7 @@ type committedContract struct {
 // service a generated client can name.
 func readCommittedContract(root string, project *Project) committedContract {
 	rel := projectRelativePath(project, committedContractFile)
-	data, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(rel))) //nolint:gosec // fixed name under an indexed project
+	data, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(rel)))
 	if err != nil {
 		return committedContract{}
 	}

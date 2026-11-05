@@ -378,8 +378,6 @@ func LoadExtensionFromDir(absPath, refName string) *ExtensionDescription {
 // read surface was already selected from the workspace lock. A non-empty root
 // is loaded as an installed extension; an empty root means exact preparation
 // failed and the ref is removed. Unrelated local extensions remain untouched.
-// This keeps read consumers from choosing a stale stable link
-// after the bounded preparation pass made a lock-faithful decision.
 func SelectPreparedExtensions(discovered []*ExtensionDescription, prepared map[string]string) []*ExtensionDescription {
 	if len(prepared) == 0 {
 		return discovered
@@ -659,10 +657,8 @@ func ListSubcommands(extensions []*ExtensionDescription, group string) []string 
 // SkippedProviderCause quotes the same remediation.
 const installedRemediation = model.InstalledRemediation
 
-// warnedOnce dedupes discovery warnings per process: discovery runs from many
-// call sites (help, completion, planning), so a skipped or adapted
-// extension would otherwise warn ~5× per invocation. Keyed by manifest path +
-// reason.
+// warnedOnce dedupes discovery warnings per process, keyed by manifest path +
+// reason: discovery runs from many call sites (help, completion, planning).
 var warnedOnce sync.Map
 
 func warnOnce(key, msg string, args ...any) {
@@ -683,9 +679,8 @@ func applyVocabularyTraits(extensions []*ExtensionDescription) {
 
 func tryLoadExtension(absPath, refName string, installed bool) (*ExtensionDescription, *SkippedExtension) {
 	manifestPath := filepath.Join(absPath, "putnami.extension.json")
-	// Distinguish "no manifest" (normal, the dir simply isn't an extension)
-	// from "manifest exists but failed to load" (a real error the user needs
-	// to see, otherwise the extension silently disappears from the workspace).
+	// A missing manifest is normal (the dir is not an extension); a manifest
+	// that exists but fails to load is a real error the user needs to see.
 	if _, statErr := os.Stat(manifestPath); os.IsNotExist(statErr) {
 		return nil, nil
 	}

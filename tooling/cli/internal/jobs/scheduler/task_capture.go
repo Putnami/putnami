@@ -7,10 +7,9 @@
 //
 // # What executes where, per declaration root
 //
-// The original design was "run the task in an isolated staging root and
-// ingest whatever lands there". That is not implementable for this workspace
-// today, and the reason is worth recording because it is a property of the
-// extensions, not of the store:
+// Capture reads each output from where it lives, not from a redirected staging
+// root. The extensions do not take the path from the job context, so a
+// redirect would be ignored:
 //
 //   - COMMAND-OUTPUT — captured FROM the real .putnami/out/<project>/<command>
 //     directory, NOT redirected into staging. Two facts forbid the redirect.

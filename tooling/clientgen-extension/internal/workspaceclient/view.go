@@ -36,7 +36,7 @@ func (f workspaceFiles) Read(rel string) ([]byte, error) {
 	if f.tree != nil {
 		return f.tree.ReadFile(clean)
 	}
-	return os.ReadFile(filepath.Join(f.root, filepath.FromSlash(clean))) //nolint:gosec // validated workspace-relative path
+	return os.ReadFile(filepath.Join(f.root, filepath.FromSlash(clean)))
 }
 
 // List returns every file at or below the workspace-relative slash path
@@ -84,7 +84,7 @@ func (f workspaceFiles) isRegularFile(rel string) bool {
 		_, kind := f.tree.Resolve(rel)
 		return kind == gitcandidate.File
 	}
-	info, err := os.Stat(filepath.Join(f.root, filepath.FromSlash(rel))) //nolint:gosec // workspace-relative path
+	info, err := os.Stat(filepath.Join(f.root, filepath.FromSlash(rel)))
 	return err == nil && info.Mode().IsRegular()
 }
 

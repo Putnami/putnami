@@ -13,10 +13,10 @@
 //
 // # Entry-format version, and why the key is not enough
 //
-// Cache key v5 (slice B0e) digests the task CONTRACT — extension, task, declared
+// Cache key v5 digests the task CONTRACT — extension, task, declared
 // outputs, effects, inputs. It does not digest the ENTRY PAYLOAD FORMAT, because
 // the payload format is a property of the CLI that wrote the entry, not of the
-// task. Every entry written before this slice therefore carries a perfectly
+// task. An entry from a CLI that predates this model therefore carries a
 // correct v5 key and a legacy payload, and the machine-global per-repo store
 // (~/.putnami/store/<repo-id>) is shared by every worktree and every branch on
 // the machine — including checkouts of older CLIs that keep publishing legacy
@@ -27,8 +27,7 @@
 //
 //	address = sha256("putnami/store/entry-format\x00" + <format> + "\x00" + key)
 //
-// Two properties follow, and both are what pre-authorizes B4b's split into
-// "write the new format" and "read the new format" as separate merges:
+// Two properties follow:
 //
 //   - A legacy entry is invisible to the new model. LookupTaskEntry(key) reads
 //     the derived address, finds nothing, and reports a MISS — never a legacy

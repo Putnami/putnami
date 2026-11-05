@@ -192,14 +192,14 @@ func (c *Client) PrepareRun(interactive bool) bool {
 		c.disablePreparedRun()
 		return false
 	}
-	defer consentLock.Release() //nolint:errcheck // telemetry is fail-silent
+	defer consentLock.Release()
 
 	bufferLock, err := acquireBufferLock(c.bufferPath)
 	if err != nil {
 		c.disablePreparedRun()
 		return false
 	}
-	defer bufferLock.Release() //nolint:errcheck // telemetry is fail-silent
+	defer bufferLock.Release()
 
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -285,7 +285,7 @@ func (c *Client) deviceIDAtTimestamp(now time.Time) string {
 	if err != nil {
 		return ""
 	}
-	defer lock.Release() //nolint:errcheck // telemetry is best-effort
+	defer lock.Release()
 	return c.deviceIDWithFreshConsentAt(now)
 }
 
@@ -349,7 +349,7 @@ func (c *Client) Flush() error {
 	if err != nil {
 		return err
 	}
-	defer lock.Release() //nolint:errcheck // write errors are returned below
+	defer lock.Release()
 	if !c.CanCollect() {
 		c.Discard()
 		return nil
@@ -373,7 +373,7 @@ func (c *Client) Flush() error {
 	enc := json.NewEncoder(f)
 	for _, ev := range events {
 		if err := enc.Encode(ev); err != nil {
-			f.Close() //nolint:errcheck // returning the encode error, which is primary
+			f.Close()
 			return err
 		}
 	}
@@ -493,13 +493,13 @@ func Disable() error {
 	if err != nil {
 		return fmt.Errorf("lock telemetry consent: %w", err)
 	}
-	defer consentLock.Release() //nolint:errcheck // disable errors are reported below
+	defer consentLock.Release()
 
 	lock, err := acquireBufferLock(bufferPath)
 	if err != nil {
 		return fmt.Errorf("lock telemetry buffer: %w", err)
 	}
-	defer lock.Release() //nolint:errcheck // disable errors are reported below
+	defer lock.Release()
 
 	configPath := filepath.Join(homeDir, configFileName)
 	cfg := readConfig(configPath)

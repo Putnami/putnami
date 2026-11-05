@@ -304,7 +304,6 @@ func VersionUpdateWithOptions(ctx context.Context, currentVersion string, binDir
 // (runcredential.MarkRepositoryCodeStarted).
 func getBinaryVersion(ctx context.Context, binaryPath string) string {
 	runcredential.MarkRepositoryCodeStarted(filepath.Base(binaryPath) + " --version")
-	//nolint:gosec // G702: binaryPath is a putnami CLI binary this command lists/installs and runs by design; on the upgrade path its sha256 is verified before here. Args go straight to exec — no shell.
 	cmd := exec.CommandContext(ctx, binaryPath, "--version")
 	cmd.Env = append(os.Environ(), launch.NoRelaunchEnv+"=1", launch.LaunchedEnv+"=")
 	out, err := cmd.Output()

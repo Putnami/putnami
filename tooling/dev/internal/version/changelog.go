@@ -17,8 +17,7 @@ const changelogDateLayout = "2006-01-02"
 
 // changelogSections are the changelog's sections, in rendering order, with the
 // conventional commit types each one collects. Breaking changes are their own
-// section rather than a marker inside another, because the reader looking for
-// them is doing a different job from the one reading the feature list.
+// section, not a marker inside another.
 //
 // A commit whose type is not listed lands in "Other". A commit that is not a
 // conventional commit at all is dropped: it says nothing a release note can

@@ -26,8 +26,6 @@ func resolveCommonFlags(flags map[string]string, params pctx.Params) commonFlags
 
 // resolveFlagBool resolves a bool from CLI flags (argv), then params (kebab key +
 // optional camelCase fallbacks).
-//
-//nolint:unparam // defaultVal is kept for API symmetry with the other flag readers
 func resolveFlagBool(flags map[string]string, flagKey string, params pctx.Params, defaultVal bool, paramKeys ...string) bool {
 	if _, ok := flags[flagKey]; ok {
 		return cli.FlagBool(flags, flagKey, defaultVal)

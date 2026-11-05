@@ -85,16 +85,14 @@ func ScanProjectPathsWithProviders(root string, scopes []ProviderScope) ([]strin
 		// adapter is, none is discoverable under `testdata` or `vendor` — whatever
 		// language that project is written in.
 		//
-		// The alternative — an exclude silencing only its own declarer's markers,
-		// with the walk descending whenever some other adapter still wants to look
-		// — was considered and rejected. It cannot be had without also descending
-		// into the install trees and fixture corpora those excludes exist to keep
-		// out: `node_modules` is excluded by the TypeScript adapter alone, so a
-		// workspace that also has the Go adapter would start walking it, and the
-		// putnami.json shipped inside an installed @putnami package would become a
-		// discovered project. Union-excluding is the conservative direction — it
-		// can only make the scan MISS a project, never invent one — and a missed
-		// project is visible (`projects sync` does not add it) rather than silent.
+		// An exclude silencing only its own declarer's markers cannot be had
+		// without also descending into the install trees and fixture corpora those
+		// excludes exist to keep out: `node_modules` is excluded by the TypeScript
+		// adapter alone, so a workspace that also has the Go adapter would walk it
+		// and an installed @putnami package's putnami.json would become a
+		// discovered project. Union-excluding can only make the scan MISS a
+		// project, never invent one, and a missed project is visible (`projects
+		// sync` does not add it) rather than silent.
 		//
 		// The one destructive consequence is closed at the other end: `--prune`
 		// refuses to remove a member the scan could not have seen, because the

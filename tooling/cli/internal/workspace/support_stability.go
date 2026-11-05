@@ -55,7 +55,7 @@ func StableChangeTest(ws *Workspace) (git.StableTest, error) {
 	if ws == nil {
 		return nil, nil
 	}
-	data, err := os.ReadFile(filepath.Join(ws.Root, supportproto.CatalogFilename)) //nolint:gosec // the workspace root plus one protocol filename
+	data, err := os.ReadFile(filepath.Join(ws.Root, supportproto.CatalogFilename))
 	if os.IsNotExist(err) {
 		return nil, nil
 	}

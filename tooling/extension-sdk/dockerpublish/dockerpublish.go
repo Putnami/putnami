@@ -112,10 +112,8 @@ func Publish(ctx *pctx.Context, emit *jsonl.Emitter, args []string) (string, map
 	imageName := dockerManifest.Image
 	localRef := dockerManifest.Tags[0]
 
-	// Identity comes from the session, not from the cached package manifest: the
-	// manifest version is stamped when the package job actually runs, so a
-	// cache-restored package would otherwise publish a release id from an earlier
-	// session.
+	// Identity comes from the session, not from the cached package manifest,
+	// whose version is stamped when the package job runs.
 	version := sessionVersion(ctx, dockerManifest.Version)
 
 	registry := dockerRegistry

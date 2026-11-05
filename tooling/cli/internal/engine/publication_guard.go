@@ -43,10 +43,9 @@ type unservedProject struct {
 //
 // sessionProjects is the selection the SESSION made, read BEFORE a release-set
 // publish narrows it (ReleaseSetRun.ScopePlanning) to the owners of the plan's
-// members. Judging the narrowed list reopened the same hole: a project
-// that declares a publish channel and owns no release-set member is dropped
-// by that narrowing, so the guard never saw it and the run published nothing
-// for it while reporting success.
+// members: a project that declares a publish channel and owns no release-set
+// member is dropped by that narrowing, so judging the narrowed list would
+// publish nothing for it while reporting success.
 //
 // releaseMembers holds the projects that own a member of this session's
 // release-set plan. It is nil when the session coordinates no release set and

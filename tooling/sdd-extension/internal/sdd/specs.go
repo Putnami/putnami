@@ -647,7 +647,7 @@ func writeSpecDocument(wsRoot, relative string, contents []byte) error {
 	if err != nil {
 		return err
 	}
-	defer root.Close() //nolint:errcheck // the write result is reported below
+	defer root.Close()
 
 	target := filepath.FromSlash(relative)
 	if parent := filepath.Dir(target); parent != "." {
@@ -671,8 +671,8 @@ func writeSpecDocument(wsRoot, relative string, contents []byte) error {
 
 // validateSpecWritePath refuses anything but a contained workspace-relative
 // path. The path is composed from a validated project root and a derived
-// filename, so this guard should never fire; it exists because the one caller
-// writes to disk.
+// filename, so this guard is defense in depth for the one caller that writes to
+// disk.
 func validateSpecWritePath(relative string) string {
 	if relative == "" || strings.HasPrefix(relative, "/") || strings.ContainsAny(relative, "\\\x00") {
 		return "spec path is not a contained workspace-relative path"
@@ -879,7 +879,7 @@ func supportKindForProject(project *workspace.Project) supportproto.SubjectKind 
 // unclassified, which would be an artifact of the reader rather than a fact.
 func readSupportCatalog(ws *workspace.Workspace) (*supportproto.Catalog, []diag.Diagnostic) {
 	catalogPath := filepath.Join(ws.Root, supportproto.CatalogFilename)
-	data, err := os.ReadFile(catalogPath) //nolint:gosec // the workspace root plus one protocol filename
+	data, err := os.ReadFile(catalogPath)
 	if err != nil {
 		if os.IsNotExist(err) {
 			return nil, []diag.Diagnostic{diag.Warningf(SpecCodeMissingSupportCatalog, supportproto.CatalogFilename,

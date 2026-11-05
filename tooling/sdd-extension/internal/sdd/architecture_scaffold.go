@@ -147,10 +147,8 @@ func BuildArchitectureInitResult(ws *workspace.Workspace, domain string, options
 // architectureInitRoot decides where a scaffold lands.
 //
 // An explicit --at wins and is checked for containment. Otherwise the manifest
-// goes beside the FIRST project the domain maps, in canonical order — a rule
-// that is deterministic and easy to correct, rather than a guess at a common
-// parent directory that would be right for some domain shapes and wrong for
-// others. A domain that maps no project yet lands at the workspace root.
+// goes beside the FIRST project the domain maps, in canonical order. A domain
+// that maps no project yet lands at the workspace root.
 func architectureInitRoot(ws *workspace.Workspace, at string, projects []string) (string, error) {
 	if trimmed := strings.TrimSpace(at); trimmed != "" {
 		cleaned := path.Clean(filepath.ToSlash(trimmed))
@@ -218,7 +216,7 @@ func createArchitectureManifest(wsRoot, relative string, contents []byte) error 
 	if err != nil {
 		return err
 	}
-	defer root.Close() //nolint:errcheck // the write result is reported below
+	defer root.Close()
 
 	target := filepath.FromSlash(relative)
 	if parent := filepath.Dir(target); parent != "." {
@@ -233,7 +231,7 @@ func createArchitectureManifest(wsRoot, relative string, contents []byte) error 
 		return err
 	}
 	if _, err := file.Write(contents); err != nil {
-		file.Close() //nolint:errcheck // the write error is the one to report
+		file.Close()
 		return err
 	}
 	return file.Close()

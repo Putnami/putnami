@@ -37,15 +37,12 @@ var ErrHostedWatch = fmt.Errorf("a run that watches does not accept %s: "+
 // decides when to re-run and over which projects, and every iteration comes back
 // through Engine.Run for the same planning, contract validation,
 // missing-extension guards, cache setup, scheduling, session recording and exit
-// code as any other run. Before A5b, internal/watch/session_iteration.go called
-// the planner and built a scheduler itself — the last of the five hand-assembled
-// lifecycles ADR 0001 §3 collapses.
+// code as any other run.
 //
-// The dependency stays engine → watch. Pointing it the other way (watch calling
-// Engine.Run directly) closes an import cycle, because the engine enters the loop
-// from execute.go. The loop therefore takes an injected watch.RunIteration, which
-// this file binds to Engine.Run — the same inversion A5a used for
-// commands.LifecycleEnv.RunJob.
+// The dependency stays engine → watch: watch calling Engine.Run directly closes
+// an import cycle, because the engine enters the loop from execute.go. The loop
+// therefore takes an injected watch.RunIteration, which this file binds to
+// Engine.Run.
 
 // runWatch enters the watch loop and maps its result onto the run's exit code.
 // A hosted run never enters it: it is a usage error (ErrHostedWatch).
@@ -80,8 +77,7 @@ func (e *Engine) runWatch(
 
 	// Both watch loops exit their select on ctx.Done and return normally,
 	// carrying the last iteration's code — which describes that iteration,
-	// not why the session ended. Ctrl-C would otherwise report 0, or worse,
-	// a stale failure from an iteration the user had already fixed.
+	// not why the session ended. An abort therefore reports its own code.
 	if abort.Source() != "" {
 		return SessionResult{ExitCode: ExitSignalReceived}
 	}

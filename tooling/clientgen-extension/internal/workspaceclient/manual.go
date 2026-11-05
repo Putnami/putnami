@@ -64,7 +64,7 @@ type detectedTransport struct {
 }
 
 // scanManualClients classifies every transport callsite the workspace scan
-// found. It receives the records rather than scanning for them, because the
+// found. It receives the records rather than scanning for them: the
 // consumer-edge scan needs the identical set and the scan is the check's
 // dominant cost (see inspect).
 func scanManualClients(files workspaceFiles, providers []provider, records []sourceRecord, report Report) ([]Adaptation, []Finding) {
@@ -465,7 +465,7 @@ func discoverSourceRecords(view workspaceView, generated map[string]bool) ([]sou
 				return nil
 			}
 			seen[rel] = true
-			return add(rel, project, func() ([]byte, error) { return os.ReadFile(path) }) //nolint:gosec // member project production source
+			return add(rel, project, func() ([]byte, error) { return os.ReadFile(path) })
 		})
 		if walkErr != nil {
 			return nil, walkErr

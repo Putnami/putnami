@@ -104,7 +104,7 @@ func NewReader(root string) (*Reader, error) {
 // the candidate cut does not exist, and the error matches fs.ErrNotExist.
 func (r *Reader) ReadFile(path string) ([]byte, error) {
 	if r.tree == nil {
-		return os.ReadFile(path) //nolint:gosec // a file of the workspace the caller names
+		return os.ReadFile(path)
 	}
 	rel, inside := within(r.root, path)
 	if !inside {
@@ -607,7 +607,7 @@ func (c *checker) isFile(path string) bool {
 // not a candidate does not exist, or from the disk.
 func (c *checker) read(file string) ([]byte, error) {
 	if c.tree == nil {
-		return os.ReadFile(file) //nolint:gosec // a document or a link target inside the workspace
+		return os.ReadFile(file)
 	}
 	rel, inside := within(c.root, file)
 	if !inside {

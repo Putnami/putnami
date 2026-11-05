@@ -123,6 +123,8 @@ type ReplayedFailure struct {
 	Attempts int
 }
 
+// JobOutcomeCached and JobOutcomeCoalesced are the reuse outcomes
+// JobResult.Outcome reports in place of the status.
 const (
 	JobOutcomeCached    = "cached"
 	JobOutcomeCoalesced = "coalesced"

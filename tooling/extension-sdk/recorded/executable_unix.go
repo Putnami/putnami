@@ -30,7 +30,7 @@ func executable(tb testing.TB, exchange Exchange, branches []Branch) string {
 	}
 	script.WriteString(replayLines(tb, dir, "default", exchange))
 	path := filepath.Join(dir, "replay")
-	if err := os.WriteFile(path, []byte(script.String()), 0o755); err != nil { //nolint:gosec // the replayed command must be executable
+	if err := os.WriteFile(path, []byte(script.String()), 0o755); err != nil {
 		tb.Fatal(err)
 	}
 	return path

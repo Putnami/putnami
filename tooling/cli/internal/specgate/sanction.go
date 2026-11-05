@@ -95,9 +95,9 @@ func Sanctions(record *features.SpecVerificationRecord) map[string]Sanction {
 		}
 		// Unobserved requirements are subtracted from the sanctioned count, not
 		// hidden: they never caused this failure (GroupBlocks does not block on
-		// them), so counting them among the blockers would send a reader looking
-		// for a regression that is not there. They are still stated, because the
-		// project is failing anyway and the reader needs the whole picture.
+		// them), so they are not counted among the blockers. They are still
+		// stated, because the project is failing anyway and the reader needs the
+		// whole picture.
 		unresolved := counts.SpecRequirements - counts.Verified - counts.Unobserved
 		sanctions[project] = Sanction{Code: features.ErrorCodeUnresolvedRequirement, Message: fmt.Sprintf(
 			"spec verification: %d of %d textual requirement(s) unresolved under enforce (unmapped %d, unexecutable %d, missing %d, stale %d, contradicted %d)%s; run `putnami specs verify` for the audit report (docs: https://putnami.dev/docs/spec-driven-development/validation-jobs)",

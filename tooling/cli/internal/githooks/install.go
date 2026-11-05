@@ -73,7 +73,7 @@ func hookTarget(gitRoot, selfBinary, goos string) string {
 
 func writeHook(dir, name, content string) {
 	path := filepath.Join(dir, name)
-	if err := os.WriteFile(path, []byte(content), 0o755); err != nil { //nolint:gosec // hook scripts are intentionally executable
+	if err := os.WriteFile(path, []byte(content), 0o755); err != nil {
 		fmt.Fprintf(os.Stderr, "Warning: failed to write hook %s: %v\n", name, err)
 	}
 }

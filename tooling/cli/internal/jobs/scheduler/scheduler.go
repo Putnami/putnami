@@ -214,10 +214,10 @@ type Scheduler struct {
 	sharedMu    sync.Mutex
 
 	// executions is the run's PHYSICAL ledger: every subprocess this scheduler
-	// spawned, appended as each attempt finishes. It is deliberately NOT derived
-	// from the surviving results — those keep only their final attempt, so a
-	// superseded retry (and a whole batch leader whose members all retried solo)
-	// would otherwise disappear from the run's measured cost. See execution.go.
+	// spawned, appended as each attempt finishes. Results keep only their final
+	// attempt, so deriving the ledger from them would drop a superseded retry
+	// (and a whole batch leader whose members all retried solo) from the run's
+	// measured cost. See execution.go.
 	executions executionLedger
 
 	// environmentBegin is the opening reading of the runner's cumulative
@@ -732,8 +732,8 @@ func (s *Scheduler) Run(ctx context.Context) *SchedulerResult {
 			break
 		}
 
-		// If we have pending jobs but all workers are busy, or no pending jobs
-		// and we need to wait for completions — use a blocking select.
+		// With pending jobs but all workers busy, or no pending jobs and
+		// completions to wait for, use a blocking select.
 		var completed jobGroupDone
 		if len(pending) > 0 && inFlight > 0 {
 			wait := s.waitForWorker(ctx, pending, inFlight, maxWorkers, readyCh, doneCh)
@@ -813,8 +813,8 @@ finish:
 	wg.Wait()
 
 	// Workers can no longer run, so every armed finalizer that never saw its
-	// frontier close runs here, and its terminal row lands in results BEFORE
-	// finalizeRun would otherwise synthesize a bare "canceled" over it.
+	// frontier close runs here; its terminal row lands in results before
+	// finalizeRun can synthesize a bare "canceled" over it.
 	s.closeInvocations(ctx, results, &mu)
 
 	s.drainRemote()

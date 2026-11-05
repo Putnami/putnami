@@ -506,9 +506,8 @@ var (
 	gcHoldBudget = 200 * time.Millisecond
 	// gcSectionMinWork is the least work a section does before it may yield,
 	// so a store whose relist alone outlasts the budget still makes progress.
-	// Small, because slow metadata operations would otherwise stretch every
-	// section well past the budget (measured: 256 unlinks took 0.5 s under
-	// load).
+	// It is small so that slow metadata operations cannot stretch a section well
+	// past the budget.
 	gcSectionMinWork = 32
 	// gcReacquireWait bounds, in non-blocking mode, how long a pass that has
 	// just released the lock retries it to finish its work. The pass released

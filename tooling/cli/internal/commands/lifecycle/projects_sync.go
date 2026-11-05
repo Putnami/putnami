@@ -219,17 +219,8 @@ func reportNameDivergences(ws *workspace.Workspace) []string {
 // workspaceAdapter is ONE resolved extension together with the provider binding
 // it declared.
 //
-// The pairing is a struct rather than two parallel slices because the two used
-// to be exactly that, appended in lockstep in DISCOVERY order and then sorted on
-// one side only — so `a.bindings[i]` and `a.extensions[i]` described different
-// extensions the moment discovery order was not extension-name order. What that
-// bought was a `syncCommands()` that looked up one extension's declared task in
-// ANOTHER extension's job table, found nothing, and returned an empty command
-// list: `projects sync` then exited 0 having run no provider's sync task at all.
-// It was masked only because the three shipped extensions happen to spell
-// `syncTask` identically, which syncCommands' own doc comment says core must
-// never assume, and discovery source #3 iterates a Go map, so the mispairing was
-// nondeterministic per process. One slice of pairs makes the bug unrepresentable.
+// The pairing is a struct, not two parallel slices, so a binding can never
+// describe a different extension than the one at the same index.
 type workspaceAdapter struct {
 	ext     *extension.ExtensionDescription
 	binding workspace.ProviderBinding
@@ -279,16 +270,11 @@ func (a workspaceAdapters) bindings() []workspace.ProviderBinding {
 // command a broken workspace is repaired with, so the additive half — the scan,
 // the adapters' own sync tasks, the index rebuild — must still run.
 //
-// FOUR arms now, ordered most-specific-first, because the recorded-index arm
-// alone cannot carry the FRESH-CLONE case: `.putnami/` is gitignored, so on
-// every fresh clone or new worktree the index is absent,
-// recordedProviderExtensions returns nothing, and the recorded-vs-resolved
-// comparison is vacuously satisfied. A clone whose extensions are not installed
-// yet would then prune every package.json / go.mod / pyproject.toml member on
-// the very first `projects sync --prune` — reproduced with the real CLI, which
-// printed `0 added, N removed` and emptied `includes` while every file was still
-// on disk. The two added arms are the direct evidence for that state: discovery
-// skipped an extension it found, or no adapter resolved at all.
+// Four arms, ordered most-specific-first. The recorded-index arm alone cannot
+// cover a fresh clone: `.putnami/` is gitignored, so the index is absent and the
+// recorded-vs-resolved comparison is vacuously satisfied. The two other arms are
+// the direct evidence for that state: discovery skipped an extension it found,
+// or no adapter resolved at all.
 func pruneRefusalReason(wsRoot string, adapters workspaceAdapters) string {
 	if adapters.discoveryErr != nil {
 		return fmt.Sprintf("the workspace adapters could not be resolved (%v), so the scan cannot see "+
@@ -333,9 +319,7 @@ func pruneRefusalReason(wsRoot string, adapters workspaceAdapters) string {
 	// Zero adapters resolved and nothing recorded to compare against. The scan
 	// then recognizes core's own putnami.json and nothing else, so EVERY member
 	// that is a package.json / go.mod / pyproject.toml directory is reported as
-	// removed. On a fresh clone with uninstalled extensions that is the whole
-	// workspace — and there is no index to notice it with, because the index is
-	// the file the clone does not have.
+	// removed, and a fresh clone has no index to notice it with.
 	if len(adapters.adapters) == 0 {
 		return fmt.Sprintf("no workspace adapter resolved for this run, so the scan recognizes only %s and "+
 			"every member discovered through an extension-declared marker would look deleted; "+

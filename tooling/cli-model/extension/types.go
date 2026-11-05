@@ -14,14 +14,36 @@ const ManifestFilename = proto.ManifestFilename
 
 // --- Manifest type aliases (re-exported from protocol) ---
 
+// Manifest is the protocol's root of putnami.extension.json.
 type Manifest = proto.Manifest
+
+// Dependencies is the protocol's manifest dependency list: names, or a
+// name-to-version map.
 type Dependencies = proto.Dependencies
+
+// CommandDefinition is the protocol's user-facing command declaration.
 type CommandDefinition = proto.CommandDefinition
+
+// SessionPrerequisiteDefinition is the protocol's command planned in the same
+// session before the command that declares it.
 type SessionPrerequisiteDefinition = proto.SessionPrerequisiteDefinition
+
+// SessionPrerequisiteParamBinding is the protocol's invocation-local parameter
+// of a prerequisite command.
 type SessionPrerequisiteParamBinding = proto.SessionPrerequisiteParamBinding
+
+// CommandTraits is the protocol's machine-readable orchestration semantics of a
+// command.
 type CommandTraits = proto.CommandTraits
+
+// ProviderDeclaration is the protocol's entry of the manifest's `providers`
+// member.
 type ProviderDeclaration = proto.ProviderDeclaration
+
+// ProviderOperation is the protocol's operation a provider declares.
 type ProviderOperation = proto.ProviderOperation
+
+// VerbDefinition is the protocol's verb of an extension's verb vocabulary.
 type VerbDefinition = proto.VerbDefinition
 
 // Re-exported trait constants from the extension protocol.
@@ -49,38 +71,95 @@ type CommandDependency = proto.CommandDependency
 // ParseCommandDependency reads `command`, `command~step` or `!command`.
 var ParseCommandDependency = proto.ParseCommandDependency
 
+// CommandGroupDefinition is the protocol's structured command group of an
+// extension.
 type CommandGroupDefinition = proto.CommandGroupDefinition
+
+// SubcommandDefinition is the protocol's entry of a command group.
 type SubcommandDefinition = proto.SubcommandDefinition
+
+// PositionalDefinition is the protocol's positional argument of an extension
+// subcommand.
 type PositionalDefinition = proto.PositionalDefinition
+
+// PipelineStep is the protocol's node of a command's execution graph.
 type PipelineStep = proto.PipelineStep
+
+// StepActivation is the protocol's plan-time condition that decides whether a
+// pipeline step is scheduled.
 type StepActivation = proto.StepActivation
+
+// TaskDefinition is the protocol's atomic executable unit.
 type TaskDefinition = proto.TaskDefinition
 
+// TaskBatchPolicy is the protocol's opt-in of a cacheable per-project task into
+// same-key batching.
 type TaskBatchPolicy = proto.TaskBatchPolicy
+
+// TaskInputPort is the protocol's task input source.
 type TaskInputPort = proto.TaskInputPort
+
+// TaskOutputPort is the protocol's task output.
 type TaskOutputPort = proto.TaskOutputPort
+
+// ResourceRef is the protocol's name of a resource a task reads or writes.
 type ResourceRef = proto.ResourceRef
 
-// Task contract v3 (protocol/extension task_contract.go): a task's declared
-// outputs, its effects beyond them, and the source-mutation flag. Re-exported
-// so the planner and the store name one set of types. Recognition only — the
-// CLI still infers capture for every task, v2 and v3 alike, until declared
-// capture lands.
+// TaskDeclaration is the protocol's v3 task contract block: a task's declared
+// outputs, its effects beyond them and the source-mutation flag, which the CLI
+// recognizes while it infers capture for every task.
 type TaskDeclaration = proto.TaskDeclaration
+
+// DeclaredOutput is the protocol's exact task output: a file or a subtree at a
+// path relative to a named root.
 type DeclaredOutput = proto.DeclaredOutput
+
+// OutputRef is the protocol's owner identity of an output: a root plus a path
+// or the port that supplies one.
 type OutputRef = proto.OutputRef
+
+// TaskCachePolicy is the protocol's caching policy of a task.
 type TaskCachePolicy = proto.TaskCachePolicy
+
+// TaskCacheKey is the protocol's declaration of what contributes to a task's
+// cache key.
 type TaskCacheKey = proto.TaskCacheKey
+
+// TaskOutputArtifact is the protocol's output a task produces.
 type TaskOutputArtifact = proto.TaskOutputArtifact
+
+// FlagDefinition is the protocol's CLI flag declared in a manifest.
 type FlagDefinition = proto.FlagDefinition
+
+// InputBinding is the protocol's step input wiring: a value, a source, or
+// another step's output.
 type InputBinding = proto.InputBinding
+
+// OutputBinding is the protocol's mapping of a command output to a step result.
 type OutputBinding = proto.OutputBinding
+
+// StepCacheOverride is the protocol's per-step override of task cache behavior.
 type StepCacheOverride = proto.StepCacheOverride
+
+// ContractsDefinition is the protocol's set of JSON schemas that validate task
+// inputs and outputs.
 type ContractsDefinition = proto.ContractsDefinition
+
+// ManifestHooks is the protocol's set of extension lifecycle hooks.
 type ManifestHooks = proto.ManifestHooks
+
+// HookDefinition is the protocol's subprocess-based hook.
 type HookDefinition = proto.HookDefinition
+
+// HookCacheConfig is the protocol's incremental build cache of a hook.
 type HookCacheConfig = proto.HookCacheConfig
+
+// RuntimeDefinition is the protocol's `runtime` section: the extension's own
+// executable and how to obtain it.
 type RuntimeDefinition = proto.RuntimeDefinition
+
+// RuntimePrepare is the protocol's workspace-independent build of an extension
+// runtime.
 type RuntimePrepare = proto.RuntimePrepare
 
 // WorkspaceAdapter is the manifest's `workspace` section: the markers that make

@@ -78,11 +78,10 @@ type subcommand struct {
 //
 // human is nil for the cases where the CLI handler returned its error WITHOUT
 // rendering anything — a workspace that would not load, a selector that was
-// rejected before any report existed. Those handlers guarded on
-// `report.Revision.Kind == ""`: a report with no resolved revision describes
-// nothing, and printing its hollow "… failed" block would bury the real error.
-// Each body below states its own guard rather than inferring one, because the
-// guard is per command in core too.
+// rejected before any report existed: a report with no resolved revision
+// describes nothing, and printing its hollow "… failed" block would bury the
+// real error. Each body below states its own guard, because the guard is per
+// command in core too.
 type outcome struct {
 	data  any
 	human func(w io.Writer)

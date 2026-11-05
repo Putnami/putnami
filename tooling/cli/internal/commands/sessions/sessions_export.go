@@ -17,11 +17,10 @@ import (
 // SessionsExport streams every recorded session.json still present under
 // .putnami/sessions, one compacted document per line, oldest first.
 //
-// It exists because the session store is the only per-run source of
-// cpu.actualMs, cpu.allocatedMs, task counts and cache reuse, it is pruned to a
-// small number of records, and an agent worktree is deleted with its records.
-// Accounting has to be collected while the worktree exists, so this is
-// the collection point.
+// The session store is the only per-run source of cpu.actualMs,
+// cpu.allocatedMs, task counts and cache reuse; it is pruned to a small number
+// of records and an agent worktree is deleted with its records, so accounting
+// is collected here while the worktree exists.
 //
 // The emitted line is the RECORDED DOCUMENT, forwarded verbatim rather than
 // re-serialized through protocolcli.SessionFile. That is the same discipline

@@ -49,10 +49,9 @@ func Inspect(workspaceRoot string, mode Mode) Report {
 // regenerated after), an operation the contract has and the client lacks, a
 // generated-marked file the manifest does not list, and the handwritten
 // transports the consumer scan finds. Whether the committed bytes are what the
-// current inputs GENERATE is the generator task's verdict — the engine compares
+// current inputs GENERATE is the generator task's verdict: the engine compares
 // each generator's declared output with the bytes present before it wrote
-// (protocols/extension ADR 0004), which is why this check no longer needs a
-// fresh render or a pre-session capture to compare against (ADR 0003).
+// (protocols/extension ADR 0004).
 func InspectCommitted(workspaceRoot string, members []string) Report {
 	view, err := committedView(workspaceRoot, members)
 	if err != nil {
@@ -86,15 +85,11 @@ func inspect(view workspaceView, discovery func(workspaceView) ([]provider, []Fi
 	report.Findings = append(report.Findings, findings...)
 	report.FrameworkTransports, findings = loadAndValidateFrameworkInventory(view)
 	report.Findings = append(report.Findings, findings...)
-	// ONE workspace source scan answers both questions below. The scan reads
-	// and parses every member project's production sources, which is the
-	// single most expensive thing this check does; running it twice doubled
-	// that for nothing, because both callers asked for the same set. The set
-	// is a function of the worktree and of the generated-file inventory, and
-	// the inventory is derived from report.Providers alone — which
-	// inspectWithReader has already settled and nothing below changes. Passing
-	// the records in rather than letting each caller re-derive them keeps that
-	// equality checkable at the call site instead of inside two scanners.
+	// ONE workspace source scan answers both questions below. It reads and
+	// parses every member project's production sources. The set is a function of
+	// the worktree and of the generated-file inventory, which derives from
+	// report.Providers alone, and inspectWithReader has already settled that.
+	// Passing the records in keeps that equality checkable at the call site.
 	report.recordTiming(PhaseInspect, time.Since(inspectStarted))
 	// The scan is timed on every exit below, including the failed-scan return,
 	// because a scan that failed still cost what it cost.
@@ -103,16 +98,11 @@ func inspect(view workspaceView, discovery func(workspaceView) ([]provider, []Fi
 	records, scanErr := workspaceSourceRecords(view, report)
 	if scanErr != nil {
 		// A scan that failed read NO source, which is not the same fact as a
-		// workspace that contains no transport. Every verdict below is about
-		// what the scan saw: an inventory callsite is stale because nothing
-		// matched it, a censused entry is stale because the workspace no longer
-		// holds the callsite it exempts. Classifying against an empty record set
-		// turns one unreadable tree into one finding per inventory entry — 114
-		// of them on this repository — and buries the single fact that explains
-		// them all. So both scanners are skipped, exactly as each skipped itself
-		// while it owned its own failing scan, and the only verdict that
-		// survives is the one needing no observation: whether the census
-		// document itself is valid.
+		// workspace that contains no transport. Every verdict below is about what
+		// the scan saw, so classifying against an empty record set would turn one
+		// unreadable tree into one finding per inventory entry. Both scanners are
+		// skipped; the only verdict that survives is the one needing no
+		// observation: whether the census document itself is valid.
 		report.Findings = append(report.Findings, Finding{Code: "clientgen.source-scan",
 			Path: ".", Message: workspaceErrorMessage(workspaceRoot, scanErr)})
 		report.Findings = append(report.Findings, loadPendingCensus(view.workspaceFiles).invalid...)
@@ -174,10 +164,8 @@ func inspectWithReader(
 			report.Findings = append(report.Findings, targetFindings...)
 			if targetReport == nil {
 				// The declared target generated nothing because the contract
-				// declares no first-party operation. Reporting it anyway would
-				// put a target with no binding in the report, and bindingAdvice
-				// would tell a consumer to regenerate a client that cannot
-				// exist (ADR 0004 decision 5).
+				// declares no first-party operation: it is not reported
+				// (ADR 0004 decision 5).
 				continue
 			}
 			report.Coverage.Covered += targetReport.Covered

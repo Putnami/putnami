@@ -42,9 +42,9 @@ type JobCommandContext struct {
 	SelectedProjects []JobContextSelectedProject `json:"selectedProjects,omitempty"`
 	// Selection is the invocation's RESOLVED project selection: the mode, whether
 	// the run is narrowed, the baseline `--impacted` resolved to, and the project
-	// ids in scope. It is the protocol's own type rather than a fourth local copy
-	// (as `invocation` already is), because the whole point of the member is that
-	// its bytes are the CLI's ResolvedSelection's bytes.
+	// ids in scope. It is the protocol's own type, not a fourth local copy (as
+	// `invocation` already is): its bytes are the CLI's ResolvedSelection's
+	// bytes.
 	//
 	// SelectedProjects says which projects, for the workspace-scoped jobs that
 	// receive it; this says what was asked for and how it resolved, for every

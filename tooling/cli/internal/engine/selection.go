@@ -287,9 +287,9 @@ func resolveReleaseSetSelections(
 		return options, nil, selectionEvidence{}, code
 	}
 	// "*" is an explicit workspace target and therefore overrides default tag
-	// exclusions. Clear --all as well: selection deliberately treats that flag
-	// as the ordinary default, which would otherwise keep those exclusions and
-	// leave the coordinator unable to key one of its members.
+	// exclusions. --all is cleared too: selection treats that flag as the
+	// ordinary default, which keeps those exclusions and leaves the coordinator
+	// unable to key one of its members.
 	req.Global.Impacted, req.Global.All, req.Global.Projects = false, false, "*"
 	return options, verification, evidence, ExitSuccess
 }
