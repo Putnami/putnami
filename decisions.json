@@ -455,9 +455,9 @@
     },
     {
       "id": "D-057",
-      "statement": "a requirement name maps to an ID by turning each run of characters other than ASCII letters and digits, non-ASCII included, into one hyphen; a name with nothing left or over 128 bytes takes requirement-<ordinal> and is unanchored",
+      "statement": "a requirement name maps to an ID through NFKD less combining marks, then each run of characters other than ASCII letters and digits becomes one hyphen; a name with nothing left or over 128 bytes takes requirement-<ordinal> and is unanchored",
       "settled": "2026-11-05",
-      "settledBy": "a build session, for the owner to review on its proposal",
+      "settledBy": "the epic session, under the owner's delegation of 2026-11-05",
       "adr": "protocols/features/doc/adr/0006-the-spec-source-contract.md",
       "reviewOnly": true
     }

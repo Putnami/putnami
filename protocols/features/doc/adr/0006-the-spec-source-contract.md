@@ -5,10 +5,10 @@
   `@putnami/sdd` (`tooling/sdd-extension`)
 - **Implements**:
   [ADR 0004 of `@putnami/sdd`](../../../../tooling/sdd-extension/doc/adr/0004-a-spec-may-live-in-an-external-market-format.md),
-  decisions D-039 to D-047. It records D-048 to D-055 and D-057 of the root
+  decisions D-039 to D-047. It records D-048 to D-055 of the root
   `decisions.json`, which build sessions took and the owner has not reviewed,
-  and D-043 as the epic session revised it under the owner's delegation of
-  2026-11-05
+  and D-043 and D-057 as the epic session revised them under the owner's
+  delegation of 2026-11-05
 - **One-way door**: the `spec` reference is authored in committed manifests,
   and the format names are public wire values. A release can add to them but
   cannot change them without a new manifest version and a move of every
@@ -40,10 +40,18 @@ task input is a static pattern, so it cannot depend on a manifest value.
 4. **A finding points into the file.** Its field is
    `<workspace path>#L<line>`.
 5. **A name becomes an ID by one mapping.** `NormalizeRequirementName`
-   lowercases ASCII letters, keeps ASCII digits, and turns each other run of
-   characters, non-ASCII ones included, into one hyphen. It trims the hyphens
-   at both ends. A name with nothing left, or longer than 128 bytes after
-   mapping, has no ID: §23 says what it gets. (D-057)
+   decomposes the name to Unicode NFKD and drops the combining marks, so
+   `Überprüfung` reads `Uberprufung` and `ﬁle` reads `file`. It then lowercases
+   ASCII letters, keeps ASCII digits, and turns each other run of characters
+   into one hyphen. It trims the hyphens at both ends. A letter with no ASCII
+   decomposition, such as `ß`, `ø` or a CJK character, stays a separator. A
+   name with nothing left, or longer than 128 bytes after mapping, has no ID:
+   §23 says what it gets. Go has no NFKD in its standard library, so the
+   protocol embeds `unicode/ascii-fold.json`: what NFKD less its marks gives
+   for each code point that it drops or turns into ASCII letters or digits.
+   The TypeScript test derives the same table from the runtime's
+   `String.prototype.normalize`, and both languages reproduce the golden
+   `fixtures/equivalence/requirement-ids.golden.json`. (D-057)
 6. **An anchor stands alone on the line above its requirement.** It reads
    `<!-- putnami:id <segment-id> -->`. In a Gherkin file it is the tag
    `@putnami-id:<segment-id>` on the line above the `Rule:`. The ID follows the
@@ -122,11 +130,13 @@ task input is a static pattern, so it cannot depend on a manifest value.
     a projection is never written as a native document, so the 512-byte bound
     of `putnami-spec.json` still holds for every file on disk. (D-043)
 23. **A name with no ID is unanchored.** A requirement whose name leaves no ID
-    under §5, and has no anchor, takes the positional ID `requirement-<n>`,
+    under §5, such as `ß` or `数据`, and has no anchor, takes the positional ID `requirement-<n>`,
     with `n` its 1-based place among the projected requirements, and is
     unanchored. `report` reads it, and `enforce` fails on it under §13 with a
     finding that asks for an anchor. A Kiro group in that case takes
-    `requirement-<n>` from its place among the groups. (D-057)
+    `requirement-<n>` from its place among the groups. A name with an accented
+    Latin letter keeps that letter as its base letter under §5, so it needs no
+    anchor. (D-057)
 
 ### The Gherkin reader
 
@@ -178,6 +188,15 @@ keywords.
 - **The `cucumber/gherkin` Go module for the Gherkin reader.** It would bring this
   protocol's first third-party modules, generated messages and a UUID library,
   into every consumer, to read six keywords and a tag line.
+- **Each non-ASCII run as a separator.** The first D-057 mapped `Überprüfung`
+  to `berpr-fung`. Once released, such an ID is recorded in
+  `specs.baseline.json` files and cannot change without a migration.
+- **The `golang.org/x/text` module for NFKD.** It would bring this protocol's
+  first third-party module into every consumer, which D-055 rules out for the
+  same reason, to read one table that fits in a committed file.
+- **A hand-written transliteration table, such as `ß` to `ss`.** No standard
+  defines it, so a second language could not derive it, and every new letter
+  would be a decision.
 
 ## Consequences
 
