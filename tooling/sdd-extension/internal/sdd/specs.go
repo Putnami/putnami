@@ -523,10 +523,10 @@ func BuildSpecInitResult(ws *workspace.Workspace, selector string, options SpecI
 		report.Path = existing.Path
 		report.Project = existing.Project
 		report.Diagnostics = append(report.Diagnostics, diag.Errorf(featureproto.ErrorCodeDuplicateSpec, existing.Path,
-			"feature %q names the %s spec %s; run `putnami specs init %s --from %s:%s` to draft its native spec",
+			"feature %q names the external spec %s:%s; run `putnami specs init %s --from %s:%s` to draft its native spec",
 			selector, existing.Format, existing.Path, selector, existing.Format, existing.Path))
 		return report, WithResultData(
-			protocolcli.Usagef("feature %q already has a %s spec at %s; draft the native spec with --from %s:%s",
+			protocolcli.Usagef("feature %q already has the external spec %s:%s; draft the native spec with --from %s:%s",
 				selector, existing.Format, existing.Path, existing.Format, existing.Path), report)
 	} else if found {
 		report.Path = existing.Path
