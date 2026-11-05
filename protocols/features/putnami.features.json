@@ -510,6 +510,21 @@
               "an-unclosed-doc-string-is-an-error"
             ]
           }
+        },
+        {
+          "id": "native-gaps",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "each-gap-kind-names-its-position-and-step",
+              "a-native-spec-has-no-gap",
+              "the-same-projection-gives-the-same-gaps"
+            ]
+          }
         }
       ]
     }

@@ -131,6 +131,10 @@
     {
       "id": "gherkin-malformed-files",
       "text": "A file with no Feature line, a second Feature line or an unclosed doc string is an error at a line, because each would hide or misplace text."
+    },
+    {
+      "id": "native-gaps",
+      "text": "SpecNativeGaps lists what a native rewrite of an external spec adds: each unanchored positional requirement, each section that restates a derived fact, each link in the projected prose that is not a doc/adr/*.md decision, and each scenario that does not match a declared check. A gap names its kind, its position in the file and the step that removes it. It is information, never a finding. A native spec has no gap, and the same projection gives the same gaps."
     }
   ],
   "decisions": [

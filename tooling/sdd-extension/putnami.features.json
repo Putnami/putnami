@@ -455,6 +455,22 @@
               "init-from-keeps-the-specs-verify-verdict"
             ]
           }
+        },
+        {
+          "id": "specs-surface-names-the-source",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "specs-list-names-the-source",
+              "specs-inspect-lists-the-native-gaps",
+              "native-gaps-never-change-the-exit-code",
+              "a-native-workspace-keeps-its-output"
+            ]
+          }
         }
       ],
       "surface": {
