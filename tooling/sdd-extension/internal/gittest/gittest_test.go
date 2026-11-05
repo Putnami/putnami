@@ -11,7 +11,9 @@ import (
 
 // hostileConfig is a global configuration that breaks every fixture commit
 // that reads it: it signs commits and tags with a gpg that does not exist,
-// rejects every commit with a hook, and names another default branch.
+// rejects every commit with a hook, and names another default branch. The
+// ignore and attributes files git reads by default under the home directory
+// ignore every file and mark it binary.
 const hostileConfig = `[commit]
 	gpgsign = true
 [tag]
@@ -52,8 +54,10 @@ func withHostileMachine(t *testing.T) {
 	if err := os.MkdirAll(filepath.Join(home, ".config", "git"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(home, ".config", "git", "config"), config, 0o644); err != nil {
-		t.Fatal(err)
+	for name, content := range map[string]string{"config": string(config), "ignore": "*\n", "attributes": "* binary\n"} {
+		if err := os.WriteFile(filepath.Join(home, ".config", "git", name), []byte(content), 0o644); err != nil {
+			t.Fatal(err)
+		}
 	}
 	t.Setenv("HOME", home)
 	t.Setenv("XDG_CONFIG_HOME", filepath.Join(home, ".config"))
@@ -95,7 +99,17 @@ func TestCommandIgnoresTheMachineConfiguration(t *testing.T) {
 		return strings.TrimSpace(string(out))
 	}
 	run("init", "-q")
-	run("commit", "-q", "--allow-empty", "-m", "fixture")
+	if err := os.WriteFile(filepath.Join(repo, "fixture.txt"), []byte("fixture\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	run("add", "-A")
+	if got := run("diff", "--cached", "--name-only"); got != "fixture.txt" {
+		t.Fatalf("staged = %q, want fixture.txt", got)
+	}
+	if got := run("check-attr", "binary", "fixture.txt"); got != "fixture.txt: binary: unspecified" {
+		t.Fatalf("attributes = %q, want none", got)
+	}
+	run("commit", "-q", "-m", "fixture")
 	run("tag", "-a", "-m", "release", "v1")
 
 	if got := run("symbolic-ref", "--short", "HEAD"); got != DefaultBranch {

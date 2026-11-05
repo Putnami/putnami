@@ -24,11 +24,6 @@ import (
 func featureTaskWorkspace(t *testing.T) string {
 	t.Helper()
 	root := candidateWorkspace(t)
-	for _, args := range [][]string{
-		{"config", "user.email", "t@t.com"}, {"config", "user.name", "T"}, {"config", "commit.gpgsign", "false"},
-	} {
-		gitIn(t, root, args...)
-	}
 	writeFixtureFile(t, filepath.Join(root, ".gitignore"), "billing/schema/feature-evidence/local.json\nbilling/out/\n")
 	writeFixtureFile(t, filepath.Join(root, "putnami.workspace.json"), `{"name":"gate","includes":["billing"]}`)
 	writeFixtureFile(t, filepath.Join(root, "billing", "putnami.json"), `{"name":"@acme/billing","type":"library"}`)

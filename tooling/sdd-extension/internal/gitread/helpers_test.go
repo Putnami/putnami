@@ -8,8 +8,9 @@ import (
 	"go.putnami.dev/tooling/sdd/extension/internal/gittest"
 )
 
-// initGitRepo creates a repository on main, with a test identity and one
-// commit of README.md, which the tree and source-binding tests read.
+// initGitRepo makes a repository on branch main with one commit of README.md.
+// runGit runs git in dir and fails the test on an error. Both run git through
+// gittest, so the fixture ignores the machine's git configuration.
 
 func initGitRepo(t *testing.T) string {
 	t.Helper()
