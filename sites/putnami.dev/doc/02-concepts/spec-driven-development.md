@@ -26,7 +26,9 @@ Five steps, each owned by a different artifact:
    a reference to an undeclared feature fails the build. A project that keeps
    its specs in OpenSpec opts in with `options.sdd.specFormats`, and the
    feature's manifest entry names the capability. The Markdown stays the one
-   home of the prose; no JSON copy exists.
+   home of the prose; no JSON copy exists. To move one feature to the native
+   format, `putnami specs init <feature> --from <format>:<path>` drafts its
+   `specs/*.json` from that Markdown, copying the text and adding none.
 3. **Prove.** Tests bind themselves to requirements in their runtime's native
    way — `spectest.Proves` in Go, `specTest` in TypeScript, the
    `putnami_proves` marker in Python. Every test run records which requirements
