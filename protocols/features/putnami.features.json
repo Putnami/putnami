@@ -428,6 +428,88 @@
               "an-unclosed-kiro-comment-or-fence-is-an-error"
             ]
           }
+        },
+        {
+          "id": "gherkin-projection",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-gherkin-corpus-reproduces-its-golden",
+              "a-gherkin-directory-reads-every-feature-file",
+              "a-feature-with-no-description-gives-its-name-as-outcome",
+              "a-rule-is-a-requirement-of-its-name-and-description",
+              "a-feature-with-no-rule-is-its-own-requirement",
+              "a-doc-string-hides-no-keyword-and-adds-no-text",
+              "the-reader-agrees-with-the-upstream-corpus"
+            ]
+          }
+        },
+        {
+          "id": "gherkin-identity",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-putnami-id-tag-names-the-requirement",
+              "a-putnami-check-tag-names-the-scenario-check",
+              "an-anchor-tag-may-share-its-line",
+              "a-name-with-no-id-needs-a-tag",
+              "a-misplaced-anchor-tag-is-an-error",
+              "a-repeated-or-malformed-anchor-tag-is-an-error"
+            ]
+          }
+        },
+        {
+          "id": "gherkin-scenarios",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-scenario-belongs-to-its-rule-or-its-feature",
+              "a-scenario-outline-counts-once",
+              "a-gherkin-mismatch-is-a-positioned-warning-either-way"
+            ]
+          }
+        },
+        {
+          "id": "gherkin-languages",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "every-gherkin-language-parses",
+              "a-french-feature-file-parses",
+              "an-unknown-language-is-an-error"
+            ]
+          }
+        },
+        {
+          "id": "gherkin-malformed-files",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-file-with-no-feature-is-an-error",
+              "a-second-feature-in-one-file-is-an-error",
+              "an-unclosed-doc-string-is-an-error"
+            ]
+          }
         }
       ]
     }

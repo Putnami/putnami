@@ -423,6 +423,22 @@
               "a-tracked-kiro-spec-is-read-through-the-candidate-cut"
             ]
           }
+        },
+        {
+          "id": "gherkin-specs-reach-the-gate",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-gherkin-project-reaches-specs-validate",
+              "a-gherkin-mismatch-reaches-specs-validate-as-a-warning",
+              "a-reordered-gherkin-spec-keeps-the-ratchet",
+              "a-tracked-gherkin-spec-is-read-through-the-candidate-cut"
+            ]
+          }
         }
       ],
       "surface": {

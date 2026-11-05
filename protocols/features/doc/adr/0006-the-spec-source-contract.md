@@ -5,7 +5,7 @@
   `@putnami/sdd` (`tooling/sdd-extension`)
 - **Implements**:
   [ADR 0004 of `@putnami/sdd`](../../../../tooling/sdd-extension/doc/adr/0004-a-spec-may-live-in-an-external-market-format.md),
-  decisions D-039 to D-047. It records D-048 to D-054 of the root
+  decisions D-039 to D-047. It records D-048 to D-055 of the root
   `decisions.json`, which build sessions took and the owner has not reviewed
 - **One-way door**: the `spec` reference is authored in committed manifests,
   and the format names are public wire values. A release can add to them but
@@ -108,6 +108,40 @@ task input is a static pattern, so it cannot depend on a manifest value.
 21. **A Kiro user story projects nothing.** It is context for its group, and
     adding it to each criterion would spend the 512-byte bound on repeated text.
 
+### The Gherkin reader
+
+Gherkin is the one format whose file a separate tool, Cucumber, also runs, so
+the reader keeps Cucumber's reading of the file. D-055 records how it gets the
+keywords.
+
+- **A file or a directory.** A directory reference reads each `.feature` file in
+  path order, because Cucumber keeps one `Feature:` per file and a product
+  feature often spans several. The requirement IDs of all files share one
+  namespace, so a duplicate is an error at both positions.
+- **Each paragraph of the `Feature:` description is one outcome.** Upstream gives
+  the description no other structure. A Feature with no description gives its
+  name as the outcome: most real files have none, and an error would fail them
+  on their first `report` run.
+- **A `Rule:` is a requirement, and its text is its name and its description.**
+  The Feature is a requirement in two cases: it has no `Rule:`, or it holds
+  scenarios outside its rules. Each scenario then has one owner, so D-051 does
+  not apply: Gherkin ties a scenario to its `Rule:` or its `Feature:`. The
+  Feature's text is its name, because its description is the outcomes.
+- **A tag is a token of a tag line.** Cucumber allows several tags on a line and
+  several lines of tags above a keyword, so §6 reads for Gherkin as: the tag is
+  among the tags of its keyword, with or without other tags.
+- **`@putnami-check:<id>` names a scenario's check.** §15 keeps its rule and takes
+  this spelling here, because `@putnami-id:` on a scenario would read as the
+  ID of a requirement. `@putnami-id:` goes on a `Rule:` or on a `Feature:` that is
+  a requirement. An anchor tag anywhere else, a repeated one, or one that breaks
+  its grammar is an error at its line, because a tag that does nothing looks
+  like one that works. Neither tag is inherited, unlike Cucumber's own tags.
+- **Layout stays Cucumber's problem.** The reader ignores steps, tables,
+  `Background:` and `Examples:`. It refuses only what would hide or misplace
+  text: no `Feature:`, a second `Feature:` in one file, an unclosed doc string or
+  a `# language:` the table does not hold. An error in one file of a directory
+  refuses the whole projection, as a native spec that fails to parse does.
+
 ## Rejected alternatives
 
 - **The `surface` rung, version 2.** Readers of the released version 2 refuse
@@ -120,6 +154,9 @@ task input is a static pattern, so it cannot depend on a manifest value.
 - **An input derived from each manifest's `path`.** Task inputs are static.
 - **`**/*.md` as an ordinary pattern.** It walks ignored directories such as
   `node_modules`, and hashes files no candidate cut can read.
+- **The `cucumber/gherkin` Go module for the Gherkin reader.** It would bring this
+  protocol's first third-party modules, generated messages and a UUID library,
+  into every consumer, to read six keywords and a tag line.
 
 ## Consequences
 
