@@ -156,6 +156,9 @@ type verifyRun struct {
 	v       Verifier
 	root    string
 	checked []checkedRef
+	// intentEdits memoizes, per base, the first changed path that edits
+	// feature intent, or "" when none does.
+	intentEdits map[string]string
 }
 
 type checkedRef struct {

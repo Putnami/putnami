@@ -1068,7 +1068,6 @@ func (r *verifyRun) verifyWorkflow(value any, final bool, expectedBaseSHA string
 		proof, session = r.workflowProof(w.get("proof"), proofTree)
 	}
 	// A ready projection needs a local producer session: without one, no
-	// requirement is proven.
 	// requirement is proven. A workflow with no current requirement has
 	// nothing to prove.
 	require(!final || proof != nil || !workflowHasCurrentRequirement(rows),
@@ -1160,31 +1159,58 @@ func workflowHasCurrentRequirement(rows map[string]workflowRequirement) bool {
 // spec a feature manifest names, or a feature manifest. Such a change carries
 // requirements, so a unit without any would skip their proof.
 func (r *verifyRun) workflowRequirementlessUnitEditsNoIntent(unit, base string) {
-	changes := r.changedFiles(base)
-	refuse := func(changed string) {
+	if changed := r.workflowIntentEdit(base); changed != "" {
 		fail("workflow unit " + unit + " carries no requirement but the change edits feature intent: " + changed)
-	}
-	for _, changed := range changes {
-		if path.Base(changed) == features.ManifestFilename ||
-			path.Ext(changed) == ".json" && path.Base(path.Dir(changed)) == features.SpecDirectory {
-			refuse(changed)
-		}
-	}
-	external := r.workflowExternalSpecPaths()
-	for _, changed := range changes {
-		for _, spec := range external {
-			if changed == spec || strings.HasPrefix(changed, spec+"/") {
-				refuse(changed)
-			}
-		}
 	}
 }
 
-// workflowExternalSpecPaths lists the external spec paths the tracked feature
-// manifests of the tree name.
+// workflowIntentEdit returns the first path changed from base that edits
+// feature intent, or "". A verifier run reads the change once per base.
+func (r *verifyRun) workflowIntentEdit(base string) string {
+	if changed, known := r.intentEdits[base]; known {
+		return changed
+	}
+	changes := r.changedFiles(base)
+	found := ""
+	for _, changed := range changes {
+		if path.Base(changed) == features.ManifestFilename ||
+			path.Ext(changed) == ".json" && path.Base(path.Dir(changed)) == features.SpecDirectory {
+			found = changed
+			break
+		}
+	}
+	if found == "" {
+		external := r.workflowExternalSpecPaths()
+	scan:
+		for _, changed := range changes {
+			for _, spec := range external {
+				if changed == spec || strings.HasPrefix(changed, spec+"/") {
+					found = changed
+					break scan
+				}
+			}
+		}
+	}
+	if r.intentEdits == nil {
+		r.intentEdits = map[string]string{}
+	}
+	r.intentEdits[base] = found
+	return found
+}
+
+// workflowExternalSpecPaths lists the external spec paths that the feature
+// manifests of the tree name. Like feature discovery, it reads a manifest only
+// at a project root: beside a tracked putnami.json.
 func (r *verifyRun) workflowExternalSpecPaths() []string {
+	projects := map[string]bool{}
+	for _, project := range r.fileList("ls-files", "-z", "--", "putnami.json", "**/putnami.json") {
+		projects[path.Dir(project)] = true
+	}
 	var specs []string
 	for _, manifestPath := range r.fileList("ls-files", "-z", "--", features.ManifestFilename, "**/"+features.ManifestFilename) {
+		if !projects[path.Dir(manifestPath)] {
+			continue
+		}
 		data, err := os.ReadFile(r.path(manifestPath))
 		if errors.Is(err, os.ErrNotExist) {
 			continue // A manifest the change deletes is itself an intent edit.

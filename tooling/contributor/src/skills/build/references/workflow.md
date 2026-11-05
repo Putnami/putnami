@@ -40,9 +40,12 @@ which the CLI checks against a native proposal-status receipt. Required stage is
 also be `planned` or `building`. A unit's requirement list must equal its
 assigned requirement rows. A unit with an empty list carries no requirement:
 it is current, passes every final check of a current unit and needs no
-producer proof. The verifier refuses it when the change from the base it knows
-edits a native spec, an external spec a feature manifest names, or a feature
-manifest. Dependencies explain delivery order, while native
+producer proof. Use it only for a change that touches no file a feature's
+checks cover: a change to the implementation of a declared requirement lists
+that requirement and supplies its proof. The verifier refuses the whole record
+when the change from the base it knows edits a native spec, an external spec a
+feature manifest names, or a feature manifest; fold such a unit into the unit
+whose requirements it serves. Dependencies explain delivery order, while native
 project dependencies control builds. A milestone or task count is not a
 receipt. Unresolved `decisions` block that unit's ready claim. Each next-cycle
 task is either `{kind: "provider", ref: {source, id}, revision?, receipt?}`

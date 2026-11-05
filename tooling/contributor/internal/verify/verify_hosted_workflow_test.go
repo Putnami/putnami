@@ -384,6 +384,9 @@ func TestHostedWorkflowUnitWithNoRequirementPassesEveryFinalCheck(t *testing.T) 
 			stage["state"] = "blocked"
 			stage["reason"] = f.note("requirementless-blocker", "Design is blocked.")
 		}},
+		{"missing receipt", "required merged receipt pending", func(_ *verifyFixture, workflow fxObj) {
+			fxObjAt(workflow, "units", 0)["requiredStage"] = "merged"
+		}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
@@ -417,7 +420,8 @@ func TestHostedWorkflowRefusesAUnitWithNoRequirementThatEditsIntent(t *testing.T
 				"id": "app/export", "type": "feature", "name": "Export", "outcome": "Data exports",
 				"owner": "app", "target": "modeled",
 				"spec": fxObj{"format": "gherkin", "path": "app/features/export.feature"}}}})
-			f.git("add", "app/putnami.features.json")
+			f.write("app/putnami.json", fxObj{"name": "app"})
+			f.git("add", "app/putnami.json", "app/putnami.features.json")
 			f.git("commit", "-q", "-m", "Manifest naming an external spec")
 			f.head = f.git("rev-parse", "HEAD")
 			f.write("app/features/export.feature", "Feature: Export\n")
@@ -431,5 +435,20 @@ func TestHostedWorkflowRefusesAUnitWithNoRequirementThatEditsIntent(t *testing.T
 				t.Fatalf("unit with no requirement accepted an intent edit: %v", err)
 			}
 		})
+	}
+}
+
+func TestHostedWorkflowReadsOnlyTheManifestsOfProjects(t *testing.T) {
+	spectest.Proves(t, "tooling/contributor-executable", "requirementless-delivery", "a-requirementless-delivery-closes-its-task")
+	t.Parallel()
+	f, request := requirementlessHostedFixture(t, func(f *verifyFixture, _ fxObj) {
+		f.write("samples/draft/putnami.features.json", fxObj{"protocolVersion": 99})
+		f.git("add", "samples/draft/putnami.features.json")
+		f.git("commit", "-q", "-m", "A manifest outside any project")
+		f.head = f.git("rev-parse", "HEAD")
+	})
+	result, err := f.checkHostedWorkflow(request)
+	if err != nil || !result.WouldCompleteAfterReady {
+		t.Fatalf("a manifest outside any project blocked a unit with no requirement: %+v, %v", result, err)
 	}
 }
