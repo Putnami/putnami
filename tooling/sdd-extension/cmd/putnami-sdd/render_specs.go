@@ -226,6 +226,9 @@ func printSpecInitHuman(w io.Writer, report sdd.SpecInitReport) {
 		fmt.Fprintf(w, "\n  No spec was created for %s\n", report.Feature)
 	}
 	fmt.Fprintf(w, "  Revision: %s\n", featureRevisionLabel(report.Revision))
+	if report.From != nil {
+		fmt.Fprintf(w, "  From: %s:%s\n", report.From.Format, report.From.Path)
+	}
 	if report.Contents != "" {
 		fmt.Fprintln(w)
 		for _, line := range strings.Split(strings.TrimRight(report.Contents, "\n"), "\n") {

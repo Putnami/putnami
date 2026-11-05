@@ -49,6 +49,10 @@ const (
 	// SpecCodeMissingSupportCatalog reports that the workspace declares no
 	// support catalog at all, so support completeness was not assessed.
 	SpecCodeMissingSupportCatalog = "specs.missing_support_catalog"
+	// SpecCodeInitFromMismatch reports a `specs init --from` that does not name
+	// the external spec the feature's manifest entry names, or a feature that
+	// names none. The manifest is correct; the argument is not.
+	SpecCodeInitFromMismatch = "specs.init_from_mismatch"
 )
 
 const (
@@ -515,7 +519,16 @@ func BuildSpecInitResult(ws *workspace.Workspace, selector string, options SpecI
 			return report, WithResultData(
 				protocolcli.Usagef("feature %q already has a native spec at %s", selector, existing.Path), report)
 		}
-	} else if existing, found := repository.byFeature[selector]; found {
+	} else if existing, found := repository.byFeature[selector]; found && existing.Format != "" {
+		report.Path = existing.Path
+		report.Project = existing.Project
+		report.Diagnostics = append(report.Diagnostics, diag.Errorf(featureproto.ErrorCodeDuplicateSpec, existing.Path,
+			"feature %q names the %s spec %s; run `putnami specs init %s --from %s:%s` to draft its native spec",
+			selector, existing.Format, existing.Path, selector, existing.Format, existing.Path))
+		return report, WithResultData(
+			protocolcli.Usagef("feature %q already has a %s spec at %s; draft the native spec with --from %s:%s",
+				selector, existing.Format, existing.Path, existing.Format, existing.Path), report)
+	} else if found {
 		report.Path = existing.Path
 		report.Project = existing.Project
 		report.Diagnostics = append(report.Diagnostics, diag.Errorf(featureproto.ErrorCodeDuplicateSpec, existing.Path,

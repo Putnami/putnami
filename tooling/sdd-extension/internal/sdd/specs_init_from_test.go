@@ -90,19 +90,43 @@ func TestSpecsInitFromWritesTheTextTheSourceStates(t *testing.T) {
 	for _, scenario := range []struct {
 		name, from, source string
 		ws                 func(*testing.T) *workspace.Workspace
+		outcomes           []string
 		requirements       []featureproto.SpecRequirement
 		nonGoals           []string
+		decisions          []string
 	}{
 		{
 			name: "openspec", from: "openspec:app/openspec/specs/invoice-export/",
-			source: "app/openspec/specs/invoice-export/spec.md", ws: openSpecWorkspace,
+			source: "app/openspec/specs/invoice-export/spec.md",
+			ws: func(t *testing.T) *workspace.Workspace {
+				ws := openSpecWorkspace(t)
+				writeOpenSpec(t, ws.Root, "", "### Requirement: Issue an invoice")
+				specPath := filepath.Join(ws.Root, "app", "openspec", "specs", "invoice-export", "spec.md")
+				writeFixtureFile(t, specPath, strings.Replace(readFixture(t, ws, "app/openspec/specs/invoice-export/spec.md"),
+					"Customers receive invoices.\n",
+					"Customers receive invoices, as [the invoice format](../../../doc/adr/0001-invoice-format.md) decides.\n", 1))
+				writeFixtureFile(t, filepath.Join(ws.Root, "app", "doc", "adr", "0001-invoice-format.md"), "# ADR 0001\n")
+				return ws
+			},
+			outcomes:     []string{"Customers receive invoices, as [the invoice format](../../../doc/adr/0001-invoice-format.md) decides."},
 			requirements: []featureproto.SpecRequirement{{ID: "issue-an-invoice", Text: "The system SHALL issue an invoice."}},
+			decisions:    []string{"app/doc/adr/0001-invoice-format.md"},
+		},
+		{
+			name: "kiro", from: "kiro:.kiro/specs/invoice-export", source: kiroRequirementsPath,
+			ws:       func(t *testing.T) *workspace.Workspace { return kiroWorkspace(t, "report", kiroAnchors) },
+			outcomes: []string{"Customers receive invoices."},
+			requirements: []featureproto.SpecRequirement{
+				{ID: "issue-an-invoice", Text: "WHEN an order closes THE system SHALL issue an invoice"},
+				{ID: "number-invoices", Text: "THE system SHALL number invoices"},
+			},
 		},
 		{
 			name: "speckit", from: "speckit:" + specKitFromPath, source: specKitFromPath + "/spec.md",
 			ws: func(t *testing.T) *workspace.Workspace {
 				return specKitFromWorkspace(t, "<!-- putnami:id export-a-month -->\n", "")
 			},
+			outcomes: []string{"An accountant exports a closed month in under 30 seconds."},
 			requirements: []featureproto.SpecRequirement{{ID: "export-a-month",
 				Text: "System MUST export the invoices of one calendar month as a CSV file with one row per invoice."}},
 			nonGoals: []string{"Exporting to a spreadsheet format other than CSV."},
@@ -139,8 +163,9 @@ func TestSpecsInitFromWritesTheTextTheSourceStates(t *testing.T) {
 			if canonical, _ := featureproto.MarshalSpec(parsed); string(canonical) != written {
 				t.Fatalf("drafted bytes are not canonical:\n%s", written)
 			}
-			if parsed.Feature != "billing/invoicing" || !reflect.DeepEqual(parsed.Requirements, scenario.requirements) ||
-				!reflect.DeepEqual(parsed.NonGoals, scenario.nonGoals) || len(parsed.Decisions) != 0 {
+			if parsed.Feature != "billing/invoicing" || !reflect.DeepEqual(parsed.Outcomes, scenario.outcomes) ||
+				!reflect.DeepEqual(parsed.Requirements, scenario.requirements) ||
+				!reflect.DeepEqual(parsed.NonGoals, scenario.nonGoals) || !reflect.DeepEqual(parsed.Decisions, scenario.decisions) {
 				t.Fatalf("drafted spec = %+v, want only the source's text", parsed)
 			}
 
@@ -189,7 +214,7 @@ func TestSpecsInitFromRefusesAtTheSourcePosition(t *testing.T) {
 			name:    "a --from that is not the feature's reference",
 			ws:      openSpecWorkspace,
 			feature: "billing/invoicing", from: "openspec:app/openspec/specs/other", wantErr: protocolcli.ErrUsage,
-			code: featureproto.ErrorCodeInvalidSpecReference, field: "app/putnami.features.json#features[0].spec",
+			code: SpecCodeInitFromMismatch, field: "app/putnami.features.json#features[0].spec",
 			mentions: "openspec:app/openspec/specs/invoice-export",
 		},
 		{
@@ -238,8 +263,23 @@ func TestSpecsInitFromRefusesAtTheSourcePosition(t *testing.T) {
 	}
 
 	_, err := BuildSpecInitResult(openSpecWorkspace(t), "billing/invoicing", SpecInitOptions{From: "markdown:app/openspec"})
-	if !errors.Is(err, protocolcli.ErrUsage) || !strings.Contains(err.Error(), "openspec") {
-		t.Fatalf("an unknown format = %v, want a usage error that lists the formats", err)
+	if !errors.Is(err, protocolcli.ErrUsage) || !strings.Contains(err.Error(), "openspec") || strings.Contains(err.Error(), "markdown") {
+		t.Fatalf("an unknown format = %v, want a usage error that lists the formats and does not echo the input", err)
+	}
+	long := "openspec:" + strings.Repeat("a", specInitFromMaxBytes)
+	if _, err := BuildSpecInitResult(openSpecWorkspace(t), "billing/invoicing", SpecInitOptions{From: long}); !errors.Is(err, protocolcli.ErrUsage) ||
+		strings.Contains(err.Error(), "aaaa") {
+		t.Fatalf("an unbounded --from = %v, want a usage error that does not echo it", err)
+	}
+	if _, err := BuildSpecInitResult(openSpecWorkspace(t), "billing/invoicing", SpecInitOptions{From: "openspec"}); !errors.Is(err, protocolcli.ErrUsage) {
+		t.Fatalf("a --from with no path = %v, want a usage error", err)
+	}
+
+	// Without --from, a feature with an external spec is pointed at --from.
+	report, err := BuildSpecInitResult(openSpecWorkspace(t), "billing/invoicing", SpecInitOptions{})
+	if !errors.Is(err, protocolcli.ErrUsage) ||
+		!hasDiagnostic(report.Diagnostics, featureproto.ErrorCodeDuplicateSpec, "--from openspec:app/openspec/specs/invoice-export") {
+		t.Fatalf("plain init on an external spec = %v, %+v, want a pointer to --from", err, report.Diagnostics)
 	}
 }
 

@@ -793,6 +793,16 @@ func TestSpecsInitForwardsFrom(t *testing.T) {
 	if _, err := os.Stat(filepath.Join(root, "app", "specs", "refunds.json")); !os.IsNotExist(err) {
 		t.Fatalf("a refused --from wrote the spec: %v", err)
 	}
+
+	// An empty --from is refused, not read as a request for a skeleton.
+	empty := wireContext(root, projects, specSelection(), map[string]any{"output": "json", "from": ""})
+	out, _, code = runSubcommand(t, empty, "specs", "init", "billing/refunds")
+	if code == protocolcli.ExitSuccess || !strings.Contains(out, "cannot be empty") {
+		t.Fatalf("specs init --from= exited %d:\n%s", code, out)
+	}
+	if _, err := os.Stat(filepath.Join(root, "app", "specs", "refunds.json")); !os.IsNotExist(err) {
+		t.Fatalf("an empty --from wrote a skeleton: %v", err)
+	}
 }
 
 // TestContractsTargetsOneProjectFromTheRawSelector pins the resolution order

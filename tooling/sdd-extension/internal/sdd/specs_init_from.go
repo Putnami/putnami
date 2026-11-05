@@ -11,10 +11,18 @@ import (
 	featureengine "go.putnami.dev/tooling/sdd/extension/internal/features"
 )
 
+// specInitFromMaxBytes bounds --from: a format name, a colon and a reference
+// path, which the protocol bounds at 4096 bytes.
+const specInitFromMaxBytes = 4096 + 32
+
 // parseSpecInitFrom reads `--from <format>:<path>`. The format must be one of
 // the closed vocabulary; the path is compared with the manifest reference,
 // which is canonical, so a trailing slash or a "./" prefix does not matter.
 func parseSpecInitFrom(raw string) (featureproto.SpecReference, error) {
+	if len(raw) > specInitFromMaxBytes {
+		return featureproto.SpecReference{}, protocolcli.Usagef(
+			"--from is longer than %d bytes; it takes <format>:<path>", specInitFromMaxBytes)
+	}
 	format, location, found := strings.Cut(strings.TrimSpace(raw), ":")
 	if !found || format == "" || location == "" {
 		return featureproto.SpecReference{}, protocolcli.Usagef(
@@ -30,7 +38,7 @@ func parseSpecInitFrom(raw string) (featureproto.SpecReference, error) {
 	}
 	if !known {
 		return featureproto.SpecReference{}, protocolcli.Usagef(
-			"--from names format %q; the formats are %s", format, strings.Join(names, ", "))
+			"--from names an unknown format; the formats are %s", strings.Join(names, ", "))
 	}
 	return featureproto.SpecReference{Format: featureproto.SpecFormat(format), Path: path.Clean(location)}, nil
 }
@@ -62,15 +70,14 @@ type specDraft struct {
 func (repository *specRepository) draftFromExternalSpec(feature string, from featureproto.SpecReference) (specDraft, []diag.Diagnostic, error) {
 	reference, field, manifest, found := repository.specReferenceOf(feature)
 	if !found {
-		return specDraft{}, []diag.Diagnostic{diag.Errorf(featureproto.ErrorCodeInvalidSpecReference, "feature",
+		return specDraft{}, []diag.Diagnostic{diag.Errorf(SpecCodeInitFromMismatch, "feature",
 				"feature %q names no external spec in %s; --from reads only the spec a manifest entry names",
 				feature, featureproto.ManifestFilename)},
 			protocolcli.Usagef("feature %q names no external spec", feature)
 	}
 	if reference != from {
-		return specDraft{}, []diag.Diagnostic{diag.Errorf(featureproto.ErrorCodeInvalidSpecReference, field,
-				"--from %s:%s is not the spec feature %q names, %s:%s",
-				from.Format, from.Path, feature, reference.Format, reference.Path)},
+		return specDraft{}, []diag.Diagnostic{diag.Errorf(SpecCodeInitFromMismatch, field,
+				"--from is not the spec feature %q names, %s:%s", feature, reference.Format, reference.Path)},
 			protocolcli.Usagef("--from must name %s:%s, the spec of feature %q", reference.Format, reference.Path, feature)
 	}
 
