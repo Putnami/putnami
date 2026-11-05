@@ -2,7 +2,8 @@
 
 - **Status**: accepted
 - **Settled**: 2026-11-04, decisions D-039 to D-047 of the root
-  `decisions.json`
+  `decisions.json`; D-056, taken on 2026-11-05 by a build session for the
+  owner to review, details decision 8
 - **Amends**:
   [ADR 0007](../../../cli/doc/adr/0007-read-mostly-spec-surface.md), §1 and
   §2: `specs init --from` drafts a native spec from an external one
@@ -80,7 +81,10 @@ because `specs.baseline.json` records `feature#requirement` pairs.
    `specs init <feature> --from <format>:<path>` writes exactly one new
    native file with `O_EXCL`. It supports `--dry-run`. It carries only text
    copied from the source. It has no `--all` and no `--force`. There is
-   still no `specs migrate`. This amends ADR 0007. (D-046)
+   still no `specs migrate`. This amends ADR 0007. (D-046) The source is the
+   external spec the feature's manifest entry names, read through the
+   discovery the gate uses, and the command refuses what `enforce` would
+   refuse. (D-056)
 9. **A project opts in to each format.** A project lists the formats it reads
    in `options.sdd.specFormats`. The default is empty, so a workspace that
    does not opt in sees no change. (D-047)
