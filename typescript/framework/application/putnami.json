@@ -26,6 +26,7 @@
         "../../../protocols/contracts/fixtures/**",
         "../../../protocols/contracts/testdata/**",
         "../../../protocols/features/fixtures/**",
+        "../../../protocols/features/unicode/**",
         "../../../protocols/http-routes/fixtures/**",
         "../../../protocols/identity/schema/contracts.gen.ts",
         "../../../protocols/identity/schema/contracts.json",

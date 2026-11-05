@@ -121,11 +121,12 @@ Then opt in on the project, in `putnami.json`:
 
 `putnami specs validate` reads `openspec/specs/invoice-export/spec.md` as the
 feature's spec. A requirement's ID is its normalized name:
-`### Requirement: Export as PDF` is `export-as-pdf`. A non-ASCII character
-counts as a separator, and a name with no ASCII letter or digit takes its
-position, such as `requirement-3`, which `enforce` refuses. To keep an ID
-through a rename, or to give one to such a name, write an anchor on the line
-above the heading:
+`### Requirement: Export as PDF` is `export-as-pdf`. An accented letter keeps
+its base letter, so `Überprüfung` is `uberprufung`. A letter with no ASCII
+form, such as `ß` or a CJK character, counts as a separator, and a name with
+no letter or digit left takes its position, such as `requirement-3`, which
+`enforce` refuses. To keep an ID through a rename, or to give one to such a
+name, write an anchor on the line above the heading:
 
 ```markdown
 <!-- putnami:id export-as-pdf -->

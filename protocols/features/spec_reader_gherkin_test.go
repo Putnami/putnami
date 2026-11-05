@@ -263,7 +263,7 @@ func TestPutnamiCheckTagNamesTheScenarioCheck(t *testing.T) {
 	spectest.Proves(t, "features/feature-contracts", "gherkin-identity", "a-putnami-check-tag-names-the-scenario-check")
 	text := "Feature: F\n  @putnami-check:exported\n  Scenario: The accountant exports March\n  Scenario: Une exportation échoue\n  Scenario: It runs\n"
 	projection := readGherkin(t, text)
-	if got := gherkinRequirements(projection); got != "f@1:exported@3,une-exportation-choue@4,it-runs@5" {
+	if got := gherkinRequirements(projection); got != "f@1:exported@3,une-exportation-echoue@4,it-runs@5" {
 		t.Fatalf("got %s", got)
 	}
 }

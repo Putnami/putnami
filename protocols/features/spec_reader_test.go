@@ -1,6 +1,7 @@
 package features_test
 
 import (
+	"encoding/json"
 	"os"
 	"strings"
 	"testing"
@@ -112,21 +113,55 @@ func TestRequirementNameNormalizesToOneID(t *testing.T) {
 	}
 }
 
-func TestNonASCIIRunIsASeparator(t *testing.T) {
+func TestAccentedLetterKeepsItsBaseLetter(t *testing.T) {
 	t.Parallel()
-	spectest.Proves(t, "features/feature-contracts", "requirement-identity-mapping", "a-non-ascii-run-is-a-separator")
+	spectest.Proves(t, "features/feature-contracts", "requirement-identity-mapping", "an-accented-letter-keeps-its-base-letter")
 	for name, want := range map[string]string{
-		"Überprüfung":       "berpr-fung",
-		"Export für Kunden": "export-f-r-kunden",
-		"Règle 2 — totaux":  "r-gle-2-totaux",
+		"Überprüfung":       "uberprufung",
+		"Export für Kunden": "export-fur-kunden",
+		"Règle 2 — totaux":  "regle-2-totaux",
+		"cafe\u0301":        "cafe",
+		"ﬁle":               "file",
+		"Straße":            "stra-e",
+		"\xffa\xfeb":        "a-b",
 	} {
 		if got, ok := features.NormalizeRequirementName(name); !ok || got != want {
 			t.Errorf("%q = %q, %v", name, got, ok)
 		}
 	}
-	for _, name := range []string{"日本語", "é", "!!!", "", strings.Repeat("a", 129)} {
+	for _, name := range []string{"日本語", "ß", "\u0301", "!!!", "", strings.Repeat("a", 129), strings.Repeat("é", 129)} {
 		if got, ok := features.NormalizeRequirementName(name); ok {
 			t.Errorf("%q = %q", name, got)
+		}
+	}
+}
+
+func TestGoldenNamesMapToGoldenIDs(t *testing.T) {
+	t.Parallel()
+	spectest.Proves(t, "features/feature-contracts", "requirement-identity-mapping", "the-go-mapping-gives-the-golden-ids")
+	data, err := os.ReadFile("fixtures/equivalence/requirement-ids.golden.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var golden struct {
+		Names []struct {
+			Name string  `json:"name"`
+			ID   *string `json:"id"`
+		} `json:"names"`
+	}
+	if err := json.Unmarshal(data, &golden); err != nil {
+		t.Fatal(err)
+	}
+	if len(golden.Names) == 0 {
+		t.Fatal("the golden holds no name")
+	}
+	for _, entry := range golden.Names {
+		got, ok := features.NormalizeRequirementName(entry.Name)
+		switch {
+		case entry.ID == nil && ok:
+			t.Errorf("%q = %q, want no ID", entry.Name, got)
+		case entry.ID != nil && (!ok || got != *entry.ID):
+			t.Errorf("%q = %q, %v, want %q", entry.Name, got, ok, *entry.ID)
 		}
 	}
 }

@@ -192,7 +192,7 @@ func TestOpenSpecNameGivesTheID(t *testing.T) {
 		t.Fatalf("got %+v", projection)
 	}
 	unnamed := readOpenSpec(t, "## Purpose\nO.\n## Requirements\n### Requirement: Über\nThe text.\n### Requirement:\nThe text.\n")
-	if unnamed.Spec == nil || requirementIDs(unnamed.Spec) != "ber,requirement-2" || len(unnamed.Findings) != 0 ||
+	if unnamed.Spec == nil || requirementIDs(unnamed.Spec) != "uber,requirement-2" || len(unnamed.Findings) != 0 ||
 		unnamed.Requirements[0].Unanchored || !unnamed.Requirements[1].Unanchored {
 		t.Fatalf("got %+v", unnamed)
 	}
@@ -289,7 +289,7 @@ func TestOpenSpecNameWithNoIDIsUnanchored(t *testing.T) {
 	t.Parallel()
 	spectest.Proves(t, "features/feature-contracts", "openspec-requirement-identity", "an-openspec-name-gives-the-id")
 	projection := readOpenSpec(t, "## Purpose\nO.\n## Requirements\n### Requirement: Überprüfung\nThe text.\n### Requirement: 日本語\nThe text.\n")
-	if projection.Spec == nil || requirementIDs(projection.Spec) != "berpr-fung,requirement-2" || len(projection.Findings) != 0 {
+	if projection.Spec == nil || requirementIDs(projection.Spec) != "uberprufung,requirement-2" || len(projection.Findings) != 0 {
 		t.Fatalf("got %+v", projection)
 	}
 	if report := projection.EnforceOnly(features.VerificationModeReport); len(report) != 0 {
