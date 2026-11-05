@@ -439,6 +439,21 @@
               "a-tracked-gherkin-spec-is-read-through-the-candidate-cut"
             ]
           }
+        },
+        {
+          "id": "init-from-copies-the-external-spec",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "init-from-writes-the-text-the-source-states",
+              "init-from-refuses-at-the-source-position",
+              "init-from-keeps-the-specs-verify-verdict"
+            ]
+          }
         }
       ],
       "surface": {

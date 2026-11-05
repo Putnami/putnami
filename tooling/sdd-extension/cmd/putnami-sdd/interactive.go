@@ -388,6 +388,7 @@ const (
 	paramApply    = "apply"
 	paramOwner    = "owner"
 	paramAt       = "at"
+	paramFrom     = "from"
 )
 
 // param reads one forwarded string parameter, trimmed. An absent parameter and
@@ -485,6 +486,7 @@ func splitReservedArgs(args []string) (contextFile string, positionals []string,
 // extension manifest, so a new string flag cannot be added without it.
 var subcommandValueFlags = map[string]bool{
 	"--at":      true,
+	"--from":    true,
 	"--owner":   true,
 	"--project": true,
 	"--session": true,
@@ -692,7 +694,17 @@ func runSpecsInspect(run *interactiveRun) outcome {
 // it (extension_command.go:180-186).
 func runSpecsInit(run *interactiveRun) outcome {
 	dryRun := run.ctx != nil && run.ctx.Params.Bool(paramDryRun, false)
-	report, verdict := sdd.BuildSpecInitResult(run.ws, positionalArgs(run.args)[0], dryRun)
+	// An empty --from is a mistake, not a request for a skeleton: a script with
+	// an unset variable must not get a document it did not ask for.
+	if run.ctx != nil {
+		if _, present := run.ctx.Params[paramFrom]; present && run.param(paramFrom) == "" {
+			return outcome{err: protocolcli.Usagef("--from takes <format>:<path>; it cannot be empty")}
+		}
+	}
+	report, verdict := sdd.BuildSpecInitResult(run.ws, positionalArgs(run.args)[0], sdd.SpecInitOptions{
+		DryRun: dryRun,
+		From:   run.param(paramFrom),
+	})
 	if verdict != nil && report.Revision.Kind == "" {
 		return outcome{err: verdict}
 	}

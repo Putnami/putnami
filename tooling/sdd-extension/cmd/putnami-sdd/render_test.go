@@ -505,3 +505,16 @@ func TestSpecVerifyRendersTheMeasuredAggregate(t *testing.T) {
 		t.Fatalf("provenance lost from the measured line:\n%s", rendered)
 	}
 }
+
+// TestSpecInitNamesTheSourceOfADraft pins that a terminal reader can tell a
+// draft from a skeleton without reading its bytes.
+func TestSpecInitNamesTheSourceOfADraft(t *testing.T) {
+	var out strings.Builder
+	printSpecInitHuman(&out, sdd.SpecInitReport{
+		Feature: "billing/invoicing", Path: "app/specs/invoicing.json", DryRun: true, Contents: "{}\n",
+		From: &featureproto.SpecReference{Format: featureproto.SpecFormatOpenSpec, Path: "app/openspec/specs/invoice-export"},
+	})
+	if !strings.Contains(out.String(), "From: openspec:app/openspec/specs/invoice-export") {
+		t.Fatalf("human output does not name the source:\n%s", out.String())
+	}
+}

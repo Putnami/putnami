@@ -256,12 +256,13 @@ func sddCommandGroups() []groupSpec {
 				{
 					name:    "init",
 					summary: "Create one minimal spec for an authored feature",
-					description: "Create one canonical spec skeleton next to the declaration of an already-authored feature, " +
-						"carrying only what that declaration states. It refuses an unknown feature, refuses a feature that " +
+					description: "Create one canonical spec next to the declaration of an already-authored feature, " +
+						"carrying only what that declaration states, or with --from only the text of the external spec its " +
+						"manifest entry names. It refuses an unknown feature, refuses a feature that " +
 						"already has a spec, and never overwrites an existing file; --dry-run prints the target path and the " +
-						"exact canonical bytes without writing. Requirements, non-goals, and decision links stay for you to " +
-						"author. The feature is an exact target, so project selection flags are rejected rather than " +
-						"silently ignored",
+						"exact canonical bytes without writing. Without --from, requirements, non-goals, and decision links " +
+						"stay for you to author. The feature is an exact target, so project selection flags are rejected " +
+						"rather than silently ignored",
 					positionals: []proto.PositionalDefinition{{Name: "feature-id", Required: true}},
 					// The global --dry-run is forwarded ONLY to a subcommand whose
 					// effective flag surface declares it
@@ -273,10 +274,17 @@ func sddCommandGroups() []groupSpec {
 							Type:        "boolean",
 							Description: "Print the target path and the exact canonical bytes without writing the file.",
 						},
+						"from": {
+							Type: "string",
+							Description: "Draft the spec from the external spec the feature's manifest entry names, given as " +
+								"<format>:<path>. Copies its outcomes, non-goals, requirements and decision links, and refuses " +
+								"what enforce would refuse.",
+						},
 					},
 					examples: []string{
 						"putnami specs init billing/invoice-export --dry-run",
 						"putnami specs init billing/invoice-export",
+						"putnami specs init billing/invoice-export --from openspec:openspec/specs/invoice-export --dry-run",
 					},
 					mutatesSources: true,
 				},

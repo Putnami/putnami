@@ -237,7 +237,7 @@ putnami specs inspect <feature-id>
 putnami specs validate
 putnami specs verify [--session <id>]
 putnami specs baseline [--update]
-putnami specs init <feature-id> [--dry-run]
+putnami specs init <feature-id> [--from <format>:<path>] [--dry-run]
 ```
 
 `list` and `validate` take the same project-selection vocabulary `features list`
@@ -339,6 +339,20 @@ leaf path, init refuses that path instead of inventing a different filename.
 writing. There is no batch or `--all` mode; see
 [ADR 0007](../../cli/doc/adr/0007-read-mostly-spec-surface.md) for why this
 surface stays read-mostly and non-destructive.
+
+`init <feature-id> --from <format>:<path>` drafts the native spec of a feature
+whose `putnami.features.json` entry names an external spec, such as
+`--from openspec:openspec/specs/invoice-export`. The value must be that entry's
+reference. The draft copies the outcomes, non-goals, requirement IDs and texts,
+and decision links the reader projects, and writes no other text. It reads the
+source through the same discovery as `specs validate`, so the two cannot
+disagree. It refuses, at the source file and line, what `enforce` would
+refuse: a positional requirement such as `FR-001` with no anchor, because the
+native ID must not depend on order, and a text over the bound. It also refuses
+a feature that already has a native spec. It edits neither the external file
+nor the manifest: until you remove both in the same change, `specs validate`
+fails on two specs for one feature, so a half-done migration cannot merge. See
+[ADR 0004](adr/0004-a-spec-may-live-in-an-external-market-format.md).
 
 ## `contracts`
 

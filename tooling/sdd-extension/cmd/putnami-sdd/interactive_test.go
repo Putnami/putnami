@@ -781,6 +781,30 @@ func TestSpecsInitHonorsTheForwardedDryRun(t *testing.T) {
 	}
 }
 
+// TestSpecsInitForwardsFrom pins that --from reaches specs init and that its
+// value is not counted as a second positional.
+func TestSpecsInitForwardsFrom(t *testing.T) {
+	root, projects := specWorkspace(t)
+	ctx := wireContext(root, projects, specSelection(), map[string]any{"output": "json", "from": "openspec:app/openspec"})
+	out, _, code := runSubcommand(t, ctx, "specs", "init", "billing/refunds", "--from", "openspec:app/openspec")
+	if code == protocolcli.ExitSuccess || !strings.Contains(out, "names no external spec") {
+		t.Fatalf("specs init --from on a feature with no external spec exited %d:\n%s", code, out)
+	}
+	if _, err := os.Stat(filepath.Join(root, "app", "specs", "refunds.json")); !os.IsNotExist(err) {
+		t.Fatalf("a refused --from wrote the spec: %v", err)
+	}
+
+	// An empty --from is refused, not read as a request for a skeleton.
+	empty := wireContext(root, projects, specSelection(), map[string]any{"output": "json", "from": ""})
+	out, _, code = runSubcommand(t, empty, "specs", "init", "billing/refunds")
+	if code == protocolcli.ExitSuccess || !strings.Contains(out, "cannot be empty") {
+		t.Fatalf("specs init --from= exited %d:\n%s", code, out)
+	}
+	if _, err := os.Stat(filepath.Join(root, "app", "specs", "refunds.json")); !os.IsNotExist(err) {
+		t.Fatalf("an empty --from wrote a skeleton: %v", err)
+	}
+}
+
 // TestContractsTargetsOneProjectFromTheRawSelector pins the resolution order
 // `resolveContractsProject` had: the subcommand's own --project first, then the
 // RAW global selector, and a refusal for the two spellings that name a set
