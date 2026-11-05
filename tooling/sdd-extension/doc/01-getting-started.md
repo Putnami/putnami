@@ -92,6 +92,49 @@ Then run `putnami context generate`. With Putnami Cloud, `putnami cloud ci init`
 writes a `putnami.ci.json` for you; check that its `commands` list `validate`.
 [`protocols/ci`](../../../protocols/ci/README.md) documents every field.
 
+## Read an existing OpenSpec repository
+
+You keep your OpenSpec files. The feature stays declared in
+`putnami.features.json`, and its entry names the capability:
+
+```json
+{
+  "protocolVersion": 3,
+  "namespace": "billing",
+  "features": [{
+    "id": "billing/invoice-export",
+    "type": "feature",
+    "name": "Invoice export",
+    "outcome": "Customers export their invoices",
+    "owner": "billing",
+    "target": "modeled",
+    "spec": {"format": "openspec", "path": "openspec/specs/invoice-export"}
+  }]
+}
+```
+
+Then opt in on the project, in `putnami.json`:
+
+```json
+{ "options": { "sdd": { "specFormats": ["openspec"] } } }
+```
+
+`putnami specs validate` reads `openspec/specs/invoice-export/spec.md` as the
+feature's spec. A requirement's ID is its normalized name:
+`### Requirement: Export as PDF` is `export-as-pdf`. To keep an ID through a
+rename, or to give one to a name with a non-ASCII character, write an anchor on
+the line above the heading:
+
+```markdown
+<!-- putnami:id export-as-pdf -->
+### Requirement: Export to PDF
+```
+
+A requirement body over 512 bytes is an error that names its line: split it.
+`#### Scenario:` names are compared with the checks you declare, and a mismatch
+is a warning. `openspec/changes/` is never read. The mapping is in the
+[`protocols/features` README](../../../protocols/features/README.md).
+
 ## If the commands are missing
 
 `putnami features` on a workspace that has not declared the extension is not a
