@@ -311,14 +311,14 @@ func validateProposal(proposal collab.Proposal, change collab.Change, draft bool
 // sent body. The readback stays strict: the body is the squash commit.
 func bodyReadbackError(read, sent string) error {
 	appended, ok := strings.CutPrefix(read, sent)
+	appended = strings.TrimSpace(appended)
 	if !ok || appended == "" {
 		return errors.New("proposal body readback failed")
 	}
-	appended = strings.TrimSpace(appended)
 	if agentMarker.MatchString(appended) {
-		return fmt.Errorf("proposal body readback failed: the host appended %q, which names an agent and would reach the squash commit; publish from a local session", truncateUTF8(appended, 512))
+		return fmt.Errorf("proposal body readback failed: the provider or its host appended %q, which names an agent and would reach the squash commit; publish from a local session", truncateUTF8(appended, 512))
 	}
-	return fmt.Errorf("proposal body readback failed: the host appended %q", truncateUTF8(appended, 512))
+	return fmt.Errorf("proposal body readback failed: the provider or its host appended %q", truncateUTF8(appended, 512))
 }
 
 func compareMembers(upsert, read collab.Proposal) error {
