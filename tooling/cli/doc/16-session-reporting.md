@@ -234,6 +234,16 @@ putnami: session reporting incomplete: reporting budget exhausted: no chunk ackn
 putnami: log reporting incomplete: reporting budget exhausted: finalization reached its 5m0s cap; replay with putnami sessions replay --session <id>
 ```
 
+A reporter that refuses an `events.jsonl` or `session.json` chunk without
+retry stops its delivery; a refused `plan.json` or `spec-verification.json` is
+omitted instead, as described above. The diagnostic names the refused chunk
+and the reporter's code, a lowercase identifier such as `unauthorized`, so you
+can tell a refused credential from a chunk the receiver did not expect:
+
+```text
+putnami: session reporting incomplete: reporter refused events.jsonl chunk 1: unauthorized; replay with putnami sessions replay --session <id>
+```
+
 Replay bounds each reporter's setup to thirty seconds before its delivery
 starts. Canceled graphs drain for two seconds so existing shutdown cleanup can
 run. A large or unavailable receiver can require another replay. Checkpoint
