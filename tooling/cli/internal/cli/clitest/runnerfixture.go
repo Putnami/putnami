@@ -214,13 +214,25 @@ func FixtureAttemptSettled(dir string) bool {
 	if !runner.TerminalState(ReadFixtureState(dir).State) {
 		return false
 	}
+	// Without a pid, the submit that launches the supervisor is in flight.
+	pid, ok := FixtureLaunchedSupervisor(dir)
+	return ok && ProcessExited(pid)
+}
+
+// FixtureLaunchedSupervisor returns the pid of the supervisor process the
+// provider launched for the attempt, once the provider recorded it.
+func FixtureLaunchedSupervisor(dir string) (int, bool) {
 	data, err := os.ReadFile(filepath.Join(dir, fixtureLaunchFile))
 	if err != nil {
-		// The submit that launches the supervisor is still in flight.
-		return false
+		return 0, false
 	}
 	pid, err := strconv.Atoi(strings.TrimSpace(string(data)))
-	return err == nil && processExited(pid)
+	return pid, err == nil
+}
+
+func fileExists(path string) bool {
+	_, err := os.Stat(path)
+	return err == nil
 }
 
 // ---------------------------------------------------------------------------
@@ -239,9 +251,10 @@ func superviseFixtureAttempt(dir string, getenv func(string) string) int {
 	}
 	if hold := getenv(RunnerFixtureClaimHoldEnv); hold != "" {
 		_ = os.WriteFile(hold+".waiting", nil, 0o600)
-		for {
-			if _, err := os.Stat(hold); err == nil {
-				break
+		for !fileExists(hold) {
+			if !fileExists(filepath.Join(dir, fixtureMetaFile)) {
+				// The test that held this supervisor removed the attempt.
+				return 1
 			}
 			time.Sleep(20 * time.Millisecond)
 		}
@@ -261,9 +274,10 @@ func superviseFixtureAttempt(dir string, getenv func(string) string) int {
 
 	if hold := getenv(RunnerFixtureHoldEnv); hold != "" {
 		_ = os.WriteFile(hold+".ready", []byte(meta.Snapshot), 0o600)
-		for {
-			if _, err := os.Stat(hold); err == nil {
-				break
+		for !fileExists(hold) {
+			if !fileExists(filepath.Join(dir, fixtureMetaFile)) {
+				// The test that held this supervisor removed the attempt.
+				return 1
 			}
 			select {
 			case <-interrupt:

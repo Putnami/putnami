@@ -9,7 +9,6 @@ package lifecycle
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -106,26 +105,17 @@ func providerAttempts(t *testing.T, providerRoot string) []string {
 	return names
 }
 
-// processGone reports whether pid no longer exists, waiting a bounded time
-// for the kernel to reap it. The bound covers a negative only.
+// processGone reports whether pid has exited, waiting a bounded time for it.
+// The bound covers a negative only.
 func processGone(pid int, deadline time.Duration) bool {
 	start := time.Now()
-	for {
-		err := syscall.Kill(pid, 0)
-		if errors.Is(err, syscall.ESRCH) {
-			return true
-		}
-		if err == nil {
-			// A zombie answers kill(0) until reaped; ask the kernel for its state.
-			if out, err := exec.Command("ps", "-o", "stat=", "-p", strconv.Itoa(pid)).Output(); err != nil || strings.HasPrefix(strings.TrimSpace(string(out)), "Z") {
-				return true
-			}
-		}
+	for !clitest.ProcessExited(pid) {
 		if time.Since(start) > deadline {
 			return false
 		}
 		time.Sleep(50 * time.Millisecond)
 	}
+	return true
 }
 
 func TestPortableLostAcknowledgementResolvesByKeyBeforeResubmitting(t *testing.T) {
@@ -252,6 +242,34 @@ func TestFixtureCancelBeforeSupervisionSettlesOnceTheLaunchedSupervisorExited(t 
 	awaitAttemptSettled(t, dir)
 	if state := clitest.ReadFixtureState(dir); state.State != runner.StateCanceled || state.Supervisor != 0 || state.Engine != 0 {
 		t.Fatalf("the late supervisor took over the canceled attempt: %+v", state)
+	}
+}
+
+// A supervisor held before its claim waits for a release a failing test never
+// writes. It exits once its attempt is removed, so a failed run leaves no
+// detached process behind.
+func TestFixtureHeldSupervisorExitsOnceItsAttemptIsRemoved(t *testing.T) {
+	providerRoot := t.TempDir()
+	hold := filepath.Join(t.TempDir(), "claim-hold")
+	ctx := context.Background()
+	session := spawnFixtureProvider(t, providerRoot, clitest.RunnerFixtureClaimHoldEnv+"="+hold)
+	request, manifest := fixtureSubmission(t)
+	submitted, err := session.Submit(ctx, &runner.SubmitParams{Request: request, Manifest: manifest})
+	if err != nil {
+		t.Fatal(err)
+	}
+	waitForFile(t, hold+".waiting", 60*time.Second)
+	dir := filepath.Join(providerRoot, "attempts", submitted.Attempt)
+	pid, ok := clitest.FixtureLaunchedSupervisor(dir)
+	if !ok {
+		t.Fatal("the provider recorded no launched supervisor")
+	}
+	if err := os.RemoveAll(dir); err != nil {
+		t.Fatal(err)
+	}
+	if !processGone(pid, 30*time.Second) {
+		_ = syscall.Kill(pid, syscall.SIGKILL)
+		t.Fatalf("the held supervisor %d outlived its removed attempt", pid)
 	}
 }
 
