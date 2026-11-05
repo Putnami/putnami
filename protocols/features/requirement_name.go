@@ -9,17 +9,16 @@ import (
 	"unicode/utf8"
 )
 
-// asciiFoldTable is what Unicode NFKD less its combining marks gives for each
-// code point it drops or turns into ASCII letters or digits. Go has no NFKD in
-// its standard library and D-055 keeps third-party modules out of this
-// protocol, so the table is committed data, which the TypeScript test of
-// @putnami/application derives from its runtime. (D-057)
+// asciiFoldTable lists the code points Unicode NFKD less its combining marks
+// drops, and the whole decomposition of each code point whose decomposition
+// holds an ASCII letter or digit. Its non-ASCII characters are separators.
+// (D-057)
 //
 //go:embed unicode/ascii-fold.json
 var asciiFoldTable []byte
 
 // asciiFold holds the parsed table: the sorted ranges of code points NFKD drops,
-// and the ASCII-bearing decomposition of the others it keeps.
+// and the decomposition of each code point that holds an ASCII letter or digit.
 type asciiFold struct {
 	drop [][2]rune
 	fold map[rune]string

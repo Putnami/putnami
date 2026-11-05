@@ -3,10 +3,9 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { specTest } from '@putnami/runtime/spectest';
 
-// The Go reader of go.putnami.dev/protocol/features maps a requirement name to
-// its ID through a committed table, because Go has no NFKD in its standard
-// library. This test derives the same table from the runtime's NFKD, and maps
-// the golden names with it, so both languages give one ID per name. (D-057)
+// The committed fold table the Go mapping reads is what the runtime's NFKD
+// gives, and the runtime's NFKD maps the golden names to the golden IDs.
+// PUTNAMI_UPDATE_GOLDEN=1 rewrites the table. (D-057)
 const IDENTITY = {
   feature: 'features/feature-contracts',
   requirement: 'requirement-identity-mapping',
