@@ -4,7 +4,9 @@
 //
 // Every operation sends its requests through the GitHub REST API (and GraphQL
 // for the draft flag of a pull request and to learn which numbers
-// discussions hold) with the credential the gh CLI would use. A write is sent once. When its outcome is unknown — the connection
+// discussions hold) with the credential the gh CLI would use. Where a Claude
+// Code cloud session's GitHub proxy refuses GraphQL, the draft flag goes
+// through the REST routes that proxy serves under pulls/{number}/ccr/. A write is sent once. When its outcome is unknown — the connection
 // broke after the request left, the deadline passed, or GitHub answered 5xx —
 // the operation reads the repository back and answers from what it finds; if
 // the read cannot establish the outcome, it answers unresolved and never

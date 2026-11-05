@@ -468,7 +468,11 @@ func (s *proposalSession) edit(pull *ghPull, in *collab.ProposalUpsertInput) (*g
 		if *in.Draft {
 			mutation = "mutation($id: ID!) { convertPullRequestToDraft(input: {pullRequestId: $id}) { pullRequest { isDraft } } }"
 		}
-		if err := s.client.GraphQL(s.ctx, mutation, map[string]any{"id": pull.NodeID}, nil); err != nil {
+		err := s.client.GraphQL(s.ctx, mutation, map[string]any{"id": pull.NodeID}, nil)
+		if err != nil && err.Kind == github.Answered && err.Status == http.StatusForbidden && !err.RateLimited {
+			err = s.proxyDraft(pull.Number, *in.Draft, err)
+		}
+		if err != nil {
 			toggled := func(current *ghPull) bool { return current.Draft == *in.Draft }
 			if failure := uncertain(err, toggled); failure != nil {
 				return nil, failure
@@ -482,6 +486,23 @@ func (s *proposalSession) edit(pull *ghPull, in *collab.ProposalUpsertInput) (*g
 		pull = fresh
 	}
 	return pull, nil
+}
+
+// proxyDraft changes the draft flag through the REST routes a Claude Code
+// cloud session's GitHub proxy serves, after that proxy refused the GraphQL
+// mutation with 403. The routes are the proxy's, not GitHub's: GitHub answers
+// 404 for them, and then the GraphQL refusal stays the answer. The refused
+// mutation changed nothing, so this is still the only write of the change.
+func (s *proposalSession) proxyDraft(number int, draft bool, refused *github.Error) *github.Error {
+	route := "ready_for_review"
+	if draft {
+		route = "convert_to_draft"
+	}
+	err := s.client.Write(s.ctx, http.MethodPost, s.repo.path("pulls", strconv.Itoa(number), "ccr", route), nil, nil)
+	if err != nil && err.Kind == github.Answered && err.Status == http.StatusNotFound {
+		return refused
+	}
+	return err
 }
 
 // A qualified foreign closing reference historically adds no labels. Refs is
