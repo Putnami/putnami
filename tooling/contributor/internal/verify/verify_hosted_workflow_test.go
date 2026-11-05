@@ -324,7 +324,7 @@ func TestHostedWorkflowReadyReceiptReplaysOriginalEvidence(t *testing.T) {
 	f.expect(stale, "evidence digest changed", "")
 }
 
-// requirementlessHostedFixture is the change of #820: an ADR and a
+// requirementlessHostedFixture is an ADR-only change: an ADR and a
 // decisions.json, no feature source and one unit with no requirement. The
 // fixture's feature manifest and spec leave the change, so only the ADR, the
 // decisions and app.txt differ from the base.

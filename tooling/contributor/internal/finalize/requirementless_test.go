@@ -16,7 +16,7 @@ import (
 	"go.putnami.dev/sdk/extension/treefingerprint"
 )
 
-// requirementlessRepository is the change of #820 in a real Git repository: a
+// requirementlessRepository is an ADR-only change in a real Git repository: a
 // base commit, then a branch commit that adds an ADR and a decisions.json and
 // carries no feature requirement. Its workflow names no feature source and one
 // unit with no requirement, at stage candidate. extra adds files to the change.
