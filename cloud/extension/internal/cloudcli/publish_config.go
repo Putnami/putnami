@@ -213,10 +213,36 @@ func configMemberSelection(params map[string]any, prepared *configcli.PreparedAu
 	if selected == nil {
 		return releaseset.PlannedMember{}, fmt.Errorf("release-set plan does not select Config member %s for project %s", prepared.Coordinate, prepared.ProjectID)
 	}
-	if selected.Version != prepared.Version || selected.SourceRevision != prepared.Member.Descriptor.SourceProvenance.Revision {
-		return releaseset.PlannedMember{}, fmt.Errorf("authored Config member %s@%s does not match the selected immutable source", prepared.Coordinate, prepared.Version)
+	if err := selectedSourceMismatch(*selected, prepared); err != nil {
+		return releaseset.PlannedMember{}, err
 	}
 	return *selected, nil
+}
+
+// selectedSourceMismatch refuses a prepared member whose version or source
+// revision differs from the selected one. The error names the sides that
+// differ, then both values of each side.
+func selectedSourceMismatch(selected releaseset.PlannedMember, prepared *configcli.PreparedAuthoredConfig) error {
+	preparedRevision := prepared.Member.Descriptor.SourceProvenance.Revision
+	var differs []string
+	if selected.Version != prepared.Version {
+		differs = append(differs, "version")
+	}
+	if selected.SourceRevision != preparedRevision {
+		differs = append(differs, "source revision")
+	}
+	verb := "differs"
+	switch len(differs) {
+	case 0:
+		return nil
+	case 2:
+		verb = "differ"
+	}
+	return fmt.Errorf(
+		"authored Config member %s does not match the selected immutable source: %s %s (selected version %q, source revision %q; prepared version %q, source revision %q)",
+		prepared.Coordinate, strings.Join(differs, " and "), verb,
+		selected.Version, selected.SourceRevision, prepared.Version, preparedRevision,
+	)
 }
 
 func emitConfigPublishedMember(ioctx IO, published *distributioncli.ConfigMemberPublicationResult) error {

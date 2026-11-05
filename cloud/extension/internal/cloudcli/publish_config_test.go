@@ -2,6 +2,7 @@ package cloudcli
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -87,6 +88,47 @@ func TestManagedConfigPublishRejectsSelectionBeforeRegistryAccess(t *testing.T) 
 	})}})
 	if err == nil || !strings.Contains(err.Error(), "selected immutable source") || requests != 0 {
 		t.Fatalf("error=%v requests=%d", err, requests)
+	}
+}
+
+func TestConfigMemberSelectionMismatchNamesBothSides(t *testing.T) {
+	_, prepared := configMemberPackageFixture(t)
+	preparedRevision := prepared.Member.Descriptor.SourceProvenance.Revision
+	otherRevision := strings.Repeat("0", 40)
+	if preparedRevision == otherRevision {
+		t.Fatal("test needs a selected source revision other than the prepared one")
+	}
+	cases := []struct {
+		name     string
+		version  string
+		revision string
+		want     string
+	}{
+		{
+			name: "version", version: "1.2.4", revision: preparedRevision,
+			want: fmt.Sprintf(`version differs (selected version "1.2.4", source revision %q; prepared version "1.2.3", source revision %q)`, preparedRevision, preparedRevision),
+		},
+		{
+			name: "source revision", version: "1.2.3", revision: otherRevision,
+			want: fmt.Sprintf(`source revision differs (selected version "1.2.3", source revision %q; prepared version "1.2.3", source revision %q)`, otherRevision, preparedRevision),
+		},
+		{
+			name: "both", version: "1.2.4", revision: otherRevision,
+			want: fmt.Sprintf(`version and source revision differ (selected version "1.2.4", source revision %q; prepared version "1.2.3", source revision %q)`, otherRevision, preparedRevision),
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			params := configMemberPlan(prepared, "sha256:"+strings.Repeat("e", 64))
+			plan := params[releaseset.ContextParamName].(*releaseset.Plan)
+			plan.Members[0].Version = tc.version
+			plan.Members[0].SourceRevision = tc.revision
+			_, err := configMemberSelection(params, prepared)
+			want := "authored Config member workspace-native/my-app-config does not match the selected immutable source: " + tc.want
+			if err == nil || err.Error() != want {
+				t.Fatalf("error = %v\nwant    %s", err, want)
+			}
+		})
 	}
 }
 
