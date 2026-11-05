@@ -279,7 +279,9 @@ the line, a `message`, and the `step` that removes it:
 
 Each step but the anchor also names the native rewrite, `putnami specs init
 <feature> --from <format>:<path>`, which removes the gap. That command refuses
-an unanchored requirement, so write its anchor first.
+a spec that `enforce` refuses, such as one with an unanchored requirement or a
+text over 512 bytes. While the spec has one, the step says the rewrite waits
+for it.
 
 Gaps are information. They never change the exit code, and `validate` never
 reports them. `inspect` omits `nativeGaps` when there is no gap. A native spec

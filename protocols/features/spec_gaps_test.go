@@ -109,3 +109,23 @@ func TestTheSameProjectionGivesTheSameGaps(t *testing.T) {
 		}
 	}
 }
+
+func TestARewriteStepWaitsForWhatEnforceRefuses(t *testing.T) {
+	t.Parallel()
+	spectest.Proves(t, "features/feature-contracts", "native-gaps", "each-gap-kind-names-its-position-and-step")
+	long := strings.Replace(openSpecWithGaps, "The system SHALL issue an invoice,",
+		"The system SHALL issue an invoice "+strings.Repeat("and keep it ", 50)+",", 1)
+	projection := readOpenSpec(t, long)
+	if projection.Spec == nil {
+		t.Fatalf("D-043 reads a text over the bound: %v", projection.Findings)
+	}
+	gaps := features.SpecNativeGaps(projection, gapFeature(features.SpecFormatOpenSpec, openSpecReference, "paid"))
+	if len(gaps) == 0 {
+		t.Fatal("no gap")
+	}
+	for _, gap := range gaps {
+		if strings.Contains(gap.Step, "or draft a native spec") || !strings.Contains(gap.Step, "waits until the findings enforce refuses are fixed") {
+			t.Fatalf("a %s gap offers a rewrite specs init --from refuses: %q", gap.Kind, gap.Step)
+		}
+	}
+}

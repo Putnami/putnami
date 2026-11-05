@@ -6,6 +6,8 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+
+	diag "go.putnami.dev/protocol/diagnostic"
 )
 
 // SpecGapKind names one way an external spec gives less than a native spec. A
@@ -54,9 +56,14 @@ func SpecNativeGaps(projection SpecProjection, feature Feature) []SpecGap {
 	}
 	reference := *feature.Spec
 	// A native spec has no section, no context link and no scenario, so the
-	// rewrite removes those gaps. It refuses an unanchored requirement, whose
-	// one step is the anchor.
-	rewrite := fmt.Sprintf("; or draft a native spec with `putnami specs init %s --from %s:%s`", feature.ID, reference.Format, reference.Path)
+	// rewrite removes those gaps. specs init --from refuses a source enforce
+	// refuses, such as an unanchored requirement or a text over the 512-byte
+	// bound (D-043, D-056), so until those are fixed the step says so.
+	command := fmt.Sprintf("`putnami specs init %s --from %s:%s`", feature.ID, reference.Format, reference.Path)
+	rewrite := "; or draft a native spec with " + command
+	if diag.HasErrors(projection.EnforceOnly(VerificationModeEnforce)) {
+		rewrite = "; a native spec with " + command + " waits until the findings enforce refuses are fixed"
+	}
 	var gaps []SpecGap
 	for i, record := range projection.Requirements {
 		if record.Unanchored {

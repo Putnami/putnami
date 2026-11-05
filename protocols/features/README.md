@@ -159,8 +159,9 @@ Every reader shares two rules, which `ReadSpecSource` applies:
 | `scenario_mismatch` | A scenario with no declared check, or a declared check with no scenario |
 
 Every step but the anchor also names `putnami specs init <feature> --from
-<format>:<path>`, the native rewrite that removes the gap; that command refuses
-an unanchored requirement. A gap is information, never a finding: no
+<format>:<path>`, the native rewrite that removes the gap. That command refuses
+a source `enforce` refuses, such as an unanchored requirement or a text over
+512 bytes, so while the spec has one, the step says the rewrite waits for it. A gap is information, never a finding: no
 verification mode makes it block. A
 text the reader gave no position keeps the reference path as its field.
 
