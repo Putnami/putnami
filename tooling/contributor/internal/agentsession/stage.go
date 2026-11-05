@@ -2,10 +2,12 @@ package agentsession
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"regexp"
 	"slices"
 	"strings"
@@ -52,7 +54,7 @@ func Stage(ctx context.Context, e *Env, args []string, stdout, stderr io.Writer)
 	}
 	files, inSession, found := e.currentSession(ctx)
 	if !found {
-		_, _ = fmt.Fprintln(stderr, "agent stage: no agent session found for this checkout: run it from a Claude Code or Codex session that runs the Putnami session hooks")
+		_, _ = fmt.Fprintf(stderr, "agent stage: no agent session found for this checkout: %s\n", e.noSessionCause())
 		return 1
 	}
 	now := e.Now()
@@ -125,6 +127,87 @@ func parseStageArgs(args []string) (collab.LoopStage, error) {
 		return "", fmt.Errorf("unknown stage %q; %s", boundedLine(args[0], 64), usage)
 	}
 	return stage, nil
+}
+
+// noSessionCause says why `agent stage` finds no session, and what the
+// operator does. The core writes the session hooks only for a workspace that
+// opts into this extension's agent content and binds missions, so without
+// both no session ever opens a cache, headless or not.
+func (e *Env) noSessionCause() string {
+	missions, optedIn := hookConditions(e.Root)
+	switch {
+	case !missions:
+		return "this workspace binds no missions provider, so putnami writes no session hooks: " +
+			"bind missions under options.collaboration in " + workspaceManifest + " and run putnami install"
+	case !optedIn:
+		return "this workspace does not opt into the agent content of " + contributorExtension + ", so putnami writes no session hooks: " +
+			"add " + contributorArtifact + " to agentArtifacts in " + workspaceManifest + " and run putnami install"
+	}
+	for _, named := range sessionEnvironment {
+		id := e.Getenv(named.variable)
+		if !sessionIDPattern.MatchString(id) {
+			continue
+		}
+		file := hookFiles[named.engine]
+		if !holdsSessionHook(filepath.Join(e.Root, file)) {
+			return fmt.Sprintf("the host names session %s, and %s holds no Putnami session hook: run putnami install to write them", id, file)
+		}
+		return fmt.Sprintf("the host names session %s, and %s holds the Putnami session hooks, but none recorded it: "+
+			"check that the host trusts this workspace and runs its hooks, and read %s",
+			id, file, filepath.Join(e.sessionsDir(), hookLogName))
+	}
+	return "run it from a Claude Code or Codex session that runs the Putnami session hooks"
+}
+
+const (
+	// contributorExtension is this extension, and contributorArtifact the
+	// agentArtifacts entry that opts a workspace into its agent content.
+	contributorExtension      = "@putnami/contributor"
+	contributorArtifactPrefix = "extension:"
+	contributorArtifact       = contributorArtifactPrefix + contributorExtension
+	// sessionHookCommand is the command every Putnami session hook runs.
+	sessionHookCommand = "agent hook --engine "
+)
+
+// hookFiles names, per engine, the host file the core writes the session
+// hooks into.
+var hookFiles = map[string]string{
+	sessionEngineClaudeCode: filepath.Join(".claude", "settings.json"),
+	sessionEngineCodex:      filepath.Join(".codex", "hooks.json"),
+}
+
+// hookConditions reads the workspace at root and reports the two conditions
+// it controls for the core to write the session hooks: it binds missions,
+// and it opts into this extension's agent content.
+func hookConditions(root string) (missions, optedIn bool) {
+	data, err := os.ReadFile(filepath.Join(root, workspaceManifest))
+	if err != nil {
+		return false, false
+	}
+	var document struct {
+		AgentArtifacts []string                   `json:"agentArtifacts"`
+		Options        map[string]json.RawMessage `json:"options"`
+	}
+	if json.Unmarshal(data, &document) != nil {
+		return false, false
+	}
+	if block := document.Options[collab.BindingOptionNamespace]; len(block) > 0 {
+		bindings, _ := collab.ParseBindings(block)
+		_, missions = bindings[collab.ContractMissions]
+	}
+	optedIn = slices.ContainsFunc(document.AgentArtifacts, func(entry string) bool {
+		// The core trims the entry and the name after its prefix.
+		name, ok := strings.CutPrefix(strings.TrimSpace(entry), contributorArtifactPrefix)
+		return ok && strings.TrimSpace(name) == contributorExtension
+	})
+	return missions, optedIn
+}
+
+// holdsSessionHook reports whether the host file at path holds a Putnami
+// session hook.
+func holdsSessionHook(path string) bool {
+	data, err := os.ReadFile(path)
+	return err == nil && strings.Contains(string(data), sessionHookCommand)
 }
 
 // currentSession finds the session `agent stage` runs in. A session the host

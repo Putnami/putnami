@@ -58,7 +58,7 @@
     },
     {
       "id": "agent-stage",
-      "text": "putnami agent stage <name> records the loop stage of the current session, the one the host names in the environment or else the last active session of the checkout and branch, and syncs it at once when the session reports to a mission; every later sync carries it. It prints the tokens the session spent so far, once its transcript was read: the sum of input, cache write, cache read and output tokens that putnami change estimate sizes. An unknown stage exits 2, and no session exits 1."
+      "text": "putnami agent stage <name> records the loop stage of the current session, the one the host names in the environment or else the last active session of the checkout and branch, and syncs it at once when the session reports to a mission; every later sync carries it. It prints the tokens spent so far, once its transcript was read. An unknown stage exits 2. No session exits 1 and says why: the workspace has no session hooks, or the host did not run them for the session it names."
     }
   ],
   "decisions": [

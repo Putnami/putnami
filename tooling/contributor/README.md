@@ -128,7 +128,11 @@ makes `issue-<n>` the mission of the checkout's branch.
 `putnami agent stage <talk|declare|show|code|check|prove|validate|merge>`
 records the loop stage of the current session and syncs it when the session
 reports to a mission; every later sync carries it. Once it read the
-transcript, it also prints the tokens the session spent so far.
+transcript, it also prints the tokens the session spent so far. When it
+finds no session, it exits 1 and says why: the workspace binds no
+`missions` provider or does not opt into this extension's agent content, so it
+has no session hooks, headless or not; the host file holds no hook yet; or the
+host did not run the hooks for the session it names.
 `putnami agent ask --input <file|->` asks the owner a decision through
 `missions.ask` for the session's mission, and the next sync binds the decision
 to the session; the input is a `missions.ask` document without its `mission`.
