@@ -140,7 +140,10 @@ proposal ref, required checks and raw provider status. It can advance eligible
 current units; pending later requirements and decisions still prevent full
 completion. A generic passing check never supplies that authority. A partial
 delivery whose workflow has no eligible unit still publishes, with no ready
-unit and no receipt; record that unit at its current stage.
+unit and no receipt; record that unit at its current stage. A current unit
+with no requirement, for a change that carries no feature requirement, has no
+native proof to supply: the hosted checks advance it, it gets a receipt, and a
+complete delivery closes its task.
 
 Keep the original workflow file immutable and create a new revision when
 recording `stage: "ready"` with the publisher result as the unit receipt. The

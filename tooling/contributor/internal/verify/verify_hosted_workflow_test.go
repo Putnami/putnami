@@ -323,3 +323,113 @@ func TestHostedWorkflowReadyReceiptReplaysOriginalEvidence(t *testing.T) {
 	stale := f.invoke("--workflow", ".context/workflow-v2.json")
 	f.expect(stale, "evidence digest changed", "")
 }
+
+// requirementlessHostedFixture is the change of #820: an ADR and a
+// decisions.json, no feature source and one unit with no requirement. The
+// fixture's feature manifest and spec leave the change, so only the ADR, the
+// decisions and app.txt differ from the base.
+func requirementlessHostedFixture(t *testing.T, edit func(*verifyFixture, fxObj)) (*verifyFixture, HostedWorkflowRequest) {
+	t.Helper()
+	f, workflow := newWorkflowFixture(t)
+	f.git("rm", "-q", "--cached", ".context/putnami.features.json", ".context/specs/workflow.json")
+	f.write("doc/adr/0001-a-settled-choice.md", "# ADR 0001\n")
+	f.write("decisions.json", fxObj{"decisions": fxArr{}})
+	workflow["sources"] = fxArr{}
+	workflow["requirements"] = fxArr{}
+	fxObjAt(workflow, "units", 0)["requirements"] = fxArr{}
+	delete(workflow, "proof")
+	if edit != nil {
+		edit(f, workflow)
+	}
+	f.write(".context/workflow.json", workflow)
+	f.resetFingerprint(fxFingerprint{})
+	head := f.git("rev-parse", "HEAD")
+	return f, HostedWorkflowRequest{File: ".context/workflow.json", BaseSHA: f.head, HeadSHA: head,
+		Fingerprint: fxTree, RequiredChecks: []string{"hosted-gate"}}
+}
+
+func TestHostedWorkflowCompletesAUnitWithNoRequirement(t *testing.T) {
+	spectest.Proves(t, "tooling/contributor-executable", "requirementless-delivery", "a-requirementless-delivery-closes-its-task")
+	t.Parallel()
+	f, request := requirementlessHostedFixture(t, nil)
+	preflight, err := f.checkHostedWorkflow(request)
+	if err != nil || !preflight.WouldCompleteAfterReady || preflight.OutcomeComplete ||
+		len(preflight.ReadyUnits) != 1 || preflight.ReadyUnits[0] != "first" {
+		t.Fatalf("hosted preflight of a unit with no requirement = %+v, %v", preflight, err)
+	}
+	request.SHA256 = preflight.WorkflowSHA256
+	request.Status = hostedPassingStatus(request.HeadSHA)
+	request.ProposalRef = request.Status.Proposal.Ref
+	verified, err := f.checkHostedWorkflow(request)
+	if err != nil || !verified.OutcomeComplete || len(verified.ReadyUnits) != 1 || verified.ReadyUnits[0] != "first" {
+		t.Fatalf("hosted checks did not complete a unit with no requirement: %+v, %v", verified, err)
+	}
+}
+
+func TestHostedWorkflowUnitWithNoRequirementPassesEveryFinalCheck(t *testing.T) {
+	spectest.Proves(t, "tooling/contributor-executable", "requirementless-delivery", "a-requirementless-unit-passes-every-final-check")
+	t.Parallel()
+	for _, tc := range []struct {
+		name, reason string
+		change       func(*verifyFixture, fxObj)
+	}{
+		{"still building", "has not reached candidate", func(_ *verifyFixture, workflow fxObj) {
+			fxObjAt(workflow, "units", 0)["stage"] = "building"
+		}},
+		{"unresolved decision", "unresolved decisions", func(f *verifyFixture, workflow fxObj) {
+			fxObjAt(workflow, "units", 0)["decisions"] = fxArr{f.note("requirementless-decision", "Owner decision pending.")}
+		}},
+		{"blocked stage", "design stage incomplete", func(f *verifyFixture, workflow fxObj) {
+			stage := fxObjAt(workflow, "stages", 2)
+			stage["state"] = "blocked"
+			stage["reason"] = f.note("requirementless-blocker", "Design is blocked.")
+		}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			f, request := requirementlessHostedFixture(t, tc.change)
+			result, err := f.checkHostedWorkflow(request)
+			if err != nil {
+				t.Fatalf("hosted preflight error = %v", err)
+			}
+			if result.WouldCompleteAfterReady || !strings.Contains(result.IncompleteReason, tc.reason) {
+				t.Fatalf("unit with no requirement skipped a final check: %+v, want %q", result, tc.reason)
+			}
+		})
+	}
+}
+
+func TestHostedWorkflowRefusesAUnitWithNoRequirementThatEditsIntent(t *testing.T) {
+	spectest.Proves(t, "tooling/contributor-executable", "requirementless-delivery", "a-spec-or-manifest-edit-refuses-a-requirementless-unit")
+	t.Parallel()
+	for _, tc := range []struct {
+		name, changed string
+		edit          func(*verifyFixture)
+	}{
+		{"native spec", "app/specs/export.json", func(f *verifyFixture) {
+			f.write("app/specs/export.json", fxObj{"protocolVersion": 1})
+		}},
+		{"feature manifest", "app/putnami.features.json", func(f *verifyFixture) {
+			f.write("app/putnami.features.json", fxObj{"protocolVersion": 2})
+		}},
+		{"external spec", "app/features/export.feature", func(f *verifyFixture) {
+			f.write("app/putnami.features.json", fxObj{"protocolVersion": 3, "namespace": "app", "features": fxArr{fxObj{
+				"id": "app/export", "type": "feature", "name": "Export", "outcome": "Data exports",
+				"owner": "app", "target": "modeled",
+				"spec": fxObj{"format": "gherkin", "path": "app/features/export.feature"}}}})
+			f.git("add", "app/putnami.features.json")
+			f.git("commit", "-q", "-m", "Manifest naming an external spec")
+			f.head = f.git("rev-parse", "HEAD")
+			f.write("app/features/export.feature", "Feature: Export\n")
+		}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			f, request := requirementlessHostedFixture(t, func(f *verifyFixture, _ fxObj) { tc.edit(f) })
+			_, err := f.checkHostedWorkflow(request)
+			if err == nil || !strings.Contains(err.Error(), "workflow unit first carries no requirement but the change edits feature intent: "+tc.changed) {
+				t.Fatalf("unit with no requirement accepted an intent edit: %v", err)
+			}
+		})
+	}
+}

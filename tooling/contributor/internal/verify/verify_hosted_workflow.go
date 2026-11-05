@@ -150,7 +150,12 @@ func hostedReadyUnits(workflow any, projection *jsObject) []string {
 			!strictEqual(at(item, "requiredStage"), "ready") || !strictEqual(at(item, "deliveryReady"), true) {
 			continue
 		}
-		for _, member := range workflowList(at(item, "requirements"), "workflow projected requirements") {
+		members := workflowList(at(item, "requirements"), "workflow projected requirements")
+		if len(members) == 0 {
+			ready = append(ready, id) // A unit with no requirement is current.
+			continue
+		}
+		for _, member := range members {
 			if strictEqual(at(member, "disposition"), "current") {
 				ready = append(ready, id)
 				break
