@@ -222,7 +222,8 @@
             "kind": "acceptance",
             "checks": [
               "a-requirement-name-normalizes-to-one-id",
-              "a-non-ascii-run-is-a-separator",
+              "an-accented-letter-keeps-its-base-letter",
+              "go-and-typescript-give-one-id-per-name",
               "an-anchor-follows-the-segment-grammar"
             ]
           }
