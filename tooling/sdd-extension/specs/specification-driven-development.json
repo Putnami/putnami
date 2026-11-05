@@ -11,7 +11,7 @@
   "nonGoals": [
     "Owning what a feature, a spec or an architecture declaration MEANS \u2014 that stays in protocols/features and protocols/architecture, and this extension adds no second opinion about any of it",
     "Knowing anything about the workspace that the job context or the command request did not carry: no directory scan, no putnami subprocess, no copied loader",
-    "Authoring durable prose on a human's behalf; specs init writes a skeleton that restates only the declaration and never invents a requirement or a decision",
+    "Authoring durable prose on a human's behalf; specs init writes a skeleton that restates only the declaration, or with --from only the text of the feature's external spec, and never invents a requirement or a decision",
     "Making contracts generate or contracts check part of the validation jobs while check owns a distinct exit-2 drift verdict and generate writes into the source tree",
     "Owning the extraction-parity recording and the wire-only boundary claim, which cli/sdd-extraction owns \u2014 the parity harness and the boundary observer live in tooling/cli",
     "Turning an observed dependency into a permission: architecture sync proposes a binding only for a relation a human already declared, never writes an import, and leaves an undeclared edge as a failing architecture finding",
@@ -125,6 +125,10 @@
     {
       "id": "gherkin-specs-reach-the-gate",
       "text": "A project that lists gherkin reads a feature's .feature file or directory through the same discovery and candidate cut as any spec. Rules and scenarios line up with the declared requirements and checks, a mismatch stays a warning, and a tag-anchored spec keeps its IDs when the file is reordered, so the ratchet holds."
+    },
+    {
+      "id": "init-from-copies-the-external-spec",
+      "text": "specs init <feature> --from <format>:<path> writes one new native spec whose outcomes, non-goals, requirement IDs and texts, and decision links are copied from the external spec that feature's manifest entry names, with no other text. It refuses a --from that is not that reference, a feature with a native spec, an unanchored positional requirement and a text over the bound, at the source file and line. The native spec and its source give one specs verify verdict."
     }
   ],
   "decisions": [
