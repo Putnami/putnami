@@ -17,7 +17,7 @@ Eight detectors read the repository:
 | Composer | each `composer.json` | `manifest` |
 | Go | `go.work`, each `go.mod` | `workspace` for a `go.work` member, `manifest` otherwise |
 | Python | each `pyproject.toml`, with the root's `[tool.uv.workspace]` | `workspace` for a uv workspace member, `manifest` otherwise |
-| Swift Package Manager | each `Package.swift` and its targets, from `swiftpm.json` from `swift package describe --type json`, else the manifest and the directories under `Sources` and `Tests` | `workspace` |
+| Swift Package Manager | each `Package.swift` and its targets, from `swiftpm.json` as `swift package describe --type json` writes it, else the manifest and the directories under `Sources` and `Tests` | `workspace` |
 | Xcode | each `.xcodeproj` and the local packages its `project.pbxproj` references | `manifest` |
 
 A component is a directory. When two detectors name one directory, the higher
@@ -64,6 +64,7 @@ A JUnit case goes to the first of:
    (`gotestsum --junitfile`), or of the Swift test target the `Module` of a
    `Module.Class` class or suite name names (xcbeautify, fastlane `scan`,
    `swift test --xunit-output`); see [the Swift detectors](09-swift.md#reports).
+   A located name that is a file is the case's file.
 3. The component that holds the report.
 
 A case that none of them places is counted in `observe.tests_unattributed`.

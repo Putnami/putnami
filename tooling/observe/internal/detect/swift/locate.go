@@ -9,7 +9,8 @@ import (
 	"sync"
 )
 
-// MaxLocatedFiles bounds the files one test target search visits.
+// MaxLocatedFiles bounds the entries the index of one test target
+// directory visits.
 const MaxLocatedFiles = 20000
 
 // testTarget is one test target a class name may name.
@@ -26,6 +27,7 @@ type locator struct {
 	targets []testTarget
 	mu      sync.Mutex
 	found   map[string]located
+	indexes map[string]index
 }
 
 type located struct {
@@ -34,7 +36,7 @@ type located struct {
 }
 
 func newLocator(root string, d Detection) *locator {
-	l := &locator{root: root, found: map[string]located{}}
+	l := &locator{root: root, found: map[string]located{}, indexes: map[string]index{}}
 	for _, p := range d.Packages {
 		for _, t := range p.TestTargets() {
 			l.targets = append(l.targets, testTarget{module: moduleName(t.Name), dir: t.Dir, component: t.Dir})
@@ -113,11 +115,36 @@ func (l *locator) search(name string) located {
 	return located{}
 }
 
+// declaration matches the type declarations and extensions of a Swift file,
+// one per line, attributes and modifiers allowed before the keyword.
+var declaration = regexp.MustCompile(`(?m)^\s*(?:@\w+(?:\([^)]*\))?\s+)*(?:(?:public|internal|private|fileprivate|open|final|package)\s+)*(?:class|struct|actor|enum|extension)\s+([A-Za-z_][A-Za-z0-9_]*)`)
+
+// index is the Swift files of one search directory: each file by its base
+// name, and the first file, in walk order, that declares each type.
+type index struct {
+	named    map[string]string
+	declared map[string]string
+}
+
 // classFile finds the Swift file of class under the repository directory
 // dir: Class.swift, else the first file, in walk order, that declares it.
+// The directory is walked and each of its files read once, on the first
+// lookup.
 func (l *locator) classFile(dir, class string) (string, bool) {
-	declares := regexp.MustCompile(`(?m)^\s*(?:@\w+(?:\([^)]*\))?\s+)*(?:(?:public|internal|private|fileprivate|open|final)\s+)*(?:class|struct|actor|enum|extension)\s+` + class + `\b`)
-	var named, declaring string
+	idx, ok := l.indexes[dir]
+	if !ok {
+		idx = l.buildIndex(dir)
+		l.indexes[dir] = idx
+	}
+	if file, ok := idx.named[class]; ok {
+		return file, true
+	}
+	file, ok := idx.declared[class]
+	return file, ok
+}
+
+func (l *locator) buildIndex(dir string) index {
+	idx := index{named: map[string]string{}, declared: map[string]string{}}
 	visited := 0
 	abs := filepath.Join(l.root, filepath.FromSlash(dir))
 	_ = filepath.WalkDir(abs, func(p string, entry fs.DirEntry, err error) error {
@@ -134,28 +161,29 @@ func (l *locator) classFile(dir, class string) (string, bool) {
 			}
 			return nil
 		}
-		if !strings.HasSuffix(entry.Name(), ".swift") {
+		base, isSwift := strings.CutSuffix(entry.Name(), ".swift")
+		if !isSwift || !entry.Type().IsRegular() {
 			return nil
 		}
 		rel, ok := relative(l.root, p)
 		if !ok {
 			return nil
 		}
-		if entry.Name() == class+".swift" {
-			named = rel
-			return fs.SkipAll
+		if _, seen := idx.named[base]; !seen {
+			idx.named[base] = rel
 		}
-		if declaring == "" {
-			if data, err := os.ReadFile(p); err == nil && declares.Match(data) {
-				declaring = rel
+		data, err := os.ReadFile(p)
+		if err != nil {
+			return nil
+		}
+		for _, m := range declaration.FindAllSubmatch(data, -1) {
+			if _, seen := idx.declared[string(m[1])]; !seen {
+				idx.declared[string(m[1])] = rel
 			}
 		}
 		return nil
 	})
-	if named != "" {
-		return named, true
-	}
-	return declaring, declaring != ""
+	return idx
 }
 
 func isDir(root, dir string) bool {

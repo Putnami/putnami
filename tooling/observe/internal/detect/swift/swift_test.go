@@ -486,3 +486,78 @@ func TestParsePlistReadsQuotedAndBareStrings(t *testing.T) {
 		}
 	}
 }
+
+func TestARootPackageAndItsModuleNames(t *testing.T) {
+	root := writeTree(t, map[string]string{
+		"Package.swift":                             "// swift-tools-version:5.9\nimport PackageDescription\n\nlet name = \"Tool\"\nlet package = Package(name: name, targets: [])\n",
+		"Sources/tool-core/Core.swift":              "struct Core {}\n",
+		"Tests/tool-core-tests/CoreTests.swift":     "final class CoreTests {}\n",
+		"Tests/tool-core-tests/Fixtures/Data.swift": "enum Data {}\n",
+	})
+	d := Detect(root)
+	ws := evidence.SourceWorkspace
+	want := []Component{
+		{ID: ".", Ecosystem: Ecosystem, Source: ws, DependsOn: []string{"Sources/tool-core"}},
+		{ID: "Sources/tool-core", Name: "tool-core", Ecosystem: Ecosystem, Source: ws},
+		{ID: "Tests/tool-core-tests", Name: "tool-core-tests", Ecosystem: Ecosystem, Source: ws, DependsOn: []string{"Sources/tool-core"}},
+	}
+	if got := d.PackageComponents(); !reflect.DeepEqual(got, want) {
+		t.Errorf("components %+v, want %+v", got, want)
+	}
+	if len(d.Diagnostics) != 1 || d.Diagnostics[0].Field != "Package.swift" {
+		t.Errorf("diagnostics %+v", d.Diagnostics)
+	}
+	// Swift spells the module of tool-core-tests tool_core_tests.
+	for name, file := range map[string]string{
+		"tool_core_tests.CoreTests": "Tests/tool-core-tests/CoreTests.swift",
+		"tool_core_tests.Data":      "Tests/tool-core-tests/Fixtures/Data.swift",
+	} {
+		if got, component, ok := d.Locate(name); !ok || got != file || component != "Tests/tool-core-tests" {
+			t.Errorf("Locate(%q) = %q, %q, %v", name, got, component, ok)
+		}
+	}
+	if _, _, ok := d.Locate("tool-core-tests.CoreTests"); ok {
+		t.Error("a name with - is no Swift class name")
+	}
+}
+
+func TestProjectsOfOneDirectoryAreOneComponent(t *testing.T) {
+	ui := strings.NewReplacer(
+		"com.apple.product-type.bundle.unit-test", "com.apple.product-type.bundle.ui-testing",
+		"name = ShopTests;", "name = ShopUITests;",
+		"relativePath = Packages/Pricing;", "relativePath = Packages/Networking;",
+	).Replace(shopProject)
+	legacy := strings.NewReplacer(
+		"com.apple.product-type.bundle.unit-test", "com.apple.product-type.bundle.ocunit-test",
+		"name = ShopTests;", "name = LegacyTests;",
+	).Replace(shopProject)
+	d := Detect(writeTree(t, map[string]string{
+		"ios/Shop.xcodeproj/project.pbxproj":   shopProject,
+		"ios/ShopUI.xcodeproj/project.pbxproj": ui,
+		"ios/Legacy.xcodeproj/project.pbxproj": legacy,
+	}))
+	if len(d.Projects) != 1 {
+		t.Fatalf("projects %+v", d.Projects)
+	}
+	p := d.Projects[0]
+	if p.Name != "Legacy" || !reflect.DeepEqual(p.TestTargets, []string{"LegacyTests", "ShopTests", "ShopUITests"}) ||
+		!reflect.DeepEqual(p.LocalPackages, []string{"ios/Packages/Networking", "ios/Packages/Pricing"}) {
+		t.Errorf("project %+v", p)
+	}
+}
+
+func TestOneScanIndexesATargetOnce(t *testing.T) {
+	root := shopTree(t, nil)
+	d := Detect(root)
+	if _, _, ok := d.Locate("PricingTests.PriceCalculatorTests"); !ok {
+		t.Fatal("not located")
+	}
+	// A file added after the first lookup is not seen: the target's
+	// directory was indexed once.
+	if err := os.WriteFile(filepath.Join(root, "Packages/Pricing/Tests/PricingTests/LateTests.swift"), []byte("final class LateTests {}\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if file, _, _ := d.Locate("PricingTests.LateTests"); file != "Packages/Pricing/Tests/PricingTests" {
+		t.Errorf("Locate = %q, want the target's directory", file)
+	}
+}

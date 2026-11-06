@@ -22,7 +22,8 @@ const MaxExportBytes = 64 << 20
 type Package struct {
 	// Dir is the repository directory that holds Package.swift.
 	Dir string
-	// Name is the package name, else the directory name.
+	// Name is the package name, else the directory name; empty for a
+	// root package whose name the manifest does not spell as a literal.
 	Name string
 	// Exported reports that swiftpm.json gave the targets.
 	Exported bool
@@ -85,8 +86,8 @@ func readPackage(root, dir string) (Package, []diag.Diagnostic) {
 	manifest, _ := os.ReadFile(filepath.Join(abs, Manifest))
 	static := readManifest(manifest)
 	pkg := Package{Dir: dir, Name: static.name, Products: static.products}
-	if pkg.Name == "" {
-		pkg.Name = path.Base(filepath.ToSlash(abs))
+	if pkg.Name == "" && dir != "." {
+		pkg.Name = path.Base(dir)
 	}
 	locals := map[string]bool{}
 	for _, rel := range static.localPaths {

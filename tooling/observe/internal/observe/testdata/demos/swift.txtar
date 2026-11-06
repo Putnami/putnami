@@ -161,10 +161,10 @@ SPEC REPOS:
   trunk:
     - Alamofire
 
-SPEC 7193b3b92c74a07f85569e1a6c4f4237291e7496S:
+SPEC CHECKSUMS:
   Alamofire: 7193b3b92c74a07f85569e1a6c4f4237291e7496
 
-PODFILE 7193b3b92c74a07f85569e1a6c4f4237291e7496: 6a8f2b5d3c1e9f7a4b2c8d0e1f3a5b7c9d2e4f60
+PODFILE CHECKSUM: 6a8f2b5d3c1e9f7a4b2c8d0e1f3a5b7c9d2e4f60
 
 COCOAPODS: 1.16.2
 -- base/Shop.xcworkspace/contents.xcworkspacedata --
@@ -348,10 +348,10 @@ SPEC REPOS:
   trunk:
     - Alamofire
 
-SPEC f3c9f73b6b5e8f8fd1e6ef0be7b3b1e5d2d4f3e1S:
+SPEC CHECKSUMS:
   Alamofire: f3c9f73b6b5e8f8fd1e6ef0be7b3b1e5d2d4f3e1
 
-PODFILE f3c9f73b6b5e8f8fd1e6ef0be7b3b1e5d2d4f3e1: 6a8f2b5d3c1e9f7a4b2c8d0e1f3a5b7c9d2e4f60
+PODFILE CHECKSUM: 6a8f2b5d3c1e9f7a4b2c8d0e1f3a5b7c9d2e4f60
 
 COCOAPODS: 1.16.2
 -- head/Shop.xcworkspace/xcshareddata/swiftpm/Package.resolved --

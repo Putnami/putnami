@@ -9,7 +9,8 @@ diff `Package.resolved` and `Podfile.lock`.
 ## Swift packages
 
 A directory that holds `Package.swift` is a Swift package. The package is a
-component, named by its package name, and so is each of its targets, at the
+component, named by its package name, else by its directory, and unnamed at
+the repository root when the manifest does not spell its name as a literal, and so is each of its targets, at the
 target's directory and named by the target. Both are of ecosystem `swift` and
 source `workspace`. The package depends on each of its targets other than its
 test targets, so a change to a target marks its package dependent, and a
@@ -61,8 +62,12 @@ components of their own: the project's directory holds the app's sources and
 its test targets' directories. Each `XCLocalSwiftPackageReference` of
 `project.pbxproj` is an edge to the package at its `relativePath`, relative to
 the project's directory, so a change to a local package marks the app
-dependent. Remote package references are no edge: `Package.resolved` holds
-their versions.
+dependent. `XCLocalSwiftPackageReference` is how Xcode 15 and later record a
+local package; an older project that adds a package as a folder reference
+gets no edge. Remote package references are no edge: `Package.resolved` holds
+their versions. Several `.xcodeproj` in one directory are one component,
+named by the first in name order, with the edges and test targets of all of
+them.
 
 A `project.pbxproj` that does not parse gets `observe.xcode_project_unreadable`,
 and the project stays a component with no edge. When a Swift package and an

@@ -1,6 +1,8 @@
 package components
 
 import (
+	"sync"
+
 	"go.putnami.dev/protocol/evidence"
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/tooling/observe/internal/detect/composer"
@@ -20,7 +22,8 @@ type Options struct {
 
 // Default returns the detectors observe runs, orchestrators first.
 func Default(opts Options) []Detector {
-	return []Detector{NxDetector{}, PantsDetector{GraphFile: opts.PantsGraph}, NodeDetector{}, ComposerDetector{}, GoDetector{}, PythonDetector{}, SwiftPMDetector{}, XcodeDetector{}}
+	scan := &swiftScan{}
+	return []Detector{NxDetector{}, PantsDetector{GraphFile: opts.PantsGraph}, NodeDetector{}, ComposerDetector{}, GoDetector{}, PythonDetector{}, SwiftPMDetector{scan: scan}, XcodeDetector{scan: scan}}
 }
 
 // fromProbe turns the projects of a probe answer into components.
@@ -137,17 +140,42 @@ func (d PantsDetector) Detect(root string) Found {
 	return found
 }
 
+// swiftScan runs the Swift detection of one repository once, for both the
+// SwiftPM and the Xcode detector.
+type swiftScan struct {
+	mu        sync.Mutex
+	root      string
+	detection swift.Detection
+	done      bool
+}
+
+// detect returns the detection of root, from the scan when it already read
+// that root. A nil scan detects every time.
+func (s *swiftScan) detect(root string) swift.Detection {
+	if s == nil {
+		return swift.Detect(root)
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if !s.done || s.root != root {
+		s.root, s.detection, s.done = root, swift.Detect(root), true
+	}
+	return s.detection
+}
+
 // SwiftPMDetector adapts the Swift detector to its Swift packages: each
 // package and each of its targets is a workspace component. It also places
 // the JUnit cases of the packages' test targets by their class names.
-type SwiftPMDetector struct{}
+type SwiftPMDetector struct {
+	scan *swiftScan
+}
 
 // Name implements Detector.
 func (SwiftPMDetector) Name() string { return "swiftpm" }
 
 // Detect implements Detector.
-func (SwiftPMDetector) Detect(root string) Found {
-	detection := swift.Detect(root)
+func (d SwiftPMDetector) Detect(root string) Found {
+	detection := d.scan.detect(root)
 	found := Found{}
 	for _, d := range detection.Diagnostics {
 		if d.Code != swift.CodeProjectUnreadable {
@@ -166,14 +194,16 @@ func (SwiftPMDetector) Detect(root string) Found {
 // XcodeDetector adapts the Swift detector to its Xcode projects: each
 // directory that holds an .xcodeproj is a manifest component, with an edge to
 // each local package the project references.
-type XcodeDetector struct{}
+type XcodeDetector struct {
+	scan *swiftScan
+}
 
 // Name implements Detector.
 func (XcodeDetector) Name() string { return "xcode" }
 
 // Detect implements Detector.
-func (XcodeDetector) Detect(root string) Found {
-	detection := swift.Detect(root)
+func (d XcodeDetector) Detect(root string) Found {
+	detection := d.scan.detect(root)
 	found := Found{}
 	for _, d := range detection.Diagnostics {
 		if d.Code == swift.CodeProjectUnreadable {

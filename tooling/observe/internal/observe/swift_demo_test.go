@@ -26,7 +26,7 @@ func TestTheSwiftDemoIsExplained(t *testing.T) {
 		{ID: "Packages/Pricing/Sources/Pricing", Name: "Pricing", Ecosystem: sw, Source: ws, Impact: evidence.ImpactDependent, DependsOn: []string{"Packages/Networking"}},
 		{ID: "Packages/Pricing/Tests/PricingTests", Name: "PricingTests", Ecosystem: sw, Source: ws, Impact: evidence.ImpactDependent, DependsOn: []string{"Packages/Pricing/Sources/Pricing"}},
 	} {
-		if got := pantsComponents(o)[want.ID]; !reflect.DeepEqual(got, want) {
+		if got := componentsByID(o)[want.ID]; !reflect.DeepEqual(got, want) {
 			t.Errorf("component %s = %+v, want %+v", want.ID, got, want)
 		}
 	}

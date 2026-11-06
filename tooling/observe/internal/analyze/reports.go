@@ -160,8 +160,9 @@ func joinDir(base, dir string) string {
 }
 
 // attributeTests gives each case of a JUnit report to a component: the one
-// that holds its test file, else the one of the Go package its suite names,
-// else the one that holds the report.
+// that holds its test file, else the one a detector locates from its class
+// or suite name (a Go package, a Swift Module.Class test class), else the one
+// that holds the report. A located name that is a file is the case's file.
 //
 // The test file is the case's file, else its class name read as a path
 // (Vitest), else its dotted class name read as a Python module: pytest writes
@@ -192,8 +193,11 @@ func (r *Result) attributeTests(report reports.Report, result readers.TestReport
 				if name == "" {
 					continue
 				}
-				if _, component, found := m.set.Locate(name); found {
+				if located, component, found := m.set.Locate(name); found {
 					owner, ok = component, true
+					if m.isFile(located) {
+						file = located
+					}
 					break
 				}
 			}
