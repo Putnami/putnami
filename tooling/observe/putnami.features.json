@@ -756,7 +756,8 @@
             "kind": "acceptance",
             "checks": [
               "a-test-log-goes-to-the-package-of-its-test-target",
-              "bazel-reports-are-discovered-through-the-convenience-links"
+              "bazel-reports-are-discovered-through-the-convenience-links",
+              "a-test-log-of-a-yielded-package-goes-to-the-enclosing-component"
             ]
           }
         },

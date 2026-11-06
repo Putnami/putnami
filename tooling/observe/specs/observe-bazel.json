@@ -30,7 +30,7 @@
     },
     {
       "id": "bazel-reports",
-      "text": "Discovery follows the bazel-testlogs and bazel-out links of the root: the test.xml of each test target, shard or run under bazel-testlogs, and bazel-out/_coverage/_coverage_report.dat, are report candidates, recognized by content and named through the link. The cases of a log under bazel-testlogs/<package>/<target>/ go to the package of its test target: the export rule that matches the directory, else the longest package that prefixes it. Each LCOV file goes to its package."
+      "text": "Discovery follows the bazel-testlogs and bazel-out links of the root: the test.xml of each test target, shard or run under bazel-testlogs, and bazel-out/_coverage/_coverage_report.dat, are report candidates, recognized by content and named through the link. The cases of a log under bazel-testlogs/<package>/<target>/ go to the package of its test target, or the component enclosing it: the export rule that matches the directory, else the longest package that prefixes it. Each LCOV file goes to its package."
     },
     {
       "id": "bazel-change-analysis",
