@@ -149,10 +149,10 @@ func TestABodyWithAmbiguousFencesRunsNoQuickAction(t *testing.T) {
 	h := newHarness(t)
 	for i, body := range []string{
 		"```npm install``` fails on CI\n/close",
-		"- item\n  ```\n  code\n  ```\n/close",
-		"```\ncode\n``` sh\n/close",
-		"<div>\n```\n</div>\n/close",
-		"~~~~\n~~~\n/close\n~~~~",
+		"- step one\n  ```\n/close",
+		"```\n```sh\n```\n/close",
+		"<div>\n```\n</div>\n\n/close",
+		"~~~~\n~~~\n~~~~\n/close",
 		"~~~\n/close\n~~~",
 	} {
 		created := h.create(`{"title":"Fence","body":` + quoteJSON(body) + `,"idempotencyKey":"fence-` + strconv.Itoa(i) + `"}`)

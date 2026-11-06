@@ -333,7 +333,14 @@ func TestATraversalSurvivesTiesAndClosedIssues(t *testing.T) {
 	// A work queue that closes each listed issue loses none after a large
 	// tie: a counted read that finds the tie used up continues from the
 	// next millisecond.
-	for _, c := range []struct{ tied, later, size int }{{49, 20, 49}, {100, 50, 100}, {60, 50, 60}} {
+	for _, c := range []struct {
+		tied, later, size int
+		// paired gives each two later issues one millisecond.
+		paired bool
+		// relabel removes the queue's label instead of closing.
+		relabel bool
+	}{{49, 20, 49, false, false}, {100, 50, 100, false, false}, {60, 50, 60, false, false},
+		{49, 20, 49, true, false}, {100, 50, 100, true, false}, {49, 20, 49, false, true}, {120, 40, 50, true, true}} {
 		h = newHarness(t)
 		var later []int
 		var at time.Time
@@ -344,8 +351,14 @@ func TestATraversalSurvivesTiesAndClosedIssues(t *testing.T) {
 			}
 			h.change(issue, func(f *fakeIssue) { f.created = at })
 		}
+		var previous *fakeIssue
 		for i := 0; i < c.later; i++ {
-			later = append(later, h.seed("Later", "", "queue").iid)
+			issue := h.seed("Later", "", "queue")
+			if c.paired && i%2 == 1 {
+				h.change(issue, func(f *fakeIssue) { f.created = previous.created })
+			}
+			previous = issue
+			later = append(later, issue.iid)
 		}
 		seen := map[int]bool{}
 		cursor := ""
@@ -359,7 +372,11 @@ func TestATraversalSurvivesTiesAndClosedIssues(t *testing.T) {
 			for _, task := range page.Items {
 				seen[mustIID(t, task.Ref)] = true
 				var done collab.TaskResult
-				h.ok("transition", `{"ref":`+refJSON(task.Ref)+`,"state":"done"}`, &done)
+				if c.relabel {
+					h.ok("update", `{"ref":`+refJSON(task.Ref)+`,"labels":["taken"]}`, &done)
+				} else {
+					h.ok("transition", `{"ref":`+refJSON(task.Ref)+`,"state":"done"}`, &done)
+				}
 			}
 			if cursor = page.Page.Next; cursor == "" {
 				break
@@ -367,7 +384,7 @@ func TestATraversalSurvivesTiesAndClosedIssues(t *testing.T) {
 		}
 		for _, iid := range later {
 			if !seen[iid] {
-				t.Fatalf("a work queue over a tie of %d in pages of %d never listed #%d", c.tied, c.size, iid)
+				t.Fatalf("a work queue over a tie of %d in pages of %d (paired %v, relabel %v) never listed #%d", c.tied, c.size, c.paired, c.relabel, iid)
 			}
 		}
 	}

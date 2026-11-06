@@ -156,7 +156,7 @@ func collect(fetch fetchPage, keep func(*glIssue) bool, size int, from string) (
 		progressed := false
 		for i := range issues {
 			issue := &issues[i]
-			if (i < skip && issue.createdMillis() == at.millis) || at.considered(issue) {
+			if (i < skip && issue.createdMillis() == anchor) || at.considered(issue) {
 				continue
 			}
 			if keep(issue) {
