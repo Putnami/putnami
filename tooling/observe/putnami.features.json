@@ -798,6 +798,177 @@
           }
         }
       ]
+    },
+    {
+      "id": "tooling/observe-swift",
+      "type": "feature",
+      "name": "Find the components of an iOS or Swift repository that keeps its own CI",
+      "outcome": "putnami observe, in an iOS or Swift repository without a Putnami workspace, knows one component per Swift package, package target and Xcode project, and the edges between them, from the describe export the CI wrote or from Package.swift and project.pbxproj, without running any Apple tool, so a change to a local package marks the packages and the app that use it, its tests and coverage land on the right component, and a Package.resolved or Podfile.lock bump is a dependency change",
+      "owner": "tooling",
+      "target": "modeled",
+      "requirements": [
+        {
+          "id": "swiftpm-export-targets",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "export-targets-are-components"
+            ]
+          }
+        },
+        {
+          "id": "swiftpm-export-unreadable",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-malformed-export-falls-back-to-the-static-read"
+            ]
+          }
+        },
+        {
+          "id": "swiftpm-export-edges",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-target-dependency-is-an-edge",
+              "a-local-product-dependency-is-an-edge"
+            ]
+          }
+        },
+        {
+          "id": "swiftpm-static-read",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "static-read-lists-source-and-test-targets",
+              "a-local-package-path-is-an-edge"
+            ]
+          }
+        },
+        {
+          "id": "swiftpm-static-read-diagnostic",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-static-read-is-an-info-diagnostic"
+            ]
+          }
+        },
+        {
+          "id": "swift-walk",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "checkouts-and-pods-are-skipped"
+            ]
+          }
+        },
+        {
+          "id": "xcode-projects",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "an-xcode-project-is-a-component",
+              "a-local-package-reference-is-an-edge",
+              "an-unreadable-project-is-a-diagnostic"
+            ]
+          }
+        },
+        {
+          "id": "swift-test-placement",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-class-name-places-on-a-swiftpm-test-target",
+              "a-class-name-places-on-an-xcode-test-target"
+            ]
+          }
+        },
+        {
+          "id": "swift-test-file",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-placed-case-names-its-test-file"
+            ]
+          }
+        },
+        {
+          "id": "swift-package-resolved",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "package-resolved-lists-its-pins"
+            ]
+          }
+        },
+        {
+          "id": "swift-podfile-lock",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "podfile-lock-lists-its-pods"
+            ]
+          }
+        },
+        {
+          "id": "swift-change-analysis",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-swift-demo-is-explained"
+            ]
+          }
+        }
+      ]
     }
   ]
 }

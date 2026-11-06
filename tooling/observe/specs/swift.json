@@ -1,0 +1,72 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-spec.json",
+  "protocolVersion": 1,
+  "feature": "tooling/observe-swift",
+  "outcomes": [
+    "In an iOS or Swift repository, each Swift package, each of its targets and each Xcode project is a component, named by its manifest, without a Putnami file",
+    "When the CI ran swift package describe --type json > swiftpm.json beside a Package.swift, the target and product dependencies are the edges; without it, the local package paths of Package.swift are, and observe says what the static read cannot see",
+    "A local package an Xcode project references is an edge, so a change to a package marks the packages and the app that use it as dependent",
+    "The JUnit and coverage reports converted from an .xcresult or written by swift test land on the components that hold the tests and the covered files, and a version bump in Package.resolved or Podfile.lock is a dependency change"
+  ],
+  "nonGoals": [
+    "Running swift, xcodebuild, pod or any Apple tool, or reading an .xcresult bundle: the CI converts it to JUnit and Cobertura or LCOV",
+    "Evaluating Package.swift: the static read matches its literal .package(path:) calls and lists the target directories",
+    "Reading the targets, build phases or file references of an Xcode project beyond its local package references and its test target names",
+    "Components for CocoaPods pods, Carthage frameworks or remote Swift packages",
+    "Reading an .xcworkspace: the projects and packages it groups are read on their own"
+  ],
+  "requirements": [
+    {
+      "id": "swiftpm-export-targets",
+      "text": "A directory that holds Package.swift is a Swift package. When it also holds swiftpm.json, as swift package describe --type json writes it, each of its targets is a component at the package directory joined with the target's path, named by the target, of source workspace and ecosystem swift. The package directory is a component named by the package that depends on each of its targets other than test targets."
+    },
+    {
+      "id": "swiftpm-export-unreadable",
+      "text": "A swiftpm.json that does not parse as a JSON object, or that lists no target, is the observe.swiftpm_export_unreadable warning, and the static read answers for that package."
+    },
+    {
+      "id": "swiftpm-export-edges",
+      "text": "Each name in a target's target_dependencies is an edge to that target of the same package. Each name in its product_dependencies is an edge to the local package that declares that product: a .package(path:) of its Package.swift, or a fileSystem dependency of the export matched by its identity, the lowercased last segment of its path. A product of a remote package is no edge."
+    },
+    {
+      "id": "swiftpm-static-read",
+      "text": "Without swiftpm.json, each directory under Sources and Tests of the package is a target component, a test target under Tests. Each .package(path:) of Package.swift, relative to the package directory, is a local package: each target under Sources depends on it, and each target under Tests depends on every target under Sources. The name: argument of Package( names the package."
+    },
+    {
+      "id": "swiftpm-static-read-diagnostic",
+      "text": "One info diagnostic observe.swiftpm_static_read names the packages read without an export, the command swift package describe --type json > swiftpm.json, and what the static read cannot see: target dependencies, custom target paths and conditions."
+    },
+    {
+      "id": "swift-walk",
+      "text": "The detectors walk the repository for Package.swift files and .xcodeproj directories. The walk skips hidden directories, .build, Pods, Carthage, DerivedData, SourcePackages and node_modules, and does not enter an .xcodeproj or .xcworkspace directory."
+    },
+    {
+      "id": "xcode-projects",
+      "text": "Each .xcodeproj directory is a component at the directory that holds it, named by the project, of source manifest and ecosystem xcode. Each XCLocalSwiftPackageReference of its project.pbxproj is an edge to the package at its relativePath, relative to that directory. A project.pbxproj that cannot be read is the observe.xcode_project_unreadable warning, and the project stays a component with no edge."
+    },
+    {
+      "id": "swift-test-placement",
+      "text": "A JUnit case whose class or suite name is Module.Class, as xcbeautify, fastlane scan and swift test --xunit-output write it, goes to the component of the test target named Module: a test target of a Swift package, or a unit or UI test target of an Xcode project. A name without a module is looked for in every test target."
+    },
+    {
+      "id": "swift-test-file",
+      "text": "The file of a case placed by its class name is Class.swift under the test target's directory, else the Swift file there that declares Class. The directory of an Xcode test target is the one named by the target beside the project, else the project's directory."
+    },
+    {
+      "id": "swift-package-resolved",
+      "text": "A Package.resolved, wherever it lies, is a lockfile of ecosystem swift: each pin of format versions 2 and 3 gives its identity, and of version 1 its package, with state.version, else state.revision. A file that does not parse is the observe.lockfile_unreadable warning of the change analyses."
+    },
+    {
+      "id": "swift-podfile-lock",
+      "text": "A Podfile.lock is a lockfile of ecosystem cocoapods: each entry of PODS gives its pod, a subspec read as its root pod, and the version in parentheses. A pod that EXTERNAL SOURCES installs from a :path: is the repository's own code and is left out."
+    },
+    {
+      "id": "swift-change-analysis",
+      "text": "On a repository with an Xcode app project that uses a local package Pricing, and a local package Networking that Pricing uses, where a change edits Networking and bumps a pin in Package.resolved and a pod in Podfile.lock, the analyses list the app, Pricing and Networking with their edges, mark Networking changed and Pricing and the app dependent; the JUnit and Cobertura reports land on the components, with no unattributed case and no unmapped file; and both bumps are dependency changes."
+    }
+  ],
+  "decisions": [
+    "tooling/cli/doc/adr/0051-user-scope-extensions-run-without-a-workspace.md",
+    "protocols/evidence/doc/adr/0001-one-self-reported-change-evidence-document.md"
+  ]
+}

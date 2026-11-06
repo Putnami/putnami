@@ -49,6 +49,18 @@
     "tooling/observe-python#python-probe-answer",
     "tooling/observe-python#python-project-edges",
     "tooling/observe-python#python-projects-are-components",
+    "tooling/observe-swift#swift-change-analysis",
+    "tooling/observe-swift#swift-package-resolved",
+    "tooling/observe-swift#swift-podfile-lock",
+    "tooling/observe-swift#swift-test-file",
+    "tooling/observe-swift#swift-test-placement",
+    "tooling/observe-swift#swift-walk",
+    "tooling/observe-swift#swiftpm-export-edges",
+    "tooling/observe-swift#swiftpm-export-targets",
+    "tooling/observe-swift#swiftpm-export-unreadable",
+    "tooling/observe-swift#swiftpm-static-read",
+    "tooling/observe-swift#swiftpm-static-read-diagnostic",
+    "tooling/observe-swift#xcode-projects",
     "tooling/observe-upload#upload-fails-open",
     "tooling/observe-upload#upload-hands-the-document-to-the-reporter"
   ]
