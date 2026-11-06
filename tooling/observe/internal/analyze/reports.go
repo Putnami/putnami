@@ -167,7 +167,8 @@ func joinDir(base, dir string) string {
 // The test file is the case's file, else its class name read as a path
 // (Vitest), else its dotted class name read as a Python module: pytest writes
 // tests.test_api.TestLogin for a case of tests/test_api.py, and its default
-// xunit2 report has no file attribute.
+// xunit2 report has no file attribute. Else it is the dotted class name read
+// as a Dart test file: tojunit writes test.price for test/price_test.dart.
 func (r *Result) attributeTests(report reports.Report, result readers.TestReport, m *mapper, tests map[string]*evidence.ComponentTests) {
 	bases := m.bases(report.Path)
 	reportOwner, reportOwned := m.set.Owner(report.Path)
@@ -183,7 +184,8 @@ func (r *Result) attributeTests(report reports.Report, result readers.TestReport
 	unattributed := 0
 	for _, c := range result.Cases {
 		owner, file, ok := "", "", false
-		for _, candidate := range append([]string{c.File, c.Classname}, moduleFiles(c.Classname)...) {
+		candidates := append([]string{c.File, c.Classname}, moduleFiles(c.Classname)...)
+		for _, candidate := range append(candidates, dartTestFiles(c.Classname)...) {
 			if rel, found := m.resolve(candidate, bases); found {
 				file = rel
 				owner, ok = m.set.Owner(rel)
@@ -265,6 +267,28 @@ func moduleFiles(classname string) []string {
 	out := make([]string, 0, len(parts))
 	for n := len(parts); n > 0; n-- {
 		out = append(out, strings.Join(parts[:n], "/")+".py")
+	}
+	return out
+}
+
+// tojunitName is a class name tojunit can write: the test file's path without
+// _test.dart or .dart, with each / written as a ., after an optional leading
+// . for an absolute path.
+var tojunitName = regexp.MustCompile(`^\.?[A-Za-z0-9_]+(\.[A-Za-z0-9_]+)*$`)
+
+// dartTestFiles returns the Dart test files a tojunit class name may name,
+// longest first. Its leading segments may be the directories of an absolute
+// path, or the --package prefix, so each shorter tail is tried too:
+// .ci.repo.apps.mobile.test.widget may be apps/mobile/test/widget_test.dart.
+func dartTestFiles(classname string) []string {
+	if !tojunitName.MatchString(classname) {
+		return nil
+	}
+	parts := strings.Split(strings.TrimPrefix(classname, "."), ".")
+	var out []string
+	for start := max(0, len(parts)-maxSuffixSegments); start < len(parts); start++ {
+		stem := strings.Join(parts[start:], "/")
+		out = append(out, stem+"_test.dart", stem+".dart")
 	}
 	return out
 }

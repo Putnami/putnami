@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"go.putnami.dev/tooling/observe/internal/toml"
+	"go.putnami.dev/tooling/observe/internal/yaml"
 )
 
 // ReadPackageLock reads an npm package-lock.json: the packages map of
@@ -281,6 +282,29 @@ func ReadPEXLock(data []byte) (Packages, error) {
 		for _, r := range resolve.LockedRequirements {
 			out.add(PyPIName(r.ProjectName), r.Version)
 		}
+	}
+	return out, nil
+}
+
+// ReadPubspecLock reads the packages of a pubspec.lock. A package of source
+// path is the repository's own code, and one of source sdk, such as flutter,
+// comes with the SDK: both are left out.
+func ReadPubspecLock(data []byte) (Packages, error) {
+	doc, err := yaml.Parse(data)
+	if err != nil {
+		return nil, fmt.Errorf("pubspec.lock is not YAML: %w", err)
+	}
+	packages, ok := yaml.Get(doc, "packages").(yaml.Map)
+	if !ok && yaml.Get(doc, "packages") != nil {
+		return nil, fmt.Errorf("the packages of pubspec.lock are not a mapping")
+	}
+	out := Packages{}
+	for name, entry := range packages {
+		switch yaml.String(entry, "source") {
+		case "path", "sdk":
+			continue
+		}
+		out.add(name, yaml.String(entry, "version"))
 	}
 	return out, nil
 }
