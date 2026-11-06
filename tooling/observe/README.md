@@ -62,7 +62,9 @@ See [doc/07-python.md](doc/07-python.md) for how it reads the projects and
 edges of a Python repository, from a uv workspace or `pyproject.toml` files.
 See [doc/08-pants.md](doc/08-pants.md) for how it reads the components and
 the inferred edges of a Pants repository, from a `pants peek` export.
-See [doc/09-jvm.md](doc/09-jvm.md) for how it reads the projects, modules and
+See [doc/09-bazel.md](doc/09-bazel.md) for how it reads the packages of a
+Bazel repository and their edges, from a `bazel query` export.
+See [doc/10-jvm.md](doc/10-jvm.md) for how it reads the projects, modules and
 edges of a Gradle or Maven repository, Android included, and its JaCoCo
 coverage.
 See [doc/06-change-analyses.md](doc/06-change-analyses.md) for how it maps a

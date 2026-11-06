@@ -7,7 +7,7 @@ queries no vulnerability database.
 
 ## Components
 
-Eight detectors read the repository:
+Nine detectors read the repository:
 
 | Detector | Reads | Source |
 |---|---|---|
@@ -19,6 +19,7 @@ Eight detectors read the repository:
 | Python | each `pyproject.toml`, with the root's `[tool.uv.workspace]` | `workspace` for a uv workspace member, `manifest` otherwise |
 | Gradle | `settings.gradle.kts` or `settings.gradle`, and each project's build file | `workspace` |
 | Maven | the root `pom.xml` and its modules, recursively | `workspace` |
+| Bazel | `bazel-graph.json` from `bazel query 'deps(//...)' --output=streamed_jsonproto`, else the `BUILD` and `BUILD.bazel` files | `orchestrator` for a query export, `manifest` otherwise |
 
 A component is a directory. When two detectors name one directory, the higher
 source wins: `orchestrator`, then `workspace`, then `manifest`. On a tie, the
@@ -52,7 +53,9 @@ its impact.
 
 A JUnit case goes to the first of:
 
-1. The component that holds its test file: the case's `file`, else its
+1. The package of its Bazel test target, for a log under `bazel-testlogs`;
+   see [the Bazel detector](09-bazel.md#tests-and-coverage).
+2. The component that holds its test file: the case's `file`, else its
    suite's, else its class name when that names a file (Vitest), else its
    dotted class name read as a Python module (pytest). pytest writes
    `tests.test_api.TestLogin` for the class `TestLogin` of `tests/test_api.py`,
@@ -60,13 +63,13 @@ A JUnit case goes to the first of:
    that names a `.py` file is the test file. The class name is relative to
    pytest's `rootdir`; see
    [the Python detector](07-python.md#reports).
-2. The component whose test source root holds the file its JVM class name
+3. The component whose test source root holds the file its JVM class name
    names: `com.acme.PriceTest` is `src/test/kotlin/com/acme/PriceTest.kt` or
    `.java`, under `src/test` or `src/androidTest`. See
-   [Gradle and Maven](09-jvm.md#reports).
-3. The component of the Go package its class or suite names
+   [Gradle and Maven](10-jvm.md#reports).
+4. The component of the Go package its class or suite names
    (`gotestsum --junitfile`).
-4. The component that holds the report.
+5. The component that holds the report.
 
 A case that none of them places is counted in `observe.tests_unattributed`.
 
@@ -74,8 +77,9 @@ A coverage report names files. A path is read in this order: absolute under
 the repository; absolute from another checkout, by its trailing segments;
 relative to a Cobertura source root; for a JaCoCo report, as a package path
 under the `src/main/java` or `src/main/kotlin` of a component; relative to the
-report's component, to the repository root, then to the report's directory;
-and, for a Go cover profile, as an import path. A file that is none of them is counted in
+report's component, to
+the repository root, then to the report's directory; and, for a Go cover
+profile, as an import path. A file that is none of them is counted in
 `observe.coverage_unmapped`. A pytest-cov report (`pytest --cov
 --cov-report=xml`) names the directory pytest ran in as its `<source>` and
 each file relative to it, so it maps whether pytest ran at the repository root
@@ -173,3 +177,5 @@ summary and the evidence document are what they were.
 | `observe.lockfile_unreadable` | A changed lockfile cannot be read at the base or the head. |
 | `observe.changed_lines_unread` | The diff's changed lines cannot be read. |
 | `observe.sbom_ambiguous` | One side has several SBOMs, so none is read and that side is unknown. |
+| `observe.bazel_graph_missing` | A Bazel workspace has no query export, so its packages have no edge. An info diagnostic that names the export command. |
+| `observe.bazel_graph_unreadable` | The Bazel query export cannot be read, so the `BUILD` files give the packages, without edges. |

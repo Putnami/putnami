@@ -464,7 +464,22 @@
             "checks": [
               "the-status-reads-each-child-through-the-contracts",
               "a-child-launches-on-merged-or-one-ready-parent",
-              "a-spent-envelope-launches-nothing"
+              "a-spent-envelope-launches-nothing",
+              "a-cloud-launch-is-recorded-and-reported"
+            ]
+          }
+        },
+        {
+          "id": "epic-cloud-child",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-push-only-build-opens-no-proposal",
+              "the-epic-session-proves-and-publishes-a-cloud-child"
             ]
           }
         }

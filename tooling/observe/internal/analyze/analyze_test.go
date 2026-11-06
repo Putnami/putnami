@@ -333,6 +333,51 @@ func TestChangedLockfilesGiveDependencyChanges(t *testing.T) {
 	}
 }
 
+func TestABazelTestLogGoesToThePackageOfItsTestTarget(t *testing.T) {
+	spectest.Proves(t, "tooling/observe-bazel", "bazel-reports", "a-test-log-goes-to-the-package-of-its-test-target")
+	root := t.TempDir()
+	write(t, root, map[string]string{
+		"MODULE.bazel":        "",
+		"BUILD.bazel":         "",
+		"pricing/BUILD.bazel": "",
+		"pricing/pricing.go":  "package pricing\n",
+		"api/BUILD.bazel":     "",
+		"api/api.go":          "package api\n",
+		"bazel-graph.json": `{"type":"RULE","rule":{"name":"//pricing:pricing_test","ruleInput":["//pricing:pricing.go"]}}
+{"type":"RULE","rule":{"name":"//api:api_test","ruleInput":["//pricing:pricing_test"]}}
+{"type":"RULE","rule":{"name":"//:all"}}
+`,
+		// rules_go names the target as the suite and no file; a case may
+		// still name a file of another package.
+		"bazel-testlogs/pricing/pricing_test/test.xml": `<testsuites><testsuite name="pricing/pricing_test">
+			<testcase classname="pricing_test" name="TestQuote" time="1"/>
+			<testcase classname="pricing_test" name="TestRound"><failure message="off by one"/></testcase>
+		</testsuite></testsuites>`,
+		"bazel-testlogs/api/api_test/test.xml": `<testsuites><testsuite name="api/api_test">
+			<testcase name="TestServe" file="api/api.go"/>
+			<testcase name="TestPrice" file="pricing/pricing.go"/>
+		</testsuite></testsuites>`,
+	})
+	set := components.Detect(root, []components.Detector{components.BazelDetector{}})
+	r := Run(Input{Root: root, Set: set, Reports: []reports.Report{
+		{Path: "bazel-testlogs/api/api_test/test.xml", Kind: reports.KindJUnit, Format: reports.FormatJUnit},
+		{Path: "bazel-testlogs/pricing/pricing_test/test.xml", Kind: reports.KindJUnit, Format: reports.FormatJUnit},
+	}})
+	if len(r.Diagnostics) != 0 {
+		t.Fatalf("diagnostics %v", r.Diagnostics)
+	}
+	got := tests(r)
+	if pricing := got["pricing"]; pricing.Passed != 1 || pricing.Failed != 1 || pricing.FailingCases[0].Suite != "pricing/pricing_test" {
+		t.Errorf("pricing tests %+v", pricing)
+	}
+	if api := got["api"]; api.Passed != 2 {
+		t.Errorf("api tests %+v", api)
+	}
+	if _, rooted := got["."]; rooted || len(r.Tests) != 2 {
+		t.Errorf("tests %+v", r.Tests)
+	}
+}
+
 const jvmFeature = "tooling/observe-jvm"
 
 // jvmRepository is a Gradle build: app, an Android library, and api depend

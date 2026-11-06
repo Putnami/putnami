@@ -50,6 +50,10 @@ Once no finding needs an edit, run the gates in this order, and no other:
 2. One final impacted gate on the accepted candidate, or the hosted gate when
    the policy and the machine's load select it.
 
+A push-only run stops after step 1, whatever the machine's load: the epic
+session runs step 2 when it publishes, as the merge stage's push-only section
+says.
+
 Measure the machine first with `"$PUTNAMI_CLI" doctor --machine`. When the
 ratio exceeds the policy's `verification.ciGate.load` (default 0.7) and the
 policy names `verification.ciGate.checks`, run no local impacted gate: the
