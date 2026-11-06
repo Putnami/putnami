@@ -26,6 +26,7 @@
     "tooling/contributor-executable#repository-policy",
     "tooling/contributor-executable#requirementless-delivery",
     "tooling/contributor-executable#squash-ready-publication",
+    "tooling/epic#epic-cloud-child",
     "tooling/epic#epic-plan-validation",
     "tooling/epic#epic-status",
     "tooling/epic#epic-waves"

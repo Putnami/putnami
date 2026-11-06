@@ -1,6 +1,6 @@
 # ADR 0010 — An epic session runs issues in waves and never codes
 
-- **Status**: accepted
+- **Status**: accepted, amended in part by [ADR 0011](0011-the-epic-session-publishes-a-cloud-child.md)
 - **Scope**: `@putnami/contributor` `epic` skill, `putnami epic plan` and
   `putnami epic status`, the `epic` member of the contributor policy, and the
   `build` stack rebase
@@ -99,3 +99,7 @@ then targets the base.
 
 Remove the `epic` skill and the two commands. Children keep running as
 ordinary `build` sessions that the owner opens by hand.
+
+Amended 2026-11-06: [ADR 0011](0011-the-epic-session-publishes-a-cloud-child.md)
+adds the `cloud` launch target. A cloud child runs `build --push-only`, and
+the epic session proves its pushed head locally and publishes its proposal.

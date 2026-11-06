@@ -484,6 +484,14 @@
         "value": "@putnami/intelligence",
         "whenMissing": "violated"
       }
+    },
+    {
+      "id": "D-060",
+      "statement": "a cloud child of an epic runs build in push-only mode and opens no proposal; the epic session proves its pushed head in a local worktree and publishes its proposal, and opens no proposal for a local child",
+      "settled": "2026-11-06",
+      "settledBy": "the epic session, under the owner's delegation of 2026-11-05",
+      "adr": "tooling/contributor/doc/adr/0011-the-epic-session-publishes-a-cloud-child.md",
+      "reviewOnly": true
     }
   ]
 }

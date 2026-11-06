@@ -24,9 +24,14 @@
     {
       "id": "epic-status",
       "text": "putnami epic status reads the epic plan, its launch records (local or cloud), and each issue's task, proposal and sessions through tasks, proposals and missions. It reports each issue's target, state and tokens, the epic's tokens against its envelope, and the issues that may launch: all dependencies merged, or one not merged with a ready proposal, while the envelope is not spent and fewer issues run than its parallel sessions. A contract the workspace does not bind is reported, not guessed."
+    },
+    {
+      "id": "epic-cloud-child",
+      "text": "A cloud child runs build --push-only: it pushes its branch at each checkpoint, declarations first, and opens no proposal. The epic skill has the owner start the cloud session, and the epic session proves the pushed head with the project gate in a local worktree before it publishes the proposal with change finalize."
     }
   ],
   "decisions": [
-    "tooling/contributor/doc/adr/0010-an-epic-session-runs-issues-in-waves.md"
+    "tooling/contributor/doc/adr/0010-an-epic-session-runs-issues-in-waves.md",
+    "tooling/contributor/doc/adr/0011-the-epic-session-publishes-a-cloud-child.md"
   ]
 }
