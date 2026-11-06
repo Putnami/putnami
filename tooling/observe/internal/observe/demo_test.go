@@ -412,7 +412,7 @@ func TestADependsOnListNamesTenComponents(t *testing.T) {
 func TestTheRushDemoChangeIsExplained(t *testing.T) {
 	spectest.Proves(t, "tooling/observe-rush", "rush-change-analysis", "the-rush-demo-change-is-explained")
 	root, base := demoRepository(t, "rush")
-	env := map[string]string{"GITHUB_ACTIONS": "true", "GITHUB_SERVER_URL": "https://github.com", "GITHUB_REPOSITORY": "Putnami/demo-observe-rush", "GITHUB_REPOSITORY_ID": "1108", "GITHUB_RUN_ID": "41335520001", "GITHUB_JOB": "test", "GITHUB_REF": "refs/pull/1/merge"}
+	env := map[string]string{"GITHUB_ACTIONS": "true", "GITHUB_SERVER_URL": "https://github.com", "GITHUB_REPOSITORY": "Putnami/demo-observe-rush", "GITHUB_REPOSITORY_ID": "1108", "GITHUB_RUN_ID": "41335520001", "GITHUB_JOB": "test"}
 	opts := Options{
 		Dir:      root,
 		Env:      func(key string) string { return env[key] },
