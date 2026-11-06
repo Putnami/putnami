@@ -232,7 +232,7 @@ func PrepareAuthoredConfig(params map[string]any, args []string, workspaceRoot s
 	if err != nil {
 		return nil, clicore.NewError(err.Error(), clicore.ExitUsage)
 	}
-	version, err := authoredConfigVersion(workspaceRoot, project)
+	version, err := authoredConfigVersion(ioctx.Version, workspaceRoot, project)
 	if err != nil {
 		return nil, err
 	}
@@ -472,7 +472,14 @@ func authoredSourceProvenance(parent context.Context, workspaceRoot string) (str
 	return "github.com/" + repositoryKey, revision, nil
 }
 
-func authoredConfigVersion(workspaceRoot, project string) (string, error) {
+// authoredConfigVersion is the version the member is published at: inside a
+// job, the version the session resolved for the job's project, the one the
+// release-set plan selects members at; outside a job, the version the
+// project's build stamp, .gen/version.json, records.
+func authoredConfigVersion(sessionVersion, workspaceRoot, project string) (string, error) {
+	if sessionVersion != "" {
+		return canonicalAuthoredConfigVersion(sessionVersion)
+	}
 	projectDir, err := clicore.FindAppDir(workspaceRoot, project)
 	if err != nil {
 		return "", err
@@ -489,7 +496,10 @@ func authoredConfigVersion(workspaceRoot, project string) (string, error) {
 	if err := json.Unmarshal(data, &document); err != nil {
 		return "", clicore.NewError("parse native Config version: "+err.Error(), clicore.ExitUsage)
 	}
-	version := clicore.StringValue(document["version"])
+	return canonicalAuthoredConfigVersion(clicore.StringValue(document["version"]))
+}
+
+func canonicalAuthoredConfigVersion(version string) (string, error) {
 	if version == "" || len(version) > 256 || version != strings.TrimSpace(version) || strings.ContainsAny(version, "/\x00\r\n") {
 		return "", clicore.NewError("native Config version is not canonical", clicore.ExitUsage)
 	}

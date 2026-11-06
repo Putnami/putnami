@@ -275,6 +275,9 @@ func RunCommand(command string, ioctx IO, args []string) error {
 	}
 
 	ioctx.Env = env
+	if context.Version != nil {
+		ioctx.Version = context.Version.Full
+	}
 	ioctx.Stdout = firstNonNil(ioctx.Stdout, func(string) {})
 	ioctx.Stderr = firstNonNil(ioctx.Stderr, func(string) {})
 	ioctx.Client = clientOrDefault(ioctx.Client)
@@ -1220,6 +1223,8 @@ type putnamiContext struct {
 	Project struct {
 		Name string `json:"name"`
 	} `json:"project"`
+	// Version is the version the session resolved for the job's project.
+	Version *job.Version `json:"version"`
 }
 
 func loadContext(argv []string, env map[string]string) (putnamiContext, error) {
