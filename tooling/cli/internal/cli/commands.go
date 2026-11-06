@@ -2,8 +2,6 @@ package cli
 
 import (
 	"context"
-	"encoding/json"
-	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -19,8 +17,12 @@ import (
 
 // runStructuredCommand dispatches a structured command (e.g. "extensions
 // install", "projects list") by looking it up in the command registry and
-// invoking its handler with a uniform CommandEnv. The handler returns an
-// error, which exitCodeForError maps to the process exit code via the cmderr
+// invoking its handler with a uniform CommandEnv. The handler writes its own
+// success output in the selected output mode: under --output=json|jsonl one
+// version-2 result envelope (shared.WriteResult), or, for `report`, the
+// contract document it forwards. A handler that fails writes nothing to stdout:
+// this function writes the failure (writeStructuredFailure), and
+// exitCodeForError maps the error to the process exit code via the cmderr
 // sentinel taxonomy.
 func (a *App) runStructuredCommand(ctx context.Context, parsed *ParsedArgs, cfg *wsproto.Config, wsRoot string) int {
 	cmd := parsed.Commands[0]
@@ -32,18 +34,6 @@ func (a *App) runStructuredCommand(ctx context.Context, parsed *ParsedArgs, cfg 
 	}
 
 	c, _ := lookupCommand(cmd)
-
-	// Structured commands emit a single result object, so --output=json and
-	// --output=jsonl are equivalent for them (only streaming job commands
-	// distinguish the two). Route both through the handlers' existing "jsonl"
-	// branch so no per-handler change is needed. A raw-output command is the
-	// exception a second time: its stdout is the recorded document itself, and
-	// the two modes differ there in FRAMING — pretty bytes under json, one
-	// compact line under jsonl — so it must see the mode that was asked.
-	if protocolcli.OutputMode(outputFormat).IsStructured() && !c.rawMachineOutput {
-		outputFormat = string(protocolcli.OutputJSONL)
-	}
-
 	env := &CommandEnv{
 		App:          a,
 		Ctx:          ctx,
@@ -54,122 +44,11 @@ func (a *App) runStructuredCommand(ctx context.Context, parsed *ParsedArgs, cfg 
 		OutputFormat: outputFormat,
 		Global:       parsed.Global,
 	}
-
-	if !protocolcli.OutputMode(parsed.Global.Output).IsStructured() {
-		if err := c.run(env); err != nil {
-			cmdPath := cmd
-			if sub != "" {
-				cmdPath = cmd + " " + sub
-			}
-			return writeStructuredFailure(os.Stdout, os.Stderr, protocolcli.OutputMode(parsed.Global.Output), cmdPath, err, env.envelopeWarnings())
-		}
-		return ExitSuccess
+	if err := c.run(env); err != nil {
+		return writeStructuredFailure(os.Stdout, os.Stderr, protocolcli.OutputMode(outputFormat),
+			commandmeta.CanonicalPath(cmd, sub), err, env.envelopeWarnings())
 	}
-
-	// A raw-output command writes its own contract document (registerRawCommand),
-	// so its stdout is forwarded untouched instead of being captured and wrapped:
-	// wrapping a document a consumer binds to directly would make every consumer
-	// unwrap it first. Its FAILURES still take the shared envelope below.
-	if c.rawMachineOutput {
-		if err := c.run(env); err != nil {
-			return writeStructuredFailure(os.Stdout, os.Stderr, protocolcli.OutputMode(parsed.Global.Output),
-				commandmeta.CanonicalPath(cmd, sub), err, env.envelopeWarnings())
-		}
-		return ExitSuccess
-	}
-
-	// Several long-lived commands still produce their data through JSONL
-	// helpers. Collect those documents here, where every structured command
-	// already passes, then put the original payload under one ResultV2.data.
-	// Commands that already produce a v2 envelope are passed through unchanged
-	// so this migration does not create a nested envelope.
-	captured, err := iox.CaptureStdout(func() error { return c.run(env) })
-	cmdPath := cmd
-	if sub != "" {
-		cmdPath = cmd + " " + sub
-	}
-	if err != nil {
-		return writeStructuredFailure(os.Stdout, os.Stderr, protocolcli.OutputMode(parsed.Global.Output), cmdPath, err, env.envelopeWarnings())
-	}
-	if envelope, ok := capturedResultEnvelope(captured); ok {
-		// A command that runs jobs inside its own result, such as impact-plan,
-		// cache verify and qualify, hands the warnings of its engine run to the
-		// command's report: its envelope carries them unless it names its own.
-		if len(envelope.WorkspaceWarnings) == 0 {
-			envelope.WorkspaceWarnings = env.envelopeWarnings()
-		}
-		code, _ := protocolcli.WriteResultV2(os.Stdout, protocolcli.OutputMode(parsed.Global.Output), envelope)
-		return code
-	}
-	data, err := structuredPayload(captured)
-	if err != nil {
-		return writeStructuredFailure(os.Stdout, os.Stderr, protocolcli.OutputMode(parsed.Global.Output), cmdPath, err, env.envelopeWarnings())
-	}
-	result := protocolcli.NewResultV2(cmdPath, data, nil)
-	result.WorkspaceWarnings = env.envelopeWarnings()
-	code, writeErr := protocolcli.WriteResultV2(os.Stdout, protocolcli.OutputMode(parsed.Global.Output), result)
-	if writeErr != nil {
-		return code
-	}
-	return code
-}
-
-// capturedResultEnvelope reports whether captured is one complete v2 result
-// envelope emitted by a command that had already adopted the shared writer.
-// It deliberately requires the complete discriminating set: a payload may
-// happen to contain protocolVersion but must remain payload data unless it is
-// actually an envelope.
-func capturedResultEnvelope(captured string) (protocolcli.ResultV2, bool) {
-	var result protocolcli.ResultV2
-	decoder := json.NewDecoder(strings.NewReader(captured))
-	if err := decoder.Decode(&result); err != nil {
-		return protocolcli.ResultV2{}, false
-	}
-	if err := ensureJSONEOF(decoder); err != nil ||
-		result.ProtocolVersion != protocolcli.ResultProtocolVersion ||
-		result.Command == "" || result.Status == "" {
-		return protocolcli.ResultV2{}, false
-	}
-	return result, true
-}
-
-// structuredPayload decodes the legacy JSONL success output of a structured
-// command. One document retains its former object shape; multiple records are
-// preserved, in order, as an array. An empty former stream becomes data: [] so
-// list commands can distinguish it from commands with no payload.
-func structuredPayload(captured string) (any, error) {
-	decoder := json.NewDecoder(strings.NewReader(captured))
-	var documents []any
-	for {
-		var document any
-		err := decoder.Decode(&document)
-		if err == io.EOF {
-			break
-		}
-		if err != nil {
-			return nil, fmt.Errorf("structured command emitted invalid JSON: %w", err)
-		}
-		documents = append(documents, document)
-	}
-	if len(documents) == 1 {
-		return documents[0], nil
-	}
-	if documents == nil {
-		// A nil slice marshals to null, not the [] this function promises.
-		return []any{}, nil
-	}
-	return documents, nil
-}
-
-func ensureJSONEOF(decoder *json.Decoder) error {
-	var extra any
-	if err := decoder.Decode(&extra); err != io.EOF {
-		if err == nil {
-			return fmt.Errorf("multiple JSON documents")
-		}
-		return err
-	}
-	return nil
+	return ExitSuccess
 }
 
 // writeStructuredFailure renders a structured command's failure and returns the
@@ -218,11 +97,10 @@ func printCommandError(w io.Writer, err error) {
 }
 
 // regenerateAIContext refreshes the shared AI context after an extensions
-// install/update. When the command is streaming JSONL on stdout it uses the
-// quiet form so the human-readable context summary does not corrupt the
-// machine-readable stream.
+// install/update. Under a structured output mode it uses the quiet form so the
+// human-readable context summary does not corrupt the result on stdout.
 func regenerateAIContext(wsRoot string, cfg *wsproto.Config, outputFormat string) error {
-	if outputFormat == "jsonl" {
+	if protocolcli.OutputMode(outputFormat).IsStructured() {
 		return agentctx.ContextGenerateQuiet(wsRoot, cfg)
 	}
 	return agentctx.ContextGenerate(wsRoot, cfg, nil)

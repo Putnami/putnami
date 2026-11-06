@@ -100,7 +100,7 @@ func (a api) do(ctx context.Context, method, path string, query url.Values, body
 		req.Header.Set("Content-Type", "application/json")
 	}
 	a.auth(req)
-	resp, err := a.client.Do(req) //nolint:gosec // G704: the base is the code host API the CI names, https only (apiBase), and redirects are not followed
+	resp, err := a.client.Do(req)
 	if err != nil {
 		return fmt.Errorf("%s %s: %w", method, a.base.Host, unwrapURLError(err))
 	}

@@ -231,7 +231,7 @@ func runEntrypoint(
 	}
 
 	if usage, ok := lifecycleHelp(args); ok {
-		fmt.Fprintln(os.Stderr, usage) //nolint:gosec // G705: usage is a constant of this binary, written to a terminal
+		fmt.Fprintln(os.Stderr, usage)
 		return nil
 	}
 

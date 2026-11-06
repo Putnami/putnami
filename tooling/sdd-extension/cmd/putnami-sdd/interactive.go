@@ -296,24 +296,17 @@ func (run *interactiveRun) emit(sub subcommand, result outcome) int {
 	return resultv2.Emit(run.stdout, run.stderr, run.mode, sub.group, sub.name, data, result.err)
 }
 
-// capturedPayload reproduces the round trip a SUCCESSFUL built-in structured
-// command's payload takes, and it exists for one reason: JSON key order.
+// capturedPayload gives a SUCCESSFUL payload the bytes of the recorded built-in
+// answers (testdata/sdd-parity in tooling/cli), and it exists for one reason:
+// JSON key order. Those answers carry every `data` object with its keys in
+// ALPHABETICAL order, while a Go struct encodes in field-declaration order, so
+// the payload is decoded into map[string]any and re-encoded: Go sorts map keys.
+// Emitting the struct directly would be byte-different from every command this
+// extension replaces, in a way no consumer asked for.
 //
-// App.runStructuredCommand does not hand the handler's report to the encoder.
-// It CAPTURES the handler's stdout, decodes it with capturedResultEnvelope into
-// a protocolcli.ResultV2 whose Data is `any` — so every object becomes a
-// map[string]any — and re-encodes that (commands.go:96-97). Go sorts map keys,
-// so a built-in command's `data` object comes out ALPHABETICAL while a Go
-// struct encodes in field-declaration order. Emitting the struct directly is
-// therefore byte-different from every command this extension replaces, in a way
-// no consumer asked for.
-//
-// A FAILURE takes the other path and must not be round-tripped:
-// writeStructuredFailure passes protocolcli.ResultData(err) — the attached value
-// itself — straight to NewResultV2 (commands.go:186), so a failure payload keeps
-// struct order. That asymmetry is core's, not a choice made here, and
-// sdd_extraction_parity_test.go in tooling/cli pins both halves against the
-// live built-in.
+// A FAILURE must not be round-tripped: the recorded failure payloads keep
+// struct order. sdd_extraction_parity_test.go in tooling/cli pins both halves
+// against the recorded answers.
 //
 // A payload that cannot round-trip is returned unchanged rather than dropped: an
 // encoding failure here would turn a correct answer into no answer.

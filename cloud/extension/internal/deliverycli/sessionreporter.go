@@ -273,7 +273,7 @@ func serveReportingFrames(ctx context.Context, in io.Reader, out, logw io.Writer
 				if !result.OK {
 					// The code only: the line may hold the run credential. op and
 					// the code are protocol constants (handshakeOp, answer).
-					fmt.Fprintf(logw, "%s %s: refused %s: %s\n", reporterBinary, command, op, result.Code) //nolint:gosec // G705: logw is the reporter's stderr, never an HTTP response, and every value is a constant
+					fmt.Fprintf(logw, "%s %s: refused %s: %s\n", reporterBinary, command, op, result.Code)
 				}
 				if err := writeReportingLine(w, result); err != nil {
 					return err
@@ -533,7 +533,7 @@ func (s *sessionReporterSender) send(ctx context.Context, dest sessionDestinatio
 	req.Header.Set(sessionFinalHeader, strconv.FormatBool(chunk.Final))
 	req.ContentLength = int64(len(payload))
 
-	resp, err := s.client.Do(req) //nolint:gosec // G704: the destination is the launcher-exported ingest base or the linked workspace's control plane, never frame content
+	resp, err := s.client.Do(req)
 	if err != nil {
 		// Transport failures (dial, reset, deadline) are the class worth another
 		// bounded attempt; the receiver may never have seen the bytes.

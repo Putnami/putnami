@@ -6,7 +6,9 @@ import (
 	"path/filepath"
 	"strings"
 
+	protocolcli "go.putnami.dev/protocol/cli"
 	"go.putnami.dev/tooling/cli/internal/cmderr"
+	"go.putnami.dev/tooling/cli/internal/commands/shared"
 	"go.putnami.dev/tooling/cli/internal/iox"
 	"go.putnami.dev/tooling/cli/internal/workspace_state"
 )
@@ -43,8 +45,8 @@ func SessionsInspect(wsRoot string, args []string, outputFormat string) error {
 
 	events, _ := readSessionEvents(store, sessionID)
 
-	if outputFormat == "jsonl" {
-		return sessionInspectJSONL(meta, plan, events)
+	if protocolcli.OutputMode(outputFormat).IsStructured() {
+		return shared.WriteResult(outputFormat, "sessions inspect", sessionInspectData(meta, plan, events), nil)
 	}
 
 	iox.Fprintln(os.Stdout)

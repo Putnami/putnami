@@ -76,9 +76,9 @@ func TestEnsureNativeCredential_MissingCLIIsADebugSkip(t *testing.T) {
 	}
 }
 
-// A real core-only putnami never says "Unknown command": it runs `cloud` as a
-// task pipeline, reads `registry-token` as a project, and exits 2 with an
-// undeclared-flag notice first. Classified on that first line alone, every
+// A real core-only putnami never says "Unknown command": it reads `cloud` as a
+// task pipeline and exits 2 naming the undeclared flag first; a 0.4.0 CLI, the
+// one recorded, then reads `registry-token` as a project. Classified on that first line alone, every
 // core-only install warned that the cloud "cannot write the credential yet".
 func TestEnsureNativeCredential_RecordedCoreOnlyCLIIsADebugSkip(t *testing.T) {
 	recordedCloudCLI(t, recordedExchange(t, "core-only-cli-materialize"))
@@ -90,11 +90,11 @@ func TestEnsureNativeCredential_RecordedCoreOnlyCLIIsADebugSkip(t *testing.T) {
 	}
 }
 
-// A cloud that names the subcommand in its flag notice is a cloud, and a flag
-// it does not declare is still a usage error worth a warning.
+// A cloud that names the subcommand in its flag message is a cloud, and a flag
+// it does not declare is a usage error worth a warning.
 func TestEnsureNativeCredential_SubcommandFlagNoticeIsNotACoreOnlyCLI(t *testing.T) {
 	fakeMaterializeCLI(t, fakeCLI{
-		Stderr: "putnami: flag --materialize is not declared by `cloud registry-token`; passing undeclared flags is deprecated\n",
+		Stderr: "putnami: flag --materialize is not declared by `cloud registry-token`\n",
 		Exit:   2,
 	})
 	outcome := EnsureNativeCredential(context.Background(), "", "npm.putnami.dev")

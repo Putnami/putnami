@@ -1,5 +1,5 @@
 // Package runtime provides typed models, JSONL parsing, and emitter helpers
-// for the Putnami runtime event protocol (v1).
+// for the Putnami runtime event protocol.
 //
 // Every job subprocess emits structured JSONL events on stdout. Each line
 // is a self-contained JSON object conforming to the event schema.
@@ -7,8 +7,15 @@ package runtime
 
 import "encoding/json"
 
-// ProtocolVersion is the current protocol version.
-const ProtocolVersion = 1
+// ProtocolVersion is the runtime event protocol version every emitter of this
+// package writes and the CLI accepts: version 2, version 1's vocabulary plus the
+// typed ready event (event_v2.go).
+const ProtocolVersion = 2
+
+// ProtocolVersion1 is version 1 of the vocabulary: every event type except
+// ready. This package still parses and validates a version 1 stream, and the
+// fixture corpus and the TypeScript runtime hold it, but no emitter writes one.
+const ProtocolVersion1 = 1
 
 // EventType enumerates the discriminator values for runtime events.
 type EventType string

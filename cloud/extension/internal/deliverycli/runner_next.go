@@ -91,7 +91,7 @@ func RunnerNext(args []string, input io.Reader, output io.Writer) int {
 	if len(*response.Env) > runnerNextMaxEnv || strings.ContainsAny(*response.Env, "\x00\r") {
 		return runnerNextFailure
 	}
-	if _, err := io.WriteString(output, *response.Env); err != nil { //nolint:gosec // G705: host-only Docker env-file stdout, never HTML; escaping would change credential bytes
+	if _, err := io.WriteString(output, *response.Env); err != nil {
 		return runnerNextFailure
 	}
 	return 0

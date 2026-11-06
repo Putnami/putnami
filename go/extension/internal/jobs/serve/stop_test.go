@@ -60,7 +60,7 @@ func startStopHelper(t *testing.T, role string) (*watchedServer, int) {
 	t.Helper()
 	pidFile := filepath.Join(t.TempDir(), "program.pid")
 	env := append(os.Environ(), stopHelperEnv+"="+role, stopHelperPIDEnv+"="+pidFile)
-	emit := jsonl.NewForVersion(runtimeproto.ProtocolVersion2)
+	emit := jsonl.NewForVersion(runtimeproto.ProtocolVersion)
 	server, err := startWatchedServer([]string{os.Args[0], "-test.run=^TestStopHelperProcess$"}, t.TempDir(), env, emit)
 	if err != nil {
 		t.Fatalf("start the served program: %v", err)

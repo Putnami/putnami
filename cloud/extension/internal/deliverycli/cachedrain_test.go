@@ -69,12 +69,12 @@ func uploadLine(t *testing.T, id int, key string, files ...cache.FileEntry) stri
 	if err != nil {
 		t.Fatal(err)
 	}
-	return `{"protocolVersion":1,"id":` + strconv.Itoa(id) + `,"op":"upload","payload":{"key":"` + key +
+	return `{"protocolVersion":2,"id":` + strconv.Itoa(id) + `,"op":"upload","payload":{"key":"` + key +
 		`","result":{"status":"success"},"manifest":` + string(manifest) + `}}`
 }
 
 func initializeLineFor(exchangeDir string) string {
-	return `{"protocolVersion":1,"id":1,"op":"initialize","payload":{"protocolVersion":1,"blobExchangeDir":` + strconv.Quote(exchangeDir) + `}}`
+	return `{"protocolVersion":2,"id":1,"op":"initialize","payload":{"protocolVersion":2,"blobExchangeDir":` + strconv.Quote(exchangeDir) + `}}`
 }
 
 // uploadSessionEnv points the next provider session at f, as a writing run.
@@ -274,7 +274,7 @@ func TestShutdownIsAcknowledgedWhenAnUploadStalls(t *testing.T) {
 	reqs := []string{
 		initializeLineFor(exchangeDir),
 		uploadLine(t, 2, uploadKey(0), stalled),
-		`{"protocolVersion":1,"id":3,"op":"shutdown"}`,
+		`{"protocolVersion":2,"id":3,"op":"shutdown"}`,
 	}
 
 	var out bytes.Buffer
@@ -351,7 +351,7 @@ func TestABrokenResponsePipeStoresTheQueuedUploads(t *testing.T) {
 	reqs := []string{
 		initializeLineFor(exchangeDir),
 		uploadLine(t, 2, uploadKey(0), stageBlob(t, exchangeDir, "output")),
-		`{"protocolVersion":1,"id":3,"op":"summary","payload":{}}`,
+		`{"protocolVersion":2,"id":3,"op":"summary","payload":{}}`,
 	}
 
 	var logw lockedWriter
@@ -415,7 +415,7 @@ func TestAClosedStdinDoesNotWaitForAPrefetch(t *testing.T) {
 	t.Setenv("PUTNAMI_CACHE_TOKEN", "ci-token")
 	reqs := []string{
 		initializeLineFor(t.TempDir()),
-		`{"protocolVersion":1,"id":2,"op":"prefetch","payload":{"keys":["` + uploadKey(0) + `"]}}`,
+		`{"protocolVersion":2,"id":2,"op":"prefetch","payload":{"keys":["` + uploadKey(0) + `"]}}`,
 	}
 
 	var out bytes.Buffer

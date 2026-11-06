@@ -48,7 +48,7 @@ func TestLease_OneWinnerPublishesForWaiter(t *testing.T) {
 	waited := make(chan error, 1)
 	go func() { waited <- waiterStore.WaitForPublish(leaseTestKey, 2*time.Second) }()
 
-	if err := winnerStore.Put(leaseTestKey, leaseStatusEntry()); err != nil {
+	if err := putFormatOneEntry(winnerStore, leaseTestKey, leaseStatusEntry()); err != nil {
 		t.Fatalf("publish: %v", err)
 	}
 	release()
@@ -214,7 +214,7 @@ func TestLease_GCPreservesLiveAndReapsExpiredSidecar(t *testing.T) {
 	}
 
 	entryKey := "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
-	if err := s.Put(entryKey, leaseStatusEntry()); err != nil {
+	if err := putFormatOneEntry(s, entryKey, leaseStatusEntry()); err != nil {
 		t.Fatalf("seed entry: %v", err)
 	}
 	expectedBytes := blobMetaBytes(s.blobDir(entryKey)) + dirBytes(filepath.Join(root, "cas"))

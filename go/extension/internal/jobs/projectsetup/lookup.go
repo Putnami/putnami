@@ -242,7 +242,7 @@ func (l *lookup) get(rawURL string) ([]byte, int, error) {
 	if login, password, ok := l.credential(l.settings.Auth, req.URL); ok {
 		req.SetBasicAuth(login, password)
 	}
-	resp, err := l.client.Do(req) //nolint:gosec // G704: a proxy GOPROXY names, or the origin of the module path, as the go command reads them
+	resp, err := l.client.Do(req)
 	if err != nil {
 		// A *url.Error quotes the URL; its cause does not.
 		var urlErr *url.Error

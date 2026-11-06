@@ -38,7 +38,7 @@ func putFilled(t *testing.T, s *LocalStore, hash string, size int, fill byte) {
 	if err := os.WriteFile(filepath.Join(src, "f.bin"), bytes.Repeat([]byte{fill}, size), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if err := s.Put(hash, entryWith(src)); err != nil {
+	if err := putFormatOneEntry(s, hash, entryWith(src)); err != nil {
 		t.Fatalf("Put %s: %v", hash, err)
 	}
 }

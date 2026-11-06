@@ -19,7 +19,7 @@ import (
 // mutex. Layout:
 //
 //	<root>/
-//	  blobs/{hash[0:2]}/{hash}/   action-cache entries
+//	  blobs/{hash[0:2]}/{hash}/   action-cache entries (task-owned, and format-1 ones a 0.3.0 CLI wrote)
 //	    meta.json
 //	    result.json
 //	    manifest.json             per-file CAS digests (entries with outputs)
@@ -69,12 +69,15 @@ func (s *LocalStore) Root() string {
 	return s.root
 }
 
-// Get retrieves a LEGACY cache entry by hash. Returns nil, nil if not found.
+// Get reads the format-1 entry stored under hash, or returns nil, nil if there
+// is none. A format-1 entry captures an output directory whole under the raw
+// cache key; a 0.3.0 CLI wrote it. This CLI writes only task-owned entries
+// (task_entry.go) and keeps reading format-1 entries until the release after
+// 0.4.0.
 //
-// A blob carrying an entry descriptor belongs to the task-owned model
-// (task_entry.go) and reads as a MISS here: its files/ tree is laid out by
-// declared-output id, so interpreting it as a legacy capture would restore a
-// wrongly shaped tree. The two models also occupy disjoint addresses, so this
+// A blob carrying an entry descriptor belongs to the task-owned model and
+// reads as a MISS here: its files/ tree is laid out by declared-output id, so
+// reading it as a whole-directory capture would restore a wrongly shaped tree. The two models also occupy disjoint addresses, so this
 // guard is defense in depth rather than the primary separation — it holds even
 // if a task-owned address is reached by another route.
 func (s *LocalStore) Get(hash string) (*Entry, error) {
@@ -130,108 +133,6 @@ func (s *LocalStore) Get(hash string) (*Entry, error) {
 	}
 
 	return entry, nil
-}
-
-// Put stores a cache entry under the given hash. Uses atomic rename for
-// crash safety: writes to tmp/ first, then renames to blobs/.
-//
-// Cross-process safe: the whole CAS ingest + publish runs under the store's
-// shared lock so a concurrent GC (exclusive) never sweeps a blob mid-ingest,
-// and the publish is first-writer-wins — if a sibling worktree already
-// published this (content-addressed, hence byte-identical) entry, theirs is
-// kept rather than clobbered. The in-process mutex still serializes goroutines
-// within this process.
-func (s *LocalStore) Put(hash string, entry *Entry) error {
-	s.ensureGeneration() // count this build before taking the store lock
-
-	// Shared lock for the whole ingest+publish: coexists with sibling
-	// publishers, excludes GC.
-	releaseLock := s.lockShared()
-	defer releaseLock()
-
-	// Create staging directory (lock-free — each tmp dir is unique)
-	tmpDir, err := s.createTmpDir()
-	if err != nil {
-		return fmt.Errorf("create tmp dir: %w", err)
-	}
-	defer os.RemoveAll(tmpDir) // cleanup on error
-
-	// Write meta.json
-	if entry.Metadata == nil {
-		entry.Metadata = &EntryMetadata{Hash: hash, CreatedAt: time.Now()}
-	}
-	entry.Metadata.Hash = hash
-
-	metaJSON, err := json.MarshalIndent(entry.Metadata, "", "  ")
-	if err != nil {
-		return fmt.Errorf("marshal metadata: %w", err)
-	}
-	if err := os.WriteFile(filepath.Join(tmpDir, "meta.json"), metaJSON, 0o644); err != nil {
-		return fmt.Errorf("write meta.json: %w", err)
-	}
-
-	// Write result.json
-	if entry.Result != nil {
-		resultJSON, err := json.MarshalIndent(entry.Result, "", "  ")
-		if err != nil {
-			return fmt.Errorf("marshal result: %w", err)
-		}
-		if err := os.WriteFile(filepath.Join(tmpDir, "result.json"), resultJSON, 0o644); err != nil {
-			return fmt.Errorf("write result.json: %w", err)
-		}
-	}
-
-	// Ingest output files into the CAS and stage a files/ tree of hardlinks
-	// plus a manifest of per-file digests. Throwaway intermediates (e.g. lcov
-	// coverage temp shards) are filtered out so they never enter the cache.
-	if entry.FilesDir != "" {
-		destFiles := filepath.Join(tmpDir, "files")
-		manifest, totalSize, err := s.ingestFiles(entry.FilesDir, destFiles)
-		if err != nil {
-			return fmt.Errorf("ingest files: %w", err)
-		}
-
-		// Write the manifest alongside the result.
-		manifestJSON, err := json.MarshalIndent(manifest, "", "  ")
-		if err != nil {
-			return fmt.Errorf("marshal manifest: %w", err)
-		}
-		if err := os.WriteFile(filepath.Join(tmpDir, manifestFilename), manifestJSON, 0o644); err != nil {
-			return fmt.Errorf("write manifest: %w", err)
-		}
-
-		outputFiles := make([]string, 0, len(manifest.Files))
-		for _, f := range manifest.Files {
-			outputFiles = append(outputFiles, f.Path)
-		}
-		entry.Metadata.Size = totalSize
-		entry.Metadata.OutputFiles = outputFiles
-
-		// Re-write meta.json with updated size/files (best-effort — metadata is advisory)
-		if updated, err := json.MarshalIndent(entry.Metadata, "", "  "); err == nil {
-			os.WriteFile(filepath.Join(tmpDir, "meta.json"), updated, 0o644)
-		}
-	}
-
-	// In-process lock for the atomic publish (the cross-process shared lock is
-	// already held for the whole call).
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	// Atomic move: tmp → blobs/{hash[0:2]}/{hash}/
-	blobDir := s.blobDir(hash)
-	blobParent := filepath.Dir(blobDir)
-	if err := os.MkdirAll(blobParent, 0o755); err != nil {
-		return fmt.Errorf("create blob parent: %w", err)
-	}
-
-	if err := s.publishEntry(tmpDir, blobDir); err != nil {
-		return err
-	}
-	// Stamp recency + this build's generation so a freshly-built entry has an
-	// idle-reclaim baseline even if it is never hit again.
-	writeLastUsed(blobDir, time.Now(), s.gen)
-	return nil
 }
 
 // publishEntry commits a staged entry directory to blobDir with first-writer-

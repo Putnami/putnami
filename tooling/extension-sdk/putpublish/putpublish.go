@@ -376,7 +376,7 @@ func send(ctx context.Context, client *http.Client, method, target, contentType,
 	if token != "" {
 		req.Header.Set("Authorization", "Bearer "+token)
 	}
-	resp, err := client.Do(req) //nolint:gosec // G704: target starts with a registry URL that ValidateRegistryURL accepted in the exported call that sends it
+	resp, err := client.Do(req)
 	if err != nil {
 		return reply{}, exchange.Failed(err, transportError(err))
 	}

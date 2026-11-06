@@ -7,7 +7,7 @@
   ],
   "nonGoals": [
     "Changing how the provider reads .putnami/cache.json, the PUTNAMI_CACHE_* variables or the default of a linked workspace",
-    "A new protocol version. provider-configuration is a capability of the v1 bootstrap"
+    "A new protocol version. provider-configuration is a capability of the initialize payload"
   ],
   "requirements": [
     {

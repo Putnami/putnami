@@ -74,9 +74,9 @@ type providerSession struct {
 	readOnly    bool
 	workspace   string
 	branch      string
-	// providerProtocolVersion is selected during the v1 initialize bootstrap.
-	// v2 enables cache-entry provenance for the rest of the session; v1 keeps
-	// old cores and strict channel-less providers byte-compatible.
+	// providerProtocolVersion is the provider RPC version initialize selects,
+	// cache.ProviderProtocolVersion. Every accepted version carries
+	// cache-entry provenance.
 	providerProtocolVersion int
 	known                   map[string]bool     // digests core already has in its CAS — never re-staged
 	client                  *remotecache.Client // nil when the cache is not configured (local-only)
@@ -288,7 +288,7 @@ func (s *providerSession) close() {
 // log writes one diagnostic line to stderr. The protocol owns stdout, so all
 // logging is funneled here.
 func (s *providerSession) log(msg string) {
-	fmt.Fprintln(s.logw, "cache-provider: "+msg) //nolint:gosec // G705: logw is the provider's stderr, never an HTTP response — no XSS sink
+	fmt.Fprintln(s.logw, "cache-provider: "+msg)
 }
 
 // logCacheError keeps ordinary cache failures scoped to their operation, but a
@@ -643,13 +643,7 @@ func (s *providerSession) initialize(req *cache.ProviderRequest, p *cache.Initia
 	if cfg.Active() {
 		s.log(sessionModeLine(mode, p.Mode, cfg.Mode, s.hosted))
 	}
-	s.providerProtocolVersion = cache.ProviderProtocolMinVersion
-	for _, capability := range p.Capabilities {
-		if capability == cache.CapabilityProviderProtocolV2 {
-			s.providerProtocolVersion = cache.ProviderProtocolVersion
-			break
-		}
-	}
+	s.providerProtocolVersion = cache.ProviderProtocolVersion
 
 	if cfg.Active() {
 		s.client = remotecache.NewClient(cfg.URL, "",

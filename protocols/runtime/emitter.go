@@ -2,18 +2,9 @@ package runtime
 
 import (
 	"encoding/json"
-	"errors"
 	"io"
 	"time"
 )
-
-// ErrReadyUnsupportedVersion is returned by Ready on a v1 stream. It is an
-// error rather than a silent downgrade because both alternatives are wire
-// violations: a `ready` line stamped v1 is an unknown type, and a v2 line in a
-// v1 stream is mixed-protocol-version. A caller that cannot emit readiness must
-// learn so, not ship an unparsable stream.
-var ErrReadyUnsupportedVersion = errors.New(
-	"runtime: ready events require protocol version 2; this stream speaks version 1")
 
 // Emitter writes structured JSONL events to a writer.
 //
@@ -26,20 +17,17 @@ type Emitter struct {
 	version int
 }
 
-// NewEmitter creates an Emitter that writes v1 events to w. v1 is the default
-// everywhere so a consumer that never advertised acceptance of a newer
-// vocabulary receives the byte-identical stream it has always parsed.
+// NewEmitter creates an Emitter that writes ProtocolVersion events to w.
 func NewEmitter(w io.Writer) *Emitter {
 	return &Emitter{w: w, version: ProtocolVersion}
 }
 
 // NewEmitterForVersion creates an Emitter whose stream speaks the given
 // protocol version. version is normally the result of NegotiatedVersion, which
-// only ever yields a known version; a version this package does not know falls
-// back to ProtocolVersion, the fail-closed direction (never emit a vocabulary
-// the consumer did not ask for).
+// only ever yields a version an emitter writes; any other version, version 1
+// included, falls back to ProtocolVersion.
 func NewEmitterForVersion(w io.Writer, version int) *Emitter {
-	if !IsKnownProtocolVersion(version) {
+	if version < ProtocolVersion || version > MaxKnownProtocolVersion {
 		version = ProtocolVersion
 	}
 	return &Emitter{w: w, version: version}
@@ -47,9 +35,6 @@ func NewEmitterForVersion(w io.Writer, version int) *Emitter {
 
 // Version reports the protocol version this emitter stamps on every event.
 func (e *Emitter) Version() int { return e.version }
-
-// SupportsReady reports whether this emitter's stream admits the `ready` event.
-func (e *Emitter) SupportsReady() bool { return e.version >= ProtocolVersion2 }
 
 // emit writes a single event as a JSON line.
 func (e *Emitter) emit(evt *Event) error {
@@ -221,10 +206,7 @@ func (e *Emitter) SummaryData(message string, extra map[string]any) error {
 	}, extra)
 }
 
-// Ready emits the typed readiness event. It requires a v2 stream and returns
-// ErrReadyUnsupportedVersion on a v1 one — readiness is the whole reason v2
-// exists, so an emitter that was not negotiated up to it has nothing valid to
-// write. Callers that must tolerate a v1 consumer check SupportsReady first.
+// Ready emits the typed readiness event.
 //
 // The endpoint list is copied and sorted into canonical order before it goes on
 // the wire, so a workload that binds its listeners in a race-dependent order
@@ -232,9 +214,6 @@ func (e *Emitter) SummaryData(message string, extra map[string]any) error {
 // contract and renderers format it — readiness must never be read back out of
 // human text, which is the substring probe this event replaces.
 func (e *Emitter) Ready(data ReadyData) error {
-	if !e.SupportsReady() {
-		return ErrReadyUnsupportedVersion
-	}
 	payload, err := json.Marshal(ReadyMarker(data))
 	if err != nil {
 		return err

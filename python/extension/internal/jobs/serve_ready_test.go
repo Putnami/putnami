@@ -81,7 +81,7 @@ func countReadyEvents(t *testing.T, out string) int {
 // loop in Serve: a source change stops the process and calls spawnServer again
 // with the SAME emitter, so readiness must be announced once per iteration.
 func TestSpawnServer_ReemitsReadinessAcrossRestarts(t *testing.T) {
-	emit := jsonl.NewForVersion(runtimeproto.ProtocolVersion2)
+	emit := jsonl.NewForVersion(runtimeproto.ProtocolVersion)
 	args, env := readyHelper()
 	dir := t.TempDir()
 
@@ -100,11 +100,11 @@ func TestSpawnServer_ReemitsReadinessAcrossRestarts(t *testing.T) {
 	}
 }
 
-// TestSpawnServer_NoReadinessLeakAtV1 is the no-leak guard: a CLI that never
-// advertised v2 acceptance sees the stream it always did, with the marker
+// TestSpawnServer_AStreamAskedForV1SpeaksV2 pins the serve path's version: an
+// emitter asked for version 1 still announces readiness, and the marker is
 // consumed rather than echoed into the log context.
-func TestSpawnServer_NoReadinessLeakAtV1(t *testing.T) {
-	emit := jsonl.NewForVersion(runtimeproto.ProtocolVersion)
+func TestSpawnServer_AStreamAskedForV1SpeaksV2(t *testing.T) {
+	emit := jsonl.NewForVersion(runtimeproto.ProtocolVersion1)
 	args, env := readyHelper()
 
 	out := captureServeStdout(t, func() {
@@ -115,8 +115,8 @@ func TestSpawnServer_NoReadinessLeakAtV1(t *testing.T) {
 		proc.wait()
 	})
 
-	if got := countReadyEvents(t, out); got != 0 {
-		t.Fatalf("a v1 stream carried %d ready events, want 0:\n%s", got, out)
+	if got := countReadyEvents(t, out); got != 1 {
+		t.Fatalf("one serve iteration emitted %d ready events, want 1:\n%s", got, out)
 	}
 	if strings.Contains(out, runtimeproto.ReadyLogKey) {
 		t.Errorf("the reserved marker leaked into the forwarded log context:\n%s", out)

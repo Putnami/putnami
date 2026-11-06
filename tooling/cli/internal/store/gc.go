@@ -269,8 +269,8 @@ func RunGC(roots []string, opts GCOptions) (*GCResult, error) {
 	}
 
 	// Idle pass — reclaim entries not hit in maxIdle builds, regardless of budget
-	// (still honoring the grace window). Entries with an unknown generation
-	// (gen < 0: legacy / never stamped) are excluded.
+	// (still honoring the grace window). An entry no build stamped with a
+	// generation (gen < 0) is excluded.
 	if maxIdle > 0 {
 		for _, e := range all {
 			// "not hit in the last maxIdle builds" → idle (currentGen - lastHitGen)

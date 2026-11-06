@@ -981,7 +981,7 @@ func TestInvocation_PruneIfPreservesImperativeSideEffects(t *testing.T) {
 			result := fixture.runWithParams(t, ctx, SchedulerConfig{MaxParallel: 2}, cache, params)
 
 			consumer := result.Results[fixture.consumer.Key()]
-			if consumer == nil || consumer.Status != "success" || !consumer.CacheHit {
+			if consumer == nil || consumer.Status != "success" || !consumer.ReuseKind().CacheHit() {
 				t.Fatalf("consumer result = %+v, want cached success", consumer)
 			}
 			producer := result.Results[fixture.producer.Key()]
@@ -1093,7 +1093,7 @@ func TestInvocation_PrunedRelationStillServesTheConsumersCachedResult(t *testing
 	if served == nil || served.Status != "success" {
 		t.Fatalf("consumer result = %+v, want the cached success it was pruned for", served)
 	}
-	if !served.CacheHit {
+	if !served.ReuseKind().CacheHit() {
 		t.Errorf("consumer result = %+v, want a cache hit; a pruned consumer must not be reported skipped", served)
 	}
 	// And its declared output is back on disk: a warm run that serves a verdict

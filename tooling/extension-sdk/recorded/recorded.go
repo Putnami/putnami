@@ -102,7 +102,7 @@ func (r Response) ServeHTTP(w http.ResponseWriter, _ *http.Request) {
 		}
 	}
 	w.WriteHeader(r.status)
-	_, _ = w.Write(r.body) //nolint:gosec // G705: replays a recorded response to a loopback test client
+	_, _ = w.Write(r.body)
 }
 
 // Server answers the first request with the first response, the second with

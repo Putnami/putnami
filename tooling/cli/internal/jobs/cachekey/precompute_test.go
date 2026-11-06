@@ -577,3 +577,53 @@ func packageTaskFixtureFor(project *workspace.Project, owner, version, path, tas
 		},
 	}
 }
+
+// writeFormatOneEntry writes the format-1 entry a 0.3.0 CLI left at hash in
+// the store rooted at storeRoot: meta.json and result.json under the raw
+// address, which LocalStore.Get reads.
+func writeFormatOneEntry(t *testing.T, storeRoot, hash string) {
+	t.Helper()
+	blob := filepath.Join(storeRoot, "blobs", hash[:2], hash)
+	if err := os.MkdirAll(blob, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	meta := `{"hash":"` + hash + `","createdAt":"2026-01-01T00:00:00Z","task":"build"}`
+	if err := os.WriteFile(filepath.Join(blob, "meta.json"), []byte(meta), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(blob, "result.json"), []byte(`{"status":"success"}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// CacheEntryPresent answers for the entry the scheduler would consume. The
+// scheduler reuses only task-owned entries, and only for a job whose task
+// declares its outputs, so a format-1 entry at the key reads as absent for a
+// declared job and for an undeclared one alike.
+func TestCacheEntryPresentNeverReportsAFormatOneEntry(t *testing.T) {
+	t.Parallel()
+	storeRoot := t.TempDir()
+	cm := store.NewCacheManager(store.NewLocalStore(storeRoot))
+	hash := strings.Repeat("ab", 32)
+	writeFormatOneEntry(t, storeRoot, hash)
+	if entry, err := cm.Lookup(hash); err != nil || entry == nil {
+		t.Fatalf("the format-1 fixture does not read back: %v, %v", entry, err)
+	}
+
+	declared := cacheableJob("build", "/proj", "proj", "proj")
+	undeclared := cacheableJob("build", "/proj", "proj", "proj")
+	undeclared.Extension.Tasks = map[string]extension.TaskDefinition{"cacheable": {}}
+	if jobmodel.CanUseCache(undeclared) {
+		t.Fatal("the undeclared fixture job can use the cache")
+	}
+
+	for name, job := range map[string]*jobmodel.ScheduledJob{"declared": declared, "undeclared": undeclared} {
+		present, err := CacheEntryPresent(cm, job, hash)
+		if err != nil {
+			t.Fatalf("%s: %v", name, err)
+		}
+		if present {
+			t.Errorf("%s job: a format-1 entry reads as present, but the scheduler never reuses it", name)
+		}
+	}
+}

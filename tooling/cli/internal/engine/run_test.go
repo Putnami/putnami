@@ -1072,9 +1072,9 @@ func TestRecordProfilerSessionEvent_Coalesced(t *testing.T) {
 	// typed value the scheduler hands the handler — not by a hand-written payload
 	// that could disagree with it.
 	task := scheduler.TaskResultOf(nil, &scheduler.JobResult{
-		Status:    "success",
-		Coalesced: true,
-		Duration:  125 * time.Millisecond,
+		Status:   "success",
+		Reuse:    scheduler.ReuseCoalesced,
+		Duration: 125 * time.Millisecond,
 	})
 	recordProfilerSessionEvent(p, scheduler.SessionRecord{
 		JobKey: "/proj:build",

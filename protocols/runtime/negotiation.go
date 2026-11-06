@@ -23,11 +23,10 @@ package runtime
 // precedent — PUTNAMI_INTERACTIVE (protocols/extension) and the
 // PUTNAMI_AGENT_* identity set (agent_identity.go).
 //
-// Absent, unparsable, or lower than a version this package knows all mean the
-// same thing: emit v1. That is the fail-closed direction — a 0.2.x CLI, a
-// directly invoked extension binary, and a corrupted value all receive the
-// byte-identical v1 stream they can parse, and a `ready` line can never leak
-// into a reader that would reject the whole stream for it.
+// Absent, unparsable, or lower than ProtocolVersion all mean the same thing:
+// emit ProtocolVersion, the lowest version an emitter writes. Every CLI release
+// accepts it, so a directly invoked extension binary and a corrupted value both
+// receive a stream the CLI parses.
 
 import (
 	"strconv"
@@ -51,18 +50,20 @@ const AcceptedVersionEnv = "PUTNAMI_RUNTIME_EVENTS"
 
 // MaxKnownProtocolVersion is the highest protocol version this package can emit
 // and validate. It is what a CLI built against this package advertises and the
-// ceiling a reader clamps a higher advertisement down to.
-const MaxKnownProtocolVersion = ProtocolVersion2
+// ceiling a reader clamps a higher advertisement down to. ProtocolVersion is the
+// floor, and today both are version 2.
+const MaxKnownProtocolVersion = ProtocolVersion
 
 // NegotiatedVersion resolves an advertised value into the protocol version an
 // emitter must stamp on every line of its stream.
 //
-// The resolution is total — every input maps to a version this package knows —
+// The resolution is total — every input maps to a version an emitter writes —
 // so an emitter never has to decide what to do with a bad advertisement:
 //
-//   - absent, blank, or unparsable → ProtocolVersion (v1), the version every
-//     consumer has always understood;
-//   - below ProtocolVersion → ProtocolVersion, for the same reason;
+//   - absent, blank, or unparsable → ProtocolVersion, the lowest version an
+//     emitter writes;
+//   - below ProtocolVersion → ProtocolVersion, version 1 included, because no
+//     emitter writes version 1;
 //   - above MaxKnownProtocolVersion → MaxKnownProtocolVersion, because an
 //     invoker that accepts a version newer than this build knows also accepts
 //     every version below it.
@@ -76,7 +77,7 @@ func NegotiatedVersion(raw string) int {
 
 // NegotiatedVersionFromEnv reads AcceptedVersionEnv through lookup (os.Getenv in
 // production, a map in tests) and resolves it with NegotiatedVersion. A nil
-// lookup yields v1, so a caller with no environment access is fail-closed too.
+// lookup yields ProtocolVersion, as an absent advertisement does.
 func NegotiatedVersionFromEnv(lookup func(string) string) int {
 	if lookup == nil {
 		return ProtocolVersion

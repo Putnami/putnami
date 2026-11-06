@@ -433,9 +433,7 @@ func TestResolveExternalDeps_UpstreamCaret(t *testing.T) {
 		},
 	}
 
-	if err := resolveExternalDeps(jobs, ws); err != nil {
-		t.Fatalf("resolveExternalDeps: %v", err)
-	}
+	resolveExternalDeps(jobs, ws)
 
 	// /app:build~generate should depend on /utils:build~generate
 	appGen := jobs[2]
@@ -685,9 +683,7 @@ func TestResolveExternalDeps_Star(t *testing.T) {
 		{Project: projects[0], JobDef: &extension.JobDefinition{Name: "deploy", DependsOn: []string{"*compile"}}},
 	}
 
-	if err := resolveExternalDeps(jobs, ws); err != nil {
-		t.Fatalf("resolveExternalDeps: %v", err)
-	}
+	resolveExternalDeps(jobs, ws)
 
 	// /A:deploy should depend on all build~compile jobs including same project
 	deploy := jobs[3]
@@ -718,9 +714,7 @@ func TestResolveExternalDeps_StarPrefixMatch(t *testing.T) {
 		{Project: projects[0], JobDef: &extension.JobDefinition{Name: "publish~npm", DependsOn: []string{"*package"}}},
 	}
 
-	if err := resolveExternalDeps(jobs, ws); err != nil {
-		t.Fatalf("resolveExternalDeps: %v", err)
-	}
+	resolveExternalDeps(jobs, ws)
 
 	// publish~npm in A should depend on package~template in both A and B (prefix match)
 	pub := jobs[2]
@@ -948,9 +942,7 @@ func TestResolveExternalDeps_PreservesCommandDepsWhenResolvingStepDeps(t *testin
 		},
 	}
 
-	if err := resolveExternalDeps(jobs, ws); err != nil {
-		t.Fatalf("resolveExternalDeps: %v", err)
-	}
+	resolveExternalDeps(jobs, ws)
 
 	pub := scheduledJobByKey(jobs, "/A:publish~push")
 	if pub == nil {

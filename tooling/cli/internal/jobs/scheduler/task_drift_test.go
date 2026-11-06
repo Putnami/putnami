@@ -145,8 +145,8 @@ func TestDriftOnAFirstGenerationWarnsLocallyAndFailsInCI(t *testing.T) {
 				t.Fatal(err)
 			}
 			result = f.hitOrFail(t, job, captureHashA)
-			if result.Status != test.wantStatus || !result.CacheHit {
-				t.Fatalf("restored: status=%s hit=%t, want %s", result.Status, result.CacheHit, test.wantStatus)
+			if result.Status != test.wantStatus || !result.ReuseKind().CacheHit() {
+				t.Fatalf("restored: status=%s hit=%t, want %s", result.Status, result.ReuseKind().CacheHit(), test.wantStatus)
 			}
 			if events := driftDiagnostics(result); len(events) != 1 || events[0].Data["severity"] != test.wantLevel {
 				t.Fatalf("restored: want one %s diagnostic, got %+v", test.wantLevel, events)
@@ -281,7 +281,7 @@ func TestRestoredDriftIsJudgedAgainstTheCheckoutItLandsIn(t *testing.T) {
 	if result.Status != "failed" || result.Error == nil || result.Error.Code != extension.OutputDriftDiagnosticCode {
 		t.Fatalf("a restore over stale bytes did not fail: status=%s error=%+v", result.Status, result.Error)
 	}
-	if !result.CacheHit {
+	if !result.ReuseKind().CacheHit() {
 		t.Error("the verdict came from the restore path but the result is not marked as a hit")
 	}
 	if got := readFileAt(t, generated); got != "package client // fresh\n" {

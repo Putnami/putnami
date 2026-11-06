@@ -134,7 +134,7 @@ func postReleasePlan(ctx context.Context, callback *scheduler.ReleasePlanCallbac
 		req.Header.Set("Content-Type", "application/json")
 		req.Header.Set("Accept", "application/json")
 		callback.SetAuthHeader(req)
-		response, err = client.Do(req) //nolint:gosec // G704: numeric HTTP loopback with a fixed path, no proxy and no redirects; validated above.
+		response, err = client.Do(req)
 		if err == nil {
 			break
 		}

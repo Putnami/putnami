@@ -5,11 +5,9 @@ event type**: `ready`, the typed readiness signal. It is additive at the level
 of this package — every v1 fixture and every v1 consumer is untouched, and both
 versions are parsed and validated here.
 
-What an INVOKER accepts is a separate question, and Putnami's CLI has since
-narrowed it: a job stream handled by a CLI that requires the current extension
-contract must be v2, and a v1 line from such a stream is rejected. See
-[Choosing a version: negotiation](#choosing-a-version-negotiation) — the table
-there describes what an emitter STAMPS, which is negotiated per stream.
+Every emitter writes v2, and Putnami's CLI rejects a v1 line from a job stream.
+See [Choosing a version: negotiation](#choosing-a-version-negotiation) — the
+table there describes what an emitter STAMPS.
 
 - Schema: [`schemas/event-v2.json`](../schemas/event-v2.json)
   (`$id` `https://putnami.dev/schemas/protocol/runtime/event-v2.json`)
@@ -149,22 +147,19 @@ PUTNAMI_RUNTIME_EVENTS=2
 
 | Advertised | Emitter stamps | Why |
 |---|---|---|
-| absent / blank / unparsable | `v: 1` | a 0.2.x CLI, or a hand-run extension binary, must receive the byte-identical v1 stream it can parse |
-| `0`, `-1`, `1` | `v: 1` | below the floor is the floor |
-| `2` | `v: 2` | readiness may travel |
+| absent / blank / unparsable | `v: 2` | a hand-run extension binary receives the stream every CLI release reads |
+| `0`, `-1`, `1` | `v: 2` | below the floor is the floor: no emitter writes v1 |
+| `2` | `v: 2` | the version the CLI advertises |
 | `3`, `99` | `v: 2` | a consumer that accepts a newer version accepts every version below it, so clamping down is safe |
 
-Decimal values outside the supported integer range are treated as unparsable and therefore select `v: 1`.
+Decimal values outside the supported integer range are treated as unparsable and therefore select `v: 2`.
 
 **What an invoker accepts below its advertisement is the invoker's policy, not
 this table's.** The table says what an EMITTER stamps. Putnami's CLI accepts
 exactly the version it advertises, and rejects a v1 line from an extension job
 stream. That is safe only because the manifest loader rejects any extension
 below the required contract first, so a v1 line means the stream contradicts the
-manifest rather than that the emitter is old. Two skews closed with it, both of
-which used to be silent: an old-SDK extension forwarding the `putnami.ready` log
-marker as ordinary context noise instead of a typed `ready` event, and a
-v1-stream serve job whose watcher never armed.
+manifest rather than that the emitter is old.
 
 One file, [`negotiation.go`](../negotiation.go), holds both sides, so they
 cannot disagree: the CLI writer
@@ -179,10 +174,9 @@ advertisement must survive a process boundary the context file does not cross:
 `--putnamiContext` reaches the extension binary alone, while a serve job's
 environment is inherited by the workload the extension spawns.
 
-`Emitter.Ready` on a v1 stream is a hard error (`ErrReadyUnsupportedVersion`),
-never a downgrade: a `ready` line stamped `v: 1` is an unknown type, and a
-`v: 2` line inside a v1 stream is `mixed-protocol-version`. Both are wire
-violations, so the only correct behavior is to refuse.
+No emitter writes a `ready` line stamped `v: 1`: the validator refuses one as
+an unknown type, and refuses a stream that mixes `v: 1` and `v: 2` lines as
+`mixed-protocol-version`.
 
 ## How a workload announces readiness
 
@@ -208,9 +202,8 @@ listening, under one reserved key:
 The key (`ReadyLogKey`) and the payload rules are defined once in
 [`ready_marker.go`](../ready_marker.go) and mirrored in TypeScript
 (`READY_LOG_KEY`). The extension SDK's shared forwarder
-(`tooling/extension-sdk/jsonl/forward.go`) recognizes it and, when its own
-stream is negotiated at v2, emits the typed `ready` event **after** the log
-event — so the console still shows the human line first — and strips the marker
+(`tooling/extension-sdk/jsonl/forward.go`) recognizes it and emits the typed
+`ready` event **after** the log event — so the console still shows the human line first — and strips the marker
 from the forwarded log's context so the machine channel never
 prints. Because the forwarder is shared, all three first-party serve wrappers
 gain the capability from one place, including Python's, which has no framework

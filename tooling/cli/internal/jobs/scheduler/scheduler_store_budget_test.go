@@ -10,22 +10,41 @@ import (
 	"testing"
 	"time"
 
+	"go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/store"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
 
-// putBudgetEntry publishes an entry whose one output file is size bytes of
-// fill, so every fill is its own CAS blob.
+// putBudgetEntry publishes a task-owned entry whose one output file is size
+// bytes of fill, so every fill is its own CAS blob.
 func putBudgetEntry(s *store.LocalStore, hash string, size int, fill byte) error {
-	dir, err := os.MkdirTemp("", "store-budget-entry-")
+	staging, err := os.MkdirTemp("", "store-budget-entry-")
 	if err != nil {
 		return err
 	}
-	defer os.RemoveAll(dir)
-	if err := os.WriteFile(filepath.Join(dir, "out.bin"), bytes.Repeat([]byte{fill}, size), 0o644); err != nil {
+	defer os.RemoveAll(staging)
+	out := store.DeclaredEntryOutput{ID: "out", Kind: extension.OutputKindFile, Root: extension.OutputRootProject, Path: "out.bin"}
+	path := store.TaskStagingPath(staging, out)
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return err
 	}
-	return s.Put(hash, &store.Entry{Result: &store.EntryResult{Status: "success"}, FilesDir: dir})
+	if err := os.WriteFile(path, bytes.Repeat([]byte{fill}, size), 0o644); err != nil {
+		return err
+	}
+	_, err = s.IngestTaskEntry(staging, store.TaskEntrySpec{
+		Key:     hash,
+		Result:  &store.EntryResult{Status: "success"},
+		Outputs: []store.DeclaredEntryOutput{out},
+	})
+	return err
+}
+
+// budgetEntryPublished reports whether the store rooted at storeRoot still
+// holds hash's task-owned entry, without stamping its recency as a lookup does.
+func budgetEntryPublished(storeRoot, hash string) bool {
+	address := store.TaskEntryAddress(hash)
+	_, err := os.Stat(filepath.Join(storeRoot, "blobs", address[:2], address))
+	return err == nil
 }
 
 // TestRunPlan_StoreBudgetCollectsAtABatchBoundaryAndSparesInFlightEntries
@@ -72,11 +91,11 @@ func TestRunPlan_StoreBudgetCollectsAtABatchBoundaryAndSparesInFlightEntries(t *
 	holding := make(chan struct{})
 	internal := map[string]InternalJobRunner{
 		holdJob.Key(): func(ctx context.Context, _ map[string]*JobResult) *JobResult {
-			_, _ = cache.LookupAndTouch(held)
+			_, _ = cache.LookupTaskEntry(held)
 			close(holding)
 			deadline := time.Now().Add(20 * time.Second)
 			for {
-				if e, _ := cache.Store().Get(stale); e == nil {
+				if !budgetEntryPublished(storeRoot, stale) {
 					break
 				}
 				if time.Now().After(deadline) {
@@ -84,7 +103,7 @@ func TestRunPlan_StoreBudgetCollectsAtABatchBoundaryAndSparesInFlightEntries(t *
 				}
 				time.Sleep(5 * time.Millisecond)
 			}
-			if e, _ := cache.Store().Get(held); e == nil {
+			if !budgetEntryPublished(storeRoot, held) {
 				return failed("the pass evicted the entry this in-flight job looked up")
 			}
 			return &JobResult{Status: "success"}
@@ -123,11 +142,11 @@ func TestRunPlan_StoreBudgetCollectsAtABatchBoundaryAndSparesInFlightEntries(t *
 		t.Fatal("run failed")
 	}
 
-	if e, _ := cache.Store().Get(stale); e != nil {
+	if budgetEntryPublished(storeRoot, stale) {
 		t.Error("the entry no job touched survived the over-budget pass")
 	}
 	for name, hash := range map[string]string{"held": held, "grown": grown} {
-		if e, _ := cache.Store().Get(hash); e == nil {
+		if !budgetEntryPublished(storeRoot, hash) {
 			t.Errorf("the %s entry, used during the run, was evicted", name)
 		}
 	}

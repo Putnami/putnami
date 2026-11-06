@@ -13,7 +13,7 @@ func materializeOne(t *testing.T, s *LocalStore, rel string) (*inmemFetcher, err
 	const content = "remote artifact bytes"
 	entry, digest := hitEntry(rel, content)
 	f := &inmemFetcher{blobs: map[string][]byte{digest: []byte(content)}}
-	return f, s.Materialize(hashA, entry, f.fetch)
+	return f, materializeFormatOneEntry(s, hashA, entry, f.fetch)
 }
 
 // TestMaterializeRefusesAManifestPathThatIsNotLocal pins the up-front path

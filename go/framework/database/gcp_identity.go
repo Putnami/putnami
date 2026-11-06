@@ -106,7 +106,7 @@ func gcpMetadataGet(ctx context.Context, path string) ([]byte, error) {
 		return nil, errors.Wrapf(err, CodeConnection, "build metadata request")
 	}
 	req.Header.Set("Metadata-Flavor", "Google")
-	resp, err := http.DefaultClient.Do(req) //nolint:gosec // G704: gcpMetadataBase is the fixed GCP metadata endpoint (test-swappable var), not user-tainted
+	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return nil, errors.Wrapf(err, CodeConnection, "request metadata server")
 	}

@@ -2,6 +2,10 @@
 
 - **Status**: accepted
 - **Scope**: `go.putnami.dev/protocol/runtime` (`protocols/runtime`)
+- **Amended**: 2026-11-05, Decision and Consequences: the resolution defaults
+  to v2, the lowest version an emitter writes. Every CLI release since 0.2.0
+  requires v2 and the only provider answers it, so no reader needs a v1 stream.
+  This package still parses and validates v1.
 
 ## Context
 
@@ -31,12 +35,12 @@ reaches the extension binary alone.
 
 `NegotiatedVersion` is total, so an emitter never handles a bad advertisement:
 
-- absent, blank, unparsable, or below v1 → v1;
+- absent, blank, unparsable, or below v2 → v2 (`ProtocolVersion`), the lowest
+  version an emitter writes;
 - above the highest known version → the highest known version.
 
-v1 is the fail-closed direction: an old invoker, a directly executed extension,
-and a corrupted value all receive a v1 stream they can parse, and a `ready`
-line never reaches a reader that would reject the stream for it.
+v2 is the fail-closed direction: a directly executed extension and a corrupted
+value both receive a stream every CLI release parses. No emitter writes v1.
 
 **An emitter answers at the advertised version, not under it.** The Putnami CLI
 accepts exactly what it advertises, because an extension at the current contract
@@ -64,7 +68,8 @@ stream disagrees with the manifest.
   upgraded in flight.
 - The variable name and the clamping live in [`negotiation.go`](../../negotiation.go),
   and both sides go through it.
-- `ProtocolVersion` (1) names the v1 vocabulary; it is not "the version to
-  stamp". Producers call the negotiation.
-- A corrupted advertisement degrades to v1 silently, so a misconfigured invoker
-  looks like an old one.
+- `ProtocolVersion` (2) is the floor an emitter stamps, and `ProtocolVersion1`
+  names the v1 vocabulary the validator still reads. Producers call the
+  negotiation.
+- A corrupted advertisement degrades to v2 silently, so a misconfigured invoker
+  looks like one that asked for v2.

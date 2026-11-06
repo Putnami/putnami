@@ -596,88 +596,18 @@ func (k *CacheKey) ComputeHashUsing(cm *CacheManager) (string, error) {
 	return hex.EncodeToString(h.Sum(nil)), nil
 }
 
-// Lookup checks for a cache hit. Returns the entry if found, nil if miss.
+// Lookup returns the format-1 entry stored under hash, or nil for a miss. A
+// 0.3.0 CLI wrote format-1 entries; this CLI reads them until the release
+// after 0.4.0 (see LocalStore.Get). The task-owned lookup is LookupTaskEntry.
 func (cm *CacheManager) Lookup(hash string) (*Entry, error) {
 	return cm.store.Get(hash)
 }
 
 // LookupAndTouch is Lookup plus an atomic lastUsed stamp under the store's
 // shared lock, so a concurrent GC cannot evict the entry between the read and
-// the stamp (closing the cold-entry hit-vs-evict race). Use on the cache-hit
-// path instead of Lookup.
+// the stamp. It reads format-1 entries under the same contract as Lookup.
 func (cm *CacheManager) LookupAndTouch(hash string) (*Entry, error) {
 	return cm.store.getAndTouch(hash)
-}
-
-// Save stores a legacy entry, capturing outputDir whole. New scheduler entries
-// use the task-owned format; this remains for store compatibility APIs.
-func (cm *CacheManager) Save(hash string, result *EntryResult, meta *EntryMetadata, outputDir string) error {
-	entry := &Entry{
-		Result:   result,
-		Metadata: meta,
-	}
-
-	// If outputDir exists and has files, include them
-	if outputDir != "" {
-		if info, err := os.Stat(outputDir); err == nil && info.IsDir() {
-			// Check if directory is non-empty
-			entries, _ := os.ReadDir(outputDir)
-			if len(entries) > 0 {
-				entry.FilesDir = outputDir
-			}
-		}
-	}
-
-	return cm.store.Put(hash, entry)
-}
-
-// SaveDirs stores a job result whose output spans several sibling directories,
-// each captured under its own subpath ("<id>/…") in the entry's files/ tree.
-// dirs maps a stable subpath id (e.g. "gen", "clients") to the absolute source
-// directory; sources that are absent or empty are skipped. It stages a union
-// directory and reuses Put's CAS ingest + manifest + first-writer-wins publish
-// unchanged, so the resulting entry is an ordinary blob the remote cache, GC, and
-// Materialize treat exactly like a single-dir entry — only the per-subpath split
-// (reconstructed by RestoreSubdir) is new. The extra staging copy is negligible
-// for generate outputs (small .gen + client trees) and keeps the battle-tested
-// ingest/publish path untouched. Used when one job (the TS generate step)
-// produces several capture-resource trees at once (.gen and clients/).
-func (cm *CacheManager) SaveDirs(hash string, result *EntryResult, meta *EntryMetadata, dirs map[string]string) error {
-	staging, err := cm.store.createTmpDir()
-	if err != nil {
-		return fmt.Errorf("stage output dirs: %w", err)
-	}
-	defer os.RemoveAll(staging)
-
-	// Deterministic order keeps the staging step stable across runs.
-	ids := make([]string, 0, len(dirs))
-	for id := range dirs {
-		ids = append(ids, id)
-	}
-	sort.Strings(ids)
-
-	staged := false
-	for _, id := range ids {
-		src := dirs[id]
-		info, statErr := os.Stat(src)
-		if statErr != nil || !info.IsDir() {
-			continue
-		}
-		entries, _ := os.ReadDir(src)
-		if len(entries) == 0 {
-			continue
-		}
-		if err := copyDir(src, filepath.Join(staging, id)); err != nil {
-			return fmt.Errorf("stage %q: %w", id, err)
-		}
-		staged = true
-	}
-
-	entry := &Entry{Result: result, Metadata: meta}
-	if staged {
-		entry.FilesDir = staging
-	}
-	return cm.store.Put(hash, entry)
 }
 
 // RestoreFiles copies cached output files to the target output directory.
@@ -732,7 +662,8 @@ func (cm *CacheManager) RestoreDirPreserving(
 
 // RestoreSubdir replaces targetDir with the entry's cached "<subpath>/" subtree
 // so targetDir is byte-identical to the snapshot (stale files removed). It is the
-// multi-rooted counterpart of RestoreDir for entries written by SaveDirs.
+// multi-rooted counterpart of RestoreDir, for a format-1 entry whose files/
+// tree holds one directory per subpath.
 // Returns (false, nil) when the entry has no files or did not capture that
 // subpath (e.g. a generate run that produced no client) — restoring a resource
 // the producing run never emitted is a no-op, not an error.

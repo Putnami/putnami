@@ -32,8 +32,6 @@
       "status": "success",
       "durationMs": 900,
       "taskWallMs": 940,
-      "cacheHit": false,
-      "coalesced": false,
       "reuse": ""
     },
     {
@@ -47,8 +45,6 @@
       "status": "canceled",
       "durationMs": 120,
       "taskWallMs": 130,
-      "cacheHit": false,
-      "coalesced": false,
       "reuse": ""
     },
     {
@@ -62,8 +58,6 @@
       "status": "canceled",
       "durationMs": 0,
       "taskWallMs": 3,
-      "cacheHit": false,
-      "coalesced": false,
       "reuse": ""
     }
   ]

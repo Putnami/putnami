@@ -135,9 +135,9 @@ func TestReplayCacheEvents_SynthesizesResultForLegacyEntry(t *testing.T) {
 	job := makeScheduledJob("app", "test~test", nil)
 
 	result := &JobResult{
-		Status:   "success",
-		CacheHit: true,
-		Data:     map[string]any{"testSummary": map[string]any{"passed": float64(7)}},
+		Status: "success",
+		Reuse:  ReuseLocalCache,
+		Data:   map[string]any{"testSummary": map[string]any{"passed": float64(7)}},
 		// The pre-fix allow-list captured metrics/diagnostics but not the result.
 		Events: []RawJobEvent{{Version: 1, Type: EventTypeMetric, Data: map[string]any{"name": "coverage", "value": float64(88)}}},
 	}
@@ -190,7 +190,7 @@ func TestReplayCacheEvents_NoSynthesisForDatalessJob(t *testing.T) {
 	s := &Scheduler{renderer: mock}
 	job := makeScheduledJob("app", "build~cross-compile", nil)
 
-	s.replayCacheEvents(job, &JobResult{Status: "success", CacheHit: true})
+	s.replayCacheEvents(job, &JobResult{Status: "success", Reuse: ReuseLocalCache})
 
 	if got := mock.eventsOfType(job.Key(), EventTypeResult); len(got) != 0 {
 		t.Fatalf("data-less job must not synthesize a result event, got %d", len(got))
@@ -429,10 +429,10 @@ func TestScheduler_CoalescesConcurrentColdMissAcrossWorktrees(t *testing.T) {
 		if jobResult == nil || jobResult.Status != "success" {
 			t.Fatalf("scheduler %d result = %+v, want success", i, jobResult)
 		}
-		if jobResult.CacheHit {
+		if jobResult.ReuseKind().CacheHit() {
 			cacheHits++
 		}
-		if jobResult.Coalesced {
+		if jobResult.ReuseKind() == ReuseCoalesced {
 			coalesced++
 		}
 	}
@@ -583,7 +583,7 @@ func TestScheduler_CoalescedSourceFixReexecutesInEveryWorktree(t *testing.T) {
 	for range runs {
 		result := <-results
 		jobResult := result.Results[runs[0].jobKey]
-		if jobResult == nil || jobResult.Status != "success" || jobResult.CacheHit || jobResult.Coalesced {
+		if jobResult == nil || jobResult.Status != "success" || jobResult.ReuseKind().Reused() {
 			t.Fatalf("scheduler result = %+v, want a local successful source-fix execution", jobResult)
 		}
 	}
@@ -750,13 +750,13 @@ func TestScheduler_EmitsEventlessReuseSessionOutcomeOnce(t *testing.T) {
 	}{
 		{
 			name:    "cached",
-			result:  &JobResult{Status: "success", CacheHit: true, TaskWall: 80 * time.Millisecond},
+			result:  &JobResult{Status: "success", Reuse: ReuseLocalCache, TaskWall: 80 * time.Millisecond},
 			outcome: JobOutcomeCached,
 			cache:   true,
 		},
 		{
 			name:      "coalesced",
-			result:    &JobResult{Status: "success", Coalesced: true, TaskWall: 80 * time.Millisecond},
+			result:    &JobResult{Status: "success", Reuse: ReuseCoalesced, TaskWall: 80 * time.Millisecond},
 			outcome:   JobOutcomeCoalesced,
 			coalesced: true,
 		},

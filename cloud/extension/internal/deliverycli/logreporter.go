@@ -114,7 +114,7 @@ func (s *logReporterSender) deliver(ctx context.Context, chunk *protocolcli.Sess
 	req.Header.Set(runLogSHA256Header, chunk.SHA256)
 	req.ContentLength = int64(len(payload))
 
-	resp, err := s.client.Do(req) //nolint:gosec // G704: the destination is the launcher-exported ingest base, never frame content
+	resp, err := s.client.Do(req)
 	if err != nil {
 		// Transport failures (dial, reset, deadline) are the class worth another
 		// bounded attempt; the receiver may never have seen the bytes.

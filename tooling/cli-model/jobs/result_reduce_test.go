@@ -110,11 +110,11 @@ func tallyLegacyBuckets(results map[string]*JobResult) legacyBuckets {
 	var b legacyBuckets
 	for _, result := range results {
 		b.total++
-		if result.Coalesced {
+		if result.ReuseKind() == ReuseCoalesced {
 			b.coalesced++
 			continue
 		}
-		if result.CacheHit {
+		if result.ReuseKind().CacheHit() {
 			b.cached++
 			continue
 		}
@@ -427,45 +427,31 @@ func TestReduceSession_IsDeterministic(t *testing.T) {
 	}
 }
 
-func TestJobResult_ReuseKindAndBooleansAgree(t *testing.T) {
+func TestJobResult_ReuseKindAndOutcome(t *testing.T) {
 	for _, test := range []struct {
-		kind      ReuseKind
-		cacheHit  bool
-		coalesced bool
-		outcome   string
+		kind     ReuseKind
+		cacheHit bool
+		outcome  string
 	}{
-		{ReuseNone, false, false, "success"},
-		{ReuseLocalCache, true, false, JobOutcomeCached},
-		{ReuseRemoteCache, true, false, JobOutcomeCached},
-		{ReuseCoalesced, false, true, JobOutcomeCoalesced},
+		{ReuseNone, false, "success"},
+		{ReuseLocalCache, true, JobOutcomeCached},
+		{ReuseRemoteCache, true, JobOutcomeCached},
+		{ReuseCoalesced, false, JobOutcomeCoalesced},
 	} {
 		result := &JobResult{Status: "success"}
 		result.MarkReuse(test.kind)
-		if result.CacheHit != test.cacheHit || result.Coalesced != test.coalesced {
-			t.Errorf("%s: CacheHit=%t Coalesced=%t, want %t/%t",
-				test.kind, result.CacheHit, result.Coalesced, test.cacheHit, test.coalesced)
+		if got := result.ReuseKind(); got != test.kind {
+			t.Errorf("ReuseKind() = %q, want %q", got, test.kind)
+		}
+		if got := result.ReuseKind().CacheHit(); got != test.cacheHit {
+			t.Errorf("%s: ReuseKind().CacheHit() = %t, want %t", test.kind, got, test.cacheHit)
 		}
 		if got := result.Outcome(); got != test.outcome {
 			t.Errorf("%s: Outcome() = %q, want %q (the recorded session vocabulary)", test.kind, got, test.outcome)
 		}
-		if got := result.ReuseKind(); got != test.kind {
-			t.Errorf("ReuseKind() = %q, want %q", got, test.kind)
-		}
 	}
-
-	// A JobResult assembled without MarkReuse (tests, pre-A2a call sites) still
-	// classifies from the booleans, so nothing silently reads as "not reused".
-	for _, test := range []struct {
-		result *JobResult
-		want   ReuseKind
-	}{
-		{&JobResult{Status: "success"}, ReuseNone},
-		{&JobResult{Status: "success", CacheHit: true}, ReuseLocalCache},
-		{&JobResult{Status: "success", Coalesced: true}, ReuseCoalesced},
-	} {
-		if got := test.result.ReuseKind(); got != test.want {
-			t.Errorf("legacy booleans %+v classified as %q, want %q", test.result, got, test.want)
-		}
+	if got := (*JobResult)(nil).ReuseKind(); got != ReuseNone {
+		t.Errorf("a nil result: ReuseKind() = %q, want none", got)
 	}
 }
 

@@ -218,10 +218,9 @@ func TestWireGoldenV2_EncodesTheSettledSemantics(t *testing.T) {
 		run := loadWireRun(t, "mixed")
 		job := run.planned[0]
 		results := map[string]*jobs.JobResult{job.Key(): {
-			Status:   string(jobs.TaskStatusFailed),
-			CacheHit: true,
-			Reuse:    jobs.ReuseLocalCache,
-			Error:    &jobs.JobError{Message: "restored failure"},
+			Status: string(jobs.TaskStatusFailed),
+			Reuse:  jobs.ReuseLocalCache,
+			Error:  &jobs.JobError{Message: "restored failure"},
 		}}
 		reduced := jobs.ReduceRun([]*jobs.ScheduledJob{job}, results, jobs.SessionOutcome{})
 		if reduced.Fresh.Failed != 0 || reduced.Status.Failed != 1 {

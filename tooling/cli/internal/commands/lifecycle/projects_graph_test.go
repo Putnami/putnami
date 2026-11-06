@@ -9,6 +9,7 @@ import (
 
 	"go.putnami.dev/protocol/features/spectest"
 	"go.putnami.dev/tooling/cli/internal/cmderr"
+	"go.putnami.dev/tooling/cli/internal/commands/sharedtest"
 	"go.putnami.dev/tooling/cli/internal/hometest"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
@@ -34,28 +35,27 @@ func makeProjectGraphWorkspace(t *testing.T) string {
 }
 
 // jsonlObjects decodes every non-empty line of output as one JSON object.
-func jsonlObjects(t *testing.T, output string) []map[string]any {
+// resultObjects decodes the one result a structured command writes and
+// returns its records as objects.
+func resultObjects(t *testing.T, output string) []map[string]any {
 	t.Helper()
 
 	var objects []map[string]any
-	for _, line := range strings.Split(strings.TrimSpace(output), "\n") {
-		if strings.TrimSpace(line) == "" {
-			continue
-		}
+	for _, record := range sharedtest.ResultRecords(t, output, "") {
 		var object map[string]any
-		if err := json.Unmarshal([]byte(line), &object); err != nil {
-			t.Fatalf("output line %q is not a JSON object: %v", line, err)
+		if err := json.Unmarshal(record, &object); err != nil {
+			t.Fatalf("record %s is not a JSON object: %v", record, err)
 		}
 		objects = append(objects, object)
 	}
 	return objects
 }
 
-func jsonlIDs(t *testing.T, output string) []string {
+func resultIDs(t *testing.T, output string) []string {
 	t.Helper()
 
 	var ids []string
-	for _, object := range jsonlObjects(t, output) {
+	for _, object := range resultObjects(t, output) {
 		id, _ := object["id"].(string)
 		ids = append(ids, id)
 	}
@@ -133,7 +133,7 @@ func TestProjectsDeps_ListsDirectAndTransitiveEdgesBothWays(t *testing.T) {
 			if err != nil {
 				t.Fatalf("ProjectsDeps(%v): %v", tt.args, err)
 			}
-			if got := jsonlIDs(t, output); !sameStrings(got, tt.want) {
+			if got := resultIDs(t, output); !sameStrings(got, tt.want) {
 				t.Errorf("ProjectsDeps(%v) = %v, want %v", tt.args, got, tt.want)
 			}
 		})
@@ -215,7 +215,7 @@ func TestProjectsWhy_PrintsTheImpactPathAndTaskScope(t *testing.T) {
 	if !sameStrings(answer.TaskScope, []string{"build"}) {
 		t.Errorf("task scope = %v, want [build]", answer.TaskScope)
 	}
-	output, err = captureStdout(t, func() error { return printWhy(answer, "") })
+	output, err = captureStdout(t, func() error { return printWhy(answer, "", nil) })
 	if err != nil {
 		t.Fatalf("printWhy: %v", err)
 	}
@@ -253,7 +253,7 @@ func TestProjectsWhy_ReportsWhenNoPathExists(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ProjectsWhy(jsonl): %v", err)
 	}
-	objects := jsonlObjects(t, output)
+	objects := resultObjects(t, output)
 	if len(objects) != 1 || objects[0]["impacted"] != false {
 		t.Fatalf("no-path jsonl = %v, want one object with impacted false", objects)
 	}
@@ -285,7 +285,7 @@ func TestProjectGraphQueries_PrintJSONL(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ProjectsOwner(jsonl): %v", err)
 	}
-	owners := jsonlObjects(t, output)
+	owners := resultObjects(t, output)
 	if len(owners) != 1 || owners[0]["id"] != "/apps/web" || owners[0]["name"] != "web" || owners[0]["path"] != "apps/web" {
 		t.Errorf("owner jsonl = %v, want one /apps/web object", owners)
 	}
@@ -296,7 +296,7 @@ func TestProjectGraphQueries_PrintJSONL(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ProjectsDeps(jsonl): %v", err)
 	}
-	deps := jsonlObjects(t, output)
+	deps := resultObjects(t, output)
 	if len(deps) != 1 || deps[0]["id"] != "/libs/util" || deps[0]["direction"] != "dependents" || deps[0]["transitive"] != false {
 		t.Errorf("deps jsonl = %v, want one /libs/util dependent object", deps)
 	}
@@ -307,7 +307,7 @@ func TestProjectGraphQueries_PrintJSONL(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ProjectsWhy(jsonl): %v", err)
 	}
-	why := jsonlObjects(t, output)
+	why := resultObjects(t, output)
 	if len(why) != 1 {
 		t.Fatalf("why jsonl = %v, want one object", why)
 	}
@@ -373,9 +373,7 @@ func TestProjectsWhy_CrossesAnExtensionConsumerEdge(t *testing.T) {
 			t.Fatalf("ProjectsWhy(%s, %s): %v", from, to, err)
 		}
 		var answer whyAnswer
-		if err := json.Unmarshal([]byte(strings.TrimSpace(output)), &answer); err != nil {
-			t.Fatalf("ProjectsWhy(%s, %s) printed %q, want one answer: %v", from, to, output, err)
-		}
+		sharedtest.ResultData(t, output, "projects why", &answer)
 		return answer
 	}
 

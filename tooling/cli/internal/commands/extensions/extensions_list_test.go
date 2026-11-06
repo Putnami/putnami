@@ -73,16 +73,16 @@ func TestExtensionsList_JSONLSortedAndShapes(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ExtensionsListPrepared: %v", err)
 	}
-	lines := strings.Split(strings.TrimSpace(out), "\n")
+	lines := sharedtest.ResultRecords(t, out, "extensions list")
 	if len(lines) != 2 {
-		t.Fatalf("got %d jsonl lines, want 2: %v", len(lines), lines)
+		t.Fatalf("got %d records, want 2: %s", len(lines), out)
 	}
 	type entry struct {
 		Name   string `json:"name"`
 		Source string `json:"source"`
 	}
 	var first entry
-	if err := json.Unmarshal([]byte(lines[0]), &first); err != nil {
+	if err := json.Unmarshal(lines[0], &first); err != nil {
 		t.Fatalf("parse line: %v", err)
 	}
 	// Sorted output: @putnami/go before @putnami/zeta.

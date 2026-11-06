@@ -23,9 +23,8 @@ package runtime
 // Readiness REPLACED the log-substring probe the CLI's watch adapter used to
 // decide a server was up by matching human text ("listening http(s)://"). The
 // watch adapter consumes the typed event and the probe is gone, so a `ready`
-// event is now the only thing that arms a serve iteration's file watcher —
-// which is why a v1 stream leaves a serve job's watcher unarmed rather than
-// falling back.
+// event is now the only thing that arms a serve iteration's file watcher, and a
+// ready event stamped v1 leaves it unarmed rather than falling back.
 //
 // Everything here is canonical by construction: endpoints are emitted and
 // validated in one total order (CompareReadyEndpoints), so a digest over a
@@ -39,18 +38,6 @@ import (
 	"sort"
 	"strconv"
 )
-
-// ProtocolVersion2 is the v2 runtime event protocol version, carried in the
-// same `v` member v1 uses.
-//
-// ProtocolVersion (=1) remains the NAME of version 1 — the vocabulary v1
-// documents and fixtures are validated against — and is no longer "what every
-// emitter writes". The CLI advertises and accepts MaxKnownProtocolVersion only,
-// and so do the events it synthesizes itself (batch member projections, replayed
-// cached result events, CLI-synthesized diagnostics). A producer picks its
-// version by negotiating it (negotiation.go); nothing should reach for
-// ProtocolVersion as "the version to stamp".
-const ProtocolVersion2 = 2
 
 // EventReady is the typed readiness event, introduced in v2. A v1 event of this
 // type is rejected as an unknown type — that is what makes v2 a version rather
@@ -128,16 +115,17 @@ var validEventTypesV2 = func() map[EventType]bool {
 // with a bad `v` reports one version diagnostic instead of a version diagnostic
 // plus a spurious unknown-type one.
 func eventTypesForVersion(v int) map[EventType]bool {
-	if v == ProtocolVersion2 {
+	if v == ProtocolVersion {
 		return validEventTypesV2
 	}
 	return validEventTypes
 }
 
 // IsKnownProtocolVersion reports whether v is a runtime event protocol version
-// this package understands.
+// this package parses and validates: version 1, which no emitter writes, and
+// ProtocolVersion.
 func IsKnownProtocolVersion(v int) bool {
-	return v == ProtocolVersion || v == ProtocolVersion2
+	return v == ProtocolVersion1 || v == ProtocolVersion
 }
 
 // ReadyEndpoint is one address a ready target accepts traffic on.

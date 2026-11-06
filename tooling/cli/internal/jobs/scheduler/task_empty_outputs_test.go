@@ -173,9 +173,9 @@ func (f *emptyingFixture) executed(t *testing.T, leg string, result *SchedulerRe
 	t.Helper()
 	rows := f.rows(t, leg, result)
 	for i, row := range rows {
-		if row.Status != "success" || row.CacheHit {
+		if row.Status != "success" || row.ReuseKind().CacheHit() {
 			t.Fatalf("%s: %s = status %q hit %v, want an execution that succeeded (error: %+v)",
-				leg, f.planned[i].Key(), row.Status, row.CacheHit, row.Error)
+				leg, f.planned[i].Key(), row.Status, row.ReuseKind().CacheHit(), row.Error)
 		}
 	}
 	return rows
@@ -186,9 +186,9 @@ func (f *emptyingFixture) hit(t *testing.T, leg string, result *SchedulerResult)
 	t.Helper()
 	rows := f.rows(t, leg, result)
 	for i, row := range rows {
-		if row.Status != "success" || !row.CacheHit {
+		if row.Status != "success" || !row.ReuseKind().CacheHit() {
 			t.Fatalf("%s: %s = status %q hit %v, want a cache hit (error: %+v)",
-				leg, f.planned[i].Key(), row.Status, row.CacheHit, row.Error)
+				leg, f.planned[i].Key(), row.Status, row.ReuseKind().CacheHit(), row.Error)
 		}
 	}
 	return rows
@@ -981,7 +981,7 @@ func TestFailureToEmptyOnRestoreExecutesTheTask(t *testing.T) {
 		f, bin, _ := prepare(t, func(int) bool { return true })
 		result := f.run(t, SchedulerConfig{})
 		row := f.rows(t, "cannot empty", result)[0]
-		if result.Success || row.Status != "failed" || row.CacheHit || row.Error == nil ||
+		if result.Success || row.Status != "failed" || row.ReuseKind().CacheHit() || row.Error == nil ||
 			!strings.Contains(row.Error.Message, "empty declared outputs") {
 			t.Fatalf("row = %+v (success=%v), want the task failed before it runs", row, result.Success)
 		}

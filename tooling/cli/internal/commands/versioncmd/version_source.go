@@ -125,7 +125,6 @@ func buildStampedCLI(ctx context.Context, moduleDir, versionVar, version string)
 	cleanup := func() { os.Remove(outPath) }
 
 	ldflags := fmt.Sprintf("-X %s=%s", versionVar, version)
-	//nolint:gosec // G702: in-workspace `go build`; ldflags carries only a git-derived 0.0.0-source-<sha> version and outPath is a temp file. Args go straight to exec — no shell.
 	cmd := exec.CommandContext(ctx, "go", "build", "-trimpath", "-ldflags", ldflags, "-o", outPath, "./cmd/putnami")
 	cmd.Dir = moduleDir
 	// Normalize GOWORK for the module being built. Putnami's Go test/build

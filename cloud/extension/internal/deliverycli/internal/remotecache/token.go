@@ -213,7 +213,7 @@ func fetchMetadataIDTokenFrom(ctx context.Context, audience, endpoint string, cl
 		return "", fmt.Errorf("build request: %w", err)
 	}
 	req.Header.Set("Metadata-Flavor", "Google")
-	resp, err := client.Do(req) //nolint:gosec // G704: production passes the fixed GCP metadata endpoint; tests pass loopback
+	resp, err := client.Do(req)
 	if err != nil {
 		return "", fmt.Errorf("fetch: %w", err)
 	}
@@ -380,7 +380,7 @@ func (t TokenSource) resolveURL(ctx context.Context) (string, error) {
 		return "", fmt.Errorf("cache token request: %w", err)
 	}
 	setUserAgent(req)
-	resp, err := http.DefaultClient.Do(req) //nolint:gosec // G704: request targets the user-configured cache token endpoint, https-validated by ValidateURL, not arbitrary user-tainted input
+	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return "", fmt.Errorf("cache token fetch: %w", err)
 	}

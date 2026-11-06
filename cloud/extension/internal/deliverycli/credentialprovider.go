@@ -667,7 +667,7 @@ func refusal(code, message string) credentialAnswer {
 func (s *credentialServer) diagnose(format string, args ...any) {
 	line := tokenLike.ReplaceAllString(fmt.Sprintf(format, args...), "<redacted>")
 	line = boundedDiagnosticText(line, credentialDiagnosticBytes, s.knownSecrets()...)
-	fmt.Fprintln(s.logw, "putnami-cloud credential-provider: "+line) //nolint:gosec // G705: logw is the provider's stderr, never an HTTP response
+	fmt.Fprintln(s.logw, "putnami-cloud credential-provider: "+line)
 }
 
 // safeText makes text from another component fit a refusal message: every

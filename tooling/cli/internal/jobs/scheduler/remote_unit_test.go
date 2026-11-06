@@ -6,8 +6,8 @@ import (
 )
 
 // newUploadTestCache builds a minimal RemoteCache for exercising the pure
-// upload-eligibility logic (prepareUpload), which needs only the stats sink — no
-// provider session or network.
+// upload-eligibility logic (PrepareTaskUpload), which needs only the stats sink
+// — no provider session or network.
 func newUploadTestCache() *remotecache.RemoteCache {
 	r := &remotecache.RemoteCache{}
 	r.SetCacheStats(&cachekey.CacheStats{})

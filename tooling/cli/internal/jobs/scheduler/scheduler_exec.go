@@ -244,8 +244,7 @@ func (s *Scheduler) openTask(
 	cacheHash, cachedResult, release := s.lookupRestoreOrClaim(ctx, job, cacheEnabled, mu, hashes)
 	if cachedResult != nil {
 		cachedResult.CacheKey = cacheHash
-		cachedResult.TaskWall = clampWallToFirstEvent(
-			time.Since(started), cachedResult.SpawnToFirstEvent, cachedResult.FirstEventObserved)
+		cachedResult.TaskWall = time.Since(started)
 		return nil, jobDone{job: job, result: cachedResult}
 	}
 
@@ -629,7 +628,9 @@ func (s *Scheduler) runTaskAttempt(ctx context.Context, job *ScheduledJob) *JobR
 // The wall is measured from run.ranAt — when THIS task's execution finished —
 // rather than from "now", so member k's wall is free of members 0..k-1's
 // finalization and a batch member's reported wall stays comparable to the same
-// task's wall when it runs alone.
+// task's wall when it runs alone. item.started precedes every attempt's spawn
+// and run.ranAt follows every attempt's return, so the wall contains the
+// startup latency the result carries.
 func (s *Scheduler) closeTask(
 	ctx context.Context,
 	item taskWork,
@@ -692,11 +693,7 @@ func (s *Scheduler) closeTask(
 		result = s.judgeExecutedDrift(item.job, result, item.drift)
 	}
 	result.CacheKey = item.cacheHash
-	result.TaskWall = clampWallToFirstEvent(
-		run.ranAt.Sub(item.started)+time.Since(finalizeStarted),
-		result.SpawnToFirstEvent,
-		result.FirstEventObserved,
-	)
+	result.TaskWall = run.ranAt.Sub(item.started) + time.Since(finalizeStarted)
 	// The leader of a plan-level shared node releases its followers here, once
 	// its outputs are on disk, its entry is published and its result is final —
 	// so a follower captures the same tree the leader was cached from and can

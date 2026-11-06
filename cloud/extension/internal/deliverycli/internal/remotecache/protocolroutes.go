@@ -52,7 +52,7 @@ func (c *Client) uploadGrantAttempt(ctx context.Context, cred *resolvedBearer) (
 		req.Header.Set(cache.AuthorizationHeader, cache.AuthorizationValue(cred.Token))
 	}
 
-	resp, err := c.httpClient.Do(req) //nolint:gosec // G704: request targets the configured remote-cache endpoint (c.baseURL), not user-tainted input
+	resp, err := c.httpClient.Do(req)
 	if err != nil {
 		return nil, 0, fmt.Errorf("%s: %w", op, err)
 	}

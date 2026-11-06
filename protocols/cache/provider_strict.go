@@ -25,7 +25,7 @@ const (
 
 // providerVersionDiag reports an unsupported provider RPC version (distinct
 // from the HTTP ProtocolVersion) on the "protocolVersion" field. The current
-// parser accepts legacy v1 envelopes as well as the v2 provenance shape.
+// parser accepts ProviderProtocolMinVersion through ProviderProtocolVersion.
 func providerVersionDiag(got int) []diag.Diagnostic {
 	if got < ProviderProtocolMinVersion || got > ProviderProtocolVersion {
 		return []diag.Diagnostic{diag.Errorf(CodeVersionMismatch, "protocolVersion",
@@ -373,7 +373,7 @@ func ParseRestoreResultStrict(data []byte) (*RestoreResult, []diag.Diagnostic) {
 // ValidateRestoreResult checks a recognized status and, on a hit, a result
 // carrying a status and a well-formed manifest. When entry provenance is
 // present, all three fields must be complete and use their closed enums; absent
-// provenance remains valid for legacy v1/channel-less providers.
+// provenance stays valid for an entry the provider holds no provenance for.
 func ValidateRestoreResult(r *RestoreResult) []diag.Diagnostic {
 	if r == nil {
 		return []diag.Diagnostic{diag.Errorf(CodeRequiredField, "", "result is nil")}
@@ -934,7 +934,7 @@ func validateDigestList(field string, digests []string) []diag.Diagnostic {
 }
 
 // validateEntryProvenance checks the provider RPC's optional provenance triple.
-// All fields may be absent for a v1/channel-less provider, but a provider that
+// All fields may be absent for an entry without provenance, but a provider that
 // supplies any provenance field must supply a known producer and channel plus
 // a non-blank opaque producer identity.
 func validateEntryProvenance(field string, producer Producer, identity string, channel Channel) []diag.Diagnostic {

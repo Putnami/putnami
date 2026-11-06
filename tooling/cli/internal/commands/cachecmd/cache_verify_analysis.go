@@ -220,7 +220,7 @@ func analyzeTaskKeysAndArtifacts(
 			Severity: "error", Message: "captured artifact changed between equivalent live runs"})
 		task.DoubleRun = "failed"
 	}
-	if !hit.CacheHit || hit.CacheKey != a.CacheKey {
+	if !hit.ReuseKind().CacheHit() || hit.CacheKey != a.CacheKey {
 		addFinding(report, Finding{Check: "hit-live", Project: job.Project.ID, Task: key,
 			Severity: "error", Message: "verification cache entry was not restored as a hit"})
 		task.HitLive = "failed"

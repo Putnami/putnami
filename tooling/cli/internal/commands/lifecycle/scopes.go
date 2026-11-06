@@ -1,14 +1,15 @@
 package lifecycle
 
 import (
-	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
 	"sort"
 	"strings"
 
+	protocolcli "go.putnami.dev/protocol/cli"
 	wsproto "go.putnami.dev/protocol/workspace"
+	"go.putnami.dev/tooling/cli/internal/commands/shared"
 	"go.putnami.dev/tooling/cli/internal/iox"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
@@ -37,8 +38,8 @@ func ScopesList(wsRoot string, cfg *wsproto.Config, outputFormat string, warning
 
 	scopes := collectScopeInfos(wsRoot, cfg, ws)
 
-	if outputFormat == "jsonl" {
-		return scopesListJSONL(scopes)
+	if protocolcli.OutputMode(outputFormat).IsStructured() {
+		return shared.WriteResult(outputFormat, "scopes list", shared.RecordsData(scopes), warnings.Envelope())
 	}
 
 	if len(scopes) == 0 {
@@ -104,12 +105,4 @@ func collectScopeInfos(wsRoot string, cfg *wsproto.Config, ws *workspace.Workspa
 	})
 
 	return scopes
-}
-
-func scopesListJSONL(scopes []ScopeInfo) error {
-	for _, s := range scopes {
-		data, _ := json.Marshal(s)
-		iox.Fprintln(os.Stdout, string(data))
-	}
-	return nil
 }

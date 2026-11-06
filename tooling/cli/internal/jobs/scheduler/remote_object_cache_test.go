@@ -359,7 +359,7 @@ func TestObjectCacheEnvStaysOutOfCacheKeys(t *testing.T) {
 		t.Fatal("the second run reused the first socket; the test cannot prove the key ignores it")
 	}
 	for key, result := range warm.Results {
-		if !result.CacheHit {
+		if !result.ReuseKind().CacheHit() {
 			t.Fatalf("%s missed on the warm run: the object-cache environment moved its cache key", key)
 		}
 	}

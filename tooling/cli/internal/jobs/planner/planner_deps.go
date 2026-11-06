@@ -58,9 +58,7 @@ func emitUpstreamJobs(
 				}
 				stepID := dep[1:]
 				// Emission is gated on the SAME exact identity that resolution
-				// uses. The legacy "<project>:<stepID>" key probe that used to
-				// sit beside this one suppressed emission on a job that could
-				// never provide the step anyway.
+				// uses.
 				for _, depName := range ws.Graph.DependenciesOf(job.Project.ID) {
 					if len(index.matchingKeys(depName, cmdName, stepID)) > 0 {
 						continue
@@ -1152,10 +1150,8 @@ func isCommandRoot(job *jobmodel.ScheduledJob) bool {
 // job IS, never a derived display string, plan name or synthesized key. A
 // reference that matches nothing exactly is legal and contributes no edge:
 // `^generate` simply has no upstream provider in a project
-// whose dependencies do not run that step. A reference that matches nothing
-// exactly but WOULD have bound through one of the removed spellings is an
-// error, not a silent rebind and not a silent drop — see legacyReferenceLines.
-func resolveExternalDeps(jobs []*jobmodel.ScheduledJob, ws *workspace.Workspace) error {
+// whose dependencies do not run that step.
+func resolveExternalDeps(jobs []*jobmodel.ScheduledJob, ws *workspace.Workspace) {
 	// Build the lookup index once: by key, by project, and by identity name
 	// (the last drives the "*" wildcard branch below without rescanning jobs).
 	idx := buildPlannedIndex(jobs)
@@ -1170,7 +1166,6 @@ func resolveExternalDeps(jobs []*jobmodel.ScheduledJob, ws *workspace.Workspace)
 	resolveCommandDeps(jobs, commandLeaves)
 	resolveSessionCommandDeps(jobs, commandLeaves)
 
-	var legacy []legacyReference
 	for _, job := range jobs {
 		if job.JobDef.DependsOn == nil {
 			continue
@@ -1190,26 +1185,14 @@ func resolveExternalDeps(jobs []*jobmodel.ScheduledJob, ws *workspace.Workspace)
 			case strings.HasPrefix(dep, "^"):
 				// ^ = upstream dependencies
 				stepID := dep[1:]
-				want := exactIdentityDescription(cmdName, stepID)
 				for _, depName := range ws.Graph.DependenciesOf(job.Project.ID) {
-					keys := idx.matchingKeys(depName, cmdName, stepID)
-					if len(keys) == 0 {
-						legacy = appendLegacyReference(legacy, job, dep, want, idx.legacyKeys(depName, cmdName, stepID))
-						continue
-					}
-					resolved = append(resolved, keys...)
+					resolved = append(resolved, idx.matchingKeys(depName, cmdName, stepID)...)
 				}
 
 			case strings.HasPrefix(dep, "/"):
 				// / = workspace-level job
 				stepID := dep[1:]
-				keys := idx.matchingKeys(ws.Name, cmdName, stepID)
-				if len(keys) == 0 {
-					legacy = appendLegacyReference(legacy, job, dep,
-						exactIdentityDescription(cmdName, stepID), idx.legacyKeys(ws.Name, cmdName, stepID))
-					break
-				}
-				resolved = append(resolved, keys...)
+				resolved = append(resolved, idx.matchingKeys(ws.Name, cmdName, stepID)...)
 
 			case strings.HasPrefix(dep, "*"):
 				// * = all projects providing this step or command. byStepName
@@ -1218,30 +1201,17 @@ func resolveExternalDeps(jobs []*jobmodel.ScheduledJob, ws *workspace.Workspace)
 				// self-references and duplicates are pruned by dedupeSorted on
 				// resolved below.
 				stepID := dep[1:]
-				matched := 0
 				for _, j := range idx.byStepName[stepID] {
 					if j.Key() == job.Key() {
 						continue
 					}
-					matched++
 					resolved = append(resolved, j.Key())
-				}
-				if matched == 0 {
-					legacy = appendLegacyReference(legacy, job, dep,
-						fmt.Sprintf("command or step %q", stepID), idx.legacyWildcardKeys(job, stepID))
 				}
 			}
 		}
 
 		job.DependsOn = jobmodel.DedupeSorted(resolved)
 	}
-
-	if lines := legacyReferenceLines(legacy, maxDAGDiagnosticLines); len(lines) > 0 {
-		return fmt.Errorf("dependency references resolve only by a removed legacy spelling:\n%s",
-			strings.Join(lines, "\n"))
-	}
-
-	return nil
 }
 
 // orderContractClients orders a generated client's jobs after the provider jobs
@@ -1512,51 +1482,6 @@ func orderDependentReaders(
 	}
 }
 
-// legacyReference is one dependency reference that no longer resolves, together
-// with the plan keys a removed stringly fallback would have bound it to. It
-// exists so the removal fails loudly at plan time instead of quietly dropping
-// an edge the manifest author believed in.
-type legacyReference struct {
-	job *jobmodel.ScheduledJob
-	ref string
-	// want describes the exact identity the reference was looked up under, so
-	// the diagnostic states what the manifest would have to provide.
-	want  string
-	would []string
-}
-
-// exactIdentityDescription names the identity a step-scoped reference resolves
-// under.
-func exactIdentityDescription(cmdName, stepID string) string {
-	return fmt.Sprintf("command %q, step %q", cmdName, stepID)
-}
-
-func appendLegacyReference(acc []legacyReference, job *jobmodel.ScheduledJob, ref, want string, would []string) []legacyReference {
-	if len(would) == 0 {
-		return acc
-	}
-	return append(acc, legacyReference{job: job, ref: ref, want: want, would: would})
-}
-
-// legacyReferenceLines renders the rejection, naming the referencing job, the
-// reference as written, and every job the removed spelling would have bound —
-// everything the manifest owner needs to respell the reference exactly.
-func legacyReferenceLines(refs []legacyReference, limit int) []string {
-	if len(refs) == 0 {
-		return nil
-	}
-	var lines []string
-	for _, ref := range refs {
-		if len(lines) >= limit {
-			lines = append(lines, fmt.Sprintf("  ... and %d more legacy references", len(refs)-limit))
-			break
-		}
-		lines = append(lines, fmt.Sprintf("  %s depends on %q, which no job provides as (%s); the removed name match would have bound %s",
-			ref.job.Key(), ref.ref, ref.want, strings.Join(ref.would, ", ")))
-	}
-	return lines
-}
-
 // computeCommandLeaves finds the leaf steps (steps not depended on by
 // any other step in the same command+project) for each (project, command).
 // Returns a map of "projectID:commandName" → list of leaf job keys.
@@ -1743,33 +1668,26 @@ type plannedIndex struct {
 	// it belongs to and the step it is. These are the two things a reference is
 	// allowed to name.
 	byStepName map[string][]*jobmodel.ScheduledJob
-	// byLegacyName indexes each job under its DERIVED spellings (display name,
-	// plan name). Nothing resolves through it — it exists so a reference that
-	// names one of those spellings can be reported instead of
-	// silently losing its edge.
-	byLegacyName map[string][]*jobmodel.ScheduledJob
 }
 
 func buildPlannedIndex(jobs []*jobmodel.ScheduledJob) *plannedIndex {
 	idx := &plannedIndex{
-		byKey:        make(map[string]*jobmodel.ScheduledJob, len(jobs)),
-		byProject:    make(map[string][]*jobmodel.ScheduledJob),
-		byStepName:   make(map[string][]*jobmodel.ScheduledJob),
-		byLegacyName: make(map[string][]*jobmodel.ScheduledJob),
+		byKey:      make(map[string]*jobmodel.ScheduledJob, len(jobs)),
+		byProject:  make(map[string][]*jobmodel.ScheduledJob),
+		byStepName: make(map[string][]*jobmodel.ScheduledJob),
 	}
 	for _, job := range jobs {
 		idx.byKey[job.Key()] = job
 		pid := job.Project.ID
 		idx.byProject[pid] = append(idx.byProject[pid], job)
 		indexJobNames(idx.byStepName, job, job.CommandName(), job.StepID())
-		indexJobNames(idx.byLegacyName, job, job.DisplayName(), job.PlanName())
 	}
 	return idx
 }
 
 // indexJobNames adds job to index under each distinct non-empty name. An empty
-// name is skipped deliberately: a non-pipeline job has no step id, and matching
-// it by "no name" is the accidental binding this slice removes.
+// name is skipped: a non-pipeline job has no step id, and a reference never
+// binds a job by an empty name.
 func indexJobNames(index map[string][]*jobmodel.ScheduledJob, job *jobmodel.ScheduledJob, names ...string) {
 	seen := make(map[string]bool, len(names))
 	for _, name := range names {
@@ -1791,37 +1709,6 @@ func (idx *plannedIndex) matchingKeys(projectID, cmdName, stepID string) []strin
 		if job.CommandName() == cmdName && job.StepID() == stepID {
 			keys = append(keys, job.Key())
 		}
-	}
-	return jobmodel.DedupeSorted(keys)
-}
-
-// legacyKeys returns the plan keys a REMOVED spelling would have bound for a
-// reference that matched nothing exactly: a job in the same project whose
-// display or plan name equals stepID, or the synthesized "<project>:<command>~
-// <step>" key. Purely diagnostic — the caller turns a non-empty result into a
-// plan-time error.
-func (idx *plannedIndex) legacyKeys(projectID, cmdName, stepID string) []string {
-	var keys []string
-	for _, job := range idx.byLegacyName[stepID] {
-		if job.Project.ID == projectID {
-			keys = append(keys, job.Key())
-		}
-	}
-	if key := projectID + ":" + extension.StepJobName(cmdName, stepID); idx.byKey[key] != nil {
-		keys = append(keys, key)
-	}
-	return jobmodel.DedupeSorted(keys)
-}
-
-// legacyWildcardKeys is legacyKeys for the "*" reference, which spans projects:
-// it reports the jobs a derived-name wildcard match would have pulled in.
-func (idx *plannedIndex) legacyWildcardKeys(job *jobmodel.ScheduledJob, stepID string) []string {
-	var keys []string
-	for _, candidate := range idx.byLegacyName[stepID] {
-		if candidate.Key() == job.Key() {
-			continue
-		}
-		keys = append(keys, candidate.Key())
 	}
 	return jobmodel.DedupeSorted(keys)
 }

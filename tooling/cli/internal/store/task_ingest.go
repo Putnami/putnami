@@ -15,10 +15,8 @@ import (
 
 // Validate-complete ingest of a task-owned entry from a staging root.
 //
-// The legacy ingest (cas.go ingestFiles) answers "what is in this directory that
-// wasn't there before?". This one answers "does the staging root contain exactly
-// what the task declared?", and refuses to publish when it does not. The two
-// differences that matter:
+// The ingest answers "does the staging root contain exactly what the task
+// declared?", and refuses to publish when it does not. Two rules carry that:
 //
 //   - COMPLETENESS IS ENFORCED. A required declared output that is absent from
 //     the staging root — or present but empty — is ErrIncompleteCapture, not a
@@ -336,9 +334,7 @@ func (s *LocalStore) ingestOutputTree(srcDir, dstDir, id string, manifest *cache
 }
 
 // ingestOneFile publishes one file's bytes into the CAS, hardlinks them into the
-// staged files/ tree, and records the manifest entry under manifestPath. It is
-// the per-file half of ingestFiles, without the baseline subtraction the
-// declared model replaces.
+// staged files/ tree, and records the manifest entry under manifestPath.
 func (s *LocalStore) ingestOneFile(
 	srcPath, dstPath string,
 	info os.FileInfo,

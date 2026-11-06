@@ -141,7 +141,9 @@ func TestTelemetryShow_NoEventsJSONL(t *testing.T) {
 	if err != nil {
 		t.Fatalf("TelemetryShow: %v", err)
 	}
-	if strings.TrimSpace(out) != "[]" {
+	var events []any
+	sharedtest.ResultData(t, out, "telemetry show", &events)
+	if events == nil || len(events) != 0 {
 		t.Errorf("output = %q, want an empty JSON array", out)
 	}
 }
@@ -181,13 +183,10 @@ func TestTelemetryShow_JSONLFormat(t *testing.T) {
 	if err != nil {
 		t.Fatalf("TelemetryShow: %v", err)
 	}
-	line := strings.TrimSpace(out)
 	var events []struct {
 		Name string `json:"name"`
 	}
-	if err := json.Unmarshal([]byte(line), &events); err != nil {
-		t.Fatalf("parse JSON array output %q: %v", line, err)
-	}
+	sharedtest.ResultData(t, out, "telemetry show", &events)
 	if len(events) != 1 || events[0].Name != "test" {
 		t.Errorf("events = %v, want the one test event", events)
 	}

@@ -4,12 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"os"
 	"path/filepath"
 	"strings"
 
 	modelextension "go.putnami.dev/cli/model/extension"
+	protocolcli "go.putnami.dev/protocol/cli"
 	diag "go.putnami.dev/protocol/diagnostic"
 	proto "go.putnami.dev/protocol/template"
 
@@ -26,15 +26,12 @@ import (
 // TemplatesInstall installs templates from the workspace config and lock file.
 // If a specific name is given, only that template is installed/added.
 // Pass --latest in args to ignore the lock file and resolve the latest versions.
-// outputFormat selects the result rendering ("jsonl" for machine-readable).
+// A structured outputFormat (--output=json|jsonl) writes one "templates install"
+// result, one record per template outcome, instead of the human lines.
 func TemplatesInstall(ctx context.Context, wsRoot string, cfg *wsproto.Config, args []string, outputFormat string) error {
-	return templatesInstall(ctx, wsRoot, cfg, args, outputFormat, os.Stdout)
-}
-
-// templatesInstall is TemplatesInstall with the human progress stream chosen by
-// the caller — see extensionsInstall for why.
-func templatesInstall(ctx context.Context, wsRoot string, cfg *wsproto.Config, args []string, outputFormat string, out io.Writer) error {
-	return TemplatesInstallWithOptions(ctx, wsRoot, cfg, args, InstallOptions{OutputFormat: outputFormat, Out: out})
+	return WithActionRecords(outputFormat, "templates install", func(records *ActionRecords) error {
+		return TemplatesInstallWithOptions(ctx, wsRoot, cfg, args, InstallOptions{OutputFormat: outputFormat, Out: os.Stdout, Records: records})
+	})
 }
 
 // TemplatesInstallWithOptions installs templates and reports typed outcomes in
@@ -44,7 +41,8 @@ func TemplatesInstallWithOptions(ctx context.Context, wsRoot string, cfg *wsprot
 }
 
 // TemplatesUpdate updates one or all templates to the latest compatible version.
-// outputFormat selects the result rendering ("jsonl" for machine-readable).
+// A structured outputFormat (--output=json|jsonl) writes one "templates update"
+// result instead of the human lines.
 func TemplatesUpdate(ctx context.Context, wsRoot string, cfg *wsproto.Config, args []string, outputFormat string) error {
 	return TemplatesUpdateWithOptions(ctx, wsRoot, cfg, args, ArtifactUpdateOptions{}, outputFormat)
 }
@@ -72,8 +70,8 @@ func TemplatesList(wsRoot string, cfg *wsproto.Config, outputFormat string) erro
 	}
 	discovered, _ := template.DiscoverTemplates(wsRoot, projectPaths)
 
-	if outputFormat == "jsonl" {
-		return templatesListJSONL(tplMap, lockFile, discovered)
+	if protocolcli.OutputMode(outputFormat).IsStructured() {
+		return shared.WriteResult(outputFormat, "templates list", shared.RecordsData(templateListEntries(tplMap, lockFile, discovered)), nil)
 	}
 
 	iox.Fprintln(os.Stdout)
@@ -117,7 +115,7 @@ func parseTemplateArg(arg string) (string, string) {
 	return splitArtifactArg(arg)
 }
 
-func templatesListJSONL(tplMap map[string]string, lockFile *lockfile.LockFile, discovered []*template.TemplateDescription) error {
+func templateListEntries(tplMap map[string]string, lockFile *lockfile.LockFile, discovered []*template.TemplateDescription) []artifactListEntry {
 	var entries []artifactListEntry
 	for name, constraint := range tplMap {
 		entry := artifactListEntry{Name: name, Constraint: constraint, Source: "config"}
@@ -135,8 +133,7 @@ func templatesListJSONL(tplMap map[string]string, lockFile *lockfile.LockFile, d
 		}
 		entries = append(entries, artifactListEntry{Name: tpl.Name, Installed: tpl.Version, Source: "workspace"})
 	}
-
-	return printArtifactListJSONL(entries)
+	return entries
 }
 
 // TemplatesValidate validates a template manifest against the protocol.

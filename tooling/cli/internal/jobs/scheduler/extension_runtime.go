@@ -1225,7 +1225,6 @@ func startRuntimeHandshake(ctx context.Context, executable string, stdout, stder
 		// interprocedural taint sibling. Suppressed HERE rather than added to the
 		// project excludes, so the analyzer stays armed for every other exec in
 		// the CLI.
-		//nolint:gosec // G702: validated, manifest-declared runtime path; executing it is the point.
 		cmd := exec.CommandContext(ctx, executable, "__putnami", "runtime-info")
 		cmd.Stdout = stdout
 		cmd.Stderr = stderr

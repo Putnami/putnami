@@ -129,7 +129,7 @@ func TestScopedCacheBypass_SparesTheDependencyClosure(t *testing.T) {
 	if got := subprocessRuns(t, appLog); got != 2 {
 		t.Fatalf("/app spawns = %d, want 2: a bypassed task must publish nothing for a later run to be served", got)
 	}
-	if !resultOf(t, second, planned, 0).CacheHit {
+	if !resultOf(t, second, planned, 0).ReuseKind().CacheHit() {
 		t.Error("/lib did not report a cache hit in the run that allowed one")
 	}
 
@@ -139,7 +139,7 @@ func TestScopedCacheBypass_SparesTheDependencyClosure(t *testing.T) {
 	if got := subprocessRuns(t, appLog); got != 2 {
 		t.Fatalf("/app spawns = %d, want 2: its key is unstable, so the run-2 miss proved nothing", got)
 	}
-	if !resultOf(t, third, planned, 1).CacheHit {
+	if !resultOf(t, third, planned, 1).ReuseKind().CacheHit() {
 		t.Error("/app did not report a cache hit once the bypass was gone")
 	}
 

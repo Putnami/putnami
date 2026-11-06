@@ -184,7 +184,6 @@ func (r *RemoteCache) RestoreTaskResult(
 	if recorded.Metadata != nil {
 		durationMs = recorded.Metadata.DurationMs
 	}
-	r.recordRestoredHit(hash, cachekey.ActionResultFromEntryResult(recorded.Result, durationMs, 0, r.actionEvents),
-		nil, durationMs, 0, start, time.Now())
+	r.recordRestoredHit(durationMs, 0, start, time.Now())
 	return recorded, jobmodel.ReuseRemoteCache
 }

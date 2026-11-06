@@ -82,9 +82,8 @@ func (s *LocalStore) markUsed(hash string) {
 
 // getAndTouch returns the entry for hash AND stamps its lastUsed time +
 // generation atomically under the shared lock, so a concurrent GC (exclusive)
-// cannot evict the entry in the window between the read and the stamp. This is
-// the cache-HIT read path; plain Get is for GC enumeration and tests, which must
-// not refresh recency.
+// cannot evict the entry in the window between the read and the stamp. It reads
+// format-1 entries under Get's contract; plain Get does not refresh recency.
 func (s *LocalStore) getAndTouch(hash string) (*Entry, error) {
 	s.ensureGeneration()
 	release := s.lockShared()

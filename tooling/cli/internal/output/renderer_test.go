@@ -235,7 +235,7 @@ func TestMachineRenderers_BoundedStreamOmitsButAggregateCarriesCacheSummary(t *t
 	var buf bytes.Buffer
 	r := NewRenderer(Config{Output: "jsonl", Out: &buf, Err: &buf})
 	job := makeRendererTestJob()
-	cached := &scheduler.JobResult{Status: "success", CacheHit: true}
+	cached := &scheduler.JobResult{Status: "success", Reuse: scheduler.ReuseLocalCache}
 
 	r.Start([]*scheduler.ScheduledJob{job})
 	r.JobStart(job)

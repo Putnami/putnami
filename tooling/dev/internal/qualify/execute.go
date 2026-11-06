@@ -305,7 +305,7 @@ func (r *execution) probeReady(ctx context.Context, endpoint string) (bool, stri
 	if err != nil {
 		return false, err.Error()
 	}
-	response, err := r.client.Do(request) //nolint:gosec // G704: the destination is the qualify target the user named; reaching it is the command's purpose, and redirects are never followed
+	response, err := r.client.Do(request)
 	if err != nil {
 		return false, err.Error()
 	}
@@ -330,7 +330,7 @@ func (r *execution) versionBinding(ctx context.Context, target Target, phase *qu
 		fail(phase, qualifyproto.StateTargetUnreachable, qualifyproto.PhaseCodeTargetUnreachable, "%v", err)
 		return
 	}
-	response, err := r.client.Do(request) //nolint:gosec // G704: the destination is the qualify target the user named; reaching it is the command's purpose, and redirects are never followed
+	response, err := r.client.Do(request)
 	if err != nil {
 		switch {
 		case interrupted(ctx, phase):
@@ -428,7 +428,7 @@ func (r *execution) send(ctx context.Context, request qualifyproto.Request, resu
 		result.State, result.Reason = qualifyproto.StateFailed, err.Error()
 		return
 	}
-	response, err := r.client.Do(httpRequest) //nolint:gosec // G704: the destination is the qualify target the user named; reaching it is the command's purpose, and redirects are never followed
+	response, err := r.client.Do(httpRequest)
 	if err == nil {
 		result.Status = response.StatusCode
 		err = drain(response)

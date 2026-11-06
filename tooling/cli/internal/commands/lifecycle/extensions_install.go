@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"os"
 
 	protocolcli "go.putnami.dev/protocol/cli"
 	wsproto "go.putnami.dev/protocol/workspace"
@@ -31,10 +32,24 @@ import (
 // no OnAction the same lines go to env.Out. When the content step fails after
 // the opt-in was written, both declarations and the lock pin stay and the error
 // names `putnami install` as the next step.
+//
+// A structured outputFormat (--output=json|jsonl) writes one "extensions
+// install" result, one record per extension outcome, once the agent content
+// step succeeds too, so a failure leaves only the failure result on stdout.
 func ExtensionsInstallNamed(ctx context.Context, wsRoot string, cfg *wsproto.Config, args []string, outputFormat string, env LifecycleEnv) error {
-	if err := extensions.ExtensionsInstall(ctx, wsRoot, cfg, args, outputFormat); err != nil {
-		return err
-	}
+	return extensions.WithActionRecords(outputFormat, "extensions install", func(records *extensions.ActionRecords) error {
+		if err := extensions.ExtensionsInstallWithOptions(ctx, wsRoot, cfg, args, extensions.InstallOptions{
+			OutputFormat: outputFormat, Out: os.Stdout, Records: records,
+		}); err != nil {
+			return err
+		}
+		return installNamedAgentContent(ctx, wsRoot, cfg, args, env)
+	})
+}
+
+// installNamedAgentContent opts the extension named in args into its agent
+// content and materializes that content (ExtensionsInstallNamed).
+func installNamedAgentContent(ctx context.Context, wsRoot string, cfg *wsproto.Config, args []string, env LifecycleEnv) error {
 	name := extensions.InstallTargetName(args)
 	if name == "" || !installWritesWorkspace() {
 		return nil

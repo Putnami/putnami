@@ -94,7 +94,6 @@ func waitReadable(fd int) error {
 func Exec(path string, argv, env []string) error {
 	c := held.Load()
 	if c == nil {
-		//nolint:gosec // G702: path is the putnami binary launch resolved, the workspace-pinned CLI or the one upgrade just installed; replacing this process with it is the point. Args go straight to exec — no shell.
 		return syscall.Exec(path, argv, env)
 	}
 	return StartHolder("the CLI "+path, func() error {
@@ -106,7 +105,6 @@ func Exec(path string, argv, env []string) error {
 		syscall.ForkLock.RLock()
 		_, err = unix.FcntlInt(uintptr(fd), unix.F_SETFD, 0)
 		if err == nil {
-			//nolint:gosec // G702: the same binary as above; next is argv with only the --credential-fd value set. Args go straight to exec — no shell.
 			err = syscall.Exec(path, next, env)
 		}
 		_ = unix.Close(fd)

@@ -17,9 +17,10 @@ import (
 )
 
 // CacheEntryPresent reports whether the local store contains the cache entry a
-// job would actually consume. Declared-capture entries and legacy entries use
-// different, format-qualified addresses; keeping this projection here prevents
-// plan emitters from treating a legacy blob as a hit for a declared task.
+// job would actually consume: the task-owned entry of a job that declares its
+// outputs. The scheduler reuses nothing else, so a job without a declaration
+// is never reported present, and a format-1 entry at the raw key never reads
+// as a hit.
 //
 // A source-bound task's entry is never reported present. Its store key also
 // binds the project's current source binding (SourceBoundEntryKey), which
@@ -32,11 +33,10 @@ func CacheEntryPresent(cache *store.CacheManager, job *jobmodel.ScheduledJob, ha
 	if hash == "" || TaskIsSourceBound(job) {
 		return false, nil
 	}
-	if jobmodel.UsesDeclaredCapture(job) {
-		entry, err := cache.LookupTaskEntry(hash)
-		return err == nil && entry != nil, err
+	if !jobmodel.UsesDeclaredCapture(job) {
+		return false, nil
 	}
-	entry, err := cache.Lookup(hash)
+	entry, err := cache.LookupTaskEntry(hash)
 	return err == nil && entry != nil, err
 }
 

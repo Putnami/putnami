@@ -141,7 +141,7 @@ func runWorkload(command string, args []string, contextFile string, stdout, stde
 	}
 	launchContext, err := job.ParseFile(contextFile)
 	if err != nil {
-		fmt.Fprintf(stderr, "putnami: %s: %v\n", command, err) //nolint:gosec // G705: stderr is a terminal or a log, never an HTTP response
+		fmt.Fprintf(stderr, "putnami: %s: %v\n", command, err)
 		return protocolcli.ExitFailure
 	}
 	launch := workloadLaunch{
@@ -218,7 +218,7 @@ func runVersion(sub string, args []string, contextFile string, stdout, stderr io
 	if contextFile != "" {
 		launch, err := job.ParseFile(contextFile)
 		if err != nil {
-			fmt.Fprintf(stderr, "version %s: %v\n", sub, err) //nolint:gosec // G705: stderr is a terminal or a log, never an HTTP response
+			fmt.Fprintf(stderr, "version %s: %v\n", sub, err)
 			return protocolcli.ExitFailure
 		}
 		command.Output = protocolcli.OutputMode(launch.Params.String("output"))
@@ -226,7 +226,7 @@ func runVersion(sub string, args []string, contextFile string, stdout, stderr io
 	}
 	root, err := os.Getwd()
 	if err != nil {
-		fmt.Fprintf(stderr, "version %s: %v\n", sub, err) //nolint:gosec // G705: stderr is a terminal or a log, never an HTTP response
+		fmt.Fprintf(stderr, "version %s: %v\n", sub, err)
 		return protocolcli.ExitFailure
 	}
 	command.Root = root

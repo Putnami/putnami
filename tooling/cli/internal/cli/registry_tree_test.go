@@ -2,7 +2,6 @@ package cli
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"os"
 	"os/exec"
@@ -16,6 +15,7 @@ import (
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/sdk/extension/gitread"
 	"go.putnami.dev/tooling/cli/internal/cmderr"
+	"go.putnami.dev/tooling/cli/internal/commands/sharedtest"
 	"go.putnami.dev/tooling/cli/internal/iox"
 )
 
@@ -119,9 +119,7 @@ func TestCmdTreeFingerprintStructuredOutputMirrorsTheRecord(t *testing.T) {
 		t.Fatalf("tree fingerprint --output=jsonl: %v", err)
 	}
 	var tree protocolcli.SessionTree
-	if err := json.Unmarshal([]byte(output), &tree); err != nil {
-		t.Fatalf("parse %q: %v", output, err)
-	}
+	sharedtest.ResultData(t, output, "tree fingerprint", &tree)
 	if !lowercaseSHA256Command.MatchString(tree.Fingerprint) {
 		t.Errorf("fingerprint = %q, want a lowercase hex sha256", tree.Fingerprint)
 	}

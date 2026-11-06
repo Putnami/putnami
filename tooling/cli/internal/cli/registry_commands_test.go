@@ -174,14 +174,20 @@ func TestBareCacheListsItsSubcommandsAndTouchesNoStore(t *testing.T) {
 			writeCacheDryRunMarkerExtension(t, wsRoot, marker)
 
 			cacheStore := store.NewLocalStore(storeRoot)
-			source := t.TempDir()
-			if err := os.WriteFile(filepath.Join(source, "kept.bin"), []byte("kept"), 0o644); err != nil {
+			staging := t.TempDir()
+			kept := store.DeclaredEntryOutput{ID: "kept", Kind: extension.OutputKindFile, Root: extension.OutputRootProject, Path: "kept.bin"}
+			keptPath := store.TaskStagingPath(staging, kept)
+			if err := os.MkdirAll(filepath.Dir(keptPath), 0o755); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.WriteFile(keptPath, []byte("kept"), 0o644); err != nil {
 				t.Fatal(err)
 			}
 			hash := strings.Repeat("b", 64)
-			if err := cacheStore.Put(hash, &store.Entry{
-				Result:   &store.EntryResult{Status: "success"},
-				FilesDir: source,
+			if _, err := cacheStore.IngestTaskEntry(staging, store.TaskEntrySpec{
+				Key:     hash,
+				Result:  &store.EntryResult{Status: "success"},
+				Outputs: []store.DeclaredEntryOutput{kept},
 			}); err != nil {
 				t.Fatalf("seed cache entry: %v", err)
 			}
@@ -216,7 +222,7 @@ func TestBareCacheListsItsSubcommandsAndTouchesNoStore(t *testing.T) {
 					t.Errorf("putnami %s error = %q, want it to contain %q", strings.Join(args, " "), err, want)
 				}
 			}
-			if entry, getErr := cacheStore.Get(hash); getErr != nil || entry == nil {
+			if entry, getErr := cacheStore.LookupTaskEntry(hash); getErr != nil || entry == nil {
 				t.Fatalf("putnami %s deleted a cache entry: entry=%v err=%v", strings.Join(args, " "), entry, getErr)
 			}
 			if _, statErr := os.Stat(marker); !os.IsNotExist(statErr) {

@@ -49,7 +49,7 @@ func ReportShow(wsRoot, sessionID, outputFormat string) error {
 	if protocolcli.OutputMode(outputFormat).IsStructured() {
 		// DELIBERATE divergence from the structured-command norm: this command
 		// writes the recorded document RAW instead of wrapping it in a result
-		// envelope, and the dispatcher registers it as such (registerRawCommand).
+		// envelope; a failure still takes the shared failure envelope.
 		// Every other structured command's payload exists only inside the
 		// envelope; a report is itself a versioned, validated contract document,
 		// and a consumer that POSTs it — cloud's CI runner — must post exactly the

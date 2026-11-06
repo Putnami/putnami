@@ -153,7 +153,6 @@ func (p *proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		writeUnavailable(w, backendNotReadyBody)
 		return
 	}
-	//nolint:gosec // G704: the destination is 127.0.0.1 at the port the member announced; nothing in the request selects it.
 	p.reverse.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), backendPortKey{}, backend)))
 }
 

@@ -65,7 +65,7 @@ func TestWorkspaceFetchWire_ReadsTheCredentialDescriptor(t *testing.T) {
 			if code != tc.code {
 				t.Fatalf("exit code = %d, want %d\nstderr:\n%s\n%s", code, tc.code, stderr, eventLines(events))
 			}
-			requireJobStream(t, events, "workspace-fetch", runtimeproto.ProtocolVersion2, tc.status)
+			requireJobStream(t, events, "workspace-fetch", runtimeproto.ProtocolVersion, tc.status)
 			if strings.Contains(eventLines(events), fetchWireBearer) || strings.Contains(stderr, fetchWireBearer) {
 				t.Errorf("the bearer reached the job's output:\n%s\n%s", eventLines(events), stderr)
 			}

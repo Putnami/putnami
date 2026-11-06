@@ -233,23 +233,22 @@ stream.
   [`doc/adr/0002-blob-exchange-directory-boundary.md`](doc/adr/0002-blob-exchange-directory-boundary.md).
 - **Version and compatibility.** `ProviderProtocolVersion` is separate from the
   HTTP `ProtocolVersion`; a single `@putnami/cloud` build speaks both. Provider
-  RPC v2 adds cache-entry provenance but its strict parsers accept legacy v1
-  envelopes, so channel-less providers continue to work. The CLI always starts
-  `initialize` with a v1 envelope and payload, and advertises
-  `provider-protocol-v2` through the already-tolerant capabilities list. A v2
-  provider may select v2 in `InitializeResult`; a v1 provider ignores the
-  unknown capability and selects v1. The session uses that selected version for
-  every later request, and the provider echoes the bootstrap version in its
-  initialize response envelope. A provider emits the new fields only for a v2
-  negotiation; an absent channel is deliberately a legacy signal for the CLI's
-  local trust policy, not an implicit trusted entry.
+  RPC v2 adds cache-entry provenance, and the strict parsers accept v2 only
+  (`ProviderProtocolMinVersion` is 2). The CLI sends `initialize` and every
+  later request at v2, and lists `provider-protocol-v2` in the capabilities,
+  because a provider released at `cloud/v0.4.0` selects v2 only when it sees
+  that token. A provider that selects another version fails `initialize`. An
+  absent channel marks an entry the provider holds no provenance for: the
+  CLI's local trust policy reads it as a hint, never as an implicit trusted
+  entry.
 - **Entry provenance.** `upload` accepts `producer` (`ci` or `developer`), an
   opaque `producerIdentity`, and `channel` (`trusted` or `hint`); these are
   syntactically validated but **untrusted assertions**. The provider/cache
   server derives and overwrites all three values from authenticated identity
   before persistence, so a developer client cannot self-declare CI. On a
   restore hit, the provider returns the persisted, provider-authoritative triple
-  for the CLI's trust policy. V1/channel-less results omit all three fields.
+  for the CLI's trust policy. A result for an entry without provenance omits
+  all three fields.
 - **Ops.** `initialize` (capabilities + known-digests handshake, returns the
   provider version for the gate), `authenticate`, `prefetch`, `restore` (`hit` /
   `miss` / `error` — the restore-failure signal), `upload`, `marker-lookup`,
@@ -386,10 +385,9 @@ conformance corpus pins every message on both contracts.
   rejects a mismatch instead of misreading fields.
 - `ProviderProtocolVersion` (RPC) is deliberately separate and evolves on its
   own clock; one provider build speaks both. `ProviderProtocolMinVersion`
-  records the oldest RPC version current parsers accept, and
+  records the oldest RPC version current parsers accept, v2, and
   `ProviderProtocolProvenanceVersion` the first that carries cache-entry
-  provenance. A session bootstraps `initialize` with the v1 shape and negotiates
-  up, so a channel-less v1 provider keeps working.
+  provenance, also v2. A session sends `initialize` at v2.
 - Growth is **additive by route, never by field**: `find-missing`,
   `commit-batch`, `upload-grant`, `upload-batch`, and `download-batch` are new
   paths gated behind `GET /v1/cache/capabilities`, which is why they did not
@@ -452,7 +450,7 @@ and [`doc/adr/0002-blob-exchange-directory-boundary.md`](doc/adr/0002-blob-excha
 - **Evidence:** the CLI ships the provider-RPC client in every release and every
   remote-cache session in CI runs through it; both contracts are pinned by the
   fixture corpus above plus determinism tests; compatibility is enforced in code
-  by capability gating and by v2↔v1 provider negotiation with a fake-provider
+  by capability gating and by the v2 provider bootstrap with a fake-provider
   end-to-end test.
 - **Why not `stable`:** the only provider on the other side of this contract is
   the Putnami cloud cache server. No provider across a boundary this repository

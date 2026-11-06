@@ -1,1 +1,1 @@
-{ "protocolVersion": 1, "id": 99, "op": "shutdown" }
+{ "protocolVersion": 2, "id": 99, "op": "shutdown" }

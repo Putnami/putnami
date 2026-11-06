@@ -29,7 +29,7 @@ func buildSyntheticStore(b *testing.B, root string, entries, filesPerEntry int) 
 			}
 		}
 		hash := fmt.Sprintf("%x", sha256.Sum256(fmt.Appendf(nil, "entry %d", e)))
-		if err := s.Put(hash, entryWith(dir)); err != nil {
+		if err := putFormatOneEntry(s, hash, entryWith(dir)); err != nil {
 			b.Fatalf("Put %s: %v", hash, err)
 		}
 		_ = os.RemoveAll(dir)

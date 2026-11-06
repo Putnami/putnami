@@ -141,7 +141,7 @@ func (t *urlTarget) Open(ctx context.Context) (string, qualifyproto.Binding, err
 	if err != nil {
 		return "", binding, &TargetError{State: qualifyproto.StateTargetUnreachable, Code: qualifyproto.PhaseCodeTargetUnreachable, Err: err}
 	}
-	response, err := t.client.Do(request) //nolint:gosec // G704: the destination is the --target URL the user named, validated by ParseTargetURL; redirects are never followed
+	response, err := t.client.Do(request)
 	if err != nil {
 		if ctx.Err() != nil {
 			return "", binding, ctx.Err()

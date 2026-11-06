@@ -147,9 +147,9 @@ type dockerRoute struct {
 // other registry keeps the direct path. An empty registry pushes nothing and
 // consults no route at all.
 //
-// The broker only carries manifest and blob requests, so a daemon-built
-// candidate (no OCI layout, no digest) cannot be published through it; that is
-// refused here rather than let `docker push` bypass the broker.
+// The broker only carries manifest and blob requests addressed by digest, so a
+// candidate without an OCI layout and a digest is refused here, before any
+// credential is resolved.
 func resolveDockerRoute(registry string, manifest *pkgmeta.DockerManifest) (dockerRoute, error) {
 	if registry == "" {
 		return dockerRoute{}, nil

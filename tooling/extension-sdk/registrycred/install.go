@@ -264,16 +264,17 @@ func mentionsNoSession(lower string) bool {
 // only the second is worth warning about: a core-only install is a supported
 // configuration.
 //
-// A core-only putnami does not say "unknown command". It runs `cloud` as a task
-// pipeline, reads `registry-token` as a project selector, and exits 2 with
-// "flag --host is not declared by `cloud`" and "no project matched --projects
-// "registry-token"" (recorded in testdata/recorded/registry-token/core-only-cli).
-// A CLI that has the cloud extension names the subcommand in its flag notice —
+// A core-only putnami does not say "unknown command". It reads `cloud` as a
+// task pipeline and exits 2 on "flag --host is not declared by `cloud`". A
+// 0.4.0 CLI prints that line as a warning, reads `registry-token` as a project
+// selector and exits 2 with "no project matched --projects "registry-token""
+// (recorded in testdata/recorded/registry-token/core-only-cli). A CLI that has
+// the cloud extension names the subcommand in its flag message —
 // "`cloud registry-token`" — and never reads the subcommand as a project.
 func mentionsUnknownCommand(lower string) bool {
 	for _, marker := range []string{
 		"unknown command", "unknown subcommand", "not a putnami command",
-		"is not declared by `" + registry.SeamParentCommand + "`;",
+		"is not declared by `" + registry.SeamParentCommand + "`",
 		"no project matched --projects \"" + registry.SeamSubcommand + "\"",
 	} {
 		if strings.Contains(lower, marker) {

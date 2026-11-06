@@ -68,7 +68,7 @@ func TestMaterialize_CreatesGettableEntry(t *testing.T) {
 	entry, digest := hitEntry("dist/app.js", content)
 	f := &inmemFetcher{blobs: map[string][]byte{digest: []byte(content)}}
 
-	if err := s.Materialize(hashA, entry, f.fetch); err != nil {
+	if err := materializeFormatOneEntry(s, hashA, entry, f.fetch); err != nil {
 		t.Fatalf("Materialize: %v", err)
 	}
 
@@ -111,7 +111,7 @@ func TestMaterialize_ReusesLocalBlobWithoutFetch(t *testing.T) {
 	entry, _ := hitEntry("b.txt", content)
 	f := &inmemFetcher{blobs: map[string][]byte{}}
 
-	if err := s.Materialize(hashB, entry, f.fetch); err != nil {
+	if err := materializeFormatOneEntry(s, hashB, entry, f.fetch); err != nil {
 		t.Fatalf("Materialize with local dedup: %v", err)
 	}
 	if len(f.opened) != 0 {
@@ -157,7 +157,7 @@ func TestMaterialize_ParallelMultiFileAndDedup(t *testing.T) {
 	}
 	f := &inmemFetcher{blobs: blobs}
 
-	if err := s.Materialize(hashA, entry, f.fetch); err != nil {
+	if err := materializeFormatOneEntry(s, hashA, entry, f.fetch); err != nil {
 		t.Fatalf("Materialize: %v", err)
 	}
 
@@ -204,7 +204,7 @@ func TestMaterialize_RejectsCorruptBlob(t *testing.T) {
 	// Fetcher returns bytes that do not match the manifest digest.
 	f := &inmemFetcher{blobs: map[string][]byte{digest: []byte("tampered content")}}
 
-	err := s.Materialize(hashA, entry, f.fetch)
+	err := materializeFormatOneEntry(s, hashA, entry, f.fetch)
 	if err == nil {
 		t.Fatal("expected an error for a blob that does not match its digest")
 	}
@@ -223,7 +223,7 @@ func TestMaterialize_RequiresFetcherForMissingBlob(t *testing.T) {
 	s := NewLocalStore(t.TempDir())
 	entry, _ := hitEntry("x.txt", "bytes not in cas")
 
-	err := s.Materialize(hashA, entry, nil)
+	err := materializeFormatOneEntry(s, hashA, entry, nil)
 	if err == nil {
 		t.Fatal("expected an error materializing a missing blob without a fetcher")
 	}
@@ -234,7 +234,7 @@ func TestMaterialize_RequiresFetcherForMissingBlob(t *testing.T) {
 
 func TestMaterialize_RequiresManifest(t *testing.T) {
 	s := NewLocalStore(t.TempDir())
-	err := s.Materialize(hashA, &Entry{Result: &EntryResult{Status: "success"}}, nil)
+	err := materializeFormatOneEntry(s, hashA, &Entry{Result: &EntryResult{Status: "success"}}, nil)
 	if err == nil || !strings.Contains(err.Error(), "manifest required") {
 		t.Fatalf("expected a manifest-required error, got: %v", err)
 	}

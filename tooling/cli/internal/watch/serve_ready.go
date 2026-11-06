@@ -43,7 +43,7 @@ import (
 // a serve iteration its hot reload, while arming early restarts a server that
 // is not listening yet and races the port it has not bound.
 func isServeReadyEvent(event jobs.RawJobEvent) bool {
-	if event.Type != jobs.EventTypeReady || event.Version != runtimeproto.ProtocolVersion2 {
+	if event.Type != jobs.EventTypeReady || event.Version != runtimeproto.ProtocolVersion {
 		return false
 	}
 	data, err := runtimeproto.ExtractReadyData(event.Data)

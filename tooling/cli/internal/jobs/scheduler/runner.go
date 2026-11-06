@@ -153,20 +153,6 @@ type jobReadResult struct {
 	result *JobResult
 }
 
-// clampWallToFirstEvent is the single definition of the startup-latency clamp.
-// cmd.Wait can win the scheduling race with the stdout reader even though the
-// child necessarily wrote the parsed event before it exited, so a measured wall
-// can come out shorter than the startup latency it contains. Both the
-// subprocess attempt (RunJob) and the scheduler-level task wall
-// (Scheduler.closeTask) clamp the same way; defining it once keeps the two from
-// drifting into different timing semantics.
-func clampWallToFirstEvent(wall, spawnToFirstEvent time.Duration, firstEventObserved bool) time.Duration {
-	if firstEventObserved && wall < spawnToFirstEvent {
-		return spawnToFirstEvent
-	}
-	return wall
-}
-
 // jobInvocation is the resolved subprocess setup shared by RunJob and
 // RunJobInteractiveWithStreams: the serialized context file, the template-expanded
 // command line, and the assembled environment.
@@ -694,13 +680,12 @@ func runJob(
 		close(waitDone)
 	}()
 
-	// Wait for process exit. Two walls are taken here, not one: `duration` is the
-	// TASK's attempt (it starts before the context file and the output directory
-	// are prepared), while `spawnWall` is the SUBPROCESS's own, which is what the
-	// physical execution record reports because it is the wall the rusage below
-	// accounts for.
+	// Wait for process exit. Two walls are taken, not one: `spawnWall` is the
+	// SUBPROCESS's own, sampled at its exit, which is what the physical
+	// execution record reports because it is the wall the rusage below accounts
+	// for; `duration` is the TASK's attempt (it starts before the context file
+	// and the output directory are prepared).
 	waitErr := <-waitCh
-	duration := time.Since(start)
 	spawnWall := time.Since(spawnedAt)
 
 	// Once the root exited, the rest of the job's group is asked to exit. A
@@ -710,6 +695,10 @@ func runJob(
 	// it holds the pipes or not.
 	_ = tree.Terminate()
 	evResult := waitForJobRead(eventsCh, stdout, tree)
+	// `duration` is sampled once the stdout reader returned, which happens
+	// after the reader observed the first event, and `start` precedes
+	// `spawnedAt`: the attempt's wall therefore contains spawnToFirstEvent.
+	duration := time.Since(start)
 	stderrText := waitForJobStderr(stderrCh, stderr, tree)
 	stopProcessGroup(tree, processGroupKillDelay)
 
@@ -725,7 +714,7 @@ func runJob(
 		}
 	}
 	result.Events = evResult.events
-	result.Duration = clampWallToFirstEvent(duration, spawnToFirstEvent, firstEventObserved)
+	result.Duration = duration
 	result.SpawnToFirstEvent = spawnToFirstEvent
 	result.FirstEventObserved = firstEventObserved
 	// The spawn site records the physical execution — id, wall, CPU split into

@@ -66,12 +66,12 @@ func assertNoStagedBlobs(t *testing.T, root string) {
 // fails while a blob with that digest exists is a lost race, not an error. The
 // digest names the bytes, so the entry links the blob the other writer
 // published, and this handle counts no bytes it did not write.
-func TestPutSucceedsWhenAnotherWriterPublishedTheBlob(t *testing.T) {
+func TestFormatOneWriteSucceedsWhenAnotherWriterPublishedTheBlob(t *testing.T) {
 	root := t.TempDir()
 	s := NewLocalStore(root)
 	loseBlobPublishRace(t)
 
-	if err := s.Put(hashA, entryWith(makeSource(t, "built"))); err != nil {
+	if err := putFormatOneEntry(s, hashA, entryWith(makeSource(t, "built"))); err != nil {
 		t.Fatalf("Put after a lost blob race: %v", err)
 	}
 	entry, err := s.Get(hashA)
@@ -90,12 +90,12 @@ func TestPutSucceedsWhenAnotherWriterPublishedTheBlob(t *testing.T) {
 
 // TestPutFailsWhenTheBlobPublishFailsAndNoBlobExists pins the other side of
 // F2: without a blob at the digest, the failed rename is the error.
-func TestPutFailsWhenTheBlobPublishFailsAndNoBlobExists(t *testing.T) {
+func TestFormatOneWriteFailsWhenTheBlobPublishFailsAndNoBlobExists(t *testing.T) {
 	root := t.TempDir()
 	s := NewLocalStore(root)
 	failBlobPublish(t)
 
-	err := s.Put(hashA, entryWith(makeSource(t, "built")))
+	err := putFormatOneEntry(s, hashA, entryWith(makeSource(t, "built")))
 	if !errors.Is(err, errHeldOpen) {
 		t.Fatalf("Put = %v, want the failed blob rename", err)
 	}
@@ -112,7 +112,7 @@ func TestMaterializeSucceedsWhenAnotherWriterPublishedTheFetchedBlob(t *testing.
 	content := "remote artifact bytes"
 	entry, digest := hitEntry("dist/app.js", content)
 	f := &inmemFetcher{blobs: map[string][]byte{digest: []byte(content)}}
-	if err := s.Materialize(hashA, entry, f.fetch); err != nil {
+	if err := materializeFormatOneEntry(s, hashA, entry, f.fetch); err != nil {
 		t.Fatalf("Materialize after a lost blob race: %v", err)
 	}
 	got, err := s.Get(hashA)
@@ -139,7 +139,7 @@ func TestMaterializeFailsWhenTheFetchedBlobPublishFailsAndNoBlobExists(t *testin
 	content := "remote artifact bytes"
 	entry, digest := hitEntry("dist/app.js", content)
 	f := &inmemFetcher{blobs: map[string][]byte{digest: []byte(content)}}
-	err := s.Materialize(hashA, entry, f.fetch)
+	err := materializeFormatOneEntry(s, hashA, entry, f.fetch)
 	if !errors.Is(err, errHeldOpen) {
 		t.Fatalf("Materialize = %v, want the failed blob rename", err)
 	}

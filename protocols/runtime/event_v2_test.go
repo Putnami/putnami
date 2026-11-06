@@ -17,7 +17,7 @@ func readyEvent(t *testing.T, data ReadyData) *Event {
 	if err != nil {
 		t.Fatal(err)
 	}
-	return &Event{V: ProtocolVersion2, Type: EventReady, Data: payload}
+	return &Event{V: ProtocolVersion, Type: EventReady, Data: payload}
 }
 
 func TestValidateReadyEvent_Valid(t *testing.T) {
@@ -171,7 +171,7 @@ func TestValidateReadyEvent_Rejects(t *testing.T) {
 
 func TestValidateReadyEvent_MissingData(t *testing.T) {
 	spectest.Proves(t, "runtime/event-stream", "readiness-is-typed-and-canonical", "a-ready-payload-is-validated")
-	diags := ValidateEvent(&Event{V: ProtocolVersion2, Type: EventReady})
+	diags := ValidateEvent(&Event{V: ProtocolVersion, Type: EventReady})
 	if !diag.HasErrors(diags) {
 		t.Fatal("ready event without data must be rejected")
 	}
@@ -182,7 +182,7 @@ func TestValidateReadyEvent_MissingData(t *testing.T) {
 
 func TestValidateReadyEvent_MalformedData(t *testing.T) {
 	spectest.Proves(t, "runtime/event-stream", "readiness-is-typed-and-canonical", "a-ready-payload-is-validated")
-	evt := &Event{V: ProtocolVersion2, Type: EventReady, Data: json.RawMessage(`{"target":42}`)}
+	evt := &Event{V: ProtocolVersion, Type: EventReady, Data: json.RawMessage(`{"target":42}`)}
 	diags := ValidateEvent(evt)
 	if !diag.HasErrors(diags) {
 		t.Fatal("ready event with a malformed payload must be rejected")
@@ -193,11 +193,11 @@ func TestValidateReadyEvent_MalformedData(t *testing.T) {
 }
 
 // TestV1RejectsReadyEvent is the additivity guard on the event vocabulary:
-// `ready` exists only at v2, so a v1 emitter cannot smuggle it in.
+// `ready` exists only at v2, so a version 1 stream cannot carry it.
 func TestV1RejectsReadyEvent(t *testing.T) {
 	spectest.Proves(t, "runtime/event-stream", "version-2-adds-only-ready", "version-2-is-version-1-plus-ready")
 	evt := readyEvent(t, ReadyData{Target: ReadyTargetWorkload})
-	evt.V = ProtocolVersion
+	evt.V = ProtocolVersion1
 
 	diags := ValidateEvent(evt)
 	if !diag.HasErrors(diags) {
@@ -243,8 +243,8 @@ func TestValidateEvent_UnknownVersion(t *testing.T) {
 func TestValidateEventStream_MixedVersions(t *testing.T) {
 	spectest.Proves(t, "runtime/event-stream", "one-stream-one-negotiated-version", "every-line-carries-the-stream-version")
 	events := []*Event{
-		{V: ProtocolVersion, Type: EventLog, Level: "info", Message: "v1"},
-		{V: ProtocolVersion2, Type: EventResult},
+		{V: ProtocolVersion1, Type: EventLog, Level: "info", Message: "v1"},
+		{V: ProtocolVersion, Type: EventResult},
 	}
 	diags := ValidateEventStream(events)
 	found := false
@@ -263,7 +263,7 @@ func TestValidateEventStream_MixedVersions(t *testing.T) {
 
 func TestValidateEventStream_SingleVersionAccepted(t *testing.T) {
 	spectest.Proves(t, "runtime/event-stream", "one-stream-one-negotiated-version", "every-line-carries-the-stream-version")
-	for _, version := range []int{ProtocolVersion, ProtocolVersion2} {
+	for _, version := range []int{ProtocolVersion1, ProtocolVersion} {
 		events := []*Event{
 			{V: version, Type: EventLog, Level: "info", Message: "hello"},
 			{V: version, Type: EventResult},
@@ -339,7 +339,7 @@ func TestEmitter_Ready(t *testing.T) {
 		{Scheme: ReadySchemeHTTPS, Host: "localhost", Port: 8443},
 		{Scheme: ReadySchemeHTTP, Host: "localhost", Port: 3000},
 	}
-	err := NewEmitterForVersion(&buf, ProtocolVersion2).Ready(ReadyData{
+	err := NewEmitterForVersion(&buf, ProtocolVersion).Ready(ReadyData{
 		Target:     ReadyTargetServer,
 		Name:       "api",
 		Endpoints:  unsorted,
@@ -358,8 +358,8 @@ func TestEmitter_Ready(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if evt.V != ProtocolVersion2 {
-		t.Errorf("emitted v = %d, want %d", evt.V, ProtocolVersion2)
+	if evt.V != ProtocolVersion {
+		t.Errorf("emitted v = %d, want %d", evt.V, ProtocolVersion)
 	}
 	if evt.Type != EventReady {
 		t.Errorf("emitted type = %q, want ready", evt.Type)
@@ -389,7 +389,7 @@ func TestEmitter_ReadyDeterministic(t *testing.T) {
 	spectest.Proves(t, "runtime/event-stream", "readiness-is-typed-and-canonical", "readiness-bytes-do-not-depend-on-bind-order")
 	emit := func(endpoints []ReadyEndpoint) string {
 		var buf bytes.Buffer
-		if err := NewEmitterForVersion(&buf, ProtocolVersion2).Ready(ReadyData{
+		if err := NewEmitterForVersion(&buf, ProtocolVersion).Ready(ReadyData{
 			Target:    ReadyTargetServer,
 			Endpoints: endpoints,
 		}); err != nil {
@@ -426,7 +426,7 @@ func TestReadyPayload_AbsentAndNil(t *testing.T) {
 	if err != nil || payload != nil {
 		t.Errorf("ReadyPayload(nil) = %v, %v; want nil, nil", payload, err)
 	}
-	payload, err = ReadyPayload(&Event{V: ProtocolVersion2, Type: EventReady})
+	payload, err = ReadyPayload(&Event{V: ProtocolVersion, Type: EventReady})
 	if err != nil || payload != nil {
 		t.Errorf("ReadyPayload(no data) = %v, %v; want nil, nil", payload, err)
 	}

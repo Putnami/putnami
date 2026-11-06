@@ -330,7 +330,7 @@ func (c *Client) send(ctx context.Context, method, target string, payload []byte
 	if payload != nil {
 		request.Header.Set("Content-Type", "application/json")
 	}
-	response, err := c.options.HTTP.Do(request) //nolint:gosec // G704: the destination is the API root of the binding's host or a loopback stand-in, both validated by ResolveEndpoint; a write never follows a redirect
+	response, err := c.options.HTTP.Do(request)
 	if err != nil {
 		kind := NotSent
 		if written.Load() {

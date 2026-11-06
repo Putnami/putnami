@@ -3,7 +3,6 @@ package extensions
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -11,6 +10,7 @@ import (
 	"sort"
 	"sync"
 
+	protocolcli "go.putnami.dev/protocol/cli"
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/tooling/cli/internal/commands/shared"
 	"go.putnami.dev/tooling/cli/internal/extension"
@@ -163,7 +163,7 @@ func writeRequestedLock(wsRoot string, installed, requested *lockfile.LockFile) 
 // omitted with a warning, which degrades that platform to the pre-existing
 // unverified per-worktree install path; failing the upgrade instead would break
 // every framework bump. quiet suppresses the human warning on the structured
-// (--output=jsonl) path.
+// (--output=json|jsonl) path.
 func carryPlatformIntegrities(ctx context.Context, ops artifactOps, name string, prior lockfile.LockEntry, hadPrior bool, entry *lockfile.LockEntry, quiet bool) {
 	if !hadPrior || len(prior.Integrities) == 0 {
 		return
@@ -276,6 +276,9 @@ type InstallOptions struct {
 	// hook. A hosted install runs its workspace-fetch between the two, then
 	// the hooks (RunExtensionInstallHooksTo). Templates have no hooks.
 	DeferInstallHooks bool
+	// Records collects one record per artifact outcome under a structured
+	// OutputFormat (WithActionRecords). Nil records nothing.
+	Records *ActionRecords
 }
 
 const maxParallelArtifactInstalls = 4
@@ -317,6 +320,10 @@ type artifactOps struct {
 	// how a version bump keeps the foreign platforms a shared lock already
 	// recorded. Nil disables the carry-forward.
 	resolvePlatformIntegrity func(ctx context.Context, name, version, goos, goarch string) (string, error)
+
+	// records collects the outcome records of a structured update. Nil
+	// records nothing.
+	records *ActionRecords
 
 	// installLocal handles workspace-local references and reports handled=true
 	// when name is one; out receives the human-readable status line and a nil out
@@ -523,9 +530,10 @@ func templateOps(wsRoot string) artifactOps {
 }
 
 // localArtifactWriter returns the human status stream for a workspace-local
-// artifact on the process-stdout paths: nil when a JSONL stream owns stdout.
-func localArtifactWriter(jsonlOut bool) io.Writer {
-	if jsonlOut {
+// artifact on the process-stdout paths: nil when a structured result owns
+// stdout.
+func localArtifactWriter(structuredOut bool) io.Writer {
+	if structuredOut {
 		return nil
 	}
 	return os.Stdout
@@ -538,7 +546,7 @@ func localArtifactWriter(jsonlOut bool) io.Writer {
 // installed". A lock below the format floor makes that the DEFAULT rendering,
 // so the reason is printed rather than inferred.
 //
-// It writes to stderr so a `--output=jsonl` stream on stdout stays machine-clean,
+// It writes to stderr so a structured result on stdout stays machine-clean,
 // and it never changes control flow: the caller carries on with a nil lock.
 func noteUnreadableLock(err error) {
 	if err == nil {
@@ -551,13 +559,11 @@ func noteUnreadableLock(err error) {
 // installArtifacts installs artifacts from the workspace config and lock file.
 // If a specific name is given in args, only that artifact is installed/added.
 // Pass --latest in args to ignore the lock file and resolve the latest versions.
-// When outputFormat is "jsonl", each artifact's outcome is emitted as one JSON
-// object per line instead of the human-readable progress lines.
+// A structured outputFormat (--output=json|jsonl) suppresses the human
+// progress lines.
 //
 // out is the human progress stream. It is a parameter because the first-use
 // bootstrap installs with it pointed at stderr under --output=json|jsonl.
-// The JSONL stream is deliberately NOT routed through it: that one is the
-// caller's own machine contract on the real stdout.
 func installArtifacts(ctx context.Context, wsRoot string, cfg *wsproto.Config, args []string, ops artifactOps, outputFormat string, out io.Writer) error {
 	return installArtifactsWithOptions(ctx, wsRoot, cfg, args, ops, InstallOptions{
 		OutputFormat: outputFormat,
@@ -589,9 +595,9 @@ type artifactInstallWork struct {
 // install one artifact's bytes and stable link. The caller-owned lock and every
 // output stream are merged by this goroutine in sorted name order afterwards.
 func installArtifactsWithOptions(ctx context.Context, wsRoot string, cfg *wsproto.Config, args []string, ops artifactOps, opts InstallOptions) error {
-	jsonlOut := opts.OutputFormat == "jsonl"
+	structuredOut := protocolcli.OutputMode(opts.OutputFormat).IsStructured()
 	humanOut := opts.Out
-	if jsonlOut {
+	if structuredOut {
 		humanOut = nil
 	}
 
@@ -618,7 +624,7 @@ func installArtifactsWithOptions(ctx context.Context, wsRoot string, cfg *wsprot
 		artMap[specificName] = constraint
 	}
 	if len(artMap) == 0 {
-		if !jsonlOut && opts.Out != nil {
+		if !structuredOut && opts.Out != nil {
 			iox.Fprintf(opts.Out, "  No %s configured.\n", ops.plural)
 		}
 		return nil
@@ -637,11 +643,11 @@ func installArtifactsWithOptions(ctx context.Context, wsRoot string, cfg *wsprot
 	runArtifactInstallWorkers(ctx, work, ops)
 	graphFailed := false
 	if ops.graph != nil {
-		work, graphFailed = installGraphWork(ctx, cfg, lockFile, work, deferred, specificName, specificVersion, latest, persistLock, ops, humanOut, globalOnly, jsonlOut)
+		work, graphFailed = installGraphWork(ctx, cfg, lockFile, work, deferred, specificName, specificVersion, latest, persistLock, ops, humanOut, globalOnly, structuredOut)
 	}
 
 	requested := lockFile.Clone()
-	actions, installed, cached, local, failed := mergeArtifactInstallWork(ctx, lockFile, requested, work, ops, persistLock, jsonlOut)
+	actions, installed, cached, local, failed := mergeArtifactInstallWork(ctx, lockFile, requested, work, ops, persistLock, structuredOut)
 	if graphFailed {
 		publishInstallActions(actions, work, opts, false)
 		return graphFailure(work)
@@ -660,7 +666,7 @@ func installArtifactsWithOptions(ctx context.Context, wsRoot string, cfg *wsprot
 	// exposed when the operation's final commit failed.
 	publishInstallActions(actions, work, opts, true)
 
-	if !jsonlOut && opts.Out != nil {
+	if !structuredOut && opts.Out != nil {
 		if local > 0 {
 			iox.Fprintf(opts.Out, "\n  %d installed, %d cached, %d local, %d failed\n", installed, cached, local, failed)
 		} else {
@@ -834,7 +840,7 @@ func installActionFor(ops artifactOps, item *artifactInstallWork, status Install
 }
 
 func publishInstallActions(actions []InstallAction, work []artifactInstallWork, opts InstallOptions, includeSuccess bool) {
-	jsonlOut := opts.OutputFormat == "jsonl"
+	structuredOut := protocolcli.OutputMode(opts.OutputFormat).IsStructured()
 	for i, action := range actions {
 		if !includeSuccess && action.Status != InstallStatusFailed {
 			continue
@@ -842,8 +848,8 @@ func publishInstallActions(actions []InstallAction, work []artifactInstallWork, 
 		if opts.OnAction != nil {
 			opts.OnAction(action)
 		}
-		if jsonlOut {
-			emitArtifactActionJSONL(artifactActionEntry{
+		if structuredOut {
+			opts.Records.add(artifactActionEntry{
 				Kind:           string(action.Kind),
 				Action:         string(action.Action),
 				Name:           action.Name,
@@ -891,10 +897,18 @@ func legacyInstallStatus(status InstallActionStatus) string {
 }
 
 // updateArtifacts updates one or all artifacts to the latest compatible version.
-// When outputFormat is "jsonl", each artifact's outcome is emitted as one JSON
-// object per line instead of the human-readable progress lines.
+// Under a structured outputFormat (--output=json|jsonl) it writes one result,
+// "<plural> update", whose data is one record per artifact outcome, instead of
+// the human-readable progress lines.
 func updateArtifacts(ctx context.Context, wsRoot string, cfg *wsproto.Config, args []string, ops artifactOps, opts ArtifactUpdateOptions, outputFormat string) error {
-	jsonlOut := outputFormat == "jsonl"
+	return WithActionRecords(outputFormat, ops.plural+" update", func(records *ActionRecords) error {
+		ops.records = records
+		return runArtifactUpdate(ctx, wsRoot, cfg, args, ops, opts, outputFormat)
+	})
+}
+
+func runArtifactUpdate(ctx context.Context, wsRoot string, cfg *wsproto.Config, args []string, ops artifactOps, opts ArtifactUpdateOptions, outputFormat string) error {
+	structuredOut := protocolcli.OutputMode(outputFormat).IsStructured()
 	var specificName string
 	if len(args) > 0 {
 		specificName, _ = ops.parseArg(args[0])
@@ -919,7 +933,7 @@ func updateArtifacts(ctx context.Context, wsRoot string, cfg *wsproto.Config, ar
 
 	artMap := ops.configMap(cfg)
 	if len(artMap) == 0 {
-		if !jsonlOut {
+		if !structuredOut {
 			iox.Fprintf(os.Stdout, "  No %s configured.\n", ops.plural)
 		}
 		return nil
@@ -939,19 +953,19 @@ func updateArtifacts(ctx context.Context, wsRoot string, cfg *wsproto.Config, ar
 
 		if ops.installLocal != nil {
 			// These two paths (`update`, its --dry-run preview) still render on the
-			// process stdout; a nil writer is their "jsonl suppresses human output".
-			handled, localErr := ops.installLocal(name, localArtifactWriter(jsonlOut))
+			// process stdout; a nil writer suppresses their human output.
+			handled, localErr := ops.installLocal(name, localArtifactWriter(structuredOut))
 			if localErr != nil {
-				if jsonlOut {
-					emitArtifactActionJSONL(artifactActionEntry{Kind: ops.label, Action: "update", Name: name, Status: "failed", Error: localErr.Error()})
+				if structuredOut {
+					ops.records.add(artifactActionEntry{Kind: ops.label, Action: "update", Name: name, Status: "failed", Error: localErr.Error()})
 				} else {
 					iox.Fprintf(os.Stderr, "  ✗ %s: %v\n", name, localErr)
 				}
 				return
 			}
 			if handled {
-				if jsonlOut {
-					emitArtifactActionJSONL(artifactActionEntry{Kind: ops.label, Action: "update", Name: name, Status: "local"})
+				if structuredOut {
+					ops.records.add(artifactActionEntry{Kind: ops.label, Action: "update", Name: name, Status: "local"})
 				}
 				roots = append(roots, artifactInstallWork{name: name, local: true})
 				return
@@ -964,8 +978,8 @@ func updateArtifacts(ctx context.Context, wsRoot string, cfg *wsproto.Config, ar
 		item.holdsPin = item.hadPrior
 		installHoldingPin(ctx, ops, &item)
 		if item.err != nil {
-			if jsonlOut {
-				emitArtifactActionJSONL(artifactActionEntry{Kind: ops.label, Action: "update", Name: name, Status: "failed", Error: item.err.Error()})
+			if structuredOut {
+				ops.records.add(artifactActionEntry{Kind: ops.label, Action: "update", Name: name, Status: "failed", Error: item.err.Error()})
 			} else {
 				iox.Fprintf(os.Stderr, "  ✗ %s: %v\n", name, item.err)
 			}
@@ -978,8 +992,8 @@ func updateArtifacts(ctx context.Context, wsRoot string, cfg *wsproto.Config, ar
 		oldVersion := prior.Version
 		if item.held != nil {
 			// The lock entry and the workspace pin stay as they are.
-			if jsonlOut {
-				emitArtifactActionJSONL(artifactActionEntry{Kind: ops.label, Action: "update", Name: name, Version: oldVersion, Source: result.Source, FromCache: result.FromCache,
+			if structuredOut {
+				ops.records.add(artifactActionEntry{Kind: ops.label, Action: "update", Name: name, Version: oldVersion, Source: result.Source, FromCache: result.FromCache,
 					Status: "kept", Channel: item.held.channel, ChannelVersion: item.held.served})
 			} else {
 				iox.Fprintf(os.Stdout, "  ✓ %s@%s (kept: %s)\n", name, oldVersion, item.held.note())
@@ -991,7 +1005,7 @@ func updateArtifacts(ctx context.Context, wsRoot string, cfg *wsproto.Config, ar
 		// A version bump starts a fresh per-platform map; carry the other
 		// platforms' integrities forward so the lock pins more than the platform
 		// that ran the upgrade.
-		carryPlatformIntegrities(ctx, ops, name, prior, hadPrior, &entry, jsonlOut)
+		carryPlatformIntegrities(ctx, ops, name, prior, hadPrior, &entry, structuredOut)
 		ops.lockSet(lockFile, name, entry)
 
 		replacesPin := ""
@@ -1001,26 +1015,26 @@ func updateArtifacts(ctx context.Context, wsRoot string, cfg *wsproto.Config, ar
 			replacesPin = declared
 		}
 		globalPin := staleGlobalPin(pins, name, declared, result.Version)
-		if globalPin != "" && !jsonlOut {
+		if globalPin != "" && !structuredOut {
 			iox.Fprintf(os.Stderr, "  ! %s is pinned to %s outside %s (in the global putnami config); the lock now records %s, so update that pin by hand\n",
 				name, globalPin, wsproto.WorkspaceConfigFilename, result.Version)
 		}
 
 		if oldVersion != "" && oldVersion != result.Version {
-			if jsonlOut {
-				emitArtifactActionJSONL(artifactActionEntry{Kind: ops.label, Action: "update", Name: name, Version: result.Version, OldVersion: oldVersion, Source: result.Source, Status: "updated", ReplacesPin: replacesPin, GlobalPin: globalPin})
+			if structuredOut {
+				ops.records.add(artifactActionEntry{Kind: ops.label, Action: "update", Name: name, Version: result.Version, OldVersion: oldVersion, Source: result.Source, Status: "updated", ReplacesPin: replacesPin, GlobalPin: globalPin})
 			} else {
 				iox.Fprintf(os.Stdout, "  %s %s: %s → %s\n", moveMark(oldVersion, result.Version), name, oldVersion, result.Version)
 			}
 			updated++
-		} else if jsonlOut {
-			emitArtifactActionJSONL(artifactActionEntry{Kind: ops.label, Action: "update", Name: name, Version: result.Version, OldVersion: oldVersion, Source: result.Source, FromCache: result.FromCache, Status: "up-to-date", ReplacesPin: replacesPin, GlobalPin: globalPin})
+		} else if structuredOut {
+			ops.records.add(artifactActionEntry{Kind: ops.label, Action: "update", Name: name, Version: result.Version, OldVersion: oldVersion, Source: result.Source, FromCache: result.FromCache, Status: "up-to-date", ReplacesPin: replacesPin, GlobalPin: globalPin})
 		} else {
 			iox.Fprintf(os.Stdout, "  ✓ %s@%s (up to date)\n", name, result.Version)
 		}
 	}
 
-	dependencies, err := updateDeclaredArtifacts(ctx, cfg, lockFile, artMap, specificName, ops, opts, jsonlOut, update, func() []artifactInstallWork { return roots })
+	dependencies, err := updateDeclaredArtifacts(ctx, cfg, lockFile, artMap, specificName, ops, opts, structuredOut, update, func() []artifactInstallWork { return roots })
 	if err != nil {
 		return err
 	}
@@ -1039,7 +1053,7 @@ func updateArtifacts(ctx context.Context, wsRoot string, cfg *wsproto.Config, ar
 		return err
 	}
 
-	if !jsonlOut {
+	if !structuredOut {
 		for _, name := range sortedPinNames(moved) {
 			iox.Fprintf(os.Stdout, "  %s %s pin %s: %s → %s\n", moveMark(replaced[name], moved[name]), wsproto.WorkspaceConfigFilename, name, replaced[name], moved[name])
 		}
@@ -1057,7 +1071,7 @@ func updateArtifacts(ctx context.Context, wsRoot string, cfg *wsproto.Config, ar
 // graph, a key only the global configuration declares updates after the
 // graph, unless it names a graph member. It returns how many dependencies
 // moved.
-func updateDeclaredArtifacts(ctx context.Context, cfg *wsproto.Config, lockFile *lockfile.LockFile, artMap map[string]string, specificName string, ops artifactOps, opts ArtifactUpdateOptions, jsonlOut bool, update func(name, constraint string), roots func() []artifactInstallWork) (int, error) {
+func updateDeclaredArtifacts(ctx context.Context, cfg *wsproto.Config, lockFile *lockfile.LockFile, artMap map[string]string, specificName string, ops artifactOps, opts ArtifactUpdateOptions, structuredOut bool, update func(name, constraint string), roots func() []artifactInstallWork) (int, error) {
 	var globalOnly map[string]bool
 	if ops.graph != nil {
 		globalOnly = ops.graph.globalOnly()
@@ -1075,12 +1089,12 @@ func updateDeclaredArtifacts(ctx context.Context, cfg *wsproto.Config, lockFile 
 	}
 	moved := 0
 	if ops.graph != nil {
-		graph, dependencies, err := updateDependencies(ctx, cfg, lockFile, roots(), globalOnly, opts, ops, jsonlOut)
+		graph, dependencies, err := updateDependencies(ctx, cfg, lockFile, roots(), globalOnly, opts, ops, structuredOut)
 		if err != nil {
 			return 0, err
 		}
 		moved = dependencies
-		for name := range graph.ignoredGlobalKeys(deferred, jsonlOut) {
+		for name := range graph.ignoredGlobalKeys(deferred, structuredOut) {
 			delete(deferred, name)
 		}
 	}
@@ -1102,10 +1116,10 @@ func staleGlobalPin(pins map[string]string, name, declared, version string) stri
 }
 
 func previewArtifactUpdates(ctx context.Context, wsRoot string, cfg *wsproto.Config, specificName string, ops artifactOps, opts ArtifactUpdateOptions, pins map[string]string, outputFormat string) error {
-	jsonlOut := outputFormat == "jsonl"
+	structuredOut := protocolcli.OutputMode(outputFormat).IsStructured()
 	artMap := ops.configMap(cfg)
 	if len(artMap) == 0 {
-		if !jsonlOut {
+		if !structuredOut {
 			iox.Fprintf(os.Stdout, "  No %s configured.\n", ops.plural)
 		}
 		return nil
@@ -1125,26 +1139,26 @@ func previewArtifactUpdates(ctx context.Context, wsRoot string, cfg *wsproto.Con
 		}
 		if ops.installLocal != nil {
 			// These two paths (`update`, its --dry-run preview) still render on the
-			// process stdout; a nil writer is their "jsonl suppresses human output".
-			handled, localErr := ops.installLocal(name, localArtifactWriter(jsonlOut))
+			// process stdout; a nil writer suppresses their human output.
+			handled, localErr := ops.installLocal(name, localArtifactWriter(structuredOut))
 			if localErr != nil {
-				if jsonlOut {
-					emitArtifactActionJSONL(artifactActionEntry{Kind: ops.label, Action: "update", Name: name, Status: "failed", Error: localErr.Error()})
+				if structuredOut {
+					ops.records.add(artifactActionEntry{Kind: ops.label, Action: "update", Name: name, Status: "failed", Error: localErr.Error()})
 				} else {
 					iox.Fprintf(os.Stderr, "  ✗ %s: %v\n", name, localErr)
 				}
 				continue
 			}
 			if handled {
-				if jsonlOut {
-					emitArtifactActionJSONL(artifactActionEntry{Kind: ops.label, Action: "update", Name: name, Status: "local"})
+				if structuredOut {
+					ops.records.add(artifactActionEntry{Kind: ops.label, Action: "update", Name: name, Status: "local"})
 				}
 				continue
 			}
 		}
 		if ops.resolve == nil {
-			if jsonlOut {
-				emitArtifactActionJSONL(artifactActionEntry{Kind: ops.label, Action: "update", Name: name, Version: constraint, Status: "resolved"})
+			if structuredOut {
+				ops.records.add(artifactActionEntry{Kind: ops.label, Action: "update", Name: name, Version: constraint, Status: "resolved"})
 			} else {
 				iox.Fprintf(os.Stdout, "  Would resolve %s@%s\n", name, constraint)
 			}
@@ -1153,8 +1167,8 @@ func previewArtifactUpdates(ctx context.Context, wsRoot string, cfg *wsproto.Con
 		}
 		result, err := ops.resolve(ctx, name, constraint)
 		if err != nil {
-			if jsonlOut {
-				emitArtifactActionJSONL(artifactActionEntry{Kind: ops.label, Action: "update", Name: name, Status: "failed", Error: err.Error()})
+			if structuredOut {
+				ops.records.add(artifactActionEntry{Kind: ops.label, Action: "update", Name: name, Status: "failed", Error: err.Error()})
 			} else {
 				iox.Fprintf(os.Stderr, "  ✗ %s: %v\n", name, err)
 			}
@@ -1164,8 +1178,8 @@ func previewArtifactUpdates(ctx context.Context, wsRoot string, cfg *wsproto.Con
 			if isUnnamedAnswer(result.Version) && channelHoldsPin(constraint, prior.Version) {
 				// The answer names no build: only the download tells whether
 				// it replaces the pin.
-				if jsonlOut {
-					emitArtifactActionJSONL(artifactActionEntry{Kind: ops.label, Action: "update", Name: name, Version: constraint, Status: "resolved"})
+				if structuredOut {
+					ops.records.add(artifactActionEntry{Kind: ops.label, Action: "update", Name: name, Version: constraint, Status: "resolved"})
 				} else {
 					iox.Fprintf(os.Stdout, "  Would resolve %s@%s: the channel names no build, so the update downloads it and keeps %s unless the build is newer\n",
 						name, constraint, prior.Version)
@@ -1174,8 +1188,8 @@ func previewArtifactUpdates(ctx context.Context, wsRoot string, cfg *wsproto.Con
 				continue
 			}
 			if held := holdPin(constraint, prior.Version, result.Version); held != nil {
-				if jsonlOut {
-					emitArtifactActionJSONL(artifactActionEntry{Kind: ops.label, Action: "update", Name: name, Version: prior.Version, Status: "kept",
+				if structuredOut {
+					ops.records.add(artifactActionEntry{Kind: ops.label, Action: "update", Name: name, Version: prior.Version, Status: "kept",
 						Channel: held.channel, ChannelVersion: held.served})
 				} else {
 					iox.Fprintf(os.Stdout, "  Would keep %s@%s: %s\n", name, prior.Version, held.note())
@@ -1190,12 +1204,12 @@ func previewArtifactUpdates(ctx context.Context, wsRoot string, cfg *wsproto.Con
 			replacesPin = declared
 		}
 		globalPin := staleGlobalPin(pins, name, declared, result.Version)
-		if globalPin != "" && !jsonlOut {
+		if globalPin != "" && !structuredOut {
 			iox.Fprintf(os.Stderr, "  ! %s is pinned to %s outside %s (in the global putnami config); the update would record %s, so that pin would need updating by hand\n",
 				name, globalPin, wsproto.WorkspaceConfigFilename, result.Version)
 		}
-		if jsonlOut {
-			emitArtifactActionJSONL(artifactActionEntry{Kind: ops.label, Action: "update", Name: name, Version: result.Version, Source: result.Source, Status: "resolved", ReplacesPin: replacesPin, GlobalPin: globalPin})
+		if structuredOut {
+			ops.records.add(artifactActionEntry{Kind: ops.label, Action: "update", Name: name, Version: result.Version, Source: result.Source, Status: "resolved", ReplacesPin: replacesPin, GlobalPin: globalPin})
 			resolved++
 			continue
 		}
@@ -1205,10 +1219,10 @@ func previewArtifactUpdates(ctx context.Context, wsRoot string, cfg *wsproto.Con
 		}
 		resolved++
 	}
-	if !jsonlOut {
+	if !structuredOut {
 		iox.Fprintf(os.Stdout, "\n  %d resolved\n", resolved)
 	}
-	previewDependencyNote(wsRoot, cfg, ops, jsonlOut)
+	previewDependencyNote(wsRoot, cfg, ops, structuredOut)
 	// The preview fails where the update would.
 	_, err := renderWorkspacePins(wsRoot, ops, moved)
 	return err
@@ -1248,7 +1262,7 @@ func removeArtifact(wsRoot string, args []string, ops artifactOps) error {
 	return nil
 }
 
-// artifactListEntry is one row of a list --output=jsonl stream.
+// artifactListEntry is one record of a structured list result.
 type artifactListEntry struct {
 	Name       string `json:"name"`
 	Constraint string `json:"constraint,omitempty"`
@@ -1261,15 +1275,7 @@ type artifactListEntry struct {
 	RemovedCapabilities []string `json:"removedCapabilities,omitempty"`
 }
 
-func printArtifactListJSONL(entries []artifactListEntry) error {
-	for _, entry := range entries {
-		data, _ := json.Marshal(entry)
-		iox.Fprintln(os.Stdout, string(data))
-	}
-	return nil
-}
-
-// artifactActionEntry is one event of an install/update --output=jsonl stream.
+// artifactActionEntry is one record of a structured install or update result.
 // Status is one of: installed, cached, updated, "up-to-date", kept, local,
 // resolved, failed. Action is "install" or "update".
 type artifactActionEntry struct {
@@ -1296,10 +1302,4 @@ type artifactActionEntry struct {
 	// pin, and an update reports status kept.
 	Channel        string `json:"channel,omitempty"`
 	ChannelVersion string `json:"channelVersion,omitempty"`
-}
-
-// emitArtifactActionJSONL writes one artifactActionEntry as a JSON line.
-func emitArtifactActionJSONL(entry artifactActionEntry) {
-	data, _ := json.Marshal(entry)
-	iox.Fprintln(os.Stdout, string(data))
 }

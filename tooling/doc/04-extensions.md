@@ -260,8 +260,9 @@ The `^` prefix is the most common — it creates cross-project dependency chains
 References resolve by **exact identity**: the step id a job *is*, within the
 command the reference is written in (`*` additionally matches a command name).
 Display names, internal plan names (`build~generate`) and synthesized
-`project:name` keys are not addressable — a reference that only a name-based
-match would have resolved is a plan-time error naming what it would have bound.
+`project:name` keys are not addressable. A reference that matches no job by its
+exact identity binds nothing: an upstream project that does not run the step
+contributes no edge.
 
 Command-level `dependsOn` also supports release gates. Bare command names are
 same-project prerequisites; `!command` is a session barrier across the current

@@ -1,9 +1,9 @@
 // Package cliargs reads the arguments putnami forwards to an interactive
 // subcommand of this runtime: the user's positionals and command flags, in
 // the order the user wrote them. putnami has already consumed its global
-// flags and split every inline value it recognized, but it passes an
-// undeclared flag through, so a command still refuses a flag it does not
-// accept.
+// flags, split every inline value it recognized and refused every flag the
+// subcommand's manifest does not declare; a command still refuses a flag it
+// does not accept.
 package cliargs
 
 import (

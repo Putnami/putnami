@@ -143,7 +143,7 @@ func TestDepsUpgradeWireThroughTheEntryPoint(t *testing.T) {
 	env := jobtest.Env(t, origin, jobtest.CacheRoot(t),
 		"PATH="+filepath.Dir(goBinary),
 		"PUTNAMI_GO_MODULE_PROXY="+origin,
-		runtimeproto.AdvertisedVersionEnv(runtimeproto.ProtocolVersion2))
+		runtimeproto.AdvertisedVersionEnv(runtimeproto.ProtocolVersion))
 
 	t.Run("success", func(t *testing.T) {
 		ws := jobtest.RealTempDir(t)
@@ -152,7 +152,7 @@ func TestDepsUpgradeWireThroughTheEntryPoint(t *testing.T) {
 		if code != 0 {
 			t.Fatalf("exit code = %d, want 0\nstderr:\n%s", code, stderr)
 		}
-		requireStream(t, events, runtimeproto.ProtocolVersion2, runtimeproto.ResultOK)
+		requireStream(t, events, runtimeproto.ProtocolVersion, runtimeproto.ResultOK)
 		if !hasEvent(events, runtimeproto.EventLog, "Dry run complete; no Go files were changed") {
 			t.Errorf("missing the dry-run log:\n%s", eventLines(events))
 		}
@@ -168,7 +168,7 @@ func TestDepsUpgradeWireThroughTheEntryPoint(t *testing.T) {
 		if code != 1 {
 			t.Fatalf("exit code = %d, want 1\nstderr:\n%s", code, stderr)
 		}
-		requireStream(t, events, runtimeproto.ProtocolVersion2, runtimeproto.ResultFailed)
+		requireStream(t, events, runtimeproto.ProtocolVersion, runtimeproto.ResultFailed)
 		var diagnostic *runtimeproto.Event
 		for _, event := range events {
 			if event.Type == runtimeproto.EventDiagnostic {
@@ -191,7 +191,7 @@ func TestProjectSetupAndDepsEditWireThroughTheEntryPoint(t *testing.T) {
 	goBinary := jobtest.RequireGo(t)
 	env := jobtest.Env(t, "off", jobtest.CacheRoot(t),
 		"PATH="+filepath.Dir(goBinary),
-		runtimeproto.AdvertisedVersionEnv(runtimeproto.ProtocolVersion2))
+		runtimeproto.AdvertisedVersionEnv(runtimeproto.ProtocolVersion))
 	const goMod = "module example.com/api\n\ngo 1.22\n\nrequire example.com/lib v1.0.0\n"
 	tests := []struct {
 		name, job, params string
@@ -223,7 +223,7 @@ func TestProjectSetupAndDepsEditWireThroughTheEntryPoint(t *testing.T) {
 			if code != tt.code {
 				t.Fatalf("exit code = %d, want %d\nstderr:\n%s\n%s", code, tt.code, stderr, eventLines(events))
 			}
-			requireJobStream(t, events, tt.job, runtimeproto.ProtocolVersion2, tt.status)
+			requireJobStream(t, events, tt.job, runtimeproto.ProtocolVersion, tt.status)
 			if !hasEvent(events, tt.event, tt.message) {
 				t.Errorf("missing the %s %q:\n%s", tt.event, tt.message, eventLines(events))
 			}

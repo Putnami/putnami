@@ -41,9 +41,9 @@ publisher and step.
 2. **`--env` and `--release` are flags of a release-set consumer.** The core
    reads them only for a run of a command whose traits declare
    `consumesReleaseSet`, so only such a run, or a task that declares the
-   flag itself, keeps them out of the undeclared-flag warning. Any other run
-   warns that they are undeclared, as it warns for any flag nothing reads: a
-   `deploy` without the trait does not ignore `--env` in silence.
+   flag itself, accepts them. Any other run refuses them as undeclared flags,
+   as it refuses any flag nothing reads: a `deploy` without the trait never
+   runs with `--env` ignored.
 
 Publication and packages follow the same rule: registry side effects replace
 the `publish` name, and declared member routes replace the `package` name.

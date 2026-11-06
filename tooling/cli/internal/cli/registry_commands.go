@@ -11,6 +11,7 @@ import (
 	"time"
 	"unicode"
 
+	protocolcli "go.putnami.dev/protocol/cli"
 	supportproto "go.putnami.dev/protocol/support"
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/tooling/cli/internal/commands/agentctx"
@@ -23,6 +24,7 @@ import (
 	"go.putnami.dev/tooling/cli/internal/commands/lifecycle"
 	"go.putnami.dev/tooling/cli/internal/commands/migrate"
 	"go.putnami.dev/tooling/cli/internal/commands/sessions"
+	"go.putnami.dev/tooling/cli/internal/commands/shared"
 	"go.putnami.dev/tooling/cli/internal/commands/treecmd"
 	"go.putnami.dev/tooling/cli/internal/commands/versioncmd"
 	"go.putnami.dev/tooling/cli/internal/engine"
@@ -50,7 +52,7 @@ func init() {
 	registerCommand("migrate", cmdMigrate)
 	registerCommand("sessions", cmdSessions)
 	registerCommand("tree", cmdTree)
-	registerRawCommand("report", cmdReport)
+	registerCommand("report", cmdReport)
 	registerCommand("completion", cmdCompletion)
 	registerCommand("install", cmdInstall)
 	registerCommand("telemetry", cmdTelemetry)
@@ -99,7 +101,7 @@ func cmdImpactPlan(env *CommandEnv) error {
 	if err != nil {
 		return err
 	}
-	return ci.RenderImpactPlan(env.OutputFormat, document)
+	return ci.RenderImpactPlan(env.OutputFormat, document, env.envelopeWarnings())
 }
 
 // impactPlanCommands parses the command list of impact-plan the way the CLI
@@ -525,8 +527,9 @@ func cmdCache(env *CommandEnv) error {
 			return usageErrorf("cache verify cannot run with --no-cache")
 		}
 		commands := cacheVerifyCommands(env.WsRoot)
+		warnings := env.WorkspaceWarnings()
 		return cachecmd.CacheVerifyCommand(env.Ctx, env.WsRoot, commands,
-			env.OutputFormat, newCacheVerifyRunner(env.Cfg, env.Global, commands, engine.New().Run, env.WorkspaceWarnings()))
+			env.OutputFormat, newCacheVerifyRunner(env.Cfg, env.Global, commands, engine.New().Run, warnings), warnings)
 	default:
 		return usageErrorf("unknown subcommand: cache %s\n  Available: clean, gc, verify", env.Sub)
 	}
@@ -720,7 +723,13 @@ func cmdSessions(env *CommandEnv) error {
 		if len(parsed.positionals) != 0 || parsed.value("--session") == "" {
 			return usageErrorf("sessions replay requires --session <exact-id>")
 		}
-		return engine.New().ReplaySession(env.Ctx, env.WsRoot, env.Cfg, parsed.value("--session"))
+		if err := engine.New().ReplaySession(env.Ctx, env.WsRoot, env.Cfg, parsed.value("--session")); err != nil {
+			return err
+		}
+		if protocolcli.OutputMode(env.OutputFormat).IsStructured() {
+			return shared.WriteResult(env.OutputFormat, "sessions replay", []any{}, nil)
+		}
+		return nil
 	default:
 		return usageErrorf("unknown subcommand: sessions %s", env.Sub)
 	}
@@ -754,10 +763,9 @@ func cmdTree(env *CommandEnv) error {
 	return treecmd.Fingerprint(workingDirectory, env.OutputFormat)
 }
 
-// cmdSessionsExport streams the recorded session documents. Its output is the
-// raw JSONL stream in every mode: --output=json|jsonl still wraps it in the
-// shared result envelope like every other `sessions` subcommand, because
-// `sessions` is a registerCommand and runStructuredCommand captures its stdout.
+// cmdSessionsExport streams the recorded session documents as raw JSONL. Under
+// --output=json|jsonl it writes one "sessions export" result whose data holds
+// the same documents, like every other `sessions` subcommand.
 func cmdSessionsExport(env *CommandEnv) error {
 	parsed, err := parseCatalogCommandFlags("sessions export", env.Args)
 	if err != nil {
@@ -766,7 +774,7 @@ func cmdSessionsExport(env *CommandEnv) error {
 	if len(parsed.positionals) != 0 {
 		return usageErrorf("sessions export takes no positional arguments: narrow the stream with --since <timestamp>")
 	}
-	return sessions.SessionsExport(env.WsRoot, parsed.value("--since"))
+	return sessions.SessionsExport(env.WsRoot, parsed.value("--since"), env.OutputFormat)
 }
 
 // cmdSessionsSummary prints the recorded sessions reduced to one ledger row
@@ -786,8 +794,8 @@ func cmdSessionsSummary(env *CommandEnv) error {
 // cmdReport reads back a finished run's recorded report. It is the contracted
 // handoff that replaces guessing which session directory is new: with no
 // argument it reads the newest CLI-driven run's report, and --session names one
-// exactly. Registered with registerRawCommand because --output=json prints the
-// recorded contract document itself rather than a result envelope.
+// exactly. Under --output=json|jsonl it prints the recorded contract document
+// itself, framed in that mode, rather than a result envelope.
 func cmdReport(env *CommandEnv) error {
 	if err := env.requireWorkspace(); err != nil {
 		return err

@@ -2,7 +2,6 @@ package extensions
 
 import (
 	"context"
-	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
@@ -139,9 +138,18 @@ func TestExtensionsInstallSkipsLocalWorkspaceRefsWithLatest(t *testing.T) {
 		}},
 	}
 
-	if err := ExtensionsInstall(context.Background(), dir, cfg, []string{"--latest"}, ""); err != nil {
+	if err := installExtensions(context.Background(), dir, cfg, []string{"--latest"}, ""); err != nil {
 		t.Fatalf("ExtensionsInstall: %v", err)
 	}
+}
+
+// installExtensions runs the install of `putnami extensions install` without
+// its agent-content step: human lines on stdout, or one "extensions install"
+// result under a structured outputFormat.
+func installExtensions(ctx context.Context, wsRoot string, cfg *wsproto.Config, args []string, outputFormat string) error {
+	return WithActionRecords(outputFormat, "extensions install", func(records *ActionRecords) error {
+		return ExtensionsInstallWithOptions(ctx, wsRoot, cfg, args, InstallOptions{OutputFormat: outputFormat, Out: os.Stdout, Records: records})
+	})
 }
 
 func TestExtensionsInstallJSONLSuppressesLocalHumanOutput(t *testing.T) {
@@ -164,13 +172,13 @@ func TestExtensionsInstallJSONLSuppressesLocalHumanOutput(t *testing.T) {
 	}
 
 	out, err := sharedtest.CaptureStdout(t, func() error {
-		return ExtensionsInstall(context.Background(), dir, cfg, nil, "jsonl")
+		return installExtensions(context.Background(), dir, cfg, nil, "jsonl")
 	})
 	if err != nil {
 		t.Fatalf("ExtensionsInstall: %v", err)
 	}
 	if strings.Contains(out, "✓") || strings.Contains(out, "(local)") {
-		t.Fatalf("stdout = %q, want only JSONL entries", out)
+		t.Fatalf("stdout = %q, want only the structured result", out)
 	}
 	var entry struct {
 		Kind   string `json:"kind"`
@@ -178,9 +186,7 @@ func TestExtensionsInstallJSONLSuppressesLocalHumanOutput(t *testing.T) {
 		Name   string `json:"name"`
 		Status string `json:"status"`
 	}
-	if err := json.Unmarshal([]byte(strings.TrimSpace(out)), &entry); err != nil {
-		t.Fatalf("parse jsonl %q: %v", out, err)
-	}
+	sharedtest.ResultData(t, out, "extensions install", &entry)
 	if entry.Kind != "extension" || entry.Action != "install" || entry.Name != "/extensions/local" || entry.Status != "local" {
 		t.Fatalf("entry = %+v, want extension/install/local", entry)
 	}
@@ -233,7 +239,7 @@ func TestExtensionsInstallRunsOnInstallHookForLocalExtension(t *testing.T) {
 	})
 
 	out, err := sharedtest.CaptureStdout(t, func() error {
-		return ExtensionsInstall(context.Background(), dir, cfg, nil, "")
+		return installExtensions(context.Background(), dir, cfg, nil, "")
 	})
 	if err != nil {
 		t.Fatalf("ExtensionsInstall: %v", err)
@@ -285,7 +291,7 @@ func TestExtensionsInstallJSONLRedirectsInstallHookOutput(t *testing.T) {
 	stderr := sharedtest.CaptureStderr(t, func() {
 		var err error
 		out, err = sharedtest.CaptureStdout(t, func() error {
-			return ExtensionsInstall(context.Background(), dir, cfg, nil, "jsonl")
+			return installExtensions(context.Background(), dir, cfg, nil, "jsonl")
 		})
 		if err != nil {
 			t.Fatalf("ExtensionsInstall: %v", err)
@@ -293,17 +299,12 @@ func TestExtensionsInstallJSONLRedirectsInstallHookOutput(t *testing.T) {
 	})
 
 	if strings.Contains(out, "Running extension install hooks") || strings.Contains(out, "hook stdout") {
-		t.Fatalf("stdout = %q, want only JSONL entries", out)
+		t.Fatalf("stdout = %q, want only the structured result", out)
 	}
 	if !strings.Contains(stderr, "Running extension install hooks") || !strings.Contains(stderr, "hook stdout should not be on stdout") {
 		t.Fatalf("stderr = %q, want hook progress and hook stdout", stderr)
 	}
-	for _, line := range strings.Split(strings.TrimSpace(out), "\n") {
-		var entry map[string]any
-		if err := json.Unmarshal([]byte(line), &entry); err != nil {
-			t.Fatalf("stdout line is not JSON: %q: %v", line, err)
-		}
-	}
+	sharedtest.ResultRecords(t, out, "extensions install")
 
 	wantHookRun(t, marker, extDir)
 }
@@ -326,7 +327,7 @@ func TestExtensionsInstallSpecificExtensionRunsOnlyThatHook(t *testing.T) {
 	})
 
 	out, err := sharedtest.CaptureStdout(t, func() error {
-		return ExtensionsInstall(context.Background(), dir, cfg, []string{"/extensions/target"}, "")
+		return installExtensions(context.Background(), dir, cfg, []string{"/extensions/target"}, "")
 	})
 	if err != nil {
 		t.Fatalf("ExtensionsInstall: %v", err)

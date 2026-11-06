@@ -144,8 +144,9 @@ from inside a subprocess the CLI never reaches:
   built-in's 2.
 - `putnami features` with no subcommand prints the group's subcommand listing
   instead of the built-in's "unknown subcommand" error.
-- An undeclared flag is a deprecation WARNING for an extension group and a hard
-  rejection for a built-in.
+- An undeclared flag is a usage error with exit code 2 for both, and the message
+  is the dispatcher's (`` flag --x is not declared by `features inspect` ``)
+  rather than the built-in's.
 
 One more is narrower: a selection-rejecting subcommand given an INVALID selector
 (`putnami features inspect X --projects nope`) now reports the selector's own

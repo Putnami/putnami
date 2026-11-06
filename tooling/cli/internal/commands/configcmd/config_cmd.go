@@ -7,20 +7,17 @@ import (
 	"path/filepath"
 	"strings"
 
+	protocolcli "go.putnami.dev/protocol/cli"
 	wsproto "go.putnami.dev/protocol/workspace"
+	"go.putnami.dev/tooling/cli/internal/commands/shared"
 	"go.putnami.dev/tooling/cli/internal/iox"
 	"go.putnami.dev/tooling/cli/internal/jsonutil"
 )
 
 // ConfigShow displays the effective configuration after all scopes are merged.
 func ConfigShow(wsRoot string, cfg *wsproto.Config, outputFormat string) error {
-	if outputFormat == "jsonl" {
-		data, err := json.Marshal(cfg)
-		if err != nil {
-			return fmt.Errorf("marshal config: %w", err)
-		}
-		iox.Fprintln(os.Stdout, string(data))
-		return nil
+	if protocolcli.OutputMode(outputFormat).IsStructured() {
+		return shared.WriteResult(outputFormat, "config show", cfg, nil)
 	}
 
 	data, err := json.MarshalIndent(cfg, "", "  ")

@@ -60,8 +60,11 @@ var initExtensions = map[string]initExtensionConfig{
 }
 
 // installExtension is swapped in tests so init tests never perform a real
-// registry install (slow and environment-dependent).
-var installExtension = extensions.ExtensionsInstall
+// registry install (slow and environment-dependent). Its progress lines go to
+// stdout.
+var installExtension = func(ctx context.Context, wsRoot string, cfg *wsproto.Config, args []string, outputFormat string) error {
+	return extensions.ExtensionsInstallWithOptions(ctx, wsRoot, cfg, args, extensions.InstallOptions{OutputFormat: outputFormat, Out: os.Stdout})
+}
 
 // The remaining required init stages are also seams for failure-path tests.
 // Successful tests still exercise their real implementations elsewhere; init

@@ -1062,9 +1062,9 @@ func TestShutdownStoresTheQueuedUploads(t *testing.T) {
 		t.Fatal(err)
 	}
 	reqs := []string{
-		`{"protocolVersion":1,"id":1,"op":"initialize","payload":{"protocolVersion":1,"blobExchangeDir":` + strconv.Quote(exchangeDir) + `}}`,
-		`{"protocolVersion":1,"id":2,"op":"upload","payload":{"key":"` + uploadKey(0) + `","result":{"status":"success"},"manifest":` + string(manifest) + `}}`,
-		`{"protocolVersion":1,"id":3,"op":"shutdown"}`,
+		`{"protocolVersion":2,"id":1,"op":"initialize","payload":{"protocolVersion":2,"blobExchangeDir":` + strconv.Quote(exchangeDir) + `}}`,
+		`{"protocolVersion":2,"id":2,"op":"upload","payload":{"key":"` + uploadKey(0) + `","result":{"status":"success"},"manifest":` + string(manifest) + `}}`,
+		`{"protocolVersion":2,"id":3,"op":"shutdown"}`,
 	}
 
 	var out, logw bytes.Buffer

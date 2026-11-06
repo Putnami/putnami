@@ -263,7 +263,7 @@ func renderVNextCheck(outputFormat string, report VNextReport) error {
 	err := vnextCheckError(report)
 	if protocolcli.OutputMode(outputFormat).IsStructured() {
 		if err == nil {
-			_, _ = protocolcli.WriteResultV2(iox.Stdout(), protocolcli.OutputJSONL,
+			_, _ = protocolcli.WriteResultV2(iox.Stdout(), protocolcli.OutputMode(outputFormat),
 				protocolcli.NewResultV2("migrate vnext", report, nil))
 		}
 		return err
@@ -276,7 +276,7 @@ func renderVNextCheck(outputFormat string, report VNextReport) error {
 // a lock that needed nothing is as migrated as one that was just converted.
 func renderVNextApply(outputFormat string, report VNextReport) error {
 	if protocolcli.OutputMode(outputFormat).IsStructured() {
-		_, err := protocolcli.WriteResultV2(iox.Stdout(), protocolcli.OutputJSONL,
+		_, err := protocolcli.WriteResultV2(iox.Stdout(), protocolcli.OutputMode(outputFormat),
 			protocolcli.NewResultV2("migrate vnext", report, nil))
 		return err
 	}

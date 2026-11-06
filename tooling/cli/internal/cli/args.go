@@ -39,9 +39,6 @@ type ParsedArgs struct {
 	// it as ExitUsage after the help and version shortcuts, which deliberately
 	// still work on a malformed invocation.
 	Err error
-	// Warnings are the deprecation notices the parse produced, in the order the
-	// flags appeared. They go to stderr so structured stdout stays machine-clean.
-	Warnings []string
 }
 
 // ParseArgs parses CLI arguments into structured form.

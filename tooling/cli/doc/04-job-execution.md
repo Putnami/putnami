@@ -886,8 +886,9 @@ environment, for every job:
 PUTNAMI_RUNTIME_EVENTS=2
 ```
 
-An extension's SDK resolves that advertisement (higher ⇒ clamped down) and
-stamps the result on **every** line it writes. Since CLI contract 3 the CLI
+An extension's SDK resolves that advertisement (higher ⇒ clamped down; the Go
+SDK writes v2 when it is absent or lower) and stamps the result on **every**
+line it writes. Since CLI contract 3 the CLI
 accepts **exactly** the version it advertises; it carries
 unknown-to-a-renderer types through untouched, as before.
 

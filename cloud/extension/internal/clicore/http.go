@@ -163,7 +163,7 @@ func doJSONRequest(client *http.Client, url string, req *http.Request) (text []b
 		req.Header.Set("Content-Type", "application/json")
 	}
 	SetUserAgent(req)
-	resp, err := client.Do(req) //nolint:gosec // G704: CLI intentionally requests the user-configured Putnami Cloud endpoint
+	resp, err := client.Do(req)
 	if err != nil {
 		return nil, 0, "", NewError(fmt.Sprintf("request failed for %s: %s", url, err.Error()), ExitAPI)
 	}

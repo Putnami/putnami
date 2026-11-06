@@ -2,7 +2,6 @@ package extensions
 
 import (
 	"context"
-	"encoding/json"
 	"maps"
 	"os"
 	"path/filepath"
@@ -447,9 +446,7 @@ func TestUpdateArtifacts_JSONLNamesTheReplacedPin(t *testing.T) {
 		stdout, _ := runPinUpdate(t, ws, wsproto.Load(ws), ops, ArtifactUpdateOptions{ConstraintOverride: "2.0.0", DryRun: dryRun}, "jsonl")
 
 		var event artifactActionEntry
-		if err := json.Unmarshal([]byte(strings.TrimSpace(stdout)), &event); err != nil {
-			t.Fatalf("dryRun=%v: parse %q: %v", dryRun, stdout, err)
-		}
+		sharedtest.ResultData(t, stdout, "extensions update", &event)
 		if event.ReplacesPin != "1.0.0" || event.Version != "2.0.0" {
 			t.Errorf("dryRun=%v: event = %+v, want replacesPin 1.0.0 and version 2.0.0", dryRun, event)
 		}
@@ -483,9 +480,7 @@ func TestUpdateArtifacts_WarnsAboutAGlobalPin(t *testing.T) {
 	for _, dryRun := range []bool{false, true} {
 		stdout, _ := runPinUpdate(t, ws, cfg, ops, ArtifactUpdateOptions{ConstraintOverride: "2.0.0", DryRun: dryRun}, "jsonl")
 		var event artifactActionEntry
-		if err := json.Unmarshal([]byte(strings.TrimSpace(stdout)), &event); err != nil {
-			t.Fatalf("dryRun=%v: parse %q: %v", dryRun, stdout, err)
-		}
+		sharedtest.ResultData(t, stdout, "extensions update", &event)
 		if event.GlobalPin != "1.0.0" || event.ReplacesPin != "" {
 			t.Errorf("dryRun=%v: event = %+v, want globalPin 1.0.0 and no replacesPin", dryRun, event)
 		}

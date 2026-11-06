@@ -200,7 +200,7 @@ func TestProviderConfigurationContract(t *testing.T) {
 	// The provider parses core's initialize with no mode as no intent, so it
 	// can fall back to the mode it is configured with.
 	params, diags := ParseAndValidateInitializeParams([]byte(
-		`{"protocolVersion":1,"blobExchangeDir":"/x","capabilities":["provider-configuration"]}`))
+		`{"protocolVersion":2,"blobExchangeDir":"/x","capabilities":["provider-configuration"]}`))
 	if params == nil || diag.HasErrors(diags) || params.Mode != "" {
 		t.Fatalf("initialize without a mode = %+v / %v, want it parsed with no mode", params, diags)
 	}
@@ -275,19 +275,19 @@ func TestAuthenticateNeverFormatsTheCredential(t *testing.T) {
 }
 
 // TestObjectCacheIsAdditiveToV2 pins the compatibility claim the design rests
-// on: the object cache ships WITHOUT a provider protocol bump, so a v1/v2
-// provider that ignores the capability keeps working unchanged.
+// on: the object cache ships WITHOUT a provider protocol bump, so a v2 provider
+// that ignores the capability keeps working unchanged.
 func TestObjectCacheIsAdditiveToV2(t *testing.T) {
 	spectest.Proves(t, "cache/remote-cache-contract", "the-object-cache-is-a-negotiated-socket", "the-object-cache-is-additive-to-version-2")
 	if ProviderProtocolVersion != 2 {
 		t.Fatalf("ProviderProtocolVersion = %d, want 2 — the object cache is additive to v2", ProviderProtocolVersion)
 	}
-	// A v1 initialize result — the shape a channel-less provider answers with —
+	// An initialize result from a provider that never heard of the object cache
 	// stays valid, and carries no socket.
-	legacy := []byte(`{"protocolVersion":1,"providerVersion":"1.0.0","ready":true}`)
-	got, diags := ParseAndValidateInitializeResult(legacy)
+	plain := []byte(`{"protocolVersion":2,"providerVersion":"1.0.0","ready":true}`)
+	got, diags := ParseAndValidateInitializeResult(plain)
 	if got == nil || diag.HasErrors(diags) {
-		t.Fatalf("a legacy initialize result must stay valid: %+v / %v", got, diags)
+		t.Fatalf("an initialize result without the object cache must stay valid: %+v / %v", got, diags)
 	}
 	if got.ObjectCacheSocket != "" {
 		t.Fatalf("ObjectCacheSocket = %q, want empty for a provider that never advertised the capability", got.ObjectCacheSocket)
@@ -568,28 +568,28 @@ func TestProviderRequest_VersionMismatch(t *testing.T) {
 	}
 }
 
-// TestProviderProtocolVersion pins the v2 provenance migration and its v1
-// compatibility floor so a future bump requires an explicit migration story.
+// TestProviderProtocolVersion pins the provider RPC version and its floor so a
+// future bump requires an explicit migration story.
 func TestProviderProtocolVersion(t *testing.T) {
 	spectest.Proves(t, "cache/remote-cache-contract", "the-versions-are-pinned", "the-provider-rpc-versions-are-pinned")
 	if ProviderProtocolVersion != 2 {
 		t.Fatalf("ProviderProtocolVersion = %d, want 2 — bumping requires a migration story", ProviderProtocolVersion)
 	}
-	if ProviderProtocolMinVersion != 1 {
-		t.Fatalf("ProviderProtocolMinVersion = %d, want 1 — v1 providers must remain tolerated", ProviderProtocolMinVersion)
+	if ProviderProtocolMinVersion != 2 {
+		t.Fatalf("ProviderProtocolMinVersion = %d, want 2 — a version 1 envelope is refused", ProviderProtocolMinVersion)
 	}
 	if ProviderProtocolProvenanceVersion != 2 {
 		t.Fatalf("ProviderProtocolProvenanceVersion = %d, want 2", ProviderProtocolProvenanceVersion)
 	}
 	if CapabilityProviderProtocolV2 != "provider-protocol-v2" {
-		t.Fatalf("CapabilityProviderProtocolV2 = %q, want stable v1-bootstrap wire token", CapabilityProviderProtocolV2)
+		t.Fatalf("CapabilityProviderProtocolV2 = %q, want the stable wire token a cloud/v0.4.0 provider reads", CapabilityProviderProtocolV2)
 	}
 }
 
-// TestProviderProtocolVersion_ToleratesLegacy pins the v1/v2 negotiation
-// window: v1 envelopes remain valid for channel-less providers while v2 carries
-// the provenance extension. Versions outside that window are rejected.
-func TestProviderProtocolVersion_ToleratesLegacy(t *testing.T) {
+// TestProviderProtocolVersion_AcceptsOnlyTheWindow pins the accepted version
+// window: a version 2 envelope parses and carries provenance, and a version
+// outside the window, version 1 included, is rejected.
+func TestProviderProtocolVersion_AcceptsOnlyTheWindow(t *testing.T) {
 	spectest.Proves(t, "cache/remote-cache-contract", "the-versions-are-pinned", "the-provider-rpc-versions-are-pinned")
 	for _, version := range []int{ProviderProtocolMinVersion, ProviderProtocolVersion} {
 		data := []byte(`{"protocolVersion": ` + strconv.Itoa(version) + `, "id": 1, "op": "restore"}`)
@@ -607,16 +607,19 @@ func TestProviderProtocolVersion_ToleratesLegacy(t *testing.T) {
 		}
 	}
 
-	if ProviderProtocolHasProvenance(ProviderProtocolMinVersion) {
-		t.Errorf("v%d should not carry provenance", ProviderProtocolMinVersion)
+	if !ProviderProtocolHasProvenance(ProviderProtocolMinVersion) {
+		t.Errorf("v%d should carry provenance", ProviderProtocolMinVersion)
+	}
+	if ProviderProtocolHasProvenance(1) {
+		t.Error("v1 should not carry provenance")
 	}
 	if !ProviderProtocolHasProvenance(ProviderProtocolVersion) {
 		t.Errorf("v%d should carry provenance", ProviderProtocolVersion)
 	}
 }
 
-// TestEntryProvenance_Validation covers both the compatibility case (all fields
-// omitted by a v1/channel-less provider) and the complete, closed v2 triple.
+// TestEntryProvenance_Validation covers both an entry without provenance (all
+// fields omitted) and the complete, closed v2 triple.
 func TestEntryProvenance_Validation(t *testing.T) {
 	spectest.Proves(t, "cache/remote-cache-contract", "provenance-is-derived-by-the-provider", "the-triple-is-closed-and-whole")
 	key := validTestKey()
@@ -668,7 +671,7 @@ func TestEntryProvenance_Validation(t *testing.T) {
 // error code is rejected (the harness relies on a populated error).
 func TestProviderResponse_FailedNeedsCode(t *testing.T) {
 	spectest.Proves(t, "cache/remote-cache-contract", "the-provider-envelope-is-closed", "a-failed-response-carries-a-code")
-	b := []byte(`{"protocolVersion": 1, "id": 1, "ok": false}`)
+	b := []byte(`{"protocolVersion": 2, "id": 1, "ok": false}`)
 	_, diags := ParseAndValidateProviderResponse(b)
 	if !diag.HasErrors(diags) {
 		t.Fatal("expected required-field error for missing error code")

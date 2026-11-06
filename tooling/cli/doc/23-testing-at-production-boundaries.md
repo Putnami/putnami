@@ -17,8 +17,8 @@ When the belief is wrong, the test is green and the product is not.
 Two cases show the failure:
 
 - A stub models a CLI without the cloud extension as
-  `echo 'Unknown command: cloud'; exit 2`. A real core-only CLI prints an
-  undeclared-flag notice and `no project matched --projects "registry-token"`.
+  `echo 'Unknown command: cloud'; exit 2`. A real core-only CLI refuses the
+  first flag no manifest declares: `` flag --host is not declared by `cloud` ``.
   Code that classifies the first line of that output tells every core-only
   install that the cloud "cannot write the credential yet". A recording exposes
   the error the first time it replaces the stub.

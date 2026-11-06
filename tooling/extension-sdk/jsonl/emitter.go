@@ -9,12 +9,13 @@
 // The stream's protocol version is NEGOTIATED once, when the emitter is built:
 // New reads the invoking CLI's advertisement (runtime.AcceptedVersionEnv) and
 // every line the emitter writes carries that version, because the protocol
-// rejects a stream that mixes versions. No advertisement means v1, so an
-// extension invoked by an older CLI — or by hand — emits the byte-identical v1
-// stream it always did.
+// rejects a stream that mixes versions. No advertisement means
+// runtime.ProtocolVersion, so an extension run by hand writes the stream the CLI
+// reads.
 package jsonl
 
 import (
+	"io"
 	"os"
 	"strconv"
 	"sync/atomic"
@@ -35,17 +36,16 @@ type Emitter struct {
 }
 
 // New creates a JSONL emitter whose stream speaks the protocol version the
-// invoking CLI advertised, defaulting to v1.
+// invoking CLI advertised, defaulting to runtime.ProtocolVersion.
 func New() *Emitter { return NewForVersion(runtime.NegotiatedVersionFromEnv(os.Getenv)) }
 
 // NewForVersion creates a JSONL emitter pinned to an explicit protocol version,
 // bypassing the environment. It exists for tests and for callers that already
-// resolved the negotiation themselves; an unknown version falls back to v1.
+// resolved the negotiation themselves. The protocol emitter resolves the
+// version, so a version no emitter writes, version 1 included, falls back to
+// runtime.ProtocolVersion.
 func NewForVersion(version int) *Emitter {
-	if !runtime.IsKnownProtocolVersion(version) {
-		version = runtime.ProtocolVersion
-	}
-	return &Emitter{version: version}
+	return &Emitter{version: runtime.NewEmitterForVersion(io.Discard, version).Version()}
 }
 
 // Observe registers fn to receive the message of every log and diagnostic event
@@ -71,11 +71,6 @@ func (e *Emitter) observe(message string) {
 
 // Version reports the protocol version this emitter stamps on every event.
 func (e *Emitter) Version() int { return e.version }
-
-// SupportsReady reports whether the negotiated stream admits typed readiness.
-// A forwarder checks this before building a readiness payload it could not
-// emit.
-func (e *Emitter) SupportsReady() bool { return e.version >= runtime.ProtocolVersion2 }
 
 // rt binds a protocol emitter to the current os.Stdout at emit time so
 // callers (and tests) that swap os.Stdout see events on the new writer.
@@ -252,15 +247,6 @@ func (e *Emitter) Result(status string, data map[string]any) {
 }
 
 // Ready emits the typed readiness event and reports whether it was written.
-//
-// On a stream that was not negotiated up to v2 it writes NOTHING and returns
-// false: there is no valid v1 spelling of readiness, and downgrading would
-// either emit an unknown type or mix versions in one stream. Callers treat
-// false as "this consumer does not speak readiness", not as an error — the
-// watch adapter simply never arms for that consumer (B6b deleted the probe).
 func (e *Emitter) Ready(data runtime.ReadyData) bool {
-	if !e.SupportsReady() {
-		return false
-	}
 	return e.rt().Ready(data) == nil
 }

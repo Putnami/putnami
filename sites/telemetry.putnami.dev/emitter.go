@@ -149,7 +149,7 @@ func (e *otlpExporter) post(ctx context.Context, body []byte) error {
 	}
 	// The destination is operator-controlled workload configuration, not request
 	// input. Private collector endpoints are an intentional deployment mode.
-	resp, err := e.client.Do(req) //nolint:gosec // G704: trusted operational destination
+	resp, err := e.client.Do(req)
 	if err != nil {
 		return err
 	}

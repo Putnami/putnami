@@ -225,7 +225,7 @@ func fetchUVChecksums(location string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	response, err := http.DefaultClient.Do(request) //nolint:gosec // G704: location is the checksum file under uvReleaseURL of a release uvtoolchain.Supported accepts
+	response, err := http.DefaultClient.Do(request)
 	if err != nil {
 		return "", err
 	}

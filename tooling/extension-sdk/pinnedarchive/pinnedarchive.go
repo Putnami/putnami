@@ -260,7 +260,6 @@ func download(ctx context.Context, pin Pin, digest string, w io.Writer, opts Opt
 	if client == nil {
 		client = &http.Client{Timeout: DefaultTimeout}
 	}
-	//nolint:gosec // G107/G704: the URL is the caller's pin, and its bytes are verified against the pinned digest before use.
 	resp, err := client.Do(req)
 	if err != nil {
 		return fmt.Errorf("download %s: %w", pin.URL, err)

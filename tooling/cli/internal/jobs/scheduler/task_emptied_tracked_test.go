@@ -60,7 +60,7 @@ var heldTrackedFile = []string{
 func (f *emptyingFixture) refused(t *testing.T, leg string, result *SchedulerResult, want ...string) {
 	t.Helper()
 	row := f.rows(t, leg, result)[0]
-	if result.Success || row.Status != "failed" || row.CacheHit || row.Error == nil {
+	if result.Success || row.Status != "failed" || row.ReuseKind().CacheHit() || row.Error == nil {
 		t.Fatalf("%s: row = %+v (success=%v), want a task that failed without a hit", leg, row, result.Success)
 	}
 	for _, want := range append([]string{`declared output "clientgen" (` + emptyingProject + `/.gen/clientgen)`}, want...) {

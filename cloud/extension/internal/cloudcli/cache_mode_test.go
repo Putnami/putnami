@@ -116,7 +116,7 @@ func providerSessionMode(t *testing.T, env map[string]string) cache.Mode {
 	if err != nil {
 		t.Fatal(err)
 	}
-	requests := string(initialize) + "\n" + `{"protocolVersion":1,"id":2,"op":"shutdown"}` + "\n"
+	requests := string(initialize) + "\n" + `{"protocolVersion":2,"id":2,"op":"shutdown"}` + "\n"
 	stdout := serveRuntimeOnce(t, []string{"cache-provider"}, IO{Env: env}, requests)
 
 	scanner := bufio.NewScanner(bytes.NewReader(stdout))

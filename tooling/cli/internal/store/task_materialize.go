@@ -93,8 +93,8 @@ var errKeptConflict = errors.New("the restored entry holds bytes at a ceded path
 // would have emptied it.
 //
 // The store's SHARED lock is held for the whole materialize, so a concurrent GC
-// (which needs the exclusive lock) cannot reclaim the blob mid-copy — the same
-// protection Put and Materialize rely on, extended to the restore path.
+// (which needs the exclusive lock) cannot reclaim the blob mid-copy, as it
+// cannot during an ingest.
 //
 // keep is for a directory output that CEDES subpaths (protocol ADR 0003): it
 // lists them, output-relative and in slash form, and whatever the destination

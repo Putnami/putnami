@@ -168,9 +168,7 @@ func Plan(
 	}
 
 	// Resolve cross-project dependencies (^, /, *)
-	if err := resolveExternalDeps(allJobs, ws); err != nil {
-		return nil, err
-	}
+	resolveExternalDeps(allJobs, ws)
 	serializeWithSharedExecutions(ws, allJobs, attachSharedExecutions(ws, allJobs, commandParams))
 
 	if err := ValidatePlanDAG(allJobs); err != nil {

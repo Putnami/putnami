@@ -34,7 +34,7 @@
           "verification": {
             "kind": "acceptance",
             "checks": [
-              "the-resolution-is-total-and-defaults-to-1",
+              "the-resolution-is-total-and-defaults-to-2",
               "every-line-carries-the-stream-version"
             ]
           }
@@ -211,7 +211,7 @@
               "the-emitter-conforms-to-the-runtime-protocol-wire-shape",
               "the-readiness-marker-has-the-protocol-wire-shape",
               "a-typed-readiness-marker-is-emitted-at-the-negotiated-version",
-              "no-readiness-marker-leaks-at-a-version-that-lacks-it",
+              "the-sdk-never-writes-version-1",
               "an-unrepresentable-value-is-dropped-rather-than-emitted-malformed",
               "the-sdk-emits-at-the-negotiated-version",
               "the-sdk-never-writes-an-invalid-line",

@@ -6,11 +6,10 @@ The Putnami CLI reads lines of at most 16 MiB. It reads a longer line to its end
 
 > Version 2 is documented in [`05-event-v2.md`](05-event-v2.md): the same
 > envelope plus the typed `ready` event. Everything below stays true for both —
-> only the `v` stamp and the extra type differ. **What an emitter writes is
-> negotiated, not fixed**: a job stream handled by a CLI that requires the
-> current extension contract is `v: 2`, and that CLI rejects a `v: 1` line.
-> `v: 1` remains what an emitter writes when nothing advertises a version. The
-> rule and its alternatives are recorded in
+> only the `v` stamp and the extra type differ. **No emitter writes `v: 1`**:
+> every emitter writes `v: 2`, also when nothing advertises a version, and the
+> CLI rejects a `v: 1` line. This package still parses and validates `v: 1`.
+> The negotiation rule and its alternatives are recorded in
 > [`adr/0001-one-stream-one-negotiated-version.md`](adr/0001-one-stream-one-negotiated-version.md).
 
 ## Envelope

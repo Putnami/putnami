@@ -31,7 +31,7 @@ func writeRecordedSession(t *testing.T, wsRoot, id, document string) {
 // exportLines runs the export and returns its emitted lines.
 func exportLines(t *testing.T, wsRoot, since string) []string {
 	t.Helper()
-	out, err := sharedtest.CaptureStdout(t, func() error { return SessionsExport(wsRoot, since) })
+	out, err := sharedtest.CaptureStdout(t, func() error { return SessionsExport(wsRoot, since, "") })
 	if err != nil {
 		t.Fatalf("SessionsExport(%q) error: %v", since, err)
 	}
@@ -420,7 +420,7 @@ func TestSessionsExport_RejectsAnInvalidSince(t *testing.T) {
 	ws := t.TempDir()
 	writeRecordedSession(t, ws, "20260101-120000-aaaaaa", recordedV2(t, "20260101-120000-aaaaaa", "2026-01-01T12:00:00Z", 1, 2))
 
-	out, err := sharedtest.CaptureStdout(t, func() error { return SessionsExport(ws, "yesterday") })
+	out, err := sharedtest.CaptureStdout(t, func() error { return SessionsExport(ws, "yesterday", "") })
 	if err == nil {
 		t.Fatal("expected an error for a non-RFC-3339 --since value")
 	}
@@ -435,7 +435,7 @@ func TestSessionsExport_RejectsAnInvalidSince(t *testing.T) {
 // TestSessionsExport_EmptyStoreEmitsNothing pins that a worktree with no
 // recorded sessions exports an empty stream rather than failing.
 func TestSessionsExport_EmptyStoreEmitsNothing(t *testing.T) {
-	out, err := sharedtest.CaptureStdout(t, func() error { return SessionsExport(t.TempDir(), "") })
+	out, err := sharedtest.CaptureStdout(t, func() error { return SessionsExport(t.TempDir(), "", "") })
 	if err != nil {
 		t.Fatalf("SessionsExport() on an empty store: %v", err)
 	}

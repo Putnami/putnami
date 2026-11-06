@@ -9,6 +9,7 @@ import (
 	"sort"
 	"strings"
 
+	protocolcli "go.putnami.dev/protocol/cli"
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/sdk/extension/filelock"
 	"go.putnami.dev/tooling/cli/internal/cmderr"
@@ -71,9 +72,12 @@ func ExtensionsInstallUser(ctx context.Context, userRoot string, args []string, 
 	extension.ClaimUserScopeRepair(userRoot)
 
 	installer := extension.NewUserScopeInstaller(userRoot)
-	return installArtifactsWithOptions(ctx, userRoot, &wsproto.Config{}, rest, userScopeOps(userRoot, installer), InstallOptions{
-		OutputFormat: outputFormat,
-		Out:          out,
+	return WithActionRecords(outputFormat, "extensions install", func(records *ActionRecords) error {
+		return installArtifactsWithOptions(ctx, userRoot, &wsproto.Config{}, rest, userScopeOps(userRoot, installer), InstallOptions{
+			OutputFormat: outputFormat,
+			Out:          out,
+			Records:      records,
+		})
 	})
 }
 
@@ -139,8 +143,8 @@ func ExtensionsListUser(userRoot string, args []string, outputFormat string, out
 			entries = append(entries, artifactListEntry{Name: name, Installed: lf.Extensions[name].Version, Source: "user"})
 		}
 	}
-	if outputFormat == "jsonl" {
-		return printArtifactListJSONL(entries)
+	if protocolcli.OutputMode(outputFormat).IsStructured() {
+		return shared.WriteResult(outputFormat, "extensions list", shared.RecordsData(entries), nil)
 	}
 	iox.Fprintln(out)
 	iox.Fprintf(out, "  %-35s %-15s %s\n", "EXTENSION", "INSTALLED", "SOURCE")

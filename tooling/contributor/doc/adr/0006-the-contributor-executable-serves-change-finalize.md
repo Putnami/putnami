@@ -134,8 +134,8 @@ operation the contract does not define: an envelope whose outcome is
 - **(a) Help.** `putnami change finalize --help` prints the help putnami builds
   from the manifest. The core prints its own finalize help.
 - **(b) Undeclared flags.** Both exit 2 and name the argument. For `change
-  finalize`, putnami first warns on stderr that undeclared flags are
-  deprecated.
+  finalize`, putnami refuses the flag before it launches the executable, so
+  the message is putnami's.
 - **(c) Message prefix.** A failure reads `change finalize: <error>`, where the
   core prints `putnami: proposals finalize: <error>`. A refused selection reads
   `change finalize takes no <flag> selection`, where the core prints
@@ -205,9 +205,10 @@ operation the contract does not define: an envelope whose outcome is
 
 - For a draft seed, a hosted partial delivery, a refused partial delivery, a
   dossier that does not verify, a usage error and an undeclared flag, `change
-  finalize` exits with the same code, prints the same stdout and the same
-  message, leaves the same branch head, pushes the same refs and writes the
-  same proposal and task records as goldens recorded from `proposals
+  finalize` exits with the same code, prints the same stdout, prints the same
+  message except for an undeclared flag, which putnami refuses with its own,
+  leaves the same branch head, pushes the same refs and writes the same
+  proposal and task records as goldens recorded from `proposals
   finalize`, the core command it replaced. A core test runs `change finalize`
   through putnami in twin workspaces and compares it with the goldens.
 - The owners of a changed path come from the host's `workspace.owners`. The

@@ -1,12 +1,13 @@
 package lifecycle
 
 import (
-	"encoding/json"
 	"fmt"
 	"os"
 	"strings"
 
+	protocolcli "go.putnami.dev/protocol/cli"
 	wsproto "go.putnami.dev/protocol/workspace"
+	"go.putnami.dev/tooling/cli/internal/commands/shared"
 	"go.putnami.dev/tooling/cli/internal/iox"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
@@ -21,8 +22,8 @@ func WorkspaceDescribe(wsRoot string, cfg *wsproto.Config, outputFormat string, 
 	}
 	warnings.Report(ws)
 
-	if outputFormat == "jsonl" {
-		return workspaceDescribeJSONL(ws, cfg)
+	if protocolcli.OutputMode(outputFormat).IsStructured() {
+		return shared.WriteResult(outputFormat, "workspace describe", workspaceInfoFor(ws, cfg), warnings.Envelope())
 	}
 
 	iox.Fprintln(os.Stdout)
@@ -63,14 +64,15 @@ func WorkspaceDescribe(wsRoot string, cfg *wsproto.Config, outputFormat string, 
 	return nil
 }
 
-func workspaceDescribeJSONL(ws *workspace.Workspace, cfg *wsproto.Config) error {
-	type wsInfo struct {
-		Name       string   `json:"name"`
-		Root       string   `json:"root"`
-		Projects   []string `json:"projects"`
-		Extensions []string `json:"extensions,omitempty"`
-	}
+// wsInfo is the data of the workspace describe result.
+type wsInfo struct {
+	Name       string   `json:"name"`
+	Root       string   `json:"root"`
+	Projects   []string `json:"projects"`
+	Extensions []string `json:"extensions,omitempty"`
+}
 
+func workspaceInfoFor(ws *workspace.Workspace, cfg *wsproto.Config) wsInfo {
 	info := wsInfo{
 		Name:       ws.Name,
 		Root:       ws.Root,
@@ -80,13 +82,7 @@ func workspaceDescribeJSONL(ws *workspace.Workspace, cfg *wsproto.Config) error 
 	for _, p := range ws.Projects {
 		info.Projects = append(info.Projects, p.Name)
 	}
-
-	data, err := json.Marshal(info)
-	if err != nil {
-		return fmt.Errorf("marshal workspace info: %w", err)
-	}
-	iox.Fprintln(os.Stdout, string(data))
-	return nil
+	return info
 }
 
 func joinTags(tags []string) string {

@@ -120,10 +120,6 @@ type Session struct {
 
 	mu     sync.Mutex
 	nextID int64
-	// protocolVersion is selected by Initialize. Sessions bootstrap at the
-	// oldest supported version so a deployed legacy provider can parse the
-	// first envelope, then use the version returned by InitializeResult.
-	protocolVersion int
 	// objectCacheSocket is the object-cache socket path Initialize accepted from
 	// the provider, or "" when the object cache is not available for this
 	// session. It is deliberately the CHECKED value, not the advertised one.
@@ -148,7 +144,6 @@ func newSession(opts ...Option) *Session {
 		shutdownTimeout: defaultShutdownTimeout,
 		pending:         make(map[int64]chan *cache.ProviderResponse),
 		nextID:          1,
-		protocolVersion: cache.ProviderProtocolMinVersion,
 		waitCh:          make(chan error, 1),
 		readDone:        make(chan struct{}),
 	}
@@ -295,7 +290,6 @@ func (s *Session) call(ctx context.Context, op cache.ProviderOp, params any) (*c
 	}
 	id := s.nextID
 	s.nextID++
-	protocolVersion := s.protocolVersion
 	ch := make(chan *cache.ProviderResponse, 1)
 	s.pending[id] = ch
 	s.mu.Unlock()
@@ -306,7 +300,7 @@ func (s *Session) call(ctx context.Context, op cache.ProviderOp, params any) (*c
 		s.mu.Unlock()
 	}()
 
-	req := &cache.ProviderRequest{ProtocolVersion: protocolVersion, ID: id, Op: op, Payload: raw}
+	req := &cache.ProviderRequest{ProtocolVersion: cache.ProviderProtocolVersion, ID: id, Op: op, Payload: raw}
 	line, err := json.Marshal(req)
 	if err != nil {
 		return nil, fmt.Errorf("encode %s request: %w", op, err)
@@ -355,12 +349,11 @@ func (s *Session) do(ctx context.Context, op cache.ProviderOp, params any) (*cac
 // --- ops ---
 
 // Initialize opens the session and performs the runtime half of the
-// capability/version gate. It deliberately bootstraps at the oldest supported
-// version so a strict legacy provider can parse the first envelope and payload.
-// The bootstrap capability tells a newer provider it may select v2; the version
-// in InitializeResult then becomes the version for every later request. The
-// caller inspects Ready to decide whether the provider can actually serve the
-// cache.
+// capability/version gate. Every request of the session, initialize included,
+// travels at cache.ProviderProtocolVersion, and the strict result parser fails
+// Initialize when a provider selects a version below
+// cache.ProviderProtocolMinVersion. The caller inspects Ready to decide whether the
+// provider can actually serve the cache.
 //
 // With a run credential (WithRunCredential), the bootstrap also advertises
 // cache.CapabilityRunCredential. A provider that echoes it receives the
@@ -384,12 +377,11 @@ func (s *Session) Initialize(ctx context.Context, p *cache.InitializeParams) (*c
 		return nil, fmt.Errorf("the run credential is not 1 to %d bytes of UTF-8 with no whitespace", cache.MaxRunCredentialBytes)
 	}
 
-	// Do not mutate the caller's reusable params. A v1 provider rejects both a
-	// v2 envelope and a v2 InitializeParams body before it can advertise the
-	// version it supports. Capabilities are an existing, forward-tolerant field,
-	// so the v2 opt-in is safe for the v1 bootstrap shape.
+	// Do not mutate the caller's reusable params. A provider released at
+	// cloud/v0.4.0 selects provider RPC v2 only when it sees
+	// cache.CapabilityProviderProtocolV2, so every initialize lists it.
 	bootstrap := *p
-	bootstrap.ProtocolVersion = cache.ProviderProtocolMinVersion
+	bootstrap.ProtocolVersion = cache.ProviderProtocolVersion
 	bootstrap.Capabilities = append([]string(nil), p.Capabilities...)
 	bootstrap.Capabilities = appendCapability(bootstrap.Capabilities, cache.CapabilityProviderProtocolV2)
 	// The object cache is the same kind of opt-in: an unknown capability string
@@ -416,7 +408,6 @@ func (s *Session) Initialize(ctx context.Context, p *cache.InitializeParams) (*c
 	}
 
 	s.mu.Lock()
-	s.protocolVersion = result.ProtocolVersion
 	s.objectCacheSocket = negotiatedObjectCacheSocket(result)
 	s.restoreResultOnly = containsCapability(result.Capabilities, cache.CapabilityRestoreResultOnly)
 	s.mu.Unlock()

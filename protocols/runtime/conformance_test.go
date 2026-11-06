@@ -10,14 +10,15 @@ import (
 	"go.putnami.dev/protocol/features/spectest"
 )
 
-// TestConformance_ProtocolVersion pins the current protocol version so any bump
-// is intentional and surfaces in code review. The wire `v` field is validated
-// against this constant in validate.go, so a bump here without a corresponding
-// migration of every emitter and the fixture corpus would break conformance.
+// TestConformance_ProtocolVersion pins the version every emitter writes so any
+// bump is intentional and surfaces in code review. The wire `v` field is
+// validated against this constant in validate.go, so a bump here without a
+// corresponding migration of every emitter and the fixture corpus would break
+// conformance.
 func TestConformance_ProtocolVersion(t *testing.T) {
 	spectest.Proves(t, "runtime/event-stream", "the-versions-are-pinned", "the-version-constants-stay-1-and-2")
-	if ProtocolVersion != 1 {
-		t.Fatalf("ProtocolVersion = %d, want 1 — bumping requires a migration story", ProtocolVersion)
+	if ProtocolVersion != 2 {
+		t.Fatalf("ProtocolVersion = %d, want 2 — bumping requires a migration story", ProtocolVersion)
 	}
 }
 

@@ -109,7 +109,7 @@ func TestSessionExitCode_ReusedFailureStillFails(t *testing.T) {
 	spectest.Proves(t, "cli/machine-contract", "one-run-verdict-on-every-surface", "the-cli-session-exit-code-follows-the-run-verdict")
 	job := makeExitCodeJob(0)
 	results := map[string]*jobs.JobResult{
-		job.Key(): {Status: "failed", CacheHit: true, Reuse: jobs.ReuseLocalCache},
+		job.Key(): {Status: "failed", Reuse: jobs.ReuseLocalCache},
 	}
 	session := jobs.ReduceRun([]*jobs.ScheduledJob{job}, results, jobs.SessionOutcome{})
 

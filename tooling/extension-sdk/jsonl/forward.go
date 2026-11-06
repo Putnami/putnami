@@ -44,10 +44,7 @@ var forwardReservedKeys = map[string]bool{
 //
 // A record carrying the reserved readiness marker (runtime.ReadyLogKey)
 // additionally produces a typed `ready` event, emitted AFTER the log event so
-// the human output ordering — which B6b's watch adapter consumes as the only readiness signal — is
-// exactly what it was before readiness was typed. The typed event is dropped
-// silently when the stream was not negotiated to v2, which keeps the whole
-// mechanism additive.
+// a reader of the human output meets the log line first.
 func ForwardLine(emit *Emitter, line string, fallbackLevel string) {
 	if strings.HasPrefix(line, "{") {
 		var parsed map[string]any
@@ -93,9 +90,6 @@ func ForwardLine(emit *Emitter, line string, fallbackLevel string) {
 // `ready` event. The marker is decoded and validated by the protocol package,
 // so a malformed one costs this signal instead of poisoning the stream.
 func forwardReadiness(emit *Emitter, record map[string]any) {
-	if !emit.SupportsReady() {
-		return
-	}
 	data, ok := runtime.ReadyMarkerFromLogRecord(record)
 	if !ok {
 		return

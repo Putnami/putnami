@@ -182,9 +182,9 @@ func TestFailureReplay_UnchangedInputsReplayWithoutExecuting(t *testing.T) {
 	if replayed.ReplayedFailure.FirstFailedAt.IsZero() {
 		t.Error("the replayed failure has no first-failure time, so its age cannot be reported")
 	}
-	if replayed.CacheHit || replayed.Outcome() != "failed" {
+	if replayed.ReuseKind().CacheHit() || replayed.Outcome() != "failed" {
 		t.Errorf("the replay was folded into the cache-hit summary: cacheHit=%v outcome=%q",
-			replayed.CacheHit, replayed.Outcome())
+			replayed.ReuseKind().CacheHit(), replayed.Outcome())
 	}
 	if replayed.ExitCode != 3 {
 		t.Errorf("replayed exit code = %d, want the original 3", replayed.ExitCode)
@@ -227,7 +227,7 @@ func TestFailureReplay_UnchangedInputsReplayWithoutExecuting(t *testing.T) {
 	if got := subprocessRuns(t, logPath); got != 4 {
 		consumed := resultOf(t, fourth, planned, 1)
 		t.Fatalf("the fixed run spawned %d subprocesses in total, want probe+consume after the two probes (consume: status=%q cacheHit=%v replayed=%v error=%+v)",
-			got, consumed.Status, consumed.CacheHit, consumed.ReplayedFailure != nil, consumed.Error)
+			got, consumed.Status, consumed.ReuseKind().CacheHit(), consumed.ReplayedFailure != nil, consumed.Error)
 	}
 
 	// --- 5. a NEW failure at a NEW key starts its own count: no attempt number

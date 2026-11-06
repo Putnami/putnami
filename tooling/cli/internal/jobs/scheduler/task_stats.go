@@ -203,7 +203,7 @@ func (s *taskStatsStore) record(job *ScheduledJob, result *JobResult) {
 	if s == nil || job == nil || result == nil {
 		return
 	}
-	if result.Status != "success" || result.CacheHit || result.Coalesced || result.Duration <= 0 {
+	if result.Status != "success" || result.ReuseKind().Reused() || result.Duration <= 0 {
 		return
 	}
 

@@ -72,8 +72,6 @@
       "cpuTimeMs": 2400,
       "spawnToFirstEventMs": 41,
       "firstEventObserved": true,
-      "cacheHit": false,
-      "coalesced": false,
       "reuse": "",
       "events": [
         {
@@ -130,8 +128,6 @@
       "cpuTimeMs": 1500,
       "spawnToFirstEventMs": 37,
       "firstEventObserved": true,
-      "cacheHit": false,
-      "coalesced": false,
       "reuse": "",
       "error": {
         "message": "2 assertions failed",
@@ -181,8 +177,6 @@
       "status": "success",
       "durationMs": 3,
       "taskWallMs": 12,
-      "cacheHit": true,
-      "coalesced": false,
       "reuse": "local-cache"
     },
     {
@@ -197,8 +191,6 @@
       "status": "success",
       "durationMs": 0,
       "taskWallMs": 640,
-      "cacheHit": false,
-      "coalesced": true,
       "reuse": "coalesced"
     },
     {
@@ -212,8 +204,6 @@
       "status": "success",
       "durationMs": 7,
       "taskWallMs": 58,
-      "cacheHit": true,
-      "coalesced": false,
       "reuse": "remote-cache"
     },
     {
@@ -228,8 +218,6 @@
       "status": "success",
       "durationMs": 410,
       "taskWallMs": 455,
-      "cacheHit": false,
-      "coalesced": false,
       "reuse": ""
     },
     {
@@ -244,8 +232,6 @@
       "status": "skipped",
       "durationMs": 0,
       "taskWallMs": 1,
-      "cacheHit": false,
-      "coalesced": false,
       "reuse": ""
     },
     {
@@ -260,8 +246,6 @@
       "status": "canceled",
       "durationMs": 0,
       "taskWallMs": 2,
-      "cacheHit": false,
-      "coalesced": false,
       "reuse": ""
     }
   ]

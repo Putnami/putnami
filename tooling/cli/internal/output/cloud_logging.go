@@ -72,8 +72,8 @@ func (r *CloudLoggingRenderer) JobComplete(job *jobs.ScheduledJob, result *jobs.
 		"job":       job.JobDef.Name,
 		"status":    status,
 		"duration":  result.Duration.Milliseconds(),
-		"cache":     result.CacheHit,
-		"coalesced": result.Coalesced,
+		"cache":     result.ReuseKind().CacheHit(),
+		"coalesced": result.ReuseKind() == jobs.ReuseCoalesced,
 	}
 	if result.Error != nil {
 		labels["error"] = result.Error.Message

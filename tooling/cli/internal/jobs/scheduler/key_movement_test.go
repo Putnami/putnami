@@ -520,7 +520,7 @@ func TestInvocation_PruningOnAMovableConsumerKeyIsConfirmedWhenTheProducerStarts
 				if producer == nil || producer.Status != "skipped" {
 					t.Fatalf("producer result = %+v, want pruned", producer)
 				}
-				if !consumer.CacheHit {
+				if !consumer.ReuseKind().CacheHit() {
 					t.Fatalf("consumer result = %+v, want the cached verdict it was pruned for", consumer)
 				}
 				if got := fixture.teardownCount(t); got != 0 {
@@ -531,7 +531,7 @@ func TestInvocation_PruningOnAMovableConsumerKeyIsConfirmedWhenTheProducerStarts
 			if producer == nil || producer.Status != "success" {
 				t.Fatalf("producer result = %+v, want it to provision for a consumer whose key moved", producer)
 			}
-			if consumer.CacheHit {
+			if consumer.ReuseKind().CacheHit() {
 				t.Fatalf("consumer result = %+v, want an execution over the new layers", consumer)
 			}
 			if _, err := os.Stat(fixture.consumed); err != nil {
@@ -621,7 +621,7 @@ func TestInvocation_ConsumerKeyAWriteMayMoveAfterTheProducerStartsIsNeverPruned(
 	if producer := result.Results[fixture.producer.Key()]; producer == nil || producer.Status != "success" {
 		t.Fatalf("producer result = %+v, want it to provision", producer)
 	}
-	if consumer := result.Results[fixture.consumer.Key()]; consumer == nil || consumer.Status != "success" || consumer.CacheHit {
+	if consumer := result.Results[fixture.consumer.Key()]; consumer == nil || consumer.Status != "success" || consumer.ReuseKind().CacheHit() {
 		t.Fatalf("consumer result = %+v, want an execution over the new layers", consumer)
 	}
 	if got := fixture.teardownCount(t); got != 1 {

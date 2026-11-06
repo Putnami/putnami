@@ -82,11 +82,8 @@ func TestScopesList_JSONL(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ScopesList: %v", err)
 	}
-	line := strings.TrimSpace(out)
 	var info ScopeInfo
-	if err := json.Unmarshal([]byte(line), &info); err != nil {
-		t.Fatalf("parse jsonl %q: %v", line, err)
-	}
+	sharedtest.ResultData(t, out, "scopes list", &info)
 	if info.Path != "backend" {
 		t.Errorf("path = %q, want backend", info.Path)
 	}
@@ -141,10 +138,10 @@ func TestScopesList_ReportsLine(t *testing.T) {
 		t.Fatalf("ScopesList jsonl: %v", err)
 	}
 	lines := map[string]string{}
-	for _, raw := range strings.Split(strings.TrimSpace(jsonl), "\n") {
+	for _, raw := range sharedtest.ResultRecords(t, jsonl, "scopes list") {
 		var info ScopeInfo
-		if err := json.Unmarshal([]byte(raw), &info); err != nil {
-			t.Fatalf("parse jsonl %q: %v", raw, err)
+		if err := json.Unmarshal(raw, &info); err != nil {
+			t.Fatalf("parse record %s: %v", raw, err)
 		}
 		lines[info.Path] = info.Line
 	}

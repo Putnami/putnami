@@ -60,7 +60,7 @@ func TestLeaseHelperProcess(t *testing.T) {
 			_, _ = fmt.Fprintf(f, "%d\n", os.Getpid())
 			_ = f.Close()
 			time.Sleep(250 * time.Millisecond) // keep the cold-key contention visible
-			if err := s.Put(leaseTestKey, leaseStatusEntry()); err != nil {
+			if err := putFormatOneEntry(s, leaseTestKey, leaseStatusEntry()); err != nil {
 				release()
 				t.Fatalf("winner publish: %v", err)
 			}

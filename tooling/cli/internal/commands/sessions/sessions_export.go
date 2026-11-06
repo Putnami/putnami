@@ -9,7 +9,9 @@ import (
 	"sort"
 	"time"
 
+	protocolcli "go.putnami.dev/protocol/cli"
 	"go.putnami.dev/tooling/cli/internal/cmderr"
+	"go.putnami.dev/tooling/cli/internal/commands/shared"
 	"go.putnami.dev/tooling/cli/internal/iox"
 	"go.putnami.dev/tooling/cli/internal/workspace_state"
 )
@@ -33,10 +35,20 @@ import (
 // Every line therefore declares its own version. A record written before the v2
 // flip carries no protocolVersion and the version-1 shape; it is emitted as it
 // is, exactly as readSessionMeta already treats it at the read side.
-func SessionsExport(wsRoot string, since string) error {
+//
+// Under --output=json|jsonl the same documents, still verbatim, are the data of
+// the sessions export result (shared.RecordsData).
+func SessionsExport(wsRoot, since, outputFormat string) error {
 	documents, err := recordedSessionStream(wsRoot, since)
 	if err != nil {
 		return err
+	}
+	if protocolcli.OutputMode(outputFormat).IsStructured() {
+		records := make([]json.RawMessage, 0, len(documents))
+		for _, document := range documents {
+			records = append(records, json.RawMessage(document.line))
+		}
+		return shared.WriteResult(outputFormat, "sessions export", shared.RecordsData(records), nil)
 	}
 	for _, document := range documents {
 		iox.Fprintln(os.Stdout, document.line)

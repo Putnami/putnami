@@ -387,7 +387,7 @@ putnami tree fingerprint
 
 putnami tree fingerprint --output=json
 # {"protocolVersion":2,"command":"tree fingerprint","status":"success","exitCode":0,
-#  "data":{"dirty":true,"fingerprint":"4f3d...","headSHA":"ad048a6b..."}}
+#  "data":{"fingerprint":"4f3d...","dirty":true,"headSHA":"ad048a6b..."}}
 ```
 
 The block is **optional by absence**: a session outside a git worktree, in a

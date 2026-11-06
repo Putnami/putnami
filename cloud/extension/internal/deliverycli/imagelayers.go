@@ -610,7 +610,6 @@ func (d goDevDist) Open(ctx context.Context, filename string) (io.ReadCloser, er
 	if client == nil {
 		client = http.DefaultClient
 	}
-	//nolint:gosec // G704: not user-controlled input — the URL is the published go.dev download root plus a filename this producer derived from the workspace's own go.work pin, and the bytes are sha256-verified against the published checksum before anything is done with them
 	resp, err := client.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("download %s: %w", target, err)

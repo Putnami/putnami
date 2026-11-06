@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	protocolcli "go.putnami.dev/protocol/cli"
+	"go.putnami.dev/tooling/cli/internal/commands/shared"
 	"go.putnami.dev/tooling/cli/internal/iox"
 )
 
@@ -92,7 +93,11 @@ func (s LoadSample) String() string {
 // prints it, as JSON under structured output and as the bare ratio (or
 // "unknown") otherwise.
 func MachineCommand(outputFormat string, reader LoadReader) error {
-	return WriteMachineLoad(iox.Stdout(), outputFormat, MachineLoad(reader))
+	sample := MachineLoad(reader)
+	if protocolcli.OutputMode(outputFormat).IsStructured() {
+		return shared.WriteResult(outputFormat, "doctor", sample, nil)
+	}
+	return WriteMachineLoad(iox.Stdout(), outputFormat, sample)
 }
 
 // WriteMachineLoad prints one sample to out.

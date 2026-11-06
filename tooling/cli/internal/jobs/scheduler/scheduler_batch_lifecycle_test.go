@@ -260,7 +260,7 @@ func TestBatchMembersStoreAndHitDeclaredEntries(t *testing.T) {
 		t.Fatalf("warm invocations = %v, want no additional subprocess", got)
 	}
 	for _, job := range planned {
-		if result := warm.Results[job.Key()]; result == nil || !result.CacheHit {
+		if result := warm.Results[job.Key()]; result == nil || !result.ReuseKind().CacheHit() {
 			t.Fatalf("warm %s = %+v, want an independent cache hit", job.Key(), result)
 		}
 	}
@@ -333,7 +333,7 @@ func TestSoloAndBatchDispatchShareOneCacheEntry(t *testing.T) {
 				t.Fatalf("warm invocations = %d, want no additional subprocess (still %d)", got, coldInvocations)
 			}
 			for _, job := range warmPlan {
-				if result := warm.Results[job.Key()]; result == nil || !result.CacheHit {
+				if result := warm.Results[job.Key()]; result == nil || !result.ReuseKind().CacheHit() {
 					t.Fatalf("warm %s = %+v, want a cache hit on the other shape's entry", job.Key(), result)
 				}
 			}
@@ -427,7 +427,7 @@ func TestFailedBatchMemberRetriesSoloAndIsNotReBatched(t *testing.T) {
 		t.Fatalf("warm invocations = %v, want no additional subprocess", got)
 	}
 	for _, job := range planned {
-		if got := warm.Results[job.Key()]; got == nil || !got.CacheHit {
+		if got := warm.Results[job.Key()]; got == nil || !got.ReuseKind().CacheHit() {
 			t.Fatalf("warm %s = %+v, want a task-owned cache hit", job.Key(), got)
 		}
 	}
@@ -761,10 +761,10 @@ func TestCanceledBatchMemberLeavesSiblingVerdictAndEntryIntact(t *testing.T) {
 
 	warm := runBatchScheduler(ctx, ws, planned,
 		SchedulerConfig{MaxParallel: 2, ContinueOnError: true}, newCache())
-	if got := warm.Results[healthy.Key()]; got == nil || !got.CacheHit {
+	if got := warm.Results[healthy.Key()]; got == nil || !got.ReuseKind().CacheHit() {
 		t.Fatalf("warm batch-mate = %+v, want a task-owned cache hit on the entry it published", got)
 	}
-	if got := warm.Results[canceled.Key()]; got == nil || got.CacheHit {
+	if got := warm.Results[canceled.Key()]; got == nil || got.ReuseKind().CacheHit() {
 		t.Fatalf("warm canceled member = %+v, want a re-execution (a canceled result is never stored)", got)
 	}
 	if log := invocationLog(t, logPath); len(log) != 2 || log[1] != "solo:a" {
@@ -866,7 +866,7 @@ func TestFailedBatchMemberIsolatedIdenticallyToSoloDispatch(t *testing.T) {
 		for _, job := range planned {
 			got := warm.Results[job.Key()]
 			wantHit := statuses[job.Key()] == "success"
-			if got == nil || got.CacheHit != wantHit {
+			if got == nil || got.ReuseKind().CacheHit() != wantHit {
 				t.Fatalf("solo=%v warm %s = %+v, want cacheHit=%v", solo, job.Key(), got, wantHit)
 			}
 		}

@@ -209,7 +209,7 @@ func setBearer(req *http.Request, token string) {
 
 func doJSON(client *http.Client, req *http.Request) (*http.Response, []byte, error) {
 	clicore.SetUserAgent(req)
-	resp, err := client.Do(req) //nolint:gosec // G704: CLI intentionally requests the user-configured Putnami Cloud endpoint
+	resp, err := client.Do(req)
 	if err != nil {
 		return nil, nil, clicore.NewError(fmt.Sprintf("request failed for %s: %s", req.URL, err.Error()), clicore.ExitAPI)
 	}

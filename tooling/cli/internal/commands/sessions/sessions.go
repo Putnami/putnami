@@ -5,6 +5,8 @@ import (
 	"os"
 	"strings"
 
+	protocolcli "go.putnami.dev/protocol/cli"
+	"go.putnami.dev/tooling/cli/internal/commands/shared"
 	"go.putnami.dev/tooling/cli/internal/iox"
 	"go.putnami.dev/tooling/cli/internal/workspace_state"
 )
@@ -39,8 +41,8 @@ func SessionsListRevision(wsRoot string, outputFormat string, revision string) e
 		sessions = append(sessions, id)
 	}
 
-	if outputFormat == "jsonl" {
-		return sessionsListJSONL(store, sessions, store.LatestID(), identities)
+	if protocolcli.OutputMode(outputFormat).IsStructured() {
+		return shared.WriteResult(outputFormat, "sessions list", sessionsListData(store, sessions, store.LatestID(), identities), nil)
 	}
 
 	if len(sessions) == 0 {

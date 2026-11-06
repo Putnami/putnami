@@ -31,7 +31,7 @@ func ValidateEvent(e *Event) []diag.Diagnostic {
 
 	if !IsKnownProtocolVersion(e.V) {
 		diags = append(diags, diag.Errorf("invalid-version", "v",
-			"expected protocol version %d or %d, got %d", ProtocolVersion, ProtocolVersion2, e.V))
+			"expected protocol version %d or %d, got %d", ProtocolVersion1, ProtocolVersion, e.V))
 	}
 
 	// The admitted type vocabulary is version-scoped: v1 admits exactly the
@@ -91,8 +91,7 @@ func ValidateEventStream(events []*Event) []diag.Diagnostic {
 
 	// One subprocess emits one contract. A stream that changes version
 	// mid-flight cannot be read as either version, so it is rejected rather
-	// than interpreted per line. An all-v1 stream — every stream emitted today
-	// — never triggers this.
+	// than interpreted per line. A stream from one emitter never triggers this.
 	if len(versions) > 1 {
 		diags = append(diags, diag.Errorf("mixed-protocol-version", "",
 			"event stream mixes protocol versions %s", sortedVersions(versions)))

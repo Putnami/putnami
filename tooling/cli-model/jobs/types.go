@@ -58,8 +58,6 @@ type JobResult struct {
 	// See execution.go.
 	Execution *Execution `json:"-"`
 	ExitCode  int        `json:"-"`
-	CacheHit  bool       `json:"-"` // true for an ordinary local or remote cache hit
-	Coalesced bool       `json:"-"` // true when a sibling in this run did the work instead
 	// CacheKey is the exact, already-computed key this run used for the task.
 	// Cache entries and runtime events never carry it. The one place it leaves
 	// the process is the canonical task record, as TaskResult.InputDigest, so a
@@ -73,12 +71,9 @@ type JobResult struct {
 	// VerificationError records an observation failure without changing the
 	// task's own verdict. The cache verifier fails closed on this field.
 	VerificationError string `json:"-"`
-	// Reuse is the canonical provenance of a reused result, refining the two
-	// booleans above into one mutually-exclusive value that also separates a
-	// local hit from a remote one. MarkReuse is its only writer and sets all
-	// three together, so the encodings cannot drift. It stays optional: a
-	// JobResult assembled by hand (tests, older call sites) leaves it empty and
-	// ReuseKind falls back to the booleans.
+	// Reuse is the provenance of a reused result: one mutually-exclusive value
+	// that separates a local hit, a remote hit and a coalesced result, and is
+	// empty for an executed one. MarkReuse writes it; ReuseKind reads it.
 	Reuse ReuseKind `json:"-"`
 	// TimedOut records that this result is a failure a deadline produced, not
 	// one its inputs produced. It is set at every site that turns a
@@ -137,45 +132,27 @@ func (r *JobResult) Outcome() string {
 	if r == nil {
 		return ""
 	}
-	if r.Coalesced {
-		return JobOutcomeCoalesced
-	}
-	if r.CacheHit {
-		return JobOutcomeCached
+	if outcome := r.Reuse.Outcome(); outcome != "" {
+		return outcome
 	}
 	return r.Status
 }
 
-// MarkReuse records that this result was reused rather than executed. It is the
-// only writer of Reuse, CacheHit and Coalesced, so the canonical enum and the
-// two legacy booleans always agree.
+// MarkReuse records that this result was reused rather than executed.
 func (r *JobResult) MarkReuse(kind ReuseKind) {
 	if r == nil {
 		return
 	}
 	r.Reuse = kind
-	r.CacheHit = kind.CacheHit()
-	r.Coalesced = kind == ReuseCoalesced
 }
 
-// ReuseKind returns the canonical provenance of this result. When Reuse was set
-// (every scheduler path) it is authoritative. Otherwise the booleans are read,
-// and a bare CacheHit reports a local hit — that is all the boolean can say.
+// ReuseKind returns the provenance of this result, ReuseNone for a nil or an
+// executed one.
 func (r *JobResult) ReuseKind() ReuseKind {
 	if r == nil {
 		return ReuseNone
 	}
-	if r.Reuse != ReuseNone {
-		return r.Reuse
-	}
-	switch {
-	case r.Coalesced:
-		return ReuseCoalesced
-	case r.CacheHit:
-		return ReuseLocalCache
-	default:
-		return ReuseNone
-	}
+	return r.Reuse
 }
 
 // JobError is the structured error from a failed job, as defined by the
