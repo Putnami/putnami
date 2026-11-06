@@ -230,8 +230,7 @@ describe.skipIf(!dockerAvailable)('DatabaseSessionStore', () => {
       const config = useConfig(SessionConfig);
       const expectedTTL = config.ttl * 1000; // Convert to milliseconds
 
-      // setAllAsync computes expires_at from the host clock, so the bounds come from the host clock
-      // too: the database clock of created_at may drift from it.
+      // setAllAsync computes expires_at from the host clock, so the bounds come from the host clock too.
       const before = Date.now();
       await store.setAllAsync(sessionId, { userId: 'user-123' });
       const after = Date.now();
