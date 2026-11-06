@@ -1506,6 +1506,86 @@
           }
         }
       ]
+    },
+    {
+      "id": "tooling/observe-ruby",
+      "type": "feature",
+      "name": "Find the components of a Ruby or Rails repository that keeps its own CI",
+      "outcome": "putnami observe, in a Ruby or Rails repository without a Putnami workspace, knows one component per packwerk pack, gem and application and the edges their package.yml, Gemfile and gemspec files declare, without running Ruby, so a change to a pack marks the packs that depend on it, its RSpec or Minitest tests and SimpleCov coverage land on the right component, and a Gemfile.lock bump is a dependency change",
+      "owner": "tooling",
+      "target": "modeled",
+      "requirements": [
+        {
+          "id": "ruby-components",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "packs-gems-and-the-application-are-components",
+              "a-malformed-package-yml-is-a-warning"
+            ]
+          }
+        },
+        {
+          "id": "ruby-edges",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-package-yml-dependency-is-an-edge",
+              "a-gemfile-path-gem-is-an-edge",
+              "a-gemspec-dependency-on-a-local-gem-is-an-edge"
+            ]
+          }
+        },
+        {
+          "id": "ruby-gemfile-lock",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-gemfile-lock-lists-its-gem-and-git-specs",
+              "a-gemfile-lock-is-a-gem-lockfile"
+            ]
+          }
+        },
+        {
+          "id": "ruby-reports",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "ruby-test-and-coverage-reports-are-discovered",
+              "a-minitest-case-goes-to-its-test-file"
+            ]
+          }
+        },
+        {
+          "id": "ruby-change-analysis",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-rails-demo-is-explained"
+            ]
+          }
+        }
+      ]
     }
   ]
 }

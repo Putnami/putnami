@@ -13,6 +13,7 @@ import (
 	"go.putnami.dev/tooling/observe/internal/detect/maven"
 	"go.putnami.dev/tooling/observe/internal/detect/pants"
 	"go.putnami.dev/tooling/observe/internal/detect/python"
+	"go.putnami.dev/tooling/observe/internal/detect/ruby"
 	"go.putnami.dev/tooling/observe/internal/detect/swift"
 	"go.putnami.dev/tooling/observe/internal/detectors/moon"
 	"go.putnami.dev/tooling/observe/internal/detectors/nx"
@@ -37,7 +38,7 @@ type Options struct {
 // its packages yield.
 func Default(opts Options) []Detector {
 	scan := &swiftScan{}
-	return []Detector{NxDetector{}, MoonDetector{GraphFile: opts.MoonGraph}, PantsDetector{GraphFile: opts.PantsGraph}, RushDetector{}, NodeDetector{}, ComposerDetector{}, GoDetector{}, PythonDetector{}, GradleDetector{}, MavenDetector{}, SwiftPMDetector{scan: scan}, XcodeDetector{scan: scan}, DartDetector{}, DotnetDetector{}, BazelDetector{GraphFile: opts.BazelGraph}}
+	return []Detector{NxDetector{}, MoonDetector{GraphFile: opts.MoonGraph}, PantsDetector{GraphFile: opts.PantsGraph}, RushDetector{}, NodeDetector{}, ComposerDetector{}, GoDetector{}, PythonDetector{}, GradleDetector{}, MavenDetector{}, SwiftPMDetector{scan: scan}, XcodeDetector{scan: scan}, DartDetector{}, DotnetDetector{}, RubyDetector{}, BazelDetector{GraphFile: opts.BazelGraph}}
 }
 
 // fromProbe turns the projects of a probe answer into components.
@@ -371,6 +372,23 @@ func (DotnetDetector) Detect(root string) Found {
 		return lockdiff.EcosystemNuGet, func(data []byte) (map[string][]string, error) {
 			return lockdiff.ReadCentralPackages(data)
 		}, true
+	}
+	return found
+}
+
+// RubyDetector adapts the Ruby detector: each packwerk pack is a workspace
+// component, each other directory with a gemspec or a Gemfile a manifest one.
+type RubyDetector struct{}
+
+// Name implements Detector.
+func (RubyDetector) Name() string { return "ruby" }
+
+// Detect implements Detector.
+func (RubyDetector) Detect(root string) Found {
+	detection := ruby.Detect(root)
+	found := Found{Diagnostics: detection.Diagnostics}
+	for _, c := range detection.Components {
+		found.Components = append(found.Components, Component{ID: c.ID, Name: c.Name, Ecosystem: ruby.Ecosystem, Source: c.Source, DependsOn: c.DependsOn})
 	}
 	return found
 }

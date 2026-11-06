@@ -7,7 +7,7 @@ queries no vulnerability database.
 
 ## Components
 
-Fifteen detectors read the repository:
+Sixteen detectors read the repository:
 
 | Detector | Reads | Source |
 |---|---|---|
@@ -25,6 +25,7 @@ Fifteen detectors read the repository:
 | Xcode | each `.xcodeproj` and the local packages its `project.pbxproj` references | `manifest` |
 | Dart | each `pubspec.yaml`, with the root's pub `workspace` and `melos.yaml` | `workspace` for a pub workspace or melos package, `manifest` otherwise |
 | .NET | each `.csproj`, `.fsproj` and `.vbproj`, with the root's `.sln` and `.slnx` | `workspace` for a project a root solution lists, `manifest` otherwise; see [the .NET detector](15-dotnet.md) |
+| Ruby | each packwerk `package.yml`, `*.gemspec` and `Gemfile` | `workspace` for a pack, `manifest` otherwise |
 | Bazel | `bazel-graph.json` from `bazel query 'deps(//...)' --output=streamed_jsonproto`, else the `BUILD` and `BUILD.bazel` files | `orchestrator` for a query export, `manifest` otherwise |
 
 A component is a directory. When two detectors name one directory, the higher
@@ -72,6 +73,8 @@ A JUnit or TRX case goes to the first of:
    read as a Dart test file (tojunit): `test.price` is `test/price_test.dart`,
    and the longest tail of a class name written from an absolute path that
    names a file is the test file; see [the Dart detector](14-dart.md#reports).
+   rspec_junit_formatter and minitest-reporters write the `file`; see
+   [the Ruby detector](16-ruby.md#reports).
 3. The component whose test source root holds the file its JVM class name
    names: `com.acme.PriceTest` is `src/test/kotlin/com/acme/PriceTest.kt` or
    `.java`, under `src/test` or `src/androidTest`. See
@@ -133,6 +136,7 @@ Each changed lockfile is read at the merge base and at the head:
 | `pubspec.lock` | `pub` | each entry of `packages`; `path` and `sdk` sources left out |
 | `packages.lock.json` | `nuget` | each package each target framework resolves; `Project` entries left out |
 | `Directory.Packages.props`, without `packages.lock.json` in the repository | `nuget` | each `PackageVersion` with a literal `Include` and `Version` |
+| `Gemfile.lock` | `gem` | the specs of the `GEM` and `GIT` sources, the platform after the first `-` dropped; `PATH` sources left out |
 
 A Rush monorepo keeps its lockfile under `common/config/rush/`: `pnpm-lock.yaml`,
 `npm-shrinkwrap.json` or `yarn.lock`, by the package manager `rush.json` names,
@@ -164,7 +168,7 @@ osv-scanner writes no vulnerability in SPDX: use CycloneDX for them.
 
 A package of the SBOM matches a dependency change by the ecosystem its
 package URL names (`npm`, `composer`, `golang` is `go`, `pypi`, `maven`, `pub`,
-`nuget`), its name, normalized for `pypi` and written `group:artifact` for `maven`, and its version, a leading `v` ignored. A package
+`nuget`, `gem`), its name, normalized for `pypi` and written `group:artifact` for `maven`, and its version, a leading `v` ignored. A package
 without a package URL matches by its name as written and its version, so a
 Python package without one matches only when the SBOM writes its normalized
 name. For each change, the base SBOM gives the `before` state, unless the

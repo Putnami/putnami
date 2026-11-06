@@ -78,6 +78,8 @@ edges of a Dart or Flutter repository, from a pub workspace, melos or
 `pubspec.yaml` files.
 See [doc/15-dotnet.md](doc/15-dotnet.md) for how it reads the projects,
 references, test assemblies and NuGet lock files of a .NET repository.
+See [doc/16-ruby.md](doc/16-ruby.md) for how it reads the packs, gems and
+edges of a Ruby or Rails repository, and its `Gemfile.lock`.
 See [doc/06-change-analyses.md](doc/06-change-analyses.md) for how it maps a
 change to components, tests, coverage and dependencies.
 

@@ -1,7 +1,9 @@
 package lockdiff
 
 import (
+	"reflect"
 	"slices"
+	"strings"
 	"testing"
 
 	"go.putnami.dev/protocol/evidence"
@@ -232,6 +234,9 @@ content-hash = "00"
 		{"1.0.0-alpha.beta", "1.0.0-alpha.1", 1, true},
 		{"1.0.0-rc.1", "1.0.0-beta", 1, true},
 		{"1.2", "1.2.0+build", 0, true},
+		{"7.1.3", "7.1.3.4", -1, true},
+		{"7.1.3.4", "7.1.4", -1, true},
+		{"1.2.3.4.5", "1.2.3", 0, false},
 		{"dev-main", "1.0.0", 0, false},
 	} {
 		if got, ok := Compare(c.a, c.b); ok != c.ok || (ok && (got < 0) != (c.want < 0)) || (ok && (got > 0) != (c.want > 0)) {
@@ -525,5 +530,86 @@ sdks:
 		if _, err := ReadPubspecLock([]byte(content)); err == nil {
 			t.Errorf("%s: no error", name)
 		}
+	}
+}
+
+// gemfileLock is a Gemfile.lock in the shape Bundler 2.5 writes: a Git
+// source, a path source for a local engine, the rubygems.org source with a
+// gem locked for two platforms, and its trailing sections.
+const gemfileLock = `GIT
+
+  remote: https://github.com/acme/money.git
+  revision: 0123456789abcdef0123456789abcdef01234567
+  specs:
+    money (6.19.0)
+      i18n (>= 0.6.4, <= 2)
+
+PATH
+  remote: engines/admin
+  specs:
+    admin (0.1.0)
+      rails (>= 7.2)
+
+GEM
+  remote: https://rubygems.org/
+  specs:
+    actionpack (7.2.2.1)
+      rack (>= 2.2.4)
+    i18n (1.14.6)
+      concurrent-ruby (~> 1.0)
+    nokogiri (1.16.7-arm64-darwin)
+      racc (~> 1.4)
+    nokogiri (1.16.7-x86_64-linux)
+      racc (~> 1.4)
+    rack (3.1.8)
+
+PLATFORMS
+  arm64-darwin-23
+  x86_64-linux
+
+DEPENDENCIES
+  admin!
+  money!
+  rails (~> 7.2.0)
+
+BUNDLED WITH
+   2.5.22
+`
+
+func TestAGemfileLockListsItsGemAndGitSpecs(t *testing.T) {
+	spectest.Proves(t, "tooling/observe-ruby", "ruby-gemfile-lock", "a-gemfile-lock-lists-its-gem-and-git-specs")
+	got, err := ReadGemfileLock([]byte(strings.ReplaceAll(gemfileLock, "\n", "\r\n")))
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := Packages{
+		"money": {"6.19.0"}, "actionpack": {"7.2.2.1"}, "i18n": {"1.14.6"}, "nokogiri": {"1.16.7"}, "rack": {"3.1.8"},
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("packages\n got %v\nwant %v", got, want)
+	}
+	if _, err := ReadGemfileLock([]byte("source 'https://rubygems.org'\ngem 'rails'\n")); err == nil {
+		t.Error("a Gemfile reads as a Gemfile.lock")
+	}
+	bumped := strings.Replace(gemfileLock, "    actionpack (7.2.2.1)", "    actionpack (7.2.2.2)", 1)
+	head, err := ReadGemfileLock([]byte(bumped))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if changes := Diff(got, head); !slices.Equal(changes, []Change{{Name: "actionpack", Change: evidence.DependencyUpgraded, From: "7.2.2.1", To: "7.2.2.2"}}) {
+		t.Errorf("changes %+v", changes)
+	}
+}
+
+func TestAGemfileLockIsAGemLockfile(t *testing.T) {
+	spectest.Proves(t, "tooling/observe-ruby", "ruby-gemfile-lock", "a-gemfile-lock-is-a-gem-lockfile")
+	for _, file := range []string{"Gemfile.lock", "packs/pricing/Gemfile.lock"} {
+		kind, ok := KindOf(file)
+		if !ok || kind.Ecosystem != EcosystemGem {
+			t.Errorf("%s: %+v %v", file, kind, ok)
+		}
+	}
+	if _, ok := KindOf("Gemfile"); ok {
+		t.Error("a Gemfile is a lockfile")
 	}
 }

@@ -71,6 +71,7 @@ var purlEcosystems = map[string]string{
 	"golang":   lockdiff.EcosystemGo,
 	"pypi":     lockdiff.EcosystemPyPI,
 	"maven":    lockdiff.EcosystemMaven,
+	"gem":      lockdiff.EcosystemGem,
 }
 
 func newSBOMIndex(sbom readers.SBOM) *sbomIndex {

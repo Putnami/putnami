@@ -174,6 +174,55 @@ func TestAPytestCaseGoesToTheComponentOfItsModuleFile(t *testing.T) {
 	}
 }
 
+func TestAMinitestCaseGoesToItsTestFile(t *testing.T) {
+	spectest.Proves(t, "tooling/observe-ruby", "ruby-reports", "a-minitest-case-goes-to-its-test-file")
+	root := t.TempDir()
+	write(t, root, map[string]string{
+		"app/models/order.rb":               "class Order; end\n",
+		"test/models/order_test.rb":         "class OrderTest; end\n",
+		"gems/pricing/lib/pricing.rb":       "module Pricing\n  def self.total(lines)\n    lines.sum\n  end\nend\n",
+		"gems/pricing/test/pricing_test.rb": "class PricingTest; end\n",
+	})
+	set := components.Detect(root, []components.Detector{fake{components.Found{Components: []components.Component{
+		{ID: ".", Ecosystem: "ruby", Source: evidence.SourceManifest},
+		{ID: "gems/pricing", Ecosystem: "ruby", Source: evidence.SourceManifest},
+	}}}})
+	// minitest-reporters, run in the gem, names each test file from there,
+	// and simplecov-lcov each covered file.
+	write(t, root, map[string]string{
+		"gems/pricing/test/reports/TEST-PricingTest.xml": `<?xml version="1.0" encoding="UTF-8"?>
+<testsuites>
+  <testsuite name="PricingTest" filepath="test/pricing_test.rb" skipped="0" failures="0" errors="0" tests="2" assertions="2" time="7.2e-05">
+    <testcase name="test_total" lineno="4" classname="PricingTest" assertions="1" time="6.2e-05" file="test/pricing_test.rb">
+    </testcase>
+    <testcase name="test_empty" lineno="8" classname="PricingTest" assertions="1" time="1.0e-05" file="test/pricing_test.rb">
+    </testcase>
+  </testsuite>
+</testsuites>
+`,
+		"gems/pricing/coverage/lcov/pricing.lcov": "SF:./lib/pricing.rb\nDA:1,1\nDA:2,1\nDA:3,4\nLF:3\nLH:3\nend_of_record\n",
+		// The application's Rails run, from the root.
+		"test/reports/TEST-OrderTest.xml": `<testsuites><testsuite name="OrderTest" filepath="test/models/order_test.rb">
+			<testcase name="test_valid" classname="OrderTest" file="test/models/order_test.rb"/>
+		</testsuite></testsuites>`,
+	})
+	r := Run(Input{Root: root, Set: set, Reports: []reports.Report{
+		{Path: "gems/pricing/test/reports/TEST-PricingTest.xml", Kind: reports.KindJUnit, Format: reports.FormatJUnit},
+		{Path: "gems/pricing/coverage/lcov/pricing.lcov", Kind: reports.KindCoverage, Format: reports.FormatLCOV},
+		{Path: "test/reports/TEST-OrderTest.xml", Kind: reports.KindJUnit, Format: reports.FormatJUnit},
+	}})
+	got := tests(r)
+	if got["gems/pricing"].Passed != 2 || got["."].Passed != 1 {
+		t.Errorf("tests %+v", r.Tests)
+	}
+	if len(r.Coverage) != 1 || r.Coverage[0] != (evidence.ComponentCoverage{Component: "gems/pricing", CoveredLines: 3, TotalLines: 3}) {
+		t.Errorf("coverage %+v", r.Coverage)
+	}
+	if len(r.Diagnostics) != 0 {
+		t.Errorf("diagnostics %v", r.Diagnostics)
+	}
+}
+
 func TestCoverageGoesToTheComponentOfEachFile(t *testing.T) {
 	spectest.Proves(t, feature, "tests-and-coverage", "coverage-goes-to-the-component-of-each-file")
 	root, set := repository(t)
