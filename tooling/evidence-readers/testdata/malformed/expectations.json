@@ -24,5 +24,9 @@
   "gocover-end-before-start.coverprofile": {"reader": "gocover", "code": "readers.malformed"},
   "gocover-unknown-mode.coverprofile": {"reader": "gocover", "code": "readers.malformed"},
   "gocover-empty.coverprofile": {"reader": "gocover", "code": "readers.malformed"},
-  "gocover-huge-span.coverprofile": {"reader": "gocover", "code": "readers.too_large"}
+  "gocover-huge-span.coverprofile": {"reader": "gocover", "code": "readers.too_large"},
+  "trx-unknown-outcome.trx": {"reader": "trx", "code": "readers.malformed"},
+  "trx-wrong-root.trx": {"reader": "trx", "code": "readers.malformed"},
+  "trx-bad-counter.trx": {"reader": "trx", "code": "readers.malformed"},
+  "trx-truncated.trx": {"reader": "trx", "code": "readers.malformed"}
 }

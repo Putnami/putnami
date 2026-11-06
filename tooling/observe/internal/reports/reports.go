@@ -2,7 +2,8 @@
 // materials (SBOM) a CI job produced.
 //
 // A report is recognized by its content, never by its name alone: a JUnit XML
-// report has a testsuites or testsuite root, a Cobertura report a coverage
+// report has a testsuites or testsuite root, a TRX report a TestRun root, a
+// Cobertura report a coverage
 // root with Cobertura attributes, a Clover report a coverage root with a
 // project, an LCOV trace starts with a TN: or SF: record, a Go cover profile
 // starts with its mode line, a CycloneDX document states its bomFormat and an
@@ -40,6 +41,7 @@ const (
 // Report formats.
 const (
 	FormatJUnit     = "junit"
+	FormatTRX       = "trx"
 	FormatLCOV      = "lcov"
 	FormatCobertura = "cobertura"
 	FormatClover    = "clover"
@@ -243,7 +245,7 @@ func discoverReports(root string, kinds map[string]bool) ([]Report, []diag.Diagn
 func candidate(name string) bool {
 	lower := strings.ToLower(name)
 	switch path.Ext(lower) {
-	case ".xml", ".info", ".lcov", ".out", ".cov", ".coverprofile", ".gocov":
+	case ".xml", ".trx", ".info", ".lcov", ".out", ".cov", ".coverprofile", ".gocov":
 		return true
 	case ".txt":
 		return strings.Contains(lower, "cover")
@@ -257,7 +259,7 @@ func candidate(name string) bool {
 
 func kindOf(format string) string {
 	switch format {
-	case FormatJUnit:
+	case FormatJUnit, FormatTRX:
 		return KindJUnit
 	case FormatLCOV, FormatCobertura, FormatClover, FormatGoCover:
 		return KindCoverage
@@ -386,6 +388,8 @@ func sniffXML(head []byte) string {
 	switch root.Name.Local {
 	case "testsuites", "testsuite":
 		return FormatJUnit
+	case "TestRun":
+		return FormatTRX
 	case "coverage":
 	default:
 		return ""

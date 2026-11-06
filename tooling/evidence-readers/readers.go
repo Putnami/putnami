@@ -1,5 +1,5 @@
 // Package readers reads the test and coverage reports a CI writes: JUnit XML,
-// LCOV, Cobertura XML, Clover XML and Go cover profiles.
+// TRX, LCOV, Cobertura XML, Clover XML and Go cover profiles.
 //
 // A reader turns one report into typed facts and nothing more. A test report
 // becomes one TestCase per test case, a coverage report one FileCoverage per

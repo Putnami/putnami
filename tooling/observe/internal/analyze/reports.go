@@ -25,7 +25,11 @@ func (r *Result) readReports(in Input, m *mapper) map[string]lineHits {
 		}
 		switch report.Kind {
 		case reports.KindJUnit:
-			result, diags := readers.ReadFile(abs, readers.ReadJUnit)
+			read := readers.ReadJUnit
+			if report.Format == reports.FormatTRX {
+				read = readers.ReadTRX
+			}
+			result, diags := readers.ReadFile(abs, read)
 			if r.unread(report, diags) {
 				continue
 			}

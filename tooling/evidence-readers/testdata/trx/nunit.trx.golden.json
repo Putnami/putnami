@@ -1,0 +1,63 @@
+{
+  "totals": {
+    "tests": 4,
+    "failures": 1,
+    "errors": 0,
+    "skipped": 0,
+    "assertions": 0,
+    "time": 0.9883631
+  },
+  "cases": [
+    {
+      "name": "SignOfANonNegativeInput(4)",
+      "classname": "Calc.Tests.CalculatorTests",
+      "suites": [
+        {
+          "name": "Calc.Tests.nunit.dll"
+        }
+      ],
+      "status": "passed",
+      "durationMs": 1
+    },
+    {
+      "name": "Skipped",
+      "classname": "Calc.Tests.CalculatorTests",
+      "suites": [
+        {
+          "name": "Calc.Tests.nunit.dll"
+        }
+      ],
+      "status": "skipped",
+      "durationMs": 0,
+      "skipped": {
+        "message": "not ready"
+      }
+    },
+    {
+      "name": "AddWrongOnPurpose",
+      "classname": "Calc.Tests.CalculatorTests",
+      "suites": [
+        {
+          "name": "Calc.Tests.nunit.dll"
+        }
+      ],
+      "status": "failed",
+      "durationMs": 35,
+      "failure": {
+        "message": "  Expected: 5\n  But was:  4\n",
+        "body": "   at Calc.Tests.CalculatorTests.AddWrongOnPurpose() in /app/Calc.Tests.nunit/CalculatorTests.cs:line 15\n"
+      }
+    },
+    {
+      "name": "Add",
+      "classname": "Calc.Tests.CalculatorTests",
+      "suites": [
+        {
+          "name": "Calc.Tests.nunit.dll"
+        }
+      ],
+      "status": "passed",
+      "durationMs": 11
+    }
+  ]
+}

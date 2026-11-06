@@ -96,6 +96,69 @@ func TestRealJUnitReportsReadToTheirExpectedCases(t *testing.T) {
 	spectest.Proves(t, feature, "junit-reads-every-case", "real-junit-reports-read-to-their-expected-cases")
 }
 
+func TestRealTRXReportsReadToTheirExpectedCases(t *testing.T) {
+	spectest.Proves(t, feature, "trx-reads-every-result", "real-trx-reports-read-to-their-expected-cases")
+	for _, fixture := range fixtures(t, "trx") {
+		report, diagnostics := ReadFile(fixture, ReadTRX)
+		if len(diagnostics) != 0 {
+			t.Fatalf("%s: %v", fixture, diagnostics)
+		}
+		statuses := map[string]int{}
+		for _, testCase := range report.Cases {
+			statuses[testCase.Status]++
+			if testCase.Classname != "Calc.Tests.CalculatorTests" || len(testCase.Suites) != 1 || !strings.HasPrefix(testCase.Suites[0].Name, "Calc.Tests.") || !strings.HasSuffix(testCase.Suites[0].Name, ".dll") {
+				t.Errorf("%s: case %q class %q suites %+v, want the class and the test assembly", fixture, testCase.Name, testCase.Classname, testCase.Suites)
+			}
+		}
+		if statuses[StatusFailed] != 1 || statuses[StatusSkipped] != 1 || statuses[StatusPassed] != 2 || report.Totals.Tests != 4 {
+			t.Errorf("%s: statuses %v, totals %+v, want one failed, one skipped and two passed of four", fixture, statuses, report.Totals)
+		}
+		golden(t, fixture, report)
+	}
+}
+
+func TestATRXOutcomeMapsToAStatus(t *testing.T) {
+	spectest.Proves(t, feature, "trx-reads-every-result", "a-trx-outcome-maps-to-a-status")
+	for outcome, want := range map[string]struct {
+		status string
+		error  bool
+	}{
+		"Passed": {StatusPassed, false}, "PassedButRunAborted": {StatusPassed, false}, "Completed": {StatusPassed, false}, "Warning": {StatusPassed, false},
+		"Failed": {StatusFailed, false}, "Error": {StatusFailed, true}, "Timeout": {StatusFailed, true}, "Aborted": {StatusFailed, true},
+		"NotExecuted": {StatusSkipped, false}, "Inconclusive": {StatusSkipped, false}, "NotRunnable": {StatusSkipped, false},
+		"Pending": {StatusSkipped, false}, "Disconnected": {StatusSkipped, false}, "InProgress": {StatusSkipped, false},
+	} {
+		report, diagnostics := ReadTRX([]byte(`<TestRun xmlns="http://microsoft.com/schemas/VisualStudio/TeamTest/2010">
+  <Results>
+    <UnitTestResult testId="t1" testName="Calc.Tests.CalculatorTests.Add" duration="01:02:03.5000000" outcome="` + outcome + `">
+      <Output><ErrorInfo><Message>why</Message><StackTrace>at Add()</StackTrace></ErrorInfo></Output>
+      <InnerResults><UnitTestResult testId="t1" testName="row" outcome="Passed" /></InnerResults>
+    </UnitTestResult>
+  </Results>
+  <TestDefinitions>
+    <UnitTest id="t1"><TestMethod codeBase="C:\\build\\Calc.Tests.dll" className="Calc.Tests.CalculatorTests, Calc.Tests, Version=1.0.0.0" name="Add" /></UnitTest>
+  </TestDefinitions>
+  <ResultSummary><Counters total="1" failed="1" error="1" timeout="2" aborted="3" notExecuted="4" /></ResultSummary>
+</TestRun>`))
+		if len(diagnostics) != 0 || len(report.Cases) != 1 {
+			t.Fatalf("%s: %v, %d cases, want one case", outcome, diagnostics, len(report.Cases))
+		}
+		got := report.Cases[0]
+		if got.Status != want.status || got.DurationMs != 3723500 || got.Classname != "Calc.Tests.CalculatorTests" || !reflect.DeepEqual(got.Suites, []Suite{{Name: "Calc.Tests.dll"}}) {
+			t.Errorf("%s: case %+v", outcome, got)
+		}
+		if want.status == StatusFailed && (got.Failure == nil || got.Failure.Error != want.error || got.Failure.Message != "why" || got.Failure.Body != "at Add()") {
+			t.Errorf("%s: failure %+v, want error=%v with the message and stack trace", outcome, got.Failure, want.error)
+		}
+		if want.status == StatusSkipped && (got.Skipped == nil || got.Skipped.Message != "why") {
+			t.Errorf("%s: skipped %+v, want the message", outcome, got.Skipped)
+		}
+		if report.Totals != (Totals{Tests: 1, Failures: 1, Errors: 6, Skipped: 4}) {
+			t.Errorf("%s: totals %+v", outcome, report.Totals)
+		}
+	}
+}
+
 func TestTheJUnitFileAttributeIsKept(t *testing.T) {
 	jest, _ := ReadJUnit(read(t, "testdata/junit/jest.xml"))
 	for _, testCase := range jest.Cases {
@@ -329,9 +392,12 @@ func TestEveryMalformedFixtureReturnsItsCode(t *testing.T) {
 		listed++
 		var result any
 		var diagnostics []diag.Diagnostic
-		if expectation.Reader == "junit" {
+		switch expectation.Reader {
+		case "junit":
 			result, diagnostics = ReadFile(fixture, ReadJUnit)
-		} else {
+		case "trx":
+			result, diagnostics = ReadFile(fixture, ReadTRX)
+		default:
 			result, diagnostics = ReadFile(fixture, coverageReaders[expectation.Reader])
 		}
 		if len(diagnostics) != 1 || diagnostics[0].Code != expectation.Code || diagnostics[0].Severity != diag.Error || diagnostics[0].Field != fixture {
@@ -367,6 +433,7 @@ func TestEveryMalformedFixtureReturnsItsCode(t *testing.T) {
 func allReaders() map[string]func([]byte) []diag.Diagnostic {
 	readers := map[string]func([]byte) []diag.Diagnostic{
 		"junit": func(data []byte) []diag.Diagnostic { _, d := ReadJUnit(data); return d },
+		"trx":   func(data []byte) []diag.Diagnostic { _, d := ReadTRX(data); return d },
 		"sbom":  func(data []byte) []diag.Diagnostic { _, d := ReadSBOM(data); return d },
 	}
 	for name, reader := range coverageReaders {
@@ -441,7 +508,7 @@ func TestArbitraryBytesNeverPanic(t *testing.T) {
 		t.Fatal(err)
 	}
 	var inputs [][]byte
-	for _, dir := range []string{"junit", "lcov", "cobertura", "clover", "gocover", "sbom", "malformed"} {
+	for _, dir := range []string{"junit", "trx", "lcov", "cobertura", "clover", "gocover", "sbom", "malformed"} {
 		for _, fixture := range fixtures(t, dir) {
 			if expectations[filepath.Base(fixture)].Code == CodeTooLarge {
 				continue
@@ -469,7 +536,7 @@ func TestArbitraryBytesNeverPanic(t *testing.T) {
 }
 
 func FuzzReaders(f *testing.F) {
-	for _, dir := range []string{"junit", "lcov", "cobertura", "clover", "gocover", "sbom"} {
+	for _, dir := range []string{"junit", "trx", "lcov", "cobertura", "clover", "gocover", "sbom"} {
 		entries, _ := os.ReadDir(filepath.Join("testdata", dir))
 		for _, entry := range entries {
 			if data, err := os.ReadFile(filepath.Join("testdata", dir, entry.Name())); err == nil {
