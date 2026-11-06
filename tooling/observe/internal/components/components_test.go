@@ -216,3 +216,87 @@ func TestAPantsResolveLockfileIsAPyPILockfile(t *testing.T) {
 		t.Error("a lockfile no resolve names is read")
 	}
 }
+
+func TestWithoutAnExportAnotherDetectorKeepsItsComponents(t *testing.T) {
+	spectest.Proves(t, "tooling/observe-bazel", "bazel-without-export", "without-an-export-another-detector-keeps-its-components")
+	files := map[string]string{
+		"MODULE.bazel":                  "",
+		"pnpm-workspace.yaml":           "packages:\n  - packages/*\n",
+		"package.json":                  `{"name":"root","private":true}`,
+		"packages/pricing/package.json": `{"name":"@demo/pricing"}`,
+		"packages/pricing/BUILD.bazel":  "",
+		"packages/api/package.json":     `{"name":"@demo/api","dependencies":{"@demo/pricing":"workspace:*"}}`,
+		"packages/api/BUILD.bazel":      "",
+		"tools/BUILD.bazel":             "",
+	}
+	root := t.TempDir()
+	write(t, root, files)
+	byID := map[string]Component{}
+	for _, c := range Detect(root, Default(Options{})).Components {
+		byID[c.ID] = c
+	}
+	if c := byID["packages/api"]; c.Ecosystem != "node" || !slices.Equal(c.DependsOn, []string{"packages/pricing"}) {
+		t.Errorf("packages/api %+v", c)
+	}
+	if c := byID["tools"]; c.Ecosystem != "bazel" || c.Source != evidence.SourceManifest {
+		t.Errorf("tools %+v", c)
+	}
+
+	// With an export, Bazel is the authority.
+	write(t, root, map[string]string{"bazel-graph.json": `{"type":"RULE","rule":{"name":"//packages/api:api","ruleInput":["//packages/pricing:pricing"]}}
+{"type":"RULE","rule":{"name":"//packages/pricing:pricing"}}
+{"type":"RULE","rule":{"name":"//tools:tools"}}
+`})
+	byID = map[string]Component{}
+	for _, c := range Detect(root, Default(Options{})).Components {
+		byID[c.ID] = c
+	}
+	if c := byID["packages/api"]; c.Ecosystem != "bazel" || c.Source != evidence.SourceOrchestrator || !slices.Equal(c.DependsOn, []string{"packages/pricing"}) {
+		t.Errorf("packages/api with an export %+v", c)
+	}
+}
+
+func TestWithoutAnExportANestedBuildFileYieldsToTheEnclosingComponent(t *testing.T) {
+	spectest.Proves(t, "tooling/observe-bazel", "bazel-without-export", "without-an-export-a-nested-build-file-yields-to-the-enclosing-component")
+	root := t.TempDir()
+	write(t, root, map[string]string{
+		"MODULE.bazel":                     "",
+		"pnpm-workspace.yaml":              "packages:\n  - packages/*\n",
+		"package.json":                     `{"name":"root","private":true}`,
+		"packages/pricing/package.json":    `{"name":"@demo/pricing"}`,
+		"packages/pricing/src/BUILD.bazel": "",
+		"packages/api/package.json":        `{"name":"@demo/api","dependencies":{"@demo/pricing":"workspace:*"}}`,
+		"svc/go.mod":                       "module example.com/svc\n\ngo 1.23\n",
+		"svc/internal/calc/BUILD.bazel":    "",
+		"tools/lint/BUILD.bazel":           "",
+	})
+	set := Detect(root, Default(Options{}))
+	if got := ids(set); !slices.Equal(got, []string{"packages/api", "packages/pricing", "svc", "tools/lint"}) {
+		t.Fatalf("components %v", got)
+	}
+	impacts := set.Impacts(map[string]bool{mustOwner(t, set, "packages/pricing/src/index.ts"): true})
+	if impacts["packages/pricing"] != evidence.ImpactChanged || impacts["packages/api"] != evidence.ImpactDependent {
+		t.Errorf("impacts %v", impacts)
+	}
+
+	// The log of a yielded package goes to the component that encloses it.
+	spectest.Proves(t, "tooling/observe-bazel", "bazel-reports", "a-test-log-of-a-yielded-package-goes-to-the-enclosing-component")
+	for report, want := range map[string]string{
+		"bazel-testlogs/packages/pricing/src/src_test/test.xml": "packages/pricing",
+		"bazel-testlogs/svc/internal/calc/calc_test/test.xml":   "svc",
+		"bazel-testlogs/tools/lint/lint_test/test.xml":          "tools/lint",
+	} {
+		if got, ok := set.ReportOwner(report); !ok || got != want {
+			t.Errorf("ReportOwner(%s) = %q, %v, want %q", report, got, ok, want)
+		}
+	}
+}
+
+func mustOwner(t *testing.T, set Set, file string) string {
+	t.Helper()
+	owner, ok := set.Owner(file)
+	if !ok {
+		t.Fatalf("%s has no owner", file)
+	}
+	return owner
+}

@@ -1,0 +1,178 @@
+The bazel demo: a Bzlmod workspace whose //api depends on //pricing, beside //web; its base, the files its change rewrites, the query export its CI wrote, and the outputs of bazel test and bazel coverage under bazel/, which the demo links as bazel-testlogs and bazel-out.
+-- base/MODULE.bazel --
+module(name = "shop", version = "0.1.0")
+
+bazel_dep(name = "rules_go", version = "0.50.1")
+bazel_dep(name = "aspect_rules_js", version = "2.1.0")
+-- base/.bazelrc --
+coverage --combined_report=lcov
+-- base/.gitignore --
+/bazel-*
+-- base/pricing/BUILD.bazel --
+load("@rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "pricing",
+    srcs = ["pricing.go"],
+    importpath = "example.com/shop/pricing",
+    visibility = ["//visibility:public"],
+)
+
+go_test(
+    name = "pricing_test",
+    srcs = ["pricing_test.go"],
+    embed = [":pricing"],
+)
+-- base/pricing/pricing.go --
+package pricing
+
+// Quote returns the price of qty units at unit cents.
+func Quote(unit, qty int) int {
+	total := unit * qty
+	return total
+}
+-- base/pricing/pricing_test.go --
+package pricing
+
+import "testing"
+
+func TestQuote(t *testing.T) {
+	if got := Quote(250, 2); got != 500 {
+		t.Fatalf("Quote(250, 2) = %d", got)
+	}
+}
+-- base/api/BUILD.bazel --
+load("@rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "api",
+    srcs = ["api.go"],
+    importpath = "example.com/shop/api",
+    deps = ["//pricing"],
+)
+
+go_test(
+    name = "api_test",
+    srcs = ["api_test.go"],
+    embed = [":api"],
+)
+-- base/api/api.go --
+package api
+
+import "example.com/shop/pricing"
+
+// Price answers the price of an order.
+func Price(unit, qty int) int {
+	return pricing.Quote(unit, qty)
+}
+-- base/api/api_test.go --
+package api
+
+import "testing"
+
+func TestPrice(t *testing.T) {
+	if got := Price(100, 3); got != 300 {
+		t.Fatalf("Price(100, 3) = %d", got)
+	}
+}
+
+func TestPriceOfNothing(t *testing.T) {
+	if got := Price(100, 0); got != 0 {
+		t.Fatalf("Price(100, 0) = %d", got)
+	}
+}
+-- base/web/BUILD.bazel --
+load("@aspect_rules_js//js:defs.bzl", "js_library")
+
+js_library(
+    name = "web",
+    srcs = ["index.js"],
+)
+-- base/web/index.js --
+export const title = "shop";
+-- head/pricing/pricing.go --
+package pricing
+
+// Quote returns the price of qty units at unit cents, ten percent off
+// from ten units.
+func Quote(unit, qty int) int {
+	total := unit * qty
+	if qty >= 10 {
+		total -= total / 10
+	}
+	return total
+}
+-- head/pricing/pricing_test.go --
+package pricing
+
+import "testing"
+
+func TestQuote(t *testing.T) {
+	if got := Quote(250, 2); got != 500 {
+		t.Fatalf("Quote(250, 2) = %d", got)
+	}
+}
+
+func TestQuoteDiscount(t *testing.T) {
+	if got := Quote(100, 10); got != 900 {
+		t.Fatalf("Quote(100, 10) = %d", got)
+	}
+}
+
+func TestQuoteOfNothing(t *testing.T) {
+	if got := Quote(100, 0); got != 0 {
+		t.Fatalf("Quote(100, 0) = %d", got)
+	}
+}
+-- ci/bazel-graph.json --
+{"type":"RULE","rule":{"name":"//pricing:pricing","ruleClass":"go_library","location":"/home/runner/work/shop/shop/pricing/BUILD.bazel:3:11","attribute":[{"name":"importpath","type":"STRING","stringValue":"example.com/shop/pricing","explicitlySpecified":true}],"ruleInput":["//pricing:pricing.go","@@rules_go+//:go_context_data","@@rules_go+//go/tools/coverdata:coverdata"]}}
+{"type":"SOURCE_FILE","sourceFile":{"name":"//pricing:pricing.go","location":"/home/runner/work/shop/shop/pricing/pricing.go:1:1"}}
+{"type":"RULE","rule":{"name":"//pricing:pricing_test","ruleClass":"go_test","location":"/home/runner/work/shop/shop/pricing/BUILD.bazel:10:8","ruleInput":["//pricing:pricing","//pricing:pricing_test.go","@@rules_go+//go/tools/bzltestutil:bzltestutil"]}}
+{"type":"SOURCE_FILE","sourceFile":{"name":"//pricing:pricing_test.go","location":"/home/runner/work/shop/shop/pricing/pricing_test.go:1:1"}}
+{"type":"RULE","rule":{"name":"//api:api","ruleClass":"go_library","location":"/home/runner/work/shop/shop/api/BUILD.bazel:3:11","ruleInput":["//api:api.go","//pricing:pricing","@@rules_go+//:go_context_data"]}}
+{"type":"SOURCE_FILE","sourceFile":{"name":"//api:api.go","location":"/home/runner/work/shop/shop/api/api.go:1:1"}}
+{"type":"RULE","rule":{"name":"//api:api_test","ruleClass":"go_test","location":"/home/runner/work/shop/shop/api/BUILD.bazel:10:8","ruleInput":["//api:api","//api:api_test.go","@@rules_go+//go/tools/bzltestutil:bzltestutil"]}}
+{"type":"SOURCE_FILE","sourceFile":{"name":"//api:api_test.go","location":"/home/runner/work/shop/shop/api/api_test.go:1:1"}}
+{"type":"RULE","rule":{"name":"//web:web","ruleClass":"js_library","location":"/home/runner/work/shop/shop/web/BUILD.bazel:3:11","ruleInput":["//web:index.js","@@aspect_rules_js+//js/private:enable_runfiles"]}}
+{"type":"SOURCE_FILE","sourceFile":{"name":"//web:index.js","location":"/home/runner/work/shop/shop/web/index.js:1:1"}}
+{"type":"RULE","rule":{"name":"@@rules_go+//go/tools/coverdata:coverdata","ruleClass":"go_library","location":"/home/runner/.cache/bazel/_bazel_runner/0f1e/external/rules_go+/go/tools/coverdata/BUILD.bazel:3:11","ruleInput":["@@rules_go+//go/tools/coverdata:coverdata.go"]}}
+{"type":"SOURCE_FILE","sourceFile":{"name":"@@rules_go+//go/tools/coverdata:coverdata.go","location":"/home/runner/.cache/bazel/_bazel_runner/0f1e/external/rules_go+/go/tools/coverdata/coverdata.go:1:1"}}
+-- bazel/testlogs/pricing/pricing_test/test.xml --
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites>
+	<testsuite errors="0" failures="0" skipped="0" tests="3" time="0.004" name="pricing/pricing_test">
+		<testcase classname="pricing_test" name="TestQuote" time="0.001"></testcase>
+		<testcase classname="pricing_test" name="TestQuoteDiscount" time="0.001"></testcase>
+		<testcase classname="pricing_test" name="TestQuoteOfNothing" time="0.000"></testcase>
+	</testsuite>
+</testsuites>
+-- bazel/testlogs/pricing/pricing_test/test.log --
+exec ${PAGER:-/usr/bin/less} "$0" || exit 1
+Executing tests from //pricing:pricing_test
+PASS
+-- bazel/testlogs/api/api_test/test.xml --
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites>
+	<testsuite errors="0" failures="0" skipped="0" tests="2" time="0.003" name="api/api_test">
+		<testcase classname="api_test" name="TestPrice" time="0.001"></testcase>
+		<testcase classname="api_test" name="TestPriceOfNothing" time="0.000"></testcase>
+	</testsuite>
+</testsuites>
+-- bazel/out/_coverage/_coverage_report.dat --
+SF:api/api.go
+FNF:0
+FNH:0
+DA:7,2
+LH:1
+LF:1
+end_of_record
+SF:pricing/pricing.go
+FNF:0
+FNH:0
+DA:6,5
+DA:7,5
+DA:8,1
+DA:10,5
+LH:4
+LF:4
+end_of_record
