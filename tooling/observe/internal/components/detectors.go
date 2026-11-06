@@ -7,12 +7,16 @@ import (
 	"go.putnami.dev/tooling/observe/internal/detect/composer"
 	"go.putnami.dev/tooling/observe/internal/detect/pants"
 	"go.putnami.dev/tooling/observe/internal/detect/python"
+	"go.putnami.dev/tooling/observe/internal/detectors/moon"
 	"go.putnami.dev/tooling/observe/internal/detectors/nx"
 	"go.putnami.dev/tooling/observe/internal/lockdiff"
 )
 
 // Options tune the default detectors.
 type Options struct {
+	// MoonGraph is the moon graph export to read, absolute or relative to the
+	// repository root; empty reads moon-graph.json when it exists.
+	MoonGraph string
 	// PantsGraph is the Pants export to read, absolute or relative to the
 	// repository root; empty reads pants-graph.json at the root.
 	PantsGraph string
@@ -21,11 +25,11 @@ type Options struct {
 	BazelGraph string
 }
 
-// Default returns the detectors observe runs, Nx and Pants first. Bazel comes
-// last: its export outranks the others by source, and without one its
+// Default returns the detectors observe runs, Nx, moon and Pants first. Bazel
+// comes last: its export outranks the others by source, and without one its
 // packages yield.
 func Default(opts Options) []Detector {
-	return []Detector{NxDetector{}, PantsDetector{GraphFile: opts.PantsGraph}, NodeDetector{}, ComposerDetector{}, GoDetector{}, PythonDetector{}, BazelDetector{GraphFile: opts.BazelGraph}}
+	return []Detector{NxDetector{}, MoonDetector{GraphFile: opts.MoonGraph}, PantsDetector{GraphFile: opts.PantsGraph}, NodeDetector{}, ComposerDetector{}, GoDetector{}, PythonDetector{}, BazelDetector{GraphFile: opts.BazelGraph}}
 }
 
 // fromProbe turns the projects of a probe answer into components.
@@ -67,6 +71,31 @@ func (d NxDetector) Detect(root string) Found {
 				return Component{}, false
 			}
 			return Component{Name: meta.Name, Ecosystem: nx.Ecosystem, Source: meta.Source}, true
+		}),
+	}
+}
+
+// MoonDetector adapts the moon detector: a graph export is an orchestrator
+// source, the moon configuration a workspace one.
+type MoonDetector struct {
+	// GraphFile is the graph export to read; empty reads moon-graph.json.
+	GraphFile string
+}
+
+// Name implements Detector.
+func (MoonDetector) Name() string { return "moon" }
+
+// Detect implements Detector.
+func (d MoonDetector) Detect(root string) Found {
+	result := moon.Probe(root, wsproto.ProbeRequest{Version: wsproto.ProbeProtocolVersion, Extension: moon.Extension}, moon.Options{GraphFile: d.GraphFile})
+	return Found{
+		Diagnostics: result.Diagnostics,
+		Components: fromProbe(result.Projects, func(p wsproto.ProbeProject) (Component, bool) {
+			meta, ok := moon.ReadMetadata(p)
+			if !ok {
+				return Component{}, false
+			}
+			return Component{Name: meta.Name, Ecosystem: moon.Ecosystem, Source: meta.Source}, true
 		}),
 	}
 }

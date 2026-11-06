@@ -15,6 +15,7 @@ answer, so the workspace must declare `@putnami/observe` to run it there.
 | `--coverage <paths>` | The same for coverage reports. Replaces coverage discovery. |
 | `--sbom <path>` | The software bill of materials (SBOM) of the commit, a path or glob pattern. Replaces SBOM discovery. |
 | `--base-sbom <path>` | The SBOM of the base. Without it, the base state of each dependency is unknown. |
+| `--moon-graph <path>` | The moon project graph export, from `moon project-graph --json`. Default `moon-graph.json` at the repository root when it exists. See [the moon detector](10-moon.md). |
 | `--pants-graph <path>` | The Pants export `pants peek ::` wrote, resolved against the directory you run in. Default `pants-graph.json` at the repository root. See [the Pants detector](08-pants.md). |
 | `--bazel-graph <path>` | The Bazel query export, from `bazel query 'deps(//...)' --output=streamed_jsonproto`. Default `bazel-graph.json` at the repository root. See [the Bazel detector](09-bazel.md). |
 | `--no-fetch` | Read only the local history: fetch no base and deepen no shallow clone. |
