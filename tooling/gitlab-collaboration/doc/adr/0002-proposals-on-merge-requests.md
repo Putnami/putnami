@@ -36,7 +36,8 @@ the merge method is a project setting.
    cannot hold a colon, so a head written `owner:branch`, the GitHub spelling
    of a fork, is `invalid` and nothing is sent, and so is a request naming a
    repository other than the bound project. A merge request opened from a fork
-   on a branch of the same name is another proposal and is never answered.
+   on a branch of the same name is another proposal and is never answered,
+   by identity or by reference.
 
 3. **One open merge request per exact identity, as on GitHub.** GitLab
    refuses a second open merge request for one source and target branch, so
@@ -92,7 +93,12 @@ the merge method is a project setting.
    named in the workspace policy is found by name, as on GitHub. `success`
    passes; `failed` and `canceled` fail unless the job is allowed to fail,
    when they are skipped, as GitLab does not fail the pipeline for them;
-   `skipped` and `manual` are skipped; every other status is pending.
+   `skipped`, and a `manual` job allowed to fail, are skipped; every other
+   status is pending, a blocking manual job included, since the pipeline
+   waits on it. GitLab lists the statuses of every pipeline of the commit
+   and hides only jobs retried within one, so the latest status of each
+   name, by id, decides: a failure an earlier pipeline reported does not
+   outlive a later success.
 
 8. **Comments are notes, by id.** `comments` reads every note of the merge
    request (at most 2,000), keeps those people wrote, never a system note,
@@ -106,7 +112,13 @@ the merge method is a project setting.
    the credential's account to the assignees and `inheritLabelPrefixes` adds
    the prefixed labels of the issues the description names; both only add,
    and a failure after the merge request was written is `unresolved`
-   (`gitlab.incomplete`), naming it. The references are GitLab's: `#12` is an
+   (`gitlab.incomplete`), naming it. GitLab keeps one assignee on a tier
+   without multiple assignees: there the present assignee stays, the account
+   is not added, and the answer lists who is assigned, as `tasks.assign`
+   does. A scoped label (`key::value`) is exclusive on the tiers that have
+   them, so of each key one label is added, the first the description names,
+   and none when the merge request already carries that key: an addition
+   never replaces a label. The references are GitLab's: `#12` is an
    issue of the bound project, `project#12` one of a project in its namespace,
    `group/project#12` one of any project of the instance, and
    `https://<host>/<project>/-/issues/12` the same on the bound host. `!12`
@@ -118,10 +130,12 @@ the merge method is a project setting.
     merge request whose head is the expected commit and sends that commit as
     GitLab's `sha`, so a head that moves between the read and the merge is a
     conflict, as is a merge request GitLab refuses to merge. The merge method
-    is a project setting in GitLab: `squash` asks for a squash, `merge` is
-    served only where the project creates a merge commit and `rebase` only
-    where it fast-forwards, and each is `unsupported` elsewhere; no method
-    leaves the choice to the project. GitLab takes
+    and the squash option are project settings in GitLab: `squash` asks for
+    a squash and is `unsupported` where the project never squashes, `merge`
+    is served only where the project creates a merge commit and `rebase` only
+    where it fast-forwards, both `unsupported` where the project always
+    squashes; nothing is sent then. No method leaves the choice to the
+    project. GitLab takes
     `should_remove_source_branch` in the merge call itself, so
     `settings.removeSourceBranch` deletes the source branch with no second
     write to compensate for.

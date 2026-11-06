@@ -58,7 +58,7 @@
     },
     {
       "id": "pipeline-checks",
-      "text": "status reports the commit statuses GitLab keeps for the head commit, pipeline jobs and external statuses alike, by name: success passes, failed and canceled fail unless the job may fail, skipped and manual are skipped, and any other is pending. The summary is failing when one fails, pending when one is not finished, passing when every one passed or was skipped, and none without any."
+      "text": "status reports the commit statuses of the head commit, pipeline jobs and external statuses alike; of each name the latest, by id, decides, since GitLab lists every pipeline's. success passes; failed and canceled fail unless the job may fail; skipped, and a manual job allowed to fail, are skipped; any other, a blocking manual job included, is pending. The summary is failing when one fails, pending when one is not finished, passing when every one passed or was skipped, and none without any."
     },
     {
       "id": "proposal-comments",
@@ -66,11 +66,11 @@
     },
     {
       "id": "reported-publication",
-      "text": "Every proposal answer lists its labels and assignees, [] when absent. upsert applies assignAuthor and inheritLabelPrefixes, which only add, and an addition that fails after the merge request was written is unresolved and names it. inheritLabelPrefixes reads the issues the description names in GitLab's references: #12 in the bound project, project#12 in its namespace, group/project#12, and an issue URL on the bound host; !12 names a merge request and adds nothing, and a URL on another host is never read."
+      "text": "Every proposal answer lists its labels and assignees, [] when absent. upsert applies assignAuthor and inheritLabelPrefixes, which only add: a tier keeping one assignee keeps the present one, and of each scoped key::value one label is added, none when the merge request has that key. A failed addition after the write is unresolved, naming the merge request. References are GitLab's: #12, project#12, group/project#12 and issue URLs on the bound host; !12 adds nothing, and a URL on another host is never read."
     },
     {
       "id": "guarded-merge",
-      "text": "merge is denied before anything is sent unless settings.allowMerge is true, merges only at the expected head, sent as GitLab's sha so a head that moves meanwhile is a conflict, and answers conflict when GitLab cannot merge. squash asks GitLab to squash; merge and rebase are served only where the project's merge method makes a merge commit or fast-forwards, unsupported elsewhere. settings.removeSourceBranch deletes the source branch in the merge call itself."
+      "text": "merge is denied before anything is sent unless settings.allowMerge is true, merges only at the expected head, sent as GitLab's sha so a head that moves meanwhile is a conflict, and answers conflict when GitLab cannot merge. squash, merge and rebase are unsupported where the project's merge method or squash option cannot honor them, and nothing is sent. settings.removeSourceBranch deletes the source branch in the merge call itself."
     },
     {
       "id": "honest-failures",

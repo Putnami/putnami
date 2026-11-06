@@ -118,6 +118,7 @@
             "kind": "acceptance",
             "checks": [
               "a-fork-head-or-another-repository-is-invalid",
+              "a-fork-merge-request-is-not-found-by-reference",
               "a-head-commit-not-on-the-branch-is-a-conflict",
               "a-lagging-head-is-awaited-then-retryable",
               "a-lost-upsert-answer-is-read-back",
@@ -167,8 +168,10 @@
           "verification": {
             "kind": "acceptance",
             "checks": [
+              "a-blocking-manual-job-is-pending",
               "an-allowed-failure-does-not-fail-the-summary",
-              "status-reports-the-head-commit-statuses"
+              "status-reports-the-head-commit-statuses",
+              "the-latest-status-of-each-name-decides"
             ]
           }
         },
@@ -198,6 +201,8 @@
             "checks": [
               "a-failed-addition-is-unresolved-and-names-the-merge-request",
               "a-merge-request-reference-or-foreign-url-adds-nothing",
+              "a-scoped-label-key-the-merge-request-has-is-kept",
+              "a-single-assignee-tier-keeps-its-assignee",
               "assign-author-adds-the-account",
               "labels-are-inherited-from-gitlab-references"
             ]
@@ -214,6 +219,7 @@
             "checks": [
               "a-merge-method-the-project-cannot-honor-is-unsupported",
               "a-moved-head-or-unmergeable-request-is-a-conflict",
+              "a-squash-option-the-project-forbids-is-unsupported",
               "merge-is-denied-unless-allowed",
               "merge-sends-the-expected-head",
               "remove-source-branch-rides-on-the-merge"
