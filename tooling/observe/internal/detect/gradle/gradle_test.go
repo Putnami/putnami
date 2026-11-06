@@ -133,6 +133,9 @@ include(":static", "dyn-$name")
 file("plugins").listFiles()?.forEach { include(":plugins:${it.name}") }
 project(":api").projectDir = file("services/${"api"}")
 rootProject.children.forEach { it.projectDir = file("x/" + it.name) }
+listOf(":c", ":d").forEach(::include)
+println("include the word in a string")
+maven { url = uri("https://repo.example.com/include") }
 `,
 		"api/":    "",
 		"static/": "",
@@ -144,8 +147,8 @@ rootProject.children.forEach { it.projectDir = file("x/" + it.name) }
 	if len(got.Diagnostics) != 1 || got.Diagnostics[0].Code != CodeDynamicSettings || got.Diagnostics[0].Severity != diag.Warning || got.Diagnostics[0].Field != "settings.gradle.kts" {
 		t.Fatalf("diagnostics %+v, want one %s warning", got.Diagnostics, CodeDynamicSettings)
 	}
-	if !strings.Contains(got.Diagnostics[0].Message, "5 include or projectDir") {
-		t.Errorf("message %q, want 5 computed values", got.Diagnostics[0].Message)
+	if !strings.Contains(got.Diagnostics[0].Message, "6 include or projectDir") {
+		t.Errorf("message %q, want 6 computed values", got.Diagnostics[0].Message)
 	}
 }
 
@@ -219,5 +222,24 @@ func TestCommentsKeepStrings(t *testing.T) {
 	}
 	if got := accessor(":libs:foo-bar_baz"); got != "libs.fooBarBaz" {
 		t.Errorf("accessor = %q", got)
+	}
+}
+
+func TestAGroovyIncludeWithoutQuotesIsDynamic(t *testing.T) {
+	spectest.Proves(t, feature, "gradle-dynamic-settings", "a-computed-include-is-a-diagnostic")
+	root := writeTree(t, map[string]string{
+		"settings.gradle": `rootProject.name = 'to-include'
+['app', 'api'].each { include it }
+file('libs').eachDir { dir -> include dir.name }
+include ':static'
+`,
+		"static/": "",
+	})
+	got := Detect(root)
+	if want := []Component{{ID: "static", Name: ":static"}}; !reflect.DeepEqual(got.Components, want) {
+		t.Errorf("components %+v, want %+v", got.Components, want)
+	}
+	if len(got.Diagnostics) != 1 || !strings.Contains(got.Diagnostics[0].Message, "2 include or projectDir") {
+		t.Errorf("diagnostics %+v, want two computed values", got.Diagnostics)
 	}
 }

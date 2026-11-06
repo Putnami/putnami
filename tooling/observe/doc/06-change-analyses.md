@@ -73,11 +73,11 @@ A JUnit case goes to the first of:
 
 A case that none of them places is counted in `observe.tests_unattributed`.
 
-A coverage report names files. A path is read in this order: absolute under
+A coverage report names files. A JaCoCo file, a package path, is first read
+under the `src/main/java` or `src/main/kotlin` of a component; see
+[Gradle and Maven](10-jvm.md#reports). A path is read in this order: absolute under
 the repository; absolute from another checkout, by its trailing segments;
-relative to a Cobertura source root; for a JaCoCo report, as a package path
-under the `src/main/java` or `src/main/kotlin` of a component; relative to the
-report's component, to
+relative to a Cobertura source root; relative to the report's component, to
 the repository root, then to the report's directory; and, for a Go cover
 profile, as an import path. A file that is none of them is counted in
 `observe.coverage_unmapped`. A pytest-cov report (`pytest --cov

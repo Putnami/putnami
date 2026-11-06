@@ -172,9 +172,10 @@ type settings struct {
 	dynamic int
 }
 
-// includeCall finds an include call: include(...) or Groovy's include '...'.
-// includeBuild and includeFlat are other calls.
-var includeCall = regexp.MustCompile(`(?:^|[^A-Za-z0-9_$])include\s*([(\"'])`)
+// includeCall finds the word include: a call with parentheses, Groovy's call
+// without them, or a function reference such as ::include. includeBuild and
+// includeFlat are other words.
+var includeCall = regexp.MustCompile(`(?:^|[^A-Za-z0-9_$])include\b`)
 
 // projectDirAssignment finds project(":x").projectDir = ..., with an optional
 // find and ?. on the project.
@@ -192,8 +193,19 @@ var staticDir = regexp.MustCompile(`^(?:file\s*\(\s*("[^"$]*"|'[^']*')\s*\)|(?:n
 func readSettings(text string) settings {
 	s := settings{dirs: map[string]string{}}
 	seen := map[string]bool{}
-	for _, m := range includeCall.FindAllStringSubmatchIndex(text, -1) {
-		open := m[2]
+	// The word include inside a string is no call: match on the text with
+	// its string contents blanked, read the arguments from the text.
+	for _, m := range includeCall.FindAllStringIndex(blankStrings(text), -1) {
+		open := m[1]
+		for open < len(text) && (text[open] == ' ' || text[open] == '\t') {
+			open++
+		}
+		if open == len(text) || (text[open] != '(' && text[open] != '"' && text[open] != '\'') {
+			// include it, include modules, forEach(::include): the
+			// projects are computed.
+			s.dynamic++
+			continue
+		}
 		args := callArguments(text, open)
 		for _, arg := range splitArguments(args) {
 			value, ok := literal(arg)
@@ -402,6 +414,29 @@ func stripComments(text string) string {
 			}
 			i--
 		}
+	}
+	return string(b)
+}
+
+// blankStrings replaces the contents of the strings of a script with spaces,
+// keeping their quotes, their length and the line breaks.
+func blankStrings(text string) string {
+	b := []byte(text)
+	for i := 0; i < len(b); i++ {
+		if b[i] != '"' && b[i] != '\'' {
+			continue
+		}
+		end := skipString(text, i)
+		quotes := 1
+		if strings.HasPrefix(text[i:], strings.Repeat(string(b[i]), 3)) {
+			quotes = 3
+		}
+		for j := i + quotes; j <= end-quotes && j < len(b); j++ {
+			if b[j] != '\n' {
+				b[j] = ' '
+			}
+		}
+		i = end
 	}
 	return string(b)
 }

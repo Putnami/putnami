@@ -328,9 +328,9 @@ func TestJaCoCoGroupsAndTheDefaultPackageAreRead(t *testing.T) {
 		t.Fatal(diagnostics)
 	}
 	want := []FileCoverage{
+		{Path: "com/acme/api/Api.kt", Lines: []Line{{3, 1}}, LineCounts: Counts{Total: 1, Covered: 1}},
 		{Path: "Main.java", Lines: []Line{{1, 0}}, LineCounts: Counts{Total: 1}},
 		{Path: "com/acme/gen/Gen.java", LineCounts: Counts{Total: 3, Covered: 1}, Functions: Counts{Total: 1, Covered: 1}},
-		{Path: "com/acme/api/Api.kt", Lines: []Line{{3, 1}}, LineCounts: Counts{Total: 1, Covered: 1}},
 	}
 	if !reflect.DeepEqual(report.Files, want) {
 		t.Errorf("files %+v, want %+v", report.Files, want)

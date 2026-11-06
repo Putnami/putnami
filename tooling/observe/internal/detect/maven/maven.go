@@ -145,8 +145,8 @@ func Detect(root string) Detection {
 			queue = append(queue, next)
 		}
 	}
-	// Every module's coordinates, components or not, so that an edge to a
-	// module that packages no code is no edge.
+	// The coordinates of the modules that package code: a dependency on an
+	// aggregator or a BOM, of packaging pom, is no edge.
 	byCoordinates := map[string]string{}
 	components := map[string]*Component{}
 	for _, p := range poms {

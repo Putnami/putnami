@@ -32,7 +32,7 @@ outside comments:
 
 | Reference | Names |
 |---|---|
-| `project(":pricing")`, `project(path: ":pricing")`, `project(path = ":pricing")` | `:pricing` |
+| `project(":pricing")`, `project(path: ":pricing")`, `project(path = ":pricing")`, `findProject(":pricing")` | `:pricing` |
 | `project("impl")` in `:libs:core` | `:libs:core:impl`: a relative path is relative to the project |
 | `projects.pricing` | `:pricing`, the type-safe project accessor |
 | `projects.libs.sharedModel` | `:libs:shared-model`: kebab and snake case become camel case |
@@ -42,7 +42,9 @@ A reference to a project the settings do not include is no edge.
 The read is static. An `include` argument or a `projectDir` value that is not
 a string literal, such as a variable, a template or a loop over directories,
 gets `observe.gradle_dynamic_settings`, and the projects the settings name with
-literals stay components:
+literals stay components. So does an `include` without parentheses or quotes,
+such as Groovy's `include it`, and a function reference, `forEach(::include)`.
+The word `include` inside a string or a comment is no include:
 
 ```kotlin
 file("plugins").listFiles()?.forEach { include(":plugins:${it.name}") }
