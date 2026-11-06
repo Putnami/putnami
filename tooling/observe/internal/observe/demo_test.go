@@ -163,6 +163,17 @@ var demos = map[string]demoExpectation{
 		lineFile:   "src/python/pricing/pricing.py",
 		dependency: evidence.DependencyChange{Ecosystem: "pypi", Lockfile: "3rdparty/python/default.lock", Name: "fastapi", Change: evidence.DependencyUpgraded, From: "0.115.5", To: "0.115.6"},
 	},
+	"rails": {
+		env: map[string]string{"GITHUB_ACTIONS": "true", "GITHUB_SERVER_URL": "https://github.com", "GITHUB_REPOSITORY": "Putnami/demo-observe-rails", "GITHUB_REPOSITORY_ID": "1108", "GITHUB_RUN_ID": "41335527004", "GITHUB_JOB": "test", "GITHUB_REF": "refs/pull/1/merge"},
+		// Gemfile.lock lies in the application at the root, which the
+		// change therefore also touches.
+		changed:    []string{".", "packs/pricing"},
+		dependent:  []string{"packs/checkout"},
+		tests:      map[string]int{".": 1, "engines/admin": 1, "packs/checkout": 2, "packs/pricing": 4},
+		covered:    []string{".", "engines/admin", "packs/checkout", "packs/pricing"},
+		lineFile:   "packs/pricing/app/models/pricing/calculator.rb",
+		dependency: evidence.DependencyChange{Ecosystem: "gem", Lockfile: "Gemfile.lock", Name: "money", Change: evidence.DependencyUpgraded, From: "6.16.0", To: "6.19.0", Component: "."},
+	},
 	"symfony": {
 		env: map[string]string{"GITLAB_CI": "true", "CI_SERVER_HOST": "gitlab.com", "CI_PROJECT_ID": "88373184", "CI_PROJECT_PATH": "putnami/demo-observe-symfony", "CI_PIPELINE_ID": "3015177948", "CI_JOB_ID": "17647015000", "CI_MERGE_REQUEST_IID": "1"},
 		// composer.lock lies in the application at the root, which the
