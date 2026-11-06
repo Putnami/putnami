@@ -189,12 +189,17 @@ func (s Set) Locate(importPath string) (file, component string, ok bool) {
 }
 
 // ReportOwner returns the component of the test target that wrote the
-// repository-relative report, through the detectors that know one.
+// repository-relative report, through the detectors that know one: the
+// target's own component or, when it yielded to another detector's, the
+// innermost component that encloses its directory.
 func (s Set) ReportOwner(report string) (string, bool) {
 	for _, owner := range s.owners {
 		if component, ok := owner(report); ok {
 			if s.has(component) {
 				return component, true
+			}
+			if enclosing, found := s.Owner(component); found {
+				return enclosing, true
 			}
 		}
 	}

@@ -90,7 +90,8 @@ Bazel writes the log of the test target `//api:api_test` under
 `bazel-testlogs/api/api_test/`. Every case of that log goes to the package of
 its test target, `api`: the rule of the export whose package and name match
 the log's directory, else, without an export, the longest package whose
-directory prefixes it. A target whose name holds a `/`, such as
+directory prefixes it. When that package yielded to another detector's
+component, the cases go to the component that encloses it. A target whose name holds a `/`, such as
 `//pricing:rules/tax_test`, is told from a package `pricing/rules` only with
 an export.
 

@@ -278,6 +278,18 @@ func TestWithoutAnExportANestedBuildFileYieldsToTheEnclosingComponent(t *testing
 	if impacts["packages/pricing"] != evidence.ImpactChanged || impacts["packages/api"] != evidence.ImpactDependent {
 		t.Errorf("impacts %v", impacts)
 	}
+
+	// The log of a yielded package goes to the component that encloses it.
+	spectest.Proves(t, "tooling/observe-bazel", "bazel-reports", "a-test-log-of-a-yielded-package-goes-to-the-enclosing-component")
+	for report, want := range map[string]string{
+		"bazel-testlogs/packages/pricing/src/src_test/test.xml": "packages/pricing",
+		"bazel-testlogs/svc/internal/calc/calc_test/test.xml":   "svc",
+		"bazel-testlogs/tools/lint/lint_test/test.xml":          "tools/lint",
+	} {
+		if got, ok := set.ReportOwner(report); !ok || got != want {
+			t.Errorf("ReportOwner(%s) = %q, %v, want %q", report, got, ok, want)
+		}
+	}
 }
 
 func mustOwner(t *testing.T, set Set, file string) string {
