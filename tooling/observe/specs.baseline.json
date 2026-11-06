@@ -49,6 +49,11 @@
     "tooling/observe-python#python-probe-answer",
     "tooling/observe-python#python-project-edges",
     "tooling/observe-python#python-projects-are-components",
+    "tooling/observe-rust#rust-change-analysis",
+    "tooling/observe-rust#rust-crate-edges",
+    "tooling/observe-rust#rust-crates-are-components",
+    "tooling/observe-rust#rust-probe-answer",
+    "tooling/observe-rust#rust-report-discovery",
     "tooling/observe-upload#upload-fails-open",
     "tooling/observe-upload#upload-hands-the-document-to-the-reporter"
   ]
