@@ -407,10 +407,11 @@ func killProcessOnPort(port string) bool {
 	}
 	port = strconv.Itoa(portNumber)
 
-	// Try lsof first
+	// Try lsof first. It lists only the processes that listen on the TCP
+	// port, never a client connected to it.
 	if lsof, err := exec.LookPath("lsof"); err == nil {
 		// lsof is resolved by LookPath and port is a validated decimal TCP port.
-		out, err := exec.Command(lsof, "-ti", ":"+port).Output() //nolint:gosec
+		out, err := exec.Command(lsof, "-t", "-i", "tcp:"+port, "-sTCP:LISTEN").Output() //nolint:gosec
 		if err == nil && len(out) > 0 {
 			pids := strings.Fields(strings.TrimSpace(string(out)))
 			for _, pid := range pids {

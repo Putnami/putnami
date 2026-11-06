@@ -170,7 +170,7 @@ log.Fatal(http.ListenAndServe(":"+port, nil))
 |------|---------|-------------|
 | `--watch` / `-w`, `--no-watch` | `true` | Watch for changes and restart (disabled in production mode); `--no-watch` or `--watch=false` turns it off |
 | `--port <n>` | `8080` | Port number; sets the `PORT` environment variable |
-| `--kill-port` | `false` | Terminate any process on the port before starting |
+| `--kill-port` | `false` | Terminate the process listening on the port before starting; a client connected to the port keeps running |
 | `--race` | `false` | Run with the Go race detector |
 | `--args <string>` | — | Extra arguments passed to the program |
 | `--entrypoint <path>` | auto-detect | Package path to run (e.g. `./cmd/api`). Auto-detected from project layout if not set |
