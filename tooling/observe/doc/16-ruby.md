@@ -109,7 +109,7 @@ and [simplecov-lcov](https://github.com/fortissimo1997/simplecov-lcov) writes
 file and a covered file are read relative to the report's component, to the
 repository root, then to the report's directory, so a run at the root and a
 run in one gem both land on the right components. See
-[tests and coverage](06-change-analyses.md#tests-and-coverage).
+[tests and coverage](/docs/tooling-&-workspace/observe/change-analyses#tests-and-coverage).
 
 ## Diagnostics
 

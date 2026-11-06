@@ -66,7 +66,7 @@ diagnostic. The detector skips it and continues.
 ## The probe wire
 
 The detector answers as a workspace probe of the
-[probe protocol](../../../protocols/extension/doc/07-lifecycles.md): one project
+[probe protocol](https://github.com/putnami/putnami/blob/main/protocols/extension/doc/07-lifecycles.md): one project
 per component, its dependencies as directory paths, and the areas, roots,
 lockfile and PHPUnit outputs in the project's metadata. It lives in
 `@putnami/observe` until the CLI can run another extension's probe outside a

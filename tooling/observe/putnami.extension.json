@@ -80,11 +80,11 @@
         },
         "junit": {
           "type": "string",
-          "description": "Comma-separated JUnit XML report paths or glob patterns; replaces JUnit discovery."
+          "description": "Comma-separated JUnit XML or TRX report paths or glob patterns; replaces test report discovery."
         },
         "coverage": {
           "type": "string",
-          "description": "Comma-separated coverage report paths or glob patterns (LCOV, Cobertura, Clover, Go cover profile); replaces coverage discovery."
+          "description": "Comma-separated coverage report paths or glob patterns (LCOV, Cobertura, Clover, JaCoCo or Kover, Go cover profile); replaces coverage discovery."
         },
         "sbom": {
           "type": "string",

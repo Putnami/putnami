@@ -123,7 +123,7 @@ binaries, such as `pricing::integration` for `tests/integration.rs` or
 `api::bin/api`. The case goes to the crate of that package name, `-` and `_`
 read as one. cargo-llvm-cov writes the absolute path of each source file,
 which maps from any checkout directory. See
-[tests and coverage](06-change-analyses.md#tests-and-coverage).
+[tests and coverage](/docs/tooling-&-workspace/observe/change-analyses#tests-and-coverage).
 
 ## Diagnostics
 

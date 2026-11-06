@@ -82,8 +82,12 @@ See [doc/16-ruby.md](doc/16-ruby.md) for how it reads the packs, gems and
 edges of a Ruby or Rails repository, and its `Gemfile.lock`.
 See [doc/17-rust.md](doc/17-rust.md) for how it reads the crates and edges
 of a Rust repository, from a Cargo workspace or `Cargo.toml` files.
+See [doc/index.md](doc/index.md) for what it answers and every tool, report
+format, lockfile and SBOM format it reads.
 See [doc/06-change-analyses.md](doc/06-change-analyses.md) for how it maps a
 change to components, tests, coverage and dependencies.
+See [doc/18-reports.md](doc/18-reports.md) for what each test, coverage and
+SBOM format gives, and when a report is rejected.
 
 ## Support
 

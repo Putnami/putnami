@@ -541,6 +541,41 @@
         "ownerProject": "putnami.dev",
         "kind": "domainAccess",
         "subkind": "snapshot",
+        "key": "public-docs.observe-documentation.v1"
+      },
+      "import": "public-docs.observe-documentation.v1",
+      "mode": "snapshot",
+      "status": "active",
+      "transports": [
+        {
+          "role": "transport",
+          "kind": "file",
+          "contract": "putnami.documentation-tree.v1",
+          "availability": "active"
+        }
+      ],
+      "enforced": {
+        "maxStaleness": "720h",
+        "onMissing": "fail-closed",
+        "onStale": "use-stale",
+        "ordering": "source-version",
+        "lateEvents": "ignore-older"
+      },
+      "provenance": {
+        "project": "putnami.dev",
+        "package": "putnami.dev",
+        "sourceKind": "framework",
+        "declaration": {
+          "root": "project",
+          "path": "putnami.json"
+        }
+      }
+    },
+    {
+      "identity": {
+        "ownerProject": "putnami.dev",
+        "kind": "domainAccess",
+        "subkind": "snapshot",
         "key": "public-docs.python-surface-documentation.v1"
       },
       "import": "public-docs.python-surface-documentation.v1",
