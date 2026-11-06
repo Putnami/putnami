@@ -5,11 +5,11 @@
   "outcomes": [
     "In a moon repository, each moon project is a component at its source directory, whether or not it holds a package.json, so a Rust, Go, Python or plain project is a component too",
     "The edges moon declares in moon.yml, and the ones it infers from package.json dependencies, are component edges, so a change to a shared project marks the projects that depend on it",
-    "When the CI ran moon project-graph --json > moon-graph.json, moon is the authority: its project graph is the one observe uses"
+    "When the CI ran moon project-graph --json > moon-graph.json, moon is the authority: its project graph is the one observe uses, as an orchestrator source"
   ],
   "nonGoals": [
     "Running moon or any package manager command",
-    "Edges that only moon's language toolchains infer, such as Cargo or Go module dependencies, without a graph export: the export carries them",
+    "Edges that only moon's language toolchains infer, such as Cargo or Go module dependencies, and tasks inherited from .moon/tasks, without a graph export: the export carries them",
     "Projects that .moon/workspace.pkl, workspace.json or workspace.toml declare, and project settings that moon.pkl declares",
     "Reading test reports, coverage and lockfiles: each project's language keeps the readers the change analyses already have",
     "Serving the probe from its own extension: the detector lives in @putnami/observe until the CLI can run a workspace probe outside a workspace"
@@ -17,23 +17,23 @@
   "requirements": [
     {
       "id": "moon-graph-export",
-      "text": "When the root holds moon-graph.json, or --moon-graph names a file, and it is a moon project graph export, each project of graph.nodes, or of data when a node is an index, is a component at its source, and each graph.edges entry between two projects but a root one is an edge from the first to the second. A missing default file is no finding; a named missing file, or one that is no export, is a warning, and the configuration answers. A project without a source, or with another's, is a warning and skipped."
+      "text": "When the root holds moon-graph.json, or --moon-graph names a file, and it is a moon project graph export, each project of graph.nodes, or of data when a node is an index, is a component of source orchestrator at its source, and each graph.edges entry between two projects but a root one is an edge from the first to the second. A missing default file is no finding; a named missing file, or a non-export when named or beside .moon/workspace.yml, is a warning, and the configuration answers."
     },
     {
       "id": "moon-projects",
-      "text": "Without a usable export, a root .moon/workspace.yml makes a moon workspace. Its projects key is a list of globs, a map of project id to directory, or both under globs and sources. Each directory a glob matches, or that holds the moon.yml a glob matches, less hidden, node_modules and .moon directories and ! globs, is a project named by its last segment; a mapped one is named by its key; moon.yml id renames it. A workspace.yml that does not read is a warning and leaves the repository to the other detectors."
+      "text": "Else a root .moon/workspace.yml makes a moon workspace, of source workspace. Its projects key is a list of globs, a map of id to directory, or both under globs and sources. A directory a glob matches, or holding a moon.yml one matches, less hidden, node_modules and ! globs, is a project named by its last segment, or its path with globFormat source-path; a mapped one by its key; moon.yml id renames it. A workspace.yml that does not read is a warning, leaving the repository to the other detectors."
     },
     {
       "id": "moon-edges",
-      "text": "dependsOn in a project's moon.yml names its edges, each a project id or alias as a string or as an object with an id. A package.json dependency that names another project's package is an edge, as moon infers it. A dependency on the project itself or on no project is no edge. A moon.yml that does not read is a warning, and its project keeps no declared edge."
+      "text": "dependsOn in a project's moon.yml names its edges, each a project id or alias as a string or as an object with an id, and so does the project of each <project>:<task> target in the deps of its tasks. A package.json dependency that names another project's package is an edge, as moon infers it. A dependency on the project itself, on the root project or on no project is no edge. A moon.yml that does not read is a warning, and its project keeps no declared edge."
     },
     {
       "id": "moon-probe-answer",
-      "text": "The detection is a workspace probe answer under the @putnami/observe extension name: one project per moon project in path order, its moon id as source name, its moon.yml or the export as source file, its dependencies as project paths, its metadata naming the id, the ecosystem moon and the component source orchestrator, and the files whose content changes the answer. The answer passes the probe protocol's strict validation."
+      "text": "The detection is a workspace probe answer under the @putnami/observe extension name: one project per moon project in path order, its moon id as source name, its moon.yml, else the export it came from, as source file, its dependencies as project paths, its metadata naming the id, the ecosystem moon and its component source, orchestrator or workspace, and the files whose content changes the answer. The answer passes the probe protocol's strict validation."
     },
     {
       "id": "moon-change-analysis",
-      "text": "On a moon workspace with apps/api, whose moon.yml depends on pricing, packages/pricing without a package.json, and apps/web, with and without the export, the summary lists the three projects of ecosystem moon and source orchestrator with the edge from api to pricing, and a change to pricing marks api dependent and web unaffected."
+      "text": "On a moon workspace with apps/api, whose moon.yml depends on pricing, packages/pricing without a package.json, and apps/web, the summary lists the three projects of ecosystem moon, of source orchestrator with the export and workspace without it, with the edge from api to pricing, and a change to pricing marks api dependent and web unaffected."
     }
   ],
   "decisions": [
