@@ -50,7 +50,10 @@
           "evidenceKinds": ["attestation"],
           "verification": {
             "kind": "acceptance",
-            "checks": ["timeout-rolls-back-once-and-a-racing-commit-awaits-it-and-fails"]
+            "checks": [
+              "timeout-rolls-back-once-and-a-racing-commit-awaits-it-and-fails",
+              "a-write-still-opening-when-the-timeout-fires-fails-instead-of-running-after-the-rollback"
+            ]
           }
         },
         {

@@ -30,7 +30,7 @@
     },
     {
       "id": "timeout-rollback",
-      "text": "A transaction that exceeds its timeout is rolled back exactly once. A commit racing that timeout awaits the in-flight rollback and then fails, instead of committing connections the timeout already released."
+      "text": "A transaction that exceeds its timeout is rolled back exactly once. A commit racing that timeout awaits the in-flight rollback and then fails, instead of committing connections the timeout already released. A write still opening the transaction when the timeout fires fails, instead of running after the rollback outside any transaction."
     },
     {
       "id": "cancellation",
