@@ -43,7 +43,8 @@ code, as ADR 0008 requires; the child reads the reviews once the draft
 exists. At the final head, the epic session runs build's check and prove
 stages there, an independent review, the final gate and the local
 qualification, then build's merge stage: a dossier from that evidence, or
-`--gate ci` with a workflow record it writes. A finding goes back to the child, which repairs and pushes again.
+`--gate ci` with a workflow record it writes. A finding goes back to the
+child, which repairs and pushes again.
 The epic session never trusts the child's records from a distance and never
 commits to the child's branch.
 
