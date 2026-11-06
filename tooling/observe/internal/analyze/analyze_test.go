@@ -501,3 +501,102 @@ func TestAMavenPackageURLMatchesAGradleChange(t *testing.T) {
 		t.Errorf("after %+v, want the SBOM's license", change.After)
 	}
 }
+
+// dartRepository is a melos repository: a Flutter app and a Dart package,
+// each with a test file, and a root lib/ that no package holds.
+func dartRepository(t *testing.T) (string, components.Set) {
+	t.Helper()
+	root := t.TempDir()
+	write(t, root, map[string]string{
+		"apps/mobile/lib/main.dart":                 "void main() {}\n",
+		"apps/mobile/test/widget_test.dart":         "void main() {}\n",
+		"packages/pricing/lib/src/price.dart":       "int price() => 1;\n",
+		"packages/pricing/test/src/price_test.dart": "void main() {}\n",
+		"packages/pricing/test/helpers.dart":        "void helper() {}\n",
+		"lib/src/price.dart":                        "int price() => 2;\n",
+	})
+	set := components.Detect(root, []components.Detector{fake{components.Found{Components: []components.Component{
+		{ID: "apps/mobile", Ecosystem: "dart", Source: evidence.SourceWorkspace},
+		{ID: "packages/pricing", Ecosystem: "dart", Source: evidence.SourceWorkspace},
+	}}}})
+	return root, set
+}
+
+func TestATojunitCaseGoesToTheComponentOfItsTestFile(t *testing.T) {
+	spectest.Proves(t, feature, "tests-and-coverage", "a-tojunit-case-goes-to-the-component-of-its-test-file")
+	spectest.Proves(t, "tooling/observe-dart", "dart-package-reports", "a-tojunit-class-name-names-its-test-file")
+	root, set := dartRepository(t)
+	write(t, root, map[string]string{
+		// One report at the root: flutter test --machine names absolute
+		// paths, which tojunit writes with a leading dot; dart test names
+		// paths relative to the package, here with a --package prefix.
+		"test-results.xml": `<testsuites>
+			<testsuite name=".home.runner.work.shop.shop.apps.mobile.test.widget" tests="2">
+				<testcase classname=".home.runner.work.shop.shop.apps.mobile.test.widget" name="renders" time="0.25"/>
+				<testcase classname=".home.runner.work.shop.shop.apps.mobile.test.widget" name="taps" time="0.25"><failure message="expected 1"/></testcase>
+			</testsuite>
+			<testsuite name="shop.packages.pricing.test.src.price">
+				<testcase classname="shop.packages.pricing.test.src.price" name="adds tax" time="0.1"/>
+			</testsuite>
+			<testsuite name="test.unknown">
+				<testcase classname="test.unknown" name="orphan"/>
+			</testsuite>
+		</testsuites>`,
+		// A report in a package: the class name is relative to it, and a
+		// helper file without _test.dart is named whole.
+		"packages/pricing/test-results.xml": `<testsuites><testsuite name="test.src.price">
+			<testcase classname="test.src.price" name="rounds"/>
+			<testcase classname="test.helpers" name="helps"/>
+			<testcase classname="test.gone" name="still in pricing"/>
+		</testsuite></testsuites>`,
+	})
+	r := Run(Input{Root: root, Set: set, Reports: []reports.Report{
+		{Path: "test-results.xml", Kind: reports.KindJUnit, Format: reports.FormatJUnit},
+		{Path: "packages/pricing/test-results.xml", Kind: reports.KindJUnit, Format: reports.FormatJUnit},
+	}})
+	got := tests(r)
+	mobile := got["apps/mobile"]
+	if mobile.Passed != 1 || mobile.Failed != 1 || len(mobile.FailingCases) != 1 || mobile.FailingCases[0].File != "apps/mobile/test/widget_test.dart" {
+		t.Errorf("mobile tests %+v", mobile)
+	}
+	if got["packages/pricing"].Passed != 4 {
+		t.Errorf("pricing tests %+v", got["packages/pricing"])
+	}
+	if len(r.Diagnostics) != 1 || r.Diagnostics[0].Code != CodeTestsUnattributed || !strings.HasPrefix(r.Diagnostics[0].Message, "1 test cases") {
+		t.Errorf("diagnostics %v", r.Diagnostics)
+	}
+	for classname, want := range map[string][]string{
+		"test.price":    {"test/price_test.dart", "test/price.dart", "price_test.dart", "price.dart"},
+		".a.test.b":     {"a/test/b_test.dart", "a/test/b.dart", "test/b_test.dart", "test/b.dart", "b_test.dart", "b.dart"},
+		"src/a.test.ts": nil,
+		"a-b.c":         nil,
+		"":              nil,
+		"a..b":          nil,
+	} {
+		if got := dartTestFiles(classname); !slices.Equal(got, want) {
+			t.Errorf("dartTestFiles(%q) = %v, want %v", classname, got, want)
+		}
+	}
+}
+
+func TestAPackageLCOVReadsFromThePackageDirectory(t *testing.T) {
+	spectest.Proves(t, "tooling/observe-dart", "dart-package-reports", "a-package-lcov-reads-from-the-package-directory")
+	root, set := dartRepository(t)
+	write(t, root, map[string]string{
+		// flutter test --coverage writes paths relative to the package; the
+		// root holds a file of the same path, which the package's wins over.
+		"packages/pricing/coverage/lcov.info": "SF:lib/src/price.dart\nDA:1,1\nLF:1\nLH:1\nend_of_record\n",
+		"apps/mobile/coverage/lcov.info":      "SF:lib/main.dart\nDA:1,0\nLF:1\nLH:0\nend_of_record\n",
+	})
+	r := Run(Input{Root: root, Set: set, Reports: []reports.Report{
+		{Path: "packages/pricing/coverage/lcov.info", Kind: reports.KindCoverage, Format: reports.FormatLCOV},
+		{Path: "apps/mobile/coverage/lcov.info", Kind: reports.KindCoverage, Format: reports.FormatLCOV},
+	}})
+	want := []evidence.ComponentCoverage{
+		{Component: "apps/mobile", CoveredLines: 0, TotalLines: 1},
+		{Component: "packages/pricing", CoveredLines: 1, TotalLines: 1},
+	}
+	if !slices.Equal(r.Coverage, want) || len(r.Diagnostics) != 0 {
+		t.Errorf("coverage %+v, diagnostics %v", r.Coverage, r.Diagnostics)
+	}
+}

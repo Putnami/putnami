@@ -7,7 +7,7 @@ queries no vulnerability database.
 
 ## Components
 
-Thirteen detectors read the repository:
+Fourteen detectors read the repository:
 
 | Detector | Reads | Source |
 |---|---|---|
@@ -23,6 +23,7 @@ Thirteen detectors read the repository:
 | Maven | the root `pom.xml` and its modules, recursively | `workspace` |
 | Swift Package Manager | each `Package.swift` and its targets, from `swiftpm.json` as `swift package describe --type json` writes it, else the manifest and the directories under `Sources` and `Tests` | `workspace` |
 | Xcode | each `.xcodeproj` and the local packages its `project.pbxproj` references | `manifest` |
+| Dart | each `pubspec.yaml`, with the root's pub `workspace` and `melos.yaml` | `workspace` for a pub workspace or melos package, `manifest` otherwise |
 | Bazel | `bazel-graph.json` from `bazel query 'deps(//...)' --output=streamed_jsonproto`, else the `BUILD` and `BUILD.bazel` files | `orchestrator` for a query export, `manifest` otherwise |
 
 A component is a directory. When two detectors name one directory, the higher
@@ -66,7 +67,10 @@ A JUnit case goes to the first of:
    and its default `xunit2` report has no `file`: the longest leading part
    that names a `.py` file is the test file. The class name is relative to
    pytest's `rootdir`; see
-   [the Python detector](07-python.md#reports).
+   [the Python detector](07-python.md#reports). Else its dotted class name
+   read as a Dart test file (tojunit): `test.price` is `test/price_test.dart`,
+   and the longest tail of a class name written from an absolute path that
+   names a file is the test file; see [the Dart detector](14-dart.md#reports).
 3. The component whose test source root holds the file its JVM class name
    names: `com.acme.PriceTest` is `src/test/kotlin/com/acme/PriceTest.kt` or
    `.java`, under `src/test` or `src/androidTest`. See
@@ -122,6 +126,7 @@ Each changed lockfile is read at the merge base and at the head:
 | a Gradle version catalog, `gradle/*.versions.toml` | `maven` | each library as `group:artifact` and each plugin as its id, at its version, `version.ref` or rich version |
 | `Package.resolved` | `swift` | each pin of format versions 1 to 3, at its version, else its revision |
 | `Podfile.lock` | `cocoapods` | each entry of `PODS`, by its root pod; pods from a `:path:` left out |
+| `pubspec.lock` | `pub` | each entry of `packages`; `path` and `sdk` sources left out |
 
 A Rush monorepo keeps its lockfile under `common/config/rush/`: `pnpm-lock.yaml`,
 `npm-shrinkwrap.json` or `yarn.lock`, by the package manager `rush.json` names,
@@ -152,7 +157,7 @@ discovered) and one for the base (`--base-sbom`):
 osv-scanner writes no vulnerability in SPDX: use CycloneDX for them.
 
 A package of the SBOM matches a dependency change by the ecosystem its
-package URL names (`npm`, `composer`, `golang` is `go`, `pypi`, `maven`), its
+package URL names (`npm`, `composer`, `golang` is `go`, `pypi`, `maven`, `pub`), its
 name, normalized for `pypi` and written `group:artifact` for `maven`, and its version, a leading `v` ignored. A package
 without a package URL matches by its name as written and its version, so a
 Python package without one matches only when the SBOM writes its normalized

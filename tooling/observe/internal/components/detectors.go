@@ -7,6 +7,7 @@ import (
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/tooling/observe/internal/detect/bazel"
 	"go.putnami.dev/tooling/observe/internal/detect/composer"
+	"go.putnami.dev/tooling/observe/internal/detect/dart"
 	"go.putnami.dev/tooling/observe/internal/detect/gradle"
 	"go.putnami.dev/tooling/observe/internal/detect/maven"
 	"go.putnami.dev/tooling/observe/internal/detect/pants"
@@ -35,7 +36,7 @@ type Options struct {
 // its packages yield.
 func Default(opts Options) []Detector {
 	scan := &swiftScan{}
-	return []Detector{NxDetector{}, MoonDetector{GraphFile: opts.MoonGraph}, PantsDetector{GraphFile: opts.PantsGraph}, RushDetector{}, NodeDetector{}, ComposerDetector{}, GoDetector{}, PythonDetector{}, GradleDetector{}, MavenDetector{}, SwiftPMDetector{scan: scan}, XcodeDetector{scan: scan}, BazelDetector{GraphFile: opts.BazelGraph}}
+	return []Detector{NxDetector{}, MoonDetector{GraphFile: opts.MoonGraph}, PantsDetector{GraphFile: opts.PantsGraph}, RushDetector{}, NodeDetector{}, ComposerDetector{}, GoDetector{}, PythonDetector{}, GradleDetector{}, MavenDetector{}, SwiftPMDetector{scan: scan}, XcodeDetector{scan: scan}, DartDetector{}, BazelDetector{GraphFile: opts.BazelGraph}}
 }
 
 // fromProbe turns the projects of a probe answer into components.
@@ -320,6 +321,24 @@ func (d XcodeDetector) Detect(root string) Found {
 	}
 	if len(detection.Projects) > 0 && len(detection.Packages) == 0 {
 		found.Locate = detection.Locate
+	}
+	return found
+}
+
+// DartDetector adapts the Dart detector: each pub workspace member and melos
+// package is a workspace component, each other pubspec.yaml package a
+// manifest one.
+type DartDetector struct{}
+
+// Name implements Detector.
+func (DartDetector) Name() string { return "dart" }
+
+// Detect implements Detector.
+func (DartDetector) Detect(root string) Found {
+	detection := dart.Detect(root)
+	found := Found{Diagnostics: detection.Diagnostics}
+	for _, c := range detection.Components {
+		found.Components = append(found.Components, Component{ID: c.ID, Name: c.Name, Ecosystem: dart.Ecosystem, Source: c.Source, DependsOn: c.DependsOn})
 	}
 	return found
 }

@@ -158,16 +158,21 @@ func TestTheDefaultDetectorsReadEachEcosystem(t *testing.T) {
 		"go.work":                       "go 1.23\n\nuse ./svc\n",
 		"svc/go.mod":                    "module example.com/svc\n\ngo 1.23\n\nrequire golang.org/x/text v0.21.0\n",
 		"php/composer.json":             `{"name":"demo/php","autoload":{"psr-4":{"Demo\\":"src/"}}}`,
+		"mobile/pubspec.yaml":           "name: mobile\ndependencies:\n  pricing:\n    path: ../pricing\n",
+		"pricing/pubspec.yaml":          "name: pricing\n",
 	})
 	set := Detect(root, Default(Options{}))
 	byID := map[string]Component{}
 	for _, c := range set.Components {
 		byID[c.ID] = c
 	}
-	for id, ecosystem := range map[string]string{"packages/pricing": "node", "apps/api": "node", "svc": "go", "php": "composer"} {
+	for id, ecosystem := range map[string]string{"packages/pricing": "node", "apps/api": "node", "svc": "go", "php": "composer", "mobile": "dart", "pricing": "dart"} {
 		if byID[id].Ecosystem != ecosystem {
 			t.Errorf("%s: %+v, want ecosystem %s (all: %v)", id, byID[id], ecosystem, ids(set))
 		}
+	}
+	if !slices.Equal(byID["mobile"].DependsOn, []string{"pricing"}) || byID["mobile"].Name != "mobile" {
+		t.Errorf("mobile %+v", byID["mobile"])
 	}
 	if !slices.Equal(byID["apps/api"].DependsOn, []string{"packages/pricing"}) {
 		t.Errorf("apps/api edges %v", byID["apps/api"].DependsOn)
