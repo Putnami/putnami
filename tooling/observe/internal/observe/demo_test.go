@@ -163,6 +163,16 @@ var demos = map[string]demoExpectation{
 		lineFile:   "src/python/pricing/pricing.py",
 		dependency: evidence.DependencyChange{Ecosystem: "pypi", Lockfile: "3rdparty/python/default.lock", Name: "fastapi", Change: evidence.DependencyUpgraded, From: "0.115.5", To: "0.115.6"},
 	},
+	"dart": {
+		env:       map[string]string{"GITHUB_ACTIONS": "true", "GITHUB_SERVER_URL": "https://github.com", "GITHUB_REPOSITORY": "Putnami/demo-observe-dart", "GITHUB_REPOSITORY_ID": "1109", "GITHUB_RUN_ID": "41335530417", "GITHUB_JOB": "test", "GITHUB_REF": "refs/pull/1/merge"},
+		changed:   []string{"packages/pricing"},
+		dependent: []string{"apps/mobile"},
+		tests:     map[string]int{"apps/mobile": 1, "packages/pricing": 4, "packages/ui": 1},
+		covered:   []string{"apps/mobile", "packages/pricing", "packages/ui"},
+		// pubspec.lock lies in the pub workspace root, which is no component.
+		lineFile:   "packages/pricing/lib/src/price.dart",
+		dependency: evidence.DependencyChange{Ecosystem: "pub", Lockfile: "pubspec.lock", Name: "intl", Change: evidence.DependencyUpgraded, From: "0.19.0", To: "0.20.2"},
+	},
 	"symfony": {
 		env: map[string]string{"GITLAB_CI": "true", "CI_SERVER_HOST": "gitlab.com", "CI_PROJECT_ID": "88373184", "CI_PROJECT_PATH": "putnami/demo-observe-symfony", "CI_PIPELINE_ID": "3015177948", "CI_JOB_ID": "17647015000", "CI_MERGE_REQUEST_IID": "1"},
 		// composer.lock lies in the application at the root, which the

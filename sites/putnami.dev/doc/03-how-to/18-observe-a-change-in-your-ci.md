@@ -49,6 +49,14 @@ bazel query 'deps(//...)' --output=streamed_jsonproto > bazel-graph.json
 
 `putnami observe` makes each Bazel package a component, reads the edges between packages from `bazel-graph.json`, and finds the logs of `bazel-testlogs` and the combined LCOV report of `bazel-out/_coverage/_coverage_report.dat` through the links Bazel leaves at the root. Each test log goes to the package of its test target. Without the export, the packages come from the `BUILD` files, without edges, and the summary names the command. The links point into Bazel's output base, so on GitLab run these lines in the job that ran Bazel, not in a later one.
 
+In a Dart or Flutter repository, run each package's tests with coverage and a JUnit report, with [junitreport](https://pub.dev/packages/junitreport) activated by `dart pub global activate junitreport`:
+
+```bash
+melos exec --dir-exists=test -- "flutter test --machine --coverage | tojunit --output test-results.xml"
+```
+
+Without melos, run the same pipe in each package's directory, or `dart test --reporter json | tojunit --output test-results.xml` for a plain Dart package. Each package with a `pubspec.yaml` is a component: a member of the pub workspace or of the `melos.yaml` packages, or any other package, and a `path:` dependency, or inside a workspace a dependency on another of its packages, is an edge. Each package's `coverage/lcov.info` reads from that package's directory, each test case lands on the package of its test file, and a `pubspec.lock` change is a dependency change of ecosystem `pub`.
+
 The install lines need the network: when the installer or the registry cannot be reached, the GitHub step or the GitLab job fails.
 
 ## Steps
@@ -196,6 +204,6 @@ Without `--base-sbom`, each dependency gets its state at the head and the summar
 ## Learn more
 
 - [What `putnami observe` reads](https://github.com/putnami/putnami/blob/main/tooling/observe/doc/01-observe.md): every flag, how the base is found, and how reports and SBOMs are discovered.
-- [The `@putnami/observe` README](https://github.com/putnami/putnami/blob/main/tooling/observe/README.md): the questions it answers and how it reads Nx, moon, Pants, Bazel, npm, pnpm, yarn, Composer, Go and Python repositories.
+- [The `@putnami/observe` README](https://github.com/putnami/putnami/blob/main/tooling/observe/README.md): the questions it answers and how it reads Nx, moon, Pants, Bazel, npm, pnpm, yarn, Composer, Go, Python and Dart repositories.
 
 You now have a CI job that records which files a change touched and which tests and coverage reports it produced, as an artifact you can keep or upload to Putnami Cloud.

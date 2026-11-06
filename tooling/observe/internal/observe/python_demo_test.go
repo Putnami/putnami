@@ -13,13 +13,13 @@ import (
 	"go.putnami.dev/tooling/observe/internal/analyze"
 )
 
-// observePythonDemo observes the python demo with the SBOMs of its sbom/
-// files, written outside the repository and named on the command line.
-func observePythonDemo(t *testing.T) Observation {
+// observeDemoWithSBOMs observes a demo with the SBOMs of its sbom/ files,
+// written outside the repository and named on the command line.
+func observeDemoWithSBOMs(t *testing.T, name string) Observation {
 	t.Helper()
-	root, base := demoRepository(t, "python")
+	root, base := demoRepository(t, name)
 	outside := t.TempDir()
-	env := demos["python"].env
+	env := demos[name].env
 	opts := Options{
 		Dir:      root,
 		Env:      func(key string) string { return env[key] },
@@ -33,17 +33,17 @@ func observePythonDemo(t *testing.T) Observation {
 		Producer: Producer{Name: "@putnami/observe", Version: "1.0.0"},
 	}
 	opts.Overrides.Base = base
-	for _, f := range readDemo(t, "python") {
-		name, ok := strings.CutPrefix(f.name, "sbom/")
+	for _, f := range readDemo(t, name) {
+		file, ok := strings.CutPrefix(f.name, "sbom/")
 		if !ok {
 			continue
 		}
-		writeDemoFile(t, outside, name, f.content)
-		switch name {
+		writeDemoFile(t, outside, file, f.content)
+		switch file {
 		case "head.cdx.json":
-			opts.SBOM = []string{filepath.Join(outside, name)}
+			opts.SBOM = []string{filepath.Join(outside, file)}
 		case "base.cdx.json":
-			opts.BaseSBOM = []string{filepath.Join(outside, name)}
+			opts.BaseSBOM = []string{filepath.Join(outside, file)}
 		}
 	}
 	return Run(context.Background(), opts)
@@ -51,7 +51,7 @@ func observePythonDemo(t *testing.T) Observation {
 
 func TestTheUVWorkspaceDemoIsExplained(t *testing.T) {
 	spectest.Proves(t, "tooling/observe-python", "python-change-analysis", "the-uv-workspace-demo-is-explained")
-	o := observePythonDemo(t)
+	o := observeDemoWithSBOMs(t, "python")
 	for _, d := range o.Diagnostics {
 		if d.Code == analyze.CodeTestsUnattributed || d.Code == analyze.CodeCoverageUnmapped {
 			t.Errorf("diagnostic %s: %s", d.Code, d.Message)
@@ -91,7 +91,7 @@ func TestTheUVWorkspaceDemoIsExplained(t *testing.T) {
 
 func TestAPyPIPackageURLMatchesAPythonLockfileChange(t *testing.T) {
 	spectest.Proves(t, analysesFeature, "dependency-sbom-facts", "a-pypi-package-url-matches-a-python-lockfile-change")
-	o := observePythonDemo(t)
+	o := observeDemoWithSBOMs(t, "python")
 	noWarnings(t, o)
 	doc := validEvidence(t, o)
 	fastapi := dependency(t, doc.DependencyChanges, "fastapi")

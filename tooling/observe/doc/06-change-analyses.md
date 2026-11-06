@@ -7,7 +7,7 @@ queries no vulnerability database.
 
 ## Components
 
-Eight detectors read the repository:
+Nine detectors read the repository:
 
 | Detector | Reads | Source |
 |---|---|---|
@@ -18,6 +18,7 @@ Eight detectors read the repository:
 | Composer | each `composer.json` | `manifest` |
 | Go | `go.work`, each `go.mod` | `workspace` for a `go.work` member, `manifest` otherwise |
 | Python | each `pyproject.toml`, with the root's `[tool.uv.workspace]` | `workspace` for a uv workspace member, `manifest` otherwise |
+| Dart | each `pubspec.yaml`, with the root's pub `workspace` and `melos.yaml` | `workspace` for a pub workspace or melos package, `manifest` otherwise |
 | Bazel | `bazel-graph.json` from `bazel query 'deps(//...)' --output=streamed_jsonproto`, else the `BUILD` and `BUILD.bazel` files | `orchestrator` for a query export, `manifest` otherwise |
 
 A component is a directory. When two detectors name one directory, the higher
@@ -61,7 +62,10 @@ A JUnit case goes to the first of:
    and its default `xunit2` report has no `file`: the longest leading part
    that names a `.py` file is the test file. The class name is relative to
    pytest's `rootdir`; see
-   [the Python detector](07-python.md#reports).
+   [the Python detector](07-python.md#reports). Else its dotted class name
+   read as a Dart test file (tojunit): `test.price` is `test/price_test.dart`,
+   and the longest tail of a class name written from an absolute path that
+   names a file is the test file; see [the Dart detector](11-dart.md#reports).
 3. The component of the Go package its class or suite names
    (`gotestsum --junitfile`).
 4. The component that holds the report.
@@ -103,6 +107,7 @@ Each changed lockfile is read at the merge base and at the head:
 | `uv.lock` | `pypi` | each `[[package]]`; `editable`, `virtual`, `directory` and `path` sources left out |
 | `poetry.lock` | `pypi` | each `[[package]]`; `directory` and `file` sources and `develop` packages left out |
 | a Pants resolve lockfile | `pypi` | each locked requirement of the PEX JSON lock a `[python.resolves]` entry of `pants.toml` names |
+| `pubspec.lock` | `pub` | each entry of `packages`; `path` and `sdk` sources left out |
 
 `go.sum` holds checksums, not versions, and is not read. A Python package
 name is read in its normalized form (PEP 503): lower case, with each run of
@@ -128,7 +133,7 @@ discovered) and one for the base (`--base-sbom`):
 osv-scanner writes no vulnerability in SPDX: use CycloneDX for them.
 
 A package of the SBOM matches a dependency change by the ecosystem its
-package URL names (`npm`, `composer`, `golang` is `go`, `pypi`), its name,
+package URL names (`npm`, `composer`, `golang` is `go`, `pypi`, `pub`), its name,
 normalized for `pypi`, and its version, a leading `v` ignored. A package
 without a package URL matches by its name as written and its version, so a
 Python package without one matches only when the SBOM writes its normalized

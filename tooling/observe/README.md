@@ -66,6 +66,9 @@ See [doc/08-pants.md](doc/08-pants.md) for how it reads the components and
 the inferred edges of a Pants repository, from a `pants peek` export.
 See [doc/09-bazel.md](doc/09-bazel.md) for how it reads the packages of a
 Bazel repository and their edges, from a `bazel query` export.
+See [doc/11-dart.md](doc/11-dart.md) for how it reads the packages and
+edges of a Dart or Flutter repository, from a pub workspace, melos or
+`pubspec.yaml` files.
 See [doc/06-change-analyses.md](doc/06-change-analyses.md) for how it maps a
 change to components, tests, coverage and dependencies.
 
