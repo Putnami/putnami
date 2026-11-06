@@ -781,12 +781,9 @@ func TestSnapshotRestoreReplacesAFileThroughARename(t *testing.T) {
 // A file Restore cannot put back is named in the error it returns, and every
 // other file is still put back.
 func TestSnapshotRestoreReportsWhatItCannotPutBack(t *testing.T) {
-	if runtime.GOOS == "windows" {
-		t.Skip("a read-only directory does not refuse writes on Windows")
-	}
 	dir := t.TempDir()
-	locked := filepath.Join(dir, "locked")
-	lost := jobtest.WriteFile(t, locked, "go.mod", "module example.com/m\n")
+	parent := filepath.Join(dir, "parent")
+	lost := jobtest.WriteFile(t, parent, "go.mod", "module example.com/m\n")
 	restored := jobtest.WriteFile(t, dir, "go.work", "before\n")
 	var snapshot workspacejob.Snapshot
 	for _, path := range []string{lost, restored} {
@@ -794,13 +791,12 @@ func TestSnapshotRestoreReportsWhatItCannotPutBack(t *testing.T) {
 			t.Fatalf("Add(%s): %v", path, err)
 		}
 	}
-	if err := os.Remove(lost); err != nil {
+	// A regular file stands where the parent directory was: no user, root
+	// included, can create parent/go.mod again.
+	if err := os.RemoveAll(parent); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.Chmod(locked, 0o555); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = os.Chmod(locked, 0o755) })
+	jobtest.WriteFile(t, dir, "parent", "not a directory\n")
 	jobtest.WriteFile(t, dir, "go.work", "after\n")
 
 	err := snapshot.Restore(nil, nil)
