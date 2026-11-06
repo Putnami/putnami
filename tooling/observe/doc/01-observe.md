@@ -15,6 +15,7 @@ answer, so the workspace must declare `@putnami/observe` to run it there.
 | `--coverage <paths>` | The same for coverage reports. Replaces coverage discovery. |
 | `--sbom <path>` | The software bill of materials (SBOM) of the commit, a path or glob pattern. Replaces SBOM discovery. |
 | `--base-sbom <path>` | The SBOM of the base. Without it, the base state of each dependency is unknown. |
+| `--pants-graph <path>` | The Pants export `pants peek ::` wrote, resolved against the directory you run in. Default `pants-graph.json` at the repository root. See [the Pants detector](08-pants.md). |
 | `--no-fetch` | Read only the local history: fetch no base and deepen no shallow clone. |
 | `--evidence <path>` | Write the change evidence document to this path, resolved against the directory you run in. |
 | `--upload` | Hand the change evidence document to the evidence reporter. See [Uploading the evidence](#uploading-the-evidence). |

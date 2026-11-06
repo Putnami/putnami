@@ -152,6 +152,17 @@ var demos = map[string]demoExpectation{
 		lineFile:   "shared/src/shared/money.py",
 		dependency: evidence.DependencyChange{Ecosystem: "pypi", Lockfile: "uv.lock", Name: "fastapi", Change: evidence.DependencyUpgraded, From: "0.115.5", To: "0.115.6"},
 	},
+	"pants": {
+		env:       map[string]string{"GITLAB_CI": "true", "CI_SERVER_HOST": "gitlab.com", "CI_PROJECT_ID": "88373291", "CI_PROJECT_PATH": "putnami/demo-observe-pants", "CI_PIPELINE_ID": "3015178544", "CI_JOB_ID": "17647016102", "CI_MERGE_REQUEST_IID": "1"},
+		changed:   []string{"src/python/pricing"},
+		dependent: []string{"src/python/api"},
+		tests:     map[string]int{"src/python/api": 2, "src/python/pricing": 4, "src/python/web": 1},
+		covered:   []string{"src/python/api", "src/python/pricing", "src/python/web"},
+		// The resolve lockfile lies in 3rdparty/python, which holds only
+		// third-party targets and is no component.
+		lineFile:   "src/python/pricing/pricing.py",
+		dependency: evidence.DependencyChange{Ecosystem: "pypi", Lockfile: "3rdparty/python/default.lock", Name: "fastapi", Change: evidence.DependencyUpgraded, From: "0.115.5", To: "0.115.6"},
+	},
 	"symfony": {
 		env: map[string]string{"GITLAB_CI": "true", "CI_SERVER_HOST": "gitlab.com", "CI_PROJECT_ID": "88373184", "CI_PROJECT_PATH": "putnami/demo-observe-symfony", "CI_PIPELINE_ID": "3015177948", "CI_JOB_ID": "17647015000", "CI_MERGE_REQUEST_IID": "1"},
 		// composer.lock lies in the application at the root, which the

@@ -484,3 +484,22 @@ func TestPublishPostsTheSummaryOnTheMergeRequest(t *testing.T) {
 		t.Fatalf("requests %v, note %q", requests, note)
 	}
 }
+
+func TestThePantsGraphFlagNamesTheExport(t *testing.T) {
+	spectest.Proves(t, "tooling/observe-pants", "pants-graph-flag", "the-pants-graph-flag-names-the-export")
+	dir := t.TempDir()
+	t.Chdir(dir)
+	opts, _, err := parseRun([]string{"--pants-graph", "dist/pants-graph.json"}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := filepath.Join(dir, "dist", "pants-graph.json"); opts.PantsGraph != want {
+		t.Errorf("PantsGraph %q, want %q", opts.PantsGraph, want)
+	}
+	if opts, _, err := parseRun(nil, nil); err != nil || opts.PantsGraph != "" {
+		t.Errorf("without the flag: %q, %v", opts.PantsGraph, err)
+	}
+	if _, _, err := parseRun([]string{"--pants-graph"}, nil); err == nil || !strings.Contains(err.Error(), "--pants-graph needs a value") {
+		t.Errorf("an empty --pants-graph: %v", err)
+	}
+}

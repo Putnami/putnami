@@ -94,6 +94,10 @@
           "type": "string",
           "description": "Path or glob pattern of the software bill of materials of the base; without it the base state of each dependency is unknown."
         },
+        "pants-graph": {
+          "type": "string",
+          "description": "Path of the Pants export the CI wrote with `pants peek :: > pants-graph.json`; default pants-graph.json at the repository root. Gives a Pants repository the dependencies Pants infers from imports."
+        },
         "fetch": {
           "type": "boolean",
           "default": true,
@@ -148,6 +152,10 @@
             {
               "command": "putnami observe --sbom sbom.cdx.json --base-sbom base.cdx.json",
               "description": "Give each changed dependency the licences and known vulnerabilities two SBOMs the job wrote list."
+            },
+            {
+              "command": "putnami observe --pants-graph dist/pants-graph.json",
+              "description": "In a Pants repository, read the dependencies Pants infers from the export `pants peek :: > dist/pants-graph.json` wrote."
             },
             {
               "command": "putnami observe --evidence putnami-evidence.json",
