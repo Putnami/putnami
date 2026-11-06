@@ -142,7 +142,7 @@ func fetchWorkspaceDependencies(parent context.Context, root, bunBin string, cre
 			return fmt.Errorf("create the fetch home: %w", err)
 		}
 		defer func() { _ = os.RemoveAll(home) }()
-		if err := writePrivateFile(filepath.Join(home, ".npmrc"), authLines); err != nil {
+		if err := writePrivateFile(privateNpmrc(home), authLines); err != nil {
 			return fmt.Errorf("write the fetch credential: %w", err)
 		}
 		for name, value := range privateHomeEnv(home) {
@@ -162,10 +162,22 @@ func fetchWorkspaceDependencies(parent context.Context, root, bunBin string, cre
 	return nil
 }
 
-// privateHomeEnv points every variable bun reads a user .npmrc or bunfig from
-// at home.
+// privateNpmrc is the user .npmrc of the private home.
+func privateNpmrc(home string) string {
+	return filepath.Join(home, ".npmrc")
+}
+
+// privateHomeEnv points the home and config-home variables at home, and the
+// npm user-config variables, which name the user .npmrc bun reads in place of
+// the home's, at home's .npmrc.
 func privateHomeEnv(home string) map[string]string {
-	env := map[string]string{"HOME": home, "XDG_CONFIG_HOME": home}
+	npmrc := privateNpmrc(home)
+	env := map[string]string{
+		"HOME":                  home,
+		"XDG_CONFIG_HOME":       home,
+		"NPM_CONFIG_USERCONFIG": npmrc,
+		"npm_config_userconfig": npmrc,
+	}
 	if runtime.GOOS == "windows" {
 		env["USERPROFILE"] = home
 	}

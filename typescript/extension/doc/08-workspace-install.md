@@ -159,9 +159,11 @@ locally and commit the result.
    dependency or patch outside the workspace, fails the fetch: a hosted run
    fetches only what the workspace holds.
 4. It writes `//<host>/:_authToken=<bearer>` for each host of the credential in
-   a `.npmrc` (mode 0600) in a private home, and points `HOME` and
-   `XDG_CONFIG_HOME` there. The bearer is in that file only, never in an
-   environment variable.
+   a `.npmrc` (mode 0600) in a private home, points `HOME` and
+   `XDG_CONFIG_HOME` there, and sets `NPM_CONFIG_USERCONFIG` and
+   `npm_config_userconfig` to that file, so a user configuration the job's
+   environment names elsewhere does not replace it. The bearer is in that file
+   only, never in an environment variable.
 5. It runs `bun install --ignore-scripts --frozen-lockfile` in the copy, with
    `BUN_INSTALL_CACHE_DIR` set to the cache `bun pm cache` reports for the
    workspace, which is the cache `workspace-install` reads. No package script
