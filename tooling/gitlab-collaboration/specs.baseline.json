@@ -4,12 +4,19 @@
   "executableRequirements": [
     "tooling/gitlab-collaboration#content-revision",
     "tooling/gitlab-collaboration#credential-safety",
+    "tooling/gitlab-collaboration#draft-by-title",
+    "tooling/gitlab-collaboration#exact-proposal-identity",
+    "tooling/gitlab-collaboration#guarded-merge",
     "tooling/gitlab-collaboration#honest-failures",
     "tooling/gitlab-collaboration#informational-assign",
     "tooling/gitlab-collaboration#label-states",
     "tooling/gitlab-collaboration#literal-bodies",
+    "tooling/gitlab-collaboration#note-reviews",
     "tooling/gitlab-collaboration#paged-find",
+    "tooling/gitlab-collaboration#pipeline-checks",
+    "tooling/gitlab-collaboration#proposal-comments",
     "tooling/gitlab-collaboration#reconciled-writes",
+    "tooling/gitlab-collaboration#reported-publication",
     "tooling/gitlab-collaboration#truthful-manifest"
   ]
 }
