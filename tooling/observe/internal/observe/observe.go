@@ -62,9 +62,15 @@ type Options struct {
 	// Resolve turns a named report path into an absolute one.
 	Resolve  func(string) string
 	Producer Producer
+	// MoonGraph names the moon project graph export; empty reads
+	// moon-graph.json when the repository holds one.
+	MoonGraph string
 	// PantsGraph is the absolute path of the Pants export --pants-graph
 	// names; empty reads pants-graph.json at the repository root.
 	PantsGraph string
+	// BazelGraph is the absolute path of the Bazel query export; empty reads
+	// bazel-graph.json at the repository root.
+	BazelGraph string
 	// Detectors replace the default detectors when not nil.
 	Detectors []components.Detector
 }
@@ -137,7 +143,7 @@ func (opts Options) detectors() []components.Detector {
 	if opts.Detectors != nil {
 		return opts.Detectors
 	}
-	return components.Default(components.Options{PantsGraph: opts.PantsGraph})
+	return components.Default(components.Options{MoonGraph: opts.MoonGraph, PantsGraph: opts.PantsGraph, BazelGraph: opts.BazelGraph})
 }
 
 // repositoryName names a repository no CI names: the path of its origin

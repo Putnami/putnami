@@ -94,9 +94,17 @@
           "type": "string",
           "description": "Path or glob pattern of the software bill of materials of the base; without it the base state of each dependency is unknown."
         },
+        "moon-graph": {
+          "type": "string",
+          "description": "Path of the moon project graph export (moon project-graph --json); default moon-graph.json at the repository root when it exists. Without one, the moon projects come from .moon/workspace.yml and each moon.yml."
+        },
         "pants-graph": {
           "type": "string",
           "description": "Path of the Pants export the CI wrote with `pants peek :: > pants-graph.json`; default pants-graph.json at the repository root. Gives a Pants repository the dependencies Pants infers from imports."
+        },
+        "bazel-graph": {
+          "type": "string",
+          "description": "Path of the Bazel query export, from bazel query 'deps(//...)' --output=streamed_jsonproto; default bazel-graph.json at the repository root. Gives the edges between the Bazel packages."
         },
         "fetch": {
           "type": "boolean",

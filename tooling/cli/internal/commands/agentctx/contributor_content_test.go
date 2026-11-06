@@ -510,7 +510,7 @@ func TestContributorBuildLoopChecksDeclarationsBeforeThePush(t *testing.T) {
 
 // TestContributorEpicLaunchesChildrenAndNeverCodes pins the epic workflow:
 // it checks its plan with epic plan, gets one approval, launches one build
-// session per issue in a local workspace, stacks a child on at most one ready
+// session per issue in a local workspace or a cloud session, stacks a child on at most one ready
 // parent, follows the children with epic status, and never codes. Build
 // takes a child of an approved epic as approved, under the same stop rules.
 func TestContributorEpicLaunchesChildrenAndNeverCodes(t *testing.T) {
@@ -522,7 +522,7 @@ func TestContributorEpicLaunchesChildrenAndNeverCodes(t *testing.T) {
 		"It never codes, never commits to a child's branch and never merges.",
 		"`\"$PUTNAMI_CLI\" epic plan --epic <epic>`",
 		"`\"$PUTNAMI_CLI\" epic status --epic <epic>`",
-		"`local` is the only one",
+		"`local`, a local workspace the owner opens, or `cloud`, a cloud session. Another value stops the run with a clear message.",
 		"One approval covers every child",
 		"passes 150 % of its share, touches a sensitive zone its plan did not name, must change the approved design, or contradicts an ADR",
 		"exactly one dependency is not merged, that parent's proposal is ready for review, and the parent started from the epic's base",
@@ -531,7 +531,7 @@ func TestContributorEpicLaunchesChildrenAndNeverCodes(t *testing.T) {
 		"Your proposal targets `<base>`: `change finalize --base <base>`.",
 		"retarget its proposal to the epic's base",
 		"`.putnami/<epic>/launches.json`",
-		"Record it before the owner opens the session.",
+		"Record it before the session opens.",
 		"`git rebase --onto <base> <parent's last head>`",
 		"When the envelope is spent, launch nothing new.",
 	} {

@@ -17,9 +17,10 @@ import (
 )
 
 const (
-	epicFeature = "tooling/epic"
-	epicWaves   = "epic-waves"
-	epicStatus  = "epic-status"
+	epicFeature    = "tooling/epic"
+	epicWaves      = "epic-waves"
+	epicStatus     = "epic-status"
+	epicCloudChild = "epic-cloud-child"
 )
 
 // workspace writes a workspace root with the example epic plan, every issue
@@ -551,8 +552,50 @@ func TestAClosedDependencyBlocksItsDependents(t *testing.T) {
 	}
 }
 
+// TestACloudLaunchIsRecordedAndReported accepts a launch record whose target
+// is a cloud session, follows that child like a local one, and reports its
+// target in JSON and in text.
+func TestACloudLaunchIsRecordedAndReported(t *testing.T) {
+	t.Parallel()
+	cloud := launch("read-contract", "b/read", "main")
+	cloud.Target = LaunchTargetCloud
+	root := workspace(t, 2, cloud, launch("plan-command", "b/plan", "main"))
+	p := newProvider()
+	p.tasks["41"] = collab.TaskStateInProgress
+	p.sessions["issue-41"] = []collab.MissionSession{session(collab.LoopStageCode, "b/read", 3_000_000)}
+	result, text := runStatus(t, root, p)
+	read := issueByKey(t, result, "read-contract")
+	if read.Target != LaunchTargetCloud || read.State != StateInProgress || read.Branch != "b/read" || read.Tokens != 3_000_000 {
+		t.Fatalf("read-contract %+v", read)
+	}
+	if plan := issueByKey(t, result, "plan-command"); plan.Target != LaunchTargetLocal {
+		t.Fatalf("plan-command %+v", plan)
+	}
+	if skill := issueByKey(t, result, "skill"); skill.Target != "" {
+		t.Fatalf("skill %+v; an issue not launched has no target", skill)
+	}
+	if !strings.Contains(text, "  read-contract (task 41): in progress at code in a cloud session, branch b/read, 3.0M tokens of a 48.5M share\n") {
+		t.Fatalf("text %q", text)
+	}
+	if !strings.Contains(text, "  plan-command (task 42): launched, branch b/plan, no usage reported, share 16.7M\n") {
+		t.Fatalf("text %q; a local child carries no cloud note", text)
+	}
+
+	// Once the epic session published the cloud child's proposal, the
+	// status shows the proposal and drops the cloud note; JSON keeps it.
+	p.proposals["b/read"] = proposal("101", "b/read", collab.ProposalStateDraft)
+	result, text = runStatus(t, root, p)
+	if read := issueByKey(t, result, "read-contract"); read.Target != LaunchTargetCloud || read.Proposal == nil {
+		t.Fatalf("read-contract %+v", read)
+	}
+	if !strings.Contains(text, "  read-contract (task 41): in progress at code, https://example.test/pull/101, 3.0M tokens of a 48.5M share\n") {
+		t.Fatalf("text %q", text)
+	}
+	spectest.Proves(t, epicFeature, epicStatus, "a-cloud-launch-is-recorded-and-reported")
+}
+
 // TestALaunchRecordIsChecked refuses a launch record that names an unknown
-// issue, another target or another epic.
+// issue, an unknown target or another epic.
 func TestALaunchRecordIsChecked(t *testing.T) {
 	t.Parallel()
 	for _, tc := range []struct {
@@ -560,7 +603,8 @@ func TestALaunchRecordIsChecked(t *testing.T) {
 		want   string
 	}{
 		{launch("nothing", "b/x", "main"), `launches[0].issue: "nothing" names no issue of the epic`},
-		{Launch{Issue: "skill", Target: "cloud", Branch: "b/x", Base: "main", RecordedAt: "2026-11-02T10:00:00Z"}, `launches[0].target: must be "local"`},
+		{Launch{Issue: "skill", Target: "remote", Branch: "b/x", Base: "main", RecordedAt: "2026-11-02T10:00:00Z"}, `launches[0].target: must be "local" or "cloud"`},
+		{Launch{Issue: "skill", Branch: "b/x", Base: "main", RecordedAt: "2026-11-02T10:00:00Z"}, `launches[0].target: must be "local" or "cloud"`},
 		{Launch{Issue: "skill", Target: LaunchTargetLocal, Branch: "b x", Base: "main", RecordedAt: "2026-11-02T10:00:00Z"}, "launches[0].branch: must be a branch name"},
 		{Launch{Issue: "skill", Target: LaunchTargetLocal, Branch: "b/x", Base: "main", RecordedAt: "yesterday"}, "launches[0].recordedAt: must be an RFC 3339 time"},
 	} {

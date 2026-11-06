@@ -54,6 +54,8 @@ See [doc/01-observe.md](doc/01-observe.md) for what each CI provides, how the
 base is found and how reports are discovered.
 See [doc/03-nx.md](doc/03-nx.md) for how it reads the projects of an Nx
 workspace.
+See [doc/10-moon.md](doc/10-moon.md) for how it reads the projects and
+edges of a moon workspace, from a graph export or the moon configuration.
 See [doc/04-node-workspaces.md](doc/04-node-workspaces.md) for how it reads the
 packages of an npm, pnpm or yarn workspace.
 See [doc/05-go-modules.md](doc/05-go-modules.md) for how it reads the modules,
@@ -62,7 +64,9 @@ See [doc/07-python.md](doc/07-python.md) for how it reads the projects and
 edges of a Python repository, from a uv workspace or `pyproject.toml` files.
 See [doc/08-pants.md](doc/08-pants.md) for how it reads the components and
 the inferred edges of a Pants repository, from a `pants peek` export.
-See [doc/09-rush.md](doc/09-rush.md) for how it reads the projects, edges and
+See [doc/09-bazel.md](doc/09-bazel.md) for how it reads the packages of a
+Bazel repository and their edges, from a `bazel query` export.
+See [doc/11-rush.md](doc/11-rush.md) for how it reads the projects, edges and
 lockfiles of a Rush monorepo.
 See [doc/06-change-analyses.md](doc/06-change-analyses.md) for how it maps a
 change to components, tests, coverage and dependencies.
