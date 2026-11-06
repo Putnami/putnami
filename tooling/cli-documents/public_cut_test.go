@@ -6,7 +6,6 @@ import (
 	"encoding/hex"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"regexp"
 	"runtime"
@@ -17,6 +16,7 @@ import (
 	"testing"
 	"unicode/utf8"
 
+	"go.putnami.dev/sdk/extension/gittest"
 	gitutil "go.putnami.dev/tooling/cli/internal/git"
 )
 
@@ -594,12 +594,15 @@ func TestPublicCutScannerControlFilesAreSelfSafe(t *testing.T) {
 	}
 }
 
-func TestPublicCutTrackedFilesIncludeNonIgnoredCandidatesAndHandleUnusualNames(t *testing.T) {
-	t.Parallel()
-	root := t.TempDir()
+// publicCutCandidateRepo is a repository that stages unusual names, deletes
+// one of them from the work tree, and holds an untracked candidate and an
+// ignored file. It returns the root and the candidate paths in sorted order.
+func publicCutCandidateRepo(t *testing.T) (root string, want []string) {
+	t.Helper()
+	root = t.TempDir()
 	publicCutRunGit(t, root, "init", "-q")
 	tracked := []string{".gitignore", "name with spaces.txt", "name\nwith-newline.txt", "tracked-deleted.txt"}
-	want := []string{".gitignore", "candidate.txt", "name with spaces.txt", "name\nwith-newline.txt"}
+	want = []string{".gitignore", "candidate.txt", "name with spaces.txt", "name\nwith-newline.txt"}
 	if runtime.GOOS == "windows" {
 		// A Windows file name cannot contain a newline; the other unusual
 		// names still run.
@@ -626,6 +629,19 @@ func TestPublicCutTrackedFilesIncludeNonIgnoredCandidatesAndHandleUnusualNames(t
 		t.Fatal(err)
 	}
 	sort.Strings(want)
+	return root, want
+}
+
+func TestPublicCutCandidateRepoIsTheSameOnAForeignMachine(t *testing.T) {
+	gittest.AssertMachineIndependent(t, func() string {
+		root, _ := publicCutCandidateRepo(t)
+		return root
+	})
+}
+
+func TestPublicCutTrackedFilesIncludeNonIgnoredCandidatesAndHandleUnusualNames(t *testing.T) {
+	t.Parallel()
+	root, want := publicCutCandidateRepo(t)
 
 	files, err := publicCutTrackedFiles(root)
 	if err != nil {
@@ -642,9 +658,7 @@ func TestPublicCutTrackedFilesIncludeNonIgnoredCandidatesAndHandleUnusualNames(t
 
 func publicCutRepositoryRoot(t *testing.T) string {
 	t.Helper()
-	cmd := exec.Command("git", "rev-parse", "--show-toplevel")
-	cmd.Dir = projectRoot(t)
-	out, err := cmd.Output()
+	out, err := gittest.Command(projectRoot(t), "rev-parse", "--show-toplevel").Output()
 	if err != nil {
 		t.Fatalf("resolve repository root: %v", err)
 	}
@@ -1176,9 +1190,5 @@ func publicCutErrorsContain(errors []string, fragment string) bool {
 
 func publicCutRunGit(t *testing.T, root string, args ...string) {
 	t.Helper()
-	cmd := exec.Command("git", args...)
-	cmd.Dir = root
-	if output, err := cmd.CombinedOutput(); err != nil {
-		t.Fatalf("git %v: %v\n%s", args, err, output)
-	}
+	gittest.Run(t, root, args...)
 }

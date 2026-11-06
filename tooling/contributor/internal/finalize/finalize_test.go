@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"slices"
 	"strconv"
@@ -16,6 +15,7 @@ import (
 
 	collab "go.putnami.dev/protocol/collaboration"
 	"go.putnami.dev/protocol/features/spectest"
+	"go.putnami.dev/sdk/extension/gittest"
 )
 
 type finalizerGit struct {
@@ -869,6 +869,44 @@ func (g fetchingGit) Push(context.Context, string) error {
 	return nil
 }
 
+// topicRepo is a repository whose main branch holds the workspace policy and a
+// second commit, mirrored at origin/main, and whose branch topic holds one
+// commit that adds source.go. git runs git in it.
+func topicRepo(t *testing.T) (root string, git func(args ...string) string) {
+	t.Helper()
+	root = t.TempDir()
+	git = func(args ...string) string {
+		t.Helper()
+		return gittest.Run(t, root, args...)
+	}
+	policy := `{"options":{"@putnami/contributor":{"version":1,"proposals":{"source":"github:acme/app"},"verification":{"language":"en"},"publication":{"bodyMaxBytes":1500}}}}`
+	git("init", "-q", "-b", "main")
+	git("config", "user.name", "Test")
+	git("config", "user.email", "test@example.com")
+	git("config", "commit.gpgsign", "false")
+	if err := os.WriteFile(filepath.Join(root, "putnami.workspace.json"), []byte(policy), 0600); err != nil {
+		t.Fatal(err)
+	}
+	git("add", "putnami.workspace.json")
+	git("commit", "-qm", "chore: workspace")
+	git("commit", "-q", "--allow-empty", "-m", "chore: second")
+	git("update-ref", "refs/remotes/origin/main", "HEAD")
+	git("switch", "-q", "-c", "topic")
+	if err := os.WriteFile(filepath.Join(root, "source.go"), []byte("package source\n"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	git("add", "source.go")
+	git("commit", "-qm", "fix: correct the source")
+	return root, git
+}
+
+func TestTopicRepoIsTheSameOnAForeignMachine(t *testing.T) {
+	gittest.AssertMachineIndependent(t, func() string {
+		root, _ := topicRepo(t)
+		return root
+	})
+}
+
 func TestABaseFetchedDuringFinalizationFailsOnlyWhenTheMergeBaseMoves(t *testing.T) {
 	for _, tc := range []struct {
 		name, from string
@@ -878,35 +916,7 @@ func TestABaseFetchedDuringFinalizationFailsOnlyWhenTheMergeBaseMoves(t *testing
 		{name: "rewritten base", from: "origin/main~1", fails: true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			root := t.TempDir()
-			git := func(args ...string) string {
-				t.Helper()
-				cmd := exec.Command("git", append([]string{"-C", root}, args...)...)
-				cmd.Env = gitEnvironment(os.Environ())
-				output, err := cmd.CombinedOutput()
-				if err != nil {
-					t.Fatalf("git %v: %v: %s", args, err, output)
-				}
-				return strings.TrimSpace(string(output))
-			}
-			policy := `{"options":{"@putnami/contributor":{"version":1,"proposals":{"source":"github:acme/app"},"verification":{"language":"en"},"publication":{"bodyMaxBytes":1500}}}}`
-			git("init", "-q", "-b", "main")
-			git("config", "user.name", "Test")
-			git("config", "user.email", "test@example.com")
-			git("config", "commit.gpgsign", "false")
-			if err := os.WriteFile(filepath.Join(root, "putnami.workspace.json"), []byte(policy), 0600); err != nil {
-				t.Fatal(err)
-			}
-			git("add", "putnami.workspace.json")
-			git("commit", "-qm", "chore: workspace")
-			git("commit", "-q", "--allow-empty", "-m", "chore: second")
-			git("update-ref", "refs/remotes/origin/main", "HEAD")
-			git("switch", "-q", "-c", "topic")
-			if err := os.WriteFile(filepath.Join(root, "source.go"), []byte("package source\n"), 0600); err != nil {
-				t.Fatal(err)
-			}
-			git("add", "source.go")
-			git("commit", "-qm", "fix: correct the source")
+			root, git := topicRepo(t)
 			bodyFile := filepath.Join(t.TempDir(), "body.txt")
 			if err := os.WriteFile(bodyFile, []byte("Explain the reason for the change."), 0600); err != nil {
 				t.Fatal(err)
@@ -1009,15 +1019,14 @@ func TestIdOnlyClosingRequiresActualProposalBinding(t *testing.T) {
 	}
 }
 
-func TestNativeGitIgnoresForeignGitDirectoryAndDraftSeed(t *testing.T) {
-	root := t.TempDir()
-	run := func(dir string, args ...string) {
+// baselineRepo is a repository with one commit that holds readme. run runs
+// git in a directory.
+func baselineRepo(t *testing.T) (root string, run func(dir string, args ...string)) {
+	t.Helper()
+	root = t.TempDir()
+	run = func(dir string, args ...string) {
 		t.Helper()
-		cmd := exec.Command("git", append([]string{"-C", dir}, args...)...)
-		cmd.Env = gitEnvironment(os.Environ())
-		if output, err := cmd.CombinedOutput(); err != nil {
-			t.Fatalf("git %v: %v: %s", args, err, output)
-		}
+		gittest.Run(t, dir, args...)
 	}
 	run(root, "init", "-q")
 	run(root, "config", "user.name", "Test")
@@ -1026,6 +1035,18 @@ func TestNativeGitIgnoresForeignGitDirectoryAndDraftSeed(t *testing.T) {
 	_ = os.WriteFile(filepath.Join(root, "readme"), []byte("test"), 0600)
 	run(root, "add", "readme")
 	run(root, "commit", "-qm", "chore: baseline")
+	return root, run
+}
+
+func TestBaselineRepoIsTheSameOnAForeignMachine(t *testing.T) {
+	gittest.AssertMachineIndependent(t, func() string {
+		root, _ := baselineRepo(t)
+		return root
+	})
+}
+
+func TestNativeGitIgnoresForeignGitDirectoryAndDraftSeed(t *testing.T) {
+	root, run := baselineRepo(t)
 	foreign := t.TempDir()
 	run(foreign, "init", "-q")
 	t.Setenv("GIT_DIR", filepath.Join(foreign, ".git"))

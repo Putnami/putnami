@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"os/exec"
 	"path"
 	"path/filepath"
 	"reflect"
@@ -14,6 +13,7 @@ import (
 	"testing"
 
 	"go.putnami.dev/protocol/features/spectest"
+	"go.putnami.dev/sdk/extension/gittest"
 )
 
 // The TypeScript emitter runs Biome's format and lint writer phases over every
@@ -153,9 +153,7 @@ func coveredByKey(input, projectRel string, projectGlobs, workspaceGlobs []strin
 func biomeConfiguredDirectories(t *testing.T, workspaceRoot string) []string {
 	t.Helper()
 	seen := map[string]bool{".": true}
-	cmd := exec.Command("git", "ls-files", "-z", "--cached", "--others", "--exclude-standard")
-	cmd.Dir = workspaceRoot
-	paths, err := cmd.Output()
+	paths, err := gittest.Command(workspaceRoot, "ls-files", "-z", "--cached", "--others", "--exclude-standard").Output()
 	if err != nil {
 		t.Fatalf("list Git candidate files for Biome configurations: %v", err)
 	}
@@ -189,7 +187,11 @@ func biomeConfiguredDirectories(t *testing.T, workspaceRoot string) []string {
 	return directories
 }
 
-func TestBiomeConfiguredDirectoriesFollowGitCandidates(t *testing.T) {
+// biomeRepository is a repository that ignores ignored/, with a Biome
+// configuration tracked under tracked/, another untracked under untracked/ and
+// a third under the ignored directory.
+func biomeRepository(t *testing.T) string {
+	t.Helper()
 	root := t.TempDir()
 	write := func(rel, contents string) {
 		t.Helper()
@@ -203,11 +205,7 @@ func TestBiomeConfiguredDirectoriesFollowGitCandidates(t *testing.T) {
 	}
 	runGit := func(args ...string) {
 		t.Helper()
-		cmd := exec.Command("git", args...)
-		cmd.Dir = root
-		if output, err := cmd.CombinedOutput(); err != nil {
-			t.Fatalf("git %v: %v: %s", args, err, output)
-		}
+		gittest.Run(t, root, args...)
 	}
 	runGit("init", "--quiet")
 	write(".gitignore", "ignored/\n")
@@ -215,7 +213,15 @@ func TestBiomeConfiguredDirectoriesFollowGitCandidates(t *testing.T) {
 	write("untracked/biome.json", "{}")
 	write("ignored/nested/biome.json", "{}")
 	runGit("add", ".gitignore", "tracked/biome.json")
+	return root
+}
 
+func TestBiomeRepositoryIsTheSameOnAForeignMachine(t *testing.T) {
+	gittest.AssertMachineIndependent(t, func() string { return biomeRepository(t) })
+}
+
+func TestBiomeConfiguredDirectoriesFollowGitCandidates(t *testing.T) {
+	root := biomeRepository(t)
 	if got, want := biomeConfiguredDirectories(t, root), []string{".", "tracked", "untracked"}; !reflect.DeepEqual(got, want) {
 		t.Fatalf("Biome configuration directories = %v, want %v", got, want)
 	}

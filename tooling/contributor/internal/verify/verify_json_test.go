@@ -15,6 +15,7 @@ import (
 	"testing"
 
 	"go.putnami.dev/protocol/features/spectest"
+	"go.putnami.dev/sdk/extension/gittest"
 )
 
 func TestStringifyMatchesJSONStringify(t *testing.T) {
@@ -234,6 +235,13 @@ func TestVerifierHelpWinsOverEveryOtherArgument(t *testing.T) {
 	}
 }
 
+func TestVerifyJSONRepoIsTheSameOnAForeignMachine(t *testing.T) {
+	gittest.AssertMachineIndependent(t, func() string {
+		root, _ := verifyJSONRepo(t)
+		return root
+	})
+}
+
 // verifyJSONRepo is a committed repository with AGENTS.md and f.txt, and an
 // empty sub directory.
 func verifyJSONRepo(t *testing.T) (root, head string) {
@@ -244,8 +252,8 @@ func verifyJSONRepo(t *testing.T) (root, head string) {
 	root = t.TempDir()
 	run := func(args ...string) string {
 		t.Helper()
-		command := exec.Command("git", args...)
-		command.Dir = root
+		command := gittest.Command(root, args...)
+		command.Env = gittest.Environ(os.Environ())
 		out, err := command.CombinedOutput()
 		if err != nil {
 			t.Fatalf("git %v: %v: %s", args, err, out)

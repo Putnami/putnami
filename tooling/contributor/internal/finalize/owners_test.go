@@ -7,7 +7,6 @@ import (
 	"errors"
 	"net"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -17,6 +16,7 @@ import (
 	wire "go.putnami.dev/protocol/extension/hostrpc"
 	"go.putnami.dev/protocol/features/spectest"
 
+	"go.putnami.dev/sdk/extension/gittest"
 	"go.putnami.dev/tooling/contributor/internal/host"
 )
 
@@ -185,13 +185,15 @@ func newOwnersRepo(t *testing.T) ownersRepo {
 	return repo
 }
 
+func TestNewOwnersRepoIsTheSameOnAForeignMachine(t *testing.T) {
+	gittest.AssertMachineIndependent(t, func() string { return newOwnersRepo(t).top })
+}
+
 // git runs git in the workspace with a fixed identity and no signing.
 func (r ownersRepo) git(t *testing.T, args ...string) string {
 	t.Helper()
-	command := exec.Command("git", append([]string{"-c", "user.name=Test", "-c", "user.email=test@example.invalid",
-		"-c", "commit.gpgsign=false", "-c", "init.defaultBranch=main"}, args...)...)
-	command.Dir = r.root
-	command.Env = append(gitEnvironment(os.Environ()), "GIT_CONFIG_GLOBAL=/dev/null")
+	command := gittest.Command(r.root, append([]string{"-c", "user.name=Test", "-c", "user.email=test@example.invalid"}, args...)...)
+	command.Env = gittest.Environ(os.Environ())
 	output, err := command.CombinedOutput()
 	if err != nil {
 		t.Fatalf("git %v: %v\n%s", args, err, output)

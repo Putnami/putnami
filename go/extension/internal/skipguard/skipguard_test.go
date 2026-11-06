@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"go.putnami.dev/sdk/extension/gittest"
 )
 
 // testFile wraps body in a test function of a file that imports testing plus
@@ -250,10 +252,10 @@ func TestScanProject(t *testing.T) {
 	}
 }
 
-func TestScanProjectSkipsDirectoriesGitIgnores(t *testing.T) {
-	if _, err := exec.LookPath("git"); err != nil {
-		t.Skip("git is not installed")
-	}
+// ignoringProject is a git repository that ignores build/ and holds an
+// unguarded skip in a_test.go and another under build/.
+func ignoringProject(t *testing.T) string {
+	t.Helper()
 	root := t.TempDir()
 	unguarded := testFile(`t.Skip("later")`)
 	for rel, content := range map[string][]byte{
@@ -270,11 +272,24 @@ func TestScanProjectSkipsDirectoriesGitIgnores(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	cmd := exec.Command("git", "init", "-q")
-	cmd.Dir = root
-	if output, err := cmd.CombinedOutput(); err != nil {
+	if output, err := gittest.Command(root, "init", "-q").CombinedOutput(); err != nil {
 		t.Fatalf("git init: %v: %s", err, output)
 	}
+	return root
+}
+
+func TestIgnoringProjectIsTheSameOnAForeignMachine(t *testing.T) {
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git is not installed")
+	}
+	gittest.AssertMachineIndependent(t, func() string { return ignoringProject(t) })
+}
+
+func TestScanProjectSkipsDirectoriesGitIgnores(t *testing.T) {
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git is not installed")
+	}
+	root := ignoringProject(t)
 
 	findings, err := ScanProject(root)
 	if err != nil {

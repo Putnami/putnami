@@ -69,7 +69,7 @@ func TestARemoteCarryingCredentialsIsRefused(t *testing.T) {
 func TestARelativeRemotePathIsTheWorkspaces(t *testing.T) {
 	isolateGit(t)
 	workspace := t.TempDir()
-	gitCommand(t, workspace, "init", "--bare", "--quiet", "shared.git")
+	bareRepository(t, workspace, "shared.git")
 	h := newHarness(t, workspace, `{"backend":"git","remote":"./shared.git"}`)
 	h.save(checkpoint("m", "k", "c", ""))
 	gitCommand(t, workspace, "--git-dir=shared.git", "rev-parse", "--verify", "refs/heads/putnami-memory")

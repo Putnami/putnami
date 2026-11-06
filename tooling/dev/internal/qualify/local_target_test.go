@@ -24,10 +24,10 @@ import (
 	qualifyproto "go.putnami.dev/protocol/qualify"
 	runtimeproto "go.putnami.dev/protocol/runtime"
 	wsproto "go.putnami.dev/protocol/workspace"
+	"go.putnami.dev/sdk/extension/gittest"
 	"go.putnami.dev/sdk/extension/proctree"
 	"go.putnami.dev/sdk/extension/scratch"
 	"go.putnami.dev/sdk/extension/treefingerprint"
-
 	"go.putnami.dev/tooling/dev/internal/compose"
 )
 
@@ -337,19 +337,38 @@ func newLocalFixture(t *testing.T, members ...localMember) *localFixture {
 			write(member.name+"/schema/http-routes.json", body)
 		}
 	}
+	commitLocalFixture(t, fixture.root)
+	t.Cleanup(fixture.killRecorded)
+	return fixture
+}
+
+// commitLocalFixture makes root a repository and commits every file in it.
+func commitLocalFixture(t *testing.T, root string) {
+	t.Helper()
 	for _, args := range [][]string{
 		{"init", "-q"},
 		{"add", "-A"},
-		{"-c", "user.name=test", "-c", "user.email=test@example.com", "-c", "commit.gpgsign=false", "commit", "-q", "-m", "fixture"},
+		{"commit", "-q", "-m", "fixture"},
 	} {
-		cmd := exec.Command("git", args...)
-		cmd.Dir = fixture.root
-		if out, err := cmd.CombinedOutput(); err != nil {
-			t.Fatalf("git %v: %v\n%s", args, err, out)
-		}
+		gittest.Run(t, root, args...)
 	}
-	t.Cleanup(fixture.killRecorded)
-	return fixture
+}
+
+func TestCommitLocalFixtureIsTheSameOnAForeignMachine(t *testing.T) {
+	gittest.AssertMachineIndependent(t, func() string {
+		root := t.TempDir()
+		for name, content := range map[string]string{".gitignore": ".putnami/\n", "app/putnami.json": "{\"name\":\"app\"}\n"} {
+			path := filepath.Join(root, filepath.FromSlash(name))
+			if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+				t.Fatal(err)
+			}
+		}
+		commitLocalFixture(t, root)
+		return root
+	})
 }
 
 func (f *localFixture) project(t *testing.T, name string) *compose.Project {

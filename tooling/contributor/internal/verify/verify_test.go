@@ -26,6 +26,7 @@ import (
 	"testing"
 
 	features "go.putnami.dev/protocol/features"
+	"go.putnami.dev/sdk/extension/gittest"
 )
 
 var (
@@ -104,6 +105,10 @@ func requireVerifyGit(t *testing.T) {
 	if _, err := exec.LookPath("git"); err != nil {
 		t.Skip("git not on PATH")
 	}
+}
+
+func TestNewVerifyFixtureIsTheSameOnAForeignMachine(t *testing.T) {
+	gittest.AssertMachineIndependent(t, func() string { return newVerifyFixture(t).root })
 }
 
 func newVerifyFixture(t *testing.T) *verifyFixture {
@@ -223,8 +228,8 @@ func newVerifyFixture(t *testing.T) *verifyFixture {
 
 func (f *verifyFixture) git(args ...string) string {
 	f.t.Helper()
-	cmd := exec.Command("git", args...)
-	cmd.Dir = f.root
+	cmd := gittest.Command(f.root, args...)
+	cmd.Env = gittest.Environ(os.Environ())
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr
 	out, err := cmd.Output()
@@ -1226,9 +1231,7 @@ func TestWorkspaceCLI(t *testing.T) {
 func TestVerifierUsesItsRootDespiteForeignGitEnvironment(t *testing.T) {
 	f := newVerifyFixture(t)
 	foreign := t.TempDir()
-	init := exec.Command("git", "init", "-q", "-b", "main")
-	init.Dir = foreign
-	if output, err := init.CombinedOutput(); err != nil {
+	if output, err := gittest.Command(foreign, "init", "-q", "-b", "main").CombinedOutput(); err != nil {
 		t.Fatalf("init foreign repository: %v: %s", err, output)
 	}
 	gitDir := filepath.Join(foreign, ".git")

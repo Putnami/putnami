@@ -12,6 +12,7 @@ import (
 
 	protocolcli "go.putnami.dev/protocol/cli"
 	wire "go.putnami.dev/protocol/extension/hostrpc"
+	"go.putnami.dev/sdk/extension/gittest"
 )
 
 // fakeHost answers version.lines with result or err, and records the scopes
@@ -62,14 +63,11 @@ func runTag(t *testing.T, root string, host Lines, args ...string) outcome {
 	return outcome{code: code, stdout: stdout.String(), stderr: stderr.String()}
 }
 
-// gitEnv isolates a test's git from the machine's configuration.
-var gitEnv = []string{"GIT_CONFIG_GLOBAL=" + os.DevNull, "GIT_CONFIG_NOSYSTEM=1", "LC_ALL=C"}
-
 // git runs git in dir and returns its trimmed standard output.
 func git(t *testing.T, dir string, args ...string) string {
 	t.Helper()
-	cmd := exec.Command("git", append([]string{"-C", dir}, args...)...)
-	cmd.Env = append(os.Environ(), gitEnv...)
+	cmd := gittest.Command(dir, args...)
+	cmd.Env = append(gittest.Environ(os.Environ()), "LC_ALL=C")
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		t.Fatalf("git %s: %v\n%s", strings.Join(args, " "), err, out)
@@ -116,6 +114,13 @@ func releaseRepo(t *testing.T) (string, []string) {
 	git(t, dir, "add", "-A")
 	git(t, dir, "commit", "-q", "-m", "fix(cli): stop the leak", "-m", "The body says why.")
 	return dir, strings.Fields(git(t, dir, "rev-list", "--reverse", "HEAD"))
+}
+
+func TestReleaseRepoIsTheSameOnAForeignMachine(t *testing.T) {
+	gittest.AssertMachineIndependent(t, func() string {
+		dir, _ := releaseRepo(t)
+		return dir
+	})
 }
 
 // toolingLine is the untagged tooling line of releaseRepo as the host

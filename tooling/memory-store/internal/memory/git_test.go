@@ -11,6 +11,7 @@ import (
 
 	collab "go.putnami.dev/protocol/collaboration"
 	"go.putnami.dev/protocol/features/spectest"
+	"go.putnami.dev/sdk/extension/gittest"
 	"go.putnami.dev/tooling/memory-store/internal/refstore"
 )
 
@@ -23,8 +24,7 @@ const remoteBranch = "agents/memory"
 func remoteHarness(t *testing.T) (*harness, string) {
 	t.Helper()
 	isolateGit(t)
-	remote := filepath.Join(t.TempDir(), "memory.git")
-	gitCommand(t, filepath.Dir(remote), "init", "--bare", "--quiet", remote)
+	remote := bareRepository(t, t.TempDir(), "memory.git")
 	return remoteHarnessOn(t, remote), remote
 }
 
@@ -206,9 +206,10 @@ func TestClonesShareOneRemoteStore(t *testing.T) {
 	}
 }
 
-func TestTheGitBackendTouchesNoHookCheckoutOrWorkingTree(t *testing.T) {
-	spectest.Proves(t, feature, "portable-git-writes", "hooks-checkouts-and-working-trees-are-never-touched")
-	isolateGit(t)
+// hookedRepository is a repository with one commit of code, whose hooks all
+// fail.
+func hookedRepository(t *testing.T) string {
+	t.Helper()
 	repository := t.TempDir()
 	gitCommand(t, repository, "init", "--quiet")
 	mustDo(t, os.WriteFile(filepath.Join(repository, "README.md"), []byte("code\n"), 0o644))
@@ -217,6 +218,17 @@ func TestTheGitBackendTouchesNoHookCheckoutOrWorkingTree(t *testing.T) {
 	for _, name := range []string{"reference-transaction", "pre-commit", "post-commit", "pre-push"} {
 		mustDo(t, os.WriteFile(filepath.Join(repository, ".git", "hooks", name), []byte("#!/bin/sh\nexit 1\n"), 0o755))
 	}
+	return repository
+}
+
+func TestHookedRepositoryIsTheSameOnAForeignMachine(t *testing.T) {
+	gittest.AssertMachineIndependent(t, func() string { return hookedRepository(t) })
+}
+
+func TestTheGitBackendTouchesNoHookCheckoutOrWorkingTree(t *testing.T) {
+	spectest.Proves(t, feature, "portable-git-writes", "hooks-checkouts-and-working-trees-are-never-touched")
+	isolateGit(t)
+	repository := hookedRepository(t)
 	head := gitCommand(t, repository, "rev-parse", "HEAD")
 
 	h := newHarness(t, t.TempDir(), `{"backend":"git","path":`+mustJSON(t, repository)+`}`)

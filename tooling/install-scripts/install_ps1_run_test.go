@@ -678,11 +678,7 @@ func newPS1RunEnv(t *testing.T, commandMap string, mapStatus int) *ps1RunEnv {
 		},
 		mapStatus: mapStatus,
 	})
-	callerDir := filepath.Join(e.root, "caller")
-	if err := os.MkdirAll(callerDir, 0o755); err != nil {
-		t.Fatal(err)
-	}
-	gitCommand(t, callerDir, "init", "-q")
+	callerDir := callerRepo(t, e.root)
 	e.workDir = callerDir
 	cliLog := filepath.Join(e.root, "cli-calls.log")
 	e.set("PUTNAMI_REGISTRY_URL", registry.URL).

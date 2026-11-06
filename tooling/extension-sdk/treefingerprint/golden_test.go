@@ -4,12 +4,12 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
 
 	"go.putnami.dev/protocol/features/spectest"
+	"go.putnami.dev/sdk/extension/gittest"
 )
 
 // The golden fixture's commit. Its object id follows from the four committed
@@ -37,30 +37,20 @@ const goldenPreimage = "putnami-tree-fingerprint/2\n" +
 // releases, so it moves only with treeFingerprintPreimageVersion.
 const goldenFingerprint = "c69d763284805d5771b16083822e7fd93eb3e30b9a63ffc11c781a538e7f4635"
 
-// goldenGit runs git for the fixture with no system or global configuration,
-// no inherited GIT_* variable, and a fixed author, committer and date, so the
-// commit has the same object id on every host.
+// goldenGit runs git for the fixture without the caller's git environment, and
+// with a fixed author, committer and date, so the commit has the same object
+// id on every host.
 func goldenGit(t *testing.T, dir string, args ...string) {
 	t.Helper()
-	emptyConfig := filepath.Join(t.TempDir(), "gitconfig")
-	write(t, emptyConfig, "")
-	env := []string{
-		"GIT_CONFIG_NOSYSTEM=1",
-		"GIT_CONFIG_GLOBAL=" + emptyConfig,
+	env := append(gittest.Environ(os.Environ()),
 		"GIT_AUTHOR_NAME=Putnami Fixture",
 		"GIT_AUTHOR_EMAIL=fixture@putnami.invalid",
 		"GIT_AUTHOR_DATE=1700000000 +0000",
 		"GIT_COMMITTER_NAME=Putnami Fixture",
 		"GIT_COMMITTER_EMAIL=fixture@putnami.invalid",
 		"GIT_COMMITTER_DATE=1700000000 +0000",
-	}
-	for _, entry := range os.Environ() {
-		if !strings.HasPrefix(strings.ToUpper(entry), "GIT_") {
-			env = append(env, entry)
-		}
-	}
-	cmd := exec.Command("git", args...)
-	cmd.Dir = dir
+	)
+	cmd := gittest.Command(dir, args...)
 	cmd.Env = env
 	if out, err := cmd.CombinedOutput(); err != nil {
 		t.Fatalf("git %v: %v\n%s", args, err, out)
@@ -95,6 +85,10 @@ func goldenFixture(t *testing.T) string {
 	write(t, filepath.Join(repo, "new file.txt"), "untracked\n")
 	write(t, filepath.Join(repo, "build.log"), "noise\n")
 	return repo
+}
+
+func TestGoldenFixtureIsTheSameOnAForeignMachine(t *testing.T) {
+	gittest.AssertMachineIndependent(t, func() string { return goldenFixture(t) })
 }
 
 // TestComputeMatchesTheGoldenPreimageAndDigest pins the encoding. The expected

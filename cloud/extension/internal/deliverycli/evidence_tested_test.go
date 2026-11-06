@@ -4,12 +4,12 @@ import (
 	"encoding/json"
 	"net/http"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
 
 	"go.putnami.dev/protocol/features/spectest"
+	"go.putnami.dev/sdk/extension/gittest"
 )
 
 // evidenceHistory is a repository whose change was merged onto a base that
@@ -26,12 +26,8 @@ const evidenceMergeRef = "refs/" + "pull/42/merge"
 
 func testGit(t *testing.T, dir string, args ...string) string {
 	t.Helper()
-	cmd := exec.Command("git", append([]string{
-		"-c", "user.name=Putnami Test", "-c", "user.email=test@putnami.invalid",
-		"-c", "commit.gpgsign=false", "-c", "init.defaultBranch=main",
-	}, args...)...)
-	cmd.Dir = dir
-	cmd.Env = append(os.Environ(), "GIT_CONFIG_NOSYSTEM=1", "GIT_CONFIG_GLOBAL="+os.DevNull)
+	cmd := gittest.Command(dir, append([]string{"-c", "user.name=Putnami Test", "-c", "user.email=test@putnami.invalid"}, args...)...)
+	cmd.Env = gittest.Environ(os.Environ())
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		t.Fatalf("git %s: %v\n%s", strings.Join(args, " "), err, out)
@@ -60,6 +56,10 @@ func newEvidenceHistory(t *testing.T) evidenceHistory {
 	testGit(t, dir, "merge", "-q", "--no-ff", "-m", "merge feature", "feature")
 	h.merge = testGit(t, dir, "rev-parse", "HEAD")
 	return h
+}
+
+func TestNewEvidenceHistoryIsTheSameOnAForeignMachine(t *testing.T) {
+	gittest.AssertMachineIndependent(t, func() string { return newEvidenceHistory(t).dir })
 }
 
 func (h evidenceHistory) tree(t *testing.T, commit string) string {

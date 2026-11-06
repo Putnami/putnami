@@ -14,6 +14,7 @@ import (
 
 	clicore "go.putnami.dev/cloud/extension/internal/clicore"
 	configcli "go.putnami.dev/cloud/extension/internal/configcli"
+	"go.putnami.dev/sdk/extension/gittest"
 )
 
 // These tests pin the cache key of cloud-validate-config-project. A cache hit
@@ -366,6 +367,10 @@ func validateConfigKeyFixture(t *testing.T, link string, generatedSchema bool) s
 	gitCommand(t, root, "add", "-A")
 	gitCommand(t, root, "commit", "-qm", "fixture")
 	return root
+}
+
+func TestValidateConfigKeyFixtureIsTheSameOnAForeignMachine(t *testing.T) {
+	gittest.AssertMachineIndependent(t, func() string { return validateConfigKeyFixture(t, "putnami.json", false) })
 }
 
 func writeFixtureJSON(t *testing.T, path string, value any) {

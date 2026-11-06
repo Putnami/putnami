@@ -6,7 +6,6 @@ import (
 	"io"
 	"net/http"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -16,6 +15,7 @@ import (
 	"go.putnami.dev/protocol/evidence"
 	extension "go.putnami.dev/protocol/extension"
 	"go.putnami.dev/protocol/features/spectest"
+	"go.putnami.dev/sdk/extension/gittest"
 	"go.putnami.dev/tooling/observe/internal/observe"
 )
 
@@ -71,10 +71,8 @@ func git(t *testing.T, dir string, args ...string) string {
 	t.Helper()
 	// The fixture's commits run no automatic maintenance, so every git
 	// process has exited when the test removes its directories.
-	cmd := exec.Command("git", append([]string{"-c", "maintenance.auto=false", "-c", "gc.auto=0"}, args...)...)
-	cmd.Dir = dir
-	cmd.Env = append(os.Environ(),
-		"GIT_CONFIG_GLOBAL=/dev/null", "GIT_CONFIG_NOSYSTEM=1",
+	cmd := gittest.Command(dir, append([]string{"-c", "maintenance.auto=false", "-c", "gc.auto=0"}, args...)...)
+	cmd.Env = append(cmd.Env,
 		"GIT_AUTHOR_NAME=t", "GIT_AUTHOR_EMAIL=t@example.com",
 		"GIT_COMMITTER_NAME=t", "GIT_COMMITTER_EMAIL=t@example.com")
 	out, err := cmd.CombinedOutput()
@@ -126,9 +124,10 @@ func jobContext(t *testing.T, callerDir, invocationDir, output string) string {
 	return file
 }
 
-func TestObserveRunsInARepositoryWithoutAWorkspace(t *testing.T) {
-	spectest.Proves(t, feature, "runs-without-a-workspace", "observe-runs-in-a-repository-without-a-workspace")
-	spectest.Proves(t, feature, "caller-directory-writes", "observe-writes-only-git-history-in-the-caller-directory")
+// workspacelessRepo is a package.json repository with no Putnami workspace:
+// a feature branch one commit past main, a report under an ignored directory.
+func workspacelessRepo(t *testing.T) string {
+	t.Helper()
 	repo := filepath.Join(t.TempDir(), "shop")
 	git(t, t.TempDir(), "init", "--quiet", "--initial-branch=main", repo)
 	write(t, repo, "package.json", `{"name":"shop","workspaces":["packages/*"]}`)
@@ -142,6 +141,17 @@ func TestObserveRunsInARepositoryWithoutAWorkspace(t *testing.T) {
 	write(t, repo, ".gitignore", "reports/\n")
 	git(t, repo, "add", ".gitignore")
 	git(t, repo, "commit", "--quiet", "-m", "ignore reports")
+	return repo
+}
+
+func TestWorkspacelessRepoIsTheSameOnAForeignMachine(t *testing.T) {
+	gittest.AssertMachineIndependent(t, func() string { return workspacelessRepo(t) })
+}
+
+func TestObserveRunsInARepositoryWithoutAWorkspace(t *testing.T) {
+	spectest.Proves(t, feature, "runs-without-a-workspace", "observe-runs-in-a-repository-without-a-workspace")
+	spectest.Proves(t, feature, "caller-directory-writes", "observe-writes-only-git-history-in-the-caller-directory")
+	repo := workspacelessRepo(t)
 	before := git(t, repo, "status", "--porcelain=v2", "--ignored", "--branch", "--untracked-files=all")
 	if _, err := os.Stat(filepath.Join(repo, "putnami.workspace.json")); !os.IsNotExist(err) {
 		t.Fatal("the fixture must not be a Putnami workspace")
@@ -304,6 +314,13 @@ func uploadFixture(t *testing.T, code string) (repo string, env map[string]strin
 		"PUTNAMI_CLI_EXECUTABLE":              cli,
 	}
 	return repo, env, record
+}
+
+func TestUploadFixtureIsTheSameOnAForeignMachine(t *testing.T) {
+	gittest.AssertMachineIndependent(t, func() string {
+		repo, _, _ := uploadFixture(t, "0")
+		return repo
+	})
 }
 
 func TestUploadHandsTheEvidenceDocumentToPutnamiCloud(t *testing.T) {

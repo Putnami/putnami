@@ -5,7 +5,6 @@ import (
 	"context"
 	"encoding/json"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"reflect"
 	"strconv"
@@ -13,6 +12,7 @@ import (
 	"testing"
 
 	"go.putnami.dev/protocol/features/spectest"
+	"go.putnami.dev/sdk/extension/gittest"
 	"go.putnami.dev/tooling/observe/internal/ci"
 )
 
@@ -32,12 +32,14 @@ func run(t *testing.T, dir string, args ...string) string {
 	t.Helper()
 	// The fixture's own commits and fetches run no automatic maintenance, so
 	// every git process has exited when the test removes its directories.
-	cmd := exec.Command("git", append([]string{"-c", "maintenance.auto=false", "-c", "gc.auto=0"}, args...)...)
-	cmd.Dir = dir
-	cmd.Env = append(gitEnv(),
-		"GIT_CONFIG_GLOBAL=/dev/null", "GIT_CONFIG_NOSYSTEM=1",
+	cmd := gittest.Command(dir, append([]string{"-c", "maintenance.auto=false", "-c", "gc.auto=0"}, args...)...)
+	cmd.Env = append(cmd.Env, "GIT_TERMINAL_PROMPT=0", "LC_ALL=C",
 		"GIT_AUTHOR_NAME=t", "GIT_AUTHOR_EMAIL=t@example.com",
 		"GIT_COMMITTER_NAME=t", "GIT_COMMITTER_EMAIL=t@example.com")
+	// traceGit asks every git process of the test for its trace.
+	if trace := os.Getenv("GIT_TRACE2_EVENT"); trace != "" {
+		cmd.Env = append(cmd.Env, "GIT_TRACE2_EVENT="+trace)
+	}
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		t.Fatalf("git %s: %v\n%s", strings.Join(args, " "), err, out)
@@ -92,6 +94,14 @@ func newFixture(t *testing.T, historyCommits, mainCommits int) fixture {
 	}
 	f.mainTip = run(t, origin, "rev-parse", "HEAD")
 	return f
+}
+
+func TestNewFixtureIsTheSameOnAForeignMachine(t *testing.T) {
+	gittest.AssertMachineIndependent(t, func() string { return newFixture(t, 2, 2).origin })
+}
+
+func TestCloneIsTheSameOnAForeignMachine(t *testing.T) {
+	gittest.AssertMachineIndependent(t, func() string { return newFixture(t, 3, 5).clone(t, 1) })
 }
 
 // clone checks the feature branch out depth commits deep, 0 for the whole

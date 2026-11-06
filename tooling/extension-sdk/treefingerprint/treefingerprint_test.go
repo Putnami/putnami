@@ -2,13 +2,13 @@ package treefingerprint
 
 import (
 	"os"
-	"os/exec"
 	"path/filepath"
 	"regexp"
 	"strings"
 	"testing"
 
 	"go.putnami.dev/protocol/features/spectest"
+	"go.putnami.dev/sdk/extension/gittest"
 )
 
 var lowercaseSHA256 = regexp.MustCompile(`^[0-9a-f]{64}$`)
@@ -44,18 +44,19 @@ func initGitRepo(t *testing.T) string {
 	runGit(t, dir, "config", "user.email", "test@test.com")
 	runGit(t, dir, "config", "user.name", "Test")
 	runGit(t, dir, "config", "commit.gpgsign", "false")
-	runGit(t, dir, "checkout", "-b", "main")
 	write(t, filepath.Join(dir, "README.md"), "# Test")
 	runGit(t, dir, "add", ".")
 	runGit(t, dir, "commit", "-m", "initial")
 	return dir
 }
 
+func TestInitGitRepoIsTheSameOnAForeignMachine(t *testing.T) {
+	gittest.AssertMachineIndependent(t, func() string { return initGitRepo(t) })
+}
+
 func runGit(t *testing.T, dir string, args ...string) string {
 	t.Helper()
-	cmd := exec.Command("git", args...)
-	cmd.Dir = dir
-	out, err := cmd.CombinedOutput()
+	out, err := gittest.Command(dir, args...).CombinedOutput()
 	if err != nil {
 		t.Fatalf("git %v: %v\n%s", args, err, out)
 	}

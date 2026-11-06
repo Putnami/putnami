@@ -6,15 +6,23 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
 
 	collab "go.putnami.dev/protocol/collaboration"
 	"go.putnami.dev/protocol/features/spectest"
+	"go.putnami.dev/sdk/extension/gittest"
 	"go.putnami.dev/sdk/extension/treefingerprint"
 )
+
+func TestRequirementlessRepositoryIsTheSameOnAForeignMachine(t *testing.T) {
+	gittest.AssertMachineIndependent(t, func() string {
+		root := t.TempDir()
+		requirementlessRepository(t, root, nil)
+		return root
+	})
+}
 
 // requirementlessRepository is an ADR-only change in a real Git repository: a
 // base commit, then a branch commit that adds an ADR and a decisions.json and
@@ -24,9 +32,8 @@ func requirementlessRepository(t *testing.T, root string, extra map[string]strin
 	t.Helper()
 	run := func(args ...string) string {
 		t.Helper()
-		command := exec.Command("git", args...)
-		command.Dir = root
-		command.Env = append(os.Environ(), "GIT_CONFIG_GLOBAL=/dev/null", "GIT_CONFIG_NOSYSTEM=1")
+		command := gittest.Command(root, args...)
+		command.Env = gittest.Environ(os.Environ())
 		out, err := command.CombinedOutput()
 		if err != nil {
 			t.Fatalf("git %v: %v: %s", args, err, out)

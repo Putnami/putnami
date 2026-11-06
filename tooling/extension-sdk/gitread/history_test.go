@@ -1,6 +1,7 @@
-package gitread
+package gitread_test
 
 import (
+	"go.putnami.dev/sdk/extension/gitread"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -15,7 +16,7 @@ func TestCommitsSinceKeepsMultilineBodies(t *testing.T) {
 	runGit(t, repo, "commit", "-q", "--allow-empty", "-m", "feat(cli): add a flag")
 	runGit(t, repo, "commit", "-q", "--allow-empty", "-m", "refactor(cli): drop the greeting\n\nWhy it goes.\n\nBREAKING CHANGE: Greet is gone.")
 
-	commits, err := CommitsSince(repo, "main", nil)
+	commits, err := gitread.CommitsSince(repo, "main", nil)
 	if err != nil {
 		t.Fatalf("CommitsSince: %v", err)
 	}
@@ -39,14 +40,14 @@ func TestCommitsSinceKeepsMultilineBodies(t *testing.T) {
 func TestCommitsSinceBoundsByPathspecAndWalksTheWholeHistory(t *testing.T) {
 	t.Parallel()
 	dir := initGitRepo(t)
-	base, err := HeadSHA(dir)
+	base, err := gitread.HeadSHA(dir)
 	if err != nil {
 		t.Fatal(err)
 	}
 	writeCommit(t, dir, "typescript/a.ts", "feat(ts): add", "why\n\nBREAKING CHANGE: gone")
 	writeCommit(t, dir, "go/a.go", "fix(go): stop", "")
 
-	scoped, err := CommitsSince(dir, base, []string{"typescript"})
+	scoped, err := gitread.CommitsSince(dir, base, []string{"typescript"})
 	if err != nil {
 		t.Fatalf("CommitsSince(typescript): %v", err)
 	}
@@ -54,7 +55,7 @@ func TestCommitsSinceBoundsByPathspecAndWalksTheWholeHistory(t *testing.T) {
 		t.Fatalf("CommitsSince(typescript) = %+v, want only the typescript commit", scoped)
 	}
 
-	whole, err := CommitsSince(dir, "", nil)
+	whole, err := gitread.CommitsSince(dir, "", nil)
 	if err != nil || len(whole) != 3 {
 		t.Fatalf("CommitsSince(whole history) = %d/%v, want 3 commits", len(whole), err)
 	}
@@ -66,7 +67,7 @@ func TestCommitsSinceRefusesABaseThatNamesNothing(t *testing.T) {
 	t.Parallel()
 	repo := initGitRepo(t)
 	for _, base := range []string{"origin/missing", "--all"} {
-		if _, err := CommitsSince(repo, base, nil); err == nil {
+		if _, err := gitread.CommitsSince(repo, base, nil); err == nil {
 			t.Fatalf("CommitsSince(%q) succeeded, want an error", base)
 		}
 	}
@@ -76,14 +77,14 @@ func TestIsShallowTellsAShallowCloneFromAFullOne(t *testing.T) {
 	t.Parallel()
 	origin := initGitRepo(t)
 	runGit(t, origin, "commit", "-q", "--allow-empty", "-m", "second")
-	shallow, err := IsShallow(origin)
+	shallow, err := gitread.IsShallow(origin)
 	if err != nil || shallow {
 		t.Fatalf("IsShallow(full) = %v, %v; want false", shallow, err)
 	}
 
 	clone := filepath.Join(t.TempDir(), "clone")
 	runGit(t, origin, "clone", "-q", "--depth", "1", "file://"+origin, clone)
-	shallow, err = IsShallow(clone)
+	shallow, err = gitread.IsShallow(clone)
 	if err != nil || !shallow {
 		t.Fatalf("IsShallow(depth 1) = %v, %v; want true", shallow, err)
 	}
