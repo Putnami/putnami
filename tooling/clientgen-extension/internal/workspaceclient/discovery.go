@@ -143,7 +143,7 @@ const committedGeneratedContractCode = "clientgen.committed-generated-contract"
 var generatedContractTrees = []string{".gen/clientgen", ".gen/schema"}
 
 // generatedContractHomes maps the project-relative path of each contract a
-// project used to commit inside those trees to its committed home.
+// build writes inside those trees to the path a project commits it at.
 var generatedContractHomes = map[string]string{
 	builtConfigFile:            committedConfigFile,
 	".gen/schema/openapi.json": "schema/openapi.json",
@@ -152,7 +152,7 @@ var generatedContractHomes = map[string]string{
 // committedGeneratedContracts reports each candidate a member project holds
 // under .gen/clientgen or .gen/schema. A build owns both trees whole, so the
 // Go build-describe fails on a tracked file there and the TypeScript
-// build-generate deletes one, and committing one is no longer supported: the
+// build-generate deletes one, and a project commits neither tree: the
 // generation contract lives at clientgen.json and the OpenAPI document at
 // schema/openapi.json.
 //
@@ -224,7 +224,7 @@ func committedGeneratedContracts(view workspaceView) []Finding {
 
 // generatedContractRemedy is the Git command that takes the candidate rel of
 // the project at projectRel out of the tree a build owns: a git mv to the
-// committed home of a contract a project used to commit there, after the
+// committed home generatedContractHomes names for a contract, after the
 // mkdir its directory may need, and a git rm --cached for any other file,
 // which a build writes, or for a contract whose home the cut already holds.
 func generatedContractRemedy(files workspaceFiles, projectRel, rel string) string {

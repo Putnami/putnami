@@ -51,11 +51,9 @@ The `^` prefix is the most common — it creates cross-project dependency chains
 References resolve by **exact identity**: the step id a job *is*, within the
 command the reference is written in (`*` additionally matches a command name).
 A job's display name, its internal plan name (`build~generate`) and synthesized
-`project:name` keys are not addressable. A reference that matches nothing is a
-no-op — an upstream project that does not run the step simply contributes no
-edge — but a reference that matches nothing exactly while a removed name-based
-spelling would have matched is a plan-time error naming what it would have
-bound, so a stale spelling fails loudly instead of binding to a different job.
+`project:name` keys are not addressable. A reference that matches no job by its
+exact identity binds nothing: an upstream project that does not run the step
+contributes no edge.
 
 ## Input Bindings
 
