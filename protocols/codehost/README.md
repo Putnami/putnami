@@ -26,7 +26,7 @@ on its next version.
 - `Lookup(slug)` returns a slug's vocabulary and whether it is known;
   `For(slug)` falls back to `generic` for display.
 - `ChangeRequestLabel(slug, n)` gives `merge request !42`; a number that is not
-  positive gives the noun alone.
+  positive integer gives the noun alone.
 - `NoteMarker` is `<!-- putnami-observe:summary -->`, the first line of the
   Putnami note. `IsPutnamiNote(body)` is true when the body starts with it
   after leading spaces, tabs, carriage returns and line feeds. The value never
@@ -48,5 +48,14 @@ together.
 
 `protocols/evidence` takes its code-host slugs from this module, and
 `@putnami/observe` its labels and the note marker.
+
+## Support
+
+`preview`, as recorded in the [reviewed support catalog](../../putnami.support.json).
+The `protocols` owner maintains it. `protocols/evidence` and `@putnami/observe`
+consume the Go module, and `@putnami/codehost-protocol` reads the same
+vocabulary document and fixture corpus. Stable support still needs a consumer
+outside this repository, the Cloud workspace, and an explicit compatibility
+window.
 
 See [ADR 0001](./doc/adr/0001-one-owner-for-code-host-vocabulary.md).

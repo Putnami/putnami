@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"regexp"
 	"slices"
 	"sort"
 	"strings"
@@ -100,6 +101,11 @@ type schemaNode struct {
 	Ref        string                 `json:"$ref"`
 	Enum       []string               `json:"enum"`
 	Required   []string               `json:"required"`
+	Const      any                    `json:"const"`
+	MinItems   int                    `json:"minItems"`
+	MaxItems   int                    `json:"maxItems"`
+	MinLength  int                    `json:"minLength"`
+	Pattern    string                 `json:"pattern"`
 }
 
 func (root *schemaNode) resolve(node *schemaNode) *schemaNode {
@@ -170,6 +176,26 @@ func TestSchema_DeclaresTheGoMembersAndSlugs(t *testing.T) {
 	}
 	if got := root.resolve(host.Properties["slug"]).Enum; !slices.Equal(got, Slugs()) {
 		t.Errorf("slug enum %v, want %v", got, Slugs())
+	}
+	// The value rules hold for the table: the version, one host per slug,
+	// non-empty words and https API bases.
+	if got, ok := root.Properties["protocolVersion"].Const.(float64); !ok || int(got) != ProtocolVersion {
+		t.Errorf("protocolVersion const %v, want %d", root.Properties["protocolVersion"].Const, ProtocolVersion)
+	}
+	hosts := root.Properties["hosts"]
+	if hosts.MinItems != len(Slugs()) || hosts.MaxItems != len(Slugs()) {
+		t.Errorf("hosts holds %d to %d items, want exactly %d", hosts.MinItems, hosts.MaxItems, len(Slugs()))
+	}
+	pattern := regexp.MustCompile(host.Properties["defaultApiBase"].Pattern)
+	for _, v := range Vocabularies() {
+		for name, value := range map[string]string{"name": v.Name, "changeRequest": v.ChangeRequest, "referencePrefix": v.ReferencePrefix, "diffTab": v.DiffTab} {
+			if len(value) < host.Properties[name].MinLength {
+				t.Errorf("%s.%s %q is shorter than %d", v.Slug, name, value, host.Properties[name].MinLength)
+			}
+		}
+		if v.DefaultAPIBase != "" && !pattern.MatchString(v.DefaultAPIBase) {
+			t.Errorf("%s.defaultApiBase %q does not match %s", v.Slug, v.DefaultAPIBase, pattern)
+		}
 	}
 }
 

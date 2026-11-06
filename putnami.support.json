@@ -29,11 +29,6 @@
       "status": "stable"
     },
     {
-      "id": "@putnami/codehost-protocol",
-      "kind": "package",
-      "status": "preview"
-    },
-    {
       "id": "@putnami/client",
       "kind": "package",
       "status": "stable"
@@ -50,6 +45,11 @@
     },
     {
       "id": "@putnami/cloud-extension",
+      "kind": "package",
+      "status": "preview"
+    },
+    {
+      "id": "@putnami/codehost-protocol",
       "kind": "package",
       "status": "preview"
     },

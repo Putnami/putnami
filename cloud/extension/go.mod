@@ -129,9 +129,9 @@ replace go.putnami.dev/protocol/ci => ../../protocols/ci
 
 replace go.putnami.dev/protocol/cli => ../../protocols/cli
 
-replace go.putnami.dev/protocol/codehost => ../../protocols/codehost
-
 replace go.putnami.dev/protocol/clientcontract => ../../protocols/clientcontract
+
+replace go.putnami.dev/protocol/codehost => ../../protocols/codehost
 
 replace go.putnami.dev/protocol/config => ../../protocols/config
 

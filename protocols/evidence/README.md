@@ -21,7 +21,7 @@ A document (`schemas/evidence.json`) has `protocolVersion: 1` and:
 
 | Member | Content |
 | --- | --- |
-| `subject` | The code host (`github`, `gitlab`, `generic`), its hostname and the repository's numeric project id (required for github and gitlab: the key that survives a rename), the repository name, the commit `sha`, the `baseSha` when one was resolved, the branch and the change request number. |
+| `subject` | The code host (`github`, `gitlab`, `generic`, the slugs [`codehost`](../codehost/README.md) owns), its hostname and the repository's numeric project id (required for github and gitlab: the key that survives a rename), the repository name, the commit `sha`, the `baseSha` when one was resolved, the branch and the change request number. |
 | `ci` | The CI system (`github-actions`, `gitlab-ci`, `generic`), its run id, job id and attempt (which, with the commit, identify the document among the jobs and re-runs of one commit), and an https run URL without credentials. |
 | `producer`, `generatedAt` | The program that wrote the document and when (RFC 3339 with a zone). |
 | `changedFiles` | The diff: path, status (`added`, `modified`, `deleted`, `renamed` with its `previousPath`), and the component the file belongs to. |

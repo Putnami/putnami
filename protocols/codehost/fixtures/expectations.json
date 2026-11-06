@@ -21,7 +21,7 @@
     { "body": " \t\r\n<!-- putnami-observe:summary -->\nbody", "putnami": true },
     { "body": "Looks good\n<!-- putnami-observe:summary -->", "putnami": false },
     { "body": "<!-- PUTNAMI-OBSERVE:SUMMARY -->", "putnami": false },
-    { "body": " <!-- putnami-observe:summary -->", "putnami": false },
+    { "body": "\u00a0<!-- putnami-observe:summary -->", "putnami": false },
     { "body": "<!-- putnami-observe:summary", "putnami": false },
     { "body": "", "putnami": false }
   ]
