@@ -9,8 +9,9 @@ import (
 	diag "go.putnami.dev/protocol/diagnostic"
 )
 
-// MaxSuiteDepth is the deepest nesting of testsuite elements a JUnit report
-// may state; a deeper report is malformed.
+// MaxSuiteDepth is the deepest nesting of testsuite elements a JUnit report,
+// or of group elements a JaCoCo report, may state; a deeper report is
+// malformed.
 const MaxSuiteDepth = 100
 
 // Test case statuses.

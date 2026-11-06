@@ -36,7 +36,8 @@ type jacocoCounter struct {
 // file, at its package path and source file name. A line with a covered
 // instruction is covered, with one hit, since JaCoCo records no execution
 // count; a line with missed instructions only is uncovered. A source file's
-// LINE and METHOD counters are its stated totals.
+// LINE and METHOD counters are its stated totals. Groups nested deeper than
+// MaxSuiteDepth are malformed.
 func ReadJaCoCo(data []byte) (CoverageReport, []diag.Diagnostic) {
 	if diagnostics := tooLarge(data); diagnostics != nil {
 		return CoverageReport{}, diagnostics
