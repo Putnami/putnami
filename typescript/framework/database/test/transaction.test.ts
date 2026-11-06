@@ -81,6 +81,33 @@ function holdReserve(): { reserving: Promise<void>; release: () => void; restore
   return { reserving, release, restore: () => __setTransactionConnectionFactory(undefined) };
 }
 
+/**
+ * Capture the transaction timeout instead of arming it, so a test fires it at
+ * a chosen point. Only the call with this distinctive delay is captured.
+ */
+function captureTimeout(): { delay: number; fire: () => void; restore: () => void } {
+  const delay = 987_654;
+  const realSetTimeout = globalThis.setTimeout;
+  let handler: (() => void) | undefined;
+  globalThis.setTimeout = ((callback: () => void, ms?: number, ...args: unknown[]) => {
+    if (ms === delay) {
+      handler = callback;
+      return realSetTimeout(() => {}, 0);
+    }
+    return realSetTimeout(callback, ms, ...args);
+  }) as typeof setTimeout;
+  return {
+    delay,
+    fire: () => {
+      if (!handler) throw new Error('the transaction timeout was not armed');
+      handler();
+    },
+    restore: () => {
+      globalThis.setTimeout = realSetTimeout;
+    },
+  };
+}
+
 let repository: TxTestRepository;
 let sql: Awaited<ReturnType<typeof database>>;
 
@@ -447,6 +474,33 @@ describe.skipIf(!dockerAvailable)('Transaction support', () => {
       `;
       expect(rows.length).toBe(4);
     });
+
+    it('a rollback that starts while a write opens the transaction keeps that write out of the table', async () => {
+      const gate = holdReserve();
+      let saveError: Error | undefined;
+
+      try {
+        await runInContext({}, async () => {
+          withTransaction();
+          const saving = repository.save({ id: 'rollback-opening-1', name: 'sibling-failed', value: 42 }).catch((e) => {
+            saveError = e as Error;
+          });
+
+          await gate.reserving;
+          const rollingBack = rollback();
+          gate.release();
+
+          await rollingBack;
+          await saving;
+        });
+      } finally {
+        gate.restore();
+      }
+
+      const rows = await sql`SELECT * FROM tx_test_items WHERE id = 'rollback-opening-1'`;
+      expect(rows.length).toBe(0);
+      expect(saveError?.message).toBe('Transaction was committed or rolled back before this query ran');
+    });
   });
 
   describe('transaction timeout', () => {
@@ -498,18 +552,8 @@ describe.skipIf(!dockerAvailable)('Transaction support', () => {
     });
 
     it('a timeout that fires while the first write opens its transaction keeps that write out of the table', async () => {
-      const timeoutMs = 987_654;
-      let fireTimeout: (() => void) | undefined;
       const gate = holdReserve();
-      const realSetTimeout = globalThis.setTimeout;
-      globalThis.setTimeout = ((handler: () => void, delay?: number, ...args: unknown[]) => {
-        if (delay === timeoutMs) {
-          fireTimeout = handler;
-          return realSetTimeout(() => {}, 0);
-        }
-        return realSetTimeout(handler, delay, ...args);
-      }) as typeof setTimeout;
-
+      const timeout = captureTimeout();
       let error: Error | undefined;
       try {
         await runInContext({}, async () => {
@@ -517,12 +561,12 @@ describe.skipIf(!dockerAvailable)('Transaction support', () => {
             async () => {
               await repository.save({ id: 'timeout-opening-1', name: 'will-timeout', value: 42 });
             },
-            { timeoutMs },
+            { timeoutMs: timeout.delay },
           );
-          globalThis.setTimeout = realSetTimeout;
+          timeout.restore();
 
           await gate.reserving;
-          fireTimeout?.();
+          timeout.fire();
           gate.release();
 
           try {
@@ -532,42 +576,42 @@ describe.skipIf(!dockerAvailable)('Transaction support', () => {
           }
         });
       } finally {
-        globalThis.setTimeout = realSetTimeout;
+        timeout.restore();
         gate.restore();
       }
 
-      expect(fireTimeout).toBeDefined();
       expect(error?.message).toBe('Transaction has timed out and was rolled back');
 
       const rows = await sql`SELECT * FROM tx_test_items WHERE id = 'timeout-opening-1'`;
       expect(rows.length).toBe(0);
     });
 
-    it('a rollback that starts while a write opens the transaction keeps that write out of the table', async () => {
-      const gate = holdReserve();
-      let saveError: Error | undefined;
-
+    it('a connection held across the timeout writes nothing after the rollback', async () => {
+      const timeout = captureTimeout();
+      let error: Error | undefined;
       try {
         await runInContext({}, async () => {
-          withTransaction();
-          const saving = repository.save({ id: 'rollback-opening-1', name: 'sibling-failed', value: 42 }).catch((e) => {
-            saveError = e as Error;
-          });
+          withTransaction({ timeoutMs: timeout.delay });
+          timeout.restore();
+          const conn = await repository.conn();
+          await conn`INSERT INTO tx_test_items (id, name, value) VALUES ('timeout-held-1', 'before', 1)`;
 
-          await gate.reserving;
-          const rollingBack = rollback();
-          gate.release();
+          timeout.fire();
 
-          await rollingBack;
-          await saving;
+          try {
+            await conn`INSERT INTO tx_test_items (id, name, value) VALUES ('timeout-held-2', 'after', 2)`;
+          } catch (e) {
+            error = e as Error;
+          }
+          await commit().catch(() => {});
         });
       } finally {
-        gate.restore();
+        timeout.restore();
       }
 
-      const rows = await sql`SELECT * FROM tx_test_items WHERE id = 'rollback-opening-1'`;
+      const rows = await sql`SELECT * FROM tx_test_items WHERE id IN ('timeout-held-1', 'timeout-held-2')`;
       expect(rows.length).toBe(0);
-      expect(saveError?.message).toBe('Transaction was committed or rolled back while this write was opening it');
+      expect(error?.message).toBe('Transaction has timed out and was rolled back');
     });
 
     it('should reject operations after timeout', async () => {

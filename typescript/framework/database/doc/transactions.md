@@ -134,7 +134,7 @@ When the timeout fires:
 
 1. The transaction is rolled back and all reserved connections are released.
 2. Any subsequent query in the same context throws: `"Transaction has timed out and was rolled back"`.
-   A write that was still opening the transaction (reserving its connection or running `BEGIN`) throws the same error, so it never runs after the rollback.
+   So does a write that was still opening the transaction (reserving its connection or running `BEGIN`), and any query on a connection a caller held across the timeout: no query runs after the rollback, outside the transaction.
 3. The timeout is cleared on `commit()` or `rollback()`, so fast transactions pay no cost.
 
 ## Request abort handling
