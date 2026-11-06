@@ -24,6 +24,14 @@ pytest --junitxml=junit.xml --cov --cov-report=xml
 
 `putnami observe` places each test case and each covered file on the project that holds it: a member of the uv workspace, or a directory whose `pyproject.toml` has a `[project]` or `[tool.poetry]` table. In a uv workspace, run it from the root as `uv run --all-packages pytest …`, so every member is installed. pytest names each test case from its file's path relative to its `rootdir`: if pytest takes another `rootdir`, for example a project's directory that holds the pytest configuration, add `--rootdir=.` so the names stay relative to the repository root. A `uv.lock` or `poetry.lock` change is a dependency change of ecosystem `pypi`.
 
+In a moon monorepo, `putnami observe` places each change on the moon project that holds it, whatever its language, and marks the projects whose `moon.yml` `dependsOn`, or whose `package.json` dependencies, name it. moon also infers edges from its language toolchains, which only its own graph holds: to use them, write the graph before the observe line, in a step where `moon` is installed:
+
+```bash
+moon project-graph --json > moon-graph.json
+```
+
+`putnami observe` reads `moon-graph.json` at the repository root; `--moon-graph <path>` names another file. Without it, `putnami observe` reads `.moon/workspace.yml` and each `moon.yml` itself.
+
 In a Pants repository, write the export of the target graph and run the tests with their reports, before the observe step:
 
 ```bash
@@ -188,6 +196,6 @@ Without `--base-sbom`, each dependency gets its state at the head and the summar
 ## Learn more
 
 - [What `putnami observe` reads](https://github.com/putnami/putnami/blob/main/tooling/observe/doc/01-observe.md): every flag, how the base is found, and how reports and SBOMs are discovered.
-- [The `@putnami/observe` README](https://github.com/putnami/putnami/blob/main/tooling/observe/README.md): the questions it answers and how it reads Nx, Pants, Bazel, npm, pnpm, yarn, Composer, Go and Python repositories.
+- [The `@putnami/observe` README](https://github.com/putnami/putnami/blob/main/tooling/observe/README.md): the questions it answers and how it reads Nx, moon, Pants, Bazel, npm, pnpm, yarn, Composer, Go and Python repositories.
 
 You now have a CI job that records which files a change touched and which tests and coverage reports it produced, as an artifact you can keep or upload to Putnami Cloud.

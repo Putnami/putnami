@@ -228,16 +228,32 @@ func TestObserveRunsInARepositoryWithoutAWorkspace(t *testing.T) {
 	}
 }
 
+func TestTheMoonGraphFlagIsResolvedAgainstTheInvocationDirectory(t *testing.T) {
+	dir := t.TempDir()
+	t.Chdir(dir)
+	opts, _, err := parseRun([]string{"--moon-graph", "out/moon-graph.json"}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := filepath.Join(dir, "out", "moon-graph.json"); opts.MoonGraph != want {
+		t.Fatalf("moon graph %q, want %q", opts.MoonGraph, want)
+	}
+	if opts, _, _ := parseRun(nil, nil); opts.MoonGraph != "" {
+		t.Fatalf("moon graph %q without the flag", opts.MoonGraph)
+	}
+}
+
 func TestAUsageErrorExitsTwo(t *testing.T) {
 	spectest.Proves(t, feature, "report-discovery", "a-missing-or-malformed-report-is-a-diagnostic")
 	t.Chdir(t.TempDir())
 	for name, args := range map[string][]string{
-		"no subcommand":   {},
-		"another command": {"verify"},
-		"an unknown flag": {"run", "--jnuit", "a.xml"},
-		"a positional":    {"run", "extra"},
-		"an empty base":   {"run", "--base"},
-		"a fetch value":   {"run", "--fetch=maybe"},
+		"no subcommand":       {},
+		"another command":     {"verify"},
+		"an unknown flag":     {"run", "--jnuit", "a.xml"},
+		"a positional":        {"run", "extra"},
+		"an empty base":       {"run", "--base"},
+		"a fetch value":       {"run", "--fetch=maybe"},
+		"an empty moon graph": {"run", "--moon-graph"},
 	} {
 		t.Run(name, func(t *testing.T) {
 			var stdout, stderr bytes.Buffer

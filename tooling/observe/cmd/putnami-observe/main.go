@@ -51,7 +51,7 @@ const contextFlag = "--putnamiContext"
 var runtimeVersion string
 
 // knownFlags are the flags `putnami observe` takes.
-var knownFlags = []string{"base", "head", "junit", "coverage", "sbom", "base-sbom", "fetch", "evidence", "upload", "publish", "pants-graph", "bazel-graph"}
+var knownFlags = []string{"base", "head", "junit", "coverage", "sbom", "base-sbom", "moon-graph", "fetch", "evidence", "upload", "publish", "pants-graph", "bazel-graph"}
 
 func run(args []string, getenv func(string) string, stdout, stderr io.Writer) int {
 	handled, err := runtimeinfo.Handle(args, stdout, extensionName, runtimeVersion)
@@ -172,7 +172,7 @@ func parseRun(args []string, launch *job.Context) (observe.Options, outputs, err
 	if err != nil {
 		return observe.Options{}, outputs{}, err
 	}
-	for _, name := range []string{"base", "head", "junit", "coverage", "sbom", "base-sbom", "evidence", "pants-graph", "bazel-graph"} {
+	for _, name := range []string{"base", "head", "junit", "coverage", "sbom", "base-sbom", "evidence", "moon-graph", "pants-graph", "bazel-graph"} {
 		if value, ok := flags[name]; ok && (value == "" || value == "true") {
 			return observe.Options{}, outputs{}, fmt.Errorf("--%s needs a value", name)
 		}
@@ -190,6 +190,9 @@ func parseRun(args []string, launch *job.Context) (observe.Options, outputs, err
 		Fetch:    fetch,
 		Producer: observe.Producer{Name: extensionName, Version: runtimeVersion},
 		Resolve:  func(p string) string { return absolute(dir, sdkcontext.ResolvePath(launch, p)) },
+	}
+	if flags["moon-graph"] != "" {
+		opts.MoonGraph = opts.Resolve(flags["moon-graph"])
 	}
 	if flags["pants-graph"] != "" {
 		opts.PantsGraph = opts.Resolve(flags["pants-graph"])
