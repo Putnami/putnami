@@ -114,6 +114,8 @@ describe('bounded machine-output helpers', () => {
         `AS${'IA'}${'B'.repeat(16)}`,
         `gh${'p_'}${'a'.repeat(36)}`,
         `github${'_pat_'}${'b'.repeat(20)}`,
+        `gl${'pat-'}${'f'.repeat(20)}`,
+        `gl${'pat-'}${'g'.repeat(27)}.01.${'h'.repeat(7)}`,
         `AI${'za'}${'c'.repeat(35)}`,
         `xo${'xb-'}${'d'.repeat(10)}`,
         `sk_${'live_'}${'e'.repeat(16)}`,
@@ -121,6 +123,7 @@ describe('bounded machine-output helpers', () => {
       for (const synthetic of syntheticValues) {
         expect(sanitizeMachineOutputString(`before ${synthetic} after`)).toBe('before [REDACTED] after');
       }
+      expect(sanitizeMachineOutputString(`use gl${'pat-'}${'f'.repeat(20)}. then`)).toBe('use [REDACTED]. then');
       expect(sanitizeMachineOutputString(`-----BEGIN ${'PRIVATE KEY-----'}\nsynthetic`)).toBe('[REDACTED]');
     },
   );

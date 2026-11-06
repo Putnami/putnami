@@ -3315,6 +3315,7 @@ const MACHINE_OUTPUT_TOKEN_PATTERNS = [
   /(?:AKIA|ASIA)[0-9A-Z]{16}/g,
   /gh[pousr]_[0-9A-Za-z]{36,255}/g,
   /github_pat_[0-9A-Za-z_]{20,255}/g,
+  /glpat-[0-9A-Za-z_-]{20,255}(?:\.[0-9A-Za-z]+){0,2}/g,
   /AIza[0-9A-Za-z_-]{35}/g,
   /xox[baprs]-[0-9A-Za-z-]{10,}/g,
   /sk_(?:live|test)_[0-9A-Za-z]{16,}/g,
