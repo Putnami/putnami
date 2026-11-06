@@ -1,0 +1,42 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-spec.json",
+  "protocolVersion": 1,
+  "feature": "tooling/observe-rust",
+  "outcomes": [
+    "In a Rust repository, each crate of the Cargo workspace and each other Cargo.toml package is a component, named by its directory and its package name, without a Putnami file",
+    "Each changed file maps to the crate that holds it, and each crate lists the repository crates its path and workspace dependencies name, so a change to a shared crate marks the crates that use it as dependent",
+    "The cargo-nextest JUnit report and the cargo-llvm-cov coverage report land on the crates that hold the tests and the covered files, and a Cargo.lock bump is a dependency change"
+  ],
+  "nonGoals": [
+    "Running cargo, cargo-nextest or cargo-llvm-cov, or reading cargo metadata",
+    "Computing the changed and dependent components, the tests and coverage per component, the changed-line coverage and the lockfile diff: the change analyses own them",
+    "Serving the probe from its own extension: the detector lives in @putnami/observe until the CLI can run a workspace probe outside a workspace",
+    "A [workspace] below the root, a target directory that CARGO_TARGET_DIR moves outside the repository, and the [patch] and [replace] tables"
+  ],
+  "requirements": [
+    {
+      "id": "rust-crates-are-components",
+      "text": "Walking past .git, target, node_modules, vendor and hidden directories, each directory the root Cargo.toml [workspace] members globs match, less those at or below an exclude entry, that holds a Cargo.toml is a component of source workspace, and so is a root with a [package] table beside its [workspace]. Each other Cargo.toml with a [package] table is one of source manifest. Its id is its directory, its name the package name, its ecosystem rust. A Cargo.toml that does not parse is a diagnostic."
+    },
+    {
+      "id": "rust-crate-edges",
+      "text": "A crate depends on another when an entry of its [dependencies], [dev-dependencies] or [build-dependencies], or of the same tables under a [target] platform, gives a path resolved against its own directory, or gives workspace = true for a workspace member, and the root [workspace.dependencies] gives that entry a path resolved against the root. A registry or git dependency, a path outside the repository or to no component, and the crate itself are no edge."
+    },
+    {
+      "id": "rust-probe-answer",
+      "text": "The detection is a workspace probe answer under the @putnami/observe extension name: one project per crate in path order, its package name and Cargo.toml as source name and source file, its dependencies as component paths, and as watched files its Cargo.toml and the Cargo.lock beside it, else the workspace's Cargo.lock at the root for a member. The answer passes the probe protocol's strict validation, so the detector can move to its own extension without a contract change."
+    },
+    {
+      "id": "rust-report-discovery",
+      "text": "Report discovery recognizes a Cargo target directory by the CACHEDIR.TAG cargo writes in it, and walks in it only its nextest store, where cargo-nextest writes target/nextest/<profile>/junit.xml, the target directories nested in it, such as the one cargo-llvm-cov builds in, and the files it holds directly, so the build outputs do not exhaust the discovery bounds. A cargo-nextest case names its test binary, such as pricing or pricing::bin/cli, and goes to the crate of that package name."
+    },
+    {
+      "id": "rust-change-analysis",
+      "text": "On a Cargo workspace whose crates api and worker depend on a crate pricing, the analyses list the three crates with the edges to pricing; a change to pricing marks api and worker dependent; the cases of the cargo-nextest JUnit report under target/nextest and the files of the cargo-llvm-cov LCOV report land on the crates, with no unattributed case and no unmapped file; and a version bump in Cargo.lock is a cargo dependency change."
+    }
+  ],
+  "decisions": [
+    "tooling/cli/doc/adr/0051-user-scope-extensions-run-without-a-workspace.md",
+    "protocols/evidence/doc/adr/0001-one-self-reported-change-evidence-document.md"
+  ]
+}

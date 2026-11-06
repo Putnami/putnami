@@ -6,6 +6,7 @@ import (
 	"go.putnami.dev/protocol/evidence"
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/tooling/observe/internal/detect/bazel"
+	"go.putnami.dev/tooling/observe/internal/detect/cargo"
 	"go.putnami.dev/tooling/observe/internal/detect/composer"
 	"go.putnami.dev/tooling/observe/internal/detect/dart"
 	"go.putnami.dev/tooling/observe/internal/detect/dotnet"
@@ -38,7 +39,7 @@ type Options struct {
 // its packages yield.
 func Default(opts Options) []Detector {
 	scan := &swiftScan{}
-	return []Detector{NxDetector{}, MoonDetector{GraphFile: opts.MoonGraph}, PantsDetector{GraphFile: opts.PantsGraph}, RushDetector{}, NodeDetector{}, ComposerDetector{}, GoDetector{}, PythonDetector{}, GradleDetector{}, MavenDetector{}, SwiftPMDetector{scan: scan}, XcodeDetector{scan: scan}, DartDetector{}, DotnetDetector{}, RubyDetector{}, BazelDetector{GraphFile: opts.BazelGraph}}
+	return []Detector{NxDetector{}, MoonDetector{GraphFile: opts.MoonGraph}, PantsDetector{GraphFile: opts.PantsGraph}, RushDetector{}, NodeDetector{}, ComposerDetector{}, GoDetector{}, PythonDetector{}, GradleDetector{}, MavenDetector{}, SwiftPMDetector{scan: scan}, XcodeDetector{scan: scan}, DartDetector{}, DotnetDetector{}, RubyDetector{}, CargoDetector{}, BazelDetector{GraphFile: opts.BazelGraph}}
 }
 
 // fromProbe turns the projects of a probe answer into components.
@@ -389,6 +390,33 @@ func (RubyDetector) Detect(root string) Found {
 	found := Found{Diagnostics: detection.Diagnostics}
 	for _, c := range detection.Components {
 		found.Components = append(found.Components, Component{ID: c.ID, Name: c.Name, Ecosystem: ruby.Ecosystem, Source: c.Source, DependsOn: c.DependsOn})
+	}
+	return found
+}
+
+// CargoDetector adapts the Cargo detector: each Cargo workspace member is a
+// workspace component, each other Cargo.toml package a manifest one. It also
+// maps the test binary ids of cargo-nextest reports to their crates.
+type CargoDetector struct{}
+
+// Name implements Detector.
+func (CargoDetector) Name() string { return "cargo" }
+
+// Detect implements Detector.
+func (CargoDetector) Detect(root string) Found {
+	result := cargo.Detect(root)
+	found := Found{
+		Diagnostics: result.Diagnostics,
+		Components: fromProbe(result.Projects, func(p wsproto.ProbeProject) (Component, bool) {
+			source := evidence.SourceManifest
+			if meta, err := cargo.ReadMetadata(p); err == nil && meta.Source == cargo.SourceWorkspace {
+				source = evidence.SourceWorkspace
+			}
+			return Component{Ecosystem: cargo.Ecosystem, Source: source}, true
+		}),
+	}
+	if len(result.Projects) > 0 {
+		found.LocateTestBinary = cargo.Locator(result)
 	}
 	return found
 }

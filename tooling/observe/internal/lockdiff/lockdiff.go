@@ -3,7 +3,7 @@
 // poetry.lock, the PEX JSON lock of a Pants resolve, gradle.lockfile, the
 // Gradle version catalog, Package.resolved, Podfile.lock, pubspec.lock,
 // NuGet's packages.lock.json, the central package versions of
-// Directory.Packages.props and Gemfile.lock.
+// Directory.Packages.props, Gemfile.lock and Cargo.lock.
 //
 // A reader turns a lockfile's content into the versions it pins per package
 // name. Workspace links, path packages and the repository's own modules are
@@ -32,6 +32,7 @@ const (
 	EcosystemCocoaPods = "cocoapods"
 	EcosystemPub       = "pub"
 	EcosystemGem       = "gem"
+	EcosystemCargo     = "cargo"
 )
 
 // Lockfile names the readers know.
@@ -49,6 +50,7 @@ const (
 	PodfileLock     = "Podfile.lock"
 	PubspecLock     = "pubspec.lock"
 	GemfileLock     = "Gemfile.lock"
+	CargoLock       = "Cargo.lock"
 	// VersionCatalogSuffix ends the name of a Gradle version catalog, which
 	// lies in a gradle directory: gradle/libs.versions.toml.
 	VersionCatalogSuffix = ".versions.toml"
@@ -104,6 +106,8 @@ func KindOf(file string) (Kind, bool) {
 		return Kind{EcosystemNuGet, ReadNuGetLock}, true
 	case GemfileLock:
 		return Kind{EcosystemGem, ReadGemfileLock}, true
+	case CargoLock:
+		return Kind{EcosystemCargo, ReadCargoLock}, true
 	}
 	if strings.HasSuffix(path.Base(file), VersionCatalogSuffix) && path.Base(path.Dir(file)) == "gradle" {
 		return Kind{EcosystemMaven, ReadVersionCatalog}, true

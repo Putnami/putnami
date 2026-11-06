@@ -84,20 +84,22 @@ fails as a diagnostic.
 ## Reports
 
 Without `--junit` or `--coverage`, `putnami observe` walks the repository,
-skipping `.git`, `node_modules`, `vendor` and the Gradle and Maven build
+skipping `.git`, `node_modules`, `vendor`, the Gradle and Maven build
 outputs that hold no report (see [Gradle and Maven](12-jvm.md#reports)), and
-reads the start of each file
+all of a Cargo target directory but its `nextest` store, its nested target
+directories and the files it holds directly (see
+[the Cargo detector](17-rust.md#reports)), and reads the start of each file
 whose name can hold a report (`.xml`, `.trx`, `.info`, `.lcov`, `.out`, `.cov`,
 `.coverprofile`, `.gocov`, and `.txt` files whose name contains `cover`). It
 keeps a file by its content:
 
 | Format | Recognized by |
 |---|---|
-| JUnit XML | a `testsuites` or `testsuite` root (Jest, Vitest, PHPUnit `--log-junit`, gotestsum, pytest `--junitxml`, `bazel test`, Gradle, Maven Surefire and Failsafe) |
-| Cobertura | a `coverage` root with `line-rate`, `lines-valid` or `branch-rate`, or a `sources` or `packages` child (pytest-cov `--cov-report=xml`, Coverlet `--collect:"XPlat Code Coverage"`) |
+| JUnit XML | a `testsuites` or `testsuite` root (Jest, Vitest, PHPUnit `--log-junit`, gotestsum, pytest `--junitxml`, `bazel test`, Gradle, Maven Surefire and Failsafe, cargo-nextest) |
+| Cobertura | a `coverage` root with `line-rate`, `lines-valid` or `branch-rate`, or a `sources` or `packages` child (pytest-cov `--cov-report=xml`, Coverlet `--collect:"XPlat Code Coverage"`, cargo-llvm-cov `--cobertura`) |
 | Clover | a `coverage` root with `generated` or `clover`, or a `project` child (PHPUnit `--coverage-clover`) |
 | JaCoCo | a `report` root whose first child is `sessioninfo`, `group`, `package` or `counter` (the JaCoCo Maven plugin, the Gradle `jacoco` plugin, Kover) |
-| LCOV | a first `TN:` or `SF:` record (`bazel coverage --combined_report=lcov`) |
+| LCOV | a first `TN:` or `SF:` record (`bazel coverage --combined_report=lcov`, cargo-llvm-cov `--lcov`) |
 | Go cover profile | a first `mode: set`, `mode: count` or `mode: atomic` line |
 | TRX | a `TestRun` root (`dotnet test --logger trx`), read as test cases |
 

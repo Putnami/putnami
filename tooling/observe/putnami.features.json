@@ -339,6 +339,7 @@
               "a-cyclonedx-pair-gives-each-changed-dependency-its-facts",
               "a-pypi-package-url-matches-a-python-lockfile-change",
               "a-pub-package-url-matches-a-pubspec-lock-change",
+              "a-cargo-package-url-matches-a-cargo-lock-change",
               "an-spdx-document-gives-licenses-and-advisories",
               "without-a-base-sbom-the-base-is-unknown",
               "the-summary-counts-the-vulnerabilities-per-dependency"
@@ -1582,6 +1583,86 @@
             "kind": "acceptance",
             "checks": [
               "the-rails-demo-is-explained"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "tooling/observe-rust",
+      "type": "feature",
+      "name": "Find the crates of a Rust repository that keeps its own CI",
+      "outcome": "putnami observe, in a Rust repository without a Putnami workspace, knows its crates from the Cargo workspace and the Cargo.toml manifests, which crate owns each file and which crates depend on which through their path and workspace dependencies, without running cargo, so a change to a shared crate marks the crates that use it, its nextest and llvm-cov reports land on the right crates, and a Cargo.lock bump is a dependency change",
+      "owner": "tooling",
+      "target": "modeled",
+      "requirements": [
+        {
+          "id": "rust-crates-are-components",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "cargo-workspace-members-are-workspace-components",
+              "a-package-outside-the-workspace-is-a-manifest-component",
+              "a-malformed-cargo-toml-is-a-diagnostic"
+            ]
+          }
+        },
+        {
+          "id": "rust-crate-edges",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-path-dependency-is-an-edge",
+              "a-workspace-dependency-with-a-path-is-an-edge",
+              "a-registry-dependency-is-no-edge"
+            ]
+          }
+        },
+        {
+          "id": "rust-probe-answer",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-cargo-answer-is-a-valid-probe-result"
+            ]
+          }
+        },
+        {
+          "id": "rust-report-discovery",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "discovery-walks-only-the-nextest-store-of-a-cargo-target-directory",
+              "a-nextest-case-goes-to-the-crate-its-binary-names"
+            ]
+          }
+        },
+        {
+          "id": "rust-change-analysis",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-cargo-workspace-demo-is-explained"
             ]
           }
         }

@@ -116,9 +116,9 @@ func TestAMalformedWorkspaceYMLLeavesTheRepositoryToTheOtherDetectors(t *testing
 	for _, c := range o.Analysis.Components {
 		got = append(got, c.ID+" "+c.Ecosystem)
 	}
-	// The Node workspace answers; pricing, with no package.json, is no
-	// component, so its change touches none.
-	if want := []string{"apps/api node", "apps/web node"}; !reflect.DeepEqual(got, want) {
+	// The Node workspace answers for the apps, and the Cargo detector for
+	// pricing, a Cargo package.
+	if want := []string{"apps/api node", "apps/web node", "packages/pricing rust"}; !reflect.DeepEqual(got, want) {
 		t.Fatalf("components %v, want %v", got, want)
 	}
 }

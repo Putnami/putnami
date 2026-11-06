@@ -95,6 +95,39 @@ func TestReportsAreFoundByTheirContent(t *testing.T) {
 	}
 }
 
+func TestDiscoveryWalksOnlyTheNextestStoreOfACargoTargetDirectory(t *testing.T) {
+	spectest.Proves(t, "tooling/observe-rust", "rust-report-discovery", "discovery-walks-only-the-nextest-store-of-a-cargo-target-directory")
+	cargoTag := "Signature: 8a477f597d28d172789f06886806bc55\n# This file is a cache directory tag created by cargo.\n"
+	root := tree(t, map[string]string{
+		"Cargo.toml":                                       "[workspace]\n",
+		"target/CACHEDIR.TAG":                              cargoTag,
+		"target/nextest/ci/junit.xml":                      junitXML,
+		"target/lcov.info":                                 lcovTrace,
+		"target/debug/build/x/out/junit.xml":               junitXML,
+		"target/doc/coverage.xml":                          coberturaXML,
+		"target/llvm-cov-target/CACHEDIR.TAG":              cargoTag,
+		"target/llvm-cov-target/nextest/default/junit.xml": junitXML,
+		"target/llvm-cov-target/debug/report.xml":          junitXML,
+		"crates/api/target/lcov.info":                      lcovTrace,
+		"build/CACHEDIR.TAG":                               "Signature: 8a477f597d28d172789f06886806bc55\n# Another tool.\n",
+		"build/junit.xml":                                  junitXML,
+	})
+	reports, diags := Collect(Request{Root: root, Resolve: resolver(root)})
+	if len(diags) != 0 {
+		t.Fatalf("diagnostics %v", diags)
+	}
+	var got []string
+	for _, r := range reports {
+		got = append(got, r.Path)
+	}
+	// A directory named target without cargo's tag, and a tag another tool
+	// wrote, are walked whole.
+	want := []string{"build/junit.xml", "crates/api/target/lcov.info", "target/lcov.info", "target/llvm-cov-target/nextest/default/junit.xml", "target/nextest/ci/junit.xml"}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("reports %v, want %v", got, want)
+	}
+}
+
 func TestSniffRecognizesEachFormat(t *testing.T) {
 	spectest.Proves(t, feature, "report-discovery", "reports-are-found-by-their-content")
 	for content, want := range map[string]string{

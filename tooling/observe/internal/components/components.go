@@ -48,6 +48,10 @@ type Found struct {
 	// to its component and no path. Nil for a detector that reads no such
 	// names.
 	Locate func(importPath string) (file, component string, ok bool)
+	// LocateTestBinary maps a cargo-nextest test binary id, which a JUnit
+	// case writes as its class name, to its manifest and component. Nil for
+	// a detector that reads none.
+	LocateTestBinary func(id string) (file, component string, ok bool)
 	// Lockfile returns the ecosystem and the reader of a lockfile only this
 	// detector can read, such as a go.mod. Nil for a detector that reads none.
 	Lockfile func(file string) (ecosystem string, read LockReader, ok bool)
@@ -79,6 +83,7 @@ type Set struct {
 	Components  []Component
 	Diagnostics []diag.Diagnostic
 	locators    []func(string) (string, string, bool)
+	binaries    []func(string) (string, string, bool)
 	lockfiles   []func(string) (string, LockReader, bool)
 	owners      []func(string) (string, bool)
 }
@@ -103,6 +108,9 @@ func Detect(root string, detectors []Detector) Set {
 		set.Diagnostics = append(set.Diagnostics, found.Diagnostics...)
 		if found.Locate != nil {
 			set.locators = append(set.locators, found.Locate)
+		}
+		if found.LocateTestBinary != nil {
+			set.binaries = append(set.binaries, found.LocateTestBinary)
 		}
 		if found.Lockfile != nil {
 			set.lockfiles = append(set.lockfiles, found.Lockfile)
@@ -181,8 +189,18 @@ func (s Set) Owner(file string) (string, bool) {
 // repository path and component, or a .NET test assembly to its component,
 // through the detectors that read such names.
 func (s Set) Locate(importPath string) (file, component string, ok bool) {
-	for _, locate := range s.locators {
-		if file, component, ok := locate(importPath); ok {
+	return s.locate(s.locators, importPath)
+}
+
+// LocateTestBinary maps a cargo-nextest test binary id to its manifest and
+// component, through the detectors that read them.
+func (s Set) LocateTestBinary(id string) (file, component string, ok bool) {
+	return s.locate(s.binaries, id)
+}
+
+func (s Set) locate(locators []func(string) (string, string, bool), name string) (file, component string, ok bool) {
+	for _, locate := range locators {
+		if file, component, ok := locate(name); ok {
 			if s.has(component) {
 				return file, component, true
 			}

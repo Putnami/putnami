@@ -684,3 +684,72 @@ func TestAPackageLCOVReadsFromThePackageDirectory(t *testing.T) {
 		t.Errorf("coverage %+v, diagnostics %v", r.Coverage, r.Diagnostics)
 	}
 }
+
+func TestANextestCaseGoesToTheCrateItsBinaryNames(t *testing.T) {
+	spectest.Proves(t, "tooling/observe-rust", "rust-report-discovery", "a-nextest-case-goes-to-the-crate-its-binary-names")
+	root := t.TempDir()
+	write(t, root, map[string]string{
+		"Cargo.toml":                "[workspace]\nmembers = [\"crates/*\"]\n",
+		"crates/api/Cargo.toml":     "[package]\nname = \"api-server\"\n",
+		"crates/pricing/Cargo.toml": "[package]\nname = \"pricing\"\n",
+		// The virtual workspace root holds the report and is no component.
+		"target/nextest/ci/junit.xml": `<testsuites name="nextest-run">
+			<testsuite name="api-server"><testcase name="tests::quote" classname="api-server"/></testsuite>
+			<testsuite name="pricing"><testcase name="tests::empty" classname="pricing"/></testsuite>
+			<testsuite name="pricing::format"><testcase name="formats" classname="pricing::format"><failure message="left != right"/></testcase></testsuite>
+			<testsuite name="api_server::bin/api"><testcase name="serves" classname="api_server::bin/api"/></testsuite>
+			<testsuite name="gone"><testcase name="orphan" classname="gone"/></testsuite>
+		</testsuites>`,
+	})
+	set := components.Detect(root, []components.Detector{components.CargoDetector{}})
+	r := Run(Input{Root: root, Set: set, Reports: []reports.Report{
+		{Path: "target/nextest/ci/junit.xml", Kind: reports.KindJUnit, Format: reports.FormatJUnit},
+	}})
+	got := tests(r)
+	if got["crates/api"].Passed != 2 || got["crates/pricing"].Passed != 1 || got["crates/pricing"].Failed != 1 {
+		t.Errorf("tests %+v", got)
+	}
+	if failing := got["crates/pricing"].FailingCases; len(failing) != 1 || failing[0].Suite != "pricing::format" {
+		t.Errorf("failing cases %+v", failing)
+	}
+	if len(r.Diagnostics) != 1 || r.Diagnostics[0].Code != CodeTestsUnattributed || !strings.HasPrefix(r.Diagnostics[0].Message, "1 test cases") {
+		t.Errorf("diagnostics %v", r.Diagnostics)
+	}
+}
+
+func TestAGoJUnitReportV1CaseGoesToThePackageItsSuiteNames(t *testing.T) {
+	spectest.Proves(t, feature, "tests-and-coverage", "a-test-goes-to-the-component-of-its-file-else-of-its-report")
+	root, set := repository(t)
+	// go-junit-report v1 writes the last element of the import path as the
+	// class name and the whole path as the suite name.
+	write(t, root, map[string]string{"junit.xml": `<testsuites>
+		<testsuite name="example.com/svc"><testcase classname="svc" name="TestCalc"/></testsuite>
+	</testsuites>`})
+	r := Run(Input{Root: root, Set: set, Reports: []reports.Report{{Path: "junit.xml", Kind: reports.KindJUnit, Format: reports.FormatJUnit}}})
+	if got := tests(r); got["svc"].Passed != 1 || len(r.Diagnostics) != 0 {
+		t.Errorf("tests %+v, diagnostics %v", got, r.Diagnostics)
+	}
+}
+
+func TestAJestSuiteNamedLikeACrateStaysWithItsReport(t *testing.T) {
+	spectest.Proves(t, "tooling/observe-rust", "rust-report-discovery", "a-nextest-case-goes-to-the-crate-its-binary-names")
+	root := t.TempDir()
+	write(t, root, map[string]string{
+		"crates/pricing/Cargo.toml": "[package]\nname = \"pricing\"\n",
+		// jest-junit writes the describe title as the suite name, and the
+		// title and the test name as the class name.
+		"web/junit.xml": `<testsuites name="jest tests">
+			<testsuite name="pricing"><testcase classname="pricing adds up" name="pricing adds up"/></testsuite>
+		</testsuites>`,
+	})
+	set := components.Detect(root, []components.Detector{components.CargoDetector{}, fake{components.Found{Components: []components.Component{
+		{ID: "web", Ecosystem: "node", Source: evidence.SourceWorkspace},
+	}}}})
+	r := Run(Input{Root: root, Set: set, Reports: []reports.Report{
+		{Path: "web/junit.xml", Kind: reports.KindJUnit, Format: reports.FormatJUnit},
+	}})
+	got := tests(r)
+	if got["web"].Passed != 1 || got["crates/pricing"].Passed != 0 {
+		t.Errorf("tests %+v", got)
+	}
+}

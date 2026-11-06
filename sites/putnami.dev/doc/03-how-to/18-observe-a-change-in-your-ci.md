@@ -129,6 +129,21 @@ bundle exec rspec --format progress --format RspecJunitFormatter --out rspec.xml
 
 `putnami observe` places each test case and each covered file on the component that holds it: a packwerk pack, a directory with a `package.yml`; a gem; or the application, a directory with a `Gemfile`. The `dependencies` of a pack's `package.yml`, a `Gemfile` gem with a `path`, and a gemspec dependency on a local gem are edges, so a change to a pack marks the packs that depend on it. With Minitest, `minitest-reporters`' `JUnitReporter` and `simplecov-lcov` write reports it reads too. A `Gemfile.lock` change is a dependency change of ecosystem `gem`.
 
+In a Rust repository, give cargo-nextest a profile that writes a JUnit report, in `.config/nextest.toml`:
+
+```toml
+[profile.ci.junit]
+path = "junit.xml"
+```
+
+Then run the tests through cargo-llvm-cov, with both installed (`cargo install cargo-nextest cargo-llvm-cov`):
+
+```bash
+cargo llvm-cov nextest --profile ci --workspace --lcov --output-path lcov.info
+```
+
+nextest writes `target/nextest/ci/junit.xml`, and `putnami observe` reads it there, without walking the rest of the target directory. Each case lands on the crate its test binary names, and each covered file on the crate that holds it: a member of the root `[workspace]`, or a directory whose `Cargo.toml` has a `[package]` table. A path dependency, or a `workspace = true` one whose `[workspace.dependencies]` entry has a path, is an edge. A `Cargo.lock` change is a dependency change of ecosystem `cargo`. When `CARGO_TARGET_DIR` puts the target directory outside the checkout, name the report with `--junit`.
+
 The install lines need the network: when the installer or the registry cannot be reached, the GitHub step or the GitLab job fails.
 
 ## Steps
@@ -234,7 +249,7 @@ To send the evidence to Putnami Cloud, store a workspace token with the `deliver
 
 A software bill of materials (SBOM) lists the packages of a build with their licences and known vulnerabilities. `putnami observe` reads one the job wrote, CycloneDX 1.4 to 1.6 or SPDX 2.3 in JSON, and gives each changed dependency what it lists: the vulnerabilities the change fixes or introduces, and the licences before and after. It queries no vulnerability database itself.
 
-On GitHub Actions, put this step before the observe step. It writes an SBOM of the head and one of the base with [osv-scanner](https://github.com/google/osv-scanner), which reads the lockfiles of Node, Composer, Go, Python, Dart and Ruby projects, `uv.lock`, `poetry.lock`, `pubspec.lock` and `Gemfile.lock` included. The base is the pull request base, or on a push the commit before the push:
+On GitHub Actions, put this step before the observe step. It writes an SBOM of the head and one of the base with [osv-scanner](https://github.com/google/osv-scanner), which reads the lockfiles of Node, Composer, Go, Python, Dart, Ruby and Rust projects, `uv.lock`, `poetry.lock`, `pubspec.lock`, `Gemfile.lock` and `Cargo.lock` included. The base is the pull request base, or on a push the commit before the push:
 
 ```yaml
       - name: Write the SBOMs
@@ -276,6 +291,6 @@ Without `--base-sbom`, each dependency gets its state at the head and the summar
 ## Learn more
 
 - [What `putnami observe` reads](https://github.com/putnami/putnami/blob/main/tooling/observe/doc/01-observe.md): every flag, how the base is found, and how reports and SBOMs are discovered.
-- [The `@putnami/observe` README](https://github.com/putnami/putnami/blob/main/tooling/observe/README.md): the questions it answers and how it reads Nx, moon, Pants, Rush, Bazel, npm, pnpm, yarn, Composer, Go, Python, Gradle, Maven, Swift, Xcode, Dart, Flutter, .NET, Ruby and Rails repositories.
+- [The `@putnami/observe` README](https://github.com/putnami/putnami/blob/main/tooling/observe/README.md): the questions it answers and how it reads Nx, moon, Pants, Rush, Bazel, npm, pnpm, yarn, Composer, Go, Python, Gradle, Maven, Swift, Xcode, Dart, Flutter, .NET, Ruby, Rails and Rust repositories.
 
 You now have a CI job that records which files a change touched and which tests and coverage reports it produced, as an artifact you can keep or upload to Putnami Cloud.

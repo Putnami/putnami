@@ -7,7 +7,7 @@ queries no vulnerability database.
 
 ## Components
 
-Sixteen detectors read the repository:
+Seventeen detectors read the repository:
 
 | Detector | Reads | Source |
 |---|---|---|
@@ -26,6 +26,7 @@ Sixteen detectors read the repository:
 | Dart | each `pubspec.yaml`, with the root's pub `workspace` and `melos.yaml` | `workspace` for a pub workspace or melos package, `manifest` otherwise |
 | .NET | each `.csproj`, `.fsproj` and `.vbproj`, with the root's `.sln` and `.slnx` | `workspace` for a project a root solution lists, `manifest` otherwise; see [the .NET detector](15-dotnet.md) |
 | Ruby | each packwerk `package.yml`, `*.gemspec` and `Gemfile` | `workspace` for a pack, `manifest` otherwise |
+| Cargo | each `Cargo.toml`, with the root's `[workspace]` | `workspace` for a Cargo workspace member, `manifest` otherwise |
 | Bazel | `bazel-graph.json` from `bazel query 'deps(//...)' --output=streamed_jsonproto`, else the `BUILD` and `BUILD.bazel` files | `orchestrator` for a query export, `manifest` otherwise |
 
 A component is a directory. When two detectors name one directory, the higher
@@ -87,7 +88,12 @@ A JUnit or TRX case goes to the first of:
    (`Pricing.Tests.dll`, from `dotnet test --logger trx` or
    `JunitXml.TestLogger`).
    A located name that is a file is the case's file.
-5. The component that holds the report.
+5. The component of the crate whose package its class name names as a
+   cargo-nextest test binary: `pricing`, `pricing::integration` or
+   `api::bin/api`; see [the Cargo detector](17-rust.md#reports). A suite name
+   is not read for it, so another runner's suite named like a crate stays
+   with its report.
+6. The component that holds the report.
 
 A case that none of them places is counted in `observe.tests_unattributed`.
 
@@ -128,6 +134,7 @@ Each changed lockfile is read at the merge base and at the head:
 | `go.mod` | `go` | the requires, after the `go.mod` replace directives; modules of the repository and local replacements left out |
 | `uv.lock` | `pypi` | each `[[package]]`; `editable`, `virtual`, `directory` and `path` sources left out |
 | `poetry.lock` | `pypi` | each `[[package]]`; `directory` and `file` sources and `develop` packages left out |
+| `Cargo.lock` | `cargo` | each `[[package]]` with a `source`; the workspace crates and path dependencies, which have none, left out |
 | a Pants resolve lockfile | `pypi` | each locked requirement of the PEX JSON lock a `[python.resolves]` entry of `pants.toml` names |
 | `gradle.lockfile`, `settings-gradle.lockfile` | `maven` | each `group:artifact:version` line, as `group:artifact` |
 | a Gradle version catalog, `gradle/*.versions.toml` | `maven` | each library as `group:artifact` and each plugin as its id, at its version, `version.ref` or rich version |
@@ -168,7 +175,7 @@ osv-scanner writes no vulnerability in SPDX: use CycloneDX for them.
 
 A package of the SBOM matches a dependency change by the ecosystem its
 package URL names (`npm`, `composer`, `golang` is `go`, `pypi`, `maven`, `pub`,
-`nuget`, `gem`), its name, normalized for `pypi` and written `group:artifact` for `maven`, and its version, a leading `v` ignored. A package
+`nuget`, `gem`, `cargo`), its name, normalized for `pypi` and written `group:artifact` for `maven`, and its version, a leading `v` ignored. A package
 without a package URL matches by its name as written and its version, so a
 Python package without one matches only when the SBOM writes its normalized
 name. For each change, the base SBOM gives the `before` state, unless the

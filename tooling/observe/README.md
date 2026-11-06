@@ -80,6 +80,8 @@ See [doc/15-dotnet.md](doc/15-dotnet.md) for how it reads the projects,
 references, test assemblies and NuGet lock files of a .NET repository.
 See [doc/16-ruby.md](doc/16-ruby.md) for how it reads the packs, gems and
 edges of a Ruby or Rails repository, and its `Gemfile.lock`.
+See [doc/17-rust.md](doc/17-rust.md) for how it reads the crates and edges
+of a Rust repository, from a Cargo workspace or `Cargo.toml` files.
 See [doc/06-change-analyses.md](doc/06-change-analyses.md) for how it maps a
 change to components, tests, coverage and dependencies.
 
