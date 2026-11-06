@@ -621,6 +621,7 @@ func authoredAgentWorkflowsDomain() *arch.Builder {
 				arch.Bind("/tooling/contributor", "/protocols/architecture"),
 				arch.Bind("/tooling/contributor", "/protocols/capabilities"),
 				arch.Bind("/tooling/contributor", "/protocols/cli"),
+				arch.Bind("/tooling/contributor", "/protocols/codehost"),
 				arch.Bind("/tooling/contributor", "/protocols/collaboration"),
 				arch.Bind("/tooling/contributor", "/protocols/database"),
 				arch.Bind("/tooling/contributor", "/protocols/diagnostic"),

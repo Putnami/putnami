@@ -97,6 +97,11 @@
         {
           "kind": "project-dependency",
           "consumerProject": "/tooling/contributor",
+          "producerProject": "/protocols/codehost"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/contributor",
           "producerProject": "/protocols/collaboration"
         },
         {

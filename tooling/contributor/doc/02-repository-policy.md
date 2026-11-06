@@ -25,7 +25,12 @@ and epics that run 3 children at once in local workspaces.
 
 Putnami binds tasks and proposals to the GitHub provider and sets the
 conventions its maintainers use. It is a reference, not a default for other
-repositories.
+repositories. A repository on another code host binds that host's provider
+for each contract it serves, and keeps the same contributor members. On
+GitLab, `@putnami/gitlab-collaboration` serves tasks only, names the project
+with `project` in place of `repository`, and its sources read
+`gitlab:<host>/<project path>`. Until it serves proposals, the proposals
+binding names another provider, and `taskReference` uses `{url}`.
 
 ```json
 {
@@ -99,8 +104,8 @@ How the pieces combine for one delivery:
   and this repository gives four meanings to its status labels.
 - `publication.taskReference` puts `Closes #<id>` in the commit and the
   proposal body; the provider reads it to copy the issue's classification
-  labels (`inheritLabelPrefixes`) and GitHub closes the issue on merge when
-  the mandated outcome is complete. For an intermediate unit, native finalize's
+  labels (`inheritLabelPrefixes`) and the code host closes the issue on merge
+  when the mandated outcome is complete. For an intermediate unit, native finalize's
   `--partial-delivery` uses a non-closing parent reference, rejects a caller
   closing directive and skips the task's delivered transition. If a versioned
   workflow dossier reports `outcomeComplete: false`, normal parent-task

@@ -119,11 +119,20 @@ and prints both lists (`none` when empty). A member the read-back omits is not
 reported by the provider: the command says it did not verify it and
 continues. A member only the upsert answer carries stops it.
 
-Native finalization never reads provider settings. Label copying and author
+Native finalization reads one thing from a binding: where the proposals
+provider publishes. An id-only `taskReference`, such as `Closes #{id}`, only
+closes the task when the proposal lands where the task lives, so the command
+renders it only when the proposals binding names the provider that issued the
+task, both bindings locate the same place, and that place spells the task's
+source. A place is the binding's `host`, or the default host of the source's
+code host, and its `repository` or `project`. It names no provider. A binding
+that locates its proposals another way must use `{url}`.
+
+Native finalization reads no other provider setting. Label copying and author
 assignment are provider settings, and the provider checks they took effect
-before it answers (the GitHub provider answers `unresolved`,
-`github.incomplete`, when GitHub dropped one). A provider that silently ignores
-its own setting must be caught by its own suite.
+before it answers (it answers `unresolved` when its code host dropped one). A
+provider that silently ignores its own setting must be caught by its own
+suite.
 
 ### 6. The language rule is policy
 
@@ -152,7 +161,12 @@ every open proposal.
   second resolution beside the digest-bound pin.
 - **Keep `gh` in the helpers behind a flag.** Neutral content would still carry
   a backend, and a second backend would need a second flag.
-- **Read `options.collaboration.proposals.settings` in finalization.** Puts
-  provider vocabulary in neutral content; each provider would need a reader.
+- **Read the label and assignment settings of the proposals binding in
+  finalization.** Puts provider vocabulary in neutral content; each provider
+  would need a reader. The place the id-only reference needs is the one
+  exception, and it reads the same three keys on every code host.
+- **Recognize the id-only reference's source by provider name.** Every new
+  provider would need a branch in the contributor; the location words and the
+  code-host vocabulary already say where a binding publishes.
 - **Declare expected labels in the repository policy.** A second copy of the
   provider's prefixes, which drifts.

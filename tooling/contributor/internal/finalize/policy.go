@@ -10,7 +10,9 @@ import (
 	"strconv"
 	"strings"
 
+	"go.putnami.dev/protocol/codehost"
 	collab "go.putnami.dev/protocol/collaboration"
+	"go.putnami.dev/sdk/extension/collabhelper"
 
 	"go.putnami.dev/tooling/contributor/internal/language"
 )
@@ -238,40 +240,89 @@ func TaskReference(policy Policy, task collab.Task, partial bool) (string, error
 }
 
 // BoundTaskReference allows an id-only closing template only when the
-// resolved proposal binding itself proves the same GitHub repository as the
-// task. Policy text alone cannot establish where the provider will publish.
-func BoundTaskReference(policy Policy, task collab.Task, partial bool, capabilities collab.Capabilities) (string, error) {
+// resolved proposals binding itself proves it publishes where the task lives.
+// Policy text alone cannot establish where the provider will publish.
+func BoundTaskReference(policy Policy, task collab.Task, partial bool, proposals, tasks collab.Capabilities) (string, error) {
 	if !partial && strings.Contains(policy.Publication.TaskReference, "{id}") {
-		source, ok := boundGitHubProposalSource(capabilities)
-		if !ok || !strings.EqualFold(source, task.Ref.Source) || !strings.EqualFold(source, policy.Proposals.Source) {
+		if !strings.EqualFold(task.Ref.Source, policy.Proposals.Source) || !bindingLocates(proposals, tasks, task.Ref.Source) {
 			return "", errors.New("id-only taskReference requires the actual proposal binding and task to serve the same source; use {url}")
 		}
 	}
 	return TaskReference(policy, task, partial)
 }
 
-func boundGitHubProposalSource(capabilities collab.Capabilities) (string, bool) {
-	if capabilities.Status != collab.BindingStatusBound || capabilities.Binding == nil || capabilities.Provider == nil ||
-		capabilities.Provider.Name != "@putnami/github-collaboration" || capabilities.Binding.Provider != capabilities.Provider.Name ||
-		capabilities.Binding.Version != 1 {
-		return "", false
+// bindingLocates reports whether the proposals binding publishes in source. It
+// names no provider. Both bindings must be bound to the same provider, the one
+// that issued source, and locate the same place: the binding's host, or the
+// code host's default, and its repository or project. That place must spell
+// source, "<slug>:<host>/<location>", or "<slug>:<location>" on the slug's
+// default host.
+func bindingLocates(proposals, tasks collab.Capabilities, source string) bool {
+	if !boundTo(proposals) || !boundTo(tasks) || proposals.Provider.Name != tasks.Provider.Name {
+		return false
 	}
+	slug, _, found := strings.Cut(source, ":")
+	vocabulary, known := codehost.Lookup(slug)
+	if !found || !known {
+		return false
+	}
+	host, location, ok := bindingPlace(proposals.Binding.Settings, vocabulary.DefaultHost)
+	taskHost, taskLocation, taskOK := bindingPlace(tasks.Binding.Settings, vocabulary.DefaultHost)
+	if !ok || !taskOK || !strings.EqualFold(host, taskHost) || !strings.EqualFold(location, taskLocation) {
+		return false
+	}
+	if strings.EqualFold(source, slug+":"+host+"/"+location) {
+		return true
+	}
+	return strings.EqualFold(host, vocabulary.DefaultHost) && strings.EqualFold(source, slug+":"+location)
+}
+
+// bindingPlace reads where a binding's settings point: its host, or
+// defaultHost, and its repository or project.
+func bindingPlace(raw json.RawMessage, defaultHost string) (host, location string, ok bool) {
 	var settings struct {
-		Repository string `json:"repository"`
 		Host       string `json:"host"`
+		Repository string `json:"repository"`
+		Project    string `json:"project"`
 	}
-	if err := json.Unmarshal(capabilities.Binding.Settings, &settings); err != nil {
-		return "", false
+	if err := json.Unmarshal(raw, &settings); err != nil {
+		return "", "", false
 	}
-	if !regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9-]{0,38}/[A-Za-z0-9._-]{1,100}$`).MatchString(settings.Repository) {
-		return "", false
+	location = settings.Repository
+	if settings.Project != "" {
+		if location != "" {
+			return "", "", false
+		}
+		location = settings.Project
 	}
-	host := settings.Host
-	if host == "" || strings.EqualFold(host, "github.com") {
-		return "github:" + strings.ToLower(settings.Repository), true
+	host = settings.Host
+	if host == "" {
+		host = defaultHost
 	}
-	if strings.ContainsAny(host, "/:@?# ") || strings.HasPrefix(host, ".") || strings.HasSuffix(host, ".") {
-		return "", false
+	return host, location, validLocation(location) && collabhelper.ValidHost(host)
+}
+
+// segmentPattern is one segment of a repository or project path.
+var segmentPattern = regexp.MustCompile(`^[A-Za-z0-9_.-]+$`)
+
+// validLocation reports whether location is a repository or project path: two
+// or more segments, none of them a dot segment.
+func validLocation(location string) bool {
+	segments := strings.Split(location, "/")
+	if len(segments) < 2 {
+		return false
 	}
-	return "github:" + strings.ToLower(host) + "/" + strings.ToLower(settings.Repository), true
+	for _, segment := range segments {
+		if !segmentPattern.MatchString(segment) || segment == "." || segment == ".." {
+			return false
+		}
+	}
+	return true
+}
+
+// boundTo reports whether capabilities describe a usable binding whose
+// provider is the one the workspace names.
+func boundTo(capabilities collab.Capabilities) bool {
+	return capabilities.Status == collab.BindingStatusBound && capabilities.Binding != nil && capabilities.Provider != nil &&
+		capabilities.Binding.Provider == capabilities.Provider.Name && capabilities.Binding.Version == 1
 }
