@@ -73,7 +73,7 @@
     },
     {
       "id": "workspace-biome-default",
-      "text": "Workspace dependency installation materializes the Biome rules owned by the resolved TypeScript extension with the workspace-root role when the workspace has no configuration, preserves an existing workspace configuration byte-for-byte, and fails explicitly when the extension default cannot be read or parsed. The Biome devDependency it adds to a workspace without one is the exact release those rules' schema names."
+      "text": "Workspace dependency installation materializes the extension's Biome rules as the workspace-root configuration when the workspace has none, preserves an existing one byte-for-byte, and fails explicitly when the extension default cannot be read or parsed. The Biome devDependency it adds is the exact release those rules' schema names. The rules keep every specs.baseline.json expanded, as `putnami specs baseline --update` writes it."
     },
     {
       "id": "workspace-bun-pin",

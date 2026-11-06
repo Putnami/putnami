@@ -8,6 +8,7 @@ import (
 	stdexec "os/exec"
 	"path/filepath"
 	"reflect"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -993,6 +994,39 @@ func TestWorkspaceBiomeDefault_InstallsTheBiomeReleaseTheShippedRulesName(t *tes
 			t.Errorf("%s is read by this project's tests but is not a declared test input (options.test.filePatterns in typescript/extension/putnami.json)", read)
 		}
 	}
+}
+
+// The shipped rules format every specs.baseline.json with expand "always",
+// the layout `putnami specs baseline --update` writes, so lint --fix never
+// rewrites a baseline the specs ratchet compares byte for byte.
+func TestWorkspaceBiomeDefault_KeepsASpecsBaselineExpanded(t *testing.T) {
+	spectest.Proves(t, "typescript/typescript-project-toolchain", "workspace-biome-default", "the-shipped-rules-keep-a-specs-baseline-expanded")
+	data, err := os.ReadFile(filepath.Join(extensionProjectRoot(t), "config", "biome.json"))
+	if err != nil {
+		t.Fatalf("read shipped biome config: %v", err)
+	}
+	var config struct {
+		Overrides []struct {
+			Includes []string `json:"includes"`
+			JSON     struct {
+				Formatter struct {
+					Expand string `json:"expand"`
+				} `json:"formatter"`
+			} `json:"json"`
+		} `json:"overrides"`
+	}
+	if err := json.Unmarshal(data, &config); err != nil {
+		t.Fatalf("parse shipped biome config: %v", err)
+	}
+	for _, override := range config.Overrides {
+		if slices.Contains(override.Includes, "**/specs.baseline.json") {
+			if override.JSON.Formatter.Expand != "always" {
+				t.Fatalf("**/specs.baseline.json formats with expand %q, want always", override.JSON.Formatter.Expand)
+			}
+			return
+		}
+	}
+	t.Fatal("no override of config/biome.json includes **/specs.baseline.json")
 }
 
 // isExactRelease reports whether version is MAJOR.MINOR.PATCH with decimal
