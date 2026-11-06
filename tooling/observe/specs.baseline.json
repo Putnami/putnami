@@ -54,6 +54,11 @@
     "tooling/observe-python#python-probe-answer",
     "tooling/observe-python#python-project-edges",
     "tooling/observe-python#python-projects-are-components",
+    "tooling/observe-ruby#ruby-change-analysis",
+    "tooling/observe-ruby#ruby-components",
+    "tooling/observe-ruby#ruby-edges",
+    "tooling/observe-ruby#ruby-gemfile-lock",
+    "tooling/observe-ruby#ruby-reports",
     "tooling/observe-upload#upload-fails-open",
     "tooling/observe-upload#upload-hands-the-document-to-the-reporter"
   ]
