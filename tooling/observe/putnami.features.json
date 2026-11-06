@@ -577,6 +577,83 @@
       ]
     },
     {
+      "id": "tooling/observe-moon",
+      "type": "feature",
+      "name": "Find the projects and declared edges of a moon workspace",
+      "outcome": "putnami observe, in a moon monorepo without a Putnami workspace, knows its moon projects, which directory each one owns and which projects each one depends on, from the project graph export the CI wrote when there is one and from .moon/workspace.yml and each moon.yml otherwise, whatever language a project is written in and without running moon, so a change to a shared project marks the projects that depend on it",
+      "owner": "tooling",
+      "target": "modeled",
+      "requirements": [
+        {
+          "id": "moon-graph-export",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-moon-graph-export-gives-the-projects-and-their-edges",
+              "a-malformed-moon-graph-export-falls-back-to-the-configuration"
+            ]
+          }
+        },
+        {
+          "id": "moon-projects",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "globbed-and-mapped-projects-are-components",
+              "a-malformed-workspace-yml-leaves-the-repository-to-the-other-detectors"
+            ]
+          }
+        },
+        {
+          "id": "moon-edges",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "depends-on-and-package-dependencies-are-edges"
+            ]
+          }
+        },
+        {
+          "id": "moon-probe-answer",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-moon-answer-is-a-valid-probe-result"
+            ]
+          }
+        },
+        {
+          "id": "moon-change-analysis",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-moon-workspace-is-explained-with-and-without-an-export"
+            ]
+          }
+        }
+      ]
+    },
+    {
       "id": "tooling/observe-pants",
       "type": "feature",
       "name": "Find the components of a Pants repository that keeps its own CI",
