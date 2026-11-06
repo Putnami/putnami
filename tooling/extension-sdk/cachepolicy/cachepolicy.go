@@ -52,7 +52,9 @@ type Entry struct {
 	Size int64
 	// LastUsed is the recency the eviction order is taken over. Whether it is a
 	// true access time or merely a download/extraction time is the extension's
-	// business; the policy only requires that older means less valuable.
+	// business; the policy only requires that older means less valuable. With
+	// a grace window, Collect also spares an entry whose Path has a
+	// modification time inside that window when its removal comes.
 	LastUsed time.Time
 	// Dir marks an entry that must be removed as a tree rather than a file.
 	Dir bool
@@ -167,17 +169,10 @@ func Collect(root string, totalBytes int64, candidates []Entry, opts Options) (*
 	return res, nil
 }
 
-// usedSinceScan reports whether a victim's modification time is now inside the
-// grace window, although the scan saw it outside.
-//
-// An extension measures its whole cache between the scan and Collect, and the
-// removals themselves take time, so a victim's LastUsed can be minutes old
-// when its turn comes. A toolchain that reads a cold entry in that window
-// refreshes its mtime and hands its path to a tool that opens it later: the go
-// command does this for the export data staticcheck loads. Reading the mtime
-// again right before the removal shrinks that window to one stat. A victim the
-// stat cannot read is left to the removal, which treats a vanished entry as a
-// miss.
+// usedSinceScan reports whether a victim's own modification time is now
+// inside the grace window. Collect reads it right before each removal, so an
+// entry a toolchain used after the scan stays. A path the stat cannot read is
+// left to the removal.
 func usedSinceScan(path string, opts Options) bool {
 	if opts.Grace <= 0 {
 		return false

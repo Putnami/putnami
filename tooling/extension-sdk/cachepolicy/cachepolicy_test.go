@@ -90,12 +90,9 @@ func TestCollect_GraceProtectsRecentEntries(t *testing.T) {
 	}
 }
 
-// TestCollect_SparesAnEntryUsedAfterTheScan is the race behind #871. An
-// extension scans its cache, then measures the rest of it, and only then calls
-// Collect, so the LastUsed values it passes can be minutes old. A go command
-// that reads a cold entry in that window refreshes its mtime and hands its path
-// to a tool that opens it later. Removing that entry on the scan's word breaks
-// the tool with ENOENT. Collect must read the mtime again before it removes.
+// TestCollect_SparesAnEntryUsedAfterTheScan: an entry whose mtime moved inside
+// the grace window between the scan and Collect stays, and a still-cold victim
+// of the same scan goes.
 func TestCollect_SparesAnEntryUsedAfterTheScan(t *testing.T) {
 	spectest.Proves(t, "tooling/extension-authoring", "cache-eviction-policy", "an-entry-used-after-the-scan-is-spared")
 	root := t.TempDir()
@@ -110,7 +107,7 @@ func TestCollect_SparesAnEntryUsedAfterTheScan(t *testing.T) {
 		{Path: cold, Size: 100, LastUsed: scanned},
 	}
 
-	// Between the scan and Collect, a go command marks one entry used.
+	// Between the scan and Collect, a toolchain marks one entry used.
 	if err := os.Chtimes(used, now, now); err != nil {
 		t.Fatalf("chtimes: %v", err)
 	}
