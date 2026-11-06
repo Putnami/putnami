@@ -4,6 +4,11 @@
   "executableRequirements": [
     "go/event-delivery#delivery-semantics",
     "go/event-delivery#ingress-authority",
+    "go/event-delivery#provider-publish",
+    "go/event-delivery#provider-publish-retry",
+    "go/event-delivery#push-receiver-mounting",
+    "go/event-delivery#push-refusal-envelope",
+    "go/event-delivery#redelivery-request",
     "go/event-delivery#retry-boundary",
     "go/event-delivery#shutdown",
     "go/event-delivery#terminal-outcome"

@@ -11,16 +11,25 @@
     "tooling/extension-authoring#credential-confinement",
     "tooling/extension-authoring#dry-run-member-probe",
     "tooling/extension-authoring#ecosystem-profiles",
+    "tooling/extension-authoring#go-embed-source-inputs",
     "tooling/extension-authoring#host-identity-scrub",
+    "tooling/extension-authoring#host-rpc-client",
+    "tooling/extension-authoring#host-rpc-version-lines-client",
+    "tooling/extension-authoring#host-rpc-workspace-owners-client",
+    "tooling/extension-authoring#host-rpc-workspace-probe-client",
     "tooling/extension-authoring#infra-aggregation-neutrality",
     "tooling/extension-authoring#local-image-publication-boundary",
     "tooling/extension-authoring#log-forwarding-fidelity",
     "tooling/extension-authoring#manifest-validated-at-build-time",
     "tooling/extension-authoring#oci-publish-by-digest",
+    "tooling/extension-authoring#publication-outbox",
     "tooling/extension-authoring#release-plan-compatibility",
+    "tooling/extension-authoring#resolve-a-path-against-the-typed-directory",
     "tooling/extension-authoring#shared-package-metadata-writer",
     "tooling/extension-authoring#subprocess-control",
     "tooling/extension-authoring#test-environment-policy",
-    "tooling/extension-authoring#tree-fingerprint"
+    "tooling/extension-authoring#tree-fingerprint",
+    "tooling/extension-authoring#upload-kit-tells-a-mismatch-from-a-conflict",
+    "tooling/extension-authoring#upload-kit-uploads-what-the-engine-verified"
   ]
 }

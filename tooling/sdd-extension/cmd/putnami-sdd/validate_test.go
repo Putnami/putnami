@@ -1331,12 +1331,48 @@ func TestSpecsRatchetValidateFailsOnARecordedRegression(t *testing.T) {
 	assertReportDiagnosticsReachTheWire(t, outcome)
 }
 
+// TestSpecsRatchetValidateFailsOnAStaleBaseline: a committed baseline that
+// records less than the floor fails the step, and the wire carries the stale
+// error naming the file and the summary's stale count.
+func TestSpecsRatchetValidateFailsOnAStaleBaseline(t *testing.T) {
+	root := ratchetFixture(t, "enforce")
+	writeFixture(t, filepath.Join(root, "app", featureproto.SpecsBaselineFilename), `{
+  "$schema": "https://putnami.dev/schemas/putnami-specs-baseline.json",
+  "protocolVersion": 2,
+  "executableRequirements": []
+}
+`)
+	outcome := runJob(t, runSpecsRatchetValidate, workspaceJobContext(root, ratchetMembers(t, root, "enforce")))
+
+	if outcome.err == nil {
+		t.Fatal("a stale baseline passed the step")
+	}
+	stale := findDiagnosticEvent(outcome.diagnostics(), sdd.ErrorCodeStaleSpecsBaseline)
+	if stale == nil || stale.Severity == nil || *stale.Severity != runtimeproto.SeverityError {
+		t.Fatalf("diagnostic events = %+v, want the stale error on the wire", outcome.diagnostics())
+	}
+	if !strings.Contains(stale.Message, "app/"+featureproto.SpecsBaselineFilename) {
+		t.Errorf("stale message = %q, want it to name the file", stale.Message)
+	}
+	if want := "1 stale file(s)"; !strings.Contains(outcome.summaryLine(), want) {
+		t.Errorf("summary line = %q, want one containing %q", outcome.summaryLine(), want)
+	}
+	assertReportDiagnosticsReachTheWire(t, outcome)
+}
+
 // TestSpecsRatchetValidateHoldsAMatchingBaseline: the committed floor equals
 // the derived one — silence, and a cache-shaped verdict with no warnings.
 func TestSpecsRatchetValidateHoldsAMatchingBaseline(t *testing.T) {
 	root := ratchetFixture(t, "enforce")
 	writeFixture(t, filepath.Join(root, "app", featureproto.SpecsBaselineFilename),
-		`{"$schema":"https://putnami.dev/schemas/putnami-specs-baseline.json","protocolVersion":2,"executableRequirements":["billing/invoicing#issue"]}`)
+		`{
+  "$schema": "https://putnami.dev/schemas/putnami-specs-baseline.json",
+  "protocolVersion": 2,
+  "executableRequirements": [
+    "billing/invoicing#issue"
+  ]
+}
+`)
 	outcome := runJob(t, runSpecsRatchetValidate, workspaceJobContext(root, ratchetMembers(t, root, "enforce")))
 
 	if outcome.err != nil {

@@ -188,7 +188,8 @@ func runArchitectureValidate(ctx *pctx.Context, emit *jsonl.Emitter, _ []string)
 // `validate-workspace` command: the rollout ratchet of the executable-spec
 // gate. It derives the CURRENT enforce floor from the committed
 // manifests and options and compares it against the committed
-// specs.baseline.json files with the protocol's shrink-only rule.
+// specs.baseline.json files with the protocol's shrink-only rule, then fails a
+// committed file that `putnami specs baseline --update` would rewrite.
 //
 // Like `architecture-validate` it runs over the CURRENT WORKTREE ONLY and
 // reads no git history: both sides of the comparison are committed files the
@@ -207,8 +208,8 @@ func runSpecsRatchetValidate(ctx *pctx.Context, emit *jsonl.Emitter, _ []string)
 	if report.Current != nil {
 		enforced = len(report.Current.Projects)
 	}
-	emit.Summary(fmt.Sprintf("specs ratchet: %d enforced project(s), baseline %d, %d regression(s), %d lost requirement(s)",
-		enforced, report.Summary.BaselineProjects, report.Summary.RegressedProjects, report.Summary.LostRequirements))
+	emit.Summary(fmt.Sprintf("specs ratchet: %d enforced project(s), baseline %d, %d regression(s), %d lost requirement(s), %d stale file(s)",
+		enforced, report.Summary.BaselineProjects, report.Summary.RegressedProjects, report.Summary.LostRequirements, len(report.Stale)))
 	return finish(report, verdict)
 }
 

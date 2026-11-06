@@ -13,6 +13,7 @@
     "typescript/web-analytics-collection#page-views-are-collected-without-cookies",
     "typescript/web-analytics-collection#raw-events-expire",
     "typescript/web-analytics-collection#the-browser-bundle-stays-inside-the-boundary",
+    "typescript/web-analytics-collection#the-tables-follow-the-datasource-schema",
     "typescript/web-analytics-collection#undeclared-actions-are-dropped"
   ]
 }

@@ -3,6 +3,7 @@
   "protocolVersion": 2,
   "executableRequirements": [
     "tooling/specification-driven-development#a-spec-format-needs-an-opt-in",
+    "tooling/specification-driven-development#a-stale-specs-baseline-fails",
     "tooling/specification-driven-development#architecture-adoption-policy",
     "tooling/specification-driven-development#authoring-never-grants-a-permission",
     "tooling/specification-driven-development#codeowners-follow-declared-owners",
@@ -13,6 +14,7 @@
     "tooling/specification-driven-development#every-project-carries-feature-coverage",
     "tooling/specification-driven-development#external-spec-files-key-the-spec-tasks",
     "tooling/specification-driven-development#external-specs-share-one-discovery",
+    "tooling/specification-driven-development#feature-authority-answers-resolve",
     "tooling/specification-driven-development#feature-findings-name-file-positions",
     "tooling/specification-driven-development#features-name-their-surface",
     "tooling/specification-driven-development#gherkin-specs-reach-the-gate",
@@ -22,9 +24,13 @@
     "tooling/specification-driven-development#openspec-specs-reach-the-gate",
     "tooling/specification-driven-development#opt-in-activation",
     "tooling/specification-driven-development#predictable-spec-scaffolding",
+    "tooling/specification-driven-development#recipe-indexes-are-checked",
     "tooling/specification-driven-development#refuse-rather-than-widen",
     "tooling/specification-driven-development#settled-decisions-are-enforced",
     "tooling/specification-driven-development#spec-findings-name-file-positions",
-    "tooling/specification-driven-development#specs-surface-names-the-source"
+    "tooling/specification-driven-development#specs-surface-names-the-source",
+    "tooling/specification-driven-development#squash-keeps-the-breaking-marker",
+    "tooling/specification-driven-development#squash-names-no-agent",
+    "tooling/specification-driven-development#verify-names-an-empty-evaluation"
   ]
 }

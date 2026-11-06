@@ -8,6 +8,7 @@
     "tooling/project-scaffolding#declared-extension-activates",
     "tooling/project-scaffolding#declared-output-ownership",
     "tooling/project-scaffolding#dry-run-produces-nothing",
+    "tooling/project-scaffolding#generated-imports-are-declared",
     "tooling/project-scaffolding#go-imports-are-required",
     "tooling/project-scaffolding#go-mod-survives-tidy",
     "tooling/project-scaffolding#manifest-selects-the-template",

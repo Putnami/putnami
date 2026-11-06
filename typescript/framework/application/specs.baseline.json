@@ -69,6 +69,7 @@
     "typescript/http-services#readiness-marker",
     "typescript/http-services#request-bounds",
     "typescript/http-services#request-log-and-trace",
+    "typescript/http-services#request-rewrite",
     "typescript/http-services#response-encoding",
     "typescript/http-services#route-fragments",
     "typescript/http-services#routing",

@@ -23,9 +23,9 @@ import (
 // The file is the reviewed policy artifact the epic requires — an enforced
 // project may not regress to report/off, and may not lose
 // executable-requirement coverage, without an explicit change to its file in
-// the same diff. Growth is always legal without touching it: executable
-// requirements may increase freely, and the baseline is raised deliberately,
-// never by side effect.
+// the same diff. This comparison only counts growth and never makes it a
+// finding; a consumer decides what growth means (the @putnami/sdd extension
+// fails a committed file that `putnami specs baseline --update` would rewrite).
 //
 // The comparison here is pure and worktree-only on both sides: the caller
 // derives the CURRENT floor from the committed manifests and options it
@@ -325,8 +325,8 @@ type SpecsRatchetSummary struct {
 	// still-enforced project.
 	LostRequirements int `json:"lostRequirements"`
 	// GrownProjects and GrownRequirements count current enforcement the
-	// baseline does not record yet — always legal, never a finding, and the
-	// caller may surface them as a nudge to raise the floor.
+	// baseline does not record yet. They are never a finding here; the caller
+	// decides what growth means.
 	GrownProjects     int `json:"grownProjects"`
 	GrownRequirements int `json:"grownRequirements"`
 }
