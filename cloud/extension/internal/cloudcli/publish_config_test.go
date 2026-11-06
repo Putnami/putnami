@@ -8,6 +8,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -88,6 +89,51 @@ func TestManagedConfigPublishRejectsSelectionBeforeRegistryAccess(t *testing.T) 
 	})}})
 	if err == nil || !strings.Contains(err.Error(), "selected immutable source") || requests != 0 {
 		t.Fatalf("error=%v requests=%d", err, requests)
+	}
+}
+
+func TestManagedConfigPublishVersionsTheMemberFromTheJobContext(t *testing.T) {
+	root, prepared := configMemberPackageFixture(t)
+	// Another session over the checkout stamped the version of the tree it saw.
+	writeJSONFile(t, filepath.Join(root, ".gen", "version.json"), map[string]any{"version": "1.2.3-another-session"})
+	params := configMemberPlan(prepared, "sha256:"+strings.Repeat("e", 64))
+	params["dry-run"] = true
+	contextFile := filepath.Join(t.TempDir(), "context.json")
+	writeJSONFile(t, contextFile, map[string]any{
+		"workspaceRoot": root, "params": params,
+		"version": map[string]any{"base": "1.2.3", "full": prepared.Version},
+	})
+	var output []string
+	err := RunCommand("config", IO{
+		Env:    map[string]string{"PUTNAMI_HOME": t.TempDir()},
+		Stdout: func(line string) { output = append(output, line) },
+	}, []string{"publish", "--putnamiContext", contextFile})
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := fmt.Sprintf("Dry run: Config member %s@%s is ready for publication.", prepared.Coordinate, prepared.Version)
+	if !slices.Contains(output, want) {
+		t.Fatalf("output = %q, want %q", output, want)
+	}
+}
+
+func TestManagedConfigPublishRefusesAJobContextVersionThePlanDidNotSelect(t *testing.T) {
+	root, prepared := configMemberPackageFixture(t)
+	params := configMemberPlan(prepared, "sha256:"+strings.Repeat("e", 64))
+	params["dry-run"] = true
+	contextFile := filepath.Join(t.TempDir(), "context.json")
+	writeJSONFile(t, contextFile, map[string]any{
+		"workspaceRoot": root, "params": params,
+		"version": map[string]any{"base": "1.2.3", "full": "1.2.4"},
+	})
+	err := RunCommand("config", IO{
+		Env:    map[string]string{"PUTNAMI_HOME": t.TempDir()},
+		Stdout: func(string) {},
+	}, []string{"publish", "--putnamiContext", contextFile})
+	want := fmt.Sprintf(`version differs (selected version %q, source revision %q; prepared version "1.2.4", source revision %q)`,
+		prepared.Version, prepared.Member.Descriptor.SourceProvenance.Revision, prepared.Member.Descriptor.SourceProvenance.Revision)
+	if err == nil || !strings.HasSuffix(err.Error(), want) {
+		t.Fatalf("error = %v\nwant suffix %s", err, want)
 	}
 }
 

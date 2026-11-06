@@ -38,7 +38,9 @@ the Config logic behind `config publish`, `config validate` and
   `/api/schemas`. A release set is the immutable record of what one publishing
   run released. When the command runs with a release-set context, it takes the
   authored-member path instead: it prepares and verifies the authored Config
-  member and publishes it to Distribution.
+  member and publishes it to Distribution. The member's version is the full
+  version the job context carries for the project. When there is none, for
+  example outside a job, it is the version `.gen/version.json` records.
 
 Run `putnami cloud config help` or `putnami cloud secrets help` for the full
 flag list.

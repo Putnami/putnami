@@ -33,6 +33,11 @@ type IO struct {
 	// Context optionally supplies an invocation lifecycle. Long-running
 	// commands fall back to a signal-aware context when it is nil.
 	Context context.Context
+	// Version is the full version the job context carries for the job's
+	// project: the version the release-set plan selects members at. It is empty
+	// when the command runs outside a job or the context carries no full
+	// version.
+	Version string
 	// Sleep pauses a polling loop while remaining cancelable. Commands fall
 	// back to a context-aware timer when this test seam is nil.
 	Sleep func(context.Context, time.Duration) error
