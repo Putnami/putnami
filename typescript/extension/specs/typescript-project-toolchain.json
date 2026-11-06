@@ -44,6 +44,10 @@
       "text": "A served or run child process forwards its own exit code; an interrupt terminates the whole child process group and reports 130, escalating to SIGKILL when the group does not exit within the grace period."
     },
     {
+      "id": "serve-kill-port",
+      "text": "Serve with --kill-port ends only the processes that listen on the TCP port: it asks lsof for the port's listeners, falls back to fuser only when lsof is absent, and kills nothing when lsof prints anything but one process id per line."
+    },
+    {
       "id": "environment-independent-library-output",
       "text": "Transpiled library output does not depend on the builder's environment: JSX compiles to the production automatic runtime (react/jsx-runtime) whatever NODE_ENV or bunfig.toml the builder has, and process.env reads, NODE_ENV included, stay runtime reads for the consumer."
     },

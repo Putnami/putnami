@@ -124,6 +124,21 @@
           }
         },
         {
+          "id": "serve-kill-port",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-listener-is-killed-and-its-client-is-not",
+              "output-other-than-process-ids-kills-nothing",
+              "fuser-runs-only-when-lsof-is-absent"
+            ]
+          }
+        },
+        {
           "id": "environment-independent-library-output",
           "stage": "coded",
           "evidenceKinds": [
