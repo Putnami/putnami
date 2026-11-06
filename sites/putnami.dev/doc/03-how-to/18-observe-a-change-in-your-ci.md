@@ -1,8 +1,17 @@
 # Observe a change in your CI
 
-You will add one step to a GitHub Actions workflow, or one job to a GitLab CI pipeline, that reads what your tests already produced and writes a change evidence document: which commit was built, what it is measured against, which files changed, and which test and coverage reports the job wrote. Your repository needs no Putnami workspace, and your pipeline keeps its own build and test commands.
+You will add one step to a GitHub Actions workflow, or one job to a GitLab CI pipeline, that explains each change from what your tests already produced. Your repository needs no Putnami workspace, and your pipeline keeps its own build and test commands.
 
-`putnami observe` comes with the `@putnami/observe` extension. It is `experimental`: being on the stable channel is not a compatibility promise.
+For each pull or merge request, the step answers:
+
+- which commit was built, and which commit the change is measured against;
+- which files changed, which parts of the repository they belong to, and which parts depend on them;
+- which tests passed or failed, and how much of the changed lines they covered;
+- which dependency versions the lockfiles moved and, with a software bill of materials (SBOM), the licences and known vulnerabilities each move brings or removes.
+
+It writes the answers in the job log, as a change evidence document you keep as an artifact, and as a status and a note on the pull or merge request. It never fails your job.
+
+`putnami observe` comes with the `@putnami/observe` extension. It is `experimental`: being on the stable channel is not a compatibility promise. [Observe](/docs/tooling-&-workspace/observe) lists every CI, repository tool, report format, lockfile and SBOM format it reads.
 
 ## What the snippets install
 
@@ -16,13 +25,45 @@ You will add one step to a GitHub Actions workflow, or one job to a GitLab CI pi
 
 `putnami observe` finds the base of the change from the CI: the pull request base on GitHub, the merge request diff base on GitLab, and on a branch push the commit before the push. It deepens a shallow clone itself, so you do not change `fetch-depth` or `GIT_DEPTH`. It finds JUnit, TRX, LCOV, Cobertura, Clover, JaCoCo and Go cover reports by their content, anywhere in the checkout except `.git`, `node_modules`, `vendor` and the Gradle and Maven build outputs that hold no report, and the reports of Bazel through its `bazel-testlogs` and `bazel-out` links.
 
-In a Python repository, have pytest write both reports, with pytest-cov installed:
+The install lines need the network: when the installer or the registry cannot be reached, the GitHub step or the GitLab job fails.
+
+## Steps
+
+### 1) Write the reports your stack needs
+
+`putnami observe` reads the test and coverage reports your job writes; it runs no test itself. Find your stack below and add what it says to your test step. A repository that mixes stacks, such as a Go API and a Node front end, follows each section that applies.
+
+#### Node: npm, pnpm, yarn, bun, Turborepo, Lerna
+
+With Vitest, write a JUnit report and coverage:
 
 ```bash
-pytest --junitxml=junit.xml --cov --cov-report=xml
+npx vitest run --coverage --reporter=default --reporter=junit --outputFile.junit=junit.xml
 ```
 
-`putnami observe` places each test case and each covered file on the project that holds it: a member of the uv workspace, or a directory whose `pyproject.toml` has a `[project]` or `[tool.poetry]` table. In a uv workspace, run it from the root as `uv run --all-packages pytest …`, so every member is installed. pytest names each test case from its file's path relative to its `rootdir`: if pytest takes another `rootdir`, for example a project's directory that holds the pytest configuration, add `--rootdir=.` so the names stay relative to the repository root. A `uv.lock` or `poetry.lock` change is a dependency change of ecosystem `pypi`.
+With Jest, add `jest-junit` to the dev dependencies, then run:
+
+```bash
+npx jest --ci --coverage --reporters=default --reporters=jest-junit
+```
+
+Each member of the workspace that `package.json` `workspaces` or `pnpm-workspace.yaml` lists is a component. A `workspace:`, `file:`, `link:` or `portal:` dependency on another member is an edge, and so is a version range another member satisfies. A `package-lock.json`, `pnpm-lock.yaml` or `yarn.lock` change is a dependency change of ecosystem `npm`. A `bun.lock` change is not read.
+
+#### Nx
+
+Run your tests as Node's section says, then write the project graph before the observe step:
+
+```bash
+npx nx graph --file=graph.json
+```
+
+`putnami observe` reads `graph.json` at the repository root. It holds the edges Nx computes from source imports, so a change to a library marks every project that imports it. Without it, the projects and edges come from `project.json`, `nx.json` and the `package.json` dependencies.
+
+#### Rush
+
+Run your tests as Node's section says. Each project of `rush.json` is a component, and a `package.json` dependency on another Rush project is an edge. A change to the lockfile under `common/config/rush`, or to a subspace lockfile, is a dependency change of ecosystem `npm`.
+
+#### moon
 
 In a moon monorepo, `putnami observe` places each change on the moon project that holds it, whatever its language, and marks the projects whose `moon.yml` `dependsOn` or task `deps`, or whose `package.json` dependencies, name it. moon also infers edges from its language toolchains, which only its own graph holds: to use them, write the graph before the observe line, in a step where `moon` is installed:
 
@@ -31,6 +72,38 @@ moon project-graph --json > moon-graph.json
 ```
 
 `putnami observe` reads `moon-graph.json` at the repository root; `--moon-graph <path>` names another file. Without it, `putnami observe` reads `.moon/workspace.yml` and each `moon.yml` itself.
+
+#### Go
+
+Write a JUnit report with [gotestsum](https://github.com/gotestyourself/gotestsum) and a cover profile:
+
+```bash
+go run gotest.tools/gotestsum@latest --junitfile reports/junit.xml -- -coverprofile=reports/coverage.out ./...
+```
+
+Each module is a component, a member of `go.work` or any directory with a `go.mod`, and a `require` of another module of the repository is an edge. Each test case and each covered file lands on its module by import path. A `go.mod` change to a required version is a dependency change of ecosystem `go`.
+
+#### PHP and Composer
+
+Have PHPUnit write a JUnit report and Clover coverage, with Xdebug or PCOV enabled:
+
+```bash
+vendor/bin/phpunit --log-junit junit.xml --coverage-clover clover.xml
+```
+
+Each directory with a `composer.json` is a component, and a package a `path` repository provides is an edge. A `composer.lock` change is a dependency change of ecosystem `composer`.
+
+#### Python
+
+In a Python repository, have pytest write both reports, with pytest-cov installed:
+
+```bash
+pytest --junitxml=junit.xml --cov --cov-report=xml
+```
+
+`putnami observe` places each test case and each covered file on the project that holds it: a member of the uv workspace, or a directory whose `pyproject.toml` has a `[project]` or `[tool.poetry]` table. In a uv workspace, run it from the root as `uv run --all-packages pytest …`, so every member is installed. pytest names each test case from its file's path relative to its `rootdir`: if pytest takes another `rootdir`, for example a project's directory that holds the pytest configuration, add `--rootdir=.` so the names stay relative to the repository root. A `uv.lock` or `poetry.lock` change is a dependency change of ecosystem `pypi`.
+
+#### Pants
 
 In a Pants repository, write the export of the target graph and run the tests with their reports, before the observe step:
 
@@ -41,6 +114,8 @@ pants test --test-report --use-coverage --coverage-py-report=xml ::
 
 `pants peek` lists every target with the dependencies Pants infers from imports, so `putnami observe` knows that a change to a library marks the code that imports it. Each directory of BUILD targets is a component; without the export, the components have no edge, and the summary says how to write it. The JUnit reports under `dist/test/reports` and the coverage under `dist/coverage` land on the components, and a change to a lockfile that `[python.resolves]` in `pants.toml` names is a dependency change of ecosystem `pypi`. Write the export elsewhere with `--pants-graph <path>`.
 
+#### Bazel
+
 In a Bazel repository, write the query export before `putnami observe`, in the job that ran `bazel test` or `bazel coverage --combined_report=lcov`:
 
 ```bash
@@ -48,6 +123,8 @@ bazel query 'deps(//...)' --output=streamed_jsonproto > bazel-graph.json
 ```
 
 `putnami observe` makes each Bazel package a component, reads the edges between packages from `bazel-graph.json`, and finds the logs of `bazel-testlogs` and the combined LCOV report of `bazel-out/_coverage/_coverage_report.dat` through the links Bazel leaves at the root. Each test log goes to the package of its test target. Without the export, the packages come from the `BUILD` files, without edges, and the summary names the command. The links point into Bazel's output base, so on GitLab run these lines in the job that ran Bazel, not in a later one.
+
+#### Gradle, Android included
 
 In a Gradle repository, Android included, apply the `jacoco` plugin with its XML report in each project, and run the tests before the observe step:
 
@@ -69,6 +146,8 @@ tasks.jacocoTestReport {
 
 Each project the settings `include` is a component, and its `project(":x")` and `projects.x` dependencies are its edges. The JUnit reports under `build/test-results` and the JaCoCo or Kover reports under `build/reports` land on the projects. A change to a `gradle.lockfile`, which `./gradlew dependencies --write-locks` writes when dependency locking is on, or to `gradle/libs.versions.toml` is a dependency change of ecosystem `maven`. On Android, run `./gradlew testDebugUnitTest createDebugUnitTestCoverageReport` with `enableUnitTestCoverage = true` on the debug build type.
 
+#### Maven
+
 In a Maven repository, add the `prepare-agent` and `report` goals of `jacoco-maven-plugin` to the build, then run `mvn verify`:
 
 ```xml
@@ -85,6 +164,8 @@ In a Maven repository, add the `prepare-agent` and `report` goals of `jacoco-mav
 
 Each module the POMs list is a component, and a dependency on another module is an edge. The reports under `target/surefire-reports`, `target/failsafe-reports` and `target/site/jacoco` land on the modules. Maven has no lockfile, so a Maven repository has no dependency change. To read only some reports, name them, for example `--junit '**/target/surefire-reports/*.xml' --coverage '**/target/site/jacoco/jacoco.xml'`.
 
+#### iOS and Swift
+
 In an iOS or Swift repository, write each package's description and convert the `.xcresult` bundle to JUnit and Cobertura, before the observe step. The same lines run in a GitHub Actions job on `runs-on: macos-15` and in a GitLab job on a macOS runner (`tags: [saas-macos-medium-m1]`), with xcbeautify and xcresultparser installed (`brew install xcbeautify xcresultparser`):
 
 ```bash
@@ -97,6 +178,8 @@ xcresultparser --output-format cobertura --project-root . build/Test.xcresult > 
 
 For a package on its own, `swift test --enable-code-coverage --xunit-output build/reports/xunit.xml` writes the JUnit report, and `llvm-cov export -format=lcov` the coverage. `putnami observe` reads no `.xcresult` itself. Each Swift package, each of its targets and each Xcode project is a component; the export gives the targets' dependencies, and a local package the Xcode project references is an edge, so a change to a package marks the packages and the app that use it. Without the export, the summary says how to write it. A test case named `PricingTests.PriceCalculatorTests` lands on the test target `PricingTests`, and a change to `Package.resolved` or `Podfile.lock` is a dependency change of ecosystem `swift` or `cocoapods`.
 
+#### Dart and Flutter
+
 In a Dart or Flutter repository, run each package's tests with coverage and a JUnit report, with [junitreport](https://pub.dev/packages/junitreport) activated by `dart pub global activate junitreport`:
 
 ```bash
@@ -105,6 +188,8 @@ melos exec --dir-exists=test -- "flutter test --machine --coverage | tojunit --o
 
 Without melos, run the same pipe in each package's directory, or `dart test --reporter json | tojunit --output test-results.xml` for a plain Dart package. Each package with a `pubspec.yaml` is a component: a member of the pub workspace or of the `melos.yaml` packages, or any other package, and a `path:` dependency, or inside a workspace a dependency on another of its packages, is an edge. Each package's `coverage/lcov.info` reads from that package's directory, each test case lands on the package of its test file, and a `pubspec.lock` change is a dependency change of ecosystem `pub`.
 
+#### .NET
+
 In a .NET repository, have `dotnet test` write a TRX report and Coverlet's coverage, with the `coverlet.collector` package in each test project:
 
 ```bash
@@ -112,6 +197,8 @@ dotnet test --logger trx --results-directory TestResults --collect:"XPlat Code C
 ```
 
 Each project file is a component, a `workspace` one when a `.sln` or `.slnx` at the root lists it, and each `ProjectReference` is an edge, so a change to a library marks the projects and test projects that reference it. Each test case lands on the project of its test assembly, and the coverage under `TestResults/` on the projects that hold the covered files. A `packages.lock.json` change is a dependency change of ecosystem `nuget`; without lock files, so is a version change in `Directory.Packages.props`.
+
+#### Ruby and Rails
 
 In a Ruby or Rails repository, have RSpec write a JUnit report with `rspec_junit_formatter`, and SimpleCov a Cobertura report with `simplecov-cobertura`, both in the `Gemfile`'s test group. Start SimpleCov at the top of `spec/spec_helper.rb`, before the application loads:
 
@@ -129,6 +216,8 @@ bundle exec rspec --format progress --format RspecJunitFormatter --out rspec.xml
 
 `putnami observe` places each test case and each covered file on the component that holds it: a packwerk pack, a directory with a `package.yml`; a gem; or the application, a directory with a `Gemfile`. The `dependencies` of a pack's `package.yml`, a `Gemfile` gem with a `path`, and a gemspec dependency on a local gem are edges, so a change to a pack marks the packs that depend on it. With Minitest, `minitest-reporters`' `JUnitReporter` and `simplecov-lcov` write reports it reads too. A `Gemfile.lock` change is a dependency change of ecosystem `gem`.
 
+#### Rust
+
 In a Rust repository, give cargo-nextest a profile that writes a JUnit report, in `.config/nextest.toml`:
 
 ```toml
@@ -144,11 +233,7 @@ cargo llvm-cov nextest --profile ci --workspace --lcov --output-path lcov.info
 
 nextest writes `target/nextest/ci/junit.xml`, and `putnami observe` reads it there, without walking the rest of the target directory. Each case lands on the crate its test binary names, and each covered file on the crate that holds it: a member of the root `[workspace]`, or a directory whose `Cargo.toml` has a `[package]` table. A path dependency, or a `workspace = true` one whose `[workspace.dependencies]` entry has a path, is an edge. A `Cargo.lock` change is a dependency change of ecosystem `cargo`. When `CARGO_TARGET_DIR` puts the target directory outside the checkout, name the report with `--junit`.
 
-The install lines need the network: when the installer or the registry cannot be reached, the GitHub step or the GitLab job fails.
-
-## Steps
-
-### 1) GitHub Actions: add a step to your test job
+### 2) GitHub Actions: add a step to your test job
 
 Give the job that runs your tests these permissions, so `--publish` can post on the pull request:
 
@@ -184,7 +269,7 @@ Then add these two steps to that job, after the step that writes the reports:
 
 `if: ${{ !cancelled() }}` runs the step when a test fails too: a failed test is part of the evidence. The job needs a Linux or macOS runner, such as `ubuntu-latest`. `GITHUB_TOKEN` is the token GitHub gives every run; a workflow passes it to a step through `env`.
 
-### 2) GitLab CI: add a job after your test job
+### 3) GitLab CI: add a job after your test job
 
 Add this job to `.gitlab-ci.yml`. It reads the reports from the artifacts of the job named `test`, so that job must keep its reports as artifacts with `when: always`:
 
@@ -216,7 +301,7 @@ observe:
 
 Rename `test` in `needs` if your test job has another name. The image holds Bash, curl, tar, `sha256sum` and Git; any image with those, and Git 2.29 or later, works. `before_script: []` and `cache: []` keep your pipeline's defaults out of this job.
 
-### 3) Read the job log
+### 4) Read the job log
 
 The step prints a summary like this one, from a Go repository:
 
@@ -235,17 +320,17 @@ putnami observe: GitHub Actions, github.com/Putnami/demo-observe-go (project 144
 
 A report it cannot find or read is a warning in the same summary, such as `observe.report_missing`. The evidence document is the `observe-evidence` artifact of the job.
 
-### 4) Read the pull or merge request
+### 5) Read the pull or merge request
 
 On a pull or merge request, `--publish` sets the commit status `putnami/observe` on the pull request's head commit, or on the commit of the merge request pipeline, with a one-line summary such as `1 changed, 2 dependent components; changed lines 80.0% covered; 1 dependency change`. It also writes one summary note with the components, their tests and coverage, the least covered changed lines and the dependency changes. The next run updates the same note instead of adding one.
 
 Without the token, or on a branch push, the summary says why nothing was posted, and the job still passes. On a pull request from a fork, GitHub gives a read-only `GITHUB_TOKEN` and refuses the post; the job still passes.
 
-### 5) Upload the evidence to Putnami Cloud
+### 6) Upload the evidence to Putnami Cloud
 
 To send the evidence to Putnami Cloud, store a workspace token with the `delivery.ingest` scope as the secret or masked CI/CD variable `PUTNAMI_CLOUD_TOKEN`. Then use the commented `--upload` line in place of the line above it, and on GitHub uncomment the `env` block. The token names the workspace. An upload that fails is a diagnostic in the summary, and the job still passes.
 
-### 5) Add licences and known vulnerabilities from an SBOM
+### 7) Add licences and known vulnerabilities from an SBOM
 
 A software bill of materials (SBOM) lists the packages of a build with their licences and known vulnerabilities. `putnami observe` reads one the job wrote, CycloneDX 1.4 to 1.6 or SPDX 2.3 in JSON, and gives each changed dependency what it lists: the vulnerabilities the change fixes or introduces, and the licences before and after. It queries no vulnerability database itself.
 
@@ -290,7 +375,9 @@ Without `--base-sbom`, each dependency gets its state at the head and the summar
 
 ## Learn more
 
-- [What `putnami observe` reads](https://github.com/putnami/putnami/blob/main/tooling/observe/doc/01-observe.md): every flag, how the base is found, and how reports and SBOMs are discovered.
-- [The `@putnami/observe` README](https://github.com/putnami/putnami/blob/main/tooling/observe/README.md): the questions it answers and how it reads Nx, moon, Pants, Rush, Bazel, npm, pnpm, yarn, Composer, Go, Python, Gradle, Maven, Swift, Xcode, Dart, Flutter, .NET, Ruby, Rails and Rust repositories.
+- [Observe](/docs/tooling-&-workspace/observe): what `putnami observe` answers, and every CI, repository tool, report format, lockfile and SBOM format it reads.
+- [What `putnami observe` reads](/docs/tooling-&-workspace/observe/observe): every flag, how the base is found, and how reports and SBOMs are discovered.
+- [How `putnami observe` explains a change](/docs/tooling-&-workspace/observe/change-analyses): components, tests, changed-line coverage and dependency changes.
+- [Reports](/docs/tooling-&-workspace/observe/reports): what each test, coverage and SBOM format gives.
 
 You now have a CI job that records which files a change touched and which tests and coverage reports it produced, as an artifact you can keep or upload to Putnami Cloud.

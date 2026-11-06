@@ -15,6 +15,7 @@ Tooling is Putnami's control plane inside your repository. It discovers projects
 | Start a project correctly | [Templates](/docs/tooling-&-workspace/templates) | Scaffolded services, libraries, and reusable project shapes |
 | Debug failed automation | [Error handling](/docs/tooling-&-workspace/error-handling) | Diagnostics, retries, exit codes, machine-readable failures |
 | Generate clients from a provider | [Generated clients](/docs/tooling-&-workspace/generated-clients) | Workspace generate/sync/check, the drift guard, strict diagnostics, migration |
+| Explain a change in any repository's CI | [Observe](/docs/tooling-&-workspace/observe) | Changed and dependent components, tests, changed-line coverage and dependency changes, for 17 repository tools, without a Putnami workspace |
 
 ## The mental model
 

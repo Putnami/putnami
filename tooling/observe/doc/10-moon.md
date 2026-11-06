@@ -120,7 +120,7 @@ each file may use any YAML. Only the first document of a file is read. `workspac
 
 The detector reads no report and no lockfile. Test and coverage reports land
 on the project that holds their files, and each lockfile is read by the reader
-of its language, as the [change analyses](06-change-analyses.md) describe.
+of its language, as the [change analyses](/docs/tooling-&-workspace/observe/change-analyses) describe.
 
 ## Diagnostics
 

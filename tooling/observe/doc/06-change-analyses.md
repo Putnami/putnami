@@ -14,7 +14,7 @@ Seventeen detectors read the repository:
 | Nx | `graph.json` from `nx graph --file`, else `nx.json` and `project.json` | `orchestrator` for a graph export, `workspace` otherwise |
 | moon | `moon-graph.json` from `moon project-graph --json`, else `.moon/workspace.yml`, each `moon.yml` and `package.json` | `orchestrator` for a graph export, `workspace` otherwise |
 | Pants | `pants-graph.json` from `pants peek ::`, else the `BUILD` files, beside `pants.toml` | `orchestrator` for the export, `workspace` otherwise |
-| Rush | `rush.json`, each project's `package.json` ([Rush](11-rush.md)) | `orchestrator` |
+| Rush | `rush.json`, each project's `package.json` ([Rush](/docs/tooling-&-workspace/observe/rush)) | `orchestrator` |
 | Node workspaces | `package.json` `workspaces`, `pnpm-workspace.yaml` | `workspace` |
 | Composer | each `composer.json` | `manifest` |
 | Go | `go.work`, each `go.mod` | `workspace` for a `go.work` member, `manifest` otherwise |
@@ -24,7 +24,7 @@ Seventeen detectors read the repository:
 | Swift Package Manager | each `Package.swift` and its targets, from `swiftpm.json` as `swift package describe --type json` writes it, else the manifest and the directories under `Sources` and `Tests` | `workspace` |
 | Xcode | each `.xcodeproj` and the local packages its `project.pbxproj` references | `manifest` |
 | Dart | each `pubspec.yaml`, with the root's pub `workspace` and `melos.yaml` | `workspace` for a pub workspace or melos package, `manifest` otherwise |
-| .NET | each `.csproj`, `.fsproj` and `.vbproj`, with the root's `.sln` and `.slnx` | `workspace` for a project a root solution lists, `manifest` otherwise; see [the .NET detector](15-dotnet.md) |
+| .NET | each `.csproj`, `.fsproj` and `.vbproj`, with the root's `.sln` and `.slnx` | `workspace` for a project a root solution lists, `manifest` otherwise; see [the .NET detector](/docs/tooling-&-workspace/observe/dotnet) |
 | Ruby | each packwerk `package.yml`, `*.gemspec` and `Gemfile` | `workspace` for a pack, `manifest` otherwise |
 | Cargo | each `Cargo.toml`, with the root's `[workspace]` | `workspace` for a Cargo workspace member, `manifest` otherwise |
 | Bazel | `bazel-graph.json` from `bazel query 'deps(//...)' --output=streamed_jsonproto`, else the `BUILD` and `BUILD.bazel` files | `orchestrator` for a query export, `manifest` otherwise |
@@ -62,7 +62,7 @@ its impact.
 A JUnit or TRX case goes to the first of:
 
 1. The package of its Bazel test target, for a log under `bazel-testlogs`;
-   see [the Bazel detector](09-bazel.md#tests-and-coverage).
+   see [the Bazel detector](/docs/tooling-&-workspace/observe/bazel#tests-and-coverage).
 2. The component that holds its test file: the case's `file`, else its
    suite's, else its class name when that names a file (Vitest), else its
    dotted class name read as a Python module (pytest). pytest writes
@@ -70,27 +70,27 @@ A JUnit or TRX case goes to the first of:
    and its default `xunit2` report has no `file`: the longest leading part
    that names a `.py` file is the test file. The class name is relative to
    pytest's `rootdir`; see
-   [the Python detector](07-python.md#reports). Else its dotted class name
+   [the Python detector](/docs/tooling-&-workspace/observe/python#reports). Else its dotted class name
    read as a Dart test file (tojunit): `test.price` is `test/price_test.dart`,
    and the longest tail of a class name written from an absolute path that
-   names a file is the test file; see [the Dart detector](14-dart.md#reports).
+   names a file is the test file; see [the Dart detector](/docs/tooling-&-workspace/observe/dart#reports).
    rspec_junit_formatter and minitest-reporters write the `file`; see
-   [the Ruby detector](16-ruby.md#reports).
+   [the Ruby detector](/docs/tooling-&-workspace/observe/ruby#reports).
 3. The component whose test source root holds the file its JVM class name
    names: `com.acme.PriceTest` is `src/test/kotlin/com/acme/PriceTest.kt` or
    `.java`, under `src/test` or `src/androidTest`. See
-   [Gradle and Maven](12-jvm.md#reports).
+   [Gradle and Maven](/docs/tooling-&-workspace/observe/jvm#reports).
 4. The component of the Go package its class or suite names
    (`gotestsum --junitfile`), or of the Swift test target the `Module` of a
    `Module.Class` class or suite name names (xcbeautify, fastlane `scan`,
-   `swift test --xunit-output`); see [the Swift detectors](13-swift.md#reports).
+   `swift test --xunit-output`); see [the Swift detectors](/docs/tooling-&-workspace/observe/swift#reports).
    Or of the .NET project whose test assembly its suite names
    (`Pricing.Tests.dll`, from `dotnet test --logger trx` or
    `JunitXml.TestLogger`).
    A located name that is a file is the case's file.
 5. The component of the crate whose package its class name names as a
    cargo-nextest test binary: `pricing`, `pricing::integration` or
-   `api::bin/api`; see [the Cargo detector](17-rust.md#reports). A suite name
+   `api::bin/api`; see [the Cargo detector](/docs/tooling-&-workspace/observe/rust#reports). A suite name
    is not read for it, so another runner's suite named like a crate stays
    with its report.
 6. The component that holds the report.
@@ -99,7 +99,7 @@ A case that none of them places is counted in `observe.tests_unattributed`.
 
 A coverage report names files. A JaCoCo file, a package path, is first read
 under the `src/main/java` or `src/main/kotlin` of a component; see
-[Gradle and Maven](12-jvm.md#reports). A path is read in this order: absolute under
+[Gradle and Maven](/docs/tooling-&-workspace/observe/jvm#reports). A path is read in this order: absolute under
 the repository; absolute from another checkout, by its trailing segments;
 relative to a Cobertura source root; relative to the report's component, to
 the repository root, then to the report's directory; and, for a Go cover

@@ -102,7 +102,7 @@ case's file is `Class.swift` under the target's directory, else the Swift file
 there that declares the class. An Xcode test target's directory is the one
 named by the target beside the project, else the project's directory. A
 coverage report's files map as in any repository: see
-[the change analyses](06-change-analyses.md#tests-and-coverage).
+[the change analyses](/docs/tooling-&-workspace/observe/change-analyses#tests-and-coverage).
 
 ## Lockfiles
 

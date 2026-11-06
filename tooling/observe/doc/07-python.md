@@ -87,7 +87,7 @@ files: when it differs from those directories, as with `pytest api` run at
 the root of a repository whose `api` holds the pytest configuration, pass
 `--rootdir=.`, or write the report in the `rootdir`. pytest-cov writes `coverage.xml` with the
 directory pytest ran in as its source root. See
-[tests and coverage](06-change-analyses.md#tests-and-coverage).
+[tests and coverage](/docs/tooling-&-workspace/observe/change-analyses#tests-and-coverage).
 
 ## Diagnostics
 

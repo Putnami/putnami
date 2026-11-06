@@ -1,7 +1,7 @@
 /**
  * The runtime half of the `public-docs` domain's declared access.
  *
- * Each of the five repository-owned documentation sources becomes one
+ * Each of the six repository-owned documentation sources becomes one
  * `Snapshot` from `@putnami/application`'s DARC runtime. The build OBSERVES a
  * source root — reads its markdown tree, digests it, and attaches that state
  * under its exact version — and then RESOLVES the section through
@@ -42,7 +42,7 @@ export interface PublicDocumentationAccessOptions {
 }
 
 /**
- * The `public-docs` domain's enforced contracts: five documentation snapshots,
+ * The `public-docs` domain's enforced contracts: six documentation snapshots,
  * one framework-runtime reference and one protocol-contract reference.
  */
 export class PublicDocumentationAccess {

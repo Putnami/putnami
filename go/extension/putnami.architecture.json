@@ -18,6 +18,11 @@
   ],
   "owns": [
     {
+      "id": "extension-providers.observe-documentation",
+      "kind": "fact",
+      "description": "The authored observe documentation tree under /tooling/observe/doc: what putnami observe reads in a CI job, the repository tools, report formats, lockfiles and SBOMs it covers, and how it explains a change. This domain decides what that reference claims about observe."
+    },
+    {
       "id": "extension-providers.probe-answers",
       "kind": "fact",
       "description": "Workspace probe answers: each provider's authoritative statement of the projects it owns and their dependency edges."
@@ -34,6 +39,27 @@
     }
   ],
   "exports": [
+    {
+      "id": "extension-providers.observe-documentation.v1",
+      "version": 1,
+      "status": "active",
+      "description": "The authored observe documentation tree (/tooling/observe/doc): the markdown a publisher copies verbatim, addressed by a deterministic digest over its sorted (relative path, content digest) pairs. The carrier contract is putnami.documentation-tree.v1. observe is experimental, and publishing this tree does not promote it.",
+      "facts": [
+        {
+          "name": "observe_documentation",
+          "authority": "extension-providers",
+          "classification": "public",
+          "personalData": "none"
+        }
+      ],
+      "modes": [
+        "snapshot"
+      ],
+      "compatibility": {
+        "strategy": "additive",
+        "minimumConsumerVersion": 1
+      }
+    },
     {
       "id": "extension-providers.probe-answers.v1",
       "version": 1,

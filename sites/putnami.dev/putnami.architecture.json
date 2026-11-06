@@ -126,6 +126,35 @@
       "justification": "The site publishes the spec-driven development method at public/docs/07-spec-driven-development by copying the /tooling/sdd-extension/doc tree verbatim at build time. The sdd domain owns the method's wording; the site owns only its placement in the published information architecture."
     },
     {
+      "id": "public-docs.observe-documentation.v1",
+      "version": 1,
+      "from": {
+        "domain": "extension-providers",
+        "export": "extension-providers.observe-documentation.v1"
+      },
+      "as": "public-docs.observe-documentation",
+      "mode": "snapshot",
+      "status": "active",
+      "facts": [
+        "observe_documentation"
+      ],
+      "transport": {
+        "kind": "file",
+        "contract": "putnami.documentation-tree.v1",
+        "availability": "active"
+      },
+      "consistency": {
+        "maxStaleness": "720h",
+        "onMissing": "fail-closed",
+        "onStale": "use-stale",
+        "ordering": "source-version",
+        "sourceVersion": "tree_digest",
+        "idempotencyKey": "tree_digest",
+        "lateEvents": "ignore-older"
+      },
+      "justification": "The site publishes the observe reference at public/docs/08-tooling-&-workspace/08-observe by copying the /tooling/observe/doc tree verbatim at build time. The extension-providers domain decides what that reference says about what observe reads; the site decides only where it appears."
+    },
+    {
       "id": "public-docs.protocol-contracts.v1",
       "version": 1,
       "from": {

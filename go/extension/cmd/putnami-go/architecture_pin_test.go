@@ -40,6 +40,8 @@ func authoredExtensionProvidersDomain() *arch.Builder {
 			"/typescript/extension",
 		).
 		Owns(
+			arch.Concept("extension-providers.observe-documentation", archproto.OwnershipFact,
+				"The authored observe documentation tree under /tooling/observe/doc: what putnami observe reads in a CI job, the repository tools, report formats, lockfiles and SBOMs it covers, and how it explains a change. This domain decides what that reference claims about observe."),
 			arch.Concept("extension-providers.python-surface-documentation", archproto.OwnershipFact,
 				"The authored Python surface documentation tree under /python/doc/framework. The Python surface is the extension and its templates only, and this domain decides what that reference claims about it; no Putnami Python framework package family ships today."),
 			arch.Concept("extension-providers.verification-observations", archproto.OwnershipFact,
@@ -66,6 +68,18 @@ func authoredExtensionProvidersDomain() *arch.Builder {
 			Description: "The authored Python surface documentation tree (/python/doc/framework): the markdown a publisher copies verbatim, addressed by a deterministic digest over its sorted (relative path, content digest) pairs. The carrier contract is putnami.documentation-tree.v1. The Python surface is experimental and opt-in, and publishing this tree next to the Go and TypeScript references does not promote it.",
 			Facts: []archproto.Fact{
 				arch.Fact("python_surface_documentation", "extension-providers",
+					archproto.ClassificationPublic, archproto.PersonalDataNone),
+			},
+			Modes:         []archproto.AccessMode{archproto.ModeSnapshot},
+			Compatibility: arch.Compatible(archproto.CompatibilityAdditive, 1),
+		}).
+		Export(archproto.Export{
+			ID:          "extension-providers.observe-documentation.v1",
+			Version:     1,
+			Status:      archproto.StatusActive,
+			Description: "The authored observe documentation tree (/tooling/observe/doc): the markdown a publisher copies verbatim, addressed by a deterministic digest over its sorted (relative path, content digest) pairs. The carrier contract is putnami.documentation-tree.v1. observe is experimental, and publishing this tree does not promote it.",
+			Facts: []archproto.Fact{
+				arch.Fact("observe_documentation", "extension-providers",
 					archproto.ClassificationPublic, archproto.PersonalDataNone),
 			},
 			Modes:         []archproto.AccessMode{archproto.ModeSnapshot},

@@ -55,7 +55,7 @@ there:
 | `/install.sh`, `/install-commands.txt`, `/install.ps1`, `/LICENSE.md` | `tooling/cli/scripts/install.sh`, `tooling/cli/scripts/install-commands.txt`, `tooling/cli/scripts/install.ps1`, `LICENSE.md` | `putnami.json` `generate.assets` copy |
 
 A `generate.assets` source that no longer exists is not silently dropped. The
-five sources another domain owns are declared imports of the `public-docs`
+six sources another domain owns are declared imports of the `public-docs`
 domain (`putnami.architecture.json`), and the build enforces them as DARC
 snapshots — see [Documentation sources are contracts](#documentation-sources-are-contracts)
 below. The copies the site itself owns (`sites/putnami.dev/doc/`) and the four
@@ -75,13 +75,14 @@ declare the same route and fails the build with `http_routes.duplicate_route`.
 
 ### Documentation sources are contracts
 
-Five of the copies above publish documentation another domain owns. Each one is
+Six of the copies above publish documentation another domain owns. Each one is
 a declared import of the `public-docs` domain in `putnami.architecture.json`, and
 `src/lib/darc/` turns that declaration into the build's configuration:
 
 | Import | Source root | Section |
 |---|---|---|
 | `public-docs.workspace-documentation.v1` | `/tooling/doc` | `08-tooling-&-workspace` |
+| `public-docs.observe-documentation.v1` | `/tooling/observe/doc` | `08-tooling-&-workspace/08-observe` |
 | `public-docs.method-documentation.v1` | `/tooling/sdd-extension/doc` | `07-spec-driven-development` |
 | `public-docs.typescript-framework-documentation.v1` | `/typescript/doc/framework` | `09-frameworks/01-typescript` |
 | `public-docs.go-framework-documentation.v1` | `/go/doc/framework` | `09-frameworks/02-go` |
@@ -102,17 +103,17 @@ refused (`DarcError('immutable')`). `maxStaleness: 720h` with
 `onStale: use-stale` is the deployment half: a container serving a month-old
 copy keeps serving it and stamps the record `stale` rather than refusing.
 
-The sixth contract, `public-docs.application-runtime.v1`, is a `reference` on the
+The seventh contract, `public-docs.application-runtime.v1`, is a `reference` on the
 TypeScript framework runtime the site is built on. Nothing is copied, so the only
 promise is minimization: the import names one fact, and asking for another throws
 `DarcError('fact-not-imported')`.
 
-The seventh contract, `public-docs.protocol-contracts.v1`, is a `reference` on the
+The eighth contract, `public-docs.protocol-contracts.v1`, is a `reference` on the
 `site-content-bundle/v1` contract that `/protocols/sitecontent` owns. The site
 implements that contract in `src/lib/content/`, and its tests prove the
 protocol's requirements. It names one fact, `wire_contract_definitions`.
 
-`src/main.ts` registers all seven through `DarcPlugin`, which contributes one
+`src/main.ts` registers all eight through `DarcPlugin`, which contributes one
 `domainAccess` row per contract to the capability manifest.
 `putnami architecture validate` joins those rows to the declarations. A row is
 evidence, never authority — emitting one cannot create a cross-domain permission.
