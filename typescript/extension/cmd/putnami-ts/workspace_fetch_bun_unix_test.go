@@ -146,9 +146,8 @@ func newFetchFixture(t *testing.T, bun, token, linker string) *fetchFixture {
 		}
 	}
 	t.Setenv("HOME", fixture.home)
-	// The job's environment names a user configuration of its own, as a cloud
-	// session does, holding another token for the registry: bun reads it
-	// before the home's unless the fetch points it at the private .npmrc.
+	// The job's environment names a user .npmrc of its own, which holds
+	// another token for the registry.
 	fixture.userConfig = filepath.Join(t.TempDir(), ".npmrc")
 	writeProbeFile(t, fixture.userConfig, "//"+fixture.registry.Host()+"/:_authToken=not-the-handed-bearer\n")
 	t.Setenv("NPM_CONFIG_USERCONFIG", fixture.userConfig)

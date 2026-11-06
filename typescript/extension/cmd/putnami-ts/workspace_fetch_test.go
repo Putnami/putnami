@@ -6,6 +6,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"runtime"
 	"slices"
 	"strings"
 	"testing"
@@ -673,5 +674,29 @@ func TestWithin(t *testing.T) {
 	}
 	if !within(filepath.Join(outside, "missing"), filepath.Join(outside, "bun")) {
 		t.Error("an unresolvable root must contain every path")
+	}
+}
+
+// The private home names its .npmrc in every variable bun reads a user .npmrc
+// from, whatever the inherited environment names.
+func TestPrivateHomeEnv_NamesThePrivateNpmrc(t *testing.T) {
+	home := filepath.Join(t.TempDir(), "home")
+	env := privateHomeEnv(home)
+	want := map[string]string{
+		"HOME":                  home,
+		"XDG_CONFIG_HOME":       home,
+		"NPM_CONFIG_USERCONFIG": filepath.Join(home, ".npmrc"),
+		"npm_config_userconfig": filepath.Join(home, ".npmrc"),
+	}
+	if runtime.GOOS == "windows" {
+		want["USERPROFILE"] = home
+	}
+	if len(env) != len(want) {
+		t.Errorf("privateHomeEnv = %v, want %v", env, want)
+	}
+	for name, value := range want {
+		if env[name] != value {
+			t.Errorf("privateHomeEnv[%s] = %q, want %q", name, env[name], value)
+		}
 	}
 }
