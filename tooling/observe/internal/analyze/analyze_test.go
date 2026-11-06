@@ -206,6 +206,29 @@ func TestANextestCaseGoesToTheCrateItsBinaryNames(t *testing.T) {
 	}
 }
 
+func TestAJestSuiteNamedLikeACrateStaysWithItsReport(t *testing.T) {
+	spectest.Proves(t, "tooling/observe-rust", "rust-report-discovery", "a-nextest-case-goes-to-the-crate-its-binary-names")
+	root := t.TempDir()
+	write(t, root, map[string]string{
+		"crates/pricing/Cargo.toml": "[package]\nname = \"pricing\"\n",
+		// jest-junit writes the describe title as the suite name, and the
+		// title and the test name as the class name.
+		"web/junit.xml": `<testsuites name="jest tests">
+			<testsuite name="pricing"><testcase classname="pricing adds up" name="pricing adds up"/></testsuite>
+		</testsuites>`,
+	})
+	set := components.Detect(root, []components.Detector{components.CargoDetector{}, fake{components.Found{Components: []components.Component{
+		{ID: "web", Ecosystem: "node", Source: evidence.SourceWorkspace},
+	}}}})
+	r := Run(Input{Root: root, Set: set, Reports: []reports.Report{
+		{Path: "web/junit.xml", Kind: reports.KindJUnit, Format: reports.FormatJUnit},
+	}})
+	got := tests(r)
+	if got["web"].Passed != 1 || got["crates/pricing"].Passed != 0 {
+		t.Errorf("tests %+v", got)
+	}
+}
+
 func TestCoverageGoesToTheComponentOfEachFile(t *testing.T) {
 	spectest.Proves(t, feature, "tests-and-coverage", "coverage-goes-to-the-component-of-each-file")
 	root, set := repository(t)

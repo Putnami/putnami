@@ -11,7 +11,7 @@ the `Cargo.lock` versions.
 Each crate is a component of ecosystem `rust`:
 
 - When the root `Cargo.toml` has a `[workspace]` table, each directory its
-  `members` globs match, less those its `exclude` globs match, that holds a
+  `members` globs match, less those at or below an `exclude` entry, that holds a
   `Cargo.toml` is a component of source `workspace`. A glob segment is `*`,
   `?` or `[…]`, or `**` for any number of directories. The root is one too
   when it has a `[package]` table; a virtual manifest, with no `[package]`, is
@@ -21,7 +21,8 @@ Each crate is a component of ecosystem `rust`:
   `[profile]` options, is none.
 
 Only the root's workspace is read: a `[workspace]` in a subdirectory makes its
-crates manifest components. Cargo also makes a member of each path dependency
+crates manifest components, and only their `path` dependencies give edges, not
+their `workspace = true` ones. Cargo also makes a member of each path dependency
 of a member that lies below the workspace root; the detector does not, so
 such a crate, outside the `members` globs, is a `manifest` component, with
 the same edges.
@@ -41,8 +42,9 @@ same tables under a `[target.<platform>]` table, when:
 
 - the entry has a `path`, such as `{ path = "../pricing" }`, resolved against
   the crate's directory;
-- the entry has `workspace = true` and the root's `[workspace.dependencies]`
-  entry of the same key has a `path`, resolved against the root.
+- the crate is a workspace member, the entry has `workspace = true` and the
+  root's `[workspace.dependencies]` entry of the same key has a `path`,
+  resolved against the root.
 
 A registry or `git` dependency is no edge, nor is a path outside the
 repository or to a directory that is no component. The `[patch]` and

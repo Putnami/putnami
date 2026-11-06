@@ -217,7 +217,7 @@ func Probe(root string, request wsproto.ProbeRequest) wsproto.ProbeResult {
 }
 
 // readWorkspace reads the [workspace] of the root Cargo.toml: the directories
-// its members globs match, less those its exclude globs match, that hold a
+// its members globs match, less those at or below an exclude entry, that hold a
 // Cargo.toml, its [workspace.dependencies] and its [workspace.package]
 // version.
 func readWorkspace(root string) (workspace, []diag.Diagnostic) {
@@ -255,7 +255,7 @@ func readWorkspace(root string) (workspace, []diag.Diagnostic) {
 	}
 	for _, dir := range dirs {
 		parts := strings.Split(dir, "/")
-		if slices.ContainsFunc(exclude, func(segments []string) bool { return memberglob.Match(segments, parts) }) {
+		if slices.ContainsFunc(exclude, func(segments []string) bool { return excludes(segments, parts) }) {
 			continue
 		}
 		if existing(root, join(dir, Marker)) != "" {
@@ -263,6 +263,17 @@ func readWorkspace(root string) (workspace, []diag.Diagnostic) {
 		}
 	}
 	return ws, diags
+}
+
+// excludes reports whether an exclude entry holds the directory: Cargo
+// excludes the entry's directory and every directory below it.
+func excludes(segments, parts []string) bool {
+	for n := len(parts); n > 0; n-- {
+		if memberglob.Match(segments, parts[:n]) {
+			return true
+		}
+	}
+	return false
 }
 
 // readManifest reads the Cargo.toml of a directory. found is false when there
@@ -294,7 +305,7 @@ func packageVersion(manifest toml.Table, ws workspace) string {
 // dependency tables, and of the same tables under each [target] platform,
 // that gives a path, resolved against its directory, or workspace = true for
 // an entry of [workspace.dependencies] that gives a path, resolved against
-// the root.
+// the root, for a workspace member.
 func edges(c *component, ws workspace, byDir map[string]*component) []string {
 	var deps []string
 	add := func(dir string, ok bool) {
@@ -313,7 +324,7 @@ func edges(c *component, ws workspace, byDir map[string]*component) []string {
 				add(under(c.dir, p))
 				continue
 			}
-			if entry["workspace"] != true || !ws.declared {
+			if entry["workspace"] != true || c.meta.Source != SourceWorkspace {
 				continue
 			}
 			if inherited, ok := ws.dependencies[key].(toml.Table); ok {

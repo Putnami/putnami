@@ -160,7 +160,8 @@ func joinDir(base, dir string) string {
 }
 
 // attributeTests gives each case of a JUnit report to a component: the one
-// that holds its test file, else the one of the Go package its suite names,
+// that holds its test file, else the one of the Go package or the
+// cargo-nextest test binary its class name, or its suite without one, names,
 // else the one that holds the report.
 //
 // The test file is the case's file, else its class name read as a path
@@ -184,9 +185,16 @@ func (r *Result) attributeTests(report reports.Report, result readers.TestReport
 			}
 		}
 		if !ok {
+			// gotestsum and cargo-nextest write the package or test binary in
+			// the class name and its suite's name alike. A suite name is read
+			// only for a case without a class name: another runner's suite,
+			// such as a Jest describe title, may be a bare word that names a
+			// crate.
 			names := []string{c.Classname}
-			for i := len(c.Suites) - 1; i >= 0; i-- {
-				names = append(names, c.Suites[i].Name)
+			if c.Classname == "" {
+				for i := len(c.Suites) - 1; i >= 0; i-- {
+					names = append(names, c.Suites[i].Name)
+				}
 			}
 			for _, name := range names {
 				if name == "" {

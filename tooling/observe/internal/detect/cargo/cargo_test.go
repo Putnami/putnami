@@ -68,8 +68,8 @@ func noDiagnostics(t *testing.T, result wsproto.ProbeResult) {
 var cargoWorkspace = map[string]string{
 	"Cargo.toml": `[workspace]
 resolver = "2"
-members = ["crates/*"]
-exclude = ["crates/legacy"]
+members = ["crates/*", "crates/experimental/*"]
+exclude = ["crates/legacy", "crates/experimental"]
 
 [workspace.package]
 version = "0.3.0"
@@ -100,6 +100,7 @@ anyhow = "1"
 path = "../pricing"
 `,
 	"crates/pricing/Cargo.toml":           "[package]\nname = \"pricing\"\nversion = \"0.2.0\"\n",
+	"crates/experimental/fast/Cargo.toml": "[package]\nname = \"fast\"\n",
 	"crates/legacy/Cargo.toml":            "[package]\nname = \"legacy\"\nversion = \"0.1.0\"\n",
 	"crates/notes.md":                     "not a member\n",
 	"tools/Cargo.toml":                    "[package]\nname = \"tools\"\n\n[target.'cfg(unix)'.build-dependencies]\npricing = { path = \"../crates/pricing\", version = \"0.2\" }\n",
@@ -113,13 +114,13 @@ func TestCargoWorkspaceMembersAreWorkspaceComponents(t *testing.T) {
 	spectest.Proves(t, feature, "rust-crates-are-components", "cargo-workspace-members-are-workspace-components")
 	result := Detect(writeTree(t, cargoWorkspace))
 	noDiagnostics(t, result)
-	if got := paths(result); !reflect.DeepEqual(got, []string{"crates/api", "crates/legacy", "crates/pricing", "crates/worker", "tools"}) {
+	if got := paths(result); !reflect.DeepEqual(got, []string{"crates/api", "crates/experimental/fast", "crates/legacy", "crates/pricing", "crates/worker", "tools"}) {
 		t.Fatalf("components %v", got)
 	}
 	projects := byPath(result)
 	for dir, source := range map[string]string{
 		"crates/api": SourceWorkspace, "crates/pricing": SourceWorkspace, "crates/worker": SourceWorkspace,
-		"crates/legacy": SourceManifest, "tools": SourceManifest,
+		"crates/legacy": SourceManifest, "tools": SourceManifest, "crates/experimental/fast": SourceManifest,
 	} {
 		if got := metadata(t, projects[dir]).Source; got != source {
 			t.Errorf("%s source %q, want %q", dir, got, source)
@@ -259,7 +260,17 @@ itself = { path = "." }
 			t.Errorf("%s depends on %v", p.Path, p.Dependencies)
 		}
 	}
-	// workspace = true outside a workspace names nothing.
+	// workspace = true names nothing for a crate outside the workspace's
+	// members, nor outside any workspace.
+	result = Detect(writeTree(t, map[string]string{
+		"Cargo.toml":       "[workspace]\nmembers = [\"b\"]\n\n[workspace.dependencies]\nb = { path = \"b\" }\n",
+		"b/Cargo.toml":     "[package]\nname = \"b\"\n",
+		"tools/Cargo.toml": "[package]\nname = \"tools\"\n\n[dependencies]\nb = { workspace = true }\n",
+	}))
+	if got := byPath(result)["tools"].Dependencies; len(got) != 0 {
+		t.Errorf("tools depends on %v", got)
+	}
+	// Outside any workspace.
 	result = Detect(writeTree(t, map[string]string{
 		"a/Cargo.toml": "[package]\nname = \"a\"\n\n[dependencies]\nb = { workspace = true }\n",
 		"b/Cargo.toml": "[package]\nname = \"b\"\n",
