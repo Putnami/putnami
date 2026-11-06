@@ -110,7 +110,7 @@ semantics. Every diagnostic code carries the `collaboration.` prefix;
   [`@putnami/github-collaboration`](../../tooling/github-collaboration/README.md)
   implements the same contracts on GitHub,
   [`@putnami/gitlab-collaboration`](../../tooling/gitlab-collaboration/README.md)
-  implements tasks on GitLab,
+  implements them on GitLab issues and merge requests,
   [`@putnami/jira-collaboration`](../../tooling/jira-collaboration/README.md)
   implements tasks on Jira Cloud, and
   [`@putnami/linear-collaboration`](../../tooling/linear-collaboration/README.md)
@@ -149,8 +149,8 @@ implementation proves the rest in its own tests:
   CLI's `cli/collaboration-providers` keeps what the CLI adds: the binding,
   capabilities, the two entry paths, the routed providers, host-only operations
   and contract names that never shadow a command.
-- `@putnami/local-collaboration` and `@putnami/github-collaboration` pass the
-  task and proposal scenarios, `@putnami/gitlab-collaboration`,
+- `@putnami/local-collaboration`, `@putnami/github-collaboration` and
+  `@putnami/gitlab-collaboration` pass the task and proposal scenarios,
   `@putnami/jira-collaboration` and `@putnami/linear-collaboration` pass the
   task scenarios, and their manifests
   draw no diagnostic.

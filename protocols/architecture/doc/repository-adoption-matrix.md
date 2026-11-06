@@ -174,7 +174,7 @@ authority is what it reports, not what it builds.
 | `/tooling/scaffold` | `@putnami/scaffold` | The template-archive job: it decides what a packaged template contains. |
 | `/tooling/clientgen-extension` | `@putnami/clientgen` | The cross-language client-generation job and the shape of what it emits. |
 | `/tooling/github-collaboration` | `@putnami/github-collaboration` | The task and proposal provider results for GitHub: how a GitHub issue or pull request maps onto the collaboration contracts. |
-| `/tooling/gitlab-collaboration` | `@putnami/gitlab-collaboration` | The task provider results for GitLab: how a GitLab issue, its labels and its closed state map onto the tasks contract. |
+| `/tooling/gitlab-collaboration` | `@putnami/gitlab-collaboration` | The task and proposal provider results for GitLab: how a GitLab issue, its labels and its closed state map onto the tasks contract, and a merge request, its draft prefix, notes and commit statuses onto the proposals contract. |
 | `/tooling/jira-collaboration` | `@putnami/jira-collaboration` | The task provider results for Jira Cloud: how a Jira issue, its status category and its resolution map onto the tasks contract. |
 | `/tooling/linear-collaboration` | `@putnami/linear-collaboration` | The task provider results for Linear: how a Linear issue maps onto the tasks contract. |
 | `/tooling/local-collaboration` | `@putnami/local-collaboration` | The task and proposal provider results for the local file-backed store. |

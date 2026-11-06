@@ -157,10 +157,13 @@ binding settings, lists what people wrote on a pull request through
 `proposals comments`, and offers merge only as an optional capability.
 
 [`@putnami/gitlab-collaboration`](../../gitlab-collaboration/README.md)
-implements **tasks** on the issues of one GitLab project, on GitLab.com or a
-self-managed instance. It finds the credential the way `glab` does, maps task
-states to labels with the same settings as the GitHub provider, and offers
-`assign`; merge requests are not served yet.
+implements **tasks** and **proposals** on the issues and merge requests of one
+GitLab project, on GitLab.com or a self-managed instance. It finds the
+credential the way `glab` does, maps task states to labels with the same
+settings as the GitHub provider, and offers `assign`. A proposal is a merge
+request from a branch of the project, a draft is its `Draft:` title prefix, a
+review is a note with an approval for `approve`, checks are the head commit's
+statuses, and merge is offered only as an optional capability.
 
 [`@putnami/jira-collaboration`](../../jira-collaboration/README.md)
 implements **tasks** on the issues of one Jira Cloud project. It reads
