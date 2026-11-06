@@ -21,7 +21,7 @@
     },
     {
       "id": "tests-and-coverage",
-      "text": "A JUnit case goes to the component that holds its test file, named by its file or class name as a path or its pytest dotted class name as a module, else to the Go package or nextest crate its class name, else suite, names, else to the one that holds its report. A covered file goes to the component that holds it. A report path is read as repository-relative, relative to the report's component or directory, absolute, or as a Go import path. Each component sums its cases, their duration and its lines."
+      "text": "A JUnit case goes to the component that holds its test file, named by its file or class name as a path or its pytest dotted class name as a module, else to the Go package its class or suite names, or the nextest crate its class names, else to the one that holds its report. A covered file goes to the component that holds it. A report path is read as repository-relative, relative to the report's component or directory, absolute or a Go import path. Each component sums its cases, their duration and its lines."
     },
     {
       "id": "changed-line-coverage",
