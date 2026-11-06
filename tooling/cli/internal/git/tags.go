@@ -47,7 +47,8 @@ func CommitFiles(repoRoot, sha string, pathspecs []string) ([]string, error) {
 //
 // It is the half of a version that a run must capture BEFORE its own hooks and
 // codegen touch the tree. The other half — the line's base version —
-// depends only on tags and history, so it is computed later, by GetVersionInfo.
+// depends only on tags and history, so it is computed later, by
+// GetVersionInfo or (*Head).LineVersion.
 //
 // The commit is HEAD's unless PUTNAMI_SOURCE_REVISION (SourceRevisionEnv)
 // names the commit the run is bound to. Then SHA and the suffix's sha half are

@@ -7,6 +7,7 @@ import (
 	"go.putnami.dev/protocol/features/spectest"
 	supportproto "go.putnami.dev/protocol/support"
 	wsproto "go.putnami.dev/protocol/workspace"
+	"go.putnami.dev/tooling/cli/internal/git"
 )
 
 // The release a line proposes reads the support status of the projects a
@@ -79,7 +80,11 @@ func TestProposedReleaseFollowsTheSupportCatalog(t *testing.T) {
 			if err != nil {
 				t.Fatalf("SelectLines: %v", err)
 			}
-			report, err := ReportLine(dir, lines[0])
+			head, err := git.ReadHead(dir, nil)
+			if err != nil {
+				t.Fatalf("ReadHead: %v", err)
+			}
+			report, err := ReportLine(dir, head, lines[0])
 			if err != nil {
 				t.Fatalf("ReportLine: %v", err)
 			}

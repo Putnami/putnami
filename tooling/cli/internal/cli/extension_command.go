@@ -15,6 +15,7 @@ import (
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/tooling/cli/internal/commandmeta"
 	"go.putnami.dev/tooling/cli/internal/commands/doctor"
+	"go.putnami.dev/tooling/cli/internal/commands/lifecycle"
 	"go.putnami.dev/tooling/cli/internal/commands/shared"
 	"go.putnami.dev/tooling/cli/internal/engine"
 	"go.putnami.dev/tooling/cli/internal/extension"
@@ -162,7 +163,8 @@ func (a *App) runExtensionStructuredCommand(
 		// The interactive path is the ONE deliberate scheduler bypass: the
 		// subprocess inherits the terminal's stdin/stdout, which no renderer-driven
 		// run can offer. It therefore loads the workspace and stamps the version
-		// here; every other alias hands both to Engine.Run below.
+		// here, except for the credential seam; every other alias hands both to
+		// Engine.Run below.
 		ws, err := workspace.Load(wsRoot)
 		if err != nil {
 			iox.Fprintf(stderr, "putnami: load workspace: %v\n", err)
@@ -305,7 +307,7 @@ func (a *App) runExtensionStructuredCommand(
 			iox.Fprintf(stderr, "putnami: %v\n", err)
 			return ExitUsage
 		}
-		versions, err := engine.BuildVersionInfo(ws)
+		versions, err := interactiveCommandVersions(ws, group, sub, engine.BuildVersionInfo)
 		if err != nil {
 			iox.Fprintf(stderr, "putnami: %v\n", err)
 			return ExitError
@@ -317,6 +319,19 @@ func (a *App) runExtensionStructuredCommand(
 		)
 	}
 	return runPlannedExtensionAlias(ctx, parsed, cfg, resolved, commandParams, wsRoot)
+}
+
+// interactiveCommandVersions resolves the version of each line for an
+// interactive extension command with resolve, engine.BuildVersionInfo in
+// production. The credential seam gets no version line: its bearer depends on
+// the host alone.
+func interactiveCommandVersions(ws *workspace.Workspace, group, sub string,
+	resolve func(*workspace.Workspace) (cachekey.RunVersions, error),
+) (cachekey.RunVersions, error) {
+	if lifecycle.IsCredentialSeam(group, sub) {
+		return nil, nil
+	}
+	return resolve(ws)
 }
 
 // negatedGlobalFlagNames answers the one question the global-flag pass makes

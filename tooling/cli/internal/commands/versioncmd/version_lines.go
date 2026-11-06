@@ -15,7 +15,7 @@ import (
 type LineReport struct {
 	// Spec is the line: its scope path and tag pattern.
 	Spec git.LineSpec
-	// Info is the line's version at HEAD (git.GetVersionInfo).
+	// Info is the line's version at HEAD (git.(*Head).LineVersion).
 	Info *git.VersionInfo
 	// Release is the line's next release when no explicit tag names it. It
 	// is nil when HEAD already carries the line's release tag, which is never
@@ -53,11 +53,11 @@ func SelectLines(specs []git.LineSpec, scope string) ([]git.LineSpec, error) {
 	return []git.LineSpec{spec}, nil
 }
 
-// ReportLine computes one line in this order: its version at HEAD, then,
-// unless HEAD is a release of the line, the release it proposes, then the
-// commits since the line's last release.
-func ReportLine(wsRoot string, spec git.LineSpec) (LineReport, error) {
-	info, err := git.GetVersionInfo(wsRoot, spec)
+// ReportLine computes one line in this order: its version at HEAD, read
+// through head, then, unless HEAD is a release of the line, the release it
+// proposes, then the commits since the line's last release.
+func ReportLine(wsRoot string, head *git.Head, spec git.LineSpec) (LineReport, error) {
+	info, err := head.LineVersion(spec)
 	if err != nil {
 		return LineReport{}, err
 	}

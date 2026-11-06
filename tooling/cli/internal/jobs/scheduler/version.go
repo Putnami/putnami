@@ -149,13 +149,18 @@ func BuildRunVersions(ws *workspace.Workspace, snapshot *putnamigit.VersionInfo)
 	if catalogErr != nil {
 		lineErrs = append(lineErrs, fmt.Errorf("every version line reads each commit as stable: %w", catalogErr))
 	}
+	// One Head serves every line; a captured snapshot is its tree state.
+	head, headErr := putnamigit.ReadHead(ws.Root, snapshot)
 	for _, line := range runVersionLines(ws) {
 		pattern := cachekey.LineTagPattern(ws, line)
 		spec := putnamigit.LineSpec{ScopePath: line, TagPattern: pattern, Stable: stable}
 		if line != "" {
 			spec.Pathspecs = []string{line}
 		}
-		info, err := putnamigit.GetVersionInfo(ws.Root, spec)
+		info, err := (*putnamigit.VersionInfo)(nil), headErr
+		if headErr == nil {
+			info, err = head.LineVersion(spec)
+		}
 		if err != nil {
 			lineErrs = append(lineErrs, fmt.Errorf("version line %q: %w", line, err))
 			if snapshot == nil {
@@ -166,14 +171,6 @@ func BuildRunVersions(ws *workspace.Workspace, snapshot *putnamigit.VersionInfo)
 				Suffix: snapshot.Suffix, IsDirty: snapshot.IsDirty, Line: line,
 			}
 			info.Full = info.Base + "-" + info.Suffix
-		} else if snapshot != nil {
-			// The tree state the run observed wins over the one read now: a
-			// hook or a codegen job may have dirtied the tree since.
-			info.SHA, info.Branch, info.Suffix, info.IsDirty =
-				snapshot.SHA, snapshot.Branch, snapshot.Suffix, snapshot.IsDirty
-			if !info.Tagged {
-				info.Full = info.Base + "-" + info.Suffix
-			}
 		}
 		versions[line] = &cachekey.JobContextVersion{
 			Base: info.Base, Full: info.Full, SHA: info.SHA, Branch: info.Branch,

@@ -103,7 +103,7 @@ func EnsureWorkspaceBootstrap(ctx context.Context, wsRoot string, cfg *wsproto.C
 	if isInstallCommand(opts.Command) {
 		return nil // install/deps/upgrade restore workspace state themselves
 	}
-	if isCredentialSeam(opts.Command, opts.Subcommand) {
+	if IsCredentialSeam(opts.Command, opts.Subcommand) {
 		return nil // stdout is the bearer; the parent command owns workspace state
 	}
 	if os.Getenv(workspaceBootstrappedEnv) == wsRoot {
@@ -179,14 +179,15 @@ func runBootstrapInstall(ctx context.Context, wsRoot string, cfg *wsproto.Config
 	})
 }
 
-// isCredentialSeam reports whether the command is `cloud registry-token`, the
+// IsCredentialSeam reports whether the command is `cloud registry-token`, the
 // seam every private archive download shells out to for a bearer. Its stdout
 // is the bearer and nothing else: an implicit install here would print its
 // setup lines ahead of the token (the caller then treats the value as no token
 // and the download goes anonymous), and it would run mid-`upgrade`, right after
 // the extension phase rewrote the lock. The invoking command owns workspace
-// state; the credential child never restores it.
-func isCredentialSeam(cmd, sub string) bool {
+// state; the credential child never restores it. Nor does it resolve the run's
+// versions: the bearer depends on the host alone.
+func IsCredentialSeam(cmd, sub string) bool {
 	return cmd == registryproto.SeamParentCommand && sub == registryproto.SeamSubcommand
 }
 
