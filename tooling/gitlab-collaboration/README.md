@@ -258,7 +258,7 @@ included, is never repeated. A write is sent exactly once.
 | `update`, `transition`, `assign` | The issue iid | Reads the issue: the requested change in place is `ok`, otherwise `unresolved` |
 | `upsert` | The source and target branch: GitLab keeps one open merge request per pair | Reads the open merge request of the pair: it is `ok`, `created` only when it carries what was sent; none is `unresolved` |
 | `review` | The idempotency key, recorded at the end of the note as a hidden comment | Looks for the key among the account's notes on the merge request: found is `ok`, not found is `unresolved` |
-| `merge` | The expected head commit | Reads the merge request: merged is `ok`, otherwise `unresolved` |
+| `merge` | The expected head commit | Reads the merge request, after a lost answer or a 408 (GitLab's statement timeout, which can strike after a write): merged is `ok`, otherwise `unresolved` |
 
 The read-back is tried 3 times, 1 then 2 seconds apart. `unresolved` is never
 retryable; its `reconcile` names the read, or the keyed repeat, that settles
@@ -283,7 +283,7 @@ one key are not detected; sequential repeats are.
 | 429 | `unavailable`, retryable, `gitlab.rate_limited` |
 | 404, a project the credential cannot see, or a reference from another source | `not_found` |
 | 409, or a stale revision | `conflict` |
-| 400, 422 and other 4xx | `invalid`, `gitlab.rejected`, with GitLab's message |
+| 400, 422 and other 4xx | `invalid`, `gitlab.rejected`, with GitLab's message; a 408 to the merge call or to its squash flag write is read back instead |
 | Unreachable, or no definite answer to a read | `unavailable`, retryable |
 | A task created in `done` or `canceled`, then its close failed | `unresolved`, `gitlab.incomplete`: the message names the open issue; read it and transition it |
 | A merge request written, then `assignAuthor` or `inheritLabelPrefixes` failed | `unresolved`, `gitlab.incomplete`: the message names the merge request; repeat the upsert |

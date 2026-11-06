@@ -384,6 +384,26 @@ func TestAnAnswerThatMergesNothingLeavesTheSquashFlag(t *testing.T) {
 	if merged.Proposal.State != collab.ProposalStateMerged {
 		t.Fatalf("a timeout after the merge answered %+v", merged.Proposal)
 	}
+	// A statement timeout on the provider's own flag write: the flag is read
+	// back, the merge goes on, and a refused merge puts the flag back.
+	h.branch("fourth", fakeSHA(2))
+	h.set(func(f *fakeGitLab) { f.branchSquash, f.squashOption = "", "default_off" })
+	fourth := h.upsert(`{"change":{"base":"main","head":"fourth"},"title":"Timed out"}`)
+	iid := mrIID(t, fourth.Proposal.Ref)
+	h.set(func(f *fakeGitLab) { f.unmergeable = true })
+	h.fake.addFault("PUT", `/merge_requests/`+strconv.Itoa(iid)+`$`, statusFault(408, "Request timed out", false))
+	failure = h.fails("merge", h.merge(fourth.Proposal.Ref, `,"method":"squash"`), collab.OutcomeConflict)
+	if failure.Reason != reasonNotMergeable || flag(iid) {
+		t.Fatalf("a refused merge after a timed-out flag write: %+v, flag %t", failure, flag(iid))
+	}
+	h.set(func(f *fakeGitLab) { f.unmergeable = false })
+	h.fake.addFault("PUT", `/merge_requests/`+strconv.Itoa(iid)+`$`, statusFault(408, "Request timed out", false))
+	h.ok("merge", h.merge(fourth.Proposal.Ref, `,"method":"squash"`), &merged)
+	h.mr(iid, func(mr *fakeMR) {
+		if mr.state != "merged" || !mr.squashed {
+			t.Fatalf("a merge after a timed-out flag write: state %s, squashed %t", mr.state, mr.squashed)
+		}
+	})
 	h.set(func(f *fakeGitLab) { f.branchSquash, f.unmergeable = "never", false })
 	// A flag that cannot be put back makes the answer unresolved: the second
 	// write, the one that puts it back, is refused.

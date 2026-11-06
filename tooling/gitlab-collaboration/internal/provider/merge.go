@@ -172,8 +172,7 @@ func (s *proposalSession) send(mr *glMergeRequest, request map[string]any) (_ an
 			return nil, collab.Fail(collab.OutcomeConflict, reasonHeadMoved, "merge request !%d moved: %s", mr.IID, err.Message), false
 		}
 	}
-	timedOut := err != nil && err.Kind == gitlab.Answered && err.Status == http.StatusRequestTimeout
-	if err != nil && err.Kind != gitlab.Uncertain && !timedOut {
+	if err != nil && !mayHaveWritten(err) {
 		return nil, fail(err, "merge merge request !%d", mr.IID), false
 	}
 	var current *glMergeRequest
@@ -201,7 +200,7 @@ func (s *proposalSession) setSquash(mr *glMergeRequest, squash bool) (*glMergeRe
 	if err == nil {
 		return &updated, nil
 	}
-	if err.Kind != gitlab.Uncertain {
+	if !mayHaveWritten(err) {
 		return nil, fail(err, "set the squash flag of merge request !%d", mr.IID)
 	}
 	var current *glMergeRequest
@@ -214,6 +213,13 @@ func (s *proposalSession) setSquash(mr *glMergeRequest, squash bool) (*glMergeRe
 	}
 	return nil, unresolved(fmt.Sprintf("read the proposal with proposals.status, set its squash flag back to %t if it changed, then repeat proposals.merge", mr.Squash),
 		"setting the squash flag of merge request !%d may have happened (%s), and reading it back did not show it; nothing was merged", mr.IID, err.Message)
+}
+
+// mayHaveWritten reports whether a failed write to a merge request may have
+// been applied: its outcome is unknown, or GitLab answered 408, its statement
+// timeout, which can strike after the write was stored.
+func mayHaveWritten(err *gitlab.Error) bool {
+	return err.Kind == gitlab.Uncertain || err.Kind == gitlab.Answered && err.Status == http.StatusRequestTimeout
 }
 
 func describeMethod(method collab.MergeMethod) string {
