@@ -88,18 +88,18 @@ func TestTheCredentialFollowsGlabDiscovery(t *testing.T) {
 		want    Token
 		message string
 	}{
-		{"GITLAB_TOKEN serves gitlab.com", "gitlab.com", map[string]string{TokenVariable: "a"}, nil, Token{"a", Bearer}, ""},
+		{"GITLAB_TOKEN serves gitlab.com", "gitlab.com", map[string]string{TokenVariable: "a"}, nil, Token{Value: "a", Scheme: Bearer}, ""},
 		{"GITLAB_TOKEN serves the GITLAB_HOST instance", "gitlab.example.com",
-			map[string]string{TokenVariable: "a", HostVariable: "https://GitLab.Example.com/"}, nil, Token{"a", Bearer}, ""},
+			map[string]string{TokenVariable: "a", HostVariable: "https://GitLab.Example.com/"}, nil, Token{Value: "a", Scheme: Bearer}, ""},
 		{"GITLAB_TOKEN of another instance falls to glab", "gitlab.example.com",
-			map[string]string{TokenVariable: "a"}, glab("b", nil), Token{"b", Bearer}, ""},
+			map[string]string{TokenVariable: "a"}, glab("b", nil), Token{Value: "b", Scheme: Bearer}, ""},
 		{"glab before the job token", "gitlab.example.com",
-			map[string]string{CIVariable: "true", CIHostVariable: "gitlab.example.com", JobKeyVariable: "j"}, glab("b\n", nil), Token{"b", Bearer}, ""},
+			map[string]string{CIVariable: "true", CIHostVariable: "gitlab.example.com", JobKeyVariable: "j"}, glab("b\n", nil), Token{Value: "b", Scheme: Bearer}, ""},
 		{"the job token of the instance", "gitlab.example.com",
-			map[string]string{CIVariable: "true", CIHostVariable: "gitlab.example.com", JobKeyVariable: "j"}, glab("", errNoGlab), Token{"j", JobToken}, ""},
+			map[string]string{CIVariable: "true", CIHostVariable: "gitlab.example.com", JobKeyVariable: "j"}, glab("", errNoGlab), Token{Value: "j", Scheme: JobToken}, ""},
 		{"the job token by FQDN", "gitlab.example.com:8443",
 			map[string]string{CIVariable: "true", CIHostVariable: "gitlab.example.com", CIFQDNVariable: "gitlab.example.com:8443", JobKeyVariable: "j"},
-			glab("", nil), Token{"j", JobToken}, ""},
+			glab("", nil), Token{Value: "j", Scheme: JobToken}, ""},
 		{"an empty job token", "gitlab.example.com",
 			map[string]string{CIVariable: "true", CIHostVariable: "gitlab.example.com"}, glab("", errors.New("glab failed")), Token{}, "CI_JOB_TOKEN (empty)"},
 		{"no glab", "gitlab.com", nil, glab("", errNoGlab), Token{}, "glab (not installed)"},
@@ -119,7 +119,7 @@ func TestTheCredentialFollowsGlabDiscovery(t *testing.T) {
 			}
 			continue
 		}
-		if err != nil || got != c.want || len(credential.Secrets()) != 1 {
+		if err != nil || got.Value != c.want.Value || got.Scheme != c.want.Scheme || got.Origin == "" || len(credential.Secrets()) != 1 {
 			t.Errorf("%s: %+v, %+v, want %+v", c.name, got, err, c.want)
 		}
 	}

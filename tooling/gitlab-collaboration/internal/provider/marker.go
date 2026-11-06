@@ -13,9 +13,12 @@ import (
 // is the only record of the key: finding it is how a repeated create returns
 // the first result instead of a second item.
 //
-//	<!-- putnami-idempotency k=<sha256 of operation and key> d=<sha256 of the request> -->
+// Each hash is written as two words of 32 hex digits: GitLab's search index
+// drops words of 50 characters or more from a description.
+//
+//	<!-- putnami-idempotency k=<sha256 of operation and key, in two halves> d=<sha256 of the request, in two halves> -->
 
-var markerPattern = regexp.MustCompile(`(?:\r?\n)*<!-- putnami-idempotency k=([0-9a-f]{64}) d=([0-9a-f]{64}) -->\s*$`)
+var markerPattern = regexp.MustCompile(`(?:\r?\n)*<!-- putnami-idempotency k=([0-9a-f]{32}) ([0-9a-f]{32}) d=([0-9a-f]{32}) ([0-9a-f]{32}) -->\s*$`)
 
 // idempotency is one key and the request it was used for.
 type idempotency struct {
@@ -29,8 +32,11 @@ func newIdempotency(operation, key string, request any) idempotency {
 }
 
 func (m idempotency) comment() string {
-	return "<!-- putnami-idempotency k=" + m.key + " d=" + m.digest + " -->"
+	return "<!-- putnami-idempotency k=" + m.key[:32] + " " + m.key[32:] + " d=" + m.digest[:32] + " " + m.digest[32:] + " -->"
 }
+
+// searchWord is the word of the marker GitLab's search finds it by.
+func (m idempotency) searchWord() string { return m.key[:32] }
 
 // withMarker appends a marker to a body.
 func withMarker(body string, marker idempotency) string {
@@ -46,7 +52,7 @@ func splitMarker(body string) (string, *idempotency) {
 	if match == nil {
 		return body, nil
 	}
-	return body[:match[0]], &idempotency{key: body[match[2]:match[3]], digest: body[match[4]:match[5]]}
+	return body[:match[0]], &idempotency{key: body[match[2]:match[3]] + body[match[4]:match[5]], digest: body[match[6]:match[7]] + body[match[8]:match[9]]}
 }
 
 // rejoin replaces the text of a body and keeps the marker it carried.

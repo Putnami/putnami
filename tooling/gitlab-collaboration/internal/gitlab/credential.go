@@ -50,6 +50,8 @@ const (
 type Token struct {
 	Value  string
 	Scheme Scheme
+	// Origin names where the token came from, never the token itself.
+	Origin string
 }
 
 // TokenCommand asks an installed glab CLI for the token it stores for a host.
@@ -151,7 +153,7 @@ func (c *Credential) resolve(ctx context.Context) (Token, *Error) {
 		value = strings.TrimSpace(value)
 		switch {
 		case err == nil && value != "":
-			return c.accept(value, "glab", Bearer)
+			return c.accept(value, "glab config get token", Bearer)
 		case errors.Is(err, errNoGlab):
 			tried += ", glab (not installed)"
 		case err != nil:
@@ -178,7 +180,7 @@ func (c *Credential) accept(value, origin string, scheme Scheme) (Token, *Error)
 	if !tokenShape.MatchString(value) {
 		return Token{}, &Error{Kind: NoCredential, Message: "the credential from " + origin + " is not a single token of letters, digits, '_', '.' and '-'"}
 	}
-	return Token{Value: value, Scheme: scheme}, nil
+	return Token{Value: value, Scheme: scheme, Origin: origin}, nil
 }
 
 // hostOf reads the host GITLAB_HOST names, as a bare host or a URL; it is
@@ -198,6 +200,13 @@ func hostOf(value string) string {
 // SameHost compares two host names, ignoring case.
 func SameHost(a, b string) bool {
 	return a != "" && strings.EqualFold(a, b)
+}
+
+// origin names where the resolved token came from, empty before one was.
+func (c *Credential) origin() string {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.token.Origin
 }
 
 // Secrets lists the resolved token, for redaction. It is empty until Token

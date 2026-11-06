@@ -50,6 +50,7 @@ func (p *Provider) taskHandler(run func(*taskSession, any) (any, *collab.Failure
 // task renders an issue as a task.
 func (s *taskSession) task(issue *glIssue) collab.Task {
 	body, _ := splitMarker(deref(issue.Description))
+	body = unescapeBody(body)
 	state, providerState := s.states.stateOf(issue)
 	key := "#" + strconv.Itoa(issue.IID)
 	task := collab.Task{
@@ -158,15 +159,15 @@ func (s *taskSession) find(input any) (any, *collab.Failure) {
 }
 
 // listIssues pages the project's issue list, oldest first. A label that
-// carries a comma cannot be named in GitLab's comma-separated filter: the
-// provider then filters on every label itself.
+// carries a comma, or that GitLab's filter reads as a keyword, cannot be named
+// in its label filter: the provider then filters on every label itself.
 func (s *taskSession) listIssues(state string, labels []string, text string) fetchPage {
 	return func(page int) ([]glIssue, bool, *collab.Failure) {
 		query := url.Values{
 			"state": {state}, "order_by": {"created_at"}, "sort": {"asc"},
 			"per_page": {strconv.Itoa(gitlabPageSize)}, "page": {strconv.Itoa(page)},
 		}
-		if len(labels) > 0 && !slices.ContainsFunc(labels, func(label string) bool { return strings.Contains(label, ",") }) {
+		if len(labels) > 0 && !slices.ContainsFunc(labels, unfilterable) {
 			query.Set("labels", strings.Join(labels, ","))
 		}
 		if text != "" {
@@ -180,6 +181,39 @@ func (s *taskSession) listIssues(state string, labels []string, text string) fet
 		}
 		return issues, gitlab.HasNext(header), nil
 	}
+}
+
+// unfilterable reports whether GitLab's label filter cannot name a label: a
+// comma separates labels there, and None and Any mean "no label" and "any
+// label".
+func unfilterable(label string) bool {
+	return strings.Contains(label, ",") || strings.EqualFold(label, "None") || strings.EqualFold(label, "Any")
+}
+
+// quickActionEscape goes before a body line that starts with a slash, so
+// GitLab reads the line as text and runs no quick action from it.
+const quickActionEscape = "\u200b"
+
+// escapeBody escapes every line of a body that starts with a slash.
+func escapeBody(body string) string {
+	lines := strings.Split(body, "\n")
+	for i, line := range lines {
+		if strings.HasPrefix(line, "/") {
+			lines[i] = quickActionEscape + line
+		}
+	}
+	return strings.Join(lines, "\n")
+}
+
+// unescapeBody removes the escape escapeBody put before a slash.
+func unescapeBody(body string) string {
+	lines := strings.Split(body, "\n")
+	for i, line := range lines {
+		if strings.HasPrefix(line, quickActionEscape+"/") {
+			lines[i] = strings.TrimPrefix(line, quickActionEscape)
+		}
+	}
+	return strings.Join(lines, "\n")
 }
 
 // createRequest is what a create's idempotency digest covers.
@@ -231,7 +265,7 @@ func (s *taskSession) create(input any) (any, *collab.Failure) {
 		return s.replay(existing, marker, in.IdempotencyKey)
 	}
 
-	request := map[string]any{"title": in.Title, "description": withMarker(in.Body, marker)}
+	request := map[string]any{"title": in.Title, "description": withMarker(escapeBody(in.Body), marker)}
 	if len(labels) > 0 {
 		request["labels"] = strings.Join(labels, ",")
 	}
@@ -349,7 +383,7 @@ func (s *taskSession) findKey(marker idempotency, deep bool) (*glIssue, *collab.
 		return nil, nil
 	}
 	query := url.Values{
-		"author_id": {strconv.FormatInt(me.ID, 10)}, "state": {"all"}, "search": {marker.key}, "in": {"description"},
+		"author_id": {strconv.FormatInt(me.ID, 10)}, "state": {"all"}, "search": {marker.searchWord()}, "in": {"description"},
 		"per_page": {"20"},
 	}
 	issues, _, failure := s.keyedList(query)
@@ -445,7 +479,7 @@ func (s *taskSession) update(input any) (any, *collab.Failure) {
 		patch["title"] = title
 	}
 	if in.Body != nil {
-		if joined := rejoin(deref(issue.Description), *in.Body); joined != deref(issue.Description) {
+		if joined := rejoin(deref(issue.Description), escapeBody(*in.Body)); joined != deref(issue.Description) {
 			body = joined
 			patch["description"] = body
 		}
@@ -496,6 +530,16 @@ func (s *taskSession) transition(input any) (any, *collab.Failure) {
 	if failure != nil {
 		return nil, failure
 	}
+	reopened := in.State == collab.TaskStateDone && issue.duplicate()
+	if reopened {
+		// A duplicate link keeps a closed issue canceled; reopening the issue
+		// clears it, and the write below closes it again.
+		if issue, failure = s.write(issue, map[string]any{"state_event": "reopen"}, "reopen", func(current *glIssue) bool {
+			return !current.closed()
+		}); failure != nil {
+			return nil, failure
+		}
+	}
 	patch := map[string]any{"labels": strings.Join(goal.labels, ",")}
 	switch {
 	case goal.closed && !issue.closed():
@@ -506,6 +550,12 @@ func (s *taskSession) transition(input any) (any, *collab.Failure) {
 	updated, failure := s.write(issue, patch, "transition to "+string(in.State), func(current *glIssue) bool {
 		return s.states.settled(current, in.State)
 	})
+	if failure != nil && reopened && failure.Outcome != collab.OutcomeUnresolved {
+		incomplete := unresolved("read the task with tasks.get, then transition it to done",
+			"reopened #%d of %s to clear its duplicate link, and closing it failed, so it is open: %s", issue.IID, s.project.path, failure.Error.Message)
+		incomplete.Error.Reason = reasonIncomplete
+		return nil, incomplete
+	}
 	if failure != nil {
 		return nil, failure
 	}

@@ -220,3 +220,104 @@ func TestAFindReadsAtMostFivePagesPerAnswer(t *testing.T) {
 		t.Fatalf("the resumed answer: %+v", page)
 	}
 }
+
+// traverse walks every page of a find, asking for the sizes in turn, and
+// calls during after each page.
+func (h *harness) traverse(arguments string, sizes []int, during func(page int)) []int {
+	h.t.Helper()
+	var iids []int
+	cursor := ""
+	for pages := 0; ; pages++ {
+		if pages > 500 {
+			h.t.Fatalf("the traversal does not end")
+		}
+		size := strconv.Itoa(sizes[pages%len(sizes)])
+		request := strings.TrimSuffix(arguments, "}")
+		if request != "{" {
+			request += ","
+		}
+		request += `"page":{"size":` + size
+		if cursor != "" {
+			request += `,"cursor":"` + cursor + `"`
+		}
+		request += "}}"
+		var page collab.TaskListResult
+		h.ok("find", request, &page)
+		for _, task := range page.Items {
+			iids = append(iids, mustIID(h.t, task.Ref))
+		}
+		if during != nil {
+			during(pages)
+		}
+		if cursor = page.Page.Next; cursor == "" {
+			return iids
+		}
+	}
+}
+
+func TestATraversalSurvivesTiesAndClosedIssues(t *testing.T) {
+	spectest.Proves(t, feature, "paged-find", "a-traversal-survives-ties-and-closed-issues")
+
+	// Issues created in one millisecond, as an import makes them: GitLab
+	// lists them by id descending, and by microsecond within a millisecond.
+	h := newHarness(t)
+	var tied []*fakeIssue
+	for i := 0; i < 7; i++ {
+		tied = append(tied, h.seed("Tied", "", "tie"))
+	}
+	at := tied[0].created
+	for i, issue := range tied {
+		h.change(issue, func(f *fakeIssue) { f.created = at })
+		if i == 5 {
+			h.change(issue, func(f *fakeIssue) { f.created = at.Add(300 * time.Microsecond) })
+		}
+		if i == 6 {
+			h.change(issue, func(f *fakeIssue) { f.created = at.Add(200 * time.Microsecond) })
+		}
+	}
+	for _, sizes := range [][]int{{1}, {2}, {3, 1}, {100}} {
+		got := h.traverse(`{"labels":["tie"]}`, sizes, nil)
+		slices.Sort(got)
+		if len(got) != len(tied) || len(slices.Compact(slices.Clone(got))) != len(tied) {
+			t.Fatalf("pages of %v listed %v of %d tied issues", sizes, got, len(tied))
+		}
+	}
+
+	// Closing issues during a traversal filtered on open moves the rest
+	// onto pages the cursor already passed.
+	h = newHarness(t)
+	var open []int
+	for i := 0; i < 150; i++ {
+		open = append(open, h.seed("Open", "", "walk").iid)
+	}
+	got := h.traverse(`{"labels":["walk"],"states":["open"]}`, []int{100}, func(page int) {
+		if page == 0 {
+			h.fake.mu.Lock()
+			for _, iid := range open[:60] {
+				h.fake.issues[iid].state = "closed"
+			}
+			h.fake.mu.Unlock()
+		}
+	})
+	if !slices.Equal(got, open) {
+		t.Fatalf("closing 60 issues mid-traversal listed %d of %d", len(got), len(open))
+	}
+
+	// More ties than a cursor carries may repeat an issue, never drop one.
+	h = newHarness(t)
+	var many []int
+	for i := 0; i < 70; i++ {
+		issue := h.seed("Many", "", "many")
+		h.change(issue, func(f *fakeIssue) { f.created = h.fake.clock })
+		many = append(many, issue.iid)
+	}
+	seen := map[int]bool{}
+	for _, iid := range h.traverse(`{"labels":["many"]}`, []int{60}, nil) {
+		seen[iid] = true
+	}
+	for _, iid := range many {
+		if !seen[iid] {
+			t.Fatalf("issue #%d of a 70-issue tie was left out", iid)
+		}
+	}
+}

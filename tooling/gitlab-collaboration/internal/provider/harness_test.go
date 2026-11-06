@@ -125,10 +125,12 @@ func (h *harness) create(arguments string) collab.TaskCreateResult {
 	return created
 }
 
-// seed adds an issue directly to the fake, as another account would.
+// seed adds an issue directly to the fake, as another account would, one
+// millisecond after the previous one.
 func (h *harness) seed(title, description string, labels ...string) *fakeIssue {
 	h.fake.mu.Lock()
 	defer h.fake.mu.Unlock()
+	h.fake.clock = h.fake.clock.Add(time.Millisecond)
 	return h.fake.newIssue(title, description, labels, otherID)
 }
 

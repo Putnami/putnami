@@ -124,7 +124,7 @@ func (c *Client) Get(ctx context.Context, path string, query url.Values, out any
 	for attempt := 1; ; attempt++ {
 		answer, failure := c.send(ctx, http.MethodGet, target, nil)
 		if failure == nil {
-			failure = answer.failure()
+			failure = c.refused(answer.failure())
 		}
 		if failure == nil {
 			if failure = decode(answer, out); failure == nil {
@@ -161,7 +161,7 @@ func (c *Client) Write(ctx context.Context, method, path string, body, out any) 
 	if failure != nil {
 		return failure
 	}
-	if failure := answer.failure(); failure != nil {
+	if failure := c.refused(answer.failure()); failure != nil {
 		failure.Message = c.redact(failure.Message)
 		return failure
 	}
@@ -262,6 +262,17 @@ func (a *answer) failure() *Error {
 			failure.Message += "; the limit resets at " + collabhelper.Bounded(reset, 64)
 		} else if after := a.header.Get("Retry-After"); after != "" {
 			failure.Message += "; retry after " + collabhelper.Bounded(after, 16) + "s"
+		}
+	}
+	return failure
+}
+
+// refused names where the token came from on an answer that refuses it, so
+// a caller knows which credential to fix.
+func (c *Client) refused(failure *Error) *Error {
+	if failure != nil && (failure.Status == http.StatusUnauthorized || failure.Status == http.StatusForbidden) {
+		if origin := c.credential.origin(); origin != "" {
+			failure.Message += "; the token came from " + origin
 		}
 	}
 	return failure

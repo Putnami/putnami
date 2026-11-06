@@ -23,7 +23,10 @@ import (
 // and created on first use, opened and closed states changed through
 // state_event, assignee_ids where 0 means none, lists ordered by creation
 // time then id and paged with X-Next-Page, filters on state, labels,
-// author and text that read the store at once — and injects faults: an
+// author and text that read the store at once, creation times to the
+// microsecond shown to the millisecond, ties in creation time listed by id
+// descending, quick actions run from description lines and removed from
+// them — and injects faults: an
 // answer lost after the write was applied, and a status answered before or
 // after applying.
 type fakeGitLab struct {
@@ -46,6 +49,11 @@ type fakeGitLab struct {
 	// singleAssignee keeps only the first assignee, as a tier without
 	// multiple assignees does.
 	singleAssignee bool
+	// onPut, when set, answers a PUT with the fault it returns, before
+	// applying it.
+	onPut func() *fault
+	// queries records the query string of every list request.
+	queries []string
 }
 
 type fakeIssue struct {
@@ -134,8 +142,17 @@ func (f *fakeGitLab) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusUnauthorized, map[string]any{"message": "401 Unauthorized"})
 		return
 	}
+	if r.Method == http.MethodGet {
+		f.queries = append(f.queries, r.URL.RawQuery)
+	}
 	var active *fault
+	if r.Method == http.MethodPut && f.onPut != nil {
+		active = f.onPut()
+	}
 	for _, candidate := range f.faults {
+		if active != nil {
+			break
+		}
 		if candidate.times > 0 && candidate.method == r.Method && candidate.path.MatchString(r.URL.Path) {
 			candidate.times--
 			active = candidate
@@ -273,7 +290,7 @@ func (f *fakeGitLab) render(issue *fakeIssue) map[string]any {
 		"id": issue.id, "iid": issue.iid, "project_id": f.projectID, "title": issue.title, "description": description,
 		"state": issue.state, "labels": append([]string{}, issue.labels...), "assignees": assignees, "author": f.user(issue.author),
 		"web_url":    fmt.Sprintf("https://%s/%s/-/issues/%d", fakeHost, f.path, issue.iid),
-		"created_at": issue.created.Format("2006-01-02T15:04:05.000Z07:00"), "updated_at": issue.updated.Format("2006-01-02T15:04:05.000Z07:00"),
+		"created_at": issue.created.UTC().Format("2006-01-02T15:04:05.000Z07:00"), "updated_at": issue.updated.Format("2006-01-02T15:04:05.000Z07:00"),
 		"_links": links, "user_notes_count": 0,
 	}
 }
@@ -337,16 +354,16 @@ func (f *fakeGitLab) list(w http.ResponseWriter, query url.Values) {
 		}
 		matched = append(matched, issue)
 	}
+	// GitLab orders by creation time, then by id descending whichever way
+	// the time is sorted.
+	descending := query.Get("sort") == "desc"
 	sort.Slice(matched, func(i, j int) bool {
 		a, b := matched[i], matched[j]
 		if !a.created.Equal(b.created) {
-			return a.created.Before(b.created)
+			return a.created.Before(b.created) != descending
 		}
-		return a.id < b.id
+		return a.id > b.id
 	})
-	if query.Get("sort") == "desc" {
-		slices.Reverse(matched)
-	}
 	perPage, _ := strconv.Atoi(query.Get("per_page"))
 	if perPage <= 0 {
 		perPage = 20
@@ -367,6 +384,26 @@ func (f *fakeGitLab) list(w http.ResponseWriter, query url.Values) {
 		w.Header().Set("X-Next-Page", "")
 	}
 	writeJSON(w, http.StatusOK, out)
+}
+
+// quickActions runs the quick actions /close, /reopen and /label ~name of a
+// description, as GitLab does, and returns the description without them.
+func (f *fakeGitLab) quickActions(issue *fakeIssue, description string) string {
+	var kept []string
+	for _, line := range strings.Split(description, "\n") {
+		command, argument, _ := strings.Cut(line, " ")
+		switch command {
+		case "/close":
+			issue.state = "closed"
+		case "/reopen":
+			issue.state = "opened"
+		case "/label":
+			issue.labels = splitLabels(strings.Join(issue.labels, ",") + "," + strings.TrimPrefix(argument, "~"))
+		default:
+			kept = append(kept, line)
+		}
+	}
+	return strings.Join(kept, "\n")
 }
 
 type fakeEdit struct {
@@ -401,7 +438,8 @@ func (f *fakeGitLab) create(w http.ResponseWriter, r *http.Request) {
 	if edit.Labels != nil {
 		labels = *edit.Labels
 	}
-	issue := f.newIssue(*edit.Title, deref(edit.Description), strings.Split(labels, ","), f.me)
+	issue := f.newIssue(*edit.Title, "", strings.Split(labels, ","), f.me)
+	issue.description = f.quickActions(issue, deref(edit.Description))
 	writeJSON(w, http.StatusCreated, f.render(issue))
 }
 
@@ -418,7 +456,7 @@ func (f *fakeGitLab) edit(w http.ResponseWriter, r *http.Request, issue *fakeIss
 		issue.title = *edit.Title
 	}
 	if edit.Description != nil {
-		issue.description = *edit.Description
+		issue.description = f.quickActions(issue, *edit.Description)
 	}
 	if edit.Labels != nil {
 		issue.labels = splitLabels(*edit.Labels)

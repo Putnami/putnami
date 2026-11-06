@@ -73,9 +73,25 @@ func TestARefusedCredentialIsDenied(t *testing.T) {
 	}
 	h.env[gitlab.TokenVariable] = "glpat-WRONGtokenWRONGtoken9999"
 	h.provider = &Provider{Getenv: h.provider.Getenv, Client: h.provider.Client}
-	if failure := h.fails("get", `{"ref":`+ref+`}`, collab.OutcomeDenied); failure.Reason != reasonUnauthorized {
+	failure := h.fails("get", `{"ref":`+ref+`}`, collab.OutcomeDenied)
+	if failure.Reason != reasonUnauthorized {
 		t.Fatalf("a 401: %+v", failure)
 	}
+	mustContain(t, failure.Message, "the token came from GITLAB_TOKEN")
+}
+
+func TestARefusalNamesTheCredentialsOrigin(t *testing.T) {
+	spectest.Proves(t, feature, "credential-safety", "a-refusal-names-the-credentials-origin")
+	h := newHarness(t)
+	issue := h.seed("Guarded", "")
+	delete(h.env, gitlab.TokenVariable)
+	h.env[gitlab.CIVariable], h.env[gitlab.CIHostVariable], h.env[gitlab.JobKeyVariable] = "true", fakeHost, fakeJobToken
+	h.fake.addFault("PUT", `/issues/[0-9]+$`, statusFault(403, "403 Forbidden", true))
+	failure := h.fails("update", `{"ref":`+refJSON(refOf(issue.iid))+`,"title":"x"}`, collab.OutcomeDenied)
+	if failure.Reason != reasonForbidden || strings.Contains(failure.Message, fakeJobToken) {
+		t.Fatalf("a refused job token: %+v", failure)
+	}
+	mustContain(t, failure.Message, "the token came from CI_JOB_TOKEN")
 }
 
 func TestAnOutageIsUnavailableAndWritesNothing(t *testing.T) {

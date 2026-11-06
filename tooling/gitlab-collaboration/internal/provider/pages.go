@@ -2,19 +2,26 @@ package provider
 
 import (
 	"regexp"
+	"slices"
 	"strconv"
+	"strings"
 
 	collab "go.putnami.dev/protocol/collaboration"
 )
 
-// A list answer walks GitLab's numbered pages of 100, oldest first: GitLab
-// orders a project's issues by creation time, then id, and cannot order them
-// by iid. Its cursor is "p<page>.t<milliseconds>.i<id>": the GitLab page to
-// resume on and the position — creation time and id — of the last issue
-// already considered. Resuming skips every issue at or before that position,
-// and steps back while the resumed page starts past it, so an issue created,
-// closed or deleted during a traversal moves no other issue across a page
-// boundary: every issue present throughout is returned exactly once.
+// A list answer walks GitLab's numbered pages of 100, oldest first. GitLab
+// orders a project's issues by creation time to the microsecond, then by id
+// descending, and shows the time to the millisecond only, so the order of
+// issues created in one millisecond is not visible. A cursor is
+// "p<page>.t<millisecond>.i<id>-<id>…": the GitLab page to resume on, the
+// millisecond of the last issue considered, and the ids already considered at
+// that millisecond. Resuming skips every issue before that millisecond and
+// every id the cursor names, wherever it sits in the page, and reads the page
+// before while the resumed page is empty or starts on an issue the cursor has
+// not seen: an issue closed or deleted during a traversal may have pulled
+// unseen issues there. Every issue present throughout a traversal is
+// returned, and none twice unless more than maxTiedIDs issues of one
+// millisecond straddle a page boundary.
 
 // gitlabPageSize is the page size every GitLab list request asks for.
 const gitlabPageSize = 100
@@ -23,25 +30,18 @@ const gitlabPageSize = 100
 // reached, the answer carries the issues found so far and a cursor.
 const maxFetchesPerPage = 5
 
-var cursorPattern = regexp.MustCompile(`^p([1-9][0-9]{0,5})\.t([0-9]{1,15})\.i([0-9]{1,18})$`)
+// maxTiedIDs bounds the ids a cursor carries, so it stays within the
+// contract's cursor length.
+const maxTiedIDs = 48
 
-// position orders issues the way GitLab lists them.
-type position struct {
-	created int64
-	id      int64
-}
-
-func (p position) after(other position) bool {
-	return p.created > other.created || (p.created == other.created && p.id > other.id)
-}
-
-func positionOf(issue *glIssue) position {
-	return position{created: issue.createdMillis(), id: issue.ID}
-}
+var cursorPattern = regexp.MustCompile(`^p([1-9][0-9]{0,5})\.t([0-9]{1,15})\.i([0-9]{1,18}(?:-[0-9]{1,18}){0,47})$`)
 
 type cursor struct {
 	page int
-	last position
+	// millis is the creation millisecond of the last issue considered.
+	millis int64
+	// tied are the ids considered at millis, oldest first.
+	tied []int64
 	// started is set once an issue was considered.
 	started bool
 }
@@ -55,13 +55,48 @@ func parseCursor(value string) (cursor, *collab.Failure) {
 		return cursor{}, collab.Fail(collab.OutcomeInvalid, collab.ReasonRequestInvalid, "cursor %q was not issued by this provider", value)
 	}
 	page, _ := strconv.Atoi(match[1])
-	created, _ := strconv.ParseInt(match[2], 10, 64)
-	id, _ := strconv.ParseInt(match[3], 10, 64)
-	return cursor{page: page, last: position{created: created, id: id}, started: true}, nil
+	millis, _ := strconv.ParseInt(match[2], 10, 64)
+	at := cursor{page: page, millis: millis, started: true}
+	for _, id := range strings.Split(match[3], "-") {
+		parsed, _ := strconv.ParseInt(id, 10, 64)
+		at.tied = append(at.tied, parsed)
+	}
+	return at, nil
 }
 
 func (c cursor) String() string {
-	return "p" + strconv.Itoa(c.page) + ".t" + strconv.FormatInt(c.last.created, 10) + ".i" + strconv.FormatInt(c.last.id, 10)
+	ids := make([]string, len(c.tied))
+	for i, id := range c.tied {
+		ids[i] = strconv.FormatInt(id, 10)
+	}
+	if len(ids) == 0 {
+		ids = []string{"0"}
+	}
+	return "p" + strconv.Itoa(c.page) + ".t" + strconv.FormatInt(c.millis, 10) + ".i" + strings.Join(ids, "-")
+}
+
+// considered reports whether the cursor already went past an issue.
+func (c *cursor) considered(issue *glIssue) bool {
+	if !c.started {
+		return false
+	}
+	millis := issue.createdMillis()
+	return millis < c.millis || (millis == c.millis && slices.Contains(c.tied, issue.ID))
+}
+
+// consider records an issue as considered.
+func (c *cursor) consider(issue *glIssue) {
+	millis := issue.createdMillis()
+	switch {
+	case !c.started || millis > c.millis:
+		c.millis, c.tied = millis, []int64{issue.ID}
+	case millis == c.millis:
+		c.tied = append(c.tied, issue.ID)
+		if len(c.tied) > maxTiedIDs {
+			c.tied = c.tied[len(c.tied)-maxTiedIDs:]
+		}
+	}
+	c.started = true
 }
 
 // fetchPage reads one GitLab page and reports whether a next one exists.
@@ -85,7 +120,7 @@ func collect(fetch fetchPage, keep func(*glIssue) bool, size int, from string) (
 			return nil, "", failure
 		}
 		if resuming {
-			if at.page > 1 && len(issues) > 0 && positionOf(&issues[0]).after(at.last) {
+			if at.page > 1 && (len(issues) == 0 || !at.considered(&issues[0])) {
 				at.page--
 				continue
 			}
@@ -93,8 +128,7 @@ func collect(fetch fetchPage, keep func(*glIssue) bool, size int, from string) (
 		}
 		for i := range issues {
 			issue := &issues[i]
-			here := positionOf(issue)
-			if at.started && !here.after(at.last) {
+			if at.considered(issue) {
 				continue
 			}
 			if keep(issue) {
@@ -103,7 +137,7 @@ func collect(fetch fetchPage, keep func(*glIssue) bool, size int, from string) (
 				}
 				out = append(out, *issue)
 			}
-			at.last, at.started = here, true
+			at.consider(issue)
 		}
 		if !more {
 			return out, "", nil

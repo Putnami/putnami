@@ -62,15 +62,19 @@ The provider finds one credential per instance, the way `glab` does:
 2. `glab config get token --host <host>`: the token `glab auth login`
    stored. A token `glab` keeps in an operating-system keyring is not read.
 3. Inside a GitLab CI/CD job (`GITLAB_CI=true`) whose `CI_SERVER_HOST` or
-   `CI_SERVER_FQDN` is the bound host, `CI_JOB_TOKEN`. GitLab decides what a
-   job token may reach; a refusal answers `denied`.
+   `CI_SERVER_FQDN` is the bound host, `CI_JOB_TOKEN`. GitLab lets a job
+   token list and read issues and nothing more: with it, `find` and `get`
+   work and every write answers `denied`. A pipeline that writes tasks sets
+   `GITLAB_TOKEN`.
 
 A job token is sent in the `JOB-TOKEN` header, any other token as
 `Authorization: Bearer`. Without a credential, every call answers `denied`
 (`gitlab.unauthenticated`) and sends nothing. No answer, error or message
 carries a token: the runtime removes the one it resolved, and every string
 shaped like a GitLab token (`glpat-`, `glcbt-` and the other published
-prefixes), from everything it writes.
+prefixes), from everything it writes. A 401 or 403 says where the token came
+from (`GITLAB_TOKEN`, `glab config get token` or `CI_JOB_TOKEN`), never the
+token.
 
 ### Environment
 
@@ -101,7 +105,13 @@ credential never leaves its own instance or this machine.
   applies the first label of `in_progress` or `blocked`, and opens then
   closes an issue asked for in `done` or `canceled`. `create` and `update`
   refuse a state label, and a label with a comma, which GitLab reads as a
-  separator.
+  separator. A transition to `done` of an issue GitLab closed as a duplicate
+  reopens it, which clears the duplicate link, then closes it.
+- **Bodies are text.** GitLab runs a quick action (`/close`, `/label`,
+  `/move`) from any description line that starts with a slash. `create` and
+  `update` put a zero-width space before such a slash, so GitLab stores the
+  line and runs nothing, and a read removes it: a task's body is what the
+  caller wrote.
 - **Assignment is information.** `assign` replaces the assignees, named by
   username; `@me` is the credential's account. A username GitLab does not
   know is `invalid` and nothing is written. GitLab keeps only one assignee on
@@ -117,10 +127,15 @@ credential never leaves its own instance or this machine.
   between the two is not detected.
 - **Find.** GitLab filters the project's issues on their state, every listed
   label and the text in title and description, oldest first; the provider
-  then keeps the requested semantic states. A cursor names GitLab's page and
-  the creation time and id of the last issue considered, so an issue opened
-  or deleted during a traversal moves no other issue across a page boundary,
-  and the page size may change between pages.
+  then keeps the requested semantic states. A label named `None` or `Any`,
+  keywords of GitLab's filter, is matched by the provider. GitLab orders
+  issues created in one millisecond in a way its API does not show, so a
+  cursor names GitLab's page, the millisecond of the last issue considered
+  and up to 48 ids seen at it, and a resumed page that is empty or starts on
+  an unseen issue is read one page earlier. An issue present throughout a
+  traversal is listed whatever the page sizes, ties and issues closed
+  meanwhile; only a tie of more than 48 issues at a page boundary can list
+  one twice.
 
 ## Failures and retries
 
@@ -139,7 +154,9 @@ it.
 
 Before it creates, `create` looks for its key among the newest issues the
 credential's account opened in the project, `keyScanPages` pages of 100, then
-in GitLab's issue search. GitLab's lists read its database, so a repeat right
+in GitLab's issue search, which finds the first half of the key's hash: each
+hash is written as two words of 32 hex digits, since GitLab's index drops
+longer words. GitLab's lists read its database, so a repeat right
 after a create finds the issue. The same request returns the issue
 (`created: false`); other content is a `conflict`. Labels are a set: their
 order does not change the request. Only an issue the account opened answers
@@ -188,6 +205,13 @@ request, and only in a project whose description carries
 ```bash
 tooling/gitlab-collaboration/bin/live-test <project path> [host]
 ```
+
+## Support
+
+This package is `preview` in [`putnami.support.json`](../../putnami.support.json):
+it can break in a minor release, and the release notes then state the change
+you must make. For `stable`, it needs a consumer in this repository, a page on
+the site, and a version gate that fails a release on an undeclared break.
 
 ## Decisions
 
