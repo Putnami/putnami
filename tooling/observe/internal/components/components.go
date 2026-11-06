@@ -53,6 +53,10 @@ type Found struct {
 	// of the test target that wrote it, such as a Bazel test log. Nil for a
 	// detector that knows no report.
 	ReportOwner func(report string) (component string, ok bool)
+	// Yield makes its components give way to a component another detector
+	// places at or above their directory, such as the packages a Bazel
+	// detector reads from BUILD files without an export.
+	Yield bool
 }
 
 // LockReader reads the versions a lockfile pins per package name.
@@ -91,6 +95,7 @@ var rank = map[string]int{
 func Detect(root string, detectors []Detector) Set {
 	var set Set
 	byID := map[string]Component{}
+	var yielding []Component
 	for _, d := range detectors {
 		found := d.Detect(root)
 		set.Diagnostics = append(set.Diagnostics, found.Diagnostics...)
@@ -111,10 +116,26 @@ func Detect(root string, detectors []Detector) Set {
 			if _, known := rank[c.Source]; !known || c.Source == evidence.SourceDeclared {
 				c.Source = evidence.SourceManifest
 			}
+			if found.Yield {
+				yielding = append(yielding, c)
+				continue
+			}
 			current, taken := byID[c.ID]
 			if taken && rank[current.Source] <= rank[c.Source] {
 				continue
 			}
+			byID[c.ID] = c
+		}
+	}
+	// A yielding component goes only where no other detector's component
+	// lies at or above its directory.
+	placed := make([]string, 0, len(byID))
+	for id := range byID {
+		placed = append(placed, id)
+	}
+	for _, c := range yielding {
+		covered := slices.ContainsFunc(placed, func(id string) bool { return id == c.ID || Contains(id, c.ID) })
+		if !covered {
 			byID[c.ID] = c
 		}
 	}

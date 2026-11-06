@@ -255,3 +255,36 @@ func TestWithoutAnExportAnotherDetectorKeepsItsComponents(t *testing.T) {
 		t.Errorf("packages/api with an export %+v", c)
 	}
 }
+
+func TestWithoutAnExportANestedBuildFileYieldsToTheEnclosingComponent(t *testing.T) {
+	spectest.Proves(t, "tooling/observe-bazel", "bazel-without-export", "without-an-export-a-nested-build-file-yields-to-the-enclosing-component")
+	root := t.TempDir()
+	write(t, root, map[string]string{
+		"MODULE.bazel":                     "",
+		"pnpm-workspace.yaml":              "packages:\n  - packages/*\n",
+		"package.json":                     `{"name":"root","private":true}`,
+		"packages/pricing/package.json":    `{"name":"@demo/pricing"}`,
+		"packages/pricing/src/BUILD.bazel": "",
+		"packages/api/package.json":        `{"name":"@demo/api","dependencies":{"@demo/pricing":"workspace:*"}}`,
+		"svc/go.mod":                       "module example.com/svc\n\ngo 1.23\n",
+		"svc/internal/calc/BUILD.bazel":    "",
+		"tools/lint/BUILD.bazel":           "",
+	})
+	set := Detect(root, Default(""))
+	if got := ids(set); !slices.Equal(got, []string{"packages/api", "packages/pricing", "svc", "tools/lint"}) {
+		t.Fatalf("components %v", got)
+	}
+	impacts := set.Impacts(map[string]bool{mustOwner(t, set, "packages/pricing/src/index.ts"): true})
+	if impacts["packages/pricing"] != evidence.ImpactChanged || impacts["packages/api"] != evidence.ImpactDependent {
+		t.Errorf("impacts %v", impacts)
+	}
+}
+
+func mustOwner(t *testing.T, set Set, file string) string {
+	t.Helper()
+	owner, ok := set.Owner(file)
+	if !ok {
+		t.Fatalf("%s has no owner", file)
+	}
+	return owner
+}

@@ -72,8 +72,9 @@ func (d NxDetector) Detect(root string) Found {
 }
 
 // BazelDetector adapts the Bazel detector: each Bazel package is an
-// orchestrator component, with the edges of the query export, or a manifest
-// one without edges when there is no export. It also places
+// orchestrator component, with the edges of the query export, or, without an
+// export, a manifest one without edges that yields to any other detector's
+// component at or above its directory. It also places
 // each test log of bazel-testlogs on the package of its test target.
 type BazelDetector struct {
 	// GraphFile is the query export to read; empty reads bazel-graph.json.
@@ -100,6 +101,7 @@ func (d BazelDetector) Detect(root string) Found {
 		})
 	}
 	found.ReportOwner = detection.TestTarget
+	found.Yield = !detection.FromExport
 	return found
 }
 

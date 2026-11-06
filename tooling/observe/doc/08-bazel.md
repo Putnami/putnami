@@ -22,9 +22,10 @@ A component is a package, never a target: the targets of one `BUILD` file
 share its directory, and a changed file belongs to the package that holds it.
 
 The Bazel detector runs after the others. With an export, its packages
-outrank them by source, as an Nx graph export does. Without one, a directory
-another detector names, such as a pnpm workspace member or a Go module, keeps
-that detector's component and its edges.
+outrank them by source, as an Nx graph export does. Without one, a package
+yields to any component another detector places at or above its directory,
+such as a pnpm workspace member or a Go module: that component keeps its
+files and its edges.
 
 ## The query export comes first
 

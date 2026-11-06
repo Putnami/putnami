@@ -97,7 +97,8 @@ keeps a file by its content:
 | Go cover profile | a first `mode: set`, `mode: count` or `mode: atomic` line |
 
 The walk does not follow links. It also reads, through the links Bazel leaves
-at the root, each `test.xml` under `bazel-testlogs` and the combined LCOV
+at the root, the `test.xml` of each test target, shard and run under
+`bazel-testlogs` and the combined LCOV
 report `bazel-out/_coverage/_coverage_report.dat`; see
 [the Bazel detector](08-bazel.md#tests-and-coverage).
 
