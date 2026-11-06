@@ -1,0 +1,39 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-spec.json",
+  "protocolVersion": 1,
+  "feature": "codehost/code-host-vocabulary",
+  "outcomes": [
+    "One module owns the code-host slugs, the words each host uses for its change request and its diff, its public defaults, and the marker of the Putnami note, and every other module takes them from it.",
+    "A Go and a TypeScript reader give the same word, the same label and the same note verdict for the same input, held to one vocabulary document and one fixture corpus."
+  ],
+  "nonGoals": [
+    "Talking to a code host: API clients, tokens, webhooks and note bodies stay with the extension or service that publishes.",
+    "Validating a document that names a host: the evidence protocol keeps its own validation and takes only the slugs from here.",
+    "CI systems, which are a separate vocabulary the evidence protocol owns."
+  ],
+  "requirements": [
+    {
+      "id": "a-closed-slug-set",
+      "text": "The code hosts are github, gitlab and generic, in that order. A slug is valid exactly when it is one of them, compared case-sensitively. A display lookup of any other slug answers the generic vocabulary."
+    },
+    {
+      "id": "one-vocabulary-document",
+      "text": "vocabulary.json, protocol version 1, lists every slug once, in the slug order, with its vocabulary, and the note marker. schemas/vocabulary.json declares exactly its members and the slug enum, and the Go and the TypeScript tables equal the document."
+    },
+    {
+      "id": "each-host-names-its-change-request",
+      "text": "GitHub names a pull request with #, GitLab a merge request with !, and a generic host a change request with #. The diff tab is Files changed on GitHub and Changes elsewhere. A label is the noun, a space, the prefix and the number; a number that is not positive gives the noun alone."
+    },
+    {
+      "id": "hosted-slugs-name-their-public-host",
+      "text": "github defaults to the host github.com and the API https://api.github.com; gitlab to gitlab.com and https://gitlab.com/api/v4. generic has no default host and no default API. A self-managed or Enterprise host overrides the default; it never changes the slug."
+    },
+    {
+      "id": "the-putnami-note-is-marked",
+      "text": "The Putnami note on a change request begins with the marker <!-- putnami-observe:summary --> on its first line. A body is the Putnami note exactly when, after leading spaces, tabs, carriage returns and line feeds, it starts with the marker; the comparison is case-sensitive."
+    }
+  ],
+  "decisions": [
+    "protocols/codehost/doc/adr/0001-one-owner-for-code-host-vocabulary.md"
+  ]
+}
