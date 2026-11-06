@@ -220,6 +220,12 @@ func TestASingleAssigneeTierKeepsItsAssignee(t *testing.T) {
 	if !slices.Equal(kept.Proposal.Assignees, []string{"alice"}) {
 		t.Fatalf("the present assignee was not kept: %v", kept.Proposal.Assignees)
 	}
+	// Keeping one of two present assignees would drop the other.
+	h.mr(1, func(mr *fakeMR) { mr.assignees = []int64{9, 10} })
+	failure := h.fails("upsert", `{"change":`+topicChange+`,"title":"Single"}`, collab.OutcomeUnresolved)
+	if failure.Reason != reasonIncomplete {
+		t.Fatalf("a dropped assignee: %+v", failure)
+	}
 }
 
 func TestAScopedLabelKeyTheMergeRequestHasIsKept(t *testing.T) {

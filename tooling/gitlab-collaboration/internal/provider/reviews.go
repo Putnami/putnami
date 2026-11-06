@@ -259,6 +259,7 @@ func (s *proposalSession) checks(sha string) (collab.Checks, *collab.Failure) {
 		return summary, nil
 	}
 	latest := map[string]glCommitStatus{}
+	truncated := false
 	for page := 1; page <= maxCheckPages; page++ {
 		query := url.Values{"per_page": {strconv.Itoa(gitlabPageSize)}, "page": {strconv.Itoa(page)}}
 		var statuses []glCommitStatus
@@ -274,6 +275,7 @@ func (s *proposalSession) checks(sha string) (collab.Checks, *collab.Failure) {
 		if !gitlab.HasNext(header) {
 			break
 		}
+		truncated = page == maxCheckPages
 	}
 	items := make([]collab.Check, 0, len(latest))
 	for _, status := range latest {
@@ -301,6 +303,10 @@ func (s *proposalSession) checks(sha string) (collab.Checks, *collab.Failure) {
 	if len(items) > collab.MaxListMembers {
 		summary.Detail = fmt.Sprintf("%d checks reported; the %d listed are the failing and pending ones first", len(items), collab.MaxListMembers)
 		items = items[:collab.MaxListMembers]
+	}
+	if truncated {
+		summary.Detail = strings.TrimSpace(summary.Detail + fmt.Sprintf(" GitLab reports more than %d statuses for %s; the newest beyond them were not read.",
+			maxCheckPages*gitlabPageSize, sha))
 	}
 	summary.Items = items
 	return summary, nil

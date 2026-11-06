@@ -137,8 +137,9 @@ func (s *proposalSession) complete(mr *glMergeRequest) (*glMergeRequest, *collab
 				return nil, partial("assigning "+me.Username, "assignAuthor", fail(err, "assign %s", me.Username))
 			}
 			// A tier without multiple assignees keeps one: the one present
-			// stays, and the answer lists who is assigned.
-			kept := len(ids) > 0 && len(updated.Assignees) == 1 && slices.Contains(ids, updated.Assignees[0].ID)
+			// stays, and the answer lists who is assigned. When it held more,
+			// keeping one would drop the others, which is no addition.
+			kept := len(ids) == 1 && len(updated.Assignees) == 1 && updated.Assignees[0].ID == ids[0]
 			if !kept && !slices.ContainsFunc(updated.Assignees, func(user glUser) bool { return user.ID == me.ID }) {
 				return nil, partial("assigning "+me.Username, "assignAuthor", collab.Fail(collab.OutcomeDenied, reasonForbidden, "GitLab did not assign %s", me.Username))
 			}

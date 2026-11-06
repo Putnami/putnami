@@ -80,7 +80,7 @@ func (s *proposalSession) merge(input any) (any, *collab.Failure) {
 	if err == nil && answer.State == "merged" {
 		return merged(&answer)
 	}
-	if err == nil && answer.MergeError != "" {
+	if err == nil && answer.MergeError != "" && answer.MergeError != mr.MergeError {
 		return nil, collab.Fail(collab.OutcomeConflict, reasonNotMergeable, "merge request !%d cannot be merged: %s", mr.IID,
 			collabhelper.Bounded(answer.MergeError, 400))
 	}
