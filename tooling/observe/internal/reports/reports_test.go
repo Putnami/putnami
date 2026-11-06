@@ -387,3 +387,52 @@ func TestAnSBOMIsFoundByItsContentOrNamed(t *testing.T) {
 		}
 	})
 }
+
+// bazelOutputs writes the outputs of bazel test and bazel coverage outside
+// the repository, and the convenience links Bazel leaves at its root.
+func bazelOutputs(t *testing.T, root string) {
+	t.Helper()
+	outputBase := tree(t, map[string]string{
+		"testlogs/pricing/pricing_test/test.xml":           junitXML,
+		"testlogs/pricing/pricing_test/test.log":           "PASS\n",
+		"testlogs/api/api_test/shard_1_of_2/test.xml":      junitXML,
+		"testlogs/api/api_test/test.outputs/outputs.xml":   junitXML,
+		"out/_coverage/_coverage_report.dat":               lcovTrace,
+		"out/k8-fastbuild/testlogs/pricing/other/test.xml": junitXML,
+	})
+	for link, target := range map[string]string{"bazel-testlogs": "testlogs", "bazel-out": "out"} {
+		if err := os.Symlink(filepath.Join(outputBase, target), filepath.Join(root, link)); err != nil {
+			t.Skipf("symbolic links: %v", err)
+		}
+	}
+}
+
+func TestBazelReportsAreDiscoveredThroughTheConvenienceLinks(t *testing.T) {
+	spectest.Proves(t, "tooling/observe-bazel", "bazel-reports", "bazel-reports-are-discovered-through-the-convenience-links")
+	root := tree(t, map[string]string{"MODULE.bazel": "", "pricing/BUILD.bazel": ""})
+	bazelOutputs(t, root)
+	found, diags := Collect(Request{Root: root, Resolve: resolver(root)})
+	if len(diags) != 0 {
+		t.Fatalf("diagnostics %v", diags)
+	}
+	want := []Report{
+		{Path: "bazel-out/_coverage/_coverage_report.dat", Kind: KindCoverage, Format: FormatLCOV, Source: SourceDiscovered},
+		{Path: "bazel-testlogs/api/api_test/shard_1_of_2/test.xml", Kind: KindJUnit, Format: FormatJUnit, Source: SourceDiscovered},
+		{Path: "bazel-testlogs/pricing/pricing_test/test.xml", Kind: KindJUnit, Format: FormatJUnit, Source: SourceDiscovered},
+	}
+	if !reflect.DeepEqual(found, want) {
+		t.Errorf("reports %+v, want %+v", found, want)
+	}
+
+	// A pattern through the link finds the same logs, named through it.
+	named, diags := Collect(Request{Root: root, JUnit: []string{"bazel-testlogs/**/test.xml"}, Coverage: []string{"bazel-out/_coverage/_coverage_report.dat"}, Resolve: resolver(root)})
+	if len(diags) != 0 {
+		t.Fatalf("diagnostics %v", diags)
+	}
+	for i := range want {
+		want[i].Source = SourceNamed
+	}
+	if !reflect.DeepEqual(named, want) {
+		t.Errorf("named reports %+v, want %+v", named, want)
+	}
+}

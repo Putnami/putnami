@@ -235,6 +235,51 @@ func discoverReports(root string, kinds map[string]bool) ([]Report, []diag.Diagn
 	if err != nil && !errors.Is(err, errBound) {
 		diags = append(diags, diag.Warningf(CodeReportUnreadable, "", "the repository cannot be walked: %v", err))
 	}
+	if errors.Is(err, errBound) {
+		return reports, diags
+	}
+	found, d := discoverBazelReports(root, kinds)
+	return append(reports, found...), append(diags, d...)
+}
+
+// Bazel writes its reports under the convenience links of the repository
+// root, which the walk does not follow: one test.xml per test target under
+// bazel-testlogs, and the combined LCOV report of bazel coverage under
+// bazel-out.
+const (
+	bazelTestLogs       = "bazel-testlogs"
+	bazelTestLog        = "test.xml"
+	bazelCoverageReport = "bazel-out/_coverage/_coverage_report.dat"
+)
+
+// discoverBazelReports finds the reports Bazel wrote through its links, named
+// by their path through the link.
+func discoverBazelReports(root string, kinds map[string]bool) ([]Report, []diag.Diagnostic) {
+	var candidates []string
+	var diags []diag.Diagnostic
+	if kinds[KindJUnit] {
+		if info, err := os.Stat(filepath.Join(root, bazelTestLogs)); err == nil && info.IsDir() {
+			files, bounded := glob(filepath.Join(root, bazelTestLogs, "**", bazelTestLog))
+			if bounded {
+				diags = append(diags, diag.Warningf(CodeDiscoveryBounded, "", "discovery stopped in %s after %d entries or %d reports: name the reports with --junit", bazelTestLogs, MaxWalkedEntries, MaxReports))
+			}
+			candidates = append(candidates, files...)
+		}
+	}
+	if kinds[KindCoverage] {
+		file := filepath.Join(root, filepath.FromSlash(bazelCoverageReport))
+		if info, err := os.Stat(file); err == nil && info.Mode().IsRegular() {
+			candidates = append(candidates, file)
+		}
+	}
+	var reports []Report
+	for _, file := range candidates {
+		format, err := sniffFile(file)
+		if err != nil || format == "" || !kinds[kindOf(format)] {
+			continue
+		}
+		reports = append(reports, Report{Path: relative(root, file), Kind: kindOf(format), Format: format, Source: SourceDiscovered})
+	}
 	return reports, diags
 }
 
@@ -444,10 +489,16 @@ func glob(pattern string) ([]string, bool) {
 	}
 	start = filepath.FromSlash(start)
 	rest := segments[literal:]
+	// A literal prefix that is a link, such as Bazel's bazel-testlogs, is
+	// walked through its target and its files are named through the link.
+	walk := start
+	if real, err := filepath.EvalSymlinks(start); err == nil {
+		walk = real
+	}
 	var files []string
 	walked := 0
 	bounded := false
-	_ = filepath.WalkDir(start, func(file string, entry fs.DirEntry, err error) error {
+	_ = filepath.WalkDir(walk, func(file string, entry fs.DirEntry, err error) error {
 		if err != nil {
 			return nil
 		}
@@ -457,17 +508,17 @@ func glob(pattern string) ([]string, bool) {
 			return filepath.SkipAll
 		}
 		if entry.IsDir() {
-			if file != start && skippedDirs[entry.Name()] {
+			if file != walk && skippedDirs[entry.Name()] {
 				return filepath.SkipDir
 			}
 			return nil
 		}
-		rel, err := filepath.Rel(start, file)
+		rel, err := filepath.Rel(walk, file)
 		if err != nil || !entry.Type().IsRegular() {
 			return nil
 		}
 		if matchSegments(rest, strings.Split(filepath.ToSlash(rel), "/")) {
-			files = append(files, file)
+			files = append(files, filepath.Join(start, rel))
 		}
 		return nil
 	})
