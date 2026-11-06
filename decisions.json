@@ -468,6 +468,22 @@
       "settledBy": "the epic session, under the owner's delegation of 2026-11-05",
       "adr": "tooling/contributor/doc/adr/0002-build-and-versioned-workflow-record.md",
       "reviewOnly": true
+    },
+    {
+      "id": "D-059",
+      "statement": "this workspace binds the missions contract to @putnami/intelligence, the only installed provider whose missions.status reads the sessions of every worktree; @putnami/local-collaboration keeps one store per worktree",
+      "settled": "2026-11-06",
+      "settledBy": "the epic session, under the owner's delegation of 2026-11-05",
+      "check": {
+        "kind": "json-value",
+        "files": [
+          "putnami.workspace.json"
+        ],
+        "pointer": "/options/collaboration/missions/provider",
+        "rule": "equals",
+        "value": "@putnami/intelligence",
+        "whenMissing": "violated"
+      }
     }
   ]
 }

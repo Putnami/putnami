@@ -446,6 +446,23 @@ func TestASpentEnvelopeLaunchesNothing(t *testing.T) {
 		!strings.Contains(text, "  read-contract (task 41): in progress at code, no live session, ") {
 		t.Fatalf("running %d, launchable %+v, text %q; want the ended session to free its slot", result.Running, result.Launchable, text)
 	}
+
+	// A ready child whose mission is not read holds a session; one whose
+	// session ended frees it.
+	p = newProvider()
+	p.proposals["b/read"] = proposal("101", "b/read", collab.ProposalStateOpen)
+	p.unsupported[collab.ContractMissions] = true
+	if result, _ := runStatus(t, root, p); issueByKey(t, result, "read-contract").State != StateReady ||
+		result.Running != 1 || len(result.Launchable) != 0 {
+		t.Fatalf("running %d, launchable %+v; want the unread ready child to hold the one session", result.Running, result.Launchable)
+	}
+	p.unsupported[collab.ContractMissions] = false
+	p.sessions["issue-41"] = []collab.MissionSession{ended}
+	result, _ = runStatus(t, root, p)
+	if read := issueByKey(t, result, "read-contract"); read.State != StateReady || !read.SessionsRead || read.Live != 0 ||
+		result.Running != 0 || !reflect.DeepEqual(result.Launchable, []Launchable{{Issue: "plan-command", Base: "main"}}) {
+		t.Fatalf("running %d, launchable %+v; want the ready child's ended session to free its slot", result.Running, result.Launchable)
+	}
 	spectest.Proves(t, epicFeature, epicStatus, "a-spent-envelope-launches-nothing")
 }
 
