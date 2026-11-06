@@ -21,7 +21,10 @@ several issues of an epic, each in its own session, never slices of one issue.
    `proposals status` reports for the parent's proposal.
 5. Push the checkpoint with `change finalize --draft` again: it pushes the
    committed HEAD and refreshes the title and body, so rewrite the body when
-   the net change moved. Never push a failing or half-edited tree.
+   the net change moved. A push-only run pushes with `git push` instead,
+   `git push --force-with-lease` after a rebase, and keeps the body in
+   `.putnami/<issue>/body.md`. Never push a failing or
+   half-edited tree.
 6. Report the slice: what it delivered, its gate session, and the tokens spent
    against its estimate. `"$PUTNAMI_CLI" agent stage code` prints the
    session's tokens so far. A slice 50 % over its estimate, or one that leaves

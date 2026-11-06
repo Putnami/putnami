@@ -14,7 +14,7 @@ You will add one step to a GitHub Actions workflow, or one job to a GitLab CI pi
 | `putnami extensions install --user @putnami/cloud` | Installs the extension that uploads the evidence to Putnami Cloud. |
 | `putnami observe --evidence observe-evidence.json --publish` | Prints the summary, writes the evidence document, and posts a commit status and a summary note on the pull or merge request. It exits `0` whatever it observes: only a usage error, or an evidence file it cannot write, fails it. |
 
-`putnami observe` finds the base of the change from the CI: the pull request base on GitHub, the merge request diff base on GitLab, and on a branch push the commit before the push. It deepens a shallow clone itself, so you do not change `fetch-depth` or `GIT_DEPTH`. It finds JUnit, TRX, LCOV, Cobertura, Clover and Go cover reports by their content, anywhere in the checkout except `.git`, `node_modules` and `vendor`.
+`putnami observe` finds the base of the change from the CI: the pull request base on GitHub, the merge request diff base on GitLab, and on a branch push the commit before the push. It deepens a shallow clone itself, so you do not change `fetch-depth` or `GIT_DEPTH`. It finds JUnit, TRX, LCOV, Cobertura, Clover and Go cover reports by their content, anywhere in the checkout except `.git`, `node_modules` and `vendor`, and the reports of Bazel through its `bazel-testlogs` and `bazel-out` links.
 
 In a Python repository, have pytest write both reports, with pytest-cov installed:
 
@@ -32,6 +32,14 @@ pants test --test-report --use-coverage --coverage-py-report=xml ::
 ```
 
 `pants peek` lists every target with the dependencies Pants infers from imports, so `putnami observe` knows that a change to a library marks the code that imports it. Each directory of BUILD targets is a component; without the export, the components have no edge, and the summary says how to write it. The JUnit reports under `dist/test/reports` and the coverage under `dist/coverage` land on the components, and a change to a lockfile that `[python.resolves]` in `pants.toml` names is a dependency change of ecosystem `pypi`. Write the export elsewhere with `--pants-graph <path>`.
+
+In a Bazel repository, write the query export before `putnami observe`, in the job that ran `bazel test` or `bazel coverage --combined_report=lcov`:
+
+```bash
+bazel query 'deps(//...)' --output=streamed_jsonproto > bazel-graph.json
+```
+
+`putnami observe` makes each Bazel package a component, reads the edges between packages from `bazel-graph.json`, and finds the logs of `bazel-testlogs` and the combined LCOV report of `bazel-out/_coverage/_coverage_report.dat` through the links Bazel leaves at the root. Each test log goes to the package of its test target. Without the export, the packages come from the `BUILD` files, without edges, and the summary names the command. The links point into Bazel's output base, so on GitLab run these lines in the job that ran Bazel, not in a later one.
 
 In a .NET repository, have `dotnet test` write a TRX report and Coverlet's coverage, with the `coverlet.collector` package in each test project:
 
@@ -188,6 +196,6 @@ Without `--base-sbom`, each dependency gets its state at the head and the summar
 ## Learn more
 
 - [What `putnami observe` reads](https://github.com/putnami/putnami/blob/main/tooling/observe/doc/01-observe.md): every flag, how the base is found, and how reports and SBOMs are discovered.
-- [The `@putnami/observe` README](https://github.com/putnami/putnami/blob/main/tooling/observe/README.md): the questions it answers and how it reads Nx, Pants, npm, pnpm, yarn, Composer, Go, Python and .NET repositories.
+- [The `@putnami/observe` README](https://github.com/putnami/putnami/blob/main/tooling/observe/README.md): the questions it answers and how it reads Nx, Pants, Bazel, npm, pnpm, yarn, Composer, Go, Python and .NET repositories.
 
 You now have a CI job that records which files a change touched and which tests and coverage reports it produced, as an artifact you can keep or upload to Putnami Cloud.

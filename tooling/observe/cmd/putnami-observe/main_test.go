@@ -503,3 +503,22 @@ func TestThePantsGraphFlagNamesTheExport(t *testing.T) {
 		t.Errorf("an empty --pants-graph: %v", err)
 	}
 }
+
+func TestTheBazelGraphFlagNamesTheExport(t *testing.T) {
+	spectest.Proves(t, "tooling/observe-bazel", "bazel-packages-are-components", "a-query-export-gives-the-packages-and-their-edges")
+	dir := t.TempDir()
+	t.Chdir(dir)
+	opts, _, err := parseRun([]string{"--bazel-graph", "ci/graph.json"}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := filepath.Join(dir, "ci", "graph.json"); opts.BazelGraph != want {
+		t.Errorf("BazelGraph %q, want %q", opts.BazelGraph, want)
+	}
+	if opts, _, err := parseRun(nil, nil); err != nil || opts.BazelGraph != "" {
+		t.Errorf("without the flag: %q, %v", opts.BazelGraph, err)
+	}
+	if _, _, err := parseRun([]string{"--bazel-graph"}, nil); err == nil {
+		t.Error("an empty --bazel-graph is no usage error")
+	}
+}

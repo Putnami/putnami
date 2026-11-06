@@ -49,6 +49,14 @@ type Found struct {
 	// Lockfile returns the ecosystem and the reader of a lockfile only this
 	// detector can read, such as a go.mod. Nil for a detector that reads none.
 	Lockfile func(file string) (ecosystem string, read LockReader, ok bool)
+	// ReportOwner maps a repository-relative report path to the component
+	// of the test target that wrote it, such as a Bazel test log. Nil for a
+	// detector that knows no report.
+	ReportOwner func(report string) (component string, ok bool)
+	// Yield makes its components give way to a component another detector
+	// places at or above their directory, such as the packages a Bazel
+	// detector reads from BUILD files without an export.
+	Yield bool
 }
 
 // LockReader reads the versions a lockfile pins per package name.
@@ -70,6 +78,7 @@ type Set struct {
 	Diagnostics []diag.Diagnostic
 	locators    []func(string) (string, string, bool)
 	lockfiles   []func(string) (string, LockReader, bool)
+	owners      []func(string) (string, bool)
 }
 
 // rank orders the sources: a lower rank wins.
@@ -86,6 +95,7 @@ var rank = map[string]int{
 func Detect(root string, detectors []Detector) Set {
 	var set Set
 	byID := map[string]Component{}
+	var yielding []Component
 	for _, d := range detectors {
 		found := d.Detect(root)
 		set.Diagnostics = append(set.Diagnostics, found.Diagnostics...)
@@ -95,6 +105,9 @@ func Detect(root string, detectors []Detector) Set {
 		if found.Lockfile != nil {
 			set.lockfiles = append(set.lockfiles, found.Lockfile)
 		}
+		if found.ReportOwner != nil {
+			set.owners = append(set.owners, found.ReportOwner)
+		}
 		for _, c := range found.Components {
 			if c.ID == "" {
 				c.ID = evidence.RootComponent
@@ -103,10 +116,26 @@ func Detect(root string, detectors []Detector) Set {
 			if _, known := rank[c.Source]; !known || c.Source == evidence.SourceDeclared {
 				c.Source = evidence.SourceManifest
 			}
+			if found.Yield {
+				yielding = append(yielding, c)
+				continue
+			}
 			current, taken := byID[c.ID]
 			if taken && rank[current.Source] <= rank[c.Source] {
 				continue
 			}
+			byID[c.ID] = c
+		}
+	}
+	// A yielding component goes only where no other detector's component
+	// lies at or above its directory.
+	placed := make([]string, 0, len(byID))
+	for id := range byID {
+		placed = append(placed, id)
+	}
+	for _, c := range yielding {
+		covered := slices.ContainsFunc(placed, func(id string) bool { return id == c.ID || Contains(id, c.ID) })
+		if !covered {
 			byID[c.ID] = c
 		}
 	}
@@ -151,12 +180,30 @@ func (s Set) Owner(file string) (string, bool) {
 func (s Set) Locate(importPath string) (file, component string, ok bool) {
 	for _, locate := range s.locators {
 		if file, component, ok := locate(importPath); ok {
-			if _, known := s.find(component); known {
+			if s.has(component) {
 				return file, component, true
 			}
 		}
 	}
 	return "", "", false
+}
+
+// ReportOwner returns the component of the test target that wrote the
+// repository-relative report, through the detectors that know one: the
+// target's own component or, when it yielded to another detector's, the
+// innermost component that encloses its directory.
+func (s Set) ReportOwner(report string) (string, bool) {
+	for _, owner := range s.owners {
+		if component, ok := owner(report); ok {
+			if s.has(component) {
+				return component, true
+			}
+			if enclosing, found := s.Owner(component); found {
+				return enclosing, true
+			}
+		}
+	}
+	return "", false
 }
 
 // Lockfile returns the ecosystem and reader a detector offers for a
@@ -170,12 +217,10 @@ func (s Set) Lockfile(file string) (string, LockReader, bool) {
 	return "", nil, false
 }
 
-func (s Set) find(id string) (Component, bool) {
+// has reports whether id is a component.
+func (s Set) has(id string) bool {
 	i := sort.Search(len(s.Components), func(i int) bool { return s.Components[i].ID >= id })
-	if i < len(s.Components) && s.Components[i].ID == id {
-		return s.Components[i], true
-	}
-	return Component{}, false
+	return i < len(s.Components) && s.Components[i].ID == id
 }
 
 // Impacts returns the impact of every component, given the components that

@@ -695,6 +695,88 @@
       ]
     },
     {
+      "id": "tooling/observe-bazel",
+      "type": "feature",
+      "name": "Read the packages and dependency graph of a Bazel repository",
+      "outcome": "putnami observe, in a Bazel repository, knows its packages, which package owns each file and which packages depend on which from the query export the CI wrote, and places the tests and coverage Bazel wrote on their packages, without running bazel, so a change to a shared library marks the packages that use it",
+      "owner": "tooling",
+      "target": "modeled",
+      "requirements": [
+        {
+          "id": "bazel-packages-are-components",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-query-export-gives-the-packages-and-their-edges",
+              "a-bazel-workspace-is-recognized-by-its-root-file"
+            ]
+          }
+        },
+        {
+          "id": "bazel-without-export",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "without-an-export-the-build-files-give-the-packages",
+              "a-malformed-export-is-a-warning",
+              "without-an-export-another-detector-keeps-its-components",
+              "without-an-export-a-nested-build-file-yields-to-the-enclosing-component"
+            ]
+          }
+        },
+        {
+          "id": "bazel-package-edges",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "an-edge-between-targets-is-an-edge-between-packages",
+              "an-external-repository-is-no-edge"
+            ]
+          }
+        },
+        {
+          "id": "bazel-reports",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-test-log-goes-to-the-package-of-its-test-target",
+              "bazel-reports-are-discovered-through-the-convenience-links",
+              "a-test-log-of-a-yielded-package-goes-to-the-enclosing-component"
+            ]
+          }
+        },
+        {
+          "id": "bazel-change-analysis",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-bazel-demo-is-explained"
+            ]
+          }
+        }
+      ]
+    },
+    {
       "id": "tooling/observe-dotnet",
       "type": "feature",
       "name": "Find the .NET projects of a repository that keeps its own CI",

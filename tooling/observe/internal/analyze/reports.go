@@ -164,8 +164,9 @@ func joinDir(base, dir string) string {
 }
 
 // attributeTests gives each case of a JUnit report to a component: the one
-// that holds its test file, else the one of the Go package its suite names,
-// else the one that holds the report.
+// of the test target that wrote the report, else the one that holds its test
+// file, else the one of the Go package its suite names, else the one that
+// holds the report.
 //
 // The test file is the case's file, else its class name read as a path
 // (Vitest), else its dotted class name read as a Python module: pytest writes
@@ -177,6 +178,12 @@ func (r *Result) attributeTests(report reports.Report, result readers.TestReport
 	if isAbsolute(report.Path) {
 		reportOwned = false
 	}
+	// A test log names the test target that wrote it, such as a Bazel log of
+	// bazel-testlogs: every case goes to the target's component.
+	targetOwner, targeted := "", false
+	if !isAbsolute(report.Path) {
+		targetOwner, targeted = m.set.ReportOwner(report.Path)
+	}
 	unattributed := 0
 	for _, c := range result.Cases {
 		owner, file, ok := "", "", false
@@ -186,6 +193,9 @@ func (r *Result) attributeTests(report reports.Report, result readers.TestReport
 				owner, ok = m.set.Owner(rel)
 				break
 			}
+		}
+		if targeted {
+			owner, ok = targetOwner, true
 		}
 		if !ok {
 			names := []string{c.Classname}

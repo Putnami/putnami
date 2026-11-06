@@ -3,6 +3,7 @@ package components
 import (
 	"go.putnami.dev/protocol/evidence"
 	wsproto "go.putnami.dev/protocol/workspace"
+	"go.putnami.dev/tooling/observe/internal/detect/bazel"
 	"go.putnami.dev/tooling/observe/internal/detect/composer"
 	"go.putnami.dev/tooling/observe/internal/detect/dotnet"
 	"go.putnami.dev/tooling/observe/internal/detect/pants"
@@ -16,11 +17,16 @@ type Options struct {
 	// PantsGraph is the Pants export to read, absolute or relative to the
 	// repository root; empty reads pants-graph.json at the root.
 	PantsGraph string
+	// BazelGraph is the Bazel query export to read, absolute or relative to
+	// the repository root; empty reads bazel-graph.json at the root.
+	BazelGraph string
 }
 
-// Default returns the detectors observe runs, orchestrators first.
+// Default returns the detectors observe runs, Nx and Pants first. Bazel comes
+// last: its export outranks the others by source, and without one its
+// packages yield.
 func Default(opts Options) []Detector {
-	return []Detector{NxDetector{}, PantsDetector{GraphFile: opts.PantsGraph}, NodeDetector{}, ComposerDetector{}, GoDetector{}, PythonDetector{}, DotnetDetector{}}
+	return []Detector{NxDetector{}, PantsDetector{GraphFile: opts.PantsGraph}, NodeDetector{}, ComposerDetector{}, GoDetector{}, PythonDetector{}, BazelDetector{GraphFile: opts.BazelGraph}, DotnetDetector{}}
 }
 
 // fromProbe turns the projects of a probe answer into components.
@@ -64,6 +70,40 @@ func (d NxDetector) Detect(root string) Found {
 			return Component{Name: meta.Name, Ecosystem: nx.Ecosystem, Source: meta.Source}, true
 		}),
 	}
+}
+
+// BazelDetector adapts the Bazel detector: each Bazel package is an
+// orchestrator component, with the edges of the query export, or, without an
+// export, a manifest one without edges that yields to any other detector's
+// component at or above its directory. It also places
+// each test log of bazel-testlogs on the package of its test target.
+type BazelDetector struct {
+	// GraphFile is the query export to read; empty reads bazel-graph.json.
+	GraphFile string
+}
+
+// Name implements Detector.
+func (BazelDetector) Name() string { return "bazel" }
+
+// Detect implements Detector.
+func (d BazelDetector) Detect(root string) Found {
+	detection := bazel.Detect(root, d.GraphFile)
+	found := Found{Diagnostics: detection.Diagnostics}
+	if len(detection.Packages) == 0 {
+		return found
+	}
+	source := evidence.SourceManifest
+	if detection.FromExport {
+		source = evidence.SourceOrchestrator
+	}
+	for _, p := range detection.Packages {
+		found.Components = append(found.Components, Component{
+			ID: p.Dir, Name: p.Label, Ecosystem: bazel.Ecosystem, Source: source, DependsOn: p.DependsOn,
+		})
+	}
+	found.ReportOwner = detection.TestTarget
+	found.Yield = !detection.FromExport
+	return found
 }
 
 // ComposerDetector adapts the Composer detector: each composer.json is a
