@@ -27,7 +27,7 @@
     },
     {
       "id": "paged-find",
-      "text": "find reads the project's issues oldest first, filtered by GitLab on state, labels and text, then by the provider on semantic states. A cursor names GitLab's page, the millisecond of the last issue considered and up to 48 ids seen at it; a resumed page that is empty or starts on an unseen issue is read one page earlier. So every issue present throughout a traversal is listed, whatever the page sizes, ties in creation time and issues closed meanwhile, and only a tie of over 48 at a boundary repeats one."
+      "text": "find reads the project's issues oldest first, filtered by GitLab on state, labels and text, then by the provider on semantic states. Each read starts at the creation millisecond of the last issue considered, and the cursor holds it with the ids seen at it, or past 48 their count. So every issue present throughout a traversal is listed once and the traversal ends, whatever the page sizes, ties or issues closed meanwhile, except that closing issues inside a tie of over 48 can hide others of it."
     },
     {
       "id": "reconciled-writes",
@@ -35,7 +35,7 @@
     },
     {
       "id": "literal-bodies",
-      "text": "A task's title and body reach GitLab as data, never as commands: create and update escape every line of a body that starts with a slash, so GitLab runs no quick action from it and stores the body whole, and a read removes that escape. A transition to done of an issue GitLab closed as a duplicate reopens it, then closes it, since the duplicate link otherwise keeps it canceled. A label named None or Any, which GitLab's filter reads as a keyword, is matched by the provider."
+      "text": "A task's title and body reach GitLab as data, never as commands: create and update escape every body line outside fenced code that starts with a slash, so GitLab runs no quick action from it and stores the body whole; a read removes the escape exactly. A transition to done of an issue GitLab closed as a duplicate reopens it, then closes it, since the duplicate link otherwise keeps it canceled. A label named None or Any, which GitLab's filter reads as a keyword, is matched by the provider."
     },
     {
       "id": "informational-assign",

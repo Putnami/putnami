@@ -100,30 +100,31 @@ wherever GitLab allows it, and departs from them only where GitLab differs.
    the reads cannot establish answers `unresolved`, names the read or the
    keyed repeat that settles it, and is never sent again.
 
-8. **`find` pages by creation and remembers the issues of its last
-   millisecond.** GitLab sorts a project's issues by creation time to the
-   microsecond, then by id descending, shows the time to the millisecond, and
-   cannot sort them by `iid`. So the order of issues created in one
-   millisecond, an import's issues above all, is not visible. A cursor is
-   `p<page>.t<millisecond>.i<id>-<id>…`: GitLab's page, the millisecond of
-   the last issue considered, and the ids already considered at that
-   millisecond. A request reads GitLab's page again and skips every issue
-   before that millisecond and every id the cursor names, whatever their
-   order inside the page. When the page is empty, or starts on an issue the
-   cursor has not seen, an issue closed or deleted meanwhile may have pulled
-   unseen ones onto the page before, so it reads that page first. An issue
-   present throughout a traversal is therefore listed once, whatever page
-   sizes the caller asks for. The cursor keeps at most 48 ids: past 48
-   issues created in one millisecond at a page boundary, an issue may be
-   listed twice, never left out.
+8. **`find` reads from a creation time, not from a page number.** GitLab
+   sorts a project's issues by creation time to the microsecond, then by id
+   descending, shows the time to the millisecond, and cannot sort them by
+   `iid`; an offset page also moves whenever an issue before it is closed or
+   deleted. So every read asks for the issues created at or after the
+   millisecond of the last issue considered (`created_after`), oldest first,
+   and the cursor is that millisecond with what was already considered at it:
+   `t<millisecond>.i<id>-<id>…`, the ids, while there are at most 48, and
+   `t<millisecond>.n<count>` past 48, the count, read at that offset. A read
+   skips every id the cursor names wherever it sits in GitLab's answer, and
+   each read lists at least one issue not yet considered, so a traversal
+   always ends. An issue present throughout a traversal is listed once,
+   whatever page sizes the caller asks for, ties in creation time and issues
+   closed meanwhile. The one exception is a tie of more than 48 issues in one
+   millisecond: there the cursor counts positions, and closing issues of that
+   tie during the traversal can hide others of it.
 
 9. **A body is data, never a command.** GitLab runs a quick action from any
    description line that starts with a slash (`/close`, `/label`, `/move`)
    and stores the description without it, so a body could change a state
-   behind `transition` and its revision check. `create` and `update` insert a
-   zero-width space before such a slash; GitLab stores the line and runs
-   nothing, and a read removes the space, so a task's body is what the caller
-   wrote. A transition to `done` of an issue GitLab closed as a duplicate
+   behind `transition` and its revision check. Outside fenced code, where
+   GitLab runs none, `create` and `update` insert a zero-width space before
+   such a slash, and before a zero-width space that starts a line; GitLab
+   stores the line and runs nothing, and a read removes exactly one, so a
+   task's body is what the caller wrote. A transition to `done` of an issue GitLab closed as a duplicate
    first reopens it, which clears the duplicate link, then closes it. A label
    named `None` or `Any`, keywords of GitLab's label filter, is matched by the
    provider rather than sent.
