@@ -238,7 +238,8 @@ credential never leaves its own instance or this machine.
   decides otherwise, `merge` is `unsupported`. Every answer that merges
   nothing leaves the flag as it was: a rule the merge request's read already
   shows sends nothing, and a flag set for the merge, by the provider or by
-  GitLab's own merge call, is put back. The project's `never` and `always`
+  GitLab's own merge call once it accepted the credential and the head, is
+  put back. The project's `never` and `always`
   refuse on the project's setting alone, even where a protected branch's
   rule would relax them: merge without a method there. No method leaves the choice to the project.
 - **Revisions.** A proposal's revision covers the stored title, description,

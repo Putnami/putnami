@@ -88,35 +88,40 @@ func (s *proposalSession) merge(input any) (any, *collab.Failure) {
 					mr.IID, needed, flagged.squashes(), s.project.path))
 			}
 			request["squash"] = needed
-			if s.settings.RemoveSourceBranch {
-				request["should_remove_source_branch"] = true
-			}
-			return s.sendRestoring(mr, request)
+			return s.sendRestoring(mr, s.withSettings(request), true)
 		}
 		request["squash"] = needed
 		if needed && !mr.Squash {
 			// GitLab's merge call sets the flag when it asks to squash, before
 			// it decides whether it can merge.
-			if s.settings.RemoveSourceBranch {
-				request["should_remove_source_branch"] = true
-			}
-			return s.sendRestoring(mr, request)
+			return s.sendRestoring(mr, s.withSettings(request), false)
 		}
 	}
+	result, failure, _ := s.send(mr, s.withSettings(request))
+	return result, failure
+}
+
+// withSettings adds what the binding's settings ask of every merge call.
+func (s *proposalSession) withSettings(request map[string]any) map[string]any {
 	if s.settings.RemoveSourceBranch {
 		request["should_remove_source_branch"] = true
 	}
-	return s.send(mr, request)
+	return request
 }
 
-// sendRestoring sends a merge call after the merge request's squash flag was
-// changed for it: an answer that merged nothing puts the flag back first, and
-// an unresolved one names the flag's earlier value.
-func (s *proposalSession) sendRestoring(mr *glMergeRequest, request map[string]any) (any, *collab.Failure) {
-	result, failure := s.send(mr, request)
+// sendRestoring sends a merge call that changes the merge request's squash
+// flag: the provider set it just before (providerWrote), or GitLab's merge
+// call sets it itself once it accepted the head. An answer that merged
+// nothing puts the flag back first, unless only GitLab could have written it
+// and it refused before doing so; an unresolved one names the flag's earlier
+// value.
+func (s *proposalSession) sendRestoring(mr *glMergeRequest, request map[string]any, providerWrote bool) (any, *collab.Failure) {
+	result, failure, gitlabWrote := s.send(mr, request)
 	switch {
 	case failure == nil:
 		return result, nil
+	case !providerWrote && !gitlabWrote && failure.Outcome != collab.OutcomeUnresolved:
+		return nil, failure
 	case failure.Outcome == collab.OutcomeUnresolved:
 		failure.Error.Message += fmt.Sprintf("; the squash flag of merge request !%d was %t before this merge", mr.IID, mr.Squash)
 		failure.Error.Reconcile += fmt.Sprintf(", and if it did not merge, set its squash flag back to %t", mr.Squash)
@@ -140,10 +145,13 @@ func (s *proposalSession) restoreSquash(mr *glMergeRequest, answer *collab.Failu
 	return answer
 }
 
-// send sends the merge call once and answers what GitLab did.
-func (s *proposalSession) send(mr *glMergeRequest, request map[string]any) (any, *collab.Failure) {
-	merged := func(current *glMergeRequest) (any, *collab.Failure) {
-		return &collab.ProposalResult{Proposal: s.proposal(current)}, nil
+// send sends the merge call once and answers what GitLab did. reached is
+// true when GitLab got past its checks of the credential and the head and
+// stored the call's squash, which it does before it decides whether it can
+// merge: an answer of 405, 406 or 422, or one that did not merge.
+func (s *proposalSession) send(mr *glMergeRequest, request map[string]any) (_ any, _ *collab.Failure, reached bool) {
+	merged := func(current *glMergeRequest) (any, *collab.Failure, bool) {
+		return &collab.ProposalResult{Proposal: s.proposal(current)}, nil, true
 	}
 	var answer glMergeRequest
 	err := s.client.Write(s.ctx, http.MethodPut, s.project.apiPath("merge_requests", strconv.Itoa(mr.IID), "merge"), request, &answer)
@@ -152,18 +160,18 @@ func (s *proposalSession) send(mr *glMergeRequest, request map[string]any) (any,
 	}
 	if err == nil && answer.MergeError != "" && answer.MergeError != mr.MergeError {
 		return nil, collab.Fail(collab.OutcomeConflict, reasonNotMergeable, "merge request !%d cannot be merged: %s", mr.IID,
-			collabhelper.Bounded(answer.MergeError, 400))
+			collabhelper.Bounded(answer.MergeError, 400)), true
 	}
 	if err != nil && err.Kind == gitlab.Answered {
 		switch err.Status {
 		case http.StatusMethodNotAllowed, http.StatusNotAcceptable, http.StatusUnprocessableEntity:
-			return nil, collab.Fail(collab.OutcomeConflict, reasonNotMergeable, "merge request !%d cannot be merged: %s", mr.IID, err.Message)
+			return nil, collab.Fail(collab.OutcomeConflict, reasonNotMergeable, "merge request !%d cannot be merged: %s", mr.IID, err.Message), true
 		case http.StatusConflict:
-			return nil, collab.Fail(collab.OutcomeConflict, reasonHeadMoved, "merge request !%d moved: %s", mr.IID, err.Message)
+			return nil, collab.Fail(collab.OutcomeConflict, reasonHeadMoved, "merge request !%d moved: %s", mr.IID, err.Message), false
 		}
 	}
 	if err != nil && err.Kind != gitlab.Uncertain {
-		return nil, fail(err, "merge merge request !%d", mr.IID)
+		return nil, fail(err, "merge merge request !%d", mr.IID), false
 	}
 	var current *glMergeRequest
 	if s.reconcile(func() (bool, *collab.Failure) {
@@ -178,7 +186,7 @@ func (s *proposalSession) send(mr *glMergeRequest, request map[string]any) (any,
 		message = err.Message
 	}
 	return nil, unresolved("read the proposal with proposals.status before any retry",
-		"merging merge request !%d may have happened (%s), and reading it back did not show it merged", mr.IID, message)
+		"merging merge request !%d may have happened (%s), and reading it back did not show it merged", mr.IID, message), true
 }
 
 // setSquash sets a merge request's squash flag, which GitLab decides a

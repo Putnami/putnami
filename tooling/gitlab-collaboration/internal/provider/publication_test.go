@@ -339,6 +339,31 @@ func TestAnAnswerThatMergesNothingLeavesTheSquashFlag(t *testing.T) {
 	if failure.Reason != reasonNotMergeable || flag(3) {
 		t.Fatalf("a refused squash merge under a rule: %+v, flag %t", failure, flag(3))
 	}
+	// A refusal GitLab answers before it stores the flag leaves nothing to
+	// put back: the outcome is the refusal's, and one write is sent.
+	for _, refusal := range []struct {
+		fault   fault
+		outcome collab.Outcome
+	}{
+		{statusFault(401, "401 Unauthorized", true), collab.OutcomeDenied},
+		{fault{status: 429, body: `{"message":"429 Too Many Requests"}`, before: true}, collab.OutcomeUnavailable},
+		{statusFault(409, "SHA does not match HEAD of source branch", true), collab.OutcomeConflict},
+	} {
+		h.set(func(f *fakeGitLab) { f.unmergeable = false })
+		h.fake.addFault("PUT", `/merge_requests/3/merge$`, refusal.fault)
+		puts := h.fake.count("PUT ")
+		h.fails("merge", h.merge(third.Proposal.Ref, `,"method":"squash"`), refusal.outcome)
+		if sent := h.fake.count("PUT ") - puts; sent != 1 || flag(3) {
+			t.Fatalf("a %s refusal sent %d writes, flag %t", refusal.outcome, sent, flag(3))
+		}
+	}
+	// An unresolved merge after a flag write names the flag's earlier value.
+	h.set(func(f *fakeGitLab) { f.branchSquash, f.unmergeable = "", false })
+	h.fake.addFault("PUT", `/merge_requests/3/merge$`, fault{status: 502, body: `{"message":"bad gateway"}`, before: true})
+	failure = h.fails("merge", h.merge(third.Proposal.Ref, `,"method":"squash"`), collab.OutcomeUnresolved)
+	mustContain(t, failure.Message, "was false before this merge")
+	mustContain(t, failure.Reconcile, "set its squash flag back to false")
+	h.mr(3, func(mr *fakeMR) { mr.squash = false })
 	h.set(func(f *fakeGitLab) { f.branchSquash, f.unmergeable = "never", false })
 	// A flag that cannot be put back makes the answer unresolved: the second
 	// write, the one that puts it back, is refused.
