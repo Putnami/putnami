@@ -103,3 +103,6 @@ ordinary `build` sessions that the owner opens by hand.
 Amended 2026-11-06: [ADR 0011](0011-the-epic-session-publishes-a-cloud-child.md)
 adds the `cloud` launch target. A cloud child runs `build --push-only`, and
 the epic session proves its pushed head locally and publishes its proposal.
+The new target also changes `epic status`, which reports each child's
+target: section 3's "changes neither the plan nor the commands" no longer
+holds for that command.

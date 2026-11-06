@@ -27,7 +27,7 @@
     },
     {
       "id": "epic-cloud-child",
-      "text": "A cloud child runs build --push-only: it pushes its branch at each checkpoint, declarations first, and opens no proposal. The epic skill has the owner start the cloud session, and the epic session proves the pushed head with the project gate in a local worktree before it publishes the proposal with change finalize."
+      "text": "A cloud child runs build --push-only: it pushes its branch at each checkpoint, declarations first, and opens no proposal. The epic skill has the owner start the cloud session, and the epic session reviews and gates the pushed head in a local worktree before it publishes the proposal with change finalize."
     }
   ],
   "decisions": [

@@ -4,7 +4,9 @@
 - **Scope**: `@putnami/contributor` `epic` skill, the `build` push-only
   mode, the launch record and `putnami epic status`
 - **Amends**: [ADR 0010](0010-an-epic-session-runs-issues-in-waves.md),
-  sections 1 and 3
+  sections 1 and 3, and applies
+  [ADR 0008](0008-build-pushes-its-intent-before-its-code.md) to a child
+  that opens no proposal
 
 ## Context
 
@@ -35,20 +37,24 @@ body and the task the proposal carries.
 ### 3. The epic session proves the pushed head, then publishes it
 
 The epic session publishes the proposal of a cloud child, and only of a
-cloud child. It checks the pushed head out in a local worktree on the
-child's branch, runs the project gate on it, and publishes with
-`change finalize`: a dossier built from that gate, or `--gate ci` with a
-workflow record it writes. It never trusts the child's records from a
-distance and never commits to the child's branch. It may open the draft
-from the declarations commit, so the reviewer still sees the intent first
-([ADR 0008](0008-build-pushes-its-intent-before-its-code.md)).
+cloud child. It keeps one local worktree on the child's branch, at the head
+the child pushed. When the child pushes a declarations commit, the epic
+session opens the draft from it, so the reviewer sees the intent before the
+code, as ADR 0008 requires; the child reads the reviews once the draft
+exists. At the final head, the epic session runs build's check stage there,
+an independent review and the final gate, then build's merge stage: a
+dossier from that review and gate, or `--gate ci` with a workflow record it
+writes. A finding goes back to the child, which repairs and pushes again.
+The epic session never trusts the child's records from a distance and never
+commits to the child's branch.
 
 ## Consequences
 
 - ADR 0010 section 1 holds for local children: the epic session still never
   codes and never merges, and opens a proposal only for a cloud child.
-- A cloud child's proof is run twice: once by the child, once by the epic
-  session on the same head. The second run is the one the proposal cites.
+- A cloud child's review and gate run twice: once by the child, once by the
+  epic session on the same head. The second run is the one the proposal
+  cites.
 - A cloud child that never reports its pushed head stays `in progress` in
   `epic status`; the epic session follows its session in the host.
 
