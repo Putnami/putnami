@@ -270,6 +270,8 @@ func TestSanitizeMachineOutputValue(t *testing.T) {
 		"AS" + "IA" + strings.Repeat("B", 16),
 		"gh" + "p_" + strings.Repeat("a", 36),
 		"github" + "_pat_" + strings.Repeat("b", 20),
+		"gl" + "pat-" + strings.Repeat("f", 20),
+		"gl" + "pat-" + strings.Repeat("g", 27) + ".01." + strings.Repeat("h", 9),
 		"AI" + "za" + strings.Repeat("c", 35),
 		"xo" + "xb-" + strings.Repeat("d", 10),
 		"sk_" + "live_" + strings.Repeat("e", 16),
@@ -279,6 +281,12 @@ func TestSanitizeMachineOutputValue(t *testing.T) {
 		if got := SanitizeMachineOutputString("before " + secret + " after"); got != "before [REDACTED] after" && got != "[REDACTED]" {
 			t.Errorf("secret pattern %d was not redacted: %q", i, got)
 		}
+	}
+	if got := SanitizeMachineOutputString("use " + "gl" + "pat-" + strings.Repeat("f", 20) + ". then"); got != "use [REDACTED]. then" {
+		t.Errorf("a GitLab token followed by a full stop = %q, want the full stop kept", got)
+	}
+	if short := "gl" + "pat-" + strings.Repeat("f", 19); SanitizeMachineOutputString(short) != short {
+		t.Errorf("a 19-character glpat- value was redacted; the form needs at least 20")
 	}
 
 	input := map[string]any{

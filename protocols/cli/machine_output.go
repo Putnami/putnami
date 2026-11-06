@@ -34,6 +34,7 @@ var (
 		regexp.MustCompile(`(?:AKIA|ASIA)[0-9A-Z]{16}`),
 		regexp.MustCompile(`gh[pousr]_[0-9A-Za-z]{36,255}`),
 		regexp.MustCompile(`github_pat_[0-9A-Za-z_]{20,255}`),
+		regexp.MustCompile(`glpat-[0-9A-Za-z_-]{20,255}(?:\.[0-9A-Za-z]+){0,2}`),
 		regexp.MustCompile(`AIza[0-9A-Za-z_-]{35}`),
 		regexp.MustCompile(`xox[baprs]-[0-9A-Za-z-]{10,}`),
 		regexp.MustCompile(`sk_(?:live|test)_[0-9A-Za-z]{16,}`),

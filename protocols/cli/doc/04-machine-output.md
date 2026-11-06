@@ -131,15 +131,25 @@ For every string value, sanitization:
 2. removes ECMA-48 terminal sequences, including CSI and OSC families;
 3. replaces remaining C0/C1 controls with U+FFFD, except tab, LF, and CR;
 4. replaces sensitive-member values with `[REDACTED]`;
-5. redacts high-confidence private-key, AWS, GitHub, Google, Slack, and Stripe
-   credential forms found inside otherwise ordinary strings.
+5. redacts high-confidence private-key, AWS, GitHub, GitLab access token
+   (`glpat-`), Google, Slack, and Stripe credential forms found inside
+   otherwise ordinary strings.
 
 The sensitive member vocabulary is closed for this sanitizer version:
 `authorization`, `proxyauthorization`, `cookie`, `setcookie`, `token`,
 `accesstoken`, `refreshtoken`, `password`, `secret`, `apikey`, `clientsecret`,
 `privatekey`, `secretkey`, `credential`, and `credentials` after normalization.
 Changing this behavior requires a new sanitization version rather than silently
-changing the meaning of an artifact already labeled v1.
+changing the meaning of an artifact already labeled v1. The one exception is the
+list of credential forms in step 5: v1 may add a form, and never removes or
+narrows one. Go and TypeScript add a form in the same change. An older reader
+still accepts newer output, which only redacts more. A newer reader rejects an
+older artifact that carries a value of the added form as
+`cli.result.unsanitized`, because that value would leak a credential.
+Re-applying the current sanitizer removes the value but does not, in general,
+make a bounded stream valid again: when the value sat in an elided record, the
+final record's elision byte counts were measured on the older output, and
+whole-sequence validation reports `cli.result.elision_mismatch`.
 
 ## Validation
 
