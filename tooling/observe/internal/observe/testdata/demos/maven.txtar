@@ -1,0 +1,253 @@
+The maven demo: a Maven 3.9.11 build whose aggregator pom.xml lists the modules pricing and api, where api depends on pricing through ${project.groupId}. The change adds a method to pricing. The reports are the output of mvn verify with maven-surefire-plugin 3.5.2, jacoco-maven-plugin 0.8.13, OpenJDK 21 and JUnit 5.11.4: the Surefire reports of each module, with their properties block, which lists the Java system properties of the machine, emptied, and the jacoco.xml of each module.
+-- base/api/pom.xml --
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+  <parent>
+    <groupId>com.acme</groupId>
+    <artifactId>shop</artifactId>
+    <version>1.0.0</version>
+  </parent>
+  <artifactId>api</artifactId>
+
+  <dependencies>
+    <dependency>
+      <groupId>${project.groupId}</groupId>
+      <artifactId>pricing</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.junit.jupiter</groupId>
+      <artifactId>junit-jupiter</artifactId>
+      <scope>test</scope>
+    </dependency>
+  </dependencies>
+</project>
+-- base/api/src/main/java/com/acme/api/Quotes.java --
+package com.acme.api;
+
+import com.acme.pricing.Pricing;
+
+public final class Quotes {
+    public String quote(long cents, int quantity) {
+        return Pricing.label(Pricing.total(cents, quantity));
+    }
+}
+-- base/api/src/test/java/com/acme/api/QuotesTest.java --
+package com.acme.api;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+
+import org.junit.jupiter.api.Nested;
+import org.junit.jupiter.api.Test;
+
+class QuotesTest {
+    @Test
+    void quoteLabelsTheTotal() {
+        assertEquals("15.00 EUR", new Quotes().quote(500, 3));
+    }
+
+    @Nested
+    class Empty {
+        @Test
+        void anEmptyQuoteIsZero() {
+            assertEquals("0.00 EUR", new Quotes().quote(500, 0));
+        }
+    }
+}
+-- base/pom.xml --
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+  <groupId>com.acme</groupId>
+  <artifactId>shop</artifactId>
+  <version>1.0.0</version>
+  <packaging>pom</packaging>
+
+  <modules>
+    <module>pricing</module>
+    <module>api</module>
+  </modules>
+
+  <properties>
+    <maven.compiler.release>21</maven.compiler.release>
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+  </properties>
+
+  <dependencyManagement>
+    <dependencies>
+      <dependency>
+        <groupId>org.junit</groupId>
+        <artifactId>junit-bom</artifactId>
+        <version>5.11.4</version>
+        <type>pom</type>
+        <scope>import</scope>
+      </dependency>
+    </dependencies>
+  </dependencyManagement>
+
+  <build>
+    <plugins>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-surefire-plugin</artifactId>
+        <version>3.5.2</version>
+      </plugin>
+      <plugin>
+        <groupId>org.jacoco</groupId>
+        <artifactId>jacoco-maven-plugin</artifactId>
+        <version>0.8.13</version>
+        <executions>
+          <execution><goals><goal>prepare-agent</goal></goals></execution>
+          <execution><id>report</id><phase>verify</phase><goals><goal>report</goal></goals></execution>
+        </executions>
+      </plugin>
+    </plugins>
+  </build>
+</project>
+-- base/pricing/pom.xml --
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+  <parent>
+    <groupId>com.acme</groupId>
+    <artifactId>shop</artifactId>
+    <version>1.0.0</version>
+  </parent>
+  <artifactId>pricing</artifactId>
+
+  <dependencies>
+    <dependency>
+      <groupId>org.junit.jupiter</groupId>
+      <artifactId>junit-jupiter</artifactId>
+      <scope>test</scope>
+    </dependency>
+  </dependencies>
+</project>
+-- base/pricing/src/main/java/com/acme/pricing/Pricing.java --
+package com.acme.pricing;
+
+public final class Pricing {
+    private Pricing() {
+    }
+
+    public static long total(long cents, int quantity) {
+        if (quantity < 0) {
+            throw new IllegalArgumentException("quantity must not be negative");
+        }
+        return cents * quantity;
+    }
+
+    public static String label(long cents) {
+        return String.format("%d.%02d EUR", cents / 100, cents % 100);
+    }
+}
+-- base/pricing/src/test/java/com/acme/pricing/PricingTest.java --
+package com.acme.pricing;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+
+import org.junit.jupiter.api.Test;
+
+class PricingTest {
+    @Test
+    void totalMultipliesByTheQuantity() {
+        assertEquals(1500, Pricing.total(500, 3));
+    }
+
+    @Test
+    void aNegativeQuantityIsRefused() {
+        assertThrows(IllegalArgumentException.class, () -> Pricing.total(500, -1));
+    }
+
+    @Test
+    void labelPadsTheCents() {
+        assertEquals("12.05 EUR", Pricing.label(1205));
+    }
+}
+-- head/pricing/src/main/java/com/acme/pricing/Pricing.java --
+package com.acme.pricing;
+
+public final class Pricing {
+    private Pricing() {
+    }
+
+    public static long total(long cents, int quantity) {
+        if (quantity < 0) {
+            throw new IllegalArgumentException("quantity must not be negative");
+        }
+        return cents * quantity;
+    }
+
+    public static long discounted(long cents, int percent) {
+        if (percent < 0 || percent > 100) {
+            throw new IllegalArgumentException("percent must be between 0 and 100");
+        }
+        return cents - cents * percent / 100;
+    }
+
+    public static String label(long cents) {
+        return String.format("%d.%02d EUR", cents / 100, cents % 100);
+    }
+}
+-- head/pricing/src/test/java/com/acme/pricing/PricingTest.java --
+package com.acme.pricing;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+
+import org.junit.jupiter.api.Test;
+
+class PricingTest {
+    @Test
+    void totalMultipliesByTheQuantity() {
+        assertEquals(1500, Pricing.total(500, 3));
+    }
+
+    @Test
+    void aNegativeQuantityIsRefused() {
+        assertThrows(IllegalArgumentException.class, () -> Pricing.total(500, -1));
+    }
+
+    @Test
+    void discountedTakesThePercentOff() {
+        assertEquals(900, Pricing.discounted(1000, 10));
+    }
+
+    @Test
+    void aDiscountOverOneHundredPercentIsRefused() {
+        assertThrows(IllegalArgumentException.class, () -> Pricing.discounted(1000, 120));
+    }
+
+    @Test
+    void labelPadsTheCents() {
+        assertEquals("12.05 EUR", Pricing.label(1205));
+    }
+}
+-- ci/pricing/target/surefire-reports/TEST-com.acme.pricing.PricingTest.xml --
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://maven.apache.org/surefire/maven-surefire-plugin/xsd/surefire-test-report.xsd" version="3.0.2" name="com.acme.pricing.PricingTest" time="0.128" tests="5" errors="0" skipped="0" failures="0">
+  <properties/>
+  <testcase name="totalMultipliesByTheQuantity" classname="com.acme.pricing.PricingTest" time="0.04"/>
+  <testcase name="discountedTakesThePercentOff" classname="com.acme.pricing.PricingTest" time="0.002"/>
+  <testcase name="aDiscountOverOneHundredPercentIsRefused" classname="com.acme.pricing.PricingTest" time="0.008"/>
+  <testcase name="labelPadsTheCents" classname="com.acme.pricing.PricingTest" time="0.021"/>
+  <testcase name="aNegativeQuantityIsRefused" classname="com.acme.pricing.PricingTest" time="0.005"/>
+</testsuite>
+-- ci/pricing/target/site/jacoco/jacoco.xml --
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?><!DOCTYPE report PUBLIC "-//JACOCO//DTD Report 1.1//EN" "report.dtd"><report name="pricing"><sessioninfo id="vm-248fd4b4" start="1793975209280" dump="1793975210317"/><package name="com/acme/pricing"><class name="com/acme/pricing/Pricing" sourcefilename="Pricing.java"><method name="total" desc="(JI)J" line="8"><counter type="INSTRUCTION" missed="0" covered="12"/><counter type="BRANCH" missed="0" covered="2"/><counter type="LINE" missed="0" covered="3"/><counter type="COMPLEXITY" missed="0" covered="2"/><counter type="METHOD" missed="0" covered="1"/></method><method name="discounted" desc="(JI)J" line="15"><counter type="INSTRUCTION" missed="0" covered="19"/><counter type="BRANCH" missed="1" covered="3"/><counter type="LINE" missed="0" covered="3"/><counter type="COMPLEXITY" missed="1" covered="2"/><counter type="METHOD" missed="0" covered="1"/></method><method name="label" desc="(J)Ljava/lang/String;" line="22"><counter type="INSTRUCTION" missed="0" covered="19"/><counter type="LINE" missed="0" covered="1"/><counter type="COMPLEXITY" missed="0" covered="1"/><counter type="METHOD" missed="0" covered="1"/></method><counter type="INSTRUCTION" missed="0" covered="50"/><counter type="BRANCH" missed="1" covered="5"/><counter type="LINE" missed="0" covered="7"/><counter type="COMPLEXITY" missed="1" covered="5"/><counter type="METHOD" missed="0" covered="3"/><counter type="CLASS" missed="0" covered="1"/></class><sourcefile name="Pricing.java"><line nr="8" mi="0" ci="2" mb="0" cb="2"/><line nr="9" mi="0" ci="5" mb="0" cb="0"/><line nr="11" mi="0" ci="5" mb="0" cb="0"/><line nr="15" mi="0" ci="5" mb="1" cb="3"/><line nr="16" mi="0" ci="5" mb="0" cb="0"/><line nr="18" mi="0" ci="9" mb="0" cb="0"/><line nr="22" mi="0" ci="19" mb="0" cb="0"/><counter type="INSTRUCTION" missed="0" covered="50"/><counter type="BRANCH" missed="1" covered="5"/><counter type="LINE" missed="0" covered="7"/><counter type="COMPLEXITY" missed="1" covered="5"/><counter type="METHOD" missed="0" covered="3"/><counter type="CLASS" missed="0" covered="1"/></sourcefile><counter type="INSTRUCTION" missed="0" covered="50"/><counter type="BRANCH" missed="1" covered="5"/><counter type="LINE" missed="0" covered="7"/><counter type="COMPLEXITY" missed="1" covered="5"/><counter type="METHOD" missed="0" covered="3"/><counter type="CLASS" missed="0" covered="1"/></package><counter type="INSTRUCTION" missed="0" covered="50"/><counter type="BRANCH" missed="1" covered="5"/><counter type="LINE" missed="0" covered="7"/><counter type="COMPLEXITY" missed="1" covered="5"/><counter type="METHOD" missed="0" covered="3"/><counter type="CLASS" missed="0" covered="1"/></report>
+-- ci/api/target/surefire-reports/TEST-com.acme.api.QuotesTest$Empty.xml --
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://maven.apache.org/surefire/maven-surefire-plugin/xsd/surefire-test-report.xsd" version="3.0.2" name="com.acme.api.QuotesTest$Empty" time="0.011" tests="2" errors="0" skipped="0" failures="0">
+  <properties/>
+  <testcase name="quoteLabelsTheTotal" classname="com.acme.api.QuotesTest" time="0.094"/>
+  <testcase name="anEmptyQuoteIsZero" classname="com.acme.api.QuotesTest$Empty" time="0.003"/>
+</testsuite>
+-- ci/api/target/surefire-reports/TEST-com.acme.api.QuotesTest.xml --
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://maven.apache.org/surefire/maven-surefire-plugin/xsd/surefire-test-report.xsd" version="3.0.2" name="com.acme.api.QuotesTest" time="0.151" tests="0" errors="0" skipped="0" failures="0">
+  <properties/>
+</testsuite>
+-- ci/api/target/site/jacoco/jacoco.xml --
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?><!DOCTYPE report PUBLIC "-//JACOCO//DTD Report 1.1//EN" "report.dtd"><report name="api"><sessioninfo id="vm-50dfce59" start="1793975211154" dump="1793975212171"/><package name="com/acme/api"><class name="com/acme/api/Quotes" sourcefilename="Quotes.java"><method name="&lt;init&gt;" desc="()V" line="5"><counter type="INSTRUCTION" missed="0" covered="3"/><counter type="LINE" missed="0" covered="1"/><counter type="COMPLEXITY" missed="0" covered="1"/><counter type="METHOD" missed="0" covered="1"/></method><method name="quote" desc="(JI)Ljava/lang/String;" line="7"><counter type="INSTRUCTION" missed="0" covered="5"/><counter type="LINE" missed="0" covered="1"/><counter type="COMPLEXITY" missed="0" covered="1"/><counter type="METHOD" missed="0" covered="1"/></method><counter type="INSTRUCTION" missed="0" covered="8"/><counter type="LINE" missed="0" covered="2"/><counter type="COMPLEXITY" missed="0" covered="2"/><counter type="METHOD" missed="0" covered="2"/><counter type="CLASS" missed="0" covered="1"/></class><sourcefile name="Quotes.java"><line nr="5" mi="0" ci="3" mb="0" cb="0"/><line nr="7" mi="0" ci="5" mb="0" cb="0"/><counter type="INSTRUCTION" missed="0" covered="8"/><counter type="LINE" missed="0" covered="2"/><counter type="COMPLEXITY" missed="0" covered="2"/><counter type="METHOD" missed="0" covered="2"/><counter type="CLASS" missed="0" covered="1"/></sourcefile><counter type="INSTRUCTION" missed="0" covered="8"/><counter type="LINE" missed="0" covered="2"/><counter type="COMPLEXITY" missed="0" covered="2"/><counter type="METHOD" missed="0" covered="2"/><counter type="CLASS" missed="0" covered="1"/></package><counter type="INSTRUCTION" missed="0" covered="8"/><counter type="LINE" missed="0" covered="2"/><counter type="COMPLEXITY" missed="0" covered="2"/><counter type="METHOD" missed="0" covered="2"/><counter type="CLASS" missed="0" covered="1"/></report>

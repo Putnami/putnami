@@ -82,16 +82,19 @@ fails as a diagnostic.
 ## Reports
 
 Without `--junit` or `--coverage`, `putnami observe` walks the repository,
-skipping `.git`, `node_modules` and `vendor`, and reads the start of each file
+skipping `.git`, `node_modules`, `vendor` and the Gradle and Maven build
+outputs that hold no report (see [Gradle and Maven](09-jvm.md#reports)), and
+reads the start of each file
 whose name can hold a report (`.xml`, `.info`, `.lcov`, `.out`, `.cov`,
 `.coverprofile`, `.gocov`, and `.txt` files whose name contains `cover`). It
 keeps a file by its content:
 
 | Format | Recognized by |
 |---|---|
-| JUnit XML | a `testsuites` or `testsuite` root (Jest, Vitest, PHPUnit `--log-junit`, gotestsum, pytest `--junitxml`) |
+| JUnit XML | a `testsuites` or `testsuite` root (Jest, Vitest, PHPUnit `--log-junit`, gotestsum, pytest `--junitxml`, Gradle, Maven Surefire and Failsafe) |
 | Cobertura | a `coverage` root with `line-rate`, `lines-valid` or `branch-rate`, or a `sources` or `packages` child (pytest-cov `--cov-report=xml`) |
 | Clover | a `coverage` root with `generated` or `clover`, or a `project` child (PHPUnit `--coverage-clover`) |
+| JaCoCo | a `report` root whose first child is `sessioninfo`, `group`, `package` or `counter` (the JaCoCo Maven plugin, the Gradle `jacoco` plugin, Kover) |
 | LCOV | a first `TN:` or `SF:` record |
 | Go cover profile | a first `mode: set`, `mode: count` or `mode: atomic` line |
 

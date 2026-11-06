@@ -163,6 +163,17 @@ var demos = map[string]demoExpectation{
 		lineFile:   "src/python/pricing/pricing.py",
 		dependency: evidence.DependencyChange{Ecosystem: "pypi", Lockfile: "3rdparty/python/default.lock", Name: "fastapi", Change: evidence.DependencyUpgraded, From: "0.115.5", To: "0.115.6"},
 	},
+	"gradle": {
+		env:       map[string]string{"GITHUB_ACTIONS": "true", "GITHUB_SERVER_URL": "https://github.com", "GITHUB_REPOSITORY": "Putnami/demo-observe-gradle", "GITHUB_REPOSITORY_ID": "1108", "GITHUB_RUN_ID": "41335530117", "GITHUB_JOB": "test", "GITHUB_REF": "refs/pull/1/merge"},
+		changed:   []string{"pricing"},
+		dependent: []string{"api", "app"},
+		tests:     map[string]int{"api": 2, "app": 1, "pricing": 5},
+		covered:   []string{"api", "app", "pricing"},
+		lineFile:  "pricing/src/main/kotlin/com/acme/pricing/Pricing.kt",
+		// The catalog lies in the gradle directory of the root project,
+		// which holds no source and is no component.
+		dependency: evidence.DependencyChange{Ecosystem: "maven", Lockfile: "pricing/gradle.lockfile", Name: "org.apache.commons:commons-lang3", Change: evidence.DependencyUpgraded, From: "3.17.0", To: "3.18.0", Component: "pricing"},
+	},
 	"symfony": {
 		env: map[string]string{"GITLAB_CI": "true", "CI_SERVER_HOST": "gitlab.com", "CI_PROJECT_ID": "88373184", "CI_PROJECT_PATH": "putnami/demo-observe-symfony", "CI_PIPELINE_ID": "3015177948", "CI_JOB_ID": "17647015000", "CI_MERGE_REQUEST_IID": "1"},
 		// composer.lock lies in the application at the root, which the
