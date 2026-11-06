@@ -237,7 +237,7 @@ func (p *parser) sequence(indent int) ([]any, error) {
 			return out, nil
 		}
 		after := l.text[1:]
-		rest := strings.TrimLeft(after, " ")
+		rest := strings.TrimLeft(after, " \t")
 		rest = stripProperties(rest)
 		var item any
 		var err error
@@ -253,7 +253,7 @@ func (p *parser) sequence(indent int) ([]any, error) {
 		default:
 			// The item's content is a node at its own column: the rest of the
 			// line takes the place of the item line.
-			column := indent + 1 + len(after) - len(strings.TrimLeft(after, " "))
+			column := indent + 1 + len(after) - len(strings.TrimLeft(after, " \t"))
 			p.lines[p.pos] = line{number: l.number, indent: column, text: rest, raw: l.raw}
 			item, err = p.node(column)
 		}
@@ -386,7 +386,7 @@ func (p *parser) block(l line, parent int, header string) (any, error) {
 
 // isItem reports whether a line's text starts a sequence item.
 func isItem(text string) bool {
-	return text == "-" || strings.HasPrefix(text, "- ")
+	return text == "-" || strings.HasPrefix(text, "- ") || strings.HasPrefix(text, "-\t")
 }
 
 // splitKey splits "key: rest". isKey is false for a line that is no mapping
@@ -406,7 +406,7 @@ func splitKey(l line) (key, rest string, isKey bool, err error) {
 			return "", "", false, nil
 		}
 		after := strings.TrimLeft(text[end+1:], " ")
-		if after != ":" && !strings.HasPrefix(after, ": ") {
+		if after != ":" && !strings.HasPrefix(after, ": ") && !strings.HasPrefix(after, ":\t") {
 			return "", "", false, nil
 		}
 		value, err := scalar(text[:end+1])
@@ -414,16 +414,16 @@ func splitKey(l line) (key, rest string, isKey bool, err error) {
 			return "", "", false, l.errorf("%v", err)
 		}
 		key, _ = value.(string)
-		return key, strings.TrimSpace(after[1:]), true, nil
+		return key, strings.Trim(after[1:], " \t"), true, nil
 	}
 	for i := 0; i < len(text); i++ {
-		if text[i] == ':' && (i+1 == len(text) || text[i+1] == ' ') {
+		if text[i] == ':' && (i+1 == len(text) || text[i+1] == ' ' || text[i+1] == '\t') {
 			value, err := scalar(strings.TrimSpace(text[:i]))
 			if err != nil {
 				return "", "", false, l.errorf("%v", err)
 			}
 			key, _ = value.(string)
-			return key, strings.TrimSpace(text[i+1:]), true, nil
+			return key, strings.Trim(text[i+1:], " \t"), true, nil
 		}
 	}
 	return "", "", false, nil

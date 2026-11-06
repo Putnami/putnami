@@ -207,6 +207,14 @@ flow: [a, "b, c", {k: v, e: }]
 	}
 }
 
+func TestATabMaySeparateAValueFromItsIndicator(t *testing.T) {
+	doc, err := Parse([]byte("name:\tfoo\n\"quoted\":\tbar\nlist:\n-\ta\n- b\n"))
+	want := Map{"name": "foo", "quoted": "bar", "list": []any{"a", "b"}}
+	if err != nil || !reflect.DeepEqual(doc, want) {
+		t.Errorf("doc = %#v, %v", doc, err)
+	}
+}
+
 func TestEmptyDocumentsAreNil(t *testing.T) {
 	for _, text := range []string{"", "# only a comment\n", "---\n", "\n\n"} {
 		doc, err := Parse([]byte(text))

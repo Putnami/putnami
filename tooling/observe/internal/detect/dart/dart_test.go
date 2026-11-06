@@ -89,7 +89,7 @@ dev_dependencies:
 `,
 	"packages/ui/example/pubspec.yaml":    "name: ui_example\ndependencies:\n  ui:\n    path: ..\n",
 	"tools/gen/pubspec.yaml":              "name: gen\ndependencies:\n  pricing: ^1.0.0\n",
-	"apps/mobile/build/pubspec.yaml":      "name: build_output\n",
+	"apps/mobile/build/web/pubspec.yaml":  "name: build_output\n",
 	"apps/mobile/ios/Pods/pubspec.yaml":   "name: pods\n",
 	"apps/mobile/.dart_tool/pubspec.yaml": "name: tool\n",
 	"node_modules/x/pubspec.yaml":         "name: x\n",
@@ -259,6 +259,49 @@ func TestAMalformedPubspecIsADiagnostic(t *testing.T) {
 	}
 	if len(broken.Components) != 1 || broken.Components[0].Source != evidence.SourceManifest {
 		t.Errorf("components %+v", broken.Components)
+	}
+}
+
+func TestAPackageThatSharesAMemberNameDoesNotTakeItsEdges(t *testing.T) {
+	spectest.Proves(t, feature, "dart-package-edges", "a-workspace-package-dependency-is-an-edge")
+	for name, files := range map[string]map[string]string{
+		"pub workspace": {
+			"pubspec.yaml":             "name: ws\nworkspace: [apps/mobile, packages/ui]\n",
+			"apps/mobile/pubspec.yaml": "name: mobile\nresolution: workspace\ndependencies:\n  ui: ^1.0.0\n",
+			"packages/ui/pubspec.yaml": "name: ui\nresolution: workspace\n",
+			"_archive/ui/pubspec.yaml": "name: ui\n",
+		},
+		"melos": {
+			"melos.yaml":               "packages: [apps/*, packages/*]\n",
+			"apps/mobile/pubspec.yaml": "name: mobile\ndependencies:\n  ui: any\n",
+			"packages/ui/pubspec.yaml": "name: ui\n",
+			"examples/ui/pubspec.yaml": "name: ui\n",
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			got := byID(Detect(writeTree(t, files)))
+			if !slices.Equal(got["apps/mobile"].DependsOn, []string{"packages/ui"}) {
+				t.Errorf("mobile edges %v", got["apps/mobile"].DependsOn)
+			}
+		})
+	}
+}
+
+func TestABuildDirectoryIsWalkedOnlyWhenItIsAPackage(t *testing.T) {
+	spectest.Proves(t, feature, "dart-packages-are-components", "a-pubspec-outside-a-workspace-is-a-manifest-component")
+	d := Detect(writeTree(t, map[string]string{
+		"pubspec.yaml":                    "name: ws\nworkspace: [build, app]\n",
+		"build/pubspec.yaml":              "name: build\nresolution: workspace\n",
+		"app/pubspec.yaml":                "name: app\nresolution: workspace\ndependencies:\n  build: any\n",
+		"app/build/flutter_assets/x.json": "{}",
+		"app/build/web/pubspec.yaml":      "name: copied\n",
+	}))
+	want := []Component{
+		{ID: "app", Name: "app", Source: evidence.SourceWorkspace, DependsOn: []string{"build"}},
+		{ID: "build", Name: "build", Source: evidence.SourceWorkspace},
+	}
+	if !reflect.DeepEqual(d.Components, want) {
+		t.Errorf("components %+v", d.Components)
 	}
 }
 

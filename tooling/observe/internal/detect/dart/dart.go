@@ -51,10 +51,11 @@ const (
 // MaxWalkedEntries bounds the directory entries the pubspec.yaml walk visits.
 const MaxWalkedEntries = 200000
 
-// skippedDirs are never walked: build outputs, installed packages and the
-// CocoaPods of an iOS app. Hidden directories, such as .dart_tool and the
-// plugin symlinks of a Flutter app, are skipped too.
-var skippedDirs = map[string]bool{"build": true, "node_modules": true, "Pods": true}
+// skippedDirs are never walked: installed packages and the CocoaPods of an
+// iOS app. Hidden directories, such as .dart_tool and the plugin symlinks of a
+// Flutter app, are skipped too, and so is a build directory, the output of
+// flutter build, unless it holds a pubspec.yaml of its own.
+var skippedDirs = map[string]bool{"node_modules": true, "Pods": true}
 
 // dependencyKeys are the pubspec.yaml tables that declare dependencies.
 var dependencyKeys = []string{"dependencies", "dev_dependencies", "dependency_overrides"}
@@ -110,11 +111,13 @@ func Detect(root string) Detection {
 	if ws.isRoot {
 		delete(packages, ".")
 	}
-	byName := map[string]string{}
+	// members maps a package name to the member that has it: only members
+	// link to each other by name.
+	members := map[string]string{}
 	for dir, p := range packages {
 		p.member = ws.member(dir)
-		if current, taken := byName[p.name]; !taken || dir < current {
-			byName[p.name] = dir
+		if current, taken := members[p.name]; p.member && (!taken || dir < current) {
+			members[p.name] = dir
 		}
 	}
 	for dir, p := range packages {
@@ -122,7 +125,7 @@ func Detect(root string) Detection {
 		if p.member {
 			c.Source = evidence.SourceWorkspace
 		}
-		c.DependsOn = edges(p, packages, byName)
+		c.DependsOn = edges(p, packages, members)
 		out.Components = append(out.Components, c)
 	}
 	sort.Slice(out.Components, func(i, j int) bool { return out.Components[i].ID < out.Components[j].ID })
@@ -146,7 +149,7 @@ func pubspecDirs(root string) ([]string, []diag.Diagnostic) {
 		}
 		name := entry.Name()
 		if entry.IsDir() {
-			if p != root && (strings.HasPrefix(name, ".") || skippedDirs[name]) {
+			if p != root && (strings.HasPrefix(name, ".") || skippedDirs[name] || name == "build" && !isFile(filepath.Join(p, Pubspec))) {
 				return fs.SkipDir
 			}
 			return nil
@@ -319,9 +322,9 @@ func matchSegments(pattern, parts []string) bool {
 }
 
 // edges returns the components p depends on: each dependency with a path to
-// a package, and, when p and the other package are both workspace members,
-// each dependency with no source of its own that names it.
-func edges(p *pkg, packages map[string]*pkg, byName map[string]string) []string {
+// a package, and, when p is a workspace member, each dependency with no source
+// of its own that names another member.
+func edges(p *pkg, packages map[string]*pkg, members map[string]string) []string {
 	var out []string
 	for _, key := range dependencyKeys {
 		deps, _ := p.manifest[key].(yaml.Map)
@@ -336,8 +339,7 @@ func edges(p *pkg, packages map[string]*pkg, byName map[string]string) []string 
 				}
 			case isTable && slices.ContainsFunc(sources, func(s string) bool { _, has := table[s]; return has }):
 			case p.member:
-				target, ok = byName[name]
-				ok = ok && packages[target].member
+				target, ok = members[name]
 			}
 			if ok && target != p.dir && !slices.Contains(out, target) {
 				out = append(out, target)
@@ -361,6 +363,11 @@ func resolvePath(dir, p string) (string, bool) {
 		return "", false
 	}
 	return joined, true
+}
+
+func isFile(p string) bool {
+	info, err := os.Stat(p)
+	return err == nil && info.Mode().IsRegular()
 }
 
 func splitPath(dir string) []string {

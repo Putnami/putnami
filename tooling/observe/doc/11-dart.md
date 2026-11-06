@@ -10,13 +10,14 @@ attribute tests and coverage, and diff `pubspec.lock`.
 ## Components
 
 Each directory whose `pubspec.yaml` names a package is a component of
-ecosystem `dart`, named by its pubspec `name`. The walk skips `build`,
-`node_modules`, `Pods` and the directories whose name starts with `.`, such as
-`.dart_tool` and the plugin symlinks of a Flutter app.
+ecosystem `dart`, named by its pubspec `name`. The walk skips `node_modules`,
+`Pods`, the directories whose name starts with `.`, such as `.dart_tool` and
+the plugin symlinks of a Flutter app, and each `build` directory, the output
+of `flutter build`, unless it holds a `pubspec.yaml` of its own.
 
 | The package is | Source |
 |---|---|
-| a member of the root pub workspace: a path or glob of the `workspace` list of the root `pubspec.yaml` (Dart 3.6 and later) | `workspace` |
+| a member of the root pub workspace: a path of the `workspace` list of the root `pubspec.yaml` (Dart 3.6 and later), matched as a glob | `workspace` |
 | a directory the `packages` globs of the root `melos.yaml` match, less its `ignore` globs | `workspace` |
 | any other package, such as a package's `example/` app | `manifest` |
 
@@ -29,11 +30,18 @@ from the pub workspace and its configuration from the `melos` key of the root
 of a repository that is neither is a component of source `manifest`, like any
 other package.
 
-A `pubspec.yaml` that does not read, or names no package, is the warning
-`observe.dart_pubspec_invalid` and no component. A `melos.yaml` that does not
-read, or whose `packages` or `ignore` is not a list, is
-`observe.dart_melos_invalid`, and a glob that leaves the repository is
-`observe.dart_pattern_invalid`.
+Each finding is a warning:
+
+| Code | Meaning |
+|---|---|
+| `observe.dart_pubspec_invalid` | A `pubspec.yaml` does not read or names no package, so it is no component; or the root `workspace` is not a list of paths. |
+| `observe.dart_melos_invalid` | `melos.yaml` does not read, or its `packages` or `ignore` is not a list. |
+| `observe.dart_pattern_invalid` | A `workspace`, `packages` or `ignore` entry leaves the repository or is no valid glob, and is ignored. |
+| `observe.dart_walk_bounded` | The walk stopped after 200000 entries, or could not read the repository. |
+
+The YAML reader reads the block and flow styles, quoted and block scalars,
+comments, tags and anchors. An alias (`*name`) is not read, so a
+`pubspec.yaml` that holds one is `observe.dart_pubspec_invalid`.
 
 ## Edges
 
@@ -92,6 +100,8 @@ the package that holds the longest tail of that path that names a file, from
 the report's package or from the root, else on the package that holds the
 report. tojunit also writes each `-` of the path as `_`, so a test in a
 directory whose name holds a `-` lands on the package of its report.
+`tojunit --base <directory>` strips that directory from the paths, which
+gives class names relative to the package.
 
 ## Lockfiles
 

@@ -162,7 +162,7 @@ To send the evidence to Putnami Cloud, store a workspace token with the `deliver
 
 A software bill of materials (SBOM) lists the packages of a build with their licences and known vulnerabilities. `putnami observe` reads one the job wrote, CycloneDX 1.4 to 1.6 or SPDX 2.3 in JSON, and gives each changed dependency what it lists: the vulnerabilities the change fixes or introduces, and the licences before and after. It queries no vulnerability database itself.
 
-On GitHub Actions, put this step before the observe step. It writes an SBOM of the head and one of the base with [osv-scanner](https://github.com/google/osv-scanner), which reads the lockfiles of Node, Composer, Go and Python projects, `uv.lock` and `poetry.lock` included. The base is the pull request base, or on a push the commit before the push:
+On GitHub Actions, put this step before the observe step. It writes an SBOM of the head and one of the base with [osv-scanner](https://github.com/google/osv-scanner), which reads the lockfiles of Node, Composer, Go, Python and Dart projects, `uv.lock`, `poetry.lock` and `pubspec.lock` included. The base is the pull request base, or on a push the commit before the push:
 
 ```yaml
       - name: Write the SBOMs
