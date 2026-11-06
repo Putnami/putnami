@@ -109,8 +109,8 @@ func TestFreshFailureSummaryCarriesNoReplayHint(t *testing.T) {
 // the session summary.
 func TestReplayedFailureKeepsTheFailedOutcome(t *testing.T) {
 	result := replayedFailedResult(true)
-	if result.Outcome() != "failed" || result.CacheHit {
-		t.Fatalf("outcome = %q cacheHit = %v, want a plain failure", result.Outcome(), result.CacheHit)
+	if result.Outcome() != "failed" || result.ReuseKind().CacheHit() {
+		t.Fatalf("outcome = %q cacheHit = %v, want a plain failure", result.Outcome(), result.ReuseKind().CacheHit())
 	}
 
 	var out, errOut bytes.Buffer

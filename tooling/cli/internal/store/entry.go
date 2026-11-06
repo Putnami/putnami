@@ -13,10 +13,8 @@ type Entry struct {
 	// Result is the structured job result (status, data, error).
 	Result *EntryResult `json:"result"`
 
-	// FilesDir is the absolute path to the files/ directory inside the
-	// blob. On Put it is the source directory of output files to ingest; on
-	// Get it is the materialized files/ directory. Empty if the entry has no
-	// output files.
+	// FilesDir is the absolute path to the entry's files/ directory, set by
+	// Get. Empty if the entry has no output files.
 	FilesDir string `json:"-"`
 
 	// Manifest lists the entry's output files with their CAS content digests

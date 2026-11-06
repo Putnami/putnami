@@ -79,7 +79,7 @@ func TestTaskEntry_LegacyEntryReadsAsMiss(t *testing.T) {
 	s := NewLocalStore(root)
 	key := "v5keyaaaa0000000000000000000000000000000000000000000000000000000"
 
-	if err := s.Put(key, entryWith(makeSource(t, "legacy"))); err != nil {
+	if err := putFormatOneEntry(s, key, entryWith(makeSource(t, "legacy"))); err != nil {
 		t.Fatalf("legacy Put: %v", err)
 	}
 
@@ -149,7 +149,7 @@ func TestTaskEntry_LegacyReaderRefusesTaskOwnedBlob(t *testing.T) {
 	}
 
 	// Positive control: a legacy blob at its own address is still served.
-	if err := s.Put("legacy-key", entryWith(makeSource(t, "legacy"))); err != nil {
+	if err := putFormatOneEntry(s, "legacy-key", entryWith(makeSource(t, "legacy"))); err != nil {
 		t.Fatal(err)
 	}
 	if got, err := s.Get("legacy-key"); err != nil || got == nil {

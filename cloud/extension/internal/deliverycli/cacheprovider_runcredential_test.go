@@ -92,17 +92,17 @@ func stubCacheProviderGuards(t *testing.T, deny error) *atomic.Int64 {
 func runCredentialSession(t *testing.T, authenticate string) ([]*cache.ProviderResponse, string) {
 	t.Helper()
 	initialize, _ := json.Marshal(map[string]any{
-		"protocolVersion": 1, "id": 1, "op": "initialize",
+		"protocolVersion": 2, "id": 1, "op": "initialize",
 		"payload": map[string]any{
-			"protocolVersion": 1, "blobExchangeDir": t.TempDir(), "mode": "full",
+			"protocolVersion": 2, "blobExchangeDir": t.TempDir(), "mode": "full",
 			"capabilities": []string{cache.CapabilityRunCredential},
 		},
 	})
 	lines := []string{
 		string(initialize),
 		authenticate,
-		`{"protocolVersion":1,"id":3,"op":"marker-lookup","payload":{"workspace":"w","branch":"main","commands":["build"],"selection":"all"}}`,
-		`{"protocolVersion":1,"id":4,"op":"shutdown"}`,
+		`{"protocolVersion":2,"id":3,"op":"marker-lookup","payload":{"workspace":"w","branch":"main","commands":["build"],"selection":"all"}}`,
+		`{"protocolVersion":2,"id":4,"op":"shutdown"}`,
 	}
 	var out, stderr bytes.Buffer
 	if err := runCacheProviderSession(strings.NewReader(strings.Join(lines, "\n")+"\n"), &out, &stderr, t.TempDir()); err != nil {
@@ -114,7 +114,7 @@ func runCredentialSession(t *testing.T, authenticate string) ([]*cache.ProviderR
 // authenticateLine is the authenticate request that carries testRunCredential.
 func authenticateLine() string {
 	encoded, _ := json.Marshal(map[string]any{
-		"protocolVersion": 1, "id": 2, "op": "authenticate",
+		"protocolVersion": 2, "id": 2, "op": "authenticate",
 		"payload": map[string]any{"credential": testRunCredential},
 	})
 	return string(encoded)

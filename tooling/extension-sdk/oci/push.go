@@ -17,7 +17,6 @@ import (
 	"github.com/google/go-containerregistry/pkg/v1/remote"
 	"golang.org/x/sync/errgroup"
 
-	"go.putnami.dev/sdk/extension/exec"
 	"go.putnami.dev/sdk/extension/jsonl"
 )
 
@@ -79,14 +78,6 @@ func IsAuthError(err error) bool {
 		// response". Classify it as auth so the cloud's own guidance (credHint)
 		// reaches the user instead of this internals string.
 		strings.Contains(msg, "no token in bearer response")
-}
-
-// execStderr extracts stderr from an exec result, returning "" if result is nil.
-func execStderr(result *exec.Result) string {
-	if result != nil {
-		return result.Stderr
-	}
-	return ""
 }
 
 // PushOptions holds the one per-call transport override supported by the OCI
@@ -163,26 +154,25 @@ func craneOptions(keychain authn.Keychain, transport http.RoundTripper) []crane.
 const layoutUploadJobs = 4
 
 // PushContent pushes the content once, unless it already exists in the registry.
-// Packages assembled in-process carry an OCI layout (layout != "") — the image is
-// pushed from it directly (no docker daemon, and the digest is preserved
-// bit-for-bit). Legacy daemon-built packages (layout == "") fall back to docker
-// tag/push. It returns an error (after emitting a diagnostic and ending the
-// docker-push phase as failed) on failure.
-func PushContent(emit *jsonl.Emitter, wsRoot, dockerDir, layout, localRef, contentRef string, contentExists bool, keychain authn.Keychain, credHint string, options ...PushOptions) error {
-	_, err := PushContentWithDigest(emit, wsRoot, dockerDir, layout, localRef, contentRef, contentExists, keychain, credHint, options...)
+// The image is read from the package's OCI layout (dockerDir/layout) and pushed
+// from it directly: no docker daemon is involved, and the digest is preserved
+// bit-for-bit. A package without a layout is refused. It returns an error (after
+// emitting a diagnostic and ending the docker-push phase as failed) on failure.
+func PushContent(emit *jsonl.Emitter, dockerDir, layout, contentRef string, contentExists bool, keychain authn.Keychain, credHint string, options ...PushOptions) error {
+	_, err := PushContentWithDigest(emit, dockerDir, layout, contentRef, contentExists, keychain, credHint, options...)
 	return err
 }
 
 // PushContentWithDigest is PushContent that also returns the digest of the
-// manifest it wrote from an OCI layout: the SHA-256 of the exact bytes the
-// registry accepted in the manifest PUT. It returns "" when it wrote no layout
-// manifest — the content already exists, or the legacy daemon path pushed it.
+// manifest it wrote from the OCI layout: the SHA-256 of the exact bytes the
+// registry accepted in the manifest PUT. It returns "" when the content already
+// exists, because it writes nothing then.
 //
 // A layout push never asks the registry whether the manifest exists. The
 // caller's cache lookup already did, and a manifest HEAD that misses is the most
 // expensive request a registry serves; remote.Write would send it again. Blob
 // uploads keep their own existence checks, so shared layers still transfer once.
-func PushContentWithDigest(emit *jsonl.Emitter, wsRoot, dockerDir, layout, localRef, contentRef string, contentExists bool, keychain authn.Keychain, credHint string, options ...PushOptions) (string, error) {
+func PushContentWithDigest(emit *jsonl.Emitter, dockerDir, layout, contentRef string, contentExists bool, keychain authn.Keychain, credHint string, options ...PushOptions) (string, error) {
 	transport, err := transportOf(options)
 	if err != nil {
 		return "", err
@@ -191,47 +181,32 @@ func PushContentWithDigest(emit *jsonl.Emitter, wsRoot, dockerDir, layout, local
 		emit.Info(fmt.Sprintf("Content %s already exists in registry, skipping push", contentRef))
 		return "", nil
 	}
-	if layout != "" {
-		img, err := loadFromLayout(filepath.Join(dockerDir, layout))
-		if err != nil {
-			emit.Diagnostic("error", "Failed to read OCI layout: "+err.Error(), "", 0)
-			emit.PhaseEnd("docker-push", "failed")
-			return "", fmt.Errorf("read OCI layout: %w", err)
-		}
-		ref, err := name.ParseReference(contentRef)
-		if err != nil {
-			emit.Diagnostic("error", "Invalid content ref "+contentRef+": "+err.Error(), "", 0)
-			emit.PhaseEnd("docker-push", "failed")
-			return "", fmt.Errorf("parse content ref: %w", err)
-		}
-		digest, err := pushLayoutImage(context.Background(), ref, img, keychain, transport)
-		if err != nil {
-			err = WrapAuthError(err, credHint)
-			emit.Diagnostic("error", fmt.Sprintf("Failed to push %s: %v", contentRef, err), "", 0)
-			emit.PhaseEnd("docker-push", "failed")
-			return "", fmt.Errorf("push %s: %w", contentRef, err)
-		}
-		emit.Info("Pushed: " + contentRef)
-		return digest, nil
-	}
-
-	// Legacy daemon path: the image lives in the local docker daemon.
-	if localRef != contentRef {
-		tagResult, _ := exec.Run("docker", []string{"tag", localRef, contentRef}, exec.Dir(wsRoot))
-		if tagResult == nil || !tagResult.Success {
-			emit.Diagnostic("error", fmt.Sprintf("Failed to tag %s → %s:\n%s", localRef, contentRef, execStderr(tagResult)), "", 0)
-			emit.PhaseEnd("docker-push", "failed")
-			return "", fmt.Errorf("failed to tag %s as %s: %s", localRef, contentRef, execStderr(tagResult))
-		}
-	}
-	pushResult, _ := exec.Run("docker", []string{"push", contentRef}, exec.Dir(wsRoot))
-	if pushResult == nil || !pushResult.Success {
-		emit.Diagnostic("error", fmt.Sprintf("Failed to push %s:\n%s", contentRef, execStderr(pushResult)), "", 0)
+	if layout == "" {
+		emit.Diagnostic("error", "Package "+contentRef+" has no OCI layout; repackage the image", "", 0)
 		emit.PhaseEnd("docker-push", "failed")
-		return "", fmt.Errorf("failed to push %s: %s", contentRef, execStderr(pushResult))
+		return "", fmt.Errorf("package %s has no OCI layout; repackage the image", contentRef)
+	}
+	img, err := loadFromLayout(filepath.Join(dockerDir, layout))
+	if err != nil {
+		emit.Diagnostic("error", "Failed to read OCI layout: "+err.Error(), "", 0)
+		emit.PhaseEnd("docker-push", "failed")
+		return "", fmt.Errorf("read OCI layout: %w", err)
+	}
+	ref, err := name.ParseReference(contentRef)
+	if err != nil {
+		emit.Diagnostic("error", "Invalid content ref "+contentRef+": "+err.Error(), "", 0)
+		emit.PhaseEnd("docker-push", "failed")
+		return "", fmt.Errorf("parse content ref: %w", err)
+	}
+	digest, err := pushLayoutImage(context.Background(), ref, img, keychain, transport)
+	if err != nil {
+		err = WrapAuthError(err, credHint)
+		emit.Diagnostic("error", fmt.Sprintf("Failed to push %s: %v", contentRef, err), "", 0)
+		emit.PhaseEnd("docker-push", "failed")
+		return "", fmt.Errorf("push %s: %w", contentRef, err)
 	}
 	emit.Info("Pushed: " + contentRef)
-	return "", nil
+	return digest, nil
 }
 
 // pushLayoutImage uploads the image's blobs, then PUTs its manifest at ref, and

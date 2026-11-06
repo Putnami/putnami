@@ -225,14 +225,12 @@ func buildPlanCache(ctx context.Context, ws *workspace.Workspace, planned []*job
 }
 
 // RenderImpactPlan writes a full ResultV2 document for extensions and CI
-// callers, with the ImpactPlan as its data, and a short summary for people.
-// Structured output is a single envelope, so a consumer validates
-// Document.data with no stdout parsing.
-func RenderImpactPlan(outputFormat string, document ciproto.ImpactPlan) error {
+// callers, with the ImpactPlan as its data and the workspace warnings its job
+// run reported, and a short summary for people. Structured output is a single
+// envelope, so a consumer validates Document.data with no stdout parsing.
+func RenderImpactPlan(outputFormat string, document ciproto.ImpactPlan, warnings []protocolcli.WorkspaceWarning) error {
 	if protocolcli.OutputMode(outputFormat).IsStructured() {
-		_, err := protocolcli.WriteResultV2(iox.Stdout(), protocolcli.OutputJSONL,
-			protocolcli.NewResultV2("impact-plan", document, nil))
-		return err
+		return shared.WriteResult(outputFormat, "impact-plan", document, warnings)
 	}
 	iox.Fprintf(os.Stdout, "\n  ImpactPlan %s\n", strings.Join(document.Commands, ","))
 	iox.Fprintf(os.Stdout, "    %s..%s (%d changed file(s), %d impacted project(s), %d task(s))\n\n",

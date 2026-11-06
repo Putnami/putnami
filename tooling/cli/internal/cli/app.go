@@ -239,7 +239,7 @@ func (a *App) Run(ctx context.Context, args []string) int {
 	// The single parse-and-validation pass reports here, after
 	// the help and version shortcuts so both keep working on a malformed
 	// invocation. A usage error is exit 2 with the message on stderr; the
-	// deprecation notices ride along on stderr and never block the run.
+	// alias notices ride along on stderr and never block the run.
 	if parsed.Err != nil {
 		printCommandError(os.Stderr, parsed.Err)
 		return exitCodeForError(parsed.Err)
@@ -248,7 +248,7 @@ func (a *App) Run(ctx context.Context, args []string) int {
 		printHelp(newHelpScope(wsRoot, cfg))
 		return ExitSuccess
 	}
-	printParseWarnings(os.Stderr, parsed.Global, append(aliasWarnings, parsed.Warnings...))
+	printParseWarnings(os.Stderr, parsed.Global, aliasWarnings)
 
 	// Resolve --output / --json into a single canonical output mode, validating
 	// the value and rejecting a --json/--output conflict. Done once here so every

@@ -16,15 +16,13 @@ import (
 	protocolcli "go.putnami.dev/protocol/cli"
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/tooling/cli/internal/cmderr"
-	"go.putnami.dev/tooling/cli/internal/iox"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
 
-// TestRunStructuredCommandWrapsLegacyPayloads exercises the dispatcher seam
-// shared by the established read-only commands whose helpers historically
-// wrote raw JSONL. The command output must now be one ResultV2 document in
-// both structured modes, retaining each former JSON document in data.
-func TestRunStructuredCommandWrapsLegacyPayloads(t *testing.T) {
+// TestStructuredCommandsWriteOneResult runs read-only structured commands
+// through the dispatcher. Each writes one ResultV2 document in both structured
+// modes: a list of several records is an array, one document is an object.
+func TestStructuredCommandsWriteOneResult(t *testing.T) {
 	wsRoot := structuredOutputWorkspace(t)
 	cfg := wsproto.Load(wsRoot)
 
@@ -35,7 +33,7 @@ func TestRunStructuredCommandWrapsLegacyPayloads(t *testing.T) {
 		assertData func(t *testing.T, data any)
 	}{
 		{
-			name:    "projects list preserves all former JSONL rows",
+			name:    "projects list carries every project",
 			args:    []string{"projects", "list"},
 			command: "projects list",
 			assertData: func(t *testing.T, data any) {
@@ -47,7 +45,7 @@ func TestRunStructuredCommandWrapsLegacyPayloads(t *testing.T) {
 			},
 		},
 		{
-			name:    "config show preserves its object payload",
+			name:    "config show carries its object payload",
 			args:    []string{"config", "show"},
 			command: "config show",
 			assertData: func(t *testing.T, data any) {
@@ -58,7 +56,7 @@ func TestRunStructuredCommandWrapsLegacyPayloads(t *testing.T) {
 			},
 		},
 		{
-			name:    "workspace describe preserves its object payload",
+			name:    "workspace describe carries its object payload",
 			args:    []string{"workspace", "describe"},
 			command: "workspace describe",
 			assertData: func(t *testing.T, data any) {
@@ -113,8 +111,8 @@ func TestRunStructuredCommandWrapsLegacyPayloads(t *testing.T) {
 		})
 	}
 
-	t.Run("a command's own envelope carries the reported warnings", func(t *testing.T) {
-		assertOwnEnvelopeCarriesWarnings(t, cfg, wsRoot)
+	t.Run("a failure carries the reported warnings", func(t *testing.T) {
+		assertFailureCarriesWarnings(t, cfg, wsRoot)
 	})
 }
 
@@ -124,28 +122,9 @@ func structuredResultsEqual(left, right protocolcli.ResultV2) bool {
 	return bytes.Equal(leftData, rightData)
 }
 
-func TestCapturedResultEnvelopePreservesAnExistingV2Result(t *testing.T) {
-	t.Parallel()
-	want := protocolcli.NewResultV2("doctor", map[string]any{"findings": 0}, nil)
-	var out bytes.Buffer
-	if _, err := protocolcli.WriteResultV2(&out, protocolcli.OutputJSONL, want); err != nil {
-		t.Fatalf("write source envelope: %v", err)
-	}
-
-	got, ok := capturedResultEnvelope(out.String())
-	if !ok {
-		t.Fatalf("capturedResultEnvelope rejected v2 envelope: %s", out.String())
-	}
-	if !structuredResultsEqual(want, got) {
-		t.Fatalf("captured envelope = %+v, want %+v", got, want)
-	}
-}
-
-// TestRunStructuredCommandForwardsARawContractDocument pins the ONE registered
-// exception to the envelope (registerRawCommand): `report` writes a document a
-// consumer binds to directly, so the dispatcher forwards its stdout untouched
-// — while its failures still take the shared envelope, which is what keeps the
-// exception to the success payload.
+// TestRunStructuredCommandForwardsARawContractDocument pins the one success
+// output that is not a result envelope: `report` writes the recorded document a
+// consumer binds to directly, while its failures take the shared envelope.
 func TestRunStructuredCommandForwardsARawContractDocument(t *testing.T) {
 	wsRoot := structuredOutputWorkspace(t)
 	cfg := wsproto.Load(wsRoot)
@@ -561,60 +540,44 @@ func TestWarningWriter(t *testing.T) {
 	}
 }
 
-// assertOwnEnvelopeCarriesWarnings pins the envelope of a command that runs
-// jobs inside its own result, such as impact-plan, cache verify and qualify:
-// the dispatcher adds the warnings the command reported to the envelope the
-// command wrote, and keeps the warnings that envelope already names. It swaps
-// the handler of impact-plan, so it runs inside a serial test.
-func assertOwnEnvelopeCarriesWarnings(t *testing.T, cfg *wsproto.Config, wsRoot string) {
+// assertFailureCarriesWarnings pins the failure envelope the dispatcher
+// writes: it carries the workspace warnings the command reported before it
+// failed. It swaps the handler of impact-plan, so it runs inside a serial test.
+func assertFailureCarriesWarnings(t *testing.T, cfg *wsproto.Config, wsRoot string) {
 	t.Helper()
 	reported := []workspace.Warning{{Code: workspace.WarningCodeJobsIgnored, Message: "reported by the engine run"}}
-	own := []protocolcli.WorkspaceWarning{{Code: "own.code", Message: "named by the command"}}
+	want := []protocolcli.WorkspaceWarning{{Code: string(workspace.WarningCodeJobsIgnored), Message: "reported by the engine run"}}
 
-	// The handler stands in for impact-plan: its engine run reports into the
-	// command's report, and it writes its own result envelope.
 	command, ok := lookupCommand("impact-plan")
 	if !ok {
 		t.Fatal("impact-plan command is not registered")
 	}
 	original := command.run
 	t.Cleanup(func() { command.run = original })
+	command.run = func(env *CommandEnv) error {
+		env.WorkspaceWarnings().Report(&workspace.Workspace{Warnings: reported})
+		return errors.New("plan failed")
+	}
 
-	for _, tc := range []struct {
-		name     string
-		envelope []protocolcli.WorkspaceWarning
-		want     []protocolcli.WorkspaceWarning
-	}{
-		{"an envelope without warnings gets the reported ones", nil,
-			[]protocolcli.WorkspaceWarning{{Code: string(workspace.WarningCodeJobsIgnored), Message: "reported by the engine run"}}},
-		{"an envelope with warnings keeps its own", own, own},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			command.run = func(env *CommandEnv) error {
-				env.WorkspaceWarnings().Report(&workspace.Workspace{Warnings: reported})
-				result := protocolcli.NewResultV2("impact-plan", map[string]any{"ok": true}, nil)
-				result.WorkspaceWarnings = tc.envelope
-				_, err := protocolcli.WriteResultV2(iox.Stdout(), protocolcli.OutputJSONL, result)
-				return err
-			}
-			parsed := ParseArgs([]string{"impact-plan", "lint", "--output=json"}, cfg.Aliases, nil)
-			if parsed.Err != nil {
-				t.Fatalf("ParseArgs: %v", parsed.Err)
-			}
-			code := ExitError
-			out := captureStdout(t, func() {
-				code = (&App{}).runStructuredCommand(context.Background(), parsed, cfg, wsRoot)
-			})
-			if code != ExitSuccess {
-				t.Fatalf("exit code = %d, want %d\n%s", code, ExitSuccess, out)
-			}
-			var envelope protocolcli.ResultV2
-			if err := json.Unmarshal([]byte(out), &envelope); err != nil {
-				t.Fatalf("output is not one result envelope: %v\n%s", err, out)
-			}
-			if !reflect.DeepEqual(envelope.WorkspaceWarnings, tc.want) {
-				t.Fatalf("workspaceWarnings = %+v, want %+v", envelope.WorkspaceWarnings, tc.want)
-			}
-		})
+	parsed := ParseArgs([]string{"impact-plan", "lint", "--output=json"}, cfg.Aliases, nil)
+	if parsed.Err != nil {
+		t.Fatalf("ParseArgs: %v", parsed.Err)
+	}
+	code := ExitSuccess
+	out := captureStdout(t, func() {
+		code = (&App{}).runStructuredCommand(context.Background(), parsed, cfg, wsRoot)
+	})
+	if code != ExitError {
+		t.Fatalf("exit code = %d, want %d\n%s", code, ExitError, out)
+	}
+	var envelope protocolcli.ResultV2
+	if err := json.Unmarshal([]byte(out), &envelope); err != nil {
+		t.Fatalf("output is not one result envelope: %v\n%s", err, out)
+	}
+	if envelope.Command != "impact-plan" || envelope.Status != protocolcli.StatusFailure {
+		t.Fatalf("envelope = %+v, want a failed impact-plan envelope", envelope)
+	}
+	if !reflect.DeepEqual(envelope.WorkspaceWarnings, want) {
+		t.Fatalf("workspaceWarnings = %+v, want %+v", envelope.WorkspaceWarnings, want)
 	}
 }

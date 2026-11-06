@@ -60,7 +60,7 @@ func ContextMapCommand(wsRoot string, opts ContextMapOptions) error {
 	printed := scopeWorkspaceMap(full, keep)
 
 	if protocolcli.OutputMode(opts.OutputFormat).IsStructured() {
-		_, err := protocolcli.WriteResultV2(iox.Stdout(), protocolcli.OutputJSONL,
+		_, err := protocolcli.WriteResultV2(iox.Stdout(), protocolcli.OutputMode(opts.OutputFormat),
 			protocolcli.NewResultV2("context map", printed, nil))
 		return err
 	}

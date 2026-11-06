@@ -16,7 +16,7 @@
   "requirements": [
     {
       "id": "the-versions-are-pinned",
-      "text": "An HTTP message carries protocolVersion 1, and a parser refuses a message of another version. The provider RPC keeps its own version: ProviderProtocolVersion is 2, ProviderProtocolMinVersion is 1, provenance starts at 2 and the v2 opt-in token is provider-protocol-v2, and a test pins each value, so a change is a reviewed bump. A provider envelope of version 1 or 2 parses, and any other version is refused."
+      "text": "An HTTP message carries protocolVersion 1, and a parser refuses a message of another version. The provider RPC keeps its own version: ProviderProtocolVersion is 2, ProviderProtocolMinVersion is 2, provenance starts at 2 and the v2 opt-in token is provider-protocol-v2, and a test pins each value, so a change is a reviewed bump. A provider envelope of version 2 parses, and any other version, version 1 included, is refused."
     },
     {
       "id": "keys-and-digests-are-content-addresses",
@@ -55,8 +55,8 @@
       "text": "A provider request and a response round-trip with their typed payloads and their id, and a nil payload is absent. The op set is closed: initialize, authenticate, prefetch, restore, upload, marker-lookup, marker-write, object-get, object-put, summary and shutdown. A failed response carries an error code, and a restore answers hit, miss or error. The Cloud provider answers each of 24 concurrent restores and acknowledges shutdown after them."
     },
     {
-      "id": "the-session-bootstraps-at-version-1",
-      "text": "The CLI sends initialize as a version 1 envelope and payload that lists provider-protocol-v2. With a provider that selects version 2 it sends every later request at version 2, and with a strict version 1 provider it stays at version 1. A result that selects an unsupported version fails initialize."
+      "id": "the-session-bootstraps-at-version-2",
+      "text": "The CLI sends initialize as a version 2 envelope and payload that lists provider-protocol-v2, so a provider released at cloud/v0.4.0 selects version 2, and it sends every later request at version 2. A provider that speaks only version 1 never answers, and a result that selects an unsupported version, version 1 included, fails initialize."
     },
     {
       "id": "provenance-is-derived-by-the-provider",

@@ -46,8 +46,8 @@ func TestDriftV2_ProtocolVersionConst(t *testing.T) {
 	if !ok || v.Const == nil {
 		t.Fatal("v2 schema has no const for the v property")
 	}
-	if *v.Const != ProtocolVersion2 {
-		t.Errorf("v2 schema pins v = %d, Go says %d", *v.Const, ProtocolVersion2)
+	if *v.Const != ProtocolVersion {
+		t.Errorf("v2 schema pins v = %d, Go says %d", *v.Const, ProtocolVersion)
 	}
 	ready, ok := schema.Defs["ReadyEvent"]
 	if !ok {
@@ -155,8 +155,8 @@ func TestDriftV2_V1SchemaFrozen(t *testing.T) {
 		t.Fatalf("parse v1 schema: %v", err)
 	}
 	v, ok := schema.Properties["v"]
-	if !ok || v.Const == nil || *v.Const != ProtocolVersion {
-		t.Fatalf("v1 schema no longer pins v = %d", ProtocolVersion)
+	if !ok || v.Const == nil || *v.Const != ProtocolVersion1 {
+		t.Fatalf("v1 schema must pin v = %d", ProtocolVersion1)
 	}
 	for _, typ := range schema.Defs["EventType"].Enum {
 		if typ == string(EventReady) {

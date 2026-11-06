@@ -30,21 +30,21 @@ Use this package when implementing a job runner, reading extension output, or bu
 
 ## Versions
 
-- **v1** (`v: 1`) — the default when there is no CLI advertisement.
+- **v1** (`v: 1`) — parsed and validated here; no emitter writes it.
   [`doc/02-event-format.md`](doc/02-event-format.md),
   [`schemas/event.json`](schemas/event.json), corpus `fixtures/{valid,invalid}`.
-- **v2** (`v: 2`) — v1 plus the typed `ready` event, which replaces the
-  watcher's `"listening http(s)://"` log-substring probe; required for job
-  streams handled by CLI contract 3.
+- **v2** (`v: 2`, `ProtocolVersion`) — v1 plus the typed `ready` event, which
+  replaces the watcher's `"listening http(s)://"` log-substring probe; every
+  emitter writes it, and CLI contract 3 requires it.
   [`doc/05-event-v2.md`](doc/05-event-v2.md),
   [`schemas/event-v2.json`](schemas/event-v2.json), corpus `fixtures/v2/`.
 
-The protocol package defines both versions, but a job stream handled by CLI
-contract 3 must use v2; the CLI advertises v2 in
-`PUTNAMI_RUNTIME_EVENTS` and accepts only events at that version. A stream may
-not mix versions, so its version is **negotiated once**, before its first line:
-the emitter stamps the resolved version on everything it writes
-([`negotiation.go`](negotiation.go)). No advertisement means v1.
+The protocol package parses both versions and emits v2 only; the CLI advertises
+v2 in `PUTNAMI_RUNTIME_EVENTS` and accepts only events at that version. A stream
+may not mix versions, so its version is **negotiated once**, before its first
+line: the emitter stamps the resolved version on everything it writes
+([`negotiation.go`](negotiation.go)). No advertisement, or one below v2, means
+v2.
 
 The **outer** session-stream record that wraps these events is owned by
 `protocols/cli` (`SessionStreamRecord`, `protocolVersion: 2`) and by nothing
@@ -174,7 +174,7 @@ the other.
   vocabularies, the schemas and the corpus; the CLI, the extensions and the
   framework runtimes are producers and consumers of that authority.
 - **Evidence**: both versions are pinned to their schemas by named tests —
-  `TestConformance_ProtocolVersion` and `TestConformance_ProtocolVersion2` /
+  `TestConformance_ProtocolVersion`, `TestConformance_ProtocolVersion1` and
   `TestDriftV2_ProtocolVersionConst`. Every closed vocabulary is drift-tested
   against the schema rather than asserted in prose (`TestDrift_EventTypes`,
   `TestDrift_LogLevels`, `TestDrift_ResultStatuses`,
@@ -206,7 +206,7 @@ Durable decisions recorded here:
 
 - [`doc/adr/0001-one-stream-one-negotiated-version.md`](doc/adr/0001-one-stream-one-negotiated-version.md)
   — a stream speaks one version, resolved once from `PUTNAMI_RUNTIME_EVENTS`
-  before its first line, with a total resolution that fails closed to v1.
+  before its first line, with a total resolution that defaults to v2.
 - [`doc/adr/0002-delete-the-producerless-stream-envelopes.md`](doc/adr/0002-delete-the-producerless-stream-envelopes.md)
   — this package owns the inner subprocess event only; the unversioned outer
   envelopes were deleted rather than frozen once they had no producer.

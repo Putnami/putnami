@@ -2698,7 +2698,7 @@
               "one-deploy-task-carries-every-workload-it-covers",
               "a-consumes-release-set-command-binds-the-environment",
               "a-release-set-consumer-narrows-to-channel-members",
-              "release-set-flags-warn-without-a-consumer"
+              "release-set-flags-are-refused-without-a-consumer"
             ]
           }
         }

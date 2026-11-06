@@ -135,31 +135,31 @@ func applyPublishDryRun(req *engine.Request, parsed *ParsedArgs, extensions []*e
 // extension resolution and before selection, rather than in ParseArgs, because
 // only extension discovery knows which flags the selected tasks declare.
 //
-// Two different verdicts, both settled in the epic's refinement:
+// Two usage errors, both printed to stderr:
 //   - a flag two selected tasks declare INCOMPATIBLY cannot be bound at all,
-//     so it is a hard usage error naming the tasks;
-//   - a flag NO task declares is a deprecation warning for one minor version,
-//     because manifests ship on their own cadence and hard-failing them is a
-//     known ecosystem-break class.
+//     so the error names the tasks;
+//   - a flag NO selected task declares, and that is neither a CLI global nor a
+//     core job flag, is refused, as a built-in command refuses it.
 //
-// Neither verdict rewrites RawJobArgs, so commandParams — and every cache key
-// and run marker derived from it — is unchanged. Both verdicts print to stderr.
+// Neither check rewrites RawJobArgs, so commandParams — and every cache key
+// and run marker derived from it — is unchanged.
 func commandFlagValidator(parsed *ParsedArgs, stderr io.Writer) func(*extension.DiscoveryResult, GlobalFlags) error {
-	return func(discovered *extension.DiscoveryResult, resolved GlobalFlags) error {
+	return func(discovered *extension.DiscoveryResult, _ GlobalFlags) error {
 		jobMap := extension.BuildJobMap(discovered.Extensions)
 		if err := conflictingTaskFlags(parsed.Commands, jobMap, parsed.RawJobArgs); err != nil {
 			printCommandError(stderr, err)
 			return err
 		}
-		// The resolved flags, not the parsed ones: PUTNAMI_QUIET must suppress
-		// these notices exactly as it did when this ran inline after
-		// applyEnvOverrides. The run consumes the release set when one of its
-		// commands does, as the engine decides it (buildReleaseSetOptions).
+		// The run consumes the release set when one of its commands does, as
+		// the engine decides it (buildReleaseSetOptions).
 		consumesReleaseSet := slices.ContainsFunc(parsed.Commands, func(command string) bool {
 			return extension.CommandConsumesReleaseSet(discovered.Extensions, command)
 		})
-		printParseWarnings(stderr, resolved,
-			undeclaredFlagWarnings(strings.Join(parsed.Commands, ","), parsed.RawJobArgs, declaredTaskFlags(parsed.Commands, jobMap), consumesReleaseSet))
+		if err := rejectUndeclaredFlags(strings.Join(parsed.Commands, ","), parsed.RawJobArgs,
+			declaredTaskFlags(parsed.Commands, jobMap), consumesReleaseSet); err != nil {
+			printCommandError(stderr, err)
+			return err
+		}
 		return nil
 	}
 }

@@ -57,8 +57,8 @@ func TestTextRendererFinish(t *testing.T) {
 	results := map[string]*jobs.JobResult{
 		"a": {Status: "success"},
 		"b": {Status: "success"},
-		"c": {CacheHit: true, Status: "success"},
-		"d": {Coalesced: true, Status: "success"},
+		"c": {Reuse: jobs.ReuseLocalCache, Status: "success"},
+		"d": {Reuse: jobs.ReuseCoalesced, Status: "success"},
 	}
 
 	r.Finish(results, jobs.SessionOutcome{})

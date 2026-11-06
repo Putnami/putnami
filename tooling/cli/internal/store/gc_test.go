@@ -15,7 +15,7 @@ func putSized(t *testing.T, s *LocalStore, hash string, size int) {
 	if err := os.WriteFile(filepath.Join(src, "f.bin"), make([]byte, size), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if err := s.Put(hash, entryWith(src)); err != nil {
+	if err := putFormatOneEntry(s, hash, entryWith(src)); err != nil {
 		t.Fatalf("Put %s: %v", hash, err)
 	}
 }
@@ -110,10 +110,10 @@ func TestRunGC_SharedBlobSurvivesWhileReferenced(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	if err := s.Put(hashN(1), entryWith(src1)); err != nil {
+	if err := putFormatOneEntry(s, hashN(1), entryWith(src1)); err != nil {
 		t.Fatal(err)
 	}
-	if err := s.Put(hashN(2), entryWith(src2)); err != nil {
+	if err := putFormatOneEntry(s, hashN(2), entryWith(src2)); err != nil {
 		t.Fatal(err)
 	}
 	writeLastUsed(s.blobDir(hashN(1)), now.Add(-2*time.Hour), 1) // evict this one

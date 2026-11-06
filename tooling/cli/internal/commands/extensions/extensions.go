@@ -9,6 +9,7 @@ import (
 	"slices"
 	"strings"
 
+	protocolcli "go.putnami.dev/protocol/cli"
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/sdk/extension/dirlink"
 	"go.putnami.dev/tooling/cli/internal/cmderr"
@@ -22,26 +23,13 @@ import (
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
 
-// ExtensionsInstall installs extensions from the workspace config and lock file.
-// If a specific name is given, only that extension is installed/added.
-// Pass --latest in args to ignore the lock file and resolve the latest versions.
-// outputFormat selects the result rendering ("jsonl" for machine-readable).
-func ExtensionsInstall(ctx context.Context, wsRoot string, cfg *wsproto.Config, args []string, outputFormat string) error {
-	return extensionsInstall(ctx, wsRoot, cfg, args, outputFormat, os.Stdout)
-}
-
-// ExtensionsInstallWithOptions installs extensions and reports typed outcomes
-// without requiring lifecycle callers to parse the human progress stream.
+// ExtensionsInstallWithOptions installs extensions from the workspace config
+// and lock file. If a specific name is given, only that extension is
+// installed/added. Pass --latest in args to ignore the lock file and resolve
+// the latest versions. It reports typed outcomes to opts.OnAction, and the
+// records of a structured result to opts.Records.
 func ExtensionsInstallWithOptions(ctx context.Context, wsRoot string, cfg *wsproto.Config, args []string, opts InstallOptions) error {
 	return extensionsInstallWithOptions(ctx, wsRoot, cfg, args, opts)
-}
-
-// extensionsInstall is ExtensionsInstall with the human progress stream chosen by
-// the caller. Install threads the first-use bootstrap's stream through here so an
-// implicit install under --output=json|jsonl cannot write to the real stdout
-// (slice A5a).
-func extensionsInstall(ctx context.Context, wsRoot string, cfg *wsproto.Config, args []string, outputFormat string, out io.Writer) error {
-	return extensionsInstallWithOptions(ctx, wsRoot, cfg, args, InstallOptions{OutputFormat: outputFormat, Out: out})
 }
 
 func extensionsInstallWithOptions(ctx context.Context, wsRoot string, cfg *wsproto.Config, args []string, opts InstallOptions) error {
@@ -225,7 +213,7 @@ func sameDirPath(a, b string) bool {
 // the caller's human stream normally, stderr under a structured output format
 // where stdout carries the machine contract.
 func materializeNoticeWriter(outputFormat string, out io.Writer) io.Writer {
-	if outputFormat == "jsonl" {
+	if protocolcli.OutputMode(outputFormat).IsStructured() {
 		return os.Stderr
 	}
 	return out
@@ -250,7 +238,8 @@ func printMaterializeNotice(w io.Writer, target extension.ArtifactTarget) {
 }
 
 // ExtensionsUpdate updates one or all extensions to the latest compatible version.
-// outputFormat selects the result rendering ("jsonl" for machine-readable).
+// A structured outputFormat (--output=json|jsonl) writes one "extensions update"
+// result instead of the human lines.
 func ExtensionsUpdate(ctx context.Context, wsRoot string, cfg *wsproto.Config, args []string, outputFormat string) error {
 	return ExtensionsUpdateWithOptions(ctx, wsRoot, cfg, args, ArtifactUpdateOptions{}, outputFormat)
 }
@@ -371,10 +360,10 @@ func RunExtensionInstallHooksTo(ctx context.Context, wsRoot string, cfg *wsproto
 
 // runExtensionInstallHooks runs workspace-scoped hooks declared by installed
 // extensions, with the caller's human stream. The args parameter mirrors
-// ExtensionsInstall so a specifically installed extension can run its hook even
-// before the config has been reloaded. A structured outputFormat still forces
-// stderr: an onInstall hook's own stdout would corrupt the JSONL stream
-// regardless of which writer the status lines use.
+// ExtensionsInstallWithOptions so a specifically installed extension can run its
+// hook even before the config has been reloaded. A structured outputFormat still
+// forces stderr: an onInstall hook's own stdout would corrupt the structured
+// result regardless of which writer the status lines use.
 func runExtensionInstallHooks(ctx context.Context, wsRoot string, cfg *wsproto.Config, args []string, outputFormat string, out io.Writer) error {
 	if wsRoot == "" {
 		return nil
@@ -409,7 +398,7 @@ func runExtensionInstallHooks(ctx context.Context, wsRoot string, cfg *wsproto.C
 		return fmt.Errorf("synchronize extension runtimes: %w", err)
 	}
 
-	jsonlOut := outputFormat == "jsonl"
+	structuredOut := protocolcli.OutputMode(outputFormat).IsStructured()
 	// The hook's OWN stdout travels with the status lines: an onInstall hook that
 	// prints to stdout during an implicit bootstrap install would corrupt the
 	// invoking command's --output=json envelope just as surely as a status line.
@@ -417,7 +406,7 @@ func runExtensionInstallHooks(ctx context.Context, wsRoot string, cfg *wsproto.C
 	if statusOut == nil {
 		statusOut, hookStdout = io.Discard, io.Discard
 	}
-	if jsonlOut {
+	if structuredOut {
 		statusOut, hookStdout = os.Stderr, os.Stderr
 	}
 

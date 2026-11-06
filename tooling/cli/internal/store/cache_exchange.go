@@ -9,7 +9,7 @@ import (
 )
 
 // ExportManifestBlobs exports every CAS blob referenced by manifest into the
-// provider/core exchange directory. It is the inverse of Materialize's fetcher:
+// provider/core exchange directory. It is the inverse of a BlobFetcher:
 // core keeps ownership of the live CAS and hands the provider hardlinks/copies
 // in the protocol-defined exchange layout.
 func (cm *CacheManager) ExportManifestBlobs(manifest *cache.Manifest, exchangeDir string) error {

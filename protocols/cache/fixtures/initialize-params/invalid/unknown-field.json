@@ -1,1 +1,1 @@
-{ "protocolVersion": 1, "blobExchangeDir": "/x", "token": "secret" }
+{ "protocolVersion": 2, "blobExchangeDir": "/x", "token": "secret" }

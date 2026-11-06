@@ -1080,7 +1080,7 @@ func resolveWorkspaceRevision(wsRoot string) string {
 // JSON form otherwise.
 func renderContextPack(outputFormat string, report ContextPackReport) error {
 	if protocolcli.OutputMode(outputFormat).IsStructured() {
-		_, err := protocolcli.WriteResultV2(iox.Stdout(), protocolcli.OutputJSONL,
+		_, err := protocolcli.WriteResultV2(iox.Stdout(), protocolcli.OutputMode(outputFormat),
 			protocolcli.NewResultV2("context pack", report, nil))
 		return err
 	}

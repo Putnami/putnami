@@ -5,7 +5,7 @@
   "outcomes": [
     "A job written in any language reports through one documented stream, and the CLI renders, replays and reacts to it without knowing the language",
     "A served workload says it is ready with a typed event, so the watcher never guesses from a log line",
-    "A new version reaches a stream only when the CLI asks for it, and an older reader keeps the bytes it always read"
+    "A version newer than 2 reaches a stream only when the CLI asks for it, and every emitter writes version 2 otherwise"
   ],
   "nonGoals": [
     "The outer session-stream record the CLI writes around these events: protocols/cli owns it",
@@ -14,15 +14,15 @@
   "requirements": [
     {
       "id": "the-versions-are-pinned",
-      "text": "ProtocolVersion stays 1 and ProtocolVersion2 stays 2, and each schema pins v to its constant, so a version bump is a reviewed migration. The version 1 schema keeps pinning v to 1 and never admits the version 2 ready type."
+      "text": "ProtocolVersion1 stays 1 and ProtocolVersion stays 2, and each schema pins v to its constant, so a version bump is a reviewed migration. The version 1 schema keeps pinning v to 1 and never admits the version 2 ready type."
     },
     {
       "id": "one-stream-one-negotiated-version",
-      "text": "A stream's version is resolved once from PUTNAMI_RUNTIME_EVENTS before its first line, and every input resolves to a known version: no advertisement, or an unknown one, is version 1. The writing and the reading side share the resolution. The emitter stamps the resolved version on every line, the default emitter stays version 1, and a stream that carries two versions is invalid."
+      "text": "A stream's version is resolved once from PUTNAMI_RUNTIME_EVENTS before its first line, and every input resolves to a version an emitter writes: no advertisement, an unknown one, or one below version 2 is version 2. The writing and the reading side share the resolution. The emitter stamps the resolved version on every line, the default emitter writes version 2, and a stream that carries two versions is invalid."
     },
     {
       "id": "version-2-adds-only-ready",
-      "text": "Version 2 accepts every version 1 event type and adds only ready. Version 1 refuses ready, an emitter on a version 1 stream refuses to write one, and a version outside the known set is refused. Every version 1 fixture still validates at version 1."
+      "text": "Version 2 accepts every version 1 event type and adds only ready. Version 1 refuses ready, no emitter writes a version 1 stream, and a version outside the known set is refused. Every version 1 fixture still validates at version 1."
     },
     {
       "id": "events-parse-and-validate-by-type",
@@ -66,11 +66,11 @@
     },
     {
       "id": "the-extension-sdk-emits-a-conforming-stream",
-      "text": "The extension SDK's emitter writes this wire shape at the version the CLI advertises, resolved through this module, and falls back to version 1 for an unknown one. A typed ready marker appears only from version 2. It never writes an invalid line: it drops a value the protocol cannot represent, reports a ready event it cannot write at version 1, keeps the log line of a malformed marker, and writes a timed-out result that parses. It announces readiness again on every restart."
+      "text": "The extension SDK's emitter writes this wire shape at the version the CLI advertises, resolved through this module, and falls back to version 2 for an absent or unknown one, version 1 included, so it never writes a version 1 stream. It never writes an invalid line: it drops a value the protocol cannot represent, keeps the log line of a malformed marker, and writes a timed-out result that parses. It announces readiness again on every restart."
     },
     {
       "id": "the-typescript-runtime-emits-and-validates-a-conforming-stream",
-      "text": "In TypeScript, @putnami/runtime gives every fixture of both versions the Go verdict and refuses a version 1 ready event and a mixed-version stream. Its emitter writes a valid line of every event type, in the Go SDK's shape for meta, result, summary, ready and timed-out result lines, drops a non-finite metric, stamps one version per line and writes no version 1 ready event. It resolves PUTNAMI_RUNTIME_EVENTS as the Go helper does, sorts endpoints by byte order, and a malformed readiness marker yields none."
+      "text": "In TypeScript, @putnami/runtime gives every fixture of both versions the Go verdict and refuses a v1 ready event and a mixed-version stream. Its emitter writes a valid line of every event type, in the Go SDK's shape for meta, result, summary, ready and timed-out result lines, drops a non-finite metric, stamps one version per line and writes no v1 ready event. It resolves an absent or lower advertisement to 1 and any other as Go does, sorts endpoints by byte order, and a bad readiness marker yields none."
     },
     {
       "id": "the-cli-arms-on-typed-readiness",

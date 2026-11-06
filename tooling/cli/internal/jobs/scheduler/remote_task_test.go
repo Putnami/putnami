@@ -760,18 +760,27 @@ func payloadDigestFor(t *testing.T, server *fakeCacheServer, key, path string) s
 	return ""
 }
 
-// warmCASWith puts content into a workspace's CAS through an ordinary legacy
+// warmCASWith puts content into a workspace's CAS through another task-owned
 // entry, so a later remote restore of the same bytes deduplicates instead of
 // fetching.
 func warmCASWith(t *testing.T, f *captureFixture, content string) {
 	t.Helper()
-	dir := t.TempDir()
-	if err := os.WriteFile(filepath.Join(dir, "warm.txt"), []byte(content), 0o644); err != nil {
+	staging := t.TempDir()
+	out := store.DeclaredEntryOutput{ID: "warm", Kind: extension.OutputKindFile, Root: extension.OutputRootProject, Path: "warm.txt"}
+	path := store.TaskStagingPath(staging, out)
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	warmHash := "dd" + strings.Repeat("2", cache.KeyLength-2)
-	if err := f.cache.Save(warmHash, &store.EntryResult{Status: "success"},
-		&store.EntryMetadata{Extension: "@test/ext", Task: "warm", Project: captureTestProject}, dir); err != nil {
+	if _, err := f.cache.IngestTaskEntry(staging, store.TaskEntrySpec{
+		Key:      warmHash,
+		Result:   &store.EntryResult{Status: "success"},
+		Metadata: &store.EntryMetadata{Extension: "@test/ext", Task: "warm", Project: captureTestProject},
+		Outputs:  []store.DeclaredEntryOutput{out},
+	}); err != nil {
 		t.Fatalf("warm CAS: %v", err)
 	}
 }
@@ -957,9 +966,6 @@ func TestDeclaredSourceRewriterRejectsMutatingStatusEntry(t *testing.T) {
 			}
 			if !cachekey.DeclaredSourceRewriter(job) {
 				t.Fatal("neither v3 source-mutation signal selected the restore guard")
-			}
-			if remotecache.SourceMutationTask(job) {
-				t.Fatal("a v3 task still infers the v2 source-mutation marker")
 			}
 
 			f := newCaptureFixture(t, job)

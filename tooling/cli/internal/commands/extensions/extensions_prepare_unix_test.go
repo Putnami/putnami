@@ -5,7 +5,6 @@ package extensions
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io/fs"
@@ -20,6 +19,7 @@ import (
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/tooling/cli/internal/artifactstore"
 	"go.putnami.dev/tooling/cli/internal/cmderr"
+	"go.putnami.dev/tooling/cli/internal/commands/sharedtest"
 	"go.putnami.dev/tooling/cli/internal/lockfile"
 	"go.putnami.dev/tooling/cli/internal/runcredential"
 )
@@ -103,14 +103,8 @@ func TestExtensionsPrepare_PreparesTheSourceBuiltRuntimes(t *testing.T) {
 	if err := extensionsPrepare(context.Background(), ws, cfg, "jsonl", &out); err != nil {
 		t.Fatalf("extensions prepare: %v", err)
 	}
-	lines := strings.Split(strings.TrimSpace(out.String()), "\n")
-	if len(lines) != 1 {
-		t.Fatalf("extensions prepare printed %q, want one runtime", out.String())
-	}
 	var entry preparedRuntimeEntry
-	if err := json.Unmarshal([]byte(lines[0]), &entry); err != nil {
-		t.Fatalf("decode %q: %v", lines[0], err)
-	}
+	sharedtest.ResultData(t, out.String(), "extensions prepare", &entry)
 	if entry.Kind != "extension-runtime" || entry.Name != "@acme/cloud" || entry.Digest == "" {
 		t.Fatalf("extensions prepare printed %+v, want the runtime of @acme/cloud", entry)
 	}

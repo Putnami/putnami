@@ -23,7 +23,7 @@ func fetchWireEnv(t *testing.T, extra ...string) []string {
 	return jobtest.Env(t, origin, jobtest.CacheRoot(t), append([]string{
 		"PATH=" + t.TempDir(),
 		extensionproto.OfflineDependenciesEnv + "=1",
-		runtimeproto.AdvertisedVersionEnv(runtimeproto.ProtocolVersion2),
+		runtimeproto.AdvertisedVersionEnv(runtimeproto.ProtocolVersion),
 	}, extra...)...)
 }
 
@@ -41,7 +41,7 @@ func TestWorkspaceFetchWire_FailsClosedOnAnUnreadableDescriptor(t *testing.T) {
 	if code != 1 {
 		t.Fatalf("exit code = %d, want 1\nstderr:\n%s", code, stderr)
 	}
-	requireJobStream(t, events, "workspace-fetch", runtimeproto.ProtocolVersion2, runtimeproto.ResultFailed)
+	requireJobStream(t, events, "workspace-fetch", runtimeproto.ProtocolVersion, runtimeproto.ResultFailed)
 	found := false
 	for _, event := range events {
 		if event.Type == runtimeproto.EventDiagnostic &&

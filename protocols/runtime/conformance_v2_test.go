@@ -17,17 +17,18 @@ import (
 // invariant v2 must preserve — v1 fixtures untouched, v1 readers
 // unaffected.
 
-// TestConformance_ProtocolVersion2 pins the v2 version constant the same way
-// TestConformance_ProtocolVersion pins v1: a bump is a migration, not an edit.
-func TestConformance_ProtocolVersion2(t *testing.T) {
+// TestConformance_ProtocolVersion1 pins the version 1 constant the same way
+// TestConformance_ProtocolVersion pins version 2: a bump is a migration, not an
+// edit. Both versions parse, and the negotiation ceiling is the emitted version.
+func TestConformance_ProtocolVersion1(t *testing.T) {
 	spectest.Proves(t, "runtime/event-stream", "the-versions-are-pinned", "the-version-constants-stay-1-and-2")
-	if ProtocolVersion2 != 2 {
-		t.Fatalf("ProtocolVersion2 = %d, want 2 — bumping requires a migration story", ProtocolVersion2)
+	if ProtocolVersion1 != 1 {
+		t.Fatalf("ProtocolVersion1 = %d, want 1 — bumping requires a migration story", ProtocolVersion1)
 	}
-	if ProtocolVersion != 1 {
-		t.Fatalf("ProtocolVersion = %d, want 1 — v2 is additive, v1 stays emitted", ProtocolVersion)
+	if MaxKnownProtocolVersion != ProtocolVersion {
+		t.Fatalf("MaxKnownProtocolVersion = %d, want %d", MaxKnownProtocolVersion, ProtocolVersion)
 	}
-	if !IsKnownProtocolVersion(ProtocolVersion) || !IsKnownProtocolVersion(ProtocolVersion2) {
+	if !IsKnownProtocolVersion(ProtocolVersion1) || !IsKnownProtocolVersion(ProtocolVersion) {
 		t.Fatal("both protocol versions must be accepted")
 	}
 	if IsKnownProtocolVersion(0) || IsKnownProtocolVersion(3) {
@@ -61,8 +62,8 @@ func TestConformance_V2ValidFixtures(t *testing.T) {
 				t.Errorf("valid v2 fixture %s produced errors: %v", path, diags)
 			}
 			for i, e := range events {
-				if e.V != ProtocolVersion2 {
-					t.Errorf("event[%d].v = %d, want %d", i, e.V, ProtocolVersion2)
+				if e.V != ProtocolVersion {
+					t.Errorf("event[%d].v = %d, want %d", i, e.V, ProtocolVersion)
 				}
 			}
 		})
@@ -208,9 +209,9 @@ func TestConformance_V1FixturesUnchangedByV2(t *testing.T) {
 			t.Fatalf("decode %s: %v", path, err)
 		}
 		for i, e := range events {
-			if e.V != ProtocolVersion {
+			if e.V != ProtocolVersion1 {
 				t.Errorf("%s event[%d].v = %d, want %d — the v1 corpus must stay v1",
-					path, i, e.V, ProtocolVersion)
+					path, i, e.V, ProtocolVersion1)
 			}
 		}
 	}

@@ -328,7 +328,7 @@ func TestSchedulerGenerationLocalHitStampsTheCurrentRevision(t *testing.T) {
 	result := f.sched.Run(context.Background())
 
 	got := result.Results[job.Key()]
-	if got == nil || !got.CacheHit {
+	if got == nil || !got.ReuseKind().CacheHit() {
 		t.Fatalf("result = %+v, want a task-owned cache hit at the new commit", got)
 	}
 	// The restore really happened: the entry's payload is on disk.
@@ -370,7 +370,7 @@ func TestSchedulerGenerationLocalHitLeavesTheStampKeyInputUnchanged(t *testing.T
 	}
 
 	f.sched.cfg.VersionInfo = current
-	if got := f.sched.Run(context.Background()).Results[job.Key()]; got == nil || !got.CacheHit {
+	if got := f.sched.Run(context.Background()).Results[job.Key()]; got == nil || !got.ReuseKind().CacheHit() {
 		t.Fatalf("result = %+v, want a task-owned cache hit", got)
 	}
 
@@ -400,7 +400,7 @@ func TestGenerationCacheHitDoesNotChurnTheBuildTime(t *testing.T) {
 	primeGenerationEntry(t, f, job, current, "2026-07-30T10:00:00Z")
 
 	f.sched.cfg.VersionInfo = current
-	if got := f.sched.Run(context.Background()).Results[job.Key()]; got == nil || !got.CacheHit {
+	if got := f.sched.Run(context.Background()).Results[job.Key()]; got == nil || !got.ReuseKind().CacheHit() {
 		t.Fatalf("result = %+v, want a task-owned cache hit", got)
 	}
 

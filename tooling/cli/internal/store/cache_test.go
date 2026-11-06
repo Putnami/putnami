@@ -144,7 +144,7 @@ func TestCacheKey_EveryProjectedParamIsSemantic(t *testing.T) {
 	}
 }
 
-func TestCacheManager_LookupAndSave(t *testing.T) {
+func TestCacheManager_LookupReadsAFormatOneEntry(t *testing.T) {
 	dir := t.TempDir()
 	s := NewLocalStore(dir)
 	cm := NewCacheManager(s)
@@ -163,7 +163,7 @@ func TestCacheManager_LookupAndSave(t *testing.T) {
 	// Save
 	result := &EntryResult{Status: "success", Data: map[string]any{"output": "/dist"}}
 	meta := &EntryMetadata{Extension: "ext", Task: "build", Project: "pkg"}
-	if err := cm.Save(hash, result, meta, ""); err != nil {
+	if err := saveFormatOneEntry(cm, hash, result, meta, ""); err != nil {
 		t.Fatalf("Save: %v", err)
 	}
 
@@ -180,7 +180,7 @@ func TestCacheManager_LookupAndSave(t *testing.T) {
 	}
 }
 
-func TestCacheManager_SaveWithFiles(t *testing.T) {
+func TestCacheManager_LookupReadsAFormatOneEntryWithFiles(t *testing.T) {
 	storeDir := t.TempDir()
 	s := NewLocalStore(storeDir)
 	cm := NewCacheManager(s)
@@ -194,7 +194,7 @@ func TestCacheManager_SaveWithFiles(t *testing.T) {
 
 	result := &EntryResult{Status: "success"}
 	meta := &EntryMetadata{Extension: "ext", Task: "build", Project: "pkg"}
-	if err := cm.Save(hash, result, meta, outputDir); err != nil {
+	if err := saveFormatOneEntry(cm, hash, result, meta, outputDir); err != nil {
 		t.Fatalf("Save: %v", err)
 	}
 
@@ -232,7 +232,7 @@ func TestCacheManager_RestoreFiles_NoFiles(t *testing.T) {
 
 	result := &EntryResult{Status: "success"}
 	meta := &EntryMetadata{Extension: "ext", Task: "lint", Project: "pkg"}
-	cm.Save(hash, result, meta, "")
+	saveFormatOneEntry(cm, hash, result, meta, "")
 
 	entry, _ := cm.Lookup(hash)
 	restored, err := cm.RestoreFiles(entry, t.TempDir())
@@ -259,7 +259,7 @@ func TestCacheManager_RestoreDir_ReplacesStaleTree(t *testing.T) {
 	os.WriteFile(filepath.Join(src, "generate-result.json"), []byte("{}"), 0o644)
 
 	hash := "11bbccdd1234567890abcdef1234567890abcdef1234567890abcdef12345678"
-	if err := cm.Save(hash, &EntryResult{Status: "success"}, &EntryMetadata{}, src); err != nil {
+	if err := saveFormatOneEntry(cm, hash, &EntryResult{Status: "success"}, &EntryMetadata{}, src); err != nil {
 		t.Fatalf("Save: %v", err)
 	}
 	entry, _ := cm.Lookup(hash)
@@ -294,7 +294,7 @@ func TestCacheManager_RestoreDir_NoFiles(t *testing.T) {
 	cm := NewCacheManager(s)
 
 	hash := "22bbccdd1234567890abcdef1234567890abcdef1234567890abcdef12345678"
-	cm.Save(hash, &EntryResult{Status: "success"}, &EntryMetadata{}, "")
+	saveFormatOneEntry(cm, hash, &EntryResult{Status: "success"}, &EntryMetadata{}, "")
 
 	entry, _ := cm.Lookup(hash)
 	restored, err := cm.RestoreDir(entry, filepath.Join(t.TempDir(), ".gen"))
@@ -321,7 +321,7 @@ func TestCacheManager_RestoreDir_UnchangedTreeIsNotRewritten(t *testing.T) {
 	}
 
 	hash := "22ccddaa1234567890abcdef1234567890abcdef1234567890abcdef12345678"
-	if err := cm.Save(hash, &EntryResult{Status: "success"}, &EntryMetadata{}, target); err != nil {
+	if err := saveFormatOneEntry(cm, hash, &EntryResult{Status: "success"}, &EntryMetadata{}, target); err != nil {
 		t.Fatalf("Save: %v", err)
 	}
 	entry, err := cm.Lookup(hash)
@@ -351,7 +351,7 @@ func TestCacheManager_RestoreDirPreservingKeepsPostCaptureSidecar(t *testing.T) 
 		t.Fatal(err)
 	}
 	hash := "23ccddaa1234567890abcdef1234567890abcdef1234567890abcdef12345678"
-	if err := cm.Save(hash, &EntryResult{Status: "success"}, &EntryMetadata{}, target); err != nil {
+	if err := saveFormatOneEntry(cm, hash, &EntryResult{Status: "success"}, &EntryMetadata{}, target); err != nil {
 		t.Fatal(err)
 	}
 	entry, err := cm.Lookup(hash)
@@ -409,7 +409,7 @@ func TestCacheManager_RestoreDirIgnoresUncacheableArtifacts(t *testing.T) {
 		t.Fatal(err)
 	}
 	hash := "24ccddaa1234567890abcdef1234567890abcdef1234567890abcdef12345678"
-	if err := cm.Save(hash, &EntryResult{Status: "success"}, &EntryMetadata{}, target); err != nil {
+	if err := saveFormatOneEntry(cm, hash, &EntryResult{Status: "success"}, &EntryMetadata{}, target); err != nil {
 		t.Fatal(err)
 	}
 	entry, err := cm.Lookup(hash)
@@ -440,11 +440,11 @@ func TestCacheManager_RestoreDirIgnoresUncacheableArtifacts(t *testing.T) {
 	}
 }
 
-// SaveDirs captures several sibling output trees into one entry under per-resource
+// A multi-rooted entry holds several sibling output trees under per-resource
 // subpaths; RestoreSubdir rematerializes each independently and byte-identically
 // (stale files removed). This is the store-level guarantee behind a single
 // generate cache hit restoring both .gen and the generated clients/ tree.
-func TestCacheManager_SaveDirs_RoundTripAndRestoreSubdir(t *testing.T) {
+func TestCacheManager_RestoreSubdirReadsAMultiRootedEntry(t *testing.T) {
 	s := NewLocalStore(t.TempDir())
 	cm := NewCacheManager(s)
 
@@ -457,7 +457,7 @@ func TestCacheManager_SaveDirs_RoundTripAndRestoreSubdir(t *testing.T) {
 	os.WriteFile(filepath.Join(clients, "ts", "src", "index.ts"), []byte("export class C {}\n"), 0o644)
 
 	hash := "33bbccdd1234567890abcdef1234567890abcdef1234567890abcdef12345678"
-	if err := cm.SaveDirs(hash, &EntryResult{Status: "success"}, &EntryMetadata{}, map[string]string{
+	if err := saveFormatOneDirs(cm, hash, &EntryResult{Status: "success"}, &EntryMetadata{}, map[string]string{
 		"gen":     gen,
 		"clients": clients,
 	}); err != nil {
@@ -497,37 +497,6 @@ func TestCacheManager_SaveDirs_RoundTripAndRestoreSubdir(t *testing.T) {
 	// A subpath the producing run never captured is a no-op, not an error.
 	if restored, err := cm.RestoreSubdir(entry, "go", filepath.Join(t.TempDir(), "go")); err != nil || restored {
 		t.Errorf("RestoreSubdir(go) = (%v, %v), want (false, nil) for an uncaptured subpath", restored, err)
-	}
-}
-
-// SaveDirs skips sources that are absent or empty, so a generate run that
-// produced no client captures only the trees it actually wrote.
-func TestCacheManager_SaveDirs_SkipsAbsentAndEmpty(t *testing.T) {
-	s := NewLocalStore(t.TempDir())
-	cm := NewCacheManager(s)
-
-	gen := t.TempDir()
-	os.WriteFile(filepath.Join(gen, "version.json"), []byte("{}"), 0o644)
-
-	empty := t.TempDir() // exists but has no files → skipped
-
-	hash := "44bbccdd1234567890abcdef1234567890abcdef1234567890abcdef12345678"
-	if err := cm.SaveDirs(hash, &EntryResult{Status: "success"}, &EntryMetadata{}, map[string]string{
-		"gen":     gen,
-		"clients": empty,
-		"missing": filepath.Join(t.TempDir(), "does-not-exist"),
-	}); err != nil {
-		t.Fatalf("SaveDirs: %v", err)
-	}
-	entry, _ := cm.Lookup(hash)
-	if entry == nil || entry.FilesDir == "" {
-		t.Fatalf("gen should have been captured")
-	}
-	if restored, _ := cm.RestoreSubdir(entry, "clients", filepath.Join(t.TempDir(), "c")); restored {
-		t.Error("empty clients source should not have been captured")
-	}
-	if restored, _ := cm.RestoreSubdir(entry, "gen", filepath.Join(t.TempDir(), "g")); !restored {
-		t.Error("gen should have been captured and restorable")
 	}
 }
 

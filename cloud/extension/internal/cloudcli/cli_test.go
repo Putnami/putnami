@@ -1812,14 +1812,13 @@ func TestRunMainStampsTheNegotiatedEventVersion(t *testing.T) {
 		}
 	})
 
-	// Absent or unparsable both mean v1 — the version every consumer has always
-	// understood — so a directly invoked binary and an older CLI still receive a
-	// stream they can read.
-	for name, advertised := range map[string]string{"absent": "", "unparsable": "not-a-number"} {
-		t.Run("falls back to v1 when the advertisement is "+name, func(t *testing.T) {
+	// An absent, unparsable or lower advertisement means v2, the lowest version
+	// an emitter writes, so no stream this extension writes carries version 1.
+	for name, advertised := range map[string]string{"absent": "", "unparsable": "not-a-number", "lower": "1"} {
+		t.Run("falls back to v2 when the advertisement is "+name, func(t *testing.T) {
 			for _, event := range run(t, advertised) {
-				if event["v"] != float64(1) {
-					t.Fatalf("event %v stamped v=%v, want the fail-closed 1", event["type"], event["v"])
+				if event["v"] != float64(2) {
+					t.Fatalf("event %v stamped v=%v, want the fallback 2", event["type"], event["v"])
 				}
 			}
 		})

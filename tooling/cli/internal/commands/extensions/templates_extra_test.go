@@ -367,15 +367,12 @@ func TestTemplatesList_JSONL(t *testing.T) {
 	if err != nil {
 		t.Fatalf("TemplatesList: %v", err)
 	}
-	line := strings.TrimSpace(out)
 	var entry struct {
 		Name       string `json:"name"`
 		Constraint string `json:"constraint"`
 		Source     string `json:"source"`
 	}
-	if err := json.Unmarshal([]byte(line), &entry); err != nil {
-		t.Fatalf("parse jsonl %q: %v", line, err)
-	}
+	sharedtest.ResultData(t, out, "templates list", &entry)
 	if entry.Name != "alpha" || entry.Constraint != "1.0.0" || entry.Source != "config" {
 		t.Errorf("entry = %+v, want alpha/1.0.0/config", entry)
 	}
@@ -866,10 +863,12 @@ func TestTemplatesInstall_FailureReported(t *testing.T) {
 	}
 }
 
-func TestTemplatesInstall_JSONLEmitsFailureEntry(t *testing.T) {
+// A failed structured install writes nothing on stdout: the dispatcher writes
+// the failure result, so a record or a human line here would be a second
+// document.
+func TestTemplatesInstall_StructuredFailureWritesNothing(t *testing.T) {
 	dir := t.TempDir()
-	// Dead registry → install fails fast; assert the JSONL failure entry is
-	// emitted and the human progress/summary lines are suppressed.
+	// Dead registry → install fails fast.
 	t.Setenv("PUTNAMI_REGISTRY_URL", "http://127.0.0.1:1")
 	t.Cleanup(extension.SetHTTPRetryBackoff(0))
 	cfg := &wsproto.Config{Templates: []string{"alpha:1.0.0"}}
@@ -880,29 +879,8 @@ func TestTemplatesInstall_JSONLEmitsFailureEntry(t *testing.T) {
 	if err == nil || !strings.Contains(err.Error(), "failed to install") {
 		t.Fatalf("err = %v, want install failure", err)
 	}
-	line := strings.TrimSpace(out)
-	if line == "" {
-		t.Fatal("expected a JSONL line, got empty output")
-	}
-	var entry struct {
-		Kind   string `json:"kind"`
-		Action string `json:"action"`
-		Name   string `json:"name"`
-		Status string `json:"status"`
-		Error  string `json:"error"`
-	}
-	if jErr := json.Unmarshal([]byte(line), &entry); jErr != nil {
-		t.Fatalf("parse jsonl %q: %v", line, jErr)
-	}
-	if entry.Kind != "template" || entry.Action != "install" || entry.Name != "alpha" || entry.Status != "failed" {
-		t.Errorf("entry = %+v, want template/install/alpha/failed", entry)
-	}
-	if entry.Error == "" {
-		t.Errorf("entry.Error empty, want failure reason")
-	}
-	// Human summary must not leak into the JSONL stream.
-	if strings.Contains(out, "installed,") || strings.Contains(out, "✓") {
-		t.Errorf("output = %q, want no human summary lines", out)
+	if out != "" {
+		t.Errorf("stdout = %q, want nothing", out)
 	}
 }
 

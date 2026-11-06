@@ -1,1 +1,1 @@
-{ "protocolVersion": 1, "id": 1, "ok": false, "error": { "message": "boom" } }
+{ "protocolVersion": 2, "id": 1, "ok": false, "error": { "message": "boom" } }

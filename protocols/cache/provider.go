@@ -63,9 +63,8 @@
 // Compatibility is established twice, neither time by a version string core
 // invents: the extension contract version is checked at discovery, and
 // InitializeResult carries the provider's negotiated RPC ProtocolVersion.
-// Sessions bootstrap Initialize with the v1 wire shape, then use a
-// backward-compatible capability to let a v2 provider select the
-// provenance-aware session version.
+// Sessions send Initialize at ProviderProtocolVersion and refuse a provider that
+// selects an older version.
 //
 // # The object cache and its socket
 //
@@ -102,7 +101,7 @@
 //     directory. A provider that nests the socket breaks every put.
 //
 // The object ops are additive to provider RPC v2: they add no field to an
-// existing v1 payload and no envelope shape. A provider sets
+// existing payload and no envelope shape. A provider sets
 // ObjectCacheSocket only when the initialize params advertised
 // CapabilityObjectCache, so a core too old to know the field never receives it
 // from a strict parser's point of view.
@@ -122,18 +121,17 @@ import (
 // It is deliberately separate from ProtocolVersion (the HTTP cache wire
 // contract): the two evolve independently, and a single build of
 // @putnami/cloud speaks both. Provider RPC v2 adds cache-entry provenance and
-// trust channels while retaining v1 parsing so channel-less providers continue
-// to work under the caller's local policy.
+// trust channels.
 const ProviderProtocolVersion = 2
 
 // ProviderProtocolMinVersion is the oldest provider RPC version a current
-// parser accepts. Version 1 predates entry provenance, so its restore results
-// and upload params have no producer or channel fields.
-const ProviderProtocolMinVersion = 1
+// parser accepts: version 2. A version 1 envelope, which predates entry
+// provenance, is refused.
+const ProviderProtocolMinVersion = 2
 
 // ProviderProtocolProvenanceVersion is the first provider RPC version that
-// carries cache-entry provenance. A provider must omit provenance fields when
-// speaking an older negotiated version so strict v1 consumers keep working.
+// carries cache-entry provenance. Every version a current parser accepts
+// carries it.
 const ProviderProtocolProvenanceVersion = 2
 
 // ProviderProtocolHasProvenance reports whether a negotiated provider RPC
@@ -142,13 +140,10 @@ func ProviderProtocolHasProvenance(version int) bool {
 	return version >= ProviderProtocolProvenanceVersion && version <= ProviderProtocolVersion
 }
 
-// CapabilityProviderProtocolV2 is sent in a v1 InitializeParams bootstrap by
-// a core that can switch to provider RPC v2. It uses the existing capabilities
-// array because unknown capability strings are safe for strict v1 providers to
-// ignore. A v2 provider that sees it may reply with an InitializeResult whose
-// ProtocolVersion is 2; core then uses v2 for subsequent envelopes and payloads.
-// A provider must otherwise select v1 so an older core stays on its legacy wire
-// shape.
+// CapabilityProviderProtocolV2 is listed in every InitializeParams core sends.
+// A provider released at cloud/v0.4.0 parses a version 2 initialize but selects
+// provider RPC v2 only when it sees this capability; a current provider selects
+// v2 for every session.
 const CapabilityProviderProtocolV2 = "provider-protocol-v2"
 
 // CapabilityObjectCache is listed in InitializeParams.Capabilities by a core
@@ -161,7 +156,7 @@ const CapabilityProviderProtocolV2 = "provider-protocol-v2"
 // cache on alone.
 const CapabilityObjectCache = "object-cache"
 
-// CapabilityRunCredential is listed in the v1-bootstrap
+// CapabilityRunCredential is listed in the
 // InitializeParams.Capabilities by a core that holds a hosted run's
 // credential, and echoed in InitializeResult.Capabilities by a provider that
 // takes it. After the echo, core sends OpAuthenticate exactly once, right after
@@ -170,7 +165,7 @@ const CapabilityObjectCache = "object-cache"
 // it, so a local run's initialize is unchanged.
 const CapabilityRunCredential = "run-credential" // #nosec G101 -- capability name, not a credential
 
-// CapabilityRestoreResultOnly is listed in the v1-bootstrap
+// CapabilityRestoreResultOnly is listed in the
 // InitializeParams.Capabilities by a core that can serve a cache hit from its
 // result alone, and echoed in InitializeResult.Capabilities by a provider that
 // honors RestoreParams.ResultOnly and PrefetchParams.ResultOnlyKeys. Core sends
@@ -179,7 +174,7 @@ const CapabilityRunCredential = "run-credential" // #nosec G101 -- capability na
 // still place blobs for a result-only key; core ignores them.
 const CapabilityRestoreResultOnly = "restore-result-only"
 
-// CapabilityProviderConfiguration is listed in the v1-bootstrap
+// CapabilityProviderConfiguration is listed in the
 // InitializeParams.Capabilities by a core that leaves the remote cache
 // configuration to the provider, and echoed in InitializeResult.Capabilities
 // by a provider that resolves it. After the echo, InitializeResult.Mode is the
@@ -331,9 +326,7 @@ func (r ProviderRequest) GoString() string { return "cache.ProviderRequest" + r.
 // Payload is the op-specific result body (InitializeResult, RestoreResult, …).
 type ProviderResponse struct {
 	// ProtocolVersion is the provider RPC version used in this response and
-	// normally echoes the request envelope. In particular, an initialize response
-	// stays on the v1 bootstrap envelope even when its InitializeResult selects
-	// v2 for subsequent messages. Current parsers accept
+	// echoes the request envelope. Current parsers accept
 	// ProviderProtocolMinVersion through ProviderProtocolVersion.
 	ProtocolVersion int `json:"protocolVersion"`
 	// ID echoes the ProviderRequest.ID this response answers.
@@ -396,13 +389,11 @@ func MarshalPayload(v any) (json.RawMessage, error) {
 
 // --- initialize ---
 
-// InitializeParams opens a provider session. The first request is a v1
-// bootstrap so legacy providers can parse it; the capabilities list carries any
-// opt-in needed for a newer session version.
+// InitializeParams opens a provider session. It is the session's first
+// request; the capabilities list carries the opt-ins core supports.
 type InitializeParams struct {
-	// ProtocolVersion is the provider RPC version used by this initialize
-	// bootstrap. Core starts at ProviderProtocolMinVersion, then adopts the
-	// negotiated version returned by InitializeResult.
+	// ProtocolVersion is the provider RPC version of this initialize: core
+	// sends ProviderProtocolVersion.
 	ProtocolVersion int `json:"protocolVersion"`
 	// BlobExchangeDir is the absolute path of the content-addressed directory the
 	// provider and core hand blobs through (see BlobExchangePath). It is the
@@ -421,8 +412,8 @@ type InitializeParams struct {
 	// Branch is the current branch, used for run-marker scope.
 	Branch string `json:"branch,omitempty"`
 	// Capabilities are the optional behaviors core supports/requests. In
-	// particular, CapabilityProviderProtocolV2 lets a v2 provider upgrade a v1
-	// bootstrap without adding a field that a strict v1 provider would reject.
+	// particular, CapabilityProviderProtocolV2 makes a provider released at
+	// cloud/v0.4.0 select provider RPC v2.
 	Capabilities []string `json:"capabilities,omitempty"`
 	// KnownDigests is the presence handshake: digests core already has locally,
 	// so the provider can skip re-downloading them. A large warm set may instead
@@ -435,9 +426,9 @@ type InitializeParams struct {
 // capability/version gate.
 type InitializeResult struct {
 	// ProtocolVersion is the provider RPC version selected for the remainder of
-	// this session. Core accepts the supported v1-v2 negotiation range. A
-	// provider selects v2 only when the v1 bootstrap advertises
-	// CapabilityProviderProtocolV2; otherwise it selects v1.
+	// this session. Core accepts ProviderProtocolMinVersion through
+	// ProviderProtocolVersion, so a provider that selects version 1 fails
+	// initialize.
 	ProtocolVersion int `json:"protocolVersion"`
 	// ProviderName identifies the provider implementation (e.g. "@putnami/cloud").
 	ProviderName string `json:"providerName,omitempty"`
@@ -635,13 +626,14 @@ type RestoreResult struct {
 	// in the exchange dir unless the request set RestoreParams.ResultOnly.
 	Manifest *Manifest `json:"manifest,omitempty"`
 	// Producer is the provider-authoritative producer class of the restored
-	// entry. It is omitted by v1/channel-less providers.
+	// entry. It is omitted for an entry without provenance.
 	Producer Producer `json:"producer,omitempty"`
 	// ProducerIdentity is an opaque provider-derived identifier for the producer
-	// (for example, an OIDC subject). It is omitted by v1/channel-less providers.
+	// (for example, an OIDC subject). It is omitted for an entry without
+	// provenance.
 	ProducerIdentity string `json:"producerIdentity,omitempty"`
 	// Channel is the provider-authoritative trust channel of the restored entry.
-	// It is omitted by v1/channel-less providers.
+	// It is omitted for an entry without provenance.
 	Channel Channel `json:"channel,omitempty"`
 }
 
@@ -753,8 +745,8 @@ type ObjectGetParams struct {
 	// unique within the namespace.
 	IDs []string `json:"ids"`
 	// AcceptChannels filters the hits by trust channel. An EMPTY list accepts
-	// every channel, including the legacy empty channel a channel-less provider
-	// reports; a run under an authoritative policy sends [ChannelTrusted] so a
+	// every channel, including the empty channel of an object without
+	// provenance; a run under an authoritative policy sends [ChannelTrusted] so a
 	// developer-produced object can never reach it. An object on a rejected
 	// channel is omitted from the result — it is a miss, not an error.
 	AcceptChannels []Channel `json:"acceptChannels,omitempty"`
@@ -782,8 +774,8 @@ type ObjectHit struct {
 	Producer Producer `json:"producer,omitempty"`
 	// Channel is the provider-authoritative trust channel of the object, derived
 	// from the credential that stored it — never from the caller that asserted
-	// it. An empty channel is the legacy signal, treated like an empty channel on
-	// a task entry.
+	// it. An empty channel marks an object without provenance, treated like an
+	// empty channel on a task entry.
 	Channel Channel `json:"channel,omitempty"`
 }
 

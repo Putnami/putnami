@@ -16,7 +16,7 @@
   "requirements": [
     {
       "id": "deploy-follows-the-environment-channel",
-      "text": "A command whose traits declare consumesReleaseSet binds the release set: with --env it resolves the environment's channel or takes --release, selects the workloads the rules name, and hands each of its jobs the set ref and the members of every workload the job covers; with --impacted and a channel it narrows strictly to channel members; beside a publish it waits for the release. A run of no such command warns that --env and --release are undeclared unless a task declares them."
+      "text": "A command whose traits declare consumesReleaseSet binds the release set: with --env it resolves the environment's channel or takes --release, selects the workloads the rules name, and hands each of its jobs the set ref and the members of every workload the job covers; with --impacted and a channel it narrows strictly to channel members; beside a publish it waits for the release. A run of no such command refuses --env and --release as undeclared flags unless a task declares them."
     }
   ],
   "decisions": [

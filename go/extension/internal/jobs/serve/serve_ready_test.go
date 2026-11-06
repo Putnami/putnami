@@ -66,7 +66,7 @@ func readyHelper() ([]string, []string) {
 // event stream — without touching the human log line the substring probe still
 // reads.
 func TestRunCommand_ForwardsTypedReadinessFromWorkload(t *testing.T) {
-	emit := jsonl.NewForVersion(runtimeproto.ProtocolVersion2)
+	emit := jsonl.NewForVersion(runtimeproto.ProtocolVersion)
 	args, env := readyHelper()
 
 	out := captureServeStdout(t, func() {
@@ -111,7 +111,7 @@ func TestRunCommand_ForwardsTypedReadinessFromWorkload(t *testing.T) {
 // through the SAME emitter, so readiness must be announced once per iteration.
 // A watcher that armed only on the first one would miss every restart.
 func TestRunCommand_ReemitsReadinessAcrossRestarts(t *testing.T) {
-	emit := jsonl.NewForVersion(runtimeproto.ProtocolVersion2)
+	emit := jsonl.NewForVersion(runtimeproto.ProtocolVersion)
 	args, env := readyHelper()
 	dir := t.TempDir()
 
@@ -138,11 +138,12 @@ func TestRunCommand_ReemitsReadinessAcrossRestarts(t *testing.T) {
 	}
 }
 
-// TestRunCommand_NoReadinessLeakAtV1 is the no-leak guard for the serve path: a
-// CLI that never advertised v2 acceptance sees exactly the stream it always
-// did, with the workload's readiness marker consumed rather than echoed.
-func TestRunCommand_NoReadinessLeakAtV1(t *testing.T) {
-	emit := jsonl.NewForVersion(runtimeproto.ProtocolVersion)
+// TestRunCommand_AStreamAskedForV1SpeaksV2 pins the serve path's version: an
+// emitter asked for version 1 writes runtime.ProtocolVersion on every line,
+// readiness included, and the workload's readiness marker is consumed rather
+// than echoed.
+func TestRunCommand_AStreamAskedForV1SpeaksV2(t *testing.T) {
+	emit := jsonl.NewForVersion(runtimeproto.ProtocolVersion1)
 	args, env := readyHelper()
 
 	out := captureServeStdout(t, func() {
@@ -155,13 +156,17 @@ func TestRunCommand_NoReadinessLeakAtV1(t *testing.T) {
 	if err != nil {
 		t.Fatalf("serve output is not a runtime event stream: %v\n%s", err, out)
 	}
+	ready := 0
 	for _, event := range events {
 		if event.Type == runtimeproto.EventReady {
-			t.Fatalf("a v1 stream must carry no readiness event:\n%s", out)
+			ready++
 		}
 		if event.V != runtimeproto.ProtocolVersion {
 			t.Errorf("event %q v = %d, want %d", event.Type, event.V, runtimeproto.ProtocolVersion)
 		}
+	}
+	if ready != 1 {
+		t.Errorf("one serve iteration emitted %d ready events, want 1:\n%s", ready, out)
 	}
 	if strings.Contains(out, runtimeproto.ReadyLogKey) {
 		t.Errorf("the reserved marker leaked into the forwarded log context:\n%s", out)

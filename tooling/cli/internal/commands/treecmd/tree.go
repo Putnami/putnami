@@ -12,6 +12,7 @@ import (
 	"os"
 
 	protocolcli "go.putnami.dev/protocol/cli"
+	"go.putnami.dev/tooling/cli/internal/commands/shared"
 	"go.putnami.dev/tooling/cli/internal/git"
 	"go.putnami.dev/tooling/cli/internal/iox"
 )
@@ -36,11 +37,15 @@ func Fingerprint(dir string, outputFormat string) error {
 		iox.Fprintln(os.Stdout, tree.Fingerprint)
 		return nil
 	}
-	document, err := json.Marshal(protocolcli.SessionTree{
+	binding := protocolcli.SessionTree{
 		Fingerprint: tree.Fingerprint,
 		Dirty:       tree.Dirty,
 		HeadSHA:     tree.HeadSHA,
-	})
+	}
+	if protocolcli.OutputMode(outputFormat).IsStructured() {
+		return shared.WriteResult(outputFormat, "tree fingerprint", binding, nil)
+	}
+	document, err := json.Marshal(binding)
 	if err != nil {
 		return fmt.Errorf("encode tree fingerprint: %w", err)
 	}

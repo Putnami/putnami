@@ -241,8 +241,8 @@ func TestRunJob_NegotiatesReadinessEndToEnd(t *testing.T) {
 	wantSummary := "negotiated=" + strconv.Itoa(runtimeproto.MaxKnownProtocolVersion)
 	var sawSummary, sawReady bool
 	for _, event := range result.Events {
-		if event.Version != runtimeproto.ProtocolVersion2 {
-			t.Errorf("event %q carried v = %d, want %d", event.Type, event.Version, runtimeproto.ProtocolVersion2)
+		if event.Version != runtimeproto.ProtocolVersion {
+			t.Errorf("event %q carried v = %d, want %d", event.Type, event.Version, runtimeproto.ProtocolVersion)
 		}
 		switch event.Type {
 		case EventTypeSummary:

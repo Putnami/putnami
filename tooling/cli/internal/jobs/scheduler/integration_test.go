@@ -266,14 +266,14 @@ func TestPlanSchedule_CacheHitReplaysResultEvents(t *testing.T) {
 	}
 
 	for key, result := range res2.Results {
-		if !result.CacheHit {
+		if !result.ReuseKind().CacheHit() {
 			t.Fatalf("warm run expected pure task-owned cache hits, %s executed", key)
 		}
 	}
 
 	for _, job := range planned2 {
 		key := job.Key()
-		if result := res2.Results[key]; result == nil || !result.CacheHit {
+		if result := res2.Results[key]; result == nil || !result.ReuseKind().CacheHit() {
 			t.Fatalf("%s: expected cache hit result, got %+v", key, result)
 		}
 
@@ -359,7 +359,7 @@ func TestPlanSchedule_DynamicCPUBudgets(t *testing.T) {
 		t.Fatalf("run 2 failed; results=%+v", result2.Results)
 	}
 	for key, result := range result2.Results {
-		if !result.CacheHit {
+		if !result.ReuseKind().CacheHit() {
 			t.Fatalf("run 2 expected pure task-owned cache hits, %s executed", key)
 		}
 	}

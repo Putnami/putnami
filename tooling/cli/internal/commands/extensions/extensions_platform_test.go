@@ -76,7 +76,7 @@ func TestExtensionsInstall_HostInstallStillRunsHooksAndWritesTheLock(t *testing.
 	dir, cfg, marker := hookedLocalExtensionWorkspace(t)
 
 	if _, err := sharedtest.CaptureStdout(t, func() error {
-		return ExtensionsInstall(context.Background(), dir, cfg, nil, "")
+		return installExtensions(context.Background(), dir, cfg, nil, "")
 	}); err != nil {
 		t.Fatalf("ExtensionsInstall: %v", err)
 	}
@@ -95,7 +95,7 @@ func TestExtensionsInstall_ForeignPlatformIsSideEffectFree(t *testing.T) {
 	dir, cfg, marker := hookedLocalExtensionWorkspace(t)
 
 	out, err := sharedtest.CaptureStdout(t, func() error {
-		return ExtensionsInstall(context.Background(), dir, cfg, []string{"--platform", foreignPlatformArg()}, "")
+		return installExtensions(context.Background(), dir, cfg, []string{"--platform", foreignPlatformArg()}, "")
 	})
 	if err != nil {
 		t.Fatalf("ExtensionsInstall --platform: %v", err)
@@ -123,7 +123,7 @@ func TestExtensionsInstall_DestAloneAlsoMaterializes(t *testing.T) {
 	dest := filepath.Join(t.TempDir(), "warm")
 
 	if _, err := sharedtest.CaptureStdout(t, func() error {
-		return ExtensionsInstall(context.Background(), dir, cfg, []string{"--dest", dest}, "")
+		return installExtensions(context.Background(), dir, cfg, []string{"--dest", dest}, "")
 	}); err != nil {
 		t.Fatalf("ExtensionsInstall --dest: %v", err)
 	}

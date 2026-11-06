@@ -9,7 +9,6 @@ import (
 	"path/filepath"
 
 	cache "go.putnami.dev/protocol/cache"
-	"go.putnami.dev/sdk/extension/dirlink"
 	"go.putnami.dev/sdk/extension/robustio"
 )
 
@@ -148,71 +147,4 @@ func (s *LocalStore) linkBlob(digest, target string, mode os.FileMode) error {
 	// owner able to read. A restore applies the manifest's own mode to the
 	// workspace copy (see recordedModes).
 	return os.Chmod(target, mode.Perm()&^0o022|0o400)
-}
-
-// ingestFiles walks srcDir, ingests each non-excluded file into CAS, hardlinks
-// it into dstFiles, and returns the manifest plus total logical size. The
-// manifest is sorted by path for deterministic output.
-func (s *LocalStore) ingestFiles(srcDir, dstFiles string) (*cache.Manifest, int64, error) {
-	manifest := &cache.Manifest{}
-	var total int64
-
-	// Defense in depth: if srcDir is a symlink or junction to a directory (e.g. a stale
-	// out/ link into the CAS that a job runner failed to reset), filepath.Walk
-	// would Lstat the root as a non-dir and try to digest it as a file
-	// ("read <dir>: is a directory"). Resolve it so we walk the real directory.
-	if fi, err := os.Lstat(srcDir); err == nil && dirlink.IsLink(srcDir, fi) {
-		if resolved, err := dirlink.Resolve(srcDir); err == nil {
-			srcDir = resolved
-		}
-	}
-
-	err := filepath.Walk(srcDir, func(path string, info os.FileInfo, err error) error {
-		if err != nil || info.IsDir() {
-			return err
-		}
-		rel, err := filepath.Rel(srcDir, path)
-		if err != nil {
-			return err
-		}
-		if uncacheableArtifact(rel) {
-			return nil
-		}
-		// A symlink's own mode is 0777 while digestFile reads its target's
-		// bytes; capture the target's mode instead.
-		if info.Mode()&os.ModeSymlink != 0 {
-			if info, err = os.Stat(path); err != nil {
-				return err
-			}
-		}
-
-		digest, size, err := digestFile(path)
-		if err != nil {
-			return err
-		}
-		s.mu.Lock()
-		err = s.ensureBlobLocked(path, digest)
-		if err == nil {
-			err = s.linkBlob(digest, filepath.Join(dstFiles, rel), info.Mode())
-		}
-		s.mu.Unlock()
-		if err != nil {
-			return err
-		}
-
-		manifest.Files = append(manifest.Files, cache.FileEntry{
-			Path:   filepath.ToSlash(rel),
-			Digest: digest,
-			Mode:   uint32(info.Mode().Perm()),
-			Size:   size,
-		})
-		total += size
-		return nil
-	})
-	if err != nil {
-		return nil, 0, err
-	}
-
-	cache.NormalizeManifestFiles(manifest)
-	return manifest, total, nil
 }

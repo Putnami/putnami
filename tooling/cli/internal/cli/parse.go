@@ -24,18 +24,15 @@ import (
 // Phase 3 (semantics) is parseGlobalFlags' binding pass in flags.go and the
 // validation in this file.
 //
-// The strictness policy is settled (epic refinement Q1) and is deliberately
-// asymmetric:
+// The strictness policy:
 //
 //   - A BUILT-IN structured command whose exact path the catalog knows is
 //     authoritative about its own flags, so an undeclared flag is a hard usage
 //     error. Nothing else can own that flag.
-//   - A JOB command or an EXTENSION command group is served by manifests that
-//     ship on their own release cadence, and internal/extension/flags.go has
-//     never validated supplied flags against declarations. Hard-failing an
-//     undeclared flag there would break every workspace pinning an extension
-//     whose manifest under-declares — a known failure mode. Those get a deprecation
-//     warning on stderr for one minor version instead.
+//   - A JOB command or an EXTENSION command group is authoritative through the
+//     manifests that serve it: a flag that neither the CLI globals, the core
+//     job flags nor a selected manifest declares is a hard usage error too,
+//     reported before any task or extension process starts.
 //   - Everything after a bare "--" is passthrough and is never validated on any
 //     surface. No built-in structured command reads a passthrough, so a
 //     built-in rejects the "--".
@@ -45,11 +42,6 @@ import (
 // what buildCommandParams hashes into every job cache key and every run marker
 // (parse_key_stability_test.go pins it). Validation reads the tokens; it does
 // not rewrite them.
-
-// undeclaredFlagDeprecation is the one-minor-version warning window for a flag
-// no manifest declares. It becomes a hard error in the next minor release, when
-// the extension ecosystem has had a release cycle to declare what it accepts.
-const undeclaredFlagDeprecation = "deprecated: it will be rejected in the next minor release"
 
 // isFlagToken reports whether a raw argument is a flag rather than a positional.
 // A bare "--", a lone "-", and a negative number ("-5", a legitimate positional
@@ -332,8 +324,8 @@ func acceptedFlagHint(declared []commandmeta.Flag) string {
 // releaseSetFlags. They are not global flags — they mean nothing outside a
 // publication or a release-set consumer — and the core reads them without a
 // manifest declaring them, because the coordinator that reads them is the CLI
-// itself. Without this exemption every release-set publish would warn about
-// the exact flag it requires.
+// itself. Without this exemption every release-set publish would be refused
+// for the exact flag it requires.
 //
 // `baseline-channel` is deliberately its own name: the global `--baseline` is
 // the git ref `--impacted` resolves against, and a release-set publish never
@@ -345,17 +337,16 @@ var coreJobFlags = map[string]bool{
 
 // releaseSetFlags are the core job flags only a command whose traits declare
 // consumesReleaseSet reads: the environment it synchronizes and the immutable
-// release it names. A run of no such command reports them as undeclared, as it
-// reports any flag nothing reads, unless one of its tasks declares the flag.
+// release it names. A run of no such command refuses them as undeclared, as it
+// refuses any flag nothing reads, unless one of its tasks declares the flag.
 var releaseSetFlags = map[string]bool{"env": true, "release": true}
 
-// undeclaredFlagWarnings is the warning-window half of the policy: one notice
-// per supplied flag that neither the CLI globals, the core job flags nor the
-// manifest-declared surface knows. scope names the command in the message
-// ("build", "cloud deploy"). consumesReleaseSet reports a run of a command
-// whose traits declare consumesReleaseSet, the only one that reads the
-// releaseSetFlags. Order is deterministic and each flag is reported once.
-func undeclaredFlagWarnings(scope string, rawArgs []string, declared map[string]extension.FlagDefinition, consumesReleaseSet bool) []string {
+// undeclaredFlags returns the supplied flags that neither the CLI globals, the
+// core job flags nor the manifest-declared surface knows, once each and in the
+// order they first appear. consumesReleaseSet reports a run of a command whose
+// traits declare consumesReleaseSet, the only one that reads the
+// releaseSetFlags.
+func undeclaredFlags(rawArgs []string, declared map[string]extension.FlagDefinition, consumesReleaseSet bool) []string {
 	var (
 		seen     = map[string]bool{}
 		reported []string
@@ -372,14 +363,32 @@ func undeclaredFlagWarnings(scope string, rawArgs []string, declared map[string]
 		seen[spelling] = true
 		reported = append(reported, spelling)
 	}
-	if len(reported) == 0 {
+	return reported
+}
+
+// rejectUndeclaredFlags returns the usage error for the first supplied flag
+// undeclaredFlags reports, naming the command (scope, such as "build" or
+// "cloud deploy") and the flags it declares, or nil when every flag is known.
+func rejectUndeclaredFlags(scope string, rawArgs []string, declared map[string]extension.FlagDefinition, consumesReleaseSet bool) error {
+	unknown := undeclaredFlags(rawArgs, declared, consumesReleaseSet)
+	if len(unknown) == 0 {
 		return nil
 	}
-	warnings := make([]string, 0, len(reported))
-	for _, spelling := range reported {
-		warnings = append(warnings, "flag "+spelling+" is not declared by `"+scope+"`; passing undeclared flags is "+undeclaredFlagDeprecation)
+	return usageErrorf("flag %s is not declared by `%s`%s", unknown[0], scope, acceptedExtensionFlagHint(declared))
+}
+
+// acceptedExtensionFlagHint renders the manifest-declared flags for an error
+// message, sorted, or "" when none is declared.
+func acceptedExtensionFlagHint(declared map[string]extension.FlagDefinition) string {
+	if len(declared) == 0 {
+		return ""
 	}
-	return warnings
+	names := make([]string, 0, len(declared))
+	for name := range declared {
+		names = append(names, "--"+name)
+	}
+	sort.Strings(names)
+	return "\n  Accepted: " + strings.Join(names, ", ")
 }
 
 // isDeclaredExtensionFlag reports whether arg names a manifest-declared flag.
@@ -421,7 +430,7 @@ func declaredTaskFlags(commands []string, jobMap map[string][]*extension.JobDefi
 
 // jobFlagTokens returns, in order, the flag tokens before the passthrough
 // separator, leaving out each token buildCommandParams binds as a flag's value
-// (takesNextAsValue). It is the one walk undeclaredFlagWarnings and
+// (takesNextAsValue). It is the one walk undeclaredFlags and
 // conflictingTaskFlags share.
 func jobFlagTokens(rawArgs []string) []string {
 	args := rawArgs[:passthroughCut(rawArgs)]
@@ -475,7 +484,7 @@ func conflictingTaskFlags(commands []string, jobMap map[string][]*extension.JobD
 	return nil
 }
 
-// printParseWarnings writes the parse pass's deprecation notices to stderr, so
+// printParseWarnings writes the parse pass's advisory notices to stderr, so
 // a structured stdout stream stays machine-clean. Quiet suppresses them like
 // every other advisory line.
 func printParseWarnings(w io.Writer, g GlobalFlags, warnings []string) {

@@ -7,6 +7,8 @@ import (
 	"os"
 	"strings"
 	"testing"
+
+	runtime "go.putnami.dev/protocol/runtime"
 )
 
 // captureStdout captures stdout during a function call and returns the output.
@@ -63,8 +65,8 @@ func TestEmitter_Meta(t *testing.T) {
 	if data["type"] != "meta" {
 		t.Errorf("type = %v, want meta", data["type"])
 	}
-	if data["v"] != float64(1) {
-		t.Errorf("v = %v, want 1", data["v"])
+	if data["v"] != float64(runtime.ProtocolVersion) {
+		t.Errorf("v = %v, want %d", data["v"], runtime.ProtocolVersion)
 	}
 	if data["message"] != "Starting build" {
 		t.Errorf("message = %v, want %q", data["message"], "Starting build")
@@ -462,8 +464,8 @@ func TestEmitter_AllEventsHaveVersion(t *testing.T) {
 	for i, fn := range events {
 		output := captureStdout(t, fn)
 		data := parseJSONL(t, output)
-		if data["v"] != float64(1) {
-			t.Errorf("event %d: v = %v, want 1", i, data["v"])
+		if data["v"] != float64(runtime.ProtocolVersion) {
+			t.Errorf("event %d: v = %v, want %d", i, data["v"], runtime.ProtocolVersion)
 		}
 	}
 }

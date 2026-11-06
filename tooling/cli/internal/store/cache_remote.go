@@ -11,11 +11,12 @@ import (
 type CacheTrust string
 
 const (
-	// CacheTrustAny accepts every provider hit, including legacy entries whose
-	// provider predates provenance. This is the local-development default.
+	// CacheTrustAny accepts every provider hit, including entries without
+	// provenance. This is the local-development default.
 	CacheTrustAny CacheTrust = "any"
 	// CacheTrustCI accepts only entries on the provider-authoritative trusted
-	// channel. Hint and legacy entries may warm CAS blobs but cannot satisfy jobs.
+	// channel. Hint entries and entries without provenance may warm CAS blobs
+	// but cannot satisfy jobs.
 	CacheTrustCI CacheTrust = "ci"
 	// CacheTrustNone disables the remote cache entirely.
 	CacheTrustNone CacheTrust = "none"
@@ -32,8 +33,8 @@ func (t CacheTrust) Valid() bool {
 }
 
 // Accepts reports whether a provider hit on channel may satisfy a job. An
-// empty channel is the compatibility signal for a v1 provider: accepted by
-// "any", treated as a non-authoritative hint by "ci".
+// empty channel marks an entry without provenance: accepted by "any", treated
+// as a non-authoritative hint by "ci".
 func (t CacheTrust) Accepts(channel cache.Channel) bool {
 	switch t {
 	case CacheTrustAny:
@@ -63,12 +64,6 @@ func (t CacheTrust) AllowsRemoteRunMarkers() bool {
 // the remote-cache upload path's blob source.
 func (cm *CacheManager) OpenBlob(digest string) (io.ReadCloser, error) {
 	return cm.store.OpenBlob(digest)
-}
-
-// Materialize installs a remote cache hit as a local entry under hash, fetching
-// any missing blob through fetch (see LocalStore.Materialize).
-func (cm *CacheManager) Materialize(hash string, entry *Entry, fetch BlobFetcher) error {
-	return cm.store.Materialize(hash, entry, fetch)
 }
 
 // PrefetchBlobs verifies and installs a remote manifest's missing blobs into

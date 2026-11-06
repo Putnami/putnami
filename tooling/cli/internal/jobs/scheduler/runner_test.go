@@ -231,8 +231,8 @@ func TestParseRawEvent_Valid(t *testing.T) {
 	if !ok {
 		t.Fatal("parseRawEvent returned false for valid event")
 	}
-	if event.Version != runtimeproto.ProtocolVersion2 {
-		t.Errorf("Version = %d, want %d", event.Version, runtimeproto.ProtocolVersion2)
+	if event.Version != runtimeproto.ProtocolVersion {
+		t.Errorf("Version = %d, want %d", event.Version, runtimeproto.ProtocolVersion)
 	}
 	if event.Type != "phase" {
 		t.Errorf("Type = %q, want phase", event.Type)
@@ -302,8 +302,8 @@ func TestParseRawEvent_AcceptsProtocolV2(t *testing.T) {
 	if !ok {
 		t.Fatal("a v2 readiness event must be accepted")
 	}
-	if event.Version != runtimeproto.ProtocolVersion2 {
-		t.Errorf("Version = %d, want %d", event.Version, runtimeproto.ProtocolVersion2)
+	if event.Version != runtimeproto.ProtocolVersion {
+		t.Errorf("Version = %d, want %d", event.Version, runtimeproto.ProtocolVersion)
 	}
 	if event.Type != EventTypeReady {
 		t.Errorf("Type = %q, want %q", event.Type, EventTypeReady)

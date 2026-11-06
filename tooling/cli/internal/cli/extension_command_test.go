@@ -150,6 +150,9 @@ printf 'hook|%%s|%%s|%%s|%%s\n' "${PUTNAMI_CLOUD_TOKEN-}" "${PUTNAMI_INTERNAL_RE
   },
   "commands": {
     "cloud-release-set": {
+      "flags": {
+        "request-file": { "type": "string", "description": "Absolute path to the protocol request file." }
+      },
       "run": [{ "id": "provider", "task": "provider" }]
     },
     "hostile-release-set": {
@@ -247,6 +250,10 @@ func TestAppRun_ExtensionStructuredCommand_InheritsGroupFlagDefault(t *testing.T
 	}
 }
 
+// TestAppRun_ExtensionStructuredCommand_InteractiveForwardsTailArgs pins that an
+// interactive subcommand receives its tail arguments verbatim: positionals and
+// the flags its manifest declares. An undeclared flag is refused before launch,
+// as on every extension command.
 func TestAppRun_ExtensionStructuredCommand_InteractiveForwardsTailArgs(t *testing.T) {
 	if _, err := os.Stat("/bin/sh"); err != nil {
 		t.Skip("/bin/sh unavailable on this platform")
@@ -258,7 +265,7 @@ func TestAppRun_ExtensionStructuredCommand_InteractiveForwardsTailArgs(t *testin
 	script := `#!/bin/sh
 printf 'argv:%s\n' "$*"
 case "$*" in
-  *"ok tenant-1 --flag value --putnamiContext "*) exit 0 ;;
+  *"ok tenant-1 --token value --putnamiContext "*) exit 0 ;;
   *) exit 9 ;;
 esac
 `
@@ -272,13 +279,13 @@ esac
 			t.Fatalf("NewApp: %v", err)
 		}
 		t.Chdir(wsRoot)
-		code := app.Run(context.Background(), []string{"demo", "login", "tenant-1", "--flag", "value"})
+		code := app.Run(context.Background(), []string{"demo", "login", "tenant-1", "--token", "value"})
 		if code != ExitSuccess {
 			t.Fatalf("demo login exit = %d, want %d", code, ExitSuccess)
 		}
 	})
 
-	if !strings.Contains(output, "argv:ok tenant-1 --flag value --putnamiContext ") {
+	if !strings.Contains(output, "argv:ok tenant-1 --token value --putnamiContext ") {
 		t.Fatalf("tail args were not forwarded to interactive extension command:\n%s", output)
 	}
 }

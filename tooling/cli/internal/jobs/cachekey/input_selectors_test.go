@@ -150,18 +150,21 @@ func TestAnOldEntryCannotRestoreAfterAListedFileEdit(t *testing.T) {
 	resolver := listingResolver(map[string][]string{"lib": {"assets/migration.sql"}})
 	keyA, _ := fixture.keys(t, resolver)
 	cache := store.NewCacheManager(store.NewLocalStore(filepath.Join(fixture.ws.Root, "cache")))
-	output := filepath.Join(fixture.ws.Root, "output")
-	writeTestFile(t, filepath.Join(output, "bundle.sql"), "SELECT 1;\n")
 	meta := &store.EntryMetadata{Extension: "@test/selectors", Task: "compile", Project: "lib"}
-	if err := cache.Save(keyA, &store.EntryResult{Status: "success"}, meta, output); err != nil {
+	if _, err := cache.IngestTaskEntry(t.TempDir(), store.TaskEntrySpec{
+		Key: keyA, Result: &store.EntryResult{Status: "success"}, Metadata: meta,
+	}); err != nil {
 		t.Fatal(err)
+	}
+	if entry, err := cache.LookupTaskEntry(keyA); err != nil || entry == nil {
+		t.Fatalf("the entry at the old key does not read back: %v, %v", entry, err)
 	}
 	writeProjectFile(t, fixture.ws.Root, "lib", "assets/migration.sql", "SELECT 2;\n")
 	keyB, _ := fixture.keys(t, resolver)
 	if keyA == keyB {
 		t.Fatal("a listed file edit kept the key")
 	}
-	if old, err := cache.Lookup(keyB); err != nil || old != nil {
+	if old, err := cache.LookupTaskEntry(keyB); err != nil || old != nil {
 		t.Fatalf("the old entry answered the new key: %v, %v", old, err)
 	}
 }

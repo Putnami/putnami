@@ -249,7 +249,7 @@ func (r *readinessRecorder) observe(event scheduler.RawJobEvent) {
 	}
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	if event.Version == runtimeproto.ProtocolVersion2 {
+	if event.Version == runtimeproto.ProtocolVersion {
 		r.ready++
 		return
 	}
@@ -476,8 +476,8 @@ func TestServeFixtureAnswersTheAdvertisedProtocolVersion(t *testing.T) {
 
 	select {
 	case event := <-readyCh:
-		if event.Version != runtimeproto.ProtocolVersion2 {
-			t.Fatalf("ready event arrived at v%d, want v%d", event.Version, runtimeproto.ProtocolVersion2)
+		if event.Version != runtimeproto.ProtocolVersion {
+			t.Fatalf("ready event arrived at v%d, want v%d", event.Version, runtimeproto.ProtocolVersion)
 		}
 		data, err := runtimeproto.ExtractReadyData(event.Data)
 		if err != nil {

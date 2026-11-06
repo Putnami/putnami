@@ -5,6 +5,7 @@ import (
 	"sort"
 	"strings"
 
+	protocolcli "go.putnami.dev/protocol/cli"
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/tooling/cli/internal/commands/shared"
 	"go.putnami.dev/tooling/cli/internal/extension"
@@ -26,7 +27,7 @@ func ExtensionsListPrepared(wsRoot string, cfg *wsproto.Config, outputFormat str
 		// unreadable one renders every row as "-": the same output as a
 		// workspace where nothing is installed. A lock below the format floor
 		// produces exactly that, so the reason is named on stderr, out of the
-		// table's and the JSONL stream's way.
+		// table's and the structured result's way.
 		noteUnreadableLock(lockErr)
 	}
 
@@ -49,8 +50,8 @@ func ExtensionsListPrepared(wsRoot string, cfg *wsproto.Config, outputFormat str
 	discovered = extension.SelectPreparedExtensions(discovered, prepared)
 	rows := dependencyRows(dependencies, removed, lockFile)
 
-	if outputFormat == "jsonl" {
-		return extensionsListJSONL(extMap, lockFile, discovered, rows)
+	if protocolcli.OutputMode(outputFormat).IsStructured() {
+		return shared.WriteResult(outputFormat, "extensions list", shared.RecordsData(extensionListEntries(extMap, lockFile, discovered, rows)), nil)
 	}
 
 	iox.Fprintln(os.Stdout)
@@ -109,7 +110,7 @@ func ExtensionsRemove(wsRoot string, cfg *wsproto.Config, args []string) error {
 	return removeExtension(wsRoot, cfg, args, extensionOps(wsRoot))
 }
 
-func extensionsListJSONL(extMap map[string]string, lockFile *lockfile.LockFile, discovered []*extension.ExtensionDescription, rows []artifactListEntry) error {
+func extensionListEntries(extMap map[string]string, lockFile *lockfile.LockFile, discovered []*extension.ExtensionDescription, rows []artifactListEntry) []artifactListEntry {
 	var entries []artifactListEntry
 	for _, name := range sortedStringKeys(extMap) {
 		entry := artifactListEntry{Name: name, Constraint: extMap[name], Source: "config"}
@@ -132,8 +133,7 @@ func extensionsListJSONL(extMap map[string]string, lockFile *lockfile.LockFile, 
 		}
 		entries = append(entries, artifactListEntry{Name: ext.Name, Installed: ext.Version, Source: "workspace"})
 	}
-
-	return printArtifactListJSONL(entries)
+	return entries
 }
 
 // dependencyRows returns one list row per dependency of the workspace graph,

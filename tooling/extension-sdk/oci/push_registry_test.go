@@ -46,7 +46,7 @@ func TestPushContent_FromLayout(t *testing.T) {
 	contentRef := host + "/team/app:c-hash"
 	kc := authn.NewMultiKeychain()
 
-	if err := PushContent(jsonl.New(), t.TempDir(), dockerDir, "oci", "", contentRef, false, kc, ""); err != nil {
+	if err := PushContent(jsonl.New(), dockerDir, "oci", contentRef, false, kc, ""); err != nil {
 		t.Fatalf("PushContent: %v", err)
 	}
 	got, err := crane.Digest(contentRef)
@@ -101,7 +101,7 @@ func TestPushContentWithDigest_SendsNoManifestHead(t *testing.T) {
 
 	for _, contentRef := range []string{host + "/team/app:c-hash", host + "/team/app@" + digest} {
 		before := len(calls())
-		got, err := PushContentWithDigest(jsonl.New(), t.TempDir(), dockerDir, "oci", "", contentRef, false, kc, "")
+		got, err := PushContentWithDigest(jsonl.New(), dockerDir, "oci", contentRef, false, kc, "")
 		if err != nil {
 			t.Fatalf("PushContentWithDigest(%s): %v", contentRef, err)
 		}
@@ -130,7 +130,7 @@ func TestPushContentWithDigest_RefusesMismatchedDigestBeforeAnyRequest(t *testin
 	seedLayout(t, dockerDir)
 	contentRef := host + "/team/app@sha256:" + strings.Repeat("a", 64)
 
-	got, err := PushContentWithDigest(jsonl.New(), t.TempDir(), dockerDir, "oci", "", contentRef, false, authn.NewMultiKeychain(), "")
+	got, err := PushContentWithDigest(jsonl.New(), dockerDir, "oci", contentRef, false, authn.NewMultiKeychain(), "")
 	if err == nil || !strings.Contains(err.Error(), "does not match target digest") || got != "" {
 		t.Fatalf("PushContentWithDigest(mismatched digest) = (%q, %v), want a digest refusal", got, err)
 	}
@@ -141,16 +141,25 @@ func TestPushContentWithDigest_RefusesMismatchedDigestBeforeAnyRequest(t *testin
 
 func TestPushContent_SkipsWhenExists(t *testing.T) {
 	// contentExists=true short-circuits before any registry contact.
-	if err := PushContent(jsonl.New(), t.TempDir(), t.TempDir(), "oci", "", "example.com/app:c-x", true, authn.NewMultiKeychain(), ""); err != nil {
+	if err := PushContent(jsonl.New(), t.TempDir(), "oci", "example.com/app:c-x", true, authn.NewMultiKeychain(), ""); err != nil {
 		t.Fatalf("PushContent (exists) should be a no-op, got: %v", err)
 	}
 }
 
 func TestPushContent_BadLayoutFails(t *testing.T) {
 	// dockerDir has no "oci" layout → loadFromLayout fails.
-	err := PushContent(jsonl.New(), t.TempDir(), t.TempDir(), "oci", "", "example.com/app:c-x", false, authn.NewMultiKeychain(), "")
+	err := PushContent(jsonl.New(), t.TempDir(), "oci", "example.com/app:c-x", false, authn.NewMultiKeychain(), "")
 	if err == nil {
 		t.Fatal("expected error for missing OCI layout, got nil")
+	}
+}
+
+func TestPushContent_RefusesAPackageWithoutALayout(t *testing.T) {
+	// No layout means no image to read: the push is refused before any registry
+	// contact, and no docker daemon is consulted.
+	err := PushContent(jsonl.New(), t.TempDir(), "", "example.com/app:c-x", false, authn.NewMultiKeychain(), "")
+	if err == nil || !strings.Contains(err.Error(), "has no OCI layout") {
+		t.Fatalf("PushContent(no layout) = %v, want a missing-layout refusal", err)
 	}
 }
 
@@ -163,7 +172,7 @@ func TestResolveDigest(t *testing.T) {
 	digest := seedLayout(t, dockerDir)
 	contentRef := host + "/team/app:c-hash"
 	kc := authn.NewMultiKeychain()
-	if err := PushContent(jsonl.New(), t.TempDir(), dockerDir, "oci", "", contentRef, false, kc, ""); err != nil {
+	if err := PushContent(jsonl.New(), dockerDir, "oci", contentRef, false, kc, ""); err != nil {
 		t.Fatalf("PushContent: %v", err)
 	}
 
@@ -191,7 +200,7 @@ func TestApplySessionRefs_StandardFallback(t *testing.T) {
 	digest := seedLayout(t, dockerDir)
 	contentRef := host + "/team/app:c-hash"
 	kc := authn.NewMultiKeychain()
-	if err := PushContent(jsonl.New(), t.TempDir(), dockerDir, "oci", "", contentRef, false, kc, ""); err != nil {
+	if err := PushContent(jsonl.New(), dockerDir, "oci", contentRef, false, kc, ""); err != nil {
 		t.Fatalf("PushContent: %v", err)
 	}
 
@@ -272,7 +281,7 @@ func TestApplySessionRefs_TagDigestFastPath(t *testing.T) {
 	digest := seedLayout(t, dockerDir)
 	contentRef := host + "/team/app:c-hash"
 	kc := authn.NewMultiKeychain()
-	if err := PushContent(jsonl.New(), t.TempDir(), dockerDir, "oci", "", contentRef, false, kc, ""); err != nil {
+	if err := PushContent(jsonl.New(), dockerDir, "oci", contentRef, false, kc, ""); err != nil {
 		t.Fatalf("PushContent: %v", err)
 	}
 

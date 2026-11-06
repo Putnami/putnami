@@ -16,6 +16,7 @@ import (
 	wsproto "go.putnami.dev/protocol/workspace"
 	sdkagentartifact "go.putnami.dev/sdk/extension/agentartifact"
 	"go.putnami.dev/tooling/cli/internal/agentartifacts"
+	"go.putnami.dev/tooling/cli/internal/commands/sharedtest"
 	"go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/lockfile"
 )
@@ -388,12 +389,12 @@ func TestExtensionsInstallNamed_ReportsActionsUnderJSONL(t *testing.T) {
 	if err != nil {
 		t.Fatalf("extensions install: %v\n%s", err, stdout)
 	}
-	for _, line := range strings.Split(strings.TrimSpace(stdout), "\n") {
+	for _, raw := range sharedtest.ResultRecords(t, stdout, "extensions install") {
 		var record struct {
 			Kind string `json:"kind"`
 		}
-		if json.Unmarshal([]byte(line), &record) != nil || record.Kind != "extension" {
-			t.Errorf("stdout line %q is not an extension install record", line)
+		if json.Unmarshal(raw, &record) != nil || record.Kind != "extension" {
+			t.Errorf("record %s is not an extension install record", raw)
 		}
 	}
 	want := []LifecycleAction{

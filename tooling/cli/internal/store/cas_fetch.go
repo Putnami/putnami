@@ -3,14 +3,12 @@ package store
 import (
 	"crypto/sha256"
 	"encoding/hex"
-	"encoding/json"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
 	"sync"
 	"sync/atomic"
-	"time"
 
 	cache "go.putnami.dev/protocol/cache"
 )
@@ -19,12 +17,10 @@ import (
 // materialization ("Build without the Bytes").
 //
 // OpenBlob exposes local CAS bytes by digest so the remote-cache write path can
-// upload them. Materialize is the inverse: it installs a remote hit (a result +
-// manifest of per-file digests) as a first-class local entry, pulling any blob
-// it does not already hold through a caller-supplied fetcher. Bytes already in
-// CAS are reused (dedup), so a hit moves only the blobs the local store is
-// missing. The on-disk result is identical to a locally produced entry, so a
-// later local lookup hits without touching the network.
+// upload them. materializeFiles is the inverse: it installs the files of a
+// remote hit's manifest, pulling any blob the store does not already hold
+// through a caller-supplied fetcher. Bytes already in CAS are reused (dedup),
+// so a hit moves only the blobs the local store is missing.
 
 // BlobFetcher yields the bytes of a CAS blob the local store is missing while
 // materializing a remote hit. The digest is "sha256:<hex>"; the caller closes
@@ -43,96 +39,6 @@ func (s *LocalStore) OpenBlob(digest string) (io.ReadCloser, error) {
 		return nil, fmt.Errorf("open blob %s: %w", digest, err)
 	}
 	return f, nil
-}
-
-// Materialize installs a remote cache hit as a local entry under hash. The
-// entry's Manifest lists each output file with its CAS digest; fetch supplies
-// the bytes for any digest not already present locally. Each fetched blob is
-// verified against its digest, published into the CAS, and hardline into the
-// entry's files/ tree; meta/result/manifest are staged and the whole entry is
-// committed with a single atomic rename, mirroring Put. fetch may be nil when
-// every referenced blob is already local (e.g. shared with another entry).
-func (s *LocalStore) Materialize(hash string, entry *Entry, fetch BlobFetcher) error {
-	if entry == nil || entry.Result == nil {
-		return fmt.Errorf("materialize %s: entry with result required", hash)
-	}
-	if entry.Manifest == nil {
-		return fmt.Errorf("materialize %s: manifest required", hash)
-	}
-
-	// Shared lock for the whole CAS fetch+publish (mirrors Put): coexists with
-	// sibling publishers, excludes GC.
-	releaseLock := s.lockShared()
-	defer releaseLock()
-
-	tmpDir, err := s.createTmpDir()
-	if err != nil {
-		return fmt.Errorf("create tmp dir: %w", err)
-	}
-	defer os.RemoveAll(tmpDir) // no-op once renamed; cleanup on error
-
-	if entry.Metadata == nil {
-		entry.Metadata = &EntryMetadata{Hash: hash, CreatedAt: time.Now()}
-	}
-	entry.Metadata.Hash = hash
-
-	resultJSON, err := json.MarshalIndent(entry.Result, "", "  ")
-	if err != nil {
-		return fmt.Errorf("marshal result: %w", err)
-	}
-	if err := os.WriteFile(filepath.Join(tmpDir, "result.json"), resultJSON, 0o644); err != nil {
-		return fmt.Errorf("write result.json: %w", err)
-	}
-
-	manifestJSON, err := json.MarshalIndent(entry.Manifest, "", "  ")
-	if err != nil {
-		return fmt.Errorf("marshal manifest: %w", err)
-	}
-	if err := os.WriteFile(filepath.Join(tmpDir, manifestFilename), manifestJSON, 0o644); err != nil {
-		return fmt.Errorf("write manifest: %w", err)
-	}
-
-	dstFiles := filepath.Join(tmpDir, "files")
-	total, err := s.materializeFiles(entry.Manifest, dstFiles, fetch)
-	if err != nil {
-		return fmt.Errorf("materialize files: %w", err)
-	}
-
-	outputFiles := make([]string, 0, len(entry.Manifest.Files))
-	for _, f := range entry.Manifest.Files {
-		outputFiles = append(outputFiles, f.Path)
-	}
-	entry.Metadata.Size = total
-	entry.Metadata.OutputFiles = outputFiles
-
-	metaJSON, err := json.MarshalIndent(entry.Metadata, "", "  ")
-	if err != nil {
-		return fmt.Errorf("marshal metadata: %w", err)
-	}
-	if err := os.WriteFile(filepath.Join(tmpDir, "meta.json"), metaJSON, 0o644); err != nil {
-		return fmt.Errorf("write meta.json: %w", err)
-	}
-
-	// In-process lock for the atomic publish (the cross-process shared lock is
-	// already held for the whole call).
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	blobDir := s.blobDir(hash)
-	if err := os.MkdirAll(filepath.Dir(blobDir), 0o755); err != nil {
-		return fmt.Errorf("create blob parent: %w", err)
-	}
-
-	// First-writer-wins (see publishEntry): never clobber a sibling's entry.
-	if err := s.publishEntry(tmpDir, blobDir); err != nil {
-		return err
-	}
-
-	if len(entry.Manifest.Files) > 0 {
-		entry.FilesDir = filepath.Join(blobDir, "files")
-	}
-
-	return nil
 }
 
 // PrefetchBlobs installs the manifest's missing bytes into CAS without

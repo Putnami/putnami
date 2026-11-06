@@ -574,12 +574,12 @@ func TestRunCacheProviderSession_ResultOnlyRoundTrip(t *testing.T) {
 
 	exchangeDir := t.TempDir()
 	reqs := []string{
-		`{"protocolVersion":1,"id":1,"op":"initialize","payload":{"protocolVersion":1,"blobExchangeDir":` + strconv.Quote(exchangeDir) + `,"mode":"full","capabilities":["restore-result-only"]}}`,
-		`{"protocolVersion":1,"id":2,"op":"prefetch","payload":{"keys":["` + only + `","` + files + `"],"resultOnlyKeys":["` + only + `"]}}`,
-		`{"protocolVersion":1,"id":3,"op":"restore","payload":{"key":"` + only + `","resultOnly":true}}`,
-		`{"protocolVersion":1,"id":4,"op":"restore","payload":{"key":"` + files + `"}}`,
-		`{"protocolVersion":1,"id":5,"op":"summary","payload":{}}`,
-		`{"protocolVersion":1,"id":6,"op":"shutdown"}`,
+		`{"protocolVersion":2,"id":1,"op":"initialize","payload":{"protocolVersion":2,"blobExchangeDir":` + strconv.Quote(exchangeDir) + `,"mode":"full","capabilities":["restore-result-only"]}}`,
+		`{"protocolVersion":2,"id":2,"op":"prefetch","payload":{"keys":["` + only + `","` + files + `"],"resultOnlyKeys":["` + only + `"]}}`,
+		`{"protocolVersion":2,"id":3,"op":"restore","payload":{"key":"` + only + `","resultOnly":true}}`,
+		`{"protocolVersion":2,"id":4,"op":"restore","payload":{"key":"` + files + `"}}`,
+		`{"protocolVersion":2,"id":5,"op":"summary","payload":{}}`,
+		`{"protocolVersion":2,"id":6,"op":"shutdown"}`,
 	}
 	var out, logw bytes.Buffer
 	if err := runCacheProviderSession(strings.NewReader(strings.Join(reqs, "\n")+"\n"), &out, &logw, t.TempDir()); err != nil {

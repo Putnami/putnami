@@ -417,8 +417,10 @@ reaches:
   rather than the built-in's `2`.
 - `putnami features` with no subcommand prints the group's subcommand listing
   instead of the built-in's "unknown subcommand" error.
-- An undeclared flag is a deprecation **warning** for an extension group and a
-  hard rejection for a built-in.
+- An undeclared flag is a usage error with exit code `2` for both, and the
+  message is the dispatcher's
+  (`` flag --x is not declared by `features inspect` ``) rather than the
+  built-in's.
 - A selection-rejecting subcommand given an **invalid** selector
   (`putnami features inspect X --projects nope`) reports the selector's own
   not-found, because selection resolves before dispatch. A valid selector still

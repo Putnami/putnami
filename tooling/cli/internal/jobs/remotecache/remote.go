@@ -26,75 +26,14 @@ const uploadConcurrency = 8
 // coordination a correctness dependency.
 const remoteRestoreLeaseWaitTimeout = 90 * time.Second
 
+// ClientsResourceID is the project resource a client generator writes.
 const ClientsResourceID = "clients"
-
-// The raw remote compatibility API remains readable for existing store data,
-// but Scheduler never routes a job to it: cachekey.IsCacheEnabled requires a task-owned
-// declaration. These helpers describe that older payload shape only.
-func taskDeclaresNoOutput(job *jobmodel.ScheduledJob) bool {
-	return job != nil && job.JobDef != nil &&
-		job.JobDef.TaskCachePolicy != nil && job.JobDef.TaskCachePolicy.NoOutput
-}
-
-func SourceMutationTask(job *jobmodel.ScheduledJob) bool {
-	return jobmodel.TaskDeclarationOf(job) == nil && taskDeclaresNoOutput(job) && cachekey.JobWritesSourceTree(job)
-}
-
-func cacheHitMissingRequiredOutput(job *jobmodel.ScheduledJob, entry *store.Entry) bool {
-	return cachekey.WritesProjectGen(job) && (entry == nil || entry.FilesDir == "")
-}
-
-func writesOnlyOptionalCapture(job *jobmodel.ScheduledJob) bool {
-	if job == nil || job.JobDef == nil {
-		return false
-	}
-	hasClients := false
-	for _, ref := range job.JobDef.Writes {
-		if ref.EffectiveScope() != extension.ResourceScopeProject {
-			continue
-		}
-		if ref.ID == cachekey.GenResourceID {
-			return false
-		}
-		if ref.ID == ClientsResourceID {
-			hasClients = true
-		}
-	}
-	return hasClients
-}
-
-func reportsClientOutput(data map[string]any) bool {
-	if data == nil {
-		return false
-	}
-	if raw, ok := data["clientOutput"].(string); ok {
-		_, ok := cachekey.CleanProjectRel(raw)
-		return ok
-	}
-	switch raw := data["clientOutputs"].(type) {
-	case []string:
-		for _, value := range raw {
-			if _, ok := cachekey.CleanProjectRel(value); ok {
-				return true
-			}
-		}
-	case []any:
-		for _, value := range raw {
-			if text, ok := value.(string); ok {
-				if _, ok := cachekey.CleanProjectRel(text); ok {
-					return true
-				}
-			}
-		}
-	}
-	return false
-}
 
 // RemoteCache wires the remote build cache into scheduling by delegating to an
 // out-of-process cache-provider extension (shipped by @putnami/cloud). Before
 // execution it hands the whole build's key set to the provider so it can warm
-// its caches; during execution it restores provider hits into the local store on
-// a local miss and uploads freshly built misses. Every remote operation is
+// its caches; during execution it restores task-owned provider hits into the
+// local store on a local miss and uploads freshly published task-owned entries. Every remote operation is
 // best-effort: any failure logs and the build falls back to local behavior, so
 // the remote cache can never break a build, only accelerate it.
 type RemoteCache struct {
@@ -110,31 +49,16 @@ type RemoteCache struct {
 
 	// keys maps a job key to its precomputed cache key (from Negotiate), only
 	// for a job whose key no planned write can move (cachekey.PlanKeyMovement); localHits
-	// records keys already present locally before negotiation. Together they let
-	// computeRequiredInputs tell "already satisfied" from "may execute locally":
-	// a job without a recorded key may execute. Neither addresses a restore or
-	// an upload: both use the key the scheduler computes when the job starts.
+	// records keys already present locally before negotiation. Neither
+	// addresses a restore or an upload: both use the key the scheduler computes
+	// when the job starts.
 	Keys      map[string]string
 	LocalHits map[string]bool
-	// requiredInputs records hit dependency keys that feed a job expected to
-	// execute locally. Such hits must materialize real output files when the
-	// provider entry claims files exist; an empty manifest is treated as unusable
-	// and the dependency is rebuilt locally instead (the satisfied-but-absent
-	// cascade) — unless the hit is a status-only optional capture
-	// (statusOnlyOptionalCaptureHit): a describe whose result reports no
-	// clients legitimately has zero files.
-	requiredInputs map[string]bool
 	// dependedOn holds the key of every job whose files a planned job reads
 	// (dependedOnJobs). Negotiate sets it before any job runs; nil means the
 	// plan was never seen, and then every task's files are needed
 	// (TaskFilesNeeded).
 	dependedOn map[string]bool
-
-	// mu guards index. index records the provider hits restored so far (cache key
-	// -> result); Restore writes it from worker goroutines as restores land and
-	// HasFiles reads it, so both must hold mu.
-	mu    sync.Mutex
-	index map[string]cache.KeyResult
 
 	// uploadWG/uploadSem run post-build uploads on a bounded background pool so
 	// their round trips overlap the build instead of stalling the worker that
@@ -325,7 +249,7 @@ func (c *RunRemoteCache) Close() {
 // Negotiate precomputes every cacheable key and hands the build's non-local,
 // non-side-effecting key set to the provider so it can warm its caches before
 // execution. The provider protocol has no batch negotiate result — hits are
-// discovered lazily through Restore on a local miss — so this records the key set
+// discovered lazily through RestoreTaskEntry on a local miss — so this records the key set
 // as misses up front and each restore reclassifies its key. Best-effort: any
 // failure logs and leaves the cache effectively empty, so every key is a miss.
 //
@@ -412,37 +336,29 @@ func (r *RemoteCache) Negotiate(
 			}
 			continue
 		}
-		// A declared-capture task negotiates the FORMAT-QUALIFIED address rather
-		// than the raw key: that is where its entry lives in the remote cache, and
-		// the separation is what keeps a pre-B4c binary from ever receiving a
-		// format-2 payload under a key it would read as a legacy capture
-		// (store/task_remote.go). localHits stays keyed by the local hash, since
-		// that is the key the required-input bookkeeping speaks.
-		if jobmodel.UsesDeclaredCapture(job) {
-			if entry, err := cm.LookupTaskEntry(hash); err == nil && entry != nil {
-				r.LocalHits[hash] = true
-				continue
-			}
-			providerKey := store.RemoteTaskEntryKey(hash)
-			providerKeys = append(providerKeys, providerKey)
-			declaredJobs[providerKey] = append(declaredJobs[providerKey], job)
-			declaredHashes[providerKey] = hash
+		// Only a declared-capture task reuses an entry (cachekey.IsCacheEnabled),
+		// so any other keyed job executes here and negotiates nothing.
+		if !jobmodel.UsesDeclaredCapture(job) {
 			executesLocally = true
 			continue
 		}
-		// Skip keys already in the local store: a local hit is served locally — it
-		// is never restored from or uploaded to the remote — so negotiating it only
-		// adds latency. With every planned key a local hit there is nothing to warm,
-		// so a fully warm rebuild never spins up the provider. (Under --no-cache
-		// PrecomputeKeys omits every key upstream, so this loop is already empty.)
-		if entry, err := cm.Lookup(hash); err == nil && entry != nil {
+		// A declared-capture task negotiates the FORMAT-QUALIFIED address rather
+		// than the raw key: that is where its entry lives in the remote cache, and
+		// the separation keeps a binary that reads the raw key as a format-1
+		// entry from ever receiving a format-2 payload (store/task_remote.go). A
+		// local hit is served locally and never negotiated, so a fully warm
+		// rebuild never spins up the provider. LocalHits stays keyed by the local
+		// hash.
+		if entry, err := cm.LookupTaskEntry(hash); err == nil && entry != nil {
 			r.LocalHits[hash] = true
 			continue
 		}
-		providerKeys = append(providerKeys, hash)
+		providerKey := store.RemoteTaskEntryKey(hash)
+		providerKeys = append(providerKeys, providerKey)
+		declaredJobs[providerKey] = append(declaredJobs[providerKey], job)
+		declaredHashes[providerKey] = hash
 		executesLocally = true
 	}
-	r.requiredInputs = r.computeRequiredInputs(planned, keys)
 
 	// Spawn the provider when there is something to warm, OR when a job will run
 	// here and could use the object cache. A fully warm rebuild still spins up
@@ -474,7 +390,7 @@ func (r *RemoteCache) Negotiate(
 	if _, err := sess.Prefetch(ctx, prefetch); err != nil {
 		slog.Warn("remote cache: provider prefetch failed; building locally", "error", err)
 	}
-	// Record the key set as misses; Restore promotes each served key to a hit.
+	// Record the key set as misses; a restore promotes each served key to a hit.
 	r.stats.RecordNegotiate(time.Since(start).Nanoseconds(), len(providerKeys), 0)
 }
 
@@ -541,133 +457,6 @@ func (r *RemoteCache) filesNeededByAny(jobs []*jobmodel.ScheduledJob) bool {
 	return false
 }
 
-// Restore attempts to satisfy a local miss from the provider cache. On a provider
-// hit it materializes the result (and, outside minimal mode, the output files)
-// into the local store and returns the restored result; the entry is then
-// indistinguishable from a local hit. It returns nil on a provider miss or any
-// failure, so the caller falls back to building the job locally.
-func (r *RemoteCache) Restore(ctx context.Context, hash string, job *jobmodel.ScheduledJob, cm *store.CacheManager) *jobmodel.JobResult {
-	if r == nil || cm == nil {
-		return nil
-	}
-
-	// The provider's Restore operation performs the network download into its
-	// session-private exchange directory. Claim the machine-global action key
-	// before invoking it so sibling worktrees wait for the resulting local entry
-	// instead of each asking its provider session to download the same blobs.
-	// Known-cheap jobs bypass coordination through the same coalescing floor as
-	// compute leases (store.CoalescingFloor); expiry, timeout, cancellation, and
-	// store errors fall through to a direct provider restore.
-	winner, release := cm.TryClaim(hash, remoteRestoreEstimatedCost(job))
-	if winner {
-		defer release()
-	} else if err := cm.WaitForPublish(ctx, hash, remoteRestoreLeaseWaitTimeout); err == nil {
-		entry, lookupErr := cm.LookupAndTouch(hash)
-		if lookupErr == nil && entry != nil && entry.Result != nil && !cacheHitMissingRequiredOutput(job, entry) {
-			var durationMs, sizeBytes int64
-			if entry.Metadata != nil {
-				durationMs = entry.Metadata.DurationMs
-				sizeBytes = entry.Metadata.Size
-			}
-			result := cachekey.JobResultFromEntryResult(entry.Result)
-			if SourceMutationTask(job) && result.SourceMutated {
-				return nil
-			}
-			r.recordRestoredHit(
-				hash,
-				cachekey.ActionResultFromEntryResult(entry.Result, durationMs, sizeBytes, r.actionEvents),
-				entry.Manifest,
-				durationMs,
-				0,
-				time.Time{},
-				time.Time{},
-			)
-			// A sibling's remote restore published this entry into the local store
-			// while we waited; CacheStats already counted it as a remote hit, so the
-			// provenance is remote even though the bytes came from the local store.
-			result.MarkReuse(jobmodel.ReuseRemoteCache)
-			return result
-		}
-	}
-
-	sess, ok := r.ensureProvider(ctx, nil, cm)
-	if !ok {
-		r.recordUnavailable()
-		return nil
-	}
-	restore, err := sess.Restore(ctx, &cache.RestoreParams{Key: hash})
-	r.recordLookup(restoreFailure(restore, err))
-	if err != nil {
-		slog.Warn("remote cache: provider restore failed; building locally",
-			"project", job.Project.Name, "job", job.JobDef.Name, "error", err)
-		return nil
-	}
-	if restore.Status != cache.RestoreHit || restore.Result == nil || restore.Manifest == nil {
-		return nil
-	}
-	if !r.Trust.Accepts(restore.Channel) {
-		// A hint (or a channel-less legacy hit) is useful as bytes but not as
-		// evidence. Verify and admit its manifest into the local CAS, then return
-		// nil so the scheduler must execute the job. Crucially, PrefetchBlobs does
-		// not publish result.json/meta.json under the action key, so neither this
-		// worker nor a later local lookup can mistake the hint for a green result.
-		start := time.Now()
-		if err := cm.PrefetchBlobs(restore.Manifest, exchangeBlobFetcher(r.providerExchangeDir())); err != nil {
-			slog.Warn("remote cache: provider hint prefetch failed; building locally",
-				"project", job.Project.Name, "job", job.JobDef.Name, "error", err)
-			return nil
-		}
-		r.stats.RecordFetch(ManifestBytes(restore.Manifest))
-		r.stats.RecordMaterialize(start, time.Now())
-		r.stats.RecordHintWarm()
-		return nil
-	}
-	// A required-input hit must materialize real output files — accepting an
-	// empty manifest would leave the downstream local job without its
-	// inputs — except when the entry is legitimately files-less: a
-	// status-only optional capture (a describe run on a project with no
-	// typed clients), a deterministic skip (a config-merge with nothing to
-	// merge), or a task declared noOutput (tidy, lint — its result is pure
-	// data), none of which capture artifacts locally either. Mirrors
-	// cacheHitMissingRequiredOutput's asymmetry on the local-hit path. Logged
-	// at debug: the rejection self-heals by rebuilding, and every legitimate
-	// files-less shape is exempted above, so per-key noise helps only when
-	// actively tracing a rebuild loop.
-	if r.requiresMaterializedInput(hash) && len(restore.Manifest.Files) == 0 &&
-		!statusOnlyOptionalCaptureHit(job, restore.Result) && !skippedFilesLessHit(restore.Result) &&
-		!taskDeclaresNoOutput(job) {
-		slog.Debug("remote cache: provider hit has no output files for a required dependency; building locally",
-			"project", job.Project.Name, "job", job.JobDef.Name)
-		return nil
-	}
-
-	result := cachekey.JobResultFromActionResult(restore.Result)
-	if SourceMutationTask(job) && result.SourceMutated {
-		return nil
-	}
-
-	entry := entryFromProviderRestore(restore, job)
-	materializeStart := time.Now()
-	if err := cm.Materialize(hash, entry, exchangeBlobFetcher(r.providerExchangeDir())); err != nil {
-		slog.Warn("remote cache: provider materialize failed; building locally",
-			"project", job.Project.Name, "job", job.JobDef.Name, "error", err)
-		return nil
-	}
-	materializeEnd := time.Now()
-	r.recordRestoredHit(
-		hash,
-		restore.Result,
-		restore.Manifest,
-		restore.Result.DurationMs,
-		ManifestBytes(restore.Manifest),
-		materializeStart,
-		materializeEnd,
-	)
-
-	result.MarkReuse(jobmodel.ReuseRemoteCache)
-	return result
-}
-
 func remoteRestoreEstimatedCost(job *jobmodel.ScheduledJob) time.Duration {
 	if job == nil || job.ExpectedWallMs <= 0 {
 		return 0
@@ -676,21 +465,11 @@ func remoteRestoreEstimatedCost(job *jobmodel.ScheduledJob) time.Duration {
 }
 
 func (r *RemoteCache) recordRestoredHit(
-	hash string,
-	result *cache.ActionResult,
-	manifest *cache.Manifest,
 	durationMs int64,
 	fetchedBytes int64,
 	materializeStart time.Time,
 	materializeEnd time.Time,
 ) {
-	r.mu.Lock()
-	if r.index == nil {
-		r.index = make(map[string]cache.KeyResult)
-	}
-	r.index[hash] = cache.KeyResult{Key: hash, Hit: true, Result: result, Manifest: manifest}
-	r.mu.Unlock()
-
 	r.stats.RecordFetch(fetchedBytes)
 	r.stats.RecordMaterialize(materializeStart, materializeEnd)
 	r.stats.RecordRestore(durationMs)
@@ -699,21 +478,6 @@ func (r *RemoteCache) recordRestoredHit(
 	// key into the hit column so a provider- or sibling-served run reports "N hit"
 	// instead of "0 hit · N miss".
 	r.stats.RecordProviderHit()
-}
-
-// HasFiles reports whether the provider hit for hash carries output files, so the
-// caller can decide whether to refresh the out/ symlink after a Restore.
-func (r *RemoteCache) HasFiles(hash string) bool {
-	if r == nil {
-		return false
-	}
-	// index is mutated from worker goroutines as restores land (see Restore), so
-	// this read must hold mu too — otherwise a HasFiles here can race a concurrent
-	// index write and trip Go's fatal concurrent map read/write.
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	res, ok := r.index[hash]
-	return ok && res.Manifest != nil && len(res.Manifest.Files) > 0
 }
 
 // Prefetch is the scheduler's pre-execution hook. The provider warms its caches
@@ -742,126 +506,6 @@ func (r *RemoteCache) Close() {
 	r.closeProvider()
 }
 
-// computeRequiredInputs returns dependency keys that feed a job which may execute
-// locally: every planned job except those already served by a LOCAL hit. If such
-// a dependency is a provider hit that materializes no files, accepting it would
-// leave the downstream local job without its inputs, so the guard in Restore
-// rebuilds the dependency instead.
-//
-// A local hit is excluded because it is served from the store and never executes,
-// so its inputs are never consumed. A provider hit is deliberately NOT excluded:
-// it can still fall back to local execution when its own materialize fails (e.g.
-// a corrupt blob), and it then consumes its inputs like any built job. Treating a
-// hit job's dependencies as optional is what let a files-less dependency hit
-// silently satisfy a job that then rebuilt locally without its inputs.
-//
-// A job is a local hit only through its recorded key (keys), so a job whose key
-// may move counts as one that may execute. Its dependencies are named through
-// the whole negotiated key set, so a dependency whose key may move is still
-// required: naming one hash too many only makes the guard stricter.
-func (r *RemoteCache) computeRequiredInputs(planned []*jobmodel.ScheduledJob, negotiated map[string]string) map[string]bool {
-	if r == nil || len(negotiated) == 0 {
-		return nil
-	}
-	out := make(map[string]bool)
-	for _, job := range planned {
-		if hash, recorded := r.Keys[job.Key()]; recorded && r.LocalHits[hash] {
-			continue
-		}
-		for _, depKey := range job.DependsOn {
-			depHash := negotiated[depKey]
-			if depHash != "" {
-				out[depHash] = true
-			}
-		}
-	}
-	if len(out) == 0 {
-		return nil
-	}
-	return out
-}
-
-func (r *RemoteCache) requiresMaterializedInput(hash string) bool {
-	return r != nil && r.requiredInputs[hash]
-}
-
-// statusOnlyOptionalCaptureHit reports whether a files-less restore is a
-// legitimate status-only result rather than a missing required output. It holds
-// only when the job's sole captured resource is optional (writesOnlyOptionalCapture
-// — the clients-writing describe task) AND the restored result reports no clients
-// directory. A files-less hit whose result still names a clients output is NOT
-// status-only: materializeCachedOutput deletes that directory when the entry has
-// no files, so accepting it would starve the downstream compile of the generated
-// client sources — that case keeps the files-less rejection.
-func statusOnlyOptionalCaptureHit(job *jobmodel.ScheduledJob, result *cache.ActionResult) bool {
-	if !writesOnlyOptionalCapture(job) {
-		return false
-	}
-	if result == nil {
-		return true
-	}
-	return !reportsClientOutput(result.Data)
-}
-
-// skippedFilesLessHit reports whether a files-less restore carries a
-// deterministic "skipped" result. A skip never captures artifacts locally
-// (storeResult stores skips status-only, and the local-hit path accepts them),
-// so an empty manifest is that entry's true shape: restoring it leaves the
-// downstream job with exactly what a local re-execution would have produced —
-// nothing. Rejecting these made every skip-resulting step that feeds another
-// job a PERMANENT remote miss loop: the rejected hit re-executed, re-uploaded
-// the same files-less entry, and was rejected again on every following build
-// (46 config-merge keys per run in this workspace alone). The clients check
-// mirrors statusOnlyOptionalCaptureHit: a result that names a
-// generated clients directory is never accepted files-less, because
-// materializeCachedOutput would delete that directory.
-func skippedFilesLessHit(result *cache.ActionResult) bool {
-	if result == nil || result.Status != "skipped" {
-		return false
-	}
-	return !reportsClientOutput(result.Data)
-}
-
-// Upload schedules a freshly built local entry to be shared with the provider and
-// returns immediately. The exchange runs on the bounded background pool so its
-// round trips overlap the rest of the build rather than stalling the worker, and
-// DrainUploads waits for the in-flight transfers at the end of the run.
-// Best-effort: failures log and never fail the build.
-func (r *RemoteCache) Upload(ctx context.Context, hash string, job *jobmodel.ScheduledJob, cm *store.CacheManager) {
-	if r == nil || cm == nil {
-		return
-	}
-	in, ok := r.prepareUpload(hash, job, cm)
-	if !ok {
-		return
-	}
-
-	r.uploadWG.Go(func() {
-		select {
-		case r.uploadSem <- struct{}{}:
-		case <-ctx.Done():
-			return
-		}
-		defer func() { <-r.uploadSem }()
-		sess, ready := r.ensureProvider(ctx, nil, cm)
-		if !ready {
-			return
-		}
-		if err := cm.ExportManifestBlobs(in.Manifest, r.providerExchangeDir()); err != nil {
-			r.stats.RecordUploadFailure()
-			slog.Warn("remote cache: provider export failed",
-				"project", job.Project.Name, "job", job.JobDef.Name, "error", err)
-			return
-		}
-		out, err := sess.Upload(ctx, &cache.UploadParams{Key: in.Key, Result: r.providerResult(in.Result), Manifest: in.Manifest})
-		if err != nil || out == nil || !out.Accepted {
-			r.stats.RecordUploadFailure()
-			slog.Warn("remote cache: provider upload failed",
-				"project", job.Project.Name, "job", job.JobDef.Name, "error", err)
-		}
-	})
-}
-
 // providerResult returns the result an upload sends to the started provider:
 // the cached events ride along only when the provider advertised
 // action-events. The upload calls it after ensureProvider, which records that
@@ -880,7 +524,7 @@ func (r *RemoteCache) providerResult(result *cache.ActionResult) *cache.ActionRe
 // for its run summary (counts/bytes restored and uploaded) and records the wall
 // time the write path added to the makespan after the build's own work
 // completed. Safe to call when no upload was scheduled. The scheduler calls this
-// only after all workers finish, so no Upload races the drain.
+// only after all workers finish, so no upload races the drain.
 func (r *RemoteCache) DrainUploads() {
 	if r == nil {
 		return
@@ -900,58 +544,4 @@ type uploadInput struct {
 	Key      string
 	Result   *cache.ActionResult
 	Manifest *cache.Manifest
-}
-
-// prepareUpload turns a freshly built local entry into the input to share with
-// the provider. Every entry is shared whatever its build duration or size,
-// except the entry of a job with external effects (jobmodel.HasExternalEffects).
-// The input keeps the cached events: the provider may not have answered
-// initialize yet, so the upload drops them later (providerResult).
-// It returns ok=false when the entry should not be uploaded.
-func (r *RemoteCache) prepareUpload(hash string, job *jobmodel.ScheduledJob, cm *store.CacheManager) (uploadInput, bool) {
-	entry, err := cm.Lookup(hash)
-	if err != nil || entry == nil || entry.Result == nil {
-		return uploadInput{}, false
-	}
-	if jobmodel.HasExternalEffects(job) {
-		return uploadInput{}, false
-	}
-
-	var durationMs, sizeBytes int64
-	if entry.Metadata != nil {
-		durationMs = entry.Metadata.DurationMs
-		sizeBytes = entry.Metadata.Size
-	}
-	// A status-only result (lint, test, describe, config-merge, …) produces a
-	// pass/fail outcome but no output files, so it has no manifest locally. It is
-	// still worth sharing: the cached status lets another machine skip the rebuild.
-	// Share it with an empty-file manifest — the wire contract accepts a zero-file
-	// manifest (the validators reject only a nil one), so the exchange transfers no
-	// blobs and just registers the key→result mapping. Without this, every
-	// lint/test/describe key was a permanent remote miss, which dominated the
-	// workspace miss count.
-	manifest := entry.Manifest
-	if manifest == nil {
-		manifest = &cache.Manifest{Files: []cache.FileEntry{}}
-	}
-
-	in := uploadInput{
-		Key:      hash,
-		Manifest: manifest,
-		Result:   cachekey.ActionResultFromEntryResult(entry.Result, durationMs, sizeBytes, true),
-	}
-	return in, true
-}
-
-func entryFromProviderRestore(res *cache.RestoreResult, job *jobmodel.ScheduledJob) *store.Entry {
-	return &store.Entry{
-		Result:   cachekey.EntryResultFromActionResult(res.Result),
-		Manifest: res.Manifest,
-		Metadata: &store.EntryMetadata{
-			Extension:  job.Extension.Name,
-			Task:       job.JobDef.Name,
-			Project:    job.Project.Name,
-			DurationMs: res.Result.DurationMs,
-		},
-	}
 }

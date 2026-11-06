@@ -78,7 +78,7 @@ func TestCloudLoggingRenderer_JobComplete_Cached(t *testing.T) {
 	result := &jobs.JobResult{
 		Status:   "success",
 		Duration: 0,
-		CacheHit: true,
+		Reuse:    jobs.ReuseLocalCache,
 	}
 	r.JobComplete(job, result)
 
@@ -93,7 +93,7 @@ func TestCloudLoggingRenderer_JobComplete_Coalesced(t *testing.T) {
 	var buf bytes.Buffer
 	r := NewCloudLoggingRenderer(&buf)
 	r.Start(nil)
-	r.JobComplete(makeTestJob("my-app", "build"), &jobs.JobResult{Status: "success", Coalesced: true})
+	r.JobComplete(makeTestJob("my-app", "build"), &jobs.JobResult{Status: "success", Reuse: jobs.ReuseCoalesced})
 
 	events := parseJSONLines(t, buf.String())
 	labels := events[0]["logging.googleapis.com/labels"].(map[string]any)

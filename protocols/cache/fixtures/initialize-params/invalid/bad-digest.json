@@ -1,1 +1,1 @@
-{ "protocolVersion": 1, "blobExchangeDir": "/x", "knownDigests": ["not-a-digest"] }
+{ "protocolVersion": 2, "blobExchangeDir": "/x", "knownDigests": ["not-a-digest"] }

@@ -375,9 +375,9 @@ func TestPlanRefusesAContextWithoutWorkspaceProjects(t *testing.T) {
 }
 
 // coreStructuredOutput re-implements the structured path the core's deleted
-// `putnami infra plan` had: `InfraPlanJSON` (one JSON object per workload) and
-// the dispatcher's `structuredPayload` (one document, an array of several, or
-// [] under the data member of one result envelope). It proves the envelope
+// `putnami infra plan` had: `InfraPlanJSON` (one JSON object per workload)
+// under the data member of one result envelope, as one document, an array of
+// several, or []. It proves the envelope
 // framing and the object, array or [] rule. The command name differs because
 // this command is `cloud infra`.
 func coreStructuredOutput(t *testing.T, workloads []job.ProjectRef, mode protocolcli.OutputMode) string {

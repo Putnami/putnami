@@ -169,7 +169,7 @@ func TestJobResultCacheRoundTrips(t *testing.T) {
 	if job.Status != "failed" || job.Error == nil || job.Error.Code != "E_BOOM" || len(job.Events) != 1 {
 		t.Fatalf("jobResultFromEntryResult = %#v", job)
 	}
-	if job.CacheHit || job.Coalesced {
+	if job.ReuseKind() != jobmodel.ReuseNone {
 		t.Fatalf("stored result unexpectedly retained run-local reuse outcome: %#v", job)
 	}
 
@@ -191,7 +191,7 @@ func TestJobResultCacheRoundTrips(t *testing.T) {
 	if fromAction.Status != entry.Status || fromAction.Error.Code != entry.Error.Code || !reflect.DeepEqual(fromAction.Data, entry.Data) {
 		t.Fatalf("jobResultFromActionResult = %#v", fromAction)
 	}
-	if fromAction.CacheHit || fromAction.Coalesced {
+	if fromAction.ReuseKind() != jobmodel.ReuseNone {
 		t.Fatalf("remote action result unexpectedly retained run-local reuse outcome: %#v", fromAction)
 	}
 

@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 
 	protocolcli "go.putnami.dev/protocol/cli"
@@ -55,9 +54,7 @@ func TestSessionsList(t *testing.T) {
 		var rows []struct {
 			ID string `json:"id"`
 		}
-		if err := json.Unmarshal([]byte(out), &rows); err != nil {
-			t.Fatalf("one session must list as a JSON array, got %q: %v", out, err)
-		}
+		sharedtest.ResultData(t, out, "sessions list", &rows)
 		if len(rows) != 1 || rows[0].ID != "20260101-120000-abc123" {
 			t.Fatalf("rows = %v, want the one session", rows)
 		}
@@ -73,7 +70,9 @@ func TestSessionsList(t *testing.T) {
 			if err != nil {
 				t.Fatalf("SessionsListRevision(%q) error: %v", revision, err)
 			}
-			if strings.TrimSpace(out) != "[]" {
+			var rows []any
+			sharedtest.ResultData(t, out, "sessions list", &rows)
+			if rows == nil || len(rows) != 0 {
 				t.Fatalf("SessionsListRevision(%q) = %q, want []", revision, out)
 			}
 		}
@@ -202,9 +201,7 @@ func TestSessionsInspect(t *testing.T) {
 		var inspection struct {
 			Metadata workspace_state.SessionMetadata `json:"metadata"`
 		}
-		if err := json.Unmarshal([]byte(out), &inspection); err != nil {
-			t.Fatalf("decode inspect output: %v", err)
-		}
+		sharedtest.ResultData(t, out, "sessions inspect", &inspection)
 		if len(inspection.Metadata.Jobs) != 1 || inspection.Metadata.Jobs[0].SpawnToFirstEventMs == nil {
 			t.Fatalf("inspect metadata jobs = %#v", inspection.Metadata.Jobs)
 		}

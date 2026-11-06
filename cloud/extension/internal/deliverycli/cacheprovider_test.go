@@ -73,12 +73,12 @@ func TestRunCacheProviderSession_RoundTrip(t *testing.T) {
 	t.Setenv("PUTNAMI_CACHE_URL", "") // deterministic: no cache configured → not ready
 	key := strings.Repeat("a", cache.KeyLength)
 	reqs := []string{
-		`{"protocolVersion":1,"id":1,"op":"initialize","payload":{"protocolVersion":1,"blobExchangeDir":"/tmp/bx","mode":"full"}}`,
-		`{"protocolVersion":1,"id":2,"op":"prefetch","payload":{"keys":["` + key + `"]}}`,
-		`{"protocolVersion":1,"id":3,"op":"restore","payload":{"key":"` + key + `"}}`,
-		`{"protocolVersion":1,"id":4,"op":"marker-lookup","payload":{"workspace":"w","branch":"main","commands":["build"],"selection":"all"}}`,
-		`{"protocolVersion":1,"id":5,"op":"summary","payload":{}}`,
-		`{"protocolVersion":1,"id":6,"op":"shutdown"}`,
+		`{"protocolVersion":2,"id":1,"op":"initialize","payload":{"protocolVersion":2,"blobExchangeDir":"/tmp/bx","mode":"full"}}`,
+		`{"protocolVersion":2,"id":2,"op":"prefetch","payload":{"keys":["` + key + `"]}}`,
+		`{"protocolVersion":2,"id":3,"op":"restore","payload":{"key":"` + key + `"}}`,
+		`{"protocolVersion":2,"id":4,"op":"marker-lookup","payload":{"workspace":"w","branch":"main","commands":["build"],"selection":"all"}}`,
+		`{"protocolVersion":2,"id":5,"op":"summary","payload":{}}`,
+		`{"protocolVersion":2,"id":6,"op":"shutdown"}`,
 	}
 	var out, logw bytes.Buffer
 	in := strings.NewReader(strings.Join(reqs, "\n") + "\n")
@@ -335,9 +335,9 @@ func TestInitialize_DisabledCacheWinsOverSynthesis(t *testing.T) {
 
 func TestRunCacheProviderSession_ShutdownStopsLoop(t *testing.T) {
 	reqs := []string{
-		`{"protocolVersion":1,"id":1,"op":"summary","payload":{}}`,
-		`{"protocolVersion":1,"id":2,"op":"shutdown"}`,
-		`{"protocolVersion":1,"id":3,"op":"summary","payload":{}}`, // must not be served
+		`{"protocolVersion":2,"id":1,"op":"summary","payload":{}}`,
+		`{"protocolVersion":2,"id":2,"op":"shutdown"}`,
+		`{"protocolVersion":2,"id":3,"op":"summary","payload":{}}`, // must not be served
 	}
 	var out, logw bytes.Buffer
 	in := strings.NewReader(strings.Join(reqs, "\n") + "\n")
@@ -356,7 +356,7 @@ func TestRunCacheProviderSession_ShutdownStopsLoop(t *testing.T) {
 func TestRunCacheProviderSession_MalformedRequestSkipped(t *testing.T) {
 	reqs := []string{
 		`this is not json`,
-		`{"protocolVersion":1,"id":7,"op":"summary","payload":{}}`,
+		`{"protocolVersion":2,"id":7,"op":"summary","payload":{}}`,
 	}
 	var out, logw bytes.Buffer
 	in := strings.NewReader(strings.Join(reqs, "\n") + "\n")
@@ -374,7 +374,7 @@ func TestRunCacheProviderSession_MalformedRequestSkipped(t *testing.T) {
 
 func TestRunCacheProviderSession_EOFWithoutShutdown(t *testing.T) {
 	var out, logw bytes.Buffer
-	in := strings.NewReader(`{"protocolVersion":1,"id":1,"op":"summary","payload":{}}` + "\n")
+	in := strings.NewReader(`{"protocolVersion":2,"id":1,"op":"summary","payload":{}}` + "\n")
 	// A closed stdin without a shutdown op is the crash/normal-exit path: clean nil.
 	if err := runCacheProviderSession(in, &out, &logw, t.TempDir()); err != nil {
 		t.Fatalf("session: %v", err)
@@ -389,7 +389,7 @@ func TestProviderSessionInitialize_Readiness(t *testing.T) {
 
 	noConfig := newProviderSession(t.TempDir(), io.Discard)
 	defer noConfig.close()
-	if mustInit(t, noConfig, &cache.InitializeParams{ProtocolVersion: 1, BlobExchangeDir: t.TempDir(), Mode: cache.ModeFull}).Ready {
+	if mustInit(t, noConfig, &cache.InitializeParams{ProtocolVersion: cache.ProviderProtocolVersion, BlobExchangeDir: t.TempDir(), Mode: cache.ModeFull}).Ready {
 		t.Error("no cache config → not ready")
 	}
 
@@ -399,7 +399,7 @@ func TestProviderSessionInitialize_Readiness(t *testing.T) {
 	}
 	configured := newProviderSession(dir, io.Discard)
 	defer configured.close()
-	if !mustInit(t, configured, &cache.InitializeParams{ProtocolVersion: 1, BlobExchangeDir: t.TempDir(), Mode: cache.ModeFull}).Ready {
+	if !mustInit(t, configured, &cache.InitializeParams{ProtocolVersion: cache.ProviderProtocolVersion, BlobExchangeDir: t.TempDir(), Mode: cache.ModeFull}).Ready {
 		t.Error("enabled config with a URL → ready")
 	}
 }
@@ -446,7 +446,7 @@ func TestProviderSessionRestore_Hit(t *testing.T) {
 	exchangeDir := t.TempDir()
 	s := newProviderSession(t.TempDir(), io.Discard)
 	defer s.close()
-	if !mustInit(t, s, &cache.InitializeParams{ProtocolVersion: 1, BlobExchangeDir: exchangeDir, Mode: cache.ModeFull}).Ready {
+	if !mustInit(t, s, &cache.InitializeParams{ProtocolVersion: cache.ProviderProtocolVersion, BlobExchangeDir: exchangeDir, Mode: cache.ModeFull}).Ready {
 		t.Fatal("expected ready with PUTNAMI_CACHE_URL set")
 	}
 
@@ -536,7 +536,7 @@ func TestProviderSessionRestore_ServedFromPrefetchIndex(t *testing.T) {
 	exchangeDir := t.TempDir()
 	s := newProviderSession(t.TempDir(), io.Discard)
 	defer s.close()
-	if !mustInit(t, s, &cache.InitializeParams{ProtocolVersion: 1, BlobExchangeDir: exchangeDir, Mode: cache.ModeFull}).Ready {
+	if !mustInit(t, s, &cache.InitializeParams{ProtocolVersion: cache.ProviderProtocolVersion, BlobExchangeDir: exchangeDir, Mode: cache.ModeFull}).Ready {
 		t.Fatal("expected ready with PUTNAMI_CACHE_URL set")
 	}
 
@@ -589,7 +589,7 @@ func TestProviderSessionRestore_UncoveredKeyFallsBack(t *testing.T) {
 
 	s := newProviderSession(t.TempDir(), io.Discard)
 	defer s.close()
-	if !mustInit(t, s, &cache.InitializeParams{ProtocolVersion: 1, BlobExchangeDir: t.TempDir(), Mode: cache.ModeFull}).Ready {
+	if !mustInit(t, s, &cache.InitializeParams{ProtocolVersion: cache.ProviderProtocolVersion, BlobExchangeDir: t.TempDir(), Mode: cache.ModeFull}).Ready {
 		t.Fatal("expected ready")
 	}
 
@@ -630,15 +630,15 @@ func TestRunCacheProviderSession_ConcurrentRestores(t *testing.T) {
 
 	exchangeDir := t.TempDir()
 	reqs := []string{
-		`{"protocolVersion":1,"id":1,"op":"initialize","payload":{"protocolVersion":1,"blobExchangeDir":` + strconv.Quote(exchangeDir) + `,"mode":"full"}}`,
-		`{"protocolVersion":1,"id":2,"op":"prefetch","payload":{"keys":["` + hitKey + `"]}}`,
+		`{"protocolVersion":2,"id":1,"op":"initialize","payload":{"protocolVersion":2,"blobExchangeDir":` + strconv.Quote(exchangeDir) + `,"mode":"full"}}`,
+		`{"protocolVersion":2,"id":2,"op":"prefetch","payload":{"keys":["` + hitKey + `"]}}`,
 	}
 	const restores = 24
 	for i := 0; i < restores; i++ {
-		reqs = append(reqs, `{"protocolVersion":1,"id":`+strconv.Itoa(3+i)+`,"op":"restore","payload":{"key":"`+hitKey+`"}}`)
+		reqs = append(reqs, `{"protocolVersion":2,"id":`+strconv.Itoa(3+i)+`,"op":"restore","payload":{"key":"`+hitKey+`"}}`)
 	}
 	shutdownID := int64(3 + restores)
-	reqs = append(reqs, `{"protocolVersion":1,"id":`+strconv.FormatInt(shutdownID, 10)+`,"op":"shutdown"}`)
+	reqs = append(reqs, `{"protocolVersion":2,"id":`+strconv.FormatInt(shutdownID, 10)+`,"op":"shutdown"}`)
 
 	var out, logw bytes.Buffer
 	in := strings.NewReader(strings.Join(reqs, "\n") + "\n")
@@ -796,7 +796,7 @@ func TestProviderSessionRestore_KnownDigestSkipped(t *testing.T) {
 	s := newProviderSession(t.TempDir(), io.Discard)
 	defer s.close()
 	if !mustInit(t, s, &cache.InitializeParams{
-		ProtocolVersion: 1, BlobExchangeDir: exchangeDir, Mode: cache.ModeFull, KnownDigests: []string{digest},
+		ProtocolVersion: cache.ProviderProtocolVersion, BlobExchangeDir: exchangeDir, Mode: cache.ModeFull, KnownDigests: []string{digest},
 	}).Ready {
 		t.Fatal("expected ready")
 	}

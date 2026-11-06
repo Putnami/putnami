@@ -492,7 +492,7 @@ func TestCacheHitCountsAsDone(t *testing.T) {
 	job := makeLiveTestJob("app", "build")
 	r, _ := newTestRenderer(t, 120, job)
 	r.JobStart(job)
-	r.JobComplete(job, &jobs.JobResult{CacheHit: true})
+	r.JobComplete(job, &jobs.JobResult{Reuse: jobs.ReuseLocalCache})
 	if got := r.projectStatus(r.rowByID["app"]); got != statusDone {
 		t.Errorf("cached project = %q, want done", got)
 	}
@@ -502,7 +502,7 @@ func TestCoalescedCountsAsDoneAndStaysDistinct(t *testing.T) {
 	job := makeLiveTestJob("app", "build")
 	r, _ := newTestRenderer(t, 120, job)
 	r.JobStart(job)
-	r.JobComplete(job, &jobs.JobResult{Status: "success", Coalesced: true})
+	r.JobComplete(job, &jobs.JobResult{Status: "success", Reuse: jobs.ReuseCoalesced})
 	row := r.rowByID["app"]
 	if got := r.projectStatus(row); got != statusDone {
 		t.Errorf("coalesced project = %q, want done", got)
@@ -542,7 +542,7 @@ func TestCoalescedCellsIgnoreReplayedMetricsAndSummaries(t *testing.T) {
 	}
 	for _, tc := range cases {
 		r.JobStart(tc.job)
-		r.JobComplete(tc.job, &jobs.JobResult{Status: "success", Coalesced: true, Events: tc.events})
+		r.JobComplete(tc.job, &jobs.JobResult{Status: "success", Reuse: jobs.ReuseCoalesced, Events: tc.events})
 	}
 
 	rendered := r.renderRow(r.rowByID["app"])
@@ -563,17 +563,17 @@ func TestCachedCellsUseRestoredMetrics(t *testing.T) {
 	r, _ := newTestRenderer(t, 120, lint, test, build)
 
 	r.JobStart(lint)
-	r.JobComplete(lint, &jobs.JobResult{Status: "success", CacheHit: true, Events: []jobs.RawJobEvent{
+	r.JobComplete(lint, &jobs.JobResult{Status: "success", Reuse: jobs.ReuseLocalCache, Events: []jobs.RawJobEvent{
 		metricEvent("lint-warnings", 2, "count"),
 	}})
 	r.JobStart(test)
-	r.JobComplete(test, &jobs.JobResult{Status: "success", CacheHit: true, Events: []jobs.RawJobEvent{
+	r.JobComplete(test, &jobs.JobResult{Status: "success", Reuse: jobs.ReuseLocalCache, Events: []jobs.RawJobEvent{
 		metricEvent("tests-total", 51, "count"),
 		metricEvent("tests-passed", 51, "count"),
 		metricEvent("coverage", 84.0, "percent"),
 	}})
 	r.JobStart(build)
-	r.JobComplete(build, &jobs.JobResult{Status: "success", CacheHit: true, Events: []jobs.RawJobEvent{
+	r.JobComplete(build, &jobs.JobResult{Status: "success", Reuse: jobs.ReuseLocalCache, Events: []jobs.RawJobEvent{
 		metricEvent("transpiled-files", 38, "count"),
 	}})
 
@@ -601,9 +601,9 @@ func TestFullyCachedCommandKeepsCachedGlyphWithAlwaysRunTail(t *testing.T) {
 
 	r.JobStart(compile)
 	r.JobComplete(compile, &jobs.JobResult{
-		Status:   "success",
-		CacheHit: true,
-		Events:   []jobs.RawJobEvent{metricEvent("transpiled-files", 38, "count")},
+		Status: "success",
+		Reuse:  jobs.ReuseLocalCache,
+		Events: []jobs.RawJobEvent{metricEvent("transpiled-files", 38, "count")},
 	})
 	r.JobStart(infra)
 	r.JobComplete(infra, &jobs.JobResult{Status: "success", Duration: 10 * time.Millisecond})
@@ -642,7 +642,7 @@ func TestCachedCoverageInheritsDimmedReplayStyling(t *testing.T) {
 	testJob.JobDef.Cache = true
 	r, _ := newTestRenderer(t, 120, testJob)
 	r.JobStart(testJob)
-	r.JobComplete(testJob, &jobs.JobResult{Status: "success", CacheHit: true, Events: []jobs.RawJobEvent{
+	r.JobComplete(testJob, &jobs.JobResult{Status: "success", Reuse: jobs.ReuseLocalCache, Events: []jobs.RawJobEvent{
 		metricEvent("tests-total", 51, "count"),
 		metricEvent("tests-passed", 51, "count"),
 		metricEvent("coverage", 84, "percent"),

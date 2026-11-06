@@ -5,16 +5,15 @@ package runtime
 // A served workload's stdout is a LOG stream, not a runtime event stream: the
 // extension that spawned it re-emits each line as a `log` event, so a workload
 // that printed a raw runtime event would have it forwarded verbatim into the
-// user's console at v1 negotiation, and would still be unable to reach the
-// event stream it does not own. The workload therefore announces readiness the
+// user's console as a log line, and would still be unable to reach the event
+// stream it does not own. The workload therefore announces readiness the
 // only way it legitimately can — as a machine-readable member of the log record
 // it already writes when it starts listening — under one reserved key whose
 // name and payload shape are defined here and mirrored in TypeScript
 // (typescript/framework/runtime/src/jobs/events.ts).
 //
 // The extension's forwarder (tooling/extension-sdk/jsonl) recognizes the key
-// and, when its own stream is negotiated at v2, emits the typed `ready` event
-// alongside the log event. Because the forwarder is shared, every first-party
+// and emits the typed `ready` event alongside the log event. Because the forwarder is shared, every first-party
 // extension — including Python's, which has no framework of its own — gains
 // typed readiness from one place, and any workload that logs this key gets it
 // for free.

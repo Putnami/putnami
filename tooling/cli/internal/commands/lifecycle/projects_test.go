@@ -555,13 +555,10 @@ func TestProjectsList_SortsJSONLOutputByName(t *testing.T) {
 	}
 
 	var names []string
-	for _, line := range strings.Split(strings.TrimSpace(output), "\n") {
-		if strings.TrimSpace(line) == "" {
-			continue
-		}
+	for _, record := range sharedtest.ResultRecords(t, output, "projects list") {
 		var entry projectEntry
-		if err := json.Unmarshal([]byte(line), &entry); err != nil {
-			t.Fatalf("unmarshal JSONL line %q: %v", line, err)
+		if err := json.Unmarshal(record, &entry); err != nil {
+			t.Fatalf("unmarshal record %s: %v", record, err)
 		}
 		names = append(names, entry.Name)
 	}
@@ -833,8 +830,8 @@ func TestProjectsList_WarnsOnAnUnindexedWorkspace(t *testing.T) {
 				!strings.Contains(stderr.String(), kept[0].Message) {
 				t.Errorf("report kept %v, want the one provider-view warning written to stderr", kept)
 			}
-			if strings.Contains(stdout, "warning") {
-				t.Errorf("the warning reached stdout:\n%s", stdout)
+			if strings.Contains(stdout, "putnami: warning") {
+				t.Errorf("the warning line reached stdout:\n%s", stdout)
 			}
 			if !strings.Contains(stdout, "web") {
 				t.Errorf("the project is missing from the listing:\n%s", stdout)

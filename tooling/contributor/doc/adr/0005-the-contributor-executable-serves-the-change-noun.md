@@ -27,9 +27,9 @@ and `verify`. Each routes to a flat command, `change-language` or
 name as its argument and is never cached. The manifest declares every flag and
 positional each subcommand accepts: `--label`, `--diff`, `--limit` and the mode
 for `language`; `--record`, `--workflow`, `--snapshot`, `--ref`, `--gate`,
-`--report` and `--base` for `verify`. A launch with those flags prints no
-undeclared-flag warning. It keeps `cliContract` 5: nothing it adds needs a
-later rung.
+`--report` and `--base` for `verify`. putnami accepts a launch with those
+flags and refuses any other flag. It keeps `cliContract` 5: nothing it adds
+needs a later rung.
 
 The `change-language` task runs in the workspace root. `verify` declares
 `workspace: optional` and its task declares no `cwd`: putnami starts it in the
@@ -135,11 +135,9 @@ Known differences from `putnami tree verify`, as the core served it:
 - **(a) Help.** `--help` prints the help putnami builds from the manifest,
   where the core prints its catalog help. Run without putnami, the executable
   prints a usage line that names `change verify`.
-- **(b) Undeclared flags.** The core rejects an undeclared flag with a usage
-  error on stderr and exits 2. For `change verify`, putnami warns on stderr
-  that undeclared flags are deprecated and launches the executable, which
-  prints a not-verified verdict, `unknown argument: <flag>`, and exits 1. The
-  warning says putnami will reject such flags in the next minor release.
+- **(b) Undeclared flags.** Both reject an undeclared flag with a usage error
+  on stderr and exit 2. For `change verify`, putnami refuses the flag before
+  it launches the executable, so the message is putnami's.
 - **(c) Working directory.** Inside a workspace the executable starts in the
   workspace root, so the Git top level comes from the workspace root. The core
   uses the caller's directory. They differ only when the caller stands in a

@@ -10,6 +10,7 @@ import (
 
 	protocolcli "go.putnami.dev/protocol/cli"
 	"go.putnami.dev/tooling/cli/internal/cmderr"
+	"go.putnami.dev/tooling/cli/internal/commands/shared"
 	"go.putnami.dev/tooling/cli/internal/iox"
 	"go.putnami.dev/tooling/cli/internal/workspace_state"
 )
@@ -60,16 +61,16 @@ func SessionsSummary(wsRoot string, since string, commands string, byDigest bool
 		}
 	}
 
-	structured := outputFormat == "json" || outputFormat == "jsonl"
+	structured := protocolcli.OutputMode(outputFormat).IsStructured()
 	if byDigest {
 		digests, undigested := summarizeByDigest(tasks)
 		if structured {
-			return printSummaryRowsJSON(digests)
+			return writeSummaryRows(outputFormat, digests)
 		}
 		return printDigestTable(digests, len(tasks), undigested)
 	}
 	if structured {
-		return printSummaryRowsJSON(rows)
+		return writeSummaryRows(outputFormat, rows)
 	}
 	return printSummaryTable(rows)
 }
@@ -335,32 +336,18 @@ func (f summaryCommandFilter) matches(row sessionSummaryRow) bool {
 	return len(seen) == len(f.names)
 }
 
-// printSummaryRowsJSON emits the rows — session rows, or digest rows under
-// --by-digest — as ONE JSON document: an array, always, including when it is
-// empty.
-//
-// Emitting them as a JSONL stream instead — one object per line, which is what
-// `sessions export` does — would put the rows under `ResultV2.data` in a shape
-// that changes with their COUNT. The shared capture in internal/cli collects the
-// documents a structured command printed and unwraps a stream of exactly one
-// (`structuredPayload`), so a summary with exactly one session would land as a
-// bare object. That breaks the `.data[]` a ledger is documented to read, and the
-// single-session case is the ordinary shape of
-// `--command lint,test,build,validate` on a fresh worktree.
-// One array document is unwrapped to itself, so `data` is an array at every
-// count.
-func printSummaryRowsJSON[Row sessionSummaryRow | digestSummaryRow](rows []Row) error {
+// writeSummaryRows writes the rows — session rows, or digest rows under
+// --by-digest — as the data of the sessions summary result: an array at every
+// count, empty included. A ledger reads `.data[]`, and a summary of exactly one
+// session, the ordinary shape of `--command lint,test,build,validate` on a
+// fresh worktree, is still an array.
+func writeSummaryRows[Row sessionSummaryRow | digestSummaryRow](outputFormat string, rows []Row) error {
 	// Never nil: a nil slice marshals to `null`, which is the shape this function
 	// exists to rule out.
 	if rows == nil {
 		rows = []Row{}
 	}
-	data, err := json.Marshal(rows)
-	if err != nil {
-		return err
-	}
-	iox.Fprintln(os.Stdout, string(data))
-	return nil
+	return shared.WriteResult(outputFormat, "sessions summary", rows, nil)
 }
 
 func printSummaryTable(rows []sessionSummaryRow) error {

@@ -629,7 +629,7 @@ func updateDependencies(ctx context.Context, cfg *wsproto.Config, lockFile *lock
 		}
 		failed = true
 		if quiet {
-			emitArtifactActionJSONL(artifactActionEntry{Kind: ops.label, Action: "update", Name: item.name, Status: "failed", Error: item.err.Error(), RequiredBy: item.requiredBy})
+			ops.records.add(artifactActionEntry{Kind: ops.label, Action: "update", Name: item.name, Status: "failed", Error: item.err.Error(), RequiredBy: item.requiredBy})
 		} else {
 			iox.Fprintf(os.Stderr, "  ✗ %s: %v\n", item.name, item.err)
 		}
@@ -644,7 +644,7 @@ func updateDependencies(ctx context.Context, cfg *wsproto.Config, lockFile *lock
 		if item.held != nil {
 			// Its lock entry stays as it is.
 			if quiet {
-				emitArtifactActionJSONL(artifactActionEntry{Kind: ops.label, Action: "update", Name: item.name, Version: item.prior.Version, Source: item.result.Source,
+				ops.records.add(artifactActionEntry{Kind: ops.label, Action: "update", Name: item.name, Version: item.prior.Version, Source: item.result.Source,
 					FromCache: item.result.FromCache, Status: "kept", RequiredBy: item.requiredBy, Channel: item.held.channel, ChannelVersion: item.held.served})
 			} else {
 				iox.Fprintf(os.Stdout, "  ✓ %s@%s%s\n", item.name, item.prior.Version, requiredBySuffix(item.requiredBy, "kept: "+item.held.note()))
@@ -658,7 +658,7 @@ func updateDependencies(ctx context.Context, cfg *wsproto.Config, lockFile *lock
 		if oldVersion != "" && oldVersion != item.result.Version {
 			moved++
 			if quiet {
-				emitArtifactActionJSONL(artifactActionEntry{Kind: ops.label, Action: "update", Name: item.name, Version: item.result.Version, OldVersion: oldVersion,
+				ops.records.add(artifactActionEntry{Kind: ops.label, Action: "update", Name: item.name, Version: item.result.Version, OldVersion: oldVersion,
 					Source: item.result.Source, Status: "updated", RequiredBy: item.requiredBy})
 			} else {
 				iox.Fprintf(os.Stdout, "  %s %s: %s → %s%s\n", moveMark(oldVersion, item.result.Version), item.name, oldVersion, item.result.Version, requiredBySuffix(item.requiredBy))
@@ -666,7 +666,7 @@ func updateDependencies(ctx context.Context, cfg *wsproto.Config, lockFile *lock
 			continue
 		}
 		if quiet {
-			emitArtifactActionJSONL(artifactActionEntry{Kind: ops.label, Action: "update", Name: item.name, Version: item.result.Version, OldVersion: oldVersion,
+			ops.records.add(artifactActionEntry{Kind: ops.label, Action: "update", Name: item.name, Version: item.result.Version, OldVersion: oldVersion,
 				Source: item.result.Source, FromCache: item.result.FromCache, Status: "up-to-date", RequiredBy: item.requiredBy})
 		} else {
 			iox.Fprintf(os.Stdout, "  ✓ %s@%s%s\n", item.name, item.result.Version, requiredBySuffix(item.requiredBy, "up to date"))
@@ -677,7 +677,7 @@ func updateDependencies(ctx context.Context, cfg *wsproto.Config, lockFile *lock
 
 // previewDependencyNote says that a dry run previewed the declared extensions
 // only, when the workspace graph holds a dependency.
-func previewDependencyNote(wsRoot string, cfg *wsproto.Config, ops artifactOps, jsonlOut bool) {
+func previewDependencyNote(wsRoot string, cfg *wsproto.Config, ops artifactOps, structuredOut bool) {
 	if ops.graph == nil {
 		return
 	}
@@ -691,7 +691,7 @@ func previewDependencyNote(wsRoot string, cfg *wsproto.Config, ops artifactOps, 
 		names[i] = dep.Name
 	}
 	out := io.Writer(os.Stdout)
-	if jsonlOut {
+	if structuredOut {
 		out = os.Stderr
 	}
 	iox.Fprintf(out, "  This preview covers the declared extensions only; `putnami extensions update` also resolves their dependencies again: %s\n",

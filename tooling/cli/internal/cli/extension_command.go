@@ -144,13 +144,14 @@ func (a *App) runExtensionStructuredCommand(
 	// alias) in plan-time param resolution.
 	effectiveFlags := resolved.EffectiveFlags()
 
-	// An extension group's flag surface comes from a manifest on its own release
-	// cadence, so an undeclared flag is a deprecation warning for one minor
-	// version rather than a hard rejection. The tokens
-	// themselves are untouched: they still reach commandParams exactly as before.
-	printParseWarnings(stderr, parsed.Global,
-		undeclaredFlagWarnings(group+" "+sub, parsed.RawJobArgs, effectiveFlags,
-			extension.CommandConsumesReleaseSet(extensions, resolved.CommandName)))
+	// An extension group's flag surface is the one its manifest declares: a flag
+	// outside it, the CLI globals and the core job flags is a usage error. The
+	// tokens of an accepted invocation reach commandParams unchanged.
+	if err := rejectUndeclaredFlags(group+" "+sub, parsed.RawJobArgs, effectiveFlags,
+		extension.CommandConsumesReleaseSet(extensions, resolved.CommandName)); err != nil {
+		printCommandError(stderr, err)
+		return ExitUsage
+	}
 
 	commandParams := buildExtensionCommandParams(parsed, effectiveFlags)
 

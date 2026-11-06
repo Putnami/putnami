@@ -29,7 +29,8 @@ type CommandEnv struct {
 	Sub string
 	// Args are the remaining raw arguments after the command and subcommand.
 	Args []string
-	// OutputFormat is the --output value ("jsonl", "cloud-logging", or "").
+	// OutputFormat is the --output value ("json", "jsonl", "cloud-logging", or
+	// ""). A structured command writes its success result in this mode.
 	OutputFormat string
 	// Global holds the parsed global flags.
 	Global GlobalFlags
@@ -91,10 +92,6 @@ type CommandFunc func(env *CommandEnv) error
 type command struct {
 	name string
 	run  CommandFunc
-	// rawMachineOutput opts the command out of the shared result envelope in a
-	// structured output mode: it writes its own machine document to stdout and
-	// the dispatcher forwards it untouched. See registerRawCommand.
-	rawMachineOutput bool
 }
 
 // commandRegistry binds each structured command NAME to its handler. It is a
@@ -127,21 +124,6 @@ func registerCommand(name string, run CommandFunc) {
 			"(internal/commandmeta/catalog_data.go) — add it there first", name))
 	}
 	commandRegistry[name] = &command{name: name, run: run}
-}
-
-// registerRawCommand registers a command whose structured output is ALREADY a
-// contract document, so the dispatcher must not wrap it in a result envelope.
-//
-// This is a narrow exception, and it earns its narrowness: every other
-// structured command produces a payload that exists only inside the envelope,
-// which is what makes `status`, `exitCode` and `error` uniform across the CLI.
-// A command qualifies here only when its stdout is a versioned document a
-// consumer binds to directly — `report`, whose bytes are the reportFile a CI
-// runner forwards verbatim. Failures still travel in the standard envelope, so
-// the exception covers the success payload only.
-func registerRawCommand(name string, run CommandFunc) {
-	registerCommand(name, run)
-	commandRegistry[name].rawMachineOutput = true
 }
 
 // lookupCommand returns the registered command for name, if any.

@@ -312,7 +312,8 @@ const eventParserFile = "cli-model/jobs/events.go"
 // reader, which requires the exact version it advertised.
 var loosenedRuntimeVersionSymbols = map[string]string{
 	"IsKnownProtocolVersion": "accepts v1 as well as v2; the CLI advertises PUTNAMI_RUNTIME_EVENTS and accepts back EXACTLY what it advertised",
-	"ProtocolVersion":        "the v1 constant; a contract-3 extension must answer at the advertised version, so a v1 line means the stream disagrees with the manifest",
+	"ProtocolVersion":        "the lowest version an emitter writes; the reader requires the version it advertised, MaxKnownProtocolVersion",
+	"ProtocolVersion1":       "the v1 constant; no emitter writes it, so a v1 line means the stream disagrees with the manifest",
 	"NegotiatedVersion":      "the EMITTER's resolution (clamping down to what an invoker accepts); a reader that clamps accepts a stream older than it asked for",
 }
 

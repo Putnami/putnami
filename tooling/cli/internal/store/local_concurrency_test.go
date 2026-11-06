@@ -34,7 +34,7 @@ func entryWith(filesDir string) *Entry {
 // on one shared store root, each with its own flock fd and its own in-process
 // mutex) publishing the SAME content-addressed entry at once. The result must be
 // exactly one intact entry — no corruption, no partial directory.
-func TestPut_ConcurrentSameHash(t *testing.T) {
+func TestPublishEntry_ConcurrentSameHash(t *testing.T) {
 	root := t.TempDir()
 	hash := "aaaa000000000000000000000000000000000000000000000000000000000000"
 
@@ -46,7 +46,7 @@ func TestPut_ConcurrentSameHash(t *testing.T) {
 		go func(i int) {
 			defer wg.Done()
 			s := NewLocalStore(root) // distinct handle per "process"
-			errs[i] = s.Put(hash, entryWith(makeSource(t, "built")))
+			errs[i] = putFormatOneEntry(s, hash, entryWith(makeSource(t, "built")))
 		}(i)
 	}
 	wg.Wait()
@@ -83,7 +83,7 @@ func TestPut_ConcurrentSameHash(t *testing.T) {
 // TestPut_ConcurrentDifferentHashes publishes many distinct entries at once and
 // asserts they all land — the shared lock must not serialize them to death or
 // drop any.
-func TestPut_ConcurrentDifferentHashes(t *testing.T) {
+func TestPublishEntry_ConcurrentDifferentHashes(t *testing.T) {
 	root := t.TempDir()
 	const writers = 16
 	hashes := make([]string, writers)
@@ -94,7 +94,7 @@ func TestPut_ConcurrentDifferentHashes(t *testing.T) {
 		go func(i int) {
 			defer wg.Done()
 			s := NewLocalStore(root)
-			if err := s.Put(hashes[i], entryWith(makeSource(t, fmt.Sprintf("c%d", i)))); err != nil {
+			if err := putFormatOneEntry(s, hashes[i], entryWith(makeSource(t, fmt.Sprintf("c%d", i)))); err != nil {
 				t.Errorf("Put %d: %v", i, err)
 			}
 		}(i)
@@ -113,21 +113,21 @@ func TestPut_ConcurrentDifferentHashes(t *testing.T) {
 // TestPut_FirstWriterWins verifies an existing entry is never clobbered by a
 // later publish of the same hash (content-addressed → byte-identical, so the
 // first writer's copy is authoritative).
-func TestPut_FirstWriterWins(t *testing.T) {
+func TestPublishEntry_FirstWriterWins(t *testing.T) {
 	root := t.TempDir()
 	s := NewLocalStore(root)
 	hash := "bbbb000000000000000000000000000000000000000000000000000000000000"
 
 	first := entryWith(makeSource(t, "first"))
 	first.Result = &EntryResult{Status: "success", Data: map[string]any{"who": "first"}}
-	if err := s.Put(hash, first); err != nil {
+	if err := putFormatOneEntry(s, hash, first); err != nil {
 		t.Fatalf("first Put: %v", err)
 	}
 
 	// A second publish of the same hash must be a no-op clobber-wise.
 	second := entryWith(makeSource(t, "second"))
 	second.Result = &EntryResult{Status: "success", Data: map[string]any{"who": "second"}}
-	if err := s.Put(hash, second); err != nil {
+	if err := putFormatOneEntry(s, hash, second); err != nil {
 		t.Fatalf("second Put: %v", err)
 	}
 

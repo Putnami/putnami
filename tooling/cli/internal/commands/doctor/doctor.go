@@ -264,7 +264,7 @@ func selectDoctorProjects(ws *workspace.Workspace, args []string, globalProjects
 func renderDoctor(out io.Writer, outputFormat string, report doctor.Report, runErr error) error {
 	if protocolcli.OutputMode(outputFormat).IsStructured() {
 		if runErr == nil {
-			_, _ = protocolcli.WriteResultV2(out, protocolcli.OutputJSONL,
+			_, _ = protocolcli.WriteResultV2(out, protocolcli.OutputMode(outputFormat),
 				protocolcli.NewResultV2("doctor", report, nil))
 		}
 		return runErr

@@ -166,7 +166,7 @@
           }
         },
         {
-          "id": "the-session-bootstraps-at-version-1",
+          "id": "the-session-bootstraps-at-version-2",
           "stage": "coded",
           "evidenceKinds": [
             "attestation"
@@ -174,7 +174,7 @@
           "verification": {
             "kind": "acceptance",
             "checks": [
-              "the-cli-bootstraps-at-1-and-follows-the-selected-version",
+              "the-cli-sends-every-request-at-2-and-lists-the-v2-capability",
               "the-cli-refuses-an-unsupported-version"
             ]
           }

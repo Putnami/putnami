@@ -19,7 +19,7 @@
     "cache/remote-cache-contract#the-provider-resolves-the-mode",
     "cache/remote-cache-contract#the-reserved-command-selects-the-provider",
     "cache/remote-cache-contract#the-run-credential-is-authenticated-once",
-    "cache/remote-cache-contract#the-session-bootstraps-at-version-1",
+    "cache/remote-cache-contract#the-session-bootstraps-at-version-2",
     "cache/remote-cache-contract#the-versions-are-pinned",
     "cache/remote-cache-contract#the-write-path-is-store-then-commit"
   ]

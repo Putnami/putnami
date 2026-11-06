@@ -13,6 +13,7 @@ import (
 	runner "go.putnami.dev/protocol/runner"
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/tooling/cli/internal/cmderr"
+	"go.putnami.dev/tooling/cli/internal/commands/shared"
 	providerext "go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/iox"
 	"go.putnami.dev/tooling/cli/internal/jobs/remotecache"
@@ -69,6 +70,9 @@ func SessionsInspectRun(ctx context.Context, wsRoot string, cfg *wsproto.Config,
 		printAttemptRecord(record)
 	}
 	if record.SessionID == "" {
+		if protocolcli.OutputMode(outputFormat).IsStructured() {
+			return shared.WriteResult(outputFormat, "sessions inspect", record, nil)
+		}
 		if structured {
 			data, err := json.MarshalIndent(record, "", "  ")
 			if err != nil {

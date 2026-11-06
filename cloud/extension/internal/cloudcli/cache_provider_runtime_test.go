@@ -62,7 +62,7 @@ func TestCacheProviderTaskStartsTheNativeRuntime(t *testing.T) {
 		t.Fatalf("cloud-cache-provider cwd = %q, want {workspaceRoot}", task.Cwd)
 	}
 
-	stdout := serveCacheProviderOnce(t, task.Args, `{"protocolVersion":1,"id":1,"op":"shutdown"}`+"\n")
+	stdout := serveCacheProviderOnce(t, task.Args, `{"protocolVersion":2,"id":1,"op":"shutdown"}`+"\n")
 	type providerResponse struct {
 		ProtocolVersion int             `json:"protocolVersion"`
 		ID              int64           `json:"id"`
@@ -85,8 +85,8 @@ func TestCacheProviderTaskStartsTheNativeRuntime(t *testing.T) {
 	if len(responses) != 1 {
 		t.Fatalf("provider wrote %d responses %s, want the one shutdown ack", len(responses), stdout)
 	}
-	if got := responses[0]; got.ID != 1 || !got.OK || got.ProtocolVersion != 1 || len(got.Error) != 0 {
-		t.Fatalf("shutdown ack = %+v, want protocolVersion 1, id 1, ok and no error", got)
+	if got := responses[0]; got.ID != 1 || !got.OK || got.ProtocolVersion != 2 || len(got.Error) != 0 {
+		t.Fatalf("shutdown ack = %+v, want protocolVersion 2, id 1, ok and no error", got)
 	}
 }
 

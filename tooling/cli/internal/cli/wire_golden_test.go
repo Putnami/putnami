@@ -60,9 +60,8 @@ import (
 //
 //   - The current v2 session-event PRODUCER. Its complete live/artifact pair is
 //     pinned in internal/output.
-//   - Cache-hit / coalesced BRANCH PRECEDENCE. jobs.JobResult.MarkReuse makes
-//     CacheHit and Coalesced mutually exclusive, and loadWireRun asserts the
-//     fixture honors that, so no fixture task can set both.
+//   - Cache-hit / coalesced BRANCH PRECEDENCE. A fixture task states one reuse
+//     kind, the one value jobs.JobResult.Reuse holds, so no task can be both.
 //   - The git block of session.json: the writer captures it from the real
 //     repository, so the corpus records a run with wsRoot "" (block omitted).
 //     internal/workspace_state/session_test.go owns that path.
@@ -130,8 +129,6 @@ type wireFixtureTask struct {
 	CPUTimeMs           int64               `json:"cpuTimeMs"`
 	SpawnToFirstEventMs int64               `json:"spawnToFirstEventMs"`
 	FirstEventObserved  bool                `json:"firstEventObserved"`
-	CacheHit            bool                `json:"cacheHit"`
-	Coalesced           bool                `json:"coalesced"`
 	Reuse               scheduler.ReuseKind `json:"reuse"`
 	Error               *wireFixtureError   `json:"error"`
 	Events              []wireFixtureEvent  `json:"events"`
@@ -232,26 +229,11 @@ func loadWireRun(t *testing.T, name string) *wireRun {
 			CPUTime:            time.Duration(task.CPUTimeMs) * time.Millisecond,
 			SpawnToFirstEvent:  time.Duration(task.SpawnToFirstEventMs) * time.Millisecond,
 			FirstEventObserved: task.FirstEventObserved,
-			CacheHit:           task.CacheHit,
-			Coalesced:          task.Coalesced,
 			Reuse:              task.Reuse,
 		}
 		if task.Error != nil {
 			result.Error = &scheduler.JobError{Message: task.Error.Message, Code: task.Error.Code}
 		}
-		// The fixture states all three encodings (the Reuse kind and the two
-		// booleans) and this asserts they agree — the invariant
-		// jobs.JobResult.MarkReuse exists to hold. An earlier change exported that
-		// writer with the result model, so the fixture COULD call it; it
-		// deliberately does not, because a fixture built through the writer
-		// could no longer disagree with itself and the check would pass
-		// vacuously. Stating the encodings independently is what keeps a
-		// fixture from describing a result production cannot produce.
-		if got := result.ReuseKind(); got != task.Reuse {
-			t.Fatalf("fixture task %q: reuse %q disagrees with the cacheHit/coalesced booleans (%q)",
-				task.Key, task.Reuse, got)
-		}
-
 		// The events go on the RESULT, not only into the replay: production
 		// results carry the stream the subprocess already parsed, and every
 		// structured record a v2 document reports (a failure's diagnostics
@@ -399,7 +381,7 @@ func TestWireGoldenFixtureCoverage(t *testing.T) {
 	// surviving goldens are comparable to.
 	fresh := 0
 	for _, task := range run.fixture.Tasks {
-		if task.Status == string(scheduler.TaskStatusFailed) && !task.CacheHit && !task.Coalesced {
+		if task.Status == string(scheduler.TaskStatusFailed) && task.Reuse == scheduler.ReuseNone {
 			fresh++
 		}
 	}

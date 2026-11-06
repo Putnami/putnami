@@ -476,9 +476,9 @@ producer starts.
 ### Lookup (on cache hit)
 
 1. Compute the cache key hash.
-2. Check if `blobs/{prefix}/{hash}/` exists.
+2. Check if the task-owned entry exists under `blobs/`, at the address the key and the entry format give (see [Task-owned entries](#task-owned-entries-declared-outputs)).
 3. Read `result.json` to restore the job result (status, data, error, and compact summary events).
-4. If `files/` directory exists, copy cached artifacts to the output directory.
+4. Materialize each declared output from the entry's `files/` to its real location.
 5. Skip subprocess execution.
 
 The skipped task process does not make the hit free: the CLI still computes
@@ -533,10 +533,12 @@ process cost without claiming that it eliminates the guard's other work.
 ### Store (on successful execution)
 
 1. Compute the cache key hash (already done during lookup).
-2. Write `result.json` with the job result and replayable summary events (`meta`, `metric`, `artifact`, `diagnostic`, `summary`).
-3. Write `meta.json` with metadata (extension, task, project, timestamp).
-4. If the output directory has files, copy them to `files/`.
-5. All writes go to `tmp/` first, then atomically rename to `blobs/`.
+2. Stage each declared output under a task-owned staging root, and ingest its bytes into `cas/` and the entry's `files/`.
+3. Write `result.json` with the job result and replayable summary events (`meta`, `metric`, `artifact`, `diagnostic`, `summary`).
+4. Write `meta.json` with metadata (extension, task, project, timestamp), and `manifest.json` with the per-file digests.
+5. All writes go to `tmp/` first, then atomically rename to `blobs/` at the entry's address.
+
+Only a task whose manifest declares its outputs is stored. An undeclared task executes on every run.
 
 ### Failure replay (negative entries)
 
@@ -632,14 +634,14 @@ failure — and, like every other entry, it never leaves the machine.
 
 ### Task-owned entries (declared outputs)
 
-The lifecycle above is the **inferred** model: what an entry holds is whatever a
-walk of the shared per-command output directory found, minus a pre-run baseline,
-plus a hand-maintained list of in-tree subtrees (`.gen`, generated clients).
-Its shape is a function of run order and of what an earlier session left behind.
+A 0.4.0 or older CLI also wrote **whole-output** (format 1) entries: what a walk
+of the shared per-command output directory found, under the raw key. No current
+writer produces one. The store keeps reading them until the release after
+0.4.0, and the scheduler never reuses one.
 
 A task whose manifest carries a **task contract v3 `declares` block**
-([07-extensions.md](07-extensions.md)) takes a second, parallel model: the entry
-holds *exactly the declared set*. Per declared output it records the id, whether
+([07-extensions.md](07-extensions.md)) is cached in the task-owned model: the
+entry holds *exactly the declared set*. Per declared output it records the id, whether
 it is a file or a subtree, the root it resolves against (`project`, `workspace`,
 `command-output`), the root-relative path, and whether the task produced bytes
 for it at all — so an output that is legitimately empty is recorded as empty
@@ -821,9 +823,8 @@ entries age out through ordinary GC.
 
 Whether a task takes this path is decided **statically**, from the declaration
 and the job shape alone, never from run results — the lookup that happens before
-the task runs and the store that happens after it must agree. A task whose
-declaration does not cover what the inferred path would have captured stays on
-the inferred path in full (and says so at `--debug`).
+the task runs and the store that happens after it must agree. A task without
+a declaration executes and publishes no entry.
 
 **No command is excluded.** `package` used to be: every packager also
 read-merge-wrote a channel index at the root of the shared output directory, a

@@ -243,7 +243,7 @@ func Publish(ctx *pctx.Context, emit *jsonl.Emitter, args []string) (string, map
 
 	dockerDir := pkgmeta.PackageOutputDir(wsRoot, projectPath, "docker")
 	pushStart := time.Now()
-	pushedDigest, err := oci.PushContentWithDigest(emit, wsRoot, dockerDir, dockerManifest.Layout, localRef, pushRef, contentExists, keychain, credHint, route.pushOptions()...)
+	pushedDigest, err := oci.PushContentWithDigest(emit, dockerDir, dockerManifest.Layout, pushRef, contentExists, keychain, credHint, route.pushOptions()...)
 	if err != nil {
 		return "FAILED", nil, err
 	}
@@ -636,7 +636,7 @@ func publishImmutableImageProject(ctx *pctx.Context, emit *jsonl.Emitter, dryRun
 		contentStatus = "pushed"
 		dockerDir := pkgmeta.PackageOutputDir(ctx.WorkspaceRoot, ctx.Project.Path, "docker")
 		emit.PhaseStart("docker-push")
-		registryDigest, err = oci.PushContentWithDigest(emit, ctx.WorkspaceRoot, dockerDir, manifest.Layout, manifest.Tags[0], pushRef, false, keychain, hint, pushOptions...)
+		registryDigest, err = oci.PushContentWithDigest(emit, dockerDir, manifest.Layout, pushRef, false, keychain, hint, pushOptions...)
 		if err != nil {
 			return "FAILED", nil, err
 		}

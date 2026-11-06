@@ -1,9 +1,10 @@
 package configcmd
 
 import (
-	"encoding/json"
 	"os"
 
+	protocolcli "go.putnami.dev/protocol/cli"
+	"go.putnami.dev/tooling/cli/internal/commands/shared"
 	"go.putnami.dev/tooling/cli/internal/iox"
 	"go.putnami.dev/tooling/cli/internal/telemetry"
 )
@@ -61,17 +62,12 @@ func TelemetryShow(outputFormat string) error {
 		return err
 	}
 
-	if outputFormat == "jsonl" {
-		// One array document, empty included, so data is an array at every count.
+	if protocolcli.OutputMode(outputFormat).IsStructured() {
+		// The data is an array at every count, empty included.
 		if events == nil {
 			events = []telemetry.Event{}
 		}
-		data, err := json.Marshal(events)
-		if err != nil {
-			return err
-		}
-		iox.Fprintln(os.Stdout, string(data))
-		return nil
+		return shared.WriteResult(outputFormat, "telemetry show", events, nil)
 	}
 
 	if len(events) == 0 {

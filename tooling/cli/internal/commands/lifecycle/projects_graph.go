@@ -2,14 +2,15 @@ package lifecycle
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"os"
 	"sort"
 	"strings"
 
+	protocolcli "go.putnami.dev/protocol/cli"
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/tooling/cli/internal/cmderr"
+	"go.putnami.dev/tooling/cli/internal/commands/shared"
 	"go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/iox"
 	"go.putnami.dev/tooling/cli/internal/jobs/inputresolve"
@@ -71,8 +72,8 @@ func ProjectsOwner(wsRoot string, cfg *wsproto.Config, args []string, outputForm
 		refs = append(refs, refForProject(p))
 	}
 
-	if outputFormat == "jsonl" {
-		return printJSONLines(refs)
+	if protocolcli.OutputMode(outputFormat).IsStructured() {
+		return shared.WriteResult(outputFormat, "projects owner", shared.RecordsData(refs), warnings.Envelope())
 	}
 	iox.Fprintln(os.Stdout)
 	if len(refs) == 0 {
@@ -140,7 +141,7 @@ func ProjectsDeps(wsRoot string, cfg *wsproto.Config, args []string, outputForma
 	if dependents {
 		direction = "dependents"
 	}
-	if outputFormat == "jsonl" {
+	if protocolcli.OutputMode(outputFormat).IsStructured() {
 		type depEntry struct {
 			projectRef
 			Direction  string `json:"direction"`
@@ -150,7 +151,7 @@ func ProjectsDeps(wsRoot string, cfg *wsproto.Config, args []string, outputForma
 		for _, ref := range refs {
 			entries = append(entries, depEntry{projectRef: ref, Direction: direction, Transitive: transitive})
 		}
-		return printJSONLines(entries)
+		return shared.WriteResult(outputFormat, "projects deps", shared.RecordsData(entries), warnings.Envelope())
 	}
 
 	reach := "direct"
@@ -222,7 +223,7 @@ func ProjectsWhy(ctx context.Context, wsRoot string, cfg *wsproto.Config, args [
 	if from.ID != to.ID {
 		index = graphTaskIndex(ctx, wsRoot, cfg, ws)
 	}
-	return printWhy(whyAnswerFor(ws, from, to, index), outputFormat)
+	return printWhy(whyAnswerFor(ws, from, to, index), outputFormat, warnings)
 }
 
 // graphTaskIndex builds the task index the engine's selection builds, from the
@@ -280,9 +281,9 @@ func whyAnswerFor(ws *workspace.Workspace, from, to *workspace.Project, index wo
 	return answer
 }
 
-func printWhy(answer whyAnswer, outputFormat string) error {
-	if outputFormat == "jsonl" {
-		return printJSONLines([]whyAnswer{answer})
+func printWhy(answer whyAnswer, outputFormat string, warnings *workspace.WarningReport) error {
+	if protocolcli.OutputMode(outputFormat).IsStructured() {
+		return shared.WriteResult(outputFormat, "projects why", answer, warnings.Envelope())
 	}
 	iox.Fprintln(os.Stdout)
 	switch {
@@ -323,18 +324,6 @@ func printProjectRows(refs []projectRef) {
 	for _, ref := range refs {
 		iox.Fprintf(os.Stdout, "  %-40s %-35s %s\n", ref.ID, ref.Name, ref.Path)
 	}
-}
-
-// printJSONLines writes one JSON object per line.
-func printJSONLines[T any](entries []T) error {
-	for _, entry := range entries {
-		data, err := json.Marshal(entry)
-		if err != nil {
-			return err
-		}
-		iox.Fprintln(os.Stdout, string(data))
-	}
-	return nil
 }
 
 func withoutID(ids []string, remove string) []string {

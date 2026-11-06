@@ -334,7 +334,7 @@ func TestMachineStreamNamesTheTypeOfEventsTheCLIBuilds(t *testing.T) {
 	renderer := WithSessionRecording(newMachineV2Renderer(&live, "test,publish", true), session, false)
 	test := testCaseJob("app")
 	upload := dockerPublicationTestJob("/app", "app", "publish~docker~upload", "publish")
-	cached := &scheduler.JobResult{Status: string(scheduler.TaskStatusSuccess), CacheHit: true, Data: map[string]any{
+	cached := &scheduler.JobResult{Status: string(scheduler.TaskStatusSuccess), Reuse: scheduler.ReuseLocalCache, Data: map[string]any{
 		"coverageSummary": map[string]any{"percentage": 78.57, "granularity": "statements", "threshold": float64(70)},
 	}}
 	replayed := scheduler.RawJobEvent{

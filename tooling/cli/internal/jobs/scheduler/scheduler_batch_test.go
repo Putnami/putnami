@@ -602,7 +602,7 @@ func TestSchedulerBatchPreservesRowsCachesAndScalesCPUWeight(t *testing.T) {
 		t.Fatalf("warm invocation count = %d, want no additional subprocess", got)
 	}
 	for _, job := range planned {
-		if result := warm.Results[job.Key()]; result == nil || !result.CacheHit {
+		if result := warm.Results[job.Key()]; result == nil || !result.ReuseKind().CacheHit() {
 			t.Fatalf("warm %s = %+v, want independent task-owned cache hit", job.Key(), result)
 		}
 	}
@@ -615,10 +615,10 @@ func TestSchedulerBatchPreservesRowsCachesAndScalesCPUWeight(t *testing.T) {
 	if got := invocationCount(t, logPath); got != 2 {
 		t.Fatalf("mixed invocation count = %d, want one additional miss", got)
 	}
-	if mixed.Results["/a:lint~check-only"].CacheHit {
+	if mixed.Results["/a:lint~check-only"].ReuseKind().CacheHit() {
 		t.Fatal("changed project a unexpectedly hit cache")
 	}
-	if !mixed.Results["/b:lint~check-only"].CacheHit {
+	if !mixed.Results["/b:lint~check-only"].ReuseKind().CacheHit() {
 		t.Fatal("unchanged project b lost its independent cache hit")
 	}
 }

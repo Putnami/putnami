@@ -15,7 +15,7 @@ func TestCacheManagerRemoteFacade(t *testing.T) {
 	entry, digest := hitEntry("dist/out.txt", "artifact")
 	f := &inmemFetcher{blobs: map[string][]byte{digest: []byte("artifact")}}
 
-	if err := cm.Materialize(hashA, entry, f.fetch); err != nil {
+	if err := materializeFormatOneEntry(cm.Store(), hashA, entry, f.fetch); err != nil {
 		t.Fatalf("Materialize: %v", err)
 	}
 	copied, err := cm.Lookup(hashA)

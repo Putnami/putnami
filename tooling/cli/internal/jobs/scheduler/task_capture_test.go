@@ -1182,7 +1182,7 @@ func TestCleanSourceRewriterPublishesReusableStatusEntry(t *testing.T) {
 	if result.SourceMutated {
 		t.Fatal("an unchanged source tree was marked as mutated")
 	}
-	if hit := f.hitOrFail(t, job, hash); !hit.CacheHit || hit.SourceMutated {
+	if hit := f.hitOrFail(t, job, hash); !hit.ReuseKind().CacheHit() || hit.SourceMutated {
 		t.Fatalf("clean source-rewriter restore = %+v, want an ordinary clean hit", hit)
 	}
 }

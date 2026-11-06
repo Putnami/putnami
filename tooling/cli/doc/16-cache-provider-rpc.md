@@ -162,7 +162,7 @@ the directory as the socket's parent.
 credential, exactly as it does for task entries; an `ObjectPut` has no channel
 field, so a caller cannot claim one. A get filtered by `acceptChannels` omits
 non-matching objects, making them indistinguishable from a miss. An empty filter
-accepts every channel, including the legacy empty one.
+accepts every channel, including the empty channel of an entry without provenance.
 
 **Failure.** Best-effort like every other op: a caller that cannot reach the
 socket, or whose request fails, falls back to whatever local cache it already had.
@@ -174,8 +174,8 @@ credential instead of `PUTNAMI_CACHE_TOKEN`, which the engine removes from its
 environment. The credential never enters the provider's launch environment,
 arguments or files; it travels over the RPC.
 
-**Negotiation.** Core lists `run-credential` (`CapabilityRunCredential`) in the
-v1-bootstrap `InitializeParams.Capabilities` only when it holds a credential,
+**Negotiation.** Core lists `run-credential` (`CapabilityRunCredential`) in
+`InitializeParams.Capabilities` only when it holds a credential,
 so a local run's `initialize` never lists it. A provider that can
 take the credential echoes the capability in `InitializeResult.Capabilities`;
 it reports `ready` as it will be once authenticated.
@@ -199,7 +199,7 @@ file and no configuration variable, so it cannot say whether a remote cache is
 configured or in which materialization mode.
 
 **Negotiation.** Core lists `provider-configuration`
-(`CapabilityProviderConfiguration`) in the v1-bootstrap
+(`CapabilityProviderConfiguration`) in
 `InitializeParams.Capabilities` of every session and sends no
 `InitializeParams.mode`. A provider that resolves its configuration echoes the
 capability in `InitializeResult.Capabilities` and returns the materialization
@@ -220,11 +220,11 @@ outside the requested projects does too. Downloading those blobs costs bytes
 no job reads.
 
 **Negotiation.** Core lists `restore-result-only`
-(`CapabilityRestoreResultOnly`) in the v1-bootstrap
+(`CapabilityRestoreResultOnly`) in
 `InitializeParams.Capabilities` of every session. A provider that honors the
 two fields below echoes it in `InitializeResult.Capabilities`. Core sends
 either field only after the echo, so a provider that does not echo it receives
-the same `prefetch` and `restore` payloads as before and keeps parsing them
+`prefetch` and `restore` payloads without either field and keeps parsing them
 strictly.
 
 **The fields.** `RestoreParams.resultOnly: true` means core reads the hit's
@@ -298,16 +298,16 @@ publishing is selected by the tasks an extension's manifest declares.
 
 ## Version negotiation
 
-The `initialize` handshake deliberately starts at
-`ProviderProtocolMinVersion` (v1) in both its envelope and payload, so a
-deployed strict-v1 provider can parse the first message. Core adds
-`provider-protocol-v2` to the existing capabilities list; that field is already
-forward-tolerant, so a v1 provider ignores it and returns v1. A v2 provider that
-recognizes the capability returns v2 in `InitializeResult` (while echoing the
-v1 bootstrap in the response envelope), and the session uses the selected v1 or
-v2 version for every later operation. Values outside the supported range are
-rejected. This negotiated handshake — not any version string core reads off a
-manifest — is what establishes RPC compatibility.
+Core sends `initialize`, and every later request, at
+`ProviderProtocolVersion` (v2) in both the envelope and the payload.
+`ProviderProtocolMinVersion` is also 2, so a provider envelope of version 1 is
+refused. Core lists `provider-protocol-v2` in the capabilities, because a
+provider released at `cloud/v0.4.0` selects v2 only when it sees that
+capability. A provider that speaks only v1 never answers, so `initialize` times
+out and the run builds locally. An `InitializeResult` that selects a version
+outside the supported range, v1 included, fails `initialize`. This handshake,
+not any version string core reads off a manifest, establishes RPC
+compatibility.
 
 ## Division of responsibility
 

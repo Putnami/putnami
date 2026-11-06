@@ -33,9 +33,9 @@ const recordFinalizeEnv = "PUTNAMI_CLI_RECORD_PROPOSALS_FINALIZE"
 // stdout, the message, the branch head, the refs the origin holds and the
 // proposal and task records. The goldens hold what `putnami proposals
 // finalize`, the core command change finalize replaces, left in the same
-// workspace. Only the message prefix, putnami's warning about an undeclared
-// flag, the store's timestamps and random identity, and the run's own paths
-// in the message are not compared. A run that pushes nothing writes no record.
+// workspace. Only the message prefix, the message of an undeclared flag,
+// which putnami refuses itself, the store's timestamps and random identity,
+// and the run's own paths in the message are not compared. A run that pushes nothing writes no record.
 func TestChangeFinalizeMatchesProposalsFinalize(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("the harness launcher requires bash")
@@ -63,8 +63,9 @@ func TestChangeFinalizeMatchesProposalsFinalize(t *testing.T) {
 		message string
 		prefix  bool
 		pushed  bool
-		// undeclared is a flag the manifest does not declare: putnami warns
-		// about it before it launches the executable, and the core did not.
+		// undeclared is a flag the manifest does not declare: putnami refuses it
+		// before it launches the executable, with the core's exit code and its
+		// own message.
 		undeclared string
 	}{
 		{name: "a draft seed", args: append(publish[:len(publish):len(publish)], "--draft"), pushed: true},
@@ -102,16 +103,17 @@ func TestChangeFinalizeMatchesProposalsFinalize(t *testing.T) {
 				got = twin.outcome(t, run, run.stderr, "putnami: proposals finalize: ")
 			} else {
 				run := twin.launch(t, filepath.Join(harness, "putnami"), append([]string{"change", "finalize"}, args...)...)
-				stderr := run.stderr
 				if tc.undeclared != "" {
-					warning := "putnami: flag " + tc.undeclared + " is not declared by `change finalize`; "
-					line, rest, _ := strings.Cut(stderr, "\n")
-					if !strings.HasPrefix(line, warning) {
-						t.Fatalf("change finalize wrote %q to stderr, want a first line starting with %q", stderr, warning)
+					refusal := "putnami: flag " + tc.undeclared + " is not declared by `change finalize`"
+					if !strings.HasPrefix(run.stderr, refusal) {
+						t.Fatalf("change finalize wrote %q to stderr, want it to start with %q", run.stderr, refusal)
 					}
-					stderr = rest
+					// Every other part of the outcome is compared with the core's golden.
+					got = twin.outcome(t, run, "", "")
+					got.message = tc.message
+				} else {
+					got = twin.outcome(t, run, run.stderr, "change finalize: ")
 				}
-				got = twin.outcome(t, run, stderr, "change finalize: ")
 			}
 
 			if got.exit != tc.exit || !tc.prefix && got.message != tc.message || tc.prefix && !strings.HasPrefix(got.message, tc.message) {

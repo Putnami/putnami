@@ -59,7 +59,7 @@ func TestTaskStats_IgnoresCacheHitsFailuresAndCancels(t *testing.T) {
 	store := loadTaskStats(t.TempDir())
 	job := statJob("/cli", "lint")
 
-	store.record(job, &JobResult{Status: "success", Duration: time.Second, CacheHit: true})
+	store.record(job, &JobResult{Status: "success", Duration: time.Second, Reuse: ReuseLocalCache})
 	store.record(job, &JobResult{Status: "failed", Duration: time.Second})
 	store.record(job, &JobResult{Status: "canceled", Duration: time.Second})
 	store.record(job, &JobResult{Status: "success"}) // zero duration

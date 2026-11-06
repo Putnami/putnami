@@ -250,10 +250,10 @@ func TestEmitter_RoundTrip(t *testing.T) {
 		}
 	}
 
-	// Verify all events have v=1 and time set.
+	// Verify every event carries ProtocolVersion and a time.
 	for i, e := range events {
-		if e.V != 1 {
-			t.Errorf("event[%d].V = %d, want 1", i, e.V)
+		if e.V != ProtocolVersion {
+			t.Errorf("event[%d].V = %d, want %d", i, e.V, ProtocolVersion)
 		}
 		if e.Time == "" {
 			t.Errorf("event[%d].Time is empty", i)

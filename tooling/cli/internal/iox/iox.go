@@ -14,19 +14,19 @@ import (
 	"sync"
 )
 
-// stdoutCapture serializes the short-lived stdout captures the structured CLI
-// dispatcher uses while it turns legacy JSONL payloads into one ResultV2
-// document. Commands are process-local and run one at a time; the mutex keeps
-// tests and any future in-process callers from interleaving two captures.
+// stdoutCaptureMu serializes the short-lived stdout captures of CaptureStdout:
+// commands are process-local and run one at a time, and the mutex keeps two
+// in-process callers from interleaving their captures.
 var (
 	stdoutCaptureMu  sync.Mutex
 	stdoutOverrideMu sync.RWMutex
 	stdoutOverride   io.Writer
 )
 
-// Stdout returns the current stdout destination. Callers which need an
-// io.Writer (rather than one of the Fprint helpers below) use it so structured
-// dispatch can collect their payload before writing the command envelope.
+// Stdout returns the current stdout destination: the process stdout, or the
+// buffer of a running CaptureStdout. Callers which need an io.Writer (rather
+// than one of the Fprint helpers below) use it so a capture collects their
+// output too.
 func Stdout() io.Writer { return stdoutWriter{} }
 
 type stdoutWriter struct{}
@@ -42,8 +42,7 @@ func (stdoutWriter) Write(p []byte) (int, error) {
 
 // CaptureStdout runs fn with writes routed through this package's stdout
 // helpers collected in memory. It is deliberately narrow: it leaves stderr
-// alone and does not alter direct os.Stdout writes, which makes it safe for
-// the human-output paths and lets the dispatcher own the final machine result.
+// alone and does not alter direct os.Stdout writes.
 func CaptureStdout(fn func() error) (output string, err error) {
 	stdoutCaptureMu.Lock()
 	defer stdoutCaptureMu.Unlock()

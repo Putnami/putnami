@@ -77,7 +77,7 @@ func TestDrift_EmitterConformsToRuntimeProtocol(t *testing.T) {
 func TestDrift_ReadyWireShape(t *testing.T) {
 	spectest.Proves(t, "runtime/event-stream", "the-extension-sdk-emits-a-conforming-stream", "the-readiness-marker-has-the-protocol-wire-shape")
 	out := captureStdout(t, func() {
-		NewForVersion(runtime.ProtocolVersion2).Ready(runtime.ReadyData{
+		NewForVersion(runtime.ProtocolVersion).Ready(runtime.ReadyData{
 			Target: runtime.ReadyTargetServer,
 			Name:   "api",
 			Endpoints: []runtime.ReadyEndpoint{
@@ -109,8 +109,8 @@ func TestDrift_ReadyWireShape(t *testing.T) {
 	}
 
 	assertKeys(t, "envelope", line, []string{"data", "time", "type", "v"})
-	if line["v"] != float64(runtime.ProtocolVersion2) {
-		t.Errorf("ready line v = %v, want %d", line["v"], runtime.ProtocolVersion2)
+	if line["v"] != float64(runtime.ProtocolVersion) {
+		t.Errorf("ready line v = %v, want %d", line["v"], runtime.ProtocolVersion)
 	}
 	if line["type"] != string(runtime.EventReady) {
 		t.Errorf("ready line type = %v, want %q", line["type"], runtime.EventReady)

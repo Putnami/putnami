@@ -48,7 +48,7 @@ func TestSchedulerLocalTaskCacheHitRestoresResultEvents(t *testing.T) {
 
 	result := f.sched.Run(context.Background())
 	got := result.Results[job.Key()]
-	if got == nil || !got.CacheHit {
+	if got == nil || !got.ReuseKind().CacheHit() {
 		t.Fatalf("result = %+v, want task-owned cache hit", got)
 	}
 	if len(got.Events) != 3 {
@@ -99,10 +99,7 @@ func TestSchedulerDeclaredGenerateIgnoresFilesLessLegacyEntryAndRunsJob(t *testi
 	if err != nil {
 		t.Fatalf("compute task cache key: %v", err)
 	}
-	meta := &store.EntryMetadata{Extension: "@test/ext", Task: "build-generate", Project: "proj"}
-	if err := cm.Save(hash, &store.EntryResult{Status: "success"}, meta, ""); err != nil {
-		t.Fatalf("Save stale generate entry: %v", err)
-	}
+	writeFormatOneEntry(t, cm.StoreRoot(), hash)
 
 	renderer := &mockRenderer{}
 	scheduler := newScheduler(ws, []*ScheduledJob{job}, nil, SchedulerConfig{MaxParallel: 1}, renderer, cm)
@@ -112,7 +109,7 @@ func TestSchedulerDeclaredGenerateIgnoresFilesLessLegacyEntryAndRunsJob(t *testi
 	if got == nil {
 		t.Fatal("missing generate result")
 	}
-	if got.CacheHit {
+	if got.ReuseKind().CacheHit() {
 		t.Fatalf("legacy files-less entry was accepted as a task-owned cache hit: %+v", got)
 	}
 	if got.Status != "success" {
@@ -172,7 +169,7 @@ func TestSchedulerGenerateTaskCacheHitRematerializesGenTree(t *testing.T) {
 
 	result := newScheduler(ws, []*ScheduledJob{job}, nil, SchedulerConfig{MaxParallel: 1}, &mockRenderer{}, cache).Run(context.Background())
 	got := result.Results[job.Key()]
-	if got == nil || !got.CacheHit {
+	if got == nil || !got.ReuseKind().CacheHit() {
 		t.Fatalf("result = %+v, want task-owned cache hit", got)
 	}
 	if got := readFileAt(t, filepath.Join(genDir, "public", "docs", "index.html")); got != "<html>docs</html>" {
@@ -227,7 +224,7 @@ func TestSchedulerClientTaskCacheHitRematerializesConfiguredOutput(t *testing.T)
 
 	result := newScheduler(ws, []*ScheduledJob{job}, nil, SchedulerConfig{MaxParallel: 1}, &mockRenderer{}, cache).Run(context.Background())
 	got := result.Results[job.Key()]
-	if got == nil || !got.CacheHit {
+	if got == nil || !got.ReuseKind().CacheHit() {
 		t.Fatalf("result = %+v, want task-owned cache hit", got)
 	}
 	if got := readFileAt(t, filepath.Join(clientDir, "client.gen.go")); got != "package client\n" {
@@ -284,7 +281,7 @@ func TestSchedulerGenerateTaskCacheHitRematerializesGenAndClients(t *testing.T) 
 
 	result := newScheduler(ws, []*ScheduledJob{job}, nil, SchedulerConfig{MaxParallel: 1}, &mockRenderer{}, cache).Run(context.Background())
 	got := result.Results[job.Key()]
-	if got == nil || !got.CacheHit {
+	if got == nil || !got.ReuseKind().CacheHit() {
 		t.Fatalf("result = %+v, want task-owned cache hit", got)
 	}
 	if _, err := os.Stat(filepath.Join(genDir, "clientgen", "config.json")); err != nil {

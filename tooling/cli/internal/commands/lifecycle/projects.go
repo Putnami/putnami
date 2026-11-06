@@ -1,14 +1,15 @@
 package lifecycle
 
 import (
-	"encoding/json"
 	"fmt"
 	"os"
 	"sort"
 	"strings"
 
+	protocolcli "go.putnami.dev/protocol/cli"
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/tooling/cli/internal/cmderr"
+	"go.putnami.dev/tooling/cli/internal/commands/shared"
 	"go.putnami.dev/tooling/cli/internal/iox"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
@@ -25,8 +26,8 @@ func ProjectsList(wsRoot string, cfg *wsproto.Config, outputFormat string, warni
 
 	projects := sortedProjects(ws.Projects)
 
-	if outputFormat == "jsonl" {
-		return projectsListJSONL(projects)
+	if protocolcli.OutputMode(outputFormat).IsStructured() {
+		return shared.WriteResult(outputFormat, "projects list", projectsListData(projects), warnings.Envelope())
 	}
 
 	iox.Fprintln(os.Stdout)
@@ -66,8 +67,8 @@ func ProjectsDescribe(wsRoot string, cfg *wsproto.Config, args []string, outputF
 		return cmderr.Classify(fmt.Errorf("project not found: %s", projectName), cmderr.ErrNotFound)
 	}
 
-	if outputFormat == "jsonl" {
-		return projectDescribeJSONL(ws, proj)
+	if protocolcli.OutputMode(outputFormat).IsStructured() {
+		return shared.WriteResult(outputFormat, "projects describe", projectDetailFor(ws, proj), warnings.Envelope())
 	}
 
 	iox.Fprintln(os.Stdout)
@@ -122,31 +123,33 @@ func ProjectsDescribe(wsRoot string, cfg *wsproto.Config, args []string, outputF
 	return nil
 }
 
-// --- JSONL helpers ---
+// --- structured result data ---
 
-func projectsListJSONL(projects []*workspace.Project) error {
-	type projectEntry struct {
-		ID           string   `json:"id"`
-		Name         string   `json:"name"`
-		Version      string   `json:"version,omitempty"`
-		Path         string   `json:"path"`
-		Tags         []string `json:"tags,omitempty"`
-		Dependencies []string `json:"dependencies,omitempty"`
-	}
+// projectEntry is one project of the projects list result.
+type projectEntry struct {
+	ID           string   `json:"id"`
+	Name         string   `json:"name"`
+	Version      string   `json:"version,omitempty"`
+	Path         string   `json:"path"`
+	Tags         []string `json:"tags,omitempty"`
+	Dependencies []string `json:"dependencies,omitempty"`
+}
 
+// projectsListData is the data of the projects list result: one entry per
+// project, in the listing order.
+func projectsListData(projects []*workspace.Project) any {
+	entries := make([]projectEntry, 0, len(projects))
 	for _, p := range projects {
-		entry := projectEntry{
+		entries = append(entries, projectEntry{
 			ID:           p.ID,
 			Name:         p.Name,
 			Version:      p.Version,
 			Path:         p.Path,
 			Tags:         p.Tags,
 			Dependencies: p.Dependencies,
-		}
-		data, _ := json.Marshal(entry)
-		iox.Fprintln(os.Stdout, string(data))
+		})
 	}
-	return nil
+	return shared.RecordsData(entries)
 }
 
 func sortedProjects(projects []*workspace.Project) []*workspace.Project {
@@ -157,20 +160,21 @@ func sortedProjects(projects []*workspace.Project) []*workspace.Project {
 	return sorted
 }
 
-func projectDescribeJSONL(ws *workspace.Workspace, proj *workspace.Project) error {
-	type projectDetail struct {
-		ID           string   `json:"id"`
-		Name         string   `json:"name"`
-		Version      string   `json:"version,omitempty"`
-		Path         string   `json:"path"`
-		Tags         []string `json:"tags,omitempty"`
-		Dependencies []string `json:"dependencies,omitempty"`
-		Dependents   []string `json:"dependents,omitempty"`
-		Extensions   []string `json:"extensions,omitempty"`
-		Publish      []string `json:"publish,omitempty"`
-	}
+// projectDetail is the data of the projects describe result.
+type projectDetail struct {
+	ID           string   `json:"id"`
+	Name         string   `json:"name"`
+	Version      string   `json:"version,omitempty"`
+	Path         string   `json:"path"`
+	Tags         []string `json:"tags,omitempty"`
+	Dependencies []string `json:"dependencies,omitempty"`
+	Dependents   []string `json:"dependents,omitempty"`
+	Extensions   []string `json:"extensions,omitempty"`
+	Publish      []string `json:"publish,omitempty"`
+}
 
-	detail := projectDetail{
+func projectDetailFor(ws *workspace.Workspace, proj *workspace.Project) projectDetail {
+	return projectDetail{
 		ID:           proj.ID,
 		Name:         proj.Name,
 		Version:      proj.Version,
@@ -181,8 +185,4 @@ func projectDescribeJSONL(ws *workspace.Workspace, proj *workspace.Project) erro
 		Extensions:   proj.Extensions,
 		Publish:      proj.Publish,
 	}
-
-	data, _ := json.Marshal(detail)
-	iox.Fprintln(os.Stdout, string(data))
-	return nil
 }

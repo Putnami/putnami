@@ -49,20 +49,10 @@ func summaryRows(t *testing.T, wsRoot, since, commands string) []sessionSummaryR
 	if err != nil {
 		t.Fatalf("SessionsSummary(since=%q, command=%q): %v", since, commands, err)
 	}
-	// Exactly ONE document, always, and always an array. The shared capture in
-	// internal/cli unwraps a stream of one document into ResultV2.data, so this
-	// is what keeps `data` an array at every row count instead of null at zero
-	// and a bare object at one. Decoding strictly here is what would catch a
-	// regression back to a JSONL stream.
-	trimmed := strings.TrimSuffix(out, "\n")
-	if strings.Contains(trimmed, "\n") {
-		t.Fatalf("summary emitted %d documents, want exactly one JSON array:\n%s",
-			strings.Count(trimmed, "\n")+1, out)
-	}
+	// Exactly ONE result, whose data is an array at every row count, never
+	// null at zero and never a bare object at one.
 	var rows []sessionSummaryRow
-	if err := json.Unmarshal([]byte(trimmed), &rows); err != nil {
-		t.Fatalf("emitted document is not a summary row array: %v (%s)", err, trimmed)
-	}
+	sharedtest.ResultData(t, out, "sessions summary", &rows)
 	return rows
 }
 
@@ -220,12 +210,10 @@ func TestSessionsSummary_CommandFilterNeverReturnsANestedRun(t *testing.T) {
 
 // TestSessionsSummary_JSONIsAlwaysAnArray pins the shape a ledger binds to.
 //
-// The rows reach a consumer as ResultV2.data, and the shared capture in
-// internal/cli unwraps a stream of exactly one document. Emitting them as JSONL
-// would therefore make `data` null at zero rows and a BARE OBJECT at one — and
-// one row is the ordinary shape of `--command lint,test,build,validate` on a
-// fresh worktree, so `.data[]` would break on the most common case rather than
-// on an exotic one. One array document is unwrapped to itself.
+// The rows reach a consumer as ResultV2.data, an array at every count: never
+// null at zero rows and never a bare object at one. One row is the ordinary
+// shape of `--command lint,test,build,validate` on a fresh worktree, so a bare
+// object would break `.data[]` on the most common case.
 func TestSessionsSummary_JSONIsAlwaysAnArray(t *testing.T) {
 	ws := gateAndNestedStore(t)
 	for _, tc := range []struct {
@@ -244,14 +232,11 @@ func TestSessionsSummary_JSONIsAlwaysAnArray(t *testing.T) {
 			if err != nil {
 				t.Fatalf("SessionsSummary: %v", err)
 			}
-			trimmed := strings.TrimSuffix(out, "\n")
 			// A JSON array, decoded as one — never null, never an object.
 			var rows []sessionSummaryRow
-			if err := json.Unmarshal([]byte(trimmed), &rows); err != nil {
-				t.Fatalf("output is not a JSON array: %v (%s)", err, trimmed)
-			}
+			sharedtest.ResultData(t, out, "sessions summary", &rows)
 			if rows == nil {
-				t.Fatalf("output decoded to a nil slice (%s): `.data[]` breaks on null", trimmed)
+				t.Fatalf("data decoded to a nil slice (%s): `.data[]` breaks on null", out)
 			}
 			if len(rows) != tc.want {
 				t.Errorf("rows = %d, want %d", len(rows), tc.want)
@@ -496,9 +481,7 @@ func digestRows(t *testing.T, ws, since, commands string) []digestSummaryRow {
 		t.Fatalf("SessionsSummary(--by-digest): %v", err)
 	}
 	var rows []digestSummaryRow
-	if err := json.Unmarshal([]byte(strings.TrimSpace(out)), &rows); err != nil {
-		t.Fatalf("--by-digest output is not a digest row array: %v (%s)", err, out)
-	}
+	sharedtest.ResultData(t, out, "sessions summary", &rows)
 	if rows == nil {
 		t.Fatalf("--by-digest decoded to a nil slice (%s): `.data[]` breaks on null", out)
 	}

@@ -49,7 +49,7 @@ func readyEventFor(t *testing.T, data runtimeproto.ReadyData) jobs.RawJobEvent {
 		t.Fatalf("decode readiness payload: %v", err)
 	}
 	return jobs.RawJobEvent{
-		Version: runtimeproto.ProtocolVersion2,
+		Version: runtimeproto.ProtocolVersion,
 		Type:    jobs.EventTypeReady,
 		Time:    "2026-07-28T09:00:01.000Z",
 		Data:    payload,
@@ -75,7 +75,7 @@ func serverReadyEvent(t *testing.T) jobs.RawJobEvent {
 // sharpest available control for "the probe is really gone".
 func listeningLogEvent() jobs.RawJobEvent {
 	return jobs.RawJobEvent{
-		Version: runtimeproto.ProtocolVersion2,
+		Version: runtimeproto.ProtocolVersion,
 		Type:    jobs.EventTypeLog,
 		Level:   "info",
 		Message: "⚡️ listening http://localhost:3000",
@@ -194,7 +194,7 @@ func TestServeReadySignal_IgnoresReadyEventAtProtocolV1(t *testing.T) {
 	ready := signal.reset()
 
 	event := serverReadyEvent(t)
-	event.Version = runtimeproto.ProtocolVersion
+	event.Version = runtimeproto.ProtocolVersion1
 	signal.observe(event)
 
 	select {
@@ -219,7 +219,7 @@ func TestServeReadySignal_IgnoresUnactionableReadyPayloads(t *testing.T) {
 
 	cases := map[string]jobs.RawJobEvent{
 		"no payload at all": {
-			Version: runtimeproto.ProtocolVersion2,
+			Version: runtimeproto.ProtocolVersion,
 			Type:    jobs.EventTypeReady,
 		},
 		"target outside the closed vocabulary":    unknownTarget,
@@ -286,7 +286,7 @@ func TestReadyClaim_ThePortIsTheFirstHTTPEndpoint(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			event := jobs.RawJobEvent{Version: runtimeproto.ProtocolVersion2, Type: jobs.EventTypeReady}
+			event := jobs.RawJobEvent{Version: runtimeproto.ProtocolVersion, Type: jobs.EventTypeReady}
 			if err := json.Unmarshal(raw, &event.Data); err != nil {
 				t.Fatal(err)
 			}

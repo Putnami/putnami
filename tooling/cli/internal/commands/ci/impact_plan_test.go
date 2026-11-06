@@ -219,7 +219,7 @@ func TestRenderImpactPlanWritesOneEnvelope(t *testing.T) {
 		t.Fatalf("EmitImpactPlan: %v", err)
 	}
 
-	printed, err := iox.CaptureStdout(func() error { return RenderImpactPlan("json", document) })
+	printed, err := iox.CaptureStdout(func() error { return RenderImpactPlan("json", document, nil) })
 	if err != nil {
 		t.Fatalf("render: %v", err)
 	}
@@ -229,11 +229,20 @@ func TestRenderImpactPlanWritesOneEnvelope(t *testing.T) {
 		Status          string             `json:"status"`
 		Data            ciproto.ImpactPlan `json:"data"`
 	}
-	if err := json.Unmarshal([]byte(printed), &envelope); err != nil {
+	decoder := json.NewDecoder(strings.NewReader(printed))
+	if err := decoder.Decode(&envelope); err != nil {
 		t.Fatalf("decode printed plan: %v\n%s", err, printed)
 	}
-	if strings.Count(strings.TrimSpace(printed), "\n") != 0 {
-		t.Fatalf("structured output is not one envelope line:\n%s", printed)
+	if decoder.More() {
+		t.Fatalf("structured output is not one envelope:\n%s", printed)
+	}
+	// --output=jsonl frames the same envelope on one line.
+	compact, err := iox.CaptureStdout(func() error { return RenderImpactPlan("jsonl", document, nil) })
+	if err != nil {
+		t.Fatalf("render jsonl: %v", err)
+	}
+	if strings.Count(strings.TrimSpace(compact), "\n") != 0 {
+		t.Fatalf("jsonl output is not one envelope line:\n%s", compact)
 	}
 	if envelope.ProtocolVersion != protocolcli.ResultProtocolVersion || envelope.Command != "impact-plan" || envelope.Status == "" {
 		t.Fatalf("envelope = %+v, want a v%d impact-plan result", envelope, protocolcli.ResultProtocolVersion)
@@ -253,7 +262,7 @@ func TestRenderImpactPlanWritesOneEnvelope(t *testing.T) {
 		t.Fatalf("printed plan differs from the emitted plan:\n%s\n%s", printedBytes, documentBytes)
 	}
 
-	human, err := iox.CaptureStdout(func() error { return RenderImpactPlan("", document) })
+	human, err := iox.CaptureStdout(func() error { return RenderImpactPlan("", document, nil) })
 	if err != nil {
 		t.Fatalf("render human: %v", err)
 	}

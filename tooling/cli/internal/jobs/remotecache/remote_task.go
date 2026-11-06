@@ -1,38 +1,23 @@
 // Remote delivery for declared-capture tasks.
 //
-// An earlier change switched v3 tasks onto the task-owned entry model but left
-// them off the remote cache: a declared miss went straight to the local
-// claim-or-wait, and a declared hit was never shared. This file removes that
-// hole without adding a second restore path.
-//
-// The shape is deliberately the same as the legacy RemoteCache.Restore/Upload
-// pair — claim the machine-global address, ask the provider, verify, publish
-// locally — and stops there. It never touches the workspace: a successful
+// A restore claims the machine-global address, asks the provider, verifies,
+// publishes locally, and stops there. It never touches the workspace: a successful
 // restore returns the PUBLISHED LOCAL ENTRY, and the scheduler then materializes
 // it through restoreDeclaredCacheHit, the same function that serves a local hit
 // and a coalesced hit. So remote, local and coalesced share one materialize (the
 // one atomic primitive), and a remote hit is byte-identical to a local one by
 // construction rather than by review.
 //
-// Two rules of the legacy remote path are deliberately NOT carried over, because
-// the declared model makes them unrepresentable rather than merely unnecessary:
+// A task-owned descriptor states per output whether it is present or recorded
+// EMPTY, and IngestTaskEntry refuses to publish an entry whose required output
+// was not produced. So a files-less hit needs no acceptance rule of its own,
+// and an accepted hit restores exactly the declared set: a downstream job
+// cannot be left without an input the entry claimed to hold.
 //
-//   - The files-less acceptance rules (statusOnlyOptionalCaptureHit,
-//     skippedFilesLessHit, taskDeclaresNoOutput) exist because a legacy
-//     manifest cannot say whether "no files" means "produced
-//     nothing" or "captured nothing". A task-owned descriptor states it per
-//     output: a files-less entry means every declared output is recorded EMPTY,
-//     and IngestTaskEntry refuses to publish an entry whose required output was
-//     not produced. The acceptance question is answered by the payload itself.
-//   - The required-input bookkeeping (requiredInputs/HasFiles) exists for the
-//     same reason and is likewise subsumed: an accepted task-owned hit restores
-//     exactly the declared set, so a downstream job cannot be left without an
-//     input the entry claimed to hold.
-//
-// What IS carried over unchanged: the trust policy (a hint warms blobs and can
-// never return a green result), the source-mutation rejection, side-effecting
-// task exclusion, and best-effort semantics — every failure logs and degrades
-// to local execution, never to a broken build.
+// The trust policy (a hint warms blobs and can never return a green result),
+// the source-mutation rejection, the side-effecting task exclusion and
+// best-effort semantics hold: every failure logs and degrades to local
+// execution, never to a broken build.
 //
 // A hit whose files no job of the run reads takes the result-only path instead
 // (remote_result_only.go). That path writes nothing, so it cannot leave a reader
@@ -131,8 +116,8 @@ func (r *RemoteCache) restoreTaskEntry(
 	cm *store.CacheManager,
 	planned bool,
 ) (*store.TaskEntry, jobmodel.ReuseKind, error) {
-	// Claim the machine-global task-owned address before the network round trip,
-	// exactly as the legacy path claims the action key: sibling worktrees then
+	// Claim the machine-global task-owned address before the network round trip:
+	// sibling worktrees then
 	// wait for the resulting local entry instead of each asking their provider
 	// session to download the same blobs. Expiry, timeout and store errors all
 	// fall through to the direct provider call below.
@@ -145,8 +130,7 @@ func (r *RemoteCache) restoreTaskEntry(
 			// entry from the provider or executed the task is not observable from
 			// here, so this is reported as COALESCED and deliberately NOT counted as
 			// a provider hit: the owner's own run already accounts for whatever it
-			// did. (The legacy path attributes this case to the remote instead;
-			// keeping that would put a local execution in the provider hit column.)
+			// did, and a local execution never lands in the provider hit column.
 			return entry, jobmodel.ReuseCoalesced, nil
 		}
 	}
@@ -203,9 +187,8 @@ func (r *RemoteCache) restoreTaskEntry(
 		r.stats.RecordHintWarm()
 		return nil, jobmodel.ReuseNone, nil
 	}
-	// No source-mutation rejection here, unlike the legacy remote path — but for
-	// a different reason than "no such entry exists". A v3 source rewriter DOES
-	// publish under this address now (clean-only status entries), so the rule is
+	// No source-mutation rejection here. A v3 source rewriter publishes under
+	// this address (clean-only status entries), so the rule is
 	// enforced where every restore leg converges instead: a mutating result is
 	// never uploaded (scheduler_exec.go), and restoreDeclaredCacheHit rejects the
 	// marker whatever produced the entry. Returning the ENTRY rather than a
@@ -231,7 +214,7 @@ func (r *RemoteCache) restoreTaskEntry(
 	}
 	materializeEnd := time.Now()
 	if planned {
-		r.recordTaskRestoredHit(hash, entry, ManifestBytes(restore.Manifest), materializeStart, materializeEnd)
+		r.recordTaskRestoredHit(entry, ManifestBytes(restore.Manifest), materializeStart, materializeEnd)
 	} else {
 		// A fetch for a reader of the store is transfer, not reuse.
 		r.stats.RecordFetch(ManifestBytes(restore.Manifest))
@@ -241,30 +224,19 @@ func (r *RemoteCache) restoreTaskEntry(
 }
 
 // recordTaskRestoredHit folds a task-owned provider hit into this run's cache
-// stats through the legacy accounting, so hits, fetched bytes and saved time
-// read the same however the entry model differs. It is called only for a hit
+// stats through recordRestoredHit, the accounting every provider hit shares. It is called only for a hit
 // this call actually fetched: an entry a sibling published while we waited is
 // reported as coalesced and left out of the provider hit column.
 func (r *RemoteCache) recordTaskRestoredHit(
-	hash string,
 	entry *store.TaskEntry,
 	fetchedBytes int64,
 	materializeStart, materializeEnd time.Time,
 ) {
-	var durationMs, sizeBytes int64
+	var durationMs int64
 	if entry.Metadata != nil {
 		durationMs = entry.Metadata.DurationMs
-		sizeBytes = entry.Metadata.Size
 	}
-	r.recordRestoredHit(
-		hash,
-		cachekey.ActionResultFromEntryResult(entry.Result, durationMs, sizeBytes, r.actionEvents),
-		entry.Manifest,
-		durationMs,
-		fetchedBytes,
-		materializeStart,
-		materializeEnd,
-	)
+	r.recordRestoredHit(durationMs, fetchedBytes, materializeStart, materializeEnd)
 }
 
 // TaskUploadInput is uploadInput plus the two pieces the task-owned exchange
@@ -278,8 +250,8 @@ type TaskUploadInput struct {
 }
 
 // UploadTaskEntry schedules a freshly published task-owned entry to be shared
-// with the provider and returns immediately, on the same bounded background pool
-// as the legacy upload path. Best-effort: failures log and never fail the build.
+// with the provider and returns immediately, on the bounded background pool
+// (uploadWG, uploadSem). Best-effort: failures log and never fail the build.
 func (r *RemoteCache) UploadTaskEntry(ctx context.Context, hash string, job *jobmodel.ScheduledJob, cm *store.CacheManager) {
 	if r == nil || cm == nil {
 		return
@@ -323,8 +295,7 @@ func (r *RemoteCache) UploadTaskEntry(ctx context.Context, hash string, job *job
 }
 
 // prepareTaskUpload turns a published task-owned entry into the input to share
-// with the provider, applying the same eligibility rule as the legacy write
-// path: every entry is shared whatever its build duration or size, except the
+// with the provider: every entry is shared whatever its build duration or size, except the
 // entry of a job with external effects (jobmodel.HasExternalEffects). The
 // input keeps the cached events, which the upload drops when the provider did
 // not advertise action-events (providerResult). It returns ok=false when the

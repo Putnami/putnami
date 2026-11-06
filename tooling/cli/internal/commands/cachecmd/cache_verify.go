@@ -13,6 +13,7 @@ import (
 	protocolcli "go.putnami.dev/protocol/cli"
 	"go.putnami.dev/sdk/extension/gitread"
 	"go.putnami.dev/tooling/cli/internal/cmderr"
+	"go.putnami.dev/tooling/cli/internal/commands/shared"
 	"go.putnami.dev/tooling/cli/internal/git"
 	"go.putnami.dev/tooling/cli/internal/iox"
 	"go.putnami.dev/tooling/cli/internal/runcredential"
@@ -38,13 +39,15 @@ type CacheVerifyRunner func(
 
 // CacheVerifyCommand runs two live executions in independent worktrees/stores,
 // then restores the first run into a third pristine worktree and evaluates the
-// three cache-correctness invariants.
+// three cache-correctness invariants. warnings is the report runner writes the
+// workspace load warnings into; the structured result carries them.
 func CacheVerifyCommand(
 	ctx context.Context,
 	wsRoot string,
 	commands []string,
 	outputFormat string,
 	runner CacheVerifyRunner,
+	warnings *workspace.WarningReport,
 ) error {
 	if runner == nil {
 		return fmt.Errorf("cache verify engine adapter is not configured")
@@ -102,7 +105,7 @@ func CacheVerifyCommand(
 		runErr = protocolcli.WithResultData(cmderr.InvalidConfigf(
 			"cache verification found %d blocking determinism issue(s)", report.Summary.Blocking), report)
 	}
-	return renderCacheVerify(outputFormat, report, runErr)
+	return renderCacheVerify(outputFormat, report, runErr, warnings.Envelope())
 }
 
 func executeCacheVerificationRun(
@@ -196,14 +199,12 @@ func removeDetachedWorktrees(ctx context.Context, repoRoot string, targets []str
 	}
 }
 
-func renderCacheVerify(outputFormat string, report Report, runErr error) error {
+func renderCacheVerify(outputFormat string, report Report, runErr error, warnings []protocolcli.WorkspaceWarning) error {
 	if protocolcli.OutputMode(outputFormat).IsStructured() {
 		if runErr != nil {
 			return runErr
 		}
-		_, err := protocolcli.WriteResultV2(iox.Stdout(), protocolcli.OutputJSONL,
-			protocolcli.NewResultV2("cache verify", report, nil))
-		return err
+		return shared.WriteResult(outputFormat, "cache verify", report, warnings)
 	}
 	// "N with declared ambient inputs" rather than "N ambient": the counter is
 	// a count of DECLARATIONS, not of comparisons that were let off. Those

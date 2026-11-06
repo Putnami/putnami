@@ -35,9 +35,9 @@ func TestProjectsListAndDescribe_ServeTheLoadedGraph(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ProjectsList: %v", err)
 	}
-	rows := jsonlObjects(t, output)
-	if want := []string{"/apps/docs", "/apps/web", "/libs/core", "/libs/util"}; !sameStrings(jsonlIDs(t, output), want) {
-		t.Fatalf("listed ids = %v, want %v", jsonlIDs(t, output), want)
+	rows := resultObjects(t, output)
+	if want := []string{"/apps/docs", "/apps/web", "/libs/core", "/libs/util"}; !sameStrings(resultIDs(t, output), want) {
+		t.Fatalf("listed ids = %v, want %v", resultIDs(t, output), want)
 	}
 	for _, row := range rows {
 		id, _ := row["id"].(string)
@@ -57,7 +57,7 @@ func TestProjectsListAndDescribe_ServeTheLoadedGraph(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ProjectsDescribe: %v", err)
 	}
-	described := jsonlObjects(t, output)
+	described := resultObjects(t, output)
 	if len(described) != 1 {
 		t.Fatalf("describe = %v, want one object", described)
 	}

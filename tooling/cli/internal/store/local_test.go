@@ -7,7 +7,7 @@ import (
 	"testing"
 )
 
-func TestLocalStore_PutAndGet(t *testing.T) {
+func TestLocalStore_GetReadsAFormatOneEntry(t *testing.T) {
 	dir := t.TempDir()
 	s := NewLocalStore(dir)
 
@@ -27,7 +27,7 @@ func TestLocalStore_PutAndGet(t *testing.T) {
 	hash := "abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890"
 
 	// Put
-	if err := s.Put(hash, entry); err != nil {
+	if err := putFormatOneEntry(s, hash, entry); err != nil {
 		t.Fatalf("Put: %v", err)
 	}
 
@@ -56,7 +56,7 @@ func TestLocalStore_PutAndGet(t *testing.T) {
 	}
 }
 
-func TestLocalStore_PutWithFiles(t *testing.T) {
+func TestLocalStore_GetReadsAFormatOneEntryWithFiles(t *testing.T) {
 	dir := t.TempDir()
 	s := NewLocalStore(dir)
 
@@ -78,7 +78,7 @@ func TestLocalStore_PutWithFiles(t *testing.T) {
 
 	hash := "1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"
 
-	if err := s.Put(hash, entry); err != nil {
+	if err := putFormatOneEntry(s, hash, entry); err != nil {
 		t.Fatalf("Put: %v", err)
 	}
 
@@ -110,49 +110,6 @@ func TestLocalStore_PutWithFiles(t *testing.T) {
 	}
 }
 
-func TestLocalStore_PutExcludesThrowawayArtifacts(t *testing.T) {
-	dir := t.TempDir()
-	s := NewLocalStore(dir)
-
-	// Output dir mixes a real deliverable with throwaway lcov coverage shards.
-	srcDir := filepath.Join(t.TempDir(), "output")
-	os.MkdirAll(srcDir, 0o755)
-	os.WriteFile(filepath.Join(srcDir, "lcov.info"), []byte("real coverage report"), 0o644)
-	os.WriteFile(filepath.Join(srcDir, "lcov.info.0.tmp"), []byte("shard 0"), 0o644)
-	os.WriteFile(filepath.Join(srcDir, "lcov.info.1.tmp"), []byte("shard 1"), 0o644)
-
-	entry := &Entry{
-		Result:   &EntryResult{Status: "success"},
-		Metadata: &EntryMetadata{Extension: "ext", Task: "test", Project: "pkg"},
-		FilesDir: srcDir,
-	}
-
-	hash := "abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890"
-	if err := s.Put(hash, entry); err != nil {
-		t.Fatalf("Put: %v", err)
-	}
-
-	got, err := s.Get(hash)
-	if err != nil {
-		t.Fatalf("Get: %v", err)
-	}
-
-	// The real report is kept.
-	if _, err := os.Stat(filepath.Join(got.FilesDir, "lcov.info")); err != nil {
-		t.Errorf("expected lcov.info to be cached: %v", err)
-	}
-	// The temp shards are dropped.
-	for _, shard := range []string{"lcov.info.0.tmp", "lcov.info.1.tmp"} {
-		if _, err := os.Stat(filepath.Join(got.FilesDir, shard)); !os.IsNotExist(err) {
-			t.Errorf("expected %s to be excluded from cache, stat err = %v", shard, err)
-		}
-	}
-
-	if len(got.Metadata.OutputFiles) != 1 {
-		t.Errorf("OutputFiles count = %d, want 1 (temp shards excluded)", len(got.Metadata.OutputFiles))
-	}
-}
-
 func TestLocalStore_Get_NotFound(t *testing.T) {
 	dir := t.TempDir()
 	s := NewLocalStore(dir)
@@ -166,7 +123,7 @@ func TestLocalStore_Get_NotFound(t *testing.T) {
 	}
 }
 
-func TestLocalStore_ConcurrentPut(t *testing.T) {
+func TestLocalStore_ConcurrentFormatOnePublish(t *testing.T) {
 	dir := t.TempDir()
 	s := NewLocalStore(dir)
 
@@ -186,7 +143,7 @@ func TestLocalStore_ConcurrentPut(t *testing.T) {
 				Result:   &EntryResult{Status: "success"},
 				Metadata: &EntryMetadata{Extension: "ext", Task: "t", Project: "p"},
 			}
-			if err := s.Put(hash, entry); err != nil {
+			if err := putFormatOneEntry(s, hash, entry); err != nil {
 				t.Errorf("concurrent Put %s: %v", hash[:8], err)
 			}
 		}(h)
@@ -216,7 +173,7 @@ func TestLocalStore_BlobDirLayout(t *testing.T) {
 		Metadata: &EntryMetadata{Extension: "ext", Task: "t", Project: "p"},
 	}
 
-	s.Put(hash, entry)
+	putFormatOneEntry(s, hash, entry)
 
 	// Verify layout: blobs/ab/ab12cd34.../meta.json
 	expectedDir := filepath.Join(dir, "blobs", "ab", hash)
@@ -252,7 +209,7 @@ func TestLocalStore_PublishIsFirstWriterWins(t *testing.T) {
 		Result:   &EntryResult{Status: "success", Data: map[string]any{"v": float64(1)}},
 		Metadata: &EntryMetadata{Extension: "ext", Task: "t", Project: "p"},
 	}
-	s.Put(hash, entry1)
+	putFormatOneEntry(s, hash, entry1)
 
 	// A second put of the same hash must NOT clobber the first. The store is now
 	// machine-global and shared across worktrees; entries are content-addressed
@@ -262,7 +219,7 @@ func TestLocalStore_PublishIsFirstWriterWins(t *testing.T) {
 		Result:   &EntryResult{Status: "success", Data: map[string]any{"v": float64(2)}},
 		Metadata: &EntryMetadata{Extension: "ext", Task: "t", Project: "p"},
 	}
-	s.Put(hash, entry2)
+	putFormatOneEntry(s, hash, entry2)
 
 	got, err := s.Get(hash)
 	if err != nil {
@@ -283,7 +240,7 @@ func TestLocalStore_ConcurrentReadWrite(t *testing.T) {
 		Metadata: &EntryMetadata{Extension: "ext", Task: "t", Project: "p"},
 	}
 
-	if err := s.Put(hash, entry); err != nil {
+	if err := putFormatOneEntry(s, hash, entry); err != nil {
 		t.Fatalf("initial Put: %v", err)
 	}
 

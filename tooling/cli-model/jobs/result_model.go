@@ -82,9 +82,9 @@ const (
 // Reused reports whether the task's result was obtained without executing it.
 func (k ReuseKind) Reused() bool { return k != ReuseNone }
 
-// CacheHit reports whether the reuse was an ordinary cache hit — the predicate
-// JobResult.CacheHit encodes. Coalescing is reuse but not a hit: the entry did
-// not exist when this run asked for it.
+// CacheHit reports whether the reuse was an ordinary local or remote cache hit.
+// Coalescing is reuse but not a hit: the entry did not exist when this run
+// asked for it.
 func (k ReuseKind) CacheHit() bool {
 	return k == ReuseLocalCache || k == ReuseRemoteCache
 }

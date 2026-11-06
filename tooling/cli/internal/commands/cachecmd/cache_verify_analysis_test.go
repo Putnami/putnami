@@ -171,7 +171,7 @@ func newVerificationFixture(t *testing.T, firstKey, secondKey, firstBytes, secon
 
 	firstResult := &jobs.JobResult{Status: "success", CacheKey: firstKey}
 	secondResult := &jobs.JobResult{Status: "success", CacheKey: secondKey}
-	hitResult := &jobs.JobResult{Status: "success", CacheKey: firstKey, CacheHit: true}
+	hitResult := &jobs.JobResult{Status: "success", CacheKey: firstKey, Reuse: jobs.ReuseLocalCache}
 	tree := Tree{".gen/out.txt": "stable"}
 	return verificationFixture{
 		job: job, project: project,
@@ -211,7 +211,7 @@ func newGeneratedDirectoryVerificationFixture(t *testing.T) verificationFixture 
 
 	firstResult := &jobs.JobResult{Status: "success", CacheKey: "stable-key"}
 	secondResult := &jobs.JobResult{Status: "success", CacheKey: "stable-key"}
-	hitResult := &jobs.JobResult{Status: "success", CacheKey: "stable-key", CacheHit: true}
+	hitResult := &jobs.JobResult{Status: "success", CacheKey: "stable-key", Reuse: jobs.ReuseLocalCache}
 	tree := Tree{".gen/out.txt": "stable", ".gen/version.json": "first"}
 	return verificationFixture{
 		job: job, project: project,

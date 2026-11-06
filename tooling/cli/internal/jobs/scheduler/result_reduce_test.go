@@ -64,11 +64,11 @@ func tallyLegacyBuckets(results map[string]*JobResult) legacyBuckets {
 	var b legacyBuckets
 	for _, result := range results {
 		b.total++
-		if result.Coalesced {
+		if result.ReuseKind() == ReuseCoalesced {
 			b.coalesced++
 			continue
 		}
-		if result.CacheHit {
+		if result.ReuseKind().CacheHit() {
 			b.cached++
 			continue
 		}
@@ -193,7 +193,7 @@ func TestTaskResultOf_CarriesTheResultMeasurements(t *testing.T) {
 	}{
 		{"solo stream", &JobResult{Status: "success", Data: measured}},
 		{"batch member", &JobResult{Status: "success", Data: measured, Canonical: &TaskResult{Status: TaskStatusSuccess}}},
-		{"warm cache hit", &JobResult{Status: "success", Data: measured, CacheHit: true}},
+		{"warm cache hit", &JobResult{Status: "success", Data: measured, Reuse: ReuseLocalCache}},
 	} {
 		task := TaskResultOf(job, test.result)
 		if task.Tests == nil || task.Tests.Total != 4 || task.Tests.Passed != 3 || task.Tests.Skipped != 1 ||

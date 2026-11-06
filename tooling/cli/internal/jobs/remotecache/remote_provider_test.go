@@ -63,10 +63,6 @@ func serveJobsFakeProvider(stdin io.Reader, stdout io.Writer, getenv func(string
 	restoreEmpty := getenv("FAKE_RESTORE_EMPTY") == "1"
 	restoreStatus := getenv("FAKE_RESTORE_STATUS")
 	restoreChannel := cache.Channel(getenv("FAKE_RESTORE_CHANNEL"))
-	providerProtocolVersion := cache.ProviderProtocolVersion
-	if getenv("FAKE_PROVIDER_LEGACY") == "1" {
-		providerProtocolVersion = cache.ProviderProtocolMinVersion
-	}
 	objectCache := getenv("FAKE_OBJECT_CACHE") == "1"
 	objectChannel := cache.Channel(getenv("FAKE_OBJECT_CHANNEL"))
 	capabilitiesOut := getenv("FAKE_CAPABILITIES_OUT")
@@ -167,11 +163,6 @@ func serveJobsFakeProvider(stdin io.Reader, stdout io.Writer, getenv func(string
 			if initModeOut != "" && p != nil {
 				_ = os.WriteFile(initModeOut, []byte(p.Mode), 0o644)
 			}
-			negotiatedVersion := req.ProtocolVersion
-			if p != nil && providerProtocolVersion >= cache.ProviderProtocolProvenanceVersion &&
-				slices.Contains(p.Capabilities, cache.CapabilityProviderProtocolV2) {
-				negotiatedVersion = providerProtocolVersion
-			}
 			if capabilitiesOut != "" && p != nil {
 				_ = os.WriteFile(capabilitiesOut, []byte(strings.Join(p.Capabilities, ",")), 0o644)
 			}
@@ -202,7 +193,7 @@ func serveJobsFakeProvider(stdin io.Reader, stdout io.Writer, getenv func(string
 				mode = providerMode
 			}
 			ok(req.ProtocolVersion, req.ID, &cache.InitializeResult{
-				ProtocolVersion:   negotiatedVersion,
+				ProtocolVersion:   req.ProtocolVersion,
 				ProviderName:      fakeProviderExtensionName,
 				ProviderVersion:   fakeProviderVersion,
 				Capabilities:      capabilities,
@@ -238,7 +229,7 @@ func serveJobsFakeProvider(stdin io.Reader, stdout io.Writer, getenv func(string
 			if restoreEmpty {
 				// A status-only entry: a hit whose manifest has zero files, as the
 				// upload path shares for lint/test/describe results (see
-				// prepareUpload). No blob is staged; the exchange carries only the
+				// PrepareTaskUpload). No blob is staged; the exchange carries only the
 				// key→result mapping.
 				actionResult := &cache.ActionResult{Status: restoreStatus, DurationMs: 1500}
 				restoredCount++

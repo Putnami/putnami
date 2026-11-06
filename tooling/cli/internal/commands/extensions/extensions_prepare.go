@@ -2,13 +2,13 @@ package extensions
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"io"
-	"os"
 
+	protocolcli "go.putnami.dev/protocol/cli"
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/tooling/cli/internal/cmderr"
+	"go.putnami.dev/tooling/cli/internal/commands/shared"
 	"go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/iox"
 	"go.putnami.dev/tooling/cli/internal/jobs/scheduler"
@@ -24,9 +24,9 @@ var ErrHostedPrepare = cmderr.Classify(
 		runcredential.Flag),
 	cmderr.ErrUsage)
 
-// preparedRuntimeEntry is one line of `extensions prepare --output=jsonl`: a
-// runtime the command prepared, or found already prepared, in the artifact
-// store.
+// preparedRuntimeEntry is one record of the `extensions prepare` structured
+// result: a runtime the command prepared, or found already prepared, in the
+// artifact store.
 type preparedRuntimeEntry struct {
 	Kind       string `json:"kind"` // "extension-runtime"
 	Name       string `json:"name"`
@@ -41,10 +41,11 @@ type preparedRuntimeEntry struct {
 // it with the engine it built, so a hosted run of the same tree loads these
 // runtimes from the store and prepares none itself. A workspace whose lock pins
 // a published CLI has no such extension, and the command prepares nothing. A
-// hosted run is refused (ErrHostedPrepare). outputFormat "jsonl" writes one
-// preparedRuntimeEntry per runtime.
+// hosted run is refused (ErrHostedPrepare). A structured outputFormat
+// (--output=json|jsonl) writes one "extensions prepare" result whose data is
+// one preparedRuntimeEntry per runtime (shared.RecordsData).
 func ExtensionsPrepare(ctx context.Context, wsRoot string, cfg *wsproto.Config, outputFormat string) error {
-	return extensionsPrepare(ctx, wsRoot, cfg, outputFormat, os.Stdout)
+	return extensionsPrepare(ctx, wsRoot, cfg, outputFormat, iox.Stdout())
 }
 
 func extensionsPrepare(ctx context.Context, wsRoot string, cfg *wsproto.Config, outputFormat string, out io.Writer) error {
@@ -73,17 +74,14 @@ func extensionsPrepare(ctx context.Context, wsRoot string, cfg *wsproto.Config, 
 		return fmt.Errorf("prepare extension runtimes: %w", err)
 	}
 
-	if outputFormat == "jsonl" {
+	if protocolcli.OutputMode(outputFormat).IsStructured() {
+		entries := make([]preparedRuntimeEntry, 0, len(built))
 		for _, ext := range built {
-			data, err := json.Marshal(preparedRuntimeEntry{
+			entries = append(entries, preparedRuntimeEntry{
 				Kind: "extension-runtime", Name: ext.Name, Digest: ext.RuntimeDigest, Executable: ext.RuntimeExecutable,
 			})
-			if err != nil {
-				return fmt.Errorf("encode prepared runtime of %s: %w", ext.Name, err)
-			}
-			iox.Fprintln(out, string(data))
 		}
-		return nil
+		return shared.WriteResultTo(out, outputFormat, "extensions prepare", shared.RecordsData(entries), nil)
 	}
 	if len(built) == 0 {
 		iox.Fprintln(out, "  No extension runtime to prepare: no path extension of this workspace serves a provider from the source build.")

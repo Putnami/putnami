@@ -122,7 +122,7 @@ func TestSourceRewriterKeysProjectConfigBytes(t *testing.T) {
 	if result.SourceMutated {
 		t.Fatal("a formatter that left an already-formatted config unchanged was marked as mutating")
 	}
-	if hit := f.hitOrFail(t, rewriter, formatted); !hit.CacheHit || hit.SourceMutated {
+	if hit := f.hitOrFail(t, rewriter, formatted); !hit.ReuseKind().CacheHit() || hit.SourceMutated {
 		t.Fatalf("clean formatter restore = %+v, want an ordinary warm hit", hit)
 	}
 

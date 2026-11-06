@@ -353,7 +353,7 @@ func TestScheduler_RestoreWaitsForTheTaskOutputHolder(t *testing.T) {
 
 	requireSuccess(t, "executing", <-first, firstJob.Key())
 	restored := requireSuccess(t, "restoring", <-second, firstJob.Key())
-	if !restored.CacheHit {
+	if !restored.ReuseKind().CacheHit() {
 		t.Fatalf("the restoring session executed instead of restoring: %+v", restored)
 	}
 	if got := readFileAt(t, f.endState); got != "a-begin\na-end\n" {

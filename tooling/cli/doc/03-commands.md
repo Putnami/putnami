@@ -319,8 +319,10 @@ as an asset. A path no project owns is reported and the command exits 0.
 `--dependents` lists the projects that depend on it instead, and `--transitive`
 follows the edges to the end of the graph instead of stopping at direct ones.
 The project itself is never listed, and the projects come out sorted by ID.
-`--output=jsonl` prints one object per project with `id`, `name`, `path`,
-`direction` (`dependencies` or `dependents`) and `transitive`.
+With `--output=json` or `--output=jsonl`, each project is one record of the
+result's `data`, with `id`, `name`, `path`, `direction` (`dependencies` or
+`dependents`) and `transitive`. One record is `data` itself, several are an
+array, and none is `[]`.
 
 `projects why <from> <to>` answers whether a change to `<from>` impacts `<to>`.
 It walks the graph `--impacted` widens with, over the same task index, and prints
@@ -341,7 +343,7 @@ List workspace scopes — the path-keyed groupings declared by `putnami.json`
 
 ```bash
 putnami scopes list                          # Tabular view (scope, projects, groups, tags)
-putnami scopes list --output=jsonl           # Structured output (one ScopeInfo per line)
+putnami scopes list --output=jsonl           # Structured output (one ScopeInfo record per scope in data)
 ```
 
 ### Infrastructure plan
@@ -589,7 +591,7 @@ that names it. When a template is declared more than once across
 would leave another entry in effect, the command stops before writing the lock
 and names the template. `--dry-run` lists each pin it would move. `extensions update`
 and `templates update` follow the same rule; with `--output=jsonl`, their
-events carry the replaced value as `replacesPin` and a stale global pin as
+records carry the replaced value as `replacesPin` and a stale global pin as
 `globalPin`.
 
 `--from-source` is the self-host escape hatch: it builds and installs the CLI from `tooling/cli/cmd/putnami` (add `--global` to replace the global binary), bypassing the download channel. See [Version Management](14-version-management.md#self-hosting-a-local-cli-build).
@@ -787,7 +789,8 @@ extension of that workspace qualifies when it declares a provider command, such
 as `cache-provider`, and its `runtime.prepare` builds its runtime. For each
 one, the command admits the runtime to the artifact store. It runs the prepare
 command only when the store holds no runtime for the current inputs. It prints
-one line per runtime, or one JSON line each with `--output=jsonl`. In any other
+one line per runtime, or, with `--output=jsonl`, one record each in the
+result's `data`. In any other
 workspace it prepares nothing.
 
 The command resolves each prepare toolchain to exactly the release the lock
@@ -1019,7 +1022,7 @@ Three codes are repository hygiene rather than production readiness and never bl
 
 `putnami doctor` also checks the workstation the workspace is checked out on. These findings are scoped to the workspace root (`/`), never block a profile, and are waivable. `doctor.crlf_checkout` reports tracked text files that the working tree holds with CRLF endings while the commit has LF, or `core.autocrlf=true` with no `.gitattributes` rule that sets `eol=lf`. On Windows only, `doctor.long_paths_disabled` reports that the `LongPathsEnabled` registry value (`HKLM\SYSTEM\CurrentControlSet\Control\FileSystem`) is not 1, `doctor.git_long_paths_disabled` reports that Git does not set `core.longpaths`, and `doctor.vc_runtime_missing` reports that `vcruntime140.dll` is not in the Windows system directory, so Biome, which `@putnami/typescript` runs to lint and format TypeScript, cannot start. The human report prints each finding's fix. The production gate inside job commands does not run these checks.
 
-`putnami doctor --machine` skips the preflight and reports the machine load: the one-minute load average divided by the logical CPU count, printed as a ratio such as `0.50`, or `unknown` when the host cannot report it. With `--output=json` it prints `{"known":true,"oneMinute":2,"cpus":4,"ratio":0.5}`, or `{"known":false}`. Passing `--profile` or `--project` with `--machine` is a usage error.
+`putnami doctor --machine` skips the preflight and reports the machine load: the one-minute load average divided by the logical CPU count, printed as a ratio such as `0.50`, or `unknown` when the host cannot report it. With `--output=json` the result's `data` is `{"known":true,"oneMinute":2,"cpus":4,"ratio":0.5}`, or `{"known":false}`. Passing `--profile` or `--project` with `--machine` is a usage error.
 
 The same gate runs inside a job command: `putnami <jobs> --profile production` aborts between plan and execution on an unwaived high/critical finding, so nothing runs against a workspace that would fail the preflight.
 

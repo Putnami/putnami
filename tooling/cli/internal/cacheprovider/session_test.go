@@ -49,7 +49,7 @@ type fakeProviderConfig struct {
 	crashOp         string // exit mid-op (drives crash fallback)
 	failOp          string // answer this op with ok=false (drives the OpError path)
 	badInitVersion  bool   // answer initialize with an unsupported protocol version
-	protocolVersion int    // 0 accepts v1/v2; non-zero emulates a strict legacy provider
+	protocolVersion int    // 0 accepts every version the protocol parses; non-zero answers only that version
 	seenVersions    chan<- int
 	// objectCache selects how the fake answers the object-cache negotiation (see
 	// the objectCache* constants). The zero value serves no object cache at all,
@@ -88,10 +88,6 @@ func serveFakeProvider(stdin io.Reader, stdout io.Writer, cfg fakeProviderConfig
 	hangOp := cfg.hangOp
 	crashOp := cfg.crashOp
 	failOp := cfg.failOp
-	providerProtocolVersion := cfg.protocolVersion
-	if providerProtocolVersion == 0 {
-		providerProtocolVersion = cache.ProviderProtocolVersion
-	}
 	var exchangeDir string
 	var objectServer *objectcachetest.Server
 	defer func() {
@@ -129,9 +125,9 @@ func serveFakeProvider(stdin io.Reader, stdout io.Writer, cfg fakeProviderConfig
 			fmt.Fprintf(os.Stderr, "fake provider: bad request: %v\n", diags)
 			continue
 		}
-		// A deployed v1 provider rejects a v2 envelope before it can return an
-		// InitializeResult. Model that strict behavior by deliberately providing
-		// no response for a mismatched request.
+		// A provider that speaks only one version refuses any other envelope
+		// before it can return an InitializeResult. Model that by deliberately
+		// providing no response for a mismatched request.
 		if cfg.protocolVersion != 0 && req.ProtocolVersion != cfg.protocolVersion {
 			continue
 		}
@@ -173,9 +169,6 @@ func serveFakeProvider(stdin io.Reader, stdout io.Writer, cfg fakeProviderConfig
 				}
 			}
 			ver := req.ProtocolVersion
-			if p != nil && providerProtocolVersion > req.ProtocolVersion && hasCapability(p.Capabilities, cache.CapabilityProviderProtocolV2) {
-				ver = providerProtocolVersion
-			}
 			if cfg.badInitVersion {
 				ver = 999
 			}
@@ -421,12 +414,11 @@ func TestSession_RoundTrip(t *testing.T) {
 	}
 }
 
-// TestSession_InitialVersionNegotiation proves the first initialize request
-// uses the v1 bootstrap and that a v2 provider then upgrades later requests.
-// The fake selects v2 only after it sees CapabilityProviderProtocolV2 in the
-// v1 initialize payload, so this covers both directions of the negotiation.
-func TestSession_InitialVersionNegotiation(t *testing.T) {
-	spectest.Proves(t, "cache/remote-cache-contract", "the-session-bootstraps-at-version-1", "the-cli-bootstraps-at-1-and-follows-the-selected-version")
+// TestSession_EveryRequestTravelsAtVersion2 proves the initialize request and
+// every later one travel at ProviderProtocolVersion, and that the session
+// accepts a provider that selects it.
+func TestSession_EveryRequestTravelsAtVersion2(t *testing.T) {
+	spectest.Proves(t, "cache/remote-cache-contract", "the-session-bootstraps-at-version-2", "the-cli-sends-every-request-at-2-and-lists-the-v2-capability")
 	versions := make(chan int, 3)
 	s := connectFake(t, fakeProviderConfig{seenVersions: versions})
 
@@ -438,38 +430,32 @@ func TestSession_InitialVersionNegotiation(t *testing.T) {
 		t.Fatalf("summary after v2 negotiation: %v", err)
 	}
 
-	if got := <-versions; got != cache.ProviderProtocolMinVersion {
-		t.Fatalf("initialize envelope version = %d, want v%d bootstrap", got, cache.ProviderProtocolMinVersion)
+	if got := <-versions; got != cache.ProviderProtocolVersion {
+		t.Fatalf("initialize envelope version = %d, want v%d", got, cache.ProviderProtocolVersion)
 	}
 	if got := <-versions; got != cache.ProviderProtocolVersion {
-		t.Fatalf("post-initialize envelope version = %d, want negotiated v%d", got, cache.ProviderProtocolVersion)
+		t.Fatalf("post-initialize envelope version = %d, want v%d", got, cache.ProviderProtocolVersion)
 	}
 }
 
-// TestSession_LegacyV1Provider exercises the real stdio subprocess path against
-// a provider that strictly rejects every envelope and initialize body except
-// v1. It therefore fails if the session ever starts (or later continues) at v2.
-func TestSession_LegacyV1Provider(t *testing.T) {
-	spectest.Proves(t, "cache/remote-cache-contract", "the-session-bootstraps-at-version-1", "the-cli-bootstraps-at-1-and-follows-the-selected-version")
-	s := spawnFake(t, "FAKE_PROTOCOL_VERSION="+strconv.Itoa(cache.ProviderProtocolMinVersion))
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+// TestSession_StrictV1ProviderFailsInitialize exercises the real stdio
+// subprocess path against a provider that refuses every envelope except
+// version 1. It never answers the version 2 initialize, so Initialize fails and
+// the build runs without the remote cache.
+func TestSession_StrictV1ProviderFailsInitialize(t *testing.T) {
+	spectest.Proves(t, "cache/remote-cache-contract", "the-session-bootstraps-at-version-2", "the-cli-refuses-an-unsupported-version")
+	s := spawnFake(t, "FAKE_PROTOCOL_VERSION=1")
+	ctx, cancel := context.WithTimeout(context.Background(), 300*time.Millisecond)
 	defer cancel()
 
-	init, err := s.Initialize(ctx, &cache.InitializeParams{
+	if _, err := s.Initialize(ctx, &cache.InitializeParams{
 		ProtocolVersion: cache.ProviderProtocolVersion,
 		BlobExchangeDir: t.TempDir(),
 		Mode:            cache.ModeFull,
 		Workspace:       "ws-id",
 		Branch:          "main",
-	})
-	if err != nil {
-		t.Fatalf("initialize strict v1 provider: %v", err)
-	}
-	if init.ProtocolVersion != cache.ProviderProtocolMinVersion {
-		t.Fatalf("initialize negotiated v%d, want legacy v%d", init.ProtocolVersion, cache.ProviderProtocolMinVersion)
-	}
-	if _, err := s.Summary(ctx, nil); err != nil {
-		t.Fatalf("summary through strict v1 provider: %v", err)
+	}); err == nil {
+		t.Fatal("initialize succeeded against a provider that speaks only version 1")
 	}
 }
 
@@ -549,7 +535,7 @@ func TestSession_OpError(t *testing.T) {
 // gate: an initialize result advertising an unsupported provider protocol
 // version is rejected.
 func TestSession_InitProtocolMismatch(t *testing.T) {
-	spectest.Proves(t, "cache/remote-cache-contract", "the-session-bootstraps-at-version-1", "the-cli-refuses-an-unsupported-version")
+	spectest.Proves(t, "cache/remote-cache-contract", "the-session-bootstraps-at-version-2", "the-cli-refuses-an-unsupported-version")
 	s := connectFake(t, fakeProviderConfig{badInitVersion: true})
 	_, err := s.Initialize(context.Background(), &cache.InitializeParams{
 		ProtocolVersion: cache.ProviderProtocolVersion,
@@ -673,7 +659,7 @@ func drainRequests(requests <-chan string) []string {
 	}
 }
 
-// initializeLine is the exact bootstrap line core sends for mustInit's params
+// initializeLine is the exact initialize line core sends for mustInit's params
 // with capabilities, the JSON array body.
 func initializeLine(t *testing.T, exchangeDir, capabilities string) string {
 	t.Helper()
@@ -681,7 +667,7 @@ func initializeLine(t *testing.T, exchangeDir, capabilities string) string {
 	if err != nil {
 		t.Fatal(err)
 	}
-	return `{"protocolVersion":1,"id":1,"op":"initialize","payload":{"protocolVersion":1,"blobExchangeDir":` + string(dir) +
+	return `{"protocolVersion":2,"id":1,"op":"initialize","payload":{"protocolVersion":2,"blobExchangeDir":` + string(dir) +
 		`,"mode":"full","workspace":"ws-id","branch":"main","capabilities":[` + capabilities + `]}}`
 }
 

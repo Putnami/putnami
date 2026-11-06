@@ -325,11 +325,9 @@ func numberValue(value any) float64 {
 	}
 }
 
-// sessionsListJSONL emits the listed sessions as ONE JSON array, empty
-// included, so the structured result's data is an array at every count (see
-// printSummaryRowsJSON). A line per session put a bare object under data for
-// one session, and a human message for none.
-func sessionsListJSONL(store *workspace_state.SessionStore, sessions []string, latestID string, identities map[string]sessionIdentity) error {
+// sessionsListData is the data of the sessions list result: one entry per
+// listed session, as an array at every count, empty included.
+func sessionsListData(store *workspace_state.SessionStore, sessions []string, latestID string, identities map[string]sessionIdentity) []any {
 	entries := make([]any, 0, len(sessions))
 	for _, id := range sessions {
 		meta, err := readSessionMeta(store, id)
@@ -359,15 +357,12 @@ func sessionsListJSONL(store *workspace_state.SessionStore, sessions []string, l
 		}
 		entries = append(entries, entry)
 	}
-	data, err := json.Marshal(entries)
-	if err != nil {
-		return err
-	}
-	iox.Fprintln(os.Stdout, string(data))
-	return nil
+	return entries
 }
 
-func sessionInspectJSONL(meta *workspace_state.SessionMetadata, plan *workspace_state.PlanSnapshot, events []workspace_state.SessionEvent) error {
+// sessionInspectData is the data of the sessions inspect result: the session
+// metadata, with its plan and events when it recorded them.
+func sessionInspectData(meta *workspace_state.SessionMetadata, plan *workspace_state.PlanSnapshot, events []workspace_state.SessionEvent) map[string]any {
 	output := map[string]any{
 		"metadata": meta,
 	}
@@ -377,13 +372,7 @@ func sessionInspectJSONL(meta *workspace_state.SessionMetadata, plan *workspace_
 	if len(events) > 0 {
 		output["events"] = events
 	}
-
-	data, err := json.MarshalIndent(output, "", "  ")
-	if err != nil {
-		return err
-	}
-	iox.Fprintln(os.Stdout, string(data))
-	return nil
+	return output
 }
 
 func formatDurationMs64(ms int64) string {
