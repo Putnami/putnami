@@ -16,11 +16,11 @@
   "requirements": [
     {
       "id": "rust-crates-are-components",
-      "text": "Walking past .git, target, node_modules, vendor and hidden directories, each directory the root Cargo.toml [workspace] members globs match, less its exclude globs, that holds a Cargo.toml is a component of source workspace, and so is a root with a [package] table beside its [workspace]. Each other Cargo.toml with a [package] table is one of source manifest. Its id is its directory, its name the package name, its ecosystem rust. A Cargo.toml that does not parse is a diagnostic."
+      "text": "Walking past .git, target, node_modules, vendor and hidden directories, each directory the root Cargo.toml [workspace] members globs match, less those at or below an exclude entry, that holds a Cargo.toml is a component of source workspace, and so is a root with a [package] table beside its [workspace]. Each other Cargo.toml with a [package] table is one of source manifest. Its id is its directory, its name the package name, its ecosystem rust. A Cargo.toml that does not parse is a diagnostic."
     },
     {
       "id": "rust-crate-edges",
-      "text": "A crate depends on another when an entry of its [dependencies], [dev-dependencies] or [build-dependencies], or of the same tables under a [target] platform, gives a path resolved against its own directory, or gives workspace = true for a workspace member and the root [workspace.dependencies] gives that entry a path resolved against the root. A registry or git dependency, a path outside the repository or to no component, and the crate itself are no edge."
+      "text": "A crate depends on another when an entry of its [dependencies], [dev-dependencies] or [build-dependencies], or of the same tables under a [target] platform, gives a path resolved against its own directory, or gives workspace = true for a workspace member, and the root [workspace.dependencies] gives that entry a path resolved against the root. A registry or git dependency, a path outside the repository or to no component, and the crate itself are no edge."
     },
     {
       "id": "rust-probe-answer",
