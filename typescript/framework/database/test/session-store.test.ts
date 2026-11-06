@@ -230,18 +230,20 @@ describe.skipIf(!dockerAvailable)('DatabaseSessionStore', () => {
       const config = useConfig(SessionConfig);
       const expectedTTL = config.ttl * 1000; // Convert to milliseconds
 
+      // setAllAsync computes expires_at from the host clock, so the bounds come from the host clock
+      // too: the database clock of created_at may drift from it.
+      const before = Date.now();
       await store.setAllAsync(sessionId, { userId: 'user-123' });
+      const after = Date.now();
 
-      // postgres.camel transforms expires_at to expiresAt and created_at to createdAt
-      const result = await sql<{ expiresAt: Date; createdAt: Date }[]>`
-        SELECT expires_at, created_at FROM sessions WHERE session_id = ${sessionId}
+      // postgres.camel transforms expires_at to expiresAt
+      const result = await sql<{ expiresAt: Date }[]>`
+        SELECT expires_at FROM sessions WHERE session_id = ${sessionId}
       `;
       const expiresAt = result[0]?.expiresAt instanceof Date ? result[0].expiresAt : new Date(result[0].expiresAt);
-      const createdAt = result[0]?.createdAt instanceof Date ? result[0].createdAt : new Date(result[0].createdAt);
-      const actualTTL = expiresAt.getTime() - createdAt.getTime();
 
-      // Allow 1 second tolerance
-      expect(Math.abs(actualTTL - expectedTTL)).toBeLessThan(1000);
+      expect(expiresAt.getTime()).toBeGreaterThanOrEqual(before + expectedTTL);
+      expect(expiresAt.getTime()).toBeLessThanOrEqual(after + expectedTTL);
     });
   });
 
