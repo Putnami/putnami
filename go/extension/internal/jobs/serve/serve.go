@@ -418,14 +418,20 @@ func killProcessOnPort(port string) bool {
 		if err != nil {
 			return false
 		}
-		killed := false
-		for _, pid := range strings.Fields(string(out)) {
-			pidNumber, err := strconv.Atoi(pid)
-			if err != nil || pidNumber < 1 {
-				continue
+		// -t prints one process id per line. Any other line means the program
+		// is not the lsof that answers this query, such as the BusyBox applet
+		// that lists every open file: nothing is killed.
+		var pids []int
+		for _, line := range strings.Split(strings.TrimSpace(string(out)), "\n") {
+			pid, err := strconv.Atoi(line)
+			if err != nil || pid < 1 || strconv.Itoa(pid) != line {
+				return false
 			}
-			// PID is normalized from lsof's decimal output.
-			if exec.Command("kill", "-9", strconv.Itoa(pidNumber)).Run() == nil { //nolint:gosec
+			pids = append(pids, pid)
+		}
+		killed := false
+		for _, pid := range pids {
+			if process, err := os.FindProcess(pid); err == nil && process.Kill() == nil {
 				killed = true
 			}
 		}

@@ -19,8 +19,8 @@ import (
 // tests: "listener" listens on a free loopback port, writes it to the file
 // named by killPortHelperFileEnv and reads every connection it accepts;
 // "client" connects to the port killPortHelperPortEnv names, then writes the
-// file named by killPortHelperFileEnv. Both run until a signal ends them, or
-// exit 3 after 10 minutes.
+// file named by killPortHelperFileEnv; "idle" only writes that file. Each runs
+// until a signal ends it, or exits 3 after 10 minutes.
 const (
 	killPortHelperEnv     = "PUTNAMI_GO_SERVE_KILL_PORT_HELPER"
 	killPortHelperFileEnv = "PUTNAMI_GO_SERVE_KILL_PORT_HELPER_FILE"
@@ -50,6 +50,10 @@ func TestKillPortHelperProcess(t *testing.T) {
 			}
 			go func() { _, _ = io.Copy(io.Discard, conn) }()
 		}
+	case "idle":
+		writeHelperFile(file, "ready")
+		time.Sleep(10 * time.Minute)
+		os.Exit(3)
 	case "client":
 		conn, err := net.Dial("tcp", "127.0.0.1:"+os.Getenv(killPortHelperPortEnv))
 		if err != nil {
@@ -152,5 +156,33 @@ func TestKillProcessOnPort_KillsTheListenerAndNotItsClient(t *testing.T) {
 	}
 	if sig := exitSignal(t, "client", clientDone, 30*time.Second); sig != syscall.SIGTERM {
 		t.Errorf("the client ended with %v, want %v: kill-port killed a process that does not listen on the port", sig, syscall.SIGTERM)
+	}
+}
+
+// An lsof that prints anything but one process id per line, such as the
+// BusyBox applet that ignores its arguments and lists every open file, makes
+// --kill-port kill nothing.
+func TestKillProcessOnPort_KillsNothingWhenLsofPrintsMoreThanProcessIDs(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("kill-port is not available on Windows")
+	}
+	idle, _, idleDone := startKillPortHelper(t, "idle")
+	pid := strconv.Itoa(idle.Process.Pid)
+
+	bin := t.TempDir()
+	busybox := "#!/bin/sh\nprintf '" + pid + "\\t/bin/sleep\\t/dev/null\\n'\n"
+	if err := os.WriteFile(filepath.Join(bin, "lsof"), []byte(busybox), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", bin+string(os.PathListSeparator)+os.Getenv("PATH"))
+
+	if killProcessOnPort("8080") {
+		t.Error("killProcessOnPort(8080) = true, want false for output that is not process ids")
+	}
+	if err := idle.Process.Signal(syscall.SIGTERM); err != nil {
+		t.Fatalf("signal the idle helper: %v", err)
+	}
+	if sig := exitSignal(t, "idle helper", idleDone, 30*time.Second); sig != syscall.SIGTERM {
+		t.Errorf("the idle helper ended with %v, want %v: kill-port killed a process lsof did not name as a listener", sig, syscall.SIGTERM)
 	}
 }
