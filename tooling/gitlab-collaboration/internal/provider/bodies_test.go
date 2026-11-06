@@ -2,6 +2,7 @@ package provider
 
 import (
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -120,9 +121,9 @@ func quoteJSON(value string) string {
 	return builder.String()
 }
 
-// TestTheBodyEscapeIsExactAndSparesFencedCode holds escapeBody and
-// unescapeBody to an exact round trip, and leaves fenced code as written.
-func TestTheBodyEscapeIsExactAndSparesFencedCode(t *testing.T) {
+// TestTheBodyEscapeIsExact holds escapeBody and unescapeBody to an exact
+// round trip, fenced code included.
+func TestTheBodyEscapeIsExact(t *testing.T) {
 	spectest.Proves(t, feature, "literal-bodies", "a-body-runs-no-quick-action")
 	for _, body := range []string{
 		"",
@@ -131,14 +132,38 @@ func TestTheBodyEscapeIsExactAndSparesFencedCode(t *testing.T) {
 		"\u200b\u200b/x\n\u200bplain",
 		"text\n/label ~a\n  /indented\n```\n/close in code\n```\n/after",
 		"~~~sh\n/run\n```\n/still code\n~~~\n/out",
-		"   ```\n/in\n    ```\n/still in\n```",
 	} {
 		if got := unescapeBody(escapeBody(body)); got != body {
 			t.Errorf("%q round-trips to %q", body, got)
 		}
 	}
-	escaped := escapeBody("```\n/close\n```\n/close")
-	if escaped != "```\n/close\n```\n\u200b/close" {
-		t.Fatalf("fenced code was escaped: %q", escaped)
+	if escaped := escapeBody("```\n/close\n```\n/close"); escaped != "```\n\u200b/close\n```\n\u200b/close" {
+		t.Fatalf("a line of fenced code was left for GitLab to read: %q", escaped)
+	}
+}
+
+// TestABodyWithAmbiguousFencesRunsNoQuickAction sends bodies whose fences
+// GitLab versions read differently through create and update.
+func TestABodyWithAmbiguousFencesRunsNoQuickAction(t *testing.T) {
+	spectest.Proves(t, feature, "literal-bodies", "a-body-runs-no-quick-action")
+	h := newHarness(t)
+	for i, body := range []string{
+		"```npm install``` fails on CI\n/close",
+		"- item\n  ```\n  code\n  ```\n/close",
+		"```\ncode\n``` sh\n/close",
+		"<div>\n```\n</div>\n/close",
+		"~~~~\n~~~\n/close\n~~~~",
+		"~~~\n/close\n~~~",
+	} {
+		created := h.create(`{"title":"Fence","body":` + quoteJSON(body) + `,"idempotencyKey":"fence-` + strconv.Itoa(i) + `"}`)
+		iid := mustIID(t, created.Task.Ref)
+		if stored := h.issue(iid); stored.state != "opened" || created.Task.Body != body {
+			t.Fatalf("create of %q ran a quick action: %s, body %q", body, stored.state, created.Task.Body)
+		}
+		var updated collab.TaskResult
+		h.ok("update", `{"ref":`+refJSON(created.Task.Ref)+`,"body":`+quoteJSON(body+"\n/label ~status::doing")+`}`, &updated)
+		if stored := h.issue(iid); stored.state != "opened" || updated.Task.State != collab.TaskStateOpen {
+			t.Fatalf("update of %q ran a quick action: %s %v", body, stored.state, stored.labels)
+		}
 	}
 }

@@ -18,10 +18,13 @@ import (
 // millisecond of the last issue considered. The cursor is that millisecond
 // with what was considered at it: "t<millisecond>.i<id>-<id>…", the ids,
 // while there are at most maxTiedIDs, and "t<millisecond>.n<count>" past
-// them, the count, which the next read skips by position. A read skips every
-// id the cursor names wherever it sits in GitLab's answer, and lists at least
-// one issue not considered yet, so a traversal always ends and lists every
-// issue present throughout it once. Only inside a tie of more than maxTiedIDs
+// them, the count, which the next read skips by position among the issues of
+// that millisecond only. A counted read whose page is empty or starts after
+// that millisecond finds the tie used up, and the next read starts at the
+// following millisecond. A read skips every id the cursor names wherever it
+// sits in GitLab's answer, and lists at least one issue not considered yet,
+// so a traversal always ends and lists every issue present throughout it
+// once. Only inside a tie of more than maxTiedIDs
 // issues does the cursor count positions, where closing issues of the tie
 // during the traversal can hide others of it.
 
@@ -37,7 +40,7 @@ const maxFetchesPerPage = 5
 // millisecond always holds an issue not considered yet.
 const maxTiedIDs = 48
 
-var cursorPattern = regexp.MustCompile(`^t([0-9]{1,15})\.(?:i([0-9]{1,18}(?:-[0-9]{1,18}){0,47})|n([1-9][0-9]{0,8}))$`)
+var cursorPattern = regexp.MustCompile(`^t([0-9]{1,15})\.(?:i((?:[0-9]{1,18}(?:-[0-9]{1,18}){0,47})?)|n([1-9][0-9]{0,8}))$`)
 
 type cursor struct {
 	// millis is the creation millisecond of the last issue considered.
@@ -65,6 +68,9 @@ func parseCursor(value string) (cursor, *collab.Failure) {
 	if match[3] != "" {
 		at.counting = true
 		at.count, _ = strconv.Atoi(match[3])
+		return at, nil
+	}
+	if match[2] == "" {
 		return at, nil
 	}
 	for _, id := range strings.Split(match[2], "-") {
@@ -141,10 +147,16 @@ func collect(fetch fetchPage, keep func(*glIssue) bool, size int, from string) (
 		if failure != nil {
 			return nil, "", failure
 		}
+		if at.counting && page > 1 && (len(issues) == 0 || issues[0].createdMillis() > at.millis) {
+			// The tie shrank below the count: every issue of its millisecond
+			// is behind the cursor, so the next read starts after it.
+			at = cursor{millis: at.millis + 1, started: true}
+			continue
+		}
 		progressed := false
 		for i := range issues {
 			issue := &issues[i]
-			if i < skip || at.considered(issue) {
+			if (i < skip && issue.createdMillis() == at.millis) || at.considered(issue) {
 				continue
 			}
 			if keep(issue) {

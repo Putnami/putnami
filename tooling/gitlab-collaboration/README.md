@@ -108,11 +108,13 @@ credential never leaves its own instance or this machine.
   separator. A transition to `done` of an issue GitLab closed as a duplicate
   reopens it, which clears the duplicate link, then closes it.
 - **Bodies are text.** GitLab runs a quick action (`/close`, `/label`,
-  `/move`) from any description line that starts with a slash, except in
-  fenced code. `create` and `update` put a zero-width space before such a
-  slash, and before a zero-width space that starts a line, outside fenced
-  code, so GitLab stores the line and runs nothing; a read removes exactly
-  one: a task's body is what the caller wrote.
+  `/move`) from a description line that starts with a slash. `create` and
+  `update` put a zero-width space before such a slash, and before a
+  zero-width space that starts a line, so GitLab stores the line and runs
+  nothing; a read removes exactly one: a task's body is what the caller
+  wrote. Fenced code is escaped too, since GitLab versions disagree on what a
+  fence is: a command copied from GitLab's page carries the invisible
+  character.
 - **Assignment is information.** `assign` replaces the assignees, named by
   username; `@me` is the credential's account. A username GitLab does not
   know is `invalid` and nothing is written. GitLab keeps only one assignee on
@@ -132,7 +134,9 @@ credential never leaves its own instance or this machine.
   keywords of GitLab's filter, is matched by the provider. Each read asks
   for the issues created at or after the millisecond of the last issue
   considered, and the cursor holds that millisecond with the ids already
-  seen at it, or their count past 48. So a traversal always ends and lists
+  seen at it, or their count past 48, which skips by position only issues of
+  that millisecond; once that tie is used up, the next read starts at the
+  following millisecond. So a traversal always ends and lists
   every issue present throughout it once, whatever the page sizes, ties in
   creation time and issues closed meanwhile; only inside a tie of more than
   48 issues can closing some of them hide others.

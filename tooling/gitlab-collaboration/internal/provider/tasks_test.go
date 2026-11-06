@@ -199,7 +199,7 @@ func TestPagesCoverTheProjectExactlyOnce(t *testing.T) {
 	if !slices.Equal(got, expected) {
 		t.Fatalf("a traversal with concurrent changes listed %d issues, want %d", len(got), len(expected))
 	}
-	for _, cursor := range []string{"p1.n3", "t1.n0", "t1.i", "t1.n1-2"} {
+	for _, cursor := range []string{"p1.n3", "t1.n0", "t1.i-", "t1.n1-2"} {
 		h.fails("find", `{"page":{"cursor":"`+cursor+`"}}`, collab.OutcomeInvalid)
 	}
 }
@@ -327,6 +327,48 @@ func TestATraversalSurvivesTiesAndClosedIssues(t *testing.T) {
 		slices.Sort(sorted)
 		if !slices.Equal(sorted, want) {
 			t.Fatalf("a tie of %d with %d later issues in pages of %d listed %d issues, want each of %d once", c.tied, c.later, c.size, len(got), len(want))
+		}
+	}
+
+	// A work queue that closes each listed issue loses none after a large
+	// tie: a counted read that finds the tie used up continues from the
+	// next millisecond.
+	for _, c := range []struct{ tied, later, size int }{{49, 20, 49}, {100, 50, 100}, {60, 50, 60}} {
+		h = newHarness(t)
+		var later []int
+		var at time.Time
+		for i := 0; i < c.tied; i++ {
+			issue := h.seed("Tied", "", "queue")
+			if i == 0 {
+				at = issue.created
+			}
+			h.change(issue, func(f *fakeIssue) { f.created = at })
+		}
+		for i := 0; i < c.later; i++ {
+			later = append(later, h.seed("Later", "", "queue").iid)
+		}
+		seen := map[int]bool{}
+		cursor := ""
+		for answers := 0; answers < 50; answers++ {
+			arguments := `{"labels":["queue"],"states":["open"],"page":{"size":` + strconv.Itoa(c.size)
+			if cursor != "" {
+				arguments += `,"cursor":"` + cursor + `"`
+			}
+			var page collab.TaskListResult
+			h.ok("find", arguments+"}}", &page)
+			for _, task := range page.Items {
+				seen[mustIID(t, task.Ref)] = true
+				var done collab.TaskResult
+				h.ok("transition", `{"ref":`+refJSON(task.Ref)+`,"state":"done"}`, &done)
+			}
+			if cursor = page.Page.Next; cursor == "" {
+				break
+			}
+		}
+		for _, iid := range later {
+			if !seen[iid] {
+				t.Fatalf("a work queue over a tie of %d in pages of %d never listed #%d", c.tied, c.size, iid)
+			}
 		}
 	}
 

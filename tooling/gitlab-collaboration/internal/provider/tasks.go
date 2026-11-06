@@ -198,9 +198,9 @@ func unfilterable(label string) bool {
 // GitLab reads the line as text and runs no quick action from it.
 const quickActionEscape = "\u200b"
 
-// escapeBody escapes every line outside fenced code that starts with a slash,
-// or with the escape itself, so unescapeBody restores the body exactly.
-// GitLab runs no quick action inside fenced code, which stays as written.
+// escapeBody escapes every line that starts with a slash, or with the escape
+// itself, so unescapeBody restores the body exactly. Fenced code is escaped
+// too: which lines GitLab reads as a fence depends on its version.
 func escapeBody(body string) string {
 	return mapBodyLines(body, func(line string) string {
 		if strings.HasPrefix(line, "/") || strings.HasPrefix(line, quickActionEscape) {
@@ -221,27 +221,11 @@ func unescapeBody(body string) string {
 	})
 }
 
-// mapBodyLines applies change to every line of a body outside fenced code. A
-// fence opens on a line that starts, after at most three spaces, with three
-// backticks or tildes, and closes on the next such line of the same
-// character; neither escaping nor unescaping changes a fence line.
+// mapBodyLines applies change to every line of a body.
 func mapBodyLines(body string, change func(string) string) string {
 	lines := strings.Split(body, "\n")
-	fence := ""
 	for i, line := range lines {
-		trimmed := strings.TrimLeft(line, " ")
-		if len(line)-len(trimmed) <= 3 && (strings.HasPrefix(trimmed, "```") || strings.HasPrefix(trimmed, "~~~")) {
-			switch {
-			case fence == "":
-				fence = trimmed[:3]
-			case strings.HasPrefix(trimmed, fence):
-				fence = ""
-			}
-			continue
-		}
-		if fence == "" {
-			lines[i] = change(line)
-		}
+		lines[i] = change(line)
 	}
 	return strings.Join(lines, "\n")
 }
