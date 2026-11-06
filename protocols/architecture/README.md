@@ -197,7 +197,7 @@ Published schemas:
 
 ## Current repository adoption
 
-The Putnami repository maps **104 of its 163 projects to 10 domains** and
+The Putnami repository maps **105 of its 164 projects to 10 domains** and
 excludes the other 59 with a reason and an owner each. There is no workspace-root
 baseline and no waiver file: adoption started clean and every wave landed with
 its declarations complete, so there has never been debt to record.

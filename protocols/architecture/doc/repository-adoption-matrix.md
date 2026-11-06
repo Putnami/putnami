@@ -1,6 +1,6 @@
 # Repository adoption matrix
 
-This repository maps **104 of its 163 projects** to **10 architecture domains**.
+This repository maps **105 of its 164 projects** to **10 architecture domains**.
 The other **59 are excluded on purpose**: 28 samples, 7 templates, 2 template
 proofs, 2 protocol proofs, the standalone area detector, the 2 Cloud runtime
 destinations, the Cloud CLI extension with its 14 generated clients, the new
