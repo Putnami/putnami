@@ -25,8 +25,12 @@ lease on the head this checkout last pushed, read from the reflog of
 `refs/remotes/origin/<branch>`: it replaces the remote branch only while
 `origin` still holds that head. When someone else pushed the branch since,
 the command refuses, writes nothing, and names the head it expected, even
-after a fetch. Fetch, integrate their commits, then run it again. A checkout
-whose reflog records no push of the branch only fast-forwards.
+after a fetch. Fetch, make your branch contain `origin/<branch>`, for example
+with `git rebase origin/<branch>`, then run it again: the push then
+fast-forwards. The lease needs the reflog of the remote-tracking ref, which
+git keeps by default, and a fetch configuration that tracks the branch under
+`refs/remotes/origin/`. A checkout whose reflog records no push of the
+branch only fast-forwards.
 
 ## Modes
 

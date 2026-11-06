@@ -180,9 +180,9 @@ type PushRefusedError struct {
 
 func (e *PushRefusedError) Error() string {
 	if e.Pushed == "" {
-		return fmt.Sprintf("origin refused %s: HEAD does not contain origin's head, and the reflog of refs/remotes/origin/%s records no push from this checkout to lease on; fetch, integrate origin's commits, then run again: %v", e.Branch, e.Branch, e.Err)
+		return fmt.Sprintf("origin refused %s: HEAD does not contain origin's head, and the reflog of refs/remotes/origin/%s records no push from this checkout to lease on, so the command only fast-forwards; fetch, make HEAD contain origin/%s (for example git rebase origin/%s), then run again: %v", e.Branch, e.Branch, e.Branch, e.Branch, e.Err)
 	}
-	return fmt.Sprintf("origin refused %s: HEAD does not contain origin's head, and origin no longer holds %s, the head this checkout last pushed; fetch, integrate origin's commits, then run again: %v", e.Branch, e.Pushed, e.Err)
+	return fmt.Sprintf("origin refused %s: HEAD does not contain origin's head, and origin no longer holds %s, the head this checkout last pushed: it holds commits this checkout did not push; fetch, make HEAD contain origin/%s (for example git rebase origin/%s), then run again: %v", e.Branch, e.Pushed, e.Branch, e.Branch, e.Err)
 }
 
 func (e *PushRefusedError) Unwrap() error { return e.Err }

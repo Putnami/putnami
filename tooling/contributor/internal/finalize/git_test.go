@@ -137,23 +137,29 @@ func TestGitEnvironmentDropsTheHostChannel(t *testing.T) {
 
 // rebaseFixture is a checkout that pushed fix/rebase to a bare origin, then
 // rebased it onto a base that moved: its head no longer contains the commit
-// it pushed. Every git command, the code under test included, reads no
-// global or system configuration.
+// it pushed. The code under test drops GIT_CONFIG_* from its environment, so
+// the fixture pins in the repositories' own configuration what a global
+// configuration could change: hooks and push signing.
 func rebaseFixture(t *testing.T) (root, origin, pushed string, run func(string, ...string) string) {
 	t.Helper()
-	t.Setenv("GIT_CONFIG_GLOBAL", os.DevNull)
-	t.Setenv("GIT_CONFIG_NOSYSTEM", "1")
 	root, origin = t.TempDir(), t.TempDir()
+	hooks := t.TempDir()
 	run = func(dir string, args ...string) string {
 		t.Helper()
-		output, err := exec.Command("git", append([]string{"-C", dir}, args...)...).CombinedOutput()
+		cmd := exec.Command("git", append([]string{"-C", dir}, args...)...)
+		cmd.Env = append(os.Environ(), "GIT_CONFIG_GLOBAL="+os.DevNull, "GIT_CONFIG_NOSYSTEM=1")
+		output, err := cmd.CombinedOutput()
 		if err != nil {
 			t.Fatalf("git %v: %v: %s", args, err, output)
 		}
 		return strings.TrimSpace(string(output))
 	}
 	run(origin, "init", "-q", "--bare", "-b", "main")
+	run(origin, "config", "core.hooksPath", hooks)
 	run(root, "init", "-q", "-b", "main")
+	run(root, "config", "core.hooksPath", hooks)
+	run(root, "config", "push.gpgSign", "false")
+	run(root, "config", "commit.gpgSign", "false")
 	run(root, "config", "user.name", "Test")
 	run(root, "config", "user.email", "test@example.invalid")
 	run(root, "remote", "add", "origin", origin)
@@ -188,9 +194,8 @@ func pushFromElsewhere(t *testing.T, origin string, run func(string, ...string) 
 	return run(other, "rev-parse", "HEAD")
 }
 
-// Not parallel: the fixture isolates git from the global configuration
-// through the environment.
 func TestNativeGitPushPublishesARebasedBranch(t *testing.T) {
+	t.Parallel()
 	root, origin, _, run := rebaseFixture(t)
 	if err := (NativeGit{Root: root}).Push(context.Background(), "fix/rebase"); err != nil {
 		t.Fatalf("push of the rebased branch: %v", err)
@@ -209,6 +214,7 @@ func TestNativeGitPushPublishesARebasedBranch(t *testing.T) {
 }
 
 func TestNativeGitPushRefusesToReplaceAnotherPush(t *testing.T) {
+	t.Parallel()
 	for _, fetched := range []bool{false, true} {
 		root, origin, pushed, run := rebaseFixture(t)
 		theirs := pushFromElsewhere(t, origin, run)
@@ -228,6 +234,7 @@ func TestNativeGitPushRefusesToReplaceAnotherPush(t *testing.T) {
 }
 
 func TestNativeGitPushPublishesAfterIntegratingAnotherPush(t *testing.T) {
+	t.Parallel()
 	root, origin, _, run := rebaseFixture(t)
 	pushFromElsewhere(t, origin, run)
 	run(root, "pull", "-q", "--rebase", "origin", "fix/rebase")
@@ -241,6 +248,7 @@ func TestNativeGitPushPublishesAfterIntegratingAnotherPush(t *testing.T) {
 }
 
 func TestNativeGitPushWithoutARecordedPushOnlyFastForwards(t *testing.T) {
+	t.Parallel()
 	root, origin, _, run := rebaseFixture(t)
 	// Expire the reflog: this checkout keeps no record of its push.
 	run(root, "reflog", "expire", "--expire=all", "refs/remotes/origin/fix/rebase")
