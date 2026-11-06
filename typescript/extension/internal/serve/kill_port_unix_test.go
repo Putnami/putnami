@@ -14,8 +14,6 @@ import (
 	"syscall"
 	"testing"
 	"time"
-
-	"go.putnami.dev/protocol/features/spectest"
 )
 
 // killPortHelperEnv selects the role of the test binary in the kill-port
@@ -130,7 +128,6 @@ func exitSignal(t *testing.T, role string, done <-chan error, bound time.Duratio
 // --kill-port ends the process that listens on the port, and only that one: a
 // client connected to the port is left running.
 func TestKillProcessOnPort_KillsTheListenerAndNotItsClient(t *testing.T) {
-	spectest.Proves(t, "typescript/typescript-project-toolchain", "serve-kill-port", "the-listener-is-killed-and-its-client-is-not")
 	if lsof, found := findTool("lsof"); found {
 		if isBusyBox(lsof) {
 			t.Skip("lsof is the BusyBox applet, which kill-port does not use")
@@ -171,7 +168,6 @@ func TestKillProcessOnPort_KillsTheListenerAndNotItsClient(t *testing.T) {
 // BusyBox applet that ignores its arguments and lists every open file, makes
 // --kill-port kill nothing.
 func TestKillProcessOnPort_KillsNothingWhenLsofPrintsMoreThanProcessIDs(t *testing.T) {
-	spectest.Proves(t, "typescript/typescript-project-toolchain", "serve-kill-port", "output-other-than-process-ids-kills-nothing")
 	listener, portText, listenerDone := startKillPortHelper(t, "listener")
 	pid := strconv.Itoa(listener.Process.Pid)
 	port, err := strconv.Atoi(portText)

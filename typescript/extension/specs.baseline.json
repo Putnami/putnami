@@ -34,7 +34,6 @@
     "typescript/typescript-project-toolchain#registries-drive-npmrc",
     "typescript/typescript-project-toolchain#runtime-manifest-parity",
     "typescript/typescript-project-toolchain#serve-entrypoint",
-    "typescript/typescript-project-toolchain#serve-kill-port",
     "typescript/typescript-project-toolchain#serve-supervision",
     "typescript/typescript-project-toolchain#source-bound-generate",
     "typescript/typescript-project-toolchain#structured-reports",

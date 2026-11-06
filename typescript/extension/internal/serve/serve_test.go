@@ -321,7 +321,6 @@ func TestKillProcessOnPort_KillsTheListenersLsofNames(t *testing.T) {
 }
 
 func TestKillProcessOnPort_LsofFindsNoListenerKillsNothing(t *testing.T) {
-	spectest.Proves(t, "typescript/typescript-project-toolchain", "serve-kill-port", "fuser-runs-only-when-lsof-is-absent")
 	killed := withMockKill(t)
 	var ranFuser bool
 	withMockExec(t, func(name string, args []string, opts ...pexec.Option) (*pexec.Result, error) {
@@ -344,7 +343,6 @@ func TestKillProcessOnPort_LsofFindsNoListenerKillsNothing(t *testing.T) {
 }
 
 func TestKillProcessOnPort_KillsNothingUnlessEveryLsofLineIsAProcessID(t *testing.T) {
-	spectest.Proves(t, "typescript/typescript-project-toolchain", "serve-kill-port", "output-other-than-process-ids-kills-nothing")
 	for name, stdout := range map[string]string{
 		"busybox listing": "1\t/bin/sh\t/dev/null\n",
 		"mixed lines":     "4242\nCOMMAND PID\n",
@@ -369,7 +367,6 @@ func TestKillProcessOnPort_KillsNothingUnlessEveryLsofLineIsAProcessID(t *testin
 }
 
 func TestKillProcessOnPort_FallsBackToFuserWhenLsofIsAbsent(t *testing.T) {
-	spectest.Proves(t, "typescript/typescript-project-toolchain", "serve-kill-port", "fuser-runs-only-when-lsof-is-absent")
 	for _, tc := range []struct {
 		name   string
 		result *pexec.Result
