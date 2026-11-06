@@ -240,7 +240,7 @@ owning none of their content.
 
 | Project | Name | Authority it carries |
 |---|---|---|
-| `/sites/putnami.dev` | `putnami.dev` | Placement, navigation, and the site's own authored pages. Five documentation trees are copied in from five other domains, and none of them is edited here. |
+| `/sites/putnami.dev` | `putnami.dev` | Placement, navigation, and the site's own authored pages. Six documentation trees are copied in from five other domains, and none of them is edited here. |
 
 ## Excluded projects
 
@@ -468,17 +468,17 @@ is the mistake this section exists to prevent.
 |---|---|---|
 | What it authorizes | One package or module dependency edge | One movement of data between domains at run time or build time |
 | Where it shows up | `bindings` on a `reference` import | `transport`, `consistency`, `localModel`, `deletion` on a non-reference import |
-| Count today | 15 imports, 601 bindings | 8 imports, 0 bindings |
+| Count today | 15 imports, 601 bindings | 9 imports, 0 bindings |
 | What it says about data | Nothing | Everything: freshness, failure, ordering, deletion |
 
 **A binding is a compile-time fact.** `/go/framework/http` may import
 `go.putnami.dev/protocol/http-routes`. That is all it says. No fact is copied, no
 staleness bound applies, and nothing is enforced at run time. All 601 bindings in
-this repository are of this kind, and 15 of the 23 imports carry them.
+this repository are of this kind, and 15 of the 24 imports carry them.
 
 **A DARC flow is a data-movement fact.** It states what is copied, how fresh it
 must be, what happens when it is missing or stale, and how the producer's
-deletion reaches the copy. The eight are:
+deletion reaches the copy. The nine are:
 
 | Import | Mode | What moves |
 |---|---|---|
@@ -486,17 +486,18 @@ deletion reaches the copy. The eight are:
 | `cli.workspace-probe-view.v1` | projection | Provider probe answers into the recorded workspace index |
 | `cli.usage-telemetry.v1` | command | Anonymous usage records to the observability ingest |
 | `public-docs.workspace-documentation.v1` | snapshot | `/tooling/doc` → `public/docs/08-tooling-&-workspace` |
+| `public-docs.observe-documentation.v1` | snapshot | `/tooling/observe/doc` → `public/docs/08-tooling-&-workspace/08-observe` |
 | `public-docs.method-documentation.v1` | snapshot | `/tooling/sdd-extension/doc` → `public/docs/07-spec-driven-development` |
 | `public-docs.typescript-framework-documentation.v1` | snapshot | `/typescript/doc/framework` → `public/docs/09-frameworks/01-typescript` |
 | `public-docs.go-framework-documentation.v1` | snapshot | `/go/doc/framework` → `public/docs/09-frameworks/02-go` |
 | `public-docs.python-surface-documentation.v1` | snapshot | `/python/doc/framework` → `public/docs/09-frameworks/03-python` |
 
-The five documentation snapshots share one carrier contract,
+The six documentation snapshots share one carrier contract,
 `putnami.documentation-tree.v1`. It **names a carrier, not a published wire
 schema**: the markdown tree that one `generate.assets` entry copies, addressed by
 a deterministic digest over its sorted (relative path, content digest) pairs. Two
 trees with the same digest are the same document, which is why `tree_digest`
-serves as both the source version and the idempotency key. All five fail closed
+serves as both the source version and the idempotency key. All six fail closed
 on a missing tree and publish a stale one, because a documentation gap is worse
 than documentation that is a day old.
 

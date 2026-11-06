@@ -25,7 +25,7 @@ pattern matches and no excluding pattern (`!`) does. A pattern takes `*`, `?`,
 and `.git` are skipped, and a wildcard never matches a directory whose name
 starts with a dot. The root is never a member. A repository where neither file
 declares members is not a Node workspace. A Rush monorepo lists its projects in
-`rush.json` instead; the [Rush detector](11-rush.md) reads it, and its lockfile
+`rush.json` instead; the [Rush detector](/docs/tooling-&-workspace/observe/rush) reads it, and its lockfile
 under `common/config/rush/`.
 
 Each member is a component named by its directory, with its package name and

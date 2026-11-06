@@ -1,0 +1,63 @@
+{
+  "totals": {
+    "tests": 4,
+    "failures": 1,
+    "errors": 0,
+    "skipped": 1,
+    "assertions": 0,
+    "time": 0.6832396
+  },
+  "cases": [
+    {
+      "name": "Add",
+      "classname": "Calc.Tests.CalculatorTests",
+      "suites": [
+        {
+          "name": "Calc.Tests.mstest.dll"
+        }
+      ],
+      "status": "passed",
+      "durationMs": 3
+    },
+    {
+      "name": "Skipped",
+      "classname": "Calc.Tests.CalculatorTests",
+      "suites": [
+        {
+          "name": "Calc.Tests.mstest.dll"
+        }
+      ],
+      "status": "skipped",
+      "durationMs": 0,
+      "skipped": {
+        "message": "not ready"
+      }
+    },
+    {
+      "name": "AddWrongOnPurpose",
+      "classname": "Calc.Tests.CalculatorTests",
+      "suites": [
+        {
+          "name": "Calc.Tests.mstest.dll"
+        }
+      ],
+      "status": "failed",
+      "durationMs": 13,
+      "failure": {
+        "message": "Assert.AreEqual failed. Expected:\u003c5\u003e. Actual:\u003c4\u003e. ",
+        "body": "   at Calc.Tests.CalculatorTests.AddWrongOnPurpose() in /app/Calc.Tests.mstest/CalculatorTests.cs:line 17\n   at System.RuntimeMethodHandle.InvokeMethod(Object target, Void** arguments, Signature sig, Boolean isConstructor)\n   at System.Reflection.MethodBaseInvoker.InvokeWithNoArgs(Object obj, BindingFlags invokeAttr)\n"
+      }
+    },
+    {
+      "name": "SignOfANonNegativeInput (4)",
+      "classname": "Calc.Tests.CalculatorTests",
+      "suites": [
+        {
+          "name": "Calc.Tests.mstest.dll"
+        }
+      ],
+      "status": "passed",
+      "durationMs": 1
+    }
+  ]
+}

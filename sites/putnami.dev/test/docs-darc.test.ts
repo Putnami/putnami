@@ -23,7 +23,7 @@ import { prerenderDocs, prerenderSourcesFor } from '../src/plugins/docs-prerende
  * The `public-docs` domain's runtime enforcement of its declared imports.
  *
  * A `generate.assets` entry whose source was deleted used to publish nothing and
- * keep the build green. Each of the five repository-owned sources is now a
+ * keep the build green. Each of the six repository-owned sources is now a
  * `Snapshot` contract, and the docs pipeline reads the file inventory it
  * publishes out of `Snapshot.latest()` — so the declared `onMissing: fail-closed`
  * is what refuses, not an `if` in the plugin.
@@ -247,7 +247,7 @@ describe('documentation sources are version-addressed snapshots', () => {
   );
 
   specTest(
-    'reports exactly the seven contracts it enforces, deterministically',
+    'reports exactly the eight contracts it enforces, deterministically',
     {
       feature: 'putnami-dev/public-documentation',
       requirement: 'documentation-sources-are-version-addressed-snapshots',
@@ -261,13 +261,14 @@ describe('documentation sources are version-addressed snapshots', () => {
         ['public-docs.application-runtime.v1', 'reference'],
         ['public-docs.go-framework-documentation.v1', 'snapshot'],
         ['public-docs.method-documentation.v1', 'snapshot'],
+        ['public-docs.observe-documentation.v1', 'snapshot'],
         ['public-docs.protocol-contracts.v1', 'reference'],
         ['public-docs.python-surface-documentation.v1', 'snapshot'],
         ['public-docs.typescript-framework-documentation.v1', 'snapshot'],
         ['public-docs.workspace-documentation.v1', 'snapshot'],
       ]);
 
-      // The domain opts into evidence with all seven rows or none: a partial set
+      // The domain opts into evidence with all eight rows or none: a partial set
       // makes `architecture validate` report declared_without_evidence for the
       // rest of the domain.
       expect(rows).toHaveLength(PUBLIC_DOCS_CONTRACTS.length);
@@ -354,6 +355,7 @@ describe('emitted domain-access evidence', () => {
       ['public-docs.protocol-contracts.v1', 'reference'],
       ['public-docs.go-framework-documentation.v1', 'snapshot'],
       ['public-docs.method-documentation.v1', 'snapshot'],
+      ['public-docs.observe-documentation.v1', 'snapshot'],
       ['public-docs.python-surface-documentation.v1', 'snapshot'],
       ['public-docs.typescript-framework-documentation.v1', 'snapshot'],
       ['public-docs.workspace-documentation.v1', 'snapshot'],

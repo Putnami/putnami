@@ -11,13 +11,13 @@ answer, so the workspace must declare `@putnami/observe` to run it there.
 |---|---|
 | `--base <commit or branch>` | The commit the change is measured against. It overrides the CI. A generic CI needs it. |
 | `--head <revision>` | The commit that was built. Default `HEAD`. |
-| `--junit <paths>` | Comma-separated JUnit XML paths or glob patterns, resolved against the directory you run in. Replaces JUnit discovery. |
+| `--junit <paths>` | Comma-separated JUnit XML or TRX paths or glob patterns, resolved against the directory you run in. Replaces JUnit discovery. |
 | `--coverage <paths>` | The same for coverage reports. Replaces coverage discovery. |
 | `--sbom <path>` | The software bill of materials (SBOM) of the commit, a path or glob pattern. Replaces SBOM discovery. |
 | `--base-sbom <path>` | The SBOM of the base. Without it, the base state of each dependency is unknown. |
-| `--moon-graph <path>` | The moon project graph export, from `moon project-graph --json`. Default `moon-graph.json` at the repository root when it exists. See [the moon detector](10-moon.md). |
-| `--pants-graph <path>` | The Pants export `pants peek ::` wrote, resolved against the directory you run in. Default `pants-graph.json` at the repository root. See [the Pants detector](08-pants.md). |
-| `--bazel-graph <path>` | The Bazel query export, from `bazel query 'deps(//...)' --output=streamed_jsonproto`. Default `bazel-graph.json` at the repository root. See [the Bazel detector](09-bazel.md). |
+| `--moon-graph <path>` | The moon project graph export, from `moon project-graph --json`. Default `moon-graph.json` at the repository root when it exists. See [the moon detector](/docs/tooling-&-workspace/observe/moon). |
+| `--pants-graph <path>` | The Pants export `pants peek ::` wrote, resolved against the directory you run in. Default `pants-graph.json` at the repository root. See [the Pants detector](/docs/tooling-&-workspace/observe/pants). |
+| `--bazel-graph <path>` | The Bazel query export, from `bazel query 'deps(//...)' --output=streamed_jsonproto`. Default `bazel-graph.json` at the repository root. See [the Bazel detector](/docs/tooling-&-workspace/observe/bazel). |
 | `--no-fetch` | Read only the local history: fetch no base and deepen no shallow clone. |
 | `--evidence <path>` | Write the change evidence document to this path, resolved against the directory you run in. |
 | `--upload` | Hand the change evidence document to the evidence reporter. See [Uploading the evidence](#uploading-the-evidence). |
@@ -84,24 +84,30 @@ fails as a diagnostic.
 ## Reports
 
 Without `--junit` or `--coverage`, `putnami observe` walks the repository,
-skipping `.git`, `node_modules` and `vendor`, and reads the start of each file
-whose name can hold a report (`.xml`, `.info`, `.lcov`, `.out`, `.cov`,
+skipping `.git`, `node_modules`, `vendor`, the Gradle and Maven build
+outputs that hold no report (see [Gradle and Maven](/docs/tooling-&-workspace/observe/jvm#reports)), and
+all of a Cargo target directory but its `nextest` store, its nested target
+directories and the files it holds directly (see
+[the Cargo detector](/docs/tooling-&-workspace/observe/rust#reports)), and reads the start of each file
+whose name can hold a report (`.xml`, `.trx`, `.info`, `.lcov`, `.out`, `.cov`,
 `.coverprofile`, `.gocov`, and `.txt` files whose name contains `cover`). It
 keeps a file by its content:
 
 | Format | Recognized by |
 |---|---|
-| JUnit XML | a `testsuites` or `testsuite` root (Jest, Vitest, PHPUnit `--log-junit`, gotestsum, pytest `--junitxml`, `bazel test`) |
-| Cobertura | a `coverage` root with `line-rate`, `lines-valid` or `branch-rate`, or a `sources` or `packages` child (pytest-cov `--cov-report=xml`) |
+| JUnit XML | a `testsuites` or `testsuite` root (Jest, Vitest, PHPUnit `--log-junit`, gotestsum, pytest `--junitxml`, `bazel test`, Gradle, Maven Surefire and Failsafe, cargo-nextest) |
+| Cobertura | a `coverage` root with `line-rate`, `lines-valid` or `branch-rate`, or a `sources` or `packages` child (pytest-cov `--cov-report=xml`, Coverlet `--collect:"XPlat Code Coverage"`, cargo-llvm-cov `--cobertura`) |
 | Clover | a `coverage` root with `generated` or `clover`, or a `project` child (PHPUnit `--coverage-clover`) |
-| LCOV | a first `TN:` or `SF:` record (`bazel coverage --combined_report=lcov`) |
+| JaCoCo | a `report` root whose first child is `sessioninfo`, `group`, `package` or `counter` (the JaCoCo Maven plugin, the Gradle `jacoco` plugin, Kover) |
+| LCOV | a first `TN:` or `SF:` record (`bazel coverage --combined_report=lcov`, cargo-llvm-cov `--lcov`) |
 | Go cover profile | a first `mode: set`, `mode: count` or `mode: atomic` line |
+| TRX | a `TestRun` root (`dotnet test --logger trx`), read as test cases |
 
 The walk does not follow links. It also reads, through the links Bazel leaves
 at the root, the `test.xml` of each test target, shard and run under
 `bazel-testlogs` and the combined LCOV
 report `bazel-out/_coverage/_coverage_report.dat`; see
-[the Bazel detector](09-bazel.md#tests-and-coverage).
+[the Bazel detector](/docs/tooling-&-workspace/observe/bazel#tests-and-coverage).
 
 Without `--sbom`, it also reads the `.json` files whose name contains `bom`,
 `cdx`, `cyclonedx` or `spdx`, and keeps a CycloneDX document (a
@@ -111,7 +117,7 @@ is never discovered: name it with `--base-sbom`, and discovery then leaves
 that file out. When a side has several SBOMs, none is read, with
 `observe.sbom_ambiguous`: a repository that commits SBOM documents, such as
 test fixtures, names its own with `--sbom`. See
-[licences and vulnerabilities](06-change-analyses.md#licences-and-vulnerabilities).
+[licences and vulnerabilities](/docs/tooling-&-workspace/observe/change-analyses#licences-and-vulnerabilities).
 
 Discovery stops after 200 000 entries or 10 000 candidate files, and keeps at
 most 1 000 reports, with the `observe.discovery_bounded` diagnostic. A named
@@ -128,7 +134,7 @@ files (the first 50), the changed and dependent components, the tests and
 coverage of each component, the coverage of the changed lines, the dependency
 changes with their licences and vulnerabilities, and the reports, then each
 diagnostic. See
-[the change analyses](06-change-analyses.md). `putnami observe`
+[the change analyses](/docs/tooling-&-workspace/observe/change-analyses). `putnami observe`
 exits 0 whatever it observes, 2 on a usage error, and 1 when it cannot read its
 job context or write its output. `--output=json`
 prints one document with `subject`, `ci`, `producer`, `base`,
@@ -137,7 +143,7 @@ prints one document with `subject`, `ci`, `producer`, `base`,
 ## The evidence document
 
 `--evidence <path>` writes a
-[`protocol/evidence`](../../../protocols/evidence/README.md) v1 document: the
+[`protocol/evidence`](https://github.com/putnami/putnami/blob/main/protocols/evidence/README.md) v1 document: the
 subject, the CI run, the producer, the changed files with their component,
 the components with their impact and edges, the tests and coverage per
 component, the changed-line coverage, the dependency changes with their
@@ -173,7 +179,7 @@ still exits 0.
 
 For `@putnami/cloud`, the job sets `PUTNAMI_CLOUD_TOKEN` to a workspace token
 of scope `delivery.ingest`. See
-[the Cloud extension](../../../cloud/extension/README.md#upload-a-change-evidence-document).
+[the Cloud extension](https://github.com/putnami/putnami/blob/main/cloud/extension/README.md#upload-a-change-evidence-document).
 
 ## Publishing on the pull or merge request
 

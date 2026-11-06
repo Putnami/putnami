@@ -76,24 +76,7 @@ func writeDemoFile(t *testing.T, root, name, content string) {
 // root and the base commit.
 func demoRepository(t *testing.T, name string) (string, string) {
 	t.Helper()
-	root := t.TempDir()
-	git(t, root, "init", "--quiet", "--initial-branch=main")
-	files := readDemo(t, name)
-	for _, stage := range []string{"base/", "head/"} {
-		for _, f := range files {
-			if rest, ok := strings.CutPrefix(f.name, stage); ok {
-				writeDemoFile(t, root, rest, f.content)
-			}
-		}
-		git(t, root, "add", "--all")
-		git(t, root, "commit", "--quiet", "-m", stage)
-	}
-	for _, f := range files {
-		if rest, ok := strings.CutPrefix(f.name, "ci/"); ok {
-			writeDemoFile(t, root, rest, f.content)
-		}
-	}
-	return root, git(t, root, "rev-parse", "HEAD~1")
+	return demoRepositoryWithout(t, name, func(string) bool { return false })
 }
 
 func TestDemoRepositoryIsTheSameOnAForeignMachine(t *testing.T) {
@@ -162,6 +145,72 @@ var demos = map[string]demoExpectation{
 		// third-party targets and is no component.
 		lineFile:   "src/python/pricing/pricing.py",
 		dependency: evidence.DependencyChange{Ecosystem: "pypi", Lockfile: "3rdparty/python/default.lock", Name: "fastapi", Change: evidence.DependencyUpgraded, From: "0.115.5", To: "0.115.6"},
+	},
+	"gradle": {
+		env:       map[string]string{"GITHUB_ACTIONS": "true", "GITHUB_SERVER_URL": "https://github.com", "GITHUB_REPOSITORY": "Putnami/demo-observe-gradle", "GITHUB_REPOSITORY_ID": "1108", "GITHUB_RUN_ID": "41335530117", "GITHUB_JOB": "test", "GITHUB_REF": "refs/pull/1/merge"},
+		changed:   []string{"pricing"},
+		dependent: []string{"api", "app"},
+		tests:     map[string]int{"api": 2, "app": 1, "pricing": 5},
+		covered:   []string{"api", "app", "pricing"},
+		lineFile:  "pricing/src/main/kotlin/com/acme/pricing/Pricing.kt",
+		// The catalog lies in the gradle directory of the root project,
+		// which holds no source and is no component.
+		dependency: evidence.DependencyChange{Ecosystem: "maven", Lockfile: "pricing/gradle.lockfile", Name: "org.apache.commons:commons-lang3", Change: evidence.DependencyUpgraded, From: "3.17.0", To: "3.18.0", Component: "pricing"},
+	},
+	"swift": {
+		env:       map[string]string{"GITHUB_ACTIONS": "true", "GITHUB_SERVER_URL": "https://github.com", "GITHUB_REPOSITORY": "Putnami/demo-observe-swift", "GITHUB_REPOSITORY_ID": "1109", "GITHUB_RUN_ID": "41335533107", "GITHUB_JOB": "test", "GITHUB_REF": "refs/pull/1/merge"},
+		changed:   []string{"Packages/Networking/Sources/Networking", "Packages/Networking/Tests/NetworkingTests"},
+		dependent: []string{"App", "Packages/Networking", "Packages/Pricing", "Packages/Pricing/Sources/Pricing", "Packages/Pricing/Tests/PricingTests"},
+		tests:     map[string]int{"App": 2, "Packages/Pricing/Tests/PricingTests": 3, "Packages/Networking/Tests/NetworkingTests": 2},
+		covered:   []string{"App", "Packages/Networking/Sources/Networking", "Packages/Pricing/Sources/Pricing"},
+		// The CocoaPods workspace at the root holds the lockfiles, and the
+		// root is no component.
+		lineFile:   "Packages/Networking/Sources/Networking/Client.swift",
+		dependency: evidence.DependencyChange{Ecosystem: "swift", Lockfile: "Shop.xcworkspace/xcshareddata/swiftpm/Package.resolved", Name: "swift-log", Change: evidence.DependencyUpgraded, From: "1.6.1", To: "1.6.2"},
+	},
+	"dart": {
+		env:       map[string]string{"GITHUB_ACTIONS": "true", "GITHUB_SERVER_URL": "https://github.com", "GITHUB_REPOSITORY": "Putnami/demo-observe-dart", "GITHUB_REPOSITORY_ID": "1109", "GITHUB_RUN_ID": "41335530417", "GITHUB_JOB": "test", "GITHUB_REF": "refs/pull/1/merge"},
+		changed:   []string{"packages/pricing"},
+		dependent: []string{"apps/mobile"},
+		tests:     map[string]int{"apps/mobile": 1, "packages/pricing": 4, "packages/ui": 1},
+		covered:   []string{"apps/mobile", "packages/pricing", "packages/ui"},
+		// pubspec.lock lies in the pub workspace root, which is no component.
+		lineFile:   "packages/pricing/lib/src/price.dart",
+		dependency: evidence.DependencyChange{Ecosystem: "pub", Lockfile: "pubspec.lock", Name: "intl", Change: evidence.DependencyUpgraded, From: "0.19.0", To: "0.20.2"},
+	},
+
+	"dotnet": {
+		env:       map[string]string{"GITHUB_ACTIONS": "true", "GITHUB_SERVER_URL": "https://github.com", "GITHUB_REPOSITORY": "Putnami/demo-observe-dotnet", "GITHUB_REPOSITORY_ID": "1109", "GITHUB_RUN_ID": "41335527412", "GITHUB_JOB": "test", "GITHUB_REF": "refs/pull/1/merge"},
+		changed:   []string{"src/Pricing", "tools/Migrate"},
+		dependent: []string{"src/Api", "src/Worker", "tests/Pricing.Tests"},
+		tests:     map[string]int{"tests/Pricing.Tests": 4},
+		covered:   []string{"src/Pricing"},
+		// The bump changes the lock file of tools/Migrate, the only project
+		// that uses the package.
+		lineFile:   "src/Pricing/PriceCalculator.cs",
+		dependency: evidence.DependencyChange{Ecosystem: "nuget", Lockfile: "tools/Migrate/packages.lock.json", Name: "Humanizer.Core", Change: evidence.DependencyUpgraded, From: "2.13.14", To: "2.14.1", Component: "tools/Migrate"},
+	},
+	"rails": {
+		env: map[string]string{"GITHUB_ACTIONS": "true", "GITHUB_SERVER_URL": "https://github.com", "GITHUB_REPOSITORY": "Putnami/demo-observe-rails", "GITHUB_REPOSITORY_ID": "1108", "GITHUB_RUN_ID": "41335527004", "GITHUB_JOB": "test", "GITHUB_REF": "refs/pull/1/merge"},
+		// Gemfile.lock lies in the application at the root, which the
+		// change therefore also touches.
+		changed:    []string{".", "packs/pricing"},
+		dependent:  []string{"packs/checkout"},
+		tests:      map[string]int{".": 1, "engines/admin": 1, "packs/checkout": 2, "packs/pricing": 4},
+		covered:    []string{".", "engines/admin", "packs/checkout", "packs/pricing"},
+		lineFile:   "packs/pricing/app/models/pricing/calculator.rb",
+		dependency: evidence.DependencyChange{Ecosystem: "gem", Lockfile: "Gemfile.lock", Name: "money", Change: evidence.DependencyUpgraded, From: "6.16.0", To: "6.19.0", Component: "."},
+	},
+	"rust": {
+		env:       map[string]string{"GITLAB_CI": "true", "CI_SERVER_HOST": "gitlab.com", "CI_PROJECT_ID": "88373402", "CI_PROJECT_PATH": "putnami/demo-observe-rust", "CI_PIPELINE_ID": "3015178713", "CI_JOB_ID": "17647016530", "CI_MERGE_REQUEST_IID": "1"},
+		changed:   []string{"crates/pricing"},
+		dependent: []string{"crates/api", "crates/worker"},
+		tests:     map[string]int{"crates/api": 2, "crates/pricing": 4, "crates/worker": 1},
+		covered:   []string{"crates/api", "crates/pricing", "crates/worker"},
+		// Cargo.lock lies in the virtual workspace root, which is no
+		// component.
+		lineFile:   "crates/pricing/src/lib.rs",
+		dependency: evidence.DependencyChange{Ecosystem: "cargo", Lockfile: "Cargo.lock", Name: "itoa", Change: evidence.DependencyUpgraded, From: "1.0.14", To: "1.0.15"},
 	},
 	"symfony": {
 		env: map[string]string{"GITLAB_CI": "true", "CI_SERVER_HOST": "gitlab.com", "CI_PROJECT_ID": "88373184", "CI_PROJECT_PATH": "putnami/demo-observe-symfony", "CI_PIPELINE_ID": "3015177948", "CI_JOB_ID": "17647015000", "CI_MERGE_REQUEST_IID": "1"},
@@ -461,4 +510,28 @@ func TestTheRushDemoChangeIsExplained(t *testing.T) {
 	if problems := evidence.ValidateDocument(Evidence(o, now)); diag.HasErrors(problems) {
 		t.Fatalf("the evidence document does not validate: %v", problems)
 	}
+}
+
+// demoRepositoryWithout builds the demo as demoRepository does, without the
+// files skip names.
+func demoRepositoryWithout(t *testing.T, name string, skip func(string) bool) (string, string) {
+	t.Helper()
+	root := t.TempDir()
+	git(t, root, "init", "--quiet", "--initial-branch=main")
+	files := slices.DeleteFunc(readDemo(t, name), func(f demoFile) bool { return skip(f.name) })
+	for _, stage := range []string{"base/", "head/"} {
+		for _, f := range files {
+			if rest, ok := strings.CutPrefix(f.name, stage); ok {
+				writeDemoFile(t, root, rest, f.content)
+			}
+		}
+		git(t, root, "add", "--all")
+		git(t, root, "commit", "--quiet", "-m", stage)
+	}
+	for _, f := range files {
+		if rest, ok := strings.CutPrefix(f.name, "ci/"); ok {
+			writeDemoFile(t, root, rest, f.content)
+		}
+	}
+	return root, git(t, root, "rev-parse", "HEAD~1")
 }

@@ -1,12 +1,21 @@
 package components
 
 import (
+	"sync"
+
 	"go.putnami.dev/protocol/evidence"
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/tooling/observe/internal/detect/bazel"
+	"go.putnami.dev/tooling/observe/internal/detect/cargo"
 	"go.putnami.dev/tooling/observe/internal/detect/composer"
+	"go.putnami.dev/tooling/observe/internal/detect/dart"
+	"go.putnami.dev/tooling/observe/internal/detect/dotnet"
+	"go.putnami.dev/tooling/observe/internal/detect/gradle"
+	"go.putnami.dev/tooling/observe/internal/detect/maven"
 	"go.putnami.dev/tooling/observe/internal/detect/pants"
 	"go.putnami.dev/tooling/observe/internal/detect/python"
+	"go.putnami.dev/tooling/observe/internal/detect/ruby"
+	"go.putnami.dev/tooling/observe/internal/detect/swift"
 	"go.putnami.dev/tooling/observe/internal/detectors/moon"
 	"go.putnami.dev/tooling/observe/internal/detectors/nx"
 	"go.putnami.dev/tooling/observe/internal/lockdiff"
@@ -29,7 +38,8 @@ type Options struct {
 // Bazel comes last: its export outranks the others by source, and without one
 // its packages yield.
 func Default(opts Options) []Detector {
-	return []Detector{NxDetector{}, MoonDetector{GraphFile: opts.MoonGraph}, PantsDetector{GraphFile: opts.PantsGraph}, RushDetector{}, NodeDetector{}, ComposerDetector{}, GoDetector{}, PythonDetector{}, BazelDetector{GraphFile: opts.BazelGraph}}
+	scan := &swiftScan{}
+	return []Detector{NxDetector{}, MoonDetector{GraphFile: opts.MoonGraph}, PantsDetector{GraphFile: opts.PantsGraph}, RushDetector{}, NodeDetector{}, ComposerDetector{}, GoDetector{}, PythonDetector{}, GradleDetector{}, MavenDetector{}, SwiftPMDetector{scan: scan}, XcodeDetector{scan: scan}, DartDetector{}, DotnetDetector{}, RubyDetector{}, CargoDetector{}, BazelDetector{GraphFile: opts.BazelGraph}}
 }
 
 // fromProbe turns the projects of a probe answer into components.
@@ -201,6 +211,212 @@ func (d PantsDetector) Detect(root string) Found {
 				return lockdiff.ReadPEXLock(data)
 			}, true
 		}
+	}
+	return found
+}
+
+// GradleDetector adapts the Gradle detector: each project the settings
+// include is a workspace component.
+type GradleDetector struct{}
+
+// Name implements Detector.
+func (GradleDetector) Name() string { return "gradle" }
+
+// Detect implements Detector.
+func (GradleDetector) Detect(root string) Found {
+	detection := gradle.Detect(root)
+	found := Found{Diagnostics: detection.Diagnostics}
+	for _, c := range detection.Components {
+		found.Components = append(found.Components, Component{ID: c.ID, Name: c.Name, Ecosystem: gradle.Ecosystem, Source: evidence.SourceWorkspace, DependsOn: c.DependsOn})
+	}
+	return found
+}
+
+// MavenDetector adapts the Maven detector: each module that packages code is
+// a workspace component.
+type MavenDetector struct{}
+
+// Name implements Detector.
+func (MavenDetector) Name() string { return "maven" }
+
+// Detect implements Detector.
+func (MavenDetector) Detect(root string) Found {
+	detection := maven.Detect(root)
+	found := Found{Diagnostics: detection.Diagnostics}
+	for _, c := range detection.Components {
+		found.Components = append(found.Components, Component{ID: c.ID, Name: c.Name, Ecosystem: maven.Ecosystem, Source: evidence.SourceWorkspace, DependsOn: c.DependsOn})
+	}
+	return found
+}
+
+// swiftScan runs the Swift detection of one repository once, for both the
+// SwiftPM and the Xcode detector.
+type swiftScan struct {
+	mu        sync.Mutex
+	root      string
+	detection swift.Detection
+	done      bool
+}
+
+// detect returns the detection of root, from the scan when it already read
+// that root. A nil scan detects every time.
+func (s *swiftScan) detect(root string) swift.Detection {
+	if s == nil {
+		return swift.Detect(root)
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if !s.done || s.root != root {
+		s.root, s.detection, s.done = root, swift.Detect(root), true
+	}
+	return s.detection
+}
+
+// SwiftPMDetector adapts the Swift detector to its Swift packages: each
+// package and each of its targets is a workspace component. It also places
+// the JUnit cases of the packages' test targets by their class names.
+type SwiftPMDetector struct {
+	scan *swiftScan
+}
+
+// Name implements Detector.
+func (SwiftPMDetector) Name() string { return "swiftpm" }
+
+// Detect implements Detector.
+func (d SwiftPMDetector) Detect(root string) Found {
+	detection := d.scan.detect(root)
+	found := Found{}
+	for _, d := range detection.Diagnostics {
+		if d.Code != swift.CodeProjectUnreadable {
+			found.Diagnostics = append(found.Diagnostics, d)
+		}
+	}
+	for _, c := range detection.PackageComponents() {
+		found.Components = append(found.Components, Component{ID: c.ID, Name: c.Name, Ecosystem: c.Ecosystem, Source: c.Source, DependsOn: c.DependsOn})
+	}
+	if len(detection.Packages) > 0 {
+		found.Locate = detection.Locate
+	}
+	return found
+}
+
+// XcodeDetector adapts the Swift detector to its Xcode projects: each
+// directory that holds an .xcodeproj is a manifest component, with an edge to
+// each local package the project references.
+type XcodeDetector struct {
+	scan *swiftScan
+}
+
+// Name implements Detector.
+func (XcodeDetector) Name() string { return "xcode" }
+
+// Detect implements Detector.
+func (d XcodeDetector) Detect(root string) Found {
+	detection := d.scan.detect(root)
+	found := Found{}
+	for _, d := range detection.Diagnostics {
+		if d.Code == swift.CodeProjectUnreadable {
+			found.Diagnostics = append(found.Diagnostics, d)
+		}
+	}
+	for _, c := range detection.ProjectComponents() {
+		found.Components = append(found.Components, Component{ID: c.ID, Name: c.Name, Ecosystem: c.Ecosystem, Source: c.Source, DependsOn: c.DependsOn})
+	}
+	if len(detection.Projects) > 0 && len(detection.Packages) == 0 {
+		found.Locate = detection.Locate
+	}
+	return found
+}
+
+// DartDetector adapts the Dart detector: each pub workspace member and melos
+// package is a workspace component, each other pubspec.yaml package a
+// manifest one.
+type DartDetector struct{}
+
+// Name implements Detector.
+func (DartDetector) Name() string { return "dart" }
+
+// Detect implements Detector.
+func (DartDetector) Detect(root string) Found {
+	detection := dart.Detect(root)
+	found := Found{Diagnostics: detection.Diagnostics}
+	for _, c := range detection.Components {
+		found.Components = append(found.Components, Component{ID: c.ID, Name: c.Name, Ecosystem: dart.Ecosystem, Source: c.Source, DependsOn: c.DependsOn})
+	}
+	return found
+}
+
+// DotnetDetector adapts the .NET detector: each project a root solution lists
+// is a workspace component, each other project file a manifest one. It also
+// maps a test assembly to its project, and reads Directory.Packages.props in a
+// repository without NuGet lock files.
+type DotnetDetector struct{}
+
+// Name implements Detector.
+func (DotnetDetector) Name() string { return "dotnet" }
+
+// Detect implements Detector.
+func (DotnetDetector) Detect(root string) Found {
+	detection := dotnet.Detect(root)
+	found := Found{Diagnostics: detection.Diagnostics}
+	if len(detection.Components) == 0 {
+		return found
+	}
+	for _, c := range detection.Components {
+		found.Components = append(found.Components, Component{ID: c.ID, Name: c.Name, Ecosystem: dotnet.Ecosystem, Source: c.Source, DependsOn: c.DependsOn})
+	}
+	found.Locate = detection.Locate
+	found.Lockfile = func(file string) (string, LockReader, bool) {
+		if !detection.IsCentralPackages(file) {
+			return "", nil, false
+		}
+		return lockdiff.EcosystemNuGet, func(data []byte) (map[string][]string, error) {
+			return lockdiff.ReadCentralPackages(data)
+		}, true
+	}
+	return found
+}
+
+// RubyDetector adapts the Ruby detector: each packwerk pack is a workspace
+// component, each other directory with a gemspec or a Gemfile a manifest one.
+type RubyDetector struct{}
+
+// Name implements Detector.
+func (RubyDetector) Name() string { return "ruby" }
+
+// Detect implements Detector.
+func (RubyDetector) Detect(root string) Found {
+	detection := ruby.Detect(root)
+	found := Found{Diagnostics: detection.Diagnostics}
+	for _, c := range detection.Components {
+		found.Components = append(found.Components, Component{ID: c.ID, Name: c.Name, Ecosystem: ruby.Ecosystem, Source: c.Source, DependsOn: c.DependsOn})
+	}
+	return found
+}
+
+// CargoDetector adapts the Cargo detector: each Cargo workspace member is a
+// workspace component, each other Cargo.toml package a manifest one. It also
+// maps the test binary ids of cargo-nextest reports to their crates.
+type CargoDetector struct{}
+
+// Name implements Detector.
+func (CargoDetector) Name() string { return "cargo" }
+
+// Detect implements Detector.
+func (CargoDetector) Detect(root string) Found {
+	result := cargo.Detect(root)
+	found := Found{
+		Diagnostics: result.Diagnostics,
+		Components: fromProbe(result.Projects, func(p wsproto.ProbeProject) (Component, bool) {
+			source := evidence.SourceManifest
+			if meta, err := cargo.ReadMetadata(p); err == nil && meta.Source == cargo.SourceWorkspace {
+				source = evidence.SourceWorkspace
+			}
+			return Component{Ecosystem: cargo.Ecosystem, Source: source}, true
+		}),
+	}
+	if len(result.Projects) > 0 {
+		found.LocateTestBinary = cargo.Locator(result)
 	}
 	return found
 }

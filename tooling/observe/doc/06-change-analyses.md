@@ -7,18 +7,26 @@ queries no vulnerability database.
 
 ## Components
 
-Nine detectors read the repository:
+Seventeen detectors read the repository:
 
 | Detector | Reads | Source |
 |---|---|---|
 | Nx | `graph.json` from `nx graph --file`, else `nx.json` and `project.json` | `orchestrator` for a graph export, `workspace` otherwise |
 | moon | `moon-graph.json` from `moon project-graph --json`, else `.moon/workspace.yml`, each `moon.yml` and `package.json` | `orchestrator` for a graph export, `workspace` otherwise |
 | Pants | `pants-graph.json` from `pants peek ::`, else the `BUILD` files, beside `pants.toml` | `orchestrator` for the export, `workspace` otherwise |
-| Rush | `rush.json`, each project's `package.json` ([Rush](11-rush.md)) | `orchestrator` |
+| Rush | `rush.json`, each project's `package.json` ([Rush](/docs/tooling-&-workspace/observe/rush)) | `orchestrator` |
 | Node workspaces | `package.json` `workspaces`, `pnpm-workspace.yaml` | `workspace` |
 | Composer | each `composer.json` | `manifest` |
 | Go | `go.work`, each `go.mod` | `workspace` for a `go.work` member, `manifest` otherwise |
 | Python | each `pyproject.toml`, with the root's `[tool.uv.workspace]` | `workspace` for a uv workspace member, `manifest` otherwise |
+| Gradle | `settings.gradle.kts` or `settings.gradle`, and each project's build file | `workspace` |
+| Maven | the root `pom.xml` and its modules, recursively | `workspace` |
+| Swift Package Manager | each `Package.swift` and its targets, from `swiftpm.json` as `swift package describe --type json` writes it, else the manifest and the directories under `Sources` and `Tests` | `workspace` |
+| Xcode | each `.xcodeproj` and the local packages its `project.pbxproj` references | `manifest` |
+| Dart | each `pubspec.yaml`, with the root's pub `workspace` and `melos.yaml` | `workspace` for a pub workspace or melos package, `manifest` otherwise |
+| .NET | each `.csproj`, `.fsproj` and `.vbproj`, with the root's `.sln` and `.slnx` | `workspace` for a project a root solution lists, `manifest` otherwise; see [the .NET detector](/docs/tooling-&-workspace/observe/dotnet) |
+| Ruby | each packwerk `package.yml`, `*.gemspec` and `Gemfile` | `workspace` for a pack, `manifest` otherwise |
+| Cargo | each `Cargo.toml`, with the root's `[workspace]` | `workspace` for a Cargo workspace member, `manifest` otherwise |
 | Bazel | `bazel-graph.json` from `bazel query 'deps(//...)' --output=streamed_jsonproto`, else the `BUILD` and `BUILD.bazel` files | `orchestrator` for a query export, `manifest` otherwise |
 
 A component is a directory. When two detectors name one directory, the higher
@@ -51,10 +59,10 @@ its impact.
 
 ## Tests and coverage
 
-A JUnit case goes to the first of:
+A JUnit or TRX case goes to the first of:
 
 1. The package of its Bazel test target, for a log under `bazel-testlogs`;
-   see [the Bazel detector](09-bazel.md#tests-and-coverage).
+   see [the Bazel detector](/docs/tooling-&-workspace/observe/bazel#tests-and-coverage).
 2. The component that holds its test file: the case's `file`, else its
    suite's, else its class name when that names a file (Vitest), else its
    dotted class name read as a Python module (pytest). pytest writes
@@ -62,14 +70,36 @@ A JUnit case goes to the first of:
    and its default `xunit2` report has no `file`: the longest leading part
    that names a `.py` file is the test file. The class name is relative to
    pytest's `rootdir`; see
-   [the Python detector](07-python.md#reports).
-3. The component of the Go package its class or suite names
-   (`gotestsum --junitfile`).
-4. The component that holds the report.
+   [the Python detector](/docs/tooling-&-workspace/observe/python#reports). Else its dotted class name
+   read as a Dart test file (tojunit): `test.price` is `test/price_test.dart`,
+   and the longest tail of a class name written from an absolute path that
+   names a file is the test file; see [the Dart detector](/docs/tooling-&-workspace/observe/dart#reports).
+   rspec_junit_formatter and minitest-reporters write the `file`; see
+   [the Ruby detector](/docs/tooling-&-workspace/observe/ruby#reports).
+3. The component whose test source root holds the file its JVM class name
+   names: `com.acme.PriceTest` is `src/test/kotlin/com/acme/PriceTest.kt` or
+   `.java`, under `src/test` or `src/androidTest`. See
+   [Gradle and Maven](/docs/tooling-&-workspace/observe/jvm#reports).
+4. The component of the Go package its class or suite names
+   (`gotestsum --junitfile`), or of the Swift test target the `Module` of a
+   `Module.Class` class or suite name names (xcbeautify, fastlane `scan`,
+   `swift test --xunit-output`); see [the Swift detectors](/docs/tooling-&-workspace/observe/swift#reports).
+   Or of the .NET project whose test assembly its suite names
+   (`Pricing.Tests.dll`, from `dotnet test --logger trx` or
+   `JunitXml.TestLogger`).
+   A located name that is a file is the case's file.
+5. The component of the crate whose package its class name names as a
+   cargo-nextest test binary: `pricing`, `pricing::integration` or
+   `api::bin/api`; see [the Cargo detector](/docs/tooling-&-workspace/observe/rust#reports). A suite name
+   is not read for it, so another runner's suite named like a crate stays
+   with its report.
+6. The component that holds the report.
 
 A case that none of them places is counted in `observe.tests_unattributed`.
 
-A coverage report names files. A path is read in this order: absolute under
+A coverage report names files. A JaCoCo file, a package path, is first read
+under the `src/main/java` or `src/main/kotlin` of a component; see
+[Gradle and Maven](/docs/tooling-&-workspace/observe/jvm#reports). A path is read in this order: absolute under
 the repository; absolute from another checkout, by its trailing segments;
 relative to a Cobertura source root; relative to the report's component, to
 the repository root, then to the report's directory; and, for a Go cover
@@ -104,7 +134,16 @@ Each changed lockfile is read at the merge base and at the head:
 | `go.mod` | `go` | the requires, after the `go.mod` replace directives; modules of the repository and local replacements left out |
 | `uv.lock` | `pypi` | each `[[package]]`; `editable`, `virtual`, `directory` and `path` sources left out |
 | `poetry.lock` | `pypi` | each `[[package]]`; `directory` and `file` sources and `develop` packages left out |
+| `Cargo.lock` | `cargo` | each `[[package]]` with a `source`; the workspace crates and path dependencies, which have none, left out |
 | a Pants resolve lockfile | `pypi` | each locked requirement of the PEX JSON lock a `[python.resolves]` entry of `pants.toml` names |
+| `gradle.lockfile`, `settings-gradle.lockfile` | `maven` | each `group:artifact:version` line, as `group:artifact` |
+| a Gradle version catalog, `gradle/*.versions.toml` | `maven` | each library as `group:artifact` and each plugin as its id, at its version, `version.ref` or rich version |
+| `Package.resolved` | `swift` | each pin of format versions 1 to 3, at its version, else its revision |
+| `Podfile.lock` | `cocoapods` | each entry of `PODS`, by its root pod; pods from a `:path:` left out |
+| `pubspec.lock` | `pub` | each entry of `packages`; `path` and `sdk` sources left out |
+| `packages.lock.json` | `nuget` | each package each target framework resolves; `Project` entries left out |
+| `Directory.Packages.props`, without `packages.lock.json` in the repository | `nuget` | each `PackageVersion` with a literal `Include` and `Version` |
+| `Gemfile.lock` | `gem` | the specs of the `GEM` and `GIT` sources, the platform after the first `-` dropped; `PATH` sources left out |
 
 A Rush monorepo keeps its lockfile under `common/config/rush/`: `pnpm-lock.yaml`,
 `npm-shrinkwrap.json` or `yarn.lock`, by the package manager `rush.json` names,
@@ -135,8 +174,8 @@ discovered) and one for the base (`--base-sbom`):
 osv-scanner writes no vulnerability in SPDX: use CycloneDX for them.
 
 A package of the SBOM matches a dependency change by the ecosystem its
-package URL names (`npm`, `composer`, `golang` is `go`, `pypi`), its name,
-normalized for `pypi`, and its version, a leading `v` ignored. A package
+package URL names (`npm`, `composer`, `golang` is `go`, `pypi`, `maven`, `pub`,
+`nuget`, `gem`, `cargo`), its name, normalized for `pypi` and written `group:artifact` for `maven`, and its version, a leading `v` ignored. A package
 without a package URL matches by its name as written and its version, so a
 Python package without one matches only when the SBOM writes its normalized
 name. For each change, the base SBOM gives the `before` state, unless the

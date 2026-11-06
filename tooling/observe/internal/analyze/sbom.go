@@ -70,6 +70,9 @@ var purlEcosystems = map[string]string{
 	"composer": lockdiff.EcosystemComposer,
 	"golang":   lockdiff.EcosystemGo,
 	"pypi":     lockdiff.EcosystemPyPI,
+	"maven":    lockdiff.EcosystemMaven,
+	"gem":      lockdiff.EcosystemGem,
+	"cargo":    lockdiff.EcosystemCargo,
 }
 
 func newSBOMIndex(sbom readers.SBOM) *sbomIndex {
@@ -79,9 +82,16 @@ func newSBOMIndex(sbom readers.SBOM) *sbomIndex {
 		key := packageKey{name: p.Name, version: normalVersion(p.Version)}
 		if purl, err := readers.ParsePURL(p.PURL); err == nil {
 			key = packageKey{ecosystem: purlEcosystem(purl.Type), name: purl.Name, version: normalVersion(purl.Version)}
-			if key.ecosystem == lockdiff.EcosystemPyPI {
+			switch key.ecosystem {
+			case lockdiff.EcosystemPyPI:
 				// The Python lockfile readers normalize their names.
 				key.name = lockdiff.PyPIName(key.name)
+			case lockdiff.EcosystemMaven:
+				// pkg:maven/group/artifact is group:artifact in a Gradle
+				// lockfile.
+				if group, artifact, ok := strings.Cut(key.name, "/"); ok {
+					key.name = group + ":" + artifact
+				}
 			}
 			if key.version == "" {
 				key.version = normalVersion(p.Version)

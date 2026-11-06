@@ -95,6 +95,39 @@ func TestReportsAreFoundByTheirContent(t *testing.T) {
 	}
 }
 
+func TestDiscoveryWalksOnlyTheNextestStoreOfACargoTargetDirectory(t *testing.T) {
+	spectest.Proves(t, "tooling/observe-rust", "rust-report-discovery", "discovery-walks-only-the-nextest-store-of-a-cargo-target-directory")
+	cargoTag := "Signature: 8a477f597d28d172789f06886806bc55\n# This file is a cache directory tag created by cargo.\n"
+	root := tree(t, map[string]string{
+		"Cargo.toml":                                       "[workspace]\n",
+		"target/CACHEDIR.TAG":                              cargoTag,
+		"target/nextest/ci/junit.xml":                      junitXML,
+		"target/lcov.info":                                 lcovTrace,
+		"target/debug/build/x/out/junit.xml":               junitXML,
+		"target/doc/coverage.xml":                          coberturaXML,
+		"target/llvm-cov-target/CACHEDIR.TAG":              cargoTag,
+		"target/llvm-cov-target/nextest/default/junit.xml": junitXML,
+		"target/llvm-cov-target/debug/report.xml":          junitXML,
+		"crates/api/target/lcov.info":                      lcovTrace,
+		"build/CACHEDIR.TAG":                               "Signature: 8a477f597d28d172789f06886806bc55\n# Another tool.\n",
+		"build/junit.xml":                                  junitXML,
+	})
+	reports, diags := Collect(Request{Root: root, Resolve: resolver(root)})
+	if len(diags) != 0 {
+		t.Fatalf("diagnostics %v", diags)
+	}
+	var got []string
+	for _, r := range reports {
+		got = append(got, r.Path)
+	}
+	// A directory named target without cargo's tag, and a tag another tool
+	// wrote, are walked whole.
+	want := []string{"build/junit.xml", "crates/api/target/lcov.info", "target/lcov.info", "target/llvm-cov-target/nextest/default/junit.xml", "target/nextest/ci/junit.xml"}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("reports %v, want %v", got, want)
+	}
+}
+
 func TestSniffRecognizesEachFormat(t *testing.T) {
 	spectest.Proves(t, feature, "report-discovery", "reports-are-found-by-their-content")
 	for content, want := range map[string]string{
@@ -108,10 +141,12 @@ func TestSniffRecognizesEachFormat(t *testing.T) {
 		"SF:a.js\nend_of_record\n":        FormatLCOV,
 		goProfile:                         FormatGoCover,
 		configXML:                         "",
-		`<coverage><unknown/></coverage>`: "",
-		"mode: fast\n":                    "",
-		"":                                "",
-		"<":                               "",
+		`<report name="m"><group name="api"/></report>`: FormatJaCoCo,
+		`<report><title/></report>`:                     "",
+		`<coverage><unknown/></coverage>`:               "",
+		"mode: fast\n":                                  "",
+		"":                                              "",
+		"<":                                             "",
 	} {
 		if got := Sniff([]byte(content)); got != want {
 			t.Errorf("Sniff(%q) = %q, want %q", content, got, want)
@@ -388,6 +423,36 @@ func TestAnSBOMIsFoundByItsContentOrNamed(t *testing.T) {
 	})
 }
 
+const trxReport = "\xef\xbb\xbf<?xml version=\"1.0\" encoding=\"utf-8\"?>\n" +
+	`<TestRun id="1" name="@vm" xmlns="http://microsoft.com/schemas/VisualStudio/TeamTest/2010"><Results/></TestRun>`
+
+func TestATRXReportIsFoundByItsContent(t *testing.T) {
+	spectest.Proves(t, "tooling/observe-dotnet", "dotnet-test-assemblies", "a-trx-report-is-found-by-its-content")
+	if got := Sniff([]byte(trxReport)); got != FormatTRX {
+		t.Errorf("Sniff(TRX) = %q, want %q", got, FormatTRX)
+	}
+	root := tree(t, map[string]string{
+		"TestResults/_vm_2026-11-06_13_55_21.trx": trxReport,
+		"tests/Api.Tests/TestResults/api.trx":     trxReport,
+		"TestResults/notes.trx":                   "not a report",
+	})
+	reports, diags := Collect(Request{Root: root, Resolve: resolver(root)})
+	want := []Report{
+		{Path: "TestResults/_vm_2026-11-06_13_55_21.trx", Kind: KindJUnit, Format: FormatTRX, Source: SourceDiscovered},
+		{Path: "tests/Api.Tests/TestResults/api.trx", Kind: KindJUnit, Format: FormatTRX, Source: SourceDiscovered},
+	}
+	if !reflect.DeepEqual(reports, want) {
+		t.Fatalf("reports:\n got %+v\nwant %+v", reports, want)
+	}
+	if len(diags) != 1 || diags[0].Code != CodeReportMissing || diags[0].Field != KindCoverage {
+		t.Errorf("diagnostics %v, want only the missing coverage", diags)
+	}
+	named, diags := Collect(Request{Root: root, Resolve: resolver(root), JUnit: []string{"tests/**/*.trx"}, Coverage: []string{"none.xml"}})
+	if len(named) != 1 || named[0].Format != FormatTRX || named[0].Source != SourceNamed {
+		t.Errorf("--junit tests/**/*.trx: %+v %v", named, diags)
+	}
+}
+
 // bazelOutputs writes the outputs of bazel test and bazel coverage outside
 // the repository, and the convenience links Bazel leaves at its root.
 func bazelOutputs(t *testing.T, root string) {
@@ -436,5 +501,100 @@ func TestBazelReportsAreDiscoveredThroughTheConvenienceLinks(t *testing.T) {
 	}
 	if !reflect.DeepEqual(named, want) {
 		t.Errorf("named reports %+v, want %+v", named, want)
+	}
+}
+
+func TestJVMReportsAreDiscovered(t *testing.T) {
+	spectest.Proves(t, "tooling/observe-jvm", "jvm-report-discovery", "jvm-reports-are-discovered")
+	jacocoXML := `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><!DOCTYPE report PUBLIC "-//JACOCO//DTD Report 1.1//EN" "report.dtd"><report name="calc"><sessioninfo id="vm" start="1" dump="2"/></report>`
+	surefireXML := `<?xml version="1.0" encoding="UTF-8"?>` + "\n" + `<testsuite xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" name="com.acme.PriceTest" tests="1"><testcase name="t" classname="com.acme.PriceTest"/></testsuite>`
+	root := tree(t, map[string]string{
+		"pricing/build/test-results/test/TEST-com.acme.PriceTest.xml":          surefireXML,
+		"app/build/outputs/androidTest-results/connected/TEST-device-app-.xml": surefireXML,
+		"pricing/build/reports/jacoco/test/jacocoTestReport.xml":               jacocoXML,
+		"api/target/surefire-reports/TEST-com.acme.ApiTest.xml":                surefireXML,
+		"api/target/failsafe-reports/TEST-com.acme.ApiIT.xml":                  surefireXML,
+		"api/target/site/jacoco/jacoco.xml":                                    jacocoXML,
+		"pricing/build/kover/report.xml":                                       jacocoXML,
+		"app/build/intermediates/merged_test_results/TEST-copy.xml":            surefireXML,
+		"app/build/generated/report.xml":                                       jacocoXML,
+		"app/build/tmp/kotlin-classes/TEST-x.xml":                              surefireXML,
+		"api/target/classes/TEST-resource.xml":                                 surefireXML,
+		"api/target/test-classes/jacoco.xml":                                   jacocoXML,
+		"api/target/generated-sources/annotations/x.xml":                       surefireXML,
+		"docs/report.xml": `<report><title>not JaCoCo</title></report>`,
+	})
+	reports, diags := Collect(Request{Root: root, Resolve: resolver(root)})
+	if len(diags) != 0 {
+		t.Fatalf("diagnostics %v", diags)
+	}
+	want := []Report{
+		{Path: "api/target/failsafe-reports/TEST-com.acme.ApiIT.xml", Kind: KindJUnit, Format: FormatJUnit, Source: SourceDiscovered},
+		{Path: "api/target/site/jacoco/jacoco.xml", Kind: KindCoverage, Format: FormatJaCoCo, Source: SourceDiscovered},
+		{Path: "api/target/surefire-reports/TEST-com.acme.ApiTest.xml", Kind: KindJUnit, Format: FormatJUnit, Source: SourceDiscovered},
+		{Path: "app/build/outputs/androidTest-results/connected/TEST-device-app-.xml", Kind: KindJUnit, Format: FormatJUnit, Source: SourceDiscovered},
+		{Path: "pricing/build/kover/report.xml", Kind: KindCoverage, Format: FormatJaCoCo, Source: SourceDiscovered},
+		{Path: "pricing/build/reports/jacoco/test/jacocoTestReport.xml", Kind: KindCoverage, Format: FormatJaCoCo, Source: SourceDiscovered},
+		{Path: "pricing/build/test-results/test/TEST-com.acme.PriceTest.xml", Kind: KindJUnit, Format: FormatJUnit, Source: SourceDiscovered},
+	}
+	if !reflect.DeepEqual(reports, want) {
+		t.Fatalf("reports:\n got %+v\nwant %+v", reports, want)
+	}
+}
+
+// The heads of the reports Ruby test runs write: rspec_junit_formatter 0.8,
+// minitest-reporters 1.7, simplecov-cobertura 4.0, which writes a doctype
+// and a comment before its root, and simplecov-lcov 0.8.
+const (
+	rspecJUnit = `<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="rspec" tests="1" skipped="0" failures="0" errors="0" time="0.004521" timestamp="2026-11-06T14:03:01+00:00" hostname="vm">
+<properties>
+<property name="seed" value="50906"/>
+</properties>
+<testcase classname="packs.pricing.spec.models.pricing.calculator_spec" name="Pricing::Calculator sums the lines" file="./packs/pricing/spec/models/pricing/calculator_spec.rb" time="0.000079"></testcase>
+</testsuite>
+`
+	minitestJUnit = `<?xml version="1.0" encoding="UTF-8"?>
+<testsuites>
+  <testsuite name="PricingTest" filepath="test/pricing_test.rb" skipped="0" failures="0" errors="0" tests="1" assertions="1" time="7.229699997424177e-05">
+    <testcase name="test_total" lineno="4" classname="PricingTest" assertions="1" time="6.227599999419908e-05" file="test/pricing_test.rb">
+    </testcase>
+  </testsuite>
+</testsuites>
+`
+	simplecovCobertura = `<?xml version='1.0'?>
+<!DOCTYPE coverage SYSTEM "http://cobertura.sourceforge.net/xml/coverage-04.dtd">
+<!--Generated by simplecov-cobertura version 4.0.0 (https://github.com/jessebs/simplecov-cobertura)-->
+<coverage line-rate="1.0" lines-covered="1" lines-valid="1" complexity="0" version="0" timestamp="1793973781">
+  <sources>
+    <source>/home/runner/work/demo-observe-rails/demo-observe-rails</source>
+  </sources>
+</coverage>
+`
+	simplecovLCOV = "SF:./lib/pricing.rb\nDA:1,1\nDA:2,1\nDA:3,4\nLF:3\nLH:3\nend_of_record\n"
+)
+
+func TestRubyTestAndCoverageReportsAreDiscovered(t *testing.T) {
+	spectest.Proves(t, "tooling/observe-ruby", "ruby-reports", "ruby-test-and-coverage-reports-are-discovered")
+	root := tree(t, map[string]string{
+		"rspec.xml":                rspecJUnit,
+		"coverage/coverage.xml":    simplecovCobertura,
+		"coverage/.resultset.json": `{"RSpec": {"coverage": {}}}`,
+		"gems/pricing/test/reports/TEST-PricingTest.xml": minitestJUnit,
+		"gems/pricing/coverage/lcov/pricing.lcov":        simplecovLCOV,
+		"vendor/bundle/ruby/3.3.0/gems/x/rspec.xml":      rspecJUnit,
+	})
+	reports, diags := Collect(Request{Root: root, Resolve: resolver(root)})
+	if len(diags) != 0 {
+		t.Fatalf("diagnostics %v", diags)
+	}
+	want := []Report{
+		{Path: "coverage/coverage.xml", Kind: KindCoverage, Format: FormatCobertura, Source: SourceDiscovered},
+		{Path: "gems/pricing/coverage/lcov/pricing.lcov", Kind: KindCoverage, Format: FormatLCOV, Source: SourceDiscovered},
+		{Path: "gems/pricing/test/reports/TEST-PricingTest.xml", Kind: KindJUnit, Format: FormatJUnit, Source: SourceDiscovered},
+		{Path: "rspec.xml", Kind: KindJUnit, Format: FormatJUnit, Source: SourceDiscovered},
+	}
+	if !reflect.DeepEqual(reports, want) {
+		t.Fatalf("reports:\n got %+v\nwant %+v", reports, want)
 	}
 }

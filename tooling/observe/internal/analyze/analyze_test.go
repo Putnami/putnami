@@ -174,6 +174,55 @@ func TestAPytestCaseGoesToTheComponentOfItsModuleFile(t *testing.T) {
 	}
 }
 
+func TestAMinitestCaseGoesToItsTestFile(t *testing.T) {
+	spectest.Proves(t, "tooling/observe-ruby", "ruby-reports", "a-minitest-case-goes-to-its-test-file")
+	root := t.TempDir()
+	write(t, root, map[string]string{
+		"app/models/order.rb":               "class Order; end\n",
+		"test/models/order_test.rb":         "class OrderTest; end\n",
+		"gems/pricing/lib/pricing.rb":       "module Pricing\n  def self.total(lines)\n    lines.sum\n  end\nend\n",
+		"gems/pricing/test/pricing_test.rb": "class PricingTest; end\n",
+	})
+	set := components.Detect(root, []components.Detector{fake{components.Found{Components: []components.Component{
+		{ID: ".", Ecosystem: "ruby", Source: evidence.SourceManifest},
+		{ID: "gems/pricing", Ecosystem: "ruby", Source: evidence.SourceManifest},
+	}}}})
+	// minitest-reporters, run in the gem, names each test file from there,
+	// and simplecov-lcov each covered file.
+	write(t, root, map[string]string{
+		"gems/pricing/test/reports/TEST-PricingTest.xml": `<?xml version="1.0" encoding="UTF-8"?>
+<testsuites>
+  <testsuite name="PricingTest" filepath="test/pricing_test.rb" skipped="0" failures="0" errors="0" tests="2" assertions="2" time="7.2e-05">
+    <testcase name="test_total" lineno="4" classname="PricingTest" assertions="1" time="6.2e-05" file="test/pricing_test.rb">
+    </testcase>
+    <testcase name="test_empty" lineno="8" classname="PricingTest" assertions="1" time="1.0e-05" file="test/pricing_test.rb">
+    </testcase>
+  </testsuite>
+</testsuites>
+`,
+		"gems/pricing/coverage/lcov/pricing.lcov": "SF:./lib/pricing.rb\nDA:1,1\nDA:2,1\nDA:3,4\nLF:3\nLH:3\nend_of_record\n",
+		// The application's Rails run, from the root.
+		"test/reports/TEST-OrderTest.xml": `<testsuites><testsuite name="OrderTest" filepath="test/models/order_test.rb">
+			<testcase name="test_valid" classname="OrderTest" file="test/models/order_test.rb"/>
+		</testsuite></testsuites>`,
+	})
+	r := Run(Input{Root: root, Set: set, Reports: []reports.Report{
+		{Path: "gems/pricing/test/reports/TEST-PricingTest.xml", Kind: reports.KindJUnit, Format: reports.FormatJUnit},
+		{Path: "gems/pricing/coverage/lcov/pricing.lcov", Kind: reports.KindCoverage, Format: reports.FormatLCOV},
+		{Path: "test/reports/TEST-OrderTest.xml", Kind: reports.KindJUnit, Format: reports.FormatJUnit},
+	}})
+	got := tests(r)
+	if got["gems/pricing"].Passed != 2 || got["."].Passed != 1 {
+		t.Errorf("tests %+v", r.Tests)
+	}
+	if len(r.Coverage) != 1 || r.Coverage[0] != (evidence.ComponentCoverage{Component: "gems/pricing", CoveredLines: 3, TotalLines: 3}) {
+		t.Errorf("coverage %+v", r.Coverage)
+	}
+	if len(r.Diagnostics) != 0 {
+		t.Errorf("diagnostics %v", r.Diagnostics)
+	}
+}
+
 func TestCoverageGoesToTheComponentOfEachFile(t *testing.T) {
 	spectest.Proves(t, feature, "tests-and-coverage", "coverage-goes-to-the-component-of-each-file")
 	root, set := repository(t)
@@ -333,6 +382,41 @@ func TestChangedLockfilesGiveDependencyChanges(t *testing.T) {
 	}
 }
 
+func TestADotnetCaseGoesToTheProjectOfItsTestAssembly(t *testing.T) {
+	spectest.Proves(t, "tooling/observe-dotnet", "dotnet-test-assemblies", "a-case-goes-to-the-project-of-its-test-assembly")
+	root := t.TempDir()
+	write(t, root, map[string]string{
+		"src/Calc/Calc.csproj": `<Project Sdk="Microsoft.NET.Sdk"/>`,
+		"tests/Calc.Tests.xunit/Calc.Tests.xunit.csproj": `<Project Sdk="Microsoft.NET.Sdk"><ItemGroup>` +
+			`<ProjectReference Include="..\..\src\Calc\Calc.csproj" /></ItemGroup></Project>`,
+	})
+	set := components.Detect(root, components.Default(components.Options{}))
+	// dotnet test --logger trx and JunitXml.TestLogger wrote these reports
+	// for the xUnit project, whose classes lie in the namespace Calc.Tests.
+	for name, file := range map[string]string{"TestResults/xunit.trx": "xunit.trx", "TestResults/junit.xml": "junit-xunit-logger.xml"} {
+		data, err := os.ReadFile(filepath.Join("testdata", file))
+		if err != nil {
+			t.Fatal(err)
+		}
+		write(t, root, map[string]string{name: string(data)})
+	}
+	r := Run(Input{Root: root, Set: set, Reports: []reports.Report{
+		{Path: "TestResults/junit.xml", Kind: reports.KindJUnit, Format: reports.FormatJUnit},
+		{Path: "TestResults/xunit.trx", Kind: reports.KindJUnit, Format: reports.FormatTRX},
+	}})
+	got := tests(r)
+	project := got["tests/Calc.Tests.xunit"]
+	if project.Passed != 4 || project.Failed != 2 || project.Skipped != 2 || len(project.FailingCases) != 2 {
+		t.Errorf("tests of the test project %+v, want both reports' cases", project)
+	}
+	if _, onLibrary := got["src/Calc"]; onLibrary || len(r.Tests) != 1 {
+		t.Errorf("tests %+v, want none on src/Calc, whose name the namespace starts with", r.Tests)
+	}
+	if len(r.Diagnostics) != 0 {
+		t.Errorf("diagnostics %v", r.Diagnostics)
+	}
+}
+
 func TestABazelTestLogGoesToThePackageOfItsTestTarget(t *testing.T) {
 	spectest.Proves(t, "tooling/observe-bazel", "bazel-reports", "a-test-log-goes-to-the-package-of-its-test-target")
 	root := t.TempDir()
@@ -375,5 +459,297 @@ func TestABazelTestLogGoesToThePackageOfItsTestTarget(t *testing.T) {
 	}
 	if _, rooted := got["."]; rooted || len(r.Tests) != 2 {
 		t.Errorf("tests %+v", r.Tests)
+	}
+}
+
+const jvmFeature = "tooling/observe-jvm"
+
+// jvmRepository is a Gradle build: app, an Android library, and api depend
+// on pricing; api and app, which do not depend on each other, both hold a
+// com.acme.shared.Util.
+func jvmRepository(t *testing.T) (string, components.Set) {
+	t.Helper()
+	root := t.TempDir()
+	write(t, root, map[string]string{
+		"pricing/src/main/kotlin/com/acme/pricing/Price.kt":     "package com.acme.pricing\n",
+		"pricing/src/test/kotlin/com/acme/pricing/PriceTest.kt": "class PriceTest\n",
+		"api/src/main/java/com/acme/api/Api.java":               "package com.acme.api;\n",
+		"api/src/test/java/com/acme/api/ApiTest.java":           "class ApiTest {}\n",
+		"api/src/main/kotlin/com/acme/shared/Util.kt":           "package com.acme.shared\n",
+		"app/src/main/kotlin/com/acme/shared/Util.kt":           "package com.acme.shared\n",
+		"app/src/androidTest/kotlin/com/acme/app/ScreenTest.kt": "class ScreenTest\n",
+	})
+	set := components.Detect(root, []components.Detector{fake{components.Found{Components: []components.Component{
+		{ID: "pricing", Ecosystem: "gradle", Source: evidence.SourceWorkspace},
+		{ID: "api", Ecosystem: "gradle", Source: evidence.SourceWorkspace, DependsOn: []string{"pricing"}},
+		{ID: "app", Ecosystem: "gradle", Source: evidence.SourceWorkspace, DependsOn: []string{"pricing"}},
+	}}}})
+	return root, set
+}
+
+func TestAJVMClassNamePlacesItsCase(t *testing.T) {
+	spectest.Proves(t, jvmFeature, "jvm-report-placement", "a-jvm-class-name-places-its-case")
+	root, set := jvmRepository(t)
+	write(t, root, map[string]string{
+		// Reports gathered at the root, as a CI collects them.
+		"reports/TEST-all.xml": `<testsuites>
+			<testsuite name="com.acme.pricing.PriceTest">
+				<testcase classname="com.acme.pricing.PriceTest" name="rounds"/>
+				<testcase classname="com.acme.pricing.PriceTest$Discounts" name="nested"><failure message="expected 9"/></testcase>
+			</testsuite>
+			<testsuite name="com.acme.api.ApiTest"><testcase classname="com.acme.api.ApiTest" name="quotes"/></testsuite>
+			<testsuite name="com.acme.app.ScreenTest"><testcase classname="com.acme.app.ScreenTest" name="renders"/></testsuite>
+			<testsuite name="com.acme.gone.GoneTest"><testcase classname="com.acme.gone.GoneTest" name="orphan"/></testsuite>
+		</testsuites>`,
+	})
+	r := Run(Input{Root: root, Set: set, Reports: []reports.Report{{Path: "reports/TEST-all.xml", Kind: reports.KindJUnit, Format: reports.FormatJUnit}}})
+	got := tests(r)
+	if p := got["pricing"]; p.Passed != 1 || p.Failed != 1 || p.FailingCases[0].File != "pricing/src/test/kotlin/com/acme/pricing/PriceTest.kt" {
+		t.Errorf("pricing tests %+v", p)
+	}
+	if got["api"].Passed != 1 || got["app"].Passed != 1 {
+		t.Errorf("tests %+v", got)
+	}
+	if len(r.Diagnostics) != 1 || r.Diagnostics[0].Code != CodeTestsUnattributed || !strings.HasPrefix(r.Diagnostics[0].Message, "1 test cases") {
+		t.Errorf("diagnostics %v", r.Diagnostics)
+	}
+	for classname, want := range map[string][]string{
+		"com.acme.PriceTest$Nested$Deeper": {"com/acme/PriceTest.java", "com/acme/PriceTest.kt"},
+		"PriceTest":                        nil,
+		"src/test/PriceTest.kt":            nil,
+		"":                                 nil,
+	} {
+		if got := jvmClassFiles(classname); !slices.Equal(got, want) {
+			t.Errorf("jvmClassFiles(%q) = %v, want %v", classname, got, want)
+		}
+	}
+}
+
+func TestAJaCoCoFileMapsThroughItsPackage(t *testing.T) {
+	spectest.Proves(t, jvmFeature, "jvm-report-placement", "a-jacoco-file-maps-through-its-package")
+	root, set := jvmRepository(t)
+	report := func(packages string) string {
+		return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><!DOCTYPE report PUBLIC "-//JACOCO//DTD Report 1.1//EN" "report.dtd"><report name="r">` + packages + `</report>`
+	}
+	write(t, root, map[string]string{
+		// The app report: its own Util.kt wins over the one of api.
+		"app/build/reports/jacoco/report.xml": report(`<package name="com/acme/shared"><sourcefile name="Util.kt"><line nr="1" mi="0" ci="2"/></sourcefile></package>`),
+		// An aggregate report at the root, with a group per project.
+		"build/reports/jacoco/aggregate.xml": report(`<group name="pricing"><package name="com/acme/pricing"><sourcefile name="Price.kt"><line nr="1" mi="0" ci="1"/><line nr="2" mi="3" ci="0"/></sourcefile></package></group>
+			<group name="api"><package name="com/acme/api"><sourcefile name="Api.java"><line nr="1" mi="0" ci="1"/></sourcefile><sourcefile name="Gone.java"><line nr="1" mi="1" ci="0"/></sourcefile></package></group>`),
+	})
+	r := Run(Input{Root: root, Set: set, Reports: []reports.Report{
+		{Path: "app/build/reports/jacoco/report.xml", Kind: reports.KindCoverage, Format: reports.FormatJaCoCo},
+		{Path: "build/reports/jacoco/aggregate.xml", Kind: reports.KindCoverage, Format: reports.FormatJaCoCo},
+	}})
+	want := []evidence.ComponentCoverage{
+		{Component: "api", CoveredLines: 1, TotalLines: 1},
+		{Component: "app", CoveredLines: 1, TotalLines: 1},
+		{Component: "pricing", CoveredLines: 1, TotalLines: 2},
+	}
+	if !slices.Equal(r.Coverage, want) {
+		t.Errorf("coverage\n got %+v\nwant %+v", r.Coverage, want)
+	}
+	if len(r.Diagnostics) != 1 || r.Diagnostics[0].Code != CodeCoverageUnmapped || !strings.HasPrefix(r.Diagnostics[0].Message, "1 of the 3 files") {
+		t.Errorf("diagnostics %v", r.Diagnostics)
+	}
+}
+
+func TestAMavenPackageURLMatchesAGradleChange(t *testing.T) {
+	spectest.Proves(t, jvmFeature, "gradle-dependency-changes", "a-maven-package-url-matches-a-gradle-change")
+	root, set := jvmRepository(t)
+	write(t, root, map[string]string{
+		"bom.cdx.json": `{"bomFormat": "CycloneDX", "specVersion": "1.5", "version": 1,
+			"components": [{"bom-ref": "g", "type": "library", "group": "com.google.guava", "name": "guava", "version": "33.4.0-jre",
+				"purl": "pkg:maven/com.google.guava/guava@33.4.0-jre", "licenses": [{"license": {"id": "Apache-2.0"}}]}]}`,
+	})
+	sides := map[Revision]string{
+		Base: "com.google.guava:guava:33.3.1-jre=compileClasspath\n",
+		Head: "com.google.guava:guava:33.4.0-jre=compileClasspath\n",
+	}
+	r := Run(Input{Root: root, Set: set,
+		ChangedFiles: []gitbase.ChangedFile{{Path: "pricing/gradle.lockfile", Status: gitbase.StatusModified}},
+		Reports:      []reports.Report{{Path: "bom.cdx.json", Kind: reports.KindSBOM, Format: reports.FormatCycloneDX}},
+		Show: func(side Revision, file string) ([]byte, bool, error) {
+			return []byte(sides[side]), true, nil
+		},
+	})
+	if len(r.DependencyChanges) != 1 {
+		t.Fatalf("dependency changes %+v", r.DependencyChanges)
+	}
+	change := r.DependencyChanges[0]
+	if change.Ecosystem != "maven" || change.Name != "com.google.guava:guava" || change.Component != "pricing" || change.Change != evidence.DependencyUpgraded {
+		t.Errorf("change %+v", change)
+	}
+	if change.After == nil || !slices.Equal(change.After.Licenses, []string{"Apache-2.0"}) {
+		t.Errorf("after %+v, want the SBOM's license", change.After)
+	}
+}
+
+// dartRepository is a melos repository: a Flutter app and a Dart package,
+// each with a test file, and a root lib/ that no package holds.
+func dartRepository(t *testing.T) (string, components.Set) {
+	t.Helper()
+	root := t.TempDir()
+	write(t, root, map[string]string{
+		"apps/mobile/lib/main.dart":                 "void main() {}\n",
+		"apps/mobile/test/widget_test.dart":         "void main() {}\n",
+		"packages/pricing/lib/src/price.dart":       "int price() => 1;\n",
+		"packages/pricing/test/src/price_test.dart": "void main() {}\n",
+		"packages/pricing/test/helpers.dart":        "void helper() {}\n",
+		"lib/src/price.dart":                        "int price() => 2;\n",
+	})
+	set := components.Detect(root, []components.Detector{fake{components.Found{Components: []components.Component{
+		{ID: "apps/mobile", Ecosystem: "dart", Source: evidence.SourceWorkspace},
+		{ID: "packages/pricing", Ecosystem: "dart", Source: evidence.SourceWorkspace},
+	}}}})
+	return root, set
+}
+
+func TestATojunitCaseGoesToTheComponentOfItsTestFile(t *testing.T) {
+	spectest.Proves(t, feature, "tests-and-coverage", "a-tojunit-case-goes-to-the-component-of-its-test-file")
+	spectest.Proves(t, "tooling/observe-dart", "dart-package-reports", "a-tojunit-class-name-names-its-test-file")
+	root, set := dartRepository(t)
+	write(t, root, map[string]string{
+		// One report at the root: flutter test --machine names absolute
+		// paths, which tojunit writes with a leading dot; dart test names
+		// paths relative to the package, here with a --package prefix.
+		"test-results.xml": `<testsuites>
+			<testsuite name=".home.runner.work.shop.shop.apps.mobile.test.widget" tests="2">
+				<testcase classname=".home.runner.work.shop.shop.apps.mobile.test.widget" name="renders" time="0.25"/>
+				<testcase classname=".home.runner.work.shop.shop.apps.mobile.test.widget" name="taps" time="0.25"><failure message="expected 1"/></testcase>
+			</testsuite>
+			<testsuite name="shop.packages.pricing.test.src.price">
+				<testcase classname="shop.packages.pricing.test.src.price" name="adds tax" time="0.1"/>
+			</testsuite>
+			<testsuite name="test.unknown">
+				<testcase classname="test.unknown" name="orphan"/>
+			</testsuite>
+		</testsuites>`,
+		// A report in a package: the class name is relative to it, and a
+		// helper file without _test.dart is named whole.
+		"packages/pricing/test-results.xml": `<testsuites><testsuite name="test.src.price">
+			<testcase classname="test.src.price" name="rounds"/>
+			<testcase classname="test.helpers" name="helps"/>
+			<testcase classname="test.gone" name="still in pricing"/>
+		</testsuite></testsuites>`,
+	})
+	r := Run(Input{Root: root, Set: set, Reports: []reports.Report{
+		{Path: "test-results.xml", Kind: reports.KindJUnit, Format: reports.FormatJUnit},
+		{Path: "packages/pricing/test-results.xml", Kind: reports.KindJUnit, Format: reports.FormatJUnit},
+	}})
+	got := tests(r)
+	mobile := got["apps/mobile"]
+	if mobile.Passed != 1 || mobile.Failed != 1 || len(mobile.FailingCases) != 1 || mobile.FailingCases[0].File != "apps/mobile/test/widget_test.dart" {
+		t.Errorf("mobile tests %+v", mobile)
+	}
+	if got["packages/pricing"].Passed != 4 {
+		t.Errorf("pricing tests %+v", got["packages/pricing"])
+	}
+	if len(r.Diagnostics) != 1 || r.Diagnostics[0].Code != CodeTestsUnattributed || !strings.HasPrefix(r.Diagnostics[0].Message, "1 test cases") {
+		t.Errorf("diagnostics %v", r.Diagnostics)
+	}
+	for classname, want := range map[string][]string{
+		"test.price":    {"test/price_test.dart", "test/price.dart", "price_test.dart", "price.dart"},
+		".a.test.b":     {"a/test/b_test.dart", "a/test/b.dart", "test/b_test.dart", "test/b.dart", "b_test.dart", "b.dart"},
+		"src/a.test.ts": nil,
+		"a-b.c":         nil,
+		"":              nil,
+		"a..b":          nil,
+	} {
+		if got := dartTestFiles(classname); !slices.Equal(got, want) {
+			t.Errorf("dartTestFiles(%q) = %v, want %v", classname, got, want)
+		}
+	}
+}
+
+func TestAPackageLCOVReadsFromThePackageDirectory(t *testing.T) {
+	spectest.Proves(t, "tooling/observe-dart", "dart-package-reports", "a-package-lcov-reads-from-the-package-directory")
+	root, set := dartRepository(t)
+	write(t, root, map[string]string{
+		// flutter test --coverage writes paths relative to the package; the
+		// root holds a file of the same path, which the package's wins over.
+		"packages/pricing/coverage/lcov.info": "SF:lib/src/price.dart\nDA:1,1\nLF:1\nLH:1\nend_of_record\n",
+		"apps/mobile/coverage/lcov.info":      "SF:lib/main.dart\nDA:1,0\nLF:1\nLH:0\nend_of_record\n",
+	})
+	r := Run(Input{Root: root, Set: set, Reports: []reports.Report{
+		{Path: "packages/pricing/coverage/lcov.info", Kind: reports.KindCoverage, Format: reports.FormatLCOV},
+		{Path: "apps/mobile/coverage/lcov.info", Kind: reports.KindCoverage, Format: reports.FormatLCOV},
+	}})
+	want := []evidence.ComponentCoverage{
+		{Component: "apps/mobile", CoveredLines: 0, TotalLines: 1},
+		{Component: "packages/pricing", CoveredLines: 1, TotalLines: 1},
+	}
+	if !slices.Equal(r.Coverage, want) || len(r.Diagnostics) != 0 {
+		t.Errorf("coverage %+v, diagnostics %v", r.Coverage, r.Diagnostics)
+	}
+}
+
+func TestANextestCaseGoesToTheCrateItsBinaryNames(t *testing.T) {
+	spectest.Proves(t, "tooling/observe-rust", "rust-report-discovery", "a-nextest-case-goes-to-the-crate-its-binary-names")
+	root := t.TempDir()
+	write(t, root, map[string]string{
+		"Cargo.toml":                "[workspace]\nmembers = [\"crates/*\"]\n",
+		"crates/api/Cargo.toml":     "[package]\nname = \"api-server\"\n",
+		"crates/pricing/Cargo.toml": "[package]\nname = \"pricing\"\n",
+		// The virtual workspace root holds the report and is no component.
+		"target/nextest/ci/junit.xml": `<testsuites name="nextest-run">
+			<testsuite name="api-server"><testcase name="tests::quote" classname="api-server"/></testsuite>
+			<testsuite name="pricing"><testcase name="tests::empty" classname="pricing"/></testsuite>
+			<testsuite name="pricing::format"><testcase name="formats" classname="pricing::format"><failure message="left != right"/></testcase></testsuite>
+			<testsuite name="api_server::bin/api"><testcase name="serves" classname="api_server::bin/api"/></testsuite>
+			<testsuite name="gone"><testcase name="orphan" classname="gone"/></testsuite>
+		</testsuites>`,
+	})
+	set := components.Detect(root, []components.Detector{components.CargoDetector{}})
+	r := Run(Input{Root: root, Set: set, Reports: []reports.Report{
+		{Path: "target/nextest/ci/junit.xml", Kind: reports.KindJUnit, Format: reports.FormatJUnit},
+	}})
+	got := tests(r)
+	if got["crates/api"].Passed != 2 || got["crates/pricing"].Passed != 1 || got["crates/pricing"].Failed != 1 {
+		t.Errorf("tests %+v", got)
+	}
+	if failing := got["crates/pricing"].FailingCases; len(failing) != 1 || failing[0].Suite != "pricing::format" {
+		t.Errorf("failing cases %+v", failing)
+	}
+	if len(r.Diagnostics) != 1 || r.Diagnostics[0].Code != CodeTestsUnattributed || !strings.HasPrefix(r.Diagnostics[0].Message, "1 test cases") {
+		t.Errorf("diagnostics %v", r.Diagnostics)
+	}
+}
+
+func TestAGoJUnitReportV1CaseGoesToThePackageItsSuiteNames(t *testing.T) {
+	spectest.Proves(t, feature, "tests-and-coverage", "a-test-goes-to-the-component-of-its-file-else-of-its-report")
+	root, set := repository(t)
+	// go-junit-report v1 writes the last element of the import path as the
+	// class name and the whole path as the suite name.
+	write(t, root, map[string]string{"junit.xml": `<testsuites>
+		<testsuite name="example.com/svc"><testcase classname="svc" name="TestCalc"/></testsuite>
+	</testsuites>`})
+	r := Run(Input{Root: root, Set: set, Reports: []reports.Report{{Path: "junit.xml", Kind: reports.KindJUnit, Format: reports.FormatJUnit}}})
+	if got := tests(r); got["svc"].Passed != 1 || len(r.Diagnostics) != 0 {
+		t.Errorf("tests %+v, diagnostics %v", got, r.Diagnostics)
+	}
+}
+
+func TestAJestSuiteNamedLikeACrateStaysWithItsReport(t *testing.T) {
+	spectest.Proves(t, "tooling/observe-rust", "rust-report-discovery", "a-nextest-case-goes-to-the-crate-its-binary-names")
+	root := t.TempDir()
+	write(t, root, map[string]string{
+		"crates/pricing/Cargo.toml": "[package]\nname = \"pricing\"\n",
+		// jest-junit writes the describe title as the suite name, and the
+		// title and the test name as the class name.
+		"web/junit.xml": `<testsuites name="jest tests">
+			<testsuite name="pricing"><testcase classname="pricing adds up" name="pricing adds up"/></testsuite>
+		</testsuites>`,
+	})
+	set := components.Detect(root, []components.Detector{components.CargoDetector{}, fake{components.Found{Components: []components.Component{
+		{ID: "web", Ecosystem: "node", Source: evidence.SourceWorkspace},
+	}}}})
+	r := Run(Input{Root: root, Set: set, Reports: []reports.Report{
+		{Path: "web/junit.xml", Kind: reports.KindJUnit, Format: reports.FormatJUnit},
+	}})
+	got := tests(r)
+	if got["web"].Passed != 1 || got["crates/pricing"].Passed != 0 {
+		t.Errorf("tests %+v", got)
 	}
 }

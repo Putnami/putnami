@@ -4,8 +4,7 @@ The Go detector finds the modules of a repository from its `go.work` and
 `go.mod` files. It reads files only: it runs no `go` command and reaches no
 module cache or network. The change analyses use what it finds to name the
 changed and dependent modules, attribute tests and coverage, and diff the
-dependency versions. Until those analyses land, the summary and the evidence
-document do not show Go modules yet.
+dependency versions.
 
 ## Components
 

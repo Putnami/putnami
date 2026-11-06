@@ -1,0 +1,61 @@
+{
+  "totals": {
+    "tests": 4,
+    "failures": 1,
+    "errors": 0,
+    "skipped": 1,
+    "assertions": 0,
+    "time": 1.2195569
+  },
+  "cases": [
+    {
+      "name": "Calc.Tests.CalculatorTests.AddWrongOnPurpose",
+      "classname": "Calc.Tests.CalculatorTests",
+      "suites": [
+        {
+          "name": "Calc.Tests.xunit.dll"
+        }
+      ],
+      "status": "failed",
+      "durationMs": 2,
+      "failure": {
+        "message": "Assert.Equal() Failure\nExpected: 5\nActual:   4",
+        "body": "   at Calc.Tests.CalculatorTests.AddWrongOnPurpose() in /app/Calc.Tests.xunit/CalculatorTests.cs:line 16\n   at System.RuntimeMethodHandle.InvokeMethod(Object target, Void** arguments, Signature sig, Boolean isConstructor)\n   at System.Reflection.MethodBaseInvoker.InvokeWithNoArgs(Object obj, BindingFlags invokeAttr)"
+      }
+    },
+    {
+      "name": "Calc.Tests.CalculatorTests.Skipped",
+      "classname": "Calc.Tests.CalculatorTests",
+      "suites": [
+        {
+          "name": "Calc.Tests.xunit.dll"
+        }
+      ],
+      "status": "skipped",
+      "durationMs": 1,
+      "skipped": {}
+    },
+    {
+      "name": "Calc.Tests.CalculatorTests.SignOfANonNegativeInput(n: 4)",
+      "classname": "Calc.Tests.CalculatorTests",
+      "suites": [
+        {
+          "name": "Calc.Tests.xunit.dll"
+        }
+      ],
+      "status": "passed",
+      "durationMs": 3
+    },
+    {
+      "name": "Calc.Tests.CalculatorTests.Add",
+      "classname": "Calc.Tests.CalculatorTests",
+      "suites": [
+        {
+          "name": "Calc.Tests.xunit.dll"
+        }
+      ],
+      "status": "passed",
+      "durationMs": 2
+    }
+  ]
+}

@@ -1,8 +1,8 @@
 # go.putnami.dev/evidence/readers
 
 Reads the test and coverage reports a CI already wrote into typed facts: JUnit
-XML into test cases, and LCOV, Cobertura XML, Clover XML and Go cover profiles
-into line-level file coverage. The observe extension builds the change
+XML and TRX into test cases, and LCOV, Cobertura XML, Clover XML, JaCoCo XML and Go
+cover profiles into line-level file coverage. The observe extension builds the change
 evidence document (`protocols/evidence`) from them, and the TypeScript
 extension reads its bun reports through it.
 
@@ -17,9 +17,11 @@ Every reader takes the report's bytes and returns its result and diagnostics.
 | Reader | Format | Result |
 | --- | --- | --- |
 | `ReadJUnit` | JUnit XML, root `testsuites` or `testsuite` | `TestReport`: the root's stated totals, and one `TestCase` per `testcase` element in document order |
+| `ReadTRX` | TRX, the report of `dotnet test --logger trx`, root `TestRun` | `TestReport`: the `ResultSummary` counters, and one `TestCase` per top-level `UnitTestResult` in document order |
 | `ReadLCOV` | LCOV tracefile | `CoverageReport` |
 | `ReadCobertura` | Cobertura XML | `CoverageReport`, with the report's source roots |
 | `ReadClover` | Clover XML | `CoverageReport` |
+| `ReadJaCoCo` | JaCoCo XML, root `report`, as the JaCoCo Maven plugin, the Gradle `jacoco` plugin and Kover write it | `CoverageReport` |
 | `ReadGoCover` | `go test -coverprofile`, mode `set`, `count` or `atomic` | `CoverageReport` |
 | `ReadSBOM` | CycloneDX 1.4, 1.5 or 1.6 JSON (`bomFormat: CycloneDX`), SPDX 2.3 JSON (`spdxVersion: SPDX-2.3`) | `SBOM`: the format, its spec version and one `Package` per component or package |
 
@@ -29,6 +31,19 @@ milliseconds, and its failure or skip. Its file is the case's `file`
 attribute, else the one of its nearest enclosing suite. A `failure` or an
 `error` element fails the case.
 
+A TRX case keeps the result's `testName` as its name, the `className` of the
+`TestMethod` its `testId` defines, cut at its first comma, as its classname,
+and one suite named by the file name of that method's `codeBase`, the test
+assembly, as `JunitXml.TestLogger` names it. A TRX report states no test file.
+`Passed`, `PassedButRunAborted`, `Completed` and `Warning` pass; `Failed`
+fails, and `Error`, `Timeout` and `Aborted` fail as an error, with the
+`ErrorInfo` message and stack trace; `NotExecuted`, `Inconclusive`,
+`NotRunnable`, `Pending`, `Disconnected` and `InProgress` skip, with the
+`ErrorInfo` message. The inner results of a data-driven test are not cases:
+their parent stands for them. The errors total counts the `error`, `timeout`
+and `aborted` counters, and the skipped total is `total` less `executed`: the
+VSTest logger leaves `notExecuted` at 0 for a skipped test.
+
 A `FileCoverage` holds the file's instrumented lines, in increasing order,
 with their hit counts, and its line and function totals counted from them. A
 line stated twice keeps its largest count. A file whose report lists no line
@@ -36,6 +51,12 @@ or no function keeps the totals the report states: LCOV's `LF`, `LH`, `FNF` and
 `FNH`, a Clover file's `methods` and `coveredmethods` metrics. A Go block marks
 every line from its start line to its end line; a block stated twice sums its
 counts in `count` and `atomic` mode.
+
+JaCoCo records which instructions of a line ran, not how often: a line with a
+covered instruction (`ci`) has one hit, a line with missed instructions only
+(`mi`) none, and a line with neither is no line. A source file's `LINE` and
+`METHOD` counters are its stated totals. The packages of every `group`, as
+`report-aggregate` writes them per module, are read.
 
 ## Software bills of materials
 
@@ -64,7 +85,9 @@ CycloneDX for them. `ParsePURL` reads a package URL into its type, its name
 
 A reader reports each path as the report states it, in slash form, and
 resolves none: a Clover file's `path` attribute wins over its `name`, a
-Cobertura file is relative to one of the report's `Sources`, and a Go profile
+Cobertura file is relative to one of the report's `Sources`, a JaCoCo file is
+its package path and source file name (`com/acme/pricing/Price.kt`, the
+source file name alone in the default package), and a Go profile
 names import paths (`example.com/calc/calc.go`). Mapping a path to the
 repository, and a case or a file to a component, is the caller's.
 
@@ -75,7 +98,7 @@ read returns an empty result and one error diagnostic:
 
 | Code | Meaning |
 | --- | --- |
-| `readers.malformed` | The report does not decode, its root is not its format's, or it states an impossible value: a line below 1, a negative count, an LCOV record without `end_of_record`, JUnit suites nested deeper than `MaxSuiteDepth` (100). |
+| `readers.malformed` | The report does not decode, its root is not its format's, or it states an impossible value: a line below 1, a negative count, an unknown TRX outcome, an LCOV record without `end_of_record`, JUnit suites or JaCoCo groups nested deeper than `MaxSuiteDepth` (100). |
 | `readers.too_large` | The report is larger than `MaxReportBytes` (256 MiB), or its files mark more than `MaxLineMarks` (4,000,000) lines; a Go block marks every line of its span. |
 | `readers.missing` | `ReadFile`: the file does not exist, or the path is empty. |
 | `readers.unreadable` | `ReadFile`: the file exists but cannot be read. |
@@ -85,6 +108,6 @@ read returns an empty result and one error diagnostic:
 ## Fixtures
 
 `testdata/` holds real reports from Jest, Vitest, node:test, c8, PHPUnit,
-gotestsum and `go test`, each with the golden output of its reader, and the
+gotestsum, `go test`, JaCoCo under Maven and Gradle, and `dotnet test` with xUnit, NUnit and MSTest, each with the golden output of its reader, and the
 malformed reports with the code each returns. `testdata/SOURCES.md` names
 the tool versions and commands.

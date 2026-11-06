@@ -1,6 +1,6 @@
 # Fixture sources
 
-Every report under `junit/`, `lcov/`, `cobertura/`, `clover/` and `gocover/` is
+Every report under `junit/`, `trx/`, `lcov/`, `cobertura/`, `clover/`, `jacoco/` and `gocover/` is
 the unmodified output of a real tool run, renamed only. Each `.golden.json` is
 what the reader returns for it: regenerate them with `go test -update` and
 review the diff. `malformed/` holds small hand-written reports, each listed in
@@ -17,12 +17,20 @@ skipped.
 | Vitest | vitest 5.0.5, @vitest/coverage-v8 5.0.5, same image | `vitest run --reporter=junit --outputFile=junit.xml --coverage.enabled --coverage.provider=v8 --coverage.reporter=lcov --coverage.reporter=cobertura --coverage.reporter=clover --coverage.reportOnFailure` | `junit/vitest.xml`, `lcov/vitest.info`, `cobertura/vitest.xml`, `clover/vitest.xml` |
 | node:test with c8 | c8 12.0.0, Node 24.22.2, same image | `c8 --reporter=lcov --reporter=cobertura node --test --test-reporter=junit --test-reporter-destination=junit.xml` | `junit/node-test.xml`, `lcov/c8.info`, `cobertura/c8.xml` |
 | PHPUnit | PHPUnit 11.5.57, PHP 8.3.36, PCOV 1.0.12, image from `sources/phpunit/Dockerfile` | `vendor/bin/phpunit --log-junit junit.xml --coverage-clover clover.xml --coverage-cobertura cobertura.xml` | `junit/phpunit.xml`, `clover/phpunit.xml`, `cobertura/phpunit.xml` |
+| Maven | Maven 3.9.11, OpenJDK 21.0.12, maven-surefire-plugin 3.5.2, jacoco-maven-plugin 0.8.13, JUnit 5.11.4 | `mvn -B verify` | `jacoco/maven.xml` |
+| Gradle with Kotlin | Gradle 8.14.3, Kotlin 2.0.21, the `jacoco` plugin with JaCoCo 0.8.13, OpenJDK 21.0.12, JUnit 5.11.4 | `gradle test`, which the build finalizes with `jacocoTestReport` | `jacoco/gradle-kotlin.xml` |
+| .NET | .NET SDK 8.0.133 (Ubuntu 24.04 package), xunit 2.4.2 with xunit.runner.visualstudio 2.4.5, NUnit 3.13.3 with NUnit3TestAdapter 4.2.1, MSTest 3.0.4, Microsoft.NET.Test.Sdk 17.6.0 | `dotnet test Calc.Tests.<framework> --logger "trx;LogFileName=<framework>.trx" --results-directory out` | `trx/xunit.trx`, `trx/nunit.trx`, `trx/mstest.trx` |
 | Go | go 1.26.1, gotestsum 1.13.0 | `go test -coverprofile=set.coverprofile ./...`, `go test -covermode=atomic -coverpkg=./... -coverprofile=atomic.coverprofile ./...`, `gotestsum --junitfile junit.xml -- ./...` | `gocover/set.coverprofile`, `gocover/atomic.coverprofile`, `junit/gotestsum.xml` |
 
 The Node and PHP projects ran mounted at `/app` in a container whose hostname
-is `ci-runner`, so the absolute paths in the reports start with `/app`. The Go
+is `ci-runner`, so the absolute paths in the reports start with `/app`. The .NET projects
+ran at `/app`, on a host named `vm`; their project files are kept as
+`*.csproj.txt` so that no tool takes `sources/dotnet` for a project. The Go
 module is `example.com/calc`; its `go.mod` is kept as `go.mod.txt` so that no
-tool takes `sources/go` for a module.
+tool takes `sources/go` for a module. The Maven and Gradle projects ran in
+`/ci/maven` and `/ci/gradle`; their `pom.xml`, `build.gradle.kts` and
+`settings.gradle.kts` are kept with a `.txt` suffix for the same reason. Their
+JaCoCo reports name no absolute path.
 
 ## Software bills of materials
 

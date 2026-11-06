@@ -4,7 +4,8 @@
 // A report is recognized by its content, never by its name alone: a JUnit XML
 // report has a testsuites or testsuite root, a Cobertura report a coverage
 // root with Cobertura attributes, a Clover report a coverage root with a
-// project, an LCOV trace starts with a TN: or SF: record, a Go cover profile
+// project, a JaCoCo report a report root with JaCoCo children, an LCOV trace
+// starts with a TN: or SF: record, a Go cover profile
 // starts with its mode line, a CycloneDX document states its bomFormat and an
 // SPDX one its spdxVersion. Named paths replace discovery for their kind. The
 // SBOM of the base is only named, never discovered, and each side keeps at most
@@ -40,10 +41,12 @@ const (
 // Report formats.
 const (
 	FormatJUnit     = "junit"
+	FormatTRX       = "trx"
 	FormatLCOV      = "lcov"
 	FormatCobertura = "cobertura"
 	FormatClover    = "clover"
 	FormatGoCover   = "go-cover"
+	FormatJaCoCo    = "jacoco"
 	FormatCycloneDX = "cyclonedx"
 	FormatSPDX      = "spdx"
 )
@@ -75,6 +78,15 @@ const (
 
 // skippedDirs are never walked.
 var skippedDirs = map[string]bool{".git": true, "node_modules": true, "vendor": true}
+
+// skippedOutputs are the Gradle (build) and Maven (target) output
+// directories that hold no report, by the name of their parent: discovery
+// skips them, so that the thousands of XML files an Android build writes
+// there do not spend its bounds.
+var skippedOutputs = map[string]map[string]bool{
+	"build":  {"intermediates": true, "generated": true, "tmp": true, "kotlin": true},
+	"target": {"classes": true, "test-classes": true, "generated-sources": true, "generated-test-sources": true},
+}
 
 // Report is one report file.
 type Report struct {
@@ -201,6 +213,8 @@ func discoverReports(root string, kinds map[string]bool) ([]Report, []diag.Diagn
 	var reports []Report
 	var diags []diag.Diagnostic
 	walked, sniffed := 0, 0
+	// cargoTargets holds the Cargo target directories walked so far.
+	cargoTargets := map[string]bool{}
 	errBound := errors.New("bound")
 	err := filepath.WalkDir(root, func(file string, entry fs.DirEntry, err error) error {
 		if err != nil {
@@ -212,8 +226,18 @@ func discoverReports(root string, kinds map[string]bool) ([]Report, []diag.Diagn
 			return errBound
 		}
 		if entry.IsDir() {
-			if file != root && skippedDirs[entry.Name()] {
+			if file == root {
+				return nil
+			}
+			if skippedDirs[entry.Name()] || skippedOutputs[filepath.Base(filepath.Dir(file))][entry.Name()] {
 				return filepath.SkipDir
+			}
+			target := isCargoTarget(file)
+			if cargoTargets[filepath.Dir(file)] && entry.Name() != NextestStore && !target {
+				return filepath.SkipDir
+			}
+			if target {
+				cargoTargets[file] = true
 			}
 			return nil
 		}
@@ -304,7 +328,7 @@ func discoverBazelReports(root string, kinds map[string]bool) ([]Report, []diag.
 func candidate(name string) bool {
 	lower := strings.ToLower(name)
 	switch path.Ext(lower) {
-	case ".xml", ".info", ".lcov", ".out", ".cov", ".coverprofile", ".gocov":
+	case ".xml", ".trx", ".info", ".lcov", ".out", ".cov", ".coverprofile", ".gocov":
 		return true
 	case ".txt":
 		return strings.Contains(lower, "cover")
@@ -318,9 +342,9 @@ func candidate(name string) bool {
 
 func kindOf(format string) string {
 	switch format {
-	case FormatJUnit:
+	case FormatJUnit, FormatTRX:
 		return KindJUnit
-	case FormatLCOV, FormatCobertura, FormatClover, FormatGoCover:
+	case FormatLCOV, FormatCobertura, FormatClover, FormatGoCover, FormatJaCoCo:
 		return KindCoverage
 	case FormatCycloneDX, FormatSPDX:
 		return KindSBOM
@@ -447,6 +471,18 @@ func sniffXML(head []byte) string {
 	switch root.Name.Local {
 	case "testsuites", "testsuite":
 		return FormatJUnit
+	case "report":
+		// JaCoCo and Kover: a report root whose first child is a JaCoCo
+		// element.
+		if child, ok := nextStart(decoder); ok {
+			switch child.Name.Local {
+			case "sessioninfo", "package", "group", "counter":
+				return FormatJaCoCo
+			}
+		}
+		return ""
+	case "TestRun":
+		return FormatTRX
 	case "coverage":
 	default:
 		return ""
@@ -585,4 +621,28 @@ func within(root, file string) (string, bool) {
 		return "", false
 	}
 	return filepath.ToSlash(rel), true
+}
+
+// NextestStore is the directory of a Cargo target directory where
+// cargo-nextest writes its JUnit reports, as nextest/<profile>/junit.xml.
+const NextestStore = "nextest"
+
+// cargoTag is the line cargo writes in the CACHEDIR.TAG of each target
+// directory it creates.
+const cargoTag = "created by cargo"
+
+// isCargoTarget reports whether dir is a Cargo target directory: one whose
+// CACHEDIR.TAG cargo wrote. Discovery walks only its nextest store, the
+// target directories nested in it, such as the one cargo-llvm-cov builds in,
+// and the files it holds directly, so its build outputs do not exhaust the
+// bounds.
+func isCargoTarget(dir string) bool {
+	f, err := os.Open(filepath.Join(dir, "CACHEDIR.TAG"))
+	if err != nil {
+		return false
+	}
+	defer f.Close()
+	head := make([]byte, 512)
+	n, _ := io.ReadFull(f, head)
+	return strings.Contains(string(head[:n]), cargoTag)
 }

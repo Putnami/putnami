@@ -28,6 +28,7 @@ import (
 
 	diag "go.putnami.dev/protocol/diagnostic"
 	wsproto "go.putnami.dev/protocol/workspace"
+	"go.putnami.dev/tooling/observe/internal/detect/memberglob"
 	"go.putnami.dev/tooling/observe/internal/toml"
 )
 
@@ -62,6 +63,11 @@ const MaxWalkedEntries = 200000
 
 // skippedDirs are never walked: installed packages and caches.
 var skippedDirs = map[string]bool{"node_modules": true, "vendor": true, "__pycache__": true, "site-packages": true}
+
+// skipped reports whether a walk leaves the directory of that name out.
+func skipped(name string) bool {
+	return strings.HasPrefix(name, ".") || skippedDirs[name]
+}
 
 // Metadata is what the detector knows about one component beyond the probe
 // project's own members. Every path is repository-relative and
@@ -108,7 +114,7 @@ func Candidates(root string) ([]string, []diag.Diagnostic) {
 		}
 		if entry.IsDir() {
 			name := entry.Name()
-			if p != root && (strings.HasPrefix(name, ".") || skippedDirs[name]) {
+			if p != root && skipped(name) {
 				return fs.SkipDir
 			}
 			return nil
@@ -239,7 +245,7 @@ func readWorkspace(root string) (workspace, []diag.Diagnostic) {
 	patterns := func(key string) [][]string {
 		var out [][]string
 		for _, pattern := range toml.Strings(table, key) {
-			segments, ok := patternSegments(pattern)
+			segments, ok := memberglob.Segments(pattern)
 			if !ok {
 				diags = append(diags, diag.Warningf(CodeManifestInvalid, Marker, "the uv workspace %s pattern %q is not a repository-relative glob and is ignored", key, pattern))
 				continue
@@ -249,13 +255,13 @@ func readWorkspace(root string) (workspace, []diag.Diagnostic) {
 		return out
 	}
 	include, exclude := patterns("members"), patterns("exclude")
-	dirs, bounded := matchDirs(root, include)
+	dirs, bounded := memberglob.Dirs(root, include, skipped, MaxWalkedEntries)
 	if bounded {
 		diags = append(diags, diag.Warningf(CodeWalkBounded, Marker, "the uv workspace walk stopped after %d entries; members past it are left out", MaxWalkedEntries))
 	}
 	for _, dir := range dirs {
 		parts := strings.Split(dir, "/")
-		if slices.ContainsFunc(exclude, func(segments []string) bool { return matchSegments(segments, parts) }) {
+		if slices.ContainsFunc(exclude, func(segments []string) bool { return memberglob.Match(segments, parts) }) {
 			continue
 		}
 		if existing(root, join(dir, Marker)) != "" {
@@ -263,116 +269,6 @@ func readWorkspace(root string) (workspace, []diag.Diagnostic) {
 		}
 	}
 	return ws, diags
-}
-
-// patternSegments splits a uv members or exclude glob into its segments. A
-// segment is a path.Match pattern, or ** for any number of directories. An
-// absolute pattern, a .. segment or an invalid segment is refused.
-func patternSegments(pattern string) ([]string, bool) {
-	pattern = strings.TrimSpace(pattern)
-	if pattern == "" || strings.HasPrefix(pattern, "/") || filepath.IsAbs(pattern) || strings.Contains(pattern, "//") {
-		return nil, false
-	}
-	pattern = path.Clean(pattern)
-	if pattern == "." || pattern == ".." || strings.HasPrefix(pattern, "../") {
-		return nil, false
-	}
-	segments := strings.Split(pattern, "/")
-	for _, segment := range segments {
-		if segment == ".." || segment == "" {
-			return nil, false
-		}
-		if _, err := path.Match(segment, ""); err != nil {
-			return nil, false
-		}
-	}
-	return segments, true
-}
-
-// matchDirs walks the repository once and returns, in path order, the
-// directories below the root that one of the patterns matches. It skips the
-// directories Candidates skips; bounded is true when it stopped early.
-func matchDirs(root string, patterns [][]string) (dirs []string, bounded bool) {
-	if len(patterns) == 0 {
-		return nil, false
-	}
-	walked := 0
-	_ = filepath.WalkDir(root, func(p string, entry fs.DirEntry, err error) error {
-		if err != nil || !entry.IsDir() {
-			return nil
-		}
-		if p == root {
-			return nil
-		}
-		walked++
-		if walked > MaxWalkedEntries {
-			bounded = true
-			return fs.SkipAll
-		}
-		name := entry.Name()
-		if strings.HasPrefix(name, ".") || skippedDirs[name] {
-			return fs.SkipDir
-		}
-		rel, err := filepath.Rel(root, p)
-		if err != nil {
-			return fs.SkipDir
-		}
-		parts := strings.Split(filepath.ToSlash(rel), "/")
-		below := false
-		for _, segments := range patterns {
-			if matchSegments(segments, parts) {
-				dirs = append(dirs, strings.Join(parts, "/"))
-				break
-			}
-		}
-		for _, segments := range patterns {
-			below = below || canMatchBelow(segments, parts)
-		}
-		if !below {
-			return fs.SkipDir
-		}
-		return nil
-	})
-	slices.Sort(dirs)
-	return slices.Compact(dirs), bounded
-}
-
-// matchSegments reports whether the path parts match the pattern segments,
-// ** matching any number of parts.
-func matchSegments(pattern, parts []string) bool {
-	if len(pattern) == 0 {
-		return len(parts) == 0
-	}
-	if pattern[0] == "**" {
-		for i := 0; i <= len(parts); i++ {
-			if matchSegments(pattern[1:], parts[i:]) {
-				return true
-			}
-		}
-		return false
-	}
-	if len(parts) == 0 {
-		return false
-	}
-	ok, _ := path.Match(pattern[0], parts[0])
-	return ok && matchSegments(pattern[1:], parts[1:])
-}
-
-// canMatchBelow reports whether a directory below the path parts can still
-// match the pattern segments.
-func canMatchBelow(pattern, parts []string) bool {
-	for i, part := range parts {
-		if i >= len(pattern) {
-			return false
-		}
-		if pattern[i] == "**" {
-			return true
-		}
-		if ok, _ := path.Match(pattern[i], part); !ok {
-			return false
-		}
-	}
-	return len(pattern) > len(parts)
 }
 
 // readManifest reads the pyproject.toml of a directory. found is false when

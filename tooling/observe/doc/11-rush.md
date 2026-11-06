@@ -2,7 +2,7 @@
 
 The Rush detector reads the projects of a [Rush](https://rushjs.io) monorepo.
 Rush lists its projects in `rush.json`, not in `package.json` `workspaces` or
-`pnpm-workspace.yaml`, so the [Node workspaces detector](04-node-workspaces.md)
+`pnpm-workspace.yaml`, so the [Node workspaces detector](/docs/tooling-&-workspace/observe/node-workspaces)
 finds none. The detector reads `rush.json` and the projects' `package.json`
 files, and runs no `rush`, no package manager, and reads no `common/temp` or
 `node_modules`.
@@ -32,7 +32,7 @@ A project depends on another Rush project when one of the `dependencies`,
 
 - with the `workspace:` protocol, an alias (`workspace:other@*`) included;
 - with a version range the other project's `package.json` version satisfies,
-  read as the [Node workspaces detector](04-node-workspaces.md#the-edges)
+  read as the [Node workspaces detector](/docs/tooling-&-workspace/observe/node-workspaces#the-edges)
   reads ranges. An `npm:` alias is installed from the registry and is no edge,
   as in Rush.
 
@@ -52,7 +52,7 @@ The package manager `rush.json` names selects the lockfile:
 
 In pnpm mode, each `common/config/subspaces/<name>/pnpm-lock.yaml` is a
 lockfile too. The change analyses read them with the pnpm, npm and yarn
-readers (see [Dependency changes](06-change-analyses.md#dependency-changes)).
+readers (see [Dependency changes](/docs/tooling-&-workspace/observe/change-analyses#dependency-changes)).
 Rush's temporary packages, named `@rush-temp/`, stand for the repository's own
 projects, and `file:` or `link:` packages are local: neither is a dependency.
 A lockfile lies outside every project, so its changes name no component.

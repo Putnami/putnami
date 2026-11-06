@@ -26,6 +26,7 @@ var coverageReaders = map[string]func([]byte) (CoverageReport, []diag.Diagnostic
 	"cobertura": ReadCobertura,
 	"clover":    ReadClover,
 	"gocover":   ReadGoCover,
+	"jacoco":    ReadJaCoCo,
 }
 
 func read(t *testing.T, path string) []byte {
@@ -94,6 +95,69 @@ func TestRealJUnitReportsReadToTheirExpectedCases(t *testing.T) {
 		golden(t, fixture, report)
 	}
 	spectest.Proves(t, feature, "junit-reads-every-case", "real-junit-reports-read-to-their-expected-cases")
+}
+
+func TestRealTRXReportsReadToTheirExpectedCases(t *testing.T) {
+	spectest.Proves(t, feature, "trx-reads-every-result", "real-trx-reports-read-to-their-expected-cases")
+	for _, fixture := range fixtures(t, "trx") {
+		report, diagnostics := ReadFile(fixture, ReadTRX)
+		if len(diagnostics) != 0 {
+			t.Fatalf("%s: %v", fixture, diagnostics)
+		}
+		statuses := map[string]int{}
+		for _, testCase := range report.Cases {
+			statuses[testCase.Status]++
+			if testCase.Classname != "Calc.Tests.CalculatorTests" || len(testCase.Suites) != 1 || !strings.HasPrefix(testCase.Suites[0].Name, "Calc.Tests.") || !strings.HasSuffix(testCase.Suites[0].Name, ".dll") {
+				t.Errorf("%s: case %q class %q suites %+v, want the class and the test assembly", fixture, testCase.Name, testCase.Classname, testCase.Suites)
+			}
+		}
+		if statuses[StatusFailed] != 1 || statuses[StatusSkipped] != 1 || statuses[StatusPassed] != 2 || report.Totals.Tests != 4 || report.Totals.Skipped != 1 {
+			t.Errorf("%s: statuses %v, totals %+v, want one failed, one skipped and two passed of four", fixture, statuses, report.Totals)
+		}
+		golden(t, fixture, report)
+	}
+}
+
+func TestATRXOutcomeMapsToAStatus(t *testing.T) {
+	spectest.Proves(t, feature, "trx-reads-every-result", "a-trx-outcome-maps-to-a-status")
+	for outcome, want := range map[string]struct {
+		status string
+		error  bool
+	}{
+		"Passed": {StatusPassed, false}, "PassedButRunAborted": {StatusPassed, false}, "Completed": {StatusPassed, false}, "Warning": {StatusPassed, false},
+		"Failed": {StatusFailed, false}, "Error": {StatusFailed, true}, "Timeout": {StatusFailed, true}, "Aborted": {StatusFailed, true},
+		"NotExecuted": {StatusSkipped, false}, "Inconclusive": {StatusSkipped, false}, "NotRunnable": {StatusSkipped, false},
+		"Pending": {StatusSkipped, false}, "Disconnected": {StatusSkipped, false}, "InProgress": {StatusSkipped, false},
+	} {
+		report, diagnostics := ReadTRX([]byte(`<TestRun xmlns="http://microsoft.com/schemas/VisualStudio/TeamTest/2010">
+  <Results>
+    <UnitTestResult testId="t1" testName="Calc.Tests.CalculatorTests.Add" duration="01:02:03.5000000" outcome="` + outcome + `">
+      <Output><ErrorInfo><Message>why</Message><StackTrace>at Add()</StackTrace></ErrorInfo></Output>
+      <InnerResults><UnitTestResult testId="t1" testName="row" outcome="Passed" /></InnerResults>
+    </UnitTestResult>
+  </Results>
+  <TestDefinitions>
+    <UnitTest id="t1"><TestMethod codeBase="C:\\build\\Calc.Tests.dll" className="Calc.Tests.CalculatorTests, Calc.Tests, Version=1.0.0.0" name="Add" /></UnitTest>
+  </TestDefinitions>
+  <ResultSummary><Counters total="9" executed="5" failed="1" error="1" timeout="2" aborted="3" notExecuted="0" /></ResultSummary>
+</TestRun>`))
+		if len(diagnostics) != 0 || len(report.Cases) != 1 {
+			t.Fatalf("%s: %v, %d cases, want one case", outcome, diagnostics, len(report.Cases))
+		}
+		got := report.Cases[0]
+		if got.Status != want.status || got.DurationMs != 3723500 || got.Classname != "Calc.Tests.CalculatorTests" || !reflect.DeepEqual(got.Suites, []Suite{{Name: "Calc.Tests.dll"}}) {
+			t.Errorf("%s: case %+v", outcome, got)
+		}
+		if want.status == StatusFailed && (got.Failure == nil || got.Failure.Error != want.error || got.Failure.Message != "why" || got.Failure.Body != "at Add()") {
+			t.Errorf("%s: failure %+v, want error=%v with the message and stack trace", outcome, got.Failure, want.error)
+		}
+		if want.status == StatusSkipped && (got.Skipped == nil || got.Skipped.Message != "why") {
+			t.Errorf("%s: skipped %+v, want the message", outcome, got.Skipped)
+		}
+		if report.Totals != (Totals{Tests: 9, Failures: 1, Errors: 6, Skipped: 4}) {
+			t.Errorf("%s: totals %+v", outcome, report.Totals)
+		}
+	}
 }
 
 func TestTheJUnitFileAttributeIsKept(t *testing.T) {
@@ -286,6 +350,62 @@ func TestConcatenatedGoProfilesReadAsOne(t *testing.T) {
 	spectest.Proves(t, feature, "go-cover-blocks-become-lines", "concatenated-profiles-read-as-one")
 }
 
+func TestRealJaCoCoReportsReadToTheirExpectedLines(t *testing.T) {
+	for fixture, want := range map[string]FileCoverage{
+		"testdata/jacoco/maven.xml": {
+			Path:       "com/example/calc/Calc.java",
+			Lines:      []Line{{8, 1}, {12, 1}, {13, 1}, {15, 0}, {20, 0}, {21, 0}},
+			LineCounts: Counts{Total: 6, Covered: 3},
+			Functions:  Counts{Total: 3, Covered: 2},
+		},
+		"testdata/jacoco/gradle-kotlin.xml": {
+			Path:       "com/example/calc/Calc.kt",
+			Lines:      []Line{{5, 1}, {9, 1}, {10, 1}, {12, 0}, {17, 0}, {18, 0}},
+			LineCounts: Counts{Total: 6, Covered: 3},
+			Functions:  Counts{Total: 3, Covered: 2},
+		},
+	} {
+		report, diagnostics := ReadJaCoCo(read(t, fixture))
+		if len(diagnostics) != 0 {
+			t.Fatalf("%s: %v", fixture, diagnostics)
+		}
+		if len(report.Files) != 1 || !reflect.DeepEqual(report.Files[0], want) {
+			t.Errorf("%s: files %+v, want %+v", fixture, report.Files, want)
+		}
+	}
+	spectest.Proves(t, feature, "jacoco-reads-source-files", "real-jacoco-reports-read-to-their-expected-lines")
+}
+
+func TestJaCoCoGroupsAndTheDefaultPackageAreRead(t *testing.T) {
+	report, diagnostics := ReadJaCoCo([]byte(`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><!DOCTYPE report PUBLIC "-//JACOCO//DTD Report 1.1//EN" "report.dtd">
+<report name="shop">
+  <group name="api">
+    <group name="nested">
+      <package name="com/acme/api"><sourcefile name="Api.kt"><line nr="3" mi="0" ci="2"/><line nr="4" mi="0" ci="0"/></sourcefile></package>
+    </group>
+  </group>
+  <package name=""><sourcefile name="Main.java"><line nr="1" mi="1" ci="0"/></sourcefile></package>
+  <package name="com/acme/gen"><sourcefile name="Gen.java"><counter type="LINE" missed="2" covered="1"/><counter type="METHOD" missed="0" covered="1"/></sourcefile></package>
+</report>`))
+	if len(diagnostics) != 0 {
+		t.Fatal(diagnostics)
+	}
+	want := []FileCoverage{
+		{Path: "com/acme/api/Api.kt", Lines: []Line{{3, 1}}, LineCounts: Counts{Total: 1, Covered: 1}},
+		{Path: "Main.java", Lines: []Line{{1, 0}}, LineCounts: Counts{Total: 1}},
+		{Path: "com/acme/gen/Gen.java", LineCounts: Counts{Total: 3, Covered: 1}, Functions: Counts{Total: 1, Covered: 1}},
+	}
+	if !reflect.DeepEqual(report.Files, want) {
+		t.Errorf("files %+v, want %+v", report.Files, want)
+	}
+	nested := `<report name="r">` + strings.Repeat(`<group name="g">`, MaxSuiteDepth) + `<package name="p"><sourcefile name="A.java"><line nr="1" mi="0" ci="1"/></sourcefile></package>` + strings.Repeat(`</group>`, MaxSuiteDepth) + `</report><package name="after"><sourcefile name="B.java"><line nr="1" mi="1" ci="0"/></sourcefile></package>`
+	deep, diagnostics := ReadJaCoCo([]byte(nested))
+	if len(diagnostics) != 0 || len(deep.Files) != 1 || deep.Files[0].Path != "p/A.java" {
+		t.Errorf("groups at MaxSuiteDepth and content after the root: files %+v, diagnostics %v, want p/A.java alone", deep.Files, diagnostics)
+	}
+	spectest.Proves(t, feature, "jacoco-reads-source-files", "jacoco-groups-and-the-default-package-are-read")
+}
+
 func TestPathsAreKeptAsStated(t *testing.T) {
 	clover, _ := ReadClover(read(t, "testdata/clover/jest.xml"))
 	if got := clover.Files[0].Path; got != "/app/src/calc.js" {
@@ -329,9 +449,12 @@ func TestEveryMalformedFixtureReturnsItsCode(t *testing.T) {
 		listed++
 		var result any
 		var diagnostics []diag.Diagnostic
-		if expectation.Reader == "junit" {
+		switch expectation.Reader {
+		case "junit":
 			result, diagnostics = ReadFile(fixture, ReadJUnit)
-		} else {
+		case "trx":
+			result, diagnostics = ReadFile(fixture, ReadTRX)
+		default:
 			result, diagnostics = ReadFile(fixture, coverageReaders[expectation.Reader])
 		}
 		if len(diagnostics) != 1 || diagnostics[0].Code != expectation.Code || diagnostics[0].Severity != diag.Error || diagnostics[0].Field != fixture {
@@ -367,6 +490,7 @@ func TestEveryMalformedFixtureReturnsItsCode(t *testing.T) {
 func allReaders() map[string]func([]byte) []diag.Diagnostic {
 	readers := map[string]func([]byte) []diag.Diagnostic{
 		"junit": func(data []byte) []diag.Diagnostic { _, d := ReadJUnit(data); return d },
+		"trx":   func(data []byte) []diag.Diagnostic { _, d := ReadTRX(data); return d },
 		"sbom":  func(data []byte) []diag.Diagnostic { _, d := ReadSBOM(data); return d },
 	}
 	for name, reader := range coverageReaders {
@@ -441,7 +565,7 @@ func TestArbitraryBytesNeverPanic(t *testing.T) {
 		t.Fatal(err)
 	}
 	var inputs [][]byte
-	for _, dir := range []string{"junit", "lcov", "cobertura", "clover", "gocover", "sbom", "malformed"} {
+	for _, dir := range []string{"junit", "trx", "lcov", "cobertura", "clover", "gocover", "sbom", "malformed"} {
 		for _, fixture := range fixtures(t, dir) {
 			if expectations[filepath.Base(fixture)].Code == CodeTooLarge {
 				continue
@@ -469,7 +593,7 @@ func TestArbitraryBytesNeverPanic(t *testing.T) {
 }
 
 func FuzzReaders(f *testing.F) {
-	for _, dir := range []string{"junit", "lcov", "cobertura", "clover", "gocover", "sbom"} {
+	for _, dir := range []string{"junit", "trx", "lcov", "cobertura", "clover", "gocover", "sbom"} {
 		entries, _ := os.ReadDir(filepath.Join("testdata", dir))
 		for _, entry := range entries {
 			if data, err := os.ReadFile(filepath.Join("testdata", dir, entry.Name())); err == nil {

@@ -1,5 +1,5 @@
 /**
- * `putnami.documentation-tree.v1` — the carrier the five documentation snapshot
+ * `putnami.documentation-tree.v1` — the carrier the six documentation snapshot
  * contracts name.
  *
  * It is not a published wire schema. It names the thing one `generate.assets`
@@ -20,7 +20,7 @@ import { createHash } from 'node:crypto';
 import { readFileSync, statSync } from 'node:fs';
 import { fileExists, joinPath } from '@putnami/utils';
 
-/** The transport contract the five documentation snapshot imports declare. */
+/** The transport contract the six documentation snapshot imports declare. */
 export const DOCUMENTATION_TREE_CONTRACT = 'putnami.documentation-tree.v1';
 
 /** The glob that decides which files a documentation tree is made of. */

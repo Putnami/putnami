@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"go.putnami.dev/tooling/observe/internal/toml"
+	"go.putnami.dev/tooling/observe/internal/yaml"
 )
 
 // ReadPackageLock reads an npm package-lock.json: the packages map of
@@ -294,6 +295,302 @@ func ReadPEXLock(data []byte) (Packages, error) {
 		for _, r := range resolve.LockedRequirements {
 			out.add(PyPIName(r.ProjectName), r.Version)
 		}
+	}
+	return out, nil
+}
+
+// ReadGradleLockfile reads a gradle.lockfile or settings-gradle.lockfile:
+// each group:artifact:version=configurations line gives the package
+// group:artifact at its version. The empty= line and comments are no package.
+func ReadGradleLockfile(data []byte) (Packages, error) {
+	out := Packages{}
+	scanner := bufio.NewScanner(bytes.NewReader(data))
+	scanner.Buffer(make([]byte, 64<<10), 16<<20)
+	number := 0
+	for scanner.Scan() {
+		number++
+		line := strings.TrimSpace(scanner.Text())
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		coordinates, _, _ := strings.Cut(line, "=")
+		if coordinates == "empty" {
+			continue
+		}
+		parts := strings.Split(coordinates, ":")
+		if len(parts) != 3 || parts[0] == "" || parts[1] == "" || parts[2] == "" {
+			return nil, fmt.Errorf("line %d of the Gradle lockfile is not group:artifact:version", number)
+		}
+		out.add(parts[0]+":"+parts[1], parts[2])
+	}
+	if err := scanner.Err(); err != nil {
+		return nil, fmt.Errorf("the Gradle lockfile cannot be read: %w", err)
+	}
+	return out, nil
+}
+
+// ReadVersionCatalog reads a Gradle version catalog, such as
+// gradle/libs.versions.toml: each library is the package group:artifact and
+// each plugin the package of its id, at the version the entry states, its
+// version.ref names in [versions], or the strictly, require or prefer member
+// of a rich version. An entry without a version, such as one a platform
+// manages, is no package.
+func ReadVersionCatalog(data []byte) (Packages, error) {
+	doc, err := toml.Parse(data)
+	if err != nil {
+		return nil, fmt.Errorf("the version catalog does not parse: %w", err)
+	}
+	versions, _ := doc["versions"].(toml.Table)
+	version := func(value any) string {
+		switch v := value.(type) {
+		case string:
+			return v
+		case toml.Table:
+			if ref, ok := v["ref"].(string); ok {
+				return richVersion(versions[ref])
+			}
+			return richVersion(v)
+		}
+		return ""
+	}
+	out := Packages{}
+	libraries, _ := doc["libraries"].(toml.Table)
+	for _, entry := range libraries {
+		switch e := entry.(type) {
+		case string:
+			if parts := strings.Split(e, ":"); len(parts) == 3 {
+				out.add(parts[0]+":"+parts[1], parts[2])
+			}
+		case toml.Table:
+			module := toml.String(e, "module")
+			if module == "" && toml.String(e, "group") != "" && toml.String(e, "name") != "" {
+				module = toml.String(e, "group") + ":" + toml.String(e, "name")
+			}
+			if strings.Count(module, ":") == 1 {
+				out.add(module, version(e["version"]))
+			}
+		}
+	}
+	plugins, _ := doc["plugins"].(toml.Table)
+	for _, entry := range plugins {
+		switch e := entry.(type) {
+		case string:
+			if id, v, ok := strings.Cut(e, ":"); ok {
+				out.add(id, v)
+			}
+		case toml.Table:
+			out.add(toml.String(e, "id"), version(e["version"]))
+		}
+	}
+	return out, nil
+}
+
+// ReadPackageResolved reads a Package.resolved of Swift Package Manager: each
+// pin of format versions 2 and 3 by its identity, and of version 1 by its
+// package name, at its state's version, else at its revision for a pin on a
+// branch or a commit.
+func ReadPackageResolved(data []byte) (Packages, error) {
+	type state struct {
+		Version  string `json:"version"`
+		Revision string `json:"revision"`
+	}
+	type pin struct {
+		Identity string `json:"identity"`
+		Package  string `json:"package"`
+		State    state  `json:"state"`
+	}
+	var resolved struct {
+		Pins   *[]pin `json:"pins"`
+		Object *struct {
+			Pins *[]pin `json:"pins"`
+		} `json:"object"`
+	}
+	if err := json.Unmarshal(data, &resolved); err != nil {
+		return nil, fmt.Errorf("the Package.resolved is not JSON: %w", err)
+	}
+	pins := resolved.Pins
+	if pins == nil && resolved.Object != nil {
+		pins = resolved.Object.Pins
+	}
+	if pins == nil {
+		return nil, fmt.Errorf("the Package.resolved has no pins")
+	}
+	out := Packages{}
+	for _, p := range *pins {
+		name := p.Identity
+		if name == "" {
+			name = p.Package
+		}
+		version := p.State.Version
+		if version == "" {
+			version = p.State.Revision
+		}
+		out.add(name, version)
+	}
+	return out, nil
+}
+
+// ReadPodfileLock reads the PODS section of a Podfile.lock: each top-level
+// entry "Name (version)" by its root pod, so the subspecs of one pod are one
+// package. A pod that EXTERNAL SOURCES installs from a :path: is the
+// repository's own code and is left out.
+func ReadPodfileLock(data []byte) (Packages, error) {
+	pods := map[string][]string{}
+	local := map[string]bool{}
+	section, external, seenPods := "", "", false
+	scanner := bufio.NewScanner(bytes.NewReader(data))
+	scanner.Buffer(make([]byte, 64<<10), 16<<20)
+	for scanner.Scan() {
+		line := strings.TrimRight(scanner.Text(), " \r")
+		if strings.TrimSpace(line) == "" || strings.HasPrefix(strings.TrimSpace(line), "#") {
+			continue
+		}
+		if !strings.HasPrefix(line, " ") {
+			section, _, _ = strings.Cut(line, ":")
+			if section == "PODS" {
+				seenPods = true
+			}
+			continue
+		}
+		switch section {
+		case "PODS":
+			entry, ok := strings.CutPrefix(line, "  - ")
+			if !ok {
+				continue
+			}
+			entry = strings.Trim(strings.TrimSuffix(entry, ":"), `"'`)
+			open := strings.LastIndex(entry, " (")
+			if open <= 0 || !strings.HasSuffix(entry, ")") {
+				continue
+			}
+			name, _, _ := strings.Cut(entry[:open], "/")
+			version := entry[open+2 : len(entry)-1]
+			if !slices.Contains(pods[name], version) {
+				pods[name] = append(pods[name], version)
+			}
+		case "EXTERNAL SOURCES":
+			if !strings.HasPrefix(line, "    ") {
+				external = strings.Trim(strings.TrimSuffix(strings.TrimSpace(line), ":"), `"'`)
+				continue
+			}
+			if strings.HasPrefix(strings.TrimSpace(line), ":path:") {
+				local[external] = true
+			}
+		}
+	}
+	if err := scanner.Err(); err != nil {
+		return nil, fmt.Errorf("the Podfile.lock cannot be read: %w", err)
+	}
+	if !seenPods {
+		return nil, fmt.Errorf("the Podfile.lock has no PODS section")
+	}
+	out := Packages{}
+	for name, versions := range pods {
+		if local[name] {
+			continue
+		}
+		for _, version := range versions {
+			out.add(name, version)
+		}
+	}
+	return out, nil
+}
+
+// richVersion is the version a [versions] value or a rich version states: a
+// string, else its strictly, require or prefer member.
+func richVersion(value any) string {
+	switch v := value.(type) {
+	case string:
+		return v
+	case toml.Table:
+		for _, member := range []string{"strictly", "require", "prefer"} {
+			if s, ok := v[member].(string); ok && s != "" {
+				return s
+			}
+		}
+	}
+	return ""
+}
+
+// ReadPubspecLock reads the packages of a pubspec.lock. A package of source
+// path is the repository's own code, and one of source sdk, such as flutter,
+// comes with the SDK: both are left out.
+func ReadPubspecLock(data []byte) (Packages, error) {
+	doc, err := yaml.Parse(data)
+	if err != nil {
+		return nil, fmt.Errorf("pubspec.lock is not YAML: %w", err)
+	}
+	packages, ok := yaml.Get(doc, "packages").(yaml.Map)
+	if !ok && yaml.Get(doc, "packages") != nil {
+		return nil, fmt.Errorf("the packages of pubspec.lock are not a mapping")
+	}
+	out := Packages{}
+	for name, entry := range packages {
+		switch yaml.String(entry, "source") {
+		case "path", "sdk":
+			continue
+		}
+		out.add(name, yaml.String(entry, "version"))
+	}
+	return out, nil
+}
+
+// gemSpec is a spec line of a Gemfile.lock source, four spaces in: a name, then
+// its version and platform in parentheses.
+var gemSpec = regexp.MustCompile(`^ {4}([^ (]+) \(([^)]+)\)$`)
+
+// ReadGemfileLock reads the specs of the GEM and GIT sources of a
+// Gemfile.lock. A spec's version is what precedes the first - in its
+// parentheses, as Bundler reads it, so the variants of one version for several
+// platforms are one version. The specs of a PATH source, the repository's own
+// gems, are left out.
+func ReadGemfileLock(data []byte) (Packages, error) {
+	out := Packages{}
+	section, specs, sections := "", false, 0
+	scanner := bufio.NewScanner(bytes.NewReader(data))
+	scanner.Buffer(make([]byte, 64<<10), 16<<20)
+	for scanner.Scan() {
+		line := strings.TrimRight(scanner.Text(), " \r")
+		switch {
+		case line == "":
+		case line[0] != ' ':
+			section, specs = line, false
+			switch section {
+			case "GEM", "GIT", "PATH", "PLATFORMS", "DEPENDENCIES":
+				sections++
+			}
+		case strings.HasPrefix(line, "  ") && line[2] != ' ':
+			specs = line == "  specs:"
+		case specs && (section == "GEM" || section == "GIT"):
+			if m := gemSpec.FindStringSubmatch(line); m != nil {
+				version, _, _ := strings.Cut(m[2], "-")
+				out.add(m[1], version)
+			}
+		}
+	}
+	if err := scanner.Err(); err != nil {
+		return nil, fmt.Errorf("the Gemfile.lock cannot be read: %w", err)
+	}
+	if sections == 0 {
+		return nil, fmt.Errorf("the Gemfile.lock has no GEM, GIT, PATH, PLATFORMS or DEPENDENCIES section")
+	}
+	return out, nil
+}
+
+// ReadCargoLock reads the [[package]] entries of a Cargo.lock. A package with
+// no source, a crate of the workspace or a path dependency, is the
+// repository's own code and is left out; a registry or git package is kept.
+func ReadCargoLock(data []byte) (Packages, error) {
+	doc, err := toml.Parse(data)
+	if err != nil {
+		return nil, fmt.Errorf("%s is not TOML: %w", CargoLock, err)
+	}
+	out := Packages{}
+	for _, p := range toml.Tables(doc["package"]) {
+		if toml.String(p, "source") == "" {
+			continue
+		}
+		out.add(toml.String(p, "name"), toml.String(p, "version"))
 	}
 	return out, nil
 }

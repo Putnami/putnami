@@ -158,16 +158,21 @@ func TestTheDefaultDetectorsReadEachEcosystem(t *testing.T) {
 		"go.work":                       "go 1.23\n\nuse ./svc\n",
 		"svc/go.mod":                    "module example.com/svc\n\ngo 1.23\n\nrequire golang.org/x/text v0.21.0\n",
 		"php/composer.json":             `{"name":"demo/php","autoload":{"psr-4":{"Demo\\":"src/"}}}`,
+		"mobile/pubspec.yaml":           "name: mobile\ndependencies:\n  pricing:\n    path: ../pricing\n",
+		"pricing/pubspec.yaml":          "name: pricing\n",
 	})
 	set := Detect(root, Default(Options{}))
 	byID := map[string]Component{}
 	for _, c := range set.Components {
 		byID[c.ID] = c
 	}
-	for id, ecosystem := range map[string]string{"packages/pricing": "node", "apps/api": "node", "svc": "go", "php": "composer"} {
+	for id, ecosystem := range map[string]string{"packages/pricing": "node", "apps/api": "node", "svc": "go", "php": "composer", "mobile": "dart", "pricing": "dart"} {
 		if byID[id].Ecosystem != ecosystem {
 			t.Errorf("%s: %+v, want ecosystem %s (all: %v)", id, byID[id], ecosystem, ids(set))
 		}
+	}
+	if !slices.Equal(byID["mobile"].DependsOn, []string{"pricing"}) || byID["mobile"].Name != "mobile" {
+		t.Errorf("mobile %+v", byID["mobile"])
 	}
 	if !slices.Equal(byID["apps/api"].DependsOn, []string{"packages/pricing"}) {
 		t.Errorf("apps/api edges %v", byID["apps/api"].DependsOn)
@@ -182,6 +187,22 @@ func TestTheDefaultDetectorsReadEachEcosystem(t *testing.T) {
 	locked, err := read([]byte("module example.com/svc\n\nrequire golang.org/x/text v0.22.0 // indirect\n"))
 	if err != nil || !slices.Equal(locked["golang.org/x/text"], []string{"v0.22.0"}) {
 		t.Errorf("locked %v %v", locked, err)
+	}
+	jvmRoot := t.TempDir()
+	write(t, jvmRoot, map[string]string{
+		"settings.gradle.kts":      "include(\":app\", \":pricing\")\n",
+		"app/build.gradle.kts":     "dependencies { implementation(projects.pricing) }\n",
+		"pricing/build.gradle.kts": "",
+		"pom.xml":                  "<project><groupId>com.acme</groupId><artifactId>shop</artifactId><packaging>pom</packaging><modules><module>tools</module></modules></project>",
+		"tools/pom.xml":            "<project><groupId>com.acme</groupId><artifactId>tools</artifactId></project>",
+	})
+	jvmSet := Detect(jvmRoot, Default(Options{}))
+	jvm := map[string]Component{}
+	for _, c := range jvmSet.Components {
+		jvm[c.ID] = c
+	}
+	if jvm["app"].Ecosystem != "gradle" || jvm["app"].Name != ":app" || !slices.Equal(jvm["app"].DependsOn, []string{"pricing"}) || jvm["tools"].Ecosystem != "maven" || jvm["tools"].Name != "com.acme:tools" || len(jvmSet.Components) != 3 {
+		t.Errorf("the Gradle and Maven detectors: %+v", jvmSet.Components)
 	}
 	nxRoot := t.TempDir()
 	write(t, nxRoot, map[string]string{

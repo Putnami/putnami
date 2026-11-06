@@ -1,6 +1,7 @@
 package analyze
 
 import (
+	"path"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -25,7 +26,11 @@ func (r *Result) readReports(in Input, m *mapper) map[string]lineHits {
 		}
 		switch report.Kind {
 		case reports.KindJUnit:
-			result, diags := readers.ReadFile(abs, readers.ReadJUnit)
+			read := readers.ReadJUnit
+			if report.Format == reports.FormatTRX {
+				read = readers.ReadTRX
+			}
+			result, diags := readers.ReadFile(abs, read)
 			if r.unread(report, diags) {
 				continue
 			}
@@ -91,6 +96,8 @@ func (r *Result) readCoverage(report reports.Report, abs string) (readers.Covera
 		read = readers.ReadClover
 	case reports.FormatGoCover:
 		read = readers.ReadGoCover
+	case reports.FormatJaCoCo:
+		read = readers.ReadJaCoCo
 	default:
 		return readers.CoverageReport{}, false
 	}
@@ -117,9 +124,20 @@ func (r *Result) mapCoverage(report reports.Report, result readers.CoverageRepor
 			sourceBases = append(sourceBases, joinDir(base, source))
 		}
 	}
+	var jvmRoots []string
+	if report.Format == reports.FormatJaCoCo {
+		jvmRoots = m.sourceRoots(report.Path, jvmMainRoots)
+	}
 	unmapped := 0
 	for _, file := range result.Files {
-		rel, ok := m.resolve(file.Path, append(sourceBases, bases...))
+		rel, ok := "", false
+		if jvmRoots != nil {
+			// A JaCoCo file is a package path under a main source root.
+			rel, ok = m.underRoots(jvmRoots, file.Path)
+		}
+		if !ok {
+			rel, ok = m.resolve(file.Path, append(sourceBases, bases...))
+		}
 		if !ok && report.Format == reports.FormatGoCover {
 			// A Go profile names import paths; only a located file that
 			// exists is one.
@@ -161,13 +179,16 @@ func joinDir(base, dir string) string {
 
 // attributeTests gives each case of a JUnit report to a component: the one
 // of the test target that wrote the report, else the one that holds its test
-// file, else the one of the Go package its suite names, else the one that
-// holds the report.
+// file, else the one a detector locates from its class or suite name (a Go
+// package, a Swift Module.Class test class), else the one of the
+// cargo-nextest test binary its class name names, else the one that holds the
+// report. A located name that is a file is the case's file.
 //
 // The test file is the case's file, else its class name read as a path
 // (Vitest), else its dotted class name read as a Python module: pytest writes
 // tests.test_api.TestLogin for a case of tests/test_api.py, and its default
-// xunit2 report has no file attribute.
+// xunit2 report has no file attribute. Else it is the dotted class name read
+// as a Dart test file: tojunit writes test.price for test/price_test.dart.
 func (r *Result) attributeTests(report reports.Report, result readers.TestReport, m *mapper, tests map[string]*evidence.ComponentTests) {
 	bases := m.bases(report.Path)
 	reportOwner, reportOwned := m.set.Owner(report.Path)
@@ -180,14 +201,28 @@ func (r *Result) attributeTests(report reports.Report, result readers.TestReport
 	if !isAbsolute(report.Path) {
 		targetOwner, targeted = m.set.ReportOwner(report.Path)
 	}
+	var testRoots []string
 	unattributed := 0
 	for _, c := range result.Cases {
 		owner, file, ok := "", "", false
-		for _, candidate := range append([]string{c.File, c.Classname}, moduleFiles(c.Classname)...) {
+		candidates := append([]string{c.File, c.Classname}, moduleFiles(c.Classname)...)
+		for _, candidate := range append(candidates, dartTestFiles(c.Classname)...) {
 			if rel, found := m.resolve(candidate, bases); found {
 				file = rel
 				owner, ok = m.set.Owner(rel)
 				break
+			}
+		}
+		if classFiles := jvmClassFiles(c.Classname); !ok && classFiles != nil {
+			if testRoots == nil {
+				testRoots = m.sourceRoots(report.Path, jvmTestRoots)
+			}
+			for _, candidate := range classFiles {
+				if rel, found := m.underRoots(testRoots, candidate); found {
+					file = rel
+					owner, ok = m.set.Owner(rel)
+					break
+				}
 			}
 		}
 		if targeted {
@@ -202,10 +237,20 @@ func (r *Result) attributeTests(report reports.Report, result readers.TestReport
 				if name == "" {
 					continue
 				}
-				if _, component, found := m.set.Locate(name); found {
+				if located, component, found := m.set.Locate(name); found {
 					owner, ok = component, true
+					if m.isFile(located) {
+						file = located
+					}
 					break
 				}
+			}
+		}
+		if !ok {
+			// cargo-nextest writes the test binary id as the class name. Only
+			// the class name is read.
+			if _, component, found := m.set.LocateTestBinary(c.Classname); found {
+				owner, ok = component, true
 			}
 		}
 		if !ok && reportOwned {
@@ -269,6 +314,69 @@ func moduleFiles(classname string) []string {
 	return out
 }
 
+// The source roots of the JVM builds: Gradle, Android and Maven read their
+// sources and tests from these directories of a project.
+var (
+	jvmMainRoots = []string{"src/main/java", "src/main/kotlin"}
+	jvmTestRoots = []string{"src/test/java", "src/test/kotlin", "src/androidTest/java", "src/androidTest/kotlin"}
+)
+
+// jvmClassFiles returns the files a JVM test class may live in:
+// com.acme.PriceTest$Nested is com/acme/PriceTest.java or .kt. It returns
+// nil for a class name that is no dotted JVM name.
+func jvmClassFiles(classname string) []string {
+	classname, _, _ = strings.Cut(classname, "$")
+	if !dottedName.MatchString(classname) || !strings.Contains(classname, ".") {
+		return nil
+	}
+	base := strings.ReplaceAll(classname, ".", "/")
+	return []string{base + ".java", base + ".kt"}
+}
+
+// sourceRoots returns the existing source root directories of the
+// components, those of the component holding the report first, then the
+// others in id order.
+func (m *mapper) sourceRoots(reportPath string, roots []string) []string {
+	out := []string{}
+	add := func(id string) {
+		for _, root := range roots {
+			if dir := joinDir(id, root); m.isDir(dir) {
+				out = append(out, dir)
+			}
+		}
+	}
+	owner, owned := m.set.Owner(reportPath)
+	owned = owned && !isAbsolute(reportPath)
+	if owned {
+		add(owner)
+	}
+	for _, c := range m.set.Components {
+		if !owned || c.ID != owner {
+			add(c.ID)
+		}
+	}
+	return out
+}
+
+// underRoots finds a relative path, such as a package path and a file name,
+// under the first source root that holds it.
+func (m *mapper) underRoots(roots []string, rel string) (string, bool) {
+	rel = strings.ReplaceAll(strings.TrimSpace(rel), `\`, "/")
+	if rel == "" || isAbsolute(rel) || strings.HasPrefix(path.Clean(rel), "..") {
+		return "", false
+	}
+	pkg := path.Dir(rel)
+	for _, root := range roots {
+		if pkg != "." && !m.isDir(root+"/"+pkg) {
+			continue
+		}
+		if candidate := root + "/" + rel; m.isFile(candidate) {
+			return candidate, true
+		}
+	}
+	return "", false
+}
+
 // bounded cuts s to the evidence string bound, on a rune boundary.
 func bounded(s string) string {
 	if len(s) <= evidence.MaxStringBytes {
@@ -279,4 +387,26 @@ func bounded(s string) string {
 		cut--
 	}
 	return s[:cut] + "..."
+}
+
+// tojunitName is a class name tojunit can write: the test file's path without
+// _test.dart or .dart, with each / written as a ., after an optional leading
+// . for an absolute path.
+var tojunitName = regexp.MustCompile(`^\.?[A-Za-z0-9_]+(\.[A-Za-z0-9_]+)*$`)
+
+// dartTestFiles returns the Dart test files a tojunit class name may name,
+// longest first. Its leading segments may be the directories of an absolute
+// path, or the --package prefix, so each shorter tail is tried too:
+// .ci.repo.apps.mobile.test.widget may be apps/mobile/test/widget_test.dart.
+func dartTestFiles(classname string) []string {
+	if !tojunitName.MatchString(classname) {
+		return nil
+	}
+	parts := strings.Split(strings.TrimPrefix(classname, "."), ".")
+	var out []string
+	for start := max(0, len(parts)-maxSuffixSegments); start < len(parts); start++ {
+		stem := strings.Join(parts[start:], "/")
+		out = append(out, stem+"_test.dart", stem+".dart")
+	}
+	return out
 }

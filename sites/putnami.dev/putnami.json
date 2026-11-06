@@ -49,6 +49,10 @@
           "to": "public/docs/08-tooling-&-workspace"
         },
         {
+          "from": "/tooling/observe/doc",
+          "to": "public/docs/08-tooling-&-workspace/08-observe"
+        },
+        {
           "from": "/tooling/sdd-extension/doc",
           "to": "public/docs/07-spec-driven-development"
         },

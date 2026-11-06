@@ -5,9 +5,11 @@
     "evidence-readers/report-readers#coverage-reads-every-instrumented-line",
     "evidence-readers/report-readers#cyclonedx-reads-components",
     "evidence-readers/report-readers#go-cover-blocks-become-lines",
+    "evidence-readers/report-readers#jacoco-reads-source-files",
     "evidence-readers/report-readers#junit-reads-every-case",
     "evidence-readers/report-readers#malformed-reports-are-diagnostics",
     "evidence-readers/report-readers#paths-as-the-report-states",
-    "evidence-readers/report-readers#spdx-reads-packages"
+    "evidence-readers/report-readers#spdx-reads-packages",
+    "evidence-readers/report-readers#trx-reads-every-result"
   ]
 }

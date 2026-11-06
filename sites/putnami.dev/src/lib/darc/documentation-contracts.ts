@@ -1,11 +1,11 @@
 /**
  * The `public-docs` domain's declared cross-domain access, as code.
  *
- * The site publishes documentation five other domains own. Until now that was a
+ * The site publishes six documentation trees that five other domains own. Until now that was a
  * build-time file copy with no contract: the TypeScript extension logs
  * `generate asset source not found, skipping` for a source that disappeared, the
  * section vanishes, and the build stays green. The declarations below are the
- * same five copies stated as Domain Access & Replication Contracts, plus the
+ * same six copies stated as Domain Access & Replication Contracts, plus the
  * reference to the TypeScript framework runtime the site itself consumes and
  * the reference to the content-bundle protocol the site implements.
  *
@@ -22,7 +22,7 @@ import type { ArchitectureImport, Consistency, Transport } from '@putnami/applic
 import { DOCUMENTATION_TREE_CONTRACT } from './documentation-tree';
 
 /**
- * The carrier the five documentation snapshots share: the markdown tree one
+ * The carrier the six documentation snapshots share: the markdown tree one
  * `generate.assets` entry copies out of the producing domain's repository root.
  */
 const DOCUMENTATION_TRANSPORT: Transport = {
@@ -32,7 +32,7 @@ const DOCUMENTATION_TRANSPORT: Transport = {
 };
 
 /**
- * The freshness, ordering and failure promise the five snapshots share.
+ * The freshness, ordering and failure promise the six snapshots share.
  *
  * `onMissing: fail-closed` is the whole contract: a source that is not there
  * fails the build instead of publishing an empty section. `onStale: use-stale`
@@ -83,7 +83,7 @@ function documentationImport(input: {
 }
 
 /**
- * The five repository-owned documentation sources, in the order
+ * The six repository-owned documentation sources, in the order
  * `sites/putnami.dev/putnami.json` declares their `generate.assets` copies.
  *
  * The site's own `/sites/putnami.dev/doc` is absent on purpose: it is this
@@ -106,6 +106,19 @@ export const DOCUMENTATION_SOURCES: readonly DocumentationSourceContract[] = [
     }),
     sourceRoot: '/tooling/doc',
     section: 'public/docs/08-tooling-&-workspace',
+  },
+  {
+    contract: documentationImport({
+      id: 'public-docs.observe-documentation.v1',
+      as: 'public-docs.observe-documentation',
+      domain: 'extension-providers',
+      exportId: 'extension-providers.observe-documentation.v1',
+      fact: 'observe_documentation',
+      justification:
+        'The site publishes the observe reference at public/docs/08-tooling-&-workspace/08-observe by copying the /tooling/observe/doc tree verbatim at build time. The extension-providers domain decides what that reference says about what observe reads; the site decides only where it appears.',
+    }),
+    sourceRoot: '/tooling/observe/doc',
+    section: 'public/docs/08-tooling-&-workspace/08-observe',
   },
   {
     contract: documentationImport({

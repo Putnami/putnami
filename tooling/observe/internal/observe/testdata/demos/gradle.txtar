@@ -1,0 +1,414 @@
+The gradle demo: a Gradle 8.14.3 build in the Kotlin DSL, with the type-safe project accessors and the version catalog gradle/libs.versions.toml. The Kotlin library :pricing locks its dependencies in pricing/gradle.lockfile; :api depends on it through projects.pricing, and :app, an Android library, through project(":pricing"). The change adds a function to pricing and bumps commons-lang3 from 3.17.0 to 3.18.0 in the catalog and the lockfile. The lockfiles and the reports of pricing and api are the output of gradle :pricing:dependencies --write-locks and gradle test with the jacoco plugin, OpenJDK 21 and Kotlin 2.0.21. The Android plugin needs the Android SDK, so the build file of app, the root build file and the Android entries of the catalog are hand-written for it, and the reports of app come from the same sources built with the Kotlin JVM plugin, placed where the Android plugin writes its unit test results and coverage.
+-- base/api/build.gradle.kts --
+plugins {
+    alias(libs.plugins.kotlin.jvm)
+    jacoco
+}
+
+dependencies {
+    implementation(projects.pricing)
+    testImplementation(platform(libs.junit.bom))
+    testImplementation(libs.junit.jupiter)
+    testRuntimeOnly(libs.junit.platform.launcher)
+}
+
+kotlin {
+    jvmToolchain(21)
+}
+
+tasks.test {
+    useJUnitPlatform()
+    finalizedBy(tasks.jacocoTestReport)
+}
+
+tasks.jacocoTestReport {
+    reports {
+        xml.required = true
+    }
+}
+-- base/api/src/main/kotlin/com/acme/api/Quotes.kt --
+package com.acme.api
+
+import com.acme.pricing.Pricing
+
+class Quotes {
+    fun quote(cents: Long, quantity: Int): String {
+        return Pricing.label(Pricing.total(cents, quantity))
+    }
+}
+-- base/api/src/test/kotlin/com/acme/api/QuotesTest.kt --
+package com.acme.api
+
+import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Test
+
+class QuotesTest {
+    @Test
+    fun quoteLabelsTheTotal() {
+        assertEquals("15.00 EUR", Quotes().quote(500, 3))
+    }
+
+    @Test
+    fun anEmptyQuoteIsZero() {
+        assertEquals("0.00 EUR", Quotes().quote(500, 0))
+    }
+}
+-- base/app/build.gradle.kts --
+plugins {
+    alias(libs.plugins.android.library)
+    alias(libs.plugins.kotlin.android)
+    jacoco
+}
+
+android {
+    namespace = "com.acme.app"
+    compileSdk = 35
+
+    defaultConfig {
+        minSdk = 26
+    }
+
+    buildTypes {
+        debug {
+            enableUnitTestCoverage = true
+        }
+    }
+}
+
+kotlin {
+    jvmToolchain(21)
+}
+
+dependencies {
+    implementation(project(":pricing"))
+    testImplementation(platform(libs.junit.bom))
+    testImplementation(libs.junit.jupiter)
+    testRuntimeOnly(libs.junit.platform.launcher)
+}
+
+tasks.withType<Test> {
+    useJUnitPlatform()
+}
+-- base/app/src/main/kotlin/com/acme/app/CartScreen.kt --
+package com.acme.app
+
+import com.acme.pricing.Pricing
+
+class CartScreen(private val cents: Long, private val quantity: Int) {
+    fun title(): String {
+        return "Cart: " + Pricing.label(Pricing.total(cents, quantity))
+    }
+}
+-- base/app/src/test/kotlin/com/acme/app/CartScreenTest.kt --
+package com.acme.app
+
+import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Test
+
+class CartScreenTest {
+    @Test
+    fun titleShowsTheTotal() {
+        assertEquals("Cart: 10.00 EUR", CartScreen(250, 4).title())
+    }
+}
+-- base/build.gradle.kts --
+plugins {
+    alias(libs.plugins.android.library) apply false
+    alias(libs.plugins.kotlin.android) apply false
+    alias(libs.plugins.kotlin.jvm) apply false
+}
+-- base/gradle/libs.versions.toml --
+[versions]
+agp = "8.7.3"
+kotlin = "2.0.21"
+commons-lang3 = "3.17.0"
+junit = "5.11.4"
+
+[libraries]
+commons-lang3 = { module = "org.apache.commons:commons-lang3", version.ref = "commons-lang3" }
+junit-bom = { module = "org.junit:junit-bom", version.ref = "junit" }
+junit-jupiter = { module = "org.junit.jupiter:junit-jupiter" }
+junit-platform-launcher = { module = "org.junit.platform:junit-platform-launcher" }
+
+[plugins]
+kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
+kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
+android-library = { id = "com.android.library", version.ref = "agp" }
+-- base/pricing/build.gradle.kts --
+plugins {
+    alias(libs.plugins.kotlin.jvm)
+    jacoco
+}
+
+dependencyLocking {
+    lockAllConfigurations()
+}
+
+dependencies {
+    implementation(libs.commons.lang3)
+    testImplementation(platform(libs.junit.bom))
+    testImplementation(libs.junit.jupiter)
+    testRuntimeOnly(libs.junit.platform.launcher)
+}
+
+kotlin {
+    jvmToolchain(21)
+}
+
+tasks.test {
+    useJUnitPlatform()
+    finalizedBy(tasks.jacocoTestReport)
+}
+
+tasks.jacocoTestReport {
+    reports {
+        xml.required = true
+    }
+}
+-- base/pricing/gradle.lockfile --
+# This is a Gradle generated file for dependency locking.
+# Manual edits can break the build and are not advised.
+# This file is expected to be part of source control.
+org.apache.commons:commons-lang3:3.17.0=compileClasspath,implementationDependenciesMetadata,runtimeClasspath,testCompileClasspath,testImplementationDependenciesMetadata,testRuntimeClasspath
+org.apiguardian:apiguardian-api:1.1.2=testCompileClasspath,testImplementationDependenciesMetadata,testRuntimeClasspath
+org.jacoco:org.jacoco.agent:0.8.13=jacocoAgent,jacocoAnt
+org.jacoco:org.jacoco.ant:0.8.13=jacocoAnt
+org.jacoco:org.jacoco.core:0.8.13=jacocoAnt
+org.jacoco:org.jacoco.report:0.8.13=jacocoAnt
+org.jetbrains.intellij.deps:trove4j:1.0.20200330=kotlinBuildToolsApiClasspath,kotlinCompilerClasspath,kotlinKlibCommonizerClasspath
+org.jetbrains.kotlin:kotlin-build-common:2.0.21=kotlinBuildToolsApiClasspath
+org.jetbrains.kotlin:kotlin-build-tools-api:2.0.21=kotlinBuildToolsApiClasspath
+org.jetbrains.kotlin:kotlin-build-tools-impl:2.0.21=kotlinBuildToolsApiClasspath
+org.jetbrains.kotlin:kotlin-compiler-embeddable:2.0.21=kotlinBuildToolsApiClasspath,kotlinCompilerClasspath,kotlinKlibCommonizerClasspath
+org.jetbrains.kotlin:kotlin-compiler-runner:2.0.21=kotlinBuildToolsApiClasspath
+org.jetbrains.kotlin:kotlin-daemon-client:2.0.21=kotlinBuildToolsApiClasspath
+org.jetbrains.kotlin:kotlin-daemon-embeddable:2.0.21=kotlinBuildToolsApiClasspath,kotlinCompilerClasspath,kotlinKlibCommonizerClasspath
+org.jetbrains.kotlin:kotlin-klib-commonizer-embeddable:2.0.21=kotlinKlibCommonizerClasspath
+org.jetbrains.kotlin:kotlin-reflect:1.6.10=kotlinBuildToolsApiClasspath,kotlinCompilerClasspath,kotlinKlibCommonizerClasspath
+org.jetbrains.kotlin:kotlin-script-runtime:2.0.21=kotlinBuildToolsApiClasspath,kotlinCompilerClasspath,kotlinCompilerPluginClasspathMain,kotlinCompilerPluginClasspathTest,kotlinKlibCommonizerClasspath
+org.jetbrains.kotlin:kotlin-scripting-common:2.0.21=kotlinBuildToolsApiClasspath,kotlinCompilerPluginClasspathMain,kotlinCompilerPluginClasspathTest
+org.jetbrains.kotlin:kotlin-scripting-compiler-embeddable:2.0.21=kotlinBuildToolsApiClasspath,kotlinCompilerPluginClasspathMain,kotlinCompilerPluginClasspathTest
+org.jetbrains.kotlin:kotlin-scripting-compiler-impl-embeddable:2.0.21=kotlinBuildToolsApiClasspath,kotlinCompilerPluginClasspathMain,kotlinCompilerPluginClasspathTest
+org.jetbrains.kotlin:kotlin-scripting-jvm:2.0.21=kotlinBuildToolsApiClasspath,kotlinCompilerPluginClasspathMain,kotlinCompilerPluginClasspathTest
+org.jetbrains.kotlin:kotlin-stdlib:2.0.21=apiDependenciesMetadata,compileClasspath,implementationDependenciesMetadata,kotlinBuildToolsApiClasspath,kotlinCompilerClasspath,kotlinCompilerPluginClasspathMain,kotlinCompilerPluginClasspathTest,kotlinKlibCommonizerClasspath,runtimeClasspath,testCompileClasspath,testImplementationDependenciesMetadata,testRuntimeClasspath
+org.jetbrains.kotlinx:kotlinx-coroutines-core-jvm:1.6.4=kotlinBuildToolsApiClasspath,kotlinCompilerClasspath,kotlinKlibCommonizerClasspath
+org.jetbrains:annotations:13.0=compileClasspath,kotlinBuildToolsApiClasspath,kotlinCompilerClasspath,kotlinCompilerPluginClasspathMain,kotlinCompilerPluginClasspathTest,kotlinKlibCommonizerClasspath,runtimeClasspath,testCompileClasspath,testRuntimeClasspath
+org.junit.jupiter:junit-jupiter-api:5.11.4=testCompileClasspath,testImplementationDependenciesMetadata,testRuntimeClasspath
+org.junit.jupiter:junit-jupiter-engine:5.11.4=testRuntimeClasspath
+org.junit.jupiter:junit-jupiter-params:5.11.4=testCompileClasspath,testImplementationDependenciesMetadata,testRuntimeClasspath
+org.junit.jupiter:junit-jupiter:5.11.4=testCompileClasspath,testImplementationDependenciesMetadata,testRuntimeClasspath
+org.junit.platform:junit-platform-commons:1.11.4=testCompileClasspath,testImplementationDependenciesMetadata,testRuntimeClasspath
+org.junit.platform:junit-platform-engine:1.11.4=testRuntimeClasspath
+org.junit.platform:junit-platform-launcher:1.11.4=testRuntimeClasspath
+org.junit:junit-bom:5.11.4=testCompileClasspath,testImplementationDependenciesMetadata,testRuntimeClasspath
+org.opentest4j:opentest4j:1.3.0=testCompileClasspath,testImplementationDependenciesMetadata,testRuntimeClasspath
+org.ow2.asm:asm-commons:9.8=jacocoAnt
+org.ow2.asm:asm-tree:9.8=jacocoAnt
+org.ow2.asm:asm:9.8=jacocoAnt
+empty=annotationProcessor,compileOnlyDependenciesMetadata,intransitiveDependenciesMetadata,kotlinCompilerPluginClasspath,kotlinNativeCompilerPluginClasspath,kotlinScriptDefExtensions,testAnnotationProcessor,testApiDependenciesMetadata,testCompileOnlyDependenciesMetadata,testIntransitiveDependenciesMetadata,testKotlinScriptDefExtensions
+-- base/pricing/src/main/kotlin/com/acme/pricing/Pricing.kt --
+package com.acme.pricing
+
+import org.apache.commons.lang3.StringUtils
+
+object Pricing {
+    fun total(cents: Long, quantity: Int): Long {
+        require(quantity >= 0) { "quantity must not be negative" }
+        return cents * quantity
+    }
+
+    fun label(cents: Long): String {
+        val euros = cents / 100
+        val rest = StringUtils.leftPad((cents % 100).toString(), 2, '0')
+        return "$euros.$rest EUR"
+    }
+}
+-- base/pricing/src/test/kotlin/com/acme/pricing/PricingTest.kt --
+package com.acme.pricing
+
+import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.assertThrows
+
+class PricingTest {
+    @Test
+    fun totalMultipliesByTheQuantity() {
+        assertEquals(1500, Pricing.total(500, 3))
+    }
+
+    @Test
+    fun aNegativeQuantityIsRefused() {
+        assertThrows<IllegalArgumentException> { Pricing.total(500, -1) }
+    }
+
+    @Test
+    fun labelPadsTheCents() {
+        assertEquals("12.05 EUR", Pricing.label(1205))
+    }
+}
+-- base/settings-gradle.lockfile --
+# This is a Gradle generated file for dependency locking.
+# Manual edits can break the build and are not advised.
+# This file is expected to be part of source control.
+empty=incomingCatalogForLibs0
+-- base/settings.gradle.kts --
+rootProject.name = "shop"
+
+enableFeaturePreview("TYPESAFE_PROJECT_ACCESSORS")
+
+dependencyResolutionManagement {
+    repositories {
+        mavenLocal()
+        mavenCentral()
+    }
+}
+
+include(":app", ":api", ":pricing")
+-- head/pricing/gradle.lockfile --
+# This is a Gradle generated file for dependency locking.
+# Manual edits can break the build and are not advised.
+# This file is expected to be part of source control.
+org.apache.commons:commons-lang3:3.18.0=compileClasspath,implementationDependenciesMetadata,runtimeClasspath,testCompileClasspath,testImplementationDependenciesMetadata,testRuntimeClasspath
+org.apiguardian:apiguardian-api:1.1.2=testCompileClasspath,testImplementationDependenciesMetadata,testRuntimeClasspath
+org.jacoco:org.jacoco.agent:0.8.13=jacocoAgent,jacocoAnt
+org.jacoco:org.jacoco.ant:0.8.13=jacocoAnt
+org.jacoco:org.jacoco.core:0.8.13=jacocoAnt
+org.jacoco:org.jacoco.report:0.8.13=jacocoAnt
+org.jetbrains.intellij.deps:trove4j:1.0.20200330=kotlinBuildToolsApiClasspath,kotlinCompilerClasspath,kotlinKlibCommonizerClasspath
+org.jetbrains.kotlin:kotlin-build-common:2.0.21=kotlinBuildToolsApiClasspath
+org.jetbrains.kotlin:kotlin-build-tools-api:2.0.21=kotlinBuildToolsApiClasspath
+org.jetbrains.kotlin:kotlin-build-tools-impl:2.0.21=kotlinBuildToolsApiClasspath
+org.jetbrains.kotlin:kotlin-compiler-embeddable:2.0.21=kotlinBuildToolsApiClasspath,kotlinCompilerClasspath,kotlinKlibCommonizerClasspath
+org.jetbrains.kotlin:kotlin-compiler-runner:2.0.21=kotlinBuildToolsApiClasspath
+org.jetbrains.kotlin:kotlin-daemon-client:2.0.21=kotlinBuildToolsApiClasspath
+org.jetbrains.kotlin:kotlin-daemon-embeddable:2.0.21=kotlinBuildToolsApiClasspath,kotlinCompilerClasspath,kotlinKlibCommonizerClasspath
+org.jetbrains.kotlin:kotlin-klib-commonizer-embeddable:2.0.21=kotlinKlibCommonizerClasspath
+org.jetbrains.kotlin:kotlin-reflect:1.6.10=kotlinBuildToolsApiClasspath,kotlinCompilerClasspath,kotlinKlibCommonizerClasspath
+org.jetbrains.kotlin:kotlin-script-runtime:2.0.21=kotlinBuildToolsApiClasspath,kotlinCompilerClasspath,kotlinCompilerPluginClasspathMain,kotlinCompilerPluginClasspathTest,kotlinKlibCommonizerClasspath
+org.jetbrains.kotlin:kotlin-scripting-common:2.0.21=kotlinBuildToolsApiClasspath,kotlinCompilerPluginClasspathMain,kotlinCompilerPluginClasspathTest
+org.jetbrains.kotlin:kotlin-scripting-compiler-embeddable:2.0.21=kotlinBuildToolsApiClasspath,kotlinCompilerPluginClasspathMain,kotlinCompilerPluginClasspathTest
+org.jetbrains.kotlin:kotlin-scripting-compiler-impl-embeddable:2.0.21=kotlinBuildToolsApiClasspath,kotlinCompilerPluginClasspathMain,kotlinCompilerPluginClasspathTest
+org.jetbrains.kotlin:kotlin-scripting-jvm:2.0.21=kotlinBuildToolsApiClasspath,kotlinCompilerPluginClasspathMain,kotlinCompilerPluginClasspathTest
+org.jetbrains.kotlin:kotlin-stdlib:2.0.21=apiDependenciesMetadata,compileClasspath,implementationDependenciesMetadata,kotlinBuildToolsApiClasspath,kotlinCompilerClasspath,kotlinCompilerPluginClasspathMain,kotlinCompilerPluginClasspathTest,kotlinKlibCommonizerClasspath,runtimeClasspath,testCompileClasspath,testImplementationDependenciesMetadata,testRuntimeClasspath
+org.jetbrains.kotlinx:kotlinx-coroutines-core-jvm:1.6.4=kotlinBuildToolsApiClasspath,kotlinCompilerClasspath,kotlinKlibCommonizerClasspath
+org.jetbrains:annotations:13.0=compileClasspath,kotlinBuildToolsApiClasspath,kotlinCompilerClasspath,kotlinCompilerPluginClasspathMain,kotlinCompilerPluginClasspathTest,kotlinKlibCommonizerClasspath,runtimeClasspath,testCompileClasspath,testRuntimeClasspath
+org.junit.jupiter:junit-jupiter-api:5.11.4=testCompileClasspath,testImplementationDependenciesMetadata,testRuntimeClasspath
+org.junit.jupiter:junit-jupiter-engine:5.11.4=testRuntimeClasspath
+org.junit.jupiter:junit-jupiter-params:5.11.4=testCompileClasspath,testImplementationDependenciesMetadata,testRuntimeClasspath
+org.junit.jupiter:junit-jupiter:5.11.4=testCompileClasspath,testImplementationDependenciesMetadata,testRuntimeClasspath
+org.junit.platform:junit-platform-commons:1.11.4=testCompileClasspath,testImplementationDependenciesMetadata,testRuntimeClasspath
+org.junit.platform:junit-platform-engine:1.11.4=testRuntimeClasspath
+org.junit.platform:junit-platform-launcher:1.11.4=testRuntimeClasspath
+org.junit:junit-bom:5.11.4=testCompileClasspath,testImplementationDependenciesMetadata,testRuntimeClasspath
+org.opentest4j:opentest4j:1.3.0=testCompileClasspath,testImplementationDependenciesMetadata,testRuntimeClasspath
+org.ow2.asm:asm-commons:9.8=jacocoAnt
+org.ow2.asm:asm-tree:9.8=jacocoAnt
+org.ow2.asm:asm:9.8=jacocoAnt
+empty=annotationProcessor,compileOnlyDependenciesMetadata,intransitiveDependenciesMetadata,kotlinCompilerPluginClasspath,kotlinNativeCompilerPluginClasspath,kotlinScriptDefExtensions,testAnnotationProcessor,testApiDependenciesMetadata,testCompileOnlyDependenciesMetadata,testIntransitiveDependenciesMetadata,testKotlinScriptDefExtensions
+-- head/pricing/src/main/kotlin/com/acme/pricing/Pricing.kt --
+package com.acme.pricing
+
+import org.apache.commons.lang3.StringUtils
+
+object Pricing {
+    fun total(cents: Long, quantity: Int): Long {
+        require(quantity >= 0) { "quantity must not be negative" }
+        return cents * quantity
+    }
+
+    fun discounted(cents: Long, percent: Int): Long {
+        require(percent in 0..100) { "percent must be between 0 and 100" }
+        return cents - cents * percent / 100
+    }
+
+    fun label(cents: Long): String {
+        val euros = cents / 100
+        val rest = StringUtils.leftPad((cents % 100).toString(), 2, '0')
+        return "$euros.$rest EUR"
+    }
+}
+-- head/pricing/src/test/kotlin/com/acme/pricing/PricingTest.kt --
+package com.acme.pricing
+
+import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.assertThrows
+
+class PricingTest {
+    @Test
+    fun totalMultipliesByTheQuantity() {
+        assertEquals(1500, Pricing.total(500, 3))
+    }
+
+    @Test
+    fun aNegativeQuantityIsRefused() {
+        assertThrows<IllegalArgumentException> { Pricing.total(500, -1) }
+    }
+
+    @Test
+    fun discountedTakesThePercentOff() {
+        assertEquals(900, Pricing.discounted(1000, 10))
+    }
+
+    @Test
+    fun aDiscountOverOneHundredPercentIsRefused() {
+        assertThrows<IllegalArgumentException> { Pricing.discounted(1000, 120) }
+    }
+
+    @Test
+    fun labelPadsTheCents() {
+        assertEquals("12.05 EUR", Pricing.label(1205))
+    }
+}
+-- head/gradle/libs.versions.toml --
+[versions]
+agp = "8.7.3"
+kotlin = "2.0.21"
+commons-lang3 = "3.18.0"
+junit = "5.11.4"
+
+[libraries]
+commons-lang3 = { module = "org.apache.commons:commons-lang3", version.ref = "commons-lang3" }
+junit-bom = { module = "org.junit:junit-bom", version.ref = "junit" }
+junit-jupiter = { module = "org.junit.jupiter:junit-jupiter" }
+junit-platform-launcher = { module = "org.junit.platform:junit-platform-launcher" }
+
+[plugins]
+kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
+kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
+android-library = { id = "com.android.library", version.ref = "agp" }
+-- ci/pricing/build/test-results/test/TEST-com.acme.pricing.PricingTest.xml --
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.acme.pricing.PricingTest" tests="5" skipped="0" failures="0" errors="0" timestamp="2026-11-06T14:26:20.589Z" hostname="vm" time="0.116">
+  <properties/>
+  <testcase name="totalMultipliesByTheQuantity()" classname="com.acme.pricing.PricingTest" time="0.044"/>
+  <testcase name="discountedTakesThePercentOff()" classname="com.acme.pricing.PricingTest" time="0.001"/>
+  <testcase name="aDiscountOverOneHundredPercentIsRefused()" classname="com.acme.pricing.PricingTest" time="0.005"/>
+  <testcase name="labelPadsTheCents()" classname="com.acme.pricing.PricingTest" time="0.056"/>
+  <testcase name="aNegativeQuantityIsRefused()" classname="com.acme.pricing.PricingTest" time="0.002"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>
+-- ci/pricing/build/reports/jacoco/test/jacocoTestReport.xml --
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?><!DOCTYPE report PUBLIC "-//JACOCO//DTD Report 1.1//EN" "report.dtd"><report name="pricing"><sessioninfo id="vm-ce6f9119" start="1793975179271" dump="1793975180720"/><package name="com/acme/pricing"><class name="com/acme/pricing/Pricing" sourcefilename="Pricing.kt"><method name="total" desc="(JI)J" line="7"><counter type="INSTRUCTION" missed="0" covered="19"/><counter type="BRANCH" missed="0" covered="4"/><counter type="LINE" missed="0" covered="2"/><counter type="COMPLEXITY" missed="0" covered="3"/><counter type="METHOD" missed="0" covered="1"/></method><method name="discounted" desc="(JI)J" line="12"><counter type="INSTRUCTION" missed="1" covered="29"/><counter type="BRANCH" missed="1" covered="5"/><counter type="LINE" missed="0" covered="2"/><counter type="COMPLEXITY" missed="1" covered="3"/><counter type="METHOD" missed="0" covered="1"/></method><method name="label" desc="(J)Ljava/lang/String;" line="17"><counter type="INSTRUCTION" missed="0" covered="18"/><counter type="LINE" missed="0" covered="3"/><counter type="COMPLEXITY" missed="0" covered="1"/><counter type="METHOD" missed="0" covered="1"/></method><counter type="INSTRUCTION" missed="1" covered="66"/><counter type="BRANCH" missed="1" covered="9"/><counter type="LINE" missed="0" covered="7"/><counter type="COMPLEXITY" missed="1" covered="7"/><counter type="METHOD" missed="0" covered="3"/><counter type="CLASS" missed="0" covered="1"/></class><sourcefile name="Pricing.kt"><line nr="7" mi="0" ci="14" mb="0" cb="4"/><line nr="8" mi="0" ci="5" mb="0" cb="0"/><line nr="12" mi="1" ci="19" mb="1" cb="5"/><line nr="13" mi="0" ci="10" mb="0" cb="0"/><line nr="17" mi="0" ci="5" mb="0" cb="0"/><line nr="18" mi="0" ci="9" mb="0" cb="0"/><line nr="19" mi="0" ci="4" mb="0" cb="0"/><counter type="INSTRUCTION" missed="1" covered="66"/><counter type="BRANCH" missed="1" covered="9"/><counter type="LINE" missed="0" covered="7"/><counter type="COMPLEXITY" missed="1" covered="7"/><counter type="METHOD" missed="0" covered="3"/><counter type="CLASS" missed="0" covered="1"/></sourcefile><counter type="INSTRUCTION" missed="1" covered="66"/><counter type="BRANCH" missed="1" covered="9"/><counter type="LINE" missed="0" covered="7"/><counter type="COMPLEXITY" missed="1" covered="7"/><counter type="METHOD" missed="0" covered="3"/><counter type="CLASS" missed="0" covered="1"/></package><counter type="INSTRUCTION" missed="1" covered="66"/><counter type="BRANCH" missed="1" covered="9"/><counter type="LINE" missed="0" covered="7"/><counter type="COMPLEXITY" missed="1" covered="7"/><counter type="METHOD" missed="0" covered="3"/><counter type="CLASS" missed="0" covered="1"/></report>
+-- ci/api/build/test-results/test/TEST-com.acme.api.QuotesTest.xml --
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.acme.api.QuotesTest" tests="2" skipped="0" failures="0" errors="0" timestamp="2026-11-06T14:26:21.944Z" hostname="vm" time="0.089">
+  <properties/>
+  <testcase name="anEmptyQuoteIsZero()" classname="com.acme.api.QuotesTest" time="0.086"/>
+  <testcase name="quoteLabelsTheTotal()" classname="com.acme.api.QuotesTest" time="0.001"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>
+-- ci/api/build/reports/jacoco/test/jacocoTestReport.xml --
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?><!DOCTYPE report PUBLIC "-//JACOCO//DTD Report 1.1//EN" "report.dtd"><report name="api"><sessioninfo id="vm-af6aa9a1" start="1793975180934" dump="1793975182046"/><package name="com/acme/api"><class name="com/acme/api/Quotes" sourcefilename="Quotes.kt"><method name="&lt;init&gt;" desc="()V" line="5"><counter type="INSTRUCTION" missed="0" covered="3"/><counter type="LINE" missed="0" covered="1"/><counter type="COMPLEXITY" missed="0" covered="1"/><counter type="METHOD" missed="0" covered="1"/></method><method name="quote" desc="(JI)Ljava/lang/String;" line="7"><counter type="INSTRUCTION" missed="0" covered="7"/><counter type="LINE" missed="0" covered="1"/><counter type="COMPLEXITY" missed="0" covered="1"/><counter type="METHOD" missed="0" covered="1"/></method><counter type="INSTRUCTION" missed="0" covered="10"/><counter type="LINE" missed="0" covered="2"/><counter type="COMPLEXITY" missed="0" covered="2"/><counter type="METHOD" missed="0" covered="2"/><counter type="CLASS" missed="0" covered="1"/></class><sourcefile name="Quotes.kt"><line nr="5" mi="0" ci="3" mb="0" cb="0"/><line nr="7" mi="0" ci="7" mb="0" cb="0"/><counter type="INSTRUCTION" missed="0" covered="10"/><counter type="LINE" missed="0" covered="2"/><counter type="COMPLEXITY" missed="0" covered="2"/><counter type="METHOD" missed="0" covered="2"/><counter type="CLASS" missed="0" covered="1"/></sourcefile><counter type="INSTRUCTION" missed="0" covered="10"/><counter type="LINE" missed="0" covered="2"/><counter type="COMPLEXITY" missed="0" covered="2"/><counter type="METHOD" missed="0" covered="2"/><counter type="CLASS" missed="0" covered="1"/></package><counter type="INSTRUCTION" missed="0" covered="10"/><counter type="LINE" missed="0" covered="2"/><counter type="COMPLEXITY" missed="0" covered="2"/><counter type="METHOD" missed="0" covered="2"/><counter type="CLASS" missed="0" covered="1"/></report>
+-- ci/app/build/test-results/testDebugUnitTest/TEST-com.acme.app.CartScreenTest.xml --
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.acme.app.CartScreenTest" tests="1" skipped="0" failures="0" errors="0" timestamp="2026-11-06T14:26:23.765Z" hostname="vm" time="0.102">
+  <properties/>
+  <testcase name="titleShowsTheTotal()" classname="com.acme.app.CartScreenTest" time="0.102"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>
+-- ci/app/build/reports/coverage/test/debug/report.xml --
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?><!DOCTYPE report PUBLIC "-//JACOCO//DTD Report 1.1//EN" "report.dtd"><report name="app"><sessioninfo id="vm-14882277" start="1793975182414" dump="1793975183884"/><package name="com/acme/app"><class name="com/acme/app/CartScreen" sourcefilename="CartScreen.kt"><method name="&lt;init&gt;" desc="(JI)V" line="5"><counter type="INSTRUCTION" missed="0" covered="9"/><counter type="LINE" missed="0" covered="1"/><counter type="COMPLEXITY" missed="0" covered="1"/><counter type="METHOD" missed="0" covered="1"/></method><method name="title" desc="()Ljava/lang/String;" line="7"><counter type="INSTRUCTION" missed="0" covered="10"/><counter type="LINE" missed="0" covered="1"/><counter type="COMPLEXITY" missed="0" covered="1"/><counter type="METHOD" missed="0" covered="1"/></method><counter type="INSTRUCTION" missed="0" covered="19"/><counter type="LINE" missed="0" covered="2"/><counter type="COMPLEXITY" missed="0" covered="2"/><counter type="METHOD" missed="0" covered="2"/><counter type="CLASS" missed="0" covered="1"/></class><sourcefile name="CartScreen.kt"><line nr="5" mi="0" ci="9" mb="0" cb="0"/><line nr="7" mi="0" ci="10" mb="0" cb="0"/><counter type="INSTRUCTION" missed="0" covered="19"/><counter type="LINE" missed="0" covered="2"/><counter type="COMPLEXITY" missed="0" covered="2"/><counter type="METHOD" missed="0" covered="2"/><counter type="CLASS" missed="0" covered="1"/></sourcefile><counter type="INSTRUCTION" missed="0" covered="19"/><counter type="LINE" missed="0" covered="2"/><counter type="COMPLEXITY" missed="0" covered="2"/><counter type="METHOD" missed="0" covered="2"/><counter type="CLASS" missed="0" covered="1"/></package><counter type="INSTRUCTION" missed="0" covered="19"/><counter type="LINE" missed="0" covered="2"/><counter type="COMPLEXITY" missed="0" covered="2"/><counter type="METHOD" missed="0" covered="2"/><counter type="CLASS" missed="0" covered="1"/></report>

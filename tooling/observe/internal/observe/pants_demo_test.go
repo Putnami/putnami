@@ -15,7 +15,7 @@ import (
 
 const pantsFeature = "tooling/observe-pants"
 
-func pantsComponents(o Observation) map[string]evidence.Component {
+func componentsByID(o Observation) map[string]evidence.Component {
 	byID := map[string]evidence.Component{}
 	for _, c := range o.Analysis.Components {
 		byID[c.ID] = c
@@ -42,7 +42,7 @@ func TestThePantsDemoIsExplained(t *testing.T) {
 		"src/python/pricing": {ID: "src/python/pricing", Ecosystem: "pants", Source: evidence.SourceOrchestrator, Impact: evidence.ImpactChanged},
 		"src/python/web":     {ID: "src/python/web", Ecosystem: "pants", Source: evidence.SourceOrchestrator, Impact: evidence.ImpactUnaffected},
 	} {
-		if got := pantsComponents(o)[id]; !reflect.DeepEqual(got, want) {
+		if got := componentsByID(o)[id]; !reflect.DeepEqual(got, want) {
 			t.Errorf("component %s = %+v, want %+v", id, got, want)
 		}
 	}
@@ -88,7 +88,7 @@ func TestThePantsDemoWithoutAnExportListsItsDirectories(t *testing.T) {
 		"src/python/web":     evidence.ImpactUnaffected,
 	} {
 		want := evidence.Component{ID: id, Ecosystem: "pants", Source: evidence.SourceWorkspace, Impact: impact}
-		if got := pantsComponents(o)[id]; !reflect.DeepEqual(got, want) {
+		if got := componentsByID(o)[id]; !reflect.DeepEqual(got, want) {
 			t.Errorf("component %s = %+v, want %+v", id, got, want)
 		}
 	}

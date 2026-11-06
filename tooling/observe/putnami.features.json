@@ -268,6 +268,7 @@
             "checks": [
               "a-test-goes-to-the-component-of-its-file-else-of-its-report",
               "a-pytest-case-goes-to-the-component-of-its-module-file",
+              "a-tojunit-case-goes-to-the-component-of-its-test-file",
               "coverage-goes-to-the-component-of-each-file"
             ]
           }
@@ -337,6 +338,8 @@
             "checks": [
               "a-cyclonedx-pair-gives-each-changed-dependency-its-facts",
               "a-pypi-package-url-matches-a-python-lockfile-change",
+              "a-pub-package-url-matches-a-pubspec-lock-change",
+              "a-cargo-package-url-matches-a-cargo-lock-change",
               "an-spdx-document-gives-licenses-and-advisories",
               "without-a-base-sbom-the-base-is-unknown",
               "the-summary-counts-the-vulnerabilities-per-dependency"
@@ -1022,6 +1025,644 @@
               "a-missing-token-publishes-nothing",
               "outside-a-change-request-nothing-is-published",
               "a-refused-call-is-a-diagnostic"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "tooling/observe-jvm",
+      "type": "feature",
+      "name": "Find the components of a Gradle or Maven repository that keeps its own CI",
+      "outcome": "putnami observe, in a Java or Kotlin repository built with Gradle or Maven, Android included, and without a Putnami workspace, knows one component per Gradle project or Maven module and the edges between them, without running the build, so a change to a shared library marks the projects that use it, the JUnit and JaCoCo reports land on the right component, and a Gradle lockfile or version catalog bump is a dependency change",
+      "owner": "tooling",
+      "target": "modeled",
+      "requirements": [
+        {
+          "id": "gradle-projects-are-components",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "settings-includes-are-components",
+              "a-missing-project-directory-is-a-diagnostic"
+            ]
+          }
+        },
+        {
+          "id": "gradle-project-edges",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "project-references-are-edges",
+              "type-safe-accessors-are-edges"
+            ]
+          }
+        },
+        {
+          "id": "gradle-dynamic-settings",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-computed-include-is-a-diagnostic"
+            ]
+          }
+        },
+        {
+          "id": "maven-modules-are-components",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "pom-modules-are-components",
+              "a-missing-or-invalid-pom-is-a-diagnostic"
+            ]
+          }
+        },
+        {
+          "id": "maven-dependency-edges",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-dependency-on-a-module-is-an-edge"
+            ]
+          }
+        },
+        {
+          "id": "jvm-report-placement",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-jvm-class-name-places-its-case",
+              "a-jacoco-file-maps-through-its-package"
+            ]
+          }
+        },
+        {
+          "id": "jvm-report-discovery",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "jvm-reports-are-discovered"
+            ]
+          }
+        },
+        {
+          "id": "gradle-dependency-changes",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-gradle-lockfile-lists-its-dependencies",
+              "a-version-catalog-lists-its-libraries-and-plugins",
+              "a-maven-package-url-matches-a-gradle-change"
+            ]
+          }
+        },
+        {
+          "id": "gradle-change-analysis",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-gradle-demo-is-explained"
+            ]
+          }
+        },
+        {
+          "id": "maven-change-analysis",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-maven-demo-is-explained"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "tooling/observe-swift",
+      "type": "feature",
+      "name": "Find the components of an iOS or Swift repository that keeps its own CI",
+      "outcome": "putnami observe, in an iOS or Swift repository without a Putnami workspace, knows one component per Swift package, package target and Xcode project, and the edges between them, from the describe export the CI wrote or from Package.swift and project.pbxproj, without running any Apple tool, so a change to a local package marks the packages and the app that use it, its tests and coverage land on the right component, and a Package.resolved or Podfile.lock bump is a dependency change",
+      "owner": "tooling",
+      "target": "modeled",
+      "requirements": [
+        {
+          "id": "swiftpm-export-targets",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "export-targets-are-components"
+            ]
+          }
+        },
+        {
+          "id": "swiftpm-export-unreadable",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-malformed-export-falls-back-to-the-static-read"
+            ]
+          }
+        },
+        {
+          "id": "swiftpm-export-edges",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-target-dependency-is-an-edge",
+              "a-local-product-dependency-is-an-edge"
+            ]
+          }
+        },
+        {
+          "id": "swiftpm-static-read",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "static-read-lists-source-and-test-targets",
+              "a-local-package-path-is-an-edge"
+            ]
+          }
+        },
+        {
+          "id": "swiftpm-static-read-diagnostic",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-static-read-is-an-info-diagnostic"
+            ]
+          }
+        },
+        {
+          "id": "swift-walk",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "checkouts-and-pods-are-skipped"
+            ]
+          }
+        },
+        {
+          "id": "xcode-projects",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "an-xcode-project-is-a-component",
+              "a-local-package-reference-is-an-edge",
+              "an-unreadable-project-is-a-diagnostic"
+            ]
+          }
+        },
+        {
+          "id": "swift-test-placement",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-class-name-places-on-a-swiftpm-test-target",
+              "a-class-name-places-on-an-xcode-test-target"
+            ]
+          }
+        },
+        {
+          "id": "swift-test-file",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-placed-case-names-its-test-file"
+            ]
+          }
+        },
+        {
+          "id": "swift-package-resolved",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "package-resolved-lists-its-pins"
+            ]
+          }
+        },
+        {
+          "id": "swift-podfile-lock",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "podfile-lock-lists-its-pods"
+            ]
+          }
+        },
+        {
+          "id": "swift-change-analysis",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-swift-demo-is-explained"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "tooling/observe-dart",
+      "type": "feature",
+      "name": "Find the packages of a Dart or Flutter repository that keeps its own CI",
+      "outcome": "putnami observe, in a Dart or Flutter repository without a Putnami workspace, knows one component per Dart package, from pub workspaces, melos and each pubspec.yaml, and the path and workspace dependencies between them, without running dart, flutter or melos, so a change to a shared package marks the apps that use it, the per-package coverage and the tojunit reports land on the right package, and a pubspec.lock bump is a dependency change",
+      "owner": "tooling",
+      "target": "modeled",
+      "requirements": [
+        {
+          "id": "dart-packages-are-components",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "pub-workspace-members-are-components",
+              "melos-packages-are-components",
+              "a-pubspec-outside-a-workspace-is-a-manifest-component",
+              "a-malformed-pubspec-is-a-diagnostic"
+            ]
+          }
+        },
+        {
+          "id": "dart-package-edges",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-path-dependency-is-an-edge",
+              "a-workspace-package-dependency-is-an-edge",
+              "a-git-sdk-or-hosted-dependency-is-no-edge"
+            ]
+          }
+        },
+        {
+          "id": "pub-lockfile",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-pubspec-lock-lists-its-hosted-packages"
+            ]
+          }
+        },
+        {
+          "id": "dart-package-reports",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-package-lcov-reads-from-the-package-directory",
+              "a-tojunit-class-name-names-its-test-file"
+            ]
+          }
+        },
+        {
+          "id": "dart-change-analysis",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-melos-demo-is-explained"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "tooling/observe-dotnet",
+      "type": "feature",
+      "name": "Find the .NET projects of a repository that keeps its own CI",
+      "outcome": "putnami observe, in a .NET repository without a Putnami workspace, knows its projects from the root solution and the project files, which project owns each file and which projects reference which, without running dotnet or MSBuild, so a change to a shared library marks the projects that reference it, the TRX and Coverlet reports land on the right projects, and a NuGet package bump is a dependency change",
+      "owner": "tooling",
+      "target": "modeled",
+      "requirements": [
+        {
+          "id": "dotnet-projects-are-components",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "solution-projects-are-workspace-components",
+              "a-project-outside-the-solutions-is-a-manifest-component",
+              "a-malformed-solution-is-a-diagnostic"
+            ]
+          }
+        },
+        {
+          "id": "dotnet-project-references",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-project-reference-is-an-edge",
+              "an-unresolved-reference-is-no-edge"
+            ]
+          }
+        },
+        {
+          "id": "dotnet-test-assemblies",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-case-goes-to-the-project-of-its-test-assembly",
+              "a-trx-report-is-found-by-its-content"
+            ]
+          }
+        },
+        {
+          "id": "dotnet-lockfiles",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-packages-lock-is-a-nuget-lockfile",
+              "central-package-versions-are-read-without-lock-files"
+            ]
+          }
+        },
+        {
+          "id": "dotnet-change-analysis",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-dotnet-demo-is-explained"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "tooling/observe-ruby",
+      "type": "feature",
+      "name": "Find the components of a Ruby or Rails repository that keeps its own CI",
+      "outcome": "putnami observe, in a Ruby or Rails repository without a Putnami workspace, knows one component per packwerk pack, gem and application and the edges their package.yml, Gemfile and gemspec files declare, without running Ruby, so a change to a pack marks the packs that depend on it, its RSpec or Minitest tests and SimpleCov coverage land on the right component, and a Gemfile.lock bump is a dependency change",
+      "owner": "tooling",
+      "target": "modeled",
+      "requirements": [
+        {
+          "id": "ruby-components",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "packs-gems-and-the-application-are-components",
+              "a-malformed-package-yml-is-a-warning"
+            ]
+          }
+        },
+        {
+          "id": "ruby-edges",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-package-yml-dependency-is-an-edge",
+              "a-gemfile-path-gem-is-an-edge",
+              "a-gemspec-dependency-on-a-local-gem-is-an-edge"
+            ]
+          }
+        },
+        {
+          "id": "ruby-gemfile-lock",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-gemfile-lock-lists-its-gem-and-git-specs",
+              "a-gemfile-lock-is-a-gem-lockfile"
+            ]
+          }
+        },
+        {
+          "id": "ruby-reports",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "ruby-test-and-coverage-reports-are-discovered",
+              "a-minitest-case-goes-to-its-test-file"
+            ]
+          }
+        },
+        {
+          "id": "ruby-change-analysis",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-rails-demo-is-explained"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "tooling/observe-rust",
+      "type": "feature",
+      "name": "Find the crates of a Rust repository that keeps its own CI",
+      "outcome": "putnami observe, in a Rust repository without a Putnami workspace, knows its crates from the Cargo workspace and the Cargo.toml manifests, which crate owns each file and which crates depend on which through their path and workspace dependencies, without running cargo, so a change to a shared crate marks the crates that use it, its nextest and llvm-cov reports land on the right crates, and a Cargo.lock bump is a dependency change",
+      "owner": "tooling",
+      "target": "modeled",
+      "requirements": [
+        {
+          "id": "rust-crates-are-components",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "cargo-workspace-members-are-workspace-components",
+              "a-package-outside-the-workspace-is-a-manifest-component",
+              "a-malformed-cargo-toml-is-a-diagnostic"
+            ]
+          }
+        },
+        {
+          "id": "rust-crate-edges",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-path-dependency-is-an-edge",
+              "a-workspace-dependency-with-a-path-is-an-edge",
+              "a-registry-dependency-is-no-edge"
+            ]
+          }
+        },
+        {
+          "id": "rust-probe-answer",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-cargo-answer-is-a-valid-probe-result"
+            ]
+          }
+        },
+        {
+          "id": "rust-report-discovery",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "discovery-walks-only-the-nextest-store-of-a-cargo-target-directory",
+              "a-nextest-case-goes-to-the-crate-its-binary-names"
+            ]
+          }
+        },
+        {
+          "id": "rust-change-analysis",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-cargo-workspace-demo-is-explained"
             ]
           }
         }

@@ -68,8 +68,26 @@ See [doc/09-bazel.md](doc/09-bazel.md) for how it reads the packages of a
 Bazel repository and their edges, from a `bazel query` export.
 See [doc/11-rush.md](doc/11-rush.md) for how it reads the projects, edges and
 lockfiles of a Rush monorepo.
+See [doc/12-jvm.md](doc/12-jvm.md) for how it reads the projects, modules and
+edges of a Gradle or Maven repository, Android included, and its JaCoCo
+coverage.
+See [doc/13-swift.md](doc/13-swift.md) for how it reads the Swift packages,
+their targets and the Xcode projects of an iOS or Swift repository.
+See [doc/14-dart.md](doc/14-dart.md) for how it reads the packages and
+edges of a Dart or Flutter repository, from a pub workspace, melos or
+`pubspec.yaml` files.
+See [doc/15-dotnet.md](doc/15-dotnet.md) for how it reads the projects,
+references, test assemblies and NuGet lock files of a .NET repository.
+See [doc/16-ruby.md](doc/16-ruby.md) for how it reads the packs, gems and
+edges of a Ruby or Rails repository, and its `Gemfile.lock`.
+See [doc/17-rust.md](doc/17-rust.md) for how it reads the crates and edges
+of a Rust repository, from a Cargo workspace or `Cargo.toml` files.
+See [doc/index.md](doc/index.md) for what it answers and every tool, report
+format, lockfile and SBOM format it reads.
 See [doc/06-change-analyses.md](doc/06-change-analyses.md) for how it maps a
 change to components, tests, coverage and dependencies.
+See [doc/18-reports.md](doc/18-reports.md) for what each test, coverage and
+SBOM format gives, and when a report is rejected.
 
 ## Support
 
