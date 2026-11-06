@@ -98,8 +98,8 @@ func ResolvePort(paramPort int) int {
 }
 
 // KillPortUnavailable reports why --kill-port cannot free a port on goos, or
-// returns nil when it can. KillProcessOnPort relies on fuser, lsof and kill,
-// which Windows does not have.
+// returns nil when it can. KillProcessOnPort relies on lsof or fuser, which
+// Windows does not have.
 func KillPortUnavailable(goos string) error {
 	if goos == "windows" {
 		return errors.New("kill-port is not available on Windows: free the port yourself " +
@@ -108,33 +108,65 @@ func KillPortUnavailable(goos string) error {
 	return nil
 }
 
-// KillProcessOnPort attempts to kill any process using the given port.
-// Returns true only when a process was actually killed. Check
-// KillPortUnavailable first.
-func KillProcessOnPort(port int) bool {
-	// Prefer fuser (Linux): it finds and kills the listener in one step.
-	if result, err := execRunFunc("fuser", []string{"-k", fmt.Sprintf("%d/tcp", port)}); err == nil && result.Success {
-		return true
+// killProcessFunc sends SIGKILL to the process pid through its process handle.
+var killProcessFunc = func(pid int) error {
+	process, err := os.FindProcess(pid)
+	if err != nil {
+		return err
 	}
+	return process.Kill()
+}
 
-	// Fallback (e.g. macOS, where fuser is unavailable): lsof lists the PIDs
-	// listening on the port; kill each one explicitly.
-	lsof, err := execRunFunc("lsof", []string{"-ti", fmt.Sprintf(":%d", port), "-sTCP:LISTEN"})
-	if err != nil || lsof == nil {
+// KillProcessOnPort sends SIGKILL to the processes that listen on the TCP
+// port, and reports whether it killed one. It asks lsof when lsof is on PATH,
+// and fuser otherwise. fuser selects by local port, so it also ends a process
+// whose own connection has that local port. Check KillPortUnavailable first.
+func KillProcessOnPort(port int) bool {
+	if port < 1 || port > 65535 {
 		return false
 	}
 
-	killed := false
-	for _, line := range strings.Split(strings.TrimSpace(lsof.Stdout), "\n") {
-		pid := strings.TrimSpace(line)
-		if pid == "" {
-			continue
+	// lsof exits with a failure when no process listens on the port.
+	lsof, err := execRunFunc("lsof", []string{"-n", "-P", "-t", "-i", fmt.Sprintf("tcp:%d", port), "-sTCP:LISTEN"})
+	if err == nil {
+		if !lsof.Success {
+			return false
 		}
-		if res, err := execRunFunc("kill", []string{"-9", pid}); err == nil && res.Success {
-			killed = true
+		pids, ok := parseListenerPIDs(lsof.Stdout)
+		if !ok {
+			return false
 		}
+		killed := false
+		for _, pid := range pids {
+			if killProcessFunc(pid) == nil {
+				killed = true
+			}
+		}
+		return killed
 	}
-	return killed
+	if !errors.Is(err, exec.ErrNotFound) {
+		return false
+	}
+
+	// fuser exits with a failure when no process uses the port.
+	fuser, err := execRunFunc("fuser", []string{"-k", fmt.Sprintf("%d/tcp", port)})
+	return err == nil && fuser.Success
+}
+
+// parseListenerPIDs reads the process ids of `lsof -t` output, one decimal id
+// per line. Any other line means the program is not the lsof that answers the
+// query, such as the BusyBox applet that lists every open file: it reports
+// false and no process id.
+func parseListenerPIDs(stdout string) ([]int, bool) {
+	var pids []int
+	for _, line := range strings.Split(strings.TrimSpace(stdout), "\n") {
+		pid, err := strconv.Atoi(line)
+		if err != nil || pid < 1 || strconv.Itoa(pid) != line {
+			return nil, false
+		}
+		pids = append(pids, pid)
+	}
+	return pids, true
 }
 
 // buildServeArgs builds the bun run args for the serve command.
