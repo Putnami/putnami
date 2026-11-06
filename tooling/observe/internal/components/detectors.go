@@ -7,6 +7,7 @@ import (
 	"go.putnami.dev/tooling/observe/internal/detect/composer"
 	"go.putnami.dev/tooling/observe/internal/detect/pants"
 	"go.putnami.dev/tooling/observe/internal/detect/python"
+	"go.putnami.dev/tooling/observe/internal/detect/ruby"
 	"go.putnami.dev/tooling/observe/internal/detectors/nx"
 	"go.putnami.dev/tooling/observe/internal/lockdiff"
 )
@@ -25,7 +26,7 @@ type Options struct {
 // last: its export outranks the others by source, and without one its
 // packages yield.
 func Default(opts Options) []Detector {
-	return []Detector{NxDetector{}, PantsDetector{GraphFile: opts.PantsGraph}, NodeDetector{}, ComposerDetector{}, GoDetector{}, PythonDetector{}, BazelDetector{GraphFile: opts.BazelGraph}}
+	return []Detector{NxDetector{}, PantsDetector{GraphFile: opts.PantsGraph}, NodeDetector{}, ComposerDetector{}, GoDetector{}, PythonDetector{}, RubyDetector{}, BazelDetector{GraphFile: opts.BazelGraph}}
 }
 
 // fromProbe turns the projects of a probe answer into components.
@@ -172,6 +173,23 @@ func (d PantsDetector) Detect(root string) Found {
 				return lockdiff.ReadPEXLock(data)
 			}, true
 		}
+	}
+	return found
+}
+
+// RubyDetector adapts the Ruby detector: each packwerk pack is a workspace
+// component, each other directory with a gemspec or a Gemfile a manifest one.
+type RubyDetector struct{}
+
+// Name implements Detector.
+func (RubyDetector) Name() string { return "ruby" }
+
+// Detect implements Detector.
+func (RubyDetector) Detect(root string) Found {
+	detection := ruby.Detect(root)
+	found := Found{Diagnostics: detection.Diagnostics}
+	for _, c := range detection.Components {
+		found.Components = append(found.Components, Component{ID: c.ID, Name: c.Name, Ecosystem: ruby.Ecosystem, Source: c.Source, DependsOn: c.DependsOn})
 	}
 	return found
 }

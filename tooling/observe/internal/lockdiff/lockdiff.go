@@ -1,6 +1,6 @@
 // Package lockdiff compares the packages a lockfile pins at two commits:
 // package-lock.json, pnpm-lock.yaml, yarn.lock, composer.lock, go.mod, uv.lock,
-// poetry.lock and the PEX JSON lock of a Pants resolve.
+// poetry.lock, the PEX JSON lock of a Pants resolve and Gemfile.lock.
 //
 // A reader turns a lockfile's content into the versions it pins per package
 // name. Workspace links, path packages and the repository's own modules are
@@ -24,6 +24,7 @@ const (
 	EcosystemComposer = "composer"
 	EcosystemGo       = "go"
 	EcosystemPyPI     = "pypi"
+	EcosystemGem      = "gem"
 )
 
 // Lockfile names the readers know.
@@ -35,6 +36,7 @@ const (
 	GoMod        = "go.mod"
 	UVLock       = "uv.lock"
 	PoetryLock   = "poetry.lock"
+	GemfileLock  = "Gemfile.lock"
 )
 
 // Packages maps a package name to the versions a lockfile pins for it.
@@ -75,6 +77,8 @@ func KindOf(file string) (Kind, bool) {
 		return Kind{EcosystemPyPI, ReadUVLock}, true
 	case PoetryLock:
 		return Kind{EcosystemPyPI, ReadPoetryLock}, true
+	case GemfileLock:
+		return Kind{EcosystemGem, ReadGemfileLock}, true
 	}
 	return Kind{}, false
 }
@@ -138,8 +142,9 @@ func sortedVersions(versions []string) []string {
 	return out
 }
 
-// Compare orders two versions of the form [v]major.minor.patch[-pre][+build]:
-// negative when a is older. ok is false when either does not read so.
+// Compare orders two versions of the form [v]major.minor.patch[-pre][+build],
+// with an optional fourth number, as Rails releases carry: negative when a is
+// older. A missing number is zero. ok is false when either does not read so.
 func Compare(a, b string) (int, bool) {
 	pa, oka := parseVersion(a)
 	pb, okb := parseVersion(b)
@@ -166,7 +171,7 @@ func Compare(a, b string) (int, bool) {
 }
 
 type version struct {
-	numbers [3]int
+	numbers [4]int
 	pre     string
 }
 
@@ -175,7 +180,7 @@ func parseVersion(s string) (version, bool) {
 	s, _, _ = strings.Cut(s, "+")
 	core, pre, _ := strings.Cut(s, "-")
 	parts := strings.Split(core, ".")
-	if len(parts) == 0 || len(parts) > 3 {
+	if len(parts) == 0 || len(parts) > len(version{}.numbers) {
 		return version{}, false
 	}
 	var v version

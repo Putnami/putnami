@@ -284,3 +284,45 @@ func ReadPEXLock(data []byte) (Packages, error) {
 	}
 	return out, nil
 }
+
+// gemSpec is a spec line of a Gemfile.lock source, four spaces in: a name, then
+// its version and platform in parentheses.
+var gemSpec = regexp.MustCompile(`^ {4}([^ (]+) \(([^)]+)\)$`)
+
+// ReadGemfileLock reads the specs of the GEM and GIT sources of a
+// Gemfile.lock. A spec's version is what precedes the first - in its
+// parentheses, as Bundler reads it, so the variants of one version for several
+// platforms are one version. The specs of a PATH source, the repository's own
+// gems, are left out.
+func ReadGemfileLock(data []byte) (Packages, error) {
+	out := Packages{}
+	section, specs, sections := "", false, 0
+	scanner := bufio.NewScanner(bytes.NewReader(data))
+	scanner.Buffer(make([]byte, 64<<10), 16<<20)
+	for scanner.Scan() {
+		line := strings.TrimRight(scanner.Text(), " \r")
+		switch {
+		case line == "":
+		case line[0] != ' ':
+			section, specs = line, false
+			switch section {
+			case "GEM", "GIT", "PATH", "PLATFORMS", "DEPENDENCIES":
+				sections++
+			}
+		case strings.HasPrefix(line, "  ") && line[2] != ' ':
+			specs = line == "  specs:"
+		case specs && (section == "GEM" || section == "GIT"):
+			if m := gemSpec.FindStringSubmatch(line); m != nil {
+				version, _, _ := strings.Cut(m[2], "-")
+				out.add(m[1], version)
+			}
+		}
+	}
+	if err := scanner.Err(); err != nil {
+		return nil, fmt.Errorf("the Gemfile.lock cannot be read: %w", err)
+	}
+	if sections == 0 {
+		return nil, fmt.Errorf("the Gemfile.lock has no GEM, GIT, PATH, PLATFORMS or DEPENDENCIES section")
+	}
+	return out, nil
+}
