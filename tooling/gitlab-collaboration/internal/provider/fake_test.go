@@ -73,6 +73,14 @@ type fakeGitLab struct {
 	foreign map[string]map[int][]string
 	// mergeRequests records the body of every merge call.
 	mergeRequests []fakeMREdit
+	// squashOption is the project's squash option.
+	squashOption string
+	// scopedLabels makes a scoped label replace the label of its key, as
+	// GitLab's paid tiers do.
+	scopedLabels bool
+	// mergeError makes GitLab answer a merge 200 without merging, with this
+	// merge_error.
+	mergeError string
 }
 
 type fakeIssue struct {
@@ -120,7 +128,7 @@ func newFakeGitLab(t *testing.T) *fakeGitLab {
 		clock:  time.Date(2026, 9, 24, 8, 0, 0, 0, time.UTC),
 		nextID: 5000, nextIID: 1, issues: map[int]*fakeIssue{},
 		mrs: map[int]*fakeMR{}, nextMRIID: 1, branches: map[string]string{"main": fakeSHA(1)}, statuses: map[string][]any{},
-		mergeMethod: "merge", foreign: map[string]map[int][]string{},
+		mergeMethod: "merge", squashOption: "default_off", foreign: map[string]map[int][]string{},
 	}
 	f.server = httptest.NewServer(f)
 	t.Cleanup(f.server.Close)

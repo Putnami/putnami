@@ -286,3 +286,30 @@ func TestSystemNotesAreNotComments(t *testing.T) {
 		t.Fatalf("comments %+v", all)
 	}
 }
+
+func TestTheLatestStatusOfEachNameDecides(t *testing.T) {
+	spectest.Proves(t, feature, "pipeline-checks", "the-latest-status-of-each-name-decides")
+	h, ref := reviewed(t)
+	h.statuses(fakeSHA(2),
+		map[string]any{"id": 2, "name": "Putnami CI", "status": "success"},
+		map[string]any{"id": 1, "name": "Putnami CI", "status": "failed"})
+	checks := h.status(ref).Checks
+	if checks.State != collab.ChecksStatePassing || len(checks.Items) != 1 {
+		t.Fatalf("a failure an earlier pipeline reported decided: %+v", checks)
+	}
+	h.statuses(fakeSHA(2),
+		map[string]any{"id": 3, "name": "Putnami CI", "status": "success"},
+		map[string]any{"id": 4, "name": "Putnami CI", "status": "failed"})
+	if state := h.status(ref).Checks.State; state != collab.ChecksStateFailing {
+		t.Fatalf("the latest failure: %s", state)
+	}
+}
+
+func TestABlockingManualJobIsPending(t *testing.T) {
+	spectest.Proves(t, feature, "pipeline-checks", "a-blocking-manual-job-is-pending")
+	h, ref := reviewed(t)
+	h.statuses(fakeSHA(2), map[string]any{"name": "Putnami CI", "status": "success"}, map[string]any{"name": "release", "status": "manual"})
+	if state := h.status(ref).Checks.State; state != collab.ChecksStatePending {
+		t.Fatalf("a blocking manual job: %s", state)
+	}
+}

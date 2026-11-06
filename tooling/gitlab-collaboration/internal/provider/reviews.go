@@ -217,6 +217,7 @@ var checkSeverity = map[collab.CheckState]int{
 
 // glCommitStatus is one commit status: a pipeline job or an external status.
 type glCommitStatus struct {
+	ID           int64  `json:"id"`
 	Name         string `json:"name"`
 	Status       string `json:"status"`
 	AllowFailure bool   `json:"allow_failure"`
@@ -224,8 +225,9 @@ type glCommitStatus struct {
 }
 
 // checkState maps a commit status: success passes, failed and canceled fail
-// unless the job may fail, skipped and manual are skipped, and every other
-// status is not finished.
+// unless the job may fail, skipped and a manual job allowed to fail are
+// skipped, and every other status, a blocking manual job included, is not
+// finished.
 func checkState(status *glCommitStatus) collab.CheckState {
 	switch status.Status {
 	case "success":
@@ -235,14 +237,19 @@ func checkState(status *glCommitStatus) collab.CheckState {
 			return collab.CheckStateSkipped
 		}
 		return collab.CheckStateFailing
-	case "skipped", "manual":
+	case "skipped":
 		return collab.CheckStateSkipped
+	case "manual":
+		if status.AllowFailure {
+			return collab.CheckStateSkipped
+		}
 	}
 	return collab.CheckStatePending
 }
 
-// checks reads the commit statuses GitLab keeps for a commit, the latest one
-// per name, and summarizes them: failing when any fails, pending when any is
+// checks reads the commit statuses GitLab keeps for a commit and keeps the
+// latest of each name, by id: GitLab lists the statuses of every pipeline of
+// the commit and hides only jobs retried within one. It summarizes them: failing when any fails, pending when any is
 // not finished, passing when every one passed or was skipped, none when
 // there is none.
 func (s *proposalSession) checks(sha string) (collab.Checks, *collab.Failure) {
@@ -251,7 +258,7 @@ func (s *proposalSession) checks(sha string) (collab.Checks, *collab.Failure) {
 		summary.Detail = "the merge request has no head commit yet"
 		return summary, nil
 	}
-	var items []collab.Check
+	latest := map[string]glCommitStatus{}
 	for page := 1; page <= maxCheckPages; page++ {
 		query := url.Values{"per_page": {strconv.Itoa(gitlabPageSize)}, "page": {strconv.Itoa(page)}}
 		var statuses []glCommitStatus
@@ -259,13 +266,19 @@ func (s *proposalSession) checks(sha string) (collab.Checks, *collab.Failure) {
 		if err != nil {
 			return collab.Checks{}, fail(err, "read the commit statuses of %s", sha)
 		}
-		for i := range statuses {
-			items = append(items, collab.Check{Name: collabhelper.OneLine(statuses[i].Name, collab.MaxTitleLength, "status"),
-				State: checkState(&statuses[i]), URL: collabhelper.DisplayURL(statuses[i].TargetURL, collab.MaxURLLength)})
+		for _, status := range statuses {
+			if kept, seen := latest[status.Name]; !seen || status.ID > kept.ID {
+				latest[status.Name] = status
+			}
 		}
 		if !gitlab.HasNext(header) {
 			break
 		}
+	}
+	items := make([]collab.Check, 0, len(latest))
+	for _, status := range latest {
+		items = append(items, collab.Check{Name: collabhelper.OneLine(status.Name, collab.MaxTitleLength, "status"),
+			State: checkState(&status), URL: collabhelper.DisplayURL(status.TargetURL, collab.MaxURLLength)})
 	}
 	counts := map[collab.CheckState]int{}
 	for _, item := range items {

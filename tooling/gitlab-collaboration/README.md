@@ -173,7 +173,7 @@ credential never leaves its own instance or this machine.
 - **Exact identity.** A proposal is the merge request whose source branch, in
   the bound project, and target branch are the request's exact head and base.
   A merge request from a fork's branch of the same name is another one and is
-  never answered. A head written `owner:branch` names a fork and is
+  never answered, by identity or by reference. A head written `owner:branch` names a fork and is
   `invalid`, as is a repository other than the bound project; nothing is
   sent. GitLab keeps one open merge request per source and target branch, so
   `upsert` updates it, or opens it, and a repeated, concurrent or lost
@@ -205,16 +205,21 @@ credential never leaves its own instance or this machine.
   records, then every current approval as an `approve` review
   (`approval-<iid>-<user id>`).
 - **Checks.** `status` reads the commit statuses GitLab keeps for the head
-  commit, pipeline jobs and external statuses alike, by name: `success`
-  passes, `failed` and `canceled` fail unless the job may fail, `skipped` and
-  `manual` are skipped, and every other status is pending.
+  commit, pipeline jobs and external statuses alike, by name. GitLab lists
+  the statuses of every pipeline of the commit, so the latest of each name,
+  by id, decides. `success` passes, `failed` and `canceled` fail unless the
+  job may fail, `skipped` and a `manual` job allowed to fail are skipped, and
+  every other status, a blocking manual job included, is pending.
 - **Comments.** `comments` lists every note people wrote, never a system
   note, by ascending note id; its cursor is `n<id>`. A review note lists its
   body without its hidden comments and names itself as its review; a diff
   note keeps its path, and its line when it is anchored to a line of the new
   file, at the head commit it was written on.
 - **Publication additions.** `assignAuthor` and `inheritLabelPrefixes` only
-  add. The issues a description names are read in GitLab's references, after
+  add. On a tier that keeps one assignee, the present assignee stays and the
+  answer lists who is assigned. A scoped label (`key::value`) is exclusive,
+  so of each key one label is added, the first the description names, and
+  none when the merge request already carries that key. The issues a description names are read in GitLab's references, after
   a keyword (`Closes`, `Fixes`, `Resolves`, `Implements`, `Refs`,
   `Related to`): `#12` in the bound project, `project#12` in a project of its
   namespace, `group/project#12`, and an `https` issue URL on the bound host.
@@ -222,10 +227,11 @@ credential never leaves its own instance or this machine.
   never read.
 - **Merge.** `merge` merges only at the expected head, which it sends as
   GitLab's `sha`, so a head that moves meanwhile is a `conflict`, as is a
-  merge request GitLab cannot merge. `squash` asks GitLab to squash; `merge`
-  is served only where the project's merge method creates a merge commit and
-  `rebase` only where it fast-forwards, `unsupported` elsewhere; no method
-  leaves the choice to the project.
+  merge request GitLab cannot merge. `squash` asks GitLab to squash and is
+  `unsupported` where the project never squashes; `merge` is served only
+  where the project's merge method creates a merge commit and `rebase` only
+  where it fast-forwards, both `unsupported` where the project always
+  squashes; nothing is sent then. No method leaves the choice to the project.
 - **Revisions.** A proposal's revision covers the stored title, description,
   state, draft flag, base, head, head commit, labels and assignees; a note
   does not move it.

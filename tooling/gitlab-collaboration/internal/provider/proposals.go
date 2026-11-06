@@ -84,6 +84,7 @@ type glMergeRequest struct {
 	Author          *glUser  `json:"author"`
 	WebURL          string   `json:"web_url"`
 	UpdatedAt       string   `json:"updated_at"`
+	MergeError      string   `json:"merge_error"`
 }
 
 func (m *glMergeRequest) head() string { return strings.ToLower(deref(m.SHA)) }
@@ -219,7 +220,12 @@ func (s *proposalSession) mergeRequest(ref collab.Ref) (*glMergeRequest, *collab
 	if !ours {
 		return nil, collab.Fail(collab.OutcomeNotFound, "proposal.missing", "%s", s.project.missingAs("proposal", ref))
 	}
-	return s.readMergeRequest(iid)
+	mr, failure := s.readMergeRequest(iid)
+	if failure == nil && !mr.sameProject() {
+		return nil, collab.Fail(collab.OutcomeNotFound, "proposal.missing",
+			"merge request !%d of %s comes from a fork; this provider serves merge requests from branches of the project only", iid, s.project.path)
+	}
+	return mr, failure
 }
 
 func (s *proposalSession) readMergeRequest(iid int) (*glMergeRequest, *collab.Failure) {

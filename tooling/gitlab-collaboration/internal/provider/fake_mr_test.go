@@ -76,7 +76,7 @@ var (
 func (f *fakeGitLab) routeProposals(w http.ResponseWriter, r *http.Request, path string) bool {
 	if match := projectRoute.FindStringSubmatch(path); match != nil && r.Method == http.MethodGet {
 		if f.project(w, match[1]) {
-			writeJSON(w, http.StatusOK, map[string]any{"id": f.projectID, "path_with_namespace": f.path, "merge_method": f.mergeMethod,
+			writeJSON(w, http.StatusOK, map[string]any{"id": f.projectID, "path_with_namespace": f.path, "merge_method": f.mergeMethod, "squash_option": f.squashOption,
 				"description": "a fake project"})
 		}
 		return true
@@ -402,7 +402,14 @@ func (f *fakeGitLab) editMR(w http.ResponseWriter, r *http.Request, mr *fakeMR) 
 		mr.description = f.mrQuickActions(mr, *edit.Description)
 	}
 	if edit.AddLabels != nil {
-		mr.labels = splitLabels(strings.Join(mr.labels, ",") + "," + *edit.AddLabels)
+		for _, label := range strings.Split(*edit.AddLabels, ",") {
+			if at := strings.LastIndex(label, "::"); f.scopedLabels && at > 0 {
+				mr.labels = slices.DeleteFunc(mr.labels, func(have string) bool {
+					return strings.HasPrefix(strings.ToLower(have), strings.ToLower(label[:at+2])) && !strings.Contains(have[at+2:], "::")
+				})
+			}
+			mr.labels = splitLabels(strings.Join(mr.labels, ",") + "," + label)
+		}
 	}
 	if edit.AssigneeIDs != nil {
 		mr.assignees = nil
@@ -410,6 +417,9 @@ func (f *fakeGitLab) editMR(w http.ResponseWriter, r *http.Request, mr *fakeMR) 
 			if _, known := f.users[id]; known && !slices.Contains(mr.assignees, id) {
 				mr.assignees = append(mr.assignees, id)
 			}
+		}
+		if f.singleAssignee && len(mr.assignees) > 1 {
+			mr.assignees = mr.assignees[:1]
 		}
 	}
 	mr.updated = f.clock
@@ -428,6 +438,12 @@ func (f *fakeGitLab) mergeMR(w http.ResponseWriter, r *http.Request, mr *fakeMR)
 	}
 	if edit.SHA != nil && *edit.SHA != f.head(mr) {
 		writeJSON(w, http.StatusConflict, map[string]any{"message": "SHA does not match HEAD of source branch: " + mr.sha})
+		return
+	}
+	if f.mergeError != "" {
+		rendered := f.renderMR(mr)
+		rendered["merge_error"] = f.mergeError
+		writeJSON(w, http.StatusOK, rendered)
 		return
 	}
 	mr.state = "merged"

@@ -36,21 +36,21 @@ func TestAssignAuthorAddsTheAccount(t *testing.T) {
 // related seeds issues the description of a proposal can name: #1 and #2 in
 // the bound project, #3 of acme/platform/lib, #4 of acme/other.
 func related(h *harness) {
-	h.seed("Feature", "", "type::feature", "area::core")
-	h.seed("Bug", "", "type::bug")
+	h.seed("Feature", "", "kind/feature", "area::core")
+	h.seed("Bug", "", "kind/bug")
 	h.set(func(f *fakeGitLab) {
-		f.foreign["acme/platform/lib"] = map[int][]string{3: {"type::lib"}}
-		f.foreign["acme/other"] = map[int][]string{4: {"type::other", "unrelated"}}
+		f.foreign["acme/platform/lib"] = map[int][]string{3: {"kind/lib"}}
+		f.foreign["acme/other"] = map[int][]string{4: {"kind/other", "unrelated"}}
 	})
 }
 
 func TestLabelsAreInheritedFromGitLabReferences(t *testing.T) {
 	spectest.Proves(t, feature, "reported-publication", "labels-are-inherited-from-gitlab-references")
-	h := newProposals(t, `"inheritLabelPrefixes":["type::"]`)
+	h := newProposals(t, `"inheritLabelPrefixes":["kind/"]`)
 	related(h)
 	body := "Closes #1\nRefs: https://" + fakeHost + "/acme/platform/app/-/issues/2.\nRelated to lib#3, fixes acme/other#4 and closes #1 again"
 	created := h.upsert(`{"change":` + topicChange + `,"title":"Inherits","body":` + strconv.Quote(body) + `}`)
-	want := []string{"type::bug", "type::feature", "type::lib", "type::other"}
+	want := []string{"kind/bug", "kind/feature", "kind/lib", "kind/other"}
 	if !slices.Equal(created.Proposal.Labels, want) || created.Proposal.Body != body {
 		t.Fatalf("labels %v, want %v", created.Proposal.Labels, want)
 	}
@@ -61,7 +61,7 @@ func TestLabelsAreInheritedFromGitLabReferences(t *testing.T) {
 
 func TestAMergeRequestReferenceOrForeignURLAddsNothing(t *testing.T) {
 	spectest.Proves(t, feature, "reported-publication", "a-merge-request-reference-or-foreign-url-adds-nothing")
-	h := newProposals(t, `"inheritLabelPrefixes":["type::"]`)
+	h := newProposals(t, `"inheritLabelPrefixes":["kind/"]`)
 	related(h)
 	body := "Closes !1\nCloses acme/platform/app!2\nCloses https://gitlab.com/acme/platform/app/-/issues/1\n" +
 		"Closes http://" + fakeHost + "/acme/platform/app/-/issues/1\nCloses #1x and refs #2-old"
@@ -79,6 +79,7 @@ func TestAFailedAdditionIsUnresolvedAndNamesTheMergeRequest(t *testing.T) {
 		t.Fatalf("a missing related issue: %+v", failure)
 	}
 	mustContain(t, failure.Message, "merge request !1 of "+fakeProject+" was written")
+	mustContain(t, failure.Reconcile, "correct or remove the reference")
 	refused := newProposals(t, `"assignAuthor":true`)
 	refused.fake.addFault("PUT", `/merge_requests/1$`, statusFault(403, "403 Forbidden", true))
 	failure = refused.fails("upsert", `{"change":`+topicChange+`,"title":"Refused"}`, collab.OutcomeUnresolved)
@@ -152,6 +153,11 @@ func TestAMovedHeadOrUnmergeableRequestIsAConflict(t *testing.T) {
 	if failure.Reason != reasonNotMergeable {
 		t.Fatalf("an unmergeable merge request: %+v", failure)
 	}
+	h.set(func(f *fakeGitLab) { f.unmergeable, f.mergeError = false, "Merge request is not mergeable" })
+	failure = h.fails("merge", `{"ref":`+refJSON(created.Proposal.Ref)+`,"expectedHeadCommit":"`+fakeSHA(3)+`"}`, collab.OutcomeConflict)
+	if failure.Reason != reasonNotMergeable {
+		t.Fatalf("a merge GitLab answered with merge_error: %+v", failure)
+	}
 	h.mr(1, func(mr *fakeMR) { mr.state = "closed" })
 	failure = h.fails("merge", `{"ref":`+refJSON(created.Proposal.Ref)+`,"expectedHeadCommit":"`+fakeSHA(3)+`"}`, collab.OutcomeConflict)
 	if failure.Reason != reasonNotMergeable {
@@ -199,4 +205,55 @@ func TestRemoveSourceBranchRidesOnTheMerge(t *testing.T) {
 	if writes := h.fake.writes(); writes != 2 {
 		t.Fatalf("the merge took %d writes with the create; deleting the branch needs none of its own", writes)
 	}
+}
+
+func TestASingleAssigneeTierKeepsItsAssignee(t *testing.T) {
+	spectest.Proves(t, feature, "reported-publication", "a-single-assignee-tier-keeps-its-assignee")
+	h := newProposals(t, `"assignAuthor":true`)
+	h.set(func(f *fakeGitLab) { f.singleAssignee = true })
+	created := h.upsert(`{"change":` + topicChange + `,"title":"Single"}`)
+	if !slices.Equal(created.Proposal.Assignees, []string{"bot"}) {
+		t.Fatalf("an unassigned merge request: %v", created.Proposal.Assignees)
+	}
+	h.mr(1, func(mr *fakeMR) { mr.assignees = []int64{9} })
+	kept := h.upsert(`{"change":` + topicChange + `,"title":"Single"}`)
+	if !slices.Equal(kept.Proposal.Assignees, []string{"alice"}) {
+		t.Fatalf("the present assignee was not kept: %v", kept.Proposal.Assignees)
+	}
+}
+
+func TestAScopedLabelKeyTheMergeRequestHasIsKept(t *testing.T) {
+	spectest.Proves(t, feature, "reported-publication", "a-scoped-label-key-the-merge-request-has-is-kept")
+	h := newProposals(t, `"inheritLabelPrefixes":["type::","area::"]`)
+	h.set(func(f *fakeGitLab) { f.scopedLabels = true })
+	h.seed("Feature", "", "type::feature", "area::core")
+	h.seed("Bug", "", "type::bug", "area::cli")
+	created := h.upsert(`{"change":` + topicChange + `,"title":"Scoped","body":"Closes #1 and closes #2"}`)
+	if !slices.Equal(created.Proposal.Labels, []string{"area::core", "type::feature"}) {
+		t.Fatalf("labels %v", created.Proposal.Labels)
+	}
+	h.branch("other", fakeSHA(5))
+	h.seedMR("other", "main", "Labeled", botID, h.fake.projectID).labels = []string{"type::chore"}
+	labeled := h.upsert(`{"change":{"base":"main","head":"other"},"title":"Labeled","body":"Closes #2"}`)
+	if !slices.Equal(labeled.Proposal.Labels, []string{"area::cli", "type::chore"}) {
+		t.Fatalf("an addition replaced a scoped label: %v", labeled.Proposal.Labels)
+	}
+}
+
+func TestASquashOptionTheProjectForbidsIsUnsupported(t *testing.T) {
+	spectest.Proves(t, feature, "guarded-merge", "a-squash-option-the-project-forbids-is-unsupported")
+	h := newProposals(t, `"allowMerge":true`)
+	created := h.upsert(`{"change":` + topicChange + `,"title":"Squash"}`)
+	h.set(func(f *fakeGitLab) { f.squashOption = "never" })
+	failure := h.fails("merge", h.merge(created.Proposal.Ref, `,"method":"squash"`), collab.OutcomeUnsupported)
+	if failure.Reason != reasonMergeMethod {
+		t.Fatalf("a squash the project never does: %+v", failure)
+	}
+	h.set(func(f *fakeGitLab) { f.squashOption = "always" })
+	h.fails("merge", h.merge(created.Proposal.Ref, `,"method":"merge"`), collab.OutcomeUnsupported)
+	if puts := h.fake.count("PUT "); puts != 0 {
+		t.Fatalf("an unsupported method sent %d merges", puts)
+	}
+	var merged collab.ProposalResult
+	h.ok("merge", h.merge(created.Proposal.Ref, `,"method":"squash"`), &merged)
 }

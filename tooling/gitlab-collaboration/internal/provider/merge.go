@@ -5,6 +5,7 @@ import (
 	"strconv"
 
 	collab "go.putnami.dev/protocol/collaboration"
+	"go.putnami.dev/sdk/extension/collabhelper"
 	"go.putnami.dev/tooling/gitlab-collaboration/internal/gitlab"
 )
 
@@ -50,21 +51,26 @@ func (s *proposalSession) merge(input any) (any, *collab.Failure) {
 		return nil, collab.Fail(collab.OutcomeConflict, reasonNotMergeable, "merge request !%d is %s", mr.IID, mr.State)
 	}
 	request := map[string]any{"sha": mr.head()}
-	switch in.Method {
-	case collab.MergeMethodSquash:
-		request["squash"] = true
-	case collab.MergeMethodMerge, collab.MergeMethodRebase:
+	if in.Method != "" {
 		var about struct {
-			MergeMethod string `json:"merge_method"`
+			MergeMethod  string `json:"merge_method"`
+			SquashOption string `json:"squash_option"`
 		}
 		if _, err := s.client.Get(s.ctx, s.project.apiPath(), nil, &about); err != nil {
-			return nil, fail(err, "read the merge method of %s", s.project.path)
+			return nil, fail(err, "read the merge settings of %s", s.project.path)
 		}
-		if projectMergeMethods[about.MergeMethod] != in.Method {
+		switch {
+		case in.Method == collab.MergeMethodSquash && about.SquashOption == "never":
+			return nil, collab.Fail(collab.OutcomeUnsupported, reasonMergeMethod,
+				"%s never squashes merge requests; nothing was sent", s.project.path)
+		case in.Method != collab.MergeMethodSquash && about.SquashOption == "always":
+			return nil, collab.Fail(collab.OutcomeUnsupported, reasonMergeMethod,
+				"%s always squashes merge requests, so a %s merge cannot keep their commits; nothing was sent", s.project.path, in.Method)
+		case in.Method != collab.MergeMethodSquash && projectMergeMethods[about.MergeMethod] != in.Method:
 			return nil, collab.Fail(collab.OutcomeUnsupported, reasonMergeMethod,
 				"%s merges with GitLab's %q method, which does not %s; nothing was sent", s.project.path, about.MergeMethod, describeMethod(in.Method))
 		}
-		request["squash"] = false
+		request["squash"] = in.Method == collab.MergeMethodSquash
 	}
 	if s.settings.RemoveSourceBranch {
 		request["should_remove_source_branch"] = true
@@ -73,6 +79,10 @@ func (s *proposalSession) merge(input any) (any, *collab.Failure) {
 	err := s.client.Write(s.ctx, http.MethodPut, s.project.apiPath("merge_requests", strconv.Itoa(mr.IID), "merge"), request, &answer)
 	if err == nil && answer.State == "merged" {
 		return merged(&answer)
+	}
+	if err == nil && answer.MergeError != "" {
+		return nil, collab.Fail(collab.OutcomeConflict, reasonNotMergeable, "merge request !%d cannot be merged: %s", mr.IID,
+			collabhelper.Bounded(answer.MergeError, 400))
 	}
 	if err != nil && err.Kind == gitlab.Answered {
 		switch err.Status {

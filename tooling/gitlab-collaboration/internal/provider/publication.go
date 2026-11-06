@@ -108,7 +108,11 @@ func (s *proposalSession) complete(mr *glMergeRequest) (*glMergeRequest, *collab
 	partial := func(what, setting string, failure *collab.Failure) *collab.Failure {
 		reconcile := "run proposals.find for the same change, then repeat proposals.upsert: it finds the merge request and applies the rest"
 		message := "merge request !%d of %s was written, and %s failed: %s"
-		if failure.Outcome == collab.OutcomeDenied {
+		switch failure.Outcome {
+		case collab.OutcomeNotFound:
+			reconcile = "correct or remove the reference in the description, then repeat proposals.upsert: until then every repeat meets the same missing issue"
+			message = "merge request !%d of %s was written, and %s found nothing: %s"
+		case collab.OutcomeDenied:
 			reconcile = "let the credential's account succeed at " + what + " in " + s.project.path + ", or turn off settings." + setting +
 				", then repeat proposals.upsert: until then every repeat is refused the same way"
 			message = "merge request !%d of %s was written, and %s was refused, as it will be on every repeat until the credential may do it: %s"
@@ -132,7 +136,10 @@ func (s *proposalSession) complete(mr *glMergeRequest) (*glMergeRequest, *collab
 			if err := s.client.Write(s.ctx, http.MethodPut, path, map[string]any{"assignee_ids": append(ids, me.ID)}, &updated); err != nil {
 				return nil, partial("assigning "+me.Username, "assignAuthor", fail(err, "assign %s", me.Username))
 			}
-			if !slices.ContainsFunc(updated.Assignees, func(user glUser) bool { return user.ID == me.ID }) {
+			// A tier without multiple assignees keeps one: the one present
+			// stays, and the answer lists who is assigned.
+			kept := len(ids) > 0 && len(updated.Assignees) == 1 && slices.Contains(ids, updated.Assignees[0].ID)
+			if !kept && !slices.ContainsFunc(updated.Assignees, func(user glUser) bool { return user.ID == me.ID }) {
 				return nil, partial("assigning "+me.Username, "assignAuthor", collab.Fail(collab.OutcomeDenied, reasonForbidden, "GitLab did not assign %s", me.Username))
 			}
 			mr = &updated
@@ -140,6 +147,15 @@ func (s *proposalSession) complete(mr *glMergeRequest) (*glMergeRequest, *collab
 	}
 	if len(s.settings.InheritLabelPrefixes) == 0 {
 		return mr, nil
+	}
+	// A scoped label, key::value, is exclusive where GitLab has them: adding
+	// one replaces the label of its key. So of each key one label is added,
+	// and none when the merge request carries that key already.
+	scopes := map[string]bool{}
+	for _, have := range mr.Labels {
+		if key, scoped := scopeKey(have); scoped {
+			scopes[key] = true
+		}
 	}
 	var wanted []string
 	for _, related := range s.relatedIssues(unescapeBody(deref(mr.Description))) {
@@ -151,9 +167,16 @@ func (s *proposalSession) complete(mr *glMergeRequest) (*glMergeRequest, *collab
 		for _, label := range issue.labelNames() {
 			inherited := slices.ContainsFunc(s.settings.InheritLabelPrefixes, func(prefix string) bool { return strings.HasPrefix(label, prefix) })
 			present := slices.ContainsFunc(mr.Labels, func(have string) bool { return strings.EqualFold(have, label) })
-			if inherited && !present && !strings.Contains(label, ",") && !slices.ContainsFunc(wanted, func(have string) bool { return strings.EqualFold(have, label) }) {
-				wanted = append(wanted, label)
+			if !inherited || present || strings.Contains(label, ",") || slices.ContainsFunc(wanted, func(have string) bool { return strings.EqualFold(have, label) }) {
+				continue
 			}
+			if key, scoped := scopeKey(label); scoped {
+				if scopes[key] {
+					continue
+				}
+				scopes[key] = true
+			}
+			wanted = append(wanted, label)
 		}
 	}
 	if len(wanted) == 0 {
@@ -169,4 +192,14 @@ func (s *proposalSession) complete(mr *glMergeRequest) (*glMergeRequest, *collab
 		}
 	}
 	return &updated, nil
+}
+
+// scopeKey is the key of a scoped label, everything before its last "::",
+// compared without case.
+func scopeKey(label string) (string, bool) {
+	at := strings.LastIndex(label, "::")
+	if at <= 0 {
+		return "", false
+	}
+	return strings.ToLower(label[:at]), true
 }

@@ -187,10 +187,15 @@ func TestTheRevisionCoversWhatAProposalShows(t *testing.T) {
 		t.Fatal("a note moved the revision")
 	}
 	for name, change := range map[string]func(*fakeMR){
-		"labels":    func(mr *fakeMR) { mr.labels = []string{"x"} },
-		"assignees": func(mr *fakeMR) { mr.assignees = []int64{9} },
-		"head":      func(mr *fakeMR) { mr.sha = fakeSHA(8) },
-		"state":     func(mr *fakeMR) { mr.state = "closed" },
+		"title":       func(mr *fakeMR) { mr.title = "Other title" },
+		"description": func(mr *fakeMR) { mr.description = "Other body" },
+		"draft":       func(mr *fakeMR) { mr.title = "Draft: Other title" },
+		"base":        func(mr *fakeMR) { mr.target = "release" },
+		"head branch": func(mr *fakeMR) { mr.source = "renamed" },
+		"labels":      func(mr *fakeMR) { mr.labels = []string{"x"} },
+		"assignees":   func(mr *fakeMR) { mr.assignees = []int64{9} },
+		"head":        func(mr *fakeMR) { mr.sha = fakeSHA(8) },
+		"state":       func(mr *fakeMR) { mr.state = "closed" },
 	} {
 		previous := status().Revision
 		h.mr(iid, change)
@@ -286,4 +291,13 @@ func TestADescriptionOrReviewRunsNoQuickAction(t *testing.T) {
 	if len(comments.Items) != 1 || comments.Items[0].Body != "/approve\n/close" {
 		t.Fatalf("the review body reads back as %+v", comments.Items)
 	}
+}
+
+func TestAForkMergeRequestIsNotFoundByReference(t *testing.T) {
+	spectest.Proves(t, feature, "exact-proposal-identity", "a-fork-merge-request-is-not-found-by-reference")
+	h := newProposals(t, "")
+	fork := h.seedMR("topic", "main", "From a fork", otherID, 77)
+	failure := h.fails("status", `{"ref":`+refJSON(mrRef(fork.iid))+`}`, collab.OutcomeNotFound)
+	mustContain(t, failure.Message, "comes from a fork")
+	h.fails("comments", `{"ref":`+refJSON(mrRef(fork.iid))+`}`, collab.OutcomeNotFound)
 }
