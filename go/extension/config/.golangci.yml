@@ -163,6 +163,13 @@ linters:
         # G115: system calls, hashes and archive headers convert between integer
         #       widths whose values the caller bounds
         - G115
+        # G702/G704/G705: the taint rules fire on inputs this tool exists to consume: URLs the
+        #                 user or the workspace configures, executables a manifest declares,
+        #                 and bytes written to a terminal or a log. They cannot tell those
+        #                 from untrusted data, and no code form satisfies them there
+        - G702
+        - G704
+        - G705
 
     gocritic:
       disabled-checks:

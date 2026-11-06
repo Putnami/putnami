@@ -84,7 +84,7 @@ func Dial() (*Client, error) {
 
 // Connect connects to the channel at socket with token.
 func Connect(socket, token string) (*Client, error) {
-	conn, err := net.Dial("unix", socket) //nolint:gosec // G704: the destination is a local Unix socket, the one putnami named for this process or the one the caller names; connecting to it is this function's purpose
+	conn, err := net.Dial("unix", socket)
 	if err != nil {
 		return nil, fmt.Errorf("connect to the putnami host RPC channel %s: %w", socket, err)
 	}

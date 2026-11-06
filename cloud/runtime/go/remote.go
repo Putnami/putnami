@@ -280,7 +280,7 @@ func (s *RemoteConfigSource) fetchOnce(ctx context.Context, body []byte, timeout
 		req.Header.Set("Authorization", "Bearer "+token)
 	}
 
-	resp, err := client.Do(req) //nolint:gosec // G704: target is operator-configured (CONFIG_SERVER_URL) or the GCP metadata server, not user-tainted
+	resp, err := client.Do(req)
 	if err != nil {
 		return nil, retryableRemoteFailure("config-server unreachable", err)
 	}

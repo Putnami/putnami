@@ -207,7 +207,7 @@ func lookupBunRelease(ctx context.Context, version, userAgent string) (BunReleas
 		req.Header.Set("User-Agent", userAgent)
 	}
 	// The URL is the package's GitHub endpoint, replaced only by tests.
-	resp, err := bunReleaseClient.Do(req) //nolint:gosec // G704: no user-controlled destination
+	resp, err := bunReleaseClient.Do(req)
 	if err != nil {
 		return BunRelease{}, fmt.Errorf("fetch %s: %w", url, err)
 	}

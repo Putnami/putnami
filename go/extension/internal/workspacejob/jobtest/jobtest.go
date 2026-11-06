@@ -578,7 +578,7 @@ func ServeFake() {
 	}
 	if version, ok := readFakeFile(".version"); ok {
 		if want, ok := readFakeFile(".args"); ok && string(want) != strings.Join(args, " ") {
-			fmt.Fprintln(os.Stderr, "unsupported arguments: "+strings.Join(args, " ")) //nolint:gosec // G705: a test fake reports its argv to the test
+			fmt.Fprintln(os.Stderr, "unsupported arguments: "+strings.Join(args, " "))
 			os.Exit(3)
 		}
 		fmt.Printf("%s has version %s built with go\n", name, strings.TrimSpace(string(version)))
@@ -595,7 +595,7 @@ func ServeFake() {
 			if name == program {
 				if logPath := os.Getenv(trapLog); logPath != "" {
 					if file, err := os.OpenFile(logPath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644); err == nil {
-						_, _ = fmt.Fprintln(file, strings.Join(append([]string{name}, args...), " ")) //nolint:gosec // G705: the trap logs its argv to a file the test reads
+						_, _ = fmt.Fprintln(file, strings.Join(append([]string{name}, args...), " "))
 						_ = file.Close()
 					}
 				}
@@ -615,7 +615,7 @@ func readFakeFile(suffix string) ([]byte, bool) {
 		return nil, false
 	}
 	if err != nil {
-		fmt.Fprintln(os.Stderr, "fake cannot read its answer: "+err.Error()) //nolint:gosec // G705: a test fake reports its own read error to the test
+		fmt.Fprintln(os.Stderr, "fake cannot read its answer: "+err.Error())
 		os.Exit(3)
 	}
 	return content, true
@@ -633,7 +633,7 @@ func envName(tool string) string {
 func serveGo(args []string) {
 	if dir := os.Getenv(goRecord); dir != "" {
 		if err := recordGo(dir, args); err != nil {
-			fmt.Fprintln(os.Stderr, "fake go cannot write its record: "+err.Error()) //nolint:gosec // G705: a test fake reports its own write error to the test
+			fmt.Fprintln(os.Stderr, "fake go cannot write its record: "+err.Error())
 			os.Exit(3)
 		}
 	}
@@ -647,7 +647,7 @@ func serveGo(args []string) {
 			time.Sleep(time.Hour)
 		}
 	}
-	cmd := exec.Command(os.Getenv(realGo), args...) //nolint:gosec // G702: the test names the real go and the fake forwards its own argv
+	cmd := exec.Command(os.Getenv(realGo), args...)
 	cmd.Stdin, cmd.Stdout, cmd.Stderr = os.Stdin, os.Stdout, os.Stderr
 	if err := cmd.Run(); err != nil {
 		exit := &exec.ExitError{}
@@ -668,7 +668,7 @@ func serveGoRelease(release string, args []string) {
 	case "version":
 		fmt.Println("go version go" + release + " " + runtime.GOOS + "/" + runtime.GOARCH)
 	default:
-		fmt.Fprintln(os.Stderr, "unsupported arguments: "+strings.Join(args, " ")) //nolint:gosec // G705: a test fake reports its argv to the test
+		fmt.Fprintln(os.Stderr, "unsupported arguments: "+strings.Join(args, " "))
 		os.Exit(3)
 	}
 	os.Exit(0)

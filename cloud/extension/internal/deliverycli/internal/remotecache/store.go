@@ -201,7 +201,7 @@ func (c *Client) UploadBlob(ctx context.Context, t cache.BlobTransfer, body io.R
 	replayable(req, body)
 	trackUpload(req)
 
-	resp, err := c.transfers.Do(req) //nolint:gosec // G704: request targets the cache server's presigned upload grant, not user-tainted input
+	resp, err := c.transfers.Do(req)
 	if err != nil {
 		return fmt.Errorf("upload blob %s: %w", t.Digest, putFailure(ctx, putCtx, timeout, err))
 	}

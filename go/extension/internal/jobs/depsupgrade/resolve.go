@@ -141,7 +141,7 @@ func (f *fetcher) get(client *http.Client, rawURL string) (*http.Response, error
 			request.SetBasicAuth(login, password)
 		}
 	}
-	return client.Do(request) //nolint:gosec // G704: rawURL is on the module origin the workspace configures
+	return client.Do(request)
 }
 
 // credentials is the job's netrc file, read once.

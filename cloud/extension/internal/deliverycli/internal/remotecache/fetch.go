@@ -67,7 +67,7 @@ func (c *Client) DownloadBlob(ctx context.Context, t cache.BlobTransfer, dst io.
 	}
 	setUserAgent(req)
 
-	resp, err := c.transfers.Do(req) //nolint:gosec // G704: request targets the cache server's presigned download grant, not user-tainted input
+	resp, err := c.transfers.Do(req)
 	if err != nil {
 		return 0, fmt.Errorf("download blob %s: %w", t.Digest, err)
 	}

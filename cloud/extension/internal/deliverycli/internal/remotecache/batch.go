@@ -892,7 +892,7 @@ func (c *Client) uploadDirect(ctx context.Context, grant *cache.UploadGrant, b c
 	replayable(req, body)
 	trackUpload(req)
 
-	resp, err := c.transfers.Do(req) //nolint:gosec // G704: request targets the cache server's presigned upload grant, not user-tainted input
+	resp, err := c.transfers.Do(req)
 	if err != nil {
 		return false, fmt.Errorf("direct upload %s: %w", b.Digest, putFailure(ctx, putCtx, timeout, err))
 	}

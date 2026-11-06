@@ -366,7 +366,7 @@ func resolvePutnamiNPMVersion(ctx context.Context, wsRoot string, declared npmRe
 	// The registry is an explicit workspace .npmrc setting, not remote request
 	// input. Private registries (including loopback in local development) are a
 	// supported npm workflow and are pinned by the request tests.
-	resp, err := npmMetadataClient.Do(req) //nolint:gosec // G704: trusted workspace registry
+	resp, err := npmMetadataClient.Do(req)
 	if err != nil {
 		return "", fail("registry is unreachable", 0, err)
 	}

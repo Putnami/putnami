@@ -288,7 +288,7 @@ func (s *providerSession) close() {
 // log writes one diagnostic line to stderr. The protocol owns stdout, so all
 // logging is funneled here.
 func (s *providerSession) log(msg string) {
-	fmt.Fprintln(s.logw, "cache-provider: "+msg) //nolint:gosec // G705: logw is the provider's stderr, never an HTTP response — no XSS sink
+	fmt.Fprintln(s.logw, "cache-provider: "+msg)
 }
 
 // logCacheError keeps ordinary cache failures scoped to their operation, but a

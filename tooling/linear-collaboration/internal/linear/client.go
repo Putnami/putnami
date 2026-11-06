@@ -262,7 +262,7 @@ func (c *Client) send(ctx context.Context, payload []byte) (*answer, *Error) {
 	request.Header.Set("Content-Type", "application/json")
 	request.Header.Set("Accept", "application/json")
 	request.Header.Set("User-Agent", c.options.UserAgent)
-	response, err := c.options.HTTP.Do(request) //nolint:gosec // G704: the destination is Linear's endpoint or a loopback stand-in, both validated by ResolveEndpoint; no redirect is followed
+	response, err := c.options.HTTP.Do(request)
 	if err != nil {
 		kind := NotSent
 		if written.Load() {

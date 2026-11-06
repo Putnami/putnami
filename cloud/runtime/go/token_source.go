@@ -114,7 +114,7 @@ func (s *GcpMetadataTokenSource) Token(ctx context.Context) (string, error) {
 	}
 	req.Header.Set("Metadata-Flavor", "Google")
 
-	resp, err := client.Do(req) //nolint:gosec // G704: target is operator-configured (CONFIG_SERVER_URL) or the GCP metadata server, not user-tainted
+	resp, err := client.Do(req)
 	if err != nil {
 		return "", fmt.Errorf("metadata token fetch: %w", err)
 	}

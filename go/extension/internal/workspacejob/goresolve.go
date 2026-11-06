@@ -402,7 +402,7 @@ func fetchGoReleaseIntegrities(version string) (map[string]string, error) {
 	}
 	request.Header.Set("Accept", "application/json")
 	client := &http.Client{Timeout: goReleaseIndexTimeout}
-	response, err := client.Do(request) //nolint:gosec // G704: goReleaseIndexURL is the go.dev release index, a package endpoint
+	response, err := client.Do(request)
 	if err != nil {
 		return nil, fmt.Errorf("fetch %s: %w", goReleaseIndexURL, err)
 	}

@@ -76,7 +76,7 @@ func ProbeArchive(ctx context.Context, archive Archive) extproto.MemberProbe {
 	if archive.Token != "" {
 		request.Header.Set("Authorization", "Bearer "+archive.Token)
 	}
-	response, err := client.Do(request) //nolint:gosec // G704: the endpoint is archiveProbeURL's validated registry origin and escaped coordinate
+	response, err := client.Do(request)
 	if err != nil {
 		return subject.Unreachable(err)
 	}

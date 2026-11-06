@@ -316,7 +316,6 @@ type watchedServer struct {
 // startWatchedServer starts cmdArgs in dir with env as the root of a new
 // process tree and forwards its output to emit.
 func startWatchedServer(cmdArgs []string, dir string, env []string, emit *jsonl.Emitter) (*watchedServer, error) {
-	//nolint:gosec // G702: cmdArgs is the resolved go command running the project's own entry point, as runCommand runs it; argv-form exec, no shell.
 	cmd := exec.Command(cmdArgs[0], cmdArgs[1:]...)
 	cmd.Dir = dir
 	cmd.Env = env

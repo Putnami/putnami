@@ -118,7 +118,7 @@ func DrainContext(ctx context.Context) {
 	}
 	// The destination is the fixed Putnami endpoint or an explicit local
 	// process environment override; no remote/request data reaches this URL.
-	response, err := clientHTTP.Do(req) //nolint:gosec // G704: trusted process configuration
+	response, err := clientHTTP.Do(req)
 	if err != nil {
 		return
 	}

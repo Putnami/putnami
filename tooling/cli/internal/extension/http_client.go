@@ -445,7 +445,7 @@ func DoWithRetry(ctx context.Context, client *http.Client, req *http.Request) (*
 		useragent.Set(attemptReq)
 		// This transport retries an already constructed request; the caller owns
 		// destination validation because private registries are supported.
-		resp, err := client.Do(attemptReq) //nolint:gosec // G704: request trust boundary belongs to caller
+		resp, err := client.Do(attemptReq)
 		if err != nil {
 			lastErr = err
 			if !isTransientErr(err) || attempt == HTTPRetryAttempts-1 {
