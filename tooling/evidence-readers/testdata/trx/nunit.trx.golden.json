@@ -3,7 +3,7 @@
     "tests": 4,
     "failures": 1,
     "errors": 0,
-    "skipped": 0,
+    "skipped": 1,
     "assertions": 0,
     "time": 0.9883631
   },

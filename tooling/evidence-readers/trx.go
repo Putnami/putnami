@@ -29,6 +29,7 @@ type trxRun struct {
 	} `xml:"TestDefinitions>UnitTest"`
 	Counters struct {
 		Total       string `xml:"total,attr"`
+		Executed    string `xml:"executed,attr"`
 		Failed      string `xml:"failed,attr"`
 		Error       string `xml:"error,attr"`
 		Timeout     string `xml:"timeout,attr"`
@@ -118,13 +119,16 @@ func ReadTRX(data []byte) (TestReport, []diag.Diagnostic) {
 	return report, nil
 }
 
-// trxTotals reads the ResultSummary counters; errors count the error, timeout
-// and aborted results, and the time is the run's start to its finish.
+// trxTotals reads the ResultSummary counters. Errors count the error, timeout
+// and aborted results, and skipped ones are the results not executed: the
+// total less the executed counter, which the VSTest logger keeps while it
+// leaves notExecuted at 0, else notExecuted. The time is the run's start to
+// its finish.
 func trxTotals(run trxRun) (Totals, []diag.Diagnostic) {
 	counters := run.Counters
 	values := map[string]int{}
 	for name, value := range map[string]string{
-		"total": counters.Total, "failed": counters.Failed, "error": counters.Error,
+		"total": counters.Total, "executed": counters.Executed, "failed": counters.Failed, "error": counters.Error,
 		"timeout": counters.Timeout, "aborted": counters.Aborted, "notExecuted": counters.NotExecuted,
 	} {
 		parsed, diagnostics := count32(value, "TRX counter "+name)
@@ -138,6 +142,9 @@ func trxTotals(run trxRun) (Totals, []diag.Diagnostic) {
 		Failures: values["failed"],
 		Errors:   values["error"] + values["timeout"] + values["aborted"],
 		Skipped:  values["notExecuted"],
+	}
+	if counters.Executed != "" && values["executed"] <= values["total"] {
+		totals.Skipped = values["total"] - values["executed"]
 	}
 	start, startErr := time.Parse(time.RFC3339Nano, run.Times.Start)
 	finish, finishErr := time.Parse(time.RFC3339Nano, run.Times.Finish)

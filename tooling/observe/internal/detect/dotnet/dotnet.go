@@ -88,15 +88,24 @@ func Detect(root string) Detection {
 	files, lockFiles, diags := walk(root)
 	out.LockFiles = lockFiles
 	out.Diagnostics = diags
-	if len(files) == 0 {
-		return out
-	}
-	known := make(map[string]bool, len(files))
+	listed, diags := solutions(root)
+	out.Diagnostics = append(out.Diagnostics, diags...)
+	known := make(map[string]bool, len(files)+len(listed))
 	for _, f := range files {
 		known[f] = true
 	}
-	listed, diags := solutions(root, known)
-	out.Diagnostics = append(out.Diagnostics, diags...)
+	// A listed project the walk skipped, such as one under packages/, is a
+	// project of the repository all the same.
+	for f := range listed {
+		if !known[f] {
+			known[f] = true
+			files = append(files, f)
+		}
+	}
+	if len(files) == 0 {
+		return out
+	}
+	sort.Strings(files)
 
 	byDir := map[string]*Component{}
 	edges := map[string]map[string]bool{}
@@ -204,9 +213,9 @@ func walk(root string) ([]string, bool, []diag.Diagnostic) {
 }
 
 // solutions returns the project files the .sln and .slnx files at the root
-// list. A solution that does not parse, or an entry that names a project file
-// the walk did not find, is a warning.
-func solutions(root string, known map[string]bool) (map[string]bool, []diag.Diagnostic) {
+// list, wherever they lie in the repository. A solution that does not parse,
+// or an entry that names no project file of the repository, is a warning.
+func solutions(root string) (map[string]bool, []diag.Diagnostic) {
 	entries, err := os.ReadDir(root)
 	if err != nil {
 		return nil, nil
@@ -239,7 +248,11 @@ func solutions(root string, known map[string]bool) (map[string]bool, []diag.Diag
 				continue
 			}
 			file, ok := reference(".", p)
-			if !ok || !known[file] {
+			if ok {
+				info, err := os.Stat(filepath.Join(root, filepath.FromSlash(file)))
+				ok = err == nil && info.Mode().IsRegular()
+			}
+			if !ok {
 				diags = append(diags, diag.Warningf(CodeSolutionInvalid, name, "%s lists %s, which is no project file of the repository", name, p))
 				continue
 			}
@@ -332,7 +345,12 @@ func readProject(root, file string) (project, error) {
 		case "ProjectReference":
 			for _, attr := range start.Attr {
 				if attr.Name.Local == "Include" {
-					references = append(references, attr.Value)
+					// An MSBuild item list separates its items with ;.
+					for _, item := range strings.Split(attr.Value, ";") {
+						if item = strings.TrimSpace(item); item != "" {
+							references = append(references, item)
+						}
+					}
 				}
 			}
 		case "AssemblyName":

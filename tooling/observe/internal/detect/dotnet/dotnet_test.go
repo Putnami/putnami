@@ -94,6 +94,24 @@ func TestSolutionProjectsAreWorkspaceComponents(t *testing.T) {
 		t.Errorf("components\n got %+v\nwant %+v", d.Components, want)
 	}
 
+	// A project the solution lists under a directory the walk skips is one
+	// of the solution's all the same.
+	skipped := writeTree(t, map[string]string{
+		"Shop.slnx":                         `<Solution><Project Path="packages/Shared/Shared.csproj" /><Project Path="src/Api/Api.csproj" /></Solution>`,
+		"packages/Shared/Shared.csproj":     pricing,
+		"src/Api/Api.csproj":                projectFile(`..\..\packages\Shared\Shared.csproj`),
+		"packages/Restored/Restored.csproj": pricing,
+	})
+	d = Detect(skipped)
+	noDiagnostics(t, d)
+	want = []Component{
+		{ID: "packages/Shared", Name: "Shared", Source: evidence.SourceWorkspace},
+		{ID: "src/Api", Name: "Api", Source: evidence.SourceWorkspace, DependsOn: []string{"packages/Shared"}},
+	}
+	if !reflect.DeepEqual(d.Components, want) {
+		t.Errorf("a listed project under packages/\n got %+v\nwant %+v", d.Components, want)
+	}
+
 	slnx := writeTree(t, map[string]string{
 		"Shop.slnx": `<Solution>
   <Folder Name="/src/">
@@ -177,7 +195,7 @@ func TestAProjectReferenceIsAnEdge(t *testing.T) {
 	root := writeTree(t, map[string]string{
 		"src/Pricing/Pricing.csproj": pricing,
 		"src/Tax/Tax.fsproj":         pricing,
-		"src/Api/Api.csproj":         projectFile(`..\Pricing\Pricing.csproj`, `../Tax/Tax.fsproj`, `..\Pricing\Pricing.csproj`),
+		"src/Api/Api.csproj":         projectFile(`..\Pricing\Pricing.csproj;../Tax/Tax.fsproj`, `..\Pricing\Pricing.csproj`),
 		"src/Worker/Worker.vbproj":   projectFile(` ..\Api\..\Pricing\Pricing.csproj `),
 	})
 	got := byID(Detect(root))

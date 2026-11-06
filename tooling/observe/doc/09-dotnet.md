@@ -20,7 +20,8 @@ name without its extension: `src/Pricing/Pricing.csproj` is the component
 `src/Pricing`, named `Pricing`. When one directory holds several project
 files, the first in name order names it, and the references of all of them
 count. The walk skips `.git`, `bin`, `obj`, `node_modules`, `packages`,
-`TestResults` and hidden directories. A solution folder makes no component.
+`TestResults` and hidden directories, but a project a root solution lists is
+read wherever it lies. A solution folder makes no component.
 
 A solution that does not parse, or that lists a project file the repository
 does not hold, gets `observe.dotnet_solution_invalid`, and a project file that
@@ -32,7 +33,8 @@ component, with no edge. Both are warnings.
 Each `<ProjectReference Include="...">` is an edge to the component whose
 directory holds the project file it names. The path is relative to the
 referencing project file's directory, with `\` or `/` separators, as
-`dotnet add reference` writes it. A change to `src/Pricing` therefore marks
+`dotnet add reference` writes it; an `Include` that lists several paths
+separated by `;` gives an edge to each. A change to `src/Pricing` therefore marks
 `src/Api`, `src/Worker` and `tests/Pricing.Tests` dependent when they
 reference it:
 

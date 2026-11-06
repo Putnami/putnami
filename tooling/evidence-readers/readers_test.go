@@ -110,7 +110,7 @@ func TestRealTRXReportsReadToTheirExpectedCases(t *testing.T) {
 				t.Errorf("%s: case %q class %q suites %+v, want the class and the test assembly", fixture, testCase.Name, testCase.Classname, testCase.Suites)
 			}
 		}
-		if statuses[StatusFailed] != 1 || statuses[StatusSkipped] != 1 || statuses[StatusPassed] != 2 || report.Totals.Tests != 4 {
+		if statuses[StatusFailed] != 1 || statuses[StatusSkipped] != 1 || statuses[StatusPassed] != 2 || report.Totals.Tests != 4 || report.Totals.Skipped != 1 {
 			t.Errorf("%s: statuses %v, totals %+v, want one failed, one skipped and two passed of four", fixture, statuses, report.Totals)
 		}
 		golden(t, fixture, report)
@@ -138,7 +138,7 @@ func TestATRXOutcomeMapsToAStatus(t *testing.T) {
   <TestDefinitions>
     <UnitTest id="t1"><TestMethod codeBase="C:\\build\\Calc.Tests.dll" className="Calc.Tests.CalculatorTests, Calc.Tests, Version=1.0.0.0" name="Add" /></UnitTest>
   </TestDefinitions>
-  <ResultSummary><Counters total="1" failed="1" error="1" timeout="2" aborted="3" notExecuted="4" /></ResultSummary>
+  <ResultSummary><Counters total="9" executed="5" failed="1" error="1" timeout="2" aborted="3" notExecuted="0" /></ResultSummary>
 </TestRun>`))
 		if len(diagnostics) != 0 || len(report.Cases) != 1 {
 			t.Fatalf("%s: %v, %d cases, want one case", outcome, diagnostics, len(report.Cases))
@@ -153,7 +153,7 @@ func TestATRXOutcomeMapsToAStatus(t *testing.T) {
 		if want.status == StatusSkipped && (got.Skipped == nil || got.Skipped.Message != "why") {
 			t.Errorf("%s: skipped %+v, want the message", outcome, got.Skipped)
 		}
-		if report.Totals != (Totals{Tests: 1, Failures: 1, Errors: 6, Skipped: 4}) {
+		if report.Totals != (Totals{Tests: 9, Failures: 1, Errors: 6, Skipped: 4}) {
 			t.Errorf("%s: totals %+v", outcome, report.Totals)
 		}
 	}

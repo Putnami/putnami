@@ -40,7 +40,8 @@ fails, and `Error`, `Timeout` and `Aborted` fail as an error, with the
 `NotRunnable`, `Pending`, `Disconnected` and `InProgress` skip, with the
 `ErrorInfo` message. The inner results of a data-driven test are not cases:
 their parent stands for them. The errors total counts the `error`, `timeout`
-and `aborted` counters.
+and `aborted` counters, and the skipped total is `total` less `executed`: the
+VSTest logger leaves `notExecuted` at 0 for a skipped test.
 
 A `FileCoverage` holds the file's instrumented lines, in increasing order,
 with their hit counts, and its line and function totals counted from them. A
