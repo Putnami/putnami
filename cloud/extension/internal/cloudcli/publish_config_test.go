@@ -121,7 +121,15 @@ func TestManagedConfigPublishRefusesAJobContextVersionThePlanDidNotSelect(t *tes
 	root, prepared := configMemberPackageFixture(t)
 	params := configMemberPlan(prepared, "sha256:"+strings.Repeat("e", 64))
 	params["dry-run"] = true
-	err := publishConfig(params, nil, root, nil, IO{Version: "1.2.4"})
+	contextFile := filepath.Join(t.TempDir(), "context.json")
+	writeJSONFile(t, contextFile, map[string]any{
+		"workspaceRoot": root, "params": params,
+		"version": map[string]any{"base": "1.2.3", "full": "1.2.4"},
+	})
+	err := RunCommand("config", IO{
+		Env:    map[string]string{"PUTNAMI_HOME": t.TempDir()},
+		Stdout: func(string) {},
+	}, []string{"publish", "--putnamiContext", contextFile})
 	want := fmt.Sprintf(`version differs (selected version %q, source revision %q; prepared version "1.2.4", source revision %q)`,
 		prepared.Version, prepared.Member.Descriptor.SourceProvenance.Revision, prepared.Member.Descriptor.SourceProvenance.Revision)
 	if err == nil || !strings.HasSuffix(err.Error(), want) {

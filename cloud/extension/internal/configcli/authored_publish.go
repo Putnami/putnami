@@ -472,9 +472,9 @@ func authoredSourceProvenance(parent context.Context, workspaceRoot string) (str
 	return "github.com/" + repositoryKey, revision, nil
 }
 
-// authoredConfigVersion is the version the member is published at: inside a
-// job, the version the session resolved for the job's project, the one the
-// release-set plan selects members at; outside a job, the version the
+// authoredConfigVersion is the version the member is published at: the full
+// version the job context carries for the project, the one the release-set
+// plan selects members at, when it carries one; otherwise the version the
 // project's build stamp, .gen/version.json, records.
 func authoredConfigVersion(sessionVersion, workspaceRoot, project string) (string, error) {
 	if sessionVersion != "" {
