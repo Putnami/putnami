@@ -85,6 +85,18 @@ In a Maven repository, add the `prepare-agent` and `report` goals of `jacoco-mav
 
 Each module the POMs list is a component, and a dependency on another module is an edge. The reports under `target/surefire-reports`, `target/failsafe-reports` and `target/site/jacoco` land on the modules. Maven has no lockfile, so a Maven repository has no dependency change. To read only some reports, name them, for example `--junit '**/target/surefire-reports/*.xml' --coverage '**/target/site/jacoco/jacoco.xml'`.
 
+In an iOS or Swift repository, write each package's description and convert the `.xcresult` bundle to JUnit and Cobertura, before the observe step. The same lines run in a GitHub Actions job on `runs-on: macos-15` and in a GitLab job on a macOS runner (`tags: [saas-macos-medium-m1]`), with xcbeautify and xcresultparser installed (`brew install xcbeautify xcresultparser`):
+
+```bash
+(cd Packages/Pricing && swift package describe --type json > swiftpm.json)
+set -o pipefail
+xcodebuild test -workspace Shop.xcworkspace -scheme Shop -destination 'platform=iOS Simulator,name=iPhone 16' \
+  -enableCodeCoverage YES -resultBundlePath build/Test.xcresult | xcbeautify --report junit --report-path build/reports
+xcresultparser --output-format cobertura --project-root . build/Test.xcresult > build/reports/coverage.xml
+```
+
+For a package on its own, `swift test --enable-code-coverage --xunit-output build/reports/xunit.xml` writes the JUnit report, and `llvm-cov export -format=lcov` the coverage. `putnami observe` reads no `.xcresult` itself. Each Swift package, each of its targets and each Xcode project is a component; the export gives the targets' dependencies, and a local package the Xcode project references is an edge, so a change to a package marks the packages and the app that use it. Without the export, the summary says how to write it. A test case named `PricingTests.PriceCalculatorTests` lands on the test target `PricingTests`, and a change to `Package.resolved` or `Podfile.lock` is a dependency change of ecosystem `swift` or `cocoapods`.
+
 The install lines need the network: when the installer or the registry cannot be reached, the GitHub step or the GitLab job fails.
 
 ## Steps
@@ -232,6 +244,6 @@ Without `--base-sbom`, each dependency gets its state at the head and the summar
 ## Learn more
 
 - [What `putnami observe` reads](https://github.com/putnami/putnami/blob/main/tooling/observe/doc/01-observe.md): every flag, how the base is found, and how reports and SBOMs are discovered.
-- [The `@putnami/observe` README](https://github.com/putnami/putnami/blob/main/tooling/observe/README.md): the questions it answers and how it reads Nx, moon, Pants, Rush, Bazel, npm, pnpm, yarn, Composer, Go, Python, Gradle and Maven repositories.
+- [The `@putnami/observe` README](https://github.com/putnami/putnami/blob/main/tooling/observe/README.md): the questions it answers and how it reads Nx, moon, Pants, Rush, Bazel, npm, pnpm, yarn, Composer, Go, Python, Gradle, Maven, Swift and Xcode repositories.
 
 You now have a CI job that records which files a change touched and which tests and coverage reports it produced, as an artifact you can keep or upload to Putnami Cloud.

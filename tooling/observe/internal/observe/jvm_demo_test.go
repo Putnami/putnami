@@ -23,7 +23,7 @@ func TestTheGradleDemoIsExplained(t *testing.T) {
 		"app":     {ID: "app", Name: ":app", Ecosystem: "gradle", Source: evidence.SourceWorkspace, Impact: evidence.ImpactDependent, DependsOn: []string{"pricing"}},
 		"pricing": {ID: "pricing", Name: ":pricing", Ecosystem: "gradle", Source: evidence.SourceWorkspace, Impact: evidence.ImpactChanged},
 	} {
-		if got := pantsComponents(o)[id]; !reflect.DeepEqual(got, want) {
+		if got := componentsByID(o)[id]; !reflect.DeepEqual(got, want) {
 			t.Errorf("component %s = %+v, want %+v", id, got, want)
 		}
 	}
@@ -62,7 +62,7 @@ func TestTheMavenDemoIsExplained(t *testing.T) {
 		"api":     {ID: "api", Name: "com.acme:api", Ecosystem: "maven", Source: evidence.SourceWorkspace, Impact: evidence.ImpactDependent, DependsOn: []string{"pricing"}},
 		"pricing": {ID: "pricing", Name: "com.acme:pricing", Ecosystem: "maven", Source: evidence.SourceWorkspace, Impact: evidence.ImpactChanged},
 	} {
-		if got := pantsComponents(o)[id]; !reflect.DeepEqual(got, want) {
+		if got := componentsByID(o)[id]; !reflect.DeepEqual(got, want) {
 			t.Errorf("component %s = %+v, want %+v", id, got, want)
 		}
 	}

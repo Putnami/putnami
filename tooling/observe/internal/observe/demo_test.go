@@ -174,6 +174,17 @@ var demos = map[string]demoExpectation{
 		// which holds no source and is no component.
 		dependency: evidence.DependencyChange{Ecosystem: "maven", Lockfile: "pricing/gradle.lockfile", Name: "org.apache.commons:commons-lang3", Change: evidence.DependencyUpgraded, From: "3.17.0", To: "3.18.0", Component: "pricing"},
 	},
+	"swift": {
+		env:       map[string]string{"GITHUB_ACTIONS": "true", "GITHUB_SERVER_URL": "https://github.com", "GITHUB_REPOSITORY": "Putnami/demo-observe-swift", "GITHUB_REPOSITORY_ID": "1109", "GITHUB_RUN_ID": "41335533107", "GITHUB_JOB": "test", "GITHUB_REF": "refs/pull/1/merge"},
+		changed:   []string{"Packages/Networking/Sources/Networking", "Packages/Networking/Tests/NetworkingTests"},
+		dependent: []string{"App", "Packages/Networking", "Packages/Pricing", "Packages/Pricing/Sources/Pricing", "Packages/Pricing/Tests/PricingTests"},
+		tests:     map[string]int{"App": 2, "Packages/Pricing/Tests/PricingTests": 3, "Packages/Networking/Tests/NetworkingTests": 2},
+		covered:   []string{"App", "Packages/Networking/Sources/Networking", "Packages/Pricing/Sources/Pricing"},
+		// The CocoaPods workspace at the root holds the lockfiles, and the
+		// root is no component.
+		lineFile:   "Packages/Networking/Sources/Networking/Client.swift",
+		dependency: evidence.DependencyChange{Ecosystem: "swift", Lockfile: "Shop.xcworkspace/xcshareddata/swiftpm/Package.resolved", Name: "swift-log", Change: evidence.DependencyUpgraded, From: "1.6.1", To: "1.6.2"},
+	},
 	"symfony": {
 		env: map[string]string{"GITLAB_CI": "true", "CI_SERVER_HOST": "gitlab.com", "CI_PROJECT_ID": "88373184", "CI_PROJECT_PATH": "putnami/demo-observe-symfony", "CI_PIPELINE_ID": "3015177948", "CI_JOB_ID": "17647015000", "CI_MERGE_REQUEST_IID": "1"},
 		// composer.lock lies in the application at the root, which the

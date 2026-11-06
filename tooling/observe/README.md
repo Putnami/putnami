@@ -71,6 +71,8 @@ lockfiles of a Rush monorepo.
 See [doc/12-jvm.md](doc/12-jvm.md) for how it reads the projects, modules and
 edges of a Gradle or Maven repository, Android included, and its JaCoCo
 coverage.
+See [doc/13-swift.md](doc/13-swift.md) for how it reads the Swift packages,
+their targets and the Xcode projects of an iOS or Swift repository.
 See [doc/06-change-analyses.md](doc/06-change-analyses.md) for how it maps a
 change to components, tests, coverage and dependencies.
 

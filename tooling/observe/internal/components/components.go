@@ -42,9 +42,10 @@ type Component struct {
 type Found struct {
 	Components  []Component
 	Diagnostics []diag.Diagnostic
-	// Locate maps a Go import path, or an import path followed by a file
-	// name, to its repository path and component. Nil for a detector that
-	// reads no import paths.
+	// Locate maps a name a report states to its repository path and
+	// component: a Go import path, or an import path followed by a file
+	// name, or a Swift Module.Class test class name. Nil for a detector that
+	// reads no such names.
 	Locate func(importPath string) (file, component string, ok bool)
 	// Lockfile returns the ecosystem and the reader of a lockfile only this
 	// detector can read, such as a go.mod. Nil for a detector that reads none.
@@ -175,8 +176,8 @@ func (s Set) Owner(file string) (string, bool) {
 	return best, found
 }
 
-// Locate maps a Go import path to its repository path and component, through
-// the detectors that read import paths.
+// Locate maps a Go import path or a Swift Module.Class test class name to its
+// repository path and component, through the detectors that read such names.
 func (s Set) Locate(importPath string) (file, component string, ok bool) {
 	for _, locate := range s.locators {
 		if file, component, ok := locate(importPath); ok {

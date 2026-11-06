@@ -1,6 +1,8 @@
 package components
 
 import (
+	"sync"
+
 	"go.putnami.dev/protocol/evidence"
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/tooling/observe/internal/detect/bazel"
@@ -9,6 +11,7 @@ import (
 	"go.putnami.dev/tooling/observe/internal/detect/maven"
 	"go.putnami.dev/tooling/observe/internal/detect/pants"
 	"go.putnami.dev/tooling/observe/internal/detect/python"
+	"go.putnami.dev/tooling/observe/internal/detect/swift"
 	"go.putnami.dev/tooling/observe/internal/detectors/moon"
 	"go.putnami.dev/tooling/observe/internal/detectors/nx"
 	"go.putnami.dev/tooling/observe/internal/lockdiff"
@@ -31,7 +34,8 @@ type Options struct {
 // Bazel comes last: its export outranks the others by source, and without one
 // its packages yield.
 func Default(opts Options) []Detector {
-	return []Detector{NxDetector{}, MoonDetector{GraphFile: opts.MoonGraph}, PantsDetector{GraphFile: opts.PantsGraph}, RushDetector{}, NodeDetector{}, ComposerDetector{}, GoDetector{}, PythonDetector{}, GradleDetector{}, MavenDetector{}, BazelDetector{GraphFile: opts.BazelGraph}}
+	scan := &swiftScan{}
+	return []Detector{NxDetector{}, MoonDetector{GraphFile: opts.MoonGraph}, PantsDetector{GraphFile: opts.PantsGraph}, RushDetector{}, NodeDetector{}, ComposerDetector{}, GoDetector{}, PythonDetector{}, GradleDetector{}, MavenDetector{}, SwiftPMDetector{scan: scan}, XcodeDetector{scan: scan}, BazelDetector{GraphFile: opts.BazelGraph}}
 }
 
 // fromProbe turns the projects of a probe answer into components.
@@ -237,6 +241,85 @@ func (MavenDetector) Detect(root string) Found {
 	found := Found{Diagnostics: detection.Diagnostics}
 	for _, c := range detection.Components {
 		found.Components = append(found.Components, Component{ID: c.ID, Name: c.Name, Ecosystem: maven.Ecosystem, Source: evidence.SourceWorkspace, DependsOn: c.DependsOn})
+	}
+	return found
+}
+
+// swiftScan runs the Swift detection of one repository once, for both the
+// SwiftPM and the Xcode detector.
+type swiftScan struct {
+	mu        sync.Mutex
+	root      string
+	detection swift.Detection
+	done      bool
+}
+
+// detect returns the detection of root, from the scan when it already read
+// that root. A nil scan detects every time.
+func (s *swiftScan) detect(root string) swift.Detection {
+	if s == nil {
+		return swift.Detect(root)
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if !s.done || s.root != root {
+		s.root, s.detection, s.done = root, swift.Detect(root), true
+	}
+	return s.detection
+}
+
+// SwiftPMDetector adapts the Swift detector to its Swift packages: each
+// package and each of its targets is a workspace component. It also places
+// the JUnit cases of the packages' test targets by their class names.
+type SwiftPMDetector struct {
+	scan *swiftScan
+}
+
+// Name implements Detector.
+func (SwiftPMDetector) Name() string { return "swiftpm" }
+
+// Detect implements Detector.
+func (d SwiftPMDetector) Detect(root string) Found {
+	detection := d.scan.detect(root)
+	found := Found{}
+	for _, d := range detection.Diagnostics {
+		if d.Code != swift.CodeProjectUnreadable {
+			found.Diagnostics = append(found.Diagnostics, d)
+		}
+	}
+	for _, c := range detection.PackageComponents() {
+		found.Components = append(found.Components, Component{ID: c.ID, Name: c.Name, Ecosystem: c.Ecosystem, Source: c.Source, DependsOn: c.DependsOn})
+	}
+	if len(detection.Packages) > 0 {
+		found.Locate = detection.Locate
+	}
+	return found
+}
+
+// XcodeDetector adapts the Swift detector to its Xcode projects: each
+// directory that holds an .xcodeproj is a manifest component, with an edge to
+// each local package the project references.
+type XcodeDetector struct {
+	scan *swiftScan
+}
+
+// Name implements Detector.
+func (XcodeDetector) Name() string { return "xcode" }
+
+// Detect implements Detector.
+func (d XcodeDetector) Detect(root string) Found {
+	detection := d.scan.detect(root)
+	found := Found{}
+	for _, d := range detection.Diagnostics {
+		if d.Code == swift.CodeProjectUnreadable {
+			found.Diagnostics = append(found.Diagnostics, d)
+		}
+	}
+	for _, c := range detection.ProjectComponents() {
+		found.Components = append(found.Components, Component{ID: c.ID, Name: c.Name, Ecosystem: c.Ecosystem, Source: c.Source, DependsOn: c.DependsOn})
+	}
+	if len(detection.Projects) > 0 && len(detection.Packages) == 0 {
+		found.Locate = detection.Locate
 	}
 	return found
 }

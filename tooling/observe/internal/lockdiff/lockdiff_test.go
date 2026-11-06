@@ -378,3 +378,99 @@ versions = { id = "com.github.ben-manes.versions" }
 		t.Error("a malformed catalog reads")
 	}
 }
+
+func TestPackageResolvedListsItsPins(t *testing.T) {
+	spectest.Proves(t, "tooling/observe-swift", "swift-package-resolved", "package-resolved-lists-its-pins")
+	v3 := `{
+  "originHash" : "4f6d3c1e",
+  "pins" : [
+    {
+      "identity" : "swift-collections",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/apple/swift-collections.git",
+      "state" : { "revision" : "671108c96644956dddcd89dd59c203dcdb36cec7", "version" : "1.1.4" }
+    },
+    {
+      "identity" : "swift-log",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/apple/swift-log",
+      "state" : { "branch" : "main", "revision" : "96a2f8a0fa41e9e09af4585e2724c4e825410b91" }
+    }
+  ],
+  "version" : 3
+}`
+	expect(t, "version 3", read(t, PackageResolved, v3), map[string][]string{
+		"swift-collections": {"1.1.4"},
+		"swift-log":         {"96a2f8a0fa41e9e09af4585e2724c4e825410b91"},
+	})
+	v1 := `{
+  "object": {
+    "pins": [
+      {
+        "package": "Alamofire",
+        "repositoryURL": "https://github.com/Alamofire/Alamofire.git",
+        "state": { "branch": null, "revision": "f455c2975872ccd2d9c81594c658af65716e9b9a", "version": "5.9.1" }
+      }
+    ]
+  },
+  "version": 1
+}`
+	expect(t, "version 1", read(t, PackageResolved, v1), map[string][]string{"Alamofire": {"5.9.1"}})
+	kind, _ := KindOf("App.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved")
+	if kind.Ecosystem != EcosystemSwift {
+		t.Errorf("ecosystem %q", kind.Ecosystem)
+	}
+	for _, bad := range []string{"{", `{"version": 2}`} {
+		if _, err := ReadPackageResolved([]byte(bad)); err == nil {
+			t.Errorf("%q read without an error", bad)
+		}
+	}
+}
+
+func TestPodfileLockListsItsPods(t *testing.T) {
+	spectest.Proves(t, "tooling/observe-swift", "swift-podfile-lock", "podfile-lock-lists-its-pods")
+	lock := `PODS:
+  - Alamofire (5.9.1)
+  - Firebase/Core (11.4.0):
+    - Firebase/CoreOnly
+    - FirebaseAnalytics (= 11.4.0)
+  - Firebase/CoreOnly (11.4.0):
+    - FirebaseCore (= 11.4.0)
+  - "GoogleUtilities/Environment (8.0.2)":
+    - GoogleUtilities/Privacy
+  - Pricing (1.0.0)
+
+DEPENDENCIES:
+  - Alamofire (~> 5.9)
+  - Firebase/Core
+  - Pricing (from ` + "`../Packages/Pricing`" + `)
+
+SPEC REPOS:
+  trunk:
+    - Alamofire
+    - Firebase
+
+EXTERNAL SOURCES:
+  Pricing:
+    :path: "../Packages/Pricing"
+
+SPEC CHECKSUMS:
+  Alamofire: 7193b3b92c74a07f85569e1a6c4f4237291e7496
+
+PODFILE CHECKSUM: 2f3c4d
+
+COCOAPODS: 1.16.2
+`
+	kind, ok := KindOf("ios/Podfile.lock")
+	if !ok || kind.Ecosystem != EcosystemCocoaPods {
+		t.Fatalf("kind %+v, %v", kind, ok)
+	}
+	expect(t, "Podfile.lock", read(t, PodfileLock, lock), map[string][]string{
+		"Alamofire":       {"5.9.1"},
+		"Firebase":        {"11.4.0"},
+		"GoogleUtilities": {"8.0.2"},
+	})
+	if _, err := ReadPodfileLock([]byte("COCOAPODS: 1.16.2\n")); err == nil {
+		t.Error("a Podfile.lock without PODS read without an error")
+	}
+}

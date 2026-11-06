@@ -7,7 +7,7 @@ queries no vulnerability database.
 
 ## Components
 
-Eleven detectors read the repository:
+Thirteen detectors read the repository:
 
 | Detector | Reads | Source |
 |---|---|---|
@@ -21,6 +21,8 @@ Eleven detectors read the repository:
 | Python | each `pyproject.toml`, with the root's `[tool.uv.workspace]` | `workspace` for a uv workspace member, `manifest` otherwise |
 | Gradle | `settings.gradle.kts` or `settings.gradle`, and each project's build file | `workspace` |
 | Maven | the root `pom.xml` and its modules, recursively | `workspace` |
+| Swift Package Manager | each `Package.swift` and its targets, from `swiftpm.json` as `swift package describe --type json` writes it, else the manifest and the directories under `Sources` and `Tests` | `workspace` |
+| Xcode | each `.xcodeproj` and the local packages its `project.pbxproj` references | `manifest` |
 | Bazel | `bazel-graph.json` from `bazel query 'deps(//...)' --output=streamed_jsonproto`, else the `BUILD` and `BUILD.bazel` files | `orchestrator` for a query export, `manifest` otherwise |
 
 A component is a directory. When two detectors name one directory, the higher
@@ -70,7 +72,10 @@ A JUnit case goes to the first of:
    `.java`, under `src/test` or `src/androidTest`. See
    [Gradle and Maven](12-jvm.md#reports).
 4. The component of the Go package its class or suite names
-   (`gotestsum --junitfile`).
+   (`gotestsum --junitfile`), or of the Swift test target the `Module` of a
+   `Module.Class` class or suite name names (xcbeautify, fastlane `scan`,
+   `swift test --xunit-output`); see [the Swift detectors](13-swift.md#reports).
+   A located name that is a file is the case's file.
 5. The component that holds the report.
 
 A case that none of them places is counted in `observe.tests_unattributed`.
@@ -115,6 +120,8 @@ Each changed lockfile is read at the merge base and at the head:
 | a Pants resolve lockfile | `pypi` | each locked requirement of the PEX JSON lock a `[python.resolves]` entry of `pants.toml` names |
 | `gradle.lockfile`, `settings-gradle.lockfile` | `maven` | each `group:artifact:version` line, as `group:artifact` |
 | a Gradle version catalog, `gradle/*.versions.toml` | `maven` | each library as `group:artifact` and each plugin as its id, at its version, `version.ref` or rich version |
+| `Package.resolved` | `swift` | each pin of format versions 1 to 3, at its version, else its revision |
+| `Podfile.lock` | `cocoapods` | each entry of `PODS`, by its root pod; pods from a `:path:` left out |
 
 A Rush monorepo keeps its lockfile under `common/config/rush/`: `pnpm-lock.yaml`,
 `npm-shrinkwrap.json` or `yarn.lock`, by the package manager `rush.json` names,

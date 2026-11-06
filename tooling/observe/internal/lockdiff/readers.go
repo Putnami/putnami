@@ -384,6 +384,117 @@ func ReadVersionCatalog(data []byte) (Packages, error) {
 	return out, nil
 }
 
+// ReadPackageResolved reads a Package.resolved of Swift Package Manager: each
+// pin of format versions 2 and 3 by its identity, and of version 1 by its
+// package name, at its state's version, else at its revision for a pin on a
+// branch or a commit.
+func ReadPackageResolved(data []byte) (Packages, error) {
+	type state struct {
+		Version  string `json:"version"`
+		Revision string `json:"revision"`
+	}
+	type pin struct {
+		Identity string `json:"identity"`
+		Package  string `json:"package"`
+		State    state  `json:"state"`
+	}
+	var resolved struct {
+		Pins   *[]pin `json:"pins"`
+		Object *struct {
+			Pins *[]pin `json:"pins"`
+		} `json:"object"`
+	}
+	if err := json.Unmarshal(data, &resolved); err != nil {
+		return nil, fmt.Errorf("the Package.resolved is not JSON: %w", err)
+	}
+	pins := resolved.Pins
+	if pins == nil && resolved.Object != nil {
+		pins = resolved.Object.Pins
+	}
+	if pins == nil {
+		return nil, fmt.Errorf("the Package.resolved has no pins")
+	}
+	out := Packages{}
+	for _, p := range *pins {
+		name := p.Identity
+		if name == "" {
+			name = p.Package
+		}
+		version := p.State.Version
+		if version == "" {
+			version = p.State.Revision
+		}
+		out.add(name, version)
+	}
+	return out, nil
+}
+
+// ReadPodfileLock reads the PODS section of a Podfile.lock: each top-level
+// entry "Name (version)" by its root pod, so the subspecs of one pod are one
+// package. A pod that EXTERNAL SOURCES installs from a :path: is the
+// repository's own code and is left out.
+func ReadPodfileLock(data []byte) (Packages, error) {
+	pods := map[string][]string{}
+	local := map[string]bool{}
+	section, external, seenPods := "", "", false
+	scanner := bufio.NewScanner(bytes.NewReader(data))
+	scanner.Buffer(make([]byte, 64<<10), 16<<20)
+	for scanner.Scan() {
+		line := strings.TrimRight(scanner.Text(), " \r")
+		if strings.TrimSpace(line) == "" || strings.HasPrefix(strings.TrimSpace(line), "#") {
+			continue
+		}
+		if !strings.HasPrefix(line, " ") {
+			section, _, _ = strings.Cut(line, ":")
+			if section == "PODS" {
+				seenPods = true
+			}
+			continue
+		}
+		switch section {
+		case "PODS":
+			entry, ok := strings.CutPrefix(line, "  - ")
+			if !ok {
+				continue
+			}
+			entry = strings.Trim(strings.TrimSuffix(entry, ":"), `"'`)
+			open := strings.LastIndex(entry, " (")
+			if open <= 0 || !strings.HasSuffix(entry, ")") {
+				continue
+			}
+			name, _, _ := strings.Cut(entry[:open], "/")
+			version := entry[open+2 : len(entry)-1]
+			if !slices.Contains(pods[name], version) {
+				pods[name] = append(pods[name], version)
+			}
+		case "EXTERNAL SOURCES":
+			if !strings.HasPrefix(line, "    ") {
+				external = strings.Trim(strings.TrimSuffix(strings.TrimSpace(line), ":"), `"'`)
+				continue
+			}
+			if strings.HasPrefix(strings.TrimSpace(line), ":path:") {
+				local[external] = true
+			}
+		}
+	}
+	if err := scanner.Err(); err != nil {
+		return nil, fmt.Errorf("the Podfile.lock cannot be read: %w", err)
+	}
+	if !seenPods {
+		return nil, fmt.Errorf("the Podfile.lock has no PODS section")
+	}
+	out := Packages{}
+	for name, versions := range pods {
+		if local[name] {
+			continue
+		}
+		for _, version := range versions {
+			out.add(name, version)
+		}
+	}
+	return out, nil
+}
+
 // richVersion is the version a [versions] value or a rich version states: a
 // string, else its strictly, require or prefer member.
 func richVersion(value any) string {

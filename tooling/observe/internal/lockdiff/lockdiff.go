@@ -1,7 +1,7 @@
 // Package lockdiff compares the packages a lockfile pins at two commits:
 // package-lock.json, pnpm-lock.yaml, yarn.lock, composer.lock, go.mod, uv.lock,
-// poetry.lock, the PEX JSON lock of a Pants resolve, gradle.lockfile and the
-// Gradle version catalog.
+// poetry.lock, the PEX JSON lock of a Pants resolve, gradle.lockfile, the
+// Gradle version catalog, Package.resolved and Podfile.lock.
 //
 // A reader turns a lockfile's content into the versions it pins per package
 // name. Workspace links, path packages and the repository's own modules are
@@ -21,24 +21,28 @@ import (
 
 // Ecosystems of the dependency changes.
 const (
-	EcosystemNPM      = "npm"
-	EcosystemComposer = "composer"
-	EcosystemGo       = "go"
-	EcosystemPyPI     = "pypi"
-	EcosystemMaven    = "maven"
+	EcosystemNPM       = "npm"
+	EcosystemComposer  = "composer"
+	EcosystemGo        = "go"
+	EcosystemPyPI      = "pypi"
+	EcosystemMaven     = "maven"
+	EcosystemSwift     = "swift"
+	EcosystemCocoaPods = "cocoapods"
 )
 
 // Lockfile names the readers know.
 const (
-	PackageLock  = "package-lock.json"
-	PNPMLock     = "pnpm-lock.yaml"
-	YarnLock     = "yarn.lock"
-	ComposerLock = "composer.lock"
-	GoMod        = "go.mod"
-	UVLock       = "uv.lock"
-	PoetryLock   = "poetry.lock"
-	GradleLock   = "gradle.lockfile"
-	SettingsLock = "settings-gradle.lockfile"
+	PackageLock     = "package-lock.json"
+	PNPMLock        = "pnpm-lock.yaml"
+	YarnLock        = "yarn.lock"
+	ComposerLock    = "composer.lock"
+	GoMod           = "go.mod"
+	UVLock          = "uv.lock"
+	PoetryLock      = "poetry.lock"
+	GradleLock      = "gradle.lockfile"
+	SettingsLock    = "settings-gradle.lockfile"
+	PackageResolved = "Package.resolved"
+	PodfileLock     = "Podfile.lock"
 	// VersionCatalogSuffix ends the name of a Gradle version catalog, which
 	// lies in a gradle directory: gradle/libs.versions.toml.
 	VersionCatalogSuffix = ".versions.toml"
@@ -84,6 +88,10 @@ func KindOf(file string) (Kind, bool) {
 		return Kind{EcosystemPyPI, ReadPoetryLock}, true
 	case GradleLock, SettingsLock:
 		return Kind{EcosystemMaven, ReadGradleLockfile}, true
+	case PackageResolved:
+		return Kind{EcosystemSwift, ReadPackageResolved}, true
+	case PodfileLock:
+		return Kind{EcosystemCocoaPods, ReadPodfileLock}, true
 	}
 	if strings.HasSuffix(path.Base(file), VersionCatalogSuffix) && path.Base(path.Dir(file)) == "gradle" {
 		return Kind{EcosystemMaven, ReadVersionCatalog}, true
