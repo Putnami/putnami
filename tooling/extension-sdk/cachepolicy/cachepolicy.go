@@ -67,7 +67,8 @@ type Options struct {
 	MaxBytes int64
 	// Grace spares any entry used within this window. Zero opts out of
 	// protection, which is only ever correct for an explicit, user-initiated
-	// clean.
+	// clean. Collect also spares a victim whose own modification time moved
+	// inside the window after the scan.
 	Grace time.Duration
 	// FloorBytes keeps at least this many candidate bytes alive even when the
 	// budget cannot be met. It exists for caches whose unevictable part (Go's
@@ -145,6 +146,9 @@ func Collect(root string, totalBytes int64, candidates []Entry, opts Options) (*
 	defer func() { _ = lock.Release() }()
 
 	for _, victim := range SelectVictims(candidates, totalBytes, opts) {
+		if usedSinceScan(victim.Path, opts) {
+			continue
+		}
 		var removeErr error
 		if victim.Dir {
 			removeErr = os.RemoveAll(victim.Path)
@@ -161,6 +165,32 @@ func Collect(root string, totalBytes int64, candidates []Entry, opts Options) (*
 		res.RemainingBytes -= victim.Size
 	}
 	return res, nil
+}
+
+// usedSinceScan reports whether a victim's modification time is now inside the
+// grace window, although the scan saw it outside.
+//
+// An extension measures its whole cache between the scan and Collect, and the
+// removals themselves take time, so a victim's LastUsed can be minutes old
+// when its turn comes. A toolchain that reads a cold entry in that window
+// refreshes its mtime and hands its path to a tool that opens it later: the go
+// command does this for the export data staticcheck loads. Reading the mtime
+// again right before the removal shrinks that window to one stat. A victim the
+// stat cannot read is left to the removal, which treats a vanished entry as a
+// miss.
+func usedSinceScan(path string, opts Options) bool {
+	if opts.Grace <= 0 {
+		return false
+	}
+	info, err := os.Lstat(path)
+	if err != nil {
+		return false
+	}
+	now := opts.Now
+	if now.IsZero() {
+		now = time.Now()
+	}
+	return now.Sub(info.ModTime()) < opts.Grace
 }
 
 // SelectVictims returns the candidates to evict, oldest first, stopping as soon
