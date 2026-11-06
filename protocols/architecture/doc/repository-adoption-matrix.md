@@ -1,6 +1,6 @@
 # Repository adoption matrix
 
-This repository maps **103 of its 162 projects** to **10 architecture domains**.
+This repository maps **104 of its 163 projects** to **10 architecture domains**.
 The other **59 are excluded on purpose**: 28 samples, 7 templates, 2 template
 proofs, 2 protocol proofs, the standalone area detector, the 2 Cloud runtime
 destinations, the Cloud CLI extension with its 14 generated clients, the new
@@ -31,7 +31,7 @@ an unmapped project is simply invisible to it. This file is that second half.
 |---|---|---|---|
 | `protocols` | `protocols` | 44 | `protocols/putnami.architecture.json` |
 | `go-framework` | `framework` | 24 | `go/framework/putnami.architecture.json` |
-| `typescript-framework` | `framework` | 14 | `typescript/framework/putnami.architecture.json` |
+| `typescript-framework` | `framework` | 15 | `typescript/framework/putnami.architecture.json` |
 | `extension-providers` | `extension-providers` | 12 | `go/extension/putnami.architecture.json` |
 | `cli` | `cli` | 5 | `tooling/cli/putnami.architecture.json` |
 | `sdd` | `sdd` | 1 | `tooling/sdd-extension/putnami.architecture.json` |
@@ -137,7 +137,7 @@ the application composes it and owns none of its shape.
 | `/go/framework/storage` | `go.putnami.dev/storage` | Object and blob storage access. |
 | `/go/framework/telemetry` | `go.putnami.dev/telemetry` | Traces, metrics, and log export from an application. |
 
-### `typescript-framework` — 14 projects
+### `typescript-framework` — 15 projects
 
 **Membership test:** the project publishes part of the `@putnami/*` runtime a
 tenant TypeScript application links, with the same authority relationship as
@@ -148,6 +148,7 @@ tenant TypeScript application links, with the same authority relationship as
 | `/typescript/framework/analytics` | `@putnami/analytics` | Cookieless audience collection, stored in the application's own database. |
 | `/typescript/framework/application` | `@putnami/application` | The application container, plugins, and lifecycle. |
 | `/typescript/framework/cli-protocol` | `@putnami/cli-protocol` | The TypeScript reader of the CLI wire contracts. |
+| `/typescript/framework/codehost-protocol` | `@putnami/codehost-protocol` | The TypeScript twin of the code-host vocabulary. |
 | `/typescript/framework/client` | `@putnami/client` | The typed outbound service client. |
 | `/typescript/framework/database` | `@putnami/database` | Connections, repositories, and the query surface. |
 | `/typescript/framework/document` | `@putnami/document` | Document modelling and validation. |

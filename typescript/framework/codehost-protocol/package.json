@@ -1,0 +1,31 @@
+{
+  "name": "@putnami/codehost-protocol",
+  "version": "0.0.0",
+  "description": "TypeScript binding of the Putnami code-host vocabulary (go.putnami.dev/protocol/codehost)",
+  "keywords": [
+    "github",
+    "gitlab",
+    "protocol",
+    "typescript"
+  ],
+  "homepage": "https://putnami.dev",
+  "bugs": {
+    "url": "https://github.com/Putnami/putnami/issues"
+  },
+  "license": "FSL-1.1-MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Putnami/putnami.git",
+    "directory": "typescript/framework/codehost-protocol"
+  },
+  "main": "src/index.ts",
+  "exports": {
+    ".": {
+      "default": "./src/index.ts"
+    }
+  },
+  "private": false,
+  "devDependencies": {
+    "@putnami/spectest": "workspace:*"
+  }
+}

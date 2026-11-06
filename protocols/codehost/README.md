@@ -40,7 +40,7 @@ the defaults with its own host and API.
 [`vocabulary.json`](./vocabulary.json), described by
 [`schemas/vocabulary.json`](./schemas/vocabulary.json), is the document every
 reader is held to. The Go table and the TypeScript binding
-`@putnami/codehost-protocol`
+[`@putnami/codehost-protocol`](../../typescript/framework/codehost-protocol/README.md)
 each compare themselves with it, and give the results listed in
 [`fixtures/expectations.json`](./fixtures/expectations.json). A change to the
 vocabulary lands in the document, the Go table and the TypeScript table

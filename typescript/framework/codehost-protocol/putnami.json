@@ -1,0 +1,31 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-project.json",
+  "name": "@putnami/codehost-protocol",
+  "type": "library",
+  "tags": ["ts"],
+  "extensions": ["/typescript/extension", "/tooling/sdd-extension"],
+  "dependencies": ["/protocols/codehost"],
+  "featureAuthority": {
+    "owner": "codehost/code-host-vocabulary"
+  },
+  "options": {
+    "test": {
+      "filePatterns": [
+        "../../../protocols/codehost/vocabulary.json",
+        "../../../protocols/codehost/fixtures/**",
+        "../../../protocols/codehost/schemas/**"
+      ]
+    },
+    "package": {
+      "npm": true
+    },
+    "publish": {
+      "npm": true
+    },
+    "sdd": {
+      "verification": {
+        "specs": "enforce"
+      }
+    }
+  }
+}

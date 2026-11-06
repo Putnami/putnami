@@ -6,6 +6,7 @@
     "framework/analytics",
     "framework/application",
     "framework/cli-protocol",
+    "framework/codehost-protocol",
     "framework/client",
     "framework/database",
     "framework/document",

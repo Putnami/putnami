@@ -13,6 +13,7 @@ Putnami frameworks are composable plugins. You only bring the parts you need for
 - **@putnami/runtime** - Foundation utilities, DI container, config, logging, validation
 - **@putnami/utils** - The declarative schema vocabulary plus shared browser/server helpers
 - **@putnami/cli-protocol** - Typed, validated reader for Putnami CLI machine output
+- **@putnami/codehost-protocol** - The code-host slugs and their words: pull or merge request, diff tab, the Putnami note marker
 
 ## Application composition
 
