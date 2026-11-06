@@ -288,7 +288,7 @@ func TestAPackageThatSharesAMemberNameDoesNotTakeItsEdges(t *testing.T) {
 }
 
 func TestABuildDirectoryIsWalkedOnlyWhenItIsAPackage(t *testing.T) {
-	spectest.Proves(t, feature, "dart-packages-are-components", "a-pubspec-outside-a-workspace-is-a-manifest-component")
+	spectest.Proves(t, feature, "dart-packages-are-components", "pub-workspace-members-are-components")
 	d := Detect(writeTree(t, map[string]string{
 		"pubspec.yaml":                    "name: ws\nworkspace: [build, app]\n",
 		"build/pubspec.yaml":              "name: build\nresolution: workspace\n",

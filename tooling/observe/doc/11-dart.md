@@ -13,7 +13,10 @@ Each directory whose `pubspec.yaml` names a package is a component of
 ecosystem `dart`, named by its pubspec `name`. The walk skips `node_modules`,
 `Pods`, the directories whose name starts with `.`, such as `.dart_tool` and
 the plugin symlinks of a Flutter app, and each `build` directory, the output
-of `flutter build`, unless it holds a `pubspec.yaml` of its own.
+of `flutter build`, unless it holds a `pubspec.yaml` of its own. The copy of a
+package that `dart run build_runner build --output build` writes holds one, so
+it reads as a second `manifest` component of that name: write that output
+elsewhere, or out of the checkout, before `putnami observe` runs.
 
 | The package is | Source |
 |---|---|
