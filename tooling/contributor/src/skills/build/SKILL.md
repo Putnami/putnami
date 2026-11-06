@@ -33,7 +33,11 @@ per run.
 selects the workflow profile. `--base <ref>` selects an existing integration
 base. `--local` keeps the run local, with no push and no proposal; a mandate
 that says to stay local, and a workspace that binds no proposals provider, do
-the same. `--dry-run` projects the work without edits or external writes.
+the same. `--push-only` pushes the branch at each checkpoint and opens no
+proposal: a cloud child of an [epic](../epic/SKILL.md) runs it, because its
+host writes a footer into each proposal body, and the epic session publishes
+its proposal. A mandate that says to push without `change finalize` does the
+same. `--dry-run` projects the work without edits or external writes.
 
 ## The loop
 

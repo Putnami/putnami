@@ -65,7 +65,7 @@
     },
     {
       "id": "epic-orchestration",
-      "text": "The epic skill splits an outcome into issues with dependencies, gets one owner approval of the plan and its envelope, and launches one build session per issue, wave by wave, through a launch recipe whose only target is a local workspace. It never codes. A child stops at 50 % over its share, an unplanned sensitive zone, a design change or an ADR conflict. A child stacks on at most one unmerged ready parent and rebases onto the base after the parent's squash merge."
+      "text": "The epic skill splits an outcome into issues with dependencies, gets one owner approval of the plan and its envelope, and launches one build session per issue, wave by wave, through a launch recipe whose target is a local workspace or a cloud session. It never codes. A child stops at 50 % over its share, an unplanned sensitive zone, a design change or an ADR conflict. A child stacks on at most one unmerged ready parent and rebases onto the base after the parent's squash merge."
     },
     {
       "id": "review-cycle",
@@ -83,6 +83,7 @@
     "tooling/contributor/doc/adr/0006-the-contributor-executable-serves-change-finalize.md",
     "tooling/contributor/doc/adr/0008-build-pushes-its-intent-before-its-code.md",
     "tooling/contributor/doc/adr/0010-an-epic-session-runs-issues-in-waves.md",
+    "tooling/contributor/doc/adr/0011-the-epic-session-publishes-a-cloud-child.md",
     "tooling/cli/doc/adr/0082-putnami-serves-no-mcp-server.md"
   ]
 }

@@ -8,7 +8,8 @@ description: Plan an outcome that needs several issues in dependency order, have
 An epic is one outcome that needs several issues, each its own proposal. This
 session plans the issues, has the owner approve one envelope, launches one
 [build](../build/SKILL.md) session per issue, wave by wave, and follows them.
-It never codes, never commits to a child's branch and never merges.
+It never codes, never commits to a child's branch and never merges. It opens
+a proposal only for a cloud child, whose host cannot publish one (section 6).
 
 Resolve the CLI from the workspace root in every shell:
 
@@ -28,8 +29,8 @@ jq '.options["@putnami/contributor"].epic // {}' putnami.workspace.json
 ```
 
 `sessions` (default `3`) is how many children run at once; `launch` (default
-`local`) is the launch target, and `local` is the only one. Another value
-stops the run with a clear message.
+`local`) is the launch target: `local`, a local workspace the owner opens, or
+`cloud`, a cloud session. Another value stops the run with a clear message.
 
 ## Arguments
 
@@ -86,14 +87,25 @@ lists each issue that may start, and the branch it starts from:
 For each issue it lists, in plan order:
 
 1. Name the child branch `epic-<epic>/<key>` and record the launch in
-   `.putnami/<epic>/launches.json`: `issue`, `target` `local`, `branch`,
-   `base` and `recordedAt`. Record it before the owner opens the session.
-2. Give the owner the launch: open a local workspace on `<branch>` from
-   `<base>`, then run build on the task (`/build <task id>` on Claude Code,
-   `$build <task id>` on Codex). The mandate names the epic, the child's
-   share, and its base: "Your proposal targets `<base>`:
-   `change finalize --base <base>`." A stacked child also rebases onto its
-   parent's branch each time the parent moves.
+   `.putnami/<epic>/launches.json`: `issue`, `target` (`local` or `cloud`,
+   from the policy), `branch`, `base` and `recordedAt`. Record it before the
+   session opens.
+2. Give the launch. The mandate names the epic, the child's share, and its
+   base. A stacked child also rebases onto its parent's branch each time the
+   parent moves.
+   - `local`: the owner opens a local workspace on `<branch>` from `<base>`,
+     then runs build on the task (`/build <task id>` on Claude Code,
+     `$build <task id>` on Codex). The mandate says: "Your proposal targets
+     `<base>`: `change finalize --base <base>`."
+   - `cloud`: the owner starts a cloud session on the repository, on
+     `<branch>` from `<base>`, with build in push-only mode
+     (`/build <task id> --push-only` on Claude Code). The mandate says: "Push
+     `<branch>` at each checkpoint, declarations first; do not run
+     `change finalize`. End with the pushed head, the title, the body, the
+     task, the gated projects and whether the delivery is partial. The epic
+     session publishes your proposal against `<base>`." The host adds a
+     footer to each proposal body it writes, so the epic session publishes
+     it (section 6).
 
 `epic status` counts the children launched or in progress against
 `envelope.sessions`; it lists nothing once their tokens reach the envelope.
@@ -109,15 +121,56 @@ shows its state, its proposal, its tokens against its share, and the
 contracts it could not read.
 
 - A child past its share stops for the owner; report it with its tokens.
+- A cloud child shows `in a cloud session` and its branch until its
+  proposal exists. Follow its session in the host, where it runs, and
+  publish it as section 6 says.
 - A stacked child whose parent merged gets the rebase line `epic status`
   prints: `git rebase --onto <base> <parent's last head>`. Pass it to the
   child's session: it rebases before its next push, then pushes with
-  `change finalize --base <epic base>`. The contracts cannot retarget a
+  `change finalize --base <epic base>`, or with
+  `git push --force-with-lease` for a cloud child, whose proposal you then
+  publish again against the epic base. The contracts cannot retarget a
   proposal: when the provider did not retarget its proposal to the epic's
   base, ask the owner to do it.
 - When the envelope is spent, launch nothing new. Report what each running
   child still needs and ask the owner for a new envelope or a stop.
 - When a wave finishes, launch the next one.
+
+## 6. Publish a cloud child
+
+A cloud child pushes its branch and opens no proposal. Publish it from this
+machine, and prove its head here: its records under `.putnami/` never reach
+the branch, and you never trust them from a distance. You review and gate;
+you never code, and never commit to the child's branch.
+
+1. Keep one worktree per cloud child, on its branch, at the head it pushed.
+   Create it the first time with `git fetch origin <branch>`, then
+   `git worktree add -B <branch> ../<epic>-<key> origin/<branch>`. Each later
+   time, in that worktree, run `git fetch origin <branch>` and
+   `git reset --hard origin/<branch>`. Its `HEAD` must be the head the child
+   reported; otherwise ask the child's session for its current head.
+2. When the child reports its declarations commit pushed, bring the worktree
+   to it and open the draft there: `"$PUTNAMI_CLI" change finalize --draft`
+   with `--base`, `--branch`, `--title`, `--body-file` and the task. The
+   reviewer sees the intent before the code, and the child reads the reviews
+   once the draft exists.
+3. When the child ends with its final head pushed, bring the worktree to it
+   and run build's check and prove stages there, without their repair:
+   freeze with `change verify --snapshot --base origin/<base>`, one fresh
+   independent reviewer, the final gate as check selects it, then the local
+   qualification as prove says. A P1 or P2 finding, a red gate, a failed
+   proof, or a gate that rewrites a file, publishes nothing: pass it to the
+   child's session, which repairs and pushes again. Never fix it in the
+   worktree.
+4. Run build's merge stage on that tree with the child's title, a body file
+   holding its body, and its task, plus `--partial-delivery` when it
+   reported one: `"$PUTNAMI_CLI" change finalize --base <base>
+   --branch <branch>` with a dossier built from your review, gate and proof
+   (`--verification-file`), or, when check selected the hosted gate,
+   `--gate ci` with a workflow record you write as merge says.
+5. When review sends the child back to code, it pushes again: prove and
+   publish its new head from step 1. Remove the worktree once the proposal
+   is merged or closed.
 
 The epic ends when every issue is merged or closed. Report each issue with
 its state, its proposal and its tokens, the tokens spent against the
