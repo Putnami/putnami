@@ -32,7 +32,7 @@
     },
     {
       "id": "dotnet-change-analysis",
-      "text": "On a solution whose Api and Worker reference Pricing, with Pricing.Tests and a tools project outside it, where a change edits Pricing and bumps Newtonsoft.Json, the analyses list the five projects with the edges to Pricing and mark Api, Worker and Pricing.Tests dependent; the TRX and Coverlet Cobertura reports under TestResults land on Pricing.Tests and Pricing, with no unattributed case and no unmapped file; and the bump is a nuget dependency change of the lock file of Pricing."
+      "text": "On a solution whose Api and Worker reference Pricing, with Pricing.Tests and a tools project outside it, where a change edits Pricing and bumps a package only the tools project uses, the analyses list the five projects with the edges to Pricing and mark Api, Worker and Pricing.Tests dependent; the TRX and Coverlet Cobertura reports under TestResults land on Pricing.Tests and Pricing, with no unattributed case and no unmapped file; and the bump is a nuget change of the tools project's lock file."
     }
   ],
   "decisions": [
