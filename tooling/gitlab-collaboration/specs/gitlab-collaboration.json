@@ -13,7 +13,8 @@
     "The link and claim operations: an issue's parent in GitLab is an epic or a work item hierarchy outside the issues REST API, and nothing enforces an exclusive claim",
     "Detecting a concurrent writer between the read and the write of a checked precondition, or two concurrent creates with one idempotency key",
     "Reading a token GitLab's CLI keeps in an operating-system keyring rather than in its configuration",
-    "Running the live proof in the ordinary gate: it mutates a real GitLab project and runs only on request"
+    "Running the live proof in the ordinary gate: it mutates a real GitLab project and runs only on request",
+    "Writing with a CI/CD job token: GitLab lets a job token read issues and nothing more, so a pipeline that writes tasks sets GITLAB_TOKEN"
   ],
   "requirements": [
     {
@@ -26,11 +27,15 @@
     },
     {
       "id": "paged-find",
-      "text": "find reads the bound project's issue list, oldest first, filtered by GitLab on state, every listed label and the query matched against title and description, then by the provider on the semantic states. A cursor names GitLab's page and the creation time and id of the last issue considered, so every issue present throughout a traversal is listed exactly once, whatever page sizes the caller asks for."
+      "text": "find reads the project's issues oldest first, filtered by GitLab on state, labels and text, then by the provider on semantic states. A cursor names GitLab's page, the millisecond of the last issue considered and up to 48 ids seen at it; a resumed page that is empty or starts on an unseen issue is read one page earlier. So every issue present throughout a traversal is listed, whatever the page sizes, ties in creation time and issues closed meanwhile, and only a tie of over 48 at a boundary repeats one."
     },
     {
       "id": "reconciled-writes",
       "text": "create ends the description with a hidden comment holding the key's hash and the request digest, and first looks for the key among the newest issues the credential's account opened, keyScanPages pages of 100, then in GitLab's search. A repeat returns that issue, created false; other content is a conflict; another account's issue never answers. Every write is sent once; after a lost answer or a 5xx the provider reads GitLab back and answers what it cannot establish unresolved. update keeps the marker."
+    },
+    {
+      "id": "literal-bodies",
+      "text": "A task's title and body reach GitLab as data, never as commands: create and update escape every line of a body that starts with a slash, so GitLab runs no quick action from it and stores the body whole, and a read removes that escape. A transition to done of an issue GitLab closed as a duplicate reopens it, then closes it, since the duplicate link otherwise keeps it canceled. A label named None or Any, which GitLab's filter reads as a keyword, is matched by the provider."
     },
     {
       "id": "informational-assign",
@@ -42,7 +47,7 @@
     },
     {
       "id": "credential-safety",
-      "text": "The token is GITLAB_TOKEN when GITLAB_HOST names the bound host, or is unset for gitlab.com; then what glab config get token --host prints; then, in a pipeline whose CI_SERVER_HOST is the host, CI_JOB_TOKEN sent as JOB-TOKEN. Without one every call is denied and nothing is sent. The token reaches only https://<host>/api/v4 or a loopback PUTNAMI_GITLAB_API_URL, and the runtime removes it and every GitLab token shape from all it writes."
+      "text": "The token is GITLAB_TOKEN when GITLAB_HOST names the bound host, or is unset for gitlab.com; then what glab config get token --host prints; then, in a pipeline whose CI_SERVER_HOST is the host, CI_JOB_TOKEN sent as JOB-TOKEN. Without one every call is denied and nothing is sent. The token reaches only https://<host>/api/v4 or a loopback PUTNAMI_GITLAB_API_URL, and the runtime removes it and every GitLab token shape from all it writes. A 401 or 403 names where the token came from."
     },
     {
       "id": "truthful-manifest",

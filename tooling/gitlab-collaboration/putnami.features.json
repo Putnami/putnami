@@ -52,6 +52,7 @@
           "verification": {
             "kind": "acceptance",
             "checks": [
+              "a-traversal-survives-ties-and-closed-issues",
               "find-filters-by-state-label-and-text",
               "pages-cover-the-project-exactly-once"
             ]
@@ -73,6 +74,21 @@
               "an-unestablished-write-is-unresolved-and-sent-once",
               "only-the-accounts-issue-answers-for-a-key",
               "update-keeps-the-marker"
+            ]
+          }
+        },
+        {
+          "id": "literal-bodies",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-body-runs-no-quick-action",
+              "a-keyword-label-is-matched-by-the-provider",
+              "done-reopens-a-duplicate-then-closes-it"
             ]
           }
         },
@@ -119,6 +135,7 @@
               "a-credential-never-reaches-an-answer",
               "a-job-token-serves-only-its-own-instance",
               "a-missing-credential-is-denied-and-sends-nothing",
+              "a-refusal-names-the-credentials-origin",
               "the-credential-follows-glab-discovery",
               "the-override-reaches-only-the-loopback-interface"
             ]

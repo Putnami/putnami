@@ -42,14 +42,17 @@ wherever GitLab allows it, and departs from them only where GitLab differs.
       that prints the stored token alone.
    3. Inside a GitLab pipeline (`GITLAB_CI=true`) whose `CI_SERVER_HOST` is
       the bound host, `CI_JOB_TOKEN`, sent in the `JOB-TOKEN` header. GitLab
-      decides what a job token may reach; a refusal answers `denied`.
+      lets a job token list and read issues and nothing more, so with it
+      every write answers `denied`; a pipeline that writes sets
+      `GITLAB_TOKEN`.
 
    Every other token goes in `Authorization: Bearer`, which GitLab accepts
    for personal, project and group access tokens and for the OAuth token
    `glab` may store. Without a credential every call answers `denied`
    (`gitlab.unauthenticated`) and sends nothing. The runtime removes the
    token, and every string shaped like a GitLab token (`glpat-`, `gloas-`,
-   `glcbt-` and the other published prefixes), from everything it writes.
+   `glcbt-` and the other published prefixes), from everything it writes. A
+   401 or 403 names where the token came from, never the token.
 
 3. **A reference is the issue's `iid`, qualified by host and project.** A
    task is `{"source": "gitlab:<host>/<project path>", "id": "<iid>"}`, all
@@ -97,15 +100,35 @@ wherever GitLab allows it, and departs from them only where GitLab differs.
    the reads cannot establish answers `unresolved`, names the read or the
    keyed repeat that settles it, and is never sent again.
 
-8. **`find` pages by creation.** GitLab sorts a project's issues by creation
-   time, then id, and cannot sort them by `iid`. A cursor is
-   `p<page>.t<creation time in milliseconds>.i<id>`: a request reads
-   GitLab's page again and skips every issue at or before that position, and
-   steps back a page when the page starts past it, so an issue opened or
-   deleted during a traversal moves no other issue across a page boundary,
-   and the caller may change the page size between pages.
+8. **`find` pages by creation and remembers the issues of its last
+   millisecond.** GitLab sorts a project's issues by creation time to the
+   microsecond, then by id descending, shows the time to the millisecond, and
+   cannot sort them by `iid`. So the order of issues created in one
+   millisecond, an import's issues above all, is not visible. A cursor is
+   `p<page>.t<millisecond>.i<id>-<id>…`: GitLab's page, the millisecond of
+   the last issue considered, and the ids already considered at that
+   millisecond. A request reads GitLab's page again and skips every issue
+   before that millisecond and every id the cursor names, whatever their
+   order inside the page. When the page is empty, or starts on an issue the
+   cursor has not seen, an issue closed or deleted meanwhile may have pulled
+   unseen ones onto the page before, so it reads that page first. An issue
+   present throughout a traversal is therefore listed once, whatever page
+   sizes the caller asks for. The cursor keeps at most 48 ids: past 48
+   issues created in one millisecond at a page boundary, an issue may be
+   listed twice, never left out.
 
-9. **`assign` is offered; `link` and `claim` are not.** `assign` resolves each
+9. **A body is data, never a command.** GitLab runs a quick action from any
+   description line that starts with a slash (`/close`, `/label`, `/move`)
+   and stores the description without it, so a body could change a state
+   behind `transition` and its revision check. `create` and `update` insert a
+   zero-width space before such a slash; GitLab stores the line and runs
+   nothing, and a read removes the space, so a task's body is what the caller
+   wrote. A transition to `done` of an issue GitLab closed as a duplicate
+   first reopens it, which clears the duplicate link, then closes it. A label
+   named `None` or `Any`, keywords of GitLab's label filter, is matched by the
+   provider rather than sent.
+
+10. **`assign` is offered; `link` and `claim` are not.** `assign` resolves each
    username to a user id (`@me` is the credential's account) and replaces
    the assignees; GitLab keeps only one on a tier without multiple
    assignees, and the answer says who is assigned. GitLab's issue
@@ -120,6 +143,7 @@ wherever GitLab allows it, and departs from them only where GitLab differs.
 - Two concurrent creates with one key can each open an issue, and a key
   repeated after the account opened more than `keyScanPages` × 100 issues
   relies on GitLab's search to find the first one.
+- A pipeline with only its job token reads tasks and writes none.
 - A `canceled` task is a closed issue with a label: an issue someone closes
   in GitLab's interface without that label reads as `done`.
 - `bin/live-test` runs the contract scenarios against a real GitLab project
