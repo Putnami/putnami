@@ -231,7 +231,11 @@ credential never leaves its own instance or this machine.
   `unsupported` where the project never squashes; `merge` is served only
   where the project's merge method creates a merge commit and `rebase` only
   where it fast-forwards, both `unsupported` where the project always
-  squashes; nothing is sent then. No method leaves the choice to the project.
+  squashes; nothing is sent then. GitLab squashes by the merge request's own
+  squash flag, which the project's default sets on create, so a named method
+  first sets that flag; when the project or a protected branch's rule still
+  decides otherwise, `merge` is `unsupported` and merges nothing. No method
+  leaves the choice to the project.
 - **Revisions.** A proposal's revision covers the stored title, description,
   state, draft flag, base, head, head commit, labels and assignees; a note
   does not move it.
@@ -280,6 +284,7 @@ one key are not detected; sequential repeats are.
 | An approval given or withdrawn, then the review note failed | `unresolved`, `gitlab.incomplete`: repeat the review with the same key |
 | `merge` without `allowMerge` | `denied`, `merge.disabled`, nothing sent |
 | A merge request with more than 2,000 notes, or more than 500 for one base and head | `unavailable`, `gitlab.unbounded` |
+| A head commit with more than 1,000 commit statuses | The newest 1,000 decide; the checks' `detail` says the oldest were not read |
 
 ## Layout
 

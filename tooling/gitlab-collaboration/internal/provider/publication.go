@@ -140,6 +140,19 @@ func (s *proposalSession) complete(mr *glMergeRequest) (*glMergeRequest, *collab
 			// stays, and the answer lists who is assigned. When it held more,
 			// keeping one would drop the others, which is no addition.
 			kept := len(ids) == 1 && len(updated.Assignees) == 1 && updated.Assignees[0].ID == ids[0]
+			var removed []string
+			for _, user := range mr.Assignees {
+				if !slices.ContainsFunc(updated.Assignees, func(have glUser) bool { return have.ID == user.ID }) {
+					removed = append(removed, user.Username)
+				}
+			}
+			if len(removed) > 0 {
+				dropped := unresolved("reassign "+strings.Join(removed, ", ")+" in GitLab if needed; a repeat of proposals.upsert answers ok with the assignee GitLab kept",
+					"GitLab keeps one assignee on merge request !%d of %s: assigning %s kept %s and removed %s",
+					mr.IID, s.project.path, me.Username, strings.Join(updated.assigneeLogins(), ", "), strings.Join(removed, ", "))
+				dropped.Error.Reason = reasonIncomplete
+				return nil, dropped
+			}
 			if !kept && !slices.ContainsFunc(updated.Assignees, func(user glUser) bool { return user.ID == me.ID }) {
 				return nil, partial("assigning "+me.Username, "assignAuthor", collab.Fail(collab.OutcomeDenied, reasonForbidden, "GitLab did not assign %s", me.Username))
 			}

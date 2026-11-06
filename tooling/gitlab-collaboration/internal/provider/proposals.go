@@ -85,6 +85,18 @@ type glMergeRequest struct {
 	WebURL          string   `json:"web_url"`
 	UpdatedAt       string   `json:"updated_at"`
 	MergeError      string   `json:"merge_error"`
+	Squash          bool     `json:"squash"`
+	SquashOnMerge   *bool    `json:"squash_on_merge"`
+}
+
+// squashes reports whether GitLab squashes the merge request when it merges
+// it: squash_on_merge, which folds in the project's and its target branch's
+// rules, or the merge request's own flag where GitLab does not report it.
+func (m *glMergeRequest) squashes() bool {
+	if m.SquashOnMerge != nil {
+		return *m.SquashOnMerge
+	}
+	return m.Squash
 }
 
 func (m *glMergeRequest) head() string { return strings.ToLower(deref(m.SHA)) }

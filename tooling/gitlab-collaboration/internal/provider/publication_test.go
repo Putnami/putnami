@@ -121,7 +121,7 @@ func TestMergeSendsTheExpectedHead(t *testing.T) {
 	})
 	// A merge already done answers the merged proposal without a call.
 	h.ok("merge", h.merge(created.Proposal.Ref, ""), &merged)
-	if h.fake.count("PUT ") != 1 {
+	if h.fake.count("PUT /api/v4/projects/acme/platform/app/merge_requests/1/merge") != 1 {
 		t.Fatal("a merged merge request was merged again")
 	}
 	// A merge whose answer is lost is read back.
@@ -157,6 +157,12 @@ func TestAMovedHeadOrUnmergeableRequestIsAConflict(t *testing.T) {
 	failure = h.fails("merge", `{"ref":`+refJSON(created.Proposal.Ref)+`,"expectedHeadCommit":"`+fakeSHA(3)+`"}`, collab.OutcomeConflict)
 	if failure.Reason != reasonNotMergeable {
 		t.Fatalf("a merge GitLab answered with merge_error: %+v", failure)
+	}
+	// The same error the merge request already carried is no answer to this
+	// attempt: the merge request is read back.
+	failure = h.fails("merge", `{"ref":`+refJSON(created.Proposal.Ref)+`,"expectedHeadCommit":"`+fakeSHA(3)+`"}`, collab.OutcomeUnresolved)
+	if failure.Retryable || failure.Reconcile == "" {
+		t.Fatalf("a stale merge_error: %+v", failure)
 	}
 	h.mr(1, func(mr *fakeMR) { mr.state = "closed" })
 	failure = h.fails("merge", `{"ref":`+refJSON(created.Proposal.Ref)+`,"expectedHeadCommit":"`+fakeSHA(3)+`"}`, collab.OutcomeConflict)
@@ -226,6 +232,10 @@ func TestASingleAssigneeTierKeepsItsAssignee(t *testing.T) {
 	if failure.Reason != reasonIncomplete {
 		t.Fatalf("a dropped assignee: %+v", failure)
 	}
+	mustContain(t, failure.Message, "kept alice and removed bob")
+	if again := h.upsert(`{"change":` + topicChange + `,"title":"Single"}`); !slices.Equal(again.Proposal.Assignees, []string{"alice"}) {
+		t.Fatalf("a repeat answered %v", again.Proposal.Assignees)
+	}
 }
 
 func TestAScopedLabelKeyTheMergeRequestHasIsKept(t *testing.T) {
@@ -262,4 +272,32 @@ func TestASquashOptionTheProjectForbidsIsUnsupported(t *testing.T) {
 	}
 	var merged collab.ProposalResult
 	h.ok("merge", h.merge(created.Proposal.Ref, `,"method":"squash"`), &merged)
+}
+
+func TestTheMergeRequestSquashFlagFollowsTheMethod(t *testing.T) {
+	spectest.Proves(t, feature, "guarded-merge", "the-merge-request-squash-flag-follows-the-method")
+	h := newProposals(t, `"allowMerge":true`)
+	// A project that encourages squashing sets the flag on every create, and
+	// a merge call never clears it.
+	h.set(func(f *fakeGitLab) { f.squashOption = "default_on" })
+	created := h.upsert(`{"change":` + topicChange + `,"title":"Kept commits"}`)
+	var merged collab.ProposalResult
+	h.ok("merge", h.merge(created.Proposal.Ref, `,"method":"merge"`), &merged)
+	h.mr(1, func(mr *fakeMR) {
+		if mr.squashed || mr.squash {
+			t.Fatalf("a merge commit was squashed: flag %t", mr.squash)
+		}
+	})
+	// A protected branch's rule overrides the merge request's flag: nothing
+	// is merged.
+	h.branch("other", fakeSHA(2))
+	other := h.upsert(`{"change":{"base":"main","head":"other"},"title":"Squashed"}`)
+	h.set(func(f *fakeGitLab) { f.squashOption, f.branchSquash = "default_off", "never" })
+	failure := h.fails("merge", h.merge(other.Proposal.Ref, `,"method":"squash"`), collab.OutcomeUnsupported)
+	if failure.Reason != reasonMergeMethod {
+		t.Fatalf("a squash a branch rule forbids: %+v", failure)
+	}
+	if merges := h.fake.count("PUT /api/v4/projects/acme/platform/app/merge_requests/2/merge"); merges != 0 {
+		t.Fatalf("an overridden method merged %d times", merges)
+	}
 }

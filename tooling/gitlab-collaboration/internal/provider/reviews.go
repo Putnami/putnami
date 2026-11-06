@@ -247,11 +247,12 @@ func checkState(status *glCommitStatus) collab.CheckState {
 	return collab.CheckStatePending
 }
 
-// checks reads the commit statuses GitLab keeps for a commit and keeps the
-// latest of each name, by id: GitLab lists the statuses of every pipeline of
-// the commit and hides only jobs retried within one. It summarizes them: failing when any fails, pending when any is
-// not finished, passing when every one passed or was skipped, none when
-// there is none.
+// checks reads the commit statuses GitLab keeps for a commit, newest first
+// and at most maxCheckPages pages, and keeps the latest of each name, by id:
+// GitLab lists the statuses of every pipeline of the commit and hides only
+// jobs retried within one. It summarizes them: failing when any fails,
+// pending when any is not finished, passing when every one passed or was
+// skipped, none when there is none.
 func (s *proposalSession) checks(sha string) (collab.Checks, *collab.Failure) {
 	summary := collab.Checks{State: collab.ChecksStateNone, Commit: token(sha)}
 	if sha == "" {
@@ -261,7 +262,7 @@ func (s *proposalSession) checks(sha string) (collab.Checks, *collab.Failure) {
 	latest := map[string]glCommitStatus{}
 	truncated := false
 	for page := 1; page <= maxCheckPages; page++ {
-		query := url.Values{"per_page": {strconv.Itoa(gitlabPageSize)}, "page": {strconv.Itoa(page)}}
+		query := url.Values{"order_by": {"id"}, "sort": {"desc"}, "per_page": {strconv.Itoa(gitlabPageSize)}, "page": {strconv.Itoa(page)}}
 		var statuses []glCommitStatus
 		header, err := s.client.Get(s.ctx, s.project.apiPath("repository", "commits", sha, "statuses"), query, &statuses)
 		if err != nil {
@@ -305,7 +306,7 @@ func (s *proposalSession) checks(sha string) (collab.Checks, *collab.Failure) {
 		items = items[:collab.MaxListMembers]
 	}
 	if truncated {
-		summary.Detail = strings.TrimSpace(summary.Detail + fmt.Sprintf(" GitLab reports more than %d statuses for %s; the newest beyond them were not read.",
+		summary.Detail = strings.TrimSpace(summary.Detail + fmt.Sprintf(" GitLab reports more than %d statuses for %s; the oldest beyond the newest of them were not read.",
 			maxCheckPages*gitlabPageSize, sha))
 	}
 	summary.Items = items

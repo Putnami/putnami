@@ -70,7 +70,19 @@ func (s *proposalSession) merge(input any) (any, *collab.Failure) {
 			return nil, collab.Fail(collab.OutcomeUnsupported, reasonMergeMethod,
 				"%s merges with GitLab's %q method, which does not %s; nothing was sent", s.project.path, about.MergeMethod, describeMethod(in.Method))
 		}
-		request["squash"] = in.Method == collab.MergeMethodSquash
+		needed := in.Method == collab.MergeMethodSquash
+		if mr.squashes() != needed {
+			flagged, failure := s.setSquash(mr, needed)
+			if failure != nil {
+				return nil, failure
+			}
+			if flagged.squashes() != needed {
+				return nil, collab.Fail(collab.OutcomeUnsupported, reasonMergeMethod,
+					"merge request !%d was set to squash %t, and GitLab still squashes it %t: a rule of %s or of its target branch decides; nothing was merged",
+					mr.IID, needed, flagged.squashes(), s.project.path)
+			}
+		}
+		request["squash"] = needed
 	}
 	if s.settings.RemoveSourceBranch {
 		request["should_remove_source_branch"] = true
@@ -109,6 +121,30 @@ func (s *proposalSession) merge(input any) (any, *collab.Failure) {
 	}
 	return nil, unresolved("read the proposal with proposals.status before any retry",
 		"merging merge request !%d may have happened (%s), and reading it back did not show it merged", mr.IID, message)
+}
+
+// setSquash sets a merge request's squash flag, which GitLab decides a
+// merge by and a merge call never clears, and answers the merge request as
+// GitLab then reports it.
+func (s *proposalSession) setSquash(mr *glMergeRequest, squash bool) (*glMergeRequest, *collab.Failure) {
+	var updated glMergeRequest
+	err := s.client.Write(s.ctx, http.MethodPut, s.project.apiPath("merge_requests", strconv.Itoa(mr.IID)), map[string]any{"squash": squash}, &updated)
+	if err == nil {
+		return &updated, nil
+	}
+	if err.Kind != gitlab.Uncertain {
+		return nil, fail(err, "set the squash flag of merge request !%d", mr.IID)
+	}
+	var current *glMergeRequest
+	if s.reconcile(func() (bool, *collab.Failure) {
+		read, failure := s.readMergeRequest(mr.IID)
+		current = read
+		return failure == nil && read.squashes() == squash, failure
+	}) {
+		return current, nil
+	}
+	return nil, unresolved("read the proposal with proposals.status, then repeat proposals.merge",
+		"setting the squash flag of merge request !%d may have happened (%s), and reading it back did not show it; nothing was merged", mr.IID, err.Message)
 }
 
 func describeMethod(method collab.MergeMethod) string {

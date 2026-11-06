@@ -43,6 +43,23 @@ type fakeMR struct {
 	notes        []*fakeNote
 	squashed     bool
 	removeSource bool
+	// squash is the merge request's own squash flag.
+	squash     bool
+	mergeError string
+}
+
+// squashOnMerge is whether GitLab squashes the merge request: a branch rule,
+// then the project's always or never, then the merge request's own flag.
+func (f *fakeGitLab) squashOnMerge(mr *fakeMR) bool {
+	for _, option := range []string{f.branchSquash, f.squashOption} {
+		switch option {
+		case "always":
+			return true
+		case "never":
+			return false
+		}
+	}
+	return mr.squash
 }
 
 type fakeNote struct {
@@ -108,7 +125,11 @@ func (f *fakeGitLab) routeProposals(w http.ResponseWriter, r *http.Request, path
 	}
 	if match := statusesRoute.FindStringSubmatch(path); match != nil && r.Method == http.MethodGet {
 		if f.project(w, match[1]) {
-			f.page(w, r.URL.Query(), f.statuses[match[2]])
+			statuses := slices.Clone(f.statuses[match[2]])
+			if r.URL.Query().Get("sort") == "desc" {
+				slices.Reverse(statuses)
+			}
+			f.page(w, r.URL.Query(), statuses)
 		}
 		return true
 	}
@@ -223,7 +244,8 @@ func (f *fakeGitLab) renderMR(mr *fakeMR) map[string]any {
 	return map[string]any{
 		"id": mr.id, "iid": mr.iid, "project_id": f.projectID, "source_project_id": mr.sourceProject, "target_project_id": f.projectID,
 		"title": mr.title, "description": description, "state": mr.state, "draft": mr.draft(), "work_in_progress": mr.draft(),
-		"source_branch": mr.source, "target_branch": mr.target, "sha": sha, "labels": append([]string{}, mr.labels...),
+		"source_branch": mr.source, "target_branch": mr.target, "sha": sha, "squash": mr.squash, "squash_on_merge": f.squashOnMerge(mr),
+		"merge_error": nilIfEmpty(mr.mergeError), "labels": append([]string{}, mr.labels...),
 		"assignees": assignees, "author": f.user(mr.author),
 		"web_url":    fmt.Sprintf("https://%s/%s/-/merge_requests/%d", fakeHost, f.path, mr.iid),
 		"created_at": mr.created.UTC().Format("2006-01-02T15:04:05.000Z07:00"), "updated_at": mr.updated.UTC().Format("2006-01-02T15:04:05.000Z07:00"),
@@ -373,6 +395,8 @@ func (f *fakeGitLab) createMR(w http.ResponseWriter, r *http.Request) {
 	}
 	mr := f.newMR(edit.SourceBranch, edit.TargetBranch, *edit.Title, f.me, f.projectID)
 	mr.sha = sha
+	// A create without squash takes the project's default.
+	mr.squash = edit.Squash != nil && *edit.Squash || edit.Squash == nil && (f.squashOption == "always" || f.squashOption == "default_on")
 	mr.description = f.mrQuickActions(mr, deref(edit.Description))
 	writeJSON(w, http.StatusCreated, f.renderMR(mr))
 }
@@ -411,6 +435,9 @@ func (f *fakeGitLab) editMR(w http.ResponseWriter, r *http.Request, mr *fakeMR) 
 			mr.labels = splitLabels(strings.Join(mr.labels, ",") + "," + label)
 		}
 	}
+	if edit.Squash != nil {
+		mr.squash = *edit.Squash
+	}
 	if edit.AssigneeIDs != nil {
 		mr.assignees = nil
 		for _, id := range *edit.AssigneeIDs {
@@ -441,16 +468,26 @@ func (f *fakeGitLab) mergeMR(w http.ResponseWriter, r *http.Request, mr *fakeMR)
 		return
 	}
 	if f.mergeError != "" {
-		rendered := f.renderMR(mr)
-		rendered["merge_error"] = f.mergeError
-		writeJSON(w, http.StatusOK, rendered)
+		mr.mergeError = f.mergeError
+		writeJSON(w, http.StatusOK, f.renderMR(mr))
 		return
 	}
+	// The merge call sets the flag only when it asks to squash.
+	if edit.Squash != nil && *edit.Squash {
+		mr.squash = true
+	}
 	mr.state = "merged"
-	mr.squashed = edit.Squash != nil && *edit.Squash
+	mr.squashed = f.squashOnMerge(mr)
 	mr.removeSource = edit.RemoveSourceBranch != nil && *edit.RemoveSourceBranch
 	if mr.removeSource {
 		delete(f.branches, mr.source)
 	}
 	writeJSON(w, http.StatusOK, f.renderMR(mr))
+}
+
+func nilIfEmpty(value string) any {
+	if value == "" {
+		return nil
+	}
+	return value
 }
