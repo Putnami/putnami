@@ -49,6 +49,11 @@
       "status": "preview"
     },
     {
+      "id": "@putnami/codehost-protocol",
+      "kind": "package",
+      "status": "preview"
+    },
+    {
       "id": "@putnami/contributor",
       "kind": "package",
       "status": "preview",
@@ -389,6 +394,11 @@
     },
     {
       "id": "go.putnami.dev/protocol/clientcontract",
+      "kind": "protocol",
+      "status": "preview"
+    },
+    {
+      "id": "go.putnami.dev/protocol/codehost",
       "kind": "protocol",
       "status": "preview"
     },

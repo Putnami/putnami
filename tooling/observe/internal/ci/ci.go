@@ -16,14 +16,15 @@ import (
 	"strconv"
 	"strings"
 
+	"go.putnami.dev/protocol/codehost"
 	diag "go.putnami.dev/protocol/diagnostic"
 )
 
-// Code hosts.
+// Code hosts: the slugs of the codehost protocol.
 const (
-	ProviderGitHub  = "github"
-	ProviderGitLab  = "gitlab"
-	ProviderGeneric = "generic"
+	ProviderGitHub  = codehost.GitHub
+	ProviderGitLab  = codehost.GitLab
+	ProviderGeneric = codehost.Generic
 )
 
 // CI systems.

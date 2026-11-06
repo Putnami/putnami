@@ -125,6 +125,7 @@ func authoredProtocolsDomain() *arch.Builder {
 			"/protocols/ci",
 			"/protocols/cli",
 			"/protocols/clientcontract",
+			"/protocols/codehost",
 			"/protocols/collaboration",
 			"/protocols/config",
 			"/protocols/contracts",

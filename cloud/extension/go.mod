@@ -58,6 +58,7 @@ require (
 	go.putnami.dev/logger v0.0.1 // indirect
 	go.putnami.dev/migration v0.0.0 // indirect
 	go.putnami.dev/protocol/capabilities v0.0.0 // indirect
+	go.putnami.dev/protocol/codehost v0.0.0 // indirect
 	go.putnami.dev/protocol/database v0.0.0 // indirect
 	go.putnami.dev/protocol/events v0.0.0 // indirect
 	go.putnami.dev/protocol/gomod v0.0.0 // indirect
@@ -129,6 +130,8 @@ replace go.putnami.dev/protocol/ci => ../../protocols/ci
 replace go.putnami.dev/protocol/cli => ../../protocols/cli
 
 replace go.putnami.dev/protocol/clientcontract => ../../protocols/clientcontract
+
+replace go.putnami.dev/protocol/codehost => ../../protocols/codehost
 
 replace go.putnami.dev/protocol/config => ../../protocols/config
 

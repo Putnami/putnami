@@ -1,0 +1,11 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-specs-baseline.json",
+  "protocolVersion": 2,
+  "executableRequirements": [
+    "codehost/code-host-vocabulary#a-closed-slug-set",
+    "codehost/code-host-vocabulary#each-host-names-its-change-request",
+    "codehost/code-host-vocabulary#hosted-slugs-name-their-public-host",
+    "codehost/code-host-vocabulary#one-vocabulary-document",
+    "codehost/code-host-vocabulary#the-putnami-note-is-marked"
+  ]
+}

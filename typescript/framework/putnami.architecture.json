@@ -7,6 +7,7 @@
     "/typescript/framework/analytics",
     "/typescript/framework/application",
     "/typescript/framework/cli-protocol",
+    "/typescript/framework/codehost-protocol",
     "/typescript/framework/client",
     "/typescript/framework/database",
     "/typescript/framework/document",
@@ -149,6 +150,11 @@
           "kind": "project-dependency",
           "consumerProject": "/typescript/framework/cli-protocol",
           "producerProject": "/protocols/qualify"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/typescript/framework/codehost-protocol",
+          "producerProject": "/protocols/codehost"
         },
         {
           "kind": "project-dependency",

@@ -13,6 +13,7 @@ import (
 	"slices"
 	"strings"
 
+	"go.putnami.dev/protocol/codehost"
 	diag "go.putnami.dev/protocol/diagnostic"
 	"go.putnami.dev/tooling/observe/internal/analyze"
 	"go.putnami.dev/tooling/observe/internal/ci"
@@ -246,11 +247,7 @@ func commitDetail(s ci.Subject) string {
 		parts = append(parts, "on "+s.Branch)
 	}
 	if s.ChangeRequest != nil {
-		kind := "pull request"
-		if s.Provider == ci.ProviderGitLab {
-			kind = "merge request"
-		}
-		parts = append(parts, fmt.Sprintf("%s #%d", kind, s.ChangeRequest.Number))
+		parts = append(parts, codehost.ChangeRequestLabel(s.Provider, s.ChangeRequest.Number))
 	}
 	if len(parts) == 0 {
 		return ""

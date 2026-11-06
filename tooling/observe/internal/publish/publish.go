@@ -18,6 +18,7 @@ import (
 	"strings"
 	"time"
 
+	"go.putnami.dev/protocol/codehost"
 	diag "go.putnami.dev/protocol/diagnostic"
 	"go.putnami.dev/tooling/observe/internal/ci"
 	"go.putnami.dev/tooling/observe/internal/observe"
@@ -25,8 +26,9 @@ import (
 
 const (
 	// Marker is the first line of the summary note: the next run finds the
-	// note by it. Markdown renders it as nothing.
-	Marker = "<!-- putnami-observe:summary -->"
+	// note by it. Markdown renders it as nothing. The codehost protocol owns
+	// it, so every reader finds the same note.
+	Marker = codehost.NoteMarker
 	// StatusName is the context (GitHub) or name (GitLab) of the commit
 	// status.
 	StatusName = "putnami/observe"
@@ -176,10 +178,7 @@ func failed(format string, args ...any) []diag.Diagnostic {
 }
 
 func label(provider string, number int) string {
-	if provider == ci.ProviderGitLab {
-		return fmt.Sprintf("merge request !%d", number)
-	}
-	return fmt.Sprintf("pull request #%d", number)
+	return codehost.ChangeRequestLabel(provider, number)
 }
 
 // runURL keeps an https run page without credentials, the only link a

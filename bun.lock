@@ -111,6 +111,13 @@
         "@putnami/utils": "workspace:*",
       },
     },
+    "typescript/framework/codehost-protocol": {
+      "name": "@putnami/codehost-protocol",
+      "version": "0.0.0",
+      "devDependencies": {
+        "@putnami/spectest": "workspace:*",
+      },
+    },
     "typescript/framework/database": {
       "name": "@putnami/database",
       "version": "0.0.0",
@@ -514,6 +521,8 @@
     "@putnami/client": ["@putnami/client@workspace:typescript/framework/client"],
 
     "@putnami/cloud": ["@putnami/cloud@workspace:cloud/runtime/typescript"],
+
+    "@putnami/codehost-protocol": ["@putnami/codehost-protocol@workspace:typescript/framework/codehost-protocol"],
 
     "@putnami/database": ["@putnami/database@workspace:typescript/framework/database"],
 

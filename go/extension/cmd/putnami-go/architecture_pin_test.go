@@ -334,6 +334,7 @@ func authoredExtensionProvidersDomain() *arch.Builder {
 				arch.Bind("/tooling/observe", "/protocols/architecture"),
 				arch.Bind("/tooling/observe", "/protocols/capabilities"),
 				arch.Bind("/tooling/observe", "/protocols/cli"),
+				arch.Bind("/tooling/observe", "/protocols/codehost"),
 				arch.Bind("/tooling/observe", "/protocols/collaboration"),
 				arch.Bind("/tooling/observe", "/protocols/database"),
 				arch.Bind("/tooling/observe", "/protocols/diagnostic"),

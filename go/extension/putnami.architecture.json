@@ -1198,6 +1198,11 @@
         {
           "kind": "project-dependency",
           "consumerProject": "/tooling/observe",
+          "producerProject": "/protocols/codehost"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/observe",
           "producerProject": "/protocols/collaboration"
         },
         {

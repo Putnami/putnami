@@ -43,6 +43,7 @@
     "typescript/framework/application",
     "typescript/framework/cli-protocol",
     "typescript/framework/client",
+    "typescript/framework/codehost-protocol",
     "typescript/framework/database",
     "typescript/framework/document",
     "typescript/framework/events",

@@ -1,0 +1,78 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-features.json",
+  "protocolVersion": 2,
+  "namespace": "codehost",
+  "features": [
+    {
+      "id": "codehost/code-host-vocabulary",
+      "type": "feature",
+      "name": "Code-host vocabulary",
+      "outcome": "Every Putnami surface that names a code host, a change request on it or the Putnami note on that request reads one slug set and one vocabulary, in Go and in TypeScript, so no two surfaces can disagree about a word or about which note is Putnami's.",
+      "owner": "protocols",
+      "target": "coded",
+      "requirements": [
+        {
+          "id": "a-closed-slug-set",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-slugs-are-github-gitlab-generic",
+              "the-typescript-slugs-are-github-gitlab-generic"
+            ]
+          }
+        },
+        {
+          "id": "one-vocabulary-document",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-schema-declares-the-go-members-and-slugs",
+              "the-go-table-is-the-document",
+              "the-typescript-table-is-the-document"
+            ]
+          }
+        },
+        {
+          "id": "each-host-names-its-change-request",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "every-label-fixture-gets-its-label",
+              "the-typescript-labels-match-the-fixtures"
+            ]
+          }
+        },
+        {
+          "id": "hosted-slugs-name-their-public-host",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-defaults-are-the-public-hosts",
+              "the-typescript-defaults-are-the-public-hosts"
+            ]
+          }
+        },
+        {
+          "id": "the-putnami-note-is-marked",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "every-note-fixture-is-recognized-as-listed",
+              "the-typescript-notes-match-the-fixtures"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}
