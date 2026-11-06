@@ -160,7 +160,8 @@ func joinDir(base, dir string) string {
 }
 
 // attributeTests gives each case of a JUnit report to a component: the one
-// that holds its test file, else the one of the Go package its suite names,
+// that holds its test file, else the one of the Go package its class or suite
+// names, else the one of the cargo-nextest test binary its class name names,
 // else the one that holds the report.
 //
 // The test file is the case's file, else its class name read as a path
@@ -196,6 +197,14 @@ func (r *Result) attributeTests(report reports.Report, result readers.TestReport
 					owner, ok = component, true
 					break
 				}
+			}
+		}
+		if !ok {
+			// cargo-nextest writes the test binary id as the class name. Only
+			// the class name is read, so another runner's suite named like a
+			// crate, such as a Jest describe title, is not given to it.
+			if _, component, found := m.set.LocateTestBinary(c.Classname); found {
+				owner, ok = component, true
 			}
 		}
 		if !ok && reportOwned {

@@ -60,11 +60,13 @@ A JUnit case goes to the first of:
    pytest's `rootdir`; see
    [the Python detector](07-python.md#reports).
 2. The component of the Go package its class or suite names
-   (`gotestsum --junitfile`), or of the crate whose package its class or
-   suite names as a cargo-nextest test binary: `pricing`,
-   `pricing::integration` or `api::bin/api`; see
-   [the Cargo detector](09-rust.md#reports).
-3. The component that holds the report.
+   (`gotestsum --junitfile`).
+3. The component of the crate whose package its class name names as a
+   cargo-nextest test binary: `pricing`, `pricing::integration` or
+   `api::bin/api`; see [the Cargo detector](09-rust.md#reports). A suite name
+   is not read for it, so another runner's suite named like a crate stays
+   with its report.
+4. The component that holds the report.
 
 A case that none of them places is counted in `observe.tests_unattributed`.
 

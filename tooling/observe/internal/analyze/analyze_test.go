@@ -206,6 +206,20 @@ func TestANextestCaseGoesToTheCrateItsBinaryNames(t *testing.T) {
 	}
 }
 
+func TestAGoJUnitReportV1CaseGoesToThePackageItsSuiteNames(t *testing.T) {
+	spectest.Proves(t, feature, "tests-and-coverage", "a-test-goes-to-the-component-of-its-file-else-of-its-report")
+	root, set := repository(t)
+	// go-junit-report v1 writes the last element of the import path as the
+	// class name and the whole path as the suite name.
+	write(t, root, map[string]string{"junit.xml": `<testsuites>
+		<testsuite name="example.com/svc"><testcase classname="svc" name="TestCalc"/></testsuite>
+	</testsuites>`})
+	r := Run(Input{Root: root, Set: set, Reports: []reports.Report{{Path: "junit.xml", Kind: reports.KindJUnit, Format: reports.FormatJUnit}}})
+	if got := tests(r); got["svc"].Passed != 1 || len(r.Diagnostics) != 0 {
+		t.Errorf("tests %+v, diagnostics %v", got, r.Diagnostics)
+	}
+}
+
 func TestAJestSuiteNamedLikeACrateStaysWithItsReport(t *testing.T) {
 	spectest.Proves(t, "tooling/observe-rust", "rust-report-discovery", "a-nextest-case-goes-to-the-crate-its-binary-names")
 	root := t.TempDir()

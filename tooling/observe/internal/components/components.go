@@ -42,10 +42,14 @@ type Component struct {
 type Found struct {
 	Components  []Component
 	Diagnostics []diag.Diagnostic
-	// Locate maps a name a report writes, a Go import path, an import path
-	// followed by a file name or a cargo-nextest test binary id, to its
-	// repository path and component. Nil for a detector that reads none.
+	// Locate maps a Go import path, or an import path followed by a file
+	// name, to its repository path and component. Nil for a detector that
+	// reads no import paths.
 	Locate func(importPath string) (file, component string, ok bool)
+	// LocateTestBinary maps a cargo-nextest test binary id, which a JUnit
+	// case writes as its class name, to its manifest and component. Nil for
+	// a detector that reads none.
+	LocateTestBinary func(id string) (file, component string, ok bool)
 	// Lockfile returns the ecosystem and the reader of a lockfile only this
 	// detector can read, such as a go.mod. Nil for a detector that reads none.
 	Lockfile func(file string) (ecosystem string, read LockReader, ok bool)
@@ -69,6 +73,7 @@ type Set struct {
 	Components  []Component
 	Diagnostics []diag.Diagnostic
 	locators    []func(string) (string, string, bool)
+	binaries    []func(string) (string, string, bool)
 	lockfiles   []func(string) (string, LockReader, bool)
 }
 
@@ -91,6 +96,9 @@ func Detect(root string, detectors []Detector) Set {
 		set.Diagnostics = append(set.Diagnostics, found.Diagnostics...)
 		if found.Locate != nil {
 			set.locators = append(set.locators, found.Locate)
+		}
+		if found.LocateTestBinary != nil {
+			set.binaries = append(set.binaries, found.LocateTestBinary)
 		}
 		if found.Lockfile != nil {
 			set.lockfiles = append(set.lockfiles, found.Lockfile)
@@ -146,11 +154,21 @@ func (s Set) Owner(file string) (string, bool) {
 	return best, found
 }
 
-// Locate maps a Go import path or a cargo-nextest test binary id to its
-// repository path and component, through the detectors that read them.
+// Locate maps a Go import path to its repository path and component, through
+// the detectors that read import paths.
 func (s Set) Locate(importPath string) (file, component string, ok bool) {
-	for _, locate := range s.locators {
-		if file, component, ok := locate(importPath); ok {
+	return s.locate(s.locators, importPath)
+}
+
+// LocateTestBinary maps a cargo-nextest test binary id to its manifest and
+// component, through the detectors that read them.
+func (s Set) LocateTestBinary(id string) (file, component string, ok bool) {
+	return s.locate(s.binaries, id)
+}
+
+func (s Set) locate(locators []func(string) (string, string, bool), name string) (file, component string, ok bool) {
+	for _, locate := range locators {
+		if file, component, ok := locate(name); ok {
 			if _, known := s.find(component); known {
 				return file, component, true
 			}

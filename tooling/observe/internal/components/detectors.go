@@ -159,7 +159,7 @@ func (CargoDetector) Detect(root string) Found {
 		}),
 	}
 	if len(result.Projects) > 0 {
-		found.Locate = cargo.Locator(result)
+		found.LocateTestBinary = cargo.Locator(result)
 	}
 	return found
 }
