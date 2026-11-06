@@ -123,10 +123,10 @@ Native finalization reads one thing from a binding: where the proposals
 provider publishes. An id-only `taskReference`, such as `Closes #{id}`, only
 closes the task when the proposal lands where the task lives, so the command
 renders it only when the proposals binding names the provider that issued the
-task and its settings locate the task's source: the code host of the source's
-kind, on the binding's `host` or that host's default, and the binding's
-`repository` or `project`. It names no provider. A binding that locates its
-proposals another way must use `{url}`.
+task, both bindings locate the same place, and that place spells the task's
+source. A place is the binding's `host`, or the default host of the source's
+code host, and its `repository` or `project`. It names no provider. A binding
+that locates its proposals another way must use `{url}`.
 
 Native finalization reads no other provider setting. Label copying and author
 assignment are provider settings, and the provider checks they took effect
@@ -163,8 +163,8 @@ every open proposal.
   a backend, and a second backend would need a second flag.
 - **Read the label and assignment settings of the proposals binding in
   finalization.** Puts provider vocabulary in neutral content; each provider
-  would need a reader. The location the id-only reference needs is the one
-  exception, and it reads the same two words on every code host.
+  would need a reader. The place the id-only reference needs is the one
+  exception, and it reads the same three keys on every code host.
 - **Recognize the id-only reference's source by provider name.** Every new
   provider would need a branch in the contributor; the location words and the
   code-host vocabulary already say where a binding publishes.
