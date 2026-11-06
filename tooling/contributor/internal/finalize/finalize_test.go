@@ -89,15 +89,15 @@ func (p *finalizerProvider) envelope(_ context.Context, contract, operation stri
 		for _, name := range names {
 			operations = append(operations, collab.OperationCapability{Name: name, Supported: true, Preconditions: collab.PreconditionsChecked})
 		}
-		capabilities := collab.Capabilities{Status: collab.BindingStatusBound, Operations: operations}
+		capabilities := collab.Capabilities{Status: collab.BindingStatusBound, Operations: operations,
+			Provider: &collab.ProviderIdentity{Name: "@acme/forge-collaboration"},
+			Binding:  &collab.Binding{Provider: "@acme/forge-collaboration", Version: 1, Settings: json.RawMessage(`{}`)}}
 		if contract == collab.ContractProposals {
 			repository := p.proposalRepository
 			if repository == "" {
 				repository = "acme/app"
 			}
-			settings, _ := json.Marshal(map[string]string{"repository": repository})
-			capabilities.Provider = &collab.ProviderIdentity{Name: "@putnami/github-collaboration"}
-			capabilities.Binding = &collab.Binding{Provider: "@putnami/github-collaboration", Version: 1, Settings: settings}
+			capabilities.Binding.Settings, _ = json.Marshal(map[string]string{"repository": repository})
 		}
 		return answer(capabilities)
 	}

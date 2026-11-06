@@ -281,7 +281,7 @@ func (f Finalizer) prepareProviders(ctx context.Context, c *publicationCandidate
 		return errors.New("tasks.get returned a different task reference")
 	}
 	c.task = found.Task
-	line, err := BoundTaskReference(c.policy, c.task, c.opts.PartialDelivery, c.proposalCaps)
+	line, err := BoundTaskReference(c.policy, c.task, c.opts.PartialDelivery, c.proposalCaps, c.taskCaps)
 	if err != nil {
 		return err
 	}
