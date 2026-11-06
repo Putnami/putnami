@@ -3,9 +3,9 @@
   "protocolVersion": 1,
   "feature": "tooling/observe-host-report",
   "outcomes": [
-    "A reviewer reads the change summary on the pull request or merge request, not in the CI log",
-    "A CI job adds --publish to putnami observe with a token the CI already holds, and gets a commit status and one summary note that the next run updates in place",
-    "A job without a token, or outside a pull or merge request, logs why it published nothing and still passes"
+    "A reviewer reads the change summary on the pull request or merge request, not in the CI log, and one click on it reaches the full report of the change",
+    "A CI job adds --upload --publish to putnami observe with the tokens it holds, and gets a commit status and one summary note that link to the full report, updated in place by the next run",
+    "A job without an upload, a failed upload, a missing code host token, or a job outside a pull or merge request logs why it published nothing and still passes"
   ],
   "nonGoals": [
     "Failing the commit status on a failed test or a low coverage: the status says the analysis ran",
@@ -16,11 +16,15 @@
   "requirements": [
     {
       "id": "publish-status",
-      "text": "With --publish, putnami observe sets the commit status putnami/observe to success on the head commit of a GitHub pull request, or on the commit of a GitLab merge request pipeline, CI_COMMIT_SHA, joined to that pipeline. Its description, at most 140 characters, counts the changed and dependent components, the changed-line coverage and the dependency changes, or says the base was not resolved, and the status links the CI run page."
+      "text": "With --publish, putnami observe sets the commit status putnami/observe to success on the head commit of a GitHub pull request, or on the commit of a GitLab merge request pipeline, CI_COMMIT_SHA, joined to that pipeline. Its description, at most 140 characters, counts the changed and dependent components, the changed-line coverage and the dependency changes, or says the base was not resolved. Its target_url is the report URL the evidence reporter answered, else the CI run page."
     },
     {
       "id": "publish-note",
-      "text": "With --publish, putnami observe writes one Markdown summary note on the pull or merge request whose first line is the hidden marker <!-- putnami-observe:summary -->. It updates the first note whose body starts with that marker and creates one when none does, so a second run updates the same note. A failed status call does not stop the note."
+      "text": "With --publish, putnami observe writes one Markdown summary note on the pull or merge request whose first line is the hidden marker <!-- putnami-observe:summary -->. The note keeps its summary, and its first link is the report URL the evidence reporter answered; without one it links the CI run page. It updates the first note whose body starts with that marker and creates one when none does, so a second run updates the same note. A failed status call does not stop the note."
+    },
+    {
+      "id": "publish-needs-upload",
+      "text": "--publish needs --upload: the note links the report the upload stored. Without --upload, --publish gives the info observe.publish_needs_upload and sends no request. When the upload fails, it gives the info observe.publish_skipped, which says the upload failed, and sends no request. putnami observe still exits 0."
     },
     {
       "id": "publish-host-endpoints",
@@ -28,7 +32,7 @@
     },
     {
       "id": "publish-fails-open",
-      "text": "--publish without the code host's token gives the warning observe.publish_token_missing; in a generic CI or outside a pull or merge request it gives the info observe.publish_skipped; neither sends a request. A refused or failed call, no GitLab API URL, an API URL that is not https, no commit to set the status on, or a run past one minute gives the warning observe.publish_failed. putnami observe still exits 0."
+      "text": "--publish with an upload but without the code host's token gives the warning observe.publish_token_missing; in a generic CI or outside a pull or merge request it gives the info observe.publish_skipped; neither sends a request. A refused or failed call, no GitLab API URL, an API URL that is not https, no commit to set the status on, or a run past one minute gives the warning observe.publish_failed. putnami observe still exits 0."
     }
   ],
   "decisions": [
