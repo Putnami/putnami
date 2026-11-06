@@ -699,7 +699,11 @@ def test_discount_out_of_range():
     "module_mapping": {},
     "overrides": null,
     "resolve": null,
-    "source": "requirements.txt",
+    "source_raw": "requirements.txt",
+    "sources": [
+      "3rdparty/python/requirements.txt"
+    ],
+    "sources_fingerprint": "b5d3c1d1e85bbbd4d2bbac3e3a8be0c9bb1d1a3d8cd1e3bdbd0ab0e60c1b5a3f",
     "tags": null,
     "type_stubs_module_mapping": {}
   },

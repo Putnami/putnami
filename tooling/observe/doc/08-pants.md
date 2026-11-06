@@ -33,8 +33,9 @@ BUILD file, `src/python/pricing`. `//` is the root. With the export, the
 component's source is `orchestrator`.
 
 A third-party target is no component: `python_requirement`,
-`python_requirements`, `poetry_requirements`, `pipenv_requirements`,
-`pants_requirements`, `go_mod`, `go_third_party_package`, `jvm_artifact` and
+`python_requirements`, `uv_requirements`, `poetry_requirements`,
+`pipenv_requirements`, `pants_requirements`, `go_mod`,
+`go_third_party_package`, `jvm_artifact`, `jvm_artifacts` and
 `node_third_party_package`. Neither is an internal target, whose type starts
 with `_`, such as a resolve's `_lockfiles`. A directory such as
 `3rdparty/python`, which holds only requirements, is therefore no component,
@@ -62,8 +63,10 @@ target other than a third-party or internal one is a component of source
 `workspace`, with no edge. The walk skips `dist`, `node_modules`,
 `__pycache__` and the directories whose name starts with `.`. A BUILD file
 that only sets `__defaults__` declares no target. The info diagnostic
-`observe.pants_graph_missing` names the export command. An export that is not
-a JSON array of targets, each with an `address`, is the warning
+`observe.pants_graph_missing` names the export command; it is a warning when
+`--pants-graph` named the missing file. `--pants-graph` in a repository
+without `pants.toml` is the warning `observe.pants_graph_unused`. An export
+that is not a JSON array of targets, each with an `address`, is the warning
 `observe.pants_graph_unreadable`, and the BUILD files answer instead.
 
 ## Reports
@@ -98,4 +101,5 @@ the version of each locked requirement of each locked resolve. A path that
 starts with `%(buildroot)s/` is read from the repository root; a path outside
 the repository is the warning `observe.pants_config_invalid`, and so is a
 `pants.toml` that does not parse. Without a `[python.resolves]` table, no
-Pants lockfile is read. JVM and Go resolves are not read.
+Pants lockfile is read, even with `enable_resolves = true` and the default
+`python-default` resolve: write the table to have its lockfile read. JVM and Go resolves are not read.

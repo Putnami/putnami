@@ -59,7 +59,8 @@ const export = `[
     "address": "3rdparty/python:reqs",
     "target_type": "python_requirements",
     "dependencies": ["3rdparty/python:reqs#fastapi", "3rdparty/python:reqs#pytest"],
-    "source": "requirements.txt"
+    "source_raw": "requirements.txt",
+    "sources": ["3rdparty/python/requirements.txt"]
   },
   {
     "address": "3rdparty/python:reqs#fastapi",
@@ -158,6 +159,8 @@ func TestAThirdPartyTargetIsNoComponent(t *testing.T) {
 		"pants.toml":                 pantsTOML,
 		"3rdparty/python/BUILD":      "python_requirements(\n    name=\"reqs\",\n)\n",
 		"3rdparty/python/BUILD.lock": "__defaults__(all=dict(resolve=\"python-default\"))\n_lockfiles()\n",
+		"3rdparty/uv/BUILD":          "uv_requirements(name=\"reqs\")\n",
+		"3rdparty/jvm/BUILD":         "jvm_artifacts(name=\"jvm\")\n",
 		"src/python/api/BUILD":       "python_sources()\n",
 	})
 	got := Detect(root, Options{}).Components
@@ -220,13 +223,16 @@ func TestBuildDirectoriesAreComponentsWithoutAnExport(t *testing.T) {
 func TestAMissingExportIsAnInfoDiagnostic(t *testing.T) {
 	spectest.Proves(t, feature, "pants-without-an-export", "a-missing-export-is-an-info-diagnostic")
 	root := writeTree(t, map[string]string{"pants.toml": pantsTOML, "src/python/api/BUILD": "python_sources()\n"})
-	for name, opts := range map[string]Options{
-		"default": {},
-		"named":   {GraphFile: filepath.Join(root, "dist", "graph.json")},
+	for name, want := range map[string]struct {
+		opts     Options
+		severity diag.Severity
+	}{
+		"default": {Options{}, diag.Info},
+		"named":   {Options{GraphFile: filepath.Join(root, "dist", "graph.json")}, diag.Warning},
 	} {
 		t.Run(name, func(t *testing.T) {
-			got := Detect(root, opts).Diagnostics
-			if len(got) != 1 || got[0].Code != CodeGraphMissing || got[0].Severity != diag.Info || !strings.Contains(got[0].Message, ExportCommand) {
+			got := Detect(root, want.opts).Diagnostics
+			if len(got) != 1 || got[0].Code != CodeGraphMissing || got[0].Severity != want.severity || !strings.Contains(got[0].Message, ExportCommand) {
 				t.Errorf("diagnostics %+v", got)
 			}
 		})
@@ -247,6 +253,12 @@ func TestThePantsGraphOptionNamesTheExport(t *testing.T) {
 		if len(got.Components) != 4 || got.Components[1].Source != evidence.SourceOrchestrator || len(got.Diagnostics) != 0 {
 			t.Errorf("%s: detection %+v", file, got)
 		}
+	}
+	// The flag in a repository without pants.toml reads nothing, and says so.
+	plain := writeTree(t, map[string]string{"dist/peek.json": export})
+	got := Detect(plain, Options{GraphFile: "dist/peek.json"})
+	if len(got.Components) != 0 || len(got.Diagnostics) != 1 || got.Diagnostics[0].Code != CodeGraphUnused || got.Diagnostics[0].Severity != diag.Warning {
+		t.Errorf("the flag without pants.toml: %+v", got)
 	}
 }
 

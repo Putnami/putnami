@@ -48,6 +48,7 @@ const ExportCommand = "pants peek :: > pants-graph.json"
 // Diagnostic codes.
 const (
 	CodeGraphMissing    = "observe.pants_graph_missing"
+	CodeGraphUnused     = "observe.pants_graph_unused"
 	CodeGraphUnreadable = "observe.pants_graph_unreadable"
 	CodeConfigInvalid   = "observe.pants_config_invalid"
 	CodeWalkBounded     = "observe.pants_walk_bounded"
@@ -64,12 +65,14 @@ const MaxGraphBytes = 512 << 20
 var thirdParty = map[string]bool{
 	"python_requirement":       true,
 	"python_requirements":      true,
+	"uv_requirements":          true,
 	"poetry_requirements":      true,
 	"pipenv_requirements":      true,
 	"pants_requirements":       true,
 	"go_mod":                   true,
 	"go_third_party_package":   true,
 	"jvm_artifact":             true,
+	"jvm_artifacts":            true,
 	"node_third_party_package": true,
 }
 
@@ -112,11 +115,16 @@ func (d Detection) IsLockfile(file string) bool {
 }
 
 // Detect reads the Pants repository at root. A root without pants.toml is no
-// Pants repository and gets an empty detection.
+// Pants repository and gets an empty detection, with a warning when the
+// caller named an export.
 func Detect(root string, opts Options) Detection {
 	var out Detection
 	config, err := os.ReadFile(filepath.Join(root, Marker))
 	if err != nil {
+		if opts.GraphFile != "" {
+			out.Diagnostics = []diag.Diagnostic{diag.Warningf(CodeGraphUnused, opts.GraphFile,
+				"--pants-graph names %s, but the repository root holds no %s, so no Pants export is read", opts.GraphFile, Marker)}
+		}
 		return out
 	}
 	out.Lockfiles, out.Diagnostics = resolves(config)
@@ -128,7 +136,7 @@ func Detect(root string, opts Options) Detection {
 	if !filepath.IsAbs(file) {
 		file = filepath.Join(root, filepath.FromSlash(file))
 	}
-	components, diags, ok := fromGraph(root, file, graphFile)
+	components, diags, ok := fromGraph(root, file, graphFile, opts.GraphFile != "")
 	out.Diagnostics = append(out.Diagnostics, diags...)
 	if !ok {
 		components, diags = fromBuildFiles(root)
@@ -149,12 +157,17 @@ type target struct {
 }
 
 // fromGraph reads the export at file, named graphFile in diagnostics. It
-// reports ok=false when there is no usable export.
-func fromGraph(root, file, graphFile string) ([]Component, []diag.Diagnostic, bool) {
+// reports ok=false when there is no usable export. A missing export is an info
+// diagnostic, and a warning when the caller named it.
+func fromGraph(root, file, graphFile string, named bool) ([]Component, []diag.Diagnostic, bool) {
 	info, err := os.Stat(file)
 	if errors.Is(err, fs.ErrNotExist) {
+		severity := diag.Info
+		if named {
+			severity = diag.Warning
+		}
 		return nil, []diag.Diagnostic{{
-			Severity: diag.Info, Code: CodeGraphMissing, Field: graphFile,
+			Severity: severity, Code: CodeGraphMissing, Field: graphFile,
 			Message: fmt.Sprintf("no Pants export at %s, so the components have no edge: write it in the CI with `%s`, or name it with --pants-graph", graphFile, ExportCommand),
 		}}, false
 	}
