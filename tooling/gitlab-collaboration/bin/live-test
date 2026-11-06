@@ -5,8 +5,10 @@
 # The project must be a disposable test project whose description carries
 # putnami-collaboration-live-test: the run opens, edits and closes issues
 # there, and deletes the issues it opened when it ends, or closes them when
-# the account may not delete issues. The test refuses any project without
-# that marker.
+# the account may not delete issues. It also creates branches one commit
+# ahead of the default branch, opens and reviews merge requests from them,
+# and closes those merge requests and deletes the branches when it ends. The
+# test refuses any project without that marker.
 set -euo pipefail
 
 if [ "$#" -lt 1 ] || [ "$#" -gt 2 ] || [ "$1" = "--help" ] || [ "$1" = "-h" ]; then

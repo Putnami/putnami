@@ -56,6 +56,23 @@ type fakeGitLab struct {
 	queries []string
 	// onList, when set, runs before a list request is answered.
 	onList func()
+
+	mrs       map[int]*fakeMR
+	nextMRIID int
+	// branches maps each branch of the project to its commit.
+	branches map[string]string
+	// statuses holds the rendered commit statuses of each commit.
+	statuses    map[string][]any
+	mergeMethod string
+	// authorMayApprove lets the author of a merge request approve it.
+	authorMayApprove bool
+	// unmergeable makes GitLab refuse every merge.
+	unmergeable bool
+	// foreign holds the labels of the issues of other projects, by
+	// lowercase project path and iid.
+	foreign map[string]map[int][]string
+	// mergeRequests records the body of every merge call.
+	mergeRequests []fakeMREdit
 }
 
 type fakeIssue struct {
@@ -102,6 +119,8 @@ func newFakeGitLab(t *testing.T) *fakeGitLab {
 		users:  map[int64]string{botID: "bot", otherID: "someone", 9: "alice", 10: "bob"},
 		clock:  time.Date(2026, 9, 24, 8, 0, 0, 0, time.UTC),
 		nextID: 5000, nextIID: 1, issues: map[int]*fakeIssue{},
+		mrs: map[int]*fakeMR{}, nextMRIID: 1, branches: map[string]string{"main": fakeSHA(1)}, statuses: map[string][]any{},
+		mergeMethod: "merge", foreign: map[string]map[int][]string{},
 	}
 	f.server = httptest.NewServer(f)
 	t.Cleanup(f.server.Close)
@@ -222,6 +241,9 @@ func (f *fakeGitLab) route(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 		writeJSON(w, http.StatusOK, append([]any{}, found...))
+		return
+	}
+	if f.routeProposals(w, r, path) {
 		return
 	}
 	if match := issuesRoute.FindStringSubmatch(path); match != nil {

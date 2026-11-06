@@ -39,7 +39,7 @@ func (p *Provider) taskHandler(run func(*taskSession, any) (any, *collab.Failure
 		}
 		ctx, cancel := p.budget(ctx)
 		defer cancel()
-		s, failure := p.open(ctx, settings)
+		s, failure := p.open(ctx, settings.Project, settings.Host)
 		if failure != nil {
 			return nil, failure
 		}

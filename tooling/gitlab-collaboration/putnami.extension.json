@@ -103,6 +103,42 @@
           "preconditions": "checked"
         }
       }
+    },
+    "proposals": {
+      "version": 1,
+      "command": "{extensionRuntime}",
+      "args": [
+        "provider"
+      ],
+      "cwd": "{workspaceRoot}",
+      "timeoutMs": 120000,
+      "operations": {
+        "find": {
+          "description": "Find the merge requests of an exact base and head in the bound GitLab project, by iid; head is a branch of the project, and a fork's branch is not served. A headCommit the branch already points at is awaited on an open merge request.",
+          "openWorld": true
+        },
+        "upsert": {
+          "description": "Update the open merge request of an exact base and head, or open it. GitLab keeps one open merge request per source and target branch, so a repeated or concurrent upsert never opens a second. A draft is the title prefix Draft:, which a proposal's title never shows; a requested title with a draft prefix is invalid. A requested headCommit must be the commit the branch points at. expectedRevision is compared with the merge request read just before the write. settings.assignAuthor adds the account's assignment; settings.inheritLabelPrefixes copies matching labels from the issues the description names in GitLab references (#12, project#12, group/project#12, issue URLs on the bound host). The answer lists the merge request's assignees and labels.",
+          "openWorld": true,
+          "preconditions": "checked"
+        },
+        "status": {
+          "description": "Read a merge request, the commit statuses of its head commit (pipeline jobs and external statuses), its review notes and its current approvals.",
+          "openWorld": true
+        },
+        "review": {
+          "description": "Publish a review as a note on a merge request that records its verdict, commit and idempotency key in hidden comments: a repeated key returns the note it posted, and a note whose outcome is unknown is read back and answered unresolved rather than posted twice. approve first approves the merge request at the reviewed head; request_changes first withdraws the account's approval, and GitLab blocks nothing on its note.",
+          "openWorld": true
+        },
+        "comments": {
+          "description": "List the notes people wrote on a merge request by note id, never a system note: a review note's body without its hidden comments, naming itself as its review, each diff note with its path, its line in the new file and the head commit it was written on, and each discussion note.",
+          "openWorld": true
+        },
+        "merge": {
+          "description": "Merge a merge request whose head is still the expected commit, sent as GitLab's sha. Refused before anything is sent unless settings.allowMerge is true; binding this provider authorizes nobody to merge. squash asks GitLab to squash; merge and rebase are served only where the project's merge method creates a merge commit or fast-forwards. settings.removeSourceBranch deletes the source branch in the merge call itself.",
+          "openWorld": true
+        }
+      }
     }
   }
 }

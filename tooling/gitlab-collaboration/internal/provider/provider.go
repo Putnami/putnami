@@ -1,6 +1,6 @@
-// Package provider implements the tasks contract of
+// Package provider implements the tasks and proposals contracts of
 // go.putnami.dev/protocol/collaboration on GitLab: tasks are the issues of
-// one project.
+// one project, and proposals its merge requests.
 //
 // Every operation sends its requests through the GitLab REST API v4 with the
 // credential glab would use. A write is sent once. When its outcome is
@@ -45,6 +45,10 @@ type Provider struct {
 	// ReconcilePause waits before read-back attempt n (1-based) after the
 	// first. The default waits 1s, then 2s.
 	ReconcilePause func(ctx context.Context, attempt int) error
+	// HeadLagPause waits before re-read n (1-based) of a merge request whose
+	// head has not caught up with its branch yet. The default waits 1s, 2s,
+	// 3s, then 4s.
+	HeadLagPause func(ctx context.Context, attempt int) error
 	// Budget bounds one operation, every request included. Default 100s,
 	// below the manifest's provider timeout, so the provider answers before
 	// the orchestrator gives up on it.
@@ -64,13 +68,22 @@ func (p *Provider) Handlers() map[collab.OperationKey]collab.Handler {
 	key := func(operation string) collab.OperationKey {
 		return collab.OperationKey{Contract: collab.ContractTasks, Version: 1, Operation: operation}
 	}
+	proposal := func(operation string) collab.OperationKey {
+		return collab.OperationKey{Contract: collab.ContractProposals, Version: 1, Operation: operation}
+	}
 	return map[collab.OperationKey]collab.Handler{
-		key(collab.OperationFind):       p.taskHandler((*taskSession).find),
-		key(collab.OperationGet):        p.taskHandler((*taskSession).get),
-		key(collab.OperationCreate):     p.taskHandler((*taskSession).create),
-		key(collab.OperationUpdate):     p.taskHandler((*taskSession).update),
-		key(collab.OperationTransition): p.taskHandler((*taskSession).transition),
-		key(collab.OperationAssign):     p.taskHandler((*taskSession).assign),
+		key(collab.OperationFind):          p.taskHandler((*taskSession).find),
+		key(collab.OperationGet):           p.taskHandler((*taskSession).get),
+		key(collab.OperationCreate):        p.taskHandler((*taskSession).create),
+		key(collab.OperationUpdate):        p.taskHandler((*taskSession).update),
+		key(collab.OperationTransition):    p.taskHandler((*taskSession).transition),
+		key(collab.OperationAssign):        p.taskHandler((*taskSession).assign),
+		proposal(collab.OperationFind):     p.proposalHandler((*proposalSession).find),
+		proposal(collab.OperationUpsert):   p.proposalHandler((*proposalSession).upsert),
+		proposal(collab.OperationStatus):   p.proposalHandler((*proposalSession).status),
+		proposal(collab.OperationReview):   p.proposalHandler((*proposalSession).review),
+		proposal(collab.OperationComments): p.proposalHandler((*proposalSession).comments),
+		proposal(collab.OperationMerge):    p.proposalHandler((*proposalSession).merge),
 	}
 }
 
@@ -106,8 +119,8 @@ type session struct {
 }
 
 // open resolves the project and the client of a call.
-func (p *Provider) open(ctx context.Context, settings TaskSettings) (*session, *collab.Failure) {
-	project, failure := parseProject(settings.Project, settings.Host)
+func (p *Provider) open(ctx context.Context, projectPath, host string) (*session, *collab.Failure) {
+	project, failure := parseProject(projectPath, host)
 	if failure != nil {
 		return nil, failure
 	}
@@ -161,6 +174,18 @@ const (
 	reasonLabelComma      = "label.comma"
 	reasonUnknownUser     = "assignee.unknown"
 	reasonKeyUnverifiable = "idempotency.unverifiable"
+	reasonRepository      = "repository.other"
+	reasonHeadFork        = "head.fork"
+	reasonHeadMoved       = "head.moved"
+	reasonHeadLagging     = "head.lagging"
+	reasonHeadMissing     = "head.missing"
+	reasonTitleDraft      = "title.draft"
+	reasonCommit          = "commit.invalid"
+	reasonTooManyItems    = "gitlab.unbounded"
+	reasonNotMergeable    = "merge.not_mergeable"
+	reasonMergeDisabled   = "merge.disabled"
+	reasonMergeMethod     = "merge.method"
+	reasonMerging         = "merge.in_progress"
 )
 
 // fail renders a failed request as the contract outcome it proves. A request
@@ -328,7 +353,12 @@ func (p project) iid(ref collab.Ref) (int, bool) {
 // missing explains why a reference names nothing here, and names this
 // project's source when the reference spells it in another casing.
 func (p project) missing(ref collab.Ref) string {
-	message := fmt.Sprintf("no task %s in source %s", ref.ID, ref.Source)
+	return p.missingAs("task", ref)
+}
+
+// missingAs is missing for an item of another kind.
+func (p project) missingAs(kind string, ref collab.Ref) string {
+	message := fmt.Sprintf("no %s %s in source %s", kind, ref.ID, ref.Source)
 	if ref.Source != p.source && strings.EqualFold(ref.Source, p.source) {
 		message += fmt.Sprintf("; this provider issues the source as %s", p.source)
 	}

@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -30,11 +31,13 @@ const (
 // marked as a disposable test project.
 const liveProjectMarker = "putnami-collaboration-live-test"
 
-// TestLiveGitLab runs the shared tasks scenarios against a real GitLab
-// project with the credential glab or GITLAB_TOKEN provides. When it ends,
-// passed or failed, it deletes every issue the credential's account opened in
-// the project during the run, or closes it when the account may not delete
-// issues. Run it with bin/live-test.
+// TestLiveGitLab runs the shared tasks and proposals scenarios against a real
+// GitLab project with the credential glab or GITLAB_TOKEN provides. Each
+// proposal scenario gets two fresh branches, one commit ahead of the default
+// branch. When it ends, passed or failed, it deletes every issue the
+// credential's account opened in the project during the run, or closes it
+// when the account may not delete issues, closes every merge request from a
+// branch of the run and deletes those branches. Run it with bin/live-test.
 func TestLiveGitLab(t *testing.T) {
 	project, host := os.Getenv(liveProjectVariable), os.Getenv(liveHostVariable)
 	if project == "" {
@@ -56,7 +59,8 @@ func TestLiveGitLab(t *testing.T) {
 	ctx := context.Background()
 
 	var about struct {
-		Description string `json:"description"`
+		Description   string `json:"description"`
+		DefaultBranch string `json:"default_branch"`
 	}
 	if _, err := client.Get(ctx, parsed.apiPath(), nil, &about); err != nil {
 		t.Fatalf("read project %s: %s", project, err.Message)
@@ -67,14 +71,35 @@ func TestLiveGitLab(t *testing.T) {
 
 	live := &liveCleanup{client: client, project: parsed, started: time.Now().Add(-time.Minute), tracked: map[string]bool{}}
 	t.Cleanup(func() { live.run(t) })
-	providertest.RunTasks(t, func(t *testing.T) providertest.Target {
-		return providertest.Target{
-			Handlers:      New().Handlers(),
-			WorkspaceRoot: t.TempDir(),
-			Settings:      raw,
-			Settle:        30 * time.Second,
-			Track:         live.track,
-		}
+	t.Run("tasks", func(t *testing.T) {
+		providertest.RunTasks(t, func(t *testing.T) providertest.Target {
+			return providertest.Target{
+				Handlers:      New().Handlers(),
+				WorkspaceRoot: t.TempDir(),
+				Settings:      raw,
+				Settle:        30 * time.Second,
+				Track:         live.track,
+			}
+		})
+	})
+	proposalRaw, _ := json.Marshal(ProposalSettings{Project: project, Host: host})
+	run := strconv.FormatInt(time.Now().UnixNano(), 36)
+	branches := 0
+	t.Run("proposals", func(t *testing.T) {
+		providertest.RunProposals(t, func(t *testing.T) providertest.Target {
+			target := providertest.Target{
+				Handlers:      New().Handlers(),
+				WorkspaceRoot: t.TempDir(),
+				Settings:      proposalRaw,
+				Base:          about.DefaultBranch,
+				Settle:        30 * time.Second,
+			}
+			for i := range target.Heads {
+				branches++
+				target.Heads[i] = live.branch(t, "putnami-live/"+run+"/"+strconv.Itoa(branches), about.DefaultBranch)
+			}
+			return target
+		})
 	})
 }
 
@@ -87,6 +112,23 @@ type liveCleanup struct {
 	mu sync.Mutex
 	// tracked holds the iids of the issues the scenarios reported.
 	tracked map[string]bool
+	// branches are the branches the run created.
+	branches []string
+}
+
+// branch creates a branch one commit ahead of base, so a merge request can
+// be opened from it.
+func (l *liveCleanup) branch(t *testing.T, name, base string) string {
+	ctx := context.Background()
+	l.mu.Lock()
+	l.branches = append(l.branches, name)
+	l.mu.Unlock()
+	request := map[string]any{"branch": name, "start_branch": base, "commit_message": "test: live proof branch " + name,
+		"actions": []map[string]any{{"action": "create", "file_path": "putnami-live/" + strings.ReplaceAll(name, "/", "-") + ".txt", "content": name + "\n"}}}
+	if err := l.client.Write(ctx, http.MethodPost, l.project.apiPath("repository", "commits"), request, nil); err != nil {
+		t.Fatalf("create branch %s: %s", name, err.Message)
+	}
+	return name
 }
 
 func (l *liveCleanup) track(_ string, ref collab.Ref) {
@@ -135,4 +177,26 @@ func (l *liveCleanup) run(t *testing.T) {
 		}
 	}
 	t.Logf("deleted %d and closed %d issues of %s", deleted, closed, l.project.path)
+	l.mu.Lock()
+	branches := slices.Clone(l.branches)
+	l.mu.Unlock()
+	for _, name := range branches {
+		var open []glMergeRequest
+		query := url.Values{"source_branch": {name}, "state": {"opened"}, "per_page": {"100"}}
+		if _, err := l.client.Get(ctx, l.project.apiPath("merge_requests"), query, &open); err != nil {
+			t.Errorf("list the merge requests from %s: %s", name, err.Message)
+		}
+		for _, mr := range open {
+			if !mr.sameProject() {
+				continue
+			}
+			if err := l.client.Write(ctx, http.MethodPut, l.project.apiPath("merge_requests", strconv.Itoa(mr.IID)), map[string]any{"state_event": "close"}, nil); err != nil {
+				t.Errorf("close merge request !%d: %s", mr.IID, err.Message)
+			}
+		}
+		if err := l.client.Write(ctx, http.MethodDelete, l.project.apiPath("repository", "branches", name), nil, nil); err != nil && err.Status != http.StatusNotFound {
+			t.Errorf("delete branch %s: %s", name, err.Message)
+		}
+	}
+	t.Logf("closed the merge requests of %d branches and deleted them", len(branches))
 }
