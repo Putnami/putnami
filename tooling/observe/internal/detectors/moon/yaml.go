@@ -15,12 +15,17 @@ import (
 // read. found is false when the document has no such key.
 func topLevel(text, key string) (value any, found bool, err error) {
 	lines := yamlLines(text)
+	content := false
 	for i := 0; i < len(lines); i++ {
 		l := lines[i]
-		if l.text == "..." || l.text == "---" && i > 0 {
+		if l.text == "..." || l.text == "---" && content {
 			break
 		}
-		if l.indent != 0 || l.text == "---" {
+		if l.indent == 0 && strings.HasPrefix(l.text, "%") || l.text == "---" {
+			continue
+		}
+		content = true
+		if l.indent != 0 {
 			continue
 		}
 		k, rest, ok := splitKey(l.text)
@@ -185,7 +190,30 @@ func (p *yamlParser) inline(text string, num int) (any, error) {
 		}
 		return value, nil
 	}
+	if (text[0] == '\'' || text[0] == '"') && !closesQuote(text) {
+		for p.next < len(p.lines) && !closesQuote(text) {
+			text += " " + p.lines[p.next].text
+			p.next++
+		}
+	}
 	return scalar(text, num)
+}
+
+// closesQuote reports whether the quoted scalar that starts text closes on
+// this text: a multi-line quoted scalar folds its lines into one.
+func closesQuote(text string) bool {
+	quote := text[0]
+	for i := 1; i < len(text); i++ {
+		switch {
+		case quote == '"' && text[i] == '\\':
+			i++
+		case text[i] == quote && quote == '\'' && i+1 < len(text) && text[i+1] == '\'':
+			i++
+		case text[i] == quote:
+			return true
+		}
+	}
+	return false
 }
 
 // scalar unquotes a plain, single-quoted or double-quoted scalar.

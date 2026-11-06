@@ -490,26 +490,29 @@ func (d *detector) edges(projects []*project) {
 		return byAlias[name]
 	}
 	for _, p := range projects {
-		link := func(target *project) {
-			if target != nil && target != p && target.dir != workspace.ProbeRootPath && !slices.Contains(p.deps, target.dir) {
-				p.deps = append(p.deps, target.dir)
+		// A dependency of root scope, as moon gives a task or package
+		// dependency on the root project, is no edge.
+		link := func(target *project, rootScope bool) {
+			if target == nil || target == p || rootScope && target.dir == workspace.ProbeRootPath || slices.Contains(p.deps, target.dir) {
+				return
 			}
+			p.deps = append(p.deps, target.dir)
 		}
 		for _, entry := range p.declared {
 			switch v := entry.(type) {
 			case string:
-				link(resolve(v))
+				link(resolve(v), false)
 			case map[string]any:
 				if id, ok := v["id"].(string); ok {
-					link(resolve(id))
+					link(resolve(id), v["scope"] == "root")
 				}
 			}
 		}
 		for _, name := range p.taskDeps {
-			link(resolve(name))
+			link(resolve(name), true)
 		}
 		for _, name := range p.packages {
-			link(byAlias[name])
+			link(byAlias[name], true)
 		}
 	}
 }

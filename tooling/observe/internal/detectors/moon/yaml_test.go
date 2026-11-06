@@ -51,6 +51,16 @@ func TestTopLevelReadsTheValueOfOneKey(t *testing.T) {
 			key:  "dependsOn",
 			want: nil,
 		},
+		"a multi-line quoted scalar": {
+			text: "tasks:\n  build:\n    command: 'cargo build\n      --release'\n    deps: ['core:build']\n",
+			key:  "tasks",
+			want: map[string]any{"build": map[string]any{"command": "cargo build --release", "deps": []any{"core:build"}}},
+		},
+		"a directive before the document start": {
+			text: "%YAML 1.2\n---\nid: a\n",
+			key:  "id",
+			want: "a",
+		},
 		"a document start": {
 			text: "---\nid: 'a''b'\n",
 			key:  "id",

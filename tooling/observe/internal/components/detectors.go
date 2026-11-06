@@ -75,8 +75,8 @@ func (d NxDetector) Detect(root string) Found {
 	}
 }
 
-// MoonDetector adapts the moon detector: each moon project, from a graph
-// export or from the moon configuration, is an orchestrator component.
+// MoonDetector adapts the moon detector: a graph export is an orchestrator
+// source, the moon configuration a workspace one.
 type MoonDetector struct {
 	// GraphFile is the graph export to read; empty reads moon-graph.json.
 	GraphFile string

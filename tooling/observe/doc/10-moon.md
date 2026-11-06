@@ -89,8 +89,10 @@ renames it.
 | Inferred | the `dependencies`, `devDependencies`, `peerDependencies` and `optionalDependencies` of the project's `package.json` that name another project's package, as moon infers them |
 
 A project's alias is the `name` of its `package.json`. A dependency on the
-project itself, on the root project `.`, or on no project of the workspace, is
-no edge: moon links no project to the root project.
+project itself, or on no project of the workspace, is no edge. Neither is a
+task or package dependency on the root project `.`, nor a `dependsOn` object
+of `scope: 'root'`: moon gives them the root scope and links them to nothing.
+A plain `dependsOn` on the root project is an edge.
 
 ```yaml
 # apps/api/moon.yml
@@ -109,7 +111,7 @@ from this read. Write the graph export in the CI to get it.
 
 The detector reads YAML for the `projects` key of `.moon/workspace.yml` and
 the `id`, `dependsOn` and `tasks` keys of each `moon.yml`: block and flow mappings and
-sequences, and plain and quoted scalars. Anchors, aliases and tags in those
+sequences, and plain and quoted scalars, a quoted one across lines. Anchors, aliases and tags in those
 keys are an error, and in `tasks` they cost the task edges only; the rest of
 each file may use any YAML. Only the first document of a file is read. `workspace.pkl`,
 `moon.pkl` and the JSON and TOML forms of moon 2 are not read.

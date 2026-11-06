@@ -428,14 +428,16 @@ func TestDependsOnAndPackageDependenciesAreEdges(t *testing.T) {
 			t.Fatalf("codes = %v", got)
 		}
 	})
-	t.Run("the root project is no edge, as moon links none", func(t *testing.T) {
+	t.Run("only a plain dependsOn links the root project, as moon does", func(t *testing.T) {
 		r := probe(t, tree(t, map[string]string{
-			WorkspaceFile:     "projects:\n  globs: ['apps/*']\n  sources:\n    root: '.'\n",
-			"apps/a/moon.yml": "dependsOn: ['root', 'b']\ntasks:\n  build:\n    deps: ['root:build']\n",
-			"apps/b/x":        "",
+			WorkspaceFile:         "projects:\n  globs: ['apps/*']\n  sources:\n    root: '.'\n",
+			"package.json":        `{"name": "monorepo"}`,
+			"apps/a/moon.yml":     "dependsOn: ['root', 'b']\n",
+			"apps/b/moon.yml":     "dependsOn:\n  - id: root\n    scope: root\ntasks:\n  build:\n    deps: ['root:build']\n",
+			"apps/b/package.json": `{"name": "b", "devDependencies": {"monorepo": "*"}}`,
 		}), Options{})
 		noDiagnostics(t, r)
-		if got := edges(r); !reflect.DeepEqual(got, map[string][]string{".": nil, "apps/a": {"apps/b"}, "apps/b": nil}) {
+		if got := edges(r); !reflect.DeepEqual(got, map[string][]string{".": nil, "apps/a": {".", "apps/b"}, "apps/b": nil}) {
 			t.Fatalf("edges = %v", got)
 		}
 	})
