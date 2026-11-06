@@ -6,6 +6,7 @@ import (
 	"go.putnami.dev/tooling/observe/internal/detect/composer"
 	"go.putnami.dev/tooling/observe/internal/detect/pants"
 	"go.putnami.dev/tooling/observe/internal/detect/python"
+	"go.putnami.dev/tooling/observe/internal/detect/swift"
 	"go.putnami.dev/tooling/observe/internal/detectors/nx"
 	"go.putnami.dev/tooling/observe/internal/lockdiff"
 )
@@ -19,7 +20,7 @@ type Options struct {
 
 // Default returns the detectors observe runs, orchestrators first.
 func Default(opts Options) []Detector {
-	return []Detector{NxDetector{}, PantsDetector{GraphFile: opts.PantsGraph}, NodeDetector{}, ComposerDetector{}, GoDetector{}, PythonDetector{}}
+	return []Detector{NxDetector{}, PantsDetector{GraphFile: opts.PantsGraph}, NodeDetector{}, ComposerDetector{}, GoDetector{}, PythonDetector{}, SwiftPMDetector{}, XcodeDetector{}}
 }
 
 // fromProbe turns the projects of a probe answer into components.
@@ -132,6 +133,58 @@ func (d PantsDetector) Detect(root string) Found {
 				return lockdiff.ReadPEXLock(data)
 			}, true
 		}
+	}
+	return found
+}
+
+// SwiftPMDetector adapts the Swift detector to its Swift packages: each
+// package and each of its targets is a workspace component. It also places
+// the JUnit cases of the packages' test targets by their class names.
+type SwiftPMDetector struct{}
+
+// Name implements Detector.
+func (SwiftPMDetector) Name() string { return "swiftpm" }
+
+// Detect implements Detector.
+func (SwiftPMDetector) Detect(root string) Found {
+	detection := swift.Detect(root)
+	found := Found{}
+	for _, d := range detection.Diagnostics {
+		if d.Code != swift.CodeProjectUnreadable {
+			found.Diagnostics = append(found.Diagnostics, d)
+		}
+	}
+	for _, c := range detection.PackageComponents() {
+		found.Components = append(found.Components, Component{ID: c.ID, Name: c.Name, Ecosystem: c.Ecosystem, Source: c.Source, DependsOn: c.DependsOn})
+	}
+	if len(detection.Packages) > 0 {
+		found.Locate = detection.Locate
+	}
+	return found
+}
+
+// XcodeDetector adapts the Swift detector to its Xcode projects: each
+// directory that holds an .xcodeproj is a manifest component, with an edge to
+// each local package the project references.
+type XcodeDetector struct{}
+
+// Name implements Detector.
+func (XcodeDetector) Name() string { return "xcode" }
+
+// Detect implements Detector.
+func (XcodeDetector) Detect(root string) Found {
+	detection := swift.Detect(root)
+	found := Found{}
+	for _, d := range detection.Diagnostics {
+		if d.Code == swift.CodeProjectUnreadable {
+			found.Diagnostics = append(found.Diagnostics, d)
+		}
+	}
+	for _, c := range detection.ProjectComponents() {
+		found.Components = append(found.Components, Component{ID: c.ID, Name: c.Name, Ecosystem: c.Ecosystem, Source: c.Source, DependsOn: c.DependsOn})
+	}
+	if len(detection.Projects) > 0 && len(detection.Packages) == 0 {
+		found.Locate = detection.Locate
 	}
 	return found
 }
