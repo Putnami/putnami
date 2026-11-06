@@ -204,15 +204,24 @@ func TestASatisfiedLocalVersionIsAnEdge(t *testing.T) {
 		Config: `{"pnpmVersion": "9.0.0", "projects": [
 			{"packageName": "api", "projectFolder": "apps/api"},
 			{"packageName": "old", "projectFolder": "apps/old"},
+			{"packageName": "opt", "projectFolder": "apps/opt"},
+			{"packageName": "alias", "projectFolder": "apps/alias"},
 			{"packageName": "pricing", "projectFolder": "libs/pricing"}
 		]}`,
 		"apps/api/package.json":     pkg("api", "1.0.0", nil, map[string]string{"pricing": "^2.1.0"}, nil),
-		"apps/old/package.json":     pkg("old", "1.0.0", map[string]string{"pricing": "^1.0.0"}, nil, nil),
+		"apps/old/package.json":     pkg("old", "1.0.0", map[string]string{"pricing": "^1.0.0", "price": "npm:pricing@^1.0.0"}, nil, nil),
+		"apps/opt/package.json":     `{"name": "opt", "version": "1.0.0", "optionalDependencies": {"pricing": "2.3.0"}}`,
+		"apps/alias/package.json":   pkg("alias", "1.0.0", map[string]string{"price": "npm:pricing@^2.0.0"}, nil, nil),
 		"libs/pricing/package.json": pkg("pricing", "2.3.0", nil, nil, nil),
 	})
 	got := edges(detect(t, root))
-	if !reflect.DeepEqual(got["apps/api"], []string{"libs/pricing"}) || got["apps/old"] != nil {
-		t.Errorf("edges %v", got)
+	for _, folder := range []string{"apps/api", "apps/opt", "apps/alias"} {
+		if !reflect.DeepEqual(got[folder], []string{"libs/pricing"}) {
+			t.Errorf("%s edges %v", folder, got[folder])
+		}
+	}
+	if got["apps/old"] != nil {
+		t.Errorf("apps/old edges %v", got["apps/old"])
 	}
 }
 
@@ -222,10 +231,12 @@ func TestADecoupledDependencyIsNoEdge(t *testing.T) {
 		Config: `{"pnpmVersion": "9.0.0", "projects": [
 			{"packageName": "lint", "projectFolder": "tools/lint", "decoupledLocalDependencies": ["core"]},
 			{"packageName": "build", "projectFolder": "tools/build", "cyclicDependencyProjects": ["core"]},
+			{"packageName": "docs", "projectFolder": "tools/docs", "decoupledLocalDependencies": ["kernel"]},
 			{"packageName": "core", "projectFolder": "libs/core"}
 		]}`,
 		"tools/lint/package.json":  pkg("lint", "1.0.0", nil, map[string]string{"core": "1.0.0"}, nil),
 		"tools/build/package.json": pkg("build", "1.0.0", nil, map[string]string{"core": "^1.0.0"}, nil),
+		"tools/docs/package.json":  pkg("docs", "1.0.0", nil, map[string]string{"kernel": "npm:core@^1.0.0"}, nil),
 		"libs/core/package.json":   pkg("core", "1.0.0", nil, nil, nil),
 	})
 	for folder, deps := range edges(detect(t, root)) {
@@ -266,8 +277,13 @@ func TestThePackageManagerSelectsTheLockfile(t *testing.T) {
 func TestASubspaceLockfileIsRead(t *testing.T) {
 	spectest.Proves(t, feature, "rush-lockfiles", "a-subspace-lockfile-is-read")
 	pnpm := detect(t, tree(t, map[string]string{Config: `{"pnpmVersion": "9.0.0", "projects": []}`}))
-	if _, ok := pnpm.LockReader("common/config/subspaces/legacy/pnpm-lock.yaml"); !ok {
-		t.Error("a subspace lockfile has no reader")
+	read, ok := pnpm.LockReader("common/config/subspaces/legacy/pnpm-lock.yaml")
+	if !ok {
+		t.Fatal("a subspace lockfile has no reader")
+	}
+	packages, err := read([]byte("lockfileVersion: '9.0'\n\npackages:\n\n  zod@3.24.1:\n    resolution: {integrity: x}\n  '@rush-temp/api@1.0.0':\n    resolution: {integrity: x}\n"))
+	if err != nil || !reflect.DeepEqual(packages, lockdiff.Packages{"zod": {"3.24.1"}}) {
+		t.Errorf("a subspace lockfile reads %v, %v", packages, err)
 	}
 	for _, file := range []string{"common/config/subspaces/pnpm-lock.yaml", "common/config/subspaces/a/b/pnpm-lock.yaml", "apps/api/pnpm-lock.yaml"} {
 		if _, ok := pnpm.LockReader(file); ok {

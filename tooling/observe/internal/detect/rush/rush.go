@@ -163,7 +163,7 @@ func Detect(root string) Detection {
 	for _, e := range entries {
 		if e.manifest != nil {
 			set := map[string]bool{}
-			for _, deps := range []map[string]string{e.manifest.Dependencies, e.manifest.DevDependencies, e.manifest.PeerDependencies} {
+			for _, deps := range []map[string]string{e.manifest.Dependencies, e.manifest.DevDependencies, e.manifest.OptionalDependencies, e.manifest.PeerDependencies} {
 				for name, spec := range deps {
 					target := edge(name, spec, e.decoupled, func(name string) (string, string, bool) {
 						t, ok := byName[name]
@@ -189,19 +189,25 @@ func Detect(root string) Detection {
 }
 
 // edge returns the folder of the Rush project a dependency links, or "" for
-// an external or decoupled one. A workspace: range links the project it
-// names, an alias included; another range links it when the project's
-// version satisfies it.
+// an external one or one whose key the project decouples. A workspace: range
+// links the project it names, an alias included; another range, an npm: alias
+// included, links it when the project's version satisfies it.
 func edge(name, spec string, decoupled map[string]bool, project func(string) (folder, version string, ok bool)) string {
+	if decoupled[name] {
+		return ""
+	}
 	spec = strings.TrimSpace(spec)
 	rest, workspace := strings.CutPrefix(spec, "workspace:")
 	if workspace {
 		if at := strings.LastIndex(rest, "@"); at > 0 {
 			name = rest[:at]
 		}
-	}
-	if decoupled[name] {
-		return ""
+	} else if alias, ok := strings.CutPrefix(spec, "npm:"); ok {
+		if at := strings.LastIndex(alias, "@"); at > 0 {
+			name, spec = alias[:at], alias[at+1:]
+		} else {
+			name, spec = alias, "*"
+		}
 	}
 	folder, version, ok := project(name)
 	if !ok {

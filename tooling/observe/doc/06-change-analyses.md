@@ -27,9 +27,9 @@ one `fallback` component `.` of ecosystem `unknown`.
 
 A changed file belongs to the innermost component that holds it. A file
 outside every component, such as a root lockfile in a Node workspace or
-`common/config/rush/pnpm-lock.yaml` in a Rush monorepo, belongs to none. A component is `changed` when one of its files changed, `dependent`
-when it reaches a changed component through its edges, and `unaffected`
-otherwise.
+`common/config/rush/pnpm-lock.yaml` in a Rush monorepo, belongs to none. A
+component is `changed` when one of its files changed, `dependent` when it
+reaches a changed component through its edges, and `unaffected` otherwise.
 
 "Changed" wins over "dependent": a change that edits a component and one that
 depends on it marks both changed. The summary keeps the edge between them. A
