@@ -351,6 +351,13 @@ committed file that `--update` would rewrite, such as a floor that grew without
 its baseline edit. The floor is
 whole-workspace by construction, so project selection flags are rejected.
 
+The comparison is byte for byte, so a formatter must leave the files as
+`--update` writes them: two-space indentation, one array entry per line. The
+Biome rules the TypeScript extension ships format `**/specs.baseline.json` with
+`expand: "always"`. A workspace that already commits its own `biome.json` adds
+`**/specs.baseline.json` to an override that sets `json.formatter.expand` to
+`"always"`.
+
 `init` creates one minimal canonical skeleton next to the declaration of an
 already-authored feature. It refuses an unknown feature, refuses a feature that
 already has a spec, and never overwrites an existing file (the document is

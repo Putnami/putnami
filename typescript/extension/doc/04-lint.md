@@ -242,6 +242,7 @@ The extension ships a comprehensive Biome config that covers TypeScript, JSON, C
 - 2-space indentation, 120-char line width, LF line endings
 - Single quotes, trailing commas, semicolons always
 - Import ordering: Bun → Node → packages → aliases → paths
+- JSON that a tool writes keeps every array expanded: `package.json`, `schema/openapi.json`, `schema/http-routes.json`, `specs.baseline.json` and `*.golden.json`, so lint leaves the bytes their writers emit
 
 **Linter rules (highlights):**
 
