@@ -406,6 +406,13 @@ var statusGitRun = func(ctx context.Context, dir string, args ...string) (string
 	return strings.TrimSpace(string(out)), err
 }
 
+// statusGitBudget derives the context every git process of one ON MAIN
+// answer shares: statusGitTimeout past reqCtx. A package var so tests can run
+// git with no wall-clock bound, or with an expired one.
+var statusGitBudget = func(reqCtx context.Context) (context.Context, context.CancelFunc) {
+	return context.WithTimeout(reqCtx, statusGitTimeout)
+}
+
 // statusOnMain answers ON MAIN for the commits of the environment's rows from
 // the local checkout at dir. Git runs once to find the main ref, then once per
 // distinct commit, and not at all when no row has a commit.
@@ -431,7 +438,7 @@ func statusOnMain(reqCtx context.Context, dir string, rows []deploymentSummaryEn
 		return answers
 	}
 
-	ctx, cancel := context.WithTimeout(reqCtx, statusGitTimeout)
+	ctx, cancel := statusGitBudget(reqCtx)
 	defer cancel()
 	ref, name, reason := statusMainRef(ctx, dir)
 	answers.Ref, answers.RefUnavailable = name, reason
