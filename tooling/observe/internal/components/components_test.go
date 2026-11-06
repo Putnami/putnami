@@ -194,6 +194,28 @@ func TestTheDefaultDetectorsReadEachEcosystem(t *testing.T) {
 	if len(nxSet.Components) != 1 || nxSet.Components[0].Ecosystem != "nx" {
 		t.Errorf("an Nx project does not win over its workspace package: %+v", nxSet.Components)
 	}
+	moonRoot := t.TempDir()
+	write(t, moonRoot, map[string]string{
+		".moon/workspace.yml":   "projects:\n  - 'apps/*'\n  - 'crates/*'\n",
+		"package.json":          `{"name":"root","private":true,"workspaces":["apps/*"]}`,
+		"apps/web/package.json": `{"name":"web"}`,
+		"crates/core/moon.yml":  "language: rust\n",
+		"go.work":               "go 1.23\n\nuse ./apps/svc\n",
+		"apps/svc/go.mod":       "module example.com/svc\n\ngo 1.23\n",
+		"apps/svc/moon.yml":     "dependsOn: ['core']\n",
+	})
+	moonSet := Detect(moonRoot, Default(Options{}))
+	if got := ids(moonSet); !slices.Equal(got, []string{"apps/svc", "apps/web", "crates/core"}) {
+		t.Fatalf("moon components %v", got)
+	}
+	for _, c := range moonSet.Components {
+		if c.Ecosystem != "moon" || c.Source != evidence.SourceOrchestrator {
+			t.Errorf("a moon project does not win over its workspace package or module: %+v", c)
+		}
+	}
+	if svc := moonSet.Components[0]; !slices.Equal(svc.DependsOn, []string{"crates/core"}) {
+		t.Errorf("apps/svc edges %v", svc.DependsOn)
+	}
 }
 
 func TestAPantsResolveLockfileIsAPyPILockfile(t *testing.T) {
