@@ -506,6 +506,9 @@ func (f Finalizer) publish(ctx context.Context, c *publicationCandidate) (Result
 		return Result{}, err
 	}
 	if err := f.Git.Push(ctx, c.opts.Branch); err != nil {
+		if refused := (*PushRefusedError)(nil); errors.As(err, &refused) {
+			return Result{}, err
+		}
 		return Result{}, fmt.Errorf("push may have happened; inspect origin before resuming: %w", err)
 	}
 	if _, err := c.recheck(ctx, f); err != nil {

@@ -18,6 +18,20 @@ must be the current branch. The command pushes it to the `origin` remote and
 resolves the base from `origin/<base>`, so `origin` must be the repository the
 proposals provider manages.
 
+A branch you rebased after a push publishes like any other. A push that
+fast-forwards the remote branch goes through as is. When `origin` refuses it
+as not a fast-forward, as after a rebase, the command pushes again with a
+lease on the head this checkout last pushed, read from the reflog of
+`refs/remotes/origin/<branch>`: it replaces the remote branch only while
+`origin` still holds that head. When someone else pushed the branch since,
+the command refuses, writes nothing, and names the head it expected, even
+after a fetch. Fetch, make your branch contain `origin/<branch>`, for example
+with `git rebase origin/<branch>`, then run it again: the push then
+fast-forwards. The lease needs the reflog of the remote-tracking ref, which
+git keeps by default, and a fetch configuration that tracks the branch under
+`refs/remotes/origin/`. A checkout whose reflog records no push of the
+branch only fast-forwards.
+
 ## Modes
 
 - **Draft.** `--draft` publishes a draft and accepts no proof. A branch with

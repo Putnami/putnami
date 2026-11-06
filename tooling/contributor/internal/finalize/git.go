@@ -3,6 +3,7 @@ package finalize
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -166,8 +167,72 @@ func (g NativeGit) CommitMessages(base string) ([]CommitMessage, error) {
 func (g NativeGit) Seed(ctx context.Context, title string) error {
 	return g.runWrite(ctx, "commit", "--allow-empty", "-m", title)
 }
+
+// PushRefusedError reports a push origin refused before it wrote anything:
+// origin's branch is not a fast-forward of HEAD, and no lease on the head
+// this checkout last pushed allows replacing it.
+type PushRefusedError struct {
+	Branch string
+	// Pushed is the head this checkout last pushed; empty when it has none.
+	Pushed string
+	Err    error
+}
+
+func (e *PushRefusedError) Error() string {
+	if e.Pushed == "" {
+		return fmt.Sprintf("origin refused %s: HEAD does not contain origin's head, and the reflog of refs/remotes/origin/%s records no push from this checkout to lease on, so the command only fast-forwards; fetch, make HEAD contain origin/%s (for example git rebase origin/%s), then run again: %v", e.Branch, e.Branch, e.Branch, e.Branch, e.Err)
+	}
+	return fmt.Sprintf("origin refused %s: HEAD does not contain origin's head, and origin no longer holds %s, the head this checkout last pushed: it holds commits this checkout did not push; fetch, make HEAD contain origin/%s (for example git rebase origin/%s), then run again: %v", e.Branch, e.Pushed, e.Branch, e.Branch, e.Err)
+}
+
+func (e *PushRefusedError) Unwrap() error { return e.Err }
+
+// Push publishes the branch to origin. A push that fast-forwards origin's
+// branch goes through as is. When origin refuses it as not a fast-forward,
+// as after a rebase, the push is repeated with a lease pinned to the head
+// this checkout last pushed: it replaces origin's branch only while origin
+// still holds that head. Someone else's push, or a deletion, moves origin
+// off that head, even when a fetch moved the remote-tracking ref along, and
+// the push is refused with a PushRefusedError.
 func (g NativeGit) Push(ctx context.Context, branch string) error {
-	return g.runWrite(ctx, "push", "-u", "origin", branch)
+	err := g.runWrite(ctx, "push", "-u", "origin", branch)
+	if err == nil || !strings.Contains(err.Error(), "[rejected]") {
+		return err
+	}
+	pushed, readErr := g.lastPushed(branch)
+	if readErr != nil {
+		return errors.Join(err, readErr)
+	}
+	if pushed == "" {
+		return &PushRefusedError{Branch: branch, Err: err}
+	}
+	err = g.runWrite(ctx, "push", "--force-with-lease=refs/heads/"+branch+":"+pushed, "-u", "origin", branch)
+	if err != nil && strings.Contains(err.Error(), "[rejected]") {
+		return &PushRefusedError{Branch: branch, Pushed: pushed, Err: err}
+	}
+	return err
+}
+
+// lastPushed is the head this checkout last pushed to origin's branch, read
+// from the reflog of its remote-tracking ref: git records each push there as
+// "update by push", and a fetch under another subject. It is empty when this
+// checkout never pushed the branch, or when its reflog no longer holds a push.
+func (g NativeGit) lastPushed(branch string) (string, error) {
+	tracking := "refs/remotes/origin/" + branch
+	if _, err := g.run("rev-parse", "--verify", "-q", tracking); err != nil {
+		return "", nil
+	}
+	entries, err := g.one("log", "-g", "--format=%H%x09%gs", tracking, "--")
+	if err != nil {
+		return "", err
+	}
+	for _, entry := range strings.Split(entries, "\n") {
+		sha, subject, found := strings.Cut(entry, "\t")
+		if found && subject == "update by push" {
+			return sha, nil
+		}
+	}
+	return "", nil
 }
 func (g NativeGit) Fingerprint() (string, error) {
 	result, err := treefingerprint.Compute(g.Root)
