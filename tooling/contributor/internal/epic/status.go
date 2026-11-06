@@ -75,10 +75,13 @@ type IssueStatus struct {
 	Wave      int               `json:"wave"`
 	State     string            `json:"state"`
 	TaskState collab.TaskState  `json:"taskState,omitempty"`
-	Branch    string            `json:"branch,omitempty"`
-	Base      string            `json:"base,omitempty"`
-	Proposal  *ProposalView     `json:"proposal,omitempty"`
-	Sessions  int               `json:"sessions"`
+	// Target is the launch record's target, local or cloud; empty before
+	// the issue launches.
+	Target   string        `json:"target,omitempty"`
+	Branch   string        `json:"branch,omitempty"`
+	Base     string        `json:"base,omitempty"`
+	Proposal *ProposalView `json:"proposal,omitempty"`
+	Sessions int           `json:"sessions"`
 	// Live counts the sessions that work, wait or were handed back; an
 	// ended or failed session does not run.
 	Live  int              `json:"live"`
@@ -278,7 +281,7 @@ func (r *statusReader) issue(ctx context.Context, plan estimate.EpicPlan, issue 
 	}
 	launch, launched := launches[issue.Key]
 	if launched {
-		status.Branch, status.Base = launch.Branch, launch.Base
+		status.Target, status.Branch, status.Base = launch.Target, launch.Branch, launch.Base
 	}
 	if issue.Task != nil {
 		var found collab.TaskResult
@@ -556,9 +559,14 @@ func numeric(id string) bool {
 // LaunchesFile is the launch record file, beside the epic plan.
 const LaunchesFile = "launches.json"
 
-// LaunchTargetLocal is the only launch target: a local workspace the owner
-// opens.
-const LaunchTargetLocal = "local"
+// Launch targets. LaunchTargetLocal is a local workspace the owner opens.
+// LaunchTargetCloud is a cloud session: the child pushes its branch and
+// stops before change finalize, and the epic session publishes it from a
+// local checkout.
+const (
+	LaunchTargetLocal = "local"
+	LaunchTargetCloud = "cloud"
+)
 
 // Launches is the launch record file: one entry per launch, oldest first.
 type Launches struct {
@@ -609,8 +617,8 @@ func readLaunches(path, shown string, plan estimate.EpicPlan) (map[string]Launch
 		switch {
 		case !keys[launch.Issue]:
 			return nil, fmt.Errorf("%s.issue: %q names no issue of the epic", at, launch.Issue)
-		case launch.Target != LaunchTargetLocal:
-			return nil, fmt.Errorf("%s.target: must be %q", at, LaunchTargetLocal)
+		case launch.Target != LaunchTargetLocal && launch.Target != LaunchTargetCloud:
+			return nil, fmt.Errorf("%s.target: must be %q or %q", at, LaunchTargetLocal, LaunchTargetCloud)
 		case !refName(launch.Branch):
 			return nil, fmt.Errorf("%s.branch: must be a branch name", at)
 		case !refName(launch.Base):
@@ -699,6 +707,9 @@ func issueText(issue IssueStatus) string {
 	parts := []string{strings.ReplaceAll(issue.State, "_", " ")}
 	if issue.Stage != "" {
 		parts[0] += " at " + string(issue.Stage)
+	}
+	if issue.Target == LaunchTargetCloud {
+		parts[0] += " in a cloud session"
 	}
 	if issue.SessionsRead && issue.Live == 0 && (issue.State == StateInProgress || issue.State == StateReady) {
 		parts = append(parts, "no live session")

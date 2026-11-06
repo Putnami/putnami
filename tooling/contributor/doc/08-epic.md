@@ -114,11 +114,14 @@ beside the plan, before the owner opens the session:
 }
 ```
 
-`target` is `local`, a local workspace the owner opens; it is the only launch
-target. `branch` is the branch the child works on, and `base` the branch it
-starts from: the epic's base, or the branch of the parent it stacks on. The
-latest launch of an issue wins. A record that names an unknown issue, another
-target or another epic is refused with exit 1.
+`target` is `local`, a local workspace the owner opens, or `cloud`, a cloud
+session. A cloud child pushes its branch and stops before `change finalize`;
+the epic session publishes its proposal from a local checkout, so the
+proposal body carries no host footer. `branch` is the branch the child works
+on, and `base` the branch it starts from: the epic's base, or the branch of
+the parent it stacks on. The latest launch of an issue wins. A record that
+names an unknown issue, another target or another epic is refused with
+exit 1.
 
 ## The status
 

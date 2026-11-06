@@ -28,8 +28,8 @@ jq '.options["@putnami/contributor"].epic // {}' putnami.workspace.json
 ```
 
 `sessions` (default `3`) is how many children run at once; `launch` (default
-`local`) is the launch target, and `local` is the only one. Another value
-stops the run with a clear message.
+`local`) is the launch target: `local`, a local workspace the owner opens, or
+`cloud`, a cloud session. Another value stops the run with a clear message.
 
 ## Arguments
 
@@ -86,14 +86,23 @@ lists each issue that may start, and the branch it starts from:
 For each issue it lists, in plan order:
 
 1. Name the child branch `epic-<epic>/<key>` and record the launch in
-   `.putnami/<epic>/launches.json`: `issue`, `target` `local`, `branch`,
-   `base` and `recordedAt`. Record it before the owner opens the session.
-2. Give the owner the launch: open a local workspace on `<branch>` from
-   `<base>`, then run build on the task (`/build <task id>` on Claude Code,
-   `$build <task id>` on Codex). The mandate names the epic, the child's
-   share, and its base: "Your proposal targets `<base>`:
-   `change finalize --base <base>`." A stacked child also rebases onto its
-   parent's branch each time the parent moves.
+   `.putnami/<epic>/launches.json`: `issue`, `target` (`local` or `cloud`,
+   from the policy), `branch`, `base` and `recordedAt`. Record it before the
+   session opens.
+2. Give the launch. The mandate names the epic, the child's share, and its
+   base. A stacked child also rebases onto its parent's branch each time the
+   parent moves.
+   - `local`: the owner opens a local workspace on `<branch>` from `<base>`,
+     then runs build on the task (`/build <task id>` on Claude Code,
+     `$build <task id>` on Codex). The mandate says: "Your proposal targets
+     `<base>`: `change finalize --base <base>`."
+   - `cloud`: start a cloud session on the repository with the build prompt
+     for the task and the same mandate, except that the child creates
+     `<branch>` from `<base>`, pushes it at each slice, and stops before
+     `change finalize`: "Push `<branch>`; do not run `change finalize`. The
+     epic session publishes your proposal." A cloud session's host adds a
+     footer to the proposal body it writes, so the epic session publishes
+     it (see Follow).
 
 `epic status` counts the children launched or in progress against
 `envelope.sessions`; it lists nothing once their tokens reach the envelope.
@@ -109,6 +118,12 @@ shows its state, its proposal, its tokens against its share, and the
 contracts it could not read.
 
 - A child past its share stops for the owner; report it with its tokens.
+- A cloud child shows `in a cloud session` and its branch until a proposal
+  exists. Follow its session in the host, where it runs. When it ends with
+  its branch pushed and its gate passed, publish it from a local checkout of
+  that branch: run the `"$PUTNAMI_CLI" change finalize --base <base>
+  --branch <branch>` the child would have run, with the title, body, task
+  and proof it reported. The epic session never commits to that branch.
 - A stacked child whose parent merged gets the rebase line `epic status`
   prints: `git rebase --onto <base> <parent's last head>`. Pass it to the
   child's session: it rebases before its next push, then pushes with
