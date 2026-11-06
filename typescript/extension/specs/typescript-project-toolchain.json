@@ -45,7 +45,7 @@
     },
     {
       "id": "serve-kill-port",
-      "text": "Serve with --kill-port ends only the processes that listen on the TCP port: it asks lsof for the port's listeners, falls back to fuser only when lsof is absent, and kills nothing when lsof prints anything but one process id per line."
+      "text": "Serve with --kill-port ends only the processes that listen on the TCP port: it asks lsof for the port's listeners and kills nothing when lsof prints anything but one process id per line. Only when lsof is absent does it fall back to fuser, which selects by local port and so also ends a process whose own connection has that local port."
     },
     {
       "id": "environment-independent-library-output",
