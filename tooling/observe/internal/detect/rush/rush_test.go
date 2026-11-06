@@ -215,13 +215,15 @@ func TestASatisfiedLocalVersionIsAnEdge(t *testing.T) {
 		"libs/pricing/package.json": pkg("pricing", "2.3.0", nil, nil, nil),
 	})
 	got := edges(detect(t, root))
-	for _, folder := range []string{"apps/api", "apps/opt", "apps/alias"} {
+	for _, folder := range []string{"apps/api", "apps/opt"} {
 		if !reflect.DeepEqual(got[folder], []string{"libs/pricing"}) {
 			t.Errorf("%s edges %v", folder, got[folder])
 		}
 	}
-	if got["apps/old"] != nil {
-		t.Errorf("apps/old edges %v", got["apps/old"])
+	for _, folder := range []string{"apps/old", "apps/alias"} {
+		if got[folder] != nil {
+			t.Errorf("%s edges %v", folder, got[folder])
+		}
 	}
 }
 
@@ -236,7 +238,7 @@ func TestADecoupledDependencyIsNoEdge(t *testing.T) {
 		]}`,
 		"tools/lint/package.json":  pkg("lint", "1.0.0", nil, map[string]string{"core": "1.0.0"}, nil),
 		"tools/build/package.json": pkg("build", "1.0.0", nil, map[string]string{"core": "^1.0.0"}, nil),
-		"tools/docs/package.json":  pkg("docs", "1.0.0", nil, map[string]string{"kernel": "npm:core@^1.0.0"}, nil),
+		"tools/docs/package.json":  pkg("docs", "1.0.0", nil, map[string]string{"kernel": "workspace:core@*"}, nil),
 		"libs/core/package.json":   pkg("core", "1.0.0", nil, nil, nil),
 	})
 	for folder, deps := range edges(detect(t, root)) {

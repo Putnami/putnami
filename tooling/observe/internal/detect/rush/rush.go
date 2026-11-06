@@ -190,8 +190,8 @@ func Detect(root string) Detection {
 
 // edge returns the folder of the Rush project a dependency links, or "" for
 // an external one or one whose key the project decouples. A workspace: range
-// links the project it names, an alias included; another range, an npm: alias
-// included, links it when the project's version satisfies it.
+// links the project it names, an alias included; another range links it when
+// the project's version satisfies it. An npm: alias is never linked.
 func edge(name, spec string, decoupled map[string]bool, project func(string) (folder, version string, ok bool)) string {
 	if decoupled[name] {
 		return ""
@@ -201,12 +201,6 @@ func edge(name, spec string, decoupled map[string]bool, project func(string) (fo
 	if workspace {
 		if at := strings.LastIndex(rest, "@"); at > 0 {
 			name = rest[:at]
-		}
-	} else if alias, ok := strings.CutPrefix(spec, "npm:"); ok {
-		if at := strings.LastIndex(alias, "@"); at > 0 {
-			name, spec = alias[:at], alias[at+1:]
-		} else {
-			name, spec = alias, "*"
 		}
 	}
 	folder, version, ok := project(name)
