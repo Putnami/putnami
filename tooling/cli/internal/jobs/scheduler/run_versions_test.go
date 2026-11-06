@@ -3,7 +3,9 @@ package scheduler
 import (
 	"errors"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"runtime"
 	"slices"
 	"strings"
 	"testing"
@@ -98,6 +100,65 @@ func TestBuildRunVersionsKeepsTheCapturedTreeState(t *testing.T) {
 	// A tagged line keeps its suffix-free Full even though a snapshot rides on it.
 	if versions["typescript"].Full != "0.4.0" {
 		t.Fatalf("typescript = %+v, want the tag's version untouched", versions["typescript"])
+	}
+}
+
+// Every line reads the same tree state and tags at HEAD, and the tree state
+// walks the whole work tree with git status. BuildRunVersions reads them once
+// for all lines, and not at all when the run captured the tree state already.
+func TestBuildRunVersionsReadsTheTreeOnceForEveryLine(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("the counting git is a POSIX shell script")
+	}
+	ws := runVersionsRepo(t)
+	ws.Lines["python"] = "py/v{version}"
+	ws.Lines["sites"] = "sites/v{version}"
+	countStatus := countingGit(t)
+
+	snapshot := &putnamigit.VersionInfo{SHA: "cafe123", Branch: "main", Suffix: "20260102030405-cafe123"}
+	if _, err := BuildRunVersions(ws, snapshot); err != nil {
+		t.Fatalf("a readable repository degraded a line: %v", err)
+	}
+	if got := countStatus(); got != 0 {
+		t.Fatalf("git status ran %d times with a captured tree state, want 0", got)
+	}
+
+	if _, err := BuildRunVersions(ws, nil); err != nil {
+		t.Fatalf("a readable repository degraded a line: %v", err)
+	}
+	if got := countStatus(); got != 1 {
+		t.Fatalf("git status ran %d times for %d lines, want 1", got, len(ws.Lines))
+	}
+}
+
+// countingGit puts a git first on PATH that records each call and runs the real
+// git. The returned function reports the git status calls since its last call.
+func countingGit(t *testing.T) func() int {
+	t.Helper()
+	real := gitread.Executable()
+	if !filepath.IsAbs(real) {
+		found, err := exec.LookPath(real)
+		if err != nil {
+			t.Fatalf("find git: %v", err)
+		}
+		real = found
+	}
+	bin := t.TempDir()
+	calls := filepath.Join(t.TempDir(), "calls")
+	writeExecutable(t, filepath.Join(bin, "git"), "#!/bin/sh\necho \"$1\" >> '"+calls+"'\nexec '"+real+"' \"$@\"\n")
+	t.Setenv("PATH", bin+string(os.PathListSeparator)+os.Getenv("PATH"))
+	seen := 0
+	return func() int {
+		data, _ := os.ReadFile(calls)
+		status := 0
+		for _, verb := range strings.Split(string(data), "\n") {
+			if verb == "status" {
+				status++
+			}
+		}
+		delta := status - seen
+		seen = status
+		return delta
 	}
 }
 

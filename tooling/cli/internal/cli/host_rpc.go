@@ -19,6 +19,7 @@ import (
 	"go.putnami.dev/tooling/cli/internal/commands/versioncmd"
 	"go.putnami.dev/tooling/cli/internal/engine"
 	"go.putnami.dev/tooling/cli/internal/extension"
+	"go.putnami.dev/tooling/cli/internal/git"
 	"go.putnami.dev/tooling/cli/internal/hostrpc"
 	"go.putnami.dev/tooling/cli/internal/iox"
 	"go.putnami.dev/tooling/cli/internal/workspace"
@@ -295,9 +296,13 @@ func (b hostRPCBinding) versionLines(ctx context.Context, params hostrpcproto.Ve
 	if result.SourceRevision, err = versioncmd.BoundRevision(b.root); err != nil {
 		return hostrpcproto.VersionLinesResult{}, err
 	}
+	head, err := git.ReadHead(b.root, nil)
+	if err != nil {
+		return hostrpcproto.VersionLinesResult{}, err
+	}
 	result.Lines = make([]hostrpcproto.VersionLine, 0, len(selected))
 	for _, spec := range selected {
-		report, err := versioncmd.ReportLine(b.root, spec)
+		report, err := versioncmd.ReportLine(b.root, head, spec)
 		if err != nil {
 			return hostrpcproto.VersionLinesResult{}, err
 		}

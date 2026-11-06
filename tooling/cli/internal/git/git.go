@@ -88,6 +88,26 @@ func OrderedSuffix(committedAt time.Time, sha, dirtyHash string) string {
 //  4. An untagged commit carries the ordered suffix, which is what makes two
 //     builds of one base version comparable and unique.
 func GetVersionInfo(repoRoot string, line LineSpec) (*VersionInfo, error) {
+	head, err := ReadHead(repoRoot, nil)
+	if err != nil {
+		return nil, err
+	}
+	return head.LineVersion(line)
+}
+
+// Head is what every version line reads from the repository in the same way:
+// the tree state and the tags at HEAD, from a clone known to be complete.
+type Head struct {
+	repoRoot string
+	tree     VersionInfo
+	atHead   []string
+}
+
+// ReadHead reads the Head of repoRoot. It refuses a shallow clone (step 1 of
+// GetVersionInfo). tree is the tree state the caller already captured, before
+// anything in the run changed the tree; ReadHead then reads none. A nil tree is
+// read here, with TreeState.
+func ReadHead(repoRoot string, tree *VersionInfo) (*Head, error) {
 	shallow, err := gitread.IsShallow(repoRoot)
 	if err != nil {
 		return nil, err
@@ -95,23 +115,33 @@ func GetVersionInfo(repoRoot string, line LineSpec) (*VersionInfo, error) {
 	if shallow {
 		return nil, fmt.Errorf("version and publish need a full clone with tags; run git fetch --unshallow --tags")
 	}
-	info, err := TreeState(repoRoot)
+	if tree == nil {
+		if tree, err = TreeState(repoRoot); err != nil {
+			return nil, err
+		}
+	}
+	atHead, err := TagsAtHead(repoRoot)
 	if err != nil {
 		return nil, err
 	}
+	return &Head{repoRoot: repoRoot, tree: *tree, atHead: atHead}, nil
+}
+
+// LineVersion computes one line's version from the Head, steps 2 to 4 of
+// GetVersionInfo. The tree fields of the result (SHA, Branch, Suffix, IsDirty)
+// are the Head's.
+func (h *Head) LineVersion(line LineSpec) (*VersionInfo, error) {
+	info := h.tree
 	info.Line = line.ScopePath
+	info.Base, info.Full, info.Tagged, info.Tag = "", "", false, ""
 
 	if strings.Count(line.TagPattern, wsproto.LineTagPlaceholder) != 1 {
 		return nil, fmt.Errorf("line %q has tag pattern %q, which carries no %s placeholder",
 			line.ScopePath, line.TagPattern, wsproto.LineTagPlaceholder)
 	}
 
-	atHead, err := TagsAtHead(repoRoot)
-	if err != nil {
-		return nil, err
-	}
 	var lineTags []string
-	for _, tag := range atHead {
+	for _, tag := range h.atHead {
 		if _, ok := linetag.Version(tag, line.TagPattern); ok {
 			lineTags = append(lineTags, tag)
 		}
@@ -126,30 +156,30 @@ func GetVersionInfo(repoRoot string, line LineSpec) (*VersionInfo, error) {
 		info.Tag = lineTags[0]
 		info.Base = version
 		info.Full = version
-		return info, nil
+		return &info, nil
 	}
 
-	last, found, err := linetag.LastRelease(repoRoot, line.TagPattern)
+	last, found, err := linetag.LastRelease(h.repoRoot, line.TagPattern)
 	if err != nil {
 		return nil, err
 	}
 	if !found {
 		info.Base = "0.0.0"
 		info.Full = info.Base + "-" + info.Suffix
-		return info, nil
+		return &info, nil
 	}
-	commits, err := gitread.CommitsSince(repoRoot, last.Commit, line.Pathspecs)
+	commits, err := gitread.CommitsSince(h.repoRoot, last.Commit, line.Pathspecs)
 	if err != nil {
 		return nil, err
 	}
 	major, _, _ := parseSemverCore(last.Version)
-	bump, err := BumpFor(commits, major == 0, LineStableTest(repoRoot, line))
+	bump, err := BumpFor(commits, major == 0, LineStableTest(h.repoRoot, line))
 	if err != nil {
 		return nil, err
 	}
 	info.Base = NextVersion(last.Version, bump, true)
 	info.Full = info.Base + "-" + info.Suffix
-	return info, nil
+	return &info, nil
 }
 
 // commitTime returns the committer time of revision. The committer time, not
