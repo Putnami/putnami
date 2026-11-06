@@ -14,7 +14,6 @@ import (
 	ciproto "go.putnami.dev/protocol/ci"
 	extproto "go.putnami.dev/protocol/extension"
 	"go.putnami.dev/protocol/features/spectest"
-	"go.putnami.dev/sdk/extension/gitread"
 	"go.putnami.dev/sdk/extension/gittest"
 )
 
@@ -429,7 +428,7 @@ func repositoryGuidanceBytes(root, path string) ([]byte, error) {
 		return nil, fmt.Errorf("inspect repository metadata: %w", err)
 	}
 
-	committed, err := exec.Command(gitread.Executable(), "-C", root, "show", "HEAD:"+filepath.ToSlash(path)).Output()
+	committed, err := gittest.Command(root, "show", "HEAD:"+filepath.ToSlash(path)).Output()
 	if err == nil {
 		return committed, nil
 	}

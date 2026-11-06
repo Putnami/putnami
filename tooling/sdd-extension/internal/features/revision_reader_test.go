@@ -224,6 +224,15 @@ func commitFeatureRepo(t *testing.T, repo, message string) {
 	runFeatureGit(t, repo, "commit", "-q", "-m", message)
 }
 
+func TestFeatureGitRepoIsTheSameOnAForeignMachine(t *testing.T) {
+	gittest.AssertMachineIndependent(t, func() string {
+		repo := initFeatureGitRepo(t)
+		writeRevisionFile(t, repo, "app/putnami.features.json", "{}\n")
+		commitFeatureRepo(t, repo, "base features")
+		return repo
+	})
+}
+
 func runFeatureGit(t *testing.T, repo string, args ...string) string {
 	t.Helper()
 	command := gittest.Command(repo, args...)

@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -466,6 +467,17 @@ func commitFixtureRepository(t *testing.T, root string) {
 			t.Fatalf("git %v: %v\n%s", args, err, out)
 		}
 	}
+}
+
+func TestCommitFixtureRepositoryIsTheSameOnAForeignMachine(t *testing.T) {
+	gittest.AssertMachineIndependent(t, func() string {
+		root := t.TempDir()
+		if err := os.WriteFile(filepath.Join(root, "putnami.json"), []byte("{}\n"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		commitFixtureRepository(t, root)
+		return root
+	})
 }
 
 // --- specs verify with a measured threshold check ----------------------------

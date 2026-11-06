@@ -47,6 +47,15 @@ func breakingMarkerRepository(t *testing.T, message string) (string, string) {
 	return root, git("rev-parse", "HEAD")
 }
 
+// The branch and the commit message come from the fixture alone: a foreign
+// identity, configuration, hook or ignore file changes neither.
+func TestBreakingMarkerRepositoryIsTheSameOnAForeignMachine(t *testing.T) {
+	gittest.AssertMachineIndependent(t, func() string {
+		root, _ := breakingMarkerRepository(t, "feat(cli)!: drop the --all flag")
+		return root
+	})
+}
+
 // impactedJobContext is the context of a `validate --impacted` run that
 // resolved baseline.
 func impactedJobContext(root, baseline string) *pctx.Context {

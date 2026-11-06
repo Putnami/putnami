@@ -31,6 +31,10 @@ func candidateWorkspace(t *testing.T) string {
 	return root
 }
 
+func TestCandidateWorkspaceIsTheSameOnAForeignMachine(t *testing.T) {
+	gittest.AssertMachineIndependent(t, func() string { return candidateWorkspace(t) })
+}
+
 func gitIn(t *testing.T, dir string, args ...string) {
 	t.Helper()
 	cmd := gittest.Command(dir, args...)

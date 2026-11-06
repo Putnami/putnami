@@ -176,9 +176,7 @@ func rebaseFixture(t *testing.T) (root, origin, pushed string, run func(string, 
 	hooks := t.TempDir()
 	run = func(dir string, args ...string) string {
 		t.Helper()
-		cmd := exec.Command("git", append([]string{"-C", dir}, args...)...)
-		cmd.Env = append(os.Environ(), "GIT_CONFIG_GLOBAL="+os.DevNull, "GIT_CONFIG_NOSYSTEM=1")
-		output, err := cmd.CombinedOutput()
+		output, err := gittest.Command(dir, args...).CombinedOutput()
 		if err != nil {
 			t.Fatalf("git %v: %v: %s", args, err, output)
 		}
@@ -211,6 +209,13 @@ func rebaseFixture(t *testing.T) (root, origin, pushed string, run func(string, 
 		t.Fatal("the rebase kept the pushed head")
 	}
 	return root, origin, pushed, run
+}
+
+func TestRebaseFixtureIsTheSameOnAForeignMachine(t *testing.T) {
+	gittest.AssertMachineIndependent(t, func() string {
+		root, _, _, _ := rebaseFixture(t)
+		return root
+	})
 }
 
 // pushFromElsewhere pushes a commit on top of origin's fix/rebase from

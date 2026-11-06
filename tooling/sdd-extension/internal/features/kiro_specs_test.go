@@ -10,6 +10,27 @@ import (
 	"go.putnami.dev/sdk/extension/gittest"
 )
 
+// stageWorkspace makes root a repository with every file staged and nothing
+// committed, which is what the candidate cut reads.
+func stageWorkspace(t *testing.T, root string) {
+	t.Helper()
+	for _, arguments := range [][]string{{"init", "-q"}, {"add", "-A"}} {
+		command := gittest.Command(root, arguments...)
+		if output, err := command.CombinedOutput(); err != nil {
+			t.Fatalf("git %v: %v: %s", arguments, err, output)
+		}
+	}
+}
+
+func TestStageWorkspaceIsTheSameOnAForeignMachine(t *testing.T) {
+	gittest.AssertMachineIndependent(t, func() string {
+		root := t.TempDir()
+		writeDiscoveryFixture(t, filepath.Join(root, ".kiro", "specs", "invoice", "requirements.md"), "## Introduction\n")
+		stageWorkspace(t, root)
+		return root
+	})
+}
+
 func TestTrackedKiroSpecIsReadThroughTheCandidateCut(t *testing.T) {
 	spectest.Proves(t, "tooling/specification-driven-development", "kiro-specs-reach-the-gate", "a-tracked-kiro-spec-is-read-through-the-candidate-cut")
 	ws := externalWorkspace(t, "", "kiro")
@@ -17,12 +38,7 @@ func TestTrackedKiroSpecIsReadThroughTheCandidateCut(t *testing.T) {
 		strings.NewReplacer(`"format":"openspec"`, `"format":"kiro"`, "app/openspec/invoice", ".kiro/specs/invoice").Replace(externalManifest))
 	writeDiscoveryFixture(t, filepath.Join(ws.Root, ".kiro", "specs", "invoice", "requirements.md"),
 		"## Introduction\n\nWhy.\n\n### Requirement 1\n\n#### Acceptance Criteria\n\n1. THE system SHALL run\n")
-	for _, arguments := range [][]string{{"init", "-q"}, {"add", "-A"}} {
-		command := gittest.Command(ws.Root, arguments...)
-		if output, err := command.CombinedOutput(); err != nil {
-			t.Fatalf("git %v: %v: %s", arguments, err, output)
-		}
-	}
+	stageWorkspace(t, ws.Root)
 	native, err := NewOSReader(ws.Root)
 	if err != nil {
 		t.Fatal(err)

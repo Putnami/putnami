@@ -9,7 +9,8 @@
 // global ignore file can drop fixture files from a commit.
 //
 // Every test of the repository that runs git goes through this package. Only
-// test code imports it.
+// tests and the helper packages only tests import use it; no product package
+// imports it.
 package gittest
 
 import (

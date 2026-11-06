@@ -1143,6 +1143,15 @@ func featureCommandsWorkspace(t *testing.T, invalid bool) *workspace.Workspace {
 	return fixtureWorkspace("features-test", root, appProject("app", "app"), appProject("orders", "orders"))
 }
 
+func TestFeatureCommandsRepositoryIsTheSameOnAForeignMachine(t *testing.T) {
+	gittest.AssertMachineIndependent(t, func() string {
+		root := featureCommandsWorkspace(t, false).Root
+		initFeatureCommandsGit(t, root)
+		commitFeatureCommandsGit(t, root, "base features")
+		return root
+	})
+}
+
 func initFeatureCommandsGit(t *testing.T, root string) {
 	t.Helper()
 	runFeatureCommandsGit(t, root, "init", "-q")

@@ -44,6 +44,10 @@ func initGitRepo(t *testing.T) string {
 	return dir
 }
 
+func TestInitGitRepoIsTheSameOnAForeignMachine(t *testing.T) {
+	gittest.AssertMachineIndependent(t, func() string { return initGitRepo(t) })
+}
+
 func runGit(t *testing.T, dir string, args ...string) string {
 	t.Helper()
 	cmd := gittest.Command(dir, args...)

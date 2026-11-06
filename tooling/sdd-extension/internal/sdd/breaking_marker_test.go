@@ -39,6 +39,13 @@ func branchWithCommits(t *testing.T, messages ...string) (string, []string) {
 	return dir, shas
 }
 
+func TestBranchWithCommitsIsTheSameOnAForeignMachine(t *testing.T) {
+	gittest.AssertMachineIndependent(t, func() string {
+		dir, _ := branchWithCommits(t, "fix(cli): stop the leak", "feat(cli)!: drop the --all flag")
+		return dir
+	})
+}
+
 // commitFile writes one file, commits it with message, and returns the commit
 // ID.
 func commitFile(t *testing.T, dir, name, content, message string) string {
