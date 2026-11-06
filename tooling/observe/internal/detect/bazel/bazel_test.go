@@ -78,8 +78,8 @@ func TestAQueryExportGivesThePackagesAndTheirEdges(t *testing.T) {
 	spectest.Proves(t, feature, "bazel-package-edges", "an-edge-between-targets-is-an-edge-between-packages")
 	root := writeTree(t, shop(map[string]string{GraphFile: streamed}))
 	d := Detect(root, "")
-	if len(d.Diagnostics) != 0 {
-		t.Fatalf("diagnostics %v", d.Diagnostics)
+	if len(d.Diagnostics) != 0 || !d.FromExport {
+		t.Fatalf("diagnostics %v, from the export %v", d.Diagnostics, d.FromExport)
 	}
 	want := []Package{
 		{Dir: "api", Label: "//api", DependsOn: []string{"pricing"}},
@@ -143,6 +143,10 @@ func TestABazelWorkspaceIsRecognizedByItsRootFile(t *testing.T) {
 			t.Errorf("%s does not make a Bazel workspace", marker)
 		}
 	}
+	// A workspace without a package names no export command.
+	if d := Detect(writeTree(t, map[string]string{"MODULE.bazel": "", "go.mod": "module shop\n"}), ""); len(d.Packages) != 0 || len(d.Diagnostics) != 0 {
+		t.Errorf("a workspace without a BUILD file: %+v", d)
+	}
 	root := writeTree(t, map[string]string{"pricing/BUILD": "", "pricing/MODULE.bazel": "", GraphFile: streamed})
 	if d := Detect(root, ""); IsWorkspace(root) || len(d.Packages) != 0 || len(d.Diagnostics) != 0 {
 		t.Errorf("a repository without a root marker: %+v", d)
@@ -154,7 +158,7 @@ func TestWithoutAnExportTheBuildFilesGiveThePackages(t *testing.T) {
 	root := writeTree(t, shop(nil))
 	d := Detect(root, "")
 	want := []Package{{Dir: "api", Label: "//api"}, {Dir: "pricing", Label: "//pricing"}, {Dir: "web", Label: "//web"}}
-	if !reflect.DeepEqual(d.Packages, want) {
+	if !reflect.DeepEqual(d.Packages, want) || d.FromExport {
 		t.Errorf("packages %+v, want %+v", d.Packages, want)
 	}
 	if got := codes(d.Diagnostics); !reflect.DeepEqual(got, []string{"info " + CodeGraphMissing}) {

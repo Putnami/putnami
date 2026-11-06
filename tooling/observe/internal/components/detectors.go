@@ -21,9 +21,11 @@ type Options struct {
 	BazelGraph string
 }
 
-// Default returns the detectors observe runs, orchestrators first.
+// Default returns the detectors observe runs, Nx and Pants first. Bazel comes
+// last: its export outranks the others by source, and without one its
+// packages yield.
 func Default(opts Options) []Detector {
-	return []Detector{NxDetector{}, PantsDetector{GraphFile: opts.PantsGraph}, BazelDetector{GraphFile: opts.BazelGraph}, NodeDetector{}, ComposerDetector{}, GoDetector{}, PythonDetector{}}
+	return []Detector{NxDetector{}, PantsDetector{GraphFile: opts.PantsGraph}, NodeDetector{}, ComposerDetector{}, GoDetector{}, PythonDetector{}, BazelDetector{GraphFile: opts.BazelGraph}}
 }
 
 // fromProbe turns the projects of a probe answer into components.
@@ -70,7 +72,8 @@ func (d NxDetector) Detect(root string) Found {
 }
 
 // BazelDetector adapts the Bazel detector: each Bazel package is an
-// orchestrator component, with the edges of the query export. It also places
+// orchestrator component, with the edges of the query export, or a manifest
+// one without edges when there is no export. It also places
 // each test log of bazel-testlogs on the package of its test target.
 type BazelDetector struct {
 	// GraphFile is the query export to read; empty reads bazel-graph.json.
@@ -87,9 +90,13 @@ func (d BazelDetector) Detect(root string) Found {
 	if len(detection.Packages) == 0 {
 		return found
 	}
+	source := evidence.SourceManifest
+	if detection.FromExport {
+		source = evidence.SourceOrchestrator
+	}
 	for _, p := range detection.Packages {
 		found.Components = append(found.Components, Component{
-			ID: p.Dir, Name: p.Label, Ecosystem: bazel.Ecosystem, Source: evidence.SourceOrchestrator, DependsOn: p.DependsOn,
+			ID: p.Dir, Name: p.Label, Ecosystem: bazel.Ecosystem, Source: source, DependsOn: p.DependsOn,
 		})
 	}
 	found.ReportOwner = detection.TestTarget

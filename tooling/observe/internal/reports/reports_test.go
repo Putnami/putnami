@@ -397,6 +397,8 @@ func bazelOutputs(t *testing.T, root string) {
 		"testlogs/pricing/pricing_test/test.log":           "PASS\n",
 		"testlogs/api/api_test/shard_1_of_2/test.xml":      junitXML,
 		"testlogs/api/api_test/test.outputs/outputs.xml":   junitXML,
+		"testlogs/api/api_test/test.outputs/test.xml":      junitXML,
+		"testlogs/api/api_test/test_attempts/test.xml":     junitXML,
 		"out/_coverage/_coverage_report.dat":               lcovTrace,
 		"out/k8-fastbuild/testlogs/pricing/other/test.xml": junitXML,
 	})
@@ -424,8 +426,8 @@ func TestBazelReportsAreDiscoveredThroughTheConvenienceLinks(t *testing.T) {
 		t.Errorf("reports %+v, want %+v", found, want)
 	}
 
-	// A pattern through the link finds the same logs, named through it.
-	named, diags := Collect(Request{Root: root, JUnit: []string{"bazel-testlogs/**/test.xml"}, Coverage: []string{"bazel-out/_coverage/_coverage_report.dat"}, Resolve: resolver(root)})
+	// Patterns through the link find the same logs, named through it.
+	named, diags := Collect(Request{Root: root, JUnit: []string{"bazel-testlogs/*/*/test.xml", "bazel-testlogs/*/*/shard_*/test.xml"}, Coverage: []string{"bazel-out/_coverage/_coverage_report.dat"}, Resolve: resolver(root)})
 	if len(diags) != 0 {
 		t.Fatalf("diagnostics %v", diags)
 	}

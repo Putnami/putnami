@@ -73,7 +73,10 @@ type Package struct {
 // Detection is what the detector found.
 type Detection struct {
 	// Packages are sorted by directory.
-	Packages    []Package
+	Packages []Package
+	// FromExport tells whether the packages and their edges come from the
+	// query export rather than the BUILD files.
+	FromExport  bool
 	Diagnostics []diag.Diagnostic
 	// targets maps the test log directory of each rule of the export,
 	// <package>/<name> relative to bazel-testlogs, to its package directory.
@@ -106,23 +109,27 @@ func Detect(root, graph string) Detection {
 	}
 	var d Detection
 	export, err := readExport(graph)
+	missing := errors.Is(err, fs.ErrNotExist) && !named
 	switch {
-	case errors.Is(err, fs.ErrNotExist) && !named:
-		d.Diagnostics = append(d.Diagnostics, diag.Diagnostic{
-			Severity: diag.Info, Code: CodeGraphMissing,
-			Message: "no Bazel query export was found, so the Bazel packages have no edge: run `" + ExportCommand + "` before putnami observe, or name the export with --bazel-graph",
-		})
+	case missing:
 	case err != nil:
 		d.Diagnostics = append(d.Diagnostics, diag.Warningf(CodeGraphUnreadable, "",
 			"the Bazel query export %s is left out, so the Bazel packages have no edge: %v; write it with `%s`", display(root, graph), err, ExportCommand))
 	default:
 		d.fromExport(root, export)
+		d.FromExport = true
 		return d
 	}
 	dirs, diags := buildDirs(root)
 	d.Diagnostics = append(d.Diagnostics, diags...)
 	for _, dir := range dirs {
 		d.Packages = append(d.Packages, Package{Dir: dir, Label: label(dir)})
+	}
+	if missing && len(d.Packages) > 0 {
+		d.Diagnostics = append(d.Diagnostics, diag.Diagnostic{
+			Severity: diag.Info, Code: CodeGraphMissing,
+			Message: "no Bazel query export was found, so the Bazel packages have no edge: run `" + ExportCommand + "` before putnami observe, or name the export with --bazel-graph",
+		})
 	}
 	return d
 }
@@ -136,25 +143,30 @@ func (d Detection) TestTarget(report string) (string, bool) {
 	if !ok {
 		return "", false
 	}
-	dir := path.Dir(rest)
-	best, bestTarget, found := "", "", false
-	for target, pkg := range d.targets {
-		if (dir == target || strings.HasPrefix(dir, target+"/")) && (!found || len(target) > len(bestTarget)) {
-			best, bestTarget, found = pkg, target, true
+	// The log directory, then each directory above it, from the deepest.
+	var dirs []string
+	for dir := path.Dir(rest); dir != "." && dir != "/"; dir = path.Dir(dir) {
+		dirs = append(dirs, dir)
+	}
+	for _, dir := range dirs {
+		if pkg, ok := d.targets[dir]; ok {
+			return pkg, true
 		}
 	}
-	if found {
-		return best, true
-	}
-	depth := -1
+	packages := make(map[string]bool, len(d.Packages))
 	for _, p := range d.Packages {
-		if p.Dir == "." && depth < 0 {
-			best, found, depth = p.Dir, true, 0
-		} else if p.Dir != "." && strings.HasPrefix(dir, p.Dir+"/") && strings.Count(p.Dir, "/")+1 > depth {
-			best, found, depth = p.Dir, true, strings.Count(p.Dir, "/")+1
+		packages[p.Dir] = true
+	}
+	// A package strictly above the log directory, which names its target.
+	for _, dir := range dirs[min(1, len(dirs)):] {
+		if packages[dir] {
+			return dir, true
 		}
 	}
-	return best, found
+	if packages["."] && len(dirs) > 0 {
+		return ".", true
+	}
+	return "", false
 }
 
 // rule is the part of a query target the detector reads.

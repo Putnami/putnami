@@ -252,6 +252,18 @@ const (
 	bazelCoverageReport = "bazel-out/_coverage/_coverage_report.dat"
 )
 
+// inTestOutputs reports whether a test log lies in what a test wrote itself,
+// its undeclared outputs or the logs of its earlier attempts, rather than the
+// log of a target, shard or run.
+func inTestOutputs(file string) bool {
+	for _, segment := range strings.Split(filepath.ToSlash(file), "/") {
+		if segment == "test.outputs" || segment == "test_attempts" {
+			return true
+		}
+	}
+	return false
+}
+
 // discoverBazelReports finds the reports Bazel wrote through its links, named
 // by their path through the link.
 func discoverBazelReports(root string, kinds map[string]bool) ([]Report, []diag.Diagnostic) {
@@ -263,7 +275,11 @@ func discoverBazelReports(root string, kinds map[string]bool) ([]Report, []diag.
 			if bounded {
 				diags = append(diags, diag.Warningf(CodeDiscoveryBounded, "", "discovery stopped in %s after %d entries or %d reports: name the reports with --junit", bazelTestLogs, MaxWalkedEntries, MaxReports))
 			}
-			candidates = append(candidates, files...)
+			for _, file := range files {
+				if rel, err := filepath.Rel(filepath.Join(root, bazelTestLogs), file); err == nil && !inTestOutputs(rel) {
+					candidates = append(candidates, file)
+				}
+			}
 		}
 	}
 	if kinds[KindCoverage] {

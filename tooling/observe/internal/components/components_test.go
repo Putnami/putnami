@@ -216,3 +216,42 @@ func TestAPantsResolveLockfileIsAPyPILockfile(t *testing.T) {
 		t.Error("a lockfile no resolve names is read")
 	}
 }
+
+func TestWithoutAnExportAnotherDetectorKeepsItsComponents(t *testing.T) {
+	spectest.Proves(t, "tooling/observe-bazel", "bazel-without-export", "without-an-export-another-detector-keeps-its-components")
+	files := map[string]string{
+		"MODULE.bazel":                  "",
+		"pnpm-workspace.yaml":           "packages:\n  - packages/*\n",
+		"package.json":                  `{"name":"root","private":true}`,
+		"packages/pricing/package.json": `{"name":"@demo/pricing"}`,
+		"packages/pricing/BUILD.bazel":  "",
+		"packages/api/package.json":     `{"name":"@demo/api","dependencies":{"@demo/pricing":"workspace:*"}}`,
+		"packages/api/BUILD.bazel":      "",
+		"tools/BUILD.bazel":             "",
+	}
+	root := t.TempDir()
+	write(t, root, files)
+	byID := map[string]Component{}
+	for _, c := range Detect(root, Default(Options{})).Components {
+		byID[c.ID] = c
+	}
+	if c := byID["packages/api"]; c.Ecosystem != "node" || !slices.Equal(c.DependsOn, []string{"packages/pricing"}) {
+		t.Errorf("packages/api %+v", c)
+	}
+	if c := byID["tools"]; c.Ecosystem != "bazel" || c.Source != evidence.SourceManifest {
+		t.Errorf("tools %+v", c)
+	}
+
+	// With an export, Bazel is the authority.
+	write(t, root, map[string]string{"bazel-graph.json": `{"type":"RULE","rule":{"name":"//packages/api:api","ruleInput":["//packages/pricing:pricing"]}}
+{"type":"RULE","rule":{"name":"//packages/pricing:pricing"}}
+{"type":"RULE","rule":{"name":"//tools:tools"}}
+`})
+	byID = map[string]Component{}
+	for _, c := range Detect(root, Default(Options{})).Components {
+		byID[c.ID] = c
+	}
+	if c := byID["packages/api"]; c.Ecosystem != "bazel" || c.Source != evidence.SourceOrchestrator || !slices.Equal(c.DependsOn, []string{"packages/pricing"}) {
+		t.Errorf("packages/api with an export %+v", c)
+	}
+}

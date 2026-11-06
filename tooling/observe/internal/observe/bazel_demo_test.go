@@ -121,7 +121,7 @@ func TestWithoutAnExportTheBazelDemoListsItsPackages(t *testing.T) {
 		t.Fatalf("components %+v", got)
 	}
 	for id, c := range got {
-		if len(c.DependsOn) != 0 || c.Name != "//"+id {
+		if len(c.DependsOn) != 0 || c.Name != "//"+id || c.Source != evidence.SourceManifest {
 			t.Errorf("component %+v", c)
 		}
 	}

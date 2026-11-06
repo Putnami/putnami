@@ -16,10 +16,15 @@ A repository whose root holds `MODULE.bazel`, `WORKSPACE` or
 | Id | The package's directory, `.` for the root package |
 | Name | The package label: `//pricing`, or `//` for the root package |
 | Ecosystem | `bazel` |
-| Source | `orchestrator` |
+| Source | `orchestrator` with the query export, `manifest` without it |
 
 A component is a package, never a target: the targets of one `BUILD` file
 share its directory, and a changed file belongs to the package that holds it.
+
+The Bazel detector runs after the others. With an export, its packages
+outrank them by source, as an Nx graph export does. Without one, a directory
+another detector names, such as a pnpm workspace member or a Go module, keeps
+that detector's component and its edges.
 
 ## The query export comes first
 
@@ -37,7 +42,10 @@ The detector reads `bazel-graph.json` at the repository root, or the file
 query result that lists the targets.
 
 - Each directory that holds a `BUILD` or `BUILD.bazel` file and at least one
-  rule of the main repository in the export is a package.
+  rule of the main repository in the export is a package. A `BUILD` file that
+  declares no rule, such as one that only calls `exports_files`, makes no
+  component: its files belong to the package above it, if any, and an edge to
+  one of its files is no edge.
 - A rule that names a target of another package among its inputs, through
   `deps`, `srcs`, `data` or any other label attribute, makes its package
   depend on the other one.
@@ -51,8 +59,9 @@ the checkout of that commit.
 ## Without an export: the BUILD files
 
 Without an export, each directory that holds a `BUILD` or `BUILD.bazel` file
-is a package, and no package has an edge. The run gets the info diagnostic
-`observe.bazel_graph_missing`, which names the export command. The walk skips
+is a package of source `manifest`, and no package has an edge. When it finds
+one, the run gets the info diagnostic `observe.bazel_graph_missing`, which
+names the export command. The walk skips
 hidden directories, `node_modules`, the `bazel-*` links of the root and the
 directories `.bazelignore` names, and stops after 200 000 entries with the
 `observe.bazel_walk_bounded` warning.
@@ -70,7 +79,7 @@ follows two of them:
 
 | Report | Path | Written by |
 |---|---|---|
-| JUnit | each `test.xml` under `bazel-testlogs` | `bazel test`, one per test target, shard and run |
+| JUnit | each `test.xml` under `bazel-testlogs`, except under a target's `test.outputs` and `test_attempts` | `bazel test`, one per test target, shard and run |
 | LCOV | `bazel-out/_coverage/_coverage_report.dat` | `bazel coverage --combined_report=lcov` |
 
 Each one is still recognized by its content, and named by its path through the
