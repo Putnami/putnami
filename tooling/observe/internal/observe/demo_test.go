@@ -76,24 +76,7 @@ func writeDemoFile(t *testing.T, root, name, content string) {
 // root and the base commit.
 func demoRepository(t *testing.T, name string) (string, string) {
 	t.Helper()
-	root := t.TempDir()
-	git(t, root, "init", "--quiet", "--initial-branch=main")
-	files := readDemo(t, name)
-	for _, stage := range []string{"base/", "head/"} {
-		for _, f := range files {
-			if rest, ok := strings.CutPrefix(f.name, stage); ok {
-				writeDemoFile(t, root, rest, f.content)
-			}
-		}
-		git(t, root, "add", "--all")
-		git(t, root, "commit", "--quiet", "-m", stage)
-	}
-	for _, f := range files {
-		if rest, ok := strings.CutPrefix(f.name, "ci/"); ok {
-			writeDemoFile(t, root, rest, f.content)
-		}
-	}
-	return root, git(t, root, "rev-parse", "HEAD~1")
+	return demoRepositoryWithout(t, name, func(string) bool { return false })
 }
 
 func TestDemoRepositoryIsTheSameOnAForeignMachine(t *testing.T) {
@@ -194,6 +177,18 @@ var demos = map[string]demoExpectation{
 		// pubspec.lock lies in the pub workspace root, which is no component.
 		lineFile:   "packages/pricing/lib/src/price.dart",
 		dependency: evidence.DependencyChange{Ecosystem: "pub", Lockfile: "pubspec.lock", Name: "intl", Change: evidence.DependencyUpgraded, From: "0.19.0", To: "0.20.2"},
+	},
+
+	"dotnet": {
+		env:       map[string]string{"GITHUB_ACTIONS": "true", "GITHUB_SERVER_URL": "https://github.com", "GITHUB_REPOSITORY": "Putnami/demo-observe-dotnet", "GITHUB_REPOSITORY_ID": "1109", "GITHUB_RUN_ID": "41335527412", "GITHUB_JOB": "test", "GITHUB_REF": "refs/pull/1/merge"},
+		changed:   []string{"src/Pricing", "tools/Migrate"},
+		dependent: []string{"src/Api", "src/Worker", "tests/Pricing.Tests"},
+		tests:     map[string]int{"tests/Pricing.Tests": 4},
+		covered:   []string{"src/Pricing"},
+		// The bump changes the lock file of tools/Migrate, the only project
+		// that uses the package.
+		lineFile:   "src/Pricing/PriceCalculator.cs",
+		dependency: evidence.DependencyChange{Ecosystem: "nuget", Lockfile: "tools/Migrate/packages.lock.json", Name: "Humanizer.Core", Change: evidence.DependencyUpgraded, From: "2.13.14", To: "2.14.1", Component: "tools/Migrate"},
 	},
 	"symfony": {
 		env: map[string]string{"GITLAB_CI": "true", "CI_SERVER_HOST": "gitlab.com", "CI_PROJECT_ID": "88373184", "CI_PROJECT_PATH": "putnami/demo-observe-symfony", "CI_PIPELINE_ID": "3015177948", "CI_JOB_ID": "17647015000", "CI_MERGE_REQUEST_IID": "1"},
@@ -493,4 +488,28 @@ func TestTheRushDemoChangeIsExplained(t *testing.T) {
 	if problems := evidence.ValidateDocument(Evidence(o, now)); diag.HasErrors(problems) {
 		t.Fatalf("the evidence document does not validate: %v", problems)
 	}
+}
+
+// demoRepositoryWithout builds the demo as demoRepository does, without the
+// files skip names.
+func demoRepositoryWithout(t *testing.T, name string, skip func(string) bool) (string, string) {
+	t.Helper()
+	root := t.TempDir()
+	git(t, root, "init", "--quiet", "--initial-branch=main")
+	files := slices.DeleteFunc(readDemo(t, name), func(f demoFile) bool { return skip(f.name) })
+	for _, stage := range []string{"base/", "head/"} {
+		for _, f := range files {
+			if rest, ok := strings.CutPrefix(f.name, stage); ok {
+				writeDemoFile(t, root, rest, f.content)
+			}
+		}
+		git(t, root, "add", "--all")
+		git(t, root, "commit", "--quiet", "-m", stage)
+	}
+	for _, f := range files {
+		if rest, ok := strings.CutPrefix(f.name, "ci/"); ok {
+			writeDemoFile(t, root, rest, f.content)
+		}
+	}
+	return root, git(t, root, "rev-parse", "HEAD~1")
 }

@@ -6,7 +6,8 @@
     "Jest, Vitest, PHPUnit and gotestsum JUnit reports read into the same test cases, with the test file when the report names it.",
     "Istanbul, c8, V8, PHPUnit, go test and JaCoCo or Kover coverage reads into the same line-level file coverage, so a consumer can measure the coverage of the lines a change touches.",
     "A missing, malformed or oversized report is one diagnostic with a stable code, and the reader never panics.",
-    "CycloneDX and SPDX documents that osv-scanner, Trivy or Syft wrote read into the same packages, each with its package URL, licences and known vulnerabilities."
+    "CycloneDX and SPDX documents that osv-scanner, Trivy or Syft wrote read into the same packages, each with its package URL, licences and known vulnerabilities.",
+    "The TRX report dotnet test writes for xUnit, NUnit and MSTest reads into the same test cases as a JUnit report, with the test assembly as suite."
   ],
   "nonGoals": [
     "Finding the report files in a CI workspace, which the observe extension owns.",
@@ -38,7 +39,7 @@
     },
     {
       "id": "malformed-reports-are-diagnostics",
-      "text": "A report that does not decode, whose root is not its format's, or that states an impossible value (a line below 1, a negative count, a malformed record, elements nested deeper than MaxSuiteDepth) returns no case and no file, and one error diagnostic of code readers.malformed. A report larger than MaxReportBytes, or whose files mark more than MaxLineMarks lines, returns readers.too_large, and ReadFile returns readers.missing for a missing file. No input makes a reader panic."
+      "text": "A report that does not decode, whose root is not its format's, or that states an impossible value (a line below 1, a negative count, a malformed record, an unknown TRX outcome, elements nested deeper than MaxSuiteDepth) returns no case and no file, and one error diagnostic of code readers.malformed. A report larger than MaxReportBytes, or whose files mark more than MaxLineMarks lines, returns readers.too_large, and ReadFile returns readers.missing for a missing file. No input makes a reader panic."
     },
     {
       "id": "cyclonedx-reads-components",
@@ -47,6 +48,10 @@
     {
       "id": "spdx-reads-packages",
       "text": "ReadSBOM reads an SPDX 2.3 JSON document into one package per package the document does not describe as itself, with its name, version and package URL, its concluded licence, else its declared one, unless NOASSERTION or NONE, and its SECURITY advisory references as vulnerabilities, named by the last segment of their locator, with an unknown severity. Another SPDX version is readers.malformed."
+    },
+    {
+      "id": "trx-reads-every-result",
+      "text": "ReadTRX reads a TestRun root into one case per top-level UnitTestResult in document order: its testName, its TestMethod's className up to a comma, a suite named by its codeBase's file name, and its duration. Passed, PassedButRunAborted, Completed and Warning pass; Failed fails; Error, Timeout and Aborted fail as an error; NotExecuted, Inconclusive, NotRunnable, Pending, Disconnected and InProgress skip. Totals are the ResultSummary counters, skipped being total less executed; other outcomes are malformed."
     }
   ]
 }

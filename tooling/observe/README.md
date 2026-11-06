@@ -76,6 +76,8 @@ their targets and the Xcode projects of an iOS or Swift repository.
 See [doc/14-dart.md](doc/14-dart.md) for how it reads the packages and
 edges of a Dart or Flutter repository, from a pub workspace, melos or
 `pubspec.yaml` files.
+See [doc/15-dotnet.md](doc/15-dotnet.md) for how it reads the projects,
+references, test assemblies and NuGet lock files of a .NET repository.
 See [doc/06-change-analyses.md](doc/06-change-analyses.md) for how it maps a
 change to components, tests, coverage and dependencies.
 

@@ -390,6 +390,36 @@ func TestAnSBOMIsFoundByItsContentOrNamed(t *testing.T) {
 	})
 }
 
+const trxReport = "\xef\xbb\xbf<?xml version=\"1.0\" encoding=\"utf-8\"?>\n" +
+	`<TestRun id="1" name="@vm" xmlns="http://microsoft.com/schemas/VisualStudio/TeamTest/2010"><Results/></TestRun>`
+
+func TestATRXReportIsFoundByItsContent(t *testing.T) {
+	spectest.Proves(t, "tooling/observe-dotnet", "dotnet-test-assemblies", "a-trx-report-is-found-by-its-content")
+	if got := Sniff([]byte(trxReport)); got != FormatTRX {
+		t.Errorf("Sniff(TRX) = %q, want %q", got, FormatTRX)
+	}
+	root := tree(t, map[string]string{
+		"TestResults/_vm_2026-11-06_13_55_21.trx": trxReport,
+		"tests/Api.Tests/TestResults/api.trx":     trxReport,
+		"TestResults/notes.trx":                   "not a report",
+	})
+	reports, diags := Collect(Request{Root: root, Resolve: resolver(root)})
+	want := []Report{
+		{Path: "TestResults/_vm_2026-11-06_13_55_21.trx", Kind: KindJUnit, Format: FormatTRX, Source: SourceDiscovered},
+		{Path: "tests/Api.Tests/TestResults/api.trx", Kind: KindJUnit, Format: FormatTRX, Source: SourceDiscovered},
+	}
+	if !reflect.DeepEqual(reports, want) {
+		t.Fatalf("reports:\n got %+v\nwant %+v", reports, want)
+	}
+	if len(diags) != 1 || diags[0].Code != CodeReportMissing || diags[0].Field != KindCoverage {
+		t.Errorf("diagnostics %v, want only the missing coverage", diags)
+	}
+	named, diags := Collect(Request{Root: root, Resolve: resolver(root), JUnit: []string{"tests/**/*.trx"}, Coverage: []string{"none.xml"}})
+	if len(named) != 1 || named[0].Format != FormatTRX || named[0].Source != SourceNamed {
+		t.Errorf("--junit tests/**/*.trx: %+v %v", named, diags)
+	}
+}
+
 // bazelOutputs writes the outputs of bazel test and bazel coverage outside
 // the repository, and the convenience links Bazel leaves at its root.
 func bazelOutputs(t *testing.T, root string) {

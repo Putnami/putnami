@@ -1,0 +1,84 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TestRun id="505676a6-46fd-4da6-919c-f326990e82ef" name="@vm 2026-11-06 13:56:13" xmlns="http://microsoft.com/schemas/VisualStudio/TeamTest/2010">
+  <Times creation="2026-11-06T13:56:13.7321919+00:00" queuing="2026-11-06T13:56:13.7321920+00:00" start="2026-11-06T13:56:12.5226905+00:00" finish="2026-11-06T13:56:13.7422474+00:00" />
+  <TestSettings name="default" id="9e8b09ff-2181-48b1-a624-3b75971c3620">
+    <Deployment runDeploymentRoot="_vm_2026-11-06_13_56_13" />
+  </TestSettings>
+  <Results>
+    <UnitTestResult executionId="a13b6764-b9bb-403a-a904-ccea0f7a08ff" testId="35dac530-52b0-9917-a29e-19d7c282f63d" testName="Calc.Tests.CalculatorTests.AddWrongOnPurpose" computerName="vm" duration="00:00:00.0022380" startTime="2026-11-06T13:56:13.5554500+00:00" endTime="2026-11-06T13:56:13.5554502+00:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Failed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="a13b6764-b9bb-403a-a904-ccea0f7a08ff">
+      <Output>
+        <ErrorInfo>
+          <Message>Assert.Equal() Failure
+Expected: 5
+Actual:   4</Message>
+          <StackTrace>   at Calc.Tests.CalculatorTests.AddWrongOnPurpose() in /app/Calc.Tests.xunit/CalculatorTests.cs:line 16
+   at System.RuntimeMethodHandle.InvokeMethod(Object target, Void** arguments, Signature sig, Boolean isConstructor)
+   at System.Reflection.MethodBaseInvoker.InvokeWithNoArgs(Object obj, BindingFlags invokeAttr)</StackTrace>
+        </ErrorInfo>
+      </Output>
+    </UnitTestResult>
+    <UnitTestResult executionId="61dfb405-3272-4c83-ac98-6b73b5132249" testId="d6c62c5f-34a7-0b9a-7952-d9ceef8e563e" testName="Calc.Tests.CalculatorTests.Skipped" computerName="vm" duration="00:00:00.0010000" startTime="2026-11-06T13:56:13.5182121+00:00" endTime="2026-11-06T13:56:13.5182376+00:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="NotExecuted" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="61dfb405-3272-4c83-ac98-6b73b5132249">
+      <Output>
+        <StdOut>not ready</StdOut>
+      </Output>
+    </UnitTestResult>
+    <UnitTestResult executionId="f5617460-b63b-45d1-a1a5-32acb999b319" testId="862eb372-5669-b478-fd62-26c0195f075b" testName="Calc.Tests.CalculatorTests.SignOfANonNegativeInput(n: 4)" computerName="vm" duration="00:00:00.0027358" startTime="2026-11-06T13:56:13.5314223+00:00" endTime="2026-11-06T13:56:13.5314224+00:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="f5617460-b63b-45d1-a1a5-32acb999b319" />
+    <UnitTestResult executionId="b5f8b22e-9f58-4709-8d90-f48bced35838" testId="2e340329-2b4c-25f5-8077-cc8996043ad1" testName="Calc.Tests.CalculatorTests.Add" computerName="vm" duration="00:00:00.0023142" startTime="2026-11-06T13:56:13.5331328+00:00" endTime="2026-11-06T13:56:13.5331330+00:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="b5f8b22e-9f58-4709-8d90-f48bced35838" />
+  </Results>
+  <TestDefinitions>
+    <UnitTest name="Calc.Tests.CalculatorTests.SignOfANonNegativeInput(n: 4)" storage="/app/calc.tests.xunit/bin/debug/net8.0/calc.tests.xunit.dll" id="862eb372-5669-b478-fd62-26c0195f075b">
+      <Execution id="f5617460-b63b-45d1-a1a5-32acb999b319" />
+      <TestMethod codeBase="/app/Calc.Tests.xunit/bin/Debug/net8.0/Calc.Tests.xunit.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="Calc.Tests.CalculatorTests" name="SignOfANonNegativeInput" />
+    </UnitTest>
+    <UnitTest name="Calc.Tests.CalculatorTests.Add" storage="/app/calc.tests.xunit/bin/debug/net8.0/calc.tests.xunit.dll" id="2e340329-2b4c-25f5-8077-cc8996043ad1">
+      <Execution id="b5f8b22e-9f58-4709-8d90-f48bced35838" />
+      <TestMethod codeBase="/app/Calc.Tests.xunit/bin/Debug/net8.0/Calc.Tests.xunit.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="Calc.Tests.CalculatorTests" name="Add" />
+    </UnitTest>
+    <UnitTest name="Calc.Tests.CalculatorTests.Skipped" storage="/app/calc.tests.xunit/bin/debug/net8.0/calc.tests.xunit.dll" id="d6c62c5f-34a7-0b9a-7952-d9ceef8e563e">
+      <Execution id="61dfb405-3272-4c83-ac98-6b73b5132249" />
+      <TestMethod codeBase="/app/Calc.Tests.xunit/bin/Debug/net8.0/Calc.Tests.xunit.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="Calc.Tests.CalculatorTests" name="Skipped" />
+    </UnitTest>
+    <UnitTest name="Calc.Tests.CalculatorTests.AddWrongOnPurpose" storage="/app/calc.tests.xunit/bin/debug/net8.0/calc.tests.xunit.dll" id="35dac530-52b0-9917-a29e-19d7c282f63d">
+      <Execution id="a13b6764-b9bb-403a-a904-ccea0f7a08ff" />
+      <TestMethod codeBase="/app/Calc.Tests.xunit/bin/Debug/net8.0/Calc.Tests.xunit.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="Calc.Tests.CalculatorTests" name="AddWrongOnPurpose" />
+    </UnitTest>
+  </TestDefinitions>
+  <TestEntries>
+    <TestEntry testId="35dac530-52b0-9917-a29e-19d7c282f63d" executionId="a13b6764-b9bb-403a-a904-ccea0f7a08ff" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="d6c62c5f-34a7-0b9a-7952-d9ceef8e563e" executionId="61dfb405-3272-4c83-ac98-6b73b5132249" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="862eb372-5669-b478-fd62-26c0195f075b" executionId="f5617460-b63b-45d1-a1a5-32acb999b319" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="2e340329-2b4c-25f5-8077-cc8996043ad1" executionId="b5f8b22e-9f58-4709-8d90-f48bced35838" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+  </TestEntries>
+  <TestLists>
+    <TestList name="Results Not in a List" id="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestList name="All Loaded Results" id="19431567-8539-422a-85d7-44ee4e166bda" />
+  </TestLists>
+  <ResultSummary outcome="Failed">
+    <Counters total="4" executed="3" passed="2" failed="1" error="0" timeout="0" aborted="0" inconclusive="0" passedButRunAborted="0" notRunnable="0" notExecuted="0" disconnected="0" warning="0" completed="0" inProgress="0" pending="0" />
+    <Output>
+      <StdOut>[xUnit.net 00:00:00.00] xUnit.net VSTest Adapter v2.4.5+1caef2f33e (64-bit .NET 8.0.33)
+[xUnit.net 00:00:00.48]   Discovering: Calc.Tests.xunit
+[xUnit.net 00:00:00.54]   Discovered:  Calc.Tests.xunit
+[xUnit.net 00:00:00.55]   Starting:    Calc.Tests.xunit
+[xUnit.net 00:00:00.59]       not ready
+[xUnit.net 00:00:00.63]       Assert.Equal() Failure
+[xUnit.net 00:00:00.63]       Expected: 5
+[xUnit.net 00:00:00.63]       Actual:   4
+[xUnit.net 00:00:00.63]       Stack Trace:
+[xUnit.net 00:00:00.63]         /app/Calc.Tests.xunit/CalculatorTests.cs(16,0): at Calc.Tests.CalculatorTests.AddWrongOnPurpose()
+[xUnit.net 00:00:00.63]            at System.RuntimeMethodHandle.InvokeMethod(Object target, Void** arguments, Signature sig, Boolean isConstructor)
+[xUnit.net 00:00:00.63]            at System.Reflection.MethodBaseInvoker.InvokeWithNoArgs(Object obj, BindingFlags invokeAttr)
+[xUnit.net 00:00:00.63]   Finished:    Calc.Tests.xunit
+Test 'Calc.Tests.CalculatorTests.Skipped' was skipped in the test run.
+</StdOut>
+    </Output>
+    <RunInfos>
+      <RunInfo computerName="vm" outcome="Warning" timestamp="2026-11-06T13:56:13.5174723+00:00">
+        <Text>[xUnit.net 00:00:00.59]     Calc.Tests.CalculatorTests.Skipped [SKIP]</Text>
+      </RunInfo>
+      <RunInfo computerName="vm" outcome="Error" timestamp="2026-11-06T13:56:13.5504745+00:00">
+        <Text>[xUnit.net 00:00:00.62]     Calc.Tests.CalculatorTests.AddWrongOnPurpose [FAIL]</Text>
+      </RunInfo>
+    </RunInfos>
+  </ResultSummary>
+</TestRun>

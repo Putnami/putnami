@@ -41,6 +41,7 @@ const (
 // Report formats.
 const (
 	FormatJUnit     = "junit"
+	FormatTRX       = "trx"
 	FormatLCOV      = "lcov"
 	FormatCobertura = "cobertura"
 	FormatClover    = "clover"
@@ -315,7 +316,7 @@ func discoverBazelReports(root string, kinds map[string]bool) ([]Report, []diag.
 func candidate(name string) bool {
 	lower := strings.ToLower(name)
 	switch path.Ext(lower) {
-	case ".xml", ".info", ".lcov", ".out", ".cov", ".coverprofile", ".gocov":
+	case ".xml", ".trx", ".info", ".lcov", ".out", ".cov", ".coverprofile", ".gocov":
 		return true
 	case ".txt":
 		return strings.Contains(lower, "cover")
@@ -329,7 +330,7 @@ func candidate(name string) bool {
 
 func kindOf(format string) string {
 	switch format {
-	case FormatJUnit:
+	case FormatJUnit, FormatTRX:
 		return KindJUnit
 	case FormatLCOV, FormatCobertura, FormatClover, FormatGoCover, FormatJaCoCo:
 		return KindCoverage
@@ -468,6 +469,8 @@ func sniffXML(head []byte) string {
 			}
 		}
 		return ""
+	case "TestRun":
+		return FormatTRX
 	case "coverage":
 	default:
 		return ""

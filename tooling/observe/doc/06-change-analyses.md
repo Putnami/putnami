@@ -7,7 +7,7 @@ queries no vulnerability database.
 
 ## Components
 
-Fourteen detectors read the repository:
+Fifteen detectors read the repository:
 
 | Detector | Reads | Source |
 |---|---|---|
@@ -24,6 +24,7 @@ Fourteen detectors read the repository:
 | Swift Package Manager | each `Package.swift` and its targets, from `swiftpm.json` as `swift package describe --type json` writes it, else the manifest and the directories under `Sources` and `Tests` | `workspace` |
 | Xcode | each `.xcodeproj` and the local packages its `project.pbxproj` references | `manifest` |
 | Dart | each `pubspec.yaml`, with the root's pub `workspace` and `melos.yaml` | `workspace` for a pub workspace or melos package, `manifest` otherwise |
+| .NET | each `.csproj`, `.fsproj` and `.vbproj`, with the root's `.sln` and `.slnx` | `workspace` for a project a root solution lists, `manifest` otherwise; see [the .NET detector](15-dotnet.md) |
 | Bazel | `bazel-graph.json` from `bazel query 'deps(//...)' --output=streamed_jsonproto`, else the `BUILD` and `BUILD.bazel` files | `orchestrator` for a query export, `manifest` otherwise |
 
 A component is a directory. When two detectors name one directory, the higher
@@ -56,7 +57,7 @@ its impact.
 
 ## Tests and coverage
 
-A JUnit case goes to the first of:
+A JUnit or TRX case goes to the first of:
 
 1. The package of its Bazel test target, for a log under `bazel-testlogs`;
    see [the Bazel detector](09-bazel.md#tests-and-coverage).
@@ -79,6 +80,9 @@ A JUnit case goes to the first of:
    (`gotestsum --junitfile`), or of the Swift test target the `Module` of a
    `Module.Class` class or suite name names (xcbeautify, fastlane `scan`,
    `swift test --xunit-output`); see [the Swift detectors](13-swift.md#reports).
+   Or of the .NET project whose test assembly its suite names
+   (`Pricing.Tests.dll`, from `dotnet test --logger trx` or
+   `JunitXml.TestLogger`).
    A located name that is a file is the case's file.
 5. The component that holds the report.
 
@@ -127,6 +131,8 @@ Each changed lockfile is read at the merge base and at the head:
 | `Package.resolved` | `swift` | each pin of format versions 1 to 3, at its version, else its revision |
 | `Podfile.lock` | `cocoapods` | each entry of `PODS`, by its root pod; pods from a `:path:` left out |
 | `pubspec.lock` | `pub` | each entry of `packages`; `path` and `sdk` sources left out |
+| `packages.lock.json` | `nuget` | each package each target framework resolves; `Project` entries left out |
+| `Directory.Packages.props`, without `packages.lock.json` in the repository | `nuget` | each `PackageVersion` with a literal `Include` and `Version` |
 
 A Rush monorepo keeps its lockfile under `common/config/rush/`: `pnpm-lock.yaml`,
 `npm-shrinkwrap.json` or `yarn.lock`, by the package manager `rush.json` names,
@@ -157,8 +163,8 @@ discovered) and one for the base (`--base-sbom`):
 osv-scanner writes no vulnerability in SPDX: use CycloneDX for them.
 
 A package of the SBOM matches a dependency change by the ecosystem its
-package URL names (`npm`, `composer`, `golang` is `go`, `pypi`, `maven`, `pub`), its
-name, normalized for `pypi` and written `group:artifact` for `maven`, and its version, a leading `v` ignored. A package
+package URL names (`npm`, `composer`, `golang` is `go`, `pypi`, `maven`, `pub`,
+`nuget`), its name, normalized for `pypi` and written `group:artifact` for `maven`, and its version, a leading `v` ignored. A package
 without a package URL matches by its name as written and its version, so a
 Python package without one matches only when the SBOM writes its normalized
 name. For each change, the base SBOM gives the `before` state, unless the

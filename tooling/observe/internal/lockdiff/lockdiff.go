@@ -1,7 +1,9 @@
 // Package lockdiff compares the packages a lockfile pins at two commits:
 // package-lock.json, pnpm-lock.yaml, yarn.lock, composer.lock, go.mod, uv.lock,
 // poetry.lock, the PEX JSON lock of a Pants resolve, gradle.lockfile, the
-// Gradle version catalog, Package.resolved, Podfile.lock and pubspec.lock.
+// Gradle version catalog, Package.resolved, Podfile.lock, pubspec.lock,
+// NuGet's packages.lock.json and the central package versions of
+// Directory.Packages.props.
 //
 // A reader turns a lockfile's content into the versions it pins per package
 // name. Workspace links, path packages and the repository's own modules are
@@ -96,6 +98,8 @@ func KindOf(file string) (Kind, bool) {
 		return Kind{EcosystemCocoaPods, ReadPodfileLock}, true
 	case PubspecLock:
 		return Kind{EcosystemPub, ReadPubspecLock}, true
+	case NuGetLock:
+		return Kind{EcosystemNuGet, ReadNuGetLock}, true
 	}
 	if strings.HasSuffix(path.Base(file), VersionCatalogSuffix) && path.Base(path.Dir(file)) == "gradle" {
 		return Kind{EcosystemMaven, ReadVersionCatalog}, true

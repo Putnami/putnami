@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TestRun id="1" name="run" xmlns="http://microsoft.com/schemas/VisualStudio/TeamTest/2010">
+  <Results>
+    <UnitTestResult testId="a" testName="Add" outcome="Exploded" />
+  </Results>
+</TestRun>

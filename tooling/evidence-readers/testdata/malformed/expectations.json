@@ -29,5 +29,9 @@
   "jacoco-line-zero.xml": {"reader": "jacoco", "code": "readers.malformed"},
   "jacoco-negative-count.xml": {"reader": "jacoco", "code": "readers.malformed"},
   "jacoco-bad-counter.xml": {"reader": "jacoco", "code": "readers.malformed"},
-  "jacoco-too-deep.xml": {"reader": "jacoco", "code": "readers.malformed"}
+  "jacoco-too-deep.xml": {"reader": "jacoco", "code": "readers.malformed"},
+  "trx-unknown-outcome.trx": {"reader": "trx", "code": "readers.malformed"},
+  "trx-wrong-root.trx": {"reader": "trx", "code": "readers.malformed"},
+  "trx-bad-counter.trx": {"reader": "trx", "code": "readers.malformed"},
+  "trx-truncated.trx": {"reader": "trx", "code": "readers.malformed"}
 }

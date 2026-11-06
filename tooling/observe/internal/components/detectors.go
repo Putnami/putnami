@@ -8,6 +8,7 @@ import (
 	"go.putnami.dev/tooling/observe/internal/detect/bazel"
 	"go.putnami.dev/tooling/observe/internal/detect/composer"
 	"go.putnami.dev/tooling/observe/internal/detect/dart"
+	"go.putnami.dev/tooling/observe/internal/detect/dotnet"
 	"go.putnami.dev/tooling/observe/internal/detect/gradle"
 	"go.putnami.dev/tooling/observe/internal/detect/maven"
 	"go.putnami.dev/tooling/observe/internal/detect/pants"
@@ -36,7 +37,7 @@ type Options struct {
 // its packages yield.
 func Default(opts Options) []Detector {
 	scan := &swiftScan{}
-	return []Detector{NxDetector{}, MoonDetector{GraphFile: opts.MoonGraph}, PantsDetector{GraphFile: opts.PantsGraph}, RushDetector{}, NodeDetector{}, ComposerDetector{}, GoDetector{}, PythonDetector{}, GradleDetector{}, MavenDetector{}, SwiftPMDetector{scan: scan}, XcodeDetector{scan: scan}, DartDetector{}, BazelDetector{GraphFile: opts.BazelGraph}}
+	return []Detector{NxDetector{}, MoonDetector{GraphFile: opts.MoonGraph}, PantsDetector{GraphFile: opts.PantsGraph}, RushDetector{}, NodeDetector{}, ComposerDetector{}, GoDetector{}, PythonDetector{}, GradleDetector{}, MavenDetector{}, SwiftPMDetector{scan: scan}, XcodeDetector{scan: scan}, DartDetector{}, DotnetDetector{}, BazelDetector{GraphFile: opts.BazelGraph}}
 }
 
 // fromProbe turns the projects of a probe answer into components.
@@ -339,6 +340,37 @@ func (DartDetector) Detect(root string) Found {
 	found := Found{Diagnostics: detection.Diagnostics}
 	for _, c := range detection.Components {
 		found.Components = append(found.Components, Component{ID: c.ID, Name: c.Name, Ecosystem: dart.Ecosystem, Source: c.Source, DependsOn: c.DependsOn})
+	}
+	return found
+}
+
+// DotnetDetector adapts the .NET detector: each project a root solution lists
+// is a workspace component, each other project file a manifest one. It also
+// maps a test assembly to its project, and reads Directory.Packages.props in a
+// repository without NuGet lock files.
+type DotnetDetector struct{}
+
+// Name implements Detector.
+func (DotnetDetector) Name() string { return "dotnet" }
+
+// Detect implements Detector.
+func (DotnetDetector) Detect(root string) Found {
+	detection := dotnet.Detect(root)
+	found := Found{Diagnostics: detection.Diagnostics}
+	if len(detection.Components) == 0 {
+		return found
+	}
+	for _, c := range detection.Components {
+		found.Components = append(found.Components, Component{ID: c.ID, Name: c.Name, Ecosystem: dotnet.Ecosystem, Source: c.Source, DependsOn: c.DependsOn})
+	}
+	found.Locate = detection.Locate
+	found.Lockfile = func(file string) (string, LockReader, bool) {
+		if !detection.IsCentralPackages(file) {
+			return "", nil, false
+		}
+		return lockdiff.EcosystemNuGet, func(data []byte) (map[string][]string, error) {
+			return lockdiff.ReadCentralPackages(data)
+		}, true
 	}
 	return found
 }

@@ -1426,6 +1426,86 @@
           }
         }
       ]
+    },
+    {
+      "id": "tooling/observe-dotnet",
+      "type": "feature",
+      "name": "Find the .NET projects of a repository that keeps its own CI",
+      "outcome": "putnami observe, in a .NET repository without a Putnami workspace, knows its projects from the root solution and the project files, which project owns each file and which projects reference which, without running dotnet or MSBuild, so a change to a shared library marks the projects that reference it, the TRX and Coverlet reports land on the right projects, and a NuGet package bump is a dependency change",
+      "owner": "tooling",
+      "target": "modeled",
+      "requirements": [
+        {
+          "id": "dotnet-projects-are-components",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "solution-projects-are-workspace-components",
+              "a-project-outside-the-solutions-is-a-manifest-component",
+              "a-malformed-solution-is-a-diagnostic"
+            ]
+          }
+        },
+        {
+          "id": "dotnet-project-references",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-project-reference-is-an-edge",
+              "an-unresolved-reference-is-no-edge"
+            ]
+          }
+        },
+        {
+          "id": "dotnet-test-assemblies",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-case-goes-to-the-project-of-its-test-assembly",
+              "a-trx-report-is-found-by-its-content"
+            ]
+          }
+        },
+        {
+          "id": "dotnet-lockfiles",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-packages-lock-is-a-nuget-lockfile",
+              "central-package-versions-are-read-without-lock-files"
+            ]
+          }
+        },
+        {
+          "id": "dotnet-change-analysis",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-dotnet-demo-is-explained"
+            ]
+          }
+        }
+      ]
     }
   ]
 }

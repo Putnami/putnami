@@ -333,6 +333,41 @@ func TestChangedLockfilesGiveDependencyChanges(t *testing.T) {
 	}
 }
 
+func TestADotnetCaseGoesToTheProjectOfItsTestAssembly(t *testing.T) {
+	spectest.Proves(t, "tooling/observe-dotnet", "dotnet-test-assemblies", "a-case-goes-to-the-project-of-its-test-assembly")
+	root := t.TempDir()
+	write(t, root, map[string]string{
+		"src/Calc/Calc.csproj": `<Project Sdk="Microsoft.NET.Sdk"/>`,
+		"tests/Calc.Tests.xunit/Calc.Tests.xunit.csproj": `<Project Sdk="Microsoft.NET.Sdk"><ItemGroup>` +
+			`<ProjectReference Include="..\..\src\Calc\Calc.csproj" /></ItemGroup></Project>`,
+	})
+	set := components.Detect(root, components.Default(components.Options{}))
+	// dotnet test --logger trx and JunitXml.TestLogger wrote these reports
+	// for the xUnit project, whose classes lie in the namespace Calc.Tests.
+	for name, file := range map[string]string{"TestResults/xunit.trx": "xunit.trx", "TestResults/junit.xml": "junit-xunit-logger.xml"} {
+		data, err := os.ReadFile(filepath.Join("testdata", file))
+		if err != nil {
+			t.Fatal(err)
+		}
+		write(t, root, map[string]string{name: string(data)})
+	}
+	r := Run(Input{Root: root, Set: set, Reports: []reports.Report{
+		{Path: "TestResults/junit.xml", Kind: reports.KindJUnit, Format: reports.FormatJUnit},
+		{Path: "TestResults/xunit.trx", Kind: reports.KindJUnit, Format: reports.FormatTRX},
+	}})
+	got := tests(r)
+	project := got["tests/Calc.Tests.xunit"]
+	if project.Passed != 4 || project.Failed != 2 || project.Skipped != 2 || len(project.FailingCases) != 2 {
+		t.Errorf("tests of the test project %+v, want both reports' cases", project)
+	}
+	if _, onLibrary := got["src/Calc"]; onLibrary || len(r.Tests) != 1 {
+		t.Errorf("tests %+v, want none on src/Calc, whose name the namespace starts with", r.Tests)
+	}
+	if len(r.Diagnostics) != 0 {
+		t.Errorf("diagnostics %v", r.Diagnostics)
+	}
+}
+
 func TestABazelTestLogGoesToThePackageOfItsTestTarget(t *testing.T) {
 	spectest.Proves(t, "tooling/observe-bazel", "bazel-reports", "a-test-log-goes-to-the-package-of-its-test-target")
 	root := t.TempDir()
