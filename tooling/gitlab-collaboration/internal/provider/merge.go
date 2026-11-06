@@ -148,7 +148,9 @@ func (s *proposalSession) restoreSquash(mr *glMergeRequest, answer *collab.Failu
 // send sends the merge call once and answers what GitLab did. reached is
 // true when GitLab got past its checks of the credential and the head and
 // stored the call's squash, which it does before it decides whether it can
-// merge: an answer of 405, 406 or 422, or one that did not merge.
+// merge: an answer of 405, 406 or 422, or one that did not merge. A 408 is
+// GitLab's statement timeout, which can strike after the squash was stored
+// and even after the merge landed, so it is read back like a lost answer.
 func (s *proposalSession) send(mr *glMergeRequest, request map[string]any) (_ any, _ *collab.Failure, reached bool) {
 	merged := func(current *glMergeRequest) (any, *collab.Failure, bool) {
 		return &collab.ProposalResult{Proposal: s.proposal(current)}, nil, true
@@ -170,7 +172,8 @@ func (s *proposalSession) send(mr *glMergeRequest, request map[string]any) (_ an
 			return nil, collab.Fail(collab.OutcomeConflict, reasonHeadMoved, "merge request !%d moved: %s", mr.IID, err.Message), false
 		}
 	}
-	if err != nil && err.Kind != gitlab.Uncertain {
+	timedOut := err != nil && err.Kind == gitlab.Answered && err.Status == http.StatusRequestTimeout
+	if err != nil && err.Kind != gitlab.Uncertain && !timedOut {
 		return nil, fail(err, "merge merge request !%d", mr.IID), false
 	}
 	var current *glMergeRequest

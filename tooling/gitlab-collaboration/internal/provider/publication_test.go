@@ -364,6 +364,26 @@ func TestAnAnswerThatMergesNothingLeavesTheSquashFlag(t *testing.T) {
 	mustContain(t, failure.Message, "was false before this merge")
 	mustContain(t, failure.Reconcile, "set its squash flag back to false")
 	h.mr(3, func(mr *fakeMR) { mr.squash = false })
+	// GitLab's statement timeout can strike after it stored the flag: the
+	// merge request is read back, and a merge that did not happen is
+	// unresolved, naming the flag's earlier value.
+	h.set(func(f *fakeGitLab) { f.branchSquash, f.unmergeable = "always", true })
+	h.fake.addFault("PUT", `/merge_requests/3/merge$`, statusFault(408, "Request timed out", false))
+	failure = h.fails("merge", h.merge(third.Proposal.Ref, `,"method":"squash"`), collab.OutcomeUnresolved)
+	if failure.Retryable || !flag(3) {
+		t.Fatalf("a timeout after the flag write: %+v, flag %t", failure, flag(3))
+	}
+	mustContain(t, failure.Message, "was false before this merge")
+	mustContain(t, failure.Reconcile, "set its squash flag back to false")
+	h.mr(3, func(mr *fakeMR) { mr.squash = false })
+	// A timeout after the merge landed answers the merge.
+	h.set(func(f *fakeGitLab) { f.unmergeable = false })
+	h.fake.addFault("PUT", `/merge_requests/3/merge$`, statusFault(408, "Request timed out", false))
+	var merged collab.ProposalResult
+	h.ok("merge", h.merge(third.Proposal.Ref, `,"method":"squash"`), &merged)
+	if merged.Proposal.State != collab.ProposalStateMerged {
+		t.Fatalf("a timeout after the merge answered %+v", merged.Proposal)
+	}
 	h.set(func(f *fakeGitLab) { f.branchSquash, f.unmergeable = "never", false })
 	// A flag that cannot be put back makes the answer unresolved: the second
 	// write, the one that puts it back, is refused.
