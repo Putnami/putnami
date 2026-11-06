@@ -283,3 +283,94 @@ func TestAPEXLockfileListsItsLockedRequirements(t *testing.T) {
 		}
 	}
 }
+
+const jvmFeature = "tooling/observe-jvm"
+
+func TestAGradleLockfileListsItsDependencies(t *testing.T) {
+	spectest.Proves(t, jvmFeature, "gradle-dependency-changes", "a-gradle-lockfile-lists-its-dependencies")
+	lock := `# This is a Gradle generated file for dependency locking.
+# Manual edits can break the build and are not advised.
+# This file is expected to be part of source control.
+com.google.guava:guava:33.3.1-jre=compileClasspath,runtimeClasspath
+org.jetbrains.kotlin:kotlin-stdlib:2.0.21=compileClasspath,runtimeClasspath,testCompileClasspath
+org.jetbrains:annotations:13.0=compileClasspath
+empty=annotationProcessor,testAnnotationProcessor
+`
+	for _, name := range []string{GradleLock, SettingsLock} {
+		kind, ok := KindOf("pricing/" + name)
+		if !ok || kind.Ecosystem != EcosystemMaven {
+			t.Fatalf("%s: kind %+v %v", name, kind, ok)
+		}
+		got, err := kind.Read([]byte(lock))
+		if err != nil {
+			t.Fatal(err)
+		}
+		expect(t, name, got, map[string][]string{
+			"com.google.guava:guava":             {"33.3.1-jre"},
+			"org.jetbrains.kotlin:kotlin-stdlib": {"2.0.21"},
+			"org.jetbrains:annotations":          {"13.0"},
+		})
+	}
+	if _, err := ReadGradleLockfile([]byte("com.google.guava:guava=compileClasspath\n")); err == nil {
+		t.Error("a line without a version reads")
+	}
+	changes := Diff(Packages{"com.google.guava:guava": {"33.3.1-jre"}}, Packages{"com.google.guava:guava": {"33.4.0-jre"}})
+	if len(changes) != 1 || changes[0].Change != evidence.DependencyUpgraded {
+		t.Errorf("changes %+v, want one upgrade", changes)
+	}
+}
+
+func TestAVersionCatalogListsItsLibrariesAndPlugins(t *testing.T) {
+	spectest.Proves(t, jvmFeature, "gradle-dependency-changes", "a-version-catalog-lists-its-libraries-and-plugins")
+	catalog := `[versions]
+kotlin = "2.0.21"
+guava = { strictly = "[33.0, 34.0[", prefer = "33.3.1-jre" }
+junit = { require = "5.11.4" }
+
+[libraries]
+commons-lang3 = "org.apache.commons:commons-lang3:3.17.0"
+guava = { module = "com.google.guava:guava", version.ref = "guava" }
+junit-jupiter = { group = "org.junit.jupiter", name = "junit-jupiter", version.ref = "junit" }
+okhttp = { module = "com.squareup.okhttp3:okhttp", version = "4.12.0" }
+coroutines = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version = { prefer = "1.9.0" } }
+junit-bom = { module = "org.junit:junit-bom", version.ref = "junit" }
+managed = { module = "org.slf4j:slf4j-api" }
+loose = "org.slf4j:slf4j-simple"
+
+[bundles]
+testing = ["junit-jupiter"]
+
+[plugins]
+kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
+android-library = "com.android.library:8.7.3"
+versions = { id = "com.github.ben-manes.versions" }
+`
+	kind, ok := KindOf("gradle/libs.versions.toml")
+	if !ok || kind.Ecosystem != EcosystemMaven {
+		t.Fatalf("kind %+v %v", kind, ok)
+	}
+	if _, ok := KindOf("libs.versions.toml"); ok {
+		t.Error("a catalog outside a gradle directory is read")
+	}
+	if _, ok := KindOf("gradle/tools.versions.toml"); !ok {
+		t.Error("a second catalog of the gradle directory is not read")
+	}
+	got, err := kind.Read([]byte(catalog))
+	if err != nil {
+		t.Fatal(err)
+	}
+	// The strictly range wins over prefer: it is what the catalog states.
+	expect(t, "catalog", got, map[string][]string{
+		"org.apache.commons:commons-lang3":              {"3.17.0"},
+		"com.google.guava:guava":                        {"[33.0, 34.0["},
+		"org.junit.jupiter:junit-jupiter":               {"5.11.4"},
+		"com.squareup.okhttp3:okhttp":                   {"4.12.0"},
+		"org.jetbrains.kotlinx:kotlinx-coroutines-core": {"1.9.0"},
+		"org.junit:junit-bom":                           {"5.11.4"},
+		"org.jetbrains.kotlin.jvm":                      {"2.0.21"},
+		"com.android.library":                           {"8.7.3"},
+	})
+	if _, err := ReadVersionCatalog([]byte("[libraries\n")); err == nil {
+		t.Error("a malformed catalog reads")
+	}
+}

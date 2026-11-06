@@ -1,6 +1,7 @@
 package analyze
 
 import (
+	"path"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -91,6 +92,8 @@ func (r *Result) readCoverage(report reports.Report, abs string) (readers.Covera
 		read = readers.ReadClover
 	case reports.FormatGoCover:
 		read = readers.ReadGoCover
+	case reports.FormatJaCoCo:
+		read = readers.ReadJaCoCo
 	default:
 		return readers.CoverageReport{}, false
 	}
@@ -117,9 +120,20 @@ func (r *Result) mapCoverage(report reports.Report, result readers.CoverageRepor
 			sourceBases = append(sourceBases, joinDir(base, source))
 		}
 	}
+	var jvmRoots []string
+	if report.Format == reports.FormatJaCoCo {
+		jvmRoots = m.sourceRoots(report.Path, jvmMainRoots)
+	}
 	unmapped := 0
 	for _, file := range result.Files {
-		rel, ok := m.resolve(file.Path, append(sourceBases, bases...))
+		rel, ok := "", false
+		if jvmRoots != nil {
+			// A JaCoCo file is a package path under a main source root.
+			rel, ok = m.underRoots(jvmRoots, file.Path)
+		}
+		if !ok {
+			rel, ok = m.resolve(file.Path, append(sourceBases, bases...))
+		}
 		if !ok && report.Format == reports.FormatGoCover {
 			// A Go profile names import paths; only a located file that
 			// exists is one.
@@ -173,6 +187,7 @@ func (r *Result) attributeTests(report reports.Report, result readers.TestReport
 	if isAbsolute(report.Path) {
 		reportOwned = false
 	}
+	var testRoots []string
 	unattributed := 0
 	for _, c := range result.Cases {
 		owner, file, ok := "", "", false
@@ -181,6 +196,18 @@ func (r *Result) attributeTests(report reports.Report, result readers.TestReport
 				file = rel
 				owner, ok = m.set.Owner(rel)
 				break
+			}
+		}
+		if classFiles := jvmClassFiles(c.Classname); !ok && classFiles != nil {
+			if testRoots == nil {
+				testRoots = m.sourceRoots(report.Path, jvmTestRoots)
+			}
+			for _, candidate := range classFiles {
+				if rel, found := m.underRoots(testRoots, candidate); found {
+					file = rel
+					owner, ok = m.set.Owner(rel)
+					break
+				}
 			}
 		}
 		if !ok {
@@ -257,6 +284,69 @@ func moduleFiles(classname string) []string {
 		out = append(out, strings.Join(parts[:n], "/")+".py")
 	}
 	return out
+}
+
+// The source roots of the JVM builds: Gradle, Android and Maven read their
+// sources and tests from these directories of a project.
+var (
+	jvmMainRoots = []string{"src/main/java", "src/main/kotlin"}
+	jvmTestRoots = []string{"src/test/java", "src/test/kotlin", "src/androidTest/java", "src/androidTest/kotlin"}
+)
+
+// jvmClassFiles returns the files a JVM test class may live in:
+// com.acme.PriceTest$Nested is com/acme/PriceTest.java or .kt. It returns
+// nil for a class name that is no dotted JVM name.
+func jvmClassFiles(classname string) []string {
+	classname, _, _ = strings.Cut(classname, "$")
+	if !dottedName.MatchString(classname) || !strings.Contains(classname, ".") {
+		return nil
+	}
+	base := strings.ReplaceAll(classname, ".", "/")
+	return []string{base + ".java", base + ".kt"}
+}
+
+// sourceRoots returns the existing source root directories of the
+// components, those of the component holding the report first, then the
+// others in id order.
+func (m *mapper) sourceRoots(reportPath string, roots []string) []string {
+	out := []string{}
+	add := func(id string) {
+		for _, root := range roots {
+			if dir := joinDir(id, root); m.isDir(dir) {
+				out = append(out, dir)
+			}
+		}
+	}
+	owner, owned := m.set.Owner(reportPath)
+	owned = owned && !isAbsolute(reportPath)
+	if owned {
+		add(owner)
+	}
+	for _, c := range m.set.Components {
+		if !owned || c.ID != owner {
+			add(c.ID)
+		}
+	}
+	return out
+}
+
+// underRoots finds a relative path, such as a package path and a file name,
+// under the first source root that holds it.
+func (m *mapper) underRoots(roots []string, rel string) (string, bool) {
+	rel = strings.ReplaceAll(strings.TrimSpace(rel), `\`, "/")
+	if rel == "" || isAbsolute(rel) || strings.HasPrefix(path.Clean(rel), "..") {
+		return "", false
+	}
+	pkg := path.Dir(rel)
+	for _, root := range roots {
+		if pkg != "." && !m.isDir(root+"/"+pkg) {
+			continue
+		}
+		if candidate := root + "/" + rel; m.isFile(candidate) {
+			return candidate, true
+		}
+	}
+	return "", false
 }
 
 // bounded cuts s to the evidence string bound, on a rune boundary.

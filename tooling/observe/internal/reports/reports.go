@@ -4,7 +4,8 @@
 // A report is recognized by its content, never by its name alone: a JUnit XML
 // report has a testsuites or testsuite root, a Cobertura report a coverage
 // root with Cobertura attributes, a Clover report a coverage root with a
-// project, an LCOV trace starts with a TN: or SF: record, a Go cover profile
+// project, a JaCoCo report a report root with JaCoCo children, an LCOV trace
+// starts with a TN: or SF: record, a Go cover profile
 // starts with its mode line, a CycloneDX document states its bomFormat and an
 // SPDX one its spdxVersion. Named paths replace discovery for their kind. The
 // SBOM of the base is only named, never discovered, and each side keeps at most
@@ -44,6 +45,7 @@ const (
 	FormatCobertura = "cobertura"
 	FormatClover    = "clover"
 	FormatGoCover   = "go-cover"
+	FormatJaCoCo    = "jacoco"
 	FormatCycloneDX = "cyclonedx"
 	FormatSPDX      = "spdx"
 )
@@ -75,6 +77,15 @@ const (
 
 // skippedDirs are never walked.
 var skippedDirs = map[string]bool{".git": true, "node_modules": true, "vendor": true}
+
+// skippedOutputs are the Gradle (build) and Maven (target) output
+// directories that hold no report, by the name of their parent: discovery
+// skips them, so that the thousands of XML files an Android build writes
+// there do not spend its bounds.
+var skippedOutputs = map[string]map[string]bool{
+	"build":  {"intermediates": true, "generated": true, "tmp": true, "kotlin": true},
+	"target": {"classes": true, "test-classes": true, "generated-sources": true, "generated-test-sources": true},
+}
 
 // Report is one report file.
 type Report struct {
@@ -212,7 +223,7 @@ func discoverReports(root string, kinds map[string]bool) ([]Report, []diag.Diagn
 			return errBound
 		}
 		if entry.IsDir() {
-			if file != root && skippedDirs[entry.Name()] {
+			if file != root && (skippedDirs[entry.Name()] || skippedOutputs[filepath.Base(filepath.Dir(file))][entry.Name()]) {
 				return filepath.SkipDir
 			}
 			return nil
@@ -259,7 +270,7 @@ func kindOf(format string) string {
 	switch format {
 	case FormatJUnit:
 		return KindJUnit
-	case FormatLCOV, FormatCobertura, FormatClover, FormatGoCover:
+	case FormatLCOV, FormatCobertura, FormatClover, FormatGoCover, FormatJaCoCo:
 		return KindCoverage
 	case FormatCycloneDX, FormatSPDX:
 		return KindSBOM
@@ -386,6 +397,16 @@ func sniffXML(head []byte) string {
 	switch root.Name.Local {
 	case "testsuites", "testsuite":
 		return FormatJUnit
+	case "report":
+		// JaCoCo and Kover: a report root whose first child is a JaCoCo
+		// element.
+		if child, ok := nextStart(decoder); ok {
+			switch child.Name.Local {
+			case "sessioninfo", "package", "group", "counter":
+				return FormatJaCoCo
+			}
+		}
+		return ""
 	case "coverage":
 	default:
 		return ""

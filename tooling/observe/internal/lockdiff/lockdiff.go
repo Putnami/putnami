@@ -1,6 +1,7 @@
 // Package lockdiff compares the packages a lockfile pins at two commits:
 // package-lock.json, pnpm-lock.yaml, yarn.lock, composer.lock, go.mod, uv.lock,
-// poetry.lock and the PEX JSON lock of a Pants resolve.
+// poetry.lock, the PEX JSON lock of a Pants resolve, gradle.lockfile and the
+// Gradle version catalog.
 //
 // A reader turns a lockfile's content into the versions it pins per package
 // name. Workspace links, path packages and the repository's own modules are
@@ -24,6 +25,7 @@ const (
 	EcosystemComposer = "composer"
 	EcosystemGo       = "go"
 	EcosystemPyPI     = "pypi"
+	EcosystemMaven    = "maven"
 )
 
 // Lockfile names the readers know.
@@ -35,6 +37,11 @@ const (
 	GoMod        = "go.mod"
 	UVLock       = "uv.lock"
 	PoetryLock   = "poetry.lock"
+	GradleLock   = "gradle.lockfile"
+	SettingsLock = "settings-gradle.lockfile"
+	// VersionCatalogSuffix ends the name of a Gradle version catalog, which
+	// lies in a gradle directory: gradle/libs.versions.toml.
+	VersionCatalogSuffix = ".versions.toml"
 )
 
 // Packages maps a package name to the versions a lockfile pins for it.
@@ -75,6 +82,11 @@ func KindOf(file string) (Kind, bool) {
 		return Kind{EcosystemPyPI, ReadUVLock}, true
 	case PoetryLock:
 		return Kind{EcosystemPyPI, ReadPoetryLock}, true
+	case GradleLock, SettingsLock:
+		return Kind{EcosystemMaven, ReadGradleLockfile}, true
+	}
+	if strings.HasSuffix(path.Base(file), VersionCatalogSuffix) && path.Base(path.Dir(file)) == "gradle" {
+		return Kind{EcosystemMaven, ReadVersionCatalog}, true
 	}
 	return Kind{}, false
 }
