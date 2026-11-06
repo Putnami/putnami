@@ -14,9 +14,8 @@ ADR 0010 launches each child in a local workspace and says the epic session
 opens no proposal. A child can also run in a cloud session. That host
 appends an attribution footer to each proposal body it writes, so
 `change finalize` fails its readback there and cannot publish the child's
-proposal (#822, #858, anthropics/claude-code#107892). The child's run
-records under `.putnami/` are ignored by Git and never reach the branch, so
-no other session can reuse its proof.
+proposal. The child's run records under `.putnami/` are ignored by Git and
+never reach the branch, so no other session can reuse its proof.
 
 ## Decision
 
