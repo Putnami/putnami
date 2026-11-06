@@ -62,6 +62,8 @@ See [doc/07-python.md](doc/07-python.md) for how it reads the projects and
 edges of a Python repository, from a uv workspace or `pyproject.toml` files.
 See [doc/08-pants.md](doc/08-pants.md) for how it reads the components and
 the inferred edges of a Pants repository, from a `pants peek` export.
+See [doc/09-swift.md](doc/09-swift.md) for how it reads the Swift packages,
+their targets and the Xcode projects of an iOS or Swift repository.
 See [doc/06-change-analyses.md](doc/06-change-analyses.md) for how it maps a
 change to components, tests, coverage and dependencies.
 

@@ -7,7 +7,7 @@ queries no vulnerability database.
 
 ## Components
 
-Six detectors read the repository:
+Eight detectors read the repository:
 
 | Detector | Reads | Source |
 |---|---|---|
@@ -17,6 +17,8 @@ Six detectors read the repository:
 | Composer | each `composer.json` | `manifest` |
 | Go | `go.work`, each `go.mod` | `workspace` for a `go.work` member, `manifest` otherwise |
 | Python | each `pyproject.toml`, with the root's `[tool.uv.workspace]` | `workspace` for a uv workspace member, `manifest` otherwise |
+| Swift Package Manager | each `Package.swift` and its targets, from `swiftpm.json` from `swift package describe --type json`, else the manifest and the directories under `Sources` and `Tests` | `workspace` |
+| Xcode | each `.xcodeproj` and the local packages its `project.pbxproj` references | `manifest` |
 
 A component is a directory. When two detectors name one directory, the higher
 source wins: `orchestrator`, then `workspace`, then `manifest`. On a tie, the
@@ -59,7 +61,9 @@ A JUnit case goes to the first of:
    pytest's `rootdir`; see
    [the Python detector](07-python.md#reports).
 2. The component of the Go package its class or suite names
-   (`gotestsum --junitfile`).
+   (`gotestsum --junitfile`), or of the Swift test target the `Module` of a
+   `Module.Class` class or suite name names (xcbeautify, fastlane `scan`,
+   `swift test --xunit-output`); see [the Swift detectors](09-swift.md#reports).
 3. The component that holds the report.
 
 A case that none of them places is counted in `observe.tests_unattributed`.
@@ -99,6 +103,8 @@ Each changed lockfile is read at the merge base and at the head:
 | `uv.lock` | `pypi` | each `[[package]]`; `editable`, `virtual`, `directory` and `path` sources left out |
 | `poetry.lock` | `pypi` | each `[[package]]`; `directory` and `file` sources and `develop` packages left out |
 | a Pants resolve lockfile | `pypi` | each locked requirement of the PEX JSON lock a `[python.resolves]` entry of `pants.toml` names |
+| `Package.resolved` | `swift` | each pin of format versions 1 to 3, at its version, else its revision |
+| `Podfile.lock` | `cocoapods` | each entry of `PODS`, by its root pod; pods from a `:path:` left out |
 
 `go.sum` holds checksums, not versions, and is not read. A Python package
 name is read in its normalized form (PEP 503): lower case, with each run of
