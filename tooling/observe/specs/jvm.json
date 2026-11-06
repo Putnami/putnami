@@ -23,11 +23,11 @@
     },
     {
       "id": "gradle-project-edges",
-      "text": "In a project's build.gradle.kts or build.gradle, outside comments, each project(\":x\"), project(path: \":x\") or project(path = \":x\") reference, and each type-safe accessor projects.x, where projects.fooBar names :foo-bar and projects.libs.core names :libs:core, is an edge from the project to the project it names. A relative path is relative to the project. A reference to a project the settings do not include is no edge."
+      "text": "In a project's build.gradle.kts or build.gradle, outside comments, each project(\":x\"), project(path: \":x\"), project(path = \":x\") or findProject(\":x\") reference, and each type-safe accessor projects.x, where projects.fooBar names :foo-bar and projects.libs.core names :libs:core, is an edge from the project to the project it names. A relative path is relative to the project. A reference to a project the settings do not include is no edge."
     },
     {
       "id": "gradle-dynamic-settings",
-      "text": "An include argument or a projectDir value that is not a string literal, such as a variable, a template or a loop, is the observe.gradle_dynamic_settings warning naming the settings file, and the projects the settings name with literals stay components."
+      "text": "An include argument or a projectDir value that is not a string literal, such as a variable, a template, a loop or a function reference, is the observe.gradle_dynamic_settings warning naming the settings file, and the projects the settings name with literals stay components. The word include inside a string or a comment is no include."
     },
     {
       "id": "maven-modules-are-components",
