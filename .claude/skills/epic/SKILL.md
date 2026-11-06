@@ -130,8 +130,9 @@ contracts it could not read.
 - A stacked child whose parent merged gets the rebase line `epic status`
   prints: `git rebase --onto <base> <parent's last head>`. Pass it to the
   child's session: it rebases before its next push, then pushes with
-  `change finalize --base <epic base>`, or with `git push` for a cloud
-  child, whose proposal you then publish again against the epic base. The contracts cannot retarget a
+  `change finalize --base <epic base>`, or with
+  `git push --force-with-lease` for a cloud child, whose proposal you then
+  publish again against the epic base. The contracts cannot retarget a
   proposal: when the provider did not retarget its proposal to the epic's
   base, ask the owner to do it.
 - When the envelope is spent, launch nothing new. Report what each running
@@ -157,17 +158,19 @@ you never code, and never commit to the child's branch.
    reviewer sees the intent before the code, and the child reads the reviews
    once the draft exists.
 3. When the child ends with its final head pushed, bring the worktree to it
-   and run build's check stage there, without its repair: freeze with
-   `change verify --snapshot`, one fresh independent reviewer, then the final
-   gate as check selects it, with `--fix=false` so the tree stays clean. A
-   P1 or P2 finding, or a red gate, publishes nothing: pass it to the child's
-   session, which repairs and pushes again. Never fix it in the worktree.
+   and run build's check and prove stages there, without their repair:
+   freeze with `change verify --snapshot --base origin/<base>`, one fresh
+   independent reviewer, the final gate as check selects it, then the local
+   qualification as prove says. A P1 or P2 finding, a red gate, a failed
+   proof, or a gate that rewrites a file, publishes nothing: pass it to the
+   child's session, which repairs and pushes again. Never fix it in the
+   worktree.
 4. Run build's merge stage on that tree with the child's title, a body file
    holding its body, and its task, plus `--partial-delivery` when it
    reported one: `"$PUTNAMI_CLI" change finalize --base <base>
-   --branch <branch>` with a dossier built from your review and gate
-   (`--verification-file`), or, when the hosted gate was selected,
-   `--gate ci` with a workflow record you write from that gate.
+   --branch <branch>` with a dossier built from your review, gate and proof
+   (`--verification-file`), or, when check selected the hosted gate,
+   `--gate ci` with a workflow record you write as merge says.
 5. When review sends the child back to code, it pushes again: prove and
    publish its new head from step 1. Remove the worktree once the proposal
    is merged or closed.

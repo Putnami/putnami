@@ -42,7 +42,8 @@ func TestAPushOnlyBuildOpensNoProposal(t *testing.T) {
 	requireSentences(t, "build/references/show.md",
 		"or push-only, open the proposal as a draft",
 		"A push-only run opens no draft and runs no `change finalize`.",
-		"It pushes the declarations commit alone with `git push -u origin <branch>`")
+		"It pushes the declarations commit alone with `git push -u origin <branch>`",
+		"the epic session opens the draft from it")
 	requireSentences(t, "build/references/code.md", "A push-only run pushes with `git push` instead")
 	requireSentences(t, "build/references/validate.md", "reads reviews and comments only once the epic session opened its proposal")
 	requireSentences(t, "build/references/merge.md",
@@ -68,12 +69,13 @@ func TestTheEpicSessionProvesAndPublishesACloudChild(t *testing.T) {
 		"`git reset --hard origin/<branch>`",
 		"Its `HEAD` must be the head the child reported",
 		"When the child reports its declarations commit pushed, bring the worktree to it and open the draft there",
-		"run build's check stage there, without its repair",
-		"one fresh independent reviewer, then the final gate as check selects it, with `--fix=false`",
-		"publishes nothing: pass it to the child's session",
+		"run build's check and prove stages there, without their repair",
+		"`change verify --snapshot --base origin/<base>`, one fresh independent reviewer, the final gate as check selects it, then the local qualification as prove says",
+		"a gate that rewrites a file, publishes nothing: pass it to the child's session",
 		"Never fix it in the worktree.",
-		"a dossier built from your review and gate (`--verification-file`)",
-		"`--gate ci` with a workflow record you write from that gate")
+		"a dossier built from your review, gate and proof (`--verification-file`)",
+		"`--gate ci` with a workflow record you write as merge says",
+		"`git push --force-with-lease` for a cloud child")
 	requireSentences(t, "build/references/code.md", "`git push --force-with-lease` after a rebase")
 	requireSentences(t, "build/references/merge.md", "Its final gate is the local `--projects` gate of its last edit, whatever the machine's load")
 	requireSentences(t, "build/references/policy.md",

@@ -83,5 +83,5 @@ code stage. A local run keeps the commit order and pushes nothing.
 
 A push-only run opens no draft and runs no `change finalize`. It pushes the
 declarations commit alone with `git push -u origin <branch>`, then reports
-its head: the epic session may open the draft from it. With no proposal yet,
+its head: the epic session opens the draft from it. With no proposal yet,
 it reads no review and no comment.
