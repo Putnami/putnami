@@ -1,0 +1,57 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-spec.json",
+  "protocolVersion": 1,
+  "feature": "tooling/gitlab-collaboration",
+  "outcomes": [
+    "A workspace keeps its work items in the issues of one GitLab project, on GitLab.com or a self-managed instance, and its skills speak only the tasks contract",
+    "A binding maps the contract's states to the project's own labels the way the GitHub provider's binding does, so one state configuration serves both hosts",
+    "A retry after a lost answer finds the issue the first attempt created instead of creating it again, and an outcome the provider cannot establish is reported as unresolved",
+    "A GitLab credential is found the way glab finds it, is sent only to its own instance, and appears in no answer, message or log"
+  ],
+  "nonGoals": [
+    "The proposals contract: merge requests are a separate change of the same epic",
+    "The link and claim operations: an issue's parent in GitLab is an epic or a work item hierarchy outside the issues REST API, and nothing enforces an exclusive claim",
+    "Detecting a concurrent writer between the read and the write of a checked precondition, or two concurrent creates with one idempotency key",
+    "Reading a token GitLab's CLI keeps in an operating-system keyring rather than in its configuration",
+    "Running the live proof in the ordinary gate: it mutates a real GitLab project and runs only on request"
+  ],
+  "requirements": [
+    {
+      "id": "label-states",
+      "text": "settings.states maps open, in_progress, blocked, done and canceled to label names, the first label of each being the one a transition applies, and every label with settings.stateLabelPrefix is a state label too. An opened issue is blocked, in_progress or open by the first of those states whose label it carries, and open without one. A closed issue is canceled when it carries a canceled label or GitLab closed it as a duplicate, and done otherwise. A transition removes every state label, applies the target's first label, and closes the issue for done and canceled or reopens it for the other states; a state other than open and done without a label is unsupported, and a task already in the state is left as it is. create applies the first label of in_progress or blocked, and opens then closes an issue asked for in done or canceled; create and update refuse a state label. providerState is the deciding label, or opened, closed or closed:duplicate."
+    },
+    {
+      "id": "content-revision",
+      "text": "A revision is v and the first 32 hex digits of the SHA-256 of the JSON array of title, whole description, state, duplicate link, sorted labels and sorted assignee usernames, so a comment never moves it and every change a task shows does. update, transition and assign compare expectedRevision with the issue read just before the write and answer conflict with the current revision before anything is written; the manifest declares them preconditions checked."
+    },
+    {
+      "id": "paged-find",
+      "text": "find reads the bound project's issue list, oldest first, filtered by GitLab on state, every listed label and the query matched against title and description, then by the provider on the semantic states. A cursor names GitLab's page and the creation time and id of the last issue considered, so every issue present throughout a traversal is listed exactly once, whatever page sizes the caller asks for."
+    },
+    {
+      "id": "reconciled-writes",
+      "text": "create records the hash of the idempotency key and the digest of the request in a hidden comment at the end of the description, and before it opens an issue it looks for that key among the newest issues the credential's account opened in the project, settings.keyScanPages pages of 100, then in GitLab's issue search. GitLab's lists read its database, so a repeat right after a create finds the issue. The same key and request return that issue with created false; the key with other content is a conflict, idempotency.mismatch; an issue another account opened never answers for a key. Every write is sent once: after a lost answer or a 5xx the provider reads GitLab back, never opens a second issue, and answers an outcome it cannot establish unresolved, naming what settles it. update keeps the marker, and a task's body never shows it."
+    },
+    {
+      "id": "informational-assign",
+      "text": "assign replaces an issue's assignees with the users the request names by username, @me naming the credential's account; a username GitLab does not know is invalid and nothing is written. GitLab keeps only the assignees it can assign, one on a tier without multiple assignees, and the answer lists the assignees the issue actually has. An assignee is information, never an exclusive claim."
+    },
+    {
+      "id": "honest-failures",
+      "text": "Failures keep their meaning: a missing issue, a project the credential cannot see and a reference another source issued are not found; an outage or a request that never left the process is unavailable, retryable, and writes nothing; a rate limit is unavailable, retryable and never repeated; 401 and 403 are denied; 400 and 422 are invalid with GitLab's message; a read without a definite answer is sent up to 3 times and a write once."
+    },
+    {
+      "id": "credential-safety",
+      "text": "The provider resolves one credential per instance, in this order: GITLAB_TOKEN when GITLAB_HOST names the bound host or is unset and the host is gitlab.com; the token glab config get token --host <host> prints; and, inside a GitLab pipeline whose CI_SERVER_HOST is the bound host, CI_JOB_TOKEN, sent as JOB-TOKEN. Without one every call answers denied, gitlab.unauthenticated, and sends nothing. The token is sent only to https://<host>/api/v4 or to a loopback stand-in PUTNAMI_GITLAB_API_URL names, and the runtime removes it, and every string shaped like a GitLab token, from everything it writes, GitLab's messages included."
+    },
+    {
+      "id": "truthful-manifest",
+      "text": "The manifest passes the extension protocol's strict validation, offers exactly the tasks operations the runtime answers (find, get, create, update, transition and assign), declares preconditions checked where GitLab cannot compare and write in one step, and marks every operation as reaching outside the machine."
+    }
+  ],
+  "decisions": [
+    "tooling/gitlab-collaboration/doc/adr/0001-gitlab-collaboration-provider.md",
+    "protocols/collaboration/doc/adr/0001-collaboration-provider-contracts.md",
+    "tooling/github-collaboration/doc/adr/0001-github-collaboration-provider.md"
+  ]
+}

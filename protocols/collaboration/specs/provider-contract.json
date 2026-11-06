@@ -48,7 +48,7 @@
     },
     {
       "id": "truthful-provider-declarations",
-      "text": "A provider offers a contract version only when its providers section declares each required operation once, with its precondition rule, atomic for claim, and workspaceSelection where the operation takes the selection. Any error withdraws that version; a provider of an unknown version draws one warning. The local, GitHub, Linear and memory providers' manifests draw no diagnostic, and the CLI answers a call to a withdrawn version unsupported."
+      "text": "A provider offers a contract version only when its providers section declares each required operation once, with its precondition rule, atomic for claim, and workspaceSelection where the operation takes the selection. Any error withdraws that version; a provider of an unknown version draws one warning. The local, GitHub, GitLab, Linear and memory providers' manifests draw no diagnostic, and the CLI answers a call to a withdrawn version unsupported."
     },
     {
       "id": "serve-validates-both-sides",
