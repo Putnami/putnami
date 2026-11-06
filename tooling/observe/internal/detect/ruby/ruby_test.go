@@ -183,16 +183,19 @@ if ENV["WITH_REPORTS"]
 end
 
 path "../gems" do
+  %w[one two].each do |name|
+  end.each do |name|
+  end
   gem "audit_log"
   gem "admin" # a gem of another path
 end
 
-group :test do
-  gem "admin"
+path "/engines" do
+  gem "absolute"
 end
 
-%w[one two].each do |name|
-end.each do |name|
+group :test do
+  gem "admin"
 end
 
 path "../gems" do

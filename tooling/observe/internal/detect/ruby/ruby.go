@@ -134,17 +134,13 @@ func Detect(root string) Detection {
 		if d.gemfile {
 			for _, ref := range gemfileReferences(read(root, join(id, Gemfile))) {
 				if ref.path != "" {
-					// An absolute path, joined, would read as a repository one.
-					if strings.HasPrefix(ref.path, "/") {
-						continue
-					}
-					if target, ok := normalize(join(id, ref.path)); ok {
+					if target, ok := relative(id, ref.path); ok {
 						edges[target] = true
 					}
 					continue
 				}
 				// A gem of a path block lies at the block's path or below it.
-				block, ok := normalize(join(id, ref.block))
+				block, ok := relative(id, ref.block)
 				for _, target := range gems[ref.name] {
 					if ok && contains(block, target) {
 						edges[target] = true
@@ -251,6 +247,15 @@ func normalize(p string) (string, bool) {
 		return "", false
 	}
 	return wsproto.NormalizeProbePath(path.Clean(p))
+}
+
+// relative resolves a path a Gemfile in dir gives. An absolute path, which
+// joined would read as a repository one, is none.
+func relative(dir, p string) (string, bool) {
+	if strings.HasPrefix(p, "/") {
+		return "", false
+	}
+	return normalize(join(dir, p))
 }
 
 // contains reports whether the repository directory dir holds target.

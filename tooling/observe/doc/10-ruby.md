@@ -131,7 +131,11 @@ run in one gem both land on the right components. See
   is no component.
 - A `Gemfile` at the root makes the root a `ruby` component, even in a
   repository whose other code is not Ruby, unless another detector names the
-  root with a higher source.
+  root: a `go.mod`, `composer.json` or `pyproject.toml` there wins, as its
+  detector runs before the Ruby one.
+- A `dependencies` flow list written over several lines, such as
+  `dependencies: [` on its own line, is the `observe.ruby_package_invalid`
+  warning: write it as a block list.
 - Edges from constant references in the code, which `packwerk check` reads,
   are not read, nor packwerk's own `packwerk.yml`.
 - `gems.rb` and `gems.locked`, the other names Bundler accepts, are not read.
