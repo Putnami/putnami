@@ -222,7 +222,8 @@
               "a-squash-option-the-project-forbids-is-unsupported",
               "merge-is-denied-unless-allowed",
               "merge-sends-the-expected-head",
-              "remove-source-branch-rides-on-the-merge"
+              "remove-source-branch-rides-on-the-merge",
+              "the-merge-request-squash-flag-follows-the-method"
             ]
           }
         },

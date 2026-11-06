@@ -98,7 +98,9 @@ the merge method is a project setting.
    waits on it. GitLab lists the statuses of every pipeline of the commit
    and hides only jobs retried within one, so the latest status of each
    name, by id, decides: a failure an earlier pipeline reported does not
-   outlive a later success.
+   outlive a later success. The statuses are read newest first, at most
+   1,000; past them the oldest are not read, and the summary's detail says
+   so.
 
 8. **Comments are notes, by id.** `comments` reads every note of the merge
    request (at most 2,000), keeps those people wrote, never a system note,
@@ -134,8 +136,13 @@ the merge method is a project setting.
     a squash and is `unsupported` where the project never squashes, `merge`
     is served only where the project creates a merge commit and `rebase` only
     where it fast-forwards, both `unsupported` where the project always
-    squashes; nothing is sent then. No method leaves the choice to the
-    project. GitLab takes
+    squashes; nothing is sent then. GitLab squashes by the merge request's
+    own squash flag, which a create sets from the project's default and a
+    merge call never clears, and on paid tiers a protected branch's rule
+    overrides both. So a named method first sets the flag to what it needs
+    and reads back `squash_on_merge`: when the project or a branch rule
+    still decides otherwise, `merge` is `unsupported` and merges nothing. No
+    method leaves the choice to the project. GitLab takes
     `should_remove_source_branch` in the merge call itself, so
     `settings.removeSourceBranch` deletes the source branch with no second
     write to compensate for.
