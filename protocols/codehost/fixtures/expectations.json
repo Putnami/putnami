@@ -1,0 +1,28 @@
+{
+  "lookups": [
+    { "slug": "github", "valid": true, "displays": "github" },
+    { "slug": "gitlab", "valid": true, "displays": "gitlab" },
+    { "slug": "generic", "valid": true, "displays": "generic" },
+    { "slug": "GitHub", "valid": false, "displays": "generic" },
+    { "slug": "bitbucket", "valid": false, "displays": "generic" },
+    { "slug": "", "valid": false, "displays": "generic" }
+  ],
+  "labels": [
+    { "slug": "github", "number": 42, "label": "pull request #42" },
+    { "slug": "gitlab", "number": 42, "label": "merge request !42" },
+    { "slug": "generic", "number": 42, "label": "change request #42" },
+    { "slug": "bitbucket", "number": 7, "label": "change request #7" },
+    { "slug": "gitlab", "number": 0, "label": "merge request" },
+    { "slug": "github", "number": -3, "label": "pull request" }
+  ],
+  "notes": [
+    { "body": "<!-- putnami-observe:summary -->\n## Putnami", "putnami": true },
+    { "body": "<!-- putnami-observe:summary -->", "putnami": true },
+    { "body": " \t\r\n<!-- putnami-observe:summary -->\nbody", "putnami": true },
+    { "body": "Looks good\n<!-- putnami-observe:summary -->", "putnami": false },
+    { "body": "<!-- PUTNAMI-OBSERVE:SUMMARY -->", "putnami": false },
+    { "body": " <!-- putnami-observe:summary -->", "putnami": false },
+    { "body": "<!-- putnami-observe:summary", "putnami": false },
+    { "body": "", "putnami": false }
+  ]
+}

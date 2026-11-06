@@ -29,7 +29,7 @@ an unmapped project is simply invisible to it. This file is that second half.
 
 | Domain | Owner | Projects | Manifest |
 |---|---|---|---|
-| `protocols` | `protocols` | 43 | `protocols/putnami.architecture.json` |
+| `protocols` | `protocols` | 44 | `protocols/putnami.architecture.json` |
 | `go-framework` | `framework` | 24 | `go/framework/putnami.architecture.json` |
 | `typescript-framework` | `framework` | 14 | `typescript/framework/putnami.architecture.json` |
 | `extension-providers` | `extension-providers` | 12 | `go/extension/putnami.architecture.json` |
@@ -51,7 +51,7 @@ from the directory.
 Each section states the domain's **membership test** first. A project belongs
 because it passes that test, not because of where its directory sits.
 
-### `protocols` — 43 projects
+### `protocols` — 44 projects
 
 **Membership test:** the project decides what one wire document *means*. It owns
 that document's strict parser, its validator, and its canonical writer, and no
@@ -67,6 +67,7 @@ other project in the repository may reinterpret it.
 | `/protocols/ci` | `go.putnami.dev/protocol/ci` | `putnami.ci.json`: the source-controlled CI intent. |
 | `/protocols/cli` | `go.putnami.dev/protocol/cli` | The CLI contract: exit-code taxonomy, result envelopes, output modes. |
 | `/protocols/clientcontract` | `go.putnami.dev/protocol/clientcontract` | The `x-putnami-client` metadata of first-party OpenAPI documents and operations. |
+| `/protocols/codehost` | `go.putnami.dev/protocol/codehost` | The code-host slugs, each host's change-request and diff vocabulary, its public defaults, and the marker of the Putnami note. |
 | `/protocols/collaboration` | `go.putnami.dev/protocol/collaboration` | The task, proposal and memory provider contracts: operations, references, revisions, capabilities and outcomes. |
 | `/protocols/config` | `go.putnami.dev/protocol/config` | Application configuration schema extraction and canonical resolution. |
 | `/protocols/contracts` | `go.putnami.dev/protocol/contracts` | The contract IR and its projections. |

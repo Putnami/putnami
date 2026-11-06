@@ -17,21 +17,25 @@
 // without trusting its producer's size.
 package evidence
 
-import diag "go.putnami.dev/protocol/diagnostic"
+import (
+	"go.putnami.dev/protocol/codehost"
+	diag "go.putnami.dev/protocol/diagnostic"
+)
 
 // ProtocolVersion is the version of the document. A reader refuses any other
 // value.
 const ProtocolVersion = 1
 
-// Code hosts: where the repository lives.
+// Code hosts: where the repository lives. The codehost protocol owns the
+// slugs; the document validates against them.
 const (
-	ProviderGitHub  = "github"
-	ProviderGitLab  = "gitlab"
-	ProviderGeneric = "generic"
+	ProviderGitHub  = codehost.GitHub
+	ProviderGitLab  = codehost.GitLab
+	ProviderGeneric = codehost.Generic
 )
 
-// Providers is the closed code-host vocabulary.
-var Providers = []string{ProviderGitHub, ProviderGitLab, ProviderGeneric}
+// Providers is the closed code-host vocabulary, codehost.Slugs.
+var Providers = codehost.Slugs()
 
 // CI systems: what ran the job that produced the document.
 const (

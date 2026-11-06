@@ -16,6 +16,7 @@ require (
 
 require (
 	go.putnami.dev/protocol/cli v0.0.0 // indirect
+	go.putnami.dev/protocol/codehost v0.0.0 // indirect
 	go.putnami.dev/protocol/runtime v0.0.0 // indirect
 	golang.org/x/sys v0.44.0 // indirect
 )
@@ -25,6 +26,7 @@ replace (
 	go.putnami.dev/protocol/architecture => ../../protocols/architecture
 	go.putnami.dev/protocol/capabilities => ../../protocols/capabilities
 	go.putnami.dev/protocol/cli => ../../protocols/cli
+	go.putnami.dev/protocol/codehost => ../../protocols/codehost
 	go.putnami.dev/protocol/collaboration => ../../protocols/collaboration
 	go.putnami.dev/protocol/database => ../../protocols/database
 	go.putnami.dev/protocol/diagnostic => ../../protocols/diagnostic

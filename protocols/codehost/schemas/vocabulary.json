@@ -1,0 +1,45 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://putnami.dev/schemas/putnami-codehost-vocabulary.json",
+  "title": "Putnami Code-Host Vocabulary",
+  "description": "The code-host slugs, the words each host uses for its change request and its diff, the public defaults of the hosted slugs, and the marker of the Putnami note on a change request.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["protocolVersion", "noteMarker", "hosts"],
+  "properties": {
+    "$schema": { "type": "string" },
+    "protocolVersion": { "type": "integer", "const": 1 },
+    "noteMarker": {
+      "type": "string",
+      "description": "The first line of the Putnami note: a body is the Putnami note when, after leading spaces, tabs, carriage returns and line feeds, it starts with this marker.",
+      "minLength": 1
+    },
+    "hosts": {
+      "type": "array",
+      "description": "One entry per slug, in the slug order.",
+      "minItems": 3,
+      "maxItems": 3,
+      "items": { "$ref": "#/$defs/host" }
+    }
+  },
+  "$defs": {
+    "slug": {
+      "type": "string",
+      "enum": ["github", "gitlab", "generic"]
+    },
+    "host": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["slug", "name", "changeRequest", "referencePrefix", "diffTab"],
+      "properties": {
+        "slug": { "$ref": "#/$defs/slug" },
+        "name": { "type": "string", "minLength": 1, "description": "The code host's display name." },
+        "changeRequest": { "type": "string", "minLength": 1, "description": "The noun of a change request, in lower case." },
+        "referencePrefix": { "type": "string", "minLength": 1, "description": "What comes before a change request's number." },
+        "diffTab": { "type": "string", "minLength": 1, "description": "The label of the tab that shows a change request's diff." },
+        "defaultHost": { "type": "string", "minLength": 1, "description": "The public host name; absent when the slug has none." },
+        "defaultApiBase": { "type": "string", "pattern": "^https://", "description": "The public REST API base URL; absent when the slug has none." }
+      }
+    }
+  }
+}

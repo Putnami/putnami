@@ -1,0 +1,32 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-codehost-vocabulary.json",
+  "protocolVersion": 1,
+  "noteMarker": "<!-- putnami-observe:summary -->",
+  "hosts": [
+    {
+      "slug": "github",
+      "name": "GitHub",
+      "changeRequest": "pull request",
+      "referencePrefix": "#",
+      "diffTab": "Files changed",
+      "defaultHost": "github.com",
+      "defaultApiBase": "https://api.github.com"
+    },
+    {
+      "slug": "gitlab",
+      "name": "GitLab",
+      "changeRequest": "merge request",
+      "referencePrefix": "!",
+      "diffTab": "Changes",
+      "defaultHost": "gitlab.com",
+      "defaultApiBase": "https://gitlab.com/api/v4"
+    },
+    {
+      "slug": "generic",
+      "name": "Git host",
+      "changeRequest": "change request",
+      "referencePrefix": "#",
+      "diffTab": "Changes"
+    }
+  ]
+}

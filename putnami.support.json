@@ -393,6 +393,11 @@
       "status": "preview"
     },
     {
+      "id": "go.putnami.dev/protocol/codehost",
+      "kind": "protocol",
+      "status": "preview"
+    },
+    {
       "id": "go.putnami.dev/protocol/collaboration",
       "kind": "protocol",
       "status": "preview"

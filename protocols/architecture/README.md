@@ -217,7 +217,7 @@ its declarations complete, so there has never been debt to record.
 
 | Domain | Owner | Projects | What it decides |
 |---|---|---|---|
-| `protocols` | protocols | 43 | The strict wire contracts every other domain speaks |
+| `protocols` | protocols | 44 | The strict wire contracts every other domain speaks |
 | `go-framework` | framework | 24 | The Go application runtime API and its documentation |
 | `typescript-framework` | framework | 14 | The TypeScript application runtime API and its documentation |
 | `extension-providers` | extension-providers | 12 | Probe answers, verification observations, provider results, the Python surface |
