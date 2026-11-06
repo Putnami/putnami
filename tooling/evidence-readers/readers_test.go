@@ -26,6 +26,7 @@ var coverageReaders = map[string]func([]byte) (CoverageReport, []diag.Diagnostic
 	"cobertura": ReadCobertura,
 	"clover":    ReadClover,
 	"gocover":   ReadGoCover,
+	"jacoco":    ReadJaCoCo,
 }
 
 func read(t *testing.T, path string) []byte {
@@ -284,6 +285,57 @@ func TestConcatenatedGoProfilesReadAsOne(t *testing.T) {
 		t.Errorf("concatenated %+v, want %+v", two, one)
 	}
 	spectest.Proves(t, feature, "go-cover-blocks-become-lines", "concatenated-profiles-read-as-one")
+}
+
+func TestRealJaCoCoReportsReadToTheirExpectedLines(t *testing.T) {
+	for fixture, want := range map[string]FileCoverage{
+		"testdata/jacoco/maven.xml": {
+			Path:       "com/example/calc/Calc.java",
+			Lines:      []Line{{8, 1}, {12, 1}, {13, 1}, {15, 0}, {20, 0}, {21, 0}},
+			LineCounts: Counts{Total: 6, Covered: 3},
+			Functions:  Counts{Total: 3, Covered: 2},
+		},
+		"testdata/jacoco/gradle-kotlin.xml": {
+			Path:       "com/example/calc/Calc.kt",
+			Lines:      []Line{{5, 1}, {9, 1}, {10, 1}, {12, 0}, {17, 0}, {18, 0}},
+			LineCounts: Counts{Total: 6, Covered: 3},
+			Functions:  Counts{Total: 3, Covered: 2},
+		},
+	} {
+		report, diagnostics := ReadJaCoCo(read(t, fixture))
+		if len(diagnostics) != 0 {
+			t.Fatalf("%s: %v", fixture, diagnostics)
+		}
+		if len(report.Files) != 1 || !reflect.DeepEqual(report.Files[0], want) {
+			t.Errorf("%s: files %+v, want %+v", fixture, report.Files, want)
+		}
+	}
+	spectest.Proves(t, feature, "jacoco-reads-source-files", "real-jacoco-reports-read-to-their-expected-lines")
+}
+
+func TestJaCoCoGroupsAndTheDefaultPackageAreRead(t *testing.T) {
+	report, diagnostics := ReadJaCoCo([]byte(`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><!DOCTYPE report PUBLIC "-//JACOCO//DTD Report 1.1//EN" "report.dtd">
+<report name="shop">
+  <group name="api">
+    <group name="nested">
+      <package name="com/acme/api"><sourcefile name="Api.kt"><line nr="3" mi="0" ci="2"/><line nr="4" mi="0" ci="0"/></sourcefile></package>
+    </group>
+  </group>
+  <package name=""><sourcefile name="Main.java"><line nr="1" mi="1" ci="0"/></sourcefile></package>
+  <package name="com/acme/gen"><sourcefile name="Gen.java"><counter type="LINE" missed="2" covered="1"/><counter type="METHOD" missed="0" covered="1"/></sourcefile></package>
+</report>`))
+	if len(diagnostics) != 0 {
+		t.Fatal(diagnostics)
+	}
+	want := []FileCoverage{
+		{Path: "Main.java", Lines: []Line{{1, 0}}, LineCounts: Counts{Total: 1}},
+		{Path: "com/acme/gen/Gen.java", LineCounts: Counts{Total: 3, Covered: 1}, Functions: Counts{Total: 1, Covered: 1}},
+		{Path: "com/acme/api/Api.kt", Lines: []Line{{3, 1}}, LineCounts: Counts{Total: 1, Covered: 1}},
+	}
+	if !reflect.DeepEqual(report.Files, want) {
+		t.Errorf("files %+v, want %+v", report.Files, want)
+	}
+	spectest.Proves(t, feature, "jacoco-reads-source-files", "jacoco-groups-and-the-default-package-are-read")
 }
 
 func TestPathsAreKeptAsStated(t *testing.T) {
