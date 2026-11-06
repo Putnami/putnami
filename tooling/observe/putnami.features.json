@@ -727,7 +727,8 @@
             "checks": [
               "without-an-export-the-build-files-give-the-packages",
               "a-malformed-export-is-a-warning",
-              "without-an-export-another-detector-keeps-its-components"
+              "without-an-export-another-detector-keeps-its-components",
+              "without-an-export-a-nested-build-file-yields-to-the-enclosing-component"
             ]
           }
         },

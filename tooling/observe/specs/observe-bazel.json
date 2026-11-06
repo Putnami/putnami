@@ -22,7 +22,7 @@
     },
     {
       "id": "bazel-without-export",
-      "text": "Without an export, each directory with a BUILD or BUILD.bazel file, past hidden directories, node_modules, the bazel-* root directories and .bazelignore entries, is a component of source manifest without edges, which another detector's component at that directory replaces; when it finds one, the info observe.bazel_graph_missing names the export command. An export that does not parse or holds no main-repository rule is the warning observe.bazel_graph_unreadable."
+      "text": "Without an export, each directory with a BUILD or BUILD.bazel file, past hidden directories, node_modules, the bazel-* root directories and .bazelignore entries, is a manifest component without edges, unless another detector has a component at or above it; when it finds a package, the info observe.bazel_graph_missing names the export command. An export that does not parse or holds no main-repository rule is the warning observe.bazel_graph_unreadable, and the BUILD files answer."
     },
     {
       "id": "bazel-package-edges",
