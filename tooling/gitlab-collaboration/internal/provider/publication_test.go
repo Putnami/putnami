@@ -329,6 +329,17 @@ func TestAnAnswerThatMergesNothingLeavesTheSquashFlag(t *testing.T) {
 	if failure.Reason != reasonMergeMethod || flag(2) {
 		t.Fatalf("an overridden squash: %+v, flag %t", failure, flag(2))
 	}
+	// A rule that squashes while the flag is off: GitLab's merge call itself
+	// sets the flag before it refuses, and the flag is put back.
+	h.branch("third", fakeSHA(2))
+	h.set(func(f *fakeGitLab) { f.branchSquash = "" })
+	third := h.upsert(`{"change":{"base":"main","head":"third"},"title":"Always"}`)
+	h.set(func(f *fakeGitLab) { f.branchSquash, f.unmergeable = "always", true })
+	failure = h.fails("merge", h.merge(third.Proposal.Ref, `,"method":"squash"`), collab.OutcomeConflict)
+	if failure.Reason != reasonNotMergeable || flag(3) {
+		t.Fatalf("a refused squash merge under a rule: %+v, flag %t", failure, flag(3))
+	}
+	h.set(func(f *fakeGitLab) { f.branchSquash, f.unmergeable = "never", false })
 	// A flag that cannot be put back makes the answer unresolved: the second
 	// write, the one that puts it back, is refused.
 	puts := 0

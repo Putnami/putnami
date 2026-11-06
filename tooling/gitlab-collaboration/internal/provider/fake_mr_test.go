@@ -462,22 +462,23 @@ func (f *fakeGitLab) mergeMR(w http.ResponseWriter, r *http.Request, mr *fakeMR)
 		return
 	}
 	f.mergeRequests = append(f.mergeRequests, edit)
-	if mr.state != "opened" || mr.draft() || f.unmergeable {
-		writeJSON(w, http.StatusMethodNotAllowed, map[string]any{"message": "405 Method Not Allowed"})
-		return
-	}
+	// GitLab checks sha, then stores squash: true, then decides whether it
+	// can merge.
 	if edit.SHA != nil && *edit.SHA != f.head(mr) {
 		writeJSON(w, http.StatusConflict, map[string]any{"message": "SHA does not match HEAD of source branch: " + mr.sha})
+		return
+	}
+	if edit.Squash != nil && *edit.Squash {
+		mr.squash = true
+	}
+	if mr.state != "opened" || mr.draft() || f.unmergeable {
+		writeJSON(w, http.StatusMethodNotAllowed, map[string]any{"message": "405 Method Not Allowed"})
 		return
 	}
 	if f.mergeError != "" {
 		mr.mergeError = f.mergeError
 		writeJSON(w, http.StatusOK, f.renderMR(mr))
 		return
-	}
-	// The merge call sets the flag only when it asks to squash.
-	if edit.Squash != nil && *edit.Squash {
-		mr.squash = true
 	}
 	mr.state = "merged"
 	mr.squashed = f.squashOnMerge(mr)

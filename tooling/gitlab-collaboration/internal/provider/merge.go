@@ -75,8 +75,8 @@ func (s *proposalSession) merge(input any) (any, *collab.Failure) {
 		if mr.squashes() != needed {
 			if mr.SquashOnMerge != nil && *mr.SquashOnMerge != mr.Squash {
 				return nil, collab.Fail(collab.OutcomeUnsupported, reasonMergeMethod,
-					"a rule of %s or of its target branch makes GitLab squash merge request !%d %t whatever its flag; nothing was sent",
-					s.project.path, mr.IID, mr.squashes())
+					"GitLab reports squash_on_merge %t for merge request !%d while its flag is %t: a rule of %s or of its target branch decides; nothing was sent",
+					mr.squashes(), mr.IID, mr.Squash, s.project.path)
 			}
 			flagged, failure := s.setSquash(mr, needed)
 			if failure != nil {
@@ -91,18 +91,38 @@ func (s *proposalSession) merge(input any) (any, *collab.Failure) {
 			if s.settings.RemoveSourceBranch {
 				request["should_remove_source_branch"] = true
 			}
-			result, failure := s.send(mr, request)
-			if failure != nil && failure.Outcome != collab.OutcomeUnresolved {
-				return nil, s.restoreSquash(mr, failure)
-			}
-			return result, failure
+			return s.sendRestoring(mr, request)
 		}
 		request["squash"] = needed
+		if needed && !mr.Squash {
+			// GitLab's merge call sets the flag when it asks to squash, before
+			// it decides whether it can merge.
+			if s.settings.RemoveSourceBranch {
+				request["should_remove_source_branch"] = true
+			}
+			return s.sendRestoring(mr, request)
+		}
 	}
 	if s.settings.RemoveSourceBranch {
 		request["should_remove_source_branch"] = true
 	}
 	return s.send(mr, request)
+}
+
+// sendRestoring sends a merge call after the merge request's squash flag was
+// changed for it: an answer that merged nothing puts the flag back first, and
+// an unresolved one names the flag's earlier value.
+func (s *proposalSession) sendRestoring(mr *glMergeRequest, request map[string]any) (any, *collab.Failure) {
+	result, failure := s.send(mr, request)
+	switch {
+	case failure == nil:
+		return result, nil
+	case failure.Outcome == collab.OutcomeUnresolved:
+		failure.Error.Message += fmt.Sprintf("; the squash flag of merge request !%d was %t before this merge", mr.IID, mr.Squash)
+		failure.Error.Reconcile += fmt.Sprintf(", and if it did not merge, set its squash flag back to %t", mr.Squash)
+		return nil, failure
+	}
+	return nil, s.restoreSquash(mr, failure)
 }
 
 // restoreSquash puts back the squash flag a merge set before an answer that
@@ -181,7 +201,7 @@ func (s *proposalSession) setSquash(mr *glMergeRequest, squash bool) (*glMergeRe
 	}) {
 		return current, nil
 	}
-	return nil, unresolved("read the proposal with proposals.status, then repeat proposals.merge",
+	return nil, unresolved(fmt.Sprintf("read the proposal with proposals.status, set its squash flag back to %t if it changed, then repeat proposals.merge", mr.Squash),
 		"setting the squash flag of merge request !%d may have happened (%s), and reading it back did not show it; nothing was merged", mr.IID, err.Message)
 }
 
