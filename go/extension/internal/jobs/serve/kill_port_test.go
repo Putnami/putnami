@@ -19,8 +19,8 @@ import (
 // tests: "listener" listens on a free loopback port, writes it to the file
 // named by killPortHelperFileEnv and reads every connection it accepts;
 // "client" connects to the port killPortHelperPortEnv names, then writes the
-// file named by killPortHelperFileEnv; "idle" only writes that file. Each runs
-// until a signal ends it, or exits 3 after 10 minutes.
+// file named by killPortHelperFileEnv. Both run until a signal ends them, or
+// exit 3 after 10 minutes.
 const (
 	killPortHelperEnv     = "PUTNAMI_GO_SERVE_KILL_PORT_HELPER"
 	killPortHelperFileEnv = "PUTNAMI_GO_SERVE_KILL_PORT_HELPER_FILE"
@@ -50,10 +50,6 @@ func TestKillPortHelperProcess(t *testing.T) {
 			}
 			go func() { _, _ = io.Copy(io.Discard, conn) }()
 		}
-	case "idle":
-		writeHelperFile(file, "ready")
-		time.Sleep(10 * time.Minute)
-		os.Exit(3)
 	case "client":
 		conn, err := net.Dial("tcp", "127.0.0.1:"+os.Getenv(killPortHelperPortEnv))
 		if err != nil {
@@ -134,10 +130,12 @@ func TestKillProcessOnPort_KillsTheListenerAndNotItsClient(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("kill-port is not available on Windows")
 	}
-	if _, lsofErr := exec.LookPath("lsof"); lsofErr != nil {
-		if _, fuserErr := exec.LookPath("fuser"); fuserErr != nil {
-			t.Skip("neither lsof nor fuser is on PATH")
+	if lsof, found := findTool("lsof"); found {
+		if isBusyBox(lsof) {
+			t.Skip("lsof is the BusyBox applet, which kill-port does not use")
 		}
+	} else if fuser, found := findTool("fuser"); !found || isBusyBox(fuser) {
+		t.Skip("neither lsof nor a fuser other than BusyBox's is on PATH")
 	}
 	_, port, listenerDone := startKillPortHelper(t, "listener")
 	client, _, clientDone := startKillPortHelper(t, "client", killPortHelperPortEnv+"="+port)
@@ -166,23 +164,40 @@ func TestKillProcessOnPort_KillsNothingWhenLsofPrintsMoreThanProcessIDs(t *testi
 	if runtime.GOOS == "windows" {
 		t.Skip("kill-port is not available on Windows")
 	}
-	idle, _, idleDone := startKillPortHelper(t, "idle")
-	pid := strconv.Itoa(idle.Process.Pid)
+	listener, port, listenerDone := startKillPortHelper(t, "listener")
+	pid := strconv.Itoa(listener.Process.Pid)
 
 	bin := t.TempDir()
 	busybox := "#!/bin/sh\nprintf '" + pid + "\\t/bin/sleep\\t/dev/null\\n'\n"
-	if err := os.WriteFile(filepath.Join(bin, "lsof"), []byte(busybox), 0o755); err != nil {
+	fake := filepath.Join(bin, "lsof")
+	if err := os.WriteFile(fake, []byte(busybox), 0o755); err != nil {
 		t.Fatal(err)
 	}
 	t.Setenv("PATH", bin+string(os.PathListSeparator)+os.Getenv("PATH"))
+	if lsof, _ := findTool("lsof"); lsof != fake {
+		t.Skipf("the fake lsof in %s cannot run, PATH resolves lsof to %q", bin, lsof)
+	}
 
-	if killProcessOnPort("8080") {
-		t.Error("killProcessOnPort(8080) = true, want false for output that is not process ids")
+	if killProcessOnPort(port) {
+		t.Errorf("killProcessOnPort(%s) = true, want false for output that is not process ids", port)
 	}
-	if err := idle.Process.Signal(syscall.SIGTERM); err != nil {
-		t.Fatalf("signal the idle helper: %v", err)
+	if err := listener.Process.Signal(syscall.SIGTERM); err != nil {
+		t.Fatalf("signal the listener: %v", err)
 	}
-	if sig := exitSignal(t, "idle helper", idleDone, 30*time.Second); sig != syscall.SIGTERM {
-		t.Errorf("the idle helper ended with %v, want %v: kill-port killed a process lsof did not name as a listener", sig, syscall.SIGTERM)
+	if sig := exitSignal(t, "listener", listenerDone, 30*time.Second); sig != syscall.SIGTERM {
+		t.Errorf("the listener ended with %v, want %v: kill-port killed a process lsof did not name as a listener", sig, syscall.SIGTERM)
 	}
+}
+
+// findTool returns the program PATH resolves name to, and whether it found one.
+func findTool(name string) (string, bool) {
+	path, err := exec.LookPath(name)
+	return path, err == nil
+}
+
+// isBusyBox reports whether the program at path is a BusyBox applet: a link to
+// the busybox binary.
+func isBusyBox(path string) bool {
+	resolved, err := filepath.EvalSymlinks(path)
+	return err == nil && filepath.Base(resolved) == "busybox"
 }
