@@ -4,13 +4,22 @@ import (
 	"go.putnami.dev/protocol/evidence"
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/tooling/observe/internal/detect/composer"
+	"go.putnami.dev/tooling/observe/internal/detect/pants"
 	"go.putnami.dev/tooling/observe/internal/detect/python"
 	"go.putnami.dev/tooling/observe/internal/detectors/nx"
+	"go.putnami.dev/tooling/observe/internal/lockdiff"
 )
 
+// Options tune the default detectors.
+type Options struct {
+	// PantsGraph is the Pants export to read, absolute or relative to the
+	// repository root; empty reads pants-graph.json at the root.
+	PantsGraph string
+}
+
 // Default returns the detectors observe runs, orchestrators first.
-func Default() []Detector {
-	return []Detector{NxDetector{}, NodeDetector{}, ComposerDetector{}, GoDetector{}, PythonDetector{}}
+func Default(opts Options) []Detector {
+	return []Detector{NxDetector{}, PantsDetector{GraphFile: opts.PantsGraph}, NodeDetector{}, ComposerDetector{}, GoDetector{}, PythonDetector{}}
 }
 
 // fromProbe turns the projects of a probe answer into components.
@@ -94,4 +103,35 @@ func (PythonDetector) Detect(root string) Found {
 			return Component{Ecosystem: python.Ecosystem, Source: source}, true
 		}),
 	}
+}
+
+// PantsDetector adapts the Pants detector: each directory of a peek export is
+// an orchestrator component, each directory of a BUILD file a workspace one.
+// It also reads the lockfiles of the Python resolves.
+type PantsDetector struct {
+	// GraphFile is the export to read; empty reads pants-graph.json.
+	GraphFile string
+}
+
+// Name implements Detector.
+func (PantsDetector) Name() string { return "pants" }
+
+// Detect implements Detector.
+func (d PantsDetector) Detect(root string) Found {
+	detection := pants.Detect(root, pants.Options{GraphFile: d.GraphFile})
+	found := Found{Diagnostics: detection.Diagnostics}
+	for _, c := range detection.Components {
+		found.Components = append(found.Components, Component{ID: c.ID, Ecosystem: pants.Ecosystem, Source: c.Source, DependsOn: c.DependsOn})
+	}
+	if len(detection.Lockfiles) > 0 {
+		found.Lockfile = func(file string) (string, LockReader, bool) {
+			if !detection.IsLockfile(file) {
+				return "", nil, false
+			}
+			return lockdiff.EcosystemPyPI, func(data []byte) (map[string][]string, error) {
+				return lockdiff.ReadPEXLock(data)
+			}, true
+		}
+	}
+	return found
 }

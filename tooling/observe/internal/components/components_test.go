@@ -120,7 +120,7 @@ func TestARepositoryWithoutDetectedComponentsIsOneComponent(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(root, "README.md"), []byte("# nothing to detect\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	set := Detect(root, Default())
+	set := Detect(root, Default(Options{}))
 	if len(set.Components) != 1 || set.Components[0].ID != evidence.RootComponent || set.Components[0].Source != evidence.SourceFallback || set.Components[0].Ecosystem != FallbackEcosystem {
 		t.Fatalf("components %+v", set.Components)
 	}
@@ -159,7 +159,7 @@ func TestTheDefaultDetectorsReadEachEcosystem(t *testing.T) {
 		"svc/go.mod":                    "module example.com/svc\n\ngo 1.23\n\nrequire golang.org/x/text v0.21.0\n",
 		"php/composer.json":             `{"name":"demo/php","autoload":{"psr-4":{"Demo\\":"src/"}}}`,
 	})
-	set := Detect(root, Default())
+	set := Detect(root, Default(Options{}))
 	byID := map[string]Component{}
 	for _, c := range set.Components {
 		byID[c.ID] = c
@@ -190,8 +190,29 @@ func TestTheDefaultDetectorsReadEachEcosystem(t *testing.T) {
 		"libs/a/package.json": `{"name":"a"}`,
 		"libs/a/project.json": `{"name":"a"}`,
 	})
-	nxSet := Detect(nxRoot, Default())
+	nxSet := Detect(nxRoot, Default(Options{}))
 	if len(nxSet.Components) != 1 || nxSet.Components[0].Ecosystem != "nx" {
 		t.Errorf("an Nx project does not win over its workspace package: %+v", nxSet.Components)
+	}
+}
+
+func TestAPantsResolveLockfileIsAPyPILockfile(t *testing.T) {
+	spectest.Proves(t, "tooling/observe-pants", "pants-resolve-lockfiles", "a-resolve-lockfile-is-a-pypi-lockfile")
+	root := t.TempDir()
+	config := "[python.resolves]\npython-default = \"3rdparty/python/default.lock\"\n"
+	if err := os.WriteFile(filepath.Join(root, "pants.toml"), []byte(config), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	set := Detect(root, Default(Options{}))
+	ecosystem, read, ok := set.Lockfile("3rdparty/python/default.lock")
+	if !ok || ecosystem != "pypi" {
+		t.Fatalf("lockfile %q, %v", ecosystem, ok)
+	}
+	packages, err := read([]byte("// header\n{\"locked_resolves\": [{\"locked_requirements\": [{\"project_name\": \"FastAPI\", \"version\": \"0.115.6\"}]}]}\n"))
+	if err != nil || !slices.Equal(packages["fastapi"], []string{"0.115.6"}) {
+		t.Errorf("packages %v, %v", packages, err)
+	}
+	if _, _, ok := set.Lockfile("3rdparty/python/other.lock"); ok {
+		t.Error("a lockfile no resolve names is read")
 	}
 }

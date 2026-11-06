@@ -1,6 +1,6 @@
 // Package lockdiff compares the packages a lockfile pins at two commits:
-// package-lock.json, pnpm-lock.yaml, yarn.lock, composer.lock, go.mod, uv.lock
-// and poetry.lock.
+// package-lock.json, pnpm-lock.yaml, yarn.lock, composer.lock, go.mod, uv.lock,
+// poetry.lock and the PEX JSON lock of a Pants resolve.
 //
 // A reader turns a lockfile's content into the versions it pins per package
 // name. Workspace links, path packages and the repository's own modules are

@@ -1,0 +1,395 @@
+// Package pants is the Pants detector of @putnami/observe: it finds the
+// components of a Pants repository and the dependencies Pants infers between
+// them, without running pants.
+//
+// The export the CI wrote with `pants peek :: > pants-graph.json` is the
+// authority: it lists every target, generated ones included, with the
+// dependencies Pants expanded from the BUILD files and inferred from imports.
+// A component is a directory: the targets of one BUILD file directory, and
+// the targets they generate, are one component. Without an export, each
+// directory whose BUILD file declares a first-party target is a component,
+// with no edge.
+//
+// The lockfiles the [python.resolves] table of pants.toml names are read in
+// the PEX JSON lock format, as dependency changes of ecosystem pypi.
+package pants
+
+import (
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io/fs"
+	"os"
+	"path"
+	"path/filepath"
+	"regexp"
+	"slices"
+	"sort"
+	"strings"
+
+	diag "go.putnami.dev/protocol/diagnostic"
+	"go.putnami.dev/protocol/evidence"
+	wsproto "go.putnami.dev/protocol/workspace"
+	"go.putnami.dev/tooling/observe/internal/toml"
+)
+
+// Ecosystem is the evidence ecosystem slug of a Pants component.
+const Ecosystem = "pants"
+
+// Files the detector reads.
+const (
+	Marker           = "pants.toml"
+	DefaultGraphFile = "pants-graph.json"
+)
+
+// ExportCommand is the command that writes the export the detector reads.
+const ExportCommand = "pants peek :: > pants-graph.json"
+
+// Diagnostic codes.
+const (
+	CodeGraphMissing    = "observe.pants_graph_missing"
+	CodeGraphUnused     = "observe.pants_graph_unused"
+	CodeGraphUnreadable = "observe.pants_graph_unreadable"
+	CodeConfigInvalid   = "observe.pants_config_invalid"
+	CodeWalkBounded     = "observe.pants_walk_bounded"
+)
+
+// MaxWalkedEntries bounds the directory entries the BUILD file walk visits.
+const MaxWalkedEntries = 200000
+
+// MaxGraphBytes bounds the export the detector reads.
+const MaxGraphBytes = 512 << 20
+
+// thirdParty are the target types that stand for packages from outside the
+// repository: they make no component and no edge.
+var thirdParty = map[string]bool{
+	"python_requirement":       true,
+	"python_requirements":      true,
+	"uv_requirements":          true,
+	"poetry_requirements":      true,
+	"pipenv_requirements":      true,
+	"pants_requirements":       true,
+	"go_mod":                   true,
+	"go_third_party_package":   true,
+	"jvm_artifact":             true,
+	"jvm_artifacts":            true,
+	"node_third_party_package": true,
+}
+
+// skippedDirs are never walked for BUILD files: build outputs, installed
+// packages and caches.
+var skippedDirs = map[string]bool{"dist": true, "node_modules": true, "__pycache__": true}
+
+// Component is one component of a Pants repository.
+type Component struct {
+	// ID is the directory relative to the repository root, or ".".
+	ID string
+	// Source is orchestrator for an export, workspace for the BUILD files.
+	Source string
+	// DependsOn lists the ids of the components it depends on, sorted.
+	DependsOn []string
+}
+
+// Detection is what the detector found in one repository.
+type Detection struct {
+	// Components are sorted by ID; empty outside a Pants repository.
+	Components []Component
+	// Lockfiles are the repository-relative lockfiles of the Python resolves,
+	// sorted.
+	Lockfiles   []string
+	Diagnostics []diag.Diagnostic
+}
+
+// Options tune one detection.
+type Options struct {
+	// GraphFile is the export to read, relative to the root or absolute.
+	// Empty means DefaultGraphFile at the root.
+	GraphFile string
+}
+
+// IsLockfile reports whether the repository-relative file is the lockfile of
+// a Python resolve.
+func (d Detection) IsLockfile(file string) bool {
+	_, found := slices.BinarySearch(d.Lockfiles, path.Clean(file))
+	return found
+}
+
+// Detect reads the Pants repository at root. A root without pants.toml is no
+// Pants repository and gets an empty detection, with a warning when the
+// caller named an export.
+func Detect(root string, opts Options) Detection {
+	var out Detection
+	config, err := os.ReadFile(filepath.Join(root, Marker))
+	if err != nil {
+		if opts.GraphFile != "" {
+			out.Diagnostics = []diag.Diagnostic{diag.Warningf(CodeGraphUnused, opts.GraphFile,
+				"--pants-graph names %s, but the repository root holds no %s, so no Pants export is read", opts.GraphFile, Marker)}
+		}
+		return out
+	}
+	out.Lockfiles, out.Diagnostics = resolves(config)
+	graphFile := opts.GraphFile
+	if graphFile == "" {
+		graphFile = DefaultGraphFile
+	}
+	file := graphFile
+	if !filepath.IsAbs(file) {
+		file = filepath.Join(root, filepath.FromSlash(file))
+	}
+	components, diags, ok := fromGraph(root, file, graphFile, opts.GraphFile != "")
+	out.Diagnostics = append(out.Diagnostics, diags...)
+	if !ok {
+		components, diags = fromBuildFiles(root)
+		out.Diagnostics = append(out.Diagnostics, diags...)
+	}
+	out.Components = components
+	return out
+}
+
+// --- the export ---------------------------------------------------------------
+
+// target is one entry of a peek export.
+type target struct {
+	Address      string   `json:"address"`
+	TargetType   string   `json:"target_type"`
+	Dependencies []string `json:"dependencies"`
+	Sources      []string `json:"sources"`
+}
+
+// fromGraph reads the export at file, named graphFile in diagnostics. It
+// reports ok=false when there is no usable export. A missing export is an info
+// diagnostic, and a warning when the caller named it.
+func fromGraph(root, file, graphFile string, named bool) ([]Component, []diag.Diagnostic, bool) {
+	info, err := os.Stat(file)
+	if errors.Is(err, fs.ErrNotExist) {
+		severity := diag.Info
+		if named {
+			severity = diag.Warning
+		}
+		return nil, []diag.Diagnostic{{
+			Severity: severity, Code: CodeGraphMissing, Field: graphFile,
+			Message: fmt.Sprintf("no Pants export at %s, so the components have no edge: write it in the CI with `%s`, or name it with --pants-graph", graphFile, ExportCommand),
+		}}, false
+	}
+	unreadable := func(format string, args ...any) ([]Component, []diag.Diagnostic, bool) {
+		return nil, []diag.Diagnostic{diag.Warningf(CodeGraphUnreadable, graphFile,
+			format+"; the BUILD files answer instead, with no edge", args...)}, false
+	}
+	if err != nil {
+		return unreadable("the Pants export %s cannot be read: %v", graphFile, err)
+	}
+	if info.Size() > MaxGraphBytes {
+		return unreadable("the Pants export %s is larger than %d bytes", graphFile, MaxGraphBytes)
+	}
+	data, err := os.ReadFile(file)
+	if err != nil {
+		return unreadable("the Pants export %s cannot be read: %v", graphFile, err)
+	}
+	var targets []target
+	if err := json.Unmarshal(data, &targets); err != nil || targets == nil {
+		return unreadable("%s is not a Pants peek export, a JSON array of targets", graphFile)
+	}
+	byAddress := make(map[string]target, len(targets))
+	for i, t := range targets {
+		if t.Address == "" {
+			return unreadable("target %d of %s names no address", i, graphFile)
+		}
+		byAddress[t.Address] = t
+	}
+	g := graph{root: root, targets: byAddress}
+	edges := map[string]map[string]bool{}
+	var diags []diag.Diagnostic
+	for _, t := range targets {
+		if !firstParty(t.TargetType) {
+			continue
+		}
+		dir, ok := g.dir(t.Address)
+		if !ok {
+			diags = append(diags, diag.Warningf(CodeGraphUnreadable, graphFile, "target %s lies outside the repository and is skipped", t.Address))
+			continue
+		}
+		if edges[dir] == nil {
+			edges[dir] = map[string]bool{}
+		}
+		for _, dep := range t.Dependencies {
+			if known, listed := byAddress[dep]; listed && !firstParty(known.TargetType) {
+				continue
+			}
+			if target, ok := g.dir(dep); ok && target != dir {
+				edges[dir][target] = true
+			}
+		}
+	}
+	out := make([]Component, 0, len(edges))
+	for dir, targets := range edges {
+		c := Component{ID: dir, Source: evidence.SourceOrchestrator}
+		for target := range targets {
+			// A target the export does not list, such as a requirement of a
+			// partial export, has no component.
+			if _, component := edges[target]; component {
+				c.DependsOn = append(c.DependsOn, target)
+			}
+		}
+		sort.Strings(c.DependsOn)
+		out = append(out, c)
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].ID < out[j].ID })
+	return out, diags, true
+}
+
+// graph resolves the addresses of one export.
+type graph struct {
+	root    string
+	targets map[string]target
+}
+
+// dir returns the repository-relative directory an address belongs to: the
+// directory of the BUILD file that declares the target or its generator.
+//
+// An address is [//]path[:target][#generated][@parameters]. The path of a
+// target generated for one file is that file, and its target name starts with
+// one ../ per directory between the file and the BUILD file.
+func (g graph) dir(address string) (string, bool) {
+	spec := strings.TrimPrefix(address, "//")
+	cut := strings.IndexAny(spec, ":#@")
+	p, name := spec, ""
+	if cut >= 0 {
+		p = spec[:cut]
+		if spec[cut] == ':' {
+			name = spec[cut+1:]
+			if end := strings.IndexAny(name, "#@"); end >= 0 {
+				name = name[:end]
+			}
+		}
+	}
+	if g.isFile(address, p, name) {
+		p = path.Dir(p)
+		for strings.HasPrefix(name, "../") {
+			if p == "." {
+				return "", false
+			}
+			name = name[len("../"):]
+			p = path.Dir(p)
+		}
+	}
+	return wsproto.NormalizeProbePath(p)
+}
+
+// isFile reports whether the path of an address names a file: when its target
+// name climbs to the BUILD file, when it is one of the target's own sources,
+// or, for a target the export does not list, when it is a file of the
+// checkout.
+func (g graph) isFile(address, p, name string) bool {
+	if p == "" {
+		return false
+	}
+	if strings.HasPrefix(name, "../") {
+		return true
+	}
+	if t, listed := g.targets[address]; listed && len(t.Sources) > 0 {
+		return slices.Contains(t.Sources, p)
+	}
+	info, err := os.Stat(filepath.Join(g.root, filepath.FromSlash(p)))
+	return err == nil && info.Mode().IsRegular()
+}
+
+// firstParty reports whether a target type is code of the repository: not a
+// third-party package and not an internal target.
+func firstParty(targetType string) bool {
+	return targetType != "" && !thirdParty[targetType] && !strings.HasPrefix(targetType, "_")
+}
+
+// --- the BUILD files ----------------------------------------------------------
+
+// call matches a call at the start of a line of a BUILD file: a target, a
+// macro or a BUILD file symbol such as __defaults__.
+var call = regexp.MustCompile(`(?m)^([A-Za-z_][A-Za-z0-9_]*)[ \t]*\(`)
+
+// fromBuildFiles lists the directories whose BUILD file declares a
+// first-party target. It skips dist, node_modules, __pycache__ and hidden
+// directories.
+func fromBuildFiles(root string) ([]Component, []diag.Diagnostic) {
+	dirs := map[string]bool{}
+	var diags []diag.Diagnostic
+	walked := 0
+	err := filepath.WalkDir(root, func(p string, entry fs.DirEntry, err error) error {
+		if err != nil {
+			return nil
+		}
+		walked++
+		if walked > MaxWalkedEntries {
+			diags = append(diags, diag.Warningf(CodeWalkBounded, "", "the Pants detector stopped after %d entries", MaxWalkedEntries))
+			return fs.SkipAll
+		}
+		name := entry.Name()
+		if entry.IsDir() {
+			if p != root && (strings.HasPrefix(name, ".") || skippedDirs[name]) {
+				return fs.SkipDir
+			}
+			return nil
+		}
+		if (name != "BUILD" && !strings.HasPrefix(name, "BUILD.")) || !entry.Type().IsRegular() {
+			return nil
+		}
+		data, err := os.ReadFile(p)
+		if err != nil || !declaresFirstParty(data) {
+			return nil
+		}
+		rel, err := filepath.Rel(root, filepath.Dir(p))
+		if err != nil {
+			return nil
+		}
+		if dir, ok := wsproto.NormalizeProbePath(filepath.ToSlash(rel)); ok {
+			dirs[dir] = true
+		}
+		return nil
+	})
+	if err != nil {
+		diags = append(diags, diag.Warningf(CodeWalkBounded, "", "the Pants detector cannot walk the repository: %v", err))
+	}
+	out := make([]Component, 0, len(dirs))
+	for dir := range dirs {
+		out = append(out, Component{ID: dir, Source: evidence.SourceWorkspace})
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].ID < out[j].ID })
+	return out, diags
+}
+
+// declaresFirstParty reports whether a BUILD file calls a target or macro
+// other than a third-party, an internal one or a BUILD file symbol.
+func declaresFirstParty(data []byte) bool {
+	for _, m := range call.FindAllSubmatch(data, -1) {
+		if firstParty(string(m[1])) {
+			return true
+		}
+	}
+	return false
+}
+
+// --- pants.toml ---------------------------------------------------------------
+
+// buildroot is the placeholder of the repository root in pants.toml values.
+const buildroot = "%(buildroot)s/"
+
+// resolves returns the lockfiles the [python.resolves] table names.
+func resolves(config []byte) ([]string, []diag.Diagnostic) {
+	doc, err := toml.Parse(config)
+	if err != nil {
+		return nil, []diag.Diagnostic{diag.Warningf(CodeConfigInvalid, Marker, "%s does not parse, so no resolve lockfile is read: %v", Marker, err)}
+	}
+	table, _ := toml.Get(doc, "python", "resolves").(toml.Table)
+	var out []string
+	var diags []diag.Diagnostic
+	for name, value := range table {
+		file, _ := value.(string)
+		file, ok := wsproto.NormalizeProbePath(strings.TrimPrefix(file, buildroot))
+		if !ok || file == wsproto.ProbeRootPath {
+			diags = append(diags, diag.Warningf(CodeConfigInvalid, Marker, "the lockfile of the resolve %s is not a repository path and is not read", name))
+			continue
+		}
+		out = append(out, file)
+	}
+	sort.Strings(out)
+	sort.Slice(diags, func(i, j int) bool { return diags[i].Message < diags[j].Message })
+	return slices.Compact(out), diags
+}

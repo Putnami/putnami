@@ -62,6 +62,9 @@ type Options struct {
 	// Resolve turns a named report path into an absolute one.
 	Resolve  func(string) string
 	Producer Producer
+	// PantsGraph is the absolute path of the Pants export --pants-graph
+	// names; empty reads pants-graph.json at the repository root.
+	PantsGraph string
 	// Detectors replace the default detectors when not nil.
 	Detectors []components.Detector
 }
@@ -134,7 +137,7 @@ func (opts Options) detectors() []components.Detector {
 	if opts.Detectors != nil {
 		return opts.Detectors
 	}
-	return components.Default()
+	return components.Default(components.Options{PantsGraph: opts.PantsGraph})
 }
 
 // repositoryName names a repository no CI names: the path of its origin
