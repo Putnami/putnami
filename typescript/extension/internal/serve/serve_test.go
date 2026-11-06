@@ -2,6 +2,7 @@ package serve
 
 import (
 	"errors"
+	"fmt"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -282,75 +283,149 @@ func withMockExec(t *testing.T, fn func(string, []string, ...pexec.Option) (*pex
 
 // ---- KillProcessOnPort ----
 
-func TestKillProcessOnPort_FuserSuccess(t *testing.T) {
+// withMockKill records the process ids KillProcessOnPort kills, instead of
+// killing them.
+func withMockKill(t *testing.T) *[]int {
+	t.Helper()
+	orig := killProcessFunc
+	t.Cleanup(func() { killProcessFunc = orig })
+	var killed []int
+	killProcessFunc = func(pid int) error {
+		killed = append(killed, pid)
+		return nil
+	}
+	return &killed
+}
+
+func TestKillProcessOnPort_KillsTheListenersLsofNames(t *testing.T) {
+	killed := withMockKill(t)
+	var calls []string
 	withMockExec(t, func(name string, args []string, opts ...pexec.Option) (*pexec.Result, error) {
-		if name == "fuser" {
-			return &pexec.Result{Success: true, ExitCode: 0}, nil
+		calls = append(calls, name+" "+strings.Join(args, " "))
+		if name == "lsof" {
+			return &pexec.Result{Success: true, Stdout: "4242\n4243\n"}, nil
 		}
-		return &pexec.Result{Success: false, ExitCode: 1}, nil
-	})
-
-	killed := KillProcessOnPort(8080)
-	if !killed {
-		t.Error("expected KillProcessOnPort to return true on fuser success")
-	}
-}
-
-func TestKillProcessOnPort_FuserFails(t *testing.T) {
-	withMockExec(t, func(name string, args []string, opts ...pexec.Option) (*pexec.Result, error) {
-		return &pexec.Result{Success: false, ExitCode: 1}, nil
-	})
-
-	killed := KillProcessOnPort(8080)
-	if killed {
-		t.Error("expected KillProcessOnPort to return false when fuser fails")
-	}
-}
-
-func TestKillProcessOnPort_FuserError(t *testing.T) {
-	withMockExec(t, func(name string, args []string, opts ...pexec.Option) (*pexec.Result, error) {
-		return nil, os.ErrNotExist
-	})
-
-	killed := KillProcessOnPort(8080)
-	if killed {
-		t.Error("expected KillProcessOnPort to return false on exec error")
-	}
-}
-
-func TestKillProcessOnPort_LsofFallbackKills(t *testing.T) {
-	var killedPIDs []string
-	withMockExec(t, func(name string, args []string, opts ...pexec.Option) (*pexec.Result, error) {
-		switch name {
-		case "fuser":
-			return &pexec.Result{Success: false, ExitCode: 1}, nil
-		case "lsof":
-			return &pexec.Result{Success: true, ExitCode: 0, Stdout: "4242\n4243\n"}, nil
-		case "kill":
-			killedPIDs = append(killedPIDs, args[len(args)-1])
-			return &pexec.Result{Success: true, ExitCode: 0}, nil
-		}
-		return &pexec.Result{Success: false, ExitCode: 1}, nil
+		return &pexec.Result{Success: true}, nil
 	})
 
 	if !KillProcessOnPort(8080) {
-		t.Error("expected KillProcessOnPort to return true when the lsof fallback kills a process")
+		t.Error("KillProcessOnPort(8080) = false, want true when lsof names listeners")
 	}
-	if len(killedPIDs) != 2 || killedPIDs[0] != "4242" || killedPIDs[1] != "4243" {
-		t.Errorf("expected to kill PIDs [4242 4243], got %v", killedPIDs)
+	if len(*killed) != 2 || (*killed)[0] != 4242 || (*killed)[1] != 4243 {
+		t.Errorf("killed %v, want [4242 4243]", *killed)
+	}
+	want := []string{"lsof -n -P -t -i tcp:8080 -sTCP:LISTEN"}
+	if strings.Join(calls, "|") != strings.Join(want, "|") {
+		t.Errorf("ran %q, want %q: fuser runs only when lsof is absent", calls, want)
 	}
 }
 
-func TestKillProcessOnPort_LsofNoProcess(t *testing.T) {
+func TestKillProcessOnPort_LsofFindsNoListenerKillsNothing(t *testing.T) {
+	killed := withMockKill(t)
+	var ranFuser bool
 	withMockExec(t, func(name string, args []string, opts ...pexec.Option) (*pexec.Result, error) {
-		if name == "lsof" {
-			return &pexec.Result{Success: true, ExitCode: 0, Stdout: "\n"}, nil
+		if name == "fuser" {
+			ranFuser = true
+			return &pexec.Result{Success: true}, nil
 		}
 		return &pexec.Result{Success: false, ExitCode: 1}, nil
 	})
 
 	if KillProcessOnPort(8080) {
-		t.Error("expected KillProcessOnPort to return false when lsof finds no listening process")
+		t.Error("KillProcessOnPort(8080) = true, want false when lsof finds no listener")
+	}
+	if ranFuser {
+		t.Error("ran fuser after lsof found no listener")
+	}
+	if len(*killed) != 0 {
+		t.Errorf("killed %v, want none", *killed)
+	}
+}
+
+func TestKillProcessOnPort_KillsNothingUnlessEveryLsofLineIsAProcessID(t *testing.T) {
+	for name, stdout := range map[string]string{
+		"busybox listing": "1\t/bin/sh\t/dev/null\n",
+		"mixed lines":     "4242\nCOMMAND PID\n",
+		"signed id":       "+4242\n",
+		"zero":            "0\n",
+		"negative":        "-1\n",
+		"empty":           "\n",
+	} {
+		t.Run(name, func(t *testing.T) {
+			killed := withMockKill(t)
+			withMockExec(t, func(string, []string, ...pexec.Option) (*pexec.Result, error) {
+				return &pexec.Result{Success: true, Stdout: stdout}, nil
+			})
+			if KillProcessOnPort(8080) {
+				t.Errorf("KillProcessOnPort(8080) = true, want false for lsof output %q", stdout)
+			}
+			if len(*killed) != 0 {
+				t.Errorf("killed %v, want none for lsof output %q", *killed, stdout)
+			}
+		})
+	}
+}
+
+func TestKillProcessOnPort_FallsBackToFuserWhenLsofIsAbsent(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		result *pexec.Result
+		err    error
+		want   bool
+	}{
+		{"fuser kills", &pexec.Result{Success: true}, nil, true},
+		{"fuser finds none", &pexec.Result{Success: false, ExitCode: 1}, nil, false},
+		{"fuser absent", nil, exec.ErrNotFound, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			killed := withMockKill(t)
+			var fuserArgs []string
+			withMockExec(t, func(name string, args []string, opts ...pexec.Option) (*pexec.Result, error) {
+				if name == "lsof" {
+					return nil, fmt.Errorf("executing lsof: %w", &exec.Error{Name: "lsof", Err: exec.ErrNotFound})
+				}
+				fuserArgs = args
+				return tc.result, tc.err
+			})
+			if got := KillProcessOnPort(8080); got != tc.want {
+				t.Errorf("KillProcessOnPort(8080) = %v, want %v", got, tc.want)
+			}
+			if strings.Join(fuserArgs, " ") != "-k 8080/tcp" {
+				t.Errorf("fuser args = %q, want [-k 8080/tcp]", fuserArgs)
+			}
+			if len(*killed) != 0 {
+				t.Errorf("killed %v through the process handle, want none: fuser kills", *killed)
+			}
+		})
+	}
+}
+
+func TestKillProcessOnPort_LsofStartFailureKillsNothing(t *testing.T) {
+	var ranFuser bool
+	withMockExec(t, func(name string, args []string, opts ...pexec.Option) (*pexec.Result, error) {
+		if name == "fuser" {
+			ranFuser = true
+			return &pexec.Result{Success: true}, nil
+		}
+		return nil, os.ErrPermission
+	})
+	if KillProcessOnPort(8080) {
+		t.Error("KillProcessOnPort(8080) = true, want false when lsof cannot start")
+	}
+	if ranFuser {
+		t.Error("ran fuser although lsof is on PATH")
+	}
+}
+
+func TestKillProcessOnPort_RejectsAnInvalidPort(t *testing.T) {
+	withMockExec(t, func(name string, args []string, opts ...pexec.Option) (*pexec.Result, error) {
+		t.Errorf("ran %s for an invalid port", name)
+		return &pexec.Result{Success: true}, nil
+	})
+	for _, port := range []int{0, -1, 65536} {
+		if KillProcessOnPort(port) {
+			t.Errorf("KillProcessOnPort(%d) = true, want false", port)
+		}
 	}
 }
 

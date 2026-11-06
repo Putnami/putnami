@@ -445,7 +445,7 @@
         },
         "kill-port": {
           "type": "boolean",
-          "description": "Kill process using port before starting"
+          "description": "Kill the process listening on the port before starting"
         },
         "port": {
           "type": "number",
