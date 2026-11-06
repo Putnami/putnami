@@ -22,7 +22,7 @@
     },
     {
       "id": "each-host-names-its-change-request",
-      "text": "GitHub names a pull request with #, GitLab a merge request with !, and a generic host a change request with #. The diff tab is Files changed on GitHub and Changes elsewhere. A label is the noun, a space, the prefix and the number; a number that is not positive gives the noun alone."
+      "text": "GitHub names a pull request with #, GitLab a merge request with !, and a generic host a change request with #. The diff tab is Files changed on GitHub and Changes elsewhere. A label is the noun, a space, the prefix and the number; a number that is not a positive integer gives the noun alone."
     },
     {
       "id": "hosted-slugs-name-their-public-host",

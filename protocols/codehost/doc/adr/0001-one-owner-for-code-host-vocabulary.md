@@ -5,8 +5,9 @@
 
 ## Context
 
-The code-host slugs `github`, `gitlab` and `generic` were declared three
-times: in `protocols/evidence`, and twice in the Cloud workspace. The words
+The code-host slugs `github`, `gitlab` and `generic` were declared four
+times: in `protocols/evidence`, in `@putnami/observe`, and twice in the Cloud
+workspace. The words
 that go with them were scattered too. `@putnami/observe` wrote "pull request"
 or "merge request" in two places, and one of them gave a GitLab merge request
 the `#` prefix GitLab does not use. The Cloud console held its own copy of the
