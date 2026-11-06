@@ -7,7 +7,7 @@ queries no vulnerability database.
 
 ## Components
 
-Six detectors read the repository:
+Seven detectors read the repository:
 
 | Detector | Reads | Source |
 |---|---|---|
@@ -52,7 +52,7 @@ its impact.
 A JUnit case goes to the first of:
 
 1. The package of its Bazel test target, for a log under `bazel-testlogs`;
-   see [the Bazel detector](08-bazel.md#tests-and-coverage).
+   see [the Bazel detector](09-bazel.md#tests-and-coverage).
 2. The component that holds its test file: the case's `file`, else its
    suite's, else its class name when that names a file (Vitest), else its
    dotted class name read as a Python module (pytest). pytest writes

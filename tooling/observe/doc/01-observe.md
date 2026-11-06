@@ -16,7 +16,7 @@ answer, so the workspace must declare `@putnami/observe` to run it there.
 | `--sbom <path>` | The software bill of materials (SBOM) of the commit, a path or glob pattern. Replaces SBOM discovery. |
 | `--base-sbom <path>` | The SBOM of the base. Without it, the base state of each dependency is unknown. |
 | `--pants-graph <path>` | The Pants export `pants peek ::` wrote, resolved against the directory you run in. Default `pants-graph.json` at the repository root. See [the Pants detector](08-pants.md). |
-| `--bazel-graph <path>` | The Bazel query export, from `bazel query 'deps(//...)' --output=streamed_jsonproto`. Default `bazel-graph.json` at the repository root. See [the Bazel detector](08-bazel.md). |
+| `--bazel-graph <path>` | The Bazel query export, from `bazel query 'deps(//...)' --output=streamed_jsonproto`. Default `bazel-graph.json` at the repository root. See [the Bazel detector](09-bazel.md). |
 | `--no-fetch` | Read only the local history: fetch no base and deepen no shallow clone. |
 | `--evidence <path>` | Write the change evidence document to this path, resolved against the directory you run in. |
 | `--upload` | Hand the change evidence document to the evidence reporter. See [Uploading the evidence](#uploading-the-evidence). |
@@ -100,7 +100,7 @@ The walk does not follow links. It also reads, through the links Bazel leaves
 at the root, the `test.xml` of each test target, shard and run under
 `bazel-testlogs` and the combined LCOV
 report `bazel-out/_coverage/_coverage_report.dat`; see
-[the Bazel detector](08-bazel.md#tests-and-coverage).
+[the Bazel detector](09-bazel.md#tests-and-coverage).
 
 Without `--sbom`, it also reads the `.json` files whose name contains `bom`,
 `cdx`, `cyclonedx` or `spdx`, and keeps a CycloneDX document (a

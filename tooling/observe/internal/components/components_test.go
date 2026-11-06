@@ -270,7 +270,7 @@ func TestWithoutAnExportANestedBuildFileYieldsToTheEnclosingComponent(t *testing
 		"svc/internal/calc/BUILD.bazel":    "",
 		"tools/lint/BUILD.bazel":           "",
 	})
-	set := Detect(root, Default(""))
+	set := Detect(root, Default(Options{}))
 	if got := ids(set); !slices.Equal(got, []string{"packages/api", "packages/pricing", "svc", "tools/lint"}) {
 		t.Fatalf("components %v", got)
 	}
