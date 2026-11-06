@@ -18,7 +18,7 @@
   "requirements": [
     {
       "id": "label-states",
-      "text": "settings.states maps open, in_progress, blocked, done and canceled to label names, the first label of each being the one a transition applies, and every label with settings.stateLabelPrefix is a state label too. An opened issue is blocked, in_progress or open by the first of those states whose label it carries, and open without one. A closed issue is canceled when it carries a canceled label or GitLab closed it as a duplicate, and done otherwise. A transition removes every state label, applies the target's first label, and closes the issue for done and canceled or reopens it for the other states; a state other than open and done without a label is unsupported, and a task already in the state is left as it is. create applies the first label of in_progress or blocked, and opens then closes an issue asked for in done or canceled; create and update refuse a state label. providerState is the deciding label, or opened, closed or closed:duplicate."
+      "text": "settings.states maps each state to labels, the first one applied by a transition; labels with settings.stateLabelPrefix are state labels too. An opened issue is blocked, in_progress or open by the first of those whose label it carries, else open. A closed issue is canceled by a canceled label or a duplicate link, done otherwise. A transition swaps the state labels and closes or reopens the issue; in_progress, blocked and canceled without a label are unsupported. create and update refuse a state label."
     },
     {
       "id": "content-revision",
@@ -30,7 +30,7 @@
     },
     {
       "id": "reconciled-writes",
-      "text": "create records the hash of the idempotency key and the digest of the request in a hidden comment at the end of the description, and before it opens an issue it looks for that key among the newest issues the credential's account opened in the project, settings.keyScanPages pages of 100, then in GitLab's issue search. GitLab's lists read its database, so a repeat right after a create finds the issue. The same key and request return that issue with created false; the key with other content is a conflict, idempotency.mismatch; an issue another account opened never answers for a key. Every write is sent once: after a lost answer or a 5xx the provider reads GitLab back, never opens a second issue, and answers an outcome it cannot establish unresolved, naming what settles it. update keeps the marker, and a task's body never shows it."
+      "text": "create ends the description with a hidden comment holding the key's hash and the request digest, and first looks for the key among the newest issues the credential's account opened, keyScanPages pages of 100, then in GitLab's search. A repeat returns that issue, created false; other content is a conflict; another account's issue never answers. Every write is sent once; after a lost answer or a 5xx the provider reads GitLab back and answers what it cannot establish unresolved. update keeps the marker."
     },
     {
       "id": "informational-assign",
@@ -42,7 +42,7 @@
     },
     {
       "id": "credential-safety",
-      "text": "The provider resolves one credential per instance, in this order: GITLAB_TOKEN when GITLAB_HOST names the bound host or is unset and the host is gitlab.com; the token glab config get token --host <host> prints; and, inside a GitLab pipeline whose CI_SERVER_HOST is the bound host, CI_JOB_TOKEN, sent as JOB-TOKEN. Without one every call answers denied, gitlab.unauthenticated, and sends nothing. The token is sent only to https://<host>/api/v4 or to a loopback stand-in PUTNAMI_GITLAB_API_URL names, and the runtime removes it, and every string shaped like a GitLab token, from everything it writes, GitLab's messages included."
+      "text": "The token is GITLAB_TOKEN when GITLAB_HOST names the bound host, or is unset for gitlab.com; then what glab config get token --host prints; then, in a pipeline whose CI_SERVER_HOST is the host, CI_JOB_TOKEN sent as JOB-TOKEN. Without one every call is denied and nothing is sent. The token reaches only https://<host>/api/v4 or a loopback PUTNAMI_GITLAB_API_URL, and the runtime removes it and every GitLab token shape from all it writes."
     },
     {
       "id": "truthful-manifest",
