@@ -196,6 +196,15 @@ export async function useTxConnection(dbName: string | undefined, mode: 'read' |
   }
 
   const opened = await opening;
+  // A finalizer that started while this write was opening its transaction has
+  // already queued its COMMIT or ROLLBACK on the connection. A query this
+  // caller sent now would run after it, outside any transaction, and persist.
+  if (tx.timedOut) {
+    throw new Error('Transaction has timed out and was rolled back');
+  }
+  if (tx.finalizing) {
+    throw new Error('Transaction was committed or rolled back while this write was opening it');
+  }
   opened.hasWrite = true;
   return opened.conn;
 }

@@ -29,6 +29,8 @@ function createFakeBackend() {
   // The single reserved connection per datasource, so identity assertions
   // ("a new'd repo joins the same tx") can compare object references.
   const reservedByKey = new Map<string, unknown>();
+  // When set, `reserve()` signals `requested` and waits for `released`.
+  let hold: { requested: () => void; released: Promise<void> } | undefined;
 
   function makeReserved(key: string) {
     const reserved = ((strings: TemplateStringsArray) => {
@@ -43,6 +45,8 @@ function createFakeBackend() {
         log.push(`${key}:commit`);
       } else if (cmd.startsWith('ROLLBACK')) {
         log.push(`${key}:rollback`);
+      } else {
+        log.push(`${key}:write`);
       }
       return Promise.resolve([]);
       // biome-ignore lint/suspicious/noExplicitAny: minimal postgres.js reserved-connection fake
@@ -55,6 +59,10 @@ function createFakeBackend() {
     // biome-ignore lint/suspicious/noExplicitAny: minimal postgres.js pool fake
     const pool = (() => Promise.resolve([])) as any;
     pool.reserve = async () => {
+      if (hold) {
+        hold.requested();
+        await hold.released;
+      }
       const reserved = makeReserved(key);
       reservedByKey.set(key, reserved);
       return reserved;
@@ -75,6 +83,19 @@ function createFakeBackend() {
         pools.set(key, pool);
       }
       return pool;
+    },
+    /** Hold every reservation until `release()`; `reserving` settles on the first request. */
+    holdReserve(): { reserving: Promise<void>; release: () => void } {
+      let requested!: () => void;
+      const reserving = new Promise<void>((resolve) => {
+        requested = resolve;
+      });
+      let release!: () => void;
+      const released = new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      hold = { requested, released };
+      return { reserving, release };
     },
     count(entry: string): number {
       return log.filter((e) => e === entry).length;
@@ -366,6 +387,53 @@ describe('transaction laziness, nesting, timeout (spec)', () => {
       expect(backend.count('db1:rollback')).toBe(1);
       expect(backend.count('db1:commit')).toBe(0);
       expect(backend.count('db1:release')).toBe(1);
+    },
+  );
+
+  specTest(
+    'a timeout that fires while the first write opens the transaction fails that write',
+    {
+      feature: 'typescript/relational-persistence',
+      requirement: 'timeout-rollback',
+      check: 'a-write-still-opening-when-the-timeout-fires-fails-instead-of-running-after-the-rollback',
+    },
+    async () => {
+      const timeoutMs = 987_654;
+      let fireTimeout: (() => void) | undefined;
+      const gate = backend.holdReserve();
+      const realSetTimeout = globalThis.setTimeout;
+      globalThis.setTimeout = ((handler: () => void, delay?: number, ...args: unknown[]) => {
+        if (delay === timeoutMs) {
+          fireTimeout = handler;
+          return realSetTimeout(() => {}, 0);
+        }
+        return realSetTimeout(handler, delay, ...args);
+      }) as typeof setTimeout;
+
+      let error: Error | undefined;
+      try {
+        await runInContext({}, async () => {
+          withTransaction({ timeoutMs });
+          globalThis.setTimeout = realSetTimeout;
+          const writing = useTxConnection('db1', 'write').then((sql) => sql`INSERT INTO items VALUES (1)`);
+
+          await gate.reserving;
+          fireTimeout?.();
+          gate.release();
+
+          try {
+            await writing;
+          } catch (e) {
+            error = e as Error;
+          }
+        });
+      } finally {
+        globalThis.setTimeout = realSetTimeout;
+      }
+
+      // The write never ran: the timeout had rolled the transaction back first.
+      expect(backend.log).toEqual(['db1:begin', 'db1:rollback', 'db1:release']);
+      expect(error?.message).toBe('Transaction has timed out and was rolled back');
     },
   );
 });
