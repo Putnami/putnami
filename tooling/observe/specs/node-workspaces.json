@@ -12,7 +12,8 @@
     "Running npm, pnpm, yarn, turbo or lerna, or reading node_modules",
     "Mapping changed files, tests and coverage to components, finding dependents, and diffing the lockfile: the change analyses own them",
     "Importing an orchestrator's graph export, such as nx graph or turbo ls: the Nx detector and later slices own it",
-    "A single package.json without workspaces, bun workspaces and Rush"
+    "A single package.json without workspaces and bun workspaces",
+    "Rush, whose projects rush.json lists: the Rush detector owns it"
   ],
   "requirements": [
     {

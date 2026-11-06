@@ -1,0 +1,37 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-spec.json",
+  "protocolVersion": 1,
+  "feature": "tooling/observe-rush",
+  "outcomes": [
+    "A Rush monorepo is read as its Rush projects, each a component named by its directory and its package name, from rush.json",
+    "Each Rush project lists the Rush projects it depends on, so a change to one project names the projects that depend on it",
+    "The lockfile Rush keeps under common/config, and each subspace lockfile, is read as the repository's dependency changes"
+  ],
+  "nonGoals": [
+    "Running rush, pnpm, npm or yarn, or reading common/temp or node_modules",
+    "Computing the changed and dependent components, the tests and coverage per component and the dependency changes: the change analyses own them",
+    "Reading Rush command-line, version policy or build cache configuration"
+  ],
+  "requirements": [
+    {
+      "id": "rush-projects-are-components",
+      "text": "A root rush.json, JSON with comments, makes a Rush monorepo. Each entry of its projects list is a component of source orchestrator and ecosystem node, its id its projectFolder, its name its packageName. An entry without a name, with a folder that leaves the repository, or with a folder or name an earlier entry took, is a diagnostic and is left out. A rush.json that cannot be read or parsed is a warning and gives no component, so the other detectors answer."
+    },
+    {
+      "id": "rush-project-edges",
+      "text": "A Rush project depends on another when one of the dependencies, devDependencies or peerDependencies of its package.json names that project's package name with the workspace: protocol, an alias included, or with a version range the version of that project's package.json satisfies. A dependency the project lists in decoupledLocalDependencies or cyclicDependencyProjects is no edge. A package.json that cannot be read is a diagnostic: its project stays a component without edges."
+    },
+    {
+      "id": "rush-lockfiles",
+      "text": "The package manager rush.json names selects the lockfile: pnpmVersion common/config/rush/pnpm-lock.yaml, npmVersion common/config/rush/npm-shrinkwrap.json, yarnVersion common/config/rush/yarn.lock. In pnpm mode, each common/config/subspaces/<name>/pnpm-lock.yaml is a lockfile too. The existing pnpm, npm and yarn readers read them; Rush's temporary projects, named @rush-temp/, and file: or link: packages are no dependency."
+    },
+    {
+      "id": "rush-change-analysis",
+      "text": "On a Rush monorepo, putnami observe summarizes the Rush projects and their edges, marks a project that depends on a changed one dependent and the others unaffected, and lists the version changes of the Rush lockfile among the dependency changes."
+    }
+  ],
+  "decisions": [
+    "tooling/cli/doc/adr/0051-user-scope-extensions-run-without-a-workspace.md",
+    "protocols/evidence/doc/adr/0001-one-self-reported-change-evidence-document.md"
+  ]
+}

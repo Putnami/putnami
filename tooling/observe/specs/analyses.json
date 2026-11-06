@@ -17,7 +17,7 @@
   "requirements": [
     {
       "id": "components",
-      "text": "The Nx, Node workspace, Composer, Go and Python detectors answer for the repository. When two name one directory, the higher source wins: orchestrator, then workspace, then manifest. A changed file belongs to the innermost component that holds it. A component is changed when one of its files changed, dependent when it reaches a changed one through its edges. Edges to an unknown component are dropped. When no detector finds a component, the repository is one fallback component."
+      "text": "The Nx, Rush, Node workspace, Composer, Go and Python detectors answer for the repository. When two name one directory, the higher source wins: orchestrator, then workspace, then manifest. A changed file belongs to the innermost component that holds it. A component is changed when one of its files changed, dependent when it reaches a changed one through its edges. Edges to an unknown component are dropped. When no detector finds a component, the repository is one fallback component."
     },
     {
       "id": "tests-and-coverage",
@@ -29,7 +29,7 @@
     },
     {
       "id": "dependency-changes",
-      "text": "Each changed package-lock.json, pnpm-lock.yaml, yarn.lock, composer.lock, go.mod, uv.lock and poetry.lock is read at the merge base and at the head. A package present on one side only is added or removed; one whose versions differ is upgraded, downgraded or, when they do not compare, changed. Workspace links, path, editable and directory packages and modules of the repository are no dependency. A Python package name is normalized. A lockfile that cannot be read is a diagnostic."
+      "text": "Each changed package-lock.json, pnpm-lock.yaml, yarn.lock, composer.lock, go.mod, uv.lock, poetry.lock and Rush npm-shrinkwrap.json is read at the merge base and at the head. A package present on one side only is added or removed; one whose versions differ is upgraded, downgraded or, when they do not compare, changed. Workspace links, path, editable and directory packages and modules of the repository are no dependency. A Python package name is normalized. A lockfile that cannot be read is a diagnostic."
     },
     {
       "id": "summary",
