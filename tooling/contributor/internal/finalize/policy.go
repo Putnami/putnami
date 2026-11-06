@@ -252,11 +252,11 @@ func BoundTaskReference(policy Policy, task collab.Task, partial bool, proposals
 }
 
 // bindingLocates reports whether the proposals binding publishes in source. It
-// names no provider. The binding must be bound to the provider that serves the
-// tasks binding, which issued source, and its settings must locate source: a
-// code-host source reads "<slug>:<host>/<location>", or "<slug>:<location>" on
-// the slug's default host, where host is the binding's host or that default
-// and location its repository or project.
+// names no provider. Both bindings must be bound to the same provider, the one
+// that issued source, and locate the same place: the binding's host, or the
+// code host's default, and its repository or project. That place must spell
+// source, "<slug>:<host>/<location>", or "<slug>:<location>" on the slug's
+// default host.
 func bindingLocates(proposals, tasks collab.Capabilities, source string) bool {
 	if !boundTo(proposals) || !boundTo(tasks) || proposals.Provider.Name != tasks.Provider.Name {
 		return false
@@ -266,32 +266,40 @@ func bindingLocates(proposals, tasks collab.Capabilities, source string) bool {
 	if !found || !known {
 		return false
 	}
-	var settings struct {
-		Host       string `json:"host"`
-		Repository string `json:"repository"`
-		Project    string `json:"project"`
-	}
-	if err := json.Unmarshal(proposals.Binding.Settings, &settings); err != nil {
-		return false
-	}
-	location := settings.Repository
-	if settings.Project != "" {
-		if location != "" {
-			return false
-		}
-		location = settings.Project
-	}
-	host := settings.Host
-	if host == "" {
-		host = vocabulary.DefaultHost
-	}
-	if !validLocation(location) || !collabhelper.ValidHost(host) {
+	host, location, ok := bindingPlace(proposals.Binding.Settings, vocabulary.DefaultHost)
+	taskHost, taskLocation, taskOK := bindingPlace(tasks.Binding.Settings, vocabulary.DefaultHost)
+	if !ok || !taskOK || !strings.EqualFold(host, taskHost) || !strings.EqualFold(location, taskLocation) {
 		return false
 	}
 	if strings.EqualFold(source, slug+":"+host+"/"+location) {
 		return true
 	}
 	return strings.EqualFold(host, vocabulary.DefaultHost) && strings.EqualFold(source, slug+":"+location)
+}
+
+// bindingPlace reads where a binding's settings point: its host, or
+// defaultHost, and its repository or project.
+func bindingPlace(raw json.RawMessage, defaultHost string) (host, location string, ok bool) {
+	var settings struct {
+		Host       string `json:"host"`
+		Repository string `json:"repository"`
+		Project    string `json:"project"`
+	}
+	if err := json.Unmarshal(raw, &settings); err != nil {
+		return "", "", false
+	}
+	location = settings.Repository
+	if settings.Project != "" {
+		if location != "" {
+			return "", "", false
+		}
+		location = settings.Project
+	}
+	host = settings.Host
+	if host == "" {
+		host = defaultHost
+	}
+	return host, location, validLocation(location) && collabhelper.ValidHost(host)
 }
 
 // segmentPattern is one segment of a repository or project path.

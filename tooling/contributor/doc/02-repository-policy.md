@@ -26,9 +26,11 @@ and epics that run 3 children at once in local workspaces.
 Putnami binds tasks and proposals to the GitHub provider and sets the
 conventions its maintainers use. It is a reference, not a default for other
 repositories. A repository on another code host binds that host's provider
-in the same two places: on GitLab, `@putnami/gitlab-collaboration` names the
-project with `project` in place of `repository`, and its sources read
-`gitlab:<host>/<project path>`. The contributor block keeps the same members.
+for each contract it serves, and keeps the same contributor members. On
+GitLab, `@putnami/gitlab-collaboration` serves tasks only, names the project
+with `project` in place of `repository`, and its sources read
+`gitlab:<host>/<project path>`. Until it serves proposals, the proposals
+binding names another provider, and `taskReference` uses `{url}`.
 
 ```json
 {

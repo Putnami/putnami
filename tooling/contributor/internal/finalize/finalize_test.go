@@ -59,6 +59,7 @@ type finalizerProvider struct {
 	task                                       collab.Task
 	checks                                     collab.Checks
 	proposalRepository                         string
+	taskProvider                               string
 	upserts, transitions, reviews, statusReads int
 	findReads                                  int
 	findHeadCommits                            []string
@@ -91,13 +92,16 @@ func (p *finalizerProvider) envelope(_ context.Context, contract, operation stri
 		}
 		capabilities := collab.Capabilities{Status: collab.BindingStatusBound, Operations: operations,
 			Provider: &collab.ProviderIdentity{Name: "@acme/forge-collaboration"},
-			Binding:  &collab.Binding{Provider: "@acme/forge-collaboration", Version: 1, Settings: json.RawMessage(`{}`)}}
+			Binding:  &collab.Binding{Provider: "@acme/forge-collaboration", Version: 1, Settings: json.RawMessage(`{"repository":"acme/app"}`)}}
 		if contract == collab.ContractProposals {
 			repository := p.proposalRepository
 			if repository == "" {
 				repository = "acme/app"
 			}
 			capabilities.Binding.Settings, _ = json.Marshal(map[string]string{"repository": repository})
+		}
+		if contract == collab.ContractTasks && p.taskProvider != "" {
+			capabilities.Provider.Name, capabilities.Binding.Provider = p.taskProvider, p.taskProvider
 		}
 		return answer(capabilities)
 	}
@@ -1008,7 +1012,8 @@ func TestIdOnlyClosingRequiresActualProposalBinding(t *testing.T) {
 			f, git, provider, opts := finalizerFixture(t)
 			provider.proposalRepository = repository
 			if repository == "" {
-				// A binding with no repository cannot prove the policy's source.
+				// A proposals binding on another repository than the tasks
+				// binding's cannot prove the policy's source.
 				provider.proposalRepository = "invalid/repository/shape"
 			}
 			opts.TaskSource, opts.TaskID = provider.task.Ref.Source, provider.task.Ref.ID
@@ -1016,6 +1021,18 @@ func TestIdOnlyClosingRequiresActualProposalBinding(t *testing.T) {
 				t.Fatalf("mismatched binding reached mutation: pushes=%d upserts=%d err=%v", git.pushes, provider.upserts, err)
 			}
 		})
+	}
+}
+
+// TestIdOnlyClosingRequiresTheTaskProvider pins that a proposals binding of
+// another provider than the tasks binding's never renders an id-only closing
+// reference, even when both name the same repository.
+func TestIdOnlyClosingRequiresTheTaskProvider(t *testing.T) {
+	f, git, provider, opts := finalizerFixture(t)
+	provider.taskProvider = "@acme/tracker-collaboration"
+	opts.TaskSource, opts.TaskID = provider.task.Ref.Source, provider.task.Ref.ID
+	if _, err := f.Run(context.Background(), opts); err == nil || !strings.Contains(err.Error(), "use {url}") || git.pushes != 0 || provider.upserts != 0 {
+		t.Fatalf("a proposals binding of another provider reached mutation: pushes=%d upserts=%d err=%v", git.pushes, provider.upserts, err)
 	}
 }
 

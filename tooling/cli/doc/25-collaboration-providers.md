@@ -162,6 +162,14 @@ self-managed instance. It finds the credential the way `glab` does, maps task
 states to labels with the same settings as the GitHub provider, and offers
 `assign`; merge requests are not served yet.
 
+Both code-host providers name the place they serve the same way: `host`, or
+the code host's default host, and `repository` or `project`. Their references
+read `<slug>:<host>/<location>`, with the slug from
+`go.putnami.dev/protocol/codehost` and the host left out on github.com.
+`putnami change finalize` relies on that convention to render an id-only
+closing reference such as `Closes #{id}`. A code-host provider that names its
+place another way leaves its workspaces on `{url}`.
+
 [`@putnami/jira-collaboration`](../../jira-collaboration/README.md)
 implements **tasks** on the issues of one Jira Cloud project. It reads
 `JIRA_EMAIL` and `JIRA_API_TOKEN`, maps task states to status categories, so a

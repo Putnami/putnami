@@ -34,22 +34,33 @@ func TestTheBoundProviderProvesTheClosingSource(t *testing.T) {
 		proposals string
 		settings  map[string]string
 		accepted  bool
+		// taskSettings are the tasks binding's settings; nil means the
+		// proposals binding's.
+		taskSettings map[string]string
 	}{
-		{"github default host", "github:acme/app", forge, forge, map[string]string{"repository": "Acme/App"}, true},
-		{"github default host spelled out", "github:acme/app", forge, forge, map[string]string{"repository": "acme/app", "host": "GitHub.com"}, true},
-		{"github enterprise", "github:ghe.example.com/acme/app", forge, forge, map[string]string{"repository": "acme/app", "host": "ghe.example.com"}, true},
-		{"gitlab.com nested group", "gitlab:gitlab.com/acme/platform/app", forge, forge, map[string]string{"project": "acme/platform/app"}, true},
-		{"gitlab self-managed", "gitlab:git.example.com/acme/app", forge, forge, map[string]string{"project": "acme/app", "host": "git.example.com"}, true},
-		{"another repository", "github:acme/app", forge, forge, map[string]string{"repository": "acme/other"}, false},
-		{"another host", "gitlab:gitlab.com/acme/app", forge, forge, map[string]string{"project": "acme/app", "host": "git.example.com"}, false},
-		{"self-managed host without its name", "github:acme/app", forge, forge, map[string]string{"repository": "acme/app", "host": "ghe.example.com"}, false},
-		{"another provider serves the tasks", "github:acme/app", "@acme/tracker-collaboration", forge, map[string]string{"repository": "acme/app"}, false},
-		{"both repository and project", "gitlab:gitlab.com/acme/app", forge, forge, map[string]string{"repository": "acme/app", "project": "acme/app"}, false},
-		{"no location", "github:acme/app", forge, forge, map[string]string{}, false},
-		{"dot segment", "gitlab:gitlab.com/acme/../app", forge, forge, map[string]string{"project": "acme/../app"}, false},
-		{"a host with a path", "gitlab:evil.example/x/acme/app", forge, forge, map[string]string{"project": "acme/app", "host": "evil.example/x"}, false},
-		{"not a code-host source", "jira:acme/app", forge, forge, map[string]string{"repository": "acme/app"}, false},
-		{"generic has no default host", "generic:acme/app", forge, forge, map[string]string{"repository": "acme/app"}, false},
+		{"github default host", "github:acme/app", forge, forge, map[string]string{"repository": "Acme/App"}, true, nil},
+		{"github default host spelled out", "github:acme/app", forge, forge, map[string]string{"repository": "acme/app", "host": "GitHub.com"}, true, nil},
+		{"github enterprise", "github:ghe.example.com/acme/app", forge, forge, map[string]string{"repository": "acme/app", "host": "ghe.example.com"}, true, nil},
+		{"gitlab.com nested group", "gitlab:gitlab.com/acme/platform/app", forge, forge, map[string]string{"project": "acme/platform/app"}, true, nil},
+		{"gitlab self-managed", "gitlab:git.example.com/acme/app", forge, forge, map[string]string{"project": "acme/app", "host": "git.example.com"}, true, nil},
+		{"another repository", "github:acme/app", forge, forge, map[string]string{"repository": "acme/other"}, false, nil},
+		{"another host", "gitlab:gitlab.com/acme/app", forge, forge, map[string]string{"project": "acme/app", "host": "git.example.com"}, false, nil},
+		{"self-managed host without its name", "github:acme/app", forge, forge, map[string]string{"repository": "acme/app", "host": "ghe.example.com"}, false, nil},
+		{"another provider serves the tasks", "github:acme/app", "@acme/tracker-collaboration", forge, map[string]string{"repository": "acme/app"}, false, nil},
+		{"both repository and project", "gitlab:gitlab.com/acme/app", forge, forge, map[string]string{"repository": "acme/app", "project": "acme/app"}, false, nil},
+		{"no location", "github:acme/app", forge, forge, map[string]string{}, false, nil},
+		{"dot segment", "gitlab:gitlab.com/acme/../app", forge, forge, map[string]string{"project": "acme/../app"}, false, nil},
+		{"a host with a path", "gitlab:evil.example/x/acme/app", forge, forge, map[string]string{"project": "acme/app", "host": "evil.example/x"}, false, nil},
+		{"not a code-host source", "jira:acme/app", forge, forge, map[string]string{"repository": "acme/app"}, false, nil},
+		{"generic has no default host", "generic:acme/app", forge, forge, map[string]string{"repository": "acme/app"}, false, nil},
+		{"tasks on github.com spelled out", "github:acme/app", forge, forge, map[string]string{"repository": "acme/app"}, true,
+			map[string]string{"repository": "ACME/app", "host": "github.com", "states": "kept"}},
+		{"a project path that spells another host", "gitlab:git.example.com/acme/app", forge, forge,
+			map[string]string{"project": "git.example.com/acme/app"}, false, map[string]string{"project": "acme/app", "host": "git.example.com"}},
+		{"the tasks binding serves another repository", "github:acme/app", forge, forge, map[string]string{"repository": "acme/app"}, false,
+			map[string]string{"repository": "acme/other"}},
+		{"the tasks binding has no location", "github:acme/app", forge, forge, map[string]string{"repository": "acme/app"}, false,
+			map[string]string{}},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
@@ -57,7 +68,11 @@ func TestTheBoundProviderProvesTheClosingSource(t *testing.T) {
 			policy.Proposals.Source = c.source
 			policy.Publication.TaskReference = "Closes #{id}"
 			task := collab.Task{Ref: collab.Ref{Source: c.source, ID: "42"}}
-			line, err := BoundTaskReference(policy, task, false, boundCapabilities(c.proposals, c.settings), boundCapabilities(c.tasks, map[string]string{}))
+			taskSettings := c.taskSettings
+			if taskSettings == nil {
+				taskSettings = c.settings
+			}
+			line, err := BoundTaskReference(policy, task, false, boundCapabilities(c.proposals, c.settings), boundCapabilities(c.tasks, taskSettings))
 			if c.accepted && (err != nil || line != "Closes #42") {
 				t.Fatalf("a binding that locates %s was refused: %q %v", c.source, line, err)
 			}
@@ -72,8 +87,15 @@ func TestTheBoundProviderProvesTheClosingSource(t *testing.T) {
 	policy.Proposals.Source = "github:acme/app"
 	policy.Publication.TaskReference = "Closes #{id}"
 	task := collab.Task{Ref: collab.Ref{Source: "github:acme/app", ID: "42"}, URL: "https://example.test/42"}
-	if _, err := BoundTaskReference(policy, task, false, unbound, boundCapabilities(forge, nil)); err == nil {
+	located := boundCapabilities(forge, map[string]string{"repository": "acme/app"})
+	if _, err := BoundTaskReference(policy, task, false, unbound, located); err == nil {
 		t.Fatal("an unbound proposals binding proved the closing source")
+	}
+	if _, err := BoundTaskReference(policy, task, false, located, unbound); err == nil {
+		t.Fatal("an unbound tasks binding proved the closing source")
+	}
+	if _, err := BoundTaskReference(policy, task, false, located, collab.Capabilities{Status: collab.BindingStatusBound}); err == nil {
+		t.Fatal("a tasks binding without provider proved the closing source")
 	}
 	if line, err := BoundTaskReference(policy, task, true, unbound, unbound); err != nil || line != "Refs "+task.URL {
 		t.Fatalf("partial delivery needs no binding proof: %q %v", line, err)
