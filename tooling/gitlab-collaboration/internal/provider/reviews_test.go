@@ -303,12 +303,18 @@ func TestTheLatestStatusOfEachNameDecides(t *testing.T) {
 	if state := h.status(ref).Checks.State; state != collab.ChecksStateFailing {
 		t.Fatalf("the latest failure: %s", state)
 	}
+	// Past the cap the oldest are not read: the newest decide.
 	many := make([]map[string]any, 0, maxCheckPages*gitlabPageSize+1)
 	for i := range maxCheckPages*gitlabPageSize + 1 {
 		many = append(many, map[string]any{"id": i + 10, "name": "job " + strconv.Itoa(i), "status": "success"})
 	}
+	many[len(many)-1]["status"] = "failed"
 	h.statuses(fakeSHA(2), many...)
-	mustContain(t, h.status(ref).Checks.Detail, "were not read")
+	checks = h.status(ref).Checks
+	mustContain(t, checks.Detail, "were not read")
+	if checks.State != collab.ChecksStateFailing {
+		t.Fatalf("the newest status was not read: %s", checks.State)
+	}
 }
 
 func TestABlockingManualJobIsPending(t *testing.T) {

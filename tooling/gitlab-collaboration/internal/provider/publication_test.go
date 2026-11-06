@@ -232,7 +232,7 @@ func TestASingleAssigneeTierKeepsItsAssignee(t *testing.T) {
 	if failure.Reason != reasonIncomplete {
 		t.Fatalf("a dropped assignee: %+v", failure)
 	}
-	mustContain(t, failure.Message, "kept alice and removed bob")
+	mustContain(t, failure.Message, "kept alice and did not keep bob, as a tier without multiple assignees does")
 	if again := h.upsert(`{"change":` + topicChange + `,"title":"Single"}`); !slices.Equal(again.Proposal.Assignees, []string{"alice"}) {
 		t.Fatalf("a repeat answered %v", again.Proposal.Assignees)
 	}
@@ -297,7 +297,51 @@ func TestTheMergeRequestSquashFlagFollowsTheMethod(t *testing.T) {
 	if failure.Reason != reasonMergeMethod {
 		t.Fatalf("a squash a branch rule forbids: %+v", failure)
 	}
-	if merges := h.fake.count("PUT /api/v4/projects/acme/platform/app/merge_requests/2/merge"); merges != 0 {
-		t.Fatalf("an overridden method merged %d times", merges)
+	if writes := h.fake.count("PUT /api/v4/projects/acme/platform/app/merge_requests/2"); writes != 0 {
+		t.Fatalf("a rule the read already showed drew %d writes", writes)
+	}
+}
+
+func TestAnAnswerThatMergesNothingLeavesTheSquashFlag(t *testing.T) {
+	spectest.Proves(t, feature, "guarded-merge", "an-answer-that-merges-nothing-leaves-the-squash-flag")
+	h := newProposals(t, `"allowMerge":true`)
+	h.set(func(f *fakeGitLab) { f.squashOption = "default_on" })
+	created := h.upsert(`{"change":` + topicChange + `,"title":"Encouraged"}`)
+	flag := func(iid int) bool {
+		var squash bool
+		h.mr(iid, func(mr *fakeMR) { squash = mr.squash })
+		return squash
+	}
+	// GitLab refuses the merge after the flag was cleared for it.
+	h.set(func(f *fakeGitLab) { f.unmergeable = true })
+	failure := h.fails("merge", h.merge(created.Proposal.Ref, `,"method":"merge"`), collab.OutcomeConflict)
+	if failure.Reason != reasonNotMergeable || !flag(1) {
+		t.Fatalf("a refused merge: %+v, flag %t", failure, flag(1))
+	}
+	mustContain(t, failure.Message, "put back")
+	// A branch rule the read does not show: the flag is set, read back, and
+	// put back.
+	h.branch("other", fakeSHA(2))
+	h.set(func(f *fakeGitLab) { f.unmergeable, f.squashOption, f.branchSquash = false, "default_off", "" })
+	other := h.upsert(`{"change":{"base":"main","head":"other"},"title":"Ruled"}`)
+	h.set(func(f *fakeGitLab) { f.branchSquash = "never" })
+	failure = h.fails("merge", h.merge(other.Proposal.Ref, `,"method":"squash"`), collab.OutcomeUnsupported)
+	if failure.Reason != reasonMergeMethod || flag(2) {
+		t.Fatalf("an overridden squash: %+v, flag %t", failure, flag(2))
+	}
+	// A flag that cannot be put back makes the answer unresolved: the second
+	// write, the one that puts it back, is refused.
+	puts := 0
+	h.set(func(f *fakeGitLab) {
+		f.onPut = func() *fault {
+			if puts++; puts == 2 {
+				return &fault{status: 403, body: `{"message":"403 Forbidden"}`, before: true}
+			}
+			return nil
+		}
+	})
+	failure = h.fails("merge", h.merge(other.Proposal.Ref, `,"method":"squash"`), collab.OutcomeUnresolved)
+	if failure.Reason != reasonIncomplete || !flag(2) {
+		t.Fatalf("a flag that could not be put back: %+v, flag %t", failure, flag(2))
 	}
 }

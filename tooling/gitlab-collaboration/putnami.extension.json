@@ -118,7 +118,7 @@
           "openWorld": true
         },
         "upsert": {
-          "description": "Update the open merge request of an exact base and head, or open it. GitLab keeps one open merge request per source and target branch, so a repeated or concurrent upsert never opens a second. A draft is the title prefix Draft:, which a proposal's title never shows; a requested title with a draft prefix is invalid. A requested headCommit must be the commit the branch points at. expectedRevision is compared with the merge request read just before the write. settings.assignAuthor adds the account's assignment; settings.inheritLabelPrefixes copies matching labels from the issues the description names in GitLab references (#12, project#12, group/project#12, issue URLs on the bound host). The answer lists the merge request's assignees and labels.",
+          "description": "Update the open merge request of an exact base and head, or open it. GitLab keeps one open merge request per source and target branch, so a repeated or concurrent upsert never opens a second. A draft is the title prefix Draft:, which a proposal's title never shows; a requested title with a draft prefix is invalid. A requested headCommit must be the commit the branch points at. expectedRevision is compared with the merge request read just before the write. settings.assignAuthor adds the account's assignment; settings.inheritLabelPrefixes copies matching labels from the issues the description names in GitLab references (#<iid>, project#<iid>, group/project#<iid>, issue URLs on the bound host). The answer lists the merge request's assignees and labels.",
           "openWorld": true,
           "preconditions": "checked"
         },
@@ -135,7 +135,7 @@
           "openWorld": true
         },
         "merge": {
-          "description": "Merge a merge request whose head is still the expected commit, sent as GitLab's sha. Refused before anything is sent unless settings.allowMerge is true; binding this provider authorizes nobody to merge. squash asks GitLab to squash; merge and rebase are served only where the project's merge method creates a merge commit or fast-forwards. settings.removeSourceBranch deletes the source branch in the merge call itself.",
+          "description": "Merge a merge request whose head is still the expected commit, sent as GitLab's sha. Refused before anything is sent unless settings.allowMerge is true; binding this provider authorizes nobody to merge. A named method sets the merge request's squash flag, and is unsupported where the project's merge method or squash option, or a branch rule, overrides it; an answer that merges nothing leaves the flag as it was. settings.removeSourceBranch deletes the source branch in the merge call itself.",
           "openWorld": true
         }
       }

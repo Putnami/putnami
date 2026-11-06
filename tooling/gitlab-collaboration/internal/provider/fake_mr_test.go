@@ -48,16 +48,19 @@ type fakeMR struct {
 	mergeError string
 }
 
-// squashOnMerge is whether GitLab squashes the merge request: a branch rule,
-// then the project's always or never, then the merge request's own flag.
+// squashOnMerge is whether GitLab squashes the merge request: the target
+// branch's option replaces the project's where a branch rule sets one, and
+// always and never decide over the merge request's own flag.
 func (f *fakeGitLab) squashOnMerge(mr *fakeMR) bool {
-	for _, option := range []string{f.branchSquash, f.squashOption} {
-		switch option {
-		case "always":
-			return true
-		case "never":
-			return false
-		}
+	option := f.squashOption
+	if f.branchSquash != "" {
+		option = f.branchSquash
+	}
+	switch option {
+	case "always":
+		return true
+	case "never":
+		return false
 	}
 	return mr.squash
 }

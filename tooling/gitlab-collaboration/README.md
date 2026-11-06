@@ -221,9 +221,10 @@ credential never leaves its own instance or this machine.
   so of each key one label is added, the first the description names, and
   none when the merge request already carries that key. The issues a description names are read in GitLab's references, after
   a keyword (`Closes`, `Fixes`, `Resolves`, `Implements`, `Refs`,
-  `Related to`): `#12` in the bound project, `project#12` in a project of its
-  namespace, `group/project#12`, and an `https` issue URL on the bound host.
-  `!12` names a merge request and adds nothing, and a URL on another host is
+  `Related to`): `#<iid>` in the bound project, `project#<iid>` in a project
+  of its namespace, `group/project#<iid>`, and an `https` issue URL on the
+  bound host.
+  `!<iid>` names a merge request and adds nothing, and a URL on another host is
   never read.
 - **Merge.** `merge` merges only at the expected head, which it sends as
   GitLab's `sha`, so a head that moves meanwhile is a `conflict`, as is a
@@ -234,8 +235,12 @@ credential never leaves its own instance or this machine.
   squashes; nothing is sent then. GitLab squashes by the merge request's own
   squash flag, which the project's default sets on create, so a named method
   first sets that flag; when the project or a protected branch's rule still
-  decides otherwise, `merge` is `unsupported` and merges nothing. No method
-  leaves the choice to the project.
+  decides otherwise, `merge` is `unsupported`. Every answer that merges
+  nothing leaves the flag as it was: a rule the merge request's read already
+  shows sends nothing, and a flag set for the merge is put back. The
+  project's `never` and `always` refuse before the merge request is read,
+  even where a protected branch's rule would relax them: merge without a
+  method there. No method leaves the choice to the project.
 - **Revisions.** A proposal's revision covers the stored title, description,
   state, draft flag, base, head, head commit, labels and assignees; a note
   does not move it.

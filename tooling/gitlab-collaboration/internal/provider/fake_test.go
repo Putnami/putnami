@@ -81,8 +81,8 @@ type fakeGitLab struct {
 	// mergeError makes GitLab answer a merge 200 without merging, with this
 	// merge_error.
 	mergeError string
-	// branchSquash is a protected target branch's squash option, "always" or
-	// "never", which overrides the project's and the merge request's.
+	// branchSquash is a protected target branch's squash option, which
+	// replaces the project's.
 	branchSquash string
 }
 

@@ -12,9 +12,10 @@ import (
 )
 
 // relatedReference is a keyword and the issue reference after it, in
-// GitLab's reference syntax: #12 in the bound project, project#12 in a
-// project of its namespace, group/project#12 in any project of the instance,
-// or an issue URL. A merge request reference (!12) never matches. The parser
+// GitLab's reference syntax: #<iid> in the bound project, project#<iid> in a
+// project of its namespace, group/project#<iid> in any project of the
+// instance, or an issue URL. A merge request reference (!<iid>) never
+// matches. The parser
 // never fetches a URL as an HTTP destination.
 var relatedReference = regexp.MustCompile(`(?i)\b(refs?|related to|close[sd]?|closing|fix(?:e[sd]|ing)?|resolve[sd]?|resolving|implement(?:s|ed|ing)?)\s*:?\s+((?:https?://[^\s<>)]+)|(?:[A-Za-z0-9_.][A-Za-z0-9_./-]*)?#[0-9]+)`)
 
@@ -147,9 +148,13 @@ func (s *proposalSession) complete(mr *glMergeRequest) (*glMergeRequest, *collab
 				}
 			}
 			if len(removed) > 0 {
-				dropped := unresolved("reassign "+strings.Join(removed, ", ")+" in GitLab if needed; a repeat of proposals.upsert answers ok with the assignee GitLab kept",
-					"GitLab keeps one assignee on merge request !%d of %s: assigning %s kept %s and removed %s",
-					mr.IID, s.project.path, me.Username, strings.Join(updated.assigneeLogins(), ", "), strings.Join(removed, ", "))
+				why := ""
+				if len(updated.Assignees) == 1 {
+					why = ", as a tier without multiple assignees does"
+				}
+				dropped := unresolved("reassign "+strings.Join(removed, ", ")+" in GitLab if needed; a repeat of proposals.upsert answers ok with the assignees GitLab kept",
+					"assigning %s to merge request !%d of %s, GitLab kept %s and did not keep %s%s",
+					me.Username, mr.IID, s.project.path, strings.Join(updated.assigneeLogins(), ", "), strings.Join(removed, ", "), why)
 				dropped.Error.Reason = reasonIncomplete
 				return nil, dropped
 			}

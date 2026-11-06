@@ -32,7 +32,7 @@ type ProposalSettings struct {
 	AssignAuthor bool `json:"assignAuthor,omitempty"`
 	// InheritLabelPrefixes copies, onto every merge request an upsert writes,
 	// the labels with one of these prefixes that the issues its description
-	// names carry ("Closes #12", "Refs group/project#12").
+	// names carry ("Closes #<iid>", "Refs group/project#<iid>").
 	InheritLabelPrefixes []string `json:"inheritLabelPrefixes,omitempty"`
 }
 
