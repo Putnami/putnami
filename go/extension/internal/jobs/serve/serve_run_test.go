@@ -75,14 +75,6 @@ func TestComputeWatchSnapshot_NestedGoFiles(t *testing.T) {
 
 // --- killProcessOnPort ---
 
-func TestKillProcessOnPort_NoProcessOnPort(t *testing.T) {
-	// Use a high port number unlikely to be in use
-	killed := killProcessOnPort("59999")
-	// On systems with lsof, returns false when no process found
-	// On systems without lsof/fuser, also returns false
-	_ = killed
-}
-
 func TestKillPortUnavailable(t *testing.T) {
 	for _, goos := range []string{"linux", "darwin"} {
 		if err := killPortUnavailable(goos); err != nil {
