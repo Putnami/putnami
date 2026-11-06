@@ -62,23 +62,54 @@ function assertOpen(tx: TransactionState): void {
   }
 }
 
+/** The postgres.js `Query` members the dispatch guard re-points. */
+type DriverQuery = {
+  handler?: ((query: unknown) => void) & { debug?: unknown };
+  reject?: (reason: unknown) => void;
+};
+
 /**
  * Wrap a reserved connection so every query it creates, as a template tag,
- * `unsafe()` or `file()`, first checks {@link assertOpen}. A caller that holds
- * the client across awaits cannot write after the transaction is finalized.
+ * `unsafe()` or `file()`, checks {@link assertOpen} when it is created and
+ * again when the driver dispatches it, on its first `then()`. A caller that
+ * holds the client, or a pending query, across awaits cannot write after the
+ * transaction is finalized.
  */
 function guardClient(tx: TransactionState, conn: ReservedSqlClient): SqlClient {
+  const guardDispatch = (result: unknown): unknown => {
+    const query = result as DriverQuery | undefined;
+    const dispatch = query?.handler;
+    const reject = query?.reject;
+    if (typeof dispatch !== 'function' || typeof reject !== 'function') {
+      // A helper fragment such as `sql(rows, ...columns)`, not a query.
+      return result;
+    }
+    (query as DriverQuery).handler = Object.assign(
+      (pending: unknown) => {
+        try {
+          assertOpen(tx);
+        } catch (error) {
+          reject(error);
+          return;
+        }
+        dispatch(pending);
+      },
+      { debug: dispatch.debug },
+    );
+    return result;
+  };
+
   return new Proxy(conn, {
     apply(target, thisArg, args) {
       assertOpen(tx);
-      return Reflect.apply(target, thisArg, args);
+      return guardDispatch(Reflect.apply(target, thisArg, args));
     },
     get(target, property, receiver) {
       const value = Reflect.get(target, property, receiver);
       if ((property === 'unsafe' || property === 'file') && typeof value === 'function') {
         return (...args: unknown[]) => {
           assertOpen(tx);
-          return Reflect.apply(value, target, args);
+          return guardDispatch(Reflect.apply(value, target, args));
         };
       }
       return value;

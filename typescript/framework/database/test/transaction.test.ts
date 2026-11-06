@@ -589,12 +589,15 @@ describe.skipIf(!dockerAvailable)('Transaction support', () => {
     it('a connection held across the timeout writes nothing after the rollback', async () => {
       const timeout = captureTimeout();
       let error: Error | undefined;
+      let pendingError: Error | undefined;
       try {
         await runInContext({}, async () => {
           withTransaction({ timeoutMs: timeout.delay });
           timeout.restore();
           const conn = await repository.conn();
           await conn`INSERT INTO tx_test_items (id, name, value) VALUES ('timeout-held-1', 'before', 1)`;
+          // Created before the timeout, sent on its first await, after it.
+          const pending = conn`INSERT INTO tx_test_items (id, name, value) VALUES ('timeout-held-3', 'pending', 3)`;
 
           timeout.fire();
 
@@ -603,15 +606,22 @@ describe.skipIf(!dockerAvailable)('Transaction support', () => {
           } catch (e) {
             error = e as Error;
           }
+          try {
+            await pending;
+          } catch (e) {
+            pendingError = e as Error;
+          }
           await commit().catch(() => {});
         });
       } finally {
         timeout.restore();
       }
 
-      const rows = await sql`SELECT * FROM tx_test_items WHERE id IN ('timeout-held-1', 'timeout-held-2')`;
+      const rows =
+        await sql`SELECT * FROM tx_test_items WHERE id IN ('timeout-held-1', 'timeout-held-2', 'timeout-held-3')`;
       expect(rows.length).toBe(0);
       expect(error?.message).toBe('Transaction has timed out and was rolled back');
+      expect(pendingError?.message).toBe('Transaction has timed out and was rolled back');
     });
 
     it('should reject operations after timeout', async () => {

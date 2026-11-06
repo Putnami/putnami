@@ -378,6 +378,8 @@ Commits all lazily-opened transactions and releases their connections. No-op if 
 
 Rolls back all lazily-opened transactions and releases their connections. No-op if no writes happened.
 
+Once `commit()` or `rollback()` starts, the transaction's connection refuses every query, including a write still opening the transaction and a query a caller held across an await. It throws `"Transaction was committed or rolled back before this query ran"`, so no query runs outside the transaction.
+
 ### Safety net
 
 `TransactionMiddleware` and `UnitOfWorkMiddleware` end every request with an internal safety net that rolls back any uncommitted transaction and releases its connection. The safety net is not exported: install the middleware instead of calling it.
