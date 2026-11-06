@@ -33,6 +33,21 @@ pants test --test-report --use-coverage --coverage-py-report=xml ::
 
 `pants peek` lists every target with the dependencies Pants infers from imports, so `putnami observe` knows that a change to a library marks the code that imports it. Each directory of BUILD targets is a component; without the export, the components have no edge, and the summary says how to write it. The JUnit reports under `dist/test/reports` and the coverage under `dist/coverage` land on the components, and a change to a lockfile that `[python.resolves]` in `pants.toml` names is a dependency change of ecosystem `pypi`. Write the export elsewhere with `--pants-graph <path>`.
 
+In a Rust repository, give cargo-nextest a profile that writes a JUnit report, in `.config/nextest.toml`:
+
+```toml
+[profile.ci.junit]
+path = "junit.xml"
+```
+
+Then run the tests through cargo-llvm-cov, with both installed (`cargo install cargo-nextest cargo-llvm-cov`):
+
+```bash
+cargo llvm-cov nextest --profile ci --workspace --lcov --output-path lcov.info
+```
+
+nextest writes `target/nextest/ci/junit.xml`, and `putnami observe` reads it there, without walking the rest of the target directory. Each case lands on the crate its test binary names, and each covered file on the crate that holds it: a member of the root `[workspace]`, or a directory whose `Cargo.toml` has a `[package]` table. A path dependency, or a `workspace = true` one whose `[workspace.dependencies]` entry has a path, is an edge. A `Cargo.lock` change is a dependency change of ecosystem `cargo`. When `CARGO_TARGET_DIR` puts the target directory outside the checkout, name the report with `--junit`.
+
 The install lines need the network: when the installer or the registry cannot be reached, the GitHub step or the GitLab job fails.
 
 ## Steps
@@ -138,7 +153,7 @@ To send the evidence to Putnami Cloud, store a workspace token with the `deliver
 
 A software bill of materials (SBOM) lists the packages of a build with their licences and known vulnerabilities. `putnami observe` reads one the job wrote, CycloneDX 1.4 to 1.6 or SPDX 2.3 in JSON, and gives each changed dependency what it lists: the vulnerabilities the change fixes or introduces, and the licences before and after. It queries no vulnerability database itself.
 
-On GitHub Actions, put this step before the observe step. It writes an SBOM of the head and one of the base with [osv-scanner](https://github.com/google/osv-scanner), which reads the lockfiles of Node, Composer, Go and Python projects, `uv.lock` and `poetry.lock` included. The base is the pull request base, or on a push the commit before the push:
+On GitHub Actions, put this step before the observe step. It writes an SBOM of the head and one of the base with [osv-scanner](https://github.com/google/osv-scanner), which reads the lockfiles of Node, Composer, Go, Python and Rust projects, `uv.lock`, `poetry.lock` and `Cargo.lock` included. The base is the pull request base, or on a push the commit before the push:
 
 ```yaml
       - name: Write the SBOMs
@@ -180,6 +195,6 @@ Without `--base-sbom`, each dependency gets its state at the head and the summar
 ## Learn more
 
 - [What `putnami observe` reads](https://github.com/putnami/putnami/blob/main/tooling/observe/doc/01-observe.md): every flag, how the base is found, and how reports and SBOMs are discovered.
-- [The `@putnami/observe` README](https://github.com/putnami/putnami/blob/main/tooling/observe/README.md): the questions it answers and how it reads Nx, Pants, npm, pnpm, yarn, Composer, Go and Python repositories.
+- [The `@putnami/observe` README](https://github.com/putnami/putnami/blob/main/tooling/observe/README.md): the questions it answers and how it reads Nx, Pants, npm, pnpm, yarn, Composer, Go, Python and Rust repositories.
 
 You now have a CI job that records which files a change touched and which tests and coverage reports it produced, as an artifact you can keep or upload to Putnami Cloud.

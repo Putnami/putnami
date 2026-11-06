@@ -82,17 +82,19 @@ fails as a diagnostic.
 ## Reports
 
 Without `--junit` or `--coverage`, `putnami observe` walks the repository,
-skipping `.git`, `node_modules` and `vendor`, and reads the start of each file
+skipping `.git`, `node_modules` and `vendor`, and all of a Cargo target
+directory but its `nextest` store, its nested target directories and the files
+it holds directly (see [the Cargo detector](09-rust.md#reports)), and reads the start of each file
 whose name can hold a report (`.xml`, `.info`, `.lcov`, `.out`, `.cov`,
 `.coverprofile`, `.gocov`, and `.txt` files whose name contains `cover`). It
 keeps a file by its content:
 
 | Format | Recognized by |
 |---|---|
-| JUnit XML | a `testsuites` or `testsuite` root (Jest, Vitest, PHPUnit `--log-junit`, gotestsum, pytest `--junitxml`) |
-| Cobertura | a `coverage` root with `line-rate`, `lines-valid` or `branch-rate`, or a `sources` or `packages` child (pytest-cov `--cov-report=xml`) |
+| JUnit XML | a `testsuites` or `testsuite` root (Jest, Vitest, PHPUnit `--log-junit`, gotestsum, pytest `--junitxml`, cargo-nextest) |
+| Cobertura | a `coverage` root with `line-rate`, `lines-valid` or `branch-rate`, or a `sources` or `packages` child (pytest-cov `--cov-report=xml`, cargo-llvm-cov `--cobertura`) |
 | Clover | a `coverage` root with `generated` or `clover`, or a `project` child (PHPUnit `--coverage-clover`) |
-| LCOV | a first `TN:` or `SF:` record |
+| LCOV | a first `TN:` or `SF:` record (cargo-llvm-cov `--lcov`) |
 | Go cover profile | a first `mode: set`, `mode: count` or `mode: atomic` line |
 
 Without `--sbom`, it also reads the `.json` files whose name contains `bom`,

@@ -163,6 +163,17 @@ var demos = map[string]demoExpectation{
 		lineFile:   "src/python/pricing/pricing.py",
 		dependency: evidence.DependencyChange{Ecosystem: "pypi", Lockfile: "3rdparty/python/default.lock", Name: "fastapi", Change: evidence.DependencyUpgraded, From: "0.115.5", To: "0.115.6"},
 	},
+	"rust": {
+		env:       map[string]string{"GITLAB_CI": "true", "CI_SERVER_HOST": "gitlab.com", "CI_PROJECT_ID": "88373402", "CI_PROJECT_PATH": "putnami/demo-observe-rust", "CI_PIPELINE_ID": "3015178713", "CI_JOB_ID": "17647016530", "CI_MERGE_REQUEST_IID": "1"},
+		changed:   []string{"crates/pricing"},
+		dependent: []string{"crates/api", "crates/worker"},
+		tests:     map[string]int{"crates/api": 2, "crates/pricing": 4, "crates/worker": 1},
+		covered:   []string{"crates/api", "crates/pricing", "crates/worker"},
+		// Cargo.lock lies in the virtual workspace root, which is no
+		// component.
+		lineFile:   "crates/pricing/src/lib.rs",
+		dependency: evidence.DependencyChange{Ecosystem: "cargo", Lockfile: "Cargo.lock", Name: "itoa", Change: evidence.DependencyUpgraded, From: "1.0.14", To: "1.0.15"},
+	},
 	"symfony": {
 		env: map[string]string{"GITLAB_CI": "true", "CI_SERVER_HOST": "gitlab.com", "CI_PROJECT_ID": "88373184", "CI_PROJECT_PATH": "putnami/demo-observe-symfony", "CI_PIPELINE_ID": "3015177948", "CI_JOB_ID": "17647015000", "CI_MERGE_REQUEST_IID": "1"},
 		// composer.lock lies in the application at the root, which the

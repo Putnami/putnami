@@ -7,7 +7,7 @@ queries no vulnerability database.
 
 ## Components
 
-Six detectors read the repository:
+Seven detectors read the repository:
 
 | Detector | Reads | Source |
 |---|---|---|
@@ -17,6 +17,7 @@ Six detectors read the repository:
 | Composer | each `composer.json` | `manifest` |
 | Go | `go.work`, each `go.mod` | `workspace` for a `go.work` member, `manifest` otherwise |
 | Python | each `pyproject.toml`, with the root's `[tool.uv.workspace]` | `workspace` for a uv workspace member, `manifest` otherwise |
+| Cargo | each `Cargo.toml`, with the root's `[workspace]` | `workspace` for a Cargo workspace member, `manifest` otherwise |
 
 A component is a directory. When two detectors name one directory, the higher
 source wins: `orchestrator`, then `workspace`, then `manifest`. On a tie, the
@@ -59,7 +60,10 @@ A JUnit case goes to the first of:
    pytest's `rootdir`; see
    [the Python detector](07-python.md#reports).
 2. The component of the Go package its class or suite names
-   (`gotestsum --junitfile`).
+   (`gotestsum --junitfile`), or of the crate whose package its class or
+   suite names as a cargo-nextest test binary: `pricing`,
+   `pricing::integration` or `api::bin/api`; see
+   [the Cargo detector](09-rust.md#reports).
 3. The component that holds the report.
 
 A case that none of them places is counted in `observe.tests_unattributed`.
@@ -98,6 +102,7 @@ Each changed lockfile is read at the merge base and at the head:
 | `go.mod` | `go` | the requires, after the `go.mod` replace directives; modules of the repository and local replacements left out |
 | `uv.lock` | `pypi` | each `[[package]]`; `editable`, `virtual`, `directory` and `path` sources left out |
 | `poetry.lock` | `pypi` | each `[[package]]`; `directory` and `file` sources and `develop` packages left out |
+| `Cargo.lock` | `cargo` | each `[[package]]` with a `source`; the workspace crates and path dependencies, which have none, left out |
 | a Pants resolve lockfile | `pypi` | each locked requirement of the PEX JSON lock a `[python.resolves]` entry of `pants.toml` names |
 
 `go.sum` holds checksums, not versions, and is not read. A Python package
@@ -124,7 +129,7 @@ discovered) and one for the base (`--base-sbom`):
 osv-scanner writes no vulnerability in SPDX: use CycloneDX for them.
 
 A package of the SBOM matches a dependency change by the ecosystem its
-package URL names (`npm`, `composer`, `golang` is `go`, `pypi`), its name,
+package URL names (`npm`, `composer`, `golang` is `go`, `pypi`, `cargo`), its name,
 normalized for `pypi`, and its version, a leading `v` ignored. A package
 without a package URL matches by its name as written and its version, so a
 Python package without one matches only when the SBOM writes its normalized
