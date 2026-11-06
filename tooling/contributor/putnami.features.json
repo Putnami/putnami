@@ -464,7 +464,8 @@
             "checks": [
               "the-status-reads-each-child-through-the-contracts",
               "a-child-launches-on-merged-or-one-ready-parent",
-              "a-spent-envelope-launches-nothing"
+              "a-spent-envelope-launches-nothing",
+          "a-cloud-launch-is-recorded-and-reported"
             ]
           }
         }
