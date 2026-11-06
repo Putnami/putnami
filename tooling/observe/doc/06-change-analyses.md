@@ -13,6 +13,7 @@ Six detectors read the repository:
 |---|---|---|
 | Nx | `graph.json` from `nx graph --file`, else `nx.json` and `project.json` | `orchestrator` for a graph export, `workspace` otherwise |
 | Pants | `pants-graph.json` from `pants peek ::`, else the `BUILD` files, beside `pants.toml` | `orchestrator` for the export, `workspace` otherwise |
+| Bazel | `bazel-graph.json` from `bazel query 'deps(//...)' --output=streamed_jsonproto`, else the `BUILD` and `BUILD.bazel` files | `orchestrator` |
 | Node workspaces | `package.json` `workspaces`, `pnpm-workspace.yaml` | `workspace` |
 | Composer | each `composer.json` | `manifest` |
 | Go | `go.work`, each `go.mod` | `workspace` for a `go.work` member, `manifest` otherwise |
@@ -50,7 +51,9 @@ its impact.
 
 A JUnit case goes to the first of:
 
-1. The component that holds its test file: the case's `file`, else its
+1. The package of its Bazel test target, for a log under `bazel-testlogs`;
+   see [the Bazel detector](08-bazel.md#tests-and-coverage).
+2. The component that holds its test file: the case's `file`, else its
    suite's, else its class name when that names a file (Vitest), else its
    dotted class name read as a Python module (pytest). pytest writes
    `tests.test_api.TestLogin` for the class `TestLogin` of `tests/test_api.py`,
@@ -58,9 +61,9 @@ A JUnit case goes to the first of:
    that names a `.py` file is the test file. The class name is relative to
    pytest's `rootdir`; see
    [the Python detector](07-python.md#reports).
-2. The component of the Go package its class or suite names
+3. The component of the Go package its class or suite names
    (`gotestsum --junitfile`).
-3. The component that holds the report.
+4. The component that holds the report.
 
 A case that none of them places is counted in `observe.tests_unattributed`.
 
@@ -164,3 +167,5 @@ summary and the evidence document are what they were.
 | `observe.lockfile_unreadable` | A changed lockfile cannot be read at the base or the head. |
 | `observe.changed_lines_unread` | The diff's changed lines cannot be read. |
 | `observe.sbom_ambiguous` | One side has several SBOMs, so none is read and that side is unknown. |
+| `observe.bazel_graph_missing` | A Bazel workspace has no query export, so its packages have no edge. An info diagnostic that names the export command. |
+| `observe.bazel_graph_unreadable` | The Bazel query export cannot be read, so the `BUILD` files give the packages, without edges. |
