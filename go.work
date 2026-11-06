@@ -108,6 +108,7 @@ use (
 	./tooling/evidence-readers
 	./tooling/extension-sdk
 	./tooling/github-collaboration
+	./tooling/gitlab-collaboration
 	./tooling/install-scripts
 	./tooling/jira-collaboration
 	./tooling/linear-collaboration

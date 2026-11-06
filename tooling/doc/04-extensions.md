@@ -368,7 +368,7 @@ A collaboration provider declares its contract under `providers`, with one comma
 }
 ```
 
-`@putnami/github-collaboration`, `@putnami/jira-collaboration`, `@putnami/linear-collaboration`, `@putnami/local-collaboration` and `@putnami/memory-store` are providers. A workspace binds them in `options.collaboration` of `putnami.workspace.json`, and `putnami tasks` and `putnami proposals` call them.
+`@putnami/github-collaboration`, `@putnami/gitlab-collaboration`, `@putnami/jira-collaboration`, `@putnami/linear-collaboration`, `@putnami/local-collaboration` and `@putnami/memory-store` are providers. A workspace binds them in `options.collaboration` of `putnami.workspace.json`, and `putnami tasks` and `putnami proposals` call them.
 
 ## The JSONL event protocol
 
