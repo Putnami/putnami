@@ -11,7 +11,7 @@ answer, so the workspace must declare `@putnami/observe` to run it there.
 |---|---|
 | `--base <commit or branch>` | The commit the change is measured against. It overrides the CI. A generic CI needs it. |
 | `--head <revision>` | The commit that was built. Default `HEAD`. |
-| `--junit <paths>` | Comma-separated JUnit XML paths or glob patterns, resolved against the directory you run in. Replaces JUnit discovery. |
+| `--junit <paths>` | Comma-separated JUnit XML or TRX paths or glob patterns, resolved against the directory you run in. Replaces JUnit discovery. |
 | `--coverage <paths>` | The same for coverage reports. Replaces coverage discovery. |
 | `--sbom <path>` | The software bill of materials (SBOM) of the commit, a path or glob pattern. Replaces SBOM discovery. |
 | `--base-sbom <path>` | The SBOM of the base. Without it, the base state of each dependency is unknown. |
@@ -83,17 +83,18 @@ fails as a diagnostic.
 
 Without `--junit` or `--coverage`, `putnami observe` walks the repository,
 skipping `.git`, `node_modules` and `vendor`, and reads the start of each file
-whose name can hold a report (`.xml`, `.info`, `.lcov`, `.out`, `.cov`,
+whose name can hold a report (`.xml`, `.trx`, `.info`, `.lcov`, `.out`, `.cov`,
 `.coverprofile`, `.gocov`, and `.txt` files whose name contains `cover`). It
 keeps a file by its content:
 
 | Format | Recognized by |
 |---|---|
 | JUnit XML | a `testsuites` or `testsuite` root (Jest, Vitest, PHPUnit `--log-junit`, gotestsum, pytest `--junitxml`) |
-| Cobertura | a `coverage` root with `line-rate`, `lines-valid` or `branch-rate`, or a `sources` or `packages` child (pytest-cov `--cov-report=xml`) |
+| Cobertura | a `coverage` root with `line-rate`, `lines-valid` or `branch-rate`, or a `sources` or `packages` child (pytest-cov `--cov-report=xml`, Coverlet `--collect:"XPlat Code Coverage"`) |
 | Clover | a `coverage` root with `generated` or `clover`, or a `project` child (PHPUnit `--coverage-clover`) |
 | LCOV | a first `TN:` or `SF:` record |
 | Go cover profile | a first `mode: set`, `mode: count` or `mode: atomic` line |
+| TRX | a `TestRun` root (`dotnet test --logger trx`), read as test cases |
 
 Without `--sbom`, it also reads the `.json` files whose name contains `bom`,
 `cdx`, `cyclonedx` or `spdx`, and keeps a CycloneDX document (a

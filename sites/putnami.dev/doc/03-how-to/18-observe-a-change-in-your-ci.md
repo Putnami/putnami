@@ -14,7 +14,7 @@ You will add one step to a GitHub Actions workflow, or one job to a GitLab CI pi
 | `putnami extensions install --user @putnami/cloud` | Installs the extension that uploads the evidence to Putnami Cloud. |
 | `putnami observe --evidence observe-evidence.json --publish` | Prints the summary, writes the evidence document, and posts a commit status and a summary note on the pull or merge request. It exits `0` whatever it observes: only a usage error, or an evidence file it cannot write, fails it. |
 
-`putnami observe` finds the base of the change from the CI: the pull request base on GitHub, the merge request diff base on GitLab, and on a branch push the commit before the push. It deepens a shallow clone itself, so you do not change `fetch-depth` or `GIT_DEPTH`. It finds JUnit, LCOV, Cobertura, Clover and Go cover reports by their content, anywhere in the checkout except `.git`, `node_modules` and `vendor`.
+`putnami observe` finds the base of the change from the CI: the pull request base on GitHub, the merge request diff base on GitLab, and on a branch push the commit before the push. It deepens a shallow clone itself, so you do not change `fetch-depth` or `GIT_DEPTH`. It finds JUnit, TRX, LCOV, Cobertura, Clover and Go cover reports by their content, anywhere in the checkout except `.git`, `node_modules` and `vendor`.
 
 In a Python repository, have pytest write both reports, with pytest-cov installed:
 
@@ -32,6 +32,14 @@ pants test --test-report --use-coverage --coverage-py-report=xml ::
 ```
 
 `pants peek` lists every target with the dependencies Pants infers from imports, so `putnami observe` knows that a change to a library marks the code that imports it. Each directory of BUILD targets is a component; without the export, the components have no edge, and the summary says how to write it. The JUnit reports under `dist/test/reports` and the coverage under `dist/coverage` land on the components, and a change to a lockfile that `[python.resolves]` in `pants.toml` names is a dependency change of ecosystem `pypi`. Write the export elsewhere with `--pants-graph <path>`.
+
+In a .NET repository, have `dotnet test` write a TRX report and Coverlet's coverage, with the `coverlet.collector` package in each test project:
+
+```bash
+dotnet test --logger trx --results-directory TestResults --collect:"XPlat Code Coverage"
+```
+
+Each project file is a component, a `workspace` one when a `.sln` or `.slnx` at the root lists it, and each `ProjectReference` is an edge, so a change to a library marks the projects and test projects that reference it. Each test case lands on the project of its test assembly, and the coverage under `TestResults/` on the projects that hold the covered files. A `packages.lock.json` change is a dependency change of ecosystem `nuget`; without lock files, so is a version change in `Directory.Packages.props`.
 
 The install lines need the network: when the installer or the registry cannot be reached, the GitHub step or the GitLab job fails.
 
@@ -180,6 +188,6 @@ Without `--base-sbom`, each dependency gets its state at the head and the summar
 ## Learn more
 
 - [What `putnami observe` reads](https://github.com/putnami/putnami/blob/main/tooling/observe/doc/01-observe.md): every flag, how the base is found, and how reports and SBOMs are discovered.
-- [The `@putnami/observe` README](https://github.com/putnami/putnami/blob/main/tooling/observe/README.md): the questions it answers and how it reads Nx, Pants, npm, pnpm, yarn, Composer, Go and Python repositories.
+- [The `@putnami/observe` README](https://github.com/putnami/putnami/blob/main/tooling/observe/README.md): the questions it answers and how it reads Nx, Pants, npm, pnpm, yarn, Composer, Go, Python and .NET repositories.
 
 You now have a CI job that records which files a change touched and which tests and coverage reports it produced, as an artifact you can keep or upload to Putnami Cloud.

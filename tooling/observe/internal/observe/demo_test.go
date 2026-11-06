@@ -76,9 +76,16 @@ func writeDemoFile(t *testing.T, root, name, content string) {
 // root and the base commit.
 func demoRepository(t *testing.T, name string) (string, string) {
 	t.Helper()
+	return demoRepositoryWithout(t, name, func(string) bool { return false })
+}
+
+// demoRepositoryWithout builds the demo as demoRepository does, without the
+// files skip names.
+func demoRepositoryWithout(t *testing.T, name string, skip func(string) bool) (string, string) {
+	t.Helper()
 	root := t.TempDir()
 	git(t, root, "init", "--quiet", "--initial-branch=main")
-	files := readDemo(t, name)
+	files := slices.DeleteFunc(readDemo(t, name), func(f demoFile) bool { return skip(f.name) })
 	for _, stage := range []string{"base/", "head/"} {
 		for _, f := range files {
 			if rest, ok := strings.CutPrefix(f.name, stage); ok {
@@ -162,6 +169,17 @@ var demos = map[string]demoExpectation{
 		// third-party targets and is no component.
 		lineFile:   "src/python/pricing/pricing.py",
 		dependency: evidence.DependencyChange{Ecosystem: "pypi", Lockfile: "3rdparty/python/default.lock", Name: "fastapi", Change: evidence.DependencyUpgraded, From: "0.115.5", To: "0.115.6"},
+	},
+	"dotnet": {
+		env:       map[string]string{"GITHUB_ACTIONS": "true", "GITHUB_SERVER_URL": "https://github.com", "GITHUB_REPOSITORY": "Putnami/demo-observe-dotnet", "GITHUB_REPOSITORY_ID": "1109", "GITHUB_RUN_ID": "41335527412", "GITHUB_JOB": "test", "GITHUB_REF": "refs/pull/1/merge"},
+		changed:   []string{"src/Pricing", "tools/Migrate"},
+		dependent: []string{"src/Api", "src/Worker", "tests/Pricing.Tests"},
+		tests:     map[string]int{"tests/Pricing.Tests": 4},
+		covered:   []string{"src/Pricing"},
+		// The bump changes the lock file of tools/Migrate, the only project
+		// that uses the package.
+		lineFile:   "src/Pricing/PriceCalculator.cs",
+		dependency: evidence.DependencyChange{Ecosystem: "nuget", Lockfile: "tools/Migrate/packages.lock.json", Name: "Humanizer.Core", Change: evidence.DependencyUpgraded, From: "2.13.14", To: "2.14.1", Component: "tools/Migrate"},
 	},
 	"symfony": {
 		env: map[string]string{"GITLAB_CI": "true", "CI_SERVER_HOST": "gitlab.com", "CI_PROJECT_ID": "88373184", "CI_PROJECT_PATH": "putnami/demo-observe-symfony", "CI_PIPELINE_ID": "3015177948", "CI_JOB_ID": "17647015000", "CI_MERGE_REQUEST_IID": "1"},
