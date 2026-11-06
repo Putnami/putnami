@@ -1,0 +1,56 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-spec.json",
+  "protocolVersion": 1,
+  "feature": "tooling/observe-pants",
+  "outcomes": [
+    "In a Pants repository, each directory that holds first-party targets is a component, named by its directory, without a Putnami file",
+    "When the CI ran pants peek :: > pants-graph.json, the dependencies Pants infers from imports are the edges, so a change to a shared library marks the code that imports it as dependent",
+    "Without the export, observe still lists the target directories, says how to produce the export, and never runs pants",
+    "The JUnit and coverage reports pants test writes under dist/ land on the components that hold the tests and the covered files, and a bump in a Python resolve lockfile is a dependency change"
+  ],
+  "nonGoals": [
+    "Running pants, pex or any Python tool, or reading the Pants cache",
+    "Parsing BUILD files beyond the names of the targets they declare: the export carries the targets, their sources and their dependencies",
+    "Components finer than a directory, such as one per Pants target, and edges between targets of one directory",
+    "Lockfiles of resolves other than [python.resolves], such as JVM or Go resolves",
+    "Serving the detector over the workspace probe wire or from its own extension: it lives in @putnami/observe"
+  ],
+  "requirements": [
+    {
+      "id": "pants-targets-are-components",
+      "text": "A repository whose root holds pants.toml is a Pants repository. When the root holds pants-graph.json, or the file --pants-graph names, and it is a JSON array of target entries that each name an address, each target belongs to the BUILD file directory of its address or of its generator: src/python/pricing:lib and src/python/pricing/pricing.py:lib are one component src/python/pricing, of source orchestrator and ecosystem pants; // is the root. Any other file is a warning, and the BUILD files answer instead."
+    },
+    {
+      "id": "pants-third-party-targets",
+      "text": "A third-party target, of type python_requirement, python_requirements, poetry_requirements, pipenv_requirements, pants_requirements, go_mod, go_third_party_package, jvm_artifact or node_third_party_package, and an internal target, whose type starts with _, make no component, with or without an export."
+    },
+    {
+      "id": "pants-inferred-edges",
+      "text": "Each address in a target entry's dependencies, which Pants expands from the explicit and the inferred dependencies, is an edge from the target's component to the dependency's component, when the two differ. A dependency on a third-party or internal target, on an address outside the repository and on the component itself is no edge."
+    },
+    {
+      "id": "pants-without-an-export",
+      "text": "Without an export, each directory that holds a BUILD or BUILD.* file declaring a target other than a third-party or internal one is a component of source workspace and ecosystem pants, with no edge. The walk skips dist, node_modules, __pycache__ and hidden directories. An info diagnostic observe.pants_graph_missing names the export command pants peek :: > pants-graph.json and the path it read."
+    },
+    {
+      "id": "pants-graph-flag",
+      "text": "--pants-graph names the export, resolved against the invocation directory; without it the detector reads pants-graph.json at the repository root. The flag is declared in the extension manifest and needs a value."
+    },
+    {
+      "id": "pants-resolve-lockfiles",
+      "text": "Each lockfile the [python.resolves] table of pants.toml names, relative to the repository root, is a lockfile of ecosystem pypi. It is read in the PEX JSON lock format after its // comment header: each locked requirement of each locked resolve gives its project name, normalized as PyPI does, and its version. A lockfile that does not parse is the observe.lockfile_unreadable warning of the change analyses."
+    },
+    {
+      "id": "pants-change-analysis",
+      "text": "On a Pants repository with src/python/pricing, src/python/api importing pricing, and src/python/web, where a change edits pricing and bumps a package in the python-default resolve, the export gives the three components and the inferred edge from api to pricing, and marks api dependent; the JUnit reports under dist/test/reports and the coverage.xml under dist/coverage land on the components, with no unattributed case and no unmapped file; and the bump is a pypi dependency change."
+    },
+    {
+      "id": "pants-change-analysis-without-an-export",
+      "text": "On the same repository without the export, the analyses list the three components with no edge, so api is unaffected, and the observe.pants_graph_missing info diagnostic names the export command."
+    }
+  ],
+  "decisions": [
+    "tooling/cli/doc/adr/0051-user-scope-extensions-run-without-a-workspace.md",
+    "protocols/evidence/doc/adr/0001-one-self-reported-change-evidence-document.md"
+  ]
+}

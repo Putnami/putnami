@@ -577,6 +577,124 @@
       ]
     },
     {
+      "id": "tooling/observe-pants",
+      "type": "feature",
+      "name": "Find the components of a Pants repository that keeps its own CI",
+      "outcome": "putnami observe, in a Pants repository without a Putnami workspace, knows one component per target directory and the edges Pants infers from imports, from the peek export the CI wrote, without running pants, so a change to a shared library marks the code that imports it, its tests and coverage land on the right component, and a resolve lockfile bump is a dependency change",
+      "owner": "tooling",
+      "target": "modeled",
+      "requirements": [
+        {
+          "id": "pants-targets-are-components",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "peek-targets-are-grouped-by-directory",
+              "a-malformed-export-is-a-diagnostic"
+            ]
+          }
+        },
+        {
+          "id": "pants-third-party-targets",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-third-party-target-is-no-component"
+            ]
+          }
+        },
+        {
+          "id": "pants-inferred-edges",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-dependency-across-directories-is-an-edge",
+              "a-third-party-dependency-is-no-edge"
+            ]
+          }
+        },
+        {
+          "id": "pants-without-an-export",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "build-directories-are-components-without-an-export",
+              "a-missing-export-is-an-info-diagnostic"
+            ]
+          }
+        },
+        {
+          "id": "pants-graph-flag",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-pants-graph-flag-names-the-export"
+            ]
+          }
+        },
+        {
+          "id": "pants-resolve-lockfiles",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-resolve-lockfile-is-a-pypi-lockfile",
+              "a-pex-lockfile-lists-its-locked-requirements"
+            ]
+          }
+        },
+        {
+          "id": "pants-change-analysis",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-pants-demo-is-explained"
+            ]
+          }
+        },
+        {
+          "id": "pants-change-analysis-without-an-export",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-pants-demo-without-an-export-lists-its-directories"
+            ]
+          }
+        }
+      ]
+    },
+    {
       "id": "tooling/observe-upload",
       "type": "feature",
       "name": "Hand the change evidence document to a reporter",
