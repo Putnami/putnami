@@ -19,7 +19,7 @@
     },
     {
       "id": "rush-project-edges",
-      "text": "A Rush project depends on another when one of the dependencies, devDependencies, optionalDependencies or peerDependencies of its package.json names that project, an alias included, with the workspace: protocol or a version range that project's version satisfies. A dependency whose key the project lists in decoupledLocalDependencies or cyclicDependencyProjects is no edge. A package.json that cannot be read is a diagnostic: its project stays a component without edges."
+      "text": "A Rush project depends on another when one of the dependencies, devDependencies, optionalDependencies or peerDependencies of its package.json names that project with the workspace: protocol, an alias included, or with a version range that project's version satisfies. A dependency whose key the project lists in decoupledLocalDependencies or cyclicDependencyProjects is no edge. A package.json that cannot be read is a diagnostic: its project stays a component without edges."
     },
     {
       "id": "rush-lockfiles",
