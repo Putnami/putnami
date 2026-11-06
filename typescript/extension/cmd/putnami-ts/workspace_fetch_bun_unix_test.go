@@ -65,6 +65,8 @@ type fetchFixture struct {
 	home     string
 	cache    string
 	tmp      string
+	// userConfig is the user .npmrc the job's environment names.
+	userConfig string
 }
 
 func newFetchFixture(t *testing.T, bun, token, linker string) *fetchFixture {
@@ -144,6 +146,13 @@ func newFetchFixture(t *testing.T, bun, token, linker string) *fetchFixture {
 		}
 	}
 	t.Setenv("HOME", fixture.home)
+	// The job's environment names a user configuration of its own, as a cloud
+	// session does, holding another token for the registry: bun reads it
+	// before the home's unless the fetch points it at the private .npmrc.
+	fixture.userConfig = filepath.Join(t.TempDir(), ".npmrc")
+	writeProbeFile(t, fixture.userConfig, "//"+fixture.registry.Host()+"/:_authToken=not-the-handed-bearer\n")
+	t.Setenv("NPM_CONFIG_USERCONFIG", fixture.userConfig)
+	t.Setenv("npm_config_userconfig", fixture.userConfig)
 	t.Setenv("MARKER_WORKSPACE", root)
 	t.Setenv("TMPDIR", fixture.tmp)
 	return fixture
@@ -153,6 +162,7 @@ func newFetchFixture(t *testing.T, bun, token, linker string) *fetchFixture {
 // configuration, or carry a registry credential.
 var bunLocationVariables = []string{
 	"BUN_INSTALL", "BUN_INSTALL_CACHE_DIR", "PUTNAMI_BUN_CACHE_DIR", "XDG_CACHE_HOME", "XDG_CONFIG_HOME", "NPM_TOKEN",
+	"NPM_CONFIG_USERCONFIG", "npm_config_userconfig",
 	extensionproto.OfflineDependenciesEnv, extensionproto.JobCredentialFDEnv,
 }
 
@@ -446,6 +456,11 @@ func assertFetchBunProcesses(t *testing.T, fixture *fetchFixture, dumps string) 
 			}
 			if variables["XDG_CONFIG_HOME"] != home {
 				t.Errorf("the scratch install ran with XDG_CONFIG_HOME=%q, want the private home", variables["XDG_CONFIG_HOME"])
+			}
+			for _, name := range []string{"NPM_CONFIG_USERCONFIG", "npm_config_userconfig"} {
+				if want := filepath.Join(home, ".npmrc"); variables[name] != want {
+					t.Errorf("the scratch install ran with %s=%q, want the private %q", name, variables[name], want)
+				}
 			}
 			if !sameDirectory(variables["BUN_INSTALL_CACHE_DIR"], fixture.cache) {
 				t.Errorf("the scratch install cached into %q, want the real home's %q", variables["BUN_INSTALL_CACHE_DIR"], fixture.cache)

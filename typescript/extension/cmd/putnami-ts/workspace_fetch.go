@@ -163,9 +163,16 @@ func fetchWorkspaceDependencies(parent context.Context, root, bunBin string, cre
 }
 
 // privateHomeEnv points every variable bun reads a user .npmrc or bunfig from
-// at home.
+// at home, the npm user-config variables, which bun reads before HOME,
+// included.
 func privateHomeEnv(home string) map[string]string {
-	env := map[string]string{"HOME": home, "XDG_CONFIG_HOME": home}
+	npmrc := filepath.Join(home, ".npmrc")
+	env := map[string]string{
+		"HOME":                  home,
+		"XDG_CONFIG_HOME":       home,
+		"NPM_CONFIG_USERCONFIG": npmrc,
+		"npm_config_userconfig": npmrc,
+	}
 	if runtime.GOOS == "windows" {
 		env["USERPROFILE"] = home
 	}
