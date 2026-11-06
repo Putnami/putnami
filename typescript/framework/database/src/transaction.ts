@@ -9,7 +9,10 @@ import type { ReservedSqlClient, SqlClient } from './sql-client';
 const TX_KEY = Symbol.for('__putnami_tx__');
 
 type ReservedConnection = {
+  /** The reserved connection; only the finalizers query it directly. */
   conn: ReservedSqlClient;
+  /** The client callers receive: it refuses a query once the transaction is finalizing. */
+  client: SqlClient;
   hasWrite: boolean;
 };
 
@@ -43,6 +46,75 @@ type TransactionState = {
 function getTxState(): TransactionState | undefined {
   const context = tryContext<Record<symbol, unknown>>();
   return context?.[TX_KEY] as TransactionState | undefined;
+}
+
+/**
+ * Throw when the transaction is timed out or finalizing. Its COMMIT or ROLLBACK
+ * is queued, or about to be, on the reserved connection: a query sent now would
+ * run after it, outside any transaction, and persist.
+ */
+function assertOpen(tx: TransactionState): void {
+  if (tx.timedOut) {
+    throw new Error('Transaction has timed out and was rolled back');
+  }
+  if (tx.finalizing) {
+    throw new Error('Transaction was committed or rolled back before this query ran');
+  }
+}
+
+/** The postgres.js `Query` members the dispatch guard re-points. */
+type DriverQuery = {
+  handler?: ((query: unknown) => void) & { debug?: unknown };
+  reject?: (reason: unknown) => void;
+};
+
+/**
+ * Wrap a reserved connection so every query it creates, as a template tag,
+ * `unsafe()` or `file()`, checks {@link assertOpen} when it is created and
+ * again when the driver dispatches it, on its first `then()`. A caller that
+ * holds the client, or a pending query, across awaits cannot write after the
+ * transaction is finalized.
+ */
+function guardClient(tx: TransactionState, conn: ReservedSqlClient): SqlClient {
+  const guardDispatch = (result: unknown): unknown => {
+    const query = result as DriverQuery | undefined;
+    const dispatch = query?.handler;
+    if (typeof dispatch !== 'function' || typeof query?.reject !== 'function') {
+      // A helper fragment such as `sql(rows, ...columns)`, not a query.
+      return result;
+    }
+    (query as DriverQuery).handler = Object.assign(
+      (pending: unknown) => {
+        try {
+          assertOpen(tx);
+        } catch (error) {
+          // Read `reject` now: a cursor re-points it at each step.
+          (pending as DriverQuery).reject?.(error);
+          return;
+        }
+        dispatch(pending);
+      },
+      { debug: dispatch.debug },
+    );
+    return result;
+  };
+
+  return new Proxy(conn, {
+    apply(target, thisArg, args) {
+      assertOpen(tx);
+      return guardDispatch(Reflect.apply(target, thisArg, args));
+    },
+    get(target, property, receiver) {
+      const value = Reflect.get(target, property, receiver);
+      if ((property === 'unsafe' || property === 'file') && typeof value === 'function') {
+        return (...args: unknown[]) => {
+          assertOpen(tx);
+          return guardDispatch(Reflect.apply(value, target, args));
+        };
+      }
+      return value;
+    },
+  });
 }
 
 /** Map a connection-map key to the datasource label used in tx telemetry. */
@@ -164,7 +236,7 @@ export async function useTxConnection(dbName: string | undefined, mode: 'read' |
     if (mode === 'write') {
       existing.hasWrite = true;
     }
-    return existing.conn;
+    return existing.client;
   }
 
   // Read in transactional mode, but no tx opened yet → use pool (zero cost)
@@ -181,7 +253,7 @@ export async function useTxConnection(dbName: string | undefined, mode: 'read' |
       const reserved = await pool.reserve();
       try {
         await reserved`BEGIN`;
-        const opened = { conn: reserved, hasWrite: true };
+        const opened = { conn: reserved, client: guardClient(tx, reserved), hasWrite: true };
         tx.connections.set(key, opened);
         return opened;
       } catch (error) {
@@ -196,8 +268,11 @@ export async function useTxConnection(dbName: string | undefined, mode: 'read' |
   }
 
   const opened = await opening;
+  // A timeout, commit or rollback may have started while this write waited
+  // for BEGIN.
+  assertOpen(tx);
   opened.hasWrite = true;
-  return opened.conn;
+  return opened.client;
 }
 
 /**

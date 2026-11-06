@@ -18,7 +18,7 @@
   "requirements": [
     {
       "id": "lazy-transaction",
-      "text": "Entering transactional mode reserves no connection and issues no BEGIN. A connection is reserved and BEGIN is issued on the first write to a datasource, once per datasource, and concurrent writers await the same opening rather than opening twice."
+      "text": "Entering transactional mode reserves no connection and issues no BEGIN. A connection is reserved and BEGIN is issued on the first write to a datasource, once per datasource, and concurrent writers await the same opening rather than opening twice. A query sent on the transaction's connection once a commit or rollback has started, including a write still opening the transaction, fails instead of running outside it."
     },
     {
       "id": "single-committer",
@@ -30,7 +30,7 @@
     },
     {
       "id": "timeout-rollback",
-      "text": "A transaction that exceeds its timeout is rolled back exactly once. A commit racing that timeout awaits the in-flight rollback and then fails, instead of committing connections the timeout already released."
+      "text": "A transaction that exceeds its timeout is rolled back exactly once. A commit racing that timeout awaits the in-flight rollback and then fails, instead of committing connections the timeout already released. A query sent on the transaction's connection after the timeout fired, including a write still opening the transaction, fails instead of running after the rollback outside any transaction."
     },
     {
       "id": "cancellation",

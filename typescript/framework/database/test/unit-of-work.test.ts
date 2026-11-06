@@ -9,6 +9,7 @@ import {
   cleanupTransaction,
   commit,
   isTransactionActive,
+  rollback,
   runInTransaction,
   useTxConnection,
   withTransaction,
@@ -29,6 +30,8 @@ function createFakeBackend() {
   // The single reserved connection per datasource, so identity assertions
   // ("a new'd repo joins the same tx") can compare object references.
   const reservedByKey = new Map<string, unknown>();
+  // When set, `reserve()` signals `requested` and waits for `released`.
+  let hold: { requested: () => void; released: Promise<void> } | undefined;
 
   function makeReserved(key: string) {
     const reserved = ((strings: TemplateStringsArray) => {
@@ -43,6 +46,8 @@ function createFakeBackend() {
         log.push(`${key}:commit`);
       } else if (cmd.startsWith('ROLLBACK')) {
         log.push(`${key}:rollback`);
+      } else {
+        log.push(`${key}:write`);
       }
       return Promise.resolve([]);
       // biome-ignore lint/suspicious/noExplicitAny: minimal postgres.js reserved-connection fake
@@ -55,6 +60,10 @@ function createFakeBackend() {
     // biome-ignore lint/suspicious/noExplicitAny: minimal postgres.js pool fake
     const pool = (() => Promise.resolve([])) as any;
     pool.reserve = async () => {
+      if (hold) {
+        hold.requested();
+        await hold.released;
+      }
       const reserved = makeReserved(key);
       reservedByKey.set(key, reserved);
       return reserved;
@@ -76,8 +85,48 @@ function createFakeBackend() {
       }
       return pool;
     },
+    /** Hold every reservation until `release()`; `reserving` settles on the first request. */
+    holdReserve(): { reserving: Promise<void>; release: () => void } {
+      let requested!: () => void;
+      const reserving = new Promise<void>((resolve) => {
+        requested = resolve;
+      });
+      let release!: () => void;
+      const released = new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      hold = { requested, released };
+      return { reserving, release };
+    },
     count(entry: string): number {
       return log.filter((e) => e === entry).length;
+    },
+  };
+}
+
+/**
+ * Capture the transaction timeout instead of arming it, so a test fires it at
+ * a chosen point. Only the call with this distinctive delay is captured.
+ */
+function captureTimeout(): { delay: number; fire: () => void; restore: () => void } {
+  const delay = 987_654;
+  const realSetTimeout = globalThis.setTimeout;
+  let handler: (() => void) | undefined;
+  globalThis.setTimeout = ((callback: () => void, ms?: number, ...args: unknown[]) => {
+    if (ms === delay) {
+      handler = callback;
+      return realSetTimeout(() => {}, 0);
+    }
+    return realSetTimeout(callback, ms, ...args);
+  }) as typeof setTimeout;
+  return {
+    delay,
+    fire: () => {
+      if (!handler) throw new Error('the transaction timeout was not armed');
+      handler();
+    },
+    restore: () => {
+      globalThis.setTimeout = realSetTimeout;
     },
   };
 }
@@ -366,6 +415,116 @@ describe('transaction laziness, nesting, timeout (spec)', () => {
       expect(backend.count('db1:rollback')).toBe(1);
       expect(backend.count('db1:commit')).toBe(0);
       expect(backend.count('db1:release')).toBe(1);
+    },
+  );
+
+  specTest(
+    'a timeout that fires while the first write opens the transaction fails that write',
+    {
+      feature: 'typescript/relational-persistence',
+      requirement: 'timeout-rollback',
+      check: 'a-write-still-opening-when-the-timeout-fires-fails-instead-of-running-after-the-rollback',
+    },
+    async () => {
+      const gate = backend.holdReserve();
+      const timeout = captureTimeout();
+      let error: Error | undefined;
+      try {
+        await runInContext({}, async () => {
+          withTransaction({ timeoutMs: timeout.delay });
+          timeout.restore();
+          const writing = useTxConnection('db1', 'write').then((sql) => sql`INSERT INTO items VALUES (1)`);
+
+          await gate.reserving;
+          timeout.fire();
+          gate.release();
+
+          try {
+            await writing;
+          } catch (e) {
+            error = e as Error;
+          }
+        });
+      } finally {
+        timeout.restore();
+      }
+
+      // The write never ran: the timeout had rolled the transaction back first.
+      expect(backend.log).toEqual(['db1:begin', 'db1:rollback', 'db1:release']);
+      expect(error?.message).toBe('Transaction has timed out and was rolled back');
+    },
+  );
+
+  specTest(
+    'a client held across the timeout refuses its next query',
+    {
+      feature: 'typescript/relational-persistence',
+      requirement: 'timeout-rollback',
+      check: 'a-held-connection-fails-after-the-timeout-rolls-back',
+    },
+    async () => {
+      const timeout = captureTimeout();
+      let error: Error | undefined;
+      let commitError: Error | undefined;
+      try {
+        await runInContext({}, async () => {
+          withTransaction({ timeoutMs: timeout.delay });
+          timeout.restore();
+          const sql = await useTxConnection('db1', 'write');
+          await sql`INSERT INTO items VALUES (1)`;
+
+          timeout.fire();
+
+          try {
+            await sql`INSERT INTO items VALUES (2)`;
+          } catch (e) {
+            error = e as Error;
+          }
+          try {
+            await commit();
+          } catch (e) {
+            commitError = e as Error;
+          }
+        });
+      } finally {
+        timeout.restore();
+      }
+
+      // Only the write sent before the timeout ran, and the rollback undid it.
+      expect(backend.log).toEqual(['db1:begin', 'db1:write', 'db1:rollback', 'db1:release']);
+      expect(error?.message).toBe('Transaction has timed out and was rolled back');
+      expect(commitError?.message).toBe('Transaction has timed out and was rolled back');
+    },
+  );
+
+  specTest(
+    'a rollback that starts while a write opens the transaction fails that write',
+    {
+      feature: 'typescript/relational-persistence',
+      requirement: 'lazy-transaction',
+      check: 'a-write-still-opening-when-a-rollback-starts-fails-instead-of-running-outside-it',
+    },
+    async () => {
+      const gate = backend.holdReserve();
+      let error: Error | undefined;
+      await runInContext({}, async () => {
+        withTransaction();
+        const writing = useTxConnection('db1', 'write').then((sql) => sql`INSERT INTO items VALUES (1)`);
+
+        await gate.reserving;
+        const rollingBack = rollback();
+        gate.release();
+
+        await rollingBack;
+        try {
+          await writing;
+        } catch (e) {
+          error = e as Error;
+        }
+      });
+
+      expect(backend.log).toEqual(['db1:begin', 'db1:rollback', 'db1:release']);
+      expect(error?.message).toBe('Transaction was committed or rolled back before this query ran');
     },
   );
 });

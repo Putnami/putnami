@@ -12,7 +12,7 @@ import {
   useTxConnection,
   withTransaction,
 } from '../src/index';
-import { cleanupTransaction } from '../src/transaction';
+import { __setTransactionConnectionFactory, cleanupTransaction } from '../src/transaction';
 import { database } from '../src/factory';
 import { ensurePostgresContainer, isDockerAvailable, POSTGRES_SETUP_TIMEOUT_MS } from './utils/postgres-helper';
 import { setPrimaryDatasource } from '../src/primary-datasource';
@@ -46,6 +46,66 @@ class PrimaryTxTestRepository extends Repository<typeof PrimaryTxTestTable> {
   constructor() {
     super(PrimaryTxTestTable);
   }
+}
+
+/**
+ * Hold every transaction's connection reservation until `release()`, so a test
+ * can finalize the transaction while its first write is still opening it.
+ */
+function holdReserve(): { reserving: Promise<void>; release: () => void; restore: () => void } {
+  let requested!: () => void;
+  const reserving = new Promise<void>((resolve) => {
+    requested = resolve;
+  });
+  let release!: () => void;
+  const released = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+
+  __setTransactionConnectionFactory(async (dbName) => {
+    const pool = await database(dbName);
+    return new Proxy(pool, {
+      get(target, property, receiver) {
+        if (property === 'reserve') {
+          return async () => {
+            requested();
+            await released;
+            return target.reserve();
+          };
+        }
+        return Reflect.get(target, property, receiver);
+      },
+    });
+  });
+
+  return { reserving, release, restore: () => __setTransactionConnectionFactory(undefined) };
+}
+
+/**
+ * Capture the transaction timeout instead of arming it, so a test fires it at
+ * a chosen point. Only the call with this distinctive delay is captured.
+ */
+function captureTimeout(): { delay: number; fire: () => void; restore: () => void } {
+  const delay = 987_654;
+  const realSetTimeout = globalThis.setTimeout;
+  let handler: (() => void) | undefined;
+  globalThis.setTimeout = ((callback: () => void, ms?: number, ...args: unknown[]) => {
+    if (ms === delay) {
+      handler = callback;
+      return realSetTimeout(() => {}, 0);
+    }
+    return realSetTimeout(callback, ms, ...args);
+  }) as typeof setTimeout;
+  return {
+    delay,
+    fire: () => {
+      if (!handler) throw new Error('the transaction timeout was not armed');
+      handler();
+    },
+    restore: () => {
+      globalThis.setTimeout = realSetTimeout;
+    },
+  };
 }
 
 let repository: TxTestRepository;
@@ -414,6 +474,33 @@ describe.skipIf(!dockerAvailable)('Transaction support', () => {
       `;
       expect(rows.length).toBe(4);
     });
+
+    it('a rollback that starts while a write opens the transaction keeps that write out of the table', async () => {
+      const gate = holdReserve();
+      let saveError: Error | undefined;
+
+      try {
+        await runInContext({}, async () => {
+          withTransaction();
+          const saving = repository.save({ id: 'rollback-opening-1', name: 'sibling-failed', value: 42 }).catch((e) => {
+            saveError = e as Error;
+          });
+
+          await gate.reserving;
+          const rollingBack = rollback();
+          gate.release();
+
+          await rollingBack;
+          await saving;
+        });
+      } finally {
+        gate.restore();
+      }
+
+      const rows = await sql`SELECT * FROM tx_test_items WHERE id = 'rollback-opening-1'`;
+      expect(rows.length).toBe(0);
+      expect(saveError?.message).toBe('Transaction was committed or rolled back before this query ran');
+    });
   });
 
   describe('transaction timeout', () => {
@@ -462,6 +549,89 @@ describe.skipIf(!dockerAvailable)('Transaction support', () => {
 
       const rows = await sql`SELECT * FROM tx_test_items WHERE id = 'timeout-message-1'`;
       expect(rows.length).toBe(0);
+    });
+
+    it('a timeout that fires while the first write opens its transaction keeps that write out of the table', async () => {
+      const gate = holdReserve();
+      const timeout = captureTimeout();
+      let error: Error | undefined;
+      try {
+        await runInContext({}, async () => {
+          const running = runInTransaction(
+            async () => {
+              await repository.save({ id: 'timeout-opening-1', name: 'will-timeout', value: 42 });
+            },
+            { timeoutMs: timeout.delay },
+          );
+          timeout.restore();
+
+          await gate.reserving;
+          timeout.fire();
+          gate.release();
+
+          try {
+            await running;
+          } catch (e) {
+            error = e as Error;
+          }
+        });
+      } finally {
+        timeout.restore();
+        gate.restore();
+      }
+
+      expect(error?.message).toBe('Transaction has timed out and was rolled back');
+
+      const rows = await sql`SELECT * FROM tx_test_items WHERE id = 'timeout-opening-1'`;
+      expect(rows.length).toBe(0);
+    });
+
+    it('a connection held across the timeout writes nothing after the rollback', async () => {
+      const timeout = captureTimeout();
+      let error: Error | undefined;
+      let pendingError: Error | undefined;
+      let cursorError: Error | undefined;
+      try {
+        await runInContext({}, async () => {
+          withTransaction({ timeoutMs: timeout.delay });
+          timeout.restore();
+          const conn = await repository.conn();
+          await conn`INSERT INTO tx_test_items (id, name, value) VALUES ('timeout-held-1', 'before', 1)`;
+          // Created before the timeout, sent on its first await, after it.
+          const pending = conn`INSERT INTO tx_test_items (id, name, value) VALUES ('timeout-held-3', 'pending', 3)`;
+          const cursor = conn`SELECT * FROM tx_test_items`.cursor(1);
+
+          timeout.fire();
+
+          try {
+            await conn`INSERT INTO tx_test_items (id, name, value) VALUES ('timeout-held-2', 'after', 2)`;
+          } catch (e) {
+            error = e as Error;
+          }
+          try {
+            await pending;
+          } catch (e) {
+            pendingError = e as Error;
+          }
+          try {
+            for await (const _ of cursor) {
+              // A cursor sent after the timeout yields nothing.
+            }
+          } catch (e) {
+            cursorError = e as Error;
+          }
+          await commit().catch(() => {});
+        });
+      } finally {
+        timeout.restore();
+      }
+
+      const rows =
+        await sql`SELECT * FROM tx_test_items WHERE id IN ('timeout-held-1', 'timeout-held-2', 'timeout-held-3')`;
+      expect(rows.length).toBe(0);
+      expect(error?.message).toBe('Transaction has timed out and was rolled back');
+      expect(pendingError?.message).toBe('Transaction has timed out and was rolled back');
+      expect(cursorError?.message).toBe('Transaction has timed out and was rolled back');
     });
 
     it('should reject operations after timeout', async () => {
