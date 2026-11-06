@@ -55,7 +55,7 @@ import (
 	"testing"
 	"time"
 
-	"go.putnami.dev/sdk/extension/gitread"
+	"go.putnami.dev/sdk/extension/gittest"
 	"go.putnami.dev/tooling/cli/internal/fixtureproc"
 )
 
@@ -563,6 +563,11 @@ func newFixture(t *testing.T, runtimePath string) string {
 	return root
 }
 
+func TestDevWorkloadFixtureIsTheSameOnAForeignMachine(t *testing.T) {
+	requireFixtureTools(t)
+	gittest.AssertMachineIndependent(t, func() string { return newFixture(t, "") })
+}
+
 // devManifest is the shipped @putnami/dev manifest with its runtime replaced
 // by the executable at runtimePath: no runtime to prepare, and every task
 // that ran the prepared runtime runs that executable.
@@ -640,9 +645,8 @@ func writeFixtureFile(t *testing.T, root, rel, content string) {
 func commitFixture(t *testing.T, root, message string) {
 	t.Helper()
 	git(t, root, "add", "-A")
-	cmd := exec.Command(gitread.Executable(), "commit", "-q", "-m", message)
-	cmd.Dir = root
-	cmd.Env = append(gitEnv(),
+	cmd := gittest.Command(root, "commit", "-q", "-m", message)
+	cmd.Env = append(cmd.Env, "LC_ALL=C",
 		"GIT_AUTHOR_NAME=Fixture", "GIT_AUTHOR_EMAIL=fixture@example.invalid", "GIT_AUTHOR_DATE=2026-01-01T00:00:00Z",
 		"GIT_COMMITTER_NAME=Fixture", "GIT_COMMITTER_EMAIL=fixture@example.invalid", "GIT_COMMITTER_DATE=2026-01-01T00:00:00Z")
 	if out, err := cmd.CombinedOutput(); err != nil {
@@ -652,22 +656,11 @@ func commitFixture(t *testing.T, root, message string) {
 
 func git(t *testing.T, dir string, args ...string) {
 	t.Helper()
-	cmd := exec.Command(gitread.Executable(), args...)
-	cmd.Dir = dir
-	cmd.Env = gitEnv()
+	cmd := gittest.Command(dir, args...)
+	cmd.Env = append(cmd.Env, "LC_ALL=C")
 	if out, err := cmd.CombinedOutput(); err != nil {
 		t.Fatalf("git %v: %v\n%s", args, err, out)
 	}
-}
-
-func gitEnv() []string {
-	var env []string
-	for _, entry := range os.Environ() {
-		if !strings.HasPrefix(entry, "GIT_") {
-			env = append(env, entry)
-		}
-	}
-	return append(env, "GIT_CONFIG_GLOBAL="+os.DevNull, "GIT_CONFIG_NOSYSTEM=1", "LC_ALL=C")
 }
 
 // --- the recordings ---------------------------------------------------------

@@ -14,7 +14,7 @@ import (
 	distribution "go.putnami.dev/protocol/distribution"
 	"go.putnami.dev/protocol/features/spectest"
 	wsproto "go.putnami.dev/protocol/workspace"
-	"go.putnami.dev/sdk/extension/gitread"
+	"go.putnami.dev/sdk/extension/gittest"
 	"go.putnami.dev/sdk/extension/releaseset"
 	putnamigit "go.putnami.dev/tooling/cli/internal/git"
 )
@@ -188,6 +188,43 @@ func TestReleaseSetCommitDropsATreeTheCheckoutNoLongerHolds(t *testing.T) {
 	}
 }
 
+// releaseSetRepo is a repository on main with one commit, which holds the
+// file rel.
+func releaseSetRepo(t *testing.T, rel string) string {
+	t.Helper()
+	root := t.TempDir()
+	releaseSetGit(t, root, "init", "-q", "-b", "main")
+	if err := os.MkdirAll(filepath.Dir(filepath.Join(root, rel)), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, rel), []byte("export const a = 1\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	releaseSetGit(t, root, "add", ".")
+	releaseSetGit(t, root, "commit", "-q", "-m", "init")
+	return root
+}
+
+// releaseSetGit runs git in root with an identity that signs nothing, and
+// returns its output without surrounding space.
+func releaseSetGit(t *testing.T, root string, args ...string) string {
+	t.Helper()
+	cmd := gittest.Command(root, append([]string{"-c", "user.name=test", "-c", "user.email=test@example.invalid", "-c", "commit.gpgsign=false"}, args...)...)
+	cmd.Env = gittest.Environ(os.Environ())
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("git %v: %v\n%s", args, err, out)
+	}
+	return strings.TrimSpace(string(out))
+}
+
+func TestReleaseSetRepoIsTheSameOnAForeignMachine(t *testing.T) {
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git is not installed")
+	}
+	gittest.AssertMachineIndependent(t, func() string { return releaseSetRepo(t, "lib/index.ts") })
+}
+
 // TestReleaseSetProvenanceReadsTheHeadTree is the git half, on a real
 // checkout: asked for a tree, the provenance records HEAD's, including when
 // PUTNAMI_SOURCE_REVISION binds the publication to another commit, and records
@@ -198,24 +235,8 @@ func TestReleaseSetProvenanceReadsTheHeadTree(t *testing.T) {
 	if _, err := exec.LookPath("git"); err != nil {
 		t.Skip("git is not installed")
 	}
-	root := t.TempDir()
-	git := func(args ...string) string {
-		t.Helper()
-		cmd := exec.Command(gitread.Executable(), append([]string{"-c", "user.name=test", "-c", "user.email=test@example.invalid", "-c", "commit.gpgsign=false"}, args...)...)
-		cmd.Dir = root
-		out, err := cmd.CombinedOutput()
-		if err != nil {
-			t.Fatalf("git %v: %v\n%s", args, err, out)
-		}
-		return strings.TrimSpace(string(out))
-	}
-	git("init", "-q", "-b", "main")
-	if err := os.WriteFile(filepath.Join(root, "index.ts"), []byte("export const a = 1\n"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	git("add", ".")
-	git("commit", "-q", "-m", "init")
-	tree := git("rev-parse", "HEAD^{tree}")
+	root := releaseSetRepo(t, "index.ts")
+	tree := releaseSetGit(t, root, "rev-parse", "HEAD^{tree}")
 	ws := workspace.NewWorkspace(root, &wsproto.Config{Name: "putnami"}, nil)
 
 	t.Setenv(putnamigit.SourceRevisionEnv, "")

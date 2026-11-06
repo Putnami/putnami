@@ -3,14 +3,13 @@ package workspace_state
 import (
 	"encoding/json"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
 
 	"go.putnami.dev/protocol/cli"
 	"go.putnami.dev/protocol/features/spectest"
-	"go.putnami.dev/sdk/extension/gitread"
+	"go.putnami.dev/sdk/extension/gittest"
 	gitpkg "go.putnami.dev/tooling/cli/internal/git"
 )
 
@@ -32,8 +31,7 @@ func treeTestRepo(t *testing.T) string {
 		{"config", "user.name", "Test"},
 		{"config", "commit.gpgsign", "false"},
 	} {
-		command := exec.Command(gitread.Executable(), args...)
-		command.Dir = dir
+		command := gittest.Command(dir, args...)
 		if out, err := command.CombinedOutput(); err != nil {
 			t.Fatalf("git %v: %v\n%s", args, err, out)
 		}
@@ -42,13 +40,16 @@ func treeTestRepo(t *testing.T) string {
 		t.Fatalf("write README: %v", err)
 	}
 	for _, args := range [][]string{{"add", "."}, {"commit", "-m", "initial"}} {
-		command := exec.Command(gitread.Executable(), args...)
-		command.Dir = dir
+		command := gittest.Command(dir, args...)
 		if out, err := command.CombinedOutput(); err != nil {
 			t.Fatalf("git %v: %v\n%s", args, err, out)
 		}
 	}
 	return dir
+}
+
+func TestTreeTestRepoIsTheSameOnAForeignMachine(t *testing.T) {
+	gittest.AssertMachineIndependent(t, func() string { return treeTestRepo(t) })
 }
 
 func recordedSession(t *testing.T, session *Session) cli.SessionFile {

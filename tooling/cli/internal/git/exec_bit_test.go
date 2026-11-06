@@ -8,6 +8,7 @@ import (
 
 	protocaps "go.putnami.dev/protocol/capabilities"
 	"go.putnami.dev/sdk/extension/gitread"
+	"go.putnami.dev/sdk/extension/gittest"
 	"go.putnami.dev/sdk/extension/sourcebinding"
 )
 
@@ -39,6 +40,10 @@ func indexExecutableRepo(t *testing.T) string {
 		}
 	}
 	return repo
+}
+
+func TestIndexExecutableRepoIsTheSameOnAForeignMachine(t *testing.T) {
+	gittest.AssertMachineIndependent(t, func() string { return indexExecutableRepo(t) })
 }
 
 // Without a host executable bit, the index mode the snapshot enumerates

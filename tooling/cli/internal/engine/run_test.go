@@ -9,7 +9,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -24,6 +23,7 @@ import (
 	extensionproto "go.putnami.dev/protocol/extension"
 	workspacepb "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/sdk/extension/gitread"
+	"go.putnami.dev/sdk/extension/gittest"
 	"go.putnami.dev/sdk/extension/scratch"
 	"go.putnami.dev/tooling/cli/internal/abort"
 	"go.putnami.dev/tooling/cli/internal/extension"
@@ -1182,6 +1182,15 @@ func selectedProjectIDs(projects []*workspace.Project) map[string]bool {
 	return ids
 }
 
+func TestCLISelectionGitRepoIsTheSameOnAForeignMachine(t *testing.T) {
+	gittest.AssertMachineIndependent(t, func() string {
+		dir := t.TempDir()
+		initCLISelectionGitRepo(t, dir)
+		commitCLISelectionFile(t, dir, "docs/guide.md", "# Guide\n", "docs: add the guide")
+		return dir
+	})
+}
+
 func commitCLISelectionFile(t *testing.T, dir, relPath, content, message string) {
 	t.Helper()
 	path := filepath.Join(dir, relPath)
@@ -1211,9 +1220,8 @@ func initCLISelectionGitRepo(t *testing.T, dir string) {
 
 func runCLISelectionGit(t *testing.T, dir string, args ...string) string {
 	t.Helper()
-	cmd := exec.Command(gitread.Executable(), args...)
-	cmd.Dir = dir
-	cmd.Env = append(os.Environ(),
+	cmd := gittest.Command(dir, args...)
+	cmd.Env = append(cmd.Env,
 		"GIT_AUTHOR_NAME=test", "GIT_AUTHOR_EMAIL=test@example.com",
 		"GIT_COMMITTER_NAME=test", "GIT_COMMITTER_EMAIL=test@example.com",
 	)

@@ -40,10 +40,21 @@ import (
 // package-private installCredentialProviders, and its install-only control
 // installs a read credential source for the whole process.
 //
+// RAISED 128→133 (test fixtures run git without the caller's git environment),
+// for five tests that build a repository twice, on this machine and under a
+// foreign git environment, with gittest.AssertMachineIndependent:
+// TestDevVersionFixtureIsTheSameOnAForeignMachine,
+// TestHostRPCVersionRepoIsTheSameOnAForeignMachine,
+// TestVersionGraphRepoIsTheSameOnAForeignMachine,
+// TestTreeCommandRepoIsTheSameOnAForeignMachine and
+// TestAliasGitRepoIsTheSameOnAForeignMachine. The foreign environment is set
+// with t.Setenv, and each test calls the package-private builder of its
+// fixture, so none can run in parallel or move to an e2e package.
+//
 // The measurement is the AST, not a regexp: a top-level Test function whose
 // body has no `t.Parallel()` statement at its top level. A t.Parallel() inside
 // a subtest closure does not free the parent, so it does not count.
-const serialTestCeiling = 128
+const serialTestCeiling = 133
 
 func TestSerialTests_StayUnderTheCeiling(t *testing.T) {
 	t.Parallel()

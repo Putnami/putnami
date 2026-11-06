@@ -29,7 +29,7 @@ import (
 	"go.putnami.dev/protocol/features/spectest"
 	registry "go.putnami.dev/protocol/registry"
 	runtimeproto "go.putnami.dev/protocol/runtime"
-	"go.putnami.dev/sdk/extension/gitread"
+	"go.putnami.dev/sdk/extension/gittest"
 	"go.putnami.dev/tooling/cli/internal/artifactstore"
 	"go.putnami.dev/tooling/cli/internal/cli/clitest"
 	"go.putnami.dev/tooling/cli/internal/fixtureproc"
@@ -122,7 +122,7 @@ func TestHostedInstallOfAPrivatePinWorksCold(t *testing.T) {
 			if runs, err := os.ReadFile(log); !errors.Is(err, os.ErrNotExist) {
 				t.Errorf("an extension task ran: %q, %v", runs, err)
 			}
-			assertUnchanged(t, ws, home, before)
+			assertUnchanged(t, ws, before)
 			assertProvider(t, record, tc.wantProvider, 1)
 		})
 	}
@@ -179,7 +179,7 @@ func TestHostedInstallOfAPrivatePinWorksCold(t *testing.T) {
 		if runs, _ := os.ReadFile(log); string(runs) != "fetch offline=\ninstall offline=1\n" {
 			t.Errorf("the extension's tasks ran as %q, want the fetch, then the install offline", runs)
 		}
-		assertUnchanged(t, ws, home, before)
+		assertUnchanged(t, ws, before)
 		// One provider served the pinned CLI download in the starting CLI, one
 		// the extension download in the pinned CLI.
 		assertProvider(t, record, runCredential, 2)
@@ -569,26 +569,22 @@ func lockedDigests(t *testing.T, ws string) map[string]string {
 }
 
 // assertUnchanged checks that every locked file of ws keeps the digest it had
-// before the run and that the checkout is clean, read with home as the user's
-// home so no global ignore file hides a change.
-func assertUnchanged(t *testing.T, ws, home string, before map[string]string) {
+// before the run and that the checkout is clean, read without the caller's git
+// environment so no global ignore file hides a change.
+func assertUnchanged(t *testing.T, ws string, before map[string]string) {
 	t.Helper()
 	for name, digest := range lockedDigests(t, ws) {
 		if digest != before[name] {
 			t.Errorf("%s changed: sha256 %s, was %s", name, digest, before[name])
 		}
 	}
-	cmd := exec.Command(gitread.Executable(), "status", "--porcelain", "--untracked-files=all")
-	cmd.Dir = ws
-	cmd.Env = append(baseEnv(home), "GIT_CONFIG_NOSYSTEM=1")
+	cmd := gittest.Command(ws, "status", "--porcelain", "--untracked-files=all")
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		t.Fatalf("git status: %v\n%s", err, out)
 	}
 	if len(out) != 0 {
-		diff := exec.Command(gitread.Executable(), "diff")
-		diff.Dir = ws
-		diff.Env = cmd.Env
+		diff := gittest.Command(ws, "diff")
 		patch, _ := diff.CombinedOutput()
 		t.Errorf("the checkout is not clean:\n%s\n%s", out, patch)
 	}

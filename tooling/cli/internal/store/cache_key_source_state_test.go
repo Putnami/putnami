@@ -2,12 +2,11 @@ package store
 
 import (
 	"os"
-	"os/exec"
 	"path/filepath"
 	"testing"
 
 	"go.putnami.dev/protocol/features/spectest"
-	"go.putnami.dev/sdk/extension/gitread"
+	"go.putnami.dev/sdk/extension/gittest"
 )
 
 // An empty source state writes zero bytes, so every key computed inside a
@@ -53,6 +52,22 @@ func TestCacheKey_SourceStateAddsOnlyItsMarker(t *testing.T) {
 	}
 }
 
+// initSourceStateRepo turns the directory dir into an empty repository.
+func initSourceStateRepo(t *testing.T, dir string) {
+	t.Helper()
+	if out, err := gittest.Command(dir, "init").CombinedOutput(); err != nil {
+		t.Fatalf("git init: %v\n%s", err, out)
+	}
+}
+
+func TestInitSourceStateRepoIsTheSameOnAForeignMachine(t *testing.T) {
+	gittest.AssertMachineIndependent(t, func() string {
+		dir := t.TempDir()
+		initSourceStateRepo(t, dir)
+		return dir
+	})
+}
+
 // SourceState names the state of a root once per manager: empty inside a
 // repository, with or without a commit, and unmanaged outside every one.
 func TestCacheManager_SourceState(t *testing.T) {
@@ -69,9 +84,7 @@ func TestCacheManager_SourceState(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	if out, err := exec.Command(gitread.Executable(), "-C", repository, "init").CombinedOutput(); err != nil {
-		t.Fatalf("git init: %v\n%s", err, out)
-	}
+	initSourceStateRepo(t, repository)
 
 	cm := NewCacheManager(nil)
 	if got := cm.SourceState(repository); got != "" {
@@ -83,9 +96,7 @@ func TestCacheManager_SourceState(t *testing.T) {
 
 	// The answer holds for the life of the manager: every key of one
 	// invocation agrees even when the root changes state under it.
-	if out, err := exec.Command(gitread.Executable(), "-C", plain, "init").CombinedOutput(); err != nil {
-		t.Fatalf("git init: %v\n%s", err, out)
-	}
+	initSourceStateRepo(t, plain)
 	if got := cm.SourceState(plain); got != SourceStateUnmanaged {
 		t.Fatalf("SourceState changed within one manager: %q", got)
 	}

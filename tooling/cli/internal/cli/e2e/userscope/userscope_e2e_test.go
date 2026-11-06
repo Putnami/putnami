@@ -30,7 +30,7 @@ import (
 	diag "go.putnami.dev/protocol/diagnostic"
 	"go.putnami.dev/protocol/features/spectest"
 	protocoljob "go.putnami.dev/protocol/job"
-	"go.putnami.dev/sdk/extension/gitread"
+	"go.putnami.dev/sdk/extension/gittest"
 	"go.putnami.dev/tooling/cli/internal/cli"
 	"go.putnami.dev/tooling/cli/internal/cli/clitest"
 	"go.putnami.dev/tooling/cli/internal/extension"
@@ -431,6 +431,24 @@ func TestAppRun_UserScope_InteractiveInterruptExitsSignalReceivedSilently(t *tes
 	}
 }
 
+// userScopeRepo is an empty repository in a directory under parent.
+func userScopeRepo(t *testing.T, parent string) string {
+	t.Helper()
+	repo := filepath.Join(parent, "repo")
+	if err := os.MkdirAll(repo, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	gitInit := gittest.Command(repo, "init", "--quiet")
+	if out, err := gitInit.CombinedOutput(); err != nil {
+		t.Fatalf("git init: %v\n%s", err, out)
+	}
+	return repo
+}
+
+func TestUserScopeRepoIsTheSameOnAForeignMachine(t *testing.T) {
+	gittest.AssertMachineIndependent(t, func() string { return userScopeRepo(t, t.TempDir()) })
+}
+
 // TestAppRun_UserScope_LeavesAGitCallerDirClean pins the repository case: run
 // from a git working tree, the command leaves `git status --porcelain` empty.
 func TestAppRun_UserScope_LeavesAGitCallerDirClean(t *testing.T) {
@@ -439,23 +457,14 @@ func TestAppRun_UserScope_LeavesAGitCallerDirClean(t *testing.T) {
 	}
 	userRoot, callerDir := userScopeTestEnv(t)
 	pinUserScopeExtension(t, userRoot, "user-scope")
-	repo := filepath.Join(callerDir, "repo")
-	if err := os.MkdirAll(repo, 0o755); err != nil {
-		t.Fatal(err)
-	}
+	repo := userScopeRepo(t, callerDir)
 	porcelain := func() string {
-		cmd := exec.Command(gitread.Executable(), "status", "--porcelain", "--untracked-files=all", "--ignored")
-		cmd.Dir = repo
+		cmd := gittest.Command(repo, "status", "--porcelain", "--untracked-files=all", "--ignored")
 		out, err := cmd.CombinedOutput()
 		if err != nil {
 			t.Fatalf("git status: %v\n%s", err, out)
 		}
 		return string(out)
-	}
-	gitInit := exec.Command(gitread.Executable(), "init", "--quiet")
-	gitInit.Dir = repo
-	if out, err := gitInit.CombinedOutput(); err != nil {
-		t.Fatalf("git init: %v\n%s", err, out)
 	}
 	if got := porcelain(); got != "" {
 		t.Fatalf("a fresh repository is not clean: %q", got)

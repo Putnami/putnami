@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"go.putnami.dev/sdk/extension/gitread"
+	"go.putnami.dev/sdk/extension/gittest"
 	"go.putnami.dev/tooling/cli/internal/cmderr"
 	"go.putnami.dev/tooling/cli/internal/commands/sharedtest"
 )
@@ -59,10 +59,9 @@ func TestSourceBuildVersion_NonGitWorkspace(t *testing.T) {
 	}
 }
 
-func TestSourceBuildVersion_GitWorkspace(t *testing.T) {
-	if _, err := exec.LookPath("git"); err != nil {
-		t.Skip("git not available")
-	}
+// sourceBuildRepo is a repository with one empty commit.
+func sourceBuildRepo(t *testing.T) string {
+	t.Helper()
 	wsRoot := t.TempDir()
 	for _, args := range [][]string{
 		{"init"},
@@ -70,11 +69,27 @@ func TestSourceBuildVersion_GitWorkspace(t *testing.T) {
 		{"config", "user.name", "t"},
 		{"commit", "--allow-empty", "-m", "init"},
 	} {
-		cmd := exec.Command(gitread.Executable(), append([]string{"-C", wsRoot}, args...)...)
+		cmd := gittest.Command(wsRoot, args...)
+		cmd.Env = gittest.Environ(os.Environ())
 		if out, err := cmd.CombinedOutput(); err != nil {
 			t.Fatalf("git %v: %v\n%s", args, err, out)
 		}
 	}
+	return wsRoot
+}
+
+func TestSourceBuildRepoIsTheSameOnAForeignMachine(t *testing.T) {
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git not available")
+	}
+	gittest.AssertMachineIndependent(t, func() string { return sourceBuildRepo(t) })
+}
+
+func TestSourceBuildVersion_GitWorkspace(t *testing.T) {
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git not available")
+	}
+	wsRoot := sourceBuildRepo(t)
 
 	got := sourceBuildVersion(context.Background(), wsRoot)
 	if !strings.HasPrefix(got, "0.0.0-source-") {

@@ -3,12 +3,12 @@ package git
 import (
 	"errors"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
 
 	"go.putnami.dev/sdk/extension/gitread"
+	"go.putnami.dev/sdk/extension/gittest"
 )
 
 // The index read keeps the mode the index records for each merged path, the
@@ -18,8 +18,7 @@ func TestReadIndexModes(t *testing.T) {
 	repo := indexExecutableRepo(t)
 	write(t, filepath.Join(repo, "conflict.md"), "# conflict\n")
 	blob := strings.TrimSpace(runGit(t, repo, "hash-object", "-w", "conflict.md"))
-	stages := exec.Command(gitread.Executable(), "update-index", "--index-info")
-	stages.Dir = repo
+	stages := gittest.Command(repo, "update-index", "--index-info")
 	stages.Stdin = strings.NewReader("100644 " + blob + " 1\tconflict.md\n100644 " + blob + " 2\tconflict.md\n")
 	if out, err := stages.CombinedOutput(); err != nil {
 		t.Fatalf("git update-index --index-info: %v\n%s", err, out)

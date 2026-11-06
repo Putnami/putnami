@@ -5,14 +5,13 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
 
 	runner "go.putnami.dev/protocol/runner"
-	"go.putnami.dev/sdk/extension/gitread"
+	"go.putnami.dev/sdk/extension/gittest"
 	"go.putnami.dev/tooling/cli/internal/jobs/cachekey"
 	"go.putnami.dev/tooling/cli/internal/runnersource"
 	"go.putnami.dev/tooling/cli/internal/store"
@@ -23,7 +22,8 @@ func admissionRepo(t *testing.T) string {
 	root := t.TempDir()
 	git := func(args ...string) {
 		t.Helper()
-		cmd := exec.Command(gitread.Executable(), append([]string{"-C", root, "-c", "user.name=t", "-c", "user.email=t@example.invalid", "-c", "commit.gpgsign=false"}, args...)...)
+		cmd := gittest.Command(root, append([]string{"-c", "user.name=t", "-c", "user.email=t@example.invalid", "-c", "commit.gpgsign=false"}, args...)...)
+		cmd.Env = gittest.Environ(os.Environ())
 		if out, err := cmd.CombinedOutput(); err != nil {
 			t.Fatalf("git %v: %v: %s", args, err, out)
 		}
@@ -49,6 +49,10 @@ func admissionRepo(t *testing.T) string {
 	write(".putnami/state.json", "{}")
 	write("app/dist/bundle.js", "built")
 	return root
+}
+
+func TestAdmissionRepoIsTheSameOnAForeignMachine(t *testing.T) {
+	gittest.AssertMachineIndependent(t, func() string { return admissionRepo(t) })
 }
 
 // listedInputs expands each selector to the files it lists, relative to the
@@ -205,7 +209,7 @@ func TestListedInputsUnderLifecycleRootsMustTravelOrRefuse(t *testing.T) {
 			writeAdmissionFile(t, root, "app/embed.go", "package app\n")
 			writeAdmissionFile(t, root, "app/"+test.listed, "SELECT 1;\n")
 			if test.tracked {
-				cmd := exec.Command(gitread.Executable(), "-C", root, "add", "-f", "app/"+test.listed)
+				cmd := gittest.Command(root, "add", "-f", "app/"+test.listed)
 				if out, err := cmd.CombinedOutput(); err != nil {
 					t.Fatalf("track lifecycle input: %v: %s", err, out)
 				}
@@ -243,7 +247,7 @@ func TestListedLinkUnderIgnoredLifecycleRootMustBeTrackedOrRefused(t *testing.T)
 	if _, err := AdmitInputs(context.Background(), root, inputs); !errors.Is(err, ErrInadmissible) || !strings.Contains(err.Error(), "app/.gen/source.go") {
 		t.Fatalf("ignored lifecycle link was admitted: %v", err)
 	}
-	cmd := exec.Command(gitread.Executable(), "-C", root, "add", "-f", "app/.gen/source.go")
+	cmd := gittest.Command(root, "add", "-f", "app/.gen/source.go")
 	if out, err := cmd.CombinedOutput(); err != nil {
 		t.Fatalf("track the link: %v: %s", err, out)
 	}

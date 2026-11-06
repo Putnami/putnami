@@ -4,7 +4,6 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"reflect"
 	"runtime"
@@ -13,7 +12,7 @@ import (
 	"go.putnami.dev/protocol/features/spectest"
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/sdk/extension/dirlink"
-	"go.putnami.dev/sdk/extension/gitread"
+	"go.putnami.dev/sdk/extension/gittest"
 	gitutil "go.putnami.dev/tooling/cli/internal/git"
 )
 
@@ -30,8 +29,7 @@ func gitInputWrite(t *testing.T, root, path, data string) {
 
 func gitInputRun(t *testing.T, root string, args ...string) {
 	t.Helper()
-	cmd := exec.Command(gitread.Executable(), args...)
-	cmd.Dir = root
+	cmd := gittest.Command(root, args...)
 	if out, err := cmd.CombinedOutput(); err != nil {
 		t.Fatalf("git %v: %v\n%s", args, err, out)
 	}
@@ -374,8 +372,7 @@ func TestGitInputsRefuseUnmergedAndSubmoduleCandidates(t *testing.T) {
 	gitInputRun(t, root, "checkout", "main")
 	gitInputWrite(t, root, "conflict.txt", "main\n")
 	gitInputRun(t, root, "commit", "-am", "main")
-	merge := exec.Command(gitread.Executable(), "merge", "other")
-	merge.Dir = root
+	merge := gittest.Command(root, "merge", "other")
 	if out, err := merge.CombinedOutput(); err == nil {
 		t.Fatalf("the merge did not conflict:\n%s", out)
 	}

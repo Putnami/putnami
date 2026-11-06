@@ -30,6 +30,10 @@ import (
 // change, so an allowance that held only for production files would not hold
 // the property. An import only the tests need is a test-only allowance, which
 // a production file fails on.
+//
+// go.putnami.dev/sdk/extension/gittest is a test-only allowance of the packages
+// whose tests build a git repository: it runs the fixture's git without the
+// caller's git environment, and imports no CLI package.
 
 // jobsSplitPackage is one package split out of internal/jobs.
 type jobsSplitPackage struct {
@@ -94,6 +98,7 @@ var jobsSplitPackages = []jobsSplitPackage{
 			"go.putnami.dev/protocol/cli",
 			"go.putnami.dev/protocol/job",
 			"go.putnami.dev/sdk/extension/gitread",
+			"go.putnami.dev/sdk/extension/gittest",
 			"go.putnami.dev/sdk/extension/profiles",
 		},
 		why: "task cache keys: a key hashes the task's declared files and params, its project and " +
@@ -118,6 +123,7 @@ var jobsSplitPackages = []jobsSplitPackage{
 			"go.putnami.dev/protocol/cli",
 			"go.putnami.dev/protocol/extension",
 			"go.putnami.dev/protocol/features/spectest",
+			"go.putnami.dev/sdk/extension/gittest",
 			"go.putnami.dev/tooling/cli/internal/store",
 		},
 		why: "the planner: it turns a selection of projects and commands into the typed plan of a " +
@@ -224,6 +230,7 @@ var jobsSplitPackages = []jobsSplitPackage{
 			"go.putnami.dev/protocol/diagnostic",
 			"go.putnami.dev/protocol/features",
 			"go.putnami.dev/protocol/workspace",
+			"go.putnami.dev/sdk/extension/gittest",
 			"go.putnami.dev/sdk/extension/ownerperm",
 			"go.putnami.dev/sdk/extension/registrycred",
 			"go.putnami.dev/tooling/cli/internal/cacheprovider",
@@ -275,6 +282,7 @@ var jobsSplitPackages = []jobsSplitPackage{
 			"go.putnami.dev/cli/model/extension",
 			"go.putnami.dev/protocol/cli",
 			"go.putnami.dev/protocol/features/spectest",
+			"go.putnami.dev/sdk/extension/gittest",
 			"go.putnami.dev/sdk/extension/npmpublish",
 			"go.putnami.dev/sdk/extension/profiles",
 			"go.putnami.dev/sdk/extension/publicationupload/publicationuploadtest",

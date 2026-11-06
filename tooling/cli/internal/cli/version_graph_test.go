@@ -3,14 +3,13 @@ package cli
 import (
 	"context"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"testing"
 	"time"
 
 	supportproto "go.putnami.dev/protocol/support"
 	wsproto "go.putnami.dev/protocol/workspace"
-	"go.putnami.dev/sdk/extension/gitread"
+	"go.putnami.dev/sdk/extension/gittest"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
 
@@ -39,6 +38,10 @@ func TestVersionRecordsTheDependencyGraphOnlyWithASupportCatalog(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestVersionGraphRepoIsTheSameOnAForeignMachine(t *testing.T) {
+	gittest.AssertMachineIndependent(t, func() string { return versionGraphRepo(t, true) })
 }
 
 // versionGraphRepo is a committed workspace with one version line and one
@@ -78,8 +81,7 @@ func versionGraphRepo(t *testing.T, withCatalog bool) string {
 		{"config", "commit.gpgsign", "false"}, {"checkout", "-b", "main"},
 		{"add", "-A"}, {"commit", "-m", "feat: the workspace"},
 	} {
-		cmd := exec.Command(gitread.Executable(), args...)
-		cmd.Dir = dir
+		cmd := gittest.Command(dir, args...)
 		if out, err := cmd.CombinedOutput(); err != nil {
 			t.Fatalf("git %v: %v\n%s", args, err, out)
 		}

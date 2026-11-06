@@ -6,7 +6,6 @@ import (
 	"io/fs"
 	"maps"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -15,7 +14,7 @@ import (
 
 	protocolcli "go.putnami.dev/protocol/cli"
 	wsproto "go.putnami.dev/protocol/workspace"
-	"go.putnami.dev/sdk/extension/gitread"
+	"go.putnami.dev/sdk/extension/gittest"
 	"go.putnami.dev/tooling/cli/internal/cmderr"
 	"go.putnami.dev/tooling/cli/internal/iox"
 	"go.putnami.dev/tooling/cli/internal/mapgen"
@@ -254,15 +253,15 @@ func TestContextMapCommand_ProjectsNarrowThePrintedMap(t *testing.T) {
 	}
 }
 
-// TestContextMapCommand_ImpactedNarrowsThePrintedMap pins --impacted: an edit
-// to one project prints only the projects it impacts, and an empty impacted set
-// prints a map with no project rather than failing.
-func TestContextMapCommand_ImpactedNarrowsThePrintedMap(t *testing.T) {
-	spectest.Proves(t, "cli/context-discovery", "workspace-map", "a-selection-narrows-the-printed-map")
-	root := mapCommandWorkspace(t)
+// commitMapFixture commits every file of root, and the ignore file for
+// .putnami, in a new repository.
+func commitMapFixture(t *testing.T, root string) {
+	t.Helper()
 	runGit := func(args ...string) {
 		t.Helper()
-		if output, err := exec.Command(gitread.Executable(), append([]string{"-C", root}, args...)...).CombinedOutput(); err != nil {
+		command := gittest.Command(root, args...)
+		command.Env = gittest.Environ(os.Environ())
+		if output, err := command.CombinedOutput(); err != nil {
 			t.Fatalf("git %v: %v\n%s", args, err, output)
 		}
 	}
@@ -271,6 +270,23 @@ func TestContextMapCommand_ImpactedNarrowsThePrintedMap(t *testing.T) {
 	runGit("add", "-A")
 	runGit("-c", "user.name=Putnami Tests", "-c", "user.email=tests@putnami.dev", "-c", "commit.gpgsign=false",
 		"commit", "--quiet", "-m", "fixture")
+}
+
+func TestMapFixtureIsTheSameOnAForeignMachine(t *testing.T) {
+	gittest.AssertMachineIndependent(t, func() string {
+		root := mapCommandWorkspace(t)
+		commitMapFixture(t, root)
+		return root
+	})
+}
+
+// TestContextMapCommand_ImpactedNarrowsThePrintedMap pins --impacted: an edit
+// to one project prints only the projects it impacts, and an empty impacted set
+// prints a map with no project rather than failing.
+func TestContextMapCommand_ImpactedNarrowsThePrintedMap(t *testing.T) {
+	spectest.Proves(t, "cli/context-discovery", "workspace-map", "a-selection-narrows-the-printed-map")
+	root := mapCommandWorkspace(t)
+	commitMapFixture(t, root)
 
 	empty, _ := printedMapDocument(t, printContextMap(t, root, ContextMapOptions{Impacted: true, Baseline: "HEAD", OutputFormat: "jsonl"}))
 	if ids := printedProjectIDs(empty); len(ids) != 0 {

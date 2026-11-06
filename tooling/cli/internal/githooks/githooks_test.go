@@ -11,7 +11,7 @@ import (
 	"strings"
 	"testing"
 
-	"go.putnami.dev/sdk/extension/gitread"
+	"go.putnami.dev/sdk/extension/gittest"
 	"go.putnami.dev/sdk/extension/pkgmeta"
 )
 
@@ -67,13 +67,49 @@ func TestRunCommitMsg(t *testing.T) {
 	}
 }
 
+// hooksRepo is an empty repository.
+func hooksRepo(t *testing.T) string {
+	t.Helper()
+	repo := t.TempDir()
+	gitRun(t, repo, "init")
+	return repo
+}
+
+// stagedNamesRepo is a repository on the branch work, with an identity and
+// git's default quoting of non-ASCII names.
+func stagedNamesRepo(t *testing.T) string {
+	t.Helper()
+	repo := hooksRepo(t)
+	gitRun(t, repo, "symbolic-ref", "HEAD", "refs/heads/work") // the hook refuses main before it looks at files
+	gitRun(t, repo, "config", "user.name", "Test")
+	gitRun(t, repo, "config", "user.email", "test@example.com")
+	gitRun(t, repo, "config", "core.quotePath", "true") // git's default: a non-ASCII name prints as "caf\303\251.bin"
+	return repo
+}
+
+func gitRun(t *testing.T, repo string, args ...string) {
+	t.Helper()
+	if out, err := gittest.Command(repo, args...).CombinedOutput(); err != nil {
+		t.Fatalf("git %s: %v\n%s", strings.Join(args, " "), err, out)
+	}
+}
+
+func TestHooksRepoIsTheSameOnAForeignMachine(t *testing.T) {
+	gittest.AssertMachineIndependent(t, func() string { return hooksRepo(t) })
+	gittest.AssertMachineIndependent(t, func() string {
+		repo := stagedNamesRepo(t)
+		if err := os.WriteFile(filepath.Join(repo, "a b.bin"), []byte("x"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		gitRun(t, repo, "add", "--", "a b.bin")
+		return repo
+	})
+}
+
 func TestInstall_WritesHooks(t *testing.T) {
 	t.Setenv("CI", "") // Install is a no-op when CI=true
 
-	repo := t.TempDir()
-	if out, err := exec.Command(gitread.Executable(), "-C", repo, "init").CombinedOutput(); err != nil {
-		t.Fatalf("git init: %v\n%s", err, out)
-	}
+	repo := hooksRepo(t)
 	t.Chdir(repo)
 
 	Install("/path/to/putnami")
@@ -109,18 +145,7 @@ func TestInstall_PreCommitHookChecksEveryStagedFileName(t *testing.T) {
 	}
 	t.Setenv("CI", "")
 
-	repo := t.TempDir()
-	run := func(args ...string) {
-		t.Helper()
-		if out, err := exec.Command(gitread.Executable(), append([]string{"-C", repo}, args...)...).CombinedOutput(); err != nil {
-			t.Fatalf("git %s: %v\n%s", strings.Join(args, " "), err, out)
-		}
-	}
-	run("init")
-	run("symbolic-ref", "HEAD", "refs/heads/work") // the hook refuses main before it looks at files
-	run("config", "user.name", "Test")
-	run("config", "user.email", "test@example.com")
-	run("config", "core.quotePath", "true") // git's default: a non-ASCII name prints as "caf\303\251.bin"
+	repo := stagedNamesRepo(t)
 
 	names := []string{"a b.bin", "café.bin", "star*.bin"}
 	for _, name := range names {
@@ -132,13 +157,14 @@ func TestInstall_PreCommitHookChecksEveryStagedFileName(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	run(append([]string{"add", "--"}, names...)...)
+	gitRun(t, repo, append([]string{"add", "--"}, names...)...)
 	t.Chdir(repo)
 
 	Install("/path/to/putnami")
 
 	cmd := exec.Command("sh", filepath.Join(repo, ".git", "hooks", "pre-commit"))
 	cmd.Dir = repo
+	cmd.Env = gittest.Environ(os.Environ()) // the git the hook runs reads the fixture, not the caller's environment
 	out, err := cmd.CombinedOutput()
 	var exit *exec.ExitError
 	if !errors.As(err, &exit) || exit.ExitCode() != 1 {
@@ -162,10 +188,7 @@ func TestInstall_PreCommitHookChecksEveryStagedFileName(t *testing.T) {
 func TestInstall_CommitMsgHookPrefersTheWorkspaceEngineLink(t *testing.T) {
 	t.Setenv("CI", "")
 
-	repo := t.TempDir()
-	if out, err := exec.Command(gitread.Executable(), "-C", repo, "init").CombinedOutput(); err != nil {
-		t.Fatalf("git init: %v\n%s", err, out)
-	}
+	repo := hooksRepo(t)
 	binDir := filepath.Join(repo, ".putnami", "bin")
 	if err := os.MkdirAll(binDir, 0o755); err != nil {
 		t.Fatal(err)
@@ -198,10 +221,7 @@ func TestInstall_CommitMsgHookPrefersTheWorkspaceEngineLink(t *testing.T) {
 func TestInstall_CommitMsgHookFallsBackToTheRunningBinary(t *testing.T) {
 	t.Setenv("CI", "")
 
-	repo := t.TempDir()
-	if out, err := exec.Command(gitread.Executable(), "-C", repo, "init").CombinedOutput(); err != nil {
-		t.Fatalf("git init: %v\n%s", err, out)
-	}
+	repo := hooksRepo(t)
 	t.Chdir(repo)
 
 	Install("/usr/local/bin/putnami")

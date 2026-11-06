@@ -5,18 +5,16 @@ import (
 	"testing"
 
 	jobmodel "go.putnami.dev/cli/model/jobs"
+	"go.putnami.dev/sdk/extension/gittest"
 	"go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/store"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
 
-// A task keyed on the Git candidate cut reads the workspace membership from its
-// context, so its key moves with the membership even when no candidate file
-// moves: a project that user config or an ignored scope manifest adds is a
-// different set of projects to judge. A task keyed on ordinary workspace files
-// does not read the membership that way, and its key stays put.
-func TestCandidateCutKeyMovesWithTheMembership(t *testing.T) {
-	t.Parallel()
+// candidateCutRepo is a repository that commits app/main.go and shared.lock,
+// and ignores the tool directory.
+func candidateCutRepo(t *testing.T) string {
+	t.Helper()
 	root := t.TempDir()
 	treeKeyedGit(t, root, "init", "-q", "-b", "main")
 	writeFileAt(t, filepath.Join(root, "app", "main.go"), "package main\n")
@@ -25,6 +23,21 @@ func TestCandidateCutKeyMovesWithTheMembership(t *testing.T) {
 	writeFileAt(t, filepath.Join(root, "tool", "main.go"), "package main\n")
 	treeKeyedGit(t, root, "add", "-A")
 	treeKeyedGit(t, root, "commit", "-q", "-m", "init")
+	return root
+}
+
+func TestCandidateCutRepoIsTheSameOnAForeignMachine(t *testing.T) {
+	gittest.AssertMachineIndependent(t, func() string { return candidateCutRepo(t) })
+}
+
+// A task keyed on the Git candidate cut reads the workspace membership from its
+// context, so its key moves with the membership even when no candidate file
+// moves: a project that user config or an ignored scope manifest adds is a
+// different set of projects to judge. A task keyed on ordinary workspace files
+// does not read the membership that way, and its key stays put.
+func TestCandidateCutKeyMovesWithTheMembership(t *testing.T) {
+	t.Parallel()
+	root := candidateCutRepo(t)
 
 	ext := &extension.ExtensionDescription{Name: "@test/ext", Tasks: map[string]extension.TaskDefinition{"check": {}}}
 	// A `git:` pattern reaches the key from the workspace, the project or the

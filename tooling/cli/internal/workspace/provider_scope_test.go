@@ -8,7 +8,7 @@ import (
 	"testing"
 
 	extproto "go.putnami.dev/protocol/extension"
-	"go.putnami.dev/sdk/extension/gitread"
+	"go.putnami.dev/sdk/extension/gittest"
 )
 
 func TestNewProviderScope_NormalizesAndSorts(t *testing.T) {
@@ -318,13 +318,46 @@ func initGitRepo(t *testing.T, root string) {
 		t.Skip("git not available; gitignore exclusion is untestable here")
 	}
 	for _, args := range [][]string{{"init"}, {"add", "-A"}} {
-		cmd := exec.Command(gitread.Executable(), args...)
-		cmd.Dir = root
-		cmd.Env = append(os.Environ(), "GIT_CONFIG_GLOBAL=/dev/null", "GIT_CONFIG_SYSTEM=/dev/null")
-		if out, err := cmd.CombinedOutput(); err != nil {
-			t.Skipf("git %v failed: %v: %s", args, err, out)
+		if out, err := gittest.Command(root, args...).CombinedOutput(); err != nil {
+			t.Fatalf("git %v failed: %v: %s", args, err, out)
 		}
 	}
+}
+
+func TestInitGitRepoIsTheSameOnAForeignMachine(t *testing.T) {
+	gittest.AssertMachineIndependent(t, func() string {
+		root := t.TempDir()
+		writeFileAt(t, filepath.Join(root, "package.json"), "{}\n")
+		initGitRepo(t, root)
+		return root
+	})
+}
+
+// ignoredDirectoriesRepo is a repository that ignores web/node_modules, with a
+// source file under web/src and another under the ignored directory.
+func ignoredDirectoriesRepo(t *testing.T) string {
+	t.Helper()
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git not available; gitignore exclusion is untestable here")
+	}
+	root := t.TempDir()
+	for _, args := range [][]string{
+		{"init"},
+		{"config", "user.email", "test@example.com"},
+		{"config", "user.name", "test"},
+	} {
+		if out, err := gittest.Command(root, args...).CombinedOutput(); err != nil {
+			t.Fatalf("git %v failed: %v: %s", args, err, out)
+		}
+	}
+	writeFileAt(t, filepath.Join(root, ".gitignore"), "node_modules/\n")
+	writeFileAt(t, filepath.Join(root, "web", "src", "index.ts"), "export const a = 1\n")
+	writeFileAt(t, filepath.Join(root, "web", "node_modules", "dep", "index.ts"), "export const b = 1\n")
+	return root
+}
+
+func TestIgnoredDirectoriesRepoIsTheSameOnAForeignMachine(t *testing.T) {
+	gittest.AssertMachineIndependent(t, func() string { return ignoredDirectoriesRepo(t) })
 }
 
 // A recursive metadata input is a witness on the bytes a provider's answer is
@@ -334,21 +367,7 @@ func initGitRepo(t *testing.T, root string) {
 // `**/*.ts` does not walk `node_modules` and a cold clone agrees with a warm
 // checkout of the same commit.
 func TestGlobInput_SkipsGitIgnoredDirectories(t *testing.T) {
-	root := t.TempDir()
-	for _, args := range [][]string{
-		{"init"},
-		{"config", "user.email", "test@example.com"},
-		{"config", "user.name", "test"},
-	} {
-		cmd := exec.Command(gitread.Executable(), args...)
-		cmd.Dir = root
-		if out, err := cmd.CombinedOutput(); err != nil {
-			t.Skipf("git unavailable: %v: %s", err, out)
-		}
-	}
-	writeFileAt(t, filepath.Join(root, ".gitignore"), "node_modules/\n")
-	writeFileAt(t, filepath.Join(root, "web", "src", "index.ts"), "export const a = 1\n")
-	writeFileAt(t, filepath.Join(root, "web", "node_modules", "dep", "index.ts"), "export const b = 1\n")
+	root := ignoredDirectoriesRepo(t)
 
 	baseline := globInput(root, "web/**/*.ts")
 	if !inputStillMatches(root, baseline) {

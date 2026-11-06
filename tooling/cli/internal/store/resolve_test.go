@@ -2,14 +2,13 @@ package store
 
 import (
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 
 	workspace "go.putnami.dev/protocol/workspace"
-	"go.putnami.dev/sdk/extension/gitread"
+	"go.putnami.dev/sdk/extension/gittest"
 	"go.putnami.dev/tooling/cli/internal/hometest"
 )
 
@@ -115,8 +114,7 @@ func TestResolveStoreRoot_WorktreesShareStore(t *testing.T) {
 
 	repo := initStoreGitRepo(t)
 	wt := filepath.Join(t.TempDir(), "linked")
-	run := exec.Command(gitread.Executable(), "worktree", "add", "-b", "wt", wt)
-	run.Dir = repo
+	run := gittest.Command(repo, "worktree", "add", "-b", "wt", wt)
 	if out, err := run.CombinedOutput(); err != nil {
 		t.Fatalf("git worktree add: %v\n%s", err, out)
 	}
@@ -125,6 +123,10 @@ func TestResolveStoreRoot_WorktreesShareStore(t *testing.T) {
 	if a, b := ResolveStoreRoot(repo), ResolveStoreRoot(wt); a != b {
 		t.Errorf("worktrees resolved different stores:\n  main=%q\n  linked=%q", a, b)
 	}
+}
+
+func TestInitStoreGitRepoIsTheSameOnAForeignMachine(t *testing.T) {
+	gittest.AssertMachineIndependent(t, func() string { return initStoreGitRepo(t) })
 }
 
 func TestResolveStoreRoot_NonGitFallback(t *testing.T) {
@@ -246,8 +248,7 @@ func initStoreGitRepo(t *testing.T) string {
 		{"config", "commit.gpgsign", "false"},
 		{"checkout", "-b", "main"},
 	} {
-		cmd := exec.Command(gitread.Executable(), args...)
-		cmd.Dir = dir
+		cmd := gittest.Command(dir, args...)
 		if out, err := cmd.CombinedOutput(); err != nil {
 			t.Fatalf("git %v: %v\n%s", args, err, out)
 		}
@@ -256,8 +257,7 @@ func initStoreGitRepo(t *testing.T) string {
 		t.Fatal(err)
 	}
 	for _, args := range [][]string{{"add", "."}, {"commit", "-m", "init"}} {
-		cmd := exec.Command(gitread.Executable(), args...)
-		cmd.Dir = dir
+		cmd := gittest.Command(dir, args...)
 		if out, err := cmd.CombinedOutput(); err != nil {
 			t.Fatalf("git %v: %v\n%s", args, err, out)
 		}

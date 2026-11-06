@@ -17,7 +17,7 @@ import (
 
 	protocolcli "go.putnami.dev/protocol/cli"
 	wsproto "go.putnami.dev/protocol/workspace"
-	"go.putnami.dev/sdk/extension/gitread"
+	"go.putnami.dev/sdk/extension/gittest"
 	"go.putnami.dev/sdk/extension/pkgmeta"
 	"go.putnami.dev/tooling/cli/internal/extension"
 )
@@ -418,6 +418,18 @@ func devVersionFixture(t *testing.T) string {
 	return root
 }
 
+// TestDevVersionFixtureIsTheSameOnAForeignMachine builds the fixture, and the
+// fixture with an origin, on a machine that sets another identity, another
+// user configuration and a global ignore file.
+func TestDevVersionFixtureIsTheSameOnAForeignMachine(t *testing.T) {
+	gittest.AssertMachineIndependent(t, func() string { return devVersionFixture(t) })
+	gittest.AssertMachineIndependent(t, func() string {
+		root := devVersionFixture(t)
+		addDevVersionOrigin(t, root)
+		return root
+	})
+}
+
 // devVersionIdentity is the fixed author and committer of a fixture commit
 // or tag made at date.
 func devVersionIdentity(date string) []string {
@@ -439,13 +451,12 @@ func devVersionCommit(t *testing.T, root, date string, message ...string) {
 	devVersionGit(t, root, devVersionIdentity(date), args...)
 }
 
-// devVersionGit runs git in dir without global or system configuration,
-// with env added, and returns its output without trailing newlines.
+// devVersionGit runs git in dir without the caller's git environment, with
+// env added, and returns its output without trailing newlines.
 func devVersionGit(t *testing.T, dir string, env []string, args ...string) string {
 	t.Helper()
-	cmd := exec.Command(gitread.Executable(), args...)
-	cmd.Dir = dir
-	cmd.Env = append(append(os.Environ(), "GIT_CONFIG_GLOBAL="+os.DevNull, "GIT_CONFIG_NOSYSTEM=1", "LC_ALL=C"), env...)
+	cmd := gittest.Command(dir, args...)
+	cmd.Env = append(append(cmd.Env, "LC_ALL=C"), env...)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		t.Fatalf("git %v: %v\n%s", args, err, out)

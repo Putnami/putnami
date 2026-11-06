@@ -15,6 +15,7 @@ import (
 
 	collab "go.putnami.dev/protocol/collaboration"
 	"go.putnami.dev/protocol/features/spectest"
+	"go.putnami.dev/sdk/extension/gittest"
 )
 
 // recordFinalizeEnv names the putnami binary a recording run takes the
@@ -164,6 +165,14 @@ type finalizeTwin struct {
 	env                         []string
 }
 
+// finalizeTwinIdentity is the author, the committer and the date of every
+// commit of the fixture, in the run's environment and in the fixture's git.
+var finalizeTwinIdentity = []string{
+	"GIT_AUTHOR_NAME=Finalize Test", "GIT_AUTHOR_EMAIL=finalize-test@example.com",
+	"GIT_COMMITTER_NAME=Finalize Test", "GIT_COMMITTER_EMAIL=finalize-test@example.com",
+	"GIT_AUTHOR_DATE=2026-01-02T03:04:05Z", "GIT_COMMITTER_DATE=2026-01-02T03:04:05Z",
+}
+
 // finalizeTwinStore is the local provider's store below the workspace root.
 const finalizeTwinStore = ".putnami/collaboration/local/state.json"
 
@@ -187,11 +196,8 @@ func newFinalizeTwin(t *testing.T, harness, change string) finalizeTwin {
 	// Every commit, the draft seed included, has the same identity and date in
 	// every run, so every run pushes the same objects. The empty home keeps
 	// the user's Git configuration, such as commit signing, out of the run.
-	twin.env = append(os.Environ(), "PATH="+harness+string(os.PathListSeparator)+os.Getenv("PATH"),
-		"HOME="+home, "XDG_CONFIG_HOME="+filepath.Join(home, ".config"), "GIT_CONFIG_NOSYSTEM=1",
-		"GIT_AUTHOR_NAME=Finalize Test", "GIT_AUTHOR_EMAIL=finalize-test@example.com",
-		"GIT_COMMITTER_NAME=Finalize Test", "GIT_COMMITTER_EMAIL=finalize-test@example.com",
-		"GIT_AUTHOR_DATE=2026-01-02T03:04:05Z", "GIT_COMMITTER_DATE=2026-01-02T03:04:05Z")
+	twin.env = append(append(os.Environ(), "PATH="+harness+string(os.PathListSeparator)+os.Getenv("PATH"),
+		"HOME="+home, "XDG_CONFIG_HOME="+filepath.Join(home, ".config"), "GIT_CONFIG_NOSYSTEM=1"), finalizeTwinIdentity...)
 	binding := collab.Binding{Provider: "@putnami/local-collaboration", Version: 1,
 		Settings: json.RawMessage(`{"repository":"acme/app"}`)}
 	var extensions []string
@@ -221,7 +227,7 @@ func newFinalizeTwin(t *testing.T, harness, change string) finalizeTwin {
 	if err := os.WriteFile(twin.body, []byte("Read the second line of the fixture.\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	twin.run(t, dir, "git", "init", "-q", "--bare", twin.origin)
+	twin.gitIn(t, dir, "init", "-q", "--bare", twin.origin)
 	twin.git(t, "init", "-q", "-b", "main")
 	twin.git(t, "config", "commit.gpgSign", "false")
 	twin.git(t, "remote", "add", "origin", twin.origin)
@@ -234,6 +240,17 @@ func newFinalizeTwin(t *testing.T, harness, change string) finalizeTwin {
 		twin.git(t, "commit", "-q", "-am", "feat: read the second line")
 	}
 	return twin
+}
+
+func TestFinalizeTwinIsTheSameOnAForeignMachine(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("the harness launcher requires bash")
+	}
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skipf("finalize requires git: %v", err)
+	}
+	harness := collaborationHarness(t)
+	gittest.AssertMachineIndependent(t, func() string { return newFinalizeTwin(t, harness, "lib/source.txt").root })
 }
 
 // run runs a command in dir and fails the test when it fails.
@@ -249,9 +266,22 @@ func (w finalizeTwin) run(t *testing.T, dir, name string, args ...string) string
 	return strings.TrimSpace(string(output))
 }
 
+// git runs git in the workspace root without the caller's git environment, as
+// the fixture's author, at the fixture's date.
 func (w finalizeTwin) git(t *testing.T, args ...string) string {
 	t.Helper()
-	return w.run(t, w.root, "git", args...)
+	return w.gitIn(t, w.root, args...)
+}
+
+func (w finalizeTwin) gitIn(t *testing.T, dir string, args ...string) string {
+	t.Helper()
+	command := gittest.Command(dir, args...)
+	command.Env = append(command.Env, finalizeTwinIdentity...)
+	output, err := command.CombinedOutput()
+	if err != nil {
+		t.Fatalf("git %v: %v\n%s", args, err, output)
+	}
+	return strings.TrimSpace(string(output))
 }
 
 // createTask creates the task T-1 in the store and returns the store's
@@ -347,7 +377,7 @@ func (w finalizeTwin) message(t *testing.T, stderr, prefix string) string {
 // pushed lists the origin's refs and the objects they name.
 func (w finalizeTwin) pushed(t *testing.T) string {
 	t.Helper()
-	return w.run(t, w.root, "git", "--git-dir", w.origin, "for-each-ref", "--format=%(refname) %(objectname)")
+	return w.gitIn(t, w.root, "--git-dir", w.origin, "for-each-ref", "--format=%(refname) %(objectname)")
 }
 
 // store is the provider's state with every timestamp replaced, in a

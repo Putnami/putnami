@@ -14,7 +14,7 @@ import (
 
 	"go.putnami.dev/protocol/features/spectest"
 	runner "go.putnami.dev/protocol/runner"
-	"go.putnami.dev/sdk/extension/gitread"
+	"go.putnami.dev/sdk/extension/gittest"
 )
 
 func sourceFixture(t *testing.T) (string, *Store) {
@@ -34,9 +34,14 @@ func sourceFixture(t *testing.T) (string, *Store) {
 	return repo, store
 }
 
+func TestSourceFixtureIsTheSameOnAForeignMachine(t *testing.T) {
+	gittest.AssertMachineIndependent(t, func() string { repo, _ := sourceFixture(t); return repo })
+}
+
 func gitCmd(t *testing.T, repo string, args ...string) string {
 	t.Helper()
-	cmd := exec.Command(gitread.Executable(), append([]string{"-C", repo, "-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "-c", "commit.gpgsign=false", "-c", "core.hooksPath=/dev/null"}, args...)...)
+	cmd := gittest.Command(repo, append([]string{"-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "-c", "commit.gpgsign=false", "-c", "core.hooksPath=/dev/null"}, args...)...)
+	cmd.Env = gittest.Environ(os.Environ())
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		t.Fatalf("git %v: %v: %s", args, err, out)

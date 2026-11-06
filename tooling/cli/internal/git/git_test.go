@@ -2,7 +2,6 @@ package git
 
 import (
 	"os"
-	"os/exec"
 	"path/filepath"
 	"reflect"
 	"regexp"
@@ -14,6 +13,7 @@ import (
 
 	"go.putnami.dev/protocol/features/spectest"
 	"go.putnami.dev/sdk/extension/gitread"
+	"go.putnami.dev/sdk/extension/gittest"
 )
 
 func initGitRepo(t *testing.T) string {
@@ -21,15 +21,14 @@ func initGitRepo(t *testing.T) string {
 	dir := t.TempDir()
 
 	cmds := [][]string{
-		{"git", "init"},
-		{"git", "config", "user.email", "test@test.com"},
-		{"git", "config", "user.name", "Test"},
-		{"git", "config", "commit.gpgsign", "false"},
-		{"git", "checkout", "-b", "main"},
+		{"init"},
+		{"config", "user.email", "test@test.com"},
+		{"config", "user.name", "Test"},
+		{"config", "commit.gpgsign", "false"},
+		{"checkout", "-b", "main"},
 	}
 	for _, args := range cmds {
-		cmd := exec.Command(args[0], args[1:]...)
-		cmd.Dir = dir
+		cmd := gittest.Command(dir, args...)
 		if out, err := cmd.CombinedOutput(); err != nil {
 			t.Fatalf("git %v: %v\n%s", args, err, out)
 		}
@@ -40,13 +39,11 @@ func initGitRepo(t *testing.T) string {
 	if err := os.WriteFile(file, []byte("# Test"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	cmd := exec.Command(gitread.Executable(), "add", ".")
-	cmd.Dir = dir
+	cmd := gittest.Command(dir, "add", ".")
 	if out, err := cmd.CombinedOutput(); err != nil {
 		t.Fatalf("git add: %v\n%s", err, out)
 	}
-	cmd = exec.Command(gitread.Executable(), "commit", "-m", "initial")
-	cmd.Dir = dir
+	cmd = gittest.Command(dir, "commit", "-m", "initial")
 	if out, err := cmd.CombinedOutput(); err != nil {
 		t.Fatalf("git commit: %v\n%s", err, out)
 	}
@@ -54,10 +51,20 @@ func initGitRepo(t *testing.T) string {
 	return dir
 }
 
+func TestInitGitRepoIsTheSameOnAForeignMachine(t *testing.T) {
+	gittest.AssertMachineIndependent(t, func() string { return initGitRepo(t) })
+	gittest.AssertMachineIndependent(t, func() string {
+		dir := initGitRepo(t)
+		writeCommit(t, dir, "second.txt", "feat: second")
+		writeCommitWithBody(t, dir, "third.txt", "fix: third", "The body.")
+		commitAt(t, dir, "fourth.txt", "chore: fourth", "2026-01-02T03:04:05Z")
+		return dir
+	})
+}
+
 func runGit(t *testing.T, dir string, args ...string) string {
 	t.Helper()
-	cmd := exec.Command(gitread.Executable(), args...)
-	cmd.Dir = dir
+	cmd := gittest.Command(dir, args...)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		t.Fatalf("git %v: %v\n%s", args, err, out)
@@ -250,8 +257,7 @@ func TestCommonDir_WorktreesAgree(t *testing.T) {
 	// A linked worktree must resolve to the SAME common dir as the main
 	// checkout — this is what lets every worktree of a repo share one store.
 	wt := filepath.Join(t.TempDir(), "linked")
-	cmd := exec.Command(gitread.Executable(), "worktree", "add", "-b", "wt-branch", wt)
-	cmd.Dir = dir
+	cmd := gittest.Command(dir, "worktree", "add", "-b", "wt-branch", wt)
 	if out, err := cmd.CombinedOutput(); err != nil {
 		t.Fatalf("git worktree add: %v\n%s", err, out)
 	}
@@ -504,7 +510,7 @@ func TestGetVersionInfo_ShallowCloneIsRefused(t *testing.T) {
 	origin := initGitRepo(t)
 	writeCommit(t, origin, "second.txt", "chore: second")
 	shallow := filepath.Join(t.TempDir(), "shallow")
-	cmd := exec.Command(gitread.Executable(), "clone", "--depth", "1", "file://"+origin, shallow)
+	cmd := gittest.Command("", "clone", "--depth", "1", "file://"+origin, shallow)
 	if out, err := cmd.CombinedOutput(); err != nil {
 		t.Skipf("shallow clone unavailable in this environment: %v\n%s", err, out)
 	}
@@ -525,9 +531,8 @@ func TestGetVersionInfo_InvalidRepo(t *testing.T) {
 // gitDo runs one git command in dir and fails the test when it does not.
 func gitDo(t *testing.T, dir string, args ...string) {
 	t.Helper()
-	cmd := exec.Command(gitread.Executable(), args...)
-	cmd.Dir = dir
-	cmd.Env = append(os.Environ(), "GIT_COMMITTER_DATE=2026-01-02T03:04:05Z", "GIT_AUTHOR_DATE=2026-01-02T03:04:05Z")
+	cmd := gittest.Command(dir, args...)
+	cmd.Env = append(cmd.Env, "GIT_COMMITTER_DATE=2026-01-02T03:04:05Z", "GIT_AUTHOR_DATE=2026-01-02T03:04:05Z")
 	if out, err := cmd.CombinedOutput(); err != nil {
 		t.Fatalf("git %v: %v\n%s", args, err, out)
 	}
@@ -867,21 +872,18 @@ func TestDiffWorkingTree(t *testing.T) {
 	dir := initGitRepo(t)
 
 	// Create a feature branch and add a file
-	cmd := exec.Command(gitread.Executable(), "checkout", "-b", "feature")
-	cmd.Dir = dir
+	cmd := gittest.Command(dir, "checkout", "-b", "feature")
 	cmd.CombinedOutput()
 
 	newFile := filepath.Join(dir, "new.go")
 	if err := os.WriteFile(newFile, []byte("package main"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	cmd = exec.Command(gitread.Executable(), "add", "new.go")
-	cmd.Dir = dir
+	cmd = gittest.Command(dir, "add", "new.go")
 	if out, err := cmd.CombinedOutput(); err != nil {
 		t.Fatalf("git add: %v\n%s", err, out)
 	}
-	cmd = exec.Command(gitread.Executable(), "commit", "-m", "add new.go")
-	cmd.Dir = dir
+	cmd = gittest.Command(dir, "commit", "-m", "add new.go")
 	if out, err := cmd.CombinedOutput(); err != nil {
 		t.Fatalf("git commit: %v\n%s", err, out)
 	}
@@ -1150,10 +1152,9 @@ func TestGetVersionInfo_SuffixIsOrderedByCommitTime(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(dir, "next.txt"), []byte("next"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	for _, args := range [][]string{{"git", "add", "."}, {"git", "commit", "-m", "next"}} {
-		cmd := exec.Command(args[0], args[1:]...)
-		cmd.Dir = dir
-		cmd.Env = append(os.Environ(), "GIT_COMMITTER_DATE=2099-01-02T03:04:05Z", "GIT_AUTHOR_DATE=2099-01-02T03:04:05Z")
+	for _, args := range [][]string{{"add", "."}, {"commit", "-m", "next"}} {
+		cmd := gittest.Command(dir, args...)
+		cmd.Env = append(cmd.Env, "GIT_COMMITTER_DATE=2099-01-02T03:04:05Z", "GIT_AUTHOR_DATE=2099-01-02T03:04:05Z")
 		if out, err := cmd.CombinedOutput(); err != nil {
 			t.Fatalf("git %v: %v\n%s", args, err, out)
 		}

@@ -1,10 +1,11 @@
 package workspace
 
 import (
-	"os/exec"
 	"path/filepath"
 	"slices"
 	"testing"
+
+	"go.putnami.dev/sdk/extension/gittest"
 )
 
 // tsScanScope is the TypeScript adapter's declaration. A package.json marks a
@@ -24,20 +25,23 @@ func initScanRepo(t *testing.T) string {
 	t.Helper()
 	dir := t.TempDir()
 	cmds := [][]string{
-		{"git", "init"},
-		{"git", "config", "user.email", "test@test.com"},
-		{"git", "config", "user.name", "Test"},
-		{"git", "config", "commit.gpgsign", "false"},
-		{"git", "checkout", "-b", "main"},
+		{"init"},
+		{"config", "user.email", "test@test.com"},
+		{"config", "user.name", "Test"},
+		{"config", "commit.gpgsign", "false"},
+		{"checkout", "-b", "main"},
 	}
 	for _, args := range cmds {
-		cmd := exec.Command(args[0], args[1:]...)
-		cmd.Dir = dir
+		cmd := gittest.Command(dir, args...)
 		if out, err := cmd.CombinedOutput(); err != nil {
 			t.Fatalf("git %v: %v\n%s", args, err, out)
 		}
 	}
 	return dir
+}
+
+func TestInitScanRepoIsTheSameOnAForeignMachine(t *testing.T) {
+	gittest.AssertMachineIndependent(t, func() string { return initScanRepo(t) })
 }
 
 func TestScanProjectPaths_SkipsGitIgnoredDirs(t *testing.T) {

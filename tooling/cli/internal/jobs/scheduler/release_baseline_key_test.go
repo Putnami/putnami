@@ -9,6 +9,7 @@ import (
 
 	"go.putnami.dev/protocol/features/spectest"
 	wsproto "go.putnami.dev/protocol/workspace"
+	"go.putnami.dev/sdk/extension/gittest"
 	"go.putnami.dev/tooling/cli/internal/extension"
 	putnamigit "go.putnami.dev/tooling/cli/internal/git"
 	"go.putnami.dev/tooling/cli/internal/workspace"
@@ -50,6 +51,10 @@ func releaseBaselineHistory(t *testing.T, parent string) string {
 		"-m", "feat(api)!: replace A with B (#7)")
 	treeKeyedGit(t, root, "update-ref", "refs/heads/main", squash)
 	return root
+}
+
+func TestReleaseBaselineHistoryIsTheSameOnAForeignMachine(t *testing.T) {
+	gittest.AssertMachineIndependent(t, func() string { return releaseBaselineHistory(t, t.TempDir()) })
 }
 
 // openReleaseBaselineLane is openTreeKeyedLane for a checkout whose version

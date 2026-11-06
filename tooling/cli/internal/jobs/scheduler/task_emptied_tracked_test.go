@@ -10,6 +10,7 @@ import (
 
 	"go.putnami.dev/protocol/features/spectest"
 	"go.putnami.dev/sdk/extension/gitread"
+	"go.putnami.dev/sdk/extension/gittest"
 	"go.putnami.dev/tooling/cli/internal/extension"
 )
 
@@ -45,6 +46,10 @@ func newTrackedEmptiedFixture(t *testing.T, git bool) (*emptyingFixture, string)
 		treeKeyedGit(t, f.ws.Root, "init", "-q", "-b", "main")
 	}
 	return f, filepath.Join(f.gen, "clientgen")
+}
+
+func TestTrackedEmptiedFixtureIsTheSameOnAForeignMachine(t *testing.T) {
+	gittest.AssertMachineIndependent(t, func() string { f, _ := newTrackedEmptiedFixture(t, true); return f.ws.Root })
 }
 
 // heldTrackedFile is what the refusal says about a tracked file in the
