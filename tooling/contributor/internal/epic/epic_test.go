@@ -447,9 +447,8 @@ func TestASpentEnvelopeLaunchesNothing(t *testing.T) {
 		t.Fatalf("running %d, launchable %+v, text %q; want the ended session to free its slot", result.Running, result.Launchable, text)
 	}
 
-	// A ready child whose session ended frees its slot once missions is
-	// bound. Unbound, no mission is read, so the open proposal counts as a
-	// running session and nothing launches (#824).
+	// A ready child whose mission is not read holds a session; one whose
+	// session ended frees it.
 	p = newProvider()
 	p.proposals["b/read"] = proposal("101", "b/read", collab.ProposalStateOpen)
 	p.unsupported[collab.ContractMissions] = true
