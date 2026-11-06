@@ -11,6 +11,7 @@ import (
 	diag "go.putnami.dev/protocol/diagnostic"
 	"go.putnami.dev/protocol/features/spectest"
 	wsproto "go.putnami.dev/protocol/workspace"
+	"go.putnami.dev/tooling/observe/internal/detect/memberglob"
 )
 
 const feature = "tooling/observe-python"
@@ -396,8 +397,8 @@ func TestAnInvalidWorkspacePatternIsADiagnostic(t *testing.T) {
 		}
 	}
 	for pattern, want := range map[string]bool{"a/**": true, "./a/": true, "packages/./a": true, "x/../packages/a": true, "": false, ".": false, "a//b": false, "../a": false, "a/../../b": false} {
-		if _, ok := patternSegments(pattern); ok != want {
-			t.Errorf("patternSegments(%q) = %v, want %v", pattern, ok, want)
+		if _, ok := memberglob.Segments(pattern); ok != want {
+			t.Errorf("memberglob.Segments(%q) = %v, want %v", pattern, ok, want)
 		}
 	}
 }

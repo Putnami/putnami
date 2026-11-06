@@ -3,6 +3,7 @@ package components
 import (
 	"go.putnami.dev/protocol/evidence"
 	wsproto "go.putnami.dev/protocol/workspace"
+	"go.putnami.dev/tooling/observe/internal/detect/cargo"
 	"go.putnami.dev/tooling/observe/internal/detect/composer"
 	"go.putnami.dev/tooling/observe/internal/detect/pants"
 	"go.putnami.dev/tooling/observe/internal/detect/python"
@@ -19,7 +20,7 @@ type Options struct {
 
 // Default returns the detectors observe runs, orchestrators first.
 func Default(opts Options) []Detector {
-	return []Detector{NxDetector{}, PantsDetector{GraphFile: opts.PantsGraph}, NodeDetector{}, ComposerDetector{}, GoDetector{}, PythonDetector{}}
+	return []Detector{NxDetector{}, PantsDetector{GraphFile: opts.PantsGraph}, NodeDetector{}, ComposerDetector{}, GoDetector{}, PythonDetector{}, CargoDetector{}}
 }
 
 // fromProbe turns the projects of a probe answer into components.
@@ -132,6 +133,33 @@ func (d PantsDetector) Detect(root string) Found {
 				return lockdiff.ReadPEXLock(data)
 			}, true
 		}
+	}
+	return found
+}
+
+// CargoDetector adapts the Cargo detector: each Cargo workspace member is a
+// workspace component, each other Cargo.toml package a manifest one. It also
+// maps the test binary ids of cargo-nextest reports to their crates.
+type CargoDetector struct{}
+
+// Name implements Detector.
+func (CargoDetector) Name() string { return "cargo" }
+
+// Detect implements Detector.
+func (CargoDetector) Detect(root string) Found {
+	result := cargo.Detect(root)
+	found := Found{
+		Diagnostics: result.Diagnostics,
+		Components: fromProbe(result.Projects, func(p wsproto.ProbeProject) (Component, bool) {
+			source := evidence.SourceManifest
+			if meta, err := cargo.ReadMetadata(p); err == nil && meta.Source == cargo.SourceWorkspace {
+				source = evidence.SourceWorkspace
+			}
+			return Component{Ecosystem: cargo.Ecosystem, Source: source}, true
+		}),
+	}
+	if len(result.Projects) > 0 {
+		found.Locate = cargo.Locator(result)
 	}
 	return found
 }
