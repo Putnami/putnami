@@ -154,6 +154,11 @@ func TestKillProcessOnPort_KillsTheListenerAndNotItsClient(t *testing.T) {
 
 	// A SIGKILL sent to the client before this SIGTERM ends it first, so the
 	// signal that ended it tells whether kill-port reached it.
+	select {
+	case err := <-clientDone:
+		t.Fatalf("the client ended with %v before the SIGTERM: kill-port killed a process that does not listen on the port", err)
+	default:
+	}
 	if err := client.Process.Signal(syscall.SIGTERM); err != nil {
 		t.Fatalf("signal the client: %v", err)
 	}

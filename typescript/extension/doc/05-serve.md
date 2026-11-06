@@ -107,7 +107,7 @@ The serve command forwards `SIGINT` and `SIGTERM` to the child process. Signal e
 | `--entrypoint` | `string` | — | Explicit entrypoint file to serve. Overrides `./serve` export resolution |
 | `--watch` / `-w`, `--no-watch` | `boolean` | `true` | Auto-restart on file changes (Bun's built-in watch mode); `--no-watch` or `--watch=false` runs the server once, with no restarts |
 | `--port` | `number` | `3000` | Server port. Also exported as `PORT` env var to the application |
-| `--kill-port` | `boolean` | — | Kill the process listening on the port before starting; a client connected to the port keeps running. It asks `lsof`, and `fuser` only when `lsof` is absent. The BusyBox `lsof` of Alpine images ignores the query, so there it kills nothing. Not available on Windows: it prints a warning instead |
+| `--kill-port` | `boolean` | — | Kill the process listening on the port before starting; a client connected to the port keeps running. It asks `lsof`, and `fuser` only when `lsof` is absent; `fuser` selects by local port, so it also ends a process whose own connection has that local port. The BusyBox `lsof` of Alpine images ignores the query, so there it kills nothing. Not available on Windows: it prints a warning instead |
 | `--debug` | `boolean` | — | Set `LOG_LEVEL=debug` in the application environment |
 | `--inspect` | `boolean` | — | Activate Bun's debugger (WebSocket inspector) |
 | `--inspect-wait` | `boolean` | — | Activate debugger and wait for a connection before running |
