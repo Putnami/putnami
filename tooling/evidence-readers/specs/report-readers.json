@@ -4,6 +4,7 @@
   "feature": "evidence-readers/report-readers",
   "outcomes": [
     "Jest, Vitest, PHPUnit and gotestsum JUnit reports read into the same test cases, with the test file when the report names it.",
+    "The TRX report dotnet test writes for xUnit, NUnit and MSTest reads into the same test cases as a JUnit report, with the test assembly as suite.",
     "Istanbul, c8, V8, PHPUnit and go test coverage reads into the same line-level file coverage, so a consumer can measure the coverage of the lines a change touches.",
     "A missing, malformed or oversized report is one diagnostic with a stable code, and the reader never panics.",
     "CycloneDX and SPDX documents that osv-scanner, Trivy or Syft wrote read into the same packages, each with its package URL, licences and known vulnerabilities."
@@ -21,6 +22,10 @@
       "text": "ReadJUnit reads a testsuites or testsuite root, up to MaxSuiteDepth nested suites, into one case per testcase element in document order, with its name, classname, enclosing suites, file, line, duration in milliseconds and failure or skip. A case's file is its file attribute, else the one of its nearest enclosing suite that states one. A failure or error element fails the case, a skipped element skips it, and a case with neither passed."
     },
     {
+      "id": "trx-reads-every-result",
+      "text": "ReadTRX reads a TestRun root into one case per top-level UnitTestResult, in document order: its testName, the className of its TestMethod cut at the first comma, one suite named by the file name of the TestMethod's codeBase, and its duration. Passed, PassedButRunAborted, Completed and Warning pass; Failed fails; Error, Timeout and Aborted fail as an error; NotExecuted, Inconclusive, NotRunnable, Pending, Disconnected and InProgress skip. Totals are the ResultSummary counters; another outcome is malformed."
+    },
+    {
       "id": "coverage-reads-every-instrumented-line",
       "text": "The LCOV, Cobertura, Clover and Go cover readers return one entry per source file, in the order the report first names it, with its instrumented lines in increasing order and their hit counts. A line stated twice keeps its largest count. A file's totals are counted from its lines and functions; a file whose report lists none keeps the totals the report states (LCOV's LF, LH, FNF and FNH, a Clover file's methods metrics)."
     },
@@ -34,7 +39,7 @@
     },
     {
       "id": "malformed-reports-are-diagnostics",
-      "text": "A report that does not decode, whose root is not its format's, or that states an impossible value (a line below 1, a negative count, a malformed record, suites nested deeper than MaxSuiteDepth) returns no case and no file, and one error diagnostic of code readers.malformed. A report larger than MaxReportBytes, or whose files mark more than MaxLineMarks lines, returns readers.too_large, and ReadFile returns readers.missing for a file that does not exist. No input makes a reader panic."
+      "text": "A report that does not decode, whose root is not its format's, or that states an impossible value (a line below 1, a negative count, a malformed record, an unknown TRX outcome, suites nested deeper than MaxSuiteDepth) returns no case and no file, and one error diagnostic of code readers.malformed. A report larger than MaxReportBytes, or whose files mark more than MaxLineMarks lines, returns readers.too_large, and ReadFile returns readers.missing for a file that does not exist. No input makes a reader panic."
     },
     {
       "id": "cyclonedx-reads-components",

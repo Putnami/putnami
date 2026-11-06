@@ -8,6 +8,7 @@
     "evidence-readers/report-readers#junit-reads-every-case",
     "evidence-readers/report-readers#malformed-reports-are-diagnostics",
     "evidence-readers/report-readers#paths-as-the-report-states",
-    "evidence-readers/report-readers#spdx-reads-packages"
+    "evidence-readers/report-readers#spdx-reads-packages",
+    "evidence-readers/report-readers#trx-reads-every-result"
   ]
 }
