@@ -268,6 +268,7 @@
             "checks": [
               "a-test-goes-to-the-component-of-its-file-else-of-its-report",
               "a-pytest-case-goes-to-the-component-of-its-module-file",
+              "a-tojunit-case-goes-to-the-component-of-its-test-file",
               "coverage-goes-to-the-component-of-each-file"
             ]
           }
@@ -337,6 +338,7 @@
             "checks": [
               "a-cyclonedx-pair-gives-each-changed-dependency-its-facts",
               "a-pypi-package-url-matches-a-python-lockfile-change",
+              "a-pub-package-url-matches-a-pubspec-lock-change",
               "an-spdx-document-gives-licenses-and-advisories",
               "without-a-base-sbom-the-base-is-unknown",
               "the-summary-counts-the-vulnerabilities-per-dependency"
@@ -848,6 +850,87 @@
             "kind": "acceptance",
             "checks": [
               "the-bazel-demo-is-explained"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "tooling/observe-dart",
+      "type": "feature",
+      "name": "Find the packages of a Dart or Flutter repository that keeps its own CI",
+      "outcome": "putnami observe, in a Dart or Flutter repository without a Putnami workspace, knows one component per Dart package, from pub workspaces, melos and each pubspec.yaml, and the path and workspace dependencies between them, without running dart, flutter or melos, so a change to a shared package marks the apps that use it, the per-package coverage and the tojunit reports land on the right package, and a pubspec.lock bump is a dependency change",
+      "owner": "tooling",
+      "target": "modeled",
+      "requirements": [
+        {
+          "id": "dart-packages-are-components",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "pub-workspace-members-are-components",
+              "melos-packages-are-components",
+              "a-pubspec-outside-a-workspace-is-a-manifest-component",
+              "a-malformed-pubspec-is-a-diagnostic"
+            ]
+          }
+        },
+        {
+          "id": "dart-package-edges",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-path-dependency-is-an-edge",
+              "a-workspace-package-dependency-is-an-edge",
+              "a-git-sdk-or-hosted-dependency-is-no-edge"
+            ]
+          }
+        },
+        {
+          "id": "pub-lockfile",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-pubspec-lock-lists-its-hosted-packages"
+            ]
+          }
+        },
+        {
+          "id": "dart-package-reports",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-package-lcov-reads-from-the-package-directory",
+              "a-tojunit-class-name-names-its-test-file"
+            ]
+          }
+        },
+        {
+          "id": "dart-change-analysis",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-melos-demo-is-explained"
             ]
           }
         }

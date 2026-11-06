@@ -1,0 +1,42 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-spec.json",
+  "protocolVersion": 1,
+  "feature": "tooling/observe-dart",
+  "outcomes": [
+    "In a Dart or Flutter repository, each Dart package is a component, named by its directory and its pubspec name, without a Putnami file",
+    "A path dependency, and inside a pub workspace or a melos repository a dependency on another of its packages, is an edge, so a change to a shared package marks the apps that use it as dependent",
+    "The coverage/lcov.info that flutter test --coverage writes in each package and the JUnit report tojunit writes land on the right package, and a pubspec.lock bump is a dependency change"
+  ],
+  "nonGoals": [
+    "Running dart, flutter, pub or melos, or reading the pub cache, .dart_tool or pubspec_overrides.yaml",
+    "Computing the changed and dependent components, the tests and coverage per component, the changed-line coverage and the lockfile diff: the change analyses own them",
+    "The native iOS and Android projects of a Flutter app, which the Swift and Gradle detectors read",
+    "Serving the detector over the workspace probe wire or from its own extension: it lives in @putnami/observe"
+  ],
+  "requirements": [
+    {
+      "id": "dart-packages-are-components",
+      "text": "Past build, node_modules, Pods and hidden directories, each directory whose pubspec.yaml names a package is a component of ecosystem dart, named by its pubspec name. A member of the root pubspec.yaml workspace list, and a directory the root melos.yaml packages globs match less its ignore globs, are of source workspace; any other is of source manifest. A root pubspec.yaml that declares a workspace or sits beside melos.yaml is no component. A pubspec.yaml or melos.yaml that does not read is a diagnostic."
+    },
+    {
+      "id": "dart-package-edges",
+      "text": "A component depends on another when an entry of its dependencies, dev_dependencies or dependency_overrides gives a path that resolves to the other's directory, or, inside a pub workspace or a melos repository, when the entry names the other's package with no source of its own. A git, sdk or hosted source, a path outside the repository or to no component, and the component itself are no edge."
+    },
+    {
+      "id": "pub-lockfile",
+      "text": "pubspec.lock is a lockfile of ecosystem pub: each entry of its packages gives its name and version, and an entry of source path or sdk is the repository's own code or the SDK's and is no dependency. A lockfile that does not read is the observe.lockfile_unreadable warning. In a pub workspace the root pubspec.lock pins the packages of every member; it lies in no component, and its change names none."
+    },
+    {
+      "id": "dart-package-reports",
+      "text": "The paths of an LCOV report under a package, such as the coverage/lcov.info flutter test --coverage writes, read first from that package's directory. A JUnit case of a tojunit report, whose class name is its test file's path without _test.dart with each / written as a ., goes to the package that holds that file, else to the package that holds the report."
+    },
+    {
+      "id": "dart-change-analysis",
+      "text": "On a melos repository with apps/mobile, a Flutter app that depends on packages/pricing through a path, and packages/ui, where a change edits pricing and bumps a package in pubspec.lock, the analyses list the three packages with the edge to pricing, mark mobile dependent and ui unaffected; the coverage/lcov.info of each package and the tojunit report land on the packages, with no unattributed case and no unmapped file; and the bump is a pub dependency change."
+    }
+  ],
+  "decisions": [
+    "tooling/cli/doc/adr/0051-user-scope-extensions-run-without-a-workspace.md",
+    "protocols/evidence/doc/adr/0001-one-self-reported-change-evidence-document.md"
+  ]
+}
