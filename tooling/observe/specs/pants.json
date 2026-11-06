@@ -22,7 +22,7 @@
     },
     {
       "id": "pants-third-party-targets",
-      "text": "A third-party target, of type python_requirement, python_requirements, poetry_requirements, pipenv_requirements, pants_requirements, go_mod, go_third_party_package, jvm_artifact or node_third_party_package, and an internal target, whose type starts with _, make no component, with or without an export."
+      "text": "A third-party target, of type python_requirement, python_requirements, uv_requirements, poetry_requirements, pipenv_requirements, pants_requirements, go_mod, go_third_party_package, jvm_artifact, jvm_artifacts or node_third_party_package, and an internal target, whose type starts with _, make no component, with or without an export."
     },
     {
       "id": "pants-inferred-edges",
@@ -30,11 +30,11 @@
     },
     {
       "id": "pants-without-an-export",
-      "text": "Without an export, each directory that holds a BUILD or BUILD.* file declaring a target other than a third-party or internal one is a component of source workspace and ecosystem pants, with no edge. The walk skips dist, node_modules, __pycache__ and hidden directories. An info diagnostic observe.pants_graph_missing names the export command pants peek :: > pants-graph.json and the path it read."
+      "text": "Without an export, each directory that holds a BUILD or BUILD.* file declaring a target other than a third-party or internal one is a component of source workspace and ecosystem pants, with no edge. The walk skips dist, node_modules, __pycache__ and hidden directories. When the caller names no export, an info diagnostic observe.pants_graph_missing names the export command pants peek :: > pants-graph.json and the path it read."
     },
     {
       "id": "pants-graph-flag",
-      "text": "--pants-graph names the export, resolved against the invocation directory; without it the detector reads pants-graph.json at the repository root. The flag is declared in the extension manifest and needs a value."
+      "text": "--pants-graph names the export, resolved against the invocation directory; without it the detector reads pants-graph.json at the repository root. The flag is declared in the extension manifest and needs a value. A named export that is missing is the observe.pants_graph_missing warning, and the flag in a repository without pants.toml is the observe.pants_graph_unused warning."
     },
     {
       "id": "pants-resolve-lockfiles",
