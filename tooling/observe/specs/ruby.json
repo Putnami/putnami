@@ -9,7 +9,7 @@
   ],
   "nonGoals": [
     "Running Ruby, Bundler, Rails, packwerk or a test runner, or reading installed gems",
-    "Evaluating a Gemfile or a gemspec: they are read as text, so a gem a condition, a variable, eval_gemfile or a gemspec directive declares is no edge",
+    "Evaluating a Gemfile or a gemspec: they are read as text, so a gem entry counts whatever condition surrounds it, and a path or a name that a variable or an expression gives, an eval_gemfile and a gemspec directive are no edge",
     "Edges from constant references in the code, which packwerk check reads, and packwerk's own configuration in packwerk.yml",
     "gems.rb and gems.locked, the other names Bundler accepts",
     "Serving the detector over the workspace probe wire or from its own extension: it lives in @putnami/observe"
