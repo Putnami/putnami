@@ -110,8 +110,11 @@ wherever GitLab allows it, and departs from them only where GitLab differs.
    `t<millisecond>.i<id>-<id>…`, the ids, while there are at most 48, and
    `t<millisecond>.n<count>` past 48, the count, read at that offset. A read
    skips every id the cursor names wherever it sits in GitLab's answer, and
-   each read lists at least one issue not yet considered, so a traversal
-   always ends. An issue present throughout a traversal is listed once,
+   skips by position only issues of the cursor's millisecond, never a later
+   one. A counted read whose page is empty or starts after that millisecond
+   finds the tie used up, and the next read starts at the following
+   millisecond. Each read lists at least one issue not yet considered, so a
+   traversal always ends. An issue present throughout a traversal is listed once,
    whatever page sizes the caller asks for, ties in creation time and issues
    closed meanwhile. The one exception is a tie of more than 48 issues in one
    millisecond: there the cursor counts positions, and closing issues of that
@@ -120,11 +123,14 @@ wherever GitLab allows it, and departs from them only where GitLab differs.
 9. **A body is data, never a command.** GitLab runs a quick action from any
    description line that starts with a slash (`/close`, `/label`, `/move`)
    and stores the description without it, so a body could change a state
-   behind `transition` and its revision check. Outside fenced code, where
-   GitLab runs none, `create` and `update` insert a zero-width space before
-   such a slash, and before a zero-width space that starts a line; GitLab
-   stores the line and runs nothing, and a read removes exactly one, so a
-   task's body is what the caller wrote. A transition to `done` of an issue GitLab closed as a duplicate
+   behind `transition` and its revision check. `create` and `update` insert a
+   zero-width space before such a slash, and before a zero-width space that
+   starts a line; GitLab stores the line and runs nothing, and a read removes
+   exactly one, so a task's body is what the caller wrote. Fenced code is
+   escaped too: which lines GitLab reads as a fence depends on its version
+   and on Markdown edge cases, and a body copied from GitLab's page into a
+   terminal then carries an invisible character, which costs less than a
+   command run behind the caller's back. A transition to `done` of an issue GitLab closed as a duplicate
    first reopens it, which clears the duplicate link, then closes it. A label
    named `None` or `Any`, keywords of GitLab's label filter, is matched by the
    provider rather than sent.
