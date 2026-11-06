@@ -74,6 +74,16 @@ together. A normal delivery adds the policy's `publication.taskReference` line
 to the body and moves the task to `states.delivered` once the proposal is
 ready. Do this only when the mandated outcome is complete.
 
+A `taskReference` with `{url}` works with every provider. One with `{id}`,
+such as `Closes #{id}`, closes the task only when the proposal lands where the
+task lives, so the command renders it only when the proposals binding is bound
+to the provider that serves the tasks binding, and its settings locate the
+task's source: its `repository` or `project`, on its `host` or the code host's
+default host. A GitHub source reads `github:<owner>/<name>`, or
+`github:<host>/<owner>/<name>` on another host; a GitLab source reads
+`gitlab:<host>/<project path>`. Any other binding stops the run before any
+write: use `{url}`.
+
 `--partial-delivery` publishes one unit and leaves the task open: the body
 refers to the task without closing it, and the task keeps its state. The
 title, the body and every nonempty branch commit must hold no closing
