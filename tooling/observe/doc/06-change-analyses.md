@@ -12,7 +12,7 @@ Eight detectors read the repository:
 | Detector | Reads | Source |
 |---|---|---|
 | Nx | `graph.json` from `nx graph --file`, else `nx.json` and `project.json` | `orchestrator` for a graph export, `workspace` otherwise |
-| moon | `moon-graph.json` from `moon project-graph --json`, else `.moon/workspace.yml`, each `moon.yml` and `package.json` | `orchestrator` |
+| moon | `moon-graph.json` from `moon project-graph --json`, else `.moon/workspace.yml`, each `moon.yml` and `package.json` | `orchestrator` for a graph export, `workspace` otherwise |
 | Pants | `pants-graph.json` from `pants peek ::`, else the `BUILD` files, beside `pants.toml` | `orchestrator` for the export, `workspace` otherwise |
 | Node workspaces | `package.json` `workspaces`, `pnpm-workspace.yaml` | `workspace` |
 | Composer | each `composer.json` | `manifest` |

@@ -71,6 +71,9 @@ func TestTopLevelReadsTheValueOfOneKey(t *testing.T) {
 	if _, found, err := topLevel("tasks:\n  dependsOn: [x]\n", "dependsOn"); found || err != nil {
 		t.Fatalf("a nested key is read as a top-level one: %v %v", found, err)
 	}
+	if _, found, err := topLevel("id: a\n---\ndependsOn: [b]\n", "dependsOn"); found || err != nil {
+		t.Fatalf("a key of the second document is read: %v %v", found, err)
+	}
 	for name, text := range map[string]string{
 		"an alias":            "dependsOn: *deps\n",
 		"an unclosed list":    "dependsOn: [a, b\n",

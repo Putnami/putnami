@@ -10,18 +10,18 @@ import (
 // a YAML parser: it reads the lines of that key only, so the rest of the
 // document may use any YAML. The value is read as block or flow mappings
 // (map[string]any), sequences ([]any) and scalars (string, the text the
-// document writes after unquoting); an empty value is nil. Anchors, aliases,
-// tags and multi-document streams are an error. found is false when the
-// document has no such key.
+// document writes after unquoting); an empty value is nil. Anchors, aliases
+// and tags in that value are an error. Only the first document of a stream is
+// read. found is false when the document has no such key.
 func topLevel(text, key string) (value any, found bool, err error) {
 	lines := yamlLines(text)
 	for i := 0; i < len(lines); i++ {
 		l := lines[i]
+		if l.text == "..." || l.text == "---" && i > 0 {
+			break
+		}
 		if l.indent != 0 || l.text == "---" {
 			continue
-		}
-		if l.text == "..." {
-			break
 		}
 		k, rest, ok := splitKey(l.text)
 		if !ok || k != key {

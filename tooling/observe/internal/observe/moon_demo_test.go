@@ -71,28 +71,30 @@ func TestTheMoonWorkspaceIsExplainedWithAndWithoutAnExport(t *testing.T) {
 	if err := os.WriteFile(named, []byte(moonGraph), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	for name, run := range map[string]func() Observation{
-		"without an export": func() Observation { return observeMoon(t, moonBase, nil, "") },
-		"with moon-graph.json": func() Observation {
-			return observeMoon(t, moonBase, map[string]string{"moon-graph.json": moonGraph}, "")
-		},
-		"with an export --moon-graph names": func() Observation { return observeMoon(t, moonBase, nil, named) },
+	exported := map[string]string{"moon-graph.json": moonGraph}
+	for name, c := range map[string]struct {
+		run    func() Observation
+		source string
+	}{
+		"without an export":                 {func() Observation { return observeMoon(t, moonBase, nil, "") }, evidence.SourceWorkspace},
+		"with moon-graph.json":              {func() Observation { return observeMoon(t, moonBase, exported, "") }, evidence.SourceOrchestrator},
+		"with an export --moon-graph names": {func() Observation { return observeMoon(t, moonBase, nil, named) }, evidence.SourceOrchestrator},
 	} {
 		t.Run(name, func(t *testing.T) {
-			o := run()
+			o := c.run()
 			noWarnings(t, o)
 			want := []evidence.Component{
-				{ID: "apps/api", Name: "api", Ecosystem: "moon", Source: evidence.SourceOrchestrator, Impact: evidence.ImpactDependent, DependsOn: []string{"packages/pricing"}},
-				{ID: "apps/web", Name: "web", Ecosystem: "moon", Source: evidence.SourceOrchestrator, Impact: evidence.ImpactUnaffected},
-				{ID: "packages/pricing", Name: "pricing", Ecosystem: "moon", Source: evidence.SourceOrchestrator, Impact: evidence.ImpactChanged},
+				{ID: "apps/api", Name: "api", Ecosystem: "moon", Source: c.source, Impact: evidence.ImpactDependent, DependsOn: []string{"packages/pricing"}},
+				{ID: "apps/web", Name: "web", Ecosystem: "moon", Source: c.source, Impact: evidence.ImpactUnaffected},
+				{ID: "packages/pricing", Name: "pricing", Ecosystem: "moon", Source: c.source, Impact: evidence.ImpactChanged},
 			}
 			if !reflect.DeepEqual(o.Analysis.Components, want) {
 				t.Fatalf("components %+v, want %+v", o.Analysis.Components, want)
 			}
 			requireLines(t, summary(t, o),
 				"  components  1 changed, 1 dependent, 1 unaffected\n",
-				"    changed   packages/pricing (pricing) [moon, orchestrator]\n",
-				"    dependent apps/api (api) [moon, orchestrator], depends on packages/pricing\n",
+				"    changed   packages/pricing (pricing) [moon, "+c.source+"]\n",
+				"    dependent apps/api (api) [moon, "+c.source+"], depends on packages/pricing\n",
 			)
 			validEvidence(t, o)
 		})

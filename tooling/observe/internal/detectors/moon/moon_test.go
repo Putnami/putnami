@@ -200,6 +200,7 @@ func TestAMalformedMoonGraphExportFallsBackToTheConfiguration(t *testing.T) {
 		"nodes without source": `{"graph": {"nodes": [{"id": "api"}], "edges": []}}`,
 		"a dangling index":     `{"graph": {"nodes": [7], "edges": []}, "data": {}}`,
 		"an edge of strings":   `{"graph": {"nodes": [{"id": "api", "source": "apps/api"}], "edges": [["api", "web"]]}}`,
+		"no node":              `{"graph": {"nodes": [], "edges": []}}`,
 	} {
 		t.Run(name, func(t *testing.T) {
 			r := probe(t, tree(t, with(demo, map[string]string{"moon-graph.json": export})), Options{})
@@ -248,6 +249,11 @@ func TestGlobbedAndMappedProjectsAreComponents(t *testing.T) {
 		if r.Projects[2].SourceFile != "packages/pricing/moon.yml" || r.Projects[1].SourceFile != "" {
 			t.Errorf("source files %q %q", r.Projects[2].SourceFile, r.Projects[1].SourceFile)
 		}
+		for _, p := range r.Projects {
+			if m, ok := ReadMetadata(p); !ok || m.Source != evidence.SourceWorkspace || m.Name != p.SourceName {
+				t.Errorf("%s metadata %+v", p.Path, m)
+			}
+		}
 		want := []string{WorkspaceFile}
 		if !reflect.DeepEqual(r.WatchedFiles, want) {
 			t.Errorf("watched %v", r.WatchedFiles)
@@ -278,6 +284,16 @@ func TestGlobbedAndMappedProjectsAreComponents(t *testing.T) {
 			workspace: "projects:\n  globs: ['.', 'apps/*']\n  sources:\n    gateway: apps/api\n",
 			files:     map[string]string{"apps/api/x": "", "apps/web/x": ""},
 			want:      []string{".=", "apps/api=gateway", "apps/web=web"},
+		},
+		"globFormat source-path names a globbed project by its path": {
+			workspace: "projects:\n  globs: ['apps/*', 'packages/*']\n  globFormat: 'source-path'\n  sources:\n    core: libs/core\n",
+			files:     map[string]string{"apps/api/moon.yml": "dependsOn: ['packages/types']\n", "packages/types/x": "", "libs/core/x": ""},
+			want:      []string{"apps/api=apps/api", "libs/core=core", "packages/types=packages/types"},
+		},
+		"globFormat dir-name": {
+			workspace: "projects:\n  globs: ['apps/*']\n  globFormat: dir-name\n",
+			files:     map[string]string{"apps/api/x": ""},
+			want:      []string{"apps/api=api"},
 		},
 		"a moon.yml id renames its project": {
 			workspace: "projects:\n- apps/*\n",
@@ -328,6 +344,7 @@ func TestAMalformedWorkspaceYMLIsAWarningWithNoProject(t *testing.T) {
 		"an alias":                 "projects: *all\n",
 		"a glob that is no string": "projects:\n  - [apps]\n",
 		"a source that is no path": "projects:\n  api: [apps/api]\n",
+		"an unknown globFormat":    "projects:\n  globs: ['apps/*']\n  globFormat: 'kebab'\n",
 	} {
 		t.Run(name, func(t *testing.T) {
 			r := probe(t, tree(t, with(demo, map[string]string{WorkspaceFile: text})), Options{})
@@ -358,7 +375,19 @@ func TestDependsOnAndPackageDependenciesAreEdges(t *testing.T) {
 		"libs/auth/Cargo.toml":  "[package]\nname = \"auth\"\n",
 		"libs/ui/package.json":  `{"name": "@demo/ui"}`,
 		// A package dependency on another project's package, and a registry one.
-		"apps/web/package.json":   `{"name": "@demo/web", "dependencies": {"@demo/ui": "workspace:*", "react": "19.0.0"}}`,
+		"apps/web/package.json": `{"name": "@demo/web", "dependencies": {"@demo/ui": "workspace:*", "react": "19.0.0"}}`,
+		// Task deps on another project's task, and targets that name no other project.
+		"apps/web/moon.yml": `tasks:
+  build:
+    command: 'vite build'
+    deps: ['tools:build', '^:build', '~:lint', 'lint', ':check', '#lib:build', 'web:test']
+  generate:
+    deps:
+      - target: 'codegen:run'
+        args: ['--all']
+`,
+		"libs/tools/x":            "",
+		"libs/codegen/x":          "",
 		"apps/admin/moon.yml":     "dependsOn: [web]\n",
 		"apps/admin/package.json": `{"name": "admin", "devDependencies": {"@demo/web": "*"}}`,
 	}
@@ -367,8 +396,10 @@ func TestDependsOnAndPackageDependenciesAreEdges(t *testing.T) {
 	want := map[string][]string{
 		"apps/admin":   {"apps/web"},
 		"apps/api":     {"libs/auth", "libs/pricing", "libs/ui"},
-		"apps/web":     {"libs/ui"},
+		"apps/web":     {"libs/codegen", "libs/tools", "libs/ui"},
 		"libs/auth":    nil,
+		"libs/codegen": nil,
+		"libs/tools":   nil,
 		"libs/pricing": nil,
 		"libs/ui":      nil,
 	}
@@ -388,10 +419,30 @@ func TestDependsOnAndPackageDependenciesAreEdges(t *testing.T) {
 			t.Fatalf("codes = %v", got)
 		}
 	})
+	t.Run("tasks that do not read cost the task edges only", func(t *testing.T) {
+		r := probe(t, tree(t, with(files, map[string]string{"apps/web/moon.yml": "dependsOn: ['tools']\ntasks:\n  build:\n    <<: *defaults\n    deps: ['codegen:run']\n"})), Options{})
+		if deps := edges(r)["apps/web"]; !reflect.DeepEqual(deps, []string{"libs/tools", "libs/ui"}) {
+			t.Fatalf("web = %v", deps)
+		}
+		if got := codes(r); !reflect.DeepEqual(got, []string{CodeManifestUnreadable}) {
+			t.Fatalf("codes = %v", got)
+		}
+	})
+	t.Run("the root project is no edge, as moon links none", func(t *testing.T) {
+		r := probe(t, tree(t, map[string]string{
+			WorkspaceFile:     "projects:\n  globs: ['apps/*']\n  sources:\n    root: '.'\n",
+			"apps/a/moon.yml": "dependsOn: ['root', 'b']\ntasks:\n  build:\n    deps: ['root:build']\n",
+			"apps/b/x":        "",
+		}), Options{})
+		noDiagnostics(t, r)
+		if got := edges(r); !reflect.DeepEqual(got, map[string][]string{".": nil, "apps/a": {"apps/b"}, "apps/b": nil}) {
+			t.Fatalf("edges = %v", got)
+		}
+	})
 	t.Run("a package.json that does not read keeps its project without package edges", func(t *testing.T) {
 		r := probe(t, tree(t, with(files, map[string]string{"apps/web/package.json": "{"})), Options{})
-		if deps, ok := edges(r)["apps/web"]; !ok || deps != nil {
-			t.Fatalf("web = %v (%v)", deps, ok)
+		if deps := edges(r)["apps/web"]; !reflect.DeepEqual(deps, []string{"libs/codegen", "libs/tools"}) {
+			t.Fatalf("web keeps only its task edges: %v", deps)
 		}
 		if got := codes(r); !reflect.DeepEqual(got, []string{CodeManifestUnreadable}) {
 			t.Fatalf("codes = %v", got)

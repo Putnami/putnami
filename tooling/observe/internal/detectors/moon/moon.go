@@ -6,7 +6,9 @@
 // a root .moon/workspace.yml makes the repository a moon workspace: its
 // projects setting, each project's moon.yml and the package.json dependencies
 // between projects are read statically. A project is a component whatever its
-// language, with or without a package.json. The answer is a workspace probe
+// language, with or without a package.json. A project of the export is an
+// orchestrator component, one of the configuration a workspace component. The
+// answer is a workspace probe
 // result, so the detector can move to an extension of its own without a
 // contract change.
 package moon
@@ -59,7 +61,8 @@ type Metadata struct {
 	Name string `json:"name"`
 	// Ecosystem is always "moon".
 	Ecosystem string `json:"ecosystem"`
-	// Source is always evidence.SourceOrchestrator.
+	// Source is evidence.SourceOrchestrator for a graph export and
+	// evidence.SourceWorkspace for the moon configuration.
 	Source string `json:"source"`
 }
 
@@ -122,15 +125,16 @@ type project struct {
 	alias      string
 	sourceFile string
 	declared   []any
+	taskDeps   []string
 	packages   []string
 	deps       []string
 	watched    []string
 }
 
-func (d *detector) probeProjects(projects []*project) []workspace.ProbeProject {
+func (d *detector) probeProjects(projects []*project, source string) []workspace.ProbeProject {
 	out := make([]workspace.ProbeProject, 0, len(projects))
 	for _, p := range projects {
-		metadata, _ := json.Marshal(Metadata{Name: p.id, Ecosystem: Ecosystem, Source: evidence.SourceOrchestrator})
+		metadata, _ := json.Marshal(Metadata{Name: p.id, Ecosystem: Ecosystem, Source: source})
 		out = append(out, workspace.ProbeProject{
 			Path:         p.dir,
 			SourceName:   p.id,
@@ -231,7 +235,7 @@ func (d *detector) fromGraph(named string) ([]workspace.ProbeProject, []string, 
 	if exists(d.root, WorkspaceFile) {
 		watched = append(watched, WorkspaceFile)
 	}
-	return d.probeProjects(projects), watched, true
+	return d.probeProjects(projects, evidence.SourceOrchestrator), watched, true
 }
 
 type exportEdge struct {
@@ -267,7 +271,7 @@ func decodeExport(data []byte) ([]exportProject, []exportEdge, error) {
 		}
 		sourced = sourced || nodes[i].Source != ""
 	}
-	if !sourced && len(nodes) > 0 {
+	if !sourced {
 		return nil, nil, errors.New("its nodes name no project source")
 	}
 	var edges []exportEdge
@@ -305,7 +309,7 @@ func (d *detector) fromConfiguration() ([]workspace.ProbeProject, []string) {
 		projects, err = d.workspaceProjects(string(data))
 		if err == nil {
 			d.edges(projects)
-			return d.probeProjects(projects), []string{WorkspaceFile}
+			return d.probeProjects(projects, evidence.SourceWorkspace), []string{WorkspaceFile}
 		}
 	}
 	d.warn(CodeWorkspaceUnreadable, WorkspaceFile, "%s cannot be read: %v; the repository is left to the other detectors", WorkspaceFile, err)
@@ -313,14 +317,16 @@ func (d *detector) fromConfiguration() ([]workspace.ProbeProject, []string) {
 }
 
 // workspaceProjects reads the projects setting: a list of globs, a map of
-// project id to directory, or both under globs and sources. Mapped projects
-// come first, so a glob never takes a mapped directory.
+// project id to directory, or both under globs and sources, with globFormat
+// naming a globbed project by its directory name or its path. Mapped
+// projects come first, so a glob never takes a mapped directory.
 func (d *detector) workspaceProjects(text string) ([]*project, error) {
 	value, _, err := topLevel(text, "projects")
 	if err != nil {
 		return nil, err
 	}
 	var globs []string
+	byPath := false
 	sources := map[string]string{}
 	switch v := value.(type) {
 	case nil:
@@ -337,6 +343,13 @@ func (d *detector) workspaceProjects(text string) ([]*project, error) {
 				return nil, err
 			}
 			mapped, _ = v["sources"].(map[string]any)
+			switch format := v["globFormat"]; format {
+			case nil, "dir-name":
+			case "source-path":
+				byPath = true
+			default:
+				return nil, fmt.Errorf("projects.globFormat %v is neither dir-name nor source-path", format)
+			}
 		}
 		for id, dir := range mapped {
 			s, ok := dir.(string)
@@ -380,6 +393,9 @@ func (d *detector) workspaceProjects(text string) ([]*project, error) {
 			continue
 		}
 		id := path.Base(dir)
+		if byPath {
+			id = dir
+		}
 		if dir == workspace.ProbeRootPath {
 			id = filepath.Base(d.root)
 		}
@@ -475,7 +491,7 @@ func (d *detector) edges(projects []*project) {
 	}
 	for _, p := range projects {
 		link := func(target *project) {
-			if target != nil && target != p && !slices.Contains(p.deps, target.dir) {
+			if target != nil && target != p && target.dir != workspace.ProbeRootPath && !slices.Contains(p.deps, target.dir) {
 				p.deps = append(p.deps, target.dir)
 			}
 		}
@@ -489,13 +505,17 @@ func (d *detector) edges(projects []*project) {
 				}
 			}
 		}
+		for _, name := range p.taskDeps {
+			link(resolve(name))
+		}
 		for _, name := range p.packages {
 			link(byAlias[name])
 		}
 	}
 }
 
-// readProjectFile reads the id and dependsOn of a project's moon.yml.
+// readProjectFile reads the id, the dependsOn and the task deps of a
+// project's moon.yml. Tasks that do not read cost the task edges only.
 func (d *detector) readProjectFile(p *project) {
 	rel := path.Join(p.dir, ProjectFile)
 	data, err := os.ReadFile(filepath.Join(d.root, filepath.FromSlash(rel)))
@@ -509,6 +529,10 @@ func (d *detector) readProjectFile(p *project) {
 	}
 	if err != nil {
 		d.warn(CodeManifestUnreadable, rel, "%s cannot be read: %v; project %s keeps no declared edge", rel, err, p.id)
+		return
+	}
+	if err := p.readTaskDeps(string(data)); err != nil {
+		d.warn(CodeManifestUnreadable, rel, "the tasks of %s cannot be read: %v; project %s keeps no task edge", rel, err, p.id)
 	}
 }
 
@@ -530,6 +554,39 @@ func (p *project) readProjectConfig(text string) error {
 	}
 	if s, ok := id.(string); ok && s != "" {
 		p.id = s
+	}
+	return nil
+}
+
+// readTaskDeps reads the projects the deps of each task name: a target
+// <project>:<task>, as a string or as an object with a target. A target of
+// the project itself (~ or no project), of its dependencies (^) or of a tag
+// (#tag) names no other project.
+func (p *project) readTaskDeps(text string) error {
+	tasks, _, err := topLevel(text, "tasks")
+	if err != nil {
+		return err
+	}
+	byName, _ := tasks.(map[string]any)
+	names := make([]string, 0, len(byName))
+	for name := range byName {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	for _, name := range names {
+		task, _ := byName[name].(map[string]any)
+		deps, _ := task["deps"].([]any)
+		for _, dep := range deps {
+			target, ok := dep.(string)
+			if object, isObject := dep.(map[string]any); isObject {
+				target, ok = object["target"].(string)
+			}
+			project, _, scoped := strings.Cut(target, ":")
+			if !ok || !scoped || project == "" || strings.ContainsAny(project[:1], "^~#") {
+				continue
+			}
+			p.taskDeps = append(p.taskDeps, project)
+		}
 	}
 	return nil
 }

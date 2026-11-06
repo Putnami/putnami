@@ -209,7 +209,7 @@ func TestTheDefaultDetectorsReadEachEcosystem(t *testing.T) {
 		t.Fatalf("moon components %v", got)
 	}
 	for _, c := range moonSet.Components {
-		if c.Ecosystem != "moon" || c.Source != evidence.SourceOrchestrator {
+		if c.Ecosystem != "moon" || c.Source != evidence.SourceWorkspace {
 			t.Errorf("a moon project does not win over its workspace package or module: %+v", c)
 		}
 	}
