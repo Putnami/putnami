@@ -70,7 +70,7 @@
     },
     {
       "id": "guarded-merge",
-      "text": "merge is denied unless settings.allowMerge is true and merges only at the expected head, sent as GitLab's sha, so a moved head is a conflict, as is a merge GitLab refuses. A named method sets the merge request's squash flag; where the project, a branch rule or the read flag overrides it, merge is unsupported. Every answer that merges nothing leaves the flag as it was, or is unresolved. settings.removeSourceBranch deletes the source branch in the merge call itself."
+      "text": "merge is denied unless settings.allowMerge is true and merges only at the expected head, sent as GitLab's sha, so a moved head is a conflict, as is a merge GitLab refuses. A named method sets the merge request's squash flag; where the project or a rule its squash_on_merge shows overrides it, merge is unsupported. Every answer that merges nothing leaves the flag as it was, or is unresolved. settings.removeSourceBranch deletes the source branch in the merge call itself."
     },
     {
       "id": "honest-failures",

@@ -146,9 +146,13 @@ the merge method is a project setting.
     rule still decides otherwise, or the merge does not happen for any other
     reason, the flag is put back as it was before the answer, so an answer
     that merged nothing changed nothing, and a flag that cannot be put back
-    is `unresolved` (`gitlab.incomplete`). The project's `never` and `always`
-    refuse before the merge request is read, even where a protected branch's
-    rule would relax them: merge without a method there. No method leaves
+    is `unresolved` (`gitlab.incomplete`). GitLab's merge call itself sets
+    the flag when it asks to squash, before it decides whether it can merge,
+    so a refused squash merge puts back a flag that was off too. An
+    `unresolved` answer after a flag write names the flag's earlier value.
+    The project's `never` and `always` refuse on the project's setting
+    alone, even where a protected branch's rule would relax them: merge
+    without a method there. No method leaves
     the choice to the project. GitLab takes
     `should_remove_source_branch` in the merge call itself, so
     `settings.removeSourceBranch` deletes the source branch with no second
