@@ -52,7 +52,9 @@ type Entry struct {
 	Size int64
 	// LastUsed is the recency the eviction order is taken over. Whether it is a
 	// true access time or merely a download/extraction time is the extension's
-	// business; the policy only requires that older means less valuable.
+	// business; the policy only requires that older means less valuable. With
+	// a grace window, Collect also spares an entry whose Path has a
+	// modification time inside that window when its removal comes.
 	LastUsed time.Time
 	// Dir marks an entry that must be removed as a tree rather than a file.
 	Dir bool
@@ -67,7 +69,8 @@ type Options struct {
 	MaxBytes int64
 	// Grace spares any entry used within this window. Zero opts out of
 	// protection, which is only ever correct for an explicit, user-initiated
-	// clean.
+	// clean. Collect also spares a victim whose own modification time moved
+	// inside the window after the scan.
 	Grace time.Duration
 	// FloorBytes keeps at least this many candidate bytes alive even when the
 	// budget cannot be met. It exists for caches whose unevictable part (Go's
@@ -145,6 +148,9 @@ func Collect(root string, totalBytes int64, candidates []Entry, opts Options) (*
 	defer func() { _ = lock.Release() }()
 
 	for _, victim := range SelectVictims(candidates, totalBytes, opts) {
+		if usedSinceScan(victim.Path, opts) {
+			continue
+		}
 		var removeErr error
 		if victim.Dir {
 			removeErr = os.RemoveAll(victim.Path)
@@ -161,6 +167,25 @@ func Collect(root string, totalBytes int64, candidates []Entry, opts Options) (*
 		res.RemainingBytes -= victim.Size
 	}
 	return res, nil
+}
+
+// usedSinceScan reports whether a victim's own modification time is now
+// inside the grace window. Collect reads it right before each removal, so an
+// entry a toolchain used after the scan stays. A path the stat cannot read is
+// left to the removal.
+func usedSinceScan(path string, opts Options) bool {
+	if opts.Grace <= 0 {
+		return false
+	}
+	info, err := os.Lstat(path)
+	if err != nil {
+		return false
+	}
+	now := opts.Now
+	if now.IsZero() {
+		now = time.Now()
+	}
+	return now.Sub(info.ModTime()) < opts.Grace
 }
 
 // SelectVictims returns the candidates to evict, oldest first, stopping as soon

@@ -54,7 +54,7 @@
     },
     {
       "id": "cache-eviction-policy",
-      "text": "Machine-cache collection evicts oldest-first to the low watermark, protects entries inside the grace window, is deterministic for identical inputs, treats an absent budget as unbounded rather than zero, treats a missing cache root as success, and skips a root another collector holds instead of blocking."
+      "text": "Machine-cache collection evicts oldest-first to the low watermark, protects entries inside the grace window, spares an entry whose last use moved inside that window after the scan, is deterministic for identical inputs, treats an absent budget as unbounded rather than zero, treats a missing cache root as success, and skips a root another collector holds instead of blocking."
     },
     {
       "id": "credential-confinement",

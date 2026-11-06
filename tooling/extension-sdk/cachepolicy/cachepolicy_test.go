@@ -90,6 +90,43 @@ func TestCollect_GraceProtectsRecentEntries(t *testing.T) {
 	}
 }
 
+// TestCollect_SparesAnEntryUsedAfterTheScan: an entry whose mtime moved inside
+// the grace window between the scan and Collect stays, and a still-cold victim
+// of the same scan goes.
+func TestCollect_SparesAnEntryUsedAfterTheScan(t *testing.T) {
+	spectest.Proves(t, "tooling/extension-authoring", "cache-eviction-policy", "an-entry-used-after-the-scan-is-spared")
+	root := t.TempDir()
+	now := time.Now()
+	scanned := now.Add(-5 * time.Hour)
+	used := filepath.Join(root, "used-after-scan")
+	cold := filepath.Join(root, "still-cold")
+	writeFile(t, used, 100, scanned)
+	writeFile(t, cold, 100, scanned)
+	candidates := []Entry{
+		{Path: used, Size: 100, LastUsed: scanned},
+		{Path: cold, Size: 100, LastUsed: scanned},
+	}
+
+	// Between the scan and Collect, a toolchain marks one entry used.
+	if err := os.Chtimes(used, now, now); err != nil {
+		t.Fatalf("chtimes: %v", err)
+	}
+
+	res, err := Collect(root, 1000, candidates, Options{MaxBytes: 100, Grace: time.Hour, Now: now})
+	if err != nil {
+		t.Fatalf("Collect: %v", err)
+	}
+	if _, err := os.Stat(used); err != nil {
+		t.Fatalf("Collect removed an entry used after the scan: %v", err)
+	}
+	if _, err := os.Stat(cold); !os.IsNotExist(err) {
+		t.Fatalf("the entry still cold at removal survived: %v", err)
+	}
+	if res.EvictedEntries != 1 || res.FreedBytes != 100 {
+		t.Fatalf("evicted %d entries (%d bytes), want 1 (100)", res.EvictedEntries, res.FreedBytes)
+	}
+}
+
 // TestSelectVictims_FloorSurvivesAnUnevictableMajority is the pathological case
 // the floor exists for: unevictable bytes alone exceed the low watermark, so an
 // unfloored target is negative and every candidate is selected.
