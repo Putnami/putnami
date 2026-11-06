@@ -4,7 +4,7 @@
   "feature": "evidence-readers/report-readers",
   "outcomes": [
     "Jest, Vitest, PHPUnit and gotestsum JUnit reports read into the same test cases, with the test file when the report names it.",
-    "Istanbul, c8, V8, PHPUnit and go test coverage reads into the same line-level file coverage, so a consumer can measure the coverage of the lines a change touches.",
+    "Istanbul, c8, V8, PHPUnit, go test and JaCoCo or Kover coverage reads into the same line-level file coverage, so a consumer can measure the coverage of the lines a change touches.",
     "A missing, malformed or oversized report is one diagnostic with a stable code, and the reader never panics.",
     "CycloneDX and SPDX documents that osv-scanner, Trivy or Syft wrote read into the same packages, each with its package URL, licences and known vulnerabilities."
   ],
@@ -12,7 +12,7 @@
     "Finding the report files in a CI workspace, which the observe extension owns.",
     "Mapping cases and files to components, or resolving absolute paths and Go import paths to repository paths, which the observe extension owns.",
     "Writing the change evidence document, which protocol/evidence specifies.",
-    "JaCoCo and SARIF, which later slices add.",
+    "SARIF, which a later slice adds.",
     "Querying a vulnerability database, or matching a software bill of materials to the lockfile changes, which the observe extension owns."
   ],
   "requirements": [
@@ -22,15 +22,19 @@
     },
     {
       "id": "coverage-reads-every-instrumented-line",
-      "text": "The LCOV, Cobertura, Clover and Go cover readers return one entry per source file, in the order the report first names it, with its instrumented lines in increasing order and their hit counts. A line stated twice keeps its largest count. A file's totals are counted from its lines and functions; a file whose report lists none keeps the totals the report states (LCOV's LF, LH, FNF and FNH, a Clover file's methods metrics)."
+      "text": "The LCOV, Cobertura, Clover, JaCoCo and Go cover readers return one entry per source file, in the order the report first names it, with its instrumented lines in increasing order and their hit counts. A line stated twice keeps its largest count. A file's totals are counted from its lines and functions; a file whose report lists none keeps the totals the report states (LCOV's LF, LH, FNF and FNH, a Clover file's methods metrics, a JaCoCo source file's LINE and METHOD counters)."
     },
     {
       "id": "go-cover-blocks-become-lines",
       "text": "ReadGoCover reads set, count and atomic profiles, a profile concatenated from several runs included. A block the profile states more than once sums its counts in count and atomic mode and keeps the largest in set mode. A block with statements marks each line from its start line to its end line, a line takes the largest count of the blocks that span it, and a block without statements marks none."
     },
     {
+      "id": "jacoco-reads-source-files",
+      "text": "ReadJaCoCo reads a JaCoCo XML report, root report, its packages nested in any depth of groups, into one file per sourcefile element: its path is the package name and the source file name, the default package giving the name alone. A line element with covered instructions (ci) is a covered line, with hits 1, since JaCoCo records no execution count; one with missed instructions only is uncovered, and one with neither is no line. Kover writes the same format."
+    },
+    {
       "id": "paths-as-the-report-states",
-      "text": "A reader reports each path as the report states it, in slash form, without resolving it: a Clover file's path attribute wins over its name, a Cobertura report's source roots are returned beside its files, and a Go profile keeps its import paths."
+      "text": "A reader reports each path as the report states it, in slash form, without resolving it: a Clover file's path attribute wins over its name, a Cobertura report's source roots are returned beside its files, a JaCoCo file is its package path and source file name, and a Go profile keeps its import paths."
     },
     {
       "id": "malformed-reports-are-diagnostics",

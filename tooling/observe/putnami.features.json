@@ -695,6 +695,152 @@
       ]
     },
     {
+      "id": "tooling/observe-jvm",
+      "type": "feature",
+      "name": "Find the components of a Gradle or Maven repository that keeps its own CI",
+      "outcome": "putnami observe, in a Java or Kotlin repository built with Gradle or Maven, Android included, and without a Putnami workspace, knows one component per Gradle project or Maven module and the edges between them, without running the build, so a change to a shared library marks the projects that use it, the JUnit and JaCoCo reports land on the right component, and a Gradle lockfile or version catalog bump is a dependency change",
+      "owner": "tooling",
+      "target": "modeled",
+      "requirements": [
+        {
+          "id": "gradle-projects-are-components",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "settings-includes-are-components",
+              "a-missing-project-directory-is-a-diagnostic"
+            ]
+          }
+        },
+        {
+          "id": "gradle-project-edges",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "project-references-are-edges",
+              "type-safe-accessors-are-edges"
+            ]
+          }
+        },
+        {
+          "id": "gradle-dynamic-settings",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-computed-include-is-a-diagnostic"
+            ]
+          }
+        },
+        {
+          "id": "maven-modules-are-components",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "pom-modules-are-components",
+              "a-missing-or-invalid-pom-is-a-diagnostic"
+            ]
+          }
+        },
+        {
+          "id": "maven-dependency-edges",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-dependency-on-a-module-is-an-edge"
+            ]
+          }
+        },
+        {
+          "id": "jvm-report-placement",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-jvm-class-name-places-its-case",
+              "a-jacoco-file-maps-through-its-package"
+            ]
+          }
+        },
+        {
+          "id": "jvm-report-discovery",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "jvm-reports-are-discovered"
+            ]
+          }
+        },
+        {
+          "id": "gradle-dependency-changes",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-gradle-lockfile-lists-its-dependencies",
+              "a-version-catalog-lists-its-libraries-and-plugins",
+              "a-maven-package-url-matches-a-gradle-change"
+            ]
+          }
+        },
+        {
+          "id": "gradle-change-analysis",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-gradle-demo-is-explained"
+            ]
+          }
+        },
+        {
+          "id": "maven-change-analysis",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-maven-demo-is-explained"
+            ]
+          }
+        }
+      ]
+    },
+    {
       "id": "tooling/observe-upload",
       "type": "feature",
       "name": "Hand the change evidence document to a reporter",

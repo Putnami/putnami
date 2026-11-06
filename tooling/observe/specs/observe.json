@@ -31,7 +31,7 @@
     },
     {
       "id": "report-discovery",
-      "text": "Without flags, observe walks the repository, skipping .git, node_modules and vendor, within bounds, and keeps each JUnit XML, LCOV, Cobertura, Clover or Go cover report it recognizes by content. --junit and --coverage take comma-separated paths or glob patterns, resolved against the invocation directory, and replace discovery for their kind. A missing, unreadable or unrecognized report is a diagnostic. observe exits 0 whatever it observes, 2 on a usage error, 1 when its job context or output fails."
+      "text": "Without flags, observe walks the repository, skipping .git, node_modules and vendor, within bounds, and keeps each JUnit XML, LCOV, Cobertura, Clover, JaCoCo or Go cover report it recognizes by content. --junit and --coverage take comma-separated paths or glob patterns, resolved against the invocation directory, and replace discovery for their kind. A missing, unreadable or unrecognized report is a diagnostic. observe exits 0 whatever it observes, 2 on a usage error, 1 when its job context or output fails."
     },
     {
       "id": "evidence-document",

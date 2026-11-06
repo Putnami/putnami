@@ -7,7 +7,7 @@
       "id": "evidence-readers/report-readers",
       "type": "feature",
       "name": "Test and coverage report readers",
-      "outcome": "A tool that observes a CI it does not run reads the JUnit, LCOV, Cobertura, Clover and Go cover reports and the CycloneDX and SPDX documents that CI already wrote into typed test cases, line-level file coverage and packages with their licences and known vulnerabilities, and a report it cannot read becomes a diagnostic, never a crash.",
+      "outcome": "A tool that observes a CI it does not run reads the JUnit, LCOV, Cobertura, Clover, JaCoCo and Go cover reports and the CycloneDX and SPDX documents that CI already wrote into typed test cases, line-level file coverage and packages with their licences and known vulnerabilities, and a report it cannot read becomes a diagnostic, never a crash.",
       "owner": "tooling",
       "target": "coded",
       "requirements": [
@@ -53,6 +53,20 @@
               "a-line-takes-the-largest-count-of-its-blocks",
               "a-repeated-block-sums-its-counts",
               "concatenated-profiles-read-as-one"
+            ]
+          }
+        },
+        {
+          "id": "jacoco-reads-source-files",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "real-jacoco-reports-read-to-their-expected-lines",
+              "jacoco-groups-and-the-default-package-are-read"
             ]
           }
         },
