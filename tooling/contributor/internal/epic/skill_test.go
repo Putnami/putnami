@@ -53,8 +53,8 @@ func TestAPushOnlyBuildOpensNoProposal(t *testing.T) {
 
 // TestTheEpicSessionProvesAndPublishesACloudChild pins the epic skill's
 // cloud recipe: the owner starts the session in push-only mode, and the
-// epic session proves the pushed head in a local worktree before it
-// publishes, never on the child's records.
+// epic session reviews and gates the pushed head in its own worktree before
+// it publishes, never on the child's records.
 func TestTheEpicSessionProvesAndPublishesACloudChild(t *testing.T) {
 	t.Parallel()
 	requireSentences(t, "epic/SKILL.md",
@@ -65,12 +65,17 @@ func TestTheEpicSessionProvesAndPublishesACloudChild(t *testing.T) {
 		"## 6. Publish a cloud child",
 		"you never trust them from a distance",
 		"`git worktree add -B <branch> ../<epic>-<key> origin/<branch>`",
+		"`git reset --hard origin/<branch>`",
 		"Its `HEAD` must be the head the child reported",
-		"`\"$PUTNAMI_CLI\" lint,test,build,validate --projects <projects> --enforce-coverage`",
-		"A red gate publishes nothing",
+		"When the child reports its declarations commit pushed, bring the worktree to it and open the draft there",
+		"run build's check stage there, without its repair",
+		"one fresh independent reviewer, then the final gate as check selects it, with `--fix=false`",
+		"publishes nothing: pass it to the child's session",
 		"Never fix it in the worktree.",
-		"passed as `--verification-file`",
+		"a dossier built from your review and gate (`--verification-file`)",
 		"`--gate ci` with a workflow record you write from that gate")
+	requireSentences(t, "build/references/code.md", "`git push --force-with-lease` after a rebase")
+	requireSentences(t, "build/references/merge.md", "Its final gate is the local `--projects` gate of its last edit, whatever the machine's load")
 	requireSentences(t, "build/references/policy.md",
 		"`local`, a local workspace the owner opens, or `cloud`, a cloud session whose branch the epic session publishes")
 	spectest.Proves(t, epicFeature, epicCloudChild, "the-epic-session-proves-and-publishes-a-cloud-child")

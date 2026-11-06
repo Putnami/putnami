@@ -117,7 +117,7 @@ beside the plan, before the owner opens the session:
 `target` is `local`, a local workspace the owner opens, or `cloud`, a cloud
 session the owner starts. A cloud child runs `build --push-only`: it pushes
 its branch and opens no proposal. The epic session checks the pushed head out
-in a local worktree, runs the project gate on it, and publishes the proposal
+in a local worktree, reviews and gates it there, and publishes the proposal
 with `change finalize`, so the proposal body carries no host footer
 ([ADR 0011](adr/0011-the-epic-session-publishes-a-cloud-child.md)). `branch` is the branch the child works
 on, and `base` the branch it starts from: the epic's base, or the branch of

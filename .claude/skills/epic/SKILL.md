@@ -142,31 +142,35 @@ contracts it could not read.
 
 A cloud child pushes its branch and opens no proposal. Publish it from this
 machine, and prove its head here: its records under `.putnami/` never reach
-the branch, and you never trust them from a distance.
+the branch, and you never trust them from a distance. You review and gate;
+you never code, and never commit to the child's branch.
 
-1. When the child reports its declarations commit pushed, you may open the
-   draft so the reviewer sees the intent first: check the branch out as in
-   step 2, then run `"$PUTNAMI_CLI" change finalize --draft` with `--base`,
-   `--branch`, `--title`, `--body-file` and the task.
-2. When the child ends with its final head pushed, check that head out in a
-   worktree of its own, on the child's branch:
-   `git fetch origin <branch>`, then
-   `git worktree add -B <branch> ../<epic>-<key> origin/<branch>`. Its
-   `HEAD` must be the head the child reported; otherwise ask the child's
-   session for its current head.
-3. In that worktree, run the project gate on the projects the child gated:
-   `"$PUTNAMI_CLI" lint,test,build,validate --projects <projects> --enforce-coverage`.
-   A red gate publishes nothing: pass the failure to the child's session,
-   which repairs and pushes again. Never fix it in the worktree.
-4. Publish with `"$PUTNAMI_CLI" change finalize --base <base> --branch <branch>`,
-   the child's title, a body file holding its body, and its task, plus
-   `--partial-delivery` when it reported one. Prove it with that gate, as
-   build's merge stage says: a dossier built from that gate session and
-   checked with `change verify`, passed as `--verification-file`; or, when
-   the machine's load selects the hosted gate, `--gate ci` with a workflow
-   record you write from that gate.
-5. Remove the worktree. When review sends the child back to code, it pushes
-   again: prove and publish its new head from step 2.
+1. Keep one worktree per cloud child, on its branch, at the head it pushed.
+   Create it the first time with `git fetch origin <branch>`, then
+   `git worktree add -B <branch> ../<epic>-<key> origin/<branch>`. Each later
+   time, in that worktree, run `git fetch origin <branch>` and
+   `git reset --hard origin/<branch>`. Its `HEAD` must be the head the child
+   reported; otherwise ask the child's session for its current head.
+2. When the child reports its declarations commit pushed, bring the worktree
+   to it and open the draft there: `"$PUTNAMI_CLI" change finalize --draft`
+   with `--base`, `--branch`, `--title`, `--body-file` and the task. The
+   reviewer sees the intent before the code, and the child reads the reviews
+   once the draft exists.
+3. When the child ends with its final head pushed, bring the worktree to it
+   and run build's check stage there, without its repair: freeze with
+   `change verify --snapshot`, one fresh independent reviewer, then the final
+   gate as check selects it, with `--fix=false` so the tree stays clean. A
+   P1 or P2 finding, or a red gate, publishes nothing: pass it to the child's
+   session, which repairs and pushes again. Never fix it in the worktree.
+4. Run build's merge stage on that tree with the child's title, a body file
+   holding its body, and its task, plus `--partial-delivery` when it
+   reported one: `"$PUTNAMI_CLI" change finalize --base <base>
+   --branch <branch>` with a dossier built from your review and gate
+   (`--verification-file`), or, when the hosted gate was selected,
+   `--gate ci` with a workflow record you write from that gate.
+5. When review sends the child back to code, it pushes again: prove and
+   publish its new head from step 1. Remove the worktree once the proposal
+   is merged or closed.
 
 The epic ends when every issue is merged or closed. Report each issue with
 its state, its proposal and its tokens, the tokens spent against the
