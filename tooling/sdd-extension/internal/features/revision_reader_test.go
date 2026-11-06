@@ -8,8 +8,8 @@ import (
 	"testing"
 
 	featureproto "go.putnami.dev/protocol/features"
+	"go.putnami.dev/sdk/extension/gittest"
 	internalgit "go.putnami.dev/tooling/sdd/extension/internal/gitread"
-	"go.putnami.dev/tooling/sdd/extension/internal/gittest"
 )
 
 func TestEvaluateGitRevisionLoadsEachTreesOwnMembershipWithoutWorktreeMutation(t *testing.T) {

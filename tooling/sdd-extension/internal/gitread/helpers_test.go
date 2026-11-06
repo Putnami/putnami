@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"go.putnami.dev/tooling/sdd/extension/internal/gittest"
+	"go.putnami.dev/sdk/extension/gittest"
 )
 
 // initGitRepo makes a repository on branch main with one commit of README.md.

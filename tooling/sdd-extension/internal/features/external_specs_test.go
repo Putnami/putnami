@@ -10,7 +10,7 @@ import (
 	"go.putnami.dev/protocol/features/conformance"
 	"go.putnami.dev/protocol/features/spectest"
 	workspaceproto "go.putnami.dev/protocol/workspace"
-	"go.putnami.dev/tooling/sdd/extension/internal/gittest"
+	"go.putnami.dev/sdk/extension/gittest"
 	workspace "go.putnami.dev/tooling/sdd/extension/internal/wsview"
 )
 

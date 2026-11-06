@@ -10,7 +10,7 @@ import (
 	protocolcli "go.putnami.dev/protocol/cli"
 	featureproto "go.putnami.dev/protocol/features"
 	pctx "go.putnami.dev/sdk/extension/context"
-	"go.putnami.dev/tooling/sdd/extension/internal/gittest"
+	"go.putnami.dev/sdk/extension/gittest"
 	"go.putnami.dev/tooling/sdd/extension/internal/sdd"
 	"go.putnami.dev/tooling/sdd/extension/internal/wsview"
 )

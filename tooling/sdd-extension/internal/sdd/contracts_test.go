@@ -10,7 +10,7 @@ import (
 	protocolcli "go.putnami.dev/protocol/cli"
 	contracts "go.putnami.dev/protocol/contracts"
 	"go.putnami.dev/protocol/features/spectest"
-	"go.putnami.dev/tooling/sdd/extension/internal/gittest"
+	"go.putnami.dev/sdk/extension/gittest"
 )
 
 // baseManifest is a valid contract manifest exercising every vocabulary the

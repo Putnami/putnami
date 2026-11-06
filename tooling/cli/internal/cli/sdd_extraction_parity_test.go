@@ -17,6 +17,7 @@ import (
 	"go.putnami.dev/protocol/features/spectest"
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/sdk/extension/gitread"
+	"go.putnami.dev/sdk/extension/gittest"
 	"go.putnami.dev/sdk/extension/pkgmeta"
 	"go.putnami.dev/sdk/extension/scratch"
 	"go.putnami.dev/tooling/cli/internal/extension"
@@ -947,22 +948,11 @@ func commitParityWorkspace(t *testing.T, root string, environ []string) {
 	}
 }
 
-// parityGitEnv is the environment of a fixture git command: environ without
-// its GIT_ variables, plus no global or system configuration, no
-// global ignore or attributes file, and the pinned commit dates. Every input of
-// the commit SHA comes from the fixture.
+// parityGitEnv is the environment of a fixture git command: environ isolated
+// by gittest.Environ, plus the pinned commit dates. Every input of the commit
+// SHA comes from the fixture.
 func parityGitEnv(environ []string) []string {
-	var env []string
-	for _, entry := range environ {
-		if !strings.HasPrefix(entry, "GIT_") {
-			env = append(env, entry)
-		}
-	}
-	return append(env,
-		"GIT_CONFIG_GLOBAL="+os.DevNull, "GIT_CONFIG_SYSTEM="+os.DevNull, "GIT_CONFIG_NOSYSTEM=1",
-		"GIT_CONFIG_COUNT=2",
-		"GIT_CONFIG_KEY_0=core.excludesFile", "GIT_CONFIG_VALUE_0="+os.DevNull,
-		"GIT_CONFIG_KEY_1=core.attributesFile", "GIT_CONFIG_VALUE_1="+os.DevNull,
+	return append(gittest.Environ(environ),
 		"GIT_AUTHOR_DATE="+parityCommitDate, "GIT_COMMITTER_DATE="+parityCommitDate)
 }
 

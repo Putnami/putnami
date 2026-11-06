@@ -7,7 +7,7 @@ import (
 
 	featureproto "go.putnami.dev/protocol/features"
 	"go.putnami.dev/protocol/features/spectest"
-	"go.putnami.dev/tooling/sdd/extension/internal/gittest"
+	"go.putnami.dev/sdk/extension/gittest"
 )
 
 func TestTrackedGherkinSpecIsReadThroughTheCandidateCut(t *testing.T) {

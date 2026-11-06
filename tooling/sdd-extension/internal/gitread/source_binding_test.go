@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"go.putnami.dev/tooling/sdd/extension/internal/gittest"
+	"go.putnami.dev/sdk/extension/gittest"
 )
 
 func TestProjectSourceBindingTracksSourceAndExcludesGeneratedOutputs(t *testing.T) {
