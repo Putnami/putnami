@@ -284,3 +284,21 @@ func ReadPEXLock(data []byte) (Packages, error) {
 	}
 	return out, nil
 }
+
+// ReadCargoLock reads the [[package]] entries of a Cargo.lock. A package with
+// no source, a crate of the workspace or a path dependency, is the
+// repository's own code and is left out; a registry or git package is kept.
+func ReadCargoLock(data []byte) (Packages, error) {
+	doc, err := toml.Parse(data)
+	if err != nil {
+		return nil, fmt.Errorf("%s is not TOML: %w", CargoLock, err)
+	}
+	out := Packages{}
+	for _, p := range toml.Tables(doc["package"]) {
+		if toml.String(p, "source") == "" {
+			continue
+		}
+		out.add(toml.String(p, "name"), toml.String(p, "version"))
+	}
+	return out, nil
+}

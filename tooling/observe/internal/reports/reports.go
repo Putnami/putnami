@@ -76,6 +76,30 @@ const (
 // skippedDirs are never walked.
 var skippedDirs = map[string]bool{".git": true, "node_modules": true, "vendor": true}
 
+// NextestStore is the directory of a Cargo target directory where
+// cargo-nextest writes its JUnit reports, as nextest/<profile>/junit.xml.
+const NextestStore = "nextest"
+
+// cargoTag is the line cargo writes in the CACHEDIR.TAG of each target
+// directory it creates.
+const cargoTag = "created by cargo"
+
+// isCargoTarget reports whether dir is a Cargo target directory: one whose
+// CACHEDIR.TAG cargo wrote. Discovery walks only its nextest store, the
+// target directories nested in it, such as the one cargo-llvm-cov builds in,
+// and the files it holds directly, so its build outputs do not exhaust the
+// bounds.
+func isCargoTarget(dir string) bool {
+	f, err := os.Open(filepath.Join(dir, "CACHEDIR.TAG"))
+	if err != nil {
+		return false
+	}
+	defer f.Close()
+	head := make([]byte, 512)
+	n, _ := io.ReadFull(f, head)
+	return strings.Contains(string(head[:n]), cargoTag)
+}
+
 // Report is one report file.
 type Report struct {
 	// Path is relative to the repository root, slash-separated, or absolute
@@ -201,6 +225,8 @@ func discoverReports(root string, kinds map[string]bool) ([]Report, []diag.Diagn
 	var reports []Report
 	var diags []diag.Diagnostic
 	walked, sniffed := 0, 0
+	// cargoTargets holds the Cargo target directories walked so far.
+	cargoTargets := map[string]bool{}
 	errBound := errors.New("bound")
 	err := filepath.WalkDir(root, func(file string, entry fs.DirEntry, err error) error {
 		if err != nil {
@@ -212,8 +238,18 @@ func discoverReports(root string, kinds map[string]bool) ([]Report, []diag.Diagn
 			return errBound
 		}
 		if entry.IsDir() {
-			if file != root && skippedDirs[entry.Name()] {
+			if file == root {
+				return nil
+			}
+			if skippedDirs[entry.Name()] {
 				return filepath.SkipDir
+			}
+			target := isCargoTarget(file)
+			if cargoTargets[filepath.Dir(file)] && entry.Name() != NextestStore && !target {
+				return filepath.SkipDir
+			}
+			if target {
+				cargoTargets[file] = true
 			}
 			return nil
 		}
