@@ -335,6 +335,11 @@ func TestJaCoCoGroupsAndTheDefaultPackageAreRead(t *testing.T) {
 	if !reflect.DeepEqual(report.Files, want) {
 		t.Errorf("files %+v, want %+v", report.Files, want)
 	}
+	nested := `<report name="r">` + strings.Repeat(`<group name="g">`, MaxSuiteDepth) + `<package name="p"><sourcefile name="A.java"><line nr="1" mi="0" ci="1"/></sourcefile></package>` + strings.Repeat(`</group>`, MaxSuiteDepth) + `</report><package name="after"><sourcefile name="B.java"><line nr="1" mi="1" ci="0"/></sourcefile></package>`
+	deep, diagnostics := ReadJaCoCo([]byte(nested))
+	if len(diagnostics) != 0 || len(deep.Files) != 1 || deep.Files[0].Path != "p/A.java" {
+		t.Errorf("groups at MaxSuiteDepth and content after the root: files %+v, diagnostics %v, want p/A.java alone", deep.Files, diagnostics)
+	}
 	spectest.Proves(t, feature, "jacoco-reads-source-files", "jacoco-groups-and-the-default-package-are-read")
 }
 

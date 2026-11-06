@@ -44,6 +44,9 @@ func ReadJaCoCo(data []byte) (CoverageReport, []diag.Diagnostic) {
 	decoder := xml.NewDecoder(bytes.NewReader(data))
 	builder := newCoverageBuilder()
 	rooted := false
+	// depth counts the open report and group elements: a package or another
+	// element is decoded or skipped whole.
+	depth := 0
 	for {
 		token, err := decoder.Token()
 		if errors.Is(err, io.EOF) {
@@ -51,6 +54,14 @@ func ReadJaCoCo(data []byte) (CoverageReport, []diag.Diagnostic) {
 		}
 		if err != nil {
 			return CoverageReport{}, malformed("JaCoCo report does not decode: %v", err)
+		}
+		if _, ok := token.(xml.EndElement); ok {
+			depth--
+			if depth == 0 {
+				// The root closed: what follows it is not read.
+				break
+			}
+			continue
 		}
 		start, ok := token.(xml.StartElement)
 		if !ok {
@@ -61,12 +72,17 @@ func ReadJaCoCo(data []byte) (CoverageReport, []diag.Diagnostic) {
 				return CoverageReport{}, malformed("JaCoCo report root is %q, want report", start.Name.Local)
 			}
 			rooted = true
+			depth = 1
 			continue
 		}
 		switch start.Name.Local {
 		case "group":
 			// report-aggregate writes a group per module, and groups nest:
 			// their packages are read where they stand.
+			depth++
+			if depth-1 > MaxSuiteDepth {
+				return CoverageReport{}, malformed("JaCoCo groups are nested deeper than %d", MaxSuiteDepth)
+			}
 		case "package":
 			var pkg jacocoPackage
 			if err := decoder.DecodeElement(&pkg, &start); err != nil {

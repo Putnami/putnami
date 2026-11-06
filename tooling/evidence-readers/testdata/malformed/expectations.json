@@ -28,5 +28,6 @@
   "jacoco-a-cobertura-report.xml": {"reader": "jacoco", "code": "readers.malformed"},
   "jacoco-line-zero.xml": {"reader": "jacoco", "code": "readers.malformed"},
   "jacoco-negative-count.xml": {"reader": "jacoco", "code": "readers.malformed"},
-  "jacoco-bad-counter.xml": {"reader": "jacoco", "code": "readers.malformed"}
+  "jacoco-bad-counter.xml": {"reader": "jacoco", "code": "readers.malformed"},
+  "jacoco-too-deep.xml": {"reader": "jacoco", "code": "readers.malformed"}
 }

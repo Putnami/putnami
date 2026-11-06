@@ -162,6 +162,7 @@ dependencies {
     implementation project(path: ':api', configuration: 'default')
     // implementation project(':libs:util')
     testImplementation project(":unknown")
+    runtimeOnly findProject(':libs:util')
 }
 `,
 		"api/build.gradle.kts": `dependencies {
@@ -176,7 +177,7 @@ dependencies {
 	})
 	got := Detect(root)
 	want := map[string][]string{
-		"app":            {"api", "pricing"},
+		"app":            {"api", "libs/util", "pricing"},
 		"api":            {"libs/core"},
 		"libs/core":      {"libs/core/impl", "libs/util"},
 		"libs/core/impl": nil,
