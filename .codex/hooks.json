@@ -1,0 +1,38 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "PUTNAMI_NO_AUTO_INSTALL=1 \"$(git rev-parse --show-toplevel)\"/putnamiw agent hook --engine codex || true",
+            "timeout": 30
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "^(update_plan)$",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "PUTNAMI_NO_AUTO_INSTALL=1 \"$(git rev-parse --show-toplevel)\"/putnamiw agent hook --engine codex || true",
+            "timeout": 30
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "PUTNAMI_NO_AUTO_INSTALL=1 \"$(git rev-parse --show-toplevel)\"/putnamiw agent hook --engine codex || true",
+            "timeout": 240
+          }
+        ]
+      }
+    ]
+  }
+}

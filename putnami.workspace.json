@@ -94,6 +94,10 @@
             "priority/"
           ]
         }
+      },
+      "missions": {
+        "provider": "@putnami/intelligence",
+        "version": 1
       }
     },
     "@putnami/contributor": {
