@@ -276,8 +276,8 @@ var spawnSites = map[string]spawnSite{
 	"workspace_state/session.go:(*Session).FinalizeV2": {spawns: 1, verdict: noRepositoryCode,
 		why: "read verbs only, through gitread.CurrentBranch: symbolic-ref, rev-parse"},
 	// Test support.
-	"cli/clitest/clitest.go:GitOutput":                                {spawns: 2, verdict: testSupport},
-	"cli/clitest/clitest.go:RunGit":                                   {spawns: 2, verdict: testSupport},
+	"cli/clitest/clitest.go:GitOutput":                                {spawns: 1, verdict: testSupport},
+	"cli/clitest/clitest.go:RunGit":                                   {spawns: 1, verdict: testSupport},
 	"cli/clitest/runnerfixture.go:(*fixtureProvider).startSupervisor": {spawns: 1, verdict: testSupport},
 	"cli/clitest/runnerfixture.go:superviseFixtureAttempt":            {spawns: 1, verdict: testSupport},
 	"cli/clitest/runnerfixture_unix.go:ProcessExited":                 {spawns: 1, verdict: testSupport},
@@ -717,7 +717,9 @@ func scanSpawnSites(t *testing.T, root string) (map[string][]token.Pos, map[stri
 //   - a gitread reader or runner starts git with the verbs its caller passes,
 //     and gitread.Executable asks /usr/bin/xcrun for the git to run on macOS;
 //   - proctree.StartTime starts ps with fixed arguments on a system without
-//     /proc.
+//     /proc;
+//   - a gittest command, runner or assertion starts the git of a test fixture,
+//     which only test support calls.
 //
 // TestEveryDependencySpawnHelperIsInventoried keeps the SDK entries complete.
 var spawnCalls = map[string]map[string]bool{
@@ -734,6 +736,9 @@ var spawnCalls = map[string]map[string]bool{
 		"ResolveCommit": true, "Run": true, "RunCapture": true, "RunCaptureEnv": true,
 		"SymbolicAbbrevRef": true, "TrunkRef": true, "Unmanaged": true, "UpstreamIsSelfCounterpart": true,
 		"UpstreamRef": true,
+	},
+	"go.putnami.dev/sdk/extension/gittest": {
+		"AssertMachineIndependent": true, "Command": true, "Describe": true, "Run": true,
 	},
 	"go.putnami.dev/sdk/extension/releaseset":      {"NewClient": true},
 	"go.putnami.dev/sdk/extension/linetag":         {"LastRelease": true},

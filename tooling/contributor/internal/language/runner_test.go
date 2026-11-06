@@ -5,7 +5,6 @@ import (
 	"context"
 	"encoding/json"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -13,6 +12,7 @@ import (
 
 	collab "go.putnami.dev/protocol/collaboration"
 	"go.putnami.dev/protocol/features/spectest"
+	"go.putnami.dev/sdk/extension/gittest"
 )
 
 func TestLanguageFileExclusions(t *testing.T) {
@@ -93,12 +93,23 @@ func TestLanguageFilesDistinguishesToolFailure(t *testing.T) {
 	}
 }
 
-func TestLanguageRangesRejectGitOptionsBeforeSpawn(t *testing.T) {
-	t.Parallel()
+// emptyRepo is a repository with no commit.
+func emptyRepo(t *testing.T) string {
+	t.Helper()
 	root := t.TempDir()
-	if err := exec.Command("git", "init", "-q", root).Run(); err != nil {
+	if err := gittest.Command("", "init", "-q", root).Run(); err != nil {
 		t.Fatal(err)
 	}
+	return root
+}
+
+func TestEmptyRepoIsTheSameOnAForeignMachine(t *testing.T) {
+	gittest.AssertMachineIndependent(t, func() string { return emptyRepo(t) })
+}
+
+func TestLanguageRangesRejectGitOptionsBeforeSpawn(t *testing.T) {
+	t.Parallel()
+	root := emptyRepo(t)
 	output := filepath.Join(root, "injected-output")
 	for _, mode := range []string{"files", "commits"} {
 		var errors bytes.Buffer
@@ -126,15 +137,16 @@ func TestLanguageRangesRejectGitOptionsBeforeSpawn(t *testing.T) {
 	}
 }
 
-func TestLanguageCommitsNeverRunsConfiguredVerifier(t *testing.T) {
-	if runtime.GOOS == "windows" {
-		t.Skip("the verifier sentinel is a POSIX executable")
-	}
-	t.Parallel()
-	root := t.TempDir()
+// signedCommitRepo is a repository whose HEAD is a commit with a signature
+// that its gpg.program would reject, with log.showSignature on. It returns
+// the root, the commit before it, the signed commit, and the file the
+// verifier writes when it runs.
+func signedCommitRepo(t *testing.T) (root, base, sha, marker string) {
+	t.Helper()
+	root = t.TempDir()
 	command := func(input []byte, args ...string) []byte {
 		t.Helper()
-		cmd := exec.Command("git", append([]string{"-C", root}, args...)...)
+		cmd := gittest.Command(root, args...)
 		cmd.Stdin = bytes.NewReader(input)
 		output, err := cmd.CombinedOutput()
 		if err != nil {
@@ -147,7 +159,7 @@ func TestLanguageCommitsNeverRunsConfiguredVerifier(t *testing.T) {
 	command(nil, "config", "user.email", "test@example.invalid")
 	command(nil, "config", "commit.gpgsign", "false")
 	command(nil, "commit", "-q", "--allow-empty", "-m", "base")
-	base := strings.TrimSpace(string(command(nil, "rev-parse", "HEAD")))
+	base = strings.TrimSpace(string(command(nil, "rev-parse", "HEAD")))
 	command(nil, "commit", "-q", "--allow-empty", "-m", "feat: English title", "-m", "Body kept exactly")
 	raw := command(nil, "cat-file", "commit", "HEAD")
 	parts := bytes.SplitN(raw, []byte("\n\n"), 2)
@@ -156,17 +168,36 @@ func TestLanguageCommitsNeverRunsConfiguredVerifier(t *testing.T) {
 	}
 	signed := append(bytes.Clone(parts[0]), []byte("\ngpgsig -----BEGIN PGP SIGNATURE-----\n fake-signature\n -----END PGP SIGNATURE-----\n\n")...)
 	signed = append(signed, parts[1]...)
-	sha := strings.TrimSpace(string(command(signed, "hash-object", "-t", "commit", "-w", "--stdin")))
+	sha = strings.TrimSpace(string(command(signed, "hash-object", "-t", "commit", "-w", "--stdin")))
 	command(nil, "update-ref", "HEAD", sha)
 	verifier := filepath.Join(root, "signature-verifier")
-	marker := verifier + ".invoked"
+	marker = verifier + ".invoked"
 	if err := os.WriteFile(verifier, []byte("#!/bin/sh\nprintf invoked > \"$0.invoked\"\nexit 23\n"), 0700); err != nil {
 		t.Fatal(err)
 	}
 	command(nil, "config", "log.showSignature", "true")
 	command(nil, "config", "gpg.format", "openpgp")
 	command(nil, "config", "gpg.program", verifier)
-	probe := exec.Command("git", "-C", root, "log", "-1", "--format=%B", sha)
+	return root, base, sha, marker
+}
+
+func TestSignedCommitRepoIsTheSameOnAForeignMachine(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("the verifier sentinel is a POSIX executable")
+	}
+	gittest.AssertMachineIndependent(t, func() string {
+		root, _, _, _ := signedCommitRepo(t)
+		return root
+	})
+}
+
+func TestLanguageCommitsNeverRunsConfiguredVerifier(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("the verifier sentinel is a POSIX executable")
+	}
+	t.Parallel()
+	root, base, sha, marker := signedCommitRepo(t)
+	probe := gittest.Command(root, "log", "-1", "--format=%B", sha)
 	_, _ = probe.CombinedOutput()
 	if _, err := os.Stat(marker); err != nil {
 		t.Fatalf("fixture did not invoke configured verifier: %v", err)

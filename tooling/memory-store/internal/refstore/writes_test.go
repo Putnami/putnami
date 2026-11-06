@@ -12,6 +12,7 @@ import (
 
 	collab "go.putnami.dev/protocol/collaboration"
 	"go.putnami.dev/protocol/features/spectest"
+	"go.putnami.dev/sdk/extension/gittest"
 	"go.putnami.dev/tooling/memory-store/internal/store"
 )
 
@@ -31,10 +32,23 @@ func isolated(t *testing.T) {
 	t.Setenv("GIT_CONFIG_NOSYSTEM", "1")
 }
 
+// bareRemote makes a bare repository named remote.git in a directory of its
+// own and returns its path.
+func bareRemote(t *testing.T) string {
+	t.Helper()
+	remote := filepath.Join(t.TempDir(), "remote.git")
+	run(t, nil, "init", "--bare", "--quiet", remote)
+	return remote
+}
+
+func TestBareRemoteIsTheSameOnAForeignMachine(t *testing.T) {
+	gittest.AssertMachineIndependent(t, func() string { return bareRemote(t) })
+}
+
 func run(t *testing.T, env []string, args ...string) string {
 	t.Helper()
-	cmd := exec.Command("git", args...)
-	cmd.Env = append(os.Environ(), append([]string{"GIT_AUTHOR_NAME=t", "GIT_AUTHOR_EMAIL=t@example.invalid",
+	cmd := gittest.Command("", args...)
+	cmd.Env = append(cmd.Env, append([]string{"GIT_AUTHOR_NAME=t", "GIT_AUTHOR_EMAIL=t@example.invalid",
 		"GIT_COMMITTER_NAME=t", "GIT_COMMITTER_EMAIL=t@example.invalid"}, env...)...)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
@@ -87,8 +101,7 @@ func TestABranchWithRecordsAndNoIdentityIsNeverGivenANewOne(t *testing.T) {
 func TestAWriteAnswersWithinItsDeadlines(t *testing.T) {
 	spectest.Proves(t, feature, "retries-never-duplicate", "a-write-answers-before-the-provider-timeout")
 	isolated(t)
-	remote := filepath.Join(t.TempDir(), "remote.git")
-	run(t, nil, "init", "--bare", "--quiet", remote)
+	remote := bareRemote(t)
 	// The budgets leave the local commands of the attempt time to finish on
 	// a loaded machine; without them the push alone waits 20 s, and its
 	// reconciliation 20 s more.

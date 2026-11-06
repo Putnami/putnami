@@ -15,6 +15,7 @@ import (
 	"time"
 
 	collab "go.putnami.dev/protocol/collaboration"
+	"go.putnami.dev/sdk/extension/gittest"
 	"go.putnami.dev/tooling/memory-store/internal/store"
 )
 
@@ -266,11 +267,21 @@ func isolateGit(t *testing.T) {
 	t.Setenv("GIT_CONFIG_NOSYSTEM", "1")
 }
 
+// bareRepository makes the bare repository name in dir and returns its path.
+func bareRepository(t *testing.T, dir, name string) string {
+	t.Helper()
+	gitCommand(t, dir, "init", "--bare", "--quiet", name)
+	return filepath.Join(dir, name)
+}
+
+func TestBareRepositoryIsTheSameOnAForeignMachine(t *testing.T) {
+	gittest.AssertMachineIndependent(t, func() string { return bareRepository(t, t.TempDir(), "memory.git") })
+}
+
 func gitCommand(t *testing.T, dir string, args ...string) string {
 	t.Helper()
-	cmd := exec.Command("git", args...)
-	cmd.Dir = dir
-	cmd.Env = append(os.Environ(), "GIT_AUTHOR_NAME=t", "GIT_AUTHOR_EMAIL=t@example.invalid",
+	cmd := gittest.Command(dir, args...)
+	cmd.Env = append(cmd.Env, "GIT_AUTHOR_NAME=t", "GIT_AUTHOR_EMAIL=t@example.invalid",
 		"GIT_COMMITTER_NAME=t", "GIT_COMMITTER_EMAIL=t@example.invalid")
 	out, err := cmd.CombinedOutput()
 	if err != nil {
@@ -312,8 +323,7 @@ func backends() []backend {
 		}},
 		{name: "git-remote", open: func(t *testing.T, _ string) (string, func() func()) {
 			isolateGit(t)
-			remote := filepath.Join(t.TempDir(), "memory.git")
-			gitCommand(t, filepath.Dir(remote), "init", "--bare", "--quiet", remote)
+			remote := bareRepository(t, t.TempDir(), "memory.git")
 			// The remote is gone.
 			return `{"backend":"git","remote":` + mustJSON(t, remote) + `,"branch":"agents/memory"}`, func() func() {
 				aside := remote + ".aside"

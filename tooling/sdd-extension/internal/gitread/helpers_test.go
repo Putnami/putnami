@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"go.putnami.dev/tooling/sdd/extension/internal/gittest"
+	"go.putnami.dev/sdk/extension/gittest"
 )
 
 // initGitRepo makes a repository on branch main with one commit of README.md.
@@ -42,6 +42,10 @@ func initGitRepo(t *testing.T) string {
 	}
 
 	return dir
+}
+
+func TestInitGitRepoIsTheSameOnAForeignMachine(t *testing.T) {
+	gittest.AssertMachineIndependent(t, func() string { return initGitRepo(t) })
 }
 
 func runGit(t *testing.T, dir string, args ...string) string {

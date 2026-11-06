@@ -30,7 +30,6 @@ import (
 	protocoljob "go.putnami.dev/protocol/job"
 	runtimeproto "go.putnami.dev/protocol/runtime"
 	wsproto "go.putnami.dev/protocol/workspace"
-	"go.putnami.dev/sdk/extension/gitread"
 	"go.putnami.dev/sdk/extension/profiles"
 	"go.putnami.dev/sdk/extension/releaseset"
 	"go.putnami.dev/tooling/cli/internal/cmderr"
@@ -2080,27 +2079,8 @@ func TestReleaseSetProvenanceReadsGitRevision(t *testing.T) {
 	if _, err := exec.LookPath("git"); err != nil {
 		t.Skip("git is not installed")
 	}
-	root := t.TempDir()
-	git := func(args ...string) string {
-		t.Helper()
-		cmd := exec.Command(gitread.Executable(), append([]string{"-c", "user.name=test", "-c", "user.email=test@example.invalid", "-c", "commit.gpgsign=false"}, args...)...)
-		cmd.Dir = root
-		out, err := cmd.CombinedOutput()
-		if err != nil {
-			t.Fatalf("git %v: %v\n%s", args, err, out)
-		}
-		return strings.TrimSpace(string(out))
-	}
-	git("init", "-q", "-b", "main")
-	if err := os.MkdirAll(filepath.Join(root, "lib"), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(filepath.Join(root, "lib", "index.ts"), []byte("export const a = 1\n"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	git("add", ".")
-	git("commit", "-q", "-m", "init")
-	head := git("rev-parse", "HEAD")
+	root := releaseSetRepo(t, "lib/index.ts")
+	head := releaseSetGit(t, root, "rev-parse", "HEAD")
 
 	project := &workspace.Project{ID: "/lib", Name: "@putnami/lib", Path: "lib"}
 	ws := workspace.NewWorkspace(root, &wsproto.Config{Name: "putnami"}, []*workspace.Project{project})

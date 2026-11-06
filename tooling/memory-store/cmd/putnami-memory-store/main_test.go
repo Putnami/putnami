@@ -17,6 +17,7 @@ import (
 	extension "go.putnami.dev/protocol/extension"
 	"go.putnami.dev/protocol/features/spectest"
 	runtimeproto "go.putnami.dev/protocol/runtime"
+	"go.putnami.dev/sdk/extension/gittest"
 )
 
 const feature = "tooling/memory-store"
@@ -165,6 +166,21 @@ func provide(request []byte) (*collab.Response, error) {
 	return response, nil
 }
 
+// bareRemote makes a bare repository named memory.git in a directory of its
+// own and returns its path.
+func bareRemote(t *testing.T) string {
+	t.Helper()
+	remote := filepath.Join(t.TempDir(), "memory.git")
+	if out, err := gittest.Command("", "init", "--bare", "--quiet", remote).CombinedOutput(); err != nil {
+		t.Fatalf("git init: %v\n%s", err, out)
+	}
+	return remote
+}
+
+func TestBareRemoteIsTheSameOnAForeignMachine(t *testing.T) {
+	gittest.AssertMachineIndependent(t, func() string { return bareRemote(t) })
+}
+
 // TestConcurrentProviderProcessesCheckpointOnce races provider processes —
 // separate operating-system processes, as concurrent agents are — on one
 // store, for each backend: of the creations exactly one lands, and of the
@@ -180,10 +196,7 @@ func TestConcurrentProviderProcessesCheckpointOnce(t *testing.T) {
 	}
 	t.Setenv("GIT_CONFIG_GLOBAL", global)
 	t.Setenv("GIT_CONFIG_NOSYSTEM", "1")
-	remote := filepath.Join(t.TempDir(), "memory.git")
-	if out, err := exec.Command("git", "init", "--bare", "--quiet", remote).CombinedOutput(); err != nil {
-		t.Fatalf("git init: %v\n%s", err, out)
-	}
+	remote := bareRemote(t)
 	for name, settings := range map[string]string{
 		"file":       `{"backend":"file"}`,
 		"git":        `{"backend":"git"}`,

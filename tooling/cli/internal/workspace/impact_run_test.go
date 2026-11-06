@@ -3,7 +3,6 @@ package workspace
 import (
 	"encoding/json"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"slices"
 	"testing"
@@ -12,6 +11,7 @@ import (
 
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/sdk/extension/gitread"
+	"go.putnami.dev/sdk/extension/gittest"
 	"go.putnami.dev/tooling/cli/internal/git"
 )
 
@@ -38,15 +38,21 @@ func gitInitWithBaseline(t *testing.T, dir string) {
 	runGitForImpact(t, dir, "branch", "-M", "main")
 }
 
+func TestGitInitWithBaselineIsTheSameOnAForeignMachine(t *testing.T) {
+	gittest.AssertMachineIndependent(t, func() string {
+		dir := t.TempDir()
+		gitInitWithBaseline(t, dir)
+		return dir
+	})
+}
+
 func runGitForImpact(t *testing.T, dir string, args ...string) {
 	t.Helper()
-	env := append(os.Environ(),
+	cmd := gittest.Command(dir, args...)
+	cmd.Env = append(cmd.Env,
 		"GIT_AUTHOR_NAME=test", "GIT_AUTHOR_EMAIL=test@example.com",
 		"GIT_COMMITTER_NAME=test", "GIT_COMMITTER_EMAIL=test@example.com",
 	)
-	cmd := exec.Command(gitread.Executable(), args...)
-	cmd.Dir = dir
-	cmd.Env = env
 	if out, err := cmd.CombinedOutput(); err != nil {
 		t.Fatalf("git %v: %v\n%s", args, err, out)
 	}

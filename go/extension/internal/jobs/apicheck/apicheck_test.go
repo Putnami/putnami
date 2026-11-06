@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"reflect"
 	"slices"
@@ -16,6 +15,7 @@ import (
 	"go.putnami.dev/protocol/features/spectest"
 	"go.putnami.dev/protocol/runtime"
 	pctx "go.putnami.dev/sdk/extension/context"
+	"go.putnami.dev/sdk/extension/gittest"
 	"go.putnami.dev/sdk/extension/jsonl"
 )
 
@@ -78,6 +78,10 @@ func newFixture(t *testing.T, supportCatalog string, projectTags ...string) *fix
 	return f
 }
 
+func TestNewFixtureIsTheSameOnAForeignMachine(t *testing.T) {
+	gittest.AssertMachineIndependent(t, func() string { return newFixture(t, catalog("package", "stable")).root })
+}
+
 func (f *fixture) write(rel, content string) {
 	f.t.Helper()
 	path := filepath.Join(f.root, filepath.FromSlash(rel))
@@ -89,7 +93,7 @@ func (f *fixture) write(rel, content string) {
 	}
 }
 
-// git runs git in the fixture root with no user or system configuration.
+// git runs git in the fixture root without the caller's git environment.
 func (f *fixture) git(args ...string) {
 	f.t.Helper()
 	runGit(f.t, f.root, args...)
@@ -97,11 +101,8 @@ func (f *fixture) git(args ...string) {
 
 func runGit(t *testing.T, dir string, args ...string) {
 	t.Helper()
-	cmd := exec.Command("git", append([]string{"-c", "commit.gpgsign=false", "-c", "tag.gpgsign=false",
-		"-c", "init.defaultBranch=main"}, args...)...)
-	cmd.Dir = dir
-	cmd.Env = append(os.Environ(),
-		"GIT_CONFIG_GLOBAL="+os.DevNull, "GIT_CONFIG_NOSYSTEM=1",
+	cmd := gittest.Command(dir, args...)
+	cmd.Env = append(cmd.Env,
 		"GIT_AUTHOR_NAME=Fixture", "GIT_AUTHOR_EMAIL=fixture@example.com",
 		"GIT_COMMITTER_NAME=Fixture", "GIT_COMMITTER_EMAIL=fixture@example.com")
 	if output, err := cmd.CombinedOutput(); err != nil {

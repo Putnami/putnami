@@ -10,7 +10,7 @@ import (
 	protocolcli "go.putnami.dev/protocol/cli"
 	"go.putnami.dev/protocol/features/spectest"
 	pctx "go.putnami.dev/sdk/extension/context"
-	"go.putnami.dev/tooling/sdd/extension/internal/gittest"
+	"go.putnami.dev/sdk/extension/gittest"
 	"go.putnami.dev/tooling/sdd/extension/internal/sdd"
 )
 
@@ -45,6 +45,15 @@ func breakingMarkerRepository(t *testing.T, message string) (string, string) {
 	git("add", "-A")
 	git("commit", "-q", "-m", message)
 	return root, git("rev-parse", "HEAD")
+}
+
+// The branch and the commit message come from the fixture alone: a foreign
+// identity, configuration, hook or ignore file changes neither.
+func TestBreakingMarkerRepositoryIsTheSameOnAForeignMachine(t *testing.T) {
+	gittest.AssertMachineIndependent(t, func() string {
+		root, _ := breakingMarkerRepository(t, "feat(cli)!: drop the --all flag")
+		return root
+	})
 }
 
 // impactedJobContext is the context of a `validate --impacted` run that

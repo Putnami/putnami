@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"go.putnami.dev/sdk/extension/gitread"
+	"go.putnami.dev/sdk/extension/gittest"
 	"go.putnami.dev/tooling/cli/internal/abort"
 	"go.putnami.dev/tooling/cli/internal/commands/sessions"
 	"go.putnami.dev/tooling/cli/internal/workspace_state"
@@ -469,11 +470,19 @@ func initAliasGitRepo(t *testing.T, dir string) {
 	runAliasGit(t, dir, "branch", "-M", "main")
 }
 
+func TestAliasGitRepoIsTheSameOnAForeignMachine(t *testing.T) {
+	gittest.AssertMachineIndependent(t, func() string {
+		dir := t.TempDir()
+		writeTestFile(t, filepath.Join(dir, "README.md"), "# Alias\n")
+		initAliasGitRepo(t, dir)
+		return dir
+	})
+}
+
 func runAliasGit(t *testing.T, dir string, args ...string) {
 	t.Helper()
-	cmd := exec.Command(gitread.Executable(), args...)
-	cmd.Dir = dir
-	cmd.Env = append(os.Environ(),
+	cmd := gittest.Command(dir, args...)
+	cmd.Env = append(cmd.Env,
 		"GIT_AUTHOR_NAME=test", "GIT_AUTHOR_EMAIL=test@example.com",
 		"GIT_COMMITTER_NAME=test", "GIT_COMMITTER_EMAIL=test@example.com",
 	)

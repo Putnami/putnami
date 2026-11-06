@@ -15,6 +15,8 @@ import (
 	"strings"
 	"sync"
 	"testing"
+
+	"go.putnami.dev/sdk/extension/gittest"
 )
 
 // The run form of the installer: `curl -fsSL "https://putnami.dev/install.sh?run=<command>" | bash`
@@ -197,14 +199,8 @@ func requireGit(t *testing.T) string {
 
 func gitCommand(t *testing.T, dir string, args ...string) string {
 	t.Helper()
-	cmd := exec.Command(requireGit(t), args...)
-	cmd.Dir = dir
-	cmd.Env = []string{
-		"PATH=" + os.Getenv("PATH"),
-		"HOME=" + t.TempDir(),
-		"GIT_CONFIG_GLOBAL=/dev/null",
-		"GIT_CONFIG_NOSYSTEM=1",
-	}
+	requireGit(t)
+	cmd := gittest.Command(dir, args...)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		t.Fatalf("git %s: %v\n%s", strings.Join(args, " "), err, out)
@@ -212,15 +208,28 @@ func gitCommand(t *testing.T, dir string, args ...string) string {
 	return string(out)
 }
 
-func newRunEnv(t *testing.T, site *runSite) *runEnv {
+// callerRepo makes the directory caller below root, a fresh `git init`
+// directory, and returns it.
+func callerRepo(t *testing.T, root string) string {
 	t.Helper()
-	requireBash(t)
-	root := t.TempDir()
 	callerDir := filepath.Join(root, "caller")
 	if err := os.MkdirAll(callerDir, 0o755); err != nil {
 		t.Fatal(err)
 	}
 	gitCommand(t, callerDir, "init", "-q")
+	return callerDir
+}
+
+func TestCallerRepoIsTheSameOnAForeignMachine(t *testing.T) {
+	requireGit(t)
+	gittest.AssertMachineIndependent(t, func() string { return callerRepo(t, t.TempDir()) })
+}
+
+func newRunEnv(t *testing.T, site *runSite) *runEnv {
+	t.Helper()
+	requireBash(t)
+	root := t.TempDir()
+	callerDir := callerRepo(t, root)
 	cliLog := filepath.Join(root, "cli-calls.log")
 	e := newEnv(t).
 		set("PUTNAMI_REGISTRY_URL", site.URL).

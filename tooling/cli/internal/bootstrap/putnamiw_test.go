@@ -21,7 +21,7 @@ import (
 	"time"
 
 	"go.putnami.dev/protocol/features/spectest"
-	"go.putnami.dev/sdk/extension/gitread"
+	"go.putnami.dev/sdk/extension/gittest"
 )
 
 // findPutnamiw walks up from the test's working directory to the repo root that
@@ -839,13 +839,24 @@ func seedSourceTree(t *testing.T, repo string) {
 	git(t, repo, "-c", "commit.gpgsign=false", "commit", "-qm", "seed")
 }
 
-// git runs one git command in dir with a fixed identity, so the fixture does not
-// depend on (or write to) the developer's git configuration.
+func TestSeedSourceTreeIsTheSameOnAForeignMachine(t *testing.T) {
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git not available")
+	}
+	gittest.AssertMachineIndependent(t, func() string {
+		repo := filepath.Join(t.TempDir(), "repo")
+		seedSourceTree(t, repo)
+		return repo
+	})
+}
+
+// git runs one git command in dir with a fixed identity, without the caller's
+// git environment, so the fixture does not depend on (or write to) the
+// developer's git configuration.
 func git(t *testing.T, dir string, args ...string) {
 	t.Helper()
-	cmd := exec.Command(gitread.Executable(), args...)
-	cmd.Dir = dir
-	cmd.Env = append(os.Environ(),
+	cmd := gittest.Command(dir, args...)
+	cmd.Env = append(cmd.Env,
 		"GIT_AUTHOR_NAME=putnami test", "GIT_AUTHOR_EMAIL=test@example.invalid",
 		"GIT_COMMITTER_NAME=putnami test", "GIT_COMMITTER_EMAIL=test@example.invalid",
 	)
@@ -1252,7 +1263,7 @@ func assertNotAGitWorkTree(t *testing.T, dir string) {
 	if _, err := exec.LookPath("git"); err != nil {
 		return
 	}
-	cmd := exec.Command(gitread.Executable(), "-C", dir, "rev-parse", "--is-inside-work-tree")
+	cmd := gittest.Command(dir, "rev-parse", "--is-inside-work-tree")
 	if out, err := cmd.CombinedOutput(); err == nil {
 		t.Fatalf("fixture %s is inside a git work tree (%s), so it exercises the content-key path "+
 			"instead of the mtime gate these tests cover. Run the suite with TMPDIR outside a repository.",

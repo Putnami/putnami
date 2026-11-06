@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -13,7 +12,7 @@ import (
 	protocolcli "go.putnami.dev/protocol/cli"
 	"go.putnami.dev/protocol/features/spectest"
 	wsproto "go.putnami.dev/protocol/workspace"
-	"go.putnami.dev/sdk/extension/gitread"
+	"go.putnami.dev/sdk/extension/gittest"
 	"go.putnami.dev/tooling/cli/internal/cmderr"
 	"go.putnami.dev/tooling/cli/internal/commands/sharedtest"
 	"go.putnami.dev/tooling/cli/internal/iox"
@@ -30,8 +29,7 @@ func treeCommandRepo(t *testing.T) string {
 		{"config", "user.name", "Test"},
 		{"config", "commit.gpgsign", "false"},
 	} {
-		command := exec.Command(gitread.Executable(), args...)
-		command.Dir = dir
+		command := gittest.Command(dir, args...)
 		if out, err := command.CombinedOutput(); err != nil {
 			t.Fatalf("git %v: %v\n%s", args, err, out)
 		}
@@ -40,13 +38,16 @@ func treeCommandRepo(t *testing.T) string {
 		t.Fatalf("write README: %v", err)
 	}
 	for _, args := range [][]string{{"add", "."}, {"commit", "-m", "initial"}} {
-		command := exec.Command(gitread.Executable(), args...)
-		command.Dir = dir
+		command := gittest.Command(dir, args...)
 		if out, err := command.CombinedOutput(); err != nil {
 			t.Fatalf("git %v: %v\n%s", args, err, out)
 		}
 	}
 	return dir
+}
+
+func TestTreeCommandRepoIsTheSameOnAForeignMachine(t *testing.T) {
+	gittest.AssertMachineIndependent(t, func() string { return treeCommandRepo(t) })
 }
 
 func runTree(t *testing.T, env *CommandEnv) (string, error) {

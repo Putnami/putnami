@@ -8,7 +8,6 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -18,6 +17,7 @@ import (
 	"time"
 
 	clicore "go.putnami.dev/cloud/extension/internal/clicore"
+	"go.putnami.dev/sdk/extension/gittest"
 )
 
 // The exact bytes `putnami cloud env status --env prod` prints without
@@ -144,13 +144,7 @@ func hermeticGit(t *testing.T, dir string) {
 
 func gitIn(t *testing.T, dir string, args ...string) string {
 	t.Helper()
-	cmd := exec.Command("git", args...)
-	cmd.Dir = dir
-	out, err := cmd.CombinedOutput()
-	if err != nil {
-		t.Fatalf("git %s: %v\n%s", strings.Join(args, " "), err, out)
-	}
-	return strings.TrimSpace(string(out))
+	return gittest.Run(t, dir, args...)
 }
 
 // statusGitFixture builds a checkout whose main branch has one commit and
@@ -168,6 +162,13 @@ func statusGitFixture(t *testing.T) (root, onMain, offMain string) {
 	gitIn(t, root, "commit", "-q", "--allow-empty", "-m", "pull request head")
 	offMain = gitIn(t, root, "rev-parse", "HEAD")
 	return root, onMain, offMain
+}
+
+func TestStatusGitFixtureIsTheSameOnAForeignMachine(t *testing.T) {
+	gittest.AssertMachineIndependent(t, func() string {
+		root, _, _ := statusGitFixture(t)
+		return root
+	})
 }
 
 // TestStatusHealthGroupsErrorsByServiceLabel is the human contract: one logs

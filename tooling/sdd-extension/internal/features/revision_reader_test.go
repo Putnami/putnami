@@ -8,8 +8,8 @@ import (
 	"testing"
 
 	featureproto "go.putnami.dev/protocol/features"
+	"go.putnami.dev/sdk/extension/gittest"
 	internalgit "go.putnami.dev/tooling/sdd/extension/internal/gitread"
-	"go.putnami.dev/tooling/sdd/extension/internal/gittest"
 )
 
 func TestEvaluateGitRevisionLoadsEachTreesOwnMembershipWithoutWorktreeMutation(t *testing.T) {
@@ -222,6 +222,15 @@ func commitFeatureRepo(t *testing.T, repo, message string) {
 	t.Helper()
 	runFeatureGit(t, repo, "add", "-A")
 	runFeatureGit(t, repo, "commit", "-q", "-m", message)
+}
+
+func TestFeatureGitRepoIsTheSameOnAForeignMachine(t *testing.T) {
+	gittest.AssertMachineIndependent(t, func() string {
+		repo := initFeatureGitRepo(t)
+		writeRevisionFile(t, repo, "app/putnami.features.json", "{}\n")
+		commitFeatureRepo(t, repo, "base features")
+		return repo
+	})
 }
 
 func runFeatureGit(t *testing.T, repo string, args ...string) string {

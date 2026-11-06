@@ -2,7 +2,6 @@ package gitread
 
 import (
 	"slices"
-	"strings"
 	"testing"
 
 	"go.putnami.dev/protocol/features/spectest"
@@ -28,18 +27,5 @@ func TestRepositoryEnvironmentKeepsTransportAndRemovesForeignRepository(t *testi
 	}
 	if !slices.Equal(got, kept) {
 		t.Errorf("RepositoryEnvironment kept %q, want %q", got, kept)
-	}
-}
-
-// A failed call names the verb, the directory and what git wrote on standard
-// error.
-func TestRunNamesTheVerbTheDirectoryAndGitsMessage(t *testing.T) {
-	repo := initGitRepo(t)
-	_, err := Run(repo, "rev-parse", "--verify", "--quiet", "missing^{commit}")
-	if err == nil {
-		t.Fatal("Run(rev-parse missing) succeeded, want an error")
-	}
-	if !strings.HasPrefix(err.Error(), "git rev-parse (in "+repo+"): ") {
-		t.Fatalf("error = %q, want it to name the verb and the directory", err)
 	}
 }

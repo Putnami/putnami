@@ -2,7 +2,6 @@ package git
 
 import (
 	"os"
-	"os/exec"
 	"path/filepath"
 	"reflect"
 	"slices"
@@ -12,6 +11,7 @@ import (
 	"time"
 
 	"go.putnami.dev/sdk/extension/gitread"
+	"go.putnami.dev/sdk/extension/gittest"
 )
 
 func TestTagsAtHead(t *testing.T) {
@@ -123,9 +123,8 @@ func commitAt(t *testing.T, dir, relPath, subject, date string) string {
 		t.Fatal(err)
 	}
 	for _, args := range [][]string{{"add", "."}, {"commit", "-m", subject}} {
-		cmd := exec.Command(gitread.Executable(), args...)
-		cmd.Dir = dir
-		cmd.Env = append(os.Environ(), "GIT_COMMITTER_DATE="+date, "GIT_AUTHOR_DATE="+date)
+		cmd := gittest.Command(dir, args...)
+		cmd.Env = append(cmd.Env, "GIT_COMMITTER_DATE="+date, "GIT_AUTHOR_DATE="+date)
 		if out, err := cmd.CombinedOutput(); err != nil {
 			t.Fatalf("git %v: %v\n%s", args, err, out)
 		}

@@ -5,7 +5,6 @@ import (
 	"context"
 	"errors"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"runtime"
 	"slices"
@@ -14,6 +13,7 @@ import (
 	"time"
 
 	wire "go.putnami.dev/protocol/extension/hostrpc"
+	"go.putnami.dev/sdk/extension/gittest"
 )
 
 func TestNativeGitReadBoundaryRejectsWritingVerbs(t *testing.T) {
@@ -29,20 +29,14 @@ func TestNativeGitReadBoundaryRejectsWritingVerbs(t *testing.T) {
 	}
 }
 
-func TestNativeGitPushThatHangsTimesOut(t *testing.T) {
-	if runtime.GOOS == "windows" {
-		t.Skip("the hanging hook is a POSIX executable")
-	}
-	// Not parallel: it shortens the package write timeout.
-	previous := gitWriteTimeout
-	gitWriteTimeout = 200 * time.Millisecond
-	t.Cleanup(func() { gitWriteTimeout = previous })
+// hangingPushRepo is a repository on branch fix/hang with one commit, an
+// origin, and a pre-push hook that sleeps.
+func hangingPushRepo(t *testing.T) string {
+	t.Helper()
 	root, origin, hooks := t.TempDir(), t.TempDir(), t.TempDir()
 	run := func(dir string, args ...string) {
 		t.Helper()
-		if output, err := exec.Command("git", append([]string{"-C", dir}, args...)...).CombinedOutput(); err != nil {
-			t.Fatalf("git %v: %v: %s", args, err, output)
-		}
+		gittest.Run(t, dir, args...)
 	}
 	run(origin, "init", "-q", "--bare")
 	run(root, "init", "-q", "-b", "fix/hang")
@@ -55,6 +49,22 @@ func TestNativeGitPushThatHangsTimesOut(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(hooks, "pre-push"), []byte("#!/bin/sh\nsleep 60\n"), 0700); err != nil {
 		t.Fatal(err)
 	}
+	return root
+}
+
+func TestHangingPushRepoIsTheSameOnAForeignMachine(t *testing.T) {
+	gittest.AssertMachineIndependent(t, func() string { return hangingPushRepo(t) })
+}
+
+func TestNativeGitPushThatHangsTimesOut(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("the hanging hook is a POSIX executable")
+	}
+	// Not parallel: it shortens the package write timeout.
+	previous := gitWriteTimeout
+	gitWriteTimeout = 200 * time.Millisecond
+	t.Cleanup(func() { gitWriteTimeout = previous })
+	root := hangingPushRepo(t)
 	started := time.Now()
 	err := (NativeGit{Root: root}).Push(context.Background(), "fix/hang")
 	if err == nil || !strings.Contains(err.Error(), "timed out after 200ms") {
@@ -65,15 +75,16 @@ func TestNativeGitPushThatHangsTimesOut(t *testing.T) {
 	}
 }
 
-func TestNativeGitCommitMessagesNeverRunsConfiguredVerifier(t *testing.T) {
-	if runtime.GOOS == "windows" {
-		t.Skip("the verifier sentinel is a POSIX executable")
-	}
-	t.Parallel()
-	root := t.TempDir()
+// signedCommitRepo is a repository whose HEAD is a commit with a signature
+// that its gpg.program would reject, with log.showSignature on. It returns
+// the root, the commit before it, the signed commit, and the file the
+// verifier writes when it runs.
+func signedCommitRepo(t *testing.T) (root, base, sha, marker string) {
+	t.Helper()
+	root = t.TempDir()
 	command := func(input []byte, args ...string) []byte {
 		t.Helper()
-		cmd := exec.Command("git", append([]string{"-C", root}, args...)...)
+		cmd := gittest.Command(root, args...)
 		cmd.Stdin = bytes.NewReader(input)
 		output, err := cmd.CombinedOutput()
 		if err != nil {
@@ -86,7 +97,7 @@ func TestNativeGitCommitMessagesNeverRunsConfiguredVerifier(t *testing.T) {
 	command(nil, "config", "user.email", "test@example.invalid")
 	command(nil, "config", "commit.gpgsign", "false")
 	command(nil, "commit", "-q", "--allow-empty", "-m", "base")
-	base := strings.TrimSpace(string(command(nil, "rev-parse", "HEAD")))
+	base = strings.TrimSpace(string(command(nil, "rev-parse", "HEAD")))
 	command(nil, "commit", "-q", "--allow-empty", "-m", "feat: English title", "-m", "Body kept exactly")
 	raw := command(nil, "cat-file", "commit", "HEAD")
 	parts := bytes.SplitN(raw, []byte("\n\n"), 2)
@@ -95,19 +106,38 @@ func TestNativeGitCommitMessagesNeverRunsConfiguredVerifier(t *testing.T) {
 	}
 	signed := append(bytes.Clone(parts[0]), []byte("\ngpgsig -----BEGIN PGP SIGNATURE-----\n fake-signature\n -----END PGP SIGNATURE-----\n\n")...)
 	signed = append(signed, parts[1]...)
-	sha := strings.TrimSpace(string(command(signed, "hash-object", "-t", "commit", "-w", "--stdin")))
+	sha = strings.TrimSpace(string(command(signed, "hash-object", "-t", "commit", "-w", "--stdin")))
 	command(nil, "update-ref", "HEAD", sha)
 
 	verifier := filepath.Join(root, "signature-verifier")
-	marker := verifier + ".invoked"
+	marker = verifier + ".invoked"
 	if err := os.WriteFile(verifier, []byte("#!/bin/sh\nprintf invoked > \"$0.invoked\"\nexit 23\n"), 0700); err != nil {
 		t.Fatal(err)
 	}
 	command(nil, "config", "log.showSignature", "true")
 	command(nil, "config", "gpg.format", "openpgp")
 	command(nil, "config", "gpg.program", verifier)
+	return root, base, sha, marker
+}
+
+func TestSignedCommitRepoIsTheSameOnAForeignMachine(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("the verifier sentinel is a POSIX executable")
+	}
+	gittest.AssertMachineIndependent(t, func() string {
+		root, _, _, _ := signedCommitRepo(t)
+		return root
+	})
+}
+
+func TestNativeGitCommitMessagesNeverRunsConfiguredVerifier(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("the verifier sentinel is a POSIX executable")
+	}
+	t.Parallel()
+	root, base, sha, marker := signedCommitRepo(t)
 	// The configured verifier really is reachable for this signed object.
-	probe := exec.Command("git", "-C", root, "log", "-1", "--format=%B", sha)
+	probe := gittest.Command(root, "log", "-1", "--format=%B", sha)
 	_, _ = probe.CombinedOutput()
 	if _, err := os.Stat(marker); err != nil {
 		t.Fatalf("fixture did not invoke configured verifier: %v", err)
@@ -146,9 +176,7 @@ func rebaseFixture(t *testing.T) (root, origin, pushed string, run func(string, 
 	hooks := t.TempDir()
 	run = func(dir string, args ...string) string {
 		t.Helper()
-		cmd := exec.Command("git", append([]string{"-C", dir}, args...)...)
-		cmd.Env = append(os.Environ(), "GIT_CONFIG_GLOBAL="+os.DevNull, "GIT_CONFIG_NOSYSTEM=1")
-		output, err := cmd.CombinedOutput()
+		output, err := gittest.Command(dir, args...).CombinedOutput()
 		if err != nil {
 			t.Fatalf("git %v: %v: %s", args, err, output)
 		}
@@ -181,6 +209,13 @@ func rebaseFixture(t *testing.T) (root, origin, pushed string, run func(string, 
 		t.Fatal("the rebase kept the pushed head")
 	}
 	return root, origin, pushed, run
+}
+
+func TestRebaseFixtureIsTheSameOnAForeignMachine(t *testing.T) {
+	gittest.AssertMachineIndependent(t, func() string {
+		root, _, _, _ := rebaseFixture(t)
+		return root
+	})
 }
 
 // pushFromElsewhere pushes a commit on top of origin's fix/rebase from

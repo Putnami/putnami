@@ -12,6 +12,7 @@ import (
 
 	distributioncli "go.putnami.dev/cloud/extension/internal/distributioncli"
 	"go.putnami.dev/sdk/extension/gitcandidate"
+	"go.putnami.dev/sdk/extension/gittest"
 )
 
 // These tests pin the cache key of cloud-validate-site-content. The task keys
@@ -93,6 +94,28 @@ func siteContentKeyFixture(t *testing.T) (root, project string) {
 	gitCommand(t, root, "add", "-A")
 	gitCommand(t, root, "commit", "-qm", "fixture")
 	return root, project
+}
+
+func TestSiteContentKeyFixtureIsTheSameOnAForeignMachine(t *testing.T) {
+	gittest.AssertMachineIndependent(t, func() string {
+		root, _ := siteContentKeyFixture(t)
+		return root
+	})
+}
+
+// nestedGitRepository makes dir a repository of its own, inside the work tree
+// that holds it.
+func nestedGitRepository(t *testing.T, dir string) {
+	t.Helper()
+	gitCommand(t, dir, "init", "-q")
+}
+
+func TestNestedGitRepositoryIsTheSameOnAForeignMachine(t *testing.T) {
+	gittest.AssertMachineIndependent(t, func() string {
+		dir := t.TempDir()
+		nestedGitRepository(t, dir)
+		return dir
+	})
 }
 
 // siteContentOutcomeOf runs the check from the project directory, as the task
@@ -210,7 +233,7 @@ func TestSiteContentPackagingReadsTheTreeValidationChecks(t *testing.T) {
 	nestedRepository := func(rel string) func(*testing.T, string) {
 		return func(t *testing.T, project string) {
 			writeFixtureFile(t, filepath.Join(project, filepath.FromSlash(rel), "inner.md"), "# Inner\n")
-			gitCommand(t, filepath.Join(project, filepath.FromSlash(rel)), "init", "-q")
+			nestedGitRepository(t, filepath.Join(project, filepath.FromSlash(rel)))
 		}
 	}
 	for _, tc := range []struct {

@@ -3,12 +3,11 @@ package shared
 import (
 	"errors"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
 
-	"go.putnami.dev/sdk/extension/gitread"
+	"go.putnami.dev/sdk/extension/gittest"
 	"go.putnami.dev/tooling/cli/internal/cmderr"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
@@ -287,9 +286,8 @@ func gitSelectionWorkspace(t *testing.T) *workspace.Workspace {
 	ws := selectionWorkspace(t)
 	run := func(args ...string) {
 		t.Helper()
-		cmd := exec.Command(gitread.Executable(), args...)
-		cmd.Dir = ws.Root
-		cmd.Env = append(os.Environ(),
+		cmd := gittest.Command(ws.Root, args...)
+		cmd.Env = append(cmd.Env,
 			"GIT_AUTHOR_NAME=test", "GIT_AUTHOR_EMAIL=test@example.com",
 			"GIT_COMMITTER_NAME=test", "GIT_COMMITTER_EMAIL=test@example.com")
 		if output, err := cmd.CombinedOutput(); err != nil {
@@ -300,6 +298,10 @@ func gitSelectionWorkspace(t *testing.T) *workspace.Workspace {
 	run("add", "-A")
 	run("commit", "-q", "-m", "fixture")
 	return ws
+}
+
+func TestGitSelectionWorkspaceIsTheSameOnAForeignMachine(t *testing.T) {
+	gittest.AssertMachineIndependent(t, func() string { return gitSelectionWorkspace(t).Root })
 }
 
 // TestResolveProjectSelectionTreatsParserSentinelsAsModes pins a trap the

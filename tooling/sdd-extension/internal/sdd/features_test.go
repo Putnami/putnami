@@ -14,8 +14,8 @@ import (
 	featureproto "go.putnami.dev/protocol/features"
 	"go.putnami.dev/protocol/features/spectest"
 	wsproto "go.putnami.dev/protocol/workspace"
+	"go.putnami.dev/sdk/extension/gittest"
 	featureengine "go.putnami.dev/tooling/sdd/extension/internal/features"
-	"go.putnami.dev/tooling/sdd/extension/internal/gittest"
 	workspace "go.putnami.dev/tooling/sdd/extension/internal/wsview"
 )
 
@@ -1141,6 +1141,15 @@ func featureCommandsWorkspace(t *testing.T, invalid bool) *workspace.Workspace {
   }]
 }`)
 	return fixtureWorkspace("features-test", root, appProject("app", "app"), appProject("orders", "orders"))
+}
+
+func TestFeatureCommandsRepositoryIsTheSameOnAForeignMachine(t *testing.T) {
+	gittest.AssertMachineIndependent(t, func() string {
+		root := featureCommandsWorkspace(t, false).Root
+		initFeatureCommandsGit(t, root)
+		commitFeatureCommandsGit(t, root, "base features")
+		return root
+	})
 }
 
 func initFeatureCommandsGit(t *testing.T, root string) {

@@ -11,6 +11,7 @@ import (
 
 	"go.putnami.dev/protocol/features/spectest"
 	"go.putnami.dev/sdk/extension/gitcandidate"
+	"go.putnami.dev/sdk/extension/gittest"
 )
 
 // fixtureMembers is the membership the CLI resolves for a fixture workspace:
@@ -25,13 +26,16 @@ func fixtureMembers(t *testing.T, root string) []string {
 	return members
 }
 
+func TestCommittedCatalogWorkspaceIsTheSameOnAForeignMachine(t *testing.T) {
+	gittest.AssertMachineIndependent(t, func() string {
+		root, _ := committedCatalogWorkspace(t)
+		return root
+	})
+}
+
 func gitIn(t *testing.T, dir string, args ...string) {
 	t.Helper()
-	cmd := exec.Command("git", args...)
-	cmd.Dir = dir
-	if out, err := cmd.CombinedOutput(); err != nil {
-		t.Fatalf("git %v: %v\n%s", args, err, out)
-	}
+	gittest.Run(t, dir, args...)
 }
 
 // cutFingerprint digests the candidate cut as the task input `git:**` keys
@@ -339,7 +343,7 @@ func TestTheCheckReportsAFileCommittedInsideABuildWrittenTree(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	listed, err := exec.Command("git", "-C", root, "ls-files", "--", config, schema).Output()
+	listed, err := gittest.Command(root, "ls-files", "--", config, schema).Output()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -389,15 +393,10 @@ func TestTheCheckTakesItsMembershipFromTheJobContext(t *testing.T) {
 	}
 }
 
-// TestTheCandidateCutListsWhatADirectoryWalkLists pins the cut reader the
-// check's discovery and output listing use: a file below a skipped directory
-// is not listed, a manifest at the provider's own root is not a target, and
-// two manifests of one language are taken in directory-walk order, which
-// differs from byte order when a sibling name sorts before "/".
-func TestTheCandidateCutListsWhatADirectoryWalkLists(t *testing.T) {
-	if _, err := exec.LookPath("git"); err != nil {
-		t.Skip("git is not installed")
-	}
+// manifestRepository is a repository of client manifests, some below
+// directories a walk skips.
+func manifestRepository(t *testing.T) string {
+	t.Helper()
 	root := t.TempDir()
 	for _, rel := range []string{
 		"p/client.putnami.json",
@@ -410,6 +409,23 @@ func TestTheCandidateCutListsWhatADirectoryWalkLists(t *testing.T) {
 		writeWorkspaceFile(t, root, rel, "{}")
 	}
 	gitIn(t, root, "init", "-q")
+	return root
+}
+
+func TestManifestRepositoryIsTheSameOnAForeignMachine(t *testing.T) {
+	gittest.AssertMachineIndependent(t, func() string { return manifestRepository(t) })
+}
+
+// TestTheCandidateCutListsWhatADirectoryWalkLists pins the cut reader the
+// check's discovery and output listing use: a file below a skipped directory
+// is not listed, a manifest at the provider's own root is not a target, and
+// two manifests of one language are taken in directory-walk order, which
+// differs from byte order when a sibling name sorts before "/".
+func TestTheCandidateCutListsWhatADirectoryWalkLists(t *testing.T) {
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git is not installed")
+	}
+	root := manifestRepository(t)
 	tree, err := gitcandidate.Open(root)
 	if err != nil || tree == nil {
 		t.Fatalf("open the candidate cut: %v, %v", tree, err)

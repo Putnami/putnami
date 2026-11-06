@@ -9,14 +9,13 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strings"
 	"testing"
 
 	wsproto "go.putnami.dev/protocol/workspace"
-	"go.putnami.dev/sdk/extension/gitread"
+	"go.putnami.dev/sdk/extension/gittest"
 	"go.putnami.dev/sdk/extension/pkgmeta"
 	"go.putnami.dev/tooling/cli/internal/commands/sharedtest"
 )
@@ -109,11 +108,14 @@ func versionLineRepo(t *testing.T) string {
 	return dir
 }
 
+func TestVersionLineRepoIsTheSameOnAForeignMachine(t *testing.T) {
+	gittest.AssertMachineIndependent(t, func() string { return versionLineRepo(t) })
+}
+
 func gitInRepo(t *testing.T, dir string, args ...string) {
 	t.Helper()
-	cmd := exec.Command(gitread.Executable(), args...)
-	cmd.Dir = dir
-	cmd.Env = append(os.Environ(), "GIT_COMMITTER_DATE=2026-01-02T03:04:05Z", "GIT_AUTHOR_DATE=2026-01-02T03:04:05Z")
+	cmd := gittest.Command(dir, args...)
+	cmd.Env = append(cmd.Env, "GIT_COMMITTER_DATE=2026-01-02T03:04:05Z", "GIT_AUTHOR_DATE=2026-01-02T03:04:05Z")
 	if out, err := cmd.CombinedOutput(); err != nil {
 		t.Fatalf("git %v: %v\n%s", args, err, out)
 	}

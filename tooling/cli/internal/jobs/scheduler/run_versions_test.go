@@ -3,13 +3,13 @@ package scheduler
 import (
 	"errors"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
 
 	"go.putnami.dev/sdk/extension/gitread"
+	"go.putnami.dev/sdk/extension/gittest"
 	putnamigit "go.putnami.dev/tooling/cli/internal/git"
 	"go.putnami.dev/tooling/cli/internal/jobs/cachekey"
 	"go.putnami.dev/tooling/cli/internal/workspace"
@@ -42,6 +42,10 @@ func runVersionsRepo(t *testing.T) *workspace.Workspace {
 	ws := workspace.NewWorkspace(dir, nil, []*workspace.Project{web, api})
 	ws.Lines = map[string]string{"typescript": "ts/v{version}", "go": "go/v{version}"}
 	return ws
+}
+
+func TestRunVersionsRepoIsTheSameOnAForeignMachine(t *testing.T) {
+	gittest.AssertMachineIndependent(t, func() string { return runVersionsRepo(t).Root })
 }
 
 // Each line gets its own version: the tagged one takes its tag with no suffix,
@@ -133,7 +137,7 @@ func TestRequireFullClone(t *testing.T) {
 		t.Fatalf("RequireFullClone on a full clone = %v", err)
 	}
 	shallow := filepath.Join(t.TempDir(), "shallow")
-	cmd := exec.Command(gitread.Executable(), "clone", "--depth", "1", "file://"+ws.Root, shallow)
+	cmd := gittest.Command("", "clone", "--depth", "1", "file://"+ws.Root, shallow)
 	if out, err := cmd.CombinedOutput(); err != nil {
 		t.Skipf("shallow clone unavailable in this environment: %v\n%s", err, out)
 	}
@@ -145,9 +149,8 @@ func TestRequireFullClone(t *testing.T) {
 
 func runVersionsGit(t *testing.T, dir string, args ...string) {
 	t.Helper()
-	cmd := exec.Command(gitread.Executable(), args...)
-	cmd.Dir = dir
-	cmd.Env = append(os.Environ(), "GIT_COMMITTER_DATE=2026-01-02T03:04:05Z", "GIT_AUTHOR_DATE=2026-01-02T03:04:05Z")
+	cmd := gittest.Command(dir, args...)
+	cmd.Env = append(cmd.Env, "GIT_COMMITTER_DATE=2026-01-02T03:04:05Z", "GIT_AUTHOR_DATE=2026-01-02T03:04:05Z")
 	if out, err := cmd.CombinedOutput(); err != nil {
 		t.Fatalf("git %v: %v\n%s", args, err, out)
 	}

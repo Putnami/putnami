@@ -12,6 +12,7 @@ import (
 	"testing"
 
 	"go.putnami.dev/sdk/extension/gitcandidate"
+	"go.putnami.dev/sdk/extension/gittest"
 )
 
 // workTree creates an empty Git work tree.
@@ -25,13 +26,13 @@ func workTree(t *testing.T) string {
 	return root
 }
 
+func TestWorkTreeIsTheSameOnAForeignMachine(t *testing.T) {
+	gittest.AssertMachineIndependent(t, func() string { return workTree(t) })
+}
+
 func runGit(t *testing.T, dir string, args ...string) {
 	t.Helper()
-	cmd := exec.Command("git", args...)
-	cmd.Dir = dir
-	if out, err := cmd.CombinedOutput(); err != nil {
-		t.Fatalf("git %v: %v\n%s", args, err, out)
-	}
+	gittest.Run(t, dir, args...)
 }
 
 func makeSymlink(t *testing.T, root, target, rel string) {

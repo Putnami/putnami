@@ -3,11 +3,12 @@ package linetag
 import (
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"sync/atomic"
 	"testing"
+
+	"go.putnami.dev/sdk/extension/gittest"
 )
 
 // repository returns a repository on branch main with one commit.
@@ -23,6 +24,10 @@ func repository(t *testing.T) string {
 	return dir
 }
 
+func TestRepositoryIsTheSameOnAForeignMachine(t *testing.T) {
+	gittest.AssertMachineIndependent(t, func() string { return repository(t) })
+}
+
 // clock dates each git call one minute after the last one, so the order of
 // the commits of a fixture never depends on how fast the test runs.
 var clock atomic.Int64
@@ -30,10 +35,8 @@ var clock atomic.Int64
 func git(t *testing.T, dir string, args ...string) string {
 	t.Helper()
 	date := fmt.Sprintf("@%d +0000", 1700000000+60*clock.Add(1))
-	cmd := exec.Command("git", args...)
-	cmd.Dir = dir
-	cmd.Env = append(os.Environ(), "GIT_CONFIG_GLOBAL="+os.DevNull, "GIT_CONFIG_NOSYSTEM=1",
-		"GIT_AUTHOR_DATE="+date, "GIT_COMMITTER_DATE="+date)
+	cmd := gittest.Command(dir, args...)
+	cmd.Env = append(gittest.Environ(os.Environ()), "GIT_AUTHOR_DATE="+date, "GIT_COMMITTER_DATE="+date)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		t.Fatalf("git %v: %v\n%s", args, err, out)

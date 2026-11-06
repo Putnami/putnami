@@ -11,7 +11,20 @@ import (
 	"time"
 
 	"go.putnami.dev/protocol/features/spectest"
+	"go.putnami.dev/sdk/extension/gittest"
 )
+
+// featureBranchRepo is an empty repository on branch feat/x.
+func featureBranchRepo(t *testing.T) string {
+	t.Helper()
+	dir := t.TempDir()
+	gittest.Run(t, dir, "init", "-q", "-b", "feat/x")
+	return dir
+}
+
+func TestFeatureBranchRepoIsTheSameOnAForeignMachine(t *testing.T) {
+	gittest.AssertMachineIndependent(t, func() string { return featureBranchRepo(t) })
+}
 
 func TestTheLaunchEnvironmentReadsTheProcess(t *testing.T) {
 	spectest.Proves(t, sessionFeature, targetRequirement, "the-repository-comes-from-origin-without-host-or-credential")
@@ -31,10 +44,7 @@ func TestTheLaunchEnvironmentReadsTheProcess(t *testing.T) {
 	if _, err := exec.LookPath("git"); err != nil {
 		t.Fatalf("git is not installed: %v", err)
 	}
-	dir := t.TempDir()
-	if _, err := runGit(context.Background(), dir, "init", "-q", "-b", "feat/x"); err != nil {
-		t.Fatal(err)
-	}
+	dir := featureBranchRepo(t)
 	if branch, err := runGit(context.Background(), dir, "symbolic-ref", "--short", "-q", "HEAD"); err != nil || branch != "feat/x" {
 		t.Errorf("branch %q, %v", branch, err)
 	}
@@ -58,6 +68,24 @@ func TestSleepEndsWithItsContext(t *testing.T) {
 	}
 }
 
+// detachedRepo is a repository whose HEAD is detached at its only commit.
+func detachedRepo(t *testing.T) string {
+	t.Helper()
+	dir := t.TempDir()
+	for _, args := range [][]string{
+		{"init", "-q", "-b", "feat/x"},
+		{"-c", "user.name=t", "-c", "user.email=t@example.com", "commit", "-q", "--allow-empty", "-m", "x"},
+		{"checkout", "-q", "--detach"},
+	} {
+		gittest.Run(t, dir, args...)
+	}
+	return dir
+}
+
+func TestDetachedRepoIsTheSameOnAForeignMachine(t *testing.T) {
+	gittest.AssertMachineIndependent(t, func() string { return detachedRepo(t) })
+}
+
 // A real git tells a detached HEAD, its status 1, from a git stopped at its
 // caller's deadline: the first is no branch, the second an error.
 func TestAGitStoppedByItsCallerIsNotADetachedHEAD(t *testing.T) {
@@ -65,16 +93,7 @@ func TestAGitStoppedByItsCallerIsNotADetachedHEAD(t *testing.T) {
 	if _, err := exec.LookPath("git"); err != nil {
 		t.Fatalf("git is not installed: %v", err)
 	}
-	dir := t.TempDir()
-	for _, args := range [][]string{
-		{"init", "-q", "-b", "feat/x"},
-		{"-c", "user.name=t", "-c", "user.email=t@example.com", "commit", "-q", "--allow-empty", "-m", "x"},
-		{"checkout", "-q", "--detach"},
-	} {
-		if _, err := runGit(context.Background(), dir, args...); err != nil {
-			t.Fatalf("git %v: %v", args, err)
-		}
-	}
+	dir := detachedRepo(t)
 	env := NewEnv(dir, nil)
 	if branch, err := env.checkoutBranch(context.Background(), dir); branch != "" || err != nil {
 		t.Errorf("detached HEAD: branch %q, %v", branch, err)

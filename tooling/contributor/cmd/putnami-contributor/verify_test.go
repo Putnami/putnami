@@ -20,6 +20,7 @@ import (
 
 	wire "go.putnami.dev/protocol/extension/hostrpc"
 	"go.putnami.dev/protocol/features/spectest"
+	"go.putnami.dev/sdk/extension/gittest"
 	"go.putnami.dev/sdk/extension/treefingerprint"
 )
 
@@ -206,17 +207,19 @@ func newVerifyRepo(t *testing.T) *verifyRepo {
 	return r
 }
 
+func TestNewVerifyRepoIsTheSameOnAForeignMachine(t *testing.T) {
+	gittest.AssertMachineIndependent(t, func() string { return newVerifyRepo(t).root })
+}
+
 func (r *verifyRepo) git(args ...string) string {
 	r.t.Helper()
-	command := exec.Command("git", args...)
-	command.Dir = r.home
+	command := gittest.Command(r.home, args...)
 	if len(args) > 0 && args[0] != "init" {
 		command.Dir = r.root
 	}
-	command.Env = []string{"PATH=" + os.Getenv("PATH"), "HOME=" + r.home, "LC_ALL=C",
-		"GIT_CONFIG_GLOBAL=/dev/null", "GIT_CONFIG_NOSYSTEM=1",
-		"GIT_AUTHOR_NAME=Fixture", "GIT_AUTHOR_EMAIL=fixture@example.invalid", "GIT_AUTHOR_DATE=" + fixtureDate,
-		"GIT_COMMITTER_NAME=Fixture", "GIT_COMMITTER_EMAIL=fixture@example.invalid", "GIT_COMMITTER_DATE=" + fixtureDate}
+	command.Env = append(gittest.Environ(os.Environ()), "HOME="+r.home, "LC_ALL=C",
+		"GIT_AUTHOR_NAME=Fixture", "GIT_AUTHOR_EMAIL=fixture@example.invalid", "GIT_AUTHOR_DATE="+fixtureDate,
+		"GIT_COMMITTER_NAME=Fixture", "GIT_COMMITTER_EMAIL=fixture@example.invalid", "GIT_COMMITTER_DATE="+fixtureDate)
 	var stderr bytes.Buffer
 	command.Stderr = &stderr
 	out, err := command.Output()
@@ -449,9 +452,7 @@ func (r *verifyRepo) dir(t *testing.T, c verifyCase) string {
 	if err := os.MkdirAll(outside, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	probe := exec.Command("git", "rev-parse", "--show-toplevel")
-	probe.Dir = outside
-	if probe.Run() == nil {
+	if gittest.Command(outside, "rev-parse", "--show-toplevel").Run() == nil {
 		t.Skip("the temporary directory is inside a Git repository")
 	}
 	return outside

@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -10,7 +11,7 @@ import (
 	protocolcli "go.putnami.dev/protocol/cli"
 	featureproto "go.putnami.dev/protocol/features"
 	pctx "go.putnami.dev/sdk/extension/context"
-	"go.putnami.dev/tooling/sdd/extension/internal/gittest"
+	"go.putnami.dev/sdk/extension/gittest"
 	"go.putnami.dev/tooling/sdd/extension/internal/sdd"
 	"go.putnami.dev/tooling/sdd/extension/internal/wsview"
 )
@@ -466,6 +467,17 @@ func commitFixtureRepository(t *testing.T, root string) {
 			t.Fatalf("git %v: %v\n%s", args, err, out)
 		}
 	}
+}
+
+func TestCommitFixtureRepositoryIsTheSameOnAForeignMachine(t *testing.T) {
+	gittest.AssertMachineIndependent(t, func() string {
+		root := t.TempDir()
+		if err := os.WriteFile(filepath.Join(root, "putnami.json"), []byte("{}\n"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		commitFixtureRepository(t, root)
+		return root
+	})
 }
 
 // --- specs verify with a measured threshold check ----------------------------

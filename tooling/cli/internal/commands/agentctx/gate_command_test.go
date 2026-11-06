@@ -14,7 +14,7 @@ import (
 	ciproto "go.putnami.dev/protocol/ci"
 	extproto "go.putnami.dev/protocol/extension"
 	"go.putnami.dev/protocol/features/spectest"
-	"go.putnami.dev/sdk/extension/gitread"
+	"go.putnami.dev/sdk/extension/gittest"
 )
 
 // writeCIDocument writes a minimal valid version 3 document declaring the given
@@ -428,7 +428,7 @@ func repositoryGuidanceBytes(root, path string) ([]byte, error) {
 		return nil, fmt.Errorf("inspect repository metadata: %w", err)
 	}
 
-	committed, err := exec.Command(gitread.Executable(), "-C", root, "show", "HEAD:"+filepath.ToSlash(path)).Output()
+	committed, err := gittest.Command(root, "show", "HEAD:"+filepath.ToSlash(path)).Output()
 	if err == nil {
 		return committed, nil
 	}
@@ -438,8 +438,39 @@ func repositoryGuidanceBytes(root, path string) ([]byte, error) {
 	return nil, fmt.Errorf("read committed %s: %w", path, err)
 }
 
-func TestRepositoryGuidanceBytesUsesTheRightSourceOfTruth(t *testing.T) {
+// committedGuidanceRepo is a repository that holds the committed guidance
+// file.
+func committedGuidanceRepo(t *testing.T) string {
+	t.Helper()
 	repo := t.TempDir()
+	runGit := func(args ...string) {
+		t.Helper()
+		command := gittest.Command(repo, args...)
+		command.Env = gittest.Environ(os.Environ())
+		if output, err := command.CombinedOutput(); err != nil {
+			t.Fatalf("git %v: %v\n%s", args, err, output)
+		}
+	}
+	runGit("init", "--quiet")
+	if err := os.WriteFile(filepath.Join(repo, ClaudeEntrypointPath), []byte("committed guidance\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	runGit("add", ClaudeEntrypointPath)
+	runGit(
+		"-c", "user.name=Putnami Tests",
+		"-c", "user.email=tests@putnami.dev",
+		"-c", "commit.gpgsign=false",
+		"commit", "--quiet", "-m", "fixture",
+	)
+	return repo
+}
+
+func TestCommittedGuidanceRepoIsTheSameOnAForeignMachine(t *testing.T) {
+	gittest.AssertMachineIndependent(t, func() string { return committedGuidanceRepo(t) })
+}
+
+func TestRepositoryGuidanceBytesUsesTheRightSourceOfTruth(t *testing.T) {
+	repo := committedGuidanceRepo(t)
 	path := ClaudeEntrypointPath
 	write := func(root, relative, body string) {
 		t.Helper()
@@ -447,23 +478,6 @@ func TestRepositoryGuidanceBytesUsesTheRightSourceOfTruth(t *testing.T) {
 			t.Fatalf("write %s: %v", relative, err)
 		}
 	}
-	runGit := func(args ...string) {
-		t.Helper()
-		commandArgs := append([]string{"-C", repo}, args...)
-		if output, err := exec.Command(gitread.Executable(), commandArgs...).CombinedOutput(); err != nil {
-			t.Fatalf("git %v: %v\n%s", args, err, output)
-		}
-	}
-
-	runGit("init", "--quiet")
-	write(repo, path, "committed guidance\n")
-	runGit("add", path)
-	runGit(
-		"-c", "user.name=Putnami Tests",
-		"-c", "user.email=tests@putnami.dev",
-		"-c", "commit.gpgsign=false",
-		"commit", "--quiet", "-m", "fixture",
-	)
 	write(repo, path, "regenerated working-tree guidance\n")
 
 	t.Run("CI reads committed guidance after preparer mutation", func(t *testing.T) {

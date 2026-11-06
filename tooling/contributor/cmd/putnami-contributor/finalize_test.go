@@ -18,6 +18,7 @@ import (
 	collab "go.putnami.dev/protocol/collaboration"
 	wire "go.putnami.dev/protocol/extension/hostrpc"
 	"go.putnami.dev/protocol/features/spectest"
+	"go.putnami.dev/sdk/extension/gittest"
 )
 
 // finalizeRequirement names the requirement the tests below prove, in the
@@ -263,6 +264,12 @@ func newFinalizeRepo(t *testing.T, change bool) finalizeRepo {
 	return repo
 }
 
+func TestNewFinalizeRepoIsTheSameOnAForeignMachine(t *testing.T) {
+	for _, change := range []bool{false, true} {
+		gittest.AssertMachineIndependent(t, func() string { return newFinalizeRepo(t, change).root })
+	}
+}
+
 func (r finalizeRepo) write(t *testing.T, name, content string) {
 	t.Helper()
 	path := filepath.Join(r.root, filepath.FromSlash(name))
@@ -280,9 +287,8 @@ func (r finalizeRepo) env() []string {
 
 func (r finalizeRepo) git(t *testing.T, dir string, args ...string) string {
 	t.Helper()
-	command := exec.Command("git", args...)
-	command.Dir = dir
-	command.Env = r.env()
+	command := gittest.Command(dir, args...)
+	command.Env = append(gittest.Environ(os.Environ()), "HOME="+r.home, "LC_ALL=C")
 	output, err := command.CombinedOutput()
 	if err != nil {
 		t.Fatalf("git %v: %v\n%s", args, err, output)

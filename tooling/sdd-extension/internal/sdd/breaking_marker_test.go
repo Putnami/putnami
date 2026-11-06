@@ -9,7 +9,7 @@ import (
 
 	protocolcli "go.putnami.dev/protocol/cli"
 	"go.putnami.dev/protocol/features/spectest"
-	"go.putnami.dev/tooling/sdd/extension/internal/gittest"
+	"go.putnami.dev/sdk/extension/gittest"
 )
 
 const breakingMarkerFeature = "tooling/specification-driven-development"
@@ -37,6 +37,13 @@ func branchWithCommits(t *testing.T, messages ...string) (string, []string) {
 		shas = append(shas, commitFile(t, dir, "src.go", "package src\n\nconst step = "+strconv.Itoa(i)+"\n", message))
 	}
 	return dir, shas
+}
+
+func TestBranchWithCommitsIsTheSameOnAForeignMachine(t *testing.T) {
+	gittest.AssertMachineIndependent(t, func() string {
+		dir, _ := branchWithCommits(t, "fix(cli): stop the leak", "feat(cli)!: drop the --all flag")
+		return dir
+	})
 }
 
 // commitFile writes one file, commits it with message, and returns the commit

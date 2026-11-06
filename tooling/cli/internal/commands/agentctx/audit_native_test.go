@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	collab "go.putnami.dev/protocol/collaboration"
+	"go.putnami.dev/sdk/extension/gittest"
 )
 
 type auditNativeWorkspace struct {
@@ -19,6 +20,41 @@ type auditNativeWorkspace struct {
 	Options    struct {
 		Collaboration collab.Bindings `json:"collaboration"`
 	} `json:"options"`
+}
+
+// commitAuditFixture commits the workspace file of root and a README on main,
+// with remote-tracking heads for main and topic at that commit, as the audit
+// helper expects.
+func commitAuditFixture(t *testing.T, root string) {
+	t.Helper()
+	git := func(args ...string) string {
+		t.Helper()
+		cmd := gittest.Command(root, args...)
+		cmd.Env = gittest.Environ(os.Environ())
+		out, err := cmd.CombinedOutput()
+		if err != nil {
+			t.Fatalf("git %v: %v: %s", args, err, out)
+		}
+		return strings.TrimSpace(string(out))
+	}
+	git("init", "-b", "main")
+	git("config", "user.name", "Audit Test")
+	git("config", "user.email", "audit-test@example.com")
+	writePathFile(t, root, "README.md", "# Audit fixture\n")
+	git("add", "README.md", "putnami.workspace.json")
+	git("commit", "-m", "docs: add the audit fixture")
+	head := git("rev-parse", "HEAD")
+	git("update-ref", "refs/remotes/origin/main", head)
+	git("update-ref", "refs/remotes/origin/topic", head)
+}
+
+func TestAuditFixtureIsTheSameOnAForeignMachine(t *testing.T) {
+	gittest.AssertMachineIndependent(t, func() string {
+		root := t.TempDir()
+		writePathFile(t, root, "putnami.workspace.json", `{"name":"audit-language-fixture"}`)
+		commitAuditFixture(t, root)
+		return root
+	})
 }
 
 // The managed audit's proposal scan must reach the language evaluator of the
@@ -71,23 +107,7 @@ func TestManagedAuditProposalScanUsesNativeLanguage(t *testing.T) {
 		out, err := cmd.CombinedOutput()
 		return string(out), err
 	}
-	git := func(args ...string) string {
-		t.Helper()
-		out, err := run("git", args...)
-		if err != nil {
-			t.Fatalf("git %v: %v: %s", args, err, out)
-		}
-		return strings.TrimSpace(out)
-	}
-	git("init", "-b", "main")
-	git("config", "user.name", "Audit Test")
-	git("config", "user.email", "audit-test@example.com")
-	writePathFile(t, root, "README.md", "# Audit fixture\n")
-	git("add", "README.md", "putnami.workspace.json")
-	git("commit", "-m", "docs: add the audit fixture")
-	head := git("rev-parse", "HEAD")
-	git("update-ref", "refs/remotes/origin/main", head)
-	git("update-ref", "refs/remotes/origin/topic", head)
+	commitAuditFixture(t, root)
 
 	upsert := func(body string) {
 		t.Helper()

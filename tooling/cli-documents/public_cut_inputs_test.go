@@ -7,20 +7,20 @@ import (
 	"strings"
 	"testing"
 
+	"go.putnami.dev/sdk/extension/gittest"
 	"go.putnami.dev/tooling/cli/internal/store"
 )
 
-// Exercise the actual declaration, collector and scanner together. A marker
-// in an unrelated project's new document must invalidate a warm pass before
-// staging; ignored manifests and private worktree state must remain invisible.
-func TestPublicCutCandidateInputsInvalidateTheRecordedVerdict(t *testing.T) {
-	patterns := declaredTestFilePatterns(t, cliDocumentsProjectDir)
+// publicCutInputsRepo is a repository that ignores local state, with README.md
+// staged. write stores a file in it.
+func publicCutInputsRepo(t *testing.T) (root string, write func(path, data string)) {
+	t.Helper()
 	root, err := filepath.EvalSymlinks(t.TempDir())
 	if err != nil {
 		t.Fatal(err)
 	}
 	publicCutRunGit(t, root, "init")
-	write := func(path, data string) {
+	write = func(path, data string) {
 		t.Helper()
 		full := filepath.Join(root, path)
 		if err := os.MkdirAll(filepath.Dir(full), 0o755); err != nil {
@@ -33,6 +33,22 @@ func TestPublicCutCandidateInputsInvalidateTheRecordedVerdict(t *testing.T) {
 	write(".gitignore", ".context/\nworktrees/\n.putnami/\n")
 	write("README.md", "public\n")
 	publicCutRunGit(t, root, "add", ".")
+	return root, write
+}
+
+func TestPublicCutInputsRepoIsTheSameOnAForeignMachine(t *testing.T) {
+	gittest.AssertMachineIndependent(t, func() string {
+		root, _ := publicCutInputsRepo(t)
+		return root
+	})
+}
+
+// Exercise the actual declaration, collector and scanner together. A marker
+// in an unrelated project's new document must invalidate a warm pass before
+// staging; ignored manifests and private worktree state must remain invisible.
+func TestPublicCutCandidateInputsInvalidateTheRecordedVerdict(t *testing.T) {
+	patterns := declaredTestFilePatterns(t, cliDocumentsProjectDir)
+	root, write := publicCutInputsRepo(t)
 	project := filepath.Join(root, cliDocumentsProjectDir)
 	if err := os.MkdirAll(project, 0o755); err != nil {
 		t.Fatal(err)

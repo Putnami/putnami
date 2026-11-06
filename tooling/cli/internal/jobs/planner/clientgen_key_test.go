@@ -3,7 +3,6 @@ package planner
 import (
 	"maps"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"slices"
 	"sort"
@@ -13,6 +12,7 @@ import (
 	jobmodel "go.putnami.dev/cli/model/jobs"
 	"go.putnami.dev/protocol/features/spectest"
 	wsproto "go.putnami.dev/protocol/workspace"
+	"go.putnami.dev/sdk/extension/gittest"
 	"go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/jobs/cachekey"
 	"go.putnami.dev/tooling/cli/internal/store"
@@ -75,12 +75,11 @@ func isolateTreeKeyedGit(t *testing.T) {
 // returns its trimmed output.
 func treeKeyedGit(t *testing.T, dir string, args ...string) string {
 	t.Helper()
-	cmd := exec.Command("git", append([]string{
+	cmd := gittest.Command(dir, append([]string{
 		"-c", "user.name=T", "-c", "user.email=t@t.com",
 		"-c", "commit.gpgsign=false", "-c", "tag.gpgsign=false",
 	}, args...)...)
-	cmd.Dir = dir
-	cmd.Env = append(os.Environ(), "GIT_COMMITTER_DATE=2026-01-02T03:04:05Z", "GIT_AUTHOR_DATE=2026-01-02T03:04:05Z")
+	cmd.Env = append(gittest.Environ(os.Environ()), "GIT_COMMITTER_DATE=2026-01-02T03:04:05Z", "GIT_AUTHOR_DATE=2026-01-02T03:04:05Z")
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		t.Fatalf("git %v: %v\n%s", args, err, out)
@@ -114,6 +113,10 @@ func newClientgenKeyFixture(t *testing.T) *clientgenKeyFixture {
 	ws := workspace.NewWorkspace(root, &wsproto.Config{}, []*workspace.Project{provider})
 	ws.Graph = workspace.BuildGraph(ws.Projects)
 	return &clientgenKeyFixture{root: root, dir: dir, ws: ws}
+}
+
+func TestClientgenKeyFixtureIsTheSameOnAForeignMachine(t *testing.T) {
+	gittest.AssertMachineIndependent(t, func() string { return newClientgenKeyFixture(t).root })
 }
 
 // key computes the task's key with a fresh cache manager, as a new process

@@ -15,7 +15,7 @@ import (
 	featureproto "go.putnami.dev/protocol/features"
 	"go.putnami.dev/protocol/features/spectest"
 	"go.putnami.dev/sdk/extension/gitcandidate"
-	"go.putnami.dev/tooling/sdd/extension/internal/gittest"
+	"go.putnami.dev/sdk/extension/gittest"
 )
 
 // candidateWorkspace is a fixture workspace that is also a Git work tree, so
@@ -29,6 +29,10 @@ func candidateWorkspace(t *testing.T) string {
 	root := decisionsWorkspace(t)
 	gitIn(t, root, "init", "-q")
 	return root
+}
+
+func TestCandidateWorkspaceIsTheSameOnAForeignMachine(t *testing.T) {
+	gittest.AssertMachineIndependent(t, func() string { return candidateWorkspace(t) })
 }
 
 func gitIn(t *testing.T, dir string, args ...string) {

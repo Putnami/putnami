@@ -17,7 +17,7 @@ import (
 	"go.putnami.dev/protocol/features/spectest"
 	supportproto "go.putnami.dev/protocol/support"
 	wsproto "go.putnami.dev/protocol/workspace"
-	"go.putnami.dev/sdk/extension/gitread"
+	"go.putnami.dev/sdk/extension/gittest"
 	"go.putnami.dev/tooling/cli/internal/cmderr"
 	"go.putnami.dev/tooling/cli/internal/commands/versioncmd"
 	"go.putnami.dev/tooling/cli/internal/git"
@@ -28,13 +28,13 @@ import (
 // hostRPCVersionLines is the requirement of the version.lines method.
 const hostRPCVersionLines = "host-rpc-version-lines"
 
-// hostRPCGit runs git in dir with no global or system configuration and
-// returns its trimmed output.
+// hostRPCGit runs git in dir without the caller's git environment, and returns
+// its trimmed output. The commits take their identity from the repository's
+// configuration.
 func hostRPCGit(t *testing.T, dir string, args ...string) string {
 	t.Helper()
-	cmd := exec.Command(gitread.Executable(), args...)
-	cmd.Dir = dir
-	cmd.Env = append(os.Environ(), "GIT_CONFIG_GLOBAL=/dev/null", "GIT_CONFIG_SYSTEM=/dev/null")
+	cmd := gittest.Command(dir, args...)
+	cmd.Env = gittest.Environ(os.Environ())
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		t.Fatalf("git %v: %v\n%s", args, err, out)
@@ -88,6 +88,10 @@ func hostRPCVersionRepo(t *testing.T) (string, []string) {
 		hostRPCVersionCommit(t, root, "README.md", "fix: the readme"),
 		hostRPCVersionCommit(t, root, "tooling/cli/b.go", "feat(cli)!: break b", "The body says why."))
 	return root, commits
+}
+
+func TestHostRPCVersionRepoIsTheSameOnAForeignMachine(t *testing.T) {
+	gittest.AssertMachineIndependent(t, func() string { root, _ := hostRPCVersionRepo(t); return root })
 }
 
 // hostRPCLineSpec is the line of root whose scope path is scope.

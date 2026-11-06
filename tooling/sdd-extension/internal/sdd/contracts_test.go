@@ -10,7 +10,7 @@ import (
 	protocolcli "go.putnami.dev/protocol/cli"
 	contracts "go.putnami.dev/protocol/contracts"
 	"go.putnami.dev/protocol/features/spectest"
-	"go.putnami.dev/tooling/sdd/extension/internal/gittest"
+	"go.putnami.dev/sdk/extension/gittest"
 )
 
 // baseManifest is a valid contract manifest exercising every vocabulary the
@@ -339,14 +339,12 @@ func TestCompareManifests_AdditionsAreCompatible(t *testing.T) {
 	}
 }
 
-// TestGitPriorManifest reads the committed HEAD manifest, not the working tree,
-// so `check` compares against the last committed contract. It also returns
-// (nil, nil) when there is no prior at HEAD.
-func TestGitPriorManifest(t *testing.T) {
-	if _, err := exec.LookPath("git"); err != nil {
-		t.Skip("git not available")
-	}
-	repo := t.TempDir()
+// priorManifestRepository is a repository whose one commit holds priorManifest
+// as the contracts source of the project "svc". It returns the directory, the
+// project path and the manifest path.
+func priorManifestRepository(t *testing.T) (repo, projRel, src string) {
+	t.Helper()
+	repo = t.TempDir()
 	runGit := func(args ...string) {
 		t.Helper()
 		cmd := gittest.Command(repo, args...)
@@ -356,16 +354,34 @@ func TestGitPriorManifest(t *testing.T) {
 	}
 	runGit("init", "-q")
 
-	projRel := "svc"
+	projRel = "svc"
 	if err := os.MkdirAll(filepath.Join(repo, projRel, "schema"), 0o755); err != nil {
 		t.Fatalf("mkdir: %v", err)
 	}
-	src := filepath.Join(repo, projRel, ContractsSourcePath)
+	src = filepath.Join(repo, projRel, ContractsSourcePath)
 	if err := os.WriteFile(src, []byte(priorManifest), 0o644); err != nil {
 		t.Fatalf("write manifest: %v", err)
 	}
 	runGit("add", "-A")
 	runGit("commit", "-q", "-m", "commit prior")
+	return repo, projRel, src
+}
+
+func TestPriorManifestRepositoryIsTheSameOnAForeignMachine(t *testing.T) {
+	gittest.AssertMachineIndependent(t, func() string {
+		repo, _, _ := priorManifestRepository(t)
+		return repo
+	})
+}
+
+// TestGitPriorManifest reads the committed HEAD manifest, not the working tree,
+// so `check` compares against the last committed contract. It also returns
+// (nil, nil) when there is no prior at HEAD.
+func TestGitPriorManifest(t *testing.T) {
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git not available")
+	}
+	repo, projRel, src := priorManifestRepository(t)
 
 	// Mutate the working tree AFTER committing; the loader must yield the
 	// committed (prior) bytes, not the working-tree edit.

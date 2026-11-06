@@ -7,6 +7,8 @@ import (
 	"runtime"
 	"strings"
 	"testing"
+
+	"go.putnami.dev/sdk/extension/gittest"
 )
 
 // fakeCompileBun stands in for bun build --compile. Like Bun, it writes its
@@ -27,11 +29,35 @@ mv "$tmp" "$out"
 
 func runGit(t *testing.T, dir string, args ...string) {
 	t.Helper()
-	cmd := stdexec.Command("git", args...)
-	cmd.Dir = dir
-	if out, err := cmd.CombinedOutput(); err != nil {
-		t.Fatalf("git %s: %v\n%s", strings.Join(args, " "), err, out)
+	gittest.Run(t, dir, args...)
+}
+
+// compileRepo is a repository that ignores .putnami and stages one source file
+// of apps/hello. It returns the root, the project and the compile output.
+func compileRepo(t *testing.T) (root, projectPath, outputPath string) {
+	t.Helper()
+	root = t.TempDir()
+	projectPath = filepath.Join(root, "apps", "hello")
+	outputPath = filepath.Join(root, ".putnami", "out", "apps", "hello", "build", "compile")
+	if err := os.MkdirAll(filepath.Join(projectPath, "src"), 0o755); err != nil {
+		t.Fatal(err)
 	}
+	if err := os.WriteFile(filepath.Join(root, ".gitignore"), []byte(".putnami\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(projectPath, "src", "main.ts"), []byte("console.log(1);\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	runGit(t, root, "init", "-q")
+	runGit(t, root, "add", "-A")
+	return root, projectPath, outputPath
+}
+
+func TestCompileRepoIsTheSameOnAForeignMachine(t *testing.T) {
+	gittest.AssertMachineIndependent(t, func() string {
+		root, _, _ := compileRepo(t)
+		return root
+	})
 }
 
 // TestRunCompileLeavesNoUntrackedFileInTheProject guards the working directory
@@ -45,20 +71,7 @@ func TestRunCompileLeavesNoUntrackedFileInTheProject(t *testing.T) {
 	if _, err := stdexec.LookPath("git"); err != nil {
 		t.Skip("git is not installed")
 	}
-	root := t.TempDir()
-	projectPath := filepath.Join(root, "apps", "hello")
-	outputPath := filepath.Join(root, ".putnami", "out", "apps", "hello", "build", "compile")
-	if err := os.MkdirAll(filepath.Join(projectPath, "src"), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(filepath.Join(root, ".gitignore"), []byte(".putnami\n"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(filepath.Join(projectPath, "src", "main.ts"), []byte("console.log(1);\n"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	runGit(t, root, "init", "-q")
-	runGit(t, root, "add", "-A")
+	_, projectPath, outputPath := compileRepo(t)
 
 	bunBin := filepath.Join(t.TempDir(), "bun")
 	if err := os.WriteFile(bunBin, []byte(fakeCompileBun), 0o755); err != nil {

@@ -10,7 +10,7 @@ import (
 	archproto "go.putnami.dev/protocol/architecture"
 	"go.putnami.dev/protocol/features/spectest"
 	wsproto "go.putnami.dev/protocol/workspace"
-	"go.putnami.dev/tooling/sdd/extension/internal/gittest"
+	"go.putnami.dev/sdk/extension/gittest"
 	workspace "go.putnami.dev/tooling/sdd/extension/internal/wsview"
 )
 
@@ -145,12 +145,10 @@ func TestEvaluateWorkspaceFailsClosedOnTypedIncompleteProviderView(t *testing.T)
 	}
 }
 
-func TestEvaluateWorkspaceLoadsPriorBaselineFromImmutableGitObjects(t *testing.T) {
-	spectest.Proves(t, "architecture/executable-contracts", "contained-read-only-tooling", "the-prior-baseline-loads-from-immutable-git-objects")
-	root := t.TempDir()
-	writeArchitectureTestFile(t, filepath.Join(root, "producer", archproto.ManifestFilename), architectureProducerManifest())
-	writeArchitectureTestFile(t, filepath.Join(root, "consumer", archproto.ManifestFilename), architectureConsumerManifest(false))
-	writeArchitectureTestFile(t, filepath.Join(root, archproto.BaselineFilename), `{"protocolVersion":1,"findings":[]}`)
+// commitArchitectureBaseline makes root a repository with one commit of every
+// file in it.
+func commitArchitectureBaseline(t *testing.T, root string) {
+	t.Helper()
 	for _, arguments := range [][]string{
 		{"init", "-q"},
 		{"add", "-A"},
@@ -158,6 +156,24 @@ func TestEvaluateWorkspaceLoadsPriorBaselineFromImmutableGitObjects(t *testing.T
 	} {
 		runArchitectureTestGit(t, root, arguments...)
 	}
+}
+
+func TestArchitectureBaselineRepositoryIsTheSameOnAForeignMachine(t *testing.T) {
+	gittest.AssertMachineIndependent(t, func() string {
+		root := t.TempDir()
+		writeArchitectureTestFile(t, filepath.Join(root, archproto.BaselineFilename), `{"protocolVersion":1,"findings":[]}`)
+		commitArchitectureBaseline(t, root)
+		return root
+	})
+}
+
+func TestEvaluateWorkspaceLoadsPriorBaselineFromImmutableGitObjects(t *testing.T) {
+	spectest.Proves(t, "architecture/executable-contracts", "contained-read-only-tooling", "the-prior-baseline-loads-from-immutable-git-objects")
+	root := t.TempDir()
+	writeArchitectureTestFile(t, filepath.Join(root, "producer", archproto.ManifestFilename), architectureProducerManifest())
+	writeArchitectureTestFile(t, filepath.Join(root, "consumer", archproto.ManifestFilename), architectureConsumerManifest(false))
+	writeArchitectureTestFile(t, filepath.Join(root, archproto.BaselineFilename), `{"protocolVersion":1,"findings":[]}`)
+	commitArchitectureBaseline(t, root)
 	base := strings.TrimSpace(runArchitectureTestGit(t, root, "rev-parse", "HEAD"))
 	edge := archproto.ObservedEdge{
 		Kind:            archproto.BindingProjectDependency,

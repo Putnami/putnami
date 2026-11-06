@@ -12,8 +12,39 @@ import (
 	"testing"
 
 	wire "go.putnami.dev/protocol/extension/hostrpc"
-	"go.putnami.dev/sdk/extension/gitread"
+	"go.putnami.dev/sdk/extension/gittest"
 )
+
+// commitVerifyFixture turns root into a repository that holds its files, in
+// one commit on main.
+func commitVerifyFixture(t *testing.T, root string) {
+	t.Helper()
+	git := func(args ...string) {
+		t.Helper()
+		cmd := gittest.Command(root, args...)
+		cmd.Env = gittest.Environ(os.Environ())
+		if out, err := cmd.CombinedOutput(); err != nil {
+			t.Fatalf("git %v: %v: %s", args, err, out)
+		}
+	}
+	git("init", "-b", "main")
+	git("config", "user.name", "Verify Test")
+	git("config", "user.email", "verify-test@example.com")
+	git("config", "commit.gpgSign", "false")
+	git("add", ".")
+	git("commit", "-m", "docs: add the verify fixture")
+}
+
+func TestVerifyFixtureIsTheSameOnAForeignMachine(t *testing.T) {
+	gittest.AssertMachineIndependent(t, func() string {
+		root := t.TempDir()
+		writePathFile(t, root, ".gitignore", ".putnami/\n")
+		writePathFile(t, root, "README.md", "# Verify fixture\n")
+		writePathFile(t, root, "docs/guide.md", "# Guide\n")
+		commitVerifyFixture(t, root)
+		return root
+	})
+}
 
 // The build skill runs `putnami change verify`, which the installed
 // @putnami/contributor serves through an interactive launch. For one invocation
@@ -45,21 +76,7 @@ func TestChangeVerifyThroughPutnamiRunsTheContributorExecutable(t *testing.T) {
 	writePathFile(t, root, "README.md", "# Verify fixture\n")
 	writePathFile(t, root, "docs/guide.md", "# Guide\n")
 	env := append(os.Environ(), "PATH="+harness+string(os.PathListSeparator)+os.Getenv("PATH"))
-	git := func(args ...string) {
-		t.Helper()
-		cmd := exec.Command(gitread.Executable(), args...)
-		cmd.Dir = root
-		cmd.Env = env
-		if out, err := cmd.CombinedOutput(); err != nil {
-			t.Fatalf("git %v: %v: %s", args, err, out)
-		}
-	}
-	git("init", "-b", "main")
-	git("config", "user.name", "Verify Test")
-	git("config", "user.email", "verify-test@example.com")
-	git("config", "commit.gpgSign", "false")
-	git("add", ".")
-	git("commit", "-m", "docs: add the verify fixture")
+	commitVerifyFixture(t, root)
 
 	run := func(cmd *exec.Cmd) (string, int) {
 		t.Helper()

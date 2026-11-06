@@ -11,7 +11,7 @@ import (
 
 	doctor "go.putnami.dev/protocol/doctor"
 	"go.putnami.dev/protocol/features/spectest"
-	"go.putnami.dev/sdk/extension/gitread"
+	"go.putnami.dev/sdk/extension/gittest"
 )
 
 // fakeWorkstation is a probe whose every answer is fixed: a clean Windows host
@@ -241,18 +241,14 @@ func TestPrintDoctorHuman_PrintsTheFix(t *testing.T) {
 	}
 }
 
-// TestSystemWorkstationProbe_ReportsACRLFCheckout is the end-to-end line-ending
-// check against a real Git checkout: a committed LF file rewritten with CRLF
-// in the working tree is reported by the probe doctor wires for the host.
-func TestSystemWorkstationProbe_ReportsACRLFCheckout(t *testing.T) {
-	if _, err := exec.LookPath("git"); err != nil {
-		t.Skip("git is not on PATH")
-	}
-	root := t.TempDir()
+// lfCheckoutRepo is a repository that commits main.go with LF line endings,
+// and the path of that file.
+func lfCheckoutRepo(t *testing.T) (root, file string) {
+	t.Helper()
+	root = t.TempDir()
 	gitIn := func(args ...string) {
 		t.Helper()
-		cmd := exec.Command(gitread.Executable(), args...)
-		cmd.Dir = root
+		cmd := gittest.Command(root, args...)
 		if out, err := cmd.CombinedOutput(); err != nil {
 			t.Fatalf("git %v: %v\n%s", args, err, out)
 		}
@@ -262,12 +258,30 @@ func TestSystemWorkstationProbe_ReportsACRLFCheckout(t *testing.T) {
 	gitIn("config", "user.name", "Test")
 	gitIn("config", "commit.gpgsign", "false")
 	gitIn("config", "core.autocrlf", "false")
-	file := filepath.Join(root, "main.go")
+	file = filepath.Join(root, "main.go")
 	if err := os.WriteFile(file, []byte("package main\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	gitIn("add", ".")
 	gitIn("commit", "-q", "-m", "initial")
+	return root, file
+}
+
+func TestLFCheckoutRepoIsTheSameOnAForeignMachine(t *testing.T) {
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git is not on PATH")
+	}
+	gittest.AssertMachineIndependent(t, func() string { root, _ := lfCheckoutRepo(t); return root })
+}
+
+// TestSystemWorkstationProbe_ReportsACRLFCheckout is the end-to-end line-ending
+// check against a real Git checkout: a committed LF file rewritten with CRLF
+// in the working tree is reported by the probe doctor wires for the host.
+func TestSystemWorkstationProbe_ReportsACRLFCheckout(t *testing.T) {
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git is not on PATH")
+	}
+	root, file := lfCheckoutRepo(t)
 
 	probe := systemWorkstationProbe(root)
 	if n := countCode(checkWorkstation(doctor.ProfileDev, probe), doctor.CheckCRLFCheckout); n != 0 {

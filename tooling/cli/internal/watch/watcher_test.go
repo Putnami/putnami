@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"go.putnami.dev/sdk/extension/gitread"
+	"go.putnami.dev/sdk/extension/gittest"
 )
 
 func TestNewWatcher_Defaults(t *testing.T) {
@@ -119,41 +119,57 @@ func TestWatcher_DetectChanges(t *testing.T) {
 	}
 }
 
-// TestWatcher_DropsGitIgnoredChanges: a log a serve run writes
-// into an ignored directory restarted the server on every line. A change Git
-// ignores is dropped, including a `log/*` rule that ignores the files but not
-// the directory. A dotenv file still counts, such as conf/.env.local.yaml that
-// config-merge reads, and so does a tracked file that matches an ignore rule.
-func TestWatcher_DropsGitIgnoredChanges(t *testing.T) {
+// ignoreRulesRepo is a repository with a .gitignore of the rules the watcher
+// test covers, an app/main.go and a log/.keep it tracks, and a kept.log it
+// tracks despite the rules.
+func ignoreRulesRepo(t *testing.T) string {
+	t.Helper()
 	if _, err := exec.LookPath("git"); err != nil {
 		t.Skip("git not available")
 	}
 	dir := t.TempDir()
 	runGit := func(args ...string) {
 		t.Helper()
-		cmd := exec.Command(gitread.Executable(), args...)
-		cmd.Dir = dir
-		if out, err := cmd.CombinedOutput(); err != nil {
+		if out, err := gittest.Command(dir, args...).CombinedOutput(); err != nil {
 			t.Fatalf("git %v: %v\n%s", args, err, out)
 		}
 	}
-	write := func(rel, content string) {
-		t.Helper()
-		path := filepath.Join(dir, filepath.FromSlash(rel))
-		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-			t.Fatal(err)
-		}
-		if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
-			t.Fatal(err)
-		}
-	}
 	runGit("init", "-q")
-	write(".gitignore", ".context/\n.playwright-mcp/\nlog/*\n!log/.keep\n*.log\n.env\n.env.local.yaml\n")
-	write("app/main.go", "package main")
-	write("log/.keep", "")
-	write("kept.log", "tracked despite the rule")
+	writeRepoFile(t, dir, ".gitignore", ".context/\n.playwright-mcp/\nlog/*\n!log/.keep\n*.log\n.env\n.env.local.yaml\n")
+	writeRepoFile(t, dir, "app/main.go", "package main")
+	writeRepoFile(t, dir, "log/.keep", "")
+	writeRepoFile(t, dir, "kept.log", "tracked despite the rule")
 	runGit("add", ".gitignore", "app/main.go", "log/.keep")
 	runGit("add", "-f", "kept.log")
+	return dir
+}
+
+func writeRepoFile(t *testing.T, dir, rel, content string) {
+	t.Helper()
+	path := filepath.Join(dir, filepath.FromSlash(rel))
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestIgnoreRulesRepoIsTheSameOnAForeignMachine(t *testing.T) {
+	gittest.AssertMachineIndependent(t, func() string { return ignoreRulesRepo(t) })
+}
+
+// TestWatcher_DropsGitIgnoredChanges: a log a serve run writes
+// into an ignored directory restarted the server on every line. A change Git
+// ignores is dropped, including a `log/*` rule that ignores the files but not
+// the directory. A dotenv file still counts, such as conf/.env.local.yaml that
+// config-merge reads, and so does a tracked file that matches an ignore rule.
+func TestWatcher_DropsGitIgnoredChanges(t *testing.T) {
+	dir := ignoreRulesRepo(t)
+	write := func(rel, content string) {
+		t.Helper()
+		writeRepoFile(t, dir, rel, content)
+	}
 
 	w := NewWatcher(WatcherConfig{Roots: []string{dir}, Ignored: gitIgnored(dir)})
 	if err := w.TakeSnapshot(); err != nil {

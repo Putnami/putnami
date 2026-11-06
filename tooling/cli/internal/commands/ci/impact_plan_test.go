@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"reflect"
 	"strings"
@@ -16,6 +15,7 @@ import (
 	protocolcli "go.putnami.dev/protocol/cli"
 	"go.putnami.dev/protocol/features/spectest"
 	"go.putnami.dev/sdk/extension/gitread"
+	"go.putnami.dev/sdk/extension/gittest"
 	"go.putnami.dev/tooling/cli/internal/cmderr"
 	"go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/iox"
@@ -323,6 +323,10 @@ func impactPlanTestJob(project *workspace.Project) *jobs.ScheduledJob {
 	}
 }
 
+func TestImpactPlanRepositoryIsTheSameOnAForeignMachine(t *testing.T) {
+	gittest.AssertMachineIndependent(t, func() string { root, _, _, _ := writeImpactPlanRepository(t); return root })
+}
+
 func writeImpactPlanFile(t *testing.T, path, contents string) {
 	t.Helper()
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
@@ -335,8 +339,8 @@ func writeImpactPlanFile(t *testing.T, path, contents string) {
 
 func runImpactPlanGit(t *testing.T, dir string, args ...string) {
 	t.Helper()
-	command := exec.Command(gitread.Executable(), args...)
-	command.Dir = dir
+	command := gittest.Command(dir, args...)
+	command.Env = gittest.Environ(os.Environ())
 	if output, err := command.CombinedOutput(); err != nil {
 		t.Fatalf("git %s: %v\n%s", strings.Join(args, " "), err, output)
 	}
@@ -344,8 +348,8 @@ func runImpactPlanGit(t *testing.T, dir string, args ...string) {
 
 func impactPlanGitOutput(t *testing.T, dir string, args ...string) string {
 	t.Helper()
-	command := exec.Command(gitread.Executable(), args...)
-	command.Dir = dir
+	command := gittest.Command(dir, args...)
+	command.Env = gittest.Environ(os.Environ())
 	output, err := command.Output()
 	if err != nil {
 		t.Fatalf("git %s: %v", strings.Join(args, " "), err)

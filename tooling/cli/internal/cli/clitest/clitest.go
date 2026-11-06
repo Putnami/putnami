@@ -23,13 +23,12 @@ import (
 	"context"
 	"encoding/json"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"testing"
 
 	protocolcli "go.putnami.dev/protocol/cli"
 	extensionproto "go.putnami.dev/protocol/extension"
-	"go.putnami.dev/sdk/extension/gitread"
+	"go.putnami.dev/sdk/extension/gittest"
 	"go.putnami.dev/tooling/cli/internal/cli"
 	"go.putnami.dev/tooling/cli/internal/commands/sharedtest"
 	"go.putnami.dev/tooling/cli/internal/extension"
@@ -175,9 +174,8 @@ func InitGitRepo(t *testing.T, dir string) {
 // RunGit runs git in dir with a fixed identity and fails the test on error.
 func RunGit(t *testing.T, dir string, args ...string) {
 	t.Helper()
-	cmd := exec.Command(gitread.Executable(), args...)
-	cmd.Dir = dir
-	cmd.Env = append(os.Environ(),
+	cmd := gittest.Command(dir, args...)
+	cmd.Env = append(cmd.Env,
 		"GIT_AUTHOR_NAME=test", "GIT_AUTHOR_EMAIL=test@example.com",
 		"GIT_COMMITTER_NAME=test", "GIT_COMMITTER_EMAIL=test@example.com",
 	)
@@ -189,8 +187,7 @@ func RunGit(t *testing.T, dir string, args ...string) {
 // GitOutput runs git in dir and returns its stdout.
 func GitOutput(t *testing.T, dir string, args ...string) string {
 	t.Helper()
-	cmd := exec.Command(gitread.Executable(), args...)
-	cmd.Dir = dir
+	cmd := gittest.Command(dir, args...)
 	out, err := cmd.Output()
 	if err != nil {
 		t.Fatalf("git %v: %v", args, err)

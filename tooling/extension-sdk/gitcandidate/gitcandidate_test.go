@@ -10,6 +10,8 @@ import (
 	"runtime"
 	"strings"
 	"testing"
+
+	"go.putnami.dev/sdk/extension/gittest"
 )
 
 // repository creates an empty Git repository with the files given, each a
@@ -27,13 +29,15 @@ func repository(t *testing.T, files map[string]string) string {
 	return root
 }
 
+func TestRepositoryIsTheSameOnAForeignMachine(t *testing.T) {
+	gittest.AssertMachineIndependent(t, func() string {
+		return repository(t, map[string]string{".gitignore": "build/\n", "README.md": "# a\n"})
+	})
+}
+
 func git(t *testing.T, dir string, args ...string) {
 	t.Helper()
-	cmd := exec.Command("git", args...)
-	cmd.Dir = dir
-	if out, err := cmd.CombinedOutput(); err != nil {
-		t.Fatalf("git %v: %v\n%s", args, err, out)
-	}
+	gittest.Run(t, dir, args...)
 }
 
 func write(t *testing.T, root, rel, content string) {
@@ -346,15 +350,12 @@ func TestFingerprintFailsWhereAGitKeyDoes(t *testing.T) {
 	}
 
 	write(t, root, "conflict.md", "# conflict\n")
-	cmd := exec.Command("git", "hash-object", "-w", "conflict.md")
-	cmd.Dir = root
-	object, err := cmd.Output()
+	object, err := gittest.Command(root, "hash-object", "-w", "conflict.md").Output()
 	if err != nil {
 		t.Fatal(err)
 	}
 	blob := strings.TrimSpace(string(object))
-	stages := exec.Command("git", "update-index", "--index-info")
-	stages.Dir = root
+	stages := gittest.Command(root, "update-index", "--index-info")
 	stages.Stdin = strings.NewReader("100644 " + blob + " 1\tconflict.md\n100644 " + blob + " 2\tconflict.md\n")
 	if out, err := stages.CombinedOutput(); err != nil {
 		t.Fatalf("git update-index --index-info: %v\n%s", err, out)

@@ -9,7 +9,6 @@ import (
 	"io"
 	"net/http"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -18,6 +17,7 @@ import (
 	diag "go.putnami.dev/protocol/diagnostic"
 	"go.putnami.dev/protocol/features/spectest"
 	"go.putnami.dev/protocol/sitecontent"
+	"go.putnami.dev/sdk/extension/gittest"
 )
 
 // writeSiteContentFixture lays down a small multi-file, nested doc tree so the
@@ -616,6 +616,22 @@ func TestPublishSiteContentBundlesRefusals(t *testing.T) {
 	}
 }
 
+// gitInit makes dir a Git work tree.
+func gitInit(t *testing.T, dir string) {
+	t.Helper()
+	if output, err := gittest.Command(dir, "init", "-q").CombinedOutput(); err != nil {
+		t.Fatalf("git init: %v: %s", err, output)
+	}
+}
+
+func TestGitInitIsTheSameOnAForeignMachine(t *testing.T) {
+	gittest.AssertMachineIndependent(t, func() string {
+		dir := t.TempDir()
+		gitInit(t, dir)
+		return dir
+	})
+}
+
 // A section reads its source tree as one directory of the site, however its
 // path is spelled, in a Git work tree as on disk. A directory deeper in the
 // site, or outside it, is not a section.
@@ -629,11 +645,7 @@ func TestSiteContentSectionIsADirectoryOfItsSite(t *testing.T) {
 	}
 	for _, repository := range []bool{false, true} {
 		if repository {
-			command := exec.Command("git", "init", "-q")
-			command.Dir = site
-			if output, err := command.CombinedOutput(); err != nil {
-				t.Fatalf("git init: %v: %s", err, output)
-			}
+			gitInit(t, site)
 		}
 		section := SiteContentSection{Dir: filepath.Join(site, "platform") + string(filepath.Separator), Mount: "/docs/platform"}
 		if files, err := collectSiteContentFiles(section); err != nil || len(files) != 1 {

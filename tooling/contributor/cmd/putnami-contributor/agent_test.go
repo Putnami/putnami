@@ -15,6 +15,7 @@ import (
 	diag "go.putnami.dev/protocol/diagnostic"
 	wire "go.putnami.dev/protocol/extension/hostrpc"
 	"go.putnami.dev/protocol/features/spectest"
+	"go.putnami.dev/sdk/extension/gittest"
 )
 
 // The feature and requirements the agent command tests prove.
@@ -36,9 +37,7 @@ func agentCheckout(t *testing.T) string {
 		{"init", "-q", "-b", agentSessionBranch, dir},
 		{"-C", dir, "remote", "add", "origin", "https://example.com/acme/widgets.git"},
 	} {
-		command := exec.Command("git", args...)
-		command.Env = append(os.Environ(), "GIT_CONFIG_GLOBAL=/dev/null", "GIT_CONFIG_NOSYSTEM=1")
-		if output, err := command.CombinedOutput(); err != nil {
+		if output, err := gittest.Command("", args...).CombinedOutput(); err != nil {
 			t.Fatalf("git %v: %v\n%s", args, err, output)
 		}
 	}
@@ -46,6 +45,10 @@ func agentCheckout(t *testing.T) string {
 		t.Fatal(err)
 	}
 	return dir
+}
+
+func TestAgentCheckoutIsTheSameOnAForeignMachine(t *testing.T) {
+	gittest.AssertMachineIndependent(t, func() string { return agentCheckout(t) })
 }
 
 // launchAgent runs `agent-<command> <args>` in dir as putnami launches an

@@ -2,13 +2,12 @@ package git
 
 import (
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
 
 	protocaps "go.putnami.dev/protocol/capabilities"
-	"go.putnami.dev/sdk/extension/gitread"
+	"go.putnami.dev/sdk/extension/gittest"
 )
 
 // projectSourceBinding drops the subprocess count these binding tests do not
@@ -291,8 +290,7 @@ func TestProjectSourceBindingRejectsUnmergedAndMalformedStageEntries(t *testing.
 		t.Fatal(err)
 	}
 	runGit(t, repo, "commit", "-am", "main")
-	cmd := exec.Command(gitread.Executable(), "merge", "other")
-	cmd.Dir = repo
+	cmd := gittest.Command(repo, "merge", "other")
 	if err := cmd.Run(); err == nil {
 		t.Fatal("expected merge conflict")
 	}

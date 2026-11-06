@@ -2,12 +2,13 @@ package git
 
 import (
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strconv"
 	"strings"
 	"testing"
 	"time"
+
+	"go.putnami.dev/sdk/extension/gittest"
 )
 
 // ---- GetVersionInfo ----
@@ -16,26 +17,18 @@ func initTestRepo(t *testing.T) string {
 	t.Helper()
 	dir := t.TempDir()
 	runGit := func(args ...string) {
-		cmd := exec.Command("git", args...)
-		cmd.Dir = dir
-		cmd.Env = append(os.Environ(),
-			"GIT_AUTHOR_NAME=Test",
-			"GIT_AUTHOR_EMAIL=test@test.com",
-			"GIT_COMMITTER_NAME=Test",
-			"GIT_COMMITTER_EMAIL=test@test.com",
-		)
-		if out, err := cmd.CombinedOutput(); err != nil {
-			t.Fatalf("git %v failed: %v\n%s", args, err, out)
-		}
+		gittest.Run(t, dir, args...)
 	}
 
 	runGit("init")
-	runGit("checkout", "-b", "main")
-	runGit("config", "commit.gpgsign", "false")
 	os.WriteFile(filepath.Join(dir, "file.txt"), []byte("hello"), 0644)
 	runGit("add", ".")
 	runGit("commit", "-m", "initial")
 	return dir
+}
+
+func TestInitTestRepoIsTheSameOnAForeignMachine(t *testing.T) {
+	gittest.AssertMachineIndependent(t, func() string { return initTestRepo(t) })
 }
 
 func TestGetVersionInfo_InGitRepo(t *testing.T) {
@@ -201,11 +194,7 @@ func TestGetVersionInfo_NonGitRepoErrors(t *testing.T) {
 // is the orchestrator's answer, and this reader only derives the suffix.
 func TestGetVersionInfo_IgnoresTags(t *testing.T) {
 	dir := initTestRepo(t)
-	cmd := exec.Command("git", "tag", "v1.0.0")
-	cmd.Dir = dir
-	if out, err := cmd.CombinedOutput(); err != nil {
-		t.Fatalf("git tag failed: %v\n%s", err, out)
-	}
+	gittest.Run(t, dir, "tag", "v1.0.0")
 
 	info, err := GetVersionInfo(dir)
 	if err != nil {
@@ -220,9 +209,7 @@ func TestGetVersionInfo_IgnoresTags(t *testing.T) {
 
 func gitRaw(t *testing.T, dir string, args ...string) string {
 	t.Helper()
-	cmd := exec.Command("git", args...)
-	cmd.Dir = dir
-	out, err := cmd.Output()
+	out, err := gittest.Command(dir, args...).Output()
 	if err != nil {
 		t.Fatalf("git %v failed: %v", args, err)
 	}

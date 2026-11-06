@@ -19,6 +19,7 @@ import (
 	collab "go.putnami.dev/protocol/collaboration"
 	wire "go.putnami.dev/protocol/extension/hostrpc"
 	"go.putnami.dev/protocol/features/spectest"
+	"go.putnami.dev/sdk/extension/gittest"
 )
 
 // languageFeature and languageRequirement name the requirement the tests
@@ -96,10 +97,24 @@ func languageExecutable(t *testing.T) string {
 func languageFixture(t *testing.T) string {
 	t.Helper()
 	dir := filepath.Join(t.TempDir(), "repo")
-	if output, err := exec.Command("bash", filepath.Join("testdata", "fixture.sh"), dir).CombinedOutput(); err != nil {
+	command := exec.Command("bash", filepath.Join("testdata", "fixture.sh"), dir)
+	// The script sets its own identity, dates and configuration; the rest of
+	// the git environment is not the caller's.
+	command.Env = gittest.Environ(os.Environ())
+	if output, err := command.CombinedOutput(); err != nil {
 		t.Fatalf("build the fixture repository: %v\n%s", err, output)
 	}
 	return dir
+}
+
+func TestLanguageFixtureIsTheSameOnAForeignMachine(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("the fixture repository is built by a bash script")
+	}
+	if _, err := exec.LookPath("bash"); err != nil {
+		t.Skip("bash is not installed")
+	}
+	gittest.AssertMachineIndependent(t, func() string { return languageFixture(t) })
 }
 
 // languageResult is what one launch of the executable answered.

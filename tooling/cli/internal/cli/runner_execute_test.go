@@ -3,13 +3,12 @@ package cli
 import (
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
 
 	runner "go.putnami.dev/protocol/runner"
-	"go.putnami.dev/sdk/extension/gitread"
+	"go.putnami.dev/sdk/extension/gittest"
 )
 
 // verifyCommitCheckout binds a version 2 request to the checkout of its
@@ -89,8 +88,7 @@ func writeTestFile(t *testing.T, path, content string) {
 
 func gitTestOutput(t *testing.T, dir string, args ...string) string {
 	t.Helper()
-	command := exec.Command(gitread.Executable(), args...)
-	command.Dir = dir
+	command := gittest.Command(dir, args...)
 	out, err := command.Output()
 	if err != nil {
 		t.Fatalf("git %v: %v", args, err)

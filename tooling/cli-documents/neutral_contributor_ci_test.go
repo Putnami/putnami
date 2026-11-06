@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -14,6 +13,7 @@ import (
 	"testing"
 
 	ciproto "go.putnami.dev/protocol/ci"
+	"go.putnami.dev/sdk/extension/gittest"
 	"go.putnami.dev/tooling/cli/internal/cli"
 	"go.putnami.dev/tooling/cli/internal/commands/agentctx"
 )
@@ -411,6 +411,15 @@ func initNeutralContributorHistory(t *testing.T, root string) {
 	writeCloudlessFile(t, root, "apps/go/main.go", "package main\n\n// A contributor's edit.\nfunc main() {}\n", 0o644)
 }
 
+func TestInitNeutralContributorHistoryIsTheSameOnAForeignMachine(t *testing.T) {
+	gittest.AssertMachineIndependent(t, func() string {
+		root := t.TempDir()
+		writeCloudlessFile(t, root, "apps/go/main.go", "package main\n\nfunc main() {}\n", 0o644)
+		initNeutralContributorHistory(t, root)
+		return root
+	})
+}
+
 func neutralGit(t *testing.T, root string, args ...string) {
 	t.Helper()
 	identity := []string{
@@ -418,12 +427,10 @@ func neutralGit(t *testing.T, root string, args ...string) {
 		"-c", "user.email=contributor@example.invalid",
 		"-c", "commit.gpgsign=false",
 	}
-	cmd := exec.Command("git", append(identity, args...)...)
-	cmd.Dir = root
-	// HOME is already redirected, but a system or XDG gitconfig still applies —
-	// a machine-wide core.hooksPath or init.templateDir would fail this run for
-	// a reason that has nothing to do with the contributor path.
-	cmd.Env = append(os.Environ(), "GIT_CONFIG_GLOBAL=/dev/null", "GIT_CONFIG_SYSTEM=/dev/null")
+	cmd := gittest.Command(root, append(identity, args...)...)
+	// The identity comes from the -c options above, so the environment sets
+	// none of its own.
+	cmd.Env = gittest.Environ(os.Environ())
 	if output, err := cmd.CombinedOutput(); err != nil {
 		t.Fatalf("git %v: %v\n%s", args, err, output)
 	}

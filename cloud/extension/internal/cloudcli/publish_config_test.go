@@ -7,7 +7,6 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -16,6 +15,7 @@ import (
 	distributioncli "go.putnami.dev/cloud/extension/internal/distributioncli"
 	distributionproto "go.putnami.dev/protocol/distribution"
 	extensionproto "go.putnami.dev/protocol/extension"
+	"go.putnami.dev/sdk/extension/gittest"
 	"go.putnami.dev/sdk/extension/releaseset"
 )
 
@@ -381,6 +381,10 @@ func configMemberSourceFixture(t *testing.T) string {
 	return root
 }
 
+func TestConfigMemberSourceFixtureIsTheSameOnAForeignMachine(t *testing.T) {
+	gittest.AssertMachineIndependent(t, func() string { return configMemberSourceFixture(t) })
+}
+
 func configMemberPlan(prepared *configcli.PreparedAuthoredConfig, fingerprint string) map[string]any {
 	return map[string]any{
 		"app": "my-app", "namespace": prepared.Namespace, "env": "prod",
@@ -440,11 +444,13 @@ func isolateGit(t *testing.T) {
 	}
 }
 
-// gitCommand runs git in a scratch repository. The fixture that builds the
-// repository calls isolateGit first.
+// gitCommand runs git in a scratch repository, without the caller's git
+// environment. The fixture that builds the repository calls isolateGit first
+// so that the code under test, which starts git itself, reads the repository
+// too.
 func gitCommand(t *testing.T, root string, args ...string) {
 	t.Helper()
-	command := exec.Command("git", append([]string{"-C", root}, args...)...)
+	command := gittest.Command(root, args...)
 	if output, err := command.CombinedOutput(); err != nil {
 		t.Fatalf("git %s: %v: %s", strings.Join(args, " "), err, output)
 	}

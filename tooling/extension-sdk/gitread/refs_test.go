@@ -1,13 +1,17 @@
-package gitread
+package gitread_test
 
-import "testing"
+import (
+	"testing"
+
+	"go.putnami.dev/sdk/extension/gitread"
+)
 
 func TestCurrentBranch_UnbornRepo(t *testing.T) {
 	t.Parallel()
 	dir := initGitRepo(t)
 	runGit(t, dir, "checkout", "-q", "--orphan", "unborn")
 
-	branch, err := CurrentBranch(dir)
+	branch, err := gitread.CurrentBranch(dir)
 	if err != nil {
 		t.Fatalf("CurrentBranch: %v", err)
 	}
@@ -21,11 +25,11 @@ func TestCurrentBranch_UnbornRepo(t *testing.T) {
 func TestCurrentBranchNameReportsNoBranchOnDetachedHEAD(t *testing.T) {
 	t.Parallel()
 	repo := initGitRepo(t)
-	if got := CurrentBranchName(repo); got != "main" {
+	if got := gitread.CurrentBranchName(repo); got != "main" {
 		t.Fatalf("CurrentBranchName = %q, want main", got)
 	}
 	runGit(t, repo, "checkout", "-q", "--detach", "HEAD")
-	if got := CurrentBranchName(repo); got != "" {
+	if got := gitread.CurrentBranchName(repo); got != "" {
 		t.Fatalf("CurrentBranchName on a detached HEAD = %q, want empty", got)
 	}
 }
@@ -42,7 +46,7 @@ func TestRefNamesBranchStripsOnlyTheRemoteSegment(t *testing.T) {
 		{"main", "main", false},
 		{"origin/main", "", false},
 	} {
-		if got := RefNamesBranch(test.ref, test.branch); got != test.want {
+		if got := gitread.RefNamesBranch(test.ref, test.branch); got != test.want {
 			t.Errorf("RefNamesBranch(%q, %q) = %t, want %t", test.ref, test.branch, got, test.want)
 		}
 	}
@@ -52,22 +56,22 @@ func TestRefNamesBranchStripsOnlyTheRemoteSegment(t *testing.T) {
 func TestTrunkRefPrefersTheRemoteDefaultBranch(t *testing.T) {
 	t.Parallel()
 	repo := initGitRepo(t)
-	if got := TrunkRef(repo); got != "main" {
+	if got := gitread.TrunkRef(repo); got != "main" {
 		t.Fatalf("TrunkRef(local main only) = %q, want main", got)
 	}
 	runGit(t, repo, "update-ref", "refs/remotes/origin/main", "HEAD")
-	if got := TrunkRef(repo); got != "origin/main" {
+	if got := gitread.TrunkRef(repo); got != "origin/main" {
 		t.Fatalf("TrunkRef(origin/main) = %q, want origin/main", got)
 	}
 	runGit(t, repo, "update-ref", "refs/remotes/origin/trunk", "HEAD")
 	runGit(t, repo, "symbolic-ref", "refs/remotes/origin/HEAD", "refs/remotes/origin/trunk")
-	if got := TrunkRef(repo); got != "origin/trunk" {
+	if got := gitread.TrunkRef(repo); got != "origin/trunk" {
 		t.Fatalf("TrunkRef(origin/HEAD) = %q, want origin/trunk", got)
 	}
 
 	bare := t.TempDir()
 	runGit(t, bare, "init", "-q")
-	if got := TrunkRef(bare); got != "" {
+	if got := gitread.TrunkRef(bare); got != "" {
 		t.Fatalf("TrunkRef(no commit) = %q, want none", got)
 	}
 }
@@ -81,17 +85,17 @@ func TestUpstreamIsSelfCounterpart(t *testing.T) {
 	runGit(t, repo, "checkout", "-q", "-b", "feature")
 	runGit(t, repo, "commit", "-q", "--allow-empty", "-m", "work")
 
-	if !UpstreamIsSelfCounterpart(repo, "origin/feature", "feature") {
+	if !gitread.UpstreamIsSelfCounterpart(repo, "origin/feature", "feature") {
 		t.Error("origin/feature is not the counterpart of feature")
 	}
-	if UpstreamIsSelfCounterpart(repo, "origin/main", "feature") {
+	if gitread.UpstreamIsSelfCounterpart(repo, "origin/main", "feature") {
 		t.Error("origin/main, which HEAD moved past, read as the counterpart of feature")
 	}
 	runGit(t, repo, "update-ref", "refs/remotes/origin/published", "HEAD")
-	if !UpstreamIsSelfCounterpart(repo, "origin/published", "feature") {
+	if !gitread.UpstreamIsSelfCounterpart(repo, "origin/published", "feature") {
 		t.Error("a ref that already contains HEAD is not read as the counterpart")
 	}
-	if got := UpstreamRef(repo); got != "" {
+	if got := gitread.UpstreamRef(repo); got != "" {
 		t.Errorf("UpstreamRef without a tracking branch = %q, want none", got)
 	}
 }

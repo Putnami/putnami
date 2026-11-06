@@ -18,6 +18,7 @@ import (
 	"go.putnami.dev/go/extension/internal/platform"
 	runtimeproto "go.putnami.dev/protocol/runtime"
 	pctx "go.putnami.dev/sdk/extension/context"
+	"go.putnami.dev/sdk/extension/gittest"
 	"go.putnami.dev/sdk/extension/jsonl"
 	"go.putnami.dev/sdk/extension/pkgmeta"
 	"go.putnami.dev/sdk/extension/runtimeinfo"
@@ -73,17 +74,16 @@ func crossCompileArgs(t *testing.T) []string {
 	return append([]string(nil), args[1:]...)
 }
 
-// gitIn runs git in dir with a fixed identity and no signing or hooks, so the
-// commit succeeds whatever the machine's own git configuration says.
+// gitIn runs git in dir with a fixed identity and without the caller's git
+// environment, so the commit succeeds whatever the machine's own git
+// configuration says.
 func gitIn(t *testing.T, dir string, args ...string) {
 	t.Helper()
 	full := append([]string{
 		"-c", "user.name=Putnami Test", "-c", "user.email=test@putnami.invalid",
-		"-c", "commit.gpgsign=false", "-c", "core.hooksPath=/dev/null",
 	}, args...)
-	cmd := exec.Command("git", full...)
-	cmd.Dir = dir
-	cmd.Env = append(os.Environ(), "GIT_CONFIG_NOSYSTEM=1")
+	cmd := gittest.Command(dir, full...)
+	cmd.Env = gittest.Environ(os.Environ())
 	if output, err := cmd.CombinedOutput(); err != nil {
 		t.Fatalf("git %v: %v\n%s", args, err, output)
 	}
@@ -117,6 +117,12 @@ func newUnstampedWorkspace(t *testing.T, manifest, putnamiJSON, readme string) u
 	gitIn(t, root, "add", "-A")
 	gitIn(t, root, "commit", "-q", "-m", readme)
 	return ws
+}
+
+func TestNewUnstampedWorkspaceIsTheSameOnAForeignMachine(t *testing.T) {
+	gittest.AssertMachineIndependent(t, func() string {
+		return newUnstampedWorkspace(t, unstampedManifest, "{}", "first\n").root
+	})
 }
 
 // context returns the job context of a package run of the project at version
