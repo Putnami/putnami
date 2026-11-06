@@ -1,6 +1,7 @@
 // Package lockdiff compares the packages a lockfile pins at two commits:
 // package-lock.json, pnpm-lock.yaml, yarn.lock, composer.lock, go.mod, uv.lock,
-// poetry.lock and the PEX JSON lock of a Pants resolve.
+// poetry.lock, the PEX JSON lock of a Pants resolve, Package.resolved and
+// Podfile.lock.
 //
 // A reader turns a lockfile's content into the versions it pins per package
 // name. Workspace links, path packages and the repository's own modules are
@@ -20,21 +21,25 @@ import (
 
 // Ecosystems of the dependency changes.
 const (
-	EcosystemNPM      = "npm"
-	EcosystemComposer = "composer"
-	EcosystemGo       = "go"
-	EcosystemPyPI     = "pypi"
+	EcosystemNPM       = "npm"
+	EcosystemComposer  = "composer"
+	EcosystemGo        = "go"
+	EcosystemPyPI      = "pypi"
+	EcosystemSwift     = "swift"
+	EcosystemCocoaPods = "cocoapods"
 )
 
 // Lockfile names the readers know.
 const (
-	PackageLock  = "package-lock.json"
-	PNPMLock     = "pnpm-lock.yaml"
-	YarnLock     = "yarn.lock"
-	ComposerLock = "composer.lock"
-	GoMod        = "go.mod"
-	UVLock       = "uv.lock"
-	PoetryLock   = "poetry.lock"
+	PackageLock     = "package-lock.json"
+	PNPMLock        = "pnpm-lock.yaml"
+	YarnLock        = "yarn.lock"
+	ComposerLock    = "composer.lock"
+	GoMod           = "go.mod"
+	UVLock          = "uv.lock"
+	PoetryLock      = "poetry.lock"
+	PackageResolved = "Package.resolved"
+	PodfileLock     = "Podfile.lock"
 )
 
 // Packages maps a package name to the versions a lockfile pins for it.
@@ -75,6 +80,10 @@ func KindOf(file string) (Kind, bool) {
 		return Kind{EcosystemPyPI, ReadUVLock}, true
 	case PoetryLock:
 		return Kind{EcosystemPyPI, ReadPoetryLock}, true
+	case PackageResolved:
+		return Kind{EcosystemSwift, ReadPackageResolved}, true
+	case PodfileLock:
+		return Kind{EcosystemCocoaPods, ReadPodfileLock}, true
 	}
 	return Kind{}, false
 }
