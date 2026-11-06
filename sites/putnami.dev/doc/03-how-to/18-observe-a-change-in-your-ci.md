@@ -41,6 +41,22 @@ bazel query 'deps(//...)' --output=streamed_jsonproto > bazel-graph.json
 
 `putnami observe` makes each Bazel package a component, reads the edges between packages from `bazel-graph.json`, and finds the logs of `bazel-testlogs` and the combined LCOV report of `bazel-out/_coverage/_coverage_report.dat` through the links Bazel leaves at the root. Each test log goes to the package of its test target. Without the export, the packages come from the `BUILD` files, without edges, and the summary names the command. The links point into Bazel's output base, so on GitLab run these lines in the job that ran Bazel, not in a later one.
 
+In a Ruby or Rails repository, have RSpec write a JUnit report with `rspec_junit_formatter`, and SimpleCov a Cobertura report with `simplecov-cobertura`, both in the `Gemfile`'s test group. Start SimpleCov at the top of `spec/spec_helper.rb`, before the application loads:
+
+```ruby
+require "simplecov"
+require "simplecov-cobertura"
+SimpleCov.start do
+  formatter SimpleCov::Formatter::CoberturaFormatter
+end
+```
+
+```bash
+bundle exec rspec --format progress --format RspecJunitFormatter --out rspec.xml
+```
+
+`putnami observe` places each test case and each covered file on the component that holds it: a packwerk pack, a directory with a `package.yml`; a gem; or the application, a directory with a `Gemfile`. The `dependencies` of a pack's `package.yml`, a `Gemfile` gem with a `path`, and a gemspec dependency on a local gem are edges, so a change to a pack marks the packs that depend on it. With Minitest, `minitest-reporters`' `JUnitReporter` and `simplecov-lcov` write reports it reads too. A `Gemfile.lock` change is a dependency change of ecosystem `gem`.
+
 The install lines need the network: when the installer or the registry cannot be reached, the GitHub step or the GitLab job fails.
 
 ## Steps
@@ -146,7 +162,7 @@ To send the evidence to Putnami Cloud, store a workspace token with the `deliver
 
 A software bill of materials (SBOM) lists the packages of a build with their licences and known vulnerabilities. `putnami observe` reads one the job wrote, CycloneDX 1.4 to 1.6 or SPDX 2.3 in JSON, and gives each changed dependency what it lists: the vulnerabilities the change fixes or introduces, and the licences before and after. It queries no vulnerability database itself.
 
-On GitHub Actions, put this step before the observe step. It writes an SBOM of the head and one of the base with [osv-scanner](https://github.com/google/osv-scanner), which reads the lockfiles of Node, Composer, Go and Python projects, `uv.lock` and `poetry.lock` included. The base is the pull request base, or on a push the commit before the push:
+On GitHub Actions, put this step before the observe step. It writes an SBOM of the head and one of the base with [osv-scanner](https://github.com/google/osv-scanner), which reads the lockfiles of Node, Composer, Go, Python and Ruby projects, `uv.lock`, `poetry.lock` and `Gemfile.lock` included. The base is the pull request base, or on a push the commit before the push:
 
 ```yaml
       - name: Write the SBOMs
@@ -188,6 +204,6 @@ Without `--base-sbom`, each dependency gets its state at the head and the summar
 ## Learn more
 
 - [What `putnami observe` reads](https://github.com/putnami/putnami/blob/main/tooling/observe/doc/01-observe.md): every flag, how the base is found, and how reports and SBOMs are discovered.
-- [The `@putnami/observe` README](https://github.com/putnami/putnami/blob/main/tooling/observe/README.md): the questions it answers and how it reads Nx, Pants, Bazel, npm, pnpm, yarn, Composer, Go and Python repositories.
+- [The `@putnami/observe` README](https://github.com/putnami/putnami/blob/main/tooling/observe/README.md): the questions it answers and how it reads Nx, Pants, Bazel, npm, pnpm, yarn, Composer, Go, Python and Ruby repositories.
 
 You now have a CI job that records which files a change touched and which tests and coverage reports it produced, as an artifact you can keep or upload to Putnami Cloud.
