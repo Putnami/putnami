@@ -147,8 +147,11 @@ the merge method is a project setting.
     reason, the flag is put back as it was before the answer, so an answer
     that merged nothing changed nothing, and a flag that cannot be put back
     is `unresolved` (`gitlab.incomplete`). GitLab's merge call itself sets
-    the flag when it asks to squash, before it decides whether it can merge,
-    so a refused squash merge puts back a flag that was off too. An
+    the flag when it asks to squash, once it accepted the credential and the
+    head and before it decides whether it can merge, so a squash merge it
+    refuses past that point puts back a flag that was off too; a refusal
+    before it, or a request that never reached it, writes nothing and keeps
+    its own outcome. An
     `unresolved` answer after a flag write names the flag's earlier value.
     The project's `never` and `always` refuse on the project's setting
     alone, even where a protected branch's rule would relax them: merge
