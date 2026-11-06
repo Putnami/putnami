@@ -201,8 +201,7 @@ func (r *Result) attributeTests(report reports.Report, result readers.TestReport
 		}
 		if !ok {
 			// cargo-nextest writes the test binary id as the class name. Only
-			// the class name is read, so another runner's suite named like a
-			// crate, such as a Jest describe title, is not given to it.
+			// the class name is read.
 			if _, component, found := m.set.LocateTestBinary(c.Classname); found {
 				owner, ok = component, true
 			}
