@@ -17,9 +17,10 @@ import (
 
 // killPortHelperEnv selects the role of the test binary in the kill-port
 // tests: "listener" listens on a free loopback port, writes it to the file
-// named by killPortHelperFileEnv and holds every connection it accepts;
+// named by killPortHelperFileEnv and reads every connection it accepts;
 // "client" connects to the port killPortHelperPortEnv names, then writes the
-// file named by killPortHelperFileEnv. Both run until a signal ends them.
+// file named by killPortHelperFileEnv. Both run until a signal ends them, or
+// exit 3 after 10 minutes.
 const (
 	killPortHelperEnv     = "PUTNAMI_GO_SERVE_KILL_PORT_HELPER"
 	killPortHelperFileEnv = "PUTNAMI_GO_SERVE_KILL_PORT_HELPER_FILE"
@@ -38,6 +39,10 @@ func TestKillPortHelperProcess(t *testing.T) {
 		}
 		port := strconv.Itoa(listener.Addr().(*net.TCPAddr).Port)
 		writeHelperFile(file, port)
+		go func() {
+			time.Sleep(10 * time.Minute)
+			os.Exit(3)
+		}()
 		for {
 			conn, err := listener.Accept()
 			if err != nil {

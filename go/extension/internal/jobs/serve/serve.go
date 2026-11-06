@@ -400,6 +400,10 @@ func killPortUnavailable(goos string) error {
 	return nil
 }
 
+// killProcessOnPort sends SIGKILL to the processes that listen on the TCP
+// port, and reports whether it killed one. It asks lsof when lsof is on PATH,
+// and fuser otherwise. fuser selects by local port, so it also ends a process
+// whose own connection has that local port.
 func killProcessOnPort(port string) bool {
 	portNumber, err := strconv.Atoi(port)
 	if err != nil || portNumber < 1 || portNumber > 65535 {
@@ -407,30 +411,31 @@ func killProcessOnPort(port string) bool {
 	}
 	port = strconv.Itoa(portNumber)
 
-	// Try lsof first. It lists only the processes that listen on the TCP
-	// port, never a client connected to it.
 	if lsof, err := exec.LookPath("lsof"); err == nil {
 		// lsof is resolved by LookPath and port is a validated decimal TCP port.
-		out, err := exec.Command(lsof, "-t", "-i", "tcp:"+port, "-sTCP:LISTEN").Output() //nolint:gosec
-		if err == nil && len(out) > 0 {
-			pids := strings.Fields(strings.TrimSpace(string(out)))
-			for _, pid := range pids {
-				pidNumber, err := strconv.Atoi(pid)
-				if err != nil || pidNumber < 1 {
-					continue
-				}
-				// PID is normalized from lsof's decimal output; the kill is best-effort.
-				exec.Command("kill", "-9", strconv.Itoa(pidNumber)).Run() //nolint:errcheck,gosec
-			}
-			return true
+		// It exits with a failure when no process listens on the port.
+		out, err := exec.Command(lsof, "-n", "-P", "-t", "-i", "tcp:"+port, "-sTCP:LISTEN").Output() //nolint:gosec
+		if err != nil {
+			return false
 		}
+		killed := false
+		for _, pid := range strings.Fields(string(out)) {
+			pidNumber, err := strconv.Atoi(pid)
+			if err != nil || pidNumber < 1 {
+				continue
+			}
+			// PID is normalized from lsof's decimal output.
+			if exec.Command("kill", "-9", strconv.Itoa(pidNumber)).Run() == nil { //nolint:gosec
+				killed = true
+			}
+		}
+		return killed
 	}
 
-	// Try fuser
 	if fuser, err := exec.LookPath("fuser"); err == nil {
 		// fuser is resolved by LookPath and port is a validated decimal TCP port.
-		exec.Command(fuser, "-k", port+"/tcp").Run() //nolint:errcheck,gosec
-		return true
+		// It exits with a failure when no process uses the port.
+		return exec.Command(fuser, "-k", port+"/tcp").Run() == nil //nolint:gosec
 	}
 
 	return false
