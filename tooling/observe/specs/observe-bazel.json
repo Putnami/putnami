@@ -12,7 +12,8 @@
     "Components finer than a package: a target is not a component",
     "Edges without an export: a BUILD file is Starlark, and observe does not evaluate it",
     "Reading MODULE.bazel.lock or the external repositories' versions as dependency changes",
-    "Serving the detection from its own extension: the detector lives in @putnami/observe until the CLI can run a workspace probe outside a workspace"
+    "Serving the detection from its own extension: the detector lives in @putnami/observe until the CLI can run a workspace probe outside a workspace",
+    "Packages whose BUILD file holds no rule, such as only exports_files: they are no component, and their files belong to the package above them, if any"
   ],
   "requirements": [
     {
@@ -21,7 +22,7 @@
     },
     {
       "id": "bazel-without-export",
-      "text": "Without an export, each directory that holds a BUILD or BUILD.bazel file, past hidden directories and node_modules, is a component without edges, and the info diagnostic observe.bazel_graph_missing names the export command. An export that does not parse, or that holds no rule of the main repository, is the warning observe.bazel_graph_unreadable, and the BUILD files answer instead."
+      "text": "Without an export, each directory with a BUILD or BUILD.bazel file, past hidden directories, node_modules, the bazel-* root directories and .bazelignore entries, is a component of source manifest without edges, which another detector's component at that directory replaces; when it finds one, the info observe.bazel_graph_missing names the export command. An export that does not parse or holds no main-repository rule is the warning observe.bazel_graph_unreadable."
     },
     {
       "id": "bazel-package-edges",
@@ -29,7 +30,7 @@
     },
     {
       "id": "bazel-reports",
-      "text": "Discovery follows the bazel-testlogs and bazel-out links of the root: each test.xml under bazel-testlogs and bazel-out/_coverage/_coverage_report.dat are report candidates, recognized by content and named through the link. The cases of a log under bazel-testlogs/<package>/<target>/ go to the package of its test target: the export rule that matches the directory, else the longest package that prefixes it. Each file of the combined LCOV goes to the package that holds it."
+      "text": "Discovery follows the bazel-testlogs and bazel-out links of the root: the test.xml of each test target, shard or run under bazel-testlogs, and bazel-out/_coverage/_coverage_report.dat, are report candidates, recognized by content and named through the link. The cases of a log under bazel-testlogs/<package>/<target>/ go to the package of its test target: the export rule that matches the directory, else the longest package that prefixes it. Each LCOV file goes to its package."
     },
     {
       "id": "bazel-change-analysis",

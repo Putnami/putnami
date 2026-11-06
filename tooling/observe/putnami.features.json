@@ -726,7 +726,8 @@
             "kind": "acceptance",
             "checks": [
               "without-an-export-the-build-files-give-the-packages",
-              "a-malformed-export-is-a-warning"
+              "a-malformed-export-is-a-warning",
+              "without-an-export-another-detector-keeps-its-components"
             ]
           }
         },
