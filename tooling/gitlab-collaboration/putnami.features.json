@@ -1,0 +1,161 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-features.json",
+  "protocolVersion": 2,
+  "namespace": "tooling",
+  "features": [
+    {
+      "id": "tooling/gitlab-collaboration",
+      "type": "feature",
+      "name": "GitLab collaboration provider",
+      "outcome": "A workspace binds its tasks to the issues of one GitLab project and calls the tasks contract without knowing GitLab's labels, states or identifiers, while a lost answer never duplicates an issue and a credential never leaves the provider",
+      "owner": "tooling",
+      "target": "modeled",
+      "requirements": [
+        {
+          "id": "label-states",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-closed-issue-is-done-unless-canceled",
+              "a-state-label-changes-only-through-transition",
+              "a-state-without-a-label-is-unsupported",
+              "a-task-already-in-the-state-is-left-as-it-is",
+              "a-transition-swaps-the-state-labels-and-closes-or-reopens",
+              "an-opened-issue-reads-its-state-from-its-labels"
+            ]
+          }
+        },
+        {
+          "id": "content-revision",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-stale-revision-is-a-conflict-before-any-write",
+              "the-revision-covers-what-a-task-shows"
+            ]
+          }
+        },
+        {
+          "id": "paged-find",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-traversal-survives-ties-and-closed-issues",
+              "find-filters-by-state-label-and-text",
+              "pages-cover-the-project-exactly-once"
+            ]
+          }
+        },
+        {
+          "id": "reconciled-writes",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-lost-create-response-returns-the-issue-without-a-duplicate",
+              "a-lost-update-response-is-read-back",
+              "a-repeated-key-returns-the-issue-it-created",
+              "a-reused-key-with-other-content-is-a-conflict",
+              "an-unestablished-write-is-unresolved-and-sent-once",
+              "only-the-accounts-issue-answers-for-a-key",
+              "update-keeps-the-marker"
+            ]
+          }
+        },
+        {
+          "id": "literal-bodies",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-body-runs-no-quick-action",
+              "a-keyword-label-is-matched-by-the-provider",
+              "done-reopens-a-duplicate-then-closes-it"
+            ]
+          }
+        },
+        {
+          "id": "informational-assign",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "an-unknown-username-is-invalid-and-writes-nothing",
+              "assign-replaces-the-assignees-by-username",
+              "me-names-the-credentials-account"
+            ]
+          }
+        },
+        {
+          "id": "honest-failures",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-missing-item-is-not-found",
+              "a-rate-limit-is-retryable-and-never-repeated",
+              "a-refused-credential-is-denied",
+              "an-outage-is-unavailable-and-writes-nothing"
+            ]
+          }
+        },
+        {
+          "id": "credential-safety",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-credential-never-reaches-an-answer",
+              "a-job-token-serves-only-its-own-instance",
+              "a-missing-credential-is-denied-and-sends-nothing",
+              "a-refusal-names-the-credentials-origin",
+              "the-credential-follows-glab-discovery",
+              "the-override-reaches-only-the-loopback-interface"
+            ]
+          }
+        },
+        {
+          "id": "truthful-manifest",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "every-operation-reaches-outside-the-machine-and-says-so",
+              "the-manifest-passes-both-gates"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

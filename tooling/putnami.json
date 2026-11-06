@@ -10,6 +10,7 @@
     "evidence-readers",
     "extension-sdk",
     "github-collaboration",
+    "gitlab-collaboration",
     "install-scripts",
     "jira-collaboration",
     "linear-collaboration",

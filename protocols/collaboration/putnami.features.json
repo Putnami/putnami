@@ -147,6 +147,7 @@
               "the-local-provider-manifest-draws-no-diagnostic",
               "the-github-provider-manifest-draws-no-diagnostic",
               "the-linear-provider-manifest-draws-no-diagnostic",
+              "the-gitlab-provider-manifest-draws-no-diagnostic",
               "the-memory-store-manifest-draws-no-diagnostic",
               "the-cli-refuses-a-call-to-a-withdrawn-contract-version"
             ]
@@ -227,7 +228,8 @@
               "the-local-provider-passes-the-task-scenarios",
               "the-github-provider-passes-the-task-scenarios",
               "the-jira-provider-passes-the-task-scenarios",
-              "the-linear-provider-passes-the-task-scenarios"
+              "the-linear-provider-passes-the-task-scenarios",
+              "the-gitlab-provider-passes-the-task-scenarios"
             ]
           }
         },

@@ -8,6 +8,7 @@
     "/python/extension",
     "/tooling/clientgen-extension",
     "/tooling/github-collaboration",
+    "/tooling/gitlab-collaboration",
     "/tooling/jira-collaboration",
     "/tooling/linear-collaboration",
     "/tooling/local-collaboration",
@@ -163,6 +164,11 @@
         {
           "kind": "project-dependency",
           "consumerProject": "/tooling/github-collaboration",
+          "producerProject": "/tooling/extension-sdk"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/gitlab-collaboration",
           "producerProject": "/tooling/extension-sdk"
         },
         {
@@ -697,6 +703,101 @@
         {
           "kind": "project-dependency",
           "consumerProject": "/tooling/github-collaboration",
+          "producerProject": "/protocols/workspace"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/gitlab-collaboration",
+          "producerProject": "/protocols/architecture"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/gitlab-collaboration",
+          "producerProject": "/protocols/capabilities"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/gitlab-collaboration",
+          "producerProject": "/protocols/cli"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/gitlab-collaboration",
+          "producerProject": "/protocols/collaboration"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/gitlab-collaboration",
+          "producerProject": "/protocols/database"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/gitlab-collaboration",
+          "producerProject": "/protocols/diagnostic"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/gitlab-collaboration",
+          "producerProject": "/protocols/distribution"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/gitlab-collaboration",
+          "producerProject": "/protocols/events"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/gitlab-collaboration",
+          "producerProject": "/protocols/extension"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/gitlab-collaboration",
+          "producerProject": "/protocols/features"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/gitlab-collaboration",
+          "producerProject": "/protocols/gomod"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/gitlab-collaboration",
+          "producerProject": "/protocols/infra"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/gitlab-collaboration",
+          "producerProject": "/protocols/job"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/gitlab-collaboration",
+          "producerProject": "/protocols/oci"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/gitlab-collaboration",
+          "producerProject": "/protocols/put"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/gitlab-collaboration",
+          "producerProject": "/protocols/registry"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/gitlab-collaboration",
+          "producerProject": "/protocols/runtime"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/gitlab-collaboration",
+          "producerProject": "/protocols/storage"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/gitlab-collaboration",
           "producerProject": "/protocols/workspace"
         },
         {

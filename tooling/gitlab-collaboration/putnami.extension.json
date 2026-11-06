@@ -1,0 +1,108 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-extension.json",
+  "name": "@putnami/gitlab-collaboration",
+  "cliContract": 19,
+  "runtime": {
+    "executable": "compiled/putnami-gitlab-collaboration",
+    "toolchains": {
+      "runtimeCompiler": {
+        "lock": "go",
+        "candidates": [
+          {
+            "from": "environment",
+            "environment": "GOROOT",
+            "path": "bin/go"
+          },
+          {
+            "from": "path",
+            "path": "go"
+          },
+          {
+            "from": "putnami-home",
+            "path": "toolchains/go/go-{version}/go/bin/go"
+          }
+        ],
+        "probe": {
+          "args": [
+            "env",
+            "GOVERSION"
+          ],
+          "expect": "go{version}",
+          "unset": [
+            "GOROOT"
+          ],
+          "environment": {
+            "GOTOOLCHAIN": "local"
+          }
+        },
+        "environment": {
+          "GOROOT": {
+            "from": "ancestor",
+            "levels": 2
+          },
+          "GOTOOLCHAIN": {
+            "from": "literal",
+            "value": "local"
+          }
+        },
+        "prependPath": true
+      }
+    },
+    "prepare": {
+      "command": "{extensionRoot}/bin/prepare",
+      "args": [
+        "--output",
+        "{runtimeOutput}"
+      ],
+      "inputs": [
+        "bin/prepare",
+        "cmd/**",
+        "go.mod",
+        "internal/**"
+      ],
+      "toolchains": [
+        "runtimeCompiler"
+      ]
+    }
+  },
+  "providers": {
+    "tasks": {
+      "version": 1,
+      "command": "{extensionRuntime}",
+      "args": [
+        "provider"
+      ],
+      "cwd": "{workspaceRoot}",
+      "timeoutMs": 120000,
+      "operations": {
+        "find": {
+          "description": "Find issues of the bound GitLab project by text, semantic state and labels, oldest first, one bounded page at a time. GitLab filters on state, labels and text in title and description; states map to labels through settings.states, and a closed issue is canceled by a canceled label or a duplicate link.",
+          "openWorld": true
+        },
+        "get": {
+          "description": "Read one issue of the bound GitLab project by its iid.",
+          "openWorld": true
+        },
+        "create": {
+          "description": "Open an issue in the bound GitLab project. The idempotency key is recorded in the description as a hidden comment: a repeated key returns the issue it opened, the same key with other content is a conflict, and a create whose outcome is unknown is read back and answered unresolved rather than opened twice. Only an issue the credential's account opened answers for a key; two concurrent calls with one key are not detected.",
+          "openWorld": true
+        },
+        "update": {
+          "description": "Change an issue's title, description or labels. Labels replace the task's labels; state labels change only through transition. expectedRevision is compared with the issue read just before the write: GitLab has no conditional issue write, so a writer between the two is not detected.",
+          "openWorld": true,
+          "preconditions": "checked"
+        },
+        "transition": {
+          "description": "Move an issue to a semantic state: the state labels settings.states names are swapped, and the issue is closed for done and canceled and reopened otherwise. A state other than open and done without a configured label is unsupported. expectedRevision is compared with the issue read just before the write.",
+          "openWorld": true,
+          "preconditions": "checked"
+        },
+        "assign": {
+          "description": "Replace an issue's assignees, named by username; @me names the credential's account. GitLab keeps only the users it can assign, one on a tier without multiple assignees, and the answer lists the actual assignees. An assignee is information, never an exclusive claim: this provider offers no claim.",
+          "openWorld": true,
+          "preconditions": "checked"
+        }
+      }
+    }
+  }
+}

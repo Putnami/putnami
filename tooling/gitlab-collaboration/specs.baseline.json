@@ -1,0 +1,15 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-specs-baseline.json",
+  "protocolVersion": 2,
+  "executableRequirements": [
+    "tooling/gitlab-collaboration#content-revision",
+    "tooling/gitlab-collaboration#credential-safety",
+    "tooling/gitlab-collaboration#honest-failures",
+    "tooling/gitlab-collaboration#informational-assign",
+    "tooling/gitlab-collaboration#label-states",
+    "tooling/gitlab-collaboration#literal-bodies",
+    "tooling/gitlab-collaboration#paged-find",
+    "tooling/gitlab-collaboration#reconciled-writes",
+    "tooling/gitlab-collaboration#truthful-manifest"
+  ]
+}

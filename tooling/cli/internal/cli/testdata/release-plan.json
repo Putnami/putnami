@@ -203,6 +203,7 @@
       "artifacts": [
         "@putnami/contributor",
         "@putnami/github-collaboration",
+        "@putnami/gitlab-collaboration",
         "@putnami/jira-collaboration",
         "@putnami/linear-collaboration",
         "@putnami/local-collaboration",

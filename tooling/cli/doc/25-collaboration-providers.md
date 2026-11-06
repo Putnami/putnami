@@ -156,6 +156,12 @@ reads the credential the way `gh` does, maps task states to labels through its
 binding settings, lists what people wrote on a pull request through
 `proposals comments`, and offers merge only as an optional capability.
 
+[`@putnami/gitlab-collaboration`](../../gitlab-collaboration/README.md)
+implements **tasks** on the issues of one GitLab project, on GitLab.com or a
+self-managed instance. It finds the credential the way `glab` does, maps task
+states to labels with the same settings as the GitHub provider, and offers
+`assign`; merge requests are not served yet.
+
 [`@putnami/jira-collaboration`](../../jira-collaboration/README.md)
 implements **tasks** on the issues of one Jira Cloud project. It reads
 `JIRA_EMAIL` and `JIRA_API_TOKEN`, maps task states to status categories, so a
