@@ -1,10 +1,11 @@
 package gitread_test
 
 import (
-	"go.putnami.dev/sdk/extension/gitread"
 	"reflect"
 	"strings"
 	"testing"
+
+	"go.putnami.dev/sdk/extension/gitread"
 )
 
 func TestHeadSHA(t *testing.T) {

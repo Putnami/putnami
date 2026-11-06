@@ -1,10 +1,11 @@
 package gitread_test
 
 import (
-	"go.putnami.dev/sdk/extension/gitread"
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"go.putnami.dev/sdk/extension/gitread"
 )
 
 // The record format keeps a body with blank lines and a footer whole, the
