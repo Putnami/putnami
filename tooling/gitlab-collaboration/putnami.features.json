@@ -7,7 +7,7 @@
       "id": "tooling/gitlab-collaboration",
       "type": "feature",
       "name": "GitLab collaboration provider",
-      "outcome": "A workspace binds its tasks to the issues of one GitLab project and calls the tasks contract without knowing GitLab's labels, states or identifiers, while a lost answer never duplicates an issue and a credential never leaves the provider",
+      "outcome": "A workspace binds its tasks to the issues of one GitLab project and its change proposals to that project's merge requests, and calls the tasks and proposals contracts without knowing GitLab's labels, states, draft prefix or identifiers, while a lost answer never duplicates an issue, a merge request or a review and a credential never leaves the provider",
       "owner": "tooling",
       "target": "modeled",
       "requirements": [
@@ -87,6 +87,7 @@
             "kind": "acceptance",
             "checks": [
               "a-body-runs-no-quick-action",
+              "a-description-or-review-runs-no-quick-action",
               "a-keyword-label-is-matched-by-the-provider",
               "done-reopens-a-duplicate-then-closes-it"
             ]
@@ -104,6 +105,126 @@
               "an-unknown-username-is-invalid-and-writes-nothing",
               "assign-replaces-the-assignees-by-username",
               "me-names-the-credentials-account"
+            ]
+          }
+        },
+        {
+          "id": "exact-proposal-identity",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-fork-head-or-another-repository-is-invalid",
+              "a-fork-merge-request-is-not-found-by-reference",
+              "a-head-commit-not-on-the-branch-is-a-conflict",
+              "a-lagging-head-is-awaited-then-retryable",
+              "a-lost-upsert-answer-is-read-back",
+              "one-merge-request-per-exact-identity",
+              "the-revision-covers-what-a-proposal-shows"
+            ]
+          }
+        },
+        {
+          "id": "draft-by-title",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-title-with-a-draft-prefix-is-invalid",
+              "an-upsert-without-draft-keeps-the-draft-state",
+              "draft-is-a-title-prefix-no-title-shows"
+            ]
+          }
+        },
+        {
+          "id": "note-reviews",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-lost-review-answer-is-read-back",
+              "a-repeated-review-key-returns-its-note",
+              "approve-approves-the-reviewed-head",
+              "request-changes-withdraws-the-approval",
+              "status-lists-review-notes-and-approvals"
+            ]
+          }
+        },
+        {
+          "id": "pipeline-checks",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-blocking-manual-job-is-pending",
+              "an-allowed-failure-does-not-fail-the-summary",
+              "status-reports-the-head-commit-statuses",
+              "the-latest-status-of-each-name-decides"
+            ]
+          }
+        },
+        {
+          "id": "proposal-comments",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-diff-note-names-its-file-line",
+              "comments-list-every-note-once",
+              "system-notes-are-not-comments"
+            ]
+          }
+        },
+        {
+          "id": "reported-publication",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-failed-addition-is-unresolved-and-names-the-merge-request",
+              "a-merge-request-reference-or-foreign-url-adds-nothing",
+              "a-scoped-label-key-the-merge-request-has-is-kept",
+              "a-single-assignee-tier-keeps-its-assignee",
+              "assign-author-adds-the-account",
+              "labels-are-inherited-from-gitlab-references"
+            ]
+          }
+        },
+        {
+          "id": "guarded-merge",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-merge-method-the-project-cannot-honor-is-unsupported",
+              "a-moved-head-or-unmergeable-request-is-a-conflict",
+              "a-squash-option-the-project-forbids-is-unsupported",
+              "an-answer-that-merges-nothing-leaves-the-squash-flag",
+              "merge-is-denied-unless-allowed",
+              "merge-sends-the-expected-head",
+              "remove-source-branch-rides-on-the-merge",
+              "the-merge-request-squash-flag-follows-the-method"
             ]
           }
         },

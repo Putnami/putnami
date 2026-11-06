@@ -4,17 +4,20 @@
   "feature": "tooling/gitlab-collaboration",
   "outcomes": [
     "A workspace keeps its work items in the issues of one GitLab project, on GitLab.com or a self-managed instance, and its skills speak only the tasks contract",
+    "A workspace publishes its change proposals as the merge requests of the same project, so the contribution loop runs on GitLab as it runs on GitHub: one merge request per exact base and head, its draft state, the commit statuses of its head, reviews, comments and a merge only the binding allows",
     "A binding maps the contract's states to the project's own labels the way the GitHub provider's binding does, so one state configuration serves both hosts",
-    "A retry after a lost answer finds the issue the first attempt created instead of creating it again, and an outcome the provider cannot establish is reported as unresolved",
+    "A retry after a lost answer finds the issue, merge request or review note the first attempt created instead of creating it again, and an outcome the provider cannot establish is reported as unresolved",
     "A GitLab credential is found the way glab finds it, is sent only to its own instance, and appears in no answer, message or log"
   ],
   "nonGoals": [
-    "The proposals contract: merge requests are a separate change of the same epic",
     "The link and claim operations: an issue's parent in GitLab is an epic or a work item hierarchy outside the issues REST API, and nothing enforces an exclusive claim",
+    "Merge requests from a fork: a proposal's head is a branch of the bound project",
+    "GitLab's reviewer states, approval rules and the Request changes of its review panel: a request_changes review is a note and a withdrawn approval, and GitLab blocks nothing on the note",
+    "Merging when the pipeline succeeds: merge merges at once or answers why GitLab refused",
     "Detecting a concurrent writer between the read and the write of a checked precondition, or two concurrent creates with one idempotency key",
     "Reading a token GitLab's CLI keeps in an operating-system keyring rather than in its configuration",
     "Running the live proof in the ordinary gate: it mutates a real GitLab project and runs only on request",
-    "Writing with a CI/CD job token: GitLab lets a job token read issues and nothing more, so a pipeline that writes tasks sets GITLAB_TOKEN"
+    "Writing with a CI/CD job token: GitLab lets a job token read issues and nothing more, so a pipeline that writes tasks or proposals sets GITLAB_TOKEN"
   ],
   "requirements": [
     {
@@ -35,11 +38,39 @@
     },
     {
       "id": "literal-bodies",
-      "text": "A task's title and body reach GitLab as data, never as commands: create and update escape every body line that starts with a slash, fenced code included, so GitLab runs no quick action from it and stores the body whole; a read removes the escape exactly. A transition to done of an issue GitLab closed as a duplicate reopens it, then closes it, since the duplicate link otherwise keeps it canceled. A label named None or Any, which GitLab's filter reads as a keyword, is matched by the provider."
+      "text": "Titles, task bodies, merge request descriptions and review bodies reach GitLab as data: every line starting with a slash, fenced code included, is escaped, so GitLab runs no quick action and stores the text whole; a read removes the escape exactly. A transition to done of an issue closed as a duplicate reopens it, then closes it, since the link keeps it canceled. A label named None or Any, keywords of GitLab's filter, is matched by the provider."
     },
     {
       "id": "informational-assign",
       "text": "assign replaces an issue's assignees with the users the request names by username, @me naming the credential's account; a username GitLab does not know is invalid and nothing is written. GitLab keeps only the assignees it can assign, one on a tier without multiple assignees, and the answer lists the assignees the issue actually has. An assignee is information, never an exclusive claim."
+    },
+    {
+      "id": "exact-proposal-identity",
+      "text": "A proposal is the merge request !<iid> whose source branch, in the bound project, and target are the request's exact head and base; GitLab keeps one open per pair, so a repeated or lost upsert never opens two. A fork head or another repository is invalid and sends nothing. A head commit not on the branch is a conflict before any write; one the branch has is awaited about 10s, then head.lagging, retryable. The revision covers title, description, state, draft, base, head, head commit, labels and assignees."
+    },
+    {
+      "id": "draft-by-title",
+      "text": "GitLab marks a merge request as a draft by a title prefix: upsert writes Draft: before the title of a draft and leaves it off a ready one, a proposal's title never shows the prefix, and an upsert without draft keeps the merge request's draft state. A requested title that starts with a prefix GitLab reads as a draft is invalid and nothing is written."
+    },
+    {
+      "id": "note-reviews",
+      "text": "A review is a merge request note holding its body, a hidden verdict and commit, and the idempotency marker: a repeated key returns its note, other content is a conflict, another account's note never answers, and a lost post is read back, else unresolved, never posted twice. approve first approves at the reviewed head, which GitLab refuses once the head moved; request_changes first withdraws the account's approval. status lists every review note and every current approval."
+    },
+    {
+      "id": "pipeline-checks",
+      "text": "status reports the commit statuses of the head commit, pipeline jobs and external statuses alike; of each name the latest, by id, decides, since GitLab lists every pipeline's. success passes; failed and canceled fail unless the job may fail; skipped, and a manual job allowed to fail, are skipped; any other, a blocking manual job included, is pending. The summary is failing when one fails, pending when one is not finished, passing when every one passed or was skipped, and none without any."
+    },
+    {
+      "id": "proposal-comments",
+      "text": "comments lists, by ascending note id and once across pages, every note people wrote on a merge request and no system note: a review note's body without its markers, naming itself as its review; a diff note with its path, its line in the new file and the head commit it was written on; a discussion note. A diff note on a deleted line or on a whole file keeps its path without a line."
+    },
+    {
+      "id": "reported-publication",
+      "text": "Every proposal answer lists its labels and assignees, [] when absent. upsert applies assignAuthor and inheritLabelPrefixes, which only add: a tier keeping one assignee keeps the present one, and of each scoped key::value one label is added, none when the merge request has that key. A failed addition after the write is unresolved, naming the merge request. References are GitLab's: #<iid>, project#<iid>, group/project#<iid>, issue URLs on the bound host; !<iid> adds nothing, a foreign URL is never read."
+    },
+    {
+      "id": "guarded-merge",
+      "text": "merge is denied unless settings.allowMerge is true and merges only at the expected head, sent as GitLab's sha, so a moved head is a conflict, as is a merge GitLab refuses. A named method sets the merge request's squash flag; where the project or a rule its squash_on_merge shows overrides it, merge is unsupported. Every answer that merges nothing leaves the flag as it was, or is unresolved. settings.removeSourceBranch deletes the source branch in the merge call itself."
     },
     {
       "id": "honest-failures",
@@ -51,11 +82,12 @@
     },
     {
       "id": "truthful-manifest",
-      "text": "The manifest passes the extension protocol's strict validation, offers exactly the tasks operations the runtime answers (find, get, create, update, transition and assign), declares preconditions checked where GitLab cannot compare and write in one step, and marks every operation as reaching outside the machine."
+      "text": "The manifest passes the extension protocol's strict validation, offers exactly the operations the runtime answers, tasks find, get, create, update, transition and assign and proposals find, upsert, status, review, comments and merge, declares preconditions checked where GitLab cannot compare and write in one step, and marks every operation as reaching outside the machine."
     }
   ],
   "decisions": [
     "tooling/gitlab-collaboration/doc/adr/0001-gitlab-collaboration-provider.md",
+    "tooling/gitlab-collaboration/doc/adr/0002-proposals-on-merge-requests.md",
     "protocols/collaboration/doc/adr/0001-collaboration-provider-contracts.md",
     "tooling/github-collaboration/doc/adr/0001-github-collaboration-provider.md"
   ]

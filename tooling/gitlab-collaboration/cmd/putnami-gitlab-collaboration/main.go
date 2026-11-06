@@ -1,6 +1,7 @@
 // Command putnami-gitlab-collaboration is the runtime of the
 // @putnami/gitlab-collaboration extension: the GitLab provider of the tasks
-// collaboration contract, over the issues of one project.
+// and proposals collaboration contracts, over the issues and merge requests
+// of one project.
 //
 // Usage:
 //
@@ -8,7 +9,8 @@
 //	putnami-gitlab-collaboration provider                 (one routed ProviderRequest on stdin, one Response on stdout)
 //
 // It is never called directly: the workspace binds it in options.collaboration
-// and Putnami routes `putnami tasks <operation>` and the host call
+// and Putnami routes `putnami tasks <operation>`, `putnami proposals
+// <operation>` and the host call
 // collaboration.call to it.
 package main
 

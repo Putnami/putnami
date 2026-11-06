@@ -35,13 +35,15 @@ type harness struct {
 	provider *Provider
 	settings string
 	env      map[string]string
+	// contract is the contract calls go to: tasks unless proposals() set it.
+	contract string
 }
 
 func newHarness(t *testing.T) *harness {
 	t.Helper()
 	fake := newFakeGitLab(t)
 	h := &harness{
-		t: t, fake: fake, settings: referenceSettings,
+		t: t, fake: fake, settings: referenceSettings, contract: collab.ContractTasks,
 		env: map[string]string{gitlab.OverrideVariable: fake.server.URL, gitlab.TokenVariable: fake.token, gitlab.HostVariable: fakeHost},
 	}
 	h.provider = &Provider{
@@ -64,7 +66,7 @@ func (h *harness) serve(operation, arguments string) string {
 	request := collab.ProviderRequest{
 		Arguments:     json.RawMessage(arguments),
 		WorkspaceRoot: h.t.TempDir(),
-		Provider: &collab.ProviderCall{Contract: collab.ContractTasks, Version: 1, Operation: operation,
+		Provider: &collab.ProviderCall{Contract: h.contract, Version: 1, Operation: operation,
 			Settings: json.RawMessage(h.settings)},
 	}
 	payload, err := json.Marshal(request)
@@ -94,7 +96,7 @@ func (h *harness) ok(operation, arguments string, into any) {
 	h.t.Helper()
 	response := h.call(operation, arguments)
 	if response.Outcome != collab.OutcomeOK {
-		h.t.Fatalf("tasks.%s %s: %s %+v", operation, arguments, response.Outcome, response.Error)
+		h.t.Fatalf("%s.%s %s: %s %+v", h.contract, operation, arguments, response.Outcome, response.Error)
 	}
 	reflect.ValueOf(into).Elem().SetZero()
 	if err := json.Unmarshal(response.Result, into); err != nil {
@@ -106,7 +108,7 @@ func (h *harness) fails(operation, arguments string, outcome collab.Outcome) col
 	h.t.Helper()
 	response := h.call(operation, arguments)
 	if response.Outcome != outcome {
-		h.t.Fatalf("tasks.%s %s: outcome %s, want %s (%+v)", operation, arguments, response.Outcome, outcome, response.Error)
+		h.t.Fatalf("%s.%s %s: outcome %s, want %s (%+v)", h.contract, operation, arguments, response.Outcome, outcome, response.Error)
 	}
 	return *response.Error
 }
@@ -174,4 +176,74 @@ func mustContain(t *testing.T, text, want string) {
 func statusFault(status int, message string, before bool) fault {
 	body, _ := json.Marshal(map[string]any{"message": message})
 	return fault{status: status, body: string(body), before: before}
+}
+
+// proposals routes the harness's calls to the proposals contract, with the
+// fake's project bound and the extra settings given, a JSON object's members
+// or nothing. HeadLagPause waits nothing.
+func (h *harness) proposals(extra string) *harness {
+	h.contract = collab.ContractProposals
+	h.settings = proposalSettings(extra)
+	h.provider.HeadLagPause = noPause
+	return h
+}
+
+func proposalSettings(extra string) string {
+	settings := `{"project":"` + fakeProject + `","host":"` + fakeHost + `"`
+	if extra != "" {
+		settings += "," + extra
+	}
+	return settings + "}"
+}
+
+// branch points a branch of the fake's project at a commit.
+func (h *harness) branch(name, sha string) {
+	h.fake.mu.Lock()
+	defer h.fake.mu.Unlock()
+	h.fake.branches[name] = sha
+}
+
+// push moves a branch to a commit, and the head of every open merge request
+// from it after lag more reads.
+func (h *harness) push(name, sha string, lag int) {
+	h.fake.mu.Lock()
+	defer h.fake.mu.Unlock()
+	h.fake.branches[name] = sha
+	for _, mr := range h.fake.mrs {
+		if mr.source == name && mr.state == "opened" {
+			mr.pending, mr.lag = sha, lag
+		}
+	}
+}
+
+// mr returns the fake merge request of an iid, for inspection under the
+// fake's lock by the caller's function.
+func (h *harness) mr(iid int, inspect func(*fakeMR)) {
+	h.fake.mu.Lock()
+	defer h.fake.mu.Unlock()
+	inspect(h.fake.mrs[iid])
+}
+
+func (h *harness) upsert(arguments string) collab.ProposalUpsertResult {
+	h.t.Helper()
+	var result collab.ProposalUpsertResult
+	h.ok("upsert", arguments, &result)
+	return result
+}
+
+func mrRef(iid int) collab.Ref {
+	return collab.Ref{Source: source, ID: "!" + strconv.Itoa(iid)}
+}
+
+func (h *harness) mrCount() int {
+	h.fake.mu.Lock()
+	defer h.fake.mu.Unlock()
+	return len(h.fake.mrs)
+}
+
+// set changes the fake under its lock.
+func (h *harness) set(change func(*fakeGitLab)) {
+	h.fake.mu.Lock()
+	defer h.fake.mu.Unlock()
+	change(h.fake)
 }

@@ -56,31 +56,34 @@ func TestTheManifestPassesBothGates(t *testing.T) {
 	spectest.Proves(t, "collaboration/provider-contract", "truthful-provider-declarations", "the-gitlab-provider-manifest-draws-no-diagnostic")
 	spectest.Proves(t, feature, "truthful-manifest", "the-manifest-passes-both-gates")
 	offer := readOffer(t)
-	if !slices.Equal(offer.Versions(collab.ContractTasks), []int{1}) || len(offer.Versions(collab.ContractProposals)) != 0 ||
-		len(offer.Versions(collab.ContractMemory)) != 0 {
+	if !slices.Equal(offer.Versions(collab.ContractTasks), []int{1}) || !slices.Equal(offer.Versions(collab.ContractProposals), []int{1}) ||
+		len(offer.Versions(collab.ContractMemory)) != 0 || len(offer.Versions(collab.ContractMissions)) != 0 {
 		t.Fatalf("offer %v", offer)
 	}
 	answered := map[collab.OperationKey]bool{}
 	for key := range provider.New().Handlers() {
 		answered[key] = true
 	}
-	operations, _ := offer.Operations(collab.ContractTasks, 1)
-	for name, provided := range operations {
-		key := collab.OperationKey{Contract: collab.ContractTasks, Version: 1, Operation: name}
-		if !answered[key] {
-			t.Errorf("the manifest offers %s, which the runtime does not answer", key)
-		}
-		delete(answered, key)
-		if !slices.Equal(provided.Provider.Args, []string{providerArg}) || provided.Provider.Command != "{extensionRuntime}" {
-			t.Errorf("%s does not route to the runtime's provider entry point", key)
-		}
-		if provided.Spec.Preconditions == collab.PreconditionRuleDeclared && provided.Preconditions() != collab.PreconditionsChecked {
-			t.Errorf("%s declares preconditions %q; GitLab has no conditional write, so it compares then writes", key, provided.Preconditions())
+	for _, contract := range []string{collab.ContractTasks, collab.ContractProposals} {
+		operations, _ := offer.Operations(contract, 1)
+		for name, provided := range operations {
+			key := collab.OperationKey{Contract: contract, Version: 1, Operation: name}
+			if !answered[key] {
+				t.Errorf("the manifest offers %s, which the runtime does not answer", key)
+			}
+			delete(answered, key)
+			if !slices.Equal(provided.Provider.Args, []string{providerArg}) || provided.Provider.Command != "{extensionRuntime}" {
+				t.Errorf("%s does not route to the runtime's provider entry point", key)
+			}
+			if provided.Spec.Preconditions == collab.PreconditionRuleDeclared && provided.Preconditions() != collab.PreconditionsChecked {
+				t.Errorf("%s declares preconditions %q; GitLab has no conditional write, so it compares then writes", key, provided.Preconditions())
+			}
 		}
 	}
 	if len(answered) != 0 {
 		t.Errorf("the runtime answers operations the manifest does not offer: %v", answered)
 	}
+	operations, _ := offer.Operations(collab.ContractTasks, 1)
 	for _, absent := range []string{collab.OperationLink, collab.OperationClaim} {
 		if _, offered := operations[absent]; offered {
 			t.Errorf("%s is offered; ADR 0001 leaves it out", absent)
@@ -90,13 +93,16 @@ func TestTheManifestPassesBothGates(t *testing.T) {
 
 func TestEveryOperationReachesOutsideTheMachineAndSaysSo(t *testing.T) {
 	spectest.Proves(t, feature, "truthful-manifest", "every-operation-reaches-outside-the-machine-and-says-so")
-	operations, _ := readOffer(t).Operations(collab.ContractTasks, 1)
-	for name, provided := range operations {
-		if provided.Operation.OpenWorld == nil || !*provided.Operation.OpenWorld {
-			t.Errorf("tasks.%s reaches GitLab and must say openWorld: true", name)
-		}
-		if provided.Provider.TimeoutMs <= 100000 {
-			t.Errorf("tasks.%s times out after %dms, before the provider's own 100s budget", name, provided.Provider.TimeoutMs)
+	offer := readOffer(t)
+	for _, contract := range []string{collab.ContractTasks, collab.ContractProposals} {
+		operations, _ := offer.Operations(contract, 1)
+		for name, provided := range operations {
+			if provided.Operation.OpenWorld == nil || !*provided.Operation.OpenWorld {
+				t.Errorf("%s.%s reaches GitLab and must say openWorld: true", contract, name)
+			}
+			if provided.Provider.TimeoutMs <= 100000 {
+				t.Errorf("%s.%s times out after %dms, before the provider's own 100s budget", contract, name, provided.Provider.TimeoutMs)
+			}
 		}
 	}
 }

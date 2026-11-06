@@ -244,7 +244,8 @@
             "checks": [
               "the-proposal-scenarios-pass-against-a-correct-provider",
               "the-local-provider-passes-the-proposal-scenarios",
-              "the-github-provider-passes-the-proposal-scenarios"
+              "the-github-provider-passes-the-proposal-scenarios",
+              "the-gitlab-provider-passes-the-proposal-scenarios"
             ]
           }
         },
@@ -259,7 +260,8 @@
             "checks": [
               "a-comment-names-its-review-and-its-file-line",
               "the-comment-scenario-passes-against-a-correct-provider",
-              "the-github-provider-passes-the-comment-scenario"
+              "the-github-provider-passes-the-comment-scenario",
+              "the-gitlab-provider-passes-the-comment-scenario"
             ]
           }
         },
