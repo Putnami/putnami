@@ -1,0 +1,43 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-spec.json",
+  "protocolVersion": 1,
+  "feature": "tooling/observe-bazel",
+  "outcomes": [
+    "In a Bazel repository, each Bazel package is a component, named by its label, and each changed file maps to the package that holds it",
+    "When the CI exported its graph with bazel query, the edges between packages come from it, so a change to a shared library marks the packages that use it as dependent",
+    "The JUnit logs of bazel test and the combined LCOV report of bazel coverage land on their packages, through the convenience links Bazel leaves at the repository root"
+  ],
+  "nonGoals": [
+    "Running bazel, or any query, build or test command: the CI writes the export, observe reads it",
+    "Components finer than a package: a target is not a component",
+    "Edges without an export: a BUILD file is Starlark, and observe does not evaluate it",
+    "Reading MODULE.bazel.lock or the external repositories' versions as dependency changes",
+    "Serving the detection from its own extension: the detector lives in @putnami/observe until the CLI can run a workspace probe outside a workspace"
+  ],
+  "requirements": [
+    {
+      "id": "bazel-packages-are-components",
+      "text": "A root that holds MODULE.bazel, WORKSPACE or WORKSPACE.bazel is a Bazel workspace. Its export is bazel-graph.json at the root, or the file --bazel-graph names, as bazel query 'deps(//...)' writes it with --output=streamed_jsonproto or jsonproto. Each directory with a BUILD or BUILD.bazel file and a rule of the main repository in the export is a component of source orchestrator and ecosystem bazel, named by its package label, // at the root."
+    },
+    {
+      "id": "bazel-without-export",
+      "text": "Without an export, each directory that holds a BUILD or BUILD.bazel file, past hidden directories and node_modules, is a component without edges, and the info diagnostic observe.bazel_graph_missing names the export command. An export that does not parse, or that holds no rule of the main repository, is the warning observe.bazel_graph_unreadable, and the BUILD files answer instead."
+    },
+    {
+      "id": "bazel-package-edges",
+      "text": "A rule of one package that names a target of another package of the main repository among its rule inputs makes its package depend on the other. A label of the main repository is //pkg:name, @//pkg:name or @@//pkg:name. A target of an external repository, such as @maven//... or @@rules_go~//..., a package with no component, and the package itself are no edge."
+    },
+    {
+      "id": "bazel-reports",
+      "text": "Discovery follows the bazel-testlogs and bazel-out links of the root: each test.xml under bazel-testlogs and bazel-out/_coverage/_coverage_report.dat are report candidates, recognized by content and named through the link. The cases of a log under bazel-testlogs/<package>/<target>/ go to the package of its test target: the export rule that matches the directory, else the longest package that prefixes it. Each file of the combined LCOV goes to the package that holds it."
+    },
+    {
+      "id": "bazel-change-analysis",
+      "text": "On a repository with //pricing, //api that depends on it, and //web: with the export, the three packages and the edge from api to pricing, and a change to pricing marks api dependent and web unaffected; without it, the three packages without edges and the info diagnostic; the bazel-testlogs cases and the combined LCOV land on their packages, with no unattributed case or unmapped file; a malformed export is a warning, never a failed run."
+    }
+  ],
+  "decisions": [
+    "tooling/cli/doc/adr/0051-user-scope-extensions-run-without-a-workspace.md",
+    "protocols/evidence/doc/adr/0001-one-self-reported-change-evidence-document.md"
+  ]
+}
