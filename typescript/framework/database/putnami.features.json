@@ -19,7 +19,8 @@
             "kind": "acceptance",
             "checks": [
               "begin-is-issued-once-per-datasource",
-              "no-reserve-or-begin-before-the-first-write-and-one-shared-opening"
+              "no-reserve-or-begin-before-the-first-write-and-one-shared-opening",
+              "a-write-still-opening-when-a-rollback-starts-fails-instead-of-running-outside-it"
             ]
           }
         },
@@ -52,7 +53,8 @@
             "kind": "acceptance",
             "checks": [
               "timeout-rolls-back-once-and-a-racing-commit-awaits-it-and-fails",
-              "a-write-still-opening-when-the-timeout-fires-fails-instead-of-running-after-the-rollback"
+              "a-write-still-opening-when-the-timeout-fires-fails-instead-of-running-after-the-rollback",
+              "a-held-connection-fails-after-the-timeout-rolls-back"
             ]
           }
         },
