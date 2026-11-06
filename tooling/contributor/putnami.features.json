@@ -23,7 +23,8 @@
               "the-finalizer-publishes-through-the-contracts",
               "partial-delivery-never-closes-parent",
               "the-read-back-carries-what-the-upsert-answered",
-              "a-settled-proposal-of-the-branch-opens-no-replacement"
+              "a-settled-proposal-of-the-branch-opens-no-replacement",
+              "the-bound-provider-proves-the-closing-source"
             ]
           }
         },

@@ -66,8 +66,9 @@ sees what changed since the approval.
 `proposals.comments` is an optional read operation of the proposals contract.
 It lists, in bounded pages, the review bodies, line comments and conversation
 comments of one proposal, each with the review and the file line it belongs
-to when known. The GitHub provider offers it. A provider that does not offer
-it answers `unsupported`, and `build` reports that it cannot read comments.
+to when known. A provider offers it when its code host exposes those
+comments. A provider that does not offer it answers `unsupported`, and `build`
+reports that it cannot read comments.
 
 ## Consequences
 
