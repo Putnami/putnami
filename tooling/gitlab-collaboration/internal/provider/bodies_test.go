@@ -119,3 +119,26 @@ func quoteJSON(value string) string {
 	builder.WriteByte('"')
 	return builder.String()
 }
+
+// TestTheBodyEscapeIsExactAndSparesFencedCode holds escapeBody and
+// unescapeBody to an exact round trip, and leaves fenced code as written.
+func TestTheBodyEscapeIsExactAndSparesFencedCode(t *testing.T) {
+	spectest.Proves(t, feature, "literal-bodies", "a-body-runs-no-quick-action")
+	for _, body := range []string{
+		"",
+		"/close",
+		"\u200b/close",
+		"\u200b\u200b/x\n\u200bplain",
+		"text\n/label ~a\n  /indented\n```\n/close in code\n```\n/after",
+		"~~~sh\n/run\n```\n/still code\n~~~\n/out",
+		"   ```\n/in\n    ```\n/still in\n```",
+	} {
+		if got := unescapeBody(escapeBody(body)); got != body {
+			t.Errorf("%q round-trips to %q", body, got)
+		}
+	}
+	escaped := escapeBody("```\n/close\n```\n/close")
+	if escaped != "```\n/close\n```\n\u200b/close" {
+		t.Fatalf("fenced code was escaped: %q", escaped)
+	}
+}

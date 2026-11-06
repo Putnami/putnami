@@ -108,10 +108,11 @@ credential never leaves its own instance or this machine.
   separator. A transition to `done` of an issue GitLab closed as a duplicate
   reopens it, which clears the duplicate link, then closes it.
 - **Bodies are text.** GitLab runs a quick action (`/close`, `/label`,
-  `/move`) from any description line that starts with a slash. `create` and
-  `update` put a zero-width space before such a slash, so GitLab stores the
-  line and runs nothing, and a read removes it: a task's body is what the
-  caller wrote.
+  `/move`) from any description line that starts with a slash, except in
+  fenced code. `create` and `update` put a zero-width space before such a
+  slash, and before a zero-width space that starts a line, outside fenced
+  code, so GitLab stores the line and runs nothing; a read removes exactly
+  one: a task's body is what the caller wrote.
 - **Assignment is information.** `assign` replaces the assignees, named by
   username; `@me` is the credential's account. A username GitLab does not
   know is `invalid` and nothing is written. GitLab keeps only one assignee on
@@ -128,14 +129,13 @@ credential never leaves its own instance or this machine.
 - **Find.** GitLab filters the project's issues on their state, every listed
   label and the text in title and description, oldest first; the provider
   then keeps the requested semantic states. A label named `None` or `Any`,
-  keywords of GitLab's filter, is matched by the provider. GitLab orders
-  issues created in one millisecond in a way its API does not show, so a
-  cursor names GitLab's page, the millisecond of the last issue considered
-  and up to 48 ids seen at it, and a resumed page that is empty or starts on
-  an unseen issue is read one page earlier. An issue present throughout a
-  traversal is listed whatever the page sizes, ties and issues closed
-  meanwhile; only a tie of more than 48 issues at a page boundary can list
-  one twice.
+  keywords of GitLab's filter, is matched by the provider. Each read asks
+  for the issues created at or after the millisecond of the last issue
+  considered, and the cursor holds that millisecond with the ids already
+  seen at it, or their count past 48. So a traversal always ends and lists
+  every issue present throughout it once, whatever the page sizes, ties in
+  creation time and issues closed meanwhile; only inside a tie of more than
+  48 issues can closing some of them hide others.
 
 ## Failures and retries
 

@@ -158,14 +158,18 @@ func (s *taskSession) find(input any) (any, *collab.Failure) {
 	return result, nil
 }
 
-// listIssues pages the project's issue list, oldest first. A label that
+// listIssues reads a page of the project's issue list, oldest first, from a
+// creation millisecond when from is not negative. A label that
 // carries a comma, or that GitLab's filter reads as a keyword, cannot be named
 // in its label filter: the provider then filters on every label itself.
 func (s *taskSession) listIssues(state string, labels []string, text string) fetchPage {
-	return func(page int) ([]glIssue, bool, *collab.Failure) {
+	return func(from int64, page int) ([]glIssue, bool, *collab.Failure) {
 		query := url.Values{
 			"state": {state}, "order_by": {"created_at"}, "sort": {"asc"},
 			"per_page": {strconv.Itoa(gitlabPageSize)}, "page": {strconv.Itoa(page)},
+		}
+		if from >= 0 {
+			query.Set("created_after", createdAfter(from))
 		}
 		if len(labels) > 0 && !slices.ContainsFunc(labels, unfilterable) {
 			query.Set("labels", strings.Join(labels, ","))
@@ -194,23 +198,49 @@ func unfilterable(label string) bool {
 // GitLab reads the line as text and runs no quick action from it.
 const quickActionEscape = "\u200b"
 
-// escapeBody escapes every line of a body that starts with a slash.
+// escapeBody escapes every line outside fenced code that starts with a slash,
+// or with the escape itself, so unescapeBody restores the body exactly.
+// GitLab runs no quick action inside fenced code, which stays as written.
 func escapeBody(body string) string {
-	lines := strings.Split(body, "\n")
-	for i, line := range lines {
-		if strings.HasPrefix(line, "/") {
-			lines[i] = quickActionEscape + line
+	return mapBodyLines(body, func(line string) string {
+		if strings.HasPrefix(line, "/") || strings.HasPrefix(line, quickActionEscape) {
+			return quickActionEscape + line
 		}
-	}
-	return strings.Join(lines, "\n")
+		return line
+	})
 }
 
-// unescapeBody removes the escape escapeBody put before a slash.
+// unescapeBody removes the one escape escapeBody put before a line.
 func unescapeBody(body string) string {
+	return mapBodyLines(body, func(line string) string {
+		rest, escaped := strings.CutPrefix(line, quickActionEscape)
+		if escaped && (strings.HasPrefix(rest, "/") || strings.HasPrefix(rest, quickActionEscape)) {
+			return rest
+		}
+		return line
+	})
+}
+
+// mapBodyLines applies change to every line of a body outside fenced code. A
+// fence opens on a line that starts, after at most three spaces, with three
+// backticks or tildes, and closes on the next such line of the same
+// character; neither escaping nor unescaping changes a fence line.
+func mapBodyLines(body string, change func(string) string) string {
 	lines := strings.Split(body, "\n")
+	fence := ""
 	for i, line := range lines {
-		if strings.HasPrefix(line, quickActionEscape+"/") {
-			lines[i] = strings.TrimPrefix(line, quickActionEscape)
+		trimmed := strings.TrimLeft(line, " ")
+		if len(line)-len(trimmed) <= 3 && (strings.HasPrefix(trimmed, "```") || strings.HasPrefix(trimmed, "~~~")) {
+			switch {
+			case fence == "":
+				fence = trimmed[:3]
+			case strings.HasPrefix(trimmed, fence):
+				fence = ""
+			}
+			continue
+		}
+		if fence == "" {
+			lines[i] = change(line)
 		}
 	}
 	return strings.Join(lines, "\n")

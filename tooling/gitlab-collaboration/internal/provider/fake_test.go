@@ -23,7 +23,7 @@ import (
 // and created on first use, opened and closed states changed through
 // state_event, assignee_ids where 0 means none, lists ordered by creation
 // time then id and paged with X-Next-Page, filters on state, labels,
-// author and text that read the store at once, creation times to the
+// author, creation time and text that read the store at once, creation times to the
 // microsecond shown to the millisecond, ties in creation time listed by id
 // descending, quick actions run from description lines and removed from
 // them — and injects faults: an
@@ -54,6 +54,8 @@ type fakeGitLab struct {
 	onPut func() *fault
 	// queries records the query string of every list request.
 	queries []string
+	// onList, when set, runs before a list request is answered.
+	onList func()
 }
 
 type fakeIssue struct {
@@ -319,6 +321,9 @@ func splitLabels(value string) []string {
 }
 
 func (f *fakeGitLab) list(w http.ResponseWriter, query url.Values) {
+	if f.onList != nil {
+		f.onList()
+	}
 	var matched []*fakeIssue
 	for _, issue := range f.issues {
 		if issue.deleted {
@@ -329,6 +334,15 @@ func (f *fakeGitLab) list(w http.ResponseWriter, query url.Values) {
 		}
 		if author := query.Get("author_id"); author != "" && author != strconv.FormatInt(issue.author, 10) {
 			continue
+		}
+		if after := query.Get("created_after"); after != "" {
+			at, err := time.Parse(time.RFC3339Nano, after)
+			if err != nil {
+				f.t.Errorf("created_after %q: %v", after, err)
+			}
+			if issue.created.Before(at) {
+				continue
+			}
 		}
 		if labels := query.Get("labels"); labels != "" {
 			all := true

@@ -199,7 +199,9 @@ func TestPagesCoverTheProjectExactlyOnce(t *testing.T) {
 	if !slices.Equal(got, expected) {
 		t.Fatalf("a traversal with concurrent changes listed %d issues, want %d", len(got), len(expected))
 	}
-	h.fails("find", `{"page":{"cursor":"p1.n3"}}`, collab.OutcomeInvalid)
+	for _, cursor := range []string{"p1.n3", "t1.n0", "t1.i", "t1.n1-2"} {
+		h.fails("find", `{"page":{"cursor":"`+cursor+`"}}`, collab.OutcomeInvalid)
+	}
 }
 
 // TestAFindReadsAtMostFivePagesPerAnswer bounds the GitLab pages one answer
@@ -303,21 +305,56 @@ func TestATraversalSurvivesTiesAndClosedIssues(t *testing.T) {
 		t.Fatalf("closing 60 issues mid-traversal listed %d of %d", len(got), len(open))
 	}
 
-	// More ties than a cursor carries may repeat an issue, never drop one.
-	h = newHarness(t)
-	var many []int
-	for i := 0; i < 70; i++ {
-		issue := h.seed("Many", "", "many")
-		h.change(issue, func(f *fakeIssue) { f.created = h.fake.clock })
-		many = append(many, issue.iid)
-	}
-	seen := map[int]bool{}
-	for _, iid := range h.traverse(`{"labels":["many"]}`, []int{60}, nil) {
-		seen[iid] = true
-	}
-	for _, iid := range many {
-		if !seen[iid] {
-			t.Fatalf("issue #%d of a 70-issue tie was left out", iid)
+	// Ties larger than the ids a cursor carries end, and list every issue
+	// once: past 48 the cursor counts them.
+	for _, c := range []struct{ tied, later, size int }{{70, 0, 60}, {120, 0, 100}, {250, 10, 100}, {49, 3, 10}} {
+		h = newHarness(t)
+		var want []int
+		var at time.Time
+		for i := 0; i < c.tied; i++ {
+			issue := h.seed("Tied", "", "many")
+			if i == 0 {
+				at = issue.created
+			}
+			h.change(issue, func(f *fakeIssue) { f.created = at })
+			want = append(want, issue.iid)
 		}
+		for i := 0; i < c.later; i++ {
+			want = append(want, h.seed("Later", "", "many").iid)
+		}
+		got := h.traverse(`{"labels":["many"]}`, []int{c.size}, nil)
+		sorted := slices.Clone(got)
+		slices.Sort(sorted)
+		if !slices.Equal(sorted, want) {
+			t.Fatalf("a tie of %d with %d later issues in pages of %d listed %d issues, want each of %d once", c.tied, c.later, c.size, len(got), len(want))
+		}
+	}
+
+	// An issue closed between two GitLab reads of one answer hides no other.
+	h = newHarness(t)
+	var doing []int
+	for i := 0; i < 250; i++ {
+		labels := []string{"walk"}
+		if i%2 == 0 {
+			labels = append(labels, "status::doing")
+		}
+		issue := h.seed("Walk", "", labels...)
+		if i%2 == 0 {
+			doing = append(doing, issue.iid)
+		}
+	}
+	reads := 0
+	h.fake.mu.Lock()
+	h.fake.onList = func() {
+		if reads++; reads == 2 {
+			for iid := 1; iid <= 30; iid++ {
+				h.fake.issues[iid].state = "closed"
+			}
+		}
+	}
+	h.fake.mu.Unlock()
+	got = h.traverse(`{"labels":["walk"],"states":["in_progress"]}`, []int{100}, nil)
+	if !slices.Equal(got, doing) {
+		t.Fatalf("closing issues between reads of one answer listed %d of %d", len(got), len(doing))
 	}
 }
