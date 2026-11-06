@@ -68,6 +68,9 @@ See [doc/09-bazel.md](doc/09-bazel.md) for how it reads the packages of a
 Bazel repository and their edges, from a `bazel query` export.
 See [doc/11-rush.md](doc/11-rush.md) for how it reads the projects, edges and
 lockfiles of a Rush monorepo.
+See [doc/12-jvm.md](doc/12-jvm.md) for how it reads the projects, modules and
+edges of a Gradle or Maven repository, Android included, and its JaCoCo
+coverage.
 See [doc/06-change-analyses.md](doc/06-change-analyses.md) for how it maps a
 change to components, tests, coverage and dependencies.
 

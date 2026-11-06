@@ -377,3 +377,127 @@ func TestABazelTestLogGoesToThePackageOfItsTestTarget(t *testing.T) {
 		t.Errorf("tests %+v", r.Tests)
 	}
 }
+
+const jvmFeature = "tooling/observe-jvm"
+
+// jvmRepository is a Gradle build: app, an Android library, and api depend
+// on pricing; api and app, which do not depend on each other, both hold a
+// com.acme.shared.Util.
+func jvmRepository(t *testing.T) (string, components.Set) {
+	t.Helper()
+	root := t.TempDir()
+	write(t, root, map[string]string{
+		"pricing/src/main/kotlin/com/acme/pricing/Price.kt":     "package com.acme.pricing\n",
+		"pricing/src/test/kotlin/com/acme/pricing/PriceTest.kt": "class PriceTest\n",
+		"api/src/main/java/com/acme/api/Api.java":               "package com.acme.api;\n",
+		"api/src/test/java/com/acme/api/ApiTest.java":           "class ApiTest {}\n",
+		"api/src/main/kotlin/com/acme/shared/Util.kt":           "package com.acme.shared\n",
+		"app/src/main/kotlin/com/acme/shared/Util.kt":           "package com.acme.shared\n",
+		"app/src/androidTest/kotlin/com/acme/app/ScreenTest.kt": "class ScreenTest\n",
+	})
+	set := components.Detect(root, []components.Detector{fake{components.Found{Components: []components.Component{
+		{ID: "pricing", Ecosystem: "gradle", Source: evidence.SourceWorkspace},
+		{ID: "api", Ecosystem: "gradle", Source: evidence.SourceWorkspace, DependsOn: []string{"pricing"}},
+		{ID: "app", Ecosystem: "gradle", Source: evidence.SourceWorkspace, DependsOn: []string{"pricing"}},
+	}}}})
+	return root, set
+}
+
+func TestAJVMClassNamePlacesItsCase(t *testing.T) {
+	spectest.Proves(t, jvmFeature, "jvm-report-placement", "a-jvm-class-name-places-its-case")
+	root, set := jvmRepository(t)
+	write(t, root, map[string]string{
+		// Reports gathered at the root, as a CI collects them.
+		"reports/TEST-all.xml": `<testsuites>
+			<testsuite name="com.acme.pricing.PriceTest">
+				<testcase classname="com.acme.pricing.PriceTest" name="rounds"/>
+				<testcase classname="com.acme.pricing.PriceTest$Discounts" name="nested"><failure message="expected 9"/></testcase>
+			</testsuite>
+			<testsuite name="com.acme.api.ApiTest"><testcase classname="com.acme.api.ApiTest" name="quotes"/></testsuite>
+			<testsuite name="com.acme.app.ScreenTest"><testcase classname="com.acme.app.ScreenTest" name="renders"/></testsuite>
+			<testsuite name="com.acme.gone.GoneTest"><testcase classname="com.acme.gone.GoneTest" name="orphan"/></testsuite>
+		</testsuites>`,
+	})
+	r := Run(Input{Root: root, Set: set, Reports: []reports.Report{{Path: "reports/TEST-all.xml", Kind: reports.KindJUnit, Format: reports.FormatJUnit}}})
+	got := tests(r)
+	if p := got["pricing"]; p.Passed != 1 || p.Failed != 1 || p.FailingCases[0].File != "pricing/src/test/kotlin/com/acme/pricing/PriceTest.kt" {
+		t.Errorf("pricing tests %+v", p)
+	}
+	if got["api"].Passed != 1 || got["app"].Passed != 1 {
+		t.Errorf("tests %+v", got)
+	}
+	if len(r.Diagnostics) != 1 || r.Diagnostics[0].Code != CodeTestsUnattributed || !strings.HasPrefix(r.Diagnostics[0].Message, "1 test cases") {
+		t.Errorf("diagnostics %v", r.Diagnostics)
+	}
+	for classname, want := range map[string][]string{
+		"com.acme.PriceTest$Nested$Deeper": {"com/acme/PriceTest.java", "com/acme/PriceTest.kt"},
+		"PriceTest":                        nil,
+		"src/test/PriceTest.kt":            nil,
+		"":                                 nil,
+	} {
+		if got := jvmClassFiles(classname); !slices.Equal(got, want) {
+			t.Errorf("jvmClassFiles(%q) = %v, want %v", classname, got, want)
+		}
+	}
+}
+
+func TestAJaCoCoFileMapsThroughItsPackage(t *testing.T) {
+	spectest.Proves(t, jvmFeature, "jvm-report-placement", "a-jacoco-file-maps-through-its-package")
+	root, set := jvmRepository(t)
+	report := func(packages string) string {
+		return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><!DOCTYPE report PUBLIC "-//JACOCO//DTD Report 1.1//EN" "report.dtd"><report name="r">` + packages + `</report>`
+	}
+	write(t, root, map[string]string{
+		// The app report: its own Util.kt wins over the one of api.
+		"app/build/reports/jacoco/report.xml": report(`<package name="com/acme/shared"><sourcefile name="Util.kt"><line nr="1" mi="0" ci="2"/></sourcefile></package>`),
+		// An aggregate report at the root, with a group per project.
+		"build/reports/jacoco/aggregate.xml": report(`<group name="pricing"><package name="com/acme/pricing"><sourcefile name="Price.kt"><line nr="1" mi="0" ci="1"/><line nr="2" mi="3" ci="0"/></sourcefile></package></group>
+			<group name="api"><package name="com/acme/api"><sourcefile name="Api.java"><line nr="1" mi="0" ci="1"/></sourcefile><sourcefile name="Gone.java"><line nr="1" mi="1" ci="0"/></sourcefile></package></group>`),
+	})
+	r := Run(Input{Root: root, Set: set, Reports: []reports.Report{
+		{Path: "app/build/reports/jacoco/report.xml", Kind: reports.KindCoverage, Format: reports.FormatJaCoCo},
+		{Path: "build/reports/jacoco/aggregate.xml", Kind: reports.KindCoverage, Format: reports.FormatJaCoCo},
+	}})
+	want := []evidence.ComponentCoverage{
+		{Component: "api", CoveredLines: 1, TotalLines: 1},
+		{Component: "app", CoveredLines: 1, TotalLines: 1},
+		{Component: "pricing", CoveredLines: 1, TotalLines: 2},
+	}
+	if !slices.Equal(r.Coverage, want) {
+		t.Errorf("coverage\n got %+v\nwant %+v", r.Coverage, want)
+	}
+	if len(r.Diagnostics) != 1 || r.Diagnostics[0].Code != CodeCoverageUnmapped || !strings.HasPrefix(r.Diagnostics[0].Message, "1 of the 3 files") {
+		t.Errorf("diagnostics %v", r.Diagnostics)
+	}
+}
+
+func TestAMavenPackageURLMatchesAGradleChange(t *testing.T) {
+	spectest.Proves(t, jvmFeature, "gradle-dependency-changes", "a-maven-package-url-matches-a-gradle-change")
+	root, set := jvmRepository(t)
+	write(t, root, map[string]string{
+		"bom.cdx.json": `{"bomFormat": "CycloneDX", "specVersion": "1.5", "version": 1,
+			"components": [{"bom-ref": "g", "type": "library", "group": "com.google.guava", "name": "guava", "version": "33.4.0-jre",
+				"purl": "pkg:maven/com.google.guava/guava@33.4.0-jre", "licenses": [{"license": {"id": "Apache-2.0"}}]}]}`,
+	})
+	sides := map[Revision]string{
+		Base: "com.google.guava:guava:33.3.1-jre=compileClasspath\n",
+		Head: "com.google.guava:guava:33.4.0-jre=compileClasspath\n",
+	}
+	r := Run(Input{Root: root, Set: set,
+		ChangedFiles: []gitbase.ChangedFile{{Path: "pricing/gradle.lockfile", Status: gitbase.StatusModified}},
+		Reports:      []reports.Report{{Path: "bom.cdx.json", Kind: reports.KindSBOM, Format: reports.FormatCycloneDX}},
+		Show: func(side Revision, file string) ([]byte, bool, error) {
+			return []byte(sides[side]), true, nil
+		},
+	})
+	if len(r.DependencyChanges) != 1 {
+		t.Fatalf("dependency changes %+v", r.DependencyChanges)
+	}
+	change := r.DependencyChanges[0]
+	if change.Ecosystem != "maven" || change.Name != "com.google.guava:guava" || change.Component != "pricing" || change.Change != evidence.DependencyUpgraded {
+		t.Errorf("change %+v", change)
+	}
+	if change.After == nil || !slices.Equal(change.After.Licenses, []string{"Apache-2.0"}) {
+		t.Errorf("after %+v, want the SBOM's license", change.After)
+	}
+}

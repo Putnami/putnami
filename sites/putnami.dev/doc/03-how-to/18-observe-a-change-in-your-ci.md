@@ -14,7 +14,7 @@ You will add one step to a GitHub Actions workflow, or one job to a GitLab CI pi
 | `putnami extensions install --user @putnami/cloud` | Installs the extension that uploads the evidence to Putnami Cloud. |
 | `putnami observe --evidence observe-evidence.json --publish` | Prints the summary, writes the evidence document, and posts a commit status and a summary note on the pull or merge request. It exits `0` whatever it observes: only a usage error, or an evidence file it cannot write, fails it. |
 
-`putnami observe` finds the base of the change from the CI: the pull request base on GitHub, the merge request diff base on GitLab, and on a branch push the commit before the push. It deepens a shallow clone itself, so you do not change `fetch-depth` or `GIT_DEPTH`. It finds JUnit, LCOV, Cobertura, Clover and Go cover reports by their content, anywhere in the checkout except `.git`, `node_modules` and `vendor`, and the reports of Bazel through its `bazel-testlogs` and `bazel-out` links.
+`putnami observe` finds the base of the change from the CI: the pull request base on GitHub, the merge request diff base on GitLab, and on a branch push the commit before the push. It deepens a shallow clone itself, so you do not change `fetch-depth` or `GIT_DEPTH`. It finds JUnit, LCOV, Cobertura, Clover, JaCoCo and Go cover reports by their content, anywhere in the checkout except `.git`, `node_modules`, `vendor` and the Gradle and Maven build outputs that hold no report, and the reports of Bazel through its `bazel-testlogs` and `bazel-out` links.
 
 In a Python repository, have pytest write both reports, with pytest-cov installed:
 
@@ -48,6 +48,42 @@ bazel query 'deps(//...)' --output=streamed_jsonproto > bazel-graph.json
 ```
 
 `putnami observe` makes each Bazel package a component, reads the edges between packages from `bazel-graph.json`, and finds the logs of `bazel-testlogs` and the combined LCOV report of `bazel-out/_coverage/_coverage_report.dat` through the links Bazel leaves at the root. Each test log goes to the package of its test target. Without the export, the packages come from the `BUILD` files, without edges, and the summary names the command. The links point into Bazel's output base, so on GitLab run these lines in the job that ran Bazel, not in a later one.
+
+In a Gradle repository, Android included, apply the `jacoco` plugin with its XML report in each project, and run the tests before the observe step:
+
+```kotlin
+plugins {
+    jacoco
+}
+
+tasks.jacocoTestReport {
+    reports {
+        xml.required = true
+    }
+}
+```
+
+```bash
+./gradlew test jacocoTestReport
+```
+
+Each project the settings `include` is a component, and its `project(":x")` and `projects.x` dependencies are its edges. The JUnit reports under `build/test-results` and the JaCoCo or Kover reports under `build/reports` land on the projects. A change to a `gradle.lockfile`, which `./gradlew dependencies --write-locks` writes when dependency locking is on, or to `gradle/libs.versions.toml` is a dependency change of ecosystem `maven`. On Android, run `./gradlew testDebugUnitTest createDebugUnitTestCoverageReport` with `enableUnitTestCoverage = true` on the debug build type.
+
+In a Maven repository, add the `prepare-agent` and `report` goals of `jacoco-maven-plugin` to the build, then run `mvn verify`:
+
+```xml
+<plugin>
+  <groupId>org.jacoco</groupId>
+  <artifactId>jacoco-maven-plugin</artifactId>
+  <version>0.8.13</version>
+  <executions>
+    <execution><goals><goal>prepare-agent</goal></goals></execution>
+    <execution><id>report</id><phase>verify</phase><goals><goal>report</goal></goals></execution>
+  </executions>
+</plugin>
+```
+
+Each module the POMs list is a component, and a dependency on another module is an edge. The reports under `target/surefire-reports`, `target/failsafe-reports` and `target/site/jacoco` land on the modules. Maven has no lockfile, so a Maven repository has no dependency change. To read only some reports, name them, for example `--junit '**/target/surefire-reports/*.xml' --coverage '**/target/site/jacoco/jacoco.xml'`.
 
 The install lines need the network: when the installer or the registry cannot be reached, the GitHub step or the GitLab job fails.
 
@@ -196,6 +232,6 @@ Without `--base-sbom`, each dependency gets its state at the head and the summar
 ## Learn more
 
 - [What `putnami observe` reads](https://github.com/putnami/putnami/blob/main/tooling/observe/doc/01-observe.md): every flag, how the base is found, and how reports and SBOMs are discovered.
-- [The `@putnami/observe` README](https://github.com/putnami/putnami/blob/main/tooling/observe/README.md): the questions it answers and how it reads Nx, moon, Pants, Bazel, npm, pnpm, yarn, Composer, Go and Python repositories.
+- [The `@putnami/observe` README](https://github.com/putnami/putnami/blob/main/tooling/observe/README.md): the questions it answers and how it reads Nx, moon, Pants, Rush, Bazel, npm, pnpm, yarn, Composer, Go, Python, Gradle and Maven repositories.
 
 You now have a CI job that records which files a change touched and which tests and coverage reports it produced, as an artifact you can keep or upload to Putnami Cloud.

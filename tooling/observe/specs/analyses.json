@@ -17,11 +17,11 @@
   "requirements": [
     {
       "id": "components",
-      "text": "The Nx, moon, Pants, Rush, Node workspace, Composer, Go, Python and Bazel detectors answer for the repository. When two name one directory, the higher source wins: orchestrator, then workspace, then manifest. A changed file belongs to the innermost component that holds it. A component is changed when one of its files changed, dependent when it reaches a changed one through its edges. Edges to an unknown component are dropped. When no detector finds a component, the repository is one fallback component."
+      "text": "Every detector answers for the repository; the feature of each stack states what its detector reads. When two name one directory, the higher source wins: orchestrator, then workspace, then manifest. A changed file belongs to the innermost component that holds it. A component is changed when one of its files changed, dependent when it reaches a changed one through its edges. Edges to an unknown component are dropped. When no detector finds a component, the repository is one fallback component."
     },
     {
       "id": "tests-and-coverage",
-      "text": "A JUnit case goes to the component that holds its test file, named by its file or class name as a path or, for pytest, its dotted class name as a module, else to the component of the Go package its suite names, else to the one that holds its report. A covered file goes to the component that holds it. A report path is read as repository-relative, relative to the report's component or directory, absolute, or as a Go import path. Each component sums its cases, their duration and its lines."
+      "text": "A test case goes to the component that holds its test file, named by its file, else by its class name as a path or as a test name its stack writes; else to the component a detector locates from its class or suite name; else to the one that holds its report. A covered file goes to the one that holds it. A report path is read as repository-relative, relative to the report's component or directory, absolute, or as a Go import path. Each component sums its cases, their duration and its lines."
     },
     {
       "id": "changed-line-coverage",
@@ -29,7 +29,7 @@
     },
     {
       "id": "dependency-changes",
-      "text": "Each changed package-lock.json, pnpm-lock.yaml, yarn.lock, composer.lock, go.mod, uv.lock, poetry.lock and Rush npm-shrinkwrap.json is read at the merge base and at the head. A package present on one side only is added or removed; one whose versions differ is upgraded, downgraded or, when they do not compare, changed. Workspace links, path, editable and directory packages and modules of the repository are no dependency. A Python package name is normalized. A lockfile that cannot be read is a diagnostic."
+      "text": "Each changed lockfile a reader or a detector knows, such as package-lock.json, go.mod or uv.lock, is read at the merge base and at the head. A package present on one side only is added or removed; one whose versions differ is upgraded, downgraded or, when they do not compare, changed. Workspace links, path, editable, directory and SDK packages and modules of the repository are no dependency. A Python package name is normalized. A lockfile that cannot be read is a diagnostic."
     },
     {
       "id": "summary",
@@ -41,7 +41,7 @@
     },
     {
       "id": "dependency-sbom-facts",
-      "text": "Each dependency change gets, per side whose SBOM lists the package at a version the lockfile locks there, its licences and known vulnerabilities, matched by ecosystem, name and version through the package URL, pypi to a Python lockfile. The summary gives per change the vulnerabilities it fixes and introduces, or the known ones at the head and an unknown base without a base SBOM, and the licences before and after. Without an SBOM, the summary and evidence are unchanged."
+      "text": "Each dependency change gets, per side whose SBOM lists the package at a version the lockfile locks there, its licences and known vulnerabilities, matched by ecosystem, name and version through the package URL, whose type maps to the lockfile's ecosystem. The summary gives per change the vulnerabilities it fixes and introduces, or the known ones at the head and an unknown base without a base SBOM, and the licences before and after. Without an SBOM, the summary and evidence are unchanged."
     }
   ],
   "decisions": [

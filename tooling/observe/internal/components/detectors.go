@@ -5,6 +5,8 @@ import (
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/tooling/observe/internal/detect/bazel"
 	"go.putnami.dev/tooling/observe/internal/detect/composer"
+	"go.putnami.dev/tooling/observe/internal/detect/gradle"
+	"go.putnami.dev/tooling/observe/internal/detect/maven"
 	"go.putnami.dev/tooling/observe/internal/detect/pants"
 	"go.putnami.dev/tooling/observe/internal/detect/python"
 	"go.putnami.dev/tooling/observe/internal/detectors/moon"
@@ -29,7 +31,7 @@ type Options struct {
 // Bazel comes last: its export outranks the others by source, and without one
 // its packages yield.
 func Default(opts Options) []Detector {
-	return []Detector{NxDetector{}, MoonDetector{GraphFile: opts.MoonGraph}, PantsDetector{GraphFile: opts.PantsGraph}, RushDetector{}, NodeDetector{}, ComposerDetector{}, GoDetector{}, PythonDetector{}, BazelDetector{GraphFile: opts.BazelGraph}}
+	return []Detector{NxDetector{}, MoonDetector{GraphFile: opts.MoonGraph}, PantsDetector{GraphFile: opts.PantsGraph}, RushDetector{}, NodeDetector{}, ComposerDetector{}, GoDetector{}, PythonDetector{}, GradleDetector{}, MavenDetector{}, BazelDetector{GraphFile: opts.BazelGraph}}
 }
 
 // fromProbe turns the projects of a probe answer into components.
@@ -201,6 +203,40 @@ func (d PantsDetector) Detect(root string) Found {
 				return lockdiff.ReadPEXLock(data)
 			}, true
 		}
+	}
+	return found
+}
+
+// GradleDetector adapts the Gradle detector: each project the settings
+// include is a workspace component.
+type GradleDetector struct{}
+
+// Name implements Detector.
+func (GradleDetector) Name() string { return "gradle" }
+
+// Detect implements Detector.
+func (GradleDetector) Detect(root string) Found {
+	detection := gradle.Detect(root)
+	found := Found{Diagnostics: detection.Diagnostics}
+	for _, c := range detection.Components {
+		found.Components = append(found.Components, Component{ID: c.ID, Name: c.Name, Ecosystem: gradle.Ecosystem, Source: evidence.SourceWorkspace, DependsOn: c.DependsOn})
+	}
+	return found
+}
+
+// MavenDetector adapts the Maven detector: each module that packages code is
+// a workspace component.
+type MavenDetector struct{}
+
+// Name implements Detector.
+func (MavenDetector) Name() string { return "maven" }
+
+// Detect implements Detector.
+func (MavenDetector) Detect(root string) Found {
+	detection := maven.Detect(root)
+	found := Found{Diagnostics: detection.Diagnostics}
+	for _, c := range detection.Components {
+		found.Components = append(found.Components, Component{ID: c.ID, Name: c.Name, Ecosystem: maven.Ecosystem, Source: evidence.SourceWorkspace, DependsOn: c.DependsOn})
 	}
 	return found
 }

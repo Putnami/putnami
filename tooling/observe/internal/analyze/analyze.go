@@ -105,10 +105,11 @@ type mapper struct {
 	root   string
 	set    components.Set
 	exists map[string]bool
+	dirs   map[string]bool
 }
 
 func newMapper(root string, set components.Set) *mapper {
-	return &mapper{root: filepath.Clean(root), set: set, exists: map[string]bool{}}
+	return &mapper{root: filepath.Clean(root), set: set, exists: map[string]bool{}, dirs: map[string]bool{}}
 }
 
 // isFile reports whether the repository-relative path is a file.
@@ -184,8 +185,13 @@ func (m *mapper) suffix(abs string, exists func(string) bool) (string, bool) {
 
 // isDir reports whether the repository path is a directory.
 func (m *mapper) isDir(rel string) bool {
+	if known, ok := m.dirs[rel]; ok {
+		return known
+	}
 	info, err := os.Stat(filepath.Join(m.root, filepath.FromSlash(rel)))
-	return err == nil && info.IsDir()
+	ok := err == nil && info.IsDir()
+	m.dirs[rel] = ok
+	return ok
 }
 
 func isAbsolute(p string) bool {

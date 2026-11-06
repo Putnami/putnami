@@ -24,5 +24,10 @@
   "gocover-end-before-start.coverprofile": {"reader": "gocover", "code": "readers.malformed"},
   "gocover-unknown-mode.coverprofile": {"reader": "gocover", "code": "readers.malformed"},
   "gocover-empty.coverprofile": {"reader": "gocover", "code": "readers.malformed"},
-  "gocover-huge-span.coverprofile": {"reader": "gocover", "code": "readers.too_large"}
+  "gocover-huge-span.coverprofile": {"reader": "gocover", "code": "readers.too_large"},
+  "jacoco-a-cobertura-report.xml": {"reader": "jacoco", "code": "readers.malformed"},
+  "jacoco-line-zero.xml": {"reader": "jacoco", "code": "readers.malformed"},
+  "jacoco-negative-count.xml": {"reader": "jacoco", "code": "readers.malformed"},
+  "jacoco-bad-counter.xml": {"reader": "jacoco", "code": "readers.malformed"},
+  "jacoco-too-deep.xml": {"reader": "jacoco", "code": "readers.malformed"}
 }

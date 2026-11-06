@@ -183,6 +183,22 @@ func TestTheDefaultDetectorsReadEachEcosystem(t *testing.T) {
 	if err != nil || !slices.Equal(locked["golang.org/x/text"], []string{"v0.22.0"}) {
 		t.Errorf("locked %v %v", locked, err)
 	}
+	jvmRoot := t.TempDir()
+	write(t, jvmRoot, map[string]string{
+		"settings.gradle.kts":      "include(\":app\", \":pricing\")\n",
+		"app/build.gradle.kts":     "dependencies { implementation(projects.pricing) }\n",
+		"pricing/build.gradle.kts": "",
+		"pom.xml":                  "<project><groupId>com.acme</groupId><artifactId>shop</artifactId><packaging>pom</packaging><modules><module>tools</module></modules></project>",
+		"tools/pom.xml":            "<project><groupId>com.acme</groupId><artifactId>tools</artifactId></project>",
+	})
+	jvmSet := Detect(jvmRoot, Default(Options{}))
+	jvm := map[string]Component{}
+	for _, c := range jvmSet.Components {
+		jvm[c.ID] = c
+	}
+	if jvm["app"].Ecosystem != "gradle" || jvm["app"].Name != ":app" || !slices.Equal(jvm["app"].DependsOn, []string{"pricing"}) || jvm["tools"].Ecosystem != "maven" || jvm["tools"].Name != "com.acme:tools" || len(jvmSet.Components) != 3 {
+		t.Errorf("the Gradle and Maven detectors: %+v", jvmSet.Components)
+	}
 	nxRoot := t.TempDir()
 	write(t, nxRoot, map[string]string{
 		"nx.json":             `{}`,

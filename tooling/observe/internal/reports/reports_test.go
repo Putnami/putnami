@@ -108,10 +108,12 @@ func TestSniffRecognizesEachFormat(t *testing.T) {
 		"SF:a.js\nend_of_record\n":        FormatLCOV,
 		goProfile:                         FormatGoCover,
 		configXML:                         "",
-		`<coverage><unknown/></coverage>`: "",
-		"mode: fast\n":                    "",
-		"":                                "",
-		"<":                               "",
+		`<report name="m"><group name="api"/></report>`: FormatJaCoCo,
+		`<report><title/></report>`:                     "",
+		`<coverage><unknown/></coverage>`:               "",
+		"mode: fast\n":                                  "",
+		"":                                              "",
+		"<":                                             "",
 	} {
 		if got := Sniff([]byte(content)); got != want {
 			t.Errorf("Sniff(%q) = %q, want %q", content, got, want)
@@ -436,5 +438,43 @@ func TestBazelReportsAreDiscoveredThroughTheConvenienceLinks(t *testing.T) {
 	}
 	if !reflect.DeepEqual(named, want) {
 		t.Errorf("named reports %+v, want %+v", named, want)
+	}
+}
+
+func TestJVMReportsAreDiscovered(t *testing.T) {
+	spectest.Proves(t, "tooling/observe-jvm", "jvm-report-discovery", "jvm-reports-are-discovered")
+	jacocoXML := `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><!DOCTYPE report PUBLIC "-//JACOCO//DTD Report 1.1//EN" "report.dtd"><report name="calc"><sessioninfo id="vm" start="1" dump="2"/></report>`
+	surefireXML := `<?xml version="1.0" encoding="UTF-8"?>` + "\n" + `<testsuite xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" name="com.acme.PriceTest" tests="1"><testcase name="t" classname="com.acme.PriceTest"/></testsuite>`
+	root := tree(t, map[string]string{
+		"pricing/build/test-results/test/TEST-com.acme.PriceTest.xml":          surefireXML,
+		"app/build/outputs/androidTest-results/connected/TEST-device-app-.xml": surefireXML,
+		"pricing/build/reports/jacoco/test/jacocoTestReport.xml":               jacocoXML,
+		"api/target/surefire-reports/TEST-com.acme.ApiTest.xml":                surefireXML,
+		"api/target/failsafe-reports/TEST-com.acme.ApiIT.xml":                  surefireXML,
+		"api/target/site/jacoco/jacoco.xml":                                    jacocoXML,
+		"pricing/build/kover/report.xml":                                       jacocoXML,
+		"app/build/intermediates/merged_test_results/TEST-copy.xml":            surefireXML,
+		"app/build/generated/report.xml":                                       jacocoXML,
+		"app/build/tmp/kotlin-classes/TEST-x.xml":                              surefireXML,
+		"api/target/classes/TEST-resource.xml":                                 surefireXML,
+		"api/target/test-classes/jacoco.xml":                                   jacocoXML,
+		"api/target/generated-sources/annotations/x.xml":                       surefireXML,
+		"docs/report.xml": `<report><title>not JaCoCo</title></report>`,
+	})
+	reports, diags := Collect(Request{Root: root, Resolve: resolver(root)})
+	if len(diags) != 0 {
+		t.Fatalf("diagnostics %v", diags)
+	}
+	want := []Report{
+		{Path: "api/target/failsafe-reports/TEST-com.acme.ApiIT.xml", Kind: KindJUnit, Format: FormatJUnit, Source: SourceDiscovered},
+		{Path: "api/target/site/jacoco/jacoco.xml", Kind: KindCoverage, Format: FormatJaCoCo, Source: SourceDiscovered},
+		{Path: "api/target/surefire-reports/TEST-com.acme.ApiTest.xml", Kind: KindJUnit, Format: FormatJUnit, Source: SourceDiscovered},
+		{Path: "app/build/outputs/androidTest-results/connected/TEST-device-app-.xml", Kind: KindJUnit, Format: FormatJUnit, Source: SourceDiscovered},
+		{Path: "pricing/build/kover/report.xml", Kind: KindCoverage, Format: FormatJaCoCo, Source: SourceDiscovered},
+		{Path: "pricing/build/reports/jacoco/test/jacocoTestReport.xml", Kind: KindCoverage, Format: FormatJaCoCo, Source: SourceDiscovered},
+		{Path: "pricing/build/test-results/test/TEST-com.acme.PriceTest.xml", Kind: KindJUnit, Format: FormatJUnit, Source: SourceDiscovered},
+	}
+	if !reflect.DeepEqual(reports, want) {
+		t.Fatalf("reports:\n got %+v\nwant %+v", reports, want)
 	}
 }

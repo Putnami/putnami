@@ -1,10 +1,11 @@
 // Package readers reads the test and coverage reports a CI writes: JUnit XML,
-// LCOV, Cobertura XML, Clover XML and Go cover profiles.
+// LCOV, Cobertura XML, Clover XML, JaCoCo XML and Go cover profiles.
 //
 // A reader turns one report into typed facts and nothing more. A test report
 // becomes one TestCase per test case, a coverage report one FileCoverage per
 // source file with its instrumented lines and their hit counts. Paths stay as
-// the report states them, in slash form: mapping a case or a file to a
+// the report states them, in slash form, a JaCoCo file as its package path
+// and source file name: mapping a case or a file to a
 // component, or an absolute path or a Go import path to a repository path, is
 // the caller's.
 //
