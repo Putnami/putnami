@@ -17,15 +17,15 @@ on its next version.
 
 | Slug | Name | Change request | Diff tab | Default host | Default API |
 | --- | --- | --- | --- | --- | --- |
-| `github` | GitHub | pull request `#42` | Files changed | `github.com` | `https://api.github.com` |
-| `gitlab` | GitLab | merge request `!42` | Changes | `gitlab.com` | `https://gitlab.com/api/v4` |
-| `generic` | Git host | change request `#42` | Changes | — | — |
+| `github` | GitHub | pull request `#5` | Files changed | `github.com` | `https://api.github.com` |
+| `gitlab` | GitLab | merge request `!5` | Changes | `gitlab.com` | `https://gitlab.com/api/v4` |
+| `generic` | Git host | change request `#5` | Changes | — | — |
 
 - `Slugs()` is the closed set, in that order; `Valid` compares
   case-sensitively.
 - `Lookup(slug)` returns a slug's vocabulary and whether it is known;
   `For(slug)` falls back to `generic` for display.
-- `ChangeRequestLabel(slug, n)` gives `merge request !42`; a number that is not a
+- `ChangeRequestLabel(slug, n)` gives `merge request !5`; a number that is not a
   positive integer gives the noun alone.
 - `NoteMarker` is `<!-- putnami-observe:summary -->`, the first line of the
   Putnami note. `IsPutnamiNote(body)` is true when the body starts with it

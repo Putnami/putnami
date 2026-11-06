@@ -9,7 +9,7 @@ change request.
 ```ts
 import { changeRequestLabel, codeHostVocabulary, isPutnamiNote } from '@putnami/codehost-protocol';
 
-changeRequestLabel('gitlab', 42); // 'merge request !42'
+changeRequestLabel('gitlab', 5); // 'merge request !5'
 codeHostVocabulary('github').diffTab; // 'Files changed'
 const ours = notes.find((note) => isPutnamiNote(note.body));
 ```
@@ -23,7 +23,7 @@ const ours = notes.find((note) => isPutnamiNote(note.body));
 | `CODEHOST_VOCABULARIES` / `CodeHostVocabulary` | Per slug: name, change-request noun and prefix, diff tab, default host and API |
 | `lookupCodeHost` | A slug's vocabulary, or `undefined` |
 | `codeHostVocabulary` | A slug's vocabulary, or the generic one for display |
-| `changeRequestLabel` | `pull request #42`, `merge request !42`, `change request #42` |
+| `changeRequestLabel` | `pull request #5`, `merge request !5`, `change request #5` |
 | `PUTNAMI_NOTE_MARKER` / `isPutnamiNote` | Find Putnami's note among a change request's notes |
 
 The table is hand-authored and held to `protocols/codehost/vocabulary.json` and

@@ -8,9 +8,9 @@
     { "slug": "", "valid": false, "displays": "generic" }
   ],
   "labels": [
-    { "slug": "github", "number": 42, "label": "pull request #42" },
-    { "slug": "gitlab", "number": 42, "label": "merge request !42" },
-    { "slug": "generic", "number": 42, "label": "change request #42" },
+    { "slug": "github", "number": 5, "label": "pull request #5" },
+    { "slug": "gitlab", "number": 5, "label": "merge request !5" },
+    { "slug": "generic", "number": 5, "label": "change request #5" },
     { "slug": "bitbucket", "number": 7, "label": "change request #7" },
     { "slug": "gitlab", "number": 0, "label": "merge request" },
     { "slug": "github", "number": -3, "label": "pull request" }

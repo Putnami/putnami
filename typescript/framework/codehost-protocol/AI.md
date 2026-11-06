@@ -6,7 +6,7 @@ label and public defaults, and the marker of the Putnami note.
 
 Use this package when you need:
 
-- to say "pull request" or "merge request", and `#42` or `!42`, for a slug
+- to say "pull request" or "merge request", and `#5` or `!5`, for a slug
 - the default host or API of github.com or gitlab.com
 - to find Putnami's note among the notes of a change request
 
