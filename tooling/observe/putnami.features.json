@@ -854,6 +854,75 @@
       ]
     },
     {
+      "id": "tooling/observe-rush",
+      "type": "feature",
+      "name": "Detect the projects of a Rush monorepo",
+      "outcome": "putnami observe, in a Rush monorepo, names its Rush projects as components with the projects each one depends on, and reads the lockfile Rush keeps under common/config as the dependency changes, from rush.json and the projects' package.json files, without running rush or a package manager",
+      "owner": "tooling",
+      "target": "modeled",
+      "requirements": [
+        {
+          "id": "rush-projects-are-components",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "rush-projects-are-orchestrator-components",
+              "a-rush-json-with-comments-is-read",
+              "a-malformed-rush-json-is-a-diagnostic",
+              "an-invalid-project-entry-is-a-diagnostic"
+            ]
+          }
+        },
+        {
+          "id": "rush-project-edges",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-workspace-range-is-an-edge",
+              "a-satisfied-local-version-is-an-edge",
+              "a-decoupled-dependency-is-no-edge"
+            ]
+          }
+        },
+        {
+          "id": "rush-lockfiles",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-package-manager-selects-the-lockfile",
+              "a-subspace-lockfile-is-read",
+              "rush-temporary-projects-are-no-dependency"
+            ]
+          }
+        },
+        {
+          "id": "rush-change-analysis",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-rush-demo-change-is-explained"
+            ]
+          }
+        }
+      ]
+    },
+    {
       "id": "tooling/observe-upload",
       "type": "feature",
       "name": "Hand the change evidence document to a reporter",

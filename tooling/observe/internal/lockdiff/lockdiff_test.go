@@ -79,6 +79,10 @@ snapshots:
 		map[string][]string{"react-dom": {"18.2.0"}})
 	expect(t, "pnpm v5", read(t, PNPMLock, "lockfileVersion: 5.4\n\npackages:\n\n  /@babel/core/7.22.0_abc:\n    resolution: {integrity: x}\n"),
 		map[string][]string{"@babel/core": {"7.22.0"}})
+	expect(t, "pnpm local packages", read(t, PNPMLock, "lockfileVersion: 5.4\n\npackages:\n\n  file:projects/api.tgz:\n    name: '@rush-temp/api'\n  /zod/3.24.1:\n    resolution: {integrity: x}\n"),
+		map[string][]string{"zod": {"3.24.1"}})
+	expect(t, "pnpm v9 local packages", read(t, PNPMLock, "lockfileVersion: '9.0'\n\npackages:\n\n  '@rush-temp/api@file:projects/api.tgz':\n    resolution: {tarball: file:projects/api.tgz}\n  zod@3.24.1:\n    resolution: {integrity: x}\n"),
+		map[string][]string{"zod": {"3.24.1"}})
 	expect(t, "yarn classic", read(t, YarnLock, `# yarn lockfile v1
 
 "@babel/core@^7.0.0", "@babel/core@^7.1.0":

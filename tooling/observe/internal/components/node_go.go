@@ -6,7 +6,9 @@ import (
 	"go.putnami.dev/protocol/evidence"
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/tooling/observe/internal/detect/nodeworkspace"
+	"go.putnami.dev/tooling/observe/internal/detect/rush"
 	"go.putnami.dev/tooling/observe/internal/detectors/golang"
+	"go.putnami.dev/tooling/observe/internal/lockdiff"
 )
 
 // NodeDetector adapts the Node workspaces detector: each npm, pnpm or yarn
@@ -65,6 +67,38 @@ func (GoDetector) Detect(root string) Found {
 				out[l.Name] = []string{l.Version}
 			}
 			return out, nil
+		}, true
+	}
+	return found
+}
+
+// RushDetector adapts the Rush detector: each Rush project is an
+// orchestrator component. It also reads the lockfiles Rush keeps under
+// common/config.
+type RushDetector struct{}
+
+// Name implements Detector.
+func (RushDetector) Name() string { return "rush" }
+
+// Detect implements Detector.
+func (RushDetector) Detect(root string) Found {
+	detection := rush.Detect(root)
+	found := Found{Diagnostics: detection.Diagnostics}
+	if len(detection.Projects) == 0 {
+		return found
+	}
+	for _, p := range detection.Projects {
+		found.Components = append(found.Components, Component{
+			ID: p.Folder, Name: p.Name, Ecosystem: rush.Ecosystem, Source: evidence.SourceOrchestrator, DependsOn: p.DependsOn,
+		})
+	}
+	found.Lockfile = func(file string) (string, LockReader, bool) {
+		read, ok := detection.LockReader(file)
+		if !ok {
+			return "", nil, false
+		}
+		return lockdiff.EcosystemNPM, func(data []byte) (map[string][]string, error) {
+			return read(data)
 		}, true
 	}
 	return found

@@ -408,3 +408,57 @@ func TestADependsOnListNamesTenComponents(t *testing.T) {
 		}
 	}
 }
+
+func TestTheRushDemoChangeIsExplained(t *testing.T) {
+	spectest.Proves(t, "tooling/observe-rush", "rush-change-analysis", "the-rush-demo-change-is-explained")
+	root, base := demoRepository(t, "rush")
+	env := map[string]string{"GITHUB_ACTIONS": "true", "GITHUB_SERVER_URL": "https://github.com", "GITHUB_REPOSITORY": "Putnami/demo-observe-rush", "GITHUB_REPOSITORY_ID": "1108", "GITHUB_RUN_ID": "41335520001", "GITHUB_JOB": "test"}
+	opts := Options{
+		Dir:      root,
+		Env:      func(key string) string { return env[key] },
+		ReadFile: func(string) ([]byte, error) { return nil, os.ErrNotExist },
+		Resolve:  func(p string) string { return filepath.Join(root, p) },
+		Producer: Producer{Name: "@putnami/observe", Version: "1.0.0"},
+	}
+	opts.Overrides.Base = base
+	o := Run(context.Background(), opts)
+
+	var components []string
+	for _, c := range o.Analysis.Components {
+		components = append(components, c.ID+" "+c.Name+" "+c.Ecosystem+" "+c.Source+" "+c.Impact+" "+strings.Join(c.DependsOn, ","))
+	}
+	want := []string{
+		"apps/api @demo/api node orchestrator dependent libs/pricing",
+		"apps/web @demo/web node orchestrator unaffected ",
+		"libs/pricing @demo/pricing node orchestrator changed ",
+	}
+	if !slices.Equal(components, want) {
+		t.Errorf("components\n%s\nwant\n%s", strings.Join(components, "\n"), strings.Join(want, "\n"))
+	}
+	var text bytes.Buffer
+	if err := WriteText(&text, o); err != nil {
+		t.Fatal(err)
+	}
+	for _, line := range []string{
+		"  components  1 changed, 1 dependent, 1 unaffected\n",
+		"    changed   libs/pricing (@demo/pricing) [node, orchestrator]\n",
+		"    dependent apps/api (@demo/api) [node, orchestrator], depends on libs/pricing\n",
+		"    upgraded   zod 3.23.8 -> 3.24.1, in common/config/rush/pnpm-lock.yaml\n",
+	} {
+		if !strings.Contains(text.String(), line) {
+			t.Errorf("the summary lacks %q:\n%s", line, text.String())
+		}
+	}
+	wantDependency := evidence.DependencyChange{Ecosystem: "npm", Lockfile: "common/config/rush/pnpm-lock.yaml", Name: "zod", Change: evidence.DependencyUpgraded, From: "3.23.8", To: "3.24.1"}
+	if len(o.Analysis.DependencyChanges) != 1 || o.Analysis.DependencyChanges[0] != wantDependency {
+		t.Errorf("dependency changes %+v, want %+v", o.Analysis.DependencyChanges, wantDependency)
+	}
+	for _, d := range o.Diagnostics {
+		if d.Severity != diag.Info && !strings.HasPrefix(d.Code, "observe.report_") {
+			t.Errorf("diagnostic %s: %s", d.Code, d.Message)
+		}
+	}
+	if problems := evidence.ValidateDocument(Evidence(o, now)); diag.HasErrors(problems) {
+		t.Fatalf("the evidence document does not validate: %v", problems)
+	}
+}

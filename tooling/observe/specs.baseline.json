@@ -59,6 +59,10 @@
     "tooling/observe-python#python-probe-answer",
     "tooling/observe-python#python-project-edges",
     "tooling/observe-python#python-projects-are-components",
+    "tooling/observe-rush#rush-change-analysis",
+    "tooling/observe-rush#rush-lockfiles",
+    "tooling/observe-rush#rush-project-edges",
+    "tooling/observe-rush#rush-projects-are-components",
     "tooling/observe-upload#upload-fails-open",
     "tooling/observe-upload#upload-hands-the-document-to-the-reporter"
   ]

@@ -192,7 +192,7 @@ func edge(dir, name, spec string, linkRanges bool, byName map[string]string, man
 	if !ok || !linkRanges {
 		return ""
 	}
-	if satisfies(manifests[target].Version, spec) {
+	if Satisfies(manifests[target].Version, spec) {
 		return target
 	}
 	return ""

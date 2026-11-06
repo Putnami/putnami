@@ -25,11 +25,11 @@ type Options struct {
 	BazelGraph string
 }
 
-// Default returns the detectors observe runs, Nx, moon and Pants first. Bazel
-// comes last: its export outranks the others by source, and without one its
-// packages yield.
+// Default returns the detectors observe runs, Nx, moon, Pants and Rush first.
+// Bazel comes last: its export outranks the others by source, and without one
+// its packages yield.
 func Default(opts Options) []Detector {
-	return []Detector{NxDetector{}, MoonDetector{GraphFile: opts.MoonGraph}, PantsDetector{GraphFile: opts.PantsGraph}, NodeDetector{}, ComposerDetector{}, GoDetector{}, PythonDetector{}, BazelDetector{GraphFile: opts.BazelGraph}}
+	return []Detector{NxDetector{}, MoonDetector{GraphFile: opts.MoonGraph}, PantsDetector{GraphFile: opts.PantsGraph}, RushDetector{}, NodeDetector{}, ComposerDetector{}, GoDetector{}, PythonDetector{}, BazelDetector{GraphFile: opts.BazelGraph}}
 }
 
 // fromProbe turns the projects of a probe answer into components.
