@@ -19,7 +19,7 @@ type Options struct {
 
 // Default returns the detectors observe runs, orchestrators first.
 func Default(opts Options) []Detector {
-	return []Detector{NxDetector{}, PantsDetector{GraphFile: opts.PantsGraph}, NodeDetector{}, ComposerDetector{}, GoDetector{}, PythonDetector{}}
+	return []Detector{NxDetector{}, PantsDetector{GraphFile: opts.PantsGraph}, RushDetector{}, NodeDetector{}, ComposerDetector{}, GoDetector{}, PythonDetector{}}
 }
 
 // fromProbe turns the projects of a probe answer into components.

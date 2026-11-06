@@ -90,11 +90,11 @@ func (c comparator) test(v version) bool {
 	return d == 0
 }
 
-// satisfies reports whether a version satisfies an npm version range. It
+// Satisfies reports whether a version satisfies an npm version range. It
 // covers what workspace manifests use: exact versions, x-ranges, caret, tilde,
 // comparisons, hyphen ranges and ||. A range it cannot read is not satisfied,
 // so it makes no edge. Pre-release versions compare by plain ordering.
-func satisfies(versionText, rangeText string) bool {
+func Satisfies(versionText, rangeText string) bool {
 	rangeText = strings.TrimSpace(rangeText)
 	if rangeText == "" || rangeText == "*" || rangeText == "x" || rangeText == "X" {
 		return true

@@ -324,8 +324,8 @@ func TestASatisfiedVersionRangeIsAnEdge(t *testing.T) {
 		{"", "^1.0.0", false},
 		{"1.2.3", "1.2.3.4", false},
 	} {
-		if got := satisfies(c.version, c.rng); got != c.want {
-			t.Errorf("satisfies(%q, %q) = %v, want %v", c.version, c.rng, got, c.want)
+		if got := Satisfies(c.version, c.rng); got != c.want {
+			t.Errorf("Satisfies(%q, %q) = %v, want %v", c.version, c.rng, got, c.want)
 		}
 	}
 }

@@ -64,7 +64,8 @@ type npmV1Dependency struct {
 // ReadPNPMLock reads the keys of the top-level packages section of a
 // pnpm-lock.yaml: name@version from lockfile version 6, with a leading slash
 // in version 6, and /name/version before it. A peer suffix in parentheses is
-// dropped.
+// dropped. A local package, whose key or version starts with file: or link:,
+// is left out.
 func ReadPNPMLock(data []byte) (Packages, error) {
 	out := Packages{}
 	inPackages, oldFormat := false, false
@@ -93,6 +94,9 @@ func ReadPNPMLock(data []byte) (Packages, error) {
 			key = key[:cut]
 		}
 		key = strings.TrimPrefix(key, "/")
+		if localPNPMSpec(key) {
+			continue
+		}
 		var name, version string
 		if oldFormat {
 			at := strings.LastIndexByte(key, '/')
@@ -110,12 +114,21 @@ func ReadPNPMLock(data []byte) (Packages, error) {
 			}
 			name, version = key[:at], key[at+1:]
 		}
+		if localPNPMSpec(version) {
+			continue
+		}
 		out.add(name, version)
 	}
 	if err := scanner.Err(); err != nil {
 		return nil, fmt.Errorf("pnpm-lock.yaml cannot be read: %w", err)
 	}
 	return out, nil
+}
+
+// localPNPMSpec reports whether a pnpm-lock.yaml key or version names a local
+// package: a file: or link: specifier.
+func localPNPMSpec(s string) bool {
+	return strings.HasPrefix(s, "file:") || strings.HasPrefix(s, "link:")
 }
 
 // ReadYarnLock reads a yarn.lock, classic or Berry: each unindented entry

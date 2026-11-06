@@ -1,0 +1,182 @@
+The Rush demo, in pnpm mode: its base and the files its change rewrites.
+-- base/rush.json --
+/**
+ * This is the main configuration file for Rush.
+ * For full documentation, please see https://rushjs.io
+ */
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/rush/v5/rush.schema.json",
+  "rushVersion": "5.140.0",
+  "pnpmVersion": "9.15.0",
+  // "npmVersion": "6.14.15",
+  "nodeSupportedVersionRange": ">=20.14.0 <23.0.0",
+  "projectFolderMinDepth": 2,
+  "projectFolderMaxDepth": 2,
+  "projects": [
+    {
+      "packageName": "@demo/api",
+      "projectFolder": "apps/api",
+      "tags": ["app"]
+    },
+    {
+      "packageName": "@demo/web",
+      "projectFolder": "apps/web"
+    },
+    {
+      "packageName": "@demo/pricing",
+      "projectFolder": "libs/pricing",
+      "shouldPublish": false
+    },
+  ]
+}
+-- base/apps/api/package.json --
+{
+  "name": "@demo/api",
+  "version": "1.0.0",
+  "private": true,
+  "dependencies": {
+    "@demo/pricing": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "~5.6.0"
+  }
+}
+-- base/apps/api/src/index.ts --
+import { price } from "@demo/pricing";
+
+export function quote(amount: number): number {
+  return price(amount);
+}
+-- base/apps/web/package.json --
+{
+  "name": "@demo/web",
+  "version": "1.0.0",
+  "private": true,
+  "devDependencies": {
+    "typescript": "~5.6.0"
+  }
+}
+-- base/apps/web/src/index.ts --
+export const title = "Demo";
+-- base/libs/pricing/package.json --
+{
+  "name": "@demo/pricing",
+  "version": "1.2.0",
+  "main": "lib/index.js",
+  "dependencies": {
+    "zod": "3.23.8"
+  }
+}
+-- base/libs/pricing/src/index.ts --
+export function price(amount: number): number {
+  return amount;
+}
+-- base/common/config/rush/pnpm-lock.yaml --
+lockfileVersion: '9.0'
+
+settings:
+  autoInstallPeers: false
+  excludeLinksFromLockfile: false
+
+importers:
+
+  .: {}
+
+  ../../apps/api:
+    dependencies:
+      '@demo/pricing':
+        specifier: workspace:*
+        version: link:../../libs/pricing
+    devDependencies:
+      typescript:
+        specifier: ~5.6.0
+        version: 5.6.3
+
+  ../../apps/web:
+    devDependencies:
+      typescript:
+        specifier: ~5.6.0
+        version: 5.6.3
+
+  ../../libs/pricing:
+    dependencies:
+      zod:
+        specifier: 3.23.8
+        version: 3.23.8
+
+packages:
+
+  typescript@5.6.3:
+    resolution: {integrity: sha512-hjcS1mhfuyi4WW8IWtjP7brDrG2cuDZukyrYrSauoXGNgx0S7zceP07adYkJycEr56BOUTNPzbInooiN3fn1qw==}
+    engines: {node: '>=14.17'}
+    hasBin: true
+
+  zod@3.23.8:
+    resolution: {integrity: sha512-XBx9AXhXktjUqnepgTiE5flcKIYWi/rme0Eaj+5Y0lftuGBq+jyRu/md4WnuxqgP1ubdpNCsYEYPxrzVHD8d6g==}
+
+snapshots:
+
+  typescript@5.6.3: {}
+
+  zod@3.23.8: {}
+-- head/libs/pricing/package.json --
+{
+  "name": "@demo/pricing",
+  "version": "1.2.0",
+  "main": "lib/index.js",
+  "dependencies": {
+    "zod": "3.24.1"
+  }
+}
+-- head/libs/pricing/src/index.ts --
+export function price(amount: number): number {
+  return Math.round(amount * 100) / 100;
+}
+-- head/common/config/rush/pnpm-lock.yaml --
+lockfileVersion: '9.0'
+
+settings:
+  autoInstallPeers: false
+  excludeLinksFromLockfile: false
+
+importers:
+
+  .: {}
+
+  ../../apps/api:
+    dependencies:
+      '@demo/pricing':
+        specifier: workspace:*
+        version: link:../../libs/pricing
+    devDependencies:
+      typescript:
+        specifier: ~5.6.0
+        version: 5.6.3
+
+  ../../apps/web:
+    devDependencies:
+      typescript:
+        specifier: ~5.6.0
+        version: 5.6.3
+
+  ../../libs/pricing:
+    dependencies:
+      zod:
+        specifier: 3.24.1
+        version: 3.24.1
+
+packages:
+
+  typescript@5.6.3:
+    resolution: {integrity: sha512-hjcS1mhfuyi4WW8IWtjP7brDrG2cuDZukyrYrSauoXGNgx0S7zceP07adYkJycEr56BOUTNPzbInooiN3fn1qw==}
+    engines: {node: '>=14.17'}
+    hasBin: true
+
+  zod@3.24.1:
+    resolution: {integrity: sha512-muH7gBL9sI1nciMZV67X5fTKKBLtwpZ5VBp1vsOQzj1MhrBZ4wlVCm3gedKZWLp0Oyel8sIGfeiz54Su+OVT+A==}
+
+snapshots:
+
+  typescript@5.6.3: {}
+
+  zod@3.24.1: {}

@@ -216,3 +216,47 @@ func TestAPantsResolveLockfileIsAPyPILockfile(t *testing.T) {
 		t.Error("a lockfile no resolve names is read")
 	}
 }
+
+func TestTheRushDetectorAnswersForARushMonorepo(t *testing.T) {
+	spectest.Proves(t, "tooling/observe-rush", "rush-projects-are-components", "rush-projects-are-orchestrator-components")
+	spectest.Proves(t, "tooling/observe-rush", "rush-projects-are-components", "a-malformed-rush-json-is-a-diagnostic")
+	root := t.TempDir()
+	write(t, root, map[string]string{
+		"rush.json":                 `{"pnpmVersion": "9.15.0", "projects": [{"packageName": "@demo/api", "projectFolder": "apps/api"}, {"packageName": "@demo/pricing", "projectFolder": "libs/pricing"}]}`,
+		"apps/api/package.json":     `{"name":"@demo/api","version":"1.0.0","dependencies":{"@demo/pricing":"workspace:*"}}`,
+		"libs/pricing/package.json": `{"name":"@demo/pricing","version":"1.0.0"}`,
+	})
+	set := Detect(root, Default(Options{}))
+	if got := ids(set); !slices.Equal(got, []string{"apps/api", "libs/pricing"}) {
+		t.Fatalf("components %v", got)
+	}
+	api := set.Components[0]
+	if api.Source != evidence.SourceOrchestrator || api.Ecosystem != "node" || api.Detector != "rush" || api.Name != "@demo/api" || !slices.Equal(api.DependsOn, []string{"libs/pricing"}) {
+		t.Errorf("api %+v", api)
+	}
+	ecosystem, read, ok := set.Lockfile("common/config/rush/pnpm-lock.yaml")
+	if !ok || ecosystem != "npm" {
+		t.Fatalf("Rush lockfile reader %v %s", ok, ecosystem)
+	}
+	locked, err := read([]byte("lockfileVersion: '9.0'\n\npackages:\n\n  zod@3.24.1:\n    resolution: {integrity: x}\n  '@rush-temp/api@file:projects/api.tgz':\n    resolution: {integrity: x}\n"))
+	if err != nil || len(locked) != 1 || !slices.Equal(locked["zod"], []string{"3.24.1"}) {
+		t.Errorf("locked %v %v", locked, err)
+	}
+
+	// A malformed rush.json leaves the repository to the other detectors.
+	write(t, root, map[string]string{
+		"rush.json":    `{"projects": [`,
+		"package.json": `{"name":"root","private":true,"workspaces":["apps/*","libs/*"]}`,
+	})
+	set = Detect(root, Default(Options{}))
+	if got := ids(set); !slices.Equal(got, []string{"apps/api", "libs/pricing"}) || set.Components[0].Detector != "node-workspaces" {
+		t.Fatalf("components %v %+v", got, set.Components)
+	}
+	found := false
+	for _, d := range set.Diagnostics {
+		found = found || (d.Code == "observe.rush_config_invalid" && d.Severity == diag.Warning)
+	}
+	if !found {
+		t.Errorf("diagnostics %v", set.Diagnostics)
+	}
+}

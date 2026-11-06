@@ -7,12 +7,13 @@ queries no vulnerability database.
 
 ## Components
 
-Six detectors read the repository:
+Seven detectors read the repository:
 
 | Detector | Reads | Source |
 |---|---|---|
 | Nx | `graph.json` from `nx graph --file`, else `nx.json` and `project.json` | `orchestrator` for a graph export, `workspace` otherwise |
 | Pants | `pants-graph.json` from `pants peek ::`, else the `BUILD` files, beside `pants.toml` | `orchestrator` for the export, `workspace` otherwise |
+| Rush | `rush.json`, each project's `package.json` ([Rush](09-rush.md)) | `orchestrator` |
 | Node workspaces | `package.json` `workspaces`, `pnpm-workspace.yaml` | `workspace` |
 | Composer | each `composer.json` | `manifest` |
 | Go | `go.work`, each `go.mod` | `workspace` for a `go.work` member, `manifest` otherwise |
@@ -25,8 +26,8 @@ component is dropped. When no detector finds a component, the repository is
 one `fallback` component `.` of ecosystem `unknown`.
 
 A changed file belongs to the innermost component that holds it. A file
-outside every component, such as a root lockfile in a Node workspace, belongs
-to none. A component is `changed` when one of its files changed, `dependent`
+outside every component, such as a root lockfile in a Node workspace or
+`common/config/rush/pnpm-lock.yaml` in a Rush monorepo, belongs to none. A component is `changed` when one of its files changed, `dependent`
 when it reaches a changed component through its edges, and `unaffected`
 otherwise.
 
@@ -92,15 +93,21 @@ Each changed lockfile is read at the merge base and at the head:
 | Lockfile | Ecosystem | Packages |
 |---|---|---|
 | `package-lock.json` | `npm` | `packages`, else the nested `dependencies` of version 1; links left out |
-| `pnpm-lock.yaml` | `npm` | the keys of `packages`, versions 5 to 9 |
+| `pnpm-lock.yaml` | `npm` | the keys of `packages`, versions 5 to 9; `file:` and `link:` packages left out |
 | `yarn.lock` | `npm` | classic and Berry entries; `workspace:`, `link:`, `portal:` and `file:` left out |
+| `npm-shrinkwrap.json` of a Rush monorepo | `npm` | as `package-lock.json` |
 | `composer.lock` | `composer` | `packages` and `packages-dev`; path packages left out |
 | `go.mod` | `go` | the requires, after the `go.mod` replace directives; modules of the repository and local replacements left out |
 | `uv.lock` | `pypi` | each `[[package]]`; `editable`, `virtual`, `directory` and `path` sources left out |
 | `poetry.lock` | `pypi` | each `[[package]]`; `directory` and `file` sources and `develop` packages left out |
 | a Pants resolve lockfile | `pypi` | each locked requirement of the PEX JSON lock a `[python.resolves]` entry of `pants.toml` names |
 
-`go.sum` holds checksums, not versions, and is not read. A Python package
+A Rush monorepo keeps its lockfile under `common/config/rush/`: `pnpm-lock.yaml`,
+`npm-shrinkwrap.json` or `yarn.lock`, by the package manager `rush.json` names,
+and in pnpm mode one `pnpm-lock.yaml` per subspace under
+`common/config/subspaces/<name>/`. Its `@rush-temp/` packages are Rush's own
+projects and are left out. `go.sum` holds checksums, not versions, and is not
+read. A Python package
 name is read in its normalized form (PEP 503): lower case, with each run of
 `-`, `_` and `.` as one `-`, so `Typing_Extensions` is `typing-extensions`. A package found on
 one side only is `added` or `removed`. A package whose versions differ is
