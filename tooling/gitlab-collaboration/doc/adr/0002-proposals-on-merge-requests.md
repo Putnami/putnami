@@ -120,12 +120,12 @@ the merge method is a project setting.
    does. A scoped label (`key::value`) is exclusive on the tiers that have
    them, so of each key one label is added, the first the description names,
    and none when the merge request already carries that key: an addition
-   never replaces a label. The references are GitLab's: `#12` is an
-   issue of the bound project, `project#12` one of a project in its namespace,
-   `group/project#12` one of any project of the instance, and
-   `https://<host>/<project>/-/issues/12` the same on the bound host. `!12`
-   names a merge request and adds nothing, and a URL on another host is never
-   read.
+   never replaces a label. The references are GitLab's: `#<iid>` is an
+   issue of the bound project, `project#<iid>` one of a project in its
+   namespace, `group/project#<iid>` one of any project of the instance, and
+   `https://<host>/<project>/-/issues/<iid>` the same on the bound host.
+   `!<iid>` names a merge request and adds nothing, and a URL on another host
+   is never read.
 
 10. **Merge is optional, off, and sent once.** `merge` is `denied` before
     anything is sent unless `settings.allowMerge` is true. It merges only a
@@ -139,10 +139,17 @@ the merge method is a project setting.
     squashes; nothing is sent then. GitLab squashes by the merge request's
     own squash flag, which a create sets from the project's default and a
     merge call never clears, and on paid tiers a protected branch's rule
-    overrides both. So a named method first sets the flag to what it needs
-    and reads back `squash_on_merge`: when the project or a branch rule
-    still decides otherwise, `merge` is `unsupported` and merges nothing. No
-    method leaves the choice to the project. GitLab takes
+    overrides both. When the merge request's `squash_on_merge` already
+    differs from its flag and from what the method needs, a rule decides,
+    and `merge` is `unsupported` with nothing sent. Otherwise a named method
+    sets the flag to what it needs and reads back `squash_on_merge`; when a
+    rule still decides otherwise, or the merge does not happen for any other
+    reason, the flag is put back as it was before the answer, so an answer
+    that merged nothing changed nothing, and a flag that cannot be put back
+    is `unresolved` (`gitlab.incomplete`). The project's `never` and `always`
+    refuse before the merge request is read, even where a protected branch's
+    rule would relax them: merge without a method there. No method leaves
+    the choice to the project. GitLab takes
     `should_remove_source_branch` in the merge call itself, so
     `settings.removeSourceBranch` deletes the source branch with no second
     write to compensate for.

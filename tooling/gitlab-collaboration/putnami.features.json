@@ -220,6 +220,7 @@
               "a-merge-method-the-project-cannot-honor-is-unsupported",
               "a-moved-head-or-unmergeable-request-is-a-conflict",
               "a-squash-option-the-project-forbids-is-unsupported",
+              "an-answer-that-merges-nothing-leaves-the-squash-flag",
               "merge-is-denied-unless-allowed",
               "merge-sends-the-expected-head",
               "remove-source-branch-rides-on-the-merge",

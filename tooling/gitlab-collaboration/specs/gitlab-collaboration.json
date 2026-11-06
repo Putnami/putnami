@@ -66,11 +66,11 @@
     },
     {
       "id": "reported-publication",
-      "text": "Every proposal answer lists its labels and assignees, [] when absent. upsert applies assignAuthor and inheritLabelPrefixes, which only add: a tier keeping one assignee keeps the present one, and of each scoped key::value one label is added, none when the merge request has that key. A failed addition after the write is unresolved, naming the merge request. References are GitLab's: #12, project#12, group/project#12 and issue URLs on the bound host; !12 adds nothing, and a URL on another host is never read."
+      "text": "Every proposal answer lists its labels and assignees, [] when absent. upsert applies assignAuthor and inheritLabelPrefixes, which only add: a tier keeping one assignee keeps the present one, and of each scoped key::value one label is added, none when the merge request has that key. A failed addition after the write is unresolved, naming the merge request. References are GitLab's: #<iid>, project#<iid>, group/project#<iid>, issue URLs on the bound host; !<iid> adds nothing, a foreign URL is never read."
     },
     {
       "id": "guarded-merge",
-      "text": "merge is denied before anything is sent unless settings.allowMerge is true, merges only at the expected head, sent as GitLab's sha so a head that moves meanwhile is a conflict, and answers conflict when GitLab cannot merge. A named method first sets the merge request's squash flag to it; where the project's merge method, squash option or a branch rule overrides that, merge is unsupported and merges nothing. settings.removeSourceBranch deletes the source branch in the merge call itself."
+      "text": "merge is denied unless settings.allowMerge is true and merges only at the expected head, sent as GitLab's sha, so a moved head is a conflict, as is a merge GitLab refuses. A named method sets the merge request's squash flag; where the project, a branch rule or the read flag overrides it, merge is unsupported. Every answer that merges nothing leaves the flag as it was, or is unresolved. settings.removeSourceBranch deletes the source branch in the merge call itself."
     },
     {
       "id": "honest-failures",
