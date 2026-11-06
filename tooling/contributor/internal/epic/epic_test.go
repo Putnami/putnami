@@ -17,9 +17,10 @@ import (
 )
 
 const (
-	epicFeature = "tooling/epic"
-	epicWaves   = "epic-waves"
-	epicStatus  = "epic-status"
+	epicFeature    = "tooling/epic"
+	epicWaves      = "epic-waves"
+	epicStatus     = "epic-status"
+	epicCloudChild = "epic-cloud-child"
 )
 
 // workspace writes a workspace root with the example epic plan, every issue
@@ -576,8 +577,19 @@ func TestACloudLaunchIsRecordedAndReported(t *testing.T) {
 	if !strings.Contains(text, "  read-contract (task 41): in progress at code in a cloud session, branch b/read, 3.0M tokens of a 48.5M share\n") {
 		t.Fatalf("text %q", text)
 	}
-	if strings.Contains(text, "plan-command (task 42): launched in a cloud session") {
-		t.Fatalf("text %q names a local child as cloud", text)
+	if !strings.Contains(text, "  plan-command (task 42): launched, branch b/plan, no usage reported, share 16.7M\n") {
+		t.Fatalf("text %q; a local child carries no cloud note", text)
+	}
+
+	// Once the epic session published the cloud child's proposal, the
+	// status shows the proposal and drops the cloud note; JSON keeps it.
+	p.proposals["b/read"] = proposal("101", "b/read", collab.ProposalStateDraft)
+	result, text = runStatus(t, root, p)
+	if read := issueByKey(t, result, "read-contract"); read.Target != LaunchTargetCloud || read.Proposal == nil {
+		t.Fatalf("read-contract %+v", read)
+	}
+	if !strings.Contains(text, "  read-contract (task 41): in progress at code, https://example.test/pull/101, 3.0M tokens of a 48.5M share\n") {
+		t.Fatalf("text %q", text)
 	}
 	spectest.Proves(t, epicFeature, epicStatus, "a-cloud-launch-is-recorded-and-reported")
 }

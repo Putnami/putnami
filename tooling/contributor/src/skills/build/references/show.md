@@ -7,8 +7,8 @@ code.
 ## Open the draft
 
 Publication is the default. Unless the run is local (`--local`, a mandate
-that says to stay local, `--dry-run`, or no bound proposals provider), open the
-proposal as a draft once the plan is settled, before the first implementation
+that says to stay local, `--dry-run`, or no bound proposals provider) or
+push-only, open the proposal as a draft once the plan is settled, before the first implementation
 edit: run `"$PUTNAMI_CLI" change finalize --draft` with the planned title, a
 body that states the intended change, and the task reference. Pass
 `--partial-delivery` when the proposal delivers one unit of a larger task. The
@@ -80,3 +80,8 @@ decision record (ADR).
 
 A settled small correction that changes no declaration keeps the order of the
 code stage. A local run keeps the commit order and pushes nothing.
+
+A push-only run opens no draft and runs no `change finalize`. It pushes the
+declarations commit alone with `git push -u origin <branch>`, then reports
+its head: the epic session may open the draft from it. With no proposal yet,
+it reads no review and no comment.

@@ -55,6 +55,16 @@ A failed or `unresolved` external write leaves a resumable state, not a reason
 to bypass a check or to repeat the write blindly. A local run ends with local
 evidence and names the finalization it did not run.
 
+## Push-only
+
+A push-only run runs no `change finalize`, ready or draft. Once check and
+prove pass, it pushes the final head and ends. Its end report gives what the
+epic session needs to publish: the branch, the pushed head, the base, the
+title, the body as it stands, the task reference, the projects the gate
+covered and whether the delivery is partial. The epic session proves that
+head again in a local worktree before it publishes; the run's own records
+stay where they are.
+
 ## Title and body
 
 The title and body are the squash commit. When the repository uses

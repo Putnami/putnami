@@ -57,7 +57,11 @@ is documented in the [migration guide](doc/03-entry-point-migration.md).
 `build` handles named tasks and coordinated units only within its mandate;
 it does not select backlog work. It publishes its own proposal by default
 ([ADR 0003](doc/adr/0003-build-publishes-its-proposal-by-default.md)), and
-`--local` keeps a run local. When the outcome changes a declaration, the first
+`--local` keeps a run local. `--push-only` pushes the branch and opens no
+proposal: a cloud child of an epic runs it, and the epic session publishes
+its proposal
+([ADR 0011](doc/adr/0011-the-epic-session-publishes-a-cloud-child.md)).
+When the outcome changes a declaration, the first
 checkpoint holds the declarations only
 ([ADR 0008](doc/adr/0008-build-pushes-its-intent-before-its-code.md)).
 
@@ -189,6 +193,7 @@ session:
 - [ADR 0008](doc/adr/0008-build-pushes-its-intent-before-its-code.md)
 - [ADR 0009](doc/adr/0009-one-contribution-loop-from-talk-to-merge.md)
 - [ADR 0010](doc/adr/0010-an-epic-session-runs-issues-in-waves.md)
+- [ADR 0011](doc/adr/0011-the-epic-session-publishes-a-cloud-child.md)
 
 ## Publication
 

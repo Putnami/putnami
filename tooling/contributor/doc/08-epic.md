@@ -115,9 +115,11 @@ beside the plan, before the owner opens the session:
 ```
 
 `target` is `local`, a local workspace the owner opens, or `cloud`, a cloud
-session. A cloud child pushes its branch and stops before `change finalize`;
-the epic session publishes its proposal from a local checkout, so the
-proposal body carries no host footer. `branch` is the branch the child works
+session the owner starts. A cloud child runs `build --push-only`: it pushes
+its branch and opens no proposal. The epic session checks the pushed head out
+in a local worktree, runs the project gate on it, and publishes the proposal
+with `change finalize`, so the proposal body carries no host footer
+([ADR 0011](adr/0011-the-epic-session-publishes-a-cloud-child.md)). `branch` is the branch the child works
 on, and `base` the branch it starts from: the epic's base, or the branch of
 the parent it stacks on. The latest launch of an issue wins. A record that
 names an unknown issue, another target or another epic is refused with
@@ -156,18 +158,17 @@ ready issue counts. A stacked issue whose parent merged gets its rebase,
 `proposals.status` reports for the parent; its proposal then targets the
 epic's base. A dependency closed without a merge blocks the issues that need
 it: each shows `blocked: <key> closed without a merge` until the owner
-replans it.
+replans it. A cloud child shows `in a cloud session` and its branch until its
+proposal exists, as `status-command` below.
 
 ```text
 Epic .putnami/42/epic.json: Plans are sized and launched in waves
-  Spent: 17.0M of 330.0M tokens; 1 of 3 sessions running
+  Spent: 20.0M of 330.0M tokens; 2 of 3 sessions running
 Wave 1
   read-contract (task 41): ready, https://example.test/pull/101, 12.0M tokens of a 48.5M share
   plan-command (task 43): merged, https://example.test/pull/102, 5.0M tokens of a 16.7M share
 Wave 2
-  status-command (task 44): planned, no usage reported, share 65.2M
-Launch now
-  status-command: from epic-42/read-contract, stacked on read-contract
+  status-command (task 44): in progress at code in a cloud session, branch epic-42/status-command, 3.0M tokens of a 65.2M share
 ```
 
 A contract whose provider answers `unsupported` or `denied` is called once,
@@ -181,5 +182,5 @@ be reached exits 1, since a partial read would look complete. Without the
 host channel, as when the executable runs by hand, the
 command exits 1 and names `putnami epic status`. `--output=json` prints the
 result document: `tokens`, `envelopeSpent`, `running`, `issues` (each with
-its `sessions`, `live`, `sessionsRead` and `blockedBy`),
+its `target`, `sessions`, `live`, `sessionsRead` and `blockedBy`),
 `launchable` and `unavailable`.

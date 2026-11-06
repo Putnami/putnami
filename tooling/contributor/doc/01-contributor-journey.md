@@ -10,7 +10,10 @@ review once the final gate passes. When the outcome changes a declaration, the
 first checkpoint holds the declarations only, so a reviewer can correct the
 intent while the code is written
 ([ADR 0008](adr/0008-build-pushes-its-intent-before-its-code.md)). `--local`
-or a mandate that says to stay local keeps the run local. A request alone
+or a mandate that says to stay local keeps the run local. `--push-only`
+pushes the branch and opens no proposal, for a cloud child whose epic
+session publishes it
+([ADR 0011](adr/0011-the-epic-session-publishes-a-cloud-child.md)). A request alone
 grants no task claim, merge or deployment.
 
 The skill's core is short. On entering a stage, build runs

@@ -708,7 +708,7 @@ func issueText(issue IssueStatus) string {
 	if issue.Stage != "" {
 		parts[0] += " at " + string(issue.Stage)
 	}
-	if issue.Target == LaunchTargetCloud {
+	if issue.Target == LaunchTargetCloud && issue.Proposal == nil {
 		parts[0] += " in a cloud session"
 	}
 	if issue.SessionsRead && issue.Live == 0 && (issue.State == StateInProgress || issue.State == StateReady) {
