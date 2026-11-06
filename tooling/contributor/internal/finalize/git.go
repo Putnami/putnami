@@ -3,6 +3,7 @@ package finalize
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -167,22 +168,47 @@ func (g NativeGit) Seed(ctx context.Context, title string) error {
 	return g.runWrite(ctx, "commit", "--allow-empty", "-m", title)
 }
 
-// Push publishes the branch to origin. Once this checkout has pushed the
-// branch, the push carries a lease pinned to the head it last pushed: it
-// replaces a rebased branch only while origin still holds that head, and
-// refuses when someone else pushed since, even after a fetch moved the
-// remote-tracking ref. Before the first push, it only fast-forwards.
+// PushRefusedError reports a push origin refused before it wrote anything:
+// origin's branch is not a fast-forward of HEAD, and no lease on the head
+// this checkout last pushed allows replacing it.
+type PushRefusedError struct {
+	Branch string
+	// Pushed is the head this checkout last pushed; empty when it has none.
+	Pushed string
+	Err    error
+}
+
+func (e *PushRefusedError) Error() string {
+	if e.Pushed == "" {
+		return fmt.Sprintf("origin refused %s: HEAD does not contain origin's head, and the reflog of refs/remotes/origin/%s records no push from this checkout to lease on; fetch, integrate origin's commits, then run again: %v", e.Branch, e.Branch, e.Err)
+	}
+	return fmt.Sprintf("origin refused %s: HEAD does not contain origin's head, and origin no longer holds %s, the head this checkout last pushed; fetch, integrate origin's commits, then run again: %v", e.Branch, e.Pushed, e.Err)
+}
+
+func (e *PushRefusedError) Unwrap() error { return e.Err }
+
+// Push publishes the branch to origin. A push that fast-forwards origin's
+// branch goes through as is. When origin refuses it as not a fast-forward,
+// as after a rebase, the push is repeated with a lease pinned to the head
+// this checkout last pushed: it replaces origin's branch only while origin
+// still holds that head. Someone else's push, or a deletion, moves origin
+// off that head, even when a fetch moved the remote-tracking ref along, and
+// the push is refused with a PushRefusedError.
 func (g NativeGit) Push(ctx context.Context, branch string) error {
-	pushed, err := g.lastPushed(branch)
-	if err != nil {
+	err := g.runWrite(ctx, "push", "-u", "origin", branch)
+	if err == nil || !strings.Contains(err.Error(), "[rejected]") {
 		return err
 	}
+	pushed, readErr := g.lastPushed(branch)
+	if readErr != nil {
+		return errors.Join(err, readErr)
+	}
 	if pushed == "" {
-		return g.runWrite(ctx, "push", "-u", "origin", branch)
+		return &PushRefusedError{Branch: branch, Err: err}
 	}
 	err = g.runWrite(ctx, "push", "--force-with-lease=refs/heads/"+branch+":"+pushed, "-u", "origin", branch)
-	if err != nil && strings.Contains(err.Error(), "(stale info)") {
-		return fmt.Errorf("origin's %s is no longer %s, the head this checkout last pushed: someone else pushed it; integrate their commits before publishing: %w", branch, pushed, err)
+	if err != nil && strings.Contains(err.Error(), "[rejected]") {
+		return &PushRefusedError{Branch: branch, Pushed: pushed, Err: err}
 	}
 	return err
 }

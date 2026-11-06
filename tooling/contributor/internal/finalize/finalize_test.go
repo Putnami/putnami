@@ -26,6 +26,7 @@ type finalizerGit struct {
 	commits                   []CommitMessage
 	pushes, seeds             int
 	pushHook                  func()
+	pushErr                   error
 }
 
 func (g *finalizerGit) Branch() (string, error)                        { return g.branch, nil }
@@ -49,7 +50,7 @@ func (g *finalizerGit) Push(context.Context, string) error {
 	if g.pushHook != nil {
 		g.pushHook()
 	}
-	return nil
+	return g.pushErr
 }
 func (g *finalizerGit) Fingerprint() (string, error) { return g.fingerprint, nil }
 
@@ -1066,5 +1067,23 @@ func TestACallThatNeverReachesTheProviderStopsTheRun(t *testing.T) {
 	}
 	if _, err := f.Run(context.Background(), opts); err == nil || err.Error() != "no host channel" || git.pushes != 0 || git.seeds != 0 {
 		t.Fatalf("error %v, pushes %d, seeds %d; want the call error before any write", err, git.pushes, git.seeds)
+	}
+}
+
+// TestARefusedPushStopsWithoutAProposalWrite pins that a push origin refused
+// before writing stops the run with the refusal, not with the warning that
+// the push may have happened, and writes no proposal.
+func TestARefusedPushStopsWithoutAProposalWrite(t *testing.T) {
+	t.Parallel()
+	f, git, provider, opts := finalizerFixture(t)
+	opts.Draft, opts.VerificationFile = true, ""
+	existingDraftProposal(provider, "prior-head")
+	git.pushErr = &PushRefusedError{Branch: opts.Branch, Pushed: "prior-head", Err: errors.New("rejected (stale info)")}
+	_, err := f.Run(context.Background(), opts)
+	if refused := (*PushRefusedError)(nil); !errors.As(err, &refused) || strings.Contains(err.Error(), "may have happened") {
+		t.Fatalf("refused push: %v", err)
+	}
+	if provider.upserts != 0 || git.pushes != 1 {
+		t.Fatalf("a refused push reached a proposal write: upserts=%d pushes=%d", provider.upserts, git.pushes)
 	}
 }

@@ -3,6 +3,7 @@ package finalize
 import (
 	"bytes"
 	"context"
+	"errors"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -136,15 +137,16 @@ func TestGitEnvironmentDropsTheHostChannel(t *testing.T) {
 
 // rebaseFixture is a checkout that pushed fix/rebase to a bare origin, then
 // rebased it onto a base that moved: its head no longer contains the commit
-// it pushed.
+// it pushed. Every git command, the code under test included, reads no
+// global or system configuration.
 func rebaseFixture(t *testing.T) (root, origin, pushed string, run func(string, ...string) string) {
 	t.Helper()
+	t.Setenv("GIT_CONFIG_GLOBAL", os.DevNull)
+	t.Setenv("GIT_CONFIG_NOSYSTEM", "1")
 	root, origin = t.TempDir(), t.TempDir()
 	run = func(dir string, args ...string) string {
 		t.Helper()
-		cmd := exec.Command("git", append([]string{"-C", dir}, args...)...)
-		cmd.Env = append(os.Environ(), "GIT_CONFIG_GLOBAL=/dev/null", "GIT_CONFIG_NOSYSTEM=1")
-		output, err := cmd.CombinedOutput()
+		output, err := exec.Command("git", append([]string{"-C", dir}, args...)...).CombinedOutput()
 		if err != nil {
 			t.Fatalf("git %v: %v: %s", args, err, output)
 		}
@@ -154,7 +156,6 @@ func rebaseFixture(t *testing.T) (root, origin, pushed string, run func(string, 
 	run(root, "init", "-q", "-b", "main")
 	run(root, "config", "user.name", "Test")
 	run(root, "config", "user.email", "test@example.invalid")
-	run(root, "config", "commit.gpgsign", "false")
 	run(root, "remote", "add", "origin", origin)
 	run(root, "commit", "-q", "--allow-empty", "-m", "chore: base")
 	run(root, "push", "-q", "origin", "main")
@@ -176,8 +177,20 @@ func rebaseFixture(t *testing.T) (root, origin, pushed string, run func(string, 
 	return root, origin, pushed, run
 }
 
+// pushFromElsewhere pushes a commit on top of origin's fix/rebase from
+// another clone, and returns origin's new head.
+func pushFromElsewhere(t *testing.T, origin string, run func(string, ...string) string) string {
+	t.Helper()
+	other := t.TempDir()
+	run(other, "clone", "-q", "-b", "fix/rebase", origin, ".")
+	run(other, "-c", "user.name=Other", "-c", "user.email=other@example.invalid", "commit", "-q", "--allow-empty", "-m", "fix: another push")
+	run(other, "push", "-q", "origin", "fix/rebase")
+	return run(other, "rev-parse", "HEAD")
+}
+
+// Not parallel: the fixture isolates git from the global configuration
+// through the environment.
 func TestNativeGitPushPublishesARebasedBranch(t *testing.T) {
-	t.Parallel()
 	root, origin, _, run := rebaseFixture(t)
 	if err := (NativeGit{Root: root}).Push(context.Background(), "fix/rebase"); err != nil {
 		t.Fatalf("push of the rebased branch: %v", err)
@@ -185,31 +198,58 @@ func TestNativeGitPushPublishesARebasedBranch(t *testing.T) {
 	if got, want := run(origin, "rev-parse", "refs/heads/fix/rebase"), run(root, "rev-parse", "HEAD"); got != want {
 		t.Fatalf("origin head = %s, want the rebased head %s", got, want)
 	}
+	// The next rebase leases on the head this push wrote.
+	run(root, "commit", "-q", "--amend", "--allow-empty", "-m", "fix: first slice, amended")
+	if err := (NativeGit{Root: root}).Push(context.Background(), "fix/rebase"); err != nil {
+		t.Fatalf("push of the amended branch: %v", err)
+	}
+	if got, want := run(origin, "rev-parse", "refs/heads/fix/rebase"), run(root, "rev-parse", "HEAD"); got != want {
+		t.Fatalf("origin head = %s, want the amended head %s", got, want)
+	}
 }
 
 func TestNativeGitPushRefusesToReplaceAnotherPush(t *testing.T) {
-	t.Parallel()
 	for _, fetched := range []bool{false, true} {
 		root, origin, pushed, run := rebaseFixture(t)
-		// Someone else pushes on top of the head this checkout pushed.
-		other := t.TempDir()
-		run(other, "clone", "-q", "-b", "fix/rebase", origin, ".")
-		run(other, "-c", "user.name=Other", "-c", "user.email=other@example.invalid", "commit", "-q", "--allow-empty", "-m", "fix: another push")
-		run(other, "push", "-q", "origin", "fix/rebase")
-		theirs := run(other, "rev-parse", "HEAD")
-		if theirs == pushed {
-			t.Fatal("the other push kept the pushed head")
-		}
+		theirs := pushFromElsewhere(t, origin, run)
 		if fetched {
 			// A fetch moves the remote-tracking ref without a push from here.
 			run(root, "fetch", "-q", "origin")
 		}
 		err := (NativeGit{Root: root}).Push(context.Background(), "fix/rebase")
-		if err == nil || !strings.Contains(err.Error(), "someone else pushed it") {
+		refused := (*PushRefusedError)(nil)
+		if !errors.As(err, &refused) || refused.Pushed != pushed {
 			t.Fatalf("fetched=%v: the push did not refuse another push: %v", fetched, err)
 		}
 		if got := run(origin, "rev-parse", "refs/heads/fix/rebase"); got != theirs {
 			t.Fatalf("fetched=%v: origin head = %s, want the other push %s", fetched, got, theirs)
 		}
+	}
+}
+
+func TestNativeGitPushPublishesAfterIntegratingAnotherPush(t *testing.T) {
+	root, origin, _, run := rebaseFixture(t)
+	pushFromElsewhere(t, origin, run)
+	run(root, "pull", "-q", "--rebase", "origin", "fix/rebase")
+	run(root, "commit", "-q", "--allow-empty", "-m", "fix: second slice")
+	if err := (NativeGit{Root: root}).Push(context.Background(), "fix/rebase"); err != nil {
+		t.Fatalf("push after integrating another push: %v", err)
+	}
+	if got, want := run(origin, "rev-parse", "refs/heads/fix/rebase"), run(root, "rev-parse", "HEAD"); got != want {
+		t.Fatalf("origin head = %s, want %s", got, want)
+	}
+}
+
+func TestNativeGitPushWithoutARecordedPushOnlyFastForwards(t *testing.T) {
+	root, origin, _, run := rebaseFixture(t)
+	// Expire the reflog: this checkout keeps no record of its push.
+	run(root, "reflog", "expire", "--expire=all", "refs/remotes/origin/fix/rebase")
+	before := run(origin, "rev-parse", "refs/heads/fix/rebase")
+	err := (NativeGit{Root: root}).Push(context.Background(), "fix/rebase")
+	if refused := (*PushRefusedError)(nil); !errors.As(err, &refused) || refused.Pushed != "" || !strings.Contains(err.Error(), "records no push") {
+		t.Fatalf("push without a recorded push: %v", err)
+	}
+	if got := run(origin, "rev-parse", "refs/heads/fix/rebase"); got != before {
+		t.Fatalf("origin head = %s, want it unchanged at %s", got, before)
 	}
 }
