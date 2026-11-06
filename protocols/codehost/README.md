@@ -25,7 +25,7 @@ on its next version.
   case-sensitively.
 - `Lookup(slug)` returns a slug's vocabulary and whether it is known;
   `For(slug)` falls back to `generic` for display.
-- `ChangeRequestLabel(slug, n)` gives `merge request !42`; a number that is not
+- `ChangeRequestLabel(slug, n)` gives `merge request !42`; a number that is not a
   positive integer gives the noun alone.
 - `NoteMarker` is `<!-- putnami-observe:summary -->`, the first line of the
   Putnami note. `IsPutnamiNote(body)` is true when the body starts with it
