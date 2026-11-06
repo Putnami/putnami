@@ -79,8 +79,7 @@ function guardClient(tx: TransactionState, conn: ReservedSqlClient): SqlClient {
   const guardDispatch = (result: unknown): unknown => {
     const query = result as DriverQuery | undefined;
     const dispatch = query?.handler;
-    const reject = query?.reject;
-    if (typeof dispatch !== 'function' || typeof reject !== 'function') {
+    if (typeof dispatch !== 'function' || typeof query?.reject !== 'function') {
       // A helper fragment such as `sql(rows, ...columns)`, not a query.
       return result;
     }
@@ -89,7 +88,8 @@ function guardClient(tx: TransactionState, conn: ReservedSqlClient): SqlClient {
         try {
           assertOpen(tx);
         } catch (error) {
-          reject(error);
+          // Read `reject` now: a cursor re-points it at each step.
+          (pending as DriverQuery).reject?.(error);
           return;
         }
         dispatch(pending);
