@@ -23,7 +23,7 @@
     },
     {
       "id": "trx-reads-every-result",
-      "text": "ReadTRX reads a TestRun root into one case per top-level UnitTestResult, in document order: its testName, the className of its TestMethod cut at the first comma, one suite named by the file name of the TestMethod's codeBase, and its duration. Passed, PassedButRunAborted, Completed and Warning pass; Failed fails; Error, Timeout and Aborted fail as an error; NotExecuted, Inconclusive, NotRunnable, Pending, Disconnected and InProgress skip. Totals are the ResultSummary counters; another outcome is malformed."
+      "text": "ReadTRX reads a TestRun root into one case per top-level UnitTestResult in document order: its testName, its TestMethod's className up to a comma, a suite named by its codeBase's file name, and its duration. Passed, PassedButRunAborted, Completed and Warning pass; Failed fails; Error, Timeout and Aborted fail as an error; NotExecuted, Inconclusive, NotRunnable, Pending, Disconnected and InProgress skip. Totals are the ResultSummary counters, skipped being total less executed; other outcomes are malformed."
     },
     {
       "id": "coverage-reads-every-instrumented-line",
