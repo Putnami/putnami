@@ -250,3 +250,37 @@ var pypiSeparators = regexp.MustCompile(`[-_.]+`)
 func PyPIName(name string) string {
 	return pypiSeparators.ReplaceAllString(strings.ToLower(strings.TrimSpace(name)), "-")
 }
+
+// ReadPEXLock reads a PEX JSON lock, the lockfile Pants writes for a Python
+// resolve: each locked requirement of each locked resolve, by its project
+// name in its normalized form. The lines that start with //, the header Pants
+// writes before the JSON document, are no content.
+func ReadPEXLock(data []byte) (Packages, error) {
+	var body bytes.Buffer
+	for line := range bytes.Lines(data) {
+		if !bytes.HasPrefix(bytes.TrimLeft(line, " \t"), []byte("//")) {
+			body.Write(line)
+		}
+	}
+	var lock struct {
+		LockedResolves *[]struct {
+			LockedRequirements []struct {
+				ProjectName string `json:"project_name"`
+				Version     string `json:"version"`
+			} `json:"locked_requirements"`
+		} `json:"locked_resolves"`
+	}
+	if err := json.Unmarshal(body.Bytes(), &lock); err != nil {
+		return nil, fmt.Errorf("the PEX lock is not JSON after its // header: %w", err)
+	}
+	if lock.LockedResolves == nil {
+		return nil, fmt.Errorf("the PEX lock has no locked_resolves")
+	}
+	out := Packages{}
+	for _, resolve := range *lock.LockedResolves {
+		for _, r := range resolve.LockedRequirements {
+			out.add(PyPIName(r.ProjectName), r.Version)
+		}
+	}
+	return out, nil
+}
