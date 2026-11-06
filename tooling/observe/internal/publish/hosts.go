@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 
+	"go.putnami.dev/protocol/codehost"
 	"go.putnami.dev/tooling/observe/internal/ci"
 	"go.putnami.dev/tooling/observe/internal/observe"
 )
@@ -23,7 +24,7 @@ type gitHub struct {
 
 // gitHubAPI is the API of github.com; GitHub Enterprise names its own in
 // GITHUB_API_URL.
-const gitHubAPI = "https://api.github.com"
+var gitHubAPI = codehost.For(codehost.GitHub).DefaultAPIBase
 
 func newGitHub(client *http.Client, getenv func(string) string, token string, o observe.Observation) (*gitHub, error) {
 	base, err := apiBase(firstOf(getenv("GITHUB_API_URL"), gitHubAPI))
@@ -234,9 +235,10 @@ func fullSHA(value string) bool {
 	return strings.Trim(value, "0123456789abcdef") == ""
 }
 
-// marked reports whether a note body starts with Marker.
+// marked reports whether a note body is the Putnami note: it starts with
+// Marker after leading white space.
 func marked(body string) bool {
-	return strings.HasPrefix(strings.TrimLeft(body, " \t\r\n"), Marker)
+	return codehost.IsPutnamiNote(body)
 }
 
 func firstOf(values ...string) string {
