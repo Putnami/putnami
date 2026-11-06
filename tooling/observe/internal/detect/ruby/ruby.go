@@ -92,7 +92,7 @@ func Detect(root string) Detection {
 	}
 	sort.Strings(ids)
 	// The gem names come first: an edge may name any gem of the repository.
-	gems := map[string]string{}
+	gems := map[string][]string{}
 	for _, id := range ids {
 		d := dirs[id]
 		for _, file := range d.gemspecs {
@@ -102,8 +102,8 @@ func Detect(root string) Detection {
 			}
 			if name := gemspecName(data); name != "" {
 				d.gemNames = append(d.gemNames, name)
-				if _, taken := gems[name]; !taken {
-					gems[name] = id
+				if !slices.Contains(gems[name], id) {
+					gems[name] = append(gems[name], id)
 				}
 			}
 		}
@@ -134,6 +134,10 @@ func Detect(root string) Detection {
 		if d.gemfile {
 			for _, ref := range gemfileReferences(read(root, join(id, Gemfile))) {
 				if ref.path != "" {
+					// An absolute path, joined, would read as a repository one.
+					if strings.HasPrefix(ref.path, "/") {
+						continue
+					}
 					if target, ok := normalize(join(id, ref.path)); ok {
 						edges[target] = true
 					}
@@ -141,15 +145,20 @@ func Detect(root string) Detection {
 				}
 				// A gem of a path block lies at the block's path or below it.
 				block, ok := normalize(join(id, ref.block))
-				if target, named := gems[ref.name]; ok && named && contains(block, target) {
-					edges[target] = true
+				for _, target := range gems[ref.name] {
+					if ok && contains(block, target) {
+						edges[target] = true
+						break
+					}
 				}
 			}
 		}
 		for _, file := range d.gemspecs {
 			for _, name := range gemspecDependencies(read(root, join(id, file))) {
-				if target, ok := gems[name]; ok {
-					edges[target] = true
+				// A gem name two directories give is the first one's, in
+				// path order.
+				if targets := gems[name]; len(targets) > 0 {
+					edges[targets[0]] = true
 				}
 			}
 		}
@@ -366,16 +375,29 @@ func gemfileReferences(data []byte) []reference {
 	var out []reference
 	var blocks []string
 	scanner := bufio.NewScanner(bytes.NewReader(data))
+	pending := ""
 	for scanner.Scan() {
 		line := strings.TrimSpace(stripComment(scanner.Text()))
 		if line == "" {
+			continue
+		}
+		// An entry whose arguments go on after a trailing comma is one line.
+		if pending != "" {
+			line = pending + " " + line
+			pending = ""
+		}
+		if strings.HasSuffix(line, ",") {
+			pending = line
 			continue
 		}
 		if blockEnd.MatchString(line) {
 			if len(blocks) > 0 {
 				blocks = blocks[:len(blocks)-1]
 			}
-			continue
+			// end.each do |x| closes a block and opens another.
+			if !blockOpen.MatchString(line) {
+				continue
+			}
 		}
 		if m := gemEntry.FindStringSubmatch(line); m != nil {
 			ref := reference{name: m[1]}

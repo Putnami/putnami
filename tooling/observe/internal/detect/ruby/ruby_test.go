@@ -173,6 +173,9 @@ gem 'billing', :path => '../engines/billing'
 gem("search", path: "../engines/search", require: false)
 gem "missing", path: "../engines/missing"
 gem "outside", path: "../../elsewhere"
+gem "absolute", path: "/engines/absolute"
+gem "billing_api",
+  path: "../engines/billing_api"
 gem "remote", git: "https://github.com/acme/remote.git"
 
 if ENV["WITH_REPORTS"]
@@ -187,14 +190,27 @@ end
 group :test do
   gem "admin"
 end
+
+%w[one two].each do |name|
+end.each do |name|
+end
+
+path "../gems" do
+  gem "late"
+end
 `,
 		"engines/billing/billing.gemspec":  "Gem::Specification.new { |s| s.name = 'billing' }\n",
 		"engines/search/search.gemspec":    "Gem::Specification.new { |s| s.name = 'search' }\n",
 		"engines/reports/reports.gemspec":  "Gem::Specification.new { |s| s.name = 'reports' }\n",
 		"engines/admin/admin.gemspec":      "Gem::Specification.new { |s| s.name = 'admin' }\n",
 		"gems/audit_log/audit_log.gemspec": "Gem::Specification.new { |s| s.name = 'audit_log' }\n",
+		"gems/late/late.gemspec":           "Gem::Specification.new { |s| s.name = 'late' }\n",
+		// A copy of a gem of another directory, first in path order.
+		"fixtures/audit_log/audit_log.gemspec":    "Gem::Specification.new { |s| s.name = 'audit_log' }\n",
+		"app/engines/absolute/absolute.gemspec":   "Gem::Specification.new { |s| s.name = 'absolute' }\n",
+		"engines/billing_api/billing_api.gemspec": "Gem::Specification.new { |s| s.name = 'billing_api' }\n",
 	})
-	want := []string{"engines/billing", "engines/reports", "engines/search", "gems/audit_log"}
+	want := []string{"engines/billing", "engines/billing_api", "engines/reports", "engines/search", "gems/audit_log", "gems/late"}
 	if deps := got["app"].DependsOn; !reflect.DeepEqual(deps, want) {
 		t.Errorf("app depends on %v, want %v", deps, want)
 	}

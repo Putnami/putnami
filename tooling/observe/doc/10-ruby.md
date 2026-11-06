@@ -50,8 +50,9 @@ end
 
 A component also depends on the local gem its gemspec names in an
 `add_dependency`, `add_runtime_dependency` or `add_development_dependency`.
-A path outside the repository or to no component, a gem of a registry or a
-Git source, and the component itself are no edge.
+An absolute path, a path outside the repository or to no component, a gem
+of a registry or a Git source, and the component itself are no edge. A gem
+entry whose options go on after a trailing comma is read as one line.
 
 In a Rails application whose `checkout` pack lists `pricing`, a change to
 `packs/pricing` marks `packs/checkout` dependent:
@@ -119,10 +120,18 @@ run in one gem both land on the right components. See
 
 ## Limits
 
-- A `Gemfile` and a gemspec are read as text, never evaluated: a gem that a
-  condition's result, a variable, an `eval_gemfile` or a `gemspec` directive
-  declares is no edge, and a gemspec whose name is not a literal string has
-  no name.
+- A `Gemfile` and a gemspec are read as text, never evaluated: a gem entry
+  counts whatever condition surrounds it, a path or a name that a variable or
+  an expression gives is no edge, nor is an `eval_gemfile` or a `gemspec`
+  directive, and a gemspec whose name is not a literal string has no name.
+- A gem name that two gemspecs give, such as a gem and its copy in a test
+  fixture, is the first directory's in path order for a gemspec dependency,
+  and the one within the block's path for a `path` block.
+- A `vendor` directory is skipped at any depth, so a gem under `vendor/gems`
+  is no component.
+- A `Gemfile` at the root makes the root a `ruby` component, even in a
+  repository whose other code is not Ruby, unless another detector names the
+  root with a higher source.
 - Edges from constant references in the code, which `packwerk check` reads,
   are not read, nor packwerk's own `packwerk.yml`.
 - `gems.rb` and `gems.locked`, the other names Bundler accepts, are not read.
