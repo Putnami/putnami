@@ -3,6 +3,8 @@ package gittest
 import (
 	"os"
 	"path/filepath"
+	"sort"
+	"strconv"
 	"strings"
 	"testing"
 )
@@ -106,12 +108,46 @@ func Describe(t testing.TB, dir string) string {
 	section("bare", read("rev-parse", "--is-bare-repository"))
 	section("branch", read("symbolic-ref", "-q", "HEAD"))
 	section("refs", read("for-each-ref", "--format=%(refname) %(objecttype) %(taggername) %(taggeremail) %(contents:subject)"))
-	section("commits", read("log", "--all", "--topo-order", "--format=%T %an <%ae> %cn <%ce> %G?%n%B"))
+	section("commits", describeCommits(read("log", "--all", "--format=%H%x00%T%x00%P%x00%an <%ae> %cn <%ce> %G?%x00%B%x1e")))
 	if read("rev-parse", "--is-bare-repository") == "false" {
 		section("index", read("ls-files", "--stage"))
 		section("untracked", read("ls-files", "--others", "--exclude-standard"))
 	}
 	return out.String()
+}
+
+// describeCommits turns a log of NUL-separated commit ID, tree, parent IDs,
+// identity and message records into one line per commit: its tree, the trees
+// of its parents, its identity and its quoted message, sorted. A commit ID
+// and the order of log depend on the dates of a commit, which a fixture does
+// not pin, so neither appears.
+func describeCommits(log string) string {
+	if strings.HasPrefix(log, "error: ") {
+		return log
+	}
+	type commit struct{ tree, parents, rest string }
+	commits := map[string]commit{}
+	for _, record := range strings.Split(log, "\x1e") {
+		fields := strings.SplitN(strings.TrimLeft(record, "\n"), "\x00", 5)
+		if len(fields) != 5 {
+			continue
+		}
+		commits[fields[0]] = commit{tree: fields[1], parents: fields[2], rest: fields[3] + " " + strconv.Quote(strings.TrimSpace(fields[4]))}
+	}
+	lines := make([]string, 0, len(commits))
+	for _, c := range commits {
+		var parents []string
+		for _, id := range strings.Fields(c.parents) {
+			if parent, ok := commits[id]; ok {
+				parents = append(parents, parent.tree)
+			} else {
+				parents = append(parents, "shallow")
+			}
+		}
+		lines = append(lines, c.tree+" parents ["+strings.Join(parents, " ")+"] "+c.rest)
+	}
+	sort.Strings(lines)
+	return strings.Join(lines, "\n")
 }
 
 // AssertMachineIndependent builds a fixture twice, on this machine and under

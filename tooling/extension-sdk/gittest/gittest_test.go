@@ -160,3 +160,43 @@ func evalSymlinks(t *testing.T, path string) string {
 	}
 	return resolved
 }
+
+// branchesFixture commits on main and on a branch that forks from it, with
+// the branch's commits dated before main's when branchFirst holds, after them
+// otherwise.
+func branchesFixture(t *testing.T, branchFirst bool) string {
+	t.Helper()
+	repo := t.TempDir()
+	commit := func(file, date string) {
+		t.Helper()
+		if err := os.WriteFile(filepath.Join(repo, file), []byte(file+"\n"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		Run(t, repo, "add", "-A")
+		cmd := Command(repo, "commit", "-q", "-m", file)
+		cmd.Env = append(cmd.Env, "GIT_AUTHOR_DATE="+date, "GIT_COMMITTER_DATE="+date)
+		if out, err := cmd.CombinedOutput(); err != nil {
+			t.Fatalf("git commit: %v\n%s", err, out)
+		}
+	}
+	early, late := "2026-01-01T00:00:01+00:00", "2026-01-01T00:00:09+00:00"
+	if !branchFirst {
+		early, late = late, early
+	}
+	Run(t, repo, "init", "-q")
+	commit("root.txt", "2026-01-01T00:00:00+00:00")
+	Run(t, repo, "switch", "-q", "-c", "feature")
+	commit("feature.txt", early)
+	Run(t, repo, "switch", "-q", DefaultBranch)
+	commit("main.txt", late)
+	return repo
+}
+
+// TestDescribeIgnoresTheDatesOfTwoBranches: two builds of one history whose
+// branches interleave differently in time describe the same.
+func TestDescribeIgnoresTheDatesOfTwoBranches(t *testing.T) {
+	requireGit(t)
+	if a, b := Describe(t, branchesFixture(t, true)), Describe(t, branchesFixture(t, false)); a != b {
+		t.Fatalf("Describe depends on commit dates\n--- branch first ---\n%s\n--- main first ---\n%s", a, b)
+	}
+}
