@@ -29,7 +29,9 @@ esac
 curl -fsSL "$INSTALL_URL" | bash -s -- --version "$channel"
 export PATH="$HOME/.putnami/bin:$PATH"
 putnami extensions install --user "@putnami/observe@$channel"
-putnami extensions install --user "@putnami/cloud@$channel"
+if [[ -n "$token" ]]; then
+  putnami extensions install --user "@putnami/cloud@$channel"
+fi
 
 evidence="${RUNNER_TEMP:-${TMPDIR:-/tmp}}/observe-evidence.json"
 args=(observe --evidence "$evidence")

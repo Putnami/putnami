@@ -109,7 +109,7 @@ func observeCall(t *testing.T, r run) string {
 
 func TestTheActionInstallsTheCLIOfTheChannel(t *testing.T) {
 	spectest.Proves(t, feature, "action-installs-the-cli", "the-action-installs-the-cli-of-the-channel")
-	spectest.Proves(t, feature, "action-installs-the-cli", "the-action-installs-both-extensions-in-the-user-scope")
+	spectest.Proves(t, feature, "action-installs-the-cli", "the-action-installs-the-extensions-in-the-user-scope")
 
 	for _, tc := range []struct{ input, channel string }{
 		{"", "stable"},
@@ -117,28 +117,47 @@ func TestTheActionInstallsTheCLIOfTheChannel(t *testing.T) {
 		{"1.4.2", "1.4.2"},
 	} {
 		t.Run(tc.channel, func(t *testing.T) {
-			r := runAction(t, map[string]string{"PUTNAMI_OBSERVE_CHANNEL": tc.input})
+			r := runAction(t, map[string]string{
+				"PUTNAMI_OBSERVE_CHANNEL": tc.input,
+				"PUTNAMI_OBSERVE_TOKEN":   "cloud-token",
+			})
 			observeCall(t, r)
-			want := []string{
+			expectCalls(t, r,
 				"curl -fsSL https://putnami.dev/install.sh",
-				"installer --version " + tc.channel,
-				"putnami extensions install --user @putnami/observe@" + tc.channel,
-				"putnami extensions install --user @putnami/cloud@" + tc.channel,
-			}
-			for i, prefix := range want {
-				if i >= len(r.log) || !strings.HasPrefix(r.log[i], prefix) {
-					t.Fatalf("call %d = %q, want prefix %q; calls %q", i, at(r.log, i), prefix, r.log)
-				}
-			}
+				"installer --version "+tc.channel,
+				"putnami extensions install --user @putnami/observe@"+tc.channel,
+				"putnami extensions install --user @putnami/cloud@"+tc.channel,
+				"putnami observe ",
+			)
 		})
 	}
 }
 
-func at(lines []string, i int) string {
-	if i < len(lines) {
-		return lines[i]
+func TestTheCloudExtensionInstallsOnlyWithAToken(t *testing.T) {
+	spectest.Proves(t, feature, "action-installs-the-cli", "the-cloud-extension-installs-only-with-a-token")
+
+	r := runAction(t, map[string]string{"PUTNAMI_OBSERVE_PUBLISH": "true"})
+	observeCall(t, r)
+	expectCalls(t, r,
+		"curl -fsSL https://putnami.dev/install.sh",
+		"installer --version stable",
+		"putnami extensions install --user @putnami/observe@stable",
+		"putnami observe ",
+	)
+}
+
+// expectCalls checks that the logged calls are exactly the given prefixes,
+// in order.
+func expectCalls(t *testing.T, r run, prefixes ...string) {
+	t.Helper()
+	if len(r.log) != len(prefixes) {
+		t.Fatalf("calls = %q, want %d calls", r.log, len(prefixes))
 	}
-	return ""
+	for i, prefix := range prefixes {
+		if !strings.HasPrefix(r.log[i], prefix) {
+			t.Fatalf("call %d = %q, want prefix %q; calls %q", i, r.log[i], prefix, r.log)
+		}
+	}
 }
 
 func TestAWindowsRunnerFailsBeforeTheInstall(t *testing.T) {

@@ -38,7 +38,7 @@ The action reads the run's `GITHUB_TOKEN` only when `publish` is on, to set the 
 
 | Input | Default | Meaning |
 |---|---|---|
-| `token` | empty | Putnami Cloud workspace token with the `delivery.ingest` scope. When set, the step uploads the evidence. |
+| `token` | empty | Putnami Cloud workspace token with the `delivery.ingest` scope. When set, the step installs `@putnami/cloud` and uploads the evidence. |
 | `publish` | `true` with a token, `false` without | `true` posts the commit status and the summary note on the pull request; `false` does not. |
 | `junit` | discovery | Comma-separated JUnit XML or TRX paths or glob patterns. Empty finds the reports by their content. |
 | `coverage` | discovery | Comma-separated LCOV, Cobertura, Clover, JaCoCo or Go cover paths or glob patterns. |
