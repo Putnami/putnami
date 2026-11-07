@@ -1,0 +1,9 @@
+{
+  "change": {
+    "base": "main",
+    "head": "fix-issue-42",
+    "headCommit": "55e2a8e42"
+  },
+  "title": "feat(cli): route collaboration contracts",
+  "draft": true
+}

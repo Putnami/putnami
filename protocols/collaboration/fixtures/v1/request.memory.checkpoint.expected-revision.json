@@ -1,0 +1,14 @@
+{
+  "mission": "42",
+  "precondition": {
+    "expectedRevision": "a1b2c3d"
+  },
+  "idempotencyKey": "42:checkpoint:4",
+  "content": "Task 2 gated; task 3 next.",
+  "evidence": [
+    {
+      "kind": "gate",
+      "locator": ".putnami/sessions/x/session.json"
+    }
+  ]
+}

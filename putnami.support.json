@@ -405,7 +405,7 @@
     {
       "id": "go.putnami.dev/protocol/collaboration",
       "kind": "protocol",
-      "status": "preview"
+      "status": "stable"
     },
     {
       "id": "go.putnami.dev/protocol/config",

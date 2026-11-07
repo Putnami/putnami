@@ -176,24 +176,52 @@ implementation proves the rest in its own tests:
 - [ADR 0005 — `missions.status` reads a mission's sessions](doc/adr/0005-missions-status-reads-a-missions-sessions.md):
   the optional read of a mission's view and sessions. It amends ADR 0003
   decisions 1 and 8.
+- [ADR 0006 — Version 1 of the contracts is stable](doc/adr/0006-version-1-is-stable.md):
+  the `stable` status from 0.5.0, what never changes within a version, the
+  frozen version 1 corpus and the support window. It amends ADR 0002
+  decision 2.
+
+## Stability
+
+Version 1 of every contract is `stable` from release 0.5.0
+([ADR 0006](doc/adr/0006-version-1-is-stable.md)).
+
+- **Never changes within a version:** every document a version defines. A
+  request, result, response, envelope, binding block or provider declaration
+  that is valid under version 1 stays valid and keeps its meaning. A new
+  member, a new required operation, a narrowed value or a new outcome opens
+  version 2 of its contract.
+- **May change within a version:** new optional operations and their
+  documents, the Go helpers (`Serve`, `ReadProviderOffer`, `providertest`)
+  before 1.0, and the guides.
+- **How long a version is supported:** until 1.0, a minor release may end a
+  version only with a migration documented in its release notes. From 1.0, a
+  version stays readable for 12 months after its successor ships.
+
+[`fixtures/v1/`](fixtures/v1) holds version 1 documents as written on
+2026-11-07: a binding block, the provider declaration of each contract, and
+requests, results, responses and envelopes of each contract.
+`frozen_v1_test.go` parses every file and pins its SHA-256. A change to one of
+these files fails the test: open a new contract version instead.
 
 ## Support
 
-- **Status:** `preview`, recorded as
-  `{"id": "go.putnami.dev/protocol/collaboration", "kind": "protocol", "status": "preview"}`
+- **Status:** `stable` from release 0.5.0, recorded as
+  `{"id": "go.putnami.dev/protocol/collaboration", "kind": "protocol", "status": "stable"}`
   in the workspace-root [`putnami.support.json`](../../putnami.support.json)
-  catalog (contract: [`protocols/support`](../support/README.md)).
+  catalog (contract: [`protocols/support`](../support/README.md)), and pinned
+  in `reviewedStableSubjects` of `protocols/support`.
 - **Owner:** the Putnami maintainers, as repository owners of `protocols/`.
-- **Evidence:** the CLI routes every collaboration call through this module;
-  `@putnami/local-collaboration`, `@putnami/github-collaboration`,
+- **Consumers:** the CLI routes every collaboration call through this module.
+  Putnami Cloud, a separate repository, requires the published module: its
+  source domain serves the tasks contract on GitHub, Jira and Linear, and its
+  intelligence domain reads memory through it.
+- **Evidence:** `@putnami/local-collaboration`, `@putnami/github-collaboration`,
   `@putnami/gitlab-collaboration`, `@putnami/jira-collaboration`,
-  `@putnami/linear-collaboration` and
-  `@putnami/memory-store` run the shared `providertest` scenarios; the fixture corpus, the drift tests and the
-  catalog tests pin every document.
-- **What may still change:** new optional operations, the Go helpers (`Serve`,
-  `ReadProviderOffer`, `providertest`) and the guides. The version 1 documents
-  do not change: a new member is a new contract version
-  ([ADR 0002](doc/adr/0002-the-contracts-are-published-as-preview.md)).
-- **Why not `stable`:** the CLI route and every provider live in this
-  repository. No consumer across a boundary this repository does not control
-  uses the contracts yet.
+  `@putnami/linear-collaboration` and `@putnami/memory-store` run the shared
+  `providertest` scenarios; the catalog tests pin each contract version; the
+  fixture corpus, the frozen version 1 corpus and the drift tests pin every
+  document.
+- **Parity:** there is no second implementation of the documents. Every
+  provider, in any language, speaks the JSON the schemas define and passes
+  the shared scenarios.
