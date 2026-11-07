@@ -48,7 +48,7 @@
     },
     {
       "id": "short-log-summary",
-      "text": "The text summary names the CI and repository, the commit, the base and the count of changed files, then the changed components and their dependents, the coverage of the changed lines, the count of dependency changes with the count of license changes and of vulnerabilities introduced and fixed, then the warnings and errors. It lists no file, report, spec, decision or per-component test: --details prints the detailed summary, and --output=json and the evidence document keep the whole analysis."
+      "text": "The text summary names the CI and repository, the commit, the base and the count of changed files, then the changed components and their dependents, the changed-line coverage, the count of dependency changes with the license changes, the vulnerabilities introduced and fixed and the changes an SBOM side leaves unknown, then the warnings, errors and publish diagnostics. --details prints the detailed summary; --output=json and the evidence document keep the whole analysis."
     },
     {
       "id": "next-command",
@@ -56,7 +56,7 @@
     },
     {
       "id": "laptop-repository-key",
-      "text": "Outside a CI, the subject is read from the origin remote: a github.com or GitLab remote names the provider, the host and the repository path, and the numeric project id comes from the code host API (GitHub GET /repos/{owner}/{repo}, GitLab GET /projects/{path}), with GITHUB_TOKEN or PUTNAMI_GITLAB_TOKEN when one is set. A remote the API does not answer leaves the id empty with a diagnostic that names the token to set. The head is HEAD and the branch the current one."
+      "text": "Outside a CI, the subject is read from the origin remote: a github.com or GitLab remote names the provider, the host and the repository path. With --upload or --open, the numeric project id comes from the code host API (GitHub GET /repos/{owner}/{repo}, GitLab GET /projects/{path}), with GITHUB_TOKEN or PUTNAMI_GITLAB_TOKEN when set; an id the API does not answer is a diagnostic that names the token. The head is HEAD and the branch the current one."
     },
     {
       "id": "laptop-base",

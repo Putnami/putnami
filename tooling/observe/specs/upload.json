@@ -29,11 +29,11 @@
     },
     {
       "id": "open-signs-in-and-uploads",
-      "text": "--open uploads as --upload does and passes --sign-in to the reporter, which uses a token or a stored session when one exists and signs the person in otherwise. Observe prints the report URL the reporter answers on standard error, and outside a CI opens it in the browser; in a CI it opens nothing."
+      "text": "--open uploads as --upload does. Outside a CI it passes --sign-in to the reporter, which uses a token or a stored session when one exists and signs the person in otherwise, then observe prints the report URL the reporter answers on standard error and opens it in the browser. In a CI it passes no --sign-in and opens nothing."
     },
     {
       "id": "nothing-leaves-without-upload-or-open",
-      "text": "Without --upload or --open, observe runs no reporter and sends nothing off the machine; --publish still needs --upload."
+      "text": "Without --upload or --open, observe runs no reporter and calls no code host API, so nothing leaves the machine; --publish still needs --upload."
     }
   ]
 }
