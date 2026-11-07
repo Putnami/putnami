@@ -22,7 +22,10 @@ them:
 
 The extension is **experimental** and opt-in: a project is validated only when
 it declares `/tooling/sdd-extension` in its `putnami.json` `extensions` array.
-The wire formats may change without a migration path.
+The architecture files it validates are preview: a version 1 manifest,
+baseline or waivers file stays valid, while finding IDs and detector coverage
+may still change
+([Stability](../../../protocols/architecture/README.md#stability)).
 
 ## Authoring an architecture manifest
 

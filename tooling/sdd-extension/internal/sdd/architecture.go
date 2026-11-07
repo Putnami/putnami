@@ -124,7 +124,7 @@ func BuildArchitectureValidationResult(ws *workspace.Workspace, baselineRef stri
 func BuildArchitectureWorktreeValidationResult(ws *workspace.Workspace) (ArchitectureValidationReport, error) {
 	result := EvaluateWorkspace(ws, EvaluationOptions{WorktreeOnly: true, Today: time.Now().UTC()})
 	report := architectureValidationReport(result)
-	report.Diagnostics = append(report.Diagnostics, unpromisedFindingIDWarnings(result.DebtFiles)...)
+	report.Diagnostics = copyArchitectureDiagnostics(append(report.Diagnostics, unpromisedFindingIDWarnings(result.DebtFiles)...))
 	report.DiagnosticCounts = countArchitectureDiagnostics(report.Diagnostics)
 	return report, architectureEvaluationError("architecture validate", result, report)
 }

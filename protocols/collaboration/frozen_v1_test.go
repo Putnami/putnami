@@ -16,10 +16,9 @@ import (
 	"go.putnami.dev/protocol/features/spectest"
 )
 
-// frozenV1Digests pins every document of fixtures/v1, written on 2026-11-07
-// when version 1 became stable (ADR 0006). A version 1 document never changes:
-// when this map or a file under fixtures/v1 needs an edit, the change opens a
-// new contract version instead.
+// frozenV1Digests pins every document of fixtures/v1. A version 1 document
+// never changes: an edit to this map or to a file under fixtures/v1 opens a new
+// contract version instead.
 var frozenV1Digests = map[string]string{
 	"bindings.full.json":                               "d5f3c71756bd3a62959c5338940d0d4041f114dbc1d4eff44cc67a1f511188c2",
 	"envelope.tasks-find-ok.json":                      "5d20ddf3c9c0f0b0a49645e766f570b35bc386a2cda6be73c824847b48c5ba57",

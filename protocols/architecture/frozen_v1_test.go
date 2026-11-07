@@ -14,11 +14,10 @@ import (
 	"go.putnami.dev/protocol/features/spectest"
 )
 
-// frozenV1Digests pins every authored document of fixtures/v1, written on
-// 2026-11-07 when the module became preview (ADR 0003). A valid version 1
-// manifest, baseline or waivers file stays valid: when this map or a file under
-// fixtures/v1 needs an edit, the change opens protocol version 2 with a
-// migration command instead.
+// frozenV1Digests pins every authored document of fixtures/v1. A valid version
+// 1 manifest, baseline or waivers file stays valid: an edit to this map or to a
+// file under fixtures/v1 opens protocol version 2 with a migration command
+// instead.
 var frozenV1Digests = map[string]string{
 	"baseline.json":               "3f8bb16ca2a8916483b3115827bdbaab2941b7a75f505b9c0c3c634d664744f9",
 	"manifest.consumer.json":      "3927e5a01365126da0640a37f9d28d5baec28aa2f58c83f15514274498f95972",

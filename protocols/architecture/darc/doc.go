@@ -61,9 +61,9 @@
 //
 // # Status
 //
-// `go.putnami.dev/protocol/architecture` is experimental: its wire format may
-// change without a migration path, and this package's API is built on its
-// types, so it moves with it. Use it behind the same explicit opt-in.
+// `go.putnami.dev/protocol/architecture` is preview: a version 1 manifest stays
+// valid, but its Go types, finding IDs and detector coverage may change. This
+// package's API is built on those types, so it moves with them.
 //
 // # Where the evidence half lives
 //

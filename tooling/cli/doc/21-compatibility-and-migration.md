@@ -25,8 +25,10 @@ document fails the build.
 | Pre-release version suffix | Published npm/Go versions, image tags, locks, release sets | `<sha>[-<dirty>]` (prior releases) and `<commitTime>-<sha>[-<dirty>]` (current) both read | Nothing to migrate: every reader treats the suffix as an opaque semver identifier; only native `@latest` ordering needs the current shape. |
 | Infra requirements | `<project>/infra/requirements.json`, `<workload>/infra/runtime.json` | exactly 1 (currently 2) | Migrate the manifest. See [protocols/infra](../../../protocols/infra/README.md#migrating-a-workspace-from-v1-to-v2). |
 | Command surface | `command-surface.json`, named by the `command-surface` option of `@putnami/go` `validate` | every version from 1 to the reader's own (currently 1) | Newer: upgrade `@putnami/go`. Until then, `validate` refuses a newer committed document and compares nothing with a newer released one. |
+| Collaboration documents | The `options.collaboration` binding block, a provider's `providers` declaration, and every request, result and envelope | exactly the bound contract version (currently 1) | Until 1.0, a minor release ends a version only with a migration in its release notes. From 1.0, a version stays readable for 12 months after its successor ships. See [Stability](../../../protocols/collaboration/README.md#stability). |
+| Architecture documents | `putnami.architecture.json`, `architecture.baseline.json`, `architecture.waivers.json` | exactly 1 | Version 2 ships with `putnami architecture migrate`, under the same window. Finding IDs and detector coverage have no window. See [Stability](../../../protocols/architecture/README.md#stability). |
 
-Three of these windows are ranges and three are single values. That is a
+Some of these windows are ranges and some are single values. That is a
 deliberate split, not an inconsistency:
 
 - a **range** is affordable when the newer version's vocabulary is *additive*
