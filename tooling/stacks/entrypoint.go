@@ -10,21 +10,12 @@ import (
 	"go.putnami.dev/sdk/extension/runtimeinfo"
 )
 
-// Main runs a stack extension's runtime: the runtime handshake, the workspace
-// probe and the input-resolve control calls, then the lint, test and build
-// jobs. version is the runtime version the build stamps.
-func Main(s Stack, version string) {
-	if err := s.Entrypoint(os.Args[1:], os.Stdin, os.Stdout, version, func(jobs map[string]cli.JobFunc) {
-		cli.RunSubcommand(jobs, cli.WithSkipEmptyProject(false))
-	}); err != nil {
-		// A control call's stdout carries exactly one document: errors go to
-		// stderr.
-		fmt.Fprintf(os.Stderr, "%s: %v\n", s.Extension, err)
-		os.Exit(1)
-	}
-}
-
-// Entrypoint dispatches one invocation; runJobs runs the job dispatcher.
+// Entrypoint dispatches one invocation of a stack extension's runtime: the
+// runtime handshake, the workspace probe and the input-resolve control calls,
+// then the lint, test and build jobs through runJobs, the SDK's job
+// dispatcher. version is the runtime version the build stamps. A control
+// call's stdout carries exactly one document, so the caller writes a returned
+// error to stderr.
 func (s Stack) Entrypoint(args []string, stdin io.Reader, stdout io.Writer, version string, runJobs func(map[string]cli.JobFunc)) error {
 	if handled, err := runtimeinfo.Handle(args, stdout, s.Extension, version); handled {
 		return err

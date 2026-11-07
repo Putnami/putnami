@@ -1,6 +1,6 @@
 # Design note: a shared core for stack extensions
 
-- **Status**: proposed
+- **Status**: accepted ([ADR 0001](adr/0001-one-extension-per-stack-on-a-shared-core.md))
 - **Date**: 2026-11-07
 - **Issue**: #933, in the epic #951
 
@@ -43,7 +43,7 @@ library, the **stack core**, `tooling/stacks`
    @putnami/rust         @putnami/php            @putnami/ruby
    manifest              manifest                manifest
    profile.json          profile.json            profile.json
-   cmd: stacks.Main      cmd: stacks.Main        cmd: stacks.Main
+   cmd: Entrypoint       cmd: Entrypoint         cmd: Entrypoint
         │
         ▼ reuses
    go.putnami.dev/tooling/observe/detect/cargo   (public, moved from internal)
@@ -101,8 +101,12 @@ The Rust reference profile:
   },
   "inputs": {
     "sources": ["src/**", "tests/**", "benches/**", "examples/**", "build.rs"],
-    "manifests": ["Cargo.toml", "{root}/Cargo.toml", "{root}/.config/nextest.toml"],
-    "lockfiles": ["{root}/Cargo.lock"]
+    "manifests": [
+      "Cargo.toml", ".cargo/config.toml", "rustfmt.toml", ".rustfmt.toml", "clippy.toml", ".clippy.toml",
+      "{root}/Cargo.toml", "{root}/.cargo/config.toml", "{root}/.config/nextest.toml",
+      "{root}/rustfmt.toml", "{root}/.rustfmt.toml", "{root}/clippy.toml", "{root}/.clippy.toml"
+    ],
+    "lockfiles": ["Cargo.lock", "{root}/Cargo.lock"]
   },
   "tasks": {
     "lint": {
@@ -114,8 +118,7 @@ The Rust reference profile:
     },
     "test": {
       "steps": [
-        ["cargo", "llvm-cov", "nextest", "--package", "{component}", "--profile", "ci",
-         "--lcov", "--output-path", "{output}/lcov.info"]
+        ["cargo", "llvm-cov", "nextest", "--package", "{component}", "--profile", "ci", "--lcov", "--output-path", "{output}/lcov.info"]
       ],
       "inputs": ["sources", "manifests", "lockfiles"],
       "reports": {
@@ -124,7 +127,9 @@ The Rust reference profile:
       }
     },
     "build": {
-      "steps": [["cargo", "build", "--package", "{component}", "--locked"]],
+      "steps": [
+        ["cargo", "build", "--package", "{component}", "--locked"]
+      ],
       "inputs": ["sources", "manifests", "lockfiles"]
     }
   }
@@ -141,7 +146,6 @@ The Rust reference profile:
 | `tasks.<task>.steps` | The commands the task runs in order, each an argument vector run in the project directory, with no shell. `{root}` is the stack root, `{component}` the detector's name for the component, `{output}` the task's output directory under the project. |
 | `tasks.<task>.inputs` | The input sets the task reads. `lint` reads fewer than `test`: a lockfile change does not rerun it. |
 | `tasks.<task>.reports` | The JUnit and coverage reports the task reads back, with the coverage format. The core copies each into `{output}` as soon as the task ends. |
-| `tasks.<task>.outputs` | The paths under the project the task writes, cached and restored like any task output. |
 
 The toolchain files are inputs of every task, whatever its input sets.
 
@@ -163,7 +167,7 @@ whole; it never merges into an array.
   "options": {
     "@putnami/rust": {
       "tasks": {
-        "test": { "steps": [["cargo", "nextest", "run", "--package", "{component}", "--profile", "ci"]] }
+        "test": { "steps": [["cargo", "llvm-cov", "nextest", "--package", "{component}", "--profile", "ci", "--features", "slow", "--lcov", "--output-path", "{output}/lcov.info"]] }
       },
       "inputs": { "sources": ["src/**", "fixtures/**"] }
     }
@@ -203,7 +207,7 @@ root; a detector that names any other root leaves the component out with
 |---|---|
 | `putnami.extension.json` | The manifest: the runtime, the workspace adapter with the profile's markers, the `lint`, `test` and `build` commands and their tasks, the three input selectors. |
 | `profile.json` | The stack profile, embedded in the runtime. |
-| `cmd/putnami-<stack>/main.go` | `stacks.Main` with the extension's name, its profile and its detector: the observe detector that names the components and their edges. |
+| `cmd/putnami-<stack>/main.go` | `Stack.Entrypoint` of the stack the extension builds from its name, its profile and its detector: the observe detector that names the components and their edges. |
 | `doc/`, `putnami.features.json`, `specs/` | The stack's own docs and requirements. |
 
 The manifests repeat one shape. The core ships a test kit that every stack
@@ -254,9 +258,11 @@ and two machines with two versions share entries. A Rust channel name such as
 After the last step, the task reads every report its profile names with the
 evidence readers. A JUnit failure, an error, or a step that exits non-zero
 fails the task; the report's failed cases name the failure. The totals and
-the coverage reach the task result. A test task whose profile names a JUnit
-path and finds no report fails with `stacks.report_missing`: a command that
-ran nothing is not a pass. The copied reports are task outputs, so a cache hit
+the coverage reach the task result. A JUnit or coverage pattern of the profile
+that matches no report fails the task with `stacks.report_missing`: a command
+that ran nothing is not a pass. The reports a task reads outside its own
+output directory are removed before its steps, so a report another component
+or an earlier run left is never read as this run's. The copied reports are task outputs, so a cache hit
 restores them and reads the same totals.
 
 ## What stays out

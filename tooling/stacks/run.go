@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	diag "go.putnami.dev/protocol/diagnostic"
@@ -114,7 +115,7 @@ func (s Stack) run(ctx context.Context, in runInput, emit reporter) (string, map
 	env := os.Environ()
 	expected, err := profile.Toolchain.ExpectedVersion(in.workspaceRoot, filepath.ToSlash(projectRel), meta.Root)
 	if err != nil {
-		return statusFailed, nil, failWith(CodeToolchainMismatch, "%v", err)
+		return statusFailed, nil, failWith(CodeToolchainUnpinned, "the expected toolchain version cannot be read: %v", err)
 	}
 	machine, err := profile.Toolchain.MachineVersion(ctx, in.projectAbs, env)
 	if errors.Is(err, ErrToolchainMissing) {
@@ -142,6 +143,13 @@ func (s Stack) run(ctx context.Context, in runInput, emit reporter) (string, map
 		return statusFailed, nil, fmt.Errorf("lock the stack root %s: %w", meta.Root, err)
 	}
 	defer func() { _ = lock.Release() }()
+
+	// A report left by another component of the root, or by an earlier
+	// run, must not pass for this run's: the reports outside the task's own
+	// output are removed before the steps, under the lock.
+	if err := removeReports(t.Reports, in.projectAbs, rootAbs); err != nil {
+		return statusFailed, nil, err
+	}
 
 	vars := map[string]string{"{root}": rootAbs, "{component}": meta.Component, "{project}": in.projectAbs, "{output}": outDir}
 	for _, step := range t.Steps {
@@ -245,4 +253,35 @@ func copyFile(src, dst string) error {
 		return err
 	}
 	return os.WriteFile(dst, data, 0o644) //nolint:gosec // a copied report
+}
+
+// removeReports deletes the files the report patterns match outside the
+// task's output directory: under the project, or under the stack root.
+func removeReports(r *Reports, projectAbs, rootAbs string) error {
+	if r == nil {
+		return nil
+	}
+	patterns := slices.Clone(r.JUnit)
+	for _, c := range r.Coverage {
+		patterns = append(patterns, c.Paths...)
+	}
+	for _, p := range patterns {
+		if strings.HasPrefix(p, "{output}/") {
+			continue
+		}
+		base, rest := projectAbs, p
+		if r, ok := strings.CutPrefix(p, "{root}/"); ok {
+			base, rest = rootAbs, r
+		}
+		matches, err := globFiles(base, rest)
+		if err != nil {
+			return err
+		}
+		for _, m := range matches {
+			if err := os.Remove(m); err != nil && !errors.Is(err, os.ErrNotExist) {
+				return fmt.Errorf("remove the stale report %s: %w", m, err)
+			}
+		}
+	}
+	return nil
 }

@@ -189,13 +189,14 @@ func (s Stack) Selectors() []string {
 // inputs changes the answer.
 func (s Stack) ResolveInputs(root string, request wsproto.InputResolveRequest) wsproto.InputResolveResult {
 	result := wsproto.InputResolveResult{Version: wsproto.InputResolveProtocolVersion, Extension: s.Extension}
+	ownRoots := s.ownRoots(root, request.Inputs)
 	for _, q := range request.Inputs {
-		result.Inputs = append(result.Inputs, s.answer(root, q))
+		result.Inputs = append(result.Inputs, s.answer(root, q, ownRoots[q.Project]))
 	}
 	return result
 }
 
-func (s Stack) answer(root string, q wsproto.InputResolveQuery) wsproto.InputResolveAnswer {
+func (s Stack) answer(root string, q wsproto.InputResolveQuery, ownRoot bool) wsproto.InputResolveAnswer {
 	fail := func(format string, args ...any) wsproto.InputResolveAnswer {
 		msg := fmt.Sprintf(format, args...)
 		if len(msg) > 4000 {
@@ -217,7 +218,7 @@ func (s Stack) answer(root string, q wsproto.InputResolveQuery) wsproto.InputRes
 	// A component that is its own stack root reads its root files in its
 	// own directory; for one under the workspace root's build they are the
 	// manifest's workspace input.
-	if s.ownRoot(root, q.Project) {
+	if ownRoot {
 		for _, r := range rootPatterns {
 			patterns = appendNew(patterns, r)
 		}
@@ -246,17 +247,26 @@ func (s Stack) answer(root string, q wsproto.InputResolveQuery) wsproto.InputRes
 	}
 }
 
-// ownRoot reports whether the project at projectRel is its own stack root:
-// the detector answers so for the project.
-func (s Stack) ownRoot(root, projectRel string) bool {
-	if projectRel == "." || projectRel == "" {
-		return true
-	}
-	components, _ := s.Detect(root, wsproto.ProbeRequest{Version: wsproto.ProbeProtocolVersion, Extension: s.Extension, Paths: []string{projectRel}})
-	for _, c := range components {
-		if c.Path == projectRel {
-			return c.Root == c.Path
+// ownRoots reports, for each asked project, whether it is its own stack
+// root, with one detector run for the whole request. The workspace root is
+// always its own.
+func (s Stack) ownRoots(root string, queries []wsproto.InputResolveQuery) map[string]bool {
+	out := map[string]bool{}
+	var paths []string
+	for _, q := range queries {
+		if q.Project == "." || q.Project == "" {
+			out[q.Project] = true
+			continue
 		}
+		paths = appendNew(paths, q.Project)
 	}
-	return false
+	if len(paths) == 0 {
+		return out
+	}
+	slices.Sort(paths)
+	components, _ := s.Detect(root, wsproto.ProbeRequest{Version: wsproto.ProbeProtocolVersion, Extension: s.Extension, Paths: paths})
+	for _, c := range components {
+		out[c.Path] = c.Root == c.Path
+	}
+	return out
 }

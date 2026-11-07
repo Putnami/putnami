@@ -165,13 +165,26 @@ func globFiles(base, pattern string) ([]string, error) {
 		}
 		return regularFiles(matches), nil
 	}
+	// Walk only below the pattern's literal prefix: "src/**" walks src/,
+	// never the build directory beside it.
+	start := base
+	segments := strings.Split(pattern, "/")
+	for _, seg := range segments[:len(segments)-1] {
+		if seg == "**" || strings.ContainsAny(seg, "*?[") {
+			break
+		}
+		start = filepath.Join(start, seg)
+	}
+	if info, err := os.Stat(start); err != nil || !info.IsDir() {
+		return nil, nil
+	}
 	var out []string
-	err := filepath.WalkDir(base, func(p string, entry os.DirEntry, err error) error {
+	err := filepath.WalkDir(start, func(p string, entry os.DirEntry, err error) error {
 		if err != nil {
 			return nil
 		}
 		if entry.IsDir() {
-			if p != base && (entry.Name() == ".git" || entry.Name() == ".putnami") {
+			if p != start && (entry.Name() == ".git" || entry.Name() == ".putnami") {
 				return filepath.SkipDir
 			}
 			return nil

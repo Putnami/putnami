@@ -102,6 +102,9 @@ func TestCheckManifestReportsEachDrift(t *testing.T) {
 		"markers": {func(m map[string]any) {
 			obj(m, "workspace")["markers"] = []any{"Cargo.toml", "rust-toolchain"}
 		}, "workspace.markers"},
+		"adapter inputs": {func(m map[string]any) {
+			obj(m, "workspace")["inputs"] = []any{"Cargo.toml"}
+		}, "toolchain file rust-toolchain"},
 		"selectors": {func(m map[string]any) { obj(m, "runtime")["inputSelectors"] = []any{"rust:lint"} }, "inputSelectors"},
 		"upstream": {func(m map[string]any) {
 			obj(m, "commands", "lint")["run"].([]any)[0].(map[string]any)["dependsOn"] = []any{}

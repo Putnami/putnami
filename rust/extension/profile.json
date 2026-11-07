@@ -11,7 +11,11 @@
   },
   "inputs": {
     "sources": ["src/**", "tests/**", "benches/**", "examples/**", "build.rs"],
-    "manifests": ["Cargo.toml", "{root}/Cargo.toml", "{root}/.config/nextest.toml", "{root}/rustfmt.toml", "{root}/clippy.toml"],
+    "manifests": [
+      "Cargo.toml", ".cargo/config.toml", "rustfmt.toml", ".rustfmt.toml", "clippy.toml", ".clippy.toml",
+      "{root}/Cargo.toml", "{root}/.cargo/config.toml", "{root}/.config/nextest.toml",
+      "{root}/rustfmt.toml", "{root}/.rustfmt.toml", "{root}/clippy.toml", "{root}/.clippy.toml"
+    ],
     "lockfiles": ["Cargo.lock", "{root}/Cargo.lock"]
   },
   "tasks": {

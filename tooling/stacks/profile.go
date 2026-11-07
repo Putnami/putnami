@@ -90,8 +90,6 @@ type Task struct {
 	Inputs []string `json:"inputs"`
 	// Reports are the reports the task reads back.
 	Reports *Reports `json:"reports,omitempty"`
-	// Outputs are project-relative paths the task writes.
-	Outputs []string `json:"outputs,omitempty"`
 }
 
 // Reports are the report paths of a task.
@@ -249,11 +247,6 @@ func (t Task) validate(sets map[string][]string) error {
 			}
 		}
 	}
-	for i, o := range t.Outputs {
-		if err := validatePattern(o, false); err != nil {
-			return fmt.Errorf("outputs[%d]: %w", i, err)
-		}
-	}
 	return nil
 }
 
@@ -264,7 +257,7 @@ func validatePattern(pattern string, rooted bool) error {
 	if rooted {
 		rest = strings.TrimPrefix(pattern, "{root}/")
 	}
-	if rest == "" || strings.HasPrefix(rest, "/") || strings.Contains(rest, "\\") || strings.Contains(rest, "{") {
+	if rest == "" || strings.HasPrefix(rest, "/") || strings.HasPrefix(rest, "!") || strings.Contains(rest, "\\") || strings.Contains(rest, "{") {
 		return fmt.Errorf("%q is not a relative slash pattern", pattern)
 	}
 	for _, seg := range strings.Split(rest, "/") {

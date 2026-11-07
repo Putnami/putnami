@@ -184,9 +184,18 @@ func (t Toolchain) Compare(expected Expected, machine string) Verdict {
 	if !IsExact(expected.Version) {
 		return Verdict{Code: CodeToolchainUnpinned, Message: fmt.Sprintf("%s states %q, which names no exact version (machine: %s): the cache key carries no toolchain version", expected.Source, expected.Version, machine)}
 	}
-	if strings.TrimPrefix(expected.Version, "v") == strings.TrimPrefix(machine, "v") {
+	if versionMatches(expected.Version, machine) {
 		return Verdict{}
 	}
 	msg := fmt.Sprintf("%s expects version %s, the machine has %s; install or select %s, or set toolchain.check to warn", expected.Source, expected.Version, machine, expected.Version)
 	return Verdict{Code: CodeToolchainMismatch, Fail: t.Check != CheckWarn, Message: msg}
+}
+
+// versionMatches reports whether the machine's version is the expected one:
+// equal, or, for an expected version with fewer components such as a rustup
+// "1.82" channel, the release that version names (1.82.0, 1.82.3).
+func versionMatches(expected, machine string) bool {
+	e := strings.TrimPrefix(expected, "v")
+	m := strings.TrimPrefix(machine, "v")
+	return e == m || strings.HasPrefix(m, e+".")
 }

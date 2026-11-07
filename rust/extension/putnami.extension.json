@@ -151,7 +151,10 @@
         "stackRoot": {
           "from": "workspace",
           "files": [
+            ".cargo/config.toml",
+            ".clippy.toml",
             ".config/nextest.toml",
+            ".rustfmt.toml",
             "Cargo.toml",
             "clippy.toml",
             "rust-toolchain",
@@ -208,7 +211,10 @@
         "stackRoot": {
           "from": "workspace",
           "files": [
+            ".cargo/config.toml",
+            ".clippy.toml",
             ".config/nextest.toml",
+            ".rustfmt.toml",
             "Cargo.lock",
             "Cargo.toml",
             "clippy.toml",
@@ -266,7 +272,10 @@
         "stackRoot": {
           "from": "workspace",
           "files": [
+            ".cargo/config.toml",
+            ".clippy.toml",
             ".config/nextest.toml",
+            ".rustfmt.toml",
             "Cargo.lock",
             "Cargo.toml",
             "clippy.toml",

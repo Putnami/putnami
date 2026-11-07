@@ -226,11 +226,13 @@ func TestRunFailsOnAFailedTestAMismatchAndAMissingReport(t *testing.T) {
 	if status, _, rec := runTask(t, testProfileWithLcov(t), root, TaskTest); status != statusOK || rec.codes() != "warning:"+CodeToolchainMismatch {
 		t.Errorf("warn lets the task run: %s %v", status, rec.diags)
 	}
+	// A report another run left at the stack root is removed before the
+	// steps: a step that writes none fails, it does not read the old one.
+	if _, err := os.Stat(filepath.Join(root, "target/junit.xml")); err != nil {
+		t.Fatalf("the previous run left its report: %v", err)
+	}
 
 	writeFile(t, root, "crates/api/putnami.json", `{"options": {"@putnami/rust": {"toolchain": {"check": "warn"}, "tasks": {"test": {"steps": [["true"]]}}}}}`)
-	if err := os.RemoveAll(filepath.Join(root, "target")); err != nil {
-		t.Fatal(err)
-	}
 	if status, _, rec := runTask(t, s0(t), root, TaskTest); status != statusFailed || !strings.Contains(rec.codes(), "error:"+CodeReportMissing) {
 		t.Errorf("a test that writes no report fails: %s %v", status, rec.diags)
 	}

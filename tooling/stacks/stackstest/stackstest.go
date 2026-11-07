@@ -44,6 +44,18 @@ func CheckManifest(t testing.TB, path string, s stacks.Stack) {
 	if got, want := sorted(doc.Workspace.Markers), sorted(s.Profile.Markers); !reflect.DeepEqual(got, want) {
 		t.Errorf("workspace.markers = %v, want the profile's %v", got, want)
 	}
+	// The probe reads the markers and the toolchain files; a file it reads
+	// that the adapter does not hash would leave its answer stale.
+	for _, f := range s.Profile.Markers {
+		if !slices.Contains(doc.Workspace.Inputs, f) {
+			t.Errorf("workspace.inputs %v does not hold the marker %s", doc.Workspace.Inputs, f)
+		}
+	}
+	for _, f := range s.Profile.Toolchain.Files {
+		if !slices.Contains(doc.Workspace.Inputs, f.Path) {
+			t.Errorf("workspace.inputs %v does not hold the toolchain file %s", doc.Workspace.Inputs, f.Path)
+		}
+	}
 	if got, want := sorted(doc.Runtime.InputSelectors), s.Selectors(); !reflect.DeepEqual(got, want) {
 		t.Errorf("runtime.inputSelectors = %v, want %v", got, want)
 	}
@@ -120,6 +132,7 @@ type manifest struct {
 	} `json:"runtime"`
 	Workspace struct {
 		Markers []string `json:"markers"`
+		Inputs  []string `json:"inputs"`
 	} `json:"workspace"`
 	Commands map[string]struct {
 		Run []struct {
