@@ -1686,7 +1686,8 @@
             "kind": "acceptance",
             "checks": [
               "the-action-installs-the-cli-of-the-channel",
-              "the-action-installs-both-extensions-in-the-user-scope",
+              "the-action-installs-the-extensions-in-the-user-scope",
+              "the-cloud-extension-installs-only-with-a-token",
               "a-windows-runner-fails-before-the-install"
             ]
           }

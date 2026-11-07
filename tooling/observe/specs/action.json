@@ -16,7 +16,7 @@
   "requirements": [
     {
       "id": "action-installs-the-cli",
-      "text": "The action runs one bash step on a Linux or macOS runner. It installs the Putnami CLI with https://putnami.dev/install.sh at the version or channel the channel input names, stable when it is empty, puts ~/.putnami/bin on the PATH, and installs @putnami/observe and @putnami/cloud in the user scope. On a Windows runner it fails with a message that names Linux and macOS, and installs nothing."
+      "text": "The action runs one bash step on a Linux or macOS runner. It installs the Putnami CLI with https://putnami.dev/install.sh at the version or channel the channel input names, stable when it is empty, puts ~/.putnami/bin on the PATH, and installs @putnami/observe from that channel in the user scope, and @putnami/cloud too when the token input is set, since only the upload needs it. On a Windows runner it fails with a message that names Linux and macOS, and installs nothing."
     },
     {
       "id": "action-maps-inputs-to-flags",
