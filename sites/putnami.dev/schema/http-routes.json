@@ -2525,6 +2525,21 @@
     },
     {
       "match": "exact",
+      "path": "/docs/tooling-\u0026-workspace/observe/architecture",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "publicEdge": true,
+      "provenance": {
+        "project": "putnami.dev",
+        "package": "@putnami/web",
+        "sourceKind": "file-route",
+        "evidencePath": "src/app/docs/[...page]/page.tsx"
+      }
+    },
+    {
+      "match": "exact",
       "path": "/docs/tooling-\u0026-workspace/observe/bazel",
       "methods": [
         "GET",
@@ -5254,6 +5269,21 @@
     },
     {
       "match": "exact",
+      "path": "/fr/docs/tooling-\u0026-workspace/observe/architecture",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "publicEdge": true,
+      "provenance": {
+        "project": "putnami.dev",
+        "package": "@putnami/web",
+        "sourceKind": "file-route",
+        "evidencePath": "src/app/docs/[...page]/page.tsx"
+      }
+    },
+    {
+      "match": "exact",
       "path": "/fr/docs/tooling-\u0026-workspace/observe/bazel",
       "methods": [
         "GET",
@@ -5786,5 +5816,5 @@
       }
     }
   ],
-  "digest": "sha256:b6087a5e53572a3bd3843204c60d9ee392fcc71b9b9066e46ebba6635aa0b361"
+  "digest": "sha256:08d15efa6b0a2b48bba031ecdf63bc136c7a5d6bd8f6350157ffc7fb3b4f2d4d"
 }
