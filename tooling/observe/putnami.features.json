@@ -1667,6 +1667,79 @@
           }
         }
       ]
+    },
+    {
+      "id": "tooling/observe-action",
+      "type": "feature",
+      "name": "Observe a change in GitHub Actions with one Marketplace step",
+      "outcome": "A GitHub Actions workflow adds uses: Putnami/observe-action@v1 after its tests and gets the change summary in its log, and with a Putnami token the evidence upload and the pull request note, without copying install lines and without failing on what it observes",
+      "owner": "tooling",
+      "target": "modeled",
+      "requirements": [
+        {
+          "id": "action-installs-the-cli",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-action-installs-the-cli-of-the-channel",
+              "the-action-installs-both-extensions-in-the-user-scope",
+              "a-windows-runner-fails-before-the-install"
+            ]
+          }
+        },
+        {
+          "id": "action-maps-inputs-to-flags",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "each-set-input-becomes-its-flag",
+              "an-empty-input-passes-no-flag",
+              "the-evidence-path-is-an-output",
+              "the-action-checks-out-nothing"
+            ]
+          }
+        },
+        {
+          "id": "action-token-uploads-and-publishes",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-token-uploads-and-publishes",
+              "no-token-prints-the-summary-only",
+              "the-publish-input-overrides-the-default",
+              "the-github-token-reaches-observe-only-when-publishing",
+              "an-invalid-publish-value-fails-the-step"
+            ]
+          }
+        },
+        {
+          "id": "action-release",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-release-copies-the-action-to-the-repository-root",
+              "a-release-tags-the-version-and-moves-the-major-tag",
+              "a-release-refuses-a-bad-or-existing-version"
+            ]
+          }
+        }
+      ]
     }
   ]
 }

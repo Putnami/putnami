@@ -1,0 +1,37 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-spec.json",
+  "protocolVersion": 1,
+  "feature": "tooling/observe-action",
+  "outcomes": [
+    "A GitHub Actions workflow adds one step, uses: Putnami/observe-action@v1, after its tests and reads the change summary in its log, with no install line to copy",
+    "With a Putnami token, the same step uploads the change evidence document and posts the commit status and the summary note on the pull request",
+    "A release of the action moves the v1 tag, so a workflow that names v1 runs the newest compatible action"
+  ],
+  "nonGoals": [
+    "Windows runners: the action fails with a message that names Linux and macOS",
+    "Checking out the repository or changing its fetch depth: putnami observe deepens a shallow clone itself",
+    "Uploading the evidence document as a workflow artifact: the step gives its path as an output for actions/upload-artifact",
+    "GitLab CI, which has no Marketplace action"
+  ],
+  "requirements": [
+    {
+      "id": "action-installs-the-cli",
+      "text": "The action runs one bash step on a Linux or macOS runner. It installs the Putnami CLI with https://putnami.dev/install.sh at the version or channel the channel input names, stable when it is empty, puts ~/.putnami/bin on the PATH, and installs @putnami/observe and @putnami/cloud in the user scope. On a Windows runner it fails with a message that names Linux and macOS, and installs nothing."
+    },
+    {
+      "id": "action-maps-inputs-to-flags",
+      "text": "The step runs putnami observe with --evidence at a file under RUNNER_TEMP and gives that path as the evidence output. Each of the junit, coverage, sbom, base-sbom and base inputs that is not empty becomes the flag of the same name with its value; an empty input passes no flag. The action checks out nothing and sets no fetch depth."
+    },
+    {
+      "id": "action-token-uploads-and-publishes",
+      "text": "With the token input set, the step runs putnami observe with --upload and PUTNAMI_CLOUD_TOKEN set to the token, and the publish input defaults to true; without it, publish defaults to false. publish set to true or false overrides the default. Only when publish is true does putnami observe get --publish and GITHUB_TOKEN, the run's token, so the job needs statuses: write and pull-requests: write only then. Another publish value fails the step before the install."
+    },
+    {
+      "id": "action-release",
+      "text": "A release of version X.Y.Z, a semantic version without a pre-release or build suffix, replaces the root of the Putnami/observe-action default branch with the action directory and the repository licence, commits it, tags it vX.Y.Z and moves the vX tag to that commit. A version that is not X.Y.Z, or a vX.Y.Z tag that already exists, stops the release before any push."
+    }
+  ],
+  "decisions": [
+    "tooling/cli/doc/adr/0051-user-scope-extensions-run-without-a-workspace.md"
+  ]
+}
