@@ -33,6 +33,7 @@ const (
 	ErrorCodeInvalidCount               = "evidence.invalid_count"
 	ErrorCodeInvalidDependencyChange    = "evidence.invalid_dependency_change"
 	ErrorCodeInvalidSBOM                = "evidence.invalid_sbom"
+	ErrorCodeInvalidDecision            = "evidence.invalid_decision"
 	ErrorCodeInvalidTimestamp           = "evidence.invalid_timestamp"
 	ErrorCodeInvalidDiagnostic          = "evidence.invalid_diagnostic"
 	ErrorCodeTooLarge                   = "evidence.too_large"
@@ -54,6 +55,7 @@ var ValidErrorCodes = map[string]bool{
 	ErrorCodeInvalidCount:               true,
 	ErrorCodeInvalidDependencyChange:    true,
 	ErrorCodeInvalidSBOM:                true,
+	ErrorCodeInvalidDecision:            true,
 	ErrorCodeInvalidTimestamp:           true,
 	ErrorCodeInvalidDiagnostic:          true,
 	ErrorCodeTooLarge:                   true,
@@ -71,6 +73,9 @@ const (
 	codeExpression = `^[a-z][a-z0-9_-]*(\.[a-z][a-z0-9_-]*)+$`
 	// specVersionExpression is a dotted version number: 1.5, 2.3.
 	specVersionExpression = `^[0-9]+\.[0-9]+(\.[0-9]+)?$`
+	// dateExpression is a calendar date; time.Parse then refuses an
+	// impossible one.
+	dateExpression = `^[0-9]{4}-[0-9]{2}-[0-9]{2}$`
 	// timestampExpression is RFC 3339 with an optional fraction and a zone;
 	// time.Parse then refuses an impossible date or time.
 	timestampExpression = `^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\.[0-9]+)?(Z|[+-][0-9]{2}:[0-9]{2})$`
@@ -83,6 +88,7 @@ var (
 	slugPattern        = regexp.MustCompile(slugExpression)
 	codePattern        = regexp.MustCompile(codeExpression)
 	specVersionPattern = regexp.MustCompile(specVersionExpression)
+	datePattern        = regexp.MustCompile(dateExpression)
 	timestampPattern   = regexp.MustCompile(timestampExpression)
 	drivePattern       = regexp.MustCompile(`^[A-Za-z]:`)
 )
@@ -137,7 +143,10 @@ var documentShape = object(map[string]*member{
 		"ecosystem": nil, "lockfile": nil, "name": nil, "change": nil, "from": nil, "to": nil, "component": nil,
 		"before": dependencyStateShape, "after": dependencyStateShape,
 	})),
-	"sbom":        object(map[string]*member{"head": sbomDocumentShape, "base": sbomDocumentShape}),
+	"sbom": object(map[string]*member{"head": sbomDocumentShape, "base": sbomDocumentShape}),
+	"decisions": array(object(map[string]*member{
+		"path": nil, "title": nil, "status": nil, "date": nil, "scope": nil, "governs": nil, "change": nil,
+	})),
 	"diagnostics": array(object(map[string]*member{"severity": nil, "code": nil, "message": nil, "field": nil})),
 })
 
@@ -268,7 +277,7 @@ func joinPath(parent, key string) string {
 }
 
 // ValidateDocument checks a decoded document: version, subject, CI, bounds,
-// paths, references, impact, counts and dependency changes.
+// paths, references, impact, counts, dependency changes and decisions.
 func ValidateDocument(document *Document) []diag.Diagnostic {
 	v := &validator{}
 	if document.ProtocolVersion != ProtocolVersion {
@@ -302,6 +311,7 @@ func ValidateDocument(document *Document) []diag.Diagnostic {
 	v.sbom(document.SBOM)
 	v.dependencyChanges(document.DependencyChanges, components, changed)
 	v.dependencyStates(document.DependencyChanges, document.SBOM)
+	v.decisions(document.Decisions, changed)
 	v.diagnostics(document.Diagnostics)
 	return v.diags
 }
@@ -388,7 +398,12 @@ func (v *validator) bounds(document *Document) bool {
 	over("tests", len(document.Tests), MaxComponents)
 	over("coverage", len(document.Coverage), MaxComponents)
 	over("dependencyChanges", len(document.DependencyChanges), MaxDependencyChanges)
+	over("decisions", len(document.Decisions), MaxDecisions)
 	over("diagnostics", len(document.Diagnostics), MaxDiagnostics)
+	for index, decision := range document.Decisions {
+		over(fmt.Sprintf("decisions[%d].scope", index), len(decision.Scope), MaxDecisionScope)
+		over(fmt.Sprintf("decisions[%d].governs", index), len(decision.Governs), MaxGovernedFiles)
+	}
 	for index, entry := range document.Tests {
 		over(fmt.Sprintf("tests[%d].failingCases", index), len(entry.FailingCases), MaxFailingCases)
 	}
@@ -778,6 +793,78 @@ func (v *validator) dependencyState(field string, state *DependencyState) {
 			v.add(ErrorCodeInvalidDependencyChange, item+".severity", "severity %q is not one of %s", vulnerability.Severity, strings.Join(Severities, ", "))
 		}
 	}
+}
+
+// decisions checks the decision records: each well formed, and consistent
+// with the diff.
+func (v *validator) decisions(list []Decision, changed map[string]string) {
+	seen := map[string]bool{}
+	for index, decision := range list {
+		field := fmt.Sprintf("decisions[%d]", index)
+		v.path(field+".path", decision.Path)
+		if seen[decision.Path] {
+			v.add(ErrorCodeDuplicate, field+".path", "decision %q is listed twice", decision.Path)
+		}
+		seen[decision.Path] = true
+		if strings.TrimSpace(decision.Title) == "" {
+			v.add(ErrorCodeInvalidDecision, field+".title", "a decision names its title")
+		}
+		if !slices.Contains(DecisionStatuses, decision.Status) {
+			v.add(ErrorCodeInvalidDecision, field+".status", "status %q is not one of %s", decision.Status, strings.Join(DecisionStatuses, ", "))
+		}
+		if decision.Date != "" && !validDate(decision.Date) {
+			v.add(ErrorCodeInvalidDecision, field+".date", "date %q is not a YYYY-MM-DD date", decision.Date)
+		}
+		patterns := map[string]bool{}
+		for item, pattern := range decision.Scope {
+			itemField := fmt.Sprintf("%s.scope[%d]", field, item)
+			v.path(itemField, pattern)
+			if patterns[pattern] {
+				v.add(ErrorCodeDuplicate, itemField, "scope pattern %q is listed twice", pattern)
+			}
+			patterns[pattern] = true
+		}
+		governed := map[string]bool{}
+		for item, file := range decision.Governs {
+			itemField := fmt.Sprintf("%s.governs[%d]", field, item)
+			if _, ok := changed[file]; !ok {
+				v.add(ErrorCodeInvalidDecision, itemField, "governed file %q is not a changed file", file)
+			}
+			if governed[file] {
+				v.add(ErrorCodeDuplicate, itemField, "governed file %q is listed twice", file)
+			}
+			governed[file] = true
+		}
+		v.decisionChange(field, decision, changed)
+	}
+}
+
+// decisionChange checks that a decision's change is its record's file status,
+// and that a decision concerns the change.
+func (v *validator) decisionChange(field string, decision Decision, changed map[string]string) {
+	status, isChanged := changed[decision.Path]
+	switch {
+	case decision.Change == "" && isChanged:
+		v.add(ErrorCodeInvalidDecision, field+".change", "record %q is a changed file, so its decision names its change", decision.Path)
+	case decision.Change == "":
+		if len(decision.Governs) == 0 {
+			v.add(ErrorCodeInvalidDecision, field, "decision %q neither governs a changed file nor is changed", decision.Path)
+		}
+	case !slices.Contains(FileStatuses, decision.Change):
+		v.add(ErrorCodeInvalidDecision, field+".change", "change %q is not one of %s", decision.Change, strings.Join(FileStatuses, ", "))
+	case !isChanged:
+		v.add(ErrorCodeInvalidDecision, field+".change", "record %q is not a changed file", decision.Path)
+	case status != decision.Change:
+		v.add(ErrorCodeInvalidDecision, field+".change", "record %q is %s, not %s", decision.Path, status, decision.Change)
+	}
+}
+
+func validDate(value string) bool {
+	if !datePattern.MatchString(value) {
+		return false
+	}
+	_, err := time.Parse(time.DateOnly, value)
+	return err == nil
 }
 
 func (v *validator) diagnostics(list []diag.Diagnostic) {

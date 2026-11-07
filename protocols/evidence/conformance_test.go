@@ -108,6 +108,7 @@ func TestConformance_VocabulariesAreClosed(t *testing.T) {
 		"dep changes":  {DependencyChanges, {"added", "removed", "upgraded", "downgraded", "changed"}},
 		"sbom formats": {SBOMFormats, {"cyclonedx", "spdx"}},
 		"severities":   {Severities, {"critical", "high", "medium", "low", "info", "none", "unknown"}},
+		"decisions":    {DecisionStatuses, {"proposed", "accepted", "rejected", "deprecated", "superseded", "unknown"}},
 	}
 	for name, pin := range pins {
 		if !slices.Equal(pin[0], pin[1]) {
@@ -266,6 +267,8 @@ func TestConformance_SchemaEnumsAreTheGoVocabularies(t *testing.T) {
 		"dependency.change":      {root.Defs["dependencyChange"].Properties["change"].Enum, DependencyChanges},
 		"sbom.format":            {root.Defs["sbomDocument"].Properties["format"].Enum, SBOMFormats},
 		"vulnerability.severity": {root.Defs["vulnerability"].Properties["severity"].Enum, Severities},
+		"decision.status":        {root.Defs["decision"].Properties["status"].Enum, DecisionStatuses},
+		"decision.change":        {root.Defs["decision"].Properties["change"].Enum, FileStatuses},
 	}
 	for name, pair := range enums {
 		if !slices.Equal(pair[0], pair[1]) {
@@ -283,6 +286,7 @@ func TestConformance_SchemaEnumsAreTheGoVocabularies(t *testing.T) {
 		"dependency.ecosystem": {root.Defs["dependencyChange"].Properties["ecosystem"].Pattern, slugExpression},
 		"diagnostic.code":      {root.Defs["diagnostic"].Properties["code"].Pattern, codeExpression},
 		"sbom.specVersion":     {root.Defs["sbomDocument"].Properties["specVersion"].Pattern, specVersionExpression},
+		"decision.date":        {root.Defs["decision"].Properties["date"].Pattern, dateExpression},
 	}
 	for name, pair := range patterns {
 		if pair[0] != pair[1] {
@@ -593,6 +597,13 @@ func TestConformance_EachBoundIsEnforced(t *testing.T) {
 	} {
 		expectCodes(t, label, codesOf(t, "sbom-pull-request.json", mutate), ErrorCodeTooLarge)
 	}
+	for label, mutate := range map[string]func(*Document){
+		"decisions": func(d *Document) { d.Decisions = make([]Decision, MaxDecisions+1) },
+		"scope":     func(d *Document) { d.Decisions[1].Scope = make([]string, MaxDecisionScope+1) },
+		"governs":   func(d *Document) { d.Decisions[1].Governs = make([]string, MaxGovernedFiles+1) },
+	} {
+		expectCodes(t, label, codesOf(t, "decisions-pull-request.json", mutate), ErrorCodeTooLarge)
+	}
 	expectCodes(t, "edges", codesOf(t, "generic-minimal.json", func(d *Document) {
 		d.Components = make([]Component, 21)
 		for index := range d.Components {
@@ -761,6 +772,96 @@ func TestConformance_EachDependencyStateDefectGetsItsCode(t *testing.T) {
 			d.DependencyChanges[2].After.Vulnerabilities[0].Severity = severity
 		}))
 	}
+}
+
+func TestConformance_EachDecisionDefectGetsItsCode(t *testing.T) {
+	spectest.Proves(t, feature, "decision-records-are-well-formed", "each-decision-defect-gets-its-code")
+	cases := map[string]func(*Document){
+		"no title":          func(d *Document) { d.Decisions[1].Title = " " },
+		"unknown status":    func(d *Document) { d.Decisions[1].Status = "approved" },
+		"uppercase status":  func(d *Document) { d.Decisions[1].Status = "Accepted" },
+		"empty status":      func(d *Document) { d.Decisions[1].Status = "" },
+		"date with a time":  func(d *Document) { d.Decisions[1].Date = "2025-03-04T10:00:00Z" },
+		"impossible date":   func(d *Document) { d.Decisions[1].Date = "2025-02-30" },
+		"date out of order": func(d *Document) { d.Decisions[1].Date = "04/03/2025" },
+	}
+	for label, mutate := range cases {
+		expectCodes(t, label, codesOf(t, "decisions-pull-request.json", mutate), ErrorCodeInvalidDecision)
+	}
+	for label, mutate := range map[string]func(*Document){
+		"absolute path":       func(d *Document) { d.Decisions[1].Path = "/docs/decisions/0002.md" },
+		"escaping pattern":    func(d *Document) { d.Decisions[1].Scope = []string{"src/../../etc"} },
+		"absolute pattern":    func(d *Document) { d.Decisions[1].Scope = []string{"/src/payments"} },
+		"pattern with a dot":  func(d *Document) { d.Decisions[1].Scope = []string{"./src"} },
+		"backslashed pattern": func(d *Document) { d.Decisions[1].Scope = []string{`src\payments`} },
+	} {
+		expectCodes(t, label, codesOf(t, "decisions-pull-request.json", mutate), ErrorCodeInvalidPath)
+	}
+	for label, mutate := range map[string]func(*Document){
+		"decision twice": func(d *Document) { d.Decisions = append(d.Decisions, d.Decisions[1]) },
+		"pattern twice":  func(d *Document) { d.Decisions[1].Scope = []string{"src/payments", "src/payments"} },
+	} {
+		expectCodes(t, label, codesOf(t, "decisions-pull-request.json", mutate), ErrorCodeDuplicate)
+	}
+	// Glob characters are part of a pattern, every status of the closed
+	// vocabulary is accepted, and a decision needs no date and no scope.
+	expectCodes(t, "glob pattern", codesOf(t, "decisions-pull-request.json", func(d *Document) {
+		d.Decisions[1].Scope = []string{"src/**/charge?.go", "src/*/ledger", "**"}
+	}))
+	for _, status := range DecisionStatuses {
+		expectCodes(t, "status "+status, codesOf(t, "decisions-pull-request.json", func(d *Document) {
+			d.Decisions[1].Status = status
+		}))
+	}
+	expectCodes(t, "no date and no scope", codesOf(t, "decisions-pull-request.json", func(d *Document) {
+		d.Decisions[1].Date, d.Decisions[1].Scope = "", nil
+	}))
+	_, diags := ParseAndValidate([]byte(strings.Replace(mustRead(t, "valid", "decisions-pull-request.json"), `"title": "Payments own the ledger",`, `"title": "Payments own the ledger", "owner": "payments",`, 1)))
+	if len(diags) != 1 || diags[0].Code != ErrorCodeUnknownField || diags[0].Field != "decisions[1].owner" {
+		t.Errorf("an undeclared decision member: diags = %v, want one unknown_field at decisions[1].owner", diags)
+	}
+}
+
+func TestConformance_ADocumentWithoutDecisionsValidatesAsBefore(t *testing.T) {
+	spectest.Proves(t, feature, "decision-records-are-well-formed", "a-document-without-decisions-validates-as-before")
+	for _, name := range []string{"generic-minimal.json", "turbo-pull-request.json", "symfony-merge-request.json", "dependency-cycle.json", "sbom-pull-request.json"} {
+		data, err := json.Marshal(readValid(t, name))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if strings.Contains(string(data), `"decisions"`) {
+			t.Errorf("%s marshals a decisions member it does not carry: %s", name, data)
+		}
+	}
+	expectCodes(t, "stripped", codesOf(t, "decisions-pull-request.json", func(d *Document) { d.Decisions = nil }))
+}
+
+func TestConformance_EachDecisionDiffDefectGetsItsCode(t *testing.T) {
+	spectest.Proves(t, feature, "decisions-follow-the-diff", "each-decision-diff-defect-gets-its-code")
+	cases := map[string]func(*Document){
+		"unchanged governed file": func(d *Document) { d.Decisions[1].Governs = []string{"src/payments/refund.go"} },
+		"concerns no change":      func(d *Document) { d.Decisions[1].Governs = nil },
+		"changed without change":  func(d *Document) { d.Decisions[3].Change = "" },
+		"change of an unchanged":  func(d *Document) { d.Decisions[1].Change = FileModified },
+		"another status":          func(d *Document) { d.Decisions[0].Change = FileModified },
+		"unknown change":          func(d *Document) { d.Decisions[3].Change = "created" },
+	}
+	for label, mutate := range cases {
+		expectCodes(t, label, codesOf(t, "decisions-pull-request.json", mutate), ErrorCodeInvalidDecision)
+	}
+	expectCodes(t, "governed twice", codesOf(t, "decisions-pull-request.json", func(d *Document) {
+		d.Decisions[1].Governs = []string{"src/payments/charge.go", "src/payments/charge.go"}
+	}), ErrorCodeDuplicate)
+	// A deleted record is a changed file, and its decision may govern
+	// nothing else.
+	expectCodes(t, "deleted record", codesOf(t, "decisions-pull-request.json", func(d *Document) {
+		d.Decisions = d.Decisions[:1]
+	}))
+	// A record the change edits may govern files too, its own included.
+	expectCodes(t, "self-governing record", codesOf(t, "decisions-pull-request.json", func(d *Document) {
+		d.Decisions[3].Scope = append(d.Decisions[3].Scope, "docs/decisions")
+		d.Decisions[3].Governs = append(d.Decisions[3].Governs, "docs/decisions/0004-retry-failed-charges.md")
+	}))
 }
 
 func mustRead(t *testing.T, dir, name string) string {

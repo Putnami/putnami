@@ -1,5 +1,6 @@
 {
   "valid": [
+    "decisions-pull-request.json",
     "dependency-cycle.json",
     "generic-minimal.json",
     "sbom-pull-request.json",
@@ -16,6 +17,9 @@
     "case-alias-member.json": [
       "evidence.unknown_field"
     ],
+    "changed-decision-without-its-change.json": [
+      "evidence.invalid_decision"
+    ],
     "changed-line-totals-are-not-the-sums.json": [
       "evidence.invalid_count"
     ],
@@ -27,6 +31,18 @@
     ],
     "covered-above-total.json": [
       "evidence.invalid_count"
+    ],
+    "decision-governing-an-unchanged-file.json": [
+      "evidence.invalid_decision"
+    ],
+    "decision-scope-outside-the-repository.json": [
+      "evidence.invalid_path"
+    ],
+    "decision-that-concerns-no-change.json": [
+      "evidence.invalid_decision"
+    ],
+    "decision-with-an-unknown-status.json": [
+      "evidence.invalid_decision"
     ],
     "dependent-without-a-changed-dependency.json": [
       "evidence.invalid_impact"
