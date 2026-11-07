@@ -1,0 +1,83 @@
+# Release the observe action — publishes tooling/observe/action to the
+# public repository Putnami/observe-action, which the GitHub Marketplace lists.
+#
+# Run it from the Actions tab on main with a version X.Y.Z. It replaces the
+# root of Putnami/observe-action with the action, tags vX.Y.Z, moves vX, and
+# creates the GitHub release vX.Y.Z. A version that is not X.Y.Z, or one
+# already released, stops before any push (tooling/observe/action/release.sh).
+#
+# The job runs in the GitHub environment observe-action, whose deployment
+# branch policy allows main only. That environment holds the secret
+# OBSERVE_ACTION_TOKEN, a fine-grained token with read and write access to the
+# contents of Putnami/observe-action only, so a dispatch from another branch
+# gets no token. A rerun after a failed release call creates the missing
+# GitHub release. The Marketplace listing itself is a checkbox on a release, in
+# the web UI, that an organization owner ticks once. See
+# tooling/observe/doc/adr/0001-the-observe-action-releases-by-copy.md.
+name: Release the observe action
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Version to release, X.Y.Z
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: observe-action-release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    if: github.ref == 'refs/heads/main'
+    environment: observe-action
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          path: putnami
+          persist-credentials: false
+      - uses: actions/checkout@v5
+        with:
+          repository: Putnami/observe-action
+          path: observe-action
+          token: ${{ secrets.OBSERVE_ACTION_TOKEN }}
+          fetch-depth: 0
+      - name: Read what the version already released
+        id: released
+        env:
+          VERSION: ${{ inputs.version }}
+          GH_TOKEN: ${{ secrets.OBSERVE_ACTION_TOKEN }}
+        run: |
+          if ! [[ "$VERSION" =~ ^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]; then
+            echo "::error::Version \"$VERSION\" is not X.Y.Z."
+            exit 1
+          fi
+          tagged=false
+          if git -C observe-action rev-parse --quiet --verify "refs/tags/v$VERSION" >/dev/null; then
+            tagged=true
+          fi
+          echo "tagged=$tagged" >>"$GITHUB_OUTPUT"
+          if gh release view "v$VERSION" --repo Putnami/observe-action >/dev/null 2>&1; then
+            echo "::error::Release v$VERSION already exists."
+            exit 1
+          fi
+      - name: Publish the action
+        if: steps.released.outputs.tagged != 'true'
+        env:
+          VERSION: ${{ inputs.version }}
+          SOURCE: ${{ github.repository }}@${{ github.sha }}
+        run: |
+          git -C observe-action config user.name 'github-actions[bot]'
+          git -C observe-action config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          bash putnami/tooling/observe/action/release.sh "$VERSION" observe-action "$SOURCE"
+      - name: Create the GitHub release
+        env:
+          GH_TOKEN: ${{ secrets.OBSERVE_ACTION_TOKEN }}
+          VERSION: ${{ inputs.version }}
+        run: gh release create "v$VERSION" --repo Putnami/observe-action --title "v$VERSION" --generate-notes --verify-tag

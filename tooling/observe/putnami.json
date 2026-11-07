@@ -24,7 +24,10 @@
     },
     "test": {
       "filePatterns": [
-        "putnami.extension.json"
+        "putnami.extension.json",
+        "action/**",
+        "../../LICENSE.md",
+        "../../.github/workflows/observe-action-release.yml"
       ]
     },
     "package": {

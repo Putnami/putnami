@@ -1,0 +1,59 @@
+name: Putnami Observe
+description: Explain each change from the test and coverage reports your job already wrote, in the log and on the pull request.
+author: Putnami
+branding:
+  icon: eye
+  color: purple
+inputs:
+  token:
+    description: Putnami Cloud workspace token with the delivery.ingest scope. When set, the step uploads the evidence and, by default, publishes on the pull request.
+    required: false
+    default: ''
+  publish:
+    description: true posts a commit status and a summary note on the pull request with the run's GITHUB_TOKEN; false does not. Empty means true when token is set, false otherwise.
+    required: false
+    default: ''
+  junit:
+    description: Comma-separated JUnit XML or TRX paths or glob patterns. Empty finds the reports by their content.
+    required: false
+    default: ''
+  coverage:
+    description: Comma-separated coverage report paths or glob patterns. Empty finds the reports by their content.
+    required: false
+    default: ''
+  sbom:
+    description: The software bill of materials of the commit, a path or glob pattern. Empty finds one in the checkout.
+    required: false
+    default: ''
+  base-sbom:
+    description: The SBOM of the base, a path. Empty leaves the base state of each dependency unknown.
+    required: false
+    default: ''
+  base:
+    description: The commit or branch the change is measured against. Empty takes it from the pull request or the push.
+    required: false
+    default: ''
+  channel:
+    description: Release channel of the Putnami CLI and its extensions, such as stable or canary; stable reads the latest channel. A version is refused.
+    required: false
+    default: stable
+outputs:
+  evidence:
+    description: Path of the change evidence document the step wrote.
+    value: ${{ steps.observe.outputs.evidence }}
+runs:
+  using: composite
+  steps:
+    - id: observe
+      shell: bash
+      env:
+        PUTNAMI_OBSERVE_TOKEN: ${{ inputs.token }}
+        PUTNAMI_OBSERVE_PUBLISH: ${{ inputs.publish }}
+        PUTNAMI_OBSERVE_JUNIT: ${{ inputs.junit }}
+        PUTNAMI_OBSERVE_COVERAGE: ${{ inputs.coverage }}
+        PUTNAMI_OBSERVE_SBOM: ${{ inputs.sbom }}
+        PUTNAMI_OBSERVE_BASE_SBOM: ${{ inputs.base-sbom }}
+        PUTNAMI_OBSERVE_BASE: ${{ inputs.base }}
+        PUTNAMI_OBSERVE_CHANNEL: ${{ inputs.channel }}
+        PUTNAMI_OBSERVE_GITHUB_TOKEN: ${{ github.token }}
+      run: bash "$GITHUB_ACTION_PATH/observe.sh"

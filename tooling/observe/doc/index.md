@@ -6,7 +6,8 @@ repository, the Git history and the reports the job wrote. It needs no Putnami
 workspace and changes nothing in your pipeline.
 
 To add it to a pipeline, follow
-[Observe a change in your CI](/docs/how-to/observe-a-change-in-your-ci).
+[Observe a change in your CI](/docs/how-to/observe-a-change-in-your-ci). On
+GitHub Actions, it is one step: `uses: Putnami/observe-action@v1`.
 
 `@putnami/observe` is `experimental`: it promises no compatibility yet.
 
