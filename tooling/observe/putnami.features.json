@@ -275,6 +275,21 @@
           }
         },
         {
+          "id": "fallback-split",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "codeowners-directories-are-components",
+              "top-level-source-directories-are-components",
+              "a-fallback-change-touches-only-its-own-components"
+            ]
+          }
+        },
+        {
           "id": "tests-and-coverage",
           "stage": "coded",
           "evidenceKinds": [

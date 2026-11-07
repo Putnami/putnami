@@ -102,7 +102,7 @@ func TestConformance_VocabulariesAreClosed(t *testing.T) {
 	pins := map[string][2][]string{
 		"providers":    {Providers, {"github", "gitlab", "generic"}},
 		"ci systems":   {CISystems, {"github-actions", "gitlab-ci", "jenkins", "circleci", "buildkite", "azure-pipelines", "bitbucket-pipelines", "teamcity", "generic"}},
-		"sources":      {ComponentSources, {"orchestrator", "workspace", "manifest", "fallback", "declared"}},
+		"sources":      {ComponentSources, {"orchestrator", "workspace", "manifest", "fallback", "fallback-codeowners", "fallback-directories", "declared"}},
 		"impacts":      {Impacts, {"changed", "dependent", "unaffected"}},
 		"statuses":     {FileStatuses, {"added", "modified", "deleted", "renamed"}},
 		"dep changes":  {DependencyChanges, {"added", "removed", "upgraded", "downgraded", "changed"}},

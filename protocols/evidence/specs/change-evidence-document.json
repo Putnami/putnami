@@ -15,7 +15,7 @@
   "requirements": [
     {
       "id": "version-1-and-closed-vocabularies",
-      "text": "Documents are protocol version 1. The code host is github, gitlab or generic; the CI system is one the-ci-run-is-identified names; a component source is orchestrator, workspace, manifest, fallback or declared; an impact is changed, dependent or unaffected; a file status is added, modified, deleted or renamed; a dependency change is added, removed, upgraded, downgraded or changed; an SBOM format is cyclonedx or spdx. Ecosystems are open lowercase slugs. Every validation code starts with evidence."
+      "text": "Documents are version 1. A code host is github, gitlab or generic; a CI system one the-ci-run-is-identified names; a component source orchestrator, workspace, manifest, fallback, fallback-codeowners, fallback-directories or declared; an impact changed, dependent or unaffected; a file status added, modified, deleted or renamed; a dependency change added, removed, upgraded, downgraded or changed; an SBOM format cyclonedx or spdx. Ecosystems are open lowercase slugs. Every code starts with evidence."
     },
     {
       "id": "one-member-set",

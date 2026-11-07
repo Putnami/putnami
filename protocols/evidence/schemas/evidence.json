@@ -335,6 +335,8 @@
             "workspace",
             "manifest",
             "fallback",
+            "fallback-codeowners",
+            "fallback-directories",
             "declared"
           ],
           "description": "How the component was found.",

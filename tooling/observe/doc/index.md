@@ -67,7 +67,9 @@ Git 2.29 or later is required.
 A detector reads one tool's files and names components. When two detectors
 name one directory, an orchestrator's graph wins over a workspace, and a
 workspace over a single manifest. When no detector finds a component, the
-whole repository is one component.
+directories CODEOWNERS names are the components, else the top-level
+directories that hold source files, else the whole repository is one; see
+[how observe explains a change](/docs/tooling-&-workspace/observe/change-analyses#a-repository-no-detector-recognizes).
 
 | Tool | Languages | A component is | Edges come from | Graph export, read when present | Page |
 |---|---|---|---|---|---|
