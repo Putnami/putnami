@@ -6,8 +6,9 @@
 // The command is the client half of the delivery records contract: it resolves
 // the subject (HEAD SHA + origin repository) from git, REFUSES to send anything
 // for a dirty working tree or an unpushed HEAD (delivery records bind to
-// resolvable, pushed commits only), derives provenance (local by default, gha
-// under GitHub Actions), and POSTs a conclusion-only submission authenticated
+// resolvable, pushed commits only), derives provenance (gha under GitHub
+// Actions, gitlab under GitLab CI, external under any other CI, local outside
+// a CI), and POSTs a conclusion-only submission authenticated
 // with the existing workspace-scoped token machinery. In the wrapper form
 // (`putnami cloud ci report -- putnami … --output=jsonl`) the wrapped command's
 // stdout is tee'd through internal/reportstream, and at run end the
@@ -37,6 +38,7 @@ import (
 	clicore "go.putnami.dev/cloud/extension/internal/clicore"
 	"go.putnami.dev/cloud/extension/internal/deliverycli/internal/reportstream"
 	perrors "go.putnami.dev/errors"
+	"go.putnami.dev/protocol/evidence"
 )
 
 // recordsIngestPath is the control-plane ingest endpoint for delivery run
@@ -169,8 +171,9 @@ type reportBatchStream struct {
 // changes the command's outcome or the run's conclusion.
 //
 // Client-side boundary (enforced, no request sent): the working tree must be
-// clean and HEAD must be pushed to a remote. Provenance is `local` unless
-// $GITHUB_ACTIONS is set (`gha`); v1 accepts no other value.
+// clean and HEAD must be pushed to a remote. Provenance is `gha` under GitHub
+// Actions, `gitlab` under GitLab CI, `external` under any other CI the
+// evidence protocol recognizes, and `local` outside a CI.
 func Report(params map[string]any, args []string, workspaceRoot string, env map[string]string, ioctx clicore.IO) error {
 	pre, wrapped, hasWrapped := splitWrappedCommand(args)
 	if hasWrapped {
@@ -283,7 +286,7 @@ func reportHelp(params map[string]any, ioctx clicore.IO) error {
 		ioctx.Stdout(fmt.Sprintf("  putnami %-80s %s", c["command"], c["description"]))
 	}
 	ioctx.Stdout("")
-	ioctx.Stdout("Refuses (nothing sent) on a dirty working tree or an unpushed HEAD; provenance is local, or gha under GitHub Actions.")
+	ioctx.Stdout("Refuses (nothing sent) on a dirty working tree or an unpushed HEAD; provenance is gha under GitHub Actions, gitlab under GitLab CI, external under another CI, else local.")
 	ioctx.Stdout("Report ingestion is fail-soft: a failed or partial report batch never changes the run's conclusion or this command's exit code.")
 	return nil
 }
@@ -371,13 +374,34 @@ func resolveReportConclusion(params map[string]any, wrapped []string, hasWrapped
 	return "", 0, clicore.NewError("cloud ci report requires a conclusion source: --conclusion <value>, --exit-code <n>, or a wrapped command after `--`", clicore.ExitUsage)
 }
 
-// reportProvenance derives the v1 provenance: gha under GitHub Actions, local
-// otherwise. `ci` is reserved for the orchestrated runner and never sent.
+// reportProvenance derives the provenance of the CI the evidence protocol's
+// markers recognize in env.
 func reportProvenance(env map[string]string) string {
-	if clicore.EnvGet(env, "GITHUB_ACTIONS") != "" {
+	return ciProvenance(evidence.DetectCI(envLookup(env)))
+}
+
+// ciProvenance is the provenance of a run a CI system reported: gha for
+// GitHub Actions, gitlab for GitLab CI, external for any other CI, and local
+// for a generic system outside a CI. `ci` is reserved for the orchestrated
+// runner and never sent.
+func ciProvenance(system string, inCI bool) string {
+	switch system {
+	case evidence.CISystemGitHubActions:
 		return "gha"
+	case evidence.CISystemGitLabCI:
+		return "gitlab"
+	case evidence.CISystemGeneric:
+		if !inCI {
+			return "local"
+		}
 	}
-	return "local"
+	return "external"
+}
+
+// envLookup reads one variable of env, the process environment when env is
+// nil.
+func envLookup(env map[string]string) func(string) string {
+	return func(key string) string { return clicore.EnvGet(env, key) }
 }
 
 // postReportBatch folds the wrapped run into a report batch and POSTs it,

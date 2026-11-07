@@ -138,7 +138,7 @@ func EvidenceReport(params map[string]any, env map[string]string, ioctx clicore.
 	if err != nil {
 		return err
 	}
-	run, err := evidenceRun(doc)
+	run, err := evidenceRun(doc, env)
 	if err != nil {
 		return err
 	}
@@ -270,18 +270,13 @@ func readEvidenceDocument(path string) (*evidence.Document, error) {
 }
 
 // evidenceRun derives the records ingest body of the document's run.
-func evidenceRun(doc *evidence.Document) (evidenceSubmitRequest, error) {
-	provenance := ""
-	switch doc.CI.System {
-	case evidence.CISystemGitHubActions:
-		provenance = "gha"
-	case evidence.CISystemGitLabCI:
-		provenance = "gitlab"
-	default:
-		return evidenceSubmitRequest{}, clicore.NewError("cloud evidence-report uploads the evidence of a GitHub Actions or GitLab CI job; Putnami Cloud has no provenance for the CI "+strconv.Quote(doc.CI.System), clicore.ExitUsage)
-	}
+// The provenance comes from the CI the document names; a generic document is
+// external when env is a CI, and local otherwise.
+func evidenceRun(doc *evidence.Document, env map[string]string) (evidenceSubmitRequest, error) {
+	_, inCI := evidence.DetectCI(envLookup(env))
+	provenance := ciProvenance(doc.CI.System, inCI)
 	if doc.Subject.ProjectID == "" {
-		return evidenceSubmitRequest{}, clicore.NewError("cloud evidence-report: the document names no numeric project id for its repository", clicore.ExitUsage)
+		return evidenceSubmitRequest{}, clicore.NewError("cloud evidence-report: the document names no numeric project id for its repository, the key Putnami Cloud stores a run under; only GitHub Actions and GitLab CI give one", clicore.ExitUsage)
 	}
 	submissionID, err := evidenceSubmissionID(doc, provenance)
 	if err != nil {

@@ -256,8 +256,10 @@ PUTNAMI_CLOUD_TOKEN=pkt_... putnami observe --upload
 The command reads a `protocol/evidence` v1 document and makes three calls:
 
 1. `POST /v1/delivery/records` opens the run. The repository is the numeric
-   project id, the provenance is `gha` or `gitlab`, the pull or merge request
-   is `changeRequest`, and the conclusion is `failure` when a test failed,
+   project id, the provenance is `gha` for a GitHub Actions document,
+   `gitlab` for a GitLab CI one, `external` for any other CI the document
+   names (a generic one is described below), the pull or merge request is
+   `changeRequest`, and the conclusion is `failure` when a test failed,
    else `success`. The submission id names the CI run, its attempt and its
    job, so uploading one job twice opens one run. GitHub Actions gives every
    leg of a matrix the same job key, so a `gha` id also carries a digest of
@@ -293,9 +295,15 @@ The command reads a `protocol/evidence` v1 document and makes three calls:
    states ignores them and stores the changes alone. The document's `sbom`
    member is not sent.
 
+A `generic` document is `external` when the upload runs in a CI by the
+[evidence protocol](https://github.com/putnami/putnami/blob/main/protocols/evidence/README.md)'s
+markers, such as `CI=true`, and `local` otherwise. A document whose subject
+names no numeric project id is refused: only GitHub Actions and GitLab CI give
+one, and Delivery stores a run under it.
+
 A batch with nothing to carry is not sent. The summary lists apart the kinds
 Delivery already held for that submission. Without the token, with a document
-that does not validate, or for a generic CI, it sends nothing. Any refusal
+that does not validate, or without a project id, it sends nothing. Any refusal
 exits non-zero with the route and the server's reason; `putnami observe`
 turns that into a diagnostic and still exits 0. `PUTNAMI_CLOUD_API_URL`
 overrides the control plane, `https://api.putnami.cloud` by default.
@@ -813,7 +821,9 @@ returned by the workspace `/logs`, `/traces`, `/metrics` endpoints). One-shot
 commands place their command-specific payload under `data`. For example,
 `cloud ci report` sets `data` to `{run_id, subject_id, status, conclusion,
 provenance, verified, idempotent, workspace_id, repo, sha, submission_id,
-reports}`, and `cloud token --output=jsonl` sets `data` to the scoped bearer
+reports}`, where `provenance` is `gha` under GitHub Actions, `gitlab` under
+GitLab CI, `external` under any other CI the evidence protocol recognizes,
+and `local` outside a CI, and `cloud token --output=jsonl` sets `data` to the scoped bearer
 envelope. `cloud ci report -- <cmd…>` consumes the wrapped command's
 `--output=jsonl` stream unchanged (its tee'd test, coverage and build report
 batch is independent of this flag on `report` itself). This wrapper is how CI
