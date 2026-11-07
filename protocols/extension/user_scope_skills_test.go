@@ -16,7 +16,7 @@ import (
 // stamped with the contract that vocabulary requires. It lives outside
 // fixtures/valid, whose manifests every additive-rung test reads as using no
 // rung above agent content.
-const userScopeManifest = "testdata/user-scope/putnami.extension.json"
+const userScopeManifest = "testdata/user-scope.extension.json"
 
 // The user-scope list names skills once: the invalid fixture repeats one and
 // spells another as prose, and each defect is reported at its entry.
