@@ -1,0 +1,55 @@
+The codeowners demo: a repository no detector recognizes, split by its CODEOWNERS, with a change in billing.
+-- base/.github/CODEOWNERS --
+# Each team owns its directory.
+*            @acme/maintainers
+/billing/    @acme/billing
+/catalog/**  @acme/catalog
+web/         @acme/web
+*.md         @acme/docs
+/missing/    @acme/nobody
+-- base/README.md --
+# Shop
+-- base/docs/guide.md --
+# Guide
+-- base/billing/invoice.py --
+def total(lines):
+    return sum(lines)
+-- base/billing/test_invoice.py --
+from invoice import total
+
+
+def test_total():
+    assert total([1, 2]) == 3
+-- base/catalog/catalog.py --
+ITEMS = ["book"]
+-- base/web/app.js --
+export const title = "Shop";
+-- head/billing/invoice.py --
+def total(lines):
+    return round(sum(lines), 2)
+-- ci/reports/junit.xml --
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites tests="1" failures="0" errors="0" time="0.010">
+	<testsuite name="pytest" tests="1" failures="0" errors="0" time="0.010">
+		<testcase classname="billing.test_invoice" name="test_total" file="billing/test_invoice.py" time="0.001"></testcase>
+	</testsuite>
+</testsuites>
+-- ci/coverage.xml --
+<?xml version="1.0" ?>
+<coverage version="7.6.1" lines-valid="2" lines-covered="2" line-rate="1">
+	<sources>
+		<source>.</source>
+	</sources>
+	<packages>
+		<package name="billing" line-rate="1">
+			<classes>
+				<class name="invoice.py" filename="billing/invoice.py" line-rate="1">
+					<lines>
+						<line number="1" hits="1"/>
+						<line number="2" hits="1"/>
+					</lines>
+				</class>
+			</classes>
+		</package>
+	</packages>
+</coverage>

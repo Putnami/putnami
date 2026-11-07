@@ -203,8 +203,8 @@ func TestObserveRunsInARepositoryWithoutAWorkspace(t *testing.T) {
 	for _, d := range o.Diagnostics {
 		codes = append(codes, d.Code)
 	}
-	if !slices.Equal(codes, []string{"observe.report_missing"}) {
-		t.Fatalf("diagnostics %v: the coverage report is missing and nothing else", o.Diagnostics)
+	if !slices.Equal(codes, []string{"observe.report_missing", "observe.fallback_split"}) {
+		t.Fatalf("diagnostics %v: the coverage report is missing, the fallback split is named, and nothing else", o.Diagnostics)
 	}
 	data, err := os.ReadFile(evidencePath)
 	if err != nil {

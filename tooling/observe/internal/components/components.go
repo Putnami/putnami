@@ -90,15 +90,19 @@ type Set struct {
 
 // rank orders the sources: a lower rank wins.
 var rank = map[string]int{
-	evidence.SourceDeclared:     0,
-	evidence.SourceOrchestrator: 1,
-	evidence.SourceWorkspace:    2,
-	evidence.SourceManifest:     3,
-	evidence.SourceFallback:     4,
+	evidence.SourceDeclared:            0,
+	evidence.SourceOrchestrator:        1,
+	evidence.SourceWorkspace:           2,
+	evidence.SourceManifest:            3,
+	evidence.SourceFallback:            4,
+	evidence.SourceFallbackCodeowners:  4,
+	evidence.SourceFallbackDirectories: 4,
 }
 
 // Detect runs the detectors on root and combines their components. Without
-// any component, the repository is one fallback component.
+// any component, the fallback split gives them: the directories CODEOWNERS
+// names, else the top-level directories that hold a source file, else the
+// repository as one component.
 func Detect(root string, detectors []Detector) Set {
 	var set Set
 	byID := map[string]Component{}
@@ -150,8 +154,10 @@ func Detect(root string, detectors []Detector) Set {
 		}
 	}
 	if len(byID) == 0 {
-		byID[evidence.RootComponent] = Component{
-			ID: evidence.RootComponent, Ecosystem: FallbackEcosystem, Source: evidence.SourceFallback, Detector: "fallback",
+		split, diags := fallbackSplit(root)
+		set.Diagnostics = append(set.Diagnostics, diags...)
+		for _, c := range split {
+			byID[c.ID] = c
 		}
 	}
 	for id, c := range byID {

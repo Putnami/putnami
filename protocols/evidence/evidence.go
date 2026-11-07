@@ -118,14 +118,18 @@ const (
 	SourceWorkspace = "workspace"
 	// SourceManifest is an isolated manifest (package.json, composer.json, go.mod).
 	SourceManifest = "manifest"
-	// SourceFallback is the repository itself, or a top-level directory, when nothing else applies.
+	// SourceFallback is the repository itself, when nothing else applies.
 	SourceFallback = "fallback"
+	// SourceFallbackCodeowners is a directory a CODEOWNERS pattern names, when no detector finds a component.
+	SourceFallbackCodeowners = "fallback-codeowners"
+	// SourceFallbackDirectories is a top-level directory that holds a source file, when no detector finds a component and no CODEOWNERS names a directory.
+	SourceFallbackDirectories = "fallback-directories"
 	// SourceDeclared is a putnami.json the team wrote.
 	SourceDeclared = "declared"
 )
 
 // ComponentSources is the closed component-source vocabulary.
-var ComponentSources = []string{SourceOrchestrator, SourceWorkspace, SourceManifest, SourceFallback, SourceDeclared}
+var ComponentSources = []string{SourceOrchestrator, SourceWorkspace, SourceManifest, SourceFallback, SourceFallbackCodeowners, SourceFallbackDirectories, SourceDeclared}
 
 // Component impacts.
 const (

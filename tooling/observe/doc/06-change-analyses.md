@@ -32,8 +32,8 @@ Seventeen detectors read the repository:
 A component is a directory. When two detectors name one directory, the higher
 source wins: `orchestrator`, then `workspace`, then `manifest`. On a tie, the
 detector listed first in the table wins. An edge to a directory that is not a
-component is dropped. When no detector finds a component, the repository is
-one `fallback` component `.` of ecosystem `unknown`.
+component is dropped. When no detector finds a component, the fallback split
+below gives them.
 
 A changed file belongs to the innermost component that holds it. A file
 outside every component, such as a root lockfile in a Node workspace or
@@ -56,6 +56,33 @@ components, then how many more:
 
 The evidence document writes the direct edges of every component, whatever
 its impact.
+
+### A repository no detector recognizes
+
+When no detector finds a component, the repository is split:
+
+1. By CODEOWNERS: the first of `CODEOWNERS`, `.github/CODEOWNERS` and
+   `docs/CODEOWNERS` that exists is read, and each pattern that names a
+   directory of the repository is a component of source `fallback-codeowners`.
+   A pattern names a directory when, without its leading `/` and a trailing
+   `/`, `/*` or `/**`, it holds no wildcard: `/billing/`, `web/` and
+   `/catalog/**` do, `*`, `*.md` and `/apps/*/src/` do not.
+2. Else by top-level directories: each one that holds a source file at any
+   depth, such as a `.go`, `.py`, `.ts` or `.c` file, is a component of source
+   `fallback-directories`. `.github`, `docs`, `vendor`, `node_modules` and
+   dot directories are left out.
+3. Else the repository is one `fallback` component `.`.
+
+These components are of ecosystem `unknown`, are named after their directory
+and have no edges: a change marks its own components `changed` and every other
+one `unaffected`. A file outside every component, such as a root `README.md`,
+belongs to none. Tests and coverage are placed by file path, as below. The
+`observe.fallback_split` diagnostic says how the split was made:
+
+```
+  components  1 changed, 0 dependent, 2 unaffected
+    changed   billing [unknown, fallback-codeowners]
+```
 
 ## Tests and coverage
 
@@ -279,6 +306,8 @@ judge whether the change follows them.
 | `observe.changed_lines_unread` | The diff's changed lines cannot be read. |
 | `observe.sbom_ambiguous` | One side has several SBOMs, so none is read and that side is unknown. |
 | `observe.bazel_graph_missing` | A Bazel workspace has no query export, so its packages have no edge. An info diagnostic that names the export command. |
+| `observe.fallback_split` | No detector found a component, so the repository is split by CODEOWNERS, by its top-level directories, or kept as one component. An info diagnostic that names the split. |
+| `observe.fallback_walk_bounded` | The directory split stopped after 200000 entries, so the directories it did not reach are no component. |
 | `observe.bazel_graph_unreadable` | The Bazel query export cannot be read, so the `BUILD` files give the packages, without edges. |
 | `observe.decision_unread` | A decision record or directory cannot be read, or a `--decisions` entry is not a directory of the repository. |
 | `observe.decision_deleted` | The change deletes an accepted decision record. |
