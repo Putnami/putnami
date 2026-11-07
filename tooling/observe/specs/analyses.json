@@ -21,7 +21,7 @@
     },
     {
       "id": "fallback-split",
-      "text": "When no detector finds a component, each directory a pattern of the first of CODEOWNERS, .github/CODEOWNERS and docs/CODEOWNERS names is one, of source fallback-codeowners; else each top-level directory holding a source file, except .github, docs, vendor, node_modules and dot directories, of source fallback-directories; else the repository is one fallback component. They have ecosystem unknown and no edges, and an info diagnostic names the split."
+      "text": "When no detector finds a component, each directory a pattern of the first of .github/CODEOWNERS, CODEOWNERS and docs/CODEOWNERS names is one, of source fallback-codeowners; else each top-level directory holding a source file, except .github, docs, vendor, node_modules and dot directories, of source fallback-directories; else the repository is one fallback component. They have ecosystem unknown and no edges, and an info diagnostic names the split."
     },
     {
       "id": "tests-and-coverage",
