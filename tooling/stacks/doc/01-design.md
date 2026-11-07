@@ -1,4 +1,4 @@
-# Design note: `@putnami/stacks`
+# Design note: a shared core for stack extensions
 
 - **Status**: proposed
 - **Date**: 2026-11-07
@@ -7,105 +7,124 @@
 ## Problem
 
 Putnami runs tasks through three full extensions: Go, TypeScript and Python. A
-team on Java and Kotlin, Swift, Dart, .NET, Ruby, Rust or PHP cannot use
-Putnami's runner, cache and verdict without a full extension for its stack,
-and each one costs 20 to 40 agent-hours.
+team on Rust, PHP, Java and Kotlin, Swift, Dart, .NET or Ruby cannot use
+Putnami's runner, cache and verdict, and a full extension written from scratch
+costs 20 to 40 agent-hours per stack.
 
 Two parts of that work already exist:
 
 - `putnami observe` finds each stack's components and the edges between them,
   without running the build: the detectors under
-  `tooling/observe/internal/detect` (Gradle, Maven, Swift, Dart, .NET, Ruby,
-  Cargo, Composer).
+  `tooling/observe/internal/detect` (Cargo, Composer, Gradle, Maven, Swift,
+  Dart, .NET, Ruby).
 - `@putnami/evidence-readers` (`go.putnami.dev/evidence/readers`) reads the
   reports those builds write: JUnit, TRX, JaCoCo, Cobertura, Clover, LCOV.
 
-`@putnami/stacks` joins them: one extension that turns each component into a
-project and runs its `lint`, `test` and `build` from a **stack profile**.
-
 ## The shape
 
+Each stack gets **its own extension**, in the language root the repository
+layout gives it: `rust/extension` (`@putnami/rust`), then `php/extension`,
+`java/extension`, `swift/extension`, `dart/extension`, `dotnet/extension` and
+`ruby/extension` in #934 to #940. Each one is thin: a manifest, a **stack
+profile** and a ten-line `main`. Everything they share lives in one Go
+library, the **stack core**, `tooling/stacks`
+(`go.putnami.dev/tooling/stacks`).
+
 ```text
-             putnami.workspace.json + putnami.json (overrides)
-                              │
-  observe detectors ──► workspace probe ──► projects, edges, stack tag
-  (public package)            │
-                              ▼
-  stack profile ──► resolved profile per project ──► input selectors
-  (in the extension)          │                      stacks:lint|test|build
-                              ▼
-                lint / test / build task: run the command in the project
-                directory, check the toolchain, read the reports
-                              │
-                              ▼
-                 evidence readers (JUnit, coverage) ──► task result
+                     tooling/stacks  (the stack core, a Go library)
+   ┌──────────────────────────────────────────────────────────────────┐
+   │ profile schema + strict decoder     workspace probe from a detector│
+   │ overrides from putnami.json         input selectors lint|test|build│
+   │ toolchain check                     task runner + report reading   │
+   │ manifest conformance test kit                                      │
+   └──────────────────────────────────────────────────────────────────┘
+        ▲ imports             ▲ imports                 ▲ imports
+   rust/extension        php/extension     …     ruby/extension
+   @putnami/rust         @putnami/php            @putnami/ruby
+   manifest              manifest                manifest
+   profile.json          profile.json            profile.json
+   cmd: stacks.Main      cmd: stacks.Main        cmd: stacks.Main
+        │
+        ▼ reuses
+   go.putnami.dev/tooling/observe/detect/cargo   (public, moved from internal)
+   go.putnami.dev/evidence/readers               (JUnit, LCOV, …)
 ```
+
+This issue ships the core and `@putnami/rust`, the reference stack. Each of
+#934 to #940 then adds one extension on the same core and refines its profile;
+#939 completes Rust beyond what this issue proves.
+
+A project names its stack's extension like any other:
+`"extensions": ["/rust/extension"]`, or the probe assigns it. A stack whose
+extension later needs more than a profile (a framework, a `serve`, a
+`publish`) grows inside its own extension; no project changes.
 
 ### Projects come from the workspace probe
 
-`@putnami/stacks` declares a workspace adapter (see the extension protocol's
-[lifecycles](../../../protocols/extension/doc/07-lifecycles.md)), with the
-union of every profile's markers: `settings.gradle.kts`, `settings.gradle`,
-`build.gradle.kts`, `build.gradle`, `pom.xml`, `Package.swift`,
-`pubspec.yaml`, `*.csproj`, `*.fsproj`, `Gemfile`, `Cargo.toml`,
-`composer.json`.
+Each stack extension declares a workspace adapter (see the extension
+protocol's [lifecycles](../../../protocols/extension/doc/07-lifecycles.md))
+with its profile's markers: `Cargo.toml` for Rust.
 
 - `putnami projects sync` finds the component directories through those
   markers and adds them to `includes`. Membership stays Putnami's.
-- The probe (`__putnami workspace-probe`) answers, for each candidate path
-  that a detector knows as a component: the source name (`:pricing`,
-  `com.acme:pricing`, the crate or package name), the dependencies as paths,
-  the tag `stack:<id>`, the extension `@putnami/stacks`, and in
-  `metadata["@putnami/stacks"]` the profile id and the expected toolchain
-  version.
-- A directory whose stack a full extension owns (Go, TypeScript, Python) is
-  no candidate of this one: those detectors are not wired in.
+- The probe (`__putnami workspace-probe`), served by the core, runs the
+  profile's detector and answers, for each candidate path that the detector
+  knows as a component: the source name (the crate name), the dependencies as
+  paths, the extension, and in `metadata` the component name, the stack root
+  and the expected toolchain version.
 
 The detectors move from `tooling/observe/internal/detect/<stack>` to a public
 package of the observe module, `go.putnami.dev/tooling/observe/detect/<stack>`,
-so `putnami observe` and `@putnami/stacks` read a repository the same way,
+so `putnami observe` and the stack extensions read a repository the same way,
 and a detector fix reaches both. Their fixtures move with them and become the
-profiles' fixtures, as #951 plans.
+extensions' fixtures, as #951 plans.
 
 ### The stack profile
 
-A profile is a JSON document the extension ships, one per stack, under
-`tooling/stacks/profiles/<id>.json`, validated by a JSON Schema in the same
-directory. This issue ships the schema and one **reference profile**,
-`gradle`. The other profiles follow in #934 to #940.
+A profile is a JSON document each extension embeds in its runtime,
+`profile.json` at the extension root, validated by the core's JSON Schema.
+The Rust reference profile:
 
 ```json
 {
-  "id": "gradle",
-  "markers": ["build.gradle.kts", "build.gradle"],
-  "detector": "gradle",
+  "id": "rust",
+  "markers": ["Cargo.toml"],
+  "detector": "cargo",
   "toolchain": {
-    "command": ["java", "-version"],
-    "pattern": "version \"(?<version>[^\"]+)\"",
-    "files": [".java-version", ".tool-versions"]
+    "command": ["rustc", "--version"],
+    "pattern": "^rustc (?<version>\\S+)",
+    "files": [
+      { "path": "rust-toolchain.toml", "key": "toolchain.channel" },
+      { "path": "rust-toolchain" }
+    ]
   },
   "inputs": {
-    "sources": ["src/**"],
-    "manifests": ["build.gradle.kts", "build.gradle", "{root}/settings.gradle.kts", "{root}/settings.gradle", "{root}/gradle/libs.versions.toml"],
-    "lockfiles": ["gradle.lockfile", "{root}/gradle/wrapper/gradle-wrapper.properties"]
+    "sources": ["src/**", "tests/**", "benches/**", "examples/**", "build.rs"],
+    "manifests": ["Cargo.toml", "{root}/Cargo.toml", "{root}/.config/nextest.toml"],
+    "lockfiles": ["{root}/Cargo.lock"]
   },
   "tasks": {
     "lint": {
-      "command": ["{root}/gradlew", "{component}:check", "-x", "test"],
+      "steps": [
+        ["cargo", "fmt", "--package", "{component}", "--check"],
+        ["cargo", "clippy", "--package", "{component}", "--all-targets", "--", "-D", "warnings"]
+      ],
       "inputs": ["sources", "manifests"]
     },
     "test": {
-      "command": ["{root}/gradlew", "{component}:test", "{component}:jacocoTestReport"],
+      "steps": [
+        ["cargo", "llvm-cov", "nextest", "--package", "{component}", "--profile", "ci",
+         "--lcov", "--output-path", "{output}/lcov.info"]
+      ],
       "inputs": ["sources", "manifests", "lockfiles"],
       "reports": {
-        "junit": ["build/test-results/test/*.xml"],
-        "coverage": [{ "format": "jacoco", "paths": ["build/reports/jacoco/test/*.xml"] }]
+        "junit": ["{root}/target/nextest/ci/junit.xml"],
+        "coverage": [{ "format": "lcov", "paths": ["{output}/lcov.info"] }]
       }
     },
     "build": {
-      "command": ["{root}/gradlew", "{component}:assemble"],
-      "inputs": ["sources", "manifests", "lockfiles"],
-      "outputs": ["build/libs/**"]
+      "steps": [["cargo", "build", "--package", "{component}", "--locked"]],
+      "inputs": ["sources", "manifests", "lockfiles"]
     }
   }
 }
@@ -113,32 +132,38 @@ directory. This issue ships the schema and one **reference profile**,
 
 | Member | Meaning |
 |---|---|
-| `id` | The profile id, the value of `stack:<id>` and of the metadata. |
+| `id` | The stack id. |
 | `markers` | The files that make a directory a candidate. |
 | `detector` | The observe detector that names the components and their edges. |
 | `toolchain.command`, `toolchain.pattern` | How to read the version on the machine: the command's output, standard output first, matched by the pattern's `version` group. |
-| `toolchain.files` | The files that state the expected version, nearest first: in the project directory, then up to the stack's root. |
-| `inputs.<set>` | Named sets of file patterns. A plain pattern is relative to the project directory; `{root}/` makes it relative to the stack's root, the directory of the build that holds the component (the Gradle settings, the Cargo workspace). |
-| `tasks.<task>.command` | The argument vector the task runs, in the project directory, with no shell. `{root}` is the stack's root, `{component}` the detector's name for the component (`:pricing`), `{project}` the project directory. |
+| `toolchain.files` | The files that state the expected version, nearest first: in the project directory, then up to the stack root. `key` reads one value of a TOML or JSON file; without it, the file's first line. |
+| `inputs.<set>` | Named sets of file patterns. A plain pattern is relative to the project directory; `{root}/` makes it relative to the stack root, the directory of the build that holds the component (the Cargo workspace, the Gradle settings). |
+| `tasks.<task>.steps` | The commands the task runs in order, each an argument vector run in the project directory, with no shell. `{root}` is the stack root, `{component}` the detector's name for the component, `{output}` the task's output directory under the project. |
 | `tasks.<task>.inputs` | The input sets the task reads. `lint` reads fewer than `test`: a lockfile change does not rerun it. |
-| `tasks.<task>.reports` | The JUnit and coverage paths the task reads back, relative to the project directory, with the coverage format. |
-| `tasks.<task>.outputs` | The paths the task writes, cached and restored like any task output. |
+| `tasks.<task>.reports` | The JUnit and coverage reports the task reads back, with the coverage format. The core copies each into `{output}` as soon as the task ends. |
+| `tasks.<task>.outputs` | The paths under the project the task writes, cached and restored like any task output. |
 
 The toolchain files are inputs of every task, whatever its input sets.
 
+Several components share one stack root: one Cargo workspace, one
+`target/`, one `target/nextest/ci/junit.xml`. The core runs the tasks of one
+stack root one at a time, under a lock it holds on that root, and copies the
+reports out before it releases the lock, so two crates never read each
+other's report. Cargo already serializes on its own build directory, so the
+lock costs little.
+
 ### A project overrides any value
 
-A project overrides the profile in its `putnami.json`, under the extension's
-option namespace. An override replaces the value at its path whole, the way
-the policy's members do; it never merges into an array.
+A project overrides its profile in its `putnami.json`, under its stack
+extension's option namespace. An override replaces the value at its path
+whole; it never merges into an array.
 
 ```json
 {
   "options": {
-    "@putnami/stacks": {
-      "profile": "gradle",
+    "@putnami/rust": {
       "tasks": {
-        "test": { "command": ["{root}/gradlew", "{component}:integrationTest"] }
+        "test": { "steps": [["cargo", "nextest", "run", "--package", "{component}", "--profile", "ci"]] }
       },
       "inputs": { "sources": ["src/**", "fixtures/**"] }
     }
@@ -146,21 +171,34 @@ the policy's members do; it never merges into an array.
 }
 ```
 
-`profile` picks another shipped profile for one project. A workspace sets
-values for every project through a scope's `putnami.json`, with the same
-inheritance as every other option. An override is validated against the
-profile schema; an unknown member fails the load, as a strict decoder does.
+A workspace sets values for every project through a scope's `putnami.json`,
+with the same inheritance as every other option. An override is validated
+against the profile schema; an unknown member fails the load.
 
 ### Inputs are input selectors
 
 A task's inputs depend on its profile and on the project's overrides, so the
 manifest cannot list them as static patterns. Each task names one selector,
-`stacks:lint`, `stacks:test` or `stacks:build`, in its `from: "project"`
-input. The extension lists them in `runtime.inputSelectors`, and answers
+`rust:lint`, `rust:test` or `rust:build`, in its `from: "project"` input. The
+extension lists them in `runtime.inputSelectors`, and the core answers
 `__putnami input-resolve` with the files the resolved profile selects for that
-task, including the stack-root files (`{root}/…`) and the toolchain files.
-Its basis covers the project's `putnami.json` and every scope `putnami.json`
-above it, so an override that changes the inputs changes the answer.
+task, including the stack-root files and the toolchain files. Its basis covers
+the project's `putnami.json` and every scope `putnami.json` above it, so an
+override that changes the inputs changes the answer.
+
+### What each extension holds
+
+| File | Content |
+|---|---|
+| `putnami.extension.json` | The manifest: the runtime, the workspace adapter with the profile's markers, the `lint`, `test` and `build` commands and their tasks, the three input selectors. |
+| `profile.json` | The stack profile, embedded in the runtime. |
+| `cmd/putnami-<stack>/main.go` | `stacks.Main(profile)`. |
+| `doc/`, `putnami.features.json`, `specs/` | The stack's own docs and requirements. |
+
+The manifests repeat one shape. The core ships a test kit that every stack
+extension runs: its manifest declares the three commands, their tasks and
+selectors, and markers equal to its profile's; its profile passes the schema.
+A stack extension that drifts from the core fails its own gate.
 
 ## The cache key
 
@@ -169,109 +207,105 @@ A task's key is the core's key (see the CLI's
 
 | Part of the core key | What it carries for a stack task |
 |---|---|
-| Implementation digest | The extension runtime, which embeds the shipped profiles: editing a profile changes every key of its stack. |
+| Implementation digest | The extension runtime, which embeds the core and the profile: editing either changes every key of the stack. |
 | Task contract digest | The manifest's task. |
-| Task params hash | The resolved `options["@putnami/stacks"]` of the project, so every override. |
-| Project metadata digest | The profile id and the expected toolchain version from the probe. |
+| Task params hash | The resolved `options["@putnami/<stack>"]` of the project, so every override. |
+| Project metadata digest | The component name, the stack root and the expected toolchain version from the probe. |
 | File content hash | The files the task's selector answered: its input sets, the stack-root files, the toolchain files. |
 | Upstream hashes | The keys of the same task of the projects it depends on. |
 
 A change in one component changes its file hash and the upstream hash of its
 dependents, so only they rerun. A `lint` that reads `sources` and `manifests`
-keeps its key when only a lockfile moves.
+keeps its key when only `Cargo.lock` moves.
 
 ### The toolchain version
 
-The key carries the **expected** version: the content of the toolchain file,
-or the profile's `toolchain.version` when a project sets one. Before it runs
-the command, the task reads the version on the machine with
-`toolchain.command`:
+The key carries the **expected** version: the value the toolchain file
+states, or `toolchain.version` when a project sets one. Before its first step,
+the task reads the version on the machine with `toolchain.command`:
 
 - the versions match, or nothing states an expected version: the task runs;
 - they differ: the task fails with `stacks.toolchain_mismatch`, which names
   both versions and the file that states the expected one. It never installs
   or switches a toolchain. A project that accepts the difference sets
   `toolchain.check` to `warn`: the task runs and reports the diagnostic as a
-  warning.
+  warning;
 - the command is missing: the task fails with `stacks.toolchain_missing`.
 
 So a stored result was produced by the version its key names, unless a
 project chose `warn`. A project that states no expected version gets
 `stacks.toolchain_unpinned`, a warning: its key carries no toolchain version,
-and two machines with two versions share entries.
+and two machines with two versions share entries. A Rust channel name such as
+`stable` is no exact version, and gets the same warning.
 
 ## Reports
 
-After the command, the task reads every report its profile names with the
-evidence readers. A JUnit failure, an error, or a command that exits non-zero
-fails the task; the report's failed cases name the failure. The totals and the
-coverage reach the task result. A test task whose profile names a JUnit path
-and finds no report fails with `stacks.report_missing`: a command that ran
-nothing is not a pass. The reports are task outputs, so a cache hit restores
-them and reads the same totals.
-
-## Switching to a full extension
-
-A stack can later get a full extension (`@putnami/java`). It reads the same
-option block shape, and claims the stack's markers. A project switches by
-replacing `@putnami/stacks` with the new name in `extensions` and in its
-`options` key, and nothing else. Until it does, the probe of the full
-extension and the probe of `@putnami/stacks` both answer for its directory,
-and the explicit `extensions` of the project decides which one runs.
+After the last step, the task reads every report its profile names with the
+evidence readers. A JUnit failure, an error, or a step that exits non-zero
+fails the task; the report's failed cases name the failure. The totals and
+the coverage reach the task result. A test task whose profile names a JUnit
+path and finds no report fails with `stacks.report_missing`: a command that
+ran nothing is not a pass. The copied reports are task outputs, so a cache hit
+restores them and reads the same totals.
 
 ## What stays out
 
-- **Publish and package.** A stack's release goes through its own tool (Maven
-  Central, NuGet, crates.io); a profile declares no `publish` task.
+- **Publish and package.** A stack's release goes through its own tool
+  (crates.io, Packagist, Maven Central); no profile declares a `publish`
+  task. A stack extension may add one later, in its own issue.
 - **Toolchain install.** The check compares; it never downloads, pins in the
-  workspace lock, or switches a version.
-- **Serve and qualify.** A profile declares no workload, so `putnami qualify`
+  workspace lock, or switches a version. cargo-nextest and cargo-llvm-cov are
+  the project's tools, like `rustc`.
+- **Serve and qualify.** No profile declares a workload, so `putnami qualify`
   reports no reachable workload for a stack project.
-- **The stacks with a full extension.** Go, TypeScript and Python keep theirs.
+- **Go, TypeScript and Python.** They keep their full extensions and do not
+  move to the core.
 - **Bazel and Pants.** They delegate (#945, #946): they keep their own cache.
-- **Reading the build's own task graph.** A Gradle task dependency outside a
-  project edge is not read: the edges are the detector's.
+- **The build's own task graph.** A dependency between Cargo targets outside
+  a crate edge is not read: the edges are the detector's.
 
 ## Rejected alternatives
 
-- **One full extension per stack.** 20 to 40 agent-hours each, and seven
-  stacks; the profiles cost a fraction, and a full extension stays possible.
-- **Profiles as user files only.** The workspace would write each stack's
-  commands from scratch. Shipped profiles with overrides keep the common case
-  at zero configuration.
-- **Static input patterns in the manifest.** One pattern set for every stack
-  would key each task on files it does not read, and an override of an input
-  would not reach the key.
+- **One shared `@putnami/stacks` extension for every stack**, the first
+  version of this note. Configuration under one generic namespace, and a
+  project that moves to a full extension later changes its options. One
+  extension per stack names the stack where a team looks for it, and lets each
+  one grow without touching the others.
+- **Full extensions written from scratch.** Seven times the probe, the
+  selectors, the runner and the report reading; the core writes them once.
+- **Static input patterns in the manifest.** An override of an input would
+  not reach the key.
 - **The machine's toolchain version in the key.** The key is computed before
   the task runs, and the core keys only a lock-resolved toolchain, which would
   pin each stack in the workspace lock and install it: what this issue keeps
   out. Failing on a mismatch keeps the cache honest without it.
-- **A copy of the detectors in the new extension.** Two readers of one
-  repository would drift; the issue asks to reuse them.
+- **A copy of the detectors in each extension.** Two readers of one
+  repository would drift.
+- **The detectors as a module of their own.** One more module to version and
+  publish, for code only observe and the core read.
 
 ## Proof
 
-On a fixture repository with two Gradle components, `:pricing` depending on
-`:catalog`, and the reference profile:
+On a fixture Cargo workspace with two crates, `api` depending on `pricing`,
+and the Rust profile:
 
-- `putnami test` runs both, reads their JUnit and JaCoCo reports, and a
-  second run is a cache hit for both;
-- a change in `catalog` reruns `catalog` and `pricing`; a change in `pricing`
-  reruns `pricing` alone;
-- a `putnami.json` override of the test command, and one of an input set,
+- `putnami test` runs both, reads their JUnit and LCOV reports, and a second
+  run is a cache hit for both;
+- a change in `pricing` reruns `pricing` and `api`; a change in `api` reruns
+  `api` alone;
+- a `putnami.json` override of the test steps, and one of an input set,
   change the key and the command run.
 
-The fixture's `gradlew` is a stub that writes the reports, so the gate needs
-no JDK; a JVM in the toolchain check is replaced the same way. That double
-sits at a genuine external boundary, the stack's own build tool, and the test
-names it.
+The gate has no Rust toolchain, so the fixture puts a stub `cargo` and
+`rustc` first on `PATH`: they print a version and write the reports a real
+run writes. That double sits at a genuine external boundary, the stack's own
+build tool, and the test names it. A second test, skipped where `cargo`,
+cargo-nextest and cargo-llvm-cov are missing, runs the same scenario with the
+real tools.
 
-## Decisions for the owner
+## Settled with the owner
 
-1. The detectors become a public package of the observe module, not a module
-   of their own.
-2. The reference profile is `gradle`, because JUnit and JaCoCo are its native
-   reports; #934 completes Java and Kotlin around it.
+1. The detectors become a public package of the observe module.
+2. Rust is the reference stack.
 3. A toolchain mismatch fails the task by default, `warn` by override.
-4. Overrides live under `options["@putnami/stacks"]`, and a switch to a full
-   extension renames that key with the extension.
+4. One extension per stack, in its language root, on a shared core.
