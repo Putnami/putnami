@@ -9,7 +9,7 @@ For each pull or merge request, the step answers:
 - which tests passed or failed, and how much of the changed lines they covered;
 - which dependency versions the lockfiles moved and, with a software bill of materials (SBOM), the licences and known vulnerabilities each move brings or removes.
 
-It writes the answers in the job log and as a change evidence document you keep as an artifact. Once it uploads the evidence, it also posts a status and a note on the pull or merge request that link to the full report. It never fails your job.
+It writes the answers in the job log and as a change evidence document you keep as an artifact. Once it uploads the evidence, it also posts a status and a note on the pull or merge request that link to the full report when the reporter answers its URL, else to the CI run. It never fails your job.
 
 `putnami observe` comes with the `@putnami/observe` extension. It is `experimental`: being on the stable channel is not a compatibility promise. [Observe](/docs/tooling-&-workspace/observe) lists every CI, repository tool, report format, lockfile and SBOM format it reads.
 
@@ -24,7 +24,7 @@ On GitHub Actions, the step is the action `Putnami/observe-action@v1`, from the 
 | `putnami extensions install --user @putnami/observe` | Installs the extension in the user scope, so its command runs outside any workspace. `--user` takes one extension per command. |
 | `putnami extensions install --user @putnami/cloud` | Installs the extension that uploads the evidence to Putnami Cloud. The action runs this line only when its `token` input is set. |
 | `putnami observe --evidence observe-evidence.json` | Prints the summary and writes the evidence document. It exits `0` whatever it observes: only a usage error, or an evidence file it cannot write, fails it. |
-| `putnami observe --evidence observe-evidence.json --upload --publish` | Also uploads the evidence, then posts a commit status and a summary note on the pull or merge request that link to the report. `--publish` needs `--upload`. The action runs this line in place of the one above when its `token` input is set. |
+| `putnami observe --evidence observe-evidence.json --upload --publish` | Also uploads the evidence, then posts a commit status and a summary note on the pull or merge request that link to the report, or to the CI run when the reporter answers no report URL. `--publish` needs `--upload`. The action runs this line in place of the one above when its `token` input is set. |
 
 `putnami observe` finds the base of the change from the CI: the pull request base on GitHub, the merge request diff base on GitLab, and on a branch push the commit before the push. It deepens a shallow clone itself, so you do not change `fetch-depth` or `GIT_DEPTH`. It finds JUnit, TRX, LCOV, Cobertura, Clover, JaCoCo and Go cover reports by their content, anywhere in the checkout except `.git`, `node_modules`, `vendor` and the Gradle and Maven build outputs that hold no report, and the reports of Bazel through its `bazel-testlogs` and `bazel-out` links.
 
