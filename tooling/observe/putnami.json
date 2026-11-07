@@ -1,6 +1,7 @@
 {
   "$schema": "https://putnami.dev/schemas/putnami-project.json",
   "name": "@putnami/observe",
+  "visibility": "public",
   "tags": [
     "go",
     "extension"

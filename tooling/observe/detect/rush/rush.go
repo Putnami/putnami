@@ -18,7 +18,7 @@ import (
 
 	diag "go.putnami.dev/protocol/diagnostic"
 	wsproto "go.putnami.dev/protocol/workspace"
-	"go.putnami.dev/tooling/observe/internal/detect/nodeworkspace"
+	"go.putnami.dev/tooling/observe/detect/nodeworkspace"
 	"go.putnami.dev/tooling/observe/internal/lockdiff"
 )
 

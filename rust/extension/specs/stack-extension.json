@@ -1,0 +1,42 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-spec.json",
+  "protocolVersion": 1,
+  "feature": "rust/stack-extension",
+  "outcomes": [
+    "Each crate of a Cargo workspace is a Putnami project named by its package, with an edge to each crate it depends on by path",
+    "putnami lint, test and build run the Rust profile's cargo steps in each crate's directory, and a second run over an unchanged tree is a cache hit",
+    "The test task reads the nextest JUnit report and the cargo-llvm-cov LCOV report into the test and coverage summary",
+    "A crate overrides any value of the Rust profile in its putnami.json, and the override reaches the cache key"
+  ],
+  "nonGoals": [
+    "Installing or switching a Rust toolchain, cargo-nextest or cargo-llvm-cov: the toolchain check compares and never installs",
+    "Publishing a crate to a registry",
+    "A Cargo workspace whose root is not the Putnami workspace root: its crates are read as their own stack roots",
+    "Mapping each nextest case and coverage line to its crate"
+  ],
+  "requirements": [
+    {
+      "id": "crates-become-projects",
+      "text": "The probe answers, for each candidate directory the observe Cargo detector knows as a crate: its package name, the directories of the crates it depends on by path, the extension @putnami/rust, the tag rust, and metadata naming the crate, its stack root (the workspace root for a member of the root Cargo workspace, its own directory otherwise) and the expected toolchain version. A directory with no crate is no project."
+    },
+    {
+      "id": "tasks-run-the-profile",
+      "text": "Each task first compares rustc --version with the version rust-toolchain.toml or rust-toolchain states, in the crate then at its stack root: a mismatch fails with stacks.toolchain_mismatch unless toolchain.check is warn, a missing rustc with stacks.toolchain_missing. It then runs each profile step in the crate's directory with no shell, one task at a time per stack root; a step that exits non-zero fails with stacks.step_failed."
+    },
+    {
+      "id": "reports-become-the-summary",
+      "text": "After its steps, the test task copies the JUnit reports the profile names into its output directory and reads them, with the LCOV report, through the evidence readers into the test and coverage summary. A failed case fails the task with stacks.test_failed; a JUnit or coverage pattern that matches no report fails it with stacks.report_missing."
+    },
+    {
+      "id": "overrides-are-honored",
+      "text": "options[\"@putnami/rust\"] in a crate's own putnami.json overrides the profile: an object merges, any other value replaces the profile's whole. The steps run and the files the rust:<task> selectors answer follow the resolved profile, and putnami.json is an input of every task. An unknown member, a change to id or markers, or a stack-root input the manifest does not declare fails the task with stacks.project_config_invalid."
+    },
+    {
+      "id": "manifest-follows-the-profile",
+      "text": "The manifest passes the stack core's conformance kit: its markers are the profile's, it lists the rust:lint, rust:test and rust:build selectors, and each command runs one task that depends on the same task upstream, reads its selector and the profile's stack-root files for that task, and declares its command-output reports directory."
+    }
+  ],
+  "decisions": [
+    "tooling/stacks/doc/adr/0001-one-extension-per-stack-on-a-shared-core.md"
+  ]
+}

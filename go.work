@@ -98,6 +98,7 @@ use (
 	./protocols/transaction
 	./protocols/workspace
 	./python/extension
+	./rust/extension
 	./sites/telemetry.putnami.dev
 	./intelligence/areas
 	./tooling/cli
@@ -118,6 +119,7 @@ use (
 	./tooling/observe
 	./tooling/scaffold
 	./tooling/sdd-extension
+	./tooling/stacks
 	./tooling/windows-vet
 	./typescript/extension
 	./typescript/samples/10-service-to-service/clients/go
