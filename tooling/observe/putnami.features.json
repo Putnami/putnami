@@ -958,7 +958,8 @@
             "kind": "acceptance",
             "checks": [
               "the-reporter-answers-the-report-url",
-              "a-reporter-without-a-url-still-uploaded"
+              "a-reporter-without-a-url-still-uploaded",
+              "a-failure-result-names-its-reason"
             ]
           }
         },
@@ -995,7 +996,8 @@
             "kind": "acceptance",
             "checks": [
               "a-github-pull-request-gets-a-status-and-a-note",
-              "a-gitlab-merge-request-gets-a-status-and-a-note"
+              "a-gitlab-merge-request-gets-a-status-and-a-note",
+              "the-note-and-the-status-link-the-report"
             ]
           }
         },
