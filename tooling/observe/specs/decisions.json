@@ -15,7 +15,7 @@
   "requirements": [
     {
       "id": "madr-records",
-      "text": "Decision records are the .md files under the repository directories --decisions names, comma-separated, else docs/decisions and docs/adr, walked recursively past hidden directories. README.md, index.md and a file whose name holds template are not records, and a directory that does not exist is no diagnostic."
+      "text": "Decision records are the .md files under the directories --decisions names, comma-separated and relative to the repository root, else docs/decisions and docs/adr, walked recursively past hidden directories. An entry outside the repository is a diagnostic and is not read. README.md, index.md and a file whose name holds template are not records, and a directory that does not exist is no diagnostic."
     },
     {
       "id": "madr-fields",
@@ -27,11 +27,11 @@
     },
     {
       "id": "decision-scope-matching",
-      "text": "A scope pattern is relative to the repository root; a leading ./ or / and a trailing / are dropped, and a pattern with a .. segment matches nothing. A pattern without glob characters governs the path itself and every path under it. In a pattern with glob characters, * and ? match within one segment and a ** segment matches any number of segments."
+      "text": "A scope pattern is relative to the repository root; a leading ./ or / and a trailing / are dropped, and a pattern with a drive letter or a .. segment matches nothing. A pattern without * or ? governs the path itself and every path under it. Otherwise * and ? match within one segment, a ** segment matches any number of segments, and every other character, [ included, matches itself."
     },
     {
       "id": "decisions-in-the-evidence",
-      "text": "The observation and the change evidence document list, sorted by path, every decision record whose scope matches a changed file, with the changed files it governs, and every record the change adds, modifies, renames or deletes, with that file status; a deleted record is read at the base. A record that cannot be read is a diagnostic. A repository without decision records gets no decisions and no diagnostic."
+      "text": "The observation and the evidence document list, sorted by path, every record whose scope matches a changed file, with the changed files it governs, and every record the change adds, modifies, renames or deletes, a record moved out of the decision directories included, with that file status; records are read at the head and a deleted one at the base. A record that cannot be read is a diagnostic. A repository without decision records gets no decisions and no diagnostic."
     },
     {
       "id": "deleted-accepted-decision",
