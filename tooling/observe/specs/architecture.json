@@ -22,7 +22,7 @@
     },
     {
       "id": "violations-are-placed",
-      "text": "A violation's file is the source file of its class or module: an ArchUnit class under the JVM main, then test, source roots; a deptrac class through the longest PSR-4 prefix of the composer.json files of the root and the components; an import-linter module as a .py file or package under a component or its src directory. It goes to the component that holds that file; without a file it keeps its message alone. A tool and rule read twice is one rule, broken when either is, its counts summed."
+      "text": "A violation's file is the source file of its class or module: an ArchUnit class under the JVM main, then test, source roots; a deptrac class through the longest PSR-4 prefix of the composer.json files of the root and the components; an import-linter module as a .py file or package under a component or its src. It goes to the component holding that file. A rule read twice, an ArchUnit rule by its test case, is one rule, broken when either is."
     },
     {
       "id": "architecture-change-analysis",
