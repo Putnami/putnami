@@ -7,7 +7,7 @@
   [ADR 0047](0047-extension-owned-agent-content.md) decision 1 (the
   workspace opt-in is the only way content is installed)
 - **Scope**: `@putnami/cli` (`internal/commands/extensions`,
-  `internal/commands/agentctx`, `internal/agentartifacts`)
+  `internal/userskills`, `internal/agentartifacts`)
 
 ## Context
 
@@ -83,7 +83,7 @@ workspace follows the workspace's own copy.
   under `.claude/skills/` and `.agents/skills/`.
 - A user-owned file is never overwritten or removed.
 
-`internal/commands/extensions/user_scope_skills_test.go` proves them.
+`internal/userskills/userskills_test.go` proves them.
 
 ## Known limits
 
