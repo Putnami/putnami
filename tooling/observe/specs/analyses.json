@@ -4,8 +4,8 @@
   "feature": "tooling/observe-analyses",
   "outcomes": [
     "The CI log of a change names the components it changed and the components that depend on them, inferred from the repository's own manifests",
-    "The same log gives the tests and the line coverage of each component, and the coverage of the lines the change added or modified",
-    "The same log lists the packages whose locked version the change added, removed, upgraded or downgraded and, when the CI wrote a software bill of materials, the known vulnerabilities each one fixes and introduces and its licences before and after",
+    "The detailed log, with --details, gives the tests and the line coverage of each component, and the coverage of the lines the change added or modified",
+    "The detailed log, with --details, lists the packages whose locked version the change added, removed, upgraded or downgraded and, when the CI wrote a software bill of materials, the known vulnerabilities each one fixes and introduces and its licences before and after",
     "The evidence document carries the same facts and validates against protocol/evidence v1"
   ],
   "nonGoals": [
@@ -37,7 +37,7 @@
     },
     {
       "id": "summary",
-      "text": "The text summary lists the changed and dependent components: a dependent one names the components it depends on, a changed one the other changed components it reaches, directly or not. It then lists each component's tests and coverage, the changed-line coverage with its least covered files, and the dependency changes. --output=json prints the same observation. --evidence writes the components with their impacts and edges and the same analyses, valid against protocol/evidence v1."
+      "text": "The detailed text summary (--details) lists the changed and dependent components: a dependent one names the components it depends on, a changed one the other changed components it reaches, directly or not. It then lists each component's tests and coverage, the changed-line coverage with its least covered files, and the dependency changes. --output=json prints the same observation. --evidence writes the components with their impacts and edges and the same analyses, valid against protocol/evidence v1."
     },
     {
       "id": "sbom-documents",

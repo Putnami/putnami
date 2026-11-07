@@ -218,7 +218,7 @@ func TestObserveRunsInARepositoryWithoutAWorkspace(t *testing.T) {
 	}
 
 	stdout.Reset()
-	if code := run([]string{"run", "--no-fetch", "--putnamiContext", jobContext(t, invocation, invocation, "")}, func(k string) string { return env[k] }, &stdout, &stderr); code != 0 {
+	if code := run([]string{"run", "--no-fetch", "--details", "--putnamiContext", jobContext(t, invocation, invocation, "")}, func(k string) string { return env[k] }, &stdout, &stderr); code != 0 {
 		t.Fatalf("text run exit %d: %s", code, stderr.String())
 	}
 	for _, want := range []string{"putnami observe: GitLab CI, gitlab.com/acme/shop (project 4242)", "merge request !7", "merge base with main from the merge request", "modified  packages/web/index.js", "junit     packages/web/reports/junit.xml"} {

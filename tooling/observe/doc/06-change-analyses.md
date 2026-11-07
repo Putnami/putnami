@@ -42,7 +42,7 @@ component is `changed` when one of its files changed, `dependent` when it
 reaches a changed component through its edges, and `unaffected` otherwise.
 
 "Changed" wins over "dependent": a change that edits a component and one that
-depends on it marks both changed. The summary keeps the edge between them. A
+depends on it marks both changed. The summary, short or detailed, keeps the edge between them. A
 dependent component's line names the components it depends on; a changed
 component's line names the other changed components it reaches through its
 edges, directly or through other components. A line names at most 10
@@ -216,8 +216,15 @@ osv-scanner names a vulnerable package without its version: when one SBOM
 lists two versions of a package, both get its vulnerabilities. A
 state holds at most 20 licences and 200 vulnerabilities.
 
-The summary names the SBOMs after the dependency count, then gives each
-change one line:
+The short summary counts the licence changes, the vulnerabilities introduced
+and fixed, and the changes whose base or head state no SBOM lists:
+
+```text
+  dependencies  3 changes, 0 license changes, vulnerabilities 1 introduced and 3 fixed
+```
+
+The detailed summary, which `--details` prints, names the SBOMs after the
+dependency count, then gives each change one line:
 
 ```text
   dependencies  3 changes, SBOM head CycloneDX 1.5, base CycloneDX 1.5
@@ -230,7 +237,8 @@ change one line:
 ```
 
 Without a base SBOM, an upgrade reads `3 (…) known at the head, base
-unknown`. A line names at most 5 vulnerabilities. Without an SBOM, the
+unknown` in the detailed summary, and counts as a change with a side no SBOM
+lists in the short one. A line names at most 5 vulnerabilities. Without an SBOM, the
 summary and the evidence document are what they were.
 
 ## Decision records
@@ -279,7 +287,7 @@ Superseded by [0002](0002-payments-own-the-ledger.md)
 - `src/**/queue/*.go`
 ```
 
-The summary and the evidence document list each decision whose scope matches
+The detailed summary (`--details`) and the evidence document list each decision whose scope matches
 a changed file, with the files it governs, and each record the change adds,
 modifies, renames or deletes, a record moved out of the decision directories
 included; a deleted record is read at the base. A change

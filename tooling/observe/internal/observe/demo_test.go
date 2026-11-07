@@ -334,7 +334,7 @@ func TestTheSummaryShowsTheAnalyses(t *testing.T) {
 	spectest.Proves(t, analysesFeature, "summary", "the-summary-shows-the-analyses")
 	o := observeDemo(t, "turbo")
 	var text bytes.Buffer
-	if err := WriteText(&text, o); err != nil {
+	if err := WriteDetails(&text, o); err != nil {
 		t.Fatal(err)
 	}
 	for _, line := range []string{
@@ -388,7 +388,7 @@ func TestAChangedComponentNamesTheChangedComponentsItDependsOn(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			o := observeDemo(t, name)
 			var text bytes.Buffer
-			if err := WriteText(&text, o); err != nil {
+			if err := WriteDetails(&text, o); err != nil {
 				t.Fatal(err)
 			}
 			for _, line := range want.lines {
@@ -486,7 +486,7 @@ func TestTheRushDemoChangeIsExplained(t *testing.T) {
 		t.Errorf("components\n%s\nwant\n%s", strings.Join(components, "\n"), strings.Join(want, "\n"))
 	}
 	var text bytes.Buffer
-	if err := WriteText(&text, o); err != nil {
+	if err := WriteDetails(&text, o); err != nil {
 		t.Fatal(err)
 	}
 	for _, line := range []string{

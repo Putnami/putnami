@@ -367,7 +367,7 @@
       "id": "cloud/evidence-upload",
       "type": "feature",
       "name": "Upload a change evidence document to Putnami Cloud",
-      "outcome": "A CI job that is not Putnami's uploads its change evidence document to Putnami Cloud with a workspace token, and the run shows its tests, coverage, components, changed-line coverage and dependency changes, marked as self-reported",
+      "outcome": "A CI job that is not Putnami's uploads its change evidence document to Putnami Cloud with a workspace token, or a person uploads it after signing in, and the run shows its tests, coverage, components, changed-line coverage and dependency changes, marked as self-reported, at the report URL the upload answers",
       "owner": "cloud",
       "target": "coded",
       "requirements": [
@@ -455,6 +455,35 @@
             "checks": [
               "nothing-is-sent-without-a-token-or-a-valid-document",
               "a-refused-call-names-the-route-and-the-reason"
+            ]
+          }
+        },
+        {
+          "id": "signs-a-person-in",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "sign-in-uses-the-stored-session",
+              "sign-in-runs-the-device-sign-in-without-a-session",
+              "a-person-upload-names-the-repository-and-no-workspace",
+              "a-token-keeps-the-workspace-path"
+            ]
+          }
+        },
+        {
+          "id": "answers-the-report-url",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-result-carries-the-report-url"
             ]
           }
         }

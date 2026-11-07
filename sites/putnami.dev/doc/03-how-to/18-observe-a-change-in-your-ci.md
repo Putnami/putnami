@@ -1,6 +1,6 @@
 # Observe a change in your CI
 
-You will add one step to a GitHub Actions workflow, or one job to a GitLab CI pipeline, that explains each change from what your tests already produced. Your repository needs no Putnami workspace, and your pipeline keeps its own build and test commands.
+You will run `putnami observe` once on your laptop, open the full report of your change, then add one step to a GitHub Actions workflow, or one job to a GitLab CI pipeline, that explains each change from what your tests already produced. Your repository needs no Putnami workspace, and your pipeline keeps its own build and test commands.
 
 For each pull or merge request, the step answers:
 
@@ -10,9 +10,29 @@ For each pull or merge request, the step answers:
 - which dependency versions the lockfiles moved and, with a software bill of materials (SBOM), the licences and known vulnerabilities each move brings or removes;
 - which MADR decision records govern the files it touches, and which records it adds, edits or deletes.
 
-It writes the answers in the job log and as a change evidence document you keep as an artifact. Once it uploads the evidence, it also posts a status and a note on the pull or merge request that link to the full report when the reporter answers its URL, else to the CI run. It never fails your job.
+It writes a short summary in the log, which ends with the one command that keeps the full report, and the whole answer as a change evidence document you keep as an artifact. Once it uploads the evidence, it also posts a status and a note on the pull or merge request that link to the full report when the reporter answers its URL, else to the CI run. It never fails your job.
 
 `putnami observe` comes with the `@putnami/observe` extension. It is `experimental`: being on the stable channel is not a compatibility promise. [Observe](/docs/tooling-&-workspace/observe) lists every CI, repository tool, report format, lockfile and SBOM format it reads.
+
+## Start on your laptop
+
+Install the CLI and the two extensions in your user scope, then run `putnami observe` in your checkout, on the branch of your change:
+
+```bash
+curl -fsSL https://putnami.dev/install.sh | bash
+export PATH="$HOME/.putnami/bin:$PATH"
+putnami extensions install --user @putnami/observe
+putnami extensions install --user @putnami/cloud
+putnami observe
+```
+
+Outside a CI, `putnami observe` measures the change against the default branch of your `origin` remote, so it needs no flag. It prints a short summary and sends nothing off your machine. Its last line names the next command:
+
+```text
+Next: run `putnami observe --open` to sign in and open the full report
+```
+
+`putnami observe --open` runs the same analysis, keys the repository by the numeric id GitHub or GitLab gives it, signs you in to Putnami Cloud in your browser when you are not signed in yet, uploads the evidence and opens the full report. The next runs reuse the session. For a private repository, set `GITHUB_TOKEN` or `PUTNAMI_GITLAB_TOKEN` to a token that reads it; without one, the summary says which to set. `putnami observe --details` prints the whole analysis in the log instead of the short summary.
 
 ## What the step installs
 
@@ -305,22 +325,22 @@ Rename `test` in `needs` if your test job has another name. The image holds Bash
 
 ### 4) Read the job log
 
-The step prints a summary like this one, from a Go repository:
+The step prints a short summary like this one, from a Go repository:
 
 ```text
 putnami observe: GitHub Actions, github.com/Putnami/demo-observe-go (project 1442100792)
   commit   bd5c750895a5, on pricing-discount, pull request #1
   base     eb60e16d8997, merge base with main from the pull request; the shallow clone was deepened by up to 64 commits
   changed  7 files
-    modified  .github/workflows/ci.yml
-    modified  api/go.mod
-    ...
-  reports  2 reports
-    go-cover  reports/coverage.out
-    junit     reports/junit.xml
+  components  1 changed, 1 dependent, 0 unaffected
+    changed   pricing [go, go.mod]
+    dependent api [go, go.mod], depends on pricing
+  changed lines  8 of 10 lines (80.0%) covered
+  dependencies  1 change; without an SBOM, their licenses and vulnerabilities are unknown
+Next: set PUTNAMI_CLOUD_TOKEN in this CI to a token from `putnami cloud token create --name ci --scopes delivery.ingest`, then add --upload to keep the full report
 ```
 
-A report it cannot find or read is a warning in the same summary, such as `observe.report_missing`. The evidence document is the `observe-evidence` artifact of the job.
+A report it cannot find or read is a warning in the same summary, such as `observe.report_missing`. The last line names what keeps the full report: the token to set, `--upload` once the job holds one, or the report URL once an upload answered it. `--details` prints the changed files, the reports, each component's tests and coverage, and each dependency change instead. The evidence document is the `observe-evidence` artifact of the job.
 
 ### 5) Read the pull or merge request
 
@@ -330,7 +350,7 @@ Without `--upload`, after a failed upload, without the code host token, or on a 
 
 ### 6) Upload the evidence to Putnami Cloud
 
-To send the evidence to Putnami Cloud, store a workspace token with the `delivery.ingest` scope as the secret or masked CI/CD variable `PUTNAMI_CLOUD_TOKEN`. The token names the workspace.
+To send the evidence to Putnami Cloud, store a workspace token with the `delivery.ingest` scope as the secret or masked CI/CD variable `PUTNAMI_CLOUD_TOKEN`. The token names the workspace. Signed in on your laptop, `putnami cloud token create --name ci --scopes delivery.ingest` creates it and prints it once.
 
 On GitHub, pass it to the action as `token: ${{ secrets.PUTNAMI_CLOUD_TOKEN }}`, as step 2 shows. With a token, the action uploads the evidence and publishes unless you set `publish` to `false`, so the job needs the permissions of step 2. On GitLab, use the commented `--upload --publish` line in place of the line above it. An upload that fails is a diagnostic in the summary, and the job still passes.
 
@@ -377,7 +397,7 @@ putnami observe --evidence observe-evidence.json --sbom /tmp/head.cdx.json --bas
 
 osv-scanner exits `1` when it finds a vulnerability, so `|| true` keeps the step green. A document it could not write, such as the base one on the first push of a branch, is a warning in the summary, and that side is unknown. `--all-packages` lists every package, not only the vulnerable ones, and `--licenses` adds their licences. osv-scanner writes no vulnerability in SPDX, so use CycloneDX. It names a vulnerable package without its version: when the checkout locks two versions of one package, in two lockfiles, both get its vulnerabilities. On GitLab, use `$CI_MERGE_REQUEST_DIFF_BASE_SHA` as the base, and a directory outside the checkout, such as `/tmp`, in place of `$RUNNER_TEMP`. [Trivy](https://trivy.dev) also writes a CycloneDX document with vulnerabilities: `trivy fs --format cyclonedx --scanners vuln --output head.cdx.json .`.
 
-Without `--base-sbom`, each dependency gets its state at the head and the summary says the base is unknown. Without `--sbom`, `putnami observe` reads an SBOM it finds in the checkout, in a `.json` file whose name contains `bom`, `cdx`, `cyclonedx` or `spdx`. The summary then gives each change one more line:
+Without `--base-sbom`, each dependency gets its state at the head and the summary says the base is unknown. Without `--sbom`, `putnami observe` reads an SBOM it finds in the checkout, in a `.json` file whose name contains `bom`, `cdx`, `cyclonedx` or `spdx`. The short summary counts the licence changes and the vulnerabilities introduced and fixed, and with `--details` it gives each change one more line:
 
 ```text
   dependencies  3 changes, SBOM head CycloneDX 1.5, base CycloneDX 1.5
@@ -402,7 +422,7 @@ scope:
 # Payments own the ledger
 ```
 
-Records kept elsewhere are named on the observe line, such as `putnami observe --decisions architecture/decisions`. The summary lists each decision with its status, and a change that deletes an accepted decision gets a warning:
+Records kept elsewhere are named on the observe line, such as `putnami observe --decisions architecture/decisions`. With `--details`, the summary lists each decision with its status, and a change that deletes an accepted decision gets a warning in every summary:
 
 ```text
   decisions  2 decisions

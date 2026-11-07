@@ -10,6 +10,11 @@
 // refuses a body over 1 MiB whole; refused for its size while its dependency
 // changes carry before and after states, it goes again without them. The bearer is the workspace token in
 // PUTNAMI_CLOUD_TOKEN; the workspace comes out of it, never out of the body.
+// With --sign-in and no token, the bearer is the person's session from
+// `putnami cloud login`, signed in first when none is stored; the run and its
+// batches then name the repository, and Putnami Cloud opens the observed
+// workspace in the person's organization. The result carries the report URL
+// Delivery answers.
 //
 // The run also names, under operational, the tree the job tested and the merge
 // base its diff started from. Only the job's checkout knows them, so the
@@ -25,6 +30,7 @@ import (
 	"io"
 	"math"
 	"net/http"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -73,6 +79,14 @@ type evidenceSubmitRequest struct {
 	Status        string                 `json:"status"`
 	Conclusion    string                 `json:"conclusion"`
 	Operational   *evidenceOperational   `json:"operational,omitempty"`
+	Repository    *evidenceRepository    `json:"repository,omitempty"`
+}
+
+// evidenceRepository names the repository of a person's upload, which names no
+// workspace: Delivery resolves the observed workspace from it.
+type evidenceRepository struct {
+	Host string `json:"host"`
+	Path string `json:"path"`
 }
 
 // evidenceOperational is the part of the run's operational metrics an observed
@@ -101,6 +115,11 @@ type evidenceReportBatch struct {
 	Components          []evidence.Component          `json:"components,omitempty"`
 	ChangedLineCoverage *evidence.ChangedLineCoverage `json:"changedLineCoverage,omitempty"`
 	DependencyChanges   []evidence.DependencyChange   `json:"dependencyChanges,omitempty"`
+	// Provider, Repo and Repository name the repository on a person's
+	// upload, as the run does.
+	Provider   string              `json:"provider,omitempty"`
+	Repo       string              `json:"repo,omitempty"`
+	Repository *evidenceRepository `json:"repository,omitempty"`
 }
 
 type evidenceTestsReport struct {
@@ -133,8 +152,10 @@ type evidenceProjectCoverage struct {
 	Percentage        float64 `json:"percentage"`
 }
 
-// EvidenceReport uploads the evidence document --file names.
-func EvidenceReport(params map[string]any, env map[string]string, ioctx clicore.IO) error {
+// EvidenceReport uploads the evidence document --file names. signIn runs the
+// device sign-in of `putnami cloud login` and stores its session; --sign-in
+// calls it when no session is stored.
+func EvidenceReport(params map[string]any, env map[string]string, ioctx clicore.IO, signIn func() error) error {
 	doc, err := readEvidenceDocument(clicore.StringParam(params, "file"))
 	if err != nil {
 		return err
@@ -144,8 +165,16 @@ func EvidenceReport(params map[string]any, env map[string]string, ioctx clicore.
 		return err
 	}
 	token := clicore.EnvGet(env, evidenceTokenEnv)
+	person := false
 	if token == "" {
-		return clicore.NewError("cloud evidence-report needs "+evidenceTokenEnv+": a workspace token of scope delivery.ingest", clicore.ExitAuth)
+		if !clicore.BoolParam(params, false, "sign-in", "signIn") {
+			return clicore.NewError("cloud evidence-report needs "+evidenceTokenEnv+": a workspace token of scope delivery.ingest, or --sign-in to upload as the signed-in person", clicore.ExitAuth)
+		}
+		if token, err = personToken(params, env, ioctx, signIn); err != nil {
+			return err
+		}
+		person = true
+		run.Repository = &evidenceRepository{Host: doc.Subject.Host, Path: doc.Subject.Repository}
 	}
 	if fields := strings.Fields(token); len(fields) != 1 || fields[0] != token {
 		return clicore.NewError(evidenceTokenEnv+" must contain exactly one bearer token", clicore.ExitAuth)
@@ -182,6 +211,9 @@ func EvidenceReport(params map[string]any, env map[string]string, ioctx clicore.
 	var stored, already, failures []string
 	statesLeftOut := ""
 	for _, batch := range evidenceBatches(doc, run.SubmissionID) {
+		if person {
+			batch.Provider, batch.Repo, batch.Repository = run.Provider, run.Repo, run.Repository
+		}
 		answer, refused, err := postEvidenceBatch(ioctx, controlURL, token, batch)
 		if err != nil && refused == http.StatusRequestEntityTooLarge {
 			// The route refuses a body over its size whole. The other members
@@ -219,6 +251,10 @@ func EvidenceReport(params map[string]any, env map[string]string, ioctx clicore.
 	if run.Operational != nil {
 		result["operational"] = run.Operational
 	}
+	reportURL := evidenceReportURL(deref(resp.ReportUrl))
+	if reportURL != "" {
+		result["reportUrl"] = reportURL
+	}
 	if len(leftOut) > 0 {
 		result["operational_left_out"] = leftOut
 	}
@@ -233,6 +269,9 @@ func EvidenceReport(params map[string]any, env map[string]string, ioctx clicore.
 	if len(already) > 0 {
 		summary += "; already stored " + strings.Join(already, ", ")
 	}
+	if reportURL != "" {
+		summary += "; the report is at " + reportURL
+	}
 	if len(failures) > 0 {
 		err := clicore.NewError("cloud evidence-report: a report batch was not stored: "+strings.Join(failures, "; "), clicore.ExitAPI)
 		if mode, modeErr := clicore.ResolveOutputMode(params); modeErr == nil && mode.IsStructured() {
@@ -244,6 +283,35 @@ func EvidenceReport(params map[string]any, env map[string]string, ioctx clicore.
 	}
 	clicore.WriteResult(result, params, ioctx, summary+".")
 	return nil
+}
+
+// personToken returns the access token of the person's stored session,
+// refreshed when it expired. Without one, it runs signIn, which stores one.
+func personToken(params map[string]any, env map[string]string, ioctx clicore.IO, signIn func() error) (string, error) {
+	auth, err := clicore.ActiveAuth(params, env, ioctx)
+	if err == nil {
+		return auth.AccessToken, nil
+	}
+	if clicore.ExitCode(err) != clicore.ExitAuth || signIn == nil {
+		return "", err
+	}
+	if err := signIn(); err != nil {
+		return "", err
+	}
+	if auth, err = clicore.ActiveAuth(params, env, ioctx); err != nil {
+		return "", err
+	}
+	return auth.AccessToken, nil
+}
+
+// evidenceReportURL returns raw when it is an absolute https URL without
+// credentials, "" otherwise.
+func evidenceReportURL(raw string) string {
+	u, err := url.Parse(raw)
+	if raw == "" || err != nil || u.Scheme != "https" || u.Host == "" || u.User != nil {
+		return ""
+	}
+	return raw
 }
 
 // readEvidenceDocument reads and validates the document at path, resolved

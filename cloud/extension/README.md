@@ -245,16 +245,27 @@ the credential rules and the refusals.
 --upload`, which runs `putnami cloud evidence-report --file <path>
 --output=json` with the document it wrote and reads the one result the command
 prints. When a report batch is refused, that result is a failure whose data
-names the run and what was stored. The result carries no report URL yet,
-because Delivery answers none. The command runs outside a workspace. In a CI
-job, set `PUTNAMI_CLOUD_TOKEN` to a workspace token of scope
-`delivery.ingest`; the token names the workspace.
+names the run and what was stored. The result's `data.reportUrl` is the
+report URL Delivery answers when it opens the run, kept only when it is an
+absolute https URL. The command runs outside a workspace. In a CI job, set
+`PUTNAMI_CLOUD_TOKEN` to a workspace token of scope `delivery.ingest`; the
+token names the workspace.
 
 ```sh
 putnami extensions install --user @putnami/observe
 putnami extensions install --user @putnami/cloud
 PUTNAMI_CLOUD_TOKEN=pkt_... putnami observe --upload
 ```
+
+On a laptop, `putnami observe --open` adds `--sign-in`. Without
+`PUTNAMI_CLOUD_TOKEN`, the command then uploads as the person signed in with
+`putnami cloud login`, refreshing the session when it expired, and runs the
+same device sign-in first when none is stored; its instructions go to standard
+error, so standard output keeps the one result. The run and both batches then
+name the repository, its `provider`, numeric `repo` and `repository` (host and
+path), and no workspace: Putnami Cloud opens the observed workspace in the
+person's organization. A token in `PUTNAMI_CLOUD_TOKEN` keeps the workspace
+path even with `--sign-in`.
 
 The command reads a `protocol/evidence` v1 document and makes three calls:
 
@@ -301,7 +312,7 @@ The command reads a `protocol/evidence` v1 document and makes three calls:
    member is not sent.
 
 A batch with nothing to carry is not sent. The summary lists apart the kinds
-Delivery already held for that submission. Without the token, with a document
+Delivery already held for that submission. Without the token or `--sign-in`, with a document
 that does not validate, or with a document whose subject names no numeric
 project id, it sends nothing. Any refusal
 exits non-zero with the route and the server's reason; `putnami observe`
