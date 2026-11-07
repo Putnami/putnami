@@ -44,3 +44,5 @@ and cache key, which a repository outside Putnami does not have.
 - Adding a closed vocabulary value (a code host, a CI system) is a protocol
   change; adding an ecosystem is not.
 - Spec, architecture and task evidence stay out of version 1.
+  [ADR 0002](0002-architecture-results-are-an-optional-member-of-version-1.md)
+  amends this for architecture results, an optional member of version 1.

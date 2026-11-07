@@ -1963,6 +1963,72 @@
           }
         }
       ]
+    },
+    {
+      "id": "tooling/observe-architecture",
+      "type": "feature",
+      "name": "Show the architecture rules a CI already checks, per component",
+      "outcome": "A team that checks its architecture with ArchUnit, deptrac or import-linter sees in putnami observe and in the evidence document each rule its CI checked, kept or broken, and each violation with its file, its line and the component that holds the file, with no rule to rewrite",
+      "owner": "tooling",
+      "target": "modeled",
+      "requirements": [
+        {
+          "id": "architecture-report-discovery",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "deptrac-and-import-linter-reports-are-found-by-content",
+              "the-architecture-flag-names-the-reports"
+            ]
+          }
+        },
+        {
+          "id": "archunit-cases-are-architecture",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "an-archunit-test-class-is-an-architecture-result",
+              "a-class-pattern-makes-a-case-an-architecture-result"
+            ]
+          }
+        },
+        {
+          "id": "violations-are-placed",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "each-violation-goes-to-the-component-of-its-file"
+            ]
+          }
+        },
+        {
+          "id": "architecture-change-analysis",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-archunit-demo-shows-the-broken-rule",
+              "the-deptrac-demo-shows-the-broken-rule",
+              "the-import-linter-demo-shows-the-broken-contract"
+            ]
+          }
+        }
+      ]
     }
   ]
 }

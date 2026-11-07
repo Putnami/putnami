@@ -2,6 +2,8 @@
   "$schema": "https://putnami.dev/schemas/putnami-specs-baseline.json",
   "protocolVersion": 2,
   "executableRequirements": [
+    "evidence/change-evidence-document#architecture-rules-are-well-formed",
+    "evidence/change-evidence-document#architecture-violations-are-well-formed",
     "evidence/change-evidence-document#components-are-well-formed",
     "evidence/change-evidence-document#counts-add-up",
     "evidence/change-evidence-document#decision-records-are-well-formed",

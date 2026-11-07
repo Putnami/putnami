@@ -7,14 +7,16 @@
     "Istanbul, c8, V8, PHPUnit, go test and JaCoCo or Kover coverage reads into the same line-level file coverage, so a consumer can measure the coverage of the lines a change touches.",
     "A missing, malformed or oversized report is one diagnostic with a stable code, and the reader never panics.",
     "CycloneDX and SPDX documents that osv-scanner, Trivy or Syft wrote read into the same packages, each with its package URL, licences and known vulnerabilities.",
-    "The TRX report dotnet test writes for xUnit, NUnit and MSTest reads into the same test cases as a JUnit report, with the test assembly as suite."
+    "The TRX report dotnet test writes for xUnit, NUnit and MSTest reads into the same test cases as a JUnit report, with the test assembly as suite.",
+    "The architecture rules ArchUnit, deptrac and import-linter checked read into the same rules, each kept or broken, with its violations and the class or module, file and line each one names."
   ],
   "nonGoals": [
     "Finding the report files in a CI workspace, which the observe extension owns.",
     "Mapping cases and files to components, or resolving absolute paths and Go import paths to repository paths, which the observe extension owns.",
     "Writing the change evidence document, which protocol/evidence specifies.",
     "SARIF, which a later slice adds.",
-    "Querying a vulnerability database, or matching a software bill of materials to the lockfile changes, which the observe extension owns."
+    "Querying a vulnerability database, or matching a software bill of materials to the lockfile changes, which the observe extension owns.",
+    "Running ArchUnit, deptrac or import-linter, or mapping a class or a module to its source file, which the observe extension owns."
   ],
   "requirements": [
     {
@@ -52,6 +54,18 @@
     {
       "id": "trx-reads-every-result",
       "text": "ReadTRX reads a TestRun root into one case per top-level UnitTestResult in document order: its testName, its TestMethod's className up to a comma, a suite named by its codeBase's file name, and its duration. Passed, PassedButRunAborted, Completed and Warning pass; Failed fails; Error, Timeout and Aborted fail as an error; NotExecuted, Inconclusive, NotRunnable, Pending, Disconnected and InProgress skip. Totals are the ResultSummary counters, skipped being total less executed; other outcomes are malformed."
+    },
+    {
+      "id": "archunit-cases-are-rules",
+      "text": "ArchUnitRule reads a JUnit case as an ArchUnit rule: a passing case is a kept rule named by the case; a skipped one is none. A failing case is a broken rule named by its Rule '...' clause, else by the case, counting the N of was violated (N times), else its violation lines. Each later line of the message is a violation: its class is the first <...> name cut before its member, its file and line those of in (File.java:N). UsesArchUnit reports whether a source imports com.tngtech.archunit."
+    },
+    {
+      "id": "deptrac-junit-reads-layers",
+      "text": "ReadDeptrac reads the report of deptrac --formatter=junit into one rule per layer testsuite, in document order, named by the layer: kept when none of its cases fails, broken otherwise. Each failure element is one violation, its message Depender:N must not depend on Dependent (A on B) read into the depending class and the line N. The Unmatched skipped violations suite is no rule. A report that does not decode, or whose root is not testsuites, is readers.malformed."
+    },
+    {
+      "id": "import-linter-text-reads-contracts",
+      "text": "ReadImportLinter reads the text lint-imports prints, colour codes stripped, into one rule per contract line Name KEPT or Name BROKEN, in order. Under Broken contracts, each import chain of a contract, a line - importer -> imported (l.N) and its indented continuation, is one violation of the first importer at the first N; a broken contract without a chain counts one. Output without its Analyzed N files, M dependencies line or a contract line is readers.malformed."
     }
   ]
 }

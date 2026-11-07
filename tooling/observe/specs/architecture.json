@@ -1,0 +1,36 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-spec.json",
+  "protocolVersion": 1,
+  "feature": "tooling/observe-architecture",
+  "outcomes": [
+    "The CI log of a change names each architecture rule the CI checked with ArchUnit, deptrac or import-linter that the change leaves broken, with each violation, its file, its line and its component",
+    "The evidence document carries every rule read, kept or broken, with the same violations, valid against protocol/evidence v1"
+  ],
+  "nonGoals": [
+    "Running ArchUnit, deptrac or import-linter, or reading their configuration: the CI runs the checker and writes its report",
+    "Writing or translating architecture rules: a rule is the checker's own",
+    "Comparing the rules of the base and of the change: the document reports what the job's checker found"
+  ],
+  "requirements": [
+    {
+      "id": "architecture-report-discovery",
+      "text": "A deptrac report is a JUnit XML report whose first testsuite states an empty package and the localhost hostname and whose first case is named Layer - Class after its suite; an import-linter report is the text of lint-imports, with its Analyzed N files, M dependencies line, found among .txt files whose name holds lint. --architecture names those reports and replaces their discovery. A deptrac report is no test report."
+    },
+    {
+      "id": "archunit-cases-are-architecture",
+      "text": "A JUnit case whose test source file imports com.tngtech.archunit, or whose class name matches a pattern of --archunit-classes, is an ArchUnit rule, not a test: it counts in no component's tests."
+    },
+    {
+      "id": "violations-are-placed",
+      "text": "A violation's file is the source file of its class or module: an ArchUnit class under the JVM main, then test, source roots; a deptrac class through the longest PSR-4 prefix of the composer.json files of the root and the components; an import-linter module as a .py file or package under a component or its src directory. It goes to the component that holds that file; without a file it keeps its message alone. A tool and rule read twice is one rule, broken when either is, its counts summed."
+    },
+    {
+      "id": "architecture-change-analysis",
+      "text": "When it read an architecture rule, the text summary counts the rules and the broken ones, then lists each broken rule with its tool and violation count, and its first violations with their component, file and line. --evidence writes every rule in the architecture member."
+    }
+  ],
+  "decisions": [
+    "protocols/evidence/doc/adr/0001-one-self-reported-change-evidence-document.md",
+    "protocols/evidence/doc/adr/0002-architecture-results-are-an-optional-member-of-version-1.md"
+  ]
+}

@@ -7,7 +7,7 @@
       "id": "evidence/change-evidence-document",
       "type": "feature",
       "name": "Change evidence document",
-      "outcome": "A repository that keeps its own CI describes one change, what it touches, its tests, its coverage, its dependency changes, the licences and known vulnerabilities of those dependencies and the decision records that govern the files it touches, in one versioned, strict, bounded document that a producer and every reader interpret the same way.",
+      "outcome": "A repository that keeps its own CI describes one change, what it touches, its tests, its coverage, its architecture rules and their violations, its dependency changes, the licences and known vulnerabilities of those dependencies and the decision records that govern the files it touches, in one versioned, strict, bounded document that a producer and every reader interpret the same way.",
       "owner": "tooling",
       "target": "coded",
       "requirements": [
@@ -266,6 +266,33 @@
             "kind": "acceptance",
             "checks": [
               "each-decision-diff-defect-gets-its-code"
+            ]
+          }
+        },
+        {
+          "id": "architecture-rules-are-well-formed",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "each-architecture-rule-defect-gets-its-code"
+            ]
+          }
+        },
+        {
+          "id": "architecture-violations-are-well-formed",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "each-architecture-violation-defect-gets-its-code",
+              "a-document-without-architecture-validates-as-before"
             ]
           }
         }
