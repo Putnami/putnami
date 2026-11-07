@@ -34,8 +34,9 @@ verified change. It uses public CLI surfaces only.
 Python integration is experimental, explicit opt-in, non-default, and does not
 claim Go or TypeScript parity. `@putnami/sdd` — which provides `features`,
 `specs`, `architecture`, `contracts`, and the `validate` /
-`validate-workspace` jobs — is experimental on the same terms: its manifest
-format, finding IDs, and detector coverage may change without a migration path.
+`validate-workspace` jobs — is experimental on the same terms. The architecture
+files it validates are preview: a version 1 manifest, baseline or waivers file
+stays valid, while finding IDs and detector coverage may still change.
 The current license remains FSL-1.1-MIT.
 
 ## Public command ownership

@@ -1,0 +1,87 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-architecture.json",
+  "protocolVersion": 1,
+  "domain": "observability",
+  "owner": "observability",
+  "projects": [
+    "/observability/workloads/telemetry-api"
+  ],
+  "owns": [
+    {
+      "id": "observability.workspace-context",
+      "kind": "model",
+      "description": "Read-only local telemetry context plus separately identified Observability-owned fields."
+    },
+    {
+      "id": "observability.retention-policy",
+      "kind": "fact",
+      "description": "Observability-owned retention configuration; never projected from Runtime."
+    }
+  ],
+  "exports": [],
+  "imports": [
+    {
+      "id": "observability.runtime-workspace-context.v1",
+      "version": 1,
+      "from": {
+        "domain": "runtime",
+        "export": "runtime.workspace-telemetry-binding.v1"
+      },
+      "as": "observability.workspace-context",
+      "mode": "projection",
+      "status": "planned",
+      "facts": [
+        "workspace_id",
+        "runtime_project",
+        "region",
+        "logging_scope",
+        "source_version"
+      ],
+      "bootstrap": {
+        "kind": "api",
+        "contract": "runtime.workspace-telemetry-bindings.v1",
+        "availability": "planned"
+      },
+      "updates": {
+        "kind": "event",
+        "contract": "runtime.workspace-telemetry-binding-changed.v1",
+        "availability": "planned"
+      },
+      "consistency": {
+        "maxStaleness": "5m",
+        "onMissing": "fail-closed",
+        "onStale": "fail-closed",
+        "ordering": "source-version",
+        "sourceVersion": "source_version",
+        "idempotencyKey": "event_id",
+        "lateEvents": "ignore-older"
+      },
+      "localModel": {
+        "name": "observability.workspace-context",
+        "kind": "projection",
+        "sourceIdentity": "workspace_id",
+        "projectedFields": [
+          "workspace_id",
+          "runtime_project",
+          "region",
+          "logging_scope",
+          "source_version"
+        ],
+        "localFields": [
+          "retention_policy"
+        ],
+        "provenanceField": "source_contract",
+        "observedAtField": "observed_at",
+        "freshnessField": "freshness_state",
+        "writer": "observability.workspace-context-projector",
+        "rebuildable": true,
+        "rebuild": "bootstrap-and-replay"
+      },
+      "deletion": {
+        "strategy": "tombstone",
+        "tombstoneField": "deleted_at"
+      },
+      "justification": "Observability needs local telemetry routing facts without making Control or Runtime a per-request lookup service."
+    }
+  ]
+}

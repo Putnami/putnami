@@ -11,9 +11,9 @@ application-owned piece, the describe plugin that emits the evidence rows shown
 below. As an application author, import `go.putnami.dev/app/darc` and nothing
 else changes.
 
-> **Experimental.** `go.putnami.dev/protocol/architecture` may change its wire
-> format without a migration path, and this package's API is built on its types,
-> so it moves with it. Use it behind the same explicit opt-in.
+> **Preview.** `go.putnami.dev/protocol/architecture` keeps a version 1
+> manifest valid, but its Go types, finding IDs and detector coverage may still
+> change. This package's API is built on those types, so it moves with them.
 
 ## The problem it solves
 

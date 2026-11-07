@@ -31,6 +31,10 @@
       "text": "Automatic architecture evaluation resolves only workspace options.sdd.verification.architecture. Enforce lets coherent findings block; report preserves the typed report and warns without blocking; off skips evaluation. Mode, provenance, and evaluation state are always reported. Policy and structural errors fail closed. The workspace file keys the cache; interactive architecture commands are unchanged."
     },
     {
+      "id": "unpromised-finding-ids-warn",
+      "text": "When the workspace commits architecture.baseline.json or architecture.waivers.json, validate-workspace warns with architecture.finding_ids_not_promised and names the file: those files list finding IDs, which the architecture protocol does not promise. The warning never changes the verdict."
+    },
+    {
       "id": "one-engine-two-surfaces",
       "text": "Each vertical stops at a Build<Something>Result builder that returns a report and never writes to stdout; a subcommand renders that one value as a version 2 envelope or as text, so the two modes cannot answer differently and neither evaluates the workspace a second time."
     },
@@ -150,6 +154,7 @@
     "tooling/sdd-extension/doc/adr/0003-every-project-carries-a-feature-a-spec-or-a-feature-authority.md",
     "protocols/features/doc/adr/0005-a-feature-declaration-names-its-surface.md",
     "tooling/sdd-extension/doc/adr/0004-a-spec-may-live-in-an-external-market-format.md",
-    "protocols/features/doc/adr/0006-the-spec-source-contract.md"
+    "protocols/features/doc/adr/0006-the-spec-source-contract.md",
+    "protocols/architecture/doc/adr/0003-authored-documents-are-promised-findings-are-not.md"
   ]
 }

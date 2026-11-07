@@ -17,9 +17,11 @@ describe the same surface, now served by `@putnami/sdd`.
 
 ## `architecture`
 
-The architecture namespace is **experimental**. `go.putnami.dev/protocol/architecture`
-is classified `experimental` in `putnami.support.json`, so the manifest format,
-finding IDs, and detector coverage may change without a migration path.
+The architecture namespace is **preview**. `go.putnami.dev/protocol/architecture`
+is classified `preview` in `putnami.support.json`. Version 1 of the manifest,
+the baseline and the waivers stays valid; finding IDs, diagnostic codes, the
+snapshot and detector coverage may change in any release
+([Stability](../../../protocols/architecture/README.md#stability)).
 
 Adopting it is an explicit opt-in, and automatic admission is a second,
 separate decision under workspace `options.sdd.verification.architecture`.

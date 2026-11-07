@@ -167,6 +167,8 @@ var reviewedStableSubjects = map[subjectIdentity]reviewedClaims{
 	{SubjectKindProtocol, "go.putnami.dev/protocol/telemetry"}:   {},
 	{SubjectKindProtocol, "go.putnami.dev/protocol/transaction"}: {},
 	{SubjectKindProtocol, "go.putnami.dev/protocol/workspace"}:   {},
+
+	{SubjectKindProtocol, "go.putnami.dev/protocol/collaboration"}: {},
 }
 
 func TestRootCatalogIsTheCanonicalAuthority(t *testing.T) {

@@ -29,6 +29,7 @@
     "collaboration/provider-contract#task-scenarios",
     "collaboration/provider-contract#truthful-provider-declarations",
     "collaboration/provider-contract#uncertain-writes-are-unresolved",
+    "collaboration/provider-contract#version-one-documents-never-change",
     "collaboration/provider-contract#well-formed-operations"
   ]
 }

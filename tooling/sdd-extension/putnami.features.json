@@ -56,6 +56,21 @@
           }
         },
         {
+          "id": "unpromised-finding-ids-warn",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-committed-baseline-or-waivers-file-warns",
+              "a-workspace-without-them-draws-no-warning",
+              "the-warning-never-changes-the-verdict"
+            ]
+          }
+        },
+        {
           "id": "one-engine-two-surfaces",
           "stage": "coded",
           "evidenceKinds": [

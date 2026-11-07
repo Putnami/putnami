@@ -72,6 +72,12 @@ func EvaluateWorkspace(ws *workspace.Workspace, options EvaluationOptions) Resul
 	ratchetOptions.Today = options.Today
 	sortDiagnostics(diagnostics)
 	result := Result{Diagnostics: diagnostics, Baseline: baselineStatus}
+	if discovery.Baseline != nil {
+		result.DebtFiles = append(result.DebtFiles, archproto.BaselineFilename)
+	}
+	if discovery.Waivers != nil {
+		result.DebtFiles = append(result.DebtFiles, archproto.WaiverFilename)
+	}
 	if diag.HasErrors(diagnostics) {
 		return result
 	}

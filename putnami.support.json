@@ -369,8 +369,7 @@
     {
       "id": "go.putnami.dev/protocol/architecture",
       "kind": "protocol",
-      "status": "experimental",
-      "default": false
+      "status": "preview"
     },
     {
       "id": "go.putnami.dev/protocol/cache",
@@ -405,7 +404,7 @@
     {
       "id": "go.putnami.dev/protocol/collaboration",
       "kind": "protocol",
-      "status": "preview"
+      "status": "stable"
     },
     {
       "id": "go.putnami.dev/protocol/config",

@@ -125,6 +125,10 @@
     {
       "id": "callers-never-repeat-an-unresolved-write",
       "text": "A caller does not repeat a write answered unresolved: putnami change finalize sends a proposal upsert answered unresolved once, then stops with an error before any dependent write, such as a task transition."
+    },
+    {
+      "id": "version-one-documents-never-change",
+      "text": "Every version 1 document frozen in fixtures/v1 on 2026-11-07, at least one per contract and document kind, parses without error under the current module, and its bytes match the SHA-256 the test pins. A change that would reject or rewrite one opens a new contract version."
     }
   ],
   "decisions": [
@@ -133,6 +137,7 @@
     "protocols/collaboration/doc/adr/0003-missions-contract.md",
     "tooling/contributor/doc/adr/0008-build-pushes-its-intent-before-its-code.md",
     "protocols/collaboration/doc/adr/0004-a-provider-is-declared-under-providers-and-speaks-its-own-wire.md",
-    "protocols/collaboration/doc/adr/0005-missions-status-reads-a-missions-sessions.md"
+    "protocols/collaboration/doc/adr/0005-missions-status-reads-a-missions-sessions.md",
+    "protocols/collaboration/doc/adr/0006-version-1-is-stable.md"
   ]
 }

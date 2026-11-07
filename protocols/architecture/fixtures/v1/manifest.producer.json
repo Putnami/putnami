@@ -1,0 +1,20 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-architecture.json",
+  "protocolVersion": 1,
+  "domain": "producer",
+  "owner": "producer-team",
+  "projects": ["/producer/lib"],
+  "owns": [],
+  "exports": [
+    {
+      "id": "producer.reference.v1",
+      "version": 1,
+      "status": "active",
+      "description": "The producer's public package, consumed as a code reference.",
+      "facts": [{"name": "id", "authority": "producer"}],
+      "modes": ["reference"],
+      "compatibility": {"strategy": "additive", "minimumConsumerVersion": 1}
+    }
+  ],
+  "imports": []
+}

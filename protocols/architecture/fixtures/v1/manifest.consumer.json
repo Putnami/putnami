@@ -1,0 +1,24 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-architecture.json",
+  "protocolVersion": 1,
+  "domain": "consumer",
+  "owner": "consumer-team",
+  "projects": ["/consumer/app"],
+  "owns": [],
+  "exports": [],
+  "imports": [
+    {
+      "id": "consumer.producer-reference.v1",
+      "version": 1,
+      "from": {"domain": "producer", "export": "producer.reference.v1"},
+      "as": "consumer.producer-reference",
+      "mode": "reference",
+      "status": "active",
+      "facts": ["id"],
+      "justification": "The consumer links the producer's public package and stores only its identity.",
+      "bindings": [
+        {"kind": "project-dependency", "consumerProject": "/consumer/app", "producerProject": "/producer/lib"}
+      ]
+    }
+  ]
+}

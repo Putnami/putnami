@@ -120,7 +120,9 @@
             "checks": [
               "an-implementation-nobody-declared-is-a-finding",
               "a-declaration-is-only-expected-to-be-implemented-inside-an-adopting-domain",
-              "evidence-coverage-reports-the-framework-tier-and-never-more"
+              "evidence-coverage-reports-the-framework-tier-and-never-more",
+              "evidence-is-read-from-committed-files-and-unmapped-projects-stay-outside",
+              "the-evaluation-reports-both-evidence-findings-and-the-framework-tier"
             ]
           }
         },
@@ -161,6 +163,20 @@
               "a-command-refuses-a-contract-that-is-not-live",
               "an-acknowledged-send-surfaces-the-carrier-verdict",
               "a-fire-and-forget-send-never-fails-the-caller"
+            ]
+          }
+        },
+        {
+          "id": "authored-version-one-stays-valid",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "every-frozen-v1-authored-document-validates",
+              "every-frozen-v1-authored-document-keeps-its-digest"
             ]
           }
         }

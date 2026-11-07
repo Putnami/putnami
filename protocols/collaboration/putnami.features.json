@@ -439,6 +439,20 @@
               "the-contributor-stops-an-unresolved-write-without-a-retry"
             ]
           }
+        },
+        {
+          "id": "version-one-documents-never-change",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "every-frozen-v1-document-parses",
+              "every-frozen-v1-document-keeps-its-digest"
+            ]
+          }
         }
       ]
     }
