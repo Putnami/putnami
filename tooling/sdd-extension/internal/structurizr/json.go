@@ -39,10 +39,10 @@ type jsonWorkspace struct {
 //
 // An implied relationship (one that carries linkedRelationshipId) is skipped:
 // it restates the explicit relationship it was derived from.
-func ParseJSON(data []byte) (*Workspace, error) {
+func ParseJSON(data []byte, file string) (*Workspace, error) {
 	var document jsonWorkspace
 	if err := json.Unmarshal(data, &document); err != nil {
-		return nil, &Error{File: "workspace.json", Message: fmt.Sprintf("not a Structurizr JSON workspace: %v", err)}
+		return nil, &Error{File: file, Message: fmt.Sprintf("not a Structurizr JSON workspace: %v", err)}
 	}
 	workspace := &Workspace{Name: document.Name}
 	byID := map[string]*Element{}
@@ -51,10 +51,10 @@ func ParseJSON(data []byte) (*Workspace, error) {
 	var add func(source jsonElement, kind Kind, parent *Element) error
 	add = func(source jsonElement, kind Kind, parent *Element) error {
 		if source.ID == "" {
-			return &Error{File: "workspace.json", Message: fmt.Sprintf("element %q has no id", source.Name)}
+			return &Error{File: file, Message: fmt.Sprintf("element %q has no id", source.Name)}
 		}
 		if _, dup := byID[source.ID]; dup {
-			return &Error{File: "workspace.json", Message: fmt.Sprintf("element id %q is declared twice", source.ID)}
+			return &Error{File: file, Message: fmt.Sprintf("element id %q is declared twice", source.ID)}
 		}
 		element := &Element{
 			Ref:         source.ID,
@@ -105,8 +105,8 @@ func ParseJSON(data []byte) (*Workspace, error) {
 		}
 		source, destination := byID[relationship.SourceID], byID[relationship.DestinationID]
 		if source == nil || destination == nil {
-			// A relationship of a deployment element: not part of the static model.
-			continue
+			return nil, &Error{File: file, Message: fmt.Sprintf(
+				"relationship %s -> %s names an element the model does not declare", relationship.SourceID, relationship.DestinationID)}
 		}
 		workspace.Relationships = append(workspace.Relationships, Relationship{
 			Source:      source,

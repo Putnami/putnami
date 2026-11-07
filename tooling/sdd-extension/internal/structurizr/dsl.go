@@ -69,6 +69,8 @@ func tokenize(source, file string) ([]token, error) {
 				return nil, &Error{File: file, Line: start, Message: "unterminated /* comment"}
 			}
 			i++
+		case r == '"' && i+2 < len(runes) && runes[i+1] == '"' && runes[i+2] == '"':
+			return nil, &Error{File: file, Line: line, Message: "text blocks (\"\"\") are not supported; export the workspace as JSON with the Structurizr CLI and import that file"}
 		case r == '"':
 			start := line
 			var value strings.Builder
@@ -139,7 +141,7 @@ type dslParser struct {
 
 // ParseDSL reads a Structurizr DSL workspace. file names the source in errors.
 func ParseDSL(data []byte, file string) (*Workspace, error) {
-	tokens, err := tokenize(string(data), file)
+	tokens, err := tokenize(strings.TrimPrefix(string(data), "\uFEFF"), file)
 	if err != nil {
 		return nil, err
 	}
@@ -158,6 +160,9 @@ func (p *dslParser) errorf(line int, format string, args ...any) error {
 }
 
 func (p *dslParser) unsupported(s statement) error {
+	if len(s.tokens) == 0 {
+		return p.errorf(s.line, "a block must follow its statement on the same line")
+	}
 	return p.errorf(s.line,
 		"unsupported DSL statement %q; export the workspace as JSON with the Structurizr CLI and import that file", s.tokens[0].value)
 }
@@ -193,6 +198,14 @@ func (p *dslParser) next() (s statement, closed, eof bool) {
 		p.pos++
 	}
 	return s, false, false
+}
+
+// lastLine is the line the input ends on.
+func (p *dslParser) lastLine() int {
+	if len(p.tokens) == 0 {
+		return 1
+	}
+	return p.tokens[len(p.tokens)-1].line
 }
 
 // skipBlock consumes the body of a block whose "{" was just read.
@@ -241,7 +254,7 @@ func (p *dslParser) parseWorkspace() error {
 	for {
 		s, closed, eof := p.next()
 		if eof {
-			return p.errorf(len(p.tokens), "the workspace block is never closed")
+			return p.errorf(p.lastLine(), "the workspace block is never closed")
 		}
 		if closed {
 			return nil
@@ -276,7 +289,7 @@ func (p *dslParser) parseModel(scope *Element) error {
 	for {
 		s, closed, eof := p.next()
 		if eof {
-			return p.errorf(len(p.tokens), "a block is never closed")
+			return p.errorf(p.lastLine(), "a block is never closed")
 		}
 		if closed {
 			return nil
@@ -350,7 +363,7 @@ func (p *dslParser) parseProperties(scope *Element) error {
 	for {
 		s, closed, eof := p.next()
 		if eof {
-			return p.errorf(len(p.tokens), "the properties block is never closed")
+			return p.errorf(p.lastLine(), "the properties block is never closed")
 		}
 		if closed {
 			return nil

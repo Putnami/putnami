@@ -92,7 +92,7 @@ func Read(path string) (*Workspace, error) {
 		return nil, err
 	}
 	if strings.EqualFold(filepath.Ext(path), ".json") {
-		return ParseJSON(data)
+		return ParseJSON(data, filepath.Base(path))
 	}
 	return ParseDSL(data, filepath.Base(path))
 }

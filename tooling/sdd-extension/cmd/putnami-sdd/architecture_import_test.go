@@ -244,3 +244,114 @@ func TestArchitectureImportRerunKeepsHandEdits(t *testing.T) {
 		t.Errorf("the rerun rewrote the hand-edited manifest:\n%s", after)
 	}
 }
+
+func mutateFile(t *testing.T, path string, edit func(string) string) string {
+	t.Helper()
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	updated := edit(string(data))
+	writeFixture(t, path, updated)
+	return updated
+}
+
+// TestArchitectureImportRerunAddsAroundHandEdits: a rerun that adds to a
+// hand-edited manifest keeps a renamed import, a refined fact and the order a
+// person chose, and its diff removes no entry.
+func TestArchitectureImportRerunAddsAroundHandEdits(t *testing.T) {
+	root, projects := bigBankWorkspace(t, false)
+	if _, code, stdout := runImport(t, root, projects, map[string]any{"apply": true}); code != protocolcli.ExitSuccess {
+		t.Fatalf("first import exit = %d\n%s", code, stdout)
+	}
+	apiPath := filepath.Join(root, "architecture", "internet-banking-system", "api-application", archproto.ManifestFilename)
+	mainframePath := filepath.Join(root, "architecture", "mainframe-banking-system", archproto.ManifestFilename)
+	webPath := filepath.Join(root, "architecture", "internet-banking-system", "web-application", archproto.ManifestFilename)
+
+	// Rename the API's import from the mainframe, refine the mainframe's fact
+	// in its export and both consumers, and reorder the API's projects.
+	refine := func(text string) string {
+		return strings.ReplaceAll(text, "mainframe_banking_system.interface", "mainframe_banking_system.accounts")
+	}
+	mutateFile(t, apiPath, func(text string) string {
+		text = refine(text)
+		text = strings.Replace(text, `"internet-banking-system.api-application.uses.mainframe-banking-system.v1"`, `"internet-banking-system.api-application.accounts.v1"`, 1)
+		return strings.Replace(text, "\"/api\",\n    \"/api/email-component\",", "\"/api/email-component\",\n    \"/api\",", 1)
+	})
+	mutateFile(t, mainframePath, refine)
+	mutateFile(t, filepath.Join(root, "architecture", "atm", archproto.ManifestFilename), refine)
+
+	// The model gains web application -> mainframe, and the API gains an edge.
+	mutateFile(t, filepath.Join(root, "model", "workspace.dsl"), func(text string) string {
+		return strings.Replace(text, "// Components", "webApplication -> mainframe \"Reads branch hours from\"\n        // Components", 1)
+	})
+	webBefore, err := os.ReadFile(webPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	report, code, stdout := runImport(t, root, projects, map[string]any{"apply": true})
+	if code != protocolcli.ExitSuccess {
+		t.Fatalf("rerun exit = %d\n%s", code, stdout)
+	}
+	if report.Summary.AddedImports != 1 || report.Summary.AddedExports != 0 {
+		t.Errorf("summary = %+v, want only the web application's new import", report.Summary)
+	}
+	for _, manifest := range report.Manifests {
+		for _, line := range strings.Split(manifest.Diff, "\n") {
+			trimmed := strings.TrimSpace(strings.TrimPrefix(line, "-"))
+			if strings.HasPrefix(line, "-") && !strings.HasPrefix(line, "---") && trimmed != "}" && trimmed != "]" {
+				t.Errorf("%s: the diff removes %q", manifest.Path, line)
+			}
+		}
+	}
+	web := readManifest(t, root, "internet-banking-system/web-application")
+	var fromMainframe *archproto.Import
+	for index := range web.Imports {
+		if web.Imports[index].From.Domain == "mainframe-banking-system" {
+			fromMainframe = &web.Imports[index]
+		}
+	}
+	if fromMainframe == nil || strings.Join(fromMainframe.Facts, ",") != "mainframe_banking_system.accounts" {
+		t.Errorf("the new import does not read the refined fact: %+v\nbefore:\n%s", web.Imports, webBefore)
+	}
+	api := readManifest(t, root, "internet-banking-system/api-application")
+	if api.Projects[0] != "/api/email-component" {
+		t.Errorf("the hand order was lost: %v", api.Projects)
+	}
+	for _, imported := range api.Imports {
+		if imported.ID == "internet-banking-system.api-application.uses.mainframe-banking-system.v1" {
+			t.Errorf("the renamed import was added back")
+		}
+	}
+	if code, stdout := runValidate(t, root, projects); code != protocolcli.ExitSuccess {
+		t.Fatalf("validate exit = %d after the rerun\n%s", code, stdout)
+	}
+}
+
+// TestArchitectureImportRefusesBeforeWriting: a taken path or a directory
+// discovery skips stops the run before any file is written.
+func TestArchitectureImportRefusesBeforeWriting(t *testing.T) {
+	root, projects := bigBankWorkspace(t, false)
+	writeFixture(t, filepath.Join(root, "architecture", "mainframe-banking-system", archproto.ManifestFilename), `{
+  "protocolVersion": 1,
+  "domain": "legacy",
+  "owner": "legacy",
+  "projects": [],
+  "exports": [],
+  "imports": []
+}
+`)
+	report, code, _ := runImport(t, root, projects, map[string]any{"apply": true})
+	if code == protocolcli.ExitSuccess || report.Summary.Written != 0 {
+		t.Fatalf("exit = %d, summary = %+v, want a refusal before any write", code, report.Summary)
+	}
+	if _, err := os.Stat(filepath.Join(root, "architecture", "atm")); !os.IsNotExist(err) {
+		t.Errorf("a manifest was written before the refusal")
+	}
+
+	root, projects = bigBankWorkspace(t, false)
+	if _, code, stdout := runImport(t, root, projects, map[string]any{"apply": true, "at": ".arch"}); code != protocolcli.ExitUsage {
+		t.Errorf("--at .arch exit = %d, want usage\n%s", code, stdout)
+	}
+}

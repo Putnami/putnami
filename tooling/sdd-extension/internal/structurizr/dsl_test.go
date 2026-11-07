@@ -88,9 +88,14 @@ func TestDSLRefusesWhatItCannotRead(t *testing.T) {
 		"archetype": "workspace {\n  model {\n    archetypes {\n    }\n  }\n}",
 		"unknown":   "workspace {\n  model {\n    a = softwareSystem \"A\"\n    a -> nowhere\n  }\n}",
 		"nesting":   "workspace {\n  model {\n    c = container \"C\"\n  }\n}",
-		"unclosed":  "workspace {\n  model {\n",
+		"unclosed":  "workspace {\n  model {\n    a = person \"A\"\n",
+		"allman":    "workspace {\n    views\n    {\n    }\n}\n",
+		"textblock": "workspace {\n  model {\n    a = person \"\"\"\n",
 	}
-	wantLine := map[string]string{"include": "w.dsl:3:", "archetype": "w.dsl:3:", "unknown": "w.dsl:4:", "nesting": "w.dsl:3:"}
+	wantLine := map[string]string{
+		"include": "w.dsl:3:", "archetype": "w.dsl:3:", "unknown": "w.dsl:4:", "nesting": "w.dsl:3:",
+		"unclosed": "w.dsl:4:", "allman": "w.dsl:3:", "textblock": "w.dsl:3:",
+	}
 	for name, source := range cases {
 		_, err := ParseDSL([]byte(source), "w.dsl")
 		if err == nil {
@@ -100,6 +105,13 @@ func TestDSLRefusesWhatItCannotRead(t *testing.T) {
 		if want := wantLine[name]; want != "" && !strings.HasPrefix(err.Error(), want) {
 			t.Errorf("%s: error %q does not start with %q", name, err, want)
 		}
+	}
+}
+
+func TestDSLAcceptsAByteOrderMark(t *testing.T) {
+	workspace, err := ParseDSL([]byte("\uFEFFworkspace {\n  model {\n    a = softwareSystem \"A\"\n  }\n}\n"), "bom.dsl")
+	if err != nil || len(workspace.Elements) != 1 {
+		t.Fatalf("workspace = %+v, err = %v", workspace, err)
 	}
 }
 
@@ -121,7 +133,7 @@ func TestReadJSONWorkspace(t *testing.T) {
       {"id": "4", "name": "Stock", "containers": [{"id": "5", "name": "DB"}]}
     ]
   }
-}`))
+}`), "small.json")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -138,7 +150,12 @@ func TestReadJSONWorkspace(t *testing.T) {
 	if got := elementByName(t, workspace, "Shop").Tags; len(got) != 2 {
 		t.Errorf("tags = %v", got)
 	}
-	if _, err := ParseJSON([]byte(`{"model": {"softwareSystems": [{"id": "1"}, {"id": "1"}]}}`)); err == nil {
-		t.Error("a duplicate id is accepted")
+	if _, err := ParseJSON([]byte(`{"model": {"softwareSystems": [{"id": "1"}, {"id": "1"}]}}`), "dup.json"); err == nil ||
+		!strings.HasPrefix(err.Error(), "dup.json:") {
+		t.Errorf("a duplicate id: %v", err)
+	}
+	dangling := `{"model": {"softwareSystems": [{"id": "1", "relationships": [{"sourceId": "1", "destinationId": "9"}]}]}}`
+	if _, err := ParseJSON([]byte(dangling), "d.json"); err == nil {
+		t.Error("a relationship to an undeclared element is dropped silently")
 	}
 }

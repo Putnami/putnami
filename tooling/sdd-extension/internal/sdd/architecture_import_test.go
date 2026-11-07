@@ -129,3 +129,23 @@ func TestImportNamingHelpers(t *testing.T) {
 		t.Errorf("fact = %q", got)
 	}
 }
+
+func TestImportRefusesTwoNamesThatGiveOneDomain(t *testing.T) {
+	ws, source := importWorkspace(t, `workspace {
+    model {
+        a = softwareSystem "Billing"
+        b = softwareSystem "Billing!"
+        a -> b "Calls"
+    }
+}`, "workspace.dsl")
+	report, err := BuildArchitectureImportResult(ws, ArchitectureImportOptions{Format: ImportFormatStructurizr, Source: source})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(unmappedReason(report, "Billing!"), "which Billing already gives") {
+		t.Errorf("unmapped = %+v", report.Unmapped)
+	}
+	if report.Unmapped == nil || len(report.Manifests) != 1 {
+		t.Errorf("manifests = %+v", report.Manifests)
+	}
+}
