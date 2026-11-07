@@ -5,8 +5,8 @@ import (
 
 	"go.putnami.dev/protocol/evidence"
 	wsproto "go.putnami.dev/protocol/workspace"
-	"go.putnami.dev/tooling/observe/internal/detect/nodeworkspace"
-	"go.putnami.dev/tooling/observe/internal/detect/rush"
+	"go.putnami.dev/tooling/observe/detect/nodeworkspace"
+	"go.putnami.dev/tooling/observe/detect/rush"
 	"go.putnami.dev/tooling/observe/internal/detectors/golang"
 	"go.putnami.dev/tooling/observe/internal/lockdiff"
 )
