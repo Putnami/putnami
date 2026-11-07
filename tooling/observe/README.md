@@ -26,7 +26,17 @@ later.
 
 ## Use it
 
-Install the extension in the user scope, then run it in the job:
+On GitHub Actions, add one step after your tests:
+
+```yaml
+- uses: Putnami/observe-action@v1
+  if: ${{ !cancelled() }}
+```
+
+The action's source is [`action/`](action/README.md); each release copies it to
+[Putnami/observe-action](https://github.com/Putnami/observe-action).
+
+In another CI, install the extension in the user scope, then run it in the job:
 
 ```bash
 putnami extensions install --user @putnami/observe
@@ -36,7 +46,8 @@ putnami observe
 See [Observe a change in your CI](https://putnami.dev/docs/how-to/observe-a-change-in-your-ci)
 for the GitHub Actions step and the GitLab CI job that install the CLI and the
 extension, run `putnami observe`, and keep the evidence document as an
-artifact.
+artifact. The release of the action is the workflow
+`.github/workflows/observe-action-release.yml`.
 
 On GitHub Actions and GitLab CI, nothing else is needed. In another CI, name
 the base:

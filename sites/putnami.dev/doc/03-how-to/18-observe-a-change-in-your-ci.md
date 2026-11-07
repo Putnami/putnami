@@ -13,7 +13,9 @@ It writes the answers in the job log, as a change evidence document you keep as 
 
 `putnami observe` comes with the `@putnami/observe` extension. It is `experimental`: being on the stable channel is not a compatibility promise. [Observe](/docs/tooling-&-workspace/observe) lists every CI, repository tool, report format, lockfile and SBOM format it reads.
 
-## What the snippets install
+## What the step installs
+
+On GitHub Actions, the step is the action `Putnami/observe-action@v1`, from the GitHub Marketplace. On GitLab CI, the job runs the same lines itself:
 
 | Line | What it does |
 |---|---|
@@ -25,7 +27,7 @@ It writes the answers in the job log, as a change evidence document you keep as 
 
 `putnami observe` finds the base of the change from the CI: the pull request base on GitHub, the merge request diff base on GitLab, and on a branch push the commit before the push. It deepens a shallow clone itself, so you do not change `fetch-depth` or `GIT_DEPTH`. It finds JUnit, TRX, LCOV, Cobertura, Clover, JaCoCo and Go cover reports by their content, anywhere in the checkout except `.git`, `node_modules`, `vendor` and the Gradle and Maven build outputs that hold no report, and the reports of Bazel through its `bazel-testlogs` and `bazel-out` links.
 
-The install lines need the network: when the installer or the registry cannot be reached, the GitHub step or the GitLab job fails.
+The install needs the network: when the installer or the registry cannot be reached, the GitHub step or the GitLab job fails.
 
 ## Steps
 
@@ -235,39 +237,37 @@ nextest writes `target/nextest/ci/junit.xml`, and `putnami observe` reads it the
 
 ### 2) GitHub Actions: add a step to your test job
 
-Give the job that runs your tests these permissions, so `--publish` can post on the pull request:
+Add this step to the job that runs your tests, after the step that writes the reports:
+
+```yaml
+      - uses: Putnami/observe-action@v1
+        if: ${{ !cancelled() }}
+```
+
+`if: ${{ !cancelled() }}` runs the step when a test fails too: a failed test is part of the evidence. The job needs a Linux or macOS runner, such as `ubuntu-latest`. Keep your `actions/checkout` step as it is: the default `fetch-depth: 1` works.
+
+Without a token, the step prints the summary in the job log and writes the evidence document. To also post the commit status and the summary note on the pull request, give the job these permissions and set `publish`:
 
 ```yaml
     permissions:
       contents: read
       statuses: write
       pull-requests: write
-```
-
-Then add these two steps to that job, after the step that writes the reports:
-
-```yaml
-      - name: Observe the change
+    steps:
+      # ... your checkout, build and test steps ...
+      - id: observe
+        uses: Putnami/observe-action@v1
         if: ${{ !cancelled() }}
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # Uncomment once an ingest token is set, to upload the evidence to Putnami Cloud.
-          # PUTNAMI_CLOUD_TOKEN: ${{ secrets.PUTNAMI_CLOUD_TOKEN }}
-        run: |
-          curl -fsSL https://putnami.dev/install.sh | bash
-          export PATH="$HOME/.putnami/bin:$PATH"
-          putnami extensions install --user @putnami/observe
-          putnami extensions install --user @putnami/cloud
-          putnami observe --evidence observe-evidence.json --publish
-          # putnami observe --evidence observe-evidence.json --publish --upload
+        with:
+          publish: true
       - uses: actions/upload-artifact@v4
         if: ${{ !cancelled() }}
         with:
           name: observe-evidence
-          path: observe-evidence.json
+          path: ${{ steps.observe.outputs.evidence }}
 ```
 
-`if: ${{ !cancelled() }}` runs the step when a test fails too: a failed test is part of the evidence. The job needs a Linux or macOS runner, such as `ubuntu-latest`. `GITHUB_TOKEN` is the token GitHub gives every run; a workflow passes it to a step through `env`.
+The action passes the run's `GITHUB_TOKEN` to `putnami observe` only when `publish` is on. The `evidence` output is the path of the evidence document; `actions/upload-artifact` keeps it. The action's inputs `junit`, `coverage`, `sbom`, `base-sbom` and `base` pass the flags of the same name, and `channel` picks the CLI release channel, `stable` by default. Its [README](https://github.com/Putnami/observe-action#readme) lists them.
 
 ### 3) GitLab CI: add a job after your test job
 
@@ -328,7 +328,9 @@ Without the token, or on a branch push, the summary says why nothing was posted,
 
 ### 6) Upload the evidence to Putnami Cloud
 
-To send the evidence to Putnami Cloud, store a workspace token with the `delivery.ingest` scope as the secret or masked CI/CD variable `PUTNAMI_CLOUD_TOKEN`. Then use the commented `--upload` line in place of the line above it, and on GitHub uncomment the `env` block. The token names the workspace. An upload that fails is a diagnostic in the summary, and the job still passes.
+To send the evidence to Putnami Cloud, store a workspace token with the `delivery.ingest` scope as the secret or masked CI/CD variable `PUTNAMI_CLOUD_TOKEN`. The token names the workspace.
+
+On GitHub, pass it to the action as `token: ${{ secrets.PUTNAMI_CLOUD_TOKEN }}`. With a token, `publish` is on unless you set it to `false`, so the job needs the permissions of step 2. On GitLab, use the commented `--upload` line in place of the line above it. An upload that fails is a diagnostic in the summary, and the job still passes.
 
 ### 7) Add licences and known vulnerabilities from an SBOM
 
@@ -355,10 +357,20 @@ On GitHub Actions, put this step before the observe step. It writes an SBOM of t
           fi
 ```
 
-Then name both documents on the observe line:
+Then name both documents in the action's inputs:
+
+```yaml
+      - uses: Putnami/observe-action@v1
+        if: ${{ !cancelled() }}
+        with:
+          sbom: ${{ runner.temp }}/head.cdx.json
+          base-sbom: ${{ runner.temp }}/base.cdx.json
+```
+
+On GitLab, name them on the observe line:
 
 ```bash
-putnami observe --evidence observe-evidence.json --sbom "$RUNNER_TEMP/head.cdx.json" --base-sbom "$RUNNER_TEMP/base.cdx.json"
+putnami observe --evidence observe-evidence.json --sbom /tmp/head.cdx.json --base-sbom /tmp/base.cdx.json
 ```
 
 osv-scanner exits `1` when it finds a vulnerability, so `|| true` keeps the step green. A document it could not write, such as the base one on the first push of a branch, is a warning in the summary, and that side is unknown. `--all-packages` lists every package, not only the vulnerable ones, and `--licenses` adds their licences. osv-scanner writes no vulnerability in SPDX, so use CycloneDX. It names a vulnerable package without its version: when the checkout locks two versions of one package, in two lockfiles, both get its vulnerabilities. On GitLab, use `$CI_MERGE_REQUEST_DIFF_BASE_SHA` as the base, and a directory outside the checkout, such as `/tmp`, in place of `$RUNNER_TEMP`. [Trivy](https://trivy.dev) also writes a CycloneDX document with vulnerabilities: `trivy fs --format cyclonedx --scanners vuln --output head.cdx.json .`.
