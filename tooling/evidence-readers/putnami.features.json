@@ -7,7 +7,7 @@
       "id": "evidence-readers/report-readers",
       "type": "feature",
       "name": "Test and coverage report readers",
-      "outcome": "A tool that observes a CI it does not run reads the JUnit, TRX, LCOV, Cobertura, Clover, JaCoCo and Go cover reports and the CycloneDX and SPDX documents that CI already wrote into typed test cases, line-level file coverage and packages with their licences and known vulnerabilities, and a report it cannot read becomes a diagnostic, never a crash.",
+      "outcome": "A tool that observes a CI it does not run reads the JUnit, TRX, LCOV, Cobertura, Clover, JaCoCo and Go cover reports, the CycloneDX and SPDX documents and the ArchUnit, deptrac and import-linter results that CI already wrote into typed test cases, line-level file coverage, packages with their licences and known vulnerabilities, and architecture rules with their violations, and a report it cannot read becomes a diagnostic, never a crash.",
       "owner": "tooling",
       "target": "coded",
       "requirements": [
@@ -136,6 +136,47 @@
             "kind": "acceptance",
             "checks": [
               "a-real-spdx-document-reads-to-its-expected-packages"
+            ]
+          }
+        },
+        {
+          "id": "archunit-cases-are-rules",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "an-archunit-failure-reads-to-its-rule-and-violations",
+              "a-passing-archunit-case-is-a-kept-rule"
+            ]
+          }
+        },
+        {
+          "id": "deptrac-junit-reads-layers",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-deptrac-junit-report-reads-to-its-layers"
+            ]
+          }
+        },
+        {
+          "id": "import-linter-text-reads-contracts",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "an-import-linter-output-reads-to-its-contracts",
+              "an-output-without-contracts-is-malformed"
             ]
           }
         }

@@ -5,12 +5,15 @@
   "outcomes": [
     "A repository that keeps its own CI describes one change, what it touches, its tests, its coverage, its dependency changes, the decision records that govern the files it touches and, when its CI wrote a software bill of materials, the licences and known vulnerabilities of each changed dependency, in one versioned document that any reader interprets the same way.",
     "A producer and every reader share one schema, one strict parser and one fixture corpus, so a document either validates everywhere or is refused with the same codes.",
-    "A document is internally consistent and bounded: every reference resolves, every count adds up, and no member grows without limit."
+    "A document is internally consistent and bounded: every reference resolves, every count adds up, and no member grows without limit.",
+    "A repository that keeps its own CI describes one change, what it touches, its tests, its coverage, the architecture rules its CI checked with their violations, its dependency changes and, when its CI wrote a software bill of materials, the licences and known vulnerabilities of each changed dependency, in one versioned document that any reader interprets the same way."
   ],
   "nonGoals": [
     "Collecting the reports, detecting components, reading decision records, matching their scope or computing the analyses, which the observe extension owns.",
     "Uploading the document or deciding how much a reader trusts it: the document carries no verdict and no trust claim, and a reader treats it as self-reported.",
-    "Spec, architecture or task evidence beyond the decision records a change concerns, which later protocol versions or other protocols carry."
+    "Spec, architecture or task evidence beyond the decision records a change concerns, which later protocol versions or other protocols carry.",
+    "Spec or task evidence, which later protocol versions or other protocols carry.",
+    "Running an architecture checker or judging a rule: the document carries the result the checker reported."
   ],
   "requirements": [
     {
@@ -88,10 +91,19 @@
     {
       "id": "decisions-follow-the-diff",
       "text": "A decision governs only changed files, each once, else evidence.invalid_decision and evidence.duplicate. Its change, when present, is the file status of its record, which is then a changed file with that status; without a change, its record is not a changed file. A decision that neither governs a changed file nor has a change concerns no change and is refused. Every defect is evidence.invalid_decision."
+    },
+    {
+      "id": "architecture-rules-are-well-formed",
+      "text": "The optional architecture member lists at most 1000 rules an architecture checker evaluated. A rule names its tool, an open lowercase slug such as archunit, deptrac or import-linter, and its rule text, else evidence.required; its status is kept or broken, else evidence.invalid_architecture. A kept rule reports no violation; a broken one a violationCount of at least 1 and of its listed violations, at most 50, else evidence.invalid_count. A tool and rule pair twice is evidence.duplicate."
+    },
+    {
+      "id": "architecture-violations-are-well-formed",
+      "text": "A violation carries a message, else evidence.required. Its file stays in the repository (evidence.invalid_path); a line, from 1, needs a file (evidence.invalid_architecture); its component names a component (evidence.unknown_component) that holds its file (evidence.invalid_component). A document without the architecture member validates as before."
     }
   ],
   "decisions": [
     "protocols/evidence/doc/adr/0001-one-self-reported-change-evidence-document.md",
-    "protocols/evidence/doc/adr/0002-the-decision-records-a-change-concerns.md"
+    "protocols/evidence/doc/adr/0002-the-decision-records-a-change-concerns.md",
+    "protocols/evidence/doc/adr/0002-architecture-results-are-an-optional-member-of-version-1.md"
   ]
 }

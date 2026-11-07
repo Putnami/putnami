@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://maven.apache.org/surefire/maven-surefire-plugin/xsd/surefire-test-report-3.0.xsd" version="3.0" name="com.acme.api.ArchitectureTest" time="1.412" tests="4" errors="0" skipped="1" failures="2">
+  <properties>
+    <property name="java.version" value="21.0.5"/>
+  </properties>
+  <testcase name="pricing_internals_stay_inside_pricing" classname="com.acme.api.ArchitectureTest" time="0.611">
+    <failure message="Architecture Violation [Priority: MEDIUM] - Rule 'classes that reside in a package '..pricing.internal..' should only be accessed by classes that reside in a package '..pricing..'' was violated (2 times):&#10;Method &lt;com.acme.api.Quotes.quote(java.lang.String)&gt; calls method &lt;com.acme.pricing.internal.Rates.base()&gt; in (Quotes.java:14)&#10;Field &lt;com.acme.api.Quotes$Cache.rates&gt; has type &lt;com.acme.pricing.internal.Rates&gt; in (Quotes.java:0)" type="java.lang.AssertionError"><![CDATA[java.lang.AssertionError: 
+Architecture Violation [Priority: MEDIUM] - Rule 'classes that reside in a package '..pricing.internal..' should only be accessed by classes that reside in a package '..pricing..'' was violated (2 times):
+Method <com.acme.api.Quotes.quote(java.lang.String)> calls method <com.acme.pricing.internal.Rates.base()> in (Quotes.java:14)
+Field <com.acme.api.Quotes$Cache.rates> has type <com.acme.pricing.internal.Rates> in (Quotes.java:0)
+	at com.tngtech.archunit.lang.ArchRule$Assertions.assertNoViolation(ArchRule.java:94)
+]]></failure>
+  </testcase>
+  <testcase name="no_cycles_between_modules" classname="com.acme.api.ArchitectureTest" time="0.402"/>
+  <testcase name="controllers_are_annotated" classname="com.acme.api.ArchitectureTest" time="0.211">
+    <failure message="Rule 'classes that reside in a package '..controllers..' should be annotated with @RestController' failed to check any classes. This means either that no classes have been passed to the rule at all, or that no classes passed to the rule matched the `that()` clause." type="java.lang.AssertionError"/>
+  </testcase>
+  <testcase name="legacy_is_frozen" classname="com.acme.api.ArchitectureTest" time="0.0">
+    <skipped message="@ArchIgnore"/>
+  </testcase>
+</testsuite>

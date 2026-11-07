@@ -1,0 +1,35 @@
+[
+  {
+    "name": "classes that reside in a package '..pricing.internal..' should only be accessed by classes that reside in a package '..pricing..'",
+    "status": "broken",
+    "count": 2,
+    "violations": [
+      {
+        "message": "Method \u003ccom.acme.api.Quotes.quote(java.lang.String)\u003e calls method \u003ccom.acme.pricing.internal.Rates.base()\u003e in (Quotes.java:14)",
+        "subject": "com.acme.api.Quotes",
+        "file": "Quotes.java",
+        "line": 14
+      },
+      {
+        "message": "Field \u003ccom.acme.api.Quotes$Cache.rates\u003e has type \u003ccom.acme.pricing.internal.Rates\u003e in (Quotes.java:0)",
+        "subject": "com.acme.api.Quotes",
+        "file": "Quotes.java"
+      }
+    ]
+  },
+  {
+    "name": "no_cycles_between_modules",
+    "status": "kept",
+    "count": 0
+  },
+  {
+    "name": "controllers_are_annotated",
+    "status": "broken",
+    "count": 1,
+    "violations": [
+      {
+        "message": "Rule 'classes that reside in a package '..controllers..' should be annotated with @RestController' failed to check any classes. This means either that no classes have been passed to the rule at all, or that no classes passed to the rule matched the `that()` clause."
+      }
+    ]
+  }
+]

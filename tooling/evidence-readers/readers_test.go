@@ -454,6 +454,10 @@ func TestEveryMalformedFixtureReturnsItsCode(t *testing.T) {
 			result, diagnostics = ReadFile(fixture, ReadJUnit)
 		case "trx":
 			result, diagnostics = ReadFile(fixture, ReadTRX)
+		case "deptrac":
+			result, diagnostics = ReadFile(fixture, ReadDeptrac)
+		case "import-linter":
+			result, diagnostics = ReadFile(fixture, ReadImportLinter)
 		default:
 			result, diagnostics = ReadFile(fixture, coverageReaders[expectation.Reader])
 		}
@@ -492,6 +496,14 @@ func allReaders() map[string]func([]byte) []diag.Diagnostic {
 		"junit": func(data []byte) []diag.Diagnostic { _, d := ReadJUnit(data); return d },
 		"trx":   func(data []byte) []diag.Diagnostic { _, d := ReadTRX(data); return d },
 		"sbom":  func(data []byte) []diag.Diagnostic { _, d := ReadSBOM(data); return d },
+		"deptrac": func(data []byte) []diag.Diagnostic {
+			_, d := ReadDeptrac(data)
+			return d
+		},
+		"import-linter": func(data []byte) []diag.Diagnostic {
+			_, d := ReadImportLinter(data)
+			return d
+		},
 	}
 	for name, reader := range coverageReaders {
 		readers[name] = func(data []byte) []diag.Diagnostic { _, d := reader(data); return d }
@@ -593,7 +605,7 @@ func TestArbitraryBytesNeverPanic(t *testing.T) {
 }
 
 func FuzzReaders(f *testing.F) {
-	for _, dir := range []string{"junit", "trx", "lcov", "cobertura", "clover", "gocover", "sbom"} {
+	for _, dir := range []string{"junit", "trx", "lcov", "cobertura", "clover", "gocover", "sbom", "archunit", "deptrac", "import-linter"} {
 		entries, _ := os.ReadDir(filepath.Join("testdata", dir))
 		for _, entry := range entries {
 			if data, err := os.ReadFile(filepath.Join("testdata", dir, entry.Name())); err == nil {

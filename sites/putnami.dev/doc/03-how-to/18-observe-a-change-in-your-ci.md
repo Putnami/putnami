@@ -411,6 +411,22 @@ Records kept elsewhere are named on the observe line, such as `putnami observe -
   warning observe.decision_deleted: the change deletes the accepted decision docs/decisions/0001-charges-are-synchronous.md (Charges are synchronous)
 ```
 
+### 9) Show your architecture rules
+
+When your CI checks its architecture with ArchUnit, deptrac or import-linter, `putnami observe` shows each rule the checker found broken, with each violation, its file, its line and its component. Keep the checker's report where the observe step can read it; you rewrite no rule.
+
+- **ArchUnit** runs as JUnit tests: nothing to add. A test class that imports `com.tngtech.archunit` is read as rules, not tests. Name a class that does not with `--archunit-classes '*ArchitectureTest'`.
+- **deptrac**: write its JUnit report, `vendor/bin/deptrac analyse --formatter=junit --output=deptrac.xml || true`.
+- **import-linter**: save its output, `lint-imports > import-linter.txt || true`.
+
+`|| true` keeps the checker from stopping the job before the observe step; keep a separate step that runs the checker without it when a broken rule must fail the job. `putnami observe` finds the deptrac report by its content, and the import-linter output in a `.txt` file whose name contains `lint`. Name them with `--architecture deptrac.xml,import-linter.txt` when they lie elsewhere. The summary then counts the rules:
+
+```text
+  architecture  2 rules, 1 broken
+    broken    import-linter: Shared imports no service (1 violation)
+      shared shared/src/shared/money.py:3: shared.money -> api.main (l.3)
+```
+
 ## Give your agents the same view
 
 The CI job reads what a change touches; your coding agents can read the same thing on your machine, in a repository that still has no `putnami.workspace.json`. Install two extensions in your user scope:
@@ -437,6 +453,7 @@ Inside a Putnami workspace, each of these skills follows the copy the workspace 
 - [Observe](/docs/tooling-&-workspace/observe): what `putnami observe` answers, and every CI, repository tool, report format, lockfile and SBOM format it reads.
 - [What `putnami observe` reads](/docs/tooling-&-workspace/observe/observe): every flag, how the base is found, and how reports and SBOMs are discovered.
 - [How `putnami observe` explains a change](/docs/tooling-&-workspace/observe/change-analyses): components, tests, changed-line coverage, dependency changes and decision records.
+- [Architecture rules](/docs/tooling-&-workspace/observe/architecture): how the ArchUnit, deptrac and import-linter results are read and placed.
 - [Reports](/docs/tooling-&-workspace/observe/reports): what each test, coverage and SBOM format gives.
 
 You now have a CI job that records which files a change touched and which tests and coverage reports it produced, as an artifact you can keep or upload to Putnami Cloud.

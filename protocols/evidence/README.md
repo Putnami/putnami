@@ -27,6 +27,7 @@ A document (`schemas/evidence.json`) has `protocolVersion: 1` and:
 | `changedFiles` | The diff: path, status (`added`, `modified`, `deleted`, `renamed` with its `previousPath`), and the component the file belongs to. |
 | `components` | Repository-relative directories (`.` for the whole repository), with an open `ecosystem` slug, the `source` that found them (`orchestrator`, `workspace`, `manifest`, `fallback` for the whole repository, `fallback-codeowners` and `fallback-directories` for the directories a fallback split gives, `declared`), their `impact` and their `dependsOn` edges. |
 | `tests`, `coverage` | One entry per component: passed, failed, skipped, duration and failing cases; covered and total lines. |
+| `architecture` | The rules an architecture checker evaluated: its `tool` (an open slug: `archunit`, `deptrac`, `import-linter`), the `rule` as the checker names it, its `status` (`kept` or `broken`), the `violationCount` it reported and up to 50 `violations`, each with its message and, when the producer located it, its `file`, `line` and `component`. Absent when the producer read none. |
 | `changedLineCoverage` | The coverage of the lines the change added or modified, per file, with the uncovered line numbers. |
 | `dependencyChanges` | The lockfile difference: ecosystem, lockfile, package, `added`, `removed`, `upgraded`, `downgraded` or `changed`, from and to versions. From a software bill of materials (SBOM), a `before` and an `after` state: the package's licences and known vulnerabilities, each an id and a severity (`critical`, `high`, `medium`, `low`, `info`, `none`, `unknown`). |
 | `sbom` | The SBOMs the states were read from: a `head` and a `base` document, each with its `format` (`cyclonedx` or `spdx`) and `specVersion`. Absent when the producer read none. Without a `base`, every base state is unknown. |
@@ -59,12 +60,18 @@ A document (`schemas/evidence.json`) has `protocolVersion: 1` and:
   changed files, names the file status of its record exactly when the record
   is a changed file, and concerns the change through one or the other
   (`evidence.invalid_decision`).
+  An architecture rule names its tool and rule; its status is `kept` or
+  `broken` and a line needs a file (`evidence.invalid_architecture`); a kept
+  rule counts no violation and a broken one at least one and its listed ones
+  (`evidence.invalid_count`); a violation's component holds its file
+  (`evidence.invalid_component`).
 - **Bounded.** At most 20000 changed files, 5000 components, 10000 dependency
   changes, 100000 dependency edges, 20000 changed-line coverage files, 500
-  diagnostics, 50 failing cases per tests entry, 200 uncovered line numbers per
-  file, 20 licences and 200 vulnerabilities per dependency state, 1000
-  decisions with at most 100 scope patterns and 1000 governed files each, and
-  4096 bytes per string (`evidence.too_large`).
+  diagnostics, 50 failing cases per tests entry, 1000 architecture rules, 50
+  violations per rule, 200 uncovered line numbers per file, 20 licences and
+  200 vulnerabilities per dependency state, 1000 decisions with at most 100
+  scope patterns and 1000 governed files each, and 4096 bytes per string
+  (`evidence.too_large`).
 - **Open where stacks grow.** Ecosystems are slugs: a new stack needs no
   protocol change. A new code host, CI system or component source is a
   protocol change: it extends a closed vocabulary of version 1, a reader built
@@ -72,9 +79,12 @@ A document (`schemas/evidence.json`) has `protocolVersion: 1` and:
   `evidence.invalid_ci`, `evidence.invalid_component`), so a reader updates
   before its producers write it.
 - **Optional members stay optional.** The `sbom` member, the dependency
-  states and the `decisions` member are optional members of version 1: a
-  document without them validates as before, and a producer that read no SBOM
-  or found no decision record writes none of them. A reader
+  states, the `decisions` member and the `architecture` member are optional
+  members of version 1
+  (`doc/adr/0002-architecture-results-are-an-optional-member-of-version-1.md`):
+  a document without them validates as before, and a producer that read no
+  SBOM, found no decision record or read no architecture result writes none
+  of them. A reader
   built before they existed refuses a document that carries them
   (`evidence.unknown_field`), so a reader updates before its producers write
   them.

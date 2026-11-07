@@ -104,6 +104,8 @@ See [doc/06-change-analyses.md](doc/06-change-analyses.md) for how it maps a
 change to components, tests, coverage and dependencies.
 See [doc/18-reports.md](doc/18-reports.md) for what each test, coverage and
 SBOM format gives, and when a report is rejected.
+See [doc/19-architecture.md](doc/19-architecture.md) for how it reads the
+ArchUnit, deptrac and import-linter results and places each violation.
 
 ## Support
 

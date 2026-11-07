@@ -1,0 +1,31 @@
+{
+  "rules": [
+    {
+      "name": "Controller",
+      "status": "broken",
+      "count": 2,
+      "violations": [
+        {
+          "message": "App\\Controller\\QuoteController must not depend on App\\Repository\\QuoteRepository (Controller on Repository)",
+          "subject": "App\\Controller\\QuoteController",
+          "line": 9
+        },
+        {
+          "message": "App\\Controller\\QuoteController must not depend on App\\Repository\\QuoteRepository (Controller on Repository)",
+          "subject": "App\\Controller\\QuoteController",
+          "line": 24
+        }
+      ]
+    },
+    {
+      "name": "Service",
+      "status": "kept",
+      "count": 0
+    },
+    {
+      "name": "Repository",
+      "status": "kept",
+      "count": 0
+    }
+  ]
+}

@@ -1,0 +1,43 @@
+
+╔══╗─────────▶╔╗ ╔╗      ╔╗◀───┐
+╚══╩╩╩╣╔═╩══╩╝╚═╝╚═══╩╩╝╚╩═╩╩═╩╝
+
+---------
+Contracts
+---------
+
+Analyzed 23 files, 44 dependencies.
+-----------------------------------
+
+Shared does not import the services KEPT
+Forbidden modules BROKEN
+Layered architecture BROKEN (2 ignored imports)
+Independent workers KEPT (1 warning)
+
+Contracts: 2 kept, 2 broken.
+
+
+----------------
+Broken contracts
+----------------
+
+Forbidden modules
+-----------------
+
+shared is not allowed to import api:
+
+-   shared.money -> api.main (l.3)
+
+-   shared.rates -> shared.money (l.5, l.9)
+    shared.money -> api.main (l.3)
+
+
+Layered architecture
+--------------------
+
+worker is not allowed to import api:
+
+- worker.tasks (l.4)
+  & worker.jobs -> api.client (l.?)
+
+

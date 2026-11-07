@@ -1,7 +1,7 @@
 # Reports
 
-`putnami observe` reads test reports, coverage reports and software bills of
-materials (SBOM) with one set of readers, `@putnami/evidence-readers`. The
+`putnami observe` reads test reports, coverage reports, software bills of
+materials (SBOM) and architecture results with one set of readers, `@putnami/evidence-readers`. The
 TypeScript extension reads bun's test and coverage reports with the same
 readers. This page says what each reader keeps from a report and when it
 rejects one.
@@ -75,3 +75,9 @@ A reader never returns half a report. It rejects a report whole, and
 - it is an SBOM of another format or version.
 
 The other reports of the job are still read.
+
+## Architecture results
+
+The ArchUnit cases of a JUnit report, the deptrac JUnit report and the text of
+`lint-imports` become architecture rules, each kept or broken with its
+violations. See [Architecture rules](/docs/tooling-&-workspace/observe/architecture).

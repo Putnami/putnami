@@ -15,6 +15,8 @@ answer, so the workspace must declare `@putnami/observe` to run it there.
 | `--coverage <paths>` | The same for coverage reports. Replaces coverage discovery. |
 | `--sbom <path>` | The software bill of materials (SBOM) of the commit, a path or glob pattern. Replaces SBOM discovery. |
 | `--base-sbom <path>` | The SBOM of the base. Without it, the base state of each dependency is unknown. |
+| `--architecture <paths>` | The deptrac `--formatter=junit` report and the `lint-imports` output, comma-separated paths or glob patterns. Replaces their discovery. See [Architecture rules](/docs/tooling-&-workspace/observe/architecture). |
+| `--archunit-classes <patterns>` | Class name patterns, such as `*ArchitectureTest`, whose JUnit cases are ArchUnit rules, besides the test classes that import `com.tngtech.archunit`. |
 | `--moon-graph <path>` | The moon project graph export, from `moon project-graph --json`. Default `moon-graph.json` at the repository root when it exists. See [the moon detector](/docs/tooling-&-workspace/observe/moon). |
 | `--pants-graph <path>` | The Pants export `pants peek ::` wrote, resolved against the directory you run in. Default `pants-graph.json` at the repository root. See [the Pants detector](/docs/tooling-&-workspace/observe/pants). |
 | `--bazel-graph <path>` | The Bazel query export, from `bazel query 'deps(//...)' --output=streamed_jsonproto`. Default `bazel-graph.json` at the repository root. See [the Bazel detector](/docs/tooling-&-workspace/observe/bazel). |

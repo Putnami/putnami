@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites>
+  <testsuite id="0" package="" name="Unmatched skipped violations" hostname="localhost" tests="0" failures="0" skipped="0" errors="1" time="0">
+    <error message="Skipped violation &quot;App\Legacy\Old&quot; for &quot;App\Controller\QuoteController&quot; was not matched." type="WARNING"/>
+  </testsuite>
+  <testsuite id="1" package="" name="Domain" hostname="localhost" tests="1" failures="0" skipped="0" errors="0" time="0">
+    <testcase name="Domain - App\Domain\Quote" classname="App\Domain\Quote" time="0"/>
+  </testsuite>
+</testsuites>

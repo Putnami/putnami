@@ -1,0 +1,43 @@
+{
+  "rules": [
+    {
+      "name": "Shared does not import the services",
+      "status": "kept",
+      "count": 0
+    },
+    {
+      "name": "Forbidden modules",
+      "status": "broken",
+      "count": 2,
+      "violations": [
+        {
+          "message": "shared.money -\u003e api.main (l.3)",
+          "subject": "shared.money",
+          "line": 3
+        },
+        {
+          "message": "shared.rates -\u003e shared.money (l.5, l.9), shared.money -\u003e api.main (l.3)",
+          "subject": "shared.rates",
+          "line": 5
+        }
+      ]
+    },
+    {
+      "name": "Layered architecture",
+      "status": "broken",
+      "count": 1,
+      "violations": [
+        {
+          "message": "worker.tasks (l.4), \u0026 worker.jobs -\u003e api.client (l.?)",
+          "subject": "worker.tasks",
+          "line": 4
+        }
+      ]
+    },
+    {
+      "name": "Independent workers",
+      "status": "kept",
+      "count": 0
+    }
+  ]
+}

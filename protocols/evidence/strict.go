@@ -34,6 +34,7 @@ const (
 	ErrorCodeInvalidDependencyChange    = "evidence.invalid_dependency_change"
 	ErrorCodeInvalidSBOM                = "evidence.invalid_sbom"
 	ErrorCodeInvalidDecision            = "evidence.invalid_decision"
+	ErrorCodeInvalidArchitecture        = "evidence.invalid_architecture"
 	ErrorCodeInvalidTimestamp           = "evidence.invalid_timestamp"
 	ErrorCodeInvalidDiagnostic          = "evidence.invalid_diagnostic"
 	ErrorCodeTooLarge                   = "evidence.too_large"
@@ -56,6 +57,7 @@ var ValidErrorCodes = map[string]bool{
 	ErrorCodeInvalidDependencyChange:    true,
 	ErrorCodeInvalidSBOM:                true,
 	ErrorCodeInvalidDecision:            true,
+	ErrorCodeInvalidArchitecture:        true,
 	ErrorCodeInvalidTimestamp:           true,
 	ErrorCodeInvalidDiagnostic:          true,
 	ErrorCodeTooLarge:                   true,
@@ -135,6 +137,10 @@ var documentShape = object(map[string]*member{
 		"failingCases": array(object(map[string]*member{"name": nil, "suite": nil, "file": nil, "message": nil})),
 	})),
 	"coverage": array(object(map[string]*member{"component": nil, "coveredLines": nil, "totalLines": nil})),
+	"architecture": array(object(map[string]*member{
+		"tool": nil, "rule": nil, "status": nil, "violationCount": nil,
+		"violations": array(object(map[string]*member{"message": nil, "file": nil, "line": nil, "component": nil})),
+	})),
 	"changedLineCoverage": object(map[string]*member{
 		"coveredLines": nil, "totalLines": nil,
 		"files": array(object(map[string]*member{"path": nil, "coveredLines": nil, "totalLines": nil, "uncoveredLines": nil})),
@@ -307,6 +313,7 @@ func ValidateDocument(document *Document) []diag.Diagnostic {
 	v.impact(document, components)
 	v.tests(document.Tests, components)
 	v.coverage(document.Coverage, components)
+	v.architecture(document.Architecture, components)
 	v.changedLineCoverage(document.ChangedLineCoverage, changed)
 	v.sbom(document.SBOM)
 	v.dependencyChanges(document.DependencyChanges, components, changed)
@@ -397,6 +404,10 @@ func (v *validator) bounds(document *Document) bool {
 	over("components", len(document.Components), MaxComponents)
 	over("tests", len(document.Tests), MaxComponents)
 	over("coverage", len(document.Coverage), MaxComponents)
+	over("architecture", len(document.Architecture), MaxArchitectureRules)
+	for index, rule := range document.Architecture {
+		over(fmt.Sprintf("architecture[%d].violations", index), len(rule.Violations), MaxViolations)
+	}
 	over("dependencyChanges", len(document.DependencyChanges), MaxDependencyChanges)
 	over("decisions", len(document.Decisions), MaxDecisions)
 	over("diagnostics", len(document.Diagnostics), MaxDiagnostics)
@@ -639,6 +650,61 @@ func (v *validator) coverage(entries []ComponentCoverage, components map[string]
 		seen[entry.Component] = true
 		v.reference(field+".component", entry.Component, components)
 		v.lines(field, entry.CoveredLines, entry.TotalLines)
+	}
+}
+
+func (v *validator) architecture(rules []ArchitectureRule, components map[string]Component) {
+	seen := map[[2]string]bool{}
+	for index, rule := range rules {
+		field := fmt.Sprintf("architecture[%d]", index)
+		if strings.TrimSpace(rule.Tool) == "" {
+			v.add(ErrorCodeRequired, field+".tool", "an architecture rule names its tool")
+		} else if !slugPattern.MatchString(rule.Tool) {
+			v.add(ErrorCodeInvalidArchitecture, field+".tool", "tool %q must be a lowercase slug", rule.Tool)
+		}
+		if strings.TrimSpace(rule.Rule) == "" {
+			v.add(ErrorCodeRequired, field+".rule", "an architecture rule names its rule")
+		}
+		key := [2]string{rule.Tool, rule.Rule}
+		if seen[key] {
+			v.add(ErrorCodeDuplicate, field+".rule", "rule %q of %s is listed twice", rule.Rule, rule.Tool)
+		}
+		seen[key] = true
+		switch rule.Status {
+		case ArchitectureKept:
+			if rule.ViolationCount != 0 || len(rule.Violations) > 0 {
+				v.add(ErrorCodeInvalidCount, field+".violationCount", "a kept rule reports no violation")
+			}
+		case ArchitectureBroken:
+			if rule.ViolationCount < max(1, len(rule.Violations)) {
+				v.add(ErrorCodeInvalidCount, field+".violationCount",
+					"a broken rule counts at least one violation and its %d listed ones, not %d", len(rule.Violations), rule.ViolationCount)
+			}
+		default:
+			v.add(ErrorCodeInvalidArchitecture, field+".status", "status %q is not kept or broken", rule.Status)
+		}
+		for violationIndex, violation := range rule.Violations {
+			v.violation(fmt.Sprintf("%s.violations[%d]", field, violationIndex), violation, components)
+		}
+	}
+}
+
+func (v *validator) violation(field string, violation ArchitectureViolation, components map[string]Component) {
+	if strings.TrimSpace(violation.Message) == "" {
+		v.add(ErrorCodeRequired, field+".message", "a violation carries its message")
+	}
+	if violation.File != "" {
+		v.path(field+".file", violation.File)
+	}
+	if violation.Line < 0 || (violation.Line > 0 && violation.File == "") {
+		v.add(ErrorCodeInvalidArchitecture, field+".line", "a line is from 1 and needs a file")
+	}
+	if violation.Component == "" {
+		return
+	}
+	v.reference(field+".component", violation.Component, components)
+	if _, known := components[violation.Component]; known && violation.File != "" && validPath(violation.File) && !contains(violation.Component, violation.File) {
+		v.add(ErrorCodeInvalidComponent, field+".component", "file %q is not inside component %q", violation.File, violation.Component)
 	}
 }
 

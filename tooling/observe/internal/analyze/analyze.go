@@ -1,8 +1,9 @@
 // Package analyze computes what a change touches: the changed and dependent
-// components, the tests and coverage of each component, the coverage of the
-// changed lines, the dependency changes of the lockfiles, with the licenses
-// and known vulnerabilities the software bills of materials list for them, and
-// the decision records the change concerns.
+// components, the tests and coverage of each component, the architecture
+// rules the CI checked with their violations, the coverage of the changed
+// lines, the dependency changes of the lockfiles, with the licenses and known
+// vulnerabilities the software bills of materials list for them, and the
+// decision records the change concerns.
 //
 // It reads the components the detectors found, the reports the CI wrote, the
 // decision records and the git diff; it runs nothing. Every finding is a diagnostic.
@@ -53,6 +54,9 @@ type Input struct {
 	// AddedLines are the lines the change adds per path at the head; nil
 	// without a base.
 	AddedLines map[string][]int
+	// ArchUnitClasses are class name patterns whose JUnit cases are ArchUnit
+	// rules, besides those of a test source that imports ArchUnit.
+	ArchUnitClasses []string
 	// Show returns the content of a repository path at one side of the
 	// change; found is false when that side has no such file.
 	Show func(side Revision, path string) (data []byte, found bool, err error)
@@ -70,6 +74,8 @@ type Result struct {
 	// Tests and Coverage are per component, sorted by component.
 	Tests    []evidence.ComponentTests    `json:"tests,omitempty"`
 	Coverage []evidence.ComponentCoverage `json:"coverage,omitempty"`
+	// Architecture is one entry per architecture rule read, in report order.
+	Architecture []evidence.ArchitectureRule `json:"architecture,omitempty"`
 	// ChangedLineCoverage is nil without a base or a coverage report.
 	ChangedLineCoverage *evidence.ChangedLineCoverage `json:"changedLineCoverage,omitempty"`
 	// DependencyChanges are the lockfile differences.
@@ -99,6 +105,11 @@ func Run(in Input) Result {
 			ID: c.ID, Name: c.Name, Ecosystem: c.Ecosystem, Source: c.Source, Impact: impacts[c.ID], DependsOn: c.DependsOn,
 		})
 	}
+	for _, pattern := range in.ArchUnitClasses {
+		if _, err := path.Match(pattern, ""); err != nil {
+			r.warn(CodePatternInvalid, "archunit-classes", "the --archunit-classes pattern %q is invalid and matches nothing: %v", pattern, err)
+		}
+	}
 	m := newMapper(in.Root, in.Set)
 	lines := r.readReports(in, m)
 	r.changedLineCoverage(in, lines)
@@ -114,10 +125,14 @@ type mapper struct {
 	set    components.Set
 	exists map[string]bool
 	dirs   map[string]bool
+	// archUnit caches whether a test source imports ArchUnit; psr4 holds the
+	// PSR-4 autoload roots, once read.
+	archUnit map[string]bool
+	psr4     []psr4Root
 }
 
 func newMapper(root string, set components.Set) *mapper {
-	return &mapper{root: filepath.Clean(root), set: set, exists: map[string]bool{}, dirs: map[string]bool{}}
+	return &mapper{root: filepath.Clean(root), set: set, exists: map[string]bool{}, dirs: map[string]bool{}, archUnit: map[string]bool{}}
 }
 
 // isFile reports whether the repository-relative path is a file.
