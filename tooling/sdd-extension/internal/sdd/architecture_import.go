@@ -752,8 +752,7 @@ func (merge *importMerge) producerExport(domain *importDomain) (archproto.Export
 func (merge *importMerge) reportNotInModel() {
 	for _, entry := range merge.ordered() {
 		for _, imported := range entry.manifest.Imports {
-			generated := imported.ID == importImportID(entry.manifest.Domain, imported.From.Domain, imported.Version)
-			if generated && merge.model[imported.From.Domain] && !merge.related[importPair{entry.manifest.Domain, imported.From.Domain}] {
+			if merge.model[imported.From.Domain] && !merge.related[importPair{entry.manifest.Domain, imported.From.Domain}] {
 				entry.row.NotInModel = append(entry.row.NotInModel, imported.ID)
 			}
 		}

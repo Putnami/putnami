@@ -446,3 +446,29 @@ func readFileString(t *testing.T, path string) string {
 	}
 	return string(data)
 }
+
+// TestArchitectureImportReportsARenamedImportTheModelDropped: an import a
+// person renamed is still reported once the model no longer relates its
+// domains, because it keeps authorizing the dependency.
+func TestArchitectureImportReportsARenamedImportTheModelDropped(t *testing.T) {
+	root, projects := bigBankWorkspace(t, false)
+	if _, code, stdout := runImport(t, root, projects, map[string]any{"apply": true}); code != protocolcli.ExitSuccess {
+		t.Fatalf("first import exit = %d\n%s", code, stdout)
+	}
+	mutateFile(t, filepath.Join(root, "architecture", "atm", archproto.ManifestFilename), func(text string) string {
+		return strings.Replace(text, `"atm.uses.mainframe-banking-system.v1"`, `"atm.reads-balances.v1"`, 1)
+	})
+	mutateFile(t, filepath.Join(root, "model", "workspace.dsl"), func(text string) string {
+		return strings.Replace(text, `atm -> mainframe "Uses"`, "", 1)
+	})
+	report, code, stdout := runImport(t, root, projects, nil)
+	if code != protocolcli.ExitSuccess {
+		t.Fatalf("rerun exit = %d\n%s", code, stdout)
+	}
+	for _, manifest := range report.Manifests {
+		if manifest.Domain == "atm" && strings.Join(manifest.NotInModel, ",") == "atm.reads-balances.v1" {
+			return
+		}
+	}
+	t.Errorf("the renamed import the model dropped is not reported: %+v", report.Manifests)
+}

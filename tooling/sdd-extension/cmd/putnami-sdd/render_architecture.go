@@ -215,7 +215,7 @@ func printArchitectureImportHuman(w io.Writer, report sdd.ArchitectureImportRepo
 		report.Summary.AddedProjects, report.Summary.AddedExports, report.Summary.AddedImports, report.Summary.AddedBindings)
 	for _, manifest := range report.Manifests {
 		for _, imported := range manifest.NotInModel {
-			fmt.Fprintf(w, "  %s: import %s is no longer in the model; remove it by hand if it is gone\n", manifest.Path, imported)
+			fmt.Fprintf(w, "  %s: import %s joins two domains the model does not relate; remove it by hand if that relation is gone\n", manifest.Path, imported)
 		}
 		if manifest.Diff == "" {
 			continue
