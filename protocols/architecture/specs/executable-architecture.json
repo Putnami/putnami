@@ -44,7 +44,7 @@
     },
     {
       "id": "framework-evidence",
-      "text": "Framework evidence is compared with the declarations without either becoming the other: an implementation no declaration matches always fails, a declaration is expected to be implemented only inside a domain that already implements something, and the coverage report names the framework-evidence tier rather than claiming runtime observation."
+      "text": "Framework evidence is compared with the declarations without either becoming the other: an implementation no declaration matches always fails, a declaration is expected to be implemented only inside a domain that already implements something, the coverage report names the framework-evidence tier rather than claiming runtime observation, and evidence is read only from committed manifests, so a project no domain maps stays outside coverage."
     },
     {
       "id": "contained-read-only-tooling",
