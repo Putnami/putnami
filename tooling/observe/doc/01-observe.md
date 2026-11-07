@@ -9,7 +9,7 @@ answer, so the workspace must declare `@putnami/observe` to run it there.
 
 | Flag | Meaning |
 |---|---|
-| `--base <commit or branch>` | The commit the change is measured against. It overrides the CI. A CI other than GitHub Actions or GitLab CI needs it. |
+| `--base <commit or branch>` | The commit the change is measured against. It overrides the CI. A CI other than GitHub Actions or GitLab CI needs it; outside a CI it defaults to the remote default branch. |
 | `--head <revision>` | The commit that was built. Default `HEAD`. |
 | `--junit <paths>` | Comma-separated JUnit XML or TRX paths or glob patterns, resolved against the directory you run in. Replaces JUnit discovery. |
 | `--coverage <paths>` | The same for coverage reports. Replaces coverage discovery. |
@@ -24,6 +24,8 @@ answer, so the workspace must declare `@putnami/observe` to run it there.
 | `--no-fetch` | Read only the local history: fetch no base and deepen no shallow clone. |
 | `--evidence <path>` | Write the change evidence document to this path, resolved against the directory you run in. |
 | `--upload` | Hand the change evidence document to the evidence reporter. See [Uploading the evidence](#uploading-the-evidence). |
+| `--open` | Upload as `--upload` does, letting the reporter sign you in first, and open the report in the browser outside a CI. See [Opening the report](#opening-the-report). |
+| `--details` | Print the detailed summary instead of the short one. See [Output](#output). |
 | `--publish` | Post a commit status and one summary note that link to the report on the pull or merge request. Needs `--upload`. See [Publishing on the pull or merge request](#publishing-on-the-pull-or-merge-request). |
 
 A glob pattern takes `*`, `?`, `[...]` and `**`, which matches any number of
@@ -62,6 +64,16 @@ The commit is the one the job checked out and measured, `HEAD` or `--head`. On
 a GitHub pull request that is the merge commit `refs/pull/<n>/merge`, not the
 pull request's head, so the changed files are the pull request's own changes.
 
+Outside a CI, on a laptop, the repository is read from the `origin` remote. On
+`github.com`, `gitlab.com` or a host whose name starts with `gitlab.`, observe
+asks the code host API for the numeric project id (GitHub
+`GET /repos/{owner}/{repo}`, GitLab `GET /projects/{path}`), with
+`GITHUB_TOKEN` or `PUTNAMI_GITLAB_TOKEN` when one is set, so the key is the one
+a CI job of the same repository sends. A remote on another host, or one the API
+does not answer, such as a private repository without a token, keeps the
+provider `generic` and gets `observe.project_id_missing`, which names the token
+to set. The branch is the current one.
+
 GitHub Actions exposes no numeric job id, so the run's job is the job key
 `GITHUB_JOB`, which every leg of a matrix shares.
 
@@ -75,6 +87,10 @@ The base is the first of:
    branch, `GITHUB_BASE_REF`, read on `origin`.
 4. The previous commit of a push: the event payload's `before` on GitHub,
    `CI_COMMIT_BEFORE_SHA` on GitLab, unless it is all zeros.
+5. Outside a CI, the default branch of the `origin` remote, which
+   `refs/remotes/origin/HEAD` records: `putnami observe` on a laptop needs no
+   flag. A clone without it gets `observe.base_missing`;
+   `git remote set-head origin --auto` records it.
 
 A base missing from the local history is fetched from `origin`. On a shallow
 clone (`fetch-depth: 1` on GitHub, `GIT_DEPTH` on GitLab), the history is then
@@ -149,11 +165,24 @@ nothing gets `observe.report_missing`, an unreadable file
 
 ## Output
 
-The summary names the CI, the repository, the commit, the base, the changed
-files (the first 50), the changed and dependent components, the tests and
-coverage of each component, the coverage of the changed lines, the dependency
-changes with their licences and vulnerabilities, the reports and the specs,
-then each diagnostic. See
+The summary is short: the CI, the repository, the commit, the base, the count
+of changed files, the changed and dependent components (the first 10), the
+coverage of the changed lines, and the count of dependency changes with the
+count of licence changes and of vulnerabilities introduced and fixed, then the
+warnings and errors. Its last line names the next command:
+
+| Situation | Last line |
+|---|---|
+| An upload answered a report URL | `Full report: <url>` |
+| Outside a CI | `putnami observe --open` |
+| A CI job whose reporter is `@putnami/cloud`, without `PUTNAMI_CLOUD_TOKEN` | The `PUTNAMI_CLOUD_TOKEN` setting and `putnami cloud token create --name ci --scopes delivery.ingest`, which creates it |
+| Any other CI job | `--upload` |
+
+`--details` prints the detailed summary instead: the changed files (the first
+50), the changed and dependent components, the tests and coverage of each
+component, the changed-line coverage with its least covered files, the
+dependency changes with their licences and vulnerabilities, the decisions, the
+reports and the specs, then each diagnostic. See
 [the change analyses](/docs/tooling-&-workspace/observe/change-analyses). `putnami observe`
 exits 0 whatever it observes, 2 on a usage error, and 1 when it cannot read its
 job context or write its output. `--output=json`
@@ -240,6 +269,16 @@ diagnostic ends with the result's error message.
 For `@putnami/cloud`, the job sets `PUTNAMI_CLOUD_TOKEN` to a workspace token
 of scope `delivery.ingest`. See
 [the Cloud extension](https://github.com/putnami/putnami/blob/main/cloud/extension/README.md#upload-a-change-evidence-document).
+
+## Opening the report
+
+`--open` is `--upload` for a person. Observe adds `--sign-in` to the reporter's
+command: with no token and no stored session, `@putnami/cloud` runs the device
+sign-in of `putnami cloud login`, which opens the browser and waits for you,
+and the next runs reuse that session. The reporter then has 16 minutes instead
+of 2. Observe prints the report URL the reporter answers, ends the summary with
+it and, outside a CI, opens it in the browser. Without `--open` or `--upload`,
+observe runs no reporter and nothing leaves the machine.
 
 ## Publishing on the pull or merge request
 
