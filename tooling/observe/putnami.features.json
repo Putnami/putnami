@@ -1800,6 +1800,123 @@
           }
         }
       ]
+    },
+    {
+      "id": "tooling/observe-decisions",
+      "type": "feature",
+      "name": "Show the MADR decisions that govern the files a change touches",
+      "outcome": "putnami observe, in a repository that keeps its decisions as MADR files, lists for each change the decisions whose scope covers the files it touches and the decision records it adds, edits or deletes, with their status, in the summary and the change evidence document, read-only, and flags a change that deletes an accepted decision",
+      "owner": "tooling",
+      "target": "modeled",
+      "requirements": [
+        {
+          "id": "madr-records",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "records-are-the-markdown-files-of-the-decision-directories"
+            ]
+          }
+        },
+        {
+          "id": "madr-fields",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "front-matter-fields-are-read",
+              "body-fields-are-read"
+            ]
+          }
+        },
+        {
+          "id": "madr-scope",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "front-matter-and-section-scopes-are-read"
+            ]
+          }
+        },
+        {
+          "id": "decision-scope-matching",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-plain-pattern-governs-its-tree",
+              "glob-patterns-match-segments"
+            ]
+          }
+        },
+        {
+          "id": "decisions-in-the-evidence",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "touched-and-governing-decisions-are-listed",
+              "a-repository-without-decisions-observes-as-before"
+            ]
+          }
+        },
+        {
+          "id": "deleted-accepted-decision",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "deleting-an-accepted-decision-is-flagged"
+            ]
+          }
+        },
+        {
+          "id": "decisions-summary",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-summary-lists-the-decisions"
+            ]
+          }
+        },
+        {
+          "id": "decisions-demo",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-madr-demo-is-explained"
+            ]
+          }
+        }
+      ]
     }
   ]
 }
