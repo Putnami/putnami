@@ -20,6 +20,8 @@ It answers six questions:
 - Which dependency versions the lockfiles moved and, from the software bills
   of materials (SBOM) the CI wrote, their licences and the known
   vulnerabilities each change fixes or introduces.
+- Which MADR decision records govern the files the change touches, and which
+  records it adds, edits or deletes; deleting an accepted decision is flagged.
 
 A missing or malformed report, or a base it cannot reach, is a diagnostic:
 `putnami observe` exits 0 whatever it observes, 2 on a usage error, and 1 when

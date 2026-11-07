@@ -7,7 +7,8 @@ For each pull or merge request, the step answers:
 - which commit was built, and which commit the change is measured against;
 - which files changed, which parts of the repository they belong to, and which parts depend on them;
 - which tests passed or failed, and how much of the changed lines they covered;
-- which dependency versions the lockfiles moved and, with a software bill of materials (SBOM), the licences and known vulnerabilities each move brings or removes.
+- which dependency versions the lockfiles moved and, with a software bill of materials (SBOM), the licences and known vulnerabilities each move brings or removes;
+- which MADR decision records govern the files it touches, and which records it adds, edits or deletes.
 
 It writes the answers in the job log, as a change evidence document you keep as an artifact, and as a status and a note on the pull or merge request. It never fails your job.
 
@@ -385,6 +386,30 @@ Without `--base-sbom`, each dependency gets its state at the head and the summar
                introduces 1 (GHSA-mrhx-c7xc-m3w5 high); license MIT
 ```
 
+### 8) See the decisions that govern a change
+
+If your team keeps its decisions as MADR files (Markdown Architectural Decision Records) under `docs/decisions` or `docs/adr`, `putnami observe` lists, with no other change, the decisions whose scope covers a changed file and the records the change adds, edits or deletes. A record gives its scope in its front matter or in a `## Scope` section:
+
+```markdown
+---
+status: accepted
+date: 2025-03-04
+scope:
+  - src/payments/
+---
+
+# Payments own the ledger
+```
+
+Records kept elsewhere are named on the observe line, such as `putnami observe --decisions architecture/decisions`. The summary lists each decision with its status, and a change that deletes an accepted decision gets a warning:
+
+```text
+  decisions  2 decisions
+    accepted   docs/decisions/0001-charges-are-synchronous.md: Charges are synchronous (deleted by the change)
+    accepted   docs/decisions/0002-payments-own-the-ledger.md: Payments own the ledger (governs 1 changed file)
+  warning observe.decision_deleted: the change deletes the accepted decision docs/decisions/0001-charges-are-synchronous.md (Charges are synchronous)
+```
+
 ## Give your agents the same view
 
 The CI job reads what a change touches; your coding agents can read the same thing on your machine, in a repository that still has no `putnami.workspace.json`. Install two extensions in your user scope:
@@ -410,7 +435,7 @@ Inside a Putnami workspace, each of these skills follows the copy the workspace 
 
 - [Observe](/docs/tooling-&-workspace/observe): what `putnami observe` answers, and every CI, repository tool, report format, lockfile and SBOM format it reads.
 - [What `putnami observe` reads](/docs/tooling-&-workspace/observe/observe): every flag, how the base is found, and how reports and SBOMs are discovered.
-- [How `putnami observe` explains a change](/docs/tooling-&-workspace/observe/change-analyses): components, tests, changed-line coverage and dependency changes.
+- [How `putnami observe` explains a change](/docs/tooling-&-workspace/observe/change-analyses): components, tests, changed-line coverage, dependency changes and decision records.
 - [Reports](/docs/tooling-&-workspace/observe/reports): what each test, coverage and SBOM format gives.
 
 You now have a CI job that records which files a change touched and which tests and coverage reports it produced, as an artifact you can keep or upload to Putnami Cloud.

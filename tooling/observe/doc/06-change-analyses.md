@@ -204,6 +204,68 @@ Without a base SBOM, an upgrade reads `3 (…) known at the head, base
 unknown`. A line names at most 5 vulnerabilities. Without an SBOM, the
 summary and the evidence document are what they were.
 
+## Decision records
+
+A team that keeps its decisions as MADR files (Markdown Architectural
+Decision Records) sees the decisions that govern the files a change touches.
+`putnami observe` reads them; it converts nothing and requires no record.
+
+The records are the `.md` files under `docs/decisions` and `docs/adr`, or
+under the repository directories `--decisions` names, comma-separated.
+`README.md`, `index.md` and a file whose name holds `template` are not
+records. Each record gives:
+
+| Field | Read from |
+|---|---|
+| Title | The front matter `title`, else the first `#` heading, else the file name. |
+| Status | The front matter `status`, else a `Status:` line (`* Status: accepted`, `- **Status**: Accepted`), else the first line of a `## Status` section. Its first word gives `proposed`, `accepted`, `rejected`, `deprecated` or `superseded`; anything else is `unknown`. |
+| Date | The front matter `date`, else a `Date:` line, when it is a `YYYY-MM-DD` date. |
+| Scope | The front matter `scope`, a list or one pattern, else the list items of a `## Scope` section. |
+
+A scope pattern is a path from the repository root. A pattern without glob
+characters governs the path and everything under it; `*` and `?` match within
+one directory and `**` any number of directories:
+
+```markdown
+---
+status: accepted
+date: 2025-03-04
+scope:
+  - src/payments/
+---
+
+# Payments own the ledger
+```
+
+```markdown
+# One queue per domain
+
+## Status
+
+Superseded by [0002](0002-payments-own-the-ledger.md)
+
+## Scope
+
+- `src/**/queue/*.go`
+```
+
+The summary and the evidence document list each decision whose scope matches
+a changed file, with the files it governs, and each record the change adds,
+modifies, renames or deletes; a deleted record is read at the base. A change
+that deletes an accepted decision gets the warning `observe.decision_deleted`:
+
+```text
+  decisions  3 decisions
+    accepted   docs/decisions/0001-charges-are-synchronous.md: Charges are synchronous (deleted by the change)
+    accepted   docs/decisions/0002-payments-own-the-ledger.md: Payments own the ledger (governs 1 changed file)
+    superseded docs/decisions/0003-one-queue-per-domain.md: One queue per domain (governs 1 changed file)
+  warning observe.decision_deleted: the change deletes the accepted decision docs/decisions/0001-charges-are-synchronous.md (Charges are synchronous)
+```
+
+A repository without decision records gets no `decisions` line and no
+diagnostic. The list says which decisions govern the change; it does not
+judge whether the change follows them.
+
 ## Diagnostics
 
 | Code | Meaning |
@@ -216,3 +278,6 @@ summary and the evidence document are what they were.
 | `observe.sbom_ambiguous` | One side has several SBOMs, so none is read and that side is unknown. |
 | `observe.bazel_graph_missing` | A Bazel workspace has no query export, so its packages have no edge. An info diagnostic that names the export command. |
 | `observe.bazel_graph_unreadable` | The Bazel query export cannot be read, so the `BUILD` files give the packages, without edges. |
+| `observe.decision_unread` | A decision record, or a decision directory, cannot be read. |
+| `observe.decision_deleted` | The change deletes an accepted decision record. |
+| `observe.decisions_truncated` | The change concerns more than 1000 decisions, or a decision names more than 100 scope patterns or governs more than 1000 changed files; the rest is left out. |

@@ -28,7 +28,8 @@ type demoFile struct {
 }
 
 // readDemo reads testdata/demos/<name>.txtar: a comment line, then files,
-// each after a "-- <path> --" line.
+// each after a "-- <path> --" line. A delete/<path> file names a base file the
+// change deletes.
 func readDemo(t *testing.T, name string) []demoFile {
 	t.Helper()
 	data, err := os.ReadFile(filepath.Join("testdata", "demos", name+".txtar"))
@@ -523,6 +524,11 @@ func demoRepositoryWithout(t *testing.T, name string, skip func(string) bool) (s
 		for _, f := range files {
 			if rest, ok := strings.CutPrefix(f.name, stage); ok {
 				writeDemoFile(t, root, rest, f.content)
+			}
+			if rest, ok := strings.CutPrefix(f.name, "delete/"); ok && stage == "head/" {
+				if err := os.Remove(filepath.Join(root, filepath.FromSlash(rest))); err != nil {
+					t.Fatal(err)
+				}
 			}
 		}
 		git(t, root, "add", "--all")
