@@ -90,6 +90,10 @@
     {
       "id": "host-hooks-exit-guard",
       "text": "Every hook command starts with PUTNAMI_NO_AUTO_INSTALL=1, so a hook never installs. No CLI exit code reaches the host as is: an ordinary hook ends with || true, and a Claude Code wake hook exits 2 when its command exits 75 and 0 otherwise. Claude Code matchers are A|B and Codex matchers ^(A|B)$. A source workspace runs \"$CLAUDE_PROJECT_DIR\"/putnamiw in Claude Code and \"$(git rev-parse --show-toplevel)\"/putnamiw in Codex."
+    },
+    {
+      "id": "user-scope-skills",
+      "text": "`extensions install --user <name>` writes only the skills the extension's `agentContent.userScope` names, under the user's home (`.claude/skills/<skill>`, `.agents/skills/<skill>`), from the content its pin binds, under the workspace's ownership rules: a file it did not write or that was edited is kept and reported, and one collision writes nothing. An unchanged pin writes nothing; `remove --user` removes what it wrote. Nothing is written in the current directory."
     }
   ],
   "decisions": [

@@ -18,6 +18,7 @@
     "extension/manifest-contract#task-digests-move-only-with-the-contract",
     "extension/manifest-contract#the-protocol-version-is-pinned",
     "extension/manifest-contract#the-publication-outbox-is-strict-and-bounded",
-    "extension/manifest-contract#the-schema-and-the-go-types-agree"
+    "extension/manifest-contract#the-schema-and-the-go-types-agree",
+    "extension/manifest-contract#user-scope-skills-are-named-by-the-author"
   ]
 }

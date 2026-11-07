@@ -6,6 +6,7 @@
     "tooling/observe#ci-detection",
     "tooling/observe#diff-base",
     "tooling/observe#evidence-document",
+    "tooling/observe#external-specs",
     "tooling/observe#report-discovery",
     "tooling/observe#runs-without-a-workspace",
     "tooling/observe-analyses#changed-line-coverage",

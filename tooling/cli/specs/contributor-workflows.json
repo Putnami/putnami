@@ -74,6 +74,18 @@
     {
       "id": "external-spec-authoring",
       "text": "In a project whose feature names an external spec, the spec skill edits the external spec that `specs inspect` resolves, in the file its format reads and in its conventions, and starts no native spec. It anchors each requirement it creates or renumbers, keeps checks in `putnami.features.json`, and proposes `specs init --from` only when the owner asks."
+    },
+    {
+      "id": "user-scope-skills",
+      "text": "@putnami/contributor names build, check, design, spec and context in `agentContent.userScope`. Each of those skills first looks for putnami.workspace.json. In a workspace, a copy loaded from outside it follows the workspace's own copy of the skill, and stops with one line when the workspace ships none. Without a workspace, build, check and design stop with one line that says they need one; no skill asks the person to create putnami.workspace.json."
+    },
+    {
+      "id": "context-without-a-workspace",
+      "text": "The context skill answers what a change touches: in a workspace from `putnami context`, `putnami projects` and `putnami <verb> --impacted --dry-run`; without one from `putnami observe --output=json`: the changed components, the components that depend on them, their tests and coverage, and the specs observe reports."
+    },
+    {
+      "id": "spec-without-a-workspace",
+      "text": "Without a workspace, the spec skill finds the specs the repository keeps from `putnami observe --output=json`, edits one in its own format and conventions (Spec Kit, OpenSpec, Kiro or Gherkin), creates a new one in the format the repository already uses, and runs `putnami observe` to read it back. It writes no native spec and no putnami.workspace.json."
     }
   ],
   "decisions": [

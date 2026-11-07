@@ -99,6 +99,22 @@
               "observe-writes-only-git-history-in-the-caller-directory"
             ]
           }
+        },
+        {
+          "id": "external-specs",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "observe-reports-a-spec-kit-requirement",
+              "observe-reports-each-external-format",
+              "observe-marks-a-changed-spec",
+              "an-unreadable-spec-is-a-diagnostic"
+            ]
+          }
         }
       ]
     },
