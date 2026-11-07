@@ -439,7 +439,7 @@ When your CI checks its architecture with ArchUnit, deptrac or import-linter, `p
 - **deptrac**: write its JUnit report, `vendor/bin/deptrac analyse --formatter=junit --output=deptrac.xml || true`.
 - **import-linter**: save its output, `lint-imports > import-linter.txt || true`.
 
-`|| true` keeps the checker from stopping the job before the observe step; keep a separate step that runs the checker without it when a broken rule must fail the job. `putnami observe` finds the deptrac report by its content, and the import-linter output in a `.txt` file whose name contains `lint`. Name them with `--architecture deptrac.xml,import-linter.txt` when they lie elsewhere. The summary then counts the rules:
+`|| true` keeps the checker from stopping the job before the observe step; keep a separate step that runs the checker without it when a broken rule must fail the job. `putnami observe` finds the deptrac report by its content, and the import-linter output in a `.txt` file whose name contains `lint`. Name them with `--architecture deptrac.xml,import-linter.txt` when they lie elsewhere. With `--details`, the summary then counts the rules:
 
 ```text
   architecture  2 rules, 1 broken
