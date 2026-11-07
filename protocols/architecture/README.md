@@ -1,18 +1,17 @@
 # Architecture Rules and Domain Access contracts
 
-`go.putnami.dev/protocol/architecture` is **experimental**: explicit opt-in,
-never part of the default experience, and free to change its wire format,
-finding IDs, and detector coverage without a migration path.
+`go.putnami.dev/protocol/architecture` is **preview**. Version 1 of the files a
+team writes (the domain manifest, the baseline and the waivers) is fixed. What
+the tooling derives from them still moves: finding IDs, diagnostic codes, the
+snapshot, and detector coverage. [Stability](#stability) states the promise.
 
-This repository DOES gate on it. `architecture validate` runs inside the fixed
+This repository gates on it. `architecture validate` runs inside the fixed
 maintainer gate (`lint,test,build,validate`, see
 [Maintainer CI](../../CONTRIBUTING.md#maintainer-ci)), reached through
-`validate`, and that is what keeps its ten declared domains honest.
-What the experimental status costs is stated rather than avoided: a finding ID,
-a wire member, or a detector's coverage may change between releases with no
-migration, so a workspace that gates on this signs up to re-read its own
-findings when the protocol moves. That is a maintenance cost to take on
-deliberately — not a reason to run the check in advisory mode.
+`validate`, and that is what keeps its ten declared domains honest. A finding
+ID or a detector's coverage may change between releases, so a workspace that
+commits a baseline or waivers re-reads them when the protocol moves;
+`validate-workspace` warns such a workspace on each run.
 
 `go.putnami.dev/protocol/architecture` owns the framework-neutral v1 wire
 contracts for Architecture Rules as Code (ARC) and Domain Access & Replication
@@ -358,15 +357,40 @@ contracts and ordered operations that both execute. A behavior that differs
 between them fails on one side rather than shipping as two runtimes that
 describe the same manifest differently.
 
+## Stability
+
+[ADR 0003](doc/adr/0003-authored-documents-are-promised-findings-are-not.md)
+records the promise.
+
+- **Never changes within a version:** the authored documents. A domain
+  manifest, an adoption baseline or a waivers file that is valid under
+  `protocolVersion: 1` stays valid. A change that would reject one opens
+  version 2, which ships with a `putnami architecture migrate` command that
+  rewrites version 1 files.
+- **May change in any release:** finding IDs, diagnostic codes, the snapshot
+  schema, and detector coverage. The release notes name each change. A
+  baseline or waiver entry names a finding ID, so a renamed ID turns its entry
+  stale, and the gate says so.
+- **How long a version is supported:** until 1.0, a minor release may end a
+  version only with a migration documented in its release notes. From 1.0, a
+  version stays readable for 12 months after its successor ships.
+
+[`fixtures/v1/`](fixtures/v1) holds four manifests, a baseline and a waivers
+file as written on 2026-11-07. `frozen_v1_test.go` validates them, the
+manifests as one repository, and pins each file's SHA-256. A change to one of
+these files fails the test: open protocol version 2 instead.
+
 ## Ownership and support
 
 - **Owner:** `go.putnami.dev/protocol/architecture`
-- **Status:** `experimental`, explicit opt-in and never part of the default
-  experience, recorded as
-  `{"id": "go.putnami.dev/protocol/architecture", "kind": "protocol", "status": "experimental", "default": false}`
+- **Status:** `preview`, recorded as
+  `{"id": "go.putnami.dev/protocol/architecture", "kind": "protocol", "status": "preview"}`
   in the workspace-root [`putnami.support.json`](../../putnami.support.json)
-  catalog (contract: [`protocols/support`](../support/README.md)). The wire
-  format, finding IDs, and detector coverage may change without a migration.
+  catalog (contract: [`protocols/support`](../support/README.md)).
+- **Consumers:** the SDD extension validates every workspace through this
+  module, and Putnami Cloud, a separate repository, parses team manifests with
+  the published module.
+- **What is missing for `stable`:** frozen finding IDs and detector coverage.
 - **Runtime boundary:** the package is pure and hermetic; filesystem discovery,
   Git baseline reads, and Putnami project-graph detection belong to the CLI
 - **Cloud boundary:** Putnami Cloud authors domain manifests and debt records; it
@@ -374,3 +398,5 @@ describe the same manifest differently.
 
 The main format decision and rejected alternatives are recorded in
 [`doc/adr/0001-declarations-are-authority-observations-are-evidence.md`](doc/adr/0001-declarations-are-authority-observations-are-evidence.md).
+The compatibility promise and the `preview` status are recorded in
+[`doc/adr/0003-authored-documents-are-promised-findings-are-not.md`](doc/adr/0003-authored-documents-are-promised-findings-are-not.md).

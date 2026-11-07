@@ -31,7 +31,7 @@ Then name it in each project that authors a feature manifest or a spec, in that 
 
 Both steps are required. A project whose files match but that does not name the extension is silently skipped — the run reports nothing to validate, which looks exactly like a clean project.
 
-`@putnami/sdd` is experimental: the manifest format, finding IDs, and detector coverage may change without a migration path.
+`@putnami/sdd` is experimental. The architecture files it validates are not: a version 1 manifest, baseline or waivers file stays valid across releases. Finding IDs and detector coverage may still change.
 
 ## Declare the feature first
 

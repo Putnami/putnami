@@ -2,7 +2,7 @@
 
 The `architecture` package builds a domain's `putnami.architecture.json` in Go and refuses to emit one that violates the ARC/DARC protocol. It is the authoring-time counterpart of `putnami architecture validate`: both run `architecture.ValidateManifest`, so a manifest that builds here is one the gate accepts.
 
-> `go.putnami.dev/protocol/architecture` is **experimental**. Its wire format, finding IDs, and detector coverage may change without a migration path, and this package changes with it.
+> `go.putnami.dev/protocol/architecture` is **preview**. A version 1 manifest stays valid across releases, but the protocol's Go types, finding IDs, and detector coverage may change, and this package changes with them.
 
 ## Overview
 

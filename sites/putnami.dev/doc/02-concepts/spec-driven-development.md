@@ -92,7 +92,8 @@ Most of those 417 edges are ARC permissions and nothing more. Seven imports go
 further and are enforced at run time: the documentation the site publishes for
 five other domains, the runtime API it is built on, and the content-bundle
 protocol it implements. The protocol is
-experimental: its wire format may still change without a migration path.
+preview: a version 1 manifest, baseline or waivers file stays valid, while
+finding IDs and detector coverage may still change.
 
 ### Authored in code, enforced at run time
 

@@ -271,6 +271,6 @@ optional there too: every domain, in any language, authors its manifest with
 
 ## Status
 
-The architecture protocol is **experimental**: its wire format may change without
-a migration path, and this module's API is built on its types, so it moves with
-it. Use it behind the same explicit opt-in.
+The architecture protocol is **preview**: a version 1 manifest stays valid, but
+its types, finding IDs and detector coverage may still change. This module's API
+is built on those types, so it moves with them.

@@ -1,0 +1,14 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-architecture-baseline.json",
+  "protocolVersion": 1,
+  "findings": [
+    {
+      "finding": "architecture.undeclared_project_dependency:project-dependency:consumer:producer:%2Fconsumer%2Fapp:%2Fproducer%2Finternal",
+      "owner": "consumer-team",
+      "reason": "The consumer imported the producer's internal package before the domains were declared.",
+      "scope": "/consumer/app -> /producer/internal only",
+      "tracking": "https://example.com/issues/42",
+      "removeWhen": "The consumer reads the producer through producer.reference.v1 only."
+    }
+  ]
+}

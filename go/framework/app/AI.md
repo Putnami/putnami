@@ -520,8 +520,8 @@ from an implemented one nobody declared. The row is evidence, never authority.
 It moves no data — the consumer supplies bootstrap and updates over whichever
 carrier the contract declares — and it decides nothing about permissions.
 
-`go.putnami.dev/protocol/architecture` is **experimental**, and this sub-package
-moves with it. See
+`go.putnami.dev/protocol/architecture` is **preview**: a version 1 manifest
+stays valid, but its Go types may change, and this sub-package moves with them. See
 [Domain access contracts](../../doc/framework/24-domain-access-contracts.md).
 
 ## Maintained contract

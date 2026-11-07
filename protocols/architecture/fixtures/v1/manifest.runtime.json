@@ -1,0 +1,65 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-architecture.json",
+  "protocolVersion": 1,
+  "domain": "runtime",
+  "owner": "runtime",
+  "projects": [
+    "/runtime/libs/workspace-runtime"
+  ],
+  "owns": [
+    {
+      "id": "runtime.workspace-telemetry-binding",
+      "kind": "model",
+      "description": "Authoritative placement facts needed to bind workspace telemetry to runtime resources."
+    }
+  ],
+  "exports": [
+    {
+      "id": "runtime.workspace-telemetry-binding.v1",
+      "version": 1,
+      "status": "planned",
+      "description": "Minimal runtime placement facts Observability may project locally.",
+      "facts": [
+        {
+          "name": "workspace_id",
+          "authority": "runtime",
+          "classification": "internal",
+          "personalData": "none"
+        },
+        {
+          "name": "runtime_project",
+          "authority": "runtime",
+          "classification": "internal",
+          "personalData": "none"
+        },
+        {
+          "name": "region",
+          "authority": "runtime",
+          "classification": "internal",
+          "personalData": "none"
+        },
+        {
+          "name": "logging_scope",
+          "authority": "runtime",
+          "classification": "internal",
+          "personalData": "none"
+        },
+        {
+          "name": "source_version",
+          "authority": "runtime",
+          "classification": "internal",
+          "personalData": "none"
+        }
+      ],
+      "modes": [
+        "projection",
+        "query"
+      ],
+      "compatibility": {
+        "strategy": "additive",
+        "minimumConsumerVersion": 1
+      }
+    }
+  ],
+  "imports": []
+}
