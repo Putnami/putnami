@@ -36,18 +36,26 @@ from one format to another. It does not turn code into a permission.
      `putnami.domain` property overrides the ID. On a software system, the
      property also applies to every container that does not set its own, so
      one property puts a whole system in one domain.
-   - A container or a component whose `path` property names a project maps
-     that project to its domain. `--path-property` names another property.
-   - A relationship between two elements in different domains becomes an
-     import of the consumer domain. It reads the producer's generated
-     `<domain>.interface.v1` export, in mode `reference`. Of the five access
-     modes, `reference` is the only one that claims no data crosses the
-     boundary. The relationship's description and technology become the
+   - A container, a component or a software system with no containers whose
+     `path` property names a project maps that project to its domain.
+     `--path-property` names another property. The issue that asked for the
+     command also offered a tag. A tag carries no value, so it cannot name a
+     path, and the command reads only a property.
+   - A relationship between two elements in different domains becomes one
+     import of the consumer domain per producer domain, in mode `reference`.
+     Of the five access modes, `reference` is the only one that claims no data
+     crosses the boundary. The import reads the producer's generated
+     `<domain>.interface.v1` export, or the one active export of the producer
+     that allows reference access, and takes that export's facts. A producer
+     with no export gets the generated one. A producer with several such
+     exports, or none, leaves the import to a person, and the relationship is
+     listed. The relationship's description and technology become the
      justification. A person refines the mode and the facts by hand.
    - Bindings follow the `architecture sync` rule. The command binds a project
-     edge only when the graph observes it, and only to the import the model
-     declares for that domain pair. An edge between two domains that the model
-     does not relate stays an `architecture validate` violation.
+     edge only when the graph observes it, and only to the one import that
+     covers that domain pair. An edge between two domains that the model does
+     not relate stays an `architecture validate` violation, and the command
+     lists it.
    - An element the command cannot map is listed with the reason: a person, a
      component with no path, a path that is no project, or a relationship that
      stays inside one domain.
@@ -55,10 +63,15 @@ from one format to another. It does not turn code into a permission.
    nothing and prints the diff. With `--apply`, it creates the missing
    manifests and adds the missing projects, exports, imports and bindings.
    It never changes or removes an entry that already exists, so a hand edit
-   survives every rerun. It reports an import the manifest holds and the model
+   survives every rerun. A domain pair that already has an import gets no
+   second one, even when a person renamed the generated import. A changed
+   manifest keeps the order of its entries: the additions are appended, and
+   the diff removes nothing. It reports an import the manifest holds and the model
    no longer has, and leaves the removal to a person. A new manifest goes to
    `architecture/<domain>/` below the workspace root, or below `--at`. A
-   domain that is already declared keeps its own file.
+   domain that is already declared keeps its own file. The command refuses,
+   before it writes anything, a new manifest whose path is taken or lies in a
+   directory architecture discovery skips.
 3. **The reader uses the standard library only.** It reads a JSON workspace
    and the DSL statements that describe a model: elements, groups,
    relationships, properties and tags. It skips views, styles, deployment
