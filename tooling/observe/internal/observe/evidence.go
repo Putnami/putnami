@@ -68,6 +68,7 @@ func Evidence(o Observation, now time.Time) *evidence.Document {
 	}
 	doc.Tests = o.Analysis.Tests
 	doc.Coverage = o.Analysis.Coverage
+	doc.Architecture = o.Analysis.Architecture
 	doc.ChangedLineCoverage = o.Analysis.ChangedLineCoverage
 	doc.DependencyChanges = o.Analysis.DependencyChanges
 	doc.SBOM = o.Analysis.SBOM

@@ -1,0 +1,187 @@
+The deptrac demo: a Symfony application whose composer.json loads App\ from src/ and requires the acme/pricing package of packages/pricing through a path repository. deptrac 3.0 checks its layers with deptrac.yaml: a Controller may use a Service, never a Repository, and the pricing package depends on no layer of the application. The change makes QuoteController read QuoteRepository and the pricing Calculator call QuoteService. The report is the output of vendor/bin/deptrac analyse --formatter=junit --output=reports/deptrac.xml.
+-- base/composer.json --
+{
+    "name": "acme/shop",
+    "type": "project",
+    "require": {
+        "php": ">=8.2",
+        "acme/pricing": "*"
+    },
+    "require-dev": {
+        "deptrac/deptrac": "^3.0"
+    },
+    "repositories": [
+        {"type": "path", "url": "packages/*"}
+    ],
+    "autoload": {
+        "psr-4": {"App\\": "src/"}
+    }
+}
+-- base/deptrac.yaml --
+deptrac:
+  paths:
+    - ./src
+    - ./packages/pricing/src
+  layers:
+    - name: Controller
+      collectors:
+        - type: classLike
+          value: App\\Controller\\.*
+    - name: Service
+      collectors:
+        - type: classLike
+          value: App\\Service\\.*
+    - name: Repository
+      collectors:
+        - type: classLike
+          value: App\\Repository\\.*
+    - name: Pricing
+      collectors:
+        - type: classLike
+          value: Acme\\Pricing\\.*
+  ruleset:
+    Controller: [Service]
+    Service: [Repository, Pricing]
+    Repository: ~
+    Pricing: ~
+-- base/packages/pricing/composer.json --
+{
+    "name": "acme/pricing",
+    "type": "library",
+    "require": {
+        "php": ">=8.2"
+    },
+    "autoload": {
+        "psr-4": {"Acme\\Pricing\\": "src/"}
+    }
+}
+-- base/packages/pricing/src/Calculator.php --
+<?php
+
+declare(strict_types=1);
+
+namespace Acme\Pricing;
+
+final class Calculator
+{
+    public function total(int $cents, int $quantity): int
+    {
+        return $cents * $quantity;
+    }
+}
+-- base/src/Controller/QuoteController.php --
+<?php
+
+declare(strict_types=1);
+
+namespace App\Controller;
+
+use App\Service\QuoteService;
+
+final class QuoteController
+{
+    public function __construct(private readonly QuoteService $quotes)
+    {
+    }
+
+    public function show(int $id): array
+    {
+        return $this->quotes->find($id);
+    }
+}
+-- base/src/Repository/QuoteRepository.php --
+<?php
+
+declare(strict_types=1);
+
+namespace App\Repository;
+
+final class QuoteRepository
+{
+    public function find(int $id): array
+    {
+        return ['id' => $id, 'total' => 0];
+    }
+}
+-- base/src/Service/QuoteService.php --
+<?php
+
+declare(strict_types=1);
+
+namespace App\Service;
+
+use Acme\Pricing\Calculator;
+use App\Repository\QuoteRepository;
+
+final class QuoteService
+{
+    public function __construct(private readonly QuoteRepository $repository, private readonly Calculator $calculator)
+    {
+    }
+
+    public function find(int $id): array
+    {
+        return $this->repository->find($id);
+    }
+}
+-- head/packages/pricing/src/Calculator.php --
+<?php
+
+declare(strict_types=1);
+
+namespace Acme\Pricing;
+
+use App\Service\QuoteService;
+
+final class Calculator
+{
+    public function total(int $cents, int $quantity): int
+    {
+        return $cents * $quantity;
+    }
+
+    public function quoted(QuoteService $quotes, int $id): int
+    {
+        return $quotes->find($id)['total'];
+    }
+}
+-- head/src/Controller/QuoteController.php --
+<?php
+
+declare(strict_types=1);
+
+namespace App\Controller;
+
+use App\Repository\QuoteRepository;
+use App\Service\QuoteService;
+
+final class QuoteController
+{
+    public function __construct(private readonly QuoteService $quotes, private readonly QuoteRepository $repository)
+    {
+    }
+
+    public function show(int $id): array
+    {
+        return $this->repository->find($id);
+    }
+}
+-- ci/reports/deptrac.xml --
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites>
+  <testsuite id="1" package="" name="Controller" hostname="localhost" tests="1" failures="2" skipped="0" errors="0" time="0">
+    <testcase name="Controller - App\Controller\QuoteController" classname="App\Controller\QuoteController" time="0">
+      <failure message="App\Controller\QuoteController:7 must not depend on App\Repository\QuoteRepository (Controller on Repository)" type="WARNING"/>
+      <failure message="App\Controller\QuoteController:12 must not depend on App\Repository\QuoteRepository (Controller on Repository)" type="WARNING"/>
+    </testcase>
+  </testsuite>
+  <testsuite id="2" package="" name="Service" hostname="localhost" tests="1" failures="0" skipped="0" errors="0" time="0">
+    <testcase name="Service - App\Service\QuoteService" classname="App\Service\QuoteService" time="0"/>
+  </testsuite>
+  <testsuite id="3" package="" name="Pricing" hostname="localhost" tests="1" failures="2" skipped="0" errors="0" time="0">
+    <testcase name="Pricing - Acme\Pricing\Calculator" classname="Acme\Pricing\Calculator" time="0">
+      <failure message="Acme\Pricing\Calculator:7 must not depend on App\Service\QuoteService (Pricing on Service)" type="WARNING"/>
+      <failure message="Acme\Pricing\Calculator:16 must not depend on App\Service\QuoteService (Pricing on Service)" type="WARNING"/>
+    </testcase>
+  </testsuite>
+</testsuites>

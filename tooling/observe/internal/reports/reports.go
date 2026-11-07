@@ -7,7 +7,9 @@
 // project, a JaCoCo report a report root with JaCoCo children, an LCOV trace
 // starts with a TN: or SF: record, a Go cover profile
 // starts with its mode line, a CycloneDX document states its bomFormat and an
-// SPDX one its spdxVersion. Named paths replace discovery for their kind. The
+// SPDX one its spdxVersion. A deptrac report is a JUnit report whose suites
+// deptrac wrote, one per layer; an import-linter report is the text
+// lint-imports printed. Named paths replace discovery for their kind. The
 // SBOM of the base is only named, never discovered, and each side keeps at most
 // one SBOM. A missing, unreadable or unrecognized report is a diagnostic.
 package reports
@@ -36,6 +38,8 @@ const (
 	// KindSBOM is the SBOM of the commit, KindBaseSBOM the one of the base.
 	KindSBOM     = "sbom"
 	KindBaseSBOM = "base-sbom"
+	// KindArchitecture is the result of an architecture checker.
+	KindArchitecture = "architecture"
 )
 
 // Report formats.
@@ -49,6 +53,10 @@ const (
 	FormatJaCoCo    = "jacoco"
 	FormatCycloneDX = "cyclonedx"
 	FormatSPDX      = "spdx"
+	// FormatDeptrac is the report of deptrac --formatter=junit,
+	// FormatImportLinter the text lint-imports prints.
+	FormatDeptrac      = "deptrac"
+	FormatImportLinter = "import-linter"
 )
 
 // Report sources.
@@ -111,6 +119,9 @@ type Request struct {
 	// way. An empty SBOM discovers it; an empty BaseSBOM reads none.
 	SBOM     []string
 	BaseSBOM []string
+	// Architecture names the architecture reports, the same way. An empty
+	// list discovers them.
+	Architecture []string
 	// Resolve turns a named path into an absolute one.
 	Resolve func(string) string
 }
@@ -123,7 +134,7 @@ func Collect(req Request) ([]Report, []diag.Diagnostic) {
 	for _, named := range []struct {
 		kind     string
 		patterns []string
-	}{{KindJUnit, req.JUnit}, {KindCoverage, req.Coverage}, {KindSBOM, req.SBOM}, {KindBaseSBOM, req.BaseSBOM}} {
+	}{{KindJUnit, req.JUnit}, {KindCoverage, req.Coverage}, {KindSBOM, req.SBOM}, {KindBaseSBOM, req.BaseSBOM}, {KindArchitecture, req.Architecture}} {
 		if len(named.patterns) == 0 {
 			if named.kind != KindBaseSBOM {
 				discover[named.kind] = true
@@ -331,7 +342,8 @@ func candidate(name string) bool {
 	case ".xml", ".trx", ".info", ".lcov", ".out", ".cov", ".coverprofile", ".gocov":
 		return true
 	case ".txt":
-		return strings.Contains(lower, "cover")
+		// A coverage profile, or the output of lint-imports.
+		return strings.Contains(lower, "cover") || strings.Contains(lower, "lint")
 	case ".json":
 		// An SBOM: bom.json, sbom.cdx.json, trivy-cyclonedx.json, sbom.spdx.json.
 		return strings.Contains(lower, "bom") || strings.Contains(lower, "cdx") ||
@@ -348,6 +360,8 @@ func kindOf(format string) string {
 		return KindCoverage
 	case FormatCycloneDX, FormatSPDX:
 		return KindSBOM
+	case FormatDeptrac, FormatImportLinter:
+		return KindArchitecture
 	}
 	return ""
 }
@@ -369,6 +383,8 @@ func label(kind string) string {
 		return "SBOM"
 	case KindBaseSBOM:
 		return "base SBOM"
+	case KindArchitecture:
+		return "architecture"
 	}
 	return "coverage"
 }
@@ -430,6 +446,9 @@ func Sniff(head []byte) string {
 	if bytes.HasPrefix(trimmed, []byte("{")) {
 		return sniffJSON(trimmed)
 	}
+	if importLinterAnalyzed.Match(ansiEscape.ReplaceAll(head, nil)) {
+		return FormatImportLinter
+	}
 	scanner := bufio.NewScanner(bytes.NewReader(trimmed))
 	if !scanner.Scan() {
 		return ""
@@ -443,6 +462,13 @@ func Sniff(head []byte) string {
 	}
 	return ""
 }
+
+var (
+	// importLinterAnalyzed is the line lint-imports prints before its
+	// contracts; ansiEscape a terminal color sequence around it.
+	importLinterAnalyzed = regexp.MustCompile(`(?m)^Analyzed \d+ files, \d+ dependencies\.\r?$`)
+	ansiEscape           = regexp.MustCompile("\x1b\\[[0-9;]*[A-Za-z]")
+)
 
 // cycloneDXMember and spdxMember are the members that name an SBOM's format,
 // which its writers put near the start of the document.
@@ -469,7 +495,12 @@ func sniffXML(head []byte) string {
 		return ""
 	}
 	switch root.Name.Local {
-	case "testsuites", "testsuite":
+	case "testsuites":
+		if deptracSuites(decoder) {
+			return FormatDeptrac
+		}
+		return FormatJUnit
+	case "testsuite":
 		return FormatJUnit
 	case "report":
 		// JaCoCo and Kover: a report root whose first child is a JaCoCo
@@ -506,6 +537,40 @@ func sniffXML(head []byte) string {
 		return FormatCobertura
 	}
 	return ""
+}
+
+// deptracSkippedSuite is the suite deptrac writes first for the skip rules
+// that matched no violation.
+const deptracSkippedSuite = "Unmatched skipped violations"
+
+// deptracSuites reports whether the first suite of a testsuites root is one
+// deptrac writes: an empty package, the localhost hostname, and cases named
+// after their layer suite, Layer - Class.
+func deptracSuites(decoder *xml.Decoder) bool {
+	suite, ok := nextStart(decoder)
+	if !ok || suite.Name.Local != "testsuite" {
+		return false
+	}
+	attrs := map[string]string{}
+	for _, attr := range suite.Attr {
+		attrs[attr.Name.Local] = attr.Value
+	}
+	if pkg, ok := attrs["package"]; !ok || pkg != "" || attrs["hostname"] != "localhost" {
+		return false
+	}
+	if attrs["name"] == deptracSkippedSuite {
+		return true
+	}
+	testcase, ok := nextStart(decoder)
+	if !ok || testcase.Name.Local != "testcase" {
+		return false
+	}
+	for _, attr := range testcase.Attr {
+		if attr.Name.Local == "name" {
+			return attrs["name"] != "" && strings.HasPrefix(attr.Value, attrs["name"]+" - ")
+		}
+	}
+	return false
 }
 
 func nextStart(decoder *xml.Decoder) (xml.StartElement, bool) {

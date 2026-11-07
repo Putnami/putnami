@@ -52,6 +52,7 @@ func writeAnalysis(b *strings.Builder, a analyze.Result) {
 		fmt.Fprintln(b, line)
 	}
 	writeTests(b, a)
+	writeArchitecture(b, a)
 	writeChangedLines(b, a.ChangedLineCoverage)
 	fmt.Fprintf(b, "  dependencies  %s%s\n", count(len(a.DependencyChanges), "change"), sbomLabel(a.SBOM))
 	for i, d := range a.DependencyChanges {
@@ -161,6 +162,62 @@ func writeTests(b *strings.Builder, a analyze.Result) {
 			}
 		}
 	}
+}
+
+// maxListedViolations caps the violations the summary lists per broken rule.
+const maxListedViolations = 5
+
+// writeArchitecture counts the architecture rules read and lists each broken
+// one with its first violations; it writes nothing when none was read.
+func writeArchitecture(b *strings.Builder, a analyze.Result) {
+	if len(a.Architecture) == 0 {
+		return
+	}
+	var broken []evidence.ArchitectureRule
+	for _, rule := range a.Architecture {
+		if rule.Status == evidence.ArchitectureBroken {
+			broken = append(broken, rule)
+		}
+	}
+	fmt.Fprintf(b, "  architecture  %s, %d broken\n", count(len(a.Architecture), "rule"), len(broken))
+	for i, rule := range broken {
+		if i == maxListedComponents {
+			fmt.Fprintf(b, "    ... and %d more\n", len(broken)-i)
+			break
+		}
+		name, _, _ := strings.Cut(rule.Rule, "\n")
+		fmt.Fprintf(b, "    broken    %s: %s (%s)\n", rule.Tool, name, count(rule.ViolationCount, "violation"))
+		for j, v := range rule.Violations {
+			if j == maxListedViolations {
+				fmt.Fprintf(b, "      ... and %d more\n", rule.ViolationCount-j)
+				break
+			}
+			fmt.Fprintf(b, "      %s\n", violationLabel(v))
+		}
+		if hidden := rule.ViolationCount - len(rule.Violations); hidden > 0 && len(rule.Violations) <= maxListedViolations {
+			fmt.Fprintf(b, "      ... and %d more\n", hidden)
+		}
+	}
+}
+
+// violationLabel names a violation's component, file and line, then its
+// message's first line.
+func violationLabel(v evidence.ArchitectureViolation) string {
+	message, _, _ := strings.Cut(v.Message, "\n")
+	where := ""
+	switch {
+	case v.File != "" && v.Line > 0:
+		where = fmt.Sprintf("%s:%d", v.File, v.Line)
+	case v.File != "":
+		where = v.File
+	}
+	if v.Component != "" {
+		where = v.Component + " " + where
+	}
+	if where == "" {
+		return message
+	}
+	return strings.TrimSpace(where) + ": " + message
 }
 
 func failingLabel(f evidence.FailingCase) string {

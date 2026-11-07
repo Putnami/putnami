@@ -1,0 +1,203 @@
+The archunit demo: the Maven build of the maven demo, where api runs its ArchUnit 1.4.1 rules as JUnit 5 tests in ArchitectureTest beside an ordinary test. The change makes api call the internal Rates class of pricing, which the rule keeping pricing.internal inside pricing forbids. The reports are the Surefire 3.5.2 reports of mvn verify on OpenJDK 21, their properties block emptied.
+-- base/api/pom.xml --
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+  <parent>
+    <groupId>com.acme</groupId>
+    <artifactId>shop</artifactId>
+    <version>1.0.0</version>
+  </parent>
+  <artifactId>api</artifactId>
+
+  <dependencies>
+    <dependency>
+      <groupId>${project.groupId}</groupId>
+      <artifactId>pricing</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.junit.jupiter</groupId>
+      <artifactId>junit-jupiter</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>com.tngtech.archunit</groupId>
+      <artifactId>archunit-junit5</artifactId>
+      <version>1.4.1</version>
+      <scope>test</scope>
+    </dependency>
+  </dependencies>
+</project>
+-- base/api/src/main/java/com/acme/api/Quotes.java --
+package com.acme.api;
+
+import com.acme.pricing.Pricing;
+
+public final class Quotes {
+    public String quote(long cents, int quantity) {
+        return Pricing.label(Pricing.total(cents, quantity));
+    }
+}
+-- base/api/src/test/java/com/acme/api/ArchitectureTest.java --
+package com.acme.api;
+
+import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.classes;
+import static com.tngtech.archunit.library.dependencies.SlicesRuleDefinition.slices;
+
+import com.tngtech.archunit.junit.AnalyzeClasses;
+import com.tngtech.archunit.junit.ArchTest;
+import com.tngtech.archunit.lang.ArchRule;
+
+@AnalyzeClasses(packages = "com.acme")
+class ArchitectureTest {
+    @ArchTest
+    static final ArchRule pricing_internals_stay_inside_pricing = classes()
+            .that().resideInAPackage("..pricing.internal..")
+            .should().onlyBeAccessed().byClassesThat().resideInAPackage("..pricing..");
+
+    @ArchTest
+    static final ArchRule no_cycles_between_modules = slices()
+            .matching("com.acme.(*)..")
+            .should().beFreeOfCycles();
+}
+-- base/api/src/test/java/com/acme/api/QuotesTest.java --
+package com.acme.api;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+
+import org.junit.jupiter.api.Test;
+
+class QuotesTest {
+    @Test
+    void quoteLabelsTheTotal() {
+        assertEquals("15.00 EUR", new Quotes().quote(500, 3));
+    }
+}
+-- base/pom.xml --
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+  <groupId>com.acme</groupId>
+  <artifactId>shop</artifactId>
+  <version>1.0.0</version>
+  <packaging>pom</packaging>
+
+  <modules>
+    <module>pricing</module>
+    <module>api</module>
+  </modules>
+
+  <properties>
+    <maven.compiler.release>21</maven.compiler.release>
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+  </properties>
+
+  <dependencyManagement>
+    <dependencies>
+      <dependency>
+        <groupId>org.junit</groupId>
+        <artifactId>junit-bom</artifactId>
+        <version>5.11.4</version>
+        <type>pom</type>
+        <scope>import</scope>
+      </dependency>
+    </dependencies>
+  </dependencyManagement>
+
+  <build>
+    <plugins>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-surefire-plugin</artifactId>
+        <version>3.5.2</version>
+      </plugin>
+      <plugin>
+        <groupId>org.jacoco</groupId>
+        <artifactId>jacoco-maven-plugin</artifactId>
+        <version>0.8.13</version>
+        <executions>
+          <execution><goals><goal>prepare-agent</goal></goals></execution>
+          <execution><id>report</id><phase>verify</phase><goals><goal>report</goal></goals></execution>
+        </executions>
+      </plugin>
+    </plugins>
+  </build>
+</project>
+-- base/pricing/pom.xml --
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+  <parent>
+    <groupId>com.acme</groupId>
+    <artifactId>shop</artifactId>
+    <version>1.0.0</version>
+  </parent>
+  <artifactId>pricing</artifactId>
+
+  <dependencies>
+    <dependency>
+      <groupId>org.junit.jupiter</groupId>
+      <artifactId>junit-jupiter</artifactId>
+      <scope>test</scope>
+    </dependency>
+  </dependencies>
+</project>
+-- base/pricing/src/main/java/com/acme/pricing/Pricing.java --
+package com.acme.pricing;
+
+import com.acme.pricing.internal.Rates;
+
+public final class Pricing {
+    private Pricing() {}
+
+    public static long total(long cents, int quantity) {
+        return Rates.base() * 0 + cents * quantity;
+    }
+
+    public static String label(long cents) {
+        return String.format("%d.%02d EUR", cents / 100, cents % 100);
+    }
+}
+-- base/pricing/src/main/java/com/acme/pricing/internal/Rates.java --
+package com.acme.pricing.internal;
+
+public final class Rates {
+    private Rates() {}
+
+    public static long base() {
+        return 100;
+    }
+}
+-- head/api/src/main/java/com/acme/api/Quotes.java --
+package com.acme.api;
+
+import com.acme.pricing.Pricing;
+import com.acme.pricing.internal.Rates;
+
+public final class Quotes {
+    public String quote(long cents, int quantity) {
+        long minimum = Rates.base();
+        return Pricing.label(Math.max(minimum, Pricing.total(cents, quantity)));
+    }
+}
+-- ci/api/target/surefire-reports/TEST-com.acme.api.ArchitectureTest.xml --
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://maven.apache.org/surefire/maven-surefire-plugin/xsd/surefire-test-report-3.0.xsd" version="3.0" name="com.acme.api.ArchitectureTest" time="1.204" tests="2" errors="0" skipped="0" failures="1">
+  <properties/>
+  <testcase name="pricing_internals_stay_inside_pricing" classname="com.acme.api.ArchitectureTest" time="0.842">
+    <failure message="Architecture Violation [Priority: MEDIUM] - Rule 'classes that reside in a package '..pricing.internal..' should only be accessed by classes that reside in a package '..pricing..'' was violated (1 times):&#10;Method &lt;com.acme.api.Quotes.quote(long, int)&gt; calls method &lt;com.acme.pricing.internal.Rates.base()&gt; in (Quotes.java:8)" type="java.lang.AssertionError"><![CDATA[java.lang.AssertionError: 
+Architecture Violation [Priority: MEDIUM] - Rule 'classes that reside in a package '..pricing.internal..' should only be accessed by classes that reside in a package '..pricing..'' was violated (1 times):
+Method <com.acme.api.Quotes.quote(long, int)> calls method <com.acme.pricing.internal.Rates.base()> in (Quotes.java:8)
+	at com.tngtech.archunit.lang.ArchRule$Assertions.assertNoViolation(ArchRule.java:94)
+	at com.tngtech.archunit.lang.ArchRule$Assertions.check(ArchRule.java:86)
+]]></failure>
+  </testcase>
+  <testcase name="no_cycles_between_modules" classname="com.acme.api.ArchitectureTest" time="0.362"/>
+</testsuite>
+-- ci/api/target/surefire-reports/TEST-com.acme.api.QuotesTest.xml --
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://maven.apache.org/surefire/maven-surefire-plugin/xsd/surefire-test-report-3.0.xsd" version="3.0" name="com.acme.api.QuotesTest" time="0.081" tests="1" errors="0" skipped="0" failures="0">
+  <properties/>
+  <testcase name="quoteLabelsTheTotal" classname="com.acme.api.QuotesTest" time="0.081"/>
+</testsuite>

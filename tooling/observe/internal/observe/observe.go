@@ -65,7 +65,12 @@ type Options struct {
 	// one of the base.
 	SBOM     []string
 	BaseSBOM []string
-	Fetch    bool
+	// Architecture names the deptrac and import-linter reports; empty
+	// discovers them. ArchUnitClasses are the class name patterns whose
+	// JUnit cases are ArchUnit rules.
+	Architecture    []string
+	ArchUnitClasses []string
+	Fetch           bool
 	// Resolve turns a named report path into an absolute one.
 	Resolve  func(string) string
 	Producer Producer
@@ -113,13 +118,13 @@ func Run(ctx context.Context, opts Options) Observation {
 	if o.Subject.Repository == "" {
 		o.Subject.Repository = repositoryName(ctx, root)
 	}
-	found, reportDiags := reports.Collect(reports.Request{Root: root, JUnit: opts.JUnit, Coverage: opts.Coverage, SBOM: opts.SBOM, BaseSBOM: opts.BaseSBOM, Resolve: opts.Resolve})
+	found, reportDiags := reports.Collect(reports.Request{Root: root, JUnit: opts.JUnit, Coverage: opts.Coverage, SBOM: opts.SBOM, BaseSBOM: opts.BaseSBOM, Architecture: opts.Architecture, Resolve: opts.Resolve})
 	o.Reports = found
 	if o.Reports == nil {
 		o.Reports = []reports.Report{}
 	}
 	set := components.Detect(root, opts.detectors())
-	input := analyze.Input{Root: root, Set: set, ChangedFiles: o.ChangedFiles, Reports: o.Reports, DecisionDirs: opts.Decisions}
+	input := analyze.Input{Root: root, Set: set, ChangedFiles: o.ChangedFiles, Reports: o.Reports, DecisionDirs: opts.Decisions, ArchUnitClasses: opts.ArchUnitClasses}
 	var analysisDiags []diag.Diagnostic
 	if resolved.BaseSHA != "" && resolved.HeadSHA != "" {
 		added, err := gitbase.AddedLines(ctx, root, resolved.BaseSHA, resolved.HeadSHA)

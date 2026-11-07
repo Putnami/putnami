@@ -1,0 +1,165 @@
+The import-linter demo: the uv workspace of the python demo, api and worker depending on shared, whose .importlinter forbids shared to import a service and keeps the services independent. The change makes shared.money import api.main. The report is the output of import-linter 2.5, uv run lint-imports > import-linter.txt; its exit status does not fail the job.
+-- base/.importlinter --
+[importlinter]
+root_packages =
+    api
+    shared
+    worker
+
+[importlinter:contract:shared-is-independent]
+name = Shared imports no service
+type = forbidden
+source_modules =
+    shared
+forbidden_modules =
+    api
+    worker
+
+[importlinter:contract:services]
+name = Services are independent
+type = independence
+modules =
+    api
+    worker
+-- base/api/pyproject.toml --
+[project]
+name = "api"
+version = "0.1.0"
+requires-python = ">=3.12"
+dependencies = ["fastapi>=0.115", "shared"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+-- base/api/src/api/__init__.py --
+-- base/api/src/api/main.py --
+from fastapi import FastAPI
+
+from shared.money import total
+
+app = FastAPI()
+
+
+@app.post("/quotes")
+def quote(lines: list[tuple[int, int]]) -> dict[str, int]:
+    return {"total": total(lines)}
+-- base/api/tests/test_api.py --
+from api.main import quote
+
+
+class TestQuote:
+    def test_quote(self):
+        assert quote([(3, 100)]) == {"total": 300}
+
+
+def test_empty_quote():
+    assert quote([]) == {"total": 0}
+-- base/pyproject.toml --
+[dependency-groups]
+dev = ["pytest>=8", "pytest-cov>=6"]
+
+[tool.uv.workspace]
+members = ["api", "worker", "shared"]
+
+[tool.uv.sources]
+shared = { workspace = true }
+-- base/shared/pyproject.toml --
+[project]
+name = "shared"
+version = "0.1.0"
+requires-python = ">=3.12"
+dependencies = []
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+-- base/shared/src/shared/__init__.py --
+-- base/shared/src/shared/money.py --
+"""Amounts in cents."""
+
+
+def total(lines: list[tuple[int, int]]) -> int:
+    """Sum quantity times unit price, in cents."""
+    return sum(quantity * price for quantity, price in lines)
+-- base/shared/tests/test_money.py --
+from shared.money import total
+
+
+class TestTotal:
+    def test_empty(self):
+        assert total([]) == 0
+
+    def test_lines(self):
+        assert total([(2, 150), (1, 99)]) == 399
+-- base/worker/pyproject.toml --
+[project]
+name = "worker"
+version = "0.1.0"
+requires-python = ">=3.12"
+dependencies = ["shared"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+-- base/worker/src/worker/__init__.py --
+-- base/worker/src/worker/tasks.py --
+from shared.money import total
+
+
+def invoice(order: dict) -> int:
+    return total(order["lines"])
+-- base/worker/tests/test_tasks.py --
+from worker.tasks import invoice
+
+
+def test_invoice():
+    assert invoice({"lines": [(1, 250)]}) == 250
+-- head/shared/src/shared/money.py --
+"""Amounts in cents."""
+
+from api.main import app
+
+
+def total(lines: list[tuple[int, int]]) -> int:
+    """Sum quantity times unit price, in cents."""
+    return sum(quantity * price for quantity, price in lines)
+
+
+def routes() -> int:
+    return len(app.routes)
+-- ci/import-linter.txt --
+
+╔══╗─────────▶╔╗ ╔╗      ╔╗◀───┐
+╚╣╠╝◀─────┐  ╔╝╚╗║║────▶╔╝╚╗   │
+ ║║   ╔══╦══╦╩╗╔╝║║  ╔╦═╩╗╔╝╔═╦══╗
+ ║║╔══╣╔╗║╔╗║╔╣║ ║║ ╔╬╣╔╗║║ ║│║╔═╝
+╔╣╠╣║║║╚╝║╚╝║║║╚╗║╚═╝║║║║║╚╗║═╣║
+╚══╩╩╩╣╔═╩══╩╝╚═╝╚═══╩╩╝╚╩═╩╩═╩╝
+  └──▶║║                    ▲
+      ╚╝────────────────────┘
+
+---------
+Contracts
+---------
+
+Analyzed 9 files, 5 dependencies.
+---------------------------------
+
+Shared imports no service BROKEN
+Services are independent KEPT
+
+Contracts: 1 kept, 1 broken.
+
+
+----------------
+Broken contracts
+----------------
+
+Shared imports no service
+-------------------------
+
+shared is not allowed to import api:
+
+-   shared.money -> api.main (l.3)
+
+

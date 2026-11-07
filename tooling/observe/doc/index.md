@@ -22,6 +22,7 @@ GitHub Actions, it is one step: `uses: Putnami/observe-action@v1`.
 | Which tests ran, and did they pass? | It reads the test reports and places each test case on its component. |
 | How well do the tests cover the change? | It reads the coverage reports, places each covered file on its component, and computes the coverage of the changed lines. |
 | Which dependencies moved? | It reads each changed lockfile at the base and at the commit, and lists the packages added, removed, upgraded or downgraded. |
+| Which architecture rules does the change break, and where? | It reads the ArchUnit, deptrac and import-linter results the job wrote, and places each violation on the component that holds its file. See [Architecture rules](/docs/tooling-&-workspace/observe/architecture). |
 | Do those moves fix or bring known vulnerabilities, or change licences? | It reads the software bill of materials (SBOM, the list of a build's packages with their licences and known vulnerabilities) the job wrote, at the base and at the commit. |
 | Which specs does the repository keep, and does the change touch them? | It reads the Spec Kit, OpenSpec, Kiro and Gherkin specs, places each on its component, and lists its requirements. |
 | Which decisions govern the change? | It reads the MADR decision records under `docs/decisions` and `docs/adr`, and lists those whose scope covers a changed file and those the change adds, edits or deletes. A change that deletes an accepted decision is flagged. |
@@ -117,6 +118,19 @@ no report. `--junit` and `--coverage` name them instead. It reads no
 `.xcresult` bundle: convert it to JUnit and Cobertura first. See
 [Reports](/docs/tooling-&-workspace/observe/reports) for what each format
 gives.
+
+### Architecture results
+
+| Checker | Report |
+|---|---|
+| ArchUnit | The JUnit report of its test class, from Maven Surefire or Gradle |
+| deptrac | `deptrac analyse --formatter=junit` |
+| import-linter | The text of `lint-imports`, saved to a file |
+
+`--architecture` names the deptrac and import-linter reports, and
+`--archunit-classes` the ArchUnit test classes that do not import
+`com.tngtech.archunit` themselves. See
+[Architecture rules](/docs/tooling-&-workspace/observe/architecture).
 
 ### Lockfiles
 

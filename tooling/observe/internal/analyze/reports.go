@@ -14,11 +14,12 @@ import (
 )
 
 // readReports reads every report: the tests and the coverage per component,
-// and the merged line coverage per repository file.
+// the architecture rules, and the merged line coverage per repository file.
 func (r *Result) readReports(in Input, m *mapper) map[string]lineHits {
 	tests := map[string]*evidence.ComponentTests{}
 	lines := map[string]lineHits{}
 	stated := map[string]readers.Counts{}
+	arch := newArchitecture()
 	for _, report := range in.Reports {
 		abs := report.Path
 		if !filepath.IsAbs(abs) {
@@ -34,7 +35,9 @@ func (r *Result) readReports(in Input, m *mapper) map[string]lineHits {
 			if r.unread(report, diags) {
 				continue
 			}
-			r.attributeTests(report, result, m, tests)
+			r.attributeTests(in, report, result, m, tests, arch)
+		case reports.KindArchitecture:
+			r.readArchitecture(report, abs, m, arch)
 		case reports.KindCoverage:
 			result, ok := r.readCoverage(report, abs)
 			if !ok {
@@ -44,6 +47,11 @@ func (r *Result) readReports(in Input, m *mapper) map[string]lineHits {
 		}
 	}
 	sortedComponents(tests, &r.Tests)
+	r.Architecture = arch.result()
+	if arch.droppedRules > 0 || arch.droppedViolations > 0 {
+		r.warn(CodeArchitectureBounded, "architecture", "%d architecture rules and %d violations over the evidence bounds (%d rules, %d violations per rule) are left out",
+			arch.droppedRules, arch.droppedViolations, evidence.MaxArchitectureRules, evidence.MaxViolations)
+	}
 	coverage := map[string]*evidence.ComponentCoverage{}
 	add := func(file string, covered, total int) {
 		owner, ok := m.set.Owner(file)
@@ -189,7 +197,10 @@ func joinDir(base, dir string) string {
 // tests.test_api.TestLogin for a case of tests/test_api.py, and its default
 // xunit2 report has no file attribute. Else it is the dotted class name read
 // as a Dart test file: tojunit writes test.price for test/price_test.dart.
-func (r *Result) attributeTests(report reports.Report, result readers.TestReport, m *mapper, tests map[string]*evidence.ComponentTests) {
+//
+// A case whose test source imports ArchUnit, or whose class name matches
+// an --archunit-classes pattern, is an architecture rule, not a test.
+func (r *Result) attributeTests(in Input, report reports.Report, result readers.TestReport, m *mapper, tests map[string]*evidence.ComponentTests, arch *architecture) {
 	bases := m.bases(report.Path)
 	reportOwner, reportOwned := m.set.Owner(report.Path)
 	if isAbsolute(report.Path) {
@@ -224,6 +235,9 @@ func (r *Result) attributeTests(report reports.Report, result readers.TestReport
 					break
 				}
 			}
+		}
+		if r.archUnitCase(in, report, c, file, m, arch) {
+			continue
 		}
 		if targeted {
 			owner, ok = targetOwner, true
