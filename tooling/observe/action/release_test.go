@@ -204,6 +204,7 @@ func TestTheReleaseJobRunsFromMainInItsEnvironment(t *testing.T) {
 	if got := yaml.String(doc, "jobs", "release", "environment"); got != "observe-action" {
 		t.Fatalf("jobs.release.environment = %q, want observe-action", got)
 	}
+	spectest.Proves(t, feature, "action-release", "the-release-workflow-checks-the-version-before-any-tag")
 	steps, _ := yaml.Get(doc, "jobs", "release", "steps").([]any)
 	var released string
 	for _, step := range steps {
