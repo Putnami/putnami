@@ -31,6 +31,7 @@
     "tooling/specification-driven-development#specs-surface-names-the-source",
     "tooling/specification-driven-development#squash-keeps-the-breaking-marker",
     "tooling/specification-driven-development#squash-names-no-agent",
+    "tooling/specification-driven-development#structurizr-models-import-as-manifests",
     "tooling/specification-driven-development#unpromised-finding-ids-warn",
     "tooling/specification-driven-development#verify-names-an-empty-evaluation"
   ]

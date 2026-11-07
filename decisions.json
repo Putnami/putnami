@@ -492,6 +492,22 @@
       "settledBy": "the epic session, under the owner's delegation of 2026-11-05",
       "adr": "tooling/contributor/doc/adr/0011-the-epic-session-publishes-a-cloud-child.md",
       "reviewOnly": true
+    },
+    {
+      "id": "D-061",
+      "statement": "architecture import --from structurizr makes each container a domain <system>/<container> and a container-less system a domain <system>; a cross-domain relationship becomes a reference import of the producer's <domain>.interface.v1 export",
+      "settled": "2026-11-07",
+      "settledBy": "the owner, approving the plan of issue 948",
+      "adr": "tooling/sdd-extension/doc/adr/0005-a-structurizr-model-is-an-authored-architecture.md",
+      "reviewOnly": true
+    },
+    {
+      "id": "D-062",
+      "statement": "architecture import writes only with --apply and then only adds manifests, projects, exports, imports and bindings; it never changes or removes an existing entry, so a hand edit survives a rerun",
+      "settled": "2026-11-07",
+      "settledBy": "the owner, approving the plan of issue 948",
+      "adr": "tooling/sdd-extension/doc/adr/0005-a-structurizr-model-is-an-authored-architecture.md",
+      "reviewOnly": true
     }
   ]
 }
