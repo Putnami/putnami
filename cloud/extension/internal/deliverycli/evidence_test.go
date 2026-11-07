@@ -297,7 +297,7 @@ func TestEvidenceReportSendsNothingItCannotUpload(t *testing.T) {
 		"no file":         {evidenceEnv(), nil, clicore.ExitUsage, "--file"},
 		"a missing file":  {evidenceEnv(), []string{"--file", filepath.Join(t.TempDir(), "none.json")}, clicore.ExitUsage, "cannot read"},
 		"an invalid file": {evidenceEnv(), []string{"--file", invalid}, clicore.ExitUsage, "not a valid change evidence document"},
-		"a generic CI":    {evidenceEnv(), []string{"--file", genericPath}, clicore.ExitUsage, "no provenance"},
+		"no project id":   {evidenceEnv(), []string{"--file", genericPath}, clicore.ExitUsage, "no numeric project id"},
 	} {
 		t.Run(name, func(t *testing.T) {
 			fake := &evidenceFakeServer{}
@@ -598,4 +598,84 @@ func jsonMemberNames(typ reflect.Type) []string {
 		}
 	}
 	return names
+}
+
+// genericEvidenceDoc writes the generic fixture with the CI system and the
+// numeric project id a generic CI job could report.
+func genericEvidenceDoc(t *testing.T, system string) string {
+	t.Helper()
+	data, err := os.ReadFile(evidenceFixture("generic-minimal.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var doc map[string]any
+	if err := json.Unmarshal(data, &doc); err != nil {
+		t.Fatal(err)
+	}
+	doc["ci"] = map[string]any{"system": system, "runId": "512", "jobId": "test"}
+	doc["subject"].(map[string]any)["projectId"] = "4521"
+	return writeEvidenceDoc(t, doc)
+}
+
+func evidenceEnvWith(vars map[string]string) map[string]string {
+	env := evidenceEnv()
+	maps.Copy(env, vars)
+	return env
+}
+
+func TestEvidenceReportOpensAnExternalRunForAnotherCI(t *testing.T) {
+	spectest.Proves(t, evidenceFeature, "sends-the-provenance-of-the-ci", "another-ci-opens-an-external-run")
+	for _, system := range []string{evidence.CISystemJenkins, evidence.CISystemCircleCI, evidence.CISystemBuildkite, evidence.CISystemAzurePipelines, evidence.CISystemBitbucketPipelines, evidence.CISystemTeamCity} {
+		t.Run(system, func(t *testing.T) {
+			fake := &evidenceFakeServer{}
+			// The document names its CI: the environment of the upload does not change it.
+			if _, err := runEvidenceReport(t, fake, evidenceEnv(), "--file", genericEvidenceDoc(t, system)); err != nil {
+				t.Fatalf("evidence-report: %v", err)
+			}
+			run := fake.requests[0].Body
+			if run["provenance"] != "external" || run["provider"] != "generic" || run["repo"] != "4521" {
+				t.Fatalf("run = %v, want an external run of generic project 4521", run)
+			}
+			if run["submissionId"] != "observe-external-4521-512-test" {
+				t.Fatalf("submissionId = %v, want the provenance, project, run and job", run["submissionId"])
+			}
+		})
+	}
+}
+
+func TestEvidenceReportOpensAnExternalRunForAGenericDocumentInACI(t *testing.T) {
+	spectest.Proves(t, evidenceFeature, "sends-the-provenance-of-the-ci", "a-generic-document-in-a-ci-opens-an-external-run")
+	for name, vars := range map[string]map[string]string{
+		"CI=true":     {"CI": "true"},
+		"CI=1":        {"CI": "1"},
+		"a CI marker": {"TEAMCITY_VERSION": "2024.03"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			fake := &evidenceFakeServer{}
+			if _, err := runEvidenceReport(t, fake, evidenceEnvWith(vars), "--file", genericEvidenceDoc(t, evidence.CISystemGeneric)); err != nil {
+				t.Fatalf("evidence-report: %v", err)
+			}
+			if got := fake.requests[0].Body["provenance"]; got != "external" {
+				t.Fatalf("provenance = %v, want external", got)
+			}
+		})
+	}
+}
+
+func TestEvidenceReportOpensALocalRunOutsideACI(t *testing.T) {
+	spectest.Proves(t, evidenceFeature, "sends-the-provenance-of-the-ci", "an-upload-outside-a-ci-opens-a-local-run")
+	for name, vars := range map[string]map[string]string{
+		"no CI variable": nil,
+		"CI=false":       {"CI": "false"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			fake := &evidenceFakeServer{}
+			if _, err := runEvidenceReport(t, fake, evidenceEnvWith(vars), "--file", genericEvidenceDoc(t, evidence.CISystemGeneric)); err != nil {
+				t.Fatalf("evidence-report: %v", err)
+			}
+			if got := fake.requests[0].Body["provenance"]; got != "local" {
+				t.Fatalf("provenance = %v, want local", got)
+			}
+		})
+	}
 }

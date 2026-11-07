@@ -23,7 +23,7 @@
     },
     {
       "id": "ci-detection",
-      "text": "GITHUB_ACTIONS=true selects GitHub Actions and GITLAB_CI=true selects GitLab CI; any other CI is generic. The subject names the code host, its numeric project id (GITHUB_REPOSITORY_ID, CI_PROJECT_ID), the repository path for display, the commit the job built and measured (the resolved head), the branch and the pull or merge request number; the run names its id, job, attempt and page. A GitHub or GitLab job without a numeric project id gets a diagnostic. --head and --base override what the CI says."
+      "text": "The evidence protocol's markers name the CI system; only GitHub Actions and GitLab CI fill the subject and the run. The subject names the code host, its numeric project id (GITHUB_REPOSITORY_ID, CI_PROJECT_ID), the repository path for display, the commit the job built and measured (the resolved head), the branch and the pull or merge request number; the run names its id, job, attempt and page. A GitHub or GitLab job without a numeric project id gets a diagnostic. --head and --base override what the CI says."
     },
     {
       "id": "diff-base",

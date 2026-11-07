@@ -7,13 +7,17 @@
   ],
   "nonGoals": [
     "Creating the observed workspace or its token: the runbook does it by hand for this slice",
-    "Uploading from a CI other than GitHub Actions or GitLab CI: Delivery has no provenance for it",
+    "Keying the repository of a CI that names no numeric project id: a document without one is refused",
     "Signing in as a person: the upload uses the workspace token alone"
   ],
   "requirements": [
     {
       "id": "opens-the-external-run",
-      "text": "putnami cloud evidence-report --file <path> reads a protocol/evidence v1 document and opens its run with POST /v1/delivery/records under the PUTNAMI_CLOUD_TOKEN bearer: the subject's provider, numeric project id as repo, commit and branch, provenance gha or gitlab from the CI, the pull or merge request as changeRequest, conclusion failure when a test failed, else success, and a submission id derived from the CI job, so a repeated upload opens no second run."
+      "text": "putnami cloud evidence-report --file <path> reads a protocol/evidence v1 document and opens its run with POST /v1/delivery/records under the PUTNAMI_CLOUD_TOKEN bearer: the subject's provider, numeric project id as repo, commit and branch, the provenance of the CI, the pull or merge request as changeRequest, conclusion failure when a test failed, else success, and a submission id derived from the CI job, so a repeated upload opens no second run."
+    },
+    {
+      "id": "sends-the-provenance-of-the-ci",
+      "text": "The provenance is gha for a github-actions document, gitlab for a gitlab-ci one and external for any other CI it names. A generic document is external when the environment of the upload is a CI by the evidence protocol's markers, and local otherwise."
     },
     {
       "id": "sends-the-tested-tree",
@@ -29,7 +33,7 @@
     },
     {
       "id": "refuses-what-it-cannot-upload",
-      "text": "Without PUTNAMI_CLOUD_TOKEN, with a document that does not parse or validate, or with a generic CI, it sends nothing and exits non-zero with a message that names the cause. A refused run or batch exits non-zero with the route and the server's reason, and never prints the token; a run opened again without its operational counts as refused only when that call is refused too."
+      "text": "Without PUTNAMI_CLOUD_TOKEN, with a document that does not parse or validate, or with a document whose subject names no numeric project id, it sends nothing and exits non-zero with a message that names the cause. A refused run or batch exits non-zero with the route and the server's reason, and never prints the token; a run opened again without its operational counts as refused only when that call is refused too."
     }
   ]
 }

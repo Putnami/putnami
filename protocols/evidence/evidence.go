@@ -18,6 +18,8 @@
 package evidence
 
 import (
+	"strings"
+
 	"go.putnami.dev/protocol/codehost"
 	diag "go.putnami.dev/protocol/diagnostic"
 )
@@ -39,13 +41,62 @@ var Providers = codehost.Slugs()
 
 // CI systems: what ran the job that produced the document.
 const (
-	CISystemGitHubActions = "github-actions"
-	CISystemGitLabCI      = "gitlab-ci"
-	CISystemGeneric       = "generic"
+	CISystemGitHubActions      = "github-actions"
+	CISystemGitLabCI           = "gitlab-ci"
+	CISystemJenkins            = "jenkins"
+	CISystemCircleCI           = "circleci"
+	CISystemBuildkite          = "buildkite"
+	CISystemAzurePipelines     = "azure-pipelines"
+	CISystemBitbucketPipelines = "bitbucket-pipelines"
+	CISystemTeamCity           = "teamcity"
+	CISystemGeneric            = "generic"
 )
 
 // CISystems is the closed CI-system vocabulary.
-var CISystems = []string{CISystemGitHubActions, CISystemGitLabCI, CISystemGeneric}
+var CISystems = []string{
+	CISystemGitHubActions, CISystemGitLabCI, CISystemJenkins, CISystemCircleCI, CISystemBuildkite,
+	CISystemAzurePipelines, CISystemBitbucketPipelines, CISystemTeamCity, CISystemGeneric,
+}
+
+// CIMarker is the variable a CI sets in every job. Value "" matches any
+// non-empty value; another value matches without case.
+type CIMarker struct {
+	System   string
+	Variable string
+	Value    string
+}
+
+// CIMarkers recognize a CI system, in order: the first that matches wins.
+var CIMarkers = []CIMarker{
+	{CISystemGitHubActions, "GITHUB_ACTIONS", "true"},
+	{CISystemGitLabCI, "GITLAB_CI", "true"},
+	{CISystemJenkins, "JENKINS_URL", ""},
+	{CISystemCircleCI, "CIRCLECI", "true"},
+	{CISystemBuildkite, "BUILDKITE", "true"},
+	{CISystemAzurePipelines, "TF_BUILD", "true"},
+	{CISystemBitbucketPipelines, "BITBUCKET_BUILD_NUMBER", ""},
+	{CISystemTeamCity, "TEAMCITY_VERSION", ""},
+}
+
+// DetectCISystem names the CI that env describes: the system of the first
+// marker that matches, else generic when CI is true or 1. ok is false when
+// the environment is no CI. env returns "" for an unset variable.
+func DetectCISystem(env func(string) string) (system string, ok bool) {
+	for _, marker := range CIMarkers {
+		value := strings.TrimSpace(env(marker.Variable))
+		if value == "" {
+			continue
+		}
+		if marker.Value == "" || strings.EqualFold(value, marker.Value) {
+			return marker.System, true
+		}
+	}
+	switch strings.ToLower(strings.TrimSpace(env("CI"))) {
+	case "true", "1":
+		return CISystemGeneric, true
+	}
+	return "", false
+}
 
 // File statuses, as git reports them.
 const (
@@ -217,7 +268,7 @@ type ChangeRequest struct {
 
 // CI names the job that produced the document.
 type CI struct {
-	// System is github-actions, gitlab-ci or generic.
+	// System is one of CISystems.
 	System string `json:"system"`
 	// RunID is the CI system's id of the run or pipeline.
 	RunID string `json:"runId,omitempty"`

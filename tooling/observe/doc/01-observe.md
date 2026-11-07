@@ -9,7 +9,7 @@ answer, so the workspace must declare `@putnami/observe` to run it there.
 
 | Flag | Meaning |
 |---|---|
-| `--base <commit or branch>` | The commit the change is measured against. It overrides the CI. A generic CI needs it. |
+| `--base <commit or branch>` | The commit the change is measured against. It overrides the CI. A CI other than GitHub Actions or GitLab CI needs it. |
 | `--head <revision>` | The commit that was built. Default `HEAD`. |
 | `--junit <paths>` | Comma-separated JUnit XML or TRX paths or glob patterns, resolved against the directory you run in. Replaces JUnit discovery. |
 | `--coverage <paths>` | The same for coverage reports. Replaces coverage discovery. |
@@ -32,7 +32,24 @@ directories.
 |---|---|---|---|
 | GitHub Actions | `GITHUB_ACTIONS=true` | `GITHUB_SERVER_URL` host, `GITHUB_REPOSITORY_ID` | `GITHUB_REF` `refs/pull/<n>/merge`, or the event payload |
 | GitLab CI | `GITLAB_CI=true` | `CI_SERVER_HOST`, `CI_PROJECT_ID` | `CI_MERGE_REQUEST_IID` |
-| Any other | neither | none | none |
+| Jenkins | `JENKINS_URL` | none | none |
+| CircleCI | `CIRCLECI=true` | none | none |
+| Buildkite | `BUILDKITE=true` | none | none |
+| Azure Pipelines | `TF_BUILD=true` | none | none |
+| Bitbucket Pipelines | `BITBUCKET_BUILD_NUMBER` | none | none |
+| TeamCity | `TEAMCITY_VERSION` | none | none |
+| Any other | `CI=true` or none of the above | none | none |
+
+The first marker that matches names the CI, in the order of this table, and
+`ci.system` carries its name (`jenkins`, `circleci`, `buildkite`,
+`azure-pipelines`, `bitbucket-pipelines`, `teamcity`); any other CI is
+`generic`. Values compare without case, and a variable without a value in the
+table matches any non-empty value. The evidence protocol owns this table.
+
+Only GitHub Actions and GitLab CI fill the code host, the project id, the
+branch, the change request and the run ids: the document of another CI names
+no numeric project id, and `@putnami/cloud` refuses to
+upload a document without one.
 
 The repository path (`GITHUB_REPOSITORY`, `CI_PROJECT_PATH`, or the path of
 the `origin` remote) is for display only. A GitHub or GitLab job without a
@@ -219,7 +236,7 @@ Publishing never fails the job:
 
 | Case | Diagnostic |
 |---|---|
-| A generic CI, or a job that runs for no pull or merge request, such as a branch push | `observe.publish_skipped` (info) |
+| A CI other than GitHub Actions or GitLab CI, or a job that runs for no pull or merge request, such as a branch push | `observe.publish_skipped` (info) |
 | The code host's token is unset | `observe.publish_token_missing` (warning) |
 | A refused or failed call, no GitLab API URL, an API URL that is not https, no commit to set the status on, or a run past 1 minute | `observe.publish_failed` (warning) |
 

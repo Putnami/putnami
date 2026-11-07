@@ -1121,7 +1121,7 @@
     },
     "cloud-evidence-report": {
       "visibility": "internal",
-      "description": "Upload a protocol/evidence v1 document to Delivery under the workspace token in PUTNAMI_CLOUD_TOKEN: open the run on POST /v1/delivery/records with provenance gha or gitlab and the pull or merge request, then post the tests and coverage, and the components, changed-line coverage and dependency changes, as two batches on POST /v1/delivery/records/reports.",
+      "description": "Upload a protocol/evidence v1 document to Delivery under the workspace token in PUTNAMI_CLOUD_TOKEN: open the run on POST /v1/delivery/records with the provenance of its CI (gha, gitlab, or external for any other CI; local for a generic document uploaded outside a CI) and the pull or merge request, then post the tests and coverage, and the components, changed-line coverage and dependency changes, as two batches on POST /v1/delivery/records/reports.",
       "flags": {
         "file": {
           "type": "string",

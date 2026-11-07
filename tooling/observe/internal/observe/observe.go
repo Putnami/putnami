@@ -15,6 +15,7 @@ import (
 
 	"go.putnami.dev/protocol/codehost"
 	diag "go.putnami.dev/protocol/diagnostic"
+	"go.putnami.dev/protocol/evidence"
 	"go.putnami.dev/tooling/observe/internal/analyze"
 	"go.putnami.dev/tooling/observe/internal/ci"
 	"go.putnami.dev/tooling/observe/internal/components"
@@ -226,6 +227,18 @@ func systemLabel(system string) string {
 		return "GitHub Actions"
 	case ci.SystemGitLabCI:
 		return "GitLab CI"
+	case evidence.CISystemJenkins:
+		return "Jenkins"
+	case evidence.CISystemCircleCI:
+		return "CircleCI"
+	case evidence.CISystemBuildkite:
+		return "Buildkite"
+	case evidence.CISystemAzurePipelines:
+		return "Azure Pipelines"
+	case evidence.CISystemBitbucketPipelines:
+		return "Bitbucket Pipelines"
+	case evidence.CISystemTeamCity:
+		return "TeamCity"
 	}
 	return "generic CI"
 }

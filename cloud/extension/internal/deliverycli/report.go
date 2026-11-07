@@ -6,8 +6,9 @@
 // The command is the client half of the delivery records contract: it resolves
 // the subject (HEAD SHA + origin repository) from git, REFUSES to send anything
 // for a dirty working tree or an unpushed HEAD (delivery records bind to
-// resolvable, pushed commits only), derives provenance (local by default, gha
-// under GitHub Actions), and POSTs a conclusion-only submission authenticated
+// resolvable, pushed commits only), derives provenance (gha under GitHub
+// Actions, gitlab under GitLab CI, external under any other CI, local outside
+// a CI), and POSTs a conclusion-only submission authenticated
 // with the existing workspace-scoped token machinery. In the wrapper form
 // (`putnami cloud ci report -- putnami … --output=jsonl`) the wrapped command's
 // stdout is tee'd through internal/reportstream, and at run end the
@@ -37,6 +38,7 @@ import (
 	clicore "go.putnami.dev/cloud/extension/internal/clicore"
 	"go.putnami.dev/cloud/extension/internal/deliverycli/internal/reportstream"
 	perrors "go.putnami.dev/errors"
+	"go.putnami.dev/protocol/evidence"
 )
 
 // recordsIngestPath is the control-plane ingest endpoint for delivery run
@@ -169,8 +171,9 @@ type reportBatchStream struct {
 // changes the command's outcome or the run's conclusion.
 //
 // Client-side boundary (enforced, no request sent): the working tree must be
-// clean and HEAD must be pushed to a remote. Provenance is `local` unless
-// $GITHUB_ACTIONS is set (`gha`); v1 accepts no other value.
+// clean and HEAD must be pushed to a remote. Provenance is `gha` under GitHub
+// Actions, `gitlab` under GitLab CI, `external` under any other CI and `local`
+// outside a CI (reportProvenance).
 func Report(params map[string]any, args []string, workspaceRoot string, env map[string]string, ioctx clicore.IO) error {
 	pre, wrapped, hasWrapped := splitWrappedCommand(args)
 	if hasWrapped {
@@ -283,7 +286,7 @@ func reportHelp(params map[string]any, ioctx clicore.IO) error {
 		ioctx.Stdout(fmt.Sprintf("  putnami %-80s %s", c["command"], c["description"]))
 	}
 	ioctx.Stdout("")
-	ioctx.Stdout("Refuses (nothing sent) on a dirty working tree or an unpushed HEAD; provenance is local, or gha under GitHub Actions.")
+	ioctx.Stdout("Refuses (nothing sent) on a dirty working tree or an unpushed HEAD; provenance is gha under GitHub Actions, gitlab under GitLab CI, external under any other CI, else local.")
 	ioctx.Stdout("Report ingestion is fail-soft: a failed or partial report batch never changes the run's conclusion or this command's exit code.")
 	return nil
 }
@@ -371,13 +374,51 @@ func resolveReportConclusion(params map[string]any, wrapped []string, hasWrapped
 	return "", 0, clicore.NewError("cloud ci report requires a conclusion source: --conclusion <value>, --exit-code <n>, or a wrapped command after `--`", clicore.ExitUsage)
 }
 
-// reportProvenance derives the v1 provenance: gha under GitHub Actions, local
-// otherwise. `ci` is reserved for the orchestrated runner and never sent.
+// Provenances a reporter sends. `ci` is reserved for the orchestrated runner
+// and never sent.
+const (
+	provenanceGHA      = "gha"
+	provenanceGitLab   = "gitlab"
+	provenanceExternal = "external"
+	provenanceLocal    = "local"
+)
+
+// reportProvenance derives the provenance of the environment: the CI the
+// evidence protocol's markers name, else local.
 func reportProvenance(env map[string]string) string {
-	if clicore.EnvGet(env, "GITHUB_ACTIONS") != "" {
-		return "gha"
+	system, inCI := evidence.DetectCISystem(envLookup(env))
+	if !inCI {
+		return provenanceLocal
 	}
-	return "local"
+	return ciProvenance(system)
+}
+
+// evidenceProvenance derives the provenance of a document: the CI it names,
+// and for a generic document, external when env is a CI and local otherwise.
+func evidenceProvenance(system string, env map[string]string) string {
+	if system == evidence.CISystemGeneric {
+		if _, inCI := evidence.DetectCISystem(envLookup(env)); !inCI {
+			return provenanceLocal
+		}
+	}
+	return ciProvenance(system)
+}
+
+// ciProvenance maps a CI system to its provenance: gha, gitlab, or external
+// for any other CI.
+func ciProvenance(system string) string {
+	switch system {
+	case evidence.CISystemGitHubActions:
+		return provenanceGHA
+	case evidence.CISystemGitLabCI:
+		return provenanceGitLab
+	default:
+		return provenanceExternal
+	}
+}
+
+func envLookup(env map[string]string) func(string) string {
+	return func(name string) string { return clicore.EnvGet(env, name) }
 }
 
 // postReportBatch folds the wrapped run into a report batch and POSTs it,

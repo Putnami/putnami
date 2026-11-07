@@ -37,7 +37,8 @@
               "a-github-actions-pull-request",
               "a-gitlab-merge-request",
               "a-generic-ci-takes-its-base-and-head-from-flags",
-              "the-repository-key-is-the-numeric-project-id"
+              "the-repository-key-is-the-numeric-project-id",
+              "another-ci-is-named-by-its-marker"
             ]
           }
         },

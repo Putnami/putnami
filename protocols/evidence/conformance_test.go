@@ -101,7 +101,7 @@ func TestConformance_VocabulariesAreClosed(t *testing.T) {
 	spectest.Proves(t, feature, "version-1-and-closed-vocabularies", "the-vocabularies-are-closed")
 	pins := map[string][2][]string{
 		"providers":    {Providers, {"github", "gitlab", "generic"}},
-		"ci systems":   {CISystems, {"github-actions", "gitlab-ci", "generic"}},
+		"ci systems":   {CISystems, {"github-actions", "gitlab-ci", "jenkins", "circleci", "buildkite", "azure-pipelines", "bitbucket-pipelines", "teamcity", "generic"}},
 		"sources":      {ComponentSources, {"orchestrator", "workspace", "manifest", "fallback", "declared"}},
 		"impacts":      {Impacts, {"changed", "dependent", "unaffected"}},
 		"statuses":     {FileStatuses, {"added", "modified", "deleted", "renamed"}},
@@ -426,7 +426,7 @@ func TestConformance_EachCIDefectGetsItsCode(t *testing.T) {
 	cases := map[string]func(*Document){
 		"http run url":       func(d *Document) { d.CI.URL = "http://github.com/run/1" },
 		"credentials in url": func(d *Document) { d.CI.URL = "https://token:x@github.com/run/1" },
-		"unknown ci":         func(d *Document) { d.CI.System = "circleci" },
+		"unknown ci":         func(d *Document) { d.CI.System = "travis" },
 		"attempt zero":       func(d *Document) { zero := 0; d.CI.Attempt = &zero },
 	}
 	for label, mutate := range cases {
@@ -770,4 +770,64 @@ func mustRead(t *testing.T, dir, name string) string {
 		t.Fatal(err)
 	}
 	return string(data)
+}
+
+func envOf(vars map[string]string) func(string) string {
+	return func(name string) string { return vars[name] }
+}
+
+func TestConformance_EachMarkerNamesItsCISystem(t *testing.T) {
+	spectest.Proves(t, feature, "the-ci-system-is-recognized-by-its-marker", "each-marker-names-its-ci-system")
+	cases := []struct {
+		vars map[string]string
+		want string
+	}{
+		{map[string]string{"GITHUB_ACTIONS": "true", "CI": "true"}, CISystemGitHubActions},
+		{map[string]string{"GITLAB_CI": "TRUE"}, CISystemGitLabCI},
+		{map[string]string{"JENKINS_URL": "https://ci.example.com/", "CI": "true"}, CISystemJenkins},
+		{map[string]string{"CIRCLECI": "true"}, CISystemCircleCI},
+		{map[string]string{"BUILDKITE": "true"}, CISystemBuildkite},
+		{map[string]string{"TF_BUILD": "True"}, CISystemAzurePipelines},
+		{map[string]string{"BITBUCKET_BUILD_NUMBER": "12"}, CISystemBitbucketPipelines},
+		{map[string]string{"TEAMCITY_VERSION": "2024.03"}, CISystemTeamCity},
+		// The first marker wins.
+		{map[string]string{"GITLAB_CI": "true", "JENKINS_URL": "https://ci.example.com/"}, CISystemGitLabCI},
+		// A marker whose value does not match is no marker.
+		{map[string]string{"GITHUB_ACTIONS": "false", "CIRCLECI": "true"}, CISystemCircleCI},
+	}
+	for _, c := range cases {
+		got, ok := DetectCISystem(envOf(c.vars))
+		if !ok || got != c.want {
+			t.Errorf("%v: got %q (%v), want %q", c.vars, got, ok, c.want)
+		}
+	}
+	for _, marker := range CIMarkers {
+		if !slices.Contains(CISystems, marker.System) {
+			t.Errorf("marker %s names %q, not a CI system", marker.Variable, marker.System)
+		}
+	}
+}
+
+func TestConformance_CITrueAloneIsAGenericCI(t *testing.T) {
+	spectest.Proves(t, feature, "the-ci-system-is-recognized-by-its-marker", "ci-true-alone-is-a-generic-ci")
+	for _, value := range []string{"true", "TRUE", "1"} {
+		got, ok := DetectCISystem(envOf(map[string]string{"CI": value}))
+		if !ok || got != CISystemGeneric {
+			t.Errorf("CI=%s: got %q (%v), want generic", value, got, ok)
+		}
+	}
+}
+
+func TestConformance_NoVariableIsNoCI(t *testing.T) {
+	spectest.Proves(t, feature, "the-ci-system-is-recognized-by-its-marker", "no-variable-is-no-ci")
+	for _, vars := range []map[string]string{
+		{},
+		{"CI": "false"},
+		{"CI": "0"},
+		{"GITHUB_ACTIONS": "false", "CIRCLECI": "", "JENKINS_URL": " "},
+	} {
+		if got, ok := DetectCISystem(envOf(vars)); ok {
+			t.Errorf("%v: got %q, want no CI", vars, got)
+		}
+	}
 }

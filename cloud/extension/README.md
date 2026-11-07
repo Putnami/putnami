@@ -243,8 +243,8 @@ the credential rules and the refusals.
 
 `@putnami/cloud` is the default evidence reporter of `putnami observe
 --upload`, which runs `putnami cloud evidence-report --file <path>` with the
-document it wrote. The command runs outside a workspace. In a GitHub Actions
-or GitLab CI job, set `PUTNAMI_CLOUD_TOKEN` to a workspace token of scope
+document it wrote. The command runs outside a workspace. In a CI job, set
+`PUTNAMI_CLOUD_TOKEN` to a workspace token of scope
 `delivery.ingest`; the token names the workspace.
 
 ```sh
@@ -256,7 +256,11 @@ PUTNAMI_CLOUD_TOKEN=pkt_... putnami observe --upload
 The command reads a `protocol/evidence` v1 document and makes three calls:
 
 1. `POST /v1/delivery/records` opens the run. The repository is the numeric
-   project id, the provenance is `gha` or `gitlab`, the pull or merge request
+   project id, the provenance is `gha` for a GitHub Actions document,
+   `gitlab` for a GitLab CI one and `external` for any other CI it names. A
+   `generic` document is `external` when the upload runs in a CI by the
+   evidence protocol's markers, and `local` otherwise. A document whose
+   subject names no numeric project id is refused. The pull or merge request
    is `changeRequest`, and the conclusion is `failure` when a test failed,
    else `success`. The submission id names the CI run, its attempt and its
    job, so uploading one job twice opens one run. GitHub Actions gives every
@@ -295,7 +299,8 @@ The command reads a `protocol/evidence` v1 document and makes three calls:
 
 A batch with nothing to carry is not sent. The summary lists apart the kinds
 Delivery already held for that submission. Without the token, with a document
-that does not validate, or for a generic CI, it sends nothing. Any refusal
+that does not validate, or with a document whose subject names no numeric
+project id, it sends nothing. Any refusal
 exits non-zero with the route and the server's reason; `putnami observe`
 turns that into a diagnostic and still exits 0. `PUTNAMI_CLOUD_API_URL`
 overrides the control plane, `https://api.putnami.cloud` by default.
