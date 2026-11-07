@@ -306,7 +306,14 @@ const StepDependencyContract = 18
 // provider, refuses the stamp instead.
 const ProviderContract = 19
 
+// UserScopeSkillsContract is required by a manifest whose agent-content
+// contribution names user-scope skills (`agentContent.userScope`). A reader at
+// this contract writes those skills under the user's home on
+// `extensions install --user`, so an older reader, which would install the
+// extension in the user scope without them, refuses the stamp instead.
+const UserScopeSkillsContract = 20
+
 // LatestContract is the highest contract this CLI reads. A manifest stamped
 // above it is refused as written for a newer putnami; a manifest stamped at or
 // below it loads when the stamp covers the vocabulary the manifest uses.
-const LatestContract = ProviderContract
+const LatestContract = UserScopeSkillsContract

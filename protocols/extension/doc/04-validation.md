@@ -293,8 +293,10 @@ changed files (`activation.changedFiles`) or binds them (`from: context`,
 `path: selection.changedFiles`),
 `protocols/cli.HostHooksContract` (17) for a `hostHooks` member, or
 `protocols/cli.StepDependencyContract` (18) for a command `dependsOn` entry
-that names one step of another command (`build~describe`), or
-`protocols/cli.ProviderContract` (19) for a `providers` section. Rung 6 named the
+that names one step of another command (`build~describe`),
+`protocols/cli.ProviderContract` (19) for a `providers` section, or
+`protocols/cli.UserScopeSkillsContract` (20) for a non-empty
+`agentContent.userScope`. Rung 6 named the
 `go-embed:build` and `go-embed:test` selectors the CLI expanded itself; rung
 14 retires it.
 `protocols/cli.GitInputModeContract` names the same rung 7 for a task whose
