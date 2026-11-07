@@ -74,7 +74,7 @@ func observeSBOMDemo(t *testing.T, inRepository map[string]string, head, base st
 func summary(t *testing.T, o Observation) string {
 	t.Helper()
 	var text bytes.Buffer
-	if err := WriteText(&text, o); err != nil {
+	if err := WriteDetails(&text, o); err != nil {
 		t.Fatal(err)
 	}
 	return text.String()

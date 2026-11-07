@@ -88,11 +88,17 @@ type Options struct {
 	Decisions []string
 	// Detectors replace the default detectors when not nil.
 	Detectors []components.Detector
+	// ProjectID asks the code host API for the numeric project id of the
+	// repository at path on host, for a run outside a CI; nil asks nothing.
+	ProjectID func(ctx context.Context, provider, host, path string) (string, error)
 }
 
 // Run observes the job.
 func Run(ctx context.Context, opts Options) Observation {
 	detection := ci.Detect(opts.Env, opts.ReadFile, opts.Overrides)
+	if detection.Local && detection.Base == nil {
+		defaultBase(ctx, opts.Dir, &detection)
+	}
 	resolved := gitbase.Resolve(ctx, gitbase.Request{Dir: opts.Dir, Head: detection.Head, Base: detection.Base, Fetch: opts.Fetch})
 	o := Observation{
 		Subject:         detection.Subject,
@@ -114,6 +120,10 @@ func Run(ctx context.Context, opts Options) Observation {
 	root := resolved.Root
 	if root == "" {
 		root = opts.Dir
+	}
+	var subjectDiags []diag.Diagnostic
+	if detection.Local {
+		subjectDiags = localSubject(ctx, root, opts, &o.Subject)
 	}
 	if o.Subject.Repository == "" {
 		o.Subject.Repository = repositoryName(ctx, root)
@@ -149,7 +159,7 @@ func Run(ctx context.Context, opts Options) Observation {
 	}
 	repoSpecs, specDiags := specs.Collect(specs.Request{Root: root, Owner: set.Owner, Changed: changed})
 	o.Specs = repoSpecs
-	o.Diagnostics = slices.Concat(detection.Diagnostics, resolved.Diagnostics, reportDiags, set.Diagnostics, analysisDiags, o.Analysis.Diagnostics, specDiags)
+	o.Diagnostics = slices.Concat(detection.Diagnostics, subjectDiags, resolved.Diagnostics, reportDiags, set.Diagnostics, analysisDiags, o.Analysis.Diagnostics, specDiags)
 	if o.Diagnostics == nil {
 		o.Diagnostics = []diag.Diagnostic{}
 	}
@@ -165,6 +175,82 @@ func (opts Options) detectors() []components.Detector {
 		return opts.Detectors
 	}
 	return components.Default(components.Options{MoonGraph: opts.MoonGraph, PantsGraph: opts.PantsGraph, BazelGraph: opts.BazelGraph})
+}
+
+// defaultBase makes the default branch of the origin remote the base of a run
+// outside a CI, and drops the diagnostic of a missing base. A clone that
+// records no default branch keeps that diagnostic.
+func defaultBase(ctx context.Context, dir string, d *ci.Detection) {
+	branch, err := gitbase.DefaultBranch(ctx, dir)
+	if err != nil || branch == "" {
+		return
+	}
+	d.Base = &ci.Base{Ref: branch, Source: ci.BaseFromDefaultBranch}
+	d.Diagnostics = slices.DeleteFunc(d.Diagnostics, func(x diag.Diagnostic) bool { return x.Code == ci.CodeBaseMissing })
+}
+
+// localSubject names the repository of a run outside a CI from its origin
+// remote: the code host, the repository path and, from the code host API, the
+// numeric project id; and the current branch. A remote on another host, or
+// one whose id the API does not answer, keeps the generic provider and gets
+// a diagnostic.
+func localSubject(ctx context.Context, root string, opts Options, s *ci.Subject) []diag.Diagnostic {
+	if s.Branch == "" {
+		s.Branch = gitbase.CurrentBranch(ctx, root)
+	}
+	remote, err := gitbase.RemoteURL(ctx, root)
+	if err != nil {
+		return nil
+	}
+	host, path := remoteHost(remote), remotePath(remote)
+	if host == "" || path == "" {
+		return nil
+	}
+	s.Host, s.Repository = host, path
+	provider, setting := "", ""
+	switch {
+	case host == codehost.For(codehost.GitHub).DefaultHost:
+		provider, setting = ci.ProviderGitHub, "GITHUB_TOKEN"
+	case host == codehost.For(codehost.GitLab).DefaultHost || strings.HasPrefix(host, "gitlab."):
+		provider, setting = ci.ProviderGitLab, "PUTNAMI_GITLAB_TOKEN"
+	default:
+		return []diag.Diagnostic{diag.Warningf(ci.CodeProjectIDMissing, "subject.projectId",
+			"the origin remote is on %s, neither GitHub nor GitLab: the repository has no stable key", host)}
+	}
+	if opts.ProjectID == nil {
+		return nil
+	}
+	id, err := opts.ProjectID(ctx, provider, host, path)
+	if err != nil || id == "" {
+		reason := "it answered no id"
+		if err != nil {
+			reason = err.Error()
+		}
+		return []diag.Diagnostic{diag.Warningf(ci.CodeProjectIDMissing, "subject.projectId",
+			"the %s API does not answer the numeric id of %s/%s (%s): set %s to a token that reads the repository", codehost.For(provider).Name, host, path, reason, setting)}
+	}
+	s.Provider, s.ProjectID = provider, id
+	return nil
+}
+
+// remoteHost returns the lowercase hostname of a remote URL, scp-like or not,
+// "" when it names none.
+func remoteHost(remote string) string {
+	if strings.Contains(remote, "://") {
+		parsed, err := url.Parse(remote)
+		if err != nil {
+			return ""
+		}
+		return strings.ToLower(parsed.Hostname())
+	}
+	host, _, ok := strings.Cut(remote, ":")
+	if !ok || strings.Contains(host, "/") || len(host) <= 1 {
+		return ""
+	}
+	if _, after, found := strings.Cut(host, "@"); found {
+		host = after
+	}
+	return strings.ToLower(host)
 }
 
 // repositoryName names a repository no CI names: the path of its origin
@@ -206,13 +292,39 @@ func WriteJSON(w io.Writer, o Observation) error {
 // maxListedFiles caps the changed files the text summary lists.
 const maxListedFiles = 50
 
-// WriteText writes the observation as a summary for a CI log.
+// WriteText writes the observation as a short summary for a log: the CI and
+// repository, the commit, the base, the count of changed files, the changed
+// and dependent components, the changed-line coverage, the dependency change
+// counts, then the warnings and errors.
 func WriteText(w io.Writer, o Observation) error {
 	var b strings.Builder
-	fmt.Fprintf(&b, "putnami observe: %s, %s\n", systemLabel(o.CI.System), repositoryLabel(o.Subject))
-	fmt.Fprintf(&b, "  commit   %s%s\n", short(o.Subject.SHA), commitDetail(o.Subject))
-	fmt.Fprintf(&b, "  base     %s\n", baseLabel(o))
-	fmt.Fprintf(&b, "  changed  %s\n", count(len(o.ChangedFiles), "file"))
+	writeHeader(&b, o)
+	writeShortAnalysis(&b, o.Analysis)
+	for _, d := range o.Diagnostics {
+		if d.Severity == diag.Info {
+			continue
+		}
+		fmt.Fprintf(&b, "  %s %s: %s\n", d.Severity, d.Code, d.Message)
+	}
+	_, err := io.WriteString(w, b.String())
+	return err
+}
+
+// writeHeader writes the CI and repository, the commit, the base and the
+// count of changed files.
+func writeHeader(b *strings.Builder, o Observation) {
+	fmt.Fprintf(b, "putnami observe: %s, %s\n", systemLabel(o.CI.System), repositoryLabel(o.Subject))
+	fmt.Fprintf(b, "  commit   %s%s\n", short(o.Subject.SHA), commitDetail(o.Subject))
+	fmt.Fprintf(b, "  base     %s\n", baseLabel(o))
+	fmt.Fprintf(b, "  changed  %s\n", count(len(o.ChangedFiles), "file"))
+}
+
+// WriteDetails writes the observation as a detailed summary: the short
+// summary's header, then each changed file, the whole analysis, the decisions,
+// the reports, the specs and every diagnostic.
+func WriteDetails(w io.Writer, o Observation) error {
+	var b strings.Builder
+	writeHeader(&b, o)
 	for i, file := range o.ChangedFiles {
 		if i == maxListedFiles {
 			fmt.Fprintf(&b, "    ... and %d more\n", len(o.ChangedFiles)-maxListedFiles)
@@ -331,10 +443,11 @@ func baseCandidate(b *ci.Base) string {
 }
 
 var sourceLabels = map[string]string{
-	ci.BaseFromFlag:         "--base",
-	ci.BaseFromMergeRequest: "the merge request",
-	ci.BaseFromPullRequest:  "the pull request",
-	ci.BaseFromPush:         "the previous push",
+	ci.BaseFromFlag:          "--base",
+	ci.BaseFromMergeRequest:  "the merge request",
+	ci.BaseFromPullRequest:   "the pull request",
+	ci.BaseFromPush:          "the previous push",
+	ci.BaseFromDefaultBranch: "the remote default branch",
 }
 
 func short(sha string) string {

@@ -128,6 +128,16 @@
           "default": false,
           "description": "Hand the change evidence document to the evidence reporter: the extension PUTNAMI_EVIDENCE_REPORTER names, @putnami/cloud when unset. A failed upload is a diagnostic; the exit code does not change."
         },
+        "open": {
+          "type": "boolean",
+          "default": false,
+          "description": "Upload as --upload does, letting the reporter sign the person in when no credential is present, print the report URL and, outside a CI, open it in the browser. A failed upload is a diagnostic; the exit code does not change."
+        },
+        "details": {
+          "type": "boolean",
+          "default": false,
+          "description": "Print the detailed summary: the changed files, the reports, each component's tests and coverage, each dependency change, the decisions and the specs, instead of the short summary."
+        },
         "publish": {
           "type": "boolean",
           "default": false,

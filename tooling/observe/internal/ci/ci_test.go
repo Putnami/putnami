@@ -241,6 +241,7 @@ func TestAGenericCITakesItsBaseAndHeadFromFlags(t *testing.T) {
 		Run:     Run{System: SystemGeneric},
 		Head:    "feature",
 		Base:    &Base{Ref: "origin/main", Source: BaseFromFlag},
+		Local:   true,
 	}
 	if !reflect.DeepEqual(d, want) {
 		t.Fatalf("detection:\n got %+v\nwant %+v", d, want)
@@ -338,6 +339,7 @@ func TestAnotherCIIsNamedByItsMarker(t *testing.T) {
 				Run:     Run{System: tc.system},
 				Head:    "HEAD",
 				Base:    &Base{Ref: "origin/main", Source: BaseFromFlag},
+				Local:   tc.env == nil,
 			}
 			if !reflect.DeepEqual(d, want) {
 				t.Fatalf("detection:\n got %+v\nwant %+v", d, want)

@@ -42,6 +42,9 @@ const (
 	BaseFromMergeRequest = "merge-request"
 	BaseFromPullRequest  = "pull-request"
 	BaseFromPush         = "push"
+	// BaseFromDefaultBranch is the default branch of the origin remote, the
+	// base of a run outside a CI.
+	BaseFromDefaultBranch = "default-branch"
 )
 
 // Diagnostic codes.
@@ -97,7 +100,10 @@ type Detection struct {
 	// Head is the revision that was built: the --head flag, or HEAD.
 	Head string
 	// Base is the base candidate, nil when neither a flag nor the CI names one.
-	Base        *Base
+	Base *Base
+	// Local is true when no CI runs the job: a person runs it on their
+	// machine.
+	Local       bool
 	Diagnostics []diag.Diagnostic
 }
 
@@ -127,8 +133,11 @@ func Detect(env Env, readFile ReadFile, overrides Overrides) Detection {
 	case SystemGitLabCI:
 		d = detectGitLab(env)
 	case "":
-		system = SystemGeneric
-		fallthrough
+		d = Detection{
+			Subject: Subject{Provider: ProviderGeneric},
+			Run:     Run{System: SystemGeneric},
+			Local:   true,
+		}
 	default:
 		d = Detection{
 			Subject: Subject{Provider: ProviderGeneric},

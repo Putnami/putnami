@@ -41,6 +41,11 @@ const (
 	FileFlag = "--file"
 	// OutputFlag asks the reporter for its protocol CLI result.
 	OutputFlag = "--output=json"
+	// SignInFlag lets the reporter sign a person in when it holds no
+	// credential.
+	SignInFlag = "--sign-in"
+	// SignInTimeout bounds a reporter that may wait for a person to sign in.
+	SignInTimeout = 16 * time.Minute
 	// CodeUploadFailed is the diagnostic of every failed hand-off.
 	CodeUploadFailed = "observe.upload_failed"
 	// Timeout bounds the reporter.
@@ -77,8 +82,11 @@ type Request struct {
 	// Output receives the reporter's standard error, its standard output when
 	// that is not a protocol CLI result, and the line naming the report.
 	Output io.Writer
-	// Timeout bounds the reporter; zero is Timeout.
+	// Timeout bounds the reporter; zero is Timeout, or SignInTimeout with
+	// SignIn.
 	Timeout time.Duration
+	// SignIn passes SignInFlag to the reporter.
+	SignIn bool
 }
 
 // Reporter returns the selected reporter's extension name and command group.
@@ -95,15 +103,19 @@ func Reporter(getenv func(string) string) (name, group string, err error) {
 }
 
 // Command returns the CLI executable, its arguments and its environment for
-// the reporter group.
-func Command(getenv func(string) string, environ []string, group, path string) (string, []string, []string) {
+// the reporter group; signIn adds SignInFlag.
+func Command(getenv func(string) string, environ []string, group, path string, signIn bool) (string, []string, []string) {
 	executable := cliName
 	env := append(append([]string{}, environ...), "PUTNAMI_NO_AUTO_INSTALL=1")
 	if advertised := strings.TrimSpace(getenv(cliExecutableEnv)); filepath.IsAbs(advertised) {
 		executable = advertised
 		env = append(env, "PUTNAMI_NO_RELAUNCH=1")
 	}
-	return executable, []string{group, Subcommand, FileFlag, path, OutputFlag}, env
+	args := []string{group, Subcommand, FileFlag, path, OutputFlag}
+	if signIn {
+		args = append(args, SignInFlag)
+	}
+	return executable, args, env
 }
 
 // Run hands the document to the selected reporter. It returns the report URL
@@ -119,12 +131,16 @@ func Run(ctx context.Context, req Request) (reportURL string, diags []diag.Diagn
 		return "", failed("%v", err)
 	}
 	timeout := req.Timeout
-	if timeout <= 0 {
+	switch {
+	case timeout > 0:
+	case req.SignIn:
+		timeout = SignInTimeout
+	default:
 		timeout = Timeout
 	}
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
-	executable, args, env := Command(req.Getenv, os.Environ(), group, req.Path)
+	executable, args, env := Command(req.Getenv, os.Environ(), group, req.Path, req.SignIn)
 	cmd := exec.CommandContext(ctx, executable, args...)
 	cmd.Env = env
 	stdout := &boundedBuffer{limit: maxResultBytes}

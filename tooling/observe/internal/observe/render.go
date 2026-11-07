@@ -22,6 +22,71 @@ const (
 // coverage per component, the changed-line coverage and the dependency
 // changes.
 func writeAnalysis(b *strings.Builder, a analyze.Result) {
+	writeComponents(b, a, maxListedComponents)
+	writeTests(b, a)
+	writeArchitecture(b, a)
+	writeChangedLines(b, a.ChangedLineCoverage)
+	fmt.Fprintf(b, "  dependencies  %s%s\n", count(len(a.DependencyChanges), "change"), sbomLabel(a.SBOM))
+	for i, d := range a.DependencyChanges {
+		if i == maxListedComponents {
+			fmt.Fprintf(b, "    ... and %d more\n", len(a.DependencyChanges)-i)
+			break
+		}
+		fmt.Fprintf(b, "    %-10s %s %s, in %s\n", d.Change, d.Name, versions(d), d.Lockfile)
+		if facts := dependencyFacts(d, a.SBOM); facts != "" {
+			fmt.Fprintf(b, "               %s\n", facts)
+		}
+	}
+}
+
+// maxShortComponents caps the components the short summary lists.
+const maxShortComponents = 10
+
+// writeShortAnalysis writes the changed and dependent components, the
+// coverage of the changed lines and the counts of the dependency changes.
+func writeShortAnalysis(b *strings.Builder, a analyze.Result) {
+	writeComponents(b, a, maxShortComponents)
+	if c := a.ChangedLineCoverage; c != nil {
+		fmt.Fprintf(b, "  changed lines  %s covered\n", ratio(c.CoveredLines, c.TotalLines))
+	} else {
+		fmt.Fprintln(b, "  changed lines  no coverage of the changed lines: it needs a base and a coverage report")
+	}
+	fmt.Fprintf(b, "  dependencies  %s\n", dependencyCounts(a.DependencyChanges, a.SBOM))
+}
+
+// dependencyCounts counts the dependency changes and, when an SBOM was read,
+// the license changes and the vulnerabilities the change introduces and
+// fixes.
+func dependencyCounts(changes []evidence.DependencyChange, sbom *evidence.SBOM) string {
+	label := count(len(changes), "change")
+	switch {
+	case len(changes) == 0:
+		return label
+	case sbom == nil:
+		return label + "; without an SBOM, their licenses and vulnerabilities are unknown"
+	}
+	licenses, introduced, fixed := 0, 0, 0
+	for _, d := range changes {
+		switch {
+		case d.Before != nil && d.After != nil:
+			f, i, _ := vulnerabilityDiff(d.Before.Vulnerabilities, d.After.Vulnerabilities)
+			fixed += len(f)
+			introduced += len(i)
+			if !slices.Equal(d.Before.Licenses, d.After.Licenses) {
+				licenses++
+			}
+		case d.After != nil && d.Change == evidence.DependencyAdded:
+			introduced += len(d.After.Vulnerabilities)
+		case d.Before != nil && d.Change == evidence.DependencyRemoved:
+			fixed += len(d.Before.Vulnerabilities)
+		}
+	}
+	return fmt.Sprintf("%s, %s, vulnerabilities %d introduced and %d fixed", label, count(licenses, "license change"), introduced, fixed)
+}
+
+// writeComponents writes the count of components by impact, then at most
+// limit changed and dependent components with their edges.
+func writeComponents(b *strings.Builder, a analyze.Result, limit int) {
 	byImpact := map[string][]evidence.Component{}
 	for _, c := range a.Components {
 		byImpact[c.Impact] = append(byImpact[c.Impact], c)
@@ -34,7 +99,7 @@ func writeAnalysis(b *strings.Builder, a analyze.Result) {
 	}
 	listed := 0
 	for _, c := range slices.Concat(changed, dependent) {
-		if listed == maxListedComponents {
+		if listed == limit {
 			fmt.Fprintf(b, "    ... and %d more\n", len(changed)+len(dependent)-listed)
 			break
 		}
@@ -50,20 +115,6 @@ func writeAnalysis(b *strings.Builder, a analyze.Result) {
 			line += ", depends on " + strings.Join(dependsOn, ", ")
 		}
 		fmt.Fprintln(b, line)
-	}
-	writeTests(b, a)
-	writeArchitecture(b, a)
-	writeChangedLines(b, a.ChangedLineCoverage)
-	fmt.Fprintf(b, "  dependencies  %s%s\n", count(len(a.DependencyChanges), "change"), sbomLabel(a.SBOM))
-	for i, d := range a.DependencyChanges {
-		if i == maxListedComponents {
-			fmt.Fprintf(b, "    ... and %d more\n", len(a.DependencyChanges)-i)
-			break
-		}
-		fmt.Fprintf(b, "    %-10s %s %s, in %s\n", d.Change, d.Name, versions(d), d.Lockfile)
-		if facts := dependencyFacts(d, a.SBOM); facts != "" {
-			fmt.Fprintf(b, "               %s\n", facts)
-		}
 	}
 }
 
