@@ -366,8 +366,7 @@ that Putnami has no full extension for.
 **What would change it:** a review that states which domain carries the stack
 core and its extensions, with the exact cross-domain permissions their imports
 of the protocols, the extension SDK, the evidence readers and the observe
-detectors need; the next stack extensions of #951 join the same section until
-then.
+detectors need; the next stack extensions join the same section until then.
 
 | Project | Class | Owner |
 |---|---|---|

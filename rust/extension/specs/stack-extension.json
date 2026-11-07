@@ -12,7 +12,7 @@
     "Installing or switching a Rust toolchain, cargo-nextest or cargo-llvm-cov: the toolchain check compares and never installs",
     "Publishing a crate to a registry",
     "A Cargo workspace whose root is not the Putnami workspace root: its crates are read as their own stack roots",
-    "Mapping each nextest case and coverage line to its crate, which #939 adds"
+    "Mapping each nextest case and coverage line to its crate"
   ],
   "requirements": [
     {

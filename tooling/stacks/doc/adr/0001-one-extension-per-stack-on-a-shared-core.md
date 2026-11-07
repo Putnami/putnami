@@ -3,7 +3,7 @@
 - **Status**: accepted
 - **Date**: 2026-11-07
 - **Scope**: `tooling/stacks` (`@putnami/stacks`), `rust/extension`
-  (`@putnami/rust`) and the stack extensions of #934 to #940
+  (`@putnami/rust`) and the stack extensions that follow it
 
 ## Context
 

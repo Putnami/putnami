@@ -2,7 +2,6 @@
 
 - **Status**: accepted ([ADR 0001](adr/0001-one-extension-per-stack-on-a-shared-core.md))
 - **Date**: 2026-11-07
-- **Issue**: #933, in the epic #951
 
 ## Problem
 
@@ -25,7 +24,7 @@ Two parts of that work already exist:
 Each stack gets **its own extension**, in the language root the repository
 layout gives it: `rust/extension` (`@putnami/rust`), then `php/extension`,
 `java/extension`, `swift/extension`, `dart/extension`, `dotnet/extension` and
-`ruby/extension` in #934 to #940. Each one is thin: a manifest, a **stack
+`ruby/extension`. Each one is thin: a manifest, a **stack
 profile** and a ten-line `main`. Everything they share lives in one Go
 library, the **stack core**, `tooling/stacks`
 (`go.putnami.dev/tooling/stacks`).
@@ -50,9 +49,9 @@ library, the **stack core**, `tooling/stacks`
    go.putnami.dev/evidence/readers               (JUnit, LCOV, …)
 ```
 
-This issue ships the core and `@putnami/rust`, the reference stack. Each of
-#934 to #940 then adds one extension on the same core and refines its profile;
-#939 completes Rust beyond what this issue proves.
+The core ships with `@putnami/rust`, the reference stack. Each other stack
+then adds one extension on the same core and refines its profile, and the
+Rust extension grows beyond what the reference proves.
 
 A project names its stack's extension like any other:
 `"extensions": ["/rust/extension"]`, or the probe assigns it. A stack whose
@@ -77,7 +76,7 @@ The detectors move from `tooling/observe/internal/detect/<stack>` to a public
 package of the observe module, `go.putnami.dev/tooling/observe/detect/<stack>`,
 so `putnami observe` and the stack extensions read a repository the same way,
 and a detector fix reaches both. Their fixtures move with them and become the
-extensions' fixtures, as #951 plans.
+extensions' fixtures.
 
 ### The stack profile
 
@@ -282,7 +281,7 @@ restores them and reads the same totals.
   reports no reachable workload for a stack project.
 - **Go, TypeScript and Python.** They keep their full extensions and do not
   move to the core.
-- **Bazel and Pants.** They delegate (#945, #946): they keep their own cache.
+- **Bazel and Pants.** They delegate: they keep their own cache.
 - **The build's own task graph.** A dependency between Cargo targets outside
   a crate edge is not read: the edges are the detector's.
 
@@ -326,7 +325,7 @@ stack's own build tool, and the tests name it. The CLI scenario above runs on
 a checkout of the repository whose root holds the fixture, with the same
 stubs for `test`, and with the real `cargo`, rustfmt and clippy for `lint`
 and `build`. A gate leg with the real cargo-nextest and cargo-llvm-cov is
-#939's.
+left to a later change.
 
 ## Settled with the owner
 

@@ -111,6 +111,6 @@ the extension does not declare. The design of the stack core is in
 - A Cargo workspace whose root is not the Putnami workspace root: its crates
   are read as their own stack roots, so the test task looks for the JUnit
   report under each crate's `target/` and fails with `stacks.report_missing`,
-  and the workspace's `Cargo.lock` reaches no key (#939).
-- Each nextest case and coverage line is not yet mapped to its crate (#939).
+  and the workspace's `Cargo.lock` reaches no key.
+- Each nextest case and coverage line is not yet mapped to its crate.
 - No publish: a crate reaches its registry through cargo.
