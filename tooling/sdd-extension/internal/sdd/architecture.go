@@ -124,7 +124,26 @@ func BuildArchitectureValidationResult(ws *workspace.Workspace, baselineRef stri
 func BuildArchitectureWorktreeValidationResult(ws *workspace.Workspace) (ArchitectureValidationReport, error) {
 	result := EvaluateWorkspace(ws, EvaluationOptions{WorktreeOnly: true, Today: time.Now().UTC()})
 	report := architectureValidationReport(result)
+	report.Diagnostics = append(report.Diagnostics, unpromisedFindingIDWarnings(result.DebtFiles)...)
+	report.DiagnosticCounts = countArchitectureDiagnostics(report.Diagnostics)
 	return report, architectureEvaluationError("architecture validate", result, report)
+}
+
+// unpromisedFindingIDWarnings tells a gated workspace which of its committed
+// files depend on finding IDs. The authored documents are promised; the IDs
+// they list are not (protocols/architecture ADR 0003). The warnings never reach
+// the verdict, which reads result, not the report.
+func unpromisedFindingIDWarnings(debtFiles []string) []diag.Diagnostic {
+	warnings := make([]diag.Diagnostic, 0, len(debtFiles))
+	for _, file := range debtFiles {
+		warnings = append(warnings, diag.Warningf(
+			WarningCodeFindingIDsNotPromised,
+			file,
+			"%s lists finding IDs, which the architecture protocol does not promise: a Putnami upgrade can rename one and turn its entry stale",
+			file,
+		))
+	}
+	return warnings
 }
 
 // BuildArchitectureSnapshotResult returns the complete deterministic machine

@@ -81,6 +81,14 @@ Policy decoding, malformed declarations, and incomplete provider/workspace
 views fail in every mode. `report` is advisory only for findings from a
 structurally coherent evaluation. This repository commits `enforce` to preserve
 its existing admission gate; the shared absent-policy default remains `report`.
+
+In every mode that runs, a committed `architecture.baseline.json` or
+`architecture.waivers.json` draws one `architecture.finding_ids_not_promised`
+warning that names the file. Both files list finding IDs, which the
+architecture protocol does not promise
+([ADR 0003](../../../protocols/architecture/doc/adr/0003-authored-documents-are-promised-findings-are-not.md)):
+an upgrade can rename an ID and turn its entry stale. The warning never changes
+the verdict.
 - **`specs-ratchet-validate`** — the rollout ratchet of the executable-spec
   gate. It derives the current enforced floor — every project
   whose effective `options.sdd.verification.specs` is `enforce`, with the

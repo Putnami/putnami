@@ -19,6 +19,12 @@ const (
 	ErrorCodeDiscoveryLimit         = "architecture.discovery_limit"
 	ErrorCodeIncompleteProjectGraph = "architecture.incomplete_project_graph"
 	ErrorCodeBaselineUnavailable    = "architecture.baseline_unavailable"
+
+	// WarningCodeFindingIDsNotPromised marks a committed baseline or waivers
+	// file. Both list finding IDs, which the architecture protocol does not
+	// promise (protocols/architecture ADR 0003): an upgrade can rename an ID
+	// and turn its entry stale.
+	WarningCodeFindingIDsNotPromised = "architecture.finding_ids_not_promised"
 )
 
 // EvaluationOptions selects the immutable baseline used for the shrink-only
@@ -53,6 +59,9 @@ type Result struct {
 	Snapshot    *archproto.Snapshot
 	Diagnostics []diag.Diagnostic
 	Baseline    BaselineStatus
+	// DebtFiles names the committed baseline and waivers files this run read,
+	// in that order.
+	DebtFiles []string
 }
 
 // BaselineStatus explains whether shrink-only comparison ran and against which commit.
