@@ -204,6 +204,16 @@ func TestTheReleaseJobRunsFromMainInItsEnvironment(t *testing.T) {
 	if got := yaml.String(doc, "jobs", "release", "environment"); got != "observe-action" {
 		t.Fatalf("jobs.release.environment = %q, want observe-action", got)
 	}
+	steps, _ := yaml.Get(doc, "jobs", "release", "steps").([]any)
+	var released string
+	for _, step := range steps {
+		if yaml.String(step, "id") == "released" {
+			released = yaml.String(step, "run")
+		}
+	}
+	if want := "if ! [[ \"$VERSION\" =~ ^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$ ]]; then"; !strings.HasPrefix(released, want) {
+		t.Fatalf("the released step does not check X.Y.Z before reading a tag:\n%s", released)
+	}
 	if got := yaml.String(doc, "permissions", "contents"); got != "read" {
 		t.Fatalf("permissions.contents = %q, want read", got)
 	}
