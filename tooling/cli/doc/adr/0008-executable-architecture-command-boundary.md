@@ -1,6 +1,9 @@
 # ADR 0008 — Keep executable architecture semantics in the protocol
 
-- **Status**: accepted
+- **Status**: accepted, amended by
+  [architecture ADR 0003](../../../../protocols/architecture/doc/adr/0003-authored-documents-are-promised-findings-are-not.md):
+  the `go.putnami.dev/protocol/architecture` support entry is `preview`, not
+  `experimental`.
 - **Scope**: the architecture engine of `@putnami/sdd`
   (`tooling/sdd-extension/internal/sdd`), the `putnami architecture` command
   group, the `architecture-validate` task, and the `sdd.architecture_context`
