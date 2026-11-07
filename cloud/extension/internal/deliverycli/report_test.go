@@ -300,7 +300,11 @@ func TestReportProvenanceDetection(t *testing.T) {
 		want string
 	}{
 		{name: "local by default", env: nil, want: "local"},
-		{name: "gha under GitHub Actions", env: map[string]string{"GITHUB_ACTIONS": "true"}, want: "gha"},
+		{name: "gha under GitHub Actions", env: map[string]string{"GITHUB_ACTIONS": "true", "CI": "true"}, want: "gha"},
+		{name: "gitlab under GitLab CI", env: map[string]string{"GITLAB_CI": "true", "CI": "true"}, want: "gitlab"},
+		{name: "external under Jenkins", env: map[string]string{"JENKINS_URL": "https://ci.example.com/"}, want: "external"},
+		{name: "external under another CI", env: map[string]string{"CI": "true"}, want: "external"},
+		{name: "local when CI is false", env: map[string]string{"CI": "false"}, want: "local"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			fake := &reportFakeServer{}
