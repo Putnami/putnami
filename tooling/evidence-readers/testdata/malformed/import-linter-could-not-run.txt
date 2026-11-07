@@ -1,0 +1,2 @@
+Contract "Layers" is not configured correctly:
+    layers: Expected a list.

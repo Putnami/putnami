@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites>
+  <testsuite id="1" package="" name="Controller" hostname="localhost" tests="2" failures="2" skipped="0" errors="0" time="0">
+    <testcase name="Controller - App\Controller\QuoteController" classname="App\Controller\QuoteController" time="0">
+      <failure message="App\Controller\QuoteController:9 must not depend on App\Repository\QuoteRepository (Controller on Repository)" type="WARNING"/>
+      <failure message="App\Controller\QuoteController:24 must not depend on App\Repository\QuoteRepository (Controller on Repository)" type="WARNING"/>
+    </testcase>
+    <testcase name="Controller - App\Controller\HealthController" classname="App\Controller\HealthController" time="0"/>
+  </testsuite>
+  <testsuite id="2" package="" name="Service" hostname="localhost" tests="1" failures="0" skipped="1" errors="0" time="0">
+    <testcase name="Service - App\Service\QuoteService" classname="App\Service\QuoteService" time="0">
+      <skipped/>
+    </testcase>
+  </testsuite>
+  <testsuite id="3" package="" name="Repository" hostname="localhost" tests="1" failures="0" skipped="0" errors="0" time="0">
+    <testcase name="Repository - App\Repository\QuoteRepository" classname="App\Repository\QuoteRepository" time="0">
+      <warning message="App\Repository\QuoteRepository:5 has uncovered dependency on Doctrine\ORM\EntityManagerInterface (Repository)" type="WARNING"/>
+    </testcase>
+  </testsuite>
+</testsuites>

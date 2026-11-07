@@ -33,5 +33,8 @@
   "trx-unknown-outcome.trx": {"reader": "trx", "code": "readers.malformed"},
   "trx-wrong-root.trx": {"reader": "trx", "code": "readers.malformed"},
   "trx-bad-counter.trx": {"reader": "trx", "code": "readers.malformed"},
-  "trx-truncated.trx": {"reader": "trx", "code": "readers.malformed"}
+  "trx-truncated.trx": {"reader": "trx", "code": "readers.malformed"},
+  "import-linter-could-not-run.txt": {"reader": "import-linter", "code": "readers.malformed"},
+  "import-linter-no-contract.txt": {"reader": "import-linter", "code": "readers.malformed"},
+  "deptrac-wrong-root.xml": {"reader": "deptrac", "code": "readers.malformed"}
 }

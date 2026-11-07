@@ -1,8 +1,9 @@
 # go.putnami.dev/evidence/readers
 
 Reads the test and coverage reports a CI already wrote into typed facts: JUnit
-XML and TRX into test cases, and LCOV, Cobertura XML, Clover XML, JaCoCo XML and Go
-cover profiles into line-level file coverage. The observe extension builds the change
+XML and TRX into test cases, LCOV, Cobertura XML, Clover XML, JaCoCo XML and Go
+cover profiles into line-level file coverage, and ArchUnit, deptrac and
+import-linter results into architecture rules. The observe extension builds the change
 evidence document (`protocols/evidence`) from them, and the TypeScript
 extension reads its bun reports through it.
 
@@ -80,6 +81,21 @@ one package, both get its vulnerabilities.
 Most SPDX writers, osv-scanner included, write no vulnerability: use
 CycloneDX for them. `ParsePURL` reads a package URL into its type, its name
 (namespace and name, decoded) and its version.
+
+## Architecture rules
+
+An `ArchitectureRule` is one rule an architecture checker evaluated: its
+name as the checker gives it, its status (`kept` or `broken`), the number of
+violations the checker counted, and the violations its report details. A
+`Violation` keeps its message, the class or module that violates the rule
+(`Subject`), and the file and line the checker names. Mapping a class or a
+module to a repository file is the caller's.
+
+| Reader | Format | Rules |
+| --- | --- | --- |
+| `ArchUnitRule` | One case of a JUnit report whose test runs ArchUnit rules; `UsesArchUnit` reports whether a test source imports `com.tngtech.archunit` | A passing case is a kept rule named by the case, a skipped one none. A failing case is a broken rule named by its `Rule '...'` clause, counting the `N` of `was violated (N times)`. Each later line of the message, else of the failure body when it lists more, is a violation: its subject is the first `<...>` unit cut to its top-level class, its file and line those of `in (File.java:N)`. A failure that names no rule is one violation. |
+| `ReadDeptrac` | The report of `deptrac --formatter=junit` | One rule per layer suite, named by the layer, broken when a case fails. Each `failure` is a violation: `Depender:N must not depend on Dependent (A on B)` gives the depending class and the line. The `Unmatched skipped violations` suite is no rule. |
+| `ReadImportLinter` | The text `lint-imports` prints, such as `lint-imports > import-linter.txt`, with or without colour codes | One rule per `Name KEPT` or `Name BROKEN` line. Under `Broken contracts`, each import chain of a contract (`- importer -> imported (l.N)` and its indented lines) is a violation of its first importer at its first line; a broken contract that lists no chain counts one. |
 
 ## Paths
 

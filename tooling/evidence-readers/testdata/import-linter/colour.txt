@@ -1,0 +1,6 @@
+[1mAnalyzed 2 files, 1 dependencies.[0m
+[1m---------------------------------[0m
+
+Only contract [32mKEPT[0m
+
+Contracts: 1 kept, 0 broken.
