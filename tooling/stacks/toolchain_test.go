@@ -46,6 +46,11 @@ func TestExpectedVersionStopsAtTheStackRoot(t *testing.T) {
 	if err != nil || got.Version != "" {
 		t.Fatalf("a file above the stack root is not read: %+v, %v", got, err)
 	}
+	writeFile(t, root, "crates/rust-toolchain", "1.70.0\n")
+	got, err = tc.ExpectedVersion(root, "crates/api", ".")
+	if err != nil || got.Source != "rust-toolchain" {
+		t.Fatalf("a directory between the project and the root is not read: %+v, %v", got, err)
+	}
 }
 
 func TestReadVersionReadsJSONKeys(t *testing.T) {

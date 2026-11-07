@@ -1,0 +1,229 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-extension.json",
+  "name": "@putnami/sample",
+  "cliContract": 14,
+  "extensionDependencies": {
+    "@putnami/dev": ""
+  },
+  "runtime": {
+    "executable": "compiled/putnami-rust",
+    "toolchains": {
+      "runtimeCompiler": {
+        "lock": "go",
+        "candidates": [
+          {
+            "from": "environment",
+            "environment": "GOROOT",
+            "path": "bin/go"
+          },
+          {
+            "from": "path",
+            "path": "go"
+          },
+          {
+            "from": "putnami-home",
+            "path": "toolchains/go/go-{version}/go/bin/go"
+          }
+        ],
+        "probe": {
+          "args": [
+            "env",
+            "GOVERSION"
+          ],
+          "expect": "go{version}",
+          "unset": [
+            "GOROOT"
+          ],
+          "environment": {
+            "GOTOOLCHAIN": "local"
+          }
+        },
+        "environment": {
+          "GOROOT": {
+            "from": "ancestor",
+            "levels": 2
+          },
+          "GOTOOLCHAIN": {
+            "from": "literal",
+            "value": "local"
+          }
+        },
+        "prependPath": true
+      }
+    },
+    "prepare": {
+      "command": "{extensionRoot}/bin/prepare",
+      "args": [
+        "--output",
+        "{runtimeOutput}"
+      ],
+      "inputs": [
+        "bin/prepare",
+        "cmd/**",
+        "go.mod",
+        "go.sum",
+        "*.go",
+        "profile.json"
+      ],
+      "toolchains": [
+        "runtimeCompiler"
+      ]
+    },
+    "inputSelectors": [
+      "rust:lint",
+      "rust:test"
+    ]
+  },
+  "workspace": {
+    "markers": [
+      "Cargo.toml"
+    ],
+    "inputs": [
+      "Cargo.toml",
+      "rust-toolchain.toml",
+      "rust-toolchain"
+    ],
+    "excludes": [
+      "target"
+    ],
+    "language": "rust"
+  },
+  "commands": {
+    "lint": {
+      "description": "Lint the crates with cargo fmt and cargo clippy.",
+      "run": [
+        {
+          "id": "lint",
+          "task": "lint-run",
+          "dependsOn": [
+            "^lint"
+          ]
+        }
+      ]
+    },
+    "test": {
+      "description": "Test the crates with cargo-nextest and cargo-llvm-cov, and read their JUnit and LCOV reports.",
+      "run": [
+        {
+          "id": "test",
+          "heavy": true,
+          "task": "test-run",
+          "dependsOn": [
+            "^test"
+          ]
+        }
+      ]
+    }
+  },
+  "tasks": {
+    "lint-run": {
+      "description": "Run the Rust profile's lint steps, cargo fmt --check then cargo clippy, on one crate in its directory, after the toolchain check. Its inputs are the files the rust:lint selector answers from the resolved profile, and the stack-root files of the profile.",
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": [
+        "lint",
+        "--output",
+        "{outputRoot}"
+      ],
+      "cwd": "{projectRoot}",
+      "timeoutMs": 1800000,
+      "inputs": {
+        "sources": {
+          "from": "project",
+          "files": [
+            "rust:lint"
+          ]
+        },
+        "stackRoot": {
+          "from": "workspace",
+          "files": [
+            "Cargo.toml",
+            "rust-toolchain",
+            "rust-toolchain.toml"
+          ]
+        },
+        "extensionVersion": {
+          "from": "runtime"
+        }
+      },
+      "outputs": {
+        "data": {
+          "description": "The task result: the test and coverage totals of a test task."
+        }
+      },
+      "cache": {
+        "enabled": true
+      },
+      "declares": {
+        "outputs": {
+          "reports": {
+            "kind": "directory",
+            "root": "command-output",
+            "path": "lint",
+            "optionalEmpty": true,
+            "description": "The reports the task wrote or copied: the LCOV report and a copy of each JUnit report of a test task."
+          }
+        },
+        "effects": [
+          "network",
+          "toolchain-cache"
+        ]
+      }
+    },
+    "test-run": {
+      "description": "Run the Rust profile's test steps, cargo llvm-cov nextest, on one crate in its directory, after the toolchain check; then copy the nextest JUnit report and the LCOV report into the command output and read them. A failed case, a step that exits non-zero, or a missing report fails the task.",
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": [
+        "test",
+        "--output",
+        "{outputRoot}"
+      ],
+      "cwd": "{projectRoot}",
+      "timeoutMs": 1800000,
+      "inputs": {
+        "sources": {
+          "from": "project",
+          "files": [
+            "rust:test"
+          ]
+        },
+        "stackRoot": {
+          "from": "workspace",
+          "files": [
+            "Cargo.lock",
+            "Cargo.toml",
+            "rust-toolchain",
+            "rust-toolchain.toml"
+          ]
+        },
+        "extensionVersion": {
+          "from": "runtime"
+        }
+      },
+      "outputs": {
+        "data": {
+          "description": "The task result: the test and coverage totals of a test task."
+        }
+      },
+      "cache": {
+        "enabled": true
+      },
+      "declares": {
+        "outputs": {
+          "reports": {
+            "kind": "directory",
+            "root": "command-output",
+            "path": "test",
+            "optionalEmpty": true,
+            "description": "The reports the task wrote or copied: the LCOV report and a copy of each JUnit report of a test task."
+          }
+        },
+        "effects": [
+          "network",
+          "toolchain-cache"
+        ]
+      }
+    }
+  }
+}

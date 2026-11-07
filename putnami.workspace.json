@@ -14,6 +14,7 @@
     "/typescript/framework/application",
     "/typescript/framework/web",
     "/python/extension",
+    "/rust/extension",
     "/tooling/scaffold",
     "/tooling/sdd-extension",
     "/tooling/contributor",
@@ -33,6 +34,7 @@
     "intelligence",
     "protocols",
     "python",
+    "rust",
     "sites",
     "tooling",
     "typescript"

@@ -3,6 +3,7 @@ package stacks
 import (
 	"encoding/json"
 	"reflect"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -48,7 +49,7 @@ func TestDecodeReadsAValidProfile(t *testing.T) {
 
 func TestDecodeRefusesWhatTheSchemaDoesNotName(t *testing.T) {
 	cases := map[string]string{
-		"unknown member":    strings.Replace(sampleProfile, `"id": "rust",`, `"id": "rust", "colour": 1,`, 1),
+		"unknown member":    strings.Replace(sampleProfile, `"id": "rust",`, `"id": "rust", "color": 1,`, 1),
 		"trailing data":     sampleProfile + `{}`,
 		"bad id":            strings.Replace(sampleProfile, `"id": "rust"`, `"id": "Rust"`, 1),
 		"no version group":  strings.Replace(sampleProfile, `(?<version>\\S+)`, `(\\S+)`, 1),
@@ -117,23 +118,23 @@ func TestResolveRefusesAnInvalidOverride(t *testing.T) {
 	}
 }
 
-func TestTaskPatternsAnchorTheSetsAndTheToolchainFiles(t *testing.T) {
+func TestTaskPatternsSplitProjectAndRootPatterns(t *testing.T) {
 	p := mustProfile(t)
-	got := p.TaskPatterns(TaskLint, "crates/api", ".")
-	want := []string{
-		"crates/api/src/**", "crates/api/Cargo.toml", "Cargo.toml",
-		"crates/api/rust-toolchain.toml", "crates/api/rust-toolchain",
-		"crates/rust-toolchain.toml", "crates/rust-toolchain",
-		"rust-toolchain.toml", "rust-toolchain",
+	project, root := p.TaskPatterns(TaskLint)
+	if want := []string{"src/**", "Cargo.toml", "rust-toolchain.toml", "rust-toolchain"}; !reflect.DeepEqual(project, want) {
+		t.Errorf("project = %v, want %v", project, want)
 	}
-	if !reflect.DeepEqual(got, want) {
-		t.Errorf("TaskPatterns(lint) =\n%v\nwant\n%v", got, want)
+	if want := []string{"Cargo.toml", "rust-toolchain.toml", "rust-toolchain"}; !reflect.DeepEqual(root, want) {
+		t.Errorf("root = %v, want %v", root, want)
 	}
-	if test := p.TaskPatterns(TaskTest, "crates/api", "."); !strings.Contains(strings.Join(test, " "), " Cargo.lock ") {
-		t.Errorf("test reads the lockfile: %v", test)
+	if _, root := p.TaskPatterns(TaskTest); !slices.Contains(root, "Cargo.lock") {
+		t.Errorf("test reads the lockfile: %v", root)
 	}
-	if got := p.TaskPatterns(TaskBuild, "crates/api", "."); got != nil {
-		t.Errorf("an undeclared task reads nothing: %v", got)
+	if project, root := p.TaskPatterns(TaskBuild); project != nil || root != nil {
+		t.Errorf("an undeclared task reads nothing: %v %v", project, root)
+	}
+	if want := []string{"Cargo.lock", "Cargo.toml", "rust-toolchain", "rust-toolchain.toml"}; !reflect.DeepEqual(p.RootPatterns(), want) {
+		t.Errorf("RootPatterns = %v", p.RootPatterns())
 	}
 }
 

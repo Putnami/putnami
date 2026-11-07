@@ -32,14 +32,15 @@ type Expected struct {
 }
 
 // ExpectedVersion reads the expected toolchain version of the project at
-// projectDir, below the stack root stackRoot, both workspace-relative, in the
+// projectDir, of the stack root stackRoot, both workspace-relative, in the
 // workspace at root. toolchain.version outranks the files; the files are read
-// nearest first, in the order the profile lists them at each directory.
+// in the project directory first, then at the stack root, in the order the
+// profile lists them.
 func (t Toolchain) ExpectedVersion(root, projectDir, stackRoot string) (Expected, error) {
 	if t.Version != "" {
 		return Expected{Version: t.Version, Source: "profile"}, nil
 	}
-	for _, dir := range ancestorsToRoot(projectDir, stackRoot) {
+	for _, dir := range versionDirs(projectDir, stackRoot) {
 		for _, f := range t.Files {
 			rel := path.Join(dir, f.Path)
 			data, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(rel))) //nolint:gosec // workspace-relative path under the workspace root

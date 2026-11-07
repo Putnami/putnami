@@ -338,71 +338,59 @@ func mergeInto(dst, src map[string]any) {
 	}
 }
 
-// TaskPatterns returns the workspace-relative input patterns of a task: its
-// input sets, in the order it names them, then every toolchain file at each
-// directory from the project up to the stack root. projectDir and stackRoot
-// are workspace-relative, "." for the workspace root.
-func (p Profile) TaskPatterns(task string, projectDir, stackRoot string) []string {
+// TaskPatterns splits the input patterns of a task: the patterns relative to
+// the project directory, and those relative to the stack root, without their
+// "{root}/" prefix. Each list holds the task's input sets, in the order it
+// names them, then the toolchain files. A task the profile does not declare
+// reads nothing.
+func (p Profile) TaskPatterns(task string) (project, root []string) {
 	t, ok := p.Tasks[task]
 	if !ok {
-		return nil
-	}
-	var out []string
-	seen := map[string]bool{}
-	add := func(s string) {
-		if !seen[s] {
-			seen[s] = true
-			out = append(out, s)
-		}
+		return nil, nil
 	}
 	for _, set := range t.Inputs {
 		for _, pattern := range p.Inputs[set] {
-			add(Anchor(pattern, projectDir, stackRoot))
+			if rest, ok := strings.CutPrefix(pattern, "{root}/"); ok {
+				root = appendNew(root, rest)
+			} else {
+				project = appendNew(project, pattern)
+			}
 		}
 	}
-	for _, dir := range ancestorsToRoot(projectDir, stackRoot) {
-		for _, f := range p.Toolchain.Files {
-			add(path.Join(dir, f.Path))
+	for _, f := range p.Toolchain.Files {
+		project = appendNew(project, f.Path)
+		root = appendNew(root, f.Path)
+	}
+	return project, root
+}
+
+// RootPatterns are the stack-root patterns of every task: what a stack
+// extension's manifest declares as its workspace input.
+func (p Profile) RootPatterns() []string {
+	var out []string
+	for _, task := range TaskNames {
+		_, root := p.TaskPatterns(task)
+		for _, r := range root {
+			out = appendNew(out, r)
 		}
 	}
+	slices.Sort(out)
 	return out
 }
 
-// ancestorsToRoot lists the workspace-relative directories from projectDir up
-// to stackRoot, nearest first. A stack root that is no ancestor of the project
-// yields the project directory alone.
-func ancestorsToRoot(projectDir, stackRoot string) []string {
-	dir := path.Clean(projectDir)
-	root := path.Clean(stackRoot)
-	out := []string{dir}
-	if dir == root || !isWithin(dir, root) {
-		return out
+func appendNew(list []string, s string) []string {
+	if slices.Contains(list, s) {
+		return list
 	}
-	for dir != root {
-		parent := path.Dir(dir)
-		if parent == dir {
-			break
-		}
-		dir = parent
-		out = append(out, dir)
-	}
-	return out
+	return append(list, s)
 }
 
-// isWithin reports whether dir is root or lies below it; "." is the
-// workspace root and holds everything.
-func isWithin(dir, root string) bool {
-	if root == "." || dir == root {
-		return true
+// versionDirs are the directories whose toolchain files state the expected
+// version: the project directory, then the stack root.
+func versionDirs(projectDir, stackRoot string) []string {
+	dir, root := path.Clean(projectDir), path.Clean(stackRoot)
+	if dir == root {
+		return []string{dir}
 	}
-	return strings.HasPrefix(dir, root+"/")
-}
-
-// Anchor turns a profile pattern into a workspace-relative one: "{root}/x"
-// lies under the stack root, any other pattern under the project directory.
-func Anchor(pattern, projectDir, stackRoot string) string {
-	if rest, ok := strings.CutPrefix(pattern, "{root}/"); ok {
-		return path.Join(stackRoot, rest)
-	}
-	return path.Join(projectDir, pattern)
+	return []string{dir, root}
 }
