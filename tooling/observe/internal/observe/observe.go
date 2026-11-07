@@ -215,7 +215,7 @@ func localSubject(ctx context.Context, root string, opts Options, s *ci.Subject)
 		provider, setting = ci.ProviderGitLab, "PUTNAMI_GITLAB_TOKEN"
 	default:
 		return []diag.Diagnostic{diag.Warningf(ci.CodeProjectIDMissing, "subject.projectId",
-			"the origin remote is on %s, neither GitHub nor GitLab: the repository has no stable key", host)}
+			"the origin remote is on %s, neither github.com nor a GitLab host: the repository has no stable key", host)}
 	}
 	if opts.ProjectID == nil {
 		return nil
@@ -295,13 +295,13 @@ const maxListedFiles = 50
 // WriteText writes the observation as a short summary for a log: the CI and
 // repository, the commit, the base, the count of changed files, the changed
 // and dependent components, the changed-line coverage, the dependency change
-// counts, then the warnings and errors.
+// counts, then the warnings, the errors and the publish diagnostics.
 func WriteText(w io.Writer, o Observation) error {
 	var b strings.Builder
 	writeHeader(&b, o)
 	writeShortAnalysis(&b, o.Analysis)
 	for _, d := range o.Diagnostics {
-		if d.Severity == diag.Info {
+		if d.Severity == diag.Info && !strings.HasPrefix(d.Code, "observe.publish_") {
 			continue
 		}
 		fmt.Fprintf(&b, "  %s %s: %s\n", d.Severity, d.Code, d.Message)

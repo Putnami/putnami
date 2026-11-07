@@ -15,7 +15,8 @@ func TestTheTextSummaryStaysShort(t *testing.T) {
 	o := observeSBOMDemo(t, nil, "head.cdx.json", "base.cdx.json")
 	o.Diagnostics = append(o.Diagnostics,
 		diag.Diagnostic{Severity: diag.Info, Code: "observe.example_info", Message: "an info the short summary leaves out"},
-		diag.Warningf("observe.example_warning", "", "a warning the short summary keeps"))
+		diag.Warningf("observe.example_warning", "", "a warning the short summary keeps"),
+		diag.Diagnostic{Severity: diag.Info, Code: "observe.publish_needs_upload", Message: "--publish needs --upload"})
 	var text bytes.Buffer
 	if err := WriteText(&text, o); err != nil {
 		t.Fatal(err)
@@ -28,6 +29,7 @@ func TestTheTextSummaryStaysShort(t *testing.T) {
 		"  changed lines  ",
 		"  dependencies  3 changes, 0 license changes, vulnerabilities 1 introduced and 3 fixed\n",
 		"  warning observe.example_warning: a warning the short summary keeps\n",
+		"  info observe.publish_needs_upload: --publish needs --upload\n",
 	)
 	for _, absent := range []string{"an info the short summary leaves out", "  reports  ", "tests and coverage per component", "    upgraded   lodash", "package-lock.json", "  specs  ", "  decisions  "} {
 		if strings.Contains(got, absent) {
@@ -54,6 +56,13 @@ func TestDependencyCountsWithoutAnSBOM(t *testing.T) {
 		After:  &evidence.DependencyState{Licenses: []string{"Apache-2.0"}},
 	}}
 	if got, want := dependencyCounts(licensed, &evidence.SBOM{}), "1 change, 1 license change, vulnerabilities 0 introduced and 0 fixed"; got != want {
+		t.Errorf("got %q, want %q", got, want)
+	}
+	headOnly := []evidence.DependencyChange{{
+		Name: "lodash", Change: evidence.DependencyUpgraded,
+		After: &evidence.DependencyState{Vulnerabilities: []evidence.Vulnerability{{ID: "GHSA-1", Severity: "high"}}},
+	}}
+	if got, want := dependencyCounts(headOnly, &evidence.SBOM{}), "1 change, 0 license changes, vulnerabilities 0 introduced and 0 fixed, 1 with a side no SBOM lists"; got != want {
 		t.Errorf("got %q, want %q", got, want)
 	}
 }

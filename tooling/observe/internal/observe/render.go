@@ -55,8 +55,9 @@ func writeShortAnalysis(b *strings.Builder, a analyze.Result) {
 }
 
 // dependencyCounts counts the dependency changes and, when an SBOM was read,
-// the license changes and the vulnerabilities the change introduces and
-// fixes.
+// the license changes, the vulnerabilities the change introduces and fixes,
+// and the changes whose base or head state no SBOM lists, which the other
+// counts leave out.
 func dependencyCounts(changes []evidence.DependencyChange, sbom *evidence.SBOM) string {
 	label := count(len(changes), "change")
 	switch {
@@ -65,7 +66,7 @@ func dependencyCounts(changes []evidence.DependencyChange, sbom *evidence.SBOM) 
 	case sbom == nil:
 		return label + "; without an SBOM, their licenses and vulnerabilities are unknown"
 	}
-	licenses, introduced, fixed := 0, 0, 0
+	licenses, introduced, fixed, unknown := 0, 0, 0, 0
 	for _, d := range changes {
 		switch {
 		case d.Before != nil && d.After != nil:
@@ -79,9 +80,15 @@ func dependencyCounts(changes []evidence.DependencyChange, sbom *evidence.SBOM) 
 			introduced += len(d.After.Vulnerabilities)
 		case d.Before != nil && d.Change == evidence.DependencyRemoved:
 			fixed += len(d.Before.Vulnerabilities)
+		default:
+			unknown++
 		}
 	}
-	return fmt.Sprintf("%s, %s, vulnerabilities %d introduced and %d fixed", label, count(licenses, "license change"), introduced, fixed)
+	label = fmt.Sprintf("%s, %s, vulnerabilities %d introduced and %d fixed", label, count(licenses, "license change"), introduced, fixed)
+	if unknown > 0 {
+		label += fmt.Sprintf(", %d with a side no SBOM lists", unknown)
+	}
+	return label
 }
 
 // writeComponents writes the count of components by impact, then at most

@@ -131,7 +131,7 @@
         "open": {
           "type": "boolean",
           "default": false,
-          "description": "Upload as --upload does, letting the reporter sign the person in when no credential is present, print the report URL and, outside a CI, open it in the browser. A failed upload is a diagnostic; the exit code does not change."
+          "description": "Upload as --upload does; outside a CI, let the reporter sign the person in when no credential is present and open the report URL in the browser. A failed upload is a diagnostic; the exit code does not change."
         },
         "details": {
           "type": "boolean",

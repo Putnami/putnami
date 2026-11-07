@@ -26,13 +26,13 @@ putnami extensions install --user @putnami/cloud
 putnami observe
 ```
 
-Outside a CI, `putnami observe` measures the change against the default branch of your `origin` remote, so it needs no flag, and it keys the repository by the numeric id GitHub or GitLab gives it. For a private repository, set `GITHUB_TOKEN` or `PUTNAMI_GITLAB_TOKEN` to a token that reads it; without one, the summary says which to set. It prints a short summary and sends nothing off your machine. Its last line names the next command:
+Outside a CI, `putnami observe` measures the change against the default branch of your `origin` remote, so it needs no flag. It prints a short summary and sends nothing off your machine. Its last line names the next command:
 
 ```text
 Next: run `putnami observe --open` to sign in and open the full report
 ```
 
-`putnami observe --open` runs the same analysis, signs you in to Putnami Cloud in your browser when you are not signed in yet, uploads the evidence and opens the full report. The next runs reuse the session. `putnami observe --details` prints the whole analysis in the log instead of the short summary.
+`putnami observe --open` runs the same analysis, keys the repository by the numeric id GitHub or GitLab gives it, signs you in to Putnami Cloud in your browser when you are not signed in yet, uploads the evidence and opens the full report. The next runs reuse the session. For a private repository, set `GITHUB_TOKEN` or `PUTNAMI_GITLAB_TOKEN` to a token that reads it; without one, the summary says which to set. `putnami observe --details` prints the whole analysis in the log instead of the short summary.
 
 ## What the step installs
 

@@ -65,8 +65,9 @@ a GitHub pull request that is the merge commit `refs/pull/<n>/merge`, not the
 pull request's head, so the changed files are the pull request's own changes.
 
 Outside a CI, on a laptop, the repository is read from the `origin` remote. On
-`github.com`, `gitlab.com` or a host whose name starts with `gitlab.`, observe
-asks the code host API for the numeric project id (GitHub
+`github.com`, `gitlab.com` or a host whose name starts with `gitlab.`, and only
+with `--upload` or `--open`, observe asks the code host API for the numeric
+project id (GitHub
 `GET /repos/{owner}/{repo}`, GitLab `GET /projects/{path}`), with
 `GITHUB_TOKEN` or `PUTNAMI_GITLAB_TOKEN` when one is set, so the key is the one
 a CI job of the same repository sends. A remote on another host, or one the API
@@ -168,8 +169,9 @@ nothing gets `observe.report_missing`, an unreadable file
 The summary is short: the CI, the repository, the commit, the base, the count
 of changed files, the changed and dependent components (the first 10), the
 coverage of the changed lines, and the count of dependency changes with the
-count of licence changes and of vulnerabilities introduced and fixed, then the
-warnings and errors. Its last line names the next command:
+count of licence changes, of vulnerabilities introduced and fixed and of
+changes whose base or head state no SBOM lists, then the warnings, the errors
+and the `--publish` diagnostics. Its last line names the next command:
 
 | Situation | Last line |
 |---|---|
@@ -272,13 +274,15 @@ of scope `delivery.ingest`. See
 
 ## Opening the report
 
-`--open` is `--upload` for a person. Observe adds `--sign-in` to the reporter's
-command: with no token and no stored session, `@putnami/cloud` runs the device
+`--open` is `--upload` for a person. Outside a CI, observe adds `--sign-in` to
+the reporter's command; in a CI it does not, so a job without a token fails
+its upload at once instead of waiting for a sign-in: with no token and no stored session, `@putnami/cloud` runs the device
 sign-in of `putnami cloud login`, which opens the browser and waits for you,
 and the next runs reuse that session. The reporter then has 16 minutes instead
 of 2. Observe prints the report URL the reporter answers, ends the summary with
 it and, outside a CI, opens it in the browser. Without `--open` or `--upload`,
-observe runs no reporter and nothing leaves the machine.
+observe runs no reporter and calls no code host API: nothing leaves the
+machine.
 
 ## Publishing on the pull or merge request
 

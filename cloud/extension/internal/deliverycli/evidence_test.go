@@ -39,8 +39,9 @@ type evidenceFakeServer struct {
 	alreadyStored bool
 	// refuseStates answers a batch whose dependency changes carry a before or
 	// after state as a body over the route's size.
-	refuseStates bool // reportURL is the report URL the run answers, "" for none.
-	reportURL    string
+	refuseStates bool
+	// reportURL is the report URL the run answers, "" for none.
+	reportURL string
 }
 
 func (s *evidenceFakeServer) RoundTrip(req *http.Request) (*http.Response, error) {

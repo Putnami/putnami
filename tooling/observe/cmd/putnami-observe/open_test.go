@@ -2,6 +2,8 @@ package main
 
 import (
 	"bytes"
+	"errors"
+	"net/http"
 	"os"
 	"path/filepath"
 	"slices"
@@ -90,8 +92,8 @@ func TestOpenOpensTheBrowserOnALaptopOnly(t *testing.T) {
 	if code := run([]string{"run", "--no-fetch", "--open"}, func(k string) string { return env[k] }, &stdout, &stderr); code != 0 {
 		t.Fatalf("exit %d: %s", code, stderr.String())
 	}
-	if args := reporterArgs(t, record); !slices.Contains(args, "--sign-in") {
-		t.Fatalf("reporter args %v", args)
+	if args := reporterArgs(t, record); slices.Contains(args, "--sign-in") {
+		t.Fatalf("a CI job waits for a sign-in: reporter args %v", args)
 	}
 	if len(*opened) != 0 {
 		t.Errorf("a CI job opened %v", *opened)
@@ -104,8 +106,16 @@ func TestOpenOpensTheBrowserOnALaptopOnly(t *testing.T) {
 func TestARunWithoutUploadOrOpenRunsNoReporter(t *testing.T) {
 	spectest.Proves(t, "tooling/observe-upload", "nothing-leaves-without-upload-or-open", "a-run-without-upload-or-open-runs-no-reporter")
 	repo, ciEnv, record := uploadFixture(t, "0")
+	git(t, repo, "remote", "add", "origin", "git@github.com:acme/shop.git")
 	env := laptop(ciEnv)
+	env["GITHUB_TOKEN"] = "ghs_fixturetoken"
 	opened := recordBrowser(t)
+	previous := publishClient
+	publishClient = &http.Client{Transport: roundTrip(func(r *http.Request) (*http.Response, error) {
+		t.Errorf("a run without --upload or --open called %s", r.URL)
+		return nil, errors.New("no request leaves the machine")
+	})}
+	t.Cleanup(func() { publishClient = previous })
 	t.Chdir(repo)
 	var stdout, stderr bytes.Buffer
 	if code := run([]string{"run", "--no-fetch"}, func(k string) string { return env[k] }, &stdout, &stderr); code != 0 {

@@ -83,8 +83,12 @@ func run(args []string, getenv func(string) string, stdout, stderr io.Writer) in
 		return 2
 	}
 	opts.Env = getenv
-	opts.ProjectID = func(ctx context.Context, provider, host, path string) (string, error) {
-		return publish.ProjectID(ctx, publishClient, getenv, provider, host, path)
+	if out.upload {
+		// The code host lookup is a request off the machine: only a run that
+		// uploads makes it.
+		opts.ProjectID = func(ctx context.Context, provider, host, path string) (string, error) {
+			return publish.ProjectID(ctx, publishClient, getenv, provider, host, path)
+		}
 	}
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
@@ -174,7 +178,8 @@ func writeAndUpload(ctx context.Context, o observe.Observation, out outputs, get
 	if len(diags) > 0 {
 		return publish.UploadFailed, "", append(diags, upload.Skipped()...)
 	}
-	reportURL, diags := upload.Run(ctx, upload.Request{Path: path, Getenv: getenv, Output: stderr, SignIn: out.open})
+	_, inCI := evidence.DetectCISystem(getenv)
+	reportURL, diags := upload.Run(ctx, upload.Request{Path: path, Getenv: getenv, Output: stderr, SignIn: out.open && !inCI})
 	if len(diags) > 0 {
 		return publish.UploadFailed, "", diags
 	}
