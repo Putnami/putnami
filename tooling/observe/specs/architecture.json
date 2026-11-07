@@ -26,7 +26,7 @@
     },
     {
       "id": "architecture-change-analysis",
-      "text": "When it read an architecture rule, the text summary counts the rules and the broken ones, then lists each broken rule with its tool and violation count, and its first violations with their component, file and line. --evidence writes every rule in the architecture member."
+      "text": "When it read an architecture rule, the detailed text summary (--details) counts the rules and the broken ones, then lists each broken rule with its tool and violation count, and its first violations with their component, file and line. --evidence writes every rule in the architecture member."
     }
   ],
   "decisions": [
