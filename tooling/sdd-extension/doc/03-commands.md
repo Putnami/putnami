@@ -201,8 +201,11 @@ an `--at` in a directory architecture discovery skips (hidden, `vendor` or
 A rerun only adds. It adds the projects, exports, imports and bindings that are
 missing, and never changes or removes an entry that exists, so a hand edit
 survives. A domain pair that already has an import gets no second one, even
-when you renamed the generated import. A changed manifest keeps the order of
-its entries, and the additions are appended. An import between two model
+when you renamed the generated import, and a new import takes the version of
+the export it reads. A changed manifest keeps the order of its entries, and the
+additions are appended. It is written in the layout `init` and `sync` write, so
+a manifest a Putnami command or the Go builder wrote keeps every existing line;
+a manifest in another layout is rewritten in that layout once. An import between two model
 domains that the model no longer relates is reported for you to remove. A
 domain whose manifest a Go program authors and pins with
 `go.putnami.dev/sdk/extension/architecture` takes the additions in that program

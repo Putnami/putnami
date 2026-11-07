@@ -355,3 +355,94 @@ func TestArchitectureImportRefusesBeforeWriting(t *testing.T) {
 		t.Errorf("--at .arch exit = %d, want usage\n%s", code, stdout)
 	}
 }
+
+func assertDiffRemovesNothing(t *testing.T, report sdd.ArchitectureImportReport) {
+	t.Helper()
+	for _, manifest := range report.Manifests {
+		for _, line := range strings.Split(manifest.Diff, "\n") {
+			trimmed := strings.TrimSpace(strings.TrimPrefix(line, "-"))
+			if strings.HasPrefix(line, "-") && !strings.HasPrefix(line, "---") &&
+				trimmed != "}" && trimmed != "]" && !strings.HasSuffix(trimmed, "[],") {
+				t.Errorf("%s: the diff removes %q", manifest.Path, line)
+			}
+		}
+	}
+}
+
+// TestArchitectureImportFollowsAVersionBumpedExport: a new consumer of a
+// producer whose export moved to version 2 imports version 2.
+func TestArchitectureImportFollowsAVersionBumpedExport(t *testing.T) {
+	root, projects := bigBankWorkspace(t, false)
+	if _, code, stdout := runImport(t, root, projects, map[string]any{"apply": true}); code != protocolcli.ExitSuccess {
+		t.Fatalf("first import exit = %d\n%s", code, stdout)
+	}
+	bump := func(text string) string {
+		text = strings.ReplaceAll(text, "mainframe-banking-system.interface.v1", "mainframe-banking-system.interface.v2")
+		text = strings.ReplaceAll(text, "uses.mainframe-banking-system.v1", "uses.mainframe-banking-system.v2")
+		return text
+	}
+	mutateFile(t, filepath.Join(root, "architecture", "mainframe-banking-system", archproto.ManifestFilename), func(text string) string {
+		text = bump(text)
+		text = strings.Replace(text, `"version": 1,`, `"version": 2,`, 1)
+		return strings.Replace(text, `"minimumConsumerVersion": 1`, `"minimumConsumerVersion": 2`, 1)
+	})
+	for _, consumer := range []string{"atm", "internet-banking-system/api-application"} {
+		mutateFile(t, filepath.Join(root, "architecture", filepath.FromSlash(consumer), archproto.ManifestFilename), func(text string) string {
+			text = bump(text)
+			return strings.Replace(text, "\"version\": 1,\n      \"from\": {\n        \"domain\": \"mainframe-banking-system\"",
+				"\"version\": 2,\n      \"from\": {\n        \"domain\": \"mainframe-banking-system\"", 1)
+		})
+	}
+	if code, stdout := runValidate(t, root, projects); code != protocolcli.ExitSuccess {
+		t.Fatalf("the hand-bumped manifests do not validate\n%s", stdout)
+	}
+	mutateFile(t, filepath.Join(root, "model", "workspace.dsl"), func(text string) string {
+		return strings.Replace(text, "// Components", "webApplication -> mainframe \"Reads branch hours from\"\n        // Components", 1)
+	})
+	report, code, stdout := runImport(t, root, projects, map[string]any{"apply": true})
+	if code != protocolcli.ExitSuccess || report.Summary.AddedImports != 1 {
+		t.Fatalf("rerun exit = %d, summary = %+v\n%s", code, report.Summary, stdout)
+	}
+	if !strings.Contains(readFileString(t, filepath.Join(root, "architecture", "internet-banking-system", "web-application", archproto.ManifestFilename)),
+		`"id": "internet-banking-system.web-application.uses.mainframe-banking-system.v2"`) {
+		t.Error("the new import does not follow the export's version")
+	}
+	if code, stdout := runValidate(t, root, projects); code != protocolcli.ExitSuccess {
+		t.Fatalf("validate exit = %d\n%s", code, stdout)
+	}
+}
+
+// TestArchitectureImportAfterSyncRemovesNothing: a manifest sync rewrote keeps
+// every line when a later import adds to it.
+func TestArchitectureImportAfterSyncRemovesNothing(t *testing.T) {
+	root, projects := bigBankWorkspace(t, false)
+	if _, code, stdout := runImport(t, root, projects, map[string]any{"apply": true}); code != protocolcli.ExitSuccess {
+		t.Fatalf("first import exit = %d\n%s", code, stdout)
+	}
+	for _, project := range projects {
+		if project.ID == "/spa" {
+			project.Dependencies = []string{"/api"}
+		}
+	}
+	ctx := wireContext(root, projects, allSelection(projects), map[string]any{"output": "json", "apply": true})
+	if stdout, _, code := runSubcommand(t, ctx, "architecture", "sync"); code != protocolcli.ExitSuccess {
+		t.Fatalf("sync exit = %d\n%s", code, stdout)
+	}
+	mutateFile(t, filepath.Join(root, "model", "workspace.dsl"), func(text string) string {
+		return strings.Replace(text, "// Components", "singlePageApplication -> mainframe \"Reads rates from\"\n        // Components", 1)
+	})
+	report, code, stdout := runImport(t, root, projects, map[string]any{"apply": true})
+	if code != protocolcli.ExitSuccess || report.Summary.AddedImports != 1 {
+		t.Fatalf("rerun exit = %d, summary = %+v\n%s", code, report.Summary, stdout)
+	}
+	assertDiffRemovesNothing(t, report)
+}
+
+func readFileString(t *testing.T, path string) string {
+	t.Helper()
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return string(data)
+}

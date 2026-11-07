@@ -1,9 +1,10 @@
 package sdd
 
 import (
-	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path"
 	"path/filepath"
@@ -506,8 +507,8 @@ func importFactName(domain string) string {
 	return strings.ReplaceAll(dottedDomain(domain), "-", "_") + ".interface"
 }
 
-func importImportID(consumer, producer string) string {
-	return dottedDomain(consumer) + ".uses." + dottedDomain(producer) + ".v1"
+func importImportID(consumer, producer string, version int) string {
+	return fmt.Sprintf("%s.uses.%s.v%d", dottedDomain(consumer), dottedDomain(producer), version)
 }
 
 func generatedExport(domain *importDomain) archproto.Export {
@@ -678,33 +679,38 @@ func (merge *importMerge) addImports(domain *importDomain, domains map[string]*i
 		if declaresImportFrom(entry.manifest, producer) {
 			continue
 		}
-		export, reason := merge.producerExport(domains[producer])
-		if export == nil {
+		export, generate, reason := merge.producerExport(domains[producer])
+		label := domain.id + " -> " + producer
+		if reason != "" {
+			merge.unmapped = append(merge.unmapped, ArchitectureImportUnmapped{Element: label, Kind: "relationship", Reason: reason})
+			continue
+		}
+		id := importImportID(domain.id, producer, export.Version)
+		if hasImport(entry.manifest, id) {
 			merge.unmapped = append(merge.unmapped, ArchitectureImportUnmapped{
-				Element: domain.id + " -> " + producer, Kind: "relationship", Reason: reason,
+				Element: label, Kind: "relationship",
+				Reason: fmt.Sprintf("domain %s already declares an import %s from another domain", domain.id, id),
 			})
 			continue
+		}
+		if generate {
+			producerEntry := merge.byDomain[producer]
+			producerEntry.manifest.Exports = append(producerEntry.manifest.Exports, export)
+			producerEntry.row.AddedExports = append(producerEntry.row.AddedExports, export.ID)
 		}
 		facts := make([]string, 0, len(export.Facts))
 		for _, fact := range export.Facts {
 			facts = append(facts, fact.Name)
 		}
 		imported := archproto.Import{
-			ID:            importImportID(domain.id, producer),
-			Version:       1,
+			ID:            id,
+			Version:       export.Version,
 			From:          archproto.ExportReference{Domain: producer, Export: export.ID},
 			As:            dottedDomain(domain.id) + ".uses." + dottedDomain(producer),
 			Mode:          archproto.ModeReference,
 			Status:        archproto.StatusActive,
 			Facts:         facts,
 			Justification: importJustification(domain.consumes[producer]),
-		}
-		if hasImport(entry.manifest, imported.ID) {
-			merge.unmapped = append(merge.unmapped, ArchitectureImportUnmapped{
-				Element: domain.id + " -> " + producer, Kind: "relationship",
-				Reason: fmt.Sprintf("domain %s already declares an import %s from another domain", domain.id, imported.ID),
-			})
-			continue
 		}
 		entry.manifest.Imports = append(entry.manifest.Imports, imported)
 		entry.row.AddedImports = append(entry.row.AddedImports, imported.ID)
@@ -713,33 +719,32 @@ func (merge *importMerge) addImports(domain *importDomain, domains map[string]*i
 
 // producerExport is the export a new import reads: the producer's generated
 // one, else the one active export that allows reference access. A producer
-// that declares no export gets the generated one; any other case is a choice
-// the import leaves to a person.
-func (merge *importMerge) producerExport(domain *importDomain) (*archproto.Export, string) {
+// that declares no export gets the generated one, which the caller adds once
+// the import is certain (generate). Any other case is a choice the import
+// leaves to a person, and reason says why.
+func (merge *importMerge) producerExport(domain *importDomain) (archproto.Export, bool, string) {
 	entry := merge.byDomain[domain.id]
-	var candidates []*archproto.Export
-	for index := range entry.manifest.Exports {
-		export := &entry.manifest.Exports[index]
+	var candidates []archproto.Export
+	for _, export := range entry.manifest.Exports {
 		if export.Status == archproto.StatusActive && slices.Contains(export.Modes, archproto.ModeReference) {
 			if export.ID == importExportID(domain.id) {
-				return export, ""
+				return export, false, ""
 			}
 			candidates = append(candidates, export)
 		}
 	}
 	switch {
 	case len(candidates) == 1:
-		return candidates[0], ""
+		return candidates[0], false, ""
 	case len(candidates) > 1:
-		return nil, fmt.Sprintf("domain %s declares %d exports that allow reference access; declare this import by hand to choose one",
+		return archproto.Export{}, false, fmt.Sprintf(
+			"domain %s declares %d exports that allow reference access; declare this import by hand to choose one",
 			domain.id, len(candidates))
 	case len(entry.manifest.Exports) > 0:
-		return nil, fmt.Sprintf("no export of domain %s allows active reference access; declare this import by hand", domain.id)
+		return archproto.Export{}, false, fmt.Sprintf(
+			"no export of domain %s allows active reference access; declare this import by hand", domain.id)
 	}
-	export := generatedExport(domain)
-	entry.manifest.Exports = append(entry.manifest.Exports, export)
-	entry.row.AddedExports = append(entry.row.AddedExports, export.ID)
-	return &entry.manifest.Exports[len(entry.manifest.Exports)-1], ""
+	return generatedExport(domain), true, ""
 }
 
 // reportNotInModel names the imports between two model domains that the model
@@ -747,7 +752,8 @@ func (merge *importMerge) producerExport(domain *importDomain) (*archproto.Expor
 func (merge *importMerge) reportNotInModel() {
 	for _, entry := range merge.ordered() {
 		for _, imported := range entry.manifest.Imports {
-			if merge.model[imported.From.Domain] && !merge.related[importPair{entry.manifest.Domain, imported.From.Domain}] {
+			generated := imported.ID == importImportID(entry.manifest.Domain, imported.From.Domain, imported.Version)
+			if generated && merge.model[imported.From.Domain] && !merge.related[importPair{entry.manifest.Domain, imported.From.Domain}] {
 				entry.row.NotInModel = append(entry.row.NotInModel, imported.ID)
 			}
 		}
@@ -781,9 +787,13 @@ func (merge *importMerge) bind(ws *workspace.Workspace) {
 		}
 		target, refusal := candidateImport(entry.manifest, edge)
 		if target == nil {
-			merge.unmapped = append(merge.unmapped, ArchitectureImportUnmapped{
-				Element: label, Kind: "project-edge", Reason: refusal.Message,
-			})
+			reason := fmt.Sprintf("domain %s declares no active import from %s that can carry the binding; declare it by hand",
+				edge.ConsumerDomain, edge.ProducerDomain)
+			if refusal.Reason == SyncRefusalAmbiguousImport {
+				reason = fmt.Sprintf("domain %s declares several imports from %s; bind the edge by hand to the one it implements",
+					edge.ConsumerDomain, edge.ProducerDomain)
+			}
+			merge.unmapped = append(merge.unmapped, ArchitectureImportUnmapped{Element: label, Kind: "project-edge", Reason: reason})
 			continue
 		}
 		target.Bindings = append(target.Bindings, archproto.Binding{
@@ -828,13 +838,19 @@ func (merge *importMerge) checkTargets(wsRoot string) []diag.Diagnostic {
 			continue
 		}
 		if !discoverableManifestPath(entry.path) {
-			diagnostics = append(diagnostics, diag.Errorf(archproto.ErrorCodeParseError, entry.path,
-				"domain %s would be written where architecture discovery never reads; choose another --at", entry.manifest.Domain))
+			diagnostics = append(diagnostics, diag.Errorf(archproto.ErrorCodeInvalidDomain, entry.path,
+				"domain %s would be written where architecture discovery never reads; set a %s property to rename it",
+				entry.manifest.Domain, importDomainProperty))
 			continue
 		}
-		if _, err := os.Lstat(filepath.Join(wsRoot, filepath.FromSlash(entry.path))); err == nil {
+		_, err := os.Lstat(filepath.Join(wsRoot, filepath.FromSlash(entry.path)))
+		switch {
+		case err == nil:
 			diagnostics = append(diagnostics, diag.Errorf(archproto.ErrorCodeParseError, entry.path,
 				"a file already exists where domain %s would be created; architecture import never overwrites a file", entry.manifest.Domain))
+		case !errors.Is(err, fs.ErrNotExist):
+			diagnostics = append(diagnostics, diag.Errorf(archproto.ErrorCodeParseError, entry.path,
+				"domain %s cannot be created here: %v", entry.manifest.Domain, err))
 		}
 	}
 	return diagnostics
@@ -894,21 +910,20 @@ func (entry *importEntry) finish(wsRoot string, apply bool) (ArchitectureImportM
 	return row, nil
 }
 
-// importManifestBytes encodes a manifest in the order its entries hold, with
-// two-space indentation and no HTML escaping, so the text a person wrote is
-// written back as they wrote it.
+// importManifestBytes encodes a manifest in the order its entries hold, in the
+// layout of the protocol's canonical writer: two-space indentation, the same
+// escaping and one trailing newline. A manifest any Putnami writer produced
+// therefore keeps every existing line; one in another layout is rewritten in
+// this layout once.
 func importManifestBytes(manifest *archproto.Manifest) ([]byte, error) {
 	if diagnostics := archproto.ValidateManifest(manifest); diag.HasErrors(diagnostics) {
 		return nil, protocolcli.InvalidConfigf("the imported manifest for domain %s is not valid", manifest.Domain)
 	}
-	var buffer bytes.Buffer
-	encoder := json.NewEncoder(&buffer)
-	encoder.SetEscapeHTML(false)
-	encoder.SetIndent("", "  ")
-	if err := encoder.Encode(manifest); err != nil {
+	data, err := json.MarshalIndent(manifest, "", "  ")
+	if err != nil {
 		return nil, err
 	}
-	return buffer.Bytes(), nil
+	return append(data, '\n'), nil
 }
 
 func declaresImportFrom(manifest *archproto.Manifest, producer string) bool {

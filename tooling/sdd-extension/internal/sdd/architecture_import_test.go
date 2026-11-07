@@ -122,7 +122,7 @@ func TestImportNamingHelpers(t *testing.T) {
 	if got := truncateText("short", 9); got != "short" {
 		t.Errorf("truncate = %q", got)
 	}
-	if got := importImportID("a/b", "c"); got != "a.b.uses.c.v1" {
+	if got := importImportID("a/b", "c", 2); got != "a.b.uses.c.v2" {
 		t.Errorf("import id = %q", got)
 	}
 	if got := importFactName("e-mail-system"); got != "e_mail_system.interface" {
