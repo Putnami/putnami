@@ -20,6 +20,7 @@
     "tooling/observe-analyses#components",
     "tooling/observe-analyses#dependency-changes",
     "tooling/observe-analyses#dependency-sbom-facts",
+    "tooling/observe-analyses#fallback-split",
     "tooling/observe-analyses#sbom-documents",
     "tooling/observe-analyses#summary",
     "tooling/observe-analyses#tests-and-coverage",
