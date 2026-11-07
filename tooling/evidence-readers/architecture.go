@@ -62,9 +62,9 @@ func UsesArchUnit(source []byte) bool {
 var (
 	// archUnitRule is the head line ArchUnit writes for a violated rule:
 	// Architecture Violation [Priority: MEDIUM] - Rule '...' was violated (2 times):
-	// A cycle rule capped at its maximum writes (>= 50 times - the maximum
-	// number of cycles to detect was reached; ...).
-	archUnitRule = regexp.MustCompile(`Rule '(.*)' was violated \((?:>= )?(\d+) times?`)
+	// A cycle rule capped at its maximum writes ( >= 50 times - the maximum
+	// number of cycles to detect has been reached; ...).
+	archUnitRule = regexp.MustCompile(`Rule '(.*)' was violated \(\s*(?:>=\s*)?(\d+) times?`)
 	// archUnitLocation is the source location ArchUnit ends a violation with.
 	archUnitLocation = regexp.MustCompile(`\(([^()\s:]+\.[A-Za-z]+):(\d+)\)\s*$`)
 	// archUnitSubject is the first code unit a violation names.
@@ -75,7 +75,8 @@ var (
 // A passing case is a kept rule named by the case; a skipped case, or one
 // that ended in an error element rather than a failure, is none.
 // A failing case is a broken rule named by the rule its message states, else
-// by the case: each line after the first of the message is one violation.
+// by the case: each line after the first of the message is one violation,
+// and an indented line continues the violation above it.
 func ArchUnitRule(c TestCase) (ArchitectureRule, bool) {
 	switch c.Status {
 	case StatusPassed:

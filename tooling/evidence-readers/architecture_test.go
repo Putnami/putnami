@@ -148,7 +148,7 @@ func TestAnArchUnitCycleIsOneViolation(t *testing.T) {
 		t.Errorf("cycle violation %+v", v)
 	}
 	capped, _ := ArchUnitRule(TestCase{Name: "no_cycles", Status: StatusFailed, Failure: &Failure{
-		Message: "Architecture Violation [Priority: MEDIUM] - Rule 'slices should be free of cycles' was violated (>= 50 times - the maximum number of cycles to detect was reached; this limit can be adapted using the `archunit.properties` value `cycles.maxNumberToDetect=xxx`):\nCycle detected: A -> \n                A",
+		Message: "Architecture Violation [Priority: MEDIUM] - Rule 'slices should be free of cycles' was violated ( >= 50 times - the maximum number of cycles to detect has been reached; this limit can be adapted using the `archunit.properties` value `cycles.maxNumberToDetect=xxx`):\nCycle detected: A -> \n                A",
 	}})
 	if capped.Name != "slices should be free of cycles" || capped.Count != 50 || len(capped.Violations) != 1 {
 		t.Errorf("capped cycle rule %+v", capped)

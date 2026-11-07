@@ -19,7 +19,7 @@ const architectureFeature = "tooling/observe-architecture"
 // with the given options on top.
 func observeArchitectureDemo(t *testing.T, root, base string, with func(*Options)) Observation {
 	t.Helper()
-	env := map[string]string{"GITHUB_ACTIONS": "true", "GITHUB_SERVER_URL": "https://github.com", "GITHUB_REPOSITORY": "Putnami/demo-observe-architecture", "GITHUB_REPOSITORY_ID": "1121", "GITHUB_RUN_ID": "41335602201", "GITHUB_JOB": "test", "GITHUB_REF": "refs/pull/1/merge"}
+	env := map[string]string{"GITHUB_ACTIONS": "true", "GITHUB_SERVER_URL": "https://github.com", "GITHUB_REPOSITORY": "Putnami/demo-observe-architecture", "GITHUB_REPOSITORY_ID": "1121", "GITHUB_RUN_ID": "41335602201", "GITHUB_JOB": "test", "GITHUB_REF": "refs/heads/feature"}
 	opts := Options{
 		Dir:      root,
 		Env:      func(key string) string { return env[key] },

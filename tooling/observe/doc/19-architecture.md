@@ -26,10 +26,13 @@ is a diagnostic. A deptrac report is never read as a test report.
 | deptrac | One layer, named by the layer: broken when a class of it depends on a layer the ruleset forbids | One `failure`, `Depender:N must not depend on Dependent (A on B)` |
 | import-linter | One contract, named by its `name` | One import chain under `Broken contracts`, `shared.money -> api.main (l.3)` |
 
-A passing ArchUnit case is a kept rule; a skipped one is no rule. An ArchUnit
-case counts in no component's tests. One rule read twice, such as one ArchUnit
-rule run by two modules, is one rule: broken when either run broke it, its
-violations summed.
+A passing ArchUnit case is a kept rule; a skipped one is no rule, and one
+that ended in an error stays a failed test. An ArchUnit case counts in no
+component's tests. A detected cycle, with its indented slices and
+dependencies, is one violation. One rule read twice, such as one ArchUnit
+test class run by two modules, is one rule: an ArchUnit rule is identified by
+its test class and case, and named by its rule text once a run breaks it. It
+is broken when either run broke it, its violations summed.
 
 ## Where a violation goes
 
