@@ -98,7 +98,7 @@ func init() {
 		"include-secrets", "includeSecrets", "with-secrets", "withSecrets",
 		"schema", "secret-keys", "secretKeys", "reveal-secrets", "revealSecrets",
 		"from-stdin", "fromStdin", "reveal",
-		"stdin", "confirm", "execute",
+		"stdin", "confirm", "execute", "sign-in", "signIn",
 		"auto-iam-authn", "autoIamAuthn", "health-check", "healthCheck", "supervise",
 		"for-registry", "forRegistry", "global", "opaque", "materialize", "include-revoked", "remove", "if-present", "ifPresent",
 		"skip-publish-config", "skipPublishConfig",

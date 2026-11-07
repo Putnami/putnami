@@ -3113,6 +3113,19 @@
             },
             "type": "array"
           },
+          "organization": {
+            "type": "string"
+          },
+          "provider": {
+            "type": "string"
+          },
+          "repo": {
+            "type": "string"
+          },
+          "repository": {
+            "$ref": "#/components/schemas/RepositoryRef",
+            "nullable": true
+          },
           "selection": {
             "$ref": "#/components/schemas/SelectionReport",
             "nullable": true
@@ -3554,6 +3567,21 @@
         },
         "type": "object"
       },
+      "RepositoryRef": {
+        "additionalProperties": false,
+        "properties": {
+          "host": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "RequiredCheckRule": {
         "additionalProperties": false,
         "properties": {
@@ -3779,6 +3807,9 @@
             "$ref": "#/components/schemas/OperationalMetrics",
             "nullable": true
           },
+          "organization": {
+            "type": "string"
+          },
           "provenance": {
             "type": "string"
           },
@@ -3799,6 +3830,10 @@
           },
           "repo": {
             "type": "string"
+          },
+          "repository": {
+            "$ref": "#/components/schemas/RepositoryRef",
+            "nullable": true
           },
           "selection": {
             "$ref": "#/components/schemas/GateSelection",
@@ -3833,6 +3868,9 @@
             "type": "boolean"
           },
           "provenance": {
+            "type": "string"
+          },
+          "reportUrl": {
             "type": "string"
           },
           "runId": {

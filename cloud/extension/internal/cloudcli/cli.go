@@ -358,7 +358,14 @@ func RunCommand(command string, ioctx IO, args []string) error {
 	case "log-reporter":
 		return deliverycli.LogReporter(params, args, workspaceRoot, env, ioctx)
 	case "evidence-report":
-		return deliverycli.EvidenceReport(params, env, ioctx)
+		return deliverycli.EvidenceReport(params, env, ioctx, func() error {
+			// The device instructions go to standard error: standard output
+			// carries the command's one result.
+			signing := ioctx
+			signing.Stdout = ioctx.Stderr
+			_, err := identitycli.Login(map[string]any{}, env, signing)
+			return err
+		})
 	case "image-layers":
 		return deliverycli.ImageLayers(params, args, workspaceRoot, env, ioctx)
 	case "shell-test":

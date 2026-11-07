@@ -16,7 +16,7 @@
       }
     ]
   },
-  "contractSha256": "2852ed863571727143441a3027bdc6610c05b09b94bdf44bd6f71a41b5d660c6",
+  "contractSha256": "9c7afb296a1457768634998db0f7ed34b37414a0ad7f326bd5bf5785e4eb6335",
   "operations": [
     {
       "operationId": "getV1_Workspaces_Workspace_Ci_Status",
@@ -369,7 +369,7 @@
   "files": [
     {
       "path": "client.gen.go",
-      "sha256": "032de2c8277c913100c42c7543fd3aafb71495b8535f138b435e7a5342e4f4b6"
+      "sha256": "b9fe5c4fcafb6bcbad295aa2090e2e925d0b430e30ecf471df900d9a1095a26e"
     }
   ]
 }

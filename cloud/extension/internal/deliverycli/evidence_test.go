@@ -39,7 +39,8 @@ type evidenceFakeServer struct {
 	alreadyStored bool
 	// refuseStates answers a batch whose dependency changes carry a before or
 	// after state as a body over the route's size.
-	refuseStates bool
+	refuseStates bool // reportURL is the report URL the run answers, "" for none.
+	reportURL    string
 }
 
 func (s *evidenceFakeServer) RoundTrip(req *http.Request) (*http.Response, error) {
@@ -57,10 +58,14 @@ func (s *evidenceFakeServer) RoundTrip(req *http.Request) (*http.Response, error
 		if s.refuseRun != 0 {
 			return reportJSONResponse(s.refuseRun, map[string]any{"error": "changeRequest.host is invalid", "message": "changeRequest.host is invalid"}), nil
 		}
-		return reportJSONResponse(http.StatusOK, map[string]any{
+		answer := map[string]any{
 			"runId": "run-1", "subjectId": "subject-1", "status": "completed",
 			"conclusion": body["conclusion"], "provenance": body["provenance"], "verified": false,
-		}), nil
+		}
+		if s.reportURL != "" {
+			answer["reportUrl"] = s.reportURL
+		}
+		return reportJSONResponse(http.StatusOK, answer), nil
 	case recordsReportsIngestPath:
 		if s.refuseStates && (strings.Contains(string(raw), `"before":`) || strings.Contains(string(raw), `"after":`)) {
 			return reportJSONResponse(http.StatusRequestEntityTooLarge, map[string]any{"error": "Request body exceeds the declared bound", "message": "Request body exceeds the declared bound"}), nil
@@ -114,7 +119,7 @@ func runEvidenceReportLogged(t *testing.T, fake *evidenceFakeServer, env map[str
 		Now:    func() time.Time { return time.Date(2026, 11, 3, 8, 0, 0, 0, time.UTC) },
 	}
 	params := clicore.MergeParams(clicore.ParseFlags(args))
-	err = EvidenceReport(params, env, ioctx)
+	err = EvidenceReport(params, env, ioctx, nil)
 	return strings.Join(out, "\n"), strings.Join(log, "\n"), err
 }
 
