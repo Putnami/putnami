@@ -6,7 +6,7 @@
     "sha": "4f6c2a9e1b7d3c5a8e0f2b4d6a8c0e1f3a5b7c9d"
   },
   "ci": {
-    "system": "jenkins"
+    "system": "travis-ci"
   },
   "producer": {
     "name": "@putnami/observe",

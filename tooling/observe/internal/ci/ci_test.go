@@ -315,3 +315,33 @@ func TestTheRepositoryKeyIsTheNumericProjectID(t *testing.T) {
 		})
 	}
 }
+
+func TestAnotherCIIsNamedByItsMarker(t *testing.T) {
+	spectest.Proves(t, feature, "ci-detection", "another-ci-is-named-by-its-marker")
+	for name, tc := range map[string]struct {
+		env    map[string]string
+		system string
+	}{
+		"jenkins":       {map[string]string{"JENKINS_URL": "https://ci.example.com/", "CI": "true"}, "jenkins"},
+		"circleci":      {map[string]string{"CIRCLECI": "true", "CI": "true"}, "circleci"},
+		"buildkite":     {map[string]string{"BUILDKITE": "true"}, "buildkite"},
+		"azure":         {map[string]string{"TF_BUILD": "True"}, "azure-pipelines"},
+		"bitbucket":     {map[string]string{"BITBUCKET_BUILD_NUMBER": "7"}, "bitbucket-pipelines"},
+		"teamcity":      {map[string]string{"TEAMCITY_VERSION": "2024.03"}, "teamcity"},
+		"ci true alone": {map[string]string{"CI": "true"}, SystemGeneric},
+		"no ci":         {nil, SystemGeneric},
+	} {
+		t.Run(name, func(t *testing.T) {
+			d := Detect(envOf(tc.env), filesOf(nil), Overrides{Base: "origin/main"})
+			want := Detection{
+				Subject: Subject{Provider: ProviderGeneric},
+				Run:     Run{System: tc.system},
+				Head:    "HEAD",
+				Base:    &Base{Ref: "origin/main", Source: BaseFromFlag},
+			}
+			if !reflect.DeepEqual(d, want) {
+				t.Fatalf("detection:\n got %+v\nwant %+v", d, want)
+			}
+		})
+	}
+}

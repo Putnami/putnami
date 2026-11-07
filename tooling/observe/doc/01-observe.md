@@ -32,7 +32,19 @@ directories.
 |---|---|---|---|
 | GitHub Actions | `GITHUB_ACTIONS=true` | `GITHUB_SERVER_URL` host, `GITHUB_REPOSITORY_ID` | `GITHUB_REF` `refs/pull/<n>/merge`, or the event payload |
 | GitLab CI | `GITLAB_CI=true` | `CI_SERVER_HOST`, `CI_PROJECT_ID` | `CI_MERGE_REQUEST_IID` |
-| Any other | neither | none | none |
+| Jenkins | `JENKINS_URL` | none | none |
+| CircleCI | `CIRCLECI=true` | none | none |
+| Buildkite | `BUILDKITE=true` | none | none |
+| Azure Pipelines | `TF_BUILD=true` | none | none |
+| Bitbucket Pipelines | `BITBUCKET_BUILD_NUMBER` | none | none |
+| TeamCity | `TEAMCITY_VERSION` | none | none |
+| Any other | `CI=true` or none of the above | none | none |
+
+The first marker that matches names the CI, in the order of this table, and
+`ci.system` carries its name (`jenkins`, `circleci`, `buildkite`,
+`azure-pipelines`, `bitbucket-pipelines`, `teamcity`); any other CI is
+`generic`. Values compare without case, and a variable without a value in the
+table matches any non-empty value. The evidence protocol owns this table.
 
 The repository path (`GITHUB_REPOSITORY`, `CI_PROJECT_PATH`, or the path of
 the `origin` remote) is for display only. A GitHub or GitLab job without a
