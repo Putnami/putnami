@@ -373,6 +373,27 @@ Without `--base-sbom`, each dependency gets its state at the head and the summar
                introduces 1 (GHSA-mrhx-c7xc-m3w5 high); license MIT
 ```
 
+## Give your agents the same view
+
+The CI job reads what a change touches; your coding agents can read the same thing on your machine, in a repository that still has no `putnami.workspace.json`. Install two extensions in your user scope:
+
+```bash
+putnami extensions install --user @putnami/observe
+putnami extensions install --user @putnami/contributor
+```
+
+The second command writes five skills to `~/.claude/skills` for Claude Code and `~/.agents/skills` for Codex, and writes nothing in your repository. A file you already keep at one of those paths is never overwritten: the install stops, names it, and writes nothing. `putnami extensions remove --user @putnami/contributor` removes them again.
+
+| Skill | What it does without a workspace |
+|---|---|
+| `context` | Answers "what does this change touch?" from `putnami observe --output=json`: the changed components, the ones that depend on them, their tests and coverage when reports exist, and the specs they keep. |
+| `spec` | Adds or changes a requirement in the Spec Kit, OpenSpec, Kiro or Gherkin spec your repository keeps, in that format, then runs `putnami observe` to read it back. |
+| `build`, `check`, `design` | Say in one line that they need a Putnami workspace, and stop. |
+
+Ask your agent "what does this change touch?" or "add a requirement to the export spec". `putnami observe` lists the specs it reads in its summary and in the `specs` member of its JSON document, so a requirement the agent adds shows up on the next CI run too.
+
+Inside a Putnami workspace, each of these skills follows the copy the workspace pins instead.
+
 ## Learn more
 
 - [Observe](/docs/tooling-&-workspace/observe): what `putnami observe` answers, and every CI, repository tool, report format, lockfile and SBOM format it reads.
