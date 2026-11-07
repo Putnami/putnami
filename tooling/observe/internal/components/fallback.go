@@ -62,13 +62,19 @@ func fallbackSplit(root string) ([]Component, []diag.Diagnostic) {
 			"no detector found a component, so the repository is split into the %d directories %s names", len(dirs), file)}
 	}
 	dirs, diags := sourceDirectories(root)
+	// read qualifies the top-level directories when a bounded walk left one
+	// unread to its end.
+	read, readAll := "", ""
+	if len(diags) > 0 {
+		read, readAll = " read to its end", " read to their end"
+	}
 	if len(dirs) > 0 {
 		return fallbackComponents(dirs, evidence.SourceFallbackDirectories), append(diags, splitInfo(
-			"no detector found a component and no CODEOWNERS names a directory, so the repository is split into its %d top-level directories that hold a source file", len(dirs)))
+			"no detector found a component and no CODEOWNERS names a directory, so the repository is split into the %d top-level directories%s that hold a source file", len(dirs), readAll))
 	}
 	return []Component{{
 		ID: evidence.RootComponent, Ecosystem: FallbackEcosystem, Source: evidence.SourceFallback, Detector: evidence.SourceFallback,
-	}}, append(diags, splitInfo("no detector found a component, no CODEOWNERS names a directory and no top-level directory holds a source file, so the repository is one component"))
+	}}, append(diags, splitInfo("no detector found a component, no CODEOWNERS names a directory and no top-level directory%s holds a source file, so the repository is one component", read))
 }
 
 func splitInfo(format string, args ...any) diag.Diagnostic {

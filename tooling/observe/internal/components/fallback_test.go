@@ -222,4 +222,7 @@ func TestALargeDirectoryWithoutSourceLeavesTheOthersToTheSplit(t *testing.T) {
 	if !bounded {
 		t.Errorf("no %s diagnostic naming assets in %+v", CodeFallbackWalkBounded, set.Diagnostics)
 	}
+	if d := splitDiagnostic(t, set); !strings.Contains(d.Message, "2 top-level directories read to their end") {
+		t.Errorf("split diagnostic %q", d.Message)
+	}
 }
