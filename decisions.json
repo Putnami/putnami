@@ -495,7 +495,7 @@
     },
     {
       "id": "D-061",
-      "statement": "architecture import --from structurizr makes each container a domain <system>/<container> and a container-less system a domain <system>; a cross-domain relationship becomes a reference import of the producer's <domain>.interface.v1 export",
+      "statement": "architecture import --from structurizr makes each container a domain <system>/<container> and a container-less system a domain <system>; a domain pair with no import gets one reference import of the producer's generated or single reference export",
       "settled": "2026-11-07",
       "settledBy": "the owner, approving the Structurizr import plan",
       "adr": "tooling/sdd-extension/doc/adr/0005-a-structurizr-model-is-an-authored-architecture.md",

@@ -64,9 +64,12 @@ from one format to another. It does not turn code into a permission.
    manifests and adds the missing projects, exports, imports and bindings.
    It never changes or removes an entry that already exists, so a hand edit
    survives every rerun. A domain pair that already has an import gets no
-   second one, even when a person renamed the generated import. A changed
-   manifest keeps the order of its entries: the additions are appended, and
-   the diff removes nothing. It reports an import the manifest holds and the model
+   second one, even when a person renamed the generated import. A new import
+   takes the version of the export it reads. A changed manifest keeps the
+   order of its entries, and the additions are appended. It is written in the
+   layout of the protocol's canonical writer, so a manifest any Putnami writer
+   produced keeps every existing line, and a manifest in another layout is
+   rewritten in that layout once. It reports an import the manifest holds and the model
    no longer has, and leaves the removal to a person. A new manifest goes to
    `architecture/<domain>/` below the workspace root, or below `--at`. A
    domain that is already declared keeps its own file. The command refuses,
