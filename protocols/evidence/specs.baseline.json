@@ -14,6 +14,7 @@
     "evidence/change-evidence-document#references-resolve",
     "evidence/change-evidence-document#sbom-sources-are-named",
     "evidence/change-evidence-document#the-ci-run-is-identified",
+    "evidence/change-evidence-document#the-ci-system-is-recognized-by-its-marker",
     "evidence/change-evidence-document#the-document-is-bounded",
     "evidence/change-evidence-document#the-subject-names-the-change",
     "evidence/change-evidence-document#timestamps-and-diagnostics-are-well-formed",

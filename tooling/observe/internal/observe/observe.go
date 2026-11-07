@@ -15,6 +15,7 @@ import (
 
 	"go.putnami.dev/protocol/codehost"
 	diag "go.putnami.dev/protocol/diagnostic"
+	"go.putnami.dev/protocol/evidence"
 	"go.putnami.dev/tooling/observe/internal/analyze"
 	"go.putnami.dev/tooling/observe/internal/ci"
 	"go.putnami.dev/tooling/observe/internal/components"
@@ -221,13 +222,7 @@ func WriteText(w io.Writer, o Observation) error {
 }
 
 func systemLabel(system string) string {
-	switch system {
-	case ci.SystemGitHubActions:
-		return "GitHub Actions"
-	case ci.SystemGitLabCI:
-		return "GitLab CI"
-	}
-	return "generic CI"
+	return evidence.CISystemName(system)
 }
 
 func repositoryLabel(s ci.Subject) string {

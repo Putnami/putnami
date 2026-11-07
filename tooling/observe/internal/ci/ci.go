@@ -2,8 +2,9 @@
 // repository and commit it built, and which commit the change is measured
 // against.
 //
-// GitHub Actions and GitLab CI are recognized by their own variables; any
-// other CI is generic and takes its base from a flag. The repository key is
+// The evidence protocol's markers name the CI. GitHub Actions and GitLab CI
+// are read in full; any other CI is named alone and takes its base from a
+// flag. The repository key is
 // the code host and its numeric project id, which survive a rename or a
 // transfer; the repository path is for display only.
 package ci
@@ -18,6 +19,7 @@ import (
 
 	"go.putnami.dev/protocol/codehost"
 	diag "go.putnami.dev/protocol/diagnostic"
+	"go.putnami.dev/protocol/evidence"
 )
 
 // Code hosts: the slugs of the codehost protocol.
@@ -27,11 +29,11 @@ const (
 	ProviderGeneric = codehost.Generic
 )
 
-// CI systems.
+// CI systems: the slugs of the evidence protocol.
 const (
-	SystemGitHubActions = "github-actions"
-	SystemGitLabCI      = "gitlab-ci"
-	SystemGeneric       = "generic"
+	SystemGitHubActions = evidence.CISystemGitHubActions
+	SystemGitLabCI      = evidence.CISystemGitLabCI
+	SystemGeneric       = evidence.CISystemGeneric
 )
 
 // Base sources: where the base candidate came from.
@@ -118,15 +120,15 @@ func Detect(env Env, readFile ReadFile, overrides Overrides) Detection {
 		readFile = os.ReadFile
 	}
 	var d Detection
-	switch {
-	case env("GITHUB_ACTIONS") == "true":
+	switch system, _ := evidence.DetectCI(env); system {
+	case SystemGitHubActions:
 		d = detectGitHub(env, readFile)
-	case env("GITLAB_CI") == "true":
+	case SystemGitLabCI:
 		d = detectGitLab(env)
 	default:
 		d = Detection{
 			Subject: Subject{Provider: ProviderGeneric},
-			Run:     Run{System: SystemGeneric},
+			Run:     Run{System: system},
 		}
 	}
 	d.Head = "HEAD"

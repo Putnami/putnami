@@ -15,7 +15,7 @@
   "requirements": [
     {
       "id": "version-1-and-closed-vocabularies",
-      "text": "Documents are protocol version 1. The code host is github, gitlab or generic; the CI system is github-actions, gitlab-ci or generic; a component source is orchestrator, workspace, manifest, fallback or declared; an impact is changed, dependent or unaffected; a file status is added, modified, deleted or renamed; a dependency change is added, removed, upgraded, downgraded or changed; an SBOM format is cyclonedx or spdx. Ecosystems are open lowercase slugs. Every validation code starts with evidence."
+      "text": "Documents are protocol version 1. The code host is github, gitlab or generic; the CI system is one the-ci-run-is-identified names; a component source is orchestrator, workspace, manifest, fallback or declared; an impact is changed, dependent or unaffected; a file status is added, modified, deleted or renamed; a dependency change is added, removed, upgraded, downgraded or changed; an SBOM format is cyclonedx or spdx. Ecosystems are open lowercase slugs. Every validation code starts with evidence."
     },
     {
       "id": "one-member-set",
@@ -35,7 +35,11 @@
     },
     {
       "id": "the-ci-run-is-identified",
-      "text": "The CI system is github-actions, gitlab-ci or generic; the run and job ids and the attempt, when present, identify the document among the runs, jobs and re-runs of one commit, and the attempt is positive; the run URL is https and carries no credentials. Any defect is evidence.invalid_ci."
+      "text": "The CI system is github-actions, gitlab-ci, jenkins, circleci, buildkite, azure-pipelines, bitbucket-pipelines, teamcity or generic; the run and job ids and the attempt, when present, identify the document among the runs, jobs and re-runs of one commit, and the attempt is positive; the run URL is https and carries no credentials. Any defect is evidence.invalid_ci."
+    },
+    {
+      "id": "the-ci-system-is-recognized-by-its-marker",
+      "text": "The variable a CI sets in every job names its system: GITHUB_ACTIONS=true github-actions, GITLAB_CI=true gitlab-ci, JENKINS_URL jenkins, CIRCLECI=true circleci, BUILDKITE=true buildkite, TF_BUILD=true azure-pipelines, BITBUCKET_BUILD_NUMBER bitbucket-pipelines, TEAMCITY_VERSION teamcity; the first wins, values compare without case, and a bare variable matches any non-empty value. Else CI=true or CI=1 is a generic CI, and neither is no CI."
     },
     {
       "id": "paths-stay-in-the-repository",

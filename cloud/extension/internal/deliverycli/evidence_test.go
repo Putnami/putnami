@@ -282,6 +282,55 @@ func writeEvidenceDoc(t *testing.T, doc any) string {
 	return path
 }
 
+// genericEvidenceDoc is generic-minimal.json run by system, with a project id.
+func genericEvidenceDoc(t *testing.T, system string) string {
+	t.Helper()
+	data, err := os.ReadFile(evidenceFixture("generic-minimal.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var doc map[string]any
+	if err := json.Unmarshal(data, &doc); err != nil {
+		t.Fatal(err)
+	}
+	doc["subject"].(map[string]any)["projectId"] = "4521"
+	doc["ci"] = map[string]any{"system": system, "runId": "88"}
+	return writeEvidenceDoc(t, doc)
+}
+
+func evidenceProvenance(t *testing.T, env map[string]string, path string) (provenance, submissionID any) {
+	t.Helper()
+	fake := &evidenceFakeServer{}
+	if _, err := runEvidenceReport(t, fake, env, "--file", path); err != nil {
+		t.Fatalf("evidence-report: %v", err)
+	}
+	return fake.requests[0].Body["provenance"], fake.requests[0].Body["submissionId"]
+}
+
+func TestEvidenceReportOpensAnExternalRunForAnotherCI(t *testing.T) {
+	spectest.Proves(t, evidenceFeature, "sends-the-provenance-of-the-ci", "another-ci-opens-an-external-run")
+	provenance, id := evidenceProvenance(t, evidenceEnv(), genericEvidenceDoc(t, evidence.CISystemJenkins))
+	if provenance != "external" || id != "observe-external-4521-88" {
+		t.Fatalf("provenance %v and submission id %v, want external and observe-external-4521-88", provenance, id)
+	}
+}
+
+func TestEvidenceReportOpensAnExternalRunForAGenericDocumentInACI(t *testing.T) {
+	spectest.Proves(t, evidenceFeature, "sends-the-provenance-of-the-ci", "a-generic-document-in-a-ci-opens-an-external-run")
+	env := evidenceEnv()
+	env["CI"] = "true"
+	if provenance, _ := evidenceProvenance(t, env, genericEvidenceDoc(t, evidence.CISystemGeneric)); provenance != "external" {
+		t.Fatalf("provenance = %v, want external under CI=true", provenance)
+	}
+}
+
+func TestEvidenceReportOpensALocalRunOutsideACI(t *testing.T) {
+	spectest.Proves(t, evidenceFeature, "sends-the-provenance-of-the-ci", "an-upload-outside-a-ci-opens-a-local-run")
+	if provenance, _ := evidenceProvenance(t, evidenceEnv(), genericEvidenceDoc(t, evidence.CISystemGeneric)); provenance != "local" {
+		t.Fatalf("provenance = %v, want local without a CI variable", provenance)
+	}
+}
+
 func TestEvidenceReportSendsNothingItCannotUpload(t *testing.T) {
 	spectest.Proves(t, evidenceFeature, "refuses-what-it-cannot-upload", "nothing-is-sent-without-a-token-or-a-valid-document")
 	genericPath := evidenceFixture("generic-minimal.json")
@@ -297,7 +346,7 @@ func TestEvidenceReportSendsNothingItCannotUpload(t *testing.T) {
 		"no file":         {evidenceEnv(), nil, clicore.ExitUsage, "--file"},
 		"a missing file":  {evidenceEnv(), []string{"--file", filepath.Join(t.TempDir(), "none.json")}, clicore.ExitUsage, "cannot read"},
 		"an invalid file": {evidenceEnv(), []string{"--file", invalid}, clicore.ExitUsage, "not a valid change evidence document"},
-		"a generic CI":    {evidenceEnv(), []string{"--file", genericPath}, clicore.ExitUsage, "no provenance"},
+		"no project id":   {evidenceEnv(), []string{"--file", genericPath}, clicore.ExitUsage, "no numeric project id"},
 	} {
 		t.Run(name, func(t *testing.T) {
 			fake := &evidenceFakeServer{}

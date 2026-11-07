@@ -386,6 +386,21 @@
           }
         },
         {
+          "id": "sends-the-provenance-of-the-ci",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "another-ci-opens-an-external-run",
+              "a-generic-document-in-a-ci-opens-an-external-run",
+              "an-upload-outside-a-ci-opens-a-local-run"
+            ]
+          }
+        },
+        {
           "id": "sends-the-tested-tree",
           "stage": "coded",
           "evidenceKinds": [

@@ -101,7 +101,7 @@ func TestConformance_VocabulariesAreClosed(t *testing.T) {
 	spectest.Proves(t, feature, "version-1-and-closed-vocabularies", "the-vocabularies-are-closed")
 	pins := map[string][2][]string{
 		"providers":    {Providers, {"github", "gitlab", "generic"}},
-		"ci systems":   {CISystems, {"github-actions", "gitlab-ci", "generic"}},
+		"ci systems":   {CISystems, {"github-actions", "gitlab-ci", "jenkins", "circleci", "buildkite", "azure-pipelines", "bitbucket-pipelines", "teamcity", "generic"}},
 		"sources":      {ComponentSources, {"orchestrator", "workspace", "manifest", "fallback", "declared"}},
 		"impacts":      {Impacts, {"changed", "dependent", "unaffected"}},
 		"statuses":     {FileStatuses, {"added", "modified", "deleted", "renamed"}},
@@ -426,7 +426,7 @@ func TestConformance_EachCIDefectGetsItsCode(t *testing.T) {
 	cases := map[string]func(*Document){
 		"http run url":       func(d *Document) { d.CI.URL = "http://github.com/run/1" },
 		"credentials in url": func(d *Document) { d.CI.URL = "https://token:x@github.com/run/1" },
-		"unknown ci":         func(d *Document) { d.CI.System = "circleci" },
+		"unknown ci":         func(d *Document) { d.CI.System = "travis" },
 		"attempt zero":       func(d *Document) { zero := 0; d.CI.Attempt = &zero },
 	}
 	for label, mutate := range cases {

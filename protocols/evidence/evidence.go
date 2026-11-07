@@ -37,15 +37,25 @@ const (
 // Providers is the closed code-host vocabulary, codehost.Slugs.
 var Providers = codehost.Slugs()
 
-// CI systems: what ran the job that produced the document.
+// CI systems: what ran the job that produced the document. Generic is a CI
+// without a marker, or no CI.
 const (
-	CISystemGitHubActions = "github-actions"
-	CISystemGitLabCI      = "gitlab-ci"
-	CISystemGeneric       = "generic"
+	CISystemGitHubActions      = "github-actions"
+	CISystemGitLabCI           = "gitlab-ci"
+	CISystemJenkins            = "jenkins"
+	CISystemCircleCI           = "circleci"
+	CISystemBuildkite          = "buildkite"
+	CISystemAzurePipelines     = "azure-pipelines"
+	CISystemBitbucketPipelines = "bitbucket-pipelines"
+	CISystemTeamCity           = "teamcity"
+	CISystemGeneric            = "generic"
 )
 
 // CISystems is the closed CI-system vocabulary.
-var CISystems = []string{CISystemGitHubActions, CISystemGitLabCI, CISystemGeneric}
+var CISystems = []string{
+	CISystemGitHubActions, CISystemGitLabCI, CISystemJenkins, CISystemCircleCI, CISystemBuildkite,
+	CISystemAzurePipelines, CISystemBitbucketPipelines, CISystemTeamCity, CISystemGeneric,
+}
 
 // File statuses, as git reports them.
 const (
@@ -217,7 +227,7 @@ type ChangeRequest struct {
 
 // CI names the job that produced the document.
 type CI struct {
-	// System is github-actions, gitlab-ci or generic.
+	// System is one of CISystems.
 	System string `json:"system"`
 	// RunID is the CI system's id of the run or pipeline.
 	RunID string `json:"runId,omitempty"`
