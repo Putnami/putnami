@@ -6,7 +6,8 @@
     "A CI job adds --upload to putnami observe and its change evidence document reaches the reporter it selected, Putnami Cloud by default",
     "A CI job that uploads gets the URL of the full report its reporter answered, in the log and on the pull or merge request note",
     "A third party writes its own reporter as an extension that answers one subcommand, with no change to observe or to the CLI",
-    "An upload that fails leaves a diagnostic in the log and never fails the CI job"
+    "An upload that fails leaves a diagnostic in the log and never fails the CI job",
+    "A person runs putnami observe --open and, after one sign-in that later runs reuse, reads the full report in the browser"
   ],
   "nonGoals": [
     "Talking to Putnami Cloud: the reporter owns the routes, the token and the retries",
@@ -25,6 +26,14 @@
     {
       "id": "upload-fails-open",
       "text": "A selector that is not an extension name, a document that was not written, a reporter that cannot start, exits non-zero or runs past two minutes each give one warning diagnostic, observe.upload_failed, and putnami observe still exits 0."
+    },
+    {
+      "id": "open-signs-in-and-uploads",
+      "text": "--open uploads as --upload does and passes --sign-in to the reporter, which uses a token or a stored session when one exists and signs the person in otherwise. Observe prints the report URL the reporter answers on standard error, and outside a CI opens it in the browser; in a CI it opens nothing."
+    },
+    {
+      "id": "nothing-leaves-without-upload-or-open",
+      "text": "Without --upload or --open, observe runs no reporter and sends nothing off the machine; --publish still needs --upload."
     }
   ]
 }

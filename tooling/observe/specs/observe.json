@@ -7,7 +7,8 @@
     "The job names the repository by a key that survives a rename or a transfer: the code host, its hostname and its numeric project id",
     "The change is measured against the commit its pull or merge request targets, found even when the CI cloned one commit deep",
     "The job lists the test and coverage reports it can read, found by their content or named by the team, and says which ones it could not read without failing",
-    "The job can keep what it observed as a change evidence document, a CI artifact that a reporter uploads and that a third party can read"
+    "The job can keep what it observed as a change evidence document, a CI artifact that a reporter uploads and that a third party can read",
+    "A person who runs putnami observe on a laptop or in a CI job reads a short summary in the log and one line that names the command that keeps the full report"
   ],
   "nonGoals": [
     "Running a build or tests, or asking the team to change how it builds or tests",
@@ -44,6 +45,22 @@
     {
       "id": "external-specs",
       "text": "observe reads the specs a repository keeps in the formats the features protocol reads: Spec Kit (`specs/<feature>/spec.md`), OpenSpec (`openspec/specs/<capability>/spec.md`), Kiro (`.kiro/specs/<feature>/requirements.md`) and Gherkin (`.feature` files). It reports each spec with its format, its path, the component that owns it, its requirements by id and name, and whether the change touches it. A spec it cannot read is a diagnostic, and the rest are still reported."
+    },
+    {
+      "id": "short-log-summary",
+      "text": "The text summary names the CI and repository, the commit, the base and the count of changed files, then the changed components and their dependents, the coverage of the changed lines, the count of dependency changes with the count of license changes and of vulnerabilities introduced and fixed, then the warnings and errors. It lists no file, report, spec, decision or per-component test: --details prints the detailed summary, and --output=json and the evidence document keep the whole analysis."
+    },
+    {
+      "id": "next-command",
+      "text": "The text summary ends with one line that names the next command: the report URL when an upload answered one; else, outside a CI, putnami observe --open; else, in a CI job whose reporter is @putnami/cloud and that holds no PUTNAMI_CLOUD_TOKEN, the PUTNAMI_CLOUD_TOKEN setting and putnami cloud token create, which creates it; else --upload."
+    },
+    {
+      "id": "laptop-repository-key",
+      "text": "Outside a CI, the subject is read from the origin remote: a github.com or GitLab remote names the provider, the host and the repository path, and the numeric project id comes from the code host API (GitHub GET /repos/{owner}/{repo}, GitLab GET /projects/{path}), with GITHUB_TOKEN or PUTNAMI_GITLAB_TOKEN when one is set. A remote the API does not answer leaves the id empty with a diagnostic that names the token to set. The head is HEAD and the branch the current one."
+    },
+    {
+      "id": "laptop-base",
+      "text": "Outside a CI and without --base, the base is the remote default branch, origin/HEAD, so putnami observe on a laptop needs no flag. A clone without origin/HEAD keeps the diagnostic of a missing base."
     }
   ],
   "decisions": [
