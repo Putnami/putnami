@@ -283,6 +283,14 @@ func locateInstalledAgentContent(wsRoot, name string) (*AgentContentSource, erro
 	}, nil
 }
 
+// LocateUserScopeAgentContent finds the agent-content contribution of an
+// extension the user scope at userRoot pins, through that pin exactly as
+// LocateAgentContent reads a workspace's registry pin. An extension that ships
+// no content returns an error wrapping ErrNoAgentContent.
+func LocateUserScopeAgentContent(userRoot, name string) (*AgentContentSource, error) {
+	return locateInstalledAgentContent(userRoot, name)
+}
+
 // verifiedManifest is a declared extension's manifest, read from where
 // discovery loads the extension and negotiated by the protocol's loader.
 type verifiedManifest struct {

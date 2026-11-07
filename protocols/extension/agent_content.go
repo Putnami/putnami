@@ -60,6 +60,24 @@ type AgentContentContribution struct {
 	// given two competing sets of instructions. Present in both forms; the
 	// package step keeps it.
 	Supersedes []string `json:"supersedes,omitempty"`
+	// UserScope names the skills of the contribution that work in a
+	// repository without a workspace. `putnami extensions install --user`
+	// writes them, and only them, under the user's home; a workspace opt-in
+	// ignores the list. It is the author's statement, present in both forms;
+	// the package step keeps it and refuses a name the built content does not
+	// ship as a skill.
+	UserScope []string `json:"userScope,omitempty"`
+}
+
+// userScopeSkillFormat is the grammar of a skill name, as the authoring layout
+// names a skill directory.
+var userScopeSkillFormat = regexp.MustCompile(`^[a-z0-9][a-z0-9-]*$`)
+
+// DeclaresUserScopeSkills reports whether the manifest's agent content names
+// at least one user-scope skill, the vocabulary of
+// protocolcli.UserScopeSkillsContract.
+func DeclaresUserScopeSkills(m *Manifest) bool {
+	return m.DeclaresAgentContent() && len(m.AgentContent.UserScope) > 0
 }
 
 // supersededNameFormat is the grammar of an agent-artifact identity a
@@ -81,7 +99,8 @@ func (c AgentContentContribution) Packaged() bool {
 }
 
 // RequiredCLIContract returns the lowest CLI contract whose vocabulary covers
-// the manifest: ProviderContract for a providers section, StepDependencyContract
+// the manifest: UserScopeSkillsContract for agent content that names user-scope
+// skills, ProviderContract for a providers section, StepDependencyContract
 // for a command that depends on one step of another command,
 // HostHooksContract for a hostHooks member, ChangedFilesContract
 // for a step that gates on or binds the run's changed files,
@@ -178,6 +197,11 @@ func RequiredLoadContract(m *Manifest) int {
 	// the step form, whatever origin the manifest loads from.
 	if DeclaresStepDependency(m) {
 		required = max(required, protocolcli.StepDependencyContract)
+	}
+	// A user-scope skill reaches the user's home only through a reader that
+	// writes it, whatever origin the manifest loads from.
+	if DeclaresUserScopeSkills(m) {
+		required = max(required, protocolcli.UserScopeSkillsContract)
 	}
 	// A provider is reached only through a reader that calls its operations,
 	// whatever origin the manifest loads from.
@@ -326,6 +350,7 @@ func ValidateAgentContent(m *Manifest) []diag.Diagnostic {
 			"agent content manifestSha256 %q must be 64 lowercase hex characters", content.ManifestSHA256))
 	}
 	diags = append(diags, validateSupersedes(m.Name, content.Supersedes)...)
+	diags = append(diags, validateUserScope(content.UserScope)...)
 
 	switch {
 	case content.Source == "" && content.ManifestSHA256 == "":
@@ -358,6 +383,28 @@ func validateSupersedes(extensionName string, names []string) []diag.Diagnostic 
 		if first, dup := seen[name]; dup {
 			diags = append(diags, diag.Errorf("invalid-agent-content-supersedes", entry,
 				"superseded agent artifact %q repeats agentContent.supersedes.%d", name, first))
+			continue
+		}
+		seen[name] = index
+	}
+	return diags
+}
+
+// validateUserScope checks the user-scope skill names: each one is a skill
+// name and none repeats. Whether the content ships each skill is checked by the
+// package step, which sees the files.
+func validateUserScope(names []string) []diag.Diagnostic {
+	var diags []diag.Diagnostic
+	seen := make(map[string]int, len(names))
+	for index, name := range names {
+		entry := "agentContent.userScope." + strconv.Itoa(index)
+		if !userScopeSkillFormat.MatchString(name) {
+			diags = append(diags, diag.Errorf("invalid-agent-content-user-scope", entry,
+				"user-scope skill %q must be a skill name: lowercase letters, digits and hyphens", name))
+		}
+		if first, dup := seen[name]; dup {
+			diags = append(diags, diag.Errorf("invalid-agent-content-user-scope", entry,
+				"user-scope skill %q repeats agentContent.userScope.%d", name, first))
 			continue
 		}
 		seen[name] = index

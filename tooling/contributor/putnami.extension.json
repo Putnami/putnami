@@ -1,7 +1,7 @@
 {
   "$schema": "https://putnami.dev/schemas/putnami-extension.json",
   "name": "@putnami/contributor",
-  "cliContract": 17,
+  "cliContract": 20,
   "runtime": {
     "executable": "compiled/putnami-contributor",
     "toolchains": {
@@ -786,6 +786,13 @@
     "supersedes": [
       "@putnami/agent-workflows",
       "@putnami/maintainer-workflows"
+    ],
+    "userScope": [
+      "build",
+      "check",
+      "context",
+      "design",
+      "spec"
     ]
   }
 }

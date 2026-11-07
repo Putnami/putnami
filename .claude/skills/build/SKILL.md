@@ -28,6 +28,24 @@ Read the repository instructions and the
 [repository policy](../../../.agents/skills/build/references/policy.md) once
 per run.
 
+## Workspace first
+
+This skill also runs from your home directory (`~/.claude/skills`,
+`~/.agents/skills`), where `putnami extensions install --user
+@putnami/contributor` installs it. Before anything else, look for
+`putnami.workspace.json` in the current directory and each directory above
+it.
+
+- Found, and this file does not lie under that workspace root: the workspace
+  pins its own copy. Read `<root>/.claude/skills/build/SKILL.md` (Codex:
+  `<root>/.agents/skills/build/SKILL.md`) and follow it instead of this file.
+  When the workspace has neither, say `This workspace does not install the
+  build skill: it opts into agent content with extension:@putnami/contributor in
+  agentArtifacts.` and stop.
+- Not found: say `build needs a Putnami workspace (putnami.workspace.json), and
+  this repository has none.` and stop. Do not create the file, and do not ask
+  the person to create it.
+
 ## Arguments
 
 `<intention|task|proposal>` names the objective; without one, ask, unless

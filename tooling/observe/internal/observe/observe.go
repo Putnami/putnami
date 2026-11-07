@@ -21,6 +21,7 @@ import (
 	"go.putnami.dev/tooling/observe/internal/components"
 	"go.putnami.dev/tooling/observe/internal/gitbase"
 	"go.putnami.dev/tooling/observe/internal/reports"
+	"go.putnami.dev/tooling/observe/internal/specs"
 )
 
 // Producer names the program that made an observation.
@@ -43,7 +44,11 @@ type Observation struct {
 	Reports         []reports.Report      `json:"reports"`
 	// Analysis is what the change touches: components, tests, coverage,
 	// changed-line coverage and dependency changes.
-	Analysis    analyze.Result    `json:"analysis"`
+	Analysis analyze.Result `json:"analysis"`
+	// Specs are the Spec Kit, OpenSpec, Kiro and Gherkin specs the
+	// repository keeps, with their requirements and whether the change
+	// touches them.
+	Specs       []specs.Spec      `json:"specs"`
 	Diagnostics []diag.Diagnostic `json:"diagnostics"`
 }
 
@@ -130,7 +135,13 @@ func Run(ctx context.Context, opts Options) Observation {
 		}
 	}
 	o.Analysis = analyze.Run(input)
-	o.Diagnostics = slices.Concat(detection.Diagnostics, resolved.Diagnostics, reportDiags, set.Diagnostics, analysisDiags, o.Analysis.Diagnostics)
+	changed := make([]string, 0, len(o.ChangedFiles))
+	for _, file := range o.ChangedFiles {
+		changed = append(changed, file.Path)
+	}
+	repoSpecs, specDiags := specs.Collect(specs.Request{Root: root, Owner: set.Owner, Changed: changed})
+	o.Specs = repoSpecs
+	o.Diagnostics = slices.Concat(detection.Diagnostics, resolved.Diagnostics, reportDiags, set.Diagnostics, analysisDiags, o.Analysis.Diagnostics, specDiags)
 	if o.Diagnostics == nil {
 		o.Diagnostics = []diag.Diagnostic{}
 	}
@@ -214,11 +225,31 @@ func WriteText(w io.Writer, o Observation) error {
 		}
 		fmt.Fprintf(&b, "    %-9s %s\n", r.Format, r.Path)
 	}
+	writeSpecs(&b, o.Specs)
 	for _, d := range o.Diagnostics {
 		fmt.Fprintf(&b, "  %s %s: %s\n", d.Severity, d.Code, d.Message)
 	}
 	_, err := io.WriteString(w, b.String())
 	return err
+}
+
+// writeSpecs lists the specs, a changed one first marked.
+func writeSpecs(b *strings.Builder, found []specs.Spec) {
+	if len(found) == 0 {
+		return
+	}
+	fmt.Fprintf(b, "  specs    %s\n", count(len(found), "spec"))
+	for _, s := range found {
+		mark := ""
+		if s.Changed {
+			mark = ", changed"
+		}
+		owner := ""
+		if s.Component != "" {
+			owner = " in " + s.Component
+		}
+		fmt.Fprintf(b, "    %-9s %s%s (%s%s)\n", s.Format, s.Path, owner, count(len(s.Requirements), "requirement"), mark)
+	}
 }
 
 func systemLabel(system string) string {

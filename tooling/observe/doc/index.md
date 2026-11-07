@@ -23,6 +23,7 @@ GitHub Actions, it is one step: `uses: Putnami/observe-action@v1`.
 | How well do the tests cover the change? | It reads the coverage reports, places each covered file on its component, and computes the coverage of the changed lines. |
 | Which dependencies moved? | It reads each changed lockfile at the base and at the commit, and lists the packages added, removed, upgraded or downgraded. |
 | Do those moves fix or bring known vulnerabilities, or change licences? | It reads the software bill of materials (SBOM, the list of a build's packages with their licences and known vulnerabilities) the job wrote, at the base and at the commit. |
+| Which specs does the repository keep, and does the change touch them? | It reads the Spec Kit, OpenSpec, Kiro and Gherkin specs, places each on its component, and lists its requirements. |
 
 ## What it writes
 

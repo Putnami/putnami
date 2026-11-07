@@ -290,6 +290,21 @@
               "the-cloud-extension-packs-outbox-descriptors-the-protocol-accepts"
             ]
           }
+        },
+        {
+          "id": "user-scope-skills-are-named-by-the-author",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-user-scope-list-names-skills-once",
+              "a-user-scope-list-requires-contract-20",
+              "the-package-step-refuses-an-unshipped-user-scope-skill"
+            ]
+          }
         }
       ]
     }

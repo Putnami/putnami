@@ -1,0 +1,4 @@
+name: context
+description: Answer what a change touches, from the workspace or, without one, from putnami observe
+allowed-tools: Bash, Read, Grep, Glob
+argument-hint: "[<path>|<question>]"

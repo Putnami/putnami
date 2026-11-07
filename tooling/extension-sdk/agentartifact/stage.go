@@ -99,6 +99,9 @@ func StageExtensionContent(extensionRoot, stageDir, name, version string) (*Resu
 	if err != nil {
 		return nil, err
 	}
+	if err := CheckUserScopeSkills(identity, contribution.UserScope, content); err != nil {
+		return nil, err
+	}
 	rewritten, err := packagedManifest(staged, contribution, content.ManifestSHA256)
 	if err != nil {
 		return nil, err
@@ -263,7 +266,7 @@ func refuseOccupiedContentPath(stageDir, contentPath string) error {
 
 // packagedManifest returns the staged manifest with its contribution in the
 // packaged form: path, the digest of what was built and, unchanged, the
-// superseded identities. Every other field is kept; the encoding is the
+// superseded identities and the user-scope skills. Every other field is kept; the encoding is the
 // sorted-key indented form packagers stamp.
 func packagedManifest(staged []byte, contribution extproto.AgentContentContribution, manifestSHA256 string) ([]byte, error) {
 	var raw map[string]any
@@ -276,6 +279,9 @@ func packagedManifest(staged []byte, contribution extproto.AgentContentContribut
 	}
 	if len(contribution.Supersedes) > 0 {
 		packaged["supersedes"] = contribution.Supersedes
+	}
+	if len(contribution.UserScope) > 0 {
+		packaged["userScope"] = contribution.UserScope
 	}
 	raw["agentContent"] = packaged
 	rewritten, err := json.MarshalIndent(raw, "", "  ")

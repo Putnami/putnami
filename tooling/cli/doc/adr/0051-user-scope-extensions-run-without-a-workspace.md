@@ -8,6 +8,10 @@
 - **Amended**: 2026-11-01, decision 4 and the first invariant: the CLI writes
   nothing in the caller's directory; an extension command writes there only
   what its own flags or its documented defaults name.
+- **Amended**: 2026-11-07, decision 2: an extension that names user-scope
+  skills (`agentContent.userScope`) gets them written under the user's home
+  by `install --user`. See
+  [ADR 0085](0085-a-user-scope-install-writes-the-skills-its-extension-names.md).
 - **Scope**: `@putnami/cli` (`internal/cli`, `internal/commands/extensions`,
   `internal/extension`, `internal/jobs`, `internal/launch`,
   `internal/commandmeta`), `@putnami/cli-model` (`jobs.ScheduledJob`),

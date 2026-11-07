@@ -5,7 +5,7 @@ keeps its own CI and has no Putnami workspace. Its `putnami observe` command
 runs at the end of the job, after the build and the tests, and changes nothing
 in the pipeline.
 
-It answers five questions:
+It answers six questions:
 
 - Which CI ran the job, and which repository and commit it built. The
   repository key is the code host and its numeric project id, which survive a
@@ -15,6 +15,8 @@ It answers five questions:
   components depend on those.
 - Which tests passed or failed and which lines they covered, per component,
   and how much of the changed lines they covered.
+- Which specs the repository keeps in Spec Kit, OpenSpec, Kiro or Gherkin,
+  their requirements, and whether the change touches them.
 - Which dependency versions the lockfiles moved and, from the software bills
   of materials (SBOM) the CI wrote, their licences and the known
   vulnerabilities each change fixes or introduces.

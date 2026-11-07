@@ -23,7 +23,7 @@ const contributorExtension = "@putnami/contributor"
 
 // contributorSkills are the complete active entry-point inventory.
 var contributorSkills = []string{
-	"build", "spec", "design", "review", "check", "epic", "content-bump",
+	"build", "spec", "design", "review", "check", "context", "epic", "content-bump",
 }
 
 var contributorRemovedSkills = []string{

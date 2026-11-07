@@ -135,6 +135,9 @@ func PackageExtension(extensionRoot, version string) (*ExtensionPackage, error) 
 	if err != nil {
 		return nil, err
 	}
+	if err := CheckUserScopeSkills(name, contribution.UserScope, content); err != nil {
+		return nil, err
+	}
 
 	var raw map[string]any
 	if err := json.Unmarshal(authored, &raw); err != nil {
@@ -149,6 +152,11 @@ func PackageExtension(extensionRoot, version string) (*ExtensionPackage, error) 
 	// content replaces; a published release carries them unchanged.
 	if len(contribution.Supersedes) > 0 {
 		packagedContent["supersedes"] = contribution.Supersedes
+	}
+	// The user-scope skills are the author's statement about which skills
+	// work without a workspace; a published release carries them unchanged.
+	if len(contribution.UserScope) > 0 {
+		packagedContent["userScope"] = contribution.UserScope
 	}
 	raw["agentContent"] = packagedContent
 	raw["cliContract"] = extproto.RequiredCLIContract(m)
@@ -242,4 +250,29 @@ func formatDiagnosticList(diags []diag.Diagnostic) string {
 		parts = append(parts, d.String())
 	}
 	return strings.Join(parts, "; ")
+}
+
+// UserScopeSkillHosts are the host directories a built skill lands in, the
+// ones agent hosts also read from the user's home.
+var UserScopeSkillHosts = []string{".claude/skills", ".agents/skills"}
+
+// CheckUserScopeSkills refuses a user-scope skill the built content does not
+// ship: each name must be a skill of the content, built for every host that
+// reads skills from the user's home. The manifest alone cannot see the files,
+// so the package step, which built them, holds the rule.
+func CheckUserScopeSkills(name string, skills []string, content *Result) error {
+	var missing []string
+	for _, skill := range skills {
+		for _, host := range UserScopeSkillHosts {
+			if _, ok := content.Files[host+"/"+skill+"/SKILL.md"]; !ok {
+				missing = append(missing, skill)
+				break
+			}
+		}
+	}
+	if len(missing) > 0 {
+		return fmt.Errorf("extension %s names user-scope skills its agent content does not ship (%s): agentContent.userScope lists skills of the content, each built from skills/<name>/SKILL.md",
+			name, strings.Join(missing, ", "))
+	}
+	return nil
 }

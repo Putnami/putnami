@@ -41,6 +41,8 @@ var agentContentInvalidFixtureCodes = map[string][]string{
 	// A superseded identity is a registry name, is not the extension itself,
 	// and appears once.
 	"agent-content-supersedes.json": {"invalid-agent-content-supersedes", "invalid-agent-content-supersedes", "invalid-agent-content-supersedes"},
+	// A user-scope entry is a skill name and appears once.
+	"agent-content-user-scope.json": {"invalid-agent-content-user-scope", "invalid-agent-content-user-scope"},
 }
 
 // The superseded identities are part of both forms: the authored fixture

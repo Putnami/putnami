@@ -48,8 +48,30 @@ state the repository's conventions in its [policy](doc/02-repository-policy.md).
 | `design` | Resolve a material technical choice, with a bounded prototype or an ADR when it needs one | implicit |
 | `review` | Independently challenge a material artifact or frozen candidate | implicit |
 | `check` | Run the gate, applicable local proof, the documentation audit and the language rule | implicit |
+| `context` | Answer what a change touches, from the workspace or, without one, from `putnami observe` | implicit |
 | `epic` | Plan several issues in waves under one envelope and launch one `build` session per issue, without coding | explicit only |
 | `content-bump` | Refresh a pinned-content lock the policy declares | explicit only |
+
+### Without a workspace
+
+`build`, `check`, `context`, `design` and `spec` also install in the user
+scope, for a repository with no `putnami.workspace.json`:
+
+```bash
+putnami extensions install --user @putnami/contributor
+putnami extensions install --user @putnami/observe
+```
+
+The first command writes those skills to `~/.claude/skills` and
+`~/.agents/skills` (`agentContent.userScope`,
+[CLI ADR 0085](../cli/doc/adr/0085-a-user-scope-install-writes-the-skills-its-extension-names.md)).
+In such a repository, `context` answers what a change touches from
+`putnami observe --output=json`, and `spec` writes the Spec Kit, OpenSpec,
+Kiro or Gherkin spec the repository keeps, which `putnami observe` then reads.
+`build`, `check` and `design` say in one line that they need a workspace, and
+stop. Inside a workspace, each one follows the workspace's own copy of the
+skill: Claude Code prefers a personal skill to a project skill of the same
+name, so the user-scope copy defers.
 
 The former `plan`, `execute`, `fix`, `code-review`, `adr`,
 `prototype`, four `putnami-*` aliases and `fix-loop` entries are removed. This intentional breaking change

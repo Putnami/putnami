@@ -153,6 +153,26 @@ Installing an extension never activates its content. A workspace opts in with
 an `extension:<name>` entry in `agentArtifacts`; see the CLI's
 [agent-workflow lifecycle](../../../tooling/cli/doc/adr/0047-extension-owned-agent-content.md).
 
+### Skills without a workspace
+
+`userScope` lists the skills of the contribution that work in a repository
+without a workspace. It belongs to both forms, and the package step keeps it:
+
+```json
+{
+  "name": "@acme/contributor",
+  "agentContent": { "path": "agent-content", "source": "agent-src", "userScope": ["spec"] }
+}
+```
+
+Each entry is a skill name (`[a-z0-9][a-z0-9-]*`) and appears once; the package
+step refuses a name the built content does not ship as `skills/<name>/SKILL.md`.
+`putnami extensions install --user <name>` writes those skills, and only them,
+under the user's home; a workspace opt-in ignores the list. A listed skill runs
+from a workspace and from the user's home, so it is written to work in both.
+A non-empty list requires `cliContract` 20 (`UserScopeSkillsContract`). See
+[ADR 0018](adr/0018-an-extension-names-the-skills-that-work-without-a-workspace.md).
+
 ### Superseded artifacts
 
 When an extension's content replaces workflows that were distributed as

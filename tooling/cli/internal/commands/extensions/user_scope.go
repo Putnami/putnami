@@ -17,6 +17,7 @@ import (
 	"go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/iox"
 	"go.putnami.dev/tooling/cli/internal/lockfile"
+	"go.putnami.dev/tooling/cli/internal/userskills"
 )
 
 // UserScopeFlag selects the user scope on `putnami extensions install|list|remove`.
@@ -73,12 +74,34 @@ func ExtensionsInstallUser(ctx context.Context, userRoot string, args []string, 
 
 	installer := extension.NewUserScopeInstaller(userRoot)
 	return WithActionRecords(outputFormat, "extensions install", func(records *ActionRecords) error {
-		return installArtifactsWithOptions(ctx, userRoot, &wsproto.Config{}, rest, userScopeOps(userRoot, installer), InstallOptions{
+		if err := installArtifactsWithOptions(ctx, userRoot, &wsproto.Config{}, rest, userScopeOps(userRoot, installer), InstallOptions{
 			OutputFormat: outputFormat,
 			Out:          out,
 			Records:      records,
-		})
+		}); err != nil {
+			return err
+		}
+		return installUserScopeSkills(userRoot, name, outputFormat, out)
 	})
+}
+
+// userHomeDir is the directory under which the agent hosts read personal
+// skills. Tests replace it.
+var userHomeDir = os.UserHomeDir
+
+// installUserScopeSkills writes the skills the freshly pinned extension names
+// for the user scope (CLI ADR 0085). A structured output keeps its one
+// document: the lines go nowhere, and a failure is still the command's.
+func installUserScopeSkills(userRoot, name, outputFormat string, out io.Writer) error {
+	home, err := userHomeDir()
+	if err != nil {
+		return fmt.Errorf("find the home directory for the user-scope skills: %w", err)
+	}
+	if protocolcli.OutputMode(outputFormat).IsStructured() {
+		out = io.Discard
+	}
+	ref, _ := parseExtensionArg(name)
+	return userskills.Install(userRoot, home, ref, out)
 }
 
 // userScopeOps returns the extension ops of the user scope at userRoot.
@@ -93,8 +116,8 @@ func userScopeOps(userRoot string, installer *extension.Installer) artifactOps {
 	return ops
 }
 
-// ExtensionsRemoveUser drops one extension from the user scope: its lock entry,
-// then its stable link. The extension tree stays in the artifact store, whose
+// ExtensionsRemoveUser drops one extension from the user scope: the skills its
+// install wrote under the home directory, its lock entry, then its stable link. The extension tree stays in the artifact store, whose
 // garbage collection reclaims it.
 func ExtensionsRemoveUser(userRoot string, args []string, out io.Writer) error {
 	_, name, err := userScopeArgs("remove", args, true)
@@ -116,6 +139,13 @@ func ExtensionsRemoveUser(userRoot string, args []string, out io.Writer) error {
 	}
 	if _, ok := lf.GetExtension(name); !ok {
 		return fmt.Errorf("extension %s is not installed in the user scope", name)
+	}
+	home, err := userHomeDir()
+	if err != nil {
+		return fmt.Errorf("find the home directory for the user-scope skills: %w", err)
+	}
+	if err := userskills.Remove(userRoot, home, name, out); err != nil {
+		return err
 	}
 	lf.RemoveExtension(name)
 	if _, err := lockfile.WriteLockFileIfChanged(userRoot, lf); err != nil {

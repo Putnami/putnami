@@ -2351,6 +2351,15 @@
               "a-source-workspace-runs-its-putnamiw"
             ]
           }
+        },
+        {
+          "id": "user-scope-skills",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": ["a-user-scope-install-writes-only-the-named-skills", "a-user-scope-reinstall-writes-nothing", "a-user-scope-collision-writes-nothing", "a-user-scope-remove-removes-what-it-wrote"]
+          }
         }
       ]
     },
@@ -3265,6 +3274,33 @@
           "verification": {
             "kind": "acceptance",
             "checks": ["the-spec-skill-edits-the-external-spec-it-resolves"]
+          }
+        },
+        {
+          "id": "user-scope-skills",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": ["the-user-scope-list-names-the-workspace-free-skills", "each-user-scope-skill-defers-to-the-workspace-copy", "build-check-and-design-stop-without-a-workspace"]
+          }
+        },
+        {
+          "id": "context-without-a-workspace",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": ["the-context-skill-reads-observe-without-a-workspace"]
+          }
+        },
+        {
+          "id": "spec-without-a-workspace",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": ["the-spec-skill-writes-the-repository-format-without-a-workspace"]
           }
         }
       ]

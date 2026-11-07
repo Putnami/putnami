@@ -40,6 +40,10 @@
     {
       "id": "caller-directory-writes",
       "text": "In the caller's directory, observe writes only the Git history it fetches to reach the merge base of a shallow clone, which --no-fetch turns off, and the file --evidence names; the working tree, the index and HEAD stay as they were, and its fetches start no automatic Git maintenance that would repack the history after it exits. Everything else it prints: a text summary, or one JSON document with --output=json."
+    },
+    {
+      "id": "external-specs",
+      "text": "observe reads the specs a repository keeps in the formats the features protocol reads: Spec Kit (`specs/<feature>/spec.md`), OpenSpec (`openspec/specs/<capability>/spec.md`), Kiro (`.kiro/specs/<feature>/requirements.md`) and Gherkin (`.feature` files). It reports each spec with its format, its path, the component that owns it, its requirements by id and name, and whether the change touches it. A spec it cannot read is a diagnostic, and the rest are still reported."
     }
   ],
   "decisions": [
