@@ -10,7 +10,7 @@ inputs:
     required: false
     default: ''
   publish:
-    description: true posts a commit status and a summary note on the pull request with the run's GITHUB_TOKEN; false does not. Empty means true when token is set, false otherwise.
+    description: true posts a commit status and a summary note on the pull request with the run's GITHUB_TOKEN, once the token input uploads the evidence; false does not. Empty means true when token is set, false otherwise.
     required: false
     default: ''
   junit:

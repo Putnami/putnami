@@ -321,8 +321,8 @@ func TestThePublishInputOverridesTheDefault(t *testing.T) {
 	if !strings.Contains(withoutToken, " --publish |") || strings.Contains(withoutToken, "--upload") {
 		t.Fatalf("no token with publish true: call = %q, want --publish without --upload", withoutToken)
 	}
-	if !strings.Contains(withoutToken, "GITHUB_TOKEN=run-token PUTNAMI_CLOUD_TOKEN=unset") {
-		t.Fatalf("no token with publish true: call = %q, want only the run token", withoutToken)
+	if !strings.HasSuffix(withoutToken, noToken) {
+		t.Fatalf("no token with publish true: call = %q, want no token, since --publish without --upload posts nothing", withoutToken)
 	}
 }
 

@@ -75,7 +75,8 @@ fi
   if [[ -n "$token" ]]; then
     export PUTNAMI_CLOUD_TOKEN="$token"
   fi
-  if [[ "$publish" == true ]]; then
+  # --publish without --upload posts nothing, so the run token stays out.
+  if [[ "$publish" == true && -n "$token" ]]; then
     export GITHUB_TOKEN="$run_token"
   fi
   exec putnami "${args[@]}"
