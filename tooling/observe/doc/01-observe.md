@@ -132,13 +132,34 @@ nothing gets `observe.report_missing`, an unreadable file
 The summary names the CI, the repository, the commit, the base, the changed
 files (the first 50), the changed and dependent components, the tests and
 coverage of each component, the coverage of the changed lines, the dependency
-changes with their licences and vulnerabilities, and the reports, then each
-diagnostic. See
+changes with their licences and vulnerabilities, the reports and the specs,
+then each diagnostic. See
 [the change analyses](/docs/tooling-&-workspace/observe/change-analyses). `putnami observe`
 exits 0 whatever it observes, 2 on a usage error, and 1 when it cannot read its
 job context or write its output. `--output=json`
 prints one document with `subject`, `ci`, `producer`, `base`,
-`deepenedCommits`, `changedFiles`, `reports`, `analysis` and `diagnostics`.
+`deepenedCommits`, `changedFiles`, `reports`, `analysis`, `specs` and
+`diagnostics`.
+
+## Specs
+
+`putnami observe` reads the specs a repository keeps, in the formats the
+features protocol reads, with the same readers a workspace uses:
+
+| Format | Where it looks |
+|---|---|
+| GitHub Spec Kit | `specs/<feature>/spec.md`, at any depth |
+| OpenSpec | `openspec/specs/<capability>/spec.md`; a change in flight under `openspec/changes` is not a current spec |
+| Kiro | `.kiro/specs/<feature>/requirements.md` |
+| Gherkin | each `.feature` file |
+
+It walks the repository as report discovery does, skipping `.git`,
+`node_modules` and `vendor`. Each spec in the `specs` member of the JSON
+document has its `format`, its `path`, the `file` that holds its requirements,
+the `component` that owns it, whether the change touches it (`changed`), and
+its `requirements`, each with its `id`, its `text` and its `line`. A spec its
+reader refuses gets `observe.spec_unreadable`, a warning, and the others are
+still reported. The summary lists each spec with its requirement count.
 
 ## The evidence document
 
