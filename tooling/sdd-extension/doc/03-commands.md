@@ -138,8 +138,73 @@ subcommand is a step of `validate`
 ([ADR 0013, decision 5](../../cli/doc/adr/0013-sdd-as-a-standalone-extension.md#5-contracts-stays-interactive-only)):
 a gate does not write into the source tree.
 
-Both are additions made after the extraction, so neither has a recorded parity oracle — see
+`init`, `sync` and `import` are additions made after the extraction, so none has a recorded parity oracle — see
 [05-parity.md](05-parity.md).
+
+### `import` — a Structurizr model
+
+```bash
+putnami architecture import --from structurizr <workspace.dsl|workspace.json> [--apply] [--at <dir>] [--path-property <name>]
+```
+
+A team that already describes its architecture in
+[Structurizr](https://structurizr.com) gets its manifests from the model
+instead of writing them. A Structurizr relationship is a declaration a person
+wrote and reviewed in the model, not an observed dependency, so `import` writes
+exports and imports where `sync` refuses to
+([ADR 0005](adr/0005-a-structurizr-model-is-an-authored-architecture.md)).
+
+| Model element | Becomes |
+|---|---|
+| Container | Domain `<system>/<container>` |
+| Software system with no containers | Domain `<system>` |
+| `putnami.domain` property | The domain id. On a system, it also applies to every container that sets none, so the whole system is one domain |
+| `putnami.owner` property | The domain owner (default: the domain id) |
+| Container or component with a `path` property | A project of its domain. The value is a project id (`/billing/api`) or the project's directory relative to the workspace root |
+| Relationship between two domains | An import of the consumer, mode `reference`, from the producer's generated `<domain>.interface.v1` export. Descriptions and technologies become the justification |
+
+Names become ids in lower case, with each run of other characters turned into
+one hyphen: `Internet Banking System` and `API Application` give the domain
+`internet-banking-system/api-application`. `--path-property` reads another
+property than `path`.
+
+The generated contracts are deliberately thin. `reference` is the one access
+mode that claims no data crosses the boundary, and each producer exports one
+fact. Refine the mode, the facts and the justification by hand: a later import
+keeps your edits.
+
+Bindings follow the `sync` rule. A project edge the graph observes gets a
+binding only when the model relates its two domains, and only on the import
+the model declares for that pair. An edge between two domains the model does
+not relate stays an `architecture.undeclared_project_dependency` finding, so
+`putnami validate` fails on a code dependency the architecture does not allow.
+
+Everything the command cannot map is listed with the reason: a person, a
+component with no `path`, a path that is no project, a project another domain
+already holds, a name that gives no valid domain id, a relationship that stays
+inside one domain, and a relationship to a system whose containers are several
+domains. Map such a relationship at the container level.
+
+Without `--apply`, nothing is written: the command prints the diff of every
+manifest it would create or change. With `--apply`, it writes them. New
+manifests go to `architecture/<domain>/putnami.architecture.json`, or below
+`--at <dir>`. A domain that is already declared keeps its own file.
+
+A rerun only adds. It adds the projects, exports, imports and bindings that are
+missing, and never changes or removes an entry that exists, so a hand edit
+survives. An import between two model domains that the model no longer relates
+is reported for you to remove. The import covers the whole model, so project
+selection flags are rejected.
+
+The reader uses the standard library only. It reads a JSON workspace, and the
+DSL statements that describe a model: `workspace`, `model`, `person`,
+`softwareSystem`, `container`, `component`, `group`, relationships (`a -> b`,
+`-> b` and `this -> b` inside an element), `description`, `technology`, `tags`
+and `properties`. It skips `views`, `configuration`, `deploymentEnvironment`,
+`perspectives`, `!docs`, `!adrs` and `!identifiers`. Any other statement, such
+as `!include`, `archetypes` or `workspace extends`, stops the command at its
+line. Export the workspace as JSON with the Structurizr CLI and import that file
+instead.
 
 ## `features`
 

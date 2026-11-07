@@ -172,8 +172,10 @@ putnami architecture inspect observability
 projection; `inspect` is the bounded view of one exact domain identity. When a
 workspace-root baseline exists, all three resolve the prior baseline directly
 from immutable Git objects. Pass the global `--baseline <git-ref>` only to
-override Putnami's normal comparison ref. No command creates declarations,
-baselines, or waivers.
+override Putnami's normal comparison ref. These three commands create no
+declarations, baselines, or waivers. The authoring commands `architecture init`,
+`sync` and `import` write manifests: `import` reads them from a Structurizr
+model.
 
 The commands live in the SDD extension,
 [`tooling/sdd-extension`](../../tooling/sdd-extension/README.md). The rationale is

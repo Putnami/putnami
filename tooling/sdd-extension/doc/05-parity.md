@@ -85,6 +85,7 @@ match. Its acceptance is its own tests, not a comparison.
 |---|---|
 | `architecture init` | `cmd/putnami-sdd/architecture_authoring_test.go` — the scaffold document, and the four refusals |
 | `architecture sync` | same file — the mechanical reconciliation, and the refusal to grant an undeclared relation |
+| `architecture import` | `cmd/putnami-sdd/architecture_import_test.go` — the adapted Structurizr Big Bank model, end to end through `architecture validate` |
 
 `TestSDDSubcommandsMatchTheRecordedBuiltIn` deliberately does not enumerate the
 manifest, so a post-capture subcommand does not read as a missing recording.

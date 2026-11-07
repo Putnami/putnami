@@ -98,7 +98,7 @@ finding IDs and detector coverage may still change.
 ### Authored in code, enforced at run time
 
 A manifest is JSON, and hand-writing several hundred lines of it does not scale.
-Three surfaces close that gap, each stopping exactly where a human decision
+Four surfaces close that gap, each stopping exactly where a human decision
 starts:
 
 - **Scaffold and reconcile.** `putnami architecture init <domain>` writes the
@@ -109,6 +109,13 @@ starts:
   edge whose contract is already declared. It never writes an **import**: an
   observed dependency with no declared contract is refused and named, and stays
   a failing finding until somebody declares it.
+- **Imported from Structurizr.** `putnami architecture import --from
+  structurizr <workspace.dsl|workspace.json>` writes the manifests a Structurizr
+  model declares: containers become domains, elements with a `path` property
+  name their projects, and relationships become imports. A relationship is a
+  declaration a person wrote in the model, so the import may write it. A code
+  dependency the model does not relate stays a failing finding. Without
+  `--apply` it prints the diff, and a rerun only adds, so hand edits survive.
 - **Authored in Go.** `go.putnami.dev/sdk/extension/architecture` builds a
   manifest through a fluent builder that runs the gate's own verdict at
   authoring time, and `Pin` holds a committed file to that program — the builder

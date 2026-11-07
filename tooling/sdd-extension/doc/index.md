@@ -34,6 +34,7 @@ Three surfaces, in the order you meet them:
 | | What it does | Language |
 |---|---|---|
 | `putnami architecture init` / `sync` | Scaffolds a domain and reconciles the mechanical half of existing manifests — see [Commands](03-commands.md#init-and-sync--the-authoring-half) | any |
+| `putnami architecture import` | Writes the manifests a Structurizr model declares — see [Commands](03-commands.md#import--a-structurizr-model) | any |
 | [`go.putnami.dev/app/darc`](https://putnami.dev/docs/frameworks/go/domain-access-contracts) | Enforces a declared import at run time, and emits the evidence `architecture validate` reads | Go |
 | [`@putnami/application` → `darc`](https://putnami.dev/docs/frameworks/typescript/domain-access-contracts) | The same, for a TypeScript workload | TypeScript |
 | [`go.putnami.dev/sdk/extension/architecture`](../../extension-sdk/doc/08-architecture-manifest.md) | Authors a manifest in Go and pins the committed file to that program | Go |

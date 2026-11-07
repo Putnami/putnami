@@ -88,7 +88,7 @@ func readManifest(t *testing.T, root, domain string) *archproto.Manifest {
 }
 
 // TestArchitectureImportWritesManifestsValidateAccepts is the done-when of
-// issue 948: the import writes manifests the gate accepts.
+// the Structurizr import: it writes manifests the gate accepts.
 func TestArchitectureImportWritesManifestsValidateAccepts(t *testing.T) {
 	spectest.Proves(t, "tooling/specification-driven-development", "structurizr-models-import-as-manifests",
 		"import-writes-manifests-validate-accepts")
