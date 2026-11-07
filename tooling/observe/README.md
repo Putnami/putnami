@@ -58,8 +58,9 @@ putnami observe --base origin/main
 
 `--output=json` prints one JSON document instead of the summary.
 `--evidence <path>` also writes the change evidence document, a CI artifact a
-reporter can upload. `--publish` posts a commit status and one summary note on
-the pull or merge request, which the next run updates in place.
+reporter can upload. `--upload --publish` uploads it, then posts a commit
+status and one summary note that link to the report on the pull or merge
+request, which the next run updates in place.
 
 See [doc/01-observe.md](doc/01-observe.md) for what each CI provides, how the
 base is found and how reports are discovered.

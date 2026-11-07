@@ -85,9 +85,12 @@ func run(args []string, getenv func(string) string, stdout, stderr io.Writer) in
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 	o := observe.Run(ctx, opts)
-	o.Diagnostics = append(o.Diagnostics, writeAndUpload(ctx, o, out, getenv, stderr)...)
+	uploaded, reportURL, diags := writeAndUpload(ctx, o, out, getenv, stderr)
+	o.Diagnostics = append(o.Diagnostics, diags...)
 	if out.publish {
-		o.Diagnostics = append(o.Diagnostics, publish.Run(ctx, publish.Request{Observation: o, Getenv: getenv, Client: publishClient, Output: stderr})...)
+		o.Diagnostics = append(o.Diagnostics, publish.Run(ctx, publish.Request{
+			Observation: o, Upload: uploaded, ReportURL: reportURL, Getenv: getenv, Client: publishClient, Output: stderr,
+		})...)
 	}
 	write := observe.WriteText
 	if out.json {
@@ -118,30 +121,35 @@ type outputs struct {
 var publishClient *http.Client
 
 // writeAndUpload writes the evidence document when --evidence or --upload asks
-// for it, hands it to the evidence reporter on --upload, and returns the
-// diagnostics of both. Without --evidence the document lives in a temporary
-// file for the upload alone.
-func writeAndUpload(ctx context.Context, o observe.Observation, out outputs, getenv func(string) string, stderr io.Writer) []diag.Diagnostic {
+// for it, hands it to the evidence reporter on --upload, and returns what the
+// upload did, the report URL the reporter answered and the diagnostics of
+// both. Without --evidence the document lives in a temporary file for the
+// upload alone.
+func writeAndUpload(ctx context.Context, o observe.Observation, out outputs, getenv func(string) string, stderr io.Writer) (publish.Upload, string, []diag.Diagnostic) {
 	path := out.evidence
 	if path == "" && out.upload {
 		dir, err := os.MkdirTemp("", "putnami-evidence-")
 		if err != nil {
-			return upload.Skipped()
+			return publish.UploadFailed, "", upload.Skipped()
 		}
 		defer os.RemoveAll(dir)
 		path = filepath.Join(dir, "evidence.json")
 	}
 	if path == "" {
-		return nil
+		return publish.NotUploaded, "", nil
 	}
 	diags := observe.WriteEvidence(path, o, time.Now())
 	if !out.upload {
-		return diags
+		return publish.NotUploaded, "", diags
 	}
 	if len(diags) > 0 {
-		return append(diags, upload.Skipped()...)
+		return publish.UploadFailed, "", append(diags, upload.Skipped()...)
 	}
-	return upload.Run(ctx, upload.Request{Path: path, Getenv: getenv, Output: stderr})
+	reportURL, diags := upload.Run(ctx, upload.Request{Path: path, Getenv: getenv, Output: stderr})
+	if len(diags) > 0 {
+		return publish.UploadFailed, "", diags
+	}
+	return publish.Uploaded, reportURL, nil
 }
 
 // parseRun reads the flags of `run` against the job context, nil outside

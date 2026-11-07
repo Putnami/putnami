@@ -364,7 +364,7 @@ func TestUploadHandsTheEvidenceDocumentToPutnamiCloud(t *testing.T) {
 		t.Fatalf("the reporter did not run: %v", err)
 	}
 	args := strings.Fields(string(data))
-	if len(args) != 4 || !slices.Equal(args[:3], []string{"cloud", "evidence-report", "--file"}) {
+	if len(args) != 5 || !slices.Equal(args[:3], []string{"cloud", "evidence-report", "--file"}) || args[4] != "--output=json" {
 		t.Fatalf("reporter args %v", args)
 	}
 	if _, err := os.Stat(args[3]); !os.IsNotExist(err) {
@@ -388,7 +388,7 @@ func TestUploadHandsTheEvidenceDocumentToPutnamiCloud(t *testing.T) {
 		t.Fatalf("exit %d", code)
 	}
 	data, _ = os.ReadFile(filepath.Join(record, "args"))
-	if args := strings.Fields(string(data)); len(args) != 4 || args[3] != kept {
+	if args := strings.Fields(string(data)); len(args) != 5 || args[3] != kept {
 		t.Fatalf("with --evidence the reporter gets that path, got %v", args)
 	}
 	if _, err := os.Stat(kept); err != nil {
@@ -444,49 +444,79 @@ func (f roundTrip) RoundTrip(req *http.Request) (*http.Response, error) { return
 func TestPublishPostsTheSummaryOnTheMergeRequest(t *testing.T) {
 	spectest.Proves(t, "tooling/observe-host-report", "publish-fails-open", "a-missing-token-publishes-nothing")
 	spectest.Proves(t, "tooling/observe-host-report", "publish-note", "a-gitlab-merge-request-gets-a-status-and-a-note")
+	spectest.Proves(t, "tooling/observe-host-report", "publish-note", "the-note-and-the-status-link-the-report")
+	spectest.Proves(t, "tooling/observe-host-report", "publish-needs-upload", "without-an-upload-nothing-is-published")
+	spectest.Proves(t, "tooling/observe-host-report", "publish-needs-upload", "a-failed-upload-publishes-nothing")
+	spectest.Proves(t, "tooling/observe-upload", "upload-answers-the-report-url", "the-reporter-answers-the-report-url")
+	const report = "https://putnami.app/w/acme/changes/acme%2Fshop%217"
 	repo, env, _ := uploadFixture(t, "0")
+	answering := filepath.Join(t.TempDir(), "putnami")
+	script := "#!/bin/sh\necho '{\"protocolVersion\":2,\"command\":\"cloud evidence-report\",\"status\":\"success\",\"exitCode\":0,\"data\":{\"reportUrl\":\"" + report + "\"}}'\n"
+	if err := os.WriteFile(answering, []byte(script), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	refusing := filepath.Join(t.TempDir(), "putnami")
+	if err := os.WriteFile(refusing, []byte("#!/bin/sh\nexit 1\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	env["PUTNAMI_CLI_EXECUTABLE"] = refusing
 	t.Chdir(repo)
 	var requests []string
-	var note string
+	var note, target string
 	publishClient = &http.Client{Transport: roundTrip(func(req *http.Request) (*http.Response, error) {
 		requests = append(requests, req.Method+" "+req.URL.Path)
 		answer := `{"id":1}`
+		var body map[string]string
 		switch {
 		case req.Method == http.MethodGet:
 			answer = `[]`
 		case strings.HasSuffix(req.URL.Path, "/notes"):
-			var body map[string]string
 			_ = json.NewDecoder(req.Body).Decode(&body)
 			note = body["body"]
+		default:
+			_ = json.NewDecoder(req.Body).Decode(&body)
+			target = body["target_url"]
 		}
 		return &http.Response{StatusCode: 201, Header: http.Header{}, Body: io.NopCloser(strings.NewReader(answer)), Request: req}, nil
 	})}
 	t.Cleanup(func() { publishClient = nil })
 
-	observeJSON := func() observe.Observation {
+	observeJSON := func(flags ...string) (observe.Observation, string) {
 		t.Helper()
 		var stdout, stderr bytes.Buffer
-		if code := run([]string{"run", "--no-fetch", "--publish", "--putnamiContext", jobContext(t, repo, repo, "json")},
-			func(k string) string { return env[k] }, &stdout, &stderr); code != 0 {
+		args := append(append([]string{"run", "--no-fetch"}, flags...), "--putnamiContext", jobContext(t, repo, repo, "json"))
+		if code := run(args, func(k string) string { return env[k] }, &stdout, &stderr); code != 0 {
 			t.Fatalf("exit %d: %s", code, stderr.String())
 		}
 		var o observe.Observation
 		if err := json.Unmarshal(stdout.Bytes(), &o); err != nil {
 			t.Fatalf("the publication's output reached stdout: %v\n%s", err, stdout.String())
 		}
-		return o
+		return o, stderr.String()
 	}
-
-	o := observeJSON()
-	if len(requests) != 0 || !slices.ContainsFunc(o.Diagnostics, func(d diag.Diagnostic) bool { return d.Code == "observe.publish_token_missing" }) {
-		t.Fatalf("without a token: requests %v, diagnostics %v", requests, o.Diagnostics)
+	has := func(o observe.Observation, code string) bool {
+		return slices.ContainsFunc(o.Diagnostics, func(d diag.Diagnostic) bool { return d.Code == code })
 	}
 
 	env["PUTNAMI_GITLAB_TOKEN"] = "glpat-test"
 	env["CI_API_V4_URL"] = "https://gitlab.com/api/v4"
-	o = observeJSON()
+	if o, _ := observeJSON("--publish"); len(requests) != 0 || !has(o, "observe.publish_needs_upload") {
+		t.Fatalf("without --upload: requests %v, diagnostics %v", requests, o.Diagnostics)
+	}
+	if o, _ := observeJSON("--upload", "--publish"); len(requests) != 0 || !has(o, "observe.upload_failed") || !has(o, "observe.publish_skipped") {
+		t.Fatalf("after a failed upload: requests %v, diagnostics %v", requests, o.Diagnostics)
+	}
+
+	env["PUTNAMI_CLI_EXECUTABLE"] = answering
+	delete(env, "PUTNAMI_GITLAB_TOKEN")
+	if o, _ := observeJSON("--upload", "--publish"); len(requests) != 0 || !has(o, "observe.publish_token_missing") {
+		t.Fatalf("without a token: requests %v, diagnostics %v", requests, o.Diagnostics)
+	}
+
+	env["PUTNAMI_GITLAB_TOKEN"] = "glpat-test"
+	o, stderr := observeJSON("--upload", "--publish")
 	for _, d := range o.Diagnostics {
-		if strings.HasPrefix(d.Code, "observe.publish") {
+		if strings.HasPrefix(d.Code, "observe.publish") || strings.HasPrefix(d.Code, "observe.upload") {
 			t.Fatalf("diagnostic %+v", d)
 		}
 	}
@@ -498,6 +528,9 @@ func TestPublishPostsTheSummaryOnTheMergeRequest(t *testing.T) {
 	}
 	if !slices.Equal(requests, want) || !strings.HasPrefix(note, "<!-- putnami-observe:summary -->\n") {
 		t.Fatalf("requests %v, note %q", requests, note)
+	}
+	if target != report || !strings.Contains(note, "[Open the full report]("+report+")") || !strings.Contains(stderr, "the report is at "+report) {
+		t.Fatalf("target %q, note %q, stderr %q", target, note, stderr)
 	}
 }
 

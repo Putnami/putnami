@@ -21,7 +21,7 @@ answer, so the workspace must declare `@putnami/observe` to run it there.
 | `--no-fetch` | Read only the local history: fetch no base and deepen no shallow clone. |
 | `--evidence <path>` | Write the change evidence document to this path, resolved against the directory you run in. |
 | `--upload` | Hand the change evidence document to the evidence reporter. See [Uploading the evidence](#uploading-the-evidence). |
-| `--publish` | Post a commit status and one summary note on the pull or merge request. See [Publishing on the pull or merge request](#publishing-on-the-pull-or-merge-request). |
+| `--publish` | Post a commit status and one summary note that link to the report on the pull or merge request. Needs `--upload`. See [Publishing on the pull or merge request](#publishing-on-the-pull-or-merge-request). |
 
 A glob pattern takes `*`, `?`, `[...]` and `**`, which matches any number of
 directories.
@@ -183,16 +183,31 @@ upload.
 
 The reporter is an installed extension. `PUTNAMI_EVIDENCE_REPORTER` names it,
 `@putnami/cloud` when unset. Observe runs
-`putnami <name> evidence-report --file <path>`, where `<name>` is the
-extension name without its scope, through the CLI that started it, with
-`PUTNAMI_NO_AUTO_INSTALL=1`. The reporter's output goes to standard error. A
-third party writes its own reporter as one workspace-optional subcommand
-`evidence-report` that takes `--file`.
+`putnami <name> evidence-report --file <path> --output=json`, where `<name>` is
+the extension name without its scope, through the CLI that started it, with
+`PUTNAMI_NO_AUTO_INSTALL=1`. The reporter's standard error goes to standard
+error. A third party writes its own reporter as one workspace-optional
+subcommand `evidence-report` that takes `--file` and `--output`.
+
+The reporter answers on standard output with one protocol CLI version 2
+result. When it stored the evidence, `data.reportUrl` is the URL of the report:
+
+```json
+{"protocolVersion": 2, "command": "cloud evidence-report", "status": "success", "exitCode": 0,
+ "data": {"reportUrl": "https://putnami.app/w/acme/changes/42"}}
+```
+
+Observe prints that URL on standard error, and `--publish` links it. It keeps
+the URL only when it is an absolute https URL without credentials, at most
+2048 bytes, with no space, quote or parenthesis. A reporter that answers no
+result or no such URL still uploaded: observe keeps no URL and gives no
+diagnostic. Standard output that is not a result goes to standard error.
 
 The upload never fails the job. A reporter that cannot start, exits non-zero
 or runs past 2 minutes, a selector that is not an extension name, and a
 document that was not written each give `observe.upload_failed`, and observe
-still exits 0.
+still exits 0. When the reporter exits non-zero with a failure result, the
+diagnostic ends with the result's error message.
 
 For `@putnami/cloud`, the job sets `PUTNAMI_CLOUD_TOKEN` to a workspace token
 of scope `delivery.ingest`. See
@@ -201,7 +216,17 @@ of scope `delivery.ingest`. See
 ## Publishing on the pull or merge request
 
 `--publish` posts the summary where a reviewer reads it, with a token the CI
-already has. On a GitHub pull request or a GitLab merge request it:
+already has, and links it to the full report. It needs `--upload`: the note
+is where a reviewer meets the report, so it links the report the upload
+stored, the URL the reporter answered. Without `--upload`, `--publish` posts
+nothing and logs `observe.publish_needs_upload`. When the upload fails, it
+posts nothing and `observe.publish_skipped` says so.
+
+```bash
+putnami observe --upload --publish
+```
+
+On a GitHub pull request or a GitLab merge request it:
 
 1. Sets the commit status `putnami/observe` to success. On GitHub it goes on
    the head commit of the pull request, since the job built a merge commit.
@@ -211,10 +236,12 @@ already has. On a GitHub pull request or a GitLab merge request it:
    counts the changed and dependent components, the coverage of the changed
    lines and the dependency changes, for example
    `1 changed, 2 dependent components; changed lines 80.0% covered; 1 dependency change`,
-   or says that the base was not resolved. It links the CI run.
-2. Writes one Markdown note on the request: the components with their tests
-   and coverage, the failing tests, the least covered changed files, the
-   dependency changes and the diagnostic codes. The note starts with the
+   or says that the base was not resolved. It links the report (its
+   `target_url`), or the CI run when the reporter answered no URL.
+2. Writes one Markdown note on the request. Its first link opens the report;
+   without a report URL it links the CI run alone. It lists the components
+   with their tests and coverage, the failing tests, the least covered
+   changed files, the dependency changes and the diagnostic codes. The note starts with the
    hidden line `<!-- putnami-observe:summary -->`. The next run finds the
    first note that starts with that line and updates it, so the request
    keeps one note.
@@ -236,6 +263,8 @@ Publishing never fails the job:
 
 | Case | Diagnostic |
 |---|---|
+| `--publish` without `--upload` | `observe.publish_needs_upload` (info) |
+| The upload failed | `observe.publish_skipped` (info) |
 | A CI other than GitHub Actions or GitLab CI, or a job that runs for no pull or merge request, such as a branch push | `observe.publish_skipped` (info) |
 | The code host's token is unset | `observe.publish_token_missing` (warning) |
 | A refused or failed call, no GitLab API URL, an API URL that is not https, no commit to set the status on, or a run past 1 minute | `observe.publish_failed` (warning) |

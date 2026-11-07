@@ -210,9 +210,9 @@ var gitlabEnv = map[string]string{
 // publish runs Run against a fixture and returns its diagnostics and output.
 func publish(t *testing.T, fixture string, o observe.Observation, env map[string]string) ([]diag.Diagnostic, string, *replay) {
 	t.Helper()
-	r := load(t, fixture, Note(o))
+	r := load(t, fixture, Note(o, ""))
 	var out bytes.Buffer
-	diags := Run(context.Background(), Request{Observation: o, Getenv: envOf(env), Client: &http.Client{Transport: r}, Output: &out})
+	diags := Run(context.Background(), Request{Observation: o, Upload: Uploaded, Getenv: envOf(env), Client: &http.Client{Transport: r}, Output: &out})
 	r.done()
 	noLeak(t, diags, out.String(), githubToken, gitlabToken, "secret")
 	return diags, out.String(), r
@@ -244,6 +244,49 @@ func TestAGitHubPullRequestGetsAStatusAndANote(t *testing.T) {
 		"putnami observe: created the summary note https://github.com/acme/shop/pull/42#issuecomment-2468024680\n"
 	if out != want {
 		t.Fatalf("output %q, want %q", out, want)
+	}
+}
+
+func TestTheNoteAndTheStatusLinkTheReport(t *testing.T) {
+	spectest.Proves(t, feature, "publish-note", "the-note-and-the-status-link-the-report")
+	const report = "https://putnami.app/w/acme/changes/acme%2Fshop%2342"
+	o := pullRequest()
+	note := Note(o, report)
+	if first := strings.Index(note, "]("); first < 0 || !strings.HasPrefix(note[first:], "]("+report+")") {
+		t.Fatalf("the first link of the note is not the report:\n%s", note)
+	}
+	if !strings.Contains(note, "[CI run](https://github.com/acme/shop/actions/runs/987)") {
+		t.Fatalf("the note lost the CI run link:\n%s", note)
+	}
+	r := load(t, "github-report.json", note)
+	var out bytes.Buffer
+	diags := Run(context.Background(), Request{Observation: o, Upload: Uploaded, ReportURL: report, Getenv: envOf(githubEnv), Client: &http.Client{Transport: r}, Output: &out})
+	r.done()
+	if len(diags) != 0 {
+		t.Fatalf("diagnostics %v", diags)
+	}
+}
+
+func TestWithoutAnUploadNothingIsPublished(t *testing.T) {
+	spectest.Proves(t, feature, "publish-needs-upload", "without-an-upload-nothing-is-published")
+	spectest.Proves(t, feature, "publish-needs-upload", "a-failed-upload-publishes-nothing")
+	for name, c := range map[string]struct {
+		upload Upload
+		code   string
+		says   string
+	}{
+		"no upload":       {NotUploaded, CodeNeedsUpload, "--publish needs --upload"},
+		"a failed upload": {UploadFailed, CodeSkipped, "the upload failed"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			r := load(t, "none.json", "")
+			var out bytes.Buffer
+			diags := Run(context.Background(), Request{Observation: pullRequest(), Upload: c.upload, ReportURL: "https://putnami.app/r", Getenv: envOf(githubEnv), Client: &http.Client{Transport: r}, Output: &out})
+			r.done()
+			if len(diags) != 1 || diags[0].Code != c.code || diags[0].Severity != diag.Info || !strings.Contains(diags[0].Message, c.says) || out.Len() != 0 {
+				t.Fatalf("diagnostics %v, output %q", diags, out.String())
+			}
+		})
 	}
 }
 
@@ -317,9 +360,9 @@ func TestAMergedResultsPipelineGetsTheStatusOnItsOwnCommit(t *testing.T) {
 		o := mergeRequest()
 		o.Subject.ChangeRequest.HeadSHA = ""
 		env["CI_COMMIT_SHA"] = "main"
-		r := load(t, "gitlab-first-run.json", Note(o))
+		r := load(t, "gitlab-first-run.json", Note(o, ""))
 		r.exchanges = r.exchanges[1:]
-		diags := Run(context.Background(), Request{Observation: o, Getenv: envOf(env), Client: &http.Client{Transport: r}})
+		diags := Run(context.Background(), Request{Observation: o, Upload: Uploaded, Getenv: envOf(env), Client: &http.Client{Transport: r}})
 		r.done()
 		if len(diags) != 1 || !strings.Contains(diags[0].Message, "names no commit of merge request !7") {
 			t.Fatalf("diagnostics %v", diags)
@@ -404,10 +447,10 @@ func TestARefusedCallIsADiagnostic(t *testing.T) {
 	t.Run("no head commit", func(t *testing.T) {
 		o := pullRequest()
 		o.Subject.ChangeRequest.HeadSHA = ""
-		r := load(t, "github-first-run.json", Note(o))
+		r := load(t, "github-first-run.json", Note(o, ""))
 		r.exchanges = r.exchanges[1:]
 		var out bytes.Buffer
-		diags := Run(context.Background(), Request{Observation: o, Getenv: envOf(githubEnv), Client: &http.Client{Transport: r}, Output: &out})
+		diags := Run(context.Background(), Request{Observation: o, Upload: Uploaded, Getenv: envOf(githubEnv), Client: &http.Client{Transport: r}, Output: &out})
 		r.done()
 		if len(diags) != 1 || diags[0].Code != CodeFailed || !strings.Contains(out.String(), "created the summary note") {
 			t.Fatalf("diagnostics %v, output %q", diags, out.String())
@@ -418,7 +461,7 @@ func TestARefusedCallIsADiagnostic(t *testing.T) {
 			<-req.Context().Done()
 			return nil, req.Context().Err()
 		})
-		diags := Run(context.Background(), Request{Observation: pullRequest(), Getenv: envOf(githubEnv), Client: &http.Client{Transport: blocked}, Timeout: 1})
+		diags := Run(context.Background(), Request{Observation: pullRequest(), Upload: Uploaded, Getenv: envOf(githubEnv), Client: &http.Client{Transport: blocked}, Timeout: 1})
 		if len(diags) != 2 || !strings.Contains(diags[1].Message, "ran past") {
 			t.Fatalf("diagnostics %v", diags)
 		}
@@ -427,7 +470,7 @@ func TestARefusedCallIsADiagnostic(t *testing.T) {
 		garbled := roundTrip(func(req *http.Request) (*http.Response, error) {
 			return &http.Response{StatusCode: 200, Header: http.Header{}, Body: io.NopCloser(strings.NewReader("<html>")), Request: req}, nil
 		})
-		diags := Run(context.Background(), Request{Observation: mergeRequest(), Getenv: envOf(gitlabEnv), Client: &http.Client{Transport: garbled}})
+		diags := Run(context.Background(), Request{Observation: mergeRequest(), Upload: Uploaded, Getenv: envOf(gitlabEnv), Client: &http.Client{Transport: garbled}})
 		if len(diags) != 1 || !strings.Contains(diags[0].Message, "not the expected JSON") {
 			t.Fatalf("diagnostics %v", diags)
 		}
@@ -451,10 +494,10 @@ func TestTheNoteRendersTheAnalysis(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := Note(pullRequest()); got != string(golden) {
+	if got := Note(pullRequest(), ""); got != string(golden) {
 		t.Fatalf("note\n%s\nwant\n%s", got, golden)
 	}
-	empty := Note(observe.Observation{})
+	empty := Note(observe.Observation{}, "")
 	if !strings.HasPrefix(empty, Marker+"\n") || !strings.Contains(empty, "No component holds a changed file.") {
 		t.Fatalf("empty note %q", empty)
 	}
@@ -486,7 +529,7 @@ func TestTheNoteAndTheDescriptionAreBounded(t *testing.T) {
 	}
 	o := pullRequest()
 	o.Analysis = a
-	note := Note(o)
+	note := Note(o, "")
 	for _, want := range []string{"... and 170 more components.", "- ... and 21 more", "... and 12 more files.", "... and 11 more dependency changes."} {
 		if !strings.Contains(note, want) {
 			t.Errorf("note lacks %q", want)
