@@ -5,7 +5,8 @@
     "generic-minimal.json",
     "sbom-pull-request.json",
     "symfony-merge-request.json",
-    "turbo-pull-request.json"
+    "turbo-pull-request.json",
+    "architecture-pull-request.json"
   ],
   "invalid": {
     "added-with-a-from-version.json": [
@@ -128,6 +129,12 @@
     ],
     "zero-change-request.json": [
       "evidence.invalid_subject"
+    ],
+    "kept-rule-with-a-violation.json": [
+      "evidence.invalid_count"
+    ],
+    "violation-outside-its-component.json": [
+      "evidence.invalid_component"
     ]
   }
 }

@@ -1,6 +1,6 @@
 // Package evidence defines the change evidence document: what one change in a
-// repository that keeps its own CI touches, with its tests, its coverage and
-// its dependency changes.
+// repository that keeps its own CI touches, with its tests, its coverage, its
+// architecture rules and its dependency changes.
 //
 // The observe extension writes the document from what the CI already produced
 // (the git diff, JUnit and coverage reports, lockfiles); a reporter uploads it.
@@ -198,6 +198,23 @@ const (
 // DecisionStatuses is the closed decision-status vocabulary.
 var DecisionStatuses = []string{DecisionProposed, DecisionAccepted, DecisionRejected, DecisionDeprecated, DecisionSuperseded, DecisionUnknown}
 
+// Architecture rule statuses: a checker kept the rule or found it broken.
+const (
+	ArchitectureKept   = "kept"
+	ArchitectureBroken = "broken"
+)
+
+// ArchitectureStatuses is the closed architecture-status vocabulary.
+var ArchitectureStatuses = []string{ArchitectureKept, ArchitectureBroken}
+
+// Architecture tools that observe reads. Tools are open lowercase slugs: a
+// new checker needs no protocol version.
+const (
+	ToolArchUnit     = "archunit"
+	ToolDeptrac      = "deptrac"
+	ToolImportLinter = "import-linter"
+)
+
 // RootComponent is the id of a component that is the whole repository.
 const RootComponent = "."
 
@@ -214,6 +231,10 @@ const (
 	// MaxDecisionScope and MaxGovernedFiles cap one decision.
 	MaxDecisionScope = 100
 	MaxGovernedFiles = 1000
+	// MaxArchitectureRules caps the architecture rules; MaxViolations caps
+	// the violations one rule lists.
+	MaxArchitectureRules = 1000
+	MaxViolations        = 50
 	// MaxLicenses and MaxVulnerabilities cap one dependency state.
 	MaxLicenses        = 20
 	MaxVulnerabilities = 200
@@ -246,6 +267,9 @@ type Document struct {
 	Tests []ComponentTests `json:"tests,omitempty"`
 	// Coverage is one entry per component whose coverage was read.
 	Coverage []ComponentCoverage `json:"coverage,omitempty"`
+	// Architecture is one entry per architecture rule a checker evaluated.
+	// Absent when the producer read no architecture result.
+	Architecture []ArchitectureRule `json:"architecture,omitempty"`
 	// ChangedLineCoverage is the coverage of the lines the change added or
 	// modified. Absent when no coverage or no base was available.
 	ChangedLineCoverage *ChangedLineCoverage `json:"changedLineCoverage,omitempty"`
@@ -381,6 +405,38 @@ type ComponentCoverage struct {
 	CoveredLines int `json:"coveredLines"`
 	// TotalLines counts the instrumented lines.
 	TotalLines int `json:"totalLines"`
+}
+
+// ArchitectureRule is one rule an architecture checker (ArchUnit, deptrac,
+// import-linter, ...) evaluated, as it reported it.
+type ArchitectureRule struct {
+	// Tool is the checker: an open lowercase slug.
+	Tool string `json:"tool"`
+	// Rule is the rule as the checker names it: an ArchUnit rule text, a
+	// deptrac layer, an import-linter contract.
+	Rule string `json:"rule"`
+	// Status is kept or broken.
+	Status string `json:"status"`
+	// ViolationCount is the number of violations the checker reported: 0 for
+	// a kept rule, at least 1 and at least the listed violations for a broken
+	// one.
+	ViolationCount int `json:"violationCount,omitempty"`
+	// Violations lists violations, at most ViolationCount and MaxViolations.
+	Violations []ArchitectureViolation `json:"violations,omitempty"`
+}
+
+// ArchitectureViolation is one violation of an architecture rule.
+type ArchitectureViolation struct {
+	// Message is the violation as the checker states it, truncated to
+	// MaxStringBytes.
+	Message string `json:"message"`
+	// File is the source file that holds the violation, relative to the
+	// repository root, when the producer located it.
+	File string `json:"file,omitempty"`
+	// Line is the line of File, from 1, when the checker states it.
+	Line int `json:"line,omitempty"`
+	// Component is the id of the component that holds File.
+	Component string `json:"component,omitempty"`
 }
 
 // ChangedLineCoverage is the coverage of the lines the change added or

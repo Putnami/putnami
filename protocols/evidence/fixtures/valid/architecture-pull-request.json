@@ -1,0 +1,77 @@
+{
+  "protocolVersion": 1,
+  "subject": {
+    "provider": "gitlab",
+    "host": "gitlab.com",
+    "projectId": "88373402",
+    "repository": "acme/quotes",
+    "sha": "7d2f4a6c8e0b1d3f5a7c9e1b3d5f7a9c1e3b5d7f",
+    "baseSha": "1a3c5e7b9d1f3a5c7e9b1d3f5a7c9e1b3d5f7a9c",
+    "changeRequest": {
+      "number": 12
+    }
+  },
+  "ci": {
+    "system": "gitlab-ci",
+    "runId": "3015178870",
+    "jobId": "17647016533"
+  },
+  "producer": {
+    "name": "@putnami/observe",
+    "version": "0.1.0"
+  },
+  "generatedAt": "2026-11-07T08:00:00Z",
+  "changedFiles": [
+    {
+      "path": "api/src/main/java/com/acme/api/Quotes.java",
+      "status": "modified",
+      "component": "api"
+    }
+  ],
+  "components": [
+    {
+      "id": "api",
+      "name": "com.acme:api",
+      "ecosystem": "maven",
+      "source": "workspace",
+      "impact": "changed",
+      "dependsOn": [
+        "pricing"
+      ]
+    },
+    {
+      "id": "pricing",
+      "name": "com.acme:pricing",
+      "ecosystem": "maven",
+      "source": "workspace",
+      "impact": "unaffected"
+    }
+  ],
+  "architecture": [
+    {
+      "tool": "archunit",
+      "rule": "classes that reside in a package '..pricing.internal..' should only be accessed by classes that reside in a package '..pricing..'",
+      "status": "broken",
+      "violationCount": 2,
+      "violations": [
+        {
+          "message": "Method <com.acme.api.Quotes.quote()> calls method <com.acme.pricing.internal.Rates.base()> in (Quotes.java:14)",
+          "file": "api/src/main/java/com/acme/api/Quotes.java",
+          "line": 14,
+          "component": "api"
+        }
+      ]
+    },
+    {
+      "tool": "archunit",
+      "rule": "no classes should depend on classes that reside in a package '..legacy..'",
+      "status": "kept"
+    },
+    {
+      "tool": "import-linter",
+      "rule": "Layered architecture",
+      "status": "broken",
+      "violationCount": 1
+    }
+  ]
+}

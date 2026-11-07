@@ -197,6 +197,14 @@
         "$ref": "#/$defs/componentCoverage"
       }
     },
+    "architecture": {
+      "type": "array",
+      "maxItems": 1000,
+      "description": "One entry per architecture rule a checker evaluated. Absent when the producer read no architecture result.",
+      "items": {
+        "$ref": "#/$defs/architectureRule"
+      }
+    },
     "changedLineCoverage": {
       "type": "object",
       "additionalProperties": false,
@@ -427,6 +435,75 @@
         "message": {
           "type": "string",
           "maxLength": 4096
+        }
+      }
+    },
+    "architectureRule": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "tool",
+        "rule",
+        "status"
+      ],
+      "properties": {
+        "tool": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]*$",
+          "maxLength": 4096,
+          "description": "The checker, an open slug: archunit, deptrac, import-linter, ..."
+        },
+        "rule": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4096,
+          "description": "The rule as the checker names it."
+        },
+        "status": {
+          "enum": [
+            "kept",
+            "broken"
+          ]
+        },
+        "violationCount": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "0 for a kept rule; at least 1 and at least the listed violations for a broken one."
+        },
+        "violations": {
+          "type": "array",
+          "maxItems": 50,
+          "items": {
+            "$ref": "#/$defs/architectureViolation"
+          }
+        }
+      }
+    },
+    "architectureViolation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "message"
+      ],
+      "properties": {
+        "message": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4096
+        },
+        "file": {
+          "$ref": "#/$defs/path"
+        },
+        "line": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "A line of file, which it needs."
+        },
+        "component": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4096,
+          "description": "The component that holds file."
         }
       }
     },

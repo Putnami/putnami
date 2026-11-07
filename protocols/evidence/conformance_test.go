@@ -109,6 +109,7 @@ func TestConformance_VocabulariesAreClosed(t *testing.T) {
 		"sbom formats": {SBOMFormats, {"cyclonedx", "spdx"}},
 		"severities":   {Severities, {"critical", "high", "medium", "low", "info", "none", "unknown"}},
 		"decisions":    {DecisionStatuses, {"proposed", "accepted", "rejected", "deprecated", "superseded", "unknown"}},
+		"architecture": {ArchitectureStatuses, {"kept", "broken"}},
 	}
 	for name, pin := range pins {
 		if !slices.Equal(pin[0], pin[1]) {
@@ -269,6 +270,7 @@ func TestConformance_SchemaEnumsAreTheGoVocabularies(t *testing.T) {
 		"vulnerability.severity": {root.Defs["vulnerability"].Properties["severity"].Enum, Severities},
 		"decision.status":        {root.Defs["decision"].Properties["status"].Enum, DecisionStatuses},
 		"decision.change":        {root.Defs["decision"].Properties["change"].Enum, FileStatuses},
+		"architecture.status":    {root.Defs["architectureRule"].Properties["status"].Enum, ArchitectureStatuses},
 	}
 	for name, pair := range enums {
 		if !slices.Equal(pair[0], pair[1]) {
@@ -287,6 +289,7 @@ func TestConformance_SchemaEnumsAreTheGoVocabularies(t *testing.T) {
 		"diagnostic.code":      {root.Defs["diagnostic"].Properties["code"].Pattern, codeExpression},
 		"sbom.specVersion":     {root.Defs["sbomDocument"].Properties["specVersion"].Pattern, specVersionExpression},
 		"decision.date":        {root.Defs["decision"].Properties["date"].Pattern, dateExpression},
+		"architecture.tool":    {root.Defs["architectureRule"].Properties["tool"].Pattern, slugExpression},
 	}
 	for name, pair := range patterns {
 		if pair[0] != pair[1] {
@@ -578,6 +581,10 @@ func TestConformance_EachBoundIsEnforced(t *testing.T) {
 		"failing cases": func(d *Document) {
 			d.Tests[0].Failed = 100
 			d.Tests[0].FailingCases = make([]FailingCase, MaxFailingCases+1)
+		},
+		"architecture rules": func(d *Document) { d.Architecture = make([]ArchitectureRule, MaxArchitectureRules+1) },
+		"violations": func(d *Document) {
+			d.Architecture = []ArchitectureRule{{Tool: "archunit", Rule: "r", Status: ArchitectureBroken, ViolationCount: 100, Violations: make([]ArchitectureViolation, MaxViolations+1)}}
 		},
 		"changed-line files": func(d *Document) {
 			d.ChangedLineCoverage.Files = make([]ChangedLineCoverageFile, MaxChangedLineCoverageFile+1)
@@ -931,4 +938,73 @@ func TestConformance_NoVariableIsNoCI(t *testing.T) {
 			t.Errorf("%v: got %q, want no CI", vars, got)
 		}
 	}
+}
+func TestConformance_EachArchitectureRuleDefectGetsItsCode(t *testing.T) {
+	spectest.Proves(t, feature, "architecture-rules-are-well-formed", "each-architecture-rule-defect-gets-its-code")
+	const fixture = "architecture-pull-request.json"
+	for label, want := range map[string]struct {
+		mutate func(*Document)
+		code   string
+	}{
+		"no tool":                  {func(d *Document) { d.Architecture[0].Tool = "" }, ErrorCodeRequired},
+		"uppercase tool":           {func(d *Document) { d.Architecture[0].Tool = "ArchUnit" }, ErrorCodeInvalidArchitecture},
+		"no rule":                  {func(d *Document) { d.Architecture[1].Rule = " " }, ErrorCodeRequired},
+		"unknown status":           {func(d *Document) { d.Architecture[1].Status = "passed" }, ErrorCodeInvalidArchitecture},
+		"kept with a count":        {func(d *Document) { d.Architecture[1].ViolationCount = 1 }, ErrorCodeInvalidCount},
+		"broken without a count":   {func(d *Document) { d.Architecture[2].ViolationCount = 0 }, ErrorCodeInvalidCount},
+		"fewer than listed":        {func(d *Document) { d.Architecture[0].ViolationCount = 0 }, ErrorCodeInvalidCount},
+		"kept with a violation":    {func(d *Document) { d.Architecture[1].Violations = []ArchitectureViolation{{Message: "m"}} }, ErrorCodeInvalidCount},
+		"one tool and rule twice":  {func(d *Document) { d.Architecture = append(d.Architecture, d.Architecture[1]) }, ErrorCodeDuplicate},
+		"negative violation count": {func(d *Document) { d.Architecture[2].ViolationCount = -1 }, ErrorCodeInvalidCount},
+	} {
+		expectCodes(t, label, codesOf(t, fixture, want.mutate), want.code)
+	}
+	// One rule text under two tools is two rules, and a tool is an open slug.
+	expectCodes(t, "same rule, other tool", codesOf(t, fixture, func(d *Document) {
+		rule := d.Architecture[1]
+		rule.Tool = "konsist"
+		d.Architecture = append(d.Architecture, rule)
+	}))
+}
+
+func TestConformance_EachArchitectureViolationDefectGetsItsCode(t *testing.T) {
+	spectest.Proves(t, feature, "architecture-violations-are-well-formed", "each-architecture-violation-defect-gets-its-code")
+	const fixture = "architecture-pull-request.json"
+	violation := func(d *Document) *ArchitectureViolation { return &d.Architecture[0].Violations[0] }
+	for label, want := range map[string]struct {
+		mutate func(*Document)
+		code   string
+	}{
+		"no message":        {func(d *Document) { violation(d).Message = "" }, ErrorCodeRequired},
+		"escaping file":     {func(d *Document) { violation(d).File = "../Quotes.java"; violation(d).Component = "" }, ErrorCodeInvalidPath},
+		"line without file": {func(d *Document) { violation(d).File = ""; violation(d).Component = "" }, ErrorCodeInvalidArchitecture},
+		"negative line":     {func(d *Document) { violation(d).Line = -2 }, ErrorCodeInvalidArchitecture},
+		"unknown component": {func(d *Document) { violation(d).Component = "web" }, ErrorCodeUnknownComponent},
+		"file outside it":   {func(d *Document) { violation(d).Component = "pricing" }, ErrorCodeInvalidComponent},
+	} {
+		expectCodes(t, label, codesOf(t, fixture, want.mutate), want.code)
+	}
+	// A violation the producer could not locate keeps its message alone.
+	expectCodes(t, "message alone", codesOf(t, fixture, func(d *Document) {
+		*violation(d) = ArchitectureViolation{Message: violation(d).Message}
+	}))
+	_, diags := ParseAndValidate([]byte(strings.Replace(mustRead(t, "valid", fixture), `"line": 14,`, `"line": 14, "column": 3,`, 1)))
+	if len(diags) != 1 || diags[0].Code != ErrorCodeUnknownField || diags[0].Field != "architecture[0].violations[0].column" {
+		t.Errorf("an undeclared violation member: diags = %v, want one unknown_field at architecture[0].violations[0].column", diags)
+	}
+}
+
+func TestConformance_ADocumentWithoutArchitectureValidatesAsBefore(t *testing.T) {
+	spectest.Proves(t, feature, "architecture-violations-are-well-formed", "a-document-without-architecture-validates-as-before")
+	for _, name := range []string{"generic-minimal.json", "turbo-pull-request.json", "symfony-merge-request.json", "dependency-cycle.json", "sbom-pull-request.json"} {
+		document := readValid(t, name)
+		data, err := json.Marshal(document)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if strings.Contains(string(data), `"architecture"`) {
+			t.Errorf("%s marshals an architecture member it does not carry: %s", name, data)
+		}
+	}
+	expectCodes(t, "stripped", codesOf(t, "architecture-pull-request.json", func(d *Document) { d.Architecture = nil }))
 }
