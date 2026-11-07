@@ -60,7 +60,10 @@ A document (`schemas/evidence.json`) has `protocolVersion: 1` and:
   file, 20 licences and 200 vulnerabilities per dependency state, and 4096
   bytes per string (`evidence.too_large`).
 - **Open where stacks grow.** Ecosystems are slugs: a new stack needs no
-  protocol version. A new code host or CI system does.
+  protocol change. A new code host or CI system is a protocol change: it
+  extends a closed vocabulary of version 1, a reader built before it refuses a
+  document that names it (`evidence.invalid_subject`, `evidence.invalid_ci`),
+  so a reader updates before its producers write it.
 - **Optional members stay optional.** The `sbom` member and the dependency
   states are optional members of version 1: a document without them validates
   as before, and a producer that read no SBOM writes none of them. A reader

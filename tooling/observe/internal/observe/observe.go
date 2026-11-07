@@ -226,8 +226,10 @@ func systemLabel(system string) string {
 		return "GitHub Actions"
 	case ci.SystemGitLabCI:
 		return "GitLab CI"
+	case ci.SystemGeneric, "":
+		return "generic CI"
 	}
-	return "generic CI"
+	return system
 }
 
 func repositoryLabel(s ci.Subject) string {

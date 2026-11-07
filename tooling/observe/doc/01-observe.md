@@ -46,6 +46,10 @@ The first marker that matches names the CI, in the order of this table, and
 `generic`. Values compare without case, and a variable without a value in the
 table matches any non-empty value. The evidence protocol owns this table.
 
+Only GitHub Actions and GitLab CI fill the subject and the run: the document
+of another CI names no numeric project id, and `@putnami/cloud` refuses to
+upload a document without one.
+
 The repository path (`GITHUB_REPOSITORY`, `CI_PROJECT_PATH`, or the path of
 the `origin` remote) is for display only. A GitHub or GitLab job without a
 numeric project id gets the `observe.project_id_missing` diagnostic.

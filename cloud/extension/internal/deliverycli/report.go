@@ -6,8 +6,9 @@
 // The command is the client half of the delivery records contract: it resolves
 // the subject (HEAD SHA + origin repository) from git, REFUSES to send anything
 // for a dirty working tree or an unpushed HEAD (delivery records bind to
-// resolvable, pushed commits only), derives provenance (local by default, gha
-// under GitHub Actions), and POSTs a conclusion-only submission authenticated
+// resolvable, pushed commits only), derives provenance (gha under GitHub
+// Actions, gitlab under GitLab CI, external under any other CI, local outside
+// a CI), and POSTs a conclusion-only submission authenticated
 // with the existing workspace-scoped token machinery. In the wrapper form
 // (`putnami cloud ci report -- putnami … --output=jsonl`) the wrapped command's
 // stdout is tee'd through internal/reportstream, and at run end the
@@ -285,7 +286,7 @@ func reportHelp(params map[string]any, ioctx clicore.IO) error {
 		ioctx.Stdout(fmt.Sprintf("  putnami %-80s %s", c["command"], c["description"]))
 	}
 	ioctx.Stdout("")
-	ioctx.Stdout("Refuses (nothing sent) on a dirty working tree or an unpushed HEAD; provenance is local, or gha under GitHub Actions.")
+	ioctx.Stdout("Refuses (nothing sent) on a dirty working tree or an unpushed HEAD; provenance is gha under GitHub Actions, gitlab under GitLab CI, external under any other CI, else local.")
 	ioctx.Stdout("Report ingestion is fail-soft: a failed or partial report batch never changes the run's conclusion or this command's exit code.")
 	return nil
 }
