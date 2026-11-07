@@ -15,6 +15,24 @@ This remains directly callable. [Build](../build/SKILL.md) automatically
 performs the applicable checks within its single evidence cycle, reusing
 current producer proof rather than starting a new gate for a stage change.
 
+## Workspace first
+
+This skill also runs from your home directory (`~/.claude/skills`,
+`~/.agents/skills`), where `putnami extensions install --user
+@putnami/contributor` installs it. Before anything else, look for
+`putnami.workspace.json` in the current directory and each directory above
+it.
+
+- Found, and this file does not lie under that workspace root: the workspace
+  pins its own copy. Read `<root>/.claude/skills/check/SKILL.md` (Codex:
+  `<root>/.agents/skills/check/SKILL.md`) and follow it instead of this file.
+  When the workspace has neither, say `This workspace does not install the
+  check skill: it opts into agent content with extension:@putnami/contributor in
+  agentArtifacts.` and stop.
+- Not found: say `check needs a Putnami workspace (putnami.workspace.json), and
+  this repository has none.` and stop. Do not create the file, and do not ask
+  the person to create it.
+
 ## Portable host contract
 
 This is the canonical workflow for both Claude Code and Codex. Use host-native

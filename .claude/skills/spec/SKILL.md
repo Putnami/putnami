@@ -30,6 +30,23 @@ for exact versioned references. Planning alone is read-only unless this
 invocation authorizes editing the feature's spec. `spec` grants no task
 creation, publication, merge or delivery authority.
 
+## Workspace first
+
+This skill also runs from your home directory (`~/.claude/skills`,
+`~/.agents/skills`), where `putnami extensions install --user
+@putnami/contributor` installs it. Before anything else, look for
+`putnami.workspace.json` in the current directory and each directory above
+it.
+
+- Found, and this file does not lie under that workspace root: the workspace
+  pins its own copy. Read `<root>/.claude/skills/spec/SKILL.md` (Codex:
+  `<root>/.agents/skills/spec/SKILL.md`) and follow it instead of this file.
+  When the workspace has neither, say `This workspace does not install the
+  spec skill: it opts into agent content with extension:@putnami/contributor in
+  agentArtifacts.` and stop.
+- Not found: follow [Without a workspace](#without-a-workspace). Never create
+  `putnami.workspace.json`, and never ask the person to create it.
+
 ## Find the spec the feature reads
 
 Run `"$PUTNAMI_CLI" specs validate`, then
@@ -77,6 +94,36 @@ For an external spec:
 
 Run `"$PUTNAMI_CLI" specs validate` after the edit; a finding names its line as
 `<path>#L<line>`.
+
+## Without a workspace
+
+A repository with no `putnami.workspace.json` keeps its specs in its own format,
+and `putnami observe` reads them. It needs the observe extension in your user
+scope (`putnami extensions install --user @putnami/observe`); when the command
+is missing, say so in one line and stop.
+
+1. Run `putnami observe --base <default branch> --no-fetch --output=json` from
+   the repository and read its `specs`: each spec's `format` (`speckit`,
+   `openspec`, `kiro` or `gherkin`), `path`, `file`, `component` and
+   `requirements` (`id`, `text`, `line`). An `observe.spec_unreadable`
+   diagnostic names a spec its reader refuses: fix it before you add to it.
+2. Pick the spec of the component the outcome belongs to. Edit `file`, in its
+   own format and the conventions of the files beside it, with the rules of
+   [an external spec](#find-the-spec-the-feature-reads): an anchor above each
+   requirement you create or renumber, an existing anchor kept, no derived
+   facts, each text within 512 bytes.
+3. When no spec covers the outcome, create one in the format the repository
+   already uses, beside its other specs: `specs/<NNN>-<name>/spec.md` for Spec
+   Kit, the next free number; `openspec/specs/<capability>/spec.md` for
+   OpenSpec; `.kiro/specs/<name>/requirements.md` for Kiro; a `.feature` file
+   beside the others for Gherkin. With no spec at all, ask the owner which
+   format to start; never pick the native JSON format.
+4. Run `putnami observe` again and check that `specs` lists your requirements
+   with the IDs you anchored, and that no new diagnostic names your file.
+
+Without a workspace there is no `putnami.features.json`, no native spec, no
+`specs validate` and no baseline: never create them, and never ask the person
+to create `putnami.workspace.json`.
 
 ## Define the outcome
 

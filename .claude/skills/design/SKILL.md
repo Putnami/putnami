@@ -29,6 +29,24 @@ labels do not assign ownership. Follow [build](../build/SKILL.md) and the
 [workflow contract](../../../.agents/skills/build/references/workflow.md).
 Planning only stays read-only unless source editing is authorized.
 
+## Workspace first
+
+This skill also runs from your home directory (`~/.claude/skills`,
+`~/.agents/skills`), where `putnami extensions install --user
+@putnami/contributor` installs it. Before anything else, look for
+`putnami.workspace.json` in the current directory and each directory above
+it.
+
+- Found, and this file does not lie under that workspace root: the workspace
+  pins its own copy. Read `<root>/.claude/skills/design/SKILL.md` (Codex:
+  `<root>/.agents/skills/design/SKILL.md`) and follow it instead of this file.
+  When the workspace has neither, say `This workspace does not install the
+  design skill: it opts into agent content with extension:@putnami/contributor in
+  agentArtifacts.` and stop.
+- Not found: say `design needs a Putnami workspace (putnami.workspace.json), and
+  this repository has none.` and stop. Do not create the file, and do not ask
+  the person to create it.
+
 ## The design
 
 Describe the behavior path, interfaces and data, invariants at risk,
