@@ -40,7 +40,7 @@ func TestRecordsAreTheMarkdownFilesOfTheDecisionDirectories(t *testing.T) {
 	} {
 		write(t, root, name, "# x\n")
 	}
-	got, err := Find(root, Dirs(nil))
+	got, err := Find(root, DefaultDirs)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -48,17 +48,24 @@ func TestRecordsAreTheMarkdownFilesOfTheDecisionDirectories(t *testing.T) {
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("default directories: records = %v, want %v", got, want)
 	}
-	got, err = Find(root, Dirs([]string{"./adr/", "docs/architecture", "missing"}))
+	named, rejected := Dirs([]string{"./adr/", "docs/architecture", "missing", "../shared", "/abs/adr", ".", `C:\adr`})
+	if want := []string{"../shared", "/abs/adr", ".", `C:\adr`}; !reflect.DeepEqual(rejected, want) {
+		t.Errorf("rejected = %v, want %v", rejected, want)
+	}
+	got, err = Find(root, named)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if want := []string{"adr/0004-d.md", "docs/architecture/0003-c.md"}; !reflect.DeepEqual(got, want) {
 		t.Errorf("named directories: records = %v, want %v", got, want)
 	}
-	if got, err := Find(t.TempDir(), Dirs(nil)); err != nil || len(got) != 0 {
+	if got, err := Find(t.TempDir(), DefaultDirs); err != nil || len(got) != 0 {
 		t.Errorf("no directory: records = %v, %v, want none", got, err)
 	}
-	if IsRecord("docs/decisions/README.md", Dirs(nil)) || !IsRecord("docs/decisions/0001-a.md", Dirs(nil)) || IsRecord("docs/decisionsx/0001-a.md", Dirs(nil)) {
+	if dirs, rejected := Dirs([]string{".."}); !reflect.DeepEqual(dirs, DefaultDirs) || len(rejected) != 1 {
+		t.Errorf("only invalid directories: %v, %v, want the default ones", dirs, rejected)
+	}
+	if IsRecord("docs/decisions/README.md", DefaultDirs) || IsRecord("docs/decisions/.md", DefaultDirs) || !IsRecord("docs/decisions/0001-a.md", DefaultDirs) || IsRecord("docs/decisionsx/0001-a.md", DefaultDirs) {
 		t.Error("IsRecord does not follow the directories and the skipped names")
 	}
 }
@@ -96,6 +103,8 @@ func TestBodyFieldsAreRead(t *testing.T) {
 		"# ADR 0001 — One document\n\n- **Status**: Deprecated\n- **Date**: 2026-11-01\n": {Title: "ADR 0001 — One document", Status: evidence.DecisionDeprecated, Date: "2026-11-01"},
 		"# Queues\n\n## Status\n\nSuperseded by [0002](0002-x.md)\n\n## Context\n":        {Title: "Queues", Status: evidence.DecisionSuperseded},
 		"# Rejected idea\n\nStatus: rejected\n":                                           {Title: "Rejected idea", Status: evidence.DecisionRejected},
+		"# Use C#\n\n````\n```\n## Status\nrejected\n````\n\n## Status\n\naccepted ##\n":  {Title: "Use C#", Status: evidence.DecisionAccepted},
+		"# Closed heading ##\n\n* Status: proposed\n":                                     {Title: "Closed heading", Status: evidence.DecisionProposed},
 		"# Draft\n\n* Status: proposed | rejected | accepted\n":                           {Title: "Draft", Status: evidence.DecisionProposed},
 		"# Unclear\n\n* Status: in review\n* Date: last week\n":                           {Title: "Unclear", Status: evidence.DecisionUnknown},
 		"```\n# Not a heading\nStatus: accepted\n```\n\nno heading here\n":                {Title: "0007-fallback", Status: evidence.DecisionUnknown},
@@ -119,6 +128,7 @@ func TestFrontMatterAndSectionScopesAreRead(t *testing.T) {
 		"---\nscope: [a, b]\n---\n# X\n\n## Scope\n\n- c\n":                                                                        {"a", "b"},
 		"# X\n\n## Scope\n\n- `src/**/queue/*.go`\n- docs/queues.md (the queue map)\n* ../outside\n\n## Decision\n\n- not/scope\n": {"src/**/queue/*.go", "docs/queues.md"},
 		"# X\n\nNo scope.\n": nil,
+		"# X\n\n## Scope\n\n- `C:\\repo\\src`\n- src\\payments\n": {"src/payments"},
 	}
 	for text, want := range cases {
 		if got := Parse("docs/decisions/0001-x.md", []byte(text)).Scope; !reflect.DeepEqual(got, want) {
@@ -157,7 +167,11 @@ func TestGlobPatternsMatchSegments(t *testing.T) {
 		{"**", "anything/at/all", true},
 		{"src/?.go", "src/a.go", true},
 		{"src/?.go", "src/ab.go", false},
-		{"src/[", "src/[", false},
+		{"src/[", "src/[", true},
+		{"src/app/[slug]", "src/app/[slug]/page.tsx", true},
+		{"src/app/[slug]", "src/app/s", false},
+		{"src/app/[slug]/*.tsx", "src/app/[slug]/page.tsx", true},
+		{"src/app/[slug]/*.tsx", "src/app/s/page.tsx", false},
 	}
 	for _, c := range cases {
 		if got := Matches(c.pattern, c.file); got != c.want {

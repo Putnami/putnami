@@ -211,7 +211,8 @@ Decision Records) sees the decisions that govern the files a change touches.
 `putnami observe` reads them; it converts nothing and requires no record.
 
 The records are the `.md` files under `docs/decisions` and `docs/adr`, or
-under the repository directories `--decisions` names, comma-separated.
+under the directories `--decisions` names, comma-separated and relative to the
+repository root.
 `README.md`, `index.md` and a file whose name holds `template` are not
 records. Each record gives:
 
@@ -251,7 +252,8 @@ Superseded by [0002](0002-payments-own-the-ledger.md)
 
 The summary and the evidence document list each decision whose scope matches
 a changed file, with the files it governs, and each record the change adds,
-modifies, renames or deletes; a deleted record is read at the base. A change
+modifies, renames or deletes, a record moved out of the decision directories
+included; a deleted record is read at the base. A change
 that deletes an accepted decision gets the warning `observe.decision_deleted`:
 
 ```text
@@ -278,6 +280,6 @@ judge whether the change follows them.
 | `observe.sbom_ambiguous` | One side has several SBOMs, so none is read and that side is unknown. |
 | `observe.bazel_graph_missing` | A Bazel workspace has no query export, so its packages have no edge. An info diagnostic that names the export command. |
 | `observe.bazel_graph_unreadable` | The Bazel query export cannot be read, so the `BUILD` files give the packages, without edges. |
-| `observe.decision_unread` | A decision record, or a decision directory, cannot be read. |
+| `observe.decision_unread` | A decision record or directory cannot be read, or a `--decisions` entry is not a directory of the repository. |
 | `observe.decision_deleted` | The change deletes an accepted decision record. |
 | `observe.decisions_truncated` | The change concerns more than 1000 decisions, or a decision names more than 100 scope patterns or governs more than 1000 changed files; the rest is left out. |

@@ -20,64 +20,76 @@ const (
 
 // decisionRecords lists the decision records the change concerns: those
 // whose scope matches a changed file and those the change adds, modifies,
-// renames or deletes.
+// renames or deletes, a record renamed out of the decision directories
+// included.
 func (r *Result) decisionRecords(in Input) {
-	dirs := decisions.Dirs(in.DecisionDirs)
+	dirs, rejected := decisions.Dirs(in.DecisionDirs)
+	for _, dir := range rejected {
+		r.warn(CodeDecisionUnread, "decisions", "%q is not a directory of the repository, so it is not read for decision records", dir)
+	}
 	found, err := decisions.Find(in.Root, dirs)
 	if err != nil {
-		r.warn(CodeDecisionUnread, "decisions", "the decision records under %s cannot be listed: %v", dirs, err)
+		r.warn(CodeDecisionUnread, "decisions", "the decision records under %v cannot be listed: %v", dirs, err)
 	}
 	status := map[string]string{}
 	for _, file := range in.ChangedFiles {
-		if decisions.IsRecord(file.Path, dirs) {
+		if decisions.IsRecord(file.Path, dirs) || (file.Status == gitbase.StatusRenamed && decisions.IsRecord(file.PreviousPath, dirs)) {
 			status[file.Path] = file.Status
 		}
 	}
-	var records []decisions.Record
-	for _, file := range found {
-		data, err := os.ReadFile(filepath.Join(in.Root, filepath.FromSlash(file)))
-		if err != nil {
-			r.warn(CodeDecisionUnread, file, "the decision record %s cannot be read: %v", file, err)
+	paths := slices.Clone(found)
+	for file := range status {
+		if !slices.Contains(paths, file) {
+			paths = append(paths, file)
+		}
+	}
+	sort.Strings(paths)
+	for _, file := range paths {
+		record, ok := r.readRecord(in, file, status[file] == gitbase.StatusDeleted)
+		if !ok {
 			continue
 		}
-		records = append(records, decisions.Parse(file, data))
-	}
-	for file, change := range status {
-		if change != gitbase.StatusDeleted || slices.Contains(found, file) {
-			continue
-		}
-		records = append(records, r.deletedRecord(in, file))
-	}
-	sort.Slice(records, func(i, j int) bool { return records[i].Path < records[j].Path })
-	for _, record := range records {
-		decision, concerned := r.decision(in, record, status[record.Path])
+		decision, concerned := r.decision(in, record, status[file])
 		if !concerned {
 			continue
 		}
-		if len(r.Decisions) == evidence.MaxDecisions {
-			r.warn(CodeDecisionsTruncated, "decisions", "the change concerns more than %d decision records; the others are left out", evidence.MaxDecisions)
-			return
-		}
 		if decision.Change == gitbase.StatusDeleted && decision.Status == evidence.DecisionAccepted {
 			r.warn(CodeDecisionDeleted, decision.Path, "the change deletes the accepted decision %s (%s)", decision.Path, decision.Title)
+		}
+		if len(r.Decisions) == evidence.MaxDecisions {
+			r.warn(CodeDecisionsTruncated, decision.Path, "the change concerns more than %d decision records; %s is left out", evidence.MaxDecisions, decision.Path)
+			continue
 		}
 		r.Decisions = append(r.Decisions, decision)
 	}
 }
 
-// deletedRecord reads a record the change deletes at the base. A record that
-// cannot be read there is listed by its file name, with an unknown status.
-func (r *Result) deletedRecord(in Input, file string) decisions.Record {
-	if in.Show != nil {
-		data, found, err := in.Show(Base, file)
-		if err == nil && found {
-			return decisions.Parse(file, data)
-		}
-		if err != nil {
-			r.warn(CodeDecisionUnread, file, "the deleted decision record %s cannot be read at the base: %v", file, err)
-		}
+// readRecord reads a record at the head, or at the base when the change
+// deletes it. A deleted record that cannot be read there is listed by its file
+// name, with an unknown status.
+func (r *Result) readRecord(in Input, file string, deleted bool) (decisions.Record, bool) {
+	side := Head
+	if deleted {
+		side = Base
 	}
-	return decisions.Parse(file, nil)
+	var data []byte
+	var err error
+	found := true
+	if in.Show != nil {
+		data, found, err = in.Show(side, file)
+	} else if !deleted {
+		data, err = os.ReadFile(filepath.Join(in.Root, filepath.FromSlash(file)))
+	} else {
+		found = false
+	}
+	switch {
+	case err != nil:
+		r.warn(CodeDecisionUnread, file, "the decision record %s cannot be read: %v", file, err)
+		return decisions.Parse(file, nil), deleted
+	case !found:
+		return decisions.Parse(file, nil), deleted
+	}
+	return decisions.Parse(file, data), true
 }
 
 // decision is the evidence entry of one record, and whether the change
@@ -86,23 +98,34 @@ func (r *Result) decision(in Input, record decisions.Record, change string) (evi
 	decision := evidence.Decision{
 		Path: record.Path, Title: bounded(record.Title), Status: record.Status, Date: record.Date, Change: change,
 	}
+	scopeCut := false
 	for _, pattern := range record.Scope {
 		if len(decision.Scope) == evidence.MaxDecisionScope {
-			r.warn(CodeDecisionsTruncated, record.Path, "the decision record %s names more than %d scope patterns; the others are left out", record.Path, evidence.MaxDecisionScope)
+			scopeCut = true
 			break
 		}
-		decision.Scope = append(decision.Scope, bounded(pattern))
+		if pattern = bounded(pattern); !slices.Contains(decision.Scope, pattern) {
+			decision.Scope = append(decision.Scope, pattern)
+		}
 	}
+	governsCut := false
 	for _, file := range in.ChangedFiles {
 		if !slices.ContainsFunc(decision.Scope, func(pattern string) bool { return decisions.Matches(pattern, file.Path) }) {
 			continue
 		}
 		if len(decision.Governs) == evidence.MaxGovernedFiles {
-			r.warn(CodeDecisionsTruncated, record.Path, "the decision record %s governs more than %d changed files; the others are left out", record.Path, evidence.MaxGovernedFiles)
+			governsCut = true
 			break
 		}
 		decision.Governs = append(decision.Governs, file.Path)
 	}
 	sort.Strings(decision.Governs)
-	return decision, change != "" || len(decision.Governs) > 0
+	concerned := change != "" || len(decision.Governs) > 0
+	if concerned && scopeCut {
+		r.warn(CodeDecisionsTruncated, record.Path, "the decision record %s names more than %d scope patterns; the others are left out", record.Path, evidence.MaxDecisionScope)
+	}
+	if concerned && governsCut {
+		r.warn(CodeDecisionsTruncated, record.Path, "the decision record %s governs more than %d changed files; the others are left out", record.Path, evidence.MaxGovernedFiles)
+	}
+	return decision, concerned
 }

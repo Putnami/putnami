@@ -18,7 +18,7 @@ answer, so the workspace must declare `@putnami/observe` to run it there.
 | `--moon-graph <path>` | The moon project graph export, from `moon project-graph --json`. Default `moon-graph.json` at the repository root when it exists. See [the moon detector](/docs/tooling-&-workspace/observe/moon). |
 | `--pants-graph <path>` | The Pants export `pants peek ::` wrote, resolved against the directory you run in. Default `pants-graph.json` at the repository root. See [the Pants detector](/docs/tooling-&-workspace/observe/pants). |
 | `--bazel-graph <path>` | The Bazel query export, from `bazel query 'deps(//...)' --output=streamed_jsonproto`. Default `bazel-graph.json` at the repository root. See [the Bazel detector](/docs/tooling-&-workspace/observe/bazel). |
-| `--decisions <directories>` | Comma-separated repository directories that hold MADR decision records. Default `docs/decisions` and `docs/adr`. See [Decision records](/docs/tooling-&-workspace/observe/change-analyses#decision-records). |
+| `--decisions <directories>` | Comma-separated directories that hold MADR decision records, relative to the repository root; an entry outside the repository is a diagnostic and is not read. Default `docs/decisions` and `docs/adr`. See [Decision records](/docs/tooling-&-workspace/observe/change-analyses#decision-records). |
 | `--no-fetch` | Read only the local history: fetch no base and deepen no shallow clone. |
 | `--evidence <path>` | Write the change evidence document to this path, resolved against the directory you run in. |
 | `--upload` | Hand the change evidence document to the evidence reporter. See [Uploading the evidence](#uploading-the-evidence). |
@@ -186,7 +186,8 @@ still reported. The summary lists each spec with its requirement count.
 subject, the CI run, the producer, the changed files with their component,
 the components with their impact and edges, the tests and coverage per
 component, the changed-line coverage, the dependency changes with their
-`before` and `after` states, the `sbom` they come from, and the diagnostics.
+`before` and `after` states, the `sbom` they come from, the `decisions` the
+change concerns, and the diagnostics.
 
 The document is validated before it is written, and replaces the file in one
 rename. A document that does not validate, such as one without a commit or a

@@ -39,19 +39,28 @@ type Record struct {
 }
 
 // Dirs normalizes the directories a flag names: repository-relative, slash
-// separated, without a leading ./ or / or a trailing /. Empty gives
-// DefaultDirs.
-func Dirs(named []string) []string {
-	var out []string
+// separated, without a leading ./ or a trailing /. It returns the entries that
+// are no repository directory apart: an absolute path, a drive letter, a ..
+// segment, or the root itself. Naming no valid directory gives DefaultDirs.
+func Dirs(named []string) (dirs, rejected []string) {
 	for _, dir := range named {
-		if clean := normalize(dir); clean != "" && !slices.Contains(out, clean) {
-			out = append(out, clean)
+		trimmed := strings.TrimSpace(dir)
+		if trimmed == "" {
+			continue
+		}
+		clean := normalize(trimmed)
+		if strings.HasPrefix(strings.ReplaceAll(trimmed, `\`, "/"), "/") || clean == "" || !valid(clean) {
+			rejected = append(rejected, trimmed)
+			continue
+		}
+		if !slices.Contains(dirs, clean) {
+			dirs = append(dirs, clean)
 		}
 	}
-	if len(out) == 0 {
-		return slices.Clone(DefaultDirs)
+	if len(dirs) == 0 {
+		dirs = slices.Clone(DefaultDirs)
 	}
-	return out
+	return dirs, rejected
 }
 
 // IsRecord reports whether the repository path names a decision record under
@@ -61,7 +70,7 @@ func IsRecord(file string, dirs []string) bool {
 		return false
 	}
 	name := strings.ToLower(path.Base(file))
-	if name == "readme.md" || name == "index.md" || strings.Contains(name, "template") {
+	if name == ".md" || name == "readme.md" || name == "index.md" || strings.Contains(name, "template") {
 		return false
 	}
 	for _, dir := range dirs {
@@ -221,7 +230,9 @@ func scalar(value any) string {
 	return strings.TrimSpace(s)
 }
 
-// lineIterator yields the lines outside fenced code blocks.
+// outsideFences visits the lines outside fenced code blocks, in order, until
+// visit returns false. A fence closes on a line that opens with at least its
+// own run of backticks or tildes.
 func outsideFences(lines []string, visit func(index int, line string) bool) {
 	fence := ""
 	for index, line := range lines {
@@ -233,7 +244,12 @@ func outsideFences(lines []string, visit func(index int, line string) bool) {
 			continue
 		}
 		if strings.HasPrefix(trimmed, "```") || strings.HasPrefix(trimmed, "~~~") {
-			fence = trimmed[:3]
+			marker := trimmed[0]
+			run := 0
+			for run < len(trimmed) && trimmed[run] == marker {
+				run++
+			}
+			fence = trimmed[:run]
 			continue
 		}
 		if !visit(index, line) {
@@ -247,12 +263,25 @@ func heading(lines []string) string {
 	var title string
 	outsideFences(lines, func(_ int, line string) bool {
 		if text, ok := strings.CutPrefix(line, "# "); ok {
-			title = strings.TrimSpace(strings.TrimRight(strings.TrimSpace(text), "#"))
+			title = closingSequence(strings.TrimSpace(text))
 			return false
 		}
 		return true
 	})
 	return title
+}
+
+// closingSequence removes the optional closing # sequence of an ATX heading,
+// which a space separates from the text.
+func closingSequence(text string) string {
+	trimmed := strings.TrimRight(text, "#")
+	if trimmed == "" {
+		return ""
+	}
+	if trimmed != text && !strings.HasSuffix(trimmed, " ") {
+		return text
+	}
+	return strings.TrimSpace(trimmed)
 }
 
 // field returns the value of the first "Name: value" line, plain, in a list
@@ -363,9 +392,16 @@ func normalize(p string) string {
 	return strings.TrimRight(p, "/")
 }
 
-// valid reports whether a normalized pattern stays in the repository: no
-// empty, dot or dot-dot segment and no control character.
+// valid reports whether a normalized pattern stays in the repository, by the
+// path rule of the evidence document: no drive letter, no backslash, no empty,
+// dot or dot-dot segment and no control character.
 func valid(p string) bool {
+	if len(p) >= 2 && p[1] == ':' && (p[0]|0x20) >= 'a' && (p[0]|0x20) <= 'z' {
+		return false
+	}
+	if strings.Contains(p, `\`) {
+		return false
+	}
 	for _, r := range p {
 		if r < 0x20 || r == 0x7f {
 			return false
@@ -380,15 +416,19 @@ func valid(p string) bool {
 }
 
 // Matches reports whether the scope pattern governs the repository path
-// file. A pattern without glob characters governs itself and every path
-// under it; otherwise * and ? match within one segment and a ** segment
-// matches any number of segments.
+// file. A pattern without * or ? governs itself and every path under it;
+// otherwise * and ? match within one segment, a ** segment matches any number
+// of segments, and every other character, [ included, matches itself.
 func Matches(pattern, file string) bool {
-	if !strings.ContainsAny(pattern, "*?[") {
+	if !strings.ContainsAny(pattern, "*?") {
 		return file == pattern || strings.HasPrefix(file, pattern+"/")
 	}
 	return match(strings.Split(pattern, "/"), strings.Split(file, "/"))
 }
+
+// literalBrackets escapes the characters path.Match reads as a class or an
+// escape, so a pattern segment holds only the * and ? wildcards.
+var literalBrackets = strings.NewReplacer(`\`, `\\`, "[", `\[`, "]", `\]`)
 
 func match(pattern, segments []string) bool {
 	for len(pattern) > 0 {
@@ -404,7 +444,7 @@ func match(pattern, segments []string) bool {
 		if len(segments) == 0 {
 			return false
 		}
-		if ok, err := path.Match(pattern[0], segments[0]); err != nil || !ok {
+		if ok, err := path.Match(literalBrackets.Replace(pattern[0]), segments[0]); err != nil || !ok {
 			return false
 		}
 		pattern, segments = pattern[1:], segments[1:]

@@ -538,3 +538,21 @@ func TestTheBazelGraphFlagNamesTheExport(t *testing.T) {
 		t.Error("an empty --bazel-graph is no usage error")
 	}
 }
+
+func TestTheDecisionsFlagNamesTheDirectories(t *testing.T) {
+	spectest.Proves(t, "tooling/observe-decisions", "madr-records", "records-are-the-markdown-files-of-the-decision-directories")
+	t.Chdir(t.TempDir())
+	opts, _, err := parseRun([]string{"--decisions", "architecture/decisions,docs/rfcs"}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := []string{"architecture/decisions", "docs/rfcs"}; !slices.Equal(opts.Decisions, want) {
+		t.Errorf("Decisions %v, want %v", opts.Decisions, want)
+	}
+	if opts, _, err := parseRun(nil, nil); err != nil || opts.Decisions != nil {
+		t.Errorf("without the flag: %v, %v", opts.Decisions, err)
+	}
+	if _, _, err := parseRun([]string{"--decisions"}, nil); err == nil || !strings.Contains(err.Error(), "--decisions needs a value") {
+		t.Errorf("an empty --decisions: %v", err)
+	}
+}
