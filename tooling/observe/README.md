@@ -15,6 +15,8 @@ It answers five questions:
   components depend on those.
 - Which tests passed or failed and which lines they covered, per component,
   and how much of the changed lines they covered.
+- Which specs the repository keeps in Spec Kit, OpenSpec, Kiro or Gherkin,
+  their requirements, and whether the change touches them.
 - Which dependency versions the lockfiles moved and, from the software bills
   of materials (SBOM) the CI wrote, their licences and the known
   vulnerabilities each change fixes or introduces.

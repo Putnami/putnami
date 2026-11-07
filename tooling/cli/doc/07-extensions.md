@@ -1077,6 +1077,17 @@ not downloaded again.
   `extensionDependencies`. The user scope has no workspace file to name its
   roots, so declare that extension in a workspace instead. The version the
   user-scope lock pinned before stays installed and pinned.
+- When the manifest names user-scope skills (`agentContent.userScope`), it
+  writes those skills, and only them, under your home: `.claude/skills/<skill>`
+  for Claude Code and `.agents/skills/<skill>` for Codex. The ownership record
+  lives in `~/.putnami/user/.putnami/agent-artifacts/`, and the rules are a
+  workspace's: a file it did not write, or one you edited, is kept and named,
+  one collision writes no skill, and the command exits 1 with the pin
+  installed. An unchanged pin writes nothing.
+
+`remove --user` removes the skills its install wrote, keeps a file you edited
+and names it, deletes the ownership record, then drops the pin and its link.
+See [ADR 0085](adr/0085-a-user-scope-install-writes-the-skills-its-extension-names.md).
 
 Outside a workspace, `putnami <group> <subcommand>` resolves against the user
 scope only. A pinned extension whose link is missing is repaired the way a

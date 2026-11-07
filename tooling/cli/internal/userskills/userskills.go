@@ -66,7 +66,11 @@ func Install(userRoot, home, name string, out io.Writer) error {
 	}
 	if plan.HasCollisions() {
 		iox.Fprint(out, agentartifacts.NewReport(plan, false).Text())
-		return ErrCollide
+		paths := make([]string, 0)
+		for _, entry := range plan.Collisions() {
+			paths = append(paths, "~/"+entry.Path)
+		}
+		return fmt.Errorf("%w: %s", ErrCollide, strings.Join(paths, ", "))
 	}
 	recorded := stateMatches(state, artifact)
 	if !plan.Mutates() && recorded {

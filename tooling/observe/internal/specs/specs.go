@@ -147,6 +147,12 @@ func classify(rel string) (features.SpecFormat, string, bool) {
 	parts := strings.Split(rel, "/")
 	n := len(parts)
 	base := parts[n-1]
+	// Under openspec/, only openspec/specs holds current specs: a change in
+	// flight (openspec/changes/...) or an archived one is not a spec of the
+	// repository, and no reader reads it.
+	if parts[0] == "openspec" && (n < 2 || parts[1] != "specs") {
+		return "", "", false
+	}
 	switch {
 	case strings.HasSuffix(base, ".feature"):
 		return features.SpecFormatGherkin, rel, true

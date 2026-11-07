@@ -127,6 +127,7 @@ func TestCollect_ReportsEachExternalFormat(t *testing.T) {
 		"specs/001-invoice-export/spec.md":          specKitSpec,
 		"openspec/specs/ci-cd/spec.md":              openSpecSpec,
 		"openspec/changes/next/specs/ci-cd/spec.md": openSpecSpec,
+		"openspec/changes/archive/2026-01-01-old/specs/ci-cd/spec.md": openSpecSpec,
 		".kiro/specs/cli/requirements.md":           kiroSpec,
 		"features/audit.feature":                    gherkinSpec,
 		"node_modules/dep/features/x.feature":       gherkinSpec,
@@ -145,12 +146,12 @@ func TestCollect_ReportsEachExternalFormat(t *testing.T) {
 			t.Errorf("%s: %+v, want a spec at %s with requirements", format, formats[format], path)
 		}
 	}
-	// A change in flight under openspec/changes is not a current spec: it is
-	// a diagnostic, not a spec.
+	// A change in flight or archived under openspec/changes is not a current
+	// spec: observe neither reports it nor warns about it.
 	if len(found) != 4 {
 		t.Errorf("found %d specs, want 4: %+v", len(found), found)
 	}
-	if len(diags) != 1 || !strings.Contains(diags[0].Message, "openspec/changes/next/specs/ci-cd") {
+	if len(diags) != 0 {
 		t.Errorf("diagnostics = %v", diags)
 	}
 }

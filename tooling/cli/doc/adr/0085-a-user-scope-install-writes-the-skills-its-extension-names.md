@@ -83,13 +83,18 @@ workspace follows the workspace's own copy.
   under `.claude/skills/` and `.agents/skills/`.
 - A user-owned file is never overwritten or removed.
 
-`internal/userskills/userskills_test.go` proves them.
+`internal/userskills/userskills_test.go` proves the ownership rules, and
+`internal/commands/extensions/user_scope_skills_test.go` proves the commands
+write under the home directory and nothing in the current one.
 
 ## Known limits
 
 - A person who points Claude Code at another configuration directory
   (`CLAUDE_CONFIG_DIR`) or Codex at another home does not get the skills
   there.
+- A home whose `.claude` or `.agents` directory is a symlink, as dotfile
+  managers make it, gets a collision on every install: the materializer never
+  writes through a symlink.
 - The skills are written for every supported host; a person who uses one host
   gets the other's files too.
 

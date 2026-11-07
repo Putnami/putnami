@@ -735,7 +735,7 @@ even when you run it inside a workspace.
 putnami extensions install --user @acme/audit          # Pin the latest version
 putnami extensions install --user @acme/audit@1.4.0    # Pin one version
 putnami extensions list --user                         # List the user-scope pins
-putnami extensions remove --user @acme/audit           # Drop a pin
+putnami extensions remove --user @acme/audit           # Drop a pin and its user-scope skills
 ```
 
 - `install --user` takes exactly one registry extension,
@@ -745,6 +745,16 @@ putnami extensions remove --user @acme/audit           # Drop a pin
   `~/.putnami/user/putnami.lock.json` and links the extension. It runs no
   install hook and touches nothing in the current directory. A re-run keeps
   the recorded pin; `--latest` moves it to the newest release.
+- When the extension names user-scope skills (`agentContent.userScope`),
+  `install --user` also writes those skills, and only them, to
+  `~/.claude/skills/<skill>` (Claude Code) and `~/.agents/skills/<skill>`
+  (Codex), under the same ownership rules as a workspace's agent content. A
+  file it did not write, or one you edited, is kept: the install prints the
+  collision, writes no skill, and exits 1, with the pin installed. A re-run
+  of an unchanged pin writes nothing. See
+  [ADR 0085](adr/0085-a-user-scope-install-writes-the-skills-its-extension-names.md).
+- `remove --user` first removes the skills its install wrote, keeps a file you
+  edited and names it, then drops the pin.
 - A local path, `--platform` and `--dest` are usage errors with `--user`.
 - `list --user` shows each pin's name, installed version, and source `user`;
   a pin has no version constraint.
