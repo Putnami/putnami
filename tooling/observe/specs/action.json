@@ -36,7 +36,7 @@
     },
     {
       "id": "action-release",
-      "text": "A release of version X.Y.Z, a semantic version without a pre-release or build suffix, replaces the root of the Putnami/observe-action default branch with the action directory and the repository licence, commits it, tags it vX.Y.Z and moves vX to it in one atomic push: the branch and both tags move together or none does. A version that is not X.Y.Z, or a vX.Y.Z tag that already exists, stops the release before any push."
+      "text": "A release of version X.Y.Z, a semantic version without a pre-release or build suffix, replaces the root of the Putnami/observe-action default branch with the action directory and the repository licence, commits it, tags it vX.Y.Z and moves vX to it in one atomic push: the branch and both tags move together or none does. A version that is not X.Y.Z stops the release before any tag is read, and a vX.Y.Z tag that already exists stops it before any push."
     },
     {
       "id": "action-release-runs-from-main",

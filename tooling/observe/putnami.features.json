@@ -1764,7 +1764,8 @@
               "a-release-copies-the-action-to-the-repository-root",
               "a-release-tags-the-version-and-moves-the-major-tag",
               "a-release-refuses-a-bad-or-existing-version",
-              "a-rejected-push-moves-no-ref"
+              "a-rejected-push-moves-no-ref",
+              "the-release-workflow-checks-the-version-before-any-tag"
             ]
           }
         },
