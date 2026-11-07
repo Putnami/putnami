@@ -76,7 +76,7 @@ func checkTask(t testing.TB, doc manifest, s stacks.Stack, task string) {
 		t.Errorf("command %s names no declared task %s", task, step.Task)
 		return
 	}
-	if want := []string{task, "--output", "{outputRoot}"}; decl.Command != "{extensionRuntime}" || !reflect.DeepEqual(decl.Args, want) || decl.Cwd != "{projectRoot}" {
+	if want := []string{task, "--report-dir", "{outputRoot}"}; decl.Command != "{extensionRuntime}" || !reflect.DeepEqual(decl.Args, want) || decl.Cwd != "{projectRoot}" {
 		t.Errorf("task %s runs %s %v in %s, want {extensionRuntime} %v in {projectRoot}", step.Task, decl.Command, decl.Args, decl.Cwd, want)
 	}
 	_, root := s.Profile.TaskPatterns(task)

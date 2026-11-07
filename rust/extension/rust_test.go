@@ -172,7 +172,7 @@ func runJob(t *testing.T, root, rel, task string) (string, map[string]any, strin
 	}
 	stdout := os.Stdout
 	os.Stdout = devnull
-	status, data, runErr := job(ctx, jsonl.New(), []string{"--output", out})
+	status, data, runErr := job(ctx, jsonl.New(), []string{"--report-dir", out})
 	os.Stdout = stdout
 	return status, data, out, runErr
 }
@@ -197,7 +197,7 @@ func TestATaskRunsTheProfileStepsAfterTheToolchainCheck(t *testing.T) {
 	}
 
 	stubTools(t, root, "1.80.0", junitPass)
-	if status, _, _, err := runJob(t, root, "crates/api", stacks.TaskBuild); status != "FAILED" || err == nil || !strings.Contains(err.Error(), "1.82.0") {
+	if status, _, _, err := runJob(t, root, "crates/api", stacks.TaskBuild); status != "FAILED" || err == nil || err.Error() != stacks.CodeToolchainMismatch {
 		t.Errorf("a toolchain mismatch fails the task: %s %v", status, err)
 	}
 }

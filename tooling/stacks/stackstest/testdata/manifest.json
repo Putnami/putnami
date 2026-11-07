@@ -122,7 +122,7 @@
       "command": "{extensionRuntime}",
       "args": [
         "lint",
-        "--output",
+        "--report-dir",
         "{outputRoot}"
       ],
       "cwd": "{projectRoot}",
@@ -176,7 +176,7 @@
       "command": "{extensionRuntime}",
       "args": [
         "test",
-        "--output",
+        "--report-dir",
         "{outputRoot}"
       ],
       "cwd": "{projectRoot}",

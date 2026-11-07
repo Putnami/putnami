@@ -136,7 +136,7 @@ The Rust reference profile:
 | `id` | The stack id. |
 | `markers` | The files that make a directory a candidate. |
 | `toolchain.command`, `toolchain.pattern` | How to read the version on the machine: the command's output, standard output first, matched by the pattern's `version` group. |
-| `toolchain.files` | The files that state the expected version, nearest first: in the project directory, then up to the stack root. `key` reads one value of a TOML or JSON file; without it, the file's first line. |
+| `toolchain.files` | The files that state the expected version, read in the project directory, then at the stack root. `key` reads one string value of a TOML table or a JSON object; without it, the file's first non-empty line. |
 | `inputs.<set>` | Named sets of file patterns. A plain pattern is relative to the project directory; `{root}/` makes it relative to the stack root, the directory of the build that holds the component (the Cargo workspace, the Gradle settings). |
 | `tasks.<task>.steps` | The commands the task runs in order, each an argument vector run in the project directory, with no shell. `{root}` is the stack root, `{component}` the detector's name for the component, `{output}` the task's output directory under the project. |
 | `tasks.<task>.inputs` | The input sets the task reads. `lint` reads fewer than `test`: a lockfile change does not rerun it. |
@@ -171,10 +171,12 @@ whole; it never merges into an array.
 }
 ```
 
-A workspace sets values for every project through a scope's `putnami.json`,
-with the same inheritance as every other option. An override is validated
-by the same strict decoder; an unknown member, or a change to `id` or
-`markers`, fails the load.
+The core reads the override from the project's own `putnami.json` only, at
+the job and in the input selectors alike, so the two never disagree and the
+selector's basis covers it. An override is validated by the same strict
+decoder: an unknown member, a change to `id` or `markers`, or a stack-root
+input the manifest does not declare fails the task with
+`stacks.project_config_invalid`. Scope-level overrides are left for later.
 
 ### Inputs are input selectors
 
@@ -183,9 +185,17 @@ manifest cannot list them as static patterns. Each task names one selector,
 `rust:lint`, `rust:test` or `rust:build`, in its `from: "project"` input. The
 extension lists them in `runtime.inputSelectors`, and the core answers
 `__putnami input-resolve` with the files the resolved profile selects for that
-task, including the stack-root files and the toolchain files. Its basis covers
-the project's `putnami.json` and every scope `putnami.json` above it, so an
+task, and the project's `putnami.json`. Its basis covers them, so an
 override that changes the inputs changes the answer.
+
+A selector answers files under the project only. The stack-root files
+(`{root}/…`, and the toolchain files at the root) reach the key through a
+second, static input of each task, `from: "workspace"`, which lists the
+shipped profile's stack-root patterns of that task; the conformance kit holds
+the two equal. So an override may narrow the stack-root inputs but not add
+one. A component is its own stack root, or the stack root is the workspace
+root; a detector that names any other root leaves the component out with
+`stacks.stack_root_unsupported`.
 
 ### What each extension holds
 
@@ -297,12 +307,15 @@ and the Rust profile:
 - a `putnami.json` override of the test steps, and one of an input set,
   change the key and the command run.
 
-The gate has no Rust toolchain, so the fixture puts a stub `cargo` and
-`rustc` first on `PATH`: they print a version and write the reports a real
-run writes. That double sits at a genuine external boundary, the stack's own
-build tool, and the test names it. A second test, skipped where `cargo`,
-cargo-nextest and cargo-llvm-cov are missing, runs the same scenario with the
-real tools.
+The gate has no Rust toolchain. The tests of `@putnami/rust` run its probe,
+selectors and jobs on such a fixture with a stub `cargo` and `rustc` first on
+`PATH`: they print a version and write the reports cargo-nextest and
+cargo-llvm-cov write. That double sits at a genuine external boundary, the
+stack's own build tool, and the tests name it. The CLI scenario above runs on
+a checkout of the repository whose root holds the fixture, with the same
+stubs for `test`, and with the real `cargo`, rustfmt and clippy for `lint`
+and `build`. A gate leg with the real cargo-nextest and cargo-llvm-cov is
+#939's.
 
 ## Settled with the owner
 

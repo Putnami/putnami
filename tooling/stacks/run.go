@@ -51,14 +51,14 @@ func (s Stack) Run(task string) func(ctx *pctx.Context, emit *jsonl.Emitter, arg
 
 func outputFlag(args []string) (string, error) {
 	for i := 0; i < len(args); i++ {
-		if v, ok := strings.CutPrefix(args[i], "--output="); ok {
+		if v, ok := strings.CutPrefix(args[i], "--report-dir="); ok {
 			return v, nil
 		}
-		if args[i] == "--output" && i+1 < len(args) {
+		if args[i] == "--report-dir" && i+1 < len(args) {
 			return args[i+1], nil
 		}
 	}
-	return "", errors.New("the task names no --output directory")
+	return "", errors.New("the task names no --report-dir directory")
 }
 
 // runInput is what one task run reads.
@@ -82,10 +82,11 @@ type reporter interface {
 }
 
 func (s Stack) run(ctx context.Context, in runInput, emit reporter) (string, map[string]any, error) {
+	// The diagnostic carries the message; the error names its code only, so
+	// the run does not print the message twice.
 	failWith := func(code, format string, args ...any) error {
-		msg := fmt.Sprintf(format, args...)
-		emit.DiagnosticWithCode("error", msg, "", 0, 0, code)
-		return errors.New(msg)
+		emit.DiagnosticWithCode("error", fmt.Sprintf(format, args...), "", 0, 0, code)
+		return errors.New(code)
 	}
 	var meta Metadata
 	if len(in.metadata) == 0 || json.Unmarshal(in.metadata, &meta) != nil || meta.Component == "" {
