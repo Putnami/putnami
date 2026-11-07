@@ -49,8 +49,8 @@ func TestCodeownersDirectoriesAreComponents(t *testing.T) {
 		"web/app.js":                "",
 		"services/search/search.go": "",
 		"README.md":                 "",
-		// A root CODEOWNERS that names no directory still wins: the first
-		// file that exists is the one read.
+		// .github/CODEOWNERS comes before docs/CODEOWNERS: the first file
+		// that exists is the one read.
 		"docs/CODEOWNERS": "/docs/ @acme/docs\n",
 	})
 	set := Detect(root, Default(Options{}))
@@ -78,8 +78,8 @@ func TestTheFirstCodeownersFileIsRead(t *testing.T) {
 	spectest.Proves(t, feature, "fallback-split", "codeowners-directories-are-components")
 	root := t.TempDir()
 	write(t, root, map[string]string{
-		"CODEOWNERS":         "/api/ @acme/api\n",
-		".github/CODEOWNERS": "/web/ @acme/web\n",
+		".github/CODEOWNERS": "/api/ @acme/api\n",
+		"CODEOWNERS":         "/web/ @acme/web\n",
 		"api/main.go":        "",
 		"web/app.js":         "",
 	})
@@ -195,5 +195,31 @@ func TestCodeownersDirectory(t *testing.T) {
 		if ok != (want != "") || got != want {
 			t.Errorf("codeownersDirectory(%q) = %q, %v; want %q", line, got, ok, want)
 		}
+	}
+}
+
+func TestALargeDirectoryWithoutSourceLeavesTheOthersToTheSplit(t *testing.T) {
+	spectest.Proves(t, feature, "fallback-split", "top-level-source-directories-are-components")
+	budget := fallbackWalkBudget
+	fallbackWalkBudget = 5
+	t.Cleanup(func() { fallbackWalkBudget = budget })
+	root := t.TempDir()
+	files := map[string]string{"billing/invoice.go": "", "web/app.js": ""}
+	for i := range 10 {
+		files["assets/img"+string(rune('a'+i))+".png"] = ""
+	}
+	write(t, root, files)
+	set := Detect(root, Default(Options{}))
+	if got := ids(set); !slices.Equal(got, []string{"billing", "web"}) {
+		t.Fatalf("components %v", got)
+	}
+	bounded := false
+	for _, d := range set.Diagnostics {
+		if d.Code == CodeFallbackWalkBounded && strings.Contains(d.Message, "assets") {
+			bounded = true
+		}
+	}
+	if !bounded {
+		t.Errorf("no %s diagnostic naming assets in %+v", CodeFallbackWalkBounded, set.Diagnostics)
 	}
 }

@@ -66,10 +66,11 @@ A document (`schemas/evidence.json`) has `protocolVersion: 1` and:
   decisions with at most 100 scope patterns and 1000 governed files each, and
   4096 bytes per string (`evidence.too_large`).
 - **Open where stacks grow.** Ecosystems are slugs: a new stack needs no
-  protocol change. A new code host or CI system is a protocol change: it
-  extends a closed vocabulary of version 1, a reader built before it refuses a
-  document that names it (`evidence.invalid_subject`, `evidence.invalid_ci`),
-  so a reader updates before its producers write it.
+  protocol change. A new code host, CI system or component source is a
+  protocol change: it extends a closed vocabulary of version 1, a reader built
+  before it refuses a document that names it (`evidence.invalid_subject`,
+  `evidence.invalid_ci`, `evidence.invalid_component`), so a reader updates
+  before its producers write it.
 - **Optional members stay optional.** The `sbom` member, the dependency
   states and the `decisions` member are optional members of version 1: a
   document without them validates as before, and a producer that read no SBOM

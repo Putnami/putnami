@@ -3,6 +3,7 @@ package components
 import (
 	"bufio"
 	"bytes"
+	"fmt"
 	"io/fs"
 	"os"
 	"path"
@@ -19,18 +20,21 @@ const (
 	// CodeFallbackSplit is the info diagnostic that names how a repository
 	// no detector recognizes is split.
 	CodeFallbackSplit = "observe.fallback_split"
-	// CodeFallbackWalkBounded is the warning of a directory walk that
-	// reached MaxFallbackWalkedEntries.
+	// CodeFallbackWalkBounded is the warning of a top-level directory whose
+	// walk reached MaxFallbackWalkedEntries before it found a source file.
 	CodeFallbackWalkBounded = "observe.fallback_walk_bounded"
 )
 
-// MaxFallbackWalkedEntries bounds the entries the directory split reads
-// while it looks for source files.
+// MaxFallbackWalkedEntries bounds the entries the directory split reads in
+// one top-level directory while it looks for a source file.
 const MaxFallbackWalkedEntries = 200000
 
-// CodeownersFiles are the CODEOWNERS locations the split reads, in order:
-// the first that exists is the one read.
-var CodeownersFiles = []string{"CODEOWNERS", ".github/CODEOWNERS", "docs/CODEOWNERS"}
+// fallbackWalkBudget is the bound holdsSource applies, MaxFallbackWalkedEntries.
+var fallbackWalkBudget = MaxFallbackWalkedEntries
+
+// CodeownersFiles are the CODEOWNERS locations the split reads, in GitHub's
+// order: the first that exists is the one read.
+var CodeownersFiles = []string{".github/CODEOWNERS", "CODEOWNERS", "docs/CODEOWNERS"}
 
 // fallbackSkipped are the top-level directories the directory split leaves
 // out, besides dot directories.
@@ -68,9 +72,7 @@ func fallbackSplit(root string) ([]Component, []diag.Diagnostic) {
 }
 
 func splitInfo(format string, args ...any) diag.Diagnostic {
-	d := diag.Warningf(CodeFallbackSplit, "components", format, args...)
-	d.Severity = diag.Info
-	return d
+	return diag.Diagnostic{Severity: diag.Info, Code: CodeFallbackSplit, Field: "components", Message: fmt.Sprintf(format, args...)}
 }
 
 func fallbackComponents(dirs []string, source string) []Component {
@@ -143,50 +145,58 @@ func codeownersDirectory(line string) (string, bool) {
 }
 
 // sourceDirectories returns the top-level directories that hold a source
-// file at any depth, sorted, leaving out fallbackSkipped and dot directories
-// at every depth.
+// file at any depth, sorted. It leaves out fallbackSkipped and dot directories
+// at the top level, and dot and node_modules directories below it. A
+// directory whose walk reaches MaxFallbackWalkedEntries before a source file
+// is left out with a warning.
 func sourceDirectories(root string) ([]string, []diag.Diagnostic) {
 	entries, err := os.ReadDir(root)
 	if err != nil {
 		return nil, nil
 	}
 	var dirs []string
-	walked := 0
+	var diags []diag.Diagnostic
 	for _, entry := range entries {
 		name := entry.Name()
 		if !entry.IsDir() || strings.HasPrefix(name, ".") || fallbackSkipped[name] {
 			continue
 		}
-		found, bounded := false, false
-		start := filepath.Join(root, name)
-		_ = filepath.WalkDir(start, func(p string, d fs.DirEntry, err error) error {
-			if err != nil {
-				return nil
-			}
-			walked++
-			if walked > MaxFallbackWalkedEntries {
-				bounded = true
-				return fs.SkipAll
-			}
-			if d.IsDir() {
-				if child := d.Name(); p != start && (strings.HasPrefix(child, ".") || child == "node_modules") {
-					return fs.SkipDir
-				}
-				return nil
-			}
-			if d.Type().IsRegular() && sourceExtensions[strings.ToLower(filepath.Ext(d.Name()))] {
-				found = true
-				return fs.SkipAll
-			}
-			return nil
-		})
-		if bounded {
-			return dirs, []diag.Diagnostic{diag.Warningf(CodeFallbackWalkBounded, "components",
-				"the directory split stopped after %d entries: %s and the directories after it are left out", MaxFallbackWalkedEntries, name)}
-		}
+		found, bounded := holdsSource(filepath.Join(root, name))
 		if found {
 			dirs = append(dirs, name)
 		}
+		if bounded {
+			diags = append(diags, diag.Warningf(CodeFallbackWalkBounded, "components",
+				"the directory split read %d entries of %s without finding a source file, so %s is no component", fallbackWalkBudget, name, name))
+		}
 	}
-	return dirs, nil
+	return dirs, diags
+}
+
+// holdsSource reports whether the directory start holds a source file, and
+// whether its walk stopped at MaxFallbackWalkedEntries first.
+func holdsSource(start string) (found, bounded bool) {
+	walked := 0
+	_ = filepath.WalkDir(start, func(p string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return nil
+		}
+		walked++
+		if walked > fallbackWalkBudget {
+			bounded = true
+			return fs.SkipAll
+		}
+		if d.IsDir() {
+			if child := d.Name(); p != start && (strings.HasPrefix(child, ".") || child == "node_modules") {
+				return fs.SkipDir
+			}
+			return nil
+		}
+		if d.Type().IsRegular() && sourceExtensions[strings.ToLower(filepath.Ext(d.Name()))] {
+			found = true
+			return fs.SkipAll
+		}
+		return nil
+	})
+	return found, bounded
 }

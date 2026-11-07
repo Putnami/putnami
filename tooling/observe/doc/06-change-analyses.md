@@ -61,16 +61,18 @@ its impact.
 
 When no detector finds a component, the repository is split:
 
-1. By CODEOWNERS: the first of `CODEOWNERS`, `.github/CODEOWNERS` and
-   `docs/CODEOWNERS` that exists is read, and each pattern that names a
+1. By CODEOWNERS: the first of `.github/CODEOWNERS`, `CODEOWNERS` and
+   `docs/CODEOWNERS` that exists is read, in GitHub's order, and each pattern that names a
    directory of the repository is a component of source `fallback-codeowners`.
    A pattern names a directory when, without its leading `/` and a trailing
    `/`, `/*` or `/**`, it holds no wildcard: `/billing/`, `web/` and
    `/catalog/**` do, `*`, `*.md` and `/apps/*/src/` do not.
 2. Else by top-level directories: each one that holds a source file at any
    depth, such as a `.go`, `.py`, `.ts` or `.c` file, is a component of source
-   `fallback-directories`. `.github`, `docs`, `vendor`, `node_modules` and
-   dot directories are left out.
+   `fallback-directories`. A source file has a programming-language
+   extension; configuration, data, documents and images are none. `.github`,
+   `docs`, `vendor`, `node_modules` and dot directories are left out, and dot
+   and `node_modules` directories are not read below the top level.
 3. Else the repository is one `fallback` component `.`.
 
 These components are of ecosystem `unknown`, are named after their directory
@@ -306,9 +308,9 @@ judge whether the change follows them.
 | `observe.changed_lines_unread` | The diff's changed lines cannot be read. |
 | `observe.sbom_ambiguous` | One side has several SBOMs, so none is read and that side is unknown. |
 | `observe.bazel_graph_missing` | A Bazel workspace has no query export, so its packages have no edge. An info diagnostic that names the export command. |
-| `observe.fallback_split` | No detector found a component, so the repository is split by CODEOWNERS, by its top-level directories, or kept as one component. An info diagnostic that names the split. |
-| `observe.fallback_walk_bounded` | The directory split stopped after 200000 entries, so the directories it did not reach are no component. |
 | `observe.bazel_graph_unreadable` | The Bazel query export cannot be read, so the `BUILD` files give the packages, without edges. |
 | `observe.decision_unread` | A decision record or directory cannot be read, or a `--decisions` entry is not a directory of the repository. |
 | `observe.decision_deleted` | The change deletes an accepted decision record. |
 | `observe.decisions_truncated` | The change concerns more than 1000 decisions, or a decision names more than 100 scope patterns or governs more than 1000 changed files; the rest is left out. |
+| `observe.fallback_split` | No detector found a component, so the repository is split by CODEOWNERS, by its top-level directories, or kept as one component. An info diagnostic that names the split. |
+| `observe.fallback_walk_bounded` | A top-level directory holds 200000 entries before any source file, so the directory split leaves it out. |
