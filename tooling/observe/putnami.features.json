@@ -1693,6 +1693,19 @@
           }
         },
         {
+          "id": "action-channel-is-a-channel",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-version-or-a-bad-channel-fails-before-the-install"
+            ]
+          }
+        },
+        {
           "id": "action-maps-inputs-to-flags",
           "stage": "coded",
           "evidenceKinds": [
@@ -1726,6 +1739,20 @@
           }
         },
         {
+          "id": "action-tokens-reach-observe-only",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-install-sees-no-token",
+              "a-token-in-the-job-environment-is-not-read"
+            ]
+          }
+        },
+        {
           "id": "action-release",
           "stage": "coded",
           "evidenceKinds": [
@@ -1736,7 +1763,21 @@
             "checks": [
               "a-release-copies-the-action-to-the-repository-root",
               "a-release-tags-the-version-and-moves-the-major-tag",
-              "a-release-refuses-a-bad-or-existing-version"
+              "a-release-refuses-a-bad-or-existing-version",
+              "a-rejected-push-moves-no-ref"
+            ]
+          }
+        },
+        {
+          "id": "action-release-runs-from-main",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-release-job-runs-from-main-in-its-environment"
             ]
           }
         }

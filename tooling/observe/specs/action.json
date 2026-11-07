@@ -16,7 +16,11 @@
   "requirements": [
     {
       "id": "action-installs-the-cli",
-      "text": "The action runs one bash step on a Linux or macOS runner. It installs the Putnami CLI with https://putnami.dev/install.sh at the version or channel the channel input names, stable when it is empty, puts ~/.putnami/bin on the PATH, and installs @putnami/observe from that channel in the user scope, and @putnami/cloud too when the token input is set, since only the upload needs it. On a Windows runner it fails with a message that names Linux and macOS, and installs nothing."
+      "text": "The action runs one bash step on a Linux or macOS runner. It installs the Putnami CLI with https://putnami.dev/install.sh, puts ~/.putnami/bin on the PATH, and installs @putnami/observe in the user scope, all from the channel input, stable when empty, which reads latest as putnami upgrade reads it; it installs @putnami/cloud too when the token input is set. On a Windows runner the step fails with a message that names Linux and macOS, and installs nothing."
+    },
+    {
+      "id": "action-channel-is-a-channel",
+      "text": "A channel input that is a version, or outside the channel alphabet of putnami init (a lowercase letter or a digit, then lowercase letters, digits, '.', '_' and '-', 64 characters at most), fails the step before any install: the release lines do not share one version."
     },
     {
       "id": "action-maps-inputs-to-flags",
@@ -27,11 +31,20 @@
       "text": "With the token input set, the step runs putnami observe with --upload and PUTNAMI_CLOUD_TOKEN set to the token, and the publish input defaults to true; without it, publish defaults to false. publish set to true or false overrides the default. Only when publish is true does putnami observe get --publish and GITHUB_TOKEN, the run's token, so the job needs statuses: write and pull-requests: write only then. Another publish value fails the step before the install."
     },
     {
+      "id": "action-tokens-reach-observe-only",
+      "text": "The token input and the run's token reach putnami observe only, never the installer or the extension installs. A PUTNAMI_CLOUD_TOKEN or GITHUB_TOKEN the job sets in the step's environment is not read, and a PUTNAMI_CLOUD_TOKEN there without the token input gives a warning that names the token input."
+    },
+    {
       "id": "action-release",
-      "text": "A release of version X.Y.Z, a semantic version without a pre-release or build suffix, replaces the root of the Putnami/observe-action default branch with the action directory and the repository licence, commits it, tags it vX.Y.Z and moves the vX tag to that commit. A version that is not X.Y.Z, or a vX.Y.Z tag that already exists, stops the release before any push."
+      "text": "A release of version X.Y.Z, a semantic version without a pre-release or build suffix, replaces the root of the Putnami/observe-action default branch with the action directory and the repository licence, commits it, tags it vX.Y.Z and moves vX to it in one atomic push: the branch and both tags move together or none does. A version that is not X.Y.Z, or a vX.Y.Z tag that already exists, stops the release before any push."
+    },
+    {
+      "id": "action-release-runs-from-main",
+      "text": "The release workflow runs on a manual dispatch from main only, in the GitHub environment observe-action, which holds the only token that writes to Putnami/observe-action; the environment's branch policy allows main only, so a dispatch from another branch gets no token."
     }
   ],
   "decisions": [
-    "tooling/cli/doc/adr/0051-user-scope-extensions-run-without-a-workspace.md"
+    "tooling/cli/doc/adr/0051-user-scope-extensions-run-without-a-workspace.md",
+    "tooling/observe/doc/adr/0001-the-observe-action-releases-by-copy.md"
   ]
 }
