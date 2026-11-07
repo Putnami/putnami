@@ -5,7 +5,7 @@ keeps its own CI and has no Putnami workspace. Its `putnami observe` command
 runs at the end of the job, after the build and the tests, and changes nothing
 in the pipeline.
 
-It answers five questions:
+It answers six questions:
 
 - Which CI ran the job, and which repository and commit it built. The
   repository key is the code host and its numeric project id, which survive a

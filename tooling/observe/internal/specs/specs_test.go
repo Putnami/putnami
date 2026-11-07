@@ -124,14 +124,15 @@ func TestCollect_ReportsASpecKitRequirement(t *testing.T) {
 func TestCollect_ReportsEachExternalFormat(t *testing.T) {
 	spectest.Proves(t, "tooling/observe", "external-specs", "observe-reports-each-external-format")
 	root := writeRepo(t, map[string]string{
-		"specs/001-invoice-export/spec.md":          specKitSpec,
-		"openspec/specs/ci-cd/spec.md":              openSpecSpec,
-		"openspec/changes/next/specs/ci-cd/spec.md": openSpecSpec,
+		"specs/001-invoice-export/spec.md":                            specKitSpec,
+		"openspec/specs/ci-cd/spec.md":                                openSpecSpec,
+		"openspec/changes/next/specs/ci-cd/spec.md":                   openSpecSpec,
 		"openspec/changes/archive/2026-01-01-old/specs/ci-cd/spec.md": openSpecSpec,
-		".kiro/specs/cli/requirements.md":           kiroSpec,
-		"features/audit.feature":                    gherkinSpec,
-		"node_modules/dep/features/x.feature":       gherkinSpec,
-		"docs/spec.md":                              "# Not a spec\n",
+		"packages/api/openspec/changes/next/specs/ci-cd/spec.md":      openSpecSpec,
+		".kiro/specs/cli/requirements.md":                             kiroSpec,
+		"features/audit.feature":                                      gherkinSpec,
+		"node_modules/dep/features/x.feature":                         gherkinSpec,
+		"docs/spec.md":                                                "# Not a spec\n",
 	})
 	found, diags := Collect(Request{Root: root})
 	formats := byFormat(found)

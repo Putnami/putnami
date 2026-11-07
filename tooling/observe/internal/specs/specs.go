@@ -9,6 +9,7 @@ import (
 	"path"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"sort"
 	"strings"
 
@@ -150,7 +151,7 @@ func classify(rel string) (features.SpecFormat, string, bool) {
 	// Under openspec/, only openspec/specs holds current specs: a change in
 	// flight (openspec/changes/...) or an archived one is not a spec of the
 	// repository, and no reader reads it.
-	if parts[0] == "openspec" && (n < 2 || parts[1] != "specs") {
+	if i := slices.Index(parts, "openspec"); i >= 0 && (i+1 >= n || parts[i+1] != "specs") {
 		return "", "", false
 	}
 	switch {
