@@ -115,7 +115,7 @@ func (s Stack) run(ctx context.Context, in runInput, emit reporter) (string, map
 	env := os.Environ()
 	expected, err := profile.Toolchain.ExpectedVersion(in.workspaceRoot, filepath.ToSlash(projectRel), meta.Root)
 	if err != nil {
-		return statusFailed, nil, failWith(CodeToolchainUnpinned, "the expected toolchain version cannot be read: %v", err)
+		return statusFailed, nil, failWith(CodeProjectConfigInvalid, "the expected toolchain version cannot be read: %v", err)
 	}
 	machine, err := profile.Toolchain.MachineVersion(ctx, in.projectAbs, env)
 	if errors.Is(err, ErrToolchainMissing) {
@@ -147,7 +147,7 @@ func (s Stack) run(ctx context.Context, in runInput, emit reporter) (string, map
 	// A report left by another component of the root, or by an earlier
 	// run, must not pass for this run's: the reports outside the task's own
 	// output are removed before the steps, under the lock.
-	if err := removeReports(t.Reports, in.projectAbs, rootAbs); err != nil {
+	if err := removeReports(profile, in.task, in.projectAbs, rootAbs); err != nil {
 		return statusFailed, nil, err
 	}
 
@@ -255,11 +255,31 @@ func copyFile(src, dst string) error {
 	return os.WriteFile(dst, data, 0o644) //nolint:gosec // a copied report
 }
 
-// removeReports deletes the files the report patterns match outside the
-// task's output directory: under the project, or under the stack root.
-func removeReports(r *Reports, projectAbs, rootAbs string) error {
+// removeReports deletes the files the report patterns of a task match
+// outside its output directory, under the project or the stack root. A file
+// the task's own inputs select is a source, never a stale report: it is kept.
+func removeReports(profile Profile, task, projectAbs, rootAbs string) error {
+	r := profile.Tasks[task].Reports
 	if r == nil {
 		return nil
+	}
+	projectInputs, rootInputs := profile.TaskPatterns(task)
+	isInput := func(m string) bool {
+		for _, in := range []struct {
+			base     string
+			patterns []string
+		}{{projectAbs, projectInputs}, {rootAbs, rootInputs}} {
+			rel, err := filepath.Rel(in.base, m)
+			if err != nil || strings.HasPrefix(rel, "..") {
+				continue
+			}
+			for _, p := range in.patterns {
+				if MatchPattern(p, filepath.ToSlash(rel)) {
+					return true
+				}
+			}
+		}
+		return false
 	}
 	patterns := slices.Clone(r.JUnit)
 	for _, c := range r.Coverage {
@@ -278,6 +298,9 @@ func removeReports(r *Reports, projectAbs, rootAbs string) error {
 			return err
 		}
 		for _, m := range matches {
+			if isInput(m) {
+				continue
+			}
 			if err := os.Remove(m); err != nil && !errors.Is(err, os.ErrNotExist) {
 				return fmt.Errorf("remove the stale report %s: %w", m, err)
 			}

@@ -270,11 +270,22 @@ func validatePattern(pattern string, rooted bool) error {
 
 // validateReportPath accepts a pattern under the project, under the stack root
 // ("{root}/…") or under the task output ("{output}/…").
+//
+// The core removes what a pattern outside "{output}/" matches before the
+// steps, so such a pattern names one place: no "**" and no wildcard in its
+// first segment.
 func validateReportPath(p string) error {
 	if rest, ok := strings.CutPrefix(p, "{output}/"); ok {
 		return validatePattern(rest, false)
 	}
-	return validatePattern(p, true)
+	if err := validatePattern(p, true); err != nil {
+		return err
+	}
+	segments := strings.Split(strings.TrimPrefix(p, "{root}/"), "/")
+	if slices.Contains(segments, "**") || strings.ContainsAny(segments[0], "*?[") {
+		return fmt.Errorf("%q: a report outside {output}/ is removed before the steps, so it names no \"**\" and no wildcard first directory", p)
+	}
+	return nil
 }
 
 // Resolve applies a project's override to the profile. The override is a JSON

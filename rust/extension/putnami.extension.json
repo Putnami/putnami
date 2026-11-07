@@ -151,6 +151,7 @@
         "stackRoot": {
           "from": "workspace",
           "files": [
+            ".cargo/config",
             ".cargo/config.toml",
             ".clippy.toml",
             ".config/nextest.toml",
@@ -211,6 +212,7 @@
         "stackRoot": {
           "from": "workspace",
           "files": [
+            ".cargo/config",
             ".cargo/config.toml",
             ".clippy.toml",
             ".config/nextest.toml",
@@ -272,6 +274,7 @@
         "stackRoot": {
           "from": "workspace",
           "files": [
+            ".cargo/config",
             ".cargo/config.toml",
             ".clippy.toml",
             ".config/nextest.toml",

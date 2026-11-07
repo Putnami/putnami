@@ -56,7 +56,7 @@ crate's directory, then at the workspace root.
 
 | Case | Result |
 |---|---|
-| The versions match | The task runs |
+| The versions match | The task runs; a `1.82` channel matches the stable 1.82 releases, such as 1.82.3, and keys the minor release |
 | They differ | The task fails with `stacks.toolchain_mismatch`; set `toolchain.check` to `warn` to run anyway |
 | `rustc` is not on `PATH` | The task fails with `stacks.toolchain_missing` |
 | No file states an exact version, such as `channel = "stable"` | The warning `stacks.toolchain_unpinned`: the cache key carries no toolchain version |
@@ -65,7 +65,7 @@ crate's directory, then at the workspace root.
 
 A task's key covers the crate's files its task reads, the workspace-root
 files (`Cargo.toml`, `Cargo.lock` for test and build, `.cargo/config.toml`,
-`.config/nextest.toml`, the rustfmt and clippy configurations, the toolchain
+`.cargo/config`, `.config/nextest.toml`, the rustfmt and clippy configurations, the toolchain
 files), the crate's
 `putnami.json`, the expected toolchain version, and the key of the same task
 of each crate it depends on. `lint` does not read `Cargo.lock`, so a lockfile
@@ -74,7 +74,7 @@ change reruns test and build only.
 | Input set | Patterns |
 |---|---|
 | `sources` | `src/**`, `tests/**`, `benches/**`, `examples/**`, `build.rs` |
-| `manifests` | `Cargo.toml`, `.cargo/config.toml`, `rustfmt.toml`, `.rustfmt.toml`, `clippy.toml`, `.clippy.toml`, in the crate and at the workspace root, and `.config/nextest.toml` at the root |
+| `manifests` | `Cargo.toml`, `.cargo/config.toml`, `.cargo/config`, `rustfmt.toml`, `.rustfmt.toml`, `clippy.toml`, `.clippy.toml`, in the crate and at the workspace root, and `.config/nextest.toml` at the root |
 | `lockfiles` | `Cargo.lock`, and the workspace root's `Cargo.lock` |
 
 `lint` reads `sources` and `manifests`; `test` and `build` read all three.

@@ -193,9 +193,14 @@ func (t Toolchain) Compare(expected Expected, machine string) Verdict {
 
 // versionMatches reports whether the machine's version is the expected one:
 // equal, or, for an expected version with fewer components such as a rustup
-// "1.82" channel, the release that version names (1.82.0, 1.82.3).
+// "1.82" channel, a stable release that version names (1.82.0, 1.82.3, not
+// 1.82.0-nightly).
 func versionMatches(expected, machine string) bool {
 	e := strings.TrimPrefix(expected, "v")
 	m := strings.TrimPrefix(machine, "v")
-	return e == m || strings.HasPrefix(m, e+".")
+	if e == m {
+		return true
+	}
+	rest, ok := strings.CutPrefix(m, e+".")
+	return ok && rest != "" && strings.Trim(rest, "0123456789.") == ""
 }

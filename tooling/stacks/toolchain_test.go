@@ -71,6 +71,9 @@ func TestCompareDecidesTheCheck(t *testing.T) {
 	if v := tc.Compare(Expected{Version: "1.82", Source: "rust-toolchain.toml"}, "1.82.3"); v.Code != "" {
 		t.Errorf("a major.minor channel matches its patch releases: %+v", v)
 	}
+	if v := tc.Compare(Expected{Version: "1.82", Source: "rust-toolchain.toml"}, "1.82.0-nightly"); v.Code != CodeToolchainMismatch {
+		t.Errorf("a major.minor channel names stable releases only: %+v", v)
+	}
 	if v := tc.Compare(Expected{Version: "1.8", Source: "rust-toolchain.toml"}, "1.82.0"); v.Code != CodeToolchainMismatch {
 		t.Errorf("1.8 does not name 1.82: %+v", v)
 	}

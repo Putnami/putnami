@@ -226,6 +226,17 @@ func TestRunFailsOnAFailedTestAMismatchAndAMissingReport(t *testing.T) {
 	if status, _, rec := runTask(t, testProfileWithLcov(t), root, TaskTest); status != statusOK || rec.codes() != "warning:"+CodeToolchainMismatch {
 		t.Errorf("warn lets the task run: %s %v", status, rec.diags)
 	}
+	// A file the task's inputs select is a source: a report pattern that
+	// matches it does not remove it.
+	writeFile(t, root, "crates/api/src/junit.xml", junitPass)
+	writeFile(t, root, "crates/api/putnami.json", `{"options": {"@putnami/rust": {"toolchain": {"check": "warn"}, "tasks": {"lint": {"steps": [["true"]], "reports": {"junit": ["src/junit.xml"]}}}}}}`)
+	if status, _, rec := runTask(t, s0(t), root, TaskLint); status != statusOK {
+		t.Errorf("lint reads its source report: %s %v", status, rec.diags)
+	}
+	if _, err := os.Stat(filepath.Join(root, "crates/api/src/junit.xml")); err != nil {
+		t.Errorf("a source the inputs select is kept: %v", err)
+	}
+	writeFile(t, root, "crates/api/putnami.json", `{"options": {"@putnami/rust": {"toolchain": {"check": "warn"}}}}`)
 	// A report another run left at the stack root is removed before the
 	// steps: a step that writes none fails, it does not read the old one.
 	if _, err := os.Stat(filepath.Join(root, "target/junit.xml")); err != nil {

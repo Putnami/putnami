@@ -57,6 +57,8 @@ func TestDecodeRefusesWhatTheSchemaDoesNotName(t *testing.T) {
 		"unknown input set": strings.Replace(sampleProfile, `"inputs": ["sources", "manifests"]}`, `"inputs": ["docs"]}`, 1),
 		"bad placeholder":   strings.Replace(sampleProfile, `"{component}"]], "inputs": ["sources", "manifests"]`, `"{crate}"]], "inputs": ["sources", "manifests"]`, 1),
 		"escaping pattern":  strings.Replace(sampleProfile, `"src/**"`, `"../src/**"`, 1),
+		"recursive report":  strings.Replace(sampleProfile, `"{root}/target/junit.xml"`, `"{root}/**/junit.xml"`, 1),
+		"wildcard report":   strings.Replace(sampleProfile, `"{root}/target/junit.xml"`, `"{root}/*/junit.xml"`, 1),
 		"negated pattern":   strings.Replace(sampleProfile, `"src/**"`, `"!src/gen/**"`, 1),
 		"coverage format":   strings.Replace(sampleProfile, `"lcov"`, `"gcov"`, 1),
 		"bad check":         strings.Replace(sampleProfile, `"command": ["rustc"`, `"check": "ignore", "command": ["rustc"`, 1),

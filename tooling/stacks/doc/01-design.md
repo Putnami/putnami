@@ -102,8 +102,8 @@ The Rust reference profile:
   "inputs": {
     "sources": ["src/**", "tests/**", "benches/**", "examples/**", "build.rs"],
     "manifests": [
-      "Cargo.toml", ".cargo/config.toml", "rustfmt.toml", ".rustfmt.toml", "clippy.toml", ".clippy.toml",
-      "{root}/Cargo.toml", "{root}/.cargo/config.toml", "{root}/.config/nextest.toml",
+      "Cargo.toml", ".cargo/config.toml", ".cargo/config", "rustfmt.toml", ".rustfmt.toml", "clippy.toml", ".clippy.toml",
+      "{root}/Cargo.toml", "{root}/.cargo/config.toml", "{root}/.cargo/config", "{root}/.config/nextest.toml",
       "{root}/rustfmt.toml", "{root}/.rustfmt.toml", "{root}/clippy.toml", "{root}/.clippy.toml"
     ],
     "lockfiles": ["Cargo.lock", "{root}/Cargo.lock"]
@@ -239,7 +239,10 @@ The key carries the **expected** version: the value the toolchain file
 states, or `toolchain.version` when a project sets one. Before its first step,
 the task reads the version on the machine with `toolchain.command`:
 
-- the versions match, or nothing states an expected version: the task runs;
+- the versions match, or nothing states an expected version: the task runs.
+  An expected version with fewer components names the stable releases it
+  prefixes: a `1.82` channel matches 1.82.0 and 1.82.3, not 1.82.0-nightly, and
+  keys the minor release, not the patch;
 - they differ: the task fails with `stacks.toolchain_mismatch`, which names
   both versions and the file that states the expected one. It never installs
   or switches a toolchain. A project that accepts the difference sets
@@ -262,7 +265,9 @@ the coverage reach the task result. A JUnit or coverage pattern of the profile
 that matches no report fails the task with `stacks.report_missing`: a command
 that ran nothing is not a pass. The reports a task reads outside its own
 output directory are removed before its steps, so a report another component
-or an earlier run left is never read as this run's. The copied reports are task outputs, so a cache hit
+or an earlier run left is never read as this run's. A file the task's inputs
+select is a source and is kept, and a report pattern outside the output
+names one place: no `**` and no wildcard first directory. The copied reports are task outputs, so a cache hit
 restores them and reads the same totals.
 
 ## What stays out
