@@ -24,7 +24,9 @@
     },
     "test": {
       "filePatterns": [
-        "putnami.extension.json"
+        "putnami.extension.json",
+        "action/**",
+        "../../LICENSE.md"
       ]
     },
     "package": {
