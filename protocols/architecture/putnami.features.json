@@ -163,6 +163,20 @@
               "a-fire-and-forget-send-never-fails-the-caller"
             ]
           }
+        },
+        {
+          "id": "authored-version-one-stays-valid",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "every-frozen-v1-authored-document-validates",
+              "every-frozen-v1-authored-document-keeps-its-digest"
+            ]
+          }
         }
       ]
     }

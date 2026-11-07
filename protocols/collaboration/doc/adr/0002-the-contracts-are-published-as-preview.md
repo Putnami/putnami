@@ -1,6 +1,8 @@
 # 0002: The contracts are published as preview
 
-- **Status**: accepted
+- **Status**: accepted, amended by
+  [ADR 0006](0006-version-1-is-stable.md): decision 2. The module is `stable`
+  from release 0.5.0.
 - **Scope**: `go.putnami.dev/protocol/collaboration` (`protocols/collaboration`)
 - **Amends**: [ADR 0001](0001-collaboration-provider-contracts.md), decisions 1 and 2
 

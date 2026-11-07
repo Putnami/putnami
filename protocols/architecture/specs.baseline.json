@@ -2,6 +2,7 @@
   "$schema": "https://putnami.dev/schemas/putnami-specs-baseline.json",
   "protocolVersion": 2,
   "executableRequirements": [
+    "architecture/executable-contracts#authored-version-one-stays-valid",
     "architecture/executable-contracts#contained-read-only-tooling",
     "architecture/executable-contracts#coverage",
     "architecture/executable-contracts#distributed-authority",

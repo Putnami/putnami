@@ -53,11 +53,16 @@
     {
       "id": "runtime-enforcement",
       "text": "A darc component takes its declared import as configuration and refuses one the architecture gate would reject. A projection applies the declared freshness bound and missing/stale behavior, orders and de-duplicates updates under the declared late-event rule, gives the write handle only to the writer the local model names, and rebuilds and deletes through the declared strategies. A snapshot version is immutable and addressable. A command refuses an inactive contract and never fails a fire-and-forget caller."
+    },
+    {
+      "id": "authored-version-one-stays-valid",
+      "text": "The version 1 manifests, baseline and waivers frozen in fixtures/v1 on 2026-11-07 parse and validate without error under the current module, the manifests as one repository, and their bytes match the SHA-256 the test pins. A change that would reject one opens protocol version 2 with a migration command. Finding IDs, diagnostic codes, the snapshot and detector coverage are outside this promise."
     }
   ],
   "decisions": [
     "protocols/architecture/doc/adr/0001-declarations-are-authority-observations-are-evidence.md",
     "protocols/architecture/doc/adr/0002-runtime-evidence-needs-an-application-carrier.md",
-    "tooling/cli/doc/adr/0008-executable-architecture-command-boundary.md"
+    "tooling/cli/doc/adr/0008-executable-architecture-command-boundary.md",
+    "protocols/architecture/doc/adr/0003-authored-documents-are-promised-findings-are-not.md"
   ]
 }
