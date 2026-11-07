@@ -2,6 +2,7 @@ package readers
 
 import (
 	"reflect"
+	"strings"
 	"testing"
 
 	"go.putnami.dev/protocol/features/spectest"
@@ -125,5 +126,35 @@ func TestAnImportLinterOutputWithoutContractsIsMalformed(t *testing.T) {
 		if report, diagnostics := ReadImportLinter([]byte(data)); len(diagnostics) != 1 || diagnostics[0].Code != CodeMalformed || report.Rules != nil {
 			t.Errorf("%q: %+v %v, want %s", data, report, diagnostics, CodeMalformed)
 		}
+	}
+}
+
+func TestAnArchUnitCycleIsOneViolation(t *testing.T) {
+	spectest.Proves(t, feature, "archunit-cases-are-rules", "an-archunit-failure-reads-to-its-rule-and-violations")
+	message := "Architecture Violation [Priority: MEDIUM] - Rule 'slices matching 'com.acme.(*)..' should be free of cycles' was violated (1 times):\n" +
+		"Cycle detected: Slice api -> \n" +
+		"                Slice pricing -> \n" +
+		"                Slice api\n" +
+		"  1. Dependencies of Slice api\n" +
+		"    - Method <com.acme.api.Quotes.quote()> calls method <com.acme.pricing.Pricing.total()> in (Quotes.java:8)\n" +
+		"  2. Dependencies of Slice pricing\n" +
+		"    - Method <com.acme.pricing.Pricing.total()> calls method <com.acme.api.Quotes.limit()> in (Pricing.java:12)"
+	rule, ok := ArchUnitRule(TestCase{Name: "no_cycles", Status: StatusFailed, Failure: &Failure{Message: message}})
+	if !ok || rule.Count != 1 || len(rule.Violations) != 1 {
+		t.Fatalf("cycle rule %+v", rule)
+	}
+	v := rule.Violations[0]
+	if v.Subject != "com.acme.api.Quotes" || v.File != "Quotes.java" || v.Line != 8 || !strings.HasPrefix(v.Message, "Cycle detected: Slice api ->\n") {
+		t.Errorf("cycle violation %+v", v)
+	}
+	capped, _ := ArchUnitRule(TestCase{Name: "no_cycles", Status: StatusFailed, Failure: &Failure{
+		Message: "Architecture Violation [Priority: MEDIUM] - Rule 'slices should be free of cycles' was violated (>= 50 times - the maximum number of cycles to detect was reached; this limit can be adapted using the `archunit.properties` value `cycles.maxNumberToDetect=xxx`):\nCycle detected: A -> \n                A",
+	}})
+	if capped.Name != "slices should be free of cycles" || capped.Count != 50 || len(capped.Violations) != 1 {
+		t.Errorf("capped cycle rule %+v", capped)
+	}
+	// A case that ended in an error checked no rule.
+	if _, ok := ArchUnitRule(TestCase{Name: "n", Status: StatusFailed, Failure: &Failure{Error: true, Message: "NoClassDefFoundError"}}); ok {
+		t.Error("an error case is no rule")
 	}
 }

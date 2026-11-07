@@ -16,6 +16,10 @@ import (
 	"go.putnami.dev/tooling/observe/internal/reports"
 )
 
+// CodePatternInvalid is an --archunit-classes pattern that is no valid
+// pattern: it matches nothing.
+const CodePatternInvalid = "observe.archunit_pattern_invalid"
+
 // CodeArchitectureBounded is a run whose architecture rules or violations
 // exceed the evidence bounds.
 const CodeArchitectureBounded = "observe.architecture_bounded"
@@ -37,13 +41,19 @@ func newArchitecture() *architecture {
 	return &architecture{rules: map[string]*evidence.ArchitectureRule{}}
 }
 
-// add merges one rule a reader read, each violation placed by place.
-func (a *architecture) add(tool string, rule readers.ArchitectureRule, place func(readers.Violation) evidence.ArchitectureViolation) {
+// add merges one rule a reader read, each violation placed by place. id
+// identifies the rule across reports when its name may differ between them:
+// an ArchUnit rule is named by its case when kept and by its rule text when
+// broken, so its identity is its case. An empty id is the name.
+func (a *architecture) add(tool, id string, rule readers.ArchitectureRule, place func(readers.Violation) evidence.ArchitectureViolation) {
 	name := bounded(strings.TrimSpace(rule.Name))
 	if name == "" {
 		name = "(unnamed)"
 	}
-	key := tool + "\x00" + name
+	if id == "" {
+		id = name
+	}
+	key := tool + "\x00" + id
 	entry := a.rules[key]
 	if entry == nil {
 		if len(a.order) == evidence.MaxArchitectureRules {
@@ -57,6 +67,8 @@ func (a *architecture) add(tool string, rule readers.ArchitectureRule, place fun
 	if rule.Status != readers.RuleBroken {
 		return
 	}
+	// A broken rule's name is the one its violation states.
+	entry.Rule = name
 	entry.Status = evidence.ArchitectureBroken
 	entry.ViolationCount += max(rule.Count, len(rule.Violations), 1)
 	for _, v := range rule.Violations {
@@ -72,9 +84,30 @@ func (a *architecture) result() []evidence.ArchitectureRule {
 	if len(a.order) == 0 {
 		return nil
 	}
+	// Two identities that end with one tool and rule, such as two ArchUnit
+	// cases that state one rule text, are one rule.
 	out := make([]evidence.ArchitectureRule, 0, len(a.order))
+	at := map[[2]string]int{}
 	for _, key := range a.order {
-		out = append(out, *a.rules[key])
+		rule := *a.rules[key]
+		index, seen := at[[2]string{rule.Tool, rule.Rule}]
+		if !seen {
+			at[[2]string{rule.Tool, rule.Rule}] = len(out)
+			out = append(out, rule)
+			continue
+		}
+		merged := &out[index]
+		if rule.Status == evidence.ArchitectureBroken {
+			merged.Status = evidence.ArchitectureBroken
+			merged.ViolationCount += rule.ViolationCount
+			for _, v := range rule.Violations {
+				if len(merged.Violations) == evidence.MaxViolations {
+					a.droppedViolations++
+					continue
+				}
+				merged.Violations = append(merged.Violations, v)
+			}
+		}
 	}
 	return out
 }
@@ -97,7 +130,7 @@ func (r *Result) readArchitecture(report reports.Report, abs string, m *mapper, 
 		return
 	}
 	for _, rule := range result.Rules {
-		arch.add(tool, rule, func(v readers.Violation) evidence.ArchitectureViolation {
+		arch.add(tool, "", rule, func(v readers.Violation) evidence.ArchitectureViolation {
 			file := ""
 			if tool == evidence.ToolDeptrac {
 				file = m.phpClassFile(v.Subject)
@@ -118,9 +151,11 @@ func (r *Result) archUnitCase(in Input, report reports.Report, c readers.TestCas
 	}
 	rule, ok := readers.ArchUnitRule(c)
 	if !ok {
-		return true
+		// A skipped case is neither a rule nor a test; a case that ended in
+		// an error checked no rule and stays a failed test.
+		return c.Status == readers.StatusSkipped
 	}
-	arch.add(evidence.ToolArchUnit, rule, func(v readers.Violation) evidence.ArchitectureViolation {
+	arch.add(evidence.ToolArchUnit, c.Classname+"#"+c.Name, rule, func(v readers.Violation) evidence.ArchitectureViolation {
 		return m.violation(v, m.jvmClassFile(report.Path, v.Subject, v.File))
 	})
 	return true
@@ -182,11 +217,11 @@ func (m *mapper) usesArchUnit(file string) bool {
 // test, source roots: the class's package path and the file name ArchUnit
 // states, else the class name as a .java or .kt file.
 func (m *mapper) jvmClassFile(reportPath, class, fileName string) string {
-	if class == "" {
+	if !dottedName.MatchString(class) || strings.ContainsAny(fileName, `/\`) || fileName == "." || fileName == ".." {
 		return ""
 	}
 	candidates := jvmClassFiles(class)
-	if fileName != "" && !strings.ContainsAny(fileName, `/\`) {
+	if fileName != "" {
 		pkg := ""
 		if dot := strings.LastIndex(class, "."); dot > 0 {
 			pkg = strings.ReplaceAll(class[:dot], ".", "/") + "/"
@@ -219,7 +254,7 @@ func (m *mapper) phpClassFile(class string) string {
 	}
 	for _, root := range m.psr4Roots() {
 		rest, ok := strings.CutPrefix(class, root.prefix)
-		if !ok || rest == "" {
+		if !ok || !cleanSegments(strings.Split(rest, `\`)) {
 			continue
 		}
 		candidate := joinDir(root.dir, strings.ReplaceAll(rest, `\`, "/")+".php")
@@ -315,6 +350,17 @@ func (m *mapper) pythonModuleFile(module string) string {
 		}
 	}
 	return ""
+}
+
+// cleanSegments reports whether every segment of a name is a plain name:
+// not empty, not . and not ..
+func cleanSegments(segments []string) bool {
+	for _, segment := range segments {
+		if segment == "" || segment == "." || segment == ".." || strings.Contains(segment, "/") {
+			return false
+		}
+	}
+	return len(segments) > 0
 }
 
 // validRepositoryPath reports whether a joined path stays in the repository.

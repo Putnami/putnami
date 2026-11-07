@@ -105,6 +105,11 @@ func Run(in Input) Result {
 			ID: c.ID, Name: c.Name, Ecosystem: c.Ecosystem, Source: c.Source, Impact: impacts[c.ID], DependsOn: c.DependsOn,
 		})
 	}
+	for _, pattern := range in.ArchUnitClasses {
+		if _, err := path.Match(pattern, ""); err != nil {
+			r.warn(CodePatternInvalid, "archunit-classes", "the --archunit-classes pattern %q is invalid and matches nothing: %v", pattern, err)
+		}
+	}
 	m := newMapper(in.Root, in.Set)
 	lines := r.readReports(in, m)
 	r.changedLineCoverage(in, lines)

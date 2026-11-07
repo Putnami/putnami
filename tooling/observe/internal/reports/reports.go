@@ -233,7 +233,7 @@ func discoverReports(root string, kinds map[string]bool) ([]Report, []diag.Diagn
 		}
 		walked++
 		if walked > MaxWalkedEntries {
-			diags = append(diags, diag.Warningf(CodeDiscoveryBounded, "", "discovery stopped after %d entries: name the reports with --junit, --coverage and --sbom", MaxWalkedEntries))
+			diags = append(diags, diag.Warningf(CodeDiscoveryBounded, "", "discovery stopped after %d entries: name the reports with --junit, --coverage, --sbom and --architecture", MaxWalkedEntries))
 			return errBound
 		}
 		if entry.IsDir() {
@@ -257,7 +257,7 @@ func discoverReports(root string, kinds map[string]bool) ([]Report, []diag.Diagn
 		}
 		sniffed++
 		if sniffed > MaxSniffedFiles {
-			diags = append(diags, diag.Warningf(CodeDiscoveryBounded, "", "discovery stopped after reading %d candidate files: name the reports with --junit, --coverage and --sbom", MaxSniffedFiles))
+			diags = append(diags, diag.Warningf(CodeDiscoveryBounded, "", "discovery stopped after reading %d candidate files: name the reports with --junit, --coverage, --sbom and --architecture", MaxSniffedFiles))
 			return errBound
 		}
 		format, err := sniffFile(file)

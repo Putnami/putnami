@@ -62,7 +62,9 @@ func UsesArchUnit(source []byte) bool {
 var (
 	// archUnitRule is the head line ArchUnit writes for a violated rule:
 	// Architecture Violation [Priority: MEDIUM] - Rule '...' was violated (2 times):
-	archUnitRule = regexp.MustCompile(`Rule '(.*)' was violated \((\d+) times?\)`)
+	// A cycle rule capped at its maximum writes (>= 50 times - the maximum
+	// number of cycles to detect was reached; ...).
+	archUnitRule = regexp.MustCompile(`Rule '(.*)' was violated \((?:>= )?(\d+) times?`)
 	// archUnitLocation is the source location ArchUnit ends a violation with.
 	archUnitLocation = regexp.MustCompile(`\(([^()\s:]+\.[A-Za-z]+):(\d+)\)\s*$`)
 	// archUnitSubject is the first code unit a violation names.
@@ -70,7 +72,8 @@ var (
 )
 
 // ArchUnitRule reads a JUnit case whose test runs ArchUnit rules as one rule.
-// A passing case is a kept rule named by the case; a skipped case is none.
+// A passing case is a kept rule named by the case; a skipped case, or one
+// that ended in an error element rather than a failure, is none.
 // A failing case is a broken rule named by the rule its message states, else
 // by the case: each line after the first of the message is one violation.
 func ArchUnitRule(c TestCase) (ArchitectureRule, bool) {
@@ -83,6 +86,10 @@ func ArchUnitRule(c TestCase) (ArchitectureRule, bool) {
 	}
 	if c.Failure == nil {
 		return archUnitFailure(c.Name, ""), true
+	}
+	if c.Failure.Error {
+		// The test did not finish: no rule was checked.
+		return ArchitectureRule{}, false
 	}
 	// Surefire may cut a long message; its body holds the whole failure.
 	rule := archUnitFailure(c.Name, c.Failure.Message)
@@ -116,15 +123,28 @@ func archUnitFailure(name, text string) ArchitectureRule {
 		rule.Name = match[1]
 	}
 	rule.Count, _ = strconv.Atoi(match[2])
-	for _, line := range lines[head+1:] {
-		line = strings.TrimSpace(line)
+	for _, raw := range lines[head+1:] {
+		line := strings.TrimSpace(raw)
 		if strings.HasPrefix(line, "at ") {
 			// A stack trace follows the violations in a failure body.
 			break
 		}
-		if line != "" {
-			rule.Violations = append(rule.Violations, archUnitViolation(line))
+		if line == "" {
+			continue
 		}
+		// An indented line continues the violation above it, such as the
+		// slices and dependencies of one detected cycle.
+		if last := len(rule.Violations) - 1; last >= 0 && raw != line && strings.TrimLeft(raw, " \t") != raw {
+			v := &rule.Violations[last]
+			v.Message += "\n" + line
+			if v.Subject == "" {
+				if detail := archUnitViolation(line); detail.Subject != "" {
+					v.Subject, v.File, v.Line = detail.Subject, detail.File, detail.Line
+				}
+			}
+			continue
+		}
+		rule.Violations = append(rule.Violations, archUnitViolation(line))
 	}
 	rule.Count = max(rule.Count, len(rule.Violations), 1)
 	return rule

@@ -10,8 +10,6 @@ For each pull or merge request, the step answers:
 - which dependency versions the lockfiles moved and, with a software bill of materials (SBOM), the licences and known vulnerabilities each move brings or removes;
 - which MADR decision records govern the files it touches, and which records it adds, edits or deletes.
 
-- with ArchUnit, deptrac or import-linter, which architecture rules the change breaks, and in which file and component.
-
 It writes the answers in the job log and as a change evidence document you keep as an artifact. Once it uploads the evidence, it also posts a status and a note on the pull or merge request that link to the full report when the reporter answers its URL, else to the CI run. It never fails your job.
 
 `putnami observe` comes with the `@putnami/observe` extension. It is `experimental`: being on the stable channel is not a compatibility promise. [Observe](/docs/tooling-&-workspace/observe) lists every CI, repository tool, report format, lockfile and SBOM format it reads.
@@ -389,8 +387,44 @@ Without `--base-sbom`, each dependency gets its state at the head and the summar
                introduces 1 (GHSA-mrhx-c7xc-m3w5 high); license MIT
 ```
 
-- [How `putnami observe` explains a change](/docs/tooling-&-workspace/observe/change-analyses): components, tests, changed-line coverage, dependency changes and decision records.
-- [Architecture rules](/docs/tooling-&-workspace/observe/architecture): how the ArchUnit, deptrac and import-linter results are read and placed.
+### 8) See the decisions that govern a change
+
+If your team keeps its decisions as MADR files (Markdown Architectural Decision Records) under `docs/decisions` or `docs/adr`, `putnami observe` lists, with no other change, the decisions whose scope covers a changed file and the records the change adds, edits or deletes. A record gives its scope in its front matter or in a `## Scope` section:
+
+```markdown
+---
+status: accepted
+date: 2025-03-04
+scope:
+  - src/payments/
+---
+
+# Payments own the ledger
+```
+
+Records kept elsewhere are named on the observe line, such as `putnami observe --decisions architecture/decisions`. The summary lists each decision with its status, and a change that deletes an accepted decision gets a warning:
+
+```text
+  decisions  2 decisions
+    accepted   docs/decisions/0001-charges-are-synchronous.md: Charges are synchronous (deleted by the change)
+    accepted   docs/decisions/0002-payments-own-the-ledger.md: Payments own the ledger (governs 1 changed file)
+  warning observe.decision_deleted: the change deletes the accepted decision docs/decisions/0001-charges-are-synchronous.md (Charges are synchronous)
+```
+
+### 9) Show your architecture rules
+
+When your CI checks its architecture with ArchUnit, deptrac or import-linter, `putnami observe` shows each rule the checker found broken, with each violation, its file, its line and its component. Keep the checker's report where the observe step can read it; you rewrite no rule.
+
+- **ArchUnit** runs as JUnit tests: nothing to add. A test class that imports `com.tngtech.archunit` is read as rules, not tests. Name a class that does not with `--archunit-classes '*ArchitectureTest'`.
+- **deptrac**: write its JUnit report, `vendor/bin/deptrac analyse --formatter=junit --output=deptrac.xml || true`.
+- **import-linter**: save its output, `lint-imports > import-linter.txt || true`.
+
+`|| true` keeps the checker from stopping the job before the observe step; keep a separate step that runs the checker without it when a broken rule must fail the job. `putnami observe` finds the deptrac report by its content, and the import-linter output in a `.txt` file whose name contains `lint`. Name them with `--architecture deptrac.xml,import-linter.txt` when they lie elsewhere. The summary then counts the rules:
+
+```text
+  architecture  2 rules, 1 broken
+    broken    import-linter: Shared imports no service (1 violation)
+      shared shared/src/shared/money.py:3: shared.money -> api.main (l.3)
 ```
 
 ## Give your agents the same view

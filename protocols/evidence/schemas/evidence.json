@@ -496,8 +496,8 @@
         },
         "line": {
           "type": "integer",
-          "minimum": 1,
-          "description": "A line of file, which it needs."
+          "minimum": 0,
+          "description": "A line of file, from 1, which it needs; 0 or absent states no line."
         },
         "component": {
           "type": "string",
