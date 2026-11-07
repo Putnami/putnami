@@ -96,6 +96,21 @@
           }
         },
         {
+          "id": "the-ci-system-is-recognized-by-its-marker",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "each-marker-names-its-ci-system",
+              "ci-true-alone-is-a-generic-ci",
+              "no-variable-is-no-ci"
+            ]
+          }
+        },
+        {
           "id": "paths-stay-in-the-repository",
           "stage": "coded",
           "evidenceKinds": [
