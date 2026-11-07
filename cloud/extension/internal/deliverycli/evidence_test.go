@@ -14,6 +14,7 @@ import (
 
 	deliveryapiclient "go.putnami.dev/cloud/clients/delivery-api/go"
 	clicore "go.putnami.dev/cloud/extension/internal/clicore"
+	protocolcli "go.putnami.dev/protocol/cli"
 	"go.putnami.dev/protocol/evidence"
 	"go.putnami.dev/protocol/features/spectest"
 )
@@ -333,6 +334,15 @@ func TestEvidenceReportNamesTheRouteAndTheReasonOfARefusal(t *testing.T) {
 	}
 	if !strings.Contains(stdout, "run run-1") || strings.Contains(err.Error(), evidenceTestToken) {
 		t.Fatalf("stdout = %q, err = %v: want the opened run and no token", stdout, err)
+	}
+
+	// Under --output=json the failure result alone reports the run: no
+	// success result goes before it.
+	fake = &evidenceFakeServer{refuseReports: http.StatusRequestEntityTooLarge}
+	stdout, err = runEvidenceReport(t, fake, evidenceEnv(), "--file", evidenceFixture("turbo-pull-request.json"), "--output=json")
+	data, _ := protocolcli.ResultData(err).(map[string]any)
+	if err == nil || clicore.ExitCode(err) != clicore.ExitAPI || stdout != "" || data["run_id"] != "run-1" {
+		t.Fatalf("stdout = %q, err = %v, data = %v: want no success result and the run in the failure data", stdout, err, data)
 	}
 }
 

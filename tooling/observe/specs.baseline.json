@@ -49,6 +49,7 @@
     "tooling/observe-go#go-report-paths",
     "tooling/observe-host-report#publish-fails-open",
     "tooling/observe-host-report#publish-host-endpoints",
+    "tooling/observe-host-report#publish-needs-upload",
     "tooling/observe-host-report#publish-note",
     "tooling/observe-host-report#publish-status",
     "tooling/observe-jvm#gradle-change-analysis",
@@ -113,6 +114,7 @@
     "tooling/observe-swift#swiftpm-static-read",
     "tooling/observe-swift#swiftpm-static-read-diagnostic",
     "tooling/observe-swift#xcode-projects",
+    "tooling/observe-upload#upload-answers-the-report-url",
     "tooling/observe-upload#upload-fails-open",
     "tooling/observe-upload#upload-hands-the-document-to-the-reporter"
   ]

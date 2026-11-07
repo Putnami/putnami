@@ -32,14 +32,14 @@ With a Putnami Cloud workspace token, stored as the secret `PUTNAMI_CLOUD_TOKEN`
 
 ## Permissions
 
-The action hands the run's `GITHUB_TOKEN` to `putnami observe` only when `publish` is on, to set the commit status `putnami/observe` and write one summary note on the pull request. Then the job needs `statuses: write` and `pull-requests: write`. With `publish` off, it uses no GitHub token and needs no permission beyond reading the checkout. The tokens reach `putnami observe` only, never the installer. A `PUTNAMI_CLOUD_TOKEN` or `GITHUB_TOKEN` set in the step's `env` is not read: pass the Putnami token as the `token` input. On a pull request from a fork, GitHub gives a read-only token: the post is refused and the step still passes.
+The action hands the run's `GITHUB_TOKEN` to `putnami observe` only when `token` is set and `publish` is on, to set the commit status `putnami/observe` and write one summary note on the pull request. Then the job needs `statuses: write` and `pull-requests: write`. With `publish` off or no `token`, it uses no GitHub token and needs no permission beyond reading the checkout. The tokens reach `putnami observe` only, never the installer. A `PUTNAMI_CLOUD_TOKEN` or `GITHUB_TOKEN` set in the step's `env` is not read: pass the Putnami token as the `token` input. On a pull request from a fork, GitHub gives a read-only token: the post is refused and the step still passes.
 
 ## Inputs
 
 | Input | Default | Meaning |
 |---|---|---|
 | `token` | empty | Putnami Cloud workspace token with the `delivery.ingest` scope. When set, the step installs `@putnami/cloud` and uploads the evidence. |
-| `publish` | `true` with a token, `false` without | `true` posts the commit status and the summary note on the pull request; `false` does not. |
+| `publish` | `true` with a token, `false` without | `true` posts the commit status and the summary note on the pull request, which link to the report the upload stored, so it needs `token`; `false` does not post. |
 | `junit` | discovery | Comma-separated JUnit XML or TRX paths or glob patterns. Empty finds the reports by their content. |
 | `coverage` | discovery | Comma-separated LCOV, Cobertura, Clover, JaCoCo or Go cover paths or glob patterns. |
 | `sbom` | discovery | The software bill of materials (SBOM) of the commit, CycloneDX or SPDX JSON. |

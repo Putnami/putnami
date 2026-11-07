@@ -51,13 +51,17 @@ func Description(o observe.Observation) string {
 		changed, dependent, lines, count(len(a.DependencyChanges), "dependency change"))
 }
 
-// Note is the Markdown summary note. Its first line is Marker.
-func Note(o observe.Observation) string {
+// Note is the Markdown summary note. Its first line is Marker, and its first
+// link is reportURL, the report the upload stored, when there is one.
+func Note(o observe.Observation, reportURL string) string {
 	var b strings.Builder
 	fmt.Fprintln(&b, Marker)
 	fmt.Fprintln(&b, "### putnami observe")
 	fmt.Fprintln(&b)
 	fmt.Fprintf(&b, "**%s**\n\n", Description(o))
+	if reportURL != "" {
+		fmt.Fprintf(&b, "[Open the full report](%s)\n\n", reportURL)
+	}
 	head := "Commit " + code(short(o.Subject.SHA))
 	if o.Subject.BaseSHA != "" {
 		head += ", measured from " + code(short(o.Subject.BaseSHA))

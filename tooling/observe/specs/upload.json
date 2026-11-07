@@ -4,6 +4,7 @@
   "feature": "tooling/observe-upload",
   "outcomes": [
     "A CI job adds --upload to putnami observe and its change evidence document reaches the reporter it selected, Putnami Cloud by default",
+    "A CI job that uploads gets the URL of the full report its reporter answered, in the log and on the pull or merge request note",
     "A third party writes its own reporter as an extension that answers one subcommand, with no change to observe or to the CLI",
     "An upload that fails leaves a diagnostic in the log and never fails the CI job"
   ],
@@ -15,7 +16,11 @@
   "requirements": [
     {
       "id": "upload-hands-the-document-to-the-reporter",
-      "text": "With --upload, putnami observe writes the evidence document to the --evidence path, else to a temporary file it removes, then runs the CLI that started it, or putnami on PATH, as <name> evidence-report --file <path>, where <name> is the name without scope of the extension PUTNAMI_EVIDENCE_REPORTER selects, @putnami/cloud when the variable is unset. The reporter's output goes to observe's standard error, so --output=json still prints one document."
+      "text": "With --upload, putnami observe writes the evidence document to the --evidence path, else to a temporary file it removes, then runs the CLI that started it, or putnami on PATH, as <name> evidence-report --file <path> --output=json, where <name> is the name without scope of the extension PUTNAMI_EVIDENCE_REPORTER selects, @putnami/cloud when the variable is unset. The reporter's standard error goes to observe's standard error."
+    },
+    {
+      "id": "upload-answers-the-report-url",
+      "text": "Observe reads the last protocol CLI version 2 result the reporter writes on its standard output, and copies output that holds none to its standard error, so --output=json still prints one document. When the upload succeeded and data.reportUrl is an absolute https URL without credentials, observe prints it on standard error and the summary note links it. A reporter that answers no result or no such URL still uploaded, with no diagnostic. A failure result adds its error message to observe.upload_failed."
     },
     {
       "id": "upload-fails-open",

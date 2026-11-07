@@ -1,7 +1,8 @@
 // Package publish posts what observe found on the pull request or merge
 // request its job ran for: a commit status, on the pull request's head commit
 // or on the commit of the merge request pipeline, and one summary note that
-// the next run updates in place.
+// the next run updates in place. Both link the report the run's upload
+// stored, so a publication needs an upload that succeeded.
 //
 // GitHub Actions publishes with GITHUB_TOKEN, GitLab CI with a project or
 // personal access token in PUTNAMI_GITLAB_TOKEN, because the GitLab job token
@@ -39,7 +40,10 @@ const (
 	// Timeout bounds one publication.
 	Timeout = time.Minute
 
-	// CodeSkipped is the info of a job that has nothing to publish on.
+	// CodeNeedsUpload is the info of a run that publishes without --upload.
+	CodeNeedsUpload = "observe.publish_needs_upload"
+	// CodeSkipped is the info of a job that has nothing to publish on, or
+	// whose upload failed.
 	CodeSkipped = "observe.publish_skipped"
 	// CodeTokenMissing is the warning of a job without the code host's token.
 	CodeTokenMissing = "observe.publish_token_missing"
@@ -51,9 +55,25 @@ const (
 	requestTimeout = 20 * time.Second
 )
 
+// Upload is what the run's --upload did.
+type Upload int
+
+const (
+	// NotUploaded is a run without --upload.
+	NotUploaded Upload = iota
+	// UploadFailed is an upload that did not store the evidence.
+	UploadFailed
+	// Uploaded is an upload the reporter took.
+	Uploaded
+)
+
 // Request is one publication.
 type Request struct {
 	Observation observe.Observation
+	// Upload is what the run's --upload did.
+	Upload Upload
+	// ReportURL is the report URL the reporter answered, "" for none.
+	ReportURL string
 	// Getenv reads the environment.
 	Getenv func(string) string
 	// Client sends the requests; nil uses a client with a per-request
@@ -92,6 +112,13 @@ func Run(ctx context.Context, req Request) []diag.Diagnostic {
 	output := req.Output
 	if output == nil {
 		output = io.Discard
+	}
+	switch req.Upload {
+	case NotUploaded:
+		return []diag.Diagnostic{{Severity: diag.Info, Code: CodeNeedsUpload, Field: "publish",
+			Message: "--publish needs --upload, so the note links the report the upload stores; nothing was published"}}
+	case UploadFailed:
+		return skipped("the upload failed, so --publish has no report to link and published nothing")
 	}
 	cr := o.Subject.ChangeRequest
 	var tokenEnv string
@@ -140,13 +167,13 @@ func Run(ctx context.Context, req Request) []diag.Diagnostic {
 	if sha := h.statusSHA(); sha == "" {
 		diags = append(diags, diag.Warningf(CodeFailed, "publish",
 			"the CI names no commit of %s, so no commit status was set", h.requestLabel()))
-	} else if err := h.setStatus(ctx, sha, status{Description: Description(o), TargetURL: runURL(o.CI.URL)}); err != nil {
+	} else if err := h.setStatus(ctx, sha, status{Description: Description(o), TargetURL: target(req.ReportURL, o)}); err != nil {
 		diags = append(diags, fail("setting the commit status "+StatusName, err))
 	} else {
 		fmt.Fprintf(output, "putnami observe: set the commit status %s on %s\n", StatusName, short(sha))
 	}
 
-	body := Note(o)
+	body := Note(o, req.ReportURL)
 	id, err := h.findNote(ctx)
 	if err != nil {
 		return append(diags, fail("reading the notes", err))
@@ -179,6 +206,14 @@ func failed(format string, args ...any) []diag.Diagnostic {
 
 func label(provider string, number int) string {
 	return codehost.ChangeRequestLabel(provider, number)
+}
+
+// target is the link of the status: the report, else the CI run page.
+func target(reportURL string, o observe.Observation) string {
+	if reportURL != "" {
+		return reportURL
+	}
+	return runURL(o.CI.URL)
 }
 
 // runURL keeps an https run page without credentials, the only link a

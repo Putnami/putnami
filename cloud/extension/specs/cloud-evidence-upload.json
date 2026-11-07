@@ -33,7 +33,7 @@
     },
     {
       "id": "refuses-what-it-cannot-upload",
-      "text": "Without PUTNAMI_CLOUD_TOKEN, with a document that does not parse or validate, or with a document whose subject names no numeric project id, it sends nothing and exits non-zero with a message that names the cause. A refused run or batch exits non-zero with the route and the server's reason, and never prints the token; a run opened again without its operational counts as refused only when that call is refused too."
+      "text": "Without PUTNAMI_CLOUD_TOKEN, with a document that does not parse or validate, or with a document whose subject names no numeric project id, it sends nothing and exits non-zero with a message that names the cause. A refused run or batch exits non-zero with the route and the server's reason, and never prints the token; a run opened again without its operational counts as refused only when that call is refused too. Under --output=json a refused batch prints one failure result naming the run and what it stored."
     }
   ]
 }

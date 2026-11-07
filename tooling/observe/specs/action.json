@@ -28,7 +28,7 @@
     },
     {
       "id": "action-token-uploads-and-publishes",
-      "text": "With the token input set, the step runs putnami observe with --upload and PUTNAMI_CLOUD_TOKEN set to the token, and the publish input defaults to true; without it, publish defaults to false. publish set to true or false overrides the default. Only when publish is true does putnami observe get --publish and GITHUB_TOKEN, the run's token, so the job needs statuses: write and pull-requests: write only then. Another publish value fails the step before the install."
+      "text": "With the token input set, the step runs putnami observe with --upload and PUTNAMI_CLOUD_TOKEN set to the token, and the publish input defaults to true; without it, publish defaults to false. publish set to true or false overrides the default. publish true adds --publish, and the run's GITHUB_TOKEN reaches putnami observe only with the token too: only then does the job need statuses: write and pull-requests: write. Another publish value fails the step before the install."
     },
     {
       "id": "action-tokens-reach-observe-only",

@@ -9,7 +9,7 @@ For each pull or merge request, the step answers:
 - which tests passed or failed, and how much of the changed lines they covered;
 - which dependency versions the lockfiles moved and, with a software bill of materials (SBOM), the licences and known vulnerabilities each move brings or removes.
 
-It writes the answers in the job log, as a change evidence document you keep as an artifact, and as a status and a note on the pull or merge request. It never fails your job.
+It writes the answers in the job log and as a change evidence document you keep as an artifact. Once it uploads the evidence, it also posts a status and a note on the pull or merge request that link to the full report when the reporter answers its URL, else to the CI run. It never fails your job.
 
 `putnami observe` comes with the `@putnami/observe` extension. It is `experimental`: being on the stable channel is not a compatibility promise. [Observe](/docs/tooling-&-workspace/observe) lists every CI, repository tool, report format, lockfile and SBOM format it reads.
 
@@ -23,7 +23,8 @@ On GitHub Actions, the step is the action `Putnami/observe-action@v1`, from the 
 | `export PATH="$HOME/.putnami/bin:$PATH"` | Makes `putnami` reachable in the rest of the step. A script piped into `bash` cannot change the `PATH` of the shell that runs it. |
 | `putnami extensions install --user @putnami/observe` | Installs the extension in the user scope, so its command runs outside any workspace. `--user` takes one extension per command. |
 | `putnami extensions install --user @putnami/cloud` | Installs the extension that uploads the evidence to Putnami Cloud. The action runs this line only when its `token` input is set. |
-| `putnami observe --evidence observe-evidence.json --publish` | Prints the summary, writes the evidence document, and posts a commit status and a summary note on the pull or merge request. It exits `0` whatever it observes: only a usage error, or an evidence file it cannot write, fails it. |
+| `putnami observe --evidence observe-evidence.json` | Prints the summary and writes the evidence document. It exits `0` whatever it observes: only a usage error, or an evidence file it cannot write, fails it. |
+| `putnami observe --evidence observe-evidence.json --upload --publish` | Also uploads the evidence, then posts a commit status and a summary note on the pull or merge request that link to the report, or to the CI run when the reporter answers no report URL. `--publish` needs `--upload`. The action runs this line in place of the one above when its `token` input is set. |
 
 `putnami observe` finds the base of the change from the CI: the pull request base on GitHub, the merge request diff base on GitLab, and on a branch push the commit before the push. It deepens a shallow clone itself, so you do not change `fetch-depth` or `GIT_DEPTH`. It finds JUnit, TRX, LCOV, Cobertura, Clover, JaCoCo and Go cover reports by their content, anywhere in the checkout except `.git`, `node_modules`, `vendor` and the Gradle and Maven build outputs that hold no report, and the reports of Bazel through its `bazel-testlogs` and `bazel-out` links.
 
@@ -246,7 +247,7 @@ Add this step to the job that runs your tests, after the step that writes the re
 
 `if: ${{ !cancelled() }}` runs the step when a test fails too: a failed test is part of the evidence. The job needs a Linux or macOS runner, such as `ubuntu-latest`. Keep your `actions/checkout` step as it is: the default `fetch-depth: 1` works.
 
-Without a token, the step prints the summary in the job log and writes the evidence document. To also post the commit status and the summary note on the pull request, give the job these permissions and set `publish`:
+Without a token, the step prints the summary in the job log and writes the evidence document. To also upload the evidence and post the commit status and the summary note on the pull request, give the job these permissions and pass the token of step 6:
 
 ```yaml
     permissions:
@@ -259,7 +260,7 @@ Without a token, the step prints the summary in the job log and writes the evide
         uses: Putnami/observe-action@v1
         if: ${{ !cancelled() }}
         with:
-          publish: true
+          token: ${{ secrets.PUTNAMI_CLOUD_TOKEN }}
       - uses: actions/upload-artifact@v4
         if: ${{ !cancelled() }}
         with:
@@ -267,7 +268,7 @@ Without a token, the step prints the summary in the job log and writes the evide
           path: ${{ steps.observe.outputs.evidence }}
 ```
 
-The action passes the run's `GITHUB_TOKEN` to `putnami observe` only when `publish` is on. The `evidence` output is the path of the evidence document; `actions/upload-artifact` keeps it. The action's inputs `junit`, `coverage`, `sbom`, `base-sbom` and `base` pass the flags of the same name, and `channel` picks the release channel of the CLI and the extensions, `stable` by default. A token set in the step's `env` is not read: pass it as the `token` input. Its [README](https://github.com/Putnami/observe-action#readme) lists them.
+The action passes the run's `GITHUB_TOKEN` to `putnami observe` only when it publishes: with a token, unless `publish` is `false`. The `evidence` output is the path of the evidence document; `actions/upload-artifact` keeps it. The action's inputs `junit`, `coverage`, `sbom`, `base-sbom` and `base` pass the flags of the same name, and `channel` picks the release channel of the CLI and the extensions, `stable` by default. A token set in the step's `env` is not read: pass it as the `token` input. Its [README](https://github.com/Putnami/observe-action#readme) lists them.
 
 ### 3) GitLab CI: add a job after your test job
 
@@ -288,9 +289,9 @@ observe:
     - export PATH="$HOME/.putnami/bin:$PATH"
     - putnami extensions install --user @putnami/observe
     - putnami extensions install --user @putnami/cloud
-    - putnami observe --evidence observe-evidence.json --publish
-    # With PUTNAMI_CLOUD_TOKEN set as a masked CI/CD variable, this line uploads the evidence to Putnami Cloud:
-    # - putnami observe --evidence observe-evidence.json --publish --upload
+    - putnami observe --evidence observe-evidence.json
+    # With PUTNAMI_CLOUD_TOKEN set as a masked CI/CD variable, this line uploads the evidence to Putnami Cloud and publishes on the merge request:
+    # - putnami observe --evidence observe-evidence.json --upload --publish
   artifacts:
     when: always
     paths:
@@ -322,15 +323,15 @@ A report it cannot find or read is a warning in the same summary, such as `obser
 
 ### 5) Read the pull or merge request
 
-On a pull or merge request, `--publish` sets the commit status `putnami/observe` on the pull request's head commit, or on the commit of the merge request pipeline, with a one-line summary such as `1 changed, 2 dependent components; changed lines 80.0% covered; 1 dependency change`. It also writes one summary note with the components, their tests and coverage, the least covered changed lines and the dependency changes. The next run updates the same note instead of adding one.
+With `--upload --publish`, on a pull or merge request, `putnami observe` sets the commit status `putnami/observe` on the pull request's head commit, or on the commit of the merge request pipeline, with a one-line summary such as `1 changed, 2 dependent components; changed lines 80.0% covered; 1 dependency change`. It also writes one summary note with the components, their tests and coverage, the least covered changed lines and the dependency changes. The status and the note's first link open the full report the upload stored, once the reporter answers its URL; until then they link the CI run. The next run updates the same note instead of adding one.
 
-Without the token, or on a branch push, the summary says why nothing was posted, and the job still passes. On a pull request from a fork, GitHub gives a read-only `GITHUB_TOKEN` and refuses the post; the job still passes.
+Without `--upload`, after a failed upload, without the code host token, or on a branch push, the summary says why nothing was posted, and the job still passes. On a pull request from a fork, GitHub gives a read-only `GITHUB_TOKEN` and refuses the post; the job still passes.
 
 ### 6) Upload the evidence to Putnami Cloud
 
 To send the evidence to Putnami Cloud, store a workspace token with the `delivery.ingest` scope as the secret or masked CI/CD variable `PUTNAMI_CLOUD_TOKEN`. The token names the workspace.
 
-On GitHub, pass it to the action as `token: ${{ secrets.PUTNAMI_CLOUD_TOKEN }}`. With a token, `publish` is on unless you set it to `false`, so the job needs the permissions of step 2. On GitLab, use the commented `--upload` line in place of the line above it. An upload that fails is a diagnostic in the summary, and the job still passes.
+On GitHub, pass it to the action as `token: ${{ secrets.PUTNAMI_CLOUD_TOKEN }}`, as step 2 shows. With a token, the action uploads the evidence and publishes unless you set `publish` to `false`, so the job needs the permissions of step 2. On GitLab, use the commented `--upload --publish` line in place of the line above it. An upload that fails is a diagnostic in the summary, and the job still passes.
 
 ### 7) Add licences and known vulnerabilities from an SBOM
 

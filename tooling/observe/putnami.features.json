@@ -965,6 +965,21 @@
           }
         },
         {
+          "id": "upload-answers-the-report-url",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-reporter-answers-the-report-url",
+              "a-reporter-without-a-url-still-uploaded",
+              "a-failure-result-names-its-reason"
+            ]
+          }
+        },
+        {
           "id": "upload-fails-open",
           "stage": "coded",
           "evidenceKinds": [
@@ -983,7 +998,7 @@
       "id": "tooling/observe-host-report",
       "type": "feature",
       "name": "Publish the change summary on the pull or merge request",
-      "outcome": "A CI job adds --publish to putnami observe and the pull request or merge request gets a commit status and one summary note, updated in place by the next run, with a token the CI already holds, and a missing token or a job outside a pull or merge request publishes nothing and never fails the job",
+      "outcome": "A CI job adds --upload --publish to putnami observe and the pull request or merge request gets a commit status and one summary note that link to the full report, updated in place by the next run, and a job without an upload, a failed upload, a missing token or a job outside a pull or merge request publishes nothing and never fails the job",
       "owner": "tooling",
       "target": "modeled",
       "requirements": [
@@ -997,7 +1012,8 @@
             "kind": "acceptance",
             "checks": [
               "a-github-pull-request-gets-a-status-and-a-note",
-              "a-gitlab-merge-request-gets-a-status-and-a-note"
+              "a-gitlab-merge-request-gets-a-status-and-a-note",
+              "the-note-and-the-status-link-the-report"
             ]
           }
         },
@@ -1012,7 +1028,22 @@
             "checks": [
               "a-github-pull-request-gets-a-status-and-a-note",
               "a-gitlab-merge-request-gets-a-status-and-a-note",
-              "a-second-run-updates-the-same-note"
+              "a-second-run-updates-the-same-note",
+              "the-note-and-the-status-link-the-report"
+            ]
+          }
+        },
+        {
+          "id": "publish-needs-upload",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "without-an-upload-nothing-is-published",
+              "a-failed-upload-publishes-nothing"
             ]
           }
         },
