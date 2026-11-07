@@ -32,7 +32,22 @@ directories.
 |---|---|---|---|
 | GitHub Actions | `GITHUB_ACTIONS=true` | `GITHUB_SERVER_URL` host, `GITHUB_REPOSITORY_ID` | `GITHUB_REF` `refs/pull/<n>/merge`, or the event payload |
 | GitLab CI | `GITLAB_CI=true` | `CI_SERVER_HOST`, `CI_PROJECT_ID` | `CI_MERGE_REQUEST_IID` |
-| Any other | neither | none | none |
+| Jenkins | `JENKINS_URL` | none | none |
+| CircleCI | `CIRCLECI=true` | none | none |
+| Buildkite | `BUILDKITE=true` | none | none |
+| Azure Pipelines | `TF_BUILD=true` | none | none |
+| Bitbucket Pipelines | `BITBUCKET_BUILD_NUMBER` | none | none |
+| TeamCity | `TEAMCITY_VERSION` | none | none |
+| Any other | none of the above | none | none |
+
+The first variable set names the CI. A value compares without case, and a
+variable listed without one matches any non-empty value. The evidence
+document's `ci.system` carries the CI's name (`jenkins`, `circleci`,
+`buildkite`, `azure-pipelines`, `bitbucket-pipelines`, `teamcity`), or
+`generic` for any other CI. Only GitHub Actions and GitLab CI give a repository
+key and a change request: every other CI takes its base from `--base`. The
+[evidence protocol](https://github.com/putnami/putnami/blob/main/protocols/evidence/README.md)
+owns this table, so the evidence reporter recognizes a CI the same way.
 
 The repository path (`GITHUB_REPOSITORY`, `CI_PROJECT_PATH`, or the path of
 the `origin` remote) is for display only. A GitHub or GitLab job without a

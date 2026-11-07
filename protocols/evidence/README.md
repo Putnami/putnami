@@ -22,7 +22,7 @@ A document (`schemas/evidence.json`) has `protocolVersion: 1` and:
 | Member | Content |
 | --- | --- |
 | `subject` | The code host (`github`, `gitlab`, `generic`, the slugs [`codehost`](../codehost/README.md) owns), its hostname and the repository's numeric project id (required for github and gitlab: the key that survives a rename), the repository name, the commit `sha`, the `baseSha` when one was resolved, the branch and the change request number. |
-| `ci` | The CI system (`github-actions`, `gitlab-ci`, `generic`), its run id, job id and attempt (which, with the commit, identify the document among the jobs and re-runs of one commit), and an https run URL without credentials. |
+| `ci` | The CI system (`github-actions`, `gitlab-ci`, `jenkins`, `circleci`, `buildkite`, `azure-pipelines`, `bitbucket-pipelines`, `teamcity`, or `generic` for a CI without a marker and for no CI), its run id, job id and attempt (which, with the commit, identify the document among the jobs and re-runs of one commit), and an https run URL without credentials. |
 | `producer`, `generatedAt` | The program that wrote the document and when (RFC 3339 with a zone). |
 | `changedFiles` | The diff: path, status (`added`, `modified`, `deleted`, `renamed` with its `previousPath`), and the component the file belongs to. |
 | `components` | Repository-relative directories (`.` for the whole repository), with an open `ecosystem` slug, the `source` that found them (`orchestrator`, `workspace`, `manifest`, `fallback`, `declared`), their `impact` and their `dependsOn` edges. |
@@ -60,7 +60,19 @@ A document (`schemas/evidence.json`) has `protocolVersion: 1` and:
   file, 20 licences and 200 vulnerabilities per dependency state, and 4096
   bytes per string (`evidence.too_large`).
 - **Open where stacks grow.** Ecosystems are slugs: a new stack needs no
-  protocol version. A new code host or CI system does.
+  protocol change. A new code host or CI system is a protocol change: a reader
+  built before it refuses a document that names it (`evidence.invalid_subject`,
+  `evidence.invalid_ci`), so a reader updates before its producers write it.
+- **One way to recognize a CI.** `DetectCI` reads the variable each CI system
+  sets in every job, the first one set winning: `GITHUB_ACTIONS=true`
+  (`github-actions`), `GITLAB_CI=true` (`gitlab-ci`), `JENKINS_URL`
+  (`jenkins`), `CIRCLECI=true` (`circleci`), `BUILDKITE=true` (`buildkite`),
+  `TF_BUILD=true` (`azure-pipelines`), `BITBUCKET_BUILD_NUMBER`
+  (`bitbucket-pipelines`) and `TEAMCITY_VERSION` (`teamcity`). A value
+  compares without case; a variable listed without one matches any non-empty
+  value. Without a marker, `CI=true` or `CI=1` is a `generic` CI, and an
+  environment with neither is not a CI. Producers and readers share this
+  table.
 - **Optional members stay optional.** The `sbom` member and the dependency
   states are optional members of version 1: a document without them validates
   as before, and a producer that read no SBOM writes none of them. A reader

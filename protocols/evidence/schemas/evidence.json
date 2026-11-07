@@ -105,6 +105,12 @@
           "enum": [
             "github-actions",
             "gitlab-ci",
+            "jenkins",
+            "circleci",
+            "buildkite",
+            "azure-pipelines",
+            "bitbucket-pipelines",
+            "teamcity",
             "generic"
           ],
           "description": "The CI system.",
