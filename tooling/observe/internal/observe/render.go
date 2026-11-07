@@ -357,3 +357,27 @@ func orNone(licenses string) string {
 	}
 	return licenses
 }
+
+// writeDecisions writes the decision records the change concerns: status,
+// path and title, then the changed files each governs and its own change.
+// A change that concerns none writes nothing.
+func writeDecisions(b *strings.Builder, list []evidence.Decision) {
+	if len(list) == 0 {
+		return
+	}
+	fmt.Fprintf(b, "  decisions  %s\n", count(len(list), "decision"))
+	for i, d := range list {
+		if i == maxListedComponents {
+			fmt.Fprintf(b, "    ... and %d more\n", len(list)-i)
+			break
+		}
+		var notes []string
+		if len(d.Governs) > 0 {
+			notes = append(notes, "governs "+count(len(d.Governs), "changed file"))
+		}
+		if d.Change != "" {
+			notes = append(notes, d.Change+" by the change")
+		}
+		fmt.Fprintf(b, "    %-10s %s: %s (%s)\n", d.Status, d.Path, d.Title, strings.Join(notes, ", "))
+	}
+}

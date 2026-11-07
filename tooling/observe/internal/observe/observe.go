@@ -43,7 +43,7 @@ type Observation struct {
 	ChangedFiles    []gitbase.ChangedFile `json:"changedFiles"`
 	Reports         []reports.Report      `json:"reports"`
 	// Analysis is what the change touches: components, tests, coverage,
-	// changed-line coverage and dependency changes.
+	// changed-line coverage, dependency changes and decision records.
 	Analysis analyze.Result `json:"analysis"`
 	// Specs are the Spec Kit, OpenSpec, Kiro and Gherkin specs the
 	// repository keeps, with their requirements and whether the change
@@ -78,6 +78,9 @@ type Options struct {
 	// BazelGraph is the absolute path of the Bazel query export; empty reads
 	// bazel-graph.json at the repository root.
 	BazelGraph string
+	// Decisions are the repository directories that hold decision records;
+	// empty reads docs/decisions and docs/adr.
+	Decisions []string
 	// Detectors replace the default detectors when not nil.
 	Detectors []components.Detector
 }
@@ -116,7 +119,7 @@ func Run(ctx context.Context, opts Options) Observation {
 		o.Reports = []reports.Report{}
 	}
 	set := components.Detect(root, opts.detectors())
-	input := analyze.Input{Root: root, Set: set, ChangedFiles: o.ChangedFiles, Reports: o.Reports}
+	input := analyze.Input{Root: root, Set: set, ChangedFiles: o.ChangedFiles, Reports: o.Reports, DecisionDirs: opts.Decisions}
 	var analysisDiags []diag.Diagnostic
 	if resolved.BaseSHA != "" && resolved.HeadSHA != "" {
 		added, err := gitbase.AddedLines(ctx, root, resolved.BaseSHA, resolved.HeadSHA)
@@ -217,6 +220,7 @@ func WriteText(w io.Writer, o Observation) error {
 		fmt.Fprintf(&b, "    %-9s %s\n", file.Status, name)
 	}
 	writeAnalysis(&b, o.Analysis)
+	writeDecisions(&b, o.Analysis.Decisions)
 	fmt.Fprintf(&b, "  reports  %s\n", count(len(o.Reports), "report"))
 	for _, r := range o.Reports {
 		if r.Kind == reports.KindBaseSBOM {

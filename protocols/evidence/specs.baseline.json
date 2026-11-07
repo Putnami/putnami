@@ -4,6 +4,8 @@
   "executableRequirements": [
     "evidence/change-evidence-document#components-are-well-formed",
     "evidence/change-evidence-document#counts-add-up",
+    "evidence/change-evidence-document#decision-records-are-well-formed",
+    "evidence/change-evidence-document#decisions-follow-the-diff",
     "evidence/change-evidence-document#dependency-changes-are-well-formed",
     "evidence/change-evidence-document#dependency-states-are-well-formed",
     "evidence/change-evidence-document#impact-is-consistent",

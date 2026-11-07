@@ -24,6 +24,7 @@ GitHub Actions, it is one step: `uses: Putnami/observe-action@v1`.
 | Which dependencies moved? | It reads each changed lockfile at the base and at the commit, and lists the packages added, removed, upgraded or downgraded. |
 | Do those moves fix or bring known vulnerabilities, or change licences? | It reads the software bill of materials (SBOM, the list of a build's packages with their licences and known vulnerabilities) the job wrote, at the base and at the commit. |
 | Which specs does the repository keep, and does the change touch them? | It reads the Spec Kit, OpenSpec, Kiro and Gherkin specs, places each on its component, and lists its requirements. |
+| Which decisions govern the change? | It reads the MADR decision records under `docs/decisions` and `docs/adr`, and lists those whose scope covers a changed file and those the change adds, edits or deletes. A change that deletes an accepted decision is flagged. |
 
 ## What it writes
 

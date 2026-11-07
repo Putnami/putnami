@@ -1,0 +1,88 @@
+The decisions demo: a Go module that keeps three MADR decision records under docs/decisions, beside a README that is no record. 0001 is an accepted MADR 2 record with its status and date in a list; 0002 is a MADR 4 record whose front matter scope governs src/payments; 0003 is a superseded record whose Scope section governs every Go file of a queue directory. The change edits src/payments/charge.go and src/billing/queue/worker.go and deletes 0001.
+-- base/go.mod --
+module github.com/acme/checkout
+
+go 1.24
+-- base/src/payments/charge.go --
+package payments
+
+// Charge charges an amount in cents.
+func Charge(cents int) error {
+	return nil
+}
+-- base/src/billing/queue/worker.go --
+package queue
+
+// Work drains the billing queue.
+func Work() {}
+-- base/docs/decisions/README.md --
+# Decisions
+
+The architecture decisions of the checkout, in MADR.
+-- base/docs/decisions/0001-charges-are-synchronous.md --
+# Charges are synchronous
+
+* Status: accepted
+* Date: 2025-02-10
+
+## Context and Problem Statement
+
+A charge either succeeds or fails before the checkout answers.
+
+## Decision Outcome
+
+Chosen option: charge synchronously.
+-- base/docs/decisions/0002-payments-own-the-ledger.md --
+---
+status: accepted
+date: 2025-03-04
+decision-makers: payments team
+scope:
+  - src/payments/
+---
+
+# Payments own the ledger
+
+## Context and Problem Statement
+
+Only the payments package writes ledger entries.
+-- base/docs/decisions/0003-one-queue-per-domain.md --
+# One queue per domain
+
+## Status
+
+Superseded by [0002](0002-payments-own-the-ledger.md)
+
+## Scope
+
+- `src/**/queue/*.go`
+- `docs/queues.md` (the queue map)
+
+## Decision
+
+Each domain drains its own queue.
+-- head/src/payments/charge.go --
+package payments
+
+// Charge charges an amount in cents, and retries a declined charge once.
+func Charge(cents int) error {
+	if err := charge(cents); err != nil {
+		return charge(cents)
+	}
+	return nil
+}
+
+func charge(cents int) error {
+	return nil
+}
+-- head/src/billing/queue/worker.go --
+package queue
+
+// Work drains the billing queue until it is empty.
+func Work() {
+	for drain() {
+	}
+}
+
+func drain() bool { return false }
+-- delete/docs/decisions/0001-charges-are-synchronous.md --

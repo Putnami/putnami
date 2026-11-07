@@ -180,6 +180,20 @@ const (
 // severe, unknown last.
 var Severities = []string{SeverityCritical, SeverityHigh, SeverityMedium, SeverityLow, SeverityInfo, SeverityNone, SeverityUnknown}
 
+// Decision record statuses, as MADR names them. A record that states no
+// status the producer recognizes gives DecisionUnknown.
+const (
+	DecisionProposed   = "proposed"
+	DecisionAccepted   = "accepted"
+	DecisionRejected   = "rejected"
+	DecisionDeprecated = "deprecated"
+	DecisionSuperseded = "superseded"
+	DecisionUnknown    = "unknown"
+)
+
+// DecisionStatuses is the closed decision-status vocabulary.
+var DecisionStatuses = []string{DecisionProposed, DecisionAccepted, DecisionRejected, DecisionDeprecated, DecisionSuperseded, DecisionUnknown}
+
 // RootComponent is the id of a component that is the whole repository.
 const RootComponent = "."
 
@@ -192,6 +206,10 @@ const (
 	MaxDiagnostics             = 500
 	MaxFailingCases            = 50
 	MaxUncoveredLines          = 200
+	MaxDecisions               = 1000
+	// MaxDecisionScope and MaxGovernedFiles cap one decision.
+	MaxDecisionScope = 100
+	MaxGovernedFiles = 1000
 	// MaxLicenses and MaxVulnerabilities cap one dependency state.
 	MaxLicenses        = 20
 	MaxVulnerabilities = 200
@@ -233,6 +251,10 @@ type Document struct {
 	// SBOM names the software bills of materials the dependency states were
 	// read from. Absent when the producer read none.
 	SBOM *SBOM `json:"sbom,omitempty"`
+	// Decisions are the decision records the change concerns: those whose
+	// scope matches a changed file and those the change adds, modifies,
+	// renames or deletes. Absent when the producer found none.
+	Decisions []Decision `json:"decisions,omitempty"`
 	// Diagnostics are the producer's findings: a missing or malformed report, an
 	// unresolved base. They never make the document invalid.
 	Diagnostics []diag.Diagnostic `json:"diagnostics,omitempty"`
@@ -441,4 +463,27 @@ type Vulnerability struct {
 	ID string `json:"id"`
 	// Severity is critical, high, medium, low, info, none or unknown.
 	Severity string `json:"severity"`
+}
+
+// Decision is one decision record the change concerns. The producer reads the
+// record and matches its scope; the document reports the result.
+type Decision struct {
+	// Path is the record's path at the commit, or its last path when deleted.
+	Path string `json:"path"`
+	// Title is the record's title.
+	Title string `json:"title"`
+	// Status is proposed, accepted, rejected, deprecated, superseded or
+	// unknown.
+	Status string `json:"status"`
+	// Date is the date the record states, YYYY-MM-DD. Absent when it states
+	// none.
+	Date string `json:"date,omitempty"`
+	// Scope lists the path patterns the record governs, repository paths
+	// whose segments may hold *, ** and ?.
+	Scope []string `json:"scope,omitempty"`
+	// Governs lists the changed files the scope matches.
+	Governs []string `json:"governs,omitempty"`
+	// Change is the record's own file status when the change adds, modifies,
+	// renames or deletes it.
+	Change string `json:"change,omitempty"`
 }

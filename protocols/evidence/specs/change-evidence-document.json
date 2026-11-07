@@ -3,14 +3,14 @@
   "protocolVersion": 1,
   "feature": "evidence/change-evidence-document",
   "outcomes": [
-    "A repository that keeps its own CI describes one change, what it touches, its tests, its coverage, its dependency changes and, when its CI wrote a software bill of materials, the licences and known vulnerabilities of each changed dependency, in one versioned document that any reader interprets the same way.",
+    "A repository that keeps its own CI describes one change, what it touches, its tests, its coverage, its dependency changes, the decision records that govern the files it touches and, when its CI wrote a software bill of materials, the licences and known vulnerabilities of each changed dependency, in one versioned document that any reader interprets the same way.",
     "A producer and every reader share one schema, one strict parser and one fixture corpus, so a document either validates everywhere or is refused with the same codes.",
     "A document is internally consistent and bounded: every reference resolves, every count adds up, and no member grows without limit."
   ],
   "nonGoals": [
-    "Collecting the reports, detecting components or computing the analyses, which the observe extension owns.",
+    "Collecting the reports, detecting components, reading decision records, matching their scope or computing the analyses, which the observe extension owns.",
     "Uploading the document or deciding how much a reader trusts it: the document carries no verdict and no trust claim, and a reader treats it as self-reported.",
-    "Spec, architecture or task evidence, which later protocol versions or other protocols carry."
+    "Spec, architecture or task evidence beyond the decision records a change concerns, which later protocol versions or other protocols carry."
   ],
   "requirements": [
     {
@@ -67,7 +67,7 @@
     },
     {
       "id": "the-document-is-bounded",
-      "text": "A document holds at most 20000 changed files, 5000 components, 100000 dependency edges, 10000 dependency changes, 20000 changed-line coverage files and 500 diagnostics; a tests entry at most 50 failing cases, a file at most 200 uncovered line numbers, and every string at most 4096 bytes. A larger member is evidence.too_large. Checking the impact is linear in the components and the edges."
+      "text": "A document holds at most 20000 changed files, 5000 components, 100000 dependency edges, 10000 dependency changes, 20000 changed-line coverage files, 1000 decisions and 500 diagnostics; a tests entry at most 50 failing cases, a file at most 200 uncovered line numbers, a decision at most 100 scope patterns and 1000 governed files, and every string at most 4096 bytes. A larger member is evidence.too_large. Checking the impact is linear in the components and the edges."
     },
     {
       "id": "timestamps-and-diagnostics-are-well-formed",
@@ -80,9 +80,18 @@
     {
       "id": "dependency-states-are-well-formed",
       "text": "A dependency change carries a before state only when the sbom member names a base and the package is not added, and an after state only when it names a head and the package is not removed. A state lists non-empty licences and vulnerabilities, each with an id and a severity of critical, high, medium, low, info, none or unknown, else evidence.invalid_dependency_change. An id twice in a state is evidence.duplicate; over 20 licences or 200 vulnerabilities is evidence.too_large."
+    },
+    {
+      "id": "decision-records-are-well-formed",
+      "text": "The optional decisions member lists the records the change concerns. A decision names its record's path, a non-empty title and a status of proposed, accepted, rejected, deprecated, superseded or unknown; a date, when present, is a valid YYYY-MM-DD date; a scope pattern is a repository path whose segments may hold *, ** and ?. A path defect is evidence.invalid_path, a path or pattern twice evidence.duplicate, any other defect evidence.invalid_decision. A document without decisions validates as before."
+    },
+    {
+      "id": "decisions-follow-the-diff",
+      "text": "A decision governs only changed files, each once, else evidence.invalid_decision and evidence.duplicate. Its change, when present, is the file status of its record, which is then a changed file with that status; without a change, its record is not a changed file. A decision that neither governs a changed file nor has a change concerns no change and is refused. Every defect is evidence.invalid_decision."
     }
   ],
   "decisions": [
-    "protocols/evidence/doc/adr/0001-one-self-reported-change-evidence-document.md"
+    "protocols/evidence/doc/adr/0001-one-self-reported-change-evidence-document.md",
+    "protocols/evidence/doc/adr/0002-the-decision-records-a-change-concerns.md"
   ]
 }

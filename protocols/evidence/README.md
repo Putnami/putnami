@@ -30,6 +30,7 @@ A document (`schemas/evidence.json`) has `protocolVersion: 1` and:
 | `changedLineCoverage` | The coverage of the lines the change added or modified, per file, with the uncovered line numbers. |
 | `dependencyChanges` | The lockfile difference: ecosystem, lockfile, package, `added`, `removed`, `upgraded`, `downgraded` or `changed`, from and to versions. From a software bill of materials (SBOM), a `before` and an `after` state: the package's licences and known vulnerabilities, each an id and a severity (`critical`, `high`, `medium`, `low`, `info`, `none`, `unknown`). |
 | `sbom` | The SBOMs the states were read from: a `head` and a `base` document, each with its `format` (`cyclonedx` or `spdx`) and `specVersion`. Absent when the producer read none. Without a `base`, every base state is unknown. |
+| `decisions` | The decision records the change concerns: each record's `path`, `title`, `status` (`proposed`, `accepted`, `rejected`, `deprecated`, `superseded`, `unknown`), `date`, the path patterns of its `scope`, the changed files it `governs`, and its own file status as `change` when the change adds, modifies, renames or deletes it. Absent when the producer found none. See `doc/adr/0002-the-decision-records-a-change-concerns.md`. |
 | `diagnostics` | The producer's own findings (a missing report, an unresolved base). They never make the document invalid. |
 
 ## Rules
@@ -54,19 +55,25 @@ A document (`schemas/evidence.json`) has `protocolVersion: 1` and:
   and a package that was not added; an `after` state needs a `head` SBOM and a
   package that was not removed (`evidence.invalid_dependency_change`). An SBOM
   names a known format and a dotted spec version (`evidence.invalid_sbom`).
+  A decision names a title, a known status and a valid date, governs only
+  changed files, names the file status of its record exactly when the record
+  is a changed file, and concerns the change through one or the other
+  (`evidence.invalid_decision`).
 - **Bounded.** At most 20000 changed files, 5000 components, 10000 dependency
   changes, 100000 dependency edges, 20000 changed-line coverage files, 500
   diagnostics, 50 failing cases per tests entry, 200 uncovered line numbers per
-  file, 20 licences and 200 vulnerabilities per dependency state, and 4096
-  bytes per string (`evidence.too_large`).
+  file, 20 licences and 200 vulnerabilities per dependency state, 1000
+  decisions with at most 100 scope patterns and 1000 governed files each, and
+  4096 bytes per string (`evidence.too_large`).
 - **Open where stacks grow.** Ecosystems are slugs: a new stack needs no
   protocol change. A new code host or CI system is a protocol change: it
   extends a closed vocabulary of version 1, a reader built before it refuses a
   document that names it (`evidence.invalid_subject`, `evidence.invalid_ci`),
   so a reader updates before its producers write it.
-- **Optional members stay optional.** The `sbom` member and the dependency
-  states are optional members of version 1: a document without them validates
-  as before, and a producer that read no SBOM writes none of them. A reader
+- **Optional members stay optional.** The `sbom` member, the dependency
+  states and the `decisions` member are optional members of version 1: a
+  document without them validates as before, and a producer that read no SBOM
+  or found no decision record writes none of them. A reader
   built before they existed refuses a document that carries them
   (`evidence.unknown_field`), so a reader updates before its producers write
   them.

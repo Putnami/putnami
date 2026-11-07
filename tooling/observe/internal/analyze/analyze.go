@@ -1,10 +1,11 @@
 // Package analyze computes what a change touches: the changed and dependent
 // components, the tests and coverage of each component, the coverage of the
-// changed lines and the dependency changes of the lockfiles, with the licenses
-// and known vulnerabilities the software bills of materials list for them.
+// changed lines, the dependency changes of the lockfiles, with the licenses
+// and known vulnerabilities the software bills of materials list for them, and
+// the decision records the change concerns.
 //
-// It reads the components the detectors found, the reports the CI wrote and
-// the git diff; it runs nothing. Every finding is a diagnostic.
+// It reads the components the detectors found, the reports the CI wrote, the
+// decision records and the git diff; it runs nothing. Every finding is a diagnostic.
 package analyze
 
 import (
@@ -55,6 +56,9 @@ type Input struct {
 	// Show returns the content of a repository path at one side of the
 	// change; found is false when that side has no such file.
 	Show func(side Revision, path string) (data []byte, found bool, err error)
+	// DecisionDirs are the repository directories that hold decision records;
+	// empty reads the default ones.
+	DecisionDirs []string
 }
 
 // Result is what the analysis found.
@@ -72,8 +76,11 @@ type Result struct {
 	DependencyChanges []evidence.DependencyChange `json:"dependencyChanges,omitempty"`
 	// SBOM names the software bills of materials the dependency states were
 	// read from; nil when none was read.
-	SBOM        *evidence.SBOM    `json:"sbom,omitempty"`
-	Diagnostics []diag.Diagnostic `json:"-"`
+	SBOM *evidence.SBOM `json:"sbom,omitempty"`
+	// Decisions are the decision records the change concerns, sorted by
+	// path.
+	Decisions   []evidence.Decision `json:"decisions,omitempty"`
+	Diagnostics []diag.Diagnostic   `json:"-"`
 }
 
 // Run analyzes one change.
@@ -97,6 +104,7 @@ func Run(in Input) Result {
 	r.changedLineCoverage(in, lines)
 	r.dependencyChanges(in)
 	r.sbomFacts(in)
+	r.decisionRecords(in)
 	return r
 }
 
