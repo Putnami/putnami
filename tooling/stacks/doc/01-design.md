@@ -33,7 +33,7 @@ library, the **stack core**, `tooling/stacks`
 ```text
                      tooling/stacks  (the stack core, a Go library)
    ┌──────────────────────────────────────────────────────────────────┐
-   │ profile schema + strict decoder     workspace probe from a detector│
+   │ profile + strict decoder            workspace probe from a detector│
    │ overrides from putnami.json         input selectors lint|test|build│
    │ toolchain check                     task runner + report reading   │
    │ manifest conformance test kit                                      │
@@ -68,7 +68,7 @@ with its profile's markers: `Cargo.toml` for Rust.
 - `putnami projects sync` finds the component directories through those
   markers and adds them to `includes`. Membership stays Putnami's.
 - The probe (`__putnami workspace-probe`), served by the core, runs the
-  profile's detector and answers, for each candidate path that the detector
+  extension's detector and answers, for each candidate path that the detector
   knows as a component: the source name (the crate name), the dependencies as
   paths, the extension, and in `metadata` the component name, the stack root
   and the expected toolchain version.
@@ -82,14 +82,15 @@ extensions' fixtures, as #951 plans.
 ### The stack profile
 
 A profile is a JSON document each extension embeds in its runtime,
-`profile.json` at the extension root, validated by the core's JSON Schema.
+`profile.json` at the extension root, validated by the core's strict decoder: an unknown member, a placeholder the
+core does not know, or a task that names no input set fails the extension's
+own tests and, for an override, the project's load.
 The Rust reference profile:
 
 ```json
 {
   "id": "rust",
   "markers": ["Cargo.toml"],
-  "detector": "cargo",
   "toolchain": {
     "command": ["rustc", "--version"],
     "pattern": "^rustc (?<version>\\S+)",
@@ -134,7 +135,6 @@ The Rust reference profile:
 |---|---|
 | `id` | The stack id. |
 | `markers` | The files that make a directory a candidate. |
-| `detector` | The observe detector that names the components and their edges. |
 | `toolchain.command`, `toolchain.pattern` | How to read the version on the machine: the command's output, standard output first, matched by the pattern's `version` group. |
 | `toolchain.files` | The files that state the expected version, nearest first: in the project directory, then up to the stack root. `key` reads one value of a TOML or JSON file; without it, the file's first line. |
 | `inputs.<set>` | Named sets of file patterns. A plain pattern is relative to the project directory; `{root}/` makes it relative to the stack root, the directory of the build that holds the component (the Cargo workspace, the Gradle settings). |
@@ -173,7 +173,8 @@ whole; it never merges into an array.
 
 A workspace sets values for every project through a scope's `putnami.json`,
 with the same inheritance as every other option. An override is validated
-against the profile schema; an unknown member fails the load.
+by the same strict decoder; an unknown member, or a change to `id` or
+`markers`, fails the load.
 
 ### Inputs are input selectors
 
@@ -192,12 +193,12 @@ override that changes the inputs changes the answer.
 |---|---|
 | `putnami.extension.json` | The manifest: the runtime, the workspace adapter with the profile's markers, the `lint`, `test` and `build` commands and their tasks, the three input selectors. |
 | `profile.json` | The stack profile, embedded in the runtime. |
-| `cmd/putnami-<stack>/main.go` | `stacks.Main(profile)`. |
+| `cmd/putnami-<stack>/main.go` | `stacks.Main` with the extension's name, its profile and its detector: the observe detector that names the components and their edges. |
 | `doc/`, `putnami.features.json`, `specs/` | The stack's own docs and requirements. |
 
 The manifests repeat one shape. The core ships a test kit that every stack
 extension runs: its manifest declares the three commands, their tasks and
-selectors, and markers equal to its profile's; its profile passes the schema.
+selectors, and markers equal to its profile's; its profile passes the decoder.
 A stack extension that drifts from the core fails its own gate.
 
 ## The cache key
