@@ -34,6 +34,7 @@ func TestRecordsAreTheMarkdownFilesOfTheDecisionDirectories(t *testing.T) {
 		"docs/decisions/adr-template.md",
 		"docs/decisions/.drafts/0009-draft.md",
 		"docs/decisions/notes.txt",
+		`docs/decisions/0010-a\b.md`,
 		"docs/adr/0002-b.md",
 		"docs/architecture/0003-c.md",
 		"adr/0004-d.md",

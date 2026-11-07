@@ -44,6 +44,7 @@ func (r *Result) decisionRecords(in Input) {
 		}
 	}
 	sort.Strings(paths)
+	left := 0
 	for _, file := range paths {
 		record, ok := r.readRecord(in, file, status[file] == gitbase.StatusDeleted)
 		if !ok {
@@ -57,10 +58,13 @@ func (r *Result) decisionRecords(in Input) {
 			r.warn(CodeDecisionDeleted, decision.Path, "the change deletes the accepted decision %s (%s)", decision.Path, decision.Title)
 		}
 		if len(r.Decisions) == evidence.MaxDecisions {
-			r.warn(CodeDecisionsTruncated, decision.Path, "the change concerns more than %d decision records; %s is left out", evidence.MaxDecisions, decision.Path)
+			left++
 			continue
 		}
 		r.Decisions = append(r.Decisions, decision)
+	}
+	if left > 0 {
+		r.warn(CodeDecisionsTruncated, "decisions", "the change concerns more than %d decision records; %d are left out", evidence.MaxDecisions, left)
 	}
 }
 

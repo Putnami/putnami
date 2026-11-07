@@ -92,7 +92,8 @@ func IsRecord(file string, dirs []string) bool {
 }
 
 // Find lists the decision records under dirs in the repository at root,
-// sorted. A directory that does not exist holds none.
+// sorted. A directory that does not exist holds none, and a file whose path is
+// no repository path, such as one with a backslash in its name, is no record.
 func Find(root string, dirs []string) ([]string, error) {
 	var out []string
 	for _, dir := range dirs {
@@ -119,7 +120,7 @@ func Find(root string, dirs []string) ([]string, error) {
 				return err
 			}
 			rel = filepath.ToSlash(rel)
-			if IsRecord(rel, dirs) && !slices.Contains(out, rel) {
+			if IsRecord(rel, dirs) && valid(rel) && !slices.Contains(out, rel) {
 				out = append(out, rel)
 			}
 			return nil
