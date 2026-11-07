@@ -199,9 +199,12 @@ result. When it stored the evidence, `data.reportUrl` is the URL of the report:
 
 Observe prints that URL on standard error, and `--publish` links it. It keeps
 the URL only when it is an absolute https URL without credentials, at most
-2048 bytes, with no space, quote or parenthesis. A reporter that answers no
+2048 bytes, with no whitespace, quote, backtick, backslash, angle bracket or
+parenthesis. A reporter that answers no
 result or no such URL still uploaded: observe keeps no URL and gives no
-diagnostic. Standard output that is not a result goes to standard error.
+diagnostic. When the reporter writes several results, the last one counts.
+Standard output that holds no result goes to standard error. A reporter must
+accept `--output=json`: one that refuses the flag fails every upload.
 
 The upload never fails the job. A reporter that cannot start, exits non-zero
 or runs past 2 minutes, a selector that is not an extension name, and a

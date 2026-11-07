@@ -445,6 +445,7 @@ func TestPublishPostsTheSummaryOnTheMergeRequest(t *testing.T) {
 	spectest.Proves(t, "tooling/observe-host-report", "publish-fails-open", "a-missing-token-publishes-nothing")
 	spectest.Proves(t, "tooling/observe-host-report", "publish-note", "a-gitlab-merge-request-gets-a-status-and-a-note")
 	spectest.Proves(t, "tooling/observe-host-report", "publish-note", "the-note-and-the-status-link-the-report")
+	spectest.Proves(t, "tooling/observe-host-report", "publish-status", "the-note-and-the-status-link-the-report")
 	spectest.Proves(t, "tooling/observe-host-report", "publish-needs-upload", "without-an-upload-nothing-is-published")
 	spectest.Proves(t, "tooling/observe-host-report", "publish-needs-upload", "a-failed-upload-publishes-nothing")
 	spectest.Proves(t, "tooling/observe-upload", "upload-answers-the-report-url", "the-reporter-answers-the-report-url")

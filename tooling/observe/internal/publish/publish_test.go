@@ -249,6 +249,7 @@ func TestAGitHubPullRequestGetsAStatusAndANote(t *testing.T) {
 
 func TestTheNoteAndTheStatusLinkTheReport(t *testing.T) {
 	spectest.Proves(t, feature, "publish-note", "the-note-and-the-status-link-the-report")
+	spectest.Proves(t, feature, "publish-status", "the-note-and-the-status-link-the-report")
 	const report = "https://putnami.app/w/acme/changes/acme%2Fshop%2342"
 	o := pullRequest()
 	note := Note(o, report)

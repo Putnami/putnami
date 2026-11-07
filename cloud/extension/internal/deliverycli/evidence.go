@@ -33,6 +33,7 @@ import (
 
 	deliveryapiclient "go.putnami.dev/cloud/clients/delivery-api/go"
 	clicore "go.putnami.dev/cloud/extension/internal/clicore"
+	protocolcli "go.putnami.dev/protocol/cli"
 	diag "go.putnami.dev/protocol/diagnostic"
 	"go.putnami.dev/protocol/evidence"
 )
@@ -232,10 +233,16 @@ func EvidenceReport(params map[string]any, env map[string]string, ioctx clicore.
 	if len(already) > 0 {
 		summary += "; already stored " + strings.Join(already, ", ")
 	}
-	clicore.WriteResult(result, params, ioctx, summary+".")
 	if len(failures) > 0 {
-		return clicore.NewError("cloud evidence-report: a report batch was not stored: "+strings.Join(failures, "; "), clicore.ExitAPI)
+		err := clicore.NewError("cloud evidence-report: a report batch was not stored: "+strings.Join(failures, "; "), clicore.ExitAPI)
+		if mode, modeErr := clicore.ResolveOutputMode(params); modeErr == nil && mode.IsStructured() {
+			// One result per run: the failure result carries what was stored.
+			return protocolcli.WithResultData(err, result)
+		}
+		clicore.WriteResult(result, params, ioctx, summary+".")
+		return err
 	}
+	clicore.WriteResult(result, params, ioctx, summary+".")
 	return nil
 }
 

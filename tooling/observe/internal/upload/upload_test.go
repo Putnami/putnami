@@ -159,7 +159,7 @@ func TestAReporterWithoutAURLStillUploaded(t *testing.T) {
 }
 
 func TestAFailureResultNamesItsReason(t *testing.T) {
-	spectest.Proves(t, feature, "upload-answers-the-report-url", "the-reporter-answers-the-report-url")
+	spectest.Proves(t, feature, "upload-answers-the-report-url", "a-failure-result-names-its-reason")
 	stdout := `{"protocolVersion":2,"command":"cloud evidence-report","status":"failure","exitCode":4,"error":{"code":"auth","message":"cloud evidence-report needs\nPUTNAMI_CLOUD_TOKEN"}}`
 	var out bytes.Buffer
 	url, diags := Run(context.Background(), Request{Path: document(t), Getenv: env(map[string]string{"PUTNAMI_CLI_EXECUTABLE": answeringCLI(t, stdout, "4")}), Output: &out})
@@ -168,6 +168,14 @@ func TestAFailureResultNamesItsReason(t *testing.T) {
 	}
 	if strings.Contains(out.String(), "protocolVersion") {
 		t.Fatalf("the result reached the output: %q", out.String())
+	}
+
+	// A reporter that writes a success result, then a failure result, failed:
+	// the last result names the reason.
+	twice := resultJSON("success", `{"reportUrl":"https://putnami.app/r"}`) + "\n" + stdout
+	url, diags = Run(context.Background(), Request{Path: document(t), Getenv: env(map[string]string{"PUTNAMI_CLI_EXECUTABLE": answeringCLI(t, twice, "4")}), Output: &out})
+	if url != "" || len(diags) != 1 || !strings.HasSuffix(diags[0].Message, "needs PUTNAMI_CLOUD_TOKEN") {
+		t.Fatalf("two results: url %q, diagnostics %+v", url, diags)
 	}
 }
 

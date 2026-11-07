@@ -169,14 +169,23 @@ type result struct {
 	} `json:"error"`
 }
 
-// parseResult reads the reporter's standard output as one protocol CLI
-// version 2 result, and reports whether it is one.
+// parseResult reads the reporter's standard output as a stream of JSON
+// documents and returns the last protocol CLI version 2 result, and whether it
+// holds one. A reporter answers one result; the last one wins when it writes
+// more.
 func parseResult(stdout []byte) (result, bool) {
-	var r result
-	if len(bytes.TrimSpace(stdout)) == 0 || json.Unmarshal(stdout, &r) != nil || r.ProtocolVersion != resultProtocolVersion || r.Status == "" {
-		return result{}, false
+	var last result
+	found := false
+	decoder := json.NewDecoder(bytes.NewReader(stdout))
+	for {
+		var r result
+		if decoder.Decode(&r) != nil {
+			return last, found
+		}
+		if r.ProtocolVersion == resultProtocolVersion && r.Status != "" {
+			last, found = r, true
+		}
 	}
-	return r, true
 }
 
 // reportURL returns data.reportUrl of a successful result when it is an

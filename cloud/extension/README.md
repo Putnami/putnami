@@ -242,9 +242,12 @@ the credential rules and the refusals.
 ## Upload a change evidence document
 
 `@putnami/cloud` is the default evidence reporter of `putnami observe
---upload`, which runs `putnami cloud evidence-report --file <path>` with the
-document it wrote. The command runs outside a workspace. In a CI job, set
-`PUTNAMI_CLOUD_TOKEN` to a workspace token of scope
+--upload`, which runs `putnami cloud evidence-report --file <path>
+--output=json` with the document it wrote and reads the one result the command
+prints. When a report batch is refused, that result is a failure whose data
+names the run and what was stored. The result carries no report URL yet,
+because Delivery answers none. The command runs outside a workspace. In a CI
+job, set `PUTNAMI_CLOUD_TOKEN` to a workspace token of scope
 `delivery.ingest`; the token names the workspace.
 
 ```sh
