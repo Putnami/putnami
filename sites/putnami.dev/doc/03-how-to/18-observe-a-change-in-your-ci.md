@@ -267,7 +267,7 @@ Without a token, the step prints the summary in the job log and writes the evide
           path: ${{ steps.observe.outputs.evidence }}
 ```
 
-The action passes the run's `GITHUB_TOKEN` to `putnami observe` only when `publish` is on. The `evidence` output is the path of the evidence document; `actions/upload-artifact` keeps it. The action's inputs `junit`, `coverage`, `sbom`, `base-sbom` and `base` pass the flags of the same name, and `channel` picks the CLI release channel, `stable` by default. Its [README](https://github.com/Putnami/observe-action#readme) lists them.
+The action passes the run's `GITHUB_TOKEN` to `putnami observe` only when `publish` is on. The `evidence` output is the path of the evidence document; `actions/upload-artifact` keeps it. The action's inputs `junit`, `coverage`, `sbom`, `base-sbom` and `base` pass the flags of the same name, and `channel` picks the release channel of the CLI and the extensions, `stable` by default. A token set in the step's `env` is not read: pass it as the `token` input. Its [README](https://github.com/Putnami/observe-action#readme) lists them.
 
 ### 3) GitLab CI: add a job after your test job
 

@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"go.putnami.dev/protocol/features/spectest"
+	"go.putnami.dev/tooling/observe/internal/yaml"
 )
 
 // git runs git in dir with a fixed identity and returns its trimmed output.
@@ -145,5 +146,65 @@ func TestAReleaseRefusesABadOrExistingVersion(t *testing.T) {
 	}
 	if got := git(t, origin, "rev-parse", "main"); got != released {
 		t.Fatalf("a refused release moved main from %s to %s", released, got)
+	}
+}
+
+func TestARejectedPushMovesNoRef(t *testing.T) {
+	spectest.Proves(t, feature, "action-release", "a-rejected-push-moves-no-ref")
+
+	origin, clone := actionRepository(t)
+	if out, err := release(t, "1.0.0", clone); err != nil {
+		t.Fatalf("release.sh 1.0.0: %v\n%s", err, out)
+	}
+	released := git(t, origin, "rev-parse", "main")
+
+	moved := filepath.Join(t.TempDir(), "moved")
+	git(t, ".", "clone", "--quiet", origin, moved)
+	write(t, filepath.Join(moved, "README.md"), "# edited by hand\n", 0o644)
+	git(t, moved, "commit", "--quiet", "-am", "Edit by hand")
+	git(t, moved, "push", "--quiet", "origin", "main")
+	edited := git(t, origin, "rev-parse", "main")
+
+	if out, err := release(t, "1.1.0", clone); err == nil {
+		t.Fatalf("release.sh 1.1.0 passed on a branch that moved:\n%s", out)
+	}
+	if got := git(t, origin, "rev-parse", "main"); got != edited {
+		t.Fatalf("main = %s, want %s", got, edited)
+	}
+	if got := git(t, origin, "rev-parse", "v1^{commit}"); got != released {
+		t.Fatalf("v1 = %s, want the 1.0.0 release %s", got, released)
+	}
+	if out, err := gitCommand(origin, "rev-parse", "--verify", "--quiet", "refs/tags/v1.1.0").CombinedOutput(); err == nil {
+		t.Fatalf("v1.1.0 exists on origin: %s", out)
+	}
+}
+
+func TestTheReleaseJobRunsFromMainInItsEnvironment(t *testing.T) {
+	spectest.Proves(t, feature, "action-release-runs-from-main", "the-release-job-runs-from-main-in-its-environment")
+
+	data, err := os.ReadFile(filepath.Join("..", "..", "..", ".github", "workflows", "observe-action-release.yml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	doc, err := yaml.Parse(data)
+	if err != nil {
+		t.Fatal(err)
+	}
+	on, _ := yaml.Get(doc, "on").(yaml.Map)
+	if _, ok := on["workflow_dispatch"]; !ok || len(on) != 1 {
+		t.Fatalf("on = %v, want workflow_dispatch only", on)
+	}
+	jobs, _ := yaml.Get(doc, "jobs").(yaml.Map)
+	if len(jobs) != 1 {
+		t.Fatalf("jobs = %v, want the release job only", jobs)
+	}
+	if got := yaml.String(doc, "jobs", "release", "if"); got != "github.ref == 'refs/heads/main'" {
+		t.Fatalf("jobs.release.if = %q", got)
+	}
+	if got := yaml.String(doc, "jobs", "release", "environment"); got != "observe-action" {
+		t.Fatalf("jobs.release.environment = %q, want observe-action", got)
+	}
+	if got := yaml.String(doc, "permissions", "contents"); got != "read" {
+		t.Fatalf("permissions.contents = %q, want read", got)
 	}
 }

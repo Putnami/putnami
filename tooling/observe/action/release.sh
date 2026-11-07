@@ -6,9 +6,10 @@
 #
 # The clone's checked-out branch receives one commit whose tree is
 # action.yml, observe.sh and README.md from this directory and LICENSE.md
-# from the repository root, tagged vX.Y.Z, and the vX tag moves to it. The
-# branch and both tags are pushed to the clone's origin. A version that is not
-# X.Y.Z, or a vX.Y.Z tag that origin already holds, stops before any write.
+# from the repository root, tagged vX.Y.Z, and the vX tag moves to it. One
+# atomic push moves the branch and both tags on the clone's origin, or none of
+# them. A version that is not X.Y.Z, or a vX.Y.Z tag that origin already holds,
+# stops before any write.
 set -euo pipefail
 
 fail() {
@@ -51,6 +52,5 @@ git commit --quiet --allow-empty -m "$message"
 git tag "$tag"
 git tag --force "$major"
 
-git push --quiet origin "HEAD:refs/heads/$branch" "refs/tags/$tag"
-git push --quiet --force origin "refs/tags/$major"
+git push --quiet --atomic origin "HEAD:refs/heads/$branch" "refs/tags/$tag" "+refs/tags/$major"
 echo "release: $tag and $major point at $(git rev-parse HEAD) on $branch"

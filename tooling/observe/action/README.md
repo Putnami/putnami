@@ -32,7 +32,7 @@ With a Putnami Cloud workspace token, stored as the secret `PUTNAMI_CLOUD_TOKEN`
 
 ## Permissions
 
-The action reads the run's `GITHUB_TOKEN` only when `publish` is on, to set the commit status `putnami/observe` and write one summary note on the pull request. Then the job needs `statuses: write` and `pull-requests: write`. With `publish` off, it uses no GitHub token and needs no permission beyond reading the checkout. On a pull request from a fork, GitHub gives a read-only token: the post is refused and the step still passes.
+The action hands the run's `GITHUB_TOKEN` to `putnami observe` only when `publish` is on, to set the commit status `putnami/observe` and write one summary note on the pull request. Then the job needs `statuses: write` and `pull-requests: write`. With `publish` off, it uses no GitHub token and needs no permission beyond reading the checkout. The tokens reach `putnami observe` only, never the installer. A `PUTNAMI_CLOUD_TOKEN` or `GITHUB_TOKEN` set in the step's `env` is not read: pass the Putnami token as the `token` input. On a pull request from a fork, GitHub gives a read-only token: the post is refused and the step still passes.
 
 ## Inputs
 
@@ -45,7 +45,7 @@ The action reads the run's `GITHUB_TOKEN` only when `publish` is on, to set the 
 | `sbom` | discovery | The software bill of materials (SBOM) of the commit, CycloneDX or SPDX JSON. |
 | `base-sbom` | empty | The SBOM of the base. Without it, the base state of each dependency is unknown. |
 | `base` | the pull request or push | The commit or branch the change is measured against. |
-| `channel` | `stable` | Release channel or exact version of the Putnami CLI and its extensions. |
+| `channel` | `stable` | Release channel of the Putnami CLI and its extensions, such as `stable` or `canary`. `stable` reads the `latest` channel, as `putnami upgrade` does. A version is refused: the CLI and the extensions do not share one version. |
 
 ## Outputs
 

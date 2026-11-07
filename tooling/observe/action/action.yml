@@ -34,7 +34,7 @@ inputs:
     required: false
     default: ''
   channel:
-    description: Release channel or exact version of the Putnami CLI and its extensions.
+    description: Release channel of the Putnami CLI and its extensions, such as stable or canary; stable reads the latest channel. A version is refused.
     required: false
     default: stable
 outputs:

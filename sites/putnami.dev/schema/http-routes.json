@@ -2510,6 +2510,21 @@
     },
     {
       "match": "exact",
+      "path": "/docs/tooling-\u0026-workspace/observe/adr/the-observe-action-releases-by-copy",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "publicEdge": true,
+      "provenance": {
+        "project": "putnami.dev",
+        "package": "@putnami/web",
+        "sourceKind": "file-route",
+        "evidencePath": "src/app/docs/[...page]/page.tsx"
+      }
+    },
+    {
+      "match": "exact",
       "path": "/docs/tooling-\u0026-workspace/observe/bazel",
       "methods": [
         "GET",
@@ -5224,6 +5239,21 @@
     },
     {
       "match": "exact",
+      "path": "/fr/docs/tooling-\u0026-workspace/observe/adr/the-observe-action-releases-by-copy",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "publicEdge": true,
+      "provenance": {
+        "project": "putnami.dev",
+        "package": "@putnami/web",
+        "sourceKind": "file-route",
+        "evidencePath": "src/app/docs/[...page]/page.tsx"
+      }
+    },
+    {
+      "match": "exact",
       "path": "/fr/docs/tooling-\u0026-workspace/observe/bazel",
       "methods": [
         "GET",
@@ -5756,5 +5786,5 @@
       }
     }
   ],
-  "digest": "sha256:1abe3d23f2fa8725b3671c83591256d4a40923a5c1bfd38855b63bd77eec8264"
+  "digest": "sha256:b6087a5e53572a3bd3843204c60d9ee392fcc71b9b9066e46ebba6635aa0b361"
 }

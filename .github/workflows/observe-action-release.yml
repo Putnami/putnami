@@ -6,10 +6,14 @@
 # creates the GitHub release vX.Y.Z. A version that is not X.Y.Z, or one
 # already released, stops before any push (tooling/observe/action/release.sh).
 #
-# The secret OBSERVE_ACTION_TOKEN is a fine-grained token with read and write
-# access to the contents of Putnami/observe-action only. The Marketplace
-# listing itself is a checkbox on a release, in the web UI, that an
-# organization owner ticks once.
+# The job runs in the GitHub environment observe-action, whose deployment
+# branch policy allows main only. That environment holds the secret
+# OBSERVE_ACTION_TOKEN, a fine-grained token with read and write access to the
+# contents of Putnami/observe-action only, so a dispatch from another branch
+# gets no token. A rerun after a failed release call creates the missing
+# GitHub release. The Marketplace listing itself is a checkbox on a release, in
+# the web UI, that an organization owner ticks once. See
+# tooling/observe/doc/adr/0001-the-observe-action-releases-by-copy.md.
 name: Release the observe action
 
 on:
@@ -30,6 +34,7 @@ concurrency:
 jobs:
   release:
     if: github.ref == 'refs/heads/main'
+    environment: observe-action
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -42,7 +47,24 @@ jobs:
           repository: Putnami/observe-action
           path: observe-action
           token: ${{ secrets.OBSERVE_ACTION_TOKEN }}
+          fetch-depth: 0
+      - name: Read what the version already released
+        id: released
+        env:
+          VERSION: ${{ inputs.version }}
+          GH_TOKEN: ${{ secrets.OBSERVE_ACTION_TOKEN }}
+        run: |
+          tagged=false
+          if git -C observe-action rev-parse --quiet --verify "refs/tags/v$VERSION" >/dev/null; then
+            tagged=true
+          fi
+          echo "tagged=$tagged" >>"$GITHUB_OUTPUT"
+          if gh release view "v$VERSION" --repo Putnami/observe-action >/dev/null 2>&1; then
+            echo "::error::Release v$VERSION already exists."
+            exit 1
+          fi
       - name: Publish the action
+        if: steps.released.outputs.tagged != 'true'
         env:
           VERSION: ${{ inputs.version }}
           SOURCE: ${{ github.repository }}@${{ github.sha }}
