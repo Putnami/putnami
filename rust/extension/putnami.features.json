@@ -91,15 +91,6 @@
             "kind": "acceptance",
             "checks": ["the-manifest-conforms-to-the-stack-core"]
           }
-        },
-        {
-          "id": "real-tools-pass",
-          "stage": "coded",
-          "evidenceKinds": ["attestation"],
-          "verification": {
-            "kind": "acceptance",
-            "checks": ["the-fixture-repository-passes-with-the-real-tools"]
-          }
         }
       ]
     }

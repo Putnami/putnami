@@ -9,7 +9,6 @@
     "rust/stack-extension#manifest-follows-the-profile",
     "rust/stack-extension#nested-roots-reach-the-key",
     "rust/stack-extension#overrides-are-honored",
-    "rust/stack-extension#real-tools-pass",
     "rust/stack-extension#reports-become-the-summary",
     "rust/stack-extension#tasks-run-the-profile"
   ]

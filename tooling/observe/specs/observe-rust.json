@@ -11,16 +11,20 @@
     "Running cargo, cargo-nextest or cargo-llvm-cov, or reading cargo metadata",
     "Computing the changed and dependent components, the tests and coverage per component, the changed-line coverage and the lockfile diff: the change analyses own them",
     "Serving the probe from its own extension: the detector lives in @putnami/observe until the CLI can run a workspace probe outside a workspace",
-    "A [workspace] below the root, a target directory that CARGO_TARGET_DIR moves outside the repository, and the [patch] and [replace] tables"
+    "A target directory that CARGO_TARGET_DIR moves outside the repository, and the [patch] and [replace] tables"
   ],
   "requirements": [
     {
       "id": "rust-crates-are-components",
-      "text": "Walking past .git, target, node_modules, vendor and hidden directories, each directory the root Cargo.toml [workspace] members globs match, less those at or below an exclude entry, that holds a Cargo.toml is a component of source workspace, and so is a root with a [package] table beside its [workspace]. Each other Cargo.toml with a [package] table is one of source manifest. Its id is its directory, its name the package name, its ecosystem rust. A Cargo.toml that does not parse is a diagnostic."
+      "text": "Walking past .git, target, node_modules, vendor and hidden directories, each directory with a Cargo.toml that the root [workspace] members globs match, or that a member or the root package names as a path dependency below the root, less those at or below an exclude entry, is a component of source workspace, and so is a root with a [package] beside its [workspace]. Each other Cargo.toml with a [package] is one of source manifest. A Cargo.toml that does not parse is a diagnostic."
     },
     {
       "id": "rust-crate-edges",
-      "text": "A crate depends on another when an entry of its [dependencies], [dev-dependencies] or [build-dependencies], or of the same tables under a [target] platform, gives a path resolved against its own directory, or gives workspace = true for a workspace member, and the root [workspace.dependencies] gives that entry a path resolved against the root. A registry or git dependency, a path outside the repository or to no component, and the crate itself are no edge."
+      "text": "A crate depends on another when an entry of its [dependencies], [dev-dependencies] or [build-dependencies], or of those under a [target] platform, gives a path resolved against its directory, or gives workspace = true and the [workspace.dependencies] of the Cargo workspace that holds it, the root's or a nested one, gives that entry a path resolved against that workspace's directory. A registry or git dependency, a path to no component, and the crate itself are no edge."
+    },
+    {
+      "id": "rust-nested-workspaces",
+      "text": "A crate outside the root's workspace records the directory of the Cargo workspace that holds it, as Cargo finds it: the one its package.workspace names, else the nearest enclosing [workspace] below the root that names it as a member by a members glob or a path dependency of a member, searching further up past one that excludes it; else its own directory. Its source stays manifest, and it inherits that workspace's version and dependencies."
     },
     {
       "id": "rust-probe-answer",

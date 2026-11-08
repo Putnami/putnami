@@ -8,7 +8,7 @@
     "The test task reads the nextest JUnit report and the cargo-llvm-cov LCOV report into the test and coverage summary, with each case and each coverage line attributed to its crate",
     "Each task reads only the inputs it needs: lint does not rerun on a lockfile or nextest configuration change, and build does not rerun on a test change",
     "A crate overrides any value of the Rust profile in its putnami.json, and the override reaches the cache key",
-    "On the Cargo detector's fixture repository, with the real cargo, cargo-nextest and cargo-llvm-cov, lint, test and build pass with no putnami.json override"
+    "On the Cargo detector's fixture repository, with the real cargo, cargo-nextest and cargo-llvm-cov, lint, test and build pass with no putnami.json override and every case and coverage line attributed; a CI leg that installs those tools proves it, since the workspace gate has none"
   ],
   "nonGoals": [
     "Installing or switching a Rust toolchain, cargo-nextest or cargo-llvm-cov: the toolchain check compares and never installs",
@@ -51,10 +51,6 @@
     {
       "id": "manifest-follows-the-profile",
       "text": "The manifest passes the stack core's conformance kit: its markers are the profile's, it lists the rust:lint, rust:test and rust:build selectors, and each command runs one task that depends on the same task upstream, reads its selector and the profile's stack-root files for that task, and declares its command-output reports directory."
-    },
-    {
-      "id": "real-tools-pass",
-      "text": "On the fixture repository of the observe Cargo detector, with the real cargo, cargo-nextest and cargo-llvm-cov on PATH, lint, test and build pass for every crate with no putnami.json override, every test case and coverage line is attributed with no stacks.test_unattributed or stacks.coverage_unmapped, and a CI leg runs that proof with the real tools."
     }
   ],
   "decisions": [
