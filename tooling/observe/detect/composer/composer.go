@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"encoding/xml"
+	"errors"
 	"io/fs"
 	"os"
 	"path"
@@ -321,6 +322,41 @@ func pathPackages(root string, components []*component, byDir map[string]*compon
 		}
 	}
 	return provided
+}
+
+// PathRepositoryDirs returns, in path order, the directories holding a
+// composer.json that the path repositories of the manifest in dir match: the
+// packages that manifest's Composer build installs from the repository. A
+// directory with no composer.json returns none.
+func PathRepositoryDirs(root, dir string) ([]string, error) {
+	data, err := os.ReadFile(abs(root, join(dir, Marker)))
+	if errors.Is(err, fs.ErrNotExist) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	var m manifest
+	if err := json.Unmarshal(data, &m); err != nil {
+		return nil, err
+	}
+	var dirs []string
+	for _, url := range pathRepositoryURLs(m.Repositories) {
+		pattern, ok := under(dir, url)
+		if !ok {
+			continue
+		}
+		matches, err := fs.Glob(os.DirFS(root), pattern)
+		if err != nil {
+			continue
+		}
+		for _, match := range matches {
+			if d, ok := wsproto.NormalizeProbePath(match); ok && existing(root, join(d, Marker)) != "" {
+				dirs = append(dirs, d)
+			}
+		}
+	}
+	return sortedUnique(dirs), nil
 }
 
 // pathRepositoryURLs returns the urls of the path repositories a manifest
