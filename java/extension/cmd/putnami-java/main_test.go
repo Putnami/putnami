@@ -37,11 +37,3 @@ func TestRunReportsAFailedControlCallOnStderr(t *testing.T) {
 		t.Fatalf("exit %d, stdout %q, stderr %q", code, stdout.String(), stderr.String())
 	}
 }
-
-func TestRunAnswersTheToolchainResolveCall(t *testing.T) {
-	var stdout, stderr bytes.Buffer
-	request := `{"version":1,"extension":"@putnami/java","identities":["java"],"platform":"linux/amd64"}`
-	if code := run([]string{"__putnami", "toolchain-resolve"}, strings.NewReader(request), &stdout, &stderr, nil); code != 0 || !strings.Contains(stdout.String(), "@putnami/java") {
-		t.Fatalf("exit %d, stdout %q, stderr %q", code, stdout.String(), stderr.String())
-	}
-}

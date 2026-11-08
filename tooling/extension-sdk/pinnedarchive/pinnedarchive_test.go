@@ -752,3 +752,50 @@ func TestWithoutCredentialsLeavesAPlainPinAndRefusesAnUnparsableOne(t *testing.T
 		t.Fatalf("the error repeats the URL: %v", err)
 	}
 }
+
+func TestInstallSkipsLinksWhenAsked(t *testing.T) {
+	links := []archiveEntry{
+		{name: "go/legal/LICENSE", typeflag: tar.TypeSymlink, link: "../../LICENSE"},
+		{name: "go/escape", typeflag: tar.TypeSymlink, link: "/etc/passwd"},
+	}
+	for _, c := range []struct {
+		name   string
+		format Format
+		data   []byte
+	}{
+		{"tar.gz", TarGz, tarGzArchive(t, append(append(goLayout(), links...), archiveEntry{name: "go/hard", typeflag: tar.TypeLink, link: "go/VERSION"})...)},
+		{"zip", Zip, zipArchive(t, append(goLayout(), links...)...)},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			server, _ := archiveServer(t, c.data)
+			pin := Pin{URL: server.URL + "/a", SHA256: sha(c.data), Format: c.format}
+			outside := t.TempDir()
+			dest := filepath.Join(outside, "out")
+			if _, err := Install(context.Background(), pin, filepath.Join(t.TempDir(), "refused"), Options{}); !errors.Is(err, ErrUnsafeEntry) {
+				t.Fatalf("without SkipLinks a link is refused: %v", err)
+			}
+			if _, err := Install(context.Background(), pin, dest, Options{SkipLinks: true}); err != nil {
+				t.Fatalf("Install: %v", err)
+			}
+			if _, err := os.Stat(filepath.Join(dest, "go", "bin", "go")); err != nil {
+				t.Errorf("the files are installed: %v", err)
+			}
+			for _, link := range []string{"go/legal/LICENSE", "go/escape", "go/hard"} {
+				if _, err := os.Lstat(filepath.Join(dest, filepath.FromSlash(link))); !errors.Is(err, os.ErrNotExist) {
+					t.Errorf("the link %s is skipped: %v", link, err)
+				}
+			}
+			_ = filepath.WalkDir(outside, func(path string, d fs.DirEntry, err error) error {
+				if err == nil && d.Type()&fs.ModeSymlink != 0 {
+					t.Errorf("Install created the link %s", path)
+				}
+				return nil
+			})
+		})
+	}
+	fifo := tarGzArchive(t, append(goLayout(), archiveEntry{name: "go/fifo", typeflag: tar.TypeFifo})...)
+	server, _ := archiveServer(t, fifo)
+	if _, err := Install(context.Background(), Pin{URL: server.URL + "/a", SHA256: sha(fifo), Format: TarGz}, filepath.Join(t.TempDir(), "out"), Options{SkipLinks: true}); !errors.Is(err, ErrUnsafeEntry) {
+		t.Errorf("SkipLinks still refuses a FIFO: %v", err)
+	}
+}

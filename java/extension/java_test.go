@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+	extensionproto "go.putnami.dev/protocol/extension"
 	"go.putnami.dev/protocol/features/spectest"
 	wsproto "go.putnami.dev/protocol/workspace"
 	pctx "go.putnami.dev/sdk/extension/context"
@@ -18,6 +19,11 @@ import (
 )
 
 const feature = "java/stack-extension"
+
+// No test downloads a JDK: a test that installs one serves it itself.
+func init() {
+	downloadURL = func(string) string { return "http://127.0.0.1:1/no-download-in-tests" }
+}
 
 func writeFile(t *testing.T, root, rel, content string) {
 	t.Helper()
@@ -317,6 +323,8 @@ func TestATaskRunsTheVariantStepsAfterTheJavaCheck(t *testing.T) {
 		}
 	}
 
+	// Offline, the task installs no JDK, so the mismatch fails it.
+	t.Setenv(extensionproto.OfflineDependenciesEnv, "1")
 	stubTools(t, g, "17.0.9", junitPass)
 	if status, _, err := runJob(t, g, "api", stacks.TaskBuild); status != "FAILED" || err == nil || err.Error() != stacks.CodeToolchainMismatch {
 		t.Errorf("a Java mismatch fails the task: %s %v", status, err)

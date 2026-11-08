@@ -24,6 +24,12 @@ import (
 // Extracted files are written with mode 0755 when the archive marks any
 // execute bit and 0644 otherwise, and directories with 0755.
 func Extract(ctx context.Context, archivePath string, format Format, dir string, limits Limits) error {
+	return extract(ctx, archivePath, format, dir, limits, false)
+}
+
+// extract is Extract; skipLinks skips a symbolic or hard link entry instead of
+// refusing the archive, and creates nothing for it.
+func extract(ctx context.Context, archivePath string, format Format, dir string, limits Limits, skipLinks bool) error {
 	limits = limitsOrDefault(limits)
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return fmt.Errorf("create %s: %w", dir, err)
@@ -34,7 +40,7 @@ func Extract(ctx context.Context, archivePath string, format Format, dir string,
 	}
 	defer func() { _ = root.Close() }()
 
-	x := &extractor{ctx: ctx, root: root, limits: limits}
+	x := &extractor{ctx: ctx, root: root, limits: limits, skipLinks: skipLinks}
 	switch format {
 	case TarGz:
 		return x.tarGz(archivePath)
@@ -46,11 +52,12 @@ func Extract(ctx context.Context, archivePath string, format Format, dir string,
 }
 
 type extractor struct {
-	ctx     context.Context
-	root    *os.Root
-	limits  Limits
-	entries int
-	written int64
+	ctx       context.Context
+	root      *os.Root
+	limits    Limits
+	skipLinks bool
+	entries   int
+	written   int64
 }
 
 func (x *extractor) tarGz(archivePath string) (err error) {
@@ -111,6 +118,10 @@ func (x *extractor) tarGz(archivePath string) (err error) {
 			if err := x.file(name, hdr.Size, hdr.Mode&0o111 != 0, tr); err != nil {
 				return err
 			}
+		case tar.TypeSymlink, tar.TypeLink:
+			if !x.skipLinks {
+				return fmt.Errorf("%w: %q is a %s", ErrUnsafeEntry, hdr.Name, tarTypeName(hdr.Typeflag))
+			}
 		default:
 			return fmt.Errorf("%w: %q is a %s", ErrUnsafeEntry, hdr.Name, tarTypeName(hdr.Typeflag))
 		}
@@ -163,6 +174,7 @@ func (x *extractor) zip(archivePath string) error {
 			if err := x.zipFile(name, entry, size, mode&0o111 != 0); err != nil {
 				return err
 			}
+		case mode&fs.ModeSymlink != 0 && x.skipLinks:
 		default:
 			return fmt.Errorf("%w: %q is a %s", ErrUnsafeEntry, entry.Name, mode.Type())
 		}

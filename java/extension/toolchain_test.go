@@ -15,72 +15,98 @@ import (
 	"testing"
 
 	"go.putnami.dev/protocol/features/spectest"
-	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/tooling/stacks"
 )
 
-func resolveJava(t *testing.T, root, committed, platform string) (wsproto.ToolchainResolution, bool) {
-	t.Helper()
-	request := wsproto.ToolchainResolveRequest{Version: wsproto.ToolchainResolveProtocolVersion, Extension: ExtensionName, Identities: []string{LockIdentity}, Platform: platform}
-	if committed != "" {
-		request.Locked = map[string]wsproto.LockToolchainEntry{LockIdentity: {Version: committed}}
-	}
-	got, ok := answerToolchainResolve(root, request, stack(t).Profile).Toolchains[LockIdentity]
-	return got, ok
-}
-
-func TestInstallPinsTheJDKTheBuildsState(t *testing.T) {
-	spectest.Proves(t, feature, "toolchain-is-provided", "install-pins-the-jdk-the-builds-state")
-	g := gradleFixture(t)
-	if got, ok := resolveJava(t, g, "", "linux/amd64"); !ok || got.Pin.Version != "21.0.13" {
-		t.Fatalf(".java-version 21 pins 21.0.13: %+v", got)
-	} else {
-		a := got.Pin.Archives["linux/amd64"]
-		if !strings.HasPrefix(a.URL, "https://github.com/adoptium/temurin21-binaries/") || a.Executable != "jdk-21.0.13+9/bin/javac" || got.Pin.Integrities["linux/amd64"] != "d7f5d5cf865a2902b70ff549b97586a7d3f234e016f041ab447ea740c7d66d1c" {
-			t.Errorf("linux archive = %+v %v", a, got.Pin.Integrities)
-		}
-		if mac := got.Pin.Archives["darwin/arm64"]; mac.Executable != "jdk-21.0.13+9/Contents/Home/bin/javac" {
-			t.Errorf("a macOS JDK nests its home: %+v", mac)
-		}
-		if win := got.Pin.Archives["windows/amd64"]; win.Format != wsproto.LockArchiveFormatZip || !strings.HasSuffix(win.Executable, "javac.exe") {
-			t.Errorf("a Windows JDK is a zip: %+v", win)
+func TestATaskInstallsTheJDKItsBuildStates(t *testing.T) {
+	spectest.Proves(t, feature, "toolchain-is-provided", "a-task-installs-the-jdk-its-build-states")
+	tc := stack(t).Profile.Toolchain
+	for expected, want := range map[string]string{"": "21.0.13", "17": "17.0.21", "21": "21.0.13", "25": "25.0.5", "25.0.5": "25.0.5"} {
+		got, ok := choose(acceptedBy(tc, jdks, stacks.Expected{Version: expected, Source: ".java-version"}), "")
+		if !ok || got.version != want {
+			t.Errorf(".java-version %q installs %s, want %s", expected, got.version, want)
 		}
 	}
-	writeFile(t, g, ".java-version", "17\n")
-	if got, _ := resolveJava(t, g, "", "linux/amd64"); got.Pin == nil || got.Pin.Version != "17.0.21" {
-		t.Errorf(".java-version 17 pins 17.0.21: %+v", got)
-	}
-	writeFile(t, g, "api/.java-version", "25\n")
-	if got, _ := resolveJava(t, g, "", "linux/amd64"); got.Pin == nil || got.Pin.Version != "17.0.21" {
-		t.Errorf("when no release suits every build, the root's statement wins: %+v", got)
-	}
-	if err := os.Remove(filepath.Join(g, ".java-version")); err != nil {
-		t.Fatal(err)
-	}
-	if got, _ := resolveJava(t, g, "", "linux/amd64"); got.Pin == nil || got.Pin.Version != "25.0.5" {
-		t.Errorf("a component's statement narrows the pin: %+v", got)
-	}
-	if err := os.Remove(filepath.Join(g, "api/.java-version")); err != nil {
-		t.Fatal(err)
-	}
-	if got, _ := resolveJava(t, g, "17.0.21", "linux/amd64"); got.Pin == nil || got.Pin.Version != "17.0.21" {
-		t.Errorf("an accepted committed pin is kept: %+v", got)
-	}
-	if _, ok := resolveJava(t, g, "", "freebsd/amd64"); ok {
-		t.Error("a platform with no archive pins nothing")
-	}
-	if _, ok := resolveJava(t, t.TempDir(), "", "linux/amd64"); ok {
-		t.Error("a workspace with no Gradle or Maven build pins nothing")
-	}
-	request := wsproto.ToolchainResolveRequest{Version: wsproto.ToolchainResolveProtocolVersion, Extension: ExtensionName, Identities: []string{"maven"}, Platform: "linux/amd64"}
-	if got := answerToolchainResolve(g, request, stack(t).Profile).Toolchains["maven"]; got.Problem == nil {
-		t.Errorf("another identity is a problem: %+v", got)
+	if _, err := Provide(tc)(context.Background(), stacks.Expected{Version: "11", Source: ".java-version"}, func(string) {}); err == nil || !strings.Contains(err.Error(), "no Temurin JDK") {
+		t.Errorf("a version the extension pins no JDK for fails: %v", err)
 	}
 	for _, r := range jdks {
 		if len(r.archives) != 5 {
 			t.Errorf("%s ships %d platforms", r.version, len(r.archives))
 		}
+		major := strings.SplitN(r.version, ".", 2)[0]
+		for platform, a := range r.archives {
+			if !strings.HasPrefix(a.url, "https://github.com/adoptium/temurin"+major+"-binaries/releases/download/") || len(a.sha256) != 64 || !strings.HasSuffix(a.executable, "/javac") && !strings.HasSuffix(a.executable, "/javac.exe") {
+				t.Errorf("%s %s = %+v", r.version, platform, a)
+			}
+		}
 	}
+	if a := jdks[1].archives["linux/amd64"]; a.sha256 != "d7f5d5cf865a2902b70ff549b97586a7d3f234e016f041ab447ea740c7d66d1c" || a.executable != "jdk-21.0.13+9/bin/javac" {
+		t.Errorf("the linux JDK 21 = %+v", a)
+	}
+	if a := jdks[1].archives["darwin/arm64"]; a.executable != "jdk-21.0.13+9/Contents/Home/bin/javac" {
+		t.Errorf("a macOS JDK nests its home: %+v", a)
+	}
+
+	// A stub JDK archive, with the links a Temurin archive holds.
+	data := jdkArchive(t)
+	downloads := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		downloads++
+		_, _ = w.Write(data)
+	}))
+	defer server.Close()
+	sum := sha256.Sum256(data)
+	oldJDKs, oldPlatform, oldURL := jdks, hostPlatform, downloadURL
+	jdks = []jdk{{"21.0.13", map[string]archive{"linux/amd64": {"https://example.test/jdk.tar.gz", "tar.gz", "jdk-21.0.13+9/bin/javac", hex.EncodeToString(sum[:])}}}}
+	hostPlatform = "linux/amd64"
+	downloadURL = func(string) string { return server.URL + "/jdk.tar.gz" }
+	defer func() { jdks, hostPlatform, downloadURL = oldJDKs, oldPlatform, oldURL }()
+	t.Setenv("PUTNAMI_HOME", t.TempDir())
+	provided, err := Provide(tc)(context.Background(), stacks.Expected{Version: "21", Source: ".java-version"}, func(string) {})
+	if err != nil || !strings.HasSuffix(provided.Executable, filepath.Join("java-21.0.13", "jdk-21.0.13+9", "bin", "javac")) {
+		t.Fatalf("Provide: %+v %v", provided, err)
+	}
+	if _, err := os.Lstat(filepath.Join(filepath.Dir(filepath.Dir(provided.Executable)), "legal", "LICENSE")); !os.IsNotExist(err) {
+		t.Errorf("the archive's links are skipped: %v", err)
+	}
+	if _, err := Provide(tc)(context.Background(), stacks.Expected{}, func(string) {}); err != nil || downloads != 1 {
+		t.Errorf("a second task reuses the install: %d downloads, %v", downloads, err)
+	}
+	hostPlatform = "freebsd/amd64"
+	if _, err := Provide(tc)(context.Background(), stacks.Expected{}, func(string) {}); err == nil {
+		t.Error("a platform with no archive fails")
+	}
+}
+
+// jdkArchive is a tar.gz with jdk-21.0.13+9/bin/javac and a link under legal/.
+func jdkArchive(t *testing.T) []byte {
+	t.Helper()
+	var buf bytes.Buffer
+	gz := gzip.NewWriter(&buf)
+	tw := tar.NewWriter(gz)
+	body := []byte("#!/bin/sh\necho 'javac 21.0.13'\n")
+	for _, h := range []*tar.Header{
+		{Name: "jdk-21.0.13+9/bin/", Typeflag: tar.TypeDir, Mode: 0o755},
+		{Name: "jdk-21.0.13+9/bin/javac", Typeflag: tar.TypeReg, Mode: 0o755, Size: int64(len(body))},
+		{Name: "jdk-21.0.13+9/legal/LICENSE", Typeflag: tar.TypeSymlink, Linkname: "../../LICENSE"},
+	} {
+		if err := tw.WriteHeader(h); err != nil {
+			t.Fatal(err)
+		}
+		if h.Typeflag == tar.TypeReg {
+			if _, err := tw.Write(body); err != nil {
+				t.Fatal(err)
+			}
+		}
+	}
+	if err := tw.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := gz.Close(); err != nil {
+		t.Fatal(err)
+	}
+	return buf.Bytes()
 }
 
 // mavenArchive is a tar.gz that holds apache-maven-<version>/bin/mvn.

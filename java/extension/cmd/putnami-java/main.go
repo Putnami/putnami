@@ -24,8 +24,7 @@ func main() {
 func run(args []string, stdin io.Reader, stdout, stderr io.Writer, runJobs func(map[string]cli.JobFunc)) int {
 	stack, err := java.Stack()
 	if err == nil {
-		var handled bool
-		if handled, err = java.HandleToolchainResolve(args, stdin, stdout, stack.Profile); !handled && err == nil {
+		{
 			err = stack.Entrypoint(args, stdin, stdout, runtimeVersion, func(jobs map[string]cli.JobFunc) {
 				jobs[java.ServeJobName] = java.ServeJob(stack)
 				jobs[java.RunJobName] = java.RunJob(stack)

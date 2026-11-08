@@ -3,8 +3,6 @@ package java
 import (
 	"context"
 	"fmt"
-	"io"
-	"io/fs"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -17,10 +15,7 @@ import (
 	"go.putnami.dev/tooling/stacks"
 )
 
-// LockIdentity is the key of the JDK pin in the workspace lock.
-const LockIdentity = "java"
-
-// defaultVersion is the JDK a workspace gets when no .java-version narrows it.
+// defaultVersion is the JDK a task installs when .java-version accepts it.
 const defaultVersion = "21.0.13"
 
 // archive is one platform's archive of a JDK release.
@@ -38,8 +33,7 @@ type jdk struct {
 }
 
 // jdks lists the shipped Temurin releases, oldest first, with the SHA-256 the
-// Adoptium API publishes for each archive. The executable is javac: its
-// -version prints the bare version the lock's probe compares.
+// Adoptium API publishes for each archive and the path of its javac.
 var jdks = []jdk{
 	{"17.0.21", map[string]archive{
 		"darwin/amd64":  {"https://github.com/adoptium/temurin17-binaries/releases/download/jdk-17.0.21%2B9/OpenJDK17U-jdk_x64_mac_hotspot_17.0.21_9.tar.gz", wsproto.LockArchiveFormatTarGz, "jdk-17.0.21+9/Contents/Home/bin/javac", "868f5c672b3389fdbe48e44f94ae170f01668b1401360944fc7159d7cc9772cc"},
@@ -64,71 +58,56 @@ var jdks = []jdk{
 	}},
 }
 
-// HandleToolchainResolve serves the toolchain-resolve control call. The bool
-// reports whether args name that call.
-func HandleToolchainResolve(args []string, stdin io.Reader, stdout io.Writer, profile stacks.Profile) (bool, error) {
-	return wsproto.ServeToolchainResolve(args, stdin, stdout, func(request wsproto.ToolchainResolveRequest) (wsproto.ToolchainResolveResult, error) {
-		root, err := os.Getwd()
-		if err != nil {
-			return wsproto.ToolchainResolveResult{}, fmt.Errorf("resolve the workspace root: %w", err)
+// hostPlatform is the platform the extension runs on. Tests name another.
+var hostPlatform = runtime.GOOS + "/" + runtime.GOARCH
+
+// downloadURL rewrites an archive URL. Tests point it at a local server.
+var downloadURL = func(url string) string { return url }
+
+// Provide installs, under the Putnami home, the Temurin JDK the expected
+// version accepts, defaultVersion first, else the newest, when the javac on
+// PATH is missing or outside it, and answers its javac. A release installed by
+// an earlier task is reused with no network access.
+func Provide(toolchain stacks.Toolchain) func(ctx context.Context, expected stacks.Expected, info func(string)) (stacks.Provided, error) {
+	return func(ctx context.Context, expected stacks.Expected, info func(string)) (stacks.Provided, error) {
+		chosen, ok := choose(acceptedBy(toolchain, jdks, expected), "")
+		if !ok {
+			return stacks.Provided{}, fmt.Errorf("no Temurin JDK the extension pins (%s) satisfies %s %s", pinnedVersions(), expected.Source, expected.Version)
 		}
-		return answerToolchainResolve(root, request, profile), nil
-	})
+		a, ok := chosen.archives[hostPlatform]
+		if !ok {
+			return stacks.Provided{}, fmt.Errorf("the extension pins no Temurin JDK %s for %s", chosen.version, hostPlatform)
+		}
+		home := putnamihome.Resolve(os.Getenv)
+		if home == "" {
+			return stacks.Provided{}, fmt.Errorf("no Putnami home to install the JDK in: set %s", putnamihome.Env)
+		}
+		dir := filepath.Join(home, "toolchains", "java", "java-"+chosen.version)
+		executable := filepath.Join(dir, filepath.FromSlash(a.executable))
+		if _, err := os.Stat(executable); err != nil {
+			info("installing the Eclipse Temurin JDK " + chosen.version)
+		}
+		format := pinnedarchive.TarGz
+		if a.format == wsproto.LockArchiveFormatZip {
+			format = pinnedarchive.Zip
+		}
+		pin := pinnedarchive.Pin{URL: downloadURL(a.url), SHA256: a.sha256, Format: format}
+		if _, err := pinnedarchive.Install(ctx, pin, dir, pinnedarchive.Options{Limits: pinnedarchive.DefaultLimits(), SkipLinks: true, Complete: func(candidate string) bool {
+			_, err := os.Stat(filepath.Join(candidate, filepath.FromSlash(a.executable)))
+			return err == nil
+		}}); err != nil {
+			return stacks.Provided{}, fmt.Errorf("install the Temurin JDK %s: %w", chosen.version, err)
+		}
+		return stacks.Provided{Executable: executable}, nil
+	}
 }
 
-// answerToolchainResolve answers one request against the workspace at root. An
-// identity it pins nothing for is omitted, which leaves the lock without it.
-func answerToolchainResolve(root string, request wsproto.ToolchainResolveRequest, profile stacks.Profile) wsproto.ToolchainResolveResult {
-	result := wsproto.ToolchainResolveResult{
-		Version:    wsproto.ToolchainResolveProtocolVersion,
-		Extension:  ExtensionName,
-		Toolchains: map[string]wsproto.ToolchainResolution{},
+func pinnedVersions() string {
+	var out []string
+	for _, r := range jdks {
+		out = append(out, r.version)
 	}
-	for _, identity := range request.Identities {
-		if identity != LockIdentity {
-			result.Toolchains[identity] = wsproto.ToolchainResolution{Problem: &wsproto.ToolchainProblem{
-				Message: fmt.Sprintf("%s pins the %s toolchain only, not %q", ExtensionName, LockIdentity, identity),
-			}}
-			continue
-		}
-		if pin, ok := resolvePin(root, request, profile); ok {
-			result.Toolchains[identity] = wsproto.ToolchainResolution{Pin: &pin}
-		}
-	}
-	return result
-}
-
-// resolvePin returns the JDK the workspace at root pins: among the shipped
-// releases every .java-version of its builds accepts, or the root's accepts
-// when none suits them all, the committed pin when it is one, else
-// defaultVersion when accepted, else the newest accepted. A workspace with no
-// Gradle or Maven build pins nothing.
-func resolvePin(root string, request wsproto.ToolchainResolveRequest, profile stacks.Profile) (wsproto.LockToolchainEntry, bool) {
-	builds := buildDirs(root)
-	if len(builds) == 0 {
-		return wsproto.LockToolchainEntry{}, false
-	}
-	accepted := slices.Clone(jdks)
-	if expected, err := profile.Toolchain.ExpectedVersion(root, wsproto.ProbeRootPath, wsproto.ProbeRootPath); err == nil {
-		accepted = acceptedBy(profile.Toolchain, accepted, expected)
-	}
-	every := accepted
-	for _, dir := range builds {
-		if expected, err := profile.Toolchain.ExpectedVersion(root, dir, wsproto.ProbeRootPath); err == nil {
-			every = acceptedBy(profile.Toolchain, every, expected)
-		}
-	}
-	if len(every) > 0 {
-		accepted = every
-	}
-	chosen, ok := choose(accepted, request.Locked[LockIdentity].Version)
-	if !ok {
-		return wsproto.LockToolchainEntry{}, false
-	}
-	if _, served := chosen.archives[request.Platform]; !served {
-		return wsproto.LockToolchainEntry{}, false
-	}
-	return chosen.lockEntry(), true
+	return strings.Join(out, ", ")
 }
 
 // acceptedBy returns the releases expected accepts, oldest first. A version no
@@ -151,54 +130,7 @@ func choose(accepted []jdk, committed string) (jdk, bool) {
 	return accepted[len(accepted)-1], true
 }
 
-// lockEntry returns the release as a lock version 5 pin.
-func (r jdk) lockEntry() wsproto.LockToolchainEntry {
-	entry := wsproto.LockToolchainEntry{
-		Version:     r.version,
-		Archives:    make(map[string]wsproto.LockToolchainArchive, len(r.archives)),
-		Integrities: make(map[string]string, len(r.archives)),
-	}
-	for platform, a := range r.archives {
-		entry.Archives[platform] = wsproto.LockToolchainArchive{URL: a.url, Format: a.format, Executable: a.executable}
-		entry.Integrities[platform] = a.sha256
-	}
-	return entry
-}
-
-// skippedDirs are the directories the build search does not enter: VCS data,
-// build outputs and installed dependencies.
-var skippedDirs = []string{".git", ".gradle", ".putnami", "build", "node_modules", "target", "vendor"}
-
-// buildDirs answers the workspace-relative directories that hold a Gradle or
-// Maven build file.
-func buildDirs(root string) []string {
-	var out []string
-	_ = filepath.WalkDir(root, func(path string, entry fs.DirEntry, err error) error {
-		if err != nil {
-			return nil
-		}
-		if entry.IsDir() {
-			if path != root && slices.Contains(skippedDirs, entry.Name()) {
-				return filepath.SkipDir
-			}
-			return nil
-		}
-		switch entry.Name() {
-		case "pom.xml", "build.gradle", "build.gradle.kts", "settings.gradle", "settings.gradle.kts":
-			rel, err := filepath.Rel(root, filepath.Dir(path))
-			if err == nil {
-				if dir, ok := wsproto.NormalizeProbePath(filepath.ToSlash(rel)); ok && !slices.Contains(out, dir) {
-					out = append(out, dir)
-				}
-			}
-		}
-		return nil
-	})
-	return out
-}
-
-// Maven is installed by the extension when the machine has none: its version
-// command prints several lines, which no lock probe compares.
+// Maven is installed by the extension when the machine has none.
 const mavenVersion = "3.9.11"
 
 // mavenURL is where the Maven archive is published. Tests point it at a local

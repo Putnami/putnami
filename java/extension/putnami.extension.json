@@ -49,35 +49,8 @@
           }
         },
         "prependPath": true
-      },
-      "java": {
-        "lock": "java",
-        "optional": true,
-        "candidates": [
-          {
-            "from": "path",
-            "path": "javac"
-          },
-          {
-            "from": "provisioned"
-          }
-        ],
-        "probe": {
-          "args": [
-            "-version"
-          ],
-          "expect": "javac {version}"
-        },
-        "environment": {
-          "PUTNAMI_JAVA_EXECUTABLE": {
-            "from": "executable"
-          }
-        }
       }
     },
-    "resolves": [
-      "java"
-    ],
     "prepare": {
       "command": "{extensionRoot}/bin/prepare",
       "args": [
@@ -281,9 +254,6 @@
       "description": "Run the lint steps of the component's variant on one Gradle project or Maven module in its directory, after the Java toolchain check: gradlew check without the tests, or mvn clean of the module, then mvn verify -DskipTests. Its inputs are the files the java:lint selector answers from the resolved profile, and the stack-root files of every variant.",
       "kind": "command",
       "command": "{extensionRuntime}",
-      "toolchains": [
-        "java"
-      ],
       "args": [
         "lint",
         "--report-dir",
@@ -364,9 +334,6 @@
       "description": "Run the test steps of the component's variant on one Gradle project or Maven module in its directory, after the Java toolchain check (for Maven, clean of the module, then verify); then copy its JUnit and JaCoCo reports into the command output and read them. A failed case, a step that exits non-zero, or a missing report fails the task.",
       "kind": "command",
       "command": "{extensionRuntime}",
-      "toolchains": [
-        "java"
-      ],
       "args": [
         "test",
         "--report-dir",
@@ -444,9 +411,6 @@
       "description": "Run the build steps of the component's variant on one Gradle project or Maven module in its directory, after the Java toolchain check: gradlew assemble, or mvn clean of the module, then mvn package -DskipTests.",
       "kind": "command",
       "command": "{extensionRuntime}",
-      "toolchains": [
-        "java"
-      ],
       "args": [
         "build",
         "--report-dir",
@@ -524,9 +488,6 @@
       "description": "Build the application's runnable form (installDist, or the Spring Boot jar) and run it with PORT and SERVER_PORT set, until the user stops it; ready once the port accepts connections.",
       "kind": "command",
       "command": "{extensionRuntime}",
-      "toolchains": [
-        "java"
-      ],
       "args": [
         "serve"
       ],
@@ -545,9 +506,6 @@
       "description": "Build the application's runnable form and run it once with the args flag, forwarding its exit code.",
       "kind": "command",
       "command": "{extensionRuntime}",
-      "toolchains": [
-        "java"
-      ],
       "args": [
         "run"
       ],
@@ -566,9 +524,6 @@
       "description": "Assemble a local OCI image of an application from its runnable form, built by its own build, on a digest-pinned Temurin JRE. Sole owner of <command-output>/docker.",
       "kind": "command",
       "command": "{extensionRuntime}",
-      "toolchains": [
-        "java"
-      ],
       "args": [
         "package-docker"
       ],
