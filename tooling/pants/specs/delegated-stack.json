@@ -17,15 +17,15 @@
   "requirements": [
     {
       "id": "packages-become-projects",
-      "text": "The probe answers, for each candidate directory the observe Pants detector knows as a component: its directory as the source name, the directories of the components it depends on in the export pants-graph.json when the workspace root holds one, the extension @putnami/pants, the tag pants, and metadata naming the component, the stack root (the workspace root) and the Pants version pants.toml states in GLOBAL.pants_version. A directory whose BUILD file declares only third-party targets, and the repository root, are no project."
+      "text": "The probe answers, for each candidate directory the observe Pants detector knows as a component: its directory as source name, the components it depends on in pants-graph.json when the workspace root holds one, the extension @putnami/pants, the tag pants, and metadata naming the component, the workspace root as stack root and GLOBAL.pants_version of pants.toml. A directory with only third-party targets, and the repository root, are no project."
     },
     {
       "id": "sync-writes-the-package-graph",
-      "text": "The extension's workspace sync task reads the export pants-graph.json at the workspace root, or runs pants peek :: when there is none, and writes in each component's putnami.json, the repository root's excepted, the extension @putnami/pants, its dependencies as the project IDs of the components the export says it depends on, and test in disable.jobs when none of its targets is a test target. It keeps every other member of an existing putnami.json, writes nothing when neither the export nor pants is available, and says so."
+      "text": "The workspace sync task reads pants-graph.json at the workspace root, or runs pants peek :: without it, and writes in each component's putnami.json, the root's excepted: the extension @putnami/pants, the project IDs of the components it depends on, and test in disable.jobs when no target is a test target. It keeps every other member, and writes nothing without the export and pants."
     },
     {
       "id": "tasks-delegate-to-pants",
-      "text": "Each task first compares pants --version with GLOBAL.pants_version in pants.toml, then runs in the workspace root, with no shell, pants lint <dir>: for lint, pants --test-report --test-use-coverage --coverage-py-report=xml test <dir>: for test, and pants package <dir>: for build, where <dir>: names the targets of that one directory and those they generate. The manifest disables Putnami's cache for every task, and the task result records delegatedTo pants. A step that exits non-zero fails the task with stacks.step_failed."
+      "text": "Each task compares pants --version with GLOBAL.pants_version, then runs at the workspace root, with no shell, pants lint <dir>:, pants --test-report --test-use-coverage --coverage-py-report=xml test <dir>:, or pants package <dir>:, where <dir>: names one directory's targets. Every task disables Putnami's cache and its result records delegatedTo pants. A step that exits non-zero fails the task with stacks.step_failed."
     },
     {
       "id": "reports-become-the-summary",
