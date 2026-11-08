@@ -236,21 +236,25 @@ func TestArtifactRemovalStaysOnLiteralPathsInsideItsBase(t *testing.T) {
 	root := t.TempDir()
 	writeFile(t, root, "rust-toolchain.toml", "[toolchain]\nchannel = \"1.82.0\"\n")
 	writeFile(t, root, "crates/api/Cargo.toml", "")
-	writeFile(t, root, "crates/api/src/sample.wasm", "source")
+	writeFile(t, root, "crates/api/pkg/sample.wasm", "kept")
+	writeFile(t, root, "Cargo.lock", "test reads it")
 	writeFile(t, filepath.Dir(root), "victim", "keep")
 	t.Setenv("STUB_ROOT", root)
 	t.Setenv("STUB_LOG", filepath.Join(root, "log"))
 	stubTools(t, "1.82.0", junitPass)
 	s := testStack(t)
 	s.Profile.Tasks[TaskBuild] = Task{Steps: [][]string{{"cargo", "build"}}, Inputs: []string{"sources"},
-		Artifacts: []string{"**/*.wasm", "{root}/{component}"}}
+		Artifacts: []string{"**/*.wasm", "{root}/{component}", "{root}/Cargo.lock"}}
 
 	status, _, rec := runTask(t, s, root, TaskBuild)
 	if status != statusOK {
 		t.Fatalf("build: %s %v", status, rec.diags)
 	}
-	if _, err := os.Stat(filepath.Join(root, "crates/api/src/sample.wasm")); err != nil {
+	if _, err := os.Stat(filepath.Join(root, "crates/api/pkg/sample.wasm")); err != nil {
 		t.Errorf("a wildcard artifact pattern removes nothing: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(root, "Cargo.lock")); err != nil {
+		t.Errorf("a file another task reads is kept: %v", err)
 	}
 
 	meta, _ := json.Marshal(Metadata{Component: "../victim", Root: "."})
