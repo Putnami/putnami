@@ -1,0 +1,47 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-spec.json",
+  "protocolVersion": 1,
+  "feature": "tooling/pants-delegated-stack",
+  "outcomes": [
+    "Each directory of a Pants repository whose BUILD file declares a first-party target is a Putnami project, delegated to Pants, with an edge to each package Pants says it depends on",
+    "putnami lint, test and build run pants lint, test and package on each affected package, and Pants's cache decides what reruns",
+    "The test task reads the JUnit and coverage reports Pants writes under dist/ into the test and coverage summary",
+    "After a change to one package, putnami test runs that package and its dependents through Pants, and stores no Putnami cache entry"
+  ],
+  "nonGoals": [
+    "Importing Pants targets as Putnami tasks, or caching a Pants result in Putnami's cache",
+    "Installing or switching a Pants version: the toolchain check compares and never installs",
+    "Reading Pants's own task graph below the package: the edges are the export's, between directories",
+    "Coverage for a backend other than Python by default: a repository without the Python backend overrides the test steps"
+  ],
+  "requirements": [
+    {
+      "id": "packages-become-projects",
+      "text": "The probe answers, for each candidate directory the observe Pants detector knows as a component: its directory as the source name (// for the repository root), the directories of the components it depends on in the export, the extension @putnami/pants, the tag pants, and metadata naming the component, the stack root (the workspace root) and the Pants version pants.toml states in GLOBAL.pants_version. A directory whose BUILD file declares only third-party targets is no project."
+    },
+    {
+      "id": "sync-writes-the-package-graph",
+      "text": "The extension's workspace sync task reads the export pants-graph.json at the workspace root, or runs pants peek :: when there is none, and writes in each component's putnami.json the extension @putnami/pants, its dependencies as the project IDs of the components the export says it depends on, and test in disable.jobs when none of its targets is a test target. It keeps every other member of an existing putnami.json, writes nothing when neither the export nor pants is available, and says so."
+    },
+    {
+      "id": "tasks-delegate-to-pants",
+      "text": "Each task first compares pants --version with GLOBAL.pants_version in pants.toml, then runs in the workspace root, with no shell, pants lint <dir>: for lint, pants --test-report --test-use-coverage --coverage-py-report=xml test <dir>: for test, and pants package <dir>: for build, where <dir>: names the targets of that one directory and those they generate. The manifest disables Putnami's cache for every task, and the task result records delegatedTo pants. A step that exits non-zero fails the task with stacks.step_failed."
+    },
+    {
+      "id": "reports-become-the-summary",
+      "text": "After its steps, the test task reads the JUnit reports under dist/test/reports and the Cobertura report dist/coverage/python/coverage.xml, removed before the steps so another package's run is never read as this one's, into the test and coverage summary. A failed case fails the task with stacks.test_failed; a report pattern that matches no report fails it with stacks.report_missing."
+    },
+    {
+      "id": "impact-follows-the-package-graph",
+      "text": "On the Pants fixture of the putnami observe detector, after the sync, putnami test after a change to one package runs that package and the packages that depend on it, each through pants test on its own directory, reads their reports, and writes no entry to the Putnami cache."
+    },
+    {
+      "id": "manifest-follows-the-profile",
+      "text": "The manifest passes the stack core's conformance kit: its markers are the profile's, it lists the pants:lint, pants:test and pants:build selectors, each command runs one task that depends on the same task upstream, and every task of the delegated profile sets cache.enabled to false."
+    }
+  ],
+  "decisions": [
+    "tooling/stacks/doc/adr/0001-one-extension-per-stack-on-a-shared-core.md",
+    "tooling/stacks/doc/adr/0002-a-delegated-stack-keeps-its-tool-cache.md"
+  ]
+}
