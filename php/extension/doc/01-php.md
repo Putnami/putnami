@@ -139,12 +139,15 @@ names its own base with `--docker-base-image image@sha256:<digest>`. A base with
 no digest fails with `php.base_not_pinned`.
 
 An image packages an application whose stack root is its own directory. A
-path repository outside the workspace fails the package. `--platform` selects
+path repository outside the workspace or a symbolic link fails the package. `--platform` selects
 the target, `linux/amd64` by default.
 
-The cache key of an image covers the files it ships, with one limit: a
-Git-ignored file under a directory named `dist`, `out` or `vendor`, outside
-`public/`, does not reach the key. Run `package --no-cache` after you change one.
+The cache key of an image covers the files it ships, with one limit. A
+Git-ignored file under a directory named `dist`, `out`, `vendor` or
+`node_modules` does not reach the key, unless it sits directly under
+`public/dist`, `public/out` or `public/vendor` with no such directory below.
+Run `package --no-cache` after you change one. A submodule inside the project
+leaves the image uncached.
 
 A library packages nothing: it reaches Packagist through its tags. Putnami
 publishes no PHP archive and no base image.

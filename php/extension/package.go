@@ -337,16 +337,15 @@ func secretFile(name string) bool {
 		strings.HasSuffix(name, ".decrypt.private.php")
 }
 
-// copyFile copies a file's content and its executable bit, following a
-// symbolic link to a file. A link to a directory is an error: nothing can tell
-// what the image should hold.
+// copyFile copies a file's content and its executable bit. A symbolic link is
+// an error: the image's cache key does not cover what a link points to.
 func copyFile(source, target string) error {
-	info, err := os.Stat(source)
+	info, err := os.Lstat(source)
 	if err != nil {
 		return err
 	}
-	if info.IsDir() {
-		return fmt.Errorf("%s is a link to a directory, which an image cannot hold", source)
+	if info.Mode()&fs.ModeSymlink != 0 {
+		return fmt.Errorf("%s is a symbolic link, which an image cannot hold: replace it with the file", source)
 	}
 	data, err := os.ReadFile(source) //nolint:gosec // inside the stack root
 	if err != nil {

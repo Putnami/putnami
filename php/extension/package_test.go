@@ -457,3 +457,15 @@ func TestDepsUpgradeRefusesOfflineDependencies(t *testing.T) {
 		t.Errorf("deps-upgrade = %v", err)
 	}
 }
+
+func TestAStagedSymbolicLinkFailsPackaging(t *testing.T) {
+	source := t.TempDir()
+	writeFile(t, source, "public/app.js", "a")
+	if err := os.Symlink("app.js", filepath.Join(source, "public/linked.js")); err != nil {
+		t.Skipf("no symbolic links: %v", err)
+	}
+	err := copyTree(source, t.TempDir())
+	if err == nil || !strings.Contains(err.Error(), "symbolic link") {
+		t.Errorf("copyTree = %v", err)
+	}
+}
