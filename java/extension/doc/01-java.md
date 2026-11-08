@@ -55,8 +55,10 @@ When the root is no component itself, it is an input-only project its
 components depend on, so its settings, wrapper and root POM reach their keys.
 A Gradle build inside another one, such as `buildSrc` or an included build, is
 part of the build that holds it, and a nested Gradle build the outer one does
-not include is left out. A build file under a `src`, `target` or `build`
-directory, such as an invoker test or an archetype template, is no build.
+not include is left out. A build file under the `src`, `target` or `build`
+directory of another build, such as an invoker test or an archetype template,
+is no build; a build under a plain `src` directory, such as `src/adservice`,
+is. A Gradle plugin declared with `apply false` is not applied.
 
 ## The variant of each component
 

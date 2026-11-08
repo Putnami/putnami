@@ -547,8 +547,13 @@ func TestAModuleUnderAFolderWithNoPOMBelongsToItsOuterBuild(t *testing.T) {
 	writeFile(t, root, "services/api/pom.xml", `<project><parent><groupId>com.acme</groupId></parent><artifactId>api</artifactId><dependencies><dependency><groupId>com.acme</groupId><artifactId>lib</artifactId></dependency></dependencies></project>`)
 	writeFile(t, root, "lib/src/it/simple/pom.xml", `<project><groupId>it</groupId><artifactId>simple</artifactId></project>`)
 	writeFile(t, root, "lib/src/main/resources/archetype-resources/pom.xml", `<project><groupId>x</groupId><artifactId>tpl</artifactId></project>`)
+	// A build under a plain src directory, with no build file above it, is a
+	// build of its own.
+	writeFile(t, root, "demo/src/adservice/settings.gradle", "rootProject.name = 'adservice'\n")
+	writeFile(t, root, "demo/src/adservice/build.gradle", "plugins {\n    id 'application'\n}\n")
+	writeFile(t, root, "demo/src/adservice/src/main/java/A.java", "class A {}\n")
 	s := stack(t)
-	result, err := s.Probe(root, wsproto.ProbeRequest{Version: wsproto.ProbeProtocolVersion, Extension: s.Extension, Paths: []string{".", "lib", "lib/src/it/simple", "lib/src/main/resources/archetype-resources", "services/api"}})
+	result, err := s.Probe(root, wsproto.ProbeRequest{Version: wsproto.ProbeProtocolVersion, Extension: s.Extension, Paths: []string{".", "demo/src/adservice", "lib", "lib/src/it/simple", "lib/src/main/resources/archetype-resources", "services/api"}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -559,7 +564,7 @@ func TestAModuleUnderAFolderWithNoPOMBelongsToItsOuterBuild(t *testing.T) {
 	for _, p := range result.Projects {
 		got[p.Path] = p
 	}
-	if len(got) != 2 || metadata(t, got["services/api"]).Root != "." || !reflect.DeepEqual(got["services/api"].Dependencies, []string{"lib"}) {
+	if len(got) != 3 || metadata(t, got["services/api"]).Root != "." || !reflect.DeepEqual(got["services/api"].Dependencies, []string{"lib"}) || got["demo/src/adservice"].Type != TypeApplication {
 		t.Errorf("projects = %+v", result.Projects)
 	}
 }

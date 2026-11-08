@@ -65,7 +65,7 @@ func Detect(root string, request wsproto.ProbeRequest) ([]stacks.Component, []di
 	mavenRoots := map[string]bool{}
 	for _, p := range request.Paths {
 		dir, ok := wsproto.NormalizeProbePath(p)
-		if !ok || underSourcesOrOutputs(dir) {
+		if !ok || underSourcesOrOutputs(root, dir) {
 			continue
 		}
 		asked[dir] = true
@@ -244,18 +244,44 @@ func outermostFirst(m map[string]bool) []string {
 	return out
 }
 
-// sourceOrOutputDirs are the directories whose build files belong to no build
-// of their own: test fixtures and templates under src/, and build outputs.
-var sourceOrOutputDirs = []string{"src", "target", "build", ".gradle", "node_modules"}
+// sourceOrOutputDirs are the directories of a build whose build files belong
+// to no build of their own: test fixtures and templates under src/, and build
+// outputs.
+var sourceOrOutputDirs = []string{"src", "target", "build"}
 
-// underSourcesOrOutputs reports whether dir lies under such a directory.
-func underSourcesOrOutputs(dir string) bool {
-	for _, segment := range strings.Split(dir, "/") {
-		if slices.Contains(sourceOrOutputDirs, segment) {
+// underSourcesOrOutputs reports whether dir lies under the sources or outputs
+// of a build: a src, target or build directory directly below a directory
+// that holds a pom.xml or a Gradle build file, or a .gradle or node_modules
+// directory anywhere. A build under a plain src directory, such as
+// src/adservice, is a build of its own.
+func underSourcesOrOutputs(root, dir string) bool {
+	segments := strings.Split(dir, "/")
+	for i, segment := range segments {
+		if segment == ".gradle" || segment == "node_modules" {
+			return true
+		}
+		if !slices.Contains(sourceOrOutputDirs, segment) || i == len(segments)-1 {
+			continue
+		}
+		parent := wsproto.ProbeRootPath
+		if i > 0 {
+			parent = strings.Join(segments[:i], "/")
+		}
+		if isFile(root, joinRel(parent, maven.POM)) || buildFileName(root, parent) != "" {
 			return true
 		}
 	}
 	return false
+}
+
+// buildFileName answers the Gradle build file of dir, or "".
+func buildFileName(root, dir string) string {
+	for _, name := range gradle.BuildFiles {
+		if isFile(root, joinRel(dir, name)) {
+			return name
+		}
+	}
+	return ""
 }
 
 func sortedKeys(m map[string]bool) []string {
@@ -321,6 +347,11 @@ func gradlePlugins(build string) []string {
 		body := braceBody(build, block[1]-1)
 		for _, line := range strings.FieldsFunc(body, func(r rune) bool { return r == '\n' || r == ';' }) {
 			line = strings.TrimSpace(line)
+			// A plugin declared with apply false is put on the classpath for
+			// subprojects, not applied to this one.
+			if applyFalse.MatchString(line) {
+				continue
+			}
 			switch m := pluginEntry.FindStringSubmatch(line); {
 			case m == nil:
 			case m[1] != "":
@@ -346,6 +377,7 @@ var (
 	// kotlin("jvm"), then alias(libs.plugins.x), then a bare or backquoted
 	// name, each with an optional version and apply false.
 	pluginEntry = regexp.MustCompile(`^(?:id\s*\(?\s*["']([^"']+)["']|kotlin\s*\(\s*["']([^"']+)["']\s*\)|alias\s*\(\s*([A-Za-z0-9_.]+)\s*\)|` + "`?" + `([A-Za-z][A-Za-z0-9_.-]*)` + "`?" + `\s*$)`)
+	applyFalse  = regexp.MustCompile(`\bapply\s*\(?\s*false\s*\)?\s*$`)
 	applyPlugin = regexp.MustCompile(`apply\s*\(?\s*plugin\s*[:=]\s*["']([^"']+)["']`)
 )
 

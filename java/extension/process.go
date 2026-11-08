@@ -197,7 +197,13 @@ func application(ctx *pctx.Context, stack stacks.Stack, emit *jsonl.Emitter) (st
 	if err != nil {
 		return stacks.RootStep{}, runnable{}, none, fail(CodeNotRunnable, err)
 	}
-	private, err := os.MkdirTemp("", "putnami-java-app-")
+	// Under the workspace's .putnami, not the system temp directory, which
+	// may be mounted noexec and would not run a launcher.
+	scratch := filepath.Join(ctx.WorkspaceRoot, ".putnami", "tmp")
+	if err := os.MkdirAll(scratch, 0o755); err != nil {
+		return stacks.RootStep{}, runnable{}, none, fail(CodeRunFailed, err)
+	}
+	private, err := os.MkdirTemp(scratch, "java-app-")
 	if err != nil {
 		return stacks.RootStep{}, runnable{}, none, fail(CodeRunFailed, err)
 	}
