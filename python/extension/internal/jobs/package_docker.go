@@ -238,7 +238,7 @@ func imageEntrypoint(ctx *pctx.Context, flags map[string]string) (string, error)
 		return "", fmt.Errorf("the entrypoint %s is outside the project", entrypoint)
 	}
 	if info, err := os.Stat(filepath.Join(ctx.Project.FullPath, filepath.FromSlash(clean))); err != nil || info.IsDir() {
-		return "", fmt.Errorf("%s has no file %s: name the entrypoint the image runs with --entrypoint", ctx.Project.FullPath, clean)
+		return "", fmt.Errorf("%s has no file %s: name the entrypoint the image runs with --entrypoint, or in options[\"@putnami/python\"]", ctx.Project.FullPath, clean)
 	}
 	return clean, nil
 }

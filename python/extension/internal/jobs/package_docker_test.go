@@ -488,7 +488,7 @@ func TestPackageRefusesWhatItCannotImage(t *testing.T) {
 	}
 }
 
-func TestTheImageRunsTheEntrypointServeRuns(t *testing.T) {
+func TestTheImageRunsTheEntrypointOptionOfPackage(t *testing.T) {
 	root, _ := shopWorkspace(t)
 	writeImageFile(t, root, "apps/shop/src/shop/server.py", "")
 	ctx := shopContext(root)
