@@ -1,0 +1,345 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-extension.json",
+  "name": "@putnami/java",
+  "cliContract": 14,
+  "extensionDependencies": {
+    "@putnami/dev": ""
+  },
+  "runtime": {
+    "executable": "compiled/putnami-java",
+    "toolchains": {
+      "runtimeCompiler": {
+        "lock": "go",
+        "candidates": [
+          {
+            "from": "environment",
+            "environment": "GOROOT",
+            "path": "bin/go"
+          },
+          {
+            "from": "path",
+            "path": "go"
+          },
+          {
+            "from": "putnami-home",
+            "path": "toolchains/go/go-{version}/go/bin/go"
+          }
+        ],
+        "probe": {
+          "args": [
+            "env",
+            "GOVERSION"
+          ],
+          "expect": "go{version}",
+          "unset": [
+            "GOROOT"
+          ],
+          "environment": {
+            "GOTOOLCHAIN": "local"
+          }
+        },
+        "environment": {
+          "GOROOT": {
+            "from": "ancestor",
+            "levels": 2
+          },
+          "GOTOOLCHAIN": {
+            "from": "literal",
+            "value": "local"
+          }
+        },
+        "prependPath": true
+      }
+    },
+    "prepare": {
+      "command": "{extensionRoot}/bin/prepare",
+      "args": [
+        "--output",
+        "{runtimeOutput}"
+      ],
+      "inputs": [
+        "bin/prepare",
+        "cmd/**",
+        "go.mod",
+        "go.sum",
+        "*.go",
+        "profile.json"
+      ],
+      "toolchains": [
+        "runtimeCompiler"
+      ]
+    },
+    "inputSelectors": [
+      "java:build",
+      "java:lint",
+      "java:test"
+    ]
+  },
+  "workspace": {
+    "markers": [
+      "build.gradle.kts",
+      "build.gradle",
+      "pom.xml"
+    ],
+    "inputs": [
+      "build.gradle.kts",
+      "build.gradle",
+      "pom.xml",
+      "settings.gradle.kts",
+      "settings.gradle",
+      ".java-version"
+    ],
+    "excludes": [
+      "build",
+      "target",
+      ".gradle"
+    ],
+    "language": "java"
+  },
+  "commands": {
+    "lint": {
+      "description": "Lint the Gradle projects with check, without their tests, and the Maven modules with verify -DskipTests.",
+      "run": [
+        {
+          "id": "lint",
+          "task": "lint-run",
+          "dependsOn": [
+            "^lint"
+          ]
+        }
+      ]
+    },
+    "test": {
+      "description": "Test the Gradle projects and the Maven modules, and read their JUnit and JaCoCo reports.",
+      "run": [
+        {
+          "id": "test",
+          "heavy": true,
+          "task": "test-run",
+          "dependsOn": [
+            "^test"
+          ]
+        }
+      ]
+    },
+    "build": {
+      "description": "Build the Gradle projects with assemble and the Maven modules with package -DskipTests.",
+      "run": [
+        {
+          "id": "build",
+          "heavy": true,
+          "task": "build-run",
+          "dependsOn": [
+            "^build"
+          ]
+        }
+      ]
+    }
+  },
+  "tasks": {
+    "lint-run": {
+      "description": "Run the lint steps of the component's variant on one Gradle project or Maven module in its directory, after the Java toolchain check: gradlew check without the tests, or mvn verify -DskipTests. Its inputs are the files the java:lint selector answers from the resolved profile, and the stack-root files of every variant.",
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": [
+        "lint",
+        "--report-dir",
+        "{outputRoot}"
+      ],
+      "cwd": "{projectRoot}",
+      "timeoutMs": 1800000,
+      "inputs": {
+        "sources": {
+          "from": "project",
+          "files": [
+            "java:lint"
+          ]
+        },
+        "stackRoot": {
+          "from": "workspace",
+          "files": [
+            ".editorconfig",
+            ".java-version",
+            ".mvn/extensions.xml",
+            ".mvn/jvm.config",
+            ".mvn/maven.config",
+            "build-logic/**",
+            "build.gradle",
+            "build.gradle.kts",
+            "buildSrc/**",
+            "config/checkstyle/**",
+            "config/detekt/**",
+            "config/pmd/**",
+            "config/spotbugs/**",
+            "gradle.properties",
+            "gradle/libs.versions.toml",
+            "gradle/wrapper/gradle-wrapper.properties",
+            "pom.xml",
+            "settings.gradle",
+            "settings.gradle.kts"
+          ]
+        },
+        "extensionVersion": {
+          "from": "runtime"
+        }
+      },
+      "outputs": {
+        "data": {
+          "description": "The task result: the test and coverage totals of a test task."
+        }
+      },
+      "cache": {
+        "enabled": true
+      },
+      "declares": {
+        "outputs": {
+          "reports": {
+            "kind": "directory",
+            "root": "command-output",
+            "path": "lint",
+            "optionalEmpty": true,
+            "description": "The reports the task wrote or copied: a copy of each JUnit and JaCoCo report of a test task."
+          }
+        },
+        "effects": [
+          "network",
+          "toolchain-cache"
+        ]
+      }
+    },
+    "test-run": {
+      "description": "Run the test steps of the component's variant on one Gradle project or Maven module in its directory, after the Java toolchain check; then copy its JUnit and JaCoCo reports into the command output and read them. A failed case, a step that exits non-zero, or a missing report fails the task.",
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": [
+        "test",
+        "--report-dir",
+        "{outputRoot}"
+      ],
+      "cwd": "{projectRoot}",
+      "timeoutMs": 1800000,
+      "inputs": {
+        "sources": {
+          "from": "project",
+          "files": [
+            "java:test"
+          ]
+        },
+        "stackRoot": {
+          "from": "workspace",
+          "files": [
+            ".java-version",
+            ".mvn/extensions.xml",
+            ".mvn/jvm.config",
+            ".mvn/maven.config",
+            "build-logic/**",
+            "build.gradle",
+            "build.gradle.kts",
+            "buildSrc/**",
+            "gradle.lockfile",
+            "gradle.properties",
+            "gradle/libs.versions.toml",
+            "gradle/wrapper/gradle-wrapper.properties",
+            "pom.xml",
+            "settings-gradle.lockfile",
+            "settings.gradle",
+            "settings.gradle.kts"
+          ]
+        },
+        "extensionVersion": {
+          "from": "runtime"
+        }
+      },
+      "outputs": {
+        "data": {
+          "description": "The task result: the test and coverage totals of a test task."
+        }
+      },
+      "cache": {
+        "enabled": true
+      },
+      "declares": {
+        "outputs": {
+          "reports": {
+            "kind": "directory",
+            "root": "command-output",
+            "path": "test",
+            "optionalEmpty": true,
+            "description": "The reports the task wrote or copied: a copy of each JUnit and JaCoCo report of a test task."
+          }
+        },
+        "effects": [
+          "network",
+          "toolchain-cache"
+        ]
+      }
+    },
+    "build-run": {
+      "description": "Run the build steps of the component's variant on one Gradle project or Maven module in its directory, after the Java toolchain check: gradlew assemble, or mvn package -DskipTests.",
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": [
+        "build",
+        "--report-dir",
+        "{outputRoot}"
+      ],
+      "cwd": "{projectRoot}",
+      "timeoutMs": 1800000,
+      "inputs": {
+        "sources": {
+          "from": "project",
+          "files": [
+            "java:build"
+          ]
+        },
+        "stackRoot": {
+          "from": "workspace",
+          "files": [
+            ".java-version",
+            ".mvn/extensions.xml",
+            ".mvn/jvm.config",
+            ".mvn/maven.config",
+            "build-logic/**",
+            "build.gradle",
+            "build.gradle.kts",
+            "buildSrc/**",
+            "gradle.lockfile",
+            "gradle.properties",
+            "gradle/libs.versions.toml",
+            "gradle/wrapper/gradle-wrapper.properties",
+            "pom.xml",
+            "settings-gradle.lockfile",
+            "settings.gradle",
+            "settings.gradle.kts"
+          ]
+        },
+        "extensionVersion": {
+          "from": "runtime"
+        }
+      },
+      "outputs": {
+        "data": {
+          "description": "The task result: the test and coverage totals of a test task."
+        }
+      },
+      "cache": {
+        "enabled": true
+      },
+      "declares": {
+        "outputs": {
+          "reports": {
+            "kind": "directory",
+            "root": "command-output",
+            "path": "build",
+            "optionalEmpty": true,
+            "description": "The reports the task wrote or copied: a copy of each JUnit and JaCoCo report of a test task."
+          }
+        },
+        "effects": [
+          "network",
+          "toolchain-cache"
+        ]
+      }
+    }
+  }
+}
