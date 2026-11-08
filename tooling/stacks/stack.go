@@ -1,6 +1,7 @@
 package stacks
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -23,10 +24,15 @@ type Component struct {
 	// path, the package. Steps receive it as {component}; an empty name
 	// gives the component its Path instead.
 	Name string
+	// InputOnly marks a stack root that holds no component, such as a virtual
+	// Cargo workspace: an input-only project whose tasks run no step.
+	InputOnly bool
 	// SourceFile is the workspace-relative manifest the name was read from.
 	SourceFile string
 	// Root is the workspace-relative stack root: the directory of the build
-	// that holds the component. It is "." or Path.
+	// that holds the component. When it is neither "." nor Path, the probe
+	// answers the component with an edge to the project at Root, which
+	// carries the root's files.
 	Root string
 	// Dependencies are the workspace-relative directories of the components
 	// this one depends on.
@@ -52,12 +58,37 @@ type Stack struct {
 	Profile Profile
 	// Detect finds the components.
 	Detect Detector
+	// CaseComponent names the component of a JUnit case from its class name,
+	// else its suite name; ok is false when neither names one. Nil reads
+	// every case as the task's component's.
+	CaseComponent func(classname, suite string) (component string, ok bool)
+	// ComponentKey is a component name as the stack compares two of them.
+	// Nil compares names as they are.
+	ComponentKey func(name string) string
+	// Provide installs the toolchain a component states when the one on PATH
+	// is missing or outside that statement, or returns the one an earlier call
+	// installed. Nil means the stack installs no toolchain. It needs a profile
+	// that names toolchain.provisioned.
+	Provide func(ctx context.Context, expected Expected, info func(string)) (Provided, error)
+	// Tools makes the tools of one task available, beyond the toolchain, and
+	// returns the directories to append to its PATH. A tool already on the
+	// PATH of env needs no directory. Nil means the stack installs no tool.
+	Tools func(ctx context.Context, task string, env []string, info func(string)) ([]string, error)
+}
+
+// Provided is a toolchain a stack extension installed.
+type Provided struct {
+	// Executable is the absolute path of the toolchain command.
+	Executable string
+	// Env holds NAME=VALUE entries the steps of the task also receive.
+	Env []string
 }
 
 // Metadata is what the probe records about a project under
 // project.metadata[<extension>]. It reaches every task's cache key.
 type Metadata struct {
-	// Component is the detector's name for the component.
+	// Component is the detector's name for the component, empty for a stack
+	// root that holds none.
 	Component string `json:"component"`
 	// Root is the workspace-relative stack root.
 	Root string `json:"root"`
@@ -82,10 +113,10 @@ func (s Stack) Probe(root string, request wsproto.ProbeRequest) (wsproto.ProbeRe
 	components, diags := s.Detect(root, request)
 	result.Diagnostics = append(result.Diagnostics, diags...)
 	rootFiles := s.Profile.RootPatterns()
+	deps, leftOut := rootEdges(components)
 	for _, c := range components {
-		if c.Root != wsproto.ProbeRootPath && c.Root != c.Path {
-			result.Diagnostics = append(result.Diagnostics, diag.Warningf(CodeStackRootUnsupported, c.Path,
-				"%s is left out: its stack root %s is neither the workspace root nor its own directory", c.Path, c.Root))
+		if reason, out := leftOut[c.Path]; out {
+			result.Diagnostics = append(result.Diagnostics, diag.Warningf(CodeStackRootUnsupported, c.Path, "%s is left out: %s", c.Path, reason))
 			continue
 		}
 		expected, err := s.Profile.Toolchain.ExpectedVersion(root, c.Path, c.Root)
@@ -96,7 +127,7 @@ func (s Stack) Probe(root string, request wsproto.ProbeRequest) (wsproto.ProbeRe
 		// application, is named by its directory in the steps: the same on
 		// every checkout. Its probe project keeps no source name.
 		component := c.Name
-		if component == "" {
+		if component == "" && !c.InputOnly {
 			component = c.Path
 		}
 		metadata := Metadata{Component: component, Root: c.Root, Toolchain: expected}
@@ -125,7 +156,7 @@ func (s Stack) Probe(root string, request wsproto.ProbeRequest) (wsproto.ProbeRe
 			SourceName:   c.Name,
 			SourceFile:   c.SourceFile,
 			Type:         c.Type,
-			Dependencies: slices.Clone(c.Dependencies),
+			Dependencies: deps[c.Path],
 			Extensions:   []string{s.Extension},
 			Tags:         []string{s.Profile.ID},
 			WatchedFiles: watched,
@@ -134,6 +165,76 @@ func (s Stack) Probe(root string, request wsproto.ProbeRequest) (wsproto.ProbeRe
 	}
 	wsproto.NormalizeProbeResult(&result)
 	return result, nil
+}
+
+// rootEdges returns the dependencies the probe answers for each component:
+// the detector's, and for a component whose stack root is neither the
+// workspace root nor its own directory, the project at that root, whose
+// selector answers the root's files. A component whose root is no component
+// of the stack, or whose root reaches it in the graph of those edges, where
+// the root edge would close a cycle, is left out with the reason; the
+// components left out leave the graph until no root reaches its member.
+func rootEdges(components []Component) (map[string][]string, map[string]string) {
+	byPath := map[string]Component{}
+	for _, c := range components {
+		byPath[c.Path] = c
+	}
+	deps := map[string][]string{}
+	leftOut := map[string]string{}
+	var nested []Component
+	for _, c := range components {
+		deps[c.Path] = slices.Clone(c.Dependencies)
+		if c.Root == wsproto.ProbeRootPath || c.Root == c.Path {
+			continue
+		}
+		if stackRoot, ok := byPath[c.Root]; !ok || stackRoot.Root != stackRoot.Path {
+			leftOut[c.Path] = fmt.Sprintf("its stack root %s is no project of the stack; run putnami projects sync", c.Root)
+			continue
+		}
+		deps[c.Path] = appendNew(deps[c.Path], c.Root)
+		slices.Sort(deps[c.Path])
+		nested = append(nested, c)
+	}
+	for {
+		var cyclic []Component
+		for _, c := range nested {
+			if _, out := leftOut[c.Path]; !out && reaches(deps, leftOut, c.Root, c.Path) {
+				cyclic = append(cyclic, c)
+			}
+		}
+		if len(cyclic) == 0 {
+			break
+		}
+		for _, c := range cyclic {
+			leftOut[c.Path] = fmt.Sprintf("its stack root %s depends on it, so the edge that carries the root's files into its key would close a cycle", c.Root)
+		}
+	}
+	for _, c := range components {
+		if _, out := leftOut[c.Path]; out {
+			delete(deps, c.Path)
+		}
+	}
+	return deps, leftOut
+}
+
+// reaches reports whether from reaches to over deps, through no component
+// left out.
+func reaches(deps map[string][]string, leftOut map[string]string, from, to string) bool {
+	seen := map[string]bool{}
+	next := []string{from}
+	for len(next) > 0 {
+		at := next[len(next)-1]
+		next = next[:len(next)-1]
+		if at == to {
+			return true
+		}
+		if _, out := leftOut[at]; out || seen[at] {
+			continue
+		}
+		seen[at] = true
+		next = append(next, deps[at]...)
+	}
+	return false
 }
 
 func joinRel(dir, name string) string {
@@ -213,14 +314,14 @@ func (s Stack) Selectors() []string {
 // inputs changes the answer.
 func (s Stack) ResolveInputs(root string, request wsproto.InputResolveRequest) wsproto.InputResolveResult {
 	result := wsproto.InputResolveResult{Version: wsproto.InputResolveProtocolVersion, Extension: s.Extension}
-	ownRoots := s.ownRoots(root, request.Inputs)
+	kinds := s.rootKinds(root, request.Inputs)
 	for _, q := range request.Inputs {
-		result.Inputs = append(result.Inputs, s.answer(root, q, ownRoots[q.Project]))
+		result.Inputs = append(result.Inputs, s.answer(root, q, kinds[q.Project]))
 	}
 	return result
 }
 
-func (s Stack) answer(root string, q wsproto.InputResolveQuery, ownRoot bool) wsproto.InputResolveAnswer {
+func (s Stack) answer(root string, q wsproto.InputResolveQuery, kind rootKind) wsproto.InputResolveAnswer {
 	fail := func(format string, args ...any) wsproto.InputResolveAnswer {
 		msg := fmt.Sprintf(format, args...)
 		if len(msg) > 4000 {
@@ -239,10 +340,15 @@ func (s Stack) answer(root string, q wsproto.InputResolveQuery, ownRoot bool) ws
 	}
 	projectPatterns, rootPatterns := p.TaskPatterns(task)
 	patterns := slices.Clone(projectPatterns)
+	// A stack root that holds no component reads its root files alone.
+	if kind.rootOnly {
+		patterns = nil
+	}
 	// A component that is its own stack root reads its root files in its
 	// own directory; for one under the workspace root's build they are the
-	// manifest's workspace input.
-	if ownRoot {
+	// manifest's workspace input, and for one under a nested root the edge
+	// to that root's project carries them.
+	if kind.own {
 		for _, r := range rootPatterns {
 			patterns = appendNew(patterns, r)
 		}
@@ -271,15 +377,23 @@ func (s Stack) answer(root string, q wsproto.InputResolveQuery, ownRoot bool) ws
 	}
 }
 
-// ownRoots reports, for each asked project, whether it is its own stack
-// root, with one detector run for the whole request. The workspace root is
-// always its own.
-func (s Stack) ownRoots(root string, queries []wsproto.InputResolveQuery) map[string]bool {
-	out := map[string]bool{}
+// rootKind is what a project is to its stack root.
+type rootKind struct {
+	// own is true for a project that is its own stack root.
+	own bool
+	// rootOnly is true for a stack root that holds no component.
+	rootOnly bool
+}
+
+// rootKinds reports, for each asked project, what it is to its stack root,
+// with one detector run for the whole request. The workspace root is always
+// its own.
+func (s Stack) rootKinds(root string, queries []wsproto.InputResolveQuery) map[string]rootKind {
+	out := map[string]rootKind{}
 	var paths []string
 	for _, q := range queries {
 		if q.Project == "." || q.Project == "" {
-			out[q.Project] = true
+			out[q.Project] = rootKind{own: true}
 			continue
 		}
 		paths = appendNew(paths, q.Project)
@@ -290,7 +404,7 @@ func (s Stack) ownRoots(root string, queries []wsproto.InputResolveQuery) map[st
 	slices.Sort(paths)
 	components, _ := s.Detect(root, wsproto.ProbeRequest{Version: wsproto.ProbeProtocolVersion, Extension: s.Extension, Paths: paths})
 	for _, c := range components {
-		out[c.Path] = c.Root == c.Path
+		out[c.Path] = rootKind{own: c.Root == c.Path, rootOnly: c.InputOnly}
 	}
 	return out
 }

@@ -117,6 +117,7 @@
     "tooling/observe-rust#rust-change-analysis",
     "tooling/observe-rust#rust-crate-edges",
     "tooling/observe-rust#rust-crates-are-components",
+    "tooling/observe-rust#rust-nested-workspaces",
     "tooling/observe-rust#rust-probe-answer",
     "tooling/observe-rust#rust-report-discovery",
     "tooling/observe-swift#swift-change-analysis",

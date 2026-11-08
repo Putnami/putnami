@@ -13,6 +13,7 @@ import (
 	"strings"
 
 	diag "go.putnami.dev/protocol/diagnostic"
+	extensionproto "go.putnami.dev/protocol/extension"
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/sdk/extension/cli"
 	pctx "go.putnami.dev/sdk/extension/context"
@@ -96,8 +97,11 @@ func failWith(emit reporter, code, format string, args ...any) error {
 
 func (s Stack) component(in runInput, emit reporter) (Metadata, Profile, error) {
 	var meta Metadata
-	if len(in.metadata) == 0 || json.Unmarshal(in.metadata, &meta) != nil || meta.Component == "" {
+	if len(in.metadata) == 0 || json.Unmarshal(in.metadata, &meta) != nil || (meta.Component == "" && meta.Root == "") {
 		return Metadata{}, Profile{}, failWith(emit, CodeNotAComponent, "%s is no component %s found: run putnami projects sync, or remove %s from the project's extensions", in.projectAbs, s.Extension, s.Extension)
+	}
+	if meta.Component == "" {
+		return meta, Profile{}, nil
 	}
 	profile, err := s.Resolved(in.projectAbs)
 	if err != nil {
@@ -108,7 +112,7 @@ func (s Stack) component(in runInput, emit reporter) (Metadata, Profile, error) 
 
 // selectToolchain runs the toolchain check of the component and returns the
 // toolchain it selects. A verdict that does not fail is a warning.
-func selectToolchain(ctx context.Context, in runInput, meta Metadata, profile Profile, emit reporter) (Selection, error) {
+func (s Stack) selectToolchain(ctx context.Context, in runInput, meta Metadata, profile Profile, emit reporter) (Selection, error) {
 	projectRel, err := filepath.Rel(in.workspaceRoot, in.projectAbs)
 	if err != nil {
 		return Selection{}, failWith(emit, CodeNotAComponent, "%v", err)
@@ -117,8 +121,21 @@ func selectToolchain(ctx context.Context, in runInput, meta Metadata, profile Pr
 	if err != nil {
 		return Selection{}, failWith(emit, CodeProjectConfigInvalid, "the expected toolchain version cannot be read: %v", err)
 	}
-	selected, err := profile.Toolchain.Select(ctx, in.projectAbs, expected, os.Environ())
+	env := os.Environ()
+	selected, err := profile.Toolchain.Select(ctx, in.projectAbs, expected, env)
+	offline := os.Getenv(extensionproto.OfflineDependenciesEnv) == "1"
+	if s.Provide != nil && !offline && (errors.Is(err, ErrToolchainMissing) || err == nil && selected.Verdict.Fail) {
+		provided, provideErr := s.Provide(ctx, expected, emit.Info)
+		if provideErr != nil {
+			return Selection{}, failWith(emit, CodeToolchainMissing, "install the %s toolchain: %v", profile.ID, provideErr)
+		}
+		env = append(append(env, provided.Env...), profile.Toolchain.Provisioned+"="+provided.Executable)
+		selected, err = profile.Toolchain.Select(ctx, in.projectAbs, expected, env)
+	}
 	if errors.Is(err, ErrToolchainMissing) {
+		if s.Provide != nil {
+			return Selection{}, failWith(emit, CodeToolchainMissing, "%v: the %s stack needs it on PATH, or a network to install it", err, profile.ID)
+		}
 		if profile.Toolchain.Provisioned != "" {
 			return Selection{}, failWith(emit, CodeToolchainMissing, "%v: the %s stack needs it on PATH, or a release its extension pins: run putnami install", err, profile.ID)
 		}
@@ -132,6 +149,15 @@ func selectToolchain(ctx context.Context, in runInput, meta Metadata, profile Pr
 			return Selection{}, failWith(emit, v.Code, "%s", v.Message)
 		}
 		emit.DiagnosticWithCode("warning", v.Message, "", 0, 0, v.Code)
+	}
+	if s.Tools != nil && !offline {
+		dirs, err := s.Tools(ctx, in.task, selected.Env, emit.Info)
+		if err != nil {
+			return Selection{}, failWith(emit, CodeToolchainMissing, "install the tools of the %s task: %v", in.task, err)
+		}
+		for _, dir := range dirs {
+			selected.Env = appendPath(selected.Env, dir)
+		}
 	}
 	return selected, nil
 }
@@ -197,7 +223,7 @@ func (s Stack) rootStep(ctx context.Context, in runInput, emit *jsonl.Emitter) (
 	if err != nil {
 		return RootStep{}, Metadata{}, Profile{}, err
 	}
-	selected, err := selectToolchain(ctx, in, meta, profile, emit)
+	selected, err := s.selectToolchain(ctx, in, meta, profile, emit)
 	if err != nil {
 		return RootStep{}, Metadata{}, Profile{}, err
 	}
@@ -364,6 +390,10 @@ func (s Stack) run(ctx context.Context, in runInput, emit reporter) (string, map
 	if err != nil {
 		return statusFailed, nil, err
 	}
+	if meta.Component == "" {
+		emit.Info(fmt.Sprintf("%s is a %s stack root with no component: its %s task reads the root's files and runs no step", meta.Root, s.Profile.ID, in.task))
+		return statusOK, nil, nil
+	}
 	t, ok := profile.Tasks[in.task]
 	if !ok {
 		emit.Info(fmt.Sprintf("the %s profile declares no %s task", profile.ID, in.task))
@@ -375,7 +405,7 @@ func (s Stack) run(ctx context.Context, in runInput, emit reporter) (string, map
 		return statusFailed, nil, err
 	}
 
-	selected, err := selectToolchain(ctx, in, meta, profile, emit)
+	selected, err := s.selectToolchain(ctx, in, meta, profile, emit)
 	if err != nil {
 		return statusFailed, nil, err
 	}
@@ -391,6 +421,24 @@ func (s Stack) run(ctx context.Context, in runInput, emit reporter) (string, map
 	// run, must not pass for this run's: the reports outside the task's own
 	// output are removed before the steps, under the lock.
 	if err := removeReports(profile, in.task, in.projectAbs, rootAbs); err != nil {
+		return statusFailed, nil, err
+	}
+	// An artifact an earlier build left is no product of this one: the file
+	// each literal artifact pattern names is removed before the steps, so
+	// only what the steps write is copied. A component name that is no single
+	// path segment names no artifact.
+	artifacts := t.Artifacts
+	if len(artifacts) > 0 && !singleSegment(meta.Component) {
+		emit.DiagnosticWithCode("warning", fmt.Sprintf("the component name %q is no single path segment: the %s task keeps no artifact", meta.Component, in.task), "", 0, 0, CodeProjectConfigInvalid)
+		artifacts = nil
+	}
+	var literal []string
+	for _, a := range artifactPatterns(artifacts, meta.Component) {
+		if !strings.ContainsAny(a, "*?[") {
+			literal = append(literal, a)
+		}
+	}
+	if err := removeOutputs(literal, profile, in.projectAbs, rootAbs); err != nil {
 		return statusFailed, nil, err
 	}
 
@@ -426,6 +474,10 @@ func (s Stack) run(ctx context.Context, in runInput, emit reporter) (string, map
 		return statusFailed, nil, stepErr
 	}
 
+	if err := copyArtifacts(artifacts, meta.Component, in.projectAbs, rootAbs, outDir); err != nil {
+		return statusFailed, nil, err
+	}
+
 	copied := 0
 	resolve := func(pattern string) ([]string, error) {
 		base, rest := in.projectAbs, pattern
@@ -449,7 +501,7 @@ func (s Stack) run(ctx context.Context, in runInput, emit reporter) (string, map
 		}
 		return out, nil
 	}
-	summary, diags := ReadReports(t.Reports, resolve, outDir)
+	summary, diags := ReadReports(t.Reports, resolve, outDir, s.attribution(in.workspaceRoot, in.projectAbs, meta.Component))
 	failed := stepErr != nil
 	for _, d := range diags {
 		// A step that failed may have written no report: the step's own
@@ -480,6 +532,9 @@ func (s Stack) run(ctx context.Context, in runInput, emit reporter) (string, map
 	}
 	if len(summary.Reports) > 0 {
 		data["reports"] = summary.Reports
+	}
+	if summary.OtherCases > 0 || summary.OtherFiles > 0 {
+		emit.Info(fmt.Sprintf("left to their own components: %d test cases and %d coverage files", summary.OtherCases, summary.OtherFiles))
 	}
 	if stepErr != nil && summary.Tests.Failed == 0 {
 		return statusFailed, data, stepErr
@@ -530,6 +585,72 @@ func copyFile(src, dst string) error {
 	return os.WriteFile(dst, data, 0o644) //nolint:gosec // a copied report
 }
 
+// copyArtifacts copies the files a task's artifact patterns match into
+// outDir/artifacts, keeping their mode. A pattern that matches nothing copies
+// nothing.
+func copyArtifacts(patterns []string, component, projectAbs, rootAbs, outDir string) error {
+	for _, pattern := range artifactPatterns(patterns, component) {
+		base, rest := projectAbs, pattern
+		if r, ok := strings.CutPrefix(pattern, "{root}/"); ok {
+			base, rest = rootAbs, r
+		}
+		matches, err := globFiles(base, rest)
+		if err != nil {
+			return err
+		}
+		for _, m := range matches {
+			if err := copyMode(m, filepath.Join(outDir, "artifacts", filepath.Base(m))); err != nil {
+				return fmt.Errorf("copy the artifact %s: %w", m, err)
+			}
+		}
+	}
+	return nil
+}
+
+// copyMode streams src to dst and gives dst the mode of src.
+func copyMode(src, dst string) error {
+	in, err := os.Open(src) //nolint:gosec // an artifact the profile names
+	if err != nil {
+		return err
+	}
+	defer func() { _ = in.Close() }()
+	info, err := in.Stat()
+	if err != nil {
+		return err
+	}
+	if err := os.MkdirAll(filepath.Dir(dst), 0o755); err != nil {
+		return err
+	}
+	out, err := os.OpenFile(dst, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, info.Mode().Perm()) //nolint:gosec // the task's own output
+	if err != nil {
+		return err
+	}
+	if _, err := io.Copy(out, in); err != nil {
+		_ = out.Close()
+		return err
+	}
+	if err := out.Close(); err != nil {
+		return err
+	}
+	return os.Chmod(dst, info.Mode().Perm())
+}
+
+// singleSegment reports whether name is one clean path segment, with no
+// glob character.
+func singleSegment(name string) bool {
+	return name != "" && name != "." && name != ".." && !strings.ContainsAny(name, "/\\*?[")
+}
+
+// artifactPatterns are a task's artifact patterns with {component}
+// expanded.
+func artifactPatterns(patterns []string, component string) []string {
+	out := make([]string, len(patterns))
+	for i, p := range patterns {
+		out[i] = strings.ReplaceAll(p, "{component}", component)
+	}
+	return out
+}
+
 // removeReports deletes the files the report patterns of a task match
 // outside its output directory, under the project or the stack root. A file
 // the task's own inputs select is a source, never a stale report: it is kept.
@@ -538,7 +659,24 @@ func removeReports(profile Profile, task, projectAbs, rootAbs string) error {
 	if r == nil {
 		return nil
 	}
-	projectInputs, rootInputs := profile.TaskPatterns(task)
+	patterns := slices.Clone(r.JUnit)
+	for _, c := range r.Coverage {
+		patterns = append(patterns, c.Paths...)
+	}
+	return removeOutputs(patterns, profile, projectAbs, rootAbs)
+}
+
+// removeOutputs deletes the files the patterns match under the project or
+// the stack root ("{root}/…"); a pattern under "{output}/" is skipped. A
+// match outside its base, or that the inputs of any task of the profile
+// select, is kept.
+func removeOutputs(patterns []string, profile Profile, projectAbs, rootAbs string) error {
+	var projectInputs, rootInputs []string
+	for _, task := range TaskNames {
+		project, root := profile.TaskPatterns(task)
+		projectInputs = append(projectInputs, project...)
+		rootInputs = append(rootInputs, root...)
+	}
 	isInput := func(m string) bool {
 		for _, in := range []struct {
 			base     string
@@ -556,10 +694,6 @@ func removeReports(profile Profile, task, projectAbs, rootAbs string) error {
 		}
 		return false
 	}
-	patterns := slices.Clone(r.JUnit)
-	for _, c := range r.Coverage {
-		patterns = append(patterns, c.Paths...)
-	}
 	for _, p := range patterns {
 		if strings.HasPrefix(p, "{output}/") {
 			continue
@@ -573,11 +707,11 @@ func removeReports(profile Profile, task, projectAbs, rootAbs string) error {
 			return err
 		}
 		for _, m := range matches {
-			if isInput(m) {
+			if rel, err := filepath.Rel(base, m); err != nil || !filepath.IsLocal(rel) || isInput(m) {
 				continue
 			}
 			if err := os.Remove(m); err != nil && !errors.Is(err, os.ErrNotExist) {
-				return fmt.Errorf("remove the stale report %s: %w", m, err)
+				return fmt.Errorf("remove the stale output %s: %w", m, err)
 			}
 		}
 	}

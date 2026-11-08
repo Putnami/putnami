@@ -13,9 +13,37 @@ import (
 
 // Diagnostic codes of the report reading.
 const (
-	CodeReportMissing = "stacks.report_missing"
-	CodeTestFailed    = "stacks.test_failed"
+	CodeReportMissing    = "stacks.report_missing"
+	CodeTestFailed       = "stacks.test_failed"
+	CodeTestUnattributed = "stacks.test_unattributed"
+	CodeCoverageUnmapped = "stacks.coverage_unmapped"
 )
+
+// Owner says whose a report entry is.
+type Owner int
+
+// The owners of a report entry.
+const (
+	// OwnerTask is the component the task runs.
+	OwnerTask Owner = iota
+	// OwnerOther is another component of the stack, whose own task counts it.
+	OwnerOther
+	// OwnerNone is no component.
+	OwnerNone
+)
+
+// Attribution decides whose each report entry is. A nil member reads every
+// entry as the task's.
+type Attribution struct {
+	// Case is the owner of a JUnit case.
+	Case func(readers.TestCase) Owner
+	// File is the owner of a coverage report's file, by the path the report
+	// states.
+	File func(path string) Owner
+}
+
+// maxNamed bounds the cases and files a diagnostic names.
+const maxNamed = 10
 
 // Summary is what a task's reports say.
 type Summary struct {
@@ -27,6 +55,11 @@ type Summary struct {
 	Coverage *readers.Counts `json:"coverage,omitempty"`
 	// Reports are the report files read, relative to the project directory.
 	Reports []string `json:"reports,omitempty"`
+	// OtherCases counts the cases of other components, left out of Tests.
+	OtherCases int `json:"otherCases,omitempty"`
+	// OtherFiles counts the coverage files of other components, left out of
+	// Coverage.
+	OtherFiles int `json:"otherFiles,omitempty"`
 }
 
 // TestTotals count test cases.
@@ -52,13 +85,17 @@ var coverageReaders = map[string]func([]byte) (readers.CoverageReport, []diag.Di
 // pattern to absolute file paths; projectAbs is the project directory, which
 // the summary's report names are relative to. A JUnit pattern set that
 // matches no file is CodeReportMissing: a test command that ran nothing is no
-// pass.
-func ReadReports(r *Reports, paths func(pattern string) ([]string, error), projectAbs string) (Summary, []diag.Diagnostic) {
+// pass. attr decides whose each case and coverage file is: another
+// component's entries are left out of the summary, a case of no component is
+// counted with CodeTestUnattributed, and a coverage file of no component is
+// left out with CodeCoverageUnmapped.
+func ReadReports(r *Reports, paths func(pattern string) ([]string, error), projectAbs string, attr Attribution) (Summary, []diag.Diagnostic) {
 	var s Summary
 	var diags []diag.Diagnostic
 	if r == nil {
 		return s, nil
 	}
+	var unattributed, unmapped []string
 	rel := func(p string) string {
 		if out, err := filepath.Rel(projectAbs, p); err == nil {
 			return filepath.ToSlash(out)
@@ -78,6 +115,13 @@ func ReadReports(r *Reports, paths func(pattern string) ([]string, error), proje
 			diags = append(diags, relabel(d, rel(f))...)
 			s.Reports = append(s.Reports, rel(f))
 			for _, c := range report.Cases {
+				switch owner(attr.Case, c) {
+				case OwnerOther:
+					s.OtherCases++
+					continue
+				case OwnerNone:
+					unattributed = append(unattributed, caseName(c))
+				}
 				s.Tests.Total++
 				switch c.Status {
 				case readers.StatusFailed:
@@ -111,15 +155,44 @@ func ReadReports(r *Reports, paths func(pattern string) ([]string, error), proje
 				s.Coverage = &readers.Counts{}
 			}
 			for _, fc := range report.Files {
+				switch owner(attr.File, fc.Path) {
+				case OwnerOther:
+					s.OtherFiles++
+					continue
+				case OwnerNone:
+					unmapped = append(unmapped, fc.Path)
+					continue
+				}
 				s.Coverage.Total += fc.LineCounts.Total
 				s.Coverage.Covered += fc.LineCounts.Covered
 			}
 		}
 	}
+	if len(unattributed) > 0 {
+		diags = append(diags, diag.Warningf(CodeTestUnattributed, "", "%d test cases name no component and are counted as this one's: %s", len(unattributed), named(unattributed)))
+	}
+	if len(unmapped) > 0 {
+		diags = append(diags, diag.Warningf(CodeCoverageUnmapped, "", "%d coverage files lie in no component and are left out of the coverage: %s", len(unmapped), named(unmapped)))
+	}
 	if s.Tests.Failed > 0 {
 		diags = append(diags, diag.Errorf(CodeTestFailed, "", "%d of %d tests failed: %s", s.Tests.Failed, s.Tests.Total, strings.Join(s.Failed, "; ")))
 	}
 	return s, diags
+}
+
+func owner[T any](of func(T) Owner, entry T) Owner {
+	if of == nil {
+		return OwnerTask
+	}
+	return of(entry)
+}
+
+// named lists at most maxNamed names, then how many more there are.
+func named(names []string) string {
+	if len(names) <= maxNamed {
+		return strings.Join(names, ", ")
+	}
+	return fmt.Sprintf("%s and %d more", strings.Join(names[:maxNamed], ", "), len(names)-maxNamed)
 }
 
 func expandAll(patterns []string, paths func(string) ([]string, error)) ([]string, error) {
