@@ -156,6 +156,8 @@ func lockStackRoot(workspaceRoot string, meta Metadata, profile Profile) (*filel
 type RootStep struct {
 	// Dir is the stack root's absolute path.
 	Dir string
+	// Project is the component's absolute path.
+	Project string
 	// Env is the environment of the step.
 	Env []string
 	// Program returns the program to run for a command name: the pinned
@@ -178,11 +180,7 @@ func (s Stack) RootJob(step func(context.Context, RootStep, *jsonl.Emitter) erro
 // atRoot selects the component's toolchain and runs step at its stack root,
 // under the root's lock.
 func (s Stack) atRoot(ctx context.Context, in runInput, step func(context.Context, RootStep, *jsonl.Emitter) error, emit *jsonl.Emitter) error {
-	meta, profile, err := s.component(in, emit)
-	if err != nil {
-		return err
-	}
-	selected, err := selectToolchain(ctx, in, meta, profile, emit)
+	root, meta, profile, err := s.rootStep(ctx, in, emit)
 	if err != nil {
 		return err
 	}
@@ -191,11 +189,33 @@ func (s Stack) atRoot(ctx context.Context, in runInput, step func(context.Contex
 		return err
 	}
 	defer func() { _ = lock.Release() }()
-	return step(ctx, RootStep{
+	return step(ctx, root, emit)
+}
+
+func (s Stack) rootStep(ctx context.Context, in runInput, emit *jsonl.Emitter) (RootStep, Metadata, Profile, error) {
+	meta, profile, err := s.component(in, emit)
+	if err != nil {
+		return RootStep{}, Metadata{}, Profile{}, err
+	}
+	selected, err := selectToolchain(ctx, in, meta, profile, emit)
+	if err != nil {
+		return RootStep{}, Metadata{}, Profile{}, err
+	}
+	return RootStep{
 		Dir:     filepath.Join(in.workspaceRoot, filepath.FromSlash(meta.Root)),
+		Project: in.projectAbs,
 		Env:     selected.Env,
 		Program: func(name string) string { return selected.Program(profile.Toolchain, name) },
-	}, emit)
+	}, meta, profile, nil
+}
+
+// Selected answers the job's component with its toolchain selected and no lock
+// of its stack root held: a process the user keeps running must not block the
+// other tasks of the root.
+func (s Stack) Selected(ctx *pctx.Context, emit *jsonl.Emitter) (RootStep, error) {
+	in := runInput{workspaceRoot: ctx.WorkspaceRoot, projectAbs: ctx.Project.FullPath, metadata: ctx.Project.Metadata[s.Extension]}
+	root, _, _, err := s.rootStep(context.Background(), in, emit)
+	return root, err
 }
 
 // MissingToolchain is what a workspace job does at a stack root whose

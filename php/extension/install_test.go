@@ -88,6 +88,7 @@ echo "cache=$COMPOSER_CACHE_DIR vendor=$COMPOSER_VENDOR_DIR network=$COMPOSER_DI
 vendor=${COMPOSER_VENDOR_DIR:-vendor}
 mkdir -p "$vendor/composer" && echo '{}' > "$vendor/composer/installed.json"
 if [ -n "$STUB_COMPOSER_FAILS" ]; then exit 3; fi
+if [ -n "$STUB_EXIT" ]; then exit "$STUB_EXIT"; fi
 `)
 	if err := os.Chmod(filepath.Join(bin, "php"), 0o755); err != nil {
 		t.Fatal(err)

@@ -30,6 +30,9 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer, runJobs func(
 				jobs[php.InstallJobName] = php.InstallJob(stack)
 				jobs[php.WorkspaceFetchJobName] = php.WorkspaceFetchJob(stack)
 				jobs[php.WorkspaceInstallJobName] = php.WorkspaceInstallJob(stack)
+				jobs[php.ServeJobName] = php.ServeJob(stack)
+				jobs[php.RunJobName] = php.RunJob(stack)
+				jobs[php.DepsUpgradeJobName] = php.DepsUpgradeJob(stack)
 				runJobs(jobs)
 			})
 		}

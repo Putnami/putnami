@@ -68,7 +68,7 @@
     },
     {
       "id": "serves-an-application",
-      "text": "serve runs php -S on 0.0.0.0 with the port flag, default 3000, with public/ as document root and public/index.php as router, on an application after the toolchain check. A library is skipped. PHP reads its files on each request, so serve has no watcher."
+      "text": "serve runs php -S on 0.0.0.0 with the port flag, default 3000, with public/ as document root, which answers a path that is no file with public/index.php, on an application after the toolchain check. A library is skipped. PHP reads its files on each request, so serve has no watcher."
     },
     {
       "id": "runs-an-application-once",
