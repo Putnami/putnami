@@ -132,6 +132,13 @@
     "workspace-install": {
       "description": "Install the Composer dependencies of each stack root of the workspace.",
       "quiet": true,
+      "flags": {
+        "force": {
+          "type": "boolean",
+          "default": false,
+          "description": "Install a stack root even when its last install is current"
+        }
+      },
       "run": [
         {
           "id": "workspace-install",
@@ -141,6 +148,13 @@
     },
     "lint": {
       "description": "Lint the Composer components with PHPStan.",
+      "flags": {
+        "docs-links": {
+          "type": "boolean",
+          "default": true,
+          "description": "Check every relative link and anchor in the project's README.md files and doc/ trees; a broken one fails lint."
+        }
+      },
       "run": [
         {
           "id": "install",
@@ -153,11 +167,23 @@
             "install",
             "^lint"
           ]
+        },
+        {
+          "id": "docs",
+          "task": "lint-docs",
+          "if": "params.docs-links"
         }
       ]
     },
     "test": {
       "description": "Test the Composer components with PHPUnit, and read their JUnit and Clover reports.",
+      "flags": {
+        "test": {
+          "type": "string",
+          "short": "-t",
+          "description": "Test filter to run, passed to PHPUnit as --filter"
+        }
+      },
       "run": [
         {
           "id": "install",
@@ -394,6 +420,46 @@
         ]
       }
     },
+    "lint-docs": {
+      "description": "Documentation link check: every relative link and anchor in the project's README.md files and doc/ trees must resolve, with the exact case of the file's name. The task body is the SDK's docslinks.Job, shared with every language extension. A link may name any file of the workspace, so the check reads the workspace's Git candidate cut (the tracked files and the untracked files no ignore rule excludes) and its key is the workspace input `git:**`, which holds that cut: deleting or renaming a link target, or editing a heading an anchor names, moves the key, and an ignored file is neither read nor keyed. The project input names the README.md the check starts from, so the key does not fold the project's ignored build output. Outside a Git work tree the check reads the disk and the task has no key. It needs neither PHP nor Composer.",
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": [
+        "lint-docs"
+      ],
+      "cwd": "{projectRoot}",
+      "timeoutMs": 120000,
+      "inputs": {
+        "readme": {
+          "from": "project",
+          "files": [
+            "README.md"
+          ]
+        },
+        "repository": {
+          "from": "workspace",
+          "files": [
+            "git:**"
+          ]
+        },
+        "docs-links": {
+          "from": "params"
+        }
+      },
+      "outputs": {
+        "data": {
+          "description": "Documentation link result with diagnostics"
+        }
+      },
+      "reads": [
+        "sources"
+      ],
+      "cache": {
+        "noOutput": true,
+        "enabled": true
+      },
+      "declares": {}
+    },
     "test-run": {
       "description": "Run the PHP profile's test step, the stack root's vendor/bin/phpunit on tests with JUnit and Clover reports, on one component in its directory, after the PHP version check; then read the reports, even when PHPUnit exits non-zero. A failed case, a step that exits non-zero, or a missing report fails the task.",
       "kind": "command",
@@ -409,6 +475,12 @@
       "cwd": "{projectRoot}",
       "timeoutMs": 1800000,
       "inputs": {
+        "test": {
+          "from": "params"
+        },
+        "t": {
+          "from": "params"
+        },
         "sources": {
           "from": "project",
           "files": [

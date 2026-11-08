@@ -560,3 +560,23 @@ func TestProjectDocumentsFollowsAReadmeLinkToAFile(t *testing.T) {
 		t.Fatalf("documents = %q, want README.md and doc/index.md", files)
 	}
 }
+
+func TestCheckProjectLeavesTheDocumentsOfAMarkedNestedProject(t *testing.T) {
+	root := t.TempDir()
+	writeFile(t, root, "README.md", "# Root\n")
+	writeFile(t, root, "packages/pricing/composer.json", "{}")
+	writeFile(t, root, "packages/pricing/README.md", "[gone](missing.md)\n")
+
+	findings, err := CheckProject(root, root)
+	if err != nil || len(findings) != 1 {
+		t.Fatalf("without the marker, the root reads the nested document: %v %v", findings, err)
+	}
+	findings, err = CheckProject(root, root, "composer.json")
+	if err != nil || len(findings) != 0 {
+		t.Fatalf("with the marker, the root leaves the nested document: %v %v", findings, err)
+	}
+	findings, err = CheckProject(root, filepath.Join(root, "packages/pricing"), "composer.json")
+	if err != nil || len(findings) != 1 {
+		t.Fatalf("the nested project reads its own document: %v %v", findings, err)
+	}
+}

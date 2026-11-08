@@ -9,6 +9,8 @@ import (
 
 	php "go.putnami.dev/php/extension"
 	"go.putnami.dev/sdk/extension/cli"
+	"go.putnami.dev/sdk/extension/docslinks"
+	"go.putnami.dev/tooling/stacks"
 )
 
 var runtimeVersion string
@@ -27,6 +29,8 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer, runJobs func(
 		var handled bool
 		if handled, err = php.HandleToolchainResolve(args, stdin, stdout, stack.Profile); !handled && err == nil {
 			err = stack.Entrypoint(args, stdin, stdout, runtimeVersion, func(jobs map[string]cli.JobFunc) {
+				jobs[stacks.TaskTest] = php.TestJob(stack)
+				jobs["lint-docs"] = docslinks.Job("composer.json")
 				jobs[php.InstallJobName] = php.InstallJob(stack)
 				jobs[php.WorkspaceFetchJobName] = php.WorkspaceFetchJob(stack)
 				jobs[php.WorkspaceInstallJobName] = php.WorkspaceInstallJob(stack)

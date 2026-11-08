@@ -39,13 +39,26 @@ const (
 // directory under the stack root's lock, then the reports, copied into the
 // task's output directory and read.
 func (s Stack) Run(task string) func(ctx *pctx.Context, emit *jsonl.Emitter, args []string) (string, map[string]any, error) {
+	return s.RunWith(task, nil)
+}
+
+// RunWith is Run with the arguments extra answers appended to the task's last
+// step, the one that does the task's work. It calls extra with the task's
+// selected toolchain and that step's expanded command, under the stack root's
+// lock. A nil extra adds none.
+func (s Stack) RunWith(task string, extra func(ctx *pctx.Context, root RootStep, lastStep []string) []string) func(ctx *pctx.Context, emit *jsonl.Emitter, args []string) (string, map[string]any, error) {
 	return func(ctx *pctx.Context, emit *jsonl.Emitter, args []string) (string, map[string]any, error) {
 		output, err := outputFlag(args)
 		if err != nil {
 			return statusFailed, nil, err
 		}
+		var stepArgs func(RootStep, []string) []string
+		if extra != nil {
+			stepArgs = func(root RootStep, lastStep []string) []string { return extra(ctx, root, lastStep) }
+		}
 		return s.run(context.Background(), runInput{
 			task:          task,
+			stepArgs:      stepArgs,
 			workspaceRoot: ctx.WorkspaceRoot,
 			projectAbs:    ctx.Project.FullPath,
 			metadata:      ctx.Project.Metadata[s.Extension],
@@ -69,7 +82,10 @@ func outputFlag(args []string) (string, error) {
 
 // runInput is what one task run reads.
 type runInput struct {
-	task          string
+	task string
+	// stepArgs answers the arguments appended to the task's last step, given
+	// that step's expanded command.
+	stepArgs      func(RootStep, []string) []string
 	workspaceRoot string
 	projectAbs    string
 	metadata      json.RawMessage
@@ -385,6 +401,15 @@ func carriesAny(config json.RawMessage, tags []string) bool {
 	return false
 }
 
+// expandStep answers step with its placeholders replaced.
+func expandStep(step []string, vars map[string]string) []string {
+	argv := make([]string, len(step))
+	for i, a := range step {
+		argv[i] = expand(a, vars)
+	}
+	return argv
+}
+
 func (s Stack) run(ctx context.Context, in runInput, emit reporter) (string, map[string]any, error) {
 	meta, profile, err := s.component(in, emit)
 	if err != nil {
@@ -454,10 +479,15 @@ func (s Stack) run(ctx context.Context, in runInput, emit reporter) (string, map
 	// and the reports it wrote are still read, so the failed cases name the
 	// failure.
 	var stepErr error
-	for _, step := range t.Steps {
-		argv := make([]string, len(step))
-		for i, a := range step {
-			argv[i] = expand(a, vars)
+	var stepArgs []string
+	if in.stepArgs != nil && len(t.Steps) > 0 {
+		root := RootStep{Dir: rootAbs, Project: in.projectAbs, Env: env, Program: func(name string) string { return selected.Program(profile.Toolchain, name) }}
+		stepArgs = in.stepArgs(root, expandStep(t.Steps[len(t.Steps)-1], vars))
+	}
+	for n, step := range t.Steps {
+		argv := expandStep(step, vars)
+		if n == len(t.Steps)-1 {
+			argv = append(argv, stepArgs...)
 		}
 		emit.Info("$ " + strings.Join(argv, " "))
 		cmd := exec.CommandContext(ctx, selected.Program(profile.Toolchain, argv[0]), argv[1:]...) //nolint:gosec // the profile's own step

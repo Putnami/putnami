@@ -85,18 +85,22 @@ type Reader struct {
 	root string
 	// tree is the candidate cut of root, or nil outside a Git work tree.
 	tree *gitcandidate.Tree
+	// markers name the files that make a nested directory a project of its
+	// own, besides putnami.json and go.mod.
+	markers []string
 }
 
 // NewReader returns the reader of the workspace at root. Inside a Git work
 // tree it lists the candidate cut once; an enumeration that fails there is an
-// error, never an empty workspace.
-func NewReader(root string) (*Reader, error) {
+// error, never an empty workspace. markers name the files that, besides
+// putnami.json and go.mod, make a nested directory a project of its own.
+func NewReader(root string, markers ...string) (*Reader, error) {
 	root = filepath.Clean(root)
 	tree, err := gitcandidate.Open(root)
 	if err != nil {
 		return nil, fmt.Errorf("list the candidate files of %s: %w", root, err)
 	}
-	return &Reader{root: root, tree: tree}, nil
+	return &Reader{root: root, tree: tree, markers: markers}, nil
 }
 
 // ReadFile returns the bytes of path, a file inside the workspace, following
@@ -117,7 +121,10 @@ func (r *Reader) ReadFile(path string) ([]byte, error) {
 // inside the reader's root, as the package-level ProjectDocuments reads them.
 func (r *Reader) ProjectDocuments(dir string) ([]string, error) {
 	nested := func(path string) bool {
-		return r.isFile(filepath.Join(path, "putnami.json")) || r.isFile(filepath.Join(path, "go.mod"))
+		if r.isFile(filepath.Join(path, "putnami.json")) || r.isFile(filepath.Join(path, "go.mod")) {
+			return true
+		}
+		return slices.ContainsFunc(r.markers, func(marker string) bool { return r.isFile(filepath.Join(path, marker)) })
 	}
 	if r.tree == nil {
 		return documents(dir, nested)
@@ -465,9 +472,9 @@ func (r *Reader) Check(files []string) ([]Finding, error) {
 }
 
 // CheckProject checks the documents ProjectDocuments returns for root, a
-// project inside workspaceRoot.
-func CheckProject(workspaceRoot, root string) ([]Finding, error) {
-	r, err := NewReader(workspaceRoot)
+// project inside workspaceRoot. markers are those of NewReader.
+func CheckProject(workspaceRoot, root string, markers ...string) ([]Finding, error) {
+	r, err := NewReader(workspaceRoot, markers...)
 	if err != nil {
 		return nil, err
 	}

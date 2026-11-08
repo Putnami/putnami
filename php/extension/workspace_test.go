@@ -2,6 +2,7 @@ package php
 
 import (
 	"context"
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
@@ -132,6 +133,29 @@ func TestWorkspaceInstallInstallsEachStackRootTheWorkspaceIncludes(t *testing.T)
 	env := readLines(t, log+".env")[0]
 	if !strings.Contains(env, "cache="+filepath.Join(cache, "composer")+" ") || !strings.HasSuffix(env, "network=") {
 		t.Errorf("env = %q", env)
+	}
+}
+
+func TestWorkspaceInstallForceInstallsARootWhoseLastInstallIsCurrent(t *testing.T) {
+	spectest.Proves(t, feature, "workspace-install-runs-composer", "workspace-install-force-installs-a-root-whose-last-install-is-current")
+	log, _ := prepareComposer(t)
+	root := fixture(t)
+	refs := []job.ProjectRef{phpProject(root, ".", `{}`)}
+	install := func(params job.Params) {
+		t.Helper()
+		ctx := &pctx.Context{WorkspaceRoot: root, WorkspaceProjects: refs, Params: params}
+		if status, _, err := WorkspaceInstallJob(stack(t))(ctx, jsonl.New(), nil); status != "OK" || err != nil {
+			t.Fatalf("install: %s %v", status, err)
+		}
+	}
+	install(nil)
+	install(nil)
+	if lines := readLines(t, log); len(lines) != 1 {
+		t.Fatalf("a current root installs once, got %q", lines)
+	}
+	install(job.Params{"force": json.RawMessage(`true`)})
+	if lines := readLines(t, log); len(lines) != 2 {
+		t.Fatalf("the force flag installs a current root, got %q", lines)
 	}
 }
 
