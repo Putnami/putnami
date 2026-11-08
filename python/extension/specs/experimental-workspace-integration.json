@@ -40,11 +40,11 @@
     },
     {
       "id": "packages-an-application-image",
-      "text": "package with the docker channel assembles an OCI image of an application with no Docker daemon, on the official python:<pinned>-slim image of the Python minor uv selects, pinned by digest, or on a digest-pinned base the project names; a base with no digest fails. The image runs python on the entrypoint serve runs, as an unprivileged user. A library packages nothing."
+      "text": "package with the docker channel assembles an OCI image of an application with no Docker daemon, on the official python:<pinned>-slim image of the Python minor uv selects, pinned by digest, or on a digest-pinned base the project names; a base with no digest fails. The image runs python on the entrypoint option of package, src/main.py by default, as an unprivileged user. A library packages nothing."
     },
     {
       "id": "image-installs-the-locked-wheels",
-      "text": "An image holds the production dependencies of uv.lock, installed as wheels for its platform and checked against their locked hashes, and the project and its workspace path dependencies built from a staging copy. A path dependency outside the project's dependency closure fails."
+      "text": "An image holds the production dependencies of uv.lock, installed as wheels for its platform and the Python release of its base, checked against their locked hashes, and the local packages uv export lists built from a staging copy. A path dependency outside the project's dependency closure fails."
     },
     {
       "id": "image-ships-the-application-files",

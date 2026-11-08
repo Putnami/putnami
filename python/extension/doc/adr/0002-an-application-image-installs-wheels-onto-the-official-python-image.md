@@ -24,13 +24,17 @@ base, pinned by digest. A base with no digest fails.
 The dependencies come from `uv.lock`. `uv export --frozen --no-dev` lists the
 production dependencies of the project. `uv pip install --target` installs the
 registry ones as wheels only, checked against their locked hashes, for the
-image's platform and Python minor. It builds nothing, so a `linux/arm64` image
-can be packaged on an `amd64` machine. The project and its workspace path
-dependencies are copied to a staging directory and built into wheels there.
-The installed packages go to one directory that `PYTHONPATH` names.
+image's platform and the Python release of its base. It builds nothing, so a
+`linux/arm64` image can be packaged on an `amd64` machine. The local packages
+the export lists, the project when it has a build system and its workspace
+path dependencies, are copied to a staging directory and built into wheels
+there. The installed packages go to one directory that `PYTHONPATH` names.
 
-The image runs `python /app/<entrypoint>`, the entrypoint `serve` runs, as an
-unprivileged user, with `PORT` set to the port it exposes.
+The image runs `python /app/<entrypoint>`, as an unprivileged user, with
+`PORT` set to the port it exposes. The entrypoint is the `entrypoint` option
+of `package`, which the workspace and the project set like any option, and
+`src/main.py` without one. A project that names its entrypoint once, in the
+options of `@putnami/python`, gives it to `serve`, `run` and the image alike.
 
 `publish --docker` pushes the image through the shared publisher, and the
 workspace probe declares the image as an `oci` release-set member.
@@ -53,6 +57,9 @@ workspace probe declares the image as an `oci` release-set member.
 
 ## Alternatives rejected
 
+- **The entrypoint `serve` runs.** A job reads the options of its own command
+  as the workspace resolved them, not those of another command, so the image
+  could run another file than `serve` without anything saying so.
 - **Copy the virtual environment.** A virtual environment points at the
   interpreter of the machine that created it, and its wheels are built for
   that machine.
