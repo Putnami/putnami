@@ -570,9 +570,15 @@
         "application": {
           "from": "project",
           "files": [
+            "git:**/*",
             "**/*",
             ".*",
             "public/.*",
+            "public/dist/**/*",
+            "public/out/**/*",
+            "public/vendor/**/*",
+            "!.gen/**",
+            "!.phpunit.cache/**",
             "!vendor/**",
             "!var/**",
             "!tests/**",
@@ -587,9 +593,15 @@
         "pathRepositories": {
           "from": "closure",
           "files": [
+            "git:**/*",
             "**/*",
             ".*",
             "public/.*",
+            "public/dist/**/*",
+            "public/out/**/*",
+            "public/vendor/**/*",
+            "!.gen/**",
+            "!.phpunit.cache/**",
             "!vendor/**",
             "!var/**",
             "!tests/**",

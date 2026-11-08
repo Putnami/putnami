@@ -69,6 +69,7 @@ func TestPackageAssemblesAnImageOfAnApplicationAndItsProductionDependencies(t *t
 	}
 
 	// The image reaches the registry, and it holds what staging shipped.
+	spectest.Proves(t, feature, "publishes-an-application-image", "publish-pushes-the-application-image")
 	status, _, err = runShopJob(t, root, PublishDockerJob(), "--docker-registry", host+"/acme")
 	if status != "OK" || err != nil {
 		t.Fatalf("publish: %s %v", status, err)
@@ -380,8 +381,7 @@ func TestAPackagedLibraryIsSkipped(t *testing.T) {
 	}
 }
 
-func TestPublishPushesTheApplicationImage(t *testing.T) {
-	spectest.Proves(t, feature, "publishes-an-application-image", "publish-pushes-the-application-image")
+func TestPublishDryRunPushesNothing(t *testing.T) {
 	root := t.TempDir()
 	status, data, err := runPublish(t, root)
 	if status != "OK" || err != nil || data["dryRun"] != true {
