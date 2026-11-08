@@ -110,6 +110,62 @@
           }
         },
         {
+          "id": "packages-an-application-image",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "package-assembles-an-image-of-an-application-and-its-production-dependencies",
+              "a-base-image-with-no-digest-fails"
+            ]
+          }
+        },
+        {
+          "id": "image-installs-the-locked-wheels",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-dependencies-install-as-hashed-wheels-for-the-image-platform",
+              "a-path-dependency-outside-the-dependency-closure-fails"
+            ]
+          }
+        },
+        {
+          "id": "image-ships-the-application-files",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-image-holds-no-tests-and-no-secret-files",
+              "the-image-cache-key-covers-the-files-it-ships"
+            ]
+          }
+        },
+        {
+          "id": "publishes-an-application-image",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "publish-pushes-the-application-image",
+              "the-probe-declares-the-image-as-an-oci-release-set-member"
+            ]
+          }
+        },
+        {
           "id": "experimental-boundary",
           "stage": "coded",
           "evidenceKinds": [
