@@ -272,9 +272,10 @@ func appendPath(env []string, dir string) []string {
 // ErrToolchainMissing is the error of a toolchain command that is not on PATH.
 var ErrToolchainMissing = errors.New("the toolchain command is missing")
 
-// exactVersion matches a version that names one release, such as 1.82.0,
-// 21.0.4 or 8.3: a channel name such as "stable" does not.
-var exactVersion = regexp.MustCompile(`^v?[0-9]+(\.[0-9]+)+([-+][0-9A-Za-z.\-+]*)?$`)
+// exactVersion matches a version that names one release or one release
+// line, such as 1.82.0, 21.0.4, 8.3 or a Java major such as 21: a channel
+// name such as "stable" does not.
+var exactVersion = regexp.MustCompile(`^v?[0-9]+(\.[0-9]+)*([-+][0-9A-Za-z.\-+]*)?$`)
 
 // IsExact reports whether a stated version names one release.
 func IsExact(version string) bool {

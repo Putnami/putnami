@@ -53,6 +53,12 @@ type Profile struct {
 	Inputs map[string][]string `json:"inputs"`
 	// Tasks are the lint, test and build tasks, by name.
 	Tasks map[string]Task `json:"tasks"`
+	// Variants are named parts of the profile, with its shape and every
+	// member optional, that the detector picks per component: a stack with
+	// several builds, such as Gradle and Maven, declares one per build. A
+	// variant merges into the profile like an override. A profile with
+	// variants may declare no task of its own.
+	Variants map[string]json.RawMessage `json:"variants,omitempty"`
 }
 
 // Toolchain is the toolchain check of a profile.
@@ -116,6 +122,10 @@ type WithoutCoverage struct {
 
 // Reports are the report paths of a task.
 type Reports struct {
+	// When names project file patterns: when none matches a file, the task
+	// expects no report, such as a module without tests. Empty, the task
+	// always expects its reports.
+	When []string `json:"when,omitempty"`
 	// JUnit are the JUnit XML report patterns.
 	JUnit []string `json:"junit,omitempty"`
 	// Coverage are the coverage reports, with their format.
@@ -128,6 +138,9 @@ type Coverage struct {
 	Format string `json:"format"`
 	// Paths are the report patterns.
 	Paths []string `json:"paths"`
+	// Optional says a missing report is not read and fails nothing: a build
+	// that writes coverage only when it is configured to.
+	Optional bool `json:"optional,omitempty"`
 }
 
 // Decode reads a profile with a strict decoder: an unknown member, a repeated
@@ -190,7 +203,7 @@ func (p Profile) Validate() error {
 			}
 		}
 	}
-	if len(p.Tasks) == 0 {
+	if len(p.Tasks) == 0 && len(p.Variants) == 0 {
 		return errors.New("tasks: a profile declares at least one task")
 	}
 	for name, task := range p.Tasks {
@@ -199,6 +212,14 @@ func (p Profile) Validate() error {
 		}
 		if err := task.validate(p.Inputs); err != nil {
 			return fmt.Errorf("tasks.%s.%w", name, err)
+		}
+	}
+	for _, name := range p.VariantNames() {
+		if !idPattern.MatchString(name) {
+			return fmt.Errorf("variants: %q is not a lowercase variant name", name)
+		}
+		if _, err := p.Variant(name); err != nil {
+			return err
 		}
 	}
 	return nil
@@ -257,6 +278,11 @@ func (t Task) validate(sets map[string][]string) error {
 		}
 	}
 	if t.Reports != nil {
+		for i, p := range t.Reports.When {
+			if err := validatePattern(p, false); err != nil {
+				return fmt.Errorf("reports.when[%d]: %w", i, err)
+			}
+		}
 		for i, p := range t.Reports.JUnit {
 			if err := validateReportPath(p); err != nil {
 				return fmt.Errorf("reports.junit[%d]: %w", i, err)
@@ -342,17 +368,96 @@ func validateReportPath(p string) error {
 // that names a member the profile schema does not know, or that changes id or
 // markers, fails.
 func (p Profile) Resolve(override json.RawMessage) (Profile, error) {
+	return p.merge(override, "override")
+}
+
+// VariantNames are the profile's variants, sorted.
+func (p Profile) VariantNames() []string {
+	var out []string
+	for name := range p.Variants {
+		out = append(out, name)
+	}
+	slices.Sort(out)
+	return out
+}
+
+// Variant returns the profile with the named variant applied. A profile
+// without variants is its own only variant, named "".
+func (p Profile) Variant(name string) (Profile, error) {
+	if name == "" {
+		if len(p.Variants) > 0 {
+			return Profile{}, fmt.Errorf("variants: the profile declares %s; a component names one", strings.Join(p.VariantNames(), ", "))
+		}
+		return p, nil
+	}
+	raw, ok := p.Variants[name]
+	if !ok {
+		return Profile{}, fmt.Errorf("variants: the profile declares no variant %q", name)
+	}
+	base := p
+	base.Variants = nil
+	out, err := base.merge(raw, "variant")
+	if err != nil {
+		return Profile{}, fmt.Errorf("variants.%s: %w", name, err)
+	}
+	return out, nil
+}
+
+// Applied returns each variant applied to the profile, in name order, or
+// the profile alone when it declares none. Invalid variants are left out:
+// Decode refuses them.
+func (p Profile) Applied() []Profile {
+	if len(p.Variants) == 0 {
+		return []Profile{p}
+	}
+	var out []Profile
+	for _, name := range p.VariantNames() {
+		if v, err := p.Variant(name); err == nil {
+			out = append(out, v)
+		}
+	}
+	return out
+}
+
+// HasTask reports whether the profile, or any of its variants, declares a
+// task.
+func (p Profile) HasTask(task string) bool {
+	for _, v := range p.Applied() {
+		if _, ok := v.Tasks[task]; ok {
+			return true
+		}
+	}
+	return false
+}
+
+// ShippedRootPatterns are the stack-root patterns a task reads in any
+// variant, sorted: what the manifest declares as the task's workspace input.
+func (p Profile) ShippedRootPatterns(task string) []string {
+	var out []string
+	for _, v := range p.Applied() {
+		_, root := v.TaskPatterns(task)
+		for _, r := range root {
+			out = appendNew(out, r)
+		}
+	}
+	slices.Sort(out)
+	return out
+}
+
+// merge applies a JSON object with the profile's shape to it; kind names it
+// in errors.
+func (p Profile) merge(override json.RawMessage, kind string) (Profile, error) {
 	trimmed := bytes.TrimSpace(override)
 	if len(trimmed) == 0 || bytes.Equal(trimmed, []byte("null")) {
 		return p, nil
 	}
 	var over map[string]any
 	if err := json.Unmarshal(trimmed, &over); err != nil {
-		return Profile{}, fmt.Errorf("the override is not a JSON object: %w", err)
+		return Profile{}, fmt.Errorf("the %s is not a JSON object: %w", kind, err)
 	}
-	for _, fixed := range []string{"id", "markers"} {
+	for _, fixed := range []string{"id", "markers", "variants"} {
 		if _, ok := over[fixed]; ok {
-			return Profile{}, fmt.Errorf("%s: an override cannot change the profile's %s", fixed, fixed)
+			return Profile{}, fmt.Errorf("%s: the %s cannot change the profile's %s", fixed, kind, fixed)
 		}
 	}
 	base, err := json.Marshal(p)
@@ -371,7 +476,7 @@ func (p Profile) Resolve(override json.RawMessage) (Profile, error) {
 	}
 	var out Profile
 	if err := strictUnmarshal(data, &out); err != nil {
-		return Profile{}, fmt.Errorf("the override does not fit the profile: %w", err)
+		return Profile{}, fmt.Errorf("the %s does not fit the profile: %w", kind, err)
 	}
 	if err := out.Validate(); err != nil {
 		return Profile{}, fmt.Errorf("the resolved profile is invalid: %w", err)
@@ -432,8 +537,7 @@ func (p Profile) TaskPatterns(task string) (project, root []string) {
 	return project, root
 }
 
-// RootPatterns are the stack-root patterns of every task: what a stack
-// extension's manifest declares as its workspace input.
+// RootPatterns are the stack-root patterns of every task of the profile.
 func (p Profile) RootPatterns() []string {
 	var out []string
 	for _, task := range TaskNames {

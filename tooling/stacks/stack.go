@@ -20,10 +20,17 @@ import (
 type Component struct {
 	// Path is the workspace-relative component directory, "." for the root.
 	Path string
-	// Name is the detector's name for the component: the crate, the Gradle
-	// path, the package. Steps receive it as {component}; an empty name
-	// gives the component its Path instead.
+	// Name is the project's source name: the crate, the module, the package.
+	// Empty, the project keeps its directory's name, and steps receive the
+	// component's Path as {component}.
 	Name string
+	// Ref is the build's own name for the component, which steps receive as
+	// {component}, when it differs from Name: a Gradle task path prefix, a
+	// Maven groupId:artifactId. Empty, it is Name.
+	Ref string
+	// Variant names the profile variant the component's build runs; empty
+	// for a profile without variants.
+	Variant string
 	// InputOnly marks a stack root that holds no component, such as a virtual
 	// Cargo workspace: an input-only project whose tasks run no step.
 	InputOnly bool
@@ -87,9 +94,11 @@ type Provided struct {
 // Metadata is what the probe records about a project under
 // project.metadata[<extension>]. It reaches every task's cache key.
 type Metadata struct {
-	// Component is the detector's name for the component, empty for a stack
-	// root that holds none.
+	// Component is the build's name for the component, steps' {component};
+	// empty for a stack root that holds none.
 	Component string `json:"component"`
+	// Variant is the profile variant of the component.
+	Variant string `json:"variant,omitempty"`
 	// Root is the workspace-relative stack root.
 	Root string `json:"root"`
 	// Toolchain is the expected toolchain version the files state.
@@ -112,25 +121,32 @@ func (s Stack) Probe(root string, request wsproto.ProbeRequest) (wsproto.ProbeRe
 	result := wsproto.ProbeResult{Version: wsproto.ProbeProtocolVersion, Extension: s.Extension}
 	components, diags := s.Detect(root, request)
 	result.Diagnostics = append(result.Diagnostics, diags...)
-	rootFiles := s.Profile.RootPatterns()
 	deps, leftOut := rootEdges(components)
 	for _, c := range components {
 		if reason, out := leftOut[c.Path]; out {
 			result.Diagnostics = append(result.Diagnostics, diag.Warningf(CodeStackRootUnsupported, c.Path, "%s is left out: %s", c.Path, reason))
 			continue
 		}
-		expected, err := s.Profile.Toolchain.ExpectedVersion(root, c.Path, c.Root)
+		profile, err := s.Profile.Variant(c.Variant)
+		if err != nil {
+			result.Diagnostics = append(result.Diagnostics, diag.Warningf(CodeProjectConfigInvalid, c.Path, "%s is left out: %v", c.Path, err))
+			continue
+		}
+		expected, err := profile.Toolchain.ExpectedVersion(root, c.Path, c.Root)
 		if err != nil {
 			result.Diagnostics = append(result.Diagnostics, diag.Warningf(CodeToolchainUnpinned, c.Path, "the expected toolchain version cannot be read: %v", err))
 		}
 		// A component whose manifest names no package, such as a Composer
 		// application, is named by its directory in the steps: the same on
 		// every checkout. Its probe project keeps no source name.
-		component := c.Name
+		component := c.Ref
+		if component == "" {
+			component = c.Name
+		}
 		if component == "" && !c.InputOnly {
 			component = c.Path
 		}
-		metadata := Metadata{Component: component, Root: c.Root, Toolchain: expected}
+		metadata := Metadata{Component: component, Variant: c.Variant, Root: c.Root, Toolchain: expected}
 		if len(c.ReleaseMembers) > 0 {
 			metadata.ReleaseSet = &releaseset.ProjectMetadata{Ecosystems: slices.Clone(c.ReleaseMembers)}
 		}
@@ -138,11 +154,12 @@ func (s Stack) Probe(root string, request wsproto.ProbeRequest) (wsproto.ProbeRe
 		if err != nil {
 			return wsproto.ProbeResult{}, err
 		}
+		rootFiles := profile.RootPatterns()
 		var watched []string
 		for _, m := range s.Profile.Markers {
 			watched = appendNew(watched, joinRel(c.Path, m))
 		}
-		for _, f := range s.Profile.Toolchain.Files {
+		for _, f := range profile.Toolchain.Files {
 			watched = appendNew(watched, joinRel(c.Path, f.Path))
 		}
 		for _, f := range rootFiles {
@@ -266,21 +283,26 @@ func (s Stack) ProjectOverride(projectAbs string) (json.RawMessage, error) {
 	return doc.Options[s.Extension], nil
 }
 
-// Resolved is the profile of one project, with its override applied.
-func (s Stack) Resolved(projectAbs string) (Profile, error) {
+// Resolved is the profile of one project: the profile, then its variant,
+// then the project's override.
+func (s Stack) Resolved(projectAbs, variant string) (Profile, error) {
+	base, err := s.Profile.Variant(variant)
+	if err != nil {
+		return Profile{}, err
+	}
 	override, err := s.ProjectOverride(projectAbs)
 	if err != nil {
 		return Profile{}, err
 	}
-	p, err := s.Profile.Resolve(override)
+	p, err := base.Resolve(override)
 	if err != nil {
 		return Profile{}, fmt.Errorf("%s options[%q]: %w", ProjectConfigFile, s.Extension, err)
 	}
 	// A stack-root pattern reaches the key only through the manifest's
-	// workspace input of its task, which declares the shipped profile's: an
-	// override may narrow them, never add one.
+	// workspace input of its task, which declares the shipped profile's, every
+	// variant's: an override may narrow them, never add one.
 	for _, task := range TaskNames {
-		_, shipped := s.Profile.TaskPatterns(task)
+		shipped := s.Profile.ShippedRootPatterns(task)
 		_, resolved := p.TaskPatterns(task)
 		for _, r := range resolved {
 			if !slices.Contains(shipped, r) {
@@ -300,7 +322,7 @@ func (s Stack) Selector(task string) string {
 func (s Stack) Selectors() []string {
 	var out []string
 	for _, task := range TaskNames {
-		if _, ok := s.Profile.Tasks[task]; ok {
+		if s.Profile.HasTask(task) {
 			out = append(out, s.Selector(task))
 		}
 	}
@@ -314,14 +336,14 @@ func (s Stack) Selectors() []string {
 // inputs changes the answer.
 func (s Stack) ResolveInputs(root string, request wsproto.InputResolveRequest) wsproto.InputResolveResult {
 	result := wsproto.InputResolveResult{Version: wsproto.InputResolveProtocolVersion, Extension: s.Extension}
-	kinds := s.rootKinds(root, request.Inputs)
+	found := s.components(root, request.Inputs)
 	for _, q := range request.Inputs {
-		result.Inputs = append(result.Inputs, s.answer(root, q, kinds[q.Project]))
+		result.Inputs = append(result.Inputs, s.answer(root, q, found[q.Project]))
 	}
 	return result
 }
 
-func (s Stack) answer(root string, q wsproto.InputResolveQuery, kind rootKind) wsproto.InputResolveAnswer {
+func (s Stack) answer(root string, q wsproto.InputResolveQuery, c found) wsproto.InputResolveAnswer {
 	fail := func(format string, args ...any) wsproto.InputResolveAnswer {
 		msg := fmt.Sprintf(format, args...)
 		if len(msg) > 4000 {
@@ -334,21 +356,24 @@ func (s Stack) answer(root string, q wsproto.InputResolveQuery, kind rootKind) w
 		return fail("%s answers no selector %s", s.Extension, q.Selector)
 	}
 	projectAbs := filepath.Join(root, filepath.FromSlash(q.Project))
-	p, err := s.Resolved(projectAbs)
+	if !c.known && len(s.Profile.Variants) > 0 {
+		return fail("%s finds no component in %s, so it cannot name its variant: run putnami projects sync", s.Extension, q.Project)
+	}
+	p, err := s.Resolved(projectAbs, c.variant)
 	if err != nil {
 		return fail("%v", err)
 	}
 	projectPatterns, rootPatterns := p.TaskPatterns(task)
 	patterns := slices.Clone(projectPatterns)
 	// A stack root that holds no component reads its root files alone.
-	if kind.rootOnly {
+	if c.rootOnly {
 		patterns = nil
 	}
 	// A component that is its own stack root reads its root files in its
 	// own directory; for one under the workspace root's build they are the
 	// manifest's workspace input, and for one under a nested root the edge
 	// to that root's project carries them.
-	if kind.own {
+	if c.ownRoot {
 		for _, r := range rootPatterns {
 			patterns = appendNew(patterns, r)
 		}
@@ -377,26 +402,33 @@ func (s Stack) answer(root string, q wsproto.InputResolveQuery, kind rootKind) w
 	}
 }
 
-// rootKind is what a project is to its stack root.
-type rootKind struct {
-	// own is true for a project that is its own stack root.
-	own bool
-	// rootOnly is true for a stack root that holds no component.
+// found is what the detector says about an asked project.
+type found struct {
+	// known says the detector finds a component there.
+	known bool
+	// ownRoot says the project is its own stack root; the workspace root
+	// always is.
+	ownRoot bool
+	// rootOnly says the project is a stack root that holds no component.
 	rootOnly bool
+	// variant is the component's profile variant.
+	variant string
 }
 
-// rootKinds reports, for each asked project, what it is to its stack root,
-// with one detector run for the whole request. The workspace root is always
-// its own.
-func (s Stack) rootKinds(root string, queries []wsproto.InputResolveQuery) map[string]rootKind {
-	out := map[string]rootKind{}
+// components reports, for each asked project, what the detector finds
+// there, with one detector run for the whole request.
+func (s Stack) components(root string, queries []wsproto.InputResolveQuery) map[string]found {
+	out := map[string]found{}
 	var paths []string
 	for _, q := range queries {
-		if q.Project == "." || q.Project == "" {
-			out[q.Project] = rootKind{own: true}
-			continue
+		p := q.Project
+		if p == "" {
+			p = wsproto.ProbeRootPath
 		}
-		paths = appendNew(paths, q.Project)
+		if p == wsproto.ProbeRootPath {
+			out[q.Project] = found{ownRoot: true}
+		}
+		paths = appendNew(paths, p)
 	}
 	if len(paths) == 0 {
 		return out
@@ -404,7 +436,11 @@ func (s Stack) rootKinds(root string, queries []wsproto.InputResolveQuery) map[s
 	slices.Sort(paths)
 	components, _ := s.Detect(root, wsproto.ProbeRequest{Version: wsproto.ProbeProtocolVersion, Extension: s.Extension, Paths: paths})
 	for _, c := range components {
-		out[c.Path] = rootKind{own: c.Root == c.Path, rootOnly: c.InputOnly}
+		f := found{known: true, ownRoot: c.Root == c.Path, rootOnly: c.InputOnly, variant: c.Variant}
+		out[c.Path] = f
+		if c.Path == wsproto.ProbeRootPath {
+			out[""] = f
+		}
 	}
 	return out
 }

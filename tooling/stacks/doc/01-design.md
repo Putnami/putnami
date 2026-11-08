@@ -154,8 +154,9 @@ The Rust reference profile:
 | `inputs.<set>` | Named sets of file patterns. A plain pattern is relative to the project directory; `{root}/` makes it relative to the stack root, the directory of the build that holds the component (the Cargo workspace, the Gradle settings). |
 | `tasks.<task>.steps` | The commands the task runs in order, each an argument vector run in the project directory, with no shell. `{root}` is the stack root, `{component}` the detector's name for the component, `{output}` the task's output directory under the project. |
 | `tasks.<task>.inputs` | The input sets the task reads. `lint` reads fewer than `test`: a lockfile change does not rerun it. |
-| `tasks.<task>.reports` | The JUnit and coverage reports the task reads back, with the coverage format. The core copies each into `{output}` as soon as the task ends. |
+| `tasks.<task>.reports` | The JUnit and coverage reports the task reads back, with the coverage format. The core copies each into `{output}` as soon as the task ends. `when` and `optional` say when a report is expected. |
 | `tasks.<task>.artifacts` | The files the task copies into `{output}/artifacts` after its steps, so a cache hit restores them: patterns under the project or the stack root that may name `{component}`. The file a pattern with no wildcard names is removed before the steps, unless its path leads outside the project or the stack root or the inputs of one of the component's tasks select it, so only what the steps write is copied. A pattern with a wildcard is only copied, and copies whatever it matches, a file an earlier build left included. A component name that is no single path segment keeps no artifact. A pattern that matches nothing copies nothing. |
+| `variants.<name>` | A part of the profile one build runs, applied before the project's override. |
 
 The toolchain files are inputs of every task, whatever its input sets.
 
@@ -165,6 +166,27 @@ stack root one at a time, under a lock it holds on that root, and copies the
 reports out before it releases the lock, so two crates never read each
 other's report. Cargo already serializes on its own build directory, so the
 lock costs little.
+
+### Variants: a stack with several builds
+
+A stack whose components run on different builds, such as Java on Gradle,
+Android and Maven, declares `variants` in its profile: named parts of the
+profile, with its shape and every member optional, merged into it like an
+override ([ADR 0002](adr/0002-profile-variants-for-a-stack-with-several-builds.md)).
+The detector names each component's variant; the probe records it in the
+metadata, and the job and the selectors resolve the profile, then the
+variant, then the project's override. With variants, the profile may declare
+no task of its own. A task's stack-root input in the manifest is the union of
+its variants' stack-root files.
+
+A component also has a reference apart from its name: `Component.Ref`, the
+build's own name, which steps receive as `{component}`, such as Gradle's task
+path prefix `:api:`. `Component.Name` stays the project's source name, and
+may be empty so the project keeps its directory's name.
+
+A task's `reports.when` names project files: when none exists, the task
+expects no report, so a module without tests passes. A coverage report marked
+`optional` is read when it exists and fails nothing when it does not.
 
 ### A project overrides any value
 

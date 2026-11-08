@@ -103,7 +103,7 @@ func (s Stack) component(in runInput, emit reporter) (Metadata, Profile, error) 
 	if meta.Component == "" {
 		return meta, Profile{}, nil
 	}
-	profile, err := s.Resolved(in.projectAbs)
+	profile, err := s.Resolved(in.projectAbs, meta.Variant)
 	if err != nil {
 		return Metadata{}, Profile{}, failWith(emit, CodeProjectConfigInvalid, "%v", err)
 	}
@@ -284,7 +284,9 @@ func (s Stack) WorkspaceRootJob(missing MissingToolchain, step func(context.Cont
 // component. A profile that does not resolve counts as present: atRoot reports
 // it.
 func (s Stack) toolchainMissing(ctx context.Context, in runInput) bool {
-	profile, err := s.Resolved(in.projectAbs)
+	var meta Metadata
+	_ = json.Unmarshal(in.metadata, &meta)
+	profile, err := s.Resolved(in.projectAbs, meta.Variant)
 	if err != nil {
 		return false
 	}
@@ -501,7 +503,12 @@ func (s Stack) run(ctx context.Context, in runInput, emit reporter) (string, map
 		}
 		return out, nil
 	}
-	summary, diags := ReadReports(t.Reports, resolve, outDir, s.attribution(in.workspaceRoot, in.projectAbs, meta.Component))
+	reports := t.Reports
+	if reports != nil && len(reports.When) > 0 && !anyFile(in.projectAbs, reports.When) {
+		emit.Info(fmt.Sprintf("no file matches %s: the %s task of %s expects no report", strings.Join(reports.When, ", "), in.task, meta.Component))
+		reports = nil
+	}
+	summary, diags := ReadReports(reports, resolve, outDir, s.attribution(in.workspaceRoot, in.projectAbs, meta.Component))
 	failed := stepErr != nil
 	for _, d := range diags {
 		// A step that failed may have written no report: the step's own
@@ -513,7 +520,7 @@ func (s Stack) run(ctx context.Context, in runInput, emit reporter) (string, map
 		failed = failed || d.Severity == diag.Error
 	}
 	data := map[string]any{}
-	if t.Reports != nil && len(t.Reports.JUnit) > 0 {
+	if reports != nil && len(reports.JUnit) > 0 {
 		data["testSummary"] = map[string]any{
 			"total": summary.Tests.Total, "passed": summary.Tests.Passed,
 			"failed": summary.Tests.Failed, "skipped": summary.Tests.Skipped,
@@ -716,4 +723,14 @@ func removeOutputs(patterns []string, profile Profile, projectAbs, rootAbs strin
 		}
 	}
 	return nil
+}
+
+// anyFile reports whether one of the patterns matches a file under dir.
+func anyFile(dir string, patterns []string) bool {
+	for _, p := range patterns {
+		if matches, err := globFiles(dir, p); err == nil && len(matches) > 0 {
+			return true
+		}
+	}
+	return false
 }
