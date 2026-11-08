@@ -100,6 +100,7 @@ func Detect(root string, request wsproto.ProbeRequest) ([]stacks.Component, []di
 				Dependencies: rebasePaths(c.DependsOn, buildRoot),
 				Type:         gradleType(text),
 			})
+			out[len(out)-1].ReleaseMembers = imageMember(root, wsproto.ProbeProject{Path: path, SourceName: gradleName(c.Name), Type: gradleType(text)})
 		}
 		if !hasRoot && buildRoot != wsproto.ProbeRootPath && asked[buildRoot] {
 			claimed[buildRoot] = true
@@ -133,6 +134,7 @@ func Detect(root string, request wsproto.ProbeRequest) ([]stacks.Component, []di
 				Dependencies: rebasePaths(c.DependsOn, buildRoot),
 				Type:         mavenType(root, path),
 			})
+			out[len(out)-1].ReleaseMembers = imageMember(root, wsproto.ProbeProject{Path: path, SourceName: artifact, Type: mavenType(root, path)})
 		}
 		if !hasRoot && buildRoot != wsproto.ProbeRootPath && asked[buildRoot] && !claimed[buildRoot] {
 			out = append(out, stacks.Component{Path: buildRoot, SourceFile: joinRel(buildRoot, maven.POM), Root: buildRoot, Variant: VariantMaven, InputOnly: true})

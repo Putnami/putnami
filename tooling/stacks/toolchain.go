@@ -12,6 +12,7 @@ import (
 	"path"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"strings"
 )
 
@@ -176,20 +177,64 @@ type Selection struct {
 
 // Program returns the program a step runs: the pinned toolchain for a step
 // that names the toolchain command, a program beside it for a step that names
-// one, such as cargo beside rustc, and name otherwise. A process resolves a bare
-// name on its own PATH, which holds no pinned toolchain.
+// one, such as cargo beside rustc, then a bare name found on the selection's
+// own PATH, which holds the directories of the task's tools, and name
+// otherwise. A process resolves a bare name on its own PATH, which holds no
+// pinned toolchain and no tool.
 func (s Selection) Program(t Toolchain, name string) string {
-	if s.Executable == "" {
-		return name
+	if s.Executable != "" {
+		if name == t.Command[0] {
+			return s.Executable
+		}
+		sibling := filepath.Join(filepath.Dir(s.Executable), name+filepath.Ext(s.Executable))
+		if info, err := os.Stat(sibling); err == nil && !info.IsDir() {
+			return sibling
+		}
 	}
-	if name == t.Command[0] {
-		return s.Executable
-	}
-	sibling := filepath.Join(filepath.Dir(s.Executable), name+filepath.Ext(s.Executable))
-	if info, err := os.Stat(sibling); err == nil && !info.IsDir() {
-		return sibling
+	if !strings.ContainsAny(name, `/\`) {
+		if found := lookPathIn(s.Env, name); found != "" {
+			return found
+		}
 	}
 	return name
+}
+
+// lookPathIn answers the first executable file named name on the PATH of env,
+// with the PATHEXT extensions on Windows, or "".
+func lookPathIn(env []string, name string) string {
+	var path string
+	for _, entry := range env {
+		if key, value, ok := strings.Cut(entry, "="); ok && strings.EqualFold(key, "PATH") {
+			path = value
+			break
+		}
+	}
+	names := []string{name}
+	if runtime.GOOS == "windows" && filepath.Ext(name) == "" {
+		names = nil
+		exts := environmentValue(env, "PATHEXT")
+		if exts == "" {
+			exts = ".com;.exe;.bat;.cmd"
+		}
+		for _, ext := range strings.Split(strings.ToLower(exts), ";") {
+			if ext != "" {
+				names = append(names, name+ext)
+			}
+		}
+	}
+	for _, dir := range filepath.SplitList(path) {
+		if dir == "" {
+			continue
+		}
+		for _, n := range names {
+			candidate := filepath.Join(dir, n)
+			info, err := os.Stat(candidate)
+			if err == nil && !info.IsDir() && (runtime.GOOS == "windows" || info.Mode()&0o111 != 0) {
+				return candidate
+			}
+		}
+	}
+	return ""
 }
 
 // Select chooses the toolchain of a task in dir. The toolchain on PATH runs

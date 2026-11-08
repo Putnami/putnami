@@ -26,7 +26,13 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer, runJobs func(
 	if err == nil {
 		var handled bool
 		if handled, err = java.HandleToolchainResolve(args, stdin, stdout, stack.Profile); !handled && err == nil {
-			err = stack.Entrypoint(args, stdin, stdout, runtimeVersion, runJobs)
+			err = stack.Entrypoint(args, stdin, stdout, runtimeVersion, func(jobs map[string]cli.JobFunc) {
+				jobs[java.ServeJobName] = java.ServeJob(stack)
+				jobs[java.RunJobName] = java.RunJob(stack)
+				jobs[java.PackageDockerJobName] = java.PackageDockerJob(stack)
+				jobs[java.PublishDockerJobName] = java.PublishDockerJob()
+				runJobs(jobs)
+			})
 		}
 	}
 	if err != nil {

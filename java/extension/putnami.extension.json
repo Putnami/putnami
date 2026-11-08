@@ -163,6 +163,117 @@
           ]
         }
       ]
+    },
+    "serve": {
+      "description": "Serve a Java application: build its runnable form with its own build, then run it on the port.",
+      "traits": {
+        "requiresRunnable": true,
+        "workload": "serve"
+      },
+      "flags": {
+        "port": {
+          "type": "number",
+          "default": 3000,
+          "description": "Port for the server, set as PORT and SERVER_PORT"
+        }
+      },
+      "run": [
+        {
+          "id": "serve",
+          "task": "serve-run"
+        }
+      ]
+    },
+    "run": {
+      "description": "Run a Java application once and forward its exit code.",
+      "traits": {
+        "requiresRunnable": true,
+        "workload": "once"
+      },
+      "flags": {
+        "args": {
+          "type": "string",
+          "description": "Arguments to pass to the application"
+        }
+      },
+      "run": [
+        {
+          "id": "run",
+          "task": "run-exec"
+        }
+      ]
+    },
+    "package": {
+      "description": "Assemble the image of an application for the docker publish channel.",
+      "traits": {
+        "injectPublishChannels": true
+      },
+      "flags": {
+        "docker": {
+          "type": "boolean",
+          "default": false,
+          "description": "Assemble the image"
+        },
+        "docker-tag": {
+          "type": "string",
+          "description": "Override the image tag"
+        },
+        "docker-base-image": {
+          "type": "string",
+          "description": "Replace the Temurin JRE image with a base pinned by digest (image@sha256:...)"
+        },
+        "docker-load": {
+          "type": "boolean",
+          "default": false,
+          "description": "Also load the assembled image into the local docker daemon"
+        },
+        "platform": {
+          "type": "string",
+          "default": "linux/amd64",
+          "description": "Target platform of the image"
+        },
+        "dry-run": {
+          "type": "boolean",
+          "default": false,
+          "description": "Plan the image without assembling it"
+        }
+      },
+      "run": [
+        {
+          "id": "docker",
+          "task": "package-docker",
+          "if": "params.docker"
+        }
+      ]
+    },
+    "publish": {
+      "dependsOn": [
+        "package"
+      ],
+      "traits": {
+        "injectPublishChannels": true,
+        "sideEffects": "registry"
+      },
+      "description": "Push the image of an application to its OCI registry. A library reaches its Maven repository through its own build.",
+      "flags": {
+        "docker": {
+          "type": "boolean",
+          "default": false,
+          "description": "Push the image"
+        },
+        "dry-run": {
+          "type": "boolean",
+          "default": false,
+          "description": "Push nothing; report what would be published"
+        }
+      },
+      "run": [
+        {
+          "id": "docker",
+          "task": "publish-docker",
+          "if": "params.docker"
+        }
+      ]
     }
   },
   "tasks": {
@@ -406,6 +517,168 @@
         "effects": [
           "network",
           "toolchain-cache"
+        ]
+      }
+    },
+    "serve-run": {
+      "description": "Build the application's runnable form (installDist, or the Spring Boot jar) and run it with PORT and SERVER_PORT set, until the user stops it; ready once the port accepts connections.",
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "toolchains": [
+        "java"
+      ],
+      "args": [
+        "serve"
+      ],
+      "cwd": "{projectRoot}",
+      "cache": false,
+      "timeoutMs": -1,
+      "declares": {
+        "effects": [
+          "network",
+          "process",
+          "workspace-files"
+        ]
+      }
+    },
+    "run-exec": {
+      "description": "Build the application's runnable form and run it once with the args flag, forwarding its exit code.",
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "toolchains": [
+        "java"
+      ],
+      "args": [
+        "run"
+      ],
+      "cwd": "{projectRoot}",
+      "cache": false,
+      "timeoutMs": -1,
+      "declares": {
+        "effects": [
+          "network",
+          "process",
+          "workspace-files"
+        ]
+      }
+    },
+    "package-docker": {
+      "description": "Assemble a local OCI image of an application from its runnable form, built by its own build, on a digest-pinned Temurin JRE. Sole owner of <command-output>/docker.",
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "toolchains": [
+        "java"
+      ],
+      "args": [
+        "package-docker"
+      ],
+      "inputs": {
+        "application": {
+          "from": "project",
+          "files": [
+            "**/*",
+            "!build/**",
+            "!target/**",
+            "!.gradle/**",
+            "!out/**",
+            "!.putnami/**",
+            "!../**"
+          ]
+        },
+        "upstream": {
+          "from": "closure",
+          "files": [
+            "**/*",
+            "!build/**",
+            "!target/**",
+            "!.gradle/**",
+            "!out/**",
+            "!.putnami/**",
+            "!../**"
+          ]
+        },
+        "stackRoot": {
+          "from": "workspace",
+          "files": [
+            "**/pom.xml",
+            ".java-version",
+            ".mvn/extensions.xml",
+            ".mvn/jvm.config",
+            ".mvn/maven.config",
+            "build-logic/**/build.gradle",
+            "build-logic/**/build.gradle.kts",
+            "build-logic/**/src/**",
+            "build-logic/settings.gradle",
+            "build-logic/settings.gradle.kts",
+            "build.gradle",
+            "build.gradle.kts",
+            "buildSrc/build.gradle",
+            "buildSrc/build.gradle.kts",
+            "buildSrc/settings.gradle",
+            "buildSrc/settings.gradle.kts",
+            "buildSrc/src/**",
+            "gradle.lockfile",
+            "gradle.properties",
+            "gradle/*.gradle",
+            "gradle/*.gradle.kts",
+            "gradle/*.versions.toml",
+            "gradle/wrapper/gradle-wrapper.properties",
+            "settings-gradle.lockfile",
+            "settings.gradle",
+            "settings.gradle.kts"
+          ]
+        },
+        "extensionVersion": {
+          "from": "runtime"
+        }
+      },
+      "cwd": "{projectRoot}",
+      "timeoutMs": 1800000,
+      "cache": {
+        "versionAware": true
+      },
+      "declares": {
+        "outputs": {
+          "docker": {
+            "kind": "directory",
+            "root": "command-output",
+            "path": "docker",
+            "optionalEmpty": true,
+            "description": "Local OCI candidate layout, its manifest and the docker channel record."
+          }
+        },
+        "effects": [
+          "network",
+          "toolchain-cache"
+        ]
+      }
+    },
+    "publish-docker": {
+      "description": "Push the packaged image to the container registry through the shared publisher.",
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": [
+        "publish-docker"
+      ],
+      "cwd": "{projectRoot}",
+      "timeoutMs": 300000,
+      "cache": false,
+      "declares": {
+        "outputs": {
+          "published-image": {
+            "kind": "file",
+            "root": "command-output",
+            "path": "docker/published-image.json",
+            "optionalEmpty": true,
+            "description": "Verified remote image record, written after the registry digest is read back."
+          }
+        },
+        "effects": [
+          "network",
+          "registry"
+        ],
+        "publishChannels": [
+          "docker"
         ]
       }
     }

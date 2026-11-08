@@ -257,3 +257,23 @@ func TestAPinnedToolchainSetsItsHome(t *testing.T) {
 		}
 	}
 }
+
+func TestProgramFindsAToolOnTheSelectionPath(t *testing.T) {
+	tools := t.TempDir()
+	writeFile(t, tools, "mvn", "#!/bin/sh\n")
+	if err := os.Chmod(filepath.Join(tools, "mvn"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeFile(t, tools, "notes", "")
+	tc := Toolchain{Command: []string{"javac", "-version"}}
+	selected := Selection{Env: []string{"PATH=" + t.TempDir() + string(os.PathListSeparator) + tools}}
+	if got := selected.Program(tc, "mvn"); got != filepath.Join(tools, "mvn") {
+		t.Errorf("a tool on the selection's PATH = %s", got)
+	}
+	if got := selected.Program(tc, "notes"); got != "notes" {
+		t.Errorf("a file that is not executable is no program: %s", got)
+	}
+	if got := selected.Program(tc, "./gradlew"); got != "./gradlew" {
+		t.Errorf("a path is kept: %s", got)
+	}
+}
