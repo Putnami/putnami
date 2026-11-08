@@ -17,7 +17,7 @@
     },
     {
       "id": "pants-impact-runs-through-pants",
-      "text": "On the Pants fixture of the putnami observe detector, with @putnami/pants loaded and pants on PATH, putnami projects sync writes each package's edges. putnami test --impacted after a change to one package runs pants test, at the workspace root, on that package and each package that depends on it, and never on a package it depends on, reads their reports, and neither looks up nor stores a Putnami cache entry."
+      "text": "On the Pants fixture of the putnami observe detector, with @putnami/pants and pants on PATH, projects sync writes each package's edges. putnami test --impacted runs pants test at the workspace root on each changed package and each package that depends on it, never on one it depends on; a requirements or lockfile change runs the packages that depend on them. It reads their reports and neither looks up nor stores a Putnami cache entry."
     }
   ],
   "decisions": [

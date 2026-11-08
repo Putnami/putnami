@@ -57,7 +57,8 @@ package's `putnami.json` with the edges of the `pants peek ::` export.
 - A package without a test target has its `test` disabled in its
   `putnami.json`: a test task that ran nothing is no pass.
 - A `BUILD` directory that holds no package, such as one of third-party
-  requirements, is a member with no extension: it runs no task, and a change
-  to it, a resolve lockfile included, runs no package.
+  requirements, is a member with no extension that runs no task. The sync
+  writes an edge from each package to the third-party directories it depends
+  on, so a change to a requirement or a resolve lockfile runs those packages.
 - The shipped Pants profile reads Python coverage; a repository without the
   Python backend overrides the test steps.

@@ -20,7 +20,7 @@
     },
     {
       "id": "sync-writes-the-package-graph",
-      "text": "The workspace sync task reads pants-graph.json at the root, or runs pants peek ::, and writes in each component's putnami.json the extension, the project IDs of the components it depends on, and test in disable.jobs when no target is a test target. It removes the extension and its Pants edges from a former package, rewrites a file only when a member it owns changes, and warns and writes nothing without the export and pants."
+      "text": "The workspace sync task reads pants-graph.json at the root, or runs pants peek ::, and writes in each component's putnami.json the extension, the project IDs of the components and third-party directories it depends on, and test in disable.jobs when no target is a test target. It retracts a former package, rewrites a file only when a member it owns changes, and warns and writes nothing without the export and pants."
     },
     {
       "id": "tasks-delegate-to-pants",
