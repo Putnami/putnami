@@ -171,6 +171,49 @@
       "visibility": "internal",
       "quiet": true,
       "run": [{ "id": "deps-upgrade", "task": "deps-upgrade-exec", "dependsOn": ["/workspace-install"] }]
+    },
+    "package": {
+      "description": "Assemble the image of an application for the docker publish channel.",
+      "traits": {
+        "injectPublishChannels": true
+      },
+      "flags": {
+        "docker": { "type": "boolean", "default": false, "description": "Assemble the image" },
+        "docker-tag": { "type": "string", "description": "Override the image tag" },
+        "docker-base-image": {
+          "type": "string",
+          "description": "Replace the official Python slim image with a base pinned by digest (image@sha256:...)"
+        },
+        "docker-load": {
+          "type": "boolean",
+          "default": false,
+          "description": "Also load the assembled image into the local docker daemon"
+        },
+        "entrypoint": {
+          "type": "string",
+          "description": "Entry point the image runs (defaults to the serve entrypoint, then src/main.py)"
+        },
+        "platform": {
+          "type": "string",
+          "default": "linux/amd64",
+          "description": "Target platform of the image: linux/amd64 or linux/arm64"
+        },
+        "dry-run": { "type": "boolean", "default": false, "description": "Plan the image without assembling it" }
+      },
+      "run": [{ "id": "docker", "task": "package-docker", "if": "params.docker", "dependsOn": ["/workspace-install"] }]
+    },
+    "publish": {
+      "dependsOn": ["package"],
+      "traits": {
+        "injectPublishChannels": true,
+        "sideEffects": "registry"
+      },
+      "description": "Push the image of an application to its OCI registry.",
+      "flags": {
+        "docker": { "type": "boolean", "default": false, "description": "Push the image" },
+        "dry-run": { "type": "boolean", "default": false, "description": "Push nothing; report what would be published" }
+      },
+      "run": [{ "id": "docker", "task": "publish-docker", "if": "params.docker" }]
     }
   },
   "tasks": {
@@ -451,6 +494,107 @@
       "timeoutMs": -1,
       "declares": {
         "effects": ["network", "process", "toolchain-cache", "workspace-files"]
+      }
+    },
+    "package-docker": {
+      "description": "Assemble a local OCI image of an application on a digest-pinned Python slim base: a layer of the production dependencies of uv.lock, installed as wheels for the image's platform with the project and its path dependencies built from a staged copy, and a layer of its files. The project and its path dependencies are keyed with everything a staged build reads, except generated directories and secret files; the closure input requires every path dependency to be a declared dependency, which the job enforces. Sole owner of <command-output>/docker.",
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": ["package-docker"],
+      "cwd": "{projectRoot}",
+      "toolchains": ["uv"],
+      "inputs": {
+        "application": {
+          "from": "project",
+          "files": [
+            "git:**/*",
+            "**/*",
+            ".*",
+            "!../**",
+            "!**/__pycache__/**",
+            "!**/.git/**",
+            "!**/.mypy_cache/**",
+            "!**/.putnami/**",
+            "!**/.pytest_cache/**",
+            "!**/.ruff_cache/**",
+            "!**/.tox/**",
+            "!**/.venv/**",
+            "!**/node_modules/**",
+            "!.gen/**",
+            "!build/**",
+            "!dist/**",
+            "!venv/**",
+            "!**/.env",
+            "!**/.netrc",
+            "!**/.pypirc"
+          ]
+        },
+        "pathDependencies": {
+          "from": "closure",
+          "files": [
+            "git:**/*",
+            "**/*",
+            ".*",
+            "!../**",
+            "!**/__pycache__/**",
+            "!**/.git/**",
+            "!**/.mypy_cache/**",
+            "!**/.putnami/**",
+            "!**/.pytest_cache/**",
+            "!**/.ruff_cache/**",
+            "!**/.tox/**",
+            "!**/.venv/**",
+            "!**/node_modules/**",
+            "!.gen/**",
+            "!build/**",
+            "!dist/**",
+            "!venv/**",
+            "!**/.env",
+            "!**/.netrc",
+            "!**/.pypirc"
+          ]
+        },
+        "workspaceConfig": { "from": "workspace", "files": ["pyproject.toml", "uv.lock", "uv.toml", ".python-version"] },
+        "parameters": { "from": "params" },
+        "extensionVersion": { "from": "runtime" }
+      },
+      "timeoutMs": 1800000,
+      "cache": {
+        "versionAware": true
+      },
+      "declares": {
+        "outputs": {
+          "docker": {
+            "kind": "directory",
+            "root": "command-output",
+            "path": "docker",
+            "optionalEmpty": true,
+            "description": "Local OCI candidate layout, its manifest and the docker channel record."
+          }
+        },
+        "effects": ["network", "toolchain-cache"]
+      }
+    },
+    "publish-docker": {
+      "description": "Push the packaged image to the container registry through the shared publisher.",
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": ["publish-docker"],
+      "cwd": "{projectRoot}",
+      "timeoutMs": 300000,
+      "cache": false,
+      "declares": {
+        "outputs": {
+          "published-image": {
+            "kind": "file",
+            "root": "command-output",
+            "path": "docker/published-image.json",
+            "optionalEmpty": true,
+            "description": "Verified remote image record, written after the registry digest is read back."
+          }
+        },
+        "effects": ["network", "registry"],
+        "publishChannels": ["docker"]
       }
     }
   }
