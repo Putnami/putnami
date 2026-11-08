@@ -10,12 +10,17 @@
     ]
   },
   "inputs": {
-    "sources": ["src/**", "tests/**", "benches/**", "examples/**", "build.rs"],
+    "sources": ["src/**", "build.rs"],
+    "targets": ["tests/**", "benches/**", "examples/**"],
     "manifests": [
-      "Cargo.toml", ".cargo/config.toml", ".cargo/config", "rustfmt.toml", ".rustfmt.toml", "clippy.toml", ".clippy.toml",
-      "{root}/Cargo.toml", "{root}/.cargo/config.toml", "{root}/.cargo/config", "{root}/.config/nextest.toml",
+      "Cargo.toml", ".cargo/config.toml", ".cargo/config",
+      "{root}/Cargo.toml", "{root}/.cargo/config.toml", "{root}/.cargo/config"
+    ],
+    "lintConfig": [
+      "rustfmt.toml", ".rustfmt.toml", "clippy.toml", ".clippy.toml",
       "{root}/rustfmt.toml", "{root}/.rustfmt.toml", "{root}/clippy.toml", "{root}/.clippy.toml"
     ],
+    "testConfig": ["{root}/.config/nextest.toml"],
     "lockfiles": ["Cargo.lock", "{root}/Cargo.lock"]
   },
   "tasks": {
@@ -24,13 +29,13 @@
         ["cargo", "fmt", "--package", "{component}", "--check"],
         ["cargo", "clippy", "--package", "{component}", "--all-targets", "--", "-D", "warnings"]
       ],
-      "inputs": ["sources", "manifests"]
+      "inputs": ["sources", "targets", "manifests", "lintConfig"]
     },
     "test": {
       "steps": [
         ["cargo", "llvm-cov", "nextest", "--package", "{component}", "--profile", "ci", "--lcov", "--output-path", "{output}/lcov.info"]
       ],
-      "inputs": ["sources", "manifests", "lockfiles"],
+      "inputs": ["sources", "targets", "manifests", "testConfig", "lockfiles"],
       "reports": {
         "junit": ["{root}/target/nextest/ci/junit.xml"],
         "coverage": [{ "format": "lcov", "paths": ["{output}/lcov.info"] }]
@@ -40,7 +45,8 @@
       "steps": [
         ["cargo", "build", "--package", "{component}", "--locked"]
       ],
-      "inputs": ["sources", "manifests", "lockfiles"]
+      "inputs": ["sources", "manifests", "lockfiles"],
+      "artifacts": ["{root}/target/debug/{component}"]
     }
   }
 }

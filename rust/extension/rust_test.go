@@ -126,6 +126,12 @@ XML
     if [ "$prev" = "--output-path" ]; then printf 'SF:/src/lib.rs\nDA:1,3\nDA:2,0\nDA:3,1\nend_of_record\n' > "$a"; fi
     prev="$a"
   done;;
+build*)
+  prev=""
+  for a in "$@"; do
+    if [ "$prev" = "--package" ]; then mkdir -p "`+root+`/target/debug" && printf 'bin' > "`+root+`/target/debug/$a"; fi
+    prev="$a"
+  done;;
 esac
 `)
 	for _, f := range []string{"rustc", "cargo"} {
@@ -251,7 +257,7 @@ func TestAPutnamiJSONOverrideChangesTheStepsAndTheInputs(t *testing.T) {
 	  "inputs": {"sources": ["src/**", "fixtures/**"]},
 	  "tasks": {"lint": {"steps": [["cargo", "clippy", "--package", "{component}"]]}}
 	}}}`)
-	if got := resolve(); !reflect.DeepEqual(got.Files, []string{"Cargo.toml", "fixtures/routes.json", "putnami.json", "src/lib.rs"}) {
+	if got := resolve(); !reflect.DeepEqual(got.Files, []string{"Cargo.toml", "fixtures/routes.json", "putnami.json", "src/lib.rs", "tests/http.rs"}) {
 		t.Errorf("an input override is honored: %v", got.Files)
 	}
 	log := stubTools(t, root, "1.82.0", junitPass)
@@ -274,5 +280,56 @@ func TestTheManifestConformsToTheStackCore(t *testing.T) {
 	stackstest.CheckManifest(t, "putnami.extension.json", stack(t))
 	if got := stack(t).Selectors(); !slices.Equal(got, []string{"rust:build", "rust:lint", "rust:test"}) {
 		t.Errorf("selectors = %v", got)
+	}
+}
+
+func TestLintDoesNotReadTheLockfileOrTheNextestConfiguration(t *testing.T) {
+	spectest.Proves(t, feature, "inputs-are-per-task", "lint-does-not-read-the-lockfile-or-the-nextest-configuration")
+	root := fixture(t)
+	writeFile(t, root, "crates/api/Cargo.lock", "version = 3\n")
+	writeFile(t, root, "crates/api/rustfmt.toml", "edition = \"2021\"\n")
+	writeFile(t, root, "crates/api/benches/load.rs", "fn main() {}\n")
+	s := stack(t)
+	files := map[string][]string{}
+	for _, task := range stacks.TaskNames {
+		result := s.ResolveInputs(root, wsproto.InputResolveRequest{Version: wsproto.InputResolveProtocolVersion, Extension: s.Extension,
+			Inputs: []wsproto.InputResolveQuery{{Project: "crates/api", Selector: s.Selector(task)}}})
+		if diags := wsproto.ValidateInputResolveResult(&result); len(diags) != 0 {
+			t.Fatalf("%s: the answer breaks the protocol: %v", task, diags)
+		}
+		files[task] = result.Inputs[0].Files
+	}
+	for task, want := range map[string][]string{
+		stacks.TaskLint:  {"Cargo.toml", "benches/load.rs", "putnami.json", "rustfmt.toml", "src/lib.rs", "tests/http.rs"},
+		stacks.TaskTest:  {"Cargo.lock", "Cargo.toml", "benches/load.rs", "src/lib.rs", "tests/http.rs"},
+		stacks.TaskBuild: {"Cargo.lock", "Cargo.toml", "src/lib.rs"},
+	} {
+		got := slices.DeleteFunc(slices.Clone(files[task]), func(f string) bool { return f == "putnami.json" && task != stacks.TaskLint })
+		if task == stacks.TaskLint {
+			got = append(slices.DeleteFunc(got, func(f string) bool { return f == "putnami.json" }), "putnami.json")
+			slices.Sort(got)
+		}
+		if !reflect.DeepEqual(got, want) {
+			t.Errorf("%s reads %v, want %v", task, got, want)
+		}
+	}
+	_, lintRoot := s.Profile.TaskPatterns(stacks.TaskLint)
+	for _, f := range []string{"Cargo.lock", ".config/nextest.toml"} {
+		if slices.Contains(lintRoot, f) {
+			t.Errorf("lint reads the stack-root file %s: %v", f, lintRoot)
+		}
+	}
+	_, testRoot := s.Profile.TaskPatterns(stacks.TaskTest)
+	if !slices.Contains(testRoot, ".config/nextest.toml") || !slices.Contains(testRoot, "Cargo.lock") || slices.Contains(testRoot, "rustfmt.toml") {
+		t.Errorf("test stack-root files = %v", testRoot)
+	}
+
+	stubTools(t, root, "1.82.0", junitPass)
+	status, _, out, err := runJob(t, root, "crates/api", stacks.TaskBuild)
+	if status != "OK" || err != nil {
+		t.Fatalf("build: %s %v", status, err)
+	}
+	if data, err := os.ReadFile(filepath.Join(out, "build", "artifacts", "api")); err != nil || string(data) != "bin" {
+		t.Errorf("the crate's binary is copied into the build output: %q %v", data, err)
 	}
 }

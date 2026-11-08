@@ -154,7 +154,6 @@
             ".cargo/config",
             ".cargo/config.toml",
             ".clippy.toml",
-            ".config/nextest.toml",
             ".rustfmt.toml",
             "Cargo.toml",
             "clippy.toml",
@@ -214,15 +213,11 @@
           "files": [
             ".cargo/config",
             ".cargo/config.toml",
-            ".clippy.toml",
             ".config/nextest.toml",
-            ".rustfmt.toml",
             "Cargo.lock",
             "Cargo.toml",
-            "clippy.toml",
             "rust-toolchain",
-            "rust-toolchain.toml",
-            "rustfmt.toml"
+            "rust-toolchain.toml"
           ]
         },
         "extensionVersion": {
@@ -254,7 +249,7 @@
       }
     },
     "build-run": {
-      "description": "Run the Rust profile's build step, cargo build --locked, on one crate in its directory, after the toolchain check.",
+      "description": "Run the Rust profile's build step, cargo build --locked, on one crate in its directory, after the toolchain check; then copy the crate's binary from the stack root's target/debug into the command output when cargo wrote one there.",
       "kind": "command",
       "command": "{extensionRuntime}",
       "args": [
@@ -276,15 +271,10 @@
           "files": [
             ".cargo/config",
             ".cargo/config.toml",
-            ".clippy.toml",
-            ".config/nextest.toml",
-            ".rustfmt.toml",
             "Cargo.lock",
             "Cargo.toml",
-            "clippy.toml",
             "rust-toolchain",
-            "rust-toolchain.toml",
-            "rustfmt.toml"
+            "rust-toolchain.toml"
           ]
         },
         "extensionVersion": {
@@ -306,7 +296,7 @@
             "root": "command-output",
             "path": "build",
             "optionalEmpty": true,
-            "description": "The reports the task wrote or copied: the LCOV report and a copy of each JUnit report of a test task."
+            "description": "The artifacts the build task copied: the crate's binary, when cargo wrote one in the stack root's target/debug."
           }
         },
         "effects": [

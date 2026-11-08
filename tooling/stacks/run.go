@@ -260,6 +260,10 @@ func (s Stack) run(ctx context.Context, in runInput, emit reporter) (string, map
 		return statusFailed, nil, stepErr
 	}
 
+	if err := copyArtifacts(t.Artifacts, meta.Component, in.projectAbs, rootAbs, outDir); err != nil {
+		return statusFailed, nil, err
+	}
+
 	copied := 0
 	resolve := func(pattern string) ([]string, error) {
 		base, rest := in.projectAbs, pattern
@@ -362,6 +366,41 @@ func copyFile(src, dst string) error {
 		return err
 	}
 	return os.WriteFile(dst, data, 0o644) //nolint:gosec // a copied report
+}
+
+// copyArtifacts copies the files a task's artifact patterns match into
+// outDir/artifacts, keeping their mode. A pattern that matches nothing copies
+// nothing.
+func copyArtifacts(patterns []string, component, projectAbs, rootAbs, outDir string) error {
+	for _, pattern := range patterns {
+		pattern = strings.ReplaceAll(pattern, "{component}", component)
+		base, rest := projectAbs, pattern
+		if r, ok := strings.CutPrefix(pattern, "{root}/"); ok {
+			base, rest = rootAbs, r
+		}
+		matches, err := globFiles(base, rest)
+		if err != nil {
+			return err
+		}
+		for _, m := range matches {
+			info, err := os.Stat(m)
+			if err != nil {
+				return err
+			}
+			data, err := os.ReadFile(m) //nolint:gosec // an artifact the profile names
+			if err != nil {
+				return err
+			}
+			dst := filepath.Join(outDir, "artifacts", filepath.Base(m))
+			if err := os.MkdirAll(filepath.Dir(dst), 0o755); err != nil {
+				return err
+			}
+			if err := os.WriteFile(dst, data, info.Mode().Perm()); err != nil {
+				return fmt.Errorf("copy the artifact %s: %w", m, err)
+			}
+		}
+	}
+	return nil
 }
 
 // removeReports deletes the files the report patterns of a task match
