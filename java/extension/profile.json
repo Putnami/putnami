@@ -412,8 +412,16 @@
               "{root}/pom.xml",
               "--projects",
               "{component}",
+              "clean"
+            ],
+            [
+              "mvn",
+              "--batch-mode",
+              "--file",
+              "{root}/pom.xml",
+              "--projects",
+              "{component}",
               "--also-make",
-              "clean",
               "verify",
               "-DskipTests"
             ]
@@ -434,8 +442,16 @@
               "{root}/pom.xml",
               "--projects",
               "{component}",
+              "clean"
+            ],
+            [
+              "mvn",
+              "--batch-mode",
+              "--file",
+              "{root}/pom.xml",
+              "--projects",
+              "{component}",
               "--also-make",
-              "clean",
               "verify"
             ]
           ],
@@ -472,8 +488,16 @@
               "{root}/pom.xml",
               "--projects",
               "{component}",
+              "clean"
+            ],
+            [
+              "mvn",
+              "--batch-mode",
+              "--file",
+              "{root}/pom.xml",
+              "--projects",
+              "{component}",
               "--also-make",
-              "clean",
               "package",
               "-DskipTests"
             ]

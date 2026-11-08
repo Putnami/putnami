@@ -98,7 +98,7 @@
   },
   "commands": {
     "lint": {
-      "description": "Lint the Gradle projects with check, without their tests, and the Maven modules with verify -DskipTests.",
+      "description": "Lint the Gradle projects with check, without their tests, and the Maven modules with clean, then verify -DskipTests.",
       "run": [
         {
           "id": "lint",
@@ -110,7 +110,7 @@
       ]
     },
     "test": {
-      "description": "Test the Gradle projects and the Maven modules, and read their JUnit and JaCoCo reports.",
+      "description": "Test the Gradle projects and the Maven modules (clean, then verify), and read their JUnit and JaCoCo reports.",
       "run": [
         {
           "id": "test",
@@ -123,7 +123,7 @@
       ]
     },
     "build": {
-      "description": "Build the Gradle projects with assemble and the Maven modules with package -DskipTests.",
+      "description": "Build the Gradle projects with assemble and the Maven modules with clean, then package -DskipTests.",
       "run": [
         {
           "id": "build",
@@ -138,7 +138,7 @@
   },
   "tasks": {
     "lint-run": {
-      "description": "Run the lint steps of the component's variant on one Gradle project or Maven module in its directory, after the Java toolchain check: gradlew check without the tests, or mvn verify -DskipTests. Its inputs are the files the java:lint selector answers from the resolved profile, and the stack-root files of every variant.",
+      "description": "Run the lint steps of the component's variant on one Gradle project or Maven module in its directory, after the Java toolchain check: gradlew check without the tests, or mvn clean of the module, then mvn verify -DskipTests. Its inputs are the files the java:lint selector answers from the resolved profile, and the stack-root files of every variant.",
       "kind": "command",
       "command": "{extensionRuntime}",
       "args": [
@@ -218,7 +218,7 @@
       }
     },
     "test-run": {
-      "description": "Run the test steps of the component's variant on one Gradle project or Maven module in its directory, after the Java toolchain check; then copy its JUnit and JaCoCo reports into the command output and read them. A failed case, a step that exits non-zero, or a missing report fails the task.",
+      "description": "Run the test steps of the component's variant on one Gradle project or Maven module in its directory, after the Java toolchain check (for Maven, clean of the module, then verify); then copy its JUnit and JaCoCo reports into the command output and read them. A failed case, a step that exits non-zero, or a missing report fails the task.",
       "kind": "command",
       "command": "{extensionRuntime}",
       "args": [
@@ -295,7 +295,7 @@
       }
     },
     "build-run": {
-      "description": "Run the build steps of the component's variant on one Gradle project or Maven module in its directory, after the Java toolchain check: gradlew assemble, or mvn package -DskipTests.",
+      "description": "Run the build steps of the component's variant on one Gradle project or Maven module in its directory, after the Java toolchain check: gradlew assemble, or mvn clean of the module, then mvn package -DskipTests.",
       "kind": "command",
       "command": "{extensionRuntime}",
       "args": [

@@ -63,14 +63,18 @@ depends on are built in the same reactor.
 | `gradle-catalog` | none | none | `gradlew {component}generateCatalogAsToml` |
 | `android` | as `gradle` | `gradlew {component}testDebugUnitTest` | `gradlew {component}assembleDebug` |
 | `android-coverage` | as `gradle` | `gradlew {component}testDebugUnitTest {component}createDebugUnitTestCoverageReport` | as `android` |
-| `maven` | `mvn --projects {component} --also-make clean verify -DskipTests` | `mvn --projects {component} --also-make clean verify` | `mvn --projects {component} --also-make clean package -DskipTests` |
+| `maven` | `mvn --projects {component} clean`, then `mvn --projects {component} --also-make verify -DskipTests` | `mvn --projects {component} clean`, then `mvn --projects {component} --also-make verify` | `mvn --projects {component} clean`, then `mvn --projects {component} --also-make package -DskipTests` |
 
 Gradle commands also pass `--console=plain`, and Maven ones `--batch-mode` and
 `--file {root}/pom.xml`, so the reactor is the whole build.
-Maven starts from `clean`: its compiler recompiles a module only when a
-dependency changed in the same run, so a module whose upstream changed in an
-earlier task would otherwise pass on its old classes. The tasks of one build
-run one at a time, so a `clean` never removes another task's output.
+Maven first cleans the component alone: its compiler recompiles a module only
+when a dependency changed in the same run, so a module whose upstream changed
+in an earlier task would otherwise pass on its old classes. Only the
+component's own `target/` is removed, not the root's, which a Cargo
+workspace at the root may share, unless the component is the root module of
+a single-module build. The clean also removes what an earlier task
+of the component left in `target/`, such as the jar of a `build`; the reports
+a task reads are copied out before it ends, so a cache hit restores them.
 
 Maven `lint` runs `verify` without running the tests, so the checks a POM binds to
 `validate` or `verify` (Checkstyle, Spotless, PMD, SpotBugs) run. Maven `test`
@@ -127,7 +131,7 @@ version, and the key of the same task of each component it depends on.
 |---|---|
 | `sources` | `src/main/**`; for Android also `src/debug/**`, `src/release/**`, `proguard-rules.pro`, `consumer-rules.pro` |
 | `tests` | `src/test/**`, `src/testFixtures/**`; for Android also `src/testDebug/**` |
-| `gradle` | the build file and `gradle.properties` of the project; at the root the settings and build files, `gradle.properties`, the catalogs and script plugins under `gradle/`, a catalog project's own `*.versions.toml`, the wrapper properties, the build files and `src/**` of `buildSrc`, and the build files and `src/**` of every project of `build-logic` |
+| `gradle` | the build file and `gradle.properties` of the project; at the root the settings and build files, `gradle.properties`, the catalogs and script plugins under `gradle/`, each project's own `*.versions.toml` and `gradle/*.versions.toml`, the wrapper properties, the build files and `src/**` of `buildSrc`, and the build files and `src/**` of every project of `build-logic` |
 | `gradleLocks` | `gradle.lockfile`; at the root `settings-gradle.lockfile` and `gradle.lockfile` |
 | `maven` | `pom.xml`; every `pom.xml` of the build, parents included, and `.mvn/maven.config`, `.mvn/jvm.config`, `.mvn/extensions.xml` at the root |
 | `lintConfig` | `lint.xml`, `detekt.yml`; at the root `.editorconfig` and `config/checkstyle/**`, `config/detekt/**`, `config/pmd/**`, `config/spotbugs/**` |
@@ -173,7 +177,10 @@ A Maven repository with the Maven wrapper runs it instead of `mvn`:
   "options": {
     "@putnami/java": {
       "tasks": {
-        "test": { "steps": [["{root}/mvnw", "--batch-mode", "--file", "{root}/pom.xml", "--projects", "{component}", "--also-make", "clean", "verify"]] }
+        "test": { "steps": [
+          ["{root}/mvnw", "--batch-mode", "--file", "{root}/pom.xml", "--projects", "{component}", "clean"],
+          ["{root}/mvnw", "--batch-mode", "--file", "{root}/pom.xml", "--projects", "{component}", "--also-make", "verify"]
+        ] }
       }
     }
   }
