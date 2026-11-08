@@ -10,6 +10,7 @@ import (
 	"time"
 
 	wsproto "go.putnami.dev/protocol/workspace"
+	"go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
 
@@ -366,30 +367,40 @@ func (p *sourceNameProvider) Probe(request wsproto.ProbeRequest) (wsproto.ProbeR
 func TestNameCollidingMembers_WritesTheProviderNameAndOtherwiseThePath(t *testing.T) {
 	cases := []struct {
 		name     string
+		added    []string
 		provider *sourceNameProvider
 		want     map[string]string
 	}{
 		{
 			name:     "a provider name wins and a member without one takes its path",
+			added:    []string{"apps/foo", "libs/foo"},
 			provider: &sourceNameProvider{names: map[string]string{"apps/foo": "@acme/foo-app"}},
 			want:     map[string]string{"apps/foo": "@acme/foo-app", "libs/foo": "libs/foo"},
 		},
 		{
 			name:     "a failed probe names by path",
+			added:    []string{"apps/foo", "libs/foo"},
 			provider: &sourceNameProvider{err: errors.New("boom")},
 			want:     map[string]string{"apps/foo": "apps/foo", "libs/foo": "libs/foo"},
+		},
+		{
+			name:     "two members that report one name take their paths",
+			added:    []string{"apps/foo", "libs/foo"},
+			provider: &sourceNameProvider{names: map[string]string{"apps/foo": "@acme/foo", "libs/foo": "@acme/foo"}},
+			want:     map[string]string{"apps/foo": "apps/foo", "libs/foo": "libs/foo"},
+		},
+		{
+			name:     "a reported name that another project resolves to is refused",
+			added:    []string{"apps/foo"},
+			provider: &sourceNameProvider{names: map[string]string{"apps/foo": "foo"}},
+			want:     map[string]string{"apps/foo": "apps/foo"},
 		},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			ws := t.TempDir()
-			added := []string{"apps/foo", "libs/foo"}
-			writeProjectFile(t, filepath.Join(ws, "putnami.workspace.json"), `{"includes":["apps/foo","libs/foo"]}`)
-			for _, member := range added {
-				writeProjectFile(t, filepath.Join(ws, member, "putnami.json"), `{}`)
-			}
+			ws := collidingWorkspace(t)
 			providers := []workspace.ProviderBinding{{Provider: tc.provider}}
-			if err := nameCollidingMembers(ws, added, providers); err != nil {
+			if err := nameCollidingMembers(ws, tc.added, providers); err != nil {
 				t.Fatalf("nameCollidingMembers: %v", err)
 			}
 			for member, name := range tc.want {
@@ -397,6 +408,30 @@ func TestNameCollidingMembers_WritesTheProviderNameAndOtherwiseThePath(t *testin
 					t.Errorf("%s is named %s: %s", member, name, got)
 				}
 			}
+			if _, err := workspace.Load(ws); err != nil {
+				t.Errorf("the workspace loads with no provider view: %v", err)
+			}
 		})
 	}
+}
+
+func TestSyncRuntimeResolver_AnswersForAWorkspaceWhoseMembersCollide(t *testing.T) {
+	ws := collidingWorkspace(t)
+	ext := &extension.ExtensionDescription{Name: "@test/names"}
+	_, err := syncRuntimeResolver(context.Background(), ws, ext)()
+	var duplicates *workspace.DuplicateNamesError
+	if errors.As(err, &duplicates) {
+		t.Fatalf("the resolver stops on the names it is called to settle: %v", err)
+	}
+}
+
+// collidingWorkspace has two members that resolve to the name foo.
+func collidingWorkspace(t *testing.T) string {
+	t.Helper()
+	ws := t.TempDir()
+	writeProjectFile(t, filepath.Join(ws, "putnami.workspace.json"), `{"includes":["apps/foo","libs/foo"]}`)
+	writeProjectFile(t, filepath.Join(ws, "apps", "foo", "putnami.json"), `{}`)
+	writeProjectFile(t, filepath.Join(ws, "libs", "foo", "putnami.json"), `{}`)
+	t.Cleanup(func() { workspace.InvalidateLoadCache(ws) })
+	return ws
 }

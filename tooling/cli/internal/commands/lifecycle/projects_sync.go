@@ -204,11 +204,42 @@ func ProjectsSync(ctx context.Context, wsRoot string, cfg *wsproto.Config, args 
 // nameCollidingMembers writes a name for each new member that resolves to the
 // name of another project with no provider view, as on a fresh clone, which has
 // no recorded view to tell them apart. The name is the one the member's provider
-// reports, so the member keeps the identity it has with a view, and its path
-// when no provider reports one. A member that states its own name keeps it.
+// reports, so the member keeps the identity it has with a view. The member takes
+// its path when no provider reports a name or when the reported name collides
+// too. A member that states its own name keeps it.
 func nameCollidingMembers(wsRoot string, added []string, providers []workspace.ProviderBinding) error {
-	workspace.InvalidateLoadCache(wsRoot)
 	defer workspace.InvalidateLoadCache(wsRoot)
+	members := addedMembersIn(duplicateNamesWithoutView(wsRoot), added)
+	if len(members) == 0 {
+		return nil
+	}
+	sourceNames := memberSourceNames(providers, members)
+	var named []string
+	for _, member := range members {
+		name := sourceNames[member]
+		if name == "" {
+			name = member
+		}
+		written, err := nameMember(wsRoot, member, name, false)
+		if err != nil {
+			return err
+		}
+		if written {
+			named = append(named, member)
+		}
+	}
+	for _, member := range addedMembersIn(duplicateNamesWithoutView(wsRoot), named) {
+		if _, err := nameMember(wsRoot, member, member, true); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// duplicateNamesWithoutView returns the project paths of each name that two
+// projects resolve to when no provider view is recorded.
+func duplicateNamesWithoutView(wsRoot string) map[string][]string {
+	workspace.InvalidateLoadCache(wsRoot)
 	ws, err := workspace.Load(wsRoot)
 	if err == nil {
 		ws.AdoptProbeViewUnvalidated(nil)
@@ -218,35 +249,27 @@ func nameCollidingMembers(wsRoot string, added []string, providers []workspace.P
 	if !errors.As(err, &duplicates) {
 		return nil
 	}
+	return duplicates.Names
+}
+
+// addedMembersIn returns, sorted, the paths of names that are listed in added.
+func addedMembersIn(names map[string][]string, added []string) []string {
 	var members []string
-	for _, paths := range duplicates.Names {
+	for _, paths := range names {
 		for _, p := range paths {
 			if slices.Contains(added, p) {
 				members = append(members, p)
 			}
 		}
 	}
-	if len(members) == 0 {
-		return nil
-	}
 	sort.Strings(members)
-	sourceNames := memberSourceNames(providers, members)
-	for _, member := range members {
-		name := sourceNames[member]
-		if name == "" {
-			name = member
-		}
-		if err := nameMember(wsRoot, member, name); err != nil {
-			return err
-		}
-	}
-	return nil
+	return members
 }
 
 // memberSourceNames asks the providers for the name each member declares, keyed
-// by member path. A failed probe leaves the members with no source name: the
-// path they then receive keeps the workspace loadable, and `projects sync` is
-// the command that repairs it.
+// by member path. A failed probe reports no name: the members then take their
+// paths, which keeps the workspace loadable, and the warning names the file that
+// sets another name.
 func memberSourceNames(providers []workspace.ProviderBinding, members []string) map[string]string {
 	if len(providers) == 0 {
 		return nil
@@ -260,7 +283,7 @@ func memberSourceNames(providers []workspace.ProviderBinding, members []string) 
 		Paths:  members,
 	}, nil)
 	if err != nil {
-		iox.Fprintf(os.Stdout, "  warning: the probe for the names of the new members failed; they are named by path: %v\n", err)
+		iox.Fprintf(os.Stdout, "  warning: the probe for the names of the new members failed, so they are named by path; set \"name\" in their putnami.json to change it: %v\n", err)
 		return nil
 	}
 	names := make(map[string]string, len(members))
@@ -270,32 +293,33 @@ func memberSourceNames(providers []workspace.ProviderBinding, members []string) 
 	return names
 }
 
-// nameMember writes name as the member's name in its putnami.json, unless the
-// file states a name.
-func nameMember(wsRoot, member, name string) error {
+// nameMember writes name as the member's name in its putnami.json and reports
+// whether it wrote it. Unless replace is set, a file that states a name stays
+// unchanged.
+func nameMember(wsRoot, member, name string, replace bool) (bool, error) {
 	file := filepath.Join(wsRoot, filepath.FromSlash(member), wsproto.ConfigFilename)
 	doc := map[string]any{}
 	data, err := os.ReadFile(file) //nolint:gosec // a project file under the workspace root
 	if err != nil && !errors.Is(err, os.ErrNotExist) {
-		return fmt.Errorf("read %s: %w", file, err)
+		return false, fmt.Errorf("read %s: %w", file, err)
 	}
 	if err == nil {
 		if err := json.Unmarshal(data, &doc); err != nil {
-			return fmt.Errorf("read %s: %w", file, err)
+			return false, fmt.Errorf("read %s: %w", file, err)
 		}
 	}
-	if stated, _ := doc["name"].(string); stated != "" {
-		return nil
+	if stated, _ := doc["name"].(string); stated != "" && !replace {
+		return false, nil
 	}
 	doc["name"] = name
 	out, err := json.MarshalIndent(doc, "", "  ")
 	if err != nil {
-		return fmt.Errorf("write %s: %w", file, err)
+		return false, fmt.Errorf("write %s: %w", file, err)
 	}
 	if err := os.WriteFile(file, append(out, '\n'), 0o644); err != nil { //nolint:gosec // a tracked project file
-		return fmt.Errorf("write %s: %w", file, err)
+		return false, fmt.Errorf("write %s: %w", file, err)
 	}
-	return nil
+	return true, nil
 }
 
 // reportNameDivergences renders the projects whose source identity disagrees
@@ -541,11 +565,9 @@ func syncRuntimeResolver(ctx context.Context, wsRoot string, ext *extension.Exte
 		if ext.RuntimeExecutable != "" {
 			return ext.RuntimeExecutable, nil
 		}
-		ws, err := workspace.Load(wsRoot)
-		if err != nil {
-			return "", err
-		}
-		if err := scheduler.SynchronizeExtensionRuntimes(ctx, ws,
+		// Runtime preparation reads only the root. A load here would refuse the
+		// colliding members this command is about to name.
+		if err := scheduler.SynchronizeExtensionRuntimes(ctx, &workspace.Workspace{Root: wsRoot},
 			[]*extension.ExtensionDescription{ext}, nil); err != nil {
 			return "", err
 		}
