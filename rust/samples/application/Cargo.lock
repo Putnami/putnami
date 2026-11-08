@@ -3,12 +3,12 @@
 version = 4
 
 [[package]]
-name = "application"
+name = "rust-example-application"
 version = "0.1.0"
 dependencies = [
- "library",
+ "rust-example-library",
 ]
 
 [[package]]
-name = "library"
+name = "rust-example-library"
 version = "0.1.0"

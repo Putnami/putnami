@@ -1,3 +1,3 @@
 fn main() {
-    println!("{}", application::total(&[1000, 500], 10));
+    println!("{}", rust_example_application::total(&[1000, 500], 10));
 }

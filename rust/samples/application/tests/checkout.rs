@@ -1,4 +1,4 @@
-use application::total;
+use rust_example_application::total;
 
 #[test]
 fn discounts_the_sum_of_the_basket() {

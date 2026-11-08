@@ -65,7 +65,8 @@ jobs:
         run: ./putnamiw install
 
       - name: Turn the remote cache off
-        run: echo '{"enabled": false}' > .putnami/cache.json
+        run: |
+          echo '{"enabled": false}' > .putnami/cache.json
 
       - name: Run the real-tool proof
         env:

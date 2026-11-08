@@ -1,4 +1,4 @@
-use library::discount;
+use rust_example_library::discount;
 
 #[test]
 fn takes_the_percentage_off() {
