@@ -27,7 +27,7 @@
     },
     {
       "id": "tasks-run-the-profile",
-      "text": "Each task first compares java -version with the version .java-version states, in the component then at the root: a major such as 21 matches every 21.x release. It then runs the variant's steps in the component's directory with no shell: for Gradle, the root's gradlew with the component's task path ({component}check -x {component}test for lint, {component}test for test, {component}assemble for build; testDebugUnitTest and assembleDebug for Android; jacocoTestReport and createDebugUnitTestCoverageReport after the tests for the coverage variants), for Maven, mvn --batch-mode --projects {component} --also-make with verify -DskipTests for lint, verify for test and package -DskipTests for build."
+      "text": "Each task first compares java -version with the version .java-version states, in the component then at the root: a major such as 21 matches every 21.x release. It then runs the variant's steps in the component's directory with no shell: for Gradle, the root's gradlew with the component's task path ({component}check -x {component}test for lint, {component}test for test, {component}assemble for build; testDebugUnitTest and assembleDebug for Android; jacocoTestReport and createDebugUnitTestCoverageReport after the tests for the coverage variants), for Maven, mvn --batch-mode --file {root}/pom.xml --projects {component} --also-make with verify -DskipTests for lint, verify for test and package -DskipTests for build."
     },
     {
       "id": "reports-become-the-summary",
