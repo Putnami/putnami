@@ -82,6 +82,11 @@ type Metadata struct {
 	// Lockfile is the Cargo.lock beside the manifest, else the workspace's
 	// Cargo.lock for a member.
 	Lockfile string `json:"lockfile,omitempty"`
+	// Workspace is the directory of the Cargo workspace that holds the
+	// crate, the root of its build: "." for a member of the root's
+	// workspace, the nearest enclosing directory whose [workspace] names the
+	// crate as a member, else the crate's own directory.
+	Workspace string `json:"workspace,omitempty"`
 }
 
 // Detect finds the crates of the repository at root.
@@ -147,10 +152,16 @@ type component struct {
 	manifest toml.Table
 	name     string
 	meta     Metadata
+	// ws is the Cargo workspace that holds the crate, nil for a crate that is
+	// its own.
+	ws *workspace
 }
 
-// workspace is the Cargo workspace the root Cargo.toml declares.
+// workspace is a Cargo workspace: the one the root Cargo.toml declares, or
+// one a nested Cargo.toml declares.
 type workspace struct {
+	// dir is the workspace's directory.
+	dir      string
 	declared bool
 	members  map[string]bool
 	// dependencies is [workspace.dependencies].
@@ -165,10 +176,11 @@ type workspace struct {
 // has a [package] table. A manifest that does not parse is a diagnostic.
 func Probe(root string, request wsproto.ProbeRequest) wsproto.ProbeResult {
 	result := wsproto.ProbeResult{Version: wsproto.ProbeProtocolVersion, Extension: ExtensionName}
-	ws, diags := readWorkspace(root)
+	ws, diags := readWorkspace(root, wsproto.ProbeRootPath)
 	result.Diagnostics = append(result.Diagnostics, diags...)
 	var components []*component
 	seen := map[string]bool{}
+	nestedCache := map[string]*workspace{}
 	for _, candidate := range request.Paths {
 		dir, ok := wsproto.NormalizeProbePath(candidate)
 		if !ok || seen[dir] {
@@ -185,18 +197,22 @@ func Probe(root string, request wsproto.ProbeRequest) wsproto.ProbeResult {
 			continue
 		}
 		_, hasPackage := manifest["package"].(toml.Table)
-		c := &component{dir: dir, manifest: manifest, name: toml.String(manifest, "package", "name"), meta: Metadata{Source: SourceManifest}}
+		c := &component{dir: dir, manifest: manifest, name: toml.String(manifest, "package", "name"), meta: Metadata{Source: SourceManifest, Workspace: dir}}
 		switch {
 		case dir == wsproto.ProbeRootPath && ws.declared:
 			// A virtual manifest is no crate; a root package is a member.
 			if !hasPackage {
 				continue
 			}
-			c.meta.Source = SourceWorkspace
+			c.meta.Source, c.ws = SourceWorkspace, &ws
 		case ws.members[dir]:
-			c.meta.Source = SourceWorkspace
+			c.meta.Source, c.meta.Workspace, c.ws = SourceWorkspace, wsproto.ProbeRootPath, &ws
 		case !hasPackage:
 			continue
+		default:
+			if nested := enclosing(root, dir, manifest, nestedCache); nested != nil {
+				c.meta.Workspace, c.ws = nested.dir, nested
+			}
 		}
 		components = append(components, c)
 	}
@@ -211,7 +227,7 @@ func Probe(root string, request wsproto.ProbeRequest) wsproto.ProbeResult {
 		if c.meta.Lockfile == "" && c.meta.Source == SourceWorkspace {
 			c.meta.Lockfile = rootLock
 		}
-		result.Projects = append(result.Projects, project(c, ws, edges(c, ws, byDir)))
+		result.Projects = append(result.Projects, project(c, edges(c, byDir)))
 	}
 	return result
 }
@@ -220,9 +236,9 @@ func Probe(root string, request wsproto.ProbeRequest) wsproto.ProbeResult {
 // its members globs match, less those at or below an exclude entry, that hold a
 // Cargo.toml, its [workspace.dependencies] and its [workspace.package]
 // version.
-func readWorkspace(root string) (workspace, []diag.Diagnostic) {
-	var ws workspace
-	manifest, found, err := readManifest(root, wsproto.ProbeRootPath)
+func readWorkspace(root, dir string) (workspace, []diag.Diagnostic) {
+	ws := workspace{dir: dir}
+	manifest, found, err := readManifest(root, dir)
 	if !found || err != nil {
 		// Probe reports a root manifest that does not parse.
 		return ws, nil
@@ -249,17 +265,17 @@ func readWorkspace(root string) (workspace, []diag.Diagnostic) {
 		return out
 	}
 	include, exclude := patterns("members"), patterns("exclude")
-	dirs, bounded := memberglob.Dirs(root, include, skipped, MaxWalkedEntries)
+	dirs, bounded := memberglob.Dirs(abs(root, dir), include, skipped, MaxWalkedEntries)
 	if bounded {
 		diags = append(diags, diag.Warningf(CodeWalkBounded, Marker, "the Cargo workspace walk stopped after %d entries; members past it are left out", MaxWalkedEntries))
 	}
-	for _, dir := range dirs {
-		parts := strings.Split(dir, "/")
+	for _, member := range dirs {
+		parts := strings.Split(member, "/")
 		if slices.ContainsFunc(exclude, func(segments []string) bool { return excludes(segments, parts) }) {
 			continue
 		}
-		if existing(root, join(dir, Marker)) != "" {
-			ws.members[dir] = true
+		if member := join(dir, member); existing(root, join(member, Marker)) != "" {
+			ws.members[member] = true
 		}
 	}
 	return ws, diags
@@ -276,6 +292,60 @@ func excludes(segments, parts []string) bool {
 	return false
 }
 
+// enclosing returns the nested Cargo workspace that holds the crate in dir, a
+// package outside the root's workspace, as cargo finds it: the workspace its
+// package.workspace key names, else the nearest parent directory below the
+// root whose Cargo.toml declares a [workspace], when that workspace names dir
+// as a member. A crate that declares its own [workspace], or that the nearest
+// workspace does not name, is its own; nil then. cache holds the workspaces
+// read, by directory.
+func enclosing(root, dir string, manifest toml.Table, cache map[string]*workspace) *workspace {
+	if _, own := manifest["workspace"].(toml.Table); own || dir == wsproto.ProbeRootPath {
+		return nil
+	}
+	read := func(at string) *workspace {
+		if ws, ok := cache[at]; ok {
+			return ws
+		}
+		var found *workspace
+		if ws, _ := readWorkspace(root, at); ws.declared {
+			found = &ws
+		}
+		cache[at] = found
+		return found
+	}
+	if named := toml.String(manifest, "package", "workspace"); named != "" {
+		if at, ok := under(dir, named); ok && at != wsproto.ProbeRootPath {
+			return read(at)
+		}
+		return nil
+	}
+	for at := path.Dir(dir); at != wsproto.ProbeRootPath; at = path.Dir(at) {
+		if ws := read(at); ws != nil {
+			if ws.members[dir] {
+				return ws
+			}
+			return nil
+		}
+	}
+	return nil
+}
+
+// VirtualWorkspace reports whether dir, below the repository root, holds a
+// virtual Cargo workspace: a Cargo.toml with a [workspace] and no [package].
+func VirtualWorkspace(root, dir string) bool {
+	if dir == wsproto.ProbeRootPath {
+		return false
+	}
+	manifest, found, err := readManifest(root, dir)
+	if !found || err != nil {
+		return false
+	}
+	_, workspace := manifest["workspace"].(toml.Table)
+	_, pkg := manifest["package"].(toml.Table)
+	return workspace && !pkg
+}
+
 // readManifest reads the Cargo.toml of a directory. found is false when there
 // is none.
 func readManifest(root, dir string) (toml.Table, bool, error) {
@@ -289,12 +359,12 @@ func readManifest(root, dir string) (toml.Table, bool, error) {
 
 // packageVersion is the [package] version, or the workspace's for a member
 // that writes version.workspace = true.
-func packageVersion(manifest toml.Table, ws workspace) string {
+func packageVersion(manifest toml.Table, ws *workspace) string {
 	switch v := toml.Get(manifest, "package", "version").(type) {
 	case string:
 		return v
 	case toml.Table:
-		if v["workspace"] == true {
+		if v["workspace"] == true && ws != nil {
 			return ws.version
 		}
 	}
@@ -306,7 +376,7 @@ func packageVersion(manifest toml.Table, ws workspace) string {
 // that gives a path, resolved against its directory, or workspace = true for
 // an entry of [workspace.dependencies] that gives a path, resolved against
 // the root, for a workspace member.
-func edges(c *component, ws workspace, byDir map[string]*component) []string {
+func edges(c *component, byDir map[string]*component) []string {
 	var deps []string
 	add := func(dir string, ok bool) {
 		if ok && dir != c.dir && byDir[dir] != nil {
@@ -324,12 +394,12 @@ func edges(c *component, ws workspace, byDir map[string]*component) []string {
 				add(under(c.dir, p))
 				continue
 			}
-			if entry["workspace"] != true || c.meta.Source != SourceWorkspace {
+			if entry["workspace"] != true || c.ws == nil {
 				continue
 			}
-			if inherited, ok := ws.dependencies[key].(toml.Table); ok {
+			if inherited, ok := c.ws.dependencies[key].(toml.Table); ok {
 				if p, ok := inherited["path"].(string); ok {
-					add(under(wsproto.ProbeRootPath, p))
+					add(under(c.ws.dir, p))
 				}
 			}
 		}
@@ -364,12 +434,12 @@ func declaredTables(manifest toml.Table) []toml.Table {
 }
 
 // project turns a crate into its probe project.
-func project(c *component, ws workspace, deps []string) wsproto.ProbeProject {
+func project(c *component, deps []string) wsproto.ProbeProject {
 	p := wsproto.ProbeProject{
 		Path:         c.dir,
 		SourceName:   c.name,
 		SourceFile:   join(c.dir, Marker),
-		Version:      packageVersion(c.manifest, ws),
+		Version:      packageVersion(c.manifest, c.ws),
 		Dependencies: deps,
 		WatchedFiles: []string{join(c.dir, Marker)},
 	}

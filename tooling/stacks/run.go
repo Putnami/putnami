@@ -95,8 +95,11 @@ func failWith(emit reporter, code, format string, args ...any) error {
 
 func (s Stack) component(in runInput, emit reporter) (Metadata, Profile, error) {
 	var meta Metadata
-	if len(in.metadata) == 0 || json.Unmarshal(in.metadata, &meta) != nil || meta.Component == "" {
+	if len(in.metadata) == 0 || json.Unmarshal(in.metadata, &meta) != nil || (meta.Component == "" && meta.Root == "") {
 		return Metadata{}, Profile{}, failWith(emit, CodeNotAComponent, "%s is no component %s found: run putnami projects sync, or remove %s from the project's extensions", in.projectAbs, s.Extension, s.Extension)
+	}
+	if meta.Component == "" {
+		return meta, Profile{}, nil
 	}
 	profile, err := s.Resolved(in.projectAbs)
 	if err != nil {
@@ -172,6 +175,9 @@ func (s Stack) RootJob(step func(context.Context, RootStep, *jsonl.Emitter) erro
 		if err != nil {
 			return statusFailed, nil, err
 		}
+		if meta.Component == "" {
+			return statusOK, nil, nil
+		}
 		selected, err := selectToolchain(background, in, meta, profile, emit)
 		if err != nil {
 			return statusFailed, nil, err
@@ -197,6 +203,10 @@ func (s Stack) run(ctx context.Context, in runInput, emit reporter) (string, map
 	meta, profile, err := s.component(in, emit)
 	if err != nil {
 		return statusFailed, nil, err
+	}
+	if meta.Component == "" {
+		emit.Info(fmt.Sprintf("%s is a %s stack root with no component: its %s task reads the root's files and runs no step", meta.Root, s.Profile.ID, in.task))
+		return statusOK, nil, nil
 	}
 	t, ok := profile.Tasks[in.task]
 	if !ok {

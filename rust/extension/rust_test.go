@@ -13,6 +13,7 @@ import (
 	wsproto "go.putnami.dev/protocol/workspace"
 	pctx "go.putnami.dev/sdk/extension/context"
 	"go.putnami.dev/sdk/extension/jsonl"
+	"go.putnami.dev/tooling/observe/detect/cargo"
 	"go.putnami.dev/tooling/stacks"
 	"go.putnami.dev/tooling/stacks/stackstest"
 )
@@ -60,7 +61,8 @@ func stack(t *testing.T) stacks.Stack {
 func probe(t *testing.T, root string) wsproto.ProbeResult {
 	t.Helper()
 	s := stack(t)
-	result, err := s.Probe(root, wsproto.ProbeRequest{Version: wsproto.ProbeProtocolVersion, Extension: s.Extension, Paths: []string{".", "crates/api", "crates/pricing", "docs", "tools/gen"}})
+	paths, _ := cargo.Candidates(root)
+	result, err := s.Probe(root, wsproto.ProbeRequest{Version: wsproto.ProbeProtocolVersion, Extension: s.Extension, Paths: append(paths, "docs")})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -414,5 +416,102 @@ func TestEachCoverageFileGoesToTheCrateThatHoldsIt(t *testing.T) {
 	}
 	if strings.Contains(emitted, "crates/pricing/src/lib.rs") {
 		t.Errorf("pricing's file is pricing's, not unmapped:\n%s", emitted)
+	}
+}
+
+// nestedFixture adds to fixture a virtual Cargo workspace services/billing,
+// whose http depends on billing-core through its [workspace.dependencies],
+// and apps/cli, a package that is a workspace root and depends on its member
+// plugin.
+func nestedFixture(t *testing.T) string {
+	t.Helper()
+	root := fixture(t)
+	writeFile(t, root, "services/billing/Cargo.toml", "[workspace]\nmembers = [\"core\", \"http\"]\n\n[workspace.dependencies]\nbilling-core = { path = \"core\" }\n")
+	writeFile(t, root, "services/billing/Cargo.lock", "version = 3\n")
+	writeFile(t, root, "services/billing/.config/nextest.toml", "[profile.ci.junit]\npath = \"junit.xml\"\n")
+	writeFile(t, root, "services/billing/core/Cargo.toml", "[package]\nname = \"billing-core\"\nversion = \"0.1.0\"\n")
+	writeFile(t, root, "services/billing/core/src/lib.rs", "pub fn bill() {}\n")
+	writeFile(t, root, "services/billing/http/Cargo.toml", "[package]\nname = \"http\"\nversion = \"0.1.0\"\n\n[dependencies]\nbilling-core = { workspace = true }\n")
+	writeFile(t, root, "services/billing/http/src/lib.rs", "")
+	writeFile(t, root, "apps/cli/Cargo.toml", "[package]\nname = \"cli\"\nversion = \"0.1.0\"\n\n[workspace]\nmembers = [\"plugin\"]\n\n[dependencies]\nplugin = { path = \"plugin\" }\n")
+	writeFile(t, root, "apps/cli/src/main.rs", "fn main() {}\n")
+	writeFile(t, root, "apps/cli/plugin/Cargo.toml", "[package]\nname = \"plugin\"\nversion = \"0.1.0\"\n")
+	return root
+}
+
+func TestANestedCargoWorkspaceRootIsAnInputOnlyProject(t *testing.T) {
+	spectest.Proves(t, feature, "nested-roots-reach-the-key", "a-nested-cargo-workspace-root-is-an-input-only-project")
+	root := nestedFixture(t)
+	s := stack(t)
+	result, err := s.Probe(root, wsproto.ProbeRequest{Version: wsproto.ProbeProtocolVersion, Extension: s.Extension,
+		Paths: []string{".", "apps/cli", "apps/cli/plugin", "crates/api", "crates/pricing", "services/billing", "services/billing/core", "services/billing/http", "tools/gen"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	type answer struct {
+		name, root string
+		deps       []string
+	}
+	got := map[string]answer{}
+	for _, p := range result.Projects {
+		var meta stacks.Metadata
+		if err := json.Unmarshal(p.Metadata, &meta); err != nil {
+			t.Fatal(err)
+		}
+		got[p.Path] = answer{meta.Component, meta.Root, p.Dependencies}
+	}
+	for path, want := range map[string]answer{
+		"services/billing":      {"", "services/billing", nil},
+		"services/billing/core": {"billing-core", "services/billing", []string{"services/billing"}},
+		"services/billing/http": {"http", "services/billing", []string{"services/billing", "services/billing/core"}},
+		"apps/cli":              {"cli", "apps/cli", []string{"apps/cli/plugin"}},
+		"tools/gen":             {"gen", "tools/gen", nil},
+		"crates/api":            {"api", ".", []string{"crates/pricing"}},
+	} {
+		if !reflect.DeepEqual(got[path], want) {
+			t.Errorf("%s = %+v, want %+v", path, got[path], want)
+		}
+	}
+	if _, ok := got["apps/cli/plugin"]; ok {
+		t.Errorf("a member its root package depends on is left out: %+v", got["apps/cli/plugin"])
+	}
+	left := false
+	for _, d := range result.Diagnostics {
+		left = left || (d.Code == stacks.CodeStackRootUnsupported && d.Field == "apps/cli/plugin")
+	}
+	if !left {
+		t.Errorf("diagnostics = %v", result.Diagnostics)
+	}
+
+	resolve := func(project, task string) []string {
+		r := s.ResolveInputs(root, wsproto.InputResolveRequest{Version: wsproto.InputResolveProtocolVersion, Extension: s.Extension,
+			Inputs: []wsproto.InputResolveQuery{{Project: project, Selector: s.Selector(task)}}})
+		if diags := wsproto.ValidateInputResolveResult(&r); len(diags) != 0 {
+			t.Fatalf("the answer breaks the protocol: %v", diags)
+		}
+		return r.Inputs[0].Files
+	}
+	if files := resolve("services/billing", stacks.TaskLint); !reflect.DeepEqual(files, []string{"Cargo.toml"}) {
+		t.Errorf("the root's lint reads %v", files)
+	}
+	if files := resolve("services/billing", stacks.TaskTest); !reflect.DeepEqual(files, []string{".config/nextest.toml", "Cargo.lock", "Cargo.toml"}) {
+		t.Errorf("the root's test reads %v", files)
+	}
+
+	log := stubTools(t, filepath.Join(root, "services/billing"), "1.82.0", `<testsuites><testsuite name="billing_core">
+  <testcase classname="billing_core" name="bills"/>
+</testsuite></testsuites>`)
+	if status, _, _, err := runJob(t, root, "services/billing", stacks.TaskTest); status != "OK" || err != nil {
+		t.Errorf("the root's test: %s %v", status, err)
+	}
+	if ran, _ := os.ReadFile(log); len(ran) != 0 {
+		t.Errorf("the root runs no step: %s", ran)
+	}
+	status, data, _, emitted, err := runJobOutput(t, root, "services/billing/core", stacks.TaskTest)
+	if status != "OK" || err != nil {
+		t.Fatalf("core's test: %s %v\n%s", status, err, emitted)
+	}
+	if got := data["testSummary"].(map[string]any); got["total"] != 1 || strings.Contains(emitted, stacks.CodeTestUnattributed) {
+		t.Errorf("core's case, under the nested root's target, is its own: %v\n%s", got, emitted)
 	}
 }

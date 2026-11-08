@@ -6,6 +6,7 @@ package rust
 import (
 	_ "embed"
 	"fmt"
+	"path"
 
 	diag "go.putnami.dev/protocol/diagnostic"
 	wsproto "go.putnami.dev/protocol/workspace"
@@ -43,22 +44,25 @@ func CaseComponent(classname, suite string) (string, bool) {
 	return cargo.BinaryPackage(suite)
 }
 
-// Detect names the crates among the candidate paths with the Cargo detector.
-// A member of the root's Cargo workspace has the workspace root for stack
-// root; any other crate is its own.
+// Detect names the crates among the candidate paths with the Cargo detector,
+// each with the directory of the Cargo workspace that holds it for stack
+// root. A candidate that holds a virtual Cargo workspace below the workspace
+// root is a stack root with no crate.
 func Detect(root string, request wsproto.ProbeRequest) ([]stacks.Component, []diag.Diagnostic) {
 	result := cargo.Probe(root, request)
 	diags := result.Diagnostics
 	var out []stacks.Component
+	answered := map[string]bool{}
 	for _, p := range result.Projects {
+		answered[p.Path] = true
 		meta, err := cargo.ReadMetadata(p)
 		if err != nil {
 			diags = append(diags, diag.Warningf(cargo.CodeManifestInvalid, p.Path, "%s: %v", p.Path, err))
 			continue
 		}
-		stackRoot := p.Path
-		if meta.Source == cargo.SourceWorkspace {
-			stackRoot = wsproto.ProbeRootPath
+		stackRoot := meta.Workspace
+		if stackRoot == "" {
+			stackRoot = p.Path
 		}
 		out = append(out, stacks.Component{
 			Path:         p.Path,
@@ -67,6 +71,14 @@ func Detect(root string, request wsproto.ProbeRequest) ([]stacks.Component, []di
 			Root:         stackRoot,
 			Dependencies: p.Dependencies,
 		})
+	}
+	for _, candidate := range request.Paths {
+		dir, ok := wsproto.NormalizeProbePath(candidate)
+		if !ok || answered[dir] || !cargo.VirtualWorkspace(root, dir) {
+			continue
+		}
+		answered[dir] = true
+		out = append(out, stacks.Component{Path: dir, SourceFile: path.Join(dir, cargo.Marker), Root: dir, InputOnly: true})
 	}
 	return out, diags
 }
