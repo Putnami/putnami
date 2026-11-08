@@ -70,7 +70,9 @@ with its profile's markers: `Cargo.toml` for Rust.
   extension's detector and answers, for each candidate path that the detector
   knows as a component: the source name (the crate name), the dependencies as
   paths, the extension, and in `metadata` the component name, the stack root
-  and the expected toolchain version.
+  and the expected toolchain version. A component whose manifest names no
+  package, such as a Composer application, keeps no source name, and its
+  component name is its directory, the same on every checkout.
 
 The detectors move from `tooling/observe/internal/detect/<stack>` to a public
 package of the observe module, `go.putnami.dev/tooling/observe/detect/<stack>`,
@@ -140,7 +142,7 @@ The Rust reference profile:
 | `id` | The stack id. |
 | `markers` | The files that make a directory a candidate. |
 | `toolchain.command`, `toolchain.pattern` | How to read the version on the machine: the command's output, standard output first, matched by the pattern's `version` group. |
-| `toolchain.files` | The files that state the expected version, read in the project directory, then at the stack root. `key` reads one string value of a TOML table or a JSON object; without it, the file's first non-empty line. |
+| `toolchain.files` | The files that state the expected version or range, read in the project directory, then at the stack root. `key` reads one string value of a TOML table or a JSON object; without it, the file's first non-empty line. |
 | `inputs.<set>` | Named sets of file patterns. A plain pattern is relative to the project directory; `{root}/` makes it relative to the stack root, the directory of the build that holds the component (the Cargo workspace, the Gradle settings). |
 | `tasks.<task>.steps` | The commands the task runs in order, each an argument vector run in the project directory, with no shell. `{root}` is the stack root, `{component}` the detector's name for the component, `{output}` the task's output directory under the project. |
 | `tasks.<task>.inputs` | The input sets the task reads. `lint` reads fewer than `test`: a lockfile change does not rerun it. |
@@ -249,11 +251,20 @@ the task reads the version on the machine with `toolchain.command`:
   warning;
 - the command is missing: the task fails with `stacks.toolchain_missing`.
 
-So a stored result was produced by the version its key names, unless a
-project chose `warn`. A project that states no expected version gets
-`stacks.toolchain_unpinned`, a warning: its key carries no toolchain version,
-and two machines with two versions share entries. A Rust channel name such as
-`stable` is no exact version, and gets the same warning.
+A file may state a range instead, in Composer's constraint syntax: the PHP
+profile reads `require.php` of `composer.json`, such as `>=8.4` or `^8.2`
+([ADR 0002](adr/0002-a-stated-version-range-is-checked.md)). The task runs
+when the machine's numeric release is in the range and fails with
+`stacks.toolchain_mismatch` otherwise, unless `toolchain.check` is `warn`. The
+key carries the range, so two machines in it share entries; a profile lists
+an exact file first, such as `.php-version`, so an exact statement wins.
+
+So a stored result was produced by the version, or a version of the range,
+its key names, unless a project chose `warn`. A project that states no
+expected version gets `stacks.toolchain_unpinned`, a warning: its key carries
+no toolchain version, and two machines with two versions share entries. A
+Rust channel name such as `stable` is neither a version nor a range, and gets
+the same warning.
 
 ## Reports
 
@@ -333,3 +344,4 @@ left to a later change.
 2. Rust is the reference stack.
 3. A toolchain mismatch fails the task by default, `warn` by override.
 4. One extension per stack, in its language root, on a shared core.
+5. A stated range is checked, for the PHP profile's `require.php` (#940).
