@@ -38,7 +38,7 @@ func gradleFixture(t *testing.T) string {
 	t.Helper()
 	root := t.TempDir()
 	writeFile(t, root, ".java-version", "21\n")
-	writeFile(t, root, "settings.gradle.kts", "rootProject.name = \"shop\"\nenableFeaturePreview(\"TYPESAFE_PROJECT_ACCESSORS\")\ninclude(\":app\", \":api\", \":pricing\", \":libs:model\", \":bom\")\n")
+	writeFile(t, root, "settings.gradle.kts", "rootProject.name = \"shop\"\nenableFeaturePreview(\"TYPESAFE_PROJECT_ACCESSORS\")\ninclude(\":app\", \":api\", \":pricing\", \":libs:model\", \":bom\", \":catalog\")\n")
 	writeFile(t, root, "build.gradle.kts", "plugins {\n    alias(libs.plugins.android.library) apply false\n}\n")
 	writeFile(t, root, "gradle/libs.versions.toml", "[versions]\nkotlin = \"2.0.21\"\n")
 	writeFile(t, root, "gradle/wrapper/gradle-wrapper.properties", "distributionUrl=https\\://services.gradle.org/distributions/gradle-8.14.3-bin.zip\n")
@@ -55,6 +55,7 @@ func gradleFixture(t *testing.T) string {
 	writeFile(t, root, "libs/model/build.gradle.kts", "plugins {\n    // jacoco\n    `java-library`\n}\n")
 	writeFile(t, root, "libs/model/src/main/java/com/acme/model/Line.java", "class Line {}\n")
 	writeFile(t, root, "bom/build.gradle.kts", "plugins {\n    `java-platform`\n}\n")
+	writeFile(t, root, "catalog/build.gradle.kts", "plugins {\n    `version-catalog`\n}\n")
 	return root
 }
 
@@ -127,11 +128,12 @@ func TestTheGradleProjectsAndMavenModulesBecomeProjects(t *testing.T) {
 		}
 	}
 	g := gradleFixture(t)
-	got := probe(t, g, ".", "api", "app", "bom", "docs", "libs/model", "pricing")
+	got := probe(t, g, ".", "api", "app", "bom", "catalog", "docs", "libs/model", "pricing")
 	check(got, map[string]want{
 		"api":        {"api", ":api:", "api/build.gradle.kts", []string{"pricing"}},
 		"app":        {"app", ":app:", "app/build.gradle.kts", []string{"pricing"}},
 		"bom":        {"bom", ":bom:", "bom/build.gradle.kts", nil},
+		"catalog":    {"catalog", ":catalog:", "catalog/build.gradle.kts", nil},
 		"libs/model": {"libs/model", ":libs:model:", "libs/model/build.gradle.kts", nil},
 		"pricing":    {"pricing", ":pricing:", "pricing/build.gradle.kts", nil},
 	})
@@ -165,8 +167,8 @@ func TestTheGradleProjectsAndMavenModulesBecomeProjects(t *testing.T) {
 
 func TestEachComponentGetsTheVariantOfItsBuild(t *testing.T) {
 	spectest.Proves(t, feature, "variants-follow-the-build", "each-component-gets-the-variant-of-its-build")
-	got := probe(t, gradleFixture(t), "api", "app", "bom", "libs/model", "pricing")
-	for path, want := range map[string]string{"bom": VariantGradlePlatform, "api": VariantGradleJaCoCo, "app": VariantAndroidCoverage, "libs/model": VariantGradle, "pricing": VariantGradleJaCoCo} {
+	got := probe(t, gradleFixture(t), "api", "app", "bom", "catalog", "libs/model", "pricing")
+	for path, want := range map[string]string{"bom": VariantGradlePlatform, "catalog": VariantGradleCatalog, "api": VariantGradleJaCoCo, "app": VariantAndroidCoverage, "libs/model": VariantGradle, "pricing": VariantGradleJaCoCo} {
 		if v := metadata(t, got[path]).Variant; v != want {
 			t.Errorf("%s variant = %q, want %q", path, v, want)
 		}
@@ -185,7 +187,7 @@ func TestEachComponentGetsTheVariantOfItsBuild(t *testing.T) {
 		"plugins { java }\n/* jacoco */":                             VariantGradle,
 		"plugins { java }\n// id(\"com.android.library\")":           VariantGradle,
 		"repositories { maven { url = uri(\"https://x/jacoco\") } }": VariantGradle,
-		"plugins { id(\"version-catalog\") }":                        VariantGradlePlatform,
+		"plugins { id(\"version-catalog\") }":                        VariantGradleCatalog,
 		"val p = \"/META-INF/*.kotlin_module\"\nval q = \"**/x\"\nandroid {\n  enableUnitTestCoverage = true\n}": VariantAndroidCoverage,
 		"val s = \"\"\"a // b\"\"\"\napply plugin: 'jacoco'":                                                     VariantGradleJaCoCo,
 	} {
@@ -207,7 +209,7 @@ func stubTools(t *testing.T, root, version, junit string) string {
 	writeFile(t, bin, "java", "#!/bin/sh\necho 'Picked up JAVA_TOOL_OPTIONS: -Dx=y' >&2\necho 'openjdk version \""+version+"\" 2024-07-16' >&2\n")
 	report := "cat > \"$dir/TEST-stub.xml\" <<'XML'\n" + junit + "\nXML\n"
 	jacoco := `<?xml version="1.0"?><report name="r"><package name="p"><sourcefile name="A.kt"><line nr="1" mi="0" ci="3"/><line nr="2" mi="2" ci="0"/><line nr="3" mi="0" ci="1"/></sourcefile></package></report>`
-	writeFile(t, bin, "mvn", "#!/bin/sh\necho \"$PWD: mvn $*\" >> \""+log+"\"\ncase \"$*\" in *maven.test.skip*) exit 0;; esac\ndir=target/surefire-reports\nmkdir -p $dir\n"+report)
+	writeFile(t, bin, "mvn", "#!/bin/sh\necho \"$PWD: mvn $*\" >> \""+log+"\"\ncase \"$*\" in *-DskipTests*) exit 0;; esac\ndir=target/surefire-reports\nmkdir -p $dir\n"+report)
 	writeFile(t, root, "gradlew", `#!/bin/sh
 echo "$PWD: gradlew $*" >> "`+log+`"
 for a in "$@"; do
@@ -273,7 +275,7 @@ func TestATaskRunsTheVariantStepsAfterTheJavaCheck(t *testing.T) {
 	spectest.Proves(t, feature, "tasks-run-the-profile", "a-task-runs-the-variant-steps-after-the-java-check")
 	g := gradleFixture(t)
 	log := stubTools(t, g, "21.0.4", junitPass)
-	for _, rel := range []string{"api", "app", "bom"} {
+	for _, rel := range []string{"api", "app", "bom", "catalog"} {
 		for _, task := range stacks.TaskNames {
 			if status, _, err := runJob(t, g, rel, task); status != "OK" || err != nil {
 				t.Fatalf("%s %s: %s %v\n%s", rel, task, status, err, ran(t, log))
@@ -284,6 +286,7 @@ func TestATaskRunsTheVariantStepsAfterTheJavaCheck(t *testing.T) {
 		filepath.Join(g, "api") + ": gradlew --console=plain :api:check -x :api:test",
 		filepath.Join(g, "bom") + ": gradlew --console=plain :bom:check\n",
 		filepath.Join(g, "bom") + ": gradlew --console=plain :bom:assemble\n",
+		filepath.Join(g, "catalog") + ": gradlew --console=plain :catalog:generateCatalogAsToml\n",
 		filepath.Join(g, "api") + ": gradlew --console=plain :api:test :api:jacocoTestReport",
 		filepath.Join(g, "api") + ": gradlew --console=plain :api:assemble",
 		filepath.Join(g, "app") + ": gradlew --console=plain :app:testDebugUnitTest :app:createDebugUnitTestCoverageReport",
@@ -302,9 +305,9 @@ func TestATaskRunsTheVariantStepsAfterTheJavaCheck(t *testing.T) {
 		}
 	}
 	for _, want := range []string{
-		"mvn --batch-mode --file " + m + "/pom.xml --projects com.acme:pricing --also-make verify -Dmaven.test.skip=true",
+		"mvn --batch-mode --file " + m + "/pom.xml --projects com.acme:pricing --also-make verify -DskipTests",
 		"mvn --batch-mode --file " + m + "/pom.xml --projects com.acme:pricing --also-make verify\n",
-		"mvn --batch-mode --file " + m + "/pom.xml --projects com.acme:pricing --also-make package -Dmaven.test.skip=true",
+		"mvn --batch-mode --file " + m + "/pom.xml --projects com.acme:pricing --also-make package -DskipTests",
 	} {
 		if !strings.Contains(ran(t, log), filepath.Join(m, "pricing")+": "+want) {
 			t.Errorf("ran\n%s\nwant %q", ran(t, log), want)
@@ -384,8 +387,8 @@ func TestALockfileChangeKeepsTheLintKey(t *testing.T) {
 	}
 	m := mavenFixture(t)
 	for _, sel := range []string{"java:lint", "java:build"} {
-		if got := resolve(t, m, "pricing", sel); !reflect.DeepEqual(got.Files, []string{"pom.xml", "src/main/java/com/acme/pricing/Pricing.java"}) {
-			t.Errorf("maven %s skips the test sources = %+v", sel, got)
+		if got := resolve(t, m, "pricing", sel); !reflect.DeepEqual(got.Files, []string{"pom.xml", "src/main/java/com/acme/pricing/Pricing.java", "src/test/java/com/acme/pricing/PricingTest.java"}) {
+			t.Errorf("maven %s reads the test sources -DskipTests compiles = %+v", sel, got)
 		}
 	}
 	s := stack(t)
@@ -398,8 +401,20 @@ func TestALockfileChangeKeepsTheLintKey(t *testing.T) {
 		t.Error("every POM of the build, parents included, is a Maven input")
 	}
 	for _, p := range s.Profile.ShippedRootPatterns(stacks.TaskBuild) {
-		if strings.HasPrefix(p, "buildSrc/") && !strings.HasPrefix(p, "buildSrc/src/") && !strings.HasSuffix(p, ".kts") && !strings.HasSuffix(p, ".gradle") {
-			t.Errorf("%s may select buildSrc's build output", p)
+		for _, dir := range []string{"buildSrc/", "build-logic/"} {
+			if strings.HasPrefix(p, dir) && !strings.HasSuffix(p, "/src/**") && !strings.HasSuffix(p, ".kts") && !strings.HasSuffix(p, ".gradle") {
+				t.Errorf("%s may select the build output of %s", p, dir)
+			}
+		}
+	}
+	for _, p := range []string{"build-logic/src/main/kotlin/A.kt", "build-logic/convention/src/main/kotlin/A.kt", "build-logic/plugins/java/build.gradle.kts"} {
+		if !slices.ContainsFunc(s.Profile.ShippedRootPatterns(stacks.TaskBuild), func(pat string) bool { return stacks.MatchPattern(pat, p) }) {
+			t.Errorf("%s reaches no key", p)
+		}
+	}
+	for _, p := range []string{"build-logic/build/classes/A.class", "build-logic/.gradle/8.14/file.lock", "buildSrc/build/libs/buildSrc.jar"} {
+		if slices.ContainsFunc(s.Profile.ShippedRootPatterns(stacks.TaskBuild), func(pat string) bool { return stacks.MatchPattern(pat, p) }) {
+			t.Errorf("the build output %s reaches the key", p)
 		}
 	}
 }
@@ -443,7 +458,7 @@ func TestTheManifestConformsToTheStackCore(t *testing.T) {
 	if got := s.Selectors(); !slices.Equal(got, []string{"java:build", "java:lint", "java:test"}) {
 		t.Errorf("selectors = %v", got)
 	}
-	if got := s.Profile.VariantNames(); !slices.Equal(got, []string{VariantAndroid, VariantAndroidCoverage, VariantGradle, VariantGradleJaCoCo, VariantGradlePlatform, VariantMaven}) {
+	if got := s.Profile.VariantNames(); !slices.Equal(got, []string{VariantAndroid, VariantAndroidCoverage, VariantGradle, VariantGradleCatalog, VariantGradleJaCoCo, VariantGradlePlatform, VariantMaven}) {
 		t.Errorf("variants = %v", got)
 	}
 }

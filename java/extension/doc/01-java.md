@@ -42,7 +42,8 @@ part of the profile with that build's steps and reports.
 |---|---|
 | `gradle` | A Gradle project, without the ones below |
 | `gradle-jacoco` | Its build file applies the `jacoco` plugin |
-| `gradle-platform` | Its build file applies `java-platform` or `version-catalog`: a project with no test task |
+| `gradle-platform` | Its build file applies `java-platform`: a project with `check` and `assemble` and no test task |
+| `gradle-catalog` | Its build file applies `version-catalog`: a project with neither |
 | `android` | Its build file applies an Android plugin (`com.android.application`, `com.android.library`, a `libs.plugins.android.*` alias) or holds an `android { }` block |
 | `android-coverage` | An Android project whose build file turns on `enableUnitTestCoverage` (or the older `testCoverageEnabled`) |
 | `maven` | A Maven module |
@@ -59,14 +60,15 @@ depends on are built in the same reactor.
 | `gradle` | `gradlew {component}check -x {component}test` | `gradlew {component}test` | `gradlew {component}assemble` |
 | `gradle-jacoco` | as `gradle` | `gradlew {component}test {component}jacocoTestReport` | as `gradle` |
 | `gradle-platform` | `gradlew {component}check` | none | `gradlew {component}assemble` |
+| `gradle-catalog` | none | none | `gradlew {component}generateCatalogAsToml` |
 | `android` | as `gradle` | `gradlew {component}testDebugUnitTest` | `gradlew {component}assembleDebug` |
 | `android-coverage` | as `gradle` | `gradlew {component}testDebugUnitTest {component}createDebugUnitTestCoverageReport` | as `android` |
-| `maven` | `mvn --projects {component} --also-make verify -Dmaven.test.skip=true` | `mvn --projects {component} --also-make verify` | `mvn --projects {component} --also-make package -Dmaven.test.skip=true` |
+| `maven` | `mvn --projects {component} --also-make verify -DskipTests` | `mvn --projects {component} --also-make verify` | `mvn --projects {component} --also-make package -DskipTests` |
 
 Gradle commands also pass `--console=plain`, and Maven ones `--batch-mode` and
 `--file {root}/pom.xml`, so the reactor is the whole build.
 
-Maven `lint` runs `verify` without compiling or running the tests, so the checks a POM binds to
+Maven `lint` runs `verify` without running the tests, so the checks a POM binds to
 `validate` or `verify` (Checkstyle, Spotless, PMD, SpotBugs) run. Maven `test`
 runs `verify`, so the JaCoCo report a POM binds to `verify` is written. With
 `--also-make`, the tests of the modules a component depends on run again in
@@ -121,19 +123,18 @@ version, and the key of the same task of each component it depends on.
 |---|---|
 | `sources` | `src/main/**`; for Android also `src/debug/**`, `src/release/**`, `proguard-rules.pro`, `consumer-rules.pro` |
 | `tests` | `src/test/**`, `src/testFixtures/**`; for Android also `src/testDebug/**` |
-| `gradle` | the build file and `gradle.properties` of the project; at the root the settings and build files, `gradle.properties`, the catalogs and script plugins under `gradle/`, the wrapper properties, the build files and `src/**` of `buildSrc`, and of `build-logic` with its `convention` sources |
+| `gradle` | the build file and `gradle.properties` of the project; at the root the settings and build files, `gradle.properties`, the catalogs and script plugins under `gradle/`, the wrapper properties, the build files and `src/**` of `buildSrc`, and the build files and `src/**` of every project of `build-logic` |
 | `gradleLocks` | `gradle.lockfile`; at the root `settings-gradle.lockfile` and `gradle.lockfile` |
 | `maven` | `pom.xml`; every `pom.xml` of the build, parents included, and `.mvn/maven.config`, `.mvn/jvm.config`, `.mvn/extensions.xml` at the root |
 | `lintConfig` | `lint.xml`, `detekt.yml`; at the root `.editorconfig` and `config/checkstyle/**`, `config/detekt/**`, `config/pmd/**`, `config/spotbugs/**` |
 
-Gradle `lint` reads `sources`, `tests`, the build set and `lintConfig`,
-because `check` compiles and checks the test sources (`checkstyleTest`,
-`pmdTest`, detekt); Maven `lint` reads `sources`, the build set and
-`lintConfig`, and skips the tests. `test` reads `sources`, `tests`, the build
-set and the lockfiles; `build` reads `sources`, the build set and the
-lockfiles. So a lockfile change reruns test and build, never lint, and a
-change under `src/test` of a Maven module reruns its test alone. A change to
-any POM reruns every Maven task: a parent POM's settings reach every module.
+`lint` reads `sources`, `tests`, the build set and `lintConfig`: Gradle's
+`check` compiles and checks the test sources (`checkstyleTest`, `pmdTest`,
+detekt), and Maven's `-DskipTests` still compiles them and builds test-jars.
+`test` reads `sources`, `tests`, the build set and the lockfiles; `build`
+reads `sources`, the build set and the lockfiles, and Maven's also `tests`.
+So a lockfile change reruns test and build, never lint. A change to any POM
+reruns every Maven task: a parent POM's settings reach every module.
 
 ## Override the profile
 
@@ -175,11 +176,6 @@ A Maven repository with the Maven wrapper runs it instead of `mvn`:
 }
 ```
 
-A Maven module whose lint plugins also check the test sources reads them:
-
-```json
-{ "options": { "@putnami/java": { "tasks": { "lint": { "inputs": ["sources", "tests", "maven", "lintConfig"] } } } } }
-```
 
 A JDK that differs from `.java-version` on purpose:
 
@@ -206,9 +202,11 @@ declare. The design of the stack core is in
   project overrides its test task.
 - Gradle builds without a wrapper: override the steps to run `gradle`.
 - The build file of an intermediate Gradle project that configures its
-  children, such as `libs/build.gradle.kts` for `:libs:core`, is not an input
-  of the children's tasks; nor is a `build-logic` included build other than
-  `build-logic/convention`.
+  children, such as `libs/build.gradle.kts` for `:libs:core` with a
+  `subprojects { }` block, is not in the children's keys: after a change to
+  it, a cached result of a child can be stale. Move that configuration to a
+  convention plugin under `buildSrc` or `build-logic`, which every key reads,
+  or run the children's tasks with `--no-cache` after such a change.
 - A Maven module is named by its artifactId: two modules with the same
   artifactId in different groups need a `name` in their `putnami.json`.
 - The Maven wrapper `mvnw` is not used unless a project overrides its steps.

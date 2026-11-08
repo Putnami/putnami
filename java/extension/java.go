@@ -29,6 +29,7 @@ const (
 	VariantGradle          = "gradle"
 	VariantGradleJaCoCo    = "gradle-jacoco"
 	VariantGradlePlatform  = "gradle-platform"
+	VariantGradleCatalog   = "gradle-catalog"
 	VariantAndroid         = "android"
 	VariantAndroidCoverage = "android-coverage"
 	VariantMaven           = "maven"
@@ -125,9 +126,12 @@ var (
 	androidPlugin = regexp.MustCompile(`com\.android\.(?:application|library|test|dynamic-feature)|plugins\.android[.\-_]?(?:application|library|test|dynamic)|(?m)^\s*android\s*\{`)
 	// androidCoverage finds unit test coverage turned on in a build type.
 	androidCoverage = regexp.MustCompile(`(?:[Ee]nableUnitTestCoverage|testCoverageEnabled)\s*=?\s*true`)
-	// platformPlugin finds the plugins of a project that declares
-	// dependency constraints or a catalog, and has no test task.
-	platformPlugin = regexp.MustCompile(`(?m)(?:^|[^A-Za-z0-9_$./-])(?:java-platform|version-catalog)(?:[^A-Za-z0-9_$/.-]|$)`)
+	// platformPlugin finds java-platform: a project of dependency
+	// constraints, with check and assemble and no test task.
+	platformPlugin = regexp.MustCompile(`(?m)(?:^|[^A-Za-z0-9_$./-])java-platform(?:[^A-Za-z0-9_$/.-]|$)`)
+	// catalogPlugin finds version-catalog: a project that publishes a
+	// catalog, with neither check, assemble nor test.
+	catalogPlugin = regexp.MustCompile(`(?m)(?:^|[^A-Za-z0-9_$./-])version-catalog(?:[^A-Za-z0-9_$/.-]|$)`)
 	// jacocoPlugin finds the jacoco plugin, applied or configured; a path
 	// or a coordinate that holds the word, such as a URL, is no plugin.
 	jacocoPlugin = regexp.MustCompile(`(?m)(?:^|[^A-Za-z0-9_$./-])jacoco(?:[^A-Za-z0-9_$/.-]|$)`)
@@ -142,6 +146,8 @@ func gradleVariant(build string) string {
 		return VariantAndroid
 	case platformPlugin.MatchString(build):
 		return VariantGradlePlatform
+	case catalogPlugin.MatchString(build):
+		return VariantGradleCatalog
 	case jacocoPlugin.MatchString(build):
 		return VariantGradleJaCoCo
 	default:

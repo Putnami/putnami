@@ -98,7 +98,7 @@
   },
   "commands": {
     "lint": {
-      "description": "Lint the Gradle projects with check, without their tests, and the Maven modules with verify, without compiling their tests.",
+      "description": "Lint the Gradle projects with check, without their tests, and the Maven modules with verify -DskipTests.",
       "run": [
         {
           "id": "lint",
@@ -123,7 +123,7 @@
       ]
     },
     "build": {
-      "description": "Build the Gradle projects with assemble and the Maven modules with package, without compiling their tests.",
+      "description": "Build the Gradle projects with assemble and the Maven modules with package -DskipTests.",
       "run": [
         {
           "id": "build",
@@ -138,7 +138,7 @@
   },
   "tasks": {
     "lint-run": {
-      "description": "Run the lint steps of the component's variant on one Gradle project or Maven module in its directory, after the Java toolchain check: gradlew check without the tests, or mvn verify -Dmaven.test.skip=true. Its inputs are the files the java:lint selector answers from the resolved profile, and the stack-root files of every variant.",
+      "description": "Run the lint steps of the component's variant on one Gradle project or Maven module in its directory, after the Java toolchain check: gradlew check without the tests, or mvn verify -DskipTests. Its inputs are the files the java:lint selector answers from the resolved profile, and the stack-root files of every variant.",
       "kind": "command",
       "command": "{extensionRuntime}",
       "args": [
@@ -164,9 +164,9 @@
             ".mvn/extensions.xml",
             ".mvn/jvm.config",
             ".mvn/maven.config",
-            "build-logic/*/build.gradle",
-            "build-logic/*/build.gradle.kts",
-            "build-logic/convention/src/**",
+            "build-logic/**/build.gradle",
+            "build-logic/**/build.gradle.kts",
+            "build-logic/**/src/**",
             "build-logic/settings.gradle",
             "build-logic/settings.gradle.kts",
             "build.gradle",
@@ -243,9 +243,9 @@
             ".mvn/extensions.xml",
             ".mvn/jvm.config",
             ".mvn/maven.config",
-            "build-logic/*/build.gradle",
-            "build-logic/*/build.gradle.kts",
-            "build-logic/convention/src/**",
+            "build-logic/**/build.gradle",
+            "build-logic/**/build.gradle.kts",
+            "build-logic/**/src/**",
             "build-logic/settings.gradle",
             "build-logic/settings.gradle.kts",
             "build.gradle",
@@ -295,7 +295,7 @@
       }
     },
     "build-run": {
-      "description": "Run the build steps of the component's variant on one Gradle project or Maven module in its directory, after the Java toolchain check: gradlew assemble, or mvn package -Dmaven.test.skip=true.",
+      "description": "Run the build steps of the component's variant on one Gradle project or Maven module in its directory, after the Java toolchain check: gradlew assemble, or mvn package -DskipTests.",
       "kind": "command",
       "command": "{extensionRuntime}",
       "args": [
@@ -320,9 +320,9 @@
             ".mvn/extensions.xml",
             ".mvn/jvm.config",
             ".mvn/maven.config",
-            "build-logic/*/build.gradle",
-            "build-logic/*/build.gradle.kts",
-            "build-logic/convention/src/**",
+            "build-logic/**/build.gradle",
+            "build-logic/**/build.gradle.kts",
+            "build-logic/**/src/**",
             "build-logic/settings.gradle",
             "build-logic/settings.gradle.kts",
             "build.gradle",

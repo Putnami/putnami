@@ -54,9 +54,9 @@
       "{root}/buildSrc/src/**",
       "{root}/build-logic/settings.gradle.kts",
       "{root}/build-logic/settings.gradle",
-      "{root}/build-logic/*/build.gradle.kts",
-      "{root}/build-logic/*/build.gradle",
-      "{root}/build-logic/convention/src/**"
+      "{root}/build-logic/**/build.gradle.kts",
+      "{root}/build-logic/**/build.gradle",
+      "{root}/build-logic/**/src/**"
     ],
     "gradleLocks": [
       "gradle.lockfile",
@@ -224,6 +224,22 @@
           "inputs": [
             "gradle",
             "gradleLocks"
+          ]
+        }
+      }
+    },
+    "gradle-catalog": {
+      "tasks": {
+        "build": {
+          "steps": [
+            [
+              "{root}/gradlew",
+              "--console=plain",
+              "{component}generateCatalogAsToml"
+            ]
+          ],
+          "inputs": [
+            "gradle"
           ]
         }
       }
@@ -396,11 +412,12 @@
               "{component}",
               "--also-make",
               "verify",
-              "-Dmaven.test.skip=true"
+              "-DskipTests"
             ]
           ],
           "inputs": [
             "sources",
+            "tests",
             "maven",
             "lintConfig"
           ]
@@ -453,11 +470,12 @@
               "{component}",
               "--also-make",
               "package",
-              "-Dmaven.test.skip=true"
+              "-DskipTests"
             ]
           ],
           "inputs": [
             "sources",
+            "tests",
             "maven"
           ]
         }
