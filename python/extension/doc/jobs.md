@@ -4,7 +4,7 @@ order: 4
 
 # Jobs
 
-The experimental Python extension exposes four user-facing jobs via the CLI, plus one internal
+The experimental Python extension exposes these user-facing jobs via the CLI, plus one internal
 workspace job.
 
 ## Available Jobs
@@ -14,6 +14,9 @@ workspace job.
 | `lint` | `putnami lint <project>` | Project | Yes | Format and check with Ruff |
 | `test` | `putnami test <project>` | Project | Yes | Run pytest |
 | `serve` | `putnami serve <project>` | Project | No | Run a Python server via UV |
+| `run` | `putnami run <project>` | Project | No | Run a Python workload once |
+| `package` | `putnami package <project> --docker` | Project | Yes | Assemble the OCI image of an application |
+| `publish` | `putnami publish <project> --docker` | Project | No | Push the image of an application |
 | `workspace-install` | `putnami workspace-install` | Workspace | No | Sync UV workspace + lock |
 | `workspace-sync` | internal (`putnami projects sync`) | Workspace | No | Align the `pyproject.toml` `[project] name` of each project whose declared identity diverges from its resolved name |
 
@@ -60,6 +63,13 @@ putnami serve <project>
 putnami serve <project> --no-watch   # run once, no restart
 putnami serve <project> --port 8080
 ```
+
+### `package` and `publish`
+
+`package --docker` assembles the OCI image of an application, with its locked
+production dependencies installed as wheels for the image's platform, on the
+official Python slim image pinned by digest. `publish --docker` pushes it. See
+[Package and Publish](./package.md).
 
 ### `workspace-install`
 

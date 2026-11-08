@@ -12,6 +12,8 @@ framework.
 - **Test**: run pytest with auto-discovery (`test_*.py` / `*_test.py`)
 - **Serve**: run a Python server via UV with optional hot-reload
 - **Run**: run a workload once for the host and forward its exit code
+- **Package and publish**: assemble the OCI image of an application, with no
+  Docker daemon, and push it to its registry
 - **UV workspace sync**: auto-discover Python packages and manage root `pyproject.toml`
 - **Templates**: scaffold Python servers and libraries in one command
 
