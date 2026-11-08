@@ -7,7 +7,7 @@
       "id": "rust/stack-extension",
       "type": "feature",
       "name": "Run the crates of a Cargo workspace as Putnami tasks",
-      "outcome": "A team with a Cargo workspace adds @putnami/rust and runs putnami lint, test and build over its crates with Putnami's runner and cache, without rewriting its build: each crate is a project with its edges, each task runs the Rust profile's cargo steps after a toolchain check, the test task reads its JUnit and LCOV reports, and a crate overrides any profile value in its putnami.json",
+      "outcome": "A team with a Cargo workspace runs putnami lint, test and build over its crates through @putnami/rust with no putnami.json override: each crate is a project with its edges and stack root, nested Cargo workspaces included, each task reads only its own inputs, the test task attributes each case and coverage line to its crate, and a crate may override any profile value",
       "owner": "rust",
       "target": "coded",
       "requirements": [
@@ -18,6 +18,15 @@
           "verification": {
             "kind": "acceptance",
             "checks": ["the-crates-of-a-cargo-workspace-become-projects-with-their-edges"]
+          }
+        },
+        {
+          "id": "nested-roots-reach-the-key",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": ["a-nested-cargo-workspace-root-is-an-input-only-project"]
           }
         },
         {
@@ -39,6 +48,33 @@
           }
         },
         {
+          "id": "cases-are-attributed",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": ["each-nextest-case-goes-to-the-crate-its-binary-names"]
+          }
+        },
+        {
+          "id": "coverage-is-attributed",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": ["each-coverage-file-goes-to-the-crate-that-holds-it"]
+          }
+        },
+        {
+          "id": "inputs-are-per-task",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": ["lint-does-not-read-the-lockfile-or-the-nextest-configuration"]
+          }
+        },
+        {
           "id": "overrides-are-honored",
           "stage": "coded",
           "evidenceKinds": ["attestation"],
@@ -54,6 +90,15 @@
           "verification": {
             "kind": "acceptance",
             "checks": ["the-manifest-conforms-to-the-stack-core"]
+          }
+        },
+        {
+          "id": "real-tools-pass",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": ["the-fixture-repository-passes-with-the-real-tools"]
           }
         }
       ]

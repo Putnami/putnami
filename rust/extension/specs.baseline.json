@@ -2,9 +2,14 @@
   "$schema": "https://putnami.dev/schemas/putnami-specs-baseline.json",
   "protocolVersion": 2,
   "executableRequirements": [
+    "rust/stack-extension#cases-are-attributed",
+    "rust/stack-extension#coverage-is-attributed",
     "rust/stack-extension#crates-become-projects",
+    "rust/stack-extension#inputs-are-per-task",
     "rust/stack-extension#manifest-follows-the-profile",
+    "rust/stack-extension#nested-roots-reach-the-key",
     "rust/stack-extension#overrides-are-honored",
+    "rust/stack-extension#real-tools-pass",
     "rust/stack-extension#reports-become-the-summary",
     "rust/stack-extension#tasks-run-the-profile"
   ]
