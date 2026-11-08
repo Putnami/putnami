@@ -133,13 +133,27 @@ func checkTask(t testing.TB, doc manifest, s stacks.Stack, task string) {
 	// A delegated stack's tool keeps its own cache: a Putnami hit would
 	// replay a result the tool never produced for this tree. Any other stack
 	// caches its tasks.
-	if enabled := decl.Cache.Enabled != nil && *decl.Cache.Enabled; enabled == s.Profile.Delegated {
+	if enabled := cacheEnabled(decl.Cache); enabled == s.Profile.Delegated {
 		t.Errorf("task %s: cache.enabled = %v, want %v for a profile whose delegated is %v", step.Task, enabled, !s.Profile.Delegated, s.Profile.Delegated)
 	}
 	out, ok := decl.Declares.Outputs["reports"]
 	if !ok || out.Kind != "directory" || out.Root != "command-output" || out.Path != task {
 		t.Errorf("task %s declares no command-output directory %q for its reports: %+v", step.Task, task, out)
 	}
+}
+
+// cacheEnabled reads a task's cache member the way the protocol does: a
+// boolean, or a policy object; an absent member or enabled is on.
+func cacheEnabled(raw json.RawMessage) bool {
+	var on bool
+	if json.Unmarshal(raw, &on) == nil {
+		return on
+	}
+	var policy proto.TaskCachePolicy
+	if len(raw) > 0 && json.Unmarshal(raw, &policy) != nil {
+		return false
+	}
+	return policy.IsEnabled()
 }
 
 func sorted(s []string) []string {
@@ -169,9 +183,7 @@ type manifest struct {
 			From  string   `json:"from"`
 			Files []string `json:"files"`
 		} `json:"inputs"`
-		Cache struct {
-			Enabled *bool `json:"enabled"`
-		} `json:"cache"`
+		Cache    json.RawMessage `json:"cache"`
 		Declares struct {
 			Outputs map[string]struct {
 				Kind string `json:"kind"`

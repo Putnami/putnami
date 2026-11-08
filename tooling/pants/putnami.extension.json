@@ -1,0 +1,320 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-extension.json",
+  "name": "@putnami/pants",
+  "cliContract": 14,
+  "extensionDependencies": {
+    "@putnami/dev": ""
+  },
+  "runtime": {
+    "executable": "compiled/putnami-pants",
+    "toolchains": {
+      "runtimeCompiler": {
+        "lock": "go",
+        "candidates": [
+          {
+            "from": "environment",
+            "environment": "GOROOT",
+            "path": "bin/go"
+          },
+          {
+            "from": "path",
+            "path": "go"
+          },
+          {
+            "from": "putnami-home",
+            "path": "toolchains/go/go-{version}/go/bin/go"
+          }
+        ],
+        "probe": {
+          "args": [
+            "env",
+            "GOVERSION"
+          ],
+          "expect": "go{version}",
+          "unset": [
+            "GOROOT"
+          ],
+          "environment": {
+            "GOTOOLCHAIN": "local"
+          }
+        },
+        "environment": {
+          "GOROOT": {
+            "from": "ancestor",
+            "levels": 2
+          },
+          "GOTOOLCHAIN": {
+            "from": "literal",
+            "value": "local"
+          }
+        },
+        "prependPath": true
+      }
+    },
+    "prepare": {
+      "command": "{extensionRoot}/bin/prepare",
+      "args": [
+        "--output",
+        "{runtimeOutput}"
+      ],
+      "inputs": [
+        "bin/prepare",
+        "cmd/**",
+        "go.mod",
+        "go.sum",
+        "*.go",
+        "profile.json"
+      ],
+      "toolchains": [
+        "runtimeCompiler"
+      ]
+    },
+    "inputSelectors": [
+      "pants:build",
+      "pants:lint",
+      "pants:test"
+    ]
+  },
+  "workspace": {
+    "markers": [
+      "BUILD",
+      "BUILD.pants"
+    ],
+    "inputs": [
+      "BUILD",
+      "BUILD.pants",
+      "pants.toml",
+      "pants-graph.json"
+    ],
+    "excludes": [
+      "dist"
+    ],
+    "syncTask": "workspace-sync-exec"
+  },
+  "commands": {
+    "lint": {
+      "description": "Lint each package with pants lint, which keeps its own cache.",
+      "run": [
+        {
+          "id": "lint",
+          "task": "lint-run",
+          "dependsOn": [
+            "^lint"
+          ]
+        }
+      ]
+    },
+    "test": {
+      "description": "Test each package with pants test, read its JUnit and coverage reports; Pants keeps its own cache.",
+      "run": [
+        {
+          "id": "test",
+          "heavy": true,
+          "task": "test-run",
+          "dependsOn": [
+            "^test"
+          ]
+        }
+      ]
+    },
+    "build": {
+      "description": "Package each package with pants package, which keeps its own cache.",
+      "run": [
+        {
+          "id": "build",
+          "heavy": true,
+          "task": "build-run",
+          "dependsOn": [
+            "^build"
+          ]
+        }
+      ]
+    },
+    "workspace-sync": {
+      "description": "Write each Pants package's putnami.json from the pants peek :: export.",
+      "visibility": "internal",
+      "quiet": true,
+      "activation": "workspace-once",
+      "run": [
+        {
+          "id": "workspace-sync",
+          "task": "workspace-sync-exec"
+        }
+      ]
+    }
+  },
+  "tasks": {
+    "lint-run": {
+      "description": "Run pants lint <dir>: in the workspace root for one package, after the Pants version check. Putnami's cache is off: Pants's cache decides what reruns.",
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": [
+        "lint",
+        "--report-dir",
+        "{outputRoot}"
+      ],
+      "cwd": "{projectRoot}",
+      "timeoutMs": 1800000,
+      "inputs": {
+        "sources": {
+          "from": "project",
+          "files": [
+            "pants:lint"
+          ]
+        },
+        "stackRoot": {
+          "from": "workspace",
+          "files": [
+            "pants.toml"
+          ]
+        },
+        "extensionVersion": {
+          "from": "runtime"
+        }
+      },
+      "outputs": {
+        "data": {
+          "description": "The task result: delegatedTo pants, and the test and coverage totals of a test task."
+        }
+      },
+      "cache": {
+        "enabled": false
+      },
+      "declares": {
+        "outputs": {
+          "reports": {
+            "kind": "directory",
+            "root": "command-output",
+            "path": "lint",
+            "optionalEmpty": true,
+            "description": "The reports the task copied: each JUnit report and the Cobertura report of a test task."
+          }
+        },
+        "effects": [
+          "network",
+          "toolchain-cache"
+        ]
+      }
+    },
+    "test-run": {
+      "description": "Run pants --test-report --test-use-coverage --coverage-py-report=xml test <dir>: in the workspace root for one package, after the Pants version check; then copy the JUnit reports under dist/test/reports and the Cobertura report dist/coverage/python/coverage.xml into the command output and read them. A failed case, a step that exits non-zero, or a missing report fails the task. Putnami's cache is off: Pants's cache decides what reruns.",
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": [
+        "test",
+        "--report-dir",
+        "{outputRoot}"
+      ],
+      "cwd": "{projectRoot}",
+      "timeoutMs": 1800000,
+      "inputs": {
+        "sources": {
+          "from": "project",
+          "files": [
+            "pants:test"
+          ]
+        },
+        "stackRoot": {
+          "from": "workspace",
+          "files": [
+            "pants.toml"
+          ]
+        },
+        "extensionVersion": {
+          "from": "runtime"
+        }
+      },
+      "outputs": {
+        "data": {
+          "description": "The task result: delegatedTo pants, and the test and coverage totals of a test task."
+        }
+      },
+      "cache": {
+        "enabled": false
+      },
+      "declares": {
+        "outputs": {
+          "reports": {
+            "kind": "directory",
+            "root": "command-output",
+            "path": "test",
+            "optionalEmpty": true,
+            "description": "The reports the task copied: each JUnit report and the Cobertura report of a test task."
+          }
+        },
+        "effects": [
+          "network",
+          "toolchain-cache"
+        ]
+      }
+    },
+    "build-run": {
+      "description": "Run pants package <dir>: in the workspace root for one package, after the Pants version check. Putnami's cache is off: Pants's cache decides what reruns.",
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": [
+        "build",
+        "--report-dir",
+        "{outputRoot}"
+      ],
+      "cwd": "{projectRoot}",
+      "timeoutMs": 1800000,
+      "inputs": {
+        "sources": {
+          "from": "project",
+          "files": [
+            "pants:build"
+          ]
+        },
+        "stackRoot": {
+          "from": "workspace",
+          "files": [
+            "pants.toml"
+          ]
+        },
+        "extensionVersion": {
+          "from": "runtime"
+        }
+      },
+      "outputs": {
+        "data": {
+          "description": "The task result: delegatedTo pants, and the test and coverage totals of a test task."
+        }
+      },
+      "cache": {
+        "enabled": false
+      },
+      "declares": {
+        "outputs": {
+          "reports": {
+            "kind": "directory",
+            "root": "command-output",
+            "path": "build",
+            "optionalEmpty": true,
+            "description": "The reports the task copied: each JUnit report and the Cobertura report of a test task."
+          }
+        },
+        "effects": [
+          "network",
+          "toolchain-cache"
+        ]
+      }
+    },
+    "workspace-sync-exec": {
+      "description": "Write in each Pants package's putnami.json the extension, its dependencies as the project IDs of the packages the pants-graph.json export at the workspace root, or pants peek ::, says it depends on, and test in disable.jobs when it holds no test target. Declares no outputs: it rewrites tracked project files, which the workspace-files effect states.",
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": [
+        "workspace-sync"
+      ],
+      "cwd": "{workspaceRoot}",
+      "cache": false,
+      "timeoutMs": 600000,
+      "declares": {
+        "effects": [
+          "workspace-files"
+        ]
+      }
+    }
+  }
+}

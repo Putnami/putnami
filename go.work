@@ -120,6 +120,7 @@ use (
 	./tooling/local-collaboration
 	./tooling/memory-store
 	./tooling/observe
+	./tooling/pants
 	./tooling/scaffold
 	./tooling/sdd-extension
 	./tooling/stacks

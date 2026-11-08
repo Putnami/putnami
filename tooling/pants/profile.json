@@ -1,0 +1,42 @@
+{
+  "id": "pants",
+  "delegated": true,
+  "markers": ["BUILD", "BUILD.pants"],
+  "toolchain": {
+    "command": ["pants", "--version"],
+    "pattern": "(?m)^(?<version>[0-9]+\\.[0-9]+\\.[0-9]+\\S*)\\s*$",
+    "files": [
+      { "path": "pants.toml", "key": "GLOBAL.pants_version" }
+    ]
+  },
+  "inputs": {
+    "sources": ["*"]
+  },
+  "tasks": {
+    "lint": {
+      "steps": [
+        ["pants", "lint", "{component}:"]
+      ],
+      "inputs": ["sources"],
+      "dir": "root"
+    },
+    "test": {
+      "steps": [
+        ["pants", "--test-report", "--test-use-coverage", "--coverage-py-report=xml", "test", "{component}:"]
+      ],
+      "inputs": ["sources"],
+      "dir": "root",
+      "reports": {
+        "junit": ["{root}/dist/test/reports/*.xml"],
+        "coverage": [{ "format": "cobertura", "paths": ["{root}/dist/coverage/python/coverage.xml"] }]
+      }
+    },
+    "build": {
+      "steps": [
+        ["pants", "package", "{component}:"]
+      ],
+      "inputs": ["sources"],
+      "dir": "root"
+    }
+  }
+}
