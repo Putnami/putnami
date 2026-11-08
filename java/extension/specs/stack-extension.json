@@ -27,7 +27,7 @@
     },
     {
       "id": "tasks-run-the-profile",
-      "text": "Each task first compares java -version with .java-version, in the component then at the root; a major such as 21 matches every 21.x release. It then runs the variant's steps in the component's directory with no shell: the root's gradlew with the component's task path (check, test, assemble, their Android forms, or generateCatalogAsToml), or mvn --file {root}/pom.xml --projects {component} --also-make clean, then verify for lint and test, package for build."
+      "text": "Each task first compares java -version with .java-version, in the component then at the root; a major such as 21 matches every 21.x release. It then runs the variant's steps in the component's directory with no shell: the root's gradlew with the component's task path (check, test, assemble, their Android forms, or generateCatalogAsToml), or mvn --file {root}/pom.xml clean of the component alone, then --also-make verify for lint and test, package for build."
     },
     {
       "id": "reports-become-the-summary",
