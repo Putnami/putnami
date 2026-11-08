@@ -425,13 +425,57 @@ func TestSyncRuntimeResolver_AnswersForAWorkspaceWhoseMembersCollide(t *testing.
 	}
 }
 
+func TestNameCollidingMembers_APathReportedByAnotherMemberIsRefused(t *testing.T) {
+	ws := workspaceWithMembers(t, "apps/foo", "libs/foo", "tools/foo")
+	provider := &sourceNameProvider{names: map[string]string{
+		"apps/foo":  "@acme/foo",
+		"libs/foo":  "@acme/foo",
+		"tools/foo": "apps/foo",
+	}}
+	added := []string{"apps/foo", "libs/foo", "tools/foo"}
+	if err := nameCollidingMembers(ws, added, []workspace.ProviderBinding{{Provider: provider}}); err != nil {
+		t.Fatalf("nameCollidingMembers: %v", err)
+	}
+	for _, member := range added {
+		if got := readText(t, filepath.Join(ws, member, "putnami.json")); !strings.Contains(got, `"name": "`+member+`"`) {
+			t.Errorf("%s is named by its path: %s", member, got)
+		}
+	}
+	if _, err := workspace.Load(ws); err != nil {
+		t.Errorf("the workspace loads with no provider view: %v", err)
+	}
+}
+
+func TestNameCollidingMembers_KeepsAStatedName(t *testing.T) {
+	ws := workspaceWithMembers(t, "apps/foo", "libs/foo")
+	stated := `{"name":"foo"}`
+	writeProjectFile(t, filepath.Join(ws, "apps", "foo", "putnami.json"), stated)
+	provider := &sourceNameProvider{names: map[string]string{"libs/foo": "foo"}}
+	added := []string{"apps/foo", "libs/foo"}
+	if err := nameCollidingMembers(ws, added, []workspace.ProviderBinding{{Provider: provider}}); err != nil {
+		t.Fatalf("nameCollidingMembers: %v", err)
+	}
+	if got := readText(t, filepath.Join(ws, "apps", "foo", "putnami.json")); got != stated {
+		t.Errorf("apps/foo keeps its file: %s", got)
+	}
+	if got := readText(t, filepath.Join(ws, "libs", "foo", "putnami.json")); !strings.Contains(got, `"name": "libs/foo"`) {
+		t.Errorf("libs/foo is named by its path: %s", got)
+	}
+}
+
 // collidingWorkspace has two members that resolve to the name foo.
 func collidingWorkspace(t *testing.T) string {
 	t.Helper()
+	return workspaceWithMembers(t, "apps/foo", "libs/foo")
+}
+
+func workspaceWithMembers(t *testing.T, members ...string) string {
+	t.Helper()
 	ws := t.TempDir()
-	writeProjectFile(t, filepath.Join(ws, "putnami.workspace.json"), `{"includes":["apps/foo","libs/foo"]}`)
-	writeProjectFile(t, filepath.Join(ws, "apps", "foo", "putnami.json"), `{}`)
-	writeProjectFile(t, filepath.Join(ws, "libs", "foo", "putnami.json"), `{}`)
+	writeProjectFile(t, filepath.Join(ws, "putnami.workspace.json"), `{"includes":["`+strings.Join(members, `","`)+`"]}`)
+	for _, member := range members {
+		writeProjectFile(t, filepath.Join(ws, filepath.FromSlash(member), "putnami.json"), `{}`)
+	}
 	t.Cleanup(func() { workspace.InvalidateLoadCache(ws) })
 	return ws
 }

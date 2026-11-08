@@ -228,12 +228,18 @@ func nameCollidingMembers(wsRoot string, added []string, providers []workspace.P
 			named = append(named, member)
 		}
 	}
-	for _, member := range addedMembersIn(duplicateNamesWithoutView(wsRoot), named) {
-		if _, err := nameMember(wsRoot, member, member, true); err != nil {
-			return err
+	for {
+		colliding := addedMembersIn(duplicateNamesWithoutView(wsRoot), named)
+		if len(colliding) == 0 {
+			return nil
 		}
+		for _, member := range colliding {
+			if _, err := nameMember(wsRoot, member, member, true); err != nil {
+				return err
+			}
+		}
+		named = slices.DeleteFunc(named, func(member string) bool { return slices.Contains(colliding, member) })
 	}
-	return nil
 }
 
 // duplicateNamesWithoutView returns the project paths of each name that two
@@ -565,8 +571,7 @@ func syncRuntimeResolver(ctx context.Context, wsRoot string, ext *extension.Exte
 		if ext.RuntimeExecutable != "" {
 			return ext.RuntimeExecutable, nil
 		}
-		// Runtime preparation reads only the root. A load here would refuse the
-		// colliding members this command is about to name.
+		// Runtime preparation reads only the root.
 		if err := scheduler.SynchronizeExtensionRuntimes(ctx, &workspace.Workspace{Root: wsRoot},
 			[]*extension.ExtensionDescription{ext}, nil); err != nil {
 			return "", err
