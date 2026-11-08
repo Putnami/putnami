@@ -142,6 +142,8 @@ The Rust reference profile:
 | `id` | The stack id. |
 | `markers` | The files that make a directory a candidate. |
 | `toolchain.command`, `toolchain.pattern` | How to read the version on the machine: the command's output, standard output first, matched by the pattern's `version` group. |
+| `toolchain.provisioned` | The environment variable that holds the toolchain the workspace lock pins, for a stack extension that pins one. |
+| `tasks.<task>.withoutCoverage` | How the task runs on a toolchain with no coverage support: a `probe` that exits non-zero there, and the `steps` that replace the task's. Its coverage reports are not read, and the task warns with `stacks.coverage_unavailable`. |
 | `toolchain.files` | The files that state the expected version or range, read in the project directory, then at the stack root. `key` reads one string value of a TOML table or a JSON object; without it, the file's first non-empty line. |
 | `inputs.<set>` | Named sets of file patterns. A plain pattern is relative to the project directory; `{root}/` makes it relative to the stack root, the directory of the build that holds the component (the Cargo workspace, the Gradle settings). |
 | `tasks.<task>.steps` | The commands the task runs in order, each an argument vector run in the project directory, with no shell. `{root}` is the stack root, `{component}` the detector's name for the component, `{output}` the task's output directory under the project. |
@@ -245,11 +247,18 @@ the task reads the version on the machine with `toolchain.command`:
   prefixes: a `1.82` channel matches 1.82.0 and 1.82.3, not 1.82.0-nightly, and
   keys the minor release, not the patch;
 - they differ: the task fails with `stacks.toolchain_mismatch`, which names
-  both versions and the file that states the expected one. It never installs
-  or switches a toolchain. A project that accepts the difference sets
+  both versions and the file that states the expected one. A project that
+  accepts the difference sets
   `toolchain.check` to `warn`: the task runs and reports the diagnostic as a
   warning;
 - the command is missing: the task fails with `stacks.toolchain_missing`.
+
+An extension may pin its toolchain, as `@putnami/php` does
+([ADR 0003](adr/0003-a-stack-extension-may-provide-its-toolchain.md)). The
+profile's `toolchain.provisioned` names the environment variable that holds
+the pinned toolchain. When the toolchain on `PATH` is missing, or fails the
+check, the task puts the pinned one first on `PATH` and checks it. A toolchain
+on `PATH` that passes always runs.
 
 A file may state a range instead, in Composer's constraint syntax: the PHP
 profile reads `require.php` of `composer.json`, such as `>=8.4` or `^8.2`
@@ -288,9 +297,8 @@ restores them and reads the same totals.
 - **Publish and package.** A stack's release goes through its own tool
   (crates.io, Packagist, Maven Central); no profile declares a `publish`
   task. A stack extension may add one later, in its own issue.
-- **Toolchain install.** The check compares; it never downloads, pins in the
-  workspace lock, or switches a version. cargo-nextest and cargo-llvm-cov are
-  the project's tools, like `rustc`.
+- **Toolchain install for Rust.** cargo-nextest and cargo-llvm-cov are the
+  project's tools, like `rustc`; `@putnami/rust` pins nothing.
 - **Serve and qualify.** No profile declares a workload, so `putnami qualify`
   reports no reachable workload for a stack project.
 - **Go, TypeScript and Python.** They keep their full extensions and do not

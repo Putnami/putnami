@@ -21,7 +21,9 @@ import (
 // Diagnostic codes of the task runner.
 const (
 	CodeNotAComponent = "stacks.not_a_component"
-	CodeStepFailed    = "stacks.step_failed"
+	// CodeCoverageUnavailable warns that the toolchain has no coverage support.
+	CodeCoverageUnavailable = "stacks.coverage_unavailable"
+	CodeStepFailed          = "stacks.step_failed"
 )
 
 // Job statuses.
@@ -117,14 +119,15 @@ func (s Stack) run(ctx context.Context, in runInput, emit reporter) (string, map
 	if err != nil {
 		return statusFailed, nil, failWith(CodeProjectConfigInvalid, "the expected toolchain version cannot be read: %v", err)
 	}
-	machine, err := profile.Toolchain.MachineVersion(ctx, in.projectAbs, env)
+	selected, err := profile.Toolchain.Select(ctx, in.projectAbs, expected, env)
 	if errors.Is(err, ErrToolchainMissing) {
-		return statusFailed, nil, failWith(CodeToolchainMissing, "%v: the %s stack needs it on PATH; Putnami installs no toolchain", err, profile.ID)
+		return statusFailed, nil, failWith(CodeToolchainMissing, "%v: the %s stack needs it on PATH, or a release its extension pins: run putnami install", err, profile.ID)
 	}
 	if err != nil {
 		return statusFailed, nil, failWith(CodeToolchainMissing, "%v", err)
 	}
-	if v := profile.Toolchain.Compare(expected, machine); v.Code != "" {
+	env = selected.Env
+	if v := selected.Verdict; v.Code != "" {
 		if v.Fail {
 			return statusFailed, nil, failWith(v.Code, "%s", v.Message)
 		}
@@ -151,6 +154,13 @@ func (s Stack) run(ctx context.Context, in runInput, emit reporter) (string, map
 		return statusFailed, nil, err
 	}
 
+	if w := t.WithoutCoverage; w != nil && !hasCoverageSupport(ctx, selected.Program(profile.Toolchain, w.Probe[0]), w.Probe[1:], in.projectAbs, env) {
+		emit.DiagnosticWithCode("warning", fmt.Sprintf("the %s toolchain has no coverage support: %s runs with no coverage report", profile.ID, in.task), "", 0, 0, CodeCoverageUnavailable)
+		reports := *t.Reports
+		reports.Coverage = nil
+		t.Steps, t.Reports = w.Steps, &reports
+	}
+
 	vars := map[string]string{"{root}": rootAbs, "{component}": meta.Component, "{project}": in.projectAbs, "{output}": outDir}
 	// A test runner exits non-zero when a case fails: the steps stop there,
 	// and the reports it wrote are still read, so the failed cases name the
@@ -162,7 +172,7 @@ func (s Stack) run(ctx context.Context, in runInput, emit reporter) (string, map
 			argv[i] = expand(a, vars)
 		}
 		emit.Info("$ " + strings.Join(argv, " "))
-		cmd := exec.CommandContext(ctx, argv[0], argv[1:]...) //nolint:gosec // the profile's own step
+		cmd := exec.CommandContext(ctx, selected.Program(profile.Toolchain, argv[0]), argv[1:]...) //nolint:gosec // the profile's own step
 		cmd.Dir = in.projectAbs
 		cmd.Env = env
 		cmd.Stdout = in.stdout
@@ -238,6 +248,15 @@ func (s Stack) run(ctx context.Context, in runInput, emit reporter) (string, map
 		return statusFailed, data, fmt.Errorf("the %s reports of %s failed", in.task, meta.Component)
 	}
 	return statusOK, data, nil
+}
+
+// hasCoverageSupport runs a task's coverage probe: an exit other than zero
+// means the toolchain has no coverage support.
+func hasCoverageSupport(ctx context.Context, program string, args []string, dir string, env []string) bool {
+	cmd := exec.CommandContext(ctx, program, args...) //nolint:gosec // the profile's own probe
+	cmd.Dir = dir
+	cmd.Env = env
+	return cmd.Run() == nil
 }
 
 func severity(d diag.Diagnostic) string {

@@ -62,6 +62,11 @@ func TestDecodeRefusesWhatTheSchemaDoesNotName(t *testing.T) {
 		"negated pattern":   strings.Replace(sampleProfile, `"src/**"`, `"!src/gen/**"`, 1),
 		"coverage format":   strings.Replace(sampleProfile, `"lcov"`, `"gcov"`, 1),
 		"bad check":         strings.Replace(sampleProfile, `"command": ["rustc"`, `"check": "ignore", "command": ["rustc"`, 1),
+		"bad provisioned":   strings.Replace(sampleProfile, `"command": ["rustc"`, `"provisioned": "not a name", "command": ["rustc"`, 1),
+		"no probe":          strings.Replace(sampleProfile, `"steps": [["cargo", "test", "--package", "{component}"]],`, `"withoutCoverage": {"probe": [], "steps": [["cargo"]]}, "steps": [["cargo", "test", "--package", "{component}"]],`, 1),
+		"no fallback steps": strings.Replace(sampleProfile, `"steps": [["cargo", "test", "--package", "{component}"]],`, `"withoutCoverage": {"probe": ["false"], "steps": []}, "steps": [["cargo", "test", "--package", "{component}"]],`, 1),
+		"bad fallback":      strings.Replace(sampleProfile, `"steps": [["cargo", "test", "--package", "{component}"]],`, `"withoutCoverage": {"probe": ["false"], "steps": [["cargo", "{crate}"]]}, "steps": [["cargo", "test", "--package", "{component}"]],`, 1),
+		"nothing to skip":   strings.Replace(sampleProfile, `"inputs": ["sources", "manifests"]}`, `"inputs": ["sources", "manifests"], "withoutCoverage": {"probe": ["false"], "steps": [["cargo"]]}}`, 1),
 	}
 	for name, doc := range cases {
 		if _, err := Decode([]byte(doc)); err == nil {

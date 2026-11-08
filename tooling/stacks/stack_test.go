@@ -326,3 +326,34 @@ func TestEntrypointServesTheControlCalls(t *testing.T) {
 		t.Errorf("a job argv reaches the dispatcher: %v", err)
 	}
 }
+
+func TestRunWithoutCoverageSupportReadsNoCoverageReport(t *testing.T) {
+	root := t.TempDir()
+	writeFile(t, root, "rust-toolchain.toml", "[toolchain]\nchannel = \"1.82.0\"\n")
+	writeFile(t, root, "crates/api/Cargo.toml", "")
+	t.Setenv("STUB_ROOT", root)
+	t.Setenv("STUB_LOG", filepath.Join(root, "log"))
+	stubTools(t, "1.82.0", junitPass)
+	s := testProfileWithLcov(t)
+	task := s.Profile.Tasks[TaskTest]
+	task.WithoutCoverage = &WithoutCoverage{Probe: []string{"false"}, Steps: [][]string{{"cargo", "test", "--package", "{component}"}}}
+	s.Profile.Tasks[TaskTest] = task
+
+	status, data, rec := runTask(t, s, root, TaskTest)
+	if status != statusOK || rec.codes() != "warning:"+CodeCoverageUnavailable {
+		t.Fatalf("status %s: %v", status, rec.diags)
+	}
+	if _, ok := data["coverageSummary"]; ok {
+		t.Errorf("no coverage summary is written: %v", data)
+	}
+	if got := data["testSummary"].(map[string]any); got["total"] != 3 {
+		t.Errorf("testSummary = %v", got)
+	}
+
+	task.WithoutCoverage.Probe = []string{"true"}
+	s.Profile.Tasks[TaskTest] = task
+	status, data, rec = runTask(t, s, root, TaskTest)
+	if _, ok := data["coverageSummary"]; status != statusOK || !ok || rec.codes() != "" {
+		t.Errorf("a toolchain with coverage support keeps the coverage report: %s %v %v", status, data, rec.diags)
+	}
+}
