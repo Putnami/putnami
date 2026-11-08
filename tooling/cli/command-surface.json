@@ -525,6 +525,13 @@
           "type": "bool"
         },
         {
+          "long": "--from",
+          "type": "value",
+          "values": [
+            "pants"
+          ]
+        },
+        {
           "long": "--project",
           "type": "value"
         },
@@ -1013,6 +1020,13 @@
         {
           "long": "--force",
           "type": "bool"
+        },
+        {
+          "long": "--from",
+          "type": "value",
+          "values": [
+            "pants"
+          ]
         },
         {
           "long": "--project",

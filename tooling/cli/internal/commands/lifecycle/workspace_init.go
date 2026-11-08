@@ -59,6 +59,31 @@ var initExtensions = map[string]initExtensionConfig{
 	"py": {packageName: "@putnami/python", template: "python-server"},
 }
 
+// initSource is a monorepo tool `putnami init --from` adopts: the starter
+// that declares the tool's stack extension, and the file that marks a
+// repository the tool describes. The extension owns everything else: its
+// probe names the packages and its workspace sync task writes their
+// putnami.json, so init only declares it and runs projects sync.
+type initSource struct {
+	starter initExtensionConfig
+	marker  string
+}
+
+// initSources are the tools --from accepts, by name.
+var initSources = map[string]initSource{
+	"pants": {starter: initExtensionConfig{packageName: "@putnami/pants"}, marker: "pants.toml"},
+}
+
+// initSourceNames lists the tools --from accepts, sorted.
+func initSourceNames() string {
+	names := make([]string, 0, len(initSources))
+	for name := range initSources {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	return strings.Join(names, ", ")
+}
+
 // installExtension is swapped in tests so init tests never perform a real
 // registry install (slow and environment-dependent). Its progress lines go to
 // stdout.
@@ -76,6 +101,9 @@ var (
 	createInitProject       = createInitProjectFiles
 	pinInitToolchains       = resolveToolchainPins
 	refreshInitLockMetadata = versioncmd.RefreshLockMetadataWithResult
+	syncInitProjects        = func(ctx context.Context, root string, cfg *wsproto.Config, env LifecycleEnv) error {
+		return ProjectsSync(ctx, root, cfg, nil, false, env)
+	}
 )
 
 // initFlags holds parsed flags for the init command.
@@ -85,6 +113,10 @@ type initFlags struct {
 	project     string
 	projectPath string
 	extension   string
+	// extensionSet reports that --extension was given.
+	extensionSet bool
+	// from is the monorepo tool of --from.
+	from string
 	// channel is the value of --channel, and channelSet reports that the flag
 	// was given: a flag with no value is a usage error, not an absent flag.
 	channel    string
@@ -96,6 +128,10 @@ func parseInitFlags(args []string) initFlags {
 	for i := 0; i < len(args); i++ {
 		if value, ok := strings.CutPrefix(args[i], initChannelFlag+"="); ok {
 			f.channel, f.channelSet = value, true
+			continue
+		}
+		if value, ok := strings.CutPrefix(args[i], "--from="); ok {
+			f.from = value
 			continue
 		}
 		switch args[i] {
@@ -123,8 +159,14 @@ func parseInitFlags(args []string) initFlags {
 				i++
 			}
 		case "--extension":
+			f.extensionSet = true
 			if i+1 < len(args) {
 				f.extension = args[i+1]
+				i++
+			}
+		case "--from":
+			if i+1 < len(args) {
+				f.from = args[i+1]
 				i++
 			}
 		}
@@ -177,8 +219,20 @@ AGENTS.md tells coding agents how to work in this workspace.
 
 // resolveInitRequest validates what an init run was asked for before anything
 // is written: the starter extension, the project placement and the channel.
+// --from names the starter of a monorepo tool, which takes no project and no
+// --extension: the tool's packages are the projects.
 func resolveInitRequest(flags initFlags) (initExtensionConfig, initChannel, error) {
 	extConfig, ok := initExtensions[flags.extension]
+	if flags.from != "" {
+		source, known := initSources[flags.from]
+		if !known {
+			return initExtensionConfig{}, initChannel{}, cmderr.Usagef("unknown --from tool %q (choose: %s)", flags.from, initSourceNames())
+		}
+		if flags.project != "" || flags.projectPath != "" || flags.extensionSet {
+			return initExtensionConfig{}, initChannel{}, cmderr.Usagef("--from %s does not combine with --project, --project-path or --extension: the %s packages become the projects", flags.from, flags.from)
+		}
+		extConfig, ok = source.starter, true
+	}
 	if !ok {
 		return initExtensionConfig{}, initChannel{}, cmderr.Usagef("unknown extension %q (choose: ts, go, py)", flags.extension)
 	}
@@ -244,6 +298,11 @@ func WorkspaceInit(ctx context.Context, wsRoot string, args []string, env Lifecy
 	cwd, err := os.Getwd()
 	if err != nil {
 		return fmt.Errorf("get cwd: %w", err)
+	}
+	if source, ok := initSources[flags.from]; ok {
+		if _, err := os.Stat(filepath.Join(cwd, source.marker)); err != nil {
+			return cmderr.Usagef("putnami init --from %s runs at the root of a %s repository, and %s holds no %s", flags.from, flags.from, cwd, source.marker)
+		}
 	}
 
 	// --- Phase 1: Initialize workspace ---
@@ -388,6 +447,17 @@ func WorkspaceInit(ctx context.Context, wsRoot string, args []string, env Lifecy
 		}
 	}
 
+	// A monorepo tool's packages become the projects: the sync records the
+	// membership the extension's probe answers, then runs its sync task,
+	// which writes each package's putnami.json.
+	if flags.from != "" {
+		iox.Fprintln(os.Stdout)
+		iox.Fprintf(os.Stdout, "  → Synchronizing the %s packages…\n", flags.from)
+		if err := syncInitProjects(ctx, cwd, wsproto.Load(cwd), env); err != nil {
+			return protocolcli.WithNext(fmt.Errorf("synchronize the %s packages: %w", flags.from, err), "putnami projects sync")
+		}
+	}
+
 	// End with the lock metadata refresh `putnami install` ends with.
 	if _, err := refreshInitLockMetadata(ctx, cwd, env.CLIVersion); err != nil {
 		return protocolcli.WithNext(fmt.Errorf("refresh lock metadata: %w", err), "putnami install")
@@ -402,7 +472,10 @@ func WorkspaceInit(ctx context.Context, wsRoot string, args []string, env Lifecy
 	iox.Fprintln(os.Stdout)
 
 	iox.Fprintln(os.Stdout, "  Next:")
-	if flags.project != "" {
+	if flags.from != "" {
+		iox.Fprintln(os.Stdout, "    putnami projects list")
+		iox.Fprintln(os.Stdout, "    putnami lint,test,build --impacted")
+	} else if flags.project != "" {
 		iox.Fprintf(os.Stdout, "    putnami lint,test,build %s\n", flags.project)
 		iox.Fprintf(os.Stdout, "    putnami serve %s\n", flags.project)
 	} else {

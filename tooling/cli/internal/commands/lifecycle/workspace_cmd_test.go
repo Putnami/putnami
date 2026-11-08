@@ -33,12 +33,22 @@ func TestParseInitFlags(t *testing.T) {
 		{
 			name: "extension go",
 			args: []string{"--extension", "go"},
-			want: initFlags{extension: "go"},
+			want: initFlags{extension: "go", extensionSet: true},
 		},
 		{
 			name: "all flags",
 			args: []string{"--force", "--workspace", "my-ws", "--project", "my-app", "--project-path", "apps/my-app", "--extension", "py"},
-			want: initFlags{force: true, workspace: "my-ws", project: "my-app", projectPath: "apps/my-app", extension: "py"},
+			want: initFlags{force: true, workspace: "my-ws", project: "my-app", projectPath: "apps/my-app", extension: "py", extensionSet: true},
+		},
+		{
+			name: "from flag",
+			args: []string{"--from", "pants"},
+			want: initFlags{extension: "ts", from: "pants"},
+		},
+		{
+			name: "from flag with an equals sign",
+			args: []string{"--from=pants"},
+			want: initFlags{extension: "ts", from: "pants"},
 		},
 		{
 			name: "workspace flag",

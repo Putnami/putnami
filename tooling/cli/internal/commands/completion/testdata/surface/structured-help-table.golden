@@ -168,9 +168,10 @@ example: putnami impact-plan test,build --base origin/main --output=json
 example: putnami impact-plan lint --base 0123456789abcdef0123456789abcdef01234567 --no-cache --output=jsonl
 ═══ init ═══
 description: Initialize a new workspace
-usage: putnami init [--workspace <name>] [--extension <ts|go|py>] [--project <name>] [--project-path <path>] [--channel <channel>] [--force]
+usage: putnami init [--workspace <name>] [--extension <ts|go|py> | --from <pants>] [--project <name>] [--project-path <path>] [--channel <channel>] [--force]
 flag: --workspace | <name> | Workspace name override
 flag: --extension | <ts|go|py> | Default extension to install
+flag: --from | <pants> | Turn the repository a monorepo tool describes into a workspace: declare the tool's extension and synchronize its packages as projects
 flag: --project | <name> | Create an initial project
 flag: --project-path | <path> | Workspace-relative path for the initial project
 flag: --channel | <channel> | Resolve the extensions, the template and the starter dependencies on one release channel (default: PUTNAMI_CHANNEL, then the channel the CLI was installed from, then latest)
@@ -179,6 +180,7 @@ example: putnami init
 example: putnami init --project my-app
 example: putnami init --project my-app --project-path apps/my-app
 example: putnami init --project my-app --channel canary
+example: putnami init --from pants
 ═══ install ═══
 description: Run workspace-level installation: extensions, templates (if configured), and dependencies
 usage: putnami install [--latest]
@@ -389,9 +391,10 @@ example: putnami workspace describe
 example: putnami workspace describe --output=jsonl
 ═══ workspace init ═══
 description: Initialize a new workspace
-usage: putnami init [--workspace <name>] [--extension <ts|go|py>] [--project <name>] [--project-path <path>] [--channel <channel>] [--force]
+usage: putnami init [--workspace <name>] [--extension <ts|go|py> | --from <pants>] [--project <name>] [--project-path <path>] [--channel <channel>] [--force]
 flag: --workspace | <name> | Workspace name override
 flag: --extension | <ts|go|py> | Default extension to install
+flag: --from | <pants> | Turn the repository a monorepo tool describes into a workspace: declare the tool's extension and synchronize its packages as projects
 flag: --project | <name> | Create an initial project
 flag: --project-path | <path> | Workspace-relative path for the initial project
 flag: --channel | <channel> | Resolve the extensions, the template and the starter dependencies on one release channel (default: PUTNAMI_CHANNEL, then the channel the CLI was installed from, then latest)
@@ -400,3 +403,4 @@ example: putnami init
 example: putnami init --project my-app
 example: putnami init --project my-app --project-path apps/my-app
 example: putnami init --project my-app --channel canary
+example: putnami init --from pants
