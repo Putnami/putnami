@@ -201,12 +201,18 @@ func ProjectsSync(ctx context.Context, wsRoot string, cfg *wsproto.Config, args 
 	return nil
 }
 
-// nameCollidingMembers writes the path as the name of each new member that the
-// load refuses because it resolves to the name of another project. A member
-// that states its own name keeps it.
+// nameCollidingMembers writes the path as the name of each new member that
+// resolves to the name of another project with no provider view, as on a fresh
+// clone, which has no recorded view to tell them apart. A member that states
+// its own name keeps it.
 func nameCollidingMembers(wsRoot string, added []string) error {
 	workspace.InvalidateLoadCache(wsRoot)
-	_, err := workspace.Load(wsRoot)
+	defer workspace.InvalidateLoadCache(wsRoot)
+	ws, err := workspace.Load(wsRoot)
+	if err == nil {
+		ws.AdoptProbeViewUnvalidated(nil)
+		err = workspace.CheckDuplicateNames(ws.Projects)
+	}
 	var duplicates *workspace.DuplicateNamesError
 	if !errors.As(err, &duplicates) {
 		return nil

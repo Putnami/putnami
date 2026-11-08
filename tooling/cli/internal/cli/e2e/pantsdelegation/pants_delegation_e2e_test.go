@@ -348,4 +348,17 @@ func TestARootRequirementOrAStrayLockfileRunsThePackagesThatUseIt(t *testing.T) 
 	if code, out := clitest.RunGateArgs(t, root, "validate", "--all"); code != 0 {
 		t.Errorf("validate exit %d after the sync:\n%s", code, out)
 	}
+
+	// A member added once a provider view is recorded still gets its path as
+	// a name: a fresh clone has no view to tell src/own and tests/own apart.
+	clitest.WriteFile(t, filepath.Join(root, "tests/own/BUILD"), "python_tests()\n")
+	if code, out := clitest.RunGateArgs(t, root, "projects", "sync"); code != 0 {
+		t.Fatalf("projects sync exit %d:\n%s", code, out)
+	}
+	if err := os.RemoveAll(filepath.Join(root, ".putnami")); err != nil {
+		t.Fatal(err)
+	}
+	if code, out := clitest.RunGateArgs(t, root, "projects", "list"); code != 0 {
+		t.Errorf("a fresh clone does not load, exit %d:\n%s", code, out)
+	}
 }
