@@ -1,4 +1,4 @@
-# ADR 0005 — A delegated stack keeps its build tool's cache
+# ADR 0007 — A delegated stack keeps its build tool's cache
 
 - **Status**: accepted
 - **Date**: 2026-11-08
