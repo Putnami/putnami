@@ -6,7 +6,7 @@
     "Each Gradle project, Android included, and each Maven module that packages code is a Putnami project, with an edge to each component it depends on in the same build",
     "putnami lint, test and build run the steps of the component's build, Gradle wrapper or Maven, in its directory, and a second run over an unchanged tree is a cache hit",
     "The test task reads the JUnit reports and the JaCoCo report the build writes into the test and coverage summary",
-    "A change under src/test reruns test, never lint",
+    "A change to a lockfile reruns test and build, never lint",
     "A component overrides any value of the Java profile in its putnami.json, and the override reaches the cache key"
   ],
   "nonGoals": [
@@ -19,23 +19,23 @@
   "requirements": [
     {
       "id": "components-become-projects",
-      "text": "The probe answers, for each candidate directory the observe Gradle or Maven detector knows as a component: a project named by the Gradle path without its leading colon, ':' turned into '/', or by the Maven artifactId (no name for the Gradle root project, which keeps its directory's name), the directories of the components it depends on, the extension @putnami/java, the tag java, and metadata naming the build's reference of the component (the Gradle task path prefix, ':' for the root project and ':api:' for :api, or the Maven groupId:artifactId), its variant, the stack root '.' and the expected Java version. A directory that both builds claim is the Gradle build's. A directory with no component is no project."
+      "text": "The probe answers, for each candidate directory the observe Gradle or Maven detector knows as a component: a project named by the Gradle path without its leading colon, ':' turned into '/', or by the Maven artifactId (none for the Gradle root project), its edges, the extension, the tag java, and metadata naming the build's reference ({component}), the variant, the stack root '.' and the expected Java version. A directory both builds claim is the Gradle build's."
     },
     {
       "id": "variants-follow-the-build",
-      "text": "A Maven module is variant maven. A Gradle project whose build file applies an Android plugin or holds an android block is variant android, or android-coverage when it enables unit test coverage; any other Gradle project is gradle, or gradle-jacoco when its build file applies the jacoco plugin. Each variant is a part of the profile applied before the project's override."
+      "text": "A Maven module is variant maven. A Gradle project whose build file applies an Android plugin or holds an android block is android, or android-coverage with unit test coverage on; one that applies java-platform or version-catalog is gradle-platform; any other is gradle, or gradle-jacoco when it applies jacoco. A variant is a part of the profile applied before the project's override."
     },
     {
       "id": "tasks-run-the-profile",
-      "text": "Each task first compares java -version with the version .java-version states, in the component then at the root: a major such as 21 matches every 21.x release. It then runs the variant's steps in the component's directory with no shell: for Gradle, the root's gradlew with the component's task path ({component}check -x {component}test for lint, {component}test for test, {component}assemble for build; testDebugUnitTest and assembleDebug for Android; jacocoTestReport and createDebugUnitTestCoverageReport after the tests for the coverage variants), for Maven, mvn --batch-mode --file {root}/pom.xml --projects {component} --also-make with verify -DskipTests for lint, verify for test and package -DskipTests for build."
+      "text": "Each task first compares java -version with .java-version, in the component then at the root; a major such as 21 matches every 21.x release. It then runs the variant's steps in the component's directory with no shell: the root's gradlew with the component's task path (check, test, assemble, or their Android forms), or mvn --file {root}/pom.xml --projects {component} --also-make (verify for lint and test, package for build)."
     },
     {
       "id": "reports-become-the-summary",
-      "text": "The test task reads the JUnit reports, build/test-results/test (testDebugUnitTest for Android) or target/surefire-reports, and the JaCoCo XML report, build/reports/jacoco/test, build/reports/coverage/test/debug or target/site/jacoco, into the test and coverage summary. A component with no file under src/test expects no report. A Maven module without a JaCoCo report reads none; for the coverage variants a missing report fails the task with stacks.report_missing."
+      "text": "The test task reads the JUnit reports, build/test-results/test (testDebugUnitTest for Android) or target/surefire-reports, and the JaCoCo XML report into the test and coverage summary. A component with no file under src/test expects no report. A missing JaCoCo report is read as none, except for android-coverage, where it fails the task with stacks.report_missing."
     },
     {
-      "id": "lint-reads-main-sources",
-      "text": "The java:lint selector answers the main sources, the build files and the lint configurations, never src/test or the lockfiles, so a change under src/test or to a lockfile reruns test and build and keeps lint's key."
+      "id": "lint-skips-the-lockfiles",
+      "text": "The java:lint selector answers the sources, the build files and the lint configurations, and for Gradle the test sources a check reads, never the lockfiles: a lockfile change reruns test and build and keeps lint's key. Maven lint and build skip the test sources with -Dmaven.test.skip=true and do not read them."
     },
     {
       "id": "overrides-are-honored",

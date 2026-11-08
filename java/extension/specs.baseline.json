@@ -3,7 +3,7 @@
   "protocolVersion": 2,
   "executableRequirements": [
     "java/stack-extension#components-become-projects",
-    "java/stack-extension#lint-reads-main-sources",
+    "java/stack-extension#lint-skips-the-lockfiles",
     "java/stack-extension#manifest-follows-the-profile",
     "java/stack-extension#overrides-are-honored",
     "java/stack-extension#reports-become-the-summary",
