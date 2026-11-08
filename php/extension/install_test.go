@@ -83,6 +83,7 @@ func composerStub(t *testing.T, version string) string {
 	log := filepath.Join(bin, "composer.log")
 	writeFile(t, bin, "php", `#!/bin/sh
 if [ "$1" = "--version" ]; then echo "PHP `+version+` (cli)"; exit 0; fi
+if [ "$1" = "-r" ]; then echo "${STUB_PHP_MINOR:-8.4}"; exit 0; fi
 echo "$PWD: $*" >> "`+log+`"
 echo "cache=$COMPOSER_CACHE_DIR vendor=$COMPOSER_VENDOR_DIR network=$COMPOSER_DISABLE_NETWORK" >> "`+log+`.env"
 vendor=${COMPOSER_VENDOR_DIR:-vendor}

@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"slices"
 	"strconv"
+	"strings"
 	"syscall"
 	"time"
 
@@ -78,19 +79,20 @@ func ServeJob(stack stacks.Stack) cli.JobFunc {
 	}
 }
 
-// RunJob runs the application's entrypoint once with the arguments after `--`
-// and answers its exit code.
+// RunJob runs the application's entrypoint once with the args parameter and
+// answers its exit code.
 func RunJob(stack stacks.Stack) cli.JobFunc {
-	return func(ctx *pctx.Context, emit *jsonl.Emitter, args []string) (string, map[string]any, error) {
-		entrypoint := cli.FlagString(cli.ParseFlags(beforeSeparator(args)), "entrypoint", ctx.Params.String("entrypoint"))
+	return func(ctx *pctx.Context, emit *jsonl.Emitter, _ []string) (string, map[string]any, error) {
+		entrypoint := ctx.Params.String("entrypoint")
 		if entrypoint == "" {
 			entrypoint = defaultEntrypoint
 		}
+		arguments := strings.Fields(ctx.Params.String("args"))
 		root, err := stack.Selected(ctx, emit)
 		if err != nil {
 			return "FAILED", nil, err
 		}
-		code, _, err := runForeground(root, root.Env, append([]string{entrypoint}, afterSeparator(args)...)...)
+		code, _, err := runForeground(root, root.Env, append([]string{entrypoint}, arguments...)...)
 		if err != nil {
 			emit.DiagnosticWithCode("error", err.Error(), "", 0, 0, CodeRunFailed)
 			return "FAILED", nil, fmt.Errorf("%s: %w", CodeRunFailed, err)
@@ -103,20 +105,6 @@ func RunJob(stack stacks.Stack) cli.JobFunc {
 		}
 		return "OK", data, nil
 	}
-}
-
-func beforeSeparator(args []string) []string {
-	if i := slices.Index(args, "--"); i >= 0 {
-		return args[:i]
-	}
-	return args
-}
-
-func afterSeparator(args []string) []string {
-	if i := slices.Index(args, "--"); i >= 0 {
-		return args[i+1:]
-	}
-	return nil
 }
 
 // runForeground runs php in the project directory until it exits or the user

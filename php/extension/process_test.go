@@ -84,7 +84,7 @@ func TestRunForwardsTheExitCodeOfTheEntrypoint(t *testing.T) {
 	root := fixture(t)
 	t.Setenv("STUB_EXIT", "7")
 
-	status, data, err := runProjectJob(t, root, ".", RunJob(stack(t)), nil, "--", "cache:clear", "--env=prod")
+	status, data, err := runProjectJob(t, root, ".", RunJob(stack(t)), job.Params{"args": json.RawMessage(`"cache:clear --env=prod"`)})
 	if status != "FAILED" || err != nil || data[exitCodeKey] != 7 {
 		t.Fatalf("run: %s %v %v", status, data, err)
 	}
@@ -129,4 +129,23 @@ func TestAFailedUpgradeNamesTheComposerFailure(t *testing.T) {
 	if status != "FAILED" || err == nil || !strings.HasPrefix(err.Error(), CodeComposerUpdateFailed) {
 		t.Errorf("upgrade: %s %v", status, err)
 	}
+}
+
+func libraryContext(root string) *pctx.Context {
+	return &pctx.Context{WorkspaceRoot: root, Project: pctx.Project{Name: "lib", Path: "lib", FullPath: filepath.Join(root, "lib"), Type: "library"}}
+}
+
+// runPublish dry-runs the shared publisher: a real push is the registry's.
+func runPublish(t *testing.T, root string) (string, map[string]any, error) {
+	t.Helper()
+	devnull, err := os.Open(os.DevNull)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer devnull.Close()
+	stdout := os.Stdout
+	os.Stdout = devnull
+	defer func() { os.Stdout = stdout }()
+	ctx := &pctx.Context{WorkspaceRoot: root, Project: pctx.Project{Name: "shop", Path: "shop", FullPath: filepath.Join(root, "shop")}}
+	return PublishDockerJob()(ctx, jsonl.New(), []string{"--docker-registry", "registry.test/acme", "--dry-run"})
 }

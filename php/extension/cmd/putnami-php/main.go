@@ -33,6 +33,8 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer, runJobs func(
 				jobs[php.ServeJobName] = php.ServeJob(stack)
 				jobs[php.RunJobName] = php.RunJob(stack)
 				jobs[php.DepsUpgradeJobName] = php.DepsUpgradeJob(stack)
+				jobs[php.PackageDockerJobName] = php.PackageDockerJob(stack)
+				jobs[php.PublishDockerJobName] = php.PublishDockerJob()
 				runJobs(jobs)
 			})
 		}

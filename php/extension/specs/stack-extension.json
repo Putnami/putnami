@@ -72,7 +72,7 @@
     },
     {
       "id": "runs-an-application-once",
-      "text": "run executes php with the entrypoint flag, default bin/console, in the directory of an application after the toolchain check, passes it the arguments after --, and exits with its exit code. A library is skipped."
+      "text": "run executes php with the entrypoint flag, default bin/console, in the directory of an application after the toolchain check, passes it the words of the args flag, and exits with its exit code. A library is skipped."
     },
     {
       "id": "upgrades-the-dependencies",
