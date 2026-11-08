@@ -224,6 +224,41 @@ func TestRunRunsTheStepsAndReadsTheReports(t *testing.T) {
 	}
 }
 
+func TestRunWithAppendsTheArgumentsToTheLastStepOnly(t *testing.T) {
+	root := t.TempDir()
+	writeFile(t, root, "rust-toolchain.toml", "[toolchain]\nchannel = \"1.82.0\"\n")
+	writeFile(t, root, "crates/api/Cargo.toml", "")
+	t.Setenv("STUB_ROOT", root)
+	t.Setenv("STUB_LOG", filepath.Join(root, "log"))
+	stubTools(t, "1.82.0", junitPass)
+	s := testProfileWithLcov(t)
+	task := s.Profile.Tasks[TaskTest]
+	task.Steps = append([][]string{{"cargo", "fetch"}}, task.Steps...)
+	s.Profile.Tasks[TaskTest] = task
+	meta, _ := json.Marshal(Metadata{Component: "api", Root: "."})
+	ctx := &pctx.Context{WorkspaceRoot: root, Project: pctx.Project{FullPath: filepath.Join(root, "crates/api"), Metadata: map[string]json.RawMessage{s.Extension: meta}}}
+
+	var selected RootStep
+	var lastStep []string
+	job := s.RunWith(TaskTest, func(_ *pctx.Context, root RootStep, step []string) []string {
+		selected, lastStep = root, step
+		return []string{"--filter", "two words"}
+	})
+	if status, _, err := job(ctx, jsonl.New(), []string{"--report-dir", filepath.Join(root, "out")}); status != statusOK || err != nil {
+		t.Fatalf("status %s: %v", status, err)
+	}
+	log, _ := os.ReadFile(filepath.Join(root, "log"))
+	if strings.Contains(string(log), "cargo fetch --filter") || !strings.Contains(string(log), "lcov.info --filter two words") {
+		t.Errorf("the arguments reach the last step alone: %s", log)
+	}
+	if selected.Dir != root || selected.Project != filepath.Join(root, "crates/api") || selected.Program == nil {
+		t.Errorf("extra receives the selected root: %+v", selected)
+	}
+	if len(lastStep) < 2 || lastStep[0] != "cargo" || lastStep[1] != "test" || strings.Contains(strings.Join(lastStep, " "), "{output}") {
+		t.Errorf("extra receives the expanded last step: %q", lastStep)
+	}
+}
+
 func TestRunFailsOnAFailedTestAMismatchAndAMissingReport(t *testing.T) {
 	root := t.TempDir()
 	writeFile(t, root, "rust-toolchain.toml", "[toolchain]\nchannel = \"1.82.0\"\n")

@@ -187,6 +187,7 @@ echo "$PWD: phpstan $*" >> "`+log+`"
 		failure = `<failure type="AssertionFailedError">expected 700</failure>`
 	}
 	writeFile(t, root, "vendor/bin/phpunit", `#!/bin/sh
+case " $* " in *" --help "*) [ -n "$STUB_PHPUNIT_WITHOUT_EMPTY_SUITE_OPTION" ] || echo "  --do-not-fail-on-empty-test-suite  Do not fail"; exit 0;; esac
 echo "$PWD: phpunit $*" >> "`+log+`"
 prev=""
 for a in "$@"; do

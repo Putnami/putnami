@@ -65,7 +65,7 @@ func installDependencies(ctx context.Context, root stacks.RootStep, emit *jsonl.
 		emit.Info("offline dependencies: composer install does not run")
 		return nil
 	}
-	return composerInstall(ctx, root, emit, composerEnv(root.Env))
+	return composerInstall(ctx, root, emit, composerEnv(root.Env), false)
 }
 
 func offlineDependencies() bool {
@@ -95,9 +95,9 @@ func composerEnv(env []string) []string {
 }
 
 // composerInstall runs composer install at the stack root with env, unless the
-// last install is current.
-func composerInstall(ctx context.Context, root stacks.RootStep, emit *jsonl.Emitter, env []string) error {
-	if vendorIsCurrent(root.Dir) {
+// last install is current and force is false.
+func composerInstall(ctx context.Context, root stacks.RootStep, emit *jsonl.Emitter, env []string, force bool) error {
+	if !force && vendorIsCurrent(root.Dir) {
 		return nil
 	}
 	phar, err := provideComposer(ctx)

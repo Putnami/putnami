@@ -25,13 +25,13 @@ const Param = "docs-links"
 // declares the workspace input `git:**` and is cached on it: deleting a link
 // target, renaming it or editing a heading an anchor names moves the key, and
 // an ignored file does not.
-func Job() cli.JobFunc {
+func Job(markers ...string) cli.JobFunc {
 	return func(ctx *pctx.Context, emit *jsonl.Emitter, _ []string) (string, map[string]any, error) {
 		if !ctx.Params.Bool(Param, true) {
 			return "SKIP", nil, nil
 		}
 		emit.PhaseStart(Code)
-		findings, err := CheckProject(ctx.WorkspaceRoot, ctx.Project.FullPath)
+		findings, err := CheckProject(ctx.WorkspaceRoot, ctx.Project.FullPath, markers...)
 		if err != nil {
 			emit.PhaseEnd(Code, "failed")
 			return "FAILED", nil, protocolcli.Classify(fmt.Errorf("check documentation links: %w", err),

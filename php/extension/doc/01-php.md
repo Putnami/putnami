@@ -53,7 +53,7 @@ projects, except the projects `disable.tags` excludes:
 | Job | What it does |
 |---|---|
 | `workspace-fetch` | Downloads the packages of each stack root's `composer.lock` into the extension's Composer cache. It uses `--no-scripts`, `--no-plugins` and a private vendor directory, so it runs no package code and writes nothing in the repository. A stack root with no `composer.lock` is skipped. |
-| `workspace-install` | Runs `composer install` at each stack root, except one whose last successful install used its current `composer.json` and `composer.lock`. With offline dependencies, such as in a hosted run, it installs from the Composer cache with the network disabled. |
+| `workspace-install` | Runs `composer install` at each stack root, except one whose last successful install used its current `composer.json` and `composer.lock`; `--force` installs that root as well. With offline dependencies, such as in a hosted run, it installs from the Composer cache with the network disabled. |
 
 With no PHP on the machine, both warn and pass. A hosted run installs no
 toolchain, so its runner needs a PHP on `PATH`.
@@ -93,6 +93,18 @@ stack root and `{output}` the task's output directory.
 | `test` | `php -d xdebug.mode=coverage -d pcov.directory={root} -d pcov.exclude=~/vendor/~ {root}/vendor/bin/phpunit --log-junit {output}/junit.xml --coverage-clover {output}/clover.xml --coverage-filter src tests` |
 
 There is no build task: PHP has no compile step.
+
+`putnami test --test <filter>`, short `-t`, adds `--filter <filter>` to
+PHPUnit, as one argument at the end of the task's last step. A team that overrides the test
+steps gets the filter on its own last step. A project in which the filter
+selects no test passes, because the filter also reaches the projects the
+selected ones depend on. The extension adds
+`--do-not-fail-on-empty-test-suite` when the help of the last step's program
+lists the option; an older PHPUnit keeps its own default for such a project.
+
+`putnami lint` also checks every relative link and anchor of the project's
+`README.md` files and `doc/` trees, and a broken one fails it. `--docs-links=false`
+turns the check off.
 
 ## Run an application
 

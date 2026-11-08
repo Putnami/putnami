@@ -40,9 +40,16 @@ func WorkspaceFetchJob(stack stacks.Stack) cli.JobFunc {
 	}
 }
 
-// WorkspaceInstallJob runs composer install at each stack root.
+// WorkspaceInstallJob runs composer install at each stack root. The force flag
+// installs a root even when its last install is current.
 func WorkspaceInstallJob(stack stacks.Stack) cli.JobFunc {
-	return stack.WorkspaceRootJob(stacks.WarnOnMissingToolchain, installWorkspaceRoot)
+	return func(ctx *pctx.Context, emit *jsonl.Emitter, args []string) (string, map[string]any, error) {
+		force := ctx.Params.Bool("force", false)
+		install := func(ctx context.Context, root stacks.RootStep, emit *jsonl.Emitter) error {
+			return installWorkspaceRoot(ctx, root, emit, force)
+		}
+		return stack.WorkspaceRootJob(stacks.WarnOnMissingToolchain, install)(ctx, emit, args)
+	}
 }
 
 // fetchPackages runs composer install into a private vendor directory it then
@@ -75,7 +82,7 @@ func fetchPackages(ctx context.Context, root stacks.RootStep, emit *jsonl.Emitte
 
 // installWorkspaceRoot installs one stack root. Offline, Composer reads its
 // cache alone, so a root without a composer.lock has nothing it can install.
-func installWorkspaceRoot(ctx context.Context, root stacks.RootStep, emit *jsonl.Emitter) error {
+func installWorkspaceRoot(ctx context.Context, root stacks.RootStep, emit *jsonl.Emitter, force bool) error {
 	if err := prepareWindowsPHP(root, emit); err != nil {
 		return err
 	}
@@ -83,7 +90,7 @@ func installWorkspaceRoot(ctx context.Context, root stacks.RootStep, emit *jsonl
 		emit.DiagnosticWithCode("warning", "no "+composerLock+" in "+root.Dir+": an offline install has nothing to install", "", 0, 0, CodeComposerInstallFailed)
 		return nil
 	}
-	return composerInstall(ctx, root, emit, composerEnv(root.Env))
+	return composerInstall(ctx, root, emit, composerEnv(root.Env), force)
 }
 
 func hasLock(dir string) bool {

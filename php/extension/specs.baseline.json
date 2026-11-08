@@ -2,9 +2,11 @@
   "$schema": "https://putnami.dev/schemas/putnami-specs-baseline.json",
   "protocolVersion": 2,
   "executableRequirements": [
+    "php/stack-extension#checks-documentation-links",
     "php/stack-extension#components-become-projects",
     "php/stack-extension#coverage-driver-is-optional",
     "php/stack-extension#fetches-the-locked-packages",
+    "php/stack-extension#filters-the-tests",
     "php/stack-extension#inputs-per-task",
     "php/stack-extension#installs-its-dependencies",
     "php/stack-extension#machine-php-comes-first",
