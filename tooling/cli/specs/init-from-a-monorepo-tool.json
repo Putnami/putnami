@@ -21,6 +21,6 @@
     }
   ],
   "decisions": [
-    "tooling/stacks/doc/adr/0002-a-delegated-stack-keeps-its-tool-cache.md"
+    "tooling/stacks/doc/adr/0005-a-delegated-stack-keeps-its-tool-cache.md"
   ]
 }

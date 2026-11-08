@@ -191,7 +191,7 @@ func TestCheckManifestHoldsADelegatedStackUncached(t *testing.T) {
 		}, "uncached"},
 		"a single step": {func(m map[string]any) {
 			obj(m, "commands", "lint")["run"] = obj(m, "commands", "lint")["run"].([]any)[1:]
-		}, "want 2 step(s)"},
+		}, "want the graph step then the lint step"},
 	} {
 		if r := checkProfile(t, delegate(c.edit), delegated); !strings.Contains(strings.Join(r.errors, "\n"), c.want) {
 			t.Errorf("%s: errors %v, want one with %q", name, r.errors, c.want)
