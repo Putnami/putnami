@@ -236,13 +236,13 @@ func TestTheSyncWritesEachPackagePutnamiJSONFromTheExport(t *testing.T) {
 		t.Errorf("result %+v, want %v written from the export", result, want)
 	}
 	api := readProjectFile(t, root, "src/python/api")
-	if !reflect.DeepEqual(api, map[string]any{"$schema": ProjectSchema, "extensions": []any{ExtensionName}, "dependencies": []any{"/src/python/pricing"}}) {
+	if !reflect.DeepEqual(api, map[string]any{"$schema": ProjectSchema, "extensions": []any{ExtensionName}, "dependencies": []any{"/3rdparty/python", "/src/python/pricing"}}) {
 		t.Errorf("api = %v", api)
 	}
 	// An existing file keeps what the sync does not own; a stale Pants edge
 	// and a disabled test of a tested package go.
 	web := readProjectFile(t, root, "src/python/web")
-	want := map[string]any{"name": "storefront", "extensions": []any{ExtensionName}, "dependencies": []any{"@acme/design"}, "disable": map[string]any{"jobs": []any{"publish"}}}
+	want := map[string]any{"name": "storefront", "extensions": []any{ExtensionName}, "dependencies": []any{"/3rdparty/python", "@acme/design"}, "disable": map[string]any{"jobs": []any{"publish"}}}
 	if !reflect.DeepEqual(web, want) {
 		t.Errorf("web = %v, want %v", web, want)
 	}
@@ -282,7 +282,7 @@ func TestTheSyncRunsPantsPeekWithoutAnExport(t *testing.T) {
 	if err != nil || result.Export != "pants peek ::" || len(result.Written) != 3 {
 		t.Fatalf("result %+v, err %v", result, err)
 	}
-	if deps := readProjectFile(t, root, "src/python/api")["dependencies"]; !reflect.DeepEqual(deps, []any{"/src/python/pricing"}) {
+	if deps := readProjectFile(t, root, "src/python/api")["dependencies"]; !reflect.DeepEqual(deps, []any{"/3rdparty/python", "/src/python/pricing"}) {
 		t.Errorf("api dependencies = %v", deps)
 	}
 	if log := stubLog(t); len(log) != 1 || !strings.HasSuffix(log[0], " pants peek ::") {
@@ -419,7 +419,7 @@ func TestTheSyncRetractsAFormerPackage(t *testing.T) {
 	if legacy := readProjectFile(t, root, "src/python/legacy"); !reflect.DeepEqual(legacy, map[string]any{"name": "legacy", "extensions": []any{"@acme/lint"}, "dependencies": []any{"@acme/design"}}) {
 		t.Errorf("legacy = %v, want the extension and its Pants edges gone", legacy)
 	}
-	if deps := readProjectFile(t, root, "src/python/api")["dependencies"]; !reflect.DeepEqual(deps, []any{"/src/python/pricing", "@acme/design"}) {
+	if deps := readProjectFile(t, root, "src/python/api")["dependencies"]; !reflect.DeepEqual(deps, []any{"/3rdparty/python", "/src/python/pricing", "@acme/design"}) {
 		t.Errorf("api dependencies = %v, want the export's edge and the non-Pants one", deps)
 	}
 	if !strings.Contains(syncSummary(result), "1 former packages retracted") {
@@ -431,7 +431,7 @@ func TestTheSyncLeavesAFileWhoseOwnedMembersAreCurrent(t *testing.T) {
 	d := readDemo(t)
 	t.Setenv("PATH", t.TempDir())
 	root := repository(t, d, true)
-	handWritten := "{\n    \"name\": \"web\",\n    \"extensions\": [\"@putnami/pants\"],\n    \"options\": {\"ratio\": 1.0, \"big\": 12345678901234567890}\n}\n"
+	handWritten := "{\n    \"name\": \"web\",\n    \"extensions\": [\"@putnami/pants\"],\n    \"dependencies\": [\"/3rdparty/python\"],\n    \"options\": {\"ratio\": 1.0, \"big\": 12345678901234567890}\n}\n"
 	writeFile(t, root, "src/python/web/putnami.json", handWritten)
 	if _, err := Sync(context.Background(), root, &bytes.Buffer{}); err != nil {
 		t.Fatal(err)

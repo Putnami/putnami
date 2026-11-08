@@ -48,13 +48,14 @@ the extension and the packages it depends on:
 {
   "$schema": "https://putnami.dev/schemas/putnami-project.json",
   "extensions": ["@putnami/pants"],
-  "dependencies": ["/src/python/pricing"]
+  "dependencies": ["/3rdparty/python", "/src/python/pricing"]
 }
 ```
 
 A package is a directory whose `BUILD` file declares a first-party target.
 `3rdparty/python`, which only declares requirements, joins the workspace as a
-bare member that runs nothing. A package with no test target also gets
+bare member that runs nothing; each package that uses its requirements depends
+on it. A package with no test target also gets
 `"disable": { "jobs": ["test"] }`. Add `.putnami/` and `.gen/` to
 `.gitignore`, then commit the files: they are the package graph Putnami
 selects on. Run `putnami projects sync` again after a change to the
@@ -91,8 +92,12 @@ and its result records `delegatedTo: pants`. `putnami lint` runs `pants lint`
 and `putnami build` runs `pants package` the same way. Putnami stores no cache
 entry for them: a package Pants has cached returns as fast as Pants does.
 
-A change to third-party requirements or to a resolve lockfile runs no package:
-run `putnami test --all` after one.
+A change to third-party requirements or to a resolve lockfile runs the
+packages that depend on them.
+
+If the first sync fails with a duplicate project name, two `BUILD` directories
+share a directory name: give one a name in a `putnami.json` of its own, such as
+`{ "name": "3rdparty/python" }`, and run `putnami projects sync` again.
 
 ### When the repository is not Python
 

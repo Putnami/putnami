@@ -25,9 +25,17 @@ A package is a directory whose `BUILD` or `BUILD.pants` file declares a
 first-party target. Every other directory with a `BUILD` file, one that
 declares only third-party targets such as `python_requirements` or only
 `__defaults__`, and the repository root, is a bare member: a project named by
-its directory, with no extension, that runs no task. A change to it runs no
-package, so a change to `3rdparty/python/requirements.txt` or to a resolve
-lockfile reruns nothing: run `putnami test --all` after one.
+its directory, with no extension, that runs no task. The sync writes an edge
+from each package to the third-party directories it depends on, so a change to
+`3rdparty/python/requirements.txt` or to a resolve lockfile runs the packages
+that use them.
+
+Before its first sync, a workspace names each member by its directory name.
+When two `BUILD` directories share one, such as `3rdparty/python` and a
+`src/python` that holds only `__defaults__`, the first `putnami projects sync`
+fails with a duplicate project name: give one of them a name in a
+`putnami.json` of its own, such as `{ "name": "3rdparty/python" }`, and run it
+again.
 
 Add `.putnami/` and `.gen/` to the repository's `.gitignore`: `init` writes one
 only when the repository has none.
@@ -41,7 +49,7 @@ writes in each package's `putnami.json`:
 | Member | Value |
 |---|---|
 | `extensions` | `@putnami/pants`, beside any other extension the file names |
-| `dependencies` | The project ID of each package the export says it depends on, such as `/src/python/pricing`; a dependency on a project that is no Pants package is kept |
+| `dependencies` | The project ID of each package, and of each third-party directory, the export says it depends on, such as `/src/python/pricing` and `/3rdparty/python`; a dependency on a project with no `BUILD` file is kept |
 | `disable.jobs` | `test` when none of the package's targets is a test target (a type that ends in `_test` or `_tests`, or a `go_package` with a `_test.go` source), so a package without tests runs no test task; the sync owns this entry and removes it from a package that has a test target |
 
 It keeps every other member, and rewrites a file only when a member it owns

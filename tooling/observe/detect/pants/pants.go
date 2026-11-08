@@ -100,7 +100,11 @@ type Detection struct {
 	// Tested lists, sorted, the ids of the components that hold a test
 	// target: a target type that ends in _test or _tests, or a go_package
 	// with a _test.go source.
-	Tested      []string
+	Tested []string
+	// Requires maps the id of each component to the directories, sorted, of
+	// the third-party and internal targets it depends on in the export, such
+	// as a requirement or a resolve lockfile; empty without an export.
+	Requires    map[string][]string
 	Diagnostics []diag.Diagnostic
 }
 
@@ -155,7 +159,7 @@ func Detect(root string, opts Options) Detection {
 	if !filepath.IsAbs(file) {
 		file = filepath.Join(root, filepath.FromSlash(file))
 	}
-	components, tested, diags, ok := fromGraph(root, file, graphFile, opts.GraphFile != "")
+	components, tested, requires, diags, ok := fromGraph(root, file, graphFile, opts.GraphFile != "")
 	out.Diagnostics = append(out.Diagnostics, diags...)
 	if !ok {
 		components, tested, diags = fromBuildFiles(root)
@@ -163,6 +167,7 @@ func Detect(root string, opts Options) Detection {
 	}
 	out.Components = components
 	out.Tested = tested
+	out.Requires = requires
 	return out
 }
 
@@ -179,20 +184,20 @@ type target struct {
 // fromGraph reads the export at file, named graphFile in diagnostics. It
 // reports ok=false when there is no usable export. A missing export is an info
 // diagnostic, and a warning when the caller named it.
-func fromGraph(root, file, graphFile string, named bool) ([]Component, []string, []diag.Diagnostic, bool) {
+func fromGraph(root, file, graphFile string, named bool) ([]Component, []string, map[string][]string, []diag.Diagnostic, bool) {
 	info, err := os.Stat(file)
 	if errors.Is(err, fs.ErrNotExist) {
 		severity := diag.Info
 		if named {
 			severity = diag.Warning
 		}
-		return nil, nil, []diag.Diagnostic{{
+		return nil, nil, nil, []diag.Diagnostic{{
 			Severity: severity, Code: CodeGraphMissing, Field: graphFile,
 			Message: fmt.Sprintf("no Pants export at %s, so the components have no edge: write it in the CI with `%s`, or name it with --pants-graph", graphFile, ExportCommand),
 		}}, false
 	}
-	unreadable := func(format string, args ...any) ([]Component, []string, []diag.Diagnostic, bool) {
-		return nil, nil, []diag.Diagnostic{diag.Warningf(CodeGraphUnreadable, graphFile,
+	unreadable := func(format string, args ...any) ([]Component, []string, map[string][]string, []diag.Diagnostic, bool) {
+		return nil, nil, nil, []diag.Diagnostic{diag.Warningf(CodeGraphUnreadable, graphFile,
 			format+"; the BUILD files answer instead, with no edge", args...)}, false
 	}
 	if err != nil {
@@ -219,6 +224,7 @@ func fromGraph(root, file, graphFile string, named bool) ([]Component, []string,
 	g := graph{root: root, targets: byAddress}
 	edges := map[string]map[string]bool{}
 	tested := map[string]bool{}
+	requires := map[string]map[string]bool{}
 	var diags []diag.Diagnostic
 	for _, t := range targets {
 		if !firstParty(t.TargetType) {
@@ -237,6 +243,12 @@ func fromGraph(root, file, graphFile string, named bool) ([]Component, []string,
 		}
 		for _, dep := range t.Dependencies {
 			if known, listed := byAddress[dep]; listed && !firstParty(known.TargetType) {
+				if target, ok := g.dir(dep); ok && target != dir {
+					if requires[dir] == nil {
+						requires[dir] = map[string]bool{}
+					}
+					requires[dir][target] = true
+				}
 				continue
 			}
 			if target, ok := g.dir(dep); ok && target != dir {
@@ -258,7 +270,11 @@ func fromGraph(root, file, graphFile string, named bool) ([]Component, []string,
 		out = append(out, c)
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].ID < out[j].ID })
-	return out, sortedKeys(tested), diags, true
+	required := make(map[string][]string, len(requires))
+	for dir, targets := range requires {
+		required[dir] = sortedKeys(targets)
+	}
+	return out, sortedKeys(tested), required, diags, true
 }
 
 func sortedKeys(set map[string]bool) []string {

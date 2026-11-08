@@ -347,3 +347,11 @@ func TestTestedNamesTheComponentsWithATestTarget(t *testing.T) {
 		t.Errorf("tested from the BUILD files = %v, want %v", Detect(root, Options{}).Tested, want)
 	}
 }
+
+func TestRequiresNamesTheThirdPartyDirectoriesOfEachComponent(t *testing.T) {
+	root := writeTree(t, map[string]string{"pants.toml": pantsTOML, DefaultGraphFile: export})
+	want := map[string][]string{"src/python/api": {"3rdparty/python"}, "src/python/pricing": {"3rdparty/python"}}
+	if got := Detect(root, Options{}).Requires; !reflect.DeepEqual(got, want) {
+		t.Errorf("requires = %v, want %v", got, want)
+	}
+}

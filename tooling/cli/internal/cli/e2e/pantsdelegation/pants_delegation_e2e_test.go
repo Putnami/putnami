@@ -216,7 +216,7 @@ func TestAChangeToOnePantsPackageRunsItAndItsDependentsThroughPants(t *testing.T
 	if err != nil || json.Unmarshal(data, &api) != nil {
 		t.Fatalf("the sync wrote no putnami.json for api: %v\n%s", err, data)
 	}
-	if !slices.Equal(api.Extensions, []string{"@putnami/pants"}) || !slices.Equal(api.Dependencies, []string{"/src/python/pricing"}) {
+	if !slices.Equal(api.Extensions, []string{"@putnami/pants"}) || !slices.Equal(api.Dependencies, []string{"/3rdparty/python", "/src/python/pricing"}) {
 		t.Errorf("api putnami.json = %s", data)
 	}
 	clitest.InitGitRepo(t, root)
@@ -244,9 +244,28 @@ func TestAChangeToOnePantsPackageRunsItAndItsDependentsThroughPants(t *testing.T
 		t.Fatal(err)
 	}
 	clitest.WriteFile(t, main, string(data)+"\n# a change to api alone\n")
-	commit(t, root, "change api")
-	tested, out = pantsTests(t, root, head, log)
+	head = commit(t, root, "change api")
+	tested, out = pantsTests(t, root, parentOf(t, root, head), log)
 	if want := []string{"src/python/api:"}; !slices.Equal(tested, want) {
 		t.Errorf("pants test ran on %v, want %v: a dependency runs no pants\n%s", tested, want, out)
 	}
+
+	// A change to the requirements and the resolve lockfile runs every
+	// package that depends on them.
+	for rel, content := range demo["head"] {
+		if strings.HasPrefix(rel, "3rdparty/") {
+			clitest.WriteFile(t, filepath.Join(root, rel), content)
+		}
+	}
+	commit(t, root, "bump fastapi")
+	tested, out = pantsTests(t, root, head, log)
+	if want := []string{"src/python/api:", "src/python/pricing:", "src/python/web:"}; !slices.Equal(tested, want) {
+		t.Errorf("pants test ran on %v, want %v: the packages that depend on the lockfile\n%s", tested, want, out)
+	}
+}
+
+// parentOf is the parent commit of head.
+func parentOf(t *testing.T, root, head string) string {
+	t.Helper()
+	return strings.TrimSpace(clitest.GitOutput(t, root, "rev-parse", head+"~1"))
 }

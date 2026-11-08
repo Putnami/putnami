@@ -49,7 +49,9 @@ type SyncResult struct {
 
 // Sync writes the package graph of the Pants repository at root into each
 // component's putnami.json: the extension, the edges of the export as project
-// IDs, and test in disable.jobs when the component holds no test target. The
+// IDs, to the other components and to the directories of the third-party
+// targets it depends on, and test in disable.jobs when the component holds no
+// test target. The
 // edges come from the export pants-graph.json at the root, or from pants
 // peek :: when there is none. Without either it writes nothing: the result's
 // Export is empty. A root without pants.toml is no Pants repository and gets
@@ -110,7 +112,7 @@ func Sync(ctx context.Context, root string, stderr io.Writer) (SyncResult, error
 			continue
 		}
 		var deps []string
-		for _, d := range withoutRoot(c.DependsOn) {
+		for _, d := range withoutRoot(append(slices.Clone(c.DependsOn), detection.Requires[c.ID]...)) {
 			deps = append(deps, wsproto.ProjectIDFromPath(d))
 		}
 		file := filepath.Join(root, filepath.FromSlash(c.ID), wsproto.ConfigFilename)
@@ -208,14 +210,18 @@ func clone(doc map[string]any) map[string]any {
 }
 
 // keepDependency reports whether the sync keeps a dependency it does not
-// write: one on a project that is no Pants package, current or former, and
-// whose directory, for a project ID, still exists.
+// write: one on a project that is no Pants package, current or former, and,
+// for a project ID, whose directory exists and holds no BUILD file.
 func keepDependency(root, dep string, components map[string]bool) bool {
 	if components[dep] {
 		return false
 	}
 	if rel, ok := strings.CutPrefix(dep, "/"); ok {
-		if _, err := os.Stat(filepath.Join(root, filepath.FromSlash(rel))); errors.Is(err, os.ErrNotExist) {
+		dir := filepath.Join(root, filepath.FromSlash(rel))
+		if _, err := os.Stat(dir); errors.Is(err, os.ErrNotExist) {
+			return false
+		}
+		if buildFile(root, rel) != "" {
 			return false
 		}
 	}
