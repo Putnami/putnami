@@ -1,0 +1,12 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-specs-baseline.json",
+  "protocolVersion": 2,
+  "executableRequirements": [
+    "php/stack-extension#components-become-projects",
+    "php/stack-extension#inputs-per-task",
+    "php/stack-extension#manifest-follows-the-profile",
+    "php/stack-extension#overrides-are-honored",
+    "php/stack-extension#reports-become-the-summary",
+    "php/stack-extension#tasks-run-the-profile"
+  ]
+}

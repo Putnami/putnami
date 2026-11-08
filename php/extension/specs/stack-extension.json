@@ -1,0 +1,48 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-spec.json",
+  "protocolVersion": 1,
+  "feature": "php/stack-extension",
+  "outcomes": [
+    "Each component of a Composer repository, such as a Symfony application and the packages beside it, is a Putnami project named by its package, with an edge to each package it requires through a path repository",
+    "putnami lint and test run the PHP profile's PHPStan and PHPUnit steps in each component's directory, and a second run over an unchanged tree is a cache hit",
+    "The test task reads the PHPUnit JUnit and Clover reports into the test and coverage summary, each case naming its test file and each covered file a file of the repository",
+    "A change to a component's tests reruns its test task and not its lint task",
+    "A component overrides any value of the PHP profile in its putnami.json, and the override reaches the cache key"
+  ],
+  "nonGoals": [
+    "Installing or switching PHP, running composer install, or installing PHPStan, PHP-CS-Fixer or a coverage driver: the toolchain check compares and never installs",
+    "A build task: PHP has no compile step, and a release goes through Packagist",
+    "A component whose Composer build is neither the workspace root's nor its own: it is left out with stacks.stack_root_unsupported",
+    "Packages a Composer registry provides, VCS repositories, and choosing between PHPStan and PHP-CS-Fixer from what a repository installs: a team that lints with PHP-CS-Fixer overrides the lint steps"
+  ],
+  "requirements": [
+    {
+      "id": "components-become-projects",
+      "text": "The probe answers, for each candidate directory the observe Composer detector knows as a component: its package name, the directories of the components it requires through a path repository, the extension @putnami/php, the tag php, and metadata naming the package, its stack root (the workspace root for the root manifest and for a package a path repository of the root composer.json provides, its own directory otherwise) and the expected PHP version. A directory with no composer.json is no project."
+    },
+    {
+      "id": "tasks-run-the-profile",
+      "text": "Each task first compares the version php --version prints with the version .php-version states, or else the range require.php of composer.json states, in the component then at its stack root. A version outside that version or range fails with stacks.toolchain_mismatch unless toolchain.check is warn; a missing php fails with stacks.toolchain_missing. lint then runs the stack root's vendor/bin/phpstan analyse on src, and test runs the stack root's vendor/bin/phpunit on tests, with coverage limited to src and the JUnit and Clover reports written to the task output, each in the component's directory with no shell, one task at a time per stack root. A step that exits non-zero fails with stacks.step_failed. The profile declares no build task and the extension no build command."
+    },
+    {
+      "id": "reports-become-the-summary",
+      "text": "After its steps, the test task reads the PHPUnit JUnit and Clover reports of its output directory through the evidence readers into the test and coverage summary. A failed case fails the task with stacks.test_failed; a JUnit or Clover pattern that matches no report fails it with stacks.report_missing."
+    },
+    {
+      "id": "inputs-per-task",
+      "text": "The php:lint selector answers the component's src files, its composer.json and its PHPStan and PHP-CS-Fixer configuration, and never its tests or composer.lock; php:test adds its tests, its Symfony config, templates, translations and migrations, its PHPUnit configuration, .env and .env.test, and composer.lock. Each task's stack-root files are the root composer.json, and for test the root composer.lock, besides the toolchain files."
+    },
+    {
+      "id": "overrides-are-honored",
+      "text": "options[\"@putnami/php\"] in a component's own putnami.json overrides the profile: an object merges, any other value replaces the profile's whole. The steps run and the files the php:<task> selectors answer follow the resolved profile, and putnami.json is an input of every task. An unknown member, a change to id or markers, or a stack-root input the manifest does not declare fails the task with stacks.project_config_invalid."
+    },
+    {
+      "id": "manifest-follows-the-profile",
+      "text": "The manifest passes the stack core's conformance kit: its markers are the profile's, it lists the php:lint and php:test selectors, and each command runs one task that depends on the same task upstream, reads its selector and the profile's stack-root files for that task, and declares its command-output reports directory."
+    }
+  ],
+  "decisions": [
+    "tooling/stacks/doc/adr/0001-one-extension-per-stack-on-a-shared-core.md",
+    "tooling/stacks/doc/adr/0002-a-stated-version-range-is-checked.md"
+  ]
+}
