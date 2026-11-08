@@ -597,3 +597,35 @@ func TestOnlyAnAppliedPluginMakesAnApplication(t *testing.T) {
 		}
 	}
 }
+
+func TestAPluginDeclaredApplyFalseIsNotApplied(t *testing.T) {
+	spectest.Proves(t, feature, "components-become-projects", "the-gradle-projects-and-maven-modules-become-projects-with-their-edges")
+	for build, want := range map[string]string{
+		"plugins {\n    id 'org.springframework.boot' version '3.5.16' apply false\n    id 'io.spring.dependency-management' version '1.1.7'\n    id 'java'\n}\n": TypeLibrary,
+		"plugins {\n    alias(libs.plugins.spring.boot) apply false\n    `java-library`\n}\n":                                                                     TypeLibrary,
+		"plugins {\n    id(\"application\") apply false\n}\n":                                                                                                     TypeLibrary,
+		"plugins {\n    id 'org.springframework.boot' version '3.5.16'\n}\n":                                                                                      TypeApplication,
+	} {
+		if got := gradleType(stripComments(build)); got != want {
+			t.Errorf("%q = %s, want %s", build, got, want)
+		}
+	}
+}
+
+func TestARootBuildMayListModulesUnderSrc(t *testing.T) {
+	spectest.Proves(t, feature, "nested-builds-are-stack-roots", "nested-gradle-and-maven-builds-are-their-components-stack-roots")
+	maven := t.TempDir()
+	writeFile(t, maven, "pom.xml", `<project><groupId>com.acme</groupId><artifactId>shop</artifactId><packaging>pom</packaging><modules><module>src/backend</module></modules></project>`)
+	writeFile(t, maven, "src/backend/pom.xml", `<project><parent><groupId>com.acme</groupId></parent><artifactId>backend</artifactId></project>`)
+	if got := probe(t, maven, ".", "src/backend"); len(got) != 1 || metadata(t, got["src/backend"]).Root != "." {
+		t.Errorf("a module the root lists under src = %+v", got)
+	}
+	gradleRoot := t.TempDir()
+	writeFile(t, gradleRoot, "settings.gradle", "include 'src:api'\n")
+	writeFile(t, gradleRoot, "build.gradle", "plugins { id 'base' }\n")
+	writeFile(t, gradleRoot, "src/api/build.gradle", "plugins { id 'java' }\n")
+	// The root holds src/, so the Gradle detector also makes it a project.
+	if got := probe(t, gradleRoot, ".", "src/api"); len(got) != 2 || metadata(t, got["src/api"]).Component != ":src:api:" || metadata(t, got["src/api"]).Root != "." {
+		t.Errorf("a project the root includes under src = %+v", got)
+	}
+}

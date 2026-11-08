@@ -65,10 +65,16 @@ func Detect(root string, request wsproto.ProbeRequest) ([]stacks.Component, []di
 	mavenRoots := map[string]bool{}
 	for _, p := range request.Paths {
 		dir, ok := wsproto.NormalizeProbePath(p)
-		if !ok || underSourcesOrOutputs(root, dir) {
+		if !ok {
 			continue
 		}
 		asked[dir] = true
+		// A build file under another build's sources or outputs, such as an
+		// invoker test, roots no build of its own; a module the outer build
+		// lists there stays one of its components.
+		if underSourcesOrOutputs(root, dir) {
+			continue
+		}
 		if r, ok := gradleBuildRoot(root, dir); ok {
 			gradleRoots[r] = true
 		}
