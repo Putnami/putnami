@@ -63,8 +63,8 @@ func TestTheExtensionPinsAPHPReleaseTheRepositoryAccepts(t *testing.T) {
 		t.Errorf("a component's statement narrows the pin: %s", got)
 	}
 	writeFile(t, nested, "services/web/composer.json", `{"require": {"php": ">=8.5"}}`)
-	if got := version(resolved(t, nested, "linux/amd64", "")); got != "8.3.32" {
-		t.Errorf("a statement that would leave no release is not applied: %s", got)
+	if got := version(resolved(t, nested, "linux/amd64", "")); got != "8.4.23" {
+		t.Errorf("components with no common release leave the root's choice: %s", got)
 	}
 
 	root := t.TempDir()

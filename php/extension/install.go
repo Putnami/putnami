@@ -14,7 +14,6 @@ import (
 
 	extensionproto "go.putnami.dev/protocol/extension"
 	"go.putnami.dev/sdk/extension/cli"
-	pctx "go.putnami.dev/sdk/extension/context"
 	"go.putnami.dev/sdk/extension/jsonl"
 	"go.putnami.dev/sdk/extension/pinnedarchive"
 	"go.putnami.dev/sdk/extension/putnamihome"
@@ -50,19 +49,23 @@ var composerSHA256 = "6f1b891e1d4927d62740276c540fb490e47689e19e102c49e8da849794
 var composerURL = "https://getcomposer.org/download/" + composerVersion + "/composer.phar"
 
 // InstallJob is the job of a component's install step: composer install at its
-// stack root. A run whose dependencies are offline installs nothing.
+// stack root.
 func InstallJob(stack stacks.Stack) cli.JobFunc {
-	job := stack.RootJob(installDependencies)
-	return func(ctx *pctx.Context, emit *jsonl.Emitter, args []string) (string, map[string]any, error) {
-		if os.Getenv(extensionproto.OfflineDependenciesEnv) == "1" {
-			emit.Info("offline dependencies: composer install does not run")
-			return "OK", nil, nil
-		}
-		return job(ctx, emit, args)
-	}
+	return stack.RootJob(installDependencies)
 }
 
+// installDependencies prepares the selected PHP, then runs composer install
+// unless the dependencies are offline or the last install is current.
 func installDependencies(ctx context.Context, root stacks.RootStep, emit *jsonl.Emitter) error {
+	program := root.Program("php")
+	if err := enableWindowsExtensions(program); err != nil {
+		emit.DiagnosticWithCode("error", err.Error(), "", 0, 0, CodeComposerInstallFailed)
+		return fmt.Errorf("%s: %w", CodeComposerInstallFailed, err)
+	}
+	if os.Getenv(extensionproto.OfflineDependenciesEnv) == "1" {
+		emit.Info("offline dependencies: composer install does not run")
+		return nil
+	}
 	if vendorIsCurrent(root.Dir) {
 		return nil
 	}
@@ -71,8 +74,8 @@ func installDependencies(ctx context.Context, root stacks.RootStep, emit *jsonl.
 		emit.DiagnosticWithCode("error", err.Error(), "", 0, 0, CodeComposerInstallFailed)
 		return fmt.Errorf("%s: %w", CodeComposerInstallFailed, err)
 	}
-	program := root.Program("php")
-	if err := enableWindowsExtensions(program); err != nil {
+	// A run that stops partway must not pass for the last finished install.
+	if err := os.Remove(filepath.Join(root.Dir, "vendor", installedMarker)); err != nil && !os.IsNotExist(err) {
 		emit.DiagnosticWithCode("error", err.Error(), "", 0, 0, CodeComposerInstallFailed)
 		return fmt.Errorf("%s: %w", CodeComposerInstallFailed, err)
 	}
@@ -87,7 +90,11 @@ func installDependencies(ctx context.Context, root stacks.RootStep, emit *jsonl.
 		emit.DiagnosticWithCode("error", fmt.Sprintf("composer install in %s: %v", root.Dir, err), "", 0, 0, CodeComposerInstallFailed)
 		return fmt.Errorf("%s: %w", CodeComposerInstallFailed, err)
 	}
-	return recordInstall(root.Dir)
+	if err := recordInstall(root.Dir); err != nil {
+		// Composer's vendor directory is configurable: the next run installs again.
+		emit.DiagnosticWithCode("warning", "the install is not recorded, so the next task installs again: "+err.Error(), "", 0, 0, CodeComposerInstallFailed)
+	}
+	return nil
 }
 
 // vendorIsCurrent reports whether the last successful install at dir was made
@@ -131,11 +138,17 @@ func enableWindowsExtensions(program string) error {
 		return nil
 	}
 	dir := filepath.Dir(program)
+	path := filepath.Join(dir, "php.ini")
 	ini := "extension_dir = \"" + filepath.Join(dir, "ext") + "\"\n"
 	for _, name := range []string{"openssl", "mbstring", "curl", "zip", "fileinfo"} {
 		ini += "extension=" + name + "\n"
 	}
-	return os.WriteFile(filepath.Join(dir, "php.ini"), []byte(ini), 0o644) //nolint:gosec // the pinned toolchain's own folder
+	if current, err := os.ReadFile(path); err == nil && string(current) == ini { //nolint:gosec // the pinned toolchain's own folder
+		return nil
+	}
+	// The folder is shared by every stack root of the machine: a reader must
+	// never see a partial file.
+	return robustio.WriteFile(path, []byte(ini), 0o644, nil)
 }
 
 // provideComposer returns the path of the pinned composer.phar under the

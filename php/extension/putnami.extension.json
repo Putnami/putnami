@@ -154,7 +154,7 @@
   },
   "tasks": {
     "install-run": {
-      "description": "Run composer install at the component's stack root with the Composer the extension pins, unless vendor/ is newer than composer.json and composer.lock.",
+      "description": "Run composer install at the component's stack root with the Composer the extension pins, unless its last successful install used the current composer.json and composer.lock.",
       "kind": "command",
       "command": "{extensionRuntime}",
       "toolchains": [

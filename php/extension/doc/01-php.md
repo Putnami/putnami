@@ -33,7 +33,7 @@ workspace with no `composer.json` outside `vendor/` pins nothing.
 |---|---|
 | None, or a range that accepts 8.4.23 | 8.4.23 |
 | A range or a `.php-version` that refuses 8.4.23 | The highest of 8.3.32, 8.4.23 and 8.5.8 it accepts |
-| A component's own statement narrows those | The same choice among the releases every component accepts, unless none is left |
+| A component's own statement narrows those | The same choice among the releases every component accepts; with no common release, the root's choice |
 | A release the extension ships, already in the lock and still accepted | That release |
 | No shipped release is accepted | No pin: the machine's PHP runs |
 
@@ -51,7 +51,8 @@ skips a stack root whose last successful install used its current
 `composer.json` and `composer.lock`. A run with offline dependencies, such as
 a hosted run, installs nothing, so its repository needs a `vendor/` already.
 On Windows, the step also writes the `php.ini` of the pinned PHP, which
-enables the extensions Composer and PHPUnit need.
+enables openssl, mbstring, curl, zip and fileinfo. A Windows project that needs
+another extension puts its own PHP on `PATH`.
 
 The pinned PHP holds neither PCOV nor Xdebug. On a PHP with no coverage
 driver, `test` runs PHPUnit with its JUnit report only, reads no Clover report

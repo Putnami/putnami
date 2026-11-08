@@ -90,9 +90,9 @@ func answerToolchainResolve(root string, request wsproto.ToolchainResolveRequest
 	return result
 }
 
-// resolvePin returns the PHP release the workspace at root pins. Each
-// component's statement narrows the releases the root accepts, unless that
-// would leave none. A committed pin of an accepted shipped release is kept;
+// resolvePin returns the PHP release the workspace at root pins, among the
+// releases every component accepts, or the root accepts when no release
+// suits every component. A committed pin of an accepted shipped release is kept;
 // otherwise it is defaultVersion when accepted, else the highest accepted
 // shipped release. A workspace with no composer.json outside vendor/, or
 // whose root states a version it cannot read, pins nothing: its tasks report
@@ -107,14 +107,14 @@ func resolvePin(root string, request wsproto.ToolchainResolveRequest, profile st
 		return wsproto.LockToolchainEntry{}, false
 	}
 	accepted := acceptedBy(profile.Toolchain, releases, expected)
+	everyComponent := accepted
 	for _, dir := range found {
-		statement, err := profile.Toolchain.ExpectedVersion(root, dir, wsproto.ProbeRootPath)
-		if err != nil {
-			continue
+		if statement, err := profile.Toolchain.ExpectedVersion(root, dir, wsproto.ProbeRootPath); err == nil {
+			everyComponent = acceptedBy(profile.Toolchain, everyComponent, statement)
 		}
-		if narrowed := acceptedBy(profile.Toolchain, accepted, statement); len(narrowed) > 0 {
-			accepted = narrowed
-		}
+	}
+	if len(everyComponent) > 0 {
+		accepted = everyComponent
 	}
 	chosen, ok := choose(accepted, request.Locked[LockIdentity].Version)
 	if !ok {

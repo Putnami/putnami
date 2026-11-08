@@ -160,6 +160,88 @@ func TestTheInstallStepReportsAFailedComposer(t *testing.T) {
 	}
 }
 
+func TestAFailedInstallLeavesNoRecordOfTheLastOne(t *testing.T) {
+	restore := setComposerDigest(t)
+	defer restore()
+	root := fixture(t)
+	t.Setenv("PUTNAMI_HOME", t.TempDir())
+	composerServer(t)
+	log := composerStub(t, "8.4.10")
+	if status, err := runInstall(t, root, "."); status != "OK" || err != nil {
+		t.Fatalf("install: %s %v", status, err)
+	}
+	lock := filepath.Join(root, "composer.lock")
+	finished, err := os.ReadFile(lock)
+	if err != nil {
+		t.Fatal(err)
+	}
+	writeFile(t, root, "composer.lock", `{"packages": [{"name": "demo/branch"}]}`)
+	t.Setenv("STUB_COMPOSER_FAILS", "1")
+	if status, _ := runInstall(t, root, "."); status != "FAILED" {
+		t.Fatalf("install on the changed lock: %s", status)
+	}
+	t.Setenv("STUB_COMPOSER_FAILS", "")
+	if err := os.WriteFile(lock, finished, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if status, err := runInstall(t, root, "."); status != "OK" || err != nil {
+		t.Fatalf("install: %s %v", status, err)
+	}
+	ran, _ := os.ReadFile(log)
+	if lines := strings.Split(strings.TrimSpace(string(ran)), "\n"); len(lines) != 3 {
+		t.Errorf("the return to the old lock installs again: %q", ran)
+	}
+}
+
+func TestASuccessfulInstallWithAnotherVendorDirectoryStaysGreen(t *testing.T) {
+	restore := setComposerDigest(t)
+	defer restore()
+	root := fixture(t)
+	t.Setenv("PUTNAMI_HOME", t.TempDir())
+	composerServer(t)
+	bin := t.TempDir()
+	writeFile(t, bin, "php", `#!/bin/sh
+if [ "$1" = "--version" ]; then echo "PHP 8.4.10 (cli)"; exit 0; fi
+mkdir -p lib
+`)
+	if err := os.Chmod(filepath.Join(bin, "php"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", bin+string(os.PathListSeparator)+os.Getenv("PATH"))
+	if status, err := runInstall(t, root, "."); status != "OK" || err != nil {
+		t.Errorf("an unrecorded install still succeeds: %s %v", status, err)
+	}
+}
+
+func TestAPinnedWindowsPHPIsPreparedEvenWhenNothingInstalls(t *testing.T) {
+	restore := setComposerDigest(t)
+	defer restore()
+	root := fixture(t)
+	t.Setenv("PUTNAMI_HOME", t.TempDir())
+	composerServer(t)
+	composerStub(t, "8.3.6")
+	if status, err := runInstall(t, root, "."); status != "FAILED" || err == nil {
+		t.Fatalf("a machine PHP outside the range: %s %v", status, err)
+	}
+
+	pinnedDir := t.TempDir()
+	writeFile(t, pinnedDir, "php", "#!/bin/sh\nif [ \"$1\" = \"--version\" ]; then echo \"PHP 8.4.23 (cli)\"; exit 0; fi\nexit 9\n")
+	pinned := filepath.Join(pinnedDir, "php")
+	if err := os.Chmod(pinned, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PUTNAMI_PHP_EXECUTABLE", pinned)
+	hostOS = "windows"
+	t.Cleanup(func() { hostOS = runtime.GOOS })
+	t.Setenv(extensionproto.OfflineDependenciesEnv, "1")
+	if status, err := runInstall(t, root, "."); status != "OK" || err != nil {
+		t.Fatalf("offline: %s %v", status, err)
+	}
+	if _, err := os.Stat(filepath.Join(pinnedDir, "php.ini")); err != nil {
+		t.Errorf("an offline run still prepares the pinned PHP: %v", err)
+	}
+}
+
 func TestAPinnedWindowsPHPLoadsTheExtensionsComposerNeeds(t *testing.T) {
 	dir := t.TempDir()
 	program := filepath.Join(dir, "php.exe")
