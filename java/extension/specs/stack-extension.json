@@ -23,7 +23,7 @@
     },
     {
       "id": "variants-follow-the-build",
-      "text": "A Maven module is variant maven. A Gradle project whose build file applies an Android plugin or holds an android block is android, or android-coverage with unit test coverage on; one that applies java-platform or version-catalog is gradle-platform; any other is gradle, or gradle-jacoco when it applies jacoco. A variant is a part of the profile applied before the project's override."
+      "text": "A Maven module is variant maven. A Gradle project whose build file applies an Android plugin or holds an android block is android, or android-coverage with unit test coverage on; one that applies java-platform is gradle-platform, version-catalog gradle-catalog; any other is gradle, or gradle-jacoco when it applies jacoco. A variant is a part of the profile applied before the project's override."
     },
     {
       "id": "tasks-run-the-profile",
@@ -35,7 +35,7 @@
     },
     {
       "id": "lint-skips-the-lockfiles",
-      "text": "The java:lint selector answers the sources, the build files and the lint configurations, and for Gradle the test sources a check reads, never the lockfiles: a lockfile change reruns test and build and keeps lint's key. Maven lint and build skip the test sources with -Dmaven.test.skip=true and do not read them."
+      "text": "The java:lint selector answers the sources, the test sources the lint commands compile or check, the build files and the lint configurations, never the lockfiles: a lockfile change reruns test and build and keeps lint's key."
     },
     {
       "id": "overrides-are-honored",
