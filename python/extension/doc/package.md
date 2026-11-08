@@ -39,14 +39,21 @@ onto a base image and runs nothing inside it.
 - **Dependencies.** `uv export --frozen --no-dev` lists the production
   dependencies of `uv.lock`. `uv pip install --target` installs the registry ones
   as wheels only, checked against their locked hashes, for the image's platform
-  and Python minor. The project and its workspace path dependencies are copied to
-  a staging directory and built into wheels there, so the repository is not
-  written to. They go to `/opt/python/site-packages`, which `PYTHONPATH` names.
+  and the Python release of its base. The local packages the export lists, the
+  project when it has a build system and its workspace path dependencies, are
+  copied to a staging directory and built into wheels there, so the repository
+  is not written to. They go to `/opt/python/site-packages`, which `PYTHONPATH`
+  names.
 - **Application.** The project's files go to `/app`, without the `tests` and
   `test` directories, the `test_*.py`, `*_test.py` and `conftest.py` files,
   generated directories (`.venv`, `__pycache__`, `build`, `dist`, `.gen`), and
-  the files that hold secrets (`.env`, `.env.*` except `.env.example`,
-  `.env.sample` and `.env.template`, `.pypirc` and `.netrc`).
+  the files that hold secrets (`.env`, `.env.*`, `.envrc`, `.pypirc` and
+  `.netrc`). The staged copy that builds the local packages leaves out the same
+  files.
+- **Ignored build outputs.** A file under a directory named `dist`, `out` or
+  `vendor` ships only when Git lists it: tracked, or untracked and not ignored.
+  The cache key reads such a directory only through Git, so an ignored file
+  there would change the image without changing its key.
 - **Process.** The image runs `python /app/<entrypoint>`, the entrypoint `serve`
   runs, as the unprivileged user `65534`, with `PORT=8080`. The application reads
   its port from `PORT`.
@@ -63,7 +70,9 @@ add.
   provide `python` of the same minor on its `PATH`, with a glibc that runs
   `manylinux_2_28` wheels.
 - `--entrypoint <path>`: the file the image runs. Defaults to the `entrypoint` of
-  `options["@putnami/python:serve"]`, then `src/main.py`.
+  the project's `options["@putnami/python:serve"]`, then of its
+  `options.serve`, then `src/main.py`. A serve entrypoint set only in the
+  workspace's options is not read: name it in the package options.
 - `--platform <platform>`: `linux/amd64` (default) or `linux/arm64`. An `arm64`
   image can be packaged on an `amd64` machine, because only wheels are installed.
 - `--docker-tag <tag>`: add a tag to the content tag `c-<hash>`.
@@ -92,7 +101,12 @@ putnami publish <project> --docker --dry-run   # report what would be pushed
 - A workspace path dependency with native code is built for the machine that
   packages it.
 - The base follows the Python minor of the machine, which the cache key does not
-  cover.
+  cover. A workspace pins it with a `.python-version` file at its root, which
+  the key covers.
+- A module named like a test file (`test_*.py`) is left out, even when the
+  application imports it.
+- A `.pth` file in a dependency is not processed, because `PYTHONPATH` is not a
+  site directory.
 - A symbolic link in the application fails packaging.
 
 See [ADR 0002](./adr/0002-an-application-image-installs-wheels-onto-the-official-python-image.md)

@@ -123,13 +123,15 @@ func probePythonWorkspace(root string, request wsproto.ProbeRequest) (wsproto.Pr
 			// A project's own answer changes when its own pyproject.toml
 			// changes; declaring it keeps core's watch and snapshot machinery
 			// from having to know that pyproject.toml is what this provider
-			// reads. Its putnami.json and the workspace's say whether it
-			// publishes an image, and under which coordinate.
-			WatchedFiles: append([]string{marker, projectConfigPathFor(normalized), pythonWorkspaceConfigFile}, pythonWorkspaceRootFiles...),
+			// reads. Its putnami.json says whether it publishes an image.
+			WatchedFiles: append([]string{marker, projectConfigPathFor(normalized)}, pythonWorkspaceRootFiles...),
 		}
-		metadata, scopeFiles := imageMember(root, project)
-		project.Metadata = metadata
-		project.WatchedFiles = append(project.WatchedFiles, scopeFiles...)
+		// An image member's coordinate also reads the workspace's registries
+		// and the scope files that name the project.
+		if metadata, scopeFiles := imageMember(root, project); metadata != nil {
+			project.Metadata = metadata
+			project.WatchedFiles = append(append(project.WatchedFiles, pythonWorkspaceConfigFile), scopeFiles...)
+		}
 		result.Projects = append(result.Projects, project)
 	}
 

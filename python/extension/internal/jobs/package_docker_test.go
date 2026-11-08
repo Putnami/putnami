@@ -14,6 +14,8 @@ import (
 	"strings"
 	"testing"
 
+	"os/exec"
+
 	"github.com/google/go-containerregistry/pkg/name"
 	"github.com/google/go-containerregistry/pkg/registry"
 	v1 "github.com/google/go-containerregistry/pkg/v1"
@@ -30,14 +32,15 @@ import (
 const imageFeature = "python/experimental-workspace-integration"
 
 // fakeUV is a uv that logs each command to $FAKE_UV_LOG. `python find` answers
-// a python that prints $FAKE_PYTHON_MINOR, `export` prints $FAKE_UV_EXPORT,
-// and `pip install --target` installs a package for each staged directory and
-// for each requirements file.
+// a python that prints $FAKE_PYTHON_VERSION, `export` prints $FAKE_UV_EXPORT,
+// and `pip install --target -r` installs fastapi for a registry requirements
+// file, and a package for each staged directory a local one names. It logs the
+// local requirement lines to local.log and the staged files to staged.log.
 const fakeUV = `#!/bin/sh
 echo "$PWD|$*" >> "$FAKE_UV_LOG"
 case "$1" in
 python)
-	printf '#!/bin/sh\necho "${FAKE_PYTHON_MINOR:-3.13}"\n' > "$FAKE_UV_DIR/python"
+	printf '#!/bin/sh\necho "${FAKE_PYTHON_VERSION:-3.13.4}"\n' > "$FAKE_UV_DIR/python"
 	chmod +x "$FAKE_UV_DIR/python"
 	echo "$FAKE_UV_DIR/python"
 	;;
@@ -49,16 +52,21 @@ pip)
 	previous=""
 	for arg in "$@"; do
 		[ "$previous" = "--target" ] && target="$arg"
-		if [ "$previous" = "-r" ]; then
+		if [ "$previous" = "-r" ] && [ "$(basename "$arg")" = "local-requirements.txt" ]; then
+			while IFS= read -r line; do
+				echo "$line" >> "$FAKE_UV_DIR/local.log"
+				staged="${line%% ;*}"
+				(cd "$staged" && find . -type f) >> "$FAKE_UV_DIR/staged.log"
+				package=$(basename "$staged")
+				mkdir -p "$target/$package" "$target/$package-0.1.0.dist-info"
+				echo "# $package" > "$target/$package/__init__.py"
+				echo "{\"url\": \"file://$staged\"}" > "$target/$package-0.1.0.dist-info/direct_url.json"
+				date +%s%N > "$target/$package-0.1.0.dist-info/uv_cache.json"
+				printf '%s\n' "$package/__init__.py,sha256=a,1" "$package-0.1.0.dist-info/direct_url.json,sha256=b,2" "$package-0.1.0.dist-info/uv_cache.json,sha256=c,3" "$package-0.1.0.dist-info/RECORD,," > "$target/$package-0.1.0.dist-info/RECORD"
+			done < "$arg"
+		elif [ "$previous" = "-r" ]; then
 			mkdir -p "$target/fastapi" && echo "app = 1" > "$target/fastapi/__init__.py"
 			mkdir -p "$target/bin" && echo "#!/machine/python" > "$target/bin/fastapi"
-		elif [ -d "$arg" ] && [ "$previous" != "--target" ]; then
-			package=$(basename "$arg")
-			mkdir -p "$target/$package" "$target/$package-0.1.0.dist-info"
-			echo "# $package" > "$target/$package/__init__.py"
-			echo "{\"url\": \"file://$arg\"}" > "$target/$package-0.1.0.dist-info/direct_url.json"
-			date +%s%N > "$target/$package-0.1.0.dist-info/uv_cache.json"
-			printf '%s\n' "$package/__init__.py,sha256=a,1" "$package-0.1.0.dist-info/direct_url.json,sha256=b,2" "$package-0.1.0.dist-info/uv_cache.json,sha256=c,3" "$package-0.1.0.dist-info/RECORD,," > "$target/$package-0.1.0.dist-info/RECORD"
 		fi
 		previous="$arg"
 	done
@@ -68,9 +76,9 @@ esac
 
 // registryExport is what uv export answers for the application shop: a
 // registry requirement with its hashes, the application itself and a path
-// dependency.
+// dependency with a marker.
 const registryExport = `./apps/shop
-./libs/discount
+./libs/discount ; python_full_version >= '3.11'
 fastapi==0.141.1 \
     --hash=sha256:aaaa \
     --hash=sha256:bbbb
@@ -78,7 +86,8 @@ colorama==0.4.6 ; sys_platform == 'win32' \
     --hash=sha256:cccc
 `
 
-// prepareUV installs the fake uv and answers the file it logs to.
+// prepareUV installs the fake uv and answers the file it logs to. The files
+// it stages and the local requirements it reads are logged next to it.
 func prepareUV(t *testing.T, export string) string {
 	t.Helper()
 	if runtime.GOOS == "windows" {
@@ -124,9 +133,8 @@ func shopWorkspace(t *testing.T) (string, []string) {
 	writeImageFile(t, root, "apps/shop/src/main.py", "print('shop')\n")
 	writeImageFile(t, root, "apps/shop/src/shop/__init__.py", "")
 	writeImageFile(t, root, "apps/shop/src/shop/build/plan.py", "")
-	writeImageFile(t, root, "apps/shop/.env.example", "TOKEN=\n")
 	for _, left := range []string{
-		".env", ".env.production", ".pypirc", "tests/test_shop.py", "src/shop/test_rules.py", "src/shop/rules_test.py",
+		".env", ".env.production", ".env.example", ".envrc", ".pypirc", "tests/test_shop.py", "src/shop/test_rules.py", "src/shop/rules_test.py",
 		"src/conftest.py", "src/shop/__pycache__/x.pyc", ".venv/bin/python", "build/lib/x.py", "dist/shop.whl", ".gen/version.json",
 	} {
 		writeImageFile(t, root, "apps/shop/"+left, "left out\n")
@@ -134,7 +142,7 @@ func shopWorkspace(t *testing.T) (string, []string) {
 	writeImageFile(t, root, "libs/discount/pyproject.toml", "[project]\nname = \"discount\"\n")
 	writeImageFile(t, root, "libs/discount/src/discount/__init__.py", "")
 	writeImageFile(t, root, "libs/discount/build/stale.py", "")
-	return root, []string{"pyproject.toml", "src/main.py", "src/shop/__init__.py", "src/shop/build/plan.py", ".env.example"}
+	return root, []string{"pyproject.toml", "src/main.py", "src/shop/__init__.py", "src/shop/build/plan.py"}
 }
 
 // shopContext is the job context of the application apps/shop.
@@ -278,20 +286,22 @@ func TestPackageAssemblesAnImageOfAnApplicationAndItsProductionDependencies(t *t
 		if !strings.HasSuffix(calls[1], "|export --frozen --no-dev --no-editable --no-header --no-annotate --package shop") {
 			t.Errorf("export = %q", calls[1])
 		}
-		platform := "--python-platform x86_64-unknown-linux-gnu --python-version 3.13 --no-deps"
+		platform := "--python-platform x86_64-unknown-linux-gnu --python-version 3.13.4 --no-deps"
 		if !strings.Contains(calls[2], platform+" --only-binary :all: --require-hashes -r ") {
 			t.Errorf("registry install = %q", calls[2])
 		}
-		if !strings.Contains(calls[3], platform+" ") || strings.Contains(calls[3], "--only-binary") {
+		if !strings.Contains(calls[3], platform+" -r ") || strings.Contains(calls[3], "--only-binary") || strings.Contains(calls[3], "--require-hashes") {
 			t.Errorf("path install = %q", calls[3])
 		}
-		for _, staged := range []string{"/staged/apps/shop", "/staged/libs/discount"} {
-			if !strings.Contains(calls[3], staged) {
-				t.Errorf("path install %q does not build %s from staging", calls[3], staged)
-			}
+		locals := readLog(t, filepath.Join(filepath.Dir(log), "local.log"))
+		if len(locals) != 2 || !strings.HasSuffix(locals[0], "/staged/apps/shop") ||
+			!strings.HasSuffix(locals[1], "/staged/libs/discount ; python_full_version >= '3.11'") {
+			t.Errorf("local requirements = %q", locals)
 		}
-		if strings.Contains(calls[3], " "+filepath.Join(root, "libs")) {
-			t.Errorf("a path dependency was built in the repository: %q", calls[3])
+		for _, local := range locals {
+			if strings.HasPrefix(local, root) {
+				t.Errorf("a path dependency was built in the repository: %q", local)
+			}
 		}
 		if _, err := os.Stat(filepath.Join(root, "libs/discount/build/lib")); !errors.Is(err, os.ErrNotExist) {
 			t.Errorf("the repository was written to: %v", err)
@@ -334,6 +344,15 @@ func TestPackageAssemblesAnImageOfAnApplicationAndItsProductionDependencies(t *t
 
 	t.Run("the image holds no tests and no secret files", func(t *testing.T) {
 		spectest.Proves(t, imageFeature, "image-ships-the-application-files", "the-image-holds-no-tests-and-no-secret-files")
+		// The packages built from staging see no test or secret file either.
+		for _, staged := range readLog(t, filepath.Join(filepath.Dir(log), "staged.log")) {
+			name := path.Base(staged)
+			generated := strings.HasPrefix(staged, "./build/") || strings.HasPrefix(staged, "./dist/") || strings.HasPrefix(staged, "./.venv/") ||
+				strings.HasPrefix(staged, "./.gen/") || strings.Contains(staged, "/__pycache__/")
+			if TestFile(name) || SecretFile(name) || strings.HasPrefix(staged, "./tests/") || generated {
+				t.Errorf("the staged build reads %s", staged)
+			}
+		}
 		for file := range files {
 			if !strings.HasPrefix(file, app) {
 				continue
@@ -476,9 +495,13 @@ func TestTheImageRunsTheEntrypointServeRuns(t *testing.T) {
 	if got, err := imageEntrypoint(ctx, nil); err != nil || got != defaultEntrypoint {
 		t.Errorf("default: %s %v", got, err)
 	}
-	ctx.Project.Options = map[string]json.RawMessage{serveOptionsKey: json.RawMessage(`{"entrypoint": "src/shop/server.py"}`)}
+	ctx.Project.Options = map[string]json.RawMessage{"serve": json.RawMessage(`{"entrypoint": "src/shop/server.py"}`)}
 	if got, err := imageEntrypoint(ctx, nil); err != nil || got != "src/shop/server.py" {
 		t.Errorf("serve: %s %v", got, err)
+	}
+	ctx.Project.Options[serveOptionsKey] = json.RawMessage(`{"entrypoint": "src/shop/__init__.py"}`)
+	if got, err := imageEntrypoint(ctx, nil); err != nil || got != "src/shop/__init__.py" {
+		t.Errorf("the extension's serve block: %s %v", got, err)
 	}
 	if got, err := imageEntrypoint(ctx, map[string]string{"entrypoint": "./src/main.py"}); err != nil || got != "src/main.py" {
 		t.Errorf("flag: %s %v", got, err)
@@ -486,12 +509,17 @@ func TestTheImageRunsTheEntrypointServeRuns(t *testing.T) {
 }
 
 func TestSplitRequirementsSeparatesTheRegistryFromLocalPaths(t *testing.T) {
-	registry, paths := splitRequirements("# comment\n" + registryExport + "file:///abs/vendor/lib ; python_version >= '3.11'\n")
-	if !slices.Equal(paths, []string{"./apps/shop", "./libs/discount", "/abs/vendor/lib"}) {
-		t.Errorf("paths = %q", paths)
+	registry, locals := splitRequirements("# comment\n" + registryExport + "file:///abs/vendor/lib ; python_version >= '3.11'\n")
+	want := []localRequirement{
+		{Path: "./apps/shop"},
+		{Path: "./libs/discount", Marker: "python_full_version >= '3.11'"},
+		{Path: "/abs/vendor/lib", Marker: "python_version >= '3.11'"},
 	}
-	want := "fastapi==0.141.1 \\\n    --hash=sha256:aaaa \\\n    --hash=sha256:bbbb\ncolorama==0.4.6 ; sys_platform == 'win32' \\\n    --hash=sha256:cccc\n"
-	if registry != want {
+	if !slices.Equal(locals, want) {
+		t.Errorf("locals = %+v", locals)
+	}
+	wantRegistry := "fastapi==0.141.1 \\\n    --hash=sha256:aaaa \\\n    --hash=sha256:bbbb\ncolorama==0.4.6 ; sys_platform == 'win32' \\\n    --hash=sha256:cccc\n"
+	if registry != wantRegistry {
 		t.Errorf("registry =\n%s", registry)
 	}
 }
@@ -606,7 +634,7 @@ func leftOutOfStaging(rel string) bool {
 	parts := strings.Split(rel, "/")
 	for i := range parts {
 		entry := fakeEntry{name: parts[i], dir: i < len(parts)-1}
-		if skipped(strings.Join(parts[:i+1], "/"), entry, false) {
+		if (treeFilter{}).skip(strings.Join(parts[:i+1], "/"), entry) {
 			return true
 		}
 	}
@@ -625,8 +653,8 @@ func (e fakeEntry) Info() (os.FileInfo, error) { return nil, errors.New("no info
 
 func TestSecretAndTestFilesAreRecognized(t *testing.T) {
 	for file, want := range map[string]bool{
-		".env": true, ".env.local": true, ".env.production": true, ".pypirc": true, ".netrc": true,
-		".env.example": false, ".env.sample": false, "settings.py": false, "environment.py": false,
+		".env": true, ".env.local": true, ".env.production": true, ".env.example": true, ".envrc": true, ".pypirc": true, ".netrc": true,
+		"settings.py": false, "environment.py": false, "env.py": false,
 	} {
 		if got := SecretFile(file); got != want {
 			t.Errorf("SecretFile(%q) = %v, want %v", file, got, want)
@@ -638,5 +666,85 @@ func TestSecretAndTestFilesAreRecognized(t *testing.T) {
 		if got := TestFile(file); got != want {
 			t.Errorf("TestFile(%q) = %v, want %v", file, got, want)
 		}
+	}
+}
+
+func TestOnlyTheLocalPackagesUVExportsAreBuilt(t *testing.T) {
+	log := prepareUV(t, "./libs/discount\n")
+	root, _ := shopWorkspace(t)
+	_, base := imageRegistry(t)
+	if status, err := runImageJob(t, shopContext(root, "libs/discount"), PackageDocker, "--docker-base-image", base); status != "OK" || err != nil {
+		t.Fatalf("package: %s %v", status, err)
+	}
+	locals := readLog(t, filepath.Join(filepath.Dir(log), "local.log"))
+	if len(locals) != 1 || !strings.HasSuffix(locals[0], "/staged/libs/discount") {
+		t.Errorf("a project with no build system was built: %q", locals)
+	}
+	for _, call := range readLog(t, log) {
+		if strings.Contains(call, "--require-hashes") {
+			t.Errorf("a registry install ran with no registry requirement: %q", call)
+		}
+	}
+}
+
+func TestANestedDirectoryTheKeyDoesNotWalkShipsOnlyItsGitCandidates(t *testing.T) {
+	spectest.Proves(t, imageFeature, "image-ships-the-application-files", "the-image-cache-key-covers-the-files-it-ships")
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("no git")
+	}
+	root, _ := shopWorkspace(t)
+	writeImageFile(t, root, ".gitignore", "dist/\n.env*\n")
+	for _, rel := range []string{"src/shop/static/dist/bundle.js", "src/shop/vendor/lib.py", "src/shop/out/data.json", "src/shop/vendor/ignored.py"} {
+		writeImageFile(t, root, "apps/shop/"+rel, "x\n")
+	}
+	writeImageFile(t, root, "apps/shop/src/shop/vendor/.gitignore", "ignored.py\n")
+	for _, args := range [][]string{{"init", "-q"}, {"add", "apps/shop/src/shop/vendor/lib.py"}} {
+		command := exec.Command("git", args...)
+		command.Dir = root
+		if out, err := command.CombinedOutput(); err != nil {
+			t.Fatalf("git %v: %v %s", args, err, out)
+		}
+	}
+	project := filepath.Join(root, "apps/shop")
+	filter, err := newTreeFilter(project)
+	if err != nil || filter.candidates == nil {
+		t.Fatalf("filter: %+v %v", filter, err)
+	}
+	files, err := treeFiles(project, ImageAppDir, filter.skip)
+	if err != nil {
+		t.Fatal(err)
+	}
+	shipped := map[string]bool{}
+	for _, file := range files {
+		shipped[strings.TrimPrefix(file.Path, ImageAppDir+"/")] = true
+	}
+	// A tracked file and an untracked file Git does not ignore are keyed
+	// through the Git candidates; an ignored one is keyed by nothing.
+	for rel, want := range map[string]bool{
+		"src/shop/vendor/lib.py": true, "src/shop/out/data.json": true,
+		"src/shop/static/dist/bundle.js": false, "src/shop/vendor/ignored.py": false, "src/main.py": true,
+	} {
+		if shipped[rel] != want {
+			t.Errorf("%s shipped = %v, want %v", rel, shipped[rel], want)
+		}
+	}
+	staging := t.TempDir()
+	if err := copyTree(project, staging); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(filepath.Join(staging, "src/shop/static/dist/bundle.js")); !errors.Is(err, os.ErrNotExist) {
+		t.Errorf("the staged build reads an unkeyed file: %v", err)
+	}
+}
+
+func TestTheDependenciesAreSelectedForThePythonOfTheBase(t *testing.T) {
+	if got := imagePythonVersion(slimBases["3.13"], "3.13.4"); got != "3.13.18" {
+		t.Errorf("official base: %s", got)
+	}
+	if got := imagePythonVersion("registry.test/python@sha256:aa", "3.12.7"); got != "3.12.7" {
+		t.Errorf("named base: %s", got)
+	}
+	if got := minorOf("3.14.0rc1"); got != "3.14" {
+		t.Errorf("minor: %s", got)
 	}
 }

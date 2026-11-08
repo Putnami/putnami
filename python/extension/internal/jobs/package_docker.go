@@ -17,6 +17,7 @@ import (
 	"go.putnami.dev/sdk/extension/cli"
 	pctx "go.putnami.dev/sdk/extension/context"
 	"go.putnami.dev/sdk/extension/dockerpublish"
+	"go.putnami.dev/sdk/extension/gitcandidate"
 	"go.putnami.dev/sdk/extension/jsonl"
 	"go.putnami.dev/sdk/extension/oci"
 	"go.putnami.dev/sdk/extension/pkgmeta"
@@ -86,6 +87,11 @@ var topLevelGenerated = []string{".gen", "build", "dist", "venv"}
 // read.
 var testDirectories = []string{"test", "tests"}
 
+// unwalkedNames are the directories the ordinary walk of a cache input skips at
+// any depth below a project. A file under one of them is keyed only through
+// the project's Git candidates, so an image ships it only when it is one.
+var unwalkedNames = []string{"dist", "out", "vendor"}
+
 // PublishDocker pushes the packaged image through the shared publisher.
 func PublishDocker(ctx *pctx.Context, emit *jsonl.Emitter, args []string) (string, map[string]any, error) {
 	return dockerpublish.Publish(ctx, emit, args)
@@ -132,11 +138,11 @@ func assembleImage(ctx *pctx.Context, flags map[string]string, emit *jsonl.Emitt
 		return fail(CodeImageFailed, err)
 	}
 	env := MakeEnv(wsRoot, projectRoot, nil)
-	minor, err := pythonMinor(uv, wsRoot, env)
+	interpreter, err := pythonVersion(uv, wsRoot, env)
 	if err != nil {
 		return fail(CodeImageFailed, err)
 	}
-	base, err := baseImage(cli.FlagString(flags, "docker-base-image", ctx.Params.String("docker-base-image", "dockerBaseImage")), minor)
+	base, err := baseImage(cli.FlagString(flags, "docker-base-image", ctx.Params.String("docker-base-image", "dockerBaseImage")), minorOf(interpreter))
 	if err != nil {
 		return fail(CodeBaseNotPinned, err)
 	}
@@ -164,7 +170,7 @@ func assembleImage(ctx *pctx.Context, flags map[string]string, emit *jsonl.Emitt
 	}
 	defer func() { _ = os.RemoveAll(workspace) }()
 	sitePackages := filepath.Join(workspace, "site-packages")
-	if err := installDependencies(ctx, uv, env, wheelPlatform, minor, workspace, sitePackages, emit); err != nil {
+	if err := installDependencies(ctx, uv, env, wheelPlatform, imagePythonVersion(base, interpreter), workspace, sitePackages, emit); err != nil {
 		code := CodeImageFailed
 		if errors.Is(err, errOutsideClosure) {
 			code = CodePathDependencyOutsideClosure
@@ -224,11 +230,16 @@ func ImageName(project string) string {
 // src/main.py. It must be a file of the project.
 func imageEntrypoint(ctx *pctx.Context, flags map[string]string) (string, error) {
 	entrypoint := cli.FlagString(flags, "entrypoint", ctx.Params.String("entrypoint"))
-	if entrypoint == "" {
+	// The project's serve options, the extension's block first: the block
+	// that names the extension is the more specific one.
+	for _, key := range []string{serveOptionsKey, "serve"} {
+		if entrypoint != "" {
+			break
+		}
 		var serve struct {
 			Entrypoint string `json:"entrypoint"`
 		}
-		if raw, ok := ctx.Project.Options[serveOptionsKey]; ok && json.Unmarshal(raw, &serve) == nil {
+		if raw, ok := ctx.Project.Options[key]; ok && json.Unmarshal(raw, &serve) == nil {
 			entrypoint = serve.Entrypoint
 		}
 	}
@@ -245,9 +256,9 @@ func imageEntrypoint(ctx *pctx.Context, flags map[string]string) (string, error)
 	return clean, nil
 }
 
-// pythonMinor answers the minor version of the interpreter uv selects at the
+// pythonVersion answers the version of the interpreter uv selects at the
 // workspace root, the one the tests run on.
-func pythonMinor(uv, wsRoot string, env []string) (string, error) {
+func pythonVersion(uv, wsRoot string, env []string) (string, error) {
 	find := exec.Command(uv, "python", "find") //nolint:gosec // the resolved uv
 	find.Dir = wsRoot
 	find.Env = env
@@ -256,14 +267,36 @@ func pythonMinor(uv, wsRoot string, env []string) (string, error) {
 		return "", fmt.Errorf("uv python find: %w%s", err, stderrOf(err))
 	}
 	interpreter := strings.TrimSpace(string(found))
-	version := exec.Command(interpreter, "-c", "import sys; print(f'{sys.version_info[0]}.{sys.version_info[1]}')") //nolint:gosec // the interpreter uv found
+	version := exec.Command(interpreter, "-c", "import platform; print(platform.python_version())") //nolint:gosec // the interpreter uv found
 	version.Dir = wsRoot
 	version.Env = env
-	minor, err := version.Output()
+	answer, err := version.Output()
 	if err != nil {
 		return "", fmt.Errorf("read the version of %s: %w%s", interpreter, err, stderrOf(err))
 	}
-	return strings.TrimSpace(string(minor)), nil
+	return strings.TrimSpace(string(answer)), nil
+}
+
+// minorOf answers the minor of a Python version: 3.13 for 3.13.7.
+func minorOf(version string) string {
+	parts := strings.SplitN(version, ".", 3)
+	if len(parts) < 2 {
+		return version
+	}
+	return parts[0] + "." + parts[1]
+}
+
+// imagePythonVersion answers the Python version the image runs, which the
+// dependencies' markers are evaluated against: the release of an official base,
+// else the interpreter's, which a named base runs the minor of.
+func imagePythonVersion(base, interpreter string) string {
+	for _, official := range slimBases {
+		if official == base {
+			tag, _, _ := strings.Cut(strings.TrimPrefix(base, "python:"), "-slim@")
+			return tag
+		}
+	}
+	return interpreter
 }
 
 // baseImage answers the named base, which must carry a digest, or the official
@@ -287,9 +320,10 @@ var errOutsideClosure = errors.New("outside the dependency closure")
 
 // installDependencies installs the production dependencies of the project into
 // sitePackages: the registry ones as wheels checked against their locked
-// hashes, then the project and its path dependencies, built from a staged
-// copy. Every package is built for the image's platform and Python minor.
-func installDependencies(ctx *pctx.Context, uv string, env []string, wheelPlatform, minor, workspace, sitePackages string, emit *jsonl.Emitter) error {
+// hashes, then the local ones uv export lists, the project and its path
+// dependencies, built from a staged copy. Every package is selected for the
+// image's platform and Python version.
+func installDependencies(ctx *pctx.Context, uv string, env []string, wheelPlatform, version, workspace, sitePackages string, emit *jsonl.Emitter) error {
 	wsRoot := ctx.WorkspaceRoot
 	export := exec.Command(uv, "export", "--frozen", "--no-dev", "--no-editable", "--no-header", "--no-annotate", //nolint:gosec // the resolved uv
 		"--package", ResolvePackageName(ctx))
@@ -299,26 +333,32 @@ func installDependencies(ctx *pctx.Context, uv string, env []string, wheelPlatfo
 	if err != nil {
 		return fmt.Errorf("uv export: %w%s", err, stderrOf(err))
 	}
-	registry, paths := splitRequirements(string(exported))
-	staged, err := stagePathDependencies(ctx, paths, filepath.Join(workspace, "staged"))
+	registry, locals := splitRequirements(string(exported))
+	staged, err := stageLocalRequirements(ctx, locals, filepath.Join(workspace, "staged"))
 	if err != nil {
 		return err
 	}
-	target := []string{"pip", "install", "--target", sitePackages, "--python-platform", wheelPlatform, "--python-version", minor, "--no-deps"}
+	target := []string{"pip", "install", "--target", sitePackages, "--python-platform", wheelPlatform, "--python-version", version, "--no-deps"}
 	if strings.TrimSpace(registry) != "" {
 		requirements := filepath.Join(workspace, "requirements.txt")
 		if err := os.WriteFile(requirements, []byte(registry), 0o600); err != nil {
 			return err
 		}
-		emit.Info("$ uv pip install --only-binary :all: --require-hashes for " + wheelPlatform + ", Python " + minor)
+		emit.Info("$ uv pip install --only-binary :all: --require-hashes for " + wheelPlatform + ", Python " + version)
 		install := slices.Concat(target, []string{"--only-binary", ":all:", "--require-hashes", "-r", requirements})
 		if err := runUV(uv, wsRoot, env, install); err != nil {
 			return err
 		}
 	}
-	emit.Info(fmt.Sprintf("$ uv pip install the project and %d path dependencies from a staged copy", len(staged)-1))
-	if err := runUV(uv, wsRoot, env, slices.Concat(target, staged)); err != nil {
-		return err
+	if len(staged) > 0 {
+		requirements := filepath.Join(workspace, "local-requirements.txt")
+		if err := os.WriteFile(requirements, []byte(strings.Join(staged, "\n")+"\n"), 0o600); err != nil {
+			return err
+		}
+		emit.Info(fmt.Sprintf("$ uv pip install %d local packages from a staged copy", len(staged)))
+		if err := runUV(uv, wsRoot, env, slices.Concat(target, []string{"-r", requirements})); err != nil {
+			return err
+		}
 	}
 	if err := dropRunRecords(sitePackages); err != nil {
 		return err
@@ -375,12 +415,18 @@ func dropRunRecords(sitePackages string) error {
 	return nil
 }
 
+// localRequirement is a requirement uv export names by path: the
+// workspace-relative directory, and the environment marker it carries.
+type localRequirement struct {
+	Path   string
+	Marker string
+}
+
 // splitRequirements splits a uv export into the requirements a registry
-// serves, with their hashes, and the workspace-relative paths of the local
-// ones.
-func splitRequirements(exported string) (string, []string) {
+// serves, with their hashes, and the local ones.
+func splitRequirements(exported string) (string, []localRequirement) {
 	var registry strings.Builder
-	var paths []string
+	var locals []localRequirement
 	local := false
 	scanner := bufio.NewScanner(strings.NewReader(exported))
 	scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
@@ -391,11 +437,11 @@ func splitRequirements(exported string) (string, []string) {
 			continue
 		}
 		if line[0] != ' ' && line[0] != '\t' {
-			requirement, _, _ := strings.Cut(strings.TrimSuffix(trimmed, "\\"), " ;")
+			requirement, marker, _ := strings.Cut(strings.TrimSpace(strings.TrimSuffix(trimmed, "\\")), " ;")
 			requirement = strings.TrimSpace(requirement)
 			local = strings.HasPrefix(requirement, ".") || strings.HasPrefix(requirement, "/") || strings.HasPrefix(requirement, "file:")
 			if local {
-				paths = append(paths, strings.TrimPrefix(requirement, "file://"))
+				locals = append(locals, localRequirement{Path: strings.TrimPrefix(requirement, "file://"), Marker: strings.TrimSpace(marker)})
 				continue
 			}
 		}
@@ -404,47 +450,48 @@ func splitRequirements(exported string) (string, []string) {
 			registry.WriteByte('\n')
 		}
 	}
-	return registry.String(), paths
+	return registry.String(), locals
 }
 
-// stagePathDependencies copies the project and each path dependency to staging,
-// at its workspace-relative path, and answers the staged directories, the
-// project first. A path dependency must be the project or a project of its
-// dependency closure, so the image's cache key covers it.
-func stagePathDependencies(ctx *pctx.Context, paths []string, staging string) ([]string, error) {
+// stageLocalRequirements copies each local requirement to staging, at its
+// workspace-relative path, and answers the requirement lines that install the
+// staged copies, markers kept. A local requirement must be the project or a
+// project of its dependency closure, so the image's cache key covers it.
+func stageLocalRequirements(ctx *pctx.Context, locals []localRequirement, staging string) ([]string, error) {
 	wsRoot := ctx.WorkspaceRoot
 	closure := map[string]bool{path.Clean(filepath.ToSlash(ctx.Project.Path)): true}
 	for _, project := range ctx.Project.DependencyClosure {
 		closure[path.Clean(filepath.ToSlash(project.Path))] = true
 	}
-	projectRel := path.Clean(filepath.ToSlash(ctx.Project.Path))
-	rels := []string{projectRel}
-	for _, dependency := range paths {
-		absolute := dependency
+	var lines []string
+	staged := map[string]bool{}
+	for _, dependency := range locals {
+		absolute := dependency.Path
 		if !filepath.IsAbs(absolute) {
-			absolute = filepath.Join(wsRoot, filepath.FromSlash(dependency))
+			absolute = filepath.Join(wsRoot, filepath.FromSlash(dependency.Path))
 		}
 		rel, err := filepath.Rel(wsRoot, absolute)
 		if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
-			return nil, fmt.Errorf("the path dependency %s is outside the workspace", dependency)
+			return nil, fmt.Errorf("the path dependency %s is outside the workspace", dependency.Path)
 		}
 		rel = path.Clean(filepath.ToSlash(rel))
 		if !closure[rel] {
 			return nil, fmt.Errorf("the path dependency %s is %w of %s: add /%s to the dependencies of its putnami.json", rel, errOutsideClosure, ctx.Project.Name, rel)
 		}
-		if !slices.Contains(rels, rel) {
-			rels = append(rels, rel)
-		}
-	}
-	staged := make([]string, 0, len(rels))
-	for _, rel := range rels {
 		target := filepath.Join(staging, filepath.FromSlash(rel))
-		if err := copyTree(filepath.Join(wsRoot, filepath.FromSlash(rel)), target, false); err != nil {
-			return nil, err
+		if !staged[rel] {
+			if err := copyTree(filepath.Join(wsRoot, filepath.FromSlash(rel)), target); err != nil {
+				return nil, err
+			}
+			staged[rel] = true
 		}
-		staged = append(staged, target)
+		line := target
+		if dependency.Marker != "" {
+			line += " ; " + dependency.Marker
+		}
+		lines = append(lines, line)
 	}
-	return staged, nil
+	return lines, nil
 }
 
 // runUV runs uv at the workspace root.
@@ -470,25 +517,55 @@ func stderrOf(err error) string {
 	return ""
 }
 
-// skipped reports whether a walk leaves out an entry: generated directories at
-// any depth, files that hold secrets, and, for an image, what only tests read.
-func skipped(rel string, entry fs.DirEntry, image bool) bool {
-	name := entry.Name()
-	if entry.IsDir() {
-		top := !strings.Contains(rel, "/")
-		return slices.Contains(generatedNames, name) || (top && slices.Contains(topLevelGenerated, name)) ||
-			(image && top && slices.Contains(testDirectories, name))
+// treeFilter decides which files of one tree an image ships and a staged build
+// reads: the same files for both, and only files the cache key of the tree
+// reads.
+type treeFilter struct {
+	// candidates are the Git candidates of the tree, nil outside a Git work
+	// tree.
+	candidates map[string]bool
+}
+
+// newTreeFilter reads the Git candidates of the tree at root.
+func newTreeFilter(root string) (treeFilter, error) {
+	tree, err := gitcandidate.Open(root)
+	if err != nil || tree == nil {
+		return treeFilter{}, err
 	}
-	return SecretFile(name) || (image && TestFile(name))
+	candidates := make(map[string]bool, len(tree.Paths()))
+	for _, candidate := range tree.Paths() {
+		candidates[candidate] = true
+	}
+	return treeFilter{candidates: candidates}, nil
+}
+
+// skip reports whether a walk of the tree leaves out an entry: generated
+// directories, what only tests read, files that hold secrets, and a file under
+// a directory the key's walk skips that is no Git candidate.
+func (f treeFilter) skip(rel string, entry fs.DirEntry) bool {
+	name := entry.Name()
+	top := !strings.Contains(rel, "/")
+	if entry.IsDir() {
+		return slices.Contains(generatedNames, name) || (top && slices.Contains(topLevelGenerated, name)) ||
+			(top && slices.Contains(testDirectories, name))
+	}
+	if SecretFile(name) || TestFile(name) {
+		return true
+	}
+	directories := strings.Split(rel, "/")
+	for _, directory := range directories[:len(directories)-1] {
+		if slices.Contains(unwalkedNames, directory) {
+			return !f.candidates[rel]
+		}
+	}
+	return false
 }
 
 // SecretFile reports the files no image holds: environment files, which hold
 // the secrets of a local run, and the credentials of a package index.
 func SecretFile(name string) bool {
 	switch name {
-	case ".env.example", ".env.sample", ".env.template":
-		return false
-	case ".env", ".netrc", ".pypirc":
+	case ".env", ".envrc", ".netrc", ".pypirc":
 		return true
 	}
 	return strings.HasPrefix(name, ".env.")
@@ -499,8 +576,12 @@ func TestFile(name string) bool {
 	return name == "conftest.py" || (strings.HasPrefix(name, "test_") && strings.HasSuffix(name, ".py")) || strings.HasSuffix(name, "_test.py")
 }
 
-// copyTree copies a tree without the entries skipped leaves out.
-func copyTree(source, target string, image bool) error {
+// copyTree copies a tree without the entries its filter leaves out.
+func copyTree(source, target string) error {
+	filter, err := newTreeFilter(source)
+	if err != nil {
+		return err
+	}
 	return filepath.WalkDir(source, func(file string, entry fs.DirEntry, err error) error {
 		if err != nil {
 			return err
@@ -512,7 +593,7 @@ func copyTree(source, target string, image bool) error {
 		if rel == "." {
 			return os.MkdirAll(target, 0o755)
 		}
-		if skipped(filepath.ToSlash(rel), entry, image) {
+		if filter.skip(filepath.ToSlash(rel), entry) {
 			if entry.IsDir() {
 				return filepath.SkipDir
 			}
@@ -559,7 +640,11 @@ func imageSpec(sitePackages, projectRoot, base, platform, entrypoint string) (oc
 	if err != nil {
 		return oci.Spec{}, err
 	}
-	files, err := treeFiles(projectRoot, ImageAppDir, func(rel string, entry fs.DirEntry) bool { return skipped(rel, entry, true) })
+	filter, err := newTreeFilter(projectRoot)
+	if err != nil {
+		return oci.Spec{}, err
+	}
+	files, err := treeFiles(projectRoot, ImageAppDir, filter.skip)
 	if err != nil {
 		return oci.Spec{}, err
 	}

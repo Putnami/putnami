@@ -47,6 +47,9 @@ func TestTheProbeDeclaresTheImageAsAnOCIReleaseSetMember(t *testing.T) {
 	if members := releaseMembers(t, lib.Metadata); len(members) != 0 {
 		t.Errorf("a library declares %+v", members)
 	}
+	if slices.Contains(lib.WatchedFiles, "putnami.workspace.json") || !slices.Contains(lib.WatchedFiles, "lib/putnami.json") {
+		t.Errorf("lib watchedFiles = %v, want its putnami.json and not the workspace's", lib.WatchedFiles)
+	}
 
 	// A project's own oci registry replaces the workspace's.
 	writeProbeFile(t, filepath.Join(root, "app", "putnami.json"), `{"publish": ["docker"], "registries": {"oci": {"publish": "registry.test/team"}}}`)

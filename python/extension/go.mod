@@ -3,6 +3,7 @@ module go.putnami.dev/python/extension
 go 1.25.7
 
 require (
+	github.com/google/go-containerregistry v0.21.6
 	go.putnami.dev/protocol/cli v0.0.0
 	go.putnami.dev/protocol/diagnostic v0.0.0
 	go.putnami.dev/protocol/extension v0.0.0
@@ -26,7 +27,6 @@ require (
 )
 
 require (
-	github.com/google/go-containerregistry v0.21.6 // indirect
 	go.putnami.dev/protocol/capabilities v0.0.0 // indirect
 	go.putnami.dev/protocol/job v0.0.0 // indirect
 	golang.org/x/sys v0.44.0 // indirect
