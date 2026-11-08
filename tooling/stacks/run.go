@@ -154,7 +154,7 @@ func (s Stack) run(ctx context.Context, in runInput, emit reporter) (string, map
 		return statusFailed, nil, err
 	}
 
-	if w := t.WithoutCoverage; w != nil && !hasCoverageSupport(ctx, selected.Program(profile.Toolchain, w.Probe[0]), w.Probe[1:], in.projectAbs, env) {
+	if w := t.WithoutCoverage; w != nil && t.Reports != nil && len(t.Reports.Coverage) > 0 && !hasCoverageSupport(ctx, selected.Program(profile.Toolchain, w.Probe[0]), w.Probe[1:], in.projectAbs, env) {
 		emit.DiagnosticWithCode("warning", fmt.Sprintf("the %s toolchain has no coverage support: %s runs with no coverage report", profile.ID, in.task), "", 0, 0, CodeCoverageUnavailable)
 		reports := *t.Reports
 		reports.Coverage = nil

@@ -49,8 +49,36 @@
           }
         },
         "prependPath": true
+      },
+      "php": {
+        "lock": "php",
+        "optional": true,
+        "candidates": [
+          {
+            "from": "path",
+            "path": "php"
+          },
+          {
+            "from": "provisioned"
+          }
+        ],
+        "probe": {
+          "args": [
+            "-r",
+            "echo PHP_VERSION;"
+          ],
+          "expect": "{version}"
+        },
+        "environment": {
+          "PUTNAMI_PHP_EXECUTABLE": {
+            "from": "executable"
+          }
+        }
       }
     },
+    "resolves": [
+      "php"
+    ],
     "prepare": {
       "command": "{extensionRoot}/bin/prepare",
       "args": [
@@ -119,6 +147,9 @@
       "description": "Run the PHP profile's lint step, the stack root's vendor/bin/phpstan analyse on src, on one component in its directory, after the PHP version check. Its inputs are the files the php:lint selector answers from the resolved profile, and the stack-root files of the profile.",
       "kind": "command",
       "command": "{extensionRuntime}",
+      "toolchains": [
+        "php"
+      ],
       "args": [
         "lint",
         "--report-dir",
@@ -172,6 +203,9 @@
       "description": "Run the PHP profile's test step, the stack root's vendor/bin/phpunit on tests with JUnit and Clover reports, on one component in its directory, after the PHP version check; then read the reports, even when PHPUnit exits non-zero. A failed case, a step that exits non-zero, or a missing report fails the task.",
       "kind": "command",
       "command": "{extensionRuntime}",
+      "toolchains": [
+        "php"
+      ],
       "args": [
         "test",
         "--report-dir",

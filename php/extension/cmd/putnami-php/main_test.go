@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 
+	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/sdk/extension/cli"
 )
 
@@ -31,6 +32,16 @@ func TestRunReportsAFailedControlCallOnStderr(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 	code := run([]string{"__putnami", "workspace-probe"}, strings.NewReader("not json"), &stdout, &stderr, nil)
 	if code != 1 || stdout.Len() != 0 || !strings.Contains(stderr.String(), "workspace-probe") {
+		t.Fatalf("exit %d, stdout %q, stderr %q", code, stdout.String(), stderr.String())
+	}
+}
+
+func TestRunServesToolchainResolve(t *testing.T) {
+	t.Chdir(t.TempDir())
+	request := `{"version":1,"extension":"@putnami/php","identities":["php"],"platform":"linux/amd64"}`
+	var stdout, stderr bytes.Buffer
+	code := run(wsproto.ToolchainResolveControlArgs(), strings.NewReader(request), &stdout, &stderr, nil)
+	if code != 0 || !strings.Contains(stdout.String(), `"extension":"@putnami/php"`) {
 		t.Fatalf("exit %d, stdout %q, stderr %q", code, stdout.String(), stderr.String())
 	}
 }

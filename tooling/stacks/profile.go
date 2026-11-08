@@ -234,9 +234,6 @@ func (t Task) validate(sets map[string][]string) error {
 		return err
 	}
 	if w := t.WithoutCoverage; w != nil {
-		if t.Reports == nil || len(t.Reports.Coverage) == 0 {
-			return errors.New("withoutCoverage: the task reads no coverage report")
-		}
 		if len(w.Probe) == 0 || w.Probe[0] == "" {
 			return errors.New("withoutCoverage.probe: the probe names a program")
 		}
