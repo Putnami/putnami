@@ -56,6 +56,7 @@ packages and Xcode projects. Three things still do not fit the core:
   tools (`llvm-cov`, `xcodebuild`, `xcrun`) are the project's own, or the
   toolchain the extension provides under ADR 0003 and ADR 0004.
 - The Rust, PHP and Java profiles name no nested marker, no exclude and no
-  runtime command: their probe answers and selector files do not change. The
-  basis of their `**` patterns now leaves `.git` and `.putnami` out, which
-  moves their selector keys once.
+  runtime command: their probe answers, selector files and keys do not change.
+  The basis of their `**` patterns now leaves `.git` and `.putnami` out of what
+  the engine reads again, and an entry of those names that is no directory, such
+  as the `.git` file of a worktree, leaves their answer with it.
