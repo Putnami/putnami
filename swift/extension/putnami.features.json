@@ -1,0 +1,147 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-features.json",
+  "protocolVersion": 2,
+  "namespace": "swift",
+  "features": [
+    {
+      "id": "swift/stack-extension",
+      "type": "feature",
+      "name": "Run the Swift packages and Xcode projects of a repository as Putnami tasks",
+      "outcome": "A team with Swift packages and Xcode projects adds @putnami/swift and runs putnami lint, test and build over them with Putnami's runner and cache: each package and Xcode project is a project with its edges, each task runs swift or xcodebuild after a toolchain check and reads its JUnit and coverage reports, a component overrides any profile value, and install, upgrade, serve and run reach the packages",
+      "owner": "swift",
+      "target": "coded",
+      "requirements": [
+        {
+          "id": "components-become-projects",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-packages-and-xcode-projects-become-projects-with-their-edges"
+            ]
+          }
+        },
+        {
+          "id": "packages-run-swiftpm",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-package-runs-swift-and-reads-its-xunit-and-lcov-reports"
+            ]
+          }
+        },
+        {
+          "id": "xcode-projects-run-xcodebuild",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "an-xcode-project-runs-xcodebuild-and-reads-its-converted-result-bundle"
+            ]
+          }
+        },
+        {
+          "id": "reports-are-attributed",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "every-case-and-coverage-line-of-the-demo-places-on-a-component"
+            ]
+          }
+        },
+        {
+          "id": "overrides-are-honored",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-putnami-json-override-changes-the-steps-and-the-inputs"
+            ]
+          }
+        },
+        {
+          "id": "manifest-follows-the-profile",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-manifest-conforms-to-the-stack-core"
+            ]
+          }
+        },
+        {
+          "id": "workspace-commands",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "install-and-upgrade-run-at-each-component"
+            ]
+          }
+        },
+        {
+          "id": "applications-serve-and-run",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "an-executable-package-serves-and-runs"
+            ]
+          }
+        },
+        {
+          "id": "test-filter",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-test-filter-reaches-swift-test-and-xcodebuild"
+            ]
+          }
+        },
+        {
+          "id": "checks-documentation-links",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "lint-fails-on-a-broken-documentation-link-unless-docs-links-is-off"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}
