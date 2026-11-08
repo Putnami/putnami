@@ -177,15 +177,19 @@ type Selection struct {
 
 // Program returns the program a step runs: the pinned toolchain for a step
 // that names the toolchain command, a program beside it for a step that names
-// one, such as cargo beside rustc, then a bare name found on the selection's
-// own PATH, which holds the directories of the task's tools, and name
-// otherwise. A process resolves a bare name on its own PATH, which holds no
-// pinned toolchain and no tool.
+// one, such as cargo beside rustc, then a tool found on the selection's own
+// PATH, which holds the directories of the task's tools, and name otherwise.
+// The machine's toolchain command stays a bare name, so a caller tells the
+// pinned toolchain, an absolute path, from the machine's. A process resolves
+// a bare name on its own PATH, which holds no pinned toolchain and no tool.
 func (s Selection) Program(t Toolchain, name string) string {
-	if s.Executable != "" {
-		if name == t.Command[0] {
+	if name == t.Command[0] {
+		if s.Executable != "" {
 			return s.Executable
 		}
+		return name
+	}
+	if s.Executable != "" {
 		sibling := filepath.Join(filepath.Dir(s.Executable), name+filepath.Ext(s.Executable))
 		if info, err := os.Stat(sibling); err == nil && !info.IsDir() {
 			return sibling
@@ -223,7 +227,9 @@ func lookPathIn(env []string, name string) string {
 		}
 	}
 	for _, dir := range filepath.SplitList(path) {
-		if dir == "" {
+		// A relative entry would resolve against the step's directory, which
+		// Go's own lookup refuses too.
+		if dir == "" || !filepath.IsAbs(dir) {
 			continue
 		}
 		for _, n := range names {

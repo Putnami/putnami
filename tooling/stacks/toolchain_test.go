@@ -276,4 +276,15 @@ func TestProgramFindsAToolOnTheSelectionPath(t *testing.T) {
 	if got := selected.Program(tc, "./gradlew"); got != "./gradlew" {
 		t.Errorf("a path is kept: %s", got)
 	}
+	writeFile(t, tools, "javac", "#!/bin/sh\n")
+	if err := os.Chmod(filepath.Join(tools, "javac"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if got := selected.Program(tc, "javac"); got != "javac" {
+		t.Errorf("the machine's toolchain command stays bare, unlike a pinned one: %s", got)
+	}
+	relative := Selection{Env: []string{"PATH=relative-bin"}}
+	if got := relative.Program(tc, "mvn"); got != "mvn" {
+		t.Errorf("a relative PATH entry is no place to find a tool: %s", got)
+	}
 }

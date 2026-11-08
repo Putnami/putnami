@@ -37,21 +37,26 @@ project and a Maven module runs as the Gradle project, with the warning
 `java.build_conflict`.
 
 A component is an `application` when its build file applies the Gradle
-`application` plugin, Spring Boot or an Android application plugin, or its
-POM declares `spring-boot-maven-plugin`; any other is a `library`, which
-`serve`, `run` and `package` leave out.
+`application` or Spring Boot plugin, in a `plugins {}` block or with
+`apply plugin`, or its POM's build applies `spring-boot-maven-plugin` with no
+`<skip>true</skip>`. Any other is a `library`, which `serve`, `run` and
+`package` leave out: a dependency on Spring Boot makes no application, and an
+Android application, which runs on a device, is a library to Putnami.
 
 ### Builds in subdirectories
 
 A build need not sit at the workspace root. A Gradle build's root is the
 nearest directory that holds `settings.gradle.kts` or `settings.gradle`; a
-Maven build's root is the topmost directory of an unbroken chain of `pom.xml`
-files. That root is the stack root of the build's components: their steps run
+Maven build's root is the outermost `pom.xml` that lists the module, through a
+chain of `pom.xml` files or a `<module>` path such as `services/api`, else the
+module's own. That root is the stack root of the build's components: their steps run
 its `gradlew` or its `pom.xml`, and the tasks of one build run one at a time.
 When the root is no component itself, it is an input-only project its
 components depend on, so its settings, wrapper and root POM reach their keys.
 A Gradle build inside another one, such as `buildSrc` or an included build, is
-part of the build that holds it.
+part of the build that holds it, and a nested Gradle build the outer one does
+not include is left out. A build file under a `src`, `target` or `build`
+directory, such as an invoker test or an archetype template, is no build.
 
 ## The variant of each component
 
@@ -181,7 +186,9 @@ reruns every Maven task: a parent POM's settings reach every module.
 ## Serve and run an application
 
 `putnami serve` and `putnami run` first build the application's runnable form
-with its own build, then start it in its directory on the task's JDK:
+with its own build, under the lock the tasks of its build share, copy it into
+a private directory, and start the copy in the application's directory on the
+task's JDK:
 
 | Application | Built with | Started as |
 |---|---|---|
@@ -304,4 +311,9 @@ declare. The design of the stack core is in
 - A Maven module is built with `--also-make` by `serve`, `run` and `package`,
   so the modules it depends on are built again.
 - An image is built for one platform; the tests run the `linux/amd64` one.
+- The image's JRE follows the JDK that ran the build, not a Gradle toolchain
+  the build compiles for: a `jvmToolchain(25)` build run on JDK 21 names
+  `--docker-base-image` with a Java 25 base.
+- A JDK found only through `JAVA_HOME`, with no `javac` on `PATH`, is not
+  seen: the task installs one.
 - A library is published by its own build, not by `putnami publish`.

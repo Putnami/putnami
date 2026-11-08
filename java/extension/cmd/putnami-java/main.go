@@ -24,15 +24,13 @@ func main() {
 func run(args []string, stdin io.Reader, stdout, stderr io.Writer, runJobs func(map[string]cli.JobFunc)) int {
 	stack, err := java.Stack()
 	if err == nil {
-		{
-			err = stack.Entrypoint(args, stdin, stdout, runtimeVersion, func(jobs map[string]cli.JobFunc) {
-				jobs[java.ServeJobName] = java.ServeJob(stack)
-				jobs[java.RunJobName] = java.RunJob(stack)
-				jobs[java.PackageDockerJobName] = java.PackageDockerJob(stack)
-				jobs[java.PublishDockerJobName] = java.PublishDockerJob()
-				runJobs(jobs)
-			})
-		}
+		err = stack.Entrypoint(args, stdin, stdout, runtimeVersion, func(jobs map[string]cli.JobFunc) {
+			jobs[java.ServeJobName] = java.ServeJob(stack)
+			jobs[java.RunJobName] = java.RunJob(stack)
+			jobs[java.PackageDockerJobName] = java.PackageDockerJob(stack)
+			jobs[java.PublishDockerJobName] = java.PublishDockerJob()
+			runJobs(jobs)
+		})
 	}
 	if err != nil {
 		fmt.Fprintf(stderr, "%s: %v\n", java.ExtensionName, err)

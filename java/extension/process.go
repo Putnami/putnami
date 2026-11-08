@@ -11,7 +11,6 @@ import (
 	"os/exec"
 	"os/signal"
 	"path/filepath"
-	"regexp"
 	"slices"
 	"strconv"
 	"strings"
@@ -66,12 +65,6 @@ const (
 	mavenBootJar
 )
 
-var (
-	springBoot             = regexp.MustCompile(`org\.springframework\.boot|plugins\.spring[.\-_]?boot`)
-	gradleApplicationOnly  = regexp.MustCompile(`(?m)(?:^|[^A-Za-z0-9_$./-])(?:org\.gradle\.)?application(?:[^A-Za-z0-9_$/.-]|$)`)
-	mavenBootPluginPattern = mavenApplication
-)
-
 // runnableKindOf reads how the component's build makes it runnable.
 func runnableKindOf(workspaceRoot string, project string, meta stacks.Metadata) (runnableKind, error) {
 	rel, err := filepath.Rel(workspaceRoot, project)
@@ -81,16 +74,17 @@ func runnableKindOf(workspaceRoot string, project string, meta stacks.Metadata) 
 	rel = filepath.ToSlash(rel)
 	if meta.Variant == VariantMaven {
 		data, err := os.ReadFile(filepath.Join(project, "pom.xml")) //nolint:gosec // the module's own POM
-		if err == nil && mavenBootPluginPattern.Match(data) {
+		if err == nil && mavenBootPlugin(data) {
 			return mavenBootJar, nil
 		}
-		return 0, fmt.Errorf("%s declares no spring-boot-maven-plugin: the extension runs a Maven module through its Spring Boot jar", rel)
+		return 0, fmt.Errorf("%s builds with no active spring-boot-maven-plugin: the extension runs a Maven module through its Spring Boot jar", rel)
 	}
 	_, build := buildFile(workspaceRoot, rel)
-	switch {
-	case springBoot.MatchString(build):
+	plugins := gradlePlugins(build)
+	if slices.ContainsFunc(plugins, isSpringBoot) {
 		return bootJar, nil
-	case gradleApplicationOnly.MatchString(build):
+	}
+	if slices.Contains(plugins, "application") || slices.Contains(plugins, "org.gradle.application") {
 		return installDist, nil
 	}
 	return 0, fmt.Errorf("%s applies neither the application plugin nor Spring Boot", rel)
@@ -158,47 +152,127 @@ func buildRunnable(ctx context.Context, root stacks.RootStep, meta stacks.Metada
 }
 
 // single answers the one entry of dir that keep accepts.
+// A build can leave the form of an earlier version beside the new one, such as
+// app-1.0.jar beside app-1.1.jar: the build just wrote the newest.
 func single(dir string, keep func(os.DirEntry) bool) (string, error) {
 	entries, err := os.ReadDir(dir)
 	if err != nil {
 		return "", err
 	}
-	var found []string
+	newest, newestTime := "", time.Time{}
 	for _, e := range entries {
-		if keep(e) {
-			found = append(found, filepath.Join(dir, e.Name()))
+		if !keep(e) {
+			continue
+		}
+		info, err := e.Info()
+		if err != nil {
+			return "", err
+		}
+		if newest == "" || info.ModTime().After(newestTime) {
+			newest, newestTime = filepath.Join(dir, e.Name()), info.ModTime()
 		}
 	}
-	if len(found) != 1 {
-		return "", fmt.Errorf("found %d candidates in %s", len(found), dir)
+	if newest == "" {
+		return "", fmt.Errorf("found no candidate in %s", dir)
 	}
-	return found[0], nil
+	return newest, nil
 }
 
 // application selects the toolchain of the job's component, reads how it
-// runs, and builds its runnable form.
-func application(ctx *pctx.Context, stack stacks.Stack, emit *jsonl.Emitter) (stacks.RootStep, runnable, error) {
+// runs, builds its runnable form under the stack root's lock, as every task of
+// the build does, and copies it into a private directory before it releases
+// the lock: a task that cleans the module later never touches what runs or
+// what an image packages. The caller calls the returned cleanup.
+func application(ctx *pctx.Context, stack stacks.Stack, emit *jsonl.Emitter) (stacks.RootStep, runnable, func(), error) {
 	fail := func(code string, err error) error {
 		emit.DiagnosticWithCode("error", err.Error(), "", 0, 0, code)
 		return fmt.Errorf("%s: %w", code, err)
 	}
+	none := func() {}
 	var meta stacks.Metadata
 	if err := json.Unmarshal(ctx.Project.Metadata[stack.Extension], &meta); err != nil || meta.Component == "" {
-		return stacks.RootStep{}, runnable{}, fail(CodeNotRunnable, fmt.Errorf("%s is no component @putnami/java found: run putnami projects sync", ctx.Project.Path))
+		return stacks.RootStep{}, runnable{}, none, fail(CodeNotRunnable, fmt.Errorf("%s is no component @putnami/java found: run putnami projects sync", ctx.Project.Path))
 	}
-	root, err := stack.Selected(ctx, emit)
+	kind, err := runnableKindOf(ctx.WorkspaceRoot, ctx.Project.FullPath, meta)
 	if err != nil {
-		return stacks.RootStep{}, runnable{}, err
+		return stacks.RootStep{}, runnable{}, none, fail(CodeNotRunnable, err)
 	}
-	kind, err := runnableKindOf(ctx.WorkspaceRoot, root.Project, meta)
+	private, err := os.MkdirTemp("", "putnami-java-app-")
 	if err != nil {
-		return stacks.RootStep{}, runnable{}, fail(CodeNotRunnable, err)
+		return stacks.RootStep{}, runnable{}, none, fail(CodeRunFailed, err)
 	}
-	app, err := buildRunnable(context.Background(), root, meta, kind, os.Stderr)
+	cleanup := func() { _ = os.RemoveAll(private) }
+	var root stacks.RootStep
+	var app runnable
+	err = stack.Locked(ctx, emit, func(run context.Context, r stacks.RootStep, _ *jsonl.Emitter) error {
+		root = r
+		built, err := buildRunnable(run, r, meta, kind, os.Stderr)
+		if err != nil {
+			return fail(CodeRunFailed, err)
+		}
+		if app, err = built.copyTo(private, r.Program("java")); err != nil {
+			return fail(CodeRunFailed, err)
+		}
+		return nil
+	})
 	if err != nil {
-		return stacks.RootStep{}, runnable{}, fail(CodeRunFailed, err)
+		cleanup()
+		return stacks.RootStep{}, runnable{}, none, err
 	}
-	return root, app, nil
+	return root, app, cleanup, nil
+}
+
+// copyTo copies the runnable form into dir and answers the copy.
+func (r runnable) copyTo(dir, java string) (runnable, error) {
+	target := filepath.Join(dir, filepath.Base(r.path))
+	if r.kind != installDist {
+		if err := copyFile(r.path, target); err != nil {
+			return runnable{}, err
+		}
+		return runnable{kind: r.kind, path: target, command: []string{java, "-jar", target}}, nil
+	}
+	err := filepath.WalkDir(r.path, func(path string, entry os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		rel, err := filepath.Rel(r.path, path)
+		if err != nil {
+			return err
+		}
+		if entry.IsDir() {
+			return os.MkdirAll(filepath.Join(target, rel), 0o755)
+		}
+		return copyFile(path, filepath.Join(target, rel))
+	})
+	if err != nil {
+		return runnable{}, err
+	}
+	rel, err := filepath.Rel(r.path, r.command[0])
+	if err != nil {
+		return runnable{}, err
+	}
+	return runnable{kind: r.kind, path: target, command: []string{filepath.Join(target, rel)}}, nil
+}
+
+// copyFile copies a file and its executable bit. A symbolic link is an error:
+// an image's cache key does not cover what a link points to.
+func copyFile(source, target string) error {
+	info, err := os.Lstat(source)
+	if err != nil {
+		return err
+	}
+	if !info.Mode().IsRegular() {
+		return fmt.Errorf("%s is no regular file, which a runnable form cannot hold", source)
+	}
+	data, err := os.ReadFile(source) //nolint:gosec // a file the build produced
+	if err != nil {
+		return err
+	}
+	mode := os.FileMode(0o644)
+	if info.Mode()&0o111 != 0 {
+		mode = 0o755
+	}
+	return os.WriteFile(target, data, mode) //nolint:gosec // a private copy
 }
 
 // ServeJob runs an application until the user stops it, and announces it
@@ -207,7 +281,8 @@ func application(ctx *pctx.Context, stack stacks.Stack, emit *jsonl.Emitter) (st
 func ServeJob(stack stacks.Stack) cli.JobFunc {
 	return func(ctx *pctx.Context, emit *jsonl.Emitter, args []string) (string, map[string]any, error) {
 		port := cli.FlagInt(cli.ParseFlags(args), "port", ctx.Params.Int("port", defaultServePort))
-		root, app, err := application(ctx, stack, emit)
+		root, app, cleanup, err := application(ctx, stack, emit)
+		defer cleanup()
 		if err != nil {
 			return "FAILED", nil, err
 		}
@@ -238,7 +313,8 @@ func ServeJob(stack stacks.Stack) cli.JobFunc {
 // exit code.
 func RunJob(stack stacks.Stack) cli.JobFunc {
 	return func(ctx *pctx.Context, emit *jsonl.Emitter, _ []string) (string, map[string]any, error) {
-		root, app, err := application(ctx, stack, emit)
+		root, app, cleanup, err := application(ctx, stack, emit)
+		defer cleanup()
 		if err != nil {
 			return "FAILED", nil, err
 		}

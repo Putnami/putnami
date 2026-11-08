@@ -4,13 +4,16 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"go.putnami.dev/protocol/features/spectest"
 	job "go.putnami.dev/protocol/job"
 	"go.putnami.dev/sdk/extension/cli"
 	pctx "go.putnami.dev/sdk/extension/context"
+	"go.putnami.dev/sdk/extension/filelock"
 	"go.putnami.dev/sdk/extension/jsonl"
 )
 
@@ -46,7 +49,7 @@ done
 	writeFile(t, root, "m/pom.xml", `<project><groupId>com.acme</groupId><artifactId>shop</artifactId><packaging>pom</packaging><modules><module>app</module></modules></project>`)
 	writeFile(t, root, "m/app/pom.xml", `<project><parent><groupId>com.acme</groupId></parent><artifactId>app</artifactId><build><plugins><plugin><artifactId>spring-boot-maven-plugin</artifactId></plugin></plugins></build></project>`)
 	writeFile(t, bin, "javac", "#!/bin/sh\necho 'javac 21.0.13'\n")
-	writeFile(t, bin, "java", "#!/bin/sh\necho \"$PWD: java $* PORT=$PORT\" >> \""+log+"\"\nexit ${STUB_EXIT:-0}\n")
+	writeFile(t, bin, "java", "#!/bin/sh\necho \"$PWD: java $1 $(basename \"$2\") $3 PORT=$PORT\" >> \""+log+"\"\nexit ${STUB_EXIT:-0}\n")
 	writeFile(t, bin, "mvn", "#!/bin/sh\necho \"$PWD: mvn $*\" >> \""+log+"\"\nmkdir -p target && echo boot > target/app-1.0.jar && echo src > target/app-1.0-sources.jar\n")
 	for _, f := range []string{filepath.Join(root, "g/gradlew"), filepath.Join(bin, "javac"), filepath.Join(bin, "java"), filepath.Join(bin, "mvn")} {
 		if err := os.Chmod(f, 0o755); err != nil {
@@ -91,11 +94,11 @@ func TestServeRunsTheApplicationItsBuildProduces(t *testing.T) {
 		}},
 		{"g/boot", "3000", []string{
 			filepath.Join(root, "g/boot") + ": gradlew --console=plain :boot:bootJar",
-			filepath.Join(root, "g/boot") + ": java -jar " + filepath.Join(root, "g/boot/build/libs/boot.jar") + " PORT=3000",
+			filepath.Join(root, "g/boot") + ": java -jar boot.jar  PORT=3000",
 		}},
 		{"m/app", "3000", []string{
 			filepath.Join(root, "m/app") + ": mvn --batch-mode --file " + filepath.Join(root, "m/pom.xml") + " --projects com.acme:app --also-make package -DskipTests",
-			filepath.Join(root, "m/app") + ": java -jar " + filepath.Join(root, "m/app/target/app-1.0.jar") + " PORT=3000",
+			filepath.Join(root, "m/app") + ": java -jar app-1.0.jar  PORT=3000",
 		}},
 	} {
 		var params job.Params
@@ -156,10 +159,11 @@ func TestPackageAssemblesTheImageOfAnApplication(t *testing.T) {
 	}
 
 	ctx := &pctx.Context{WorkspaceRoot: root, Project: pctx.Project{Path: "g/app", FullPath: filepath.Join(root, "g/app"), Metadata: map[string]json.RawMessage{ExtensionName: probe(t, root, "g", "g/app")["g/app"].Metadata}}}
-	rootStep, app, err := application(ctx, s, jsonl.New())
+	rootStep, app, cleanup, err := application(ctx, s, jsonl.New())
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer cleanup()
 	base, err := baseImage(t.Context(), rootStep, "")
 	if err != nil || base != jreBases["21"] {
 		t.Fatalf("the base follows the selected Java major: %s %v", base, err)
@@ -175,11 +179,11 @@ func TestPackageAssemblesTheImageOfAnApplication(t *testing.T) {
 			t.Errorf("the launcher stays executable: %o", f.Mode)
 		}
 	}
-	if strings.Join(paths, ",") != "/app/bin/app,/app/bin/app.bat,/app/lib/app.jar" || strings.Join(spec.Entrypoint, " ") != "/app/bin/app" || spec.User != imageUser || strings.Join(spec.Env, ",") != "PORT=8080,SERVER_PORT=8080" {
+	if strings.Join(paths, ",") != "/app/bin/app,/app/lib/app.jar" || strings.Join(spec.Entrypoint, " ") != "/app/bin/app" || spec.User != imageUser || strings.Join(spec.Env, ",") != "PORT=8080,SERVER_PORT=8080" {
 		t.Errorf("installDist image = %+v %v", spec, paths)
 	}
 	boot, err := imageSpec(runnable{kind: bootJar, path: "/x/boot.jar", command: []string{"java", "-jar", "/x/boot.jar"}}, base, defaultPlatform, defaultImagePort)
-	if err != nil || strings.Join(boot.Entrypoint, " ") != imageJava+" -jar /app/app.jar" || boot.Layers[0].Files[0].Path != "/app/app.jar" {
+	if err != nil || strings.Join(boot.Entrypoint, " ") != "java -jar /app/app.jar" || boot.Layers[0].Files[0].Path != "/app/app.jar" {
 		t.Errorf("boot jar image = %+v %v", boot, err)
 	}
 	for major, ref := range jreBases {
@@ -208,5 +212,78 @@ func TestAnApplicationThatPublishesAnImageIsAReleaseMember(t *testing.T) {
 	}
 	if strings.Contains(string(got["g/lib"].Metadata), "releaseSet") {
 		t.Errorf("a library publishes no image: %s", got["g/lib"].Metadata)
+	}
+}
+
+func TestTheRunnableFormIsBuiltUnderTheRootLock(t *testing.T) {
+	spectest.Proves(t, feature, "serve-runs-the-application", "serve-runs-the-application-until-stopped-and-reports-it-ready")
+	root, log := appFixture(t)
+	lockDir := filepath.Join(root, ".putnami", "locks", "stacks")
+	if err := os.MkdirAll(lockDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	lock, err := filelock.Acquire(filepath.Join(lockDir, "java-g.lock"), true, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	done := make(chan string)
+	go func() {
+		status, _, _ := runProjectJob(t, root, "g/app", RunJob(stack(t)), nil)
+		done <- status
+	}()
+	time.Sleep(500 * time.Millisecond)
+	if strings.Contains(ran(t, log), "installDist") {
+		t.Error("the build ran while a task held the root's lock")
+	}
+	if err := lock.Release(); err != nil {
+		t.Fatal(err)
+	}
+	if status := <-done; status != "OK" || !strings.Contains(ran(t, log), "installDist") {
+		t.Errorf("run after the lock: %s\n%s", status, ran(t, log))
+	}
+	// The run used a private copy: removing the build's output after it does
+	// not change what ran.
+	if _, err := os.Stat(filepath.Join(root, "g/app/build/install/app/bin/app")); err != nil {
+		t.Errorf("the build's own output stays: %v", err)
+	}
+}
+
+func TestTheNewestJarOfAnEarlierVersionIsNotPicked(t *testing.T) {
+	dir := t.TempDir()
+	old := filepath.Join(dir, "app-1.0.jar")
+	writeFile(t, dir, "app-1.0.jar", "old")
+	writeFile(t, dir, "app-1.1.jar", "new")
+	past := time.Now().Add(-time.Hour)
+	if err := os.Chtimes(old, past, past); err != nil {
+		t.Fatal(err)
+	}
+	got, err := single(dir, func(e os.DirEntry) bool { return strings.HasSuffix(e.Name(), ".jar") })
+	if err != nil || filepath.Base(got) != "app-1.1.jar" {
+		t.Errorf("single = %s %v", got, err)
+	}
+}
+
+func TestTheImageKeyLeavesOutBuildOutputs(t *testing.T) {
+	data, err := os.ReadFile("putnami.extension.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var m struct {
+		Tasks map[string]struct {
+			Inputs map[string]struct {
+				Files []string `json:"files"`
+			} `json:"inputs"`
+		} `json:"tasks"`
+	}
+	if err := json.Unmarshal(data, &m); err != nil {
+		t.Fatal(err)
+	}
+	for _, input := range []string{"application", "upstream"} {
+		files := m.Tasks["package-docker"].Inputs[input].Files
+		for _, out := range []string{"!**/target/**", "!**/build/**", "!**/.gradle/**"} {
+			if !slices.Contains(files, out) {
+				t.Errorf("package-docker %s reads %s: %v", input, out, files)
+			}
+		}
 	}
 }

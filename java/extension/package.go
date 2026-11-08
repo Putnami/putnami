@@ -41,7 +41,6 @@ const (
 	dockerChannel    = "docker"
 	imageAppDir      = "/app"
 	imageUser        = "1000:1000"
-	imageJava        = "/opt/java/openjdk/bin/java"
 	defaultImagePort = "8080"
 	defaultPlatform  = "linux/amd64"
 )
@@ -96,7 +95,8 @@ func assembleImage(ctx *pctx.Context, stack stacks.Stack, flags map[string]strin
 		}
 		return nil
 	}
-	root, app, err := application(ctx, stack, emit)
+	root, app, cleanup, err := application(ctx, stack, emit)
+	defer cleanup()
 	if err != nil {
 		return err
 	}
@@ -196,7 +196,8 @@ func imageSpec(app runnable, base, platform, port string) (oci.Spec, error) {
 		entrypoint = []string{imageAppDir + "/bin/" + filepath.Base(app.command[0])}
 	default:
 		files = []oci.File{{Source: app.path, Path: imageAppDir + "/app.jar", Mode: 0o644}}
-		entrypoint = []string{imageJava, "-jar", imageAppDir + "/app.jar"}
+		// The base image's PATH names its java, a Temurin JRE or another base.
+		entrypoint = []string{"java", "-jar", imageAppDir + "/app.jar"}
 	}
 	return oci.Spec{
 		BaseRef:      base,
@@ -219,7 +220,8 @@ func imageFiles(dir string) ([]oci.File, error) {
 		if err != nil {
 			return err
 		}
-		if entry.IsDir() {
+		// A Windows launcher has no use in a Linux image.
+		if entry.IsDir() || strings.HasSuffix(entry.Name(), ".bat") {
 			return nil
 		}
 		info, err := os.Lstat(path)

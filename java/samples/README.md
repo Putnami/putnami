@@ -10,11 +10,11 @@ Two builds, each an application that depends on a library:
 
 Each build's root is its components' stack root, and a project of its own.
 These projects carry the `e2e` tag, so the default gate skips them. To run
-them, you need no JDK and no Maven: `putnami install` pins an Eclipse Temurin
-JDK, and the first Maven task installs Apache Maven.
+them, you need no JDK and no Maven: the first task installs the Eclipse
+Temurin JDK `.java-version` states, and the first Maven task installs Apache
+Maven.
 
 ```bash
-putnami install
 putnami projects sync
 putnami lint,test,build --tag e2e --projects /java/samples/gradle/library,/java/samples/gradle/application,/java/samples/maven/library,/java/samples/maven/application
 putnami serve --projects /java/samples/gradle/application --port 3456

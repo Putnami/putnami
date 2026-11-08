@@ -235,6 +235,15 @@ func (s Stack) rootStep(ctx context.Context, in runInput, emit *jsonl.Emitter) (
 	}, meta, profile, nil
 }
 
+// Locked runs step at the job's component's stack root with its toolchain
+// selected, under the root's lock: a workload command that builds with the
+// stack's build, then runs what it built, builds under the lock and releases
+// it before it runs, so it never shares the build directory with a task.
+func (s Stack) Locked(ctx *pctx.Context, emit *jsonl.Emitter, step func(context.Context, RootStep, *jsonl.Emitter) error) error {
+	in := runInput{workspaceRoot: ctx.WorkspaceRoot, projectAbs: ctx.Project.FullPath, metadata: ctx.Project.Metadata[s.Extension]}
+	return s.atRoot(context.Background(), in, step, emit)
+}
+
 // Selected answers the job's component with its toolchain selected and no lock
 // of its stack root held: a process the user keeps running must not block the
 // other tasks of the root.

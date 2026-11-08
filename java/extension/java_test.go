@@ -23,6 +23,7 @@ const feature = "java/stack-extension"
 // No test downloads a JDK: a test that installs one serves it itself.
 func init() {
 	downloadURL = func(string) string { return "http://127.0.0.1:1/no-download-in-tests" }
+	mavenURL = "http://127.0.0.1:1/no-download-in-tests"
 }
 
 func writeFile(t *testing.T, root, rel, content string) {
@@ -535,5 +536,59 @@ func TestNestedBuildsHaveTheirOwnStackRoot(t *testing.T) {
 	}
 	if got := resolve(t, root, "samples/gradle", "java:build"); !slices.Contains(got.Files, "settings.gradle.kts") || got.Error != "" {
 		t.Errorf("the nested root reads its root files: %+v", got)
+	}
+}
+
+func TestAModuleUnderAFolderWithNoPOMBelongsToItsOuterBuild(t *testing.T) {
+	spectest.Proves(t, feature, "nested-builds-are-stack-roots", "nested-gradle-and-maven-builds-are-their-components-stack-roots")
+	root := t.TempDir()
+	writeFile(t, root, "pom.xml", `<project><groupId>com.acme</groupId><artifactId>shop</artifactId><packaging>pom</packaging><modules><module>services/api</module><module>lib</module></modules></project>`)
+	writeFile(t, root, "lib/pom.xml", `<project><parent><groupId>com.acme</groupId></parent><artifactId>lib</artifactId></project>`)
+	writeFile(t, root, "services/api/pom.xml", `<project><parent><groupId>com.acme</groupId></parent><artifactId>api</artifactId><dependencies><dependency><groupId>com.acme</groupId><artifactId>lib</artifactId></dependency></dependencies></project>`)
+	writeFile(t, root, "lib/src/it/simple/pom.xml", `<project><groupId>it</groupId><artifactId>simple</artifactId></project>`)
+	writeFile(t, root, "lib/src/main/resources/archetype-resources/pom.xml", `<project><groupId>x</groupId><artifactId>tpl</artifactId></project>`)
+	s := stack(t)
+	result, err := s.Probe(root, wsproto.ProbeRequest{Version: wsproto.ProbeProtocolVersion, Extension: s.Extension, Paths: []string{".", "lib", "lib/src/it/simple", "lib/src/main/resources/archetype-resources", "services/api"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if diags := wsproto.ValidateProbeResult(&result); len(diags) != 0 {
+		t.Fatalf("the probe breaks the protocol: %v", diags)
+	}
+	got := map[string]wsproto.ProbeProject{}
+	for _, p := range result.Projects {
+		got[p.Path] = p
+	}
+	if len(got) != 2 || metadata(t, got["services/api"]).Root != "." || !reflect.DeepEqual(got["services/api"].Dependencies, []string{"lib"}) {
+		t.Errorf("projects = %+v", result.Projects)
+	}
+}
+
+func TestOnlyAnAppliedPluginMakesAnApplication(t *testing.T) {
+	spectest.Proves(t, feature, "components-become-projects", "the-gradle-projects-and-maven-modules-become-projects-with-their-edges")
+	for build, want := range map[string]string{
+		"plugins {\n    application\n}\n":                                         TypeApplication,
+		"plugins {\n    id(\"application\")\n}\n":                                 TypeApplication,
+		"apply plugin: 'application'\n":                                           TypeApplication,
+		"plugins {\n    id(\"org.springframework.boot\") version \"3.5.16\"\n}\n": TypeApplication,
+		"plugins {\n    alias(libs.plugins.spring.boot)\n}\n":                     TypeApplication,
+		"plugins {\n    `java-library`\n}\ndependencies {\n    implementation(\"org.springframework.boot:spring-boot-starter-web\")\n}\n": TypeLibrary,
+		"plugins {\n    `java-library`\n}\ndescription = \"the application's pricing\"\n":                                                 TypeLibrary,
+		"plugins {\n    id(\"com.android.application\")\n}\nandroid {\n}\n":                                                               TypeLibrary,
+		"plugins {\n    kotlin(\"jvm\")\n    application\n}\n":                                                                            TypeApplication,
+	} {
+		if got := gradleType(stripComments(build)); got != want {
+			t.Errorf("%q = %s, want %s", build, got, want)
+		}
+	}
+	for pom, want := range map[string]bool{
+		`<project><build><plugins><plugin><artifactId>spring-boot-maven-plugin</artifactId></plugin></plugins></build></project>`:                                                 true,
+		`<project><build><plugins><plugin><artifactId>spring-boot-maven-plugin</artifactId><configuration><skip>true</skip></configuration></plugin></plugins></build></project>`: false,
+		`<project><build><pluginManagement><plugins><plugin><artifactId>spring-boot-maven-plugin</artifactId></plugin></plugins></pluginManagement></build></project>`:            false,
+		`<project><dependencies><dependency><artifactId>spring-boot-starter-web</artifactId></dependency></dependencies></project>`:                                               false,
+	} {
+		if got := mavenBootPlugin([]byte(pom)); got != want {
+			t.Errorf("%s = %v, want %v", pom, got, want)
+		}
 	}
 }
