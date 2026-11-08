@@ -64,7 +64,7 @@
     },
     {
       "id": "filters-the-tests",
-      "text": "test with the test flag, short -t, passes its value to PHPUnit as one --filter argument, with or without coverage. The value is part of the task's key, so a filtered result never answers an unfiltered run."
+      "text": "test with the test flag, short -t, passes its value to PHPUnit as one --filter argument, with or without coverage, and a project in which the filter selects no test passes when that PHPUnit lists --do-not-fail-on-empty-test-suite. The value is part of the task's key, so a filtered result never answers an unfiltered run."
     },
     {
       "id": "fetches-the-locked-packages",
