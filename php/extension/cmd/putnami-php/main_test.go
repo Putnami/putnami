@@ -23,7 +23,7 @@ func TestRunHandsTheTasksToTheJobDispatcher(t *testing.T) {
 			got = append(got, name)
 		}
 	})
-	if code != 0 || len(got) != 2 {
+	if code != 0 || len(got) != 3 {
 		t.Fatalf("exit %d, jobs %v", code, got)
 	}
 }
