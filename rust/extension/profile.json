@@ -1,0 +1,46 @@
+{
+  "id": "rust",
+  "markers": ["Cargo.toml"],
+  "toolchain": {
+    "command": ["rustc", "--version"],
+    "pattern": "^rustc (?<version>\\S+)",
+    "files": [
+      { "path": "rust-toolchain.toml", "key": "toolchain.channel" },
+      { "path": "rust-toolchain" }
+    ]
+  },
+  "inputs": {
+    "sources": ["src/**", "tests/**", "benches/**", "examples/**", "build.rs"],
+    "manifests": [
+      "Cargo.toml", ".cargo/config.toml", ".cargo/config", "rustfmt.toml", ".rustfmt.toml", "clippy.toml", ".clippy.toml",
+      "{root}/Cargo.toml", "{root}/.cargo/config.toml", "{root}/.cargo/config", "{root}/.config/nextest.toml",
+      "{root}/rustfmt.toml", "{root}/.rustfmt.toml", "{root}/clippy.toml", "{root}/.clippy.toml"
+    ],
+    "lockfiles": ["Cargo.lock", "{root}/Cargo.lock"]
+  },
+  "tasks": {
+    "lint": {
+      "steps": [
+        ["cargo", "fmt", "--package", "{component}", "--check"],
+        ["cargo", "clippy", "--package", "{component}", "--all-targets", "--", "-D", "warnings"]
+      ],
+      "inputs": ["sources", "manifests"]
+    },
+    "test": {
+      "steps": [
+        ["cargo", "llvm-cov", "nextest", "--package", "{component}", "--profile", "ci", "--lcov", "--output-path", "{output}/lcov.info"]
+      ],
+      "inputs": ["sources", "manifests", "lockfiles"],
+      "reports": {
+        "junit": ["{root}/target/nextest/ci/junit.xml"],
+        "coverage": [{ "format": "lcov", "paths": ["{output}/lcov.info"] }]
+      }
+    },
+    "build": {
+      "steps": [
+        ["cargo", "build", "--package", "{component}", "--locked"]
+      ],
+      "inputs": ["sources", "manifests", "lockfiles"]
+    }
+  }
+}

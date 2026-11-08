@@ -9,8 +9,8 @@ import (
 	diag "go.putnami.dev/protocol/diagnostic"
 	"go.putnami.dev/protocol/evidence"
 	"go.putnami.dev/protocol/features/spectest"
+	"go.putnami.dev/tooling/observe/detect/pants"
 	"go.putnami.dev/tooling/observe/internal/analyze"
-	"go.putnami.dev/tooling/observe/internal/detect/pants"
 )
 
 const pantsFeature = "tooling/observe-pants"

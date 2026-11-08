@@ -30,6 +30,7 @@
       "intelligence",
       "protocols",
       "python",
+      "rust",
       "sites",
       "tooling",
       "typescript"
@@ -49,6 +50,7 @@
       "scope/intelligence",
       "scope/protocols",
       "scope/python",
+      "scope/rust",
       "scope/sites",
       "scope/tooling",
       "scope/typescript",

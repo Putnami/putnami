@@ -1,0 +1,62 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-features.json",
+  "protocolVersion": 2,
+  "namespace": "rust",
+  "features": [
+    {
+      "id": "rust/stack-extension",
+      "type": "feature",
+      "name": "Run the crates of a Cargo workspace as Putnami tasks",
+      "outcome": "A team with a Cargo workspace adds @putnami/rust and runs putnami lint, test and build over its crates with Putnami's runner and cache, without rewriting its build: each crate is a project with its edges, each task runs the Rust profile's cargo steps after a toolchain check, the test task reads its JUnit and LCOV reports, and a crate overrides any profile value in its putnami.json",
+      "owner": "rust",
+      "target": "coded",
+      "requirements": [
+        {
+          "id": "crates-become-projects",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": ["the-crates-of-a-cargo-workspace-become-projects-with-their-edges"]
+          }
+        },
+        {
+          "id": "tasks-run-the-profile",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": ["a-task-runs-the-profile-steps-after-the-toolchain-check"]
+          }
+        },
+        {
+          "id": "reports-become-the-summary",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": ["junit-and-lcov-become-the-test-and-coverage-summary"]
+          }
+        },
+        {
+          "id": "overrides-are-honored",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": ["a-putnami-json-override-changes-the-steps-and-the-inputs"]
+          }
+        },
+        {
+          "id": "manifest-follows-the-profile",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": ["the-manifest-conforms-to-the-stack-core"]
+          }
+        }
+      ]
+    }
+  ]
+}

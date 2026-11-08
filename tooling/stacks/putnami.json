@@ -1,0 +1,24 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-project.json",
+  "name": "@putnami/stacks",
+  "visibility": "public",
+  "tags": [
+    "go"
+  ],
+  "extensions": [
+    "/go/extension"
+  ],
+  "disable": {
+    "jobs": [
+      "serve"
+    ]
+  },
+  "featureAuthority": {
+    "dependents": true
+  },
+  "options": {
+    "test": {
+      "coverage-threshold": 80
+    }
+  }
+}
