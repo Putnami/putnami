@@ -49,11 +49,13 @@ func Detect(root string, request wsproto.ProbeRequest) ([]stacks.Component, []di
 			stackRoot = wsproto.ProbeRootPath
 		}
 		out = append(out, stacks.Component{
-			Path:         p.Path,
-			Name:         p.SourceName,
-			SourceFile:   p.SourceFile,
-			Root:         stackRoot,
-			Dependencies: p.Dependencies,
+			Path:           p.Path,
+			Name:           p.SourceName,
+			SourceFile:     p.SourceFile,
+			Root:           stackRoot,
+			Dependencies:   p.Dependencies,
+			Type:           p.Type,
+			ReleaseMembers: imageMember(root, p, stackRoot),
 		})
 	}
 	return out, diags

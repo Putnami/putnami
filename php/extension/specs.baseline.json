@@ -4,13 +4,20 @@
   "executableRequirements": [
     "php/stack-extension#components-become-projects",
     "php/stack-extension#coverage-driver-is-optional",
+    "php/stack-extension#fetches-the-locked-packages",
     "php/stack-extension#inputs-per-task",
     "php/stack-extension#installs-its-dependencies",
     "php/stack-extension#machine-php-comes-first",
     "php/stack-extension#manifest-follows-the-profile",
     "php/stack-extension#overrides-are-honored",
+    "php/stack-extension#packages-an-application-image",
     "php/stack-extension#pins-a-php-release",
+    "php/stack-extension#publishes-an-application-image",
     "php/stack-extension#reports-become-the-summary",
-    "php/stack-extension#tasks-run-the-profile"
+    "php/stack-extension#runs-an-application-once",
+    "php/stack-extension#serves-an-application",
+    "php/stack-extension#tasks-run-the-profile",
+    "php/stack-extension#upgrades-the-dependencies",
+    "php/stack-extension#workspace-install-runs-composer"
   ]
 }

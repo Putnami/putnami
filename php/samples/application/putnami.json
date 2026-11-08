@@ -2,5 +2,6 @@
   "$schema": "https://putnami.dev/schemas/putnami-project.json",
   "tags": ["sample", "php", "e2e"],
   "extensions": ["/php/extension"],
-  "featureAuthority": { "owner": "php/stack-extension" }
+  "featureAuthority": { "owner": "php/stack-extension" },
+  "options": { "package": { "docker": true } }
 }

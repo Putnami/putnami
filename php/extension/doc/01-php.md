@@ -20,8 +20,8 @@ needs neither PHP nor Composer.
    each package it requires through a path repository, and tags it `php`. An
    application whose `composer.json` names no package is named by its
    directory in the steps.
-3. Run `putnami install`, then `putnami lint,test`. The first task of a
-   component runs `composer install` at its stack root.
+3. Run `putnami install`, then `putnami lint,test`. `putnami install` runs
+   `composer install` at each stack root.
 
 ## Where PHP and Composer come from
 
@@ -45,12 +45,23 @@ A `php` on `PATH` that satisfies the statement always runs. The pinned PHP
 runs only when `php` is missing or outside the statement.
 
 Composer is a single file, so the extension downloads `composer.phar` 2.11.1
-under the Putnami home and checks its SHA-256. The `install` step of each
-`lint` and `test` runs `composer install` at the component's stack root. It
-skips a stack root whose last successful install used its current
-`composer.json` and `composer.lock`. A run with offline dependencies, such as
-a hosted run, installs nothing, so its repository needs a `vendor/` already.
-On Windows, the step also writes the `php.ini` of the pinned PHP, which
+under the Putnami home and checks its SHA-256.
+
+`putnami install` runs two jobs of this extension over the workspace's
+projects, except the projects `disable.tags` excludes:
+
+| Job | What it does |
+|---|---|
+| `workspace-fetch` | Downloads the packages of each stack root's `composer.lock` into the extension's Composer cache. It uses `--no-scripts`, `--no-plugins` and a private vendor directory, so it runs no package code and writes nothing in the repository. A stack root with no `composer.lock` is skipped. |
+| `workspace-install` | Runs `composer install` at each stack root, except one whose last successful install used its current `composer.json` and `composer.lock`. With offline dependencies, such as in a hosted run, it installs from the Composer cache with the network disabled. |
+
+With no PHP on the machine, both warn and pass. A hosted run installs no
+toolchain, so its runner needs a PHP on `PATH`.
+
+The `install` step of each `lint`, `test`, `serve` and `run` runs the same
+`composer install` for one stack root, so a project `disable.tags` excludes
+still works when you name it. It installs nothing with offline dependencies.
+On Windows, these steps also write the `php.ini` of the pinned PHP, which
 enables openssl, mbstring, curl, zip and fileinfo. A Windows project that needs
 another extension puts its own PHP on `PATH`.
 
@@ -82,6 +93,64 @@ stack root and `{output}` the task's output directory.
 | `test` | `php -d xdebug.mode=coverage -d pcov.directory={root} -d pcov.exclude=~/vendor/~ {root}/vendor/bin/phpunit --log-junit {output}/junit.xml --coverage-clover {output}/clover.xml --coverage-filter src tests` |
 
 There is no build task: PHP has no compile step.
+
+## Run an application
+
+A project is an application when its `composer.json` says `"type": "project"`.
+Any other type, or no type, is a library, as in Composer. `serve`, `run` and
+`package` skip a library.
+
+| Command | What it runs |
+|---|---|
+| `putnami serve <project>` | `php -S 0.0.0.0:<port> -t public <router>` in the project directory. `--port` defaults to 3000, and 0 selects a free port. The router answers a path that is no file with `public/index.php`, and the command fails when that file is missing. It reports the server ready once it accepts connections, so `putnami qualify` and compose can wait on it. PHP reads its files on each request, so there is no watcher. |
+| `putnami run <project> --args "<arguments>"` | `php <entrypoint> <arguments>` in the project directory, and exits with its exit code. `--entrypoint` defaults to `bin/console`. |
+
+`putnami upgrade` runs `composer update` at each stack root with the pinned
+Composer.
+
+## Package and publish an image
+
+An application reaches a registry as an OCI image, a standard container image.
+Declare the channel in the project's `putnami.json`:
+
+```json
+{ "options": { "package": { "docker": true }, "publish": { "docker": true } } }
+```
+
+`putnami package` assembles the image with no Docker daemon. `--docker-load`
+also loads it into the local Docker daemon. `putnami publish` pushes it to the
+registry that `registries.oci.publish` of `putnami.workspace.json` declares,
+through the shared publisher of the Go and TypeScript extensions.
+
+| Layer | Content |
+|---|---|
+| Dependencies | `composer install --no-dev --no-scripts --optimize-autoloader`, with path repositories copied in |
+| Files | The stack root, without `vendor`, `var`, `tests`, generated files and the files that hold secrets: `auth.json`, `.env.local`, `.env.*.local`, `.env.local.php` and `*.decrypt.private.php`. Composer still reads `auth.json` while it installs. |
+| Apache | The port and a site whose document root is `public/`, which falls back to `public/index.php` |
+
+The image listens on `PORT`, 8080 by default, and runs as `www-data`. The
+application directory is read-only for that user, so the image sets
+`APP_CACHE_DIR` and `APP_LOG_DIR` under `/tmp/app`.
+
+The base is the official `php:<version>-apache` image for the PHP minor
+version that resolved the dependencies, pinned by digest for 8.3, 8.4 and 8.5.
+That image has no `pdo_mysql` or `pdo_pgsql`: an application that needs them
+names its own base with `--docker-base-image image@sha256:<digest>`. A base with
+no digest fails with `php.base_not_pinned`.
+
+An image packages an application whose stack root is its own directory. A
+path repository outside the workspace or a symbolic link fails the package. `--platform` selects
+the target, `linux/amd64` by default.
+
+The cache key of an image covers the files it ships, with one limit. A
+Git-ignored file under a directory named `dist`, `out`, `vendor` or
+`node_modules` does not reach the key, unless it sits directly under
+`public/dist`, `public/out` or `public/vendor` with no such directory below.
+Run `package --no-cache` after you change one. A submodule inside the project
+leaves the image uncached.
+
+A library packages nothing: it reaches Packagist through its tags. Putnami
+publishes no PHP archive and no base image.
 
 PHPStan reads the `phpstan.neon`, `phpstan.neon.dist` or `phpstan.dist.neon`
 of the component's directory, and analyses its `src` whatever `paths` the
@@ -238,4 +307,4 @@ design of the stack core is in
 - An application whose `composer.json` sits at the workspace root, the usual
   Symfony layout, is not a project yet: `projects sync` does not add the
   workspace root, and `.` in `includes` is ignored. Its packages are.
-- No publish: a package reaches Packagist through its tags.
+- A library publishes nothing: it reaches Packagist through its tags.

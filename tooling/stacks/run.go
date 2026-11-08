@@ -14,6 +14,7 @@ import (
 
 	diag "go.putnami.dev/protocol/diagnostic"
 	extensionproto "go.putnami.dev/protocol/extension"
+	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/sdk/extension/cli"
 	pctx "go.putnami.dev/sdk/extension/context"
 	"go.putnami.dev/sdk/extension/filelock"
@@ -181,6 +182,8 @@ func lockStackRoot(workspaceRoot string, meta Metadata, profile Profile) (*filel
 type RootStep struct {
 	// Dir is the stack root's absolute path.
 	Dir string
+	// Project is the component's absolute path.
+	Project string
 	// Env is the environment of the step.
 	Env []string
 	// Program returns the program to run for a command name: the pinned
@@ -192,34 +195,194 @@ type RootStep struct {
 // check, then step under the root's lock.
 func (s Stack) RootJob(step func(context.Context, RootStep, *jsonl.Emitter) error) cli.JobFunc {
 	return func(ctx *pctx.Context, emit *jsonl.Emitter, _ []string) (string, map[string]any, error) {
-		background := context.Background()
 		in := runInput{workspaceRoot: ctx.WorkspaceRoot, projectAbs: ctx.Project.FullPath, metadata: ctx.Project.Metadata[s.Extension]}
-		meta, profile, err := s.component(in, emit)
-		if err != nil {
-			return statusFailed, nil, err
-		}
-		if meta.Component == "" {
-			return statusOK, nil, nil
-		}
-		selected, err := s.selectToolchain(background, in, meta, profile, emit)
-		if err != nil {
-			return statusFailed, nil, err
-		}
-		lock, err := lockStackRoot(in.workspaceRoot, meta, profile)
-		if err != nil {
-			return statusFailed, nil, err
-		}
-		defer func() { _ = lock.Release() }()
-		root := RootStep{
-			Dir:     filepath.Join(in.workspaceRoot, filepath.FromSlash(meta.Root)),
-			Env:     selected.Env,
-			Program: func(name string) string { return selected.Program(profile.Toolchain, name) },
-		}
-		if err := step(background, root, emit); err != nil {
+		if err := s.atRoot(context.Background(), in, step, emit); err != nil {
 			return statusFailed, nil, err
 		}
 		return statusOK, nil, nil
 	}
+}
+
+// atRoot selects the component's toolchain and runs step at its stack root,
+// under the root's lock.
+func (s Stack) atRoot(ctx context.Context, in runInput, step func(context.Context, RootStep, *jsonl.Emitter) error, emit *jsonl.Emitter) error {
+	root, meta, profile, err := s.rootStep(ctx, in, emit)
+	if err != nil {
+		return err
+	}
+	lock, err := lockStackRoot(in.workspaceRoot, meta, profile)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = lock.Release() }()
+	return step(ctx, root, emit)
+}
+
+func (s Stack) rootStep(ctx context.Context, in runInput, emit *jsonl.Emitter) (RootStep, Metadata, Profile, error) {
+	meta, profile, err := s.component(in, emit)
+	if err != nil {
+		return RootStep{}, Metadata{}, Profile{}, err
+	}
+	selected, err := s.selectToolchain(ctx, in, meta, profile, emit)
+	if err != nil {
+		return RootStep{}, Metadata{}, Profile{}, err
+	}
+	return RootStep{
+		Dir:     filepath.Join(in.workspaceRoot, filepath.FromSlash(meta.Root)),
+		Project: in.projectAbs,
+		Env:     selected.Env,
+		Program: func(name string) string { return selected.Program(profile.Toolchain, name) },
+	}, meta, profile, nil
+}
+
+// Selected answers the job's component with its toolchain selected and no lock
+// of its stack root held: a process the user keeps running must not block the
+// other tasks of the root.
+func (s Stack) Selected(ctx *pctx.Context, emit *jsonl.Emitter) (RootStep, error) {
+	in := runInput{workspaceRoot: ctx.WorkspaceRoot, projectAbs: ctx.Project.FullPath, metadata: ctx.Project.Metadata[s.Extension]}
+	root, _, _, err := s.rootStep(context.Background(), in, emit)
+	return root, err
+}
+
+// MissingToolchain is what a workspace job does at a stack root whose
+// toolchain the machine does not have.
+type MissingToolchain int
+
+const (
+	// FailOnMissingToolchain fails the job.
+	FailOnMissingToolchain MissingToolchain = iota
+	// WarnOnMissingToolchain reports a warning and moves on to the next root.
+	WarnOnMissingToolchain
+)
+
+// WorkspaceRootJob is a workspace job: it runs step once at each stack root of
+// the workspace's components, in path order. It leaves out the projects of
+// another extension and the projects whose authored tags the workspace's
+// disable.tags names.
+func (s Stack) WorkspaceRootJob(missing MissingToolchain, step func(context.Context, RootStep, *jsonl.Emitter) error) cli.JobFunc {
+	return func(ctx *pctx.Context, emit *jsonl.Emitter, _ []string) (string, map[string]any, error) {
+		background := context.Background()
+		components, err := s.workspaceComponents(ctx)
+		if err != nil {
+			return statusFailed, nil, failWith(emit, CodeProjectConfigInvalid, "%v", err)
+		}
+		for _, c := range components {
+			in := runInput{workspaceRoot: ctx.WorkspaceRoot, projectAbs: filepath.Join(ctx.WorkspaceRoot, filepath.FromSlash(c.Path)), metadata: c.Metadata}
+			if missing == WarnOnMissingToolchain && s.toolchainMissing(background, in) {
+				emit.DiagnosticWithCode("warning", fmt.Sprintf("%s is left out: the %s toolchain is not on this machine", c.Path, s.Profile.ID), "", 0, 0, CodeToolchainMissing)
+				continue
+			}
+			if err := s.atRoot(background, in, step, emit); err != nil {
+				return statusFailed, nil, err
+			}
+		}
+		return statusOK, nil, nil
+	}
+}
+
+// toolchainMissing reports whether the machine has no toolchain for the
+// component. A profile that does not resolve counts as present: atRoot reports
+// it.
+func (s Stack) toolchainMissing(ctx context.Context, in runInput) bool {
+	profile, err := s.Resolved(in.projectAbs)
+	if err != nil {
+		return false
+	}
+	_, err = profile.Toolchain.Select(ctx, in.projectAbs, Expected{}, os.Environ())
+	return errors.Is(err, ErrToolchainMissing)
+}
+
+// workspaceComponents returns one component per stack root among the
+// workspace's projects this extension owns.
+func (s Stack) workspaceComponents(ctx *pctx.Context) ([]wsproto.ProbeProject, error) {
+	disabled, err := disabledTags(ctx.WorkspaceRoot)
+	if err != nil {
+		return nil, err
+	}
+	paths := []string{}
+	for _, ref := range ctx.WorkspaceProjects {
+		if s.ownedBy(ctx.WorkspaceRoot, ref.Extensions) && !carriesAny(ref.Config, disabled) {
+			paths = append(paths, ref.Path)
+		}
+	}
+	slices.Sort(paths)
+	result, err := s.Probe(ctx.WorkspaceRoot, wsproto.ProbeRequest{Version: wsproto.ProbeProtocolVersion, Extension: s.Extension, Paths: paths})
+	if err != nil {
+		return nil, err
+	}
+	roots := map[string]bool{}
+	components := make([]wsproto.ProbeProject, 0, len(result.Projects))
+	for _, p := range result.Projects {
+		var meta Metadata
+		if err := json.Unmarshal(p.Metadata, &meta); err != nil {
+			return nil, err
+		}
+		if !roots[meta.Root] {
+			roots[meta.Root] = true
+			components = append(components, p)
+		}
+	}
+	return components, nil
+}
+
+// ownedBy reports whether one of the extension references is this stack's: its
+// name, or a workspace path whose manifest has that name.
+func (s Stack) ownedBy(workspaceRoot string, references []string) bool {
+	for _, reference := range references {
+		if reference == s.Extension {
+			return true
+		}
+		if strings.HasPrefix(reference, "/") {
+			data, err := os.ReadFile(filepath.Join(workspaceRoot, filepath.FromSlash(reference), "putnami.extension.json")) //nolint:gosec // a path of the workspace
+			var manifest struct {
+				Name string `json:"name"`
+			}
+			if err == nil && json.Unmarshal(data, &manifest) == nil && manifest.Name == s.Extension {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// disabledTags reads the disable.tags of the workspace's configuration.
+func disabledTags(workspaceRoot string) ([]string, error) {
+	data, err := os.ReadFile(filepath.Join(workspaceRoot, "putnami.workspace.json")) //nolint:gosec // the workspace's own file
+	if errors.Is(err, os.ErrNotExist) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	var config struct {
+		Disable struct {
+			Tags []string `json:"tags"`
+		} `json:"disable"`
+	}
+	if err := json.Unmarshal(data, &config); err != nil {
+		return nil, fmt.Errorf("putnami.workspace.json: %w", err)
+	}
+	return config.Disable.Tags, nil
+}
+
+// carriesAny reports whether the authored project configuration has one of the
+// tags.
+func carriesAny(config json.RawMessage, tags []string) bool {
+	if len(config) == 0 || len(tags) == 0 {
+		return false
+	}
+	var project struct {
+		Tags []string `json:"tags"`
+	}
+	if json.Unmarshal(config, &project) != nil {
+		return false
+	}
+	for _, tag := range project.Tags {
+		if slices.Contains(tags, tag) {
+			return true
+		}
+	}
+	return false
 }
 
 func (s Stack) run(ctx context.Context, in runInput, emit reporter) (string, map[string]any, error) {

@@ -16,6 +16,8 @@ import (
 	extensionproto "go.putnami.dev/protocol/extension"
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/sdk/extension/cli"
+	pctx "go.putnami.dev/sdk/extension/context"
+	"go.putnami.dev/sdk/extension/jsonl"
 )
 
 // fakeDetector names two crates of a root workspace, api depending on
@@ -357,6 +359,52 @@ func TestRunWithoutCoverageSupportReadsNoCoverageReport(t *testing.T) {
 	status, data, rec = runTask(t, s, root, TaskTest)
 	if _, ok := data["coverageSummary"]; status != statusOK || !ok || rec.codes() != "" {
 		t.Errorf("a toolchain with coverage support keeps the coverage report: %s %v %v", status, data, rec.diags)
+	}
+}
+
+func TestWorkspaceRootJobRunsOnceAtEachRootTheWorkspaceIncludes(t *testing.T) {
+	root := t.TempDir()
+	writeFile(t, root, "putnami.workspace.json", `{"disable": {"tags": ["e2e"]}}`)
+	s := testStack(t)
+	var dirs []string
+	job := s.WorkspaceRootJob(FailOnMissingToolchain, func(_ context.Context, step RootStep, _ *jsonl.Emitter) error {
+		dirs = append(dirs, step.Dir)
+		return nil
+	})
+	ref := func(path string, extensions []string, config string) pctx.ProjectRef {
+		return pctx.ProjectRef{Name: path, Path: path, Extensions: extensions, Config: json.RawMessage(config)}
+	}
+	own := []string{s.Extension}
+	ctx := &pctx.Context{WorkspaceRoot: root, WorkspaceProjects: []pctx.ProjectRef{
+		ref("crates/api", own, `{}`),
+		ref("crates/pricing", own, `{}`),
+		ref("crates/sample", own, `{"tags": ["e2e"]}`),
+		ref("crates/other", []string{"@putnami/go"}, `{}`),
+	}}
+	writeFile(t, root, "crates/api/Cargo.toml", "")
+	stubTools(t, "1.82.0", junitPass)
+	status, _, err := job(ctx, jsonl.New(), nil)
+	if status != statusOK || err != nil {
+		t.Fatalf("job: %s %v", status, err)
+	}
+	if len(dirs) != 1 || dirs[0] != filepath.Join(root, ".") {
+		t.Errorf("dirs = %v", dirs)
+	}
+}
+
+func TestWorkspaceRootJobWarnsWhenTheToolchainIsMissing(t *testing.T) {
+	root := t.TempDir()
+	writeFile(t, root, "crates/api/Cargo.toml", "")
+	s := testStack(t)
+	t.Setenv("PATH", t.TempDir())
+	ctx := &pctx.Context{WorkspaceRoot: root, WorkspaceProjects: []pctx.ProjectRef{{Name: "crates/api", Path: "crates/api", Extensions: []string{s.Extension}}}}
+	ran := false
+	step := func(context.Context, RootStep, *jsonl.Emitter) error { ran = true; return nil }
+	if status, _, err := s.WorkspaceRootJob(WarnOnMissingToolchain, step)(ctx, jsonl.New(), nil); status != statusOK || err != nil || ran {
+		t.Errorf("warn: %s %v ran=%v", status, err, ran)
+	}
+	if status, _, err := s.WorkspaceRootJob(FailOnMissingToolchain, step)(ctx, jsonl.New(), nil); status != statusFailed || err == nil {
+		t.Errorf("fail: %s %v", status, err)
 	}
 }
 

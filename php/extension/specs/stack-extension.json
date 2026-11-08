@@ -8,11 +8,12 @@
     "The test task reads the PHPUnit JUnit and Clover reports into the test and coverage summary, each case naming its test file and each covered file a file of the repository",
     "A change to a component's tests reruns its test task and not its lint task, and a change to its dependencies reruns both",
     "A component overrides any value of the PHP profile in its putnami.json, and the override reaches the cache key",
-    "On a machine with no PHP and no Composer, putnami install then putnami lint and test work on a Composer repository, and a workspace without @putnami/php or without a composer.json downloads neither"
+    "On a machine with no PHP and no Composer, putnami install then putnami lint and test work on a Composer repository, and a workspace without @putnami/php or without a composer.json downloads neither",
+    "putnami install fetches and installs the Composer dependencies of a repository, serve and run start an application, deps-upgrade updates its packages, and package and publish produce its Docker image"
   ],
   "nonGoals": [
     "Building or publishing PHP archives, and installing PHPStan, PHP-CS-Fixer or a coverage driver: the pinned PHP comes from its existing distributions, and PHPStan and PHPUnit come from the repository's own Composer dependencies",
-    "A build task: PHP has no compile step, and a release goes through Packagist",
+    "A build task: PHP has no compile step, and a library reaches Packagist through its tags",
     "A component whose Composer build is neither the workspace root's nor its own: it is left out with stacks.stack_root_unsupported",
     "Packages a Composer registry provides, VCS repositories, and choosing between PHPStan and PHP-CS-Fixer from what a repository installs: a team that lints with PHP-CS-Fixer overrides the lint steps"
   ],
@@ -56,11 +57,40 @@
     {
       "id": "coverage-driver-is-optional",
       "text": "A test task on a PHP with neither PCOV nor Xdebug runs PHPUnit with its JUnit report only, reads no Clover report, and reports the warning stacks.coverage_unavailable. The test summary is complete and no coverage summary is written. A PHP with a driver keeps the Clover report."
+    },
+    {
+      "id": "fetches-the-locked-packages",
+      "text": "workspace-fetch downloads the packages of each stack root's composer.lock into the extension's Composer cache, with --no-scripts and --no-plugins and a private vendor directory, so it runs none of their code and writes nothing in the repository. A stack root with no composer.lock is skipped. With no PHP it warns and passes."
+    },
+    {
+      "id": "workspace-install-runs-composer",
+      "text": "workspace-install runs the pinned Composer's install at each stack root of the workspace's projects, except a project disable.tags excludes and a root whose last install is current. A run with offline dependencies installs from the Composer cache with the network disabled. With no PHP it warns and passes."
+    },
+    {
+      "id": "serves-an-application",
+      "text": "serve runs php -S on 0.0.0.0 with the port flag, default 3000 and 0 for a free port, with public/ as document root and a router that answers a path that is no file with public/index.php, on an application after the toolchain check, and emits a ready event once the server accepts connections. A library is skipped. PHP reads its files on each request, so serve has no watcher."
+    },
+    {
+      "id": "runs-an-application-once",
+      "text": "run executes php with the entrypoint flag, default bin/console, in the directory of an application after the toolchain check, passes it the words of the args flag, and exits with its exit code. A library is skipped."
+    },
+    {
+      "id": "upgrades-the-dependencies",
+      "text": "deps-upgrade runs the pinned Composer's update at each stack root of the workspace's projects, with the PHP the toolchain check selects."
+    },
+    {
+      "id": "packages-an-application-image",
+      "text": "package with the docker channel assembles an OCI image of an application with no Docker daemon: a layer of composer install --no-dev --no-scripts --optimize-autoloader, a layer of its files, and an Apache configuration serving public/. The base is the official php:<pinned>-apache image pinned by digest, or a digest-pinned base the project names; a base with no digest fails. It runs as www-data and holds no auth.json, local environment file or decryption key. A library packages nothing."
+    },
+    {
+      "id": "publishes-an-application-image",
+      "text": "publish with the docker channel pushes the packaged image to the declared OCI registry through the shared publisher, and reports it as a release-set member. A library publishes nothing."
     }
   ],
   "decisions": [
     "tooling/stacks/doc/adr/0001-one-extension-per-stack-on-a-shared-core.md",
     "tooling/stacks/doc/adr/0002-a-stated-version-range-is-checked.md",
-    "tooling/stacks/doc/adr/0003-a-stack-extension-may-provide-its-toolchain.md"
+    "tooling/stacks/doc/adr/0003-a-stack-extension-may-provide-its-toolchain.md",
+    "php/extension/doc/adr/0001-an-application-image-copies-onto-the-official-php-image.md"
   ]
 }

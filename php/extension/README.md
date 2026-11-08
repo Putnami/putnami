@@ -3,7 +3,9 @@
 `@putnami/php` runs the components of a Composer repository, such as a
 Symfony application and the packages beside it, as Putnami projects:
 `putnami lint` runs PHPStan and `putnami test` runs PHPUnit on each component
-with Putnami's runner and cache, without changing the build.
+with Putnami's runner and cache, without changing the build. It also installs
+the dependencies, serves and runs an application, and packages and publishes
+its image.
 
 It is a stack extension: a manifest, the PHP stack profile (`profile.json`)
 and the entrypoint of the stack core,

@@ -113,9 +113,32 @@
     "excludes": [
       "vendor"
     ],
-    "language": "php"
+    "language": "php",
+    "installInputs": [
+      "composer.lock"
+    ]
   },
   "commands": {
+    "workspace-fetch": {
+      "description": "Download the packages each stack root's composer.lock names into the extension's Composer cache, running none of their code.",
+      "quiet": true,
+      "run": [
+        {
+          "id": "workspace-fetch",
+          "task": "workspace-fetch-exec"
+        }
+      ]
+    },
+    "workspace-install": {
+      "description": "Install the Composer dependencies of each stack root of the workspace.",
+      "quiet": true,
+      "run": [
+        {
+          "id": "workspace-install",
+          "task": "workspace-install-exec"
+        }
+      ]
+    },
     "lint": {
       "description": "Lint the Composer components with PHPStan.",
       "run": [
@@ -148,6 +171,146 @@
             "install",
             "^test"
           ]
+        }
+      ]
+    },
+    "serve": {
+      "description": "Serve a PHP application with the PHP built-in server.",
+      "traits": {
+        "requiresRunnable": true,
+        "workload": "serve"
+      },
+      "flags": {
+        "port": {
+          "type": "number",
+          "default": 3000,
+          "description": "Port for the server"
+        }
+      },
+      "run": [
+        {
+          "id": "install",
+          "task": "install-run"
+        },
+        {
+          "id": "serve",
+          "task": "serve-run",
+          "dependsOn": [
+            "install"
+          ]
+        }
+      ]
+    },
+    "run": {
+      "description": "Run a PHP application once and forward its exit code.",
+      "traits": {
+        "requiresRunnable": true,
+        "workload": "once"
+      },
+      "flags": {
+        "entrypoint": {
+          "type": "string",
+          "description": "Entry point to run (defaults to bin/console)"
+        },
+        "args": {
+          "type": "string",
+          "description": "Additional arguments to pass to the entrypoint"
+        }
+      },
+      "run": [
+        {
+          "id": "install",
+          "task": "install-run"
+        },
+        {
+          "id": "run",
+          "task": "run-exec",
+          "dependsOn": [
+            "install"
+          ]
+        }
+      ]
+    },
+    "deps-upgrade": {
+      "description": "Update the Composer dependencies of each stack root of the workspace.",
+      "visibility": "internal",
+      "quiet": true,
+      "run": [
+        {
+          "id": "deps-upgrade",
+          "task": "deps-upgrade-exec"
+        }
+      ]
+    },
+    "package": {
+      "description": "Assemble the image of an application for the docker publish channel.",
+      "traits": {
+        "injectPublishChannels": true
+      },
+      "flags": {
+        "docker": {
+          "type": "boolean",
+          "default": false,
+          "description": "Assemble the image"
+        },
+        "docker-tag": {
+          "type": "string",
+          "description": "Override the image tag"
+        },
+        "docker-base-image": {
+          "type": "string",
+          "description": "Replace the official PHP image with a base pinned by digest (image@sha256:...)"
+        },
+        "docker-load": {
+          "type": "boolean",
+          "default": false,
+          "description": "Also load the assembled image into the local docker daemon"
+        },
+        "platform": {
+          "type": "string",
+          "default": "linux/amd64",
+          "description": "Target platform of the image"
+        },
+        "dry-run": {
+          "type": "boolean",
+          "default": false,
+          "description": "Plan the image without assembling it"
+        }
+      },
+      "run": [
+        {
+          "id": "docker",
+          "task": "package-docker",
+          "if": "params.docker"
+        }
+      ]
+    },
+    "publish": {
+      "dependsOn": [
+        "package"
+      ],
+      "traits": {
+        "injectPublishChannels": true,
+        "sideEffects": "registry"
+      },
+      "description": "Push the image of an application to its OCI registry. A library reaches Packagist through its tags.",
+      "flags": {
+        "docker": {
+          "type": "boolean",
+          "default": false,
+          "description": "Push the image"
+        },
+        "dry-run": {
+          "type": "boolean",
+          "default": false,
+          "description": "Push nothing; report what would be published"
+        }
+      },
+      "run": [
+        {
+          "id": "docker",
+          "task": "publish-docker",
+          "if": "params.docker"
         }
       ]
     }
@@ -286,6 +449,228 @@
           "toolchain-cache"
         ]
       }
+    },
+    "workspace-fetch-exec": {
+      "description": "Run composer install with no script and no plugin into a private vendor directory, which leaves the packages in the extension's Composer cache.",
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "toolchains": [
+        "php"
+      ],
+      "args": [
+        "workspace-fetch"
+      ],
+      "cwd": "{workspaceRoot}",
+      "cache": false,
+      "timeoutMs": 1800000,
+      "declares": {
+        "effects": [
+          "network",
+          "process",
+          "toolchain-cache"
+        ]
+      }
+    },
+    "workspace-install-exec": {
+      "description": "Run composer install at each stack root of the workspace, except the projects disable.tags excludes and the roots whose last install is current. Offline, it installs from the extension's Composer cache with the network disabled.",
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "toolchains": [
+        "php"
+      ],
+      "args": [
+        "workspace-install"
+      ],
+      "cwd": "{workspaceRoot}",
+      "cache": false,
+      "timeoutMs": 1800000,
+      "declares": {
+        "effects": [
+          "network",
+          "process",
+          "toolchain-cache",
+          "workspace-files"
+        ]
+      }
+    },
+    "serve-run": {
+      "description": "Run php -S with public/ as document root until the user stops it. PHP reads its files on each request, so there is no watcher.",
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "toolchains": [
+        "php"
+      ],
+      "args": [
+        "serve"
+      ],
+      "cwd": "{projectRoot}",
+      "cache": false,
+      "timeoutMs": -1,
+      "declares": {
+        "effects": [
+          "network",
+          "process"
+        ]
+      }
+    },
+    "run-exec": {
+      "description": "Run php with the entrypoint in the application directory and forward its exit code.",
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "toolchains": [
+        "php"
+      ],
+      "args": [
+        "run"
+      ],
+      "cwd": "{projectRoot}",
+      "cache": false,
+      "timeoutMs": -1,
+      "declares": {
+        "effects": [
+          "network",
+          "process",
+          "workspace-files"
+        ]
+      }
+    },
+    "deps-upgrade-exec": {
+      "description": "Run composer update at each stack root of the workspace with the pinned Composer and the selected PHP.",
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "toolchains": [
+        "php"
+      ],
+      "args": [
+        "deps-upgrade"
+      ],
+      "cwd": "{workspaceRoot}",
+      "cache": false,
+      "timeoutMs": 1800000,
+      "declares": {
+        "effects": [
+          "network",
+          "process",
+          "toolchain-cache",
+          "workspace-files"
+        ]
+      }
+    },
+    "package-docker": {
+      "description": "Assemble a local OCI image of an application from its production dependencies and its files, on a digest-pinned PHP Apache base. Sole owner of <command-output>/docker.",
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "toolchains": [
+        "php"
+      ],
+      "args": [
+        "package-docker"
+      ],
+      "inputs": {
+        "application": {
+          "from": "project",
+          "files": [
+            "git:**/*",
+            "**/*",
+            ".*",
+            "public/.*",
+            "public/dist/**/*",
+            "public/out/**/*",
+            "public/vendor/**/*",
+            "!../**",
+            "!.gen/**",
+            "!.phpunit.cache/**",
+            "!vendor/**",
+            "!var/**",
+            "!tests/**",
+            "!node_modules/**",
+            "!auth.json",
+            "!.env.local",
+            "!.env.*.local",
+            "!.env.local.php",
+            "!**/*.decrypt.private.php"
+          ]
+        },
+        "pathRepositories": {
+          "from": "closure",
+          "files": [
+            "git:**/*",
+            "**/*",
+            ".*",
+            "public/.*",
+            "public/dist/**/*",
+            "public/out/**/*",
+            "public/vendor/**/*",
+            "!../**",
+            "!.gen/**",
+            "!.phpunit.cache/**",
+            "!vendor/**",
+            "!var/**",
+            "!tests/**",
+            "!node_modules/**",
+            "!auth.json",
+            "!.env.local",
+            "!.env.*.local",
+            "!.env.local.php",
+            "!**/*.decrypt.private.php"
+          ]
+        },
+        "extensionVersion": {
+          "from": "runtime"
+        }
+      },
+      "cwd": "{projectRoot}",
+      "timeoutMs": 1800000,
+      "cache": {
+        "versionAware": true
+      },
+      "declares": {
+        "outputs": {
+          "docker": {
+            "kind": "directory",
+            "root": "command-output",
+            "path": "docker",
+            "optionalEmpty": true,
+            "description": "Local OCI candidate layout, its manifest and the docker channel record."
+          }
+        },
+        "effects": [
+          "network",
+          "toolchain-cache"
+        ]
+      }
+    },
+    "publish-docker": {
+      "description": "Push the packaged image to the container registry through the shared publisher.",
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": [
+        "publish-docker"
+      ],
+      "cwd": "{projectRoot}",
+      "timeoutMs": 300000,
+      "cache": false,
+      "declares": {
+        "outputs": {
+          "published-image": {
+            "kind": "file",
+            "root": "command-output",
+            "path": "docker/published-image.json",
+            "optionalEmpty": true,
+            "description": "Verified remote image record, written after the registry digest is read back."
+          }
+        },
+        "effects": [
+          "network",
+          "registry"
+        ],
+        "publishChannels": [
+          "docker"
+        ]
+      }
     }
-  }
+  },
+  "uses": [
+    "oci"
+  ]
 }

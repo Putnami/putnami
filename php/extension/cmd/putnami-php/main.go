@@ -28,6 +28,13 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer, runJobs func(
 		if handled, err = php.HandleToolchainResolve(args, stdin, stdout, stack.Profile); !handled && err == nil {
 			err = stack.Entrypoint(args, stdin, stdout, runtimeVersion, func(jobs map[string]cli.JobFunc) {
 				jobs[php.InstallJobName] = php.InstallJob(stack)
+				jobs[php.WorkspaceFetchJobName] = php.WorkspaceFetchJob(stack)
+				jobs[php.WorkspaceInstallJobName] = php.WorkspaceInstallJob(stack)
+				jobs[php.ServeJobName] = php.ServeJob(stack)
+				jobs[php.RunJobName] = php.RunJob(stack)
+				jobs[php.DepsUpgradeJobName] = php.DepsUpgradeJob(stack)
+				jobs[php.PackageDockerJobName] = php.PackageDockerJob(stack)
+				jobs[php.PublishDockerJobName] = php.PublishDockerJob()
 				runJobs(jobs)
 			})
 		}
