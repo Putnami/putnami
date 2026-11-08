@@ -271,6 +271,34 @@ func TestRunFailsOnAFailedTestAMismatchAndAMissingReport(t *testing.T) {
 	}
 }
 
+// A test runner that exits non-zero on a failed case still has its report
+// read: the failed case names the failure, and a run that wrote no report is
+// a failed step, not a missing report.
+func TestRunReadsTheReportsOfAFailedTestRun(t *testing.T) {
+	root := t.TempDir()
+	writeFile(t, root, "rust-toolchain.toml", "[toolchain]\nchannel = \"1.82.0\"\n")
+	writeFile(t, root, "crates/api/Cargo.toml", "")
+	t.Setenv("STUB_ROOT", root)
+	t.Setenv("STUB_LOG", filepath.Join(root, "log"))
+	stubTools(t, "1.82.0", junitPass)
+	t.Setenv("JUNIT_FAIL", junitFail)
+	writeFile(t, root, "crates/api/putnami.json", `{"options": {"@putnami/rust": {"tasks": {"test": {
+	  "steps": [["sh", "-c", "printf '%s' \"$JUNIT_FAIL\" > \"$0\"; exit 1", "{output}/junit.xml"], ["true"]],
+	  "reports": {"junit": ["{output}/junit.xml"], "coverage": []}
+	}}}}}`)
+	status, data, rec := runTask(t, s0(t), root, TaskTest)
+	if status != statusFailed || !strings.Contains(rec.codes(), "error:"+CodeTestFailed) || data["testSummary"].(map[string]any)["failed"] != 1 {
+		t.Errorf("the failed case is read: %s %v %v", status, rec.diags, data)
+	}
+
+	writeFile(t, root, "crates/api/putnami.json", `{"options": {"@putnami/rust": {"tasks": {"test": {
+	  "steps": [["false"]], "reports": {"junit": ["{output}/none.xml"], "coverage": []}
+	}}}}}`)
+	if status, _, rec := runTask(t, s0(t), root, TaskTest); status != statusFailed || rec.codes() != "error:"+CodeStepFailed {
+		t.Errorf("a run that wrote no report is a failed step: %s %v", status, rec.diags)
+	}
+}
+
 func s0(t *testing.T) Stack { return testStack(t) }
 
 func TestRunRefusesAProjectWithoutComponentMetadata(t *testing.T) {

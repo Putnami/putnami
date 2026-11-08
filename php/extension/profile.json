@@ -12,9 +12,9 @@
   "inputs": {
     "sources": ["src/**"],
     "tests": ["tests/**"],
-    "app": ["config/**", "templates/**", "translations/**", "migrations/**"],
+    "app": ["config/**", "templates/**", "translations/**", "migrations/**", "assets/**", "importmap.php"],
     "manifests": ["composer.json", "{root}/composer.json"],
-    "lintConfig": ["phpstan.neon", "phpstan.neon.dist", "phpstan.dist.neon", ".php-cs-fixer.php", ".php-cs-fixer.dist.php"],
+    "lintConfig": ["phpstan.neon", "phpstan.neon.dist", "phpstan.dist.neon", "phpstan-baseline.neon", "phpstan-baseline.php", ".php-cs-fixer.php", ".php-cs-fixer.dist.php"],
     "testConfig": ["phpunit.xml", "phpunit.dist.xml", "phpunit.xml.dist", ".env", ".env.test"],
     "lockfiles": ["composer.lock", "{root}/composer.lock"]
   },
@@ -23,12 +23,12 @@
       "steps": [
         ["{root}/vendor/bin/phpstan", "analyse", "--no-progress", "--no-interaction", "src"]
       ],
-      "inputs": ["sources", "manifests", "lintConfig"]
+      "inputs": ["sources", "manifests", "lockfiles", "lintConfig"]
     },
     "test": {
       "steps": [
         [
-          "php", "-d", "xdebug.mode=coverage", "{root}/vendor/bin/phpunit",
+          "php", "-d", "xdebug.mode=coverage", "-d", "pcov.directory={root}", "-d", "pcov.exclude=~/vendor/~", "{root}/vendor/bin/phpunit",
           "--log-junit", "{output}/junit.xml", "--coverage-clover", "{output}/clover.xml", "--coverage-filter", "src", "tests"
         ]
       ],

@@ -127,6 +127,23 @@ func TestTheComponentsOfAComposerRepositoryBecomeProjects(t *testing.T) {
 	}
 }
 
+func TestARootPHPVersionWinsOverAPackageRange(t *testing.T) {
+	root := fixture(t)
+	writeFile(t, root, ".php-version", "8.4.10\n")
+	for _, p := range probe(t, root).Projects {
+		if p.Path != "packages/pricing" {
+			continue
+		}
+		if meta := metadata(t, p); meta.Toolchain != (stacks.Expected{Version: "8.4.10", Source: ".php-version"}) {
+			t.Errorf("pricing expects %+v", meta.Toolchain)
+		}
+	}
+	stubTools(t, root, "8.4.9", 0)
+	if status, _, _, err := runJob(t, root, "packages/pricing", stacks.TaskLint); status != "FAILED" || err == nil || err.Error() != stacks.CodeToolchainMismatch {
+		t.Errorf("8.4.9 is not the root's 8.4.10, though it is in the package's range: %s %v", status, err)
+	}
+}
+
 func TestAMalformedRootManifestLeavesEachPackageItsOwnRoot(t *testing.T) {
 	root := fixture(t)
 	writeFile(t, root, "composer.json", `{`)
@@ -149,7 +166,8 @@ func TestAMalformedRootManifestLeavesEachPackageItsOwnRoot(t *testing.T) {
 // PHPUnit, and writes the stack root's vendor/bin/phpstan and
 // vendor/bin/phpunit. Both log their arguments; phpunit writes the JUnit and
 // Clover reports PHPUnit writes, each case naming its test file and each
-// covered file an absolute path. PHP and its tools are the stack's own build:
+// covered file an absolute path, and exits 1 when a case fails, as PHPUnit
+// does. PHP and its tools are the stack's own build:
 // the stub stands at that boundary.
 func stubTools(t *testing.T, root, version string, failures int) string {
 	t.Helper()
@@ -191,6 +209,7 @@ XML
   esac
   prev="$a"
 done
+exit `+map[bool]string{true: "1", false: "0"}[failures > 0]+`
 `)
 	for _, f := range []string{filepath.Join(bin, "php"), filepath.Join(root, "vendor/bin/phpstan"), filepath.Join(root, "vendor/bin/phpunit")} {
 		if err := os.Chmod(f, 0o755); err != nil {
@@ -316,7 +335,7 @@ func TestATestOnlyChangeLeavesTheLintInputsUnchanged(t *testing.T) {
 	spectest.Proves(t, feature, "inputs-per-task", "a-test-only-change-leaves-the-lint-inputs-unchanged")
 	root := fixture(t)
 	lint := resolve(t, root, ".", "php:lint")
-	if want := []string{"composer.json", "phpstan.dist.neon", "src/Controller/QuoteController.php", "src/Kernel.php"}; !reflect.DeepEqual(lint, want) {
+	if want := []string{"composer.json", "composer.lock", "phpstan.dist.neon", "src/Controller/QuoteController.php", "src/Kernel.php"}; !reflect.DeepEqual(lint, want) {
 		t.Errorf("lint inputs = %v, want %v", lint, want)
 	}
 	test := resolve(t, root, ".", "php:test")
@@ -336,9 +355,8 @@ func TestATestOnlyChangeLeavesTheLintInputsUnchanged(t *testing.T) {
 	}
 
 	writeFile(t, root, "tests/Controller/ProfileTest.php", "<?php\n")
-	writeFile(t, root, "composer.lock", `{"packages": [{"name": "brick/math", "version": "0.13.1"}]}`)
 	if got := resolve(t, root, ".", "php:lint"); !reflect.DeepEqual(got, lint) {
-		t.Errorf("a test and lockfile change moved the lint inputs: %v", got)
+		t.Errorf("a test change moved the lint inputs: %v", got)
 	}
 	if got := resolve(t, root, ".", "php:test"); !slices.Contains(got, "tests/Controller/ProfileTest.php") {
 		t.Errorf("the new test is no test input: %v", got)

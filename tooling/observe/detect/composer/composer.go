@@ -326,7 +326,7 @@ func pathPackages(root string, components []*component, byDir map[string]*compon
 
 // PathRepositoryDirs returns, in path order, the directories holding a
 // composer.json that the path repositories of the manifest in dir match: the
-// packages that manifest's Composer build installs from the repository. A
+// packages that manifest's Composer build may install from the repository. A
 // directory with no composer.json returns none.
 func PathRepositoryDirs(root, dir string) ([]string, error) {
 	data, err := os.ReadFile(abs(root, join(dir, Marker)))

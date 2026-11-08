@@ -149,9 +149,9 @@ func (b bound) holds(v []int) bool {
 	case "!=":
 		return c != 0
 	default:
-		// An equal condition with fewer components names the releases it
-		// prefixes: =8.3 holds for 8.3.0 and 8.3.6.
-		return len(v) >= len(b.release) && compareRelease(v[:len(b.release)], b.release) == 0
+		// As in Composer, an equal condition is one release, the missing
+		// components read as zero: =8.3 holds for 8.3.0, not 8.3.6.
+		return c == 0
 	}
 }
 

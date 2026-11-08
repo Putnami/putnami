@@ -269,8 +269,11 @@ the same warning.
 ## Reports
 
 After the last step, the task reads every report its profile names with the
-evidence readers. A JUnit failure, an error, or a step that exits non-zero
-fails the task; the report's failed cases name the failure. The totals and
+evidence readers. A test runner exits non-zero when a case fails, so a step
+that exits non-zero stops the steps and the reports are still read. A JUnit
+failure, an error, or a step that exits non-zero fails the task; the report's
+failed cases name the failure, with `stacks.test_failed`, and a failed step
+that wrote no report is `stacks.step_failed`, not a missing report. The totals and
 the coverage reach the task result. A JUnit or coverage pattern of the profile
 that matches no report fails the task with `stacks.report_missing`: a command
 that ran nothing is not a pass. The reports a task reads outside its own
@@ -344,4 +347,4 @@ left to a later change.
 2. Rust is the reference stack.
 3. A toolchain mismatch fails the task by default, `warn` by override.
 4. One extension per stack, in its language root, on a shared core.
-5. A stated range is checked, for the PHP profile's `require.php` (#940).
+5. A stated range is checked, for the PHP profile's `require.php`.

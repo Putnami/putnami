@@ -152,6 +152,10 @@ func (s Stack) run(ctx context.Context, in runInput, emit reporter) (string, map
 	}
 
 	vars := map[string]string{"{root}": rootAbs, "{component}": meta.Component, "{project}": in.projectAbs, "{output}": outDir}
+	// A test runner exits non-zero when a case fails: the steps stop there,
+	// and the reports it wrote are still read, so the failed cases name the
+	// failure.
+	var stepErr error
 	for _, step := range t.Steps {
 		argv := make([]string, len(step))
 		for i, a := range step {
@@ -164,8 +168,12 @@ func (s Stack) run(ctx context.Context, in runInput, emit reporter) (string, map
 		cmd.Stdout = in.stdout
 		cmd.Stderr = in.stdout
 		if err := cmd.Run(); err != nil {
-			return statusFailed, nil, failWith(CodeStepFailed, "%s: %v", strings.Join(argv, " "), err)
+			stepErr = failWith(CodeStepFailed, "%s: %v", strings.Join(argv, " "), err)
+			break
 		}
+	}
+	if stepErr != nil && t.Reports == nil {
+		return statusFailed, nil, stepErr
 	}
 
 	copied := 0
@@ -192,8 +200,13 @@ func (s Stack) run(ctx context.Context, in runInput, emit reporter) (string, map
 		return out, nil
 	}
 	summary, diags := ReadReports(t.Reports, resolve, outDir)
-	failed := false
+	failed := stepErr != nil
 	for _, d := range diags {
+		// A step that failed may have written no report: the step's own
+		// diagnostic says why, not a missing report.
+		if stepErr != nil && d.Code == CodeReportMissing {
+			continue
+		}
 		emit.DiagnosticWithCode(severity(d), d.Message, d.Field, 0, 0, d.Code)
 		failed = failed || d.Severity == diag.Error
 	}
@@ -217,6 +230,9 @@ func (s Stack) run(ctx context.Context, in runInput, emit reporter) (string, map
 	}
 	if len(summary.Reports) > 0 {
 		data["reports"] = summary.Reports
+	}
+	if stepErr != nil && summary.Tests.Failed == 0 {
+		return statusFailed, data, stepErr
 	}
 	if failed {
 		return statusFailed, data, fmt.Errorf("the %s reports of %s failed", in.task, meta.Component)

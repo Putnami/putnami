@@ -109,3 +109,21 @@ func TestMachineVersionReadsTheCommandOutput(t *testing.T) {
 		t.Fatalf("a missing command: %v", err)
 	}
 }
+
+func TestAnExactVersionWinsOverARange(t *testing.T) {
+	root := t.TempDir()
+	tc := Toolchain{Command: []string{"php"}, Pattern: `(?<version>.*)`, Files: []VersionFile{{Path: ".php-version"}, {Path: "composer.json", Key: "require.php"}}}
+	writeFile(t, root, "composer.json", `{"require": {"php": ">=8.4"}}`)
+	writeFile(t, root, "packages/pricing/composer.json", `{"require": {"php": "^8.2"}}`)
+	if got, _ := tc.ExpectedVersion(root, "packages/pricing", "."); got != (Expected{Version: "^8.2", Source: "packages/pricing/composer.json"}) {
+		t.Errorf("with no exact version, the nearest range: %+v", got)
+	}
+	writeFile(t, root, ".php-version", "8.4.10\n")
+	if got, _ := tc.ExpectedVersion(root, "packages/pricing", "."); got != (Expected{Version: "8.4.10", Source: ".php-version"}) {
+		t.Errorf("a root exact version wins over the package's range: %+v", got)
+	}
+	writeFile(t, root, "packages/pricing/.php-version", "stable\n")
+	if got, _ := tc.ExpectedVersion(root, "packages/pricing", "."); got.Version != "stable" {
+		t.Errorf("a value that is no range ends the search: %+v", got)
+	}
+}
