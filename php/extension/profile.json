@@ -7,7 +7,8 @@
     "files": [
       { "path": ".php-version" },
       { "path": "composer.json", "key": "require.php" }
-    ]
+    ],
+    "provisioned": "PUTNAMI_PHP_EXECUTABLE"
   },
   "inputs": {
     "sources": ["src/**"],
@@ -32,6 +33,10 @@
           "--log-junit", "{output}/junit.xml", "--coverage-clover", "{output}/clover.xml", "--coverage-filter", "src", "tests"
         ]
       ],
+      "withoutCoverage": {
+        "probe": ["php", "-r", "exit(extension_loaded('pcov') || extension_loaded('xdebug') ? 0 : 1);"],
+        "steps": [["php", "{root}/vendor/bin/phpunit", "--log-junit", "{output}/junit.xml", "--no-coverage", "tests"]]
+      },
       "inputs": ["sources", "tests", "app", "testConfig", "manifests", "lockfiles"],
       "reports": {
         "junit": ["{output}/junit.xml"],

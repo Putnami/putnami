@@ -68,6 +68,10 @@ type Toolchain struct {
 	Version string `json:"version,omitempty"`
 	// Check is "fail" (the default) or "warn": what a mismatch does.
 	Check string `json:"check,omitempty"`
+	// Provisioned names the environment variable that holds the path of the
+	// toolchain the workspace lock pins. A task uses that toolchain when the
+	// one on PATH is missing or outside the stated version.
+	Provisioned string `json:"provisioned,omitempty"`
 }
 
 // VersionFile is a file that states the expected toolchain version.
@@ -90,6 +94,19 @@ type Task struct {
 	Inputs []string `json:"inputs"`
 	// Reports are the reports the task reads back.
 	Reports *Reports `json:"reports,omitempty"`
+	// WithoutCoverage is how the task runs on a toolchain with no coverage
+	// support. Without it, such a toolchain fails on its missing report.
+	WithoutCoverage *WithoutCoverage `json:"withoutCoverage,omitempty"`
+}
+
+// WithoutCoverage replaces a task's steps on a toolchain with no coverage
+// support, and leaves its coverage reports unread.
+type WithoutCoverage struct {
+	// Probe is an argument vector that exits non-zero when the toolchain has
+	// no coverage support. It runs in the project directory, with no shell.
+	Probe []string `json:"probe"`
+	// Steps replace the task's steps.
+	Steps [][]string `json:"steps"`
 }
 
 // Reports are the report paths of a task.
@@ -203,23 +220,25 @@ func (t Toolchain) validate() error {
 	default:
 		return fmt.Errorf("check: %q is not fail or warn", t.Check)
 	}
+	if t.Provisioned != "" && !environmentName.MatchString(t.Provisioned) {
+		return fmt.Errorf("provisioned: %q is not an environment variable name", t.Provisioned)
+	}
 	return nil
 }
 
+// environmentName matches an environment variable name.
+var environmentName = regexp.MustCompile(`^[A-Z_][A-Z0-9_]*$`)
+
 func (t Task) validate(sets map[string][]string) error {
-	if len(t.Steps) == 0 {
-		return errors.New("steps: a task runs at least one step")
+	if err := validateSteps("steps", t.Steps); err != nil {
+		return err
 	}
-	for i, step := range t.Steps {
-		if len(step) == 0 || step[0] == "" {
-			return fmt.Errorf("steps[%d]: a step names a program", i)
+	if w := t.WithoutCoverage; w != nil {
+		if len(w.Probe) == 0 || w.Probe[0] == "" {
+			return errors.New("withoutCoverage.probe: the probe names a program")
 		}
-		for _, arg := range step {
-			for _, ph := range placeholderExpr.FindAllString(arg, -1) {
-				if !slices.Contains(stepPlaceholders, ph) {
-					return fmt.Errorf("steps[%d]: %s is no placeholder; use {root}, {component}, {project} or {output}", i, ph)
-				}
-			}
+		if err := validateSteps("withoutCoverage.steps", w.Steps); err != nil {
+			return err
 		}
 	}
 	for _, name := range t.Inputs {
@@ -243,6 +262,25 @@ func (t Task) validate(sets map[string][]string) error {
 			for j, p := range c.Paths {
 				if err := validateReportPath(p); err != nil {
 					return fmt.Errorf("reports.coverage[%d].paths[%d]: %w", i, j, err)
+				}
+			}
+		}
+	}
+	return nil
+}
+
+func validateSteps(field string, steps [][]string) error {
+	if len(steps) == 0 {
+		return fmt.Errorf("%s: a task runs at least one step", field)
+	}
+	for i, step := range steps {
+		if len(step) == 0 || step[0] == "" {
+			return fmt.Errorf("%s[%d]: a step names a program", field, i)
+		}
+		for _, arg := range step {
+			for _, ph := range placeholderExpr.FindAllString(arg, -1) {
+				if !slices.Contains(stepPlaceholders, ph) {
+					return fmt.Errorf("%s[%d]: %s is no placeholder; use {root}, {component}, {project} or {output}", field, i, ph)
 				}
 			}
 		}
@@ -316,6 +354,7 @@ func (p Profile) Resolve(override json.RawMessage) (Profile, error) {
 		return Profile{}, err
 	}
 	mergeInto(merged, over)
+	dropStaleFallbacks(merged, over)
 	data, err := json.Marshal(merged)
 	if err != nil {
 		return Profile{}, err
@@ -328,6 +367,21 @@ func (p Profile) Resolve(override json.RawMessage) (Profile, error) {
 		return Profile{}, fmt.Errorf("the resolved profile is invalid: %w", err)
 	}
 	return out, nil
+}
+
+// dropStaleFallbacks removes the withoutCoverage of a task whose steps the
+// override replaces: those steps are not the ones the fallback stands for.
+func dropStaleFallbacks(merged, over map[string]any) {
+	overTasks, _ := over["tasks"].(map[string]any)
+	mergedTasks, _ := merged["tasks"].(map[string]any)
+	for name, value := range overTasks {
+		task, _ := value.(map[string]any)
+		_, replaced := task["steps"]
+		_, restated := task["withoutCoverage"]
+		if target, ok := mergedTasks[name].(map[string]any); ok && replaced && !restated {
+			delete(target, "withoutCoverage")
+		}
+	}
 }
 
 func mergeInto(dst, src map[string]any) {

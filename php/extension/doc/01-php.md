@@ -3,8 +3,8 @@
 `@putnami/php` turns each Composer component of a repository, such as a
 Symfony application and the packages beside it, into a Putnami project, and
 runs its lint and test with the PHPStan and PHPUnit the repository already
-installs. It reads the repository the way `putnami observe` does, and it never
-installs PHP, Composer or a tool.
+requires. It reads the repository the way `putnami observe` does. The machine
+needs neither PHP nor Composer.
 
 ## Adopt it
 
@@ -20,8 +20,44 @@ installs PHP, Composer or a tool.
    each package it requires through a path repository, and tags it `php`. An
    application whose `composer.json` names no package is named by its
    directory in the steps.
-3. Run `composer install`, as the team already does, then
-   `putnami lint,test`.
+3. Run `putnami install`, then `putnami lint,test`. The first task of a
+   component runs `composer install` at its stack root.
+
+## Where PHP and Composer come from
+
+`putnami install` pins one PHP release for the workspace in
+`putnami.lock.json`, and downloads it when the machine has no such PHP. A
+workspace with no `composer.json` outside `vendor/` pins nothing.
+
+| Root statement | Pinned release |
+|---|---|
+| None, or a range that accepts 8.4.23 | 8.4.23 |
+| A range or a `.php-version` that refuses 8.4.23 | The highest of 8.3.32, 8.4.23 and 8.5.8 it accepts |
+| A component's own statement narrows those | The same choice among the releases every component accepts; with no common release, the root's choice |
+| A release the extension ships, already in the lock and still accepted | That release |
+| No shipped release is accepted | No pin: the machine's PHP runs |
+
+The Linux and macOS archives come from `dl.static-php.dev`, a third party, and
+the Windows archives from `windows.php.net`. Each archive is pinned by
+SHA-256. Windows on ARM has no archive, so it gets no pin.
+
+A `php` on `PATH` that satisfies the statement always runs. The pinned PHP
+runs only when `php` is missing or outside the statement.
+
+Composer is a single file, so the extension downloads `composer.phar` 2.11.1
+under the Putnami home and checks its SHA-256. The `install` step of each
+`lint` and `test` runs `composer install` at the component's stack root. It
+skips a stack root whose last successful install used its current
+`composer.json` and `composer.lock`. A run with offline dependencies, such as
+a hosted run, installs nothing, so its repository needs a `vendor/` already.
+On Windows, the step also writes the `php.ini` of the pinned PHP, which
+enables openssl, mbstring, curl, zip and fileinfo. A Windows project that needs
+another extension puts its own PHP on `PATH`.
+
+The pinned PHP holds neither PCOV nor Xdebug. On a PHP with no coverage
+driver, `test` runs PHPUnit with its JUnit report only, reads no Clover report
+and warns with `stacks.coverage_unavailable`. For coverage, put a PHP with a
+driver on `PATH`.
 
 ## Where the tools come from
 
@@ -54,7 +90,7 @@ configuration names. PHPUnit reads the `phpunit.xml`, `phpunit.dist.xml` or
 directory, so the root application never runs a package's tests.
 `--coverage-filter src` adds `src` to the sources the configuration names: a
 root configuration that also names a package's sources reports them too, with
-the lines the root's tests run. The test task needs a coverage driver, PCOV or
+the lines the root's tests run. Coverage needs a driver, PCOV or
 Xdebug. `-d xdebug.mode=coverage` switches Xdebug to coverage; the two `pcov`
 settings make PCOV instrument the whole stack root but `vendor/`, where it
 would otherwise instrument the `src` of the directory PHPUnit runs in.
@@ -83,7 +119,8 @@ An exact version wins over a range wherever it is: a root `.php-version` of
 | `.php-version` states `8.3`, the machine has 8.3.6 | The task runs; `8.3` matches the 8.3 releases and keys the minor release |
 | `require.php` states `>=8.4`, `^8.2` or `8.3.*`, and the machine's version is in it | The task runs; the key carries the range, so two machines in it share entries |
 | The machine's version is outside the version or the range | The task fails with `stacks.toolchain_mismatch`; set `toolchain.check` to `warn` to run anyway |
-| `php` is not on `PATH` | The task fails with `stacks.toolchain_missing` |
+| The machine's version is outside it, or `php` is not on `PATH`, and the workspace pins a release in it | The task runs with the pinned PHP |
+| `php` is not on `PATH` and the workspace pins no release | The task fails with `stacks.toolchain_missing` |
 | Nothing states a version | The warning `stacks.toolchain_unpinned`: the cache key carries no PHP version |
 
 A range uses Composer's constraint syntax: `>=`, `<`, `!=`, `^`, `~`,
@@ -159,8 +196,8 @@ the input set and the steps that name `src`.
 }
 ```
 
-Test without a coverage driver: keep the JUnit report and drop the Clover
-one. `reports` is an object, so it merges: the empty `coverage` list replaces
+Test without coverage, even on a PHP with a driver: keep the JUnit report and
+drop the Clover one. `reports` is an object, so it merges: the empty `coverage` list replaces
 the profile's.
 
 ```json

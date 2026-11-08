@@ -62,6 +62,10 @@ func TestDecodeRefusesWhatTheSchemaDoesNotName(t *testing.T) {
 		"negated pattern":   strings.Replace(sampleProfile, `"src/**"`, `"!src/gen/**"`, 1),
 		"coverage format":   strings.Replace(sampleProfile, `"lcov"`, `"gcov"`, 1),
 		"bad check":         strings.Replace(sampleProfile, `"command": ["rustc"`, `"check": "ignore", "command": ["rustc"`, 1),
+		"bad provisioned":   strings.Replace(sampleProfile, `"command": ["rustc"`, `"provisioned": "not a name", "command": ["rustc"`, 1),
+		"no probe":          strings.Replace(sampleProfile, `"steps": [["cargo", "test", "--package", "{component}"]],`, `"withoutCoverage": {"probe": [], "steps": [["cargo"]]}, "steps": [["cargo", "test", "--package", "{component}"]],`, 1),
+		"no fallback steps": strings.Replace(sampleProfile, `"steps": [["cargo", "test", "--package", "{component}"]],`, `"withoutCoverage": {"probe": ["false"], "steps": []}, "steps": [["cargo", "test", "--package", "{component}"]],`, 1),
+		"bad fallback":      strings.Replace(sampleProfile, `"steps": [["cargo", "test", "--package", "{component}"]],`, `"withoutCoverage": {"probe": ["false"], "steps": [["cargo", "{crate}"]]}, "steps": [["cargo", "test", "--package", "{component}"]],`, 1),
 	}
 	for name, doc := range cases {
 		if _, err := Decode([]byte(doc)); err == nil {
@@ -156,5 +160,28 @@ func TestMatchPattern(t *testing.T) {
 		if got := MatchPattern(c.pattern, c.name); got != c.want {
 			t.Errorf("MatchPattern(%q, %q) = %v", c.pattern, c.name, got)
 		}
+	}
+}
+
+func TestAnOverrideOfTheStepsDropsTheCoverageFallback(t *testing.T) {
+	p := mustProfile(t)
+	task := p.Tasks[TaskTest]
+	task.WithoutCoverage = &WithoutCoverage{Probe: []string{"false"}, Steps: [][]string{{"cargo", "test"}}}
+	p.Tasks[TaskTest] = task
+
+	resolved, err := p.Resolve(json.RawMessage(`{"tasks": {"test": {"steps": [["cargo", "nextest", "run"]]}}}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resolved.Tasks[TaskTest].WithoutCoverage != nil {
+		t.Errorf("replaced steps drop the fallback: %+v", resolved.Tasks[TaskTest].WithoutCoverage)
+	}
+
+	resolved, err = p.Resolve(json.RawMessage(`{"tasks": {"test": {"inputs": ["sources"]}}}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resolved.Tasks[TaskTest].WithoutCoverage == nil {
+		t.Error("an override that keeps the steps keeps the fallback")
 	}
 }

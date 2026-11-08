@@ -75,11 +75,12 @@ func CheckManifest(t testing.TB, path string, s stacks.Stack) {
 func checkTask(t testing.TB, doc manifest, s stacks.Stack, task string) {
 	t.Helper()
 	command, ok := doc.Commands[task]
-	if !ok || len(command.Run) != 1 {
-		t.Errorf("command %s: want one step, got %+v", task, command.Run)
+	i := slices.IndexFunc(command.Run, func(step commandStep) bool { return step.ID == task })
+	if !ok || i < 0 {
+		t.Errorf("command %s: want a step %s, got %+v", task, task, command.Run)
 		return
 	}
-	step := command.Run[0]
+	step := command.Run[i]
 	if !slices.Contains(step.DependsOn, "^"+step.ID) {
 		t.Errorf("command %s: step %s depends on no ^%s: a change upstream would not rerun it", task, step.ID, step.ID)
 	}
@@ -135,11 +136,7 @@ type manifest struct {
 		Inputs  []string `json:"inputs"`
 	} `json:"workspace"`
 	Commands map[string]struct {
-		Run []struct {
-			ID        string   `json:"id"`
-			Task      string   `json:"task"`
-			DependsOn []string `json:"dependsOn"`
-		} `json:"run"`
+		Run []commandStep `json:"run"`
 	} `json:"commands"`
 	Tasks map[string]struct {
 		Command string   `json:"command"`
@@ -157,4 +154,11 @@ type manifest struct {
 			} `json:"outputs"`
 		} `json:"declares"`
 	} `json:"tasks"`
+}
+
+// commandStep is one step of a manifest command.
+type commandStep struct {
+	ID        string   `json:"id"`
+	Task      string   `json:"task"`
+	DependsOn []string `json:"dependsOn"`
 }

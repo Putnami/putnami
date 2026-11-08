@@ -175,6 +175,7 @@ func stubTools(t *testing.T, root, version string, failures int) string {
 	log := filepath.Join(bin, "tools.log")
 	writeFile(t, bin, "php", `#!/bin/sh
 if [ "$1" = "--version" ]; then echo "PHP `+version+` (cli) (built: Oct  1 2026 10:00:00) (NTS)"; exit 0; fi
+if [ "$1" = "-r" ]; then exit ${STUB_NO_COVERAGE_DRIVER:-0}; fi
 while [ "$#" -gt 0 ] && [ "$1" = "-d" ]; do shift 2; done
 exec "$@"
 `)
@@ -314,6 +315,74 @@ func TestJUnitAndCloverBecomeTheTestAndCoverageSummary(t *testing.T) {
 	stubTools(t, root, "8.4.10", 1)
 	if status, data, _, err := runJob(t, root, "packages/pricing", stacks.TaskTest); status != "FAILED" || err == nil || data["testSummary"].(map[string]any)["failed"] != 1 {
 		t.Errorf("a failed case fails the task: %s %v %v", status, err, data)
+	}
+}
+
+func TestAPHPWithNoCoverageDriverRunsTheTestsWithoutACloverReport(t *testing.T) {
+	spectest.Proves(t, feature, "coverage-driver-is-optional", "a-php-with-no-coverage-driver-runs-the-tests-without-a-clover-report")
+	root := fixture(t)
+	log := stubTools(t, root, "8.4.10", 0)
+	t.Setenv("STUB_NO_COVERAGE_DRIVER", "1")
+	status, data, out, err := runJob(t, root, "packages/pricing", stacks.TaskTest)
+	if status != "OK" || err != nil {
+		t.Fatalf("test: %s %v", status, err)
+	}
+	if got := data["testSummary"].(map[string]any); got["total"] != 2 {
+		t.Errorf("testSummary = %v", got)
+	}
+	if _, ok := data["coverageSummary"]; ok {
+		t.Errorf("no coverage summary is written: %v", data)
+	}
+	ran, _ := os.ReadFile(log)
+	want := ": phpunit --log-junit " + filepath.Join(out, "test", "junit.xml") + " --no-coverage tests"
+	if !strings.Contains(string(ran), want) || strings.Contains(string(ran), "clover") {
+		t.Errorf("test ran\n%s\nwant %q", ran, want)
+	}
+}
+
+func TestATaskUsesTheProvisionedPHPOnlyWhenTheMachinePHPIsUnusable(t *testing.T) {
+	spectest.Proves(t, feature, "machine-php-comes-first", "a-task-uses-the-provisioned-php-only-when-the-machine-php-is-unusable")
+	root := fixture(t)
+	pinnedDir := t.TempDir()
+	used := filepath.Join(pinnedDir, "used")
+	writeFile(t, pinnedDir, "php", `#!/bin/sh
+if [ "$1" = "--version" ]; then echo "PHP 8.4.23 (cli)"; exit 0; fi
+echo "$1" >> "`+used+`"
+if [ "$1" = "-r" ]; then exit 1; fi
+while [ "$#" -gt 0 ] && [ "$1" = "-d" ]; do shift 2; done
+exec "$@"
+`)
+	pinned := filepath.Join(pinnedDir, "php")
+	if err := os.Chmod(pinned, 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	// The application states >=8.4: 8.3.6 is outside it.
+	stubTools(t, root, "8.3.6", 0)
+	if status, _, _, err := runJob(t, root, ".", stacks.TaskTest); status != "FAILED" || err == nil || err.Error() != stacks.CodeToolchainMismatch {
+		t.Fatalf("with no pinned PHP the check fails as before: %s %v", status, err)
+	}
+	t.Setenv("PUTNAMI_PHP_EXECUTABLE", pinned)
+	status, data, _, err := runJob(t, root, ".", stacks.TaskTest)
+	if status != "OK" || err != nil {
+		t.Fatalf("a machine PHP outside the range gives way: %s %v", status, err)
+	}
+	if _, ok := data["coverageSummary"]; ok {
+		t.Errorf("the probe runs on the pinned PHP: %v", data)
+	}
+	if ran, _ := os.ReadFile(used); !strings.Contains(string(ran), "-r") {
+		t.Errorf("the pinned PHP ran %q", ran)
+	}
+
+	if err := os.Remove(used); err != nil {
+		t.Fatal(err)
+	}
+	stubTools(t, root, "8.4.10", 0)
+	if status, data, _, err := runJob(t, root, ".", stacks.TaskTest); status != "OK" || err != nil || data["coverageSummary"] == nil {
+		t.Fatalf("a machine PHP in the range runs: %s %v %v", status, err, data)
+	}
+	if ran, err := os.ReadFile(used); err == nil {
+		t.Errorf("a machine PHP in the range keeps the pinned PHP out: %q", ran)
 	}
 }
 

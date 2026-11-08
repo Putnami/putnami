@@ -5,6 +5,8 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"slices"
+	"strings"
 	"testing"
 )
 
@@ -125,5 +127,76 @@ func TestAnExactVersionWinsOverARange(t *testing.T) {
 	writeFile(t, root, "packages/pricing/.php-version", "stable\n")
 	if got, _ := tc.ExpectedVersion(root, "packages/pricing", "."); got.Version != "stable" {
 		t.Errorf("a value that is no range ends the search: %+v", got)
+	}
+}
+
+func stubVersionTool(t *testing.T, dir, name, version string) string {
+	t.Helper()
+	path := filepath.Join(dir, name)
+	if err := os.WriteFile(path, []byte("#!/bin/sh\necho 'tool "+version+"'\n"), 0o755); err != nil { //nolint:gosec // an executable stub
+		t.Fatal(err)
+	}
+	return path
+}
+
+func TestSelectPrefersThePathToolchainAndFallsBackOnThePinnedOne(t *testing.T) {
+	tc := Toolchain{Command: []string{"stubtool", "--version"}, Pattern: `^tool (?<version>[0-9.]+)`, Provisioned: "STUB_PINNED"}
+	expected := Expected{Version: "^8.3", Source: "composer.json"}
+	pinned := stubVersionTool(t, t.TempDir(), "stubtool", "8.4.23")
+	bin := t.TempDir()
+	ctx := context.Background()
+
+	t.Setenv("PATH", bin)
+	env := []string{"PATH=" + bin, "STUB_PINNED=" + pinned}
+	got, err := tc.Select(ctx, bin, expected, env)
+	if err != nil || got.Executable != pinned || got.Verdict.Code != "" {
+		t.Fatalf("a missing toolchain falls back on the pinned one: %+v %v", got, err)
+	}
+	if got.Program(tc, "stubtool") != pinned || got.Program(tc, "other") != "other" {
+		t.Errorf("only the toolchain command is redirected: %q", got.Program(tc, "stubtool"))
+	}
+	if !strings.HasPrefix(environmentValue(got.Env, "PATH"), filepath.Dir(pinned)+string(os.PathListSeparator)) {
+		t.Errorf("the pinned directory comes first on PATH: %v", got.Env)
+	}
+
+	stubVersionTool(t, bin, "stubtool", "8.5.1")
+	got, err = tc.Select(ctx, bin, expected, env)
+	if err != nil || got.Executable != "" {
+		t.Errorf("a toolchain on PATH in the range runs: %+v %v", got, err)
+	}
+
+	stubVersionTool(t, bin, "stubtool", "7.4.0")
+	got, err = tc.Select(ctx, bin, expected, env)
+	if err != nil || got.Executable != pinned || got.Verdict.Fail {
+		t.Errorf("a toolchain on PATH outside the range gives way: %+v %v", got, err)
+	}
+
+	warn := tc
+	warn.Check = CheckWarn
+	got, err = warn.Select(ctx, bin, expected, env)
+	if err != nil || got.Executable != "" || got.Verdict.Code != CodeToolchainMismatch {
+		t.Errorf("warn keeps the toolchain on PATH: %+v %v", got, err)
+	}
+
+	got, err = tc.Select(ctx, bin, Expected{Version: "^9.0", Source: "composer.json"}, env)
+	if err != nil || got.Executable != "" || !got.Verdict.Fail {
+		t.Errorf("a pinned toolchain outside the range leaves the failure of the one on PATH: %+v %v", got, err)
+	}
+
+	got, err = tc.Select(ctx, bin, expected, []string{"PATH=" + bin})
+	if err != nil || got.Executable != "" || !got.Verdict.Fail {
+		t.Errorf("with no pinned toolchain, the check fails as before: %+v %v", got, err)
+	}
+
+	empty := t.TempDir()
+	t.Setenv("PATH", empty)
+	if _, err = tc.Select(ctx, empty, expected, []string{"PATH=" + empty}); !errors.Is(err, ErrToolchainMissing) {
+		t.Errorf("with nothing to run, the toolchain is missing: %v", err)
+	}
+}
+
+func TestPrependPathAddsAPathWhenThereIsNone(t *testing.T) {
+	if got := prependPath([]string{"A=1"}, "/x"); !slices.Equal(got, []string{"A=1", "PATH=/x"}) {
+		t.Errorf("prependPath = %v", got)
 	}
 }

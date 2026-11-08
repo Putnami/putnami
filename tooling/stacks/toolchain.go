@@ -163,6 +163,84 @@ func (t Toolchain) MachineVersion(ctx context.Context, dir string, env []string)
 	return "", fmt.Errorf("%s printed no version that matches %q", strings.Join(t.Command, " "), t.Pattern)
 }
 
+// Selection is the toolchain a task runs and the outcome of its check.
+type Selection struct {
+	// Env is the environment of the task's steps.
+	Env []string
+	// Executable is the path of the pinned toolchain; empty when the toolchain
+	// on PATH runs.
+	Executable string
+	// Verdict is the outcome of the check of the selected toolchain.
+	Verdict Verdict
+}
+
+// Program returns the program a step runs: the pinned toolchain for a step
+// that names the toolchain command, and name otherwise.
+func (s Selection) Program(t Toolchain, name string) string {
+	if s.Executable != "" && name == t.Command[0] {
+		return s.Executable
+	}
+	return name
+}
+
+// Select chooses the toolchain of a task in dir. The toolchain on PATH runs
+// when its check does not fail. Otherwise the toolchain the Provisioned
+// variable of env names runs, with its directory first on PATH, when it
+// answers and its check passes or nothing is on PATH. The error is the one of
+// the toolchain on PATH when no toolchain answers.
+func (t Toolchain) Select(ctx context.Context, dir string, expected Expected, env []string) (Selection, error) {
+	onPath := Selection{Env: env}
+	machine, machineErr := t.MachineVersion(ctx, dir, env)
+	if machineErr == nil {
+		onPath.Verdict = t.Compare(expected, machine)
+		if !onPath.Verdict.Fail {
+			return onPath, nil
+		}
+	}
+	pinned := environmentValue(env, t.Provisioned)
+	if t.Provisioned == "" || !filepath.IsAbs(pinned) {
+		return onPath, machineErr
+	}
+	withPin := t
+	withPin.Command = append([]string{pinned}, t.Command[1:]...)
+	version, err := withPin.MachineVersion(ctx, dir, env)
+	if err != nil {
+		return onPath, machineErr
+	}
+	verdict := t.Compare(expected, version)
+	if verdict.Fail && machineErr == nil {
+		return onPath, nil
+	}
+	return Selection{Env: prependPath(env, filepath.Dir(pinned)), Executable: pinned, Verdict: verdict}, nil
+}
+
+func environmentValue(env []string, name string) string {
+	for _, entry := range env {
+		if value, ok := strings.CutPrefix(entry, name+"="); ok {
+			return value
+		}
+	}
+	return ""
+}
+
+// prependPath returns env with dir first on its PATH.
+func prependPath(env []string, dir string) []string {
+	out := make([]string, 0, len(env)+1)
+	found := false
+	for _, entry := range env {
+		name, value, ok := strings.Cut(entry, "=")
+		if ok && !found && strings.EqualFold(name, "PATH") {
+			found = true
+			entry = name + "=" + dir + string(os.PathListSeparator) + value
+		}
+		out = append(out, entry)
+	}
+	if !found {
+		out = append(out, "PATH="+dir)
+	}
+	return out
+}
+
 // ErrToolchainMissing is the error of a toolchain command that is not on PATH.
 var ErrToolchainMissing = errors.New("the toolchain command is missing")
 
