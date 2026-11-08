@@ -7,10 +7,7 @@
     "@putnami/python"
   ],
   "options": {
-    "@putnami/python:run": {
-      "entrypoint": "src/<%= projectModule %>/__init__.py"
-    },
-    "@putnami/python:serve": {
+    "@putnami/python": {
       "entrypoint": "src/<%= projectModule %>/__init__.py"
     }
   }

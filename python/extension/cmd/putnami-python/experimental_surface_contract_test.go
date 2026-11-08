@@ -234,21 +234,23 @@ func TestExperimentalPythonLibraryUsesSrcLayout(t *testing.T) {
 	}
 }
 
-// The server template's shape requirement names configured run and serve
-// entrypoints. The boundary test reads pyproject.toml.template and the test
-// file; the entrypoints live in putnami.json.template, so nothing checked
-// them. Without them `putnami serve` has no entrypoint to resolve.
-func TestExperimentalPythonServerConfiguresRunAndServeEntrypoints(t *testing.T) {
-	spectest.Proves(t, "python/experimental-server-template", "minimal-server-shape", "the-server-template-configures-run-and-serve-entrypoints")
+// The server template's shape requirement names one configured entrypoint for
+// its commands. The boundary test reads pyproject.toml.template and the test
+// file; the entrypoint lives in putnami.json.template, so nothing checked it.
+// Without it `putnami serve`, `run` and `package` have no entrypoint to
+// resolve. It sits in the extension's block, which every command of the
+// extension reads, so the image runs the file serve runs.
+func TestExperimentalPythonServerConfiguresOneEntrypointForItsCommands(t *testing.T) {
+	spectest.Proves(t, "python/experimental-server-template", "minimal-server-shape", "the-server-template-configures-one-entrypoint-for-its-commands")
 	root := filepath.Join("..", "..", "..", "..")
 	manifest := readExperimentalFile(t, filepath.Join(root, "python", "templates", "python-server", "putnami.json.template"))
 
-	for _, task := range []string{"@putnami/python:run", "@putnami/python:serve"} {
-		if !strings.Contains(manifest, task) {
-			t.Errorf("python-server declares no %s entrypoint", task)
-		}
+	if !strings.Contains(manifest, `"@putnami/python": {`) || !strings.Contains(manifest, `"entrypoint"`) {
+		t.Error("python-server names no entrypoint in the options of @putnami/python")
 	}
-	if !strings.Contains(manifest, `"entrypoint"`) {
-		t.Error("python-server names no entrypoint for its run and serve tasks")
+	for _, command := range []string{"@putnami/python:run", "@putnami/python:serve", "@putnami/python:package"} {
+		if strings.Contains(manifest, command) {
+			t.Errorf("python-server sets %s, which can name another entrypoint than the other commands", command)
+		}
 	}
 }

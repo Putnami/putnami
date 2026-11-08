@@ -11,8 +11,12 @@
     "python/experimental-workspace-integration#exact-uv-declaration",
     "python/experimental-workspace-integration#experimental-boundary",
     "python/experimental-workspace-integration#explicit-opt-in",
+    "python/experimental-workspace-integration#image-installs-the-locked-wheels",
+    "python/experimental-workspace-integration#image-ships-the-application-files",
     "python/experimental-workspace-integration#native-tools",
+    "python/experimental-workspace-integration#packages-an-application-image",
     "python/experimental-workspace-integration#pinned-uv",
+    "python/experimental-workspace-integration#publishes-an-application-image",
     "python/experimental-workspace-integration#uv-answers-its-toolchain-pin",
     "python/experimental-workspace-integration#workspace-scope"
   ]

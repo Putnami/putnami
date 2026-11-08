@@ -10,7 +10,10 @@ workspace path or add parity with Go or TypeScript.
 
 ## Per-Project: Serve Defaults
 
-Set default `serve` options so you don't need to pass flags every time:
+Set default `serve` options so you don't need to pass flags every time. The
+entrypoint goes in the options of `@putnami/python`, which `serve`, `run` and
+`package` all read, so the image runs the file `serve` runs; an entrypoint in
+`@putnami/python:serve` would reach `serve` alone.
 
 ```json
 {
@@ -18,8 +21,10 @@ Set default `serve` options so you don't need to pass flags every time:
   "type": "application",
   "extensions": ["@putnami/python"],
   "options": {
+    "@putnami/python": {
+      "entrypoint": "src/api_server/__init__.py"
+    },
     "@putnami/python:serve": {
-      "entrypoint": "src/api_server/__init__.py",
       "port": 8080
     }
   }

@@ -15,6 +15,8 @@
 //	test               Run Python tests with pytest
 //	serve              Serve a Python application with hot-reload
 //	run                Run a Python workload once and forward its exit code
+//	package-docker     Assemble the OCI image of an application
+//	publish-docker     Push the image of an application to its registry
 package main
 
 import (
@@ -41,6 +43,8 @@ func commandHandlers() map[string]cli.JobFunc {
 		"test":              jobs.Test,
 		"serve":             jobs.Serve,
 		"run":               jobs.Run,
+		"package-docker":    jobs.PackageDocker,
+		"publish-docker":    jobs.PublishDocker,
 	}
 }
 

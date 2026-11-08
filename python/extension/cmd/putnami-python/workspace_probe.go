@@ -116,16 +116,23 @@ func probePythonWorkspace(root string, request wsproto.ProbeRequest) (wsproto.Pr
 				diag.Warningf("invalid-manifest", marker, "pyproject.toml declares no [project] name: %v", err))
 			continue
 		}
-		result.Projects = append(result.Projects, wsproto.ProbeProject{
+		project := wsproto.ProbeProject{
 			Path:       normalized,
 			SourceName: name,
 			SourceFile: marker,
 			// A project's own answer changes when its own pyproject.toml
 			// changes; declaring it keeps core's watch and snapshot machinery
 			// from having to know that pyproject.toml is what this provider
-			// reads.
-			WatchedFiles: append([]string{marker}, pythonWorkspaceRootFiles...),
-		})
+			// reads. Its putnami.json says whether it publishes an image.
+			WatchedFiles: append([]string{marker, projectConfigPathFor(normalized)}, pythonWorkspaceRootFiles...),
+		}
+		// An image member's coordinate also reads the workspace's registries
+		// and the scope files that name the project.
+		if metadata, scopeFiles := imageMember(root, project); metadata != nil {
+			project.Metadata = metadata
+			project.WatchedFiles = append(append(project.WatchedFiles, pythonWorkspaceConfigFile), scopeFiles...)
+		}
+		result.Projects = append(result.Projects, project)
 	}
 
 	wsproto.NormalizeProbeResult(&result)

@@ -240,6 +240,8 @@ func TestDeclaredOutputOwnerTable(t *testing.T) {
 	m := loadExtensionManifest(t)
 
 	want := []ownerRow{
+		{task: "package-docker", id: "docker", kind: "directory", root: "command-output", path: "docker", optionalEmpty: true},
+		{task: "publish-docker", id: "published-image", kind: "file", root: "command-output", path: "docker/published-image.json", optionalEmpty: true},
 		{task: "test-run", id: "featureVerification", kind: "file", root: "command-output", path: "putnami-feature-verification.json", optionalEmpty: true},
 	}
 
@@ -303,20 +305,26 @@ func rowsString(rows []ownerRow) string {
 // reproduce — that the task is not cacheable. A task missing from the table
 // declares no effects.
 //
-// Every task in this manifest shells out through `uv`, and `uv run` resolves and
+// Every task but the image ones shells out through `uv run`, which resolves and
 // downloads the tool it is asked for (network) into the machine-global uv cache
-// and virtualenv (toolchain-cache). Every task also runs the uv workspace sync
+// and virtualenv (toolchain-cache). Those tasks also run the uv workspace sync
 // first, which rewrites the workspace-root pyproject.toml — that is
-// workspace-files, and it is why even a per-project lint task declares it.
+// workspace-files, and it is why even a per-project lint task declares it. The
+// image tasks run no sync.
 func TestTaskEffectTable(t *testing.T) {
 	m := loadExtensionManifest(t)
 
 	want := map[string][]string{
-		"deps-upgrade-exec":      {"network", "toolchain-cache", "workspace-files"},
-		"lint-check-fix":         {"network", "toolchain-cache", "workspace-files"},
-		"lint-check-readonly":    {"network", "toolchain-cache", "workspace-files"},
-		"lint-format-fix":        {"network", "toolchain-cache", "workspace-files"},
-		"lint-format-readonly":   {"network", "toolchain-cache", "workspace-files"},
+		"deps-upgrade-exec":    {"network", "toolchain-cache", "workspace-files"},
+		"lint-check-fix":       {"network", "toolchain-cache", "workspace-files"},
+		"lint-check-readonly":  {"network", "toolchain-cache", "workspace-files"},
+		"lint-format-fix":      {"network", "toolchain-cache", "workspace-files"},
+		"lint-format-readonly": {"network", "toolchain-cache", "workspace-files"},
+		// package-docker writes only its declared output: uv installs into a
+		// temporary directory, from uv's cache.
+		"package-docker": {"network", "toolchain-cache"},
+		// publish-docker runs no uv: it pushes the packaged image.
+		"publish-docker":         {"network", "registry"},
 		"run-exec":               {"network", "process", "toolchain-cache", "workspace-files"},
 		"serve-run":              {"network", "process", "toolchain-cache", "workspace-files"},
 		"test-run":               {"network", "toolchain-cache", "workspace-files"},
@@ -679,7 +687,7 @@ func TestUVTasksRequireThePinnedUVToolchain(t *testing.T) {
 		t.Fatalf("runToolchains = %v: workspace-sync runs before a uv is pinned and must not require one", m.Runtime.RunToolchains)
 	}
 
-	runsNoUV := map[string]bool{"lint-docs": true, "workspace-sync-exec": true}
+	runsNoUV := map[string]bool{"lint-docs": true, "publish-docker": true, "workspace-sync-exec": true}
 	for _, name := range sortedTaskNames(m) {
 		got := m.Tasks[name].Toolchains
 		want := []string{"uv"}

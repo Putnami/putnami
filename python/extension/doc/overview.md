@@ -11,7 +11,10 @@ than providing a Python framework.
 
 ## What it provides
 
-- **CLI jobs**: `lint`, `test`, `serve`, `workspace-install`
+- **CLI jobs**: `lint`, `test`, `serve`, `run`, `package`, `publish`, `workspace-install`
+- **Application image**: `package --docker` assembles the OCI image of an
+  application on the official Python slim image, and `publish --docker` pushes
+  it (see [Package and Publish](./package.md))
 - **Workspace adapter**: answers the workspace probe for explicitly configured
   Python projects with each project's `[project]` name, and owns the
   `pyproject.toml` identity write (`workspace-sync`)
