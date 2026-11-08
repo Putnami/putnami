@@ -1,0 +1,80 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-features.json",
+  "protocolVersion": 2,
+  "namespace": "java",
+  "features": [
+    {
+      "id": "java/stack-extension",
+      "type": "feature",
+      "name": "Run the Gradle projects and Maven modules of a Java or Kotlin build as Putnami tasks",
+      "outcome": "A team with a Gradle build, Android included, or a Maven build adds @putnami/java and runs putnami lint, test and build over its components with Putnami's runner and cache, without rewriting its build: each Gradle project or Maven module is a project with its edges, each task runs the steps of the component's build after a Java toolchain check, the test task reads its JUnit and JaCoCo reports, and a component overrides any profile value in its putnami.json",
+      "owner": "java",
+      "target": "coded",
+      "requirements": [
+        {
+          "id": "components-become-projects",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": ["the-gradle-projects-and-maven-modules-become-projects-with-their-edges"]
+          }
+        },
+        {
+          "id": "variants-follow-the-build",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": ["each-component-gets-the-variant-of-its-build"]
+          }
+        },
+        {
+          "id": "tasks-run-the-profile",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": ["a-task-runs-the-variant-steps-after-the-java-check"]
+          }
+        },
+        {
+          "id": "reports-become-the-summary",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": ["junit-and-jacoco-become-the-test-and-coverage-summary"]
+          }
+        },
+        {
+          "id": "lint-reads-main-sources",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": ["a-test-only-change-keeps-the-lint-inputs"]
+          }
+        },
+        {
+          "id": "overrides-are-honored",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": ["a-putnami-json-override-changes-the-steps-and-the-inputs"]
+          }
+        },
+        {
+          "id": "manifest-follows-the-profile",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": ["the-manifest-conforms-to-the-stack-core"]
+          }
+        }
+      ]
+    }
+  ]
+}
