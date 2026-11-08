@@ -140,6 +140,97 @@
               "a-php-with-no-coverage-driver-runs-the-tests-without-a-clover-report"
             ]
           }
+        },
+        {
+          "id": "fetches-the-locked-packages",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "workspace-fetch-downloads-the-locked-packages-and-runs-none-of-their-code"
+            ]
+          }
+        },
+        {
+          "id": "workspace-install-runs-composer",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "workspace-install-installs-each-stack-root-the-workspace-includes"
+            ]
+          }
+        },
+        {
+          "id": "serves-an-application",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "serve-runs-the-php-built-in-server-on-an-application"
+            ]
+          }
+        },
+        {
+          "id": "runs-an-application-once",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "run-forwards-the-exit-code-of-the-entrypoint"
+            ]
+          }
+        },
+        {
+          "id": "upgrades-the-dependencies",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "deps-upgrade-runs-composer-update"
+            ]
+          }
+        },
+        {
+          "id": "packages-an-application-image",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "package-assembles-an-image-of-an-application-and-its-production-dependencies"
+            ]
+          }
+        },
+        {
+          "id": "publishes-an-application-image",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "publish-pushes-the-application-image"
+            ]
+          }
         }
       ]
     }
