@@ -26,6 +26,7 @@ import (
 	"unicode"
 
 	diag "go.putnami.dev/protocol/diagnostic"
+	"go.putnami.dev/protocol/evidence"
 	"go.putnami.dev/protocol/job"
 	sdkcli "go.putnami.dev/sdk/extension/cli"
 	sdkcontext "go.putnami.dev/sdk/extension/context"
@@ -51,7 +52,7 @@ const contextFlag = "--putnamiContext"
 var runtimeVersion string
 
 // knownFlags are the flags `putnami observe` takes.
-var knownFlags = []string{"base", "head", "junit", "coverage", "sbom", "base-sbom", "architecture", "archunit-classes", "moon-graph", "fetch", "evidence", "upload", "publish", "pants-graph", "bazel-graph", "decisions"}
+var knownFlags = []string{"base", "head", "junit", "coverage", "sbom", "base-sbom", "architecture", "archunit-classes", "moon-graph", "fetch", "evidence", "upload", "publish", "pants-graph", "bazel-graph", "decisions", "details", "open"}
 
 func run(args []string, getenv func(string) string, stdout, stderr io.Writer) int {
 	handled, err := runtimeinfo.Handle(args, stdout, extensionName, runtimeVersion)
@@ -82,21 +83,46 @@ func run(args []string, getenv func(string) string, stdout, stderr io.Writer) in
 		return 2
 	}
 	opts.Env = getenv
+	if out.upload {
+		// The code host lookup is a request off the machine: only a run that
+		// uploads makes it.
+		opts.ProjectID = func(ctx context.Context, provider, host, path string) (string, error) {
+			return publish.ProjectID(ctx, publishClient, getenv, provider, host, path)
+		}
+	}
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 	o := observe.Run(ctx, opts)
 	uploaded, reportURL, diags := writeAndUpload(ctx, o, out, getenv, stderr)
 	o.Diagnostics = append(o.Diagnostics, diags...)
+	if out.open && reportURL != "" {
+		if _, inCI := evidence.DetectCISystem(getenv); !inCI {
+			if err := openBrowser(reportURL); err != nil {
+				fmt.Fprintf(stderr, "putnami observe: the browser did not open (%v); open %s\n", err, reportURL)
+			}
+		}
+	}
 	if out.publish {
 		o.Diagnostics = append(o.Diagnostics, publish.Run(ctx, publish.Request{
 			Observation: o, Upload: uploaded, ReportURL: reportURL, Getenv: getenv, Client: publishClient, Output: stderr,
 		})...)
 	}
-	write := observe.WriteText
 	if out.json {
-		write = observe.WriteJSON
+		if err := observe.WriteJSON(stdout, o); err != nil {
+			fmt.Fprintf(stderr, "putnami observe: %v\n", err)
+			return 1
+		}
+		return 0
 	}
-	if err := write(stdout, o); err != nil {
+	write := observe.WriteText
+	if out.details {
+		write = observe.WriteDetails
+	}
+	err = write(stdout, o)
+	if err == nil {
+		_, err = fmt.Fprintln(stdout, upload.Next(upload.Step{Getenv: getenv, Upload: uploaded, ReportURL: reportURL}))
+	}
+	if err != nil {
 		fmt.Fprintf(stderr, "putnami observe: %v\n", err)
 		return 1
 	}
@@ -114,7 +140,14 @@ type outputs struct {
 	// publish posts a commit status and a summary note on the pull or merge
 	// request.
 	publish bool
+	// details prints the detailed summary instead of the short one.
+	details bool
+	// open uploads with sign-in and opens the report outside a CI.
+	open bool
 }
+
+// openBrowser opens the report URL outside a CI. Tests replace it.
+var openBrowser = upload.OpenBrowser
 
 // publishClient sends the requests of --publish; nil is the default client.
 // Tests replace it.
@@ -145,7 +178,8 @@ func writeAndUpload(ctx context.Context, o observe.Observation, out outputs, get
 	if len(diags) > 0 {
 		return publish.UploadFailed, "", append(diags, upload.Skipped()...)
 	}
-	reportURL, diags := upload.Run(ctx, upload.Request{Path: path, Getenv: getenv, Output: stderr})
+	_, inCI := evidence.DetectCISystem(getenv)
+	reportURL, diags := upload.Run(ctx, upload.Request{Path: path, Getenv: getenv, Output: stderr, SignIn: out.open && !inCI})
 	if len(diags) > 0 {
 		return publish.UploadFailed, "", diags
 	}
@@ -177,6 +211,14 @@ func parseRun(args []string, launch *job.Context) (observe.Options, outputs, err
 		return observe.Options{}, outputs{}, err
 	}
 	publishFlag, err := boolFlag(flags, "publish", false)
+	if err != nil {
+		return observe.Options{}, outputs{}, err
+	}
+	details, err := boolFlag(flags, "details", false)
+	if err != nil {
+		return observe.Options{}, outputs{}, err
+	}
+	openFlag, err := boolFlag(flags, "open", false)
 	if err != nil {
 		return observe.Options{}, outputs{}, err
 	}
@@ -213,7 +255,7 @@ func parseRun(args []string, launch *job.Context) (observe.Options, outputs, err
 	}
 	opts.Overrides.Base = flags["base"]
 	opts.Overrides.Head = flags["head"]
-	out := outputs{upload: uploadFlag, publish: publishFlag}
+	out := outputs{upload: uploadFlag || openFlag, publish: publishFlag, details: details, open: openFlag}
 	if launch != nil {
 		switch launch.Params.String("output") {
 		case "json", "jsonl", "cloud-logging":

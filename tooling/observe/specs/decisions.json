@@ -3,7 +3,7 @@
   "protocolVersion": 1,
   "feature": "tooling/observe-decisions",
   "outcomes": [
-    "A team that keeps its decisions as MADR files sees, for each change, the decisions that govern the files it touches, with their status, in the summary and in the change evidence document",
+    "A team that keeps its decisions as MADR files sees, for each change, the decisions that govern the files it touches, with their status, in the detailed summary and in the change evidence document",
     "A change that adds, edits or deletes a decision record lists it, and a change that deletes an accepted decision is flagged",
     "Nothing is converted and no decision is required: a repository without decision records observes as before"
   ],
@@ -39,11 +39,11 @@
     },
     {
       "id": "decisions-summary",
-      "text": "The text summary lists the decisions under a decisions heading, one line each with its status, its path and its title, then how many changed files it governs and whether the change added, modified, renamed or deleted it."
+      "text": "The detailed text summary, which --details prints, lists the decisions under a decisions heading, one line each with its status, its path and its title, then how many changed files it governs and whether the change added, modified, renamed or deleted it."
     },
     {
       "id": "decisions-demo",
-      "text": "On a repository with three MADR files, one governing a path by its front matter scope, one by a Scope section and one accepted decision the change deletes, a change under the governed paths lists their decisions in the summary and in the evidence document, which validates, and the deleted accepted decision is flagged."
+      "text": "On a repository with three MADR files, one governing a path by its front matter scope, one by a Scope section and one accepted decision the change deletes, a change under the governed paths lists their decisions in the detailed summary and in the evidence document, which validates, and the deleted accepted decision is flagged."
     }
   ],
   "decisions": [

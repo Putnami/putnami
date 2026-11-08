@@ -350,6 +350,21 @@ func RemoteURL(ctx context.Context, dir string) (string, error) {
 	return git{ctx: ctx, dir: dir}.output("remote", "get-url", remote)
 }
 
+// DefaultBranch returns the default branch of the origin remote as the clone
+// recorded it, origin/<branch>, from refs/remotes/origin/HEAD.
+func DefaultBranch(ctx context.Context, dir string) (string, error) {
+	return git{ctx: ctx, dir: dir}.output("symbolic-ref", "--quiet", "--short", "refs/remotes/"+remote+"/HEAD")
+}
+
+// CurrentBranch returns the branch HEAD is on, "" when HEAD is detached.
+func CurrentBranch(ctx context.Context, dir string) string {
+	branch, err := git{ctx: ctx, dir: dir}.output("symbolic-ref", "--quiet", "--short", "HEAD")
+	if err != nil {
+		return ""
+	}
+	return branch
+}
+
 func (g git) output(args ...string) (string, error) {
 	out, err := g.raw(args...)
 	return strings.TrimSpace(string(out)), err

@@ -116,6 +116,62 @@
               "an-unreadable-spec-is-a-diagnostic"
             ]
           }
+        },
+        {
+          "id": "short-log-summary",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-text-summary-stays-short"
+            ]
+          }
+        },
+        {
+          "id": "next-command",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-laptop-run-names-open",
+              "a-ci-job-without-a-token-names-the-token-setting",
+              "a-ci-job-with-a-token-names-upload",
+              "an-upload-names-the-report-url"
+            ]
+          }
+        },
+        {
+          "id": "laptop-repository-key",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-laptop-run-keys-its-origin-by-the-numeric-project-id",
+              "an-origin-without-an-id-is-a-diagnostic-naming-the-token"
+            ]
+          }
+        },
+        {
+          "id": "laptop-base",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-laptop-run-measures-from-the-remote-default-branch"
+            ]
+          }
         }
       ]
     },
@@ -961,7 +1017,7 @@
       "id": "tooling/observe-upload",
       "type": "feature",
       "name": "Hand the change evidence document to a reporter",
-      "outcome": "A CI job adds --upload to putnami observe and its change evidence document reaches the reporter it selected, Putnami Cloud by default, and an upload that fails is a diagnostic that never fails the job",
+      "outcome": "A CI job adds --upload to putnami observe and its change evidence document reaches the reporter it selected, Putnami Cloud by default; a person adds --open and gets the full report after signing in; an upload that fails is a diagnostic that never fails the job",
       "owner": "tooling",
       "target": "modeled",
       "requirements": [
@@ -1004,6 +1060,33 @@
             "kind": "acceptance",
             "checks": [
               "a-failed-upload-is-a-diagnostic"
+            ]
+          }
+        },
+        {
+          "id": "open-signs-in-and-uploads",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "open-passes-sign-in-and-prints-the-report-url",
+              "open-opens-the-browser-on-a-laptop-only"
+            ]
+          }
+        },
+        {
+          "id": "nothing-leaves-without-upload-or-open",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-run-without-upload-or-open-runs-no-reporter"
             ]
           }
         }

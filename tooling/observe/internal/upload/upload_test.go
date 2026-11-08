@@ -196,7 +196,7 @@ func TestAnUnsetSelectorPicksPutnamiCloud(t *testing.T) {
 func TestCommandUsesPutnamiOnPathWithoutAnAbsoluteExecutable(t *testing.T) {
 	spectest.Proves(t, feature, "upload-hands-the-document-to-the-reporter", "upload-runs-the-selected-reporter-with-the-document")
 	for _, advertised := range []string{"", "bin/putnami"} {
-		executable, args, environ := Command(env(map[string]string{"PUTNAMI_CLI_EXECUTABLE": advertised}), []string{"A=1"}, "cloud", "/tmp/e.json")
+		executable, args, environ := Command(env(map[string]string{"PUTNAMI_CLI_EXECUTABLE": advertised}), []string{"A=1"}, "cloud", "/tmp/e.json", false)
 		if executable != "putnami" || !slices.Equal(args, []string{"cloud", Subcommand, FileFlag, "/tmp/e.json", OutputFlag}) {
 			t.Fatalf("advertised %q: %s %v", advertised, executable, args)
 		}

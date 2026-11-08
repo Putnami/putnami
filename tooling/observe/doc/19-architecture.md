@@ -50,7 +50,7 @@ component.
 
 ## What it prints
 
-When it read a rule, the summary counts the rules and lists each broken one
+When it read a rule, the detailed summary (`--details`) counts the rules and lists each broken one
 with its first five violations:
 
 ```text

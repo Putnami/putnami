@@ -56,7 +56,7 @@ func TestTheMADRDemoIsExplained(t *testing.T) {
 		t.Errorf("evidence decisions = %+v", doc.Decisions)
 	}
 	var text bytes.Buffer
-	if err := WriteText(&text, o); err != nil {
+	if err := WriteDetails(&text, o); err != nil {
 		t.Fatal(err)
 	}
 	for _, line := range []string{
@@ -144,7 +144,7 @@ func TestARepositoryWithoutDecisionsObservesAsBefore(t *testing.T) {
 		}
 	}
 	var text bytes.Buffer
-	if err := WriteText(&text, o); err != nil {
+	if err := WriteDetails(&text, o); err != nil {
 		t.Fatal(err)
 	}
 	if strings.Contains(text.String(), "decisions") {

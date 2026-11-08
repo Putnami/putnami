@@ -2,6 +2,7 @@ package publish
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -248,4 +249,59 @@ func firstOf(values ...string) string {
 		}
 	}
 	return ""
+}
+
+// ProjectID asks the code host API for the numeric id of the repository at
+// path on host: GitHub GET /repos/{owner}/{repo}, GitLab GET /projects/{path}.
+// It sends GITHUB_TOKEN or PUTNAMI_GITLAB_TOKEN when one is set, so a private
+// repository answers too. GITHUB_API_URL and CI_API_V4_URL name another API.
+func ProjectID(ctx context.Context, client *http.Client, getenv func(string) string, provider, host, path string) (string, error) {
+	var raw, resource, token string
+	var auth func(*http.Request, string)
+	switch provider {
+	case ci.ProviderGitHub:
+		owner, name, ok := strings.Cut(path, "/")
+		if !ok || owner == "" || name == "" || strings.Contains(name, "/") {
+			return "", fmt.Errorf("the repository %q is not owner/name", path)
+		}
+		raw = firstOf(getenv("GITHUB_API_URL"), gitHubAPI)
+		resource = "/repos/" + url.PathEscape(owner) + "/" + url.PathEscape(name)
+		token = strings.TrimSpace(getenv("GITHUB_TOKEN"))
+		auth = func(r *http.Request, token string) {
+			r.Header.Set("Accept", "application/vnd.github+json")
+			r.Header.Set("X-GitHub-Api-Version", "2022-11-28")
+			if token != "" {
+				r.Header.Set("Authorization", "Bearer "+token)
+			}
+		}
+	case ci.ProviderGitLab:
+		raw = firstOf(getenv("CI_API_V4_URL"), "https://"+host+"/api/v4")
+		resource = "/projects/" + url.PathEscape(path)
+		token = strings.TrimSpace(getenv("PUTNAMI_GITLAB_TOKEN"))
+		auth = func(r *http.Request, token string) {
+			if token != "" {
+				r.Header.Set("PRIVATE-TOKEN", token)
+			}
+		}
+	default:
+		return "", fmt.Errorf("the code host %q has no API observe reads", provider)
+	}
+	base, err := apiBase(raw)
+	if err != nil {
+		return "", err
+	}
+	ctx, cancel := context.WithTimeout(ctx, requestTimeout)
+	defer cancel()
+	var answer struct {
+		ID json.Number `json:"id"`
+	}
+	a := api{client: apiClient(client), base: base, auth: func(r *http.Request) { auth(r, token) }}
+	if err := a.do(ctx, http.MethodGet, resource, nil, nil, &answer); err != nil {
+		return "", err
+	}
+	id := answer.ID.String()
+	if id == "" || strings.Trim(id, "0123456789") != "" || id[0] == '0' {
+		return "", fmt.Errorf("the API answered the id %q, not a positive integer", id)
+	}
+	return id, nil
 }
