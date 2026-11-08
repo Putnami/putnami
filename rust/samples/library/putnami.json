@@ -1,0 +1,6 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-project.json",
+  "tags": ["sample", "rust", "e2e"],
+  "extensions": ["/rust/extension"],
+  "featureAuthority": { "owner": "rust/stack-extension" }
+}
