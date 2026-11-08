@@ -1,0 +1,42 @@
+{
+  "id": "php",
+  "markers": ["composer.json"],
+  "toolchain": {
+    "command": ["php", "--version"],
+    "pattern": "^PHP (?<version>[0-9]+(?:\\.[0-9]+)*)",
+    "files": [
+      { "path": ".php-version" },
+      { "path": "composer.json", "key": "require.php" }
+    ]
+  },
+  "inputs": {
+    "sources": ["src/**"],
+    "tests": ["tests/**"],
+    "app": ["config/**", "templates/**", "translations/**", "migrations/**"],
+    "manifests": ["composer.json", "{root}/composer.json"],
+    "lintConfig": ["phpstan.neon", "phpstan.neon.dist", "phpstan.dist.neon", ".php-cs-fixer.php", ".php-cs-fixer.dist.php"],
+    "testConfig": ["phpunit.xml", "phpunit.dist.xml", "phpunit.xml.dist", ".env", ".env.test"],
+    "lockfiles": ["composer.lock", "{root}/composer.lock"]
+  },
+  "tasks": {
+    "lint": {
+      "steps": [
+        ["{root}/vendor/bin/phpstan", "analyse", "--no-progress", "--no-interaction", "src"]
+      ],
+      "inputs": ["sources", "manifests", "lintConfig"]
+    },
+    "test": {
+      "steps": [
+        [
+          "php", "-d", "xdebug.mode=coverage", "{root}/vendor/bin/phpunit",
+          "--log-junit", "{output}/junit.xml", "--coverage-clover", "{output}/clover.xml", "--coverage-filter", "src", "tests"
+        ]
+      ],
+      "inputs": ["sources", "tests", "app", "testConfig", "manifests", "lockfiles"],
+      "reports": {
+        "junit": ["{output}/junit.xml"],
+        "coverage": [{ "format": "clover", "paths": ["{output}/clover.xml"] }]
+      }
+    }
+  }
+}

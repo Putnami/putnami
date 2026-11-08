@@ -19,7 +19,8 @@ type Component struct {
 	// Path is the workspace-relative component directory, "." for the root.
 	Path string
 	// Name is the detector's name for the component: the crate, the Gradle
-	// path, the package. Steps receive it as {component}.
+	// path, the package. Steps receive it as {component}; an empty name
+	// gives the component its Path instead.
 	Name string
 	// SourceFile is the workspace-relative manifest the name was read from.
 	SourceFile string
@@ -80,7 +81,14 @@ func (s Stack) Probe(root string, request wsproto.ProbeRequest) (wsproto.ProbeRe
 		if err != nil {
 			result.Diagnostics = append(result.Diagnostics, diag.Warningf(CodeToolchainUnpinned, c.Path, "the expected toolchain version cannot be read: %v", err))
 		}
-		meta, err := json.Marshal(Metadata{Component: c.Name, Root: c.Root, Toolchain: expected})
+		// A component whose manifest names no package, such as a Composer
+		// application, is named by its directory in the steps: the same on
+		// every checkout. Its probe project keeps no source name.
+		component := c.Name
+		if component == "" {
+			component = c.Path
+		}
+		meta, err := json.Marshal(Metadata{Component: component, Root: c.Root, Toolchain: expected})
 		if err != nil {
 			return wsproto.ProbeResult{}, err
 		}

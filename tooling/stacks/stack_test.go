@@ -72,6 +72,20 @@ func TestProbeAnswersEachComponent(t *testing.T) {
 	}
 }
 
+func TestAnUnnamedComponentIsNamedByItsDirectory(t *testing.T) {
+	s := Stack{Extension: "@putnami/php", Profile: mustProfile(t), Detect: func(string, wsproto.ProbeRequest) ([]Component, []diag.Diagnostic) {
+		return []Component{{Path: ".", SourceFile: "composer.json", Root: "."}}, nil
+	}}
+	result, err := s.Probe(t.TempDir(), wsproto.ProbeRequest{Version: wsproto.ProbeProtocolVersion, Extension: s.Extension, Paths: []string{"."}})
+	if err != nil || len(result.Projects) != 1 {
+		t.Fatalf("projects = %+v, %v", result.Projects, err)
+	}
+	var meta Metadata
+	if p := result.Projects[0]; p.SourceName != "" || json.Unmarshal(p.Metadata, &meta) != nil || meta.Component != "." {
+		t.Errorf("project = %+v, metadata %+v", p, meta)
+	}
+}
+
 func resolveOne(t *testing.T, s Stack, root, project, selector string) wsproto.InputResolveAnswer {
 	t.Helper()
 	result := s.ResolveInputs(root, wsproto.InputResolveRequest{
