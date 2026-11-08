@@ -61,7 +61,8 @@ depends on are built in the same reactor.
 | `android-coverage` | as `gradle` | `gradlew {component}testDebugUnitTest {component}createDebugUnitTestCoverageReport` | as `android` |
 | `maven` | `mvn --projects {component} --also-make verify -DskipTests` | `mvn --projects {component} --also-make verify` | `mvn --projects {component} --also-make package -DskipTests` |
 
-Gradle commands also pass `--console=plain`, and Maven ones `--batch-mode`.
+Gradle commands also pass `--console=plain`, and Maven ones `--batch-mode` and
+`--file {root}/pom.xml`, so the reactor is the whole build.
 
 Maven `lint` runs `verify` without the tests, so the checks a POM binds to
 `validate` or `verify` (Checkstyle, Spotless, PMD, SpotBugs) run. Maven `test`
@@ -162,7 +163,7 @@ A Maven repository with the Maven wrapper runs it instead of `mvn`:
   "options": {
     "@putnami/java": {
       "tasks": {
-        "test": { "steps": [["{root}/mvnw", "--batch-mode", "--projects", "{component}", "--also-make", "verify"]] }
+        "test": { "steps": [["{root}/mvnw", "--batch-mode", "--file", "{root}/pom.xml", "--projects", "{component}", "--also-make", "verify"]] }
       }
     }
   }

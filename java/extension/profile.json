@@ -121,11 +121,11 @@
     "maven": {
       "tasks": {
         "lint": {
-          "steps": [["mvn", "--batch-mode", "--projects", "{component}", "--also-make", "verify", "-DskipTests"]],
+          "steps": [["mvn", "--batch-mode", "--file", "{root}/pom.xml", "--projects", "{component}", "--also-make", "verify", "-DskipTests"]],
           "inputs": ["sources", "maven", "lintConfig"]
         },
         "test": {
-          "steps": [["mvn", "--batch-mode", "--projects", "{component}", "--also-make", "verify"]],
+          "steps": [["mvn", "--batch-mode", "--file", "{root}/pom.xml", "--projects", "{component}", "--also-make", "verify"]],
           "inputs": ["sources", "tests", "maven"],
           "reports": {
             "when": ["src/test/**"],
@@ -134,7 +134,7 @@
           }
         },
         "build": {
-          "steps": [["mvn", "--batch-mode", "--projects", "{component}", "--also-make", "package", "-DskipTests"]],
+          "steps": [["mvn", "--batch-mode", "--file", "{root}/pom.xml", "--projects", "{component}", "--also-make", "package", "-DskipTests"]],
           "inputs": ["sources", "maven"]
         }
       }

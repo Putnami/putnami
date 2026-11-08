@@ -295,9 +295,9 @@ func TestATaskRunsTheVariantStepsAfterTheJavaCheck(t *testing.T) {
 		}
 	}
 	for _, want := range []string{
-		"mvn --batch-mode --projects com.acme:pricing --also-make verify -DskipTests",
-		"mvn --batch-mode --projects com.acme:pricing --also-make verify\n",
-		"mvn --batch-mode --projects com.acme:pricing --also-make package -DskipTests",
+		"mvn --batch-mode --file " + m + "/pom.xml --projects com.acme:pricing --also-make verify -DskipTests",
+		"mvn --batch-mode --file " + m + "/pom.xml --projects com.acme:pricing --also-make verify\n",
+		"mvn --batch-mode --file " + m + "/pom.xml --projects com.acme:pricing --also-make package -DskipTests",
 	} {
 		if !strings.Contains(ran(t, log), filepath.Join(m, "pricing")+": "+want) {
 			t.Errorf("ran\n%s\nwant %q", ran(t, log), want)
