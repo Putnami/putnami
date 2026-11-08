@@ -183,13 +183,19 @@ func (s Stack) selectToolchain(ctx context.Context, in runInput, meta Metadata, 
 // of one root share its build directory and its reports, so one task runs at
 // a time per root. The caller releases the returned lock.
 func lockStackRoot(workspaceRoot string, meta Metadata, profile Profile) (*filelock.Lock, error) {
+	return LockRoot(workspaceRoot, profile.ID, meta.Root)
+}
+
+// LockRoot takes the lock the tasks of a stack hold on its root, for a tool
+// call an extension makes outside a task. The caller releases it.
+func LockRoot(workspaceRoot, stack, root string) (*filelock.Lock, error) {
 	lockDir := filepath.Join(workspaceRoot, ".putnami", "locks", "stacks")
 	if err := os.MkdirAll(lockDir, 0o755); err != nil {
 		return nil, err
 	}
-	lock, err := filelock.Acquire(filepath.Join(lockDir, lockName(profile.ID, meta.Root)), true, false)
+	lock, err := filelock.Acquire(filepath.Join(lockDir, lockName(stack, root)), true, false)
 	if err != nil {
-		return nil, fmt.Errorf("lock the stack root %s: %w", meta.Root, err)
+		return nil, fmt.Errorf("lock the stack root %s: %w", root, err)
 	}
 	return lock, nil
 }

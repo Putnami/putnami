@@ -105,9 +105,10 @@ type Detection struct {
 	// the third-party and internal targets it depends on in the export, such
 	// as a requirement or a resolve lockfile; empty without an export.
 	Requires map[string][]string
-	// RequiredFiles maps the id of each component to the files, sorted, that
-	// declare the third-party targets it depends on, such as a requirements
-	// file; empty without an export.
+	// RequiredFiles maps the id of each component that uses a third-party
+	// target, even one in its own directory, to the files, sorted, that
+	// declare those targets, such as a requirements file; empty without an
+	// export.
 	RequiredFiles map[string][]string
 	Diagnostics   []diag.Diagnostic
 }
@@ -175,7 +176,9 @@ func Detect(root string, opts Options) Detection {
 		out.Requires = make(map[string][]string, len(requires))
 		out.RequiredFiles = make(map[string][]string, len(requires))
 		for dir, use := range requires {
-			out.Requires[dir] = use.dirs
+			if len(use.dirs) > 0 {
+				out.Requires[dir] = use.dirs
+			}
 			out.RequiredFiles[dir] = use.files
 		}
 	}
@@ -261,15 +264,15 @@ func fromGraph(root, file, graphFile string, named bool) ([]Component, []string,
 		}
 		for _, dep := range t.Dependencies {
 			if known, listed := byAddress[dep]; listed && !firstParty(known.TargetType) {
+				if requiredFiles[dir] == nil {
+					requiredFiles[dir] = map[string]bool{}
+				}
+				g.thirdPartyFiles(dep, requiredFiles[dir], map[string]bool{})
 				if target, ok := g.dir(dep); ok && target != dir {
 					if requires[dir] == nil {
 						requires[dir] = map[string]bool{}
 					}
 					requires[dir][target] = true
-					if requiredFiles[dir] == nil {
-						requiredFiles[dir] = map[string]bool{}
-					}
-					g.thirdPartyFiles(dep, requiredFiles[dir], map[string]bool{})
 				}
 				continue
 			}
@@ -292,9 +295,9 @@ func fromGraph(root, file, graphFile string, named bool) ([]Component, []string,
 		out = append(out, c)
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].ID < out[j].ID })
-	required := make(map[string]requirement, len(requires))
-	for dir, targets := range requires {
-		required[dir] = requirement{dirs: sortedKeys(targets), files: sortedKeys(requiredFiles[dir])}
+	required := make(map[string]requirement, len(requiredFiles))
+	for dir, files := range requiredFiles {
+		required[dir] = requirement{dirs: sortedKeys(requires[dir]), files: sortedKeys(files)}
 	}
 	return out, sortedKeys(tested), required, diags, true
 }

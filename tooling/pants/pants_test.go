@@ -10,6 +10,7 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"go.putnami.dev/protocol/features/spectest"
 	wsproto "go.putnami.dev/protocol/workspace"
@@ -488,5 +489,36 @@ func TestTheSyncLeavesAFileWhoseOwnedMembersAreCurrent(t *testing.T) {
 	}
 	if data, _ := os.ReadFile(filepath.Join(root, "src/python/web/putnami.json")); !strings.Contains(string(data), `"big": 12345678901234567890`) || !strings.Contains(string(data), `"ratio": 1.0`) {
 		t.Errorf("a rewrite keeps the numbers as written:\n%s", data)
+	}
+}
+
+func TestPeekWaitsForTheTasksOfTheStackRoot(t *testing.T) {
+	d := readDemo(t)
+	stubPants(t, d)
+	root := repository(t, d, false)
+	lock, err := stacks.LockRoot(root, profileID, wsproto.ProbeRootPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	done := make(chan error, 1)
+	go func() {
+		_, err := Stale(context.Background(), root, &bytes.Buffer{})
+		done <- err
+	}()
+	select {
+	case err := <-done:
+		t.Fatalf("peek ran beside a task that holds the lock: %v", err)
+	case <-time.After(200 * time.Millisecond):
+	}
+	if err := lock.Release(); err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case err := <-done:
+		if err != nil {
+			t.Fatal(err)
+		}
+	case <-time.After(30 * time.Second):
+		t.Fatal("peek never ran after the lock was released")
 	}
 }

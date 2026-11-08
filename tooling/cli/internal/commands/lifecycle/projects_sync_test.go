@@ -316,3 +316,29 @@ func TestProjectsSync_UnchangedTreeDoesNotRewriteSnapshot(t *testing.T) {
 		t.Error("a metadata change did not refresh the snapshot")
 	}
 }
+
+func TestProjectsSync_NamesByPathOnlyTheMembersWhoseNamesCollide(t *testing.T) {
+	ws := t.TempDir()
+	writeProjectFile(t, filepath.Join(ws, "putnami.workspace.json"), `{"includes":["apps","services"]}`)
+	writeProjectFile(t, filepath.Join(ws, "apps", "putnami.json"), `{"includes":[],"publishConfig":{"npm":{"namePattern":"@acme/app-{name}"}}}`)
+	writeProjectFile(t, filepath.Join(ws, "services", "putnami.json"), `{"includes":[],"publishConfig":{"npm":{"namePattern":"@acme/svc-{name}"}}}`)
+	writeProjectFile(t, filepath.Join(ws, "apps", "api", "putnami.json"), `{}`)
+	writeProjectFile(t, filepath.Join(ws, "services", "api", "putnami.json"), `{}`)
+	writeProjectFile(t, filepath.Join(ws, "libs", "foo", "putnami.json"), `{}`)
+	writeProjectFile(t, filepath.Join(ws, "tools", "foo", "putnami.json"), `{}`)
+
+	cfg := wsproto.Load(ws)
+	if err := ProjectsSync(context.Background(), ws, cfg, []string{"--skip-install"}, false, LifecycleEnv{}); err != nil {
+		t.Fatalf("ProjectsSync: %v", err)
+	}
+	for _, member := range []string{"libs/foo", "tools/foo"} {
+		if got := readText(t, filepath.Join(ws, member, "putnami.json")); !strings.Contains(got, `"name": "`+member+`"`) {
+			t.Errorf("%s is named by its path: %s", member, got)
+		}
+	}
+	for _, member := range []string{"apps/api", "services/api"} {
+		if got := readText(t, filepath.Join(ws, member, "putnami.json")); strings.Contains(got, `"name"`) {
+			t.Errorf("%s resolves through its scope and keeps no written name: %s", member, got)
+		}
+	}
+}

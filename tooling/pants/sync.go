@@ -20,6 +20,7 @@ import (
 	pctx "go.putnami.dev/sdk/extension/context"
 	"go.putnami.dev/sdk/extension/jsonl"
 	detect "go.putnami.dev/tooling/observe/detect/pants"
+	"go.putnami.dev/tooling/stacks"
 )
 
 // SyncJob is the job name of the workspace sync task.
@@ -166,12 +167,12 @@ func synchronize(ctx context.Context, root string, stderr io.Writer, dry bool) (
 // targets it uses, and the root BUILD file when it uses a target of the root.
 // A component that uses no third-party target has none.
 func requiredInputs(root, dir string, detection detect.Detection) []string {
-	dirs := detection.Requires[dir]
-	if len(dirs) == 0 {
+	declared, uses := detection.RequiredFiles[dir]
+	if !uses {
 		return nil
 	}
-	files := append(slices.Clone(detection.Lockfiles), detection.RequiredFiles[dir]...)
-	if slices.Contains(dirs, wsproto.ProbeRootPath) {
+	files := append(slices.Clone(detection.Lockfiles), declared...)
+	if slices.Contains(detection.Requires[dir], wsproto.ProbeRootPath) {
 		if build := buildFile(root, wsproto.ProbeRootPath); build != "" {
 			files = append(files, build)
 		}
@@ -214,6 +215,9 @@ func setInputs(doc map[string]any, inputs []string) {
 		delete(doc, "options")
 	}
 }
+
+// profileID is the id of the Pants profile, which names its stack-root lock.
+const profileID = "pants"
 
 // filePatternsKey is the member of an option layer that names the files that
 // select the project.
@@ -327,6 +331,13 @@ func retractProject(root, file string, components map[string]bool, dry bool) (bo
 
 // peek runs pants peek :: in root and writes its output to a temporary file.
 func peek(ctx context.Context, root string, stderr io.Writer) (string, func(), error) {
+	// Pants serves one run at a time per repository, so peek waits for the
+	// tasks of the stack root, under the lock they hold.
+	lock, err := stacks.LockRoot(root, profileID, wsproto.ProbeRootPath)
+	if err != nil {
+		return "", nil, err
+	}
+	defer func() { _ = lock.Release() }()
 	dir, err := os.MkdirTemp("", "putnami-pants-peek-")
 	if err != nil {
 		return "", nil, err

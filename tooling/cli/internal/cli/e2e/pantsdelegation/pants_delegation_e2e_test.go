@@ -276,6 +276,8 @@ func rootRequirementsDemo(junit, coverage string) map[string]map[string]string {
 			"lockfiles/python-default.lock": "{}\n",
 			"src/foo/BUILD":                 "python_tests()\n",
 			"src/foo/foo_test.py":           "def test_foo():\n    pass\n",
+			"src/own/BUILD":                 "python_requirements(name=\"reqs\")\npython_tests()\n",
+			"src/own/own_test.py":           "def test_own():\n    pass\n",
 			"tests/foo/BUILD":               "python_tests()\n",
 			"tests/foo/foo_test.py":         "def test_foo():\n    pass\n",
 		},
@@ -285,8 +287,11 @@ func rootRequirementsDemo(junit, coverage string) map[string]map[string]string {
   {"address": "//:reqs#fastapi", "target_type": "python_requirement", "dependencies": ["requirements.txt:reqs"]},
   {"address": "requirements.txt:reqs", "target_type": "_python_requirements_file", "dependencies": [], "sources": ["requirements.txt"]},
   {"address": "src/foo/foo_test.py:tests", "target_type": "python_test", "dependencies": ["//:reqs#fastapi"], "sources": ["src/foo/foo_test.py"]},
-  {"address": "tests/foo/foo_test.py:tests", "target_type": "python_test", "dependencies": ["//:reqs#fastapi"], "sources": ["tests/foo/foo_test.py"]}
+  {"address": "tests/foo/foo_test.py:tests", "target_type": "python_test", "dependencies": ["//:reqs#fastapi"], "sources": ["tests/foo/foo_test.py"]},
+  {"address": "src/own:reqs#fastapi", "target_type": "python_requirement", "dependencies": []},
+  {"address": "src/own/own_test.py:tests", "target_type": "python_test", "dependencies": ["src/own:reqs#fastapi"], "sources": ["src/own/own_test.py"]}
 ]`,
+			"dist/test/reports/src.own.own_test.py.tests.xml":   junit,
 			"dist/test/reports/src.foo.foo_test.py.tests.xml":   junit,
 			"dist/test/reports/tests.foo.foo_test.py.tests.xml": junit,
 			"dist/coverage/python/coverage.xml":                 coverage,
@@ -321,8 +326,11 @@ func TestARootRequirementOrAStrayLockfileRunsThePackagesThatUseIt(t *testing.T) 
 
 	clitest.WriteFile(t, filepath.Join(root, "lockfiles/python-default.lock"), "{\"changed\": true}\n")
 	commit(t, root, "bump the lockfile")
-	if tested, out := pantsTests(t, root, requirements, log); !slices.Equal(tested, want) {
-		t.Errorf("a lockfile change ran %v, want %v\n%s", tested, want, out)
+	// src/own declares its requirement in its own directory: the lockfile
+	// selects it too.
+	wantLock := []string{"src/foo:", "src/own:", "tests/foo:"}
+	if tested, out := pantsTests(t, root, requirements, log); !slices.Equal(tested, wantLock) {
+		t.Errorf("a lockfile change ran %v, want %v\n%s", tested, wantLock, out)
 	}
 
 	// An import Pants infers adds an edge with no BUILD change: validate
