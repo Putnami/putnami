@@ -121,6 +121,13 @@ func ProjectsSync(ctx context.Context, wsRoot string, cfg *wsproto.Config, args 
 		return nil
 	}
 
+	// A new member is named by its directory until a provider answers for it,
+	// so two that share a directory name would stop the next load. Each of
+	// them is named by its path, which is what its provider can only confirm.
+	if err := nameCollidingMembers(wsRoot, ws, added); err != nil {
+		return err
+	}
+
 	// Partition membership changes by scope. Everything from here to
 	// runWorkspaceSyncTasks is core's half of the sync: Putnami membership and
 	// scopes, `--prune`, and the canonical report. No native manifest is touched
@@ -192,6 +199,48 @@ func ProjectsSync(ctx context.Context, wsRoot string, cfg *wsproto.Config, args 
 		}
 	}
 
+	return nil
+}
+
+// nameCollidingMembers writes the path as the name of each new member whose
+// directory name another project or new member already resolves to. A member
+// that states its own name keeps it.
+func nameCollidingMembers(wsRoot string, ws *workspace.Workspace, added []string) error {
+	taken := make(map[string]int, len(ws.Projects)+len(added))
+	for _, p := range ws.Projects {
+		taken[p.Name]++
+	}
+	for _, p := range added {
+		taken[filepath.Base(p)]++
+	}
+	for _, p := range added {
+		if taken[filepath.Base(p)] < 2 {
+			continue
+		}
+		file := filepath.Join(wsRoot, filepath.FromSlash(p), wsproto.ConfigFilename)
+		doc := map[string]any{}
+		data, err := os.ReadFile(file) //nolint:gosec // a project file under the workspace root
+		switch {
+		case errors.Is(err, os.ErrNotExist):
+		case err != nil:
+			return fmt.Errorf("read %s: %w", file, err)
+		default:
+			if err := json.Unmarshal(data, &doc); err != nil {
+				return fmt.Errorf("read %s: %w", file, err)
+			}
+		}
+		if name, _ := doc["name"].(string); name != "" {
+			continue
+		}
+		doc["name"] = p
+		out, err := json.MarshalIndent(doc, "", "  ")
+		if err != nil {
+			return fmt.Errorf("write %s: %w", file, err)
+		}
+		if err := os.WriteFile(file, append(out, '\n'), 0o644); err != nil { //nolint:gosec // a tracked project file
+			return fmt.Errorf("write %s: %w", file, err)
+		}
+	}
 	return nil
 }
 

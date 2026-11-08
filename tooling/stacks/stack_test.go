@@ -626,3 +626,21 @@ func TestProbeNamesABareDirectoryAndADelegatedStackServesTheGraphJob(t *testing.
 		t.Errorf("the graph job passes and runs nothing: %s %v %v", status, data, err)
 	}
 }
+
+func TestAFailedStepOfADelegatedTaskNamesItsTool(t *testing.T) {
+	root := t.TempDir()
+	writeFile(t, root, "rust-toolchain.toml", "[toolchain]\nchannel = \"1.82.0\"\n")
+	writeFile(t, root, "crates/api/Cargo.toml", "")
+	t.Setenv("STUB_ROOT", root)
+	t.Setenv("STUB_LOG", filepath.Join(root, "log"))
+	stubTools(t, "1.82.0", junitPass)
+	s := testProfileWithLcov(t)
+	s.Profile.Delegated = true
+	task := s.Profile.Tasks[TaskLint]
+	task.Steps = [][]string{{"false"}}
+	s.Profile.Tasks[TaskLint] = task
+	status, data, _ := runTask(t, s, root, TaskLint)
+	if status != statusFailed || data["delegatedTo"] != s.Profile.ID {
+		t.Errorf("status %s, data %v", status, data)
+	}
+}

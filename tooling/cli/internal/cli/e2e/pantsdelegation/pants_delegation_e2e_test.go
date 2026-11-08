@@ -263,3 +263,81 @@ func TestAChangeToOnePantsPackageRunsItAndItsDependentsThroughPants(t *testing.T
 		t.Errorf("pants test ran on %v, want %v: the packages that depend on the lockfile\n%s", tested, want, out)
 	}
 }
+
+// rootRequirementsDemo is a repository whose requirements lie at the root and
+// whose lockfile lies in a directory with no BUILD file, and whose two packages
+// share a directory name.
+func rootRequirementsDemo(junit, coverage string) map[string]map[string]string {
+	return map[string]map[string]string{
+		"base": {
+			"pants.toml":                    "[GLOBAL]\npants_version = \"2.25.0\"\nbackend_packages = [\"pants.backend.python\"]\n\n[python.resolves]\npython-default = \"lockfiles/python-default.lock\"\n",
+			"BUILD":                         "python_requirements(name=\"reqs\")\n",
+			"requirements.txt":              "fastapi==0.110.0\n",
+			"lockfiles/python-default.lock": "{}\n",
+			"src/foo/BUILD":                 "python_tests()\n",
+			"src/foo/foo_test.py":           "def test_foo():\n    pass\n",
+			"tests/foo/BUILD":               "python_tests()\n",
+			"tests/foo/foo_test.py":         "def test_foo():\n    pass\n",
+		},
+		"ci": {
+			"pants-graph.json": `[
+  {"address": "//:reqs", "target_type": "python_requirements", "dependencies": ["//:reqs#fastapi"], "sources": ["requirements.txt"]},
+  {"address": "//:reqs#fastapi", "target_type": "python_requirement", "dependencies": ["requirements.txt:reqs"]},
+  {"address": "requirements.txt:reqs", "target_type": "_python_requirements_file", "dependencies": [], "sources": ["requirements.txt"]},
+  {"address": "src/foo/foo_test.py:tests", "target_type": "python_test", "dependencies": ["//:reqs#fastapi"], "sources": ["src/foo/foo_test.py"]},
+  {"address": "tests/foo/foo_test.py:tests", "target_type": "python_test", "dependencies": ["//:reqs#fastapi"], "sources": ["tests/foo/foo_test.py"]}
+]`,
+			"dist/test/reports/src.foo.foo_test.py.tests.xml":   junit,
+			"dist/test/reports/tests.foo.foo_test.py.tests.xml": junit,
+			"dist/coverage/python/coverage.xml":                 coverage,
+		},
+	}
+}
+
+func TestARootRequirementOrAStrayLockfileRunsThePackagesThatUseIt(t *testing.T) {
+	spectest.Proves(t, "cli/init-from-a-monorepo-tool", "pants-impact-runs-through-pants", "a-change-to-one-pants-package-runs-it-and-its-dependents-through-pants-uncached")
+	clitest.RequireShell(t)
+	t.Setenv("PUTNAMI_NO_AUTO_INSTALL", "1")
+	t.Setenv("PUTNAMI_STORE_DIR", filepath.Join(t.TempDir(), "store"))
+	ci := readDemo(t)["ci"]
+	demo := rootRequirementsDemo(ci["dist/test/reports/src.python.pricing.pricing_test.py.tests.xml"], ci["dist/coverage/python/coverage.xml"])
+	root := pantsWorkspace(t, demo, buildRuntime(t))
+	log := stubPants(t, demo)
+
+	// src/foo and tests/foo share a directory name: the first sync names each
+	// by its path, and passes.
+	if code, out := clitest.RunGateArgs(t, root, "projects", "sync"); code != 0 {
+		t.Fatalf("projects sync exit %d:\n%s", code, out)
+	}
+	clitest.InitGitRepo(t, root)
+	base := strings.TrimSpace(clitest.GitOutput(t, root, "rev-parse", "HEAD"))
+	want := []string{"src/foo:", "tests/foo:"}
+
+	clitest.WriteFile(t, filepath.Join(root, "requirements.txt"), "fastapi==0.111.0\n")
+	requirements := commit(t, root, "bump the requirement")
+	if tested, out := pantsTests(t, root, base, log); !slices.Equal(tested, want) {
+		t.Errorf("a root requirements change ran %v, want %v\n%s", tested, want, out)
+	}
+
+	clitest.WriteFile(t, filepath.Join(root, "lockfiles/python-default.lock"), "{\"changed\": true}\n")
+	commit(t, root, "bump the lockfile")
+	if tested, out := pantsTests(t, root, requirements, log); !slices.Equal(tested, want) {
+		t.Errorf("a lockfile change ran %v, want %v\n%s", tested, want, out)
+	}
+
+	// An import Pants infers adds an edge with no BUILD change: validate
+	// fails until the sync records it.
+	clitest.WriteFile(t, filepath.Join(root, "pants-graph.json"), strings.Replace(demo["ci"]["pants-graph.json"],
+		`"tests/foo/foo_test.py:tests", "target_type": "python_test", "dependencies": ["//:reqs#fastapi"]`,
+		`"tests/foo/foo_test.py:tests", "target_type": "python_test", "dependencies": ["//:reqs#fastapi", "src/foo/foo_test.py:tests"]`, 1))
+	code, out := clitest.RunGateArgs(t, root, "validate", "--all")
+	if code == 0 || !strings.Contains(out, "pants.sync_stale") {
+		t.Errorf("validate exit %d on a stale graph:\n%s", code, out)
+	}
+	if code, out := clitest.RunGateArgs(t, root, "projects", "sync"); code != 0 {
+		t.Fatalf("projects sync exit %d:\n%s", code, out)
+	}
+	if code, out := clitest.RunGateArgs(t, root, "validate", "--all"); code != 0 {
+		t.Errorf("validate exit %d after the sync:\n%s", code, out)
+	}
+}

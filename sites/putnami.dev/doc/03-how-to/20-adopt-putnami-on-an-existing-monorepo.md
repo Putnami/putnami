@@ -93,16 +93,16 @@ and `putnami build` runs `pants package` the same way. Putnami stores no cache
 entry for them: a package Pants has cached returns as fast as Pants does.
 
 A change to third-party requirements or to a resolve lockfile runs the
-packages that depend on them.
+packages that depend on them, wherever those files lie.
 
-If the first sync fails with a duplicate project name, two `BUILD` directories
-share a directory name: give one a name in a `putnami.json` of its own, such as
-`{ "name": "3rdparty/python" }`, and run `putnami projects sync` again.
+An `import` can change the edges with no change to a `BUILD` file, because
+Pants infers them. `putnami validate` fails with `pants.sync_stale` when the
+edges no longer match Pants: run `putnami projects sync` and commit the result.
 
 ### When the repository is not Python
 
 The shipped test command reads Python coverage. Without the Python backend,
-override the test task in each package's `putnami.json`:
+override the test task and its reports in each package's `putnami.json`:
 
 ```json
 {
@@ -111,7 +111,7 @@ override the test task in each package's `putnami.json`:
       "tasks": {
         "test": {
           "steps": [["pants", "--test-report", "test", "{component}:"]],
-          "reports": { "junit": ["{root}/dist/test/reports/*.xml"] }
+          "reports": { "junit": ["{root}/dist/test/reports/*.xml"], "coverage": [] }
         }
       }
     }

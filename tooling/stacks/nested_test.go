@@ -110,7 +110,7 @@ func TestAttributionOwnsCasesAndFilesByComponent(t *testing.T) {
 		return name, name != ""
 	}
 	s.ComponentKey = func(name string) string { return strings.ReplaceAll(name, "-", "_") }
-	a := s.attribution(root, filepath.Join(root, "crates/api"), "api")
+	a := s.attribution(root, filepath.Join(root, "crates/api"), filepath.Join(root, "crates/api"), "api")
 	for classname, want := range map[string]Owner{"api::http": OwnerTask, "pricing": OwnerOther, "": OwnerNone} {
 		if got := a.Case(readers.TestCase{Classname: classname}); got != want {
 			t.Errorf("case %q owner = %v, want %v", classname, got, want)
@@ -132,11 +132,11 @@ func TestAttributionOwnsCasesAndFilesByComponent(t *testing.T) {
 	if err := os.Symlink(root, link); err != nil {
 		t.Skip(err)
 	}
-	linked := s.attribution(link, filepath.Join(link, "crates/api"), "api")
+	linked := s.attribution(link, filepath.Join(link, "crates/api"), filepath.Join(link, "crates/api"), "api")
 	if got := linked.File(filepath.ToSlash(filepath.Join(root, "crates/api/src/lib.rs"))); got != OwnerTask {
 		t.Errorf("a path under the resolved workspace root is attributed: %v", got)
 	}
-	if got := (Stack{}).attribution(root, root, "api").Case; got != nil {
+	if got := (Stack{}).attribution(root, root, root, "api").Case; got != nil {
 		t.Errorf("a stack with no case resolver reads every case as the task's")
 	}
 }

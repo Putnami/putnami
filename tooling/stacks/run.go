@@ -527,7 +527,11 @@ func (s Stack) run(ctx context.Context, in runInput, emit reporter) (string, map
 		}
 	}
 	if stepErr != nil && t.Reports == nil {
-		return statusFailed, nil, stepErr
+		var failure map[string]any
+		if profile.Delegated {
+			failure = map[string]any{"delegatedTo": profile.ID}
+		}
+		return statusFailed, failure, stepErr
 	}
 
 	if err := copyArtifacts(artifacts, meta.Component, in.projectAbs, rootAbs, outDir); err != nil {
@@ -562,7 +566,11 @@ func (s Stack) run(ctx context.Context, in runInput, emit reporter) (string, map
 		emit.Info(fmt.Sprintf("no file matches %s: the %s task of %s expects no report", strings.Join(reports.When, ", "), in.task, meta.Component))
 		reports = nil
 	}
-	summary, diags := ReadReports(reports, resolve, outDir, s.attribution(in.workspaceRoot, in.projectAbs, meta.Component))
+	reportBase := in.projectAbs
+	if t.Dir == DirRoot {
+		reportBase = rootAbs
+	}
+	summary, diags := ReadReports(reports, resolve, outDir, s.attribution(in.workspaceRoot, in.projectAbs, reportBase, meta.Component))
 	failed := stepErr != nil
 	for _, d := range diags {
 		// A step that failed may have written no report: the step's own

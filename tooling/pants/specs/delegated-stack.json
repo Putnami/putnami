@@ -20,7 +20,11 @@
     },
     {
       "id": "sync-writes-the-package-graph",
-      "text": "The workspace sync task reads pants-graph.json at the root, or runs pants peek ::, and writes in each component's putnami.json the extension, the project IDs of the components and third-party directories it depends on, and test in disable.jobs when no target is a test target. It retracts a former package, rewrites a file only when a member it owns changes, and warns and writes nothing without the export and pants."
+      "text": "The workspace sync task reads pants-graph.json at the root, or runs pants peek ::, and writes in each component's putnami.json the extension, the project IDs it depends on, the lockfiles and third-party declaration files it uses as filePatterns, and test in disable.jobs without a test target. It retracts a former package, rewrites a file only when a member it owns changes, and warns and writes nothing without the export and pants, or with an export that lists no package."
+    },
+    {
+      "id": "validate-fails-on-a-stale-graph",
+      "text": "putnami validate compares each package's putnami.json with the export, or pants peek ::, writes nothing, and fails with pants.sync_stale when a sync would change one, so an import that changes the edges Pants infers cannot pass the gate. Without the export and pants it warns and passes."
     },
     {
       "id": "tasks-delegate-to-pants",

@@ -30,6 +30,15 @@
           }
         },
         {
+          "id": "validate-fails-on-a-stale-graph",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": ["a-stale-package-graph-fails-validate"]
+          }
+        },
+        {
           "id": "tasks-delegate-to-pants",
           "stage": "coded",
           "evidenceKinds": ["attestation"],

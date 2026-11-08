@@ -27,6 +27,7 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer, runJobs func(
 	if err == nil {
 		err = stack.Entrypoint(args, stdin, stdout, runtimeVersion, func(jobs map[string]cli.JobFunc) {
 			jobs[pants.SyncJob] = pants.RunSync
+			jobs[pants.CheckJob] = pants.RunCheck
 			runJobs(jobs)
 		})
 	}

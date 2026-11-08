@@ -236,13 +236,13 @@ func TestTheSyncWritesEachPackagePutnamiJSONFromTheExport(t *testing.T) {
 		t.Errorf("result %+v, want %v written from the export", result, want)
 	}
 	api := readProjectFile(t, root, "src/python/api")
-	if !reflect.DeepEqual(api, map[string]any{"$schema": ProjectSchema, "extensions": []any{ExtensionName}, "dependencies": []any{"/3rdparty/python", "/src/python/pricing"}}) {
+	if !reflect.DeepEqual(api, map[string]any{"$schema": ProjectSchema, "extensions": []any{ExtensionName}, "dependencies": []any{"/3rdparty/python", "/src/python/pricing"}, "options": map[string]any{ExtensionName: map[string]any{"filePatterns": []any{"../../../3rdparty/python/default.lock", "../../../3rdparty/python/requirements.txt"}}}}) {
 		t.Errorf("api = %v", api)
 	}
 	// An existing file keeps what the sync does not own; a stale Pants edge
 	// and a disabled test of a tested package go.
 	web := readProjectFile(t, root, "src/python/web")
-	want := map[string]any{"name": "storefront", "extensions": []any{ExtensionName}, "dependencies": []any{"/3rdparty/python", "@acme/design"}, "disable": map[string]any{"jobs": []any{"publish"}}}
+	want := map[string]any{"name": "storefront", "extensions": []any{ExtensionName}, "dependencies": []any{"/3rdparty/python", "@acme/design"}, "disable": map[string]any{"jobs": []any{"publish"}}, "options": map[string]any{ExtensionName: map[string]any{"filePatterns": []any{"../../../3rdparty/python/default.lock", "../../../3rdparty/python/requirements.txt"}}}}
 	if !reflect.DeepEqual(web, want) {
 		t.Errorf("web = %v, want %v", web, want)
 	}
@@ -287,6 +287,39 @@ func TestTheSyncRunsPantsPeekWithoutAnExport(t *testing.T) {
 	}
 	if log := stubLog(t); len(log) != 1 || !strings.HasSuffix(log[0], " pants peek ::") {
 		t.Errorf("pants calls = %v", log)
+	}
+
+	// A package that uses third-party targets is selected by what declares
+	// them, wherever those files lie.
+	inputs := readProjectFile(t, root, "src/python/api")["options"].(map[string]any)[ExtensionName].(map[string]any)["filePatterns"]
+	if want := []any{"../../../3rdparty/python/default.lock", "../../../3rdparty/python/requirements.txt"}; !reflect.DeepEqual(inputs, want) {
+		t.Errorf("api filePatterns = %v, want %v", inputs, want)
+	}
+
+	// A check compares without writing, and names the file that drifted.
+	spectest.Proves(t, feature, "validate-fails-on-a-stale-graph", "a-stale-package-graph-fails-validate")
+	if stale, err := Stale(context.Background(), root, &bytes.Buffer{}); err != nil || len(stale.Written) != 0 || len(stale.Retracted) != 0 {
+		t.Errorf("a current graph is not stale: %+v %v", stale, err)
+	}
+	before, _ := os.ReadFile(filepath.Join(root, "src/python/web/putnami.json"))
+	writeFile(t, root, "src/python/web/putnami.json", `{"extensions": ["@putnami/pants"]}`)
+	stale, err := Stale(context.Background(), root, &bytes.Buffer{})
+	if err != nil || !reflect.DeepEqual(stale.Written, []string{"src/python/web/putnami.json"}) {
+		t.Errorf("a drifted package is stale: %+v %v", stale, err)
+	}
+	if after, _ := os.ReadFile(filepath.Join(root, "src/python/web/putnami.json")); string(after) != `{"extensions": ["@putnami/pants"]}` {
+		t.Errorf("the check wrote %s", after)
+	}
+	writeFile(t, root, "src/python/web/putnami.json", string(before))
+
+	// An export that lists no package retracts nothing.
+	writeFile(t, root, "pants-graph.json", "[]")
+	empty, err := Sync(context.Background(), root, &bytes.Buffer{})
+	if err != nil || !empty.EmptyExport || len(empty.Retracted) != 0 {
+		t.Errorf("an empty export writes nothing: %+v %v", empty, err)
+	}
+	if ext := readProjectFile(t, root, "src/python/api")["extensions"]; !reflect.DeepEqual(ext, []any{ExtensionName}) {
+		t.Errorf("api extensions after an empty export = %v", ext)
 	}
 
 	// An export that is no export fails the sync and writes nothing.
@@ -380,8 +413,17 @@ func TestThePantsReportsBecomeTheTestAndCoverageSummary(t *testing.T) {
 	if got := data["testSummary"].(map[string]any); got["total"] != 4 || got["passed"] != 4 {
 		t.Errorf("testSummary = %v, want pricing's 4 cases alone", got)
 	}
-	if got := data["coverageSummary"].(map[string]any); got["covered"] != 33 || got["total"] != 33 {
-		t.Errorf("coverageSummary = %v", got)
+	if got := data["coverageSummary"].(map[string]any); got["covered"] != 17 || got["total"] != 17 {
+		t.Errorf("coverageSummary = %v, want pricing's 17 lines alone", got)
+	}
+
+	// The override a repository without the Python backend states reads no
+	// coverage report, and the file patterns the sync writes beside it are
+	// no member of the profile.
+	writeFile(t, root, "src/python/pricing/putnami.json", `{"options": {"@putnami/pants": {"filePatterns": ["../../../python-default.lock"], "tasks": {"test": {"steps": [["pants", "--test-report", "test", "{component}:"]], "reports": {"junit": ["{root}/dist/test/reports/*.xml"], "coverage": []}}}}}}`)
+	status, data, events = runJob(t, root, "src/python/pricing", stacks.TaskTest)
+	if _, covered := data["coverageSummary"]; status != "OK" || covered {
+		t.Errorf("the documented override: %s %v %s", status, data, events)
 	}
 
 	// A test run that writes no report fails.
@@ -431,7 +473,7 @@ func TestTheSyncLeavesAFileWhoseOwnedMembersAreCurrent(t *testing.T) {
 	d := readDemo(t)
 	t.Setenv("PATH", t.TempDir())
 	root := repository(t, d, true)
-	handWritten := "{\n    \"name\": \"web\",\n    \"extensions\": [\"@putnami/pants\"],\n    \"dependencies\": [\"/3rdparty/python\"],\n    \"options\": {\"ratio\": 1.0, \"big\": 12345678901234567890}\n}\n"
+	handWritten := "{\n    \"name\": \"web\",\n    \"extensions\": [\"@putnami/pants\"],\n    \"dependencies\": [\"/3rdparty/python\"],\n    \"options\": {\"ratio\": 1.0, \"big\": 12345678901234567890, \"@putnami/pants\": {\"filePatterns\": [\"../../../3rdparty/python/default.lock\", \"../../../3rdparty/python/requirements.txt\"]}}\n}\n"
 	writeFile(t, root, "src/python/web/putnami.json", handWritten)
 	if _, err := Sync(context.Background(), root, &bytes.Buffer{}); err != nil {
 		t.Fatal(err)

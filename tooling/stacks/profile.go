@@ -505,6 +505,9 @@ func (p Profile) merge(override json.RawMessage, kind string) (Profile, error) {
 	if err := json.Unmarshal(trimmed, &over); err != nil {
 		return Profile{}, fmt.Errorf("the %s is not a JSON object: %w", kind, err)
 	}
+	// filePatterns is the workspace's own member of an extension's option
+	// layer: it says which files select the project, and no profile has it.
+	delete(over, "filePatterns")
 	for _, fixed := range []string{"id", "markers", "variants", "delegated"} {
 		if _, ok := over[fixed]; ok {
 			return Profile{}, fmt.Errorf("%s: the %s cannot change the profile's %s", fixed, kind, fixed)

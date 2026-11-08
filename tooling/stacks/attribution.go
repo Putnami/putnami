@@ -11,8 +11,10 @@ import (
 )
 
 // attribution is the Attribution of one task: the component's own cases and
-// coverage files, against the other components of the workspace at root.
-func (s Stack) attribution(root, projectAbs, component string) Attribution {
+// coverage files, against the other components of the workspace at root. A
+// relative coverage path is resolved against reportBase, the directory the
+// task's steps ran in.
+func (s Stack) attribution(root, projectAbs, reportBase, component string) Attribution {
 	var a Attribution
 	if s.CaseComponent != nil {
 		key := s.componentKey(component)
@@ -37,7 +39,7 @@ func (s Stack) attribution(root, projectAbs, component string) Attribution {
 	a.File = func(p string) Owner {
 		abs := filepath.FromSlash(p)
 		if !filepath.IsAbs(abs) {
-			abs = filepath.Join(projectAbs, abs)
+			abs = filepath.Join(reportBase, abs)
 		}
 		dir, ok := owners(abs)
 		switch {

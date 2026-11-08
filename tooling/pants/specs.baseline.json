@@ -6,6 +6,7 @@
     "tooling/pants-delegated-stack#packages-become-projects",
     "tooling/pants-delegated-stack#reports-become-the-summary",
     "tooling/pants-delegated-stack#sync-writes-the-package-graph",
-    "tooling/pants-delegated-stack#tasks-delegate-to-pants"
+    "tooling/pants-delegated-stack#tasks-delegate-to-pants",
+    "tooling/pants-delegated-stack#validate-fails-on-a-stale-graph"
   ]
 }

@@ -30,12 +30,8 @@ from each package to the third-party directories it depends on, so a change to
 `3rdparty/python/requirements.txt` or to a resolve lockfile runs the packages
 that use them.
 
-Before its first sync, a workspace names each member by its directory name.
-When two `BUILD` directories share one, such as `3rdparty/python` and a
-`src/python` that holds only `__defaults__`, the first `putnami projects sync`
-fails with a duplicate project name: give one of them a name in a
-`putnami.json` of its own, such as `{ "name": "3rdparty/python" }`, and run it
-again.
+When two `BUILD` directories share a directory name, such as `src/foo` and
+`tests/foo`, `putnami projects sync` names each of them by its path.
 
 Add `.putnami/` and `.gen/` to the repository's `.gitignore`: `init` writes one
 only when the repository has none.
@@ -50,13 +46,20 @@ writes in each package's `putnami.json`:
 |---|---|
 | `extensions` | `@putnami/pants`, beside any other extension the file names |
 | `dependencies` | The project ID of each package, and of each third-party directory, the export says it depends on, such as `/src/python/pricing` and `/3rdparty/python`; a dependency on a project with no `BUILD` file is kept |
+| `options.@putnami/pants.filePatterns` | The resolve lockfiles and the files that declare the package's third-party targets, relative to the package, and the root `BUILD` file when it uses a target of the root. A change to one selects the package, wherever the file lies. A package with no third-party target has none |
 | `disable.jobs` | `test` when none of the package's targets is a test target (a type that ends in `_test` or `_tests`, or a `go_package` with a `_test.go` source), so a package without tests runs no test task; the sync owns this entry and removes it from a package that has a test target |
 
 It keeps every other member, and rewrites a file only when a member it owns
 changes, with two-space indentation and sorted keys. A package that left the
 export loses the extension and its Pants edges. Without the export and without
-`pants`, the sync warns with `pants.sync_no_export` and writes nothing. Run the
-sync again after a change to the dependencies between packages.
+`pants`, or with an export that lists no package, the sync warns with
+`pants.sync_no_export` and writes nothing.
+
+Run the sync again after any change to the dependencies between packages, and
+commit the result. An `import` is such a change: Pants infers the edge from it
+with no change to a `BUILD` file. `putnami validate` compares each
+`putnami.json` with the export and fails with `pants.sync_stale` when a sync
+would change one. Keep it in the CI gate.
 
 ## What each task runs
 
@@ -79,8 +82,8 @@ another's report. A failed case, a command that exits non-zero, or a missing
 report fails the task.
 
 The shipped test command reads Python coverage. A repository without the
-Python backend overrides the test steps and reports in each package's
-`putnami.json`:
+Python backend overrides the test steps and states `"coverage": []` in each
+package's `putnami.json`:
 
 ```json
 {
@@ -89,7 +92,7 @@ Python backend overrides the test steps and reports in each package's
       "tasks": {
         "test": {
           "steps": [["pants", "--test-report", "test", "{component}:"]],
-          "reports": { "junit": ["{root}/dist/test/reports/*.xml"] }
+          "reports": { "junit": ["{root}/dist/test/reports/*.xml"], "coverage": [] }
         }
       }
     }

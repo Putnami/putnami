@@ -13,11 +13,11 @@
   "requirements": [
     {
       "id": "init-from-pants",
-      "text": "putnami init --from pants, at the root of a repository that holds pants.toml, writes a workspace that declares @putnami/pants, installs it, and runs putnami projects sync, which writes each package's putnami.json through the extension's sync task. Without pants.toml it fails with a usage error that names the file, and an unknown --from value fails with a usage error that lists the supported tools. --from does not combine with --project or --extension."
+      "text": "putnami init --from pants, at the root of a repository that holds pants.toml, writes a workspace that declares @putnami/pants, installs it, and runs putnami projects sync, which writes each package's putnami.json through the extension's sync task and names by path two directories that share a name. Without pants.toml it fails with a usage error that names the file, and an unknown --from value fails with a usage error that lists the supported tools. --from does not combine with --project or --extension."
     },
     {
       "id": "pants-impact-runs-through-pants",
-      "text": "On the Pants fixture of the putnami observe detector, with @putnami/pants and pants on PATH, projects sync writes each package's edges. putnami test --impacted runs pants test at the workspace root on each changed package and each package that depends on it, never on one it depends on; a requirements or lockfile change runs the packages that depend on them. It reads their reports and neither looks up nor stores a Putnami cache entry."
+      "text": "On the Pants fixture of the putnami observe detector, with @putnami/pants and pants on PATH, projects sync writes each package's edges. putnami test --impacted runs pants test at the workspace root on each changed package and each package that depends on it, never on one it depends on; a requirements or lockfile change, wherever the file lies, runs the packages that use it. It reads their reports and neither looks up nor stores a Putnami cache entry."
     }
   ],
   "decisions": [

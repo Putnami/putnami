@@ -104,8 +104,12 @@ type Detection struct {
 	// Requires maps the id of each component to the directories, sorted, of
 	// the third-party and internal targets it depends on in the export, such
 	// as a requirement or a resolve lockfile; empty without an export.
-	Requires    map[string][]string
-	Diagnostics []diag.Diagnostic
+	Requires map[string][]string
+	// RequiredFiles maps the id of each component to the files, sorted, that
+	// declare the third-party targets it depends on, such as a requirements
+	// file; empty without an export.
+	RequiredFiles map[string][]string
+	Diagnostics   []diag.Diagnostic
 }
 
 // IsTested reports whether the component with the id holds a test target.
@@ -167,7 +171,14 @@ func Detect(root string, opts Options) Detection {
 	}
 	out.Components = components
 	out.Tested = tested
-	out.Requires = requires
+	if requires != nil {
+		out.Requires = make(map[string][]string, len(requires))
+		out.RequiredFiles = make(map[string][]string, len(requires))
+		for dir, use := range requires {
+			out.Requires[dir] = use.dirs
+			out.RequiredFiles[dir] = use.files
+		}
+	}
 	return out
 }
 
@@ -184,7 +195,13 @@ type target struct {
 // fromGraph reads the export at file, named graphFile in diagnostics. It
 // reports ok=false when there is no usable export. A missing export is an info
 // diagnostic, and a warning when the caller named it.
-func fromGraph(root, file, graphFile string, named bool) ([]Component, []string, map[string][]string, []diag.Diagnostic, bool) {
+// requirement is what one component uses of the third-party targets: their
+// directories, and the files that declare them.
+type requirement struct {
+	dirs, files []string
+}
+
+func fromGraph(root, file, graphFile string, named bool) ([]Component, []string, map[string]requirement, []diag.Diagnostic, bool) {
 	info, err := os.Stat(file)
 	if errors.Is(err, fs.ErrNotExist) {
 		severity := diag.Info
@@ -196,7 +213,7 @@ func fromGraph(root, file, graphFile string, named bool) ([]Component, []string,
 			Message: fmt.Sprintf("no Pants export at %s, so the components have no edge: write it in the CI with `%s`, or name it with --pants-graph", graphFile, ExportCommand),
 		}}, false
 	}
-	unreadable := func(format string, args ...any) ([]Component, []string, map[string][]string, []diag.Diagnostic, bool) {
+	unreadable := func(format string, args ...any) ([]Component, []string, map[string]requirement, []diag.Diagnostic, bool) {
 		return nil, nil, nil, []diag.Diagnostic{diag.Warningf(CodeGraphUnreadable, graphFile,
 			format+"; the BUILD files answer instead, with no edge", args...)}, false
 	}
@@ -225,6 +242,7 @@ func fromGraph(root, file, graphFile string, named bool) ([]Component, []string,
 	edges := map[string]map[string]bool{}
 	tested := map[string]bool{}
 	requires := map[string]map[string]bool{}
+	requiredFiles := map[string]map[string]bool{}
 	var diags []diag.Diagnostic
 	for _, t := range targets {
 		if !firstParty(t.TargetType) {
@@ -248,6 +266,10 @@ func fromGraph(root, file, graphFile string, named bool) ([]Component, []string,
 						requires[dir] = map[string]bool{}
 					}
 					requires[dir][target] = true
+					if requiredFiles[dir] == nil {
+						requiredFiles[dir] = map[string]bool{}
+					}
+					g.thirdPartyFiles(dep, requiredFiles[dir], map[string]bool{})
 				}
 				continue
 			}
@@ -270,9 +292,9 @@ func fromGraph(root, file, graphFile string, named bool) ([]Component, []string,
 		out = append(out, c)
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].ID < out[j].ID })
-	required := make(map[string][]string, len(requires))
+	required := make(map[string]requirement, len(requires))
 	for dir, targets := range requires {
-		required[dir] = sortedKeys(targets)
+		required[dir] = requirement{dirs: sortedKeys(targets), files: sortedKeys(requiredFiles[dir])}
 	}
 	return out, sortedKeys(tested), required, diags, true
 }
@@ -340,6 +362,25 @@ func (g graph) isFile(address, p, name string) bool {
 	}
 	info, err := os.Stat(filepath.Join(g.root, filepath.FromSlash(p)))
 	return err == nil && info.Mode().IsRegular()
+}
+
+// thirdPartyFiles adds to files the sources of a third-party target and of the
+// third-party targets it depends on: a generated requirement's source is the
+// requirements file target it depends on.
+func (g graph) thirdPartyFiles(address string, files, seen map[string]bool) {
+	t, listed := g.targets[address]
+	if !listed || seen[address] || firstParty(t.TargetType) {
+		return
+	}
+	seen[address] = true
+	for _, source := range t.Sources {
+		if clean, ok := wsproto.NormalizeProbePath(source); ok {
+			files[clean] = true
+		}
+	}
+	for _, dep := range t.Dependencies {
+		g.thirdPartyFiles(dep, files, seen)
+	}
 }
 
 // firstParty reports whether a target type is code of the repository: not a

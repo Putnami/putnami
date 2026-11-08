@@ -45,18 +45,33 @@ type SyncResult struct {
 	// packages the sync removed the extension and the Pants edges from,
 	// sorted.
 	Retracted []string
+	// EmptyExport reports an export that lists no package while packages
+	// are marked: the sync wrote nothing, so a filtered export retracts none.
+	EmptyExport bool
 }
 
 // Sync writes the package graph of the Pants repository at root into each
 // component's putnami.json: the extension, the edges of the export as project
 // IDs, to the other components and to the directories of the third-party
 // targets it depends on, and test in disable.jobs when the component holds no
-// test target. The
+// test target, and as its filePatterns the lockfiles and the files that declare
+// the third-party targets it uses, which no edge reaches when they lie outside
+// a member directory. The
 // edges come from the export pants-graph.json at the root, or from pants
 // peek :: when there is none. Without either it writes nothing: the result's
 // Export is empty. A root without pants.toml is no Pants repository and gets
 // an empty result.
 func Sync(ctx context.Context, root string, stderr io.Writer) (SyncResult, error) {
+	return synchronize(ctx, root, stderr, false)
+}
+
+// Stale answers what Sync would change, and writes nothing: Written and
+// Retracted name the putnami.json files that no longer match the export.
+func Stale(ctx context.Context, root string, stderr io.Writer) (SyncResult, error) {
+	return synchronize(ctx, root, stderr, true)
+}
+
+func synchronize(ctx context.Context, root string, stderr io.Writer, dry bool) (SyncResult, error) {
 	var result SyncResult
 	if _, err := os.Stat(filepath.Join(root, detect.Marker)); err != nil {
 		return result, nil
@@ -100,6 +115,9 @@ func Sync(ctx context.Context, root string, stderr io.Writer) (SyncResult, error
 	if err != nil {
 		return SyncResult{}, err
 	}
+	if len(current) == 0 && len(former) > 0 {
+		return SyncResult{Export: result.Export, EmptyExport: true}, nil
+	}
 	components := map[string]bool{}
 	for dir := range current {
 		components[wsproto.ProjectIDFromPath(dir)] = true
@@ -116,7 +134,8 @@ func Sync(ctx context.Context, root string, stderr io.Writer) (SyncResult, error
 			deps = append(deps, wsproto.ProjectIDFromPath(d))
 		}
 		file := filepath.Join(root, filepath.FromSlash(c.ID), wsproto.ConfigFilename)
-		changed, err := writeProject(root, file, deps, components, detection.IsTested(c.ID))
+		inputs := requiredInputs(root, c.ID, detection)
+		changed, err := writeProject(root, file, deps, inputs, components, detection.IsTested(c.ID), dry)
 		if err != nil {
 			return SyncResult{}, fmt.Errorf("%s/%s: %w", c.ID, wsproto.ConfigFilename, err)
 		}
@@ -131,7 +150,7 @@ func Sync(ctx context.Context, root string, stderr io.Writer) (SyncResult, error
 			continue
 		}
 		file := filepath.Join(root, filepath.FromSlash(dir), wsproto.ConfigFilename)
-		changed, err := retractProject(root, file, components)
+		changed, err := retractProject(root, file, components, dry)
 		if err != nil {
 			return SyncResult{}, fmt.Errorf("%s/%s: %w", dir, wsproto.ConfigFilename, err)
 		}
@@ -141,6 +160,64 @@ func Sync(ctx context.Context, root string, stderr io.Writer) (SyncResult, error
 	}
 	return result, nil
 }
+
+// requiredInputs are the file patterns of a component, relative to its
+// directory: the resolve lockfiles and the files that declare the third-party
+// targets it uses, and the root BUILD file when it uses a target of the root.
+// A component that uses no third-party target has none.
+func requiredInputs(root, dir string, detection detect.Detection) []string {
+	dirs := detection.Requires[dir]
+	if len(dirs) == 0 {
+		return nil
+	}
+	files := append(slices.Clone(detection.Lockfiles), detection.RequiredFiles[dir]...)
+	if slices.Contains(dirs, wsproto.ProbeRootPath) {
+		if build := buildFile(root, wsproto.ProbeRootPath); build != "" {
+			files = append(files, build)
+		}
+	}
+	var out []string
+	for _, file := range files {
+		rel, err := filepath.Rel(filepath.FromSlash(dir), filepath.FromSlash(file))
+		if err == nil {
+			out = append(out, filepath.ToSlash(rel))
+		}
+	}
+	return sortedUnique(out)
+}
+
+// setInputs writes the file patterns of the extension's option layer, and
+// removes the layer and options when nothing is left in them.
+func setInputs(doc map[string]any, inputs []string) {
+	options, _ := doc["options"].(map[string]any)
+	layer, _ := options[ExtensionName].(map[string]any)
+	if len(inputs) > 0 {
+		if options == nil {
+			options = map[string]any{}
+			doc["options"] = options
+		}
+		if layer == nil {
+			layer = map[string]any{}
+			options[ExtensionName] = layer
+		}
+		layer[filePatternsKey] = inputs
+		return
+	}
+	if layer == nil {
+		return
+	}
+	delete(layer, filePatternsKey)
+	if len(layer) == 0 {
+		delete(options, ExtensionName)
+	}
+	if len(options) == 0 {
+		delete(doc, "options")
+	}
+}
+
+// filePatternsKey is the member of an option layer that names the files that
+// select the project.
+const filePatternsKey = "filePatterns"
 
 // skippedDirs are never walked for project files: build outputs, installed
 // packages and caches.
@@ -230,7 +307,7 @@ func keepDependency(root, dep string, components map[string]bool) bool {
 
 // retractProject removes from the putnami.json of a former package the
 // extension and its Pants edges, and writes it when its content changes.
-func retractProject(root, file string, components map[string]bool) (bool, error) {
+func retractProject(root, file string, components map[string]bool, dry bool) (bool, error) {
 	doc, existing, err := readProject(file)
 	if err != nil {
 		return false, err
@@ -238,8 +315,12 @@ func retractProject(root, file string, components map[string]bool) (bool, error)
 	before := clone(doc)
 	setList(doc, "extensions", slices.DeleteFunc(stringList(doc["extensions"]), func(e string) bool { return e == ExtensionName }))
 	setList(doc, "dependencies", slices.DeleteFunc(stringList(doc["dependencies"]), func(d string) bool { return !keepDependency(root, d, components) }))
+	setInputs(doc, nil)
 	if reflect.DeepEqual(clone(doc), before) {
 		return false, nil
+	}
+	if dry {
+		return true, nil
 	}
 	return writeJSON(file, doc, existing)
 }
@@ -276,7 +357,7 @@ func peek(ctx context.Context, root string, stderr io.Writer) (string, func(), e
 // and writes it when a member the sync owns changes: the extension, the
 // dependencies on Pants packages, and test in disable.jobs. Every other member
 // is kept as it is.
-func writeProject(root, file string, deps []string, components map[string]bool, tested bool) (bool, error) {
+func writeProject(root, file string, deps, inputs []string, components map[string]bool, tested, dry bool) (bool, error) {
 	doc, existing, err := readProject(file)
 	if err != nil {
 		return false, err
@@ -310,8 +391,13 @@ func writeProject(root, file string, deps []string, components map[string]bool, 
 		doc["disable"] = disable
 	}
 
+	setInputs(doc, inputs)
+
 	if existing != nil && reflect.DeepEqual(clone(doc), before) {
 		return false, nil
+	}
+	if dry {
+		return true, nil
 	}
 	return writeJSON(file, doc, existing)
 }
@@ -384,7 +470,7 @@ func RunSync(ctx *pctx.Context, emit *jsonl.Emitter, _ []string) (string, map[st
 		emit.DiagnosticWithCode("error", err.Error(), "", 0, 0, CodeSyncFailed)
 		return "FAILED", nil, errors.New(CodeSyncFailed)
 	}
-	if result.Export == "" {
+	if result.Export == "" || result.EmptyExport {
 		emit.DiagnosticWithCode("warning", syncSummary(result), "", 0, 0, CodeSyncNoExport)
 	} else {
 		emit.Info(syncSummary(result))
@@ -399,9 +485,41 @@ const (
 	// CodeSyncNoExport is a sync with neither the export nor pants, which
 	// wrote nothing.
 	CodeSyncNoExport = "pants.sync_no_export"
+	// CodeSyncStale is a package whose putnami.json no longer matches the
+	// export.
+	CodeSyncStale = "pants.sync_stale"
 )
 
+// CheckJob is the job name of the task that fails on a stale package graph.
+const CheckJob = "pants-graph-check"
+
+// RunCheck is the job of the validate task: it fails when a sync would change
+// a putnami.json, so a source change that altered the edges Pants infers
+// cannot pass a gate that selected the projects on the old ones.
+func RunCheck(ctx *pctx.Context, emit *jsonl.Emitter, _ []string) (string, map[string]any, error) {
+	result, err := Stale(context.Background(), ctx.WorkspaceRoot, os.Stderr)
+	if err != nil {
+		emit.DiagnosticWithCode("error", err.Error(), "", 0, 0, CodeSyncFailed)
+		return "FAILED", nil, errors.New(CodeSyncFailed)
+	}
+	if result.Export == "" || result.EmptyExport {
+		emit.DiagnosticWithCode("warning", "the package graph cannot be checked: "+syncSummary(result), "", 0, 0, CodeSyncNoExport)
+		return "OK", nil, nil
+	}
+	stale := append(slices.Clone(result.Written), result.Retracted...)
+	if len(stale) == 0 {
+		return "OK", nil, nil
+	}
+	for _, file := range stale {
+		emit.DiagnosticWithCode("error", fmt.Sprintf("%s no longer matches %s: run putnami projects sync and commit the result", file, result.Export), file, 0, 0, CodeSyncStale)
+	}
+	return "FAILED", nil, errors.New(CodeSyncStale)
+}
+
 func syncSummary(r SyncResult) string {
+	if r.EmptyExport {
+		return fmt.Sprintf("%s lists no package, so no putnami.json changes: check the target filters of the repository, then run putnami projects sync", r.Export)
+	}
 	if r.Export == "" {
 		return fmt.Sprintf("no %s at the workspace root and no pants on PATH: the putnami.json files keep their edges; write the export with `%s`, then run putnami projects sync", detect.DefaultGraphFile, detect.ExportCommand)
 	}
