@@ -237,10 +237,22 @@ func (s Stack) run(ctx context.Context, in runInput, emit reporter) (string, map
 	if err := removeReports(profile, in.task, in.projectAbs, rootAbs); err != nil {
 		return statusFailed, nil, err
 	}
-	// An artifact an earlier build left is no product of this one: the files
-	// the artifact patterns match are removed before the steps, so only what
-	// the steps write is copied.
-	if err := removeOutputs(artifactPatterns(t.Artifacts, meta.Component), profile, in.task, in.projectAbs, rootAbs); err != nil {
+	// An artifact an earlier build left is no product of this one: the file
+	// each literal artifact pattern names is removed before the steps, so
+	// only what the steps write is copied. A component name that is no single
+	// path segment names no artifact.
+	artifacts := t.Artifacts
+	if len(artifacts) > 0 && !singleSegment(meta.Component) {
+		emit.DiagnosticWithCode("warning", fmt.Sprintf("the component name %q is no single path segment: the %s task keeps no artifact", meta.Component, in.task), "", 0, 0, CodeProjectConfigInvalid)
+		artifacts = nil
+	}
+	var literal []string
+	for _, a := range artifactPatterns(artifacts, meta.Component) {
+		if !strings.ContainsAny(a, "*?[") {
+			literal = append(literal, a)
+		}
+	}
+	if err := removeOutputs(literal, profile, in.projectAbs, rootAbs); err != nil {
 		return statusFailed, nil, err
 	}
 
@@ -276,7 +288,7 @@ func (s Stack) run(ctx context.Context, in runInput, emit reporter) (string, map
 		return statusFailed, nil, stepErr
 	}
 
-	if err := copyArtifacts(t.Artifacts, meta.Component, in.projectAbs, rootAbs, outDir); err != nil {
+	if err := copyArtifacts(artifacts, meta.Component, in.projectAbs, rootAbs, outDir); err != nil {
 		return statusFailed, nil, err
 	}
 
@@ -437,6 +449,12 @@ func copyMode(src, dst string) error {
 	return os.Chmod(dst, info.Mode().Perm())
 }
 
+// singleSegment reports whether name is one clean path segment, with no
+// glob character.
+func singleSegment(name string) bool {
+	return name != "" && name != "." && name != ".." && !strings.ContainsAny(name, "/\\*?[")
+}
+
 // artifactPatterns are a task's artifact patterns with {component}
 // expanded.
 func artifactPatterns(patterns []string, component string) []string {
@@ -459,14 +477,20 @@ func removeReports(profile Profile, task, projectAbs, rootAbs string) error {
 	for _, c := range r.Coverage {
 		patterns = append(patterns, c.Paths...)
 	}
-	return removeOutputs(patterns, profile, task, projectAbs, rootAbs)
+	return removeOutputs(patterns, profile, projectAbs, rootAbs)
 }
 
 // removeOutputs deletes the files the patterns match under the project or
-// the stack root ("{root}/…"); a pattern under "{output}/" is skipped. A file
-// the task's own inputs select is a source, and is kept.
-func removeOutputs(patterns []string, profile Profile, task, projectAbs, rootAbs string) error {
-	projectInputs, rootInputs := profile.TaskPatterns(task)
+// the stack root ("{root}/…"); a pattern under "{output}/" is skipped. A
+// match outside its base, or that the inputs of any task of the profile
+// select, is kept.
+func removeOutputs(patterns []string, profile Profile, projectAbs, rootAbs string) error {
+	var projectInputs, rootInputs []string
+	for _, task := range TaskNames {
+		project, root := profile.TaskPatterns(task)
+		projectInputs = append(projectInputs, project...)
+		rootInputs = append(rootInputs, root...)
+	}
 	isInput := func(m string) bool {
 		for _, in := range []struct {
 			base     string
@@ -497,7 +521,7 @@ func removeOutputs(patterns []string, profile Profile, task, projectAbs, rootAbs
 			return err
 		}
 		for _, m := range matches {
-			if isInput(m) {
+			if rel, err := filepath.Rel(base, m); err != nil || !filepath.IsLocal(rel) || isInput(m) {
 				continue
 			}
 			if err := os.Remove(m); err != nil && !errors.Is(err, os.ErrNotExist) {

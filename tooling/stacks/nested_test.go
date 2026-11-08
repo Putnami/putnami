@@ -231,3 +231,42 @@ func TestAStaleArtifactIsRemovedBeforeTheSteps(t *testing.T) {
 		t.Errorf("a binary the steps did not write is not copied: %v", err)
 	}
 }
+
+func TestArtifactRemovalStaysOnLiteralPathsInsideItsBase(t *testing.T) {
+	root := t.TempDir()
+	writeFile(t, root, "rust-toolchain.toml", "[toolchain]\nchannel = \"1.82.0\"\n")
+	writeFile(t, root, "crates/api/Cargo.toml", "")
+	writeFile(t, root, "crates/api/src/sample.wasm", "source")
+	writeFile(t, filepath.Dir(root), "victim", "keep")
+	t.Setenv("STUB_ROOT", root)
+	t.Setenv("STUB_LOG", filepath.Join(root, "log"))
+	stubTools(t, "1.82.0", junitPass)
+	s := testStack(t)
+	s.Profile.Tasks[TaskBuild] = Task{Steps: [][]string{{"cargo", "build"}}, Inputs: []string{"sources"},
+		Artifacts: []string{"**/*.wasm", "{root}/{component}"}}
+
+	status, _, rec := runTask(t, s, root, TaskBuild)
+	if status != statusOK {
+		t.Fatalf("build: %s %v", status, rec.diags)
+	}
+	if _, err := os.Stat(filepath.Join(root, "crates/api/src/sample.wasm")); err != nil {
+		t.Errorf("a wildcard artifact pattern removes nothing: %v", err)
+	}
+
+	meta, _ := json.Marshal(Metadata{Component: "../victim", Root: "."})
+	rec = &recorder{}
+	status, _, _ = s.run(context.Background(), runInput{task: TaskBuild, workspaceRoot: root, projectAbs: filepath.Join(root, "crates/api"),
+		metadata: meta, outputRoot: t.TempDir(), stdout: &strings.Builder{}}, rec)
+	if status != statusOK || rec.codes() != "warning:"+CodeProjectConfigInvalid {
+		t.Errorf("a component that is no path segment keeps no artifact: %s %v", status, rec.diags)
+	}
+	if _, err := os.Stat(filepath.Join(filepath.Dir(root), "victim")); err != nil {
+		t.Errorf("no file outside the workspace is removed: %v", err)
+	}
+	if err := removeOutputs([]string{"{root}/../victim"}, s.Profile, filepath.Join(root, "crates/api"), root); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(filepath.Join(filepath.Dir(root), "victim")); err != nil {
+		t.Errorf("a match outside its base is kept: %v", err)
+	}
+}

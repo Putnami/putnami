@@ -84,8 +84,9 @@ type Metadata struct {
 	Lockfile string `json:"lockfile,omitempty"`
 	// Workspace is the directory of the Cargo workspace that holds the
 	// crate, the root of its build: "." for a member of the root's
-	// workspace, the nearest enclosing directory whose [workspace] names the
-	// crate as a member, else the crate's own directory.
+	// workspace; for another crate, the workspace its package.workspace
+	// names, else the nearest enclosing [workspace] that names it as a
+	// member, past one that excludes it; else the crate's own directory.
 	Workspace string `json:"workspace,omitempty"`
 }
 
