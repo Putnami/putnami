@@ -1,0 +1,73 @@
+# Rust stack with the real tools — the leg that runs @putnami/rust with the
+# real cargo, cargo-nextest and cargo-llvm-cov.
+#
+# The workspace gate has no Rust toolchain, so the tests of @putnami/rust run
+# its tasks with a stub cargo. This job installs the real tools and runs the
+# real-tool proof, TestTheFixtureRepositoryPassesWithTheRealTools, on the
+# fixture repository of the observe Cargo detector: each crate's lint, test
+# and build pass, and every nextest case and coverage line is attributed to
+# its crate. PUTNAMI_RUST_REAL_TOOLS=1 makes a missing tool fail the test
+# instead of skipping it, and --no-cache keeps a result stored by a run
+# without the tools from standing in for this one. One test runs, so the
+# project's coverage is reported and not enforced; the workspace gate
+# enforces it.
+#
+# Like the credential-free gate, the job reads no secret.
+name: Rust stack with the real tools
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - rust/**
+      - tooling/stacks/**
+      - tooling/observe/detect/cargo/**
+      - tooling/observe/internal/observe/testdata/demos/rust.txtar
+      - .github/workflows/rust-stack.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: rust-stack-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  real-tools:
+    name: '@putnami/rust with cargo-nextest and cargo-llvm-cov'
+    if: github.event_name != 'pull_request' || !github.event.pull_request.draft
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      PUTNAMI_CLOUD_TOKEN: ''
+      PUTNAMI_CACHE_URL: ''
+      PUTNAMI_CACHE_TOKEN: ''
+      PUTNAMI_TOKEN: ''
+      DO_NOT_TRACK: '1'
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.work
+          cache: false
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy, llvm-tools-preview
+
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-nextest,cargo-llvm-cov
+
+      - name: Install the workspace
+        run: ./putnamiw install
+
+      - name: Turn the remote cache off
+        run: echo '{"enabled": false}' > .putnami/cache.json
+
+      - name: Run the real-tool proof
+        env:
+          PUTNAMI_RUST_REAL_TOOLS: '1'
+        run: ./putnamiw test --projects @putnami/rust --run TestTheFixtureRepositoryPassesWithTheRealTools --no-enforce-coverage --no-cache
