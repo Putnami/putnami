@@ -59,12 +59,20 @@
       "text": "A test task on a PHP with neither PCOV nor Xdebug runs PHPUnit with its JUnit report only, reads no Clover report, and reports the warning stacks.coverage_unavailable. The test summary is complete and no coverage summary is written. A PHP with a driver keeps the Clover report."
     },
     {
+      "id": "checks-documentation-links",
+      "text": "lint checks every relative link and anchor of the project's README.md files and doc/ trees with the SDK's documentation link check, and a broken one fails lint. The docs-links flag, on by default, turns the check off."
+    },
+    {
+      "id": "filters-the-tests",
+      "text": "test with the test flag, short -t, passes its value to PHPUnit as one --filter argument, with or without coverage. The value is part of the task's key, so a filtered result never answers an unfiltered run."
+    },
+    {
       "id": "fetches-the-locked-packages",
       "text": "workspace-fetch downloads the packages of each stack root's composer.lock into the extension's Composer cache, with --no-scripts and --no-plugins and a private vendor directory, so it runs none of their code and writes nothing in the repository. A stack root with no composer.lock is skipped. With no PHP it warns and passes."
     },
     {
       "id": "workspace-install-runs-composer",
-      "text": "workspace-install runs the pinned Composer's install at each stack root of the workspace's projects, except a project disable.tags excludes and a root whose last install is current. A run with offline dependencies installs from the Composer cache with the network disabled. With no PHP it warns and passes."
+      "text": "workspace-install runs the pinned Composer's install at each stack root of the workspace's projects, except a project disable.tags excludes and a root whose last install is current, which the force flag installs again. A run with offline dependencies installs from the Composer cache with the network disabled. With no PHP it warns and passes."
     },
     {
       "id": "serves-an-application",

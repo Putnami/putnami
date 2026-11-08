@@ -163,7 +163,8 @@
           "verification": {
             "kind": "acceptance",
             "checks": [
-              "workspace-install-installs-each-stack-root-the-workspace-includes"
+              "workspace-install-installs-each-stack-root-the-workspace-includes",
+              "workspace-install-force-installs-a-root-whose-last-install-is-current"
             ]
           }
         },
@@ -229,6 +230,32 @@
             "kind": "acceptance",
             "checks": [
               "publish-pushes-the-application-image"
+            ]
+          }
+        },
+        {
+          "id": "checks-documentation-links",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "lint-fails-on-a-broken-documentation-link-unless-docs-links-is-off"
+            ]
+          }
+        },
+        {
+          "id": "filters-the-tests",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "test-passes-the-filter-to-phpunit-and-keys-the-task-on-it"
             ]
           }
         }
