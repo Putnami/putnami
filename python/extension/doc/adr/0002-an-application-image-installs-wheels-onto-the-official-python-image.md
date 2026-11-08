@@ -43,6 +43,11 @@ workspace probe declares the image as an `oci` release-set member.
   packages it.
 - A named base must provide `python` of the same minor on its `PATH`, with a
   glibc that runs `manylinux_2_28` wheels.
+- The cache key does not hold the Python minor of the machine. A workspace pins
+  it with a `.python-version` file at its root, which the key holds; without
+  one, a cache hit can return an image of another minor than the tests ran on.
+- The staged build leaves out the files the image leaves out, so a wheel built
+  from it holds no test and no secret file.
 - The application files are read-only for the user that runs them, and
   Python writes no bytecode at run time.
 
