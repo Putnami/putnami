@@ -2,6 +2,8 @@
   "$schema": "https://putnami.dev/schemas/putnami-scope.json",
   "line": {},
   "includes": [
-    "extension"
+    "extension",
+    "samples/application",
+    "samples/library"
   ]
 }
