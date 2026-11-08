@@ -16,6 +16,7 @@ require (
 	go.putnami.dev/evidence/readers v0.0.0 // indirect
 	go.putnami.dev/protocol/cli v0.0.0 // indirect
 	go.putnami.dev/protocol/codehost v0.0.0 // indirect
+	go.putnami.dev/protocol/distribution v0.0.0 // indirect
 	go.putnami.dev/protocol/extension v0.0.0 // indirect
 	go.putnami.dev/protocol/job v0.0.0 // indirect
 	go.putnami.dev/protocol/runtime v0.0.0 // indirect
