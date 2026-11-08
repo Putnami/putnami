@@ -13,8 +13,8 @@ itself, but needs a JDK to start.
 
 The CLI installs a toolchain the workspace lock pins (ADR 0003 of the stack
 core), with the extension SDK's `pinnedarchive`, which refuses an archive that
-holds a link. Every Temurin JDK archive links license files to one another
-under `legal/`, and a macOS one links `libjli.dylib` for its bundle.
+holds a link. The Linux Temurin JDK archives link license files to one another
+under `legal/`.
 
 ## Decision
 
@@ -48,8 +48,8 @@ under `legal/`, and a macOS one links `libjli.dylib` for its bundle.
 
 - The archives come from GitHub releases of the Adoptium project; a pin moves
   only when an extension release ships new digests.
-- An installed JDK has no license links under `legal/` and no
-  `Contents/MacOS/libjli.dylib`, so it is not a macOS application bundle.
+- An installed JDK has no license links under `legal/`; its license files
+  remain under `java.base`.
 - Offline, a task installs nothing and fails when the machine has no JDK.
 - A build that uses Gradle toolchains (`jvmToolchain(17)`) still finds or
   downloads its own JDK; the installed one only starts Gradle.

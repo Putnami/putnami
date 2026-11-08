@@ -21,11 +21,11 @@
   "requirements": [
     {
       "id": "components-become-projects",
-      "text": "The probe answers, for each candidate directory a Gradle or Maven build knows as a component: its name (the Gradle path without its first colon, ':' turned into '/', or the artifactId), its edges, the extension, the tag java, its type (application for the Gradle application plugin, Spring Boot or an Android app, else library) and metadata naming the build's reference, the variant, its stack root and the expected Java version."
+      "text": "The probe answers, for each candidate directory a Gradle or Maven build knows as a component: its name (the Gradle path without its first colon, ':' turned into '/', or the artifactId), its edges, the extension, the tag java, its type and metadata naming the build's reference, the variant, its stack root and the expected Java version. A component is an application when its build applies the application or Spring Boot plugin, Android aside; any other is a library."
     },
     {
       "id": "nested-builds-are-stack-roots",
-      "text": "A Gradle build's root is the nearest directory with a settings file, a Maven build's the topmost of an unbroken chain of pom.xml files; it is its components' stack root, and an input-only project when it is no component. A Gradle build inside another one, such as buildSrc, is part of that build. A directory both builds claim is the Gradle build's."
+      "text": "A Gradle build's root is the nearest directory with a settings file; a Maven build's root is the outermost pom.xml that lists the module, or the module's own. It is its components' stack root, and an input-only project when it is no component. A build inside another one, such as buildSrc, and a build file under a src, target or build directory are no builds of their own. A directory both builds claim is the Gradle build's."
     },
     {
       "id": "variants-follow-the-build",
@@ -49,7 +49,7 @@
     },
     {
       "id": "serve-runs-the-application",
-      "text": "putnami serve builds an application's runnable form (installDist for the Gradle application plugin, the Spring Boot jar otherwise) and runs it with PORT and SERVER_PORT set to the port flag, until the user stops it; it reports the server ready once the port accepts connections. A library runs nothing."
+      "text": "putnami serve builds an application's runnable form (installDist for the Gradle application plugin, the Spring Boot jar otherwise) under its stack root's lock, copies it aside, and runs the copy with PORT and SERVER_PORT set to the port flag, until the user stops it; it reports the server ready once the port accepts connections. A library runs nothing."
     },
     {
       "id": "run-runs-the-application-once",
