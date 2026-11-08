@@ -330,6 +330,42 @@ func sddCommandGroups() []groupSpec {
 					},
 				},
 				{
+					name:    "import",
+					summary: "Import an architecture model as domain manifests",
+					description: "Read a Structurizr workspace (DSL or JSON) and map it to domain manifests: each container " +
+						"becomes a domain <system>/<container> and a software system with no containers a domain <system>, a " +
+						"putnami.domain property overriding the id; a container or component whose path property names a project " +
+						"maps it to its domain; a relationship between two domains becomes a reference import of the producer's " +
+						"generated <domain>.interface.v1 export, bound only to project edges the graph observes. Every element it " +
+						"cannot map is listed with the reason. Without --apply nothing is written and the diff is printed; with " +
+						"it, the command only adds, so a hand edit survives a rerun. The import covers the whole model, so " +
+						"project selection flags are rejected",
+					positionals: []proto.PositionalDefinition{{Name: "model-file", Required: true}},
+					flags: map[string]proto.FlagDefinition{
+						"apply": {
+							Type:        "boolean",
+							Description: "Write the imported manifests instead of only printing the diff.",
+						},
+						"at": {
+							Type:        "string",
+							Description: "Workspace-relative directory new manifests go below (default: architecture).",
+						},
+						"from": {
+							Type:        "string",
+							Description: "Format of the model file; only structurizr is read.",
+						},
+						"path-property": {
+							Type:        "string",
+							Description: "Element property that names a project, as a project id or a workspace-relative directory (default: path).",
+						},
+					},
+					examples: []string{
+						"putnami architecture import --from structurizr workspace.dsl",
+						"putnami architecture import --from structurizr workspace.json --apply",
+					},
+					mutatesSources: true,
+				},
+				{
 					name:    "init",
 					summary: "Scaffold one domain manifest",
 					description: "Create one canonical putnami.architecture.json for a domain that does not exist yet, " +
@@ -515,16 +551,16 @@ func subcommandTask(group string, sub subcommandSpec) proto.TaskDefinition {
 }
 
 // TestCommandGroupsCarryTheWholeInventory pins the surface against the
-// inventory table: four groups, eighteen subcommands (the original fourteen, plus
-// `specs verify` and `specs baseline`, plus `architecture init`
-// and `architecture sync`), and no extras.
+// inventory table: four groups, nineteen subcommands (the original fourteen, plus
+// `specs verify` and `specs baseline`, plus `architecture init`,
+// `architecture sync` and `architecture import`), and no extras.
 func TestCommandGroupsCarryTheWholeInventory(t *testing.T) {
 	m := committedManifest(t)
 
 	want := map[string][]string{
 		"features":     {"diff", "inspect", "list", "snapshot", "validate"},
 		"specs":        {"baseline", "init", "inspect", "list", "validate", "verify"},
-		"architecture": {"init", "inspect", "snapshot", "sync", "validate"},
+		"architecture": {"import", "init", "inspect", "snapshot", "sync", "validate"},
 		"contracts":    {"check", "generate"},
 	}
 	if got := sortedKeys(m.CommandGroups); !reflect.DeepEqual(got, []string{"architecture", "contracts", "features", "specs"}) {
@@ -561,13 +597,14 @@ var reservedFlags = []string{"projects", "impacted", "all", "baseline", "tag", "
 //  3. The argv: the task hands the binary `<group> <subcommand>` through the
 //     prepared runtime, rooted at the workspace, and is uncacheable — an
 //     interactive run writes no result document for a hit to restore.
-//  4. Honest source mutation. Thirteen of the eighteen read and report. Five write
+//  4. Honest source mutation. Thirteen of the nineteen read and report. Six write
 //     into the tree a human then commits — `specs init` creates a spec document,
 //     `specs baseline --update` rewrites the committed enforce floor,
 //     `contracts generate` rewrites the artifacts under schema/,
-//     `architecture init` creates a domain manifest, and `architecture sync
-//     --apply` rewrites the mechanical half of existing ones — and only those
-//     five may declare `mutatesSources` with the project-scoped `sources` write
+//     `architecture init` creates a domain manifest, `architecture sync
+//     --apply` rewrites the mechanical half of existing ones, and `architecture
+//     import --apply` adds what a model declares — and only those six may
+//     declare `mutatesSources` with the project-scoped `sources` write
 //     resource, which is what the planner serializes source mutation on. The set
 //     is spelled out here so a subcommand that gained the declaration has to be
 //     added to it deliberately.
@@ -581,7 +618,7 @@ func TestEverySubcommandRoutesAndRunsTheOneWayD6Settles(t *testing.T) {
 	m := committedManifest(t)
 	writers := map[string]bool{
 		"specs init": true, "specs baseline": true, "contracts generate": true,
-		"architecture init": true, "architecture sync": true,
+		"architecture import": true, "architecture init": true, "architecture sync": true,
 	}
 
 	for _, group := range sortedKeys(m.CommandGroups) {

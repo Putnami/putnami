@@ -206,6 +206,15 @@ func interactiveSubcommands() map[string]subcommand {
 			rejectsSelection: true,
 			run:              runArchitectureSync,
 		},
+		{
+			// `architecture import` maps a whole model against every declared
+			// manifest, so a project selection could only be silently ignored —
+			// rejected instead, exactly as `architecture sync` does.
+			group: "architecture", name: "import",
+			arity:            exactly(1, "architecture import requires exactly one <model-file>"),
+			rejectsSelection: true,
+			run:              runArchitectureImport,
+		},
 		// `contracts` declares no positional arity: both subcommands name their
 		// project with `--project <selector>`, and core checked nothing here.
 		{group: "contracts", name: "generate", run: runContractsGenerate},
@@ -381,6 +390,9 @@ const (
 	paramOwner    = "owner"
 	paramAt       = "at"
 	paramFrom     = "from"
+	// paramPathProperty names the element property `architecture import` reads a
+	// project from.
+	paramPathProperty = "path-property"
 )
 
 // param reads one forwarded string parameter, trimmed. An absent parameter and
@@ -477,11 +489,12 @@ func splitReservedArgs(args []string) (contextFile string, positionals []string,
 // TestEveryValueTakingSubcommandFlagIsKnown holds the set to the committed
 // extension manifest, so a new string flag cannot be added without it.
 var subcommandValueFlags = map[string]bool{
-	"--at":      true,
-	"--from":    true,
-	"--owner":   true,
-	"--project": true,
-	"--session": true,
+	"--at":            true,
+	"--from":          true,
+	"--owner":         true,
+	"--path-property": true,
+	"--project":       true,
+	"--session":       true,
 }
 
 // positionalArgs returns the tokens that are not flags. The CLI hands an
@@ -801,6 +814,26 @@ func runArchitectureSync(run *interactiveRun) outcome {
 	return outcome{
 		data:  report,
 		human: func(w io.Writer) { printArchitectureSyncHuman(w, report) },
+		err:   verdict,
+	}
+}
+
+// runArchitectureImport maps an authored architecture model to domain
+// manifests. Without --apply it prints the diff and writes nothing; the git diff
+// of an applied run is where the imported declarations are reviewed.
+func runArchitectureImport(run *interactiveRun) outcome {
+	source := positionalArgs(run.args)[0]
+	report, verdict := sdd.BuildArchitectureImportResult(run.ws, sdd.ArchitectureImportOptions{
+		Format:       run.param(paramFrom),
+		Source:       pctx.ResolvePath(run.ctx, source),
+		SourceLabel:  source,
+		At:           run.param(paramAt),
+		PathProperty: run.param(paramPathProperty),
+		Apply:        run.ctx != nil && run.ctx.Params.Bool(paramApply, false),
+	})
+	return outcome{
+		data:  report,
+		human: func(w io.Writer) { printArchitectureImportHuman(w, report) },
 		err:   verdict,
 	}
 }

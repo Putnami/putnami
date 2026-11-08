@@ -55,6 +55,17 @@
         }
       ]
     },
+    "sdd-architecture-import": {
+      "description": "Import an architecture model as domain manifests",
+      "visibility": "internal",
+      "activation": "workspace-once",
+      "run": [
+        {
+          "id": "run",
+          "task": "sdd-architecture-import-exec"
+        }
+      ]
+    },
     "sdd-architecture-inspect": {
       "description": "Inspect one declared domain and its relationships",
       "visibility": "internal",
@@ -357,6 +368,43 @@
             },
             {
               "command": "putnami architecture init billing --projects /billing --owner billing-team"
+            }
+          ]
+        },
+        "import": {
+          "description": "Read a Structurizr workspace (DSL or JSON) and map it to domain manifests: each container becomes a domain <system>/<container> and a software system with no containers a domain <system>, a putnami.domain property overriding the id; a container or component whose path property names a project maps it to its domain; a relationship between two domains becomes a reference import of the producer's generated <domain>.interface.v1 export, bound only to project edges the graph observes. Every element it cannot map is listed with the reason. Without --apply nothing is written and the diff is printed; with it, the command only adds, so a hand edit survives a rerun. The import covers the whole model, so project selection flags are rejected",
+          "command": "sdd-architecture-import",
+          "interactive": true,
+          "flags": {
+            "apply": {
+              "type": "boolean",
+              "description": "Write the imported manifests instead of only printing the diff."
+            },
+            "at": {
+              "type": "string",
+              "description": "Workspace-relative directory new manifests go below (default: architecture)."
+            },
+            "from": {
+              "type": "string",
+              "description": "Format of the model file; only structurizr is read."
+            },
+            "path-property": {
+              "type": "string",
+              "description": "Element property that names a project, as a project id or a workspace-relative directory (default: path)."
+            }
+          },
+          "positionals": [
+            {
+              "name": "model-file",
+              "required": true
+            }
+          ],
+          "examples": [
+            {
+              "command": "putnami architecture import --from structurizr workspace.dsl"
+            },
+            {
+              "command": "putnami architecture import --from structurizr workspace.json --apply"
             }
           ]
         },
@@ -1023,6 +1071,26 @@
       "args": [
         "architecture",
         "init"
+      ],
+      "cwd": "{workspaceRoot}",
+      "timeoutMs": 600000,
+      "writes": [
+        "sources"
+      ],
+      "cache": {
+        "enabled": false
+      },
+      "declares": {
+        "mutatesSources": true
+      }
+    },
+    "sdd-architecture-import-exec": {
+      "description": "Import an architecture model as domain manifests. Interactive: the CLI runs it with the terminal's own stdout and parses nothing, so it writes the command's result envelope (or its human rendering) itself and declares no output ports.",
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": [
+        "architecture",
+        "import"
       ],
       "cwd": "{workspaceRoot}",
       "timeoutMs": 600000,

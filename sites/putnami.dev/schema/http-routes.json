@@ -2285,6 +2285,21 @@
     },
     {
       "match": "exact",
+      "path": "/docs/spec-driven-development/adr/a-structurizr-model-is-an-authored-architecture",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "publicEdge": true,
+      "provenance": {
+        "project": "putnami.dev",
+        "package": "@putnami/web",
+        "sourceKind": "file-route",
+        "evidencePath": "src/app/docs/[...page]/page.tsx"
+      }
+    },
+    {
+      "match": "exact",
       "path": "/docs/spec-driven-development/adr/every-project-carries-a-feature-a-spec-or-a-feature-authority",
       "methods": [
         "GET",
@@ -5029,6 +5044,21 @@
     },
     {
       "match": "exact",
+      "path": "/fr/docs/spec-driven-development/adr/a-structurizr-model-is-an-authored-architecture",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "publicEdge": true,
+      "provenance": {
+        "project": "putnami.dev",
+        "package": "@putnami/web",
+        "sourceKind": "file-route",
+        "evidencePath": "src/app/docs/[...page]/page.tsx"
+      }
+    },
+    {
+      "match": "exact",
       "path": "/fr/docs/spec-driven-development/adr/every-project-carries-a-feature-a-spec-or-a-feature-authority",
       "methods": [
         "GET",
@@ -5816,5 +5846,5 @@
       }
     }
   ],
-  "digest": "sha256:08d15efa6b0a2b48bba031ecdf63bc136c7a5d6bd8f6350157ffc7fb3b4f2d4d"
+  "digest": "sha256:68218f9814f036faa5a80f14a156dc754e0657c301d956d996586109edb415d3"
 }

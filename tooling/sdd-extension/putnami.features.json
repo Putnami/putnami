@@ -503,10 +503,27 @@
               "a-native-workspace-keeps-its-output"
             ]
           }
+        },
+        {
+          "id": "structurizr-models-import-as-manifests",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "import-writes-manifests-validate-accepts",
+              "import-reports-what-it-cannot-map",
+              "import-rerun-keeps-hand-edits",
+              "import-leaves-an-unmodeled-edge-a-violation"
+            ]
+          }
         }
       ],
       "surface": {
         "commands": [
+          "architecture import",
           "architecture init",
           "architecture inspect",
           "architecture snapshot",

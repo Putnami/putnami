@@ -141,6 +141,10 @@
     {
       "id": "specs-surface-names-the-source",
       "text": "specs list names each spec's source: native, or its market format, as the source member in JSON and after the path in human output. specs inspect of an external spec gives source.format and lists its native gaps with their positions and steps. Gaps never change an exit code and are never validate findings. A workspace with only native specs keeps its output, apart from source: native on each specs list row."
+    },
+    {
+      "id": "structurizr-models-import-as-manifests",
+      "text": "architecture import --from structurizr <file> maps the containers and container-less systems of a Structurizr DSL or JSON workspace to domains, path-mapped elements to projects, and cross-domain relationships to reference imports bound only to observed edges; it lists each element it cannot map with the reason, writes only with --apply and then only adds, so a hand edit survives a rerun and an edge the model does not allow stays an architecture validate violation."
     }
   ],
   "decisions": [
@@ -155,6 +159,7 @@
     "protocols/features/doc/adr/0005-a-feature-declaration-names-its-surface.md",
     "tooling/sdd-extension/doc/adr/0004-a-spec-may-live-in-an-external-market-format.md",
     "protocols/features/doc/adr/0006-the-spec-source-contract.md",
-    "protocols/architecture/doc/adr/0003-authored-documents-are-promised-findings-are-not.md"
+    "protocols/architecture/doc/adr/0003-authored-documents-are-promised-findings-are-not.md",
+    "tooling/sdd-extension/doc/adr/0005-a-structurizr-model-is-an-authored-architecture.md"
   ]
 }

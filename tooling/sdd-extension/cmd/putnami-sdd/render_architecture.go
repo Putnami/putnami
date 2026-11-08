@@ -200,3 +200,44 @@ func printArchitectureSyncRefusals(w io.Writer, refusals []sdd.ArchitectureSyncR
 func syncBindingLabel(binding sdd.ArchitectureSyncBinding) string {
 	return fmt.Sprintf("%s -> %s (%s)", binding.ConsumerProject, binding.ProducerProject, binding.Import)
 }
+
+// printArchitectureImportHuman renders an import: what each manifest gains, the
+// diff, what the model no longer relates, and every element left unmapped.
+func printArchitectureImportHuman(w io.Writer, report sdd.ArchitectureImportReport) {
+	mode := "diff"
+	if report.Applied {
+		mode = "applied"
+	}
+	fmt.Fprintf(w, "\n  Architecture import from %s (%s, %s)\n", report.Source, report.Format, mode)
+	fmt.Fprintf(w, "  %d domain(s) · %d new manifest(s) · %d changed · %d written\n",
+		report.Summary.Domains, report.Summary.Created, report.Summary.Changed, report.Summary.Written)
+	fmt.Fprintf(w, "  Adds %d project(s) · %d export(s) · %d import(s) · %d binding(s)\n",
+		report.Summary.AddedProjects, report.Summary.AddedExports, report.Summary.AddedImports, report.Summary.AddedBindings)
+	for _, manifest := range report.Manifests {
+		for _, imported := range manifest.NotInModel {
+			fmt.Fprintf(w, "  %s: import %s joins two domains the model does not relate; remove it by hand if that relation is gone\n", manifest.Path, imported)
+		}
+		if manifest.Diff == "" {
+			continue
+		}
+		fmt.Fprintln(w)
+		for _, line := range strings.Split(strings.TrimSuffix(manifest.Diff, "\n"), "\n") {
+			fmt.Fprintf(w, "  %s\n", line)
+		}
+	}
+	if len(report.Unmapped) > 0 {
+		fmt.Fprintf(w, "\n  Not mapped (%d):\n", len(report.Unmapped))
+		for _, unmapped := range report.Unmapped {
+			location := ""
+			if unmapped.Line > 0 {
+				location = fmt.Sprintf(" (line %d)", unmapped.Line)
+			}
+			fmt.Fprintf(w, "    [%s] %s%s: %s\n", unmapped.Kind, unmapped.Element, location, unmapped.Reason)
+		}
+	}
+	printArchitectureDiagnostics(w, report.Diagnostics)
+	if !report.Applied && report.Summary.Changed > 0 {
+		fmt.Fprintln(w, "  Nothing was written. Re-run with --apply, then review the diff.")
+	}
+	fmt.Fprintln(w)
+}

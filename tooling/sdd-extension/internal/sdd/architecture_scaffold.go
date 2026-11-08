@@ -158,6 +158,9 @@ func architectureInitRoot(ws *workspace.Workspace, at string, projects []string)
 		if code := validateArchitectureWritePath(cleaned); code != "" {
 			return "", protocolcli.Usagef("--at %s is not a contained workspace-relative directory", at)
 		}
+		if !discoverableManifestPath(cleaned + "/" + archproto.ManifestFilename) {
+			return "", protocolcli.Usagef("--at %s is a directory architecture discovery skips (hidden, vendor or node_modules)", at)
+		}
 		return cleaned, nil
 	}
 	if len(projects) == 0 {
