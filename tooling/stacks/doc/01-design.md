@@ -69,10 +69,11 @@ with its profile's markers: `Cargo.toml` for Rust.
 - The probe (`__putnami workspace-probe`), served by the core, runs the
   extension's detector and answers, for each candidate path that the detector
   knows as a component: the source name (the crate name), the dependencies as
-  paths, the extension, and in `metadata` the component name, the stack root
-  and the expected toolchain version. A component whose manifest names no
-  package, such as a Composer application, keeps no source name, and its
-  component name is its directory, the same on every checkout.
+  paths, the extension, and in `metadata` the build's name of the component,
+  its variant, the stack root and the expected toolchain version. A component
+  whose manifest names no package, such as a Composer application, keeps no
+  source name, and its component name is its directory, the same on every
+  checkout.
 
 The detectors move from `tooling/observe/internal/detect/<stack>` to a public
 package of the observe module, `go.putnami.dev/tooling/observe/detect/<stack>`,
@@ -152,7 +153,7 @@ The Rust reference profile:
 | `tasks.<task>.withoutCoverage` | How the task runs on a toolchain with no coverage support: a `probe` that exits non-zero there, and the `steps` that replace the task's. Its coverage reports are not read, and the task warns with `stacks.coverage_unavailable`. |
 | `toolchain.files` | The files that state the expected version or range, read in the project directory, then at the stack root. `key` reads one string value of a TOML table or a JSON object; without it, the file's first non-empty line. |
 | `inputs.<set>` | Named sets of file patterns. A plain pattern is relative to the project directory; `{root}/` makes it relative to the stack root, the directory of the build that holds the component (the Cargo workspace, the Gradle settings). |
-| `tasks.<task>.steps` | The commands the task runs in order, each an argument vector run in the project directory, with no shell. `{root}` is the stack root, `{component}` the detector's name for the component, `{output}` the task's output directory under the project. |
+| `tasks.<task>.steps` | The commands the task runs in order, each an argument vector run in the project directory, with no shell. `{root}` is the stack root, `{component}` the build's name for the component (`Component.Ref`, or its name), `{output}` the task's output directory under the project. |
 | `tasks.<task>.inputs` | The input sets the task reads. `lint` reads fewer than `test`: a lockfile change does not rerun it. |
 | `tasks.<task>.reports` | The JUnit and coverage reports the task reads back, with the coverage format. The core copies each into `{output}` as soon as the task ends. `when` and `optional` say when a report is expected. |
 | `tasks.<task>.artifacts` | The files the task copies into `{output}/artifacts` after its steps, so a cache hit restores them: patterns under the project or the stack root that may name `{component}`. The file a pattern with no wildcard names is removed before the steps, unless its path leads outside the project or the stack root or the inputs of one of the component's tasks select it, so only what the steps write is copied. A pattern with a wildcard is only copied, and copies whatever it matches, a file an earlier build left included. A component name that is no single path segment keeps no artifact. A pattern that matches nothing copies nothing. |
@@ -276,7 +277,7 @@ A task's key is the core's key (see the CLI's
 | Implementation digest | The extension runtime, which embeds the core and the profile: editing either changes every key of the stack. |
 | Task contract digest | The manifest's task. |
 | Task params hash | The resolved `options["@putnami/<stack>"]` of the project, so every override. |
-| Project metadata digest | The component name, the stack root and the expected toolchain version from the probe. |
+| Project metadata digest | The build's name of the component, its variant, the stack root and the expected toolchain version from the probe. |
 | File content hash | The files the task's selector answered: its input sets, the stack-root files, the toolchain files. |
 | Upstream hashes | The keys of the same task of the projects it depends on. |
 

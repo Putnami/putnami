@@ -98,7 +98,7 @@
   },
   "commands": {
     "lint": {
-      "description": "Lint the Gradle projects with check, without their tests, and the Maven modules with verify -DskipTests.",
+      "description": "Lint the Gradle projects with check, without their tests, and the Maven modules with verify, without compiling their tests.",
       "run": [
         {
           "id": "lint",
@@ -123,7 +123,7 @@
       ]
     },
     "build": {
-      "description": "Build the Gradle projects with assemble and the Maven modules with package -DskipTests.",
+      "description": "Build the Gradle projects with assemble and the Maven modules with package, without compiling their tests.",
       "run": [
         {
           "id": "build",
@@ -138,7 +138,7 @@
   },
   "tasks": {
     "lint-run": {
-      "description": "Run the lint steps of the component's variant on one Gradle project or Maven module in its directory, after the Java toolchain check: gradlew check without the tests, or mvn verify -DskipTests. Its inputs are the files the java:lint selector answers from the resolved profile, and the stack-root files of every variant.",
+      "description": "Run the lint steps of the component's variant on one Gradle project or Maven module in its directory, after the Java toolchain check: gradlew check without the tests, or mvn verify -Dmaven.test.skip=true. Its inputs are the files the java:lint selector answers from the resolved profile, and the stack-root files of every variant.",
       "kind": "command",
       "command": "{extensionRuntime}",
       "args": [
@@ -158,23 +158,33 @@
         "stackRoot": {
           "from": "workspace",
           "files": [
+            "**/pom.xml",
             ".editorconfig",
             ".java-version",
             ".mvn/extensions.xml",
             ".mvn/jvm.config",
             ".mvn/maven.config",
-            "build-logic/**",
+            "build-logic/*/build.gradle",
+            "build-logic/*/build.gradle.kts",
+            "build-logic/convention/src/**",
+            "build-logic/settings.gradle",
+            "build-logic/settings.gradle.kts",
             "build.gradle",
             "build.gradle.kts",
-            "buildSrc/**",
+            "buildSrc/build.gradle",
+            "buildSrc/build.gradle.kts",
+            "buildSrc/settings.gradle",
+            "buildSrc/settings.gradle.kts",
+            "buildSrc/src/**",
             "config/checkstyle/**",
             "config/detekt/**",
             "config/pmd/**",
             "config/spotbugs/**",
             "gradle.properties",
-            "gradle/libs.versions.toml",
+            "gradle/*.gradle",
+            "gradle/*.gradle.kts",
+            "gradle/*.versions.toml",
             "gradle/wrapper/gradle-wrapper.properties",
-            "pom.xml",
             "settings.gradle",
             "settings.gradle.kts"
           ]
@@ -228,19 +238,29 @@
         "stackRoot": {
           "from": "workspace",
           "files": [
+            "**/pom.xml",
             ".java-version",
             ".mvn/extensions.xml",
             ".mvn/jvm.config",
             ".mvn/maven.config",
-            "build-logic/**",
+            "build-logic/*/build.gradle",
+            "build-logic/*/build.gradle.kts",
+            "build-logic/convention/src/**",
+            "build-logic/settings.gradle",
+            "build-logic/settings.gradle.kts",
             "build.gradle",
             "build.gradle.kts",
-            "buildSrc/**",
+            "buildSrc/build.gradle",
+            "buildSrc/build.gradle.kts",
+            "buildSrc/settings.gradle",
+            "buildSrc/settings.gradle.kts",
+            "buildSrc/src/**",
             "gradle.lockfile",
             "gradle.properties",
-            "gradle/libs.versions.toml",
+            "gradle/*.gradle",
+            "gradle/*.gradle.kts",
+            "gradle/*.versions.toml",
             "gradle/wrapper/gradle-wrapper.properties",
-            "pom.xml",
             "settings-gradle.lockfile",
             "settings.gradle",
             "settings.gradle.kts"
@@ -275,7 +295,7 @@
       }
     },
     "build-run": {
-      "description": "Run the build steps of the component's variant on one Gradle project or Maven module in its directory, after the Java toolchain check: gradlew assemble, or mvn package -DskipTests.",
+      "description": "Run the build steps of the component's variant on one Gradle project or Maven module in its directory, after the Java toolchain check: gradlew assemble, or mvn package -Dmaven.test.skip=true.",
       "kind": "command",
       "command": "{extensionRuntime}",
       "args": [
@@ -295,19 +315,29 @@
         "stackRoot": {
           "from": "workspace",
           "files": [
+            "**/pom.xml",
             ".java-version",
             ".mvn/extensions.xml",
             ".mvn/jvm.config",
             ".mvn/maven.config",
-            "build-logic/**",
+            "build-logic/*/build.gradle",
+            "build-logic/*/build.gradle.kts",
+            "build-logic/convention/src/**",
+            "build-logic/settings.gradle",
+            "build-logic/settings.gradle.kts",
             "build.gradle",
             "build.gradle.kts",
-            "buildSrc/**",
+            "buildSrc/build.gradle",
+            "buildSrc/build.gradle.kts",
+            "buildSrc/settings.gradle",
+            "buildSrc/settings.gradle.kts",
+            "buildSrc/src/**",
             "gradle.lockfile",
             "gradle.properties",
-            "gradle/libs.versions.toml",
+            "gradle/*.gradle",
+            "gradle/*.gradle.kts",
+            "gradle/*.versions.toml",
             "gradle/wrapper/gradle-wrapper.properties",
-            "pom.xml",
             "settings-gradle.lockfile",
             "settings.gradle",
             "settings.gradle.kts"

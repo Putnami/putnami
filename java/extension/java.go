@@ -28,6 +28,7 @@ const ExtensionName = "@putnami/java"
 const (
 	VariantGradle          = "gradle"
 	VariantGradleJaCoCo    = "gradle-jacoco"
+	VariantGradlePlatform  = "gradle-platform"
 	VariantAndroid         = "android"
 	VariantAndroidCoverage = "android-coverage"
 	VariantMaven           = "maven"
@@ -124,8 +125,12 @@ var (
 	androidPlugin = regexp.MustCompile(`com\.android\.(?:application|library|test|dynamic-feature)|plugins\.android[.\-_]?(?:application|library|test|dynamic)|(?m)^\s*android\s*\{`)
 	// androidCoverage finds unit test coverage turned on in a build type.
 	androidCoverage = regexp.MustCompile(`(?:[Ee]nableUnitTestCoverage|testCoverageEnabled)\s*=?\s*true`)
-	// jacocoPlugin finds the jacoco plugin, applied or configured.
-	jacocoPlugin = regexp.MustCompile(`(?m)(?:^|[^A-Za-z0-9_$.])jacoco(?:[^A-Za-z0-9_$]|$)`)
+	// platformPlugin finds the plugins of a project that declares
+	// dependency constraints or a catalog, and has no test task.
+	platformPlugin = regexp.MustCompile(`(?m)(?:^|[^A-Za-z0-9_$./-])(?:java-platform|version-catalog)(?:[^A-Za-z0-9_$/.-]|$)`)
+	// jacocoPlugin finds the jacoco plugin, applied or configured; a path
+	// or a coordinate that holds the word, such as a URL, is no plugin.
+	jacocoPlugin = regexp.MustCompile(`(?m)(?:^|[^A-Za-z0-9_$./-])jacoco(?:[^A-Za-z0-9_$/.-]|$)`)
 )
 
 // gradleVariant reads the variant of a Gradle project from its build file.
@@ -135,6 +140,8 @@ func gradleVariant(build string) string {
 		return VariantAndroidCoverage
 	case androidPlugin.MatchString(build):
 		return VariantAndroid
+	case platformPlugin.MatchString(build):
+		return VariantGradlePlatform
 	case jacocoPlugin.MatchString(build):
 		return VariantGradleJaCoCo
 	default:
@@ -155,16 +162,56 @@ func buildFile(root, dir string) (string, string) {
 	return "", ""
 }
 
-var (
-	lineComment  = regexp.MustCompile(`(?m)//.*$`)
-	blockComment = regexp.MustCompile(`(?s)/\*.*?\*/`)
-)
-
-// stripComments removes the comments of a build script, so that a plugin
-// that is commented out picks no variant. A "//" inside a string, such as a
-// URL, cuts the rest of its line, which never names a plugin.
+// stripComments removes the // and /* */ comments of a build script, so
+// that a plugin that is commented out picks no variant. Strings, triple-quoted
+// ones included, are kept whole: a "//" or "/*" inside one is no comment.
 func stripComments(text string) string {
-	return lineComment.ReplaceAllString(blockComment.ReplaceAllString(text, ""), "")
+	var b strings.Builder
+	for i := 0; i < len(text); i++ {
+		switch c := text[i]; {
+		case c == '"' || c == '\'':
+			end := stringEnd(text, i)
+			b.WriteString(text[i : end+1])
+			i = end
+		case strings.HasPrefix(text[i:], "//"):
+			for i < len(text) && text[i] != '\n' {
+				i++
+			}
+			if i < len(text) {
+				b.WriteByte('\n')
+			}
+		case strings.HasPrefix(text[i:], "/*"):
+			end := strings.Index(text[i+2:], "*/")
+			if end < 0 {
+				return b.String()
+			}
+			i += end + 3
+		default:
+			b.WriteByte(c)
+		}
+	}
+	return b.String()
+}
+
+// stringEnd returns the index of the last byte of the string that opens at
+// i, a triple-quoted one included; the last index when it does not close.
+func stringEnd(text string, i int) int {
+	quote := text[i]
+	if triple := strings.Repeat(string(quote), 3); strings.HasPrefix(text[i:], triple) {
+		if end := strings.Index(text[i+3:], triple); end >= 0 {
+			return i + 3 + end + 2
+		}
+		return len(text) - 1
+	}
+	for j := i + 1; j < len(text); j++ {
+		switch text[j] {
+		case '\\':
+			j++
+		case quote, '\n':
+			return j
+		}
+	}
+	return len(text) - 1
 }
 
 func joinRel(dir, name string) string {
