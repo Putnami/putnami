@@ -173,7 +173,7 @@ lock costs little.
 A stack whose components run on different builds, such as Java on Gradle,
 Android and Maven, declares `variants` in its profile: named parts of the
 profile, with its shape and every member optional, merged into it like an
-override ([ADR 0002](adr/0002-profile-variants-for-a-stack-with-several-builds.md)).
+override ([ADR 0005](adr/0005-profile-variants-for-a-stack-with-several-builds.md)).
 The detector names each component's variant; the probe records it in the
 metadata, and the job and the selectors resolve the profile, then the
 variant, then the project's override. With variants, the profile may declare

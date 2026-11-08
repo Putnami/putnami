@@ -1,4 +1,4 @@
-# ADR 0002 — Profile variants for a stack with several builds
+# ADR 0005 — Profile variants for a stack with several builds
 
 - **Status**: accepted
 - **Date**: 2026-11-08
