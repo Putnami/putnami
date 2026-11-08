@@ -17,11 +17,11 @@
   "requirements": [
     {
       "id": "packages-become-projects",
-      "text": "The probe answers, for each candidate directory the observe Pants detector knows as a component: its directory as the source name (// for the repository root), the directories of the components it depends on in the export, the extension @putnami/pants, the tag pants, and metadata naming the component, the stack root (the workspace root) and the Pants version pants.toml states in GLOBAL.pants_version. A directory whose BUILD file declares only third-party targets is no project."
+      "text": "The probe answers, for each candidate directory the observe Pants detector knows as a component: its directory as the source name, the directories of the components it depends on in the export pants-graph.json when the workspace root holds one, the extension @putnami/pants, the tag pants, and metadata naming the component, the stack root (the workspace root) and the Pants version pants.toml states in GLOBAL.pants_version. A directory whose BUILD file declares only third-party targets, and the repository root, are no project."
     },
     {
       "id": "sync-writes-the-package-graph",
-      "text": "The extension's workspace sync task reads the export pants-graph.json at the workspace root, or runs pants peek :: when there is none, and writes in each component's putnami.json the extension @putnami/pants, its dependencies as the project IDs of the components the export says it depends on, and test in disable.jobs when none of its targets is a test target. It keeps every other member of an existing putnami.json, writes nothing when neither the export nor pants is available, and says so."
+      "text": "The extension's workspace sync task reads the export pants-graph.json at the workspace root, or runs pants peek :: when there is none, and writes in each component's putnami.json, the repository root's excepted, the extension @putnami/pants, its dependencies as the project IDs of the components the export says it depends on, and test in disable.jobs when none of its targets is a test target. It keeps every other member of an existing putnami.json, writes nothing when neither the export nor pants is available, and says so."
     },
     {
       "id": "tasks-delegate-to-pants",
