@@ -28,7 +28,10 @@ packages and Xcode projects. Three things still do not fit the core:
   and the attribution of a report reads the marker alone as a pattern, never
   the directory above it.
 - **Excluded directories.** A profile may name `excludes`: directory names that
-  an input pattern with `**` never walks into.
+  an input pattern with `**` never walks into. The basis of an input answer
+  leaves them out too, with `.git` and `.putnami`, so a build writing there
+  neither moves the digest nor races its read; a directory a pattern names
+  before its first wildcard stays in.
 - **Runtime commands.** A step may run `{runtime}`, the extension's own
   executable, with a command the extension registers in `Stack.Commands`. The
   entrypoint dispatches such a call before the jobs. The command is the
@@ -53,4 +56,6 @@ packages and Xcode projects. Three things still do not fit the core:
   tools (`llvm-cov`, `xcodebuild`, `xcrun`) are the project's own, or the
   toolchain the extension provides under ADR 0003 and ADR 0004.
 - The Rust, PHP and Java profiles name no nested marker, no exclude and no
-  runtime command: their probe answers and selector answers do not change.
+  runtime command: their probe answers and selector files do not change. The
+  basis of their `**` patterns now leaves `.git` and `.putnami` out, which
+  moves their selector keys once.
