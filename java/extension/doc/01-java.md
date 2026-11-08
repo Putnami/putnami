@@ -3,8 +3,11 @@
 `@putnami/java` turns each Gradle project, Android included, and each Maven
 module of a Java or Kotlin repository into a Putnami project, and runs its
 lint, test and build with the build the team already uses. It reads the
-repository the way `putnami observe` does, and it never installs a JDK, Gradle
-or Maven.
+repository the way `putnami observe` does. A machine with no JDK and no Maven
+runs it: the extension installs a pinned Eclipse Temurin JDK and Apache Maven
+when the machine has none. An application also serves, runs, and ships as an
+image. The samples in [`java/samples`](../../samples/README.md) show both
+builds.
 
 ## Adopt it
 
@@ -16,9 +19,9 @@ or Maven.
 
 2. Run `putnami projects sync`. Each Gradle project that `settings.gradle.kts`
    or `settings.gradle` includes with a string literal, the root project when
-   it has a `src/` directory, and each module the root `pom.xml` lists, with
-   any packaging but `pom`, joins the workspace's `includes`. No `putnami.json`
-   is needed.
+   it has a `src/` directory, and each module a `pom.xml` lists, with any
+   packaging but `pom`, joins the workspace's `includes`. No `putnami.json` is
+   needed.
 3. Run `putnami lint,test,build`.
 
 | Component | Project name | `{component}`, the build's reference |
@@ -32,6 +35,23 @@ Each project gets an edge to each component it depends on in the same build:
 sibling module's coordinates in a POM. A directory that is both a Gradle
 project and a Maven module runs as the Gradle project, with the warning
 `java.build_conflict`.
+
+A component is an `application` when its build file applies the Gradle
+`application` plugin, Spring Boot or an Android application plugin, or its
+POM declares `spring-boot-maven-plugin`; any other is a `library`, which
+`serve`, `run` and `package` leave out.
+
+### Builds in subdirectories
+
+A build need not sit at the workspace root. A Gradle build's root is the
+nearest directory that holds `settings.gradle.kts` or `settings.gradle`; a
+Maven build's root is the topmost directory of an unbroken chain of `pom.xml`
+files. That root is the stack root of the build's components: their steps run
+its `gradlew` or its `pom.xml`, and the tasks of one build run one at a time.
+When the root is no component itself, it is an input-only project its
+components depend on, so its settings, wrapper and root POM reach their keys.
+A Gradle build inside another one, such as `buildSrc` or an included build, is
+part of the build that holds it.
 
 ## The variant of each component
 
@@ -104,22 +124,36 @@ earlier run left is never read as this run's.
 
 ## The toolchain check
 
-Before its steps, each task compares the version `java -version` prints with
+Before its steps, each task compares the version `javac -version` prints with
 the one `.java-version` states, in the component's directory, then at the
-workspace root.
+stack root. It checks `javac`, so a JRE alone is no JDK.
 
 | Case | Result |
 |---|---|
 | The versions match | The task runs; `21` matches every 21 release, such as 21.0.4, and keys the major line |
-| They differ | The task fails with `stacks.toolchain_mismatch`; set `toolchain.check` to `warn` to run anyway |
-| `java` is not on `PATH` | The task fails with `stacks.toolchain_missing` |
+| `javac` is missing, or differs | The task installs the JDK `.java-version` accepts, below, and runs it |
+| No pinned JDK matches, such as `.java-version` 11 | The task fails with `stacks.toolchain_mismatch` or `stacks.toolchain_missing`; set `toolchain.check` to `warn` to run the machine's anyway |
 | No `.java-version` | The warning `stacks.toolchain_unpinned`: the cache key carries no Java version |
 
-The Gradle wrapper downloads the Gradle version
-`gradle/wrapper/gradle-wrapper.properties` names; that file is an input of
-every Gradle task, so a wrapper upgrade reruns them. A build that uses Gradle
-toolchains (`jvmToolchain(21)`) compiles with the JDK it names, whatever runs
-Gradle. Java 8's `1.8.0_392` form matches only an exact `.java-version`.
+### A machine with no JDK or no Maven
+
+The extension pins three Eclipse Temurin JDKs, 17.0.21, 21.0.13 and 25.0.5,
+for Linux and macOS on x64 and arm64 and Windows on x64, each by the SHA-256
+the Adoptium API publishes. When `javac` is missing or outside
+`.java-version`, the task installs the one `.java-version` accepts, 21 first,
+under `toolchains/java` of the Putnami home, and runs it first on `PATH` and
+as `JAVA_HOME`, which Gradle and Maven read. Every later task reuses it. The
+archive's links, license notices under `legal/`, are not installed.
+
+A Maven component with no `mvn` on `PATH` gets Apache Maven 3.9.11 the same
+way, under `toolchains/maven`. A Gradle build runs its wrapper, which
+downloads the Gradle version `gradle/wrapper/gradle-wrapper.properties` names;
+that file is an input of every Gradle task, so a wrapper upgrade reruns them.
+Offline, a task installs nothing.
+
+A build that uses Gradle toolchains (`jvmToolchain(21)`) compiles with the
+JDK it names, whatever runs Gradle. Java 8's `1.8.0_392` form matches only an
+exact `.java-version`.
 
 ## What reaches the cache key
 
@@ -133,7 +167,7 @@ version, and the key of the same task of each component it depends on.
 | `tests` | `src/test/**`, `src/testFixtures/**`; for Android also `src/testDebug/**` |
 | `gradle` | the build file and `gradle.properties` of the project; at the root the settings and build files, `gradle.properties`, the catalogs and script plugins under `gradle/`, each project's own `*.versions.toml` and `gradle/*.versions.toml`, the wrapper properties, the build files and `src/**` of `buildSrc`, and the build files and `src/**` of every project of `build-logic` |
 | `gradleLocks` | `gradle.lockfile`; at the root `settings-gradle.lockfile` and `gradle.lockfile` |
-| `maven` | `pom.xml`; every `pom.xml` of the build, parents included, and `.mvn/maven.config`, `.mvn/jvm.config`, `.mvn/extensions.xml` at the root |
+| `maven` | `pom.xml`; every `pom.xml` of the build up to four directories below its root, parents included, and `.mvn/maven.config`, `.mvn/jvm.config`, `.mvn/extensions.xml` at the root. The copy a jar build writes under `target/classes/META-INF/maven` lies deeper and reaches no key |
 | `lintConfig` | `lint.xml`, `detekt.yml`; at the root `.editorconfig` and `config/checkstyle/**`, `config/detekt/**`, `config/pmd/**`, `config/spotbugs/**` |
 
 `lint` reads `sources`, `tests`, the build set and `lintConfig`: Gradle's
@@ -143,6 +177,50 @@ detekt), and Maven's `-DskipTests` still compiles them and builds test-jars.
 reads `sources`, the build set and the lockfiles, and Maven's also `tests`.
 So a lockfile change reruns test and build, never lint. A change to any POM
 reruns every Maven task: a parent POM's settings reach every module.
+
+## Serve and run an application
+
+`putnami serve` and `putnami run` first build the application's runnable form
+with its own build, then start it in its directory on the task's JDK:
+
+| Application | Built with | Started as |
+|---|---|---|
+| Gradle `application` plugin | `gradlew {component}installDist` | `build/install/<name>/bin/<name>` |
+| Gradle with Spring Boot | `gradlew {component}bootJar` | `java -jar build/libs/<name>.jar` |
+| Maven with Spring Boot | `mvn --projects {component} --also-make package -DskipTests` | `java -jar target/<artifact>.jar` |
+
+`serve` sets `PORT` and `SERVER_PORT`, which Spring Boot reads, to its
+`--port` flag, 3000 by default, and reports the server ready once the port
+accepts connections, so `putnami qualify` requests the routes that
+`schema/http-routes.json` lists. It runs until the user stops it. `run` runs
+the application once with `--args` and answers its exit code.
+
+## Package and publish an image
+
+`putnami package --docker` assembles the image of an application with the OCI
+assembler of the extension SDK, with no Docker daemon: its runnable form under
+`/app`, on the Eclipse Temurin JRE of the task's Java major
+(`eclipse-temurin:<release>-jre`, pinned by digest for 17, 21 and 25), run as
+user 1000 with `PORT` and `SERVER_PORT` set to 8080.
+
+```bash
+putnami package --docker --docker-load --projects /java/samples/maven/application
+putnami publish --docker --projects /java/samples/maven/application
+```
+
+| Flag | Meaning |
+|---|---|
+| `--docker-base-image` | A base pinned by digest, `image@sha256:<digest>`, in place of the Temurin JRE |
+| `--docker-tag` | A tag beside the content tag `c-<hash>` |
+| `--docker-load` | Also load the image into the local Docker daemon |
+| `--platform` | The image platform, `linux/amd64` by default |
+
+An application turns the image on with `"options": { "package": { "docker":
+true } }` in its `putnami.json`, or with `"publish": ["docker"]`, which also
+declares the image as a member of the release set under the namespace of
+`registries.oci.publish`. `putnami publish --docker` pushes it through the
+publisher every stack shares. A library packages nothing: it reaches its Maven
+repository through its own build.
 
 ## Override the profile
 
@@ -203,8 +281,8 @@ declare. The design of the stack core is in
 
 ## Limits
 
-- The build root is the workspace root: a Gradle or Maven build in a
-  subdirectory, and a Gradle composite build (`includeBuild`), are not read.
+- A Gradle composite build (`includeBuild`) runs as the build that includes
+  it: its included builds are not projects.
 - A Gradle settings file that computes its includes keeps the projects it
   names with string literals, with the warning `observe.gradle_dynamic_settings`.
 - A plugin applied from a convention plugin or from the root build file, such
@@ -220,4 +298,10 @@ declare. The design of the stack core is in
 - A Maven module is named by its artifactId: two modules with the same
   artifactId in different groups need a `name` in their `putnami.json`.
 - The Maven wrapper `mvnw` is not used unless a project overrides its steps.
-- No publish: an artifact reaches its repository through Gradle or Maven.
+- An application built another way, such as a fat jar from the Shadow plugin or
+  a Maven module with no Spring Boot, is a library to `serve`, `run` and
+  `package`.
+- A Maven module is built with `--also-make` by `serve`, `run` and `package`,
+  so the modules it depends on are built again.
+- An image is built for one platform; the tests run the `linux/amd64` one.
+- A library is published by its own build, not by `putnami publish`.

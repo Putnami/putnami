@@ -413,7 +413,9 @@ func TestALockfileChangeKeepsTheLintKey(t *testing.T) {
 			t.Errorf("%s reads the root lockfile: %v", task, s.Profile.ShippedRootPatterns(task))
 		}
 	}
-	if !slices.Contains(s.Profile.ShippedRootPatterns(stacks.TaskTest), "**/pom.xml") {
+	if !slices.Contains(s.Profile.ShippedRootPatterns(stacks.TaskTest), "*/*/pom.xml") || slices.ContainsFunc(s.Profile.ShippedRootPatterns(stacks.TaskTest), func(p string) bool {
+		return stacks.MatchPattern(p, "app/target/classes/META-INF/maven/com.acme/app/pom.xml")
+	}) {
 		t.Error("every POM of the build, parents included, is a Maven input")
 	}
 	for _, p := range s.Profile.ShippedRootPatterns(stacks.TaskBuild) {

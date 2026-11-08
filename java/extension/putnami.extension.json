@@ -271,7 +271,10 @@
         "stackRoot": {
           "from": "workspace",
           "files": [
-            "**/pom.xml",
+            "*/*/*/*/pom.xml",
+            "*/*/*/pom.xml",
+            "*/*/pom.xml",
+            "*/pom.xml",
             ".editorconfig",
             ".java-version",
             ".mvn/extensions.xml",
@@ -298,6 +301,7 @@
             "gradle/*.gradle.kts",
             "gradle/*.versions.toml",
             "gradle/wrapper/gradle-wrapper.properties",
+            "pom.xml",
             "settings.gradle",
             "settings.gradle.kts"
           ]
@@ -351,7 +355,10 @@
         "stackRoot": {
           "from": "workspace",
           "files": [
-            "**/pom.xml",
+            "*/*/*/*/pom.xml",
+            "*/*/*/pom.xml",
+            "*/*/pom.xml",
+            "*/pom.xml",
             ".java-version",
             ".mvn/extensions.xml",
             ".mvn/jvm.config",
@@ -374,6 +381,7 @@
             "gradle/*.gradle.kts",
             "gradle/*.versions.toml",
             "gradle/wrapper/gradle-wrapper.properties",
+            "pom.xml",
             "settings-gradle.lockfile",
             "settings.gradle",
             "settings.gradle.kts"
@@ -428,7 +436,10 @@
         "stackRoot": {
           "from": "workspace",
           "files": [
-            "**/pom.xml",
+            "*/*/*/*/pom.xml",
+            "*/*/*/pom.xml",
+            "*/*/pom.xml",
+            "*/pom.xml",
             ".java-version",
             ".mvn/extensions.xml",
             ".mvn/jvm.config",
@@ -451,6 +462,7 @@
             "gradle/*.gradle.kts",
             "gradle/*.versions.toml",
             "gradle/wrapper/gradle-wrapper.properties",
+            "pom.xml",
             "settings-gradle.lockfile",
             "settings.gradle",
             "settings.gradle.kts"
@@ -555,7 +567,10 @@
         "stackRoot": {
           "from": "workspace",
           "files": [
-            "**/pom.xml",
+            "*/*/*/*/pom.xml",
+            "*/*/*/pom.xml",
+            "*/*/pom.xml",
+            "*/pom.xml",
             ".java-version",
             ".mvn/extensions.xml",
             ".mvn/jvm.config",
@@ -578,6 +593,7 @@
             "gradle/*.gradle.kts",
             "gradle/*.versions.toml",
             "gradle/wrapper/gradle-wrapper.properties",
+            "pom.xml",
             "settings-gradle.lockfile",
             "settings.gradle",
             "settings.gradle.kts"

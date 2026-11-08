@@ -71,7 +71,11 @@
     ],
     "maven": [
       "pom.xml",
-      "{root}/**/pom.xml",
+      "{root}/pom.xml",
+      "{root}/*/pom.xml",
+      "{root}/*/*/pom.xml",
+      "{root}/*/*/*/pom.xml",
+      "{root}/*/*/*/*/pom.xml",
       "{root}/.mvn/maven.config",
       "{root}/.mvn/jvm.config",
       "{root}/.mvn/extensions.xml"
