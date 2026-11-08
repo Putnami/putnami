@@ -258,7 +258,9 @@ An extension may pin its toolchain, as `@putnami/php` does
 profile's `toolchain.provisioned` names the environment variable that holds
 the pinned toolchain. When the toolchain on `PATH` is missing, or fails the
 check, the task puts the pinned one first on `PATH` and checks it. A toolchain
-on `PATH` that passes always runs.
+on `PATH` that passes always runs. `Stack.RootJob` gives an extension a job
+that runs at the stack root with the same toolchain and under the same lock,
+such as an install step.
 
 A file may state a range instead, in Composer's constraint syntax: the PHP
 profile reads `require.php` of `composer.json`, such as `>=8.4` or `^8.2`

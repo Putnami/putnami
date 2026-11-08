@@ -4,11 +4,12 @@ Two Composer components: `application` requires `library` through a path
 repository. Each has its own `vendor/`.
 
 These projects carry the `e2e` tag, so the default gate skips them. To run
-them, you need PHP 8.3 or later, Composer, and PCOV or Xdebug:
+them, you need neither PHP nor Composer: `putnami install` pins PHP, and the
+first task runs `composer install`. Coverage needs a PHP with PCOV or Xdebug on
+`PATH`; without one, `test` warns and writes no Clover report.
 
 ```bash
-(cd php/samples/library && composer install)
-(cd php/samples/application && composer install)
+putnami install
 putnami projects sync
 putnami lint,test,build --tag e2e --projects /php/samples/library,/php/samples/application
 ```
