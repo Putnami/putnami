@@ -26,8 +26,12 @@ decides what reruns:
   says which tool produced the result.
 - A task's `dir` may be `root`: its steps run in the stack root, where the
   tool resolves its addresses, instead of the project directory.
-- Impact selection is Putnami's own, on the project graph the stack extension
-  writes: a change runs its package and the packages that depend on it.
+- Each command of a delegated stack runs a `graph` step, then its task. The
+  `graph` step depends on the `graph` step of each project upstream and runs
+  nothing; the task depends on its own project's `graph` step alone. Impact
+  selection is Putnami's own, on the project graph the stack extension
+  writes: a change runs the tool on its package and the packages that depend
+  on it, and a package it depends on runs its `graph` step only.
 
 `@putnami/pants` is the first delegated stack. `putnami init --from pants`
 declares it and synchronizes the projects; its sync task writes each
@@ -39,6 +43,9 @@ package's `putnami.json` with the edges of the `pants peek ::` export.
   Putnami's key weaker than the tool's.
 - **Keep Putnami's cache on, with the tool's inputs.** The key cannot cover
   what the tool resolves at run time, so a hit could replay a stale result.
+- **Make each task depend on the same task upstream (`^test`).** A
+  dependency would run its tool on every change to a package that depends on
+  it, with no Putnami cache to absorb it.
 - **Run `pants test <dir>::`.** The recursive spec runs a nested package's
   targets in its parent's task too, so one change runs them twice and
   attributes them to the wrong project; `<dir>:` names one directory's
@@ -49,5 +56,8 @@ package's `putnami.json` with the edges of the `pants peek ::` export.
 - A delegated task always runs, and is as fast as the tool's own cache.
 - A package without a test target has its `test` disabled in its
   `putnami.json`: a test task that ran nothing is no pass.
+- A `BUILD` directory that holds no package, such as one of third-party
+  requirements, is a member with no extension: it runs no task, and a change
+  to it, a resolve lockfile included, runs no package.
 - The shipped Pants profile reads Python coverage; a repository without the
   Python backend overrides the test steps.
