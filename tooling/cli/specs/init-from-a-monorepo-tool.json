@@ -3,7 +3,8 @@
   "protocolVersion": 1,
   "feature": "cli/init-from-a-monorepo-tool",
   "outcomes": [
-    "A team turns a repository its monorepo tool already describes into a Putnami workspace with one command"
+    "A team turns a repository its monorepo tool already describes into a Putnami workspace with one command",
+    "After a change to one package of an adopted Pants repository, putnami test runs that package and its dependents through Pants, and Putnami's cache stores nothing"
   ],
   "nonGoals": [
     "Reading a monorepo tool's configuration in the CLI: the tool's stack extension owns it",
@@ -13,6 +14,10 @@
     {
       "id": "init-from-pants",
       "text": "putnami init --from pants, at the root of a repository that holds pants.toml, writes a workspace that declares @putnami/pants, installs it, and runs putnami projects sync, which writes each package's putnami.json through the extension's sync task. Without pants.toml it fails with a usage error that names the file, and an unknown --from value fails with a usage error that lists the supported tools. --from does not combine with --project or --extension."
+    },
+    {
+      "id": "pants-impact-runs-through-pants",
+      "text": "On the Pants fixture of the putnami observe detector, with @putnami/pants loaded and pants on PATH, putnami projects sync writes each package's edges, and putnami test --impacted after a change to one package runs pants test on that package and on each package that depends on it, at the workspace root, reads their reports, and writes no entry to the Putnami cache."
     }
   ],
   "decisions": [

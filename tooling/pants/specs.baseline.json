@@ -2,7 +2,6 @@
   "$schema": "https://putnami.dev/schemas/putnami-specs-baseline.json",
   "protocolVersion": 2,
   "executableRequirements": [
-    "tooling/pants-delegated-stack#impact-follows-the-package-graph",
     "tooling/pants-delegated-stack#manifest-follows-the-profile",
     "tooling/pants-delegated-stack#packages-become-projects",
     "tooling/pants-delegated-stack#reports-become-the-summary",

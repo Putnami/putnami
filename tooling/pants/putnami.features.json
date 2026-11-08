@@ -48,15 +48,6 @@
           }
         },
         {
-          "id": "impact-follows-the-package-graph",
-          "stage": "coded",
-          "evidenceKinds": ["attestation"],
-          "verification": {
-            "kind": "acceptance",
-            "checks": ["a-change-to-one-package-runs-it-and-its-dependents-through-pants-uncached"]
-          }
-        },
-        {
           "id": "manifest-follows-the-profile",
           "stage": "coded",
           "evidenceKinds": ["attestation"],

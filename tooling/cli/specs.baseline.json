@@ -134,6 +134,7 @@
     "cli/init-channel#templates-test-builds-the-rendered-project",
     "cli/init-channel#the-workspace-pins-no-channel",
     "cli/init-from-a-monorepo-tool#init-from-pants",
+    "cli/init-from-a-monorepo-tool#pants-impact-runs-through-pants",
     "cli/job-planning-execution#a-declared-provider-that-cannot-serve-says-so-once",
     "cli/job-planning-execution#a-flag-takes-its-ci-default-when-ci-is-set",
     "cli/job-planning-execution#a-group-default-takes-positionals",
