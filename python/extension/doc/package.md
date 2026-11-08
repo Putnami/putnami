@@ -53,10 +53,11 @@ onto a base image and runs nothing inside it.
 - **Ignored build outputs.** A file under a directory named `dist`, `out` or
   `vendor` ships only when Git lists it: tracked, or untracked and not ignored.
   The cache key reads such a directory only through Git, so an ignored file
-  there would change the image without changing its key.
-- **Process.** The image runs `python /app/<entrypoint>`, the entrypoint `serve`
-  runs, as the unprivileged user `65534`, with `PORT=8080`. The application reads
-  its port from `PORT`.
+  there would change the image without changing its key. Outside a Git work
+  tree, no file under such a directory ships.
+- **Process.** The image runs `python /app/<entrypoint>`, with the `entrypoint`
+  option of `package`, as the unprivileged user `65534`, with `PORT=8080`. The
+  application reads its port from `PORT`.
 
 A path dependency must be a dependency of the project in its `putnami.json`, so
 that the image's cache key covers its files. Packaging fails with
@@ -69,10 +70,10 @@ add.
 - `--docker-base-image <image@sha256:...>`: replace the official base. It must
   provide `python` of the same minor on its `PATH`, with a glibc that runs
   `manylinux_2_28` wheels.
-- `--entrypoint <path>`: the file the image runs. Defaults to the `entrypoint` of
-  the project's `options["@putnami/python:serve"]`, then of its
-  `options.serve`, then `src/main.py`. A serve entrypoint set only in the
-  workspace's options is not read: name it in the package options.
+- `--entrypoint <path>`: the file the image runs, `src/main.py` by default. Like
+  any option, it can be set in the workspace's or the project's options. Set it
+  once in `options["@putnami/python"]` to give `serve`, `run` and the image the
+  same file; the `python-server` template does.
 - `--platform <platform>`: `linux/amd64` (default) or `linux/arm64`. An `arm64`
   image can be packaged on an `amd64` machine, because only wheels are installed.
 - `--docker-tag <tag>`: add a tag to the content tag `c-<hash>`.

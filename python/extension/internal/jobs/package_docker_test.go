@@ -495,13 +495,14 @@ func TestTheImageRunsTheEntrypointServeRuns(t *testing.T) {
 	if got, err := imageEntrypoint(ctx, nil); err != nil || got != defaultEntrypoint {
 		t.Errorf("default: %s %v", got, err)
 	}
-	ctx.Project.Options = map[string]json.RawMessage{"serve": json.RawMessage(`{"entrypoint": "src/shop/server.py"}`)}
-	if got, err := imageEntrypoint(ctx, nil); err != nil || got != "src/shop/server.py" {
-		t.Errorf("serve: %s %v", got, err)
+	// The serve options are another command's: the image does not read them.
+	ctx.Project.Options = map[string]json.RawMessage{"@putnami/python:serve": json.RawMessage(`{"entrypoint": "src/shop/server.py"}`)}
+	if got, err := imageEntrypoint(ctx, nil); err != nil || got != defaultEntrypoint {
+		t.Errorf("serve options: %s %v", got, err)
 	}
-	ctx.Project.Options[serveOptionsKey] = json.RawMessage(`{"entrypoint": "src/shop/__init__.py"}`)
-	if got, err := imageEntrypoint(ctx, nil); err != nil || got != "src/shop/__init__.py" {
-		t.Errorf("the extension's serve block: %s %v", got, err)
+	ctx.Params = pctx.Params{"entrypoint": json.RawMessage(`"src/shop/server.py"`)}
+	if got, err := imageEntrypoint(ctx, nil); err != nil || got != "src/shop/server.py" {
+		t.Errorf("package option: %s %v", got, err)
 	}
 	if got, err := imageEntrypoint(ctx, map[string]string{"entrypoint": "./src/main.py"}); err != nil || got != "src/main.py" {
 		t.Errorf("flag: %s %v", got, err)

@@ -191,7 +191,7 @@
         },
         "entrypoint": {
           "type": "string",
-          "description": "Entry point the image runs (defaults to the serve entrypoint, then src/main.py)"
+          "description": "Entry point the image runs (defaults to src/main.py); set it in options[\"@putnami/python\"] to share it with serve and run"
         },
         "platform": {
           "type": "string",
@@ -497,7 +497,7 @@
       }
     },
     "package-docker": {
-      "description": "Assemble a local OCI image of an application on a digest-pinned Python slim base: a layer of the production dependencies of uv.lock, installed as wheels for the image's platform with the project and its path dependencies built from a staged copy, and a layer of its files. The project and its path dependencies are keyed with everything a staged build reads, except generated directories and secret files; the closure input requires every path dependency to be a declared dependency, which the job enforces. Sole owner of <command-output>/docker.",
+      "description": "Assemble a local OCI image of an application on a digest-pinned Python slim base: a layer of the production dependencies of uv.lock, installed as wheels for the image's platform and the Python release of its base, with the local packages uv export lists built from a staged copy, and a layer of its files. The image and the staged build read the same files of the project and its path dependencies, and only files these inputs key: no generated directory, test or secret file, and a file under a dist, out or vendor directory only when Git lists it. The closure input requires every path dependency to be a declared dependency, which the job enforces. Sole owner of <command-output>/docker.",
       "kind": "command",
       "command": "{extensionRuntime}",
       "args": ["package-docker"],

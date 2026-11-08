@@ -50,9 +50,9 @@ const (
 	imageUser        = "65534:65534"
 	defaultImagePort = "8080"
 	defaultPlatform  = "linux/amd64"
-	// defaultEntrypoint is the entrypoint serve runs when none is configured.
+	// defaultEntrypoint is the entrypoint an image runs when none is
+	// configured, as serve and run do.
 	defaultEntrypoint = "src/main.py"
-	serveOptionsKey   = "@putnami/python:serve"
 )
 
 // slimBases are the official Python slim images, pinned by digest, by Python
@@ -226,23 +226,10 @@ func ImageName(project string) string {
 }
 
 // imageEntrypoint answers the project-relative entrypoint the image runs: the
-// entrypoint flag of package, else the entrypoint serve runs, else
-// src/main.py. It must be a file of the project.
+// entrypoint option of package, which the workspace and the project set like
+// any option, else src/main.py. It must be a file of the project.
 func imageEntrypoint(ctx *pctx.Context, flags map[string]string) (string, error) {
 	entrypoint := cli.FlagString(flags, "entrypoint", ctx.Params.String("entrypoint"))
-	// The project's serve options, the extension's block first: the block
-	// that names the extension is the more specific one.
-	for _, key := range []string{serveOptionsKey, "serve"} {
-		if entrypoint != "" {
-			break
-		}
-		var serve struct {
-			Entrypoint string `json:"entrypoint"`
-		}
-		if raw, ok := ctx.Project.Options[key]; ok && json.Unmarshal(raw, &serve) == nil {
-			entrypoint = serve.Entrypoint
-		}
-	}
 	if entrypoint == "" {
 		entrypoint = defaultEntrypoint
 	}
