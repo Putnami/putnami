@@ -72,6 +72,20 @@ func TestProbeAnswersEachComponent(t *testing.T) {
 	}
 }
 
+func TestAnUnnamedComponentIsNamedByItsDirectory(t *testing.T) {
+	s := Stack{Extension: "@putnami/php", Profile: mustProfile(t), Detect: func(string, wsproto.ProbeRequest) ([]Component, []diag.Diagnostic) {
+		return []Component{{Path: ".", SourceFile: "composer.json", Root: "."}}, nil
+	}}
+	result, err := s.Probe(t.TempDir(), wsproto.ProbeRequest{Version: wsproto.ProbeProtocolVersion, Extension: s.Extension, Paths: []string{"."}})
+	if err != nil || len(result.Projects) != 1 {
+		t.Fatalf("projects = %+v, %v", result.Projects, err)
+	}
+	var meta Metadata
+	if p := result.Projects[0]; p.SourceName != "" || json.Unmarshal(p.Metadata, &meta) != nil || meta.Component != "." {
+		t.Errorf("project = %+v, metadata %+v", p, meta)
+	}
+}
+
 func resolveOne(t *testing.T, s Stack, root, project, selector string) wsproto.InputResolveAnswer {
 	t.Helper()
 	result := s.ResolveInputs(root, wsproto.InputResolveRequest{
@@ -254,6 +268,34 @@ func TestRunFailsOnAFailedTestAMismatchAndAMissingReport(t *testing.T) {
 	}
 	if status, _, rec := runTask(t, s0(t), root, TaskBuild); status != statusOK {
 		t.Errorf("a task the profile does not declare passes: %s %v", status, rec.diags)
+	}
+}
+
+// A test runner that exits non-zero on a failed case still has its report
+// read: the failed case names the failure, and a run that wrote no report is
+// a failed step, not a missing report.
+func TestRunReadsTheReportsOfAFailedTestRun(t *testing.T) {
+	root := t.TempDir()
+	writeFile(t, root, "rust-toolchain.toml", "[toolchain]\nchannel = \"1.82.0\"\n")
+	writeFile(t, root, "crates/api/Cargo.toml", "")
+	t.Setenv("STUB_ROOT", root)
+	t.Setenv("STUB_LOG", filepath.Join(root, "log"))
+	stubTools(t, "1.82.0", junitPass)
+	t.Setenv("JUNIT_FAIL", junitFail)
+	writeFile(t, root, "crates/api/putnami.json", `{"options": {"@putnami/rust": {"tasks": {"test": {
+	  "steps": [["sh", "-c", "printf '%s' \"$JUNIT_FAIL\" > \"$0\"; exit 1", "{output}/junit.xml"], ["true"]],
+	  "reports": {"junit": ["{output}/junit.xml"], "coverage": []}
+	}}}}}`)
+	status, data, rec := runTask(t, s0(t), root, TaskTest)
+	if status != statusFailed || !strings.Contains(rec.codes(), "error:"+CodeTestFailed) || data["testSummary"].(map[string]any)["failed"] != 1 {
+		t.Errorf("the failed case is read: %s %v %v", status, rec.diags, data)
+	}
+
+	writeFile(t, root, "crates/api/putnami.json", `{"options": {"@putnami/rust": {"tasks": {"test": {
+	  "steps": [["false"]], "reports": {"junit": ["{output}/none.xml"], "coverage": []}
+	}}}}}`)
+	if status, _, rec := runTask(t, s0(t), root, TaskTest); status != statusFailed || rec.codes() != "error:"+CodeStepFailed {
+		t.Errorf("a run that wrote no report is a failed step: %s %v", status, rec.diags)
 	}
 }
 

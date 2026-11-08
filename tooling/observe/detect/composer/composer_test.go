@@ -387,3 +387,31 @@ func TestCandidatesOfAMissingDirectory(t *testing.T) {
 		t.Fatalf("projects %+v", result.Projects)
 	}
 }
+
+func TestPathRepositoryDirsNamesTheProvidedPackages(t *testing.T) {
+	if got, err := PathRepositoryDirs(demo, "."); err != nil || !reflect.DeepEqual(got, []string{"packages/pricing"}) {
+		t.Fatalf("the demo's root provides %v, %v", got, err)
+	}
+	if got, err := PathRepositoryDirs(demo, "packages/pricing"); err != nil || got != nil {
+		t.Fatalf("pricing provides %v, %v", got, err)
+	}
+	root := writeTree(t, map[string]string{
+		"composer.json":              `{"repositories": {"billing": {"type": "path", "url": "./libs/billing/"}, "abs": {"type": "path", "url": "/opt/x"}}}`,
+		"libs/billing/composer.json": `{"name": "acme/billing", "repositories": [{"type": "path", "url": "../*"}]}`,
+		"libs/money/composer.json":   `{"name": "acme/money"}`,
+		"libs/empty/README.md":       "no manifest",
+		"bad/composer.json":          `{`,
+	})
+	if got, _ := PathRepositoryDirs(root, "."); !reflect.DeepEqual(got, []string{"libs/billing"}) {
+		t.Errorf("the root provides %v", got)
+	}
+	if got, _ := PathRepositoryDirs(root, "libs/billing"); !reflect.DeepEqual(got, []string{"libs/billing", "libs/money"}) {
+		t.Errorf("billing provides %v", got)
+	}
+	if got, err := PathRepositoryDirs(root, "docs"); err != nil || got != nil {
+		t.Errorf("a directory with no manifest provides %v, %v", got, err)
+	}
+	if _, err := PathRepositoryDirs(root, "bad"); err == nil {
+		t.Error("a manifest that does not parse is an error")
+	}
+}

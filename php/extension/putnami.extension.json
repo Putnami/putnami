@@ -1,0 +1,225 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-extension.json",
+  "name": "@putnami/php",
+  "cliContract": 14,
+  "extensionDependencies": {
+    "@putnami/dev": ""
+  },
+  "runtime": {
+    "executable": "compiled/putnami-php",
+    "toolchains": {
+      "runtimeCompiler": {
+        "lock": "go",
+        "candidates": [
+          {
+            "from": "environment",
+            "environment": "GOROOT",
+            "path": "bin/go"
+          },
+          {
+            "from": "path",
+            "path": "go"
+          },
+          {
+            "from": "putnami-home",
+            "path": "toolchains/go/go-{version}/go/bin/go"
+          }
+        ],
+        "probe": {
+          "args": [
+            "env",
+            "GOVERSION"
+          ],
+          "expect": "go{version}",
+          "unset": [
+            "GOROOT"
+          ],
+          "environment": {
+            "GOTOOLCHAIN": "local"
+          }
+        },
+        "environment": {
+          "GOROOT": {
+            "from": "ancestor",
+            "levels": 2
+          },
+          "GOTOOLCHAIN": {
+            "from": "literal",
+            "value": "local"
+          }
+        },
+        "prependPath": true
+      }
+    },
+    "prepare": {
+      "command": "{extensionRoot}/bin/prepare",
+      "args": [
+        "--output",
+        "{runtimeOutput}"
+      ],
+      "inputs": [
+        "bin/prepare",
+        "cmd/**",
+        "go.mod",
+        "go.sum",
+        "*.go",
+        "profile.json"
+      ],
+      "toolchains": [
+        "runtimeCompiler"
+      ]
+    },
+    "inputSelectors": [
+      "php:lint",
+      "php:test"
+    ]
+  },
+  "workspace": {
+    "markers": [
+      "composer.json"
+    ],
+    "inputs": [
+      "composer.json",
+      ".php-version"
+    ],
+    "excludes": [
+      "vendor"
+    ],
+    "language": "php"
+  },
+  "commands": {
+    "lint": {
+      "description": "Lint the Composer components with PHPStan.",
+      "run": [
+        {
+          "id": "lint",
+          "task": "lint-run",
+          "dependsOn": [
+            "^lint"
+          ]
+        }
+      ]
+    },
+    "test": {
+      "description": "Test the Composer components with PHPUnit, and read their JUnit and Clover reports.",
+      "run": [
+        {
+          "id": "test",
+          "heavy": true,
+          "task": "test-run",
+          "dependsOn": [
+            "^test"
+          ]
+        }
+      ]
+    }
+  },
+  "tasks": {
+    "lint-run": {
+      "description": "Run the PHP profile's lint step, the stack root's vendor/bin/phpstan analyse on src, on one component in its directory, after the PHP version check. Its inputs are the files the php:lint selector answers from the resolved profile, and the stack-root files of the profile.",
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": [
+        "lint",
+        "--report-dir",
+        "{outputRoot}"
+      ],
+      "cwd": "{projectRoot}",
+      "timeoutMs": 1800000,
+      "inputs": {
+        "sources": {
+          "from": "project",
+          "files": [
+            "php:lint"
+          ]
+        },
+        "stackRoot": {
+          "from": "workspace",
+          "files": [
+            ".php-version",
+            "composer.json",
+            "composer.lock"
+          ]
+        },
+        "extensionVersion": {
+          "from": "runtime"
+        }
+      },
+      "outputs": {
+        "data": {
+          "description": "The task result: the test and coverage totals of a test task."
+        }
+      },
+      "cache": {
+        "enabled": true
+      },
+      "declares": {
+        "outputs": {
+          "reports": {
+            "kind": "directory",
+            "root": "command-output",
+            "path": "lint",
+            "optionalEmpty": true,
+            "description": "The reports the task wrote: the JUnit and Clover reports of a test task."
+          }
+        },
+        "effects": [
+          "toolchain-cache"
+        ]
+      }
+    },
+    "test-run": {
+      "description": "Run the PHP profile's test step, the stack root's vendor/bin/phpunit on tests with JUnit and Clover reports, on one component in its directory, after the PHP version check; then read the reports, even when PHPUnit exits non-zero. A failed case, a step that exits non-zero, or a missing report fails the task.",
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": [
+        "test",
+        "--report-dir",
+        "{outputRoot}"
+      ],
+      "cwd": "{projectRoot}",
+      "timeoutMs": 1800000,
+      "inputs": {
+        "sources": {
+          "from": "project",
+          "files": [
+            "php:test"
+          ]
+        },
+        "stackRoot": {
+          "from": "workspace",
+          "files": [
+            ".php-version",
+            "composer.json",
+            "composer.lock"
+          ]
+        },
+        "extensionVersion": {
+          "from": "runtime"
+        }
+      },
+      "outputs": {
+        "data": {
+          "description": "The task result: the test and coverage totals of a test task."
+        }
+      },
+      "cache": {
+        "enabled": true
+      },
+      "declares": {
+        "outputs": {
+          "reports": {
+            "kind": "directory",
+            "root": "command-output",
+            "path": "test",
+            "optionalEmpty": true,
+            "description": "The reports the task wrote: the JUnit and Clover reports of a test task."
+          }
+        },
+        "effects": [
+          "toolchain-cache"
+        ]
+      }
+    }
+  }
+}

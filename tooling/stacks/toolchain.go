@@ -35,11 +35,13 @@ type Expected struct {
 // projectDir, of the stack root stackRoot, both workspace-relative, in the
 // workspace at root. toolchain.version outranks the files; the files are read
 // in the project directory first, then at the stack root, in the order the
-// profile lists them.
+// profile lists them. A range does not end the search: an exact version a
+// later file states wins over it (ADR 0002).
 func (t Toolchain) ExpectedVersion(root, projectDir, stackRoot string) (Expected, error) {
 	if t.Version != "" {
 		return Expected{Version: t.Version, Source: "profile"}, nil
 	}
+	var firstRange Expected
 	for _, dir := range versionDirs(projectDir, stackRoot) {
 		for _, f := range t.Files {
 			rel := path.Join(dir, f.Path)
@@ -54,12 +56,19 @@ func (t Toolchain) ExpectedVersion(root, projectDir, stackRoot string) (Expected
 			if err != nil {
 				return Expected{}, fmt.Errorf("%s: %w", rel, err)
 			}
-			if version != "" {
-				return Expected{Version: version, Source: rel}, nil
+			if version == "" {
+				continue
 			}
+			if _, isRange := parseRange(version); isRange && !IsExact(version) {
+				if firstRange.Version == "" {
+					firstRange = Expected{Version: version, Source: rel}
+				}
+				continue
+			}
+			return Expected{Version: version, Source: rel}, nil
 		}
 	}
-	return Expected{}, nil
+	return firstRange, nil
 }
 
 // readVersion reads a version from a file's content: the string at a dotted
@@ -182,7 +191,17 @@ func (t Toolchain) Compare(expected Expected, machine string) Verdict {
 		return Verdict{Code: CodeToolchainUnpinned, Message: fmt.Sprintf("no toolchain file states the expected version (machine: %s): the cache key carries no toolchain version", machine)}
 	}
 	if !IsExact(expected.Version) {
-		return Verdict{Code: CodeToolchainUnpinned, Message: fmt.Sprintf("%s states %q, which names no exact version (machine: %s): the cache key carries no toolchain version", expected.Source, expected.Version, machine)}
+		// A stated range, such as composer.json's require.php ">=8.4", is
+		// checked: the machine's release must satisfy it (ADR 0002).
+		r, ok := parseRange(expected.Version)
+		if !ok {
+			return Verdict{Code: CodeToolchainUnpinned, Message: fmt.Sprintf("%s states %q, which names no exact version and no range (machine: %s): the cache key carries no toolchain version", expected.Source, expected.Version, machine)}
+		}
+		if r.satisfiedBy(machine) {
+			return Verdict{}
+		}
+		msg := fmt.Sprintf("%s expects a version in %s, the machine has %s; install or select one, or set toolchain.check to warn", expected.Source, expected.Version, machine)
+		return Verdict{Code: CodeToolchainMismatch, Fail: t.Check != CheckWarn, Message: msg}
 	}
 	if versionMatches(expected.Version, machine) {
 		return Verdict{}
