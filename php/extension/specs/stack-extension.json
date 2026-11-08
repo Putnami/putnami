@@ -22,7 +22,7 @@
     },
     {
       "id": "tasks-run-the-profile",
-      "text": "Each task first compares the version php --version prints with the version .php-version states, or else the range require.php of composer.json states, in the component then at its stack root. A version outside that version or range fails with stacks.toolchain_mismatch unless toolchain.check is warn; a missing php fails with stacks.toolchain_missing. lint then runs the stack root's vendor/bin/phpstan analyse on src, and test runs the stack root's vendor/bin/phpunit on tests, with coverage limited to src and the JUnit and Clover reports written to the task output, each in the component's directory with no shell, one task at a time per stack root. A step that exits non-zero fails with stacks.step_failed. The profile declares no build task and the extension no build command."
+      "text": "Each task first compares php --version with the version .php-version states, or else the range require.php of composer.json states, in the component then at its stack root: a version outside it fails with stacks.toolchain_mismatch unless toolchain.check is warn. lint then runs the stack root's vendor/bin/phpstan analyse on src, and test its vendor/bin/phpunit on tests with coverage limited to src, in the component's directory with no shell, one task at a time per stack root. There is no build task."
     },
     {
       "id": "reports-become-the-summary",
