@@ -1,9 +1,13 @@
 package php
 
 import (
+	"context"
 	"encoding/json"
+	"io"
+	"net"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -53,7 +57,7 @@ func TestServeRunsThePhpBuiltInServerOnAnApplication(t *testing.T) {
 		t.Fatalf("serve: %s %v", status, err)
 	}
 	lines := readLines(t, log)
-	if len(lines) != 2 || !strings.HasSuffix(lines[0], "-S 0.0.0.0:3000 -t public") || !strings.HasSuffix(lines[1], "-S 0.0.0.0:8081 -t public") {
+	if len(lines) != 2 || !strings.Contains(lines[0], "-S 0.0.0.0:3000 -t public ") || !strings.Contains(lines[1], "-S 0.0.0.0:8081 -t public ") || !strings.HasSuffix(lines[0], "router.php") {
 		t.Errorf("php ran with %q", lines)
 	}
 }
@@ -148,4 +152,40 @@ func runPublish(t *testing.T, root string) (string, map[string]any, error) {
 	defer func() { os.Stdout = stdout }()
 	ctx := &pctx.Context{WorkspaceRoot: root, Project: pctx.Project{Name: "shop", Path: "shop", FullPath: filepath.Join(root, "shop")}}
 	return PublishDockerJob()(ctx, jsonl.New(), []string{"--docker-registry", "registry.test/acme", "--dry-run"})
+}
+
+func TestServeAnnouncesAServerThatAcceptsConnections(t *testing.T) {
+	port, err := freePort()
+	if err != nil || port == 0 {
+		t.Fatalf("freePort: %d %v", port, err)
+	}
+	listener, err := net.Listen("tcp", net.JoinHostPort("127.0.0.1", strconv.Itoa(port)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer listener.Close()
+	read, write, err := os.Pipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	stdout := os.Stdout
+	os.Stdout = write
+	defer func() { os.Stdout = stdout }()
+	announceReady(context.Background(), jsonl.New(), port)
+	write.Close()
+	output, err := io.ReadAll(read)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(output), `"port":`+strconv.Itoa(port)) || !strings.Contains(string(output), "ready") {
+		t.Errorf("output = %s", output)
+	}
+}
+
+func TestTheRouterSendsAPathWithADotToTheFrontController(t *testing.T) {
+	for _, want := range []string{"is_file($root . $path)", "return false;", "require $root . '/index.php';"} {
+		if !strings.Contains(routerScript, want) {
+			t.Errorf("the router has no %q", want)
+		}
+	}
 }

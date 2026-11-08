@@ -82,13 +82,16 @@ func prepareWindowsPHP(root stacks.RootStep, emit *jsonl.Emitter) error {
 
 // composerEnv returns env with Composer's package cache in the directory this
 // extension owns on the machine, which workspace-fetch fills and every install
-// reads.
+// reads, and with the network off when the dependencies are offline.
 func composerEnv(env []string) []string {
-	cache := os.Getenv(extensionproto.MachineCacheRootEnv)
-	if cache == "" {
-		return env
+	out := slices.Clip(env)
+	if cache := os.Getenv(extensionproto.MachineCacheRootEnv); cache != "" {
+		out = append(out, "COMPOSER_CACHE_DIR="+filepath.Join(cache, "composer"))
 	}
-	return append(slices.Clip(env), "COMPOSER_CACHE_DIR="+filepath.Join(cache, "composer"))
+	if offlineDependencies() {
+		out = append(out, "COMPOSER_DISABLE_NETWORK=1")
+	}
+	return out
 }
 
 // composerInstall runs composer install at the stack root with env, unless the
@@ -185,7 +188,8 @@ func enableWindowsExtensions(program string) error {
 }
 
 // provideComposer returns the path of the pinned composer.phar under the
-// Putnami home, downloading it when its digest does not match.
+// Putnami home, downloading it when its digest does not match. Offline, a
+// missing Composer is an error.
 func provideComposer(ctx context.Context) (string, error) {
 	home := putnamihome.Resolve(os.Getenv)
 	if home == "" {
@@ -194,6 +198,9 @@ func provideComposer(ctx context.Context) (string, error) {
 	path := filepath.Join(home, "tools", "php", "composer-"+composerVersion, "composer.phar")
 	if digest, err := fileSHA256(path); err == nil && digest == composerSHA256 {
 		return path, nil
+	}
+	if offlineDependencies() {
+		return "", fmt.Errorf("offline dependencies: Composer %s is not at %s, and this run cannot download it", composerVersion, path)
 	}
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return "", err

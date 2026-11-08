@@ -96,12 +96,13 @@ There is no build task: PHP has no compile step.
 
 ## Run an application
 
-A project is an application unless its `composer.json` says `"type": "library"`.
-`serve` and `run` skip a library.
+A project is an application when its `composer.json` says `"type": "project"`.
+Any other type, or no type, is a library, as in Composer. `serve`, `run` and
+`package` skip a library.
 
 | Command | What it runs |
 |---|---|
-| `putnami serve <project>` | `php -S 0.0.0.0:<port> -t public` in the project directory. `--port` defaults to 3000. The server answers a path that is no file with `public/index.php`, and fails when that file is missing. PHP reads its files on each request, so there is no watcher. |
+| `putnami serve <project>` | `php -S 0.0.0.0:<port> -t public <router>` in the project directory. `--port` defaults to 3000, and 0 selects a free port. The router answers a path that is no file with `public/index.php`, and the command fails when that file is missing. It reports the server ready once it accepts connections, so `putnami qualify` and compose can wait on it. PHP reads its files on each request, so there is no watcher. |
 | `putnami run <project> --args "<arguments>"` | `php <entrypoint> <arguments>` in the project directory, and exits with its exit code. `--entrypoint` defaults to `bin/console`. |
 
 `putnami upgrade` runs `composer update` at each stack root with the pinned
@@ -124,7 +125,7 @@ through the shared publisher of the Go and TypeScript extensions.
 | Layer | Content |
 |---|---|
 | Dependencies | `composer install --no-dev --no-scripts --optimize-autoloader`, with path repositories copied in |
-| Files | The stack root, without `vendor`, `var`, `tests`, generated files and the `.env.local` and `.env.*.local` files |
+| Files | The stack root, without `vendor`, `var`, `tests`, generated files and the files that hold secrets: `auth.json`, `.env.local`, `.env.*.local`, `.env.local.php` and `*.decrypt.private.php`. Composer still reads `auth.json` while it installs. |
 | Apache | The port and a site whose document root is `public/`, which falls back to `public/index.php` |
 
 The image listens on `PORT`, 8080 by default, and runs as `www-data`. The

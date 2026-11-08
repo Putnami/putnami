@@ -12,6 +12,7 @@ import (
 
 	diag "go.putnami.dev/protocol/diagnostic"
 	wsproto "go.putnami.dev/protocol/workspace"
+	"go.putnami.dev/sdk/extension/releaseset"
 )
 
 // Component is one component a stack's detector finds.
@@ -30,6 +31,13 @@ type Component struct {
 	// Dependencies are the workspace-relative directories of the components
 	// this one depends on.
 	Dependencies []string
+	// Type is the detector's classification, "library" or "application". The
+	// planner gives a library no runnable command. Empty leaves it to the
+	// project's own configuration.
+	Type string
+	// ReleaseMembers are the artifacts this component contributes to a release
+	// set.
+	ReleaseMembers []releaseset.MemberDeclaration
 }
 
 // Detector finds the components among a probe request's candidate paths, in
@@ -55,6 +63,9 @@ type Metadata struct {
 	Root string `json:"root"`
 	// Toolchain is the expected toolchain version the files state.
 	Toolchain Expected `json:"toolchain"`
+	// ReleaseSet declares the artifacts the project contributes to a release
+	// set. It is absent on a project that publishes none.
+	ReleaseSet *releaseset.ProjectMetadata `json:"releaseSet,omitempty"`
 }
 
 // Stack-root diagnostics.
@@ -88,7 +99,11 @@ func (s Stack) Probe(root string, request wsproto.ProbeRequest) (wsproto.ProbeRe
 		if component == "" {
 			component = c.Path
 		}
-		meta, err := json.Marshal(Metadata{Component: component, Root: c.Root, Toolchain: expected})
+		metadata := Metadata{Component: component, Root: c.Root, Toolchain: expected}
+		if len(c.ReleaseMembers) > 0 {
+			metadata.ReleaseSet = &releaseset.ProjectMetadata{Ecosystems: slices.Clone(c.ReleaseMembers)}
+		}
+		meta, err := json.Marshal(metadata)
 		if err != nil {
 			return wsproto.ProbeResult{}, err
 		}
@@ -109,6 +124,7 @@ func (s Stack) Probe(root string, request wsproto.ProbeRequest) (wsproto.ProbeRe
 			Path:         c.Path,
 			SourceName:   c.Name,
 			SourceFile:   c.SourceFile,
+			Type:         c.Type,
 			Dependencies: slices.Clone(c.Dependencies),
 			Extensions:   []string{s.Extension},
 			Tags:         []string{s.Profile.ID},

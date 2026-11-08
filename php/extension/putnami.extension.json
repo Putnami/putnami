@@ -248,6 +248,11 @@
         "injectPublishChannels": true
       },
       "flags": {
+        "docker": {
+          "type": "boolean",
+          "default": false,
+          "description": "Assemble the image"
+        },
         "docker-tag": {
           "type": "string",
           "description": "Override the image tag"
@@ -561,6 +566,45 @@
       "args": [
         "package-docker"
       ],
+      "inputs": {
+        "application": {
+          "from": "project",
+          "files": [
+            "**/*",
+            ".*",
+            "public/.*",
+            "!vendor/**",
+            "!var/**",
+            "!tests/**",
+            "!node_modules/**",
+            "!auth.json",
+            "!.env.local",
+            "!.env.*.local",
+            "!.env.local.php",
+            "!**/*.decrypt.private.php"
+          ]
+        },
+        "pathRepositories": {
+          "from": "closure",
+          "files": [
+            "**/*",
+            ".*",
+            "public/.*",
+            "!vendor/**",
+            "!var/**",
+            "!tests/**",
+            "!node_modules/**",
+            "!auth.json",
+            "!.env.local",
+            "!.env.*.local",
+            "!.env.local.php",
+            "!**/*.decrypt.private.php"
+          ]
+        },
+        "extensionVersion": {
+          "from": "runtime"
+        }
+      },
       "cwd": "{projectRoot}",
       "timeoutMs": 1800000,
       "cache": {
@@ -611,5 +655,8 @@
         ]
       }
     }
-  }
+  },
+  "uses": [
+    "oci"
+  ]
 }

@@ -1,6 +1,7 @@
 package php
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"strings"
@@ -137,6 +138,9 @@ func TestWorkspaceInstallInstallsEachStackRootTheWorkspaceIncludes(t *testing.T)
 func TestAnOfflineWorkspaceInstallDisablesTheNetwork(t *testing.T) {
 	log, _ := prepareComposer(t)
 	root := fixture(t)
+	if _, err := provideComposer(context.Background()); err != nil {
+		t.Fatal(err)
+	}
 	t.Setenv(extensionproto.OfflineDependenciesEnv, "1")
 	if status, err := runWorkspaceJob(t, root, WorkspaceInstallJob(stack(t)), phpProject(root, ".", `{}`)); status != "OK" || err != nil {
 		t.Fatalf("install: %s %v", status, err)

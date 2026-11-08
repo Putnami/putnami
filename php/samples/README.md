@@ -14,5 +14,8 @@ putnami install
 putnami projects sync
 putnami lint,test,build --tag e2e --projects /php/samples/library,/php/samples/application
 putnami serve --projects /php/samples/application --port 3456
+putnami qualify /php/samples/application --target local
 putnami package --docker --docker-load --projects /php/samples/application
 ```
+
+`application/schema/http-routes.json` lists the routes `putnami qualify` requests.

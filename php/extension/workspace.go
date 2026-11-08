@@ -65,7 +65,7 @@ func fetchPackages(ctx context.Context, root stacks.RootStep, emit *jsonl.Emitte
 		return failFetch(emit, err)
 	}
 	defer func() { _ = os.RemoveAll(private) }()
-	env := append(composerEnv(root.Env), "COMPOSER_VENDOR_DIR="+filepath.Join(private, "vendor"), "TMPDIR="+private)
+	env := append(composerEnv(root.Env), "COMPOSER_VENDOR_DIR="+filepath.Join(private, "vendor"), "COMPOSER_BIN_DIR="+filepath.Join(private, "bin"), "TMPDIR="+private)
 	emit.Info("$ composer install --no-scripts --no-plugins in " + root.Dir)
 	if err := runComposer(ctx, root, env, phar, "install", "--no-interaction", "--no-progress", "--no-scripts", "--no-plugins", "--no-autoloader"); err != nil {
 		return failFetch(emit, fmt.Errorf("composer install in %s: %w", root.Dir, err))
@@ -73,22 +73,17 @@ func fetchPackages(ctx context.Context, root stacks.RootStep, emit *jsonl.Emitte
 	return nil
 }
 
-// installWorkspaceRoot installs one stack root. Offline, it installs from the
-// Composer cache with the network disabled, so a root without a composer.lock
-// has nothing it can install.
+// installWorkspaceRoot installs one stack root. Offline, Composer reads its
+// cache alone, so a root without a composer.lock has nothing it can install.
 func installWorkspaceRoot(ctx context.Context, root stacks.RootStep, emit *jsonl.Emitter) error {
 	if err := prepareWindowsPHP(root, emit); err != nil {
 		return err
 	}
-	env := composerEnv(root.Env)
-	if offlineDependencies() {
-		if !hasLock(root.Dir) {
-			emit.DiagnosticWithCode("warning", "no "+composerLock+" in "+root.Dir+": an offline install has nothing to install", "", 0, 0, CodeComposerInstallFailed)
-			return nil
-		}
-		env = append(env, "COMPOSER_DISABLE_NETWORK=1")
+	if offlineDependencies() && !hasLock(root.Dir) {
+		emit.DiagnosticWithCode("warning", "no "+composerLock+" in "+root.Dir+": an offline install has nothing to install", "", 0, 0, CodeComposerInstallFailed)
+		return nil
 	}
-	return composerInstall(ctx, root, emit, env)
+	return composerInstall(ctx, root, emit, composerEnv(root.Env))
 }
 
 func hasLock(dir string) bool {

@@ -52,6 +52,10 @@ var apacheBases = map[string]string{
 	"8.5": "php:8.5.8-apache@sha256:eacc0d98992683cb46e4f8f44b2418a0323855dc8b59d32dc54f7a9b90a966dd",
 }
 
+// composerAuth is the file that holds a project's registry tokens. Composer
+// reads it at the stack root while it installs, and no image holds it.
+const composerAuth = "auth.json"
+
 // stagingExcludes are the top-level names of a stack root an image leaves out:
 // the installed dependencies, generated files, and what only tests read.
 var stagingExcludes = []string{".gen", ".git", ".phpunit.cache", ".putnami", "node_modules", "tests", "var", vendorDir}
@@ -116,7 +120,7 @@ func assembleImage(run context.Context, ctx *pctx.Context, root stacks.RootStep,
 	}
 
 	output := filepath.Join(ctx.WorkspaceRoot, ".putnami", "out", ctx.Project.Path, "package", dockerChannel)
-	name := strings.ReplaceAll(strings.TrimPrefix(ctx.Project.Name, "@"), "/", "-")
+	name := imageName(ctx.Project.Name)
 	version := "0.0.0"
 	if ctx.Version != nil && ctx.Version.Full != "" {
 		version = ctx.Version.Full
@@ -201,8 +205,8 @@ func assembleImage(run context.Context, ctx *pctx.Context, root stacks.RootStep,
 // image of the PHP minor version the machine resolved the dependencies with.
 func baseImage(run context.Context, root stacks.RootStep, named string) (string, error) {
 	if named != "" {
-		if !strings.Contains(named, "@sha256:") {
-			return "", fmt.Errorf("the base image %s has no digest: name it as image@sha256:<digest>", named)
+		if _, err := oci.ParseDigestReference(named); err != nil {
+			return "", fmt.Errorf("the base image %s has no valid digest: name it as image@sha256:<digest>: %w", named, err)
 		}
 		return named, nil
 	}
@@ -231,6 +235,12 @@ func stageApplication(workspaceRoot, stackRoot, workspace string) (string, error
 	staged := filepath.Join(workspace, rel)
 	if err := copyTree(stackRoot, staged); err != nil {
 		return "", err
+	}
+	auth := filepath.Join(stackRoot, composerAuth)
+	if _, err := os.Stat(auth); err == nil {
+		if err := copyFile(auth, filepath.Join(staged, composerAuth)); err != nil {
+			return "", err
+		}
 	}
 	repositories, err := pathRepositories(stackRoot)
 	if err != nil {
@@ -289,7 +299,7 @@ func pathRepositories(root string) ([]string, error) {
 }
 
 // copyTree copies a tree, without the staging excludes at its top level and
-// the local Symfony environment files, which hold the machine's secrets.
+// the files that hold secrets, at any depth.
 func copyTree(source, target string) error {
 	return filepath.WalkDir(source, func(path string, entry fs.DirEntry, err error) error {
 		if err != nil {
@@ -308,7 +318,7 @@ func copyTree(source, target string) error {
 			}
 			return nil
 		}
-		if localEnvironment(entry.Name()) {
+		if !entry.IsDir() && secretFile(entry.Name()) {
 			return nil
 		}
 		destination := filepath.Join(target, rel)
@@ -319,8 +329,12 @@ func copyTree(source, target string) error {
 	})
 }
 
-func localEnvironment(name string) bool {
-	return name == ".env.local" || (strings.HasPrefix(name, ".env.") && strings.HasSuffix(name, ".local"))
+// secretFile reports the files no image holds: Composer's registry tokens,
+// Symfony's local environment files and its production decryption keys.
+func secretFile(name string) bool {
+	return name == composerAuth || name == ".env.local" || name == ".env.local.php" ||
+		(strings.HasPrefix(name, ".env.") && strings.HasSuffix(name, ".local")) ||
+		strings.HasSuffix(name, ".decrypt.private.php")
 }
 
 // copyFile copies a file's content and its executable bit, following a
@@ -359,7 +373,7 @@ func imageSpec(staged, workspace, base, platform, port string) (oci.Spec, error)
 		return oci.Spec{}, err
 	}
 	files, err := imageFiles(staged, func(rel string) bool {
-		return rel != vendorDir && !strings.HasPrefix(rel, vendorDir+string(filepath.Separator))
+		return rel != composerAuth && rel != vendorDir && !strings.HasPrefix(rel, vendorDir+string(filepath.Separator))
 	})
 	if err != nil {
 		return oci.Spec{}, err
