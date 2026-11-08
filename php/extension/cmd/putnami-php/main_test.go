@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"slices"
 	"strings"
 	"testing"
 
@@ -23,7 +24,9 @@ func TestRunHandsTheTasksToTheJobDispatcher(t *testing.T) {
 			got = append(got, name)
 		}
 	})
-	if code != 0 || len(got) != 3 {
+	slices.Sort(got)
+	want := []string{"install", "lint", "test", "workspace-fetch", "workspace-install"}
+	if code != 0 || !slices.Equal(got, want) {
 		t.Fatalf("exit %d, jobs %v", code, got)
 	}
 }

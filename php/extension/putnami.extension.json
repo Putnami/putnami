@@ -113,9 +113,32 @@
     "excludes": [
       "vendor"
     ],
-    "language": "php"
+    "language": "php",
+    "installInputs": [
+      "composer.lock"
+    ]
   },
   "commands": {
+    "workspace-fetch": {
+      "description": "Download the packages each stack root's composer.lock names into the extension's Composer cache, running none of their code.",
+      "quiet": true,
+      "run": [
+        {
+          "id": "workspace-fetch",
+          "task": "workspace-fetch-exec"
+        }
+      ]
+    },
+    "workspace-install": {
+      "description": "Install the Composer dependencies of each stack root of the workspace.",
+      "quiet": true,
+      "run": [
+        {
+          "id": "workspace-install",
+          "task": "workspace-install-exec"
+        }
+      ]
+    },
     "lint": {
       "description": "Lint the Composer components with PHPStan.",
       "run": [
@@ -284,6 +307,49 @@
         },
         "effects": [
           "toolchain-cache"
+        ]
+      }
+    },
+    "workspace-fetch-exec": {
+      "description": "Run composer install with no script and no plugin into a private vendor directory, which leaves the packages in the extension's Composer cache.",
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "toolchains": [
+        "php"
+      ],
+      "args": [
+        "workspace-fetch"
+      ],
+      "cwd": "{workspaceRoot}",
+      "cache": false,
+      "timeoutMs": 1800000,
+      "declares": {
+        "effects": [
+          "network",
+          "process",
+          "toolchain-cache"
+        ]
+      }
+    },
+    "workspace-install-exec": {
+      "description": "Run composer install at each stack root of the workspace, except the projects disable.tags excludes and the roots whose last install is current. Offline, it installs from the extension's Composer cache with the network disabled.",
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "toolchains": [
+        "php"
+      ],
+      "args": [
+        "workspace-install"
+      ],
+      "cwd": "{workspaceRoot}",
+      "cache": false,
+      "timeoutMs": 1800000,
+      "declares": {
+        "effects": [
+          "network",
+          "process",
+          "toolchain-cache",
+          "workspace-files"
         ]
       }
     }

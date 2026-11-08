@@ -10,6 +10,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"time"
 
 	extensionproto "go.putnami.dev/protocol/extension"
@@ -57,15 +58,42 @@ func InstallJob(stack stacks.Stack) cli.JobFunc {
 // installDependencies prepares the selected PHP, then runs composer install
 // unless the dependencies are offline or the last install is current.
 func installDependencies(ctx context.Context, root stacks.RootStep, emit *jsonl.Emitter) error {
-	program := root.Program("php")
-	if err := enableWindowsExtensions(program); err != nil {
-		emit.DiagnosticWithCode("error", err.Error(), "", 0, 0, CodeComposerInstallFailed)
-		return fmt.Errorf("%s: %w", CodeComposerInstallFailed, err)
+	if err := prepareWindowsPHP(root, emit); err != nil {
+		return err
 	}
-	if os.Getenv(extensionproto.OfflineDependenciesEnv) == "1" {
+	if offlineDependencies() {
 		emit.Info("offline dependencies: composer install does not run")
 		return nil
 	}
+	return composerInstall(ctx, root, emit, composerEnv(root.Env))
+}
+
+func offlineDependencies() bool {
+	return os.Getenv(extensionproto.OfflineDependenciesEnv) == "1"
+}
+
+func prepareWindowsPHP(root stacks.RootStep, emit *jsonl.Emitter) error {
+	if err := enableWindowsExtensions(root.Program("php")); err != nil {
+		emit.DiagnosticWithCode("error", err.Error(), "", 0, 0, CodeComposerInstallFailed)
+		return fmt.Errorf("%s: %w", CodeComposerInstallFailed, err)
+	}
+	return nil
+}
+
+// composerEnv returns env with Composer's package cache in the directory this
+// extension owns on the machine, which workspace-fetch fills and every install
+// reads.
+func composerEnv(env []string) []string {
+	cache := os.Getenv(extensionproto.MachineCacheRootEnv)
+	if cache == "" {
+		return env
+	}
+	return append(slices.Clip(env), "COMPOSER_CACHE_DIR="+filepath.Join(cache, "composer"))
+}
+
+// composerInstall runs composer install at the stack root with env, unless the
+// last install is current.
+func composerInstall(ctx context.Context, root stacks.RootStep, emit *jsonl.Emitter, env []string) error {
 	if vendorIsCurrent(root.Dir) {
 		return nil
 	}
@@ -80,13 +108,7 @@ func installDependencies(ctx context.Context, root stacks.RootStep, emit *jsonl.
 		return fmt.Errorf("%s: %w", CodeComposerInstallFailed, err)
 	}
 	emit.Info("$ composer install in " + root.Dir)
-	cmd := exec.CommandContext(ctx, program, phar, "install", "--no-interaction", "--no-progress") //nolint:gosec // the pinned Composer
-	cmd.Dir = root.Dir
-	cmd.Env = root.Env
-	// The job's stdout carries its protocol.
-	cmd.Stdout = os.Stderr
-	cmd.Stderr = os.Stderr
-	if err := cmd.Run(); err != nil {
+	if err := runComposer(ctx, root, env, phar, "install", "--no-interaction", "--no-progress"); err != nil {
 		emit.DiagnosticWithCode("error", fmt.Sprintf("composer install in %s: %v", root.Dir, err), "", 0, 0, CodeComposerInstallFailed)
 		return fmt.Errorf("%s: %w", CodeComposerInstallFailed, err)
 	}
@@ -95,6 +117,17 @@ func installDependencies(ctx context.Context, root stacks.RootStep, emit *jsonl.
 		emit.DiagnosticWithCode("warning", "the install is not recorded, so the next task installs again: "+err.Error(), "", 0, 0, CodeComposerInstallFailed)
 	}
 	return nil
+}
+
+// runComposer runs the pinned Composer at the stack root. The job's stdout
+// carries its protocol, so Composer's output goes to stderr.
+func runComposer(ctx context.Context, root stacks.RootStep, env []string, phar string, args ...string) error {
+	cmd := exec.CommandContext(ctx, root.Program("php"), append([]string{phar}, args...)...) //nolint:gosec // the pinned Composer
+	cmd.Dir = root.Dir
+	cmd.Env = env
+	cmd.Stdout = os.Stderr
+	cmd.Stderr = os.Stderr
+	return cmd.Run()
 }
 
 // vendorIsCurrent reports whether the last successful install at dir was made

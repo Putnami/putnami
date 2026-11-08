@@ -84,7 +84,9 @@ func composerStub(t *testing.T, version string) string {
 	writeFile(t, bin, "php", `#!/bin/sh
 if [ "$1" = "--version" ]; then echo "PHP `+version+` (cli)"; exit 0; fi
 echo "$PWD: $*" >> "`+log+`"
-mkdir -p vendor/composer && echo '{}' > vendor/composer/installed.json
+echo "cache=$COMPOSER_CACHE_DIR vendor=$COMPOSER_VENDOR_DIR network=$COMPOSER_DISABLE_NETWORK" >> "`+log+`.env"
+vendor=${COMPOSER_VENDOR_DIR:-vendor}
+mkdir -p "$vendor/composer" && echo '{}' > "$vendor/composer/installed.json"
 if [ -n "$STUB_COMPOSER_FAILS" ]; then exit 3; fi
 `)
 	if err := os.Chmod(filepath.Join(bin, "php"), 0o755); err != nil {

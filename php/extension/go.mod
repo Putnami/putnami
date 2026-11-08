@@ -6,6 +6,7 @@ require (
 	go.putnami.dev/protocol/diagnostic v0.0.0
 	go.putnami.dev/protocol/extension v0.0.0
 	go.putnami.dev/protocol/features v0.0.0
+	go.putnami.dev/protocol/job v0.0.0
 	go.putnami.dev/protocol/workspace v0.0.0
 	go.putnami.dev/sdk/extension v0.0.0
 	go.putnami.dev/tooling/observe v0.0.0
@@ -15,7 +16,8 @@ require (
 require (
 	go.putnami.dev/evidence/readers v0.0.0 // indirect
 	go.putnami.dev/protocol/cli v0.0.0 // indirect
-	go.putnami.dev/protocol/job v0.0.0 // indirect
+	go.putnami.dev/protocol/distribution v0.0.0 // indirect
+	go.putnami.dev/protocol/registry v0.0.0 // indirect
 	go.putnami.dev/protocol/runtime v0.0.0 // indirect
 	golang.org/x/sys v0.44.0 // indirect
 )
