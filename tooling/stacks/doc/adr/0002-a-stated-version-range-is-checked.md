@@ -14,8 +14,9 @@ version, such as `1.82.0` or a `1.82` channel; any other value got
 
 Some stacks state a range, not a version. A PHP repository states the PHP it
 runs on in `composer.json`, as `require.php`: `>=8.4`, `^8.2`, `8.3.*`. That
-range is the only statement most PHP repositories make, and issue #940 asks
-the core to check it. A Dart `environment.sdk` is a range too.
+range is the only statement most PHP repositories make, and the PHP stack
+extension asks the core to check it. A Dart `environment.sdk` is a range
+too.
 
 ## Decision
 
@@ -34,7 +35,14 @@ a space (and) or by `||` (or). Stability flags such as `@dev` are ignored.
 
 The key carries the range as the files state it, never the machine's version.
 Only the numeric release of the machine's version is compared: `8.4.0RC1`
-satisfies `>=8.4`.
+satisfies `>=8.4`. Inside a range, `=8.3`, `==8.3` and a bare `8.3` mean
+8.3.0, as in Composer; a whole value that is a bare version, such as a
+`.php-version` of `8.3`, keeps the exact rule and names the 8.3 releases.
+
+An exact version wins over a range wherever the files state them: the core
+reads the files nearest first, and a range it finds does not end the search
+until no file further up states an exact version. So a root `.php-version`
+of `8.4.10` applies to a package whose own `composer.json` states `>=8.4`.
 
 ## Rejected alternatives
 
@@ -54,5 +62,7 @@ satisfies `>=8.4`.
 
 - Two machines whose versions both satisfy a range share cache entries. A
   repository that needs one version in the key states it exactly.
-- A profile lists an exact file first and a range file after it, so an exact
-  statement wins: the PHP profile reads `.php-version`, then `composer.json`.
+- A profile lists an exact file first and a range file after it: the PHP
+  profile reads `.php-version`, then `composer.json`.
+- A value that is neither, such as `stable`, still ends the search where it
+  is found, as rustup reads the nearest toolchain file.

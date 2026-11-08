@@ -6,7 +6,7 @@
     "Each component of a Composer repository, such as a Symfony application and the packages beside it, is a Putnami project named by its package, with an edge to each package it requires through a path repository",
     "putnami lint and test run the PHP profile's PHPStan and PHPUnit steps in each component's directory, and a second run over an unchanged tree is a cache hit",
     "The test task reads the PHPUnit JUnit and Clover reports into the test and coverage summary, each case naming its test file and each covered file a file of the repository",
-    "A change to a component's tests reruns its test task and not its lint task",
+    "A change to a component's tests reruns its test task and not its lint task, and a change to its dependencies reruns both",
     "A component overrides any value of the PHP profile in its putnami.json, and the override reaches the cache key"
   ],
   "nonGoals": [
@@ -22,15 +22,15 @@
     },
     {
       "id": "tasks-run-the-profile",
-      "text": "Each task first compares php --version with the version .php-version states, or else the range require.php of composer.json states, in the component then at its stack root: a version outside it fails with stacks.toolchain_mismatch unless toolchain.check is warn. lint then runs the stack root's vendor/bin/phpstan analyse on src, and test its vendor/bin/phpunit on tests with coverage limited to src, in the component's directory with no shell, one task at a time per stack root. There is no build task."
+      "text": "Each task first compares php --version with the version .php-version states, or else the range require.php of composer.json states, in the component then at its stack root, an exact version winning over a range: a version outside it fails with stacks.toolchain_mismatch unless toolchain.check is warn. lint then runs the stack root's vendor/bin/phpstan analyse on src, and test its vendor/bin/phpunit on tests with coverage of src, in the component's directory with no shell. There is no build task."
     },
     {
       "id": "reports-become-the-summary",
-      "text": "After its steps, the test task reads the PHPUnit JUnit and Clover reports of its output directory through the evidence readers into the test and coverage summary. A failed case fails the task with stacks.test_failed; a JUnit or Clover pattern that matches no report fails it with stacks.report_missing."
+      "text": "After its steps, even when PHPUnit exits non-zero, the test task reads the JUnit and Clover reports of its output directory through the evidence readers into the test and coverage summary. A failed case fails the task with stacks.test_failed; a JUnit or Clover pattern that matches no report after steps that succeeded fails it with stacks.report_missing."
     },
     {
       "id": "inputs-per-task",
-      "text": "The php:lint selector answers the component's src files, its composer.json and its PHPStan and PHP-CS-Fixer configuration, and never its tests or composer.lock; php:test adds its tests, its Symfony config, templates, translations and migrations, its PHPUnit configuration, .env and .env.test, and composer.lock. Each task's stack-root files are the root composer.json, and for test the root composer.lock, besides the toolchain files."
+      "text": "The php:lint selector answers the component's src files, composer.json and composer.lock, its PHPStan configuration and baseline and its PHP-CS-Fixer configuration, and never its tests; php:test adds its tests, its Symfony config, templates, translations, migrations and assets, its PHPUnit configuration and .env files. Each task's stack-root files are the root composer.json and composer.lock, besides the toolchain files."
     },
     {
       "id": "overrides-are-honored",
