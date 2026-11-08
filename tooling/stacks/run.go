@@ -36,8 +36,9 @@ const (
 )
 
 // Run is the job of one task: the toolchain check, the steps in the project
-// directory under the stack root's lock, then the reports, copied into the
-// task's output directory and read.
+// directory, or the stack root when the task's dir is root, under the stack
+// root's lock, then the reports, copied into the task's output directory and
+// read. A delegated stack's result names the stack in delegatedTo.
 func (s Stack) Run(task string) func(ctx *pctx.Context, emit *jsonl.Emitter, args []string) (string, map[string]any, error) {
 	return s.RunWith(task, nil)
 }
@@ -514,6 +515,9 @@ func (s Stack) run(ctx context.Context, in runInput, emit reporter) (string, map
 		emit.Info("$ " + strings.Join(argv, " "))
 		cmd := exec.CommandContext(ctx, selected.Program(profile.Toolchain, argv[0]), argv[1:]...) //nolint:gosec // the profile's own step
 		cmd.Dir = in.projectAbs
+		if t.Dir == DirRoot {
+			cmd.Dir = rootAbs
+		}
 		cmd.Env = env
 		cmd.Stdout = in.stdout
 		cmd.Stderr = in.stdout
@@ -570,6 +574,10 @@ func (s Stack) run(ctx context.Context, in runInput, emit reporter) (string, map
 		failed = failed || d.Severity == diag.Error
 	}
 	data := map[string]any{}
+	if profile.Delegated {
+		data["delegatedTo"] = profile.ID
+		emit.Info(fmt.Sprintf("%s ran %s on %s; its own cache decides what reran", profile.ID, in.task, meta.Component))
+	}
 	if reports != nil && len(reports.JUnit) > 0 {
 		data["testSummary"] = map[string]any{
 			"total": summary.Tests.Total, "passed": summary.Tests.Passed,

@@ -42,6 +42,11 @@ func (r *recorder) Fatalf(format string, args ...any) {
 
 func check(t *testing.T, path string) *recorder {
 	t.Helper()
+	return checkProfile(t, path, profile)
+}
+
+func checkProfile(t *testing.T, path, profile string) *recorder {
+	t.Helper()
 	p, err := stacks.Decode([]byte(profile))
 	if err != nil {
 		t.Fatal(err)
@@ -119,6 +124,9 @@ func TestCheckManifestReportsEachDrift(t *testing.T) {
 		"reports": {func(m map[string]any) {
 			obj(m, "tasks", "test-run", "declares", "outputs", "reports")["path"] = "out"
 		}, "reports"},
+		"cache": {func(m map[string]any) {
+			obj(m, "tasks", "test-run", "cache")["enabled"] = false
+		}, "cache.enabled = false, want true"},
 		"undeclared command": {func(m map[string]any) {
 			obj(m, "commands")["build"] = map[string]any{"description": "Build.", "run": []any{map[string]any{"id": "build", "task": "lint-run"}}}
 		}, "command build runs a task the profile does not declare"},
@@ -141,5 +149,20 @@ func TestCheckManifestStopsOnAnUnreadableManifest(t *testing.T) {
 	}
 	if r := check(t, path); !r.fatal {
 		t.Errorf("an invalid manifest is fatal: %v", r.errors)
+	}
+}
+
+func TestCheckManifestHoldsADelegatedStackUncached(t *testing.T) {
+	delegated := strings.Replace(profile, `"id": "rust",`, `"id": "rust", "delegated": true,`, 1)
+	if r := checkProfile(t, "testdata/manifest.json", delegated); !strings.Contains(strings.Join(r.errors, "\n"), "cache.enabled = true, want false") {
+		t.Errorf("a cached task of a delegated stack is a drift: %v", r.errors)
+	}
+	uncached := mutate(t, func(m map[string]any) {
+		for _, task := range []string{"lint-run", "test-run"} {
+			obj(m, "tasks", task, "cache")["enabled"] = false
+		}
+	})
+	if r := checkProfile(t, uncached, delegated); len(r.errors) > 0 {
+		t.Errorf("a delegated stack with its cache off conforms: %v", r.errors)
 	}
 }

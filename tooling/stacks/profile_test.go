@@ -185,3 +185,25 @@ func TestAnOverrideOfTheStepsDropsTheCoverageFallback(t *testing.T) {
 		t.Error("an override that keeps the steps keeps the fallback")
 	}
 }
+
+func TestDecodeReadsTheTaskDirAndTheDelegation(t *testing.T) {
+	delegated := strings.Replace(sampleProfile, `"id": "rust",`, `"id": "rust", "delegated": true,`, 1)
+	delegated = strings.Replace(delegated, `"inputs": ["sources", "manifests"]}`, `"inputs": ["sources", "manifests"], "dir": "root"}`, 1)
+	p, err := Decode([]byte(delegated))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !p.Delegated || p.Tasks[TaskLint].Dir != DirRoot || p.Tasks[TaskTest].Dir != "" {
+		t.Errorf("delegated = %v, lint dir = %q, test dir = %q", p.Delegated, p.Tasks[TaskLint].Dir, p.Tasks[TaskTest].Dir)
+	}
+	if _, err := Decode([]byte(strings.Replace(delegated, `"dir": "root"`, `"dir": "elsewhere"`, 1))); err == nil || !strings.Contains(err.Error(), "dir:") {
+		t.Errorf("an unknown dir is refused: %v", err)
+	}
+	if _, err := p.Resolve(json.RawMessage(`{"delegated": false}`)); err == nil || !strings.Contains(err.Error(), "delegated") {
+		t.Errorf("an override cannot change the delegation: %v", err)
+	}
+	r, err := p.Resolve(json.RawMessage(`{"tasks": {"test": {"dir": "root"}}}`))
+	if err != nil || r.Tasks[TaskTest].Dir != DirRoot {
+		t.Errorf("an override sets a task's dir: %v %+v", err, r.Tasks[TaskTest])
+	}
+}

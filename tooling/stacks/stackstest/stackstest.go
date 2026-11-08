@@ -17,7 +17,8 @@ import (
 )
 
 // CheckManifest checks the manifest at path against the stack: the protocol's
-// own validation and contract, then the shape every stack extension shares.
+// own validation and contract, then the shape every stack extension shares:
+// the cache of each task is on, or off for a delegated profile.
 func CheckManifest(t testing.TB, path string, s stacks.Stack) {
 	t.Helper()
 	data, err := os.ReadFile(path) //nolint:gosec // the extension's own committed manifest
@@ -129,6 +130,12 @@ func checkTask(t testing.TB, doc manifest, s stacks.Stack, task string) {
 	if !workspace && len(root) > 0 {
 		t.Errorf("task %s reads no workspace input for the stack-root files %v", step.Task, root)
 	}
+	// A delegated stack's tool keeps its own cache: a Putnami hit would
+	// replay a result the tool never produced for this tree. Any other stack
+	// caches its tasks.
+	if enabled := decl.Cache.Enabled != nil && *decl.Cache.Enabled; enabled == s.Profile.Delegated {
+		t.Errorf("task %s: cache.enabled = %v, want %v for a profile whose delegated is %v", step.Task, enabled, !s.Profile.Delegated, s.Profile.Delegated)
+	}
 	out, ok := decl.Declares.Outputs["reports"]
 	if !ok || out.Kind != "directory" || out.Root != "command-output" || out.Path != task {
 		t.Errorf("task %s declares no command-output directory %q for its reports: %+v", step.Task, task, out)
@@ -162,6 +169,9 @@ type manifest struct {
 			From  string   `json:"from"`
 			Files []string `json:"files"`
 		} `json:"inputs"`
+		Cache struct {
+			Enabled *bool `json:"enabled"`
+		} `json:"cache"`
 		Declares struct {
 			Outputs map[string]struct {
 				Kind string `json:"kind"`

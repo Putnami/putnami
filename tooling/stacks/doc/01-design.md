@@ -158,6 +158,8 @@ The Rust reference profile:
 | `tasks.<task>.reports` | The JUnit and coverage reports the task reads back, with the coverage format. The core copies each into `{output}` as soon as the task ends. `when` and `optional` say when a report is expected. |
 | `tasks.<task>.artifacts` | The files the task copies into `{output}/artifacts` after its steps, so a cache hit restores them: patterns under the project or the stack root that may name `{component}`. The file a pattern with no wildcard names is removed before the steps, unless its path leads outside the project or the stack root or the inputs of one of the component's tasks select it, so only what the steps write is copied. A pattern with a wildcard is only copied, and copies whatever it matches, a file an earlier build left included. A component name that is no single path segment keeps no artifact. A pattern that matches nothing copies nothing. |
 | `variants.<name>` | A part of the profile one build runs, applied before the project's override. |
+| `tasks.<task>.dir` | Where the steps run: `project`, the default, or `root`, the stack root, for a tool that resolves its addresses from there. |
+| `delegated` | `true` for a stack whose build tool keeps its own cache; see [Delegated stacks](#delegated-stacks). An override cannot change it. |
 
 The toolchain files are inputs of every task, whatever its input sets.
 
@@ -378,6 +380,25 @@ select is a source and is kept, and a report pattern outside the output
 names one place: no `**` and no wildcard first directory. The copied reports are task outputs, so a cache hit
 restores them and reads the same totals.
 
+## Delegated stacks
+
+A build system with its own hermetic cache, Pants or Bazel, is delegated to:
+its profile sets `"delegated": true`, and Putnami runs the tool on each
+affected component instead of importing its targets
+([ADR 0002](adr/0002-a-delegated-stack-keeps-its-tool-cache.md)).
+
+- Every task of the extension's manifest sets `cache.enabled` to `false`, and
+  the conformance kit holds the manifest to it: Putnami stores no entry and
+  replays none, and the tool's cache decides what reruns.
+- Each task result records `delegatedTo`, the stack id, beside its test and
+  coverage summary.
+- A task whose `dir` is `root` runs its steps in the stack root, where the
+  tool resolves its addresses.
+- Impact selection stays Putnami's: a change runs its component and the
+  components that depend on it, on the edges the extension writes.
+
+`@putnami/pants` is the first delegated stack.
+
 ## What stays out
 
 - **Publish and package.** A stack's release goes through its own tool
@@ -387,7 +408,8 @@ restores them and reads the same totals.
   reports no reachable workload for a stack project.
 - **Go, TypeScript and Python.** They keep their full extensions and do not
   move to the core.
-- **Bazel and Pants.** They delegate: they keep their own cache.
+- **Bazel and Pants as cached stacks.** They delegate: they keep their own
+  cache, see [Delegated stacks](#delegated-stacks).
 - **The build's own task graph.** A dependency between Cargo targets outside
   a crate edge is not read: the edges are the detector's.
 
