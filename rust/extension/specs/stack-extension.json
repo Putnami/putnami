@@ -8,10 +8,11 @@
     "The test task reads the nextest JUnit report and the cargo-llvm-cov LCOV report into the test and coverage summary, with each case and each coverage line attributed to its crate",
     "Each task reads only the inputs it needs: lint does not rerun on a lockfile or nextest configuration change, and build does not rerun on a test change",
     "A crate overrides any value of the Rust profile in its putnami.json, and the override reaches the cache key",
-    "On the Cargo detector's fixture repository, with the real cargo, cargo-nextest and cargo-llvm-cov, lint, test and build pass with no putnami.json override and every case and coverage line attributed; a CI leg that installs those tools proves it, since the workspace gate has none"
+    "On the Cargo detector's fixture repository, with the real cargo, cargo-nextest and cargo-llvm-cov, lint, test and build pass with no putnami.json override and every case and coverage line attributed; a CI leg that installs those tools proves it, since the workspace gate has none",
+    "On a machine with no Rust, cargo-nextest or cargo-llvm-cov, putnami lint, test and build install what is missing and pass on a Cargo repository; a machine that holds a Rust satisfying the repository's statement keeps it"
   ],
   "nonGoals": [
-    "Installing or switching a Rust toolchain, cargo-nextest or cargo-llvm-cov: the toolchain check compares and never installs",
+    "A C linker, which rustc needs and the machine must hold, and the targets and components a rust-toolchain file lists beyond rustfmt, clippy and llvm-tools",
     "Publishing a crate to a registry",
     "A member of a nested Cargo workspace whose root package depends on that member: the edge to its root would close a cycle"
   ],
@@ -51,10 +52,23 @@
     {
       "id": "manifest-follows-the-profile",
       "text": "The manifest passes the stack core's conformance kit: its markers are the profile's, it lists the rust:lint, rust:test and rust:build selectors, and each command runs one task that depends on the same task upstream, reads its selector and the profile's stack-root files for that task, and declares its command-output reports directory."
+    },
+    {
+      "id": "provides-its-toolchain",
+      "text": "A task whose rustc is missing, or outside the version a rust-toolchain file states, installs that version, or the extension's default, with the rustup the extension pins by SHA-256, in a rustup home under the Putnami home, once per version. A rustc on PATH that satisfies the statement runs and nothing is installed. An offline run installs nothing and reports stacks.toolchain_missing."
+    },
+    {
+      "id": "provides-its-test-tools",
+      "text": "The test task, and no other, makes cargo-nextest and cargo-llvm-cov available when the PATH holds neither: each is installed from an archive the extension pins by SHA-256 and its directory is appended to the PATH of the task, so a tool the machine holds comes first."
+    },
+    {
+      "id": "coverage-is-optional",
+      "text": "A test task on a Rust with no llvm-tools runs cargo nextest with its JUnit report only, reads no LCOV report, and reports the warning stacks.coverage_unavailable."
     }
   ],
   "decisions": [
     "tooling/stacks/doc/adr/0001-one-extension-per-stack-on-a-shared-core.md",
-    "tooling/stacks/doc/adr/0002-a-nested-stack-root-is-an-input-only-project.md"
+    "tooling/stacks/doc/adr/0002-a-nested-stack-root-is-an-input-only-project.md",
+    "tooling/stacks/doc/adr/0004-a-stack-extension-may-install-its-toolchain-at-task-time.md"
   ]
 }

@@ -7,7 +7,8 @@
     "files": [
       { "path": "rust-toolchain.toml", "key": "toolchain.channel" },
       { "path": "rust-toolchain" }
-    ]
+    ],
+    "provisioned": "PUTNAMI_RUST_EXECUTABLE"
   },
   "inputs": {
     "sources": ["src/**", "build.rs"],
@@ -35,6 +36,10 @@
       "steps": [
         ["cargo", "llvm-cov", "nextest", "--package", "{component}", "--profile", "ci", "--lcov", "--output-path", "{output}/lcov.info"]
       ],
+      "withoutCoverage": {
+        "probe": ["cargo", "llvm-cov", "show-env"],
+        "steps": [["cargo", "nextest", "run", "--package", "{component}", "--profile", "ci"]]
+      },
       "inputs": ["sources", "targets", "manifests", "testConfig", "lockfiles"],
       "reports": {
         "junit": ["{root}/target/nextest/ci/junit.xml"],

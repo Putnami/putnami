@@ -13,6 +13,7 @@ import (
 	"strings"
 
 	diag "go.putnami.dev/protocol/diagnostic"
+	extensionproto "go.putnami.dev/protocol/extension"
 	"go.putnami.dev/sdk/extension/cli"
 	pctx "go.putnami.dev/sdk/extension/context"
 	"go.putnami.dev/sdk/extension/filelock"
@@ -110,7 +111,7 @@ func (s Stack) component(in runInput, emit reporter) (Metadata, Profile, error) 
 
 // selectToolchain runs the toolchain check of the component and returns the
 // toolchain it selects. A verdict that does not fail is a warning.
-func selectToolchain(ctx context.Context, in runInput, meta Metadata, profile Profile, emit reporter) (Selection, error) {
+func (s Stack) selectToolchain(ctx context.Context, in runInput, meta Metadata, profile Profile, emit reporter) (Selection, error) {
 	projectRel, err := filepath.Rel(in.workspaceRoot, in.projectAbs)
 	if err != nil {
 		return Selection{}, failWith(emit, CodeNotAComponent, "%v", err)
@@ -119,8 +120,21 @@ func selectToolchain(ctx context.Context, in runInput, meta Metadata, profile Pr
 	if err != nil {
 		return Selection{}, failWith(emit, CodeProjectConfigInvalid, "the expected toolchain version cannot be read: %v", err)
 	}
-	selected, err := profile.Toolchain.Select(ctx, in.projectAbs, expected, os.Environ())
+	env := os.Environ()
+	selected, err := profile.Toolchain.Select(ctx, in.projectAbs, expected, env)
+	offline := os.Getenv(extensionproto.OfflineDependenciesEnv) == "1"
+	if s.Provide != nil && !offline && (errors.Is(err, ErrToolchainMissing) || err == nil && selected.Verdict.Fail) {
+		provided, provideErr := s.Provide(ctx, expected, emit.Info)
+		if provideErr != nil {
+			return Selection{}, failWith(emit, CodeToolchainMissing, "install the %s toolchain: %v", profile.ID, provideErr)
+		}
+		env = append(append(env, provided.Env...), profile.Toolchain.Provisioned+"="+provided.Executable)
+		selected, err = profile.Toolchain.Select(ctx, in.projectAbs, expected, env)
+	}
 	if errors.Is(err, ErrToolchainMissing) {
+		if s.Provide != nil {
+			return Selection{}, failWith(emit, CodeToolchainMissing, "%v: the %s stack needs it on PATH, or a network to install it", err, profile.ID)
+		}
 		if profile.Toolchain.Provisioned != "" {
 			return Selection{}, failWith(emit, CodeToolchainMissing, "%v: the %s stack needs it on PATH, or a release its extension pins: run putnami install", err, profile.ID)
 		}
@@ -134,6 +148,15 @@ func selectToolchain(ctx context.Context, in runInput, meta Metadata, profile Pr
 			return Selection{}, failWith(emit, v.Code, "%s", v.Message)
 		}
 		emit.DiagnosticWithCode("warning", v.Message, "", 0, 0, v.Code)
+	}
+	if s.Tools != nil && !offline {
+		dirs, err := s.Tools(ctx, in.task, selected.Env, emit.Info)
+		if err != nil {
+			return Selection{}, failWith(emit, CodeToolchainMissing, "install the tools of the %s task: %v", in.task, err)
+		}
+		for _, dir := range dirs {
+			selected.Env = appendPath(selected.Env, dir)
+		}
 	}
 	return selected, nil
 }
@@ -178,7 +201,7 @@ func (s Stack) RootJob(step func(context.Context, RootStep, *jsonl.Emitter) erro
 		if meta.Component == "" {
 			return statusOK, nil, nil
 		}
-		selected, err := selectToolchain(background, in, meta, profile, emit)
+		selected, err := s.selectToolchain(background, in, meta, profile, emit)
 		if err != nil {
 			return statusFailed, nil, err
 		}
@@ -219,7 +242,7 @@ func (s Stack) run(ctx context.Context, in runInput, emit reporter) (string, map
 		return statusFailed, nil, err
 	}
 
-	selected, err := selectToolchain(ctx, in, meta, profile, emit)
+	selected, err := s.selectToolchain(ctx, in, meta, profile, emit)
 	if err != nil {
 		return statusFailed, nil, err
 	}

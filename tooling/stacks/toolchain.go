@@ -175,10 +175,19 @@ type Selection struct {
 }
 
 // Program returns the program a step runs: the pinned toolchain for a step
-// that names the toolchain command, and name otherwise.
+// that names the toolchain command, a program beside it for a step that names
+// one, such as cargo beside rustc, and name otherwise. A process resolves a bare
+// name on its own PATH, which holds no pinned toolchain.
 func (s Selection) Program(t Toolchain, name string) string {
-	if s.Executable != "" && name == t.Command[0] {
+	if s.Executable == "" {
+		return name
+	}
+	if name == t.Command[0] {
 		return s.Executable
+	}
+	sibling := filepath.Join(filepath.Dir(s.Executable), name+filepath.Ext(s.Executable))
+	if info, err := os.Stat(sibling); err == nil && !info.IsDir() {
+		return sibling
 	}
 	return name
 }
@@ -232,6 +241,25 @@ func prependPath(env []string, dir string) []string {
 		if ok && !found && strings.EqualFold(name, "PATH") {
 			found = true
 			entry = name + "=" + dir + string(os.PathListSeparator) + value
+		}
+		out = append(out, entry)
+	}
+	if !found {
+		out = append(out, "PATH="+dir)
+	}
+	return out
+}
+
+// appendPath returns env with dir last on its PATH: a tool the machine already
+// holds keeps coming first.
+func appendPath(env []string, dir string) []string {
+	out := make([]string, 0, len(env)+1)
+	found := false
+	for _, entry := range env {
+		name, value, ok := strings.Cut(entry, "=")
+		if ok && !found && strings.EqualFold(name, "PATH") {
+			found = true
+			entry = name + "=" + value + string(os.PathListSeparator) + dir
 		}
 		out = append(out, entry)
 	}

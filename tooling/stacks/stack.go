@@ -1,6 +1,7 @@
 package stacks
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -56,6 +57,23 @@ type Stack struct {
 	// ComponentKey is a component name as the stack compares two of them.
 	// Nil compares names as they are.
 	ComponentKey func(name string) string
+	// Provide installs the toolchain a component states when the one on PATH
+	// is missing or outside that statement, or returns the one an earlier call
+	// installed. Nil means the stack installs no toolchain. It needs a profile
+	// that names toolchain.provisioned.
+	Provide func(ctx context.Context, expected Expected, info func(string)) (Provided, error)
+	// Tools makes the tools of one task available, beyond the toolchain, and
+	// returns the directories to append to its PATH. A tool already on the
+	// PATH of env needs no directory. Nil means the stack installs no tool.
+	Tools func(ctx context.Context, task string, env []string, info func(string)) ([]string, error)
+}
+
+// Provided is a toolchain a stack extension installed.
+type Provided struct {
+	// Executable is the absolute path of the toolchain command.
+	Executable string
+	// Env holds NAME=VALUE entries the steps of the task also receive.
+	Env []string
 }
 
 // Metadata is what the probe records about a project under

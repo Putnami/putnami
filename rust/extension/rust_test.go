@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+	extensionproto "go.putnami.dev/protocol/extension"
 	"go.putnami.dev/protocol/features/spectest"
 	wsproto "go.putnami.dev/protocol/workspace"
 	pctx "go.putnami.dev/sdk/extension/context"
@@ -113,6 +114,8 @@ func TestTheCratesOfACargoWorkspaceBecomeProjects(t *testing.T) {
 // stands at that boundary.
 func stubTools(t *testing.T, root, version, junit string) string {
 	t.Helper()
+	// A stubbed toolchain stays the one under test: nothing is installed.
+	t.Setenv(extensionproto.OfflineDependenciesEnv, "1")
 	bin := t.TempDir()
 	log := filepath.Join(bin, "cargo.log")
 	writeFile(t, bin, "rustc", "#!/bin/sh\necho 'rustc "+version+" (stub 2024-10-15)'\n")

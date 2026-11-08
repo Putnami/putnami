@@ -3,7 +3,8 @@
 `@putnami/rust` turns each crate of a Rust repository into a Putnami project
 and runs its lint, test and build with the cargo tools the team already uses.
 It reads the repository the way `putnami observe` does, needs no
-`putnami.json` in a typical repository, and never installs a toolchain.
+`putnami.json` in a typical repository, and installs Rust and its test tools
+when the machine lacks them.
 
 ## Adopt it
 
@@ -18,8 +19,8 @@ It reads the repository the way `putnami observe` does, needs no
    workspace's `includes`, and so does each virtual Cargo workspace below the
    workspace root. The extension names each crate by its package, adds an edge
    to each crate it depends on by path, and tags it `rust`.
-3. Install cargo-nextest and cargo-llvm-cov, and give the nextest profile `ci`
-   a JUnit report, in `.config/nextest.toml` at the Cargo workspace root:
+3. Give the nextest profile `ci` a JUnit report, in `.config/nextest.toml` at
+   the Cargo workspace root:
 
    ```toml
    [profile.ci.junit]
@@ -28,6 +29,24 @@ It reads the repository the way `putnami observe` does, needs no
 
 4. Run `putnami lint,test,build`. A second run over an unchanged tree is a
    cache hit for every crate.
+
+## What it installs
+
+| Tool | When | From | Where |
+|---|---|---|---|
+| Rust, with rustfmt, clippy and llvm-tools | `rustc` is missing, or outside the version a `rust-toolchain` file states | A rustup pinned by SHA-256 | `<Putnami home>/tools/rust/rustup-home` |
+| cargo-nextest, cargo-llvm-cov | The `test` task, when `PATH` holds neither | Archives pinned by SHA-256 | `<Putnami home>/tools/rust` |
+
+A Rust on `PATH` that satisfies the statement always runs. With no statement,
+the extension installs its default release, 1.99.1. Your `~/.cargo` and
+`~/.rustup` stay untouched, and `putnami.lock.json` holds no Rust pin.
+
+An offline run installs nothing and fails with `stacks.toolchain_missing`.
+rustc needs a C linker on the machine: `cc` on Linux and macOS, the MSVC build
+tools on Windows. A Rust with no llvm-tools, such as a Homebrew one, runs
+`cargo nextest run`: `test` warns with `stacks.coverage_unavailable` and reads no
+coverage report. Targets and components a `rust-toolchain` file lists beyond
+those three are not installed.
 
 ## Crates and stack roots
 

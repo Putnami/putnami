@@ -200,3 +200,34 @@ func TestPrependPathAddsAPathWhenThereIsNone(t *testing.T) {
 		t.Errorf("prependPath = %v", got)
 	}
 }
+
+func TestProgramFindsAProgramBesideThePinnedToolchain(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, dir, "rustc", "")
+	writeFile(t, dir, "cargo", "")
+	tc := Toolchain{Command: []string{"rustc", "--version"}}
+	selected := Selection{Executable: filepath.Join(dir, "rustc")}
+	if got := selected.Program(tc, "rustc"); got != filepath.Join(dir, "rustc") {
+		t.Errorf("toolchain command = %s", got)
+	}
+	if got := selected.Program(tc, "cargo"); got != filepath.Join(dir, "cargo") {
+		t.Errorf("sibling = %s", got)
+	}
+	if got := selected.Program(tc, "sh"); got != "sh" {
+		t.Errorf("another program = %s", got)
+	}
+	if got := (Selection{}).Program(tc, "cargo"); got != "cargo" {
+		t.Errorf("the machine's toolchain = %s", got)
+	}
+}
+
+func TestAppendPathKeepsTheMachineFirst(t *testing.T) {
+	got := appendPath([]string{"A=1", "PATH=/machine"}, "/tools")
+	want := "PATH=/machine" + string(os.PathListSeparator) + "/tools"
+	if got[1] != want {
+		t.Errorf("PATH = %s", got[1])
+	}
+	if got := appendPath([]string{"A=1"}, "/tools"); got[1] != "PATH=/tools" {
+		t.Errorf("no PATH = %v", got)
+	}
+}

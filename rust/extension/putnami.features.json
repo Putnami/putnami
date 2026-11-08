@@ -91,6 +91,33 @@
             "kind": "acceptance",
             "checks": ["the-manifest-conforms-to-the-stack-core"]
           }
+        },
+        {
+          "id": "provides-its-toolchain",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": ["a-task-installs-the-stated-rust-when-the-machine-has-none"]
+          }
+        },
+        {
+          "id": "provides-its-test-tools",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": ["the-test-task-installs-the-tools-the-machine-does-not-hold"]
+          }
+        },
+        {
+          "id": "coverage-is-optional",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": ["a-rust-with-no-llvm-tools-runs-the-tests-without-a-coverage-report"]
+          }
         }
       ]
     }

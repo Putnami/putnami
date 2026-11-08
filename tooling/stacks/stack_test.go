@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -12,6 +13,7 @@ import (
 	"testing"
 
 	diag "go.putnami.dev/protocol/diagnostic"
+	extensionproto "go.putnami.dev/protocol/extension"
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/sdk/extension/cli"
 )
@@ -355,5 +357,130 @@ func TestRunWithoutCoverageSupportReadsNoCoverageReport(t *testing.T) {
 	status, data, rec = runTask(t, s, root, TaskTest)
 	if _, ok := data["coverageSummary"]; status != statusOK || !ok || rec.codes() != "" {
 		t.Errorf("a toolchain with coverage support keeps the coverage report: %s %v %v", status, data, rec.diags)
+	}
+}
+
+// provideStack is the test stack with a Provide that installs a stub toolchain
+// in dir, and the count of its calls.
+func provideStack(t *testing.T, dir, version string) (Stack, *int) {
+	t.Helper()
+	s := testProfileWithLcov(t)
+	s.Profile.Toolchain.Provisioned = "STUB_PROVIDED"
+	calls := 0
+	s.Provide = func(_ context.Context, expected Expected, info func(string)) (Provided, error) {
+		calls++
+		info("installing " + expected.Version)
+		writeFile(t, dir, "rustc", "#!/bin/sh\necho 'rustc "+version+" (stub 2024-10-15)'\n")
+		writeFile(t, dir, "cargo", "#!/bin/sh\necho \"$STUB_FROM_PROVIDE\" > \"$STUB_ROOT/from-provide\"\nprintf '"+junitPass+"' > /dev/null\n")
+		for _, name := range []string{"rustc", "cargo"} {
+			if err := os.Chmod(filepath.Join(dir, name), 0o755); err != nil {
+				t.Fatal(err)
+			}
+		}
+		return Provided{Executable: filepath.Join(dir, "rustc"), Env: []string{"STUB_FROM_PROVIDE=yes"}}, nil
+	}
+	return s, &calls
+}
+
+func TestATaskInstallsAMissingToolchainAndRunsIt(t *testing.T) {
+	root := t.TempDir()
+	writeFile(t, root, "rust-toolchain.toml", "[toolchain]\nchannel = \"1.82.0\"\n")
+	writeFile(t, root, "crates/api/Cargo.toml", "")
+	t.Setenv("STUB_ROOT", root)
+	t.Setenv("PATH", t.TempDir())
+	s, calls := provideStack(t, t.TempDir(), "1.82.0")
+	status, _, rec := runTask(t, s, root, TaskLint)
+	if status != statusOK {
+		t.Fatalf("status %s: %v", status, rec.diags)
+	}
+	if *calls != 1 {
+		t.Errorf("Provide ran %d times", *calls)
+	}
+	if got, _ := os.ReadFile(filepath.Join(root, "from-provide")); strings.TrimSpace(string(got)) != "yes" {
+		t.Errorf("the provided environment reaches the steps: %q", got)
+	}
+}
+
+func TestATaskLeavesASatisfyingToolchainAlone(t *testing.T) {
+	root := t.TempDir()
+	writeFile(t, root, "rust-toolchain.toml", "[toolchain]\nchannel = \"1.82.0\"\n")
+	writeFile(t, root, "crates/api/Cargo.toml", "")
+	t.Setenv("STUB_ROOT", root)
+	t.Setenv("STUB_LOG", filepath.Join(root, "log"))
+	stubTools(t, "1.82.0", junitPass)
+	s, calls := provideStack(t, t.TempDir(), "1.82.0")
+	if status, _, rec := runTask(t, s, root, TaskLint); status != statusOK {
+		t.Fatalf("status %s: %v", status, rec.diags)
+	}
+	if *calls != 0 {
+		t.Errorf("Provide ran %d times", *calls)
+	}
+}
+
+func TestAnOfflineTaskProvidesNothing(t *testing.T) {
+	root := t.TempDir()
+	writeFile(t, root, "crates/api/Cargo.toml", "")
+	t.Setenv("PATH", t.TempDir())
+	t.Setenv(extensionproto.OfflineDependenciesEnv, "1")
+	s, calls := provideStack(t, t.TempDir(), "1.82.0")
+	status, _, rec := runTask(t, s, root, TaskLint)
+	if status != statusFailed || !strings.Contains(rec.codes(), CodeToolchainMissing) {
+		t.Errorf("status %s: %v", status, rec.diags)
+	}
+	if *calls != 0 {
+		t.Errorf("Provide ran %d times", *calls)
+	}
+}
+
+func TestAFailedInstallIsAMissingToolchain(t *testing.T) {
+	root := t.TempDir()
+	writeFile(t, root, "crates/api/Cargo.toml", "")
+	t.Setenv("PATH", t.TempDir())
+	s := testProfileWithLcov(t)
+	s.Profile.Toolchain.Provisioned = "STUB_PROVIDED"
+	s.Provide = func(context.Context, Expected, func(string)) (Provided, error) {
+		return Provided{}, errors.New("no network")
+	}
+	status, _, rec := runTask(t, s, root, TaskLint)
+	if status != statusFailed || !strings.Contains(strings.Join(rec.diags, " "), "no network") {
+		t.Errorf("status %s: %v", status, rec.diags)
+	}
+}
+
+func TestToolsReachThePathOfTheTask(t *testing.T) {
+	root := t.TempDir()
+	writeFile(t, root, "rust-toolchain.toml", "[toolchain]\nchannel = \"1.82.0\"\n")
+	writeFile(t, root, "crates/api/Cargo.toml", "")
+	t.Setenv("STUB_ROOT", root)
+	t.Setenv("STUB_LOG", filepath.Join(root, "log"))
+	stubTools(t, "1.82.0", junitPass)
+	tools := t.TempDir()
+	writeFile(t, tools, "probe-tool", "#!/bin/sh\necho reached > \"$STUB_ROOT/tool\"\n")
+	if err := os.Chmod(filepath.Join(tools, "probe-tool"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	s := testProfileWithLcov(t)
+	task := s.Profile.Tasks[TaskLint]
+	task.Steps = [][]string{{"sh", "-c", "probe-tool"}}
+	s.Profile.Tasks[TaskLint] = task
+	var tasks []string
+	s.Tools = func(_ context.Context, name string, _ []string, _ func(string)) ([]string, error) {
+		tasks = append(tasks, name)
+		return []string{tools}, nil
+	}
+	if status, _, rec := runTask(t, s, root, TaskLint); status != statusOK {
+		t.Fatalf("status %s: %v", status, rec.diags)
+	}
+	if !slices.Equal(tasks, []string{TaskLint}) {
+		t.Errorf("Tools ran for %v", tasks)
+	}
+	if got, _ := os.ReadFile(filepath.Join(root, "tool")); strings.TrimSpace(string(got)) != "reached" {
+		t.Errorf("the tool ran: %q", got)
+	}
+	s.Tools = func(context.Context, string, []string, func(string)) ([]string, error) {
+		return nil, errors.New("no archive")
+	}
+	if status, _, rec := runTask(t, s, root, TaskLint); status != statusFailed || !strings.Contains(strings.Join(rec.diags, " "), "no archive") {
+		t.Errorf("status %s: %v", status, rec.diags)
 	}
 }

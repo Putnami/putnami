@@ -288,6 +288,13 @@ on `PATH` that passes always runs. `Stack.RootJob` gives an extension a job
 that runs at the stack root with the same toolchain and under the same lock,
 such as an install step.
 
+An extension may instead install its toolchain when a task needs it, as
+`@putnami/rust` does
+([ADR 0004](adr/0004-a-stack-extension-may-install-its-toolchain-at-task-time.md)).
+`Stack.Provide` runs when the toolchain on `PATH` is missing or fails the check,
+and `Stack.Tools` returns directories appended to the task's `PATH`. An offline
+run calls neither.
+
 A file may state a range instead, in Composer's constraint syntax: the PHP
 profile reads `require.php` of `composer.json`, such as `>=8.4` or `^8.2`
 ([ADR 0002](adr/0002-a-stated-version-range-is-checked.md)). The task runs
@@ -338,8 +345,6 @@ restores them and reads the same totals.
 - **Publish and package.** A stack's release goes through its own tool
   (crates.io, Packagist, Maven Central); no profile declares a `publish`
   task. A stack extension may add one later, in its own issue.
-- **Toolchain install for Rust.** cargo-nextest and cargo-llvm-cov are the
-  project's tools, like `rustc`; `@putnami/rust` pins nothing.
 - **Serve and qualify.** No profile declares a workload, so `putnami qualify`
   reports no reachable workload for a stack project.
 - **Go, TypeScript and Python.** They keep their full extensions and do not

@@ -32,6 +32,8 @@ func Stack() (stacks.Stack, error) {
 		Detect:        Detect,
 		CaseComponent: CaseComponent,
 		ComponentKey:  cargo.PackageKey,
+		Provide:       Provide,
+		Tools:         Tools,
 	}, nil
 }
 
