@@ -84,29 +84,11 @@ func (s Stack) Probe(root string, request wsproto.ProbeRequest) (wsproto.ProbeRe
 	components, diags := s.Detect(root, request)
 	result.Diagnostics = append(result.Diagnostics, diags...)
 	rootFiles := s.Profile.RootPatterns()
-	byPath := map[string]Component{}
+	deps, leftOut := rootEdges(components)
 	for _, c := range components {
-		byPath[c.Path] = c
-	}
-	for _, c := range components {
-		deps := slices.Clone(c.Dependencies)
-		// A stack root below the workspace root is a project of its own,
-		// whose selector answers the root's files: the edge to it carries
-		// them into the component's key.
-		if c.Root != wsproto.ProbeRootPath && c.Root != c.Path {
-			stackRoot, ok := byPath[c.Root]
-			switch {
-			case !ok || stackRoot.Root != stackRoot.Path:
-				result.Diagnostics = append(result.Diagnostics, diag.Warningf(CodeStackRootUnsupported, c.Path,
-					"%s is left out: its stack root %s is no project of the %s stack; run putnami projects sync", c.Path, c.Root, s.Profile.ID))
-				continue
-			case dependsOn(byPath, c.Root, c.Path):
-				result.Diagnostics = append(result.Diagnostics, diag.Warningf(CodeStackRootUnsupported, c.Path,
-					"%s is left out: its stack root %s depends on it, so the edge that carries the root's files into its key would close a cycle", c.Path, c.Root))
-				continue
-			}
-			deps = appendNew(deps, c.Root)
-			slices.Sort(deps)
+		if reason, out := leftOut[c.Path]; out {
+			result.Diagnostics = append(result.Diagnostics, diag.Warningf(CodeStackRootUnsupported, c.Path, "%s is left out: %s", c.Path, reason))
+			continue
 		}
 		expected, err := s.Profile.Toolchain.ExpectedVersion(root, c.Path, c.Root)
 		if err != nil {
@@ -140,7 +122,7 @@ func (s Stack) Probe(root string, request wsproto.ProbeRequest) (wsproto.ProbeRe
 			Path:         c.Path,
 			SourceName:   c.Name,
 			SourceFile:   c.SourceFile,
-			Dependencies: deps,
+			Dependencies: deps[c.Path],
 			Extensions:   []string{s.Extension},
 			Tags:         []string{s.Profile.ID},
 			WatchedFiles: watched,
@@ -151,9 +133,59 @@ func (s Stack) Probe(root string, request wsproto.ProbeRequest) (wsproto.ProbeRe
 	return result, nil
 }
 
-// dependsOn reports whether the component at from reaches the component at
-// to over the components' dependencies.
-func dependsOn(byPath map[string]Component, from, to string) bool {
+// rootEdges returns the dependencies the probe answers for each component:
+// the detector's, and for a component whose stack root is neither the
+// workspace root nor its own directory, the project at that root, whose
+// selector answers the root's files. A component whose root is no component
+// of the stack, or whose root reaches it in the graph of those edges, where
+// the root edge would close a cycle, is left out with the reason; the
+// components left out leave the graph until no root reaches its member.
+func rootEdges(components []Component) (map[string][]string, map[string]string) {
+	byPath := map[string]Component{}
+	for _, c := range components {
+		byPath[c.Path] = c
+	}
+	deps := map[string][]string{}
+	leftOut := map[string]string{}
+	var nested []Component
+	for _, c := range components {
+		deps[c.Path] = slices.Clone(c.Dependencies)
+		if c.Root == wsproto.ProbeRootPath || c.Root == c.Path {
+			continue
+		}
+		if stackRoot, ok := byPath[c.Root]; !ok || stackRoot.Root != stackRoot.Path {
+			leftOut[c.Path] = fmt.Sprintf("its stack root %s is no project of the stack; run putnami projects sync", c.Root)
+			continue
+		}
+		deps[c.Path] = appendNew(deps[c.Path], c.Root)
+		slices.Sort(deps[c.Path])
+		nested = append(nested, c)
+	}
+	for {
+		var cyclic []Component
+		for _, c := range nested {
+			if _, out := leftOut[c.Path]; !out && reaches(deps, leftOut, c.Root, c.Path) {
+				cyclic = append(cyclic, c)
+			}
+		}
+		if len(cyclic) == 0 {
+			break
+		}
+		for _, c := range cyclic {
+			leftOut[c.Path] = fmt.Sprintf("its stack root %s depends on it, so the edge that carries the root's files into its key would close a cycle", c.Root)
+		}
+	}
+	for _, c := range components {
+		if _, out := leftOut[c.Path]; out {
+			delete(deps, c.Path)
+		}
+	}
+	return deps, leftOut
+}
+
+// reaches reports whether from reaches to over deps, through no component
+// left out.
+func reaches(deps map[string][]string, leftOut map[string]string, from, to string) bool {
 	seen := map[string]bool{}
 	next := []string{from}
 	for len(next) > 0 {
@@ -162,11 +194,11 @@ func dependsOn(byPath map[string]Component, from, to string) bool {
 		if at == to {
 			return true
 		}
-		if seen[at] {
+		if _, out := leftOut[at]; out || seen[at] {
 			continue
 		}
 		seen[at] = true
-		next = append(next, byPath[at].Dependencies...)
+		next = append(next, deps[at]...)
 	}
 	return false
 }

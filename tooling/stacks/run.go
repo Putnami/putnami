@@ -237,6 +237,12 @@ func (s Stack) run(ctx context.Context, in runInput, emit reporter) (string, map
 	if err := removeReports(profile, in.task, in.projectAbs, rootAbs); err != nil {
 		return statusFailed, nil, err
 	}
+	// An artifact an earlier build left is no product of this one: the files
+	// the artifact patterns match are removed before the steps, so only what
+	// the steps write is copied.
+	if err := removeOutputs(artifactPatterns(t.Artifacts, meta.Component), profile, in.task, in.projectAbs, rootAbs); err != nil {
+		return statusFailed, nil, err
+	}
 
 	if w := t.WithoutCoverage; w != nil && t.Reports != nil && len(t.Reports.Coverage) > 0 && !hasCoverageSupport(ctx, selected.Program(profile.Toolchain, w.Probe[0]), w.Probe[1:], in.projectAbs, env) {
 		emit.DiagnosticWithCode("warning", fmt.Sprintf("the %s toolchain has no coverage support: %s runs with no coverage report", profile.ID, in.task), "", 0, 0, CodeCoverageUnavailable)
@@ -385,8 +391,7 @@ func copyFile(src, dst string) error {
 // outDir/artifacts, keeping their mode. A pattern that matches nothing copies
 // nothing.
 func copyArtifacts(patterns []string, component, projectAbs, rootAbs, outDir string) error {
-	for _, pattern := range patterns {
-		pattern = strings.ReplaceAll(pattern, "{component}", component)
+	for _, pattern := range artifactPatterns(patterns, component) {
 		base, rest := projectAbs, pattern
 		if r, ok := strings.CutPrefix(pattern, "{root}/"); ok {
 			base, rest = rootAbs, r
@@ -396,24 +401,50 @@ func copyArtifacts(patterns []string, component, projectAbs, rootAbs, outDir str
 			return err
 		}
 		for _, m := range matches {
-			info, err := os.Stat(m)
-			if err != nil {
-				return err
-			}
-			data, err := os.ReadFile(m) //nolint:gosec // an artifact the profile names
-			if err != nil {
-				return err
-			}
-			dst := filepath.Join(outDir, "artifacts", filepath.Base(m))
-			if err := os.MkdirAll(filepath.Dir(dst), 0o755); err != nil {
-				return err
-			}
-			if err := os.WriteFile(dst, data, info.Mode().Perm()); err != nil {
+			if err := copyMode(m, filepath.Join(outDir, "artifacts", filepath.Base(m))); err != nil {
 				return fmt.Errorf("copy the artifact %s: %w", m, err)
 			}
 		}
 	}
 	return nil
+}
+
+// copyMode streams src to dst and gives dst the mode of src.
+func copyMode(src, dst string) error {
+	in, err := os.Open(src) //nolint:gosec // an artifact the profile names
+	if err != nil {
+		return err
+	}
+	defer func() { _ = in.Close() }()
+	info, err := in.Stat()
+	if err != nil {
+		return err
+	}
+	if err := os.MkdirAll(filepath.Dir(dst), 0o755); err != nil {
+		return err
+	}
+	out, err := os.OpenFile(dst, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, info.Mode().Perm()) //nolint:gosec // the task's own output
+	if err != nil {
+		return err
+	}
+	if _, err := io.Copy(out, in); err != nil {
+		_ = out.Close()
+		return err
+	}
+	if err := out.Close(); err != nil {
+		return err
+	}
+	return os.Chmod(dst, info.Mode().Perm())
+}
+
+// artifactPatterns are a task's artifact patterns with {component}
+// expanded.
+func artifactPatterns(patterns []string, component string) []string {
+	out := make([]string, len(patterns))
+	for i, p := range patterns {
+		out[i] = strings.ReplaceAll(p, "{component}", component)
+	}
+	return out
 }
 
 // removeReports deletes the files the report patterns of a task match
@@ -424,6 +455,17 @@ func removeReports(profile Profile, task, projectAbs, rootAbs string) error {
 	if r == nil {
 		return nil
 	}
+	patterns := slices.Clone(r.JUnit)
+	for _, c := range r.Coverage {
+		patterns = append(patterns, c.Paths...)
+	}
+	return removeOutputs(patterns, profile, task, projectAbs, rootAbs)
+}
+
+// removeOutputs deletes the files the patterns match under the project or
+// the stack root ("{root}/…"); a pattern under "{output}/" is skipped. A file
+// the task's own inputs select is a source, and is kept.
+func removeOutputs(patterns []string, profile Profile, task, projectAbs, rootAbs string) error {
 	projectInputs, rootInputs := profile.TaskPatterns(task)
 	isInput := func(m string) bool {
 		for _, in := range []struct {
@@ -442,10 +484,6 @@ func removeReports(profile Profile, task, projectAbs, rootAbs string) error {
 		}
 		return false
 	}
-	patterns := slices.Clone(r.JUnit)
-	for _, c := range r.Coverage {
-		patterns = append(patterns, c.Paths...)
-	}
 	for _, p := range patterns {
 		if strings.HasPrefix(p, "{output}/") {
 			continue
@@ -463,7 +501,7 @@ func removeReports(profile Profile, task, projectAbs, rootAbs string) error {
 				continue
 			}
 			if err := os.Remove(m); err != nil && !errors.Is(err, os.ErrNotExist) {
-				return fmt.Errorf("remove the stale report %s: %w", m, err)
+				return fmt.Errorf("remove the stale output %s: %w", m, err)
 			}
 		}
 	}

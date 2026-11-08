@@ -155,7 +155,7 @@ The Rust reference profile:
 | `tasks.<task>.steps` | The commands the task runs in order, each an argument vector run in the project directory, with no shell. `{root}` is the stack root, `{component}` the detector's name for the component, `{output}` the task's output directory under the project. |
 | `tasks.<task>.inputs` | The input sets the task reads. `lint` reads fewer than `test`: a lockfile change does not rerun it. |
 | `tasks.<task>.reports` | The JUnit and coverage reports the task reads back, with the coverage format. The core copies each into `{output}` as soon as the task ends. |
-| `tasks.<task>.artifacts` | The files the task copies into `{output}/artifacts` after its steps, so a cache hit restores them: patterns under the project or the stack root that may name `{component}`. A pattern that matches nothing copies nothing. |
+| `tasks.<task>.artifacts` | The files the task copies into `{output}/artifacts` after its steps, so a cache hit restores them: patterns under the project or the stack root that may name `{component}`. What they match is removed before the steps, unless the task's inputs select it, so only what the steps write is copied. A pattern that matches nothing copies nothing. |
 
 The toolchain files are inputs of every task, whatever its input sets.
 
@@ -223,8 +223,10 @@ at its root, so the same task's upstream key carries the root's files: a
 lockfile change reruns the members' test and build, not their lint.
 
 The probe leaves a component out with `stacks.stack_root_unsupported` when no
-project of the stack sits at its root, or when the component at its root
-depends on it, since the edge would close a cycle. The workspace root keeps
+project of the stack sits at its root, or when its root reaches it over the
+edges the probe answers, root edges included, since its own root edge would
+close a cycle; it repeats that check without the components it left out until
+no root reaches its member. The workspace root keeps
 the static workspace input: a project there would own every file no deeper
 project claims.
 

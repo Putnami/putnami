@@ -36,8 +36,8 @@ it: its `Cargo.toml`, `Cargo.lock`, `.cargo/config.toml` and `target/`.
 
 | Crate | Stack root |
 |---|---|
-| A member of the workspace root's `[workspace]`, or the root package | The workspace root |
-| A member of a nested `[workspace]`, the nearest one above the crate, or the one its `package.workspace` names | That workspace's directory |
+| A member of the workspace root's `[workspace]`, by a `members` glob or as a path dependency of a member below it, or the root package | The workspace root |
+| A member of a nested `[workspace]`: the one its `package.workspace` names, else the nearest one above it that names it, past one that excludes it | That workspace's directory |
 | A crate that declares its own `[workspace]`, or that no workspace names | Its own directory |
 
 A virtual Cargo workspace below the workspace root, such as
@@ -45,9 +45,9 @@ A virtual Cargo workspace below the workspace root, such as
 `services/billing/http`, is an **input-only project**: its tasks run no step,
 and each task reads the root files it needs. Each of its crates depends on
 it, so a change to `services/billing/Cargo.lock` reruns their test and build,
-and not their lint. A member of a nested workspace whose root package depends
-on it is left out with `stacks.stack_root_unsupported`: the edge to its root
-would close a cycle.
+and not their lint. A member whose stack root reaches it over the crates'
+edges, such as a member its root package depends on, is left out with
+`stacks.stack_root_unsupported`: the edge to its root would close a cycle.
 
 The crates of one stack root run one task at a time, because they share its
 `target/` directory, and a task of a crate waits for the same task of the
@@ -65,10 +65,12 @@ directory.
 | `test` | `cargo llvm-cov nextest --package {component} --profile ci --lcov --output-path {output}/lcov.info` |
 | `build` | `cargo build --package {component} --locked` |
 
-After its steps, `build` copies `{root}/target/debug/{component}`, the
-crate's binary, into its output when cargo wrote one there, so a cache hit
-restores it. A library crate, or a target directory moved by
-`CARGO_TARGET_DIR` or `build.target-dir`, copies nothing.
+Before its steps, `build` removes `{root}/target/debug/{component}`, and after
+them copies the crate's binary from there into its output when cargo wrote
+one, so a cache hit restores it and an older build's binary is never kept. A
+library crate, or a target directory moved by `CARGO_TARGET_DIR` or
+`build.target-dir`, copies nothing. The copy is a debug binary, stored in the
+cache with each build result.
 
 ## What the test task reads
 

@@ -191,3 +191,43 @@ func TestArtifactsAreCopiedIntoTheOutput(t *testing.T) {
 		t.Errorf("an artifact outside the project is refused: %v", err)
 	}
 }
+
+func TestRootEdgesLeaveOutAMemberWhoseRootReachesIt(t *testing.T) {
+	// Two nested roots whose packages each depend on the other's member:
+	// a/ma -> a -> b/mb -> b -> a/ma once the root edges are added.
+	deps, leftOut := rootEdges([]Component{
+		{Path: "a", Name: "a", Root: "a", Dependencies: []string{"b/mb"}},
+		{Path: "a/ma", Name: "ma", Root: "a"},
+		{Path: "b", Name: "b", Root: "b", Dependencies: []string{"a/ma"}},
+		{Path: "b/mb", Name: "mb", Root: "b"},
+		{Path: "c/mc", Name: "mc", Root: "c"},
+	})
+	if len(leftOut) != 3 || leftOut["a/ma"] == "" || leftOut["b/mb"] == "" || !strings.Contains(leftOut["c/mc"], "no project") {
+		t.Errorf("left out = %v", leftOut)
+	}
+	if !reflect.DeepEqual(deps, map[string][]string{"a": {"b/mb"}, "b": {"a/ma"}}) {
+		t.Errorf("deps = %v", deps)
+	}
+}
+
+func TestAStaleArtifactIsRemovedBeforeTheSteps(t *testing.T) {
+	root := t.TempDir()
+	writeFile(t, root, "rust-toolchain.toml", "[toolchain]\nchannel = \"1.82.0\"\n")
+	writeFile(t, root, "crates/api/Cargo.toml", "")
+	writeFile(t, root, "target/debug/api", "old")
+	t.Setenv("STUB_ROOT", root)
+	t.Setenv("STUB_LOG", filepath.Join(root, "log"))
+	stubTools(t, "1.82.0", junitPass)
+	s := testStack(t)
+	s.Profile.Tasks[TaskBuild] = Task{Steps: [][]string{{"cargo", "build", "--package", "{component}"}}, Inputs: []string{"sources"}, Artifacts: []string{"{root}/target/debug/{component}"}}
+	status, _, rec := runTask(t, s, root, TaskBuild)
+	if status != statusOK {
+		t.Fatalf("build: %s %v", status, rec.diags)
+	}
+	if _, err := os.Stat(filepath.Join(root, "target/debug/api")); !os.IsNotExist(err) {
+		t.Errorf("the stale binary is removed before the steps: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(root, ".putnami/out/api/build/build/artifacts/api")); !os.IsNotExist(err) {
+		t.Errorf("a binary the steps did not write is not copied: %v", err)
+	}
+}

@@ -7,7 +7,6 @@ import (
 	"strings"
 	"testing"
 
-	"go.putnami.dev/protocol/features/spectest"
 	"go.putnami.dev/tooling/stacks"
 )
 
@@ -45,8 +44,10 @@ func writeDemo(t *testing.T, root string) {
 	}
 }
 
+// TestTheFixtureRepositoryPassesWithTheRealTools carries no spec check: it
+// skips on a machine without the tools, and the rust-stack workflow, which
+// installs them, runs it.
 func TestTheFixtureRepositoryPassesWithTheRealTools(t *testing.T) {
-	spectest.Proves(t, feature, "real-tools-pass", "the-fixture-repository-passes-with-the-real-tools")
 	for _, tool := range []string{"rustc", "cargo", "cargo-nextest", "cargo-llvm-cov"} {
 		if _, err := exec.LookPath(tool); err != nil {
 			if os.Getenv(RealToolsVariable) == "1" {
