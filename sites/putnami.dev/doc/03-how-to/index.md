@@ -36,6 +36,7 @@ How-To is organized by user intent, not architecture.
 - [Build an API service](/docs/how-to/build-an-api-service)
 - [Share code between projects](/docs/how-to/share-code-between-projects)
 - [Configure your app](/docs/how-to/configure-your-app)
+- [Adopt Putnami on an existing monorepo](/docs/how-to/adopt-putnami-on-an-existing-monorepo)
 
 ### Extend
 
