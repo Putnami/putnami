@@ -167,7 +167,7 @@ func ProjectsSync(ctx context.Context, wsRoot string, cfg *wsproto.Config, args 
 
 	// A new member is named by its directory until a provider answers for it,
 	// so two that resolve to one name would stop the next load.
-	if err := nameCollidingMembers(wsRoot, added); err != nil {
+	if err := nameCollidingMembers(wsRoot, added, adapters.boundTo(ctx)); err != nil {
 		return err
 	}
 
@@ -201,11 +201,12 @@ func ProjectsSync(ctx context.Context, wsRoot string, cfg *wsproto.Config, args 
 	return nil
 }
 
-// nameCollidingMembers writes the path as the name of each new member that
-// resolves to the name of another project with no provider view, as on a fresh
-// clone, which has no recorded view to tell them apart. A member that states
-// its own name keeps it.
-func nameCollidingMembers(wsRoot string, added []string) error {
+// nameCollidingMembers writes a name for each new member that resolves to the
+// name of another project with no provider view, as on a fresh clone, which has
+// no recorded view to tell them apart. The name is the one the member's provider
+// reports, so the member keeps the identity it has with a view, and its path
+// when no provider reports one. A member that states its own name keeps it.
+func nameCollidingMembers(wsRoot string, added []string, providers []workspace.ProviderBinding) error {
 	workspace.InvalidateLoadCache(wsRoot)
 	defer workspace.InvalidateLoadCache(wsRoot)
 	ws, err := workspace.Load(wsRoot)
@@ -217,22 +218,61 @@ func nameCollidingMembers(wsRoot string, added []string) error {
 	if !errors.As(err, &duplicates) {
 		return nil
 	}
+	var members []string
 	for _, paths := range duplicates.Names {
 		for _, p := range paths {
-			if !slices.Contains(added, p) {
-				continue
+			if slices.Contains(added, p) {
+				members = append(members, p)
 			}
-			if err := nameMember(wsRoot, p); err != nil {
-				return err
-			}
+		}
+	}
+	if len(members) == 0 {
+		return nil
+	}
+	sort.Strings(members)
+	sourceNames := memberSourceNames(providers, members)
+	for _, member := range members {
+		name := sourceNames[member]
+		if name == "" {
+			name = member
+		}
+		if err := nameMember(wsRoot, member, name); err != nil {
+			return err
 		}
 	}
 	return nil
 }
 
-// nameMember writes the member's path as its name in its putnami.json, unless
-// the file states a name.
-func nameMember(wsRoot, member string) error {
+// memberSourceNames asks the providers for the name each member declares, keyed
+// by member path. A failed probe leaves the members with no source name: the
+// path they then receive keeps the workspace loadable, and `projects sync` is
+// the command that repairs it.
+func memberSourceNames(providers []workspace.ProviderBinding, members []string) map[string]string {
+	if len(providers) == 0 {
+		return nil
+	}
+	asked := make([]workspace.ProbeProvider, 0, len(providers))
+	for _, binding := range providers {
+		asked = append(asked, binding.Provider)
+	}
+	outcome, err := workspace.RunProbe(asked, wsproto.ProbeRequest{
+		Reason: wsproto.ProbeReasonRefresh,
+		Paths:  members,
+	}, nil)
+	if err != nil {
+		iox.Fprintf(os.Stdout, "  warning: the probe for the names of the new members failed; they are named by path: %v\n", err)
+		return nil
+	}
+	names := make(map[string]string, len(members))
+	for _, member := range members {
+		names[member] = outcome.Merged[member].SourceName
+	}
+	return names
+}
+
+// nameMember writes name as the member's name in its putnami.json, unless the
+// file states a name.
+func nameMember(wsRoot, member, name string) error {
 	file := filepath.Join(wsRoot, filepath.FromSlash(member), wsproto.ConfigFilename)
 	doc := map[string]any{}
 	data, err := os.ReadFile(file) //nolint:gosec // a project file under the workspace root
@@ -244,10 +284,10 @@ func nameMember(wsRoot, member string) error {
 			return fmt.Errorf("read %s: %w", file, err)
 		}
 	}
-	if name, _ := doc["name"].(string); name != "" {
+	if stated, _ := doc["name"].(string); stated != "" {
 		return nil
 	}
-	doc["name"] = member
+	doc["name"] = name
 	out, err := json.MarshalIndent(doc, "", "  ")
 	if err != nil {
 		return fmt.Errorf("write %s: %w", file, err)
@@ -314,6 +354,18 @@ func (a workspaceAdapters) bindings() []workspace.ProviderBinding {
 	bindings := make([]workspace.ProviderBinding, 0, len(a.adapters))
 	for _, adapter := range a.adapters {
 		bindings = append(bindings, adapter.binding)
+	}
+	return bindings
+}
+
+// boundTo returns the bindings with their providers tied to ctx, so a canceled
+// command stops the providers it started.
+func (a workspaceAdapters) boundTo(ctx context.Context) []workspace.ProviderBinding {
+	bindings := a.bindings()
+	for i := range bindings {
+		if provider, ok := bindings[i].Provider.(*workspace.ExecProbeProvider); ok {
+			provider.Context = ctx
+		}
 	}
 	return bindings
 }
@@ -624,12 +676,7 @@ func refreshWorkspaceSnapshot(
 		iox.Fprintf(os.Stdout, "  warning: could not reload the workspace for the snapshot: %v\n", err)
 		return
 	}
-	bindings := adapters.bindings()
-	for i := range bindings {
-		if provider, ok := bindings[i].Provider.(*workspace.ExecProbeProvider); ok {
-			provider.Context = ctx
-		}
-	}
+	bindings := adapters.boundTo(ctx)
 	outcome, err := workspace.Synchronize(workspace.SyncRequest{
 		Context: ctx,
 		OnLockWait: func(message string) {

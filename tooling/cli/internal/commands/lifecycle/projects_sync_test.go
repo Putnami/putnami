@@ -2,6 +2,7 @@ package lifecycle
 
 import (
 	"context"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -340,5 +341,62 @@ func TestProjectsSync_NamesByPathOnlyTheMembersWhoseNamesCollide(t *testing.T) {
 		if got := readText(t, filepath.Join(ws, member, "putnami.json")); strings.Contains(got, `"name"`) {
 			t.Errorf("%s resolves through its scope and keeps no written name: %s", member, got)
 		}
+	}
+}
+
+// sourceNameProvider answers a probe with the names it was given.
+type sourceNameProvider struct {
+	names map[string]string
+	err   error
+}
+
+func (p *sourceNameProvider) Name() string { return "@test/names" }
+
+func (p *sourceNameProvider) Probe(request wsproto.ProbeRequest) (wsproto.ProbeResult, error) {
+	if p.err != nil {
+		return wsproto.ProbeResult{}, p.err
+	}
+	result := wsproto.ProbeResult{Version: wsproto.ProbeProtocolVersion, Extension: p.Name()}
+	for _, path := range request.Paths {
+		result.Projects = append(result.Projects, wsproto.ProbeProject{Path: path, SourceName: p.names[path]})
+	}
+	return result, nil
+}
+
+func TestNameCollidingMembers_WritesTheProviderNameAndOtherwiseThePath(t *testing.T) {
+	cases := []struct {
+		name     string
+		provider *sourceNameProvider
+		want     map[string]string
+	}{
+		{
+			name:     "a provider name wins and a member without one takes its path",
+			provider: &sourceNameProvider{names: map[string]string{"apps/foo": "@acme/foo-app"}},
+			want:     map[string]string{"apps/foo": "@acme/foo-app", "libs/foo": "libs/foo"},
+		},
+		{
+			name:     "a failed probe names by path",
+			provider: &sourceNameProvider{err: errors.New("boom")},
+			want:     map[string]string{"apps/foo": "apps/foo", "libs/foo": "libs/foo"},
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			ws := t.TempDir()
+			added := []string{"apps/foo", "libs/foo"}
+			writeProjectFile(t, filepath.Join(ws, "putnami.workspace.json"), `{"includes":["apps/foo","libs/foo"]}`)
+			for _, member := range added {
+				writeProjectFile(t, filepath.Join(ws, member, "putnami.json"), `{}`)
+			}
+			providers := []workspace.ProviderBinding{{Provider: tc.provider}}
+			if err := nameCollidingMembers(ws, added, providers); err != nil {
+				t.Fatalf("nameCollidingMembers: %v", err)
+			}
+			for member, name := range tc.want {
+				if got := readText(t, filepath.Join(ws, member, "putnami.json")); !strings.Contains(got, `"name": "`+name+`"`) {
+					t.Errorf("%s is named %s: %s", member, name, got)
+				}
+			}
+		})
 	}
 }

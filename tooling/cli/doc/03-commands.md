@@ -398,7 +398,7 @@ putnami workspace describe      # Show workspace details
 
 `init` can also scaffold a starter project with `--project <name>`. Use `--project-path <path>` to place that project somewhere other than the default `<project-name>` (at workspace root).
 
-`init --from <tool>` turns a repository that a monorepo tool already describes into a workspace. It runs at the repository root, which must hold the tool's marker file, declares and installs the tool's extension instead of a language starter, and runs `putnami projects sync`, whose extension sync task writes each package's `putnami.json`. It takes no `--project`, `--project-path` or `--extension`: the tool's packages are the projects. When two new members share a directory name, `projects sync` names each by its path in its `putnami.json`.
+`init --from <tool>` turns a repository that a monorepo tool already describes into a workspace. It runs at the repository root, which must hold the tool's marker file, declares and installs the tool's extension instead of a language starter, and runs `putnami projects sync`, whose extension sync task writes each package's `putnami.json`. It takes no `--project`, `--project-path` or `--extension`: the tool's packages are the projects. When two new members share a directory name, `projects sync` writes a name for each in its `putnami.json`: the name its provider reports, or its path when there is none.
 
 | Tool | Marker | Extension | What the sync writes |
 |---|---|---|---|
