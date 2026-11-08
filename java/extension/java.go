@@ -48,61 +48,184 @@ func Stack() (stacks.Stack, error) {
 	if err != nil {
 		return stacks.Stack{}, fmt.Errorf("profile.json: %w", err)
 	}
-	return stacks.Stack{Extension: ExtensionName, Profile: profile, Detect: Detect}, nil
+	return stacks.Stack{Extension: ExtensionName, Profile: profile, Detect: Detect, Tools: Tools}, nil
 }
 
 // Detect names the Gradle projects and the Maven modules among the candidate
-// paths. Both detectors read the build at the workspace root, which is every
-// component's stack root. A directory both builds claim is the Gradle
-// build's.
+// paths. A Gradle build's root is the nearest directory that holds a settings
+// file; a Maven build's root is the topmost directory of an unbroken chain of
+// pom.xml files. Each build's root is the stack root of its components; a root
+// that is no component is an input-only project they depend on. A Gradle
+// build inside another one, such as buildSrc or an included build, is no build
+// of its own. A directory both builds claim is the Gradle build's.
 func Detect(root string, request wsproto.ProbeRequest) ([]stacks.Component, []diag.Diagnostic) {
 	asked := map[string]bool{}
+	gradleRoots := map[string]bool{}
+	mavenRoots := map[string]bool{}
 	for _, p := range request.Paths {
-		asked[p] = true
+		dir, ok := wsproto.NormalizeProbePath(p)
+		if !ok {
+			continue
+		}
+		asked[dir] = true
+		if r, ok := gradleBuildRoot(root, dir); ok {
+			gradleRoots[r] = true
+		}
+		if r, ok := mavenBuildRoot(root, dir); ok {
+			mavenRoots[r] = true
+		}
 	}
 	var out []stacks.Component
-	g := gradle.Detect(root)
-	m := maven.Detect(root)
-	diags := append(slices.Clone(g.Diagnostics), m.Diagnostics...)
+	var diags []diag.Diagnostic
 	claimed := map[string]bool{}
-	for _, c := range g.Components {
-		claimed[c.ID] = true
-		if !asked[c.ID] {
-			continue
-		}
-		file, text := buildFile(root, c.ID)
-		out = append(out, stacks.Component{
-			Path:         c.ID,
-			Name:         gradleName(c.Name),
-			Ref:          gradleRef(c.Name),
-			Variant:      gradleVariant(text),
-			SourceFile:   file,
-			Root:         wsproto.ProbeRootPath,
-			Dependencies: slices.Clone(c.DependsOn),
-		})
-	}
-	for _, c := range m.Components {
-		if claimed[c.ID] {
-			if asked[c.ID] {
-				diags = append(diags, diag.Warningf(CodeBuildConflict, c.ID, "%s is both a Gradle project and the Maven module %s; it runs as the Gradle project", c.ID, c.Name))
+	for _, buildRoot := range sortedKeys(gradleRoots) {
+		g := gradle.Detect(filepath.Join(root, filepath.FromSlash(buildRoot)))
+		diags = append(diags, rebaseDiagnostics(g.Diagnostics, buildRoot)...)
+		hasRoot := false
+		for _, c := range g.Components {
+			path := joinRel(buildRoot, c.ID)
+			claimed[path] = true
+			hasRoot = hasRoot || path == buildRoot
+			if !asked[path] {
+				continue
 			}
-			continue
+			file, text := buildFile(root, path)
+			out = append(out, stacks.Component{
+				Path:         path,
+				Name:         gradleName(c.Name),
+				Ref:          gradleRef(c.Name),
+				Variant:      gradleVariant(text),
+				SourceFile:   file,
+				Root:         buildRoot,
+				Dependencies: rebasePaths(c.DependsOn, buildRoot),
+				Type:         gradleType(text),
+			})
 		}
-		if !asked[c.ID] {
-			continue
+		if !hasRoot && buildRoot != wsproto.ProbeRootPath && asked[buildRoot] {
+			claimed[buildRoot] = true
+			out = append(out, stacks.Component{Path: buildRoot, SourceFile: settingsFile(root, buildRoot), Root: buildRoot, Variant: VariantGradle, InputOnly: true})
 		}
-		_, artifact, _ := strings.Cut(c.Name, ":")
-		out = append(out, stacks.Component{
-			Path:         c.ID,
-			Name:         artifact,
-			Ref:          c.Name,
-			Variant:      VariantMaven,
-			SourceFile:   joinRel(c.ID, maven.POM),
-			Root:         wsproto.ProbeRootPath,
-			Dependencies: slices.Clone(c.DependsOn),
-		})
+	}
+	for _, buildRoot := range sortedKeys(mavenRoots) {
+		m := maven.Detect(filepath.Join(root, filepath.FromSlash(buildRoot)))
+		diags = append(diags, rebaseDiagnostics(m.Diagnostics, buildRoot)...)
+		hasRoot := false
+		for _, c := range m.Components {
+			path := joinRel(buildRoot, c.ID)
+			if claimed[path] {
+				if asked[path] {
+					diags = append(diags, diag.Warningf(CodeBuildConflict, path, "%s is both a Gradle project and the Maven module %s; it runs as the Gradle project", path, c.Name))
+				}
+				continue
+			}
+			hasRoot = hasRoot || path == buildRoot
+			if !asked[path] {
+				continue
+			}
+			_, artifact, _ := strings.Cut(c.Name, ":")
+			out = append(out, stacks.Component{
+				Path:         path,
+				Name:         artifact,
+				Ref:          c.Name,
+				Variant:      VariantMaven,
+				SourceFile:   joinRel(path, maven.POM),
+				Root:         buildRoot,
+				Dependencies: rebasePaths(c.DependsOn, buildRoot),
+				Type:         mavenType(root, path),
+			})
+		}
+		if !hasRoot && buildRoot != wsproto.ProbeRootPath && asked[buildRoot] && !claimed[buildRoot] {
+			out = append(out, stacks.Component{Path: buildRoot, SourceFile: joinRel(buildRoot, maven.POM), Root: buildRoot, Variant: VariantMaven, InputOnly: true})
+		}
 	}
 	return out, diags
+}
+
+// gradleBuildRoot answers the root of the Gradle build that holds dir: the
+// nearest directory, dir included, that holds a settings file. A settings
+// file inside another Gradle build names an included build, which belongs to
+// that outer build: dir then has no build of its own.
+func gradleBuildRoot(root, dir string) (string, bool) {
+	found := ""
+	for d := dir; ; d = parentDir(d) {
+		if settingsFile(root, d) != "" {
+			if found != "" {
+				return "", false
+			}
+			found = d
+		}
+		if d == wsproto.ProbeRootPath {
+			break
+		}
+	}
+	return found, found != ""
+}
+
+// mavenBuildRoot answers the root of the Maven build that holds dir: the
+// topmost directory of the unbroken chain of pom.xml files from dir up.
+func mavenBuildRoot(root, dir string) (string, bool) {
+	if !isFile(root, joinRel(dir, maven.POM)) {
+		return "", false
+	}
+	found := dir
+	for d := dir; d != wsproto.ProbeRootPath; {
+		d = parentDir(d)
+		if !isFile(root, joinRel(d, maven.POM)) {
+			break
+		}
+		found = d
+	}
+	return found, true
+}
+
+// settingsFile answers the settings file of a Gradle build rooted at dir, or
+// "" when dir holds none.
+func settingsFile(root, dir string) string {
+	for _, name := range gradle.SettingsFiles {
+		if isFile(root, joinRel(dir, name)) {
+			return joinRel(dir, name)
+		}
+	}
+	return ""
+}
+
+func isFile(root, rel string) bool {
+	info, err := os.Stat(filepath.Join(root, filepath.FromSlash(rel)))
+	return err == nil && info.Mode().IsRegular()
+}
+
+func parentDir(dir string) string {
+	if i := strings.LastIndex(dir, "/"); i >= 0 {
+		return dir[:i]
+	}
+	return wsproto.ProbeRootPath
+}
+
+func rebasePaths(paths []string, buildRoot string) []string {
+	var out []string
+	for _, p := range paths {
+		out = append(out, joinRel(buildRoot, p))
+	}
+	return out
+}
+
+func rebaseDiagnostics(diags []diag.Diagnostic, buildRoot string) []diag.Diagnostic {
+	out := slices.Clone(diags)
+	for i := range out {
+		if out[i].Field != "" {
+			out[i].Field = joinRel(buildRoot, out[i].Field)
+		}
+	}
+	return out
+}
+
+func sortedKeys(m map[string]bool) []string {
+	var out []string
+	for k := range m {
+		out = append(out, k)
+	}
+	slices.Sort(out)
+	return out
 }
 
 // gradleName is the project name of a Gradle path: :libs:core is libs/core.
@@ -136,6 +259,38 @@ var (
 	// or a coordinate that holds the word, such as a URL, is no plugin.
 	jacocoPlugin = regexp.MustCompile(`(?m)(?:^|[^A-Za-z0-9_$./-])(?:org\.gradle\.)?jacoco(?:[^A-Za-z0-9_$/.-]|$)`)
 )
+
+// Component types the planner reads: an application runs, a library does not.
+const (
+	TypeApplication = "application"
+	TypeLibrary     = "library"
+)
+
+var (
+	// gradleApplication finds the plugins that make a runnable project: the
+	// application plugin, Spring Boot, and an Android application.
+	gradleApplication = regexp.MustCompile(`(?m)(?:^|[^A-Za-z0-9_$./-])(?:org\.gradle\.)?application(?:[^A-Za-z0-9_$/.-]|$)|org\.springframework\.boot|plugins\.spring[.\-_]?boot|com\.android\.application|plugins\.android[.\-_]?application`)
+	// mavenApplication finds a module that builds a runnable jar: the
+	// Spring Boot plugin.
+	mavenApplication = regexp.MustCompile(`<artifactId>\s*spring-boot-maven-plugin\s*</artifactId>`)
+)
+
+// gradleType reads a Gradle project's type from its build file.
+func gradleType(build string) string {
+	if gradleApplication.MatchString(build) {
+		return TypeApplication
+	}
+	return TypeLibrary
+}
+
+// mavenType reads a Maven module's type from its POM.
+func mavenType(root, dir string) string {
+	data, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(joinRel(dir, maven.POM)))) //nolint:gosec // a POM under the workspace root
+	if err == nil && mavenApplication.Match(data) {
+		return TypeApplication
+	}
+	return TypeLibrary
+}
 
 // gradleVariant reads the variant of a Gradle project from its build file.
 func gradleVariant(build string) string {
@@ -223,6 +378,9 @@ func stringEnd(text string, i int) int {
 func joinRel(dir, name string) string {
 	if dir == "" || dir == wsproto.ProbeRootPath {
 		return name
+	}
+	if name == wsproto.ProbeRootPath {
+		return dir
 	}
 	return dir + "/" + name
 }

@@ -168,7 +168,7 @@ func Provide(ctx context.Context, expected stacks.Expected, info func(string)) (
 
 // Tools makes cargo-nextest and cargo-llvm-cov available to the test task,
 // each only when the PATH of env holds none, and returns their directories.
-func Tools(ctx context.Context, task string, env []string, info func(string)) ([]string, error) {
+func Tools(ctx context.Context, task string, _ stacks.Metadata, env []string, info func(string)) ([]string, error) {
 	if task != stacks.TaskTest {
 		return nil, nil
 	}

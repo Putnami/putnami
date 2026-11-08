@@ -208,7 +208,7 @@ func stubTools(t *testing.T, root, version, junit string) string {
 	t.Helper()
 	bin := t.TempDir()
 	log := filepath.Join(bin, "build.log")
-	writeFile(t, bin, "java", "#!/bin/sh\necho 'Picked up JAVA_TOOL_OPTIONS: -Dx=y' >&2\necho 'openjdk version \""+version+"\" 2024-07-16' >&2\n")
+	writeFile(t, bin, "javac", "#!/bin/sh\necho 'Picked up JAVA_TOOL_OPTIONS: -Dx=y' >&2\necho 'javac "+version+"'\n")
 	report := "cat > \"$dir/TEST-stub.xml\" <<'XML'\n" + junit + "\nXML\n"
 	jacoco := `<?xml version="1.0"?><report name="r"><package name="p"><sourcefile name="A.kt"><line nr="1" mi="0" ci="3"/><line nr="2" mi="2" ci="0"/><line nr="3" mi="0" ci="1"/></sourcefile></package></report>`
 	writeFile(t, bin, "mvn", "#!/bin/sh\necho \"$PWD: mvn $*\" >> \""+log+"\"\ncase \"$*\" in *-DskipTests*) exit 0;; esac\ndir=target/surefire-reports\nmkdir -p $dir\n"+report)
@@ -226,7 +226,7 @@ for a in "$@"; do
   prev="$a"
 done
 `)
-	for _, f := range []string{filepath.Join(bin, "java"), filepath.Join(bin, "mvn"), filepath.Join(root, "gradlew")} {
+	for _, f := range []string{filepath.Join(bin, "javac"), filepath.Join(bin, "mvn"), filepath.Join(root, "gradlew")} {
 		if err := os.Chmod(f, 0o755); err != nil {
 			t.Fatal(err)
 		}
@@ -482,4 +482,48 @@ func runJobNoXML(t *testing.T, g string) (string, map[string]any, error) {
 	writeFile(t, g, "gradlew", strings.Replace(string(data), "*:jacocoTestReport) mkdir", "*:jacocoTestReport) continue; mkdir", 1))
 	defer writeFile(t, g, "gradlew", string(data))
 	return runJob(t, g, "api", stacks.TaskTest)
+}
+
+func TestNestedBuildsHaveTheirOwnStackRoot(t *testing.T) {
+	spectest.Proves(t, feature, "nested-builds-are-stack-roots", "nested-gradle-and-maven-builds-are-their-components-stack-roots")
+	root := t.TempDir()
+	writeFile(t, root, "samples/gradle/settings.gradle.kts", "include(\":app\", \":lib\")\n")
+	writeFile(t, root, "samples/gradle/app/build.gradle.kts", "plugins {\n    application\n}\ndependencies {\n    implementation(project(\":lib\"))\n}\n")
+	writeFile(t, root, "samples/gradle/app/src/main/java/App.java", "class App {}\n")
+	writeFile(t, root, "samples/gradle/lib/build.gradle.kts", "plugins {\n    `java-library`\n}\n")
+	writeFile(t, root, "samples/gradle/lib/src/main/java/Lib.java", "class Lib {}\n")
+	writeFile(t, root, "samples/gradle/buildSrc/settings.gradle.kts", "\n")
+	writeFile(t, root, "samples/gradle/buildSrc/build.gradle.kts", "plugins { `kotlin-dsl` }\n")
+	writeFile(t, root, "samples/maven/pom.xml", `<project><groupId>com.acme</groupId><artifactId>shop</artifactId><packaging>pom</packaging><modules><module>app</module><module>lib</module></modules></project>`)
+	writeFile(t, root, "samples/maven/app/pom.xml", `<project><parent><groupId>com.acme</groupId></parent><artifactId>app</artifactId><dependencies><dependency><groupId>com.acme</groupId><artifactId>lib</artifactId></dependency></dependencies><build><plugins><plugin><artifactId>spring-boot-maven-plugin</artifactId></plugin></plugins></build></project>`)
+	writeFile(t, root, "samples/maven/lib/pom.xml", `<project><parent><groupId>com.acme</groupId></parent><artifactId>lib</artifactId></project>`)
+	got := probe(t, root, "samples/gradle", "samples/gradle/app", "samples/gradle/buildSrc", "samples/gradle/lib", "samples/maven", "samples/maven/app", "samples/maven/lib")
+	want := map[string]struct {
+		root, ref, typ string
+		deps           []string
+	}{
+		"samples/gradle":     {"samples/gradle", "", "", nil},
+		"samples/gradle/app": {"samples/gradle", ":app:", TypeApplication, []string{"samples/gradle", "samples/gradle/lib"}},
+		"samples/gradle/lib": {"samples/gradle", ":lib:", TypeLibrary, []string{"samples/gradle"}},
+		"samples/maven":      {"samples/maven", "", "", nil},
+		"samples/maven/app":  {"samples/maven", "com.acme:app", TypeApplication, []string{"samples/maven", "samples/maven/lib"}},
+		"samples/maven/lib":  {"samples/maven", "com.acme:lib", TypeLibrary, []string{"samples/maven"}},
+	}
+	if len(got) != len(want) {
+		t.Fatalf("projects = %v", got)
+	}
+	for path, w := range want {
+		p, ok := got[path]
+		if !ok {
+			t.Errorf("no project %s", path)
+			continue
+		}
+		meta := metadata(t, p)
+		if meta.Root != w.root || meta.Component != w.ref || p.Type != w.typ || !reflect.DeepEqual(p.Dependencies, w.deps) {
+			t.Errorf("%s = %+v, metadata %+v", path, p, meta)
+		}
+	}
+	if got := resolve(t, root, "samples/gradle", "java:build"); !slices.Contains(got.Files, "settings.gradle.kts") || got.Error != "" {
+		t.Errorf("the nested root reads its root files: %+v", got)
+	}
 }

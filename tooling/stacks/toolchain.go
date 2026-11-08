@@ -220,7 +220,22 @@ func (t Toolchain) Select(ctx context.Context, dir string, expected Expected, en
 	if verdict.Fail && machineErr == nil {
 		return onPath, nil
 	}
-	return Selection{Env: prependPath(env, filepath.Dir(pinned)), Executable: pinned, Verdict: verdict}, nil
+	selected := prependPath(env, filepath.Dir(pinned))
+	if t.Home != "" {
+		selected = setEnv(selected, t.Home, filepath.Dir(filepath.Dir(pinned)))
+	}
+	return Selection{Env: selected, Executable: pinned, Verdict: verdict}, nil
+}
+
+// setEnv returns env with name set to value, replacing any earlier value.
+func setEnv(env []string, name, value string) []string {
+	out := make([]string, 0, len(env)+1)
+	for _, entry := range env {
+		if !strings.HasPrefix(entry, name+"=") {
+			out = append(out, entry)
+		}
+	}
+	return append(out, name+"="+value)
 }
 
 func environmentValue(env []string, name string) string {

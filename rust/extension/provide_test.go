@@ -236,13 +236,13 @@ func TestTheTestTaskInstallsTheToolsTheMachineDoesNotHold(t *testing.T) {
 		t.Fatal(err)
 	}
 	env := []string{"PATH=" + held}
-	if dirs, err := Tools(context.Background(), stacks.TaskLint, env, func(string) {}); err != nil || len(dirs) != 0 {
+	if dirs, err := Tools(context.Background(), stacks.TaskLint, stacks.Metadata{}, env, func(string) {}); err != nil || len(dirs) != 0 {
 		t.Errorf("lint installs no tool: %v %v", dirs, err)
 	}
 	if downloads.Load() != 0 {
 		t.Errorf("lint downloaded %d", downloads.Load())
 	}
-	dirs, err := Tools(context.Background(), stacks.TaskTest, env, func(string) {})
+	dirs, err := Tools(context.Background(), stacks.TaskTest, stacks.Metadata{}, env, func(string) {})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -252,7 +252,7 @@ func TestTheTestTaskInstallsTheToolsTheMachineDoesNotHold(t *testing.T) {
 	if info, err := os.Stat(filepath.Join(dirs[0], "cargo-llvm-cov")); err != nil || info.Mode().Perm()&0o100 == 0 {
 		t.Errorf("binary: %v %v", info, err)
 	}
-	if _, err := Tools(context.Background(), stacks.TaskTest, env, func(string) {}); err != nil {
+	if _, err := Tools(context.Background(), stacks.TaskTest, stacks.Metadata{}, env, func(string) {}); err != nil {
 		t.Fatal(err)
 	}
 	if downloads.Load() != 1 {

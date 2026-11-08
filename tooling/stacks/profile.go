@@ -78,6 +78,10 @@ type Toolchain struct {
 	// toolchain the workspace lock pins. A task uses that toolchain when the
 	// one on PATH is missing or outside the stated version.
 	Provisioned string `json:"provisioned,omitempty"`
+	// Home names the environment variable a task sets to the home of the
+	// pinned toolchain when it runs it: the parent of the directory that holds
+	// its command, such as JAVA_HOME. Build tools read the home before PATH.
+	Home string `json:"home,omitempty"`
 }
 
 // VersionFile is a file that states the expected toolchain version.
@@ -248,6 +252,9 @@ func (t Toolchain) validate() error {
 	}
 	if t.Provisioned != "" && !environmentName.MatchString(t.Provisioned) {
 		return fmt.Errorf("provisioned: %q is not an environment variable name", t.Provisioned)
+	}
+	if t.Home != "" && (t.Provisioned == "" || !environmentName.MatchString(t.Home)) {
+		return fmt.Errorf("home: %q is not an environment variable name beside a provisioned toolchain", t.Home)
 	}
 	return nil
 }

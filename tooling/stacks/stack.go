@@ -77,10 +77,12 @@ type Stack struct {
 	// installed. Nil means the stack installs no toolchain. It needs a profile
 	// that names toolchain.provisioned.
 	Provide func(ctx context.Context, expected Expected, info func(string)) (Provided, error)
-	// Tools makes the tools of one task available, beyond the toolchain, and
-	// returns the directories to append to its PATH. A tool already on the
-	// PATH of env needs no directory. Nil means the stack installs no tool.
-	Tools func(ctx context.Context, task string, env []string, info func(string)) ([]string, error)
+	// Tools makes the tools of one task of a component available, beyond the
+	// toolchain, and returns the directories to append to its PATH. meta is
+	// the component's, so a stack with several builds installs only the tools
+	// of the component's. A tool already on the PATH of env needs no
+	// directory. Nil means the stack installs no tool.
+	Tools func(ctx context.Context, task string, meta Metadata, env []string, info func(string)) ([]string, error)
 }
 
 // Provided is a toolchain a stack extension installed.

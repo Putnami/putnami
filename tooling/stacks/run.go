@@ -151,7 +151,7 @@ func (s Stack) selectToolchain(ctx context.Context, in runInput, meta Metadata, 
 		emit.DiagnosticWithCode("warning", v.Message, "", 0, 0, v.Code)
 	}
 	if s.Tools != nil && !offline {
-		dirs, err := s.Tools(ctx, in.task, selected.Env, emit.Info)
+		dirs, err := s.Tools(ctx, in.task, meta, selected.Env, emit.Info)
 		if err != nil {
 			return Selection{}, failWith(emit, CodeToolchainMissing, "install the tools of the %s task: %v", in.task, err)
 		}

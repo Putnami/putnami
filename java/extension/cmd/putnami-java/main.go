@@ -24,7 +24,10 @@ func main() {
 func run(args []string, stdin io.Reader, stdout, stderr io.Writer, runJobs func(map[string]cli.JobFunc)) int {
 	stack, err := java.Stack()
 	if err == nil {
-		err = stack.Entrypoint(args, stdin, stdout, runtimeVersion, runJobs)
+		var handled bool
+		if handled, err = java.HandleToolchainResolve(args, stdin, stdout, stack.Profile); !handled && err == nil {
+			err = stack.Entrypoint(args, stdin, stdout, runtimeVersion, runJobs)
+		}
 	}
 	if err != nil {
 		fmt.Fprintf(stderr, "%s: %v\n", java.ExtensionName, err)
