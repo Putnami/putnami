@@ -485,7 +485,11 @@ func (s Stack) run(ctx context.Context, in runInput, emit reporter) (string, map
 		t.Steps, t.Reports = w.Steps, &reports
 	}
 
-	vars := map[string]string{"{root}": rootAbs, "{component}": meta.Component, "{project}": in.projectAbs, "{output}": outDir}
+	runtime, err := s.runtimePath()
+	if err != nil {
+		return statusFailed, nil, err
+	}
+	vars := map[string]string{"{root}": rootAbs, "{component}": meta.Component, "{project}": in.projectAbs, "{output}": outDir, "{runtime}": runtime}
 	// A test runner exits non-zero when a case fails: the steps stop there,
 	// and the reports it wrote are still read, so the failed cases name the
 	// failure.
@@ -598,6 +602,19 @@ func hasCoverageSupport(ctx context.Context, program string, args []string, dir 
 	cmd.Dir = dir
 	cmd.Env = env
 	return cmd.Run() == nil
+}
+
+// runtimePath is what {runtime} expands to: Stack.Runtime, else the running
+// executable.
+func (s Stack) runtimePath() (string, error) {
+	if s.Runtime != "" {
+		return s.Runtime, nil
+	}
+	exe, err := os.Executable()
+	if err != nil {
+		return "", fmt.Errorf("locate the extension runtime for {runtime}: %w", err)
+	}
+	return exe, nil
 }
 
 func severity(d diag.Diagnostic) string {

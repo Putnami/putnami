@@ -20,6 +20,14 @@ func (s Stack) Entrypoint(args []string, stdin io.Reader, stdout io.Writer, vers
 	if handled, err := runtimeinfo.Handle(args, stdout, s.Extension, version); handled {
 		return err
 	}
+	if len(args) > 0 {
+		if command, ok := s.Commands[args[0]]; ok {
+			if err := command(args[1:], stdout, os.Stderr); err != nil {
+				return fmt.Errorf("%s: %w", args[0], err)
+			}
+			return nil
+		}
+	}
 	root, err := os.Getwd()
 	if err != nil {
 		return fmt.Errorf("resolve the workspace root: %w", err)

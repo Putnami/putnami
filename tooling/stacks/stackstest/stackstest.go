@@ -9,6 +9,7 @@ import (
 	"os"
 	"reflect"
 	"slices"
+	"strings"
 	"testing"
 
 	proto "go.putnami.dev/protocol/extension"
@@ -56,6 +57,13 @@ func CheckManifest(t testing.TB, path string, s stacks.Stack) {
 			if !slices.Contains(doc.Workspace.Inputs, f.Path) {
 				t.Errorf("workspace.inputs %v does not hold the toolchain file %s", doc.Workspace.Inputs, f.Path)
 			}
+		}
+	}
+	// A runtime command shares the runtime's argument space with the jobs
+	// and the control calls.
+	for name := range s.Commands {
+		if slices.Contains(stacks.TaskNames, name) || strings.HasPrefix(name, "__") || strings.HasPrefix(name, "-") {
+			t.Errorf("runtime command %q shadows a task or a control call", name)
 		}
 	}
 	if got, want := sorted(doc.Runtime.InputSelectors), s.Selectors(); !reflect.DeepEqual(got, want) {

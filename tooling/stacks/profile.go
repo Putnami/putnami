@@ -45,12 +45,17 @@ var coverageFormats = []string{"lcov", "cobertura", "jacoco", "clover", "gocover
 type Profile struct {
 	// ID is the stack id, such as "rust".
 	ID string `json:"id"`
-	// Markers are the files that make a directory a candidate project.
+	// Markers are the files that make a directory a candidate project: a
+	// file name, or a file one directory down whose directory may be a
+	// wildcard, such as "*.xcodeproj/project.pbxproj".
 	Markers []string `json:"markers"`
 	// Toolchain is how the version on the machine is read and compared.
 	Toolchain Toolchain `json:"toolchain"`
 	// Inputs are named sets of file patterns the tasks read.
 	Inputs map[string][]string `json:"inputs"`
+	// Excludes are directory names an input pattern with "**" never walks
+	// into: the build outputs and dependency checkouts beside the sources.
+	Excludes []string `json:"excludes,omitempty"`
 	// Tasks are the lint, test and build tasks, by name.
 	Tasks map[string]Task `json:"tasks"`
 	// Variants are named parts of the profile, with its shape and every
@@ -179,7 +184,7 @@ var (
 )
 
 // stepPlaceholders are the placeholders a step may name.
-var stepPlaceholders = []string{"{root}", "{component}", "{project}", "{output}"}
+var stepPlaceholders = []string{"{root}", "{component}", "{project}", "{output}", "{runtime}"}
 
 // Validate reports the first rule the profile breaks.
 func (p Profile) Validate() error {
@@ -190,8 +195,13 @@ func (p Profile) Validate() error {
 		return errors.New("markers: a profile names at least one marker")
 	}
 	for i, m := range p.Markers {
-		if m == "" || strings.Contains(m, "/") || strings.Contains(m, "{") {
-			return fmt.Errorf("markers[%d]: %q is not a file name", i, m)
+		if err := validateMarker(m); err != nil {
+			return fmt.Errorf("markers[%d]: %w", i, err)
+		}
+	}
+	for i, e := range p.Excludes {
+		if e == "" || e == "." || e == ".." || strings.ContainsAny(e, "/\\{*?[") {
+			return fmt.Errorf("excludes[%d]: %q is not a directory name", i, e)
 		}
 	}
 	if err := p.Toolchain.validate(); err != nil {
@@ -224,6 +234,21 @@ func (p Profile) Validate() error {
 		}
 		if _, err := p.Variant(name); err != nil {
 			return err
+		}
+	}
+	return nil
+}
+
+// validateMarker accepts a file name, or a file one directory down whose
+// directory may be a wildcard: "Package.swift", "*.xcodeproj/project.pbxproj".
+func validateMarker(m string) error {
+	segments := strings.Split(m, "/")
+	if len(segments) > 2 || strings.Contains(m, "{") || strings.Contains(m, "\\") {
+		return fmt.Errorf("%q is not a file name, or a file one directory down", m)
+	}
+	for _, seg := range segments {
+		if seg == "" || seg == "." || seg == ".." || seg == "**" {
+			return fmt.Errorf("%q is not a file name, or a file one directory down", m)
 		}
 	}
 	return nil
@@ -323,7 +348,7 @@ func validateSteps(field string, steps [][]string) error {
 		for _, arg := range step {
 			for _, ph := range placeholderExpr.FindAllString(arg, -1) {
 				if !slices.Contains(stepPlaceholders, ph) {
-					return fmt.Errorf("%s[%d]: %s is no placeholder; use {root}, {component}, {project} or {output}", field, i, ph)
+					return fmt.Errorf("%s[%d]: %s is no placeholder; use {root}, {component}, {project}, {output} or {runtime}", field, i, ph)
 				}
 			}
 		}

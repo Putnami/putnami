@@ -113,12 +113,34 @@ func (s Stack) fileOwners(root string) func(abs string) (string, bool) {
 }
 
 func (s Stack) hasMarker(root, dir string) bool {
+	base := filepath.Join(root, filepath.FromSlash(dir))
 	for _, m := range s.Profile.Markers {
-		if info, err := os.Stat(filepath.Join(root, filepath.FromSlash(dir), m)); err == nil && info.Mode().IsRegular() {
-			return true
+		candidates := []string{filepath.Join(base, filepath.FromSlash(m))}
+		// A marker may name a file one directory down with a wildcard
+		// directory: the marker alone is a pattern, never the path above it.
+		if strings.ContainsAny(m, "*?[") {
+			candidates, _ = filepath.Glob(filepath.Join(globEscape(base), filepath.FromSlash(m)))
+		}
+		for _, c := range candidates {
+			if info, err := os.Stat(c); err == nil && info.Mode().IsRegular() {
+				return true
+			}
 		}
 	}
 	return false
+}
+
+// globEscape escapes the pattern characters of a path, so filepath.Glob reads
+// it as itself.
+func globEscape(p string) string {
+	var b strings.Builder
+	for _, r := range p {
+		if strings.ContainsRune(`*?[\`, r) && filepath.Separator != '\\' {
+			b.WriteByte('\\')
+		}
+		b.WriteRune(r)
+	}
+	return b.String()
 }
 
 // relSlash is target relative to base in slash form; ok is false when target
