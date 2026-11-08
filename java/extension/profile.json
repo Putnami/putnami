@@ -38,6 +38,8 @@
       "build.gradle.kts",
       "build.gradle",
       "gradle.properties",
+      "*.versions.toml",
+      "gradle/*.versions.toml",
       "{root}/settings.gradle.kts",
       "{root}/settings.gradle",
       "{root}/build.gradle.kts",
@@ -411,6 +413,7 @@
               "--projects",
               "{component}",
               "--also-make",
+              "clean",
               "verify",
               "-DskipTests"
             ]
@@ -432,6 +435,7 @@
               "--projects",
               "{component}",
               "--also-make",
+              "clean",
               "verify"
             ]
           ],
@@ -469,6 +473,7 @@
               "--projects",
               "{component}",
               "--also-make",
+              "clean",
               "package",
               "-DskipTests"
             ]

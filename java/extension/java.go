@@ -128,13 +128,13 @@ var (
 	androidCoverage = regexp.MustCompile(`(?:[Ee]nableUnitTestCoverage|testCoverageEnabled)\s*=?\s*true`)
 	// platformPlugin finds java-platform: a project of dependency
 	// constraints, with check and assemble and no test task.
-	platformPlugin = regexp.MustCompile(`(?m)(?:^|[^A-Za-z0-9_$./-])java-platform(?:[^A-Za-z0-9_$/.-]|$)`)
+	platformPlugin = regexp.MustCompile(`(?m)(?:^|[^A-Za-z0-9_$./-])(?:org\.gradle\.)?java-platform(?:[^A-Za-z0-9_$/.-]|$)`)
 	// catalogPlugin finds version-catalog: a project that publishes a
 	// catalog, with neither check, assemble nor test.
-	catalogPlugin = regexp.MustCompile(`(?m)(?:^|[^A-Za-z0-9_$./-])version-catalog(?:[^A-Za-z0-9_$/.-]|$)`)
+	catalogPlugin = regexp.MustCompile(`(?m)(?:^|[^A-Za-z0-9_$./-])(?:org\.gradle\.)?version-catalog(?:[^A-Za-z0-9_$/.-]|$)`)
 	// jacocoPlugin finds the jacoco plugin, applied or configured; a path
 	// or a coordinate that holds the word, such as a URL, is no plugin.
-	jacocoPlugin = regexp.MustCompile(`(?m)(?:^|[^A-Za-z0-9_$./-])jacoco(?:[^A-Za-z0-9_$/.-]|$)`)
+	jacocoPlugin = regexp.MustCompile(`(?m)(?:^|[^A-Za-z0-9_$./-])(?:org\.gradle\.)?jacoco(?:[^A-Za-z0-9_$/.-]|$)`)
 )
 
 // gradleVariant reads the variant of a Gradle project from its build file.

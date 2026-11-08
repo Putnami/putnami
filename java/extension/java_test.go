@@ -182,6 +182,8 @@ func TestEachComponentGetsTheVariantOfItsBuild(t *testing.T) {
 		"plugins { alias(libs.plugins.android.application) }":        VariantAndroid,
 		"android {\n  testCoverageEnabled true\n}":                   VariantAndroidCoverage,
 		"plugins {\n    id(\"jacoco\")\n}":                           VariantGradleJaCoCo,
+		"plugins { id(\"org.gradle.version-catalog\") }":             VariantGradleCatalog,
+		"plugins { id 'org.gradle.jacoco' }":                         VariantGradleJaCoCo,
 		"apply plugin: 'jacoco'":                                     VariantGradleJaCoCo,
 		"tasks.jacocoTestReport { }":                                 VariantGradle,
 		"plugins { java }\n/* jacoco */":                             VariantGradle,
@@ -305,9 +307,9 @@ func TestATaskRunsTheVariantStepsAfterTheJavaCheck(t *testing.T) {
 		}
 	}
 	for _, want := range []string{
-		"mvn --batch-mode --file " + m + "/pom.xml --projects com.acme:pricing --also-make verify -DskipTests",
-		"mvn --batch-mode --file " + m + "/pom.xml --projects com.acme:pricing --also-make verify\n",
-		"mvn --batch-mode --file " + m + "/pom.xml --projects com.acme:pricing --also-make package -DskipTests",
+		"mvn --batch-mode --file " + m + "/pom.xml --projects com.acme:pricing --also-make clean verify -DskipTests",
+		"mvn --batch-mode --file " + m + "/pom.xml --projects com.acme:pricing --also-make clean verify\n",
+		"mvn --batch-mode --file " + m + "/pom.xml --projects com.acme:pricing --also-make clean package -DskipTests",
 	} {
 		if !strings.Contains(ran(t, log), filepath.Join(m, "pricing")+": "+want) {
 			t.Errorf("ran\n%s\nwant %q", ran(t, log), want)
@@ -384,6 +386,11 @@ func TestALockfileChangeKeepsTheLintKey(t *testing.T) {
 	}
 	if got := resolve(t, g, "pricing", "java:test"); !slices.Contains(got.Files, "gradle.lockfile") {
 		t.Errorf("gradle test reads the lockfile = %+v", got)
+	}
+	writeFile(t, g, "catalog/libs.versions.toml", "[versions]\n")
+	writeFile(t, g, "catalog/build/version-catalog/libs.versions.toml", "[versions]\n")
+	if got := resolve(t, g, "catalog", "java:build"); !reflect.DeepEqual(got.Files, []string{"build.gradle.kts", "libs.versions.toml"}) {
+		t.Errorf("a catalog build reads its own TOML, not its output = %+v", got)
 	}
 	m := mavenFixture(t)
 	for _, sel := range []string{"java:lint", "java:build"} {
