@@ -106,6 +106,8 @@ var excludedProjects = map[string]string{
 	"/intelligence/areas":                                  reasonAreaDetector,
 	"/protocols/capabilities/proof":                        reasonProtocolProof,
 	"/protocols/diagnostic/proof":                          reasonProtocolProof,
+	"/php/samples/application":                             reasonSample,
+	"/php/samples/library":                                 reasonSample,
 	"/python/samples/application":                          reasonSample,
 	"/python/samples/library":                              reasonSample,
 	"/python/templates/python-library":                     reasonTemplate,

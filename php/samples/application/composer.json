@@ -1,0 +1,26 @@
+{
+  "name": "putnami-example/application",
+  "description": "An application of the @putnami/php sample, which requires the library through a path repository.",
+  "type": "project",
+  "license": "MIT",
+  "repositories": [
+    { "type": "path", "url": "../library" }
+  ],
+  "require": {
+    "php": "^8.3",
+    "putnami-example/library": "@dev"
+  },
+  "require-dev": {
+    "phpstan/phpstan": "^2.1",
+    "phpunit/phpunit": "^12.0"
+  },
+  "autoload": {
+    "psr-4": { "PutnamiExample\\Application\\": "src/" }
+  },
+  "autoload-dev": {
+    "psr-4": { "PutnamiExample\\Application\\Tests\\": "tests/" }
+  },
+  "config": {
+    "platform": { "php": "8.3.0" }
+  }
+}
