@@ -41,7 +41,7 @@ func TestReadReportsSumsTestsAndCoverage(t *testing.T) {
 	writeFile(t, dir, "out/junit.xml", junitPass)
 	writeFile(t, dir, "out/lcov.info", lcov)
 	r := &Reports{JUnit: []string{"out/*.xml"}, Coverage: []Coverage{{Format: "lcov", Paths: []string{"out/lcov.info"}}}}
-	s, d := ReadReports(r, globUnder(dir), dir)
+	s, d := ReadReports(r, globUnder(dir), dir, Attribution{})
 	if len(d) != 0 {
 		t.Fatalf("diagnostics: %v", d)
 	}
@@ -59,15 +59,15 @@ func TestReadReportsSumsTestsAndCoverage(t *testing.T) {
 func TestReadReportsFailsOnAFailedCaseAndOnAMissingReport(t *testing.T) {
 	dir := t.TempDir()
 	writeFile(t, dir, "out/junit.xml", junitFail)
-	s, d := ReadReports(&Reports{JUnit: []string{"out/**/*.xml"}}, globUnder(dir), dir)
+	s, d := ReadReports(&Reports{JUnit: []string{"out/**/*.xml"}}, globUnder(dir), dir, Attribution{})
 	if s.Tests.Failed != 1 || codes(d) != CodeTestFailed || !strings.Contains(d[0].Message, "api > serves") {
 		t.Errorf("failed case: %+v %v", s, d)
 	}
-	_, d = ReadReports(&Reports{JUnit: []string{"none/*.xml"}, Coverage: []Coverage{{Format: "lcov", Paths: []string{"none.info"}}}}, globUnder(dir), dir)
+	_, d = ReadReports(&Reports{JUnit: []string{"none/*.xml"}, Coverage: []Coverage{{Format: "lcov", Paths: []string{"none.info"}}}}, globUnder(dir), dir, Attribution{})
 	if codes(d) != CodeReportMissing+","+CodeReportMissing {
 		t.Errorf("missing reports: %v", d)
 	}
-	if s, d := ReadReports(nil, globUnder(dir), dir); len(d) != 0 || s.Tests.Total != 0 {
+	if s, d := ReadReports(nil, globUnder(dir), dir, Attribution{}); len(d) != 0 || s.Tests.Total != 0 {
 		t.Errorf("no reports: %+v %v", s, d)
 	}
 	_ = filepath.Join

@@ -94,6 +94,11 @@ type Task struct {
 	Inputs []string `json:"inputs"`
 	// Reports are the reports the task reads back.
 	Reports *Reports `json:"reports,omitempty"`
+	// Artifacts are the files the task copies into {output}/artifacts after
+	// its steps, so a cache hit restores them: patterns under the project or
+	// the stack root ("{root}/…") that may name {component}. A pattern that
+	// matches no file copies nothing.
+	Artifacts []string `json:"artifacts,omitempty"`
 	// WithoutCoverage is how the task runs on a toolchain with no coverage
 	// support. Without it, such a toolchain fails on its missing report.
 	WithoutCoverage *WithoutCoverage `json:"withoutCoverage,omitempty"`
@@ -244,6 +249,11 @@ func (t Task) validate(sets map[string][]string) error {
 	for _, name := range t.Inputs {
 		if _, ok := sets[name]; !ok {
 			return fmt.Errorf("inputs: %q names no input set", name)
+		}
+	}
+	for i, a := range t.Artifacts {
+		if err := validatePattern(strings.ReplaceAll(a, "{component}", "component"), true); err != nil {
+			return fmt.Errorf("artifacts[%d]: %w", i, err)
 		}
 	}
 	if t.Reports != nil {

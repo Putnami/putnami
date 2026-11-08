@@ -101,12 +101,17 @@ The Rust reference profile:
     ]
   },
   "inputs": {
-    "sources": ["src/**", "tests/**", "benches/**", "examples/**", "build.rs"],
+    "sources": ["src/**", "build.rs"],
+    "targets": ["tests/**", "benches/**", "examples/**"],
     "manifests": [
-      "Cargo.toml", ".cargo/config.toml", ".cargo/config", "rustfmt.toml", ".rustfmt.toml", "clippy.toml", ".clippy.toml",
-      "{root}/Cargo.toml", "{root}/.cargo/config.toml", "{root}/.cargo/config", "{root}/.config/nextest.toml",
+      "Cargo.toml", ".cargo/config.toml", ".cargo/config",
+      "{root}/Cargo.toml", "{root}/.cargo/config.toml", "{root}/.cargo/config"
+    ],
+    "lintConfig": [
+      "rustfmt.toml", ".rustfmt.toml", "clippy.toml", ".clippy.toml",
       "{root}/rustfmt.toml", "{root}/.rustfmt.toml", "{root}/clippy.toml", "{root}/.clippy.toml"
     ],
+    "testConfig": ["{root}/.config/nextest.toml"],
     "lockfiles": ["Cargo.lock", "{root}/Cargo.lock"]
   },
   "tasks": {
@@ -115,13 +120,13 @@ The Rust reference profile:
         ["cargo", "fmt", "--package", "{component}", "--check"],
         ["cargo", "clippy", "--package", "{component}", "--all-targets", "--", "-D", "warnings"]
       ],
-      "inputs": ["sources", "manifests"]
+      "inputs": ["sources", "targets", "manifests", "lintConfig"]
     },
     "test": {
       "steps": [
         ["cargo", "llvm-cov", "nextest", "--package", "{component}", "--profile", "ci", "--lcov", "--output-path", "{output}/lcov.info"]
       ],
-      "inputs": ["sources", "manifests", "lockfiles"],
+      "inputs": ["sources", "targets", "manifests", "testConfig", "lockfiles"],
       "reports": {
         "junit": ["{root}/target/nextest/ci/junit.xml"],
         "coverage": [{ "format": "lcov", "paths": ["{output}/lcov.info"] }]
@@ -131,7 +136,8 @@ The Rust reference profile:
       "steps": [
         ["cargo", "build", "--package", "{component}", "--locked"]
       ],
-      "inputs": ["sources", "manifests", "lockfiles"]
+      "inputs": ["sources", "manifests", "lockfiles"],
+      "artifacts": ["{root}/target/debug/{component}"]
     }
   }
 }
@@ -149,6 +155,7 @@ The Rust reference profile:
 | `tasks.<task>.steps` | The commands the task runs in order, each an argument vector run in the project directory, with no shell. `{root}` is the stack root, `{component}` the detector's name for the component, `{output}` the task's output directory under the project. |
 | `tasks.<task>.inputs` | The input sets the task reads. `lint` reads fewer than `test`: a lockfile change does not rerun it. |
 | `tasks.<task>.reports` | The JUnit and coverage reports the task reads back, with the coverage format. The core copies each into `{output}` as soon as the task ends. |
+| `tasks.<task>.artifacts` | The files the task copies into `{output}/artifacts` after its steps, so a cache hit restores them: patterns under the project or the stack root that may name `{component}`. The file a pattern with no wildcard names is removed before the steps, unless its path leads outside the project or the stack root or the inputs of one of the component's tasks select it, so only what the steps write is copied. A pattern with a wildcard is only copied, and copies whatever it matches, a file an earlier build left included. A component name that is no single path segment keeps no artifact. A pattern that matches nothing copies nothing. |
 
 The toolchain files are inputs of every task, whatever its input sets.
 
@@ -200,9 +207,28 @@ A selector answers files under the project only. The stack-root files
 second, static input of each task, `from: "workspace"`, which lists the
 shipped profile's stack-root patterns of that task; the conformance kit holds
 the two equal. So an override may narrow the stack-root inputs but not add
-one. A component is its own stack root, or the stack root is the workspace
-root; a detector that names any other root leaves the component out with
-`stacks.stack_root_unsupported`.
+one.
+
+### A nested stack root is an input-only project
+
+A component whose stack root is neither the workspace root nor its own
+directory, such as a crate of a Cargo workspace under `services/billing`,
+reads the root's files through an edge
+([ADR 0002](adr/0002-a-nested-stack-root-is-an-input-only-project.md)). The
+detector answers that root as a component with no name when it holds none, a
+virtual Cargo workspace: an **input-only project**, whose tasks run no step
+and whose selector answers the stack-root files of each task in its own
+directory. The probe gives each component of the root an edge to the project
+at its root, so the same task's upstream key carries the root's files: a
+lockfile change reruns the members' test and build, not their lint.
+
+The probe leaves a component out with `stacks.stack_root_unsupported` when no
+project of the stack sits at its root, or when its root reaches it over the
+edges the probe answers, root edges included, since its own root edge would
+close a cycle; it repeats that check without the components it left out until
+no root reaches its member. The workspace root keeps
+the static workspace input: a project there would own every file no deeper
+project claims.
 
 ### What each extension holds
 
@@ -262,6 +288,13 @@ on `PATH` that passes always runs. `Stack.RootJob` gives an extension a job
 that runs at the stack root with the same toolchain and under the same lock,
 such as an install step.
 
+An extension may instead install its toolchain when a task needs it, as
+`@putnami/rust` does
+([ADR 0004](adr/0004-a-stack-extension-may-install-its-toolchain-at-task-time.md)).
+`Stack.Provide` runs when the toolchain on `PATH` is missing or fails the check,
+and `Stack.Tools` returns directories appended to the task's `PATH`. An offline
+run calls neither.
+
 A file may state a range instead, in Composer's constraint syntax: the PHP
 profile reads `require.php` of `composer.json`, such as `>=8.4` or `^8.2`
 ([ADR 0002](adr/0002-a-stated-version-range-is-checked.md)). The task runs
@@ -280,11 +313,24 @@ the same warning.
 ## Reports
 
 After the last step, the task reads every report its profile names with the
-evidence readers. A test runner exits non-zero when a case fails, so a step
-that exits non-zero stops the steps and the reports are still read. A JUnit
-failure, an error, or a step that exits non-zero fails the task; the report's
-failed cases name the failure, with `stacks.test_failed`, and a failed step
-that wrote no report is `stacks.step_failed`, not a missing report. The totals and
+evidence readers, and attributes each entry to a component:
+
+- a JUnit case, through the stack's case resolver, which names the component
+  from the case's class name, else its suite name: the Rust stack reads the
+  package of a nextest binary id, with `-` and `_` read as one. A stack with no
+  resolver reads every case as the task's;
+- a coverage file, to the deepest component whose directory holds it: an
+  absolute path, or one relative to the project, whose directories the stack's
+  detector reads.
+
+A test runner exits non-zero when a case fails, so a step that exits non-zero
+stops the steps and the reports are still read. An entry of another component
+is left out of the summary: that component's own task counts it. A case of no
+component is counted, with the warning `stacks.test_unattributed`; a coverage
+file of no component is left out, with the warning `stacks.coverage_unmapped`.
+A JUnit failure, an error, or a step that exits non-zero fails the task; the
+report's failed cases name the failure, with `stacks.test_failed`, and a failed
+step that wrote no report is `stacks.step_failed`, not a missing report. The totals and
 the coverage reach the task result. A JUnit or coverage pattern of the profile
 that matches no report fails the task with `stacks.report_missing`: a command
 that ran nothing is not a pass. The reports a task reads outside its own
@@ -299,8 +345,6 @@ restores them and reads the same totals.
 - **Publish and package.** A stack's release goes through its own tool
   (crates.io, Packagist, Maven Central); no profile declares a `publish`
   task. A stack extension may add one later, in its own issue.
-- **Toolchain install for Rust.** cargo-nextest and cargo-llvm-cov are the
-  project's tools, like `rustc`; `@putnami/rust` pins nothing.
 - **Serve and qualify.** No profile declares a workload, so `putnami qualify`
   reports no reachable workload for a stack project.
 - **Go, TypeScript and Python.** They keep their full extensions and do not
@@ -348,8 +392,12 @@ cargo-llvm-cov write. That double sits at a genuine external boundary, the
 stack's own build tool, and the tests name it. The CLI scenario above runs on
 a checkout of the repository whose root holds the fixture, with the same
 stubs for `test`, and with the real `cargo`, rustfmt and clippy for `lint`
-and `build`. A gate leg with the real cargo-nextest and cargo-llvm-cov is
-left to a later change.
+and `build`.
+
+The extension's real-tool proof runs lint, test and build for every crate of
+the observe Cargo detector's fixture repository with the real cargo,
+cargo-nextest and cargo-llvm-cov, and the workflow
+`.github/workflows/rust-stack.yml` installs those tools and runs it.
 
 ## Settled with the owner
 

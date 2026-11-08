@@ -1773,6 +1773,19 @@
           }
         },
         {
+          "id": "rust-nested-workspaces",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-crate-names-the-cargo-workspace-that-holds-it"
+            ]
+          }
+        },
+        {
           "id": "rust-probe-answer",
           "stage": "coded",
           "evidenceKinds": [

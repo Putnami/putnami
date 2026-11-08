@@ -336,3 +336,61 @@ func TestANextestCaseGoesToTheCrateItsBinaryNames(t *testing.T) {
 		}
 	}
 }
+
+func TestACrateNamesTheCargoWorkspaceThatHoldsIt(t *testing.T) {
+	spectest.Proves(t, feature, "rust-nested-workspaces", "a-crate-names-the-cargo-workspace-that-holds-it")
+	result := Detect(writeTree(t, map[string]string{
+		"Cargo.toml":               "[workspace]\nmembers = [\"crates/*\"]\nexclude = [\"services\"]\n",
+		"crates/api/Cargo.toml":    "[package]\nname = \"api\"\n\n[dependencies]\nshared = { path = \"../../libs/shared\" }\n",
+		"libs/shared/Cargo.toml":   "[package]\nname = \"shared\"\n",
+		"svc/Cargo.toml":           "[workspace]\nmembers = [\"http\"]\n",
+		"svc/http/Cargo.toml":      "[package]\nname = \"svc-http\"\n\n[dependencies]\nsvc-core = { path = \"../core\" }\n",
+		"svc/core/Cargo.toml":      "[package]\nname = \"svc-core\"\n",
+		"outer/Cargo.toml":         "[workspace]\nmembers = [\"inner/*\"]\n",
+		"outer/inner/Cargo.toml":   "[workspace]\nmembers = []\nexclude = [\"x\"]\n",
+		"outer/inner/x/Cargo.toml": "[package]\nname = \"x\"\n",
+		"services/billing/Cargo.toml": "[workspace]\nmembers = [\"core\", \"http\"]\n\n[workspace.package]\nversion = \"2.0.0\"\n\n" +
+			"[workspace.dependencies]\nbilling-core = { path = \"core\" }\n",
+		"services/billing/core/Cargo.toml":  "[package]\nname = \"billing-core\"\nversion.workspace = true\n",
+		"services/billing/http/Cargo.toml":  "[package]\nname = \"http\"\n\n[dependencies]\nbilling-core = { workspace = true }\n",
+		"services/billing/stray/Cargo.toml": "[package]\nname = \"stray\"\n",
+		"tools/gen/Cargo.toml":              "[package]\nname = \"gen\"\nworkspace = \"../../services/billing\"\n",
+		"standalone/Cargo.toml":             "[package]\nname = \"standalone\"\n\n[workspace]\n",
+	}))
+	noDiagnostics(t, result)
+	projects := byPath(result)
+	for path, want := range map[string]string{
+		"crates/api":             ".",
+		"libs/shared":            ".",
+		"svc/core":               "svc",
+		"outer/inner/x":          "outer",
+		"services/billing/core":  "services/billing",
+		"services/billing/http":  "services/billing",
+		"services/billing/stray": "services/billing/stray",
+		"tools/gen":              "services/billing",
+		"standalone":             "standalone",
+	} {
+		if got := metadata(t, projects[path]).Workspace; got != want {
+			t.Errorf("%s workspace = %q, want %q", path, got, want)
+		}
+	}
+	if got := metadata(t, projects["libs/shared"]).Source; got != SourceWorkspace {
+		t.Errorf("a path dependency of a member below the root is a member: %s", got)
+	}
+	if _, ok := projects["services/billing"]; ok {
+		t.Errorf("a virtual nested workspace is no crate")
+	}
+	if got := projects["services/billing/http"].Dependencies; !reflect.DeepEqual(got, []string{"services/billing/core"}) {
+		t.Errorf("a nested workspace dependency is an edge: %v", got)
+	}
+	if got := projects["services/billing/core"].Version; got != "2.0.0" {
+		t.Errorf("a nested member inherits its workspace's version: %q", got)
+	}
+	root := t.TempDir()
+	if err := os.WriteFile(filepath.Join(root, "Cargo.toml"), []byte("[workspace]\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if VirtualWorkspace(root, ".") {
+		t.Errorf("the repository root is never a nested workspace")
+	}
+}

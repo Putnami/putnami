@@ -20,12 +20,18 @@ Each crate is a component of ecosystem `rust`:
   `manifest`. A `Cargo.toml` with neither, such as one that only sets
   `[profile]` options, is none.
 
-Only the root's workspace is read: a `[workspace]` in a subdirectory makes its
-crates manifest components, and only their `path` dependencies give edges, not
-their `workspace = true` ones. Cargo also makes a member of each path dependency
-of a member that lies below the workspace root; the detector does not, so
-such a crate, outside the `members` globs, is a `manifest` component, with
-the same edges.
+Cargo also makes a member of each path dependency of the root package or of a
+member that lies below the workspace root and is not excluded, and so does the
+detector: such a crate is a `workspace` component too.
+
+A crate outside the root's workspace stays a `manifest` component, and the
+detector records the Cargo workspace that holds it, as cargo finds it: the
+one its `package.workspace` key names, else the nearest `[workspace]` above it
+that names it as a member, searching further up past one that excludes it.
+It inherits that workspace's `[workspace.package]` version, and its
+`workspace = true` dependencies give edges through that workspace's
+`[workspace.dependencies]`. `@putnami/rust` reads that workspace as the
+crate's stack root.
 
 The search skips `target`, `node_modules`, `vendor` and the directories whose
 name starts with `.`, such as `.git` and `.cargo`. A component's id is its
@@ -42,9 +48,9 @@ same tables under a `[target.<platform>]` table, when:
 
 - the entry has a `path`, such as `{ path = "../pricing" }`, resolved against
   the crate's directory;
-- the crate is a workspace member, the entry has `workspace = true` and the
-  root's `[workspace.dependencies]` entry of the same key has a `path`,
-  resolved against the root.
+- the entry has `workspace = true` and the `[workspace.dependencies]` entry of
+  the same key, in the Cargo workspace that holds the crate, the root's or a
+  nested one, has a `path`, resolved against that workspace's directory.
 
 A registry or `git` dependency is no edge, nor is a path outside the
 repository or to a directory that is no component. The `[patch]` and
