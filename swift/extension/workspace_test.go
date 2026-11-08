@@ -144,6 +144,16 @@ func TestTheTestFilterReachesSwiftTestAndXcodebuild(t *testing.T) {
 	}
 	_ = os.Remove(filepath.Join(root, "Packages/Networking/putnami.json"))
 
+	// An Xcode project whose scheme has no target the filter names fails:
+	// xcodebuild refuses the selection and no case failed.
+	t.Setenv("STUB_FAIL", "1")
+	s.write(t, "tests.json", `{"testNodes":[]}`)
+	if status, _, _, err := runJobWith(t, root, "App", stacks.TaskTest, test, job.Params{"test": json.RawMessage(`"Missing"`)}); status != "FAILED" || err == nil {
+		t.Errorf("an Xcode filter that names no target fails: %s %v", status, err)
+	}
+	t.Setenv("STUB_FAIL", "")
+	s.demoReports(t, root, false)
+
 	// Without a filter, the test task runs every test.
 	if status, _, _, err := runJobWith(t, root, "Packages/Pricing", stacks.TaskTest, test, nil); status != "OK" || err != nil {
 		t.Errorf("test without a filter: %s %v", status, err)

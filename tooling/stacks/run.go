@@ -485,11 +485,18 @@ func (s Stack) run(ctx context.Context, in runInput, emit reporter) (string, map
 		t.Steps, t.Reports = w.Steps, &reports
 	}
 
-	runtime, err := s.runtimePath()
-	if err != nil {
-		return statusFailed, nil, err
+	vars := map[string]string{"{root}": rootAbs, "{component}": meta.Component, "{project}": in.projectAbs, "{output}": outDir}
+	// {runtime} is resolved only for a task that names it, so a stack with
+	// no runtime command never depends on locating its own executable.
+	if slices.ContainsFunc(t.Steps, func(step []string) bool {
+		return slices.ContainsFunc(step, func(a string) bool { return strings.Contains(a, "{runtime}") })
+	}) {
+		runtime, err := s.runtimePath()
+		if err != nil {
+			return statusFailed, nil, failWith(emit, CodeStepFailed, "%v", err)
+		}
+		vars["{runtime}"] = runtime
 	}
-	vars := map[string]string{"{root}": rootAbs, "{component}": meta.Component, "{project}": in.projectAbs, "{output}": outDir, "{runtime}": runtime}
 	// A test runner exits non-zero when a case fails: the steps stop there,
 	// and the reports it wrote are still read, so the failed cases name the
 	// failure.

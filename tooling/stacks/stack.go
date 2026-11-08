@@ -435,8 +435,40 @@ func (s Stack) answer(root string, q wsproto.InputResolveQuery, c found) wsproto
 		Project:  q.Project,
 		Selector: q.Selector,
 		Files:    files,
-		Basis:    wsproto.InputBasis{Content: [][]string{patterns}},
+		Basis:    wsproto.InputBasis{Content: [][]string{basisSet(patterns, p.Excludes)}},
 	}
+}
+
+// basisSet is the basis of an answer: its patterns, without the directories a
+// "**" walk skips, so a write under .git, .putnami or an excluded build
+// directory neither moves the digest nor races its read. A directory a
+// pattern names before its first wildcard is walked, so it stays in.
+func basisSet(patterns, excludes []string) []string {
+	if !slices.ContainsFunc(patterns, func(p string) bool { return strings.Contains(p, "**") }) {
+		return patterns
+	}
+	out := slices.Clone(patterns)
+	for _, dir := range append([]string{".git", ".putnami"}, excludes...) {
+		if !slices.ContainsFunc(patterns, func(p string) bool { return literalPrefixNames(p, dir) }) {
+			out = append(out, "!**/"+dir+"/**")
+		}
+	}
+	return out
+}
+
+// literalPrefixNames reports whether pattern names dir as one of the
+// directories before its first wildcard segment.
+func literalPrefixNames(pattern, dir string) bool {
+	segments := strings.Split(pattern, "/")
+	for _, seg := range segments[:len(segments)-1] {
+		if strings.ContainsAny(seg, "*?[") {
+			return false
+		}
+		if seg == dir {
+			return true
+		}
+	}
+	return false
 }
 
 // found is what the detector says about an asked project.

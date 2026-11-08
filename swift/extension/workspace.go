@@ -74,10 +74,10 @@ func isPackage(dir string) bool {
 }
 
 func resolveRoot(ctx context.Context, root stacks.RootStep, emit *jsonl.Emitter, force bool) error {
-	// Offline, as in a hosted run, a resolve would reach the network: the
-	// build resolves from what the machine already holds.
+	// Offline, as in a hosted run, a resolve would reach the network, so
+	// install resolves nothing; the build resolves what it needs itself.
 	if os.Getenv(extensionproto.OfflineDependenciesEnv) == "1" {
-		emit.DiagnosticWithCode("warning", "offline dependencies: "+root.Dir+" is not resolved", "", 0, 0, CodeResolveFailed)
+		emit.Info("offline dependencies: " + root.Dir + " is not resolved ahead of its build")
 		return nil
 	}
 	if !isPackage(root.Dir) {

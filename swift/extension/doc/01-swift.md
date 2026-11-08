@@ -108,8 +108,9 @@ workspace's components, except the projects `disable.tags` excludes:
 | Xcode project | `xcodebuild -resolvePackageDependencies -onlyUsePackageVersionsFromResolvedFile` |
 
 With no Swift on the machine, it warns and passes. With offline dependencies,
-as in a hosted run, it resolves nothing and warns: the build resolves from what
-the machine already holds.
+as in a hosted run, it resolves nothing ahead of time: `swift build` and
+`xcodebuild` then resolve the pinned versions themselves, over the network the
+runner allows.
 
 There is no `workspace-fetch`: resolving a package runs its `Package.swift`,
 and the packages it depends on, with no sandbox on Linux, so the extension

@@ -97,6 +97,30 @@ func TestExcludedDirectoriesStayOutOfTheInputs(t *testing.T) {
 	if want := []string{"Shop.app/project.def", "main.src"}; got.Error != "" || !reflect.DeepEqual(got.Files, want) {
 		t.Errorf("lint inputs = %+v, want %v", got, want)
 	}
+	// The basis leaves the skipped directories out too: a build writing
+	// there moves no digest.
+	project := filepath.Join(root, "App")
+	before, err := wsproto.InputBasisDigest(project, got.Basis)
+	if err != nil {
+		t.Fatal(err)
+	}
+	writeFile(t, root, "App/.build/new.src", "x")
+	writeFile(t, root, "App/.putnami/out/x.src", "x")
+	writeFile(t, root, "App/.git/objects/x.src", "x")
+	if after, err := wsproto.InputBasisDigest(project, got.Basis); err != nil || after != before {
+		t.Errorf("a write under a skipped directory moved the digest: %v", err)
+	}
+	writeFile(t, root, "App/main.src", "changed")
+	if after, _ := wsproto.InputBasisDigest(project, got.Basis); after == before {
+		t.Error("a source change moves the digest")
+	}
+	// A directory a pattern names before its wildcard stays in the basis.
+	if got := basisSet([]string{".build/**", "src/**"}, []string{".build"}); slices.Contains(got, "!**/.build/**") || !slices.Contains(got, "!**/.git/**") {
+		t.Errorf("basisSet = %v", got)
+	}
+	if got := basisSet([]string{"Package.kit"}, []string{".build"}); !reflect.DeepEqual(got, []string{"Package.kit"}) {
+		t.Errorf("a basis with no ** walk stays as it is: %v", got)
+	}
 }
 
 func TestHasMarkerReadsTheMarkerAloneAsAPattern(t *testing.T) {
