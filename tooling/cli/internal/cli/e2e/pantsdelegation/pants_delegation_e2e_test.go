@@ -228,7 +228,7 @@ func TestAChangeToOnePantsPackageRunsItAndItsDependentsThroughPants(t *testing.T
 			clitest.WriteFile(t, filepath.Join(root, rel), content)
 		}
 	}
-	head := commit(t, root, "change pricing")
+	pricingChange := commit(t, root, "change pricing")
 	tested, out := pantsTests(t, root, base, log)
 	if want := []string{"src/python/api:", "src/python/pricing:"}; !slices.Equal(tested, want) {
 		t.Errorf("pants test ran on %v, want %v: the changed package and its dependent\n%s", tested, want, out)
@@ -244,8 +244,8 @@ func TestAChangeToOnePantsPackageRunsItAndItsDependentsThroughPants(t *testing.T
 		t.Fatal(err)
 	}
 	clitest.WriteFile(t, main, string(data)+"\n# a change to api alone\n")
-	head = commit(t, root, "change api")
-	tested, out = pantsTests(t, root, parentOf(t, root, head), log)
+	apiChange := commit(t, root, "change api")
+	tested, out = pantsTests(t, root, pricingChange, log)
 	if want := []string{"src/python/api:"}; !slices.Equal(tested, want) {
 		t.Errorf("pants test ran on %v, want %v: a dependency runs no pants\n%s", tested, want, out)
 	}
@@ -258,14 +258,8 @@ func TestAChangeToOnePantsPackageRunsItAndItsDependentsThroughPants(t *testing.T
 		}
 	}
 	commit(t, root, "bump fastapi")
-	tested, out = pantsTests(t, root, head, log)
+	tested, out = pantsTests(t, root, apiChange, log)
 	if want := []string{"src/python/api:", "src/python/pricing:", "src/python/web:"}; !slices.Equal(tested, want) {
 		t.Errorf("pants test ran on %v, want %v: the packages that depend on the lockfile\n%s", tested, want, out)
 	}
-}
-
-// parentOf is the parent commit of head.
-func parentOf(t *testing.T, root, head string) string {
-	t.Helper()
-	return strings.TrimSpace(clitest.GitOutput(t, root, "rev-parse", head+"~1"))
 }
