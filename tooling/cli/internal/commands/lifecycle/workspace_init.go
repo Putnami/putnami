@@ -115,8 +115,10 @@ type initFlags struct {
 	extension   string
 	// extensionSet reports that --extension was given.
 	extensionSet bool
-	// from is the monorepo tool of --from.
-	from string
+	// from is the monorepo tool of --from, and fromSet reports that the flag
+	// was given: a flag with no value is a usage error, not an absent flag.
+	from    string
+	fromSet bool
 	// channel is the value of --channel, and channelSet reports that the flag
 	// was given: a flag with no value is a usage error, not an absent flag.
 	channel    string
@@ -131,7 +133,7 @@ func parseInitFlags(args []string) initFlags {
 			continue
 		}
 		if value, ok := strings.CutPrefix(args[i], "--from="); ok {
-			f.from = value
+			f.from, f.fromSet = value, true
 			continue
 		}
 		switch args[i] {
@@ -165,6 +167,7 @@ func parseInitFlags(args []string) initFlags {
 				i++
 			}
 		case "--from":
+			f.fromSet = true
 			if i+1 < len(args) {
 				f.from = args[i+1]
 				i++
@@ -223,7 +226,10 @@ AGENTS.md tells coding agents how to work in this workspace.
 // --extension: the tool's packages are the projects.
 func resolveInitRequest(flags initFlags) (initExtensionConfig, initChannel, error) {
 	extConfig, ok := initExtensions[flags.extension]
-	if flags.from != "" {
+	if flags.fromSet {
+		if flags.from == "" {
+			return initExtensionConfig{}, initChannel{}, cmderr.Usagef("--from needs a tool (choose: %s)", initSourceNames())
+		}
 		source, known := initSources[flags.from]
 		if !known {
 			return initExtensionConfig{}, initChannel{}, cmderr.Usagef("unknown --from tool %q (choose: %s)", flags.from, initSourceNames())

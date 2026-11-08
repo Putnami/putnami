@@ -10,7 +10,7 @@
     ]
   },
   "inputs": {
-    "sources": ["*"]
+    "sources": ["**"]
   },
   "tasks": {
     "lint": {

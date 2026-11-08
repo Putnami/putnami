@@ -599,3 +599,30 @@ func TestToolsReachThePathOfTheTask(t *testing.T) {
 		t.Errorf("status %s: %v", status, rec.diags)
 	}
 }
+
+func TestProbeNamesABareDirectoryAndADelegatedStackServesTheGraphJob(t *testing.T) {
+	s := testStack(t)
+	s.Detect = func(string, wsproto.ProbeRequest) ([]Component, []diag.Diagnostic) {
+		return []Component{{Path: "3rdparty/python", Name: "3rdparty/python", SourceFile: "3rdparty/python/BUILD", Bare: true}}, nil
+	}
+	result, err := s.Probe(t.TempDir(), wsproto.ProbeRequest{Version: wsproto.ProbeProtocolVersion, Extension: s.Extension, Paths: []string{"3rdparty/python"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := wsproto.ProbeProject{Path: "3rdparty/python", SourceName: "3rdparty/python", SourceFile: "3rdparty/python/BUILD"}
+	if len(result.Projects) != 1 || !reflect.DeepEqual(result.Projects[0], want) {
+		t.Errorf("a bare directory gets its name alone: %+v", result.Projects)
+	}
+
+	if _, ok := s.Jobs()[TaskGraph]; ok {
+		t.Error("a stack that keeps Putnami's cache serves no graph job")
+	}
+	s.Profile.Delegated = true
+	graph, ok := s.Jobs()[TaskGraph]
+	if !ok {
+		t.Fatal("a delegated stack serves the graph job")
+	}
+	if status, data, err := graph(nil, nil, nil); status != statusOK || data != nil || err != nil {
+		t.Errorf("the graph job passes and runs nothing: %s %v %v", status, data, err)
+	}
+}

@@ -404,6 +404,8 @@ putnami workspace describe      # Show workspace details
 |---|---|---|---|
 | `pants` | `pants.toml` | `@putnami/pants` | Each package's edges from the `pants peek ::` export; Pants keeps its own cache. See [Run a Pants repository with Putnami](../../pants/doc/01-pants.md) |
 
+`@putnami/pants` is not published yet: until its first release, `init --from pants` stops at the extension install, after it has written the workspace files.
+
 ```bash
 putnami init --from pants
 ```

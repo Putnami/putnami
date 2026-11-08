@@ -7,6 +7,10 @@ execution, so Putnami caches nothing for these tasks.
 
 ## Adopt it
 
+`@putnami/pants` is not published yet: until its first release, `putnami init
+--from pants` stops at the extension install, after it has written the
+workspace files, and a workspace loads the extension from a source checkout.
+
 At the root of the repository, where `pants.toml` lies:
 
 ```bash
@@ -18,8 +22,15 @@ runs `putnami projects sync`. Pants must be on `PATH`, or the CI's export must
 be at the root as `pants-graph.json` (`pants peek :: > pants-graph.json`).
 
 A package is a directory whose `BUILD` or `BUILD.pants` file declares a
-first-party target. A directory that declares only third-party targets, such
-as `python_requirements`, and the repository root are no project.
+first-party target. Every other directory with a `BUILD` file, one that
+declares only third-party targets such as `python_requirements` or only
+`__defaults__`, and the repository root, is a bare member: a project named by
+its directory, with no extension, that runs no task. A change to it runs no
+package, so a change to `3rdparty/python/requirements.txt` or to a resolve
+lockfile reruns nothing: run `putnami test --all` after one.
+
+Add `.putnami/` and `.gen/` to the repository's `.gitignore`: `init` writes one
+only when the repository has none.
 
 ## What the sync writes
 
@@ -31,11 +42,13 @@ writes in each package's `putnami.json`:
 |---|---|
 | `extensions` | `@putnami/pants`, beside any other extension the file names |
 | `dependencies` | The project ID of each package the export says it depends on, such as `/src/python/pricing`; a dependency on a project that is no Pants package is kept |
-| `disable.jobs` | `test` when none of the package's targets is a test target (a type that ends in `_test` or `_tests`, or a `go_package` with a `_test.go` source), so a package without tests runs no test task |
+| `disable.jobs` | `test` when none of the package's targets is a test target (a type that ends in `_test` or `_tests`, or a `go_package` with a `_test.go` source), so a package without tests runs no test task; the sync owns this entry and removes it from a package that has a test target |
 
-It keeps every other member, writes a file only when its content changes, and
-writes nothing when it has neither the export nor `pants`. Run the sync again
-after a change to the dependencies between packages.
+It keeps every other member, and rewrites a file only when a member it owns
+changes, with two-space indentation and sorted keys. A package that left the
+export loses the extension and its Pants edges. Without the export and without
+`pants`, the sync warns with `pants.sync_no_export` and writes nothing. Run the
+sync again after a change to the dependencies between packages.
 
 ## What each task runs
 
@@ -82,9 +95,13 @@ Every task sets `cache.enabled` to `false`: Putnami stores no entry and
 replays none, and each task result records `delegatedTo: pants`. A task that
 Pants has cached returns as fast as Pants does.
 
-Impact selection is Putnami's: `putnami test --impacted` runs the packages
-whose files changed and the packages that depend on them, on the edges the
-sync wrote.
+Impact selection is Putnami's: `putnami test --impacted` runs Pants on the
+packages whose files changed and on the packages that depend on them, on the
+edges the sync wrote. Each command runs a `graph` step before its task: the
+`graph` step of a package depends on the `graph` step of each package it
+depends on and runs nothing, and the task depends on its own package's `graph`
+step alone. So a change to a package never runs Pants on the packages it
+depends on.
 
 ## The version check
 

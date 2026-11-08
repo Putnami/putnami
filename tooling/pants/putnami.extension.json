@@ -96,10 +96,17 @@
       "description": "Lint each package with pants lint, which keeps its own cache.",
       "run": [
         {
+          "id": "graph",
+          "task": "graph-run",
+          "dependsOn": [
+            "^graph"
+          ]
+        },
+        {
           "id": "lint",
           "task": "lint-run",
           "dependsOn": [
-            "^lint"
+            "graph"
           ]
         }
       ]
@@ -108,11 +115,18 @@
       "description": "Test each package with pants test, read its JUnit and coverage reports; Pants keeps its own cache.",
       "run": [
         {
+          "id": "graph",
+          "task": "graph-run",
+          "dependsOn": [
+            "^graph"
+          ]
+        },
+        {
           "id": "test",
           "heavy": true,
           "task": "test-run",
           "dependsOn": [
-            "^test"
+            "graph"
           ]
         }
       ]
@@ -121,11 +135,18 @@
       "description": "Package each package with pants package, which keeps its own cache.",
       "run": [
         {
+          "id": "graph",
+          "task": "graph-run",
+          "dependsOn": [
+            "^graph"
+          ]
+        },
+        {
           "id": "build",
           "heavy": true,
           "task": "build-run",
           "dependsOn": [
-            "^build"
+            "graph"
           ]
         }
       ]
@@ -133,7 +154,6 @@
     "workspace-sync": {
       "description": "Write each Pants package's putnami.json from the pants peek :: export.",
       "visibility": "internal",
-      "quiet": true,
       "activation": "workspace-once",
       "run": [
         {
@@ -144,6 +164,27 @@
     }
   },
   "tasks": {
+    "graph-run": {
+      "description": "Carry the package graph: each lint, test and build step depends on the graph step of its own package, which alone depends on the graph step of each package upstream, so a change selects the packages that depend on it while a dependency runs no pants. Runs nothing and passes.",
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": [
+        "graph"
+      ],
+      "cwd": "{projectRoot}",
+      "timeoutMs": 60000,
+      "inputs": {
+        "sources": {
+          "from": "project",
+          "files": [
+            "pants:test"
+          ]
+        }
+      },
+      "cache": {
+        "enabled": false
+      }
+    },
     "lint-run": {
       "description": "Run pants lint <dir>: in the workspace root for one package, after the Pants version check. Putnami's cache is off: Pants's cache decides what reruns.",
       "kind": "command",

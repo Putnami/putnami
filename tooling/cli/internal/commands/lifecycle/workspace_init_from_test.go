@@ -77,6 +77,8 @@ func TestInitFromRefusesWhatItCannotAdopt(t *testing.T) {
 		want      string
 	}{
 		"no pants.toml":   {[]string{"--from", "pants"}, false, "holds no pants.toml"},
+		"no tool":         {[]string{"--from"}, true, "--from needs a tool (choose: pants)"},
+		"an empty tool":   {[]string{"--from="}, true, "--from needs a tool (choose: pants)"},
 		"an unknown tool": {[]string{"--from", "gradle"}, true, `unknown --from tool "gradle" (choose: pants)`},
 		"a project":       {[]string{"--from", "pants", "--project", "web"}, true, "does not combine with --project"},
 		"an extension":    {[]string{"--from", "pants", "--extension", "go"}, true, "does not combine with --project, --project-path or --extension"},

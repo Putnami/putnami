@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"reflect"
 	"slices"
 	"strings"
 
@@ -40,6 +41,10 @@ type SyncResult struct {
 	Written []string
 	// Unchanged counts the files whose content was already current.
 	Unchanged int
+	// Retracted are the workspace-relative putnami.json files of former
+	// packages the sync removed the extension and the Pants edges from,
+	// sorted.
+	Retracted []string
 }
 
 // Sync writes the package graph of the Pants repository at root into each
@@ -80,9 +85,25 @@ func Sync(ctx context.Context, root string, stderr io.Writer) (SyncResult, error
 			return SyncResult{}, fmt.Errorf("the Pants export cannot be read, so no edge is written: %s", strings.Join(reasons, "; "))
 		}
 	}
-	components := map[string]bool{}
+	current := map[string]bool{}
 	for _, c := range detection.Components {
-		components[wsproto.ProjectIDFromPath(c.ID)] = true
+		if c.ID != wsproto.ProbeRootPath {
+			current[c.ID] = true
+		}
+	}
+	// The sync owns the edges between the projects it marks: the current
+	// packages, and the former ones whose putnami.json still names the
+	// extension.
+	former, err := markedProjects(root)
+	if err != nil {
+		return SyncResult{}, err
+	}
+	components := map[string]bool{}
+	for dir := range current {
+		components[wsproto.ProjectIDFromPath(dir)] = true
+	}
+	for _, dir := range former {
+		components[wsproto.ProjectIDFromPath(dir)] = true
 	}
 	for _, c := range detection.Components {
 		if c.ID == wsproto.ProbeRootPath {
@@ -93,7 +114,7 @@ func Sync(ctx context.Context, root string, stderr io.Writer) (SyncResult, error
 			deps = append(deps, wsproto.ProjectIDFromPath(d))
 		}
 		file := filepath.Join(root, filepath.FromSlash(c.ID), wsproto.ConfigFilename)
-		changed, err := writeProject(file, deps, components, detection.IsTested(c.ID))
+		changed, err := writeProject(root, file, deps, components, detection.IsTested(c.ID))
 		if err != nil {
 			return SyncResult{}, fmt.Errorf("%s/%s: %w", c.ID, wsproto.ConfigFilename, err)
 		}
@@ -103,7 +124,118 @@ func Sync(ctx context.Context, root string, stderr io.Writer) (SyncResult, error
 			result.Unchanged++
 		}
 	}
+	for _, dir := range former {
+		if current[dir] {
+			continue
+		}
+		file := filepath.Join(root, filepath.FromSlash(dir), wsproto.ConfigFilename)
+		changed, err := retractProject(root, file, components)
+		if err != nil {
+			return SyncResult{}, fmt.Errorf("%s/%s: %w", dir, wsproto.ConfigFilename, err)
+		}
+		if changed {
+			result.Retracted = append(result.Retracted, dir+"/"+wsproto.ConfigFilename)
+		}
+	}
 	return result, nil
+}
+
+// skippedDirs are never walked for project files: build outputs, installed
+// packages and caches.
+var skippedDirs = map[string]bool{"dist": true, "node_modules": true, "__pycache__": true}
+
+// markedProjects lists, sorted, the workspace-relative directories under root
+// whose putnami.json names the extension. It skips hidden directories, dist,
+// node_modules and __pycache__.
+func markedProjects(root string) ([]string, error) {
+	var out []string
+	err := filepath.WalkDir(root, func(p string, entry os.DirEntry, err error) error {
+		if err != nil {
+			return nil
+		}
+		if entry.IsDir() {
+			if p != root && (strings.HasPrefix(entry.Name(), ".") || skippedDirs[entry.Name()]) {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		if entry.Name() != wsproto.ConfigFilename {
+			return nil
+		}
+		doc, _, err := readProject(p)
+		if err != nil || !slices.Contains(stringList(doc["extensions"]), ExtensionName) {
+			return nil
+		}
+		rel, err := filepath.Rel(root, filepath.Dir(p))
+		if err != nil || rel == "." {
+			return nil
+		}
+		out = append(out, filepath.ToSlash(rel))
+		return nil
+	})
+	slices.Sort(out)
+	return out, err
+}
+
+// readProject reads the putnami.json at file as a JSON object, with its
+// bytes; a missing file reads as an empty object and nil bytes.
+func readProject(file string) (map[string]any, []byte, error) {
+	doc := map[string]any{}
+	existing, err := os.ReadFile(file) //nolint:gosec // a project file under the workspace root
+	if errors.Is(err, os.ErrNotExist) {
+		return doc, nil, nil
+	}
+	if err != nil {
+		return nil, nil, err
+	}
+	dec := json.NewDecoder(bytes.NewReader(existing))
+	dec.UseNumber()
+	if err := dec.Decode(&doc); err != nil {
+		return nil, nil, fmt.Errorf("not a JSON object: %w", err)
+	}
+	return doc, existing, nil
+}
+
+// clone deep-copies a decoded JSON object, so the members the sync owns can be
+// compared before and after it edits them.
+func clone(doc map[string]any) map[string]any {
+	data, _ := json.Marshal(doc)
+	out := map[string]any{}
+	dec := json.NewDecoder(bytes.NewReader(data))
+	dec.UseNumber()
+	_ = dec.Decode(&out)
+	return out
+}
+
+// keepDependency reports whether the sync keeps a dependency it does not
+// write: one on a project that is no Pants package, current or former, and
+// whose directory, for a project ID, still exists.
+func keepDependency(root, dep string, components map[string]bool) bool {
+	if components[dep] {
+		return false
+	}
+	if rel, ok := strings.CutPrefix(dep, "/"); ok {
+		if _, err := os.Stat(filepath.Join(root, filepath.FromSlash(rel))); errors.Is(err, os.ErrNotExist) {
+			return false
+		}
+	}
+	return true
+}
+
+// retractProject removes from the putnami.json of a former package the
+// extension and its Pants edges, and writes it when its content changes.
+func retractProject(root, file string, components map[string]bool) (bool, error) {
+	doc, existing, err := readProject(file)
+	if err != nil {
+		return false, err
+	}
+	before := clone(doc)
+	setList(doc, "extensions", slices.DeleteFunc(stringList(doc["extensions"]), func(e string) bool { return e == ExtensionName }))
+	setList(doc, "dependencies", slices.DeleteFunc(stringList(doc["dependencies"]), func(d string) bool { return !keepDependency(root, d, components) }))
+	if reflect.DeepEqual(clone(doc), before) {
+		return false, nil
+	}
+	return writeJSON(file, doc, existing)
 }
 
 // peek runs pants peek :: in root and writes its output to a temporary file.
@@ -135,22 +267,18 @@ func peek(ctx context.Context, root string, stderr io.Writer) (string, func(), e
 }
 
 // writeProject merges the package's Pants facts into the putnami.json at file
-// and writes it when its content changes. Every member the sync does not own
-// is kept: dependencies on a project that is no Pants component, other
-// extensions, other disabled jobs.
-func writeProject(file string, deps []string, components map[string]bool, tested bool) (bool, error) {
-	doc := map[string]any{}
-	existing, err := os.ReadFile(file) //nolint:gosec // the component's own putnami.json
-	switch {
-	case errors.Is(err, os.ErrNotExist):
-		doc["$schema"] = ProjectSchema
-	case err != nil:
+// and writes it when a member the sync owns changes: the extension, the
+// dependencies on Pants packages, and test in disable.jobs. Every other member
+// is kept as it is.
+func writeProject(root, file string, deps []string, components map[string]bool, tested bool) (bool, error) {
+	doc, existing, err := readProject(file)
+	if err != nil {
 		return false, err
-	default:
-		if err := json.Unmarshal(existing, &doc); err != nil {
-			return false, fmt.Errorf("not a JSON object: %w", err)
-		}
 	}
+	if existing == nil {
+		doc["$schema"] = ProjectSchema
+	}
+	before := clone(doc)
 
 	extensions := stringList(doc["extensions"])
 	if !slices.Contains(extensions, ExtensionName) {
@@ -158,7 +286,7 @@ func writeProject(file string, deps []string, components map[string]bool, tested
 	}
 	doc["extensions"] = extensions
 
-	kept := slices.DeleteFunc(stringList(doc["dependencies"]), func(d string) bool { return components[d] })
+	kept := slices.DeleteFunc(stringList(doc["dependencies"]), func(d string) bool { return !keepDependency(root, d, components) })
 	setList(doc, "dependencies", sortedUnique(append(kept, deps...)))
 
 	disable, _ := doc["disable"].(map[string]any)
@@ -176,6 +304,16 @@ func writeProject(file string, deps []string, components map[string]bool, tested
 		doc["disable"] = disable
 	}
 
+	if existing != nil && reflect.DeepEqual(clone(doc), before) {
+		return false, nil
+	}
+	return writeJSON(file, doc, existing)
+}
+
+// writeJSON writes doc at file, two-space indented with sorted keys, when its
+// bytes differ from existing; it reports whether it wrote. The file is
+// replaced through a temporary file beside it.
+func writeJSON(file string, doc map[string]any, existing []byte) (bool, error) {
 	var buf bytes.Buffer
 	enc := json.NewEncoder(&buf)
 	enc.SetEscapeHTML(false)
@@ -186,8 +324,23 @@ func writeProject(file string, deps []string, components map[string]bool, tested
 	if bytes.Equal(buf.Bytes(), existing) {
 		return false, nil
 	}
-	if err := os.WriteFile(file, buf.Bytes(), 0o644); err != nil { //nolint:gosec // a tracked project file
+	tmp, err := os.CreateTemp(filepath.Dir(file), "."+wsproto.ConfigFilename+".*")
+	if err != nil {
 		return false, err
+	}
+	_, werr := tmp.Write(buf.Bytes())
+	if cerr := tmp.Close(); werr == nil {
+		werr = cerr
+	}
+	if werr == nil {
+		werr = os.Chmod(tmp.Name(), 0o644) //nolint:gosec // a tracked project file
+	}
+	if werr == nil {
+		werr = os.Rename(tmp.Name(), file)
+	}
+	if werr != nil {
+		_ = os.Remove(tmp.Name())
+		return false, werr
 	}
 	return true, nil
 }
@@ -225,16 +378,26 @@ func RunSync(ctx *pctx.Context, emit *jsonl.Emitter, _ []string) (string, map[st
 		emit.DiagnosticWithCode("error", err.Error(), "", 0, 0, CodeSyncFailed)
 		return "FAILED", nil, errors.New(CodeSyncFailed)
 	}
-	emit.Info(syncSummary(result))
-	return "OK", map[string]any{"written": result.Written}, nil
+	if result.Export == "" {
+		emit.DiagnosticWithCode("warning", syncSummary(result), "", 0, 0, CodeSyncNoExport)
+	} else {
+		emit.Info(syncSummary(result))
+	}
+	return "OK", map[string]any{"written": result.Written, "retracted": result.Retracted}, nil
 }
 
-// CodeSyncFailed is the diagnostic code of a sync that wrote nothing.
-const CodeSyncFailed = "pants.sync_failed"
+// Diagnostic codes of the sync.
+const (
+	// CodeSyncFailed is a sync that failed and wrote nothing.
+	CodeSyncFailed = "pants.sync_failed"
+	// CodeSyncNoExport is a sync with neither the export nor pants, which
+	// wrote nothing.
+	CodeSyncNoExport = "pants.sync_no_export"
+)
 
 func syncSummary(r SyncResult) string {
 	if r.Export == "" {
 		return fmt.Sprintf("no %s at the workspace root and no pants on PATH: the putnami.json files keep their edges; write the export with `%s`, then run putnami projects sync", detect.DefaultGraphFile, detect.ExportCommand)
 	}
-	return fmt.Sprintf("the package graph of %s: %d putnami.json written, %d current", r.Export, len(r.Written), r.Unchanged)
+	return fmt.Sprintf("the package graph of %s: %d putnami.json written, %d current, %d former packages retracted", r.Export, len(r.Written), r.Unchanged, len(r.Retracted))
 }

@@ -162,9 +162,16 @@ func TestThePackagesOfAPantsRepositoryBecomeProjects(t *testing.T) {
 	for _, p := range result.Projects {
 		got[p.Path] = p
 	}
+	// A directory whose BUILD file declares only third-party targets is bare:
+	// named by its directory, with no extension; the root, which holds no
+	// BUILD file, is not answered.
+	if bare, ok := got["3rdparty/python"]; !ok || !reflect.DeepEqual(bare, wsproto.ProbeProject{Path: "3rdparty/python", SourceName: "3rdparty/python", SourceFile: "3rdparty/python/BUILD"}) {
+		t.Errorf("3rdparty/python = %+v, want a bare project", bare)
+	}
+	delete(got, "3rdparty/python")
 	want := map[string][]string{"src/python/api": {"src/python/pricing"}, "src/python/pricing": nil, "src/python/web": nil}
 	if len(got) != len(want) {
-		t.Fatalf("projects = %+v, want %v: third-party directories and the root are no project", result.Projects, want)
+		t.Fatalf("projects = %+v, want the packages %v", result.Projects, want)
 	}
 	for path, deps := range want {
 		p := got[path]
@@ -182,12 +189,12 @@ func TestThePackagesOfAPantsRepositoryBecomeProjects(t *testing.T) {
 	// Without the export, the BUILD files name the packages, and the edges
 	// come from each package's putnami.json.
 	result = probe(t, repository(t, d, false))
-	if len(result.Projects) != 3 || len(result.Diagnostics) != 0 || len(result.Projects[0].Dependencies) != 0 {
+	if len(result.Projects) != 4 || len(result.Diagnostics) != 0 || len(result.Projects[1].Dependencies) != 0 {
 		t.Errorf("without the export: projects %+v, diagnostics %v", result.Projects, result.Diagnostics)
 	}
 }
 
-func readProject(t *testing.T, root, dir string) map[string]any {
+func readProjectFile(t *testing.T, root, dir string) map[string]any {
 	t.Helper()
 	data, err := os.ReadFile(filepath.Join(root, dir, "putnami.json"))
 	if err != nil {
@@ -228,13 +235,13 @@ func TestTheSyncWritesEachPackagePutnamiJSONFromTheExport(t *testing.T) {
 	if want := []string{"src/python/api/putnami.json", "src/python/pricing/putnami.json", "src/python/web/putnami.json"}; result.Export != "pants-graph.json" || !reflect.DeepEqual(result.Written, want) {
 		t.Errorf("result %+v, want %v written from the export", result, want)
 	}
-	api := readProject(t, root, "src/python/api")
+	api := readProjectFile(t, root, "src/python/api")
 	if !reflect.DeepEqual(api, map[string]any{"$schema": ProjectSchema, "extensions": []any{ExtensionName}, "dependencies": []any{"/src/python/pricing"}}) {
 		t.Errorf("api = %v", api)
 	}
 	// An existing file keeps what the sync does not own; a stale Pants edge
 	// and a disabled test of a tested package go.
-	web := readProject(t, root, "src/python/web")
+	web := readProjectFile(t, root, "src/python/web")
 	want := map[string]any{"name": "storefront", "extensions": []any{ExtensionName}, "dependencies": []any{"@acme/design"}, "disable": map[string]any{"jobs": []any{"publish"}}}
 	if !reflect.DeepEqual(web, want) {
 		t.Errorf("web = %v, want %v", web, want)
@@ -262,7 +269,7 @@ func TestTheSyncWritesEachPackagePutnamiJSONFromTheExport(t *testing.T) {
 	if _, err := Sync(context.Background(), root, &bytes.Buffer{}); err != nil {
 		t.Fatal(err)
 	}
-	if jobs := readProject(t, root, "src/python/web")["disable"]; !reflect.DeepEqual(jobs, map[string]any{"jobs": []any{"publish", "test"}}) {
+	if jobs := readProjectFile(t, root, "src/python/web")["disable"]; !reflect.DeepEqual(jobs, map[string]any{"jobs": []any{"publish", "test"}}) {
 		t.Errorf("an untested package's disable = %v", jobs)
 	}
 }
@@ -275,7 +282,7 @@ func TestTheSyncRunsPantsPeekWithoutAnExport(t *testing.T) {
 	if err != nil || result.Export != "pants peek ::" || len(result.Written) != 3 {
 		t.Fatalf("result %+v, err %v", result, err)
 	}
-	if deps := readProject(t, root, "src/python/api")["dependencies"]; !reflect.DeepEqual(deps, []any{"/src/python/pricing"}) {
+	if deps := readProjectFile(t, root, "src/python/api")["dependencies"]; !reflect.DeepEqual(deps, []any{"/src/python/pricing"}) {
 		t.Errorf("api dependencies = %v", deps)
 	}
 	if log := stubLog(t); len(log) != 1 || !strings.HasSuffix(log[0], " pants peek ::") {
@@ -391,4 +398,53 @@ func TestTheManifestConformsToTheStackCore(t *testing.T) {
 		t.Fatal("the Pants profile is delegated")
 	}
 	stackstest.CheckManifest(t, "putnami.extension.json", s)
+}
+
+func TestTheSyncRetractsAFormerPackage(t *testing.T) {
+	spectest.Proves(t, feature, "sync-writes-the-package-graph", "the-sync-writes-each-package-putnami-json-from-the-export")
+	d := readDemo(t)
+	t.Setenv("PATH", t.TempDir())
+	root := repository(t, d, true)
+	// A former package keeps a putnami.json that names the extension; api
+	// still depends on it and on a package whose directory is gone.
+	writeFile(t, root, "src/python/legacy/putnami.json", `{"name": "legacy", "extensions": ["@putnami/pants", "@acme/lint"], "dependencies": ["/src/python/pricing", "@acme/design"]}`+"\n")
+	writeFile(t, root, "src/python/api/putnami.json", `{"extensions": ["@putnami/pants"], "dependencies": ["/src/python/legacy", "/src/python/gone", "@acme/design"]}`+"\n")
+	result, err := Sync(context.Background(), root, &bytes.Buffer{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := []string{"src/python/legacy/putnami.json"}; !reflect.DeepEqual(result.Retracted, want) {
+		t.Errorf("retracted = %v, want %v", result.Retracted, want)
+	}
+	if legacy := readProjectFile(t, root, "src/python/legacy"); !reflect.DeepEqual(legacy, map[string]any{"name": "legacy", "extensions": []any{"@acme/lint"}, "dependencies": []any{"@acme/design"}}) {
+		t.Errorf("legacy = %v, want the extension and its Pants edges gone", legacy)
+	}
+	if deps := readProjectFile(t, root, "src/python/api")["dependencies"]; !reflect.DeepEqual(deps, []any{"/src/python/pricing", "@acme/design"}) {
+		t.Errorf("api dependencies = %v, want the export's edge and the non-Pants one", deps)
+	}
+	if !strings.Contains(syncSummary(result), "1 former packages retracted") {
+		t.Errorf("summary = %s", syncSummary(result))
+	}
+}
+
+func TestTheSyncLeavesAFileWhoseOwnedMembersAreCurrent(t *testing.T) {
+	d := readDemo(t)
+	t.Setenv("PATH", t.TempDir())
+	root := repository(t, d, true)
+	handWritten := "{\n    \"name\": \"web\",\n    \"extensions\": [\"@putnami/pants\"],\n    \"options\": {\"ratio\": 1.0, \"big\": 12345678901234567890}\n}\n"
+	writeFile(t, root, "src/python/web/putnami.json", handWritten)
+	if _, err := Sync(context.Background(), root, &bytes.Buffer{}); err != nil {
+		t.Fatal(err)
+	}
+	if data, _ := os.ReadFile(filepath.Join(root, "src/python/web/putnami.json")); string(data) != handWritten {
+		t.Errorf("a file whose owned members are current is kept byte for byte:\n%s", data)
+	}
+	// A change to an owned member rewrites it, numbers kept.
+	writeFile(t, root, "src/python/web/putnami.json", strings.Replace(handWritten, `["@putnami/pants"]`, `[]`, 1))
+	if _, err := Sync(context.Background(), root, &bytes.Buffer{}); err != nil {
+		t.Fatal(err)
+	}
+	if data, _ := os.ReadFile(filepath.Join(root, "src/python/web/putnami.json")); !strings.Contains(string(data), `"big": 12345678901234567890`) || !strings.Contains(string(data), `"ratio": 1.0`) {
+		t.Errorf("a rewrite keeps the numbers as written:\n%s", data)
+	}
 }

@@ -394,8 +394,13 @@ affected component instead of importing its targets
   coverage summary.
 - A task whose `dir` is `root` runs its steps in the stack root, where the
   tool resolves its addresses.
-- Impact selection stays Putnami's: a change runs its component and the
-  components that depend on it, on the edges the extension writes.
+- Each command runs a `graph` step, then its task. The `graph` step depends
+  on the `graph` step upstream and runs nothing; the task depends on its own
+  `graph` step alone. Impact selection stays Putnami's: a change runs the
+  tool on its component and the components that depend on it, never on the
+  components it depends on.
+- A detector may answer a candidate directory as bare: a member named by its
+  directory, with no extension, that runs no task.
 
 `@putnami/pants` is the first delegated stack.
 

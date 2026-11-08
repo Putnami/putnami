@@ -38,18 +38,30 @@ func Stack() (stacks.Stack, error) {
 // Detect names the components among the candidate paths with the Pants
 // detector: each directory whose BUILD file declares a first-party target,
 // named by its directory, with the workspace root for stack root and the
-// edges of the export pants-graph.json when the root holds one. The
-// repository root is no component: its putnami.json would make the
-// workspace root a project.
+// edges of the export pants-graph.json when the root holds one. Every other
+// candidate that holds a BUILD file, a directory whose BUILD file declares
+// only third-party targets or BUILD file symbols and the repository root, is
+// bare: it is named by its directory, the root by the workspace, and runs no
+// task.
 func Detect(root string, request wsproto.ProbeRequest) ([]stacks.Component, []diag.Diagnostic) {
 	detection := detect.Detect(root, detect.Options{})
-	asked := make(map[string]bool, len(request.Paths))
-	for _, p := range request.Paths {
-		asked[p] = true
+	components := make(map[string]detect.Component, len(detection.Components))
+	for _, c := range detection.Components {
+		components[c.ID] = c
 	}
 	var out []stacks.Component
-	for _, c := range detection.Components {
-		if c.ID == wsproto.ProbeRootPath || !asked[c.ID] {
+	for _, p := range request.Paths {
+		c, ok := components[p]
+		if !ok || p == wsproto.ProbeRootPath {
+			file := buildFile(root, p)
+			if file == "" {
+				continue
+			}
+			name := p
+			if p == wsproto.ProbeRootPath {
+				name = ""
+			}
+			out = append(out, stacks.Component{Path: p, Name: name, SourceFile: file, Bare: true})
 			continue
 		}
 		out = append(out, stacks.Component{

@@ -152,16 +152,46 @@ esac
 	return log
 }
 
-func cacheFiles(t *testing.T, root string) []string {
+// pantsTests runs putnami test --impacted from base and returns the packages
+// pants test ran on, sorted, and the run's output. Every pants test call runs
+// at the workspace root.
+func pantsTests(t *testing.T, root, base, log string) ([]string, string) {
 	t.Helper()
-	var files []string
-	_ = filepath.WalkDir(filepath.Join(root, ".putnami", "cache"), func(p string, d os.DirEntry, err error) error {
-		if err == nil && !d.IsDir() {
-			files = append(files, p)
+	_ = os.Remove(log)
+	code, out := clitest.RunGateArgs(t, root, "test", "--impacted", "--baseline", base)
+	if code != 0 {
+		t.Fatalf("test --impacted exit %d:\n%s", code, out)
+	}
+	logged, err := os.ReadFile(log)
+	if err != nil && !os.IsNotExist(err) {
+		t.Fatal(err)
+	}
+	rootReal, _ := filepath.EvalSymlinks(root)
+	var tested []string
+	for _, line := range strings.Split(strings.TrimSpace(string(logged)), "\n") {
+		dir, call, _ := strings.Cut(line, " pants ")
+		if !strings.Contains(call, " test ") {
+			continue
 		}
-		return nil
-	})
-	return files
+		if real, _ := filepath.EvalSymlinks(dir); real != rootReal {
+			t.Errorf("pants test ran in %s, want the workspace root", dir)
+		}
+		tested = append(tested, call[strings.LastIndex(call, " ")+1:])
+	}
+	slices.Sort(tested)
+	// Every task of the run is uncached: no lookup, so no hit and no miss,
+	// and nothing is stored.
+	if !strings.Contains(out, "Cache: 0 local hit · 0 miss") {
+		t.Errorf("the run looked up or stored Putnami cache entries for delegated tasks:\n%s", out)
+	}
+	return tested, out
+}
+
+func commit(t *testing.T, root, message string) string {
+	t.Helper()
+	clitest.RunGit(t, root, "add", "-A")
+	clitest.RunGit(t, root, "commit", "-m", message)
+	return strings.TrimSpace(clitest.GitOutput(t, root, "rev-parse", "HEAD"))
 }
 
 func TestAChangeToOnePantsPackageRunsItAndItsDependentsThroughPants(t *testing.T) {
@@ -192,51 +222,31 @@ func TestAChangeToOnePantsPackageRunsItAndItsDependentsThroughPants(t *testing.T
 	clitest.InitGitRepo(t, root)
 	base := strings.TrimSpace(clitest.GitOutput(t, root, "rev-parse", "HEAD"))
 
-	// The change touches pricing alone.
+	// A change to pricing runs pricing and api, which depends on it.
 	for rel, content := range demo["head"] {
 		if strings.HasPrefix(rel, "src/python/pricing/") {
 			clitest.WriteFile(t, filepath.Join(root, rel), content)
 		}
 	}
-	clitest.RunGit(t, root, "add", "-A")
-	clitest.RunGit(t, root, "commit", "-m", "change pricing")
-	if err := os.Remove(log); err != nil {
-		t.Fatal(err)
-	}
-
-	code, out := clitest.RunGateArgs(t, root, "test", "--impacted", "--baseline", base)
-	if code != 0 {
-		t.Fatalf("test --impacted exit %d:\n%s", code, out)
-	}
-	logged, err := os.ReadFile(log)
-	if err != nil {
-		t.Fatal(err)
-	}
-	rootReal, _ := filepath.EvalSymlinks(root)
-	var tested []string
-	for _, line := range strings.Split(strings.TrimSpace(string(logged)), "\n") {
-		dir, call, _ := strings.Cut(line, " pants ")
-		if !strings.Contains(call, " test ") {
-			continue
-		}
-		if real, _ := filepath.EvalSymlinks(dir); real != rootReal {
-			t.Errorf("pants test ran in %s, want the workspace root", dir)
-		}
-		tested = append(tested, call[strings.LastIndex(call, " ")+1:])
-	}
-	slices.Sort(tested)
+	head := commit(t, root, "change pricing")
+	tested, out := pantsTests(t, root, base, log)
 	if want := []string{"src/python/api:", "src/python/pricing:"}; !slices.Equal(tested, want) {
 		t.Errorf("pants test ran on %v, want %v: the changed package and its dependent\n%s", tested, want, out)
-	}
-	for _, want := range []string{"src/python/pricing test~test", "src/python/api test~test"} {
-		if !strings.Contains(out, want) {
-			t.Errorf("the run reports no %s:\n%s", want, out)
-		}
 	}
 	if strings.Contains(out, "src/python/web test~test") {
 		t.Errorf("web, which nothing in the change reaches, ran:\n%s", out)
 	}
-	if files := cacheFiles(t, root); len(files) != 0 {
-		t.Errorf("the run stored Putnami cache entries for delegated tasks: %v", files)
+
+	// A change to api runs api alone: pricing, its dependency, runs no pants.
+	main := filepath.Join(root, "src/python/api/main.py")
+	data, err = os.ReadFile(main)
+	if err != nil {
+		t.Fatal(err)
+	}
+	clitest.WriteFile(t, main, string(data)+"\n# a change to api alone\n")
+	commit(t, root, "change api")
+	tested, out = pantsTests(t, root, head, log)
+	if want := []string{"src/python/api:"}; !slices.Equal(tested, want) {
+		t.Errorf("pants test ran on %v, want %v: a dependency runs no pants\n%s", tested, want, out)
 	}
 }

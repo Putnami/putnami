@@ -98,7 +98,19 @@ func checkTask(t testing.TB, doc manifest, s stacks.Stack, task string) {
 		return
 	}
 	step := command.Run[i]
-	if !slices.Contains(step.DependsOn, "^"+step.ID) {
+	if s.Profile.Delegated {
+		if len(command.Run) != 2 || i != 1 {
+			t.Errorf("command %s: want the %s step then the %s step, got %+v", task, stacks.TaskGraph, task, command.Run)
+			return
+		}
+		checkGraphStep(t, doc, task, command.Run[0])
+		// The tool runs on the selected projects alone: the graph step
+		// carries the edge, so a dependency runs its graph step, never its
+		// tool.
+		if !slices.Equal(step.DependsOn, []string{stacks.TaskGraph}) {
+			t.Errorf("command %s: step %s depends on %v, want its own %s step alone", task, step.ID, step.DependsOn, stacks.TaskGraph)
+		}
+	} else if !slices.Contains(step.DependsOn, "^"+step.ID) {
 		t.Errorf("command %s: step %s depends on no ^%s: a change upstream would not rerun it", task, step.ID, step.ID)
 	}
 	decl, ok := doc.Tasks[step.Task]
@@ -130,9 +142,8 @@ func checkTask(t testing.TB, doc manifest, s stacks.Stack, task string) {
 	if !workspace && len(root) > 0 {
 		t.Errorf("task %s reads no workspace input for the stack-root files %v", step.Task, root)
 	}
-	// A delegated stack's tool keeps its own cache: a Putnami hit would
-	// replay a result the tool never produced for this tree. Any other stack
-	// caches its tasks.
+	// Every task of a delegated stack is uncached; every task of any other
+	// stack is cached.
 	if enabled := cacheEnabled(decl.Cache); enabled == s.Profile.Delegated {
 		t.Errorf("task %s: cache.enabled = %v, want %v for a profile whose delegated is %v", step.Task, enabled, !s.Profile.Delegated, s.Profile.Delegated)
 	}
@@ -154,6 +165,24 @@ func cacheEnabled(raw json.RawMessage) bool {
 		return false
 	}
 	return policy.IsEnabled()
+}
+
+// checkGraphStep checks the graph step of a delegated command: it depends on
+// the graph step upstream, and its task runs the runtime's graph job
+// uncached.
+func checkGraphStep(t testing.TB, doc manifest, command string, step commandStep) {
+	t.Helper()
+	if step.ID != stacks.TaskGraph || !slices.Equal(step.DependsOn, []string{"^" + stacks.TaskGraph}) {
+		t.Errorf("command %s: the first step is %s depending on %v, want %s depending on ^%s", command, step.ID, step.DependsOn, stacks.TaskGraph, stacks.TaskGraph)
+	}
+	decl, ok := doc.Tasks[step.Task]
+	if !ok {
+		t.Errorf("command %s names no declared task %s", command, step.Task)
+		return
+	}
+	if want := []string{stacks.TaskGraph}; decl.Command != "{extensionRuntime}" || !reflect.DeepEqual(decl.Args, want) || cacheEnabled(decl.Cache) {
+		t.Errorf("task %s runs %s %v cached=%v, want {extensionRuntime} %v uncached", step.Task, decl.Command, decl.Args, cacheEnabled(decl.Cache), want)
+	}
 }
 
 func sorted(s []string) []string {
