@@ -59,7 +59,7 @@
           "verification": {
             "kind": "acceptance",
             "checks": [
-              "install-pins-the-jdk-the-builds-state",
+              "a-task-installs-the-jdk-its-build-states",
               "a-pinned-jdk-runs-when-the-machine-has-none",
               "a-maven-component-gets-maven-when-the-machine-has-none"
             ]
