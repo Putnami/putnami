@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"time"
 
 	extensionproto "go.putnami.dev/protocol/extension"
@@ -17,6 +18,7 @@ import (
 	"go.putnami.dev/sdk/extension/jsonl"
 	"go.putnami.dev/sdk/extension/pinnedarchive"
 	"go.putnami.dev/sdk/extension/putnamihome"
+	"go.putnami.dev/sdk/extension/robustio"
 	"go.putnami.dev/tooling/stacks"
 )
 
@@ -31,6 +33,13 @@ const (
 	// composerDownloadTimeout bounds the download of composer.phar.
 	composerDownloadTimeout = 5 * time.Minute
 )
+
+// installedMarker is the file under vendor/ that holds the digest of the
+// manifests of the last successful install.
+const installedMarker = ".putnami-composer-install"
+
+// hostOS is the operating system the extension runs on. Tests name another.
+var hostOS = runtime.GOOS
 
 // composerSHA256 is the digest of the pinned composer.phar. Tests pin the file
 // their local server publishes.
@@ -62,8 +71,13 @@ func installDependencies(ctx context.Context, root stacks.RootStep, emit *jsonl.
 		emit.DiagnosticWithCode("error", err.Error(), "", 0, 0, CodeComposerInstallFailed)
 		return fmt.Errorf("%s: %w", CodeComposerInstallFailed, err)
 	}
+	program := root.Program("php")
+	if err := enableWindowsExtensions(program); err != nil {
+		emit.DiagnosticWithCode("error", err.Error(), "", 0, 0, CodeComposerInstallFailed)
+		return fmt.Errorf("%s: %w", CodeComposerInstallFailed, err)
+	}
 	emit.Info("$ composer install in " + root.Dir)
-	cmd := exec.CommandContext(ctx, root.Program("php"), phar, "install", "--no-interaction", "--no-progress") //nolint:gosec // the pinned Composer
+	cmd := exec.CommandContext(ctx, program, phar, "install", "--no-interaction", "--no-progress") //nolint:gosec // the pinned Composer
 	cmd.Dir = root.Dir
 	cmd.Env = root.Env
 	// The job's stdout carries its protocol.
@@ -73,22 +87,55 @@ func installDependencies(ctx context.Context, root stacks.RootStep, emit *jsonl.
 		emit.DiagnosticWithCode("error", fmt.Sprintf("composer install in %s: %v", root.Dir, err), "", 0, 0, CodeComposerInstallFailed)
 		return fmt.Errorf("%s: %w", CodeComposerInstallFailed, err)
 	}
-	return nil
+	return recordInstall(root.Dir)
 }
 
-// vendorIsCurrent reports whether vendor/composer/installed.json is newer than
-// composer.json and composer.lock at dir.
+// vendorIsCurrent reports whether the last successful install at dir was made
+// from its current composer.json and composer.lock.
 func vendorIsCurrent(dir string) bool {
-	installed, err := os.Stat(filepath.Join(dir, "vendor", "composer", "installed.json"))
+	recorded, err := os.ReadFile(filepath.Join(dir, "vendor", installedMarker)) //nolint:gosec // inside the stack root
 	if err != nil {
 		return false
 	}
-	for _, name := range []string{"composer.json", "composer.lock"} {
-		if manifest, err := os.Stat(filepath.Join(dir, name)); err == nil && !installed.ModTime().After(manifest.ModTime()) {
-			return false
-		}
+	digest, err := manifestsDigest(dir)
+	return err == nil && string(recorded) == digest
+}
+
+// recordInstall records the manifests a successful install used.
+func recordInstall(dir string) error {
+	digest, err := manifestsDigest(dir)
+	if err != nil {
+		return err
 	}
-	return true
+	return os.WriteFile(filepath.Join(dir, "vendor", installedMarker), []byte(digest), 0o644) //nolint:gosec // inside the stack root
+}
+
+func manifestsDigest(dir string) (string, error) {
+	hash := sha256.New()
+	for _, name := range []string{"composer.json", "composer.lock"} {
+		content, err := os.ReadFile(filepath.Join(dir, name)) //nolint:gosec // inside the stack root
+		if err != nil && !os.IsNotExist(err) {
+			return "", err
+		}
+		_, _ = hash.Write(content)
+		_, _ = hash.Write([]byte{0})
+	}
+	return hex.EncodeToString(hash.Sum(nil)), nil
+}
+
+// enableWindowsExtensions writes the php.ini of a pinned Windows PHP, whose
+// archive ships none: without one, PHP loads no shared extension, and Composer
+// and PHPUnit stop on the missing openssl and mbstring.
+func enableWindowsExtensions(program string) error {
+	if hostOS != "windows" || !filepath.IsAbs(program) {
+		return nil
+	}
+	dir := filepath.Dir(program)
+	ini := "extension_dir = \"" + filepath.Join(dir, "ext") + "\"\n"
+	for _, name := range []string{"openssl", "mbstring", "curl", "zip", "fileinfo"} {
+		ini += "extension=" + name + "\n"
+	}
+	return os.WriteFile(filepath.Join(dir, "php.ini"), []byte(ini), 0o644) //nolint:gosec // the pinned toolchain's own folder
 }
 
 // provideComposer returns the path of the pinned composer.phar under the
@@ -124,7 +171,7 @@ func downloadComposer(ctx context.Context, path string) error {
 	if err := pinnedarchive.Download(ctx, pin, stage, pinnedarchive.Options{}); err != nil {
 		return fmt.Errorf("download Composer %s: %w", composerVersion, err)
 	}
-	return os.Rename(stage, path)
+	return robustio.Rename(stage, path)
 }
 
 func fileSHA256(path string) (string, error) {

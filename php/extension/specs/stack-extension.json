@@ -39,11 +39,11 @@
     },
     {
       "id": "manifest-follows-the-profile",
-      "text": "The manifest passes the stack core's conformance kit: its markers are the profile's, it lists the php:lint and php:test selectors, and each command runs one task that depends on the same task upstream, reads its selector and the profile's stack-root files for that task, and declares its command-output reports directory."
+      "text": "The manifest passes the stack core's conformance kit: its markers are the profile's, it lists the php:lint and php:test selectors, and each command runs a step named after it that depends on the same task upstream, reads its selector and the profile's stack-root files for that task, and declares its command-output reports directory."
     },
     {
       "id": "pins-a-php-release",
-      "text": "toolchain-resolve answers the identity php with a release the extension ships, an archive and a SHA-256 for each platform, when a composer.json exists outside vendor/. A committed pin of a shipped release the root's .php-version or require.php accepts is kept; otherwise 8.4.23 when they accept it, else the highest shipped release they accept. With no composer.json, no accepted release, or no archive for the platform, it answers no pin."
+      "text": "toolchain-resolve answers the identity php with a release the extension ships, an archive and a SHA-256 for each platform, when a composer.json exists outside vendor/. Each component's statement narrows the shipped releases the root's .php-version or require.php accepts, unless that would leave none. A committed pin of an accepted release is kept; otherwise 8.4.23 when accepted, else the highest accepted release. With no composer.json, no accepted release, or no archive for the platform, it answers no pin."
     },
     {
       "id": "machine-php-comes-first",
@@ -51,7 +51,7 @@
     },
     {
       "id": "installs-its-dependencies",
-      "text": "Before lint and test, the install step of a component runs the Composer release the extension pins by SHA-256 with composer install at its stack root, one run per root at a time. A root whose vendor/composer/installed.json is newer than composer.json and composer.lock is left alone. A run with offline dependencies installs nothing."
+      "text": "Before lint and test, the install step of a component runs the Composer release the extension pins by SHA-256 with composer install at its stack root, one run per root at a time. A root whose last successful install, recorded under vendor/, used its current composer.json and composer.lock is left alone. On Windows the step writes the php.ini of the pinned PHP, which loads openssl, mbstring, curl, zip and fileinfo. A run with offline dependencies installs nothing."
     },
     {
       "id": "coverage-driver-is-optional",

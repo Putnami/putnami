@@ -57,6 +57,16 @@ func TestTheExtensionPinsAPHPReleaseTheRepositoryAccepts(t *testing.T) {
 		})
 	}
 
+	nested := t.TempDir()
+	writeFile(t, nested, "services/api/composer.json", `{"require": {"php": "~8.3.0"}}`)
+	if got := version(resolved(t, nested, "linux/amd64", "")); got != "8.3.32" {
+		t.Errorf("a component's statement narrows the pin: %s", got)
+	}
+	writeFile(t, nested, "services/web/composer.json", `{"require": {"php": ">=8.5"}}`)
+	if got := version(resolved(t, nested, "linux/amd64", "")); got != "8.3.32" {
+		t.Errorf("a statement that would leave no release is not applied: %s", got)
+	}
+
 	root := t.TempDir()
 	writeFile(t, root, "vendor/acme/composer.json", `{}`)
 	if pin := resolved(t, root, "linux/amd64", ""); pin != nil {

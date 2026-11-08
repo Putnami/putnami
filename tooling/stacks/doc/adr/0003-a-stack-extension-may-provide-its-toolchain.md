@@ -50,4 +50,4 @@ it as an optional runtime toolchain.
   shipped with the extension, so a changed archive fails its download.
 - A pin moves only when an extension release ships new digests.
 - A cached test result of a machine with no driver holds no coverage, and a
-  machine with a driver can reuse it: the key carries no machine fact.
+  machine with a driver can reuse it: the key carries no version or path of the machine, only whether the toolchain was available.

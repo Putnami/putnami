@@ -354,6 +354,7 @@ func (p Profile) Resolve(override json.RawMessage) (Profile, error) {
 		return Profile{}, err
 	}
 	mergeInto(merged, over)
+	dropStaleFallbacks(merged, over)
 	data, err := json.Marshal(merged)
 	if err != nil {
 		return Profile{}, err
@@ -366,6 +367,21 @@ func (p Profile) Resolve(override json.RawMessage) (Profile, error) {
 		return Profile{}, fmt.Errorf("the resolved profile is invalid: %w", err)
 	}
 	return out, nil
+}
+
+// dropStaleFallbacks removes the withoutCoverage of a task whose steps the
+// override replaces: those steps are not the ones the fallback stands for.
+func dropStaleFallbacks(merged, over map[string]any) {
+	overTasks, _ := over["tasks"].(map[string]any)
+	mergedTasks, _ := merged["tasks"].(map[string]any)
+	for name, value := range overTasks {
+		task, _ := value.(map[string]any)
+		_, replaced := task["steps"]
+		_, restated := task["withoutCoverage"]
+		if target, ok := mergedTasks[name].(map[string]any); ok && replaced && !restated {
+			delete(target, "withoutCoverage")
+		}
+	}
 }
 
 func mergeInto(dst, src map[string]any) {

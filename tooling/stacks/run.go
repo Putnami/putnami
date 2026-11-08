@@ -118,7 +118,10 @@ func selectToolchain(ctx context.Context, in runInput, meta Metadata, profile Pr
 	}
 	selected, err := profile.Toolchain.Select(ctx, in.projectAbs, expected, os.Environ())
 	if errors.Is(err, ErrToolchainMissing) {
-		return Selection{}, failWith(emit, CodeToolchainMissing, "%v: the %s stack needs it on PATH, or a release its extension pins: run putnami install", err, profile.ID)
+		if profile.Toolchain.Provisioned != "" {
+			return Selection{}, failWith(emit, CodeToolchainMissing, "%v: the %s stack needs it on PATH, or a release its extension pins: run putnami install", err, profile.ID)
+		}
+		return Selection{}, failWith(emit, CodeToolchainMissing, "%v: the %s stack needs it on PATH", err, profile.ID)
 	}
 	if err != nil {
 		return Selection{}, failWith(emit, CodeToolchainMissing, "%v", err)

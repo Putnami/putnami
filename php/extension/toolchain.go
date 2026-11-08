@@ -90,23 +90,32 @@ func answerToolchainResolve(root string, request wsproto.ToolchainResolveRequest
 	return result
 }
 
-// resolvePin returns the PHP release the workspace at root pins. A committed
-// pin of a shipped release that the root accepts is kept; otherwise it is
-// defaultVersion when the root accepts it, else the highest shipped release
-// the root accepts. A workspace with no composer.json outside vendor/, or
+// resolvePin returns the PHP release the workspace at root pins. Each
+// component's statement narrows the releases the root accepts, unless that
+// would leave none. A committed pin of an accepted shipped release is kept;
+// otherwise it is defaultVersion when accepted, else the highest accepted
+// shipped release. A workspace with no composer.json outside vendor/, or
 // whose root states a version it cannot read, pins nothing: its tasks report
 // that statement.
 func resolvePin(root string, request wsproto.ToolchainResolveRequest, profile stacks.Profile) (wsproto.LockToolchainEntry, bool) {
-	if found, _ := composer.Candidates(root); len(found) == 0 {
+	found, _ := composer.Candidates(root)
+	if len(found) == 0 {
 		return wsproto.LockToolchainEntry{}, false
 	}
 	expected, err := profile.Toolchain.ExpectedVersion(root, wsproto.ProbeRootPath, wsproto.ProbeRootPath)
 	if err != nil {
 		return wsproto.LockToolchainEntry{}, false
 	}
-	accepted := slices.DeleteFunc(slices.Clone(releases), func(r release) bool {
-		return profile.Toolchain.Compare(expected, r.version).Fail
-	})
+	accepted := acceptedBy(profile.Toolchain, releases, expected)
+	for _, dir := range found {
+		statement, err := profile.Toolchain.ExpectedVersion(root, dir, wsproto.ProbeRootPath)
+		if err != nil {
+			continue
+		}
+		if narrowed := acceptedBy(profile.Toolchain, accepted, statement); len(narrowed) > 0 {
+			accepted = narrowed
+		}
+	}
 	chosen, ok := choose(accepted, request.Locked[LockIdentity].Version)
 	if !ok {
 		return wsproto.LockToolchainEntry{}, false
@@ -115,6 +124,13 @@ func resolvePin(root string, request wsproto.ToolchainResolveRequest, profile st
 		return wsproto.LockToolchainEntry{}, false
 	}
 	return chosen.lockEntry(), true
+}
+
+// acceptedBy returns the releases expected accepts, oldest first.
+func acceptedBy(toolchain stacks.Toolchain, candidates []release, expected stacks.Expected) []release {
+	return slices.DeleteFunc(slices.Clone(candidates), func(r release) bool {
+		return toolchain.Compare(expected, r.version).Fail
+	})
 }
 
 // choose picks among accepted releases, oldest first.

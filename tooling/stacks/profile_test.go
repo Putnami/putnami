@@ -162,3 +162,26 @@ func TestMatchPattern(t *testing.T) {
 		}
 	}
 }
+
+func TestAnOverrideOfTheStepsDropsTheCoverageFallback(t *testing.T) {
+	p := mustProfile(t)
+	task := p.Tasks[TaskTest]
+	task.WithoutCoverage = &WithoutCoverage{Probe: []string{"false"}, Steps: [][]string{{"cargo", "test"}}}
+	p.Tasks[TaskTest] = task
+
+	resolved, err := p.Resolve(json.RawMessage(`{"tasks": {"test": {"steps": [["cargo", "nextest", "run"]]}}}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resolved.Tasks[TaskTest].WithoutCoverage != nil {
+		t.Errorf("replaced steps drop the fallback: %+v", resolved.Tasks[TaskTest].WithoutCoverage)
+	}
+
+	resolved, err = p.Resolve(json.RawMessage(`{"tasks": {"test": {"inputs": ["sources"]}}}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resolved.Tasks[TaskTest].WithoutCoverage == nil {
+		t.Error("an override that keeps the steps keeps the fallback")
+	}
+}

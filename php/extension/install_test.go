@@ -8,9 +8,9 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
-	"time"
 
 	extensionproto "go.putnami.dev/protocol/extension"
 	"go.putnami.dev/protocol/features/spectest"
@@ -84,8 +84,8 @@ func composerStub(t *testing.T, version string) string {
 	writeFile(t, bin, "php", `#!/bin/sh
 if [ "$1" = "--version" ]; then echo "PHP `+version+` (cli)"; exit 0; fi
 echo "$PWD: $*" >> "`+log+`"
-if [ -n "$STUB_COMPOSER_FAILS" ]; then exit 3; fi
 mkdir -p vendor/composer && echo '{}' > vendor/composer/installed.json
+if [ -n "$STUB_COMPOSER_FAILS" ]; then exit 3; fi
 `)
 	if err := os.Chmod(filepath.Join(bin, "php"), 0o755); err != nil {
 		t.Fatal(err)
@@ -122,11 +122,8 @@ func TestTheInstallStepInstallsEachStackRootWithThePinnedComposer(t *testing.T) 
 		t.Errorf("downloads = %d", *downloads)
 	}
 
-	// A manifest newer than vendor/ installs again, with the phar it holds.
-	later := time.Now().Add(time.Hour)
-	if err := os.Chtimes(filepath.Join(root, "composer.lock"), later, later); err != nil {
-		t.Fatal(err)
-	}
+	// A changed manifest installs again, with the phar it holds.
+	writeFile(t, root, "composer.lock", `{"packages": [{"name": "demo/new"}]}`)
 	if status, err := runInstall(t, root, "."); status != "OK" || err != nil {
 		t.Fatalf("install: %s %v", status, err)
 	}
@@ -157,6 +154,40 @@ func TestTheInstallStepReportsAFailedComposer(t *testing.T) {
 	t.Setenv("STUB_COMPOSER_FAILS", "1")
 	if status, err := runInstall(t, root, "."); status != "FAILED" || err == nil || !strings.HasPrefix(err.Error(), CodeComposerInstallFailed) {
 		t.Errorf("a failed composer install fails the step: %s %v", status, err)
+	}
+	if status, err := runInstall(t, root, "."); status != "FAILED" || err == nil {
+		t.Errorf("a failed install is not taken for a finished one: %s %v", status, err)
+	}
+}
+
+func TestAPinnedWindowsPHPLoadsTheExtensionsComposerNeeds(t *testing.T) {
+	dir := t.TempDir()
+	program := filepath.Join(dir, "php.exe")
+	if err := enableWindowsExtensions(program); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(filepath.Join(dir, "php.ini")); !os.IsNotExist(err) {
+		t.Fatalf("another host writes no php.ini: %v", err)
+	}
+	hostOS = "windows"
+	t.Cleanup(func() { hostOS = runtime.GOOS })
+	if err := enableWindowsExtensions("php"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(filepath.Join(dir, "php.ini")); !os.IsNotExist(err) {
+		t.Fatalf("a machine PHP keeps its own php.ini: %v", err)
+	}
+	if err := enableWindowsExtensions(program); err != nil {
+		t.Fatal(err)
+	}
+	ini, err := os.ReadFile(filepath.Join(dir, "php.ini"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{filepath.Join(dir, "ext"), "extension=openssl", "extension=mbstring"} {
+		if !strings.Contains(string(ini), want) {
+			t.Errorf("php.ini lacks %q:\n%s", want, ini)
+		}
 	}
 }
 
