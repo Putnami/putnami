@@ -114,6 +114,18 @@ func TestExcludedDirectoriesStayOutOfTheInputs(t *testing.T) {
 	if after, _ := wsproto.InputBasisDigest(project, got.Basis); after == before {
 		t.Error("a source change moves the digest")
 	}
+	// An entry named like a skipped directory that is no directory, such as
+	// the .git file of a worktree or a linked build directory, leaves the
+	// answer with the basis, and the answer stays valid.
+	writeFile(t, root, "App/sub/.git", "gitdir: ../../.git/worktrees/x\n")
+	if err := os.Symlink(filepath.Join(root, "App", "main.src"), filepath.Join(root, "App", "sub", ".build")); err != nil {
+		t.Fatal(err)
+	}
+	writeFile(t, root, "App/sub/kept.src", "")
+	writeFile(t, root, "App/putnami.json", `{"options": {"@putnami/kit": {"inputs": {"sources": ["**"]}}}}`)
+	if got := resolveOne(t, kitStack(t), root, "App", "kit:lint"); got.Error != "" || slices.Contains(got.Files, "sub/.git") || slices.Contains(got.Files, "sub/.build") || !slices.Contains(got.Files, "sub/kept.src") {
+		t.Errorf("lint inputs = %+v", got)
+	}
 	// A directory a pattern names before its wildcard stays in the basis.
 	if got := basisSet([]string{".build/**", "src/**"}, []string{".build"}); slices.Contains(got, "!**/.build/**") || !slices.Contains(got, "!**/.git/**") {
 		t.Errorf("basisSet = %v", got)

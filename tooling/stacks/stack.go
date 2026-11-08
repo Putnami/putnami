@@ -430,12 +430,17 @@ func (s Stack) answer(root string, q wsproto.InputResolveQuery, c found) wsproto
 			files = appendNew(files, filepath.ToSlash(rel))
 		}
 	}
+	// The basis leaves the skipped directories out, and its exclusions name
+	// any entry of that name: a .git file at a worktree's root, a linked
+	// Pods. The answer lists only what its basis selects.
+	basis := basisSet(patterns, p.Excludes)
+	files = slices.DeleteFunc(files, func(f string) bool { return !wsproto.SelectsPath(f, basis) })
 	slices.Sort(files)
 	return wsproto.InputResolveAnswer{
 		Project:  q.Project,
 		Selector: q.Selector,
 		Files:    files,
-		Basis:    wsproto.InputBasis{Content: [][]string{basisSet(patterns, p.Excludes)}},
+		Basis:    wsproto.InputBasis{Content: [][]string{basis}},
 	}
 }
 
