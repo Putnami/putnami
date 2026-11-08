@@ -34,6 +34,7 @@
       "python",
       "rust",
       "sites",
+      "swift",
       "tooling",
       "typescript"
     ],
@@ -56,6 +57,7 @@
       "scope/python",
       "scope/rust",
       "scope/sites",
+      "scope/swift",
       "scope/tooling",
       "scope/typescript",
       "severity/critical",

@@ -102,6 +102,7 @@ use (
 	./python/extension
 	./rust/extension
 	./sites/telemetry.putnami.dev
+	./swift/extension
 	./intelligence/areas
 	./tooling/cli
 	./tooling/cli-documents

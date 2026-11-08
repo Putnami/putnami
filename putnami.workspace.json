@@ -17,6 +17,7 @@
     "/php/extension",
     "/python/extension",
     "/rust/extension",
+    "/swift/extension",
     "/tooling/scaffold",
     "/tooling/sdd-extension",
     "/tooling/contributor",
@@ -40,6 +41,7 @@
     "python",
     "rust",
     "sites",
+    "swift",
     "tooling",
     "typescript"
   ],
