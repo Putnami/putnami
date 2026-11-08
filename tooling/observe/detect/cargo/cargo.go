@@ -409,17 +409,17 @@ func Locator(result wsproto.ProbeResult) func(string) (file, component string, o
 			if (meta.Source == SourceWorkspace) != workspaceFirst || p.SourceName == "" {
 				continue
 			}
-			if _, taken := byName[packageKey(p.SourceName)]; !taken {
-				byName[packageKey(p.SourceName)] = p
+			if _, taken := byName[PackageKey(p.SourceName)]; !taken {
+				byName[PackageKey(p.SourceName)] = p
 			}
 		}
 	}
 	return func(id string) (string, string, bool) {
-		m := binaryID.FindStringSubmatch(strings.TrimSpace(id))
-		if m == nil {
+		pkg, ok := BinaryPackage(id)
+		if !ok {
 			return "", "", false
 		}
-		p, ok := byName[packageKey(m[1])]
+		p, ok := byName[PackageKey(pkg)]
 		if !ok {
 			return "", "", false
 		}
@@ -427,8 +427,20 @@ func Locator(result wsproto.ProbeResult) func(string) (file, component string, o
 	}
 }
 
-// packageKey is a package name as Cargo compares it with its crate name.
-func packageKey(name string) string {
+// BinaryPackage returns the package name a cargo-nextest binary id names:
+// pricing for pricing::integration, api for api::bin/api. ok is false for a
+// string that is no binary id.
+func BinaryPackage(id string) (string, bool) {
+	m := binaryID.FindStringSubmatch(strings.TrimSpace(id))
+	if m == nil {
+		return "", false
+	}
+	return m[1], true
+}
+
+// PackageKey is a package name as Cargo compares it with its crate name: - and
+// _ read as one.
+func PackageKey(name string) string {
 	return strings.ReplaceAll(name, "-", "_")
 }
 

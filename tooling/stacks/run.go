@@ -287,7 +287,7 @@ func (s Stack) run(ctx context.Context, in runInput, emit reporter) (string, map
 		}
 		return out, nil
 	}
-	summary, diags := ReadReports(t.Reports, resolve, outDir)
+	summary, diags := ReadReports(t.Reports, resolve, outDir, s.attribution(in.workspaceRoot, in.projectAbs, meta.Component))
 	failed := stepErr != nil
 	for _, d := range diags {
 		// A step that failed may have written no report: the step's own
@@ -318,6 +318,9 @@ func (s Stack) run(ctx context.Context, in runInput, emit reporter) (string, map
 	}
 	if len(summary.Reports) > 0 {
 		data["reports"] = summary.Reports
+	}
+	if summary.OtherCases > 0 || summary.OtherFiles > 0 {
+		emit.Info(fmt.Sprintf("left to their own components: %d test cases and %d coverage files", summary.OtherCases, summary.OtherFiles))
 	}
 	if stepErr != nil && summary.Tests.Failed == 0 {
 		return statusFailed, data, stepErr

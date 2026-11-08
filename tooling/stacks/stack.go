@@ -44,6 +44,13 @@ type Stack struct {
 	Profile Profile
 	// Detect finds the components.
 	Detect Detector
+	// CaseComponent names the component of a JUnit case from its class name,
+	// else its suite name; ok is false when neither names one. Nil reads
+	// every case as the task's component's.
+	CaseComponent func(classname, suite string) (component string, ok bool)
+	// ComponentKey is a component name as the stack compares two of them.
+	// Nil compares names as they are.
+	ComponentKey func(name string) string
 }
 
 // Metadata is what the probe records about a project under

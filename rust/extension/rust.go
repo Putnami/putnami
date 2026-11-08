@@ -25,7 +25,22 @@ func Stack() (stacks.Stack, error) {
 	if err != nil {
 		return stacks.Stack{}, fmt.Errorf("profile.json: %w", err)
 	}
-	return stacks.Stack{Extension: ExtensionName, Profile: profile, Detect: Detect}, nil
+	return stacks.Stack{
+		Extension:     ExtensionName,
+		Profile:       profile,
+		Detect:        Detect,
+		CaseComponent: CaseComponent,
+		ComponentKey:  cargo.PackageKey,
+	}, nil
+}
+
+// CaseComponent names the crate of a nextest JUnit case: the package of the
+// binary id its class name states, else its suite name.
+func CaseComponent(classname, suite string) (string, bool) {
+	if pkg, ok := cargo.BinaryPackage(classname); ok {
+		return pkg, true
+	}
+	return cargo.BinaryPackage(suite)
 }
 
 // Detect names the crates among the candidate paths with the Cargo detector.

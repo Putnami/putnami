@@ -162,7 +162,7 @@ func stubTools(t *testing.T, version string, junit string) {
 	writeFile(t, bin, "rustc", "#!/bin/sh\necho 'rustc "+version+" (stub)'\n")
 	cargo := "#!/bin/sh\nset -e\necho \"cargo $*\" >> \"$STUB_LOG\"\n" +
 		"mkdir -p \"$STUB_ROOT/target\"\ncat > \"$STUB_ROOT/target/junit.xml\" <<'XML'\n" + junit + "\nXML\n" +
-		"for a in \"$@\"; do case \"$a\" in */lcov.info) printf 'SF:/src/lib.rs\\nDA:1,1\\nDA:2,0\\nend_of_record\\n' > \"$a\";; esac; done\n"
+		"for a in \"$@\"; do case \"$a\" in */lcov.info) printf 'SF:src/lib.rs\\nDA:1,1\\nDA:2,0\\nend_of_record\\n' > \"$a\";; esac; done\n"
 	writeFile(t, bin, "cargo", cargo)
 	for _, f := range []string{"rustc", "cargo"} {
 		if err := os.Chmod(filepath.Join(bin, f), 0o755); err != nil {

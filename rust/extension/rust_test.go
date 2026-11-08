@@ -123,7 +123,9 @@ case "$*" in *nextest*)
 XML
   prev=""
   for a in "$@"; do
-    if [ "$prev" = "--output-path" ]; then printf 'SF:/src/lib.rs\nDA:1,3\nDA:2,0\nDA:3,1\nend_of_record\n' > "$a"; fi
+    if [ "$prev" = "--output-path" ]; then
+      if [ -n "$STUB_LCOV" ]; then cp "$STUB_LCOV" "$a"; else printf 'SF:src/lib.rs\nDA:1,3\nDA:2,0\nDA:3,1\nend_of_record\n' > "$a"; fi
+    fi
     prev="$a"
   done;;
 build*)
@@ -158,6 +160,13 @@ const junitFail = `<?xml version="1.0"?>
 // way the CLI calls it.
 func runJob(t *testing.T, root, rel, task string) (string, map[string]any, string, error) {
 	t.Helper()
+	status, data, out, _, err := runJobOutput(t, root, rel, task)
+	return status, data, out, err
+}
+
+// runJobOutput is runJob, with what the job emitted.
+func runJobOutput(t *testing.T, root, rel, task string) (string, map[string]any, string, string, error) {
+	t.Helper()
 	s := stack(t)
 	result := probe(t, root)
 	var meta json.RawMessage
@@ -172,15 +181,20 @@ func runJob(t *testing.T, root, rel, task string) (string, map[string]any, strin
 	}}
 	out := filepath.Join(root, ".putnami/out", strings.ReplaceAll(rel, "/", "_"), task)
 	job := s.Jobs()[task]
-	devnull, err := os.Open(os.DevNull)
+	emitted, err := os.CreateTemp(t.TempDir(), "emitted")
 	if err != nil {
 		t.Fatal(err)
 	}
 	stdout := os.Stdout
-	os.Stdout = devnull
+	os.Stdout = emitted
 	status, data, runErr := job(ctx, jsonl.New(), []string{"--report-dir", out})
 	os.Stdout = stdout
-	return status, data, out, runErr
+	_ = emitted.Close()
+	text, err := os.ReadFile(emitted.Name())
+	if err != nil {
+		t.Fatal(err)
+	}
+	return status, data, out, string(text), runErr
 }
 
 func TestATaskRunsTheProfileStepsAfterTheToolchainCheck(t *testing.T) {
@@ -331,5 +345,74 @@ func TestLintDoesNotReadTheLockfileOrTheNextestConfiguration(t *testing.T) {
 	}
 	if data, err := os.ReadFile(filepath.Join(out, "build", "artifacts", "api")); err != nil || string(data) != "bin" {
 		t.Errorf("the crate's binary is copied into the build output: %q %v", data, err)
+	}
+}
+
+const junitMixed = `<?xml version="1.0"?>
+<testsuites>
+<testsuite name="api::http">
+  <testcase classname="api::http" name="serves"/>
+</testsuite>
+<testsuite name="api">
+  <testcase classname="api" name="routes"/>
+  <testcase classname="api::bin/api" name="starts"/>
+</testsuite>
+<testsuite name="pricing::integration">
+  <testcase classname="pricing::integration" name="totals"/>
+</testsuite>
+<testsuite name="loose suite">
+  <testcase classname="loose case" name="stray"/>
+</testsuite>
+</testsuites>`
+
+func TestEachNextestCaseGoesToTheCrateItsBinaryNames(t *testing.T) {
+	spectest.Proves(t, feature, "cases-are-attributed", "each-nextest-case-goes-to-the-crate-its-binary-names")
+	root := fixture(t)
+	stubTools(t, root, "1.82.0", junitMixed)
+	status, data, _, emitted, err := runJobOutput(t, root, "crates/api", stacks.TaskTest)
+	if status != "OK" || err != nil {
+		t.Fatalf("test: %s %v\n%s", status, err, emitted)
+	}
+	// Three cases of api, one of no crate; the pricing case is pricing's.
+	if got := data["testSummary"].(map[string]any); got["total"] != 4 || got["passed"] != 4 {
+		t.Errorf("testSummary = %v", got)
+	}
+	if !strings.Contains(emitted, stacks.CodeTestUnattributed) || !strings.Contains(emitted, `loose case \u003e stray`) {
+		t.Errorf("a case of no crate is reported:\n%s", emitted)
+	}
+	if strings.Contains(emitted, "pricing::integration \\u003e totals") {
+		t.Errorf("the pricing case is not this crate's:\n%s", emitted)
+	}
+	s := stack(t)
+	if pkg, ok := s.CaseComponent("my-lib::it", ""); !ok || s.ComponentKey(pkg) != s.ComponentKey("my_lib") {
+		t.Errorf("- and _ read as one: %q %v", pkg, ok)
+	}
+	if pkg, ok := s.CaseComponent("", "worker::bin/worker"); !ok || pkg != "worker" {
+		t.Errorf("the suite name names the crate when the class name does not: %q %v", pkg, ok)
+	}
+}
+
+func TestEachCoverageFileGoesToTheCrateThatHoldsIt(t *testing.T) {
+	spectest.Proves(t, feature, "coverage-is-attributed", "each-coverage-file-goes-to-the-crate-that-holds-it")
+	root := fixture(t)
+	lcov := filepath.Join(t.TempDir(), "lcov.info")
+	writeFile(t, filepath.Dir(lcov), "lcov.info", "SF:"+filepath.Join(root, "crates/api/src/lib.rs")+"\nDA:1,1\nDA:2,0\nend_of_record\n"+
+		"SF:tests/http.rs\nDA:1,1\nend_of_record\n"+
+		"SF:"+filepath.Join(root, "crates/pricing/src/lib.rs")+"\nDA:1,1\nDA:2,1\nDA:3,1\nend_of_record\n"+
+		"SF:/opt/cargo/registry/src/itoa/lib.rs\nDA:1,1\nend_of_record\n")
+	t.Setenv("STUB_LCOV", lcov)
+	stubTools(t, root, "1.82.0", junitPass)
+	status, data, _, emitted, err := runJobOutput(t, root, "crates/api", stacks.TaskTest)
+	if status != "OK" || err != nil {
+		t.Fatalf("test: %s %v\n%s", status, err, emitted)
+	}
+	if got := data["coverageSummary"].(map[string]any); got["covered"] != 2 || got["total"] != 3 {
+		t.Errorf("coverageSummary = %v, want api's two files alone", got)
+	}
+	if !strings.Contains(emitted, stacks.CodeCoverageUnmapped) || !strings.Contains(emitted, "/opt/cargo/registry/src/itoa/lib.rs") {
+		t.Errorf("a file in no crate is reported:\n%s", emitted)
+	}
+	if strings.Contains(emitted, "crates/pricing/src/lib.rs") {
+		t.Errorf("pricing's file is pricing's, not unmapped:\n%s", emitted)
 	}
 }
