@@ -212,7 +212,7 @@
             "kind": "acceptance",
             "checks": [
               "the-server-template-ships-fastapi-uvicorn-and-a-root-response-test",
-              "the-server-template-configures-run-and-serve-entrypoints"
+              "the-server-template-configures-one-entrypoint-for-its-commands"
             ]
           }
         },

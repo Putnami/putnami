@@ -19,7 +19,7 @@
     },
     {
       "id": "minimal-server-shape",
-      "text": "The generated project contains a FastAPI application, uvicorn dependency, configured run and serve entrypoints, and a test for its root response."
+      "text": "The generated project contains a FastAPI application, uvicorn dependency, one configured entrypoint for run, serve and package, and a test for its root response."
     },
     {
       "id": "experimental-disclosure",
