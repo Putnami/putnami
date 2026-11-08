@@ -5,9 +5,15 @@
     "java/stack-extension#components-become-projects",
     "java/stack-extension#lint-skips-the-lockfiles",
     "java/stack-extension#manifest-follows-the-profile",
+    "java/stack-extension#nested-builds-are-stack-roots",
     "java/stack-extension#overrides-are-honored",
+    "java/stack-extension#package-assembles-an-image",
+    "java/stack-extension#publish-pushes-the-image",
     "java/stack-extension#reports-become-the-summary",
+    "java/stack-extension#run-runs-the-application-once",
+    "java/stack-extension#serve-runs-the-application",
     "java/stack-extension#tasks-run-the-profile",
+    "java/stack-extension#toolchain-is-provided",
     "java/stack-extension#variants-follow-the-build"
   ]
 }

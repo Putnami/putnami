@@ -7,7 +7,7 @@
       "id": "java/stack-extension",
       "type": "feature",
       "name": "Run the Gradle projects and Maven modules of a Java or Kotlin build as Putnami tasks",
-      "outcome": "A team with a Gradle build, Android included, or a Maven build adds @putnami/java and runs putnami lint, test and build over its components with Putnami's runner and cache, without rewriting its build: each Gradle project or Maven module is a project with its edges, each task runs the steps of the component's build after a Java toolchain check, the test task reads its JUnit and JaCoCo reports, and a component overrides any profile value in its putnami.json",
+      "outcome": "A team with a Gradle build, Android included, or a Maven build adds @putnami/java and runs putnami lint, test and build over its components with Putnami's runner and cache, without rewriting its build and without a JDK on the machine: each component is a project with its edges, each task runs the steps of its build, the test task reads its JUnit and JaCoCo reports, an application serves, runs, and ships as an image, and a component overrides any profile value in its putnami.json",
       "owner": "java",
       "target": "coded",
       "requirements": [
@@ -25,6 +25,19 @@
           }
         },
         {
+          "id": "nested-builds-are-stack-roots",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "nested-gradle-and-maven-builds-are-their-components-stack-roots"
+            ]
+          }
+        },
+        {
           "id": "variants-follow-the-build",
           "stage": "coded",
           "evidenceKinds": [
@@ -34,6 +47,21 @@
             "kind": "acceptance",
             "checks": [
               "each-component-gets-the-variant-of-its-build"
+            ]
+          }
+        },
+        {
+          "id": "toolchain-is-provided",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "install-pins-the-jdk-the-builds-state",
+              "a-pinned-jdk-runs-when-the-machine-has-none",
+              "a-maven-component-gets-maven-when-the-machine-has-none"
             ]
           }
         },
@@ -73,6 +101,58 @@
             "kind": "acceptance",
             "checks": [
               "a-lockfile-change-keeps-the-lint-key"
+            ]
+          }
+        },
+        {
+          "id": "serve-runs-the-application",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "serve-runs-the-application-until-stopped-and-reports-it-ready"
+            ]
+          }
+        },
+        {
+          "id": "run-runs-the-application-once",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "run-forwards-the-exit-code"
+            ]
+          }
+        },
+        {
+          "id": "package-assembles-an-image",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "package-assembles-the-image-of-an-application"
+            ]
+          }
+        },
+        {
+          "id": "publish-pushes-the-image",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "an-application-that-publishes-an-image-is-a-release-member"
             ]
           }
         },

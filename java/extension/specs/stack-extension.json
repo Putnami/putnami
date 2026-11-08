@@ -3,31 +3,41 @@
   "protocolVersion": 1,
   "feature": "java/stack-extension",
   "outcomes": [
-    "Each Gradle project, Android included, and each Maven module that packages code is a Putnami project, with an edge to each component it depends on in the same build",
+    "Each Gradle project, Android included, and each Maven module that packages code is a Putnami project, with an edge to each component it depends on in the same build, whether the build sits at the workspace root or in a subdirectory",
     "putnami lint, test and build run the steps of the component's build, Gradle wrapper or Maven, in its directory, and a second run over an unchanged tree is a cache hit",
+    "A machine with no JDK or no Maven runs the tasks: putnami install pins an Eclipse Temurin JDK, and the extension installs Apache Maven",
     "The test task reads the JUnit reports and the JaCoCo report the build writes into the test and coverage summary",
     "A change to a lockfile reruns test and build, never lint",
+    "putnami serve and putnami run start an application, and putnami package and publish build and push its image",
     "A component overrides any value of the Java profile in its putnami.json, and the override reaches the cache key"
   ],
   "nonGoals": [
-    "Installing or switching a JDK, Gradle or Maven: the toolchain check compares and never installs",
     "Comparing the Gradle wrapper's version with the machine: the wrapper downloads the version it names, and its properties file reaches the key",
-    "A Gradle or Maven build whose root is not the Putnami workspace root, and Gradle composite builds",
+    "Gradle composite builds: an included build is part of the build that includes it",
     "Android product flavors: a flavored app overrides the test step",
-    "Publishing an artifact to a repository"
+    "Publishing a library to a Maven repository: Gradle or Maven publishes it",
+    "An application image for a build other than the Gradle application plugin and Spring Boot"
   ],
   "requirements": [
     {
       "id": "components-become-projects",
-      "text": "The probe answers, for each candidate directory the observe Gradle or Maven detector knows as a component: a project named by the Gradle path without its leading colon, ':' turned into '/', or by the Maven artifactId (none for the Gradle root project), its edges, the extension, the tag java, and metadata naming the build's reference ({component}), the variant, the stack root '.' and the expected Java version. A directory both builds claim is the Gradle build's."
+      "text": "The probe answers, for each candidate directory a Gradle or Maven build knows as a component: its name (the Gradle path without its first colon, ':' turned into '/', or the artifactId), its edges, the extension, the tag java, its type (application for the Gradle application plugin, Spring Boot or an Android app, else library) and metadata naming the build's reference, the variant, its stack root and the expected Java version."
+    },
+    {
+      "id": "nested-builds-are-stack-roots",
+      "text": "A Gradle build's root is the nearest directory with a settings file, a Maven build's the topmost of an unbroken chain of pom.xml files; it is its components' stack root, and an input-only project when it is no component. A Gradle build inside another one, such as buildSrc, is part of that build. A directory both builds claim is the Gradle build's."
     },
     {
       "id": "variants-follow-the-build",
       "text": "A Maven module is variant maven. A Gradle project whose build file applies an Android plugin or holds an android block is android, or android-coverage with unit test coverage on; one that applies java-platform is gradle-platform, version-catalog gradle-catalog; any other is gradle, or gradle-jacoco when it applies jacoco. A variant is a part of the profile applied before the project's override."
     },
     {
+      "id": "toolchain-is-provided",
+      "text": "The toolchain check runs javac -version against .java-version. When javac is missing or outside it, the task runs the Eclipse Temurin JDK that putnami install pins in putnami.lock.json (17, 21 or 25, by SHA-256 per platform), first on PATH and as JAVA_HOME. A Maven component with no mvn on PATH gets Apache Maven 3.9.11, installed under the Putnami home after its SHA-256 is checked."
+    },
+    {
       "id": "tasks-run-the-profile",
-      "text": "Each task first compares java -version with .java-version, in the component then at the root; a major such as 21 matches every 21.x release. It then runs the variant's steps in the component's directory with no shell: the root's gradlew with the component's task path (check, test, assemble, their Android forms, or generateCatalogAsToml), or mvn --file {root}/pom.xml clean of the component alone, then --also-make verify for lint and test, package for build."
+      "text": "After the toolchain check, a major such as 21 in .java-version matching every 21.x release, each task runs the variant's steps in the component's directory with no shell: the root's gradlew with the component's task path (check, test, assemble, their Android forms, or generateCatalogAsToml), or mvn --file {root}/pom.xml clean of the component alone, then --also-make verify for lint and test, package for build."
     },
     {
       "id": "reports-become-the-summary",
@@ -36,6 +46,22 @@
     {
       "id": "lint-skips-the-lockfiles",
       "text": "The java:lint selector answers the sources, the test sources the lint commands compile or check, the build files and the lint configurations, never the lockfiles: a lockfile change reruns test and build and keeps lint's key."
+    },
+    {
+      "id": "serve-runs-the-application",
+      "text": "putnami serve builds an application's runnable form (installDist for the Gradle application plugin, the Spring Boot jar otherwise) and runs it with PORT and SERVER_PORT set to the port flag, until the user stops it; it reports the server ready once the port accepts connections. A library runs nothing."
+    },
+    {
+      "id": "run-runs-the-application-once",
+      "text": "putnami run builds the application's runnable form, runs it once with the args flag, and answers its exit code."
+    },
+    {
+      "id": "package-assembles-an-image",
+      "text": "putnami package --docker assembles, with no Docker daemon, the OCI image of an application: its runnable form on the Eclipse Temurin JRE of its Java major, pinned by digest, or on a base the project pins by digest, run as a non-root user with PORT and SERVER_PORT set to 8080. A library packages nothing."
+    },
+    {
+      "id": "publish-pushes-the-image",
+      "text": "putnami publish --docker pushes the packaged image through the shared publisher, and an application that publishes an image declares it as a member of the release set."
     },
     {
       "id": "overrides-are-honored",
@@ -48,6 +74,9 @@
   ],
   "decisions": [
     "tooling/stacks/doc/adr/0001-one-extension-per-stack-on-a-shared-core.md",
-    "tooling/stacks/doc/adr/0005-profile-variants-for-a-stack-with-several-builds.md"
+    "tooling/stacks/doc/adr/0005-profile-variants-for-a-stack-with-several-builds.md",
+    "tooling/stacks/doc/adr/0006-a-pinned-toolchain-sets-its-home-and-tools-know-the-component.md",
+    "java/extension/doc/adr/0001-the-jdk-is-pinned-in-the-workspace-lock.md",
+    "java/extension/doc/adr/0002-an-application-image-copies-onto-the-temurin-jre.md"
   ]
 }
