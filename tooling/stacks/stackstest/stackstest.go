@@ -51,21 +51,23 @@ func CheckManifest(t testing.TB, path string, s stacks.Stack) {
 			t.Errorf("workspace.inputs %v does not hold the marker %s", doc.Workspace.Inputs, f)
 		}
 	}
-	for _, f := range s.Profile.Toolchain.Files {
-		if !slices.Contains(doc.Workspace.Inputs, f.Path) {
-			t.Errorf("workspace.inputs %v does not hold the toolchain file %s", doc.Workspace.Inputs, f.Path)
+	for _, v := range s.Profile.Applied() {
+		for _, f := range v.Toolchain.Files {
+			if !slices.Contains(doc.Workspace.Inputs, f.Path) {
+				t.Errorf("workspace.inputs %v does not hold the toolchain file %s", doc.Workspace.Inputs, f.Path)
+			}
 		}
 	}
 	if got, want := sorted(doc.Runtime.InputSelectors), s.Selectors(); !reflect.DeepEqual(got, want) {
 		t.Errorf("runtime.inputSelectors = %v, want %v", got, want)
 	}
 	for name := range doc.Commands {
-		if _, ok := s.Profile.Tasks[name]; !ok && slices.Contains(stacks.TaskNames, name) {
+		if !s.Profile.HasTask(name) && slices.Contains(stacks.TaskNames, name) {
 			t.Errorf("command %s runs a task the profile does not declare", name)
 		}
 	}
 	for _, task := range stacks.TaskNames {
-		if _, ok := s.Profile.Tasks[task]; !ok {
+		if !s.Profile.HasTask(task) {
 			continue
 		}
 		checkTask(t, doc, s, task)
@@ -92,7 +94,7 @@ func checkTask(t testing.TB, doc manifest, s stacks.Stack, task string) {
 	if want := []string{task, "--report-dir", "{outputRoot}"}; decl.Command != "{extensionRuntime}" || !reflect.DeepEqual(decl.Args, want) || decl.Cwd != "{projectRoot}" {
 		t.Errorf("task %s runs %s %v in %s, want {extensionRuntime} %v in {projectRoot}", step.Task, decl.Command, decl.Args, decl.Cwd, want)
 	}
-	_, root := s.Profile.TaskPatterns(task)
+	root := s.Profile.ShippedRootPatterns(task)
 	var selector, workspace bool
 	for name, in := range decl.Inputs {
 		switch in.From {
@@ -103,7 +105,7 @@ func checkTask(t testing.TB, doc manifest, s stacks.Stack, task string) {
 		case "workspace":
 			workspace = true
 			if got, want := sorted(in.Files), sorted(root); !reflect.DeepEqual(got, want) {
-				t.Errorf("task %s input %s = %v, want the profile's stack-root files %v", step.Task, name, got, want)
+				t.Errorf("task %s input %s = %v, want the stack-root files of every variant %v", step.Task, name, got, want)
 			}
 		}
 	}

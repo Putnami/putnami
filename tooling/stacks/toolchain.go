@@ -12,6 +12,7 @@ import (
 	"path"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"strings"
 )
 
@@ -176,20 +177,70 @@ type Selection struct {
 
 // Program returns the program a step runs: the pinned toolchain for a step
 // that names the toolchain command, a program beside it for a step that names
-// one, such as cargo beside rustc, and name otherwise. A process resolves a bare
-// name on its own PATH, which holds no pinned toolchain.
+// one, such as cargo beside rustc, then a tool found on the selection's own
+// PATH, which holds the directories of the task's tools, and name otherwise.
+// The machine's toolchain command stays a bare name, so a caller tells the
+// pinned toolchain, an absolute path, from the machine's. A process resolves
+// a bare name on its own PATH, which holds no pinned toolchain and no tool.
 func (s Selection) Program(t Toolchain, name string) string {
-	if s.Executable == "" {
+	if name == t.Command[0] {
+		if s.Executable != "" {
+			return s.Executable
+		}
 		return name
 	}
-	if name == t.Command[0] {
-		return s.Executable
+	if s.Executable != "" {
+		sibling := filepath.Join(filepath.Dir(s.Executable), name+filepath.Ext(s.Executable))
+		if info, err := os.Stat(sibling); err == nil && !info.IsDir() {
+			return sibling
+		}
 	}
-	sibling := filepath.Join(filepath.Dir(s.Executable), name+filepath.Ext(s.Executable))
-	if info, err := os.Stat(sibling); err == nil && !info.IsDir() {
-		return sibling
+	if !strings.ContainsAny(name, `/\`) {
+		if found := lookPathIn(s.Env, name); found != "" {
+			return found
+		}
 	}
 	return name
+}
+
+// lookPathIn answers the first executable file named name on the PATH of env,
+// with the PATHEXT extensions on Windows, or "".
+func lookPathIn(env []string, name string) string {
+	var path string
+	for _, entry := range env {
+		if key, value, ok := strings.Cut(entry, "="); ok && strings.EqualFold(key, "PATH") {
+			path = value
+			break
+		}
+	}
+	names := []string{name}
+	if runtime.GOOS == "windows" && filepath.Ext(name) == "" {
+		names = nil
+		exts := environmentValue(env, "PATHEXT")
+		if exts == "" {
+			exts = ".com;.exe;.bat;.cmd"
+		}
+		for _, ext := range strings.Split(strings.ToLower(exts), ";") {
+			if ext != "" {
+				names = append(names, name+ext)
+			}
+		}
+	}
+	for _, dir := range filepath.SplitList(path) {
+		// A relative entry would resolve against the step's directory, which
+		// Go's own lookup refuses too.
+		if dir == "" || !filepath.IsAbs(dir) {
+			continue
+		}
+		for _, n := range names {
+			candidate := filepath.Join(dir, n)
+			info, err := os.Stat(candidate)
+			if err == nil && !info.IsDir() && (runtime.GOOS == "windows" || info.Mode()&0o111 != 0) {
+				return candidate
+			}
+		}
+	}
+	return ""
 }
 
 // Select chooses the toolchain of a task in dir. The toolchain on PATH runs
@@ -220,7 +271,22 @@ func (t Toolchain) Select(ctx context.Context, dir string, expected Expected, en
 	if verdict.Fail && machineErr == nil {
 		return onPath, nil
 	}
-	return Selection{Env: prependPath(env, filepath.Dir(pinned)), Executable: pinned, Verdict: verdict}, nil
+	selected := prependPath(env, filepath.Dir(pinned))
+	if t.Home != "" {
+		selected = setEnv(selected, t.Home, filepath.Dir(filepath.Dir(pinned)))
+	}
+	return Selection{Env: selected, Executable: pinned, Verdict: verdict}, nil
+}
+
+// setEnv returns env with name set to value, replacing any earlier value.
+func setEnv(env []string, name, value string) []string {
+	out := make([]string, 0, len(env)+1)
+	for _, entry := range env {
+		if !strings.HasPrefix(entry, name+"=") {
+			out = append(out, entry)
+		}
+	}
+	return append(out, name+"="+value)
 }
 
 func environmentValue(env []string, name string) string {
@@ -272,9 +338,10 @@ func appendPath(env []string, dir string) []string {
 // ErrToolchainMissing is the error of a toolchain command that is not on PATH.
 var ErrToolchainMissing = errors.New("the toolchain command is missing")
 
-// exactVersion matches a version that names one release, such as 1.82.0,
-// 21.0.4 or 8.3: a channel name such as "stable" does not.
-var exactVersion = regexp.MustCompile(`^v?[0-9]+(\.[0-9]+)+([-+][0-9A-Za-z.\-+]*)?$`)
+// exactVersion matches a version that names one release or one release
+// line, such as 1.82.0, 21.0.4, 8.3 or a Java major such as 21: a channel
+// name such as "stable" does not.
+var exactVersion = regexp.MustCompile(`^v?[0-9]+(\.[0-9]+)*([-+][0-9A-Za-z.\-+]*)?$`)
 
 // IsExact reports whether a stated version names one release.
 func IsExact(version string) bool {

@@ -9,7 +9,7 @@
 //
 // Extraction accepts regular files and directories only. It creates no link:
 // an archive that holds a symbolic link, a hard link, a device or a FIFO is
-// refused as a whole, and so is an entry whose name is absolute, climbs out
+// refused as a whole, unless Options.SkipLinks skips its links, and so is an entry whose name is absolute, climbs out
 // with "..", or carries a backslash or a colon. Every write goes through an
 // os.Root opened on the staging directory, so no entry can land outside it.
 //
@@ -122,6 +122,11 @@ type Options struct {
 	// rejects, and refuses an archive whose extraction it rejects. Nil
 	// accepts any existing directory.
 	Complete func(dir string) bool
+	// SkipLinks skips the symbolic and hard link entries of the archive
+	// instead of refusing it: the install holds no link, and no entry is
+	// created for one. A JDK archive links license files to one another; a
+	// caller sets it only for an archive whose links nothing it runs reads.
+	SkipLinks bool
 	// Prepare, when set, shapes the extracted archive into the install: Install
 	// calls it once on the staging directory, after the extraction and before
 	// Complete judges that directory. An archive that nests its content under
@@ -194,7 +199,7 @@ func Install(ctx context.Context, pin Pin, dest string, opts Options) (installed
 		return false, fmt.Errorf("create the staging directory: %w", err)
 	}
 	defer func() { _ = os.RemoveAll(stage) }()
-	if err := Extract(ctx, archivePath, pin.Format, stage, opts.Limits); err != nil {
+	if err := extract(ctx, archivePath, pin.Format, stage, opts.Limits, opts.SkipLinks); err != nil {
 		return false, err
 	}
 	if opts.Prepare != nil {

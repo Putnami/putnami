@@ -48,7 +48,7 @@ func (s Stack) Entrypoint(args []string, stdin io.Reader, stdout io.Writer, vers
 func (s Stack) Jobs() map[string]cli.JobFunc {
 	jobs := map[string]cli.JobFunc{}
 	for _, task := range TaskNames {
-		if _, ok := s.Profile.Tasks[task]; ok {
+		if s.Profile.HasTask(task) {
 			jobs[task] = s.Run(task)
 		}
 	}

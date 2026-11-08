@@ -1,0 +1,522 @@
+{
+  "id": "java",
+  "markers": [
+    "build.gradle.kts",
+    "build.gradle",
+    "pom.xml",
+    "settings.gradle.kts",
+    "settings.gradle"
+  ],
+  "toolchain": {
+    "command": [
+      "javac",
+      "-version"
+    ],
+    "pattern": "javac (?<version>[0-9][^\\s\"]*)",
+    "files": [
+      {
+        "path": ".java-version"
+      }
+    ],
+    "provisioned": "PUTNAMI_JAVA_EXECUTABLE",
+    "home": "JAVA_HOME"
+  },
+  "inputs": {
+    "sources": [
+      "src/main/**"
+    ],
+    "tests": [
+      "src/test/**",
+      "src/testFixtures/**"
+    ],
+    "lintConfig": [
+      "lint.xml",
+      "detekt.yml",
+      "{root}/.editorconfig",
+      "{root}/config/checkstyle/**",
+      "{root}/config/detekt/**",
+      "{root}/config/pmd/**",
+      "{root}/config/spotbugs/**"
+    ],
+    "gradle": [
+      "build.gradle.kts",
+      "build.gradle",
+      "gradle.properties",
+      "*.versions.toml",
+      "gradle/*.versions.toml",
+      "{root}/settings.gradle.kts",
+      "{root}/settings.gradle",
+      "{root}/build.gradle.kts",
+      "{root}/build.gradle",
+      "{root}/gradle.properties",
+      "{root}/gradle/*.versions.toml",
+      "{root}/gradle/*.gradle",
+      "{root}/gradle/*.gradle.kts",
+      "{root}/gradle/wrapper/gradle-wrapper.properties",
+      "{root}/buildSrc/build.gradle.kts",
+      "{root}/buildSrc/build.gradle",
+      "{root}/buildSrc/settings.gradle.kts",
+      "{root}/buildSrc/settings.gradle",
+      "{root}/buildSrc/src/**",
+      "{root}/build-logic/settings.gradle.kts",
+      "{root}/build-logic/settings.gradle",
+      "{root}/build-logic/**/build.gradle.kts",
+      "{root}/build-logic/**/build.gradle",
+      "{root}/build-logic/**/src/**"
+    ],
+    "gradleLocks": [
+      "gradle.lockfile",
+      "{root}/settings-gradle.lockfile",
+      "{root}/gradle.lockfile"
+    ],
+    "maven": [
+      "pom.xml",
+      "{root}/pom.xml",
+      "{root}/*/pom.xml",
+      "{root}/*/*/pom.xml",
+      "{root}/*/*/*/pom.xml",
+      "{root}/*/*/*/*/pom.xml",
+      "{root}/.mvn/maven.config",
+      "{root}/.mvn/jvm.config",
+      "{root}/.mvn/extensions.xml"
+    ]
+  },
+  "variants": {
+    "gradle": {
+      "tasks": {
+        "lint": {
+          "steps": [
+            [
+              "{root}/gradlew",
+              "--console=plain",
+              "{component}check",
+              "-x",
+              "{component}test"
+            ]
+          ],
+          "inputs": [
+            "sources",
+            "tests",
+            "gradle",
+            "lintConfig"
+          ]
+        },
+        "test": {
+          "steps": [
+            [
+              "{root}/gradlew",
+              "--console=plain",
+              "{component}test"
+            ]
+          ],
+          "inputs": [
+            "sources",
+            "tests",
+            "gradle",
+            "gradleLocks"
+          ],
+          "reports": {
+            "when": [
+              "src/test/**"
+            ],
+            "junit": [
+              "build/test-results/test/*.xml"
+            ]
+          }
+        },
+        "build": {
+          "steps": [
+            [
+              "{root}/gradlew",
+              "--console=plain",
+              "{component}assemble"
+            ]
+          ],
+          "inputs": [
+            "sources",
+            "gradle",
+            "gradleLocks"
+          ]
+        }
+      }
+    },
+    "gradle-jacoco": {
+      "tasks": {
+        "lint": {
+          "steps": [
+            [
+              "{root}/gradlew",
+              "--console=plain",
+              "{component}check",
+              "-x",
+              "{component}test"
+            ]
+          ],
+          "inputs": [
+            "sources",
+            "tests",
+            "gradle",
+            "lintConfig"
+          ]
+        },
+        "test": {
+          "steps": [
+            [
+              "{root}/gradlew",
+              "--console=plain",
+              "{component}test",
+              "{component}jacocoTestReport"
+            ]
+          ],
+          "inputs": [
+            "sources",
+            "tests",
+            "gradle",
+            "gradleLocks"
+          ],
+          "reports": {
+            "when": [
+              "src/test/**"
+            ],
+            "junit": [
+              "build/test-results/test/*.xml"
+            ],
+            "coverage": [
+              {
+                "format": "jacoco",
+                "paths": [
+                  "build/reports/jacoco/test/jacocoTestReport.xml"
+                ],
+                "optional": true
+              }
+            ]
+          }
+        },
+        "build": {
+          "steps": [
+            [
+              "{root}/gradlew",
+              "--console=plain",
+              "{component}assemble"
+            ]
+          ],
+          "inputs": [
+            "sources",
+            "gradle",
+            "gradleLocks"
+          ]
+        }
+      }
+    },
+    "gradle-platform": {
+      "tasks": {
+        "lint": {
+          "steps": [
+            [
+              "{root}/gradlew",
+              "--console=plain",
+              "{component}check"
+            ]
+          ],
+          "inputs": [
+            "gradle",
+            "lintConfig"
+          ]
+        },
+        "build": {
+          "steps": [
+            [
+              "{root}/gradlew",
+              "--console=plain",
+              "{component}assemble"
+            ]
+          ],
+          "inputs": [
+            "gradle",
+            "gradleLocks"
+          ]
+        }
+      }
+    },
+    "gradle-catalog": {
+      "tasks": {
+        "build": {
+          "steps": [
+            [
+              "{root}/gradlew",
+              "--console=plain",
+              "{component}generateCatalogAsToml"
+            ]
+          ],
+          "inputs": [
+            "gradle"
+          ]
+        }
+      }
+    },
+    "android": {
+      "inputs": {
+        "sources": [
+          "src/main/**",
+          "src/debug/**",
+          "src/release/**",
+          "proguard-rules.pro",
+          "consumer-rules.pro"
+        ],
+        "tests": [
+          "src/test/**",
+          "src/testDebug/**",
+          "src/testFixtures/**"
+        ]
+      },
+      "tasks": {
+        "lint": {
+          "steps": [
+            [
+              "{root}/gradlew",
+              "--console=plain",
+              "{component}check",
+              "-x",
+              "{component}test"
+            ]
+          ],
+          "inputs": [
+            "sources",
+            "tests",
+            "gradle",
+            "lintConfig"
+          ]
+        },
+        "test": {
+          "steps": [
+            [
+              "{root}/gradlew",
+              "--console=plain",
+              "{component}testDebugUnitTest"
+            ]
+          ],
+          "inputs": [
+            "sources",
+            "tests",
+            "gradle",
+            "gradleLocks"
+          ],
+          "reports": {
+            "when": [
+              "src/test/**",
+              "src/testDebug/**"
+            ],
+            "junit": [
+              "build/test-results/testDebugUnitTest/*.xml"
+            ]
+          }
+        },
+        "build": {
+          "steps": [
+            [
+              "{root}/gradlew",
+              "--console=plain",
+              "{component}assembleDebug"
+            ]
+          ],
+          "inputs": [
+            "sources",
+            "gradle",
+            "gradleLocks"
+          ]
+        }
+      }
+    },
+    "android-coverage": {
+      "inputs": {
+        "sources": [
+          "src/main/**",
+          "src/debug/**",
+          "src/release/**",
+          "proguard-rules.pro",
+          "consumer-rules.pro"
+        ],
+        "tests": [
+          "src/test/**",
+          "src/testDebug/**",
+          "src/testFixtures/**"
+        ]
+      },
+      "tasks": {
+        "lint": {
+          "steps": [
+            [
+              "{root}/gradlew",
+              "--console=plain",
+              "{component}check",
+              "-x",
+              "{component}test"
+            ]
+          ],
+          "inputs": [
+            "sources",
+            "tests",
+            "gradle",
+            "lintConfig"
+          ]
+        },
+        "test": {
+          "steps": [
+            [
+              "{root}/gradlew",
+              "--console=plain",
+              "{component}testDebugUnitTest",
+              "{component}createDebugUnitTestCoverageReport"
+            ]
+          ],
+          "inputs": [
+            "sources",
+            "tests",
+            "gradle",
+            "gradleLocks"
+          ],
+          "reports": {
+            "when": [
+              "src/test/**",
+              "src/testDebug/**"
+            ],
+            "junit": [
+              "build/test-results/testDebugUnitTest/*.xml"
+            ],
+            "coverage": [
+              {
+                "format": "jacoco",
+                "paths": [
+                  "build/reports/coverage/test/debug/report.xml"
+                ]
+              }
+            ]
+          }
+        },
+        "build": {
+          "steps": [
+            [
+              "{root}/gradlew",
+              "--console=plain",
+              "{component}assembleDebug"
+            ]
+          ],
+          "inputs": [
+            "sources",
+            "gradle",
+            "gradleLocks"
+          ]
+        }
+      }
+    },
+    "maven": {
+      "tasks": {
+        "lint": {
+          "steps": [
+            [
+              "mvn",
+              "--batch-mode",
+              "--file",
+              "{root}/pom.xml",
+              "--projects",
+              "{component}",
+              "clean"
+            ],
+            [
+              "mvn",
+              "--batch-mode",
+              "--file",
+              "{root}/pom.xml",
+              "--projects",
+              "{component}",
+              "--also-make",
+              "verify",
+              "-DskipTests"
+            ]
+          ],
+          "inputs": [
+            "sources",
+            "tests",
+            "maven",
+            "lintConfig"
+          ]
+        },
+        "test": {
+          "steps": [
+            [
+              "mvn",
+              "--batch-mode",
+              "--file",
+              "{root}/pom.xml",
+              "--projects",
+              "{component}",
+              "clean"
+            ],
+            [
+              "mvn",
+              "--batch-mode",
+              "--file",
+              "{root}/pom.xml",
+              "--projects",
+              "{component}",
+              "--also-make",
+              "verify"
+            ]
+          ],
+          "inputs": [
+            "sources",
+            "tests",
+            "maven"
+          ],
+          "reports": {
+            "when": [
+              "src/test/**"
+            ],
+            "junit": [
+              "target/surefire-reports/TEST-*.xml",
+              "target/failsafe-reports/TEST-*.xml"
+            ],
+            "coverage": [
+              {
+                "format": "jacoco",
+                "paths": [
+                  "target/site/jacoco/jacoco.xml"
+                ],
+                "optional": true
+              }
+            ]
+          }
+        },
+        "build": {
+          "steps": [
+            [
+              "mvn",
+              "--batch-mode",
+              "--file",
+              "{root}/pom.xml",
+              "--projects",
+              "{component}",
+              "clean"
+            ],
+            [
+              "mvn",
+              "--batch-mode",
+              "--file",
+              "{root}/pom.xml",
+              "--projects",
+              "{component}",
+              "--also-make",
+              "package",
+              "-DskipTests"
+            ]
+          ],
+          "inputs": [
+            "sources",
+            "tests",
+            "maven"
+          ]
+        }
+      }
+    }
+  }
+}

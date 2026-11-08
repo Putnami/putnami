@@ -106,6 +106,12 @@ var excludedProjects = map[string]string{
 	"/intelligence/areas":                                  reasonAreaDetector,
 	"/protocols/capabilities/proof":                        reasonProtocolProof,
 	"/protocols/diagnostic/proof":                          reasonProtocolProof,
+	"/java/samples/gradle":                                 reasonSample,
+	"/java/samples/gradle/application":                     reasonSample,
+	"/java/samples/gradle/library":                         reasonSample,
+	"/java/samples/maven":                                  reasonSample,
+	"/java/samples/maven/application":                      reasonSample,
+	"/java/samples/maven/library":                          reasonSample,
 	"/php/samples/application":                             reasonSample,
 	"/php/samples/library":                                 reasonSample,
 	"/rust/samples/application":                            reasonSample,
@@ -118,6 +124,7 @@ var excludedProjects = map[string]string{
 	"/tooling/evidence-readers":                            reasonEvidenceReaders,
 	"/tooling/stacks":                                      reasonStackExtension,
 	"/rust/extension":                                      reasonStackExtension,
+	"/java/extension":                                      reasonStackExtension,
 	"/php/extension":                                       reasonStackExtension,
 	"/typescript/samples/01-hello-world":                   reasonSample,
 	"/typescript/samples/02-rest-api":                      reasonSample,
@@ -152,7 +159,7 @@ const (
 	reasonCloudCLIExtension       = "Cloud CLI extension: the @putnami/cloud extension binary, a client of the hosted platform that no repository project links from the workspace, whose wire contracts no existing domain owns, owned by cloud"
 	reasonCloudCLIClient          = "generated client: produced by @putnami/clientgen from the published Cloud CLI schema, consumed only by the Cloud CLI extension, owned by cloud"
 	reasonDevelopmentVocabulary   = "development verb vocabulary: the @putnami/dev extension, a new project that stays outside the frontier until a review names the domain that owns the vocabulary, owned by tooling"
-	reasonStackExtension          = "stack core and stack extensions: the @putnami/stacks library and the @putnami/rust and @putnami/php extensions built on it, new projects that stay outside the frontier until a review names the domain that owns running a stack Putnami has no full extension for, owned by tooling"
+	reasonStackExtension          = "stack core and stack extensions: the @putnami/stacks library and the @putnami/rust, @putnami/php and @putnami/java extensions built on it, new projects that stay outside the frontier until a review names the domain that owns running a stack Putnami has no full extension for, owned by tooling"
 	reasonEvidenceReaders         = "evidence report readers: the @putnami/evidence-readers library, a new project that stays outside the frontier until a review names the domain that owns the reading of CI test and coverage reports, owned by tooling"
 )
 

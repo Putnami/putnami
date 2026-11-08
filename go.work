@@ -97,6 +97,7 @@ use (
 	./protocols/template
 	./protocols/transaction
 	./protocols/workspace
+	./java/extension
 	./php/extension
 	./python/extension
 	./rust/extension

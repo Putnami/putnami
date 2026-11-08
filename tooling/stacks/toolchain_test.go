@@ -231,3 +231,60 @@ func TestAppendPathKeepsTheMachineFirst(t *testing.T) {
 		t.Errorf("no PATH = %v", got)
 	}
 }
+
+func TestAPinnedToolchainSetsItsHome(t *testing.T) {
+	home := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(home, "bin"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	pinned := stubVersionTool(t, filepath.Join(home, "bin"), "stubjava", "21.0.13")
+	tc := Toolchain{Command: []string{"stubjava", "-version"}, Pattern: `^tool (?<version>[0-9.]+)`, Provisioned: "STUB_PINNED", Home: "STUB_HOME"}
+	bin := t.TempDir()
+	t.Setenv("PATH", bin)
+	got, err := tc.Select(context.Background(), bin, Expected{Version: "21", Source: ".java-version"}, []string{"PATH=" + bin, "STUB_PINNED=" + pinned, "STUB_HOME=/elsewhere"})
+	if err != nil || got.Executable != pinned {
+		t.Fatalf("select: %+v %v", got, err)
+	}
+	if v := environmentValue(got.Env, "STUB_HOME"); v != home {
+		t.Errorf("the home of the pinned toolchain replaces the machine's: %q", v)
+	}
+	for name, tc := range map[string]Toolchain{
+		"a home without a provisioned toolchain": {Command: []string{"java"}, Pattern: `(?<version>.*)`, Home: "JAVA_HOME"},
+		"a home that is no variable name":        {Command: []string{"java"}, Pattern: `(?<version>.*)`, Provisioned: "P", Home: "java home"},
+	} {
+		if tc.validate() == nil {
+			t.Errorf("%s is accepted", name)
+		}
+	}
+}
+
+func TestProgramFindsAToolOnTheSelectionPath(t *testing.T) {
+	tools := t.TempDir()
+	writeFile(t, tools, "mvn", "#!/bin/sh\n")
+	if err := os.Chmod(filepath.Join(tools, "mvn"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeFile(t, tools, "notes", "")
+	tc := Toolchain{Command: []string{"javac", "-version"}}
+	selected := Selection{Env: []string{"PATH=" + t.TempDir() + string(os.PathListSeparator) + tools}}
+	if got := selected.Program(tc, "mvn"); got != filepath.Join(tools, "mvn") {
+		t.Errorf("a tool on the selection's PATH = %s", got)
+	}
+	if got := selected.Program(tc, "notes"); got != "notes" {
+		t.Errorf("a file that is not executable is no program: %s", got)
+	}
+	if got := selected.Program(tc, "./gradlew"); got != "./gradlew" {
+		t.Errorf("a path is kept: %s", got)
+	}
+	writeFile(t, tools, "javac", "#!/bin/sh\n")
+	if err := os.Chmod(filepath.Join(tools, "javac"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if got := selected.Program(tc, "javac"); got != "javac" {
+		t.Errorf("the machine's toolchain command stays bare, unlike a pinned one: %s", got)
+	}
+	relative := Selection{Env: []string{"PATH=relative-bin"}}
+	if got := relative.Program(tc, "mvn"); got != "mvn" {
+		t.Errorf("a relative PATH entry is no place to find a tool: %s", got)
+	}
+}

@@ -1,0 +1,667 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-extension.json",
+  "name": "@putnami/java",
+  "cliContract": 14,
+  "extensionDependencies": {
+    "@putnami/dev": ""
+  },
+  "runtime": {
+    "executable": "compiled/putnami-java",
+    "toolchains": {
+      "runtimeCompiler": {
+        "lock": "go",
+        "candidates": [
+          {
+            "from": "environment",
+            "environment": "GOROOT",
+            "path": "bin/go"
+          },
+          {
+            "from": "path",
+            "path": "go"
+          },
+          {
+            "from": "putnami-home",
+            "path": "toolchains/go/go-{version}/go/bin/go"
+          }
+        ],
+        "probe": {
+          "args": [
+            "env",
+            "GOVERSION"
+          ],
+          "expect": "go{version}",
+          "unset": [
+            "GOROOT"
+          ],
+          "environment": {
+            "GOTOOLCHAIN": "local"
+          }
+        },
+        "environment": {
+          "GOROOT": {
+            "from": "ancestor",
+            "levels": 2
+          },
+          "GOTOOLCHAIN": {
+            "from": "literal",
+            "value": "local"
+          }
+        },
+        "prependPath": true
+      }
+    },
+    "prepare": {
+      "command": "{extensionRoot}/bin/prepare",
+      "args": [
+        "--output",
+        "{runtimeOutput}"
+      ],
+      "inputs": [
+        "bin/prepare",
+        "cmd/**",
+        "go.mod",
+        "go.sum",
+        "*.go",
+        "profile.json"
+      ],
+      "toolchains": [
+        "runtimeCompiler"
+      ]
+    },
+    "inputSelectors": [
+      "java:build",
+      "java:lint",
+      "java:test"
+    ]
+  },
+  "workspace": {
+    "markers": [
+      "build.gradle.kts",
+      "build.gradle",
+      "pom.xml",
+      "settings.gradle.kts",
+      "settings.gradle"
+    ],
+    "inputs": [
+      "build.gradle.kts",
+      "build.gradle",
+      "pom.xml",
+      "settings.gradle.kts",
+      "settings.gradle",
+      ".java-version"
+    ],
+    "excludes": [
+      "build",
+      "target",
+      ".gradle"
+    ],
+    "language": "java"
+  },
+  "commands": {
+    "lint": {
+      "description": "Lint the Gradle projects with check, without their tests, and the Maven modules with clean, then verify -DskipTests.",
+      "run": [
+        {
+          "id": "lint",
+          "task": "lint-run",
+          "dependsOn": [
+            "^lint"
+          ]
+        }
+      ]
+    },
+    "test": {
+      "description": "Test the Gradle projects and the Maven modules (clean, then verify), and read their JUnit and JaCoCo reports.",
+      "run": [
+        {
+          "id": "test",
+          "heavy": true,
+          "task": "test-run",
+          "dependsOn": [
+            "^test"
+          ]
+        }
+      ]
+    },
+    "build": {
+      "description": "Build the Gradle projects with assemble and the Maven modules with clean, then package -DskipTests.",
+      "run": [
+        {
+          "id": "build",
+          "heavy": true,
+          "task": "build-run",
+          "dependsOn": [
+            "^build"
+          ]
+        }
+      ]
+    },
+    "serve": {
+      "description": "Serve a Java application: build its runnable form with its own build, then run it on the port.",
+      "traits": {
+        "requiresRunnable": true,
+        "workload": "serve"
+      },
+      "flags": {
+        "port": {
+          "type": "number",
+          "default": 3000,
+          "description": "Port for the server, set as PORT and SERVER_PORT"
+        }
+      },
+      "run": [
+        {
+          "id": "serve",
+          "task": "serve-run"
+        }
+      ]
+    },
+    "run": {
+      "description": "Run a Java application once and forward its exit code.",
+      "traits": {
+        "requiresRunnable": true,
+        "workload": "once"
+      },
+      "flags": {
+        "args": {
+          "type": "string",
+          "description": "Arguments to pass to the application"
+        }
+      },
+      "run": [
+        {
+          "id": "run",
+          "task": "run-exec"
+        }
+      ]
+    },
+    "package": {
+      "description": "Assemble the image of an application for the docker publish channel.",
+      "traits": {
+        "injectPublishChannels": true
+      },
+      "flags": {
+        "docker": {
+          "type": "boolean",
+          "default": false,
+          "description": "Assemble the image"
+        },
+        "docker-tag": {
+          "type": "string",
+          "description": "Override the image tag"
+        },
+        "docker-base-image": {
+          "type": "string",
+          "description": "Replace the Temurin JRE image with a base pinned by digest (image@sha256:...)"
+        },
+        "docker-load": {
+          "type": "boolean",
+          "default": false,
+          "description": "Also load the assembled image into the local docker daemon"
+        },
+        "platform": {
+          "type": "string",
+          "default": "linux/amd64",
+          "description": "Target platform of the image"
+        },
+        "dry-run": {
+          "type": "boolean",
+          "default": false,
+          "description": "Plan the image without assembling it"
+        }
+      },
+      "run": [
+        {
+          "id": "docker",
+          "task": "package-docker",
+          "if": "params.docker"
+        }
+      ]
+    },
+    "publish": {
+      "dependsOn": [
+        "package"
+      ],
+      "traits": {
+        "injectPublishChannels": true,
+        "sideEffects": "registry"
+      },
+      "description": "Push the image of an application to its OCI registry. A library reaches its Maven repository through its own build.",
+      "flags": {
+        "docker": {
+          "type": "boolean",
+          "default": false,
+          "description": "Push the image"
+        },
+        "dry-run": {
+          "type": "boolean",
+          "default": false,
+          "description": "Push nothing; report what would be published"
+        }
+      },
+      "run": [
+        {
+          "id": "docker",
+          "task": "publish-docker",
+          "if": "params.docker"
+        }
+      ]
+    }
+  },
+  "tasks": {
+    "lint-run": {
+      "description": "Run the lint steps of the component's variant on one Gradle project or Maven module in its directory, after the Java toolchain check: gradlew check without the tests, or mvn clean of the module, then mvn verify -DskipTests. Its inputs are the files the java:lint selector answers from the resolved profile, and the stack-root files of every variant.",
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": [
+        "lint",
+        "--report-dir",
+        "{outputRoot}"
+      ],
+      "cwd": "{projectRoot}",
+      "timeoutMs": 1800000,
+      "inputs": {
+        "sources": {
+          "from": "project",
+          "files": [
+            "java:lint"
+          ]
+        },
+        "stackRoot": {
+          "from": "workspace",
+          "files": [
+            "*/*/*/*/pom.xml",
+            "*/*/*/pom.xml",
+            "*/*/pom.xml",
+            "*/pom.xml",
+            ".editorconfig",
+            ".java-version",
+            ".mvn/extensions.xml",
+            ".mvn/jvm.config",
+            ".mvn/maven.config",
+            "build-logic/**/build.gradle",
+            "build-logic/**/build.gradle.kts",
+            "build-logic/**/src/**",
+            "build-logic/settings.gradle",
+            "build-logic/settings.gradle.kts",
+            "build.gradle",
+            "build.gradle.kts",
+            "buildSrc/build.gradle",
+            "buildSrc/build.gradle.kts",
+            "buildSrc/settings.gradle",
+            "buildSrc/settings.gradle.kts",
+            "buildSrc/src/**",
+            "config/checkstyle/**",
+            "config/detekt/**",
+            "config/pmd/**",
+            "config/spotbugs/**",
+            "gradle.properties",
+            "gradle/*.gradle",
+            "gradle/*.gradle.kts",
+            "gradle/*.versions.toml",
+            "gradle/wrapper/gradle-wrapper.properties",
+            "pom.xml",
+            "settings.gradle",
+            "settings.gradle.kts"
+          ]
+        },
+        "extensionVersion": {
+          "from": "runtime"
+        }
+      },
+      "outputs": {
+        "data": {
+          "description": "The task result: the test and coverage totals of a test task."
+        }
+      },
+      "cache": {
+        "enabled": true
+      },
+      "declares": {
+        "outputs": {
+          "reports": {
+            "kind": "directory",
+            "root": "command-output",
+            "path": "lint",
+            "optionalEmpty": true,
+            "description": "The reports the task wrote or copied: a copy of each JUnit and JaCoCo report of a test task."
+          }
+        },
+        "effects": [
+          "network",
+          "toolchain-cache"
+        ]
+      }
+    },
+    "test-run": {
+      "description": "Run the test steps of the component's variant on one Gradle project or Maven module in its directory, after the Java toolchain check (for Maven, clean of the module, then verify); then copy its JUnit and JaCoCo reports into the command output and read them. A failed case, a step that exits non-zero, or a missing report fails the task.",
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": [
+        "test",
+        "--report-dir",
+        "{outputRoot}"
+      ],
+      "cwd": "{projectRoot}",
+      "timeoutMs": 1800000,
+      "inputs": {
+        "sources": {
+          "from": "project",
+          "files": [
+            "java:test"
+          ]
+        },
+        "stackRoot": {
+          "from": "workspace",
+          "files": [
+            "*/*/*/*/pom.xml",
+            "*/*/*/pom.xml",
+            "*/*/pom.xml",
+            "*/pom.xml",
+            ".java-version",
+            ".mvn/extensions.xml",
+            ".mvn/jvm.config",
+            ".mvn/maven.config",
+            "build-logic/**/build.gradle",
+            "build-logic/**/build.gradle.kts",
+            "build-logic/**/src/**",
+            "build-logic/settings.gradle",
+            "build-logic/settings.gradle.kts",
+            "build.gradle",
+            "build.gradle.kts",
+            "buildSrc/build.gradle",
+            "buildSrc/build.gradle.kts",
+            "buildSrc/settings.gradle",
+            "buildSrc/settings.gradle.kts",
+            "buildSrc/src/**",
+            "gradle.lockfile",
+            "gradle.properties",
+            "gradle/*.gradle",
+            "gradle/*.gradle.kts",
+            "gradle/*.versions.toml",
+            "gradle/wrapper/gradle-wrapper.properties",
+            "pom.xml",
+            "settings-gradle.lockfile",
+            "settings.gradle",
+            "settings.gradle.kts"
+          ]
+        },
+        "extensionVersion": {
+          "from": "runtime"
+        }
+      },
+      "outputs": {
+        "data": {
+          "description": "The task result: the test and coverage totals of a test task."
+        }
+      },
+      "cache": {
+        "enabled": true
+      },
+      "declares": {
+        "outputs": {
+          "reports": {
+            "kind": "directory",
+            "root": "command-output",
+            "path": "test",
+            "optionalEmpty": true,
+            "description": "The reports the task wrote or copied: a copy of each JUnit and JaCoCo report of a test task."
+          }
+        },
+        "effects": [
+          "network",
+          "toolchain-cache"
+        ]
+      }
+    },
+    "build-run": {
+      "description": "Run the build steps of the component's variant on one Gradle project or Maven module in its directory, after the Java toolchain check: gradlew assemble, or mvn clean of the module, then mvn package -DskipTests.",
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": [
+        "build",
+        "--report-dir",
+        "{outputRoot}"
+      ],
+      "cwd": "{projectRoot}",
+      "timeoutMs": 1800000,
+      "inputs": {
+        "sources": {
+          "from": "project",
+          "files": [
+            "java:build"
+          ]
+        },
+        "stackRoot": {
+          "from": "workspace",
+          "files": [
+            "*/*/*/*/pom.xml",
+            "*/*/*/pom.xml",
+            "*/*/pom.xml",
+            "*/pom.xml",
+            ".java-version",
+            ".mvn/extensions.xml",
+            ".mvn/jvm.config",
+            ".mvn/maven.config",
+            "build-logic/**/build.gradle",
+            "build-logic/**/build.gradle.kts",
+            "build-logic/**/src/**",
+            "build-logic/settings.gradle",
+            "build-logic/settings.gradle.kts",
+            "build.gradle",
+            "build.gradle.kts",
+            "buildSrc/build.gradle",
+            "buildSrc/build.gradle.kts",
+            "buildSrc/settings.gradle",
+            "buildSrc/settings.gradle.kts",
+            "buildSrc/src/**",
+            "gradle.lockfile",
+            "gradle.properties",
+            "gradle/*.gradle",
+            "gradle/*.gradle.kts",
+            "gradle/*.versions.toml",
+            "gradle/wrapper/gradle-wrapper.properties",
+            "pom.xml",
+            "settings-gradle.lockfile",
+            "settings.gradle",
+            "settings.gradle.kts"
+          ]
+        },
+        "extensionVersion": {
+          "from": "runtime"
+        }
+      },
+      "outputs": {
+        "data": {
+          "description": "The task result: the test and coverage totals of a test task."
+        }
+      },
+      "cache": {
+        "enabled": true
+      },
+      "declares": {
+        "outputs": {
+          "reports": {
+            "kind": "directory",
+            "root": "command-output",
+            "path": "build",
+            "optionalEmpty": true,
+            "description": "The reports the task wrote or copied: a copy of each JUnit and JaCoCo report of a test task."
+          }
+        },
+        "effects": [
+          "network",
+          "toolchain-cache"
+        ]
+      }
+    },
+    "serve-run": {
+      "description": "Build the application's runnable form (installDist, or the Spring Boot jar) and run it with PORT and SERVER_PORT set, until the user stops it; ready once the port accepts connections.",
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": [
+        "serve"
+      ],
+      "cwd": "{projectRoot}",
+      "cache": false,
+      "timeoutMs": -1,
+      "declares": {
+        "effects": [
+          "network",
+          "process",
+          "workspace-files"
+        ]
+      }
+    },
+    "run-exec": {
+      "description": "Build the application's runnable form and run it once with the args flag, forwarding its exit code.",
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": [
+        "run"
+      ],
+      "cwd": "{projectRoot}",
+      "cache": false,
+      "timeoutMs": -1,
+      "declares": {
+        "effects": [
+          "network",
+          "process",
+          "workspace-files"
+        ]
+      }
+    },
+    "package-docker": {
+      "description": "Assemble a local OCI image of an application from its runnable form, built by its own build, on a digest-pinned Temurin JRE. Sole owner of <command-output>/docker.",
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": [
+        "package-docker"
+      ],
+      "inputs": {
+        "application": {
+          "from": "project",
+          "files": [
+            "**/*",
+            "!build/**",
+            "!target/**",
+            "!.gradle/**",
+            "!out/**",
+            "!.putnami/**",
+            "!../**",
+            "!**/target/**",
+            "!**/build/**",
+            "!**/.gradle/**",
+            "!**/.kotlin/**",
+            "!**/.gen/**"
+          ]
+        },
+        "upstream": {
+          "from": "closure",
+          "files": [
+            "**/*",
+            "!build/**",
+            "!target/**",
+            "!.gradle/**",
+            "!out/**",
+            "!.putnami/**",
+            "!../**",
+            "!**/target/**",
+            "!**/build/**",
+            "!**/.gradle/**",
+            "!**/.kotlin/**",
+            "!**/.gen/**"
+          ]
+        },
+        "stackRoot": {
+          "from": "workspace",
+          "files": [
+            "*/*/*/*/pom.xml",
+            "*/*/*/pom.xml",
+            "*/*/pom.xml",
+            "*/pom.xml",
+            ".java-version",
+            ".mvn/extensions.xml",
+            ".mvn/jvm.config",
+            ".mvn/maven.config",
+            "build-logic/**/build.gradle",
+            "build-logic/**/build.gradle.kts",
+            "build-logic/**/src/**",
+            "build-logic/settings.gradle",
+            "build-logic/settings.gradle.kts",
+            "build.gradle",
+            "build.gradle.kts",
+            "buildSrc/build.gradle",
+            "buildSrc/build.gradle.kts",
+            "buildSrc/settings.gradle",
+            "buildSrc/settings.gradle.kts",
+            "buildSrc/src/**",
+            "gradle.lockfile",
+            "gradle.properties",
+            "gradle/*.gradle",
+            "gradle/*.gradle.kts",
+            "gradle/*.versions.toml",
+            "gradle/wrapper/gradle-wrapper.properties",
+            "pom.xml",
+            "settings-gradle.lockfile",
+            "settings.gradle",
+            "settings.gradle.kts"
+          ]
+        },
+        "extensionVersion": {
+          "from": "runtime"
+        }
+      },
+      "cwd": "{projectRoot}",
+      "timeoutMs": 1800000,
+      "cache": {
+        "versionAware": true
+      },
+      "declares": {
+        "outputs": {
+          "docker": {
+            "kind": "directory",
+            "root": "command-output",
+            "path": "docker",
+            "optionalEmpty": true,
+            "description": "Local OCI candidate layout, its manifest and the docker channel record."
+          }
+        },
+        "effects": [
+          "network",
+          "toolchain-cache"
+        ]
+      }
+    },
+    "publish-docker": {
+      "description": "Push the packaged image to the container registry through the shared publisher.",
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": [
+        "publish-docker"
+      ],
+      "cwd": "{projectRoot}",
+      "timeoutMs": 300000,
+      "cache": false,
+      "declares": {
+        "outputs": {
+          "published-image": {
+            "kind": "file",
+            "root": "command-output",
+            "path": "docker/published-image.json",
+            "optionalEmpty": true,
+            "description": "Verified remote image record, written after the registry digest is read back."
+          }
+        },
+        "effects": [
+          "network",
+          "registry"
+        ],
+        "publishChannels": [
+          "docker"
+        ]
+      }
+    }
+  }
+}

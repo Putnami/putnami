@@ -69,10 +69,11 @@ with its profile's markers: `Cargo.toml` for Rust.
 - The probe (`__putnami workspace-probe`), served by the core, runs the
   extension's detector and answers, for each candidate path that the detector
   knows as a component: the source name (the crate name), the dependencies as
-  paths, the extension, and in `metadata` the component name, the stack root
-  and the expected toolchain version. A component whose manifest names no
-  package, such as a Composer application, keeps no source name, and its
-  component name is its directory, the same on every checkout.
+  paths, the extension, and in `metadata` the build's name of the component,
+  its variant, the stack root and the expected toolchain version. A component
+  whose manifest names no package, such as a Composer application, keeps no
+  source name, and its component name is its directory, the same on every
+  checkout.
 
 The detectors move from `tooling/observe/internal/detect/<stack>` to a public
 package of the observe module, `go.putnami.dev/tooling/observe/detect/<stack>`,
@@ -152,10 +153,11 @@ The Rust reference profile:
 | `tasks.<task>.withoutCoverage` | How the task runs on a toolchain with no coverage support: a `probe` that exits non-zero there, and the `steps` that replace the task's. Its coverage reports are not read, and the task warns with `stacks.coverage_unavailable`. |
 | `toolchain.files` | The files that state the expected version or range, read in the project directory, then at the stack root. `key` reads one string value of a TOML table or a JSON object; without it, the file's first non-empty line. |
 | `inputs.<set>` | Named sets of file patterns. A plain pattern is relative to the project directory; `{root}/` makes it relative to the stack root, the directory of the build that holds the component (the Cargo workspace, the Gradle settings). |
-| `tasks.<task>.steps` | The commands the task runs in order, each an argument vector run in the project directory, with no shell. `{root}` is the stack root, `{component}` the detector's name for the component, `{output}` the task's output directory under the project. |
+| `tasks.<task>.steps` | The commands the task runs in order, each an argument vector run in the project directory, with no shell. `{root}` is the stack root, `{component}` the build's name for the component (`Component.Ref`, or its name), `{output}` the task's output directory under the project. |
 | `tasks.<task>.inputs` | The input sets the task reads. `lint` reads fewer than `test`: a lockfile change does not rerun it. |
-| `tasks.<task>.reports` | The JUnit and coverage reports the task reads back, with the coverage format. The core copies each into `{output}` as soon as the task ends. |
+| `tasks.<task>.reports` | The JUnit and coverage reports the task reads back, with the coverage format. The core copies each into `{output}` as soon as the task ends. `when` and `optional` say when a report is expected. |
 | `tasks.<task>.artifacts` | The files the task copies into `{output}/artifacts` after its steps, so a cache hit restores them: patterns under the project or the stack root that may name `{component}`. The file a pattern with no wildcard names is removed before the steps, unless its path leads outside the project or the stack root or the inputs of one of the component's tasks select it, so only what the steps write is copied. A pattern with a wildcard is only copied, and copies whatever it matches, a file an earlier build left included. A component name that is no single path segment keeps no artifact. A pattern that matches nothing copies nothing. |
+| `variants.<name>` | A part of the profile one build runs, applied before the project's override. |
 
 The toolchain files are inputs of every task, whatever its input sets.
 
@@ -165,6 +167,27 @@ stack root one at a time, under a lock it holds on that root, and copies the
 reports out before it releases the lock, so two crates never read each
 other's report. Cargo already serializes on its own build directory, so the
 lock costs little.
+
+### Variants: a stack with several builds
+
+A stack whose components run on different builds, such as Java on Gradle,
+Android and Maven, declares `variants` in its profile: named parts of the
+profile, with its shape and every member optional, merged into it like an
+override ([ADR 0005](adr/0005-profile-variants-for-a-stack-with-several-builds.md)).
+The detector names each component's variant; the probe records it in the
+metadata, and the job and the selectors resolve the profile, then the
+variant, then the project's override. With variants, the profile may declare
+no task of its own. A task's stack-root input in the manifest is the union of
+its variants' stack-root files.
+
+A component also has a reference apart from its name: `Component.Ref`, the
+build's own name, which steps receive as `{component}`, such as Gradle's task
+path prefix `:api:`. `Component.Name` stays the project's source name, and
+may be empty so the project keeps its directory's name.
+
+A task's `reports.when` names project files: when none exists, the task
+expects no report, so a module without tests passes. A coverage report marked
+`optional` is read when it exists and fails nothing when it does not.
 
 ### A project overrides any value
 
@@ -254,7 +277,7 @@ A task's key is the core's key (see the CLI's
 | Implementation digest | The extension runtime, which embeds the core and the profile: editing either changes every key of the stack. |
 | Task contract digest | The manifest's task. |
 | Task params hash | The resolved `options["@putnami/<stack>"]` of the project, so every override. |
-| Project metadata digest | The component name, the stack root and the expected toolchain version from the probe. |
+| Project metadata digest | The build's name of the component, its variant, the stack root and the expected toolchain version from the probe. |
 | File content hash | The files the task's selector answered: its input sets, the stack-root files, the toolchain files. |
 | Upstream hashes | The keys of the same task of the projects it depends on. |
 

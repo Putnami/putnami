@@ -547,20 +547,22 @@ func TestToolsReachThePathOfTheTask(t *testing.T) {
 	task.Steps = [][]string{{"sh", "-c", "probe-tool"}}
 	s.Profile.Tasks[TaskLint] = task
 	var tasks []string
-	s.Tools = func(_ context.Context, name string, _ []string, _ func(string)) ([]string, error) {
+	var components []string
+	s.Tools = func(_ context.Context, name string, meta Metadata, _ []string, _ func(string)) ([]string, error) {
 		tasks = append(tasks, name)
+		components = append(components, meta.Component)
 		return []string{tools}, nil
 	}
 	if status, _, rec := runTask(t, s, root, TaskLint); status != statusOK {
 		t.Fatalf("status %s: %v", status, rec.diags)
 	}
-	if !slices.Equal(tasks, []string{TaskLint}) {
-		t.Errorf("Tools ran for %v", tasks)
+	if !slices.Equal(tasks, []string{TaskLint}) || !slices.Equal(components, []string{"api"}) {
+		t.Errorf("Tools ran for %v of %v", tasks, components)
 	}
 	if got, _ := os.ReadFile(filepath.Join(root, "tool")); strings.TrimSpace(string(got)) != "reached" {
 		t.Errorf("the tool ran: %q", got)
 	}
-	s.Tools = func(context.Context, string, []string, func(string)) ([]string, error) {
+	s.Tools = func(context.Context, string, Metadata, []string, func(string)) ([]string, error) {
 		return nil, errors.New("no archive")
 	}
 	if status, _, rec := runTask(t, s, root, TaskLint); status != statusFailed || !strings.Contains(strings.Join(rec.diags, " "), "no archive") {
