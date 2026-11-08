@@ -88,6 +88,58 @@
               "the-manifest-conforms-to-the-stack-core"
             ]
           }
+        },
+        {
+          "id": "pins-a-php-release",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-extension-pins-a-php-release-the-repository-accepts"
+            ]
+          }
+        },
+        {
+          "id": "machine-php-comes-first",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-task-uses-the-provisioned-php-only-when-the-machine-php-is-unusable"
+            ]
+          }
+        },
+        {
+          "id": "installs-its-dependencies",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-install-step-installs-each-stack-root-with-the-pinned-composer"
+            ]
+          }
+        },
+        {
+          "id": "coverage-driver-is-optional",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-php-with-no-coverage-driver-runs-the-tests-without-a-clover-report"
+            ]
+          }
         }
       ]
     }

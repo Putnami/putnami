@@ -3,9 +3,13 @@
   "protocolVersion": 2,
   "executableRequirements": [
     "php/stack-extension#components-become-projects",
+    "php/stack-extension#coverage-driver-is-optional",
     "php/stack-extension#inputs-per-task",
+    "php/stack-extension#installs-its-dependencies",
+    "php/stack-extension#machine-php-comes-first",
     "php/stack-extension#manifest-follows-the-profile",
     "php/stack-extension#overrides-are-honored",
+    "php/stack-extension#pins-a-php-release",
     "php/stack-extension#reports-become-the-summary",
     "php/stack-extension#tasks-run-the-profile"
   ]
