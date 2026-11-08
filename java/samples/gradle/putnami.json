@@ -1,0 +1,7 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-project.json",
+  "name": "java-gradle-sample",
+  "tags": ["sample", "java", "e2e"],
+  "extensions": ["/java/extension"],
+  "featureAuthority": { "owner": "java/stack-extension" }
+}
