@@ -3,8 +3,9 @@
 `@putnami/ruby` turns each Rails application, packwerk pack and local gem of
 a Ruby repository into a Putnami project, and runs its lint and test with the
 tools the team already uses: RuboCop, RSpec or Rails's Minitest runner, and
-SimpleCov. It reads the repository the way `putnami observe` does, and it
-never installs Ruby, Bundler or a gem.
+SimpleCov. It reads the repository the way `putnami observe` does. The
+machine needs no Ruby: `putnami install` pins one when the machine has none
+that fits.
 
 ## Adopt it
 
@@ -20,8 +21,9 @@ never installs Ruby, Bundler or a gem.
    names the component by its gem, else by its pack's path; adds an edge to
    each pack its `package.yml` lists and each local gem its `Gemfile` or
    gemspec names; and tags it `ruby`.
-3. Run `putnami install`, then `putnami lint,test`. `putnami install`
-   installs the bundle of each stack root whose `bundle check` fails.
+3. Run `putnami install`, then `putnami lint,test`. `putnami install` pins
+   Ruby, then installs the bundle of each stack root whose `bundle check`
+   fails.
 
 The [Ruby detector](../../../tooling/observe/doc/16-ruby.md) says which
 directories are components and how their edges are read.
@@ -89,10 +91,43 @@ pack or gem. A covered file in no component is left out with the warning
 run one at a time, lint included, because they share its `coverage/`
 directory, and a report another run left there is removed before the steps.
 
+## Where Ruby and Bundler come from
+
+`putnami install` pins one Ruby release for the workspace in
+`putnami.lock.json`, and downloads it when the machine has no such Ruby. A
+workspace with no Ruby component pins nothing.
+
+| Statement | Pinned release |
+|---|---|
+| None | 4.0.9, the newest |
+| A `.ruby-version` or `.tool-versions` that names a minor, such as `3.4` | The release of that minor the extension ships: 3.4.12 |
+| A component's own statement narrows those | The same choice among the releases every component accepts; with no common release, the root's choice |
+| A release the extension ships, already in the lock and still accepted | That release |
+| An exact version the extension does not ship, such as `3.4.7` | No pin: the machine's Ruby runs |
+
+The extension ships 3.2.11, 3.3.13, 3.4.12 and 4.0.9. The archives come from
+release `20261023` of
+[`spinel-coop/rv-ruby`](https://github.com/spinel-coop/rv-ruby), a third
+party that builds Rubies to run from any directory. Each archive is pinned by
+SHA-256. The pins cover macOS and Linux, each on arm64 and x86_64. Windows has
+no archive, so it gets no pin. On Linux the pin is the glibc build, which does
+not run on a musl Linux such as Alpine: put a Ruby on `PATH` there.
+
+A `ruby` on `PATH` that satisfies the statement always runs, and so does any
+`ruby` on `PATH` when nothing states a version. The pinned Ruby runs only when
+`ruby` is missing or outside the statement. It then comes first on `PATH`, so
+its own `bundle` and `gem` run too. `bundle install` then installs the gems in
+the pinned Ruby's folder under the Putnami home, unless the repository sets
+`BUNDLE_PATH`.
+
+Bundler ships with Ruby, so the extension downloads no Bundler. When
+`Gemfile.lock` states another Bundler, the Bundler check warns and the task
+runs. When the bundle is incomplete, `bundle install` installs the locked
+Bundler and switches to it, and later tasks run that one.
+
 ## Install the bundle
 
-Ruby and Bundler come from the machine: the extension installs neither. It
-installs the gems.
+The extension installs the gems with Bundler.
 
 | Job | What it does |
 |---|---|
@@ -129,8 +164,10 @@ root.
 | Case | Result |
 |---|---|
 | The versions match | The task runs; a `3.3` version matches 3.3.0 and 3.3.6 |
-| They differ | The task fails with `stacks.toolchain_mismatch`; set `toolchain.check` or `toolchain.also[0].check` to `warn` to run anyway |
-| `ruby` or `bundle` is not on `PATH` | The task fails with `stacks.toolchain_missing` |
+| The Ruby versions differ, or `ruby` is not on `PATH`, and the workspace pins a release that matches | The task runs with the pinned Ruby |
+| The Ruby versions differ, and no pinned release matches | The task fails with `stacks.toolchain_mismatch`; set `toolchain.check` to `warn` to run anyway |
+| The Bundler versions differ | The warning `stacks.toolchain_mismatch`; set `toolchain.also[0].check` to `fail` to fail the task |
+| `ruby` or `bundle` is not on `PATH`, and no pinned release matches | The task fails with `stacks.toolchain_missing` |
 | No file states an exact version | The warning `stacks.toolchain_unpinned`: the cache key carries no version for that tool |
 
 ## What reaches the cache key

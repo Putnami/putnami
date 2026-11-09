@@ -359,7 +359,7 @@ the task reads the version on the machine with `toolchain.command`:
   warning;
 - the command is missing: the task fails with `stacks.toolchain_missing`.
 
-An extension may pin its toolchain, as `@putnami/php` does
+An extension may pin its toolchain, as `@putnami/php` and `@putnami/ruby` do
 ([ADR 0003](adr/0003-a-stack-extension-may-provide-its-toolchain.md)). The
 profile's `toolchain.provisioned` names the environment variable that holds
 the pinned toolchain. When the toolchain on `PATH` is missing, or fails the
