@@ -68,7 +68,8 @@ func workspaceNameAt(dir string) (string, bool) {
 }
 
 // resolvedWorkspaceProjects returns the recorded membership under root, and
-// whether the invocation carried one.
+// whether it holds any project there. A membership with no project under root
+// describes another tree, so the lookups walk root instead.
 func resolvedWorkspaceProjects(root string) ([]WorkspaceProject, bool) {
 	workspaceNames.RLock()
 	defer workspaceNames.RUnlock()
@@ -82,7 +83,7 @@ func resolvedWorkspaceProjects(root string) ([]WorkspaceProject, bool) {
 			projects = append(projects, project)
 		}
 	}
-	return projects, true
+	return projects, len(projects) > 0
 }
 
 // canonicalDir is dir made absolute, with its symlinks resolved when it exists.

@@ -250,6 +250,7 @@ func RunCommand(command string, ioctx IO, args []string) error {
 	// `name`: its provider's source name, a scope name pattern, its directory.
 	// Every project lookup reads the names the native CLI resolved.
 	useWorkspaceProjects(context)
+	defer clicore.UseWorkspaceProjects(nil)
 	params := mergeParams(context.Params, parseFlags(args))
 	params["command"] = commandPath(command, args)
 	if err := clicore.ValidateOutputMode(params); err != nil {

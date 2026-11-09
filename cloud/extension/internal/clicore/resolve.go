@@ -111,14 +111,8 @@ func ResolveApp(params map[string]any, workspaceRoot string) (string, error) {
 	// putnami.json at the workspace root. This repo uses putnami.workspace.json
 	// at the root so the fallback no-ops here, but other repos may still rely
 	// on it.
-	rootProject := filepath.Join(workspaceRoot, "putnami.json")
-	if data, err := os.ReadFile(rootProject); err == nil {
-		var project map[string]any
-		if err := json.Unmarshal(data, &project); err == nil {
-			if name := StringValue(project["name"]); name != "" {
-				return name, nil
-			}
-		}
+	if name, _ := ProjectNameAt(workspaceRoot); name != "" {
+		return name, nil
 	}
 	return "", NewError("could not determine app; pass it as the first positional (`putnami cloud <command> <app>`) or cd into a workload directory", ExitUsage)
 }
@@ -388,9 +382,8 @@ func manifestLink(options map[string]any) (map[string]any, bool, error) {
 
 // FindActiveProject walks up from start looking for the nearest workload
 // project. Returns the name the workspace gives it (ProjectNameAt) + true on
-// hit. The
-// native putnami CLI uses an equivalent walk for project resolution; this
-// is the cloud extension catching up so `cd <workload> && putnami cloud
+// hit. The native putnami CLI uses an equivalent walk for project resolution;
+// this is the cloud extension catching up so `cd <workload> && putnami cloud
 // config publish` doesn't need an explicit --app flag.
 //
 // The walk is constrained to descendants of workspaceRoot so it doesn't

@@ -367,8 +367,9 @@ input it reads changes:
   and Linux CI do not share a result.
 
 The step checks only the project in its working directory, the directory the
-key hashes. It takes the project name from that directory's `putnami.json`,
-and the CLI resolves that name to the working directory before it searches
+key hashes. It takes the project name the workspace gives that directory,
+from its `putnami.json` `name` or, without one, from its provider, such as a
+Composer package name, and the CLI resolves that name to the working directory before it searches
 the workspace, so a same-name copy elsewhere in the tree does not change the
 result. The step refuses `--schema-from` and `--app` naming another project,
 because each one would read files the key does not cover. Run
@@ -855,9 +856,15 @@ that reported test cases is partial.
 **App resolution**:
 
 1. First positional after the verb (for example `putnami cloud config apps/auth-server`). This matches the native `putnami build <app>` convention. For `secrets`, project-wide commands use the positional after the subverb (`putnami cloud secrets list apps/auth-server`), and key commands use `<app> <key>` (`putnami cloud secrets set apps/auth-server database.password --from-stdin`).
-2. Walked up from the current directory until the nearest workload `putnami.json` (the same resolution the native CLI uses). `cd apps/auth-server && putnami cloud config` resolves `apps/auth-server` automatically.
+2. Walked up from the current directory until the nearest workload project (the same resolution the native CLI uses). `cd apps/auth-server && putnami cloud config` resolves `apps/auth-server` automatically.
 3. Legacy fallback: a top-level `putnami.json` at the workspace root (for single-project workspaces).
 4. Error: `could not determine app; pass it as the first positional or cd into a workload directory`.
+
+A project answers to the name the workspace gives it: the `name` of its
+`putnami.json`, else its provider's name (a Composer package, for example),
+else the scope name pattern or its directory. Under a `putnami` task the
+extension reads those names from the job context; run on its own, it reads
+each `putnami.json` `name`.
 
 Name-based lookup excludes assistant worktree copies under `.context` and
 `.claude`; those copies cannot shadow the selected workspace's real project.

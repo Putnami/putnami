@@ -542,7 +542,6 @@ func TestValidateConfigProjectAcceptsAProviderNamedProject(t *testing.T) {
 		}
 		if membership {
 			context["workspaceProjects"] = []any{
-				map[string]any{"name": "acme", "path": ".", "fullPath": root},
 				map[string]any{"name": "acme-vendor/my-app", "path": "apps/my-app", "fullPath": projectDir},
 				map[string]any{"name": "other", "path": "apps/other", "fullPath": filepath.Join(root, "apps", "other")},
 			}

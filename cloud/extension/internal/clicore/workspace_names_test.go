@@ -21,7 +21,6 @@ func TestProjectLookupsReadTheWorkspaceNames(t *testing.T) {
 	t.Cleanup(func() { UseWorkspaceProjects(nil) })
 
 	UseWorkspaceProjects([]WorkspaceProject{
-		{Name: "acme", Dir: root},
 		{Name: "putnami-example/library", Dir: library},
 		{Name: "apps/api", Dir: api},
 	})
@@ -41,10 +40,13 @@ func TestProjectLookupsReadTheWorkspaceNames(t *testing.T) {
 		t.Fatalf("FindActiveProject(library/src) = %q, %v", name, ok)
 	}
 	keys := WorkspaceProjectKeys(root)
-	for _, key := range []string{"putnami-example/library", "php/samples/library", "apps/api", "acme"} {
+	for _, key := range []string{"putnami-example/library", "php/samples/library", "apps/api"} {
 		if !keys[key] {
 			t.Errorf("WorkspaceProjectKeys misses %q: %v", key, keys)
 		}
+	}
+	if keys["acme"] {
+		t.Errorf("WorkspaceProjectKeys holds the workspace itself, which the membership does not name: %v", keys)
 	}
 
 	UseWorkspaceProjects(nil)
