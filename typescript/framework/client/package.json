@@ -27,7 +27,7 @@
     "putnami-client-generate": "./bin/generate.ts"
   },
   "dependencies": {
-    "@biomejs/biome": "^2.5.3",
+    "@biomejs/biome": "^2.5.15",
     "@putnami/application": "workspace:*",
     "@putnami/runtime": "workspace:*",
     "@putnami/utils": "workspace:*"

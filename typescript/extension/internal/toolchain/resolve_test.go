@@ -202,7 +202,7 @@ func TestResolveInNodeModules_NativeBiomeOfAnIsolatedInstall(t *testing.T) {
 		t.Fatal(err)
 	}
 	writeShim(t, root, "biome")
-	store := filepath.Join(root, "node_modules", ".bun", "@biomejs+biome@2.5.3", "node_modules", "@biomejs")
+	store := filepath.Join(root, "node_modules", ".bun", "@biomejs+biome@2.5.15", "node_modules", "@biomejs")
 	writeFileAt(t, filepath.Join(store, "biome"), "package.json")
 	want := writeFileAt(t, filepath.Join(store, "cli-linux-arm64"), "biome")
 	if err := os.MkdirAll(filepath.Join(root, "node_modules", "@biomejs"), 0o755); err != nil {

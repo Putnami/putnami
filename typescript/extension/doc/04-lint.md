@@ -263,7 +263,7 @@ To override the defaults, create a `biome.json` in your project root. It extends
 
 ```json
 {
-  "$schema": "https://biomejs.dev/schemas/2.5.3/schema.json",
+  "$schema": "https://biomejs.dev/schemas/2.5.15/schema.json",
   "root": false,
   "extends": ["../../biome.json"],
   "linter": {
