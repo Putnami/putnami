@@ -86,7 +86,8 @@
       "WORKSPACE",
       "WORKSPACE.bazel",
       ".bazelversion",
-      "bazel-graph.json"
+      "bazel-graph.json",
+      "putnami.json"
     ],
     "excludes": [
       "bazel-bin",
