@@ -28,7 +28,7 @@
       "filePatterns": [
         "putnami.extension.json",
         "profile.json",
-        "../observe/internal/observe/testdata/demos/bazel.txtar"
+        "../../tooling/observe/internal/observe/testdata/demos/bazel.txtar"
       ]
     }
   }

@@ -9,8 +9,8 @@ import (
 	"io"
 	"os"
 
+	"go.putnami.dev/monorepo/bazel"
 	"go.putnami.dev/sdk/extension/cli"
-	"go.putnami.dev/tooling/bazel"
 )
 
 var runtimeVersion string

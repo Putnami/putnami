@@ -1,7 +1,7 @@
 {
   "$schema": "https://putnami.dev/schemas/putnami-spec.json",
   "protocolVersion": 1,
-  "feature": "tooling/bazel-delegated-stack",
+  "feature": "monorepo/bazel-delegated-stack",
   "outcomes": [
     "Each Bazel package that holds a rule is a Putnami project, delegated to Bazel, with an edge to each package the query export says it depends on",
     "putnami test and build run bazel coverage and bazel build on each affected package, and Bazel's cache decides what reruns",

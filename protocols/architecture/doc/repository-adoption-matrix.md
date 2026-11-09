@@ -374,12 +374,12 @@ detectors need; the next stack extensions join the same section until then.
 | `/dart/extension` | Stack extension | `tooling` |
 | `/dotnet/extension` | Stack extension | `tooling` |
 | `/java/extension` | Stack extension | `tooling` |
+| `/monorepo/bazel` | Delegated stack extension | `tooling` |
+| `/monorepo/pants` | Delegated stack extension | `tooling` |
 | `/php/extension` | Stack extension | `tooling` |
 | `/ruby/extension` | Stack extension | `tooling` |
 | `/rust/extension` | Stack extension | `tooling` |
 | `/swift/extension` | Stack extension | `tooling` |
-| `/tooling/bazel` | Delegated stack extension | `tooling` |
-| `/tooling/pants` | Delegated stack extension | `tooling` |
 | `/tooling/stacks` | Stack core | `tooling` |
 
 ### Samples — 42 projects

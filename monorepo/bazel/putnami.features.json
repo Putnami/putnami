@@ -4,7 +4,7 @@
   "namespace": "tooling",
   "features": [
     {
-      "id": "tooling/bazel-delegated-stack",
+      "id": "monorepo/bazel-delegated-stack",
       "type": "feature",
       "name": "Run the packages of a Bazel workspace through Bazel",
       "outcome": "A team with a Bazel repository reaches Putnami's runner and verdict without leaving Bazel: each Bazel package is a Putnami project with its edges, each task runs bazel on that package and reads its reports, and Bazel keeps its own cache and remote execution",

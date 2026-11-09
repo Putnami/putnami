@@ -1,7 +1,6 @@
 {
   "$schema": "https://putnami.dev/schemas/putnami-scope.json",
   "includes": [
-    "bazel",
     "cli",
     "cli-documents",
     "cli-model",
@@ -18,7 +17,6 @@
     "local-collaboration",
     "memory-store",
     "observe",
-    "pants",
     "scaffold",
     "sdd-extension",
     "stacks",

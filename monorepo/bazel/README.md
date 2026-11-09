@@ -7,7 +7,7 @@ and leave caching and remote execution to Bazel.
 
 It is a delegated stack extension: a manifest, the Bazel stack profile
 (`profile.json`), the entrypoint of the stack core,
-[`tooling/stacks`](../stacks/doc/01-design.md#delegated-stacks), and a
+[`tooling/stacks`](../../tooling/stacks/doc/01-design.md#delegated-stacks), and a
 workspace sync task that writes each package's `putnami.json` from the
 `bazel query` export. The packages come from the Bazel detector of
 `putnami observe`.

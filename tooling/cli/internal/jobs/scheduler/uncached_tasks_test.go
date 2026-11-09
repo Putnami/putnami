@@ -21,10 +21,10 @@ var uncachedByVerdict = map[string]string{
 	"tooling/sdd-extension/putnami.extension.json:feature-coverage-ratchet-validate": "its verdict reads the debt list at the merge base of this invocation's baseline",
 	"cloud/extension/putnami.extension.json:cloud-package-config-member":             "its member embeds the HEAD commit, the origin repository and the linked workspace",
 	"cloud/extension/putnami.extension.json:cloud-package-site-content":              "its bundle embeds the HEAD commit",
-	"tooling/pants/putnami.extension.json:pants-graph-check-exec":                    "it compares tracked files with what pants peek answers now, which no cache key can read",
-	"tooling/pants/putnami.extension.json:graph-run":                                 "it runs nothing, and a delegated stack's run stores no cache entry",
-	"tooling/bazel/putnami.extension.json:bazel-graph-check-exec":                    "it compares tracked files with what bazel query answers now, which no cache key can read",
-	"tooling/bazel/putnami.extension.json:graph-run":                                 "it runs nothing, and a delegated stack's run stores no cache entry",
+	"monorepo/pants/putnami.extension.json:pants-graph-check-exec":                    "it compares tracked files with what pants peek answers now, which no cache key can read",
+	"monorepo/pants/putnami.extension.json:graph-run":                                 "it runs nothing, and a delegated stack's run stores no cache entry",
+	"monorepo/bazel/putnami.extension.json:bazel-graph-check-exec":                    "it compares tracked files with what bazel query answers now, which no cache key can read",
+	"monorepo/bazel/putnami.extension.json:graph-run":                                 "it runs nothing, and a delegated stack's run stores no cache entry",
 }
 
 // interactiveTasks returns the tasks of a manifest that run only as

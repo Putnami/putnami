@@ -20,12 +20,12 @@ import (
 	"go.putnami.dev/tooling/stacks/stackstest"
 )
 
-const feature = "tooling/pants-delegated-stack"
+const feature = "monorepo/pants-delegated-stack"
 
 // demoFile is the Pants demo of putnami observe: a Pants 2.25 repository
 // where api imports pricing and web stands alone, with the export and the
 // reports its CI wrote.
-const demoFile = "../observe/internal/observe/testdata/demos/pants.txtar"
+const demoFile = "../../tooling/observe/internal/observe/testdata/demos/pants.txtar"
 
 // demo holds the demo's sections by prefix: base/ is the repository, head/
 // the change on top of it, ci/ what the CI wrote.

@@ -73,7 +73,7 @@ func buildRuntime(t *testing.T) string {
 	}
 	out := filepath.Join(t.TempDir(), "putnami-bazel")
 	cmd := exec.Command(goBinary, "build", "-o", out, "./cmd/putnami-bazel")
-	cmd.Dir = filepath.Join(repoRoot, "tooling/bazel")
+	cmd.Dir = filepath.Join(repoRoot, "monorepo/bazel")
 	cmd.Env = append(os.Environ(), "GOWORK=off", "GOFLAGS=-mod=mod", "CGO_ENABLED=0")
 	if data, err := cmd.CombinedOutput(); err != nil {
 		t.Fatalf("build the Bazel runtime: %v\n%s", err, data)
@@ -96,7 +96,7 @@ func bazelWorkspace(t *testing.T, demo map[string]map[string]string, runtime str
 	clitest.WriteFile(t, filepath.Join(root, ".gitignore"), "/bazel-*\n.putnami\n.gen\ndist\n")
 	clitest.WriteFile(t, filepath.Join(root, "putnami.workspace.json"), `{"name": "shop", "extensions": ["/bazel-extension"], "includes": []}`)
 
-	data, err := os.ReadFile(filepath.Join(repoRoot, "tooling/bazel/putnami.extension.json"))
+	data, err := os.ReadFile(filepath.Join(repoRoot, "monorepo/bazel/putnami.extension.json"))
 	if err != nil {
 		t.Fatal(err)
 	}

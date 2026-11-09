@@ -1,4 +1,4 @@
-module go.putnami.dev/tooling/pants
+module go.putnami.dev/monorepo/pants
 
 go 1.25.7
 
@@ -24,7 +24,7 @@ require (
 )
 
 replace (
-	go.putnami.dev/evidence/readers => ../evidence-readers
+	go.putnami.dev/evidence/readers => ../../tooling/evidence-readers
 	go.putnami.dev/protocol/architecture => ../../protocols/architecture
 	go.putnami.dev/protocol/capabilities => ../../protocols/capabilities
 	go.putnami.dev/protocol/cli => ../../protocols/cli
@@ -46,7 +46,7 @@ replace (
 	go.putnami.dev/protocol/runtime => ../../protocols/runtime
 	go.putnami.dev/protocol/storage => ../../protocols/storage
 	go.putnami.dev/protocol/workspace => ../../protocols/workspace
-	go.putnami.dev/sdk/extension => ../extension-sdk
-	go.putnami.dev/tooling/observe => ../observe
-	go.putnami.dev/tooling/stacks => ../stacks
+	go.putnami.dev/sdk/extension => ../../tooling/extension-sdk
+	go.putnami.dev/tooling/observe => ../../tooling/observe
+	go.putnami.dev/tooling/stacks => ../../tooling/stacks
 )

@@ -205,9 +205,9 @@ match Bazel: run `putnami projects sync` and commit the result.
 
 ## Next
 
-- [Run a Pants repository with Putnami](https://github.com/Putnami/putnami/blob/main/tooling/pants/doc/01-pants.md):
+- [Run a Pants repository with Putnami](https://github.com/Putnami/putnami/blob/main/monorepo/pants/doc/01-pants.md):
   every command, the version check, what the sync owns.
-- [Run a Bazel workspace with Putnami](https://github.com/Putnami/putnami/blob/main/tooling/bazel/doc/01-bazel.md):
+- [Run a Bazel workspace with Putnami](https://github.com/Putnami/putnami/blob/main/monorepo/bazel/doc/01-bazel.md):
   every command, the version check, what the sync owns.
 - [Observe a change in your CI](/docs/how-to/observe-a-change-in-your-ci): the
   report on a pull request, before you adopt anything.

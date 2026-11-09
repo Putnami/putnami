@@ -8,8 +8,8 @@ import (
 	"io"
 	"os"
 
+	"go.putnami.dev/monorepo/pants"
 	"go.putnami.dev/sdk/extension/cli"
-	"go.putnami.dev/tooling/pants"
 )
 
 var runtimeVersion string

@@ -107,7 +107,7 @@ use (
 	./sites/telemetry.putnami.dev
 	./swift/extension
 	./intelligence/areas
-	./tooling/bazel
+	./monorepo/bazel
 	./tooling/cli
 	./tooling/cli-documents
 	./tooling/cli-model
@@ -124,7 +124,7 @@ use (
 	./tooling/local-collaboration
 	./tooling/memory-store
 	./tooling/observe
-	./tooling/pants
+	./monorepo/pants
 	./tooling/scaffold
 	./tooling/sdd-extension
 	./tooling/stacks

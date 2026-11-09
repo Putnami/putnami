@@ -2,11 +2,11 @@
   "$schema": "https://putnami.dev/schemas/putnami-specs-baseline.json",
   "protocolVersion": 2,
   "executableRequirements": [
-    "tooling/bazel-delegated-stack#manifest-follows-the-profile",
-    "tooling/bazel-delegated-stack#packages-become-projects",
-    "tooling/bazel-delegated-stack#reports-become-the-summary",
-    "tooling/bazel-delegated-stack#sync-writes-the-package-graph",
-    "tooling/bazel-delegated-stack#tasks-delegate-to-bazel",
-    "tooling/bazel-delegated-stack#validate-fails-on-a-stale-graph"
+    "monorepo/bazel-delegated-stack#manifest-follows-the-profile",
+    "monorepo/bazel-delegated-stack#packages-become-projects",
+    "monorepo/bazel-delegated-stack#reports-become-the-summary",
+    "monorepo/bazel-delegated-stack#sync-writes-the-package-graph",
+    "monorepo/bazel-delegated-stack#tasks-delegate-to-bazel",
+    "monorepo/bazel-delegated-stack#validate-fails-on-a-stale-graph"
   ]
 }

@@ -2,7 +2,7 @@
 
 - **Status**: accepted
 - **Date**: 2026-11-08
-- **Scope**: `tooling/stacks` (`@putnami/stacks`), `tooling/pants`
+- **Scope**: `tooling/stacks` (`@putnami/stacks`), `monorepo/pants`
   (`@putnami/pants`) and the delegated stacks that follow it (Bazel)
 
 ## Context

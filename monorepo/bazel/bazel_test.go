@@ -21,12 +21,12 @@ import (
 	"go.putnami.dev/tooling/stacks/stackstest"
 )
 
-const feature = "tooling/bazel-delegated-stack"
+const feature = "monorepo/bazel-delegated-stack"
 
 // demoFile is the Bazel demo of putnami observe: a Bzlmod workspace where
 // //api depends on //pricing and //web stands alone, with the export and the
 // test outputs its CI wrote.
-const demoFile = "../observe/internal/observe/testdata/demos/bazel.txtar"
+const demoFile = "../../tooling/observe/internal/observe/testdata/demos/bazel.txtar"
 
 // version is the Bazel version the tests state in .bazelversion.
 const version = "7.4.1"
