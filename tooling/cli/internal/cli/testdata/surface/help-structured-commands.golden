@@ -204,11 +204,12 @@ putnami init
 Initialize a new workspace
 
 Usage:
-  putnami init [--workspace <name>] [--extension <ts|go|py>] [--project <name>] [--project-path <path>] [--channel <channel>] [--force]
+  putnami init [--workspace <name>] [--extension <ts|go|py> | --from <pants>] [--project <name>] [--project-path <path>] [--channel <channel>] [--force]
 
 Command Flags:
   --workspace <name>           Workspace name override
   --extension <ts|go|py>       Default extension to install
+  --from <pants>               Turn the repository a monorepo tool describes into a workspace: declare the tool's extension and synchronize its packages as projects
   --project <name>             Create an initial project
   --project-path <path>        Workspace-relative path for the initial project
   --channel <channel>          Resolve the extensions, the template and the starter dependencies on one release channel (default: PUTNAMI_CHANNEL, then the channel the CLI was installed from, then latest)
@@ -219,6 +220,7 @@ Examples:
   putnami init --project my-app
   putnami init --project my-app --project-path apps/my-app
   putnami init --project my-app --channel canary
+  putnami init --from pants
 
 Global Options:
   Common: --verbose, --debug, --help
@@ -1458,11 +1460,12 @@ putnami workspace init
 Initialize a new workspace
 
 Usage:
-  putnami init [--workspace <name>] [--extension <ts|go|py>] [--project <name>] [--project-path <path>] [--channel <channel>] [--force]
+  putnami init [--workspace <name>] [--extension <ts|go|py> | --from <pants>] [--project <name>] [--project-path <path>] [--channel <channel>] [--force]
 
 Command Flags:
   --workspace <name>           Workspace name override
   --extension <ts|go|py>       Default extension to install
+  --from <pants>               Turn the repository a monorepo tool describes into a workspace: declare the tool's extension and synchronize its packages as projects
   --project <name>             Create an initial project
   --project-path <path>        Workspace-relative path for the initial project
   --channel <channel>          Resolve the extensions, the template and the starter dependencies on one release channel (default: PUTNAMI_CHANNEL, then the channel the CLI was installed from, then latest)
@@ -1473,6 +1476,7 @@ Examples:
   putnami init --project my-app
   putnami init --project my-app --project-path apps/my-app
   putnami init --project my-app --channel canary
+  putnami init --from pants
 
 Global Options:
   Common: --verbose, --debug, --help

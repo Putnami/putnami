@@ -18,6 +18,7 @@
     "/python/extension",
     "/rust/extension",
     "/swift/extension",
+    "/tooling/pants",
     "/tooling/scaffold",
     "/tooling/sdd-extension",
     "/tooling/contributor",

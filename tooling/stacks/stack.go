@@ -52,6 +52,10 @@ type Component struct {
 	// ReleaseMembers are the artifacts this component contributes to a release
 	// set.
 	ReleaseMembers []releaseset.MemberDeclaration
+	// Bare marks a directory whose markers make it a workspace member but
+	// that holds no component: the probe answers its name alone, with no
+	// extension, tag or metadata, so it runs no task.
+	Bare bool
 }
 
 // Detector finds the components among a probe request's candidate paths, in
@@ -131,7 +135,7 @@ const (
 
 // Probe answers a workspace probe: one project per component the detector
 // finds among the candidates, with its name, its edges, the extension, and
-// its metadata.
+// its metadata; a bare directory gets its name alone.
 func (s Stack) Probe(root string, request wsproto.ProbeRequest) (wsproto.ProbeResult, error) {
 	result := wsproto.ProbeResult{Version: wsproto.ProbeProtocolVersion, Extension: s.Extension}
 	components, diags := s.Detect(root, request)
@@ -143,6 +147,10 @@ func (s Stack) Probe(root string, request wsproto.ProbeRequest) (wsproto.ProbeRe
 	}
 	deps, leftOut := rootEdges(components)
 	for _, c := range components {
+		if c.Bare {
+			result.Projects = append(result.Projects, wsproto.ProbeProject{Path: c.Path, SourceName: c.Name, SourceFile: c.SourceFile})
+			continue
+		}
 		if reason, out := leftOut[c.Path]; out {
 			result.Diagnostics = append(result.Diagnostics, diag.Warningf(CodeStackRootUnsupported, c.Path, "%s is left out: %s", c.Path, reason))
 			continue

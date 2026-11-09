@@ -30,6 +30,12 @@ const (
 // TaskNames are the tasks a profile may declare, in run order.
 var TaskNames = []string{TaskLint, TaskTest, TaskBuild}
 
+// Task directories: where a task's steps run.
+const (
+	DirProject = "project"
+	DirRoot    = "root"
+)
+
 // Toolchain check modes.
 const (
 	CheckFail = "fail"
@@ -64,6 +70,10 @@ type Profile struct {
 	// variant merges into the profile like an override. A profile with
 	// variants may declare no task of its own.
 	Variants map[string]json.RawMessage `json:"variants,omitempty"`
+	// Delegated marks a stack whose build tool keeps its own cache: every
+	// task of the extension's manifest disables Putnami's cache, and each
+	// task result names the stack id in delegatedTo.
+	Delegated bool `json:"delegated,omitempty"`
 }
 
 // Toolchain is the toolchain check of a profile.
@@ -107,6 +117,9 @@ type Task struct {
 	Steps [][]string `json:"steps"`
 	// Inputs name the input sets the task reads.
 	Inputs []string `json:"inputs"`
+	// Dir is where the steps run: "project" (the default), the project
+	// directory, or "root", the stack root.
+	Dir string `json:"dir,omitempty"`
 	// Reports are the reports the task reads back.
 	Reports *Reports `json:"reports,omitempty"`
 	// Artifacts are the files the task copies into {output}/artifacts after
@@ -299,6 +312,11 @@ func (t Task) validate(sets map[string][]string) error {
 			return err
 		}
 	}
+	switch t.Dir {
+	case "", DirProject, DirRoot:
+	default:
+		return fmt.Errorf("dir: %q is not project or root", t.Dir)
+	}
 	for _, name := range t.Inputs {
 		if _, ok := sets[name]; !ok {
 			return fmt.Errorf("inputs: %q names no input set", name)
@@ -397,8 +415,8 @@ func validateReportPath(p string) error {
 // Resolve applies a project's override to the profile. The override is a JSON
 // object with the profile's shape and every member optional: an object member
 // merges, any other value replaces the value at its path whole. An override
-// that names a member the profile schema does not know, or that changes id or
-// markers, fails.
+// that names a member the profile schema does not know, or that changes id,
+// markers or delegated, fails.
 func (p Profile) Resolve(override json.RawMessage) (Profile, error) {
 	return p.merge(override, "override")
 }
@@ -487,7 +505,10 @@ func (p Profile) merge(override json.RawMessage, kind string) (Profile, error) {
 	if err := json.Unmarshal(trimmed, &over); err != nil {
 		return Profile{}, fmt.Errorf("the %s is not a JSON object: %w", kind, err)
 	}
-	for _, fixed := range []string{"id", "markers", "variants"} {
+	// filePatterns is the workspace's own member of an extension's option
+	// layer: it says which files select the project, and no profile has it.
+	delete(over, "filePatterns")
+	for _, fixed := range []string{"id", "markers", "variants", "delegated"} {
 		if _, ok := over[fixed]; ok {
 			return Profile{}, fmt.Errorf("%s: the %s cannot change the profile's %s", fixed, kind, fixed)
 		}

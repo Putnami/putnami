@@ -96,8 +96,36 @@ type Detection struct {
 	Components []Component
 	// Lockfiles are the repository-relative lockfiles of the Python resolves,
 	// sorted.
-	Lockfiles   []string
-	Diagnostics []diag.Diagnostic
+	Lockfiles []string
+	// Tested lists, sorted, the ids of the components that hold a test
+	// target: a target type that ends in _test or _tests, or a go_package
+	// with a _test.go source.
+	Tested []string
+	// Requires maps the id of each component to the directories, sorted, of
+	// the third-party and internal targets it depends on in the export, such
+	// as a requirement or a resolve lockfile; empty without an export.
+	Requires map[string][]string
+	// RequiredFiles maps the id of each component that uses a third-party
+	// target, even one in its own directory, to the files, sorted, that
+	// declare those targets, such as a requirements file; empty without an
+	// export.
+	RequiredFiles map[string][]string
+	Diagnostics   []diag.Diagnostic
+}
+
+// IsTested reports whether the component with the id holds a test target.
+func (d Detection) IsTested(id string) bool {
+	_, found := slices.BinarySearch(d.Tested, id)
+	return found
+}
+
+// testTarget reports whether a target of the type, with the sources, runs
+// tests.
+func testTarget(targetType string, sources []string) bool {
+	if strings.HasSuffix(targetType, "_test") || strings.HasSuffix(targetType, "_tests") {
+		return true
+	}
+	return targetType == "go_package" && slices.ContainsFunc(sources, func(s string) bool { return strings.HasSuffix(s, "_test.go") })
 }
 
 // Options tune one detection.
@@ -136,13 +164,24 @@ func Detect(root string, opts Options) Detection {
 	if !filepath.IsAbs(file) {
 		file = filepath.Join(root, filepath.FromSlash(file))
 	}
-	components, diags, ok := fromGraph(root, file, graphFile, opts.GraphFile != "")
+	components, tested, requires, diags, ok := fromGraph(root, file, graphFile, opts.GraphFile != "")
 	out.Diagnostics = append(out.Diagnostics, diags...)
 	if !ok {
-		components, diags = fromBuildFiles(root)
+		components, tested, diags = fromBuildFiles(root)
 		out.Diagnostics = append(out.Diagnostics, diags...)
 	}
 	out.Components = components
+	out.Tested = tested
+	if requires != nil {
+		out.Requires = make(map[string][]string, len(requires))
+		out.RequiredFiles = make(map[string][]string, len(requires))
+		for dir, use := range requires {
+			if len(use.dirs) > 0 {
+				out.Requires[dir] = use.dirs
+			}
+			out.RequiredFiles[dir] = use.files
+		}
+	}
 	return out
 }
 
@@ -159,20 +198,26 @@ type target struct {
 // fromGraph reads the export at file, named graphFile in diagnostics. It
 // reports ok=false when there is no usable export. A missing export is an info
 // diagnostic, and a warning when the caller named it.
-func fromGraph(root, file, graphFile string, named bool) ([]Component, []diag.Diagnostic, bool) {
+// requirement is what one component uses of the third-party targets: their
+// directories, and the files that declare them.
+type requirement struct {
+	dirs, files []string
+}
+
+func fromGraph(root, file, graphFile string, named bool) ([]Component, []string, map[string]requirement, []diag.Diagnostic, bool) {
 	info, err := os.Stat(file)
 	if errors.Is(err, fs.ErrNotExist) {
 		severity := diag.Info
 		if named {
 			severity = diag.Warning
 		}
-		return nil, []diag.Diagnostic{{
+		return nil, nil, nil, []diag.Diagnostic{{
 			Severity: severity, Code: CodeGraphMissing, Field: graphFile,
 			Message: fmt.Sprintf("no Pants export at %s, so the components have no edge: write it in the CI with `%s`, or name it with --pants-graph", graphFile, ExportCommand),
 		}}, false
 	}
-	unreadable := func(format string, args ...any) ([]Component, []diag.Diagnostic, bool) {
-		return nil, []diag.Diagnostic{diag.Warningf(CodeGraphUnreadable, graphFile,
+	unreadable := func(format string, args ...any) ([]Component, []string, map[string]requirement, []diag.Diagnostic, bool) {
+		return nil, nil, nil, []diag.Diagnostic{diag.Warningf(CodeGraphUnreadable, graphFile,
 			format+"; the BUILD files answer instead, with no edge", args...)}, false
 	}
 	if err != nil {
@@ -198,6 +243,9 @@ func fromGraph(root, file, graphFile string, named bool) ([]Component, []diag.Di
 	}
 	g := graph{root: root, targets: byAddress}
 	edges := map[string]map[string]bool{}
+	tested := map[string]bool{}
+	requires := map[string]map[string]bool{}
+	requiredFiles := map[string]map[string]bool{}
 	var diags []diag.Diagnostic
 	for _, t := range targets {
 		if !firstParty(t.TargetType) {
@@ -211,8 +259,21 @@ func fromGraph(root, file, graphFile string, named bool) ([]Component, []diag.Di
 		if edges[dir] == nil {
 			edges[dir] = map[string]bool{}
 		}
+		if testTarget(t.TargetType, t.Sources) {
+			tested[dir] = true
+		}
 		for _, dep := range t.Dependencies {
 			if known, listed := byAddress[dep]; listed && !firstParty(known.TargetType) {
+				if requiredFiles[dir] == nil {
+					requiredFiles[dir] = map[string]bool{}
+				}
+				g.thirdPartyFiles(dep, requiredFiles[dir], map[string]bool{})
+				if target, ok := g.dir(dep); ok && target != dir {
+					if requires[dir] == nil {
+						requires[dir] = map[string]bool{}
+					}
+					requires[dir][target] = true
+				}
 				continue
 			}
 			if target, ok := g.dir(dep); ok && target != dir {
@@ -234,7 +295,20 @@ func fromGraph(root, file, graphFile string, named bool) ([]Component, []diag.Di
 		out = append(out, c)
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].ID < out[j].ID })
-	return out, diags, true
+	required := make(map[string]requirement, len(requiredFiles))
+	for dir, files := range requiredFiles {
+		required[dir] = requirement{dirs: sortedKeys(requires[dir]), files: sortedKeys(files)}
+	}
+	return out, sortedKeys(tested), required, diags, true
+}
+
+func sortedKeys(set map[string]bool) []string {
+	out := make([]string, 0, len(set))
+	for k := range set {
+		out = append(out, k)
+	}
+	sort.Strings(out)
+	return out
 }
 
 // graph resolves the addresses of one export.
@@ -293,6 +367,25 @@ func (g graph) isFile(address, p, name string) bool {
 	return err == nil && info.Mode().IsRegular()
 }
 
+// thirdPartyFiles adds to files the sources of a third-party target and of the
+// third-party targets it depends on: a generated requirement's source is the
+// requirements file target it depends on.
+func (g graph) thirdPartyFiles(address string, files, seen map[string]bool) {
+	t, listed := g.targets[address]
+	if !listed || seen[address] || firstParty(t.TargetType) {
+		return
+	}
+	seen[address] = true
+	for _, source := range t.Sources {
+		if clean, ok := wsproto.NormalizeProbePath(source); ok {
+			files[clean] = true
+		}
+	}
+	for _, dep := range t.Dependencies {
+		g.thirdPartyFiles(dep, files, seen)
+	}
+}
+
 // firstParty reports whether a target type is code of the repository: not a
 // third-party package and not an internal target.
 func firstParty(targetType string) bool {
@@ -306,10 +399,12 @@ func firstParty(targetType string) bool {
 var call = regexp.MustCompile(`(?m)^([A-Za-z_][A-Za-z0-9_]*)[ \t]*\(`)
 
 // fromBuildFiles lists the directories whose BUILD file declares a
-// first-party target. It skips dist, node_modules, __pycache__ and hidden
-// directories.
-func fromBuildFiles(root string) ([]Component, []diag.Diagnostic) {
+// first-party target, and those of them that call a test target or a
+// go_package beside a _test.go file. It skips dist, node_modules, __pycache__
+// and hidden directories.
+func fromBuildFiles(root string) ([]Component, []string, []diag.Diagnostic) {
 	dirs := map[string]bool{}
+	tested := map[string]bool{}
 	var diags []diag.Diagnostic
 	walked := 0
 	err := filepath.WalkDir(root, func(p string, entry fs.DirEntry, err error) error {
@@ -341,6 +436,9 @@ func fromBuildFiles(root string) ([]Component, []diag.Diagnostic) {
 		}
 		if dir, ok := wsproto.NormalizeProbePath(filepath.ToSlash(rel)); ok {
 			dirs[dir] = true
+			if callsTestTarget(data, filepath.Dir(p)) {
+				tested[dir] = true
+			}
 		}
 		return nil
 	})
@@ -352,7 +450,22 @@ func fromBuildFiles(root string) ([]Component, []diag.Diagnostic) {
 		out = append(out, Component{ID: dir, Source: evidence.SourceWorkspace})
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].ID < out[j].ID })
-	return out, diags
+	return out, sortedKeys(tested), diags
+}
+
+// callsTestTarget reports whether a BUILD file in dir calls a test target, or
+// a go_package beside a _test.go file.
+func callsTestTarget(data []byte, dir string) bool {
+	var goTests []string
+	if matches, _ := filepath.Glob(filepath.Join(dir, "*_test.go")); len(matches) > 0 {
+		goTests = []string{"x_test.go"}
+	}
+	for _, m := range call.FindAllSubmatch(data, -1) {
+		if testTarget(string(m[1]), goTests) {
+			return true
+		}
+	}
+	return false
 }
 
 // declaresFirstParty reports whether a BUILD file calls a target or macro

@@ -7,6 +7,8 @@ import (
 
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/sdk/extension/cli"
+	pctx "go.putnami.dev/sdk/extension/context"
+	"go.putnami.dev/sdk/extension/jsonl"
 	"go.putnami.dev/sdk/extension/runtimeinfo"
 )
 
@@ -52,9 +54,22 @@ func (s Stack) Entrypoint(args []string, stdin io.Reader, stdout io.Writer, vers
 	return nil
 }
 
-// Jobs are the job handlers of the profile's tasks.
+// TaskGraph is the job of a delegated stack's graph step: it runs nothing and
+// passes. Each lint, test and build step of a delegated stack's manifest
+// depends on the graph step of its own project, which alone depends on the
+// graph step of each project upstream: a change selects its dependents, and
+// a dependency runs its graph step, never its tool.
+const TaskGraph = "graph"
+
+// Jobs are the job handlers of the profile's tasks, and the graph job of a
+// delegated profile.
 func (s Stack) Jobs() map[string]cli.JobFunc {
 	jobs := map[string]cli.JobFunc{}
+	if s.Profile.Delegated {
+		jobs[TaskGraph] = func(*pctx.Context, *jsonl.Emitter, []string) (string, map[string]any, error) {
+			return statusOK, nil, nil
+		}
+	}
 	for _, task := range TaskNames {
 		if s.Profile.HasTask(task) {
 			jobs[task] = s.Run(task)

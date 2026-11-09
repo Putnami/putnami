@@ -36,8 +36,9 @@ const (
 )
 
 // Run is the job of one task: the toolchain check, the steps in the project
-// directory under the stack root's lock, then the reports, copied into the
-// task's output directory and read.
+// directory, or the stack root when the task's dir is root, under the stack
+// root's lock, then the reports, copied into the task's output directory and
+// read. A delegated stack's result names the stack in delegatedTo.
 func (s Stack) Run(task string) func(ctx *pctx.Context, emit *jsonl.Emitter, args []string) (string, map[string]any, error) {
 	return s.RunWith(task, nil)
 }
@@ -182,13 +183,19 @@ func (s Stack) selectToolchain(ctx context.Context, in runInput, meta Metadata, 
 // of one root share its build directory and its reports, so one task runs at
 // a time per root. The caller releases the returned lock.
 func lockStackRoot(workspaceRoot string, meta Metadata, profile Profile) (*filelock.Lock, error) {
+	return LockRoot(workspaceRoot, profile.ID, meta.Root)
+}
+
+// LockRoot takes the lock the tasks of a stack hold on its root, for a tool
+// call an extension makes outside a task. The caller releases it.
+func LockRoot(workspaceRoot, stack, root string) (*filelock.Lock, error) {
 	lockDir := filepath.Join(workspaceRoot, ".putnami", "locks", "stacks")
 	if err := os.MkdirAll(lockDir, 0o755); err != nil {
 		return nil, err
 	}
-	lock, err := filelock.Acquire(filepath.Join(lockDir, lockName(profile.ID, meta.Root)), true, false)
+	lock, err := filelock.Acquire(filepath.Join(lockDir, lockName(stack, root)), true, false)
 	if err != nil {
-		return nil, fmt.Errorf("lock the stack root %s: %w", meta.Root, err)
+		return nil, fmt.Errorf("lock the stack root %s: %w", root, err)
 	}
 	return lock, nil
 }
@@ -514,6 +521,9 @@ func (s Stack) run(ctx context.Context, in runInput, emit reporter) (string, map
 		emit.Info("$ " + strings.Join(argv, " "))
 		cmd := exec.CommandContext(ctx, selected.Program(profile.Toolchain, argv[0]), argv[1:]...) //nolint:gosec // the profile's own step
 		cmd.Dir = in.projectAbs
+		if t.Dir == DirRoot {
+			cmd.Dir = rootAbs
+		}
 		cmd.Env = env
 		cmd.Stdout = in.stdout
 		cmd.Stderr = in.stdout
@@ -523,7 +533,11 @@ func (s Stack) run(ctx context.Context, in runInput, emit reporter) (string, map
 		}
 	}
 	if stepErr != nil && t.Reports == nil {
-		return statusFailed, nil, stepErr
+		var failure map[string]any
+		if profile.Delegated {
+			failure = map[string]any{"delegatedTo": profile.ID}
+		}
+		return statusFailed, failure, stepErr
 	}
 
 	if err := copyArtifacts(artifacts, meta.Component, in.projectAbs, rootAbs, outDir); err != nil {
@@ -558,7 +572,11 @@ func (s Stack) run(ctx context.Context, in runInput, emit reporter) (string, map
 		emit.Info(fmt.Sprintf("no file matches %s: the %s task of %s expects no report", strings.Join(reports.When, ", "), in.task, meta.Component))
 		reports = nil
 	}
-	summary, diags := ReadReports(reports, resolve, outDir, s.attribution(in.workspaceRoot, in.projectAbs, meta.Component))
+	reportBase := in.projectAbs
+	if t.Dir == DirRoot {
+		reportBase = rootAbs
+	}
+	summary, diags := ReadReports(reports, resolve, outDir, s.attribution(in.workspaceRoot, in.projectAbs, reportBase, meta.Component))
 	failed := stepErr != nil
 	for _, d := range diags {
 		// A step that failed may have written no report: the step's own
@@ -570,6 +588,10 @@ func (s Stack) run(ctx context.Context, in runInput, emit reporter) (string, map
 		failed = failed || d.Severity == diag.Error
 	}
 	data := map[string]any{}
+	if profile.Delegated {
+		data["delegatedTo"] = profile.ID
+		emit.Info(fmt.Sprintf("%s ran %s on %s; its own cache decides what reran", profile.ID, in.task, meta.Component))
+	}
 	if reports != nil && len(reports.JUnit) > 0 {
 		data["testSummary"] = map[string]any{
 			"total": summary.Tests.Total, "passed": summary.Tests.Passed,

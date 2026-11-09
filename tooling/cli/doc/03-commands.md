@@ -390,12 +390,25 @@ Initialize and inspect workspaces.
 
 ```bash
 putnami init                    # Create a new workspace (putnami.workspace.json)
+putnami init --from pants       # Turn a Pants repository into a workspace
 putnami workspace describe      # Show workspace details
 ```
 
 `init` writes a `README.md`, a `.gitignore` and a `.gitattributes` with `* text=auto eol=lf` when they do not exist. The README names the workspace and the commands that check a change. The `.gitattributes` gives every checkout, Windows included, LF line endings. An existing file is left as it is; `putnami doctor` reports a checkout that converts line endings.
 
 `init` can also scaffold a starter project with `--project <name>`. Use `--project-path <path>` to place that project somewhere other than the default `<project-name>` (at workspace root).
+
+`init --from <tool>` turns a repository that a monorepo tool already describes into a workspace. It runs at the repository root, which must hold the tool's marker file, declares and installs the tool's extension instead of a language starter, and runs `putnami projects sync`, whose extension sync task writes each package's `putnami.json`. It takes no `--project`, `--project-path` or `--extension`: the tool's packages are the projects. When two new members share a directory name, `projects sync` writes a name for each in its `putnami.json`: the name its provider reports, or its path when there is none or when that name is taken.
+
+| Tool | Marker | Extension | What the sync writes |
+|---|---|---|---|
+| `pants` | `pants.toml` | `@putnami/pants` | Each package's edges from the `pants peek ::` export; Pants keeps its own cache. See [Run a Pants repository with Putnami](../../pants/doc/01-pants.md) |
+
+`@putnami/pants` is not published yet: until its first release, `init --from pants` stops at the extension install, after it has written the workspace files.
+
+```bash
+putnami init --from pants
+```
 
 `init` resolves the extensions, the template and the starter's dependencies on one release channel. It takes the first of:
 

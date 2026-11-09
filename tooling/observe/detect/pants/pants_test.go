@@ -324,3 +324,34 @@ func hasCode(diags []diag.Diagnostic, code string) bool {
 	}
 	return false
 }
+
+func TestTestedNamesTheComponentsWithATestTarget(t *testing.T) {
+	root := writeTree(t, map[string]string{"pants.toml": pantsTOML, DefaultGraphFile: export})
+	got := Detect(root, Options{})
+	if want := []string{"src/python/pricing/tests"}; !reflect.DeepEqual(got.Tested, want) {
+		t.Errorf("tested from the export = %v, want %v", got.Tested, want)
+	}
+	if !got.IsTested("src/python/pricing/tests") || got.IsTested("src/python/api") {
+		t.Errorf("IsTested disagrees with Tested %v", got.Tested)
+	}
+	root = writeTree(t, map[string]string{
+		"pants.toml":                 pantsTOML,
+		"src/python/api/BUILD":       "python_sources()\n",
+		"src/python/pricing/BUILD":   "python_sources()\n\npython_tests(name=\"tests\")\n",
+		"src/go/money/BUILD":         "go_package()\n",
+		"src/go/money/money_test.go": "package money\n",
+		"src/go/fx/BUILD":            "go_package()\n",
+		"src/jvm/ledger/BUILD":       "junit_tests()\n",
+	})
+	if want := []string{"src/go/money", "src/jvm/ledger", "src/python/pricing"}; !reflect.DeepEqual(Detect(root, Options{}).Tested, want) {
+		t.Errorf("tested from the BUILD files = %v, want %v", Detect(root, Options{}).Tested, want)
+	}
+}
+
+func TestRequiresNamesTheThirdPartyDirectoriesOfEachComponent(t *testing.T) {
+	root := writeTree(t, map[string]string{"pants.toml": pantsTOML, DefaultGraphFile: export})
+	want := map[string][]string{"src/python/api": {"3rdparty/python"}, "src/python/pricing": {"3rdparty/python"}}
+	if got := Detect(root, Options{}).Requires; !reflect.DeepEqual(got, want) {
+		t.Errorf("requires = %v, want %v", got, want)
+	}
+}

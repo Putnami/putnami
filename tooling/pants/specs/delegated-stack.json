@@ -1,0 +1,46 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-spec.json",
+  "protocolVersion": 1,
+  "feature": "tooling/pants-delegated-stack",
+  "outcomes": [
+    "Each directory of a Pants repository whose BUILD file declares a first-party target is a Putnami project, delegated to Pants, with an edge to each package Pants says it depends on",
+    "putnami lint, test and build run pants lint, test and package on each affected package, and Pants's cache decides what reruns",
+    "The test task reads the JUnit and coverage reports Pants writes under dist/ into the test and coverage summary"
+  ],
+  "nonGoals": [
+    "Importing Pants targets as Putnami tasks, or caching a Pants result in Putnami's cache",
+    "Installing or switching a Pants version: the toolchain check compares and never installs",
+    "Reading Pants's own task graph below the package: the edges are the export's, between directories",
+    "Coverage for a backend other than Python by default: a repository without the Python backend overrides the test steps"
+  ],
+  "requirements": [
+    {
+      "id": "packages-become-projects",
+      "text": "The probe answers, for each candidate directory the observe Pants detector knows as a component: its directory as source name, the components it depends on in pants-graph.json when the root holds one, the extension @putnami/pants, the tag pants, and metadata naming the component, the workspace root as stack root and GLOBAL.pants_version. Any other candidate holding a BUILD file, the root included, is bare: named by its directory, with no extension, so it runs no task."
+    },
+    {
+      "id": "sync-writes-the-package-graph",
+      "text": "The workspace sync task reads pants-graph.json at the root, or runs pants peek ::, and writes in each component's putnami.json the extension, the project IDs it depends on, the lockfiles and third-party declaration files it uses as filePatterns, and test in disable.jobs without a test target. It retracts a former package, rewrites a file only when a member it owns changes, and warns and writes nothing without the export and pants, or with an export that lists no package."
+    },
+    {
+      "id": "validate-fails-on-a-stale-graph",
+      "text": "putnami validate compares each package's putnami.json with the export, or pants peek ::, writes nothing, and fails with pants.sync_stale when a sync would change one, so an import that changes the edges Pants infers cannot pass the gate. Without the export and pants it warns and passes."
+    },
+    {
+      "id": "tasks-delegate-to-pants",
+      "text": "Each task compares pants --version with GLOBAL.pants_version, then runs at the workspace root pants lint <dir>:, pants --test-report --test-use-coverage --coverage-py-report=xml test <dir>:, or pants package <dir>:, where <dir>: names one directory's targets. Each task depends only on its package's graph step, which runs no pants. Putnami's cache is off for every task, and the result records delegatedTo pants. A failing step fails with stacks.step_failed."
+    },
+    {
+      "id": "reports-become-the-summary",
+      "text": "After its steps, the test task reads the JUnit reports under dist/test/reports and the Cobertura report dist/coverage/python/coverage.xml, removed before the steps so another package's run is never read as this one's, into the test and coverage summary. A failed case fails the task with stacks.test_failed; a report pattern that matches no report fails it with stacks.report_missing."
+    },
+    {
+      "id": "manifest-follows-the-profile",
+      "text": "The manifest passes the stack core's conformance kit: its markers are the profile's, it lists the pants:lint, pants:test and pants:build selectors, each command runs the graph step, which depends on the graph step upstream, then its task, which depends on its own graph step alone, and every task, the graph task included, sets cache.enabled to false."
+    }
+  ],
+  "decisions": [
+    "tooling/stacks/doc/adr/0001-one-extension-per-stack-on-a-shared-core.md",
+    "tooling/stacks/doc/adr/0008-a-delegated-stack-keeps-its-tool-cache.md"
+  ]
+}

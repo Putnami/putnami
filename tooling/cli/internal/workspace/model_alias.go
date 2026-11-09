@@ -62,6 +62,9 @@ var NewWorkspace = model.NewWorkspace
 // same name.
 var CheckDuplicateNames = model.CheckDuplicateNames
 
+// DuplicateNamesError is two or more projects that resolve to one name.
+type DuplicateNamesError = model.DuplicateNamesError
+
 // CanonicalRoot resolves a workspace root to its absolute, symlink-free form.
 var CanonicalRoot = model.CanonicalRoot
 

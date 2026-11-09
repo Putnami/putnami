@@ -1670,6 +1670,21 @@
     },
     {
       "match": "exact",
+      "path": "/docs/how-to/adopt-putnami-on-an-existing-monorepo",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "publicEdge": true,
+      "provenance": {
+        "project": "putnami.dev",
+        "package": "@putnami/web",
+        "sourceKind": "file-route",
+        "evidencePath": "src/app/docs/[...page]/page.tsx"
+      }
+    },
+    {
+      "match": "exact",
       "path": "/docs/how-to/bring-your-external-specs",
       "methods": [
         "GET",
@@ -4429,6 +4444,21 @@
     },
     {
       "match": "exact",
+      "path": "/fr/docs/how-to/adopt-putnami-on-an-existing-monorepo",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "publicEdge": true,
+      "provenance": {
+        "project": "putnami.dev",
+        "package": "@putnami/web",
+        "sourceKind": "file-route",
+        "evidencePath": "src/app/docs/[...page]/page.tsx"
+      }
+    },
+    {
+      "match": "exact",
       "path": "/fr/docs/how-to/bring-your-external-specs",
       "methods": [
         "GET",
@@ -5846,5 +5876,5 @@
       }
     }
   ],
-  "digest": "sha256:68218f9814f036faa5a80f14a156dc754e0657c301d956d996586109edb415d3"
+  "digest": "sha256:9d66519ffe7e3867996c3ab8c0ced1f4a26169165be27931cc1c9a4b3cc89d98"
 }

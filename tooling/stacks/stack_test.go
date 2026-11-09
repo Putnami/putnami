@@ -340,6 +340,36 @@ func TestRunReadsTheReportsOfAFailedTestRun(t *testing.T) {
 
 func s0(t *testing.T) Stack { return testStack(t) }
 
+func TestRunOfADelegatedStackRunsInTheRootAndNamesTheTool(t *testing.T) {
+	root := t.TempDir()
+	writeFile(t, root, "rust-toolchain.toml", "[toolchain]\nchannel = \"1.82.0\"\n")
+	writeFile(t, root, "crates/api/Cargo.toml", "")
+	writeFile(t, root, "crates/api/putnami.json", `{"options": {"@putnami/rust": {"tasks": {"lint": {"steps": [["sh", "-c", "pwd > \"$STUB_LOG\""]], "dir": "root"}}}}}`)
+	t.Setenv("STUB_ROOT", root)
+	t.Setenv("STUB_LOG", filepath.Join(root, "log"))
+	stubTools(t, "1.82.0", junitPass)
+	s := testStack(t)
+	s.Profile.Delegated = true
+
+	status, data, rec := runTask(t, s, root, TaskLint)
+	if status != statusOK {
+		t.Fatalf("status %s: %v", status, rec.diags)
+	}
+	if data["delegatedTo"] != "rust" {
+		t.Errorf("the result names the tool it delegated to: %v", data)
+	}
+	got, _ := os.ReadFile(filepath.Join(root, "log"))
+	want, _ := filepath.EvalSymlinks(root)
+	if dir, _ := filepath.EvalSymlinks(strings.TrimSpace(string(got))); dir != want {
+		t.Errorf("a root task runs in the stack root %s, ran in %s", want, got)
+	}
+
+	s.Profile.Delegated = false
+	if _, data, _ := runTask(t, s, root, TaskLint); data["delegatedTo"] != nil {
+		t.Errorf("a stack that keeps Putnami's cache names no delegation: %v", data)
+	}
+}
+
 func TestRunRefusesAProjectWithoutComponentMetadata(t *testing.T) {
 	rec := &recorder{}
 	status, _, _ := testStack(t).run(context.Background(), runInput{task: TaskTest, workspaceRoot: t.TempDir(), projectAbs: t.TempDir(), outputRoot: t.TempDir()}, rec)
@@ -567,5 +597,50 @@ func TestToolsReachThePathOfTheTask(t *testing.T) {
 	}
 	if status, _, rec := runTask(t, s, root, TaskLint); status != statusFailed || !strings.Contains(strings.Join(rec.diags, " "), "no archive") {
 		t.Errorf("status %s: %v", status, rec.diags)
+	}
+}
+
+func TestProbeNamesABareDirectoryAndADelegatedStackServesTheGraphJob(t *testing.T) {
+	s := testStack(t)
+	s.Detect = func(string, wsproto.ProbeRequest) ([]Component, []diag.Diagnostic) {
+		return []Component{{Path: "3rdparty/python", Name: "3rdparty/python", SourceFile: "3rdparty/python/BUILD", Bare: true}}, nil
+	}
+	result, err := s.Probe(t.TempDir(), wsproto.ProbeRequest{Version: wsproto.ProbeProtocolVersion, Extension: s.Extension, Paths: []string{"3rdparty/python"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := wsproto.ProbeProject{Path: "3rdparty/python", SourceName: "3rdparty/python", SourceFile: "3rdparty/python/BUILD"}
+	if len(result.Projects) != 1 || !reflect.DeepEqual(result.Projects[0], want) {
+		t.Errorf("a bare directory gets its name alone: %+v", result.Projects)
+	}
+
+	if _, ok := s.Jobs()[TaskGraph]; ok {
+		t.Error("a stack that keeps Putnami's cache serves no graph job")
+	}
+	s.Profile.Delegated = true
+	graph, ok := s.Jobs()[TaskGraph]
+	if !ok {
+		t.Fatal("a delegated stack serves the graph job")
+	}
+	if status, data, err := graph(nil, nil, nil); status != statusOK || data != nil || err != nil {
+		t.Errorf("the graph job passes and runs nothing: %s %v %v", status, data, err)
+	}
+}
+
+func TestAFailedStepOfADelegatedTaskNamesItsTool(t *testing.T) {
+	root := t.TempDir()
+	writeFile(t, root, "rust-toolchain.toml", "[toolchain]\nchannel = \"1.82.0\"\n")
+	writeFile(t, root, "crates/api/Cargo.toml", "")
+	t.Setenv("STUB_ROOT", root)
+	t.Setenv("STUB_LOG", filepath.Join(root, "log"))
+	stubTools(t, "1.82.0", junitPass)
+	s := testProfileWithLcov(t)
+	s.Profile.Delegated = true
+	task := s.Profile.Tasks[TaskLint]
+	task.Steps = [][]string{{"false"}}
+	s.Profile.Tasks[TaskLint] = task
+	status, data, _ := runTask(t, s, root, TaskLint)
+	if status != statusFailed || data["delegatedTo"] != s.Profile.ID {
+		t.Errorf("status %s, data %v", status, data)
 	}
 }

@@ -176,24 +176,36 @@ func CheckDuplicateNames(projects []*Project) error {
 		paths[p.Name] = append(paths[p.Name], p.Path)
 	}
 
-	dupNames := make([]string, 0)
+	duplicates := make(map[string][]string)
 	for name, ps := range paths {
 		if len(ps) > 1 {
-			dupNames = append(dupNames, name)
+			sort.Strings(ps)
+			duplicates[name] = ps
 		}
 	}
-	if len(dupNames) == 0 {
+	if len(duplicates) == 0 {
 		return nil
 	}
-	sort.Strings(dupNames)
+	return &DuplicateNamesError{Names: duplicates}
+}
 
-	parts := make([]string, len(dupNames))
-	for i, name := range dupNames {
-		ps := append([]string(nil), paths[name]...)
-		sort.Strings(ps)
-		parts[i] = fmt.Sprintf("%q (%s)", name, strings.Join(ps, ", "))
+// DuplicateNamesError is two or more projects that resolve to one name.
+type DuplicateNamesError struct {
+	// Names maps each colliding name to its declaring paths, sorted.
+	Names map[string][]string
+}
+
+func (e *DuplicateNamesError) Error() string {
+	names := make([]string, 0, len(e.Names))
+	for name := range e.Names {
+		names = append(names, name)
 	}
-	return fmt.Errorf(
+	sort.Strings(names)
+	parts := make([]string, len(names))
+	for i, name := range names {
+		parts[i] = fmt.Sprintf("%q (%s)", name, strings.Join(e.Names[name], ", "))
+	}
+	return fmt.Sprintf(
 		"duplicate project name(s) %s; project names must be unique across the workspace — rename one of the colliding projects (or fix the scope config that resolves them to the same name)",
 		strings.Join(parts, "; "),
 	)

@@ -4393,6 +4393,38 @@
           }
         }
       ]
+    },
+    {
+      "id": "cli/init-from-a-monorepo-tool",
+      "type": "feature",
+      "name": "Initialize a workspace from a monorepo tool",
+      "outcome": "A team turns a repository its monorepo tool already describes into a Putnami workspace with one command, putnami init --from <tool>, and its packages become projects with their edges",
+      "owner": "tooling",
+      "target": "coded",
+      "requirements": [
+        {
+          "id": "init-from-pants",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "init-from-pants-declares-the-pants-extension-and-syncs-the-projects"
+            ]
+          }
+        },
+        {
+          "id": "pants-impact-runs-through-pants",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-change-to-one-pants-package-runs-it-and-its-dependents-through-pants-uncached"
+            ]
+          }
+        }
+      ]
     }
   ]
 }
