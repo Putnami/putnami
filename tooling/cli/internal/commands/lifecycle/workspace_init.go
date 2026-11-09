@@ -60,18 +60,29 @@ var initExtensions = map[string]initExtensionConfig{
 }
 
 // initSource is a monorepo tool `putnami init --from` adopts: the starter
-// that declares the tool's stack extension, and the file that marks a
-// repository the tool describes. The extension owns everything else: its
+// that declares the tool's stack extension, and the files, any one of which
+// marks a repository the tool describes. The extension owns everything else: its
 // probe names the packages and its workspace sync task writes their
 // putnami.json, so init only declares it and runs projects sync.
 type initSource struct {
 	starter initExtensionConfig
-	marker  string
+	markers []string
 }
 
 // initSources are the tools --from accepts, by name.
 var initSources = map[string]initSource{
-	"pants": {starter: initExtensionConfig{packageName: "@putnami/pants"}, marker: "pants.toml"},
+	"bazel": {starter: initExtensionConfig{packageName: "@putnami/bazel"}, markers: []string{"MODULE.bazel", "WORKSPACE", "WORKSPACE.bazel"}},
+	"pants": {starter: initExtensionConfig{packageName: "@putnami/pants"}, markers: []string{"pants.toml"}},
+}
+
+// holdsAny reports whether dir holds one of the files.
+func holdsAny(dir string, files []string) bool {
+	for _, f := range files {
+		if _, err := os.Stat(filepath.Join(dir, f)); err == nil {
+			return true
+		}
+	}
+	return false
 }
 
 // initSourceNames lists the tools --from accepts, sorted.
@@ -305,10 +316,8 @@ func WorkspaceInit(ctx context.Context, wsRoot string, args []string, env Lifecy
 	if err != nil {
 		return fmt.Errorf("get cwd: %w", err)
 	}
-	if source, ok := initSources[flags.from]; ok {
-		if _, err := os.Stat(filepath.Join(cwd, source.marker)); err != nil {
-			return cmderr.Usagef("putnami init --from %s runs at the root of a %s repository, and %s holds no %s", flags.from, flags.from, cwd, source.marker)
-		}
+	if source, ok := initSources[flags.from]; ok && !holdsAny(cwd, source.markers) {
+		return cmderr.Usagef("putnami init --from %s runs at the root of a %s repository, and %s holds no %s", flags.from, flags.from, cwd, strings.Join(source.markers, ", "))
 	}
 
 	// --- Phase 1: Initialize workspace ---
