@@ -20,6 +20,7 @@ import (
 	"go.putnami.dev/tooling/cli/internal/commands/versioncmd"
 	"go.putnami.dev/tooling/cli/internal/git"
 	"go.putnami.dev/tooling/cli/internal/iox"
+	"go.putnami.dev/tooling/cli/internal/jobs/machineprobe"
 	"go.putnami.dev/tooling/cli/internal/jobs/toolchain"
 	"go.putnami.dev/tooling/cli/internal/jobs/toolchainpins"
 	"go.putnami.dev/tooling/cli/internal/lockfile"
@@ -70,8 +71,10 @@ func resolveToolchainPins(ctx context.Context, wsRoot string, env LifecycleEnv) 
 
 // installToolchainPins installs, in identity order, the pinned release of each
 // identity an extension answered for, unless the machine already holds it
-// (toolchain.Provision). A hosted run, or one whose dependencies are offline,
-// installs nothing: it runs the toolchains the machine holds. It reports each
+// (toolchain.Provision). A pin with no archive for the host is skipped when
+// its toolchain is optional, and fails the run when it is required. A hosted
+// run, or one whose dependencies are offline, installs nothing: it runs the
+// toolchains the machine holds. It reports each
 // release it installed to env.OnAction; with no OnAction the same line goes
 // to env.Out. It stops at the first failure.
 func installToolchainPins(ctx context.Context, wsRoot string, pins toolchainpins.Result, opts toolchainpins.Options, env LifecycleEnv) error {
@@ -88,10 +91,16 @@ func installToolchainPins(ctx context.Context, wsRoot string, pins toolchainpins
 		if !pinned {
 			continue
 		}
+		answer := pins.Answers[identity]
+		if _, served := entry.Archives[machineprobe.HostPlatform()]; !served && answer.Toolchain != nil && answer.Toolchain.Optional {
+			// The extension kept the committed pin for the platforms it
+			// serves; an optional toolchain has nothing to install here.
+			continue
+		}
 		_, installed, err := toolchain.Provision(ctx, wsRoot, toolchain.ProvisionTarget{
 			Identity:  identity,
 			Entry:     entry,
-			Toolchain: pins.Answers[identity].Toolchain,
+			Toolchain: answer.Toolchain,
 		}, toolchain.ProvisionOptions{UserAgent: useragent.String()})
 		if err != nil {
 			return err

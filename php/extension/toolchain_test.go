@@ -1,6 +1,7 @@
 package php
 
 import (
+	"reflect"
 	"strings"
 	"testing"
 
@@ -78,6 +79,23 @@ func TestTheExtensionPinsAPHPReleaseTheRepositoryAccepts(t *testing.T) {
 		t.Errorf("a platform with no archive pins nothing: %v", pin.Version)
 	}
 	pin := resolved(t, root, "linux/amd64", "")
+	request := wsproto.ToolchainResolveRequest{
+		Version:    wsproto.ToolchainResolveProtocolVersion,
+		Extension:  ExtensionName,
+		Identities: []string{LockIdentity},
+		Locked:     map[string]wsproto.LockToolchainEntry{LockIdentity: *pin},
+		Platform:   "windows/arm64",
+	}
+	result := answerToolchainResolve(root, request, stack(t).Profile)
+	if kept := result.Toolchains[LockIdentity].Pin; kept == nil || !reflect.DeepEqual(*kept, *pin) {
+		t.Errorf("a platform with no archive keeps the committed pin as committed: %+v", kept)
+	}
+	if diags := wsproto.ValidateToolchainResolveAnswer(&request, &result); len(diags) != 0 {
+		t.Errorf("the kept pin answers the request: %v", diags)
+	}
+	if kept := resolved(t, root, "windows/arm64", "8.2.1"); kept != nil {
+		t.Errorf("a committed release the extension does not choose is not kept: %v", kept.Version)
+	}
 	if len(pin.Archives) != 5 || len(pin.Integrities) != 5 {
 		t.Fatalf("each platform has an archive and a digest: %+v", pin)
 	}

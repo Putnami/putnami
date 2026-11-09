@@ -56,7 +56,8 @@ type ToolchainResolveRequest struct {
 	// the lock does not pin has no entry.
 	Locked map[string]LockToolchainEntry `json:"locked,omitempty"`
 	// Platform is the host platform, "os/arch" (lockPlatformPattern). Every
-	// pin the answer records must serve it.
+	// pin the answer records must serve it, except a locked entry kept as
+	// it was sent.
 	Platform string `json:"platform"`
 	// Offline asks for an answer made without the network: from the committed
 	// pins, the workspace's declarations and the extension's own knowledge.
@@ -82,7 +83,8 @@ type ToolchainResolveResult struct {
 // Problem.
 type ToolchainResolution struct {
 	// Pin is a lock version 5 toolchain entry, which the lock records as
-	// written. It covers the request's platform.
+	// written. It covers the request's platform, unless it is the identity's
+	// locked entry kept as it was sent.
 	Pin *LockToolchainEntry `json:"pin,omitempty"`
 	// Problem is why the extension cannot pin the identity.
 	Problem *ToolchainProblem `json:"problem,omitempty"`
@@ -287,7 +289,10 @@ func ParseAndValidateToolchainResolveResult(data []byte) (*ToolchainResolveResul
 // attributed to the asked extension, it resolves only asked identities, and
 // every pin covers the request's platform with both an integrity and an
 // archive. A pin that cannot serve the host is not a pin the host can install,
-// so the extension answers a problem for that identity instead.
+// so the extension answers a problem for that identity instead, unless the pin
+// is the identity's locked entry kept as it was sent: an extension that cannot
+// pin for the host leaves the committed pin to the platforms it serves rather
+// than removing it from the lock, and the core installs nothing from it here.
 //
 // It checks only the relation between the two documents and expects each to
 // have passed its own validation. Diagnostics come out in identity order.
@@ -318,18 +323,29 @@ func ValidateToolchainResolveAnswer(request *ToolchainResolveRequest, result *To
 		if pin == nil {
 			continue
 		}
+		if locked, ok := request.Locked[identity]; ok && sameToolchainEntry(locked, *pin) {
+			continue
+		}
 		if _, ok := pin.Integrities[request.Platform]; !ok {
 			diags = append(diags, diag.Errorf("required-field", field+".pin.integrities."+request.Platform,
-				"toolchain %q pin records no integrity for the host platform %s; a pin that cannot serve the host is answered as a problem",
+				"toolchain %q pin records no integrity for the host platform %s; a pin that cannot serve the host is answered as a problem, or as the locked entry kept as sent",
 				identity, request.Platform))
 		}
 		if _, ok := pin.Archives[request.Platform]; !ok {
 			diags = append(diags, diag.Errorf("required-field", field+".pin.archives."+request.Platform,
-				"toolchain %q pin records no archive for the host platform %s; a pin that cannot serve the host is answered as a problem",
+				"toolchain %q pin records no archive for the host platform %s; a pin that cannot serve the host is answered as a problem, or as the locked entry kept as sent",
 				identity, request.Platform))
 		}
 	}
 	return diags
+}
+
+// sameToolchainEntry reports whether a and b are one lock entry: their JSON
+// forms, which encoding/json renders with sorted map keys, are equal.
+func sameToolchainEntry(a, b LockToolchainEntry) bool {
+	left, errLeft := json.Marshal(a)
+	right, errRight := json.Marshal(b)
+	return errLeft == nil && errRight == nil && bytes.Equal(left, right)
 }
 
 // validateToolchainProblem checks one problem's message and remedy.

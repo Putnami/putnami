@@ -17,6 +17,7 @@ import (
 	"sync/atomic"
 	"testing"
 
+	extensionproto "go.putnami.dev/protocol/extension"
 	"go.putnami.dev/protocol/features/spectest"
 	"go.putnami.dev/tooling/cli/internal/jobs/toolchain"
 	"go.putnami.dev/tooling/cli/internal/jobs/toolchainpins"
@@ -160,6 +161,36 @@ func TestInstallToolchainPins_AHostedOrOfflineRunInstallsNothing(t *testing.T) {
 			}
 			if got := fixture.requests.Load(); got != 0 || out.Len() != 0 {
 				t.Fatalf("the %s run made %d requests and printed %q; want none", name, got, out.String())
+			}
+		})
+	}
+}
+
+// A pin the extension kept for the platforms it serves, with no archive for
+// the host, installs nothing and requests nothing when its toolchain is
+// optional, and fails naming the host platform when it is required.
+func TestInstallToolchainPins_APinWithNoHostArchive(t *testing.T) {
+	spectest.Proves(t, "cli/runtime-toolchain-pinning", "pinned-archives-are-provisioned", "a-pin-with-no-host-archive-installs-nothing-when-optional")
+	platform := lockfile.PlatformKey(runtime.GOOS, runtime.GOARCH)
+	for name, optional := range map[string]bool{"optional": true, "required": false} {
+		t.Run(name, func(t *testing.T) {
+			fixture := newToolchainPinsFixture(t)
+			entry := fixture.pins.Toolchains["tool"]
+			entry.Archives = map[string]lockfile.LockArchive{"plan9/amd64": entry.Archives[platform]}
+			entry.Integrities = map[string]string{"plan9/amd64": entry.Integrities[platform]}
+			fixture.pins.Toolchains["tool"] = entry
+			fixture.pins.Answers["tool"] = toolchainpins.Answer{Extension: "@acme/tool", Alias: "tool",
+				Toolchain: &extensionproto.RuntimeToolchain{Lock: "tool", Optional: optional}}
+			var out bytes.Buffer
+			err := installToolchainPins(context.Background(), fixture.root, fixture.pins, toolchainpins.Options{}, LifecycleEnv{Out: &out})
+			switch {
+			case optional && err != nil:
+				t.Fatalf("an optional toolchain with no host archive failed the install: %v", err)
+			case !optional && (err == nil || !strings.Contains(err.Error(), "no archive for "+platform)):
+				t.Fatalf("a required toolchain with no host archive: err = %v, want one naming %s", err, platform)
+			}
+			if got := fixture.requests.Load(); got != 0 || out.Len() != 0 {
+				t.Fatalf("made %d requests and printed %q; want none", got, out.String())
 			}
 		})
 	}
