@@ -46,6 +46,11 @@ const (
 	// another channel's head, which is a different statement about the same
 	// set id and a reader must be able to tell the two apart.
 	ReleaseSetBaselineChannelSource = "release-set-baseline-channel"
+	// ReleaseSetInheritChannelSource is the tier reported when that head came
+	// from the channel `--inherit-channel` named: the publication is stacked on
+	// a set that is not released yet and measured against it whatever the
+	// advanced channel holds.
+	ReleaseSetInheritChannelSource = "release-set-inherit-channel"
 )
 
 // releaseOrderedSuffixPattern matches the commit-derived ordered suffix a
@@ -315,6 +320,14 @@ type ReleaseSetOptions struct {
 	// produced instead of republishing every member (D14, ADR 0006). "" names
 	// none, which is the unchanged behavior.
 	BaselineChannel string
+	// InheritChannel is the channel impact is measured against, and unchanged
+	// members inherit from, WHATEVER the first advanced channel holds: the
+	// publication is stacked on another one whose set sits on that channel and
+	// is not released yet. It is READ and never advanced, it comes before the
+	// first channel's own head and before BaselineChannel, and it must have a
+	// head: a missing one is a usage error. Each advanced channel still moves
+	// from its own resolved head (D14). "" names none.
+	InheritChannel string
 	// ReuseChannel is one further channel the publication READS and never
 	// advances: a member the plan selects is released with the artifact that
 	// channel's head already carries when that record has the same selection
@@ -391,6 +404,9 @@ type ReleaseSetRequest struct {
 	// BaselineChannel is the raw `--baseline-channel <name>` value: one
 	// channel the publication reads and never advances.
 	BaselineChannel string
+	// InheritChannel is the raw `--inherit-channel <name>` value: one channel
+	// the publication reads, never advances, and inherits from.
+	InheritChannel string
 	// ReuseChannel is the raw `--reuse-channel <name>` value: one channel
 	// whose already-published members the publication may release instead of
 	// building them again.
@@ -424,7 +440,11 @@ func BuildReleaseSetOptions(request ReleaseSetRequest) (ReleaseSetOptions, error
 	if err != nil {
 		return ReleaseSetOptions{}, cmderr.Usagef("%v", err)
 	}
-	reuseChannel, err := ParseReleaseSetReuseChannel(request.ReuseChannel, channels, baselineChannel)
+	inheritChannel, err := ParseReleaseSetInheritChannel(request.InheritChannel, channels, baselineChannel)
+	if err != nil {
+		return ReleaseSetOptions{}, cmderr.Usagef("%v", err)
+	}
+	reuseChannel, err := ParseReleaseSetReuseChannel(request.ReuseChannel, channels, baselineChannel, inheritChannel)
 	if err != nil {
 		return ReleaseSetOptions{}, cmderr.Usagef("%v", err)
 	}
@@ -451,7 +471,7 @@ func BuildReleaseSetOptions(request ReleaseSetRequest) (ReleaseSetOptions, error
 	}
 	return ReleaseSetOptions{
 		Commands: request.Commands, Publishes: request.Publishes, ConsumesReleaseSet: request.ConsumesReleaseSet,
-		Channels: channels, BaselineChannel: baselineChannel,
+		Channels: channels, BaselineChannel: baselineChannel, InheritChannel: inheritChannel,
 		ReuseChannel: reuseChannel, ReuseSourceRevision: reuseSourceRevision, IgnoredReuseChannel: ignoredReuseChannel,
 		Impacted: request.Impacted, All: request.All, DryRun: request.DryRun,
 		Versions: request.Versions, Tagged: tagged, Line: line,
@@ -586,21 +606,54 @@ func ParseReleaseSetBaselineChannel(raw string, advanced []string) (string, erro
 	return name, nil
 }
 
+// ParseReleaseSetInheritChannel reads the `--inherit-channel <name>` value:
+// one portable channel name the publication READS, never advances, and
+// inherits from, or "" for none.
+//
+// It is refused when it names one of the advanced channels: an advanced channel
+// is released, and an inherit channel is read and never moved. It may name the
+// baseline channel, which it then supersedes.
+//
+// The bound is the baseline's: the ONE resolve names the advanced channels,
+// the baseline and the inherit channel, and a resolve request carries at most
+// MaxChannelsPerRelease channels.
+func ParseReleaseSetInheritChannel(raw string, advanced []string, baseline string) (string, error) {
+	name := strings.TrimSpace(raw)
+	if name == "" {
+		return "", nil
+	}
+	if !distribution.IsPortableChannel(name) {
+		return "", fmt.Errorf("--inherit-channel %s is not a portable channel name; a channel matches %s", name, distribution.ChannelPattern)
+	}
+	if slices.Contains(advanced, name) {
+		return "", fmt.Errorf("--inherit-channel %s is already advanced by --channel; an inherit channel is read and never advanced", name)
+	}
+	resolved := len(advanced) + 1
+	if baseline != "" && baseline != name {
+		resolved++
+	}
+	if resolved > distribution.MaxChannelsPerRelease {
+		return "", fmt.Errorf("--channel, --baseline-channel and --inherit-channel name %d channels to resolve, exceeding the limit of %d", resolved, distribution.MaxChannelsPerRelease)
+	}
+	return name, nil
+}
+
 // ParseReleaseSetReuseChannel reads the `--reuse-channel <name>` value: one
 // portable channel name the publication READS and never advances, or "" for
 // none.
 //
-// It is refused when it names an advanced channel or the baseline channel. An
-// advanced channel's head is the expectation its release compares against and,
-// first, the baseline; the baseline's head is what unchanged members inherit.
-// A reuse head is neither: it only offers artifacts for members the baseline
-// selected, and one head serving two of these roles would make the plan say
-// two different things about it.
+// It is refused when it names an advanced channel, the baseline channel or the
+// inherit channel. An advanced channel's head is the expectation its release
+// compares against and, first, the baseline; the baseline's and the inherit
+// channel's heads are what unchanged members inherit. A reuse head is neither:
+// it only offers artifacts for members the baseline selected, and one head
+// serving two of these roles would make the plan say two different things
+// about it.
 //
 // The bound is the baseline's: the ONE resolve names the advanced channels,
-// the baseline and the reuse channel, and a resolve request carries at most
-// MaxChannelsPerRelease channels.
-func ParseReleaseSetReuseChannel(raw string, advanced []string, baseline string) (string, error) {
+// the baseline, the inherit channel and the reuse channel, and a resolve
+// request carries at most MaxChannelsPerRelease channels.
+func ParseReleaseSetReuseChannel(raw string, advanced []string, baseline, inherit string) (string, error) {
 	name := strings.TrimSpace(raw)
 	if name == "" {
 		return "", nil
@@ -614,12 +667,18 @@ func ParseReleaseSetReuseChannel(raw string, advanced []string, baseline string)
 	if name == baseline {
 		return "", fmt.Errorf("--reuse-channel %s is already the --baseline-channel; the baseline is inherited from, a reuse channel only offers artifacts for selected members", name)
 	}
+	if name == inherit {
+		return "", fmt.Errorf("--reuse-channel %s is already the --inherit-channel; the inherit channel is inherited from, a reuse channel only offers artifacts for selected members", name)
+	}
 	resolved := len(advanced) + 1
 	if baseline != "" {
 		resolved++
 	}
+	if inherit != "" && inherit != baseline {
+		resolved++
+	}
 	if resolved > distribution.MaxChannelsPerRelease {
-		return "", fmt.Errorf("--channel, --baseline-channel and --reuse-channel name %d channels to resolve, exceeding the limit of %d", resolved, distribution.MaxChannelsPerRelease)
+		return "", fmt.Errorf("--channel, --baseline-channel, --inherit-channel and --reuse-channel name %d channels to resolve, exceeding the limit of %d", resolved, distribution.MaxChannelsPerRelease)
 	}
 	return name, nil
 }
@@ -651,14 +710,17 @@ func ParseReleaseSetReuseSourceRevision(raw, reuseChannel string) (string, error
 }
 
 // releaseSetResolveChannels is what the ONE resolve of the publication names:
-// the advanced channels in order, then the baseline, then the reuse channel,
-// each when it is not already among them. Every head must come from the SAME
+// the advanced channels in order, then the baseline, then the inherit channel,
+// then the reuse channel, each when it is not already among them. Every head must come from the SAME
 // read as the others, or the plan would compare a head from one instant
 // against expectations from another.
 func releaseSetResolveChannels(options ReleaseSetOptions, channels []string) []string {
 	resolved := append([]string(nil), channels...)
 	if options.BaselineChannel != "" && !slices.Contains(resolved, options.BaselineChannel) {
 		resolved = append(resolved, options.BaselineChannel)
+	}
+	if options.InheritChannel != "" && !slices.Contains(resolved, options.InheritChannel) {
+		resolved = append(resolved, options.InheritChannel)
 	}
 	if options.ReuseChannel != "" && !slices.Contains(resolved, options.ReuseChannel) {
 		resolved = append(resolved, options.ReuseChannel)
@@ -669,19 +731,29 @@ func releaseSetResolveChannels(options ReleaseSetOptions, channels []string) []s
 // releaseSetBaselineHead applies the precedence of D14 as amended by ADR 0006
 // and reports which channel the head came from ("" for an empty baseline):
 //
-//  1. the first advanced channel's own head, when it exists;
+//  0. the named inherit channel's head, whatever the advanced channels hold;
+//  1. otherwise the first advanced channel's own head, when it exists;
 //  2. otherwise the named baseline channel's head, when it has one;
 //  3. otherwise nothing: every member is selected.
 //
 // A channel that already has a head keeps measuring against it, so the second
 // push of a pull request compares with what the first one published, not with a
-// channel that moved meanwhile.
+// channel that moved meanwhile. An inherit channel is the caller's statement
+// that the publication is stacked on a set that is not released yet, so it
+// comes first; requireReleaseSetInheritHead refuses it without a head before
+// this runs.
 func releaseSetBaselineHead(
 	options ReleaseSetOptions,
 	channels []string,
 	heads map[string]*distribution.ChannelHead,
 ) (*distribution.ChannelHead, string) {
 	if len(channels) == 0 {
+		return nil, ""
+	}
+	if options.InheritChannel != "" {
+		if head := heads[options.InheritChannel]; head != nil {
+			return head, options.InheritChannel
+		}
 		return nil, ""
 	}
 	if head := heads[channels[0]]; head != nil {
@@ -722,6 +794,9 @@ func ValidateReleaseSetSelection(options ReleaseSetOptions) error {
 		}
 	}
 	if err := validateReleaseSetBaselineChannel(options); err != nil {
+		return err
+	}
+	if err := validateReleaseSetInheritChannel(options); err != nil {
 		return err
 	}
 	if err := validateReleaseSetReuseChannel(options); err != nil {
@@ -778,6 +853,49 @@ func validateReleaseSetBaselineChannel(options ReleaseSetOptions) error {
 			options.BaselineChannel)
 	}
 	return nil
+}
+
+// validateReleaseSetInheritChannel refuses an inherit channel on the
+// publications that could not read one soundly, for the reasons
+// validateReleaseSetBaselineChannel gives: a publication that advances no
+// channel reads no head, --all inherits nothing, a tagged publish republishes
+// its whole line, and a selection that is not --impacted measures no impact.
+func validateReleaseSetInheritChannel(options ReleaseSetOptions) error {
+	if options.InheritChannel == "" {
+		return nil
+	}
+	switch {
+	case len(options.Channels) == 0 && !options.Tagged:
+		return cmderr.Usagef(
+			"--inherit-channel %s names the head a published channel inherits from, but --channel names none to publish",
+			options.InheritChannel)
+	case options.All:
+		return cmderr.Usagef(
+			"--inherit-channel %s measures impact against a head, which --all never does; drop one of the two flags",
+			options.InheritChannel)
+	case options.Tagged:
+		return cmderr.Usagef(
+			"--inherit-channel %s cannot apply to a tagged publish: the tag republishes its whole version line whatever a head recorded",
+			options.InheritChannel)
+	case !options.Impacted:
+		return cmderr.Usagef(
+			"--inherit-channel %s names the head impact is measured against, which requires --impacted",
+			options.InheritChannel)
+	}
+	return nil
+}
+
+// requireReleaseSetInheritHead refuses a publication whose inherit channel has
+// no head. The caller asked to stack on a set that does not exist; measuring
+// against the advanced channel instead would release a set that drops what the
+// missing one was meant to carry.
+func requireReleaseSetInheritHead(options ReleaseSetOptions, heads map[string]*distribution.ChannelHead) error {
+	if options.InheritChannel == "" || heads[options.InheritChannel] != nil {
+		return nil
+	}
+	return cmderr.Usagef(
+		"--inherit-channel %s has no head: there is no release set to stack this publication on",
+		options.InheritChannel)
 }
 
 // validateReleaseSetReuseChannel refuses a reuse channel on the publications
@@ -1483,8 +1601,8 @@ func resolveSelectionFingerprints(
 // RunSelection returns the selection block the session reports. When the plan
 // measured impact against the head, the block says so: mode impacted, the
 // head id as baseline (empty for an empty channel), and the source tier that
-// names WHICH head it was — the advanced channel's own, or the channel
-// `--baseline-channel` named. Otherwise the previous block's mode and baseline
+// names WHICH head it was — the advanced channel's own, the channel
+// `--baseline-channel` named, or the channel `--inherit-channel` named. Otherwise the previous block's mode and baseline
 // are kept for the narrowed project list.
 //
 // A mixed gate+publish session keeps the GATE's mode, baseline and tier: they
@@ -1568,7 +1686,11 @@ func (run *ReleaseSetRun) baselineSource() string {
 	if run == nil || run.plan == nil {
 		return ReleaseSetHeadBaselineSource
 	}
-	if name := run.plan.BaselineChannelName(); name != "" && name == run.plan.BaselineChannel {
+	name := run.plan.BaselineChannelName()
+	switch {
+	case name != "" && name == run.plan.InheritChannel:
+		return ReleaseSetInheritChannelSource
+	case name != "" && name == run.plan.BaselineChannel:
 		return ReleaseSetBaselineChannelSource
 	}
 	return ReleaseSetHeadBaselineSource
@@ -2004,9 +2126,10 @@ func releaseSetPlanChannels(options ReleaseSetOptions) ([]string, error) {
 // attribution of every member — its project and kind — is the workspace's
 // declaration when the repository opts in, republished or not.
 //
-// The baseline is the head of the FIRST listed channel, or — when that channel
+// The baseline is the head of the inherit channel when the publication named
+// one; otherwise the head of the FIRST listed channel, or — when that channel
 // is still empty and the publication named one — the head of the baseline
-// channel, which is read and never advanced (D14, ADR 0006). Every other
+// channel. Both are read and never advanced (D14, ADR 0006). Every other
 // resolved head is carried in the plan for its own compare-and-swap expectation
 // and never contributes anything to inherit.
 func buildReleaseSetPlan(
@@ -2021,6 +2144,9 @@ func buildReleaseSetPlan(
 	}
 	channels, err := releaseSetPlanChannels(options)
 	if err != nil {
+		return nil, err
+	}
+	if err := requireReleaseSetInheritHead(options, heads); err != nil {
 		return nil, err
 	}
 	head, baselineChannel := releaseSetBaselineHead(options, channels, heads)
@@ -2109,8 +2235,14 @@ func buildReleaseSetPlan(
 	// tells a reader that this head is inherited from and never released. It
 	// is named only when it is the head this plan actually measured against;
 	// a baseline the publication never had to fall back on leaves no trace.
+	// An inherit channel is recorded as such: it is the baseline whatever the
+	// first channel holds, which BaselineChannel, a fallback, cannot say.
 	if baselineChannel != "" && !slices.Contains(channels, baselineChannel) {
-		plan.BaselineChannel = baselineChannel
+		if baselineChannel == options.InheritChannel {
+			plan.InheritChannel = baselineChannel
+		} else {
+			plan.BaselineChannel = baselineChannel
+		}
 		plan.Heads[baselineChannel] = heads[baselineChannel]
 	}
 	recordReleaseReuse(plan, options, heads[options.ReuseChannel], reused, provenance)

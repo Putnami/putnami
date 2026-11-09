@@ -648,6 +648,109 @@ func TestPlanHeadsReplayTheResolveThatIncludedTheBaseline(t *testing.T) {
 	}
 }
 
+// staleTestHead is a head older than testPlan's baseline: every member records
+// another version and fingerprint, so a plan measured against it could not
+// leave a member unselected.
+func staleTestHead(t *testing.T) *distribution.ChannelHead {
+	t.Helper()
+	set := *testPlan(t).Heads["canary"].ReleaseSet
+	set.Members = append([]distribution.ReleaseSetMember(nil), set.Members...)
+	for i := range set.Members {
+		set.Members[i].Version = "0.9.0-old"
+		set.Members[i].SelectionFingerprint = testDigest('9')
+		set.Members[i].Dependencies = append([]distribution.ReleaseSetDependency{}, set.Members[i].Dependencies...)
+		for j := range set.Members[i].Dependencies {
+			set.Members[i].Dependencies[j].Version = "0.9.0-old"
+		}
+	}
+	set = *distribution.NormalizeReleaseSet(&set)
+	ref, diagnostics := distribution.DeriveReleaseSetRef(&set)
+	if hasDiagnosticErrors(diagnostics) {
+		t.Fatalf("derive stale ref: %v", diagnostics)
+	}
+	return &distribution.ChannelHead{Ref: ref, Generation: 6, ReleaseSet: &set}
+}
+
+// A plan stacked on a set that is not released yet names the channel holding
+// it as InheritChannel. That head is the baseline WHATEVER the advanced
+// channel holds, it rides in Heads because the publication resolved it, and it
+// is never released.
+func TestValidatePlanInheritsFromTheInheritChannel(t *testing.T) {
+	plan := testPlan(t)
+	stage := plan.Heads["canary"]
+	plan.Heads = map[string]*distribution.ChannelHead{"canary": staleTestHead(t), "stage-1": stage}
+	plan.InheritChannel = "stage-1"
+	if err := ValidatePlan(plan); err != nil {
+		t.Fatalf("plan over an inherit channel rejected: %v", err)
+	}
+	if plan.Baseline() != stage || plan.BaselineChannelName() != "stage-1" {
+		t.Fatalf("baseline = %+v / %q, want stage-1's head", plan.Baseline(), plan.BaselineChannelName())
+	}
+
+	// Without the field, stage-1's head is one the plan never requested, and
+	// the unselected upstream would inherit from canary's stale record.
+	unnamed := ClonePlan(plan)
+	unnamed.InheritChannel = ""
+	if err := ValidatePlan(unnamed); err == nil || !strings.Contains(err.Error(), "which was not requested") {
+		t.Fatalf("an unrequested inherit head was accepted: %v", err)
+	}
+	if unnamed.BaselineChannelName() != "canary" {
+		t.Fatalf("baseline without an inherit channel = %q, want canary's own head", unnamed.BaselineChannelName())
+	}
+
+	// The inherit channel is named in the plan's JSON only when it is set, so
+	// a plan without one keeps its bytes.
+	bare, err := json.Marshal(testPlan(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(bare), `"inheritChannel"`) {
+		t.Fatalf("a plan without an inherit channel emits the key: %s", bare)
+	}
+}
+
+// An inherit channel is read and never released, it is the baseline so no
+// fallback baseline is named beside it, and it always has a head.
+func TestValidatePlanRefusesAnInheritChannelItCannotRead(t *testing.T) {
+	cases := []struct {
+		name string
+		edit func(*Plan)
+		want string
+	}{
+		{"advanced", func(plan *Plan) {
+			plan.InheritChannel = "canary"
+		}, `inherit channel "canary" is also advanced by the plan`},
+		{"beside a baseline channel", func(plan *Plan) {
+			plan.Channels = []string{"pr-7"}
+			plan.Heads = map[string]*distribution.ChannelHead{"pr-7": nil, "canary": plan.Heads["canary"], "stage-1": plan.Heads["canary"]}
+			plan.BaselineChannel = "canary"
+			plan.InheritChannel = "stage-1"
+		}, "the inherit channel is the baseline"},
+		{"without a head", func(plan *Plan) {
+			plan.Heads["stage-1"] = nil
+			plan.InheritChannel = "stage-1"
+		}, `inherit channel "stage-1" has no head`},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			plan := testPlan(t)
+			tc.edit(plan)
+			if err := ValidatePlan(plan); err == nil || !strings.Contains(err.Error(), tc.want) {
+				t.Fatalf("ValidatePlan = %v, want %q", err, tc.want)
+			}
+		})
+	}
+	var nilPlan *Plan
+	if nilPlan.Baseline() != nil || nilPlan.BaselineChannelName() != "" {
+		t.Fatal("a nil plan reports a baseline")
+	}
+	empty := testPlan(t)
+	empty.InheritChannel = "stage-1"
+	if empty.BaselineChannelName() != "" {
+		t.Fatalf("an inherit channel without a head named %q as the baseline", empty.BaselineChannelName())
+	}
+}
+
 // testTree is the git tree a fixture member was built from.
 const testTree = "c0ffee5f1e2d3c4b5a69788796a5b4c3d2e1f0a9"
 
@@ -917,6 +1020,9 @@ func TestValidatePlanRefusesAReuseItCannotProve(t *testing.T) {
 		{"reuse channel is the baseline channel", func(plan *Plan) {
 			plan.BaselineChannel = "pr-7"
 		}, "is also its baseline channel"},
+		{"reuse channel is the inherit channel", func(plan *Plan) {
+			plan.InheritChannel = "pr-7"
+		}, "is also its inherit channel"},
 		{"reused list without a reuse channel", func(plan *Plan) {
 			plan.ReuseChannel = ""
 			plan.SourceRevision = ""

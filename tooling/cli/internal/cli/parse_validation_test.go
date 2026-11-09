@@ -281,7 +281,7 @@ func TestUndeclaredFlags_AcceptKnownShapes(t *testing.T) {
 	}
 }
 
-// The core reads --channel, --baseline-channel, --reuse-channel,
+// The core reads --channel, --baseline-channel, --inherit-channel, --reuse-channel,
 // --reuse-source-revision, --visibility and --scope from a publication, and
 // --env and --release from a command whose traits declare consumesReleaseSet:
 // it reads them without a manifest declaring them, because the coordinator that
@@ -294,6 +294,8 @@ func TestUndeclaredFlagsExemptCoreJobFlags(t *testing.T) {
 		{"--channel=canary,next"},
 		{"--baseline-channel", "canary"},
 		{"--baseline-channel=canary"},
+		{"--inherit-channel", "stage-1"},
+		{"--inherit-channel=stage-1"},
 		{"--reuse-channel", "pr-7"},
 		{"--reuse-channel=pr-7"},
 		{"--reuse-source-revision", strings.Repeat("a", 40)},

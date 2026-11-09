@@ -3162,6 +3162,243 @@ func TestReleaseSetBaselineChannelIsRefusedWhereItCannotBeRead(t *testing.T) {
 	}
 }
 
+// staleReleaseSetHead is a canary head older than releaseSetHead's: both
+// members record another fingerprint and an older version, so a publication
+// measured against it republishes every member.
+func staleReleaseSetHead(t *testing.T) *distribution.ChannelHead {
+	t.Helper()
+	head := releaseSetHead(t)["canary"]
+	head.Generation = 2
+	for index := range head.ReleaseSet.Members {
+		member := &head.ReleaseSet.Members[index]
+		member.Version = "0.9.0-old"
+		member.SelectionFingerprint = testFingerprint("/stale" + member.Coordinate)
+		for dependency := range member.Dependencies {
+			member.Dependencies[dependency].Version = "0.9.0-old"
+		}
+	}
+	refreshHeadRef(t, head)
+	return head
+}
+
+// A publication stacked on another one that is not released yet names the
+// channel that holds the earlier set with --inherit-channel. It measures impact
+// against that head and inherits unchanged members from it WHATEVER the
+// advanced channel holds, reads it without advancing it, and still advances
+// canary from canary's own head (D14).
+func TestPrepareReleaseSetInheritsFromTheInheritChannel(t *testing.T) {
+	spectest.Proves(t, "cli/job-planning-execution", "release-set-channel-advance", "an-inherit-channel-is-the-baseline-whatever-the-channel-holds")
+	ws, upstream, downstream := releaseSetWorkspace(t)
+
+	t.Run("over the advanced channel's own head", func(t *testing.T) {
+		useReleaseSetProvenance(t, map[string]string{downstream.ID: digestFor('9')})
+		stage := releaseSetHead(t)["canary"]
+		canary := staleReleaseSetHead(t)
+		provider := &fakeReleaseSetProvider{heads: map[string]*distribution.ChannelHead{"canary": canary, "stage-1": stage}}
+		useReleaseSetProviderFake(t, provider)
+
+		options := releaseSetRequest()
+		options.InheritChannel = "stage-1"
+		run, err := prepareReleaseSet(t, options, ws, ws.Projects, providerDiscovery())
+		if err != nil || run == nil {
+			t.Fatalf("inherit-channel preparation = %+v, %v", run, err)
+		}
+		if provider.resolveCalls != 1 || !slices.Equal(provider.resolveRequests[0].Channels, []string{"canary", "stage-1"}) {
+			t.Fatalf("resolve = %d calls, %+v; want one naming canary then stage-1", provider.resolveCalls, provider.resolveRequests)
+		}
+
+		// Measured against canary, both members would be republished. Measured
+		// against stage-1, only the changed downstream is, and the upstream
+		// carries stage-1's record verbatim.
+		if len(run.plan.SelectedMembers()) != 1 {
+			t.Fatalf("selected members = %+v, want only the changed downstream", run.plan.SelectedMembers())
+		}
+		up, _ := run.plan.Member(distribution.Ecosystem("npm"), upstream.Name)
+		var inherited distribution.ReleaseSetMember
+		for _, member := range stage.ReleaseSet.Members {
+			if member.Coordinate == upstream.Name {
+				inherited = member
+			}
+		}
+		if up.Selected || up.Version != inherited.Version || up.ArtifactDigest != inherited.ArtifactDigest ||
+			up.SelectionFingerprint != inherited.SelectionFingerprint {
+			t.Fatalf("unchanged upstream = %+v, want stage-1's record %+v verbatim", up, inherited)
+		}
+		if run.HeadRef() == nil || *run.HeadRef() != stage.Ref {
+			t.Fatalf("baseline = %+v, want stage-1's head", run.HeadRef())
+		}
+		if run.plan.InheritChannel != "stage-1" || run.plan.BaselineChannel != "" || run.plan.BaselineChannelName() != "stage-1" {
+			t.Fatalf("plan inherit/baseline channel = %q / %q / %q, want stage-1 alone",
+				run.plan.InheritChannel, run.plan.BaselineChannel, run.plan.BaselineChannelName())
+		}
+		selection := run.RunSelection(&protocoljob.Selection{Mode: protocoljob.SelectionModeImpacted}, ws.Projects)
+		if selection.Baseline != stage.Ref.ID || selection.BaselineSource != ReleaseSetInheritChannelSource {
+			t.Fatalf("session selection = %+v, want stage-1's set id under the inherit-channel tier", selection)
+		}
+
+		// canary moves from its own head; stage-1 is read, never written.
+		results := publishedResults(run.plan, digestFor('c'))
+		run.Finalizer(context.Background())(results)
+		if result := results[releaseSetResultKey]; result == nil || result.Status != "success" {
+			t.Fatalf("inherit-channel release = %+v", result)
+		}
+		request := provider.releaseRequest
+		if len(request.Channels) != 1 || request.Channels[0].Name != "canary" ||
+			request.Channels[0].Expected == nil || *request.Channels[0].Expected != canary.Ref {
+			t.Fatalf("release channels = %+v, want canary alone, expected at its own head", request.Channels)
+		}
+		if outcome := releaseSetOutcomeOf(t, results); outcome.Channels["stage-1"] != nil {
+			t.Fatalf("outcome advanced the inherit channel: %+v", outcome.Channels)
+		}
+	})
+
+	t.Run("before the baseline channel", func(t *testing.T) {
+		useReleaseSetProvenance(t, map[string]string{downstream.ID: digestFor('9')})
+		stage := releaseSetHead(t)["canary"]
+		provider := &fakeReleaseSetProvider{heads: map[string]*distribution.ChannelHead{
+			"pr-7": nil, "canary": staleReleaseSetHead(t), "stage-1": stage,
+		}}
+		useReleaseSetProviderFake(t, provider)
+
+		options := releaseSetRequest()
+		options.Channels = []string{"pr-7"}
+		options.BaselineChannel = "canary"
+		options.InheritChannel = "stage-1"
+		run, err := prepareReleaseSet(t, options, ws, ws.Projects, providerDiscovery())
+		if err != nil || run == nil {
+			t.Fatalf("inherit-channel preparation = %+v, %v", run, err)
+		}
+		if !slices.Equal(provider.resolveRequests[0].Channels, []string{"pr-7", "canary", "stage-1"}) {
+			t.Fatalf("resolve request channels = %v, want pr-7, canary then stage-1", provider.resolveRequests[0].Channels)
+		}
+		if run.HeadRef() == nil || *run.HeadRef() != stage.Ref || len(run.plan.SelectedMembers()) != 1 {
+			t.Fatalf("baseline = %+v, selected = %+v; want stage-1's head and the changed downstream alone",
+				run.HeadRef(), run.plan.SelectedMembers())
+		}
+		// The baseline channel the publication never fell back on leaves no
+		// trace in the plan.
+		if run.plan.BaselineChannel != "" || run.plan.Heads["canary"] != nil || len(run.plan.Heads) != 2 {
+			t.Fatalf("plan heads = %+v, baseline channel = %q; an unused baseline leaves no trace",
+				run.plan.Heads, run.plan.BaselineChannel)
+		}
+	})
+}
+
+// --inherit-channel names a set to stack on. When that channel has no head the
+// set does not exist, and measuring against the advanced channel instead would
+// release a set that drops what the missing one was meant to carry: the
+// publication is refused as a usage error before anything is planned.
+func TestPrepareReleaseSetRefusesAnInheritChannelWithoutAHead(t *testing.T) {
+	spectest.Proves(t, "cli/job-planning-execution", "release-set-channel-advance", "an-inherit-channel-without-a-head-is-refused")
+	ws, _, _ := releaseSetWorkspace(t)
+	useReleaseSetProvenance(t, nil)
+	heads := releaseSetHead(t)
+	heads["stage-1"] = nil
+	provider := &fakeReleaseSetProvider{heads: heads}
+	useReleaseSetProviderFake(t, provider)
+
+	options := releaseSetRequest()
+	options.InheritChannel = "stage-1"
+	run, err := prepareReleaseSet(t, options, ws, ws.Projects, providerDiscovery())
+	if !errors.Is(err, cmderr.ErrUsage) || run != nil {
+		t.Fatalf("inherit channel without a head = %+v, %v; want a usage error", run, err)
+	}
+	if !strings.Contains(err.Error(), "--inherit-channel stage-1 has no head") {
+		t.Fatalf("error = %v, want it to name the flag and the channel", err)
+	}
+	if provider.releaseCalls != 0 {
+		t.Fatalf("release calls = %d, want none", provider.releaseCalls)
+	}
+}
+
+// An inherit channel is refused wherever a baseline channel is, and wherever it
+// would be advanced: it is read and never moved. The flag is answered before
+// anything is packaged.
+func TestReleaseSetInheritChannelIsRefusedWhereItCannotApply(t *testing.T) {
+	spectest.Proves(t, "cli/job-planning-execution", "release-set-channel-advance", "an-inherit-channel-that-cannot-apply-is-refused")
+	if got, err := ParseReleaseSetInheritChannel("  ", []string{"canary"}, ""); err != nil || got != "" {
+		t.Fatalf("an unset inherit channel = %q, %v; want none", got, err)
+	}
+	if got, err := ParseReleaseSetInheritChannel(" stage-1 ", []string{"canary"}, ""); err != nil || got != "stage-1" {
+		t.Fatalf("ParseReleaseSetInheritChannel = %q, %v; want the trimmed name", got, err)
+	}
+	if got, err := ParseReleaseSetInheritChannel("canary", []string{"pr-7"}, "canary"); err != nil || got != "canary" {
+		t.Fatalf("an inherit channel that is the baseline = %q, %v; want it accepted", got, err)
+	}
+	if _, err := ParseReleaseSetInheritChannel("Stage-1", []string{"canary"}, ""); err == nil {
+		t.Fatal("a non-portable inherit channel was accepted")
+	}
+	if _, err := ParseReleaseSetInheritChannel("canary", []string{"pr-7", "canary"}, ""); err == nil {
+		t.Fatal("an inherit channel this publication also advances was accepted")
+	}
+
+	// The ONE resolve names the advanced channels, the baseline and the
+	// inherit channel, and a resolve request carries at most
+	// MaxChannelsPerRelease channels.
+	full := make([]string, distribution.MaxChannelsPerRelease)
+	for index := range full {
+		full[index] = fmt.Sprintf("c%d", index)
+	}
+	if _, err := ParseReleaseSetInheritChannel("stage-1", full, ""); err == nil {
+		t.Fatalf("%d advanced channels plus an inherit channel was accepted", len(full))
+	}
+	if _, err := ParseReleaseSetInheritChannel("stage-1", full[:len(full)-1], ""); err != nil {
+		t.Fatalf("%d advanced channels plus an inherit channel = %v, want the exact bound accepted", len(full)-1, err)
+	}
+	if _, err := ParseReleaseSetInheritChannel("stage-1", full[:len(full)-1], "canary"); err == nil {
+		t.Fatalf("%d advanced channels plus a baseline and an inherit channel was accepted", len(full)-1)
+	}
+	if _, err := ParseReleaseSetInheritChannel("canary", full[:len(full)-1], "canary"); err != nil {
+		t.Fatalf("an inherit channel that is the baseline counted twice: %v", err)
+	}
+
+	// The flag is bound through the one request builder.
+	options, err := BuildReleaseSetOptions(ReleaseSetRequest{
+		Commands: []string{"publish"}, Publishes: true, Channel: "canary", InheritChannel: "stage-1", Impacted: true,
+	})
+	if err != nil || options.InheritChannel != "stage-1" {
+		t.Fatalf("BuildReleaseSetOptions = %+v, %v; want stage-1 as the inherit channel", options, err)
+	}
+	for _, request := range []ReleaseSetRequest{
+		{Commands: []string{"publish"}, Publishes: true, Channel: "canary", InheritChannel: "canary", Impacted: true},
+		{Commands: []string{"publish"}, Publishes: true, Channel: "canary", InheritChannel: "stage-1",
+			ReuseChannel: "stage-1", ReuseSourceRevision: reuseTestRevision, Impacted: true},
+	} {
+		if _, err := BuildReleaseSetOptions(request); !errors.Is(err, cmderr.ErrUsage) {
+			t.Fatalf("BuildReleaseSetOptions(%+v) = %v, want a usage error", request, err)
+		}
+	}
+
+	base := ReleaseSetOptions{Commands: []string{"publish"}, Publishes: true, Channels: []string{"canary"}, InheritChannel: "stage-1"}
+	cases := []struct {
+		name    string
+		options ReleaseSetOptions
+		refused bool
+	}{
+		{"impacted", withReleaseSetSelection(base, func(o *ReleaseSetOptions) { o.Impacted = true }), false},
+		{"all", withReleaseSetSelection(base, func(o *ReleaseSetOptions) { o.All = true }), true},
+		{"tagged", withReleaseSetSelection(base, func(o *ReleaseSetOptions) {
+			o.Impacted, o.Tagged = true, true
+			o.Versions = cachekey.RunVersions{"": &cachekey.JobContextVersion{Base: "1.0.0", Full: "1.0.0", Tagged: true, Tag: "v1.0.0"}}
+		}), true},
+		{"no selection flag", base, true},
+		{"no channel", withReleaseSetSelection(base, func(o *ReleaseSetOptions) {
+			o.Channels, o.Impacted = nil, true
+		}), true},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			err := ValidateReleaseSetSelection(tc.options)
+			if refused := err != nil; refused != tc.refused {
+				t.Fatalf("ValidateReleaseSetSelection = %v, refused = %t", err, tc.refused)
+			}
+			if tc.refused && (!errors.Is(err, cmderr.ErrUsage) || !strings.Contains(err.Error(), "--inherit-channel stage-1")) {
+				t.Fatalf("ValidateReleaseSetSelection error = %v, want a usage error naming the flag", err)
+			}
+		})
+	}
+}
+
 func withReleaseSetSelection(options ReleaseSetOptions, edit func(*ReleaseSetOptions)) ReleaseSetOptions {
 	copied := options
 	copied.Channels = append([]string(nil), options.Channels...)
@@ -3732,10 +3969,10 @@ func TestReleaseSetReuseSourceRevisionGoesWithItsChannel(t *testing.T) {
 // publication ignores it instead (TestReleaseSetTaggedPublicationIgnoresTheReuseChannel).
 func TestReleaseSetReuseChannelIsRefusedWhereItCannotApply(t *testing.T) {
 	spectest.Proves(t, "cli/job-planning-execution", "release-set-reuse-channel", "a-reuse-channel-that-cannot-apply-is-refused")
-	if got, err := ParseReleaseSetReuseChannel("  ", []string{"canary"}, ""); err != nil || got != "" {
+	if got, err := ParseReleaseSetReuseChannel("  ", []string{"canary"}, "", ""); err != nil || got != "" {
 		t.Fatalf("an unset reuse channel = %q, %v; want none", got, err)
 	}
-	if got, err := ParseReleaseSetReuseChannel(" pr-7 ", []string{"canary"}, ""); err != nil || got != "pr-7" {
+	if got, err := ParseReleaseSetReuseChannel(" pr-7 ", []string{"canary"}, "", ""); err != nil || got != "pr-7" {
 		t.Fatalf("ParseReleaseSetReuseChannel = %q, %v; want the trimmed name", got, err)
 	}
 	refusals := []struct {
@@ -3743,13 +3980,15 @@ func TestReleaseSetReuseChannelIsRefusedWhereItCannotApply(t *testing.T) {
 		raw      string
 		advanced []string
 		baseline string
+		inherit  string
 	}{
-		{"not portable", "PR-7", []string{"canary"}, ""},
-		{"an advanced channel", "canary", []string{"pr-9", "canary"}, ""},
-		{"the baseline channel", "canary", []string{"pr-9"}, "canary"},
+		{"not portable", "PR-7", []string{"canary"}, "", ""},
+		{"an advanced channel", "canary", []string{"pr-9", "canary"}, "", ""},
+		{"the baseline channel", "canary", []string{"pr-9"}, "canary", ""},
+		{"the inherit channel", "stage-1", []string{"canary"}, "", "stage-1"},
 	}
 	for _, tc := range refusals {
-		if _, err := ParseReleaseSetReuseChannel(tc.raw, tc.advanced, tc.baseline); err == nil {
+		if _, err := ParseReleaseSetReuseChannel(tc.raw, tc.advanced, tc.baseline, tc.inherit); err == nil {
 			t.Fatalf("a reuse channel that is %s was accepted", tc.name)
 		}
 	}
@@ -3760,17 +3999,24 @@ func TestReleaseSetReuseChannelIsRefusedWhereItCannotApply(t *testing.T) {
 	for index := range full {
 		full[index] = fmt.Sprintf("c%d", index)
 	}
-	if _, err := ParseReleaseSetReuseChannel("pr-7", full, ""); err == nil {
+	if _, err := ParseReleaseSetReuseChannel("pr-7", full, "", ""); err == nil {
 		t.Fatalf("%d advanced channels plus a reuse channel was accepted", len(full))
 	}
-	if _, err := ParseReleaseSetReuseChannel("pr-7", full[:len(full)-1], ""); err != nil {
+	if _, err := ParseReleaseSetReuseChannel("pr-7", full[:len(full)-1], "", ""); err != nil {
 		t.Fatalf("%d advanced channels plus a reuse channel = %v, want the exact bound accepted", len(full)-1, err)
 	}
-	if _, err := ParseReleaseSetReuseChannel("pr-7", full[:len(full)-1], "canary"); err == nil {
+	if _, err := ParseReleaseSetReuseChannel("pr-7", full[:len(full)-1], "canary", ""); err == nil {
 		t.Fatalf("%d advanced channels plus a baseline and a reuse channel was accepted", len(full)-1)
 	}
-	if _, err := ParseReleaseSetReuseChannel("pr-7", full[:len(full)-2], "canary"); err != nil {
+	if _, err := ParseReleaseSetReuseChannel("pr-7", full[:len(full)-2], "canary", ""); err != nil {
 		t.Fatalf("%d advanced channels plus a baseline and a reuse channel = %v, want the exact bound accepted", len(full)-2, err)
+	}
+	// An inherit channel counts once more, unless it is the baseline itself.
+	if _, err := ParseReleaseSetReuseChannel("pr-7", full[:len(full)-2], "canary", "stage-1"); err == nil {
+		t.Fatalf("%d advanced channels plus a baseline, an inherit and a reuse channel was accepted", len(full)-2)
+	}
+	if _, err := ParseReleaseSetReuseChannel("pr-7", full[:len(full)-2], "canary", "canary"); err != nil {
+		t.Fatalf("an inherit channel that is the baseline counted twice: %v", err)
 	}
 
 	if _, err := BuildReleaseSetOptions(ReleaseSetRequest{

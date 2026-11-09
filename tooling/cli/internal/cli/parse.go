@@ -317,7 +317,8 @@ func acceptedFlagHint(declared []commandmeta.Flag) string {
 
 // coreJobFlags are the flags the CORE reads from a job-running command rather
 // than an extension manifest: the release-set channels, the channel a first
-// publish measures against without advancing it, the channel whose published
+// publish measures against without advancing it, the channel a stacked
+// publication inherits from without advancing it, the channel whose published
 // members a publication may release instead of building them and the commit
 // whose records alone it may release from that channel, the visibility a
 // publication confers, the version line a tagged publish releases, and the
@@ -331,7 +332,7 @@ func acceptedFlagHint(declared []commandmeta.Flag) string {
 // the git ref `--impacted` resolves against, and a release-set publish never
 // measures against git (D16), so the two could not share a spelling.
 var coreJobFlags = map[string]bool{
-	"channel": true, "baseline-channel": true, "reuse-channel": true, "reuse-source-revision": true,
+	"channel": true, "baseline-channel": true, "inherit-channel": true, "reuse-channel": true, "reuse-source-revision": true,
 	"visibility": true, "scope": true, "release": true, "env": true,
 }
 
