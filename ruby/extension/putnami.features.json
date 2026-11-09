@@ -7,7 +7,7 @@
       "id": "ruby/stack-extension",
       "type": "feature",
       "name": "Run the components of a Ruby or Rails repository as Putnami tasks",
-      "outcome": "A team with a Ruby or Rails repository adds @putnami/ruby and runs putnami install, lint and test over its packs and local gems with Putnami's runner and cache, without rewriting its build: each component is a project with its edges, lint runs RuboCop and test RSpec or Rails's Minitest runner after a Ruby and Bundler check and a bundle install, with the Ruby the workspace pins when the machine has none that fits, serve and run start an application, package and publish produce its image, and a component overrides any profile value in its putnami.json",
+      "outcome": "A team with a Ruby or Rails repository adds @putnami/ruby and runs its packs and local gems with Putnami's runner and cache, without rewriting its build: each component is a project, lint runs RuboCop and test RSpec or Minitest after a bundle install, with a pinned Ruby when the machine has none that fits, serve and run start an application, package and publish produce its image, and a component overrides any profile value in its putnami.json",
       "owner": "ruby",
       "target": "coded",
       "requirements": [
