@@ -184,6 +184,11 @@ func pantsTests(t *testing.T, root, base, log string) ([]string, string) {
 	if !strings.Contains(out, "Cache: 0 local hit · 0 miss") {
 		t.Errorf("the run looked up or stored Putnami cache entries for delegated tasks:\n%s", out)
 	}
+	// The probe attributes each Pants edge to the Pants graph, so the
+	// declared-edge check judges them and finds every one backed.
+	if strings.Contains(out, "workspace.declared_edge") {
+		t.Errorf("the run warns workspace.declared_edge for a Pants package:\n%s", out)
+	}
 	return tested, out
 }
 

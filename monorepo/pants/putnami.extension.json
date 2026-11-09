@@ -1,7 +1,7 @@
 {
   "$schema": "https://putnami.dev/schemas/putnami-extension.json",
   "name": "@putnami/pants",
-  "cliContract": 14,
+  "cliContract": 21,
   "extensionDependencies": {
     "@putnami/dev": ""
   },
@@ -89,7 +89,9 @@
     "excludes": [
       "dist"
     ],
-    "syncTask": "workspace-sync-exec"
+    "syncTask": "workspace-sync-exec",
+    "dependencySources": true,
+    "buildGraphEdges": true
   },
   "commands": {
     "lint": {

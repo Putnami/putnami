@@ -37,8 +37,9 @@ func Stack() (stacks.Stack, error) {
 
 // Detect names the components among the candidate paths with the Pants
 // detector: each directory whose BUILD file declares a first-party target,
-// named by its directory, with the workspace root for stack root and the
-// edges of the export pants-graph.json when the root holds one. Every other
+// named by its directory, with the workspace root for stack root, and as edges
+// those of the export pants-graph.json when the root holds one and those the
+// sync wrote in its putnami.json, each attributed to the Pants graph. Every other
 // candidate that holds a BUILD file, a directory whose BUILD file declares
 // only third-party targets or BUILD file symbols and the repository root, is
 // bare: it is named by its directory, the root by the workspace, and runs no
@@ -69,7 +70,8 @@ func Detect(root string, request wsproto.ProbeRequest) ([]stacks.Component, []di
 			Name:         c.ID,
 			SourceFile:   buildFile(root, c.ID),
 			Root:         wsproto.ProbeRootPath,
-			Dependencies: withoutRoot(c.DependsOn),
+			Dependencies: sortedUnique(append(withoutRoot(c.DependsOn), syncedEdges(root, c.ID, components)...)),
+			EdgeSource:   wsproto.DependencySourceBuildGraph,
 		})
 	}
 	// Without an export the edges come from each package's putnami.json,
@@ -81,6 +83,29 @@ func Detect(root string, request wsproto.ProbeRequest) ([]stacks.Component, []di
 		}
 	}
 	return out, diags
+}
+
+// syncedEdges are the Pants edges the sync wrote in the putnami.json of the
+// component at dir: each project ID dependency it owns, on a Pants package or
+// on another directory that holds a BUILD file, as a workspace-relative
+// directory. Without the export, they are the edges pants peek :: reported.
+// An unreadable file has none: the core reports it.
+func syncedEdges(root, dir string, components map[string]detect.Component) []string {
+	doc, _, err := readProject(filepath.Join(root, filepath.FromSlash(dir), wsproto.ConfigFilename))
+	if err != nil {
+		return nil
+	}
+	var out []string
+	for _, dep := range stringList(doc["dependencies"]) {
+		rel, ok := strings.CutPrefix(dep, "/")
+		if !ok || rel == "" || rel == dir {
+			continue
+		}
+		if _, component := components[rel]; component || buildFile(root, rel) != "" {
+			out = append(out, rel)
+		}
+	}
+	return out
 }
 
 func withoutRoot(dirs []string) []string {

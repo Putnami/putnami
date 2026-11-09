@@ -678,3 +678,54 @@ func TestAFailedStepOfADelegatedTaskNamesItsTool(t *testing.T) {
 		t.Errorf("status %s, data %v", status, data)
 	}
 }
+
+func TestProbeAttributesTheEdgesOfAComponentThatNamesTheirSource(t *testing.T) {
+	root := t.TempDir()
+	writeFile(t, root, "rust-toolchain.toml", "[toolchain]\nchannel = \"1.82.0\"\n")
+	s := testStack(t)
+	source := wsproto.DependencySourceBuildGraph
+	s.Detect = func(string, wsproto.ProbeRequest) ([]Component, []diag.Diagnostic) {
+		return []Component{
+			{Path: "ws", Name: "ws", Root: "ws", EdgeSource: source},
+			{Path: "ws/a", Name: "a", Root: "ws", Dependencies: []string{"ws/b"}, EdgeSource: source},
+			{Path: "ws/b", Name: "b", Root: "ws", EdgeSource: source},
+			{Path: "plain", Name: "plain", Root: ".", Dependencies: []string{"ws/b"}},
+		}, nil
+	}
+	request := wsproto.ProbeRequest{Version: wsproto.ProbeProtocolVersion, Extension: s.Extension, Paths: []string{"plain", "ws", "ws/a", "ws/b"}}
+
+	result, err := s.Probe(root, request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, p := range result.Projects {
+		if p.DependencySources != nil {
+			t.Errorf("%s answers provenance to a request that did not ask: %v", p.Path, p.DependencySources)
+		}
+	}
+
+	request.DependencySources = true
+	result, err = s.Probe(root, request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if diags := wsproto.ValidateProbeResult(&result); len(diags) != 0 {
+		t.Fatalf("the answer breaks the protocol: %v", diags)
+	}
+	got := map[string]map[string]wsproto.DependencySource{}
+	for _, p := range result.Projects {
+		got[p.Path] = p.DependencySources
+	}
+	want := map[string]map[string]wsproto.DependencySource{
+		// The stack-root edge takes the component's source too.
+		"ws/a": {"ws": source, "ws/b": source},
+		"ws/b": {"ws": source},
+		// A component with no edge is attributed all the same.
+		"ws": {},
+		// A component that names no source stays unattributed.
+		"plain": nil,
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("dependencySources = %v, want %v", got, want)
+	}
+}
