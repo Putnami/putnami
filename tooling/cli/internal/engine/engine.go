@@ -1068,6 +1068,7 @@ func buildReleaseSetOptions(
 ) (publication.ReleaseSetOptions, error) {
 	channel, _ := req.CommandParams["channel"].(string)
 	baselineChannel, _ := req.CommandParams["baseline-channel"].(string)
+	inheritChannel, _ := req.CommandParams["inherit-channel"].(string)
 	reuseChannel, _ := req.CommandParams["reuse-channel"].(string)
 	reuseSourceRevision, _ := req.CommandParams["reuse-source-revision"].(string)
 	visibility, _ := req.CommandParams["visibility"].(string)
@@ -1081,7 +1082,7 @@ func buildReleaseSetOptions(
 		ConsumesReleaseSet: slices.ContainsFunc(req.Commands, func(command string) bool {
 			return extension.CommandConsumesReleaseSet(extensions, command)
 		}),
-		Channel: channel, BaselineChannel: baselineChannel,
+		Channel: channel, BaselineChannel: baselineChannel, InheritChannel: inheritChannel,
 		ReuseChannel: reuseChannel, ReuseSourceRevision: reuseSourceRevision,
 		Visibility: visibility, Scope: scope, DryRun: dryRun,
 		Impacted: req.Global.Impacted, All: req.Global.All,

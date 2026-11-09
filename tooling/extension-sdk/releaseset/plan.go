@@ -31,9 +31,9 @@ const placeholderArtifactDigest = "sha256:00000000000000000000000000000000000000
 // carries the head resolved for each of them — one entry per channel, a nil
 // entry meaning that channel has no head yet — so the release can
 // compare-and-swap every channel from its own expectation without resolving
-// anything a second time. BaselineChannel and ReuseChannel each name one
-// further channel, read and never released, whose head is carried in Heads
-// beside them.
+// anything a second time. InheritChannel, BaselineChannel and ReuseChannel each
+// name one further channel, read and never released, whose head is carried in
+// Heads beside them.
 //
 // Members is always the next full snapshot: selected members carry their
 // candidate version, the provenance of the tree being published, and an empty
@@ -51,6 +51,12 @@ type Plan struct {
 	// released. Empty when the first channel's own head was the baseline,
 	// which is every plan that names none.
 	BaselineChannel string `json:"baselineChannel,omitempty"`
+	// InheritChannel is the channel the plan measured against whatever its
+	// first channel holds: a publication stacked on another one that is not
+	// released yet. Its head is carried in Heads, it is never released, and it
+	// always has a head. When set it is the baseline and BaselineChannel is
+	// empty. Empty when the publication named none.
+	InheritChannel string `json:"inheritChannel,omitempty"`
 	// ReuseChannel is the channel whose head already published some members
 	// this plan selected by fingerprint. Its head is carried in Heads, it is
 	// never released and never a baseline. Empty unless at least one member
@@ -114,17 +120,23 @@ func MemberKey(ecosystem distribution.Ecosystem, coordinate string) string {
 	return string(ecosystem) + "\x00" + coordinate
 }
 
-// Baseline is the head impact is measured against: the head of the first
-// channel named by the publication, or, when that channel has no head, the
-// head of the named BaselineChannel. It is nil when neither has one.
+// Baseline is the head impact is measured against: the head of the named
+// InheritChannel; otherwise the head of the first channel named by the
+// publication, or, when that channel has no head, the head of the named
+// BaselineChannel. It is nil when none has one.
 //
-// The first channel's own head comes first so that every publication that
-// already has one behaves exactly as it did before a baseline could be named:
-// the named channel is a fallback for the first publish into an empty channel,
-// never a redirection of an established one.
+// An inherit channel is a deliberate redirection: the publication is stacked on
+// a set that is not released yet. Without one, the first channel's own head
+// comes first so that every publication that already has one behaves exactly
+// as it did before a baseline could be named: the named baseline channel is a
+// fallback for the first publish into an empty channel, never a redirection of
+// an established one.
 func (p *Plan) Baseline() *distribution.ChannelHead {
 	if p == nil || len(p.Channels) == 0 {
 		return nil
+	}
+	if p.InheritChannel != "" {
+		return p.Heads[p.InheritChannel]
 	}
 	if head := p.Heads[p.Channels[0]]; head != nil {
 		return head
@@ -139,6 +151,12 @@ func (p *Plan) Baseline() *distribution.ChannelHead {
 // baseline is empty. The session report names it.
 func (p *Plan) BaselineChannelName() string {
 	if p == nil || len(p.Channels) == 0 {
+		return ""
+	}
+	if p.InheritChannel != "" {
+		if p.Heads[p.InheritChannel] != nil {
+			return p.InheritChannel
+		}
 		return ""
 	}
 	if p.Heads[p.Channels[0]] != nil {
@@ -276,6 +294,10 @@ func ParseParams(params job.Params) (*Plan, error) {
 // channels the plan advances: an advanced channel is already its own baseline,
 // and naming it twice would state two different things about one head.
 //
+// InheritChannel is read and never released too, so it is not an advanced
+// channel either. It is the baseline whenever it is set, so it has a head, and
+// the plan names no BaselineChannel beside it.
+//
 // ReuseChannel is read and never released either, and is neither an advanced
 // channel nor the baseline. Every member Reused names is unselected, exists in
 // the reuse head with a record whose SourceRevision is ReuseSourceRevision, and
@@ -302,6 +324,9 @@ func ValidatePlan(plan *Plan) error {
 	// correct.
 	if plan.BaselineChannel != "" && slices.Contains(plan.Channels, plan.BaselineChannel) {
 		return fmt.Errorf("release-set plan baseline channel %q is also advanced by the plan; a baseline is read and never released", plan.BaselineChannel)
+	}
+	if err := validatePlanInheritChannel(plan); err != nil {
+		return err
 	}
 	if err := validatePlanReuseChannel(plan); err != nil {
 		return err
@@ -446,19 +471,43 @@ func validatePlanHeads(plan *Plan) error {
 }
 
 // planResolvedChannels is the channel list the plan's one resolve named: the
-// advanced channels in order, then the baseline, then the reuse channel, each
-// when it is not already among them. ValidatePlan refuses a baseline or a
-// reuse channel that IS among them, so the guards here only keep this helper
-// independently correct.
+// advanced channels in order, then the baseline, then the inherit channel, then
+// the reuse channel, each when it is not already among them. ValidatePlan
+// refuses a baseline, an inherit or a reuse channel that IS among them, so the
+// guards here only keep this helper independently correct.
 func planResolvedChannels(plan *Plan) []string {
 	channels := append([]string(nil), plan.Channels...)
 	if plan.BaselineChannel != "" && !slices.Contains(channels, plan.BaselineChannel) {
 		channels = append(channels, plan.BaselineChannel)
 	}
+	if plan.InheritChannel != "" && !slices.Contains(channels, plan.InheritChannel) {
+		channels = append(channels, plan.InheritChannel)
+	}
 	if plan.ReuseChannel != "" && !slices.Contains(channels, plan.ReuseChannel) {
 		channels = append(channels, plan.ReuseChannel)
 	}
 	return channels
+}
+
+// validatePlanInheritChannel checks the inherit channel against the other
+// channels. It is read and never released, so it is not advanced; it is the
+// baseline, so the fallback BaselineChannel is not named beside it; and it
+// always has a head, because a publication stacked on a set that does not
+// exist is refused before any plan is built.
+func validatePlanInheritChannel(plan *Plan) error {
+	if plan.InheritChannel == "" {
+		return nil
+	}
+	if slices.Contains(plan.Channels, plan.InheritChannel) {
+		return fmt.Errorf("release-set plan inherit channel %q is also advanced by the plan; an inherit channel is read and never released", plan.InheritChannel)
+	}
+	if plan.BaselineChannel != "" {
+		return fmt.Errorf("release-set plan names baseline channel %q beside inherit channel %q; the inherit channel is the baseline", plan.BaselineChannel, plan.InheritChannel)
+	}
+	if plan.Heads[plan.InheritChannel] == nil {
+		return fmt.Errorf("release-set plan inherit channel %q has no head to inherit from", plan.InheritChannel)
+	}
+	return nil
 }
 
 // validatePlanReuseChannel checks the reuse fields against each other and
@@ -477,6 +526,9 @@ func validatePlanReuseChannel(plan *Plan) error {
 	}
 	if plan.ReuseChannel == plan.BaselineChannel {
 		return fmt.Errorf("release-set plan reuse channel %q is also its baseline channel", plan.ReuseChannel)
+	}
+	if plan.ReuseChannel == plan.InheritChannel {
+		return fmt.Errorf("release-set plan reuse channel %q is also its inherit channel", plan.ReuseChannel)
 	}
 	if len(plan.Reused) == 0 {
 		return fmt.Errorf("release-set plan names reuse channel %q but reuses no member", plan.ReuseChannel)

@@ -73,6 +73,15 @@ it was. The baseline channel's head rides in `Heads` beside the advanced ones,
 because the publication resolved all of them in one exchange
 (`protocols/distribution` ADR 0006).
 
+`Plan.InheritChannel` names a channel the plan READS, never releases, and
+inherits from whatever its first channel holds: the publication is stacked on
+a set that is not released yet. When it is set, its head is `Plan.Baseline()`,
+`Plan.BaselineChannelName()` returns it, and `Plan.BaselineChannel` is empty.
+`ValidatePlan` refuses an inherit channel the plan advances, one without a
+head, and one named beside a baseline channel. A plan without one carries no
+`inheritChannel` key. An SDK older than this field refuses a plan that names
+one: the inherit head is a head it did not request.
+
 `Plan.ReuseChannel` names one more channel the plan READS and never releases,
 and only when the plan took at least one member from its head: `Plan.Reused`
 lists those members, `Plan.ReusedMembers()` returns them, and

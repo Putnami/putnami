@@ -851,7 +851,10 @@
               "an-empty-channel-measures-against-the-named-baseline",
               "an-advanced-channel-with-a-head-ignores-the-baseline",
               "a-baseline-channel-that-cannot-be-read-is-refused",
-              "a-first-publish-against-a-baseline-uploads-only-what-changed"
+              "a-first-publish-against-a-baseline-uploads-only-what-changed",
+              "an-inherit-channel-is-the-baseline-whatever-the-channel-holds",
+              "an-inherit-channel-without-a-head-is-refused",
+              "an-inherit-channel-that-cannot-apply-is-refused"
             ]
           }
         },

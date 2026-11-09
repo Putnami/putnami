@@ -315,6 +315,23 @@ func TestReleaseSetOptionsCarryTheBaselineChannelFlag(t *testing.T) {
 			t.Fatalf("a reuse channel equal to %s was accepted", name)
 		}
 	}
+
+	// --inherit-channel arrives the same way, beside the baseline it comes
+	// before, and is refused at parse time on a channel this run advances.
+	inheriting := *req
+	inheriting.CommandParams = maps.Clone(req.CommandParams)
+	inheriting.CommandParams["inherit-channel"] = "stage-1"
+	options, err = buildReleaseSetOptions(&inheriting, ws)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if options.InheritChannel != "stage-1" || options.BaselineChannel != "canary" {
+		t.Fatalf("release-set options = %+v; want stage-1 as the inherit channel beside canary", options)
+	}
+	inheriting.CommandParams["inherit-channel"] = "pr-7"
+	if _, err := buildReleaseSetOptions(&inheriting, ws); err == nil {
+		t.Fatal("an inherit channel this publication advances was accepted")
+	}
 }
 
 // A degraded line is invisible in its 0.0.0 stamp, so --debug names why, one
