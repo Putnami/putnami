@@ -39,7 +39,9 @@ workspace with no `composer.json` outside `vendor/` pins nothing.
 
 The Linux and macOS archives come from `dl.static-php.dev`, a third party, and
 the Windows archives from `windows.php.net`. Each archive is pinned by
-SHA-256. Windows on ARM has no archive, so it gets no pin.
+SHA-256. Windows on ARM has no archive: an install there keeps the pin the
+lock already holds for the other platforms, installs no PHP, and records no
+pin when the lock holds none.
 
 A `php` on `PATH` that satisfies the statement always runs. The pinned PHP
 runs only when `php` is missing or outside the statement.

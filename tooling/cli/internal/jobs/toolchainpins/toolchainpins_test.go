@@ -1,11 +1,13 @@
 package toolchainpins
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
+	"reflect"
 	"runtime"
 	"slices"
 	"strings"
@@ -272,6 +274,41 @@ func TestAnExplicitRunWritesOnlyAChange(t *testing.T) {
 	}
 	if len(providers.requests()) != 2 {
 		t.Fatalf("requests = %d, want one per run", len(providers.requests()))
+	}
+}
+
+// An explicit run on a host the extension ships no archive for keeps the
+// committed pin when the extension answers it as committed: the answer is
+// valid, and the lock neither loses the identity nor is written.
+func TestAnExplicitRunKeepsAPinItsHostHasNoArchiveFor(t *testing.T) {
+	t.Parallel()
+	root := writeWorkspace(t, fixtureExtension{name: "@acme/php", resolves: []string{"php"}})
+	committed := pin("8.4.23", "c")
+	committed.Integrities = map[string]string{"plan9/amd64": committed.Integrities[hostPlatform]}
+	committed.Archives = map[string]wsproto.LockToolchainArchive{"plan9/amd64": committed.Archives[hostPlatform]}
+	writeLock(t, root, lockfile.FormatVersionV5, map[string]lockfile.LockEntry{"php": lockfile.ToolchainEntryFromProtocol(*committed)})
+	before := readLockBytes(t, root)
+	providers := &fakeProviders{answers: map[string]map[string]wsproto.ToolchainResolution{
+		"@acme/php": {"php": {Pin: committed}},
+	}}
+	result, err := resolve(context.Background(), root, Options{}, providers.provider)
+	if err != nil || result.Written || len(result.Added)+len(result.Changed)+len(result.Removed) != 0 {
+		t.Fatalf("resolve = %+v, %v; want the committed pin kept and no write", result, err)
+	}
+	if _, ok := result.Toolchains["php"]; !ok {
+		t.Fatalf("settled toolchains lost the kept pin: %+v", result.Toolchains)
+	}
+	requests := providers.requests()
+	answer := wsproto.ToolchainResolveResult{Version: wsproto.ToolchainResolveProtocolVersion, Extension: "@acme/php",
+		Toolchains: map[string]wsproto.ToolchainResolution{"php": {Pin: committed}}}
+	if len(requests) != 1 || !reflect.DeepEqual(requests[0].Locked["php"], *committed) {
+		t.Fatalf("requests = %+v, want one carrying the committed pin", requests)
+	}
+	if diags := wsproto.ValidateToolchainResolveAnswer(&requests[0], &answer); len(diags) != 0 {
+		t.Fatalf("the kept pin does not answer the request: %v", diags)
+	}
+	if after := readLockBytes(t, root); !bytes.Equal(before, after) {
+		t.Fatalf("the lock changed:\n%s\nwant\n%s", after, before)
 	}
 }
 

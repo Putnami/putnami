@@ -292,7 +292,7 @@ func ParseAndValidateToolchainResolveResult(data []byte) (*ToolchainResolveResul
 // so the extension answers a problem for that identity instead, unless the pin
 // is the identity's locked entry kept as it was sent: an extension that cannot
 // pin for the host leaves the committed pin to the platforms it serves rather
-// than removing it from the lock, and the core installs nothing from it here.
+// than removing it from the lock (ADR 0006).
 //
 // It checks only the relation between the two documents and expects each to
 // have passed its own validation. Diagnostics come out in identity order.

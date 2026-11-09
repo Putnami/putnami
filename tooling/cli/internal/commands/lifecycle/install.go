@@ -74,9 +74,8 @@ func resolveToolchainPins(ctx context.Context, wsRoot string, env LifecycleEnv) 
 // (toolchain.Provision). A pin with no archive for the host is skipped when
 // its toolchain is optional, and fails the run when it is required. A hosted
 // run, or one whose dependencies are offline, installs nothing: it runs the
-// toolchains the machine holds. It reports each
-// release it installed to env.OnAction; with no OnAction the same line goes
-// to env.Out. It stops at the first failure.
+// toolchains the machine holds. It reports each release it installed to
+// env.OnAction; with no OnAction the same line goes to env.Out. It stops at the first failure.
 func installToolchainPins(ctx context.Context, wsRoot string, pins toolchainpins.Result, opts toolchainpins.Options, env LifecycleEnv) error {
 	if opts.Hosted || opts.Offline {
 		return nil

@@ -123,9 +123,8 @@ func resolvePin(root string, request wsproto.ToolchainResolveRequest, profile st
 		return wsproto.LockToolchainEntry{}, false
 	}
 	if _, served := chosen.digests[request.Platform]; !served {
-		// No archive serves this host, so it cannot pin PHP. The committed pin
-		// of the chosen release stays as committed, for the platforms it
-		// serves; answering no pin would remove it from the lock.
+		// No archive serves this host: the committed pin of the chosen release
+		// stays as committed, for the platforms it serves (ADR 0006).
 		if locked && committed.Version == chosen.version {
 			return committed, true
 		}
