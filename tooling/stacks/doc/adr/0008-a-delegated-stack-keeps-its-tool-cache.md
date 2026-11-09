@@ -3,8 +3,8 @@
 - **Status**: accepted
 - **Date**: 2026-11-08
 - **Scope**: `tooling/stacks` (`@putnami/stacks`), `monorepo/pants`
-  (`@putnami/pants`), `monorepo/nx` (`@putnami/nx`) and the delegated stacks
-  that follow it (Bazel)
+  (`@putnami/pants`), `monorepo/nx` (`@putnami/nx`), `monorepo/moon`
+  (`@putnami/moon`) and the delegated stacks that follow it (Bazel)
 
 ## Context
 
@@ -65,3 +65,10 @@ package's `putnami.json` with the edges of the `pants peek ::` export.
   on, so a change to a requirement or a resolve lockfile runs those packages.
 - The shipped Pants profile reads Python coverage; a repository without the
   Python backend overrides the test steps.
+- moon is delegated the same way, and moon names a task per project: the
+  sync writes the step of a task moon tags rather than names as an override
+  in the project's `putnami.json`, and disables a command the project has no
+  task for. Adopted in import mode instead, a moon project whose language has
+  a Putnami extension runs that extension under Putnami's cache, and every
+  other project stays delegated: no project runs both, so no Putnami cache
+  sits over moon's.

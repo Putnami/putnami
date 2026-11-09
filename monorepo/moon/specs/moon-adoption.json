@@ -1,0 +1,48 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-spec.json",
+  "protocolVersion": 1,
+  "feature": "monorepo/moon-adoption",
+  "outcomes": [
+    "Each project of a moon repository is a Putnami project with an edge to each project moon says it depends on",
+    "In delegate mode, putnami lint, test and build run moon run on each affected project, and moon's cache decides what reruns",
+    "In import mode, a project whose language has a Putnami extension runs it, and every other project stays delegated to moon"
+  ],
+  "nonGoals": [
+    "Installing or switching a moon version",
+    "Running a moon task other than the one named or tagged build, test or lint: the others are listed and keep running through moon",
+    "Reading moon's task graph below the project: the edges are the project graph's"
+  ],
+  "requirements": [
+    {
+      "id": "projects-and-tasks-are-read",
+      "text": "The extension reads the moon project graph from moon-graph.json, the moon project-graph --json export, at the workspace root when present, else from .moon/workspace.yml and each project's moon.yml. A project's tasks are its moon.yml tasks over the tasks it inherits from .moon/tasks.yml and the .moon/tasks/*.yml files whose name or inheritedBy matches its language, stack, layer or tags, after the include, exclude and rename of its workspace.inheritedTasks. An export's own tasks win over the configuration."
+    },
+    {
+      "id": "sync-writes-each-project",
+      "text": "The workspace sync task writes in each moon project's putnami.json the tag moon, the extension the mode maps it to, the project IDs of the projects moon says it depends on, and build, test or lint in disable.jobs when the project has no moon task named or tagged that way. It keeps every member it does not own, retracts a former project, and lists each moon task it maps to no Putnami command with the reason."
+    },
+    {
+      "id": "import-maps-to-language-extensions",
+      "text": "With mode import in the workspace options of @putnami/moon, a project whose moon language is typescript, go, python, php, ruby or rust runs that language's Putnami extension, which the sync declares in the workspace's extensions; any other project runs the delegated @putnami/moon tasks, so no Putnami cache sits over moon's. With mode delegate, or no mode, every project runs @putnami/moon."
+    },
+    {
+      "id": "tasks-delegate-to-moon",
+      "text": "Each lint, test and build task of @putnami/moon runs moon run <project>:<task> at the workspace root, where <task> is the moon task named that way, else the first, by name, tagged that way. Each task depends only on its project's graph step, which runs nothing. Putnami's cache is off for every task, the result records delegatedTo moon, and a failing step fails with stacks.step_failed."
+    },
+    {
+      "id": "reports-from-options",
+      "text": "The test task reads the JUnit and coverage reports the project's own options name under options[\"@putnami/moon\"].tasks.test.reports into the test and coverage summary, as the stack core reads any report. A project whose options name none has its exit code alone for result, and the sync lists it."
+    },
+    {
+      "id": "validate-fails-on-a-stale-graph",
+      "text": "putnami validate compares each moon project's putnami.json with what the sync would write, writes nothing, and fails with moon.sync_stale when a sync would change one. Without moon-graph.json and without .moon/workspace.yml it warns and passes."
+    },
+    {
+      "id": "manifest-follows-the-profile",
+      "text": "The manifest passes the stack core's conformance kit: its markers are the profile's, it lists the moon:lint, moon:test and moon:build selectors, each command runs the graph step, which depends on the graph step upstream, then its task, which depends on its own graph step alone, and every task sets cache.enabled to false."
+    }
+  ],
+  "decisions": [
+    "tooling/stacks/doc/adr/0008-a-delegated-stack-keeps-its-tool-cache.md"
+  ]
+}
