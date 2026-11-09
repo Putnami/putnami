@@ -77,7 +77,16 @@
   },
   "workspace": {
     "markers": [
-      "moon.yml"
+      "moon.yml",
+      "package.json",
+      "tsconfig.json",
+      "deno.json",
+      "go.mod",
+      "Cargo.toml",
+      "pyproject.toml",
+      "requirements.txt",
+      "composer.json",
+      "Gemfile"
     ],
     "inputs": [
       "moon.yml",
@@ -95,10 +104,13 @@
       "pyproject.toml",
       "requirements.txt",
       "composer.json",
-      "Gemfile"
+      "Gemfile",
+      "deno.json"
     ],
     "excludes": [
-      ".moon/cache"
+      ".moon/cache",
+      "node_modules",
+      "target"
     ],
     "syncTask": "workspace-sync-exec"
   },

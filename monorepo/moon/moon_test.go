@@ -468,3 +468,16 @@ func TestTheSyncKeepsTheWorkspaceConfigOrder(t *testing.T) {
 		t.Errorf("no workspace config: %v %v", changed, err)
 	}
 }
+
+func TestAnExtensionLoadedFromTheWorkspaceIsDeclared(t *testing.T) {
+	spectest.Proves(t, feature, "import-maps-to-language-extensions", "import-mode-maps-a-project-to-its-language-extension")
+	root := t.TempDir()
+	writeFile(t, root, wsproto.WorkspaceConfigFilename, `{"extensions": ["/moon-extension", "./tools/go", "/missing"]}`)
+	writeFile(t, root, "tools/go/putnami.extension.json", `{"name": "@putnami/go"}`)
+	if changed, err := declareExtensions(root, []string{"@putnami/go"}, false); err != nil || changed {
+		t.Errorf("an extension the workspace loads by path is declared: %v %v", changed, err)
+	}
+	if changed, err := declareExtensions(root, []string{"@putnami/rust"}, true); err != nil || !changed {
+		t.Errorf("a dry run reports an undeclared extension: %v %v", changed, err)
+	}
+}

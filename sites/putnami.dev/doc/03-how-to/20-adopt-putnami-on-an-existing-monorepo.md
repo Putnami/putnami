@@ -19,6 +19,7 @@ Putnami adopts a tool in one of two modes:
 | Pants | Delegate | `putnami init --from pants` |
 | Bazel | Delegate | `putnami init --from bazel` |
 | Nx | Import or delegate, asked | `putnami init --from nx` |
+| moon | Import or delegate, asked | `putnami init --from moon` |
 
 ## Pants
 
@@ -299,6 +300,95 @@ Nx infers edges from imports, so `putnami validate` fails with
 `nx.sync_stale` when a project's `putnami.json` no longer matches Nx's graph:
 run `putnami projects sync` and commit the result.
 
+## moon
+
+moon offers both modes. Delegate keeps moon and its cache, local and remote:
+each Putnami task runs `moon run` on one project. Import runs each project
+whose language has a Putnami extension (TypeScript, Go, Python, PHP, Ruby or
+Rust) through that extension, under Putnami's cache, and keeps every other
+project delegated to moon, so no Putnami cache sits over moon's.
+
+### Before you start
+
+- `@putnami/moon` is not published yet: until its first release,
+  `putnami init --from moon` stops at the extension install.
+- `.moon/workspace.yml` lies at the root of the repository, which becomes the
+  workspace root.
+- In delegate mode, moon is on `PATH`, at the version `.prototools` pins.
+  Without a pin, each task warns that the version is not pinned.
+
+### Turn the repository into a workspace
+
+At the repository root:
+
+```bash
+putnami init --from moon --mode delegate
+```
+
+`init` declares `@putnami/moon` with the mode under
+`options["@putnami/moon"].mode`, installs it, and synchronizes the projects.
+The sync reads `moon-graph.json` at the root when the CI wrote it, else
+`.moon/workspace.yml` and each `moon.yml`, with the tasks each project
+inherits from `.moon/tasks.yml` and `.moon/tasks/*.yml`. It writes, in each
+project's `putnami.json`, the tag `moon`, the extension, and the projects it
+depends on:
+
+```json
+{
+  "$schema": "https://putnami.dev/schemas/putnami-project.json",
+  "tags": ["moon"],
+  "extensions": ["@putnami/moon"],
+  "dependencies": ["/packages/pricing"]
+}
+```
+
+`putnami lint`, `putnami test` and `putnami build` run the moon task named
+`lint`, `test` or `build`, else the first one tagged that way. A project with
+no such task has that command in `disable.jobs`. The sync lists every other
+task, such as `api:dev`: it keeps running through moon.
+
+In import mode, `putnami init --from moon` writes `@putnami/typescript` in
+the `putnami.json` of a TypeScript project, declares the extension in the
+workspace and installs it; a project in a language with no Putnami extension
+stays on `@putnami/moon`.
+
+Commit the files: they are the project graph Putnami selects on. Run
+`init --from moon` again later to see what the sync would change, and
+`--apply` to write it:
+
+```bash
+putnami init --from moon           # prints the diff, writes nothing
+putnami init --from moon --apply   # writes it
+```
+
+### Run what a change affects
+
+```bash
+putnami test --impacted
+```
+
+In delegate mode, after a change to `pricing`, Putnami runs `pricing` and the
+projects that depend on it, `api` here, each with one command at the root:
+
+```text
+moon run pricing:unit
+moon run api:test
+```
+
+A change to `api` alone runs `api` alone. Each result records
+`delegatedTo: moon`, and Putnami stores no cache entry for it: moon's cache
+decides what reruns.
+
+A delegated test reads the JUnit and coverage reports the project names
+under `options["@putnami/moon"].tasks.test.reports` in its `putnami.json`;
+without them its result is moon's exit code alone, and `init` lists the
+project.
+
+moon infers edges from manifests and task inputs, so an edit can change them:
+`putnami validate` fails with `moon.sync_stale` when a `putnami.json` no
+longer matches moon's project graph. Run `putnami projects sync` and commit
+the result.
+
 ## Next
 
 - [Run a Pants repository with Putnami](https://github.com/Putnami/putnami/blob/main/monorepo/pants/doc/01-pants.md):
@@ -307,5 +397,7 @@ run `putnami projects sync` and commit the result.
   every command, the version check, what the sync owns.
 - [Run a Nx repository with Putnami](https://github.com/Putnami/putnami/blob/main/monorepo/nx/doc/01-nx.md):
   both modes, what the sync owns, which targets import maps.
+- [Run a moon workspace with Putnami](https://github.com/Putnami/putnami/blob/main/monorepo/moon/doc/01-moon.md):
+  the two modes, task matching, reports, what the sync owns.
 - [Observe a change in your CI](/docs/how-to/observe-a-change-in-your-ci): the
   report on a pull request, before you adopt anything.

@@ -48,6 +48,12 @@ and each project's `moon.yml`. A project's tasks are the export's, or its
 `<language>-<layer>`, `tag-<tag>`) or by `inheritedBy`, after its
 `workspace.inheritedTasks` include, exclude and rename.
 
+`putnami projects sync` looks for moon projects in the directories that hold
+a `moon.yml` or a language manifest moon reads (`package.json`,
+`tsconfig.json`, `deno.json`, `go.mod`, `Cargo.toml`, `pyproject.toml`,
+`requirements.txt`, `composer.json`, `Gemfile`); a project with none of them
+joins on the next sync, once the first one wrote its `putnami.json`.
+
 `putnami lint`, `putnami test` and `putnami build` run the moon task named
 `lint`, `test` or `build`, else the first one, by name, tagged that way. A
 project with no such task has that command in `disable.jobs`. Every other

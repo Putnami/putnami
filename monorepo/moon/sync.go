@@ -302,7 +302,8 @@ func declareExtensions(root string, extensions []string, dry bool) (bool, error)
 			return false, fmt.Errorf("extensions is not a list of names: %w", err)
 		}
 	}
-	missing := slices.DeleteFunc(slices.Clone(extensions), func(e string) bool { return slices.Contains(declared, e) })
+	names := declaredNames(root, declared)
+	missing := slices.DeleteFunc(slices.Clone(extensions), func(e string) bool { return slices.Contains(names, e) })
 	if len(missing) == 0 {
 		return false, nil
 	}
@@ -310,6 +311,33 @@ func declareExtensions(root string, extensions []string, dry bool) (bool, error)
 		return true, nil
 	}
 	return true, writeExtensions(file, data, append(declared, missing...))
+}
+
+// declaredNames are the names of the declared extensions: an entry that names
+// a workspace directory, such as /tools/ts-extension, by the name its
+// manifest gives, and any other entry as it is written.
+func declaredNames(root string, declared []string) []string {
+	names := slices.Clone(declared)
+	for _, entry := range declared {
+		rel, ok := strings.CutPrefix(entry, "/")
+		if !ok {
+			rel, ok = strings.CutPrefix(entry, "./")
+		}
+		if !ok {
+			continue
+		}
+		data, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(rel), "putnami.extension.json")) //nolint:gosec // a manifest under the workspace root
+		if err != nil {
+			continue
+		}
+		var manifest struct {
+			Name string `json:"name"`
+		}
+		if json.Unmarshal(data, &manifest) == nil && manifest.Name != "" {
+			names = append(names, manifest.Name)
+		}
+	}
+	return names
 }
 
 // writeExtensions rewrites the extensions member of the workspace config,

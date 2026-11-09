@@ -1,9 +1,9 @@
-// Package moondelegation drives a moon workspace through the real CLI with
-// @putnami/moon in delegate mode: the extension's runtime is built from this
-// tree, the workspace is the moon demo of putnami observe, and moon is a stub
-// on PATH that logs each run. These tests swap the process streams and the
-// working directory, so they run in their own test binary.
-package moondelegation
+// Package moonadoption drives a moon workspace through the real CLI with
+// @putnami/moon, in delegate and in import mode: the extension's runtime is
+// built from this tree, the workspace is the moon demo of putnami observe,
+// and moon is a stub on PATH that logs each run. These tests swap the process
+// streams and the working directory, so they run in their own test binary.
+package moonadoption
 
 import (
 	"encoding/json"
