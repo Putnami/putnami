@@ -44,7 +44,9 @@ func Stack() (stacks.Stack, error) {
 // detector: each directory that holds a BUILD or BUILD.bazel file and a rule
 // of the export bazel-graph.json, or without the export each such directory
 // whose putnami.json the sync wrote for this extension, named by its
-// directory, with the workspace root for stack root and the export's edges.
+// directory, with the workspace root for stack root, and as edges the
+// export's and those the sync wrote in its putnami.json, each attributed to the
+// Bazel graph.
 // Without the export, a BUILD file is not parsed: the sync, which reads the
 // rules from bazel query, tells a package from a directory with no rule.
 // Every other candidate that holds a BUILD file, the root package included,
@@ -56,8 +58,10 @@ func Detect(root string, request wsproto.ProbeRequest) ([]stacks.Component, []di
 	}
 	detection := detect.Detect(root, "")
 	packages := make(map[string]detect.Package, len(detection.Packages))
+	dirs := make(map[string]bool, len(detection.Packages))
 	for _, p := range detection.Packages {
 		packages[p.Dir] = p
+		dirs[p.Dir] = true
 	}
 	var out []stacks.Component
 	for _, dir := range request.Paths {
@@ -77,18 +81,20 @@ func Detect(root string, request wsproto.ProbeRequest) ([]stacks.Component, []di
 			out = append(out, stacks.Component{Path: dir, Name: name, SourceFile: file, Bare: true})
 			continue
 		}
-		var deps []string
+		deps := graphSync.SyncedEdges(root, p.Dir, dirs)
 		for _, d := range p.DependsOn {
 			if d != wsproto.ProbeRootPath {
 				deps = append(deps, d)
 			}
 		}
+		slices.Sort(deps)
 		out = append(out, stacks.Component{
 			Path:         p.Dir,
 			Name:         p.Dir,
 			SourceFile:   detect.BuildFile(root, p.Dir),
 			Root:         wsproto.ProbeRootPath,
-			Dependencies: deps,
+			Dependencies: slices.Compact(deps),
+			EdgeSource:   wsproto.DependencySourceBuildGraph,
 		})
 	}
 	// Without an export the edges come from each package's putnami.json,

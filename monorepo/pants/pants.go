@@ -50,6 +50,10 @@ func Detect(root string, request wsproto.ProbeRequest) ([]stacks.Component, []di
 	for _, c := range detection.Components {
 		components[c.ID] = c
 	}
+	packages := make(map[string]bool, len(components))
+	for id := range components {
+		packages[id] = true
+	}
 	var out []stacks.Component
 	for _, p := range request.Paths {
 		c, ok := components[p]
@@ -70,7 +74,7 @@ func Detect(root string, request wsproto.ProbeRequest) ([]stacks.Component, []di
 			Name:         c.ID,
 			SourceFile:   buildFile(root, c.ID),
 			Root:         wsproto.ProbeRootPath,
-			Dependencies: sortedUnique(append(withoutRoot(c.DependsOn), syncedEdges(root, c.ID, components)...)),
+			Dependencies: union(withoutRoot(c.DependsOn), graphSync.SyncedEdges(root, c.ID, packages)),
 			EdgeSource:   wsproto.DependencySourceBuildGraph,
 		})
 	}
@@ -85,27 +89,11 @@ func Detect(root string, request wsproto.ProbeRequest) ([]stacks.Component, []di
 	return out, diags
 }
 
-// syncedEdges are the Pants edges the sync wrote in the putnami.json of the
-// component at dir: each project ID dependency it owns, on a Pants package or
-// on another directory that holds a BUILD file, as a workspace-relative
-// directory. Without the export, they are the edges pants peek :: reported.
-// An unreadable file has none: the core reports it.
-func syncedEdges(root, dir string, components map[string]detect.Component) []string {
-	doc, _, err := readProject(filepath.Join(root, filepath.FromSlash(dir), wsproto.ConfigFilename))
-	if err != nil {
-		return nil
-	}
-	var out []string
-	for _, dep := range stringList(doc["dependencies"]) {
-		rel, ok := strings.CutPrefix(dep, "/")
-		if !ok || rel == "" || rel == dir {
-			continue
-		}
-		if _, component := components[rel]; component || buildFile(root, rel) != "" {
-			out = append(out, rel)
-		}
-	}
-	return out
+// union is the sorted set of two edge lists.
+func union(a, b []string) []string {
+	out := append(slices.Clone(a), b...)
+	slices.Sort(out)
+	return slices.Compact(out)
 }
 
 func withoutRoot(dirs []string) []string {

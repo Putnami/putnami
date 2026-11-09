@@ -257,6 +257,31 @@ func (g GraphSync) keepDependency(root, dep string, components map[string]bool) 
 	return true
 }
 
+// SyncedEdges are the edges the sync owns in the putnami.json of the package
+// at dir, as workspace-relative directories: each project ID dependency on
+// one of packages, the directories of the tool's current packages, or on
+// another directory that holds a build file. A probe attributes them to the
+// tool's graph (wsproto.DependencySourceBuildGraph): without the export, they
+// are the edges the tool's own query reported to the last sync. An unreadable
+// file has none: the core reports it.
+func (g GraphSync) SyncedEdges(root, dir string, packages map[string]bool) []string {
+	doc, _, err := readProject(filepath.Join(root, filepath.FromSlash(dir), wsproto.ConfigFilename))
+	if err != nil {
+		return nil
+	}
+	var out []string
+	for _, dep := range stringList(doc["dependencies"]) {
+		rel, ok := strings.CutPrefix(dep, "/")
+		if !ok || rel == "" || rel == dir {
+			continue
+		}
+		if packages[rel] || (g.HoldsBuildFile != nil && g.HoldsBuildFile(root, rel)) {
+			out = append(out, rel)
+		}
+	}
+	return sortedUnique(out)
+}
+
 // retractProject removes from the putnami.json of a former package the
 // extension and the tool's edges, and writes it when its content changes.
 func (g GraphSync) retractProject(root, file string, components map[string]bool, dry bool) (bool, error) {

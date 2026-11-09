@@ -248,17 +248,35 @@ func TestThePackagesOfABazelWorkspaceBecomeProjects(t *testing.T) {
 		}
 	}
 	// After the sync, the packages of the query are the projects that name
-	// the extension, with no edge from the probe: their putnami.json holds
-	// the edges. tools, which holds no rule, stays bare.
+	// the extension, and their edges are those the sync wrote in their
+	// putnami.json, each attributed to the Bazel graph to a request that asks.
+	// tools, which holds no rule, stays bare.
 	if _, err := Sync(context.Background(), root, &bytes.Buffer{}); err != nil {
 		t.Fatal(err)
 	}
+	s := stack(t)
+	attributed, err := s.Probe(root, wsproto.ProbeRequest{Version: wsproto.ProbeProtocolVersion, Extension: s.Extension,
+		DependencySources: true, Paths: []string{".", "api", "pricing", "web", "tools"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if diags := wsproto.ValidateProbeResult(&attributed); len(diags) != 0 {
+		t.Fatalf("the answer breaks the protocol: %v", diags)
+	}
 	got = map[string]wsproto.ProbeProject{}
-	for _, p := range probe(t, root).Projects {
+	for _, p := range attributed.Projects {
 		got[p.Path] = p
 	}
-	for _, path := range []string{"api", "pricing", "web"} {
-		if p := got[path]; !reflect.DeepEqual(p.Extensions, []string{ExtensionName}) || len(p.Dependencies) != 0 {
+	graph := wsproto.DependencySourceBuildGraph
+	wantEdges := map[string]map[string]wsproto.DependencySource{"api": {"pricing": graph}, "pricing": {}, "web": {}}
+	for path, sources := range wantEdges {
+		p := got[path]
+		var deps []string
+		for dep := range sources {
+			deps = append(deps, dep)
+		}
+		if !reflect.DeepEqual(p.Extensions, []string{ExtensionName}) || len(p.Dependencies) != len(deps) ||
+			!reflect.DeepEqual(p.DependencySources, sources) {
 			t.Errorf("after the sync %s = %+v", path, p)
 		}
 	}
