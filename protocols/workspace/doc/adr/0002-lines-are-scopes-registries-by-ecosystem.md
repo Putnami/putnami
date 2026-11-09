@@ -1,6 +1,7 @@
 # ADR 0002: Lines are scopes, registries are keyed by ecosystem, versions come from git
 
-- **Status**: accepted
+- **Status**: accepted, amended by
+  [ADR 0005](0005-the-docker-registry-flag-overrides-the-oci-registry.md)
 - **Scope**: `go.putnami.dev/protocol/workspace` (`protocols/workspace`): the
   `putnami.workspace.json`, scope, and project documents
 
