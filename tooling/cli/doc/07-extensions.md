@@ -1250,7 +1250,10 @@ its digest, and unpacks it into `toolchains/<identity>/<identity>-<version>/`
 under the Putnami home, keeping the entries the folder already held, such as
 Bun's package cache. The folder is complete when the toolchain's probe answers
 the pinned version from the archive's executable, and a complete folder is
-reused with no request. A hosted run, or one whose dependencies are offline
+reused with no request. A pin an extension kept for the platforms it serves,
+with no archive for the host, installs nothing when its toolchain is optional,
+and fails the install, naming the platform, when it is required. A hosted run,
+or one whose dependencies are offline
 (`PUTNAMI_OFFLINE_DEPENDENCIES=1`), installs no toolchain: it runs the one the
 machine holds. A runtime toolchain candidate `{"from": "provisioned"}` names
 the executable of that folder.

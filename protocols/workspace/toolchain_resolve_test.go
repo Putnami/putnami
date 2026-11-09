@@ -180,6 +180,21 @@ func TestValidateToolchainResolveAnswer(t *testing.T) {
 		{"pin without the host archive", func(q *ToolchainResolveRequest, _ *ToolchainResolveResult) {
 			q.Platform = "windows/arm64"
 		}, "required-field", "toolchains.go.pin.archives.windows/arm64"},
+		{"locked entry kept for a host it does not cover", func(q *ToolchainResolveRequest, r *ToolchainResolveResult) {
+			q.Platform = "windows/arm64"
+			q.Locked["go"] = *r.Toolchains["go"].Pin
+		}, "", ""},
+		{"changed pin for a host it does not cover", func(q *ToolchainResolveRequest, r *ToolchainResolveResult) {
+			q.Platform = "windows/arm64"
+			q.Locked["go"] = *r.Toolchains["go"].Pin
+			changed := *r.Toolchains["go"].Pin
+			changed.Version = "1.26.2"
+			r.Toolchains["go"] = ToolchainResolution{Pin: &changed}
+		}, "required-field", "toolchains.go.pin.archives.windows/arm64"},
+		{"locked entry of another identity", func(q *ToolchainResolveRequest, r *ToolchainResolveResult) {
+			q.Platform = "windows/arm64"
+			q.Locked["golangci-lint"] = *r.Toolchains["go"].Pin
+		}, "required-field", "toolchains.go.pin.archives.windows/arm64"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

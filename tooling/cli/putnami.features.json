@@ -2953,7 +2953,8 @@
               "a-complete-folder-is-reused-without-a-request",
               "a-held-release-is-not-downloaded",
               "a-folder-of-another-layout-keeps-its-entries",
-              "a-hosted-or-offline-run-installs-nothing"
+              "a-hosted-or-offline-run-installs-nothing",
+              "a-pin-with-no-host-archive-installs-nothing-when-optional"
             ]
           }
         },

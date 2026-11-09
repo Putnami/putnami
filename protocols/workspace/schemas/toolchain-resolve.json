@@ -68,7 +68,7 @@
         },
         "platform": {
           "allOf": [{ "$ref": "#/definitions/platform" }],
-          "description": "Host platform. Every pin the answer records must cover it."
+          "description": "Host platform. Every pin the answer records must cover it, except the identity's locked entry kept as sent."
         },
         "offline": {
           "type": "boolean",
@@ -102,7 +102,7 @@
       "properties": {
         "pin": {
           "allOf": [{ "$ref": "https://putnami.dev/schemas/putnami-lock.json#/definitions/toolchainEntry" }],
-          "description": "A lock version 5 toolchain entry, which the lock records as written. It covers the request's platform with both an integrity and an archive."
+          "description": "A lock version 5 toolchain entry, which the lock records as written. It covers the request's platform with both an integrity and an archive, unless it is the identity's locked entry kept as sent."
         },
         "problem": { "$ref": "#/definitions/toolchainProblem" }
       }

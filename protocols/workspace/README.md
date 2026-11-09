@@ -350,8 +350,10 @@ handled, err := workspace.ServeToolchainResolve(os.Args[1:], os.Stdin, os.Stdout
   v5 entry rules, through the function `ValidateLock` uses.
   `ValidateToolchainResolveAnswer` holds the result to its request: the asked
   extension, only asked identities, and pins that cover the host platform with
-  both an integrity and an archive. `ServeToolchainResolve` runs both before a
-  byte reaches stdout.
+  both an integrity and an archive. A pin that is the identity's locked entry,
+  kept as sent, may leave the host out: an extension that cannot pin for this
+  host keeps the committed pin for the platforms it serves instead of removing
+  it. `ServeToolchainResolve` runs both before a byte reaches stdout.
 
 Codes: `invalid-toolchain-resolve-version` at `version`, `conflicting-field` for
 a pin with a problem, `unknown-reference` for an identity the request does not

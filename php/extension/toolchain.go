@@ -94,9 +94,10 @@ func answerToolchainResolve(root string, request wsproto.ToolchainResolveRequest
 // releases every component accepts, or the root accepts when no release
 // suits every component. A committed pin of an accepted shipped release is kept;
 // otherwise it is defaultVersion when accepted, else the highest accepted
-// shipped release. A workspace with no composer.json outside vendor/, or
-// whose root states a version it cannot read, pins nothing: its tasks report
-// that statement.
+// shipped release. On a platform no shipped archive serves, a committed pin
+// of the chosen release is kept as committed, and nothing else is pinned. A
+// workspace with no composer.json outside vendor/, or whose root states a
+// version it cannot read, pins nothing: its tasks report that statement.
 func resolvePin(root string, request wsproto.ToolchainResolveRequest, profile stacks.Profile) (wsproto.LockToolchainEntry, bool) {
 	found, _ := composer.Candidates(root)
 	if len(found) == 0 {
@@ -116,11 +117,17 @@ func resolvePin(root string, request wsproto.ToolchainResolveRequest, profile st
 	if len(everyComponent) > 0 {
 		accepted = everyComponent
 	}
-	chosen, ok := choose(accepted, request.Locked[LockIdentity].Version)
+	committed, locked := request.Locked[LockIdentity]
+	chosen, ok := choose(accepted, committed.Version)
 	if !ok {
 		return wsproto.LockToolchainEntry{}, false
 	}
 	if _, served := chosen.digests[request.Platform]; !served {
+		// No archive serves this host: the committed pin of the chosen release
+		// stays as committed, for the platforms it serves (ADR 0006).
+		if locked && committed.Version == chosen.version {
+			return committed, true
+		}
 		return wsproto.LockToolchainEntry{}, false
 	}
 	return chosen.lockEntry(), true
