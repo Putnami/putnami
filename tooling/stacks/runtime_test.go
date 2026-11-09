@@ -149,7 +149,12 @@ func TestHasMarkerReadsTheMarkerAloneAsAPattern(t *testing.T) {
 }
 
 func TestAStepRunsTheExtensionRuntimeCommand(t *testing.T) {
-	root := t.TempDir()
+	// The shell prints its resolved working directory, so the root is
+	// compared resolved: on macOS the temporary directory is a symlink.
+	root, err := filepath.EvalSymlinks(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
 	writeFile(t, root, "App/.kit-version", "1.0\n")
 	bin := t.TempDir()
 	writeFile(t, bin, "kit", "#!/bin/sh\necho 'kit 1.0'\n")
