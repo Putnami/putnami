@@ -473,3 +473,29 @@ func TestTheManifestConformsToTheStackCore(t *testing.T) {
 	}
 	stackstest.CheckManifest(t, "putnami.extension.json", s)
 }
+
+func TestTheSyncJobPreviewsAnotherModeAndWritesNothing(t *testing.T) {
+	spectest.Proves(t, feature, "sync-writes-the-project-graph", "the-sync-writes-each-project-putnami-json-in-both-modes")
+	root := repository(t, readDemo(t), ModeImport)
+	var events strings.Builder
+	emit := jsonl.New()
+	emit.Observe(func(message string) { events.WriteString(message + "\n") })
+	ctx := &pctx.Context{WorkspaceRoot: root, Params: pctx.Params{"dryRun": json.RawMessage(`true`), ModeOption: json.RawMessage(`"delegate"`)}}
+	status, data, err := RunSync(ctx, emit, nil)
+	if err != nil || status != "OK" || data["mode"] != ModeDelegate || data["dryRun"] != true {
+		t.Fatalf("status %s, data %v, err %v", status, data, err)
+	}
+	if _, err := os.Stat(filepath.Join(root, "apps/api/putnami.json")); !os.IsNotExist(err) {
+		t.Errorf("a dry run writes no putnami.json: %v", err)
+	}
+	for _, want := range []string{"apps/api/putnami.json would change (delegate mode)", "+++ b/apps/api/putnami.json", "@demo/api:start no Putnami task runs it"} {
+		if !strings.Contains(events.String(), want) {
+			t.Errorf("the dry run's output lacks %q:\n%s", want, events.String())
+		}
+	}
+	// An unknown mode fails the job.
+	ctx.Params[ModeOption] = json.RawMessage(`"mirror"`)
+	if status, _, _ := RunSync(ctx, emit, nil); status != "FAILED" {
+		t.Errorf("an unknown mode: %s", status)
+	}
+}

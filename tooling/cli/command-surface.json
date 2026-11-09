@@ -508,6 +508,10 @@
       "path": "init",
       "flags": [
         {
+          "long": "--apply",
+          "type": "bool"
+        },
+        {
           "long": "--channel",
           "type": "value"
         },
@@ -529,7 +533,16 @@
           "type": "value",
           "values": [
             "bazel",
+            "nx",
             "pants"
+          ]
+        },
+        {
+          "long": "--mode",
+          "type": "value",
+          "values": [
+            "delegate",
+            "import"
           ]
         },
         {
@@ -1006,6 +1019,10 @@
       "path": "workspace init",
       "flags": [
         {
+          "long": "--apply",
+          "type": "bool"
+        },
+        {
           "long": "--channel",
           "type": "value"
         },
@@ -1027,7 +1044,16 @@
           "type": "value",
           "values": [
             "bazel",
+            "nx",
             "pants"
+          ]
+        },
+        {
+          "long": "--mode",
+          "type": "value",
+          "values": [
+            "delegate",
+            "import"
           ]
         },
         {

@@ -429,7 +429,7 @@ Initialize a new workspace
 **Usage**
 
 ```
-putnami init [--workspace <name>] [--extension <ts|go|py> | --from <bazel|pants>] [--project <name>] [--project-path <path>] [--channel <channel>] [--force]
+putnami init [--workspace <name>] [--extension <ts|go|py> | --from <bazel|nx|pants> [--mode <import|delegate>] [--apply]] [--project <name>] [--project-path <path>] [--channel <channel>] [--force]
 ```
 
 **Flags**
@@ -438,7 +438,9 @@ putnami init [--workspace <name>] [--extension <ts|go|py> | --from <bazel|pants>
 |------|-------------|
 | `--workspace` <name> | Workspace name override |
 | `--extension` <ts|go|py> | Default extension to install |
-| `--from` <bazel|pants> | Turn the repository a monorepo tool describes into a workspace: declare the tool's extension and synchronize its packages as projects |
+| `--from` <bazel|nx|pants> | Turn the repository a monorepo tool describes into a workspace: declare the tool's extension and synchronize its packages as projects; rerun in the workspace to preview what would change |
+| `--mode` <import|delegate> | With --from: import hands the targets Putnami can map to its runner and cache, delegate keeps the tool running each target with its cache (default: asked in a terminal, else import; Bazel and Pants delegate) |
+| `--apply` | With --from in an existing workspace: record the mode and synchronize, instead of previewing |
 | `--project` <name> | Create an initial project |
 | `--project-path` <path> | Workspace-relative path for the initial project |
 | `--channel` <channel> | Resolve the extensions, the template and the starter dependencies on one release channel (default: PUTNAMI_CHANNEL, then the channel the CLI was installed from, then latest) |
@@ -452,6 +454,8 @@ putnami init [--workspace <name>] [--extension <ts|go|py> | --from <bazel|pants>
 - `putnami init --project my-app --channel canary`
 - `putnami init --from bazel`
 - `putnami init --from pants`
+- `putnami init --from nx --mode delegate`
+- `putnami init --from nx --mode import --apply`
 
 ### `putnami workspace describe`
 

@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"os"
 	"path"
 	"path/filepath"
@@ -53,6 +52,9 @@ const (
 	// CodeUnmapped is a target the sync maps to no Putnami task, or that
 	// keeps running through Nx in import mode.
 	CodeUnmapped = "nx.target_unmapped"
+	// CodeSyncPreview is a putnami.json a dry run would change, with its
+	// diff.
+	CodeSyncPreview = "nx.sync_preview"
 )
 
 // lifecycleTasks are the Putnami tasks a Nx target maps to, by name.
@@ -248,15 +250,27 @@ func readWorkspace(root string) (*workspaceDoc, error) {
 }
 
 // declaresExtension reports whether the workspace at root declares the
-// extension, by name or by a path whose last segment is its language
-// extension directory.
+// extension: by name, or by a path whose manifest states that name.
 func declaresExtension(root, name string) bool {
 	doc, err := readWorkspace(root)
 	if err != nil || doc == nil {
 		return false
 	}
 	for _, e := range doc.Extensions {
-		if e == name || (name == TypeScriptExtension && strings.HasSuffix(e, "/typescript/extension")) {
+		if e == name {
+			return true
+		}
+		if !strings.HasPrefix(e, "/") && !strings.HasPrefix(e, ".") {
+			continue
+		}
+		data, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(strings.TrimPrefix(e, "/")), "putnami.extension.json")) //nolint:gosec // a manifest the workspace declares
+		if err != nil {
+			continue
+		}
+		var manifest struct {
+			Name string `json:"name"`
+		}
+		if json.Unmarshal(data, &manifest) == nil && manifest.Name == name {
 			return true
 		}
 	}
@@ -762,22 +776,23 @@ func RunSync(ctx *pctx.Context, emit *jsonl.Emitter, _ []string) (string, map[st
 		emit.Info("no nx.json at the workspace root: no Nx project to synchronize")
 		return "OK", nil, nil
 	}
-	report(emit, os.Stderr, result, dry)
+	report(emit, result, dry)
 	return "OK", map[string]any{"mode": result.Mode, "written": result.Written, "retracted": result.Retracted, "unmapped": result.Unmapped, "dryRun": dry}, nil
 }
 
-// report prints the summary, each unmapped target and, in a dry run, the
-// diff of each change.
-func report(emit *jsonl.Emitter, out io.Writer, result SyncResult, dry bool) {
+// report prints the summary, each unmapped target as a warning and, in a dry
+// run, each change as a warning that carries its diff, so the run's output
+// shows them.
+func report(emit *jsonl.Emitter, result SyncResult, dry bool) {
 	emit.Info(syncSummary(result, dry))
 	for _, u := range result.Unmapped {
-		emit.DiagnosticWithCode("info", fmt.Sprintf("%s:%s %s", u.Project, u.Target, u.Reason), "", 0, 0, CodeUnmapped)
+		emit.DiagnosticWithCode("warning", fmt.Sprintf("%s:%s %s", u.Project, u.Target, u.Reason), "", 0, 0, CodeUnmapped)
 	}
 	if !dry {
 		return
 	}
 	for _, c := range result.Changes {
-		_, _ = io.WriteString(out, Diff(c.File, c.Before, c.After))
+		emit.DiagnosticWithCode("warning", fmt.Sprintf("%s would change (%s mode):\n%s", c.File, result.Mode, strings.TrimSuffix(Diff(c.File, c.Before, c.After), "\n")), c.File, 0, 0, CodeSyncPreview)
 	}
 }
 

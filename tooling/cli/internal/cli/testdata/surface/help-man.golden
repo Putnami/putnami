@@ -398,7 +398,7 @@ Initialize a new workspace.
 .PP
 .B Usage:
 .br
-putnami init [--workspace <name>] [--extension <ts|go|py> | --from <bazel|pants>] [--project <name>] [--project-path <path>] [--channel <channel>] [--force]
+putnami init [--workspace <name>] [--extension <ts|go|py> | --from <bazel|nx|pants> [--mode <import|delegate>] [--apply]] [--project <name>] [--project-path <path>] [--channel <channel>] [--force]
 .TP
 .B --workspace
 Workspace name override.
@@ -407,7 +407,13 @@ Workspace name override.
 Default extension to install.
 .TP
 .B --from
-Turn the repository a monorepo tool describes into a workspace: declare the tool's extension and synchronize its packages as projects.
+Turn the repository a monorepo tool describes into a workspace: declare the tool's extension and synchronize its packages as projects; rerun in the workspace to preview what would change.
+.TP
+.B --mode
+With --from: import hands the targets Putnami can map to its runner and cache, delegate keeps the tool running each target with its cache (default: asked in a terminal, else import; Bazel and Pants delegate).
+.TP
+.B --apply
+With --from in an existing workspace: record the mode and synchronize, instead of previewing.
 .TP
 .B --project
 Create an initial project.
