@@ -4,9 +4,10 @@
 `PORT` names, and `GET /robots.txt` the file its target ships as a resource,
 which the image holds in the resource bundle beside the executable.
 
-The project carries the `e2e` tag, so the default gate skips it. To run it,
-you need a Swift 6.3 or 6.4 toolchain from swift.org on `PATH`. `package`
-installs the Static Linux SDK of that Swift the first time.
+The project carries the `e2e` tag, so the default gate skips it. Its
+`.swift-version` states Swift 6.4: a task installs that release from swift.org
+under the Putnami home when `PATH` has none, and `package` installs its Static
+Linux SDK the first time. The Swift of Xcode cannot build with that SDK.
 
 ```bash
 putnami install
