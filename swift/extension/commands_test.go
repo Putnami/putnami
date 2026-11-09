@@ -48,6 +48,17 @@ func TestSwiftPMTestExportsTheLCOVOfTheTestBinary(t *testing.T) {
 	if ran := s.ran(t); !strings.Contains(ran, "ClientTests.xctest/Contents/MacOS/ClientTests -object "+filepath.Join(pkg, ".build/debug/ServerTests.xctest/Contents/MacOS/ServerTests")) {
 		t.Errorf("llvm-cov reads every test target bundle: %s", ran)
 	}
+	// On Linux, each test target is a library its test runner loads.
+	_ = os.RemoveAll(filepath.Join(pkg, ".build/debug/ClientTests.xctest"))
+	_ = os.RemoveAll(filepath.Join(pkg, ".build/debug/ServerTests.xctest"))
+	writeFile(t, pkg, ".build/debug/ClientTests-test-runner", "")
+	writeFile(t, pkg, ".build/debug/ClientTests.so", "")
+	if err := exportLCOV(io.Discard, nil, filepath.Join(pkg, "lcov.info")); err != nil {
+		t.Fatal(err)
+	}
+	if ran := s.ran(t); !strings.Contains(ran, filepath.Join(pkg, ".build/debug/ClientTests.so")+"\n") {
+		t.Errorf("llvm-cov reads the library of the test runner: %s", ran)
+	}
 	_ = os.RemoveAll(filepath.Join(pkg, ".build"))
 	if err := cmd([]string{"--output", "out", "--", "-c", "release", "--filter", "ClientTests"}, io.Discard, io.Discard); err != nil {
 		t.Fatal(err)

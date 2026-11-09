@@ -11,7 +11,7 @@ Linux SDK the first time. The Swift of Xcode cannot build with that SDK.
 
 ```bash
 putnami install
-putnami lint,build --tag e2e --projects swift-example-application
+putnami lint,test,build --tag e2e --projects swift-example-application
 putnami serve --projects swift-example-application --port 3456
 putnami qualify swift-example-application --target local
 putnami package --docker --docker-load --projects swift-example-application

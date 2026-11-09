@@ -352,17 +352,27 @@ func lastLine(s string) string {
 }
 
 // testBinaries finds the test products of a package in its bin path. The
-// native build system writes one, <Package>PackageTests.xctest; the Swift
-// Build backend, the default of Swift 6.4 on macOS, writes one per test
-// target, <Target>.xctest. A product is a file on Linux, a bundle whose
-// executable is Contents/MacOS/<name> on macOS.
+// native build system writes one, <Package>PackageTests.xctest, a file on
+// Linux and a bundle whose executable is Contents/MacOS/<name> on macOS. The
+// Swift Build backend of Swift 6.4 writes one per test target: the bundle
+// <Target>.xctest on macOS, and on Linux the library <Target>.so that
+// <Target>-test-runner loads.
 func testBinaries(binPath string) ([]string, error) {
 	matches, _ := filepath.Glob(filepath.Join(binPath, "*PackageTests.xctest"))
 	if len(matches) == 0 {
 		matches, _ = filepath.Glob(filepath.Join(binPath, "*.xctest"))
 	}
 	if len(matches) == 0 {
-		return nil, fmt.Errorf("no *PackageTests.xctest or test target .xctest in %s: the package has no test target, or swift test did not build it", binPath)
+		runners, _ := filepath.Glob(filepath.Join(binPath, "*-test-runner"))
+		for _, runner := range runners {
+			library := strings.TrimSuffix(runner, "-test-runner") + ".so"
+			if _, err := os.Stat(library); err == nil {
+				matches = append(matches, library)
+			}
+		}
+	}
+	if len(matches) == 0 {
+		return nil, fmt.Errorf("no *PackageTests.xctest, <Target>.xctest or <Target>.so beside <Target>-test-runner in %s: the package has no test target, or swift test did not build it", binPath)
 	}
 	sort.Strings(matches)
 	out := make([]string, 0, len(matches))

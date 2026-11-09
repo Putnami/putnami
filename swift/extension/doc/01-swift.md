@@ -343,7 +343,3 @@ An override that names an unknown member, changes `id`, `markers` or
   musl does not offer, or that needs the Foundation of a native Linux build,
   cannot be packaged: it builds its own image.
 - An arm64 image is assembled as an amd64 one is; no test runs one.
-- With the build layout of Swift 6.4, where a test target builds to
-  `<Target>.so` beside `<Target>-test-runner`, the test task finds no
-  `*PackageTests.xctest` to export coverage from, and fails after the tests
-  pass.
