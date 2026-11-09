@@ -385,7 +385,7 @@ restores them and reads the same totals.
 A build system with its own hermetic cache, Pants or Bazel, is delegated to:
 its profile sets `"delegated": true`, and Putnami runs the tool on each
 affected component instead of importing its targets
-([ADR 0007](adr/0007-a-delegated-stack-keeps-its-tool-cache.md)).
+([ADR 0008](adr/0008-a-delegated-stack-keeps-its-tool-cache.md)).
 
 - Every task of the extension's manifest sets `cache.enabled` to `false`, and
   the conformance kit holds the manifest to it: Putnami stores no entry and
