@@ -55,8 +55,10 @@ The runtime commands:
 - `swiftpm-test` runs `swift test --force-resolved-versions
   --enable-code-coverage --parallel --xunit-output {output}/xunit.xml`, with
   the arguments after `--`, then exports the coverage to LCOV: `llvm-cov
-  export` of the package's test binary with `default.profdata`, kept to the
-  files under the package outside `.build` and `Tests`. It runs `llvm-cov`
+  export` of the package's test products with `default.profdata`, kept to the
+  files under the package outside `.build` and `Tests`. The products are
+  `<Package>PackageTests.xctest`, or with the Swift Build layout of Swift 6.4
+  each `<Target>.xctest` on macOS and each `<Target>.so` on Linux. It runs `llvm-cov`
   from `PATH`, else through `xcrun`. A `swift test` that exits non-zero with
   a failed case lets the task read the failed cases; one with no failed case,
   a compile error for instance, fails the step. SwiftPM writes no coverage
@@ -165,8 +167,10 @@ of the selected Swift, so the same command packages from macOS and from Linux
    extension pins the checksum of the SDK of each release from 6.4.0 to
    6.4.2; another release fails with `swift.static_sdk_unavailable` and names
    the pinned ones. Before 6.4, SwiftPM selects an SDK of the bundle
-   whatever `--triple` names, so no earlier release is pinned. The Swift of Xcode cannot build with the SDK: on macOS, select
-   a swift.org toolchain with swiftly or the swift.org installer.
+   whatever `--triple` names, so no earlier release is pinned. The Swift of
+   Xcode cannot build with the SDK: on macOS, state a swift.org release in
+   `.swift-version`, which a task installs when `PATH` has none, or select one
+   with swiftly or the swift.org installer.
 2. When `swift sdk list` does not name the SDK, `swift sdk install <url>
    --checksum <pin>` installs it, once per machine: one install of a bundle
    runs at a time.
