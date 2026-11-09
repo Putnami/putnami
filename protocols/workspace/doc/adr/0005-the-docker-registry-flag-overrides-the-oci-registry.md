@@ -11,14 +11,15 @@
 ## Context
 
 ADR 0002 makes `registries.<ecosystem>` the place a workspace declares its
-registry endpoints. The `publish` command of the Go and TypeScript extensions
-also declares a `--docker-registry` flag, and the documentation describes it as
-an override for one push.
+registry endpoints. The `publish` command of every extension that publishes a
+Docker image also declares a `--docker-registry` flag, and the documentation
+describes it as an override for one push.
 
 The CLI delivers a command flag to a job in the job parameters, and a job
-cannot tell a flag from a configuration option: `options.publish`,
-`options.<extension>` and `options.<extension>:publish` set the same
-parameter. Any reader of the flag therefore also reads those options.
+cannot tell a flag from a configuration option: `options["*"]`,
+`options.publish`, `options.<extension>` and `options.<extension>:publish`, in
+the workspace or in a project, set the same parameter. Any reader of the flag
+therefore also reads those options.
 
 ## Decision
 
@@ -34,5 +35,5 @@ parameter. Any reader of the flag therefore also reads those options.
 - `registries.oci.publish` stays the workspace's declared registry. The flag
   and the option change the target of the projects they reach, and nothing
   else.
-- A project that sets `options.publish["docker-registry"]` publishes there,
-  whatever the workspace declares.
+- A workspace or project that sets a `docker-registry` option publishes
+  there, whatever `registries.oci.publish` declares.
