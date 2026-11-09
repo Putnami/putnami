@@ -44,8 +44,8 @@ fails.
 - The same command packages the same image on macOS and on Linux, for
   `linux/amd64` and `linux/arm64`, from any of these machines.
 - The image holds one file of the build and the resource bundles beside it; it
-  has no shell and no package manager, and runs as the `nonroot` user of the
-  base, listening on `PORT`.
+  has no shell and no package manager, and runs as the user 65532, the
+  `nonroot` user of distroless, on any base, listening on `PORT`.
 - The Static Linux SDK needs a toolchain from swift.org: the Swift of Xcode
   cannot use it, so a macOS machine packages with a toolchain that swiftly or
   the swift.org installer provides.
