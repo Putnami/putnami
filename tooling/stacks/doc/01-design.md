@@ -411,11 +411,10 @@ Each tool of `tools` is checked the same way after the toolchain, in the
 order of its name, with its own files, its own `version` and its own `check`,
 which a project sets as `tools.<name>.check`. It is read the way the steps
 reach it: beside a provisioned toolchain, or on the task's PATH, which holds
-the directories `Stack.Tools` adds; a step's program named without a path
-that the extension's own PATH does not hold is looked up on that PATH too. Nothing provides a tool, so it names no
-`provisioned`. The probe records its expected
-version under `tools.<name>` in the project metadata, so it reaches the key
-too.
+the directories `Stack.Tools` adds, as a step's program named without a path
+is. Nothing provides a tool, so it names no `provisioned`. The probe records
+its expected version under `tools.<name>` in the project metadata, so it
+reaches the key too.
 
 ## Reports
 

@@ -48,7 +48,8 @@ component with Ruby test files that match neither runner, such as the
 choice, the component's `rspec`, `minitest` or `untested` variant, so it
 reaches the cache key through the project metadata; the workspace adapter
 hashes the Ruby files under `spec/` and `test/`, so adding or removing one
-asks the probe again.
+asks the probe again. Each command reads them to decide whether the
+workspace changed: about half a second for 18,000 spec files.
 Tests run from the stack root because a pack's specs load the application's
 `.rspec`, `spec_helper` or `test_helper`. There is no build task: Ruby has no
 compile step, and a gem reaches its registry through `gem push`.
@@ -149,9 +150,9 @@ Every set leaves out `vendor/`, `node_modules/` and `tmp/`, and `component`
 also `log/`, `coverage/`, `storage/`, `.bundle/`, Putnami's `.gen/`, `db/*.sqlite3*`,
 `public/assets/`, `public/packs/`, `.rspec_status` and `spec/examples.txt`:
 what a run or an install writes is no input. An exclusion never leaves out
-the component's `putnami.json`, `.ruby-version`, `.tool-versions`,
-`Gemfile.lock` or a Ruby file under `spec/` or `test/`, since they decide
-the steps. `.ruby-version`, `.tool-versions` and `Gemfile.lock`, in the component
+the component's `putnami.json`, `.ruby-version`, `.tool-versions` or
+`Gemfile.lock`; the Ruby files under `spec/` and `test/`, which decide the
+variant, reach the key through the probe's metadata. `.ruby-version`, `.tool-versions` and `Gemfile.lock`, in the component
 and at the stack root, are inputs of every task: the lockfile pins RuboCop as
 well as the test gems. Lint reads the files RuboCop inspects, not a fixture,
 an ERB view or `.rspec`, so a change to them reruns test only. A pack's test
@@ -163,9 +164,8 @@ application: a change there reruns the tests of every pack.
 A component overrides any value of the profile in its own `putnami.json`,
 under `options["@putnami/ruby"]`. An object merges, `null` removes a value,
 such as a task, and any other value, such as a list of steps or patterns,
-replaces the profile's whole. The override
-applies after the RSpec or Minitest choice, and may replace the list of
-variants that makes it.
+replaces the profile's whole. The override applies after the component's
+variant, and cannot change `variants`.
 
 ```json
 {
@@ -191,8 +191,9 @@ profile's; a component that skips RuboCop with
 report elsewhere replaces `tasks.test.reports`. A steps override keeps the
 profile's reports: a test step must still write `{output}/junit.xml` and
 `coverage/coverage.xml`. An override fails the task with
-`stacks.project_config_invalid` when it names an unknown member, changes `id`
-or `markers`, or adds a stack-root input the extension does not declare. The
+`stacks.project_config_invalid` when it names an unknown member, changes `id`,
+`markers` or `variants`, or adds a stack-root input the extension does not
+declare. The
 design of the stack core is in
 [its design note](../../../tooling/stacks/doc/01-design.md).
 
