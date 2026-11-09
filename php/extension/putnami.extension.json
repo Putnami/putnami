@@ -482,9 +482,6 @@
         "test": {
           "from": "params"
         },
-        "t": {
-          "from": "params"
-        },
         "sources": {
           "from": "project",
           "files": [

@@ -404,6 +404,14 @@ type Request struct {
 	// on — because whether its deprecation notices print at all depends on the
 	// resolved Quiet.
 	ValidateCommandFlags func(*extension.DiscoveryResult, GlobalFlags) error
+	// CommandParamRenames, when non-nil, runs right after ValidateCommandFlags
+	// and answers which CommandParams keys move to another name.
+	// It is where the CLI moves a param a flag's short alias spelled to the
+	// flag's long name, which only the resolved extensions declare. Every later
+	// stage, the cache keys and the run markers included, reads the renamed
+	// params. A watch iteration leaves it nil: it forwards the outer run's
+	// renamed params.
+	CommandParamRenames func(*extension.DiscoveryResult) map[string]string
 	// VersionSnapshot is the git-derived version state captured before any in-run
 	// tree mutation. Nil makes the engine capture it itself at the start
 	// of Run, before hooks — which is what the terminal path did.
@@ -710,6 +718,19 @@ func (e *Engine) run(ctx context.Context, req *Request, sink EventSink) (Session
 	if req.ValidateCommandFlags != nil {
 		if err := req.ValidateCommandFlags(discovered, req.Global); err != nil {
 			return SessionResult{ExitCode: protocolcli.ExitCodeForError(err)}, err
+		}
+	}
+	// The renamed params are a new map: an adapter's own map stays as it was.
+	if req.CommandParamRenames != nil {
+		if renames := req.CommandParamRenames(discovered); len(renames) > 0 {
+			params := maps.Clone(req.CommandParams)
+			for from, to := range renames {
+				if value, ok := req.CommandParams[from]; ok {
+					delete(params, from)
+					params[to] = value
+				}
+			}
+			req.CommandParams = params
 		}
 	}
 

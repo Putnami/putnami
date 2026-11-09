@@ -2,8 +2,11 @@ package cli
 
 import (
 	"fmt"
+	"maps"
+	"sort"
 	"strings"
 
+	"go.putnami.dev/cli/model/extension"
 	"go.putnami.dev/protocol/doctor"
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/tooling/cli/internal/env"
@@ -92,4 +95,92 @@ func buildCommandParams(rawArgs []string) map[string]any {
 		}
 	}
 	return params
+}
+
+// shortAliasTargets maps each short alias the declared flags give to the long
+// name it stands for, without dashes: manifests spell an alias "-t" or "t". A
+// short name that is itself a declared long name keeps its own meaning and is
+// left out, as is an alias two declarations give to different long names:
+// neither can be renamed without guessing.
+func shortAliasTargets(declared map[string]extension.FlagDefinition) map[string]string {
+	targets := make(map[string]string)
+	ambiguous := make(map[string]bool)
+	for long, def := range declared {
+		short := strings.TrimLeft(def.Short, "-")
+		if short == "" || short == long {
+			continue
+		}
+		if _, isLong := declared[short]; isLong {
+			continue
+		}
+		if previous, seen := targets[short]; seen && previous != long {
+			ambiguous[short] = true
+			continue
+		}
+		targets[short] = long
+	}
+	for short := range ambiguous {
+		delete(targets, short)
+	}
+	return targets
+}
+
+// shortAliasRenames returns, for each declared short alias the invocation
+// spells before the passthrough separator ("-t x", "-t=x"), the long name its
+// param takes. A token after the separator is the user's payload and is never
+// resolved. It refuses an invocation that spells one flag both by its alias
+// and by its long name, such as `-t a --test b`: both bind the same param, and
+// which value wins is not the user's to guess.
+func shortAliasRenames(rawArgs []string, declared map[string]extension.FlagDefinition) (map[string]string, error) {
+	targets := shortAliasTargets(declared)
+	if len(targets) == 0 {
+		return nil, nil
+	}
+	renames := make(map[string]string)
+	spelledLong := make(map[string]string)
+	for _, token := range jobFlagTokens(rawArgs) {
+		spelling := flagSpelling(token)
+		if !strings.HasPrefix(spelling, "--") {
+			if long, ok := targets[spelling[1:]]; ok {
+				renames[spelling[1:]] = long
+				continue
+			}
+		}
+		spelledLong[flagBaseName(token)] = spelling
+	}
+	shorts := make([]string, 0, len(renames))
+	for short := range renames {
+		shorts = append(shorts, short)
+	}
+	sort.Strings(shorts)
+	for _, short := range shorts {
+		if spelling, both := spelledLong[renames[short]]; both {
+			return nil, usageErrorf("flags -%s and %s name the same flag\n  Pass one of them.", short, spelling)
+		}
+	}
+	return renames, nil
+}
+
+// renameParams returns params with each key renames names moved to the name
+// it maps to, such as a short alias's "t" to its flag's "test", the rename the
+// engine applies to a job command's params (Request.CommandParamRenames). A
+// moved key replaces a value already under the new name. params itself is
+// left unchanged; with nothing to move it is returned as is.
+func renameParams[V any](params map[string]V, renames map[string]string) map[string]V {
+	var renamed map[string]V
+	for from, to := range renames {
+		value, ok := params[from]
+		if !ok {
+			continue
+		}
+		if renamed == nil {
+			renamed = maps.Clone(params)
+		}
+		delete(renamed, from)
+		renamed[to] = value
+	}
+	if renamed == nil {
+		return params
+	}
+	return renamed
 }

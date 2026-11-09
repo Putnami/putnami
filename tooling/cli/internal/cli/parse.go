@@ -431,7 +431,7 @@ func declaredTaskFlags(commands []string, jobMap map[string][]*extension.JobDefi
 
 // jobFlagTokens returns, in order, the flag tokens before the passthrough
 // separator, leaving out each token buildCommandParams binds as a flag's value
-// (takesNextAsValue). It is the one walk undeclaredFlags and
+// (takesNextAsValue). It is the one walk undeclaredFlags, shortAliasRenames and
 // conflictingTaskFlags share.
 func jobFlagTokens(rawArgs []string) []string {
 	args := rawArgs[:passthroughCut(rawArgs)]

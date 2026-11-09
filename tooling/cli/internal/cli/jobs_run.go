@@ -84,6 +84,7 @@ func terminalRequest(parsed *ParsedArgs, cfg *wsproto.Config, wsRoot string, tc 
 		Hooks:                cfg.Hooks,
 		Observer:             newSessionObserver(tc, parsed.OriginalArgs, interactive),
 		ValidateCommandFlags: commandFlagValidator(parsed, os.Stderr),
+		CommandParamRenames:  commandParamRenames(parsed),
 		// The production doctor gate. Unlike the two seams above it is NOT
 		// terminal-only: every adapter wires the same evaluator, because a build
 		// that executes jobs must be gated whichever surface asked for it. It is
@@ -135,14 +136,16 @@ func applyPublishDryRun(req *engine.Request, parsed *ParsedArgs, extensions []*e
 // extension resolution and before selection, rather than in ParseArgs, because
 // only extension discovery knows which flags the selected tasks declare.
 //
-// Two usage errors, both printed to stderr:
+// Three usage errors, all printed to stderr:
 //   - a flag two selected tasks declare INCOMPATIBLY cannot be bound at all,
 //     so the error names the tasks;
 //   - a flag NO selected task declares, and that is neither a CLI global nor a
-//     core job flag, is refused, as a built-in command refuses it.
+//     core job flag, is refused, as a built-in command refuses it;
+//   - a flag spelled both by its short alias and by its long name binds one
+//     param twice, so the error names both spellings.
 //
-// Neither check rewrites RawJobArgs, so commandParams — and every cache key
-// and run marker derived from it — is unchanged.
+// No check rewrites RawJobArgs. The one rename of commandParams, a short
+// alias to its long name, is commandParamRenames'.
 func commandFlagValidator(parsed *ParsedArgs, stderr io.Writer) func(*extension.DiscoveryResult, GlobalFlags) error {
 	return func(discovered *extension.DiscoveryResult, _ GlobalFlags) error {
 		jobMap := extension.BuildJobMap(discovered.Extensions)
@@ -155,12 +158,30 @@ func commandFlagValidator(parsed *ParsedArgs, stderr io.Writer) func(*extension.
 		consumesReleaseSet := slices.ContainsFunc(parsed.Commands, func(command string) bool {
 			return extension.CommandConsumesReleaseSet(discovered.Extensions, command)
 		})
+		declared := declaredTaskFlags(parsed.Commands, jobMap)
 		if err := rejectUndeclaredFlags(strings.Join(parsed.Commands, ","), parsed.RawJobArgs,
-			declaredTaskFlags(parsed.Commands, jobMap), consumesReleaseSet); err != nil {
+			declared, consumesReleaseSet); err != nil {
+			printCommandError(stderr, err)
+			return err
+		}
+		if _, err := shortAliasRenames(parsed.RawJobArgs, declared); err != nil {
 			printCommandError(stderr, err)
 			return err
 		}
 		return nil
+	}
+}
+
+// commandParamRenames returns the engine's CommandParamRenames seam for a job
+// command: the long name of each short alias of a selected task's flag the
+// command line spells, against the same flag surface commandFlagValidator
+// validated. The validator has already refused a flag spelled both ways, so
+// the error cannot occur here.
+func commandParamRenames(parsed *ParsedArgs) func(*extension.DiscoveryResult) map[string]string {
+	return func(discovered *extension.DiscoveryResult) map[string]string {
+		declared := declaredTaskFlags(parsed.Commands, extension.BuildJobMap(discovered.Extensions))
+		renames, _ := shortAliasRenames(parsed.RawJobArgs, declared)
+		return renames
 	}
 }
 

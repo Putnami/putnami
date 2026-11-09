@@ -146,6 +146,8 @@ Each contributor keeps its usual activation rules. A command only joins the comp
 
 Flag merging is deterministic. If two active contributors declare the same flag name, their full flag definitions must be identical. Identical shared flags, such as a common `dry-run` boolean, are merged once. Different definitions for the same flag fail validation before execution with a message naming the command, flag, and conflicting extensions. Contributor-specific flags can use unique names and remain available through the normal `params` map without changing the common command shape.
 
+A flag reaches `params` under its long name, whichever spelling the command line used. When a flag declares a `short` alias, such as `"short": "-t"` on `test`, `putnami test -t Unit` and `putnami test --test Unit` give the job the same `test: Unit` param, the same `{"from": "params"}` task inputs and the same cache key. A job therefore reads one name and never the short one. Spelling one flag both ways, such as `-t a --test b`, is a usage error. Tokens after a bare `--` are passthrough and keep their spelling.
+
 Command groups can point back at the same flat command for compatibility aliases:
 
 ```json
