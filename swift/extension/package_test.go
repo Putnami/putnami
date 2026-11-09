@@ -198,17 +198,21 @@ func TestPackageRefusesWhatItCannotBuildStatic(t *testing.T) {
 }
 
 func TestStaticSDKForNamesThePinnedBundle(t *testing.T) {
-	sdk, err := staticSDKFor("6.3")
+	sdk, err := staticSDKFor("6.4.0")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if sdk.ID != "swift-6.3-RELEASE_static-linux-0.1.0" ||
-		sdk.URL != "https://download.swift.org/swift-6.3-release/static-sdk/swift-6.3-RELEASE/swift-6.3-RELEASE_static-linux-0.1.0.artifactbundle.tar.gz" ||
-		sdk.Checksum != staticSDKs["6.3"].checksum {
+	if sdk.ID != "swift-6.4.0-RELEASE_static-linux-0.1.0" ||
+		sdk.URL != "https://download.swift.org/swift-6.4.0-release/static-sdk/swift-6.4.0-RELEASE/swift-6.4.0-RELEASE_static-linux-0.1.0.artifactbundle.tar.gz" ||
+		sdk.Checksum != staticSDKs["6.4.0"].checksum {
 		t.Errorf("sdk = %+v", sdk)
 	}
-	if _, err := staticSDKFor("6.9.9"); err == nil || !strings.Contains(err.Error(), "6.4.2") {
-		t.Errorf("an unpinned release names the pinned ones: %v", err)
+	// A release before 6.4 selects an SDK of the bundle whatever --triple
+	// names, so none is pinned.
+	for _, release := range []string{"6.3", "6.3.3", "6.9.9"} {
+		if _, err := staticSDKFor(release); err == nil || !strings.Contains(err.Error(), "6.4.0, 6.4.1, 6.4.2") {
+			t.Errorf("the unpinned %s names the pinned releases: %v", release, err)
+		}
 	}
 }
 

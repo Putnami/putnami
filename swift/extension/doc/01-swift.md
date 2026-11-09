@@ -162,9 +162,10 @@ of the selected Swift, so the same command packages from macOS and from Linux
 ([ADR 0001](adr/0001-an-application-image-holds-a-static-binary.md)):
 
 1. `swift --version` names the swift.org release, such as `6.4.2`. The
-   extension pins the checksum of the SDK of each release from 6.3 to 6.4.2;
-   another release fails with `swift.static_sdk_unavailable` and names the
-   pinned ones. The Swift of Xcode cannot build with the SDK: on macOS, select
+   extension pins the checksum of the SDK of each release from 6.4.0 to
+   6.4.2; another release fails with `swift.static_sdk_unavailable` and names
+   the pinned ones. Before 6.4, SwiftPM selects an SDK of the bundle
+   whatever `--triple` names, so no earlier release is pinned. The Swift of Xcode cannot build with the SDK: on macOS, select
    a swift.org toolchain with swiftly or the swift.org installer.
 2. When `swift sdk list` does not name the SDK, `swift sdk install <url>
    --checksum <pin>` installs it, once per machine: one install of a bundle

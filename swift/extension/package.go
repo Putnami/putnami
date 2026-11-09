@@ -59,12 +59,10 @@ const (
 
 // staticSDKs are the Static Linux SDK of each Swift release the extension
 // supports: the SDK version of its artifact bundle and the bundle's SHA-256,
-// as swift.org publishes them.
+// as swift.org publishes them. It starts at 6.4.0: the bundle holds the
+// x86_64 and aarch64 SDKs, and the SwiftPM of an earlier release picks one of
+// them whatever --triple names.
 var staticSDKs = map[string]struct{ version, checksum string }{
-	"6.3":   {"0.1.0", "d2078b69bdeb5c31202c10e9d8a11d6f66f82938b51a4b75f032ccb35c4c286c"},
-	"6.3.1": {"0.1.0", "fac05271c1f7d060bd203240ce5251d5ca902d30ac899f553765dbb3a88b97ad"},
-	"6.3.2": {"0.1.0", "3fd798bef6f4408f1ea5a6f94ce4d4052830c4326ab85ebc04f983f01b3da407"},
-	"6.3.3": {"0.1.0", "87c3eaf908e67c0e13a84367119e12273cec1d2cd3d81f7d74bb36722d6b607b"},
 	"6.4.0": {"0.1.0", "47d2fd89eebfdf9eb4d536b6710414297f755c17926cdebc4742c08982b40a9e"},
 	"6.4.1": {"0.1.0", "cef5592d7430ed3c5ae1ddda479849c6f5252bd94a5723db1559f984caf38a7c"},
 	"6.4.2": {"0.1.0", "3786b179936d9cc9e266dd506bd1654176358d7b25288e243359f4d17cc4dc5a"},
