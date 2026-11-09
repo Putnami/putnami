@@ -46,6 +46,9 @@
   ],
   "variants": {
     "swiftpm": {
+      "toolchain": {
+        "provisioned": "PUTNAMI_SWIFT_EXECUTABLE"
+      },
       "tasks": {
         "lint": {
           "steps": [

@@ -549,6 +549,30 @@ func TestAnOfflineTaskProvidesNothing(t *testing.T) {
 	}
 }
 
+func TestAProfileWithNoProvisionedToolchainInstallsNothing(t *testing.T) {
+	root := t.TempDir()
+	writeFile(t, root, "crates/api/Cargo.toml", "")
+	t.Setenv("PATH", t.TempDir())
+	t.Setenv(extensionproto.OfflineDependenciesEnv, "")
+	s, calls := provideStack(t, t.TempDir(), "1.82.0")
+	// A variant such as an Xcode project's names no provisioned toolchain:
+	// it keeps its check only.
+	s.Profile.Toolchain.Provisioned = ""
+	status, _, rec := runTask(t, s, root, TaskLint)
+	if status != statusFailed || !strings.Contains(rec.codes(), CodeToolchainMissing) || strings.Contains(strings.Join(rec.diags, " "), "network") {
+		t.Errorf("status %s: %v", status, rec.diags)
+	}
+	ctx := &pctx.Context{WorkspaceRoot: root, WorkspaceProjects: []pctx.ProjectRef{{Name: "crates/api", Path: "crates/api", Extensions: []string{s.Extension}}}}
+	ran := false
+	step := func(context.Context, RootStep, *jsonl.Emitter) error { ran = true; return nil }
+	if status, _, err := s.WorkspaceRootJob(WarnOnMissingToolchain, step)(ctx, jsonl.New(), nil); status != statusOK || err != nil || ran {
+		t.Errorf("a workspace job leaves it out: %s %v ran=%v", status, err, ran)
+	}
+	if *calls != 0 {
+		t.Errorf("Provide ran %d times", *calls)
+	}
+}
+
 func TestAFailedInstallIsAMissingToolchain(t *testing.T) {
 	root := t.TempDir()
 	writeFile(t, root, "crates/api/Cargo.toml", "")

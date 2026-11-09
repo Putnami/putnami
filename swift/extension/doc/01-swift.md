@@ -3,8 +3,9 @@
 `@putnami/swift` turns each Swift package and each Xcode project of a
 repository into a Putnami project, and runs its lint, test and build with the
 tools the team already uses: `swift` for a package, `xcodebuild` for an Xcode
-project. It reads the repository the way `putnami observe` does, and it never
-installs a toolchain.
+project. It reads the repository the way `putnami observe` does. On a machine
+with no Swift, or with a Swift outside the release a package states, a package
+task installs that release under the Putnami home; it never installs Xcode.
 
 ## Adopt it
 
@@ -107,7 +108,8 @@ workspace's components, except the projects `disable.tags` excludes:
 | Package | `swift package resolve --force-resolved-versions`, except when its last successful resolve used its current `Package.swift`, `Package@swift-*.swift` and `Package.resolved`; `--force` resolves it as well |
 | Xcode project | `xcodebuild -resolvePackageDependencies -onlyUsePackageVersionsFromResolvedFile` |
 
-With no Swift on the machine, it warns and passes. With offline dependencies,
+With no Swift on the machine, a package installs its Swift as a task does,
+and an Xcode project without Xcode warns and passes. With offline dependencies,
 as in a hosted run, it resolves nothing ahead of time: `swift build` and
 `xcodebuild` then resolve the pinned versions themselves, over the network the
 runner allows.
@@ -153,6 +155,37 @@ A version with fewer components names the releases it prefixes: `6.0` matches
 `toolchain.check` to `warn` to run anyway. A component that states no version
 gets `stacks.toolchain_unpinned`, a warning, and its cache key carries no
 toolchain version.
+
+## Swift installed at task time
+
+A package task whose `swift` is missing, or outside the release its
+`.swift-version` states, installs that release, or 6.4.2 when the package
+states none, and runs it. A `swift` on `PATH` that satisfies the statement
+always runs, and nothing is installed.
+
+- The install runs [swiftly](https://github.com/swiftlang/swiftly) 1.2.0,
+  which the extension downloads and checks against the SHA-256 it pins for
+  Linux (x86_64, aarch64) and macOS. It runs with a home, a toolchains
+  directory and a gpg keyring of its own under
+  `<Putnami home>/tools/swift`, so the machine's swiftly, toolchains and
+  keyring stay untouched. On Linux, swiftly checks the toolchain's signature
+  with `gpg`, which the machine provides.
+- `.swift-version` names a release: `6`, `6.4` or `6.4.2`, as swiftly takes
+  it; `6.4` installs the newest 6.4 patch. Any other statement, such as a
+  snapshot, is refused: put a matching `swift` on `PATH`.
+- Each release installs once per machine: a later task, in any workspace,
+  runs the release an earlier one installed.
+- On Linux, a toolchain needs system packages, such as `libcurl` and
+  `libxml2` headers. Installing them takes root, so the task says which ones
+  swiftly names and does not install them.
+- The test task of a package appends the directory of its toolchain's
+  `llvm-cov` to its `PATH` when that `PATH` holds none, so `swiftpm-test`
+  exports the LCOV with the `llvm-cov` of the `swift` that ran the tests.
+- With offline dependencies, as in a hosted run, nothing is installed: a
+  missing `swift` fails the task with `stacks.toolchain_missing`, and a
+  mismatch with `stacks.toolchain_mismatch`.
+- An Xcode project keeps its toolchain check only: the extension installs no
+  Xcode.
 
 ## What reaches the cache key
 
@@ -245,6 +278,6 @@ An override that names an unknown member, changes `id`, `markers` or
   root, is named after the checkout's directory.
 - Two Xcode projects whose tests run at the same time may share a simulator.
 - The result bundle is a task output, so it is cached with the reports.
-- The extension does not install Swift, Xcode or a simulator, and does not
-  package or publish an application image; it does not archive or sign an
-  app.
+- The extension does not install Xcode, a simulator or the system packages a
+  Linux Swift needs, and does not package or publish an application image; it
+  does not archive or sign an app.

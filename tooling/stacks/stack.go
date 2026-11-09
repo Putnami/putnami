@@ -81,8 +81,9 @@ type Stack struct {
 	// the one on PATH is missing or outside the versions its files state, or
 	// returns the one an earlier call installed. expected holds the version
 	// each of the toolchain's checks expects, in the order of Checks. Nil means
-	// the stack installs no toolchain. It needs a profile that names
-	// toolchain.provisioned.
+	// the stack installs no toolchain. The core calls it only for a resolved
+	// profile that names toolchain.provisioned: a variant that names none
+	// keeps its toolchain check only.
 	Provide func(ctx context.Context, toolchain Toolchain, expected []Expected, info func(string)) (Provided, error)
 	// Tools makes the tools of one task of a component available, beyond the
 	// toolchain, and returns the directories to append to its PATH. meta is

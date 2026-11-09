@@ -5,7 +5,9 @@ Putnami projects: `putnami lint`, `putnami test` and `putnami build` run each
 package's `swift` steps and each Xcode project's `xcodebuild` steps with
 Putnami's runner and cache, without changing the build. `putnami install` and
 `putnami upgrade` resolve and update the packages, and `putnami serve` and
-`putnami run` start a package's executable product.
+`putnami run` start a package's executable product. A package task on a
+machine with no Swift, or outside the release `.swift-version` states,
+installs that release with a pinned swiftly under the Putnami home.
 
 It is a stack extension: a manifest, the Swift stack profile (`profile.json`,
 with an `xcode` variant), runtime commands for what an argument vector cannot
