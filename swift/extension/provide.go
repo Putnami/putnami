@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -131,6 +132,7 @@ func Provide(ctx context.Context, toolchain stacks.Toolchain, expected []stacks.
 	if script, err := os.ReadFile(postInstall); err == nil && strings.TrimSpace(string(script)) != "" { //nolint:gosec // a file of the extension's own folder
 		info("Swift " + stated.Version + " needs system packages this machine lacks; run as root:\n" + strings.TrimSpace(string(script)))
 	}
+	_ = os.Remove(postInstall)
 	dir, ok := h.newest(admitted, false)
 	if !ok {
 		return stacks.Provided{}, fmt.Errorf("swiftly install %s left no toolchain of that release under %s", stated.Version, h.toolchains)
@@ -150,10 +152,13 @@ type swiftlyHome struct {
 func home(base string) swiftlyHome {
 	return swiftlyHome{
 		swiftlyHome: filepath.Join(base, "swiftly-home"),
-		bin:         filepath.Join(base, "swiftly-home", "bin"),
-		toolchains:  filepath.Join(base, "toolchains"),
-		gnupg:       filepath.Join(base, "gnupg"),
-		installed:   filepath.Join(base, "installed"),
+		// swiftly init moves the swiftly it runs into its bin directory, and
+		// leaves one that already runs from there in place: the pinned
+		// swiftly's own directory is that bin directory.
+		bin:        filepath.Join(base, "swiftly-"+swiftlyVersion),
+		toolchains: filepath.Join(base, "toolchains"),
+		gnupg:      filepath.Join(base, "gnupg"),
+		installed:  filepath.Join(base, "installed"),
 	}
 }
 
@@ -186,7 +191,16 @@ func (h swiftlyHome) newest(admitted func(string) bool, finished bool) (string, 
 	best, bestVersion := "", ""
 	for _, e := range entries {
 		m := toolchainDirPattern.FindStringSubmatch(e.Name())
-		if m == nil || !admitted(m[1]) {
+		if m == nil {
+			continue
+		}
+		// A macOS toolchain of a patch-zero release before 6.4 is named
+		// swift-6.0-RELEASE: the release is 6.0.0.
+		version := m[1]
+		if strings.Count(version, ".") == 1 {
+			version += ".0"
+		}
+		if !admitted(version) {
 			continue
 		}
 		if _, err := os.Stat(h.swift(e.Name())); err != nil {
@@ -195,8 +209,8 @@ func (h swiftlyHome) newest(admitted func(string) bool, finished bool) (string, 
 		if _, err := os.Stat(h.marker(e.Name())); finished && err != nil {
 			continue
 		}
-		if best == "" || compareVersions(m[1], bestVersion) > 0 {
-			best, bestVersion = e.Name(), m[1]
+		if best == "" || compareVersions(version, bestVersion) > 0 {
+			best, bestVersion = e.Name(), version
 		}
 	}
 	return best, best != ""
@@ -213,10 +227,32 @@ func (h swiftlyHome) run(ctx context.Context, swiftly string, args ...string) er
 		"SWIFTLY_TOOLCHAINS_DIR="+h.toolchains,
 		"GNUPGHOME="+h.gnupg,
 	)
-	// The job's stdout carries its protocol.
+	// The job's stdout carries its protocol. The end of swiftly's stderr,
+	// where it says why it failed, also reaches the error.
+	tail := &tailWriter{max: 2048}
 	cmd.Stdout = os.Stderr
-	cmd.Stderr = os.Stderr
-	return cmd.Run()
+	cmd.Stderr = io.MultiWriter(os.Stderr, tail)
+	if err := cmd.Run(); err != nil {
+		if said := strings.TrimSpace(string(tail.buf)); said != "" {
+			return fmt.Errorf("%w: %s", err, said)
+		}
+		return err
+	}
+	return nil
+}
+
+// tailWriter keeps the last max bytes written to it.
+type tailWriter struct {
+	buf []byte
+	max int
+}
+
+func (w *tailWriter) Write(p []byte) (int, error) {
+	w.buf = append(w.buf, p...)
+	if len(w.buf) > w.max {
+		w.buf = w.buf[len(w.buf)-w.max:]
+	}
+	return len(p), nil
 }
 
 // withoutSwiftlyEnv drops what would select another swiftly home or keyring.
@@ -263,6 +299,12 @@ func lockedHome() (string, func(), error) {
 	lock, err := filelock.Acquire(filepath.Join(base, ".lock"), true, false)
 	if err != nil {
 		return "", nil, fmt.Errorf("lock %s: %w", base, err)
+	}
+	// A download an interrupted install left behind.
+	if stale, err := filepath.Glob(filepath.Join(base, "download-*")); err == nil {
+		for _, dir := range stale {
+			_ = os.RemoveAll(dir)
+		}
 	}
 	return base, func() { _ = lock.Release() }, nil
 }

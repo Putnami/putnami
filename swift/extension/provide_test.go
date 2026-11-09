@@ -26,14 +26,17 @@ import (
 )
 
 // swiftlyScript is what the stub swiftly does: like swiftly, init writes the
-// config of SWIFTLY_HOME_DIR, and install writes a toolchain under
+// config of SWIFTLY_HOME_DIR and moves the swiftly it runs into
+// SWIFTLY_BIN_DIR, unless it runs from there, and install writes a toolchain under
 // SWIFTLY_TOOLCHAINS_DIR, 6.0 resolving to 6.0.3, whose swift prints its
 // release and logs a build, beside an llvm-cov.
 func swiftlyScript(log string) string {
 	return `#!/bin/sh
 echo "$* GNUPGHOME=$GNUPGHOME" >> "` + log + `"
 case "$1" in
-init) echo '{}' > "$SWIFTLY_HOME_DIR/config.json";;
+init) echo '{}' > "$SWIFTLY_HOME_DIR/config.json"
+  if [ "$0" != "$SWIFTLY_BIN_DIR/swiftly" ]; then /bin/mv "$0" "$SWIFTLY_BIN_DIR/swiftly"; fi;;
+fail) echo "Unsupported Linux platform" >&2; exit 1;;
 install)
   release="$2"
   if [ "$release" = 6.0 ]; then release=6.0.3; fi
@@ -163,6 +166,36 @@ func TestProvideUnpacksTheMacOSPackage(t *testing.T) {
 	}
 	if ran, _ := os.ReadFile(log); !strings.Contains(string(ran), "install 6.0 ") {
 		t.Errorf("swiftly ran %q", ran)
+	}
+}
+
+func TestNewestReadsTheMacOSToolchainNames(t *testing.T) {
+	spectest.Proves(t, feature, "provides-its-toolchain", "a-package-task-installs-the-stated-swift-when-the-machine-has-none")
+	h := home(t.TempDir())
+	for _, dir := range []string{"swift-6.0-RELEASE.xctoolchain", "swift-6.4.2-RELEASE.xctoolchain", "main-snapshot-2026-10-01.xctoolchain"} {
+		writeExecutable(t, filepath.Join(h.toolchains, dir, "usr", "bin"), "swift", "#!/bin/sh\n")
+	}
+	check := swiftToolchain(t)
+	for stated, want := range map[string]string{"6.0.0": "swift-6.0-RELEASE.xctoolchain", "6.0": "swift-6.0-RELEASE.xctoolchain", "6": "swift-6.4.2-RELEASE.xctoolchain", "6.4.2": "swift-6.4.2-RELEASE.xctoolchain"} {
+		admitted := func(v string) bool { return check.Compare(stacks.Expected{Version: stated}, v).Code == "" }
+		if got, ok := h.newest(admitted, false); !ok || got != want {
+			t.Errorf("%s: %q %v, want %s", stated, got, ok, want)
+		}
+	}
+}
+
+func TestASwiftlyFailureSaysWhy(t *testing.T) {
+	spectest.Proves(t, feature, "provides-its-toolchain", "a-package-task-installs-the-stated-swift-when-the-machine-has-none")
+	stubSwiftly(t, false)
+	base := t.TempDir()
+	swiftly := filepath.Join(base, "swiftly")
+	writeExecutable(t, base, "swiftly", swiftlyScript(filepath.Join(base, "log")))
+	h := home(base)
+	if err := h.prepare(); err != nil {
+		t.Fatal(err)
+	}
+	if err := h.run(context.Background(), swiftly, "fail"); err == nil || !strings.Contains(err.Error(), "Unsupported Linux platform") {
+		t.Errorf("err = %v", err)
 	}
 }
 

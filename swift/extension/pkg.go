@@ -43,12 +43,12 @@ func extractPkgFile(pkgPath, name, dest string) error {
 
 // xarHeader is the fixed header of a xar archive.
 type xarHeader struct {
-	Magic            [4]byte
-	Size             uint16
-	Version          uint16
-	TOCCompressed    uint64
-	TOCUncompressed  uint64
-	ChecksumAlgoritm uint32
+	Magic             [4]byte
+	Size              uint16
+	Version           uint16
+	TOCCompressed     uint64
+	TOCUncompressed   uint64
+	ChecksumAlgorithm uint32
 }
 
 type xarEntry struct {

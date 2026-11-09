@@ -169,7 +169,12 @@ always runs, and nothing is installed.
   directory and a gpg keyring of its own under
   `<Putnami home>/tools/swift`, so the machine's swiftly, toolchains and
   keyring stay untouched. On Linux, swiftly checks the toolchain's signature
-  with `gpg`, which the machine provides.
+  with `gpg`, and needs the system's CA certificates (`ca-certificates`), which
+  the machine provides; it installs on the distributions swift.org publishes
+  for: Ubuntu, Debian, Fedora, Amazon Linux and Red Hat UBI. On another one,
+  the task fails with swiftly's reason. On macOS, the installed toolchain
+  builds with the SDK of the Xcode Command Line Tools, which the machine
+  provides.
 - `.swift-version` names a release: `6`, `6.4` or `6.4.2`, as swiftly takes
   it; `6.4` installs the newest 6.4 patch. Any other statement, such as a
   snapshot, is refused: put a matching `swift` on `PATH`.
