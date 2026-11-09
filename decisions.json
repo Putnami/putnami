@@ -508,6 +508,13 @@
       "settledBy": "the owner, approving the Structurizr import plan",
       "adr": "tooling/sdd-extension/doc/adr/0005-a-structurizr-model-is-an-authored-architecture.md",
       "reviewOnly": true
+    },
+    {
+      "id": "D-063",
+      "statement": "a monorepo tool integration, such as @putnami/bazel or @putnami/pants, lives in monorepo/<tool>, a top-level scope of its own, never under tooling/",
+      "settled": "2026-11-09",
+      "settledBy": "fdumay",
+      "reviewOnly": true
     }
   ]
 }

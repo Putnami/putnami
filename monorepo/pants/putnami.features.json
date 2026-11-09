@@ -1,10 +1,10 @@
 {
   "$schema": "https://putnami.dev/schemas/putnami-features.json",
   "protocolVersion": 2,
-  "namespace": "tooling",
+  "namespace": "monorepo",
   "features": [
     {
-      "id": "tooling/pants-delegated-stack",
+      "id": "monorepo/pants-delegated-stack",
       "type": "feature",
       "name": "Run the packages of a Pants repository through Pants",
       "outcome": "A team with a Pants repository reaches Putnami's runner and verdict without leaving Pants: each BUILD package is a Putnami project with its edges, each task runs pants on that package and reads its reports, and Pants keeps its own cache and remote execution",

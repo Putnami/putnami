@@ -72,3 +72,18 @@ func TestReadReportsFailsOnAFailedCaseAndOnAMissingReport(t *testing.T) {
 	}
 	_ = filepath.Join
 }
+
+func TestReadReportsMergesASourceFileAcrossCoverageReports(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, dir, "out/unit/coverage.dat", "SF:api/api.go\nDA:1,1\nDA:2,1\nDA:3,0\nDA:4,0\nend_of_record\n")
+	writeFile(t, dir, "out/integration/coverage.dat", "SF:api/api.go\nDA:1,0\nDA:2,0\nDA:3,2\nDA:4,0\nend_of_record\nSF:api/routes.go\nLF:5\nLH:2\nend_of_record\n")
+	writeFile(t, dir, "out/other/coverage.dat", "SF:api/routes.go\nLF:5\nLH:4\nend_of_record\n")
+	r := &Reports{Coverage: []Coverage{{Format: "lcov", Paths: []string{"out/**/coverage.dat"}}}}
+	s, d := ReadReports(r, globUnder(dir), dir, Attribution{})
+	if len(d) != 0 {
+		t.Fatalf("diagnostics: %v", d)
+	}
+	if s.Coverage == nil || s.Coverage.Total != 9 || s.Coverage.Covered != 7 {
+		t.Errorf("coverage = %+v, want api.go's 4 lines with 3 covered once each and routes.go's largest stated 5/4", s.Coverage)
+	}
+}

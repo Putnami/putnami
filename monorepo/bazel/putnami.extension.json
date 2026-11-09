@@ -1,0 +1,316 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-extension.json",
+  "name": "@putnami/bazel",
+  "cliContract": 14,
+  "extensionDependencies": {
+    "@putnami/dev": ""
+  },
+  "runtime": {
+    "executable": "compiled/putnami-bazel",
+    "toolchains": {
+      "runtimeCompiler": {
+        "lock": "go",
+        "candidates": [
+          {
+            "from": "environment",
+            "environment": "GOROOT",
+            "path": "bin/go"
+          },
+          {
+            "from": "path",
+            "path": "go"
+          },
+          {
+            "from": "putnami-home",
+            "path": "toolchains/go/go-{version}/go/bin/go"
+          }
+        ],
+        "probe": {
+          "args": [
+            "env",
+            "GOVERSION"
+          ],
+          "expect": "go{version}",
+          "unset": [
+            "GOROOT"
+          ],
+          "environment": {
+            "GOTOOLCHAIN": "local"
+          }
+        },
+        "environment": {
+          "GOROOT": {
+            "from": "ancestor",
+            "levels": 2
+          },
+          "GOTOOLCHAIN": {
+            "from": "literal",
+            "value": "local"
+          }
+        },
+        "prependPath": true
+      }
+    },
+    "prepare": {
+      "command": "{extensionRoot}/bin/prepare",
+      "args": [
+        "--output",
+        "{runtimeOutput}"
+      ],
+      "inputs": [
+        "bin/prepare",
+        "cmd/**",
+        "go.mod",
+        "go.sum",
+        "*.go",
+        "profile.json"
+      ],
+      "toolchains": [
+        "runtimeCompiler"
+      ]
+    },
+    "inputSelectors": [
+      "bazel:build",
+      "bazel:test"
+    ]
+  },
+  "workspace": {
+    "markers": [
+      "BUILD.bazel",
+      "BUILD"
+    ],
+    "inputs": [
+      "BUILD.bazel",
+      "BUILD",
+      "MODULE.bazel",
+      "WORKSPACE",
+      "WORKSPACE.bazel",
+      ".bazelversion",
+      "bazel-graph.json",
+      "putnami.json"
+    ],
+    "excludes": [
+      "bazel-bin",
+      "bazel-out",
+      "bazel-testlogs"
+    ],
+    "syncTask": "workspace-sync-exec"
+  },
+  "commands": {
+    "test": {
+      "description": "Test each package with bazel coverage, read its JUnit and LCOV reports; Bazel keeps its own cache.",
+      "run": [
+        {
+          "id": "graph",
+          "task": "graph-run",
+          "dependsOn": [
+            "^graph"
+          ]
+        },
+        {
+          "id": "test",
+          "heavy": true,
+          "task": "test-run",
+          "dependsOn": [
+            "graph"
+          ]
+        }
+      ]
+    },
+    "build": {
+      "description": "Build each package with bazel build, which keeps its own cache.",
+      "run": [
+        {
+          "id": "graph",
+          "task": "graph-run",
+          "dependsOn": [
+            "^graph"
+          ]
+        },
+        {
+          "id": "build",
+          "heavy": true,
+          "task": "build-run",
+          "dependsOn": [
+            "graph"
+          ]
+        }
+      ]
+    },
+    "validate": {
+      "description": "Fail when a package's putnami.json no longer matches the Bazel query export, such as after a BUILD change that alters the edges between packages.",
+      "activation": "workspace-once",
+      "run": [
+        {
+          "id": "bazel-graph-check",
+          "task": "bazel-graph-check-exec"
+        }
+      ]
+    },
+    "workspace-sync": {
+      "description": "Write each Bazel package's putnami.json from the bazel-graph.json export, or bazel query //....",
+      "visibility": "internal",
+      "activation": "workspace-once",
+      "run": [
+        {
+          "id": "workspace-sync",
+          "task": "workspace-sync-exec"
+        }
+      ]
+    }
+  },
+  "tasks": {
+    "graph-run": {
+      "description": "Carry the package graph: each test and build step depends on the graph step of its own package, which alone depends on the graph step of each package upstream, so a change selects the packages that depend on it while a dependency runs no bazel. Runs nothing and passes.",
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": [
+        "graph"
+      ],
+      "cwd": "{projectRoot}",
+      "timeoutMs": 60000,
+      "inputs": {
+        "sources": {
+          "from": "project",
+          "files": [
+            "bazel:test"
+          ]
+        }
+      },
+      "cache": {
+        "enabled": false
+      }
+    },
+    "test-run": {
+      "description": "Run bazel coverage //<package>:all in the workspace root for one package, after the Bazel version check, with a build-event file in the command output; then copy the test.xml and coverage.dat of each test run the build-event file lists into the command output and read them. A failed case, a step that exits non-zero, or a missing JUnit report fails the task. Putnami's cache is off: Bazel's cache decides what reruns, and Bazel's outputs are never removed.",
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": [
+        "test",
+        "--report-dir",
+        "{outputRoot}"
+      ],
+      "cwd": "{projectRoot}",
+      "timeoutMs": 1800000,
+      "inputs": {
+        "sources": {
+          "from": "project",
+          "files": [
+            "bazel:test"
+          ]
+        },
+        "stackRoot": {
+          "from": "workspace",
+          "files": [
+            ".bazelversion"
+          ]
+        },
+        "extensionVersion": {
+          "from": "runtime"
+        }
+      },
+      "outputs": {
+        "data": {
+          "description": "The task result: delegatedTo bazel, and the test and coverage totals of a test task."
+        }
+      },
+      "cache": {
+        "enabled": false
+      },
+      "declares": {
+        "outputs": {
+          "reports": {
+            "kind": "directory",
+            "root": "command-output",
+            "path": "test",
+            "optionalEmpty": true,
+            "description": "The reports the task copied: each JUnit report and LCOV coverage file of a test task, and its build-event file."
+          }
+        },
+        "effects": [
+          "network",
+          "toolchain-cache"
+        ]
+      }
+    },
+    "build-run": {
+      "description": "Run bazel build //<package>:all in the workspace root for one package, after the Bazel version check. Putnami's cache is off: Bazel's cache decides what reruns.",
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": [
+        "build",
+        "--report-dir",
+        "{outputRoot}"
+      ],
+      "cwd": "{projectRoot}",
+      "timeoutMs": 1800000,
+      "inputs": {
+        "sources": {
+          "from": "project",
+          "files": [
+            "bazel:build"
+          ]
+        },
+        "stackRoot": {
+          "from": "workspace",
+          "files": [
+            ".bazelversion"
+          ]
+        },
+        "extensionVersion": {
+          "from": "runtime"
+        }
+      },
+      "outputs": {
+        "data": {
+          "description": "The task result: delegatedTo bazel, and the test and coverage totals of a test task."
+        }
+      },
+      "cache": {
+        "enabled": false
+      },
+      "declares": {
+        "outputs": {
+          "reports": {
+            "kind": "directory",
+            "root": "command-output",
+            "path": "build",
+            "optionalEmpty": true,
+            "description": "The task's command output, which a build task leaves empty."
+          }
+        },
+        "effects": [
+          "network",
+          "toolchain-cache"
+        ]
+      }
+    },
+    "workspace-sync-exec": {
+      "description": "Write in each Bazel package's putnami.json the extension, its dependencies as the project IDs of the packages the bazel-graph.json export at the workspace root, or bazel query //..., says it depends on, the module files of the root as its filePatterns, and test in disable.jobs when it holds no test rule. Declares no outputs: it rewrites tracked project files, which the workspace-files effect states.",
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": [
+        "workspace-sync"
+      ],
+      "cwd": "{workspaceRoot}",
+      "cache": false,
+      "timeoutMs": 600000,
+      "declares": {
+        "effects": [
+          "workspace-files"
+        ]
+      }
+    },
+    "bazel-graph-check-exec": {
+      "description": "Compare each Bazel package's putnami.json with the bazel-graph.json export at the workspace root, or bazel query //..., and fail with bazel.sync_stale when a sync would change one. Writes nothing, and warns when neither the export nor bazel is available.",
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": [
+        "bazel-graph-check"
+      ],
+      "cwd": "{workspaceRoot}",
+      "cache": false,
+      "timeoutMs": 600000
+    }
+  }
+}

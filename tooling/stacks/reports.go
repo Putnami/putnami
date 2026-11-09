@@ -153,6 +153,8 @@ func ReadReports(r *Reports, paths func(pattern string) ([]string, error), proje
 		}
 		diags = append(diags, diag.Errorf(CodeReportMissing, "", "the test task wrote no %s report matching %s", strings.Join(kinds, " or "), strings.Join(slices.Concat(r.JUnit, r.TRX), ", ")))
 	}
+	merged := coverageMerge{}
+	others := map[string]struct{}{}
 	for _, c := range r.Coverage {
 		read := coverageReaders[c.Format]
 		files, err := expandAll(c.Paths, paths)
@@ -171,18 +173,26 @@ func ReadReports(r *Reports, paths func(pattern string) ([]string, error), proje
 				s.Coverage = &readers.Counts{}
 			}
 			for _, fc := range report.Files {
-				switch owner(attr.File, underSource(fc.Path, report.Sources)) {
+				source := underSource(fc.Path, report.Sources)
+				if _, seen := others[source]; seen {
+					continue
+				}
+				switch owner(attr.File, source) {
 				case OwnerOther:
+					others[source] = struct{}{}
 					s.OtherFiles++
 					continue
 				case OwnerNone:
+					others[source] = struct{}{}
 					unmapped = append(unmapped, fc.Path)
 					continue
 				}
-				s.Coverage.Total += fc.LineCounts.Total
-				s.Coverage.Covered += fc.LineCounts.Covered
+				merged.add(source, fc)
 			}
 		}
+	}
+	if s.Coverage != nil {
+		*s.Coverage = merged.counts()
 	}
 	if len(unattributed) > 0 {
 		diags = append(diags, diag.Warningf(CodeTestUnattributed, "", "%d test cases name no component and are counted as this one's: %s", len(unattributed), named(unattributed)))
@@ -194,6 +204,53 @@ func ReadReports(r *Reports, paths func(pattern string) ([]string, error), proje
 		diags = append(diags, diag.Errorf(CodeTestFailed, "", "%d of %d tests failed: %s", s.Tests.Failed, s.Tests.Total, strings.Join(s.Failed, "; ")))
 	}
 	return s, diags
+}
+
+// coverageMerge merges the coverage of one source file across reports: a
+// line keeps its largest count, so a line any test run covered counts once
+// as covered, and a file stated by totals alone keeps the largest of each.
+type coverageMerge map[string]*mergedFile
+
+type mergedFile struct {
+	lines  map[int]int64
+	stated readers.Counts
+}
+
+func (m coverageMerge) add(source string, fc readers.FileCoverage) {
+	f, ok := m[source]
+	if !ok {
+		f = &mergedFile{lines: map[int]int64{}}
+		m[source] = f
+	}
+	if len(fc.Lines) == 0 {
+		f.stated = readers.Counts{Total: max(f.stated.Total, fc.LineCounts.Total), Covered: max(f.stated.Covered, fc.LineCounts.Covered)}
+		return
+	}
+	for _, line := range fc.Lines {
+		if current, seen := f.lines[line.Number]; !seen || line.Hits > current {
+			f.lines[line.Number] = line.Hits
+		}
+	}
+}
+
+// counts sums the merged files. A file known by its lines counts them; a
+// file only ever stated by totals counts those totals.
+func (m coverageMerge) counts() readers.Counts {
+	var c readers.Counts
+	for _, f := range m {
+		if len(f.lines) == 0 {
+			c.Total += f.stated.Total
+			c.Covered += f.stated.Covered
+			continue
+		}
+		c.Total += len(f.lines)
+		for _, hits := range f.lines {
+			if hits > 0 {
+				c.Covered++
+			}
+		}
+	}
+	return c
 }
 
 // HasTests reports whether the reports name a JUnit or a TRX pattern.

@@ -4,7 +4,8 @@
   "feature": "cli/init-from-a-monorepo-tool",
   "outcomes": [
     "A team turns a repository its monorepo tool already describes into a Putnami workspace with one command",
-    "After a change to one package of an adopted Pants repository, putnami test runs that package and its dependents through Pants, and Putnami's cache stores nothing"
+    "After a change to one package of an adopted Pants repository, putnami test runs that package and its dependents through Pants, and Putnami's cache stores nothing",
+    "After a change to one package of an adopted Bazel workspace, putnami test runs that package and its dependents through Bazel, and Putnami's cache stores nothing"
   ],
   "nonGoals": [
     "Reading a monorepo tool's configuration in the CLI: the tool's stack extension owns it",
@@ -18,6 +19,14 @@
     {
       "id": "pants-impact-runs-through-pants",
       "text": "On the Pants fixture of the putnami observe detector, with @putnami/pants and pants on PATH, projects sync writes each package's edges. putnami test --impacted runs pants test at the workspace root on each changed package and each package that depends on it, never on one it depends on; a requirements or lockfile change, wherever the file lies, runs the packages that use it. It reads their reports and neither looks up nor stores a Putnami cache entry."
+    },
+    {
+      "id": "init-from-bazel",
+      "text": "putnami init --from bazel, at the root of a repository that holds MODULE.bazel, WORKSPACE or WORKSPACE.bazel, writes a workspace that declares @putnami/bazel, installs it, and runs putnami projects sync, which writes each package's putnami.json through the extension's sync task. Without one of those files it fails with a usage error that names them."
+    },
+    {
+      "id": "bazel-impact-runs-through-bazel",
+      "text": "On the Bazel fixture of the putnami observe detector, with @putnami/bazel and bazel on PATH, projects sync writes each package's edges. putnami test --impacted runs bazel coverage at the workspace root on each changed package and each package that depends on it, never on one it depends on; a MODULE.bazel change runs every package. It reads their reports and neither looks up nor stores a Putnami cache entry."
     }
   ],
   "decisions": [

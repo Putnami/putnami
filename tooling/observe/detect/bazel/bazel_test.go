@@ -82,12 +82,18 @@ func TestAQueryExportGivesThePackagesAndTheirEdges(t *testing.T) {
 		t.Fatalf("diagnostics %v, from the export %v", d.Diagnostics, d.FromExport)
 	}
 	want := []Package{
-		{Dir: "api", Label: "//api", DependsOn: []string{"pricing"}},
-		{Dir: "pricing", Label: "//pricing"},
+		{Dir: "api", Label: "//api", DependsOn: []string{"pricing"}, Tested: true},
+		{Dir: "pricing", Label: "//pricing", Tested: true},
 		{Dir: "web", Label: "//web"},
 	}
 	if !reflect.DeepEqual(d.Packages, want) {
 		t.Errorf("packages %+v, want %+v", d.Packages, want)
+	}
+	if got := BuildFile(root, "web"); got != "web/BUILD" {
+		t.Errorf("BuildFile(web) = %q", got)
+	}
+	if got := BuildFile(root, "docs"); got != "" {
+		t.Errorf("BuildFile(docs) = %q, want none", got)
 	}
 }
 

@@ -302,6 +302,20 @@ func TestReportStepsRunAfterAFailedStep(t *testing.T) {
 	if status != statusFailed || !strings.Contains(rec.codes(), "error:"+CodeStepFailed) || !strings.Contains(rec.codes(), "error:"+CodeTestFailed) {
 		t.Errorf("the report step writes the report a failed runner leaves, and its failed case names the failure: %s %v", status, rec.diags)
 	}
+	// A report step may run the extension's runtime, which collects the
+	// reports a tool wrote outside the output directory.
+	collect := filepath.Join(t.TempDir(), "collect")
+	writeFile(t, filepath.Dir(collect), "collect", "#!/bin/sh\nmkdir -p \"$2\" && printf '%s' \"$JUNIT\" > \"$2/junit.xml\"\n")
+	if err := os.Chmod(collect, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	s.Runtime = collect
+	task.ReportSteps = [][]string{{"{runtime}", "collect-reports", "{output}"}}
+	s.Profile.Tasks[TaskBuild] = task
+	status, rec, _ = runTargetsTask(t, s, root, "pkgs/core", "core", "base", TaskBuild)
+	if status != statusFailed || !strings.Contains(rec.codes(), "error:"+CodeTestFailed) {
+		t.Errorf("a report step that names {runtime} runs the runtime: %s %v", status, rec.diags)
+	}
 	if _, err := Decode([]byte(strings.Replace(targetsProfile, `"inputs": ["code", "manifests"],
       "targets": [{"each": "bin/*.src"}]`, `"inputs": ["code", "manifests"],
       "targets": [{"each": "bin/*.src"}], "reportSteps": [["tool", "{target}"]]`, 1))); err == nil || !strings.Contains(err.Error(), "reportSteps") {

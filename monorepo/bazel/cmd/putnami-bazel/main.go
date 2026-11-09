@@ -1,6 +1,7 @@
-// Command putnami-pants is the runtime of @putnami/pants: the stack core run
-// with the Pants profile and the Pants detector, and the workspace sync task
-// that writes each package's putnami.json.
+// Command putnami-bazel is the runtime of @putnami/bazel: the stack core run
+// with the Bazel profile and the Bazel detector, the workspace sync task that
+// writes each package's putnami.json, and the command that collects the
+// reports of a test run.
 package main
 
 import (
@@ -8,8 +9,8 @@ import (
 	"io"
 	"os"
 
+	"go.putnami.dev/monorepo/bazel"
 	"go.putnami.dev/sdk/extension/cli"
-	"go.putnami.dev/tooling/pants"
 )
 
 var runtimeVersion string
@@ -23,16 +24,16 @@ func main() {
 // run dispatches one invocation and returns the exit code. A control call's
 // stdout carries exactly one document, so errors go to stderr.
 func run(args []string, stdin io.Reader, stdout, stderr io.Writer, runJobs func(map[string]cli.JobFunc)) int {
-	stack, err := pants.Stack()
+	stack, err := bazel.Stack()
 	if err == nil {
 		err = stack.Entrypoint(args, stdin, stdout, runtimeVersion, func(jobs map[string]cli.JobFunc) {
-			jobs[pants.SyncJob] = pants.RunSync
-			jobs[pants.CheckJob] = pants.RunCheck
+			jobs[bazel.SyncJob] = bazel.RunSync
+			jobs[bazel.CheckJob] = bazel.RunCheck
 			runJobs(jobs)
 		})
 	}
 	if err != nil {
-		fmt.Fprintf(stderr, "%s: %v\n", pants.ExtensionName, err)
+		fmt.Fprintf(stderr, "%s: %v\n", bazel.ExtensionName, err)
 		return 1
 	}
 	return 0

@@ -8,7 +8,7 @@ Pants.
 
 It is the first delegated stack extension: a manifest, the Pants stack profile
 (`profile.json`), the entrypoint of the stack core,
-[`tooling/stacks`](../stacks/doc/01-design.md#delegated-stacks), and a
+[`tooling/stacks`](../../tooling/stacks/doc/01-design.md#delegated-stacks), and a
 workspace sync task that writes each package's `putnami.json` from the
 `pants peek ::` export. The packages come from the Pants detector of
 `putnami observe`.

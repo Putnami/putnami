@@ -1,0 +1,47 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-spec.json",
+  "protocolVersion": 1,
+  "feature": "monorepo/bazel-delegated-stack",
+  "outcomes": [
+    "Each Bazel package that holds a rule is a Putnami project, delegated to Bazel, with an edge to each package the query export says it depends on",
+    "putnami test and build run bazel coverage and bazel build on each affected package, and Bazel's cache decides what reruns",
+    "The test task reads the JUnit and LCOV reports of the run's test targets into the test and coverage summary"
+  ],
+  "nonGoals": [
+    "Importing Bazel targets as Putnami tasks, or caching a Bazel result in Putnami's cache",
+    "Installing or switching a Bazel version: the toolchain check compares and never installs",
+    "Reading Bazel's own action graph below the package: the edges are the export's, between packages",
+    "A lint task: Bazel declares no lint convention",
+    "A Bazel workspace whose root is not the Putnami workspace root"
+  ],
+  "requirements": [
+    {
+      "id": "packages-become-projects",
+      "text": "The probe answers, for each package of bazel-graph.json, or without it each directory whose putnami.json the sync wrote for @putnami/bazel: its directory as source name, the packages the export says it depends on, the extension @putnami/bazel, the tag bazel, and metadata naming the package, the workspace root as stack root and the .bazelversion version. Any other candidate holding a BUILD or BUILD.bazel file, the root package included, is bare: named by its directory, with no extension, so it runs no task."
+    },
+    {
+      "id": "sync-writes-the-package-graph",
+      "text": "The workspace sync task reads bazel-graph.json at the root, or runs bazel query //..., and writes in each package's putnami.json the extension, the project IDs of the packages it depends on, the root's module, lock, rc and version files as filePatterns, and test in disable.jobs without a test rule. It retracts a former package, rewrites a file only when a member it owns changes, and warns and writes nothing without the export and bazel."
+    },
+    {
+      "id": "validate-fails-on-a-stale-graph",
+      "text": "putnami validate compares each package's putnami.json with the export, or bazel query //..., writes nothing, and fails with bazel.sync_stale when a sync would change one, so a BUILD change that alters the edges cannot pass the gate. Without the export and bazel it warns and passes."
+    },
+    {
+      "id": "tasks-delegate-to-bazel",
+      "text": "Each task compares bazel --version with .bazelversion, then runs at the workspace root bazel coverage --build_event_json_file=<output>/build-events.json //<package>:all, or bazel build //<package>:all, where :all names the rules of one package. Each task depends only on its package's graph step, which runs no bazel. Putnami's cache is off for every task, and the result records delegatedTo bazel. A failing step fails with stacks.step_failed."
+    },
+    {
+      "id": "reports-become-the-summary",
+      "text": "After its steps, whatever their outcome, the test task copies into its output the test.xml and coverage.dat of each test run the build-event file lists and reads them into the test and coverage summary, merging a source file across runs. It never removes a Bazel output, so Bazel's cache serves the next run. A failed case fails the task with stacks.test_failed, a run with no JUnit report fails it with stacks.report_missing, and a missing coverage report fails nothing."
+    },
+    {
+      "id": "manifest-follows-the-profile",
+      "text": "The manifest passes the stack core's conformance kit: its markers are the profile's, it lists the bazel:test and bazel:build selectors, each command runs the graph step, which depends on the graph step upstream, then its task, which depends on its own graph step alone, and every task, the graph task included, sets cache.enabled to false. Bazel declares no lint convention, so the manifest declares no lint command."
+    }
+  ],
+  "decisions": [
+    "tooling/stacks/doc/adr/0001-one-extension-per-stack-on-a-shared-core.md",
+    "tooling/stacks/doc/adr/0008-a-delegated-stack-keeps-its-tool-cache.md"
+  ]
+}

@@ -528,6 +528,7 @@
           "long": "--from",
           "type": "value",
           "values": [
+            "bazel",
             "pants"
           ]
         },
@@ -1025,6 +1026,7 @@
           "long": "--from",
           "type": "value",
           "values": [
+            "bazel",
             "pants"
           ]
         },

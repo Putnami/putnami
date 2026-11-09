@@ -1,0 +1,12 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-specs-baseline.json",
+  "protocolVersion": 2,
+  "executableRequirements": [
+    "monorepo/pants-delegated-stack#manifest-follows-the-profile",
+    "monorepo/pants-delegated-stack#packages-become-projects",
+    "monorepo/pants-delegated-stack#reports-become-the-summary",
+    "monorepo/pants-delegated-stack#sync-writes-the-package-graph",
+    "monorepo/pants-delegated-stack#tasks-delegate-to-pants",
+    "monorepo/pants-delegated-stack#validate-fails-on-a-stale-graph"
+  ]
+}

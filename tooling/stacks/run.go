@@ -654,9 +654,10 @@ func (s Stack) run(ctx context.Context, in runInput, emit reporter) (string, map
 		}
 	}
 	t.Steps = steps
-	// {runtime} is resolved only for a task that names it, so a stack with
-	// no runtime command never depends on locating its own executable.
-	if slices.ContainsFunc(t.Steps, func(step []string) bool {
+	// {runtime} is resolved only for a task that names it, in a step or a
+	// report step, so a stack with no runtime command never depends on
+	// locating its own executable.
+	if slices.ContainsFunc(slices.Concat(t.Steps, t.ReportSteps), func(step []string) bool {
 		return slices.ContainsFunc(step, func(a string) bool { return strings.Contains(a, "{runtime}") })
 	}) {
 		runtime, err := s.runtimePath()

@@ -4442,6 +4442,28 @@
               "a-change-to-one-pants-package-runs-it-and-its-dependents-through-pants-uncached"
             ]
           }
+        },
+        {
+          "id": "init-from-bazel",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "init-from-bazel-declares-the-bazel-extension-and-syncs-the-projects"
+            ]
+          }
+        },
+        {
+          "id": "bazel-impact-runs-through-bazel",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-change-to-one-bazel-package-runs-it-and-its-dependents-through-bazel-uncached"
+            ]
+          }
         }
       ]
     }

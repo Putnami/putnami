@@ -1,7 +1,7 @@
 {
   "$schema": "https://putnami.dev/schemas/putnami-spec.json",
   "protocolVersion": 1,
-  "feature": "tooling/pants-delegated-stack",
+  "feature": "monorepo/pants-delegated-stack",
   "outcomes": [
     "Each directory of a Pants repository whose BUILD file declares a first-party target is a Putnami project, delegated to Pants, with an edge to each package Pants says it depends on",
     "putnami lint, test and build run pants lint, test and package on each affected package, and Pants's cache decides what reruns",

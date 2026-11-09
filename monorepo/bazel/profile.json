@@ -1,0 +1,38 @@
+{
+  "id": "bazel",
+  "delegated": true,
+  "markers": ["BUILD.bazel", "BUILD"],
+  "toolchain": {
+    "command": ["bazel", "--version"],
+    "pattern": "(?m)^bazel (?<version>[0-9]+\\.[0-9]+\\.[0-9]+\\S*)\\s*$",
+    "files": [
+      { "path": ".bazelversion" }
+    ]
+  },
+  "inputs": {
+    "sources": ["**"]
+  },
+  "tasks": {
+    "test": {
+      "steps": [
+        ["bazel", "coverage", "--build_event_json_file={output}/build-events.json", "//{component}:all"]
+      ],
+      "reportSteps": [
+        ["{runtime}", "collect-reports", "--events", "{output}/build-events.json", "--root", "{root}", "--into", "{output}/reports"]
+      ],
+      "inputs": ["sources"],
+      "dir": "root",
+      "reports": {
+        "junit": ["{output}/reports/**/test.xml"],
+        "coverage": [{ "format": "lcov", "paths": ["{output}/reports/**/coverage.dat"], "optional": true }]
+      }
+    },
+    "build": {
+      "steps": [
+        ["bazel", "build", "//{component}:all"]
+      ],
+      "inputs": ["sources"],
+      "dir": "root"
+    }
+  }
+}

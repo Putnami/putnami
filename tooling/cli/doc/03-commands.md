@@ -393,6 +393,7 @@ Initialize and inspect workspaces.
 ```bash
 putnami init                    # Create a new workspace (putnami.workspace.json)
 putnami init --from pants       # Turn a Pants repository into a workspace
+putnami init --from bazel       # Turn a Bazel repository into a workspace
 putnami workspace describe      # Show workspace details
 ```
 
@@ -400,16 +401,18 @@ putnami workspace describe      # Show workspace details
 
 `init` can also scaffold a starter project with `--project <name>`. Use `--project-path <path>` to place that project somewhere other than the default `<project-name>` (at workspace root).
 
-`init --from <tool>` turns a repository that a monorepo tool already describes into a workspace. It runs at the repository root, which must hold the tool's marker file, declares and installs the tool's extension instead of a language starter, and runs `putnami projects sync`, whose extension sync task writes each package's `putnami.json`. It takes no `--project`, `--project-path` or `--extension`: the tool's packages are the projects. When two new members share a directory name, `projects sync` writes a name for each in its `putnami.json`: the name its provider reports, or its path when there is none or when that name is taken.
+`init --from <tool>` turns a repository that a monorepo tool already describes into a workspace. It runs at the repository root, which must hold one of the tool's marker files, declares and installs the tool's extension instead of a language starter, and runs `putnami projects sync`, whose extension sync task writes each package's `putnami.json`. It takes no `--project`, `--project-path` or `--extension`: the tool's packages are the projects. When two new members share a directory name, `projects sync` writes a name for each in its `putnami.json`: the name its provider reports, or its path when there is none or when that name is taken.
 
 | Tool | Marker | Extension | What the sync writes |
 |---|---|---|---|
-| `pants` | `pants.toml` | `@putnami/pants` | Each package's edges from the `pants peek ::` export; Pants keeps its own cache. See [Run a Pants repository with Putnami](../../pants/doc/01-pants.md) |
+| `pants` | `pants.toml` | `@putnami/pants` | Each package's edges from the `pants peek ::` export; Pants keeps its own cache. See [Run a Pants repository with Putnami](../../../monorepo/pants/doc/01-pants.md) |
+| `bazel` | `MODULE.bazel`, `WORKSPACE` or `WORKSPACE.bazel` | `@putnami/bazel` | Each package's edges from `bazel query //...`, or from a `bazel-graph.json` export; Bazel keeps its own cache. See [Run a Bazel workspace with Putnami](../../../monorepo/bazel/doc/01-bazel.md) |
 
-`@putnami/pants` is not published yet: until its first release, `init --from pants` stops at the extension install, after it has written the workspace files.
+`@putnami/pants` and `@putnami/bazel` are not published yet: until their first release, `init --from <tool>` stops at the extension install, after it has written the workspace files.
 
 ```bash
 putnami init --from pants
+putnami init --from bazel
 ```
 
 `init` resolves the extensions, the template and the starter's dependencies on one release channel. It takes the first of:

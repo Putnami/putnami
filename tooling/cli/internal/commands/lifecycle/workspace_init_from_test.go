@@ -19,10 +19,27 @@ const initFromFeature = "cli/init-from-a-monorepo-tool"
 
 func TestInitFromPantsDeclaresThePantsExtensionAndSyncsTheProjects(t *testing.T) {
 	spectest.Proves(t, initFromFeature, "init-from-pants", "init-from-pants-declares-the-pants-extension-and-syncs-the-projects")
+	assertInitFrom(t, "pants", "pants.toml", "@putnami/pants")
+}
+
+func TestInitFromBazelDeclaresTheBazelExtensionAndSyncsTheProjects(t *testing.T) {
+	spectest.Proves(t, initFromFeature, "init-from-bazel", "init-from-bazel-declares-the-bazel-extension-and-syncs-the-projects")
+	for _, marker := range []string{"MODULE.bazel", "WORKSPACE", "WORKSPACE.bazel"} {
+		t.Run(marker, func(t *testing.T) {
+			assertInitFrom(t, "bazel", marker, "@putnami/bazel")
+		})
+	}
+}
+
+// assertInitFrom runs putnami init --from tool in a directory that holds the
+// marker, and checks that it declares and installs the extension alone, then
+// synchronizes the projects.
+func assertInitFrom(t *testing.T, tool, marker, extension string) {
+	t.Helper()
 	dir := t.TempDir()
 	stubWorkspaceInitStages(t, "", 0)
 	t.Chdir(dir)
-	if err := os.WriteFile(filepath.Join(dir, "pants.toml"), []byte("[GLOBAL]\npants_version = \"2.25.0\"\n"), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(dir, marker), []byte("\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	var installed []string
@@ -42,7 +59,7 @@ func TestInitFromPantsDeclaresThePantsExtensionAndSyncsTheProjects(t *testing.T)
 	}
 
 	out, err := captureStdout(t, func() error {
-		return WorkspaceInit(context.Background(), "", []string{"--from", "pants", "--workspace", "shop"}, LifecycleEnv{})
+		return WorkspaceInit(context.Background(), "", []string{"--from", tool, "--workspace", "shop"}, LifecycleEnv{})
 	})
 	if err != nil {
 		t.Fatalf("WorkspaceInit: %v\n%s", err, out)
@@ -55,14 +72,14 @@ func TestInitFromPantsDeclaresThePantsExtensionAndSyncsTheProjects(t *testing.T)
 	if err := json.Unmarshal(data, &cfg); err != nil {
 		t.Fatal(err)
 	}
-	if !slices.Equal(cfg.Extensions, []string{"@putnami/pants"}) || len(cfg.Templates) != 0 || len(cfg.Registries) != 0 {
-		t.Errorf("workspace config = %s, want @putnami/pants declared alone", data)
+	if !slices.Equal(cfg.Extensions, []string{extension}) || len(cfg.Templates) != 0 || len(cfg.Registries) != 0 {
+		t.Errorf("workspace config = %s, want %s declared alone", data, extension)
 	}
-	if !slices.Equal(installed, []string{"@putnami/pants"}) {
-		t.Errorf("installed = %v, want @putnami/pants", installed)
+	if !slices.Equal(installed, []string{extension}) {
+		t.Errorf("installed = %v, want %s", installed, extension)
 	}
-	if synced == nil || !slices.Contains(synced.Extensions.Names(), "@putnami/pants") {
-		t.Errorf("projects sync ran on %+v, want the workspace that declares @putnami/pants", synced)
+	if synced == nil || !slices.Contains(synced.Extensions.Names(), extension) {
+		t.Errorf("projects sync ran on %+v, want the workspace that declares %s", synced, extension)
 	}
 	if !strings.Contains(out, "putnami lint,test,build --impacted") {
 		t.Errorf("the summary names the next command:\n%s", out)
@@ -71,15 +88,17 @@ func TestInitFromPantsDeclaresThePantsExtensionAndSyncsTheProjects(t *testing.T)
 
 func TestInitFromRefusesWhatItCannotAdopt(t *testing.T) {
 	spectest.Proves(t, initFromFeature, "init-from-pants", "init-from-pants-declares-the-pants-extension-and-syncs-the-projects")
+	spectest.Proves(t, initFromFeature, "init-from-bazel", "init-from-bazel-declares-the-bazel-extension-and-syncs-the-projects")
 	for name, c := range map[string]struct {
 		args      []string
 		pantsTOML bool
 		want      string
 	}{
 		"no pants.toml":   {[]string{"--from", "pants"}, false, "holds no pants.toml"},
-		"no tool":         {[]string{"--from"}, true, "--from needs a tool (choose: pants)"},
-		"an empty tool":   {[]string{"--from="}, true, "--from needs a tool (choose: pants)"},
-		"an unknown tool": {[]string{"--from", "gradle"}, true, `unknown --from tool "gradle" (choose: pants)`},
+		"no Bazel root":   {[]string{"--from", "bazel"}, true, "holds no MODULE.bazel, WORKSPACE, WORKSPACE.bazel"},
+		"no tool":         {[]string{"--from"}, true, "--from needs a tool (choose: bazel, pants)"},
+		"an empty tool":   {[]string{"--from="}, true, "--from needs a tool (choose: bazel, pants)"},
+		"an unknown tool": {[]string{"--from", "gradle"}, true, `unknown --from tool "gradle" (choose: bazel, pants)`},
 		"a project":       {[]string{"--from", "pants", "--project", "web"}, true, "does not combine with --project"},
 		"an extension":    {[]string{"--from", "pants", "--extension", "go"}, true, "does not combine with --project, --project-path or --extension"},
 	} {

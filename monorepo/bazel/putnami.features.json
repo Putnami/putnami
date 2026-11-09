@@ -1,0 +1,95 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-features.json",
+  "protocolVersion": 2,
+  "namespace": "monorepo",
+  "features": [
+    {
+      "id": "monorepo/bazel-delegated-stack",
+      "type": "feature",
+      "name": "Run the packages of a Bazel workspace through Bazel",
+      "outcome": "A team with a Bazel repository reaches Putnami's runner and verdict without leaving Bazel: each Bazel package is a Putnami project with its edges, each task runs bazel on that package and reads its reports, and Bazel keeps its own cache and remote execution",
+      "owner": "tooling",
+      "target": "coded",
+      "requirements": [
+        {
+          "id": "packages-become-projects",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-packages-of-a-bazel-workspace-become-projects-with-their-edges"
+            ]
+          }
+        },
+        {
+          "id": "sync-writes-the-package-graph",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-sync-writes-each-package-putnami-json-from-the-export"
+            ]
+          }
+        },
+        {
+          "id": "validate-fails-on-a-stale-graph",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-stale-package-graph-fails-validate"
+            ]
+          }
+        },
+        {
+          "id": "tasks-delegate-to-bazel",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-task-runs-bazel-on-its-package-and-records-the-delegation"
+            ]
+          }
+        },
+        {
+          "id": "reports-become-the-summary",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-bazel-junit-and-coverage-become-the-test-and-coverage-summary"
+            ]
+          }
+        },
+        {
+          "id": "manifest-follows-the-profile",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-manifest-conforms-to-the-stack-core"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

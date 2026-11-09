@@ -348,7 +348,7 @@ _putnami_flags_for() {
                 '--channel[Resolve the extensions, the template and the starter dependencies on one release channel (default: PUTNAMI_CHANNEL, then the channel the CLI was installed from, then latest)]:channel:'
                 '--extension[Default extension to install]:ts|go|py:(go py ts)'
                 '--force[Reinitialize an existing workspace]'
-                '--from[Turn the repository a monorepo tool describes into a workspace: declare the tool'\''s extension and synchronize its packages as projects]:pants:(pants)'
+                '--from[Turn the repository a monorepo tool describes into a workspace: declare the tool'\''s extension and synchronize its packages as projects]:bazel|pants:(bazel pants)'
                 '--project[Create an initial project]:name:'
                 '--project-path[Workspace-relative path for the initial project]:path:'
                 '--workspace[Workspace name override]:name:'
@@ -467,7 +467,7 @@ _putnami_flags_for() {
                 '--channel[Resolve the extensions, the template and the starter dependencies on one release channel (default: PUTNAMI_CHANNEL, then the channel the CLI was installed from, then latest)]:channel:'
                 '--extension[Default extension to install]:ts|go|py:(go py ts)'
                 '--force[Reinitialize an existing workspace]'
-                '--from[Turn the repository a monorepo tool describes into a workspace: declare the tool'\''s extension and synchronize its packages as projects]:pants:(pants)'
+                '--from[Turn the repository a monorepo tool describes into a workspace: declare the tool'\''s extension and synchronize its packages as projects]:bazel|pants:(bazel pants)'
                 '--project[Create an initial project]:name:'
                 '--project-path[Workspace-relative path for the initial project]:path:'
                 '--workspace[Workspace name override]:name:'
@@ -705,6 +705,7 @@ _putnami() {
                         ;;
                     'init --from')
                         cmd_values=(
+                            'bazel'
                             'pants'
                         )
                         value_slot=1
@@ -821,6 +822,7 @@ _putnami() {
                         ;;
                     'workspace init --from')
                         cmd_values=(
+                            'bazel'
                             'pants'
                         )
                         value_slot=1

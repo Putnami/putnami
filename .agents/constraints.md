@@ -26,6 +26,7 @@ Framework reference lives in the `AI.md` of each module and extension; it is nev
 The repo is organized by ownership — each language ecosystem is self-contained. Full rules live in CONTRIBUTING.md (Repository Layout); the short map:
 
 - `tooling/` — workspace-wide machinery: the CLI (`tooling/cli`, Go), extension SDK, scaffold, client generator, SDD extension, agent workflows, hooks, and tooling samples.
+- `monorepo/` — monorepo tool integrations, each a delegated stack extension that runs the tool and reads its results: `monorepo/bazel`, `monorepo/pants` (D-063).
 - `intelligence/` — public Intelligence code: the area detector (`intelligence/areas`).
 - `cloud/` — public client code of the hosted platform, such as the Cloud runtime destination libraries.
 - `protocols/` — cross-pillar wire contracts (JSON schemas + fixture corpora) shared by frameworks, tooling, and platform. Structured CLI output, workspace/project config, extension manifests, features, support status, and the other contracts are defined here.
@@ -70,13 +71,13 @@ Docs live next to the thing they describe, in each package's `doc/` folder; `sit
 ## Repository Conventions
 
 - Put persistent project-specific instructions in this file. Nothing regenerates it.
-- Keep product-code changes inside the owning domain (tooling/, intelligence/, cloud/, protocols/, go/, typescript/, python/, sites/). Agent guidance and host configuration belong in the established .agents/, .claude/, and .codex/ roots.
+- Keep product-code changes inside the owning domain (tooling/, monorepo/, intelligence/, cloud/, protocols/, go/, typescript/, python/, sites/). Agent guidance and host configuration belong in the established .agents/, .claude/, and .codex/ roots.
 - Do not add tracked files under retired roots such as apps/, core/, extensions/, framework/, packages/, web/, samples/, scripts/, or docs/.
 - For user-facing changes, update adjacent docs in the same owning domain, in the same PR.
 - A change that adds or alters user-visible behavior also carries its product intent: a feature declaration in the owning project's `putnami.features.json`, one spec under `specs/`, and — when the change rests on a durable choice — a decision record under `<project>/doc/adr/`. Never hand-write feature evidence; build and test producers emit it.
 - Every project carries a feature of its own, a spec, or a reviewed `featureAuthority` in its `putnami.json` (D-025). `validate` fails a project that carries none unless `options.sdd.featureCoverage.debt` in `putnami.workspace.json` names it. Never add an entry to pass the gate: the pull request that gives a listed project its answer removes its entry. A protocol owns the feature of its contract, and each implementation proves its requirements in its own tests, under a check of its own (D-026).
 - A public support status is a separate, reviewed decision recorded only in `putnami.support.json` (rules in `protocols/support`). Do not claim one in prose, and do not add an entry without that review.
-- A domain is a top-level scope: a root directory whose `putnami.json` is a scope manifest (`tooling/`, `intelligence/`, `cloud/`, `protocols/`, `go/`, `typescript/`, `python/`, `sites/`). Its projects are that scope's `includes`.
+- A domain is a top-level scope: a root directory whose `putnami.json` is a scope manifest (`tooling/`, `monorepo/`, `intelligence/`, `cloud/`, `protocols/`, `go/`, `typescript/`, `python/`, `sites/`). Its projects are that scope's `includes`.
 - Write every GitHub artifact (issue, pull request, comment, commit message) and every code comment and doc in English, whatever the language of the conversation. The only exceptions are UTF-8 test fixtures and proper nouns such as RGPD or CNIL. `./putnamiw change language text|files|commits|tasks` is the shared detector: `change finalize` refuses a non-English PR, `/check` runs it on the branch, and `/audit` files the remaining debt under `prop/language`. The active audit integration keeps `check/scripts/english-only.sh` only as a thin relay to that native command.
 - A code comment states the contract of the code next to it, never its history. Do not write why a guard exists, which incident motivated it, which issue or PR introduced it, or what would break without it: state the rule in the present tense, or say nothing. A lint escape (`//nolint`, `as any`, `@ts-ignore`, `biome-ignore`) is a change to the code or to the lint rule, not a comment to justify; `/audit --prune` removes both classes.
 - Use Conventional Commit style for both commit messages and PR titles: `type(scope): summary` when a useful scope exists, otherwise `type: summary`.
