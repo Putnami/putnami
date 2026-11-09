@@ -17,6 +17,7 @@ Putnami adopts a tool in one of two modes:
 | Tool | Mode | Command |
 |---|---|---|
 | Pants | Delegate | `putnami init --from pants` |
+| Bazel | Delegate | `putnami init --from bazel` |
 
 ## Pants
 
@@ -119,9 +120,89 @@ override the test task and its reports in each package's `putnami.json`:
 }
 ```
 
+## Bazel
+
+Bazel keeps its cache and its remote execution: each Putnami task runs
+`bazel` on one package.
+
+### Before you start
+
+- `@putnami/bazel` is not published yet: until its first release,
+  `putnami init --from bazel` stops at the extension install.
+- Bazel is on `PATH`, at the version `.bazelversion` states. Without
+  `.bazelversion`, each task warns that the version is not pinned.
+- `MODULE.bazel`, `WORKSPACE` or `WORKSPACE.bazel` lies at the root of the
+  repository, which becomes the workspace root.
+
+### Turn the repository into a workspace
+
+At the repository root:
+
+```bash
+putnami init --from bazel
+```
+
+`init` declares `@putnami/bazel`, installs it, and synchronizes the projects.
+The sync runs `bazel query //...` and writes, in each package's
+`putnami.json`, the extension and the packages it depends on:
+
+```json
+{
+  "$schema": "https://putnami.dev/schemas/putnami-project.json",
+  "extensions": ["@putnami/bazel"],
+  "dependencies": ["/pricing"]
+}
+```
+
+A package is a directory whose `BUILD` or `BUILD.bazel` file declares a rule
+the query lists. Any other directory with a `BUILD` file, the root included,
+joins the workspace as a bare member that runs nothing. A package with no test rule also gets `"disable": { "jobs": ["test"] }`. Add
+`.putnami/` and `.gen/` to `.gitignore`, then commit the files: they are the
+package graph Putnami selects on. Run `putnami projects sync` again after a
+change to the dependencies between packages.
+
+In a CI without Bazel on the machine that syncs, write the export first and
+the sync reads it instead:
+
+```bash
+bazel query 'deps(//...)' --output=streamed_jsonproto > bazel-graph.json
+putnami projects sync
+```
+
+### Run what a change affects
+
+```bash
+putnami test --impacted
+```
+
+After a change to `pricing`, Putnami runs `pricing` and the packages that
+depend on it, `api` here, each with one command at the root:
+
+```text
+bazel coverage --build_event_json_file=<output>/build-events.json //pricing:all
+bazel coverage --build_event_json_file=<output>/build-events.json //api:all
+```
+
+A change to `api` alone runs `api` alone: Putnami never runs Bazel on the
+packages a changed package depends on. A change to `MODULE.bazel`, its
+lockfile, `.bazelrc` or `.bazelversion` runs every package.
+
+Each task copies the `test.xml` and `coverage.dat` of each test run the
+build-event file lists into its own output, and reads them into its test and
+coverage summary. It never removes a Bazel output, so a test Bazel has cached
+returns as fast as Bazel does. Its result records `delegatedTo: bazel`, and
+Putnami stores no cache entry for it. `putnami build` runs `bazel build` the
+same way. Bazel declares no lint convention, so a Bazel package has no lint
+task.
+
+`putnami validate` fails with `bazel.sync_stale` when the edges no longer
+match Bazel: run `putnami projects sync` and commit the result.
+
 ## Next
 
 - [Run a Pants repository with Putnami](https://github.com/Putnami/putnami/blob/main/tooling/pants/doc/01-pants.md):
+  every command, the version check, what the sync owns.
+- [Run a Bazel workspace with Putnami](https://github.com/Putnami/putnami/blob/main/tooling/bazel/doc/01-bazel.md):
   every command, the version check, what the sync owns.
 - [Observe a change in your CI](/docs/how-to/observe-a-change-in-your-ci): the
   report on a pull request, before you adopt anything.
