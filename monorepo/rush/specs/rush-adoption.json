@@ -9,7 +9,7 @@
   ],
   "nonGoals": [
     "Installing or switching a Rush version: the toolchain check compares and never installs",
-    "Rewriting rush.json or command-line.json, or a project's package.json beyond the exports an import adds (D-067)",
+    "Rewriting rush.json or command-line.json, or a project's package.json beyond the exports an import adds (D-066)",
     "Rush subspaces, version policies and publishing: rush publish and rush version keep running through Rush",
     "A Rush repository whose rush.json is not at the Putnami workspace root"
   ],

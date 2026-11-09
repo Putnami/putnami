@@ -8,7 +8,8 @@
     "After a change to one package of an adopted Bazel workspace, putnami test runs that package and its dependents through Bazel, and Putnami's cache stores nothing",
     "A team adopts a Nx repository in the mode it picks: import, where Putnami's runner and cache take over, or delegate, where Nx and its cache keep running each target",
     "After a change to one project of a moon repository adopted in delegate mode, putnami test runs moon on that project and its dependents, and Putnami's cache stores nothing; adopted in import mode, its projects run the Putnami extension of their language",
-    "After a change to one package of a Turborepo repository adopted in delegate mode, putnami test runs turbo on that package and its dependents, and Putnami's cache stores nothing"
+    "After a change to one package of a Turborepo repository adopted in delegate mode, putnami test runs turbo on that package and its dependents, and Putnami's cache stores nothing",
+    "After a change to one project of a Rush repository adopted in delegate mode, putnami build runs rush build on that project and its dependents, and Putnami's cache stores nothing"
   ],
   "nonGoals": [
     "Reading a monorepo tool's configuration in the CLI: the tool's stack extension owns it",
@@ -71,6 +72,18 @@
     {
       "id": "turbo-import-graph",
       "text": "On the same fixture, in import mode, the sync keeps the edges putnami observe reads, gives a TypeScript package @putnami/typescript for a task whose script already runs bun test and disables @putnami/turbo for it, and lists each tsc or vitest task it leaves on Turborepo."
+    },
+    {
+      "id": "init-from-rush",
+      "text": "putnami init --from rush, at the root of a repository that holds rush.json, declares @putnami/rush, records the mode in its options, also declares @putnami/typescript in import mode, installs them and runs projects sync, whose Rush sync task writes each Rush project's putnami.json. In import mode the TypeScript install writes the root package.json with the projects as workspaces. Without rush.json it is a usage error that names the file."
+    },
+    {
+      "id": "rush-import-runs-through-putnami",
+      "text": "On the Rush fixture of the putnami observe detector, an import writes each Rush project as a TypeScript project whose dependencies are the edges putnami observe reads, then putnami lint,test,build passes and no task runs rush. A command-line.json bulk command whose name is not build, test or lint appears in the output as unmapped."
+    },
+    {
+      "id": "rush-impact-runs-through-rush",
+      "text": "On the Rush fixture of the putnami observe detector, with @putnami/rush and rush on PATH, putnami init --from rush --mode delegate --apply writes each project's edges. After a change to one project, putnami build --impacted runs rush build --to <package> at the workspace root on that project and each project that depends on it, never on one it depends on, records delegatedTo rush, and neither looks up nor stores a Putnami cache entry."
     }
   ],
   "decisions": [

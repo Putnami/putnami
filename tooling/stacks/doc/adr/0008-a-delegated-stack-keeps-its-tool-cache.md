@@ -5,7 +5,7 @@
 - **Scope**: `tooling/stacks` (`@putnami/stacks`), `monorepo/pants`
   (`@putnami/pants`), `monorepo/nx` (`@putnami/nx`), `monorepo/moon`
   (`@putnami/moon`), `monorepo/turbo` (`@putnami/turbo`) and the delegated
-  stacks that follow it (Bazel)
+  stacks that follow it (Bazel, and Rush in delegate mode, `monorepo/rush`)
 
 ## Context
 
@@ -85,3 +85,6 @@ package's `putnami.json` with the edges of the `pants peek ::` export.
   extension's job of each task. A `tsc`, `vitest`, `jest` or `eslint` task
   keeps running through Turborepo, because moving it would change the tool
   that checks the code.
+- Rush keeps its build cache the same way when a workspace adopts it in
+  delegate mode. Its cache is opt-in: without it, each delegated task reruns
+  the projects upstream of its own, so the Rush sync warns.

@@ -4580,6 +4580,45 @@
               "an-imported-turborepo-maps-typescript-packages-and-lists-unmapped-tasks"
             ]
           }
+        },
+        {
+          "id": "init-from-rush",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "init-from-rush-declares-the-extensions-of-the-mode-and-syncs-the-projects"
+            ]
+          }
+        },
+        {
+          "id": "rush-import-runs-through-putnami",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "an-imported-rush-repository-passes-lint-test-build-with-the-graph-observe-reads"
+            ]
+          }
+        },
+        {
+          "id": "rush-impact-runs-through-rush",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-change-to-one-rush-project-runs-rush-build-on-it-and-its-dependents-uncached"
+            ]
+          }
         }
       ]
     }
