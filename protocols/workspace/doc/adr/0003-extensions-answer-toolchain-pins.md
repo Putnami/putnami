@@ -1,6 +1,7 @@
 # ADR 0003: Extensions answer toolchain pins
 
-- **Status**: accepted
+- **Status**: accepted, amended by
+  [ADR 0006](0006-a-host-with-no-archive-keeps-the-committed-pin.md)
 - **Date**: 2026-10-22
 - **Scope**: `go.putnami.dev/protocol/workspace` (`protocols/workspace`): the
   `putnami.lock.json` toolchain entries and the toolchain-resolve exchange;

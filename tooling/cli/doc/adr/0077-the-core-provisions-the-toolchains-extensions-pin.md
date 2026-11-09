@@ -1,6 +1,7 @@
 # ADR 0077 — The core provisions the toolchains extensions pin
 
-- **Status**: accepted
+- **Status**: accepted, amended by
+  [workspace ADR 0006](../../../../protocols/workspace/doc/adr/0006-a-host-with-no-archive-keeps-the-committed-pin.md)
 - **Date**: 2026-10-22
 - **Scope**: `@putnami/cli` (`internal/jobs/toolchainpins`,
   `internal/jobs/toolchain`, `internal/lockfile`, `internal/commands/lifecycle`,
