@@ -70,7 +70,7 @@ with its profile's markers: `Cargo.toml` for Rust.
   extension's detector and answers, for each candidate path that the detector
   knows as a component: the source name (the crate name), the dependencies as
   paths, the extension, and in `metadata` the build's name of the component,
-  its variant, the stack root and the expected toolchain version. A component
+  its variant, the stack root and the expected toolchain versions. A component
   whose manifest names no package, such as a Composer application, keeps no
   source name, and its component name is its directory, the same on every
   checkout.
@@ -151,17 +151,33 @@ The Rust reference profile:
 | `toolchain.command`, `toolchain.pattern` | How to read the version on the machine: the command's output, standard output first, matched by the pattern's `version` group. |
 | `toolchain.provisioned` | The environment variable that holds the toolchain the workspace lock pins, for a stack extension that pins one. |
 | `tasks.<task>.withoutCoverage` | How the task runs on a toolchain with no coverage support: a `probe` that exits non-zero there, and the `steps` that replace the task's. Its coverage reports are not read, and the task warns with `stacks.coverage_unavailable`. |
-| `toolchain.files` | The files that state the expected version or range, read in the project directory, then at the stack root. `key` reads one string value of a TOML table or a JSON object; without it, the file's first non-empty line. |
-| `inputs.<set>` | Named sets of file patterns. A plain pattern is relative to the project directory; `{root}/` makes it relative to the stack root, the directory of the build that holds the component (the Cargo workspace, the Gradle settings). |
-| `tasks.<task>.steps` | The commands the task runs in order, each an argument vector run in the project directory, with no shell. `{root}` is the stack root, `{component}` the build's name for the component (`Component.Ref`, or its name), `{output}` the task's output directory under the project. |
+| `toolchain.files` | The files that state the expected version or range, read in the project directory, then at the stack root. `key` reads one string value of a TOML table, a JSON object or, in a `.yaml` or `.yml` file, a YAML mapping; without it, the file's first non-empty line. |
+| `toolchain.ranges` | How a range a file states reads: Composer's syntax, or `pub-sdk` and `pub-flutter`, as pub reads a Dart or Flutter SDK constraint ([ADR 0008](adr/0008-task-targets-exclusions-and-pub-ranges.md)). `toolchain.version` reads plain. |
+| `toolchain.also` | Further checks with the same members, such as the Dart SDK a Flutter SDK bundles, run with the selected toolchain. An entry without `check` takes the first check's. |
+| `inputs.<set>` | Named sets of file patterns. A plain pattern is relative to the project directory; `{root}/` makes it relative to the stack root, the directory of the build that holds the component (the Cargo workspace, the Gradle settings); a pattern under the project that starts with `!` leaves its files out of the task's inputs, such as a file the build tool writes under a directory the task reads, never `putnami.json` or a toolchain file. |
+| `tasks.<task>.steps` | The commands the task runs in order, each an argument vector run in the project directory, with no shell. `{root}` is the stack root, `{component}` the build's name for the component (`Component.Ref`, or its name), `{output}` the task's output directory under the project, `{target}` one of the task's targets. |
 | `tasks.<task>.inputs` | The input sets the task reads. `lint` reads fewer than `test`: a lockfile change does not rerun it. |
+| `tasks.<task>.reportSteps` | Steps that run after the task's steps whatever their outcome, such as a converter that writes the JUnit report a failing test runner leaves to it, so the failed cases name the failure. They name no `{target}`. |
 | `tasks.<task>.reports` | The JUnit and coverage reports the task reads back, with the coverage format. The core copies each into `{output}` as soon as the task ends. `when` and `optional` say when a report is expected. |
+| `tasks.<task>.targets` | What a step that names `{target}` runs on, listed in the project directory when the task runs: a `name`, or one target per file an `each` pattern matches, named by its base name without extension; `when` lists paths that must all exist, `hosts` the systems (`linux`, `darwin`, `windows`) that build it. A step that names `{target}` runs once per target, and not at all when there is none; it needs the task to declare targets, and each target's paths are in the task's inputs. |
 | `tasks.<task>.artifacts` | The files the task copies into `{output}/artifacts` after its steps, so a cache hit restores them: patterns under the project or the stack root that may name `{component}`. The file a pattern with no wildcard names is removed before the steps, unless its path leads outside the project or the stack root or the inputs of one of the component's tasks select it, so only what the steps write is copied. A pattern with a wildcard is only copied, and copies whatever it matches, a file an earlier build left included. A component name that is no single path segment keeps no artifact. A pattern that matches nothing copies nothing. |
 | `variants.<name>` | A part of the profile one build runs, applied before the project's override. |
 | `tasks.<task>.dir` | Where the steps run: `project`, the default, or `root`, the stack root, for a tool that resolves its addresses from there. |
 | `delegated` | `true` for a stack whose build tool keeps its own cache; see [Delegated stacks](#delegated-stacks). An override cannot change it. |
 
 The toolchain files are inputs of every task, whatever its input sets.
+
+### Targets
+
+A Flutter app builds one artifact per platform directory it holds, and a Dart
+package one executable per `bin/*.dart`. A task lists its targets when it
+runs, from the project directory and the host system, rather than from the
+probe, which is not rerun when a directory appears. The files a target needs
+are task inputs, so a target that appears or disappears changes the key. A
+task whose targets name `hosts` declares the `hostPlatform` runtime input, so
+the host system reaches its key; the conformance kit holds it, and an
+override cannot add `hosts` to another task.
+([ADR 0008](adr/0008-task-targets-exclusions-and-pub-ranges.md)).
 
 Several components share one stack root: one Cargo workspace, one
 `target/`, one `target/nextest/ci/junit.xml`. The core runs the tasks of one
@@ -228,9 +244,11 @@ whole; it never merges into an array.
 The core reads the override from the project's own `putnami.json` only, at
 the job and in the input selectors alike, so the two never disagree and the
 selector's basis covers it. An override is validated by the same strict
-decoder: an unknown member, a change to `id` or `markers`, or a stack-root
-input the manifest does not declare fails the task with
-`stacks.project_config_invalid`. Scope-level overrides are left for later.
+decoder: an unknown member, a change to `id`, `markers` or `variants`, a
+stack-root input the manifest does not declare, a target whose paths are in
+none of the task's inputs, a step that names `{target}` in a task without
+targets, or a target with `hosts` in a task whose manifest declares no
+`hostPlatform` input fails the task with `stacks.project_config_invalid`. Scope-level overrides are left for later.
 
 ### Inputs are input selectors
 
@@ -294,7 +312,7 @@ A task's key is the core's key (see the CLI's
 | Implementation digest | The extension runtime, which embeds the core and the profile: editing either changes every key of the stack. |
 | Task contract digest | The manifest's task. |
 | Task params hash | The resolved `options["@putnami/<stack>"]` of the project, so every override. |
-| Project metadata digest | The build's name of the component, its variant, the stack root and the expected toolchain version from the probe. |
+| Project metadata digest | The build's name of the component, its variant, the stack root and the expected toolchain versions from the probe. |
 | File content hash | The files the task's selector answered: its input sets, the stack-root files, the toolchain files. |
 | Upstream hashes | The keys of the same task of the projects it depends on. |
 
@@ -333,7 +351,20 @@ An extension may instead install its toolchain when a task needs it, as
 ([ADR 0004](adr/0004-a-stack-extension-may-install-its-toolchain-at-task-time.md)).
 `Stack.Provide` runs when the toolchain on `PATH` is missing or fails the check,
 and `Stack.Tools` returns directories appended to the task's `PATH`. An offline
-run calls neither.
+run calls neither. `Provide` receives the component's resolved toolchain and
+the version each of its checks expects, so a stack with variants, such as Dart
+and Flutter, installs the one the component runs; a further check that fails
+calls it too, and the task then runs the installed toolchain. A workspace job
+counts a toolchain the stack installs as present when the run is not offline,
+and runs at each stack root with a component of that root, before its
+input-only project, so the root's tasks and its workspace job select the same
+toolchain.
+A step's program is the pinned toolchain or a program beside it, then a
+program beside the toolchain on the task's `PATH`, such as a Flutter SDK's
+`dart`, then the first of that name on the task's `PATH`, where the
+directories of `Tools` are. `Stack.Selected`,
+`RunForeground`, `AnnounceReady` and `FreePort` serve a stack's `run` and
+`serve` commands.
 
 A file may state a range instead, in Composer's constraint syntax: the PHP
 profile reads `require.php` of `composer.json`, such as `>=8.4` or `^8.2`
@@ -341,11 +372,15 @@ profile reads `require.php` of `composer.json`, such as `>=8.4` or `^8.2`
 when the machine's numeric release is in the range and fails with
 `stacks.toolchain_mismatch` otherwise, unless `toolchain.check` is `warn`. The
 key carries the range, so two machines in it share entries; a profile lists
-an exact file first, such as `.php-version`, so an exact statement wins.
+an exact file first, such as `.php-version`, so an exact statement wins. A
+Dart or Flutter SDK constraint in `pubspec.yaml` reads as pub reads it, under
+`toolchain.ranges`, and `toolchain.also` adds a further check, such as the
+Dart SDK a Flutter SDK bundles
+([ADR 0008](adr/0008-task-targets-exclusions-and-pub-ranges.md)).
 
-So a stored result was produced by the version, or a version of the range,
+So a stored result was produced by the versions, or versions of the ranges,
 its key names, unless a project chose `warn`. A project that states no
-expected version gets `stacks.toolchain_unpinned`, a warning: its key carries
+expected version for any check gets `stacks.toolchain_unpinned`, a warning: its key carries
 no toolchain version, and two machines with two versions share entries. A
 Rust channel name such as `stable` is neither a version nor a range, and gets
 the same warning.

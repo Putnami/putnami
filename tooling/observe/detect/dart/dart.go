@@ -75,6 +75,17 @@ type Component struct {
 	Source string
 	// DependsOn lists the ids of the components it depends on, sorted.
 	DependsOn []string
+	// Flutter reports a package built with the Flutter SDK: its pubspec
+	// depends on it (sdk: flutter) or constrains its version
+	// (environment.flutter).
+	Flutter bool
+	// PubWorkspace is the ID of the outermost pub workspace that resolves the
+	// package: the root's, ".", or one a pubspec below the root declares.
+	// Empty for a package no pub workspace lists, a melos package included.
+	PubWorkspace string
+	// DeclaresWorkspace reports a pubspec with a workspace list: the root of
+	// a pub workspace below the repository root.
+	DeclaresWorkspace bool
 }
 
 // Detection is what the detector found in one repository.
@@ -91,6 +102,11 @@ type pkg struct {
 	name     string
 	manifest yaml.Map
 	member   bool
+	// scope is the workspace whose members link to each other by name: the
+	// outermost pub workspace, else "." for a melos package.
+	scope string
+	// pubWorkspace is the outermost pub workspace that lists the package.
+	pubWorkspace string
 }
 
 // Detect reads the Dart packages of the repository at root.
@@ -111,21 +127,38 @@ func Detect(root string) Detection {
 	if ws.isRoot {
 		delete(packages, ".")
 	}
-	// members maps a package name to the member that has it: only members
-	// link to each other by name.
-	members := map[string]string{}
 	for dir, p := range packages {
 		p.member = ws.member(dir)
-		if current, taken := members[p.name]; p.member && (!taken || dir < current) {
-			members[p.name] = dir
+		if p.member {
+			p.scope = wsproto.ProbeRootPath
+		}
+		if ws.pubMember(dir) {
+			p.pubWorkspace = wsproto.ProbeRootPath
+		}
+	}
+	out.Diagnostics = append(out.Diagnostics, nestedWorkspaces(packages)...)
+	// members maps a scope and a package name to the member that has it: only
+	// the members of one workspace link to each other by name.
+	members := map[string]map[string]string{}
+	for dir, p := range packages {
+		if p.scope == "" {
+			continue
+		}
+		if members[p.scope] == nil {
+			members[p.scope] = map[string]string{}
+		}
+		if current, taken := members[p.scope][p.name]; !taken || dir < current {
+			members[p.scope][p.name] = dir
 		}
 	}
 	for dir, p := range packages {
-		c := Component{ID: dir, Name: p.name, Source: evidence.SourceManifest}
+		c := Component{ID: dir, Name: p.name, Source: evidence.SourceManifest, PubWorkspace: p.pubWorkspace}
 		if p.member {
 			c.Source = evidence.SourceWorkspace
 		}
-		c.DependsOn = edges(p, packages, members)
+		_, c.DeclaresWorkspace = p.manifest["workspace"]
+		c.DependsOn = edges(p, packages, members[p.scope])
+		c.Flutter = usesFlutter(p.manifest)
 		out.Components = append(out.Components, c)
 	}
 	sort.Slice(out.Components, func(i, j int) bool { return out.Components[i].ID < out.Components[j].ID })
@@ -205,6 +238,74 @@ type workspace struct {
 	melos   bool
 	include [][]string
 	ignore  [][]string
+}
+
+// pubMember reports whether the package at dir is a member of the root pub
+// workspace.
+func (ws workspace) pubMember(dir string) bool {
+	if dir == "." && ws.isRoot {
+		return false
+	}
+	parts := splitPath(dir)
+	return slices.ContainsFunc(ws.members, func(p []string) bool { return matchSegments(p, parts) })
+}
+
+// nestedWorkspaces reads the workspace list of each pubspec below the root
+// that declares one: its members are workspace members, which link to each
+// other by name, and resolve with the outermost pub workspace that lists the
+// workspace root, or with that root.
+func nestedWorkspaces(packages map[string]*pkg) []diag.Diagnostic {
+	var diags []diag.Diagnostic
+	dirs := make([]string, 0, len(packages))
+	for dir := range packages {
+		dirs = append(dirs, dir)
+	}
+	sort.Strings(dirs)
+	for _, dir := range dirs {
+		root := packages[dir]
+		value, declared := root.manifest["workspace"]
+		if dir == "." || !declared {
+			continue
+		}
+		file := join(dir, Pubspec)
+		list, ok := yaml.Strings(value)
+		if !ok {
+			diags = append(diags, diag.Warningf(CodePubspecInvalid, file, "the workspace of %s is not a list of paths, so it has no member", file))
+		}
+		var parsed [][]string
+		parsed, diags = patterns(file+"#workspace", list, diags)
+		for _, member := range dirs {
+			rel, inside := strings.CutPrefix(member, dir+"/")
+			if !inside || !slices.ContainsFunc(parsed, func(p []string) bool { return matchSegments(p, splitPath(rel)) }) {
+				continue
+			}
+			p := packages[member]
+			p.member = true
+			if p.pubWorkspace == "" {
+				p.pubWorkspace = dir
+			}
+		}
+	}
+	// A pub workspace that is itself a member resolves with the outer one.
+	for _, p := range packages {
+		for p.pubWorkspace != "" && p.pubWorkspace != wsproto.ProbeRootPath {
+			outer := packages[p.pubWorkspace]
+			if outer == nil || outer.pubWorkspace == "" || outer.pubWorkspace == p.pubWorkspace {
+				break
+			}
+			p.pubWorkspace = outer.pubWorkspace
+		}
+		if p.pubWorkspace != "" {
+			p.scope = p.pubWorkspace
+		}
+	}
+	for dir, p := range packages {
+		// The root of a nested pub workspace links its members by name too.
+		if _, declared := p.manifest["workspace"]; declared && dir != "." && p.scope == "" {
+			p.scope = dir
+		}
+	}
+	return diags
 }
 
 // member reports whether the package at dir belongs to the pub workspace or
@@ -338,7 +439,7 @@ func edges(p *pkg, packages map[string]*pkg, members map[string]string) []string
 					_, ok = packages[target]
 				}
 			case isTable && slices.ContainsFunc(sources, func(s string) bool { _, has := table[s]; return has }):
-			case p.member:
+			case p.scope != "":
 				target, ok = members[name]
 			}
 			if ok && target != p.dir && !slices.Contains(out, target) {
@@ -348,6 +449,23 @@ func edges(p *pkg, packages map[string]*pkg, members map[string]string) []string
 	}
 	sort.Strings(out)
 	return out
+}
+
+// usesFlutter reports whether a pubspec names the Flutter SDK: a dependency
+// with sdk: flutter, or a flutter entry in its environment.
+func usesFlutter(manifest yaml.Map) bool {
+	if env, ok := manifest["environment"].(yaml.Map); ok && env["flutter"] != nil {
+		return true
+	}
+	for _, key := range dependencyKeys {
+		deps, _ := manifest[key].(yaml.Map)
+		for _, spec := range deps {
+			if table, ok := spec.(yaml.Map); ok && strings.TrimSpace(yaml.String(table, "sdk")) == "flutter" {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 // resolvePath resolves a dependency path, relative to the directory of the

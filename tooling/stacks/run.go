@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"slices"
 	"strings"
 
@@ -117,9 +118,9 @@ func (s Stack) component(in runInput, emit reporter) (Metadata, Profile, error) 
 	if len(in.metadata) == 0 || json.Unmarshal(in.metadata, &meta) != nil || (meta.Component == "" && meta.Root == "") {
 		return Metadata{}, Profile{}, failWith(emit, CodeNotAComponent, "%s is no component %s found: run putnami projects sync, or remove %s from the project's extensions", in.projectAbs, s.Extension, s.Extension)
 	}
-	if meta.Component == "" {
-		return meta, Profile{}, nil
-	}
+	// A stack root that holds no component runs no step, but a job at that
+	// root, such as an install, selects its toolchain: its profile resolves
+	// too.
 	profile, err := s.Resolved(in.projectAbs, meta.Variant)
 	if err != nil {
 		return Metadata{}, Profile{}, failWith(emit, CodeProjectConfigInvalid, "%v", err)
@@ -134,20 +135,64 @@ func (s Stack) selectToolchain(ctx context.Context, in runInput, meta Metadata, 
 	if err != nil {
 		return Selection{}, failWith(emit, CodeNotAComponent, "%v", err)
 	}
-	expected, err := profile.Toolchain.ExpectedVersion(in.workspaceRoot, filepath.ToSlash(projectRel), meta.Root)
-	if err != nil {
-		return Selection{}, failWith(emit, CodeProjectConfigInvalid, "the expected toolchain version cannot be read: %v", err)
+	// A check that states no version warns only when no check does: the key
+	// then carries no toolchain version at all.
+	checks := profile.Toolchain.Checks()
+	expectedAll := make([]Expected, len(checks))
+	pinned := false
+	for i, check := range checks {
+		expectedAll[i], err = check.ExpectedVersion(in.workspaceRoot, filepath.ToSlash(projectRel), meta.Root)
+		if err != nil {
+			return Selection{}, failWith(emit, CodeProjectConfigInvalid, "the expected toolchain version cannot be read: %v", err)
+		}
+		pinned = pinned || expectedAll[i].Version != ""
 	}
+	expected := expectedAll[0]
 	env := os.Environ()
+	// The further checks read the selected toolchain: a command beside it
+	// runs that one.
+	further := func(sel Selection) ([]Verdict, error) {
+		var out []Verdict
+		for i, check := range checks[1:] {
+			c := check
+			c.Command = append([]string{sel.ProgramIn(profile.Toolchain, check.Command[0], sel.Env)}, check.Command[1:]...)
+			machine, err := c.MachineVersion(ctx, in.projectAbs, sel.Env)
+			if err != nil {
+				return nil, err
+			}
+			out = append(out, check.Compare(expectedAll[i+1], machine))
+		}
+		return out, nil
+	}
+	furtherFails := func(verdicts []Verdict, err error) bool {
+		return err != nil || slices.ContainsFunc(verdicts, func(v Verdict) bool { return v.Fail })
+	}
 	selected, err := profile.Toolchain.Select(ctx, in.projectAbs, expected, env)
+	var furtherVerdicts []Verdict
+	var furtherErr error
+	if err == nil && !selected.Verdict.Fail {
+		furtherVerdicts, furtherErr = further(selected)
+	}
 	offline := os.Getenv(extensionproto.OfflineDependenciesEnv) == "1"
-	if s.Provide != nil && !offline && (errors.Is(err, ErrToolchainMissing) || err == nil && selected.Verdict.Fail) {
-		provided, provideErr := s.Provide(ctx, expected, emit.Info)
+	if s.Provide != nil && !offline && (errors.Is(err, ErrToolchainMissing) || err == nil && (selected.Verdict.Fail || furtherFails(furtherVerdicts, furtherErr))) {
+		// A further check that fails, such as the Dart a Flutter SDK
+		// bundles, asks for the installed toolchain even when the one on
+		// PATH passes the first check.
+		forcePinned := err == nil && !selected.Verdict.Fail
+		provided, provideErr := s.Provide(ctx, profile.Toolchain, expectedAll, emit.Info)
 		if provideErr != nil {
 			return Selection{}, failWith(emit, CodeToolchainMissing, "install the %s toolchain: %v", profile.ID, provideErr)
 		}
 		env = append(append(env, provided.Env...), profile.Toolchain.Provisioned+"="+provided.Executable)
-		selected, err = profile.Toolchain.Select(ctx, in.projectAbs, expected, env)
+		if forcePinned {
+			selected, err = profile.Toolchain.Pinned(ctx, in.projectAbs, expected, env)
+		} else {
+			selected, err = profile.Toolchain.Select(ctx, in.projectAbs, expected, env)
+		}
+		furtherVerdicts, furtherErr = nil, nil
+		if err == nil && !selected.Verdict.Fail {
+			furtherVerdicts, furtherErr = further(selected)
+		}
 	}
 	if errors.Is(err, ErrToolchainMissing) {
 		if s.Provide != nil {
@@ -161,11 +206,28 @@ func (s Stack) selectToolchain(ctx context.Context, in runInput, meta Metadata, 
 	if err != nil {
 		return Selection{}, failWith(emit, CodeToolchainMissing, "%v", err)
 	}
-	if v := selected.Verdict; v.Code != "" {
-		if v.Fail {
-			return Selection{}, failWith(emit, v.Code, "%s", v.Message)
+	warnedUnpinned := false
+	report := func(v Verdict, stated Expected) error {
+		if v.Code == "" || (stated.Version == "" && pinned) || (v.Code == CodeToolchainUnpinned && warnedUnpinned) {
+			return nil
 		}
+		if v.Fail {
+			return failWith(emit, v.Code, "%s", v.Message)
+		}
+		warnedUnpinned = warnedUnpinned || v.Code == CodeToolchainUnpinned
 		emit.DiagnosticWithCode("warning", v.Message, "", 0, 0, v.Code)
+		return nil
+	}
+	if err := report(selected.Verdict, expected); err != nil {
+		return Selection{}, err
+	}
+	if furtherErr != nil {
+		return Selection{}, failWith(emit, CodeToolchainMissing, "%v: the %s stack needs it on PATH", furtherErr, profile.ID)
+	}
+	for i, v := range furtherVerdicts {
+		if err := report(v, expectedAll[i+1]); err != nil {
+			return Selection{}, err
+		}
 	}
 	if s.Tools != nil && !offline {
 		dirs, err := s.Tools(ctx, in.task, meta, selected.Env, emit.Info)
@@ -314,8 +376,11 @@ func (s Stack) WorkspaceRootJob(missing MissingToolchain, step func(context.Cont
 
 // toolchainMissing reports whether the machine has no toolchain for the
 // component. A profile that does not resolve counts as present: atRoot reports
-// it.
+// it; so does a toolchain the stack installs when the run is not offline.
 func (s Stack) toolchainMissing(ctx context.Context, in runInput) bool {
+	if s.Provide != nil && os.Getenv(extensionproto.OfflineDependenciesEnv) != "1" {
+		return false
+	}
 	var meta Metadata
 	_ = json.Unmarshal(in.metadata, &meta)
 	profile, err := s.Resolved(in.projectAbs, meta.Variant)
@@ -344,16 +409,24 @@ func (s Stack) workspaceComponents(ctx *pctx.Context) ([]wsproto.ProbeProject, e
 	if err != nil {
 		return nil, err
 	}
-	roots := map[string]bool{}
+	// A component stands for its stack root before the input-only project of
+	// that root: its toolchain is the one the root's tasks select.
+	chosen := map[string]int{}
 	components := make([]wsproto.ProbeProject, 0, len(result.Projects))
+	inputOnly := map[int]bool{}
 	for _, p := range result.Projects {
 		var meta Metadata
 		if err := json.Unmarshal(p.Metadata, &meta); err != nil {
 			return nil, err
 		}
-		if !roots[meta.Root] {
-			roots[meta.Root] = true
+		i, seen := chosen[meta.Root]
+		switch {
+		case !seen:
+			chosen[meta.Root] = len(components)
+			inputOnly[len(components)] = meta.Component == ""
 			components = append(components, p)
+		case inputOnly[i] && meta.Component != "":
+			components[i], inputOnly[i] = p, false
 		}
 	}
 	return components, nil
@@ -485,7 +558,7 @@ func (s Stack) run(ctx context.Context, in runInput, emit reporter) (string, map
 		return statusFailed, nil, err
 	}
 
-	if w := t.WithoutCoverage; w != nil && t.Reports != nil && len(t.Reports.Coverage) > 0 && !hasCoverageSupport(ctx, selected.Program(profile.Toolchain, w.Probe[0]), w.Probe[1:], in.projectAbs, env) {
+	if w := t.WithoutCoverage; w != nil && t.Reports != nil && len(t.Reports.Coverage) > 0 && !hasCoverageSupport(ctx, selected.ProgramIn(profile.Toolchain, w.Probe[0], env), w.Probe[1:], in.projectAbs, env) {
 		emit.DiagnosticWithCode("warning", fmt.Sprintf("the %s toolchain has no coverage support: %s runs with no coverage report", profile.ID, in.task), "", 0, 0, CodeCoverageUnavailable)
 		reports := *t.Reports
 		reports.Coverage = nil
@@ -493,6 +566,26 @@ func (s Stack) run(ctx context.Context, in runInput, emit reporter) (string, map
 	}
 
 	vars := map[string]string{"{root}": rootAbs, "{component}": meta.Component, "{project}": in.projectAbs, "{output}": outDir}
+	// A step that names {target} runs once per target the task lists in the
+	// project directory, and not at all when there is none.
+	targets, err := t.ListTargets(in.projectAbs, runtime.GOOS)
+	if err != nil {
+		return statusFailed, nil, failWith(emit, CodeProjectConfigInvalid, "list the %s targets: %v", in.task, err)
+	}
+	var steps [][]string
+	for _, step := range t.Steps {
+		if !namesTarget(step) {
+			steps = append(steps, step)
+			continue
+		}
+		if len(targets) == 0 {
+			emit.Info(fmt.Sprintf("no %s target in %s: %s does not run", in.task, meta.Component, strings.Join(step, " ")))
+		}
+		for _, target := range targets {
+			steps = append(steps, expandStep(step, map[string]string{TargetPlaceholder: target}))
+		}
+	}
+	t.Steps = steps
 	// {runtime} is resolved only for a task that names it, so a stack with
 	// no runtime command never depends on locating its own executable.
 	if slices.ContainsFunc(t.Steps, func(step []string) bool {
@@ -519,7 +612,7 @@ func (s Stack) run(ctx context.Context, in runInput, emit reporter) (string, map
 			argv = append(argv, stepArgs...)
 		}
 		emit.Info("$ " + strings.Join(argv, " "))
-		cmd := exec.CommandContext(ctx, selected.Program(profile.Toolchain, argv[0]), argv[1:]...) //nolint:gosec // the profile's own step
+		cmd := exec.CommandContext(ctx, selected.ProgramIn(profile.Toolchain, argv[0], env), argv[1:]...) //nolint:gosec // the profile's own step
 		cmd.Dir = in.projectAbs
 		if t.Dir == DirRoot {
 			cmd.Dir = rootAbs
@@ -530,6 +623,25 @@ func (s Stack) run(ctx context.Context, in runInput, emit reporter) (string, map
 		if err := cmd.Run(); err != nil {
 			stepErr = failWith(emit, CodeStepFailed, "%s: %v", strings.Join(argv, " "), err)
 			break
+		}
+	}
+	// The report steps write the reports a failing runner leaves to a
+	// converter: they run whatever the steps' outcome, so the failed cases
+	// name the failure.
+	for _, step := range t.ReportSteps {
+		argv := expandStep(step, vars)
+		emit.Info("$ " + strings.Join(argv, " "))
+		cmd := exec.CommandContext(ctx, selected.ProgramIn(profile.Toolchain, argv[0], env), argv[1:]...) //nolint:gosec // the profile's own step
+		cmd.Dir = in.projectAbs
+		cmd.Env = env
+		cmd.Stdout = in.stdout
+		cmd.Stderr = in.stdout
+		if err := cmd.Run(); err != nil {
+			if stepErr == nil {
+				stepErr = failWith(emit, CodeStepFailed, "%s: %v", strings.Join(argv, " "), err)
+			} else {
+				emit.Info(fmt.Sprintf("%s: %v", strings.Join(argv, " "), err))
+			}
 		}
 	}
 	if stepErr != nil && t.Reports == nil {
@@ -763,13 +875,23 @@ func removeReports(profile Profile, task, projectAbs, rootAbs string) error {
 // match outside its base, or that the inputs of any task of the profile
 // select, is kept.
 func removeOutputs(patterns []string, profile Profile, projectAbs, rootAbs string) error {
-	var projectInputs, rootInputs []string
+	var projectInputs, rootInputs, excludes []string
 	for _, task := range TaskNames {
 		project, root := profile.TaskPatterns(task)
 		projectInputs = append(projectInputs, project...)
 		rootInputs = append(rootInputs, root...)
+		excludes = append(excludes, profile.TaskExcludes(task)...)
 	}
+	kept := profile.KeptInputs()
 	isInput := func(m string) bool {
+		if rel, err := filepath.Rel(projectAbs, m); err == nil && filepath.IsLocal(rel) {
+			if rel = filepath.ToSlash(rel); slices.Contains(kept, rel) {
+				return true
+			}
+			if Excluded(excludes, rel) {
+				return false
+			}
+		}
 		for _, in := range []struct {
 			base     string
 			patterns []string

@@ -1,0 +1,160 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-features.json",
+  "protocolVersion": 2,
+  "namespace": "dart",
+  "features": [
+    {
+      "id": "dart/stack-extension",
+      "type": "feature",
+      "name": "Run the packages of a Dart or Flutter repository as Putnami tasks",
+      "outcome": "A team with a Dart or Flutter repository adds @putnami/dart and runs putnami lint, test and build over its packages with Putnami's runner and cache, without rewriting its build, on a machine with or without an SDK: each package is a project with its edges, each task checks the SDK against pubspec.yaml and installs the one it needs, the test task reads JUnit and LCOV, the workspace commands resolve, upgrade, run and serve, and a package overrides any profile value",
+      "owner": "dart",
+      "target": "coded",
+      "requirements": [
+        {
+          "id": "packages-become-projects",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-packages-of-a-pub-workspace-become-projects-with-their-edges"
+            ]
+          }
+        },
+        {
+          "id": "variant-follows-the-resolver",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-pure-dart-package-in-a-flutter-workspace-resolves-with-flutter"
+            ]
+          }
+        },
+        {
+          "id": "tasks-run-the-profile",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-task-runs-the-variant-steps-after-the-toolchain-check"
+            ]
+          }
+        },
+        {
+          "id": "reports-become-the-summary",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "tojunit-and-lcov-become-the-test-and-coverage-summary"
+            ]
+          }
+        },
+        {
+          "id": "lint-skips-test-changes",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-lint-selector-reads-no-test-file"
+            ]
+          }
+        },
+        {
+          "id": "overrides-are-honored",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-putnami-json-override-changes-the-steps-and-the-inputs"
+            ]
+          }
+        },
+        {
+          "id": "manifest-follows-the-profile",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-manifest-conforms-to-the-stack-core"
+            ]
+          }
+        },
+        {
+          "id": "installs-the-sdk",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-task-installs-the-sdk-the-constraint-admits-when-the-machine-has-none"
+            ]
+          }
+        },
+        {
+          "id": "installs-the-test-tools",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-test-task-activates-tojunit-and-format-coverage-in-its-own-pub-cache"
+            ]
+          }
+        },
+        {
+          "id": "workspace-commands",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "workspace-install-and-deps-upgrade-run-pub-at-each-stack-root"
+            ]
+          }
+        },
+        {
+          "id": "runs-and-serves",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "run-forwards-the-exit-code-and-serve-reports-ready"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

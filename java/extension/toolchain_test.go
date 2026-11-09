@@ -27,7 +27,7 @@ func TestATaskInstallsTheJDKItsBuildStates(t *testing.T) {
 			t.Errorf(".java-version %q installs %s, want %s", expected, got.version, want)
 		}
 	}
-	if _, err := Provide(tc)(context.Background(), stacks.Expected{Version: "11", Source: ".java-version"}, func(string) {}); err == nil || !strings.Contains(err.Error(), "no Temurin JDK") {
+	if _, err := Provide(context.Background(), tc, []stacks.Expected{{Version: "11", Source: ".java-version"}}, func(string) {}); err == nil || !strings.Contains(err.Error(), "no Temurin JDK") {
 		t.Errorf("a version the extension pins no JDK for fails: %v", err)
 	}
 	for _, r := range jdks {
@@ -63,18 +63,18 @@ func TestATaskInstallsTheJDKItsBuildStates(t *testing.T) {
 	downloadURL = func(string) string { return server.URL + "/jdk.tar.gz" }
 	defer func() { jdks, hostPlatform, downloadURL = oldJDKs, oldPlatform, oldURL }()
 	t.Setenv("PUTNAMI_HOME", t.TempDir())
-	provided, err := Provide(tc)(context.Background(), stacks.Expected{Version: "21", Source: ".java-version"}, func(string) {})
+	provided, err := Provide(context.Background(), tc, []stacks.Expected{{Version: "21", Source: ".java-version"}}, func(string) {})
 	if err != nil || !strings.HasSuffix(provided.Executable, filepath.Join("java-21.0.13", "jdk-21.0.13+9", "bin", "javac")) {
 		t.Fatalf("Provide: %+v %v", provided, err)
 	}
 	if _, err := os.Lstat(filepath.Join(filepath.Dir(filepath.Dir(provided.Executable)), "legal", "LICENSE")); !os.IsNotExist(err) {
 		t.Errorf("the archive's links are skipped: %v", err)
 	}
-	if _, err := Provide(tc)(context.Background(), stacks.Expected{}, func(string) {}); err != nil || downloads != 1 {
+	if _, err := Provide(context.Background(), tc, []stacks.Expected{{}}, func(string) {}); err != nil || downloads != 1 {
 		t.Errorf("a second task reuses the install: %d downloads, %v", downloads, err)
 	}
 	hostPlatform = "freebsd/amd64"
-	if _, err := Provide(tc)(context.Background(), stacks.Expected{}, func(string) {}); err == nil {
+	if _, err := Provide(context.Background(), tc, []stacks.Expected{{}}, func(string) {}); err == nil {
 		t.Error("a platform with no archive fails")
 	}
 }

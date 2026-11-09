@@ -49,7 +49,7 @@ func Stack() (stacks.Stack, error) {
 	if err != nil {
 		return stacks.Stack{}, fmt.Errorf("profile.json: %w", err)
 	}
-	return stacks.Stack{Extension: ExtensionName, Profile: profile, Detect: Detect, Provide: Provide(profile.Toolchain), Tools: Tools}, nil
+	return stacks.Stack{Extension: ExtensionName, Profile: profile, Detect: Detect, Provide: Provide, Tools: Tools}, nil
 }
 
 // Detect names the Gradle projects and the Maven modules among the candidate

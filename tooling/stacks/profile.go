@@ -14,7 +14,9 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
 	"path"
+	"path/filepath"
 	"regexp"
 	"slices"
 	"strings"
@@ -97,6 +99,43 @@ type Toolchain struct {
 	// pinned toolchain when it runs it: the parent of the directory that holds
 	// its command, such as JAVA_HOME. Build tools read the home before PATH.
 	Home string `json:"home,omitempty"`
+	// Ranges names the rules a range a file states follows: "" for Composer's
+	// syntax (ADR 0002), "pub-sdk" for a Dart SDK constraint and
+	// "pub-flutter" for a Flutter SDK constraint, as pub reads them for a
+	// package below language version 3.9 (ADR 0008). Version reads plain.
+	Ranges string `json:"ranges,omitempty"`
+	// Also are further toolchain checks every task runs, such as the Dart SDK
+	// a Flutter SDK bundles. An entry with no check takes this one's.
+	Also []Toolchain `json:"also,omitempty"`
+}
+
+// Range dialects.
+const (
+	RangesPubSDK     = "pub-sdk"
+	RangesPubFlutter = "pub-flutter"
+)
+
+// Checks are the toolchain checks a task runs: this one, then each of Also.
+func (t Toolchain) Checks() []Toolchain {
+	first := t
+	first.Also = nil
+	out := []Toolchain{first}
+	for _, a := range t.Also {
+		if a.Check == "" {
+			a.Check = t.Check
+		}
+		out = append(out, a)
+	}
+	return out
+}
+
+// AllFiles are the version files of every check.
+func (t Toolchain) AllFiles() []VersionFile {
+	var out []VersionFile
+	for _, c := range t.Checks() {
+		out = append(out, c.Files...)
+	}
+	return out
 }
 
 // VersionFile is a file that states the expected toolchain version.
@@ -105,8 +144,9 @@ type VersionFile struct {
 	// parent up to the stack root.
 	Path string `json:"path"`
 	// Key is a dotted key whose string value is the version: a TOML table
-	// key ("toolchain.channel") or a JSON object key ("sdk.version"). Without
-	// it, the file's first non-empty line is the version.
+	// key ("toolchain.channel"), a JSON object key ("sdk.version") or, in a
+	// .yaml or .yml file, a YAML mapping key ("environment.sdk"). Without it,
+	// the file's first non-empty line is the version.
 	Key string `json:"key,omitempty"`
 }
 
@@ -130,6 +170,26 @@ type Task struct {
 	// WithoutCoverage is how the task runs on a toolchain with no coverage
 	// support. Without it, such a toolchain fails on its missing report.
 	WithoutCoverage *WithoutCoverage `json:"withoutCoverage,omitempty"`
+	// Targets are what a step that names {target} runs on, once each, listed
+	// in the project directory when the task runs.
+	Targets []Target `json:"targets,omitempty"`
+	// ReportSteps run after the steps whatever their outcome: they write the
+	// reports a runner that fails on a failed case leaves to a converter.
+	ReportSteps [][]string `json:"reportSteps,omitempty"`
+}
+
+// Target is one target of a task, or one per file a pattern matches.
+type Target struct {
+	// Name is the target's name.
+	Name string `json:"name,omitempty"`
+	// Each is a pattern under the project: each file it matches is a target
+	// named by its base name without its extension.
+	Each string `json:"each,omitempty"`
+	// When are paths under the project that must all exist.
+	When []string `json:"when,omitempty"`
+	// Hosts are the host systems (linux, darwin, windows) the target is
+	// built on; empty for every host.
+	Hosts []string `json:"hosts,omitempty"`
 }
 
 // WithoutCoverage replaces a task's steps on a toolchain with no coverage
@@ -197,7 +257,15 @@ var (
 )
 
 // stepPlaceholders are the placeholders a step may name.
-var stepPlaceholders = []string{"{root}", "{component}", "{project}", "{output}", "{runtime}"}
+var stepPlaceholders = []string{"{root}", "{component}", "{project}", "{output}", "{runtime}", TargetPlaceholder}
+
+// TargetPlaceholder is the placeholder of a step that runs once per target.
+const TargetPlaceholder = "{target}"
+
+// targetHosts are the host systems a target may name, as Go names them.
+var targetHosts = []string{"linux", "darwin", "windows"}
+
+var targetNamePattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]*$`)
 
 // Validate reports the first rule the profile breaks.
 func (p Profile) Validate() error {
@@ -220,12 +288,26 @@ func (p Profile) Validate() error {
 	if err := p.Toolchain.validate(); err != nil {
 		return fmt.Errorf("toolchain.%w", err)
 	}
+	for i, a := range p.Toolchain.Also {
+		if len(a.Also) > 0 {
+			return fmt.Errorf("toolchain.also[%d].also: a further check names no checks of its own", i)
+		}
+		if err := a.validate(); err != nil {
+			return fmt.Errorf("toolchain.also[%d].%w", i, err)
+		}
+	}
 	for name, patterns := range p.Inputs {
 		if !setNamePattern.MatchString(name) {
 			return fmt.Errorf("inputs: %q is not an input set name", name)
 		}
 		for i, pattern := range patterns {
-			if err := validatePattern(pattern, true); err != nil {
+			var err error
+			if excluded, ok := strings.CutPrefix(pattern, "!"); ok {
+				err = validatePattern(excluded, false)
+			} else {
+				err = validatePattern(pattern, true)
+			}
+			if err != nil {
 				return fmt.Errorf("inputs.%s[%d]: %w", name, i, err)
 			}
 		}
@@ -267,6 +349,20 @@ func validateMarker(m string) error {
 	return nil
 }
 
+// HostDependent reports whether a task of the profile or of a variant names
+// a target built on some host systems only: its manifest task declares the
+// hostPlatform runtime input.
+func (p Profile) HostDependent(task string) bool {
+	for _, v := range p.Applied() {
+		for _, target := range v.Tasks[task].Targets {
+			if len(target.Hosts) > 0 {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 func (t Toolchain) validate() error {
 	if len(t.Command) == 0 || t.Command[0] == "" {
 		return errors.New("command: the toolchain check names a command")
@@ -294,6 +390,11 @@ func (t Toolchain) validate() error {
 	if t.Home != "" && (t.Provisioned == "" || !environmentName.MatchString(t.Home)) {
 		return fmt.Errorf("home: %q is not an environment variable name beside a provisioned toolchain", t.Home)
 	}
+	switch t.Ranges {
+	case "", RangesPubSDK, RangesPubFlutter:
+	default:
+		return fmt.Errorf("ranges: %q is not %s or %s", t.Ranges, RangesPubSDK, RangesPubFlutter)
+	}
 	return nil
 }
 
@@ -320,6 +421,19 @@ func (t Task) validate(sets map[string][]string) error {
 	for _, name := range t.Inputs {
 		if _, ok := sets[name]; !ok {
 			return fmt.Errorf("inputs: %q names no input set", name)
+		}
+	}
+	if err := t.validateTargets(sets); err != nil {
+		return err
+	}
+	if len(t.ReportSteps) > 0 {
+		if err := validateSteps("reportSteps", t.ReportSteps); err != nil {
+			return err
+		}
+		for i, step := range t.ReportSteps {
+			if namesTarget(step) {
+				return fmt.Errorf("reportSteps[%d]: a report step names no %s", i, TargetPlaceholder)
+			}
 		}
 	}
 	for i, a := range t.Artifacts {
@@ -355,6 +469,109 @@ func (t Task) validate(sets map[string][]string) error {
 	return nil
 }
 
+func (t Task) validateTargets(sets map[string][]string) error {
+	for i, target := range t.Targets {
+		if err := target.validate(); err != nil {
+			return fmt.Errorf("targets[%d].%w", i, err)
+		}
+	}
+	if len(t.Targets) == 0 {
+		for i, step := range t.Steps {
+			if namesTarget(step) {
+				return fmt.Errorf("steps[%d]: names %s, but the task declares no targets", i, TargetPlaceholder)
+			}
+		}
+	}
+	// A target appears or disappears with the files it needs: they reach the
+	// key only as task inputs.
+	var patterns []string
+	for _, set := range t.Inputs {
+		for _, pattern := range sets[set] {
+			if !strings.HasPrefix(pattern, "!") && !strings.HasPrefix(pattern, "{root}/") {
+				patterns = append(patterns, pattern)
+			}
+		}
+	}
+	covered := func(rel string) bool {
+		return slices.ContainsFunc(patterns, func(p string) bool { return MatchPattern(p, rel) || strings.HasPrefix(p, rel+"/") })
+	}
+	for i, target := range t.Targets {
+		for _, w := range target.When {
+			if !covered(w) {
+				return fmt.Errorf("targets[%d].when: %s is in no input of the task", i, w)
+			}
+		}
+		if target.Each != "" && !covered(strings.NewReplacer("*", "x", "?", "x").Replace(target.Each)) {
+			return fmt.Errorf("targets[%d].each: %s is in no input of the task", i, target.Each)
+		}
+	}
+	return nil
+}
+
+func (t Target) validate() error {
+	switch {
+	case (t.Name == "") == (t.Each == ""):
+		return errors.New("name: a target names either a name or an each pattern")
+	case t.Name != "" && !targetNamePattern.MatchString(t.Name):
+		return fmt.Errorf("name: %q is not a target name", t.Name)
+	case t.Each != "":
+		if err := validatePattern(t.Each, false); err != nil {
+			return fmt.Errorf("each: %w", err)
+		}
+	}
+	for i, w := range t.When {
+		if err := validatePattern(w, false); err != nil || strings.ContainsAny(w, "*?[") {
+			return fmt.Errorf("when[%d]: %q is not a plain relative path", i, w)
+		}
+	}
+	for i, h := range t.Hosts {
+		if !slices.Contains(targetHosts, h) {
+			return fmt.Errorf("hosts[%d]: %q is not one of %s", i, h, strings.Join(targetHosts, ", "))
+		}
+	}
+	return nil
+}
+
+// namesTarget reports whether a step names {target}, so it runs once per
+// target.
+func namesTarget(step []string) bool {
+	return slices.ContainsFunc(step, func(a string) bool { return strings.Contains(a, TargetPlaceholder) })
+}
+
+// ListTargets lists the targets of a task in the project directory at
+// projectAbs, on the host system goos, in the order the task declares them.
+func (t Task) ListTargets(projectAbs, goos string) ([]string, error) {
+	var out []string
+	for _, target := range t.Targets {
+		if len(target.Hosts) > 0 && !slices.Contains(target.Hosts, goos) {
+			continue
+		}
+		present := true
+		for _, w := range target.When {
+			if _, err := os.Stat(filepath.Join(projectAbs, filepath.FromSlash(w))); err != nil {
+				present = false
+				break
+			}
+		}
+		if !present {
+			continue
+		}
+		if target.Name != "" {
+			out = appendNew(out, target.Name)
+			continue
+		}
+		matches, err := globFiles(projectAbs, target.Each)
+		if err != nil {
+			return nil, err
+		}
+		for _, m := range matches {
+			base := filepath.Base(m)
+			out = appendNew(out, strings.TrimSuffix(base, filepath.Ext(base)))
+		}
+	}
+	return out, nil
+}
+
 func validateSteps(field string, steps [][]string) error {
 	if len(steps) == 0 {
 		return fmt.Errorf("%s: a task runs at least one step", field)
@@ -366,7 +583,7 @@ func validateSteps(field string, steps [][]string) error {
 		for _, arg := range step {
 			for _, ph := range placeholderExpr.FindAllString(arg, -1) {
 				if !slices.Contains(stepPlaceholders, ph) {
-					return fmt.Errorf("%s[%d]: %s is no placeholder; use {root}, {component}, {project}, {output} or {runtime}", field, i, ph)
+					return fmt.Errorf("%s[%d]: %s is no placeholder; use {root}, {component}, {project}, {output}, {runtime} or {target}", field, i, ph)
 				}
 			}
 		}
@@ -576,6 +793,9 @@ func (p Profile) TaskPatterns(task string) (project, root []string) {
 	}
 	for _, set := range t.Inputs {
 		for _, pattern := range p.Inputs[set] {
+			if strings.HasPrefix(pattern, "!") {
+				continue
+			}
 			if rest, ok := strings.CutPrefix(pattern, "{root}/"); ok {
 				root = appendNew(root, rest)
 			} else {
@@ -583,11 +803,42 @@ func (p Profile) TaskPatterns(task string) (project, root []string) {
 			}
 		}
 	}
-	for _, f := range p.Toolchain.Files {
+	for _, f := range p.Toolchain.AllFiles() {
 		project = appendNew(project, f.Path)
 		root = appendNew(root, f.Path)
 	}
 	return project, root
+}
+
+// TaskExcludes are the project patterns, without their "!", whose files a
+// task's input sets leave out: a file the build tool writes, such as a
+// generated registrant, under a directory the task reads.
+func (p Profile) TaskExcludes(task string) []string {
+	var out []string
+	for _, set := range p.Tasks[task].Inputs {
+		for _, pattern := range p.Inputs[set] {
+			if excluded, ok := strings.CutPrefix(pattern, "!"); ok {
+				out = appendNew(out, excluded)
+			}
+		}
+	}
+	return out
+}
+
+// KeptInputs are the project files no exclusion leaves out of a task's
+// inputs: the project's putnami.json and the toolchain files.
+func (p Profile) KeptInputs() []string {
+	kept := []string{ProjectConfigFile}
+	for _, f := range p.Toolchain.AllFiles() {
+		kept = appendNew(kept, f.Path)
+	}
+	return kept
+}
+
+// Excluded reports whether a project-relative slash path matches one of the
+// exclusion patterns.
+func Excluded(excludes []string, rel string) bool {
+	return slices.ContainsFunc(excludes, func(e string) bool { return MatchPattern(e, rel) })
 }
 
 // RootPatterns are the stack-root patterns of every task of the profile.

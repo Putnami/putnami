@@ -1,0 +1,74 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-spec.json",
+  "protocolVersion": 1,
+  "feature": "dart/stack-extension",
+  "outcomes": [
+    "Each Dart or Flutter package of a repository is a Putnami project named by its pubspec, with an edge to each package it depends on by path or through its pub workspace or melos repository",
+    "putnami lint, test and build run the Dart profile's steps in each package's directory, dart or flutter by the package, and a second run over an unchanged tree is a cache hit",
+    "The test task reads the JUnit report tojunit writes and the package's LCOV report into the test and coverage summary",
+    "lint reads the package's code, manifests and lockfiles and no test file, so a change under test/ reruns test alone",
+    "A package overrides any value of the Dart profile in its putnami.json, and the override reaches the cache key",
+    "A task whose Dart or Flutter SDK is missing or outside the pubspec constraint installs the newest stable release in it under the Putnami home, and the test task installs tojunit and format_coverage, so a repository runs on a machine with no SDK",
+    "workspace-fetch, workspace-install, deps-upgrade, run and serve fetch, resolve, upgrade, run and serve the packages the way pub, dart and flutter do, and lint checks the documentation links"
+  ],
+  "nonGoals": [
+    "Publishing a package to pub.dev",
+    "Building an iOS app, which needs code signing: a project adds its own step",
+    "Running melos scripts: the tasks run the profile's dart and flutter steps",
+    "Installing an SDK from a source other than the publisher's archives, or for a platform the publisher does not build, such as Flutter on Linux arm64",
+    "A test filter: dart test fails a run whose filter selects no test, so a filter reaching the packages a selected one depends on would fail them",
+    "Packaging or publishing an application image"
+  ],
+  "requirements": [
+    {
+      "id": "packages-become-projects",
+      "text": "The probe answers, for each candidate directory the observe Dart detector knows as a package: its pubspec name, the packages it depends on, the extension @putnami/dart, the tag dart, and metadata naming the package, its stack root (the directory of the pub workspace that lists it, else its own directory), its variant and the expected SDK versions. A pub workspace below the workspace root is an input-only project; the one at the root is no project."
+    },
+    {
+      "id": "variant-follows-the-resolver",
+      "text": "A package whose pubspec names the Flutter SDK runs the flutter variant. A pure Dart package runs the dart-in-flutter variant when the pub workspace that lists it holds a Flutter package, since only flutter resolves that workspace: it resolves with flutter and runs dart. Any other package, a pure Dart melos package included, runs the dart variant, the profile itself, with dart."
+    },
+    {
+      "id": "tasks-run-the-profile",
+      "text": "Each task first checks the SDKs: dart --version against environment.sdk, or flutter --version against environment.flutter and its Dart against environment.sdk, read as pub reads them; outside, it fails with stacks.toolchain_mismatch unless toolchain.check is warn. An install step resolves the stack root with pub get --enforce-lockfile; lint runs dart analyze on lib and bin; test runs flutter test or dart test; build runs flutter build per platform of an app, or dart compile exe per bin/*.dart."
+    },
+    {
+      "id": "reports-become-the-summary",
+      "text": "After the test steps, whatever their outcome, the task converts the test JSON report with tojunit, then reads that JUnit report and the LCOV report, coverage/lcov.info for flutter test and the format_coverage output for dart test, through the evidence readers into the test and coverage summary. A failed case fails the task with stacks.test_failed naming it; a missing report fails it with stacks.report_missing."
+    },
+    {
+      "id": "lint-skips-test-changes",
+      "text": "The dart:lint selector answers the package's lib, bin, manifest, lockfile and putnami.json files and no file under test/; dart:test adds test/, the assets and dart_test.yaml; dart:build adds the assets and the platform directories, without the ephemeral files and plugin registrants flutter writes there."
+    },
+    {
+      "id": "overrides-are-honored",
+      "text": "options[\"@putnami/dart\"] in a package's own putnami.json overrides its resolved profile, the variant included: an object merges, any other value replaces the profile's whole. The steps run and the files the dart:<task> selectors answer follow the resolved profile. An unknown member, a change to id, markers or variants, or a stack-root input the manifest does not declare fails the task with stacks.project_config_invalid."
+    },
+    {
+      "id": "manifest-follows-the-profile",
+      "text": "The manifest passes the stack core's conformance kit: its markers are the profile's, it lists the dart:lint, dart:test and dart:build selectors, and each command runs one task that depends on the same task upstream, reads its selector and the stack-root files every variant of the profile declares for that task, and declares its command-output reports directory."
+    },
+    {
+      "id": "installs-the-sdk",
+      "text": "When the dart or flutter on PATH is missing, or it or its bundled Dart is outside the pubspec constraints, a task that is not offline installs the newest stable release the constraints admit, Dart from the dart-archive and Flutter from its release manifest, each checked against the SHA-256 the publisher states, under the Putnami home, and runs it. An SDK on PATH that satisfies the constraints runs, and nothing is installed."
+    },
+    {
+      "id": "installs-the-test-tools",
+      "text": "The test task finds tojunit and format_coverage on its PATH, or activates junitreport 2.0.2 and coverage 1.x with the selected dart into a pub cache of that Dart SDK version under the Putnami home, and runs them from there. The machine's pub cache is untouched."
+    },
+    {
+      "id": "workspace-commands",
+      "text": "workspace-fetch runs pub get at each stack root to fill the pub cache; workspace-install runs pub get --enforce-lockfile, --offline in an offline run, and skips a root the selected SDK resolved last, with the same pubspecs, lockfile and package_config.json, unless --force; deps-upgrade runs pub upgrade; each uses flutter for a root that holds a Flutter package. lint --docs-links checks the README.md and doc/ links."
+    },
+    {
+      "id": "runs-and-serves",
+      "text": "run runs a Dart command-line package with dart run and its entrypoint and args, and answers its exit code; serve runs a Dart server with dart run and PORT set, or a Flutter app with web/ through flutter run -d web-server on that port, and reports ready once the port accepts connections."
+    }
+  ],
+  "decisions": [
+    "tooling/stacks/doc/adr/0001-one-extension-per-stack-on-a-shared-core.md",
+    "tooling/stacks/doc/adr/0002-a-stated-version-range-is-checked.md",
+    "tooling/stacks/doc/adr/0008-task-targets-exclusions-and-pub-ranges.md",
+    "dart/extension/doc/adr/0001-the-sdk-installs-from-the-publishers-archives.md"
+  ]
+}

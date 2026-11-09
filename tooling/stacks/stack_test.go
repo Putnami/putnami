@@ -60,7 +60,7 @@ func TestProbeAnswersEachComponent(t *testing.T) {
 		t.Errorf("api = %+v", api)
 	}
 	var meta Metadata
-	if err := json.Unmarshal(api.Metadata, &meta); err != nil || meta != (Metadata{Component: "api", Root: ".", Toolchain: Expected{Version: "1.82.0", Source: "rust-toolchain.toml"}}) {
+	if err := json.Unmarshal(api.Metadata, &meta); err != nil || !reflect.DeepEqual(meta, Metadata{Component: "api", Root: ".", Toolchain: Expected{Version: "1.82.0", Source: "rust-toolchain.toml"}}) {
 		t.Errorf("metadata = %s (%v)", api.Metadata, err)
 	}
 	for _, want := range []string{"crates/api/Cargo.toml", "crates/api/rust-toolchain.toml", "Cargo.lock", "Cargo.toml", "rust-toolchain.toml"} {
@@ -141,13 +141,14 @@ func TestResolveInputsAnswersTheProfileFiles(t *testing.T) {
 type recorder struct {
 	diags   []string
 	summary string
+	infos   []string
 }
 
 func (r *recorder) DiagnosticWithCode(severity, message, file string, line, column int, code string) {
 	r.diags = append(r.diags, severity+":"+code+":"+message)
 }
 func (r *recorder) Summary(message string) { r.summary = message }
-func (r *recorder) Info(string)            {}
+func (r *recorder) Info(message string)    { r.infos = append(r.infos, message) }
 
 func (r *recorder) codes() string {
 	var out []string
@@ -480,9 +481,12 @@ func provideStack(t *testing.T, dir, version string) (Stack, *int) {
 	s := testProfileWithLcov(t)
 	s.Profile.Toolchain.Provisioned = "STUB_PROVIDED"
 	calls := 0
-	s.Provide = func(_ context.Context, expected Expected, info func(string)) (Provided, error) {
+	s.Provide = func(_ context.Context, toolchain Toolchain, expected []Expected, info func(string)) (Provided, error) {
 		calls++
-		info("installing " + expected.Version)
+		if toolchain.Command[0] != "rustc" || len(expected) != 1 {
+			t.Errorf("Provide gets the resolved toolchain and each check's expected version: %v %v", toolchain.Command, expected)
+		}
+		info("installing " + expected[0].Version)
 		writeFile(t, dir, "rustc", "#!/bin/sh\necho 'rustc "+version+" (stub 2024-10-15)'\n")
 		writeFile(t, dir, "cargo", "#!/bin/sh\necho \"$STUB_FROM_PROVIDE\" > \"$STUB_ROOT/from-provide\"\nprintf '"+junitPass+"' > /dev/null\n")
 		for _, name := range []string{"rustc", "cargo"} {
@@ -551,7 +555,7 @@ func TestAFailedInstallIsAMissingToolchain(t *testing.T) {
 	t.Setenv("PATH", t.TempDir())
 	s := testProfileWithLcov(t)
 	s.Profile.Toolchain.Provisioned = "STUB_PROVIDED"
-	s.Provide = func(context.Context, Expected, func(string)) (Provided, error) {
+	s.Provide = func(context.Context, Toolchain, []Expected, func(string)) (Provided, error) {
 		return Provided{}, errors.New("no network")
 	}
 	status, _, rec := runTask(t, s, root, TaskLint)

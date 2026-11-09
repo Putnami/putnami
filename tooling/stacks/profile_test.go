@@ -59,7 +59,7 @@ func TestDecodeRefusesWhatTheSchemaDoesNotName(t *testing.T) {
 		"escaping pattern":  strings.Replace(sampleProfile, `"src/**"`, `"../src/**"`, 1),
 		"recursive report":  strings.Replace(sampleProfile, `"{root}/target/junit.xml"`, `"{root}/**/junit.xml"`, 1),
 		"wildcard report":   strings.Replace(sampleProfile, `"{root}/target/junit.xml"`, `"{root}/*/junit.xml"`, 1),
-		"negated pattern":   strings.Replace(sampleProfile, `"src/**"`, `"!src/gen/**"`, 1),
+		"negated root":      strings.Replace(sampleProfile, `"src/**"`, `"!{root}/src/gen/**"`, 1),
 		"coverage format":   strings.Replace(sampleProfile, `"lcov"`, `"gcov"`, 1),
 		"bad check":         strings.Replace(sampleProfile, `"command": ["rustc"`, `"check": "ignore", "command": ["rustc"`, 1),
 		"bad provisioned":   strings.Replace(sampleProfile, `"command": ["rustc"`, `"provisioned": "not a name", "command": ["rustc"`, 1),

@@ -56,11 +56,11 @@ func TestExpectedVersionStopsAtTheStackRoot(t *testing.T) {
 }
 
 func TestReadVersionReadsJSONKeys(t *testing.T) {
-	got, err := readVersion([]byte(`{"sdk": {"version": "8.0.401"}}`), "sdk.version")
+	got, err := readVersion("global.json", []byte(`{"sdk": {"version": "8.0.401"}}`), "sdk.version")
 	if err != nil || got != "8.0.401" {
 		t.Fatalf("readVersion = %q, %v", got, err)
 	}
-	if got, _ := readVersion([]byte(`{"sdk": 1}`), "sdk.version"); got != "" {
+	if got, _ := readVersion("global.json", []byte(`{"sdk": 1}`), "sdk.version"); got != "" {
 		t.Fatalf("a missing key reads nothing: %q", got)
 	}
 }
@@ -229,6 +229,138 @@ func TestAppendPathKeepsTheMachineFirst(t *testing.T) {
 	}
 	if got := appendPath([]string{"A=1"}, "/tools"); got[1] != "PATH=/tools" {
 		t.Errorf("no PATH = %v", got)
+	}
+}
+
+func TestReadVersionReadsYAMLKeys(t *testing.T) {
+	pubspec := `name: shop # the package
+environment: # the SDKs
+  # the Dart SDK
+  sdk: ^3.7.0 # pub constraint
+  flutter: ">=3.29.0"
+dependencies:
+  environment:
+    sdk: not-this
+  flutter:
+    sdk: flutter
+`
+	for key, want := range map[string]string{"environment.sdk": "^3.7.0", "environment.flutter": ">=3.29.0", "name": "shop", "environment.dart": "", "dependencies.flutter.sdk": "flutter", "environment": ""} {
+		if got, err := readVersion("pubspec.yaml", []byte(pubspec), key); err != nil || got != want {
+			t.Errorf("%s = %q, %v; want %q", key, got, err, want)
+		}
+	}
+	if got, _ := readVersion("pubspec.yml", []byte("environment:\n    sdk: '>=3.0.0 <4.0.0'\n"), "environment.sdk"); got != ">=3.0.0 <4.0.0" {
+		t.Errorf("a .yml file with a deeper indent = %q", got)
+	}
+}
+
+func TestPubDialectsReadARangeAsPubDoes(t *testing.T) {
+	tc := mustProfile(t).Toolchain
+	sdk, flutter := tc, tc
+	sdk.Ranges, flutter.Ranges = RangesPubSDK, RangesPubFlutter
+	for _, c := range []struct {
+		check             Toolchain
+		expected, machine string
+		code              string
+	}{
+		{tc, "^0.0.3", "0.0.9", CodeToolchainMismatch},
+		{sdk, "^0.0.3", "0.0.9", ""},
+		{sdk, "^0.0.3", "0.1.0", CodeToolchainMismatch},
+		{sdk, "^3.7.0", "3.9.2", ""},
+		{sdk, "^3.7.0", "4.0.0", CodeToolchainMismatch},
+		{sdk, ">=3.7.0<4.0.0", "3.8.0", ""},
+		{sdk, ">=3.7.0<4.0.0", "4.0.0", CodeToolchainMismatch},
+		{tc, ">=2.17.0 <3.0.0", "3.7.2", CodeToolchainMismatch},
+		{sdk, ">=2.17.0 <3.0.0", "3.7.2", ""},
+		{sdk, ">=2.17.0 <3.0.0-0", "3.7.2", ""},
+		{sdk, ">=2.12.0-0 <3.0.0", "3.7.2", ""},
+		{sdk, ">=2.17.0 <3.0.0", "4.0.0", CodeToolchainMismatch},
+		{sdk, ">=2.10.0 <3.0.0", "3.7.2", CodeToolchainMismatch},
+		{sdk, ">=2.17.0 <3.1.0", "3.7.2", CodeToolchainMismatch},
+		{flutter, ">=3.0.0 <3.10.0", "3.29.2", ""},
+		{flutter, ">=3.0.0 <3.10.0", "2.10.5", CodeToolchainMismatch},
+		{flutter, "3.29.2", "3.32.0", ""},
+		{flutter, "3.29.2", "3.27.4", CodeToolchainMismatch},
+		{sdk, "any", "3.7.2", CodeToolchainUnpinned},
+	} {
+		if v := c.check.Compare(Expected{Version: c.expected, Source: "pubspec.yaml"}, c.machine); v.Code != c.code {
+			t.Errorf("%q %s against %s = %+v, want %q", c.check.Ranges, c.expected, c.machine, v, c.code)
+		}
+	}
+	if v := flutter.Compare(Expected{Version: "3.29.2", Source: "profile"}, "3.35.0"); v.Code != CodeToolchainMismatch || !v.Fail {
+		t.Errorf("toolchain.version reads plain, whatever the dialect: %+v", v)
+	}
+	if v := sdk.Compare(Expected{Version: ">=2.17.0 <3.0.0", Source: "profile"}, "3.7.2"); v.Code != CodeToolchainMismatch || strings.Contains(v.Message, "as pub reads it") {
+		t.Errorf("a range toolchain.version reads plain too: %+v", v)
+	}
+	if v := sdk.Compare(Expected{Version: "^3.7.0", Source: "pubspec.yaml"}, "3.6.0"); !strings.Contains(v.Message, "as pub reads it") {
+		t.Errorf("a dialect names itself in the message: %+v", v)
+	}
+}
+
+func TestFurtherChecksInheritTheCheckMode(t *testing.T) {
+	p := mustProfile(t)
+	p.Toolchain.Check = CheckWarn
+	p.Toolchain.Also = []Toolchain{{Command: []string{"cargo", "--version"}, Pattern: `cargo (?<version>\S+)`, Files: []VersionFile{{Path: "cargo-version"}}}}
+	checks := p.Toolchain.Checks()
+	if len(checks) != 2 || checks[0].Also != nil || checks[1].Check != CheckWarn {
+		t.Fatalf("checks = %+v", checks)
+	}
+	if err := p.Validate(); err != nil {
+		t.Fatal(err)
+	}
+	if _, root := p.TaskPatterns(TaskLint); !slices.Contains(root, "cargo-version") {
+		t.Errorf("a further check's file is an input: %v", root)
+	}
+	p.Toolchain.Also[0].Also = []Toolchain{p.Toolchain.Also[0]}
+	if err := p.Validate(); err == nil {
+		t.Error("a further check names no checks of its own")
+	}
+	p.Toolchain.Also = []Toolchain{{Command: []string{"cargo"}, Pattern: `(?<version>.*)`, Ranges: "npm"}}
+	if err := p.Validate(); err == nil {
+		t.Error("an unknown range dialect is refused")
+	}
+}
+
+func TestAFlutterConstraintReadsPlainForALanguage39Pubspec(t *testing.T) {
+	root := t.TempDir()
+	flutter := Toolchain{Command: []string{"flutter"}, Pattern: `Flutter (?<version>\S+)`, Ranges: RangesPubFlutter,
+		Files: []VersionFile{{Path: "pubspec.yaml", Key: "environment.flutter"}}}
+	writeFile(t, root, "old/pubspec.yaml", "environment:\n  sdk: ^3.7.0\n  flutter: \">=3.29.0 <3.30.0\"\n")
+	writeFile(t, root, "new/pubspec.yaml", "environment:\n  sdk: ^3.9.0\n  flutter: \">=3.29.0 <3.30.0\"\n")
+	old, err := flutter.ExpectedVersion(root, "old", "old")
+	if err != nil || old.Reading != "" {
+		t.Fatalf("old = %+v %v", old, err)
+	}
+	if v := flutter.Compare(old, "3.32.0"); v.Code != "" {
+		t.Errorf("below language 3.9 the upper bound is ignored: %+v", v)
+	}
+	newer, err := flutter.ExpectedVersion(root, "new", "new")
+	if err != nil || newer.Reading != ReadingPlain {
+		t.Fatalf("new = %+v %v", newer, err)
+	}
+	if v := flutter.Compare(newer, "3.32.0"); v.Code != CodeToolchainMismatch {
+		t.Errorf("from language 3.9 the upper bound holds: %+v", v)
+	}
+	if v := flutter.Compare(Expected{Version: ">=3.29.0-0<3.30.0", Source: "pubspec.yaml", Reading: ReadingPlain}, "3.29.2"); v.Code != "" {
+		t.Errorf("a plain reading keeps pub's syntax: %+v", v)
+	}
+}
+
+func TestPinnedSelectsTheInstalledToolchain(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, dir, "rustc", "#!/bin/sh\necho 'rustc 1.90.0'\n")
+	if err := os.Chmod(filepath.Join(dir, "rustc"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	tc := mustProfile(t).Toolchain
+	tc.Provisioned = "STUB_PINNED"
+	sel, err := tc.Pinned(context.Background(), dir, Expected{Version: "1.90.0"}, []string{"STUB_PINNED=" + filepath.Join(dir, "rustc"), "PATH=/usr/bin"})
+	if err != nil || sel.Executable != filepath.Join(dir, "rustc") || sel.Verdict.Code != "" || !strings.HasPrefix(pathValue(sel.Env), dir) {
+		t.Errorf("Pinned = %+v %v", sel, err)
+	}
+	if _, err := tc.Pinned(context.Background(), dir, Expected{}, []string{"PATH=/usr/bin"}); !errors.Is(err, ErrToolchainMissing) {
+		t.Errorf("no installed toolchain: %v", err)
 	}
 }
 

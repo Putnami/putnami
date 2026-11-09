@@ -1,0 +1,563 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-extension.json",
+  "name": "@putnami/dart",
+  "cliContract": 14,
+  "extensionDependencies": {
+    "@putnami/dev": ""
+  },
+  "runtime": {
+    "executable": "compiled/putnami-dart",
+    "toolchains": {
+      "runtimeCompiler": {
+        "lock": "go",
+        "candidates": [
+          {
+            "from": "environment",
+            "environment": "GOROOT",
+            "path": "bin/go"
+          },
+          {
+            "from": "path",
+            "path": "go"
+          },
+          {
+            "from": "putnami-home",
+            "path": "toolchains/go/go-{version}/go/bin/go"
+          }
+        ],
+        "probe": {
+          "args": [
+            "env",
+            "GOVERSION"
+          ],
+          "expect": "go{version}",
+          "unset": [
+            "GOROOT"
+          ],
+          "environment": {
+            "GOTOOLCHAIN": "local"
+          }
+        },
+        "environment": {
+          "GOROOT": {
+            "from": "ancestor",
+            "levels": 2
+          },
+          "GOTOOLCHAIN": {
+            "from": "literal",
+            "value": "local"
+          }
+        },
+        "prependPath": true
+      }
+    },
+    "prepare": {
+      "command": "{extensionRoot}/bin/prepare",
+      "args": [
+        "--output",
+        "{runtimeOutput}"
+      ],
+      "inputs": [
+        "bin/prepare",
+        "cmd/**",
+        "go.mod",
+        "go.sum",
+        "*.go",
+        "profile.json"
+      ],
+      "toolchains": [
+        "runtimeCompiler"
+      ]
+    },
+    "inputSelectors": [
+      "dart:build",
+      "dart:lint",
+      "dart:test"
+    ]
+  },
+  "workspace": {
+    "markers": [
+      "pubspec.yaml"
+    ],
+    "inputs": [
+      "pubspec.yaml",
+      "melos.yaml"
+    ],
+    "excludes": [
+      "build",
+      ".dart_tool"
+    ],
+    "language": "dart"
+  },
+  "commands": {
+    "lint": {
+      "description": "Resolve the packages and analyze their lib and bin directories with dart analyze.",
+      "run": [
+        {
+          "id": "install",
+          "task": "install-run"
+        },
+        {
+          "id": "lint",
+          "task": "lint-run",
+          "dependsOn": [
+            "install",
+            "^lint"
+          ]
+        },
+        {
+          "id": "docs",
+          "task": "lint-docs",
+          "if": "params.docs-links"
+        }
+      ],
+      "flags": {
+        "docs-links": {
+          "type": "boolean",
+          "default": true,
+          "description": "Check every relative link and anchor in the project's README.md files and doc/ trees; a broken one fails lint."
+        }
+      }
+    },
+    "test": {
+      "description": "Test the packages with flutter test or dart test, and read their JUnit and LCOV reports.",
+      "run": [
+        {
+          "id": "install",
+          "task": "install-run"
+        },
+        {
+          "id": "test",
+          "heavy": true,
+          "task": "test-run",
+          "dependsOn": [
+            "install",
+            "^test"
+          ]
+        }
+      ]
+    },
+    "build": {
+      "description": "Build each platform of a Flutter app with flutter build, and each executable of a Dart package with dart compile exe.",
+      "run": [
+        {
+          "id": "install",
+          "task": "install-run"
+        },
+        {
+          "id": "build",
+          "heavy": true,
+          "task": "build-run",
+          "dependsOn": [
+            "install",
+            "^build"
+          ]
+        }
+      ]
+    },
+    "workspace-fetch": {
+      "description": "Download the packages each stack root's pubspec.lock names into the pub cache, running none of their code.",
+      "quiet": true,
+      "run": [
+        {
+          "id": "workspace-fetch",
+          "task": "workspace-fetch-exec"
+        }
+      ]
+    },
+    "workspace-install": {
+      "description": "Resolve the dependencies of each stack root of the workspace with pub get.",
+      "quiet": true,
+      "flags": {
+        "force": {
+          "type": "boolean",
+          "default": false,
+          "description": "Resolve a stack root even when its last resolution is current"
+        }
+      },
+      "run": [
+        {
+          "id": "workspace-install",
+          "task": "workspace-install-exec"
+        }
+      ]
+    },
+    "deps-upgrade": {
+      "description": "Upgrade the dependencies of each stack root of the workspace with pub upgrade.",
+      "visibility": "internal",
+      "quiet": true,
+      "run": [
+        {
+          "id": "deps-upgrade",
+          "task": "deps-upgrade-exec"
+        }
+      ]
+    },
+    "serve": {
+      "description": "Serve a Dart server with dart run, or a Flutter web app with flutter run -d web-server.",
+      "traits": {
+        "requiresRunnable": true,
+        "workload": "serve"
+      },
+      "flags": {
+        "port": {
+          "type": "number",
+          "default": 3000,
+          "description": "Port for the server"
+        },
+        "entrypoint": {
+          "type": "string",
+          "description": "Dart entry point to serve (defaults to bin/server.dart, else the package's executable)"
+        }
+      },
+      "run": [
+        {
+          "id": "serve",
+          "task": "serve-run"
+        }
+      ]
+    },
+    "run": {
+      "description": "Run a Dart command-line package once with dart run and forward its exit code.",
+      "traits": {
+        "requiresRunnable": true,
+        "workload": "once"
+      },
+      "flags": {
+        "entrypoint": {
+          "type": "string",
+          "description": "Entry point to run (defaults to the package's executable)"
+        },
+        "args": {
+          "type": "string",
+          "description": "Additional arguments to pass to the entrypoint"
+        }
+      },
+      "run": [
+        {
+          "id": "run",
+          "task": "run-exec"
+        }
+      ]
+    }
+  },
+  "tasks": {
+    "lint-run": {
+      "description": "Run the Dart profile's lint steps on one package in its directory, after the SDK version check: dart pub get or flutter pub get, then dart analyze on each of lib and bin that exists. Its inputs are the files the dart:lint selector answers from the resolved profile, which hold no test file, and the stack-root files of the profile.",
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": [
+        "lint",
+        "--report-dir",
+        "{outputRoot}"
+      ],
+      "cwd": "{projectRoot}",
+      "timeoutMs": 1800000,
+      "inputs": {
+        "sources": {
+          "from": "project",
+          "files": [
+            "dart:lint"
+          ]
+        },
+        "stackRoot": {
+          "from": "workspace",
+          "files": [
+            "analysis_options.yaml",
+            "pubspec.lock",
+            "pubspec.yaml"
+          ]
+        },
+        "extensionVersion": {
+          "from": "runtime"
+        }
+      },
+      "outputs": {
+        "data": {
+          "description": "The task result: the test and coverage totals of a test task."
+        }
+      },
+      "cache": {
+        "enabled": true
+      },
+      "declares": {
+        "outputs": {
+          "reports": {
+            "kind": "directory",
+            "root": "command-output",
+            "path": "lint",
+            "optionalEmpty": true,
+            "description": "The reports the task wrote or copied: the LCOV and JUnit reports of a test task, the executables of a Dart build."
+          }
+        },
+        "effects": [
+          "network",
+          "toolchain-cache"
+        ]
+      }
+    },
+    "test-run": {
+      "description": "Run the Dart profile's test steps on one package in its directory, after the SDK version check: flutter test --coverage, or dart test with coverage and format_coverage, then tojunit; then read the JUnit and LCOV reports. A failed case, a step that exits non-zero, or a missing report fails the task.",
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": [
+        "test",
+        "--report-dir",
+        "{outputRoot}"
+      ],
+      "cwd": "{projectRoot}",
+      "timeoutMs": 1800000,
+      "inputs": {
+        "sources": {
+          "from": "project",
+          "files": [
+            "dart:test"
+          ]
+        },
+        "stackRoot": {
+          "from": "workspace",
+          "files": [
+            "analysis_options.yaml",
+            "pubspec.lock",
+            "pubspec.yaml"
+          ]
+        },
+        "extensionVersion": {
+          "from": "runtime"
+        }
+      },
+      "outputs": {
+        "data": {
+          "description": "The task result: the test and coverage totals of a test task."
+        }
+      },
+      "cache": {
+        "enabled": true
+      },
+      "declares": {
+        "outputs": {
+          "reports": {
+            "kind": "directory",
+            "root": "command-output",
+            "path": "test",
+            "optionalEmpty": true,
+            "description": "The reports the task wrote or copied: the LCOV and JUnit reports of a test task, the executables of a Dart build."
+          }
+        },
+        "effects": [
+          "network",
+          "toolchain-cache"
+        ]
+      }
+    },
+    "build-run": {
+      "description": "Run the Dart profile's build steps on one package in its directory, after the SDK version check: flutter build for each platform directory of a Flutter app that the host builds, or dart compile exe for each bin/*.dart of a Dart package.",
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": [
+        "build",
+        "--report-dir",
+        "{outputRoot}"
+      ],
+      "cwd": "{projectRoot}",
+      "timeoutMs": 1800000,
+      "inputs": {
+        "sources": {
+          "from": "project",
+          "files": [
+            "dart:build"
+          ]
+        },
+        "stackRoot": {
+          "from": "workspace",
+          "files": [
+            "analysis_options.yaml",
+            "pubspec.lock",
+            "pubspec.yaml"
+          ]
+        },
+        "extensionVersion": {
+          "from": "runtime"
+        },
+        "hostPlatform": {
+          "from": "runtime"
+        }
+      },
+      "outputs": {
+        "data": {
+          "description": "The task result: the test and coverage totals of a test task."
+        }
+      },
+      "cache": {
+        "enabled": true
+      },
+      "declares": {
+        "outputs": {
+          "reports": {
+            "kind": "directory",
+            "root": "command-output",
+            "path": "build",
+            "optionalEmpty": true,
+            "description": "The reports the task wrote or copied: the LCOV and JUnit reports of a test task, the executables of a Dart build."
+          }
+        },
+        "effects": [
+          "network",
+          "toolchain-cache"
+        ]
+      }
+    },
+    "lint-docs": {
+      "description": "Documentation link check: every relative link and anchor in the project's README.md files and doc/ trees must resolve, with the exact case of the file's name. The task body is the SDK's docslinks.Job, shared with every language extension. A link may name any file of the workspace, so the check reads the workspace's Git candidate cut (the tracked files and the untracked files no ignore rule excludes) and its key is the workspace input `git:**`, which holds that cut: deleting or renaming a link target, or editing a heading an anchor names, moves the key, and an ignored file is neither read nor keyed. The project input names the README.md the check starts from, so the key does not fold the project's ignored build output. Outside a Git work tree the check reads the disk and the task has no key. It needs neither Dart nor Flutter.",
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": [
+        "lint-docs"
+      ],
+      "cwd": "{projectRoot}",
+      "timeoutMs": 120000,
+      "inputs": {
+        "readme": {
+          "from": "project",
+          "files": [
+            "README.md"
+          ]
+        },
+        "repository": {
+          "from": "workspace",
+          "files": [
+            "git:**"
+          ]
+        },
+        "docs-links": {
+          "from": "params"
+        }
+      },
+      "outputs": {
+        "data": {
+          "description": "Documentation link result with diagnostics"
+        }
+      },
+      "reads": [
+        "sources"
+      ],
+      "cache": {
+        "noOutput": true,
+        "enabled": true
+      },
+      "declares": {}
+    },
+    "workspace-install-exec": {
+      "description": "Run pub get --enforce-lockfile at each stack root of the workspace, with flutter when the root holds a Flutter package, except the projects disable.tags excludes and the roots whose package_config.json is newer than their pubspecs and pubspec.lock. Offline, pub resolves from the pub cache alone, and a root whose SDK the machine lacks is left out with a warning.",
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": [
+        "workspace-install"
+      ],
+      "cwd": "{workspaceRoot}",
+      "cache": false,
+      "timeoutMs": 1800000,
+      "declares": {
+        "effects": [
+          "network",
+          "process",
+          "toolchain-cache",
+          "workspace-files"
+        ]
+      }
+    },
+    "deps-upgrade-exec": {
+      "description": "Run pub upgrade at each stack root of the workspace with the selected SDK.",
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": [
+        "deps-upgrade"
+      ],
+      "cwd": "{workspaceRoot}",
+      "cache": false,
+      "timeoutMs": 1800000,
+      "declares": {
+        "effects": [
+          "network",
+          "process",
+          "toolchain-cache",
+          "workspace-files"
+        ]
+      }
+    },
+    "serve-run": {
+      "description": "Run a Dart server with dart run and PORT set, or a Flutter app with web/ through flutter run -d web-server on the port, until the user stops it.",
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": [
+        "serve"
+      ],
+      "cwd": "{projectRoot}",
+      "cache": false,
+      "timeoutMs": -1,
+      "declares": {
+        "effects": [
+          "network",
+          "process",
+          "toolchain-cache"
+        ]
+      }
+    },
+    "run-exec": {
+      "description": "Run dart run with the entrypoint in the package directory and forward its exit code.",
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": [
+        "run"
+      ],
+      "cwd": "{projectRoot}",
+      "cache": false,
+      "timeoutMs": -1,
+      "declares": {
+        "effects": [
+          "network",
+          "process",
+          "toolchain-cache",
+          "workspace-files"
+        ]
+      }
+    },
+    "install-run": {
+      "description": "Run pub get --enforce-lockfile at the component's stack root, with flutter when the root holds a Flutter package, unless its package_config.json is newer than its pubspecs and pubspec.lock. An offline run resolves nothing: workspace-install resolved every root from the pub cache before.",
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": [
+        "install"
+      ],
+      "cwd": "{projectRoot}",
+      "timeoutMs": 1800000,
+      "cache": false,
+      "declares": {
+        "effects": [
+          "network",
+          "process",
+          "toolchain-cache",
+          "workspace-files"
+        ]
+      }
+    },
+    "workspace-fetch-exec": {
+      "description": "Run pub get at each stack root of the workspace, with flutter when the root holds a Flutter package, which downloads the locked packages into the pub cache and runs none of their code.",
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": [
+        "workspace-fetch"
+      ],
+      "cwd": "{workspaceRoot}",
+      "cache": false,
+      "timeoutMs": 1800000,
+      "declares": {
+        "effects": [
+          "network",
+          "process",
+          "toolchain-cache"
+        ]
+      }
+    }
+  }
+}

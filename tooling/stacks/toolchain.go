@@ -30,7 +30,14 @@ type Expected struct {
 	// Source is the workspace-relative file that states it, or "profile"
 	// when the profile or an override sets toolchain.version.
 	Source string `json:"source,omitempty"`
+	// Reading is ReadingPlain when the version reads with no dialect though
+	// the check names one: a pub-flutter constraint in a pubspec whose
+	// environment.sdk starts at 3.9 or later, which pub reads as stated.
+	Reading string `json:"reading,omitempty"`
 }
+
+// ReadingPlain marks an expected version that reads with no dialect.
+const ReadingPlain = "plain"
 
 // ExpectedVersion reads the expected toolchain version of the project at
 // projectDir, of the stack root stackRoot, both workspace-relative, in the
@@ -53,28 +60,53 @@ func (t Toolchain) ExpectedVersion(root, projectDir, stackRoot string) (Expected
 			if err != nil {
 				return Expected{}, err
 			}
-			version, err := readVersion(data, f.Key)
+			version, err := readVersion(f.Path, data, f.Key)
 			if err != nil {
 				return Expected{}, fmt.Errorf("%s: %w", rel, err)
 			}
 			if version == "" {
 				continue
 			}
-			if _, isRange := parseRange(version); isRange && !IsExact(version) {
+			if _, isRange := t.parseStated(version, t.Ranges); isRange && !IsExact(version) {
 				if firstRange.Version == "" {
-					firstRange = Expected{Version: version, Source: rel}
+					firstRange = Expected{Version: version, Source: rel, Reading: t.reading(f, data)}
 				}
 				continue
 			}
-			return Expected{Version: version, Source: rel}, nil
+			return Expected{Version: version, Source: rel, Reading: t.reading(f, data)}, nil
 		}
 	}
 	return firstRange, nil
 }
 
-// readVersion reads a version from a file's content: the string at a dotted
-// key of a JSON object or a TOML table, or the first non-empty line.
-func readVersion(data []byte, key string) (string, error) {
+// reading is how the version a file states reads: a pub-flutter constraint in
+// a pubspec whose environment.sdk starts at 3.9 or later reads plain, since
+// pub reads it as stated there.
+func (t Toolchain) reading(f VersionFile, data []byte) string {
+	if t.Ranges != RangesPubFlutter {
+		return ""
+	}
+	sdk, err := readVersion(f.Path, data, "environment.sdk")
+	if err != nil || sdk == "" {
+		return ""
+	}
+	r, ok := t.parseStated(sdk, RangesPubSDK)
+	if !ok {
+		return ""
+	}
+	if low, ok := r.lowerBound(); ok && compareRelease(low, []int{3, 9}) >= 0 {
+		return ReadingPlain
+	}
+	return ""
+}
+
+// readVersion reads a version from the content of the file name: the string
+// at a dotted key of a JSON object, a YAML mapping (a .yaml or .yml file) or
+// a TOML table, or the first non-empty line.
+func readVersion(name string, data []byte, key string) (string, error) {
+	if ext := strings.ToLower(path.Ext(name)); key != "" && (ext == ".yaml" || ext == ".yml") {
+		return yamlString(data, key), nil
+	}
 	if key == "" {
 		sc := bufio.NewScanner(bytes.NewReader(data))
 		for sc.Scan() {
@@ -133,6 +165,82 @@ func tomlString(data []byte, key string) string {
 		}
 	}
 	return ""
+}
+
+// yamlString reads the scalar value of a dotted key ("environment.sdk") from
+// YAML text. It reads block mappings indented with spaces and plain or quoted
+// scalars: what a pubspec.yaml environment holds. A key it does not find, or
+// that holds no scalar, reads as "".
+func yamlString(data []byte, key string) string {
+	segments := strings.Split(key, ".")
+	type level struct{ indent, child int }
+	var matched []level
+	sc := bufio.NewScanner(bytes.NewReader(data))
+	for sc.Scan() {
+		line := strings.TrimRight(sc.Text(), " \t\r")
+		trimmed := strings.TrimLeft(line, " ")
+		if trimmed == "" || strings.HasPrefix(trimmed, "#") || strings.HasPrefix(trimmed, "---") {
+			continue
+		}
+		indent := len(line) - len(trimmed)
+		for len(matched) > 0 && indent <= matched[len(matched)-1].indent {
+			matched = matched[:len(matched)-1]
+		}
+		want := 0
+		if n := len(matched); n > 0 {
+			if matched[n-1].child < 0 {
+				matched[n-1].child = indent
+			}
+			want = matched[n-1].child
+		}
+		if indent != want {
+			continue
+		}
+		k, v, ok := yamlKeyValue(trimmed)
+		if !ok || k != segments[len(matched)] {
+			continue
+		}
+		if len(matched) == len(segments)-1 {
+			return v
+		}
+		if v != "" {
+			return ""
+		}
+		matched = append(matched, level{indent: indent, child: -1})
+	}
+	return ""
+}
+
+// yamlKeyValue splits a "key: value" line, with the value unquoted and its
+// comment removed.
+func yamlKeyValue(line string) (string, string, bool) {
+	i := strings.Index(line, ":")
+	for i >= 0 && i+1 < len(line) && line[i+1] != ' ' {
+		next := strings.Index(line[i+1:], ":")
+		if next < 0 {
+			i = -1
+			break
+		}
+		i += next + 1
+	}
+	if i <= 0 {
+		return "", "", false
+	}
+	key := strings.Trim(strings.TrimSpace(line[:i]), `"'`)
+	value := strings.TrimSpace(line[i+1:])
+	if value != "" && (value[0] == '"' || value[0] == '\'') {
+		if end := strings.IndexByte(value[1:], value[0]); end >= 0 {
+			return key, value[1 : end+1], true
+		}
+		return key, "", true
+	}
+	if strings.HasPrefix(value, "#") {
+		value = ""
+	}
+	if c := strings.Index(value, " #"); c >= 0 {
+		value = strings.TrimSpace(value[:c])
+	}
+	return key, value, true
 }
 
 // MachineVersion runs the toolchain command in dir and matches its output:
@@ -196,51 +304,11 @@ func (s Selection) Program(t Toolchain, name string) string {
 		}
 	}
 	if !strings.ContainsAny(name, `/\`) {
-		if found := lookPathIn(s.Env, name); found != "" {
+		if found, ok := LookPathIn(s.Env, name); ok {
 			return found
 		}
 	}
 	return name
-}
-
-// lookPathIn answers the first executable file named name on the PATH of env,
-// with the PATHEXT extensions on Windows, or "".
-func lookPathIn(env []string, name string) string {
-	var path string
-	for _, entry := range env {
-		if key, value, ok := strings.Cut(entry, "="); ok && strings.EqualFold(key, "PATH") {
-			path = value
-			break
-		}
-	}
-	names := []string{name}
-	if runtime.GOOS == "windows" && filepath.Ext(name) == "" {
-		names = nil
-		exts := environmentValue(env, "PATHEXT")
-		if exts == "" {
-			exts = ".com;.exe;.bat;.cmd"
-		}
-		for _, ext := range strings.Split(strings.ToLower(exts), ";") {
-			if ext != "" {
-				names = append(names, name+ext)
-			}
-		}
-	}
-	for _, dir := range filepath.SplitList(path) {
-		// A relative entry would resolve against the step's directory, which
-		// Go's own lookup refuses too.
-		if dir == "" || !filepath.IsAbs(dir) {
-			continue
-		}
-		for _, n := range names {
-			candidate := filepath.Join(dir, n)
-			info, err := os.Stat(candidate)
-			if err == nil && !info.IsDir() && (runtime.GOOS == "windows" || info.Mode()&0o111 != 0) {
-				return candidate
-			}
-		}
-	}
-	return ""
 }
 
 // Select chooses the toolchain of a task in dir. The toolchain on PATH runs
@@ -287,6 +355,95 @@ func setEnv(env []string, name, value string) []string {
 		}
 	}
 	return append(out, name+"="+value)
+}
+
+// ProgramIn returns the program a step runs in env: a program beside the
+// toolchain on PATH when none is pinned, then what Program answers, else the
+// first executable of that name on the PATH of env, where a task's tools are,
+// else name.
+func (s Selection) ProgramIn(t Toolchain, name string, env []string) string {
+	if strings.ContainsAny(name, `/\`) {
+		return s.Program(t, name)
+	}
+	// A program beside the toolchain on PATH, such as the dart of a Flutter
+	// SDK, belongs to it, whatever comes first on PATH.
+	if s.Executable == "" && name != t.Command[0] {
+		if toolchain, ok := LookPathIn(env, t.Command[0]); ok {
+			if sibling, ok := LookPathIn([]string{"PATH=" + filepath.Dir(toolchain)}, name); ok {
+				return sibling
+			}
+		}
+	}
+	if program := s.Program(t, name); program != name {
+		return program
+	}
+	if found, ok := LookPathIn(env, name); ok {
+		return found
+	}
+	return name
+}
+
+// LookPathIn finds an executable file on the PATH of env, with the PATHEXT
+// extensions on Windows for a name that has none.
+func LookPathIn(env []string, name string) (string, bool) {
+	names := []string{name}
+	if runtime.GOOS == "windows" && filepath.Ext(name) == "" {
+		names = nil
+		exts := environmentValue(env, "PATHEXT")
+		if exts == "" {
+			exts = ".com;.exe;.bat;.cmd"
+		}
+		for _, ext := range strings.Split(strings.ToLower(exts), ";") {
+			if ext != "" {
+				names = append(names, name+ext)
+			}
+		}
+	}
+	for _, dir := range filepath.SplitList(pathValue(env)) {
+		// A relative entry would resolve against the step's directory, which
+		// Go's own lookup refuses too.
+		if dir == "" || !filepath.IsAbs(dir) {
+			continue
+		}
+		for _, n := range names {
+			candidate := filepath.Join(dir, n)
+			if info, err := os.Stat(candidate); err == nil && info.Mode().IsRegular() && (runtime.GOOS == "windows" || info.Mode()&0o111 != 0) {
+				return candidate, true
+			}
+		}
+	}
+	return "", false
+}
+
+// pathValue is the PATH of env, whatever the case of its name.
+func pathValue(env []string) string {
+	for _, entry := range env {
+		if key, value, ok := strings.Cut(entry, "="); ok && strings.EqualFold(key, "PATH") {
+			return value
+		}
+	}
+	return ""
+}
+
+// Pinned selects the toolchain the Provisioned variable of env names, whatever
+// the toolchain on PATH: a further check that fails with the toolchain on PATH
+// asks for it.
+func (t Toolchain) Pinned(ctx context.Context, dir string, expected Expected, env []string) (Selection, error) {
+	pinned := environmentValue(env, t.Provisioned)
+	if t.Provisioned == "" || !filepath.IsAbs(pinned) {
+		return Selection{}, fmt.Errorf("%w: no installed %s", ErrToolchainMissing, t.Command[0])
+	}
+	withPin := t
+	withPin.Command = append([]string{pinned}, t.Command[1:]...)
+	version, err := withPin.MachineVersion(ctx, dir, env)
+	if err != nil {
+		return Selection{}, err
+	}
+	selected := prependPath(env, filepath.Dir(pinned))
+	if t.Home != "" {
+		selected = setEnv(selected, t.Home, filepath.Dir(filepath.Dir(pinned)))
+	}
+	return Selection{Env: selected, Executable: pinned, Verdict: t.Compare(expected, version)}, nil
 }
 
 func environmentValue(env []string, name string) string {
@@ -363,17 +520,31 @@ func (t Toolchain) Compare(expected Expected, machine string) Verdict {
 	if expected.Version == "" {
 		return Verdict{Code: CodeToolchainUnpinned, Message: fmt.Sprintf("no toolchain file states the expected version (machine: %s): the cache key carries no toolchain version", machine)}
 	}
-	if !IsExact(expected.Version) {
+	// A dialect reads a constraint a file states; toolchain.version, set by
+	// the profile or a project, reads plain (ADR 0008).
+	dialect := t.Ranges
+	switch {
+	case expected.Source == "profile":
+		dialect = ""
+	case expected.Reading == ReadingPlain:
+		// Pub's syntax, with none of its SDK rules.
+		dialect = pubSyntax
+	}
+	if !IsExact(expected.Version) || dialect == RangesPubFlutter {
 		// A stated range, such as composer.json's require.php ">=8.4", is
 		// checked: the machine's release must satisfy it (ADR 0002).
-		r, ok := parseRange(expected.Version)
+		r, ok := t.parseStated(expected.Version, dialect)
 		if !ok {
 			return Verdict{Code: CodeToolchainUnpinned, Message: fmt.Sprintf("%s states %q, which names no exact version and no range (machine: %s): the cache key carries no toolchain version", expected.Source, expected.Version, machine)}
 		}
 		if r.satisfiedBy(machine) {
 			return Verdict{}
 		}
-		msg := fmt.Sprintf("%s expects a version in %s, the machine has %s; install or select one, or set toolchain.check to warn", expected.Source, expected.Version, machine)
+		reading := ""
+		if dialect != "" {
+			reading = " as pub reads it"
+		}
+		msg := fmt.Sprintf("%s expects a version in %s%s, the machine has %s; install or select one, or set toolchain.check to warn", expected.Source, expected.Version, reading, machine)
 		return Verdict{Code: CodeToolchainMismatch, Fail: t.Check != CheckWarn, Message: msg}
 	}
 	if versionMatches(expected.Version, machine) {
