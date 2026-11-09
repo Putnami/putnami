@@ -199,12 +199,13 @@ func TestTheSyncWritesEachMoonProjectPutnamiJSON(t *testing.T) {
 		t.Errorf("unreported %v, mode %s, extensions %v", result.Unreported, result.Mode, result.Extensions)
 	}
 
+	marked := map[string]any{ExtensionName: map[string]any{"graphSync": true}}
 	want := map[string]map[string]any{
 		"apps/api": {"$schema": nil, "name": "api", "tags": []any{"moon"}, "extensions": []any{ExtensionName}, "dependencies": []any{"/packages/pricing"},
-			"options": map[string]any{ExtensionName: map[string]any{"tasks": map[string]any{"test": map[string]any{"reports": map[string]any{"junit": []any{"reports/junit.xml"}}}}}}},
-		"apps/web": {"$schema": stacks.ProjectSchema, "tags": []any{"moon"}, "extensions": []any{ExtensionName}, "disable": map[string]any{"jobs": []any{"build", "test"}}},
+			"options": map[string]any{ExtensionName: map[string]any{"graphSync": true, "tasks": map[string]any{"test": map[string]any{"reports": map[string]any{"junit": []any{"reports/junit.xml"}}}}}}},
+		"apps/web": {"$schema": stacks.ProjectSchema, "tags": []any{"moon"}, "extensions": []any{ExtensionName}, "disable": map[string]any{"jobs": []any{"build", "test"}}, "options": marked},
 		"packages/pricing": {"$schema": stacks.ProjectSchema, "tags": []any{"moon"}, "extensions": []any{ExtensionName}, "disable": map[string]any{"jobs": []any{"lint"}},
-			"options": map[string]any{ExtensionName: map[string]any{"tasks": map[string]any{"test": map[string]any{"steps": []any{[]any{"moon", "run", "{component}:unit"}}}}}}},
+			"options": map[string]any{ExtensionName: map[string]any{"graphSync": true, "tasks": map[string]any{"test": map[string]any{"steps": []any{[]any{"moon", "run", "{component}:unit"}}}}}}},
 		"tools/legacy": {"name": "legacy", "tags": []any{"team"}, "extensions": []any{"@acme/lint"}, "dependencies": []any{"@acme/design"}},
 	}
 	for dir, doc := range want {
@@ -256,7 +257,7 @@ func TestImportModeMapsAProjectToItsLanguageExtension(t *testing.T) {
 		if !reflect.DeepEqual(doc["extensions"], []any{ext}) || !reflect.DeepEqual(doc["tags"], []any{"moon"}) {
 			t.Errorf("%s = %v, want %s", dir, doc, ext)
 		}
-		if _, ok := doc["options"]; ok {
+		if !reflect.DeepEqual(doc["options"], map[string]any{ExtensionName: map[string]any{"graphSync": true}}) {
 			t.Errorf("%s holds a moon step: %v", dir, doc["options"])
 		}
 	}
@@ -518,5 +519,67 @@ func TestADryRunOfTheSyncJobPrintsEachDiffAndWritesNothing(t *testing.T) {
 	ctx.Params = pctx.Params{"mode": json.RawMessage(`"mirror"`)}
 	if status, _, err := RunSync(ctx, jsonl.New(), nil); status != "FAILED" || err == nil {
 		t.Errorf("an unknown mode fails the sync: %s %v", status, err)
+	}
+}
+
+func TestTheSyncKeepsTheProjectOwnSteps(t *testing.T) {
+	spectest.Proves(t, feature, "sync-writes-each-project", "the-sync-writes-each-moon-project-putnami-json")
+	d := readDemo(t)
+	root := repository(t, d, ModeDelegate, false)
+	own := `{"options": {"@putnami/moon": {"tasks": {"test": {"steps": [["moon", "ci", "pricing:unit"]]}}}}}`
+	writeFile(t, root, "packages/pricing/putnami.json", own)
+	if _, err := Sync(context.Background(), root); err != nil {
+		t.Fatal(err)
+	}
+	doc := readProjectFile(t, root, "packages/pricing")
+	steps := doc["options"].(map[string]any)[ExtensionName].(map[string]any)["tasks"].(map[string]any)["test"].(map[string]any)["steps"]
+	if !reflect.DeepEqual(steps, []any{[]any{"moon", "ci", "pricing:unit"}}) {
+		t.Errorf("the project's own steps = %v", steps)
+	}
+	if stale, err := Stale(context.Background(), root); err != nil || len(stale.Written) != 0 {
+		t.Errorf("a project's own steps are no drift: %v %v", stale.Written, err)
+	}
+	// A step the sync wrote is the sync's: it goes once the task is named.
+	writeFile(t, root, "packages/pricing/putnami.json", `{"options": {"@putnami/moon": {"tasks": {"test": {"steps": [["moon", "run", "{component}:unit"]]}}}}}`)
+	writeFile(t, root, "packages/pricing/moon.yml", "language: 'rust'\ntasks:\n  test:\n    command: 'cargo test'\n")
+	if _, err := Sync(context.Background(), root); err != nil {
+		t.Fatal(err)
+	}
+	if doc := readProjectFile(t, root, "packages/pricing"); !reflect.DeepEqual(doc["options"], map[string]any{ExtensionName: map[string]any{"graphSync": true}}) {
+		t.Errorf("pricing options = %v", doc["options"])
+	}
+}
+
+func TestImportDeclaresIntoTheObjectFormOfExtensions(t *testing.T) {
+	spectest.Proves(t, feature, "import-maps-to-language-extensions", "import-mode-maps-a-project-to-its-language-extension")
+	d := readDemo(t)
+	root := repository(t, d, ModeImport, false)
+	writeFile(t, root, wsproto.WorkspaceConfigFilename, "{\n  \"extensions\": {\"@putnami/moon\": \"^0.1.0\"},\n  \"options\": {\"@putnami/moon\": {\"mode\": \"import\"}}\n}\n")
+	if _, err := Sync(context.Background(), root); err != nil {
+		t.Fatal(err)
+	}
+	data, _ := os.ReadFile(filepath.Join(root, wsproto.WorkspaceConfigFilename))
+	want := "{\n  \"extensions\": {\n    \"@putnami/moon\": \"^0.1.0\",\n    \"@putnami/rust\": \"\",\n    \"@putnami/typescript\": \"\"\n  },\n  \"options\": {\n    \"@putnami/moon\": {\n      \"mode\": \"import\"\n    }\n  }\n}\n"
+	if string(data) != want {
+		t.Errorf("config:\n%s\nwant\n%s", data, want)
+	}
+	if stale, err := Stale(context.Background(), root); err != nil || len(stale.Written) != 0 {
+		t.Errorf("after the sync nothing is stale: %v %v", stale.Written, err)
+	}
+	writeFile(t, root, wsproto.WorkspaceConfigFilename, `{"extensions": 3, "options": {"@putnami/moon": {"mode": "import"}}}`)
+	if _, err := Sync(context.Background(), root); err == nil || !strings.Contains(err.Error(), "neither a list") {
+		t.Errorf("extensions of another form fails the sync: %v", err)
+	}
+}
+
+func TestAnUnknownRecordedModeFailsTheSync(t *testing.T) {
+	spectest.Proves(t, feature, "sync-writes-each-project", "the-sync-writes-each-moon-project-putnami-json")
+	d := readDemo(t)
+	root := repository(t, d, "mirror", false)
+	if _, err := Sync(context.Background(), root); err == nil || !strings.Contains(err.Error(), `unknown mode "mirror"`) {
+		t.Errorf("err = %v", err)
+	}
+	if Mode(root) != ModeDelegate {
+		t.Error("the probe delegates a workspace whose mode is unknown")
 	}
 }

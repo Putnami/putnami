@@ -215,6 +215,7 @@ func TestTheGraphSyncWritesAnotherExtensionTheTagAndTheOwnedJobs(t *testing.T) {
 	g := testGraphSync()
 	g.Extensions = []string{"@acme/lang"}
 	g.Tag = "tool"
+	g.Marked = true
 	g.Jobs = []string{"build", "lint", "test"}
 	g.Retract = func(doc map[string]any) { delete(doc, "owned") }
 	writeTestFile(t, filepath.Join(root, "web", "BUILD"), "")
@@ -233,7 +234,7 @@ func TestTheGraphSyncWritesAnotherExtensionTheTagAndTheOwnedJobs(t *testing.T) {
 	if got := api["disable"]; !reflect.DeepEqual(got, map[string]any{"jobs": []any{"serve", "build"}}) {
 		t.Fatalf("api disable %v", got)
 	}
-	if api["owned"] != true || !reflect.DeepEqual(api["tags"], []any{"tool"}) {
+	if api["owned"] != true || !reflect.DeepEqual(api["tags"], []any{"tool"}) || !reflect.DeepEqual(api["options"], map[string]any{testExtension: map[string]any{MarkMember: true}}) {
 		t.Fatalf("api %v", api)
 	}
 	web := readTestProject(t, root, "web")
@@ -241,8 +242,8 @@ func TestTheGraphSyncWritesAnotherExtensionTheTagAndTheOwnedJobs(t *testing.T) {
 		t.Fatalf("web disable %v", got)
 	}
 
-	// api is no package any more: the tag marks it, so the sync retracts
-	// what it wrote, the language extension included.
+	// api is no package any more: the mark names it the sync's, so the sync
+	// retracts what it wrote, and keeps the language extension it runs.
 	result, err := g.Apply(root, packages[1:], false)
 	if err != nil {
 		t.Fatal(err)
@@ -251,7 +252,7 @@ func TestTheGraphSyncWritesAnotherExtensionTheTagAndTheOwnedJobs(t *testing.T) {
 		t.Fatalf("retracted %v", result.Retracted)
 	}
 	api = readTestProject(t, root, "api")
-	want := map[string]any{"extensions": []any{"@acme/other"}, "disable": map[string]any{"jobs": []any{"serve"}}, "$schema": ProjectSchema}
+	want := map[string]any{"extensions": []any{"@acme/other", "@acme/lang"}, "disable": map[string]any{"jobs": []any{"serve"}}, "$schema": ProjectSchema}
 	delete(api, "$schema")
 	delete(want, "$schema")
 	if !reflect.DeepEqual(api, want) {
@@ -306,5 +307,21 @@ func TestDiffAlignsTheLinesOfAFile(t *testing.T) {
 	}
 	if got := Diff("f", nil, []byte("a\n")); got != "--- /dev/null\n+++ b/f\n+a\n" {
 		t.Errorf("a new file:\n%s", got)
+	}
+}
+
+func TestATagAloneMarksNoPackage(t *testing.T) {
+	root := t.TempDir()
+	g := testGraphSync()
+	g.Tag, g.Marked = "tool", true
+	writeTestFile(t, filepath.Join(root, "api", "BUILD"), "")
+	own := `{"name": "scripts", "tags": ["tool"], "extensions": ["@acme/lang"], "dependencies": ["/api"]}`
+	writeTestFile(t, filepath.Join(root, "scripts", "putnami.json"), own)
+	result, err := g.Apply(root, []GraphPackage{{Dir: "api", Tested: true}}, false)
+	if err != nil || len(result.Retracted) != 0 {
+		t.Fatalf("retracted %v (%v)", result.Retracted, err)
+	}
+	if data, _ := os.ReadFile(filepath.Join(root, "scripts", "putnami.json")); string(data) != own {
+		t.Errorf("a project the team tagged was rewritten: %s", data)
 	}
 }

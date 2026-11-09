@@ -67,21 +67,30 @@ func Stack() (stacks.Stack, error) {
 
 // Mode reads the adoption mode of the workspace at root, from its
 // options["@putnami/moon"].mode; a workspace that states none, or a value
-// that is no mode, delegates.
+// that is no mode, delegates. The sync refuses a value that is no mode.
 func Mode(root string) string {
+	if recordedMode(root) == ModeImport {
+		return ModeImport
+	}
+	return ModeDelegate
+}
+
+// recordedMode is the mode the workspace config states, as it states it;
+// empty when it states none.
+func recordedMode(root string) string {
 	data, err := os.ReadFile(filepath.Join(root, wsproto.WorkspaceConfigFilename)) //nolint:gosec // the workspace config under the root
 	if err != nil {
-		return ModeDelegate
+		return ""
 	}
 	var cfg struct {
 		Options map[string]struct {
 			Mode string `json:"mode"`
 		} `json:"options"`
 	}
-	if json.Unmarshal(data, &cfg) != nil || cfg.Options[ExtensionName].Mode != ModeImport {
-		return ModeDelegate
+	if json.Unmarshal(data, &cfg) != nil {
+		return ""
 	}
-	return ModeImport
+	return cfg.Options[ExtensionName].Mode
 }
 
 // ExtensionFor is the extension a project runs in the mode: its language's in

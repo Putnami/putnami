@@ -65,9 +65,14 @@ type GraphSync struct {
 	// language extensions a tool's projects are imported into: the sync
 	// writes the package's own and removes the others.
 	Extensions []string
-	// Tag, when set, is a tag the sync writes on every package and that
-	// marks a package as the sync's, whatever extension it runs.
+	// Tag, when set, is a tag the sync writes on every package, for
+	// selection; it marks nothing, since a team may tag its own projects so.
 	Tag string
+	// Marked, when set, makes the sync write MarkMember in the extension's
+	// option layer of every package and read it as the mark of its packages,
+	// whatever extension a package runs. Unset, a package is the sync's when
+	// it names the extension.
+	Marked bool
 	// Jobs, when set, are the jobs the sync owns in disable.jobs, each
 	// package naming those it disables in Disabled; unset, the sync owns test
 	// alone, by Tested.
@@ -183,7 +188,7 @@ func (g GraphSync) Apply(root string, packages []GraphPackage, dry bool) (GraphR
 		}
 	}
 	if dry {
-		result.Changes = append(written, retracted...)
+		result.Changes = append(slices.Clone(written), retracted...)
 	}
 	return result, nil
 }
@@ -258,7 +263,49 @@ func (g GraphSync) markedProjects(root string) ([]string, error) {
 // marks reports whether a putnami.json is the sync's: it names the
 // extension, or carries the sync's tag.
 func (g GraphSync) marks(doc map[string]any) bool {
-	return slices.Contains(stringList(doc["extensions"]), g.Extension) || g.Tag != "" && slices.Contains(stringList(doc["tags"]), g.Tag)
+	if slices.Contains(stringList(doc["extensions"]), g.Extension) {
+		return true
+	}
+	if !g.Marked {
+		return false
+	}
+	options, _ := doc["options"].(map[string]any)
+	layer, _ := options[g.Extension].(map[string]any)
+	return layer[MarkMember] == true
+}
+
+// MarkMember is the member of a stack extension's option layer that marks a
+// project as its graph sync's: the sync writes it, and a profile override
+// ignores it.
+const MarkMember = "graphSync"
+
+// setMark writes or removes the sync's mark in the extension's option layer,
+// and removes the layer and options when nothing is left in them.
+func (g GraphSync) setMark(doc map[string]any, marked bool) {
+	options, _ := doc["options"].(map[string]any)
+	layer, _ := options[g.Extension].(map[string]any)
+	if marked {
+		if options == nil {
+			options = map[string]any{}
+			doc["options"] = options
+		}
+		if layer == nil {
+			layer = map[string]any{}
+			options[g.Extension] = layer
+		}
+		layer[MarkMember] = true
+		return
+	}
+	if layer == nil {
+		return
+	}
+	delete(layer, MarkMember)
+	if len(layer) == 0 {
+		delete(options, g.Extension)
+	}
+	if len(options) == 0 {
+		delete(doc, "options")
+	}
 }
 
 // owns reports whether the sync writes the extension.
@@ -323,17 +370,22 @@ func (g GraphSync) retractProject(root, file string, components map[string]bool,
 		return false, nil, err
 	}
 	before := cloneDoc(doc)
-	setList(doc, "extensions", slices.DeleteFunc(stringList(doc["extensions"]), g.owns))
+	// A former package keeps a language extension it runs: the project
+	// stays the team's, and only the stack's own extension leaves.
+	setList(doc, "extensions", slices.DeleteFunc(stringList(doc["extensions"]), func(e string) bool { return e == g.Extension }))
 	setList(doc, "dependencies", slices.DeleteFunc(stringList(doc["dependencies"]), func(d string) bool { return !g.keepDependency(root, d, components) }))
+	if g.Retract != nil {
+		g.Retract(doc)
+	}
 	g.setInputs(doc, nil)
+	if g.Marked {
+		g.setMark(doc, false)
+	}
 	if g.Tag != "" {
 		setList(doc, "tags", slices.DeleteFunc(stringList(doc["tags"]), func(t string) bool { return t == g.Tag }))
 	}
 	if g.Jobs != nil {
 		g.setDisabled(doc, nil)
-	}
-	if g.Retract != nil {
-		g.Retract(doc)
 	}
 	if reflect.DeepEqual(cloneDoc(doc), before) {
 		return false, nil, nil
@@ -382,9 +434,12 @@ func (g GraphSync) writeProject(root, file string, deps []string, p GraphPackage
 	}
 	g.setDisabled(doc, disabled)
 
-	g.setInputs(doc, p.Inputs)
 	if p.Edit != nil {
 		p.Edit(doc)
+	}
+	g.setInputs(doc, p.Inputs)
+	if g.Marked {
+		g.setMark(doc, true)
 	}
 
 	if existing != nil && reflect.DeepEqual(cloneDoc(doc), before) {

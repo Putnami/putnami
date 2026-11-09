@@ -51,8 +51,8 @@ and each project's `moon.yml`. A project's tasks are the export's, or its
 `putnami projects sync` looks for moon projects in the directories that hold
 a `moon.yml` or a language manifest moon reads (`package.json`,
 `tsconfig.json`, `deno.json`, `go.mod`, `Cargo.toml`, `pyproject.toml`,
-`requirements.txt`, `composer.json`, `Gemfile`); a project with none of them
-joins on the next sync, once the first one wrote its `putnami.json`.
+`requirements.txt`, `composer.json`, `Gemfile`), and in the directories
+whose `putnami.json` the sync wrote.
 
 `putnami lint`, `putnami test` and `putnami build` run the moon task named
 `lint`, `test` or `build`, else the first one, by name, tagged that way. A
@@ -64,7 +64,10 @@ task is listed by the sync and keeps running through moon.
 `putnami projects sync` runs the extension's sync task. In each project's
 `putnami.json` it writes:
 
-- the tag `moon`, which marks the project as the sync's;
+- the tag `moon`, for selection;
+- `options["@putnami/moon"].graphSync`, which marks the project as the
+  sync's, whatever extension it runs: a project the team tags `moon` is not
+  the sync's;
 - the extension the mode maps it to;
 - its `dependencies` on the other moon projects, as project IDs;
 - `build`, `lint` or `test` in `disable.jobs` when the project has no task for
@@ -72,8 +75,15 @@ task is listed by the sync and keeps running through moon.
 - for a delegated project whose task is tagged rather than named, the step
   under `options["@putnami/moon"].tasks.<command>.steps`.
 
-It keeps every other member, retracts a project moon no longer lists, and in
-import mode adds the language extensions to the workspace's `extensions`.
+It keeps every other member, the project's own steps included: it writes a
+step only where none is set or where it wrote the one there. It retracts a
+project moon no longer lists, keeping the language extension the project
+runs, and in import mode adds the language extensions to the workspace's
+`extensions`, in its list or object form.
+
+Import sets each project's extension from moon's language: a JavaScript
+project runs `@putnami/moon` even when its `putnami.json` named
+`@putnami/typescript`, and a TypeScript project loses `@putnami/moon`.
 
 `putnami validate` fails with `moon.sync_stale` when a sync would change a
 `putnami.json`: moon infers edges from manifests and task inputs, so an edit

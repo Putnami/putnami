@@ -94,9 +94,12 @@ func synchronize(_ context.Context, root string, dry bool, given string) (SyncRe
 	}
 	detection := detect.Detect(root, detect.Options{})
 	mode := given
+	if mode == "" {
+		mode = recordedMode(root)
+	}
 	switch mode {
 	case "":
-		mode = Mode(root)
+		mode = ModeDelegate
 	case ModeImport, ModeDelegate:
 	default:
 		return SyncResult{}, fmt.Errorf("unknown mode %q: choose %s or %s", mode, ModeImport, ModeDelegate)
@@ -229,6 +232,10 @@ func setSteps(doc map[string]any, steps map[string][][]string) {
 	}
 	for _, command := range Commands {
 		task, _ := tasks[command].(map[string]any)
+		if !syncShaped(task[stepsKey]) {
+			// The project's own steps win: the sync never writes over them.
+			continue
+		}
 		if s, ok := steps[command]; ok {
 			if task == nil {
 				task = map[string]any{}
@@ -256,6 +263,24 @@ func setSteps(doc map[string]any, steps map[string][][]string) {
 	setMember(layer, "tasks", tasks)
 	setMember(options, ExtensionName, layer)
 	setMember(doc, "options", options)
+}
+
+// syncShaped reports whether steps are absent or the one step the sync
+// writes: moon run {component}:<task>.
+func syncShaped(steps any) bool {
+	if steps == nil {
+		return true
+	}
+	list, _ := steps.([]any)
+	if len(list) != 1 {
+		return false
+	}
+	step, _ := list[0].([]any)
+	if len(step) != 3 || step[0] != "moon" || step[1] != "run" {
+		return false
+	}
+	arg, _ := step[2].(string)
+	return strings.HasPrefix(arg, "{component}:")
 }
 
 // setMember sets the object at key, or removes it when it is empty.
@@ -289,9 +314,10 @@ func namesReports(root, dir string) bool {
 }
 
 // declareExtensions adds to the workspace config's extensions each of the
-// language extensions it does not declare yet, and reports whether it changed
-// the file. It never removes one: a workspace may run a language extension
-// for its own projects.
+// language extensions it does not declare yet, in the list or object form
+// the config uses, and reports whether it changed the file; in a dry run it
+// answers the change instead of writing it. It never removes one: a workspace
+// may run a language extension for its own projects.
 func declareExtensions(root string, extensions []string, dry bool) (bool, *stacks.FileChange, error) {
 	if len(extensions) == 0 {
 		return false, nil, nil
@@ -304,14 +330,20 @@ func declareExtensions(root string, extensions []string, dry bool) (bool, *stack
 	if err != nil {
 		return false, nil, err
 	}
-	var cfg map[string]json.RawMessage
-	if err := json.Unmarshal(data, &cfg); err != nil {
-		return false, nil, fmt.Errorf("not a JSON object: %w", err)
+	keys, members, err := objectMembers(data)
+	if err != nil {
+		return false, nil, err
 	}
 	var declared []string
-	if raw, ok := cfg["extensions"]; ok {
+	raw, isSet := members["extensions"]
+	object := false
+	if isSet {
 		if err := json.Unmarshal(raw, &declared); err != nil {
-			return false, nil, fmt.Errorf("extensions is not a list of names: %w", err)
+			names, _, objErr := objectMembers(raw)
+			if objErr != nil {
+				return false, nil, errors.New("extensions is neither a list of names nor an object of name to version")
+			}
+			declared, object = names, true
 		}
 	}
 	names := declaredNames(root, declared)
@@ -319,79 +351,73 @@ func declareExtensions(root string, extensions []string, dry bool) (bool, *stack
 	if len(missing) == 0 {
 		return false, nil, nil
 	}
-	after, err := renderExtensions(data, append(declared, missing...))
+	var value []byte
+	if object {
+		value, err = appendMembers(raw, missing)
+	} else {
+		value, err = json.Marshal(append(declared, missing...))
+	}
+	if err != nil {
+		return false, nil, err
+	}
+	if !isSet {
+		keys = append(keys, "extensions")
+	}
+	members["extensions"] = value
+	after, err := renderObject(keys, members)
 	if err != nil {
 		return false, nil, err
 	}
 	if dry {
 		return true, &stacks.FileChange{File: wsproto.WorkspaceConfigFilename, Before: data, After: after}, nil
 	}
-	info, err := os.Stat(file)
-	if err != nil {
-		return false, nil, err
-	}
-	return true, nil, os.WriteFile(file, after, info.Mode().Perm()) //nolint:gosec // the workspace config under the root
+	return true, nil, replaceFile(file, after)
 }
 
-// declaredNames are the names of the declared extensions: an entry that names
-// a workspace directory, such as /tools/ts-extension, by the name its
-// manifest gives, and any other entry as it is written.
-func declaredNames(root string, declared []string) []string {
-	names := slices.Clone(declared)
-	for _, entry := range declared {
-		rel, ok := strings.CutPrefix(entry, "/")
-		if !ok {
-			rel, ok = strings.CutPrefix(entry, "./")
-		}
-		if !ok {
-			continue
-		}
-		data, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(rel), "putnami.extension.json")) //nolint:gosec // a manifest under the workspace root
-		if err != nil {
-			continue
-		}
-		var manifest struct {
-			Name string `json:"name"`
-		}
-		if json.Unmarshal(data, &manifest) == nil && manifest.Name != "" {
-			names = append(names, manifest.Name)
-		}
-	}
-	return names
-}
-
-// renderExtensions is the workspace config with its extensions member
-// replaced, every other member kept in its order, two-space indented.
-func renderExtensions(data []byte, extensions []string) ([]byte, error) {
+// objectMembers reads a JSON object's keys, in order, and their raw values.
+func objectMembers(data []byte) ([]string, map[string]json.RawMessage, error) {
 	dec := json.NewDecoder(bytes.NewReader(data))
 	if tok, err := dec.Token(); err != nil || tok != json.Delim('{') {
-		return nil, errors.New("not a JSON object")
+		return nil, nil, errors.New("not a JSON object")
 	}
 	var keys []string
 	members := map[string]json.RawMessage{}
 	for dec.More() {
 		tok, err := dec.Token()
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		key, _ := tok.(string)
 		var raw json.RawMessage
 		if err := dec.Decode(&raw); err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		if _, seen := members[key]; !seen {
 			keys = append(keys, key)
 		}
 		members[key] = raw
 	}
-	list, err := json.Marshal(extensions)
+	return keys, members, nil
+}
+
+// appendMembers adds to an object of extension name to version constraint a
+// member with no constraint for each name, keeping the others in order.
+func appendMembers(object json.RawMessage, names []string) ([]byte, error) {
+	keys, members, err := objectMembers(object)
 	if err != nil {
 		return nil, err
 	}
-	if _, ok := members["extensions"]; !ok {
-		keys = append(keys, "extensions")
+	for _, name := range names {
+		keys = append(keys, name)
+		members[name] = json.RawMessage(`""`)
 	}
-	members["extensions"] = list
+	out, err := renderObject(keys, members)
+	return bytes.TrimSpace(out), err
+}
+
+// renderObject writes the members in the order of keys, two-space indented,
+// with a final newline.
+func renderObject(keys []string, members map[string]json.RawMessage) ([]byte, error) {
 	var buf bytes.Buffer
 	buf.WriteString("{\n")
 	for i, key := range keys {
@@ -410,6 +436,33 @@ func renderExtensions(data []byte, extensions []string) ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
+// replaceFile writes data at file through a temporary file beside it, so a
+// reader never sees half a file, keeping the file's permissions.
+func replaceFile(file string, data []byte) error {
+	info, err := os.Stat(file)
+	if err != nil {
+		return err
+	}
+	tmp, err := os.CreateTemp(filepath.Dir(file), "."+filepath.Base(file)+".*")
+	if err != nil {
+		return err
+	}
+	_, werr := tmp.Write(data)
+	if cerr := tmp.Close(); werr == nil {
+		werr = cerr
+	}
+	if werr == nil {
+		werr = os.Chmod(tmp.Name(), info.Mode().Perm())
+	}
+	if werr == nil {
+		werr = os.Rename(tmp.Name(), file)
+	}
+	if werr != nil {
+		_ = os.Remove(tmp.Name())
+	}
+	return werr
+}
+
 // graphSync writes the moon project graph: a directory that holds a moon.yml
 // is a moon project, whose edges the sync owns, and the tag moon marks every
 // project the sync wrote, whatever extension it runs.
@@ -417,6 +470,7 @@ var graphSync = stacks.GraphSync{
 	Extension:      ExtensionName,
 	Extensions:     slices.Sorted(maps.Values(LanguageExtensions)),
 	Tag:            profileID,
+	Marked:         true,
 	Jobs:           Commands,
 	HoldsBuildFile: func(root, dir string) bool { return fileExists(root, path.Join(dir, detect.ProjectFile)) },
 	Retract:        retractSteps,
@@ -522,4 +576,31 @@ func sortUnmapped(list []Unmapped) {
 		}
 		return list[i].Task < list[j].Task
 	})
+}
+
+// declaredNames are the names of the declared extensions: an entry that names
+// a workspace directory, such as /tools/ts-extension, by the name its
+// manifest gives, and any other entry as it is written.
+func declaredNames(root string, declared []string) []string {
+	names := slices.Clone(declared)
+	for _, entry := range declared {
+		rel, ok := strings.CutPrefix(entry, "/")
+		if !ok {
+			rel, ok = strings.CutPrefix(entry, "./")
+		}
+		if !ok {
+			continue
+		}
+		data, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(rel), "putnami.extension.json")) //nolint:gosec // a manifest under the workspace root
+		if err != nil {
+			continue
+		}
+		var manifest struct {
+			Name string `json:"name"`
+		}
+		if json.Unmarshal(data, &manifest) == nil && manifest.Name != "" {
+			names = append(names, manifest.Name)
+		}
+	}
+	return names
 }
