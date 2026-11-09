@@ -33,7 +33,7 @@
     },
     {
       "id": "reports-become-the-summary",
-      "text": "After its steps, whatever their outcome, the test task copies into its output the test.xml and coverage.dat of each test run the build-event file lists and reads them into the test and coverage summary, where a source file that several test runs cover counts each line once, covered when any run covered it. It never removes a Bazel output, so Bazel's cache serves the next run. A failed case fails the task with stacks.test_failed, a run with no JUnit report fails it with stacks.report_missing, and a missing coverage report fails nothing."
+      "text": "After its steps, whatever their outcome, the test task copies into its output the test.xml and coverage.dat of each test run the build-event file lists and reads them into the test and coverage summary, merging a source file across runs. It never removes a Bazel output, so Bazel's cache serves the next run. A failed case fails the task with stacks.test_failed, a run with no JUnit report fails it with stacks.report_missing, and a missing coverage report fails nothing."
     },
     {
       "id": "manifest-follows-the-profile",
