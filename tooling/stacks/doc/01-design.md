@@ -151,11 +151,11 @@ The Rust reference profile:
 | `toolchain.command`, `toolchain.pattern` | How to read the version on the machine: the command's output, standard output first, matched by the pattern's `version` group. |
 | `toolchain.provisioned` | The environment variable that holds the toolchain the workspace lock pins, for a stack extension that pins one. |
 | `tasks.<task>.withoutCoverage` | How the task runs on a toolchain with no coverage support: a `probe` that exits non-zero there, and the `steps` that replace the task's. Its coverage reports are not read, and the task warns with `stacks.coverage_unavailable`. |
-| `toolchain.files` | The files that state the expected version or range, read in the project directory, then at the stack root. `key` reads one string value of a TOML table, a JSON object or, in a `.yaml` or `.yml` file, a YAML block or flow mapping; without it, the file's first non-empty line. |
+| `toolchain.files` | The files that state the expected version or range, read in the project directory, then at the stack root. `key` reads one string value of a TOML table, a JSON object or, in a `.yaml` or `.yml` file, a YAML block or flow mapping; `pattern`, a regular expression matched against the file's content, reads its `version` group, such as `^(?:ruby-)?(?<version>\S+)` for `ruby-3.3.6`; without either, the file's first non-empty line. |
 | `toolchain.ranges` | How a range a file states reads: Composer's syntax, or `pub-sdk` and `pub-flutter`, as pub reads a Dart or Flutter SDK constraint ([ADR 0008](adr/0008-task-targets-exclusions-and-pub-ranges.md)). `toolchain.version` reads plain. |
-| `toolchain.also` | Further checks with the same members, such as the Dart SDK a Flutter SDK bundles, run with the selected toolchain. An entry without `check` takes the first check's. |
-| `inputs.<set>` | Named sets of file patterns. A plain pattern is relative to the project directory; `{root}/` makes it relative to the stack root, the directory of the build that holds the component (the Cargo workspace, the Gradle settings); a pattern under the project that starts with `!` leaves its files out of the task's inputs, such as a file the build tool writes under a directory the task reads, never `putnami.json` or a toolchain file. |
-| `tasks.<task>.steps` | The commands the task runs in order, each an argument vector run in the project directory, with no shell. `{root}` is the stack root, `{component}` the build's name for the component (`Component.Ref`, or its name), `{output}` the task's output directory under the project, `{target}` one of the task's targets. |
+| `toolchain.also` | Further checks with the same members, such as the Dart SDK a Flutter SDK bundles or the Bundler beside Ruby, run with the selected toolchain. An entry without `check` takes the first check's. |
+| `inputs.<set>` | Named sets of file patterns. A plain pattern is relative to the project directory; `{root}/` makes it relative to the stack root, the directory of the build that holds the component (the Cargo workspace, the Gradle settings); a pattern that starts with `!` leaves its files out of the task's inputs, such as a file the build tool writes under a directory the task reads or `!vendor/**` beside `**/*.rb`, never `putnami.json` or a toolchain file. A stack-root exclusion, `!{root}/pattern`, reaches the manifest's workspace input with the other stack-root patterns. |
+| `tasks.<task>.steps` | The commands the task runs in order, each an argument vector run in the directory `dir` names, with no shell. `{root}` is the stack root, `{component}` the build's name for the component (`Component.Ref`, or its name), `{output}` the task's output directory under the project, `{target}` one of the task's targets. |
 | `tasks.<task>.inputs` | The input sets the task reads. `lint` reads fewer than `test`: a lockfile change does not rerun it. |
 | `tasks.<task>.reportSteps` | Steps that run after the task's steps whatever their outcome, such as a converter that writes the JUnit report a failing test runner leaves to it, so the failed cases name the failure. They name no `{target}`. |
 | `tasks.<task>.reports` | The JUnit and coverage reports the task reads back, with the coverage format. The core copies each into `{output}` as soon as the task ends. `when` and `optional` say when a report is expected. |
@@ -165,7 +165,28 @@ The Rust reference profile:
 | `tasks.<task>.dir` | Where the steps run: `project`, the default, or `root`, the stack root, for a tool that resolves its addresses from there. |
 | `delegated` | `true` for a stack whose build tool keeps its own cache; see [Delegated stacks](#delegated-stacks). An override cannot change it. |
 
-The toolchain files are inputs of every task, whatever its input sets.
+The toolchain files are inputs of every task, whatever its input sets. Every
+task names at least one input set.
+
+### A profile adapts to each component
+
+A Ruby component tests with RSpec, with Minitest, or not at all: the Ruby
+detector names its variant, `rspec`, `minitest` or `untested`, as Java's
+names a build. In a variant or an override, `null` removes a member, such as
+a task, which then passes with nothing to run
+([ADR 0009](adr/0009-a-profile-adapts-to-each-component.md)).
+
+A task with `dir` set to `root` runs its steps at the stack root: a packwerk
+pack's specs load the application's `.rspec` and `spec_helper`, and run from
+the directory of the `Gemfile`, with the pack's directory as an argument.
+One coverage report at that root then holds every file the run loaded, and
+the attribution counts only the component's own: it reads a relative path
+under a source root the report states, else under the directory the steps
+ran in, the project directory when only the project holds the file. A
+stack whose every directory holding a marker is a component, such as Ruby,
+sets `Stack.IsComponent`, so the attribution asks it instead of running the
+detector, which may read the whole repository, for each such directory a
+report reaches.
 
 ### Targets
 
@@ -225,8 +246,9 @@ and the probe reports the other with `stacks.component_conflict`.
 ### A project overrides any value
 
 A project overrides its profile in its `putnami.json`, under its stack
-extension's option namespace. An override replaces the value at its path
-whole; it never merges into an array.
+extension's option namespace. An object merges, `null` removes the value at
+its path, and any other value replaces it whole; an override never merges
+into an array.
 
 ```json
 {
@@ -337,7 +359,7 @@ the task reads the version on the machine with `toolchain.command`:
   warning;
 - the command is missing: the task fails with `stacks.toolchain_missing`.
 
-An extension may pin its toolchain, as `@putnami/php` does
+An extension may pin its toolchain, as `@putnami/php` and `@putnami/ruby` do
 ([ADR 0003](adr/0003-a-stack-extension-may-provide-its-toolchain.md)). The
 profile's `toolchain.provisioned` names the environment variable that holds
 the pinned toolchain. When the toolchain on `PATH` is missing, or fails the
@@ -386,6 +408,11 @@ expected version for any check gets `stacks.toolchain_unpinned`, a warning: its 
 no toolchain version, and two machines with two versions share entries. A
 Rust channel name such as `stable` is neither a version nor a range, and gets
 the same warning.
+
+A further check, such as the Bundler beside Ruby, is read with the selected
+toolchain: a pinned Ruby's own `bundle`. The probe records its expected
+version under `toolchains` in the project metadata, in the order of
+`toolchain.also`, so it reaches the key too.
 
 ## Reports
 

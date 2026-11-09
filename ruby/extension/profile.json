@@ -1,0 +1,216 @@
+{
+  "id": "ruby",
+  "markers": [
+    "Gemfile",
+    "package.yml",
+    "*.gemspec"
+  ],
+  "toolchain": {
+    "command": [
+      "ruby",
+      "--version"
+    ],
+    "pattern": "^ruby (?<version>[0-9]+\\.[0-9]+\\.[0-9]+)",
+    "files": [
+      {
+        "path": ".ruby-version",
+        "pattern": "^\\s*(?:ruby-)?(?<version>[^\\s#]+)"
+      },
+      {
+        "path": ".tool-versions",
+        "pattern": "(?m)^ruby\\s+(?<version>\\S+)"
+      }
+    ],
+    "provisioned": "PUTNAMI_RUBY_EXECUTABLE",
+    "also": [
+      {
+        "command": [
+          "bundle",
+          "--version"
+        ],
+        "pattern": "(?<version>[0-9]+\\.[0-9]+\\.[0-9]+(?:\\.[0-9A-Za-z]+)*)",
+        "check": "warn",
+        "files": [
+          {
+            "path": "Gemfile.lock",
+            "pattern": "(?m)^BUNDLED WITH\\r?\\n\\s+(?<version>\\S+)"
+          }
+        ]
+      }
+    ]
+  },
+  "inputs": {
+    "ruby": [
+      "**/*.rb",
+      "**/*.arb",
+      "**/*.axlsx",
+      "**/*.builder",
+      "**/*.fcgi",
+      "**/*.gemfile",
+      "**/*.gemspec",
+      "**/*.god",
+      "**/*.jb",
+      "**/*.jbuilder",
+      "**/*.mspec",
+      "**/*.opal",
+      "**/*.pluginspec",
+      "**/*.podspec",
+      "**/*.rabl",
+      "**/*.rake",
+      "**/*.rbuild",
+      "**/*.rbw",
+      "**/*.rbx",
+      "**/*.ru",
+      "**/*.ruby",
+      "**/*.schema",
+      "**/*.spec",
+      "**/*.thor",
+      "**/*.watchr",
+      "**/.irbrc",
+      "**/.pryrc",
+      "**/.simplecov",
+      "**/buildfile",
+      "**/Appraisals",
+      "**/Berksfile",
+      "**/Brewfile",
+      "**/Buildfile",
+      "**/Capfile",
+      "**/Cheffile",
+      "**/Dangerfile",
+      "**/Deliverfile",
+      "**/Fastfile",
+      "**/*Fastfile",
+      "**/Gemfile",
+      "**/Guardfile",
+      "**/Jarfile",
+      "**/Mavenfile",
+      "**/Podfile",
+      "**/Puppetfile",
+      "**/Rakefile",
+      "**/rakefile",
+      "**/Snapfile",
+      "**/Steepfile",
+      "**/Thorfile",
+      "**/Vagabondfile",
+      "**/Vagrantfile",
+      "bin/*",
+      "exe/*",
+      "!vendor/**",
+      "!node_modules/**",
+      "!tmp/**"
+    ],
+    "rubocop": [
+      "**/.rubocop*.yml",
+      "{root}/.rubocop.yml",
+      "{root}/.rubocop_todo.yml",
+      "!vendor/**",
+      "!node_modules/**",
+      "!tmp/**"
+    ],
+    "component": [
+      "**",
+      "!vendor/**",
+      "!node_modules/**",
+      "!tmp/**",
+      "!log/**",
+      "!coverage/**",
+      "!storage/**",
+      "!.bundle/**",
+      "!.gen/**",
+      "!db/*.sqlite3*",
+      "!public/assets/**",
+      "!public/packs/**",
+      "!.rspec_status",
+      "!spec/examples.txt"
+    ],
+    "boot": [
+      "{root}/Gemfile",
+      "{root}/.rspec",
+      "{root}/.simplecov",
+      "{root}/app/**",
+      "{root}/lib/**",
+      "{root}/config/**",
+      "{root}/db/**/*.rb",
+      "{root}/db/**/*.sql",
+      "{root}/spec/**",
+      "{root}/test/**",
+      "!{root}/spec/examples.txt",
+      "!{root}/spec/reports/**",
+      "!{root}/test/reports/**"
+    ]
+  },
+  "tasks": {
+    "lint": {
+      "steps": [
+        [
+          "bundle",
+          "exec",
+          "rubocop"
+        ]
+      ],
+      "inputs": [
+        "ruby",
+        "rubocop"
+      ]
+    },
+    "test": {
+      "dir": "root",
+      "steps": [
+        [
+          "bundle",
+          "exec",
+          "rspec",
+          "{project}/spec",
+          "--format",
+          "progress",
+          "--format",
+          "RspecJunitFormatter",
+          "--out",
+          "{output}/junit.xml"
+        ]
+      ],
+      "inputs": [
+        "component",
+        "boot"
+      ],
+      "reports": {
+        "junit": [
+          "{output}/junit.xml"
+        ],
+        "coverage": [
+          {
+            "format": "cobertura",
+            "paths": [
+              "{root}/coverage/coverage.xml"
+            ]
+          }
+        ]
+      }
+    }
+  },
+  "variants": {
+    "rspec": {},
+    "minitest": {
+      "tasks": {
+        "test": {
+          "steps": [
+            [
+              "bundle",
+              "exec",
+              "rails",
+              "test",
+              "{project}/test",
+              "--junit",
+              "--junit-filename={output}/junit.xml"
+            ]
+          ]
+        }
+      }
+    },
+    "untested": {
+      "tasks": {
+        "test": null
+      }
+    }
+  }
+}

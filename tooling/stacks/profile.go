@@ -59,7 +59,9 @@ type Profile struct {
 	Markers []string `json:"markers"`
 	// Toolchain is how the version on the machine is read and compared.
 	Toolchain Toolchain `json:"toolchain"`
-	// Inputs are named sets of file patterns the tasks read.
+	// Inputs are named sets of file patterns the tasks read. A pattern
+	// written "!pattern" or "!{root}/pattern" leaves the files it matches
+	// out of every task that reads the set.
 	Inputs map[string][]string `json:"inputs"`
 	// Excludes are directory names an input pattern with "**" never walks
 	// into: the build outputs and dependency checkouts beside the sources.
@@ -148,12 +150,16 @@ type VersionFile struct {
 	// .yaml or .yml file, a YAML mapping key ("environment.sdk"). Without it,
 	// the file's first non-empty line is the version.
 	Key string `json:"key,omitempty"`
+	// Pattern is a regular expression matched against the file's content;
+	// its "version" group is the version. Without a key or a pattern, the
+	// file's first non-empty line is the version.
+	Pattern string `json:"pattern,omitempty"`
 }
 
 // Task is one task of a profile.
 type Task struct {
-	// Steps are the argument vectors the task runs in order, in the project
-	// directory, with no shell.
+	// Steps are the argument vectors the task runs in order, in the
+	// directory Dir names, with no shell.
 	Steps [][]string `json:"steps"`
 	// Inputs name the input sets the task reads.
 	Inputs []string `json:"inputs"`
@@ -235,6 +241,9 @@ func Decode(data []byte) (Profile, error) {
 	if err := p.Validate(); err != nil {
 		return Profile{}, err
 	}
+	if len(p.Tasks) == 0 && len(p.Variants) == 0 {
+		return Profile{}, errors.New("tasks: a profile declares at least one task")
+	}
 	return p, nil
 }
 
@@ -303,7 +312,7 @@ func (p Profile) Validate() error {
 		for i, pattern := range patterns {
 			var err error
 			if excluded, ok := strings.CutPrefix(pattern, "!"); ok {
-				err = validatePattern(excluded, false)
+				err = validatePattern(excluded, true)
 			} else {
 				err = validatePattern(pattern, true)
 			}
@@ -311,9 +320,6 @@ func (p Profile) Validate() error {
 				return fmt.Errorf("inputs.%s[%d]: %w", name, i, err)
 			}
 		}
-	}
-	if len(p.Tasks) == 0 && len(p.Variants) == 0 {
-		return errors.New("tasks: a profile declares at least one task")
 	}
 	for name, task := range p.Tasks {
 		if !slices.Contains(TaskNames, name) {
@@ -378,6 +384,18 @@ func (t Toolchain) validate() error {
 		if f.Path == "" || strings.Contains(f.Path, "/") {
 			return fmt.Errorf("files[%d].path: %q is not a file name", i, f.Path)
 		}
+		if f.Pattern != "" {
+			if f.Key != "" {
+				return fmt.Errorf("files[%d]: a version file names a key or a pattern, not both", i)
+			}
+			re, err := regexp.Compile(f.Pattern)
+			if err != nil {
+				return fmt.Errorf("files[%d].pattern: %w", i, err)
+			}
+			if re.SubexpIndex("version") < 0 {
+				return fmt.Errorf("files[%d].pattern: the pattern has no (?<version>…) group", i)
+			}
+		}
 	}
 	switch t.Check {
 	case "", CheckFail, CheckWarn:
@@ -412,6 +430,9 @@ func (t Task) validate(sets map[string][]string) error {
 		if err := validateSteps("withoutCoverage.steps", w.Steps); err != nil {
 			return err
 		}
+	}
+	if len(t.Inputs) == 0 {
+		return errors.New("inputs: a task names at least one input set")
 	}
 	switch t.Dir {
 	case "", DirProject, DirRoot:
@@ -631,9 +652,9 @@ func validateReportPath(p string) error {
 
 // Resolve applies a project's override to the profile. The override is a JSON
 // object with the profile's shape and every member optional: an object member
-// merges, any other value replaces the value at its path whole. An override
-// that names a member the profile schema does not know, or that changes id,
-// markers or delegated, fails.
+// merges, null removes the value at its path, such as a task, and any other
+// value replaces it whole. An override that names a member the profile schema
+// does not know, or that changes id, markers or delegated, fails.
 func (p Profile) Resolve(override json.RawMessage) (Profile, error) {
 	return p.merge(override, "override")
 }
@@ -769,8 +790,14 @@ func dropStaleFallbacks(merged, over map[string]any) {
 	}
 }
 
+// mergeInto merges src into dst: an object merges, null removes the member,
+// any other value replaces it.
 func mergeInto(dst, src map[string]any) {
 	for k, v := range src {
+		if v == nil {
+			delete(dst, k)
+			continue
+		}
 		if sv, ok := v.(map[string]any); ok {
 			if dv, ok := dst[k].(map[string]any); ok {
 				mergeInto(dv, sv)
@@ -784,16 +811,21 @@ func mergeInto(dst, src map[string]any) {
 // TaskPatterns splits the input patterns of a task: the patterns relative to
 // the project directory, and those relative to the stack root, without their
 // "{root}/" prefix. Each list holds the task's input sets, in the order it
-// names them, then the toolchain files. A task the profile does not declare
-// reads nothing.
+// names them, then the version files of every toolchain check. A project
+// exclusion is left to TaskExcludes; a stack-root exclusion "!{root}/p" is in
+// the root list as "!p", which the manifest's workspace input carries. A task
+// the profile does not declare reads the version files alone, so an override
+// that adds it keeps the same stack-root inputs.
 func (p Profile) TaskPatterns(task string) (project, root []string) {
-	t, ok := p.Tasks[task]
-	if !ok {
+	if !slices.Contains(TaskNames, task) {
 		return nil, nil
 	}
-	for _, set := range t.Inputs {
+	for _, set := range p.Tasks[task].Inputs {
 		for _, pattern := range p.Inputs[set] {
-			if strings.HasPrefix(pattern, "!") {
+			if excluded, ok := strings.CutPrefix(pattern, "!"); ok {
+				if rest, ok := strings.CutPrefix(excluded, "{root}/"); ok {
+					root = appendNew(root, "!"+rest)
+				}
 				continue
 			}
 			if rest, ok := strings.CutPrefix(pattern, "{root}/"); ok {
@@ -817,7 +849,7 @@ func (p Profile) TaskExcludes(task string) []string {
 	var out []string
 	for _, set := range p.Tasks[task].Inputs {
 		for _, pattern := range p.Inputs[set] {
-			if excluded, ok := strings.CutPrefix(pattern, "!"); ok {
+			if excluded, ok := strings.CutPrefix(pattern, "!"); ok && !strings.HasPrefix(excluded, "{root}/") {
 				out = appendNew(out, excluded)
 			}
 		}

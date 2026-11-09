@@ -155,7 +155,7 @@ func ReadReports(r *Reports, paths func(pattern string) ([]string, error), proje
 				s.Coverage = &readers.Counts{}
 			}
 			for _, fc := range report.Files {
-				switch owner(attr.File, fc.Path) {
+				switch owner(attr.File, underSource(fc.Path, report.Sources)) {
 				case OwnerOther:
 					s.OtherFiles++
 					continue
@@ -193,6 +193,26 @@ func named(names []string) string {
 		return strings.Join(names, ", ")
 	}
 	return fmt.Sprintf("%s and %d more", strings.Join(names[:maxNamed], ", "), len(names)-maxNamed)
+}
+
+// underSource is a covered file's path joined to the first source root the
+// report states under which the file exists, such as SimpleCov's root in a
+// Cobertura report; else the path as the report states it.
+func underSource(p string, sources []string) string {
+	if filepath.IsAbs(filepath.FromSlash(p)) {
+		return p
+	}
+	for _, src := range sources {
+		base := filepath.FromSlash(src)
+		if !filepath.IsAbs(base) {
+			continue
+		}
+		candidate := filepath.Join(base, filepath.FromSlash(p))
+		if isRegular(candidate) {
+			return filepath.ToSlash(candidate)
+		}
+	}
+	return p
 }
 
 func expandAll(patterns []string, paths func(string) ([]string, error)) ([]string, error) {

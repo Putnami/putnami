@@ -1,0 +1,285 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-features.json",
+  "protocolVersion": 2,
+  "namespace": "ruby",
+  "features": [
+    {
+      "id": "ruby/stack-extension",
+      "type": "feature",
+      "name": "Run the components of a Ruby or Rails repository as Putnami tasks",
+      "outcome": "A team with a Ruby or Rails repository adds @putnami/ruby and runs its packs and local gems with Putnami's runner and cache, without rewriting its build: each component is a project, lint runs RuboCop and test RSpec or Minitest after a bundle install, with a pinned Ruby when the machine has none that fits, serve and run start an application, package and publish produce its image, and a component overrides any profile value in its putnami.json",
+      "owner": "ruby",
+      "target": "coded",
+      "requirements": [
+        {
+          "id": "components-become-projects",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-application-packs-and-gems-become-projects-with-their-edges"
+            ]
+          }
+        },
+        {
+          "id": "tasks-run-the-profile",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-task-runs-the-profile-steps-after-the-ruby-and-bundler-checks"
+            ]
+          }
+        },
+        {
+          "id": "test-runner-per-component",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-component-runs-rspec-or-rails-test-by-its-test-files"
+            ]
+          }
+        },
+        {
+          "id": "reports-become-the-summary",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "junit-and-cobertura-become-the-component-summary"
+            ]
+          }
+        },
+        {
+          "id": "lint-reads-the-ruby-files",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-test-only-change-keeps-the-lint-inputs"
+            ]
+          }
+        },
+        {
+          "id": "overrides-are-honored",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-putnami-json-override-changes-the-steps-and-the-inputs"
+            ]
+          }
+        },
+        {
+          "id": "manifest-follows-the-profile",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-manifest-conforms-to-the-stack-core"
+            ]
+          }
+        },
+        {
+          "id": "installs-its-bundle",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-install-step-installs-the-bundle-of-each-stack-root",
+              "the-install-step-installs-again-when-the-bundler-differs-from-the-lock"
+            ]
+          }
+        },
+        {
+          "id": "workspace-install-runs-bundler",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "workspace-install-installs-each-stack-root-the-workspace-includes",
+              "workspace-install-force-installs-a-root-whose-bundle-is-complete",
+              "workspace-install-installs-again-when-the-bundler-differs-from-the-lock",
+              "an-offline-workspace-install-installs-from-the-gem-cache"
+            ]
+          }
+        },
+        {
+          "id": "upgrades-the-dependencies",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "deps-upgrade-runs-bundle-update"
+            ]
+          }
+        },
+        {
+          "id": "checks-documentation-links",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "lint-fails-on-a-broken-documentation-link-unless-docs-links-is-off"
+            ]
+          }
+        },
+        {
+          "id": "filters-the-tests",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "test-passes-the-filter-to-rspec-or-rails-test-and-keys-the-task-on-it"
+            ]
+          }
+        },
+        {
+          "id": "pins-a-ruby-release",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-extension-pins-a-ruby-release-the-repository-accepts",
+              "every-shipped-archive-has-a-url-and-a-sha-256"
+            ]
+          }
+        },
+        {
+          "id": "machine-ruby-comes-first",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-task-uses-the-provisioned-ruby-only-when-the-machine-ruby-is-unusable"
+            ]
+          }
+        },
+        {
+          "id": "fetches-the-locked-gems",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "workspace-fetch-downloads-the-locked-gems-and-runs-none-of-their-code"
+            ]
+          }
+        },
+        {
+          "id": "serves-an-application",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "serve-runs-rails-server-or-rackup-on-an-application"
+            ]
+          }
+        },
+        {
+          "id": "runs-an-application-once",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "run-forwards-the-exit-code-of-the-entrypoint"
+            ]
+          }
+        },
+        {
+          "id": "packages-an-application-image",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "package-assembles-an-image-of-an-application-and-its-production-bundle",
+              "a-static-ruby-builds-extensions-the-images-ruby-finds",
+              "the-base-is-the-official-ruby-slim-image-or-a-digest-pinned-base",
+              "packaging-the-same-tree-twice-gives-the-same-image"
+            ]
+          }
+        },
+        {
+          "id": "refuses-a-foreign-packaging-host",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "package-refuses-a-host-that-cannot-build-the-images-native-extensions"
+            ]
+          }
+        },
+        {
+          "id": "publishes-an-application-image",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "publish-pushes-the-application-image"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

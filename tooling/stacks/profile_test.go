@@ -59,7 +59,8 @@ func TestDecodeRefusesWhatTheSchemaDoesNotName(t *testing.T) {
 		"escaping pattern":  strings.Replace(sampleProfile, `"src/**"`, `"../src/**"`, 1),
 		"recursive report":  strings.Replace(sampleProfile, `"{root}/target/junit.xml"`, `"{root}/**/junit.xml"`, 1),
 		"wildcard report":   strings.Replace(sampleProfile, `"{root}/target/junit.xml"`, `"{root}/*/junit.xml"`, 1),
-		"negated root":      strings.Replace(sampleProfile, `"src/**"`, `"!{root}/src/gen/**"`, 1),
+		"negated root":      strings.Replace(sampleProfile, `"src/**"`, `"src/**", "!{root}/../target/**"`, 1),
+		"negated escape":    strings.Replace(sampleProfile, `"src/**"`, `"src/**", "!../gen/**"`, 1),
 		"coverage format":   strings.Replace(sampleProfile, `"lcov"`, `"gcov"`, 1),
 		"bad check":         strings.Replace(sampleProfile, `"command": ["rustc"`, `"check": "ignore", "command": ["rustc"`, 1),
 		"bad provisioned":   strings.Replace(sampleProfile, `"command": ["rustc"`, `"provisioned": "not a name", "command": ["rustc"`, 1),
@@ -137,8 +138,14 @@ func TestTaskPatternsSplitProjectAndRootPatterns(t *testing.T) {
 	if _, root := p.TaskPatterns(TaskTest); !slices.Contains(root, "Cargo.lock") {
 		t.Errorf("test reads the lockfile: %v", root)
 	}
-	if project, root := p.TaskPatterns(TaskBuild); project != nil || root != nil {
-		t.Errorf("an undeclared task reads nothing: %v %v", project, root)
+	if want := []string{"rust-toolchain.toml", "rust-toolchain"}; true {
+		project, root := p.TaskPatterns(TaskBuild)
+		if !reflect.DeepEqual(project, want) || !reflect.DeepEqual(root, want) {
+			t.Errorf("an undeclared task reads the version files alone: %v %v", project, root)
+		}
+	}
+	if project, root := p.TaskPatterns("fmt"); project != nil || root != nil {
+		t.Errorf("no task reads nothing: %v %v", project, root)
 	}
 	if want := []string{"Cargo.lock", "Cargo.toml", "rust-toolchain", "rust-toolchain.toml"}; !reflect.DeepEqual(p.RootPatterns(), want) {
 		t.Errorf("RootPatterns = %v", p.RootPatterns())

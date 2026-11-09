@@ -77,6 +77,11 @@ type Stack struct {
 	// ComponentKey is a component name as the stack compares two of them.
 	// Nil compares names as they are.
 	ComponentKey func(name string) string
+	// IsComponent reports whether a workspace-relative directory that holds
+	// one of the profile's markers is a component, without the detector. Nil
+	// asks the detector, which may read the whole repository. The coverage
+	// attribution asks it for each such directory a report's files lie in.
+	IsComponent func(root, dir string) bool
 	// Provide installs the toolchain of the component's resolved profile when
 	// the one on PATH is missing or outside the versions its files state, or
 	// returns the one an earlier call installed. expected holds the version
@@ -203,7 +208,7 @@ func (s Stack) Probe(root string, request wsproto.ProbeRequest) (wsproto.ProbeRe
 			watched = appendNew(watched, joinRel(c.Path, f.Path))
 		}
 		for _, f := range rootFiles {
-			if !strings.ContainsAny(f, "*?[") {
+			if !strings.ContainsAny(f, "*?[!") {
 				watched = appendNew(watched, joinRel(c.Root, f))
 			}
 		}
@@ -351,6 +356,9 @@ func (s Stack) Resolved(projectAbs, variant string) (Profile, error) {
 	}
 	p, err := base.Resolve(override)
 	if err != nil {
+		if variant != "" {
+			return Profile{}, fmt.Errorf("%s options[%q], applied after the variant %s: %w", ProjectConfigFile, s.Extension, variant, err)
+		}
 		return Profile{}, fmt.Errorf("%s options[%q]: %w", ProjectConfigFile, s.Extension, err)
 	}
 	// A stack-root pattern reaches the key only through the manifest's
@@ -432,13 +440,17 @@ func (s Stack) answer(root string, q wsproto.InputResolveQuery, c found) wsproto
 	// own directory; for one under the workspace root's build they are the
 	// manifest's workspace input, and for one under a nested root the edge
 	// to that root's project carries them.
+	excludes, kept := p.TaskExcludes(task), p.KeptInputs()
 	if c.ownRoot {
 		for _, r := range rootPatterns {
-			patterns = appendNew(patterns, r)
+			if excluded, ok := strings.CutPrefix(r, "!"); ok {
+				excludes = appendNew(excludes, excluded)
+			} else {
+				patterns = appendNew(patterns, r)
+			}
 		}
 	}
 	patterns = appendNew(patterns, ProjectConfigFile)
-	excludes, kept := p.TaskExcludes(task), p.KeptInputs()
 	var files []string
 	for _, pattern := range patterns {
 		matches, err := globFiles(projectAbs, pattern, p.Excludes...)
@@ -457,15 +469,26 @@ func (s Stack) answer(root string, q wsproto.InputResolveQuery, c found) wsproto
 	}
 	// The basis leaves the skipped directories out, and its exclusions name
 	// any entry of that name: a .git file at a worktree's root, a linked
-	// Pods. The answer lists only what its basis selects.
-	basis := basisSet(patterns, p.Excludes)
-	files = slices.DeleteFunc(files, func(f string) bool { return !wsproto.SelectsPath(f, basis) })
+	// Pods. It carries the input sets' exclusions too, so a write under an
+	// excluded directory, such as the report a run writes, does not move its
+	// digest; the files no exclusion leaves out then have a set of their own.
+	// The answer lists only what its basis selects.
+	basis := [][]string{slices.Clone(basisSet(patterns, p.Excludes))}
+	if len(excludes) > 0 {
+		for _, e := range excludes {
+			basis[0] = append(basis[0], "!"+e)
+		}
+		basis = append(basis, kept)
+	}
+	files = slices.DeleteFunc(files, func(f string) bool {
+		return !slices.ContainsFunc(basis, func(set []string) bool { return wsproto.SelectsPath(f, set) })
+	})
 	slices.Sort(files)
 	return wsproto.InputResolveAnswer{
 		Project:  q.Project,
 		Selector: q.Selector,
 		Files:    files,
-		Basis:    wsproto.InputBasis{Content: [][]string{basis}},
+		Basis:    wsproto.InputBasis{Content: basis},
 	}
 }
 
