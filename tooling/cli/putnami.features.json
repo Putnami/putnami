@@ -4464,6 +4464,50 @@
               "a-change-to-one-bazel-package-runs-it-and-its-dependents-through-bazel-uncached"
             ]
           }
+        },
+        {
+          "id": "init-from-nx",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "init-from-nx-declares-the-nx-extension-records-the-mode-and-syncs"
+            ]
+          }
+        },
+        {
+          "id": "init-asks-the-mode",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "init-from-asks-the-mode-with-import-preselected"
+            ]
+          }
+        },
+        {
+          "id": "init-rerun-shows-a-diff",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "init-from-rerun-previews-and-writes-only-with-apply"
+            ]
+          }
+        },
+        {
+          "id": "nx-impact-runs-through-nx",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-change-to-one-nx-project-runs-it-and-its-dependents-through-nx-uncached"
+            ]
+          }
         }
       ]
     }

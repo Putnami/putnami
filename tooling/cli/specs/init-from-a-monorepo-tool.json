@@ -5,11 +5,13 @@
   "outcomes": [
     "A team turns a repository its monorepo tool already describes into a Putnami workspace with one command",
     "After a change to one package of an adopted Pants repository, putnami test runs that package and its dependents through Pants, and Putnami's cache stores nothing",
-    "After a change to one package of an adopted Bazel workspace, putnami test runs that package and its dependents through Bazel, and Putnami's cache stores nothing"
+    "After a change to one package of an adopted Bazel workspace, putnami test runs that package and its dependents through Bazel, and Putnami's cache stores nothing",
+    "A team adopts a Nx repository in the mode it picks: import, where Putnami's runner and cache take over, or delegate, where Nx and its cache keep running each target"
   ],
   "nonGoals": [
     "Reading a monorepo tool's configuration in the CLI: the tool's stack extension owns it",
-    "Rewriting the repository's build files"
+    "Rewriting the repository's build files",
+    "Choosing between import and delegate for the team: the mode is asked, given with --mode, or import without a terminal"
   ],
   "requirements": [
     {
@@ -27,6 +29,22 @@
     {
       "id": "bazel-impact-runs-through-bazel",
       "text": "On the Bazel fixture of the putnami observe detector, with @putnami/bazel and bazel on PATH, projects sync writes each package's edges. putnami test --impacted runs bazel coverage at the workspace root on each changed package and each package that depends on it, never on one it depends on; a MODULE.bazel change runs every package. It reads their reports and neither looks up nor stores a Putnami cache entry."
+    },
+    {
+      "id": "init-from-nx",
+      "text": "putnami init --from nx, at the root of a repository that holds nx.json, writes a workspace that declares @putnami/nx, records the mode in its options, also declares @putnami/typescript in import mode, installs them and runs putnami projects sync, which writes each Nx project's putnami.json through the extension's sync task. Without nx.json it fails with a usage error that names the file."
+    },
+    {
+      "id": "init-asks-the-mode",
+      "text": "For a tool that offers both modes, putnami init --from <tool> asks import or delegate in a terminal, with import preselected, and imports without a terminal. --mode import|delegate skips the question; a value the tool does not offer, Pants offering delegate alone, fails with a usage error that lists its modes, and --mode without --from is a usage error."
+    },
+    {
+      "id": "init-rerun-shows-a-diff",
+      "text": "Rerun in a workspace that already exists, putnami init --from <tool> runs the workspace sync tasks as a dry run with the mode it resolves, prints what each would change and the mode change, and writes nothing. With --apply it records the mode and runs putnami projects sync."
+    },
+    {
+      "id": "nx-impact-runs-through-nx",
+      "text": "On the Nx fixture of the putnami observe detector, after putnami init --from nx --mode delegate --apply with a stub nx on PATH, putnami test after a change to one project runs nx run <project>:test at the workspace root on that project and each project that depends on it, never on one it depends on, stores no Putnami cache entry and records delegatedTo nx."
     }
   ],
   "decisions": [

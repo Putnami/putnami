@@ -1,0 +1,121 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-features.json",
+  "protocolVersion": 2,
+  "namespace": "monorepo",
+  "features": [
+    {
+      "id": "monorepo/nx-adoption",
+      "type": "feature",
+      "name": "Adopt a Nx repository in import or delegate mode",
+      "outcome": "A team with a Nx repository reaches Putnami's runner and verdict in the mode it picks: import, where TypeScript targets become Putnami tasks with Putnami's cache, or delegate, where each task runs nx run on its project and Nx keeps its cache, local or Nx Cloud",
+      "owner": "tooling",
+      "target": "coded",
+      "requirements": [
+        {
+          "id": "projects-become-projects",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-projects-of-a-nx-workspace-become-projects-with-their-edges"
+            ]
+          }
+        },
+        {
+          "id": "sync-writes-the-project-graph",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-sync-writes-each-project-putnami-json-in-both-modes"
+            ]
+          }
+        },
+        {
+          "id": "import-maps-typescript-targets",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "import-maps-each-typescript-target-to-the-typescript-task"
+            ]
+          }
+        },
+        {
+          "id": "unmapped-targets-are-listed",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "an-unmapped-target-is-listed-with-its-reason"
+            ]
+          }
+        },
+        {
+          "id": "validate-fails-on-a-stale-graph",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-stale-project-graph-fails-validate"
+            ]
+          }
+        },
+        {
+          "id": "tasks-delegate-to-nx",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-task-runs-nx-run-on-its-project-and-records-the-delegation"
+            ]
+          }
+        },
+        {
+          "id": "reports-from-project-options",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-junit-and-coverage-files-the-project-names-become-the-summary"
+            ]
+          }
+        },
+        {
+          "id": "manifest-follows-the-profile",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-manifest-conforms-to-the-stack-core"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}
