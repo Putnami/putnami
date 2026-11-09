@@ -158,7 +158,7 @@ The Rust reference profile:
 | `inputs.<set>` | Named sets of file patterns. A plain pattern is relative to the project directory; `{root}/` makes it relative to the stack root, the directory of the build that holds the component (the Cargo workspace, the Gradle settings); a pattern that starts with `!` leaves its files out of the task's inputs, such as a file the build tool writes under a directory the task reads or `!vendor/**` beside `**/*.rb`, never `putnami.json` or a toolchain file. A stack-root exclusion, such as `!{root}/**/obj/**`, reaches the manifest's workspace input with the other stack-root patterns. |
 | `tasks.<task>.steps` | The commands the task runs in order, each an argument vector run in the directory `dir` names, with no shell. `{root}` is the stack root, `{component}` the build's name for the component (`Component.Ref`, or its name), `{manifest}` the absolute path of the manifest the detector read it from, `{output}` the task's output directory under the project, `{target}` one of the task's targets. |
 | `tasks.<task>.inputs` | The input sets the task reads. `lint` reads fewer than `test`: a lockfile change does not rerun it. |
-| `tasks.<task>.reportSteps` | Steps that run after the task's steps whatever their outcome, such as a converter that writes the JUnit report a failing test runner leaves to it, so the failed cases name the failure. They name no `{target}`. |
+| `tasks.<task>.reportSteps` | Steps that run after the task's steps whatever their outcome, such as a converter that writes the JUnit report a failing test runner leaves to it, so the failed cases name the failure. They name no `{target}`, and may name `{runtime}`. |
 | `tasks.<task>.reports` | The JUnit (`junit`) and TRX (`trx`) test reports and the coverage reports the task reads back, with the coverage format. The core copies each into `{output}` as soon as the task ends. `when` and `optional` say when a report is expected. |
 | `tasks.<task>.targets` | What a step that names `{target}` runs on, listed in the project directory when the task runs: a `name`, or one target per file an `each` pattern matches, named by its base name without extension; `when` lists paths that must all exist, `hosts` the systems (`linux`, `darwin`, `windows`) that build it. A step that names `{target}` runs once per target, and not at all when there is none; it needs the task to declare targets, and each target's paths are in the task's inputs. |
 | `tasks.<task>.artifacts` | The files the task copies into `{output}/artifacts` after its steps, so a cache hit restores them: patterns under the project or the stack root that may name `{component}`. The file a pattern with no wildcard names is removed before the steps, unless its path leads outside the project or the stack root or the inputs of one of the component's tasks select it, so only what the steps write is copied. A pattern with a wildcard is only copied, and copies whatever it matches, a file an earlier build left included. A component name that is no single path segment keeps no artifact. A pattern that matches nothing copies nothing. |
@@ -490,8 +490,17 @@ affected component instead of importing its targets
   components it depends on.
 - A detector may answer a candidate directory as bare: a member named by its
   directory, with no extension, that runs no task.
+- The package graph is the tool's: `GraphSync` writes each package's
+  `putnami.json` from the tool's export (the extension, the edges as project
+  IDs, the files that select it as `filePatterns`, and `test` in
+  `disable.jobs` without a test target), and retracts a former package.
+  `GraphJobs` runs it as the workspace sync task, and as a validate task that
+  fails with `<tool>.sync_stale` when a sync would change a file.
+- A report step may name `{runtime}`: a tool whose outputs it caches, such as
+  Bazel's test logs, keeps them, and the extension's runtime copies the run's
+  reports into `{output}`, which the core never reads from another run.
 
-`@putnami/pants` is the first delegated stack.
+`@putnami/pants` and `@putnami/bazel` are the delegated stacks.
 
 ## What stays out
 
