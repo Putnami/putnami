@@ -1,11 +1,11 @@
 # Repository adoption matrix
 
-This repository maps **105 of its 186 projects** to **10 architecture domains**.
-The other **81 are excluded on purpose**: 41 samples, 7 templates, 2 template
+This repository maps **105 of its 187 projects** to **10 architecture domains**.
+The other **82 are excluded on purpose**: 42 samples, 7 templates, 2 template
 proofs, 2 protocol proofs, the standalone area detector, the 2 Cloud runtime
 destinations, the Cloud CLI extension with its 14 generated clients, the new
 development verb vocabulary, the new evidence report readers, and the new
-stack core with its first eight stack extensions. Every one of the 186 appears
+stack core with its first eight stack extensions. Every one of the 187 appears
 in a table below, mapped or excluded, with a reason.
 
 The matrix exists so the adoption frontier is measurable instead of implied.
@@ -381,7 +381,7 @@ detectors need; the next stack extensions join the same section until then.
 | `/tooling/pants` | Delegated stack extension | `tooling` |
 | `/tooling/stacks` | Stack core | `tooling` |
 
-### Samples — 41 projects
+### Samples — 42 projects
 
 **Why excluded:** a sample is a *proof*. It exists to demonstrate that the public
 API works and to fail loudly in the end-to-end suite when it stops working. It
@@ -418,6 +418,7 @@ reviewed permissions.
 | `/php/samples/library` | PHP sample | `tooling` |
 | `/rust/samples/application` | Rust sample | `tooling` |
 | `/rust/samples/library` | Rust sample | `tooling` |
+| `/swift/samples/application` | Swift sample | `tooling` |
 | `/python/samples/application` | Python sample | `extension-providers` |
 | `/python/samples/library` | Python sample | `extension-providers` |
 | `/typescript/samples/01-hello-world` | TypeScript sample | `framework` |
