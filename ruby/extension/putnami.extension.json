@@ -562,6 +562,9 @@
       "description": "Run bundle cache with no install, a frozen lockfile, a private install path and a private local configuration, which leaves the locked gems in the extension's gem cache and writes nothing in the repository.",
       "kind": "command",
       "command": "{extensionRuntime}",
+      "toolchains": [
+        "ruby"
+      ],
       "args": [
         "workspace-fetch"
       ],
@@ -624,6 +627,9 @@
       "description": "Run bundle exec rails server, or bundle exec rackup for an application without bin/rails, on 0.0.0.0 and the port flag in the application directory until the user stops it.",
       "kind": "command",
       "command": "{extensionRuntime}",
+      "toolchains": [
+        "ruby"
+      ],
       "args": [
         "serve"
       ],
@@ -641,6 +647,9 @@
       "description": "Run bundle exec ruby with the entrypoint in the application directory and forward its exit code.",
       "kind": "command",
       "command": "{extensionRuntime}",
+      "toolchains": [
+        "ruby"
+      ],
       "args": [
         "run"
       ],
@@ -659,6 +668,9 @@
       "description": "Assemble a local OCI image of an application from its production bundle, installed on this Linux host, and its files, on a digest-pinned official Ruby slim base. Sole owner of <command-output>/docker.",
       "kind": "command",
       "command": "{extensionRuntime}",
+      "toolchains": [
+        "ruby"
+      ],
       "args": [
         "package-docker"
       ],
