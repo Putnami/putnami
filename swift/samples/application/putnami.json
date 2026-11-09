@@ -1,0 +1,8 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-project.json",
+  "name": "swift-example-application",
+  "tags": ["sample", "swift", "e2e"],
+  "extensions": ["/swift/extension"],
+  "featureAuthority": { "owner": "swift/stack-extension" },
+  "options": { "package": { "docker": true } }
+}
