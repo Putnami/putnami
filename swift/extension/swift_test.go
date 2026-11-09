@@ -64,7 +64,12 @@ func fixture(t *testing.T) string {
 	if err != nil {
 		t.Fatal(err)
 	}
-	root := t.TempDir()
+	// The stub tools print their resolved working directory, so the root is
+	// resolved too: on macOS the temporary directory is a symlink.
+	root, err := filepath.EvalSymlinks(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
 	src := string(data)
 	marks := txtarFile.FindAllStringSubmatchIndex(src, -1)
 	for i, m := range marks {
