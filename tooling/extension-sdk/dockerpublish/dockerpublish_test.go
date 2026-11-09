@@ -715,6 +715,34 @@ func TestDockerRegistryFromRegistriesEntry(t *testing.T) {
 	}
 }
 
+// The CLI delivers a command flag in the job parameters, under its own name and
+// a camelCase alias, and never in the job arguments: a manifest task's arguments
+// are static. `putnami publish --docker --docker-registry <url>` runs the task
+// with `publish --docker`, so the flag wins from the parameters.
+func TestDockerRegistryFlagFromJobParameters(t *testing.T) {
+	spectest.Proves(t, "tooling/extension-authoring", "oci-publish-by-digest", "the-registry-flag-overrides-the-workspace-registry")
+	t.Setenv("DOCKER_REGISTRY", "registry.example.com/environment")
+	params := pctx.Params{
+		"docker":          json.RawMessage(`true`),
+		"docker-registry": json.RawMessage(`"localhost:15005/acme"`),
+		"dockerRegistry":  json.RawMessage(`"localhost:15005/acme"`),
+		"registries":      json.RawMessage(`{"oci":{"publish":"oci.putnami.dev/declared"}}`),
+	}
+	got, err := resolveDockerRegistry(cli.ParseFlags([]string{"publish", "--docker"}), &pctx.Context{Params: params})
+	if err != nil {
+		t.Fatalf("resolveDockerRegistry() error: %v", err)
+	}
+	if got != "localhost:15005/acme" {
+		t.Fatalf("resolveDockerRegistry() = %q, want the registry the flag names", got)
+	}
+
+	// An argument still ranks above the parameter.
+	got, err = resolveDockerRegistry(cli.ParseFlags([]string{"--docker-registry=registry.example.com/argument"}), &pctx.Context{Params: params})
+	if err != nil || got != "registry.example.com/argument" {
+		t.Fatalf("resolveDockerRegistry(argument and parameter) = (%q, %v), want the argument", got, err)
+	}
+}
+
 // eventString reads a string field of a runtime event.
 func eventString(t *testing.T, event map[string]any, key string) string {
 	t.Helper()

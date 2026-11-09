@@ -329,13 +329,13 @@ func Publish(ctx *pctx.Context, emit *jsonl.Emitter, args []string) (string, map
 // packaging parses its spec for local assembly but never reads DOCKER_REGISTRY
 // or performs output-registry work.
 //
-// The chain is: the `--docker-registry` argument, then the workspace's
+// The chain is: the `--docker-registry` flag, then the workspace's
 // `registries.oci` entry, then DOCKER_REGISTRY, then nothing — which the image
-// project branch resolves to the managed target. The registries entry is the
-// single declared source for an endpoint, so there is no publish-option spelling
-// of it to read from the parameter bag any more.
+// project branch resolves to the managed target. The flag comes from the job
+// arguments, else from the `docker-registry` job parameter, where the CLI
+// delivers a command flag. The camelCase `dockerRegistry` parameter is not read.
 func resolveDockerRegistry(flags map[string]string, ctx *pctx.Context) (string, error) {
-	if explicit := cli.FlagString(flags, "docker-registry", ""); explicit != "" {
+	if explicit := strings.TrimSpace(cli.FlagString(flags, "docker-registry", ctx.Params.String("docker-registry"))); explicit != "" {
 		return explicit, nil
 	}
 	declared, err := ociRegistryFromRegistries(ctx.Params)
