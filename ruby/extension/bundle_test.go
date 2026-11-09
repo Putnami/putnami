@@ -92,6 +92,48 @@ func TestWorkspaceInstallInstallsEachStackRootOnce(t *testing.T) {
 	}
 }
 
+func TestTheInstallStepInstallsAgainWhenTheBundlerDiffersFromTheLock(t *testing.T) {
+	spectest.Proves(t, feature, "installs-its-bundle", "the-install-step-installs-again-when-the-bundler-differs-from-the-lock")
+	spectest.Proves(t, feature, "workspace-install-runs-bundler", "workspace-install-installs-again-when-the-bundler-differs-from-the-lock")
+	root := fixture(t)
+	s := stack(t)
+	t.Setenv("STUB_BUNDLE_CHECK", "0")
+
+	// The fixture's Gemfile.lock states Bundler 2.5.22; 2.6.9 runs.
+	log := stubTools(t, "3.3.6", "2.6.9", 0)
+	if status, _, err := InstallJob(s)(componentContext(t, root, "packs/pricing", nil), jsonl.New(), nil); status != "OK" || err != nil {
+		t.Fatalf("install: %s %v", status, err)
+	}
+	if got := calls(t, log); !reflect.DeepEqual(got, []string{root + ": bundle install"}) {
+		t.Errorf("a complete bundle with another Bundler installs again: %q", got)
+	}
+
+	log = stubTools(t, "3.3.6", "2.6.9", 0)
+	if status, _, err := WorkspaceInstallJob(s)(workspaceContext(root, nil), jsonl.New(), nil); status != "OK" || err != nil {
+		t.Fatalf("workspace-install: %s %v", status, err)
+	}
+	if got := calls(t, log); !reflect.DeepEqual(got, []string{root + ": bundle install"}) {
+		t.Errorf("only the root whose lockfile states another Bundler installs again: %q", got)
+	}
+
+	log = stubTools(t, "3.3.6", "2.5.22", 0)
+	if status, _, err := InstallJob(s)(componentContext(t, root, "packs/pricing", nil), jsonl.New(), nil); status != "OK" || err != nil {
+		t.Fatalf("install: %s %v", status, err)
+	}
+	if got := calls(t, log); len(got) != 1 || got[0] != "" {
+		t.Errorf("a complete bundle with the locked Bundler installs nothing: %q", got)
+	}
+
+	log = stubTools(t, "3.3.6", "2.6.9", 0)
+	t.Setenv("PUTNAMI_OFFLINE_DEPENDENCIES", "1")
+	if status, _, err := InstallJob(s)(componentContext(t, root, "packs/pricing", nil), jsonl.New(), nil); status != "OK" || err != nil {
+		t.Fatalf("install: %s %v", status, err)
+	}
+	if got := calls(t, log); len(got) != 1 || got[0] != "" {
+		t.Errorf("offline, another Bundler alone installs nothing: %q", got)
+	}
+}
+
 func TestDepsUpgradeRunsBundleUpdate(t *testing.T) {
 	spectest.Proves(t, feature, "upgrades-the-dependencies", "deps-upgrade-runs-bundle-update")
 	root := fixture(t)

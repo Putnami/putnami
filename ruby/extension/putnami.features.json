@@ -111,7 +111,8 @@
           "verification": {
             "kind": "acceptance",
             "checks": [
-              "the-install-step-installs-the-bundle-of-each-stack-root"
+              "the-install-step-installs-the-bundle-of-each-stack-root",
+              "the-install-step-installs-again-when-the-bundler-differs-from-the-lock"
             ]
           }
         },
@@ -125,7 +126,8 @@
             "kind": "acceptance",
             "checks": [
               "workspace-install-installs-each-stack-root-the-workspace-includes",
-              "workspace-install-force-installs-a-root-whose-bundle-is-complete"
+              "workspace-install-force-installs-a-root-whose-bundle-is-complete",
+              "workspace-install-installs-again-when-the-bundler-differs-from-the-lock"
             ]
           }
         },

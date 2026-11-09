@@ -32,20 +32,23 @@ const (
 )
 
 // InstallJob is the job of a component's install step: bundle install at its
-// stack root when its bundle is incomplete.
+// stack root when its bundle is incomplete, or when the Bundler that runs is
+// not the one its Gemfile.lock states.
 func InstallJob(stack stacks.Stack) cli.JobFunc {
+	bundler := bundlerCheck(stack)
 	return stack.RootJob(func(ctx context.Context, root stacks.RootStep, emit *jsonl.Emitter) error {
-		return bundleInstall(ctx, root, emit, false)
+		return bundleInstall(ctx, root, emit, bundler, false)
 	})
 }
 
 // WorkspaceInstallJob runs bundle install at each stack root. The force flag
 // installs a root whose bundle check passes as well.
 func WorkspaceInstallJob(stack stacks.Stack) cli.JobFunc {
+	bundler := bundlerCheck(stack)
 	return func(ctx *pctx.Context, emit *jsonl.Emitter, args []string) (string, map[string]any, error) {
 		force := ctx.Params.Bool("force", false)
 		install := func(ctx context.Context, root stacks.RootStep, emit *jsonl.Emitter) error {
-			return bundleInstall(ctx, root, emit, force)
+			return bundleInstall(ctx, root, emit, bundler, force)
 		}
 		return stack.WorkspaceRootJob(stacks.WarnOnMissingToolchain, install)(ctx, emit, args)
 	}
@@ -57,15 +60,21 @@ func DepsUpgradeJob(stack stacks.Stack) cli.JobFunc {
 }
 
 // bundleInstall runs bundle install at the stack root, unless the root holds
-// no Gemfile or, without force, bundle check accepts its bundle. With offline
-// dependencies it installs from the gems already on the machine.
-func bundleInstall(ctx context.Context, root stacks.RootStep, emit *jsonl.Emitter, force bool) error {
+// no Gemfile or, without force, bundle check accepts its bundle and the
+// Bundler that runs is the locked one. bundle install installs the locked
+// Bundler and switches to it, so the next task runs that one. With offline
+// dependencies it installs from the gems already on the machine, and a
+// Bundler other than the locked one alone installs nothing.
+func bundleInstall(ctx context.Context, root stacks.RootStep, emit *jsonl.Emitter, bundler stacks.Toolchain, force bool) error {
 	if !hasGemfile(root.Dir) {
 		emit.Info("no Gemfile in " + root.Dir + ": nothing to install")
 		return nil
 	}
 	if !force && runBundle(ctx, root, nil, "check") == nil {
-		return nil
+		if offlineDependencies() || !bundlerDiffers(ctx, root, bundler) {
+			return nil
+		}
+		emit.Info("the Bundler that runs in " + root.Dir + " is not the one Gemfile.lock states: bundle install switches to it")
 	}
 	args := []string{"install"}
 	if offlineDependencies() {
@@ -109,6 +118,33 @@ func runBundle(ctx context.Context, root stacks.RootStep, out *os.File, args ...
 		cmd.Stderr = out
 	}
 	return cmd.Run()
+}
+
+// bundlerCheck is the further check of the profile that reads the Bundler
+// version: the one whose command is bundle.
+func bundlerCheck(stack stacks.Stack) stacks.Toolchain {
+	for _, check := range stack.Profile.Toolchain.Also {
+		if len(check.Command) > 0 && check.Command[0] == "bundle" {
+			return check
+		}
+	}
+	return stacks.Toolchain{}
+}
+
+// bundlerDiffers reports whether the Bundler that runs at the stack root
+// prints a version other than the one its Gemfile.lock states. A lockfile
+// that states none, or a Bundler that does not answer, differs from nothing.
+func bundlerDiffers(ctx context.Context, root stacks.RootStep, check stacks.Toolchain) bool {
+	if len(check.Command) == 0 {
+		return false
+	}
+	expected, err := check.ExpectedVersion(root.Dir, ".", ".")
+	if err != nil || expected.Version == "" {
+		return false
+	}
+	check.Command = append([]string{root.Program(check.Command[0])}, check.Command[1:]...)
+	running, err := check.MachineVersion(ctx, root.Dir, root.Env)
+	return err == nil && check.Compare(expected, running).Code == stacks.CodeToolchainMismatch
 }
 
 func hasGemfile(dir string) bool {

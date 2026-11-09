@@ -26,7 +26,7 @@
     },
     {
       "id": "tasks-run-the-profile",
-      "text": "Each task first compares ruby --version with .ruby-version or .tool-versions, in the component then at its stack root: a mismatch fails with stacks.toolchain_mismatch unless check is warn. It then compares bundle --version with the BUNDLED WITH of Gemfile.lock: a mismatch warns with stacks.toolchain_mismatch, since bundle install switches to the locked Bundler. Lint then runs bundle exec rubocop in the component's directory; test runs from the stack root and names the component's test directory."
+      "text": "Each task first compares ruby --version with .ruby-version or .tool-versions, in the component then at its stack root: a mismatch fails with stacks.toolchain_mismatch unless check is warn. A bundle --version other than the BUNDLED WITH of Gemfile.lock warns with the same code, because the core checks before the install step that fixes it. Lint then runs bundle exec rubocop in the component; test runs from the stack root on the component's test directory."
     },
     {
       "id": "test-runner-per-component",
@@ -50,11 +50,11 @@
     },
     {
       "id": "installs-its-bundle",
-      "text": "Before lint and test, the install step of a component runs bundle check at its stack root with the Ruby the check selects, then bundle install when the bundle is incomplete, one run per root at a time. A run with offline dependencies runs bundle install --local, which installs from the gems already on the machine."
+      "text": "Before lint and test, the install step runs bundle check at the component's stack root with the selected Ruby, then bundle install when the bundle is incomplete or bundle --version is not the BUNDLED WITH of Gemfile.lock, one run per root at a time; bundle install then switches to the locked Bundler. Offline, it runs bundle install --local, from the gems on the machine, and a Bundler mismatch alone installs nothing."
     },
     {
       "id": "workspace-install-runs-bundler",
-      "text": "workspace-install runs bundle install at each stack root of the workspace's projects, except a project disable.tags excludes and a root whose bundle check passes, which the force flag installs again. A run with offline dependencies runs bundle install --local. With no Ruby it warns and passes."
+      "text": "workspace-install runs bundle install at each stack root of the workspace's projects, except a project disable.tags excludes and a root whose bundle check passes with the Bundler its Gemfile.lock states, which the force flag installs again. A run with offline dependencies runs bundle install --local. With no Ruby it warns and passes."
     },
     {
       "id": "upgrades-the-dependencies",
@@ -70,7 +70,7 @@
     },
     {
       "id": "pins-a-ruby-release",
-      "text": "toolchain-resolve answers ruby with a release the extension ships, 3.2.11, 3.3.13, 3.4.12 or 4.0.9, with an rv-ruby archive of a fixed release and a SHA-256 per platform, when the workspace holds a Ruby component. It chooses among the releases every component's statement accepts, else those the root accepts. A committed pin of an accepted release is kept; else the highest accepted. With no Ruby component, no accepted release, or no archive for the platform, such as Windows, it answers no pin."
+      "text": "When the workspace holds a Ruby component, toolchain-resolve answers ruby with a shipped release: a stable 3.2, 3.3, 3.4 or 4.0 patch of a fixed rv-ruby release, with an archive and a SHA-256 per platform. It picks among the releases every component accepts, else those the root accepts: a committed accepted pin, else the highest. With no Ruby component, no accepted release, or no archive for the platform, such as Windows, it answers no pin."
     },
     {
       "id": "machine-ruby-comes-first",

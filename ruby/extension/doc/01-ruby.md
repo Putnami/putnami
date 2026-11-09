@@ -100,16 +100,19 @@ workspace with no Ruby component pins nothing.
 | Statement | Pinned release |
 |---|---|
 | None | 4.0.9, the newest |
-| A `.ruby-version` or `.tool-versions` that names a minor, such as `3.4` | The release of that minor the extension ships: 3.4.12 |
+| A `.ruby-version` or `.tool-versions` that names a version, such as `3.3.6` | That release |
+| One that names a minor, such as `3.4` | The newest release of that minor: 3.4.12 |
 | A component's own statement narrows those | The same choice among the releases every component accepts; with no common release, the root's choice |
 | A release the extension ships, already in the lock and still accepted | That release |
-| An exact version the extension does not ship, such as `3.4.7` | No pin: the machine's Ruby runs |
+| A version the extension does not ship, such as `3.4.0` or `3.1` | No pin: the machine's Ruby runs |
 
-The extension ships 3.2.11, 3.3.13, 3.4.12 and 4.0.9. The archives come from
+The extension ships every stable release of Ruby 3.2, 3.3, 3.4 and 4.0 that
 release `20261023` of
 [`spinel-coop/rv-ruby`](https://github.com/spinel-coop/rv-ruby), a third
-party that builds Rubies to run from any directory. Each archive is pinned by
-SHA-256. The pins cover macOS and Linux, each on arm64 and x86_64. Windows has
+party that builds Rubies to run from any directory, holds: 3.2.1 to 3.2.11,
+3.3.0 to 3.3.13, 3.4.1 to 3.4.12, and 4.0.0 to 4.0.9. Each archive is pinned
+by SHA-256. `releases.go` lists them; `scripts/rv-ruby-releases.sh <tag>`
+writes it again from another rv-ruby release. The pins cover macOS and Linux, each on arm64 and x86_64. Windows has
 no archive, so it gets no pin. On Linux the pin is the glibc build, which does
 not run on a musl Linux such as Alpine: put a Ruby on `PATH` there.
 
@@ -121,9 +124,10 @@ the pinned Ruby's folder under the Putnami home, unless the repository sets
 `BUNDLE_PATH`.
 
 Bundler ships with Ruby, so the extension downloads no Bundler. When
-`Gemfile.lock` states another Bundler, the Bundler check warns and the task
-runs. When the bundle is incomplete, `bundle install` installs the locked
-Bundler and switches to it, and later tasks run that one.
+`Gemfile.lock` states another Bundler, the install step runs `bundle install`,
+which installs the locked Bundler and switches to it, so later tasks run that
+one. The Bundler check only warns, because the stack core runs it before the
+install step's own command, which would otherwise never run to fix it.
 
 ## Install the bundle
 
@@ -131,12 +135,13 @@ The extension installs the gems with Bundler.
 
 | Job | What it does |
 |---|---|
-| `install`, before `lint` and `test` | Runs `bundle check` at the component's stack root, then `bundle install` when the bundle is incomplete, one run per stack root at a time. |
-| `workspace-install`, from `putnami install` | Runs the same at each stack root of the workspace's projects, except the projects `disable.tags` excludes; `--force` installs a root whose `bundle check` passes as well. With no Ruby on the machine it warns and passes. |
+| `install`, before `lint` and `test` | Runs `bundle check` at the component's stack root, then `bundle install` when the bundle is incomplete or when `bundle --version` is not the `BUNDLED WITH` of `Gemfile.lock`, one run per stack root at a time. |
+| `workspace-install`, from `putnami install` | Runs the same at each stack root of the workspace's projects, except the projects `disable.tags` excludes; `--force` installs a root whose bundle and Bundler pass as well. With no Ruby on the machine it warns and passes. |
 | `deps-upgrade` | Runs `bundle update` at each stack root. |
 
 With offline dependencies, such as in a hosted run, `bundle install --local`
-installs from the gems already on the machine, and `deps-upgrade` fails.
+installs from the gems already on the machine, a Bundler mismatch alone
+installs nothing, and `deps-upgrade` fails.
 There is no `workspace-fetch`: Bundler downloads a gem only as it installs
 it, and `bundle cache` writes `vendor/cache` into the repository.
 
@@ -269,8 +274,8 @@ design of the stack core is in
   application's `app/` or `spec/` selects no pack, though its key moves. Use
   `--all` or name the projects.
 - The install step runs `bundle check` before each task of each component,
-  about a third of a second, one at a time per stack root, even when the
-  task's result is cached.
+  about a third of a second, then `bundle --version` when the check passes,
+  one at a time per stack root, even when the task's result is cached.
 - `--watch` matches the stack-root inputs without their exclusions, so a
   repository that keeps `spec/examples.txt` reruns its packs' tests after
   each run.
