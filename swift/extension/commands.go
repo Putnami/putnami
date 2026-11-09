@@ -204,7 +204,7 @@ func exportLCOV(stderr io.Writer, flags []string, output string) error {
 	if _, err := os.Stat(profdata); err != nil {
 		return fmt.Errorf("no coverage profile at %s: run swift test --enable-code-coverage first", profdata)
 	}
-	binary, err := testBinary(binPath)
+	binaries, err := testBinaries(binPath)
 	if err != nil {
 		return err
 	}
@@ -213,7 +213,10 @@ func exportLCOV(stderr io.Writer, flags []string, output string) error {
 		return err
 	}
 	argv := slices.Concat(llvmCov[1:], []string{"export", "-format=lcov", "-instr-profile", profdata,
-		"-ignore-filename-regex", `(\.build|/Tests)/`, binary})
+		"-ignore-filename-regex", `(\.build|/Tests)/`, binaries[0]})
+	for _, other := range binaries[1:] {
+		argv = append(argv, "-object", other)
+	}
 	lcov, err := run(stderr, llvmCov[0], argv...)
 	if err != nil {
 		return err
@@ -348,28 +351,47 @@ func lastLine(s string) string {
 	return lines[len(lines)-1]
 }
 
-// testBinary finds the test product of a package in its bin path:
-// <Package>PackageTests.xctest, a file on Linux, a bundle whose executable is
-// Contents/MacOS/<Package>PackageTests on macOS.
-func testBinary(binPath string) (string, error) {
+// testBinaries finds the test products of a package in its bin path. The
+// native build system writes one, <Package>PackageTests.xctest, a file on
+// Linux and a bundle whose executable is Contents/MacOS/<name> on macOS. The
+// Swift Build backend of Swift 6.4 writes one per test target: the bundle
+// <Target>.xctest on macOS, and on Linux the library <Target>.so that
+// <Target>-test-runner loads.
+func testBinaries(binPath string) ([]string, error) {
 	matches, _ := filepath.Glob(filepath.Join(binPath, "*PackageTests.xctest"))
 	if len(matches) == 0 {
-		return "", fmt.Errorf("no *PackageTests.xctest in %s: the package has no test target, or swift test did not build it", binPath)
+		matches, _ = filepath.Glob(filepath.Join(binPath, "*.xctest"))
+	}
+	if len(matches) == 0 {
+		runners, _ := filepath.Glob(filepath.Join(binPath, "*-test-runner"))
+		for _, runner := range runners {
+			library := strings.TrimSuffix(runner, "-test-runner") + ".so"
+			if _, err := os.Stat(library); err == nil {
+				matches = append(matches, library)
+			}
+		}
+	}
+	if len(matches) == 0 {
+		return nil, fmt.Errorf("no *PackageTests.xctest, <Target>.xctest or <Target>.so beside <Target>-test-runner in %s: the package has no test target, or swift test did not build it", binPath)
 	}
 	sort.Strings(matches)
-	product := matches[0]
-	info, err := os.Stat(product)
-	if err != nil {
-		return "", err
+	out := make([]string, 0, len(matches))
+	for _, product := range matches {
+		info, err := os.Stat(product)
+		if err != nil {
+			return nil, err
+		}
+		if !info.IsDir() {
+			out = append(out, product)
+			continue
+		}
+		inner := filepath.Join(product, "Contents", "MacOS", strings.TrimSuffix(filepath.Base(product), ".xctest"))
+		if _, err := os.Stat(inner); err != nil {
+			return nil, fmt.Errorf("the test bundle %s holds no executable: %w", product, err)
+		}
+		out = append(out, inner)
 	}
-	if !info.IsDir() {
-		return product, nil
-	}
-	inner := filepath.Join(product, "Contents", "MacOS", strings.TrimSuffix(filepath.Base(product), ".xctest"))
-	if _, err := os.Stat(inner); err != nil {
-		return "", fmt.Errorf("the test bundle %s holds no executable: %w", product, err)
-	}
-	return inner, nil
+	return out, nil
 }
 
 // xcodebuild runs xcodebuild test or build on a scheme of the project in the

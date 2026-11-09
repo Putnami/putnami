@@ -308,7 +308,12 @@ func TestThePackageTestTaskFindsTheLLVMCovOfItsToolchain(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("the stubs are shell scripts")
 	}
-	toolchain := t.TempDir()
+	// Tools answers the link's target with its links resolved: on macOS the
+	// temporary directory under /var resolves to /private/var.
+	toolchain, err := filepath.EvalSymlinks(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
 	usrBin := filepath.Join(toolchain, "usr", "bin")
 	writeExecutable(t, usrBin, "swift", "#!/bin/sh\n")
 	writeExecutable(t, usrBin, "llvm-cov", "#!/bin/sh\n")

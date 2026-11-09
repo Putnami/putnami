@@ -7,7 +7,7 @@
     "putnami lint, test and build run swift on a package and xcodebuild on an Xcode project, in its directory, and a second run over an unchanged tree is a cache hit",
     "The test task reads the xunit and LCOV reports of a package, and the JUnit and Cobertura reports the extension converts from an Xcode result bundle, into the test and coverage summary",
     "A component overrides any value of the Swift profile in its putnami.json, and the override reaches the cache key",
-    "putnami install resolves each component's packages, putnami upgrade updates a package's dependencies, and putnami serve and run start a package's executable product",
+    "putnami install resolves each component's packages, putnami upgrade updates a package's dependencies, putnami serve and run start a package's executable product, and putnami package and publish produce the image of an application",
     "On a machine with no Swift, or a Swift outside the release .swift-version states, a package task installs that release, or the extension's default, under the Putnami home, and a second run installs nothing"
   ],
   "nonGoals": [
@@ -17,8 +17,8 @@
     "Each SwiftPM target as a project of its own: the package is the unit swift builds and tests",
     "Linting with swift-format's default style: a repository without a .swift-format configuration is not linted",
     "An Xcode project's lint keeping its cache entry when a Swift test file changes: it lints the test files too; a change to any other test file keeps it",
-    "Packaging or publishing an application image: it follows in #986",
-    "Archiving or signing an app, and publishing a package to a registry"
+    "Archiving or signing an app, and publishing a package to a registry",
+    "Building an image with a native Linux toolchain on a swift:<version>-slim base, and a base with the Foundation libraries a dynamically linked binary needs: an image holds a static binary, and a project that needs another base names it"
   ],
   "requirements": [
     {
@@ -68,12 +68,21 @@
     {
       "id": "provides-llvm-cov",
       "text": "The package test task, and no other, appends the directory of its toolchain's llvm-cov to the PATH of the task when that PATH holds none, so swiftpm-test exports the LCOV with the llvm-cov of the swift that ran the tests."
+    },
+    {
+      "id": "packages-an-application-image",
+      "text": "package with the docker channel assembles an OCI image of an application with no Docker daemon: it installs the Static Linux SDK of the selected Swift with its pinned checksum when missing, builds the executable serve starts with swift build -c release --swift-sdk <bundle> --triple <arch>-swift-linux-musl, and copies it and its resource bundles onto distroless static:nonroot or a digest-pinned base the project names. It runs as non-root on PORT. A library or an Xcode project packages nothing."
+    },
+    {
+      "id": "publishes-an-application-image",
+      "text": "publish with the docker channel pushes the packaged image to registries.oci.publish through the shared publisher, and an application that publishes the docker channel declares it as an oci release-set member. A library or an Xcode project publishes nothing."
     }
   ],
   "decisions": [
     "tooling/stacks/doc/adr/0001-one-extension-per-stack-on-a-shared-core.md",
     "tooling/stacks/doc/adr/0004-a-stack-extension-may-install-its-toolchain-at-task-time.md",
     "tooling/stacks/doc/adr/0005-profile-variants-for-a-stack-with-several-builds.md",
-    "tooling/stacks/doc/adr/0007-nested-markers-excludes-and-runtime-commands.md"
+    "tooling/stacks/doc/adr/0007-nested-markers-excludes-and-runtime-commands.md",
+    "swift/extension/doc/adr/0001-an-application-image-holds-a-static-binary.md"
   ]
 }

@@ -19,6 +19,7 @@ import (
 
 	diag "go.putnami.dev/protocol/diagnostic"
 	wsproto "go.putnami.dev/protocol/workspace"
+	"go.putnami.dev/sdk/extension/releaseset"
 	"go.putnami.dev/tooling/observe/detect/swift"
 	"go.putnami.dev/tooling/stacks"
 )
@@ -73,14 +74,19 @@ func Detect(root string, request wsproto.ProbeRequest) ([]stacks.Component, []di
 		if len(ExecutableProducts(manifest)) > 0 {
 			kind = "application"
 		}
+		var members []releaseset.MemberDeclaration
+		if kind == "application" {
+			members = imageMember(root, p.Dir, p.Name)
+		}
 		out = append(out, stacks.Component{
-			Path:         p.Dir,
-			Name:         name,
-			SourceFile:   path.Join(p.Dir, swift.Manifest),
-			Root:         p.Dir,
-			Dependencies: slices.Clone(p.LocalPackages),
-			Type:         kind,
-			Variant:      VariantSwiftPM,
+			Path:           p.Dir,
+			Name:           name,
+			SourceFile:     path.Join(p.Dir, swift.Manifest),
+			Root:           p.Dir,
+			Dependencies:   slices.Clone(p.LocalPackages),
+			Type:           kind,
+			Variant:        VariantSwiftPM,
+			ReleaseMembers: members,
 		})
 	}
 	for _, p := range detection.Projects {

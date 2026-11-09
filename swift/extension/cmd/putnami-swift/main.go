@@ -33,6 +33,8 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer, runJobs func(
 			jobs[swift.ServeJobName] = swift.ServeJob(stack)
 			jobs[swift.RunJobName] = swift.RunJob(stack)
 			jobs[swift.DepsUpgradeJobName] = swift.DepsUpgradeJob(stack)
+			jobs[swift.PackageDockerJobName] = swift.PackageDockerJob(stack)
+			jobs[swift.PublishDockerJobName] = swift.PublishDockerJob()
 			runJobs(jobs)
 		})
 	}
