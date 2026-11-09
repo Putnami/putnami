@@ -1,0 +1,16 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-specs-baseline.json",
+  "protocolVersion": 2,
+  "executableRequirements": [
+    "swift/stack-extension#applications-serve-and-run",
+    "swift/stack-extension#checks-documentation-links",
+    "swift/stack-extension#components-become-projects",
+    "swift/stack-extension#manifest-follows-the-profile",
+    "swift/stack-extension#overrides-are-honored",
+    "swift/stack-extension#packages-run-swiftpm",
+    "swift/stack-extension#reports-are-attributed",
+    "swift/stack-extension#test-filter",
+    "swift/stack-extension#workspace-commands",
+    "swift/stack-extension#xcode-projects-run-xcodebuild"
+  ]
+}

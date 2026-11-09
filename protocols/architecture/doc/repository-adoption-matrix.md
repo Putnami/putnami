@@ -1,11 +1,11 @@
 # Repository adoption matrix
 
-This repository maps **105 of its 178 projects** to **10 architecture domains**.
-The other **73 are excluded on purpose**: 38 samples, 7 templates, 2 template
+This repository maps **105 of its 179 projects** to **10 architecture domains**.
+The other **74 are excluded on purpose**: 38 samples, 7 templates, 2 template
 proofs, 2 protocol proofs, the standalone area detector, the 2 Cloud runtime
 destinations, the Cloud CLI extension with its 14 generated clients, the new
 development verb vocabulary, the new evidence report readers, and the new
-stack core with its first three stack extensions. Every one of the 178 appears in a
+stack core with its first four stack extensions. Every one of the 179 appears in a
 table below, mapped or excluded, with a reason.
 
 The matrix exists so the adoption frontier is measurable instead of implied.
@@ -354,10 +354,10 @@ permissions its import of the protocols and its consumer in
 |---|---|---|
 | `/tooling/evidence-readers` | Evidence report readers | `tooling` |
 
-### Stack core and stack extensions — 4 projects
+### Stack core and stack extensions — 5 projects
 
 **Why excluded:** `@putnami/stacks` is a new library, the stack core, and
-`@putnami/rust`, `@putnami/php` and `@putnami/java` its first stack extensions, each a manifest, a stack profile and the
+`@putnami/rust`, `@putnami/php`, `@putnami/java` and `@putnami/swift` its first stack extensions, each a manifest, a stack profile and the
 core's entrypoint, which run a stack's components as Putnami tasks from the
 components the `putnami observe` detectors find. A new project starts excluded
 (rule 4), and no review has yet named the domain that owns running a stack
@@ -373,6 +373,7 @@ detectors need; the next stack extensions join the same section until then.
 | `/java/extension` | Stack extension | `tooling` |
 | `/php/extension` | Stack extension | `tooling` |
 | `/rust/extension` | Stack extension | `tooling` |
+| `/swift/extension` | Stack extension | `tooling` |
 | `/tooling/stacks` | Stack core | `tooling` |
 
 ### Samples — 38 projects

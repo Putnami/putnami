@@ -1,0 +1,389 @@
+The observe Swift demo repository (tooling/observe/internal/observe/testdata/demos/swift.txtar), at its base revision, with the swiftpm.json export the CI writes for Packages/Pricing, and the Package.resolved files Xcode and SwiftPM write for App/Shop.xcodeproj and Packages/Pricing, so a pinned resolution passes: an Xcode project App/Shop.xcodeproj that uses the local package Packages/Pricing, which uses the local package Packages/Networking.
+-- App/Shop.xcodeproj/project.pbxproj --
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		A10000000000000000000001 /* Pricing in Frameworks */ = {isa = PBXBuildFile; productRef = A10000000000000000000020 /* Pricing */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		A10000000000000000000002 /* Shop.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Shop.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		A10000000000000000000003 /* ShopTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = ShopTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+/* End PBXFileReference section */
+
+/* Begin PBXFileSystemSynchronizedRootGroup section */
+		A10000000000000000000004 /* Shop */ = {isa = PBXFileSystemSynchronizedRootGroup; path = Shop; sourceTree = "<group>"; };
+		A10000000000000000000005 /* ShopTests */ = {isa = PBXFileSystemSynchronizedRootGroup; path = ShopTests; sourceTree = "<group>"; };
+/* End PBXFileSystemSynchronizedRootGroup section */
+
+/* Begin PBXNativeTarget section */
+		A10000000000000000000010 /* Shop */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = A10000000000000000000030 /* Build configuration list for PBXNativeTarget "Shop" */;
+			buildPhases = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				A10000000000000000000004 /* Shop */,
+			);
+			name = Shop;
+			packageProductDependencies = (
+				A10000000000000000000020 /* Pricing */,
+			);
+			productName = Shop;
+			productReference = A10000000000000000000002 /* Shop.app */;
+			productType = "com.apple.product-type.application";
+		};
+		A10000000000000000000011 /* ShopTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = A10000000000000000000031 /* Build configuration list for PBXNativeTarget "ShopTests" */;
+			buildPhases = (
+			);
+			fileSystemSynchronizedGroups = (
+				A10000000000000000000005 /* ShopTests */,
+			);
+			name = ShopTests;
+			productName = ShopTests;
+			productReference = A10000000000000000000003 /* ShopTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		A10000000000000000000040 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 1600;
+			};
+			mainGroup = A10000000000000000000050;
+			packageReferences = (
+				A10000000000000000000060 /* XCLocalSwiftPackageReference "../Packages/Pricing" */,
+				A10000000000000000000061 /* XCRemoteSwiftPackageReference "swift-log" */,
+			);
+			targets = (
+				A10000000000000000000010 /* Shop */,
+				A10000000000000000000011 /* ShopTests */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin XCLocalSwiftPackageReference section */
+		A10000000000000000000060 /* XCLocalSwiftPackageReference "../Packages/Pricing" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = ../Packages/Pricing;
+		};
+/* End XCLocalSwiftPackageReference section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		A10000000000000000000061 /* XCRemoteSwiftPackageReference "swift-log" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/apple/swift-log";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 1.6.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		A10000000000000000000020 /* Pricing */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = Pricing;
+		};
+/* End XCSwiftPackageProductDependency section */
+	};
+	rootObject = A10000000000000000000040 /* Project object */;
+}
+-- App/Shop/ShopApp.swift --
+import SwiftUI
+
+@main
+struct ShopApp: App {
+    var body: some Scene {
+        WindowGroup { Text("Shop") }
+    }
+}
+-- App/Shop/Checkout.swift --
+import Pricing
+
+struct Checkout {
+    let calculator: PriceCalculator
+
+    func total(of amounts: [Decimal]) -> Decimal {
+        calculator.total(amounts, taxRate: 0.2)
+    }
+}
+-- App/ShopTests/CheckoutTests.swift --
+import Networking
+import Pricing
+import XCTest
+@testable import Shop
+
+final class CheckoutTests: XCTestCase {
+    let checkout = Checkout(calculator: PriceCalculator(client: Client(baseURL: URL(string: "https://shop.example.com")!)))
+
+    func testTotalAddsTax() {
+        XCTAssertEqual(checkout.total(of: [10, 20]), 36)
+    }
+
+    func testEmptyCartIsFree() {
+        XCTAssertEqual(checkout.total(of: []), 0)
+    }
+}
+-- Podfile --
+platform :ios, '16.0'
+project 'App/Shop.xcodeproj'
+
+target 'Shop' do
+  use_frameworks!
+  pod 'Alamofire', '~> 5.9'
+
+  target 'ShopTests' do
+    inherit! :search_paths
+  end
+end
+-- Podfile.lock --
+PODS:
+  - Alamofire (5.9.1)
+
+DEPENDENCIES:
+  - Alamofire (~> 5.9)
+
+SPEC REPOS:
+  trunk:
+    - Alamofire
+
+SPEC CHECKSUMS:
+  Alamofire: 7193b3b92c74a07f85569e1a6c4f4237291e7496
+
+PODFILE CHECKSUM: 6a8f2b5d3c1e9f7a4b2c8d0e1f3a5b7c9d2e4f60
+
+COCOAPODS: 1.16.2
+-- Shop.xcworkspace/contents.xcworkspacedata --
+<?xml version="1.0" encoding="UTF-8"?>
+<Workspace
+   version = "1.0">
+   <FileRef
+      location = "group:App/Shop.xcodeproj">
+   </FileRef>
+   <FileRef
+      location = "group:Pods/Pods.xcodeproj">
+   </FileRef>
+</Workspace>
+-- Shop.xcworkspace/xcshareddata/swiftpm/Package.resolved --
+{
+  "originHash" : "8c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d",
+  "pins" : [
+    {
+      "identity" : "swift-collections",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/apple/swift-collections.git",
+      "state" : {
+        "revision" : "671108c96644956dddcd89dd59c203dcdb36cec7",
+        "version" : "1.1.4"
+      }
+    },
+    {
+      "identity" : "swift-log",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/apple/swift-log",
+      "state" : {
+        "revision" : "9cb486020ebf03bfa5b5df985387a14a98744537",
+        "version" : "1.6.1"
+      }
+    }
+  ],
+  "version" : 3
+}
+-- Packages/Pricing/Package.swift --
+// swift-tools-version:5.9
+import PackageDescription
+
+let package = Package(
+    name: "Pricing",
+    platforms: [.iOS(.v16), .macOS(.v13)],
+    products: [
+        .library(name: "Pricing", targets: ["Pricing"]),
+    ],
+    dependencies: [
+        .package(path: "../Networking"),
+        .package(url: "https://github.com/apple/swift-collections.git", from: "1.1.0"),
+    ],
+    targets: [
+        .target(name: "Pricing", dependencies: ["Networking", .product(name: "Collections", package: "swift-collections")]),
+        .testTarget(name: "PricingTests", dependencies: ["Pricing"]),
+    ]
+)
+-- Packages/Pricing/Sources/Pricing/PriceCalculator.swift --
+import Networking
+
+public struct PriceCalculator {
+    public let client: Client
+
+    public init(client: Client) {
+        self.client = client
+    }
+
+    public func total(_ amounts: [Decimal], taxRate: Decimal) -> Decimal {
+        let net = amounts.reduce(0, +)
+        return net + net * taxRate
+    }
+
+    public func quoteURL(for sku: String) -> URL {
+        client.url(for: "quotes/\(sku)")
+    }
+}
+-- Packages/Pricing/Tests/PricingTests/PriceCalculatorTests.swift --
+import Networking
+import XCTest
+@testable import Pricing
+
+final class PriceCalculatorTests: XCTestCase {
+    let calculator = PriceCalculator(client: Client(baseURL: URL(string: "https://shop.example.com")!))
+
+    func testTotalAddsTax() {
+        XCTAssertEqual(calculator.total([10, 20], taxRate: 0.2), 36)
+    }
+
+    func testTotalOfNothingIsZero() {
+        XCTAssertEqual(calculator.total([], taxRate: 0.2), 0)
+    }
+
+    func testQuoteURLNamesTheSKU() {
+        XCTAssertEqual(calculator.quoteURL(for: "A1").absoluteString, "https://shop.example.com/quotes/A1")
+    }
+}
+-- Packages/Networking/Package.swift --
+// swift-tools-version:5.9
+import PackageDescription
+
+let package = Package(
+    name: "Networking",
+    platforms: [.iOS(.v16), .macOS(.v13)],
+    products: [
+        .library(name: "Networking", targets: ["Networking"]),
+    ],
+    targets: [
+        .target(name: "Networking"),
+        .testTarget(name: "NetworkingTests", dependencies: ["Networking"]),
+    ]
+)
+-- Packages/Networking/Sources/Networking/Client.swift --
+import Foundation
+
+public struct Client {
+    public let baseURL: URL
+
+    public init(baseURL: URL) {
+        self.baseURL = baseURL
+    }
+
+    public func url(for path: String) -> URL {
+        baseURL.appendingPathComponent(path)
+    }
+}
+-- Packages/Networking/Tests/NetworkingTests/ClientTests.swift --
+import XCTest
+@testable import Networking
+
+final class ClientTests: XCTestCase {
+    let client = Client(baseURL: URL(string: "https://shop.example.com")!)
+
+    func testURLAppendsThePath() {
+        XCTAssertEqual(client.url(for: "quotes").absoluteString, "https://shop.example.com/quotes")
+    }
+}
+-- Packages/Pricing/swiftpm.json --
+{
+  "dependencies" : [
+    {
+      "identity" : "networking",
+      "path" : "/Users/runner/work/shop/shop/Packages/Networking",
+      "type" : "fileSystem"
+    },
+    {
+      "identity" : "swift-collections",
+      "requirement" : { "range" : [ { "lower_bound" : "1.1.0", "upper_bound" : "2.0.0" } ] },
+      "type" : "sourceControl",
+      "url" : "https://github.com/apple/swift-collections.git"
+    }
+  ],
+  "manifest_display_name" : "Pricing",
+  "name" : "Pricing",
+  "path" : "/Users/runner/work/shop/shop/Packages/Pricing",
+  "platforms" : [ { "name" : "ios", "version" : "16.0" } ],
+  "products" : [
+    { "name" : "Pricing", "targets" : [ "Pricing" ], "type" : { "library" : [ "automatic" ] } }
+  ],
+  "targets" : [
+    {
+      "c99name" : "PricingTests",
+      "module_type" : "SwiftTarget",
+      "name" : "PricingTests",
+      "path" : "Tests/PricingTests",
+      "sources" : [ "PriceCalculatorTests.swift" ],
+      "target_dependencies" : [ "Pricing" ],
+      "type" : "test"
+    },
+    {
+      "c99name" : "Pricing",
+      "module_type" : "SwiftTarget",
+      "name" : "Pricing",
+      "path" : "Sources/Pricing",
+      "product_dependencies" : [ "Networking", "Collections" ],
+      "product_memberships" : [ "Pricing" ],
+      "sources" : [ "PriceCalculator.swift" ],
+      "type" : "library"
+    }
+  ],
+  "tools_version" : "5.9"
+}
+-- App/Shop.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved --
+{
+  "originHash" : "8c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d",
+  "pins" : [
+    {
+      "identity" : "swift-collections",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/apple/swift-collections.git",
+      "state" : {
+        "revision" : "671108c96644956dddcd89dd59c203dcdb36cec7",
+        "version" : "1.1.4"
+      }
+    },
+    {
+      "identity" : "swift-log",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/apple/swift-log",
+      "state" : {
+        "revision" : "9cb486020ebf03bfa5b5df985387a14a98744537",
+        "version" : "1.6.1"
+      }
+    }
+  ],
+  "version" : 3
+}
+-- Packages/Pricing/Package.resolved --
+{
+  "originHash" : "3b0e1f5a7c9d2e4f6a8b0c1d3e5f7a9b1c2d4e6f8a0b2c3d5e7f9a1b3c4d5e6f",
+  "pins" : [
+    {
+      "identity" : "swift-collections",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/apple/swift-collections.git",
+      "state" : {
+        "revision" : "671108c96644956dddcd89dd59c203dcdb36cec7",
+        "version" : "1.1.4"
+      }
+    }
+  ],
+  "version" : 3
+}

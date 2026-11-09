@@ -1,0 +1,68 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-spec.json",
+  "protocolVersion": 1,
+  "feature": "swift/stack-extension",
+  "outcomes": [
+    "Each Swift package and each directory holding an Xcode project is a Putnami project, with an edge to each local package it uses",
+    "putnami lint, test and build run swift on a package and xcodebuild on an Xcode project, in its directory, and a second run over an unchanged tree is a cache hit",
+    "The test task reads the xunit and LCOV reports of a package, and the JUnit and Cobertura reports the extension converts from an Xcode result bundle, into the test and coverage summary",
+    "A component overrides any value of the Swift profile in its putnami.json, and the override reaches the cache key",
+    "putnami install resolves each component's packages, putnami upgrade updates a package's dependencies, and putnami serve and run start a package's executable product"
+  ],
+  "nonGoals": [
+    "Installing or switching a Swift toolchain or an Xcode version: the toolchain check compares and never installs; a Swift install follows in #985",
+    "Building through an .xcworkspace or CocoaPods: a project that needs it overrides its steps",
+    "Each SwiftPM target as a project of its own: the package is the unit swift builds and tests",
+    "Linting with swift-format's default style: a repository without a .swift-format configuration is not linted",
+    "An Xcode project's lint keeping its cache entry when a Swift test file changes: it lints the test files too; a change to any other test file keeps it",
+    "Packaging or publishing an application image: it follows in #986",
+    "Archiving or signing an app, and publishing a package to a registry"
+  ],
+  "requirements": [
+    {
+      "id": "components-become-projects",
+      "text": "The probe answers, for each candidate the observe Swift detectors know: a directory with Package.swift is a package named by its package, with the variant swiftpm; a directory holding .xcodeproj projects is an Xcode project named by its first project, with the variant xcode. Each has an edge to each local package it uses, is its own stack root, and has the extension @putnami/swift and the tag swift. A directory with both keeps the package and reports stacks.component_conflict."
+    },
+    {
+      "id": "packages-run-swiftpm",
+      "text": "A package task compares swift --version with .swift-version, then runs, with the versions Package.resolved pins: lint with swift format lint --strict when a .swift-format exists in the package or at the workspace root, else nothing; test with swift test, its xunit report and the LCOV of the package's own sources, through the swiftpm-test command; build with swift build. A non-zero swift test with a failed case reads the reports; one without fails."
+    },
+    {
+      "id": "xcode-projects-run-xcodebuild",
+      "text": "An Xcode project task compares xcodebuild -version with .xcode-version, then runs, through the extension's commands and with the versions Package.resolved pins, swift format lint as a package does, and xcodebuild test or build on the scheme named after the project, on macOS or the newest simulator of its platform. The test converts the result bundle into JUnit and Cobertura of the project's own files; a failed xcodebuild with no failed case fails the task."
+    },
+    {
+      "id": "reports-are-attributed",
+      "text": "On the observe Swift demo repository, every JUnit case the tasks write names a Module.Class that the observe Swift detector places on a component, and every coverage file is under a component directory."
+    },
+    {
+      "id": "overrides-are-honored",
+      "text": "options[\"@putnami/swift\"] in a component's own putnami.json overrides its resolved profile, after its variant: an object merges, any other value replaces the profile's whole. The steps run and the files the swift:<task> selectors answer follow the resolved profile, and putnami.json is an input of every task."
+    },
+    {
+      "id": "manifest-follows-the-profile",
+      "text": "The manifest passes the stack core's conformance kit: its markers are the profile's, Package.swift and *.xcodeproj/project.pbxproj, it lists the swift:lint, swift:test and swift:build selectors, and each command runs one task that depends on the same task upstream, reads its selector and the stack-root files of the profile's variants, and declares its command-output reports directory."
+    },
+    {
+      "id": "workspace-commands",
+      "text": "workspace-install resolves each package with swift package resolve and the pinned versions, unless its last resolve used the current Package.swift and Package.resolved, which --force overrides, and each Xcode project with xcodebuild -resolvePackageDependencies; with offline dependencies it resolves nothing. deps-upgrade runs swift package update in each package and leaves the Xcode projects out. There is no workspace-fetch: a resolve runs package code."
+    },
+    {
+      "id": "applications-serve-and-run",
+      "text": "A package whose manifest declares an executable product, or with none an executable target, is an application, any other a library. serve runs swift run of it with the pinned versions and PORT, 3000 by default or a free port for 0, and reports ready once the port accepts a connection; run runs it once with --args and forwards its exit code. --entrypoint names it among several. An Xcode project is neither served nor run."
+    },
+    {
+      "id": "test-filter",
+      "text": "test --test, short -t, adds --filter to the task's last step when it runs the swiftpm-test or xcodebuild command, which pass it to swift test --filter and xcodebuild -only-testing; another program gets no filter. A package in which the filter, also given to the components the selected ones depend on, selects no test passes with empty reports; an Xcode project whose scheme has no target the filter names fails."
+    },
+    {
+      "id": "checks-documentation-links",
+      "text": "lint also checks every relative link and anchor of the component's README.md files and doc/ trees, a nested package answering for its own, and a broken one fails it, unless --docs-links=false."
+    }
+  ],
+  "decisions": [
+    "tooling/stacks/doc/adr/0001-one-extension-per-stack-on-a-shared-core.md",
+    "tooling/stacks/doc/adr/0005-profile-variants-for-a-stack-with-several-builds.md",
+    "tooling/stacks/doc/adr/0007-nested-markers-excludes-and-runtime-commands.md"
+  ]
+}

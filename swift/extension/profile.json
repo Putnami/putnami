@@ -1,0 +1,206 @@
+{
+  "id": "swift",
+  "markers": [
+    "Package.swift",
+    "*.xcodeproj/project.pbxproj"
+  ],
+  "toolchain": {
+    "command": [
+      "swift",
+      "--version"
+    ],
+    "pattern": "Swift version (?<version>[0-9]+(?:\\.[0-9]+)*)",
+    "files": [
+      {
+        "path": ".swift-version"
+      }
+    ]
+  },
+  "inputs": {
+    "sources": [
+      "Sources/**",
+      "Plugins/**"
+    ],
+    "tests": [
+      "Tests/**"
+    ],
+    "manifests": [
+      "Package.swift",
+      "Package@swift-*.swift"
+    ],
+    "lintConfig": [
+      "{root}/.swift-format"
+    ],
+    "lockfiles": [
+      "Package.resolved"
+    ]
+  },
+  "excludes": [
+    ".build",
+    "DerivedData",
+    "SourcePackages",
+    "Pods",
+    "Carthage",
+    "xcuserdata",
+    "node_modules"
+  ],
+  "variants": {
+    "swiftpm": {
+      "tasks": {
+        "lint": {
+          "steps": [
+            [
+              "{runtime}",
+              "swift-format-lint",
+              "Package.swift",
+              "Sources"
+            ]
+          ],
+          "inputs": [
+            "sources",
+            "manifests",
+            "lintConfig"
+          ]
+        },
+        "test": {
+          "steps": [
+            [
+              "{runtime}",
+              "swiftpm-test",
+              "--output",
+              "{output}"
+            ]
+          ],
+          "inputs": [
+            "sources",
+            "tests",
+            "manifests",
+            "lockfiles"
+          ],
+          "reports": {
+            "junit": [
+              "{output}/xunit*.xml"
+            ],
+            "coverage": [
+              {
+                "format": "lcov",
+                "paths": [
+                  "{output}/lcov.info"
+                ]
+              }
+            ]
+          }
+        },
+        "build": {
+          "steps": [
+            [
+              "swift",
+              "build",
+              "--force-resolved-versions"
+            ]
+          ],
+          "inputs": [
+            "sources",
+            "manifests",
+            "lockfiles"
+          ]
+        }
+      }
+    },
+    "xcode": {
+      "toolchain": {
+        "command": [
+          "xcodebuild",
+          "-version"
+        ],
+        "pattern": "^Xcode (?<version>[0-9]+(?:\\.[0-9]+)*)",
+        "files": [
+          {
+            "path": ".xcode-version"
+          }
+        ]
+      },
+      "inputs": {
+        "sources": [
+          "**"
+        ],
+        "swiftSources": [
+          "**/*.swift"
+        ],
+        "manifests": [
+          "*.xcodeproj/project.pbxproj",
+          "*.xcodeproj/xcshareddata/**"
+        ],
+        "lockfiles": [
+          "*.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved"
+        ]
+      },
+      "tasks": {
+        "lint": {
+          "steps": [
+            [
+              "{runtime}",
+              "swift-format-lint",
+              "."
+            ]
+          ],
+          "inputs": [
+            "swiftSources",
+            "lintConfig"
+          ]
+        },
+        "test": {
+          "steps": [
+            [
+              "{runtime}",
+              "xcodebuild",
+              "test",
+              "--scheme",
+              "{component}",
+              "--result-bundle",
+              "{output}/Tests.xcresult",
+              "--junit",
+              "{output}/junit.xml",
+              "--cobertura",
+              "{output}/coverage.xml"
+            ]
+          ],
+          "inputs": [
+            "sources",
+            "manifests",
+            "lockfiles"
+          ],
+          "reports": {
+            "junit": [
+              "{output}/junit.xml"
+            ],
+            "coverage": [
+              {
+                "format": "cobertura",
+                "paths": [
+                  "{output}/coverage.xml"
+                ]
+              }
+            ]
+          }
+        },
+        "build": {
+          "steps": [
+            [
+              "{runtime}",
+              "xcodebuild",
+              "build",
+              "--scheme",
+              "{component}"
+            ]
+          ],
+          "inputs": [
+            "sources",
+            "manifests",
+            "lockfiles"
+          ]
+        }
+      }
+    }
+  }
+}

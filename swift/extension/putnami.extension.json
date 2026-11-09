@@ -1,0 +1,515 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-extension.json",
+  "name": "@putnami/swift",
+  "cliContract": 14,
+  "extensionDependencies": {
+    "@putnami/dev": ""
+  },
+  "runtime": {
+    "executable": "compiled/putnami-swift",
+    "toolchains": {
+      "runtimeCompiler": {
+        "lock": "go",
+        "candidates": [
+          {
+            "from": "environment",
+            "environment": "GOROOT",
+            "path": "bin/go"
+          },
+          {
+            "from": "path",
+            "path": "go"
+          },
+          {
+            "from": "putnami-home",
+            "path": "toolchains/go/go-{version}/go/bin/go"
+          }
+        ],
+        "probe": {
+          "args": [
+            "env",
+            "GOVERSION"
+          ],
+          "expect": "go{version}",
+          "unset": [
+            "GOROOT"
+          ],
+          "environment": {
+            "GOTOOLCHAIN": "local"
+          }
+        },
+        "environment": {
+          "GOROOT": {
+            "from": "ancestor",
+            "levels": 2
+          },
+          "GOTOOLCHAIN": {
+            "from": "literal",
+            "value": "local"
+          }
+        },
+        "prependPath": true
+      }
+    },
+    "prepare": {
+      "command": "{extensionRoot}/bin/prepare",
+      "args": [
+        "--output",
+        "{runtimeOutput}"
+      ],
+      "inputs": [
+        "bin/prepare",
+        "cmd/**",
+        "go.mod",
+        "go.sum",
+        "*.go",
+        "profile.json"
+      ],
+      "toolchains": [
+        "runtimeCompiler"
+      ]
+    },
+    "inputSelectors": [
+      "swift:build",
+      "swift:lint",
+      "swift:test"
+    ]
+  },
+  "workspace": {
+    "markers": [
+      "Package.swift",
+      "*.xcodeproj/project.pbxproj"
+    ],
+    "inputs": [
+      "Package.swift",
+      "*.xcodeproj/project.pbxproj",
+      "swiftpm.json",
+      ".swift-version",
+      ".xcode-version"
+    ],
+    "excludes": [
+      ".build",
+      "DerivedData",
+      "SourcePackages",
+      "Pods",
+      "Carthage",
+      "xcuserdata"
+    ],
+    "language": "swift"
+  },
+  "commands": {
+    "workspace-install": {
+      "description": "Resolve the packages of each component of the workspace.",
+      "quiet": true,
+      "flags": {
+        "force": {
+          "type": "boolean",
+          "default": false,
+          "description": "Resolve a package even when its last resolve is current"
+        }
+      },
+      "run": [
+        {
+          "id": "workspace-install",
+          "task": "workspace-install-exec"
+        }
+      ]
+    },
+    "lint": {
+      "description": "Lint the Swift packages and Xcode projects with swift format, when the repository configures it.",
+      "run": [
+        {
+          "id": "lint",
+          "task": "lint-run",
+          "dependsOn": [
+            "^lint"
+          ]
+        },
+        {
+          "id": "docs",
+          "task": "lint-docs",
+          "if": "params.docs-links"
+        }
+      ],
+      "flags": {
+        "docs-links": {
+          "type": "boolean",
+          "default": true,
+          "description": "Check every relative link and anchor in the project's README.md files and doc/ trees; a broken one fails lint."
+        }
+      }
+    },
+    "test": {
+      "description": "Test the Swift packages with swift test and the Xcode projects with xcodebuild test, and read their JUnit and coverage reports.",
+      "run": [
+        {
+          "id": "test",
+          "heavy": true,
+          "task": "test-run",
+          "dependsOn": [
+            "^test"
+          ]
+        }
+      ],
+      "flags": {
+        "test": {
+          "type": "string",
+          "short": "-t",
+          "description": "Test filter to run, passed to swift test --filter or xcodebuild -only-testing"
+        }
+      }
+    },
+    "build": {
+      "description": "Build the Swift packages with swift build and the Xcode projects with xcodebuild build.",
+      "run": [
+        {
+          "id": "build",
+          "heavy": true,
+          "task": "build-run",
+          "dependsOn": [
+            "^build"
+          ]
+        }
+      ]
+    },
+    "serve": {
+      "description": "Serve the executable product of a Swift package with swift run.",
+      "traits": {
+        "requiresRunnable": true,
+        "workload": "serve"
+      },
+      "flags": {
+        "port": {
+          "type": "number",
+          "default": 3000,
+          "description": "Port for the server, passed as PORT"
+        },
+        "entrypoint": {
+          "type": "string",
+          "description": "Executable product to serve (defaults to the package's only executable)"
+        }
+      },
+      "run": [
+        {
+          "id": "serve",
+          "task": "serve-run"
+        }
+      ]
+    },
+    "run": {
+      "description": "Run the executable product of a Swift package once and forward its exit code.",
+      "traits": {
+        "requiresRunnable": true,
+        "workload": "once"
+      },
+      "flags": {
+        "entrypoint": {
+          "type": "string",
+          "description": "Executable product to run (defaults to the package's only executable)"
+        },
+        "args": {
+          "type": "string",
+          "description": "Additional arguments to pass to the executable"
+        }
+      },
+      "run": [
+        {
+          "id": "run",
+          "task": "run-exec"
+        }
+      ]
+    },
+    "deps-upgrade": {
+      "description": "Update the Swift package dependencies of each package of the workspace.",
+      "visibility": "internal",
+      "quiet": true,
+      "run": [
+        {
+          "id": "deps-upgrade",
+          "task": "deps-upgrade-exec"
+        }
+      ]
+    }
+  },
+  "tasks": {
+    "lint-run": {
+      "description": "Run the Swift profile's lint step on one package or Xcode project in its directory, after the toolchain check: swift format lint --strict with the .swift-format of the component or of the workspace root, or nothing without one. Its inputs are the files the swift:lint selector answers from the resolved profile, and the stack-root files.",
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": [
+        "lint",
+        "--report-dir",
+        "{outputRoot}"
+      ],
+      "cwd": "{projectRoot}",
+      "timeoutMs": 1800000,
+      "inputs": {
+        "sources": {
+          "from": "project",
+          "files": [
+            "swift:lint"
+          ]
+        },
+        "stackRoot": {
+          "from": "workspace",
+          "files": [
+            ".swift-format",
+            ".swift-version",
+            ".xcode-version"
+          ]
+        },
+        "extensionVersion": {
+          "from": "runtime"
+        }
+      },
+      "outputs": {
+        "data": {
+          "description": "The task result: the test and coverage totals of a test task."
+        }
+      },
+      "cache": {
+        "enabled": true
+      },
+      "declares": {
+        "outputs": {
+          "reports": {
+            "kind": "directory",
+            "root": "command-output",
+            "path": "lint",
+            "optionalEmpty": true,
+            "description": "The reports the task wrote or copied: the JUnit and coverage reports of a test task."
+          }
+        },
+        "effects": [
+          "network",
+          "toolchain-cache"
+        ]
+      }
+    },
+    "test-run": {
+      "description": "Run the Swift profile's test steps on one component in its directory, after the toolchain check, with the versions Package.resolved pins: swift test with code coverage and its LCOV export for a package; xcodebuild test and the conversion of its result bundle for an Xcode project. Then copy and read the JUnit and coverage reports. A failed case, a step that fails with no failed case, or a missing report fails the task.",
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": [
+        "test",
+        "--report-dir",
+        "{outputRoot}"
+      ],
+      "cwd": "{projectRoot}",
+      "timeoutMs": 1800000,
+      "inputs": {
+        "test": {
+          "from": "params"
+        },
+        "t": {
+          "from": "params"
+        },
+        "sources": {
+          "from": "project",
+          "files": [
+            "swift:test"
+          ]
+        },
+        "stackRoot": {
+          "from": "workspace",
+          "files": [
+            ".swift-version",
+            ".xcode-version"
+          ]
+        },
+        "extensionVersion": {
+          "from": "runtime"
+        }
+      },
+      "outputs": {
+        "data": {
+          "description": "The task result: the test and coverage totals of a test task."
+        }
+      },
+      "cache": {
+        "enabled": true
+      },
+      "declares": {
+        "outputs": {
+          "reports": {
+            "kind": "directory",
+            "root": "command-output",
+            "path": "test",
+            "optionalEmpty": true,
+            "description": "The reports the task wrote or copied: the JUnit and coverage reports of a test task."
+          }
+        },
+        "effects": [
+          "network",
+          "toolchain-cache"
+        ]
+      }
+    },
+    "build-run": {
+      "description": "Run the Swift profile's build step on one component in its directory, after the toolchain check, with the versions Package.resolved pins: swift build for a package, xcodebuild build for an Xcode project.",
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": [
+        "build",
+        "--report-dir",
+        "{outputRoot}"
+      ],
+      "cwd": "{projectRoot}",
+      "timeoutMs": 1800000,
+      "inputs": {
+        "sources": {
+          "from": "project",
+          "files": [
+            "swift:build"
+          ]
+        },
+        "stackRoot": {
+          "from": "workspace",
+          "files": [
+            ".swift-version",
+            ".xcode-version"
+          ]
+        },
+        "extensionVersion": {
+          "from": "runtime"
+        }
+      },
+      "outputs": {
+        "data": {
+          "description": "The task result: the test and coverage totals of a test task."
+        }
+      },
+      "cache": {
+        "enabled": true
+      },
+      "declares": {
+        "outputs": {
+          "reports": {
+            "kind": "directory",
+            "root": "command-output",
+            "path": "build",
+            "optionalEmpty": true,
+            "description": "The reports the task wrote or copied: the JUnit and coverage reports of a test task."
+          }
+        },
+        "effects": [
+          "network",
+          "toolchain-cache"
+        ]
+      }
+    },
+    "lint-docs": {
+      "description": "Documentation link check: every relative link and anchor in the project's README.md files and doc/ trees must resolve, with the exact case of the file's name. The task body is the SDK's docslinks.Job, shared with every language extension. A link may name any file of the workspace, so the check reads the workspace's Git candidate cut (the tracked files and the untracked files no ignore rule excludes) and its key is the workspace input `git:**`, which holds that cut: deleting or renaming a link target, or editing a heading an anchor names, moves the key, and an ignored file is neither read nor keyed. The project input names the README.md the check starts from, so the key does not fold the project's ignored build output. Outside a Git work tree the check reads the disk and the task has no key. It needs no Swift toolchain.",
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": [
+        "lint-docs"
+      ],
+      "cwd": "{projectRoot}",
+      "timeoutMs": 120000,
+      "inputs": {
+        "readme": {
+          "from": "project",
+          "files": [
+            "README.md"
+          ]
+        },
+        "repository": {
+          "from": "workspace",
+          "files": [
+            "git:**"
+          ]
+        },
+        "docs-links": {
+          "from": "params"
+        }
+      },
+      "outputs": {
+        "data": {
+          "description": "Documentation link result with diagnostics"
+        }
+      },
+      "reads": [
+        "sources"
+      ],
+      "cache": {
+        "noOutput": true,
+        "enabled": true
+      },
+      "declares": {}
+    },
+    "workspace-install-exec": {
+      "description": "Run swift package resolve with the pinned versions at each package of the workspace, except the projects disable.tags excludes and the packages whose last resolve is current, and xcodebuild -resolvePackageDependencies at each Xcode project. With offline dependencies it resolves nothing.",
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": [
+        "workspace-install"
+      ],
+      "cwd": "{workspaceRoot}",
+      "cache": false,
+      "timeoutMs": 1800000,
+      "declares": {
+        "effects": [
+          "network",
+          "process",
+          "toolchain-cache",
+          "workspace-files"
+        ]
+      }
+    },
+    "serve-run": {
+      "description": "Run swift run of the package's executable product, with the versions Package.resolved pins and PORT set, until the user stops it, and report it ready once the port accepts a connection.",
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": [
+        "serve"
+      ],
+      "cwd": "{projectRoot}",
+      "cache": false,
+      "timeoutMs": -1,
+      "declares": {
+        "effects": [
+          "network",
+          "process"
+        ]
+      }
+    },
+    "run-exec": {
+      "description": "Run swift run of the package's executable product, with the versions Package.resolved pins and the arguments, and forward its exit code.",
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": [
+        "run"
+      ],
+      "cwd": "{projectRoot}",
+      "cache": false,
+      "timeoutMs": -1,
+      "declares": {
+        "effects": [
+          "network",
+          "process",
+          "workspace-files"
+        ]
+      }
+    },
+    "deps-upgrade-exec": {
+      "description": "Run swift package update at each package of the workspace with the selected Swift. An Xcode project keeps its pins and is left out.",
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": [
+        "deps-upgrade"
+      ],
+      "cwd": "{workspaceRoot}",
+      "cache": false,
+      "timeoutMs": 1800000,
+      "declares": {
+        "effects": [
+          "network",
+          "process",
+          "toolchain-cache",
+          "workspace-files"
+        ]
+      }
+    }
+  }
+}

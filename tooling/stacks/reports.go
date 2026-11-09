@@ -229,8 +229,9 @@ func relabel(d []diag.Diagnostic, name string) []diag.Diagnostic {
 }
 
 // globFiles returns the regular files a slash pattern matches under base,
-// with "**" for any number of directories, sorted.
-func globFiles(base, pattern string) ([]string, error) {
+// with "**" for any number of directories, sorted. A "**" walk never enters a
+// directory named in excludes.
+func globFiles(base, pattern string, excludes ...string) ([]string, error) {
 	if !strings.Contains(pattern, "**") {
 		matches, err := filepath.Glob(filepath.Join(base, filepath.FromSlash(pattern)))
 		if err != nil {
@@ -257,7 +258,7 @@ func globFiles(base, pattern string) ([]string, error) {
 			return nil
 		}
 		if entry.IsDir() {
-			if p != start && (entry.Name() == ".git" || entry.Name() == ".putnami") {
+			if p != start && (entry.Name() == ".git" || entry.Name() == ".putnami" || slices.Contains(excludes, entry.Name())) {
 				return filepath.SkipDir
 			}
 			return nil

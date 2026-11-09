@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path"
 	"path/filepath"
@@ -83,7 +84,18 @@ type Stack struct {
 	// of the component's. A tool already on the PATH of env needs no
 	// directory. Nil means the stack installs no tool.
 	Tools func(ctx context.Context, task string, meta Metadata, env []string, info func(string)) ([]string, error)
+	// Commands are the extension's own runtime commands, by name: a step
+	// runs one as {runtime} <name> <args>. A name is neither a task nor a
+	// control call.
+	Commands map[string]Command
+	// Runtime is the path {runtime} expands to; empty means the running
+	// executable.
+	Runtime string
 }
+
+// Command is a runtime command of a stack extension. It runs in the step's
+// directory, with the step's environment, and its error fails the step.
+type Command func(args []string, stdout, stderr io.Writer) error
 
 // Provided is a toolchain a stack extension installed.
 type Provided struct {
@@ -114,6 +126,7 @@ type Metadata struct {
 const (
 	CodeProjectConfigInvalid = "stacks.project_config_invalid"
 	CodeStackRootUnsupported = "stacks.stack_root_unsupported"
+	CodeComponentConflict    = "stacks.component_conflict"
 )
 
 // Probe answers a workspace probe: one project per component the detector
@@ -123,6 +136,11 @@ func (s Stack) Probe(root string, request wsproto.ProbeRequest) (wsproto.ProbeRe
 	result := wsproto.ProbeResult{Version: wsproto.ProbeProtocolVersion, Extension: s.Extension}
 	components, diags := s.Detect(root, request)
 	result.Diagnostics = append(result.Diagnostics, diags...)
+	components, conflicts := firstPerPath(components)
+	for _, c := range conflicts {
+		result.Diagnostics = append(result.Diagnostics, diag.Warningf(CodeComponentConflict, c.Path,
+			"%s holds two components; the first one the detector names is the project, and %s is left out", c.Path, c.Name))
+	}
 	deps, leftOut := rootEdges(components)
 	for _, c := range components {
 		if reason, out := leftOut[c.Path]; out {
@@ -159,7 +177,9 @@ func (s Stack) Probe(root string, request wsproto.ProbeRequest) (wsproto.ProbeRe
 		rootFiles := profile.RootPatterns()
 		var watched []string
 		for _, m := range s.Profile.Markers {
-			watched = appendNew(watched, joinRel(c.Path, m))
+			if !strings.ContainsAny(m, "*?[") {
+				watched = appendNew(watched, joinRel(c.Path, m))
+			}
 		}
 		for _, f := range profile.Toolchain.Files {
 			watched = appendNew(watched, joinRel(c.Path, f.Path))
@@ -184,6 +204,21 @@ func (s Stack) Probe(root string, request wsproto.ProbeRequest) (wsproto.ProbeRe
 	}
 	wsproto.NormalizeProbeResult(&result)
 	return result, nil
+}
+
+// firstPerPath keeps the first component the detector names at each path,
+// and returns the others.
+func firstPerPath(components []Component) (kept, dropped []Component) {
+	seen := map[string]bool{}
+	for _, c := range components {
+		if seen[c.Path] {
+			dropped = append(dropped, c)
+			continue
+		}
+		seen[c.Path] = true
+		kept = append(kept, c)
+	}
+	return kept, dropped
 }
 
 // rootEdges returns the dependencies the probe answers for each component:
@@ -383,7 +418,7 @@ func (s Stack) answer(root string, q wsproto.InputResolveQuery, c found) wsproto
 	patterns = appendNew(patterns, ProjectConfigFile)
 	var files []string
 	for _, pattern := range patterns {
-		matches, err := globFiles(projectAbs, pattern)
+		matches, err := globFiles(projectAbs, pattern, p.Excludes...)
 		if err != nil {
 			return fail("%v", err)
 		}
@@ -395,13 +430,50 @@ func (s Stack) answer(root string, q wsproto.InputResolveQuery, c found) wsproto
 			files = appendNew(files, filepath.ToSlash(rel))
 		}
 	}
+	// The basis leaves the skipped directories out, and its exclusions name
+	// any entry of that name: a .git file at a worktree's root, a linked
+	// Pods. The answer lists only what its basis selects.
+	basis := basisSet(patterns, p.Excludes)
+	files = slices.DeleteFunc(files, func(f string) bool { return !wsproto.SelectsPath(f, basis) })
 	slices.Sort(files)
 	return wsproto.InputResolveAnswer{
 		Project:  q.Project,
 		Selector: q.Selector,
 		Files:    files,
-		Basis:    wsproto.InputBasis{Content: [][]string{patterns}},
+		Basis:    wsproto.InputBasis{Content: [][]string{basis}},
 	}
+}
+
+// basisSet is the basis of an answer: its patterns, without the directories a
+// "**" walk skips, so a write under .git, .putnami or an excluded build
+// directory neither moves the digest nor races its read. A directory a
+// pattern names before its first wildcard is walked, so it stays in.
+func basisSet(patterns, excludes []string) []string {
+	if !slices.ContainsFunc(patterns, func(p string) bool { return strings.Contains(p, "**") }) {
+		return patterns
+	}
+	out := slices.Clone(patterns)
+	for _, dir := range append([]string{".git", ".putnami"}, excludes...) {
+		if !slices.ContainsFunc(patterns, func(p string) bool { return literalPrefixNames(p, dir) }) {
+			out = append(out, "!**/"+dir+"/**")
+		}
+	}
+	return out
+}
+
+// literalPrefixNames reports whether pattern names dir as one of the
+// directories before its first wildcard segment.
+func literalPrefixNames(pattern, dir string) bool {
+	segments := strings.Split(pattern, "/")
+	for _, seg := range segments[:len(segments)-1] {
+		if strings.ContainsAny(seg, "*?[") {
+			return false
+		}
+		if seg == dir {
+			return true
+		}
+	}
+	return false
 }
 
 // found is what the detector says about an asked project.
@@ -437,6 +509,7 @@ func (s Stack) components(root string, queries []wsproto.InputResolveQuery) map[
 	}
 	slices.Sort(paths)
 	components, _ := s.Detect(root, wsproto.ProbeRequest{Version: wsproto.ProbeProtocolVersion, Extension: s.Extension, Paths: paths})
+	components, _ = firstPerPath(components)
 	for _, c := range components {
 		f := found{known: true, ownRoot: c.Root == c.Path, rootOnly: c.InputOnly, variant: c.Variant}
 		out[c.Path] = f

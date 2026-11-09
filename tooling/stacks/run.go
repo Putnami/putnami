@@ -486,6 +486,17 @@ func (s Stack) run(ctx context.Context, in runInput, emit reporter) (string, map
 	}
 
 	vars := map[string]string{"{root}": rootAbs, "{component}": meta.Component, "{project}": in.projectAbs, "{output}": outDir}
+	// {runtime} is resolved only for a task that names it, so a stack with
+	// no runtime command never depends on locating its own executable.
+	if slices.ContainsFunc(t.Steps, func(step []string) bool {
+		return slices.ContainsFunc(step, func(a string) bool { return strings.Contains(a, "{runtime}") })
+	}) {
+		runtime, err := s.runtimePath()
+		if err != nil {
+			return statusFailed, nil, failWith(emit, CodeStepFailed, "%v", err)
+		}
+		vars["{runtime}"] = runtime
+	}
 	// A test runner exits non-zero when a case fails: the steps stop there,
 	// and the reports it wrote are still read, so the failed cases name the
 	// failure.
@@ -598,6 +609,19 @@ func hasCoverageSupport(ctx context.Context, program string, args []string, dir 
 	cmd.Dir = dir
 	cmd.Env = env
 	return cmd.Run() == nil
+}
+
+// runtimePath is what {runtime} expands to: Stack.Runtime, else the running
+// executable.
+func (s Stack) runtimePath() (string, error) {
+	if s.Runtime != "" {
+		return s.Runtime, nil
+	}
+	exe, err := os.Executable()
+	if err != nil {
+		return "", fmt.Errorf("locate the extension runtime for {runtime}: %w", err)
+	}
+	return exe, nil
 }
 
 func severity(d diag.Diagnostic) string {

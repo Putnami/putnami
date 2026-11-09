@@ -189,6 +189,21 @@ A task's `reports.when` names project files: when none exists, the task
 expects no report, so a module without tests passes. A coverage report marked
 `optional` is read when it exists and fails nothing when it does not.
 
+### Nested markers, excluded directories and runtime commands
+
+[ADR 0007](adr/0007-nested-markers-excludes-and-runtime-commands.md) adds
+three members a stack needs when its components have no fixed layout or its
+tools write to standard output:
+
+| Member | Meaning |
+|---|---|
+| `markers` | A marker may name a file one directory down with a wildcard directory: `*.xcodeproj/project.pbxproj`. |
+| `excludes` | Directory names an input pattern with `**` never walks into: `.build`, `DerivedData`. |
+| `{runtime}` | In a step: the extension's own executable, which runs a command the extension registers in `Stack.Commands`. |
+
+When the detector names two components at one path, the first is the project,
+and the probe reports the other with `stacks.component_conflict`.
+
 ### A project overrides any value
 
 A project overrides its profile in its `putnami.json`, under its stack
