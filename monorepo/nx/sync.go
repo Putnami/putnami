@@ -338,7 +338,7 @@ func importReason(declared, isTS bool, task string, target detect.Target) string
 		return fmt.Sprintf("the workspace does not declare %s: %s keeps running through nx run", TypeScriptExtension, task)
 	}
 	if !isTS {
-		return fmt.Sprintf("the project is no TypeScript project (package.json, and tsconfig.json or a .ts source): %s keeps running through nx run", task)
+		return fmt.Sprintf("the project is no TypeScript project (package.json, and a tsconfig*.json or a .ts source): %s keeps running through nx run", task)
 	}
 	return fmt.Sprintf("@putnami/typescript runs %s, not %q: %s keeps running through nx run", strings.Join(typeScriptCommands[task], " or "), runs, task)
 }
@@ -397,16 +397,27 @@ var testConfigs = []string{
 	"vite.config.ts", "vite.config.js", "vite.config.mts", "vitest.config.ts", "vitest.config.js", "vitest.config.mts",
 }
 
-// configString matches a string member of a test configuration by key.
-func configString(text, key string) string {
+// rawConfigString matches a string member of a test configuration by key,
+// as written.
+func rawConfigString(text, key string) string {
 	m := regexp.MustCompile(`\b` + key + `\s*:\s*['"]([^'"]+)['"]`).FindStringSubmatch(text)
 	if m == nil {
 		return ""
 	}
-	// jest reads <rootDir> as the directory of its configuration, the
-	// project's.
-	value := strings.ReplaceAll(m[1], "<rootDir>/", "")
+	return m[1]
+}
+
+// configString is rawConfigString with jest's <rootDir>, the directory of its
+// configuration, read as the project directory.
+func configString(text, key string) string {
+	value := strings.ReplaceAll(rawConfigString(text, key), "<rootDir>/", "")
 	return strings.ReplaceAll(value, "<rootDir>", ".")
+}
+
+// safeReportPath reports whether a report path stays under the directory it
+// is read from and names no placeholder the sync does not resolve.
+func safeReportPath(file string) bool {
+	return file != ".." && !strings.HasPrefix(file, "../") && !path.IsAbs(file) && !strings.Contains(file, "<")
 }
 
 // testReports is the reports override of a project's test task: the JUnit
@@ -428,6 +439,7 @@ func testReports(root, dir string, target detect.Target) map[string]any {
 	if strings.Contains(text, "junit") {
 		file := ""
 		if strings.Contains(text, "jest-junit") {
+			rawDir := rawConfigString(text, "outputDirectory")
 			outDir, outName := configString(text, "outputDirectory"), configString(text, "outputName")
 			if outDir == "" {
 				outDir = "."
@@ -437,20 +449,21 @@ func testReports(root, dir string, target detect.Target) map[string]any {
 			}
 			file = path.Join(outDir, outName)
 			// Under @nx/jest, jest runs in the workspace root, where
-			// jest-junit resolves its outputDirectory, unless it names
-			// <rootDir>.
-			if strings.HasPrefix(target.Executor, "@nx/jest:") || strings.HasPrefix(target.Executor, "@nrwl/jest:") {
-				if !strings.Contains(text, "<rootDir>") && !strings.HasPrefix(file, "../") {
+			// jest-junit resolves an outputDirectory that does not start
+			// from <rootDir>.
+			nxJest := strings.HasPrefix(target.Executor, "@nx/jest:") || strings.HasPrefix(target.Executor, "@nrwl/jest:")
+			if nxJest && !strings.Contains(rawDir, "<rootDir>") {
+				if safeReportPath(file) {
 					reports["junit"] = []any{"{root}/" + file}
-					file = ""
 				}
+				file = ""
 			}
 		} else if out := configString(text, "junit"); out != "" {
 			file = path.Clean(out)
 		} else if out := configString(text, "outputFile"); out != "" {
 			file = path.Clean(out)
 		}
-		if file != "" && !strings.HasPrefix(file, "../") && !path.IsAbs(file) && !strings.Contains(file, "<") {
+		if file != "" && safeReportPath(file) {
 			reports["junit"] = []any{file}
 		}
 	}
@@ -470,7 +483,7 @@ func testReports(root, dir string, target detect.Target) map[string]any {
 			covDir = "coverage"
 		}
 		file := path.Join(covDir, name)
-		if !strings.HasPrefix(file, "../") && !path.IsAbs(file) && !strings.Contains(file, "<") {
+		if safeReportPath(file) {
 			reports["coverage"] = []any{map[string]any{"format": format, "paths": []any{file}}}
 		}
 	}

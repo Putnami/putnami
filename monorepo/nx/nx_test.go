@@ -377,6 +377,18 @@ func TestTheReportsResolveRootDirAndTheNxJestWorkingDirectory(t *testing.T) {
 	if got, want := reports("nx:run-script"), map[string]any{"junit": []any{"reports/libs/a/junit.xml"}}; !reflect.DeepEqual(got, want) {
 		t.Errorf("run-script reports = %v, want %v", got, want)
 	}
+	// The demo's configuration names <rootDir> elsewhere: under @nx/jest its
+	// jest-junit report still lands in the workspace root.
+	config(readDemo(t)["base"]["packages/pricing/jest.config.js"])
+	want = map[string]any{"junit": []any{"{root}/reports/junit.xml"}, "coverage": []any{map[string]any{"format": "cobertura", "paths": []any{"reports/coverage/cobertura-coverage.xml"}}}}
+	if got := reports("@nx/jest:jest"); !reflect.DeepEqual(got, want) {
+		t.Errorf("demo under @nx/jest = %v, want %v", got, want)
+	}
+	// An absolute outputDirectory names no report.
+	config(`export default { reporters: [['jest-junit', { outputDirectory: '/tmp/reports' }]] };`)
+	if got := reports("@nx/jest:jest"); got != nil {
+		t.Errorf("an absolute outputDirectory = %v, want no report", got)
+	}
 }
 
 func TestAStaleProjectGraphFailsValidate(t *testing.T) {
