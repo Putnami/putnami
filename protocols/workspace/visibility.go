@@ -73,6 +73,10 @@ const (
 	// DependencySourcePackageJSON is an edge a package.json dependency on a
 	// workspace package states.
 	DependencySourcePackageJSON DependencySource = "package-json"
+	// DependencySourceBuildGraph is an edge the build tool of a delegated stack
+	// states in its own dependency graph (pants peek ::, a Pants export). The
+	// tool builds with it, so it backs the edge as an import does.
+	DependencySourceBuildGraph DependencySource = "build-graph"
 	// DependencySourceContract is the edge from a generated client to the
 	// provider whose contract it was generated from. It is derived by core from
 	// the committed client manifest and is never reported by a provider.
@@ -85,6 +89,7 @@ var ValidDependencySources = []DependencySource{
 	DependencySourceGoModule,
 	DependencySourcePackageJSON,
 	DependencySourceContract,
+	DependencySourceBuildGraph,
 }
 
 // Valid reports whether s is a member of the closed set.
@@ -106,9 +111,10 @@ func (s DependencySource) ReportableByProvider() bool {
 }
 
 // IsImport reports whether this source is a real import — code that reads code
-// — as opposed to a declaration. Visibility is enforced on imports only.
+// — as opposed to a declaration. A delegated build tool's graph counts as one:
+// the tool performs the edge. Visibility is enforced on imports only.
 func (s DependencySource) IsImport() bool {
-	return s == DependencySourceGoModule || s == DependencySourcePackageJSON
+	return s == DependencySourceGoModule || s == DependencySourcePackageJSON || s == DependencySourceBuildGraph
 }
 
 // StrongerDependencySource is the deterministic winner when two providers

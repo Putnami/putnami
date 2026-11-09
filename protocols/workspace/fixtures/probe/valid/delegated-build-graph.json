@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "extension": "@putnami/pants",
+  "projects": [
+    {
+      "path": "src/python/api",
+      "sourceName": "src/python/api",
+      "sourceFile": "src/python/api/BUILD",
+      "tags": ["pants"],
+      "dependencies": ["3rdparty/python", "src/python/pricing"],
+      "dependencySources": { "3rdparty/python": "build-graph", "src/python/pricing": "build-graph" },
+      "extensions": ["@putnami/pants"]
+    },
+    { "path": "src/python/pricing", "sourceName": "src/python/pricing", "extensions": ["@putnami/pants"] },
+    { "path": "3rdparty/python", "sourceName": "3rdparty/python" }
+  ]
+}

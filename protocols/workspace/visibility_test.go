@@ -68,6 +68,9 @@ func TestStrongerDependencySourcePrefersAnImportAndIsOrderIndependent(t *testing
 		{DependencySourcePackageJSON, DependencySourceDeclared, DependencySourcePackageJSON},
 		{DependencySourceGoModule, DependencySourcePackageJSON, DependencySourceGoModule},
 		{DependencySourcePackageJSON, DependencySourceGoModule, DependencySourceGoModule},
+		{DependencySourceDeclared, DependencySourceBuildGraph, DependencySourceBuildGraph},
+		{DependencySourceBuildGraph, DependencySourceDeclared, DependencySourceBuildGraph},
+		{DependencySourceGoModule, DependencySourceBuildGraph, DependencySourceBuildGraph},
 	}
 	for _, tc := range cases {
 		if got := StrongerDependencySource(tc.a, tc.b); got != tc.want {
@@ -80,6 +83,9 @@ func TestDependencySourceClassification(t *testing.T) {
 	spectest.Proves(t, "workspace/workspace-contract", "dependency-sources-attribute-each-edge", "an-edge-is-attributed-to-its-manifest-family")
 	if !DependencySourceGoModule.IsImport() || !DependencySourcePackageJSON.IsImport() {
 		t.Error("a go.mod require and a package.json dependency are imports")
+	}
+	if !DependencySourceBuildGraph.IsImport() || !DependencySourceBuildGraph.ReportableByProvider() {
+		t.Error("a delegated build tool's graph edge is an import a provider may report")
 	}
 	if DependencySourceDeclared.IsImport() || DependencySourceContract.IsImport() {
 		t.Error("a declaration and a contract edge are not imports")

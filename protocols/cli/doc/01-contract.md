@@ -300,6 +300,12 @@ in a repository without a workspace. From 20 on, `putnami extensions install
 install the extension in the user scope without them, so it refuses the stamp.
 The floor binds a manifest wherever it loads from. Only a manifest whose list
 is not empty is stamped 20.
+Contract `21` (`BuildGraphEdgesContract`) is additive for
+`workspace.buildGraphEdges`: a probe that attributes edges to `build-graph`,
+the source of the build tool a delegated stack runs. A reader below 21
+strict-validates each probe answer and would reject one that names the
+source, so it refuses the stamp. The floor binds a manifest wherever it loads
+from. Only a manifest that declares the member is stamped 21.
 Contract `6` was additive for `go-embed:build` and `go-embed:test` in an
 extension's project task inputs, which the CLI expanded itself. Contract 14
 retires that meaning; the number stays taken.
