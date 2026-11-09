@@ -126,6 +126,7 @@ var excludedProjects = map[string]string{
 	"/rust/extension":                                      reasonStackExtension,
 	"/java/extension":                                      reasonStackExtension,
 	"/php/extension":                                       reasonStackExtension,
+	"/dart/extension":                                      reasonStackExtension,
 	"/swift/extension":                                     reasonStackExtension,
 	"/tooling/pants":                                       reasonStackExtension,
 	"/typescript/samples/01-hello-world":                   reasonSample,
@@ -161,7 +162,7 @@ const (
 	reasonCloudCLIExtension       = "Cloud CLI extension: the @putnami/cloud extension binary, a client of the hosted platform that no repository project links from the workspace, whose wire contracts no existing domain owns, owned by cloud"
 	reasonCloudCLIClient          = "generated client: produced by @putnami/clientgen from the published Cloud CLI schema, consumed only by the Cloud CLI extension, owned by cloud"
 	reasonDevelopmentVocabulary   = "development verb vocabulary: the @putnami/dev extension, a new project that stays outside the frontier until a review names the domain that owns the vocabulary, owned by tooling"
-	reasonStackExtension          = "stack core and stack extensions: the @putnami/stacks library and the @putnami/rust, @putnami/php, @putnami/java, @putnami/swift and @putnami/pants extensions built on it, new projects that stay outside the frontier until a review names the domain that owns running a stack Putnami has no full extension for, owned by tooling"
+	reasonStackExtension          = "stack core and stack extensions: the @putnami/stacks library and the @putnami/rust, @putnami/php, @putnami/dart, @putnami/java, @putnami/swift and @putnami/pants extensions built on it, new projects that stay outside the frontier until a review names the domain that owns running a stack Putnami has no full extension for, owned by tooling"
 	reasonEvidenceReaders         = "evidence report readers: the @putnami/evidence-readers library, a new project that stays outside the frontier until a review names the domain that owns the reading of CI test and coverage reports, owned by tooling"
 )
 

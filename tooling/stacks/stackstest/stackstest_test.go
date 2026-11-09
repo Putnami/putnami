@@ -198,3 +198,19 @@ func TestCheckManifestHoldsADelegatedStackUncached(t *testing.T) {
 		}
 	}
 }
+
+func TestCheckManifestHoldsEveryVariant(t *testing.T) {
+	variants := strings.Replace(profile, `"tasks": {`, `"variants": {"alt": {
+    "toolchain": {"files": [{"path": "alt-toolchain"}]},
+    "inputs": {"lockfiles": ["{root}/Cargo.lock", "{root}/alt.lock"]},
+    "tasks": {"lint": {"steps": [["alt", "{target}"]], "targets": [{"name": "x", "hosts": ["linux"]}]}}
+  }},
+  "tasks": {`, 1)
+	r := checkProfile(t, "testdata/manifest.json", variants)
+	got := strings.Join(r.errors, "\n")
+	for _, want := range []string{"toolchain file alt-toolchain", "alt.lock", "lint-run builds host-dependent targets"} {
+		if !strings.Contains(got, want) {
+			t.Errorf("errors %v, want one with %q", r.errors, want)
+		}
+	}
+}

@@ -100,9 +100,9 @@ func TestPubWorkspaceMembersAreComponents(t *testing.T) {
 	spectest.Proves(t, feature, "dart-package-edges", "a-workspace-package-dependency-is-an-edge")
 	d := Detect(writeTree(t, pubWorkspace))
 	want := []Component{
-		{ID: "apps/mobile", Name: "mobile", Source: evidence.SourceWorkspace, DependsOn: []string{"packages/pricing", "packages/ui"}},
-		{ID: "packages/pricing", Name: "pricing", Source: evidence.SourceWorkspace},
-		{ID: "packages/ui", Name: "ui", Source: evidence.SourceWorkspace, DependsOn: []string{"packages/pricing"}},
+		{ID: "apps/mobile", Name: "mobile", Source: evidence.SourceWorkspace, DependsOn: []string{"packages/pricing", "packages/ui"}, Flutter: true, PubWorkspace: "."},
+		{ID: "packages/pricing", Name: "pricing", Source: evidence.SourceWorkspace, PubWorkspace: "."},
+		{ID: "packages/ui", Name: "ui", Source: evidence.SourceWorkspace, DependsOn: []string{"packages/pricing"}, Flutter: true, PubWorkspace: "."},
 		{ID: "packages/ui/example", Name: "ui_example", Source: evidence.SourceManifest, DependsOn: []string{"packages/ui"}},
 		{ID: "tools/gen", Name: "gen", Source: evidence.SourceManifest},
 	}
@@ -297,8 +297,8 @@ func TestABuildDirectoryIsWalkedOnlyWhenItIsAPackage(t *testing.T) {
 		"app/build/web/pubspec.yaml":      "name: copied\n",
 	}))
 	want := []Component{
-		{ID: "app", Name: "app", Source: evidence.SourceWorkspace, DependsOn: []string{"build"}},
-		{ID: "build", Name: "build", Source: evidence.SourceWorkspace},
+		{ID: "app", Name: "app", Source: evidence.SourceWorkspace, DependsOn: []string{"build"}, PubWorkspace: "."},
+		{ID: "build", Name: "build", Source: evidence.SourceWorkspace, PubWorkspace: "."},
 	}
 	if !reflect.DeepEqual(d.Components, want) {
 		t.Errorf("components %+v", d.Components)
@@ -319,6 +319,45 @@ func TestPatternsStayInTheRepository(t *testing.T) {
 		got, ok := patternSegments(pattern)
 		if ok != (want != nil) || !slices.Equal(got, want) {
 			t.Errorf("patternSegments(%q) = %v, %v; want %v", pattern, got, ok, want)
+		}
+	}
+}
+
+func TestAPackageThatNamesTheFlutterSDKIsAFlutterPackage(t *testing.T) {
+	d := byID(Detect(writeTree(t, map[string]string{
+		"app/pubspec.yaml":    "name: app\ndependencies:\n  flutter:\n    sdk: flutter\n",
+		"tests/pubspec.yaml":  "name: tests\ndev_dependencies:\n  flutter_test:\n    sdk: flutter\n",
+		"pinned/pubspec.yaml": "name: pinned\nenvironment:\n  sdk: ^3.7.0\n  flutter: \">=3.29.0\"\n",
+		"cli/pubspec.yaml":    "name: cli\nenvironment:\n  sdk: ^3.7.0\ndependencies:\n  args: ^2.6.0\n  meta:\n    sdk: dart\n",
+	})))
+	for id, want := range map[string]bool{"app": true, "tests": true, "pinned": true, "cli": false} {
+		if d[id].Flutter != want {
+			t.Errorf("%s Flutter = %v, want %v", id, d[id].Flutter, want)
+		}
+	}
+}
+
+func TestANestedPubWorkspaceResolvesItsMembers(t *testing.T) {
+	spectest.Proves(t, feature, "dart-packages-are-components", "pub-workspace-members-are-components")
+	d := byID(Detect(writeTree(t, map[string]string{
+		"mono/pubspec.yaml":            "name: mono\npublish_to: none\nworkspace:\n  - app\n  - core\n",
+		"mono/app/pubspec.yaml":        "name: app\nresolution: workspace\ndependencies:\n  core:\n",
+		"mono/core/pubspec.yaml":       "name: core\nresolution: workspace\n",
+		"mono/tools/x/pubspec.yaml":    "name: x\n",
+		"outer/pubspec.yaml":           "name: outer\nworkspace: [inner]\n",
+		"outer/inner/pubspec.yaml":     "name: inner\nresolution: workspace\nworkspace: [lib]\n",
+		"outer/inner/lib/pubspec.yaml": "name: deep\nresolution: workspace\n",
+	})))
+	for id, want := range map[string]Component{
+		"mono":            {ID: "mono", Name: "mono", Source: evidence.SourceManifest, DeclaresWorkspace: true},
+		"mono/app":        {ID: "mono/app", Name: "app", Source: evidence.SourceWorkspace, PubWorkspace: "mono", DependsOn: []string{"mono/core"}},
+		"mono/core":       {ID: "mono/core", Name: "core", Source: evidence.SourceWorkspace, PubWorkspace: "mono"},
+		"mono/tools/x":    {ID: "mono/tools/x", Name: "x", Source: evidence.SourceManifest},
+		"outer/inner":     {ID: "outer/inner", Name: "inner", Source: evidence.SourceWorkspace, PubWorkspace: "outer", DeclaresWorkspace: true},
+		"outer/inner/lib": {ID: "outer/inner/lib", Name: "deep", Source: evidence.SourceWorkspace, PubWorkspace: "outer"},
+	} {
+		if got := d[id]; !reflect.DeepEqual(got, want) {
+			t.Errorf("%s = %+v, want %+v", id, got, want)
 		}
 	}
 }

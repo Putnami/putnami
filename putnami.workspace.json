@@ -13,6 +13,7 @@
     "/typescript/extension",
     "/typescript/framework/application",
     "/typescript/framework/web",
+    "/dart/extension",
     "/java/extension",
     "/php/extension",
     "/python/extension",
@@ -34,6 +35,7 @@
   ],
   "includes": [
     "cloud",
+    "dart",
     "go",
     "intelligence",
     "java",

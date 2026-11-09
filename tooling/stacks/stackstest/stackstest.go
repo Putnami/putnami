@@ -54,7 +54,7 @@ func CheckManifest(t testing.TB, path string, s stacks.Stack) {
 		}
 	}
 	for _, v := range s.Profile.Applied() {
-		for _, f := range v.Toolchain.Files {
+		for _, f := range v.Toolchain.AllFiles() {
 			if !slices.Contains(doc.Workspace.Inputs, f.Path) {
 				t.Errorf("workspace.inputs %v does not hold the toolchain file %s", doc.Workspace.Inputs, f.Path)
 			}
@@ -135,6 +135,9 @@ func checkTask(t testing.TB, doc manifest, s stacks.Stack, task string) {
 				t.Errorf("task %s input %s = %v, want the stack-root files of every variant %v", step.Task, name, got, want)
 			}
 		}
+	}
+	if host, ok := decl.Inputs["hostPlatform"]; s.Profile.HostDependent(task) && (!ok || host.From != "runtime") {
+		t.Errorf("task %s builds host-dependent targets but reads no hostPlatform runtime input", step.Task)
 	}
 	if !selector {
 		t.Errorf("task %s reads no project input that names %s", step.Task, s.Selector(task))

@@ -1,0 +1,258 @@
+# Run a Dart or Flutter repository with Putnami
+
+`@putnami/dart` turns each package of a Dart or Flutter repository into a
+Putnami project and runs its lint, test and build with the dart and flutter
+tools the team already uses. It reads the repository the way `putnami
+observe` does, and installs the SDK a package needs when the machine has
+none.
+
+## Adopt it
+
+1. Declare the extension in `putnami.workspace.json`:
+
+   ```json
+   { "extensions": ["@putnami/dart"] }
+   ```
+
+2. Run `putnami projects sync`. Each directory whose `pubspec.yaml` names a
+   package joins the workspace's `includes`; the root of a pub workspace does
+   not. No `putnami.json` is needed: the extension names the project by its
+   pubspec name, adds an edge to each package it depends on by path or through
+   the root pub workspace or melos repository, and tags it `dart`.
+3. Commit the `pubspec.lock` of each pub workspace and standalone package: the
+   tasks resolve with `--enforce-lockfile`, so they never write the lockfile
+   they read, and a package without one fails with pub's own message.
+4. Run `putnami lint,test,build`. A machine with no Dart or Flutter SDK
+   needs nothing more: see [Install the SDK](#install-the-sdk).
+
+## Dart and Flutter packages
+
+A package whose `pubspec.yaml` depends on the Flutter SDK (`sdk: flutter`, in
+`dependencies` or `dev_dependencies`) or states `environment.flutter` runs the
+`flutter` variant of the profile. A pure Dart package that a pub workspace
+holding a Flutter package lists runs the `dart-in-flutter` variant: only
+flutter resolves that workspace, so the package resolves with
+`flutter pub get` and runs `dart`. Any other package is a pure Dart package
+and runs the `dart` variant, the profile itself, a pure Dart melos package
+included, since it resolves on its own.
+
+A package that a pub workspace lists, at the workspace root or below it, has
+that workspace's directory for stack root: pub resolves it there, with one
+`pubspec.lock`. The root of a pub workspace below the workspace root is an
+input-only project, whose selectors answer its `pubspec.yaml` and
+`pubspec.lock`; each member depends on it. Any other package, a melos package
+included, is its own stack root.
+
+## What each task runs
+
+Each task runs in the package's directory, with no shell. An `install` step
+first resolves the package's stack root with `pub get --enforce-lockfile`,
+with `flutter` when the root holds a Flutter package, unless the selected SDK
+resolved it last: a marker in `.dart_tool/` records the SDK program and the
+version it answers, the pubspecs, `pubspec.lock` and `package_config.json` of
+that resolution, so a resolution another SDK or an editor wrote since, or a
+shim that now selects another SDK, runs `pub get` again. A root with no
+`pubspec.lock` fails: no task writes the lockfile it reads. The input-only root
+of a pub workspace below the workspace root resolves nothing itself: its
+members' install steps resolve it with their SDK. An offline run resolves nothing there: `workspace-install`
+resolved every root from the pub cache before.
+
+| Task | Dart package | Flutter package |
+|---|---|---|
+| `lint` | `dart analyze lib` and `dart analyze bin`, for each that exists | The same |
+| `test` | `dart test --coverage={output}/coverage --file-reporter=json:{output}/tests.json`, then `format_coverage` into `{output}/lcov.info` and `tojunit` | `flutter test --no-pub --coverage --file-reporter=json:{output}/tests.json`, then `tojunit` |
+| `build` | `dart compile exe bin/<name>.dart -o {output}/<name>` for each `bin/*.dart` | `flutter build <platform>` for each platform of an app |
+
+A `dart-in-flutter` package runs the Dart package's steps. A step's `dart` is
+the one beside the selected `flutter` for a Flutter or `dart-in-flutter`
+package, whatever comes first on `PATH`.
+
+`format_coverage` and `tojunit` are report steps: they run after the test
+runner whatever its outcome, so a failed case names the failure. `tojunit`
+strips the package directory from each test's class name. The test task reads
+the JUnit report `tojunit` writes and the LCOV report, `coverage/lcov.info`
+for a Flutter package, into the test and coverage summary. A failed case, a
+step that exits non-zero, or a missing report fails the task; a package
+without a `test/` directory fails its test task, since `dart test` and
+`flutter test` find nothing to run.
+
+`flutter build` resolves again, keeping the locked versions, and writes the
+release plugin registrant. It may rewrite `pubspec.lock` when the lockfile is
+stale in a way `--enforce-lockfile` does not check, such as its `sdks` after
+an `environment` change, a lockfile with no content hashes, or a
+`pub.dartlang.org` URL: commit the lockfile a plain `pub get` writes.
+
+A Flutter package with `lib/main.dart` is an app. Its build runs one
+`flutter build` per platform directory it holds that the host builds:
+
+| Directory | Target | Hosts |
+|---|---|---|
+| `android/` | `apk` | every host |
+| `web/` | `web` | every host |
+| `linux/` | `linux` | Linux |
+| `macos/` | `macos` | macOS |
+| `windows/` | `windows` | Windows |
+
+A Flutter package that is no app builds nothing. iOS needs code signing, so
+it is no default target: add a step, as shown below. The release APK,
+`build/app/outputs/flutter-apk/app-release.apk`, is copied into the task's
+output, so a cache hit restores it. The web and desktop bundles are
+directories that stay under `build/`: a cache hit does not restore them.
+
+The packages of one pub workspace run one task at a time, since they share
+its `.dart_tool/` and its `pubspec.lock`. A task of a package waits for the
+same task of the packages it depends on.
+
+## Install the SDK
+
+When the `dart` or `flutter` on `PATH` is missing, or it or the Dart a Flutter
+SDK bundles is outside the constraints its package states, a task installs the
+newest stable release the constraints admit, under `tools/dart` of the Putnami
+home, and runs it
+([ADR 0001](adr/0001-the-sdk-installs-from-the-publishers-archives.md)):
+
+| SDK | Release list | Checksum |
+|---|---|---|
+| Dart | The stable releases of the dart-archive on `storage.googleapis.com` | The `.sha256sum` beside each archive |
+| Flutter | The release manifest of the host system on `storage.googleapis.com`; the release must also bundle a Dart in `environment.sdk` | The SHA-256 the manifest names |
+
+The archive is checked before it is unpacked, and later tasks reuse the
+install. The checksum comes over HTTPS from the host that serves the archive:
+it detects a truncated or altered download, not a compromised publisher. An SDK on `PATH` that satisfies the constraint runs, and nothing is
+installed. An offline run installs nothing. A Flutter archive weighs 1.5 to
+2.5 GB and unpacks with the host's `tar`, which needs `xz` on Linux, without
+keeping the archive's owner; Flutter itself needs `git`. Flutter publishes no
+archive for Linux on arm64, where `flutter` must be on `PATH`.
+
+The test task runs `tojunit` and `format_coverage`. For each one its `PATH`
+lacks, it activates `junitreport` 2.0.2 or `coverage` 1.x with the task's
+`dart`, the one beside the selected `flutter` for a package that resolves with
+Flutter, into a pub cache of that Dart SDK version under the Putnami home, and
+runs it from there with that `dart`: the machine's pub cache is untouched. A team that has activated them itself, with
+`~/.pub-cache/bin` on `PATH`, runs its own.
+
+## The SDK version check
+
+Before its steps, each task compares the SDK versions on the machine with the
+constraints the package's `pubspec.yaml` states, then the root's:
+
+| Package | Command | Constraints |
+|---|---|---|
+| Dart | `dart --version` | `environment.sdk` |
+| Flutter | `flutter --version` | `environment.flutter`, and `environment.sdk` for the Dart SDK the Flutter SDK bundles |
+
+The constraints read as pub reads them: a null-safe `environment.sdk` whose
+upper bound is `<3.0.0` admits Dart 3, and, below language version 3.9,
+`environment.flutter` is a lower bound, its upper bound ignored. From an
+`environment.sdk` of 3.9, `environment.flutter` reads as stated.
+
+| Case | Result |
+|---|---|
+| The version is inside the constraint, such as 3.7.2 for `^3.7.0` | The task runs |
+| It is outside | The task fails with `stacks.toolchain_mismatch`; set `toolchain.check` to `warn` to run anyway |
+| The command is not on `PATH` | The task fails with `stacks.toolchain_missing` |
+| No pubspec states any of the constraints | The warning `stacks.toolchain_unpinned`: the cache key carries no SDK version |
+
+The cache key carries the constraints, so two machines with versions inside
+them share entries. A Flutter package that states only `environment.sdk`, as
+`flutter create` writes it, keys and checks its Dart SDK alone.
+
+## What reaches the cache key
+
+A task's key covers the package's files its task reads, the workspace-root
+`pubspec.yaml`, `analysis_options.yaml` and `pubspec.lock`, the package's
+`putnami.json`, its variant, the expected SDK version, and the key of the
+same task of each package it depends on.
+
+| Input set | Patterns |
+|---|---|
+| `code` | `lib/**`, `bin/**` |
+| `tests` | `test/**`, `dart_test.yaml` |
+| `assets` | `assets/**`, `fonts/**`, `l10n.yaml` |
+| `manifests` | `pubspec.yaml`, `pubspec_overrides.yaml`, `analysis_options.yaml`, and the root's `pubspec.yaml` and `analysis_options.yaml` |
+| `lockfiles` | `pubspec.lock`, and the root's `pubspec.lock` |
+| `platforms` | The sources of the `android/`, `ios/`, `macos/`, `web/`, `linux/` and `windows/` directories, without the files `flutter pub get` and `flutter build` generate there: the ephemeral directories and each plugin registrant |
+
+| Task | Input sets |
+|---|---|
+| `lint` | `code`, `manifests`, `lockfiles` |
+| `test` | `code`, `tests`, `assets`, `manifests`, `lockfiles` |
+| `build` | `code`, `manifests`, `lockfiles`; a Flutter package adds `assets` and `platforms` |
+
+`lint` reads no test file, so a change under `test/` reruns test alone. The
+build task also keys the host system, since a Flutter app's targets depend on
+it.
+
+## Override the profile
+
+A package overrides any value of its profile in its own `putnami.json`, under
+`options["@putnami/dart"]`, on top of its variant. An object merges; any
+other value, such as a list of steps or patterns, replaces the profile's
+whole. The overrides a team uses most:
+
+```json
+{
+  "options": {
+    "@putnami/dart": {
+      "tasks": {
+        "lint": {
+          "steps": [["dart", "analyze", "--fatal-infos", "{target}"]],
+          "targets": [{ "name": "lib", "when": ["lib"] }, { "name": "test", "when": ["test"] }],
+          "inputs": ["code", "tests", "manifests", "lockfiles"]
+        },
+        "test": { "steps": [
+          ["flutter", "test", "--no-pub", "--coverage", "--dart-define=ENV=ci", "--file-reporter=json:{output}/tests.json"]
+        ] },
+        "build": { "steps": [["flutter", "build", "ios", "--no-codesign"]], "targets": [] }
+      },
+      "inputs": { "assets": ["assets/**", "fonts/**", "l10n.yaml", "shaders/**", "images/**"] },
+      "toolchain": { "check": "warn" }
+    }
+  }
+}
+```
+
+The lint override above also analyzes `test/`, so it adds `tests` to its
+inputs: its key then follows the test files. A steps override keeps the
+profile's report steps and reports: the test step must still write
+`{output}/tests.json` for `tojunit`, and the LCOV report, or the override also
+replaces `tasks.test.reportSteps` and `tasks.test.reports`. The install step
+resolves the stack root before every task, so no step needs `pub get`. An override
+fails the task with `stacks.project_config_invalid` when it names an unknown
+member, changes `id`, `markers` or `variants`, adds a workspace-root input the
+extension does not declare, names a target whose paths are in none of the
+task's inputs, or adds `hosts` to a task other than build, which alone keys
+the host system. The design of the stack core is in
+[its design note](../../../tooling/stacks/doc/01-design.md).
+
+## Workspace commands
+
+| Command | What it runs |
+|---|---|
+| `putnami workspace-fetch` | `pub get --enforce-lockfile` at each stack root, which downloads the locked packages into the pub cache and runs none of their code. A hosted run calls it with the network, before any repository process. A root with no `pubspec.lock` fails it. |
+| `putnami workspace-install` | `pub get --enforce-lockfile` at each stack root, with `flutter` when the root holds a Flutter package, `--offline` in an offline run. A root the selected SDK resolved last, with the same pubspecs, `pubspec.lock` and `package_config.json`, is current and skipped; `--force` resolves it anyway. A root with no `pubspec.lock` yet resolves one. A root whose SDK the machine lacks in an offline run is left out with a warning. |
+| `putnami deps-upgrade` | `pub upgrade` at each stack root. It needs the network. |
+| `putnami run` | `dart run` in a Dart command-line package, with `--entrypoint` and `--args`, and forwards its exit code. A Flutter app runs on a device with `flutter run`, outside Putnami. |
+| `putnami serve` | A Dart server: `dart run` on `bin/server.dart`, or `--entrypoint`, or the package's executable, with `PORT` set. A Flutter app with `web/`: `flutter run -d web-server --web-port <port> --web-hostname 0.0.0.0`. It reports ready once the port accepts connections; `--port 0` picks a free one. |
+| `putnami lint --docs-links` | Checks every relative link and anchor of the package's `README.md` and `doc/`, on by default. |
+
+A package with `bin/*.dart` or `lib/main.dart` is an application, which `run`
+and `serve` accept; any other is a library.
+
+`putnami test --test` is not offered: `dart test` and `flutter test` fail a
+run whose filter selects no test, so a filter that reaches the packages a
+selected one depends on would fail them.
+
+## Limits
+
+- On Windows, `dart compile exe` writes the executable under the target's
+  name, with no `.exe`.
+- An offline task installs nothing: a hosted run needs `dart` or `flutter`,
+  `tojunit` and `format_coverage` on `PATH` of its runner.
+- Each package selects its SDK from its own pubspec, then its stack root's:
+  the members of one pub workspace whose constraints admit no common SDK
+  resolve with whichever installs first.
+- No package or publish: a package reaches pub.dev through
+  `dart pub publish`, and an application image is built outside Putnami.
+- melos scripts do not run: the tasks run the profile's dart and flutter
+  steps.

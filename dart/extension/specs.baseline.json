@@ -1,0 +1,17 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-specs-baseline.json",
+  "protocolVersion": 2,
+  "executableRequirements": [
+    "dart/stack-extension#installs-the-sdk",
+    "dart/stack-extension#installs-the-test-tools",
+    "dart/stack-extension#lint-skips-test-changes",
+    "dart/stack-extension#manifest-follows-the-profile",
+    "dart/stack-extension#overrides-are-honored",
+    "dart/stack-extension#packages-become-projects",
+    "dart/stack-extension#reports-become-the-summary",
+    "dart/stack-extension#runs-and-serves",
+    "dart/stack-extension#tasks-run-the-profile",
+    "dart/stack-extension#variant-follows-the-resolver",
+    "dart/stack-extension#workspace-commands"
+  ]
+}

@@ -200,3 +200,88 @@ func compareRelease(a, b []int) int {
 	}
 	return 0
 }
+
+var (
+	// pubPreRelease is the pre-release or build suffix of a pub version, such
+	// as the "-0" of "<3.0.0-0": only the numeric release is compared.
+	pubPreRelease = regexp.MustCompile(`([0-9])[-+][0-9A-Za-z.\-+]*`)
+	// pubZeroCaret is a pub caret on a 0.0 release: pub fixes the minor
+	// version, ^0.0.3 is [0.0.3, 0.1.0), where Composer fixes the patch.
+	pubZeroCaret = regexp.MustCompile(`\^\s*v?0\.0\.([0-9]+)`)
+	// pubJoined is an operator joined to the version before it, as pub reads
+	// ">=3.7.0<4.0.0".
+	pubJoined = regexp.MustCompile(`([0-9])(<|>|=)`)
+)
+
+// pubSyntax reads a range in pub's syntax with none of its SDK rules.
+const pubSyntax = "pub-syntax"
+
+// parseStated reads a version a file states, in the dialect: Composer's
+// syntax, or pub's for a Dart or Flutter SDK constraint (ADR 0008).
+func (t Toolchain) parseStated(version, dialect string) (versionRange, bool) {
+	if dialect != "" {
+		version = pubZeroCaret.ReplaceAllString(version, ">=0.0.$1 <0.1.0")
+		version = pubPreRelease.ReplaceAllString(version, "$1")
+		version = pubJoined.ReplaceAllString(version, "$1 $2")
+	}
+	r, ok := parseRange(version)
+	if !ok {
+		return nil, false
+	}
+	return applyDialect(r, dialect), true
+}
+
+// applyDialect reads a range the way pub reads an SDK constraint of the
+// dialect: a null-safe Dart SDK constraint, whose lower bound is 2.12 or
+// later, reads an upper bound of 3.0.0 as 4.0.0; a Flutter SDK constraint is a
+// lower bound, its upper bound ignored and an exact version a minimum.
+func applyDialect(r versionRange, dialect string) versionRange {
+	if dialect == "" {
+		return r
+	}
+	out := make(versionRange, 0, len(r))
+	for _, conj := range r {
+		var next []bound
+		nullSafe := false
+		for _, b := range conj {
+			if (b.op == ">=" || b.op == ">") && compareRelease(b.release, []int{2, 12}) >= 0 {
+				nullSafe = true
+			}
+		}
+		for _, b := range conj {
+			switch {
+			case dialect == RangesPubFlutter && (b.op == "<" || b.op == "<="):
+				continue
+			case dialect == RangesPubFlutter && b.op == "=":
+				b.op = ">="
+			case dialect == RangesPubSDK && nullSafe && b.op == "<" && compareRelease(b.release, []int{3}) == 0:
+				b.release = []int{4}
+			}
+			next = append(next, b)
+		}
+		out = append(out, next)
+	}
+	return out
+}
+
+// lowerBound is the lowest release the range admits from below: the smallest
+// lower bound of its alternatives. A range with an alternative that has none
+// reports false.
+func (r versionRange) lowerBound() ([]int, bool) {
+	var low []int
+	for _, conj := range r {
+		var alt []int
+		for _, b := range conj {
+			if (b.op == ">=" || b.op == ">" || b.op == "=") && (alt == nil || compareRelease(b.release, alt) > 0) {
+				alt = b.release
+			}
+		}
+		if alt == nil {
+			return nil, false
+		}
+		if low == nil || compareRelease(alt, low) < 0 {
+			low = alt
+		}
+	}
+	return low, low != nil
+}

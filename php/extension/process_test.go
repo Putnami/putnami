@@ -16,6 +16,7 @@ import (
 	"go.putnami.dev/sdk/extension/cli"
 	pctx "go.putnami.dev/sdk/extension/context"
 	"go.putnami.dev/sdk/extension/jsonl"
+	"go.putnami.dev/tooling/stacks"
 )
 
 // runProjectJob runs a job for the component at rel with the job arguments.
@@ -155,9 +156,9 @@ func runPublish(t *testing.T, root string) (string, map[string]any, error) {
 }
 
 func TestServeAnnouncesAServerThatAcceptsConnections(t *testing.T) {
-	port, err := freePort()
+	port, err := stacks.FreePort()
 	if err != nil || port == 0 {
-		t.Fatalf("freePort: %d %v", port, err)
+		t.Fatalf("FreePort: %d %v", port, err)
 	}
 	listener, err := net.Listen("tcp", net.JoinHostPort("127.0.0.1", strconv.Itoa(port)))
 	if err != nil {
@@ -171,7 +172,7 @@ func TestServeAnnouncesAServerThatAcceptsConnections(t *testing.T) {
 	stdout := os.Stdout
 	os.Stdout = write
 	defer func() { os.Stdout = stdout }()
-	announceReady(context.Background(), jsonl.New(), port)
+	stacks.AnnounceReady(context.Background(), jsonl.New(), port)
 	write.Close()
 	output, err := io.ReadAll(read)
 	if err != nil {

@@ -115,7 +115,7 @@ func TestProbeRecordsTheRefAndTheVariant(t *testing.T) {
 	}
 	for _, p := range result.Projects {
 		var meta Metadata
-		if err := json.Unmarshal(p.Metadata, &meta); err != nil || meta != want[p.Path] {
+		if err := json.Unmarshal(p.Metadata, &meta); err != nil || !reflect.DeepEqual(meta, want[p.Path]) {
 			t.Errorf("%s metadata = %s, want %+v", p.Path, p.Metadata, want[p.Path])
 		}
 		if p.Path == "." && p.SourceName != "" {

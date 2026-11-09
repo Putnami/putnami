@@ -77,11 +77,13 @@ type Stack struct {
 	// ComponentKey is a component name as the stack compares two of them.
 	// Nil compares names as they are.
 	ComponentKey func(name string) string
-	// Provide installs the toolchain a component states when the one on PATH
-	// is missing or outside that statement, or returns the one an earlier call
-	// installed. Nil means the stack installs no toolchain. It needs a profile
-	// that names toolchain.provisioned.
-	Provide func(ctx context.Context, expected Expected, info func(string)) (Provided, error)
+	// Provide installs the toolchain of the component's resolved profile when
+	// the one on PATH is missing or outside the versions its files state, or
+	// returns the one an earlier call installed. expected holds the version
+	// each of the toolchain's checks expects, in the order of Checks. Nil means
+	// the stack installs no toolchain. It needs a profile that names
+	// toolchain.provisioned.
+	Provide func(ctx context.Context, toolchain Toolchain, expected []Expected, info func(string)) (Provided, error)
 	// Tools makes the tools of one task of a component available, beyond the
 	// toolchain, and returns the directories to append to its PATH. meta is
 	// the component's, so a stack with several builds installs only the tools
@@ -121,6 +123,9 @@ type Metadata struct {
 	Root string `json:"root"`
 	// Toolchain is the expected toolchain version the files state.
 	Toolchain Expected `json:"toolchain"`
+	// Toolchains are the expected versions of the further checks, in the
+	// order of toolchain.also.
+	Toolchains []Expected `json:"toolchains,omitempty"`
 	// ReleaseSet declares the artifacts the project contributes to a release
 	// set. It is absent on a project that publishes none.
 	ReleaseSet *releaseset.ProjectMetadata `json:"releaseSet,omitempty"`
@@ -160,9 +165,13 @@ func (s Stack) Probe(root string, request wsproto.ProbeRequest) (wsproto.ProbeRe
 			result.Diagnostics = append(result.Diagnostics, diag.Warningf(CodeProjectConfigInvalid, c.Path, "%s is left out: %v", c.Path, err))
 			continue
 		}
-		expected, err := profile.Toolchain.ExpectedVersion(root, c.Path, c.Root)
-		if err != nil {
-			result.Diagnostics = append(result.Diagnostics, diag.Warningf(CodeToolchainUnpinned, c.Path, "the expected toolchain version cannot be read: %v", err))
+		var expected []Expected
+		for _, check := range profile.Toolchain.Checks() {
+			e, err := check.ExpectedVersion(root, c.Path, c.Root)
+			if err != nil {
+				result.Diagnostics = append(result.Diagnostics, diag.Warningf(CodeToolchainUnpinned, c.Path, "the expected toolchain version cannot be read: %v", err))
+			}
+			expected = append(expected, e)
 		}
 		// A component whose manifest names no package, such as a Composer
 		// application, is named by its directory in the steps: the same on
@@ -174,7 +183,7 @@ func (s Stack) Probe(root string, request wsproto.ProbeRequest) (wsproto.ProbeRe
 		if component == "" && !c.InputOnly {
 			component = c.Path
 		}
-		metadata := Metadata{Component: component, Variant: c.Variant, Root: c.Root, Toolchain: expected}
+		metadata := Metadata{Component: component, Variant: c.Variant, Root: c.Root, Toolchain: expected[0], Toolchains: expected[1:]}
 		if len(c.ReleaseMembers) > 0 {
 			metadata.ReleaseSet = &releaseset.ProjectMetadata{Ecosystems: slices.Clone(c.ReleaseMembers)}
 		}
@@ -189,7 +198,7 @@ func (s Stack) Probe(root string, request wsproto.ProbeRequest) (wsproto.ProbeRe
 				watched = appendNew(watched, joinRel(c.Path, m))
 			}
 		}
-		for _, f := range profile.Toolchain.Files {
+		for _, f := range profile.Toolchain.AllFiles() {
 			watched = appendNew(watched, joinRel(c.Path, f.Path))
 		}
 		for _, f := range rootFiles {
@@ -345,8 +354,12 @@ func (s Stack) Resolved(projectAbs, variant string) (Profile, error) {
 	}
 	// A stack-root pattern reaches the key only through the manifest's
 	// workspace input of its task, which declares the shipped profile's, every
-	// variant's: an override may narrow them, never add one.
+	// variant's: an override may narrow them, never add one. A task keys the
+	// host system only when the manifest declares it.
 	for _, task := range TaskNames {
+		if !s.Profile.HostDependent(task) && p.HostDependent(task) {
+			return Profile{}, fmt.Errorf("%s options[%q]: tasks.%s names a target with hosts, but the extension keys %s with no hostPlatform; drop hosts and name the targets the host builds", ProjectConfigFile, s.Extension, task, task)
+		}
 		shipped := s.Profile.ShippedRootPatterns(task)
 		_, resolved := p.TaskPatterns(task)
 		for _, r := range resolved {
@@ -424,6 +437,7 @@ func (s Stack) answer(root string, q wsproto.InputResolveQuery, c found) wsproto
 		}
 	}
 	patterns = appendNew(patterns, ProjectConfigFile)
+	excludes, kept := p.TaskExcludes(task), p.KeptInputs()
 	var files []string
 	for _, pattern := range patterns {
 		matches, err := globFiles(projectAbs, pattern, p.Excludes...)
@@ -435,7 +449,9 @@ func (s Stack) answer(root string, q wsproto.InputResolveQuery, c found) wsproto
 			if err != nil {
 				continue
 			}
-			files = appendNew(files, filepath.ToSlash(rel))
+			if rel = filepath.ToSlash(rel); slices.Contains(kept, rel) || !Excluded(excludes, rel) {
+				files = appendNew(files, rel)
+			}
 		}
 	}
 	// The basis leaves the skipped directories out, and its exclusions name

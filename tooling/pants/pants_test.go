@@ -182,7 +182,7 @@ func TestThePackagesOfAPantsRepositoryBecomeProjects(t *testing.T) {
 		}
 		var meta stacks.Metadata
 		if err := json.Unmarshal(p.Metadata, &meta); err != nil ||
-			meta != (stacks.Metadata{Component: path, Root: ".", Toolchain: stacks.Expected{Version: "2.25.0", Source: "pants.toml"}}) {
+			!reflect.DeepEqual(meta, stacks.Metadata{Component: path, Root: ".", Toolchain: stacks.Expected{Version: "2.25.0", Source: "pants.toml"}}) {
 			t.Errorf("%s metadata = %s (%v)", path, p.Metadata, err)
 		}
 	}

@@ -17,6 +17,7 @@ use (
 	./cloud/clients/runtime-api
 	./cloud/clients/source-api
 	./cloud/runtime/go
+	./dart/extension
 	./go/extension
 	./go/framework/api
 	./go/framework/app

@@ -4,6 +4,7 @@
 package rust
 
 import (
+	"context"
 	_ "embed"
 	"fmt"
 	"path"
@@ -32,8 +33,10 @@ func Stack() (stacks.Stack, error) {
 		Detect:        Detect,
 		CaseComponent: CaseComponent,
 		ComponentKey:  cargo.PackageKey,
-		Provide:       Provide,
-		Tools:         Tools,
+		Provide: func(ctx context.Context, _ stacks.Toolchain, expected []stacks.Expected, info func(string)) (stacks.Provided, error) {
+			return Provide(ctx, expected[0], info)
+		},
+		Tools: Tools,
 	}, nil
 }
 

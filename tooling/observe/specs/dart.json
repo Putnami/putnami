@@ -16,7 +16,7 @@
   "requirements": [
     {
       "id": "dart-packages-are-components",
-      "text": "Past node_modules, Pods, hidden directories and a build directory with no pubspec.yaml, each directory whose pubspec.yaml names a package is a component of ecosystem dart named by its pubspec. A member of the root pubspec.yaml workspace list, or a package the root melos.yaml packages globs match less its ignore globs, is of source workspace, others of source manifest. A root pubspec.yaml that declares a workspace or sits beside melos.yaml is no component. An unreadable pubspec or melos.yaml is a diagnostic."
+      "text": "Past node_modules, Pods, hidden directories and a build directory with no pubspec.yaml, each directory whose pubspec.yaml names a package is a component of ecosystem dart named by its pubspec. A member of any pubspec.yaml workspace list, or a package the root melos.yaml globs match less its ignore globs, is of source workspace, others of source manifest. A root pubspec.yaml that declares a workspace or sits beside melos.yaml is no component. An unreadable pubspec or melos.yaml is a diagnostic."
     },
     {
       "id": "dart-package-edges",

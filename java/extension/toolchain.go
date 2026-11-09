@@ -68,38 +68,37 @@ var downloadURL = func(url string) string { return url }
 // version accepts, defaultVersion first, else the newest, when the javac on
 // PATH is missing or outside it, and answers its javac. A release installed by
 // an earlier task is reused with no network access.
-func Provide(toolchain stacks.Toolchain) func(ctx context.Context, expected stacks.Expected, info func(string)) (stacks.Provided, error) {
-	return func(ctx context.Context, expected stacks.Expected, info func(string)) (stacks.Provided, error) {
-		chosen, ok := choose(acceptedBy(toolchain, jdks, expected), "")
-		if !ok {
-			return stacks.Provided{}, fmt.Errorf("no Temurin JDK the extension pins (%s) satisfies %s %s", pinnedVersions(), expected.Source, expected.Version)
-		}
-		a, ok := chosen.archives[hostPlatform]
-		if !ok {
-			return stacks.Provided{}, fmt.Errorf("the extension pins no Temurin JDK %s for %s", chosen.version, hostPlatform)
-		}
-		home := putnamihome.Resolve(os.Getenv)
-		if home == "" {
-			return stacks.Provided{}, fmt.Errorf("no Putnami home to install the JDK in: set %s", putnamihome.Env)
-		}
-		dir := filepath.Join(home, "toolchains", "java", "java-"+chosen.version)
-		executable := filepath.Join(dir, filepath.FromSlash(a.executable))
-		if _, err := os.Stat(executable); err != nil {
-			info("installing the Eclipse Temurin JDK " + chosen.version)
-		}
-		format := pinnedarchive.TarGz
-		if a.format == wsproto.LockArchiveFormatZip {
-			format = pinnedarchive.Zip
-		}
-		pin := pinnedarchive.Pin{URL: downloadURL(a.url), SHA256: a.sha256, Format: format}
-		if _, err := pinnedarchive.Install(ctx, pin, dir, pinnedarchive.Options{Limits: pinnedarchive.DefaultLimits(), SkipLinks: true, Complete: func(candidate string) bool {
-			_, err := os.Stat(filepath.Join(candidate, filepath.FromSlash(a.executable)))
-			return err == nil
-		}}); err != nil {
-			return stacks.Provided{}, fmt.Errorf("install the Temurin JDK %s: %w", chosen.version, err)
-		}
-		return stacks.Provided{Executable: executable}, nil
+func Provide(ctx context.Context, toolchain stacks.Toolchain, expectedAll []stacks.Expected, info func(string)) (stacks.Provided, error) {
+	expected := expectedAll[0]
+	chosen, ok := choose(acceptedBy(toolchain, jdks, expected), "")
+	if !ok {
+		return stacks.Provided{}, fmt.Errorf("no Temurin JDK the extension pins (%s) satisfies %s %s", pinnedVersions(), expected.Source, expected.Version)
 	}
+	a, ok := chosen.archives[hostPlatform]
+	if !ok {
+		return stacks.Provided{}, fmt.Errorf("the extension pins no Temurin JDK %s for %s", chosen.version, hostPlatform)
+	}
+	home := putnamihome.Resolve(os.Getenv)
+	if home == "" {
+		return stacks.Provided{}, fmt.Errorf("no Putnami home to install the JDK in: set %s", putnamihome.Env)
+	}
+	dir := filepath.Join(home, "toolchains", "java", "java-"+chosen.version)
+	executable := filepath.Join(dir, filepath.FromSlash(a.executable))
+	if _, err := os.Stat(executable); err != nil {
+		info("installing the Eclipse Temurin JDK " + chosen.version)
+	}
+	format := pinnedarchive.TarGz
+	if a.format == wsproto.LockArchiveFormatZip {
+		format = pinnedarchive.Zip
+	}
+	pin := pinnedarchive.Pin{URL: downloadURL(a.url), SHA256: a.sha256, Format: format}
+	if _, err := pinnedarchive.Install(ctx, pin, dir, pinnedarchive.Options{Limits: pinnedarchive.DefaultLimits(), SkipLinks: true, Complete: func(candidate string) bool {
+		_, err := os.Stat(filepath.Join(candidate, filepath.FromSlash(a.executable)))
+		return err == nil
+	}}); err != nil {
+		return stacks.Provided{}, fmt.Errorf("install the Temurin JDK %s: %w", chosen.version, err)
+	}
+	return stacks.Provided{Executable: executable}, nil
 }
 
 func pinnedVersions() string {

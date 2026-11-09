@@ -1,0 +1,166 @@
+{
+  "id": "dart",
+  "markers": ["pubspec.yaml"],
+  "toolchain": {
+    "command": ["dart", "--version"],
+    "pattern": "Dart SDK version: (?<version>\\S+)",
+    "files": [
+      { "path": "pubspec.yaml", "key": "environment.sdk" }
+    ],
+    "ranges": "pub-sdk",
+    "provisioned": "PUTNAMI_DART_EXECUTABLE"
+  },
+  "inputs": {
+    "code": ["lib/**", "bin/**"],
+    "tests": ["test/**", "dart_test.yaml"],
+    "assets": ["assets/**", "fonts/**", "l10n.yaml"],
+    "manifests": ["pubspec.yaml", "pubspec_overrides.yaml", "analysis_options.yaml", "{root}/pubspec.yaml", "{root}/analysis_options.yaml"],
+    "lockfiles": ["pubspec.lock", "{root}/pubspec.lock"],
+    "platforms": [
+      "android/app/src/**",
+      "android/app/build.gradle",
+      "android/app/build.gradle.kts",
+      "android/build.gradle",
+      "android/build.gradle.kts",
+      "android/settings.gradle",
+      "android/settings.gradle.kts",
+      "android/gradle.properties",
+      "android/gradle/wrapper/gradle-wrapper.properties",
+      "ios/Runner/**",
+      "ios/Runner.xcodeproj/project.pbxproj",
+      "ios/Flutter/Debug.xcconfig",
+      "ios/Flutter/Release.xcconfig",
+      "ios/Podfile",
+      "ios/Podfile.lock",
+      "macos/Runner/**",
+      "macos/Runner.xcodeproj/project.pbxproj",
+      "macos/Flutter/Flutter-Debug.xcconfig",
+      "macos/Flutter/Flutter-Release.xcconfig",
+      "macos/Podfile",
+      "macos/Podfile.lock",
+      "web/**",
+      "linux/CMakeLists.txt",
+      "linux/*.cc",
+      "linux/*.h",
+      "linux/runner/**",
+      "linux/flutter/CMakeLists.txt",
+      "windows/CMakeLists.txt",
+      "windows/runner/**",
+      "windows/flutter/CMakeLists.txt",
+      "!**/GeneratedPluginRegistrant.*",
+      "!**/generated_plugin_registrant.*"
+    ]
+  },
+  "tasks": {
+    "lint": {
+      "steps": [
+        ["dart", "analyze", "{target}"]
+      ],
+      "inputs": ["code", "manifests", "lockfiles"],
+      "targets": [
+        { "name": "lib", "when": ["lib"] },
+        { "name": "bin", "when": ["bin"] }
+      ]
+    },
+    "test": {
+      "steps": [
+        ["dart", "test", "--coverage={output}/coverage", "--file-reporter=json:{output}/tests.json"]
+      ],
+      "inputs": ["code", "tests", "assets", "manifests", "lockfiles"],
+      "reports": {
+        "junit": ["{output}/junit.xml"],
+        "coverage": [
+          { "format": "lcov", "paths": ["{output}/lcov.info"] }
+        ]
+      },
+      "reportSteps": [
+        ["format_coverage", "--lcov", "--in={output}/coverage", "--out={output}/lcov.info", "--report-on=lib", "--base-directory=."],
+        ["tojunit", "--input", "{output}/tests.json", "--output", "{output}/junit.xml", "--base", "{project}/"]
+      ]
+    },
+    "build": {
+      "steps": [
+        ["dart", "compile", "exe", "bin/{target}.dart", "-o", "{output}/{target}"]
+      ],
+      "inputs": ["code", "manifests", "lockfiles"],
+      "targets": [
+        { "each": "bin/*.dart" }
+      ]
+    }
+  },
+  "variants": {
+    "dart": {},
+    "flutter": {
+      "toolchain": {
+        "command": ["flutter", "--version"],
+        "pattern": "(?m)^Flutter (?<version>\\S+)",
+        "files": [
+          { "path": "pubspec.yaml", "key": "environment.flutter" }
+        ],
+        "ranges": "pub-flutter",
+        "also": [
+          {
+            "command": ["flutter", "--version"],
+            "pattern": "Tools • Dart (?<version>\\S+)",
+            "files": [
+              { "path": "pubspec.yaml", "key": "environment.sdk" }
+            ],
+            "ranges": "pub-sdk"
+          }
+        ],
+        "provisioned": "PUTNAMI_FLUTTER_EXECUTABLE"
+      },
+      "tasks": {
+        "test": {
+          "steps": [
+            ["flutter", "test", "--no-pub", "--coverage", "--file-reporter=json:{output}/tests.json"]
+          ],
+          "reports": {
+            "junit": ["{output}/junit.xml"],
+            "coverage": [
+              { "format": "lcov", "paths": ["coverage/lcov.info"] }
+            ]
+          },
+          "reportSteps": [
+            ["tojunit", "--input", "{output}/tests.json", "--output", "{output}/junit.xml", "--base", "{project}/"]
+          ]
+        },
+        "build": {
+          "steps": [
+            ["flutter", "build", "{target}"]
+          ],
+          "inputs": ["code", "assets", "manifests", "lockfiles", "platforms"],
+          "targets": [
+            { "name": "apk", "when": ["lib/main.dart", "android"] },
+            { "name": "web", "when": ["lib/main.dart", "web"] },
+            { "name": "linux", "when": ["lib/main.dart", "linux"], "hosts": ["linux"] },
+            { "name": "macos", "when": ["lib/main.dart", "macos"], "hosts": ["darwin"] },
+            { "name": "windows", "when": ["lib/main.dart", "windows"], "hosts": ["windows"] }
+          ],
+          "artifacts": ["build/app/outputs/flutter-apk/app-release.apk"]
+        }
+      }
+    },
+    "dart-in-flutter": {
+      "toolchain": {
+        "command": ["flutter", "--version"],
+        "pattern": "(?m)^Flutter (?<version>\\S+)",
+        "files": [
+          { "path": "pubspec.yaml", "key": "environment.flutter" }
+        ],
+        "ranges": "pub-flutter",
+        "also": [
+          {
+            "command": ["flutter", "--version"],
+            "pattern": "Tools • Dart (?<version>\\S+)",
+            "files": [
+              { "path": "pubspec.yaml", "key": "environment.sdk" }
+            ],
+            "ranges": "pub-sdk"
+          }
+        ],
+        "provisioned": "PUTNAMI_FLUTTER_EXECUTABLE"
+      }
+    }
+  }
+}
