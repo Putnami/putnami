@@ -5,6 +5,9 @@
   "extensionDependencies": {
     "@putnami/dev": ""
   },
+  "uses": [
+    "oci"
+  ],
   "runtime": {
     "executable": "compiled/putnami-swift",
     "toolchains": {
@@ -216,6 +219,86 @@
         {
           "id": "run",
           "task": "run-exec"
+        }
+      ]
+    },
+    "package": {
+      "description": "Assemble the image of an application, its executable product built static with the Static Linux SDK, for the docker publish channel.",
+      "traits": {
+        "injectPublishChannels": true
+      },
+      "flags": {
+        "docker": {
+          "type": "boolean",
+          "default": false,
+          "description": "Assemble the image"
+        },
+        "entrypoint": {
+          "type": "string",
+          "description": "Executable product to package (defaults to the package's only executable)"
+        },
+        "docker-tag": {
+          "type": "string",
+          "description": "Override the image tag"
+        },
+        "docker-base-image": {
+          "type": "string",
+          "description": "Replace the distroless static base with a base pinned by digest (image@sha256:...)"
+        },
+        "docker-load": {
+          "type": "boolean",
+          "default": false,
+          "description": "Also load the assembled image into the local docker daemon"
+        },
+        "platform": {
+          "type": "string",
+          "default": "linux/amd64",
+          "description": "Target platform of the image: linux/amd64 or linux/arm64"
+        },
+        "dry-run": {
+          "type": "boolean",
+          "default": false,
+          "description": "Plan the image without assembling it"
+        }
+      },
+      "run": [
+        {
+          "id": "docker",
+          "task": "package-docker",
+          "if": "params.docker"
+        }
+      ]
+    },
+    "publish": {
+      "dependsOn": [
+        "package"
+      ],
+      "traits": {
+        "injectPublishChannels": true,
+        "sideEffects": "registry"
+      },
+      "description": "Push the image of an application to its OCI registry. A library publishes nothing.",
+      "flags": {
+        "docker": {
+          "type": "boolean",
+          "default": false,
+          "description": "Push the image"
+        },
+        "docker-registry": {
+          "type": "string",
+          "description": "Registry to push the image to, above registries.oci.publish"
+        },
+        "dry-run": {
+          "type": "boolean",
+          "default": false,
+          "description": "Push nothing; report what would be published"
+        }
+      },
+      "run": [
+        {
+          "id": "docker",
+          "task": "publish-docker",
+          "if": "params.docker"
         }
       ]
     },
@@ -489,6 +572,90 @@
           "network",
           "process",
           "workspace-files"
+        ]
+      }
+    },
+    "package-docker": {
+      "description": "Install the pinned Static Linux SDK of the selected Swift when it is missing, build the application's executable product with swift build -c release --swift-sdk <arch>-swift-linux-musl and the versions Package.resolved pins, and assemble a local OCI image of it and its resource bundles on a digest-pinned distroless static base. Sole owner of <command-output>/docker.",
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": [
+        "package-docker"
+      ],
+      "inputs": {
+        "sources": {
+          "from": "project",
+          "files": [
+            "swift:build"
+          ]
+        },
+        "localPackages": {
+          "from": "closure",
+          "files": [
+            "Package.swift",
+            "Package@swift-*.swift",
+            "Package.resolved",
+            "Sources/**",
+            "Plugins/**"
+          ]
+        },
+        "stackRoot": {
+          "from": "workspace",
+          "files": [
+            ".swift-version"
+          ]
+        },
+        "extensionVersion": {
+          "from": "runtime"
+        }
+      },
+      "cwd": "{projectRoot}",
+      "timeoutMs": 3600000,
+      "cache": {
+        "versionAware": true
+      },
+      "declares": {
+        "outputs": {
+          "docker": {
+            "kind": "directory",
+            "root": "command-output",
+            "path": "docker",
+            "optionalEmpty": true,
+            "description": "Local OCI candidate layout, its manifest and the docker channel record."
+          }
+        },
+        "effects": [
+          "network",
+          "toolchain-cache"
+        ]
+      }
+    },
+    "publish-docker": {
+      "description": "Push the packaged image to the container registry through the shared publisher.",
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": [
+        "publish-docker"
+      ],
+      "cwd": "{projectRoot}",
+      "timeoutMs": 300000,
+      "cache": false,
+      "declares": {
+        "outputs": {
+          "published-image": {
+            "kind": "file",
+            "root": "command-output",
+            "path": "docker/published-image.json",
+            "optionalEmpty": true,
+            "description": "Verified remote image record, written after the registry digest is read back."
+          }
+        },
+        "effects": [
+          "network",
+          "registry"
+        ],
+        "publishChannels": [
+          "docker"
         ]
       }
     },

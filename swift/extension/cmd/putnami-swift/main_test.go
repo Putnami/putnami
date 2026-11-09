@@ -34,7 +34,7 @@ func TestRunHandsTheTasksToTheJobDispatcher(t *testing.T) {
 		}
 	})
 	slices.Sort(got)
-	if want := []string{"build", "deps-upgrade", "lint", "lint-docs", "run", "serve", "test", "workspace-install"}; code != 0 || !slices.Equal(got, want) {
+	if want := []string{"build", "deps-upgrade", "lint", "lint-docs", "package-docker", "publish-docker", "run", "serve", "test", "workspace-install"}; code != 0 || !slices.Equal(got, want) {
 		t.Fatalf("exit %d, jobs %v", code, got)
 	}
 }

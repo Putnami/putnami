@@ -140,6 +140,56 @@ package's only executable product, or, with none, its only executable target;
 with several, the one named after the project, else the one `--entrypoint`
 names.
 
+## Package and publish an image
+
+An application reaches a registry as an OCI image, a standard container image.
+Declare the channel in the project's `putnami.json`:
+
+```json
+{ "options": { "package": { "docker": true }, "publish": { "docker": true } } }
+```
+
+`putnami package` assembles the image with no Docker daemon. `--docker-load`
+also loads it into the local Docker daemon. `putnami publish` pushes it to the
+registry that `registries.oci.publish` of `putnami.workspace.json` declares,
+through the shared publisher of the other stacks. `--docker-registry
+<registry>` overrides that registry for one push. A library packages and
+publishes nothing.
+
+The image holds a static binary, built with the
+[Static Linux SDK](https://www.swift.org/documentation/articles/static-linux-getting-started.html)
+of the selected Swift, so the same command packages from macOS and from Linux
+([ADR 0001](adr/0001-an-application-image-holds-a-static-binary.md)):
+
+1. `swift --version` names the swift.org release, such as `6.4.2`. The
+   extension pins the checksum of the SDK of each release from 6.3 to 6.4.2;
+   another release fails with `swift.static_sdk_unavailable` and names the
+   pinned ones. The Swift of Xcode cannot build with the SDK: on macOS, select
+   a swift.org toolchain with swiftly or the swift.org installer.
+2. When `swift sdk list` does not name the SDK, `swift sdk install <url>
+   --checksum <pin>` installs it, once per machine.
+3. `swift build -c release --force-resolved-versions --swift-sdk
+   <arch>-swift-linux-musl --product <executable> -Xlinker -s` builds the
+   executable, stripped, with the versions `Package.resolved` pins. The
+   executable is the one `serve` starts; `--entrypoint` names it among several.
+   `--platform` selects `linux/amd64`, the default, or `linux/arm64`.
+
+| Layer | Content |
+|---|---|
+| Resources | The `.resources` and `.bundle` directories SwiftPM wrote beside the executable, under `/app`, where `Bundle.module` finds them. Only a package with resources has this layer. |
+| Executable | `/app/<executable>`, the image's entrypoint |
+
+The image runs as the user `65532`, the `nonroot` user of distroless, in
+`/app`, with `PORT=8080` set and exposed: the executable reads `PORT` to
+listen, as it does under `serve`. The base is `gcr.io/distroless/static:nonroot`
+pinned by digest, which holds CA certificates and time zones and no shell. A
+project names another base with `--docker-base-image image@sha256:<digest>`; a
+base with no digest fails with `swift.base_not_pinned`.
+
+A Vapor application that serves files from `Public/` or renders templates from
+`Resources/` reads them from its working directory, which the image does not
+hold: declare them as target resources so that they reach `Bundle.module`.
+
 ## The toolchain check
 
 Before its first step, each task compares the version on the machine with the
@@ -284,5 +334,8 @@ An override that names an unknown member, changes `id`, `markers` or
 - Two Xcode projects whose tests run at the same time may share a simulator.
 - The result bundle is a task output, so it is cached with the reports.
 - The extension does not install Xcode, a simulator or the system packages a
-  Linux Swift needs, and does not package or publish an application image; it
-  does not archive or sign an app.
+  Linux Swift needs, and does not archive or sign an app.
+- An image holds a static binary only: a package that links a system library
+  musl does not offer, or that needs the Foundation of a native Linux build,
+  cannot be packaged: it builds its own image.
+- An arm64 image has not been run.
