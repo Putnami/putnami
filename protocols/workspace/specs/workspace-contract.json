@@ -71,7 +71,7 @@
     },
     {
       "id": "dependency-sources-attribute-each-edge",
-      "text": "dependencySources attributes a reported edge to go-module, package-json, build-graph (a delegated build tool's own graph) or declared; an unnamed edge is declared, and build-graph counts as an import. It is answered only to a request that asks for it, and an empty map stays an answer. Normalization drops provenance for an edge the project does not report, the digest moves with provenance, and a merge prefers the import in any provider order."
+      "text": "dependencySources attributes a reported edge to go-module, package-json, build-graph (a delegated build tool's own graph) or declared; an unnamed edge is declared. build-graph backs an edge as an import does, but only an import crosses visibility. It is answered only to a request that asks for it, and an empty map stays an answer. Normalization drops provenance for an edge the project does not report, the digest moves with provenance, and a merge prefers the import in any provider order."
     },
     {
       "id": "a-reserved-call-exchanges-one-bounded-document",

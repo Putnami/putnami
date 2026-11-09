@@ -24,7 +24,12 @@ that has an edge.
 
 1. **A new provider source, `build-graph`.** It names an edge the build tool a
    delegated stack runs states in its own dependency graph. Like an import, it
-   backs the edge, and visibility applies to it: the build performs it.
+   backs the edge in the declared-edge check: the build performs it. It is no
+   import, so the visibility check does not judge it. A Pants package's
+   `putnami.json` makes it a scope for the packages nested under it, and the
+   tool's own graph, not Putnami's scopes, states who may depend on what:
+   judging those edges would refuse the graph of every repository whose
+   packages nest.
 2. **The adapter declares it.** `workspace.buildGraphEdges` states that the
    adapter's probe answers `build-graph`. It requires
    `workspace.dependencySources`, which still gates the request member.
@@ -36,8 +41,8 @@ that has an edge.
 ## Consequences
 
 - A Pants package's edges, from the export or from the putnami.json the sync
-  wrote, are attributed and judged: a run warns no `workspace.declared_edge`
-  for them.
+  wrote, are attributed and judged by the declared-edge check: a run warns no
+  `workspace.declared_edge` for them. Visibility judges imports alone.
 - The stack core carries the provenance of a component's edges, so another
   delegated stack attributes its edges the same way.
 - `@putnami/pants` is stamped at contract 21 and needs a CLI that reads it.
