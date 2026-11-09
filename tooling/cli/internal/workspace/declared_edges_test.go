@@ -55,6 +55,12 @@ func declaredEdgeFixture(t *testing.T) *Workspace {
 			Options: map[string]map[string]any{"test": {"filePatterns": []any{"../../libs/core/**"}}}},
 		Dependencies:      []string{"acme/core"},
 		DependencySources: map[string]wsproto.DependencySource{"acme/core": wsproto.DependencySourceDeclared}}
+	// A delegated stack's package: the putnami.json entry its sync wrote is an
+	// edge the build tool's own graph states, which backs it.
+	delegated := &Project{ID: "/py/api", Name: "py/api", Path: "py/api",
+		Config:            &wsproto.ProjectConfig{Name: "py/api", Dependencies: []string{"/libs/core"}},
+		Dependencies:      []string{"/libs/core", "acme/core"},
+		DependencySources: map[string]wsproto.DependencySource{"acme/core": wsproto.DependencySourceBuildGraph}}
 	// No provider said anything about this project's edges at all.
 	unattributed := &Project{ID: "/python/app", Name: "acme/py-app", Path: "python/app",
 		Config:       &wsproto.ProjectConfig{Name: "acme/py-app", Dependencies: []string{"acme/core"}},
@@ -71,7 +77,7 @@ func declaredEdgeFixture(t *testing.T) *Workspace {
 		GeneratedClient: &GeneratedClientBinding{ServiceID: "orders", ManifestPath: "clients/orders-go/client.putnami.json"}}
 
 	return NewWorkspace(root, nil, []*Project{
-		core, kit, catalog, api, worker, ui, tool, reader, unattributed, client, orphan})
+		core, kit, catalog, api, worker, ui, tool, reader, delegated, unattributed, client, orphan})
 }
 
 func findingFor(t *testing.T, findings []DeclaredEdgeFinding, project string) DeclaredEdgeFinding {
@@ -125,6 +131,9 @@ func TestAnImportBackedEdgeIsNotReportedAndAContractEdgeSurvivesTheDeclaration(t
 		}
 		if finding.ProjectName == "acme/reader" {
 			t.Fatalf("an edge a declared file input backs was reported: %+v", finding)
+		}
+		if finding.ProjectName == "py/api" {
+			t.Fatalf("an edge a delegated build tool's graph backs was reported: %+v", finding)
 		}
 		if finding.ProjectName == "acme/py-app" {
 			t.Fatalf("an edge no provider attributed at all was reported as declared: %+v", finding)

@@ -61,6 +61,20 @@ with no change to a `BUILD` file. `putnami validate` compares each
 `putnami.json` with the export and fails with `pants.sync_stale` when a sync
 would change one. Keep it in the CI gate.
 
+## How Putnami judges the edges
+
+The probe reports each package's edges as the Pants graph's (`build-graph`):
+those of the export, and each dependency of its `putnami.json` on a package or
+another directory with a `BUILD` file, which is what the sync writes. Pants
+builds with them, so the declared-edge check counts them as real and warns no
+`workspace.declared_edge` for them. A dependency you add by hand on a
+directory with no `BUILD` file is a declaration: the check reports it unless a
+file input of the package reads inside that directory.
+
+Visibility does not judge a Pants edge. A package's `putnami.json` makes it a
+scope for the packages nested under it, and Pants's own graph, not Putnami's
+scopes, says which package may depend on which.
+
 ## What each task runs
 
 Each task first compares `pants --version` with `GLOBAL.pants_version` in

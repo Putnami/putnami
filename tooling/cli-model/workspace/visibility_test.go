@@ -124,6 +124,27 @@ func TestVisibilityViolationsIgnoresADeclaredEdgeWithNoImport(t *testing.T) {
 	}
 }
 
+// A Pants package's putnami.json scopes the packages nested under it, so a
+// nested package's edges to its siblings cross a scope. Its delegated build
+// tool's graph states them, and that graph, not Putnami's scopes, says who may
+// depend on what: a build-graph edge is no import.
+func TestVisibilityViolationsIgnoresABuildGraphEdgeAcrossScopes(t *testing.T) {
+	spectest.Proves(t, "cli/workspace-model", "import-visibility", "an-edge-carries-the-manifest-family-it-came-from")
+	ws := NewWorkspace("/ws", nil, []*Project{
+		imports(scoped("/src/python/api/handlers", "src/python/api/handlers", "src/python/api/handlers", "src/python/api/putnami.json"),
+			wsproto.DependencySourceBuildGraph, "src/python/pricing"),
+		scoped("/src/python/api", "src/python/api", "src/python/api"),
+		scoped("/src/python/pricing", "src/python/pricing", "src/python/pricing"),
+	})
+
+	if got := VisibilityViolations(ws); len(got) != 0 {
+		t.Fatalf("violations = %v, want none: a build-graph edge is not an import", got)
+	}
+	if source := ws.Graph.edgeSource("/src/python/api/handlers", "/src/python/pricing"); source != wsproto.DependencySourceBuildGraph {
+		t.Fatalf("edgeSource = %q, want %q", source, wsproto.DependencySourceBuildGraph)
+	}
+}
+
 func TestVisibilityViolationsAllowsAContractEdgeAcrossScopes(t *testing.T) {
 	spectest.Proves(t, "cli/workspace-model", "import-visibility", "a-public-project-a-generated-client-and-a-contract-edge-are-allowed")
 	provider := scoped("/go/samples/catalog", "catalog", "go/samples/catalog", "go/putnami.json")

@@ -111,26 +111,48 @@ func (s DependencySource) ReportableByProvider() bool {
 }
 
 // IsImport reports whether this source is a real import — code that reads code
-// — as opposed to a declaration. A delegated build tool's graph counts as one:
-// the tool performs the edge. Visibility is enforced on imports only.
+// — as opposed to a declaration. Visibility is enforced on imports only.
 func (s DependencySource) IsImport() bool {
-	return s == DependencySourceGoModule || s == DependencySourcePackageJSON || s == DependencySourceBuildGraph
+	return s == DependencySourceGoModule || s == DependencySourcePackageJSON
+}
+
+// Backs reports whether this source makes the edge real: an import, or an
+// edge a delegated build tool's own graph states, which the tool performs.
+// The declared-edge check judges an edge no source backs. A build-graph edge
+// is no import: the tool's graph, not Putnami's scopes, says who may depend on
+// what, so visibility does not judge it.
+func (s DependencySource) Backs() bool {
+	return s.IsImport() || s == DependencySourceBuildGraph
+}
+
+// dependencySourceRank orders the sources for a merge: an import, then a
+// build-graph edge, then a declaration.
+func dependencySourceRank(s DependencySource) int {
+	switch {
+	case s.IsImport():
+		return 2
+	case s.Backs():
+		return 1
+	default:
+		return 0
+	}
 }
 
 // StrongerDependencySource is the deterministic winner when two providers
-// describe one edge. An import outranks a declaration, because one provider
-// having read a real import is enough to make the edge an import; two import
-// families are both true, and the lexicographically smaller one is kept so the
-// merged answer never depends on provider order.
+// describe one edge. An import outranks a build-graph edge, which outranks a
+// declaration, because one provider having read a real import is enough to
+// make the edge an import; two sources of one rank are both true, and the
+// lexicographically smaller one is kept so the merged answer never depends on
+// provider order.
 func StrongerDependencySource(a, b DependencySource) DependencySource {
 	switch {
 	case a == "":
 		return b
 	case b == "":
 		return a
-	case a.IsImport() && !b.IsImport():
+	case dependencySourceRank(a) > dependencySourceRank(b):
 		return a
-	case b.IsImport() && !a.IsImport():
+	case dependencySourceRank(b) > dependencySourceRank(a):
 		return b
 	case a <= b:
 		return a
