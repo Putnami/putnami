@@ -81,12 +81,13 @@ var writableDirs = []string{"log", "tmp", "tmp/cache", "tmp/pids", "tmp/sockets"
 
 // hostProbe prints what the packaging host's Ruby builds native extensions
 // for, one value per line: its version, the CPU, OS and libc of its RubyGems
-// platform, and its extension API directory.
-const hostProbe = `p = Gem::Platform.local; print [RUBY_VERSION, p.cpu, p.os, p.version.to_s, Gem.extension_api_version].join("\n")`
+// platform, its extension API directory, and the preprocessor flags mkmf
+// writes in an extension's Makefile.
+const hostProbe = `p = Gem::Platform.local; print [RUBY_VERSION, p.cpu, p.os, p.version.to_s, Gem.extension_api_version, RbConfig::MAKEFILE_CONFIG["CPPFLAGS"].to_s].join("\n")`
 
 // rubyHost is what the packaging host's Ruby builds native extensions for.
 type rubyHost struct {
-	version, cpu, os, libc, extensionAPI string
+	version, cpu, os, libc, extensionAPI, cppflags string
 }
 
 // minor is the Ruby minor version, such as 3.4.
@@ -192,7 +193,7 @@ func assembleImage(run context.Context, ctx *pctx.Context, root stacks.RootStep,
 		return fail(CodeImageFailed, err)
 	}
 	bundle := filepath.Join(workspace, "bundle")
-	if err := installBundle(run, root, staged, bundle, filepath.Join(workspace, "config"), gemCache(ctx.WorkspaceRoot), emit); err != nil {
+	if err := installBundle(run, root, host, staged, bundle, filepath.Join(workspace, "config"), gemCache(ctx.WorkspaceRoot), emit); err != nil {
 		return fail(CodeImageFailed, err)
 	}
 	if err := sharedExtensionDirs(bundle, host); err != nil {
@@ -253,10 +254,10 @@ func probeHost(run context.Context, root stacks.RootStep) (rubyHost, error) {
 		return rubyHost{}, fmt.Errorf("read the Ruby platform: %w", err)
 	}
 	fields := strings.Split(string(out), "\n")
-	if len(fields) != 5 || fields[0] == "" {
+	if len(fields) != 6 || fields[0] == "" {
 		return rubyHost{}, fmt.Errorf("read the Ruby platform: ruby printed %q", out)
 	}
-	return rubyHost{version: fields[0], cpu: fields[1], os: fields[2], libc: fields[3], extensionAPI: fields[4]}, nil
+	return rubyHost{version: fields[0], cpu: fields[1], os: fields[2], libc: fields[3], extensionAPI: fields[4], cppflags: fields[5]}, nil
 }
 
 // baseImage answers the named base, which must carry a digest, or the official
@@ -326,15 +327,28 @@ func pathGemsInside(stackRoot string) error {
 // selects. Bundler reads its local configuration from config, so neither the
 // repository's .bundle nor the staged copy is read or written. With offline
 // dependencies it installs from the gems on the machine and in the gem cache.
-func installBundle(run context.Context, root stacks.RootStep, staged, bundle, config, cache string, emit *jsonl.Emitter) error {
+// The native extensions compile with the bundle directory mapped to the
+// image's bundle path, so they do not record the temporary directory.
+func installBundle(run context.Context, root stacks.RootStep, host rubyHost, staged, bundle, config, cache string, emit *jsonl.Emitter) error {
 	step := root
 	step.Dir = staged
+	existing := ""
+	for _, entry := range root.Env {
+		if value, ok := strings.CutPrefix(entry, "CONFIGURE_ARGS="); ok {
+			existing = value
+		}
+	}
+	configure, mapped := configureArgs(existing, host.cppflags, bundle)
+	if !mapped {
+		emit.Warn("the native extensions record the temporary directory " + bundle + ", which a compiler flag cannot carry: two packagings give two images")
+	}
 	step.Env = append(slices.Clip(root.Env),
 		"BUNDLE_GEMFILE="+filepath.Join(staged, "Gemfile"),
 		"BUNDLE_APP_CONFIG="+config,
 		"BUNDLE_PATH="+bundle,
 		"BUNDLE_DEPLOYMENT=1",
 		"BUNDLE_WITHOUT="+bundleWithout,
+		"CONFIGURE_ARGS="+configure,
 	)
 	if cache != "" {
 		step.Env = cacheEnv(step.Env, cache)
@@ -348,6 +362,33 @@ func installBundle(run context.Context, root stacks.RootStep, staged, bundle, co
 		return fmt.Errorf("bundle install: %w", err)
 	}
 	return nil
+}
+
+// configureArgs answers the CONFIGURE_ARGS under which mkmf compiles every
+// native extension with -ffile-prefix-map from the bundle directory to the
+// image's bundle path: the compiler writes the image's paths, not the
+// temporary directory, in each extension's debug information, and so in its
+// build ID. --with-cppflags replaces the Ruby's own preprocessor flags, so the
+// value starts with them, after the arguments the environment already sets.
+// It answers the existing arguments and false when the bundle path holds a
+// character the flag cannot carry through a shell and a Makefile.
+func configureArgs(existing, cppflags, bundle string) (string, bool) {
+	existing = strings.TrimSpace(existing)
+	if strings.ContainsFunc(bundle, func(r rune) bool { return !safePathRune(r) }) {
+		return existing, false
+	}
+	flags := strings.TrimSpace(cppflags + " -ffile-prefix-map=" + bundle + "=" + imageBundlePath)
+	arg := "--with-cppflags='" + strings.ReplaceAll(flags, "'", `'\''`) + "'"
+	if existing != "" {
+		return existing + " " + arg, true
+	}
+	return arg, true
+}
+
+// safePathRune reports whether a path character passes through a shell, a
+// Makefile and a compiler flag unchanged.
+func safePathRune(r rune) bool {
+	return r >= 'a' && r <= 'z' || r >= 'A' && r <= 'Z' || r >= '0' && r <= '9' || strings.ContainsRune("/._-+", r)
 }
 
 // sharedExtensionDirs renames the extension directories a static Ruby writes,
@@ -464,13 +505,7 @@ func writeWritableDirs(file string) error {
 
 // imageSpec describes the application's image.
 func imageSpec(staged, bundle, writable, base, platform, port string) (oci.Spec, error) {
-	dependencies, err := imageFiles(bundle, imageBundlePath, func(rel string) bool {
-		parts := strings.Split(rel, "/")
-		// Bundler keeps the .gem archives it installed and the Git history of
-		// a git source; the image runs neither.
-		return !(len(parts) > 2 && parts[0] == "ruby" && parts[2] == "cache") &&
-			!(len(parts) > 5 && parts[0] == "ruby" && parts[2] == "bundler" && parts[3] == "gems" && parts[5] == ".git")
-	})
+	dependencies, err := imageFiles(bundle, imageBundlePath, bundleFileKept)
 	if err != nil {
 		return oci.Spec{}, err
 	}
@@ -499,6 +534,44 @@ func imageSpec(staged, bundle, writable, base, platform, port string) (oci.Spec,
 		User:         imageUser,
 		ExposedPorts: []string{port + "/tcp"},
 	}, nil
+}
+
+// buildLogs are the files RubyGems and mkmf write while they build a native
+// extension. They record the temporary directory, and nothing reads them at
+// run time.
+var buildLogs = []string{"gem_make.out", "mkmf.log"}
+
+// bundleFileKept reports whether the image holds the file or directory at rel,
+// a slash path under the bundle directory. The image runs none of what it
+// leaves out: the .gem archives Bundler installed, the Git history of a git
+// source, and what a native extension's build leaves behind, its logs, and
+// the Makefile and object files under the gem's ext directory.
+func bundleFileKept(rel string) bool {
+	parts := strings.Split(rel, "/")
+	if len(parts) < 3 || parts[0] != "ruby" {
+		return true
+	}
+	name := parts[len(parts)-1]
+	gem := 0
+	switch {
+	case parts[2] == "cache":
+		return false
+	case parts[2] == "extensions":
+		return !slices.Contains(buildLogs, name)
+	case parts[2] == "gems":
+		gem = 3
+	case len(parts) > 3 && parts[2] == "bundler" && parts[3] == "gems":
+		if len(parts) > 5 && parts[5] == ".git" {
+			return false
+		}
+		gem = 4
+	default:
+		return true
+	}
+	if len(parts) < gem+3 || parts[gem+1] != "ext" {
+		return true
+	}
+	return name != "Makefile" && !slices.Contains(buildLogs, name) && !strings.HasSuffix(name, ".o")
 }
 
 // imageServer is the server command of the image, on the PORT its shell reads.

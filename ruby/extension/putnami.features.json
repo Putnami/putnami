@@ -248,7 +248,8 @@
             "checks": [
               "package-assembles-an-image-of-an-application-and-its-production-bundle",
               "a-static-ruby-builds-extensions-the-images-ruby-finds",
-              "the-base-is-the-official-ruby-slim-image-or-a-digest-pinned-base"
+              "the-base-is-the-official-ruby-slim-image-or-a-digest-pinned-base",
+              "packaging-the-same-tree-twice-gives-the-same-image"
             ]
           }
         },

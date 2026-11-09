@@ -153,6 +153,15 @@ func TestPackageAssemblesAnImageOfAnApplicationAndItsProductionBundle(t *testing
 	if strings.Contains(env, "BUNDLE_PATH="+root) || strings.Contains(env, "BUNDLE_APP_CONFIG="+root) {
 		t.Errorf("Bundler writes in the repository: %q", env)
 	}
+	bundle := ""
+	for _, field := range strings.Fields(env) {
+		if value, ok := strings.CutPrefix(field, "BUNDLE_PATH="); ok {
+			bundle = value
+		}
+	}
+	if bundle == "" || !strings.Contains(env, "CONFIGURE_ARGS=--with-cppflags='-DSTUB -ffile-prefix-map="+bundle+"=/usr/local/bundle'") {
+		t.Errorf("the extensions do not compile with the bundle mapped to the image's: %q", env)
+	}
 	var manifest pkgmeta.DockerManifest
 	data, err := os.ReadFile(filepath.Join(root, ".putnami/out/shop/package/docker/manifest.json"))
 	if err != nil {
@@ -187,12 +196,12 @@ func TestPackageAssemblesAnImageOfAnApplicationAndItsProductionBundle(t *testing
 		}
 	}
 	gems := strings.TrimPrefix(imageBundlePath, "/") + "/ruby/3.3.0/"
-	for _, want := range []string{"gems/rack-3.1.0/lib/rack.rb", "extensions/x86_64-linux/3.3.0/puma-6.4.0/gem.build_complete", "bundler/gems/tool-abc123/tool.rb", "bin/rackup"} {
+	for _, want := range []string{"gems/rack-3.1.0/lib/rack.rb", "extensions/x86_64-linux/3.3.0/puma-6.4.0/gem.build_complete", "extensions/x86_64-linux/3.3.0/puma-6.4.0/puma_http11.so", "gems/puma-6.4.0/ext/puma_http11/puma_http11.c", "bundler/gems/tool-abc123/tool.rb", "bin/rackup"} {
 		if files[gems+want] == nil {
 			t.Errorf("the bundle layer has no %s", want)
 		}
 	}
-	for _, left := range []string{"cache/rack-3.1.0.gem", "bundler/gems/tool-abc123/.git/HEAD"} {
+	for _, left := range []string{"cache/rack-3.1.0.gem", "bundler/gems/tool-abc123/.git/HEAD", "extensions/x86_64-linux/3.3.0/puma-6.4.0/gem_make.out", "extensions/x86_64-linux/3.3.0/puma-6.4.0/mkmf.log", "gems/puma-6.4.0/ext/puma_http11/Makefile", "gems/puma-6.4.0/ext/puma_http11/puma_http11.o"} {
 		if files[gems+left] != nil {
 			t.Errorf("the bundle layer holds %s", left)
 		}
@@ -226,7 +235,7 @@ func TestAStaticRubyBuildsExtensionsTheImagesRubyFinds(t *testing.T) {
 	root := workspaceRoot(t)
 	host, base := imageRegistry(t)
 	rackApp(t, root, "shop")
-	t.Setenv("STUB_RUBY_HOST", `3.3.6\naarch64\nlinux\n\n3.3.0-static`)
+	t.Setenv("STUB_RUBY_HOST", `3.3.6\naarch64\nlinux\n\n3.3.0-static\n`)
 	t.Setenv("STUB_EXTENSION_API", "3.3.0-static")
 	status, _, err := runProjectJob(t, root, "shop", PackageDockerJob(stack(t)), nil, "--docker-base-image", base, "--platform", "linux/arm64")
 	if status != "OK" || err != nil {
@@ -254,14 +263,125 @@ func TestAStaticRubyBuildsExtensionsTheImagesRubyFinds(t *testing.T) {
 	}
 }
 
+func TestPackagingTheSameTreeTwiceGivesTheSameImage(t *testing.T) {
+	spectest.Proves(t, feature, "packages-an-application-image", "packaging-the-same-tree-twice-gives-the-same-image")
+	linuxHost(t)
+	rubyTools(t)
+	machineCache(t)
+	root := workspaceRoot(t)
+	_, base := imageRegistry(t)
+	imageApplication(t, root)
+	digests := []string{}
+	for range 2 {
+		status, _, err := runProjectJob(t, root, "shop", PackageDockerJob(stack(t)), nil, "--docker-base-image", base)
+		if status != "OK" || err != nil {
+			t.Fatalf("package: %s %v", status, err)
+		}
+		var manifest pkgmeta.DockerManifest
+		data, err := os.ReadFile(filepath.Join(root, ".putnami/out/shop/package/docker/manifest.json"))
+		if err != nil || json.Unmarshal(data, &manifest) != nil {
+			t.Fatalf("manifest: %v", err)
+		}
+		digests = append(digests, manifest.Digest)
+	}
+	if digests[0] == "" || digests[0] != digests[1] {
+		t.Errorf("two packagings of one tree give %v", digests)
+	}
+}
+
+func TestPackageKeepsTheConfigureArgumentsOfTheEnvironment(t *testing.T) {
+	spectest.Proves(t, feature, "packages-an-application-image", "packaging-the-same-tree-twice-gives-the-same-image")
+	linuxHost(t)
+	log := rubyTools(t)
+	machineCache(t)
+	root := workspaceRoot(t)
+	_, base := imageRegistry(t)
+	rackApp(t, root, "shop")
+	t.Setenv("CONFIGURE_ARGS", "--with-opt-dir=/opt")
+	status, _, err := runProjectJob(t, root, "shop", PackageDockerJob(stack(t)), nil, "--docker-base-image", base)
+	if status != "OK" || err != nil {
+		t.Fatalf("package: %s %v", status, err)
+	}
+	if env := readLines(t, log+".env")[0]; !strings.Contains(env, "CONFIGURE_ARGS=--with-opt-dir=/opt --with-cppflags='-DSTUB -ffile-prefix-map=") {
+		t.Errorf("the environment's arguments are lost: %q", env)
+	}
+
+	// A temporary directory no compiler flag carries still packages, with
+	// the environment's arguments only.
+	spaced := filepath.Join(t.TempDir(), "with space")
+	if err := os.Mkdir(spaced, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("TMPDIR", spaced)
+	status, _, err = runProjectJob(t, root, "shop", PackageDockerJob(stack(t)), nil, "--docker-base-image", base)
+	if status != "OK" || err != nil {
+		t.Fatalf("package: %s %v", status, err)
+	}
+	if env := readLines(t, log+".env")[1]; !strings.Contains(env, "CONFIGURE_ARGS=--with-opt-dir=/opt ") && !strings.HasSuffix(env, "CONFIGURE_ARGS=--with-opt-dir=/opt") {
+		t.Errorf("CONFIGURE_ARGS changes under %s: %q", spaced, env)
+	}
+}
+
+func TestTheBundleLayerLeavesOutWhatTheImageNeverRuns(t *testing.T) {
+	spectest.Proves(t, feature, "packages-an-application-image", "packaging-the-same-tree-twice-gives-the-same-image")
+	cases := map[string]bool{
+		"ruby/3.4.0/gems/puma-8.0.2/lib/puma/puma_http11.so":         true,
+		"ruby/3.4.0/gems/puma-8.0.2/ext/puma_http11/http11_parser.c": true,
+		"ruby/3.4.0/gems/puma-8.0.2/ext/puma_http11/extconf.rb":      true,
+		"ruby/3.4.0/gems/puma-8.0.2/ext/puma_http11/Makefile":        false,
+		"ruby/3.4.0/gems/puma-8.0.2/ext/puma_http11/http11_parser.o": false,
+		"ruby/3.4.0/gems/puma-8.0.2/ext/puma_http11/mkmf.log":        false,
+		"ruby/3.4.0/gems/json-3.1.0/ext/json/ext/parser/Makefile":    false,
+		"ruby/3.4.0/gems/make-1.0.0/lib/make/Makefile":               true,
+		"ruby/3.4.0/gems/ext": true,
+		"ruby/3.4.0/extensions/aarch64-linux/3.4.0/puma-8.0.2/puma/puma_http11.so": true,
+		"ruby/3.4.0/extensions/aarch64-linux/3.4.0/puma-8.0.2/gem.build_complete":  true,
+		"ruby/3.4.0/extensions/aarch64-linux/3.4.0/puma-8.0.2/gem_make.out":        false,
+		"ruby/3.4.0/extensions/aarch64-linux/3.4.0/json-3.1.0/mkmf.log":            false,
+		"ruby/3.4.0/bundler/gems/tool-abc123/ext/tool/Makefile":                    false,
+		"ruby/3.4.0/bundler/gems/tool-abc123/ext/tool/tool.c":                      true,
+		"ruby/3.4.0/bundler/gems/tool-abc123/.git":                                 false,
+		"ruby/3.4.0/bundler/gems/tool-abc123/lib/tool.rb":                          true,
+		"ruby/3.4.0/cache/rack-3.1.0.gem":                                          false,
+		"ruby/3.4.0/bin/rackup":                                                    true,
+		"ruby/3.4.0/specifications/puma-8.0.2.gemspec":                             true,
+		"bin/Makefile": true,
+	}
+	for rel, kept := range cases {
+		if bundleFileKept(rel) != kept {
+			t.Errorf("bundleFileKept(%s) = %v, want %v", rel, !kept, kept)
+		}
+	}
+}
+
+func TestTheExtensionsCompileWithTheBundleMappedToTheImagesPath(t *testing.T) {
+	spectest.Proves(t, feature, "packages-an-application-image", "packaging-the-same-tree-twice-gives-the-same-image")
+	cases := []struct {
+		existing, cppflags, bundle, want string
+		mapped                           bool
+	}{
+		{"", " $(DEFS) $(cppflags)", "/tmp/putnami-ruby-image-1/bundle", `--with-cppflags='$(DEFS) $(cppflags) -ffile-prefix-map=/tmp/putnami-ruby-image-1/bundle=/usr/local/bundle'`, true},
+		{" --with-opt-dir=/opt ", "", "/tmp/x_y/bundle", `--with-opt-dir=/opt --with-cppflags='-ffile-prefix-map=/tmp/x_y/bundle=/usr/local/bundle'`, true},
+		{"", `-DNAME='x'`, "/tmp/b", `--with-cppflags='-DNAME='\''x'\'' -ffile-prefix-map=/tmp/b=/usr/local/bundle'`, true},
+		{"--with-opt-dir=/opt", "", "/tmp/my dir/bundle", "--with-opt-dir=/opt", false},
+		{"", "", "/tmp/a=b/bundle", "", false},
+	}
+	for _, c := range cases {
+		got, mapped := configureArgs(c.existing, c.cppflags, c.bundle)
+		if got != c.want || mapped != c.mapped {
+			t.Errorf("configureArgs(%q, %q, %q) = %q %v, want %q %v", c.existing, c.cppflags, c.bundle, got, mapped, c.want, c.mapped)
+		}
+	}
+}
+
 func TestPackageRefusesAHostThatCannotBuildTheImage(t *testing.T) {
 	spectest.Proves(t, feature, "refuses-a-foreign-packaging-host", "package-refuses-a-host-that-cannot-build-the-images-native-extensions")
 	cases := map[string]struct {
 		os, host, platform string
 	}{
-		"macOS":                 {"darwin", `3.3.6\narm64\ndarwin\n23\n3.3.0`, "linux/arm64"},
+		"macOS":                 {"darwin", `3.3.6\narm64\ndarwin\n23\n3.3.0\n`, "linux/arm64"},
 		"another architecture":  {"linux", defaultHost, "linux/arm64"},
-		"musl":                  {"linux", `3.3.6\nx86_64\nlinux\nmusl\n3.3.0`, "linux/amd64"},
+		"musl":                  {"linux", `3.3.6\nx86_64\nlinux\nmusl\n3.3.0\n`, "linux/amd64"},
 		"an unknown target cpu": {"linux", defaultHost, "linux/riscv64"},
 	}
 	for label, c := range cases {

@@ -17,16 +17,16 @@ import (
 )
 
 // defaultHost is what the stub ruby answers the host probe with: Ruby 3.3.6,
-// shared, on glibc Linux x86_64.
-const defaultHost = `3.3.6\nx86_64\nlinux\n\n3.3.0`
+// shared, on glibc Linux x86_64, with the preprocessor flags -DSTUB.
+const defaultHost = `3.3.6\nx86_64\nlinux\n\n3.3.0\n-DSTUB`
 
 // rubyTools puts first on PATH a ruby 3.3.6 and a bundle 2.5.22. The ruby
 // answers the host probe with STUB_RUBY_HOST, else defaultHost. The bundle
 // logs every call but --version and check to the returned log, and the
-// BUNDLE_ and PORT variables of each to the log's .env file. Its install
-// writes a bundle under BUNDLE_PATH, with the extension directory
-// STUB_EXTENSION_API names, and its cache a .gem file in BUNDLE_CACHE_PATH. It
-// exits with STUB_EXIT.
+// BUNDLE_, PORT and CONFIGURE_ARGS variables of each to the log's .env file.
+// Its install writes a bundle under BUNDLE_PATH, with the extension directory
+// STUB_EXTENSION_API names and what puma's native build leaves, and its cache
+// a .gem file in BUNDLE_CACHE_PATH. It exits with STUB_EXIT.
 func rubyTools(t *testing.T) string {
 	t.Helper()
 	bin := t.TempDir()
@@ -39,10 +39,14 @@ echo 'ruby 3.3.6 (2024-11-05 revision 75015d4c1f) [x86_64-linux]'
 if [ "$1" = "--version" ]; then echo 'Bundler version 2.5.22'; exit 0; fi
 if [ "$1" = "check" ]; then exit "${STUB_BUNDLE_CHECK:-0}"; fi
 echo "$PWD: bundle $*" >> "`+log+`"
-echo "$(env | grep -E '^(BUNDLE_[A-Z_]*|PORT)=' | sort | tr '\n' ' ')" >> "`+log+`.env"
+echo "$(env | grep -E '^(BUNDLE_[A-Z_]*|PORT|CONFIGURE_ARGS)=' | sort | tr '\n' ' ')" >> "`+log+`.env"
 if [ "$1" = "install" ] && [ -n "$BUNDLE_PATH" ]; then
   gems="$BUNDLE_PATH/ruby/3.3.0"
-  mkdir -p "$gems/gems/rack-3.1.0/lib" "$gems/cache" "$gems/extensions/x86_64-linux/${STUB_EXTENSION_API:-3.3.0}/puma-6.4.0" "$gems/bundler/gems/tool-abc123/.git" "$gems/bin"
+  mkdir -p "$gems/gems/rack-3.1.0/lib" "$gems/cache" "$gems/extensions/x86_64-linux/${STUB_EXTENSION_API:-3.3.0}/puma-6.4.0" "$gems/bundler/gems/tool-abc123/.git" "$gems/bin" "$gems/gems/puma-6.4.0/ext/puma_http11"
+  for f in gem_make.out mkmf.log; do echo "$BUNDLE_PATH" > "$gems/extensions/x86_64-linux/${STUB_EXTENSION_API:-3.3.0}/puma-6.4.0/$f"; done
+  for f in Makefile puma_http11.o; do echo "$BUNDLE_PATH" > "$gems/gems/puma-6.4.0/ext/puma_http11/$f"; done
+  echo 'ELF' > "$gems/extensions/x86_64-linux/${STUB_EXTENSION_API:-3.3.0}/puma-6.4.0/puma_http11.so"
+  echo 'int x;' > "$gems/gems/puma-6.4.0/ext/puma_http11/puma_http11.c"
   echo 'module Rack; end' > "$gems/gems/rack-3.1.0/lib/rack.rb"
   echo 'gem' > "$gems/cache/rack-3.1.0.gem"
   echo '' > "$gems/extensions/x86_64-linux/${STUB_EXTENSION_API:-3.3.0}/puma-6.4.0/gem.build_complete"

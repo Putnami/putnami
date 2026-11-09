@@ -92,7 +92,7 @@
     },
     {
       "id": "packages-an-application-image",
-      "text": "package assembles an OCI image of an application with no Docker daemon: its production bundle under /usr/local/bundle, its files under /app without tests, run output or secret files, and tmp/ and log/ owned by its non-root user. The base is the digest-pinned ruby:<version>-slim-trixie of the host Ruby's minor, or a named base, which fails with ruby.base_not_pinned without a digest. The image runs rails server or rackup on PORT 8080 in production. A library packages nothing."
+      "text": "package assembles an OCI image of an application without Docker: its production bundle under /usr/local/bundle, its files under /app without tests, run output and secrets, and tmp/ and log/ owned by its non-root user, on the digest-pinned ruby:<version>-slim-trixie of the host Ruby's minor or a named base, which fails with ruby.base_not_pinned without a digest. It runs rails server or rackup on PORT 8080 in production. Two packagings of one tree on a machine give the same image. A library packages nothing."
     },
     {
       "id": "refuses-a-foreign-packaging-host",

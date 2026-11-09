@@ -176,7 +176,7 @@ through the shared publisher of the Go and TypeScript extensions.
 
 | Layer | Content |
 |---|---|
-| Bundle | `bundle install` with `BUNDLE_DEPLOYMENT=1` and `BUNDLE_WITHOUT=development:test`, under `/usr/local/bundle`, without the `.gem` archives and the Git history of a Git source |
+| Bundle | `bundle install` with `BUNDLE_DEPLOYMENT=1` and `BUNDLE_WITHOUT=development:test`, under `/usr/local/bundle`, without the `.gem` archives, the Git history of a Git source, and what native extension builds leave: `gem_make.out`, `mkmf.log`, and the `Makefile` and `*.o` files under a gem's `ext/` |
 | Files | The stack root under `/app`, without `.git`, `tmp`, `log`, `storage`, `node_modules`, `spec`, `test`, `coverage`, `.bundle`, `vendor/bundle`, Putnami's `.putnami` and `.gen`, and the files that hold secrets: `config/master.key`, `config/credentials/*.key` and every `.env*` file |
 | Writable directories | `tmp/`, `tmp/cache`, `tmp/pids`, `tmp/sockets` and `log/`, owned by the image's user |
 
@@ -206,6 +206,14 @@ package on a Linux runner of the target architecture. A CI runner such as
 `ubuntu-latest` with the application's Ruby is one.
 [ADR 0001](adr/0001-an-application-image-copies-onto-the-official-ruby-image.md)
 records why.
+
+Packaging the same tree twice on the same machine gives the same image
+digest. Native extensions compile with `-ffile-prefix-map`, a compiler flag
+that writes `/usr/local/bundle` in their debug information in place of the
+temporary build directory. `package` passes the flag to mkmf, Ruby's extension
+build tool, through `CONFIGURE_ARGS`, after the arguments your environment
+already sets there. An extension whose `extconf.rb` replaces `$CPPFLAGS`, or
+that compiles without mkmf, still records the build directory.
 
 An image packages an application whose stack root is its own directory, with a
 `Gemfile.lock`. A path gem outside that directory or a symbolic link fails the
