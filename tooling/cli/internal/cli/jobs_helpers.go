@@ -159,38 +159,3 @@ func shortAliasRenames(rawArgs []string, declared map[string]extension.FlagDefin
 	}
 	return renames, nil
 }
-
-// resolveShortAliasParams returns params with each key renames names moved to
-// the flag's long name, so `-t x` reaches every task, task input, cache key
-// and run marker as `test: x`, exactly as `--test x` does. A renamed key
-// replaces a long-named one only a passthrough token gave. params itself is
-// left unchanged; with nothing to rename it is returned as is.
-func resolveShortAliasParams(params map[string]any, renames map[string]string) map[string]any {
-	if len(renames) == 0 {
-		return params
-	}
-	resolved := make(map[string]any, len(params))
-	for name, value := range params {
-		if _, renamed := renames[name]; !renamed {
-			resolved[name] = value
-		}
-	}
-	for short, long := range renames {
-		if value, ok := params[short]; ok {
-			resolved[long] = value
-		}
-	}
-	return resolved
-}
-
-// buildAliasResolvedParams is buildCommandParams with each short alias of the
-// declared flags resolved to its long name. Its caller has already refused a
-// flag spelled both ways (shortAliasRenames), so no error remains to report.
-func buildAliasResolvedParams(rawArgs []string, declared map[string]extension.FlagDefinition) map[string]any {
-	params := buildCommandParams(rawArgs)
-	renames, err := shortAliasRenames(rawArgs, declared)
-	if err != nil {
-		return params
-	}
-	return resolveShortAliasParams(params, renames)
-}

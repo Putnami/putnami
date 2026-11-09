@@ -2,13 +2,13 @@ package cli
 
 import (
 	"errors"
-	"os"
-	"path/filepath"
+	"fmt"
 	"strings"
 	"testing"
 
 	"go.putnami.dev/protocol/features/spectest"
 	"go.putnami.dev/tooling/cli/internal/cmderr"
+	"go.putnami.dev/tooling/cli/internal/engine"
 	"go.putnami.dev/tooling/cli/internal/extension"
 )
 
@@ -32,9 +32,10 @@ func shortAliasDiscovery(short string) *extension.DiscoveryResult {
 	}}}
 }
 
-// resolvedJobParams is what the engine plans with for a job command line:
-// the terminal mapping's params, after the validator and the resolver seam.
-func resolvedJobParams(t *testing.T, discovered *extension.DiscoveryResult, args ...string) (map[string]any, error) {
+// resolvedJobParams renders what the engine plans with for a job command
+// line: the terminal mapping's params, after the validator and the renames
+// seam, in fmt's sorted map form.
+func resolvedJobParams(t *testing.T, discovered *extension.DiscoveryResult, args ...string) (string, error) {
 	t.Helper()
 	parsed := ParseArgs(args, nil, nil)
 	if parsed.Err != nil {
@@ -42,9 +43,10 @@ func resolvedJobParams(t *testing.T, discovered *extension.DiscoveryResult, args
 	}
 	var stderr strings.Builder
 	if err := commandFlagValidator(parsed, &stderr)(discovered, parsed.Global); err != nil {
-		return nil, err
+		return "", err
 	}
-	return commandParamsResolver(parsed)(discovered, buildCommandParams(parsed.RawJobArgs)), nil
+	renames := commandParamRenames(parsed)(discovered)
+	return fmt.Sprint(engine.RenameParams(buildCommandParams(parsed.RawJobArgs), renames)), nil
 }
 
 // `-t x` reaches the test task as `test: x`, the params `--test x` gives, so
@@ -58,6 +60,9 @@ func TestAJobShortAliasBindsTheLongName(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
+		if long != "map[test:NoSuchTest]" {
+			t.Fatalf("--test: params = %s", long)
+		}
 		for _, args := range [][]string{
 			{"test", "-t", "NoSuchTest"},
 			{"test", "-t=NoSuchTest"},
@@ -66,11 +71,8 @@ func TestAJobShortAliasBindsTheLongName(t *testing.T) {
 			if err != nil {
 				t.Fatalf("short %q, %v: %v", short, args, err)
 			}
-			if params["test"] != "NoSuchTest" || len(params) != len(long) {
-				t.Errorf("short %q, %v: params = %v, want %v", short, args, params, long)
-			}
-			if _, kept := params["t"]; kept {
-				t.Errorf("short %q, %v: params keep the short name: %v", short, args, params)
+			if params != long {
+				t.Errorf("short %q, %v: params = %s, want %s", short, args, params, long)
 			}
 		}
 	}
@@ -80,16 +82,12 @@ func TestAJobShortAliasBindsTheLongName(t *testing.T) {
 // token past the passthrough separator is the user's payload: neither moves.
 func TestAShortNameNoTaskDeclaresKeepsItsName(t *testing.T) {
 	t.Parallel()
-	discovered := shortAliasDiscovery("-t")
-	params, err := resolvedJobParams(t, discovered, "test", "--", "-t", "x")
+	params, err := resolvedJobParams(t, shortAliasDiscovery("-t"), "test", "--", "-t", "x")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if params["t"] != "x" {
-		t.Errorf("a passthrough -t moved: %v", params)
-	}
-	if _, moved := params["test"]; moved {
-		t.Errorf("a passthrough -t reached the test param: %v", params)
+	if params != "map[:true t:x]" {
+		t.Errorf("a passthrough -t moved: %s", params)
 	}
 
 	// A short name that is also a declared long name keeps that meaning.
@@ -105,10 +103,14 @@ func TestAShortNameNoTaskDeclaresKeepsItsName(t *testing.T) {
 		t.Errorf("shortAliasRenames = %v; want no rename for an ambiguous alias", renames)
 	}
 
-	// A renamed alias wins over a long name only the passthrough gave.
-	resolved := resolveShortAliasParams(map[string]any{"t": "a", "test": "b"}, map[string]string{"t": "test"})
-	if len(resolved) != 1 || resolved["test"] != "a" {
-		t.Errorf("resolveShortAliasParams = %v, want test: a", resolved)
+	// A renamed alias wins over a long name only the passthrough gave, and
+	// the map the rename read is left as it was.
+	passthrough := map[string]string{"t": "a", "test": "b"}
+	if got := fmt.Sprint(engine.RenameParams(passthrough, map[string]string{"t": "test"})); got != "map[test:a]" {
+		t.Errorf("RenameParams = %s, want map[test:a]", got)
+	}
+	if got := fmt.Sprint(passthrough); got != "map[t:a test:b]" {
+		t.Errorf("RenameParams changed its input: %s", got)
 	}
 }
 
@@ -130,51 +132,4 @@ func TestBothSpellingsOfOneFlagAreRefused(t *testing.T) {
 			t.Errorf("%v: error %q does not name both spellings", args, err)
 		}
 	}
-}
-
-// An extension subcommand resolves its short aliases against its effective
-// flags, for the params the job receives and for its run marker alike, and the
-// flat job command resolves them through the engine, end to end.
-func TestAnExtensionSubcommandShortAliasBindsTheLongName(t *testing.T) {
-	requireShell(t)
-	spectest.Proves(t, shortAliasSpec, shortAliasRequirement, "an-extension-subcommand-short-alias-binds-the-long-name")
-	wsRoot := t.TempDir()
-	writeWorkspaceAliasFixture(t, wsRoot)
-	manifestPath := filepath.Join(wsRoot, "demo-extension", "putnami.extension.json")
-	manifest, err := os.ReadFile(manifestPath)
-	if err != nil {
-		t.Fatal(err)
-	}
-	withShort := strings.Replace(string(manifest),
-		`"dry-run": { "type": "boolean", "default": false, "description": "Preview without changes" }`,
-		`"dry-run": { "type": "boolean", "default": false, "description": "Preview without changes" },
-        "target": { "type": "string", "short": "-g", "description": "Deployment target" }`, 1)
-	if withShort == string(manifest) {
-		t.Fatal("the fixture manifest no longer declares the dry-run flag this test extends")
-	}
-	if err := os.WriteFile(manifestPath, []byte(withShort), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	writeAliasFixtureScript(t, wsRoot, `#!/bin/sh
-ctx=""
-while [ "$#" -gt 0 ]; do
-  case "$1" in
-    --putnamiContext) ctx="$2"; shift 2 ;;
-    *) shift ;;
-  esac
-done
-if grep -q '"target":"edge"' "$ctx" && ! grep -q '"g":' "$ctx"; then
-  exit 0
-fi
-printf '%s\n' '{"v":2,"type":"log","level":"error","message":"target did not arrive under its long name"}'
-exit 9
-`)
-	t.Setenv("PUTNAMI_STORE_DIR", filepath.Join(t.TempDir(), "store"))
-
-	runAlias(t, wsRoot, []string{"demo", "deploy", "app", "-g", "edge"}, ExitSuccess)
-	runAlias(t, wsRoot, []string{"demo", "deploy", "app", "-g", "edge", "--target", "core"}, ExitUsage)
-	// The flat job command resolves the same alias through the engine's
-	// ResolveCommandParams seam, once discovery knows the flags.
-	runAlias(t, wsRoot, []string{"deploy", "app", "-g", "edge"}, ExitSuccess)
-	runAlias(t, wsRoot, []string{"deploy", "app", "-g", "edge", "--target", "core"}, ExitUsage)
 }

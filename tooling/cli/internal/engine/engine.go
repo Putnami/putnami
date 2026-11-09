@@ -404,13 +404,14 @@ type Request struct {
 	// on — because whether its deprecation notices print at all depends on the
 	// resolved Quiet.
 	ValidateCommandFlags func(*extension.DiscoveryResult, GlobalFlags) error
-	// ResolveCommandParams, when non-nil, runs right after ValidateCommandFlags
-	// and replaces CommandParams with what it returns. It is where the CLI
-	// renames a param a flag's short alias spelled to the flag's long name,
-	// which only the resolved extensions can declare. Every later stage, the
-	// cache keys and the run markers included, reads the returned map. A watch
-	// iteration leaves it nil: it forwards the outer run's resolved params.
-	ResolveCommandParams func(*extension.DiscoveryResult, map[string]any) map[string]any
+	// CommandParamRenames, when non-nil, runs right after ValidateCommandFlags
+	// and answers which CommandParams keys move to another name (RenameParams).
+	// It is where the CLI moves a param a flag's short alias spelled to the
+	// flag's long name, which only the resolved extensions declare. Every later
+	// stage, the cache keys and the run markers included, reads the renamed
+	// params. A watch iteration leaves it nil: it forwards the outer run's
+	// renamed params.
+	CommandParamRenames func(*extension.DiscoveryResult) map[string]string
 	// VersionSnapshot is the git-derived version state captured before any in-run
 	// tree mutation. Nil makes the engine capture it itself at the start
 	// of Run, before hooks — which is what the terminal path did.
@@ -700,6 +701,33 @@ func (e *Engine) Run(ctx context.Context, request Request, sink EventSink) (Sess
 	return result, runErr
 }
 
+// RenameParams returns params with each key renames names moved to the name
+// it maps to, such as a short alias's "t" to its flag's "test". A moved key
+// replaces a value already under the new name. params itself is left
+// unchanged; with nothing to move it is returned as is.
+func RenameParams[V any](params map[string]V, renames map[string]string) map[string]V {
+	moves := false
+	for from := range renames {
+		if _, ok := params[from]; ok {
+			moves = true
+			break
+		}
+	}
+	if !moves {
+		return params
+	}
+	renamed := maps.Clone(params)
+	for from := range renames {
+		delete(renamed, from)
+	}
+	for from, to := range renames {
+		if value, ok := params[from]; ok {
+			renamed[to] = value
+		}
+	}
+	return renamed
+}
+
 // run is the lifecycle proper, between the before and after hooks.
 func (e *Engine) run(ctx context.Context, req *Request, sink EventSink) (SessionResult, error) {
 	// Phase 1: load the workspace and resolve extensions — once per run.
@@ -719,8 +747,8 @@ func (e *Engine) run(ctx context.Context, req *Request, sink EventSink) (Session
 			return SessionResult{ExitCode: protocolcli.ExitCodeForError(err)}, err
 		}
 	}
-	if req.ResolveCommandParams != nil {
-		req.CommandParams = req.ResolveCommandParams(discovered, req.CommandParams)
+	if req.CommandParamRenames != nil {
+		req.CommandParams = RenameParams(req.CommandParams, req.CommandParamRenames(discovered))
 	}
 
 	// Phase 1b': the committed verification policy (options.sdd.verification)
