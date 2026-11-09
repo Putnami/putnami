@@ -3,6 +3,7 @@
   "name": "@putnami/python",
   "cliContract": 13,
   "extensionDependencies": {"@putnami/dev": ""},
+  "uses": ["oci"],
   "runtime": {
     "executable": "compiled/putnami-python",
     "toolchains": {
