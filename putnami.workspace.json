@@ -22,6 +22,7 @@
     "/swift/extension",
     "/monorepo/pants",
     "/monorepo/bazel",
+    "/monorepo/nx",
     "/dotnet/extension",
     "/tooling/scaffold",
     "/tooling/sdd-extension",

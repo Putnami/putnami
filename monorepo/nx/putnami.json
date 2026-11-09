@@ -6,13 +6,29 @@
     "extension"
   ],
   "extensions": [
+    "/go/extension",
     "/tooling/sdd-extension"
   ],
+  "disable": {
+    "jobs": [
+      "serve"
+    ]
+  },
   "options": {
+    "@putnami/go": {
+      "entrypoint": "./cmd/putnami-nx",
+      "version-var": "main.runtimeVersion"
+    },
     "sdd": {
       "verification": {
         "specs": "enforce"
       }
+    },
+    "test": {
+      "filePatterns": [
+        "putnami.extension.json",
+        "profile.json"
+      ]
     }
   }
 }
