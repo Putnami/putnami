@@ -151,6 +151,7 @@ func inputs(root string, p detect.Package, modules []string) []string {
 var graphSync = stacks.GraphSync{
 	Extension:      ExtensionName,
 	HoldsBuildFile: func(root, dir string) bool { return detect.BuildFile(root, dir) != "" },
+	SkippedDirs:    []string{"bazel-bin", "bazel-out", "bazel-testlogs"},
 }
 
 // query runs the query in root and writes its output to a temporary file.

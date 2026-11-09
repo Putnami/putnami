@@ -456,6 +456,9 @@ stops the steps and the reports are still read. An entry of another component
 is left out of the summary: that component's own task counts it. A case of no
 component is counted, with the warning `stacks.test_unattributed`; a coverage
 file of no component is left out, with the warning `stacks.coverage_unmapped`.
+A source file that several coverage reports name is merged: each line
+counts once, covered when any report covered it, and a file a report states
+by totals alone keeps the largest totals.
 A JUnit failure, an error, or a step that exits non-zero fails the task; the
 report's failed cases name the failure, with `stacks.test_failed`, and a failed
 step that wrote no report is `stacks.step_failed`, not a missing report. The totals and

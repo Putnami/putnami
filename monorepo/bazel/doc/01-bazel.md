@@ -80,7 +80,8 @@ After the test command, whatever its outcome, the task copies into its
 command output the `test.xml` and `coverage.dat` of each test run the
 build-event file lists, from the file the event names or else from
 `bazel-testlogs/<package>/<target>/`, and reads them into the test and
-coverage summary. A log that a removed target left in `bazel-testlogs` is no
+coverage summary. A source file that several test runs cover counts each
+line once, covered when any run covered it. A log that a removed target left in `bazel-testlogs` is no
 run of this one, and is not read. A failed case, a command that exits
 non-zero, or a run with no JUnit report fails the task; a test rule without
 coverage support fails nothing.

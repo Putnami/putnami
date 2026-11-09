@@ -157,8 +157,8 @@ The sync runs `bazel query //...` and writes, in each package's
 A package is a directory whose `BUILD` or `BUILD.bazel` file declares a rule
 the query lists. Any other directory with a `BUILD` file, the root included,
 joins the workspace as a bare member that runs nothing. A package with no
-test rule also gets `"disable": { "jobs": ["test"] }`. Add `.putnami/` and
-`.gen/` to `.gitignore`, then commit the files: they are the package graph
+test rule also gets `"disable": { "jobs": ["test"] }`. Add `.putnami/`,
+`.gen/` and `/bazel-*` to `.gitignore`, then commit the files: they are the package graph
 Putnami selects on. Run `putnami projects sync` again after a
 change to the dependencies between packages.
 
