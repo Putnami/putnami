@@ -26,7 +26,8 @@ Swift offers two ways to build a Linux executable:
 ## Decision
 
 `package` builds the executable with the Static Linux SDK of the selected
-Swift release, `swift build -c release --swift-sdk <arch>-swift-linux-musl`,
+Swift release, `swift build -c release --swift-sdk <bundle> --triple
+<arch>-swift-linux-musl`, which names the pinned bundle and not only its target,
 and copies it, with the resource bundles SwiftPM writes beside it, onto
 `gcr.io/distroless/static:nonroot` pinned by digest, the base of
 `@putnami/go`.

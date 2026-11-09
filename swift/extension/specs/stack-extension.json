@@ -71,7 +71,7 @@
     },
     {
       "id": "packages-an-application-image",
-      "text": "package with the docker channel assembles an OCI image of an application with no Docker daemon: it installs the Static Linux SDK of the selected Swift with its pinned checksum when missing, builds the executable serve would start with swift build -c release --swift-sdk <arch>-swift-linux-musl for the platform, and copies it and its resource bundles onto distroless static:nonroot or a digest-pinned base the project names. It runs as non-root on PORT. A library packages nothing."
+      "text": "package with the docker channel assembles an OCI image of an application with no Docker daemon: it installs the Static Linux SDK of the selected Swift with its pinned checksum when missing, builds the executable serve would start with swift build -c release --swift-sdk <bundle> --triple <arch>-swift-linux-musl for the platform, and copies it and its resource bundles onto distroless static:nonroot or a digest-pinned base the project names. It runs as non-root on PORT. A library packages nothing."
     },
     {
       "id": "publishes-an-application-image",
