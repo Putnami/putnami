@@ -38,11 +38,11 @@ tasks:
     command: 'vitest'
     tags: ['test', 'fast']
 `,
-	"apps/api/package.json":     `{"name": "@demo/api"}`,
-	"apps/web/package.json":     `{"name": "@demo/web"}`,
-	"apps/web/tsconfig.json":    `{}`,
-	"packages/ui/moon.yml":      "type: 'library'\nlanguage: 'typescript'\nworkspace:\n  inheritedTasks:\n    include: ['build']\n",
-	"packages/pricing/moon.yml": "stack: 'backend'\n",
+	"apps/api/package.json":       `{"name": "@demo/api"}`,
+	"apps/web/package.json":       `{"name": "@demo/web"}`,
+	"apps/web/tsconfig.json":      `{}`,
+	"packages/ui/moon.yml":        "type: 'library'\nlanguage: 'typescript'\nworkspace:\n  inheritedTasks:\n    include: ['build']\n",
+	"packages/pricing/moon.yml":   "stack: 'backend'\n",
 	"packages/pricing/Cargo.toml": "[package]\nname = \"pricing\"\n",
 }
 
