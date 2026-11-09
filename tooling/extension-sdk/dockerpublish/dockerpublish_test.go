@@ -725,7 +725,7 @@ func TestDockerRegistryFlagFromJobParameters(t *testing.T) {
 	params := pctx.Params{
 		"docker":          json.RawMessage(`true`),
 		"docker-registry": json.RawMessage(`"localhost:15005/acme"`),
-		"dockerRegistry":  json.RawMessage(`"localhost:15005/acme"`),
+		"dockerRegistry":  json.RawMessage(`"registry.example.com/alias"`),
 		"registries":      json.RawMessage(`{"oci":{"publish":"oci.putnami.dev/declared"}}`),
 	}
 	got, err := resolveDockerRegistry(cli.ParseFlags([]string{"publish", "--docker"}), &pctx.Context{Params: params})
@@ -740,6 +740,16 @@ func TestDockerRegistryFlagFromJobParameters(t *testing.T) {
 	got, err = resolveDockerRegistry(cli.ParseFlags([]string{"--docker-registry=registry.example.com/argument"}), &pctx.Context{Params: params})
 	if err != nil || got != "registry.example.com/argument" {
 		t.Fatalf("resolveDockerRegistry(argument and parameter) = (%q, %v), want the argument", got, err)
+	}
+
+	// A flag given without a value reaches the parameters as a boolean: it names
+	// no registry, so the job refuses it instead of falling back.
+	_, err = resolveDockerRegistry(cli.ParseFlags([]string{"publish", "--docker"}), &pctx.Context{Params: pctx.Params{
+		"docker-registry": json.RawMessage(`true`),
+		"registries":      params["registries"],
+	}})
+	if err == nil || !strings.Contains(err.Error(), "--docker-registry requires a registry value") {
+		t.Fatalf("resolveDockerRegistry(flag without a value) error = %v, want the missing value refused", err)
 	}
 }
 

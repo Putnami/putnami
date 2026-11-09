@@ -212,6 +212,7 @@
       "description": "Push the image of an application to its OCI registry.",
       "flags": {
         "docker": { "type": "boolean", "default": false, "description": "Push the image" },
+        "docker-registry": { "type": "string", "description": "Registry to push the image to, above registries.oci.publish" },
         "dry-run": { "type": "boolean", "default": false, "description": "Push nothing; report what would be published" }
       },
       "run": [{ "id": "docker", "task": "publish-docker", "if": "params.docker" }]

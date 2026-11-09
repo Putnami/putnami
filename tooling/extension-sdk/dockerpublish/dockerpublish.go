@@ -333,9 +333,14 @@ func Publish(ctx *pctx.Context, emit *jsonl.Emitter, args []string) (string, map
 // `registries.oci` entry, then DOCKER_REGISTRY, then nothing — which the image
 // project branch resolves to the managed target. The flag comes from the job
 // arguments, else from the `docker-registry` job parameter, where the CLI
-// delivers a command flag. The camelCase `dockerRegistry` parameter is not read.
+// delivers a command flag and a `docker-registry` option alike. The camelCase
+// `dockerRegistry` parameter is not read.
 func resolveDockerRegistry(flags map[string]string, ctx *pctx.Context) (string, error) {
-	if explicit := strings.TrimSpace(cli.FlagString(flags, "docker-registry", ctx.Params.String("docker-registry"))); explicit != "" {
+	explicit, err := dockerRegistryFlag(flags, ctx.Params)
+	if err != nil {
+		return "", err
+	}
+	if explicit != "" {
 		return explicit, nil
 	}
 	declared, err := ociRegistryFromRegistries(ctx.Params)
@@ -346,6 +351,24 @@ func resolveDockerRegistry(flags map[string]string, ctx *pctx.Context) (string, 
 		return declared, nil
 	}
 	return os.Getenv("DOCKER_REGISTRY"), nil
+}
+
+// dockerRegistryFlag answers the `--docker-registry` value from the job
+// arguments, else from the `docker-registry` job parameter. A parameter that is
+// not a string is a flag given without a value, and it is an error.
+func dockerRegistryFlag(flags map[string]string, params pctx.Params) (string, error) {
+	if value, ok := flags["docker-registry"]; ok {
+		return strings.TrimSpace(value), nil
+	}
+	raw, ok := params["docker-registry"]
+	if !ok {
+		return "", nil
+	}
+	var value string
+	if err := json.Unmarshal(raw, &value); err != nil {
+		return "", fmt.Errorf("flag --docker-registry requires a registry value")
+	}
+	return strings.TrimSpace(value), nil
 }
 
 // ociRegistryFromRegistries reads `registries.oci.publish` out of the job

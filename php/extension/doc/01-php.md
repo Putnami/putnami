@@ -133,6 +133,7 @@ Declare the channel in the project's `putnami.json`:
 also loads it into the local Docker daemon. `putnami publish` pushes it to the
 registry that `registries.oci.publish` of `putnami.workspace.json` declares,
 through the shared publisher of the Go and TypeScript extensions.
+`--docker-registry <registry>` overrides that registry for one push.
 
 | Layer | Content |
 |---|---|
