@@ -264,8 +264,14 @@ func TestTheProbeAttributesThePantsEdgesToTheBuildGraph(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, p := range result.Projects {
-		if p.Path == "src/python/api" && !reflect.DeepEqual(p.Dependencies, []string{"3rdparty/python", "src/python/pricing"}) {
+		if p.Path != "src/python/api" {
+			continue
+		}
+		if !reflect.DeepEqual(p.Dependencies, []string{"3rdparty/python", "src/python/pricing"}) {
 			t.Errorf("api dependencies with the export = %v", p.Dependencies)
+		}
+		if want := map[string]wsproto.DependencySource{"3rdparty/python": graph, "src/python/pricing": graph}; !reflect.DeepEqual(p.DependencySources, want) {
+			t.Errorf("api dependencySources with the export = %v, want %v", p.DependencySources, want)
 		}
 	}
 }
