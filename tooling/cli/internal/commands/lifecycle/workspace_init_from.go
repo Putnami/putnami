@@ -19,7 +19,7 @@ import (
 	"go.putnami.dev/tooling/cli/internal/jsonutil"
 )
 
-// Adoption modes of `putnami init --from` (D-063).
+// Adoption modes of `putnami init --from` (D-064).
 const (
 	// initModeImport hands the targets Putnami can map to its own runner and
 	// cache.
