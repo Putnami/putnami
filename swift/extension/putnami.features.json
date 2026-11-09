@@ -7,7 +7,7 @@
       "id": "swift/stack-extension",
       "type": "feature",
       "name": "Run the Swift packages and Xcode projects of a repository as Putnami tasks",
-      "outcome": "A team with Swift packages and Xcode projects adds @putnami/swift and runs putnami lint, test and build over them with Putnami's runner and cache: each package and Xcode project is a project with its edges, each task runs swift or xcodebuild after a toolchain check and reads its JUnit and coverage reports, a component overrides any profile value, and install, upgrade, serve and run reach the packages",
+      "outcome": "A team with Swift packages and Xcode projects adds @putnami/swift and runs putnami lint, test and build over them with Putnami's runner and cache: each package and Xcode project is a project with its edges, each task runs swift or xcodebuild after a toolchain check, a package installing the stated Swift when the machine has none, and reads its JUnit and coverage reports, a component overrides any profile value, and install, upgrade, serve and run reach the packages",
       "owner": "swift",
       "target": "coded",
       "requirements": [
@@ -138,6 +138,32 @@
             "kind": "acceptance",
             "checks": [
               "lint-fails-on-a-broken-documentation-link-unless-docs-links-is-off"
+            ]
+          }
+        },
+        {
+          "id": "provides-its-toolchain",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-package-task-installs-the-stated-swift-when-the-machine-has-none"
+            ]
+          }
+        },
+        {
+          "id": "provides-llvm-cov",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-package-test-task-finds-the-llvm-cov-of-its-toolchain"
             ]
           }
         }

@@ -7,10 +7,12 @@
     "putnami lint, test and build run swift on a package and xcodebuild on an Xcode project, in its directory, and a second run over an unchanged tree is a cache hit",
     "The test task reads the xunit and LCOV reports of a package, and the JUnit and Cobertura reports the extension converts from an Xcode result bundle, into the test and coverage summary",
     "A component overrides any value of the Swift profile in its putnami.json, and the override reaches the cache key",
-    "putnami install resolves each component's packages, putnami upgrade updates a package's dependencies, and putnami serve and run start a package's executable product"
+    "putnami install resolves each component's packages, putnami upgrade updates a package's dependencies, and putnami serve and run start a package's executable product",
+    "On a machine with no Swift, or a Swift outside the release .swift-version states, a package task installs that release, or the extension's default, under the Putnami home, and a second run installs nothing"
   ],
   "nonGoals": [
-    "Installing or switching a Swift toolchain or an Xcode version: the toolchain check compares and never installs; a Swift install follows in #985",
+    "Installing or switching an Xcode version: an Xcode project's toolchain check compares and never installs",
+    "Installing the system packages a Swift toolchain needs on Linux: the task names them, as swiftly reports them",
     "Building through an .xcworkspace or CocoaPods: a project that needs it overrides its steps",
     "Each SwiftPM target as a project of its own: the package is the unit swift builds and tests",
     "Linting with swift-format's default style: a repository without a .swift-format configuration is not linted",
@@ -58,10 +60,19 @@
     {
       "id": "checks-documentation-links",
       "text": "lint also checks every relative link and anchor of the component's README.md files and doc/ trees, a nested package answering for its own, and a broken one fails it, unless --docs-links=false."
+    },
+    {
+      "id": "provides-its-toolchain",
+      "text": "A package task whose swift is missing, or outside the release .swift-version states, installs that release, or the default one, with a swiftly pinned by SHA-256 per platform, Linux and macOS, in a home under the Putnami home, once per release; the machine's toolchains stay untouched. A swift on PATH that satisfies the statement runs alone. An offline run installs nothing and reports stacks.toolchain_missing. An Xcode project keeps its toolchain check only."
+    },
+    {
+      "id": "provides-llvm-cov",
+      "text": "The package test task, and no other, appends the directory of its toolchain's llvm-cov to the PATH of the task when that PATH holds none, so swiftpm-test exports the LCOV with the llvm-cov of the swift that ran the tests."
     }
   ],
   "decisions": [
     "tooling/stacks/doc/adr/0001-one-extension-per-stack-on-a-shared-core.md",
+    "tooling/stacks/doc/adr/0004-a-stack-extension-may-install-its-toolchain-at-task-time.md",
     "tooling/stacks/doc/adr/0005-profile-variants-for-a-stack-with-several-builds.md",
     "tooling/stacks/doc/adr/0007-nested-markers-excludes-and-runtime-commands.md"
   ]
