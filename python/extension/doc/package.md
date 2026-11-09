@@ -33,8 +33,9 @@ from its configuration:
 onto a base image and runs nothing inside it.
 
 - **Base.** The official `python:<version>-slim` image, pinned by digest, of the
-  Python minor that `uv python find` selects at the workspace root: the
-  interpreter the tests run on. The extension pins Python 3.11 to 3.14. Another
+  Python minor that `uv run` selects at the workspace root: the interpreter the
+  tests run on. Like the tests, the job installs that interpreter when the
+  machine has none. The extension pins Python 3.11 to 3.14. Another
   base must be named with its digest; a base with no digest fails.
 - **Dependencies.** `uv export --frozen --no-dev` lists the production
   dependencies of `uv.lock`. `uv pip install --target` installs the registry ones

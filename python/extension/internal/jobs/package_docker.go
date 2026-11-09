@@ -243,23 +243,18 @@ func imageEntrypoint(ctx *pctx.Context, flags map[string]string) (string, error)
 	return clean, nil
 }
 
-// pythonVersion answers the version of the interpreter uv selects at the
-// workspace root, the one the tests run on.
+// pythonVersion answers the version of the interpreter `uv run` selects at the
+// workspace root, the one the tests run on. Like the tests' `uv run`, it
+// provisions that interpreter and the workspace environment when the machine
+// has none; `uv python find` answers only an interpreter already installed, so
+// it fails on a fresh runner. --no-sync installs no dependency.
 func pythonVersion(uv, wsRoot string, env []string) (string, error) {
-	find := exec.Command(uv, "python", "find") //nolint:gosec // the resolved uv
-	find.Dir = wsRoot
-	find.Env = env
-	found, err := find.Output()
-	if err != nil {
-		return "", fmt.Errorf("uv python find: %w%s", err, stderrOf(err))
-	}
-	interpreter := strings.TrimSpace(string(found))
-	version := exec.Command(interpreter, "-c", "import platform; print(platform.python_version())") //nolint:gosec // the interpreter uv found
+	version := exec.Command(uv, "run", "--no-sync", "python", "-c", "import platform; print(platform.python_version())") //nolint:gosec // the resolved uv
 	version.Dir = wsRoot
 	version.Env = env
 	answer, err := version.Output()
 	if err != nil {
-		return "", fmt.Errorf("read the version of %s: %w%s", interpreter, err, stderrOf(err))
+		return "", fmt.Errorf("uv run python: %w%s", err, stderrOf(err))
 	}
 	return strings.TrimSpace(string(answer)), nil
 }
