@@ -520,3 +520,49 @@ func TestValidateConfigProjectIgnoresSameNameCopies(t *testing.T) {
 		t.Fatalf("a same-name copy changed the outcome\nwithout copy:\n%s\nwith copy:\n%s", baseline, got)
 	}
 }
+
+// TestValidateConfigProjectAcceptsAProviderNamedProject covers a project whose
+// putnami.json declares no `name`, such as a Composer package the workspace
+// names from its provider. The task context carries the resolved name and the
+// workspace membership; the check must take that name as its own project's.
+func TestValidateConfigProjectAcceptsAProviderNamedProject(t *testing.T) {
+	root := validateConfigKeyFixture(t, "putnami.workspace.json", false)
+	projectDir := filepath.Join(root, "apps", "my-app")
+	writeFixtureJSON(t, filepath.Join(projectDir, "putnami.json"), map[string]any{
+		"options": map[string]any{"publish": map[string]any{"namespace": "workspace-native"}},
+	})
+	writeProjectManifest(t, filepath.Join(root, "apps", "other"), "other")
+	t.Cleanup(func() { clicore.UseWorkspaceProjects(nil) })
+	run := func(t *testing.T, membership bool) error {
+		t.Helper()
+		context := map[string]any{
+			"workspaceRoot": root,
+			"params":        map[string]any{},
+			"project":       map[string]any{"name": "acme-vendor/my-app"},
+		}
+		if membership {
+			context["workspaceProjects"] = []any{
+				map[string]any{"name": "acme-vendor/my-app", "path": "apps/my-app", "fullPath": projectDir},
+				map[string]any{"name": "other", "path": "apps/other", "fullPath": filepath.Join(root, "apps", "other")},
+			}
+		}
+		contextFile := filepath.Join(t.TempDir(), "context.json")
+		writeFixtureJSON(t, contextFile, context)
+		t.Chdir(projectDir)
+		return RunCommand("validate-config-project", IO{
+			Env:    map[string]string{"PUTNAMI_WORKSPACE_ROOT": root},
+			Stdout: func(string) {}, Stderr: func(string) {},
+		}, []string{"--putnamiContext", contextFile})
+	}
+	t.Run("with the workspace membership", func(t *testing.T) {
+		if err := run(t, true); err != nil {
+			t.Fatalf("provider-named project refused: %v", err)
+		}
+	})
+	t.Run("without the workspace membership", func(t *testing.T) {
+		err := run(t, false)
+		if err == nil || !strings.Contains(err.Error(), "checks only the project in its working directory") {
+			t.Fatalf("err = %v, want the working-directory refusal a putnami.json lookup gives", err)
+		}
+	})
+}

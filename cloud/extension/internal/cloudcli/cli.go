@@ -246,6 +246,11 @@ func RunCommand(command string, ioctx IO, args []string) error {
 	if err != nil {
 		return err
 	}
+	// The workspace names a project from more sources than its putnami.json
+	// `name`: its provider's source name, a scope name pattern, its directory.
+	// Every project lookup reads the names the native CLI resolved.
+	useWorkspaceProjects(context)
+	defer clicore.UseWorkspaceProjects(nil)
 	params := mergeParams(context.Params, parseFlags(args))
 	params["command"] = commandPath(command, args)
 	if err := clicore.ValidateOutputMode(params); err != nil {
@@ -290,7 +295,8 @@ func RunCommand(command string, ioctx IO, args []string) error {
 
 	switch command {
 	case "help", "":
-		return help(params, ioctx)
+		help(params, ioctx)
+		return nil
 
 	// The public root: one entry per thing the user knows.
 	case "login":
@@ -443,7 +449,7 @@ func runtimeInfo(args []string, ioctx IO) error {
 
 // help lists the public root: exactly the entries of publicEntries. Hidden
 // aliases, machine commands and operator commands never appear.
-func help(params map[string]any, ioctx IO) error {
+func help(params map[string]any, ioctx IO) {
 	commands := make([]map[string]string, 0, len(publicEntries))
 	for _, entry := range publicEntries {
 		commands = append(commands, map[string]string{
@@ -454,7 +460,7 @@ func help(params map[string]any, ioctx IO) error {
 	}
 	if clicore.StructuredOutput(params) {
 		writeResult(map[string]any{"commands": commands}, params, ioctx, "")
-		return nil
+		return
 	}
 	width := 0
 	for _, entry := range publicEntries {
@@ -468,7 +474,6 @@ func help(params map[string]any, ioctx IO) error {
 	}
 	ioctx.Stdout("")
 	ioctx.Stdout("Run `putnami cloud <command> help` for the verbs of one command.")
-	return nil
 }
 
 func resultParamsFor(command string, args []string, env map[string]string) map[string]any {
@@ -1193,6 +1198,20 @@ func adoptContextProject(params map[string]any, ctx putnamiContext) {
 	}
 	params["app"] = proj
 	params["_contextApp"] = proj
+}
+
+// useWorkspaceProjects records the workspace membership of the job context for
+// the project lookups of this invocation; a context without one clears it.
+func useWorkspaceProjects(ctx putnamiContext) {
+	projects := make([]clicore.WorkspaceProject, 0, len(ctx.WorkspaceProjects))
+	for _, ref := range ctx.WorkspaceProjects {
+		dir := ref.FullPath
+		if dir == "" && ref.Path != "" && ctx.WorkspaceRoot != "" {
+			dir = filepath.Join(ctx.WorkspaceRoot, filepath.FromSlash(ref.Path))
+		}
+		projects = append(projects, clicore.WorkspaceProject{Name: ref.Name, Dir: dir})
+	}
+	clicore.UseWorkspaceProjects(projects)
 }
 
 // workspaceName reads the `name` field from putnami.workspace.json at the
