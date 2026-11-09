@@ -1,0 +1,393 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-extension.json",
+  "name": "@putnami/moon",
+  "cliContract": 14,
+  "extensionDependencies": {
+    "@putnami/dev": ""
+  },
+  "runtime": {
+    "executable": "compiled/putnami-moon",
+    "toolchains": {
+      "runtimeCompiler": {
+        "lock": "go",
+        "candidates": [
+          {
+            "from": "environment",
+            "environment": "GOROOT",
+            "path": "bin/go"
+          },
+          {
+            "from": "path",
+            "path": "go"
+          },
+          {
+            "from": "putnami-home",
+            "path": "toolchains/go/go-{version}/go/bin/go"
+          }
+        ],
+        "probe": {
+          "args": [
+            "env",
+            "GOVERSION"
+          ],
+          "expect": "go{version}",
+          "unset": [
+            "GOROOT"
+          ],
+          "environment": {
+            "GOTOOLCHAIN": "local"
+          }
+        },
+        "environment": {
+          "GOROOT": {
+            "from": "ancestor",
+            "levels": 2
+          },
+          "GOTOOLCHAIN": {
+            "from": "literal",
+            "value": "local"
+          }
+        },
+        "prependPath": true
+      }
+    },
+    "prepare": {
+      "command": "{extensionRoot}/bin/prepare",
+      "args": [
+        "--output",
+        "{runtimeOutput}"
+      ],
+      "inputs": [
+        "bin/prepare",
+        "cmd/**",
+        "go.mod",
+        "go.sum",
+        "*.go",
+        "profile.json"
+      ],
+      "toolchains": [
+        "runtimeCompiler"
+      ]
+    },
+    "inputSelectors": [
+      "moon:build",
+      "moon:lint",
+      "moon:test"
+    ]
+  },
+  "workspace": {
+    "markers": [
+      "moon.yml"
+    ],
+    "inputs": [
+      "moon.yml",
+      ".moon/workspace.yml",
+      ".moon/tasks.yml",
+      ".moon/tasks/**",
+      "moon-graph.json",
+      ".prototools",
+      "putnami.json",
+      "putnami.workspace.json",
+      "package.json",
+      "tsconfig.json",
+      "go.mod",
+      "Cargo.toml",
+      "pyproject.toml",
+      "requirements.txt",
+      "composer.json",
+      "Gemfile"
+    ],
+    "excludes": [
+      ".moon/cache"
+    ],
+    "syncTask": "workspace-sync-exec"
+  },
+  "commands": {
+    "lint": {
+      "description": "Lint each moon project with moon run <project>:<task>, the moon task named or tagged lint; moon keeps its own cache.",
+      "run": [
+        {
+          "id": "graph",
+          "task": "graph-run",
+          "dependsOn": [
+            "^graph"
+          ]
+        },
+        {
+          "id": "lint",
+          "task": "lint-run",
+          "dependsOn": [
+            "graph"
+          ]
+        }
+      ]
+    },
+    "test": {
+      "description": "Test each moon project with moon run <project>:<task>, the moon task named or tagged test, and read the reports its options name; moon keeps its own cache.",
+      "run": [
+        {
+          "id": "graph",
+          "task": "graph-run",
+          "dependsOn": [
+            "^graph"
+          ]
+        },
+        {
+          "id": "test",
+          "heavy": true,
+          "task": "test-run",
+          "dependsOn": [
+            "graph"
+          ]
+        }
+      ]
+    },
+    "build": {
+      "description": "Build each moon project with moon run <project>:<task>, the moon task named or tagged build; moon keeps its own cache.",
+      "run": [
+        {
+          "id": "graph",
+          "task": "graph-run",
+          "dependsOn": [
+            "^graph"
+          ]
+        },
+        {
+          "id": "build",
+          "heavy": true,
+          "task": "build-run",
+          "dependsOn": [
+            "graph"
+          ]
+        }
+      ]
+    },
+    "validate": {
+      "description": "Fail when a moon project's putnami.json no longer matches what the sync would write from the moon project graph, such as after a moon.yml or manifest change that alters moon's edges.",
+      "activation": "workspace-once",
+      "run": [
+        {
+          "id": "moon-graph-check",
+          "task": "moon-graph-check-exec"
+        }
+      ]
+    },
+    "workspace-sync": {
+      "description": "Write each moon project's putnami.json from the moon project graph, in the workspace's adoption mode.",
+      "visibility": "internal",
+      "activation": "workspace-once",
+      "run": [
+        {
+          "id": "workspace-sync",
+          "task": "workspace-sync-exec"
+        }
+      ]
+    }
+  },
+  "tasks": {
+    "graph-run": {
+      "description": "Carry the package graph: each lint, test and build step depends on the graph step of its own package, which alone depends on the graph step of each package upstream, so a change selects the packages that depend on it while a dependency runs no moon. Runs nothing and passes.",
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": [
+        "graph"
+      ],
+      "cwd": "{projectRoot}",
+      "timeoutMs": 60000,
+      "inputs": {
+        "sources": {
+          "from": "project",
+          "files": [
+            "moon:test"
+          ]
+        }
+      },
+      "cache": {
+        "enabled": false
+      }
+    },
+    "lint-run": {
+      "description": "Run moon run <project>:<task> at the workspace root for one project, after the moon version check, where <task> is the moon task named or tagged lint. Putnami's cache is off: moon's cache decides what reruns.",
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": [
+        "lint",
+        "--report-dir",
+        "{outputRoot}"
+      ],
+      "cwd": "{projectRoot}",
+      "timeoutMs": 1800000,
+      "inputs": {
+        "sources": {
+          "from": "project",
+          "files": [
+            "moon:lint"
+          ]
+        },
+        "stackRoot": {
+          "from": "workspace",
+          "files": [
+            ".prototools"
+          ]
+        },
+        "extensionVersion": {
+          "from": "runtime"
+        }
+      },
+      "outputs": {
+        "data": {
+          "description": "The task result: delegatedTo moon, and the test and coverage totals of a test task."
+        }
+      },
+      "cache": {
+        "enabled": false
+      },
+      "declares": {
+        "outputs": {
+          "reports": {
+            "kind": "directory",
+            "root": "command-output",
+            "path": "lint",
+            "optionalEmpty": true,
+            "description": "The reports the task read: each JUnit and coverage report the project's options name."
+          }
+        },
+        "effects": [
+          "network",
+          "toolchain-cache"
+        ]
+      }
+    },
+    "test-run": {
+      "description": "Run moon run <project>:<task> at the workspace root for one project, after the moon version check, where <task> is the moon task named or tagged test; then read the JUnit and coverage reports the project's options name. A failed case, a step that exits non-zero, or a named report that is missing fails the task. Putnami's cache is off: moon's cache decides what reruns.",
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": [
+        "test",
+        "--report-dir",
+        "{outputRoot}"
+      ],
+      "cwd": "{projectRoot}",
+      "timeoutMs": 1800000,
+      "inputs": {
+        "sources": {
+          "from": "project",
+          "files": [
+            "moon:test"
+          ]
+        },
+        "stackRoot": {
+          "from": "workspace",
+          "files": [
+            ".prototools"
+          ]
+        },
+        "extensionVersion": {
+          "from": "runtime"
+        }
+      },
+      "outputs": {
+        "data": {
+          "description": "The task result: delegatedTo moon, and the test and coverage totals of a test task."
+        }
+      },
+      "cache": {
+        "enabled": false
+      },
+      "declares": {
+        "outputs": {
+          "reports": {
+            "kind": "directory",
+            "root": "command-output",
+            "path": "test",
+            "optionalEmpty": true,
+            "description": "The reports the task read: each JUnit and coverage report the project's options name."
+          }
+        },
+        "effects": [
+          "network",
+          "toolchain-cache"
+        ]
+      }
+    },
+    "build-run": {
+      "description": "Run moon run <project>:<task> at the workspace root for one project, after the moon version check, where <task> is the moon task named or tagged build. Putnami's cache is off: moon's cache decides what reruns.",
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": [
+        "build",
+        "--report-dir",
+        "{outputRoot}"
+      ],
+      "cwd": "{projectRoot}",
+      "timeoutMs": 1800000,
+      "inputs": {
+        "sources": {
+          "from": "project",
+          "files": [
+            "moon:build"
+          ]
+        },
+        "stackRoot": {
+          "from": "workspace",
+          "files": [
+            ".prototools"
+          ]
+        },
+        "extensionVersion": {
+          "from": "runtime"
+        }
+      },
+      "outputs": {
+        "data": {
+          "description": "The task result: delegatedTo moon, and the test and coverage totals of a test task."
+        }
+      },
+      "cache": {
+        "enabled": false
+      },
+      "declares": {
+        "outputs": {
+          "reports": {
+            "kind": "directory",
+            "root": "command-output",
+            "path": "build",
+            "optionalEmpty": true,
+            "description": "The reports the task read: each JUnit and coverage report the project's options name."
+          }
+        },
+        "effects": [
+          "network",
+          "toolchain-cache"
+        ]
+      }
+    },
+    "workspace-sync-exec": {
+      "description": "Write in each moon project's putnami.json the tag moon, the extension the workspace's mode maps it to, its dependencies as the project IDs of the projects moon says it depends on, build, lint or test in disable.jobs when it has no moon task named or tagged that way, and the step of a task moon tags rather than names. Declares no outputs: it rewrites tracked project files, which the workspace-files effect states.",
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": [
+        "workspace-sync"
+      ],
+      "cwd": "{workspaceRoot}",
+      "cache": false,
+      "timeoutMs": 600000,
+      "declares": {
+        "effects": [
+          "workspace-files"
+        ]
+      }
+    },
+    "moon-graph-check-exec": {
+      "description": "Compare each moon project's putnami.json with what the sync would write from moon-graph.json at the workspace root, or the moon configuration, and fail with moon.sync_stale when a sync would change one. Writes nothing, and warns outside a moon workspace.",
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": [
+        "moon-graph-check"
+      ],
+      "cwd": "{workspaceRoot}",
+      "cache": false,
+      "timeoutMs": 600000
+    }
+  }
+}

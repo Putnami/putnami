@@ -26,7 +26,7 @@ Framework reference lives in the `AI.md` of each module and extension; it is nev
 The repo is organized by ownership — each language ecosystem is self-contained. Full rules live in CONTRIBUTING.md (Repository Layout); the short map:
 
 - `tooling/` — workspace-wide machinery: the CLI (`tooling/cli`, Go), extension SDK, scaffold, client generator, SDD extension, agent workflows, hooks, and tooling samples.
-- `monorepo/` — monorepo tool integrations, each a delegated stack extension that runs the tool and reads its results: `monorepo/bazel`, `monorepo/pants` (D-063).
+- `monorepo/` — monorepo tool integrations, each a delegated stack extension that runs the tool and reads its results: `monorepo/bazel`, `monorepo/moon`, `monorepo/pants` (D-063).
 - `intelligence/` — public Intelligence code: the area detector (`intelligence/areas`).
 - `cloud/` — public client code of the hosted platform, such as the Cloud runtime destination libraries.
 - `protocols/` — cross-pillar wire contracts (JSON schemas + fixture corpora) shared by frameworks, tooling, and platform. Structured CLI output, workspace/project config, extension manifests, features, support status, and the other contracts are defined here.

@@ -32,8 +32,17 @@ type GraphPackage struct {
 	// though no edge reaches them, such as a lockfile outside every member.
 	Inputs []string
 	// Tested reports that the package holds a test target: without one, the
-	// sync disables its test job.
+	// sync disables its test job. Ignored when the sync names its Jobs.
 	Tested bool
+	// Extension is the extension the package runs, one of the sync's
+	// Extension and Extensions; empty is the sync's Extension.
+	Extension string
+	// Disabled are the jobs, among the sync's Jobs, the package runs none
+	// of, such as a command its tool has no task for.
+	Disabled []string
+	// Edit, when set, writes the members of the package's putnami.json the
+	// stack owns beyond the sync's, after them, and is called on every write.
+	Edit func(doc map[string]any)
 }
 
 // GraphSync writes the package graph a delegated tool's export states into
@@ -52,6 +61,20 @@ type GraphSync struct {
 	// SkippedDirs are directory names the walk for marked packages never
 	// enters, besides hidden directories: the tool's outputs and caches.
 	SkippedDirs []string
+	// Extensions are the other extensions a package may run, such as the
+	// language extensions a tool's projects are imported into: the sync
+	// writes the package's own and removes the others.
+	Extensions []string
+	// Tag, when set, is a tag the sync writes on every package and that
+	// marks a package as the sync's, whatever extension it runs.
+	Tag string
+	// Jobs, when set, are the jobs the sync owns in disable.jobs, each
+	// package naming those it disables in Disabled; unset, the sync owns test
+	// alone, by Tested.
+	Jobs []string
+	// Retract, when set, removes from a former package's putnami.json the
+	// members its packages' Edit wrote.
+	Retract func(doc map[string]any)
 }
 
 // GraphResult is what one graph sync did.
@@ -114,7 +137,7 @@ func (g GraphSync) Apply(root string, packages []GraphPackage, dry bool) (GraphR
 			}
 		}
 		file := filepath.Join(root, filepath.FromSlash(p.Dir), wsproto.ConfigFilename)
-		changed, err := g.writeProject(root, file, deps, p.Inputs, components, p.Tested, dry)
+		changed, err := g.writeProject(root, file, deps, p, components, dry)
 		if err != nil {
 			return GraphResult{}, fmt.Errorf("%s/%s: %w", p.Dir, wsproto.ConfigFilename, err)
 		}
@@ -194,7 +217,7 @@ func (g GraphSync) markedProjects(root string) ([]string, error) {
 			return nil
 		}
 		doc, _, err := readProject(p)
-		if err != nil || !slices.Contains(stringList(doc["extensions"]), g.Extension) {
+		if err != nil || !g.marks(doc) {
 			return nil
 		}
 		rel, err := filepath.Rel(root, filepath.Dir(p))
@@ -206,6 +229,17 @@ func (g GraphSync) markedProjects(root string) ([]string, error) {
 	})
 	slices.Sort(out)
 	return out, err
+}
+
+// marks reports whether a putnami.json is the sync's: it names the
+// extension, or carries the sync's tag.
+func (g GraphSync) marks(doc map[string]any) bool {
+	return slices.Contains(stringList(doc["extensions"]), g.Extension) || g.Tag != "" && slices.Contains(stringList(doc["tags"]), g.Tag)
+}
+
+// owns reports whether the sync writes the extension.
+func (g GraphSync) owns(extension string) bool {
+	return extension == g.Extension || slices.Contains(g.Extensions, extension)
 }
 
 // readProject reads the putnami.json at file as a JSON object, with its
@@ -265,9 +299,18 @@ func (g GraphSync) retractProject(root, file string, components map[string]bool,
 		return false, err
 	}
 	before := cloneDoc(doc)
-	setList(doc, "extensions", slices.DeleteFunc(stringList(doc["extensions"]), func(e string) bool { return e == g.Extension }))
+	setList(doc, "extensions", slices.DeleteFunc(stringList(doc["extensions"]), g.owns))
 	setList(doc, "dependencies", slices.DeleteFunc(stringList(doc["dependencies"]), func(d string) bool { return !g.keepDependency(root, d, components) }))
 	g.setInputs(doc, nil)
+	if g.Tag != "" {
+		setList(doc, "tags", slices.DeleteFunc(stringList(doc["tags"]), func(t string) bool { return t == g.Tag }))
+	}
+	if g.Jobs != nil {
+		g.setDisabled(doc, nil)
+	}
+	if g.Retract != nil {
+		g.Retract(doc)
+	}
 	if reflect.DeepEqual(cloneDoc(doc), before) {
 		return false, nil
 	}
@@ -279,9 +322,10 @@ func (g GraphSync) retractProject(root, file string, components map[string]bool,
 
 // writeProject merges the package's facts into the putnami.json at file and
 // writes it when a member the sync owns changes: the extension, the
-// dependencies on the tool's packages, the inputs and test in disable.jobs.
-// Every other member is kept as it is.
-func (g GraphSync) writeProject(root, file string, deps, inputs []string, components map[string]bool, tested, dry bool) (bool, error) {
+// dependencies on the tool's packages, the inputs, the tag and the jobs it
+// owns in disable.jobs, then what the package's Edit owns. Every other member
+// is kept as it is.
+func (g GraphSync) writeProject(root, file string, deps []string, p GraphPackage, components map[string]bool, dry bool) (bool, error) {
 	doc, existing, err := readProject(file)
 	if err != nil {
 		return false, err
@@ -291,31 +335,36 @@ func (g GraphSync) writeProject(root, file string, deps, inputs []string, compon
 	}
 	before := cloneDoc(doc)
 
-	extensions := stringList(doc["extensions"])
-	if !slices.Contains(extensions, g.Extension) {
-		extensions = append(extensions, g.Extension)
+	extension := p.Extension
+	if extension == "" {
+		extension = g.Extension
+	}
+	extensions := slices.DeleteFunc(stringList(doc["extensions"]), func(e string) bool { return e != extension && g.owns(e) })
+	if !slices.Contains(extensions, extension) {
+		extensions = append(extensions, extension)
 	}
 	doc["extensions"] = extensions
+	if g.Tag != "" {
+		tags := stringList(doc["tags"])
+		if !slices.Contains(tags, g.Tag) {
+			tags = append(tags, g.Tag)
+		}
+		doc["tags"] = tags
+	}
 
 	kept := slices.DeleteFunc(stringList(doc["dependencies"]), func(d string) bool { return !g.keepDependency(root, d, components) })
 	setList(doc, "dependencies", sortedUnique(append(kept, deps...)))
 
-	disable, _ := doc["disable"].(map[string]any)
-	if disable == nil {
-		disable = map[string]any{}
+	disabled := p.Disabled
+	if g.Jobs == nil && !p.Tested {
+		disabled = []string{"test"}
 	}
-	jobs := slices.DeleteFunc(stringList(disable["jobs"]), func(j string) bool { return j == "test" })
-	if !tested {
-		jobs = append(jobs, "test")
-	}
-	setList(disable, "jobs", jobs)
-	if len(disable) == 0 {
-		delete(doc, "disable")
-	} else {
-		doc["disable"] = disable
-	}
+	g.setDisabled(doc, disabled)
 
-	g.setInputs(doc, inputs)
+	g.setInputs(doc, p.Inputs)
+	if p.Edit != nil {
+		p.Edit(doc)
+	}
 
 	if existing != nil && reflect.DeepEqual(cloneDoc(doc), before) {
 		return false, nil
@@ -324,6 +373,31 @@ func (g GraphSync) writeProject(root, file string, deps, inputs []string, compon
 		return true, nil
 	}
 	return writeJSON(file, doc, existing)
+}
+
+// setDisabled writes the jobs the sync owns in disable.jobs: those of
+// disabled, after every job the sync does not own, kept in its place.
+func (g GraphSync) setDisabled(doc map[string]any, disabled []string) {
+	owned := g.Jobs
+	if owned == nil {
+		owned = []string{"test"}
+	}
+	disable, _ := doc["disable"].(map[string]any)
+	if disable == nil {
+		disable = map[string]any{}
+	}
+	jobs := slices.DeleteFunc(stringList(disable["jobs"]), func(j string) bool { return slices.Contains(owned, j) })
+	for _, j := range owned {
+		if slices.Contains(disabled, j) {
+			jobs = append(jobs, j)
+		}
+	}
+	setList(disable, "jobs", jobs)
+	if len(disable) == 0 {
+		delete(doc, "disable")
+	} else {
+		doc["disable"] = disable
+	}
 }
 
 // writeJSON writes doc at file, two-space indented with sorted keys, when its

@@ -209,3 +209,52 @@ func TestTheGraphJobsReportTheSyncAndAStaleGraph(t *testing.T) {
 		t.Errorf("a failed check = %v", err)
 	}
 }
+
+func TestTheGraphSyncWritesAnotherExtensionTheTagAndTheOwnedJobs(t *testing.T) {
+	root := t.TempDir()
+	g := testGraphSync()
+	g.Extensions = []string{"@acme/lang"}
+	g.Tag = "tool"
+	g.Jobs = []string{"build", "lint", "test"}
+	g.Retract = func(doc map[string]any) { delete(doc, "owned") }
+	writeTestFile(t, filepath.Join(root, "web", "BUILD"), "")
+	writeTestFile(t, filepath.Join(root, "api", "putnami.json"), `{"extensions": ["@acme/tool", "@acme/other"], "disable": {"jobs": ["serve", "lint"]}}`)
+	packages := []GraphPackage{
+		{Dir: "api", Extension: "@acme/lang", Disabled: []string{"build"}, Edit: func(doc map[string]any) { doc["owned"] = true }},
+		{Dir: "web", Disabled: []string{"lint", "test"}},
+	}
+	if _, err := g.Apply(root, packages, false); err != nil {
+		t.Fatal(err)
+	}
+	api := readTestProject(t, root, "api")
+	if got := api["extensions"]; !reflect.DeepEqual(got, []any{"@acme/other", "@acme/lang"}) {
+		t.Fatalf("api extensions %v", got)
+	}
+	if got := api["disable"]; !reflect.DeepEqual(got, map[string]any{"jobs": []any{"serve", "build"}}) {
+		t.Fatalf("api disable %v", got)
+	}
+	if api["owned"] != true || !reflect.DeepEqual(api["tags"], []any{"tool"}) {
+		t.Fatalf("api %v", api)
+	}
+	web := readTestProject(t, root, "web")
+	if got := web["disable"]; !reflect.DeepEqual(got, map[string]any{"jobs": []any{"lint", "test"}}) {
+		t.Fatalf("web disable %v", got)
+	}
+
+	// api is no package any more: the tag marks it, so the sync retracts
+	// what it wrote, the language extension included.
+	result, err := g.Apply(root, packages[1:], false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(result.Retracted, []string{"api/putnami.json"}) {
+		t.Fatalf("retracted %v", result.Retracted)
+	}
+	api = readTestProject(t, root, "api")
+	want := map[string]any{"extensions": []any{"@acme/other"}, "disable": map[string]any{"jobs": []any{"serve"}}, "$schema": ProjectSchema}
+	delete(api, "$schema")
+	delete(want, "$schema")
+	if !reflect.DeepEqual(api, want) {
+		t.Fatalf("retracted api %v", api)
+	}
+}

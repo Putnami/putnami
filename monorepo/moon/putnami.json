@@ -1,0 +1,35 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-project.json",
+  "name": "@putnami/moon",
+  "tags": [
+    "go",
+    "extension"
+  ],
+  "extensions": [
+    "/go/extension",
+    "/tooling/sdd-extension"
+  ],
+  "disable": {
+    "jobs": [
+      "serve"
+    ]
+  },
+  "options": {
+    "@putnami/go": {
+      "entrypoint": "./cmd/putnami-moon",
+      "version-var": "main.runtimeVersion"
+    },
+    "sdd": {
+      "verification": {
+        "specs": "enforce"
+      }
+    },
+    "test": {
+      "filePatterns": [
+        "putnami.extension.json",
+        "profile.json",
+        "../../tooling/observe/internal/observe/testdata/demos/moon.txtar"
+      ]
+    }
+  }
+}

@@ -245,7 +245,7 @@ not.
 The repo is organized by ownership — each language ecosystem is self-contained:
 
 - `tooling/` — workspace-wide machinery: CLI, extension SDK, scaffold, client generator, tooling samples
-- `monorepo/` — monorepo tool integrations that delegate to the tool: `monorepo/bazel` (`@putnami/bazel`) and `monorepo/pants` (`@putnami/pants`)
+- `monorepo/` — monorepo tool integrations that delegate to the tool: `monorepo/bazel` (`@putnami/bazel`), `monorepo/moon` (`@putnami/moon`) and `monorepo/pants` (`@putnami/pants`)
 - `intelligence/` — public Intelligence code: the area detector (`intelligence/areas`)
 - `cloud/` — public client code of the hosted platform, such as the Cloud runtime destination libraries
 - `protocols/` — cross-pillar wire contracts (schemas + fixtures) shared by frameworks, tooling, and platform

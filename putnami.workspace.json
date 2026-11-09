@@ -23,6 +23,7 @@
     "/monorepo/pants",
     "/monorepo/bazel",
     "/monorepo/nx",
+    "/monorepo/moon",
     "/dotnet/extension",
     "/tooling/scaffold",
     "/tooling/sdd-extension",

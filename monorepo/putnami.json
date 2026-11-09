@@ -3,6 +3,7 @@
   "line": {},
   "includes": [
     "bazel",
+    "moon",
     "nx",
     "pants"
   ]

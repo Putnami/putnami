@@ -109,6 +109,7 @@ use (
 	./swift/extension
 	./intelligence/areas
 	./monorepo/bazel
+	./monorepo/moon
 	./tooling/cli
 	./tooling/cli-documents
 	./tooling/cli-model

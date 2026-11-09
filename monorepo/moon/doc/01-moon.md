@@ -1,0 +1,104 @@
+# Run a moon workspace with Putnami
+
+`@putnami/moon` turns each project of a moon workspace into a Putnami project,
+with an edge to each project moon says it depends on. Putnami selects what a
+change affects and gives the verdict; what runs each task depends on the mode
+the workspace adopted moon in.
+
+## Adopt it
+
+`@putnami/moon` is not published yet: until its first release, `putnami init
+--from moon` stops at the extension install, after it has written the
+workspace files, and a workspace loads the extension from a source checkout.
+
+At the root of the repository, where `.moon/workspace.yml` lies:
+
+```bash
+putnami init --from moon
+```
+
+In a terminal, `init` asks the mode, with import preselected. Without a
+terminal, in CI or from an agent, it imports unless `--mode delegate` is
+given; `--mode import` or `--mode delegate` skips the question. `init` writes
+a workspace that declares `@putnami/moon` with the mode under
+`options["@putnami/moon"].mode`, installs it, runs `putnami projects sync`,
+then installs the language extensions the sync declared.
+
+Rerun in a workspace, `init --from moon` prints the diff of what the sync
+would write and changes nothing; `--apply` writes it.
+
+## The two modes
+
+| | Import | Delegate |
+|---|---|---|
+| A TypeScript, Go, Python, PHP, Ruby or Rust project | runs `@putnami/<language>` | runs `moon run` |
+| Any other project | runs `moon run` | runs `moon run` |
+| Cache | Putnami's for the imported projects, moon's for the others | moon's, local and remote |
+
+A project never runs both: no Putnami cache sits over moon's. Switching mode
+is a change to `options["@putnami/moon"].mode` and a `putnami projects sync`.
+
+## Projects and tasks
+
+The extension reads `moon-graph.json` at the root when the CI wrote it
+(`moon project-graph --json > moon-graph.json`), else `.moon/workspace.yml`
+and each project's `moon.yml`. A project's tasks are the export's, or its
+`moon.yml` tasks over the ones it inherits from `.moon/tasks.yml` and
+`.moon/tasks/*.yml`: by file name (`node`, `<language>`, `<stack>`,
+`<language>-<layer>`, `tag-<tag>`) or by `inheritedBy`, after its
+`workspace.inheritedTasks` include, exclude and rename.
+
+`putnami lint`, `putnami test` and `putnami build` run the moon task named
+`lint`, `test` or `build`, else the first one, by name, tagged that way. A
+project with no such task has that command in `disable.jobs`. Every other
+task is listed by the sync and keeps running through moon.
+
+## What the sync writes
+
+`putnami projects sync` runs the extension's sync task. In each project's
+`putnami.json` it writes:
+
+- the tag `moon`, which marks the project as the sync's;
+- the extension the mode maps it to;
+- its `dependencies` on the other moon projects, as project IDs;
+- `build`, `lint` or `test` in `disable.jobs` when the project has no task for
+  it;
+- for a delegated project whose task is tagged rather than named, the step
+  under `options["@putnami/moon"].tasks.<command>.steps`.
+
+It keeps every other member, retracts a project moon no longer lists, and in
+import mode adds the language extensions to the workspace's `extensions`.
+
+`putnami validate` fails with `moon.sync_stale` when a sync would change a
+`putnami.json`: moon infers edges from manifests and task inputs, so an edit
+can change them.
+
+## Reports
+
+A delegated `test` task reads the JUnit and coverage reports the project
+names in its own options, as the stack core reads any report:
+
+```json
+{
+  "options": {
+    "@putnami/moon": {
+      "tasks": {
+        "test": {
+          "reports": {
+            "junit": ["{root}/apps/api/reports/junit.xml"],
+            "coverage": [{ "format": "lcov", "paths": ["{root}/apps/api/coverage/lcov.info"] }]
+          }
+        }
+      }
+    }
+  }
+}
+```
+
+Without them the result is moon's exit code alone, and the sync lists the
+project.
+
+## Toolchain
+
+Each task checks `moon --version` against the `moon` version `.prototools`
+pins; without one it warns and runs. The extension never installs moon.
