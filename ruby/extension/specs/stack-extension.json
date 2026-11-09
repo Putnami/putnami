@@ -17,7 +17,6 @@
     "Reading the constant references packwerk check reads",
     "gems.rb and gems.locked, the other names Bundler accepts",
     "A project for the application at the workspace root, which the CLI does not discover yet",
-    "A workspace-fetch: Bundler downloads a gem only as it installs it, and bundle cache writes vendor/cache into the repository",
     "JRuby and TruffleRuby, whose --version the toolchain check does not read",
     "Packaging an image on a host of another OS or architecture than the image's: the bundle's native extensions build on the host, so a team packages on a Linux runner of the target architecture"
   ],
