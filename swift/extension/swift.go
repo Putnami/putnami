@@ -35,14 +35,14 @@ const (
 //go:embed profile.json
 var profileJSON []byte
 
-// Stack returns the Swift stack: the embedded profile, the Swift detectors
-// and the runtime commands.
+// Stack returns the Swift stack: the embedded profile, the Swift detectors,
+// the install of a package's Swift and the runtime commands.
 func Stack() (stacks.Stack, error) {
 	profile, err := stacks.Decode(profileJSON)
 	if err != nil {
 		return stacks.Stack{}, fmt.Errorf("profile.json: %w", err)
 	}
-	return stacks.Stack{Extension: ExtensionName, Profile: profile, Detect: Detect, Commands: Commands()}, nil
+	return stacks.Stack{Extension: ExtensionName, Profile: profile, Detect: Detect, Provide: Provide, Tools: Tools, Commands: Commands()}, nil
 }
 
 // Detect names the packages and the Xcode projects among the candidate

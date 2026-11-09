@@ -11,6 +11,7 @@ import (
 	"strings"
 	"testing"
 
+	extensionproto "go.putnami.dev/protocol/extension"
 	"go.putnami.dev/protocol/features/spectest"
 	"go.putnami.dev/protocol/job"
 	wsproto "go.putnami.dev/protocol/workspace"
@@ -360,6 +361,8 @@ func TestAPackageRunsSwiftAndReadsItsXunitAndLCOVReports(t *testing.T) {
 	}
 	t.Setenv("STUB_FAIL", "")
 
+	// Offline, a mismatch installs nothing and fails the task.
+	t.Setenv(extensionproto.OfflineDependenciesEnv, "1")
 	writeFile(t, root, "Packages/Pricing/.swift-version", "5.10\n")
 	if status, _, _, err := runJob(t, root, "Packages/Pricing", stacks.TaskBuild); status != "FAILED" || err == nil || err.Error() != stacks.CodeToolchainMismatch {
 		t.Errorf("a toolchain mismatch fails the task: %s %v", status, err)

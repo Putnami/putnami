@@ -2,7 +2,8 @@
 
 - **Status**: accepted
 - **Date**: 2026-11-08
-- **Scope**: `tooling/stacks` (`@putnami/stacks`) and `@putnami/rust`; amends
+- **Scope**: `tooling/stacks` (`@putnami/stacks`), `@putnami/rust`, then
+  `@putnami/swift`; amends
   [ADR 0003](0003-a-stack-extension-may-provide-its-toolchain.md)
 
 ## Context
@@ -67,3 +68,12 @@ toolchain, such as `cargo` beside `rustc`, runs that program.
 - Targets and components a `rust-toolchain.toml` lists beyond the three above are
   not installed.
 - The default release moves only when an extension release changes it.
+
+## Amendment — 2026-11-09: a variant without a provisioned toolchain
+
+`@putnami/swift` installs a package's Swift with a swiftly pinned by SHA-256
+per platform, in a home under the Putnami home, and installs no Xcode. The core
+calls `Provide` only for a resolved profile, variant applied, that names
+`toolchain.provisioned`: a variant that names none, such as Swift's Xcode
+project, keeps its toolchain check only, and a workspace job leaves its
+component out when that toolchain is missing.

@@ -347,10 +347,12 @@ that runs at the stack root with the same toolchain and under the same lock,
 such as an install step.
 
 An extension may instead install its toolchain when a task needs it, as
-`@putnami/rust` does
+`@putnami/rust` and `@putnami/swift` do
 ([ADR 0004](adr/0004-a-stack-extension-may-install-its-toolchain-at-task-time.md)).
 `Stack.Provide` runs when the toolchain on `PATH` is missing or fails the check,
-and `Stack.Tools` returns directories appended to the task's `PATH`. An offline
+for a resolved profile that names `toolchain.provisioned`: a variant that names
+none, such as Swift's Xcode project, keeps its check only, and a workspace job
+leaves its component out when its toolchain is missing. `Stack.Tools` returns directories appended to the task's `PATH`. An offline
 run calls neither. `Provide` receives the component's resolved toolchain and
 the version each of its checks expects, so a stack with variants, such as Dart
 and Flutter, installs the one the component runs; a further check that fails

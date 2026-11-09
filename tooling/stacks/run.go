@@ -174,7 +174,8 @@ func (s Stack) selectToolchain(ctx context.Context, in runInput, meta Metadata, 
 		furtherVerdicts, furtherErr = further(selected)
 	}
 	offline := os.Getenv(extensionproto.OfflineDependenciesEnv) == "1"
-	if s.Provide != nil && !offline && (errors.Is(err, ErrToolchainMissing) || err == nil && (selected.Verdict.Fail || furtherFails(furtherVerdicts, furtherErr))) {
+	provides := s.provides(profile)
+	if provides && !offline && (errors.Is(err, ErrToolchainMissing) || err == nil && (selected.Verdict.Fail || furtherFails(furtherVerdicts, furtherErr))) {
 		// A further check that fails, such as the Dart a Flutter SDK
 		// bundles, asks for the installed toolchain even when the one on
 		// PATH passes the first check.
@@ -195,7 +196,7 @@ func (s Stack) selectToolchain(ctx context.Context, in runInput, meta Metadata, 
 		}
 	}
 	if errors.Is(err, ErrToolchainMissing) {
-		if s.Provide != nil {
+		if provides {
 			return Selection{}, failWith(emit, CodeToolchainMissing, "%v: the %s stack needs it on PATH, or a network to install it", err, profile.ID)
 		}
 		if profile.Toolchain.Provisioned != "" {
@@ -374,17 +375,24 @@ func (s Stack) WorkspaceRootJob(missing MissingToolchain, step func(context.Cont
 	}
 }
 
+// provides reports whether the stack installs the toolchain of a resolved
+// profile: it sets Provide, and the profile names toolchain.provisioned. A
+// variant that names none, such as an Xcode project's, keeps its check only.
+func (s Stack) provides(profile Profile) bool {
+	return s.Provide != nil && profile.Toolchain.Provisioned != ""
+}
+
 // toolchainMissing reports whether the machine has no toolchain for the
 // component. A profile that does not resolve counts as present: atRoot reports
 // it; so does a toolchain the stack installs when the run is not offline.
 func (s Stack) toolchainMissing(ctx context.Context, in runInput) bool {
-	if s.Provide != nil && os.Getenv(extensionproto.OfflineDependenciesEnv) != "1" {
-		return false
-	}
 	var meta Metadata
 	_ = json.Unmarshal(in.metadata, &meta)
 	profile, err := s.Resolved(in.projectAbs, meta.Variant)
 	if err != nil {
+		return false
+	}
+	if s.provides(profile) && os.Getenv(extensionproto.OfflineDependenciesEnv) != "1" {
 		return false
 	}
 	_, err = profile.Toolchain.Select(ctx, in.projectAbs, Expected{}, os.Environ())

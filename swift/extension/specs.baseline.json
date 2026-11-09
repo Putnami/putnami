@@ -8,6 +8,8 @@
     "swift/stack-extension#manifest-follows-the-profile",
     "swift/stack-extension#overrides-are-honored",
     "swift/stack-extension#packages-run-swiftpm",
+    "swift/stack-extension#provides-its-toolchain",
+    "swift/stack-extension#provides-llvm-cov",
     "swift/stack-extension#reports-are-attributed",
     "swift/stack-extension#test-filter",
     "swift/stack-extension#workspace-commands",
