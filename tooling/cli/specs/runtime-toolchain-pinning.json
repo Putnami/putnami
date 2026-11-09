@@ -62,6 +62,7 @@
     "protocols/extension/doc/adr/0002-runtime-toolchains-are-lock-pinned-under-the-current-contract.md",
     "protocols/extension/doc/adr/0012-a-provisioned-candidate-names-the-pinned-archive-executable.md",
     "tooling/cli/doc/adr/0019-toolchain-lock-follows-provisioned-runtimes.md",
-    "tooling/cli/doc/adr/0077-the-core-provisions-the-toolchains-extensions-pin.md"
+    "tooling/cli/doc/adr/0077-the-core-provisions-the-toolchains-extensions-pin.md",
+    "protocols/workspace/doc/adr/0006-a-host-with-no-archive-keeps-the-committed-pin.md"
   ]
 }
