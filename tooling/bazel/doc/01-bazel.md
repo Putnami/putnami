@@ -24,7 +24,9 @@ be at the root as `bazel-graph.json`
 (`bazel query 'deps(//...)' --output=streamed_jsonproto > bazel-graph.json`).
 
 A package is a directory whose `BUILD.bazel` or `BUILD` file declares a rule
-the export lists. Every other directory with a `BUILD` file, and the root
+the export lists. Without the export, the extension does not parse `BUILD`
+files: a package is a directory whose `putnami.json` the sync wrote from
+`bazel query`. Every other directory with a `BUILD` file, and the root
 package, is a bare member: a project named by its directory, with no
 extension, that runs no task. Directories under `bazel-*` links, hidden
 directories and `node_modules` are never read.
@@ -56,6 +58,10 @@ Run the sync again after a `BUILD` change that alters the dependencies
 between packages, and commit the result. `putnami validate` compares each
 `putnami.json` with the export and fails with `bazel.sync_stale` when a sync
 would change one. Keep it in the CI gate.
+
+While `bazel-graph.json` lies at the root, the sync and `putnami validate`
+read it and never run `bazel query`, so a stale export hides a new edge. Do
+not commit it: write it in the CI job that runs the sync and the gate.
 
 ## What each task runs
 
@@ -102,6 +108,7 @@ depends on.
 | It prints another one | The task fails with `stacks.toolchain_mismatch`; set `toolchain.check` to `warn` in the package's options to run anyway |
 | `bazel` is not on `PATH` | The task fails with `stacks.toolchain_missing` |
 | The root holds no `.bazelversion` | The warning `stacks.toolchain_unpinned` |
+| `.bazelversion` names a Bazelisk alias, such as `latest` or `rolling` | The warning `stacks.toolchain_unpinned`, and the task runs |
 
 The extension never installs Bazel; Bazelisk on `PATH` as `bazel` reads
 `.bazelversion` itself.

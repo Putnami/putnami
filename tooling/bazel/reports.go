@@ -192,6 +192,10 @@ func localOutput(uri string) (string, string, bool) {
 		return "", "", false
 	}
 	slashed := u.Path
+	// file:///C:/x names C:/x: the slash before a drive letter is no root.
+	if len(slashed) > 1 && filepath.VolumeName(filepath.FromSlash(slashed[1:])) != "" {
+		slashed = slashed[1:]
+	}
 	file := filepath.FromSlash(slashed)
 	if i := strings.LastIndex(slashed, "/testlogs/"); i >= 0 {
 		return file, path.Dir(slashed[i+len("/testlogs/"):]), true

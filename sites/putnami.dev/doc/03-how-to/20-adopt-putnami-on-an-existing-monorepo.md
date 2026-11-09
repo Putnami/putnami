@@ -156,9 +156,10 @@ The sync runs `bazel query //...` and writes, in each package's
 
 A package is a directory whose `BUILD` or `BUILD.bazel` file declares a rule
 the query lists. Any other directory with a `BUILD` file, the root included,
-joins the workspace as a bare member that runs nothing. A package with no test rule also gets `"disable": { "jobs": ["test"] }`. Add
-`.putnami/` and `.gen/` to `.gitignore`, then commit the files: they are the
-package graph Putnami selects on. Run `putnami projects sync` again after a
+joins the workspace as a bare member that runs nothing. A package with no
+test rule also gets `"disable": { "jobs": ["test"] }`. Add `.putnami/` and
+`.gen/` to `.gitignore`, then commit the files: they are the package graph
+Putnami selects on. Run `putnami projects sync` again after a
 change to the dependencies between packages.
 
 In a CI without Bazel on the machine that syncs, write the export first and
@@ -168,6 +169,10 @@ the sync reads it instead:
 bazel query 'deps(//...)' --output=streamed_jsonproto > bazel-graph.json
 putnami projects sync
 ```
+
+Do not commit `bazel-graph.json`: while it lies at the root, the sync and
+`putnami validate` read it and never ask Bazel, so a stale file hides a new
+edge. Write it in the same CI job, before the sync and the gate.
 
 ### Run what a change affects
 

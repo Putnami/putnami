@@ -7,7 +7,11 @@ package bazel
 
 import (
 	_ "embed"
+	"encoding/json"
 	"fmt"
+	"os"
+	"path/filepath"
+	"slices"
 
 	diag "go.putnami.dev/protocol/diagnostic"
 	wsproto "go.putnami.dev/protocol/workspace"
@@ -38,11 +42,14 @@ func Stack() (stacks.Stack, error) {
 
 // Detect names the Bazel packages among the candidate paths with the Bazel
 // detector: each directory that holds a BUILD or BUILD.bazel file and a rule
-// of the export bazel-graph.json, or without the export each directory that
-// holds a BUILD file, named by its directory, with the workspace root for
-// stack root and the export's edges. Every other candidate that holds a BUILD
-// file, the root package included, is bare: it is named by its directory, the
-// root by the workspace, and runs no task.
+// of the export bazel-graph.json, or without the export each such directory
+// whose putnami.json the sync wrote for this extension, named by its
+// directory, with the workspace root for stack root and the export's edges.
+// Without the export, a BUILD file is not parsed: the sync, which reads the
+// rules from bazel query, tells a package from a directory with no rule.
+// Every other candidate that holds a BUILD file, the root package included,
+// is bare: it is named by its directory, the root by the workspace, and runs
+// no task.
 func Detect(root string, request wsproto.ProbeRequest) ([]stacks.Component, []diag.Diagnostic) {
 	if !detect.IsWorkspace(root) {
 		return nil, nil
@@ -55,6 +62,9 @@ func Detect(root string, request wsproto.ProbeRequest) ([]stacks.Component, []di
 	var out []stacks.Component
 	for _, dir := range request.Paths {
 		p, ok := packages[dir]
+		if !detection.FromExport && ok {
+			ok = synced(root, dir)
+		}
 		if !ok || dir == wsproto.ProbeRootPath {
 			file := detect.BuildFile(root, dir)
 			if file == "" {
@@ -90,4 +100,17 @@ func Detect(root string, request wsproto.ProbeRequest) ([]stacks.Component, []di
 		}
 	}
 	return out, diags
+}
+
+// synced answers whether the putnami.json of the directory dir names the
+// extension, as the sync writes it for each package of the query.
+func synced(root, dir string) bool {
+	data, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(dir), wsproto.ConfigFilename)) //nolint:gosec // a project file under the workspace root
+	if err != nil {
+		return false
+	}
+	var project struct {
+		Extensions []string `json:"extensions"`
+	}
+	return json.Unmarshal(data, &project) == nil && slices.Contains(project.Extensions, ExtensionName)
 }

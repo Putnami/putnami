@@ -91,6 +91,8 @@ func bazelWorkspace(t *testing.T, demo map[string]map[string]string, runtime str
 		clitest.WriteFile(t, filepath.Join(root, rel), content)
 	}
 	clitest.WriteFile(t, filepath.Join(root, ".bazelversion"), "7.4.1\n")
+	// A directory whose BUILD file declares no rule is no Bazel package.
+	clitest.WriteFile(t, filepath.Join(root, "tools/BUILD"), "exports_files([\"lint.sh\"])\n")
 	clitest.WriteFile(t, filepath.Join(root, ".gitignore"), "/bazel-*\n.putnami\n.gen\ndist\n")
 	clitest.WriteFile(t, filepath.Join(root, "putnami.workspace.json"), `{"name": "shop", "extensions": ["/bazel-extension"], "includes": []}`)
 
@@ -315,14 +317,16 @@ func TestAChangeToOneBazelPackageRunsItAndItsDependentsThroughBazel(t *testing.T
 	}
 
 	// A change to MODULE.bazel runs every package that holds a test; web
-	// holds none, so its test task is disabled.
+	// holds none, so its test task is disabled, and tools, which holds no
+	// rule, is a bare member that runs nothing.
 	file = filepath.Join(root, "MODULE.bazel")
 	data, err = os.ReadFile(file)
 	if err != nil {
 		t.Fatal(err)
 	}
 	clitest.WriteFile(t, file, string(data)+"bazel_dep(name = \"gazelle\", version = \"0.40.0\")\n")
-	commit(t, root, "add gazelle")
+	clitest.WriteFile(t, filepath.Join(root, "tools/lint.sh"), "#!/bin/sh\n")
+	commit(t, root, "add gazelle and a lint script")
 	tested, out = bazelTests(t, root, apiChange, log)
 	if want := []string{"//api:all", "//pricing:all"}; !slices.Equal(tested, want) {
 		t.Errorf("bazel coverage ran on %v, want %v: the packages that read MODULE.bazel\n%s", tested, want, out)
