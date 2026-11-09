@@ -80,7 +80,8 @@ func buildRuntime(t *testing.T) string {
 	return out
 }
 
-// moonWorkspace writes the demo's base as a workspace in the mode that loads
+// moonWorkspace writes the demo's base as a workspace, in the mode when one is
+// given, that loads
 // @putnami/moon from a local copy of its manifest, whose prepare copies the
 // runtime built from this tree.
 func moonWorkspace(t *testing.T, demo map[string]map[string]string, runtime, mode string) string {
@@ -91,7 +92,11 @@ func moonWorkspace(t *testing.T, demo map[string]map[string]string, runtime, mod
 	}
 	clitest.WriteFile(t, filepath.Join(root, ".prototools"), "moon = \"1.30.4\"\n")
 	clitest.WriteFile(t, filepath.Join(root, ".gitignore"), ".moon/cache\n.putnami\n.gen\ndist\n")
-	clitest.WriteFile(t, filepath.Join(root, "putnami.workspace.json"), `{"name": "shop", "extensions": ["/moon-extension"], "options": {"@putnami/moon": {"mode": "`+mode+`"}}, "includes": []}`)
+	options := ""
+	if mode != "" {
+		options = `, "options": {"@putnami/moon": {"mode": "` + mode + `"}}`
+	}
+	clitest.WriteFile(t, filepath.Join(root, "putnami.workspace.json"), `{"name": "shop", "extensions": ["/moon-extension"]`+options+`, "includes": []}`)
 
 	data, err := os.ReadFile(filepath.Join(repoRoot, "monorepo/moon/putnami.extension.json"))
 	if err != nil {
@@ -210,17 +215,26 @@ func TestAChangeToOneMoonProjectRunsItAndItsDependentsThroughMoon(t *testing.T) 
 	t.Setenv("PUTNAMI_NO_AUTO_INSTALL", "1")
 	t.Setenv("PUTNAMI_STORE_DIR", filepath.Join(t.TempDir(), "store"))
 	demo := readDemo(t)
-	root := moonWorkspace(t, demo, buildRuntime(t), "delegate")
+	root := moonWorkspace(t, demo, buildRuntime(t), "")
 	log := stubMoon(t)
 
-	// The sync records the projects and writes each one's edges, and lists
-	// the task no Putnami command runs.
-	code, out := clitest.RunGateArgs(t, root, "projects", "sync")
-	if code != 0 {
-		t.Fatalf("projects sync exit %d:\n%s", code, out)
+	// A rerun of init in the workspace previews the putnami.json files the
+	// sync would write and the task no Putnami command runs, and writes
+	// nothing.
+	code, out := clitest.RunGateArgs(t, root, "init", "--from", "moon", "--mode", "delegate")
+	if code != 0 || !strings.Contains(out, "Nothing was written") || !strings.Contains(out, "+++ b/apps/api/putnami.json") || !strings.Contains(out, "api:dev") {
+		t.Fatalf("init preview exit %d:\n%s", code, out)
 	}
-	if !strings.Contains(out, "api:dev") {
-		t.Errorf("the sync lists no unmapped task:\n%s", out)
+	if _, err := os.Stat(filepath.Join(root, "apps/api/putnami.json")); !os.IsNotExist(err) {
+		t.Fatalf("the preview wrote apps/api/putnami.json: %v", err)
+	}
+
+	// --apply records the mode, and the sync writes each project's edges.
+	if code, out = clitest.RunGateArgs(t, root, "init", "--from", "moon", "--mode", "delegate", "--apply"); code != 0 {
+		t.Fatalf("init --apply exit %d:\n%s", code, out)
+	}
+	if config, _ := os.ReadFile(filepath.Join(root, "putnami.workspace.json")); !strings.Contains(string(config), `"mode": "delegate"`) {
+		t.Errorf("the workspace records no delegate mode:\n%s", config)
 	}
 	if api := readProject(t, root, "apps/api"); !slices.Equal(api.Extensions, []string{"@putnami/moon"}) || !slices.Equal(api.Dependencies, []string{"/packages/pricing"}) {
 		t.Errorf("api putnami.json = %+v", api)

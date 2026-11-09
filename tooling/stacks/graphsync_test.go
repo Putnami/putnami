@@ -258,3 +258,53 @@ func TestTheGraphSyncWritesAnotherExtensionTheTagAndTheOwnedJobs(t *testing.T) {
 		t.Fatalf("retracted api %v", api)
 	}
 }
+
+func TestADryGraphSyncAnswersEachChangeWithItsContent(t *testing.T) {
+	root := t.TempDir()
+	g := testGraphSync()
+	for _, dir := range []string{"api", "pricing"} {
+		writeTestFile(t, filepath.Join(root, dir, "BUILD"), "")
+	}
+	writeTestFile(t, filepath.Join(root, "old", "putnami.json"), `{"extensions": ["@acme/tool"]}`)
+	existing := "{\n  \"name\": \"api\"\n}\n"
+	writeTestFile(t, filepath.Join(root, "api", "putnami.json"), existing)
+	result, err := g.Apply(root, []GraphPackage{{Dir: "api", DependsOn: []string{"pricing"}, Tested: true}, {Dir: "pricing", Tested: true}}, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var files []string
+	for _, c := range result.Changes {
+		files = append(files, c.File)
+	}
+	if !reflect.DeepEqual(files, []string{"api/putnami.json", "pricing/putnami.json", "old/putnami.json"}) {
+		t.Fatalf("changes %v", files)
+	}
+	api := result.Changes[0]
+	if string(api.Before) != existing || !strings.Contains(string(api.After), `"/pricing"`) || result.Changes[1].Before != nil {
+		t.Errorf("api change %q → %q", api.Before, api.After)
+	}
+	if data, _ := os.ReadFile(filepath.Join(root, "api", "putnami.json")); string(data) != existing {
+		t.Errorf("a dry run wrote %s", data)
+	}
+	if _, err := os.Stat(filepath.Join(root, "pricing", "putnami.json")); !os.IsNotExist(err) {
+		t.Errorf("a dry run created a file: %v", err)
+	}
+	// The preview prints each change with its diff.
+	var events strings.Builder
+	emit := jsonl.New()
+	emit.Observe(func(message string) { events.WriteString(message + "\n") })
+	EmitPreview(emit, "tool", result)
+	if !strings.Contains(events.String(), "--- /dev/null") || !strings.Contains(events.String(), "+    \"/pricing\"") {
+		t.Errorf("preview:\n%s", events.String())
+	}
+}
+
+func TestDiffAlignsTheLinesOfAFile(t *testing.T) {
+	got := Diff("f", []byte("a\nb\nc\n"), []byte("a\nx\nc\nd\n"))
+	if want := "--- a/f\n+++ b/f\n a\n-b\n+x\n c\n+d\n"; got != want {
+		t.Errorf("got\n%s\nwant\n%s", got, want)
+	}
+	if got := Diff("f", nil, []byte("a\n")); got != "--- /dev/null\n+++ b/f\n+a\n" {
+		t.Errorf("a new file:\n%s", got)
+	}
+}

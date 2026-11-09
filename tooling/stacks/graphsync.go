@@ -95,6 +95,17 @@ type GraphResult struct {
 	// EmptyExport reports an export that lists no package while packages
 	// are marked: the sync wrote nothing, so a filtered export retracts none.
 	EmptyExport bool
+	// Changes are, in a dry run, the content each file of Written and
+	// Retracted holds and would hold, in the same order: Written's, then
+	// Retracted's.
+	Changes []FileChange
+}
+
+// FileChange is a file a sync changes: its workspace-relative path, its
+// content before and after. A nil Before is a file the sync creates.
+type FileChange struct {
+	File          string
+	Before, After []byte
 }
 
 // Apply writes the packages' facts into their putnami.json under root, and
@@ -103,6 +114,7 @@ type GraphResult struct {
 // and answers what it would change.
 func (g GraphSync) Apply(root string, packages []GraphPackage, dry bool) (GraphResult, error) {
 	var result GraphResult
+	var written, retracted []FileChange
 	current := map[string]bool{}
 	for _, p := range packages {
 		if p.Dir != wsproto.ProbeRootPath {
@@ -137,29 +149,41 @@ func (g GraphSync) Apply(root string, packages []GraphPackage, dry bool) (GraphR
 			}
 		}
 		file := filepath.Join(root, filepath.FromSlash(p.Dir), wsproto.ConfigFilename)
-		changed, err := g.writeProject(root, file, deps, p, components, dry)
+		changed, change, err := g.writeProject(root, file, deps, p, components, dry)
 		if err != nil {
 			return GraphResult{}, fmt.Errorf("%s/%s: %w", p.Dir, wsproto.ConfigFilename, err)
 		}
 		if changed {
 			result.Written = append(result.Written, p.Dir+"/"+wsproto.ConfigFilename)
+			if change != nil {
+				change.File = p.Dir + "/" + wsproto.ConfigFilename
+				written = append(written, *change)
+			}
 		} else {
 			result.Unchanged++
 		}
 	}
 	slices.Sort(result.Written)
+	slices.SortFunc(written, func(a, b FileChange) int { return strings.Compare(a.File, b.File) })
 	for _, dir := range former {
 		if current[dir] {
 			continue
 		}
 		file := filepath.Join(root, filepath.FromSlash(dir), wsproto.ConfigFilename)
-		changed, err := g.retractProject(root, file, components, dry)
+		changed, change, err := g.retractProject(root, file, components, dry)
 		if err != nil {
 			return GraphResult{}, fmt.Errorf("%s/%s: %w", dir, wsproto.ConfigFilename, err)
 		}
 		if changed {
 			result.Retracted = append(result.Retracted, dir+"/"+wsproto.ConfigFilename)
+			if change != nil {
+				change.File = dir + "/" + wsproto.ConfigFilename
+				retracted = append(retracted, *change)
+			}
 		}
+	}
+	if dry {
+		result.Changes = append(written, retracted...)
 	}
 	return result, nil
 }
@@ -293,10 +317,10 @@ func (g GraphSync) keepDependency(root, dep string, components map[string]bool) 
 
 // retractProject removes from the putnami.json of a former package the
 // extension and the tool's edges, and writes it when its content changes.
-func (g GraphSync) retractProject(root, file string, components map[string]bool, dry bool) (bool, error) {
+func (g GraphSync) retractProject(root, file string, components map[string]bool, dry bool) (bool, *FileChange, error) {
 	doc, existing, err := readProject(file)
 	if err != nil {
-		return false, err
+		return false, nil, err
 	}
 	before := cloneDoc(doc)
 	setList(doc, "extensions", slices.DeleteFunc(stringList(doc["extensions"]), g.owns))
@@ -312,12 +336,9 @@ func (g GraphSync) retractProject(root, file string, components map[string]bool,
 		g.Retract(doc)
 	}
 	if reflect.DeepEqual(cloneDoc(doc), before) {
-		return false, nil
+		return false, nil, nil
 	}
-	if dry {
-		return true, nil
-	}
-	return writeJSON(file, doc, existing)
+	return g.commit(file, doc, existing, dry)
 }
 
 // writeProject merges the package's facts into the putnami.json at file and
@@ -325,10 +346,10 @@ func (g GraphSync) retractProject(root, file string, components map[string]bool,
 // dependencies on the tool's packages, the inputs, the tag and the jobs it
 // owns in disable.jobs, then what the package's Edit owns. Every other member
 // is kept as it is.
-func (g GraphSync) writeProject(root, file string, deps []string, p GraphPackage, components map[string]bool, dry bool) (bool, error) {
+func (g GraphSync) writeProject(root, file string, deps []string, p GraphPackage, components map[string]bool, dry bool) (bool, *FileChange, error) {
 	doc, existing, err := readProject(file)
 	if err != nil {
-		return false, err
+		return false, nil, err
 	}
 	if existing == nil {
 		doc["$schema"] = ProjectSchema
@@ -367,12 +388,9 @@ func (g GraphSync) writeProject(root, file string, deps []string, p GraphPackage
 	}
 
 	if existing != nil && reflect.DeepEqual(cloneDoc(doc), before) {
-		return false, nil
+		return false, nil, nil
 	}
-	if dry {
-		return true, nil
-	}
-	return writeJSON(file, doc, existing)
+	return g.commit(file, doc, existing, dry)
 }
 
 // setDisabled writes the jobs the sync owns in disable.jobs: those of
@@ -400,17 +418,45 @@ func (g GraphSync) setDisabled(doc map[string]any, disabled []string) {
 	}
 }
 
-// writeJSON writes doc at file, two-space indented with sorted keys, when its
-// bytes differ from existing; it reports whether it wrote. The file is
-// replaced through a temporary file beside it.
-func writeJSON(file string, doc map[string]any, existing []byte) (bool, error) {
+// commit writes doc at file, or in a dry run answers the change it would
+// make, with the content the file would hold.
+func (g GraphSync) commit(file string, doc map[string]any, existing []byte, dry bool) (bool, *FileChange, error) {
+	if !dry {
+		changed, err := writeJSON(file, doc, existing)
+		return changed, nil, err
+	}
+	after, err := renderJSON(doc)
+	if err != nil {
+		return false, nil, err
+	}
+	if bytes.Equal(after, existing) {
+		return false, nil, nil
+	}
+	return true, &FileChange{Before: existing, After: after}, nil
+}
+
+// renderJSON is doc as the sync writes it: two-space indented, with sorted
+// keys and a final newline.
+func renderJSON(doc map[string]any) ([]byte, error) {
 	var buf bytes.Buffer
 	enc := json.NewEncoder(&buf)
 	enc.SetEscapeHTML(false)
 	enc.SetIndent("", "  ")
 	if err := enc.Encode(doc); err != nil {
+		return nil, err
+	}
+	return buf.Bytes(), nil
+}
+
+// writeJSON writes doc at file, two-space indented with sorted keys, when its
+// bytes differ from existing; it reports whether it wrote. The file is
+// replaced through a temporary file beside it.
+func writeJSON(file string, doc map[string]any, existing []byte) (bool, error) {
+	data, err := renderJSON(doc)
+	if err != nil {
 		return false, err
 	}
+	buf := bytes.NewBuffer(data)
 	if bytes.Equal(buf.Bytes(), existing) {
 		return false, nil
 	}
@@ -508,11 +554,24 @@ func (j GraphJobs) RunSync(ctx *pctx.Context, emit *jsonl.Emitter, _ []string) (
 		emit.Info(j.Summary(result))
 	}
 	if dry {
-		for _, file := range append(slices.Clone(result.Written), result.Retracted...) {
-			emit.DiagnosticWithCode("warning", fmt.Sprintf("%s would change", file), file, 0, 0, j.Tool+SyncPreviewSuffix)
-		}
+		EmitPreview(emit, j.Tool, result)
 	}
 	return statusOK, map[string]any{"written": result.Written, "retracted": result.Retracted, "dryRun": dry}, nil
+}
+
+// EmitPreview reports each file a dry run of a sync would change as a
+// <tool>.sync_preview warning that carries its diff, so the run's output
+// shows it.
+func EmitPreview(emit *jsonl.Emitter, tool string, result GraphResult) {
+	if len(result.Changes) > 0 {
+		for _, c := range result.Changes {
+			emit.DiagnosticWithCode("warning", fmt.Sprintf("%s would change:\n%s", c.File, strings.TrimSuffix(Diff(c.File, c.Before, c.After), "\n")), c.File, 0, 0, tool+SyncPreviewSuffix)
+		}
+		return
+	}
+	for _, file := range append(slices.Clone(result.Written), result.Retracted...) {
+		emit.DiagnosticWithCode("warning", fmt.Sprintf("%s would change", file), file, 0, 0, tool+SyncPreviewSuffix)
+	}
 }
 
 // RunCheck is the job of the validate task: it fails when a sync would change

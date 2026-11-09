@@ -449,7 +449,7 @@ func TestTheSyncKeepsTheWorkspaceConfigOrder(t *testing.T) {
 	root := t.TempDir()
 	file := filepath.Join(root, wsproto.WorkspaceConfigFilename)
 	writeFile(t, root, wsproto.WorkspaceConfigFilename, "{\n  \"name\": \"demo\",\n  \"options\": {\"@putnami/moon\": {\"mode\": \"import\"}},\n  \"extensions\": [\"@putnami/moon\"]\n}\n")
-	if changed, err := declareExtensions(root, []string{"@putnami/go"}, false); err != nil || !changed {
+	if changed, _, err := declareExtensions(root, []string{"@putnami/go"}, false); err != nil || !changed {
 		t.Fatalf("declare: %v %v", changed, err)
 	}
 	data, _ := os.ReadFile(file)
@@ -457,14 +457,14 @@ func TestTheSyncKeepsTheWorkspaceConfigOrder(t *testing.T) {
 	if string(data) != want {
 		t.Errorf("config:\n%s\nwant\n%s", data, want)
 	}
-	if changed, err := declareExtensions(root, []string{"@putnami/go"}, false); err != nil || changed {
+	if changed, _, err := declareExtensions(root, []string{"@putnami/go"}, false); err != nil || changed {
 		t.Errorf("a declared extension changes nothing: %v %v", changed, err)
 	}
 	writeFile(t, root, wsproto.WorkspaceConfigFilename, "[]")
-	if _, err := declareExtensions(root, []string{"@putnami/go"}, false); err == nil {
+	if _, _, err := declareExtensions(root, []string{"@putnami/go"}, false); err == nil {
 		t.Error("a config that is no object fails")
 	}
-	if changed, err := declareExtensions(t.TempDir(), []string{"@putnami/go"}, false); err != nil || changed {
+	if changed, _, err := declareExtensions(t.TempDir(), []string{"@putnami/go"}, false); err != nil || changed {
 		t.Errorf("no workspace config: %v %v", changed, err)
 	}
 }
@@ -474,10 +474,49 @@ func TestAnExtensionLoadedFromTheWorkspaceIsDeclared(t *testing.T) {
 	root := t.TempDir()
 	writeFile(t, root, wsproto.WorkspaceConfigFilename, `{"extensions": ["/moon-extension", "./tools/go", "/missing"]}`)
 	writeFile(t, root, "tools/go/putnami.extension.json", `{"name": "@putnami/go"}`)
-	if changed, err := declareExtensions(root, []string{"@putnami/go"}, false); err != nil || changed {
+	if changed, _, err := declareExtensions(root, []string{"@putnami/go"}, false); err != nil || changed {
 		t.Errorf("an extension the workspace loads by path is declared: %v %v", changed, err)
 	}
-	if changed, err := declareExtensions(root, []string{"@putnami/rust"}, true); err != nil || !changed {
+	if changed, _, err := declareExtensions(root, []string{"@putnami/rust"}, true); err != nil || !changed {
 		t.Errorf("a dry run reports an undeclared extension: %v %v", changed, err)
+	}
+}
+
+func TestADryRunOfTheSyncJobPrintsEachDiffAndWritesNothing(t *testing.T) {
+	spectest.Proves(t, feature, "sync-writes-each-project", "the-sync-writes-each-moon-project-putnami-json")
+	d := readDemo(t)
+	root := repository(t, d, ModeDelegate, false)
+	config, _ := os.ReadFile(filepath.Join(root, wsproto.WorkspaceConfigFilename))
+	var events strings.Builder
+	emit := jsonl.New()
+	emit.Observe(func(message string) { events.WriteString(message + "\n") })
+	// The mode parameter wins over the recorded one: init previews the mode
+	// it is about to record.
+	ctx := &pctx.Context{WorkspaceRoot: root}
+	ctx.Params = pctx.Params{"dryRun": json.RawMessage(`true`), "mode": json.RawMessage(`"import"`)}
+	status, data, err := RunSync(ctx, emit, nil)
+	if status != "OK" || err != nil || data["mode"] != ModeImport || data["dryRun"] != true {
+		t.Fatalf("the dry sync job: %s %v %v", status, data, err)
+	}
+	out := events.String()
+	for _, want := range []string{
+		"apps/api/putnami.json would change:\n--- /dev/null\n+++ b/apps/api/putnami.json\n",
+		"+    \"@putnami/typescript\"",
+		"putnami.workspace.json would change:\n--- a/putnami.workspace.json",
+		"+    \"@putnami/rust\",",
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("the preview prints %q:\n%s", want, out)
+		}
+	}
+	if _, err := os.Stat(filepath.Join(root, "apps/api/putnami.json")); !os.IsNotExist(err) {
+		t.Errorf("a dry run wrote api: %v", err)
+	}
+	if after, _ := os.ReadFile(filepath.Join(root, wsproto.WorkspaceConfigFilename)); string(after) != string(config) {
+		t.Errorf("a dry run wrote the workspace config:\n%s", after)
+	}
+	ctx.Params = pctx.Params{"mode": json.RawMessage(`"mirror"`)}
+	if status, _, err := RunSync(ctx, jsonl.New(), nil); status != "FAILED" || err == nil {
+		t.Errorf("an unknown mode fails the sync: %s %v", status, err)
 	}
 }

@@ -77,21 +77,30 @@ type SyncResult struct {
 // language extensions it maps projects to. A root that is no moon workspace
 // gets an empty result.
 func Sync(ctx context.Context, root string) (SyncResult, error) {
-	return synchronize(ctx, root, false)
+	return synchronize(ctx, root, false, "")
 }
 
 // Stale answers what Sync would change, and writes nothing.
 func Stale(ctx context.Context, root string) (SyncResult, error) {
-	return synchronize(ctx, root, true)
+	return synchronize(ctx, root, true, "")
 }
 
-func synchronize(_ context.Context, root string, dry bool) (SyncResult, error) {
+// synchronize runs the sync in the mode given, else the workspace's; with dry
+// set it writes nothing, and its result holds the content of each change.
+func synchronize(_ context.Context, root string, dry bool, given string) (SyncResult, error) {
 	fromExport := fileExists(root, detect.DefaultGraphFile)
 	if !detect.IsWorkspace(root) && !fromExport {
 		return SyncResult{}, nil
 	}
 	detection := detect.Detect(root, detect.Options{})
-	mode := Mode(root)
+	mode := given
+	switch mode {
+	case "":
+		mode = Mode(root)
+	case ModeImport, ModeDelegate:
+	default:
+		return SyncResult{}, fmt.Errorf("unknown mode %q: choose %s or %s", mode, ModeImport, ModeDelegate)
+	}
 	result := SyncResult{Mode: mode}
 	extensions := map[string]bool{}
 	var packages []stacks.GraphPackage
@@ -141,12 +150,15 @@ func synchronize(_ context.Context, root string, dry bool) (SyncResult, error) {
 	}
 	result.Extensions = slices.Sorted(maps.Keys(extensions))
 	if !graph.EmptyExport {
-		changed, err := declareExtensions(root, result.Extensions, dry)
+		changed, change, err := declareExtensions(root, result.Extensions, dry)
 		if err != nil {
 			return SyncResult{}, fmt.Errorf("%s: %w", wsproto.WorkspaceConfigFilename, err)
 		}
 		if changed {
 			result.Written = append(result.Written, wsproto.WorkspaceConfigFilename)
+		}
+		if change != nil {
+			result.Changes = append(result.Changes, *change)
 		}
 	}
 	return result, nil
@@ -280,37 +292,45 @@ func namesReports(root, dir string) bool {
 // language extensions it does not declare yet, and reports whether it changed
 // the file. It never removes one: a workspace may run a language extension
 // for its own projects.
-func declareExtensions(root string, extensions []string, dry bool) (bool, error) {
+func declareExtensions(root string, extensions []string, dry bool) (bool, *stacks.FileChange, error) {
 	if len(extensions) == 0 {
-		return false, nil
+		return false, nil, nil
 	}
 	file := filepath.Join(root, wsproto.WorkspaceConfigFilename)
 	data, err := os.ReadFile(file) //nolint:gosec // the workspace config under the root
 	if errors.Is(err, os.ErrNotExist) {
-		return false, nil
+		return false, nil, nil
 	}
 	if err != nil {
-		return false, err
+		return false, nil, err
 	}
 	var cfg map[string]json.RawMessage
 	if err := json.Unmarshal(data, &cfg); err != nil {
-		return false, fmt.Errorf("not a JSON object: %w", err)
+		return false, nil, fmt.Errorf("not a JSON object: %w", err)
 	}
 	var declared []string
 	if raw, ok := cfg["extensions"]; ok {
 		if err := json.Unmarshal(raw, &declared); err != nil {
-			return false, fmt.Errorf("extensions is not a list of names: %w", err)
+			return false, nil, fmt.Errorf("extensions is not a list of names: %w", err)
 		}
 	}
 	names := declaredNames(root, declared)
 	missing := slices.DeleteFunc(slices.Clone(extensions), func(e string) bool { return slices.Contains(names, e) })
 	if len(missing) == 0 {
-		return false, nil
+		return false, nil, nil
+	}
+	after, err := renderExtensions(data, append(declared, missing...))
+	if err != nil {
+		return false, nil, err
 	}
 	if dry {
-		return true, nil
+		return true, &stacks.FileChange{File: wsproto.WorkspaceConfigFilename, Before: data, After: after}, nil
 	}
-	return true, writeExtensions(file, data, append(declared, missing...))
+	info, err := os.Stat(file)
+	if err != nil {
+		return false, nil, err
+	}
+	return true, nil, os.WriteFile(file, after, info.Mode().Perm()) //nolint:gosec // the workspace config under the root
 }
 
 // declaredNames are the names of the declared extensions: an entry that names
@@ -340,24 +360,24 @@ func declaredNames(root string, declared []string) []string {
 	return names
 }
 
-// writeExtensions rewrites the extensions member of the workspace config,
-// keeping every other member, in its order, two-space indented.
-func writeExtensions(file string, data []byte, extensions []string) error {
+// renderExtensions is the workspace config with its extensions member
+// replaced, every other member kept in its order, two-space indented.
+func renderExtensions(data []byte, extensions []string) ([]byte, error) {
 	dec := json.NewDecoder(bytes.NewReader(data))
 	if tok, err := dec.Token(); err != nil || tok != json.Delim('{') {
-		return errors.New("not a JSON object")
+		return nil, errors.New("not a JSON object")
 	}
 	var keys []string
 	members := map[string]json.RawMessage{}
 	for dec.More() {
 		tok, err := dec.Token()
 		if err != nil {
-			return err
+			return nil, err
 		}
 		key, _ := tok.(string)
 		var raw json.RawMessage
 		if err := dec.Decode(&raw); err != nil {
-			return err
+			return nil, err
 		}
 		if _, seen := members[key]; !seen {
 			keys = append(keys, key)
@@ -366,7 +386,7 @@ func writeExtensions(file string, data []byte, extensions []string) error {
 	}
 	list, err := json.Marshal(extensions)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if _, ok := members["extensions"]; !ok {
 		keys = append(keys, "extensions")
@@ -378,7 +398,7 @@ func writeExtensions(file string, data []byte, extensions []string) error {
 		name, _ := json.Marshal(key)
 		var value bytes.Buffer
 		if err := json.Indent(&value, members[key], "  ", "  "); err != nil {
-			return err
+			return nil, err
 		}
 		fmt.Fprintf(&buf, "  %s: %s", name, value.Bytes())
 		if i < len(keys)-1 {
@@ -387,11 +407,7 @@ func writeExtensions(file string, data []byte, extensions []string) error {
 		buf.WriteByte('\n')
 	}
 	buf.WriteString("}\n")
-	info, err := os.Stat(file)
-	if err != nil {
-		return err
-	}
-	return os.WriteFile(file, buf.Bytes(), info.Mode().Perm()) //nolint:gosec // the workspace config under the root
+	return buf.Bytes(), nil
 }
 
 // graphSync writes the moon project graph: a directory that holds a moon.yml
@@ -418,11 +434,14 @@ var graphJobs = stacks.GraphJobs{
 	ExportCommand: detect.ExportCommand,
 }
 
-// RunSync is the job of the workspace sync task: Sync on the workspace root,
-// reported line by line, with each moon task it maps to no command and each
-// delegated project whose test reads no report.
+// RunSync is the job of the workspace sync task: Sync on the workspace root
+// in the mode of the mode parameter, else the recorded one, reported line by
+// line with each moon task it maps to no command and each delegated project
+// whose test reads no report. With the dryRun parameter it writes nothing
+// and prints the diff of each file it would change.
 func RunSync(ctx *pctx.Context, emit *jsonl.Emitter, _ []string) (string, map[string]any, error) {
-	result, err := Sync(context.Background(), ctx.WorkspaceRoot)
+	dry := ctx.Params.Bool("dryRun", false)
+	result, err := synchronize(context.Background(), ctx.WorkspaceRoot, dry, ctx.Params.String("mode"))
 	if err != nil {
 		emit.DiagnosticWithCode("error", err.Error(), "", 0, 0, CodeSyncFailed)
 		return "FAILED", nil, errors.New(CodeSyncFailed)
@@ -438,11 +457,15 @@ func RunSync(ctx *pctx.Context, emit *jsonl.Emitter, _ []string) (string, map[st
 	if len(result.Unreported) > 0 {
 		emit.DiagnosticWithCode("warning", fmt.Sprintf("the test task of %s names no report under options[%q].tasks.test.reports: its result is moon's exit code alone", strings.Join(result.Unreported, ", "), ExtensionName), "", 0, 0, CodeReportsUnnamed)
 	}
+	if dry {
+		stacks.EmitPreview(emit, profileID, result.GraphResult)
+	}
 	unmapped := make([]string, 0, len(result.Unmapped))
 	for _, u := range result.Unmapped {
 		unmapped = append(unmapped, u.Project+":"+u.Task)
 	}
 	return "OK", map[string]any{
+		"dryRun":     dry,
 		"mode":       result.Mode,
 		"written":    result.Written,
 		"retracted":  result.Retracted,

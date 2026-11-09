@@ -44,16 +44,16 @@ func TestInitFromMoonInImportModeMapsTheProjectsAndPassesLintTestBuild(t *testin
 	t.Setenv("PUTNAMI_NO_AUTO_INSTALL", "1")
 	t.Setenv("PUTNAMI_STORE_DIR", filepath.Join(t.TempDir(), "store"))
 	demo := readDemo(t)
-	root := moonWorkspace(t, demo, buildRuntime(t), "import")
+	root := moonWorkspace(t, demo, buildRuntime(t), "")
 	moonLog := stubMoon(t)
 	langLog := filepath.Join(t.TempDir(), "languages.log")
 	languageExtension(t, root, "typescript-extension", "@putnami/typescript", langLog)
 	languageExtension(t, root, "rust-extension", "@putnami/rust", langLog)
-	clitest.WriteFile(t, filepath.Join(root, "putnami.workspace.json"), `{"name": "shop", "extensions": ["/moon-extension", "/typescript-extension", "/rust-extension"], "options": {"@putnami/moon": {"mode": "import"}}, "includes": []}`)
+	clitest.WriteFile(t, filepath.Join(root, "putnami.workspace.json"), `{"name": "shop", "extensions": ["/moon-extension", "/typescript-extension", "/rust-extension"], "includes": []}`)
 
-	code, out := clitest.RunGateArgs(t, root, "projects", "sync")
+	code, out := clitest.RunGateArgs(t, root, "init", "--from", "moon", "--mode", "import", "--apply")
 	if code != 0 {
-		t.Fatalf("projects sync exit %d:\n%s", code, out)
+		t.Fatalf("init --apply exit %d:\n%s", code, out)
 	}
 	// The unmapped task is listed, and keeps running through moon.
 	if !strings.Contains(out, "api:dev") {
