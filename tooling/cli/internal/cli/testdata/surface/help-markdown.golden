@@ -429,7 +429,7 @@ Initialize a new workspace
 **Usage**
 
 ```
-putnami init [--workspace <name>] [--extension <ts|go|py> | --from <bazel|nx|pants> [--mode <import|delegate>] [--apply]] [--project <name>] [--project-path <path>] [--channel <channel>] [--force]
+putnami init [--workspace <name>] [--extension <ts|go|py> | --from <bazel|moon|nx|pants> [--mode <import|delegate>] [--apply]] [--project <name>] [--project-path <path>] [--channel <channel>] [--force]
 ```
 
 **Flags**
@@ -438,7 +438,7 @@ putnami init [--workspace <name>] [--extension <ts|go|py> | --from <bazel|nx|pan
 |------|-------------|
 | `--workspace` <name> | Workspace name override |
 | `--extension` <ts|go|py> | Default extension to install |
-| `--from` <bazel|nx|pants> | Turn the repository a monorepo tool describes into a workspace: declare the tool's extension and synchronize its packages as projects; rerun in the workspace to preview what would change |
+| `--from` <bazel|moon|nx|pants> | Turn the repository a monorepo tool describes into a workspace: declare the tool's extension and synchronize its packages as projects; rerun in the workspace to preview what would change |
 | `--mode` <import|delegate> | With --from: import hands the targets Putnami can map to its runner and cache, delegate keeps the tool running each target with its cache (default: asked in a terminal, else import; Bazel and Pants delegate) |
 | `--apply` | With --from in an existing workspace: record the mode and synchronize, instead of previewing |
 | `--project` <name> | Create an initial project |
@@ -456,6 +456,7 @@ putnami init [--workspace <name>] [--extension <ts|go|py> | --from <bazel|nx|pan
 - `putnami init --from pants`
 - `putnami init --from nx --mode delegate`
 - `putnami init --from nx --mode import --apply`
+- `putnami init --from moon --mode delegate`
 
 ### `putnami workspace describe`
 

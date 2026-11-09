@@ -443,3 +443,28 @@ func TestTheMoonManifestConformsToTheStackCore(t *testing.T) {
 	}
 	stackstest.CheckManifest(t, "putnami.extension.json", s)
 }
+
+func TestTheSyncKeepsTheWorkspaceConfigOrder(t *testing.T) {
+	spectest.Proves(t, feature, "import-maps-to-language-extensions", "import-mode-maps-a-project-to-its-language-extension")
+	root := t.TempDir()
+	file := filepath.Join(root, wsproto.WorkspaceConfigFilename)
+	writeFile(t, root, wsproto.WorkspaceConfigFilename, "{\n  \"name\": \"demo\",\n  \"options\": {\"@putnami/moon\": {\"mode\": \"import\"}},\n  \"extensions\": [\"@putnami/moon\"]\n}\n")
+	if changed, err := declareExtensions(root, []string{"@putnami/go"}, false); err != nil || !changed {
+		t.Fatalf("declare: %v %v", changed, err)
+	}
+	data, _ := os.ReadFile(file)
+	want := "{\n  \"name\": \"demo\",\n  \"options\": {\n    \"@putnami/moon\": {\n      \"mode\": \"import\"\n    }\n  },\n  \"extensions\": [\n    \"@putnami/moon\",\n    \"@putnami/go\"\n  ]\n}\n"
+	if string(data) != want {
+		t.Errorf("config:\n%s\nwant\n%s", data, want)
+	}
+	if changed, err := declareExtensions(root, []string{"@putnami/go"}, false); err != nil || changed {
+		t.Errorf("a declared extension changes nothing: %v %v", changed, err)
+	}
+	writeFile(t, root, wsproto.WorkspaceConfigFilename, "[]")
+	if _, err := declareExtensions(root, []string{"@putnami/go"}, false); err == nil {
+		t.Error("a config that is no object fails")
+	}
+	if changed, err := declareExtensions(t.TempDir(), []string{"@putnami/go"}, false); err != nil || changed {
+		t.Errorf("no workspace config: %v %v", changed, err)
+	}
+}

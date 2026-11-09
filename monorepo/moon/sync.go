@@ -313,22 +313,52 @@ func declareExtensions(root string, extensions []string, dry bool) (bool, error)
 }
 
 // writeExtensions rewrites the extensions member of the workspace config,
-// keeping the order and the bytes of every other member.
+// keeping every other member, in its order, two-space indented.
 func writeExtensions(file string, data []byte, extensions []string) error {
-	var doc map[string]any
 	dec := json.NewDecoder(bytes.NewReader(data))
-	dec.UseNumber()
-	if err := dec.Decode(&doc); err != nil {
+	if tok, err := dec.Token(); err != nil || tok != json.Delim('{') {
+		return errors.New("not a JSON object")
+	}
+	var keys []string
+	members := map[string]json.RawMessage{}
+	for dec.More() {
+		tok, err := dec.Token()
+		if err != nil {
+			return err
+		}
+		key, _ := tok.(string)
+		var raw json.RawMessage
+		if err := dec.Decode(&raw); err != nil {
+			return err
+		}
+		if _, seen := members[key]; !seen {
+			keys = append(keys, key)
+		}
+		members[key] = raw
+	}
+	list, err := json.Marshal(extensions)
+	if err != nil {
 		return err
 	}
-	doc["extensions"] = extensions
+	if _, ok := members["extensions"]; !ok {
+		keys = append(keys, "extensions")
+	}
+	members["extensions"] = list
 	var buf bytes.Buffer
-	enc := json.NewEncoder(&buf)
-	enc.SetEscapeHTML(false)
-	enc.SetIndent("", "  ")
-	if err := enc.Encode(doc); err != nil {
-		return err
+	buf.WriteString("{\n")
+	for i, key := range keys {
+		name, _ := json.Marshal(key)
+		var value bytes.Buffer
+		if err := json.Indent(&value, members[key], "  ", "  "); err != nil {
+			return err
+		}
+		fmt.Fprintf(&buf, "  %s: %s", name, value.Bytes())
+		if i < len(keys)-1 {
+			buf.WriteByte(',')
+		}
+		buf.WriteByte('\n')
 	}
+	buf.WriteString("}\n")
 	info, err := os.Stat(file)
 	if err != nil {
 		return err
