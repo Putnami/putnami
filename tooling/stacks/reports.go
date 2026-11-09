@@ -144,7 +144,14 @@ func ReadReports(r *Reports, paths func(pattern string) ([]string, error), proje
 		}
 	}
 	if r.HasTests() && read == 0 {
-		diags = append(diags, diag.Errorf(CodeReportMissing, "", "the test task wrote no test report matching %s", strings.Join(slices.Concat(r.JUnit, r.TRX), ", ")))
+		var kinds []string
+		if len(r.JUnit) > 0 {
+			kinds = append(kinds, "JUnit")
+		}
+		if len(r.TRX) > 0 {
+			kinds = append(kinds, "TRX")
+		}
+		diags = append(diags, diag.Errorf(CodeReportMissing, "", "the test task wrote no %s report matching %s", strings.Join(kinds, " or "), strings.Join(slices.Concat(r.JUnit, r.TRX), ", ")))
 	}
 	for _, c := range r.Coverage {
 		read := coverageReaders[c.Format]

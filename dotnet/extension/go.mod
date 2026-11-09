@@ -23,6 +23,7 @@ require (
 	github.com/opencontainers/image-spec v1.1.1 // indirect
 	github.com/sirupsen/logrus v1.9.4 // indirect
 	go.putnami.dev/evidence/readers v0.0.0 // indirect
+	go.putnami.dev/protocol/capabilities v0.0.0 // indirect
 	go.putnami.dev/protocol/cli v0.0.0 // indirect
 	go.putnami.dev/protocol/codehost v0.0.0 // indirect
 	go.putnami.dev/protocol/distribution v0.0.0 // indirect

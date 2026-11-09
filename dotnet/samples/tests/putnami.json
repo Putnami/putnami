@@ -1,5 +1,6 @@
 {
   "$schema": "https://putnami.dev/schemas/putnami-project.json",
+  "name": "dotnet-example-tests",
   "tags": ["sample", "dotnet", "e2e"],
   "extensions": ["/dotnet/extension"],
   "featureAuthority": { "owner": "dotnet/stack-extension" }
