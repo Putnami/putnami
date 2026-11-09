@@ -48,11 +48,14 @@ func TestTestPassesTheFilterToPHPUnitAndKeysTheTaskOnIt(t *testing.T) {
 	}
 	selected := stacks.RootStep{Dir: root, Project: root, Env: os.Environ(), Program: func(name string) string { return name }}
 	step := []string{filepath.Join(root, "vendor/bin/phpunit"), "--log-junit", "junit.xml", "tests"}
-	for _, name := range []string{testFilterFlag, testFilterShort} {
-		got := testFilter(&pctx.Context{Params: job.Params{name: json.RawMessage(`"two words"`)}}, selected, step)
-		if !slices.Equal(got, []string{"--filter", "two words", emptySuiteOption}) {
-			t.Errorf("the value of %s is one argument: %q", name, got)
-		}
+	got := testFilter(&pctx.Context{Params: job.Params{testFilterFlag: json.RawMessage(`"two words"`)}}, selected, step)
+	if !slices.Equal(got, []string{"--filter", "two words", emptySuiteOption}) {
+		t.Errorf("the value of %s is one argument: %q", testFilterFlag, got)
+	}
+	// The CLI names the value after the long flag, so the short name is no
+	// parameter the job reads.
+	if got := testFilter(&pctx.Context{Params: job.Params{"t": json.RawMessage(`"x"`)}}, selected, step); got != nil {
+		t.Errorf("the job read the short name: %q", got)
 	}
 
 	// An overridden step answers for its own program, wherever it stands.
@@ -83,9 +86,10 @@ func TestTestPassesTheFilterToPHPUnitAndKeysTheTaskOnIt(t *testing.T) {
 	if flag := manifest.Commands["test"].Flags[testFilterFlag]; flag.Short != "-t" {
 		t.Errorf("the test flag = %+v", flag)
 	}
-	for _, name := range []string{testFilterFlag, testFilterShort} {
-		if input := manifest.Tasks["test-run"].Inputs[name]; input.From != "params" {
-			t.Errorf("the %s parameter is no input of the task's key: %+v", name, input)
-		}
+	if input := manifest.Tasks["test-run"].Inputs[testFilterFlag]; input.From != "params" {
+		t.Errorf("the %s parameter is no input of the task's key: %+v", testFilterFlag, input)
+	}
+	if input, kept := manifest.Tasks["test-run"].Inputs["t"]; kept {
+		t.Errorf("the task keys on the short name: %+v", input)
 	}
 }

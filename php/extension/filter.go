@@ -14,10 +14,9 @@ import (
 
 const (
 	// testFilterFlag is the test command's flag that selects the tests to run.
+	// The CLI names the value after the long flag, whichever spelling the
+	// command line used, so -t reaches the job as test too.
 	testFilterFlag = "test"
-	// testFilterShort is the name the CLI gives the flag's value when the
-	// command line spells it -t.
-	testFilterShort = "t"
 	// emptySuiteOption makes PHPUnit pass a run that selects no test.
 	emptySuiteOption = "--do-not-fail-on-empty-test-suite"
 	// stepHelpTimeout bounds the question of what a step's program accepts.
@@ -35,7 +34,7 @@ func TestJob(stack stacks.Stack) cli.JobFunc {
 // selected ones depend on, where it can select no test: a PHPUnit that fails
 // such a run by default offers the option that passes it.
 func testFilter(ctx *pctx.Context, root stacks.RootStep, lastStep []string) []string {
-	filter := ctx.Params.String(testFilterFlag, testFilterShort)
+	filter := ctx.Params.String(testFilterFlag)
 	if filter == "" {
 		return nil
 	}
