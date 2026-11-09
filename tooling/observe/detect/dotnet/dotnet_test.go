@@ -86,9 +86,9 @@ func TestSolutionProjectsAreWorkspaceComponents(t *testing.T) {
 	d := Detect(root)
 	noDiagnostics(t, d)
 	want := []Component{
-		{ID: "src/Api", Name: "Api", Source: evidence.SourceWorkspace, DependsOn: []string{"src/Pricing"}},
-		{ID: "src/Pricing", Name: "Pricing", Source: evidence.SourceWorkspace},
-		{ID: "tests/Pricing.Tests", Name: "Pricing.Tests", Source: evidence.SourceWorkspace, DependsOn: []string{"src/Pricing"}},
+		{ID: "src/Api", Name: "Api", File: "src/Api/Api.csproj", Type: TypeLibrary, Source: evidence.SourceWorkspace, DependsOn: []string{"src/Pricing"}},
+		{ID: "src/Pricing", Name: "Pricing", File: "src/Pricing/Pricing.csproj", Type: TypeLibrary, Source: evidence.SourceWorkspace},
+		{ID: "tests/Pricing.Tests", Name: "Pricing.Tests", File: "tests/Pricing.Tests/Pricing.Tests.csproj", Type: TypeLibrary, Source: evidence.SourceWorkspace, DependsOn: []string{"src/Pricing"}},
 	}
 	if !reflect.DeepEqual(d.Components, want) {
 		t.Errorf("components\n got %+v\nwant %+v", d.Components, want)
@@ -105,8 +105,8 @@ func TestSolutionProjectsAreWorkspaceComponents(t *testing.T) {
 	d = Detect(skipped)
 	noDiagnostics(t, d)
 	want = []Component{
-		{ID: "packages/Shared", Name: "Shared", Source: evidence.SourceWorkspace},
-		{ID: "src/Api", Name: "Api", Source: evidence.SourceWorkspace, DependsOn: []string{"packages/Shared"}},
+		{ID: "packages/Shared", Name: "Shared", File: "packages/Shared/Shared.csproj", Type: TypeLibrary, Source: evidence.SourceWorkspace},
+		{ID: "src/Api", Name: "Api", File: "src/Api/Api.csproj", Type: TypeLibrary, Source: evidence.SourceWorkspace, DependsOn: []string{"packages/Shared"}},
 	}
 	if !reflect.DeepEqual(d.Components, want) {
 		t.Errorf("a listed project under packages/\n got %+v\nwant %+v", d.Components, want)
@@ -145,10 +145,10 @@ func TestAProjectOutsideTheSolutionsIsAManifestComponent(t *testing.T) {
 		"packages/Pkg/Pkg.csproj":         pricing,
 	})
 	got := byID(Detect(root))
-	if want := (Component{ID: "tools/Migrate", Name: "Migrate", Source: evidence.SourceManifest, DependsOn: []string{"src/Api", "src/Pricing"}}); !reflect.DeepEqual(got["tools/Migrate"], want) {
+	if want := (Component{ID: "tools/Migrate", Name: "Migrate", File: "tools/Migrate/Migrate.csproj", Type: TypeLibrary, Source: evidence.SourceManifest, DependsOn: []string{"src/Api", "src/Pricing"}}); !reflect.DeepEqual(got["tools/Migrate"], want) {
 		t.Errorf("tools/Migrate = %+v, want %+v", got["tools/Migrate"], want)
 	}
-	if want := (Component{ID: ".", Name: "Root", Source: evidence.SourceManifest}); !reflect.DeepEqual(got["."], want) {
+	if want := (Component{ID: ".", Name: "Root", File: "Root.fsproj", Type: TypeLibrary, Source: evidence.SourceManifest}); !reflect.DeepEqual(got["."], want) {
 		t.Errorf(". = %+v, want %+v", got["."], want)
 	}
 	if got["tests/Pricing.Tests"].Source != evidence.SourceManifest {
@@ -185,7 +185,7 @@ func TestAMalformedSolutionIsADiagnostic(t *testing.T) {
 	if codes[CodeSolutionInvalid] != 5 || codes[CodeProjectInvalid] != 1 {
 		t.Errorf("diagnostics %v", messages)
 	}
-	if want := []Component{{ID: "src/Pricing", Name: "Pricing", Source: evidence.SourceWorkspace}}; !reflect.DeepEqual(d.Components, want) {
+	if want := []Component{{ID: "src/Pricing", Name: "Pricing", File: "src/Pricing/Pricing.csproj", Type: TypeLibrary, Source: evidence.SourceWorkspace}}; !reflect.DeepEqual(d.Components, want) {
 		t.Errorf("components %+v, want the project that does not parse, with no edge", d.Components)
 	}
 }
@@ -281,5 +281,93 @@ func TestCentralPackagesAreReadOnlyWithoutLockFiles(t *testing.T) {
 	}
 	if d := Detect(writeTree(t, map[string]string{"Directory.Packages.props": "<Project/>"})); d.IsCentralPackages("Directory.Packages.props") {
 		t.Error("a repository without a project reads its Directory.Packages.props")
+	}
+}
+
+func TestATestProjectIsReadFromItsFileAndTheNearestDirectoryBuildProps(t *testing.T) {
+	root := writeTree(t, map[string]string{
+		"src/Pricing/Pricing.csproj": pricing,
+		// dotnet new xunit states both markers.
+		"tests/Unit/Unit.csproj": `<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><IsTestProject>true</IsTestProject></PropertyGroup>
+  <ItemGroup><PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.6.0" /></ItemGroup>
+</Project>`,
+		"tests/Package/Package.csproj": `<Project Sdk="Microsoft.NET.Sdk"><ItemGroup><PackageReference Include="microsoft.net.test.sdk" /></ItemGroup></Project>`,
+		"tests/MSTest/MSTest.csproj":   `<Project Sdk="MSTest.Sdk/3.6.1"></Project>`,
+		"tests/Element/Element.csproj": `<Project><Sdk Name="MSTest.Sdk" Version="3.6.1" /></Project>`,
+		// A condition hides a marker: MSBuild is not evaluated.
+		"tests/Conditioned/Conditioned.csproj": `<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup Condition="'$(Configuration)' == 'Debug'"><PackageReference Include="Microsoft.NET.Test.Sdk" /></ItemGroup>
+  <PropertyGroup><IsTestProject Condition="true">true</IsTestProject></PropertyGroup>
+</Project>`,
+		// A Choose branch and a target are conditioned too.
+		"tests/Choose/Choose.csproj": `<Project Sdk="Microsoft.NET.Sdk">
+  <Choose><When Condition="true"></When><Otherwise><PropertyGroup><IsTestProject>true</IsTestProject></PropertyGroup></Otherwise></Choose>
+  <Target Name="Mark"><PropertyGroup><IsTestProject>true</IsTestProject></PropertyGroup></Target>
+</Project>`,
+		// The nearest Directory.Build.props makes its projects tests, unless
+		// a project file denies it.
+		"suites/Directory.Build.props":      `<Project><ItemGroup><PackageReference Include="Microsoft.NET.Test.Sdk" /></ItemGroup></Project>`,
+		"suites/Api.Tests/Api.Tests.csproj": pricing,
+		"suites/Helpers/Helpers.csproj":     `<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><IsTestProject>false</IsTestProject></PropertyGroup></Project>`,
+		// A nearer Directory.Build.props that states nothing hides the outer one.
+		"suites/inner/Directory.Build.props":    `<Project><PropertyGroup><Nullable>enable</Nullable></PropertyGroup></Project>`,
+		"suites/inner/Fixtures/Fixtures.csproj": pricing,
+	})
+	d := Detect(root)
+	noDiagnostics(t, d)
+	tests := map[string]bool{}
+	for _, c := range d.Components {
+		tests[c.ID] = c.Test
+	}
+	want := map[string]bool{
+		"src/Pricing": false, "tests/Unit": true, "tests/Package": true, "tests/MSTest": true, "tests/Element": true,
+		"tests/Conditioned": false, "tests/Choose": false, "suites/Api.Tests": true, "suites/Helpers": false, "suites/inner/Fixtures": false,
+	}
+	if !reflect.DeepEqual(tests, want) {
+		t.Errorf("test projects = %v, want %v", tests, want)
+	}
+}
+
+func TestIsTestLetsTheProjectFileDecide(t *testing.T) {
+	for _, c := range []struct {
+		project, props testMarker
+		want           bool
+	}{
+		{testStated, testUnstated, true},
+		{testStated, testDenied, true},
+		{testDenied, testStated, false},
+		{testUnstated, testStated, true},
+		{testUnstated, testDenied, false},
+		{testUnstated, testUnstated, false},
+	} {
+		if got := isTest(c.project, c.props); got != c.want {
+			t.Errorf("isTest(%d, %d) = %v, want %v", c.project, c.props, got, c.want)
+		}
+	}
+}
+
+func TestAWebWorkerOrExecutableProjectIsAnApplication(t *testing.T) {
+	root := writeTree(t, map[string]string{
+		"web/Web.csproj":         `<Project Sdk="Microsoft.NET.Sdk.Web"></Project>`,
+		"worker/Worker.csproj":   `<Project Sdk="Microsoft.NET.Sdk.Worker/8.0.0"></Project>`,
+		"tool/Tool.fsproj":       `<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><OutputType>Exe</OutputType></PropertyGroup></Project>`,
+		"lib/Lib.csproj":         pricing,
+		"cond/Cond.csproj":       `<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup Condition="'$(X)' == ''"><OutputType>Exe</OutputType></PropertyGroup></Project>`,
+		"tests/Tests.csproj":     `<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><OutputType>Exe</OutputType><IsTestProject>true</IsTestProject></PropertyGroup></Project>`,
+		"element/Element.csproj": `<Project><Sdk Name="Microsoft.NET.Sdk.Web" /></Project>`,
+	})
+	d := Detect(root)
+	noDiagnostics(t, d)
+	got := map[string]string{}
+	for _, c := range d.Components {
+		got[c.ID] = c.Type
+	}
+	want := map[string]string{
+		"web": TypeApplication, "worker": TypeApplication, "tool": TypeApplication, "element": TypeApplication,
+		"lib": TypeLibrary, "cond": TypeLibrary, "tests": TypeLibrary,
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("types = %v, want %v", got, want)
 	}
 }

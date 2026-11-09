@@ -182,6 +182,7 @@ func TestCommittedRepositoryContentStaysOnTheLegacyManifestWire(t *testing.T) {
 		filepath.Join("dart", "extension", ManifestFilename):                      true,
 		filepath.Join("php", "extension", ManifestFilename):                       true,
 		filepath.Join("ruby", "extension", ManifestFilename):                      true,
+		filepath.Join("dotnet", "extension", ManifestFilename):                    true,
 		filepath.Join("rust", "extension", ManifestFilename):                      true,
 		filepath.Join("sites", "telemetry.putnami.dev", ManifestFilename):         true,
 		filepath.Join("sites", "putnami.dev", ManifestFilename):                   true,

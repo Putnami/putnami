@@ -8,7 +8,7 @@
     "The TRX or JUnit report and the Coverlet Cobertura report dotnet test writes land on the test project and on the covered projects, and a package bump in a NuGet lock file or in the central package versions is a dependency change"
   ],
   "nonGoals": [
-    "Running dotnet, MSBuild or NuGet, or evaluating MSBuild: properties, imports, conditions and Directory.Build.props are not read",
+    "Running dotnet, MSBuild or NuGet, or evaluating MSBuild: properties, imports and conditions are not read, and Directory.Build.props is read only for whether it makes its projects test projects",
     "Projects that a solution below the root lists without a project file in the walk, and project types other than C#, F# and Visual Basic, such as .sqlproj or .vcxproj",
     "Attributing a test case by its namespace: a namespace need not name the project that holds the test",
     "Serving the detector over the workspace probe wire or from its own extension: it lives in @putnami/observe"

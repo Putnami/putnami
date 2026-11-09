@@ -60,7 +60,7 @@ func TestProbeAnswersEachComponent(t *testing.T) {
 		t.Errorf("api = %+v", api)
 	}
 	var meta Metadata
-	if err := json.Unmarshal(api.Metadata, &meta); err != nil || !reflect.DeepEqual(meta, Metadata{Component: "api", Root: ".", Toolchain: Expected{Version: "1.82.0", Source: "rust-toolchain.toml"}}) {
+	if err := json.Unmarshal(api.Metadata, &meta); err != nil || !reflect.DeepEqual(meta, Metadata{Component: "api", Root: ".", Toolchain: Expected{Version: "1.82.0", Source: "rust-toolchain.toml"}, Manifest: "crates/api/Cargo.toml"}) {
 		t.Errorf("metadata = %s (%v)", api.Metadata, err)
 	}
 	for _, want := range []string{"crates/api/Cargo.toml", "crates/api/rust-toolchain.toml", "Cargo.lock", "Cargo.toml", "rust-toolchain.toml"} {

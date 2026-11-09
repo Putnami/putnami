@@ -52,7 +52,7 @@ func (s Stack) attribution(root, projectAbs, reportBase, component string) Attri
 		switch {
 		case !ok:
 			return OwnerNone
-		case dir == project:
+		case dir == project, s.CrossComponentCoverage:
 			return OwnerTask
 		default:
 			return OwnerOther

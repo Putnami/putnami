@@ -27,6 +27,7 @@
     "scopes": [
       "cloud",
       "dart",
+      "dotnet",
       "go",
       "intelligence",
       "java",
@@ -52,6 +53,7 @@
       "priority/p3",
       "scope/cloud",
       "scope/dart",
+      "scope/dotnet",
       "scope/go",
       "scope/intelligence",
       "scope/java",

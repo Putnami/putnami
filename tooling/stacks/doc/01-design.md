@@ -149,16 +149,17 @@ The Rust reference profile:
 | `id` | The stack id. |
 | `markers` | The files that make a directory a candidate. |
 | `toolchain.command`, `toolchain.pattern` | How to read the version on the machine: the command's output, standard output first, matched by the pattern's `version` group. |
+| `toolchain.fallback` | A command that lists the installed versions, run when `toolchain.command` fails: when none of them satisfies the expected version, the check is a mismatch that names them, so a provided toolchain may take its place. |
 | `toolchain.provisioned` | The environment variable that holds the toolchain the workspace lock pins, for a stack extension that pins one. |
 | `tasks.<task>.withoutCoverage` | How the task runs on a toolchain with no coverage support: a `probe` that exits non-zero there, and the `steps` that replace the task's. Its coverage reports are not read, and the task warns with `stacks.coverage_unavailable`. |
 | `toolchain.files` | The files that state the expected version or range, read in the project directory, then at the stack root. `key` reads one string value of a TOML table, a JSON object or, in a `.yaml` or `.yml` file, a YAML block or flow mapping; `pattern`, a regular expression matched against the file's content, reads its `version` group, such as `^(?:ruby-)?(?<version>\S+)` for `ruby-3.3.6`; without either, the file's first non-empty line. |
 | `toolchain.ranges` | How a range a file states reads: Composer's syntax, or `pub-sdk` and `pub-flutter`, as pub reads a Dart or Flutter SDK constraint ([ADR 0008](adr/0008-task-targets-exclusions-and-pub-ranges.md)). `toolchain.version` reads plain. |
 | `toolchain.also` | Further checks with the same members, such as the Dart SDK a Flutter SDK bundles or the Bundler beside Ruby, run with the selected toolchain. An entry without `check` takes the first check's. |
-| `inputs.<set>` | Named sets of file patterns. A plain pattern is relative to the project directory; `{root}/` makes it relative to the stack root, the directory of the build that holds the component (the Cargo workspace, the Gradle settings); a pattern that starts with `!` leaves its files out of the task's inputs, such as a file the build tool writes under a directory the task reads or `!vendor/**` beside `**/*.rb`, never `putnami.json` or a toolchain file. A stack-root exclusion, `!{root}/pattern`, reaches the manifest's workspace input with the other stack-root patterns. |
-| `tasks.<task>.steps` | The commands the task runs in order, each an argument vector run in the directory `dir` names, with no shell. `{root}` is the stack root, `{component}` the build's name for the component (`Component.Ref`, or its name), `{output}` the task's output directory under the project, `{target}` one of the task's targets. |
+| `inputs.<set>` | Named sets of file patterns. A plain pattern is relative to the project directory; `{root}/` makes it relative to the stack root, the directory of the build that holds the component (the Cargo workspace, the Gradle settings); a pattern that starts with `!` leaves its files out of the task's inputs, such as a file the build tool writes under a directory the task reads or `!vendor/**` beside `**/*.rb`, never `putnami.json` or a toolchain file. A stack-root exclusion, such as `!{root}/**/obj/**`, reaches the manifest's workspace input with the other stack-root patterns. |
+| `tasks.<task>.steps` | The commands the task runs in order, each an argument vector run in the directory `dir` names, with no shell. `{root}` is the stack root, `{component}` the build's name for the component (`Component.Ref`, or its name), `{manifest}` the absolute path of the manifest the detector read it from, `{output}` the task's output directory under the project, `{target}` one of the task's targets. |
 | `tasks.<task>.inputs` | The input sets the task reads. `lint` reads fewer than `test`: a lockfile change does not rerun it. |
 | `tasks.<task>.reportSteps` | Steps that run after the task's steps whatever their outcome, such as a converter that writes the JUnit report a failing test runner leaves to it, so the failed cases name the failure. They name no `{target}`. |
-| `tasks.<task>.reports` | The JUnit and coverage reports the task reads back, with the coverage format. The core copies each into `{output}` as soon as the task ends. `when` and `optional` say when a report is expected. |
+| `tasks.<task>.reports` | The JUnit (`junit`) and TRX (`trx`) test reports and the coverage reports the task reads back, with the coverage format. The core copies each into `{output}` as soon as the task ends. `when` and `optional` say when a report is expected. |
 | `tasks.<task>.targets` | What a step that names `{target}` runs on, listed in the project directory when the task runs: a `name`, or one target per file an `each` pattern matches, named by its base name without extension; `when` lists paths that must all exist, `hosts` the systems (`linux`, `darwin`, `windows`) that build it. A step that names `{target}` runs once per target, and not at all when there is none; it needs the task to declare targets, and each target's paths are in the task's inputs. |
 | `tasks.<task>.artifacts` | The files the task copies into `{output}/artifacts` after its steps, so a cache hit restores them: patterns under the project or the stack root that may name `{component}`. The file a pattern with no wildcard names is removed before the steps, unless its path leads outside the project or the stack root or the inputs of one of the component's tasks select it, so only what the steps write is copied. A pattern with a wildcard is only copied, and copies whatever it matches, a file an earlier build left included. A component name that is no single path segment keeps no artifact. A pattern that matches nothing copies nothing. |
 | `variants.<name>` | A part of the profile one build runs, applied before the project's override. |
@@ -199,6 +200,24 @@ task whose targets name `hosts` declares the `hostPlatform` runtime input, so
 the host system reaches its key; the conformance kit holds it, and an
 override cannot add `hosts` to another task.
 ([ADR 0008](adr/0008-task-targets-exclusions-and-pub-ranges.md)).
+
+### What a stack shapes beyond its profile
+
+A stack whose components differ in kind, or whose toolchain has its own
+version rule, says so in its extension's Go code
+([ADR 0009](adr/0009-a-stack-shapes-its-components-tasks-and-versions.md)):
+
+- the detector names the tasks each component runs (`Component.Tasks`): a
+  task outside the list passes with no step and no toolchain check. A .NET
+  library runs no `dotnet test`; without a list, every task runs. The probe
+  records the list, and the task asks the detector again when it runs, so a
+  file that decides it and that the key covers decides it fresh;
+- the detector names the other files it read for a component
+  (`Component.Watched`), such as each `Directory.Build.props` above a .NET
+  project; the probe reports them, with the component's manifest, among its
+  watched files;
+- `Stack.MatchVersion` replaces the core's rule for an exact expected
+  version: the .NET stack applies `global.json`'s `rollForward`.
 
 Several components share one stack root: one Cargo workspace, one
 `target/`, one `target/nextest/ci/junit.xml`. The core runs the tasks of one
@@ -282,7 +301,8 @@ extension lists them in `runtime.inputSelectors`, and the core answers
 task, and the project's `putnami.json`. Its basis covers them, so an
 override that changes the inputs changes the answer.
 
-A selector answers files under the project only. The stack-root files
+A selector answers files under the project only, never under a `.git` or
+`.putnami` directory. The stack-root files
 (`{root}/…`, and the toolchain files at the root) reach the key through a
 second, static input of each task, `from: "workspace"`, which lists the
 shipped profile's stack-root patterns of that task; the conformance kit holds
@@ -334,7 +354,7 @@ A task's key is the core's key (see the CLI's
 | Implementation digest | The extension runtime, which embeds the core and the profile: editing either changes every key of the stack. |
 | Task contract digest | The manifest's task. |
 | Task params hash | The resolved `options["@putnami/<stack>"]` of the project, so every override. |
-| Project metadata digest | The build's name of the component, its variant, the stack root and the expected toolchain versions from the probe. |
+| Project metadata digest | The build's name of the component, its variant, the stack root, the manifest, the tasks it runs and the expected toolchain versions from the probe. |
 | File content hash | The files the task's selector answered: its input sets, the stack-root files, the toolchain files. |
 | Upstream hashes | The keys of the same task of the projects it depends on. |
 
@@ -416,8 +436,9 @@ version under `toolchains` in the project metadata, in the order of
 
 ## Reports
 
-After the last step, the task reads every report its profile names with the
-evidence readers, and attributes each entry to a component:
+The task's output directory is emptied before its first step. After the
+last step, the task reads every report its profile names with the evidence
+readers, JUnit and TRX alike, and attributes each entry to a component:
 
 - a JUnit case, through the stack's case resolver, which names the component
   from the case's class name, else its suite name: the Rust stack reads the
@@ -436,7 +457,8 @@ A JUnit failure, an error, or a step that exits non-zero fails the task; the
 report's failed cases name the failure, with `stacks.test_failed`, and a failed
 step that wrote no report is `stacks.step_failed`, not a missing report. The totals and
 the coverage reach the task result. A JUnit or coverage pattern of the profile
-that matches no report fails the task with `stacks.report_missing`: a command
+that matches no report fails the task with `stacks.report_missing`; JUnit
+and TRX patterns count together: a command
 that ran nothing is not a pass. The reports a task reads outside its own
 output directory are removed before its steps, so a report another component
 or an earlier run left is never read as this run's. A file the task's inputs

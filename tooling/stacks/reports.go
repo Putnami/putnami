@@ -83,9 +83,9 @@ var coverageReaders = map[string]func([]byte) (readers.CoverageReport, []diag.Di
 
 // ReadReports reads every report a task names. paths resolves a report
 // pattern to absolute file paths; projectAbs is the project directory, which
-// the summary's report names are relative to. A JUnit pattern set that
-// matches no file is CodeReportMissing: a test command that ran nothing is no
-// pass. attr decides whose each case and coverage file is: another
+// the summary's report names are relative to. JUnit and TRX patterns that
+// together match no file are CodeReportMissing: a test command that ran
+// nothing is no pass. attr decides whose each case and coverage file is: another
 // component's entries are left out of the summary, a case of no component is
 // counted with CodeTestUnattributed, and a coverage file of no component is
 // left out with CodeCoverageUnmapped.
@@ -102,16 +102,22 @@ func ReadReports(r *Reports, paths func(pattern string) ([]string, error), proje
 		}
 		return filepath.ToSlash(p)
 	}
-	if len(r.JUnit) > 0 {
-		files, err := expandAll(r.JUnit, paths)
+	testReaders := []struct {
+		patterns []string
+		read     func([]byte) (readers.TestReport, []diag.Diagnostic)
+	}{{r.JUnit, readers.ReadJUnit}, {r.TRX, readers.ReadTRX}}
+	read := 0
+	for _, tr := range testReaders {
+		if len(tr.patterns) == 0 {
+			continue
+		}
+		files, err := expandAll(tr.patterns, paths)
 		if err != nil {
 			return s, []diag.Diagnostic{diag.Errorf(CodeReportMissing, "", "%v", err)}
 		}
-		if len(files) == 0 {
-			diags = append(diags, diag.Errorf(CodeReportMissing, "", "the test task wrote no JUnit report matching %s", strings.Join(r.JUnit, ", ")))
-		}
+		read += len(files)
 		for _, f := range files {
-			report, d := readers.ReadFile(f, readers.ReadJUnit)
+			report, d := readers.ReadFile(f, tr.read)
 			diags = append(diags, relabel(d, rel(f))...)
 			s.Reports = append(s.Reports, rel(f))
 			for _, c := range report.Cases {
@@ -136,6 +142,9 @@ func ReadReports(r *Reports, paths func(pattern string) ([]string, error), proje
 				}
 			}
 		}
+	}
+	if r.HasTests() && read == 0 {
+		diags = append(diags, diag.Errorf(CodeReportMissing, "", "the test task wrote no test report matching %s", strings.Join(slices.Concat(r.JUnit, r.TRX), ", ")))
 	}
 	for _, c := range r.Coverage {
 		read := coverageReaders[c.Format]
@@ -178,6 +187,11 @@ func ReadReports(r *Reports, paths func(pattern string) ([]string, error), proje
 		diags = append(diags, diag.Errorf(CodeTestFailed, "", "%d of %d tests failed: %s", s.Tests.Failed, s.Tests.Total, strings.Join(s.Failed, "; ")))
 	}
 	return s, diags
+}
+
+// HasTests reports whether the reports name a JUnit or a TRX pattern.
+func (r *Reports) HasTests() bool {
+	return r != nil && len(r.JUnit)+len(r.TRX) > 0
 }
 
 func owner[T any](of func(T) Owner, entry T) Owner {

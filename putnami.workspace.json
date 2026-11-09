@@ -21,6 +21,7 @@
     "/rust/extension",
     "/swift/extension",
     "/tooling/pants",
+    "/dotnet/extension",
     "/tooling/scaffold",
     "/tooling/sdd-extension",
     "/tooling/contributor",
@@ -37,6 +38,7 @@
   "includes": [
     "cloud",
     "dart",
+    "dotnet",
     "go",
     "intelligence",
     "java",

@@ -1,0 +1,52 @@
+{
+  "id": "dotnet",
+  "markers": ["*.csproj", "*.fsproj", "*.vbproj"],
+  "toolchain": {
+    "command": ["dotnet", "--version"],
+    "fallback": ["dotnet", "--list-sdks"],
+    "pattern": "(?m)^(?<version>[0-9]+\\.[0-9]+\\.[0-9]+\\S*)(\\s|$)",
+    "files": [
+      { "path": "global.json", "key": "sdk.version" }
+    ],
+    "provisioned": "PUTNAMI_DOTNET_EXECUTABLE"
+  },
+  "inputs": {
+    "sources": ["**/*.cs", "**/*.fs", "**/*.fsi", "**/*.vb", "**/*.razor", "**/*.cshtml", "**/*.xaml", "**/*.resx"],
+    "analyzers": ["**/.editorconfig", "**/*.globalconfig", "BannedSymbols.txt", "PublicAPI.Shipped.txt", "PublicAPI.Unshipped.txt", "stylecop.json"],
+    "projects": [
+      "*.csproj", "*.fsproj", "*.vbproj", "*.user", "Directory.Build.props", "Directory.Build.targets",
+      "{root}/**/Directory.Build.props", "{root}/**/Directory.Build.targets", "{root}/**/Directory.Build.rsp",
+      "{root}/**/.editorconfig", "{root}/**/*.globalconfig",
+      "{root}/**/NuGet.Config", "{root}/**/NuGet.config", "{root}/**/nuget.config", "{root}/**/global.json"
+    ],
+    "packages": ["packages.lock.json", "{root}/**/Directory.Packages.props"],
+    "project": ["**"],
+    "notTestSettings": ["!**/*.runsettings", "!**/xunit.runner.json", "!**/testconfig.json"],
+    "buildOutputs": ["!{root}/**/bin/**", "!{root}/**/obj/**", "!{root}/**/TestResults/**", "!**/.DS_Store", "!**/*.DotSettings.user"]
+  },
+  "excludes": ["bin", "obj", "TestResults", "node_modules", ".gen", ".vs", ".idea", ".vscode"],
+  "tasks": {
+    "lint": {
+      "steps": [
+        ["dotnet", "format", "{manifest}", "--verify-no-changes"]
+      ],
+      "inputs": ["sources", "analyzers", "projects", "packages", "buildOutputs"]
+    },
+    "test": {
+      "steps": [
+        ["dotnet", "test", "{manifest}", "--logger", "trx", "--results-directory", "{output}", "--collect", "XPlat Code Coverage"]
+      ],
+      "inputs": ["project", "projects", "packages", "buildOutputs"],
+      "reports": {
+        "trx": ["{output}/*.trx"],
+        "coverage": [{ "format": "cobertura", "paths": ["{output}/*/coverage.cobertura.xml"] }]
+      }
+    },
+    "build": {
+      "steps": [
+        ["dotnet", "build", "{manifest}"]
+      ],
+      "inputs": ["project", "projects", "packages", "notTestSettings", "buildOutputs"]
+    }
+  }
+}

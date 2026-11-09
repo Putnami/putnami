@@ -1,0 +1,28 @@
+{
+  "protocolVersion": 2,
+  "contracts": [
+    {
+      "authority": ".NET release metadata and SDK archives (github.com/dotnet/core/blob/main/release-notes/releases-index.json)",
+      "adapter": "dotnet/extension/provide.go",
+      "callsites": [
+        {
+          "path": "dotnet/extension/provide.go",
+          "transport": "http",
+          "symbol": "http.Client",
+          "fingerprint": "a14066c9bce9b81a55485f656dba946c899912bc8ac2d026ecb90948b7f43af8"
+        },
+        {
+          "path": "dotnet/extension/provide.go",
+          "transport": "http",
+          "symbol": "http.NewRequestWithContext",
+          "fingerprint": "f736bbdc032e15da7c16441dd56689e16321ab336cc5ce10cb86c137d3764ee4"
+        }
+      ],
+      "owner": "@putnami/dotnet",
+      "tests": [
+        "dotnet/extension/provide_test.go"
+      ],
+      "reason": "Reads the release metadata Microsoft publishes and downloads the SDK archive it names over HTTPS, with no credential, and checks the archive against the SHA-512 the metadata states."
+    }
+  ]
+}

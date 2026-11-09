@@ -1,0 +1,7 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-project.json",
+  "tags": ["sample", "dotnet", "e2e"],
+  "extensions": ["/dotnet/extension"],
+  "featureAuthority": { "owner": "dotnet/stack-extension" },
+  "options": { "package": { "docker": true } }
+}

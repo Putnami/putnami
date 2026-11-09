@@ -149,6 +149,12 @@ func (s Stack) selectToolchain(ctx context.Context, in runInput, meta Metadata, 
 	}
 	expected := expectedAll[0]
 	env := os.Environ()
+	matches := versionMatches
+	if s.MatchVersion != nil {
+		matches = func(e, m string) bool {
+			return s.MatchVersion(in.workspaceRoot, Expected{Version: e, Source: expected.Source}, m)
+		}
+	}
 	// The further checks read the selected toolchain: a command beside it
 	// runs that one.
 	further := func(sel Selection) ([]Verdict, error) {
@@ -167,7 +173,7 @@ func (s Stack) selectToolchain(ctx context.Context, in runInput, meta Metadata, 
 	furtherFails := func(verdicts []Verdict, err error) bool {
 		return err != nil || slices.ContainsFunc(verdicts, func(v Verdict) bool { return v.Fail })
 	}
-	selected, err := profile.Toolchain.Select(ctx, in.projectAbs, expected, env)
+	selected, err := profile.Toolchain.SelectWith(ctx, in.projectAbs, expected, env, matches)
 	var furtherVerdicts []Verdict
 	var furtherErr error
 	if err == nil && !selected.Verdict.Fail {
@@ -180,7 +186,11 @@ func (s Stack) selectToolchain(ctx context.Context, in runInput, meta Metadata, 
 		// bundles, asks for the installed toolchain even when the one on
 		// PATH passes the first check.
 		forcePinned := err == nil && !selected.Verdict.Fail
-		provided, provideErr := s.Provide(ctx, profile.Toolchain, expectedAll, emit.Info)
+		withRoot := slices.Clone(expectedAll)
+		for i := range withRoot {
+			withRoot[i].Root = in.workspaceRoot
+		}
+		provided, provideErr := s.Provide(ctx, profile.Toolchain, withRoot, emit.Info)
 		if provideErr != nil {
 			return Selection{}, failWith(emit, CodeToolchainMissing, "install the %s toolchain: %v", profile.ID, provideErr)
 		}
@@ -188,7 +198,7 @@ func (s Stack) selectToolchain(ctx context.Context, in runInput, meta Metadata, 
 		if forcePinned {
 			selected, err = profile.Toolchain.Pinned(ctx, in.projectAbs, expected, env)
 		} else {
-			selected, err = profile.Toolchain.Select(ctx, in.projectAbs, expected, env)
+			selected, err = profile.Toolchain.SelectWith(ctx, in.projectAbs, expected, env, matches)
 		}
 		furtherVerdicts, furtherErr = nil, nil
 		if err == nil && !selected.Verdict.Fail {
@@ -523,8 +533,20 @@ func (s Stack) run(ctx context.Context, in runInput, emit reporter) (string, map
 		emit.Info(fmt.Sprintf("the %s profile declares no %s task", profile.ID, in.task))
 		return statusOK, nil, nil
 	}
+	projectRel, err := filepath.Rel(in.workspaceRoot, in.projectAbs)
+	if err != nil {
+		return statusFailed, nil, failWith(emit, CodeNotAComponent, "%v", err)
+	}
+	if tasks := s.componentTasks(in.workspaceRoot, filepath.ToSlash(projectRel), meta.Tasks); tasks != nil && !slices.Contains(tasks, in.task) {
+		emit.Info(fmt.Sprintf("%s runs no %s task", meta.Component, in.task))
+		return statusOK, nil, nil
+	}
 	rootAbs := filepath.Join(in.workspaceRoot, filepath.FromSlash(meta.Root))
+	// The output directory starts empty.
 	outDir := filepath.Join(in.outputRoot, in.task)
+	if err := os.RemoveAll(outDir); err != nil {
+		return statusFailed, nil, err
+	}
 	if err := os.MkdirAll(outDir, 0o755); err != nil {
 		return statusFailed, nil, err
 	}
@@ -574,6 +596,16 @@ func (s Stack) run(ctx context.Context, in runInput, emit reporter) (string, map
 	}
 
 	vars := map[string]string{"{root}": rootAbs, "{component}": meta.Component, "{project}": in.projectAbs, "{output}": outDir}
+	if meta.Manifest != "" {
+		vars["{manifest}"] = filepath.Join(in.workspaceRoot, filepath.FromSlash(meta.Manifest))
+	}
+	for _, step := range t.Steps {
+		for _, a := range step {
+			if strings.Contains(a, "{manifest}") && meta.Manifest == "" {
+				return statusFailed, nil, failWith(emit, CodeProjectConfigInvalid, "%s: the step names {manifest}, and the %s detector names no manifest for %s", strings.Join(step, " "), profile.ID, meta.Component)
+			}
+		}
+	}
 	// A step that names {target} runs once per target the task lists in the
 	// project directory, and not at all when there is none.
 	targets, err := t.ListTargets(in.projectAbs, runtime.GOOS)
@@ -712,7 +744,7 @@ func (s Stack) run(ctx context.Context, in runInput, emit reporter) (string, map
 		data["delegatedTo"] = profile.ID
 		emit.Info(fmt.Sprintf("%s ran %s on %s; its own cache decides what reran", profile.ID, in.task, meta.Component))
 	}
-	if reports != nil && len(reports.JUnit) > 0 {
+	if reports.HasTests() {
 		data["testSummary"] = map[string]any{
 			"total": summary.Tests.Total, "passed": summary.Tests.Passed,
 			"failed": summary.Tests.Failed, "skipped": summary.Tests.Skipped,
@@ -871,7 +903,7 @@ func removeReports(profile Profile, task, projectAbs, rootAbs string) error {
 	if r == nil {
 		return nil
 	}
-	patterns := slices.Clone(r.JUnit)
+	patterns := slices.Concat(r.JUnit, r.TRX)
 	for _, c := range r.Coverage {
 		patterns = append(patterns, c.Paths...)
 	}
@@ -946,4 +978,20 @@ func anyFile(dir string, patterns []string) bool {
 		}
 	}
 	return false
+}
+
+// componentTasks are the tasks the component at the workspace-relative
+// projectRel runs: the detector's answer now, or, when it no longer names the
+// component, the probe's. nil runs every task.
+func (s Stack) componentTasks(root, projectRel string, probed []string) []string {
+	if s.Detect == nil {
+		return probed
+	}
+	components, _ := s.Detect(root, wsproto.ProbeRequest{Version: wsproto.ProbeProtocolVersion, Extension: s.Extension, Paths: []string{projectRel}})
+	for _, c := range components {
+		if c.Path == projectRel {
+			return c.Tasks
+		}
+	}
+	return probed
 }

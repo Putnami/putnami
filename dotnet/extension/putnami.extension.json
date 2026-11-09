@@ -1,0 +1,613 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-extension.json",
+  "name": "@putnami/dotnet",
+  "cliContract": 14,
+  "extensionDependencies": {
+    "@putnami/dev": ""
+  },
+  "runtime": {
+    "executable": "compiled/putnami-dotnet",
+    "toolchains": {
+      "runtimeCompiler": {
+        "lock": "go",
+        "candidates": [
+          {
+            "from": "environment",
+            "environment": "GOROOT",
+            "path": "bin/go"
+          },
+          {
+            "from": "path",
+            "path": "go"
+          },
+          {
+            "from": "putnami-home",
+            "path": "toolchains/go/go-{version}/go/bin/go"
+          }
+        ],
+        "probe": {
+          "args": [
+            "env",
+            "GOVERSION"
+          ],
+          "expect": "go{version}",
+          "unset": [
+            "GOROOT"
+          ],
+          "environment": {
+            "GOTOOLCHAIN": "local"
+          }
+        },
+        "environment": {
+          "GOROOT": {
+            "from": "ancestor",
+            "levels": 2
+          },
+          "GOTOOLCHAIN": {
+            "from": "literal",
+            "value": "local"
+          }
+        },
+        "prependPath": true
+      }
+    },
+    "prepare": {
+      "command": "{extensionRoot}/bin/prepare",
+      "args": [
+        "--output",
+        "{runtimeOutput}"
+      ],
+      "inputs": [
+        "bin/prepare",
+        "cmd/**",
+        "go.mod",
+        "go.sum",
+        "*.go",
+        "profile.json"
+      ],
+      "toolchains": [
+        "runtimeCompiler"
+      ]
+    },
+    "inputSelectors": [
+      "dotnet:build",
+      "dotnet:lint",
+      "dotnet:test"
+    ]
+  },
+  "workspace": {
+    "markers": [
+      "*.csproj",
+      "*.fsproj",
+      "*.vbproj"
+    ],
+    "inputs": [
+      "*.csproj",
+      "*.fsproj",
+      "*.vbproj",
+      "Directory.Build.props",
+      "global.json"
+    ],
+    "excludes": [
+      "bin",
+      "obj",
+      "TestResults"
+    ],
+    "language": "dotnet"
+  },
+  "commands": {
+    "lint": {
+      "description": "Lint the projects with dotnet format --verify-no-changes.",
+      "run": [
+        {
+          "id": "lint",
+          "task": "lint-run",
+          "dependsOn": [
+            "^lint"
+          ]
+        }
+      ]
+    },
+    "test": {
+      "description": "Test the test projects with dotnet test, and read their TRX and Coverlet Cobertura reports.",
+      "run": [
+        {
+          "id": "test",
+          "heavy": true,
+          "task": "test-run",
+          "dependsOn": [
+            "^test"
+          ]
+        }
+      ]
+    },
+    "build": {
+      "description": "Build the projects with dotnet build.",
+      "run": [
+        {
+          "id": "build",
+          "heavy": true,
+          "task": "build-run",
+          "dependsOn": [
+            "^build"
+          ]
+        }
+      ]
+    },
+    "serve": {
+      "description": "Serve a .NET application with dotnet run on the port flag.",
+      "traits": {
+        "requiresRunnable": true,
+        "workload": "serve"
+      },
+      "flags": {
+        "port": {
+          "type": "number",
+          "default": 3000,
+          "description": "Port for the server"
+        }
+      },
+      "run": [
+        {
+          "id": "serve",
+          "task": "serve-run"
+        }
+      ]
+    },
+    "run": {
+      "description": "Run a .NET application once with dotnet run and forward its exit code.",
+      "traits": {
+        "requiresRunnable": true,
+        "workload": "once"
+      },
+      "flags": {
+        "args": {
+          "type": "string",
+          "description": "Arguments to pass to the application"
+        }
+      },
+      "run": [
+        {
+          "id": "run",
+          "task": "run-exec"
+        }
+      ]
+    },
+    "package": {
+      "description": "Assemble the image of an application for the docker publish channel.",
+      "traits": {
+        "injectPublishChannels": true
+      },
+      "flags": {
+        "docker": {
+          "type": "boolean",
+          "default": false,
+          "description": "Assemble the image"
+        },
+        "docker-tag": {
+          "type": "string",
+          "description": "Override the image tag"
+        },
+        "docker-base-image": {
+          "type": "string",
+          "description": "Replace the official .NET image with a base pinned by digest (image@sha256:...)"
+        },
+        "docker-load": {
+          "type": "boolean",
+          "default": false,
+          "description": "Also load the assembled image into the local docker daemon"
+        },
+        "platform": {
+          "type": "string",
+          "default": "linux/amd64",
+          "description": "Target platform of the image"
+        },
+        "dry-run": {
+          "type": "boolean",
+          "default": false,
+          "description": "Plan the image without assembling it"
+        },
+        "framework": {
+          "type": "string",
+          "description": "Target framework the image runs, for a project that targets several"
+        }
+      },
+      "run": [
+        {
+          "id": "docker",
+          "task": "package-docker",
+          "if": "params.docker"
+        }
+      ]
+    },
+    "publish": {
+      "dependsOn": [
+        "package"
+      ],
+      "traits": {
+        "injectPublishChannels": true,
+        "sideEffects": "registry"
+      },
+      "description": "Push the image of an application to its OCI registry. A library reaches NuGet through dotnet pack and dotnet nuget push.",
+      "flags": {
+        "docker": {
+          "type": "boolean",
+          "default": false,
+          "description": "Push the image"
+        },
+        "dry-run": {
+          "type": "boolean",
+          "default": false,
+          "description": "Push nothing; report what would be published"
+        }
+      },
+      "run": [
+        {
+          "id": "docker",
+          "task": "publish-docker",
+          "if": "params.docker"
+        }
+      ]
+    }
+  },
+  "tasks": {
+    "lint-run": {
+      "description": "Run the .NET profile's lint step, dotnet format --verify-no-changes, on one project's file in its directory, after the SDK check. Its inputs are the files the dotnet:lint selector answers from the resolved profile, and the stack-root files of the profile.",
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": [
+        "lint",
+        "--report-dir",
+        "{outputRoot}"
+      ],
+      "cwd": "{projectRoot}",
+      "timeoutMs": 1800000,
+      "inputs": {
+        "sources": {
+          "from": "project",
+          "files": [
+            "dotnet:lint"
+          ]
+        },
+        "stackRoot": {
+          "from": "workspace",
+          "files": [
+            "!**/TestResults/**",
+            "!**/bin/**",
+            "!**/obj/**",
+            "**/*.globalconfig",
+            "**/.editorconfig",
+            "**/Directory.Build.props",
+            "**/Directory.Build.rsp",
+            "**/Directory.Build.targets",
+            "**/Directory.Packages.props",
+            "**/NuGet.Config",
+            "**/NuGet.config",
+            "**/global.json",
+            "**/nuget.config",
+            "global.json"
+          ]
+        },
+        "extensionVersion": {
+          "from": "runtime"
+        }
+      },
+      "outputs": {
+        "data": {
+          "description": "The task result: the test and coverage totals of a test task."
+        }
+      },
+      "cache": {
+        "enabled": true
+      },
+      "declares": {
+        "outputs": {
+          "reports": {
+            "kind": "directory",
+            "root": "command-output",
+            "path": "lint",
+            "optionalEmpty": true,
+            "description": "The reports the task wrote: the TRX and Cobertura reports of a test task."
+          }
+        },
+        "effects": [
+          "network",
+          "toolchain-cache"
+        ]
+      }
+    },
+    "test-run": {
+      "description": "Run the .NET profile's test step, dotnet test with the TRX logger and the XPlat Code Coverage collector, on one test project's file in its directory, after the SDK check; then read the TRX and Cobertura reports it wrote into the command output, even when the step exits non-zero. A project that is no test project runs nothing. A failed case, a step that exits non-zero, or a missing report fails the task.",
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": [
+        "test",
+        "--report-dir",
+        "{outputRoot}"
+      ],
+      "cwd": "{projectRoot}",
+      "timeoutMs": 1800000,
+      "inputs": {
+        "sources": {
+          "from": "project",
+          "files": [
+            "dotnet:test"
+          ]
+        },
+        "stackRoot": {
+          "from": "workspace",
+          "files": [
+            "!**/TestResults/**",
+            "!**/bin/**",
+            "!**/obj/**",
+            "**/*.globalconfig",
+            "**/.editorconfig",
+            "**/Directory.Build.props",
+            "**/Directory.Build.rsp",
+            "**/Directory.Build.targets",
+            "**/Directory.Packages.props",
+            "**/NuGet.Config",
+            "**/NuGet.config",
+            "**/global.json",
+            "**/nuget.config",
+            "global.json"
+          ]
+        },
+        "extensionVersion": {
+          "from": "runtime"
+        }
+      },
+      "outputs": {
+        "data": {
+          "description": "The task result: the test and coverage totals of a test task."
+        }
+      },
+      "cache": {
+        "enabled": true
+      },
+      "declares": {
+        "outputs": {
+          "reports": {
+            "kind": "directory",
+            "root": "command-output",
+            "path": "test",
+            "optionalEmpty": true,
+            "description": "The reports the task wrote: the TRX and Cobertura reports of a test task."
+          }
+        },
+        "effects": [
+          "network",
+          "toolchain-cache"
+        ]
+      }
+    },
+    "build-run": {
+      "description": "Run the .NET profile's build step, dotnet build, on one project's file in its directory, after the SDK check.",
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": [
+        "build",
+        "--report-dir",
+        "{outputRoot}"
+      ],
+      "cwd": "{projectRoot}",
+      "timeoutMs": 1800000,
+      "inputs": {
+        "sources": {
+          "from": "project",
+          "files": [
+            "dotnet:build"
+          ]
+        },
+        "stackRoot": {
+          "from": "workspace",
+          "files": [
+            "!**/TestResults/**",
+            "!**/bin/**",
+            "!**/obj/**",
+            "**/*.globalconfig",
+            "**/.editorconfig",
+            "**/Directory.Build.props",
+            "**/Directory.Build.rsp",
+            "**/Directory.Build.targets",
+            "**/Directory.Packages.props",
+            "**/NuGet.Config",
+            "**/NuGet.config",
+            "**/global.json",
+            "**/nuget.config",
+            "global.json"
+          ]
+        },
+        "extensionVersion": {
+          "from": "runtime"
+        }
+      },
+      "outputs": {
+        "data": {
+          "description": "The task result: the test and coverage totals of a test task."
+        }
+      },
+      "cache": {
+        "enabled": true
+      },
+      "declares": {
+        "outputs": {
+          "reports": {
+            "kind": "directory",
+            "root": "command-output",
+            "path": "build",
+            "optionalEmpty": true,
+            "description": "The reports the task wrote: the TRX and Cobertura reports of a test task."
+          }
+        },
+        "effects": [
+          "network",
+          "toolchain-cache"
+        ]
+      }
+    },
+    "serve-run": {
+      "description": "Run dotnet run on the application's project file, with no launch profile, on the port flag, until the user stops it.",
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": [
+        "serve"
+      ],
+      "cwd": "{projectRoot}",
+      "cache": false,
+      "timeoutMs": -1,
+      "declares": {
+        "effects": [
+          "network",
+          "process",
+          "toolchain-cache"
+        ]
+      }
+    },
+    "run-exec": {
+      "description": "Run dotnet run on the application's project file once and forward its exit code.",
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": [
+        "run"
+      ],
+      "cwd": "{projectRoot}",
+      "cache": false,
+      "timeoutMs": -1,
+      "declares": {
+        "effects": [
+          "network",
+          "process",
+          "toolchain-cache",
+          "workspace-files"
+        ]
+      }
+    },
+    "package-docker": {
+      "description": "Run dotnet publish on an application and assemble a local OCI image of its output, on a digest-pinned official .NET base. Sole owner of <command-output>/docker.",
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": [
+        "package-docker"
+      ],
+      "inputs": {
+        "application": {
+          "from": "project",
+          "files": [
+            "git:**/*",
+            "**/*",
+            ".*",
+            "!../**",
+            "!bin/**",
+            "!obj/**",
+            "!**/bin/**",
+            "!**/obj/**",
+            "!TestResults/**",
+            "!**/TestResults/**",
+            "!node_modules/**",
+            "!**/node_modules/**",
+            "!.gen/**",
+            "!.vs/**",
+            "!.idea/**",
+            "!.vscode/**"
+          ]
+        },
+        "references": {
+          "from": "closure",
+          "files": [
+            "git:**/*",
+            "**/*",
+            ".*",
+            "!../**",
+            "!bin/**",
+            "!obj/**",
+            "!**/bin/**",
+            "!**/obj/**",
+            "!TestResults/**",
+            "!**/TestResults/**",
+            "!node_modules/**",
+            "!**/node_modules/**",
+            "!.gen/**",
+            "!.vs/**",
+            "!.idea/**",
+            "!.vscode/**"
+          ]
+        },
+        "stackRoot": {
+          "from": "workspace",
+          "files": [
+            "!**/TestResults/**",
+            "!**/bin/**",
+            "!**/obj/**",
+            "**/*.globalconfig",
+            "**/.editorconfig",
+            "**/Directory.Build.props",
+            "**/Directory.Build.rsp",
+            "**/Directory.Build.targets",
+            "**/Directory.Packages.props",
+            "**/NuGet.Config",
+            "**/NuGet.config",
+            "**/global.json",
+            "**/nuget.config",
+            "global.json"
+          ]
+        },
+        "extensionVersion": {
+          "from": "runtime"
+        }
+      },
+      "cwd": "{projectRoot}",
+      "timeoutMs": 1800000,
+      "cache": {
+        "versionAware": true
+      },
+      "declares": {
+        "outputs": {
+          "docker": {
+            "kind": "directory",
+            "root": "command-output",
+            "path": "docker",
+            "optionalEmpty": true,
+            "description": "Local OCI candidate layout, its manifest and the docker channel record."
+          }
+        },
+        "effects": [
+          "network",
+          "toolchain-cache"
+        ]
+      }
+    },
+    "publish-docker": {
+      "description": "Push the packaged image to the container registry through the shared publisher.",
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": [
+        "publish-docker"
+      ],
+      "cwd": "{projectRoot}",
+      "timeoutMs": 300000,
+      "cache": false,
+      "declares": {
+        "outputs": {
+          "published-image": {
+            "kind": "file",
+            "root": "command-output",
+            "path": "docker/published-image.json",
+            "optionalEmpty": true,
+            "description": "Verified remote image record, written after the registry digest is read back."
+          }
+        },
+        "effects": [
+          "network",
+          "registry"
+        ],
+        "publishChannels": [
+          "docker"
+        ]
+      }
+    }
+  },
+  "uses": [
+    "oci"
+  ]
+}

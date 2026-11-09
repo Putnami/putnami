@@ -240,6 +240,12 @@ func TestCoverageGoesToTheComponentOfEachFile(t *testing.T) {
 		"reports/api/cobertura.xml": `<coverage><sources><source>/builds/acme/shop/apps/api</source><source>/x/../../apps</source></sources><packages><package name="p"><classes>
 			<class name="quote" filename="src/quote.ts"><lines><line number="4" hits="1"/></lines></class>
 		</classes></package></packages></coverage>`,
+		// Coverlet on Linux: the source is "/", each file name the absolute
+		// path without its leading slash, in this checkout or another one.
+		"reports/coverlet/cobertura.xml": `<coverage><sources><source>/</source></sources><packages><package name="p"><classes>
+			<class name="quote" filename="` + strings.TrimPrefix(filepath.ToSlash(filepath.Join(root, "apps/api/src/quote.ts")), "/") + `"><lines><line number="5" hits="1"/></lines></class>
+			<class name="quote" filename="builds/acme/shop/apps/api/src/quote.ts"><lines><line number="6" hits="0"/></lines></class>
+		</classes></package></packages></coverage>`,
 		// A Go cover profile names import paths.
 		"reports/cover.out": "mode: set\nexample.com/svc/calc.go:1.1,2.2 1 1\nexample.com/svc/calc.go:3.1,3.5 1 0\n",
 		"reports/bad.info":  "SF:x\nDA:0,1\n",
@@ -249,11 +255,12 @@ func TestCoverageGoesToTheComponentOfEachFile(t *testing.T) {
 		{Path: "apps/api/coverage/cobertura.xml", Kind: reports.KindCoverage, Format: reports.FormatCobertura},
 		{Path: "reports/clover.xml", Kind: reports.KindCoverage, Format: reports.FormatClover},
 		{Path: "reports/api/cobertura.xml", Kind: reports.KindCoverage, Format: reports.FormatCobertura},
+		{Path: "reports/coverlet/cobertura.xml", Kind: reports.KindCoverage, Format: reports.FormatCobertura},
 		{Path: "reports/cover.out", Kind: reports.KindCoverage, Format: reports.FormatGoCover},
 		{Path: "reports/bad.info", Kind: reports.KindCoverage, Format: reports.FormatLCOV},
 	}})
 	want := []evidence.ComponentCoverage{
-		{Component: "apps/api", CoveredLines: 3, TotalLines: 4},
+		{Component: "apps/api", CoveredLines: 4, TotalLines: 6},
 		{Component: "packages/pricing", CoveredLines: 1, TotalLines: 2},
 		{Component: "svc", CoveredLines: 2, TotalLines: 3},
 	}
