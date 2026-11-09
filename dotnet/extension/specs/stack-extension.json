@@ -1,0 +1,94 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-spec.json",
+  "protocolVersion": 1,
+  "feature": "dotnet/stack-extension",
+  "outcomes": [
+    "Each C#, F# or Visual Basic project of a .NET repository is a Putnami project named by its project file, with an edge to each project it references",
+    "putnami lint, test and build run dotnet format, dotnet test and dotnet build on each project's file, and a second run over an unchanged tree is a cache hit",
+    "Only a test project runs dotnet test, and its TRX and Coverlet Cobertura reports become the test and coverage summary",
+    "The SDK version global.json states is checked with its roll-forward policy before each task",
+    "A project overrides any value of the .NET profile in its putnami.json",
+    "On a machine with no .NET SDK, or none global.json accepts, putnami lint, test and build install an SDK global.json accepts, with the runtimes the projects target, and run",
+    "serve and run start an application, and package and publish produce its OCI image, with no Docker daemon",
+    "putnami install restores every project's NuGet packages, and putnami upgrade moves their references to the newest versions"
+  ],
+  "nonGoals": [
+    "Evaluating MSBuild: a reference, an assembly name or a test marker that holds a property or a condition is not read",
+    "The Microsoft.Testing.Platform command line: its test projects override the test step",
+    "Mapping each test case and coverage line to its project",
+    "Publishing a NuGet package: a library reaches NuGet through dotnet pack and dotnet nuget push",
+    "Pinning the SDK in the workspace lock: Microsoft publishes no SHA-256 of its archives",
+    "A self-contained, trimmed or ahead-of-time compiled image, and other publish flags: an image is framework-dependent"
+  ],
+  "requirements": [
+    {
+      "id": "projects-become-projects",
+      "text": "The probe answers, for each candidate directory the observe .NET detector knows as a project: the project file's name without its extension, the directories of the projects it references, the extension @putnami/dotnet, the tag dotnet, and metadata naming the project, the workspace root as its stack root, its project file, the tasks it runs and the expected SDK version. A directory with no project file is no project."
+    },
+    {
+      "id": "tasks-run-the-profile",
+      "text": "Each task first checks the SDK dotnet --version prints against the sdk.version of global.json, in the project then at the workspace root. It then runs, with no shell and one .NET task at a time, dotnet format <project file> --verify-no-changes for lint, dotnet test <project file> --logger trx --results-directory <output> --collect \"XPlat Code Coverage\" for test, and dotnet build <project file> for build; a step that exits non-zero with no failed case fails with stacks.step_failed."
+    },
+    {
+      "id": "only-test-projects-test",
+      "text": "A project is a test project when, outside any condition, its project file states IsTestProject true, a reference to Microsoft.NET.Test.Sdk or the MSTest.Sdk SDK, and no IsTestProject false; or states none of those while the nearest Directory.Build.props states one of the first three and no IsTestProject false. The test task decides it again at its run, from files its key covers. Any other project passes its test task with no step and no toolchain check."
+    },
+    {
+      "id": "reports-become-the-summary",
+      "text": "After its step, even one that exits non-zero, the test task reads every TRX report in its output directory and every coverage.cobertura.xml one directory below it through the evidence readers into the test and coverage summary. A failed case fails the task with stacks.test_failed and names the case; no TRX report, or no Cobertura report, fails it with stacks.report_missing. The output directory is emptied before the step."
+    },
+    {
+      "id": "sdk-roll-forward-is-honored",
+      "text": "The SDK matches the expected version under global.json's sdk.rollForward: disable, the same version; patch and latestPatch, the default, the same feature band and at least the expected patch; feature and latestFeature, the same major and minor; minor and latestMinor, the same major; major and latestMajor, any; each but disable at least the expected version. A mismatch, or a failing dotnet --version while dotnet --list-sdks names SDKs, fails with stacks.toolchain_mismatch unless toolchain.check is warn."
+    },
+    {
+      "id": "inputs-stay-narrow",
+      "text": "The dotnet:lint, dotnet:test and dotnet:build selectors answer no file under a bin, obj, TestResults or node_modules directory. Lint reads the sources, analyzer files, project files and package versions; build reads every other file of the project but the test settings; test reads them all. Every task reads the workspace's Directory.Build.props and .targets, .editorconfig, NuGet.config, Directory.Packages.props and global.json outside bin, obj and TestResults."
+    },
+    {
+      "id": "manifest-follows-the-profile",
+      "text": "The manifest passes the stack core's conformance kit: its markers are the profile's, it lists the dotnet:lint, dotnet:test and dotnet:build selectors, and each command runs one task that depends on the same task upstream, reads its selector and the profile's stack-root files for that task, and declares its command-output reports directory."
+    },
+    {
+      "id": "applications-are-told-apart",
+      "text": "A project is an application when, outside any condition, its project file uses the Microsoft.NET.Sdk.Web or Microsoft.NET.Sdk.Worker SDK or states OutputType Exe or WinExe, and it is no test project; the probe gives it the type application, and any other project the type library, which has no serve, run, package or publish."
+    },
+    {
+      "id": "provides-the-sdk",
+      "text": "When no SDK on PATH satisfies global.json, a task uses one under <PutnamiHome>/tools/dotnet for its platform: the one the policy picks among those installed, with no network; else from the release metadata the stated SDK for disable, patch or none, the latest patch of the stated or next feature band for feature, minor and major, the highest for latest ones, the latest of 10.0 with no global.json, with the runtimes of every channel from 8.0 up to it, checked by SHA-512. Offline, none."
+    },
+    {
+      "id": "serves-an-application",
+      "text": "serve builds an application under the stack-root lock after the SDK check, then runs dotnet run --no-build --project <project file> --no-launch-profile in its directory with ASPNETCORE_URLS on 0.0.0.0 and PORT set to the port flag, default 3000 and 0 for a free port, and emits a ready event once the port accepts connections. It stops the process on interrupt and exits with its exit code."
+    },
+    {
+      "id": "runs-an-application-once",
+      "text": "run builds an application under the stack-root lock after the SDK check, then runs dotnet run --no-build --project <project file> --no-launch-profile -- with the words of the args flag in its directory, and exits with its exit code."
+    },
+    {
+      "id": "packages-an-application-image",
+      "text": "package with the docker channel runs, under the stack-root lock, dotnet publish -c Release for the target platform, framework-dependent, and assembles an OCI image with no Docker daemon: the published files under /app, run as dotnet <assembly>.dll by the app user, onto the official mcr.microsoft.com/dotnet/aspnet image when the published runtimeconfig needs ASP.NET Core, on port 8080, else runtime, pinned by digest, or a digest-pinned base the project names."
+    },
+    {
+      "id": "publishes-an-application-image",
+      "text": "publish with the docker channel pushes the packaged image to the declared OCI registry through the shared publisher, and an application whose putnami.json publishes docker is a release-set member of the OCI ecosystem."
+    },
+    {
+      "id": "restores-the-workspace",
+      "text": "workspace-install runs dotnet restore on the file of every project of the workspace that disable.tags keeps, in locked mode for a project with a packages.lock.json and with --force under the force flag; workspace-fetch runs the same restore to fill the NuGet global packages folder. A machine with no SDK global.json accepts installs one unless the run is offline, where the stack root is left out with a warning."
+    },
+    {
+      "id": "upgrades-the-packages",
+      "text": "deps-upgrade runs dotnet package update on the file of every project of the workspace with the selected SDK. It fails with dotnet.package_update_failed, and runs nothing, when that SDK is older than .NET 10 or the run is offline."
+    },
+    {
+      "id": "checks-documentation-links",
+      "text": "lint checks every relative link and anchor of the project's README.md files and doc/ trees with the shared documentation link check, unless the docs-links flag is off."
+    }
+  ],
+  "decisions": [
+    "tooling/stacks/doc/adr/0001-one-extension-per-stack-on-a-shared-core.md",
+    "tooling/stacks/doc/adr/0010-a-stack-shapes-its-components-tasks-and-versions.md",
+    "dotnet/extension/doc/adr/0001-the-sdk-comes-from-microsoft-and-an-image-copies-onto-the-official-runtime.md"
+  ]
+}

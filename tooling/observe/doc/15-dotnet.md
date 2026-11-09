@@ -100,7 +100,9 @@ matches a change by its name as written and its version.
   components.
 - `.sqlproj`, `.vcxproj`, `.esproj` and other project types are not
   components.
-- MSBuild properties, conditions, imports and `Directory.Build.props` are not
-  evaluated.
+- MSBuild properties, conditions and imports are not evaluated. The nearest
+  `Directory.Build.props` is read for one thing only: whether it makes its
+  projects test projects, which `@putnami/dotnet` uses to run `dotnet test`
+  in test projects only.
 - The inner results of a data-driven TRX test are not cases: their parent
   stands for them.

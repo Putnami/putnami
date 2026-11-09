@@ -56,7 +56,18 @@ type Component struct {
 	// that holds no component: the probe answers its name alone, with no
 	// extension, tag or metadata, so it runs no task.
 	Bare bool
+	// Tasks are the profile tasks the component runs; nil runs every task.
+	// A task outside it passes with no step run. A component whose list
+	// names no profile task is no project.
+	Tasks []string
+	// Watched are other workspace-relative files the detector read to answer
+	// for the component; the probe reports them among its watched files.
+	Watched []string
 }
+
+// VersionMatcher reports whether the machine's toolchain version satisfies
+// the exact expected one, for a project of the workspace at root.
+type VersionMatcher func(root string, expected Expected, machine string) bool
 
 // Detector finds the components among a probe request's candidate paths, in
 // the workspace at root.
@@ -103,6 +114,14 @@ type Stack struct {
 	// Runtime is the path {runtime} expands to; empty means the running
 	// executable.
 	Runtime string
+	// CrossComponentCoverage counts a coverage file of another component of
+	// the workspace as the task's: a stack whose tests live in components of
+	// their own, such as a .NET test project, measures the code of the
+	// components it references, which run no test of their own.
+	CrossComponentCoverage bool
+	// MatchVersion, when set, replaces the core's rule for an exact expected
+	// version: equal, or a stable release of a shorter expected version.
+	MatchVersion VersionMatcher
 }
 
 // Command is a runtime command of a stack extension. It runs in the step's
@@ -135,6 +154,11 @@ type Metadata struct {
 	// ReleaseSet declares the artifacts the project contributes to a release
 	// set. It is absent on a project that publishes none.
 	ReleaseSet *releaseset.ProjectMetadata `json:"releaseSet,omitempty"`
+	// Manifest is the workspace-relative manifest the detector read the
+	// component from; steps receive its absolute path as {manifest}.
+	Manifest string `json:"manifest,omitempty"`
+	// Tasks are the profile tasks the component runs; absent, every task.
+	Tasks []string `json:"tasks,omitempty"`
 }
 
 // Stack-root diagnostics.
@@ -189,7 +213,20 @@ func (s Stack) Probe(root string, request wsproto.ProbeRequest) (wsproto.ProbeRe
 		if component == "" && !c.InputOnly {
 			component = c.Path
 		}
-		metadata := Metadata{Component: component, Variant: c.Variant, Root: c.Root, Toolchain: expected[0], Toolchains: expected[1:]}
+		var tasks []string
+		if c.Tasks != nil {
+			for _, t := range TaskNames {
+				if slices.Contains(c.Tasks, t) {
+					tasks = append(tasks, t)
+				}
+			}
+			if len(tasks) == 0 {
+				result.Diagnostics = append(result.Diagnostics, diag.Warningf(CodeNotAComponent, c.Path,
+					"%s is left out: it runs none of the %s tasks", c.Path, s.Profile.ID))
+				continue
+			}
+		}
+		metadata := Metadata{Component: component, Variant: c.Variant, Root: c.Root, Toolchain: expected[0], Toolchains: expected[1:], Manifest: c.SourceFile, Tasks: tasks}
 		if len(c.ReleaseMembers) > 0 {
 			metadata.ReleaseSet = &releaseset.ProjectMetadata{Ecosystems: slices.Clone(c.ReleaseMembers)}
 		}
@@ -199,6 +236,12 @@ func (s Stack) Probe(root string, request wsproto.ProbeRequest) (wsproto.ProbeRe
 		}
 		rootFiles := profile.RootPatterns()
 		var watched []string
+		if c.SourceFile != "" {
+			watched = appendNew(watched, c.SourceFile)
+		}
+		for _, f := range c.Watched {
+			watched = appendNew(watched, f)
+		}
 		for _, m := range s.Profile.Markers {
 			if !strings.ContainsAny(m, "*?[") {
 				watched = appendNew(watched, joinRel(c.Path, m))

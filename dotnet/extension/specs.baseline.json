@@ -1,0 +1,22 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-specs-baseline.json",
+  "protocolVersion": 2,
+  "executableRequirements": [
+    "dotnet/stack-extension#applications-are-told-apart",
+    "dotnet/stack-extension#checks-documentation-links",
+    "dotnet/stack-extension#inputs-stay-narrow",
+    "dotnet/stack-extension#manifest-follows-the-profile",
+    "dotnet/stack-extension#only-test-projects-test",
+    "dotnet/stack-extension#packages-an-application-image",
+    "dotnet/stack-extension#projects-become-projects",
+    "dotnet/stack-extension#provides-the-sdk",
+    "dotnet/stack-extension#publishes-an-application-image",
+    "dotnet/stack-extension#reports-become-the-summary",
+    "dotnet/stack-extension#restores-the-workspace",
+    "dotnet/stack-extension#runs-an-application-once",
+    "dotnet/stack-extension#sdk-roll-forward-is-honored",
+    "dotnet/stack-extension#serves-an-application",
+    "dotnet/stack-extension#tasks-run-the-profile",
+    "dotnet/stack-extension#upgrades-the-packages"
+  ]
+}

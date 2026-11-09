@@ -1,11 +1,11 @@
 # Repository adoption matrix
 
-This repository maps **105 of its 182 projects** to **10 architecture domains**.
-The other **77 are excluded on purpose**: 38 samples, 7 templates, 2 template
+This repository maps **105 of its 186 projects** to **10 architecture domains**.
+The other **81 are excluded on purpose**: 41 samples, 7 templates, 2 template
 proofs, 2 protocol proofs, the standalone area detector, the 2 Cloud runtime
 destinations, the Cloud CLI extension with its 14 generated clients, the new
 development verb vocabulary, the new evidence report readers, and the new
-stack core with its first seven stack extensions. Every one of the 182 appears
+stack core with its first eight stack extensions. Every one of the 186 appears
 in a table below, mapped or excluded, with a reason.
 
 The matrix exists so the adoption frontier is measurable instead of implied.
@@ -354,10 +354,10 @@ permissions its import of the protocols and its consumer in
 |---|---|---|
 | `/tooling/evidence-readers` | Evidence report readers | `tooling` |
 
-### Stack core and stack extensions — 8 projects
+### Stack core and stack extensions — 9 projects
 
 **Why excluded:** `@putnami/stacks` is a new library, the stack core, and
-`@putnami/rust`, `@putnami/php`, `@putnami/dart`, `@putnami/java`,
+`@putnami/rust`, `@putnami/php`, `@putnami/dotnet`, `@putnami/dart`, `@putnami/java`,
 `@putnami/swift`, `@putnami/ruby` and `@putnami/pants` its first stack
 extensions, each a manifest, a stack profile and the core's entrypoint, which run a stack's components as Putnami tasks from
 the components the `putnami observe` detectors find. A new project starts excluded
@@ -372,6 +372,7 @@ detectors need; the next stack extensions join the same section until then.
 | Project | Class | Owner |
 |---|---|---|
 | `/dart/extension` | Stack extension | `tooling` |
+| `/dotnet/extension` | Stack extension | `tooling` |
 | `/java/extension` | Stack extension | `tooling` |
 | `/php/extension` | Stack extension | `tooling` |
 | `/ruby/extension` | Stack extension | `tooling` |
@@ -380,7 +381,7 @@ detectors need; the next stack extensions join the same section until then.
 | `/tooling/pants` | Delegated stack extension | `tooling` |
 | `/tooling/stacks` | Stack core | `tooling` |
 
-### Samples — 38 projects
+### Samples — 41 projects
 
 **Why excluded:** a sample is a *proof*. It exists to demonstrate that the public
 API works and to fail loudly in the end-to-end suite when it stops working. It
@@ -404,6 +405,9 @@ reviewed permissions.
 | `/go/samples/simple-api` | Go sample | `framework` |
 | `/go/samples/task-api` | Go sample | `framework` |
 | `/go/samples/unit-of-work-proof` | Go sample | `framework` |
+| `/dotnet/samples/application` | .NET sample | `tooling` |
+| `/dotnet/samples/library` | .NET sample | `tooling` |
+| `/dotnet/samples/tests` | .NET sample | `tooling` |
 | `/java/samples/gradle` | Java sample | `tooling` |
 | `/java/samples/gradle/application` | Java sample | `tooling` |
 | `/java/samples/gradle/library` | Java sample | `tooling` |

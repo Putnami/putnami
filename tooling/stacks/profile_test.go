@@ -67,6 +67,8 @@ func TestDecodeRefusesWhatTheSchemaDoesNotName(t *testing.T) {
 		"no probe":          strings.Replace(sampleProfile, `"steps": [["cargo", "test", "--package", "{component}"]],`, `"withoutCoverage": {"probe": [], "steps": [["cargo"]]}, "steps": [["cargo", "test", "--package", "{component}"]],`, 1),
 		"no fallback steps": strings.Replace(sampleProfile, `"steps": [["cargo", "test", "--package", "{component}"]],`, `"withoutCoverage": {"probe": ["false"], "steps": []}, "steps": [["cargo", "test", "--package", "{component}"]],`, 1),
 		"bad fallback":      strings.Replace(sampleProfile, `"steps": [["cargo", "test", "--package", "{component}"]],`, `"withoutCoverage": {"probe": ["false"], "steps": [["cargo", "{crate}"]]}, "steps": [["cargo", "test", "--package", "{component}"]],`, 1),
+		"bad trx report":    strings.Replace(sampleProfile, `"junit": [`, `"trx": ["{root}/**/x.trx"], "junit": [`, 1),
+		"bad fallback cmd":  strings.Replace(sampleProfile, `"command": ["rustc"`, `"fallback": [""], "command": ["rustc"`, 1),
 	}
 	for name, doc := range cases {
 		if _, err := Decode([]byte(doc)); err == nil {

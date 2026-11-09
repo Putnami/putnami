@@ -13,6 +13,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"runtime"
+	"slices"
 	"strings"
 )
 
@@ -34,6 +35,9 @@ type Expected struct {
 	// the check names one: a pub-flutter constraint in a pubspec whose
 	// environment.sdk starts at 3.9 or later, which pub reads as stated.
 	Reading string `json:"reading,omitempty"`
+	// Root is the absolute workspace root Source is relative to, when a task
+	// hands the expected version to its stack's Provide. It reaches no key.
+	Root string `json:"-"`
 }
 
 // ReadingPlain marks an expected version that reads with no dialect.
@@ -475,6 +479,40 @@ func (p *flowParser) plain() string {
 	return strings.Join(strings.Fields(p.s[start:p.i]), " ")
 }
 
+// MachineVersions runs the toolchain command in dir and returns every version
+// its output states, in order: every match of the pattern in the standard
+// output, or in the standard error when the standard output has none. A
+// command that lists the installed toolchains states several.
+func (t Toolchain) MachineVersions(ctx context.Context, dir string, env []string) ([]string, error) {
+	re, err := regexp.Compile(t.Pattern)
+	if err != nil {
+		return nil, err
+	}
+	if _, err := exec.LookPath(t.Command[0]); err != nil {
+		return nil, fmt.Errorf("%w: %s", ErrToolchainMissing, t.Command[0])
+	}
+	cmd := exec.CommandContext(ctx, t.Command[0], t.Command[1:]...) //nolint:gosec // the profile's own toolchain command
+	cmd.Dir = dir
+	cmd.Env = env
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+	if err := cmd.Run(); err != nil {
+		return nil, fmt.Errorf("%s: %w: %s", strings.Join(t.Command, " "), err, strings.TrimSpace(stderr.String()))
+	}
+	idx := re.SubexpIndex("version")
+	for _, out := range []string{stdout.String(), stderr.String()} {
+		var versions []string
+		for _, m := range re.FindAllStringSubmatch(out, -1) {
+			versions = append(versions, m[idx])
+		}
+		if len(versions) > 0 {
+			return versions, nil
+		}
+	}
+	return nil, fmt.Errorf("%s printed no version that matches %q", strings.Join(t.Command, " "), t.Pattern)
+}
+
 // MachineVersion runs the toolchain command in dir and matches its output:
 // the standard output, or the standard error when the standard output does
 // not match. A missing command is ErrToolchainMissing.
@@ -549,11 +587,24 @@ func (s Selection) Program(t Toolchain, name string) string {
 // answers and its check passes or nothing is on PATH. The error is the one of
 // the toolchain on PATH when no toolchain answers.
 func (t Toolchain) Select(ctx context.Context, dir string, expected Expected, env []string) (Selection, error) {
+	return t.SelectWith(ctx, dir, expected, env, versionMatches)
+}
+
+// SelectWith is Select with a stack's own rule for an exact expected version.
+// When the toolchain command fails and the fallback lists versions none of
+// which matches, the toolchain on PATH is a mismatch, so a pinned or provided
+// toolchain may take its place.
+func (t Toolchain) SelectWith(ctx context.Context, dir string, expected Expected, env []string, matches func(expected, machine string) bool) (Selection, error) {
 	onPath := Selection{Env: env}
 	machine, machineErr := t.MachineVersion(ctx, dir, env)
 	if machineErr == nil {
-		onPath.Verdict = t.Compare(expected, machine)
+		onPath.Verdict = t.CompareWith(expected, machine, matches)
 		if !onPath.Verdict.Fail {
+			return onPath, nil
+		}
+	} else if v, ok := t.fallbackVerdict(ctx, dir, expected, env, machineErr, matches); ok {
+		onPath.Verdict, machineErr = v, nil
+		if !v.Fail {
 			return onPath, nil
 		}
 	}
@@ -567,7 +618,7 @@ func (t Toolchain) Select(ctx context.Context, dir string, expected Expected, en
 	if err != nil {
 		return onPath, machineErr
 	}
-	verdict := t.Compare(expected, version)
+	verdict := t.CompareWith(expected, version, matches)
 	if verdict.Fail && machineErr == nil {
 		return onPath, nil
 	}
@@ -747,8 +798,32 @@ type Verdict struct {
 	Message string
 }
 
+// fallbackVerdict runs the fallback after the toolchain command failed with
+// err: when the versions it lists include none that satisfies an exact
+// expected version, the check is a mismatch that names them. ok is false
+// otherwise, and err stands.
+func (t Toolchain) fallbackVerdict(ctx context.Context, dir string, expected Expected, env []string, err error, matches func(expected, machine string) bool) (Verdict, bool) {
+	if len(t.Fallback) == 0 || errors.Is(err, ErrToolchainMissing) || !IsExact(expected.Version) {
+		return Verdict{}, false
+	}
+	fallback := t
+	fallback.Command = t.Fallback
+	installed, ferr := fallback.MachineVersions(ctx, dir, env)
+	if ferr != nil || slices.ContainsFunc(installed, func(m string) bool { return matches(expected.Version, m) }) {
+		return Verdict{}, false
+	}
+	msg := fmt.Sprintf("%v; the machine has %s, and none satisfies version %s that %s states; install or select it, or set toolchain.check to warn", err, strings.Join(installed, ", "), expected.Version, expected.Source)
+	return Verdict{Code: CodeToolchainMismatch, Fail: t.Check != CheckWarn, Message: msg}, true
+}
+
 // Compare decides the check of an expected version against the machine's.
 func (t Toolchain) Compare(expected Expected, machine string) Verdict {
+	return t.CompareWith(expected, machine, versionMatches)
+}
+
+// CompareWith is Compare with a stack's own rule for an exact expected
+// version.
+func (t Toolchain) CompareWith(expected Expected, machine string, matches func(expected, machine string) bool) Verdict {
 	if expected.Version == "" {
 		return Verdict{Code: CodeToolchainUnpinned, Message: fmt.Sprintf("no toolchain file states the expected version (machine: %s): the cache key carries no toolchain version", machine)}
 	}
@@ -779,7 +854,7 @@ func (t Toolchain) Compare(expected Expected, machine string) Verdict {
 		msg := fmt.Sprintf("%s expects a version in %s%s, the machine has %s; install or select one, or set toolchain.check to warn", expected.Source, expected.Version, reading, machine)
 		return Verdict{Code: CodeToolchainMismatch, Fail: t.Check != CheckWarn, Message: msg}
 	}
-	if versionMatches(expected.Version, machine) {
+	if matches(expected.Version, machine) {
 		return Verdict{}
 	}
 	msg := fmt.Sprintf("%s expects version %s, the machine has %s; install or select %s, or set toolchain.check to warn", expected.Source, expected.Version, machine, expected.Version)

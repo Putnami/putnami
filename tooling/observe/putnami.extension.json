@@ -57,6 +57,7 @@
       "inputs": [
         "bin/prepare",
         "cmd/**",
+        "detect/**",
         "go.mod",
         "internal/**"
       ],

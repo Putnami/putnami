@@ -117,7 +117,7 @@ func (r *Result) readCoverage(report reports.Report, abs string) (readers.Covera
 // merges its lines: a line two reports instrument keeps its largest count.
 func (r *Result) mapCoverage(report reports.Report, result readers.CoverageReport, m *mapper, lines map[string]lineHits, stated map[string]readers.Counts) {
 	bases := m.bases(report.Path)
-	var sourceBases []string
+	var sourceBases, absoluteSources []string
 	for _, source := range result.Sources {
 		if isAbsolute(source) {
 			if rel, ok := m.relative(source); ok {
@@ -125,6 +125,8 @@ func (r *Result) mapCoverage(report reports.Report, result readers.CoverageRepor
 			} else if rel, ok := m.suffix(source, m.isDir); ok {
 				// A source written in another checkout directory.
 				sourceBases = append(sourceBases, rel)
+			} else {
+				absoluteSources = append(absoluteSources, source)
 			}
 			continue
 		}
@@ -145,6 +147,15 @@ func (r *Result) mapCoverage(report reports.Report, result readers.CoverageRepor
 		}
 		if !ok {
 			rel, ok = m.resolve(file.Path, append(sourceBases, bases...))
+		}
+		// An absolute source that maps to no repository directory, such as
+		// the "/" Coverlet writes on Linux, makes each file name an absolute
+		// path.
+		for _, source := range absoluteSources {
+			if ok || isAbsolute(file.Path) {
+				break
+			}
+			rel, ok = m.resolve(path.Join(strings.ReplaceAll(source, `\`, "/"), file.Path), nil)
 		}
 		if !ok && report.Format == reports.FormatGoCover {
 			// A Go profile names import paths; only a located file that

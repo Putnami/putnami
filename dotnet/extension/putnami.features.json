@@ -1,0 +1,228 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-features.json",
+  "protocolVersion": 2,
+  "namespace": "dotnet",
+  "features": [
+    {
+      "id": "dotnet/stack-extension",
+      "type": "feature",
+      "name": "Run the projects of a .NET repository as Putnami tasks",
+      "outcome": "A team with a .NET repository adds @putnami/dotnet and runs putnami install, upgrade, lint, test, build, serve, run, package and publish over its projects with Putnami's runner and cache, without rewriting its build or installing an SDK: test projects read their TRX and Cobertura reports, the global.json SDK is checked and installed, and an application becomes an OCI image",
+      "owner": "dotnet",
+      "target": "coded",
+      "requirements": [
+        {
+          "id": "projects-become-projects",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-projects-of-a-dotnet-repository-become-projects-with-their-references"
+            ]
+          }
+        },
+        {
+          "id": "tasks-run-the-profile",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-task-runs-the-dotnet-steps-on-the-project-file-after-the-sdk-check"
+            ]
+          }
+        },
+        {
+          "id": "only-test-projects-test",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-project-that-is-no-test-project-runs-no-test"
+            ]
+          }
+        },
+        {
+          "id": "reports-become-the-summary",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "trx-and-cobertura-become-the-test-and-coverage-summary"
+            ]
+          }
+        },
+        {
+          "id": "sdk-roll-forward-is-honored",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-sdk-check-applies-the-global-json-roll-forward-policy"
+            ]
+          }
+        },
+        {
+          "id": "inputs-stay-narrow",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "build-outputs-and-test-settings-stay-out-of-the-lint-inputs"
+            ]
+          }
+        },
+        {
+          "id": "manifest-follows-the-profile",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-manifest-conforms-to-the-stack-core"
+            ]
+          }
+        },
+        {
+          "id": "applications-are-told-apart",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-web-or-executable-project-is-an-application"
+            ]
+          }
+        },
+        {
+          "id": "provides-the-sdk",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-task-installs-the-sdk-global-json-accepts-when-the-machine-has-none"
+            ]
+          }
+        },
+        {
+          "id": "serves-an-application",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "serve-runs-dotnet-run-on-the-port"
+            ]
+          }
+        },
+        {
+          "id": "runs-an-application-once",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "run-forwards-the-exit-code-of-the-application"
+            ]
+          }
+        },
+        {
+          "id": "packages-an-application-image",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "package-assembles-an-image-of-the-published-application"
+            ]
+          }
+        },
+        {
+          "id": "publishes-an-application-image",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "publish-pushes-the-application-image"
+            ]
+          }
+        },
+        {
+          "id": "restores-the-workspace",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "workspace-install-restores-every-project-file",
+              "workspace-fetch-downloads-the-packages-of-every-project",
+              "an-offline-workspace-install-with-no-sdk-warns"
+            ]
+          }
+        },
+        {
+          "id": "upgrades-the-packages",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "deps-upgrade-runs-dotnet-package-update-on-every-project",
+              "deps-upgrade-refuses-an-sdk-before-10-and-an-offline-run"
+            ]
+          }
+        },
+        {
+          "id": "checks-documentation-links",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "lint-checks-the-documentation-links"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

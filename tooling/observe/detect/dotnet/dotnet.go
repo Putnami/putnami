@@ -7,7 +7,9 @@
 // the other project files of the repository are manifest ones. A
 // ProjectReference to the project file of another component is an edge.
 // MSBuild is not evaluated: a reference or an assembly name that holds a
-// property is not read, and Directory.Build.props and imports are not read.
+// property is not read, and imports are not read. The nearest
+// Directory.Build.props is read for one thing only: whether it makes its
+// projects test projects.
 //
 // The detector also maps a test assembly's file name, the suite of a TRX or
 // JUnit case, to the project that builds it.
@@ -58,6 +60,14 @@ type Component struct {
 	ID string
 	// Name is the project file name without its extension.
 	Name string
+	// File is the repository-relative project file that names it.
+	File string
+	// Test reports whether the project is a test project: see isTest.
+	Test bool
+	// Type is "application" for a project that uses the Microsoft.NET.Sdk.Web
+	// or Microsoft.NET.Sdk.Worker SDK or states OutputType Exe or WinExe,
+	// outside any condition, and is no test project; "library" otherwise.
+	Type string
 	// Source is workspace for a project a root solution lists, else manifest.
 	Source string
 	// DependsOn lists the ids of the components it references, sorted.
@@ -79,7 +89,29 @@ type Detection struct {
 type project struct {
 	assembly   string
 	references []string
+	test       testMarker
+	// executable is set by a web or worker SDK, or an Exe or WinExe
+	// OutputType, outside any condition.
+	executable bool
 }
+
+// testMarker is what an MSBuild file states, outside any condition, about
+// whether its project is a test project.
+type testMarker int
+
+const (
+	// testUnstated: the file states nothing.
+	testUnstated testMarker = iota
+	// testStated: IsTestProject true, a Microsoft.NET.Test.Sdk package
+	// reference, or the MSTest.Sdk SDK.
+	testStated
+	// testDenied: IsTestProject false.
+	testDenied
+)
+
+// directoryBuildProps is the file MSBuild imports, nearest first, into every
+// project under its directory.
+const directoryBuildProps = "Directory.Build.props"
 
 // Detect reads the .NET repository at root. A repository without a project
 // file gets an empty detection.
@@ -109,6 +141,7 @@ func Detect(root string) Detection {
 
 	byDir := map[string]*Component{}
 	edges := map[string]map[string]bool{}
+	props := map[string]testMarker{}
 	out.assemblies = map[string]string{}
 	for _, file := range files {
 		p, err := readProject(root, file)
@@ -119,9 +152,14 @@ func Detect(root string) Detection {
 		c := byDir[dir]
 		if c == nil {
 			// files are sorted, so the first project file of a directory names it.
-			c = &Component{ID: dir, Name: stem(file), Source: evidence.SourceManifest}
+			c = &Component{ID: dir, Name: stem(file), File: file, Source: evidence.SourceManifest}
 			byDir[dir] = c
 			edges[dir] = map[string]bool{}
+			c.Test = isTest(p.test, nearestProps(root, dir, props))
+			c.Type = TypeLibrary
+			if p.executable && !c.Test {
+				c.Type = TypeApplication
+			}
 		}
 		if listed[file] {
 			c.Source = evidence.SourceWorkspace
@@ -144,6 +182,41 @@ func Detect(root string) Detection {
 	}
 	sort.Slice(out.Components, func(i, j int) bool { return out.Components[i].ID < out.Components[j].ID })
 	return out
+}
+
+// isTest decides whether a project is a test project from what its project
+// file and the nearest Directory.Build.props state: the project file's
+// IsTestProject false denies it, any other statement of either file makes it
+// one.
+func isTest(projectFile, props testMarker) bool {
+	switch projectFile {
+	case testStated:
+		return true
+	case testDenied:
+		return false
+	}
+	return props == testStated
+}
+
+// nearestProps reads the test marker of the Directory.Build.props nearest to
+// the repository-relative directory dir, in dir or a parent up to the root.
+// A file that does not parse states nothing.
+func nearestProps(root, dir string, cache map[string]testMarker) testMarker {
+	for d := dir; ; d = path.Dir(d) {
+		if m, ok := cache[d]; ok {
+			return m
+		}
+		file := path.Join(d, directoryBuildProps)
+		if info, err := os.Stat(filepath.Join(root, filepath.FromSlash(file))); err == nil && info.Mode().IsRegular() {
+			p, _ := readProject(root, file)
+			cache[d] = p.test
+			return p.test
+		}
+		if d == "." || d == "/" || d == "" {
+			cache[d] = testUnstated
+			return testUnstated
+		}
+	}
 }
 
 // Locate maps the file name of a test assembly, such as Pricing.Tests.dll or
@@ -329,6 +402,10 @@ func readProject(root, file string) (project, error) {
 	decoder := xml.NewDecoder(bytes.NewReader(bytes.TrimPrefix(data, []byte("\xef\xbb\xbf"))))
 	var references []string
 	assembly := ""
+	// conditioned holds, for each open element, whether it or an ancestor
+	// carries a Condition: a test marker inside one is not read.
+	var conditioned []bool
+	stated, denied, executable := false, false, false
 	for {
 		token, err := decoder.Token()
 		if errors.Is(err, io.EOF) {
@@ -337,9 +414,52 @@ func readProject(root, file string) (project, error) {
 		if err != nil {
 			return p, err
 		}
+		if _, ok := token.(xml.EndElement); ok && len(conditioned) > 0 {
+			conditioned = conditioned[:len(conditioned)-1]
+			continue
+		}
 		start, ok := token.(xml.StartElement)
 		if !ok {
 			continue
+		}
+		cond := (len(conditioned) > 0 && conditioned[len(conditioned)-1]) || attr(start, "Condition") != "" || conditional[start.Name.Local]
+		conditioned = append(conditioned, cond)
+		if !cond {
+			switch {
+			case len(conditioned) == 1 && start.Name.Local == "Project" && usesMSTestSdk(attr(start, "Sdk")):
+				stated = true
+			case len(conditioned) == 1 && start.Name.Local == "Project" && usesAppSdk(attr(start, "Sdk")),
+				start.Name.Local == "Sdk" && usesAppSdk(attr(start, "Name")):
+				executable = true
+			case start.Name.Local == "OutputType":
+				var value string
+				if err := decoder.DecodeElement(&value, &start); err != nil {
+					return p, err
+				}
+				conditioned = conditioned[:len(conditioned)-1]
+				switch strings.ToLower(strings.TrimSpace(value)) {
+				case "exe", "winexe":
+					executable = true
+				}
+				continue
+			case start.Name.Local == "Sdk" && usesMSTestSdk(attr(start, "Name")):
+				stated = true
+			case start.Name.Local == "PackageReference" && strings.EqualFold(strings.TrimSpace(attr(start, "Include")), "Microsoft.NET.Test.Sdk"):
+				stated = true
+			case start.Name.Local == "IsTestProject":
+				var value string
+				if err := decoder.DecodeElement(&value, &start); err != nil {
+					return p, err
+				}
+				conditioned = conditioned[:len(conditioned)-1]
+				switch strings.ToLower(strings.TrimSpace(value)) {
+				case "true":
+					stated = true
+				case "false":
+					denied = true
+				}
+				continue
+			}
 		}
 		switch start.Name.Local {
 		case "ProjectReference":
@@ -358,16 +478,69 @@ func readProject(root, file string) (project, error) {
 			if err := decoder.DecodeElement(&value, &start); err != nil {
 				return p, err
 			}
+			conditioned = conditioned[:len(conditioned)-1]
 			if value = strings.TrimSpace(value); value != "" && !strings.Contains(value, "$(") {
 				assembly = value
 			}
 		}
 	}
+	switch {
+	case denied:
+		p.test = testDenied
+	case stated:
+		p.test = testStated
+	}
 	p.references = references
+	p.executable = executable
 	if assembly != "" {
 		p.assembly = assembly
 	}
 	return p, nil
+}
+
+// conditional are the MSBuild elements whose content is conditioned without
+// a Condition attribute of its own: a Choose branch, or a target, which sets
+// its properties when it runs, not when the project is evaluated.
+var conditional = map[string]bool{"When": true, "Otherwise": true, "Target": true}
+
+// attr returns the value of an element's attribute, or "".
+func attr(start xml.StartElement, name string) string {
+	for _, a := range start.Attr {
+		if a.Name.Local == name {
+			return a.Value
+		}
+	}
+	return ""
+}
+
+// Project types.
+const (
+	TypeApplication = "application"
+	TypeLibrary     = "library"
+)
+
+// usesAppSdk reports whether an Sdk value names the web or worker SDK, whose
+// projects are executables.
+func usesAppSdk(value string) bool {
+	for _, sdk := range strings.Split(value, ";") {
+		name, _, _ := strings.Cut(strings.TrimSpace(sdk), "/")
+		if strings.EqualFold(name, "Microsoft.NET.Sdk.Web") || strings.EqualFold(name, "Microsoft.NET.Sdk.Worker") {
+			return true
+		}
+	}
+	return false
+}
+
+// usesMSTestSdk reports whether an Sdk value, a ;-separated list of names
+// with an optional /version each, names MSTest.Sdk.
+func usesMSTestSdk(value string) bool {
+	for _, sdk := range strings.Split(value, ";") {
+		name, _, _ := strings.Cut(strings.TrimSpace(sdk), "/")
+		if strings.EqualFold(name, "MSTest.Sdk") {
+			return true
+		}
+	}
+	return false
 }
 
 // reference resolves a project path, relative to the repository-relative

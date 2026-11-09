@@ -60,7 +60,7 @@ func TestProbeAnswersEachComponent(t *testing.T) {
 		t.Errorf("api = %+v", api)
 	}
 	var meta Metadata
-	if err := json.Unmarshal(api.Metadata, &meta); err != nil || !reflect.DeepEqual(meta, Metadata{Component: "api", Root: ".", Toolchain: Expected{Version: "1.82.0", Source: "rust-toolchain.toml"}}) {
+	if err := json.Unmarshal(api.Metadata, &meta); err != nil || !reflect.DeepEqual(meta, Metadata{Component: "api", Root: ".", Toolchain: Expected{Version: "1.82.0", Source: "rust-toolchain.toml"}, Manifest: "crates/api/Cargo.toml"}) {
 		t.Errorf("metadata = %s (%v)", api.Metadata, err)
 	}
 	for _, want := range []string{"crates/api/Cargo.toml", "crates/api/rust-toolchain.toml", "Cargo.lock", "Cargo.toml", "rust-toolchain.toml"} {
@@ -432,9 +432,10 @@ func TestWorkspaceRootJobRunsOnceAtEachRootTheWorkspaceIncludes(t *testing.T) {
 	root := t.TempDir()
 	writeFile(t, root, "putnami.workspace.json", `{"disable": {"tags": ["e2e"]}}`)
 	s := testStack(t)
-	var dirs []string
+	var dirs, manifests []string
 	job := s.WorkspaceRootJob(FailOnMissingToolchain, func(_ context.Context, step RootStep, _ *jsonl.Emitter) error {
 		dirs = append(dirs, step.Dir)
+		manifests = append(manifests, step.Manifests...)
 		return nil
 	})
 	ref := func(path string, extensions []string, config string) pctx.ProjectRef {
@@ -455,6 +456,11 @@ func TestWorkspaceRootJobRunsOnceAtEachRootTheWorkspaceIncludes(t *testing.T) {
 	}
 	if len(dirs) != 1 || dirs[0] != filepath.Join(root, ".") {
 		t.Errorf("dirs = %v", dirs)
+	}
+	// The step lists the manifest of every component the job keeps at the
+	// root, not the disabled one's.
+	if want := []string{filepath.Join(root, "crates/api/Cargo.toml"), filepath.Join(root, "crates/pricing/Cargo.toml")}; !reflect.DeepEqual(manifests, want) {
+		t.Errorf("manifests = %v, want %v", manifests, want)
 	}
 }
 

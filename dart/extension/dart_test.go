@@ -118,6 +118,7 @@ func TestThePackagesOfAPubWorkspaceBecomeProjects(t *testing.T) {
 		if err := json.Unmarshal(p.Metadata, &meta); err != nil {
 			t.Fatal(err)
 		}
+		w.meta.Manifest = p.Path + "/pubspec.yaml"
 		if p.SourceName != w.meta.Component || !reflect.DeepEqual(p.Dependencies, w.deps) || !reflect.DeepEqual(meta, w.meta) {
 			t.Errorf("%s = %+v, metadata %+v, want %+v", p.Path, p, meta, w.meta)
 		}

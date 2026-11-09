@@ -49,7 +49,10 @@ var coverageFormats = []string{"lcov", "cobertura", "jacoco", "clover", "gocover
 
 // Profile is a stack profile: how one stack's components are linted, tested
 // and built. Every path pattern is slash-separated and relative to the project
-// directory, or to the stack root when it starts with "{root}/".
+// directory, or to the stack root when it starts with "{root}/". An input
+// pattern that starts with "!" is an exclusion: "!x" removes what it matches
+// from the files the task reads under the project, "!{root}/x" from those it
+// reads at the stack root.
 type Profile struct {
 	// ID is the stack id, such as "rust".
 	ID string `json:"id"`
@@ -82,8 +85,13 @@ type Profile struct {
 
 // Toolchain is the toolchain check of a profile.
 type Toolchain struct {
-	// Command reads the version on the machine.
+	// Command reads the version on the machine: the one the build uses.
 	Command []string `json:"command"`
+	// Fallback, when set, lists the installed versions when Command fails,
+	// such as a toolchain that refuses to start outside its pinned version:
+	// when none of them satisfies the expected version, the check fails as a
+	// mismatch.
+	Fallback []string `json:"fallback,omitempty"`
 	// Pattern matches the command's output; its "version" group is the
 	// version.
 	Pattern string `json:"pattern"`
@@ -216,6 +224,9 @@ type Reports struct {
 	When []string `json:"when,omitempty"`
 	// JUnit are the JUnit XML report patterns.
 	JUnit []string `json:"junit,omitempty"`
+	// TRX are the Visual Studio TRX report patterns, read with the JUnit
+	// reports into one test summary.
+	TRX []string `json:"trx,omitempty"`
 	// Coverage are the coverage reports, with their format.
 	Coverage []Coverage `json:"coverage,omitempty"`
 }
@@ -266,7 +277,7 @@ var (
 )
 
 // stepPlaceholders are the placeholders a step may name.
-var stepPlaceholders = []string{"{root}", "{component}", "{project}", "{output}", "{runtime}", TargetPlaceholder}
+var stepPlaceholders = []string{"{root}", "{component}", "{project}", "{output}", "{manifest}", "{runtime}", TargetPlaceholder}
 
 // TargetPlaceholder is the placeholder of a step that runs once per target.
 const TargetPlaceholder = "{target}"
@@ -373,6 +384,9 @@ func (t Toolchain) validate() error {
 	if len(t.Command) == 0 || t.Command[0] == "" {
 		return errors.New("command: the toolchain check names a command")
 	}
+	if len(t.Fallback) > 0 && t.Fallback[0] == "" {
+		return errors.New("fallback: a fallback names a program")
+	}
 	re, err := regexp.Compile(t.Pattern)
 	if err != nil {
 		return fmt.Errorf("pattern: %w", err)
@@ -471,6 +485,11 @@ func (t Task) validate(sets map[string][]string) error {
 		for i, p := range t.Reports.JUnit {
 			if err := validateReportPath(p); err != nil {
 				return fmt.Errorf("reports.junit[%d]: %w", i, err)
+			}
+		}
+		for i, p := range t.Reports.TRX {
+			if err := validateReportPath(p); err != nil {
+				return fmt.Errorf("reports.trx[%d]: %w", i, err)
 			}
 		}
 		for i, c := range t.Reports.Coverage {
@@ -604,7 +623,7 @@ func validateSteps(field string, steps [][]string) error {
 		for _, arg := range step {
 			for _, ph := range placeholderExpr.FindAllString(arg, -1) {
 				if !slices.Contains(stepPlaceholders, ph) {
-					return fmt.Errorf("%s[%d]: %s is no placeholder; use {root}, {component}, {project}, {output}, {runtime} or {target}", field, i, ph)
+					return fmt.Errorf("%s[%d]: %s is no placeholder; use {root}, {component}, {project}, {output}, {manifest}, {runtime} or {target}", field, i, ph)
 				}
 			}
 		}
