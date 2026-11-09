@@ -278,7 +278,7 @@
         "injectPublishChannels": true,
         "sideEffects": "registry"
       },
-      "description": "Push the image of an application to its OCI registry. A library publishes nothing.",
+      "description": "Push the image of an application to its OCI registry. A library or an Xcode project publishes nothing.",
       "flags": {
         "docker": {
           "type": "boolean",
@@ -577,7 +577,7 @@
       }
     },
     "package-docker": {
-      "description": "Install the pinned Static Linux SDK of the selected Swift when it is missing, under a machine-wide lock, then, holding the lock of the stack root, build the application's executable product with swift build -c release --swift-sdk <bundle> --triple <arch>-swift-linux-musl and the versions Package.resolved pins, and assemble a local OCI image of it and its resource bundles on a digest-pinned distroless static base. Sole owner of <command-output>/docker.",
+      "description": "Holding the lock of the stack root, install the pinned Static Linux SDK of the selected Swift when it is missing, one install of a bundle at a time on the machine, build the application's executable product with swift build -c release --swift-sdk <bundle> --triple <arch>-swift-linux-musl and the versions Package.resolved pins, and copy it and its resource bundles out of the build directory; then, with the lock released, assemble a local OCI image of them on a digest-pinned distroless static base. A library or an Xcode project packages nothing. Sole owner of <command-output>/docker.",
       "kind": "command",
       "command": "{extensionRuntime}",
       "args": [

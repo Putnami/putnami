@@ -153,8 +153,8 @@ Declare the channel in the project's `putnami.json`:
 also loads it into the local Docker daemon. `putnami publish` pushes it to the
 registry that `registries.oci.publish` of `putnami.workspace.json` declares,
 through the shared publisher of the other stacks. `--docker-registry
-<registry>` overrides that registry for one push. A library packages and
-publishes nothing.
+<registry>` overrides that registry for one push. A library or an Xcode
+project packages and publishes nothing.
 
 The image holds a static binary, built with the
 [Static Linux SDK](https://www.swift.org/documentation/articles/static-linux-getting-started.html)

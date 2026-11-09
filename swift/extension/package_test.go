@@ -4,6 +4,7 @@ import (
 	"archive/tar"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net/http/httptest"
 	"os"
@@ -11,6 +12,7 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/google/go-containerregistry/pkg/name"
 	"github.com/google/go-containerregistry/pkg/registry"
@@ -23,6 +25,7 @@ import (
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/sdk/extension/cli"
 	pctx "go.putnami.dev/sdk/extension/context"
+	"go.putnami.dev/sdk/extension/filelock"
 	"go.putnami.dev/sdk/extension/jsonl"
 	"go.putnami.dev/sdk/extension/pkgmeta"
 )
@@ -41,8 +44,8 @@ echo "$PWD: swift $*" >> "`+log+`"
 case "$1" in
 --version) echo "${SWIFT_STUB_BANNER:-Swift version ${SWIFT_STUB_RELEASE:-6.4.2} (swift-${SWIFT_STUB_RELEASE:-6.4.2}-RELEASE)}"; echo "Target: x86_64-unknown-linux-gnu";;
 sdk) case "$2" in
-  list) if [ -f "`+state+`/sdk" ]; then cat "`+state+`/sdk"; else echo "No Swift SDKs are currently installed."; fi;;
-  install) echo "swift-${SWIFT_STUB_RELEASE:-6.4.2}-RELEASE_static-linux-0.1.0" > "`+state+`/sdk";;
+  list) if [ -f "$STUB_SWIFT_STATE/sdk" ]; then cat "$STUB_SWIFT_STATE/sdk"; else echo "No Swift SDKs are currently installed."; fi;;
+  install) echo "swift-${SWIFT_STUB_RELEASE:-6.4.2}-RELEASE_static-linux-0.1.0" > "$STUB_SWIFT_STATE/sdk";;
   esac;;
 build) out="$PWD/.build/out/Products/Release-staticlinux-x86_64"
   for a in "$@"; do if [ "$a" = "--show-bin-path" ]; then echo "Building for production..."; echo "$out"; exit 0; fi; done
@@ -57,6 +60,7 @@ esac
 	}
 	t.Setenv("PATH", bin+string(os.PathListSeparator)+os.Getenv("PATH"))
 	t.Setenv("PUTNAMI_HOME", filepath.Join(state, "home"))
+	t.Setenv("STUB_SWIFT_STATE", state)
 	return log
 }
 
@@ -220,6 +224,60 @@ func TestADryRunPackageRecordsTheChannelAndRunsNoSwift(t *testing.T) {
 	}
 	if _, err := os.Stat(filepath.Join(root, ".putnami/out/server/package/docker/channel.json")); err != nil {
 		t.Errorf("no channel record: %v", err)
+	}
+}
+
+func TestADryRunChoosesTheExecutableAsARunDoes(t *testing.T) {
+	stubSwiftBuild(t)
+	root := t.TempDir()
+	serverPackage(t, root)
+	writeFile(t, root, "server/Package.swift", `let package = Package(
+    name: "Server",
+    products: [.executable(name: "Server", targets: ["Server"]), .executable(name: "Migrate", targets: ["Migrate"])],
+    targets: [.executableTarget(name: "Server"), .executableTarget(name: "Migrate")]
+)
+`)
+	// The project is named server, and no product is: the run cannot choose.
+	status, _, err := runServerJob(t, root, PackageDockerJob(stack(t)), "--dry-run")
+	if status != "FAILED" || err == nil || !strings.Contains(err.Error(), CodeNoExecutable) {
+		t.Errorf("dry run with several executables: %s %v", status, err)
+	}
+}
+
+func TestAJobThatWaitedForAnInstallInstallsNothing(t *testing.T) {
+	log := stubSwiftBuild(t)
+	root := t.TempDir()
+	serverPackage(t, root)
+	_, base := imageRegistry(t)
+	locks := filepath.Join(os.Getenv("PUTNAMI_HOME"), "locks")
+	if err := os.MkdirAll(locks, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	held, err := filelock.Acquire(filepath.Join(locks, "swift-sdk-swift-6.4.2-RELEASE_static-linux-0.1.0.lock"), true, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	done := make(chan string, 1)
+	go func() {
+		status, _, err := runServerJob(t, root, PackageDockerJob(stack(t)), "--docker-base-image", base)
+		done <- fmt.Sprint(status, " ", err)
+	}()
+	// The other installer finishes while the job waits on its lock.
+	for {
+		if ran, _ := os.ReadFile(log); strings.Contains(string(ran), "swift sdk list") {
+			break
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	writeFile(t, os.Getenv("STUB_SWIFT_STATE"), "sdk", "swift-6.4.2-RELEASE_static-linux-0.1.0\n")
+	if err := held.Release(); err != nil {
+		t.Fatal(err)
+	}
+	if got := <-done; got != "OK <nil>" {
+		t.Fatalf("package: %s", got)
+	}
+	if strings.Contains(readFileString(t, log), "swift sdk install") {
+		t.Errorf("a job that waited installed the bundle again:\n%s", readFileString(t, log))
 	}
 }
 

@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"io/fs"
 	"os"
 	"os/exec"
@@ -165,14 +166,7 @@ func packageImage(stack stacks.Stack, ctx *pctx.Context, flags map[string]string
 	record := func() error {
 		return pkgmeta.WriteChannelRecord(output, pkgmeta.ChannelRecord{Version: version, Artifact: name, Channels: []string{dockerChannel}})
 	}
-	if cli.FlagBool(flags, "dry-run", ctx.Params.Bool("dry-run", false, "dryRun")) {
-		emit.Info("dry run: would assemble an image of " + name + " for " + platform + " on " + base)
-		if err := record(); err != nil {
-			return fail(emit, CodeImageFailed, err)
-		}
-		return nil
-	}
-
+	dryRun := cli.FlagBool(flags, "dry-run", ctx.Params.Bool("dry-run", false, "dryRun"))
 	staging, err := os.MkdirTemp("", "putnami-swift-image-")
 	if err != nil {
 		return fail(emit, CodeImageFailed, err)
@@ -180,13 +174,20 @@ func packageImage(stack stacks.Stack, ctx *pctx.Context, flags map[string]string
 	defer func() { _ = os.RemoveAll(staging) }()
 	var product string
 	err = stack.Locked(ctx, emit, func(run context.Context, root stacks.RootStep, emit *jsonl.Emitter) error {
-		if product, err = executableAt(root, ctx, emit); err != nil {
+		if product, err = executableAt(root, ctx, emit); err != nil || dryRun {
 			return err
 		}
 		return buildStatic(run, root, product, triple, staging, emit)
 	})
 	if err != nil {
 		return err
+	}
+	if dryRun {
+		emit.Info("dry run: would assemble an image of " + product + " for " + platform + " on " + base)
+		if err := record(); err != nil {
+			return fail(emit, CodeImageFailed, err)
+		}
+		return nil
 	}
 	return assembleImage(ctx, flags, staging, product, base, platform, output, name, version, record, emit)
 }
@@ -424,15 +425,26 @@ func stageBuild(binPath, product, staging string) error {
 }
 
 // copyFile copies the content of a file, through a link, with mode.
-func copyFile(source, target string, mode fs.FileMode) error {
+func copyFile(source, target string, mode fs.FileMode) (err error) {
 	if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
 		return err
 	}
-	data, err := os.ReadFile(source) //nolint:gosec // a product of the job's build
+	in, err := os.Open(source)
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(target, data, mode) //nolint:gosec // a staged copy
+	defer func() { _ = in.Close() }()
+	out, err := os.OpenFile(target, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, mode)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if closeErr := out.Close(); err == nil {
+			err = closeErr
+		}
+	}()
+	_, err = io.Copy(out, in)
+	return err
 }
 
 // imageSpec describes the application's image: the executable at
