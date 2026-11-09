@@ -7,10 +7,11 @@
     "putnami lint runs RuboCop in each component, and putnami test runs RSpec or Rails's Minitest runner on each component from the directory of its Gemfile; a second run over an unchanged tree is a cache hit",
     "The test task reads the JUnit report and the SimpleCov Cobertura report into the test and coverage summary of the component, with only the lines of its own files",
     "A component overrides any value of the Ruby profile in its putnami.json, and the override reaches the cache key",
-    "putnami install runs bundle install at each stack root, and lint and test install a stack root whose bundle is incomplete first, so a fresh checkout needs no bundle install by hand"
+    "putnami install runs bundle install at each stack root, and lint and test install a stack root whose bundle is incomplete first, so a fresh checkout needs no bundle install by hand",
+    "On a machine with no Ruby, or none the repository's .ruby-version or .tool-versions accepts, putnami install then putnami lint and test work with a Ruby the extension pins, and a workspace without @putnami/ruby or without a Ruby component downloads none"
   ],
   "nonGoals": [
-    "Installing or switching Ruby or Bundler: the checks compare and never install",
+    "Building or publishing Ruby archives, downloading Bundler on its own, and installing RuboCop, RSpec or a gem outside the bundle: the pinned Ruby comes from the rv-ruby release archives, its Bundler is the one it ships or the one bundle install switches to, and the tools come from the repository's own bundle",
     "A build task: Ruby has no compile step, and a gem reaches its registry through gem push",
     "Reading the constant references packwerk check reads",
     "gems.rb and gems.locked, the other names Bundler accepts",
@@ -25,7 +26,7 @@
     },
     {
       "id": "tasks-run-the-profile",
-      "text": "Each task first compares ruby --version with .ruby-version or .tool-versions, and bundle --version with the BUNDLED WITH of Gemfile.lock, in the component then at its stack root: a mismatch fails with stacks.toolchain_mismatch unless check is warn. Lint then runs bundle exec rubocop in the component's directory; test runs from the stack root and names the component's test directory."
+      "text": "Each task first compares ruby --version with .ruby-version or .tool-versions, in the component then at its stack root: a mismatch fails with stacks.toolchain_mismatch unless check is warn. It then compares bundle --version with the BUNDLED WITH of Gemfile.lock: a mismatch warns with stacks.toolchain_mismatch, since bundle install switches to the locked Bundler. Lint then runs bundle exec rubocop in the component's directory; test runs from the stack root and names the component's test directory."
     },
     {
       "id": "test-runner-per-component",
@@ -66,10 +67,19 @@
     {
       "id": "filters-the-tests",
       "text": "test with the test flag, short -t, passes its value to RSpec as -e and to rails test as -n with the value quoted as a regular expression, so a component in which it selects no test passes. The value is part of the task's key, so a filtered result never answers an unfiltered run."
+    },
+    {
+      "id": "pins-a-ruby-release",
+      "text": "toolchain-resolve answers ruby with a release the extension ships, 3.2.11, 3.3.13, 3.4.12 or 4.0.9, with an rv-ruby archive of a fixed release and a SHA-256 per platform, when the workspace holds a Ruby component. It chooses among the releases every component's statement accepts, else those the root accepts. A committed pin of an accepted release is kept; else the highest accepted. With no Ruby component, no accepted release, or no archive for the platform, such as Windows, it answers no pin."
+    },
+    {
+      "id": "machine-ruby-comes-first",
+      "text": "Each task runs the ruby on PATH when its version satisfies the stated version. When ruby is missing, or outside the statement, the task puts the Ruby the workspace lock pins first on PATH, so its bundle runs too, and repeats the check. A project whose toolchain.check is warn keeps the ruby on PATH. With no pinned Ruby installed, the check fails as it did before."
     }
   ],
   "decisions": [
     "tooling/stacks/doc/adr/0001-one-extension-per-stack-on-a-shared-core.md",
+    "tooling/stacks/doc/adr/0003-a-stack-extension-may-provide-its-toolchain.md",
     "tooling/stacks/doc/adr/0005-profile-variants-for-a-stack-with-several-builds.md",
     "tooling/stacks/doc/adr/0009-a-profile-adapts-to-each-component.md"
   ]

@@ -49,8 +49,36 @@
           }
         },
         "prependPath": true
+      },
+      "ruby": {
+        "lock": "ruby",
+        "optional": true,
+        "candidates": [
+          {
+            "from": "path",
+            "path": "ruby"
+          },
+          {
+            "from": "provisioned"
+          }
+        ],
+        "probe": {
+          "args": [
+            "-e",
+            "print RUBY_VERSION"
+          ],
+          "expect": "{version}"
+        },
+        "environment": {
+          "PUTNAMI_RUBY_EXECUTABLE": {
+            "from": "executable"
+          }
+        }
       }
     },
+    "resolves": [
+      "ruby"
+    ],
     "prepare": {
       "command": "{extensionRoot}/bin/prepare",
       "args": [
@@ -191,6 +219,9 @@
       "description": "Run bundle check at the component's stack root, then bundle install when the bundle is incomplete; with offline dependencies, bundle install --local.",
       "kind": "command",
       "command": "{extensionRuntime}",
+      "toolchains": [
+        "ruby"
+      ],
       "args": [
         "install"
       ],
@@ -201,6 +232,7 @@
         "effects": [
           "network",
           "process",
+          "toolchain-cache",
           "workspace-files"
         ]
       }
@@ -209,6 +241,9 @@
       "description": "Run the Ruby profile's lint step, bundle exec rubocop, on one component in its directory, after the Ruby and Bundler checks. Its inputs are the files the ruby:lint selector answers from the resolved profile, and the stack-root files of the profile.",
       "kind": "command",
       "command": "{extensionRuntime}",
+      "toolchains": [
+        "ruby"
+      ],
       "args": [
         "lint",
         "--report-dir",
@@ -265,6 +300,9 @@
       "description": "Run the Ruby profile's test step on one component from its stack root, after the Ruby and Bundler checks: bundle exec rspec on its spec directory, or bundle exec rails test on its test directory for a component with only Minitest files, and nothing for a component with neither; then read the JUnit report and the SimpleCov Cobertura report, counting only the component's own files. A failed case, a step that exits non-zero, or a missing report fails the task.",
       "kind": "command",
       "command": "{extensionRuntime}",
+      "toolchains": [
+        "ruby"
+      ],
       "args": [
         "test",
         "--report-dir",
@@ -378,6 +416,9 @@
       "description": "Run bundle install at each stack root of the workspace, except the projects disable.tags excludes and the roots whose bundle check passes, unless the force flag is set. With offline dependencies it runs bundle install --local.",
       "kind": "command",
       "command": "{extensionRuntime}",
+      "toolchains": [
+        "ruby"
+      ],
       "args": [
         "workspace-install"
       ],
@@ -388,6 +429,7 @@
         "effects": [
           "network",
           "process",
+          "toolchain-cache",
           "workspace-files"
         ]
       }
@@ -396,6 +438,9 @@
       "description": "Run bundle update at each stack root of the workspace with the Ruby the toolchain check selects.",
       "kind": "command",
       "command": "{extensionRuntime}",
+      "toolchains": [
+        "ruby"
+      ],
       "args": [
         "deps-upgrade"
       ],
@@ -406,6 +451,7 @@
         "effects": [
           "network",
           "process",
+          "toolchain-cache",
           "workspace-files"
         ]
       }

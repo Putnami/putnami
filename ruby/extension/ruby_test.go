@@ -193,6 +193,8 @@ type recorded struct {
 	data   map[string]any
 	out    string
 	err    error
+	// events is what the job emitted.
+	events string
 }
 
 // runJob runs a task of the component at rel through the extension's job,
@@ -211,16 +213,17 @@ func runJob(t *testing.T, root, rel, task string) recorded {
 		Metadata: map[string]json.RawMessage{ExtensionName: meta},
 	}}
 	out := filepath.Join(root, ".putnami/out", strings.ReplaceAll(rel, "/", "_"), task)
-	devnull, err := os.Open(os.DevNull)
+	events, err := os.Create(filepath.Join(t.TempDir(), "events.jsonl"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer devnull.Close()
+	defer events.Close()
 	stdout := os.Stdout
-	os.Stdout = devnull
+	os.Stdout = events
 	status, data, runErr := s.Jobs()[task](ctx, jsonl.New(), []string{"--report-dir", out})
 	os.Stdout = stdout
-	return recorded{status, data, out, runErr}
+	emitted, _ := os.ReadFile(events.Name())
+	return recorded{status, data, out, runErr, string(emitted)}
 }
 
 func calls(t *testing.T, log string) []string {
@@ -248,9 +251,10 @@ func TestATaskRunsTheProfileStepsAfterTheRubyAndBundlerChecks(t *testing.T) {
 		t.Errorf("ran\n%s\nwant\n%s", strings.Join(got, "\n"), strings.Join(want, "\n"))
 	}
 
+	// bundle install switches to the locked Bundler, so a mismatch warns.
 	stubTools(t, "3.3.6", "2.4.1", 0)
-	if r := runJob(t, root, "packs/pricing", stacks.TaskLint); r.status != "FAILED" || r.err == nil || r.err.Error() != stacks.CodeToolchainMismatch {
-		t.Errorf("a Bundler mismatch fails the task: %+v", r)
+	if r := runJob(t, root, "packs/pricing", stacks.TaskLint); r.status != "OK" || r.err != nil || !strings.Contains(r.events, stacks.CodeToolchainMismatch) {
+		t.Errorf("a Bundler mismatch warns and runs the task: %+v", r)
 	}
 	stubTools(t, "3.2.4", "2.5.22", 0)
 	if r := runJob(t, root, "packs/pricing", stacks.TaskLint); r.status != "FAILED" || r.err == nil || r.err.Error() != stacks.CodeToolchainMismatch {

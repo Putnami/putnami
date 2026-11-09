@@ -26,14 +26,17 @@ func main() {
 func run(args []string, stdin io.Reader, stdout, stderr io.Writer, runJobs func(map[string]cli.JobFunc)) int {
 	stack, err := ruby.Stack()
 	if err == nil {
-		err = stack.Entrypoint(args, stdin, stdout, runtimeVersion, func(jobs map[string]cli.JobFunc) {
-			jobs[stacks.TaskTest] = ruby.TestJob(stack)
-			jobs["lint-docs"] = docslinks.Job("Gemfile", "package.yml")
-			jobs[ruby.InstallJobName] = ruby.InstallJob(stack)
-			jobs[ruby.WorkspaceInstallJobName] = ruby.WorkspaceInstallJob(stack)
-			jobs[ruby.DepsUpgradeJobName] = ruby.DepsUpgradeJob(stack)
-			runJobs(jobs)
-		})
+		var handled bool
+		if handled, err = ruby.HandleToolchainResolve(args, stdin, stdout, stack.Profile); !handled && err == nil {
+			err = stack.Entrypoint(args, stdin, stdout, runtimeVersion, func(jobs map[string]cli.JobFunc) {
+				jobs[stacks.TaskTest] = ruby.TestJob(stack)
+				jobs["lint-docs"] = docslinks.Job("Gemfile", "package.yml")
+				jobs[ruby.InstallJobName] = ruby.InstallJob(stack)
+				jobs[ruby.WorkspaceInstallJobName] = ruby.WorkspaceInstallJob(stack)
+				jobs[ruby.DepsUpgradeJobName] = ruby.DepsUpgradeJob(stack)
+				runJobs(jobs)
+			})
+		}
 	}
 	if err != nil {
 		fmt.Fprintf(stderr, "%s: %v\n", ruby.ExtensionName, err)

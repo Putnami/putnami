@@ -21,6 +21,7 @@
         "pattern": "(?m)^ruby\\s+(?<version>\\S+)"
       }
     ],
+    "provisioned": "PUTNAMI_RUBY_EXECUTABLE",
     "also": [
       {
         "command": [
@@ -28,6 +29,7 @@
           "--version"
         ],
         "pattern": "(?<version>[0-9]+\\.[0-9]+\\.[0-9]+(?:\\.[0-9A-Za-z]+)*)",
+        "check": "warn",
         "files": [
           {
             "path": "Gemfile.lock",

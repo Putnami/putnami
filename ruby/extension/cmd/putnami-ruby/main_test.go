@@ -13,6 +13,7 @@ import (
 	proto "go.putnami.dev/protocol/extension"
 	"go.putnami.dev/protocol/features/spectest"
 	protojob "go.putnami.dev/protocol/job"
+	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/sdk/extension/cli"
 	pctx "go.putnami.dev/sdk/extension/context"
 	"go.putnami.dev/sdk/extension/docslinks"
@@ -43,6 +44,20 @@ func TestRunReportsAFailedControlCallOnStderr(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 	code := run([]string{"__putnami", "workspace-probe"}, strings.NewReader("not json"), &stdout, &stderr, nil)
 	if code != 1 || stdout.Len() != 0 || !strings.Contains(stderr.String(), "workspace-probe") {
+		t.Fatalf("exit %d, stdout %q, stderr %q", code, stdout.String(), stderr.String())
+	}
+}
+
+func TestRunServesToolchainResolve(t *testing.T) {
+	root := t.TempDir()
+	if err := os.WriteFile(filepath.Join(root, "Gemfile"), []byte("source \"https://rubygems.org\"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	t.Chdir(root)
+	request := `{"version":1,"extension":"@putnami/ruby","identities":["ruby"],"platform":"linux/amd64"}`
+	var stdout, stderr bytes.Buffer
+	code := run(wsproto.ToolchainResolveControlArgs(), strings.NewReader(request), &stdout, &stderr, nil)
+	if code != 0 || !strings.Contains(stdout.String(), `"extension":"@putnami/ruby"`) || !strings.Contains(stdout.String(), `"version":"4.0.9"`) {
 		t.Fatalf("exit %d, stdout %q, stderr %q", code, stdout.String(), stderr.String())
 	}
 }

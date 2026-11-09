@@ -7,7 +7,7 @@
       "id": "ruby/stack-extension",
       "type": "feature",
       "name": "Run the components of a Ruby or Rails repository as Putnami tasks",
-      "outcome": "A team with a Ruby or Rails repository adds @putnami/ruby and runs putnami install, lint and test over its packs and local gems with Putnami's runner and cache, without rewriting its build: each component is a project with its edges, lint runs RuboCop and test RSpec or Rails's Minitest runner after a Ruby and Bundler check and a bundle install, and a component overrides any profile value in its putnami.json",
+      "outcome": "A team with a Ruby or Rails repository adds @putnami/ruby and runs putnami install, lint and test over its packs and local gems with Putnami's runner and cache, without rewriting its build: each component is a project with its edges, lint runs RuboCop and test RSpec or Rails's Minitest runner after a Ruby and Bundler check and a bundle install, with the Ruby the workspace pins when the machine has none that fits, and a component overrides any profile value in its putnami.json",
       "owner": "ruby",
       "target": "coded",
       "requirements": [
@@ -165,6 +165,33 @@
             "kind": "acceptance",
             "checks": [
               "test-passes-the-filter-to-rspec-or-rails-test-and-keys-the-task-on-it"
+            ]
+          }
+        },
+        {
+          "id": "pins-a-ruby-release",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-extension-pins-a-ruby-release-the-repository-accepts",
+              "every-shipped-archive-has-a-url-and-a-sha-256"
+            ]
+          }
+        },
+        {
+          "id": "machine-ruby-comes-first",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-task-uses-the-provisioned-ruby-only-when-the-machine-ruby-is-unusable"
             ]
           }
         }
