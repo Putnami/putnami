@@ -1,0 +1,76 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-spec.json",
+  "protocolVersion": 1,
+  "feature": "ruby/stack-extension",
+  "outcomes": [
+    "Each packwerk pack and local gem of a Ruby repository is a Putnami project, with an edge to each pack its package.yml lists and each local gem its Gemfile or gemspec names, and the probe answers the application the same way",
+    "putnami lint runs RuboCop in each component, and putnami test runs RSpec or Rails's Minitest runner on each component from the directory of its Gemfile; a second run over an unchanged tree is a cache hit",
+    "The test task reads the JUnit report and the SimpleCov Cobertura report into the test and coverage summary of the component, with only the lines of its own files",
+    "A component overrides any value of the Ruby profile in its putnami.json, and the override reaches the cache key",
+    "putnami install runs bundle install at each stack root, and lint and test install a stack root whose bundle is incomplete first, so a fresh checkout needs no bundle install by hand"
+  ],
+  "nonGoals": [
+    "Installing or switching Ruby or Bundler: the checks compare and never install",
+    "A build task: Ruby has no compile step, and a gem reaches its registry through gem push",
+    "Reading the constant references packwerk check reads",
+    "gems.rb and gems.locked, the other names Bundler accepts",
+    "A project for the application at the workspace root, which the CLI does not discover yet",
+    "A workspace-fetch: Bundler downloads a gem only as it installs it, and bundle cache writes vendor/cache into the repository",
+    "JRuby and TruffleRuby, whose --version the toolchain check does not read"
+  ],
+  "requirements": [
+    {
+      "id": "components-become-projects",
+      "text": "The probe answers, for each candidate directory the observe Ruby detector knows as a component: its gem name, else its pack path, else the workspace directory's name, the directories of the components it depends on, the extension @putnami/ruby, the tag ruby, and metadata naming its stack root, the nearest of its own directory and the workspace root that holds a Gemfile, and the expected Ruby and Bundler versions."
+    },
+    {
+      "id": "tasks-run-the-profile",
+      "text": "Each task first compares ruby --version with .ruby-version or .tool-versions, and bundle --version with the BUNDLED WITH of Gemfile.lock, in the component then at its stack root: a mismatch fails with stacks.toolchain_mismatch unless check is warn. Lint then runs bundle exec rubocop in the component's directory; test runs from the stack root and names the component's test directory."
+    },
+    {
+      "id": "test-runner-per-component",
+      "text": "The probe names each component's profile variant: rspec when it holds a spec/**/*_spec.rb file, which runs bundle exec rspec on its spec directory with the RspecJunitFormatter; minitest when it holds a test/**/*_test.rb file and no spec file, which runs bundle exec rails test on its test directory with minitest-junit; untested otherwise, whose test runs nothing and passes. Such a file is a workspace input, so adding or removing one changes the variant and the key."
+    },
+    {
+      "id": "reports-become-the-summary",
+      "text": "The test task reads its JUnit report and the SimpleCov Cobertura report at the stack root's coverage/coverage.xml through the evidence readers. The coverage summary counts only the files under the component's directory outside a nested component; a covered file in no component is the warning stacks.coverage_unmapped. A failed case fails the task with stacks.test_failed, and a missing report with stacks.report_missing."
+    },
+    {
+      "id": "lint-reads-the-ruby-files",
+      "text": "The ruby:lint selector answers the files RuboCop inspects by default and the RuboCop configuration, outside vendor, node_modules and tmp, and not the test fixtures, .rspec or the ERB views: a change to one of them reruns test and keeps the lint key."
+    },
+    {
+      "id": "overrides-are-honored",
+      "text": "options[\"@putnami/ruby\"] in a component's own putnami.json overrides the profile after its variant: an object merges, null removes the member, and any other value replaces the profile's whole. The steps run and the files the ruby:<task> selectors answer follow the resolved profile, and putnami.json is an input of every task. An unknown member fails the task with stacks.project_config_invalid."
+    },
+    {
+      "id": "manifest-follows-the-profile",
+      "text": "The manifest passes the stack core's conformance kit: its markers are the profile's, it lists the ruby:lint and ruby:test selectors, and each command runs one task that depends on the same task upstream, reads its selector and the profile's stack-root files for that task, and declares its command-output reports directory."
+    },
+    {
+      "id": "installs-its-bundle",
+      "text": "Before lint and test, the install step of a component runs bundle check at its stack root with the Ruby the check selects, then bundle install when the bundle is incomplete, one run per root at a time. A run with offline dependencies runs bundle install --local, which installs from the gems already on the machine."
+    },
+    {
+      "id": "workspace-install-runs-bundler",
+      "text": "workspace-install runs bundle install at each stack root of the workspace's projects, except a project disable.tags excludes and a root whose bundle check passes, which the force flag installs again. A run with offline dependencies runs bundle install --local. With no Ruby it warns and passes."
+    },
+    {
+      "id": "upgrades-the-dependencies",
+      "text": "deps-upgrade runs bundle update at each stack root of the workspace's projects, with the Ruby the toolchain check selects."
+    },
+    {
+      "id": "checks-documentation-links",
+      "text": "lint checks every relative link and anchor of the component's README.md files and doc/ trees, and a broken one fails it, unless the docs-links flag is false. The check needs neither Ruby nor Bundler."
+    },
+    {
+      "id": "filters-the-tests",
+      "text": "test with the test flag, short -t, passes its value to RSpec as -e and to rails test as -n with the value quoted as a regular expression, so a component in which it selects no test passes. The value is part of the task's key, so a filtered result never answers an unfiltered run."
+    }
+  ],
+  "decisions": [
+    "tooling/stacks/doc/adr/0001-one-extension-per-stack-on-a-shared-core.md",
+    "tooling/stacks/doc/adr/0005-profile-variants-for-a-stack-with-several-builds.md",
+    "tooling/stacks/doc/adr/0007-a-profile-adapts-to-each-component.md"
+  ]
+}

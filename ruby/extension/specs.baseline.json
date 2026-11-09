@@ -1,0 +1,18 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-specs-baseline.json",
+  "protocolVersion": 2,
+  "executableRequirements": [
+    "ruby/stack-extension#checks-documentation-links",
+    "ruby/stack-extension#components-become-projects",
+    "ruby/stack-extension#filters-the-tests",
+    "ruby/stack-extension#installs-its-bundle",
+    "ruby/stack-extension#lint-reads-the-ruby-files",
+    "ruby/stack-extension#manifest-follows-the-profile",
+    "ruby/stack-extension#overrides-are-honored",
+    "ruby/stack-extension#reports-become-the-summary",
+    "ruby/stack-extension#tasks-run-the-profile",
+    "ruby/stack-extension#test-runner-per-component",
+    "ruby/stack-extension#upgrades-the-dependencies",
+    "ruby/stack-extension#workspace-install-runs-bundler"
+  ]
+}
