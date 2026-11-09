@@ -79,7 +79,7 @@
     },
     {
       "id": "a-toolchain-answer-pins-only-what-was-asked",
-      "text": "A toolchain-resolve request names the extension, 1 to 64 unique lock identities, their locked entries, the host os/arch and offline, and no path. A result gives an identity a version 5 pin, held to the lock's entry rules, or a problem, never both. The answer names the asked extension and only asked identities, and each pin covers the host platform with an archive and an integrity. Diagnostics come in a fixed order."
+      "text": "A toolchain-resolve request names the extension, 1 to 64 unique lock identities, their locked entries, the host os/arch and offline, and no path. A result gives an identity a version 5 pin, held to the lock's entry rules, or a problem, never both. The answer names the asked extension and only asked identities, and each pin covers the host platform with an archive and an integrity, unless it is the identity's locked entry kept as it was sent. Diagnostics come in a fixed order."
     },
     {
       "id": "an-input-answer-lists-files-and-their-basis",

@@ -44,7 +44,7 @@
     },
     {
       "id": "pins-a-php-release",
-      "text": "toolchain-resolve answers php with a release the extension ships, an archive and a SHA-256 per platform, when a composer.json exists outside vendor/. It chooses among the releases every component's statement accepts, else those the root accepts. A committed pin of an accepted release is kept; else 8.4.23 when accepted, else the highest accepted. With no composer.json, no accepted release, or no archive for the platform, it answers no pin."
+      "text": "toolchain-resolve answers php with a release the extension ships, an archive and a SHA-256 per platform, when a composer.json exists outside vendor/. It chooses among the releases every component's statement accepts, else those the root accepts. A committed pin of an accepted release is kept, as committed on a platform with no archive; else 8.4.23 when accepted, else the highest accepted. With no composer.json or no accepted release, or a platform with no archive and no such pin, it answers no pin."
     },
     {
       "id": "machine-php-comes-first",
