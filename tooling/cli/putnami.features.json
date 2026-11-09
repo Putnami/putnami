@@ -1557,6 +1557,21 @@
           }
         },
         {
+          "id": "a-short-alias-reaches-the-task-under-its-long-name",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-job-short-alias-binds-the-long-name",
+              "an-extension-subcommand-short-alias-binds-the-long-name",
+              "both-spellings-of-one-flag-are-refused"
+            ]
+          }
+        },
+        {
           "id": "an-interactive-subcommand-refuses-a-preview-it-cannot-honor",
           "stage": "coded",
           "evidenceKinds": [
