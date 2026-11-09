@@ -80,6 +80,10 @@ func (a *App) runUserScopeSubcommand(
 		printCommandError(stderr, err)
 		return ExitUsage
 	}
+	if _, err := shortAliasRenames(parsed.RawJobArgs, effectiveFlags); err != nil {
+		printCommandError(stderr, err)
+		return ExitUsage
+	}
 	commandParams := buildExtensionCommandParams(parsed, effectiveFlags)
 	if parsed.Global.MaxParallel > 0 {
 		commandParams["max-parallel"] = strconv.Itoa(parsed.Global.MaxParallel)

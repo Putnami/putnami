@@ -404,6 +404,13 @@ type Request struct {
 	// on — because whether its deprecation notices print at all depends on the
 	// resolved Quiet.
 	ValidateCommandFlags func(*extension.DiscoveryResult, GlobalFlags) error
+	// ResolveCommandParams, when non-nil, runs right after ValidateCommandFlags
+	// and replaces CommandParams with what it returns. It is where the CLI
+	// renames a param a flag's short alias spelled to the flag's long name,
+	// which only the resolved extensions can declare. Every later stage, the
+	// cache keys and the run markers included, reads the returned map. A watch
+	// iteration leaves it nil: it forwards the outer run's resolved params.
+	ResolveCommandParams func(*extension.DiscoveryResult, map[string]any) map[string]any
 	// VersionSnapshot is the git-derived version state captured before any in-run
 	// tree mutation. Nil makes the engine capture it itself at the start
 	// of Run, before hooks — which is what the terminal path did.
@@ -711,6 +718,9 @@ func (e *Engine) run(ctx context.Context, req *Request, sink EventSink) (Session
 		if err := req.ValidateCommandFlags(discovered, req.Global); err != nil {
 			return SessionResult{ExitCode: protocolcli.ExitCodeForError(err)}, err
 		}
+	}
+	if req.ResolveCommandParams != nil {
+		req.CommandParams = req.ResolveCommandParams(discovered, req.CommandParams)
 	}
 
 	// Phase 1b': the committed verification policy (options.sdd.verification)
