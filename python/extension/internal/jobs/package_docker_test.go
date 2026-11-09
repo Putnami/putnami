@@ -31,18 +31,16 @@ import (
 
 const imageFeature = "python/experimental-workspace-integration"
 
-// fakeUV is a uv that logs each command to $FAKE_UV_LOG. `python find` answers
-// a python that prints $FAKE_PYTHON_VERSION, `export` prints $FAKE_UV_EXPORT,
+// fakeUV is a uv that logs each command to $FAKE_UV_LOG. `run` prints
+// $FAKE_PYTHON_VERSION, `export` prints $FAKE_UV_EXPORT,
 // and `pip install --target -r` installs fastapi for a registry requirements
 // file, and a package for each staged directory a local one names. It logs the
 // local requirement lines to local.log and the staged files to staged.log.
 const fakeUV = `#!/bin/sh
 echo "$PWD|$*" >> "$FAKE_UV_LOG"
 case "$1" in
-python)
-	printf '#!/bin/sh\necho "${FAKE_PYTHON_VERSION:-3.13.4}"\n' > "$FAKE_UV_DIR/python"
-	chmod +x "$FAKE_UV_DIR/python"
-	echo "$FAKE_UV_DIR/python"
+run)
+	echo "${FAKE_PYTHON_VERSION:-3.13.4}"
 	;;
 export)
 	cat "$FAKE_UV_EXPORT"
@@ -460,7 +458,7 @@ func TestADryRunPackageRecordsTheChannelAndInstallsNothing(t *testing.T) {
 	if err != nil || !index.HasChannel(DockerChannel) {
 		t.Fatalf("channels: %+v %v", index, err)
 	}
-	if calls := readLog(t, log); len(calls) != 1 || !strings.HasSuffix(calls[0], "|python find") {
+	if calls := readLog(t, log); len(calls) != 1 || !strings.Contains(calls[0], "|run --no-sync python -c ") {
 		t.Errorf("uv ran %q", calls)
 	}
 }

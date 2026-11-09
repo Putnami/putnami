@@ -17,7 +17,7 @@ for the machine that packages it.
 
 `package --docker` assembles the image of an application on the official
 `python:<version>-slim` image, pinned by digest for each Python minor the
-extension ships. The minor is that of the interpreter `uv python find` selects
+extension ships. The minor is that of the interpreter `uv run` selects
 at the workspace root, the one the tests run on. A project may name its own
 base, pinned by digest. A base with no digest fails.
 
