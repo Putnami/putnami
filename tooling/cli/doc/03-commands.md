@@ -405,8 +405,8 @@ putnami workspace describe      # Show workspace details
 
 | Tool | Marker | Extension | What the sync writes |
 |---|---|---|---|
-| `pants` | `pants.toml` | `@putnami/pants` | Each package's edges from the `pants peek ::` export; Pants keeps its own cache. See [Run a Pants repository with Putnami](../../pants/doc/01-pants.md) |
-| `bazel` | `MODULE.bazel`, `WORKSPACE` or `WORKSPACE.bazel` | `@putnami/bazel` | Each package's edges from `bazel query //...`, or from a `bazel-graph.json` export; Bazel keeps its own cache. See [Run a Bazel workspace with Putnami](../../bazel/doc/01-bazel.md) |
+| `pants` | `pants.toml` | `@putnami/pants` | Each package's edges from the `pants peek ::` export; Pants keeps its own cache. See [Run a Pants repository with Putnami](../../../monorepo/pants/doc/01-pants.md) |
+| `bazel` | `MODULE.bazel`, `WORKSPACE` or `WORKSPACE.bazel` | `@putnami/bazel` | Each package's edges from `bazel query //...`, or from a `bazel-graph.json` export; Bazel keeps its own cache. See [Run a Bazel workspace with Putnami](../../../monorepo/bazel/doc/01-bazel.md) |
 
 `@putnami/pants` and `@putnami/bazel` are not published yet: until their first release, `init --from <tool>` stops at the extension install, after it has written the workspace files.
 

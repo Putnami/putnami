@@ -1,7 +1,7 @@
 {
   "$schema": "https://putnami.dev/schemas/putnami-features.json",
   "protocolVersion": 2,
-  "namespace": "tooling",
+  "namespace": "monorepo",
   "features": [
     {
       "id": "monorepo/bazel-delegated-stack",
