@@ -106,41 +106,41 @@ func staticSDKFor(release string) (staticSDK, error) {
 }
 
 // PublishDockerJob pushes the packaged image of an application through the
-// shared publisher. Any other component publishes nothing.
+// shared publisher. A library or an Xcode project publishes nothing.
 func PublishDockerJob() cli.JobFunc {
 	return func(ctx *pctx.Context, emit *jsonl.Emitter, args []string) (string, map[string]any, error) {
-		if ctx.Project.Type != "application" {
+		if !imageable(ctx) {
 			return "SKIP", nil, nil
 		}
 		return dockerpublish.Publish(ctx, emit, args)
 	}
 }
 
+// imageable reports whether the job's component may have an image: a package
+// that is not a library.
+func imageable(ctx *pctx.Context) bool {
+	return ctx.Project.Type != "library" && isPackage(ctx.Project.FullPath)
+}
+
 // PackageDockerJob assembles the image of an application: its executable
 // product, built static with the Static Linux SDK, and the resource bundles
-// beside it, on a digest-pinned distroless base. It needs no Docker daemon,
-// and holds the lock of the stack root while it builds. A library or an Xcode
+// beside it, on a digest-pinned distroless base. It needs no Docker daemon.
+// It builds under the lock of the stack root and copies what it built out of
+// the build directory before it releases the lock. A library or an Xcode
 // project packages nothing.
 func PackageDockerJob(stack stacks.Stack) cli.JobFunc {
 	return func(ctx *pctx.Context, emit *jsonl.Emitter, args []string) (string, map[string]any, error) {
-		if ctx.Project.Type != "application" {
+		if !imageable(ctx) {
 			return "SKIP", nil, nil
 		}
-		err := stack.Locked(ctx, emit, func(run context.Context, root stacks.RootStep, emit *jsonl.Emitter) error {
-			product, err := executableAt(root, ctx, emit)
-			if err != nil {
-				return err
-			}
-			return assembleImage(run, ctx, root, product, cli.ParseFlags(args), emit)
-		})
-		if err != nil {
+		if err := packageImage(stack, ctx, cli.ParseFlags(args), emit); err != nil {
 			return "FAILED", nil, err
 		}
 		return "OK", nil, nil
 	}
 }
 
-func assembleImage(run context.Context, ctx *pctx.Context, root stacks.RootStep, product string, flags map[string]string, emit *jsonl.Emitter) error {
+func packageImage(stack stacks.Stack, ctx *pctx.Context, flags map[string]string, emit *jsonl.Emitter) error {
 	base := cli.FlagString(flags, "docker-base-image", ctx.Params.String("docker-base-image", "dockerBaseImage"))
 	if base == "" {
 		base = staticBase
@@ -166,13 +166,35 @@ func assembleImage(run context.Context, ctx *pctx.Context, root stacks.RootStep,
 		return pkgmeta.WriteChannelRecord(output, pkgmeta.ChannelRecord{Version: version, Artifact: name, Channels: []string{dockerChannel}})
 	}
 	if cli.FlagBool(flags, "dry-run", ctx.Params.Bool("dry-run", false, "dryRun")) {
-		emit.Info("dry run: would assemble an image of " + product + " for " + platform + " on " + base)
+		emit.Info("dry run: would assemble an image of " + name + " for " + platform + " on " + base)
 		if err := record(); err != nil {
 			return fail(emit, CodeImageFailed, err)
 		}
 		return nil
 	}
 
+	staging, err := os.MkdirTemp("", "putnami-swift-image-")
+	if err != nil {
+		return fail(emit, CodeImageFailed, err)
+	}
+	defer func() { _ = os.RemoveAll(staging) }()
+	var product string
+	err = stack.Locked(ctx, emit, func(run context.Context, root stacks.RootStep, emit *jsonl.Emitter) error {
+		if product, err = executableAt(root, ctx, emit); err != nil {
+			return err
+		}
+		return buildStatic(run, root, product, triple, staging, emit)
+	})
+	if err != nil {
+		return err
+	}
+	return assembleImage(ctx, flags, staging, product, base, platform, output, name, version, record, emit)
+}
+
+// buildStatic builds the executable product with the pinned Static Linux SDK
+// of the selected Swift for triple, and copies it and the resource bundles
+// beside it into staging.
+func buildStatic(run context.Context, root stacks.RootStep, product, triple, staging string, emit *jsonl.Emitter) error {
 	sdk, err := selectStaticSDK(run, root, emit)
 	if err != nil {
 		return err
@@ -193,7 +215,16 @@ func assembleImage(run context.Context, ctx *pctx.Context, root stacks.RootStep,
 	if _, err := swiftOutput(run, root, build...); err != nil {
 		return fail(emit, CodeImageFailed, err)
 	}
-	spec, err := imageSpec(binPath, product, base, platform, defaultImagePort)
+	if err := stageBuild(binPath, product, staging); err != nil {
+		return fail(emit, CodeImageFailed, err)
+	}
+	return nil
+}
+
+// assembleImage assembles the staged executable and bundles into the OCI
+// layout of output, records it, and loads it into Docker when asked.
+func assembleImage(ctx *pctx.Context, flags map[string]string, staging, product, base, platform, output, name, version string, record func() error, emit *jsonl.Emitter) error {
+	spec, err := imageSpec(staging, product, base, platform, defaultImagePort)
 	if err != nil {
 		return fail(emit, CodeImageFailed, err)
 	}
@@ -344,18 +375,78 @@ func firstLine(text string) string {
 	return line
 }
 
-// imageSpec describes the application's image: the executable at
-// /app/<product>, and each resource bundle SwiftPM wrote beside it under
-// /app, where Bundle.module finds it.
-func imageSpec(binPath, product, base, platform, port string) (oci.Spec, error) {
+// stageBuild copies the executable product and the resource bundles of a bin
+// path into staging, with the same names.
+func stageBuild(binPath, product, staging string) error {
 	executable := filepath.Join(binPath, product)
 	info, err := os.Stat(executable)
 	if err != nil || info.IsDir() {
-		return oci.Spec{}, fmt.Errorf("swift build wrote no executable %s", executable)
+		return fmt.Errorf("swift build wrote no executable %s", executable)
+	}
+	if err := copyFile(executable, filepath.Join(staging, product), 0o755); err != nil {
+		return err
+	}
+	entries, err := os.ReadDir(binPath)
+	if err != nil {
+		return err
+	}
+	for _, entry := range entries {
+		if !entry.IsDir() || !isResourceBundle(entry.Name()) {
+			continue
+		}
+		bundle := filepath.Join(binPath, entry.Name())
+		err := filepath.WalkDir(bundle, func(path string, d fs.DirEntry, err error) error {
+			if err != nil || d.IsDir() {
+				return err
+			}
+			info, err := os.Stat(path)
+			if err != nil {
+				return err
+			}
+			if info.IsDir() {
+				return fmt.Errorf("%s is a link to a directory, which an image cannot hold", path)
+			}
+			rel, err := filepath.Rel(binPath, path)
+			if err != nil {
+				return err
+			}
+			mode := fs.FileMode(0o644)
+			if info.Mode()&0o111 != 0 {
+				mode = 0o755
+			}
+			return copyFile(path, filepath.Join(staging, rel), mode)
+		})
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// copyFile copies the content of a file, through a link, with mode.
+func copyFile(source, target string, mode fs.FileMode) error {
+	if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
+		return err
+	}
+	data, err := os.ReadFile(source) //nolint:gosec // a product of the job's build
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(target, data, mode) //nolint:gosec // a staged copy
+}
+
+// imageSpec describes the application's image: the executable at
+// /app/<product>, and each resource bundle SwiftPM wrote beside it under
+// /app, where Bundle.module finds it, from the staged build.
+func imageSpec(staged, product, base, platform, port string) (oci.Spec, error) {
+	executable := filepath.Join(staged, product)
+	info, err := os.Stat(executable)
+	if err != nil || info.IsDir() {
+		return oci.Spec{}, fmt.Errorf("no executable %s was staged", executable)
 	}
 	entrypoint := imageAppDir + "/" + product
 	files := []oci.File{{Source: executable, Path: entrypoint, Mode: 0o755}}
-	resources, err := resourceBundles(binPath)
+	resources, err := resourceBundles(staged)
 	if err != nil {
 		return oci.Spec{}, err
 	}
@@ -376,9 +467,9 @@ func imageSpec(binPath, product, base, platform, port string) (oci.Spec, error) 
 }
 
 // resourceBundles lists the files of the .resources and .bundle directories of
-// a bin path, the resource bundles of the package's targets.
-func resourceBundles(binPath string) ([]oci.File, error) {
-	entries, err := os.ReadDir(binPath)
+// a staged build, the resource bundles of the product's targets.
+func resourceBundles(staged string) ([]oci.File, error) {
+	entries, err := os.ReadDir(staged)
 	if err != nil {
 		return nil, err
 	}
@@ -387,7 +478,7 @@ func resourceBundles(binPath string) ([]oci.File, error) {
 		if !entry.IsDir() || !isResourceBundle(entry.Name()) {
 			continue
 		}
-		err := filepath.WalkDir(filepath.Join(binPath, entry.Name()), func(path string, d fs.DirEntry, err error) error {
+		err := filepath.WalkDir(filepath.Join(staged, entry.Name()), func(path string, d fs.DirEntry, err error) error {
 			if err != nil || d.IsDir() {
 				return err
 			}
@@ -398,7 +489,7 @@ func resourceBundles(binPath string) ([]oci.File, error) {
 			if info.IsDir() {
 				return fmt.Errorf("%s is a link to a directory, which an image cannot hold", path)
 			}
-			rel, err := filepath.Rel(binPath, path)
+			rel, err := filepath.Rel(staged, path)
 			if err != nil {
 				return err
 			}

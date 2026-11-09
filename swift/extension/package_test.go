@@ -56,6 +56,7 @@ esac
 		t.Fatal(err)
 	}
 	t.Setenv("PATH", bin+string(os.PathListSeparator)+os.Getenv("PATH"))
+	t.Setenv("PUTNAMI_HOME", filepath.Join(state, "home"))
 	return log
 }
 
@@ -115,6 +116,9 @@ func TestPackageAssemblesTheImageOfAStaticExecutable(t *testing.T) {
 	}
 	if n := strings.Count(readFileString(t, log), "swift sdk install"); n != 1 {
 		t.Errorf("the SDK was installed %d times", n)
+	}
+	if _, err := os.Stat(filepath.Join(os.Getenv("PUTNAMI_HOME"), "locks", "swift-sdk-swift-6.4.2-RELEASE_static-linux-0.1.0.lock")); err != nil {
+		t.Errorf("the install took no lock in the Putnami home: %v", err)
 	}
 
 	spectest.Proves(t, feature, "publishes-an-application-image", "publish-pushes-the-application-image")
@@ -219,14 +223,20 @@ func TestADryRunPackageRecordsTheChannelAndRunsNoSwift(t *testing.T) {
 	}
 }
 
-func TestOnlyAnApplicationPackagesAndPublishes(t *testing.T) {
-	for _, kind := range []string{"library", ""} {
-		ctx := &pctx.Context{Project: pctx.Project{Name: "lib", Path: "lib", Type: kind}}
+func TestALibraryOrAnXcodeProjectNeitherPackagesNorPublishes(t *testing.T) {
+	root := t.TempDir()
+	serverPackage(t, root)
+	writeFile(t, root, "App/Shop.xcodeproj/project.pbxproj", "// !$*UTF8*$!\n")
+	for _, project := range []pctx.Project{
+		{Name: "server", Path: "server", FullPath: filepath.Join(root, "server"), Type: "library"},
+		{Name: "Shop", Path: "App", FullPath: filepath.Join(root, "App")},
+	} {
+		ctx := &pctx.Context{WorkspaceRoot: root, Project: project}
 		if status, _, err := PackageDockerJob(stack(t))(ctx, jsonl.New(), nil); status != "SKIP" || err != nil {
-			t.Errorf("package of %q: %s %v", kind, status, err)
+			t.Errorf("package of %s: %s %v", project.Path, status, err)
 		}
 		if status, _, err := PublishDockerJob()(ctx, jsonl.New(), []string{"--docker"}); status != "SKIP" || err != nil {
-			t.Errorf("publish of %q: %s %v", kind, status, err)
+			t.Errorf("publish of %s: %s %v", project.Path, status, err)
 		}
 	}
 }
