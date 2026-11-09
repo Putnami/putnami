@@ -205,7 +205,7 @@ override cannot add `hosts` to another task.
 
 A stack whose components differ in kind, or whose toolchain has its own
 version rule, says so in its extension's Go code
-([ADR 0009](adr/0009-a-stack-shapes-its-components-tasks-and-versions.md)):
+([ADR 0010](adr/0010-a-stack-shapes-its-components-tasks-and-versions.md)):
 
 - the detector names the tasks each component runs (`Component.Tasks`): a
   task outside the list passes with no step and no toolchain check. A .NET
@@ -217,7 +217,10 @@ version rule, says so in its extension's Go code
   project; the probe reports them, with the component's manifest, among its
   watched files;
 - `Stack.MatchVersion` replaces the core's rule for an exact expected
-  version: the .NET stack applies `global.json`'s `rollForward`.
+  version: the .NET stack applies `global.json`'s `rollForward`;
+- a root step lists the absolute manifests it runs for
+  (`RootStep.Manifests`): the job's component, or, in a workspace job, every
+  component of the workspace at that stack root.
 
 Several components share one stack root: one Cargo workspace, one
 `target/`, one `target/nextest/ci/junit.xml`. The core runs the tasks of one

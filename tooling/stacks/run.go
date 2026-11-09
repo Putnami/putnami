@@ -285,6 +285,10 @@ type RootStep struct {
 	// Program returns the program to run for a command name: the pinned
 	// toolchain for the toolchain command, and name otherwise.
 	Program func(name string) string
+	// Manifests are the absolute manifest paths of the components the step
+	// runs for, for a detector that names them: the job's component, or, in a
+	// workspace job, every component of the workspace at this stack root.
+	Manifests []string
 }
 
 // RootJob is a job that runs step at the component's stack root: the toolchain
@@ -323,11 +327,16 @@ func (s Stack) rootStep(ctx context.Context, in runInput, emit *jsonl.Emitter) (
 	if err != nil {
 		return RootStep{}, Metadata{}, Profile{}, err
 	}
+	var manifests []string
+	if meta.Manifest != "" {
+		manifests = []string{filepath.Join(in.workspaceRoot, filepath.FromSlash(meta.Manifest))}
+	}
 	return RootStep{
-		Dir:     filepath.Join(in.workspaceRoot, filepath.FromSlash(meta.Root)),
-		Project: in.projectAbs,
-		Env:     selected.Env,
-		Program: func(name string) string { return selected.Program(profile.Toolchain, name) },
+		Dir:       filepath.Join(in.workspaceRoot, filepath.FromSlash(meta.Root)),
+		Project:   in.projectAbs,
+		Env:       selected.Env,
+		Program:   func(name string) string { return selected.Program(profile.Toolchain, name) },
+		Manifests: manifests,
 	}, meta, profile, nil
 }
 
@@ -367,11 +376,19 @@ const (
 func (s Stack) WorkspaceRootJob(missing MissingToolchain, step func(context.Context, RootStep, *jsonl.Emitter) error) cli.JobFunc {
 	return func(ctx *pctx.Context, emit *jsonl.Emitter, _ []string) (string, map[string]any, error) {
 		background := context.Background()
-		components, err := s.workspaceComponents(ctx)
+		components, manifests, err := s.workspaceComponents(ctx)
 		if err != nil {
 			return statusFailed, nil, failWith(emit, CodeProjectConfigInvalid, "%v", err)
 		}
 		for _, c := range components {
+			step := step
+			if m := manifests[c.Path]; len(m) > 0 {
+				inner := step
+				step = func(ctx context.Context, root RootStep, emit *jsonl.Emitter) error {
+					root.Manifests = m
+					return inner(ctx, root, emit)
+				}
+			}
 			in := runInput{workspaceRoot: ctx.WorkspaceRoot, projectAbs: filepath.Join(ctx.WorkspaceRoot, filepath.FromSlash(c.Path)), metadata: c.Metadata}
 			if missing == WarnOnMissingToolchain && s.toolchainMissing(background, in) {
 				emit.DiagnosticWithCode("warning", fmt.Sprintf("%s is left out: the %s toolchain is not on this machine", c.Path, s.Profile.ID), "", 0, 0, CodeToolchainMissing)
@@ -410,11 +427,12 @@ func (s Stack) toolchainMissing(ctx context.Context, in runInput) bool {
 }
 
 // workspaceComponents returns one component per stack root among the
-// workspace's projects this extension owns.
-func (s Stack) workspaceComponents(ctx *pctx.Context) ([]wsproto.ProbeProject, error) {
+// workspace's projects this extension owns, and, by the path of each, the
+// absolute manifests of every component at its root.
+func (s Stack) workspaceComponents(ctx *pctx.Context) ([]wsproto.ProbeProject, map[string][]string, error) {
 	disabled, err := disabledTags(ctx.WorkspaceRoot)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	paths := []string{}
 	for _, ref := range ctx.WorkspaceProjects {
@@ -425,17 +443,21 @@ func (s Stack) workspaceComponents(ctx *pctx.Context) ([]wsproto.ProbeProject, e
 	slices.Sort(paths)
 	result, err := s.Probe(ctx.WorkspaceRoot, wsproto.ProbeRequest{Version: wsproto.ProbeProtocolVersion, Extension: s.Extension, Paths: paths})
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	// A component stands for its stack root before the input-only project of
 	// that root: its toolchain is the one the root's tasks select.
 	chosen := map[string]int{}
 	components := make([]wsproto.ProbeProject, 0, len(result.Projects))
 	inputOnly := map[int]bool{}
+	rootManifests := map[string][]string{}
 	for _, p := range result.Projects {
 		var meta Metadata
 		if err := json.Unmarshal(p.Metadata, &meta); err != nil {
-			return nil, err
+			return nil, nil, err
+		}
+		if meta.Manifest != "" {
+			rootManifests[meta.Root] = append(rootManifests[meta.Root], filepath.Join(ctx.WorkspaceRoot, filepath.FromSlash(meta.Manifest)))
 		}
 		i, seen := chosen[meta.Root]
 		switch {
@@ -447,7 +469,13 @@ func (s Stack) workspaceComponents(ctx *pctx.Context) ([]wsproto.ProbeProject, e
 			components[i], inputOnly[i] = p, false
 		}
 	}
-	return components, nil
+	manifests := map[string][]string{}
+	for _, c := range components {
+		var meta Metadata
+		_ = json.Unmarshal(c.Metadata, &meta)
+		manifests[c.Path] = rootManifests[meta.Root]
+	}
+	return components, manifests, nil
 }
 
 // ownedBy reports whether one of the extension references is this stack's: its

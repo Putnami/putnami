@@ -58,11 +58,31 @@ which names it; a step that exits non-zero with no failed case, or a missing
 TRX or Cobertura report, fails it too. The output directory is emptied before
 the step.
 
+`lint` also checks every relative link and anchor of the project's
+`README.md` files and `doc/` trees with the documentation link check every
+language extension shares; `--docs-links=false` turns it off.
+
 A task of a project waits for the same task of the projects it references.
 Every project has the workspace root for stack root, because MSBuild reads
 `global.json`, `Directory.Build.props` and `NuGet.config` up to it and a
 build writes the `obj/` of each project it references: the .NET tasks of a
 workspace run one at a time.
+
+## Restore and upgrade the packages
+
+`dotnet build`, `dotnet test` and `dotnet format` restore their project
+themselves. The workspace commands restore every project ahead of them:
+
+| Job | What it runs |
+|---|---|
+| `workspace-install`, run by `putnami install` | `dotnet restore <project file>` for every project of the workspace that `disable.tags` keeps, with `--locked-mode` for a project that holds a `packages.lock.json`, so the install keeps its locked versions. `--force` adds `--force`. |
+| `workspace-fetch`, run by `putnami install` | The same restore, which downloads the packages into the NuGet global packages folder. A hosted run calls it with the network before the tasks, which then restore from that folder. |
+| `deps-upgrade`, run by `putnami upgrade` | `dotnet package update --project <project file>` for every project, which moves each package reference to the newest version its sources hold and restores the project, its `packages.lock.json` included. It needs the .NET 10 SDK and the network, and fails with `dotnet.package_update_failed` otherwise. |
+
+A restore that fails fails the command with `dotnet.restore_failed`. When the
+machine has no SDK `global.json` accepts, the command installs one as a task
+does; offline, it leaves the workspace out with a `stacks.toolchain_missing`
+warning.
 
 ## The SDK check
 
@@ -165,7 +185,8 @@ daemon, and `--docker-tag` adds a tag. The image name is the project name in
 lowercase.
 
 `putnami publish --docker` pushes it through the shared publisher, to the
-`registries.oci.publish` registry of the project, else of the workspace. An
+registry `--docker-registry` names, else the `registries.oci.publish` registry
+of the project, else of the workspace. An
 application whose `putnami.json` sets `options.publish.docker`, or lists
 `docker` in `publish`, is a release-set member of the OCI ecosystem.
 

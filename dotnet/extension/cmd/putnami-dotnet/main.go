@@ -9,6 +9,7 @@ import (
 
 	dotnet "go.putnami.dev/dotnet/extension"
 	"go.putnami.dev/sdk/extension/cli"
+	"go.putnami.dev/sdk/extension/docslinks"
 )
 
 var runtimeVersion string
@@ -25,6 +26,10 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer, runJobs func(
 	stack, err := dotnet.Stack()
 	if err == nil {
 		err = stack.Entrypoint(args, stdin, stdout, runtimeVersion, func(jobs map[string]cli.JobFunc) {
+			jobs["lint-docs"] = docslinks.Job()
+			jobs[dotnet.WorkspaceInstallJobName] = dotnet.WorkspaceInstallJob(stack)
+			jobs[dotnet.WorkspaceFetchJobName] = dotnet.WorkspaceFetchJob(stack)
+			jobs[dotnet.DepsUpgradeJobName] = dotnet.DepsUpgradeJob(stack)
 			jobs[dotnet.ServeJobName] = dotnet.ServeJob(stack)
 			jobs[dotnet.RunJobName] = dotnet.RunJob(stack)
 			jobs[dotnet.PackageDockerJobName] = dotnet.PackageDockerJob(stack)

@@ -455,3 +455,20 @@ func TestAStackRootExclusionJoinsTheWorkspaceInput(t *testing.T) {
 		t.Errorf("RootPatterns = %v", p.RootPatterns())
 	}
 }
+
+func TestAStackRootExclusionLeavesTheOwnRootAnswer(t *testing.T) {
+	root := t.TempDir()
+	writeFile(t, root, "Cargo.toml", "")
+	writeFile(t, root, "src/lib.rs", "")
+	writeFile(t, root, "global.json", "{}")
+	writeFile(t, root, "bin/Debug/global.json", "{}")
+	s := testStack(t)
+	s.Profile.Inputs["manifests"] = append(s.Profile.Inputs["manifests"], "{root}/**/global.json", "!{root}/**/bin/**")
+	got := resolveOne(t, s, root, ".", "rust:lint")
+	if got.Error != "" || !slices.Contains(got.Files, "global.json") || slices.Contains(got.Files, "bin/Debug/global.json") {
+		t.Errorf("a project that is its own root reads its root files without the excluded ones: %+v", got)
+	}
+	if !slices.Contains(got.Basis.Content[0], "!**/bin/**") {
+		t.Errorf("the basis carries the exclusion: %v", got.Basis.Content)
+	}
+}

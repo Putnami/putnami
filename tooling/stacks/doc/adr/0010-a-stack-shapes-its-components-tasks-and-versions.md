@@ -1,4 +1,4 @@
-# ADR 0009 — A stack shapes its components' tasks, inputs and toolchain versions
+# ADR 0010 — A stack shapes its components' tasks, inputs and toolchain versions
 
 - **Status**: accepted
 - **Date**: 2026-11-09
@@ -8,23 +8,21 @@
 ## Context
 
 The core of [ADR 0001](0001-one-extension-per-stack-on-a-shared-core.md), with
-ADR 0002 to 0008, runs every task of a profile on every component of a
+ADR 0002 to 0009, runs every task of a profile on every component of a
 variant, reads JUnit test reports, keys a task on the files its input
 patterns select under the project, and matches the machine's toolchain
 version with one rule: equal, or a stable release of a shorter version.
-ADR 0007's `excludes` and ADR 0008's `!` patterns keep build outputs out of
-the files under the project. .NET breaks the rest on a typical repository:
+ADR 0007's `excludes`, ADR 0008's `!` patterns and ADR 0009's `!{root}/`
+stack-root exclusions keep build outputs out of a task's files. .NET breaks
+the rest on a typical repository:
 
 - `dotnet test` runs only in a test project; in a library it exits 0 and
   writes no report, which the core reads as `stacks.report_missing`.
-- A build reads `global.json`, `Directory.Build.props` and `NuGet.Config`
-  anywhere under the stack root, and copies some of them into `bin/` and
-  `obj/`: `{root}/**/global.json` selects the copies, so a build changes the
-  next run's key.
 - `dotnet test` writes a TRX report with no extra package; a JUnit report
   needs a logger package in every test project.
 - A folder that holds a solution and a project file makes `dotnet build`
-  without an argument fail; the step must name the project file.
+  without an argument fail; the step must name the project file, and a
+  workspace restore must name every project file of the stack root.
 - `global.json` states an SDK version and a roll-forward policy: `8.0.400`
   accepts 8.0.404 by default, so the core's rule fails a correct machine.
 - A test project measures the code of the projects it references, which run
@@ -34,8 +32,10 @@ the files under the project. .NET breaks the rest on a typical repository:
 
 ## Decision
 
-The core gains six generic means, each optional, and the .NET profile uses
-all of them:
+The core gains five generic means, each optional, and the .NET profile uses
+all of them, with ADR 0009's `!{root}/**/bin/**` and `!{root}/**/obj/**` so
+the copies a build writes of `global.json` and `Directory.Build.props` change
+no key:
 
 1. **A detector names the tasks a component runs.** `Component.Tasks`
    reaches the probe metadata, and the task asks the detector again when it
@@ -43,19 +43,17 @@ all of them:
    fresh. A task outside the list passes with nothing run, not even the
    toolchain check. No list runs every task, as before; a component whose
    list is empty is no project.
-2. **A stack-root pattern can exclude.** ADR 0008's `!` exclusion extends
-   to the stack root: `!{root}/…` removes what it matches from the
-   stack-root files, and joins the manifest's workspace input of the task
-   with them, so a build that copies a `global.json` into `bin/` changes no
-   key. The project files keep ADR 0007's `excludes` and ADR 0008's
-   exclusions.
-3. **A test task reads TRX reports.** `reports.trx` names TRX patterns read
+2. **A test task reads TRX reports.** `reports.trx` names TRX patterns read
    by the evidence readers beside `reports.junit`; the two count in one test
    summary, and a test task whose JUnit and TRX patterns together match no
    report fails with `stacks.report_missing`.
-4. **A step names the component's manifest.** The probe metadata carries the
+3. **A step names the component's manifest.** The probe metadata carries the
    detector's manifest file, and `{manifest}` expands to its absolute path.
-5. **A stack matches its own toolchain versions.** `Stack.MatchVersion`, when
+   A root step lists the manifests it runs for in `RootStep.Manifests`: the
+   job's component, or every component at the stack root in a workspace job,
+   so `dotnet restore` reaches each project of a root that holds no
+   solution.
+4. **A stack matches its own toolchain versions.** `Stack.MatchVersion`, when
    set, replaces the core's rule; the key still carries the expected version
    the files state, and the check compares the version the toolchain command
    prints, the one the build uses. A profile may name a fallback command,
@@ -64,11 +62,10 @@ all of them:
    `toolchain.check: warn` relaxes it. The .NET stack reads `dotnet --version`,
    which fails outright when no SDK satisfies `global.json`, falls back to
    `dotnet --list-sdks`, and applies `global.json`'s `rollForward`.
-
-6. **A stack counts the coverage its tests measure.**
+5. **A stack counts the coverage its tests measure.**
    `Stack.CrossComponentCoverage` counts a coverage file of another component
-   as the task's, and a coverage file name relative to an absolute report
-   source is read under that source.
+   as the task's. Coverlet's file names, relative to the source `/`, are read
+   under that source, as ADR 0009 settles for a relative path.
 
 When the toolchain command fails and its fallback lists no satisfying
 version, the toolchain on the machine is a mismatch: a stack that provides
@@ -87,8 +84,8 @@ a task's output directory before its steps.
 
 ## Consequences
 
-- Rust's metadata gains its crate's manifest path, so every Rust key changes
-  once; its behavior does not.
+- The metadata of every stack whose detector names a manifest gains its path,
+  so each of its keys changes once; its behavior does not.
 - A component the detector misreads runs a task it should not, or skips one
   it should run: the detector's rule is in its stack's reference page, with
   the project-file property that settles it.

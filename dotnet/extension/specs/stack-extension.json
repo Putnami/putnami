@@ -9,7 +9,8 @@
     "The SDK version global.json states is checked with its roll-forward policy before each task",
     "A project overrides any value of the .NET profile in its putnami.json",
     "On a machine with no .NET SDK, or none global.json accepts, putnami lint, test and build install an SDK global.json accepts, with the runtimes the projects target, and run",
-    "serve and run start an application, and package and publish produce its OCI image, with no Docker daemon"
+    "serve and run start an application, and package and publish produce its OCI image, with no Docker daemon",
+    "putnami install restores every project's NuGet packages, and putnami upgrade moves their references to the newest versions"
   ],
   "nonGoals": [
     "Evaluating MSBuild: a reference, an assembly name or a test marker that holds a property or a condition is not read",
@@ -71,11 +72,23 @@
     {
       "id": "publishes-an-application-image",
       "text": "publish with the docker channel pushes the packaged image to the declared OCI registry through the shared publisher, and an application whose putnami.json publishes docker is a release-set member of the OCI ecosystem."
+    },
+    {
+      "id": "restores-the-workspace",
+      "text": "workspace-install runs dotnet restore on the file of every project of the workspace that disable.tags keeps, in locked mode for a project with a packages.lock.json and with --force under the force flag; workspace-fetch runs the same restore to fill the NuGet global packages folder. A machine with no SDK global.json accepts installs one unless the run is offline, where the stack root is left out with a warning."
+    },
+    {
+      "id": "upgrades-the-packages",
+      "text": "deps-upgrade runs dotnet package update on the file of every project of the workspace with the selected SDK. It fails with dotnet.package_update_failed, and runs nothing, when that SDK is older than .NET 10 or the run is offline."
+    },
+    {
+      "id": "checks-documentation-links",
+      "text": "lint checks every relative link and anchor of the project's README.md files and doc/ trees with the shared documentation link check, unless the docs-links flag is off."
     }
   ],
   "decisions": [
     "tooling/stacks/doc/adr/0001-one-extension-per-stack-on-a-shared-core.md",
-    "tooling/stacks/doc/adr/0009-a-stack-shapes-its-components-tasks-and-versions.md",
+    "tooling/stacks/doc/adr/0010-a-stack-shapes-its-components-tasks-and-versions.md",
     "dotnet/extension/doc/adr/0001-the-sdk-comes-from-microsoft-and-an-image-copies-onto-the-official-runtime.md"
   ]
 }

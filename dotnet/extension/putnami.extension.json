@@ -105,8 +105,20 @@
           "dependsOn": [
             "^lint"
           ]
+        },
+        {
+          "id": "docs",
+          "task": "lint-docs",
+          "if": "params.docs-links"
         }
-      ]
+      ],
+      "flags": {
+        "docs-links": {
+          "type": "boolean",
+          "default": true,
+          "description": "Check every relative link and anchor in the project's README.md files and doc/ trees; a broken one fails lint."
+        }
+      }
     },
     "test": {
       "description": "Test the test projects with dotnet test, and read their TRX and Coverlet Cobertura reports.",
@@ -131,6 +143,44 @@
           "dependsOn": [
             "^build"
           ]
+        }
+      ]
+    },
+    "workspace-fetch": {
+      "description": "Download the packages every project of the workspace references into the NuGet global packages folder with dotnet restore.",
+      "quiet": true,
+      "run": [
+        {
+          "id": "workspace-fetch",
+          "task": "workspace-fetch-exec"
+        }
+      ]
+    },
+    "workspace-install": {
+      "description": "Restore every project of the workspace with dotnet restore, in locked mode for a project with a packages.lock.json.",
+      "quiet": true,
+      "flags": {
+        "force": {
+          "type": "boolean",
+          "default": false,
+          "description": "Restore a project even when NuGet holds its restore current"
+        }
+      },
+      "run": [
+        {
+          "id": "workspace-install",
+          "task": "workspace-install-exec"
+        }
+      ]
+    },
+    "deps-upgrade": {
+      "description": "Update the package references of every project of the workspace with dotnet package update.",
+      "visibility": "internal",
+      "quiet": true,
+      "run": [
+        {
+          "id": "deps-upgrade",
+          "task": "deps-upgrade-exec"
         }
       ]
     },
@@ -234,6 +284,10 @@
           "type": "boolean",
           "default": false,
           "description": "Push the image"
+        },
+        "docker-registry": {
+          "type": "string",
+          "description": "Registry to push the image to, above registries.oci.publish"
         },
         "dry-run": {
           "type": "boolean",
@@ -443,6 +497,103 @@
         "effects": [
           "network",
           "toolchain-cache"
+        ]
+      }
+    },
+    "lint-docs": {
+      "description": "Documentation link check: every relative link and anchor in the project's README.md files and doc/ trees must resolve, with the exact case of the file's name. The task body is the SDK's docslinks.Job, shared with every language extension. A link may name any file of the workspace, so the check reads the workspace's Git candidate cut (the tracked files and the untracked files no ignore rule excludes) and its key is the workspace input `git:**`, which holds that cut: deleting or renaming a link target, or editing a heading an anchor names, moves the key, and an ignored file is neither read nor keyed. The project input names the README.md the check starts from, so the key does not fold the project's ignored build output. Outside a Git work tree the check reads the disk and the task has no key. It needs no .NET SDK.",
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": [
+        "lint-docs"
+      ],
+      "cwd": "{projectRoot}",
+      "timeoutMs": 120000,
+      "inputs": {
+        "readme": {
+          "from": "project",
+          "files": [
+            "README.md"
+          ]
+        },
+        "repository": {
+          "from": "workspace",
+          "files": [
+            "git:**"
+          ]
+        },
+        "docs-links": {
+          "from": "params"
+        }
+      },
+      "outputs": {
+        "data": {
+          "description": "Documentation link result with diagnostics"
+        }
+      },
+      "reads": [
+        "sources"
+      ],
+      "cache": {
+        "noOutput": true,
+        "enabled": true
+      },
+      "declares": {}
+    },
+    "workspace-fetch-exec": {
+      "description": "Run dotnet restore on the file of every project of the workspace, in locked mode for a project with a packages.lock.json, which downloads the packages it references into the NuGet global packages folder. A stack root whose SDK the machine lacks installs one global.json accepts, unless the run is offline.",
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": [
+        "workspace-fetch"
+      ],
+      "cwd": "{workspaceRoot}",
+      "cache": false,
+      "timeoutMs": 1800000,
+      "declares": {
+        "effects": [
+          "network",
+          "process",
+          "toolchain-cache",
+          "workspace-files"
+        ]
+      }
+    },
+    "workspace-install-exec": {
+      "description": "Run dotnet restore on the file of every project of the workspace, except the projects disable.tags excludes, in locked mode for a project with a packages.lock.json, with --force under the force flag. A stack root whose SDK the machine lacks installs one global.json accepts; offline, it is left out with a warning.",
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": [
+        "workspace-install"
+      ],
+      "cwd": "{workspaceRoot}",
+      "cache": false,
+      "timeoutMs": 1800000,
+      "declares": {
+        "effects": [
+          "network",
+          "process",
+          "toolchain-cache",
+          "workspace-files"
+        ]
+      }
+    },
+    "deps-upgrade-exec": {
+      "description": "Run dotnet package update on the file of every project of the workspace with the selected SDK, which needs the .NET 10 SDK and the network, and restores each project, its packages.lock.json included.",
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": [
+        "deps-upgrade"
+      ],
+      "cwd": "{workspaceRoot}",
+      "cache": false,
+      "timeoutMs": 1800000,
+      "declares": {
+        "effects": [
+          "network",
+          "process",
+          "toolchain-cache",
+          "workspace-files"
         ]
       }
     },

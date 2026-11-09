@@ -7,7 +7,7 @@
       "id": "dotnet/stack-extension",
       "type": "feature",
       "name": "Run the projects of a .NET repository as Putnami tasks",
-      "outcome": "A team with a .NET repository adds @putnami/dotnet and runs putnami lint, test, build, serve, run, package and publish over its projects with Putnami's runner and cache, without rewriting its build or installing an SDK: test projects read their TRX and Cobertura reports, the global.json SDK is checked and installed, and an application becomes an OCI image",
+      "outcome": "A team with a .NET repository adds @putnami/dotnet and runs putnami install, upgrade, lint, test, build, serve, run, package and publish over its projects with Putnami's runner and cache, without rewriting its build or installing an SDK: test projects read their TRX and Cobertura reports, the global.json SDK is checked and installed, and an application becomes an OCI image",
       "owner": "dotnet",
       "target": "coded",
       "requirements": [
@@ -177,6 +177,48 @@
             "kind": "acceptance",
             "checks": [
               "publish-pushes-the-application-image"
+            ]
+          }
+        },
+        {
+          "id": "restores-the-workspace",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "workspace-install-restores-every-project-file",
+              "workspace-fetch-downloads-the-packages-of-every-project",
+              "an-offline-workspace-install-with-no-sdk-warns"
+            ]
+          }
+        },
+        {
+          "id": "upgrades-the-packages",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "deps-upgrade-runs-dotnet-package-update-on-every-project",
+              "deps-upgrade-refuses-an-sdk-before-10-and-an-offline-run"
+            ]
+          }
+        },
+        {
+          "id": "checks-documentation-links",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "lint-checks-the-documentation-links"
             ]
           }
         }

@@ -60,7 +60,7 @@ digest.
   HTTPS, as `dotnet-install` does; the archive's bytes are checked against it.
 - The workspace lock pins no SDK, so two machines may install two SDKs the
   same `global.json` accepts; the cache key carries the stated version, as
-  ADR 0009 of the stack core settles.
+  ADR 0010 of the stack core settles.
 - An image holds no SDK and no source: only the published output.
 
 ## Alternatives rejected
