@@ -16,7 +16,7 @@
   "requirements": [
     {
       "id": "packages-become-projects",
-      "text": "The probe answers, for each candidate directory the observe Pants detector knows as a component: its directory as source name, the components it depends on in pants-graph.json when the root holds one, the extension @putnami/pants, the tag pants, and metadata naming the component, the workspace root as stack root and GLOBAL.pants_version. Any other candidate holding a BUILD file, the root included, is bare: named by its directory, with no extension, so it runs no task."
+      "text": "The probe answers, for each candidate directory the observe Pants detector knows as a component: its directory as source name, the components it depends on in pants-graph.json when the root holds one and the edges the sync wrote, each attributed build-graph, the extension @putnami/pants, the tag pants, and metadata: the component, the root as stack root, GLOBAL.pants_version. Any other candidate holding a BUILD file, the root included, is bare: named by its directory, with no extension, so it runs no task."
     },
     {
       "id": "sync-writes-the-package-graph",
@@ -41,6 +41,7 @@
   ],
   "decisions": [
     "tooling/stacks/doc/adr/0001-one-extension-per-stack-on-a-shared-core.md",
-    "tooling/stacks/doc/adr/0008-a-delegated-stack-keeps-its-tool-cache.md"
+    "tooling/stacks/doc/adr/0008-a-delegated-stack-keeps-its-tool-cache.md",
+    "protocols/workspace/doc/adr/0007-a-delegated-build-graph-backs-its-edges.md"
   ]
 }
