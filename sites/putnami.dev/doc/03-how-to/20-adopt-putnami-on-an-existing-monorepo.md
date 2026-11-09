@@ -18,6 +18,7 @@ Putnami adopts a tool in one of two modes:
 |---|---|---|
 | Pants | Delegate | `putnami init --from pants` |
 | Bazel | Delegate | `putnami init --from bazel` |
+| Nx | Import or delegate, asked | `putnami init --from nx` |
 
 ## Pants
 
@@ -203,11 +204,108 @@ task.
 `putnami validate` fails with `bazel.sync_stale` when the edges no longer
 match Bazel: run `putnami projects sync` and commit the result.
 
+## Nx
+
+Nx adopts in the mode you pick. In a terminal, `putnami init --from nx` asks,
+with **Import** preselected; in CI or from an agent it imports unless you pass
+`--mode delegate`.
+
+- **Import**: a TypeScript project's `build`, `test` and `lint` whose script
+  already runs `bun build`, `bun test` or Biome run as `@putnami/typescript`
+  tasks, under Putnami's runner and cache. Every other target, a `jest` test
+  or an `@nx/webpack:webpack` build for example, keeps running through Nx, so
+  no target changes the tool that checks it.
+- **Delegate**: you keep Nx and its cache, local or Nx Cloud. Each task runs
+  `nx run <project>:<target>` on one affected project, and Putnami caches
+  nothing for it.
+
+### Before you start
+
+- `@putnami/nx` is not published yet: until its first release,
+  `putnami init --from nx` stops at the extension install.
+- `nx.json` lies at the root of the repository, which becomes the workspace
+  root, and Nx is installed in `node_modules`: each task runs
+  `npx --no nx`, which never downloads one.
+
+### Turn the repository into a workspace
+
+At the repository root:
+
+```bash
+putnami init --from nx --mode delegate
+```
+
+`init` declares `@putnami/nx`, and `@putnami/typescript` in import mode,
+records the mode in `putnami.workspace.json`, installs the extensions and
+synchronizes the projects. The sync reads `graph.json` when the root holds
+one (`nx graph --file=graph.json`), else `nx.json`, each `project.json` and
+each workspace `package.json`, and writes in each project's `putnami.json`
+the extension, the projects it depends on, and the jobs it disables:
+
+```json
+{
+  "$schema": "https://putnami.dev/schemas/putnami-project.json",
+  "extensions": ["@putnami/nx"],
+  "dependencies": ["/packages/pricing"],
+  "disable": { "jobs": ["lint"] }
+}
+```
+
+A project with no `lint` target has `lint` disabled. In import mode a
+project's `disable.jobs` also names the extension that does not run each
+target: `@putnami/nx:test` when a `bun test` script moves to
+`@putnami/typescript`, `@putnami/typescript:build` when a
+`@nx/webpack:webpack` build keeps running through Nx. The sync owns these
+entries. The output lists each target Putnami does not run itself, such as
+`serve`, `e2e` or a `jest` test, with the reason.
+
+### Switch mode, or see what a sync would change
+
+Rerun `init` in the workspace. It shows the diff of each `putnami.json` and
+the mode change, and writes nothing:
+
+```bash
+putnami init --from nx --mode import
+```
+
+`--apply` records the mode, installs `@putnami/typescript` when import needs
+it, and synchronizes:
+
+```bash
+putnami init --from nx --mode import --apply
+```
+
+### Run what a change affects
+
+```bash
+putnami test --impacted
+```
+
+In delegate mode, after a change to `packages/pricing`, Putnami runs
+`pricing` and the projects that depend on it, `api` here, at the root:
+
+```text
+npx --no nx run @demo/pricing:test --outputStyle=static
+npx --no nx run @demo/api:test --outputStyle=static
+```
+
+Nx's `dependsOn` runs the upstream targets, and Nx's cache answers them. A
+change to `api` alone runs `api` alone. The test task reads the JUnit and
+Cobertura or LCOV files the project's jest or vitest configuration names,
+`jest-junit`'s `outputDirectory` and `coverageDirectory` for example; without
+them its result is the exit code alone. Each result records `delegatedTo: nx`.
+
+Nx infers edges from imports, so `putnami validate` fails with
+`nx.sync_stale` when a project's `putnami.json` no longer matches Nx's graph:
+run `putnami projects sync` and commit the result.
+
 ## Next
 
 - [Run a Pants repository with Putnami](https://github.com/Putnami/putnami/blob/main/monorepo/pants/doc/01-pants.md):
   every command, the version check, what the sync owns.
 - [Run a Bazel workspace with Putnami](https://github.com/Putnami/putnami/blob/main/monorepo/bazel/doc/01-bazel.md):
   every command, the version check, what the sync owns.
+- [Run a Nx repository with Putnami](https://github.com/Putnami/putnami/blob/main/monorepo/nx/doc/01-nx.md):
+  both modes, what the sync owns, which targets import maps.
 - [Observe a change in your CI](/docs/how-to/observe-a-change-in-your-ci): the
   report on a pull request, before you adopt anything.
