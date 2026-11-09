@@ -261,7 +261,8 @@ func (g GraphSync) markedProjects(root string) ([]string, error) {
 }
 
 // marks reports whether a putnami.json is the sync's: it names the
-// extension, or carries the sync's tag.
+// extension, or, when the sync is Marked, carries MarkMember in the
+// extension's option layer.
 func (g GraphSync) marks(doc map[string]any) bool {
 	if slices.Contains(stringList(doc["extensions"]), g.Extension) {
 		return true

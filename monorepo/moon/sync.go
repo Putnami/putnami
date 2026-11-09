@@ -464,8 +464,9 @@ func replaceFile(file string, data []byte) error {
 }
 
 // graphSync writes the moon project graph: a directory that holds a moon.yml
-// is a moon project, whose edges the sync owns, and the tag moon marks every
-// project the sync wrote, whatever extension it runs.
+// is a moon project, whose edges the sync owns, and
+// options["@putnami/moon"].graphSync marks every project the sync wrote,
+// whatever extension it runs.
 var graphSync = stacks.GraphSync{
 	Extension:      ExtensionName,
 	Extensions:     slices.Sorted(maps.Values(LanguageExtensions)),

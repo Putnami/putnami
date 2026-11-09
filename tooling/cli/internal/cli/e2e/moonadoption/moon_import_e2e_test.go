@@ -19,7 +19,7 @@ func languageExtension(t *testing.T, root, dir, name, log string) {
 	t.Helper()
 	ext := filepath.Join(root, dir)
 	task := func(command string) string {
-		return `"` + command + `-run": {"kind": "command", "command": "{extensionRoot}/run.sh", "args": ["` + command + `"], "cwd": "{projectRoot}", "cache": false, "timeoutMs": 60000}`
+		return `"` + command + `-run": {"kind": "command", "command": "{extensionRoot}/run.sh", "args": ["` + command + `"], "cwd": "{projectRoot}", "cache": false, "timeoutMs": -1}`
 	}
 	command := func(command string) string {
 		return `"` + command + `": {"description": "` + command + ` with the stand-in", "run": [{"id": "` + command + `", "task": "` + command + `-run"}]}`
