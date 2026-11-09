@@ -629,3 +629,4 @@ Durable decisions:
 - [ADR 0002 — Lines are scopes, registries are keyed by ecosystem, versions come from git](doc/adr/0002-lines-are-scopes-registries-by-ecosystem.md)
 - [ADR 0003 — Extensions answer toolchain pins](doc/adr/0003-extensions-answer-toolchain-pins.md)
 - [ADR 0004 — Extensions expand their input selectors](doc/adr/0004-extensions-expand-their-input-selectors.md)
+- [ADR 0005 — The docker-registry flag overrides the OCI registry](doc/adr/0005-the-docker-registry-flag-overrides-the-oci-registry.md)

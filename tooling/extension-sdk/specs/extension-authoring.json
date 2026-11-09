@@ -82,7 +82,7 @@
     },
     {
       "id": "oci-publish-by-digest",
-      "text": "Verified uploads and reuse emit a member at the full repository path, excluding only the registry host. Native images require an exact selected plan coordinate, project and version; standalone images retain their content version. Private image publication writes only the digest; workload Docker publication may tag its version. Channels belong to the release. The workspace registry determines the target. Publication makes one manifest existence check, with no extra push or digest lookup."
+      "text": "Verified uploads and reuse emit a member at the full repository path, excluding only the registry host. Native images require an exact selected plan coordinate, project and version; standalone images retain their content version. Private image publication writes only the digest; workload Docker publication may tag its version. Channels belong to the release. The target is --docker-registry, else the workspace registry. Publication makes one manifest existence check, with no extra push or digest lookup."
     },
     {
       "id": "dry-run-member-probe",

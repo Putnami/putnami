@@ -89,7 +89,7 @@ with its `manifest.json`.
 `registries.oci.publish` names, through the publisher the Go, TypeScript and PHP
 extensions share. The workspace probe declares the image as an `oci` release-set
 member of an application that publishes the docker channel, so a release set can
-deploy it.
+deploy it. `--docker-registry <registry>` overrides that registry for one push.
 
 ```bash
 putnami publish <project> --docker --dry-run   # report what would be pushed

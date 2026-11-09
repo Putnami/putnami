@@ -110,6 +110,7 @@
     "protocols/workspace/doc/adr/0001-core-owns-identity-providers-own-language.md",
     "protocols/workspace/doc/adr/0002-lines-are-scopes-registries-by-ecosystem.md",
     "protocols/workspace/doc/adr/0003-extensions-answer-toolchain-pins.md",
-    "protocols/workspace/doc/adr/0004-extensions-expand-their-input-selectors.md"
+    "protocols/workspace/doc/adr/0004-extensions-expand-their-input-selectors.md",
+    "protocols/workspace/doc/adr/0005-the-docker-registry-flag-overrides-the-oci-registry.md"
   ]
 }

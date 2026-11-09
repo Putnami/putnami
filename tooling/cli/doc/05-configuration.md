@@ -607,6 +607,8 @@ The resolution order is `--docker-registry` on the command line, then
 `registries.oci.publish`, then `DOCKER_REGISTRY`, then the managed target
 `oci.putnami.dev/<workspace>/<flattened-project>`. `--docker-registry` is an
 override for a one-off push, not the place a workspace declares its registry.
+A `docker-registry` value in `options.publish` sets the same override for the
+projects it reaches, like any other `publish` flag.
 
 A workload can consume that local candidate artifact as its base:
 

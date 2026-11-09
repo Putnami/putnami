@@ -237,6 +237,10 @@
           "default": false,
           "description": "Push the image"
         },
+        "docker-registry": {
+          "type": "string",
+          "description": "Registry to push the image to, above registries.oci.publish"
+        },
         "dry-run": {
           "type": "boolean",
           "default": false,

@@ -228,7 +228,8 @@ An application turns the image on with `"options": { "package": { "docker":
 true } }` in its `putnami.json`, or with `"publish": ["docker"]`, which also
 declares the image as a member of the release set under the namespace of
 `registries.oci.publish`. `putnami publish --docker` pushes it through the
-publisher every stack shares. A library packages nothing: it reaches its Maven
+publisher every stack shares, and `--docker-registry <registry>` overrides that
+registry for one push. A library packages nothing: it reaches its Maven
 repository through its own build.
 
 ## Override the profile

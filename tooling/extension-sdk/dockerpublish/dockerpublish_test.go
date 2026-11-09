@@ -706,12 +706,51 @@ func TestDockerRegistryFromRegistriesEntry(t *testing.T) {
 		})
 	}
 
-	// A publish option is no longer a source: only the declared entry is.
+	// The camelCase `dockerRegistry` option is not a source: only the flag's own
+	// name is.
 	got, err := resolveDockerRegistry(nil, &pctx.Context{Params: pctx.Params{
 		"dockerRegistry": json.RawMessage(`"registry.example.com/legacy"`),
 	}})
 	if err != nil || got != "registry.example.com/environment" {
 		t.Fatalf("resolveDockerRegistry(publish option) = (%q, %v), want the environment floor", got, err)
+	}
+}
+
+// The CLI delivers a command flag in the job parameters, under its own name and
+// a camelCase alias, and never in the job arguments: a manifest task's arguments
+// are static. `putnami publish --docker --docker-registry <url>` runs the task
+// with `publish --docker`, so the flag wins from the parameters.
+func TestDockerRegistryFlagFromJobParameters(t *testing.T) {
+	spectest.Proves(t, "tooling/extension-authoring", "oci-publish-by-digest", "the-registry-flag-overrides-the-workspace-registry")
+	t.Setenv("DOCKER_REGISTRY", "registry.example.com/environment")
+	params := pctx.Params{
+		"docker":          json.RawMessage(`true`),
+		"docker-registry": json.RawMessage(`"localhost:15005/acme"`),
+		"dockerRegistry":  json.RawMessage(`"registry.example.com/alias"`),
+		"registries":      json.RawMessage(`{"oci":{"publish":"oci.putnami.dev/declared"}}`),
+	}
+	got, err := resolveDockerRegistry(cli.ParseFlags([]string{"publish", "--docker"}), &pctx.Context{Params: params})
+	if err != nil {
+		t.Fatalf("resolveDockerRegistry() error: %v", err)
+	}
+	if got != "localhost:15005/acme" {
+		t.Fatalf("resolveDockerRegistry() = %q, want the registry the flag names", got)
+	}
+
+	// An argument still ranks above the parameter.
+	got, err = resolveDockerRegistry(cli.ParseFlags([]string{"--docker-registry=registry.example.com/argument"}), &pctx.Context{Params: params})
+	if err != nil || got != "registry.example.com/argument" {
+		t.Fatalf("resolveDockerRegistry(argument and parameter) = (%q, %v), want the argument", got, err)
+	}
+
+	// A flag given without a value reaches the parameters as a boolean: it names
+	// no registry, so the job refuses it instead of falling back.
+	_, err = resolveDockerRegistry(cli.ParseFlags([]string{"publish", "--docker"}), &pctx.Context{Params: pctx.Params{
+		"docker-registry": json.RawMessage(`true`),
+		"registries":      params["registries"],
+	}})
+	if err == nil || !strings.Contains(err.Error(), "--docker-registry requires a registry value") {
+		t.Fatalf("resolveDockerRegistry(flag without a value) error = %v, want the missing value refused", err)
 	}
 }
 
