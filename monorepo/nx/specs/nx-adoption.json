@@ -21,11 +21,11 @@
     },
     {
       "id": "sync-writes-the-project-graph",
-      "text": "The workspace sync task writes in each Nx project's putnami.json the extension, the project IDs it depends on, and in disable.jobs each of build, test and lint the project has no target for. It reads the mode from options[\"@putnami/nx\"].mode, import by default, retracts a former project, rewrites a file only when a member it owns changes, and with the dryRun parameter writes nothing and prints the diff of each file it would change."
+      "text": "The workspace sync task writes in each Nx project's putnami.json the extension, the project IDs it depends on, and in disable.jobs each of build, test and lint the project has no target for; it owns those entries and their @putnami/nx: and @putnami/typescript: forms. It reads the mode from options[\"@putnami/nx\"].mode, import by default, retracts a former project, rewrites a file only when a member it owns changes, and with dryRun writes nothing and reports each diff."
     },
     {
       "id": "import-maps-typescript-targets",
-      "text": "In import mode, a project with package.json and a tsconfig*.json or a .ts source is TypeScript: its build, test and lint targets whose executor, or script command, the TypeScript extension covers (tsc, jest, vitest, eslint) run as the @putnami/typescript task, and @putnami/nx:<task> is disabled; every other build, test or lint target runs the delegated @putnami/nx task and @putnami/typescript:<task> is disabled, so no Putnami cache sits over Nx's."
+      "text": "In import mode, a project with package.json and a tsconfig*.json or a .ts source is TypeScript: its build, test and lint targets whose script already runs what @putnami/typescript runs (bun build, bun test, biome) run as its task, and @putnami/nx:<task> is disabled. Every other build, test or lint target, such as jest, eslint, tsc or an Nx executor, keeps running through Nx, is listed with its reason, and @putnami/typescript:<task> is disabled, so no runner changes silently."
     },
     {
       "id": "unmapped-targets-are-listed",
@@ -41,7 +41,7 @@
     },
     {
       "id": "reports-from-project-options",
-      "text": "The sync writes, as the project's test reports, the JUnit file and the Cobertura or LCOV report its jest or vitest configuration names (jest-junit outputDirectory and outputName, coverageDirectory or reportsDirectory). The test task removes them before its run, so a stale report is never read, and reads them into the test and coverage summary. A project whose configuration names none has the exit code alone as result, and the sync lists it."
+      "text": "The sync writes, as the project's test reports, the JUnit file and the Cobertura or LCOV report its jest or vitest configuration names (jest-junit outputDirectory and outputName, coverageDirectory or reportsDirectory, <rootDir> as the project), at the workspace root for jest-junit under @nx/jest. The test task removes them before its run and reads them into the test and coverage summary. A project whose configuration names none has the exit code alone as result, and the sync lists it."
     },
     {
       "id": "manifest-follows-the-profile",

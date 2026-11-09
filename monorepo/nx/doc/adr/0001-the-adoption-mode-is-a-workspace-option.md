@@ -27,11 +27,14 @@ every later `putnami projects sync` rewrites the projects' `putnami.json`.
   project has no target for.
 - In import mode, `init` also declares `@putnami/typescript`, whose probe
   claims each project with a `package.json`. For a TypeScript project, one
-  with `package.json` and `tsconfig.json`, the sync disables the qualified
-  job of the extension that does not run a target:
-  `@putnami/nx:<task>` when the TypeScript extension covers the target's
-  executor or script, `@putnami/typescript:<task>` otherwise. One extension
-  runs each task, so no Putnami cache sits over Nx's.
+  with `package.json` and a `tsconfig*.json` or a `.ts` source, the sync
+  disables the qualified job of the extension that does not run a target:
+  `@putnami/nx:<task>` when the target's script already runs what the
+  TypeScript extension runs (`bun build`, `bun test`, `biome`),
+  `@putnami/typescript:<task>` otherwise. One extension runs each task, so
+  no Putnami cache sits over Nx's, and no target changes runner: a jest,
+  eslint or tsc target, or one an Nx executor runs, stays on Nx and is
+  listed.
 - A rerun of `init` without `--apply` runs the workspace sync tasks with
   `dryRun`, prints what they would change, and writes nothing.
 
@@ -46,6 +49,13 @@ every later `putnami projects sync` rewrites the projects' `putnami.json`.
   already reports what they would change.
 
 ## Consequences
+
+- Import mode moves to Putnami only the targets whose runner is already the
+  TypeScript extension's. Moving a jest, eslint or tsc target would change
+  the tool that checks the code, which needs its own decision.
+- The sync owns the `build`, `test` and `lint` entries of `disable.jobs`
+  and their qualified forms, as the Pants sync owns `test`: an entry a team
+  writes there by hand is replaced at the next sync.
 
 - Switching mode is `putnami init --from nx --mode <mode> --apply`.
 - A build, test or lint target the TypeScript extension does not cover
