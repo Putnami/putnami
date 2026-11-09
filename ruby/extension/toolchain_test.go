@@ -2,9 +2,10 @@ package ruby
 
 import (
 	"encoding/hex"
+	"maps"
 	"os"
 	"path/filepath"
-	"slices"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -41,13 +42,16 @@ func TestTheExtensionPinsARubyReleaseTheRepositoryAccepts(t *testing.T) {
 		{name: "no statement takes the newest", want: "4.0.9"},
 		{name: "a minor takes its shipped patch", rubyVersion: "3.4\n", want: "3.4.12"},
 		{name: "a ruby- prefix reads the same", rubyVersion: "ruby-3.3\n", want: "3.3.13"},
-		{name: "the shipped patch itself", rubyVersion: "3.2.11\n", want: "3.2.11"},
+		{name: "the newest patch itself", rubyVersion: "3.2.11\n", want: "3.2.11"},
+		{name: "an exact older patch", rubyVersion: "3.3.6\n", want: "3.3.6"},
+		{name: "an exact patch with the ruby- prefix", rubyVersion: "ruby-3.4.7\n", want: "3.4.7"},
 		{name: "a major takes its newest minor", rubyVersion: "3\n", want: "3.4.12"},
 		{name: "a tool-versions file", toolVersions: "nodejs 22.1.0\nruby 3.3\n", want: "3.3.13"},
 		{name: "an accepted committed pin is kept", committed: "3.3.13", want: "3.3.13"},
 		{name: "a committed pin the statement refuses is replaced", rubyVersion: "3.4\n", committed: "3.3.13", want: "3.4.12"},
-		{name: "a committed release no longer shipped is replaced", committed: "3.4.7", want: "4.0.9"},
-		{name: "an older patch than the shipped one", rubyVersion: "3.4.7\n", want: "no pin"},
+		{name: "an accepted committed older patch is kept", rubyVersion: "3.4\n", committed: "3.4.7", want: "3.4.7"},
+		{name: "a committed release no longer shipped is replaced", committed: "3.1.6", want: "4.0.9"},
+		{name: "a patch the rv-ruby release lacks", rubyVersion: "3.4.0\n", want: "no pin"},
 		{name: "a minor no release ships", rubyVersion: "3.1\n", want: "no pin"},
 	}
 	for _, c := range cases {
@@ -119,10 +123,13 @@ func TestTheExtensionPinsARubyReleaseTheRepositoryAccepts(t *testing.T) {
 
 func TestEveryShippedArchiveHasAURLAndASHA256(t *testing.T) {
 	spectest.Proves(t, feature, "pins-a-ruby-release", "every-shipped-archive-has-a-url-and-a-sha-256")
-	var versions []string
+	newest := map[string]string{}
 	seen := map[string]bool{}
-	for _, r := range releases {
-		versions = append(versions, r.version)
+	for i, r := range releases {
+		if i > 0 && !olderThan(releases[i-1].version, r.version) {
+			t.Errorf("releases are not oldest first: %s before %s", releases[i-1].version, r.version)
+		}
+		newest[r.version[:strings.LastIndex(r.version, ".")]] = r.version
 		if len(r.digests) != len(rvRubyPlatforms) {
 			t.Errorf("%s ships %d archives, want one per platform: %v", r.version, len(r.digests), r.digests)
 		}
@@ -145,9 +152,27 @@ func TestEveryShippedArchiveHasAURLAndASHA256(t *testing.T) {
 			}
 		}
 	}
-	if want := []string{"3.2.11", "3.3.13", "3.4.12", "4.0.9"}; !slices.Equal(versions, want) {
-		t.Errorf("shipped releases = %v, want %v, oldest first", versions, want)
+	want := map[string]string{"3.2": "3.2.11", "3.3": "3.3.13", "3.4": "3.4.12", "4.0": "4.0.9"}
+	if !maps.Equal(newest, want) {
+		t.Errorf("the newest shipped patch of each minor = %v, want %v", newest, want)
 	}
+	if len(releases) != 47 {
+		t.Errorf("%d releases shipped, want every stable patch of release %s: 47", len(releases), rvRubyRelease)
+	}
+}
+
+// olderThan reports whether version a, such as 3.4.9, comes before b, such as
+// 3.4.10.
+func olderThan(a, b string) bool {
+	pa, pb := strings.Split(a, "."), strings.Split(b, ".")
+	for i := range min(len(pa), len(pb)) {
+		na, _ := strconv.Atoi(pa[i])
+		nb, _ := strconv.Atoi(pb[i])
+		if na != nb {
+			return na < nb
+		}
+	}
+	return len(pa) < len(pb)
 }
 
 func TestToolchainResolveRefusesAnIdentityItDoesNotPin(t *testing.T) {

@@ -14,9 +14,6 @@ import (
 // LockIdentity is the key of the Ruby pin in the workspace lock.
 const LockIdentity = "ruby"
 
-// rvRubyRelease is the spinel-coop/rv-ruby release the archives come from.
-const rvRubyRelease = "20261023"
-
 const rvRubyURL = "https://github.com/spinel-coop/rv-ruby/releases/download/" + rvRubyRelease + "/ruby-%s.%s.tar.gz"
 
 // rvRubyPlatforms names the rv-ruby build of each platform. Linux takes the
@@ -29,39 +26,11 @@ var rvRubyPlatforms = map[string]string{
 }
 
 // release is a Ruby release the extension can pin, with the SHA-256 of its
-// archive for each platform.
+// archive for each platform. releases.go lists them; to move to another
+// rv-ruby release, run scripts/rv-ruby-releases.sh with its tag.
 type release struct {
 	version string
 	digests map[string]string
-}
-
-// releases lists the shipped releases, oldest first: the latest stable patch
-// of each minor the rv-ruby release holds.
-var releases = []release{
-	{"3.2.11", map[string]string{
-		"darwin/amd64": "b40be21a5b224329e59d4276131c787cb0ae68617884511e0f256745cd8d5f10",
-		"darwin/arm64": "a6cbd7d16b735572ec98562d6f4ef13afe40c9318a1c0919ff9971f9d6d7d7e2",
-		"linux/amd64":  "773beb5b6b9b4f1c3a03dcbfc3b76025b574a409f1d79233b119b6cbbf1c9eb9",
-		"linux/arm64":  "869d0cb8cccaab7029b1ecd22408b035f74c4b3201c77be0e12df8c27562758d",
-	}},
-	{"3.3.13", map[string]string{
-		"darwin/amd64": "5888338a10eca3c337919688af7a4c670be27c1f3527e42b4e333f915cad50d3",
-		"darwin/arm64": "4b20f7b1a07327c54c2cb88ec6e36490b4dbb7703d0296e794526d9cc37967d8",
-		"linux/amd64":  "e122ba0e5ef87b4e948c73a08696677df81bb0b7991c9b656918540ec940b2c9",
-		"linux/arm64":  "8844a7fb0a1debd8bc3ddad626000d55c27123b7d67d7650c6b16005c5ec0db0",
-	}},
-	{"3.4.12", map[string]string{
-		"darwin/amd64": "f0486193baf65317f875927fc8656b3fe5cec06a165648a401054b3f206f96bf",
-		"darwin/arm64": "ca533624180ee28a740017fd7adb310d6b0fd067a3409c7d3c1b538f94cf9494",
-		"linux/amd64":  "870cb1547941444754ca4eff50732d5a07a26feb59fbf932f9f6650ed05c18a7",
-		"linux/arm64":  "a7cdda85baa73ab9d39d1efe730d613762bfdf1f7b4d6fc168486df971744dff",
-	}},
-	{"4.0.9", map[string]string{
-		"darwin/amd64": "46525402025acde1428a014cf345a3653ecbc496a0606eb4a60ef08999632f86",
-		"darwin/arm64": "38130a97c314e2e44198f37fc6555a66ab9a8011ecc5980d4ae36f2858ed11b5",
-		"linux/amd64":  "16b24f5b3aac3925f95cbbdd08e55c2877aec4f2614edf44af236a59a6591aa4",
-		"linux/arm64":  "6b49808f690ecfe0f51f266b9c3477908f69d7a927d90355565368c40c875d22",
-	}},
 }
 
 // HandleToolchainResolve serves the toolchain-resolve control call. The bool
