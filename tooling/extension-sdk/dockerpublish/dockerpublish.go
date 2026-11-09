@@ -355,7 +355,7 @@ func resolveDockerRegistry(flags map[string]string, ctx *pctx.Context) (string, 
 
 // dockerRegistryFlag answers the `--docker-registry` value from the job
 // arguments, else from the `docker-registry` job parameter. A parameter that is
-// not a string is a flag given without a value, and it is an error.
+// not a string is a command flag given without a value, and it is an error.
 func dockerRegistryFlag(flags map[string]string, params pctx.Params) (string, error) {
 	if value, ok := flags["docker-registry"]; ok {
 		return strings.TrimSpace(value), nil

@@ -706,7 +706,8 @@ func TestDockerRegistryFromRegistriesEntry(t *testing.T) {
 		})
 	}
 
-	// A publish option is no longer a source: only the declared entry is.
+	// The camelCase `dockerRegistry` option is not a source: only the flag's own
+	// name is.
 	got, err := resolveDockerRegistry(nil, &pctx.Context{Params: pctx.Params{
 		"dockerRegistry": json.RawMessage(`"registry.example.com/legacy"`),
 	}})
