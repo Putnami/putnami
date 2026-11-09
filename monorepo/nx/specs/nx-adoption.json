@@ -25,7 +25,7 @@
     },
     {
       "id": "import-maps-typescript-targets",
-      "text": "In import mode, a project whose directory holds package.json and tsconfig.json is TypeScript: its build, test and lint targets whose executor or script the TypeScript extension covers (tsc, jest, vitest, eslint) run as the @putnami/typescript task, and @putnami/nx:<task> is disabled; every other build, test or lint target runs the delegated @putnami/nx task and @putnami/typescript:<task> is disabled, so no Putnami cache sits over Nx's."
+      "text": "In import mode, a project with package.json and a tsconfig*.json or a .ts source is TypeScript: its build, test and lint targets whose executor, or script command, the TypeScript extension covers (tsc, jest, vitest, eslint) run as the @putnami/typescript task, and @putnami/nx:<task> is disabled; every other build, test or lint target runs the delegated @putnami/nx task and @putnami/typescript:<task> is disabled, so no Putnami cache sits over Nx's."
     },
     {
       "id": "unmapped-targets-are-listed",
@@ -41,7 +41,7 @@
     },
     {
       "id": "reports-from-project-options",
-      "text": "The sync writes, as the project's test reports, the JUnit files (junit*.xml) and the Cobertura (cobertura-coverage.xml) or LCOV (lcov.info) report under the outputs of its test target, its options resolved; the test task removes them before its run, so a stale report is never read, and reads them into the test and coverage summary. A project whose test outputs name none has the exit code alone as result, and the sync lists it."
+      "text": "The sync writes, as the project's test reports, the JUnit file and the Cobertura or LCOV report its jest or vitest configuration names (jest-junit outputDirectory and outputName, coverageDirectory or reportsDirectory). The test task removes them before its run, so a stale report is never read, and reads them into the test and coverage summary. A project whose configuration names none has the exit code alone as result, and the sync lists it."
     },
     {
       "id": "manifest-follows-the-profile",
