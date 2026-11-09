@@ -295,7 +295,8 @@ func RunCommand(command string, ioctx IO, args []string) error {
 
 	switch command {
 	case "help", "":
-		return help(params, ioctx)
+		help(params, ioctx)
+		return nil
 
 	// The public root: one entry per thing the user knows.
 	case "login":
@@ -448,7 +449,7 @@ func runtimeInfo(args []string, ioctx IO) error {
 
 // help lists the public root: exactly the entries of publicEntries. Hidden
 // aliases, machine commands and operator commands never appear.
-func help(params map[string]any, ioctx IO) error {
+func help(params map[string]any, ioctx IO) {
 	commands := make([]map[string]string, 0, len(publicEntries))
 	for _, entry := range publicEntries {
 		commands = append(commands, map[string]string{
@@ -459,7 +460,7 @@ func help(params map[string]any, ioctx IO) error {
 	}
 	if clicore.StructuredOutput(params) {
 		writeResult(map[string]any{"commands": commands}, params, ioctx, "")
-		return nil
+		return
 	}
 	width := 0
 	for _, entry := range publicEntries {
@@ -473,7 +474,6 @@ func help(params map[string]any, ioctx IO) error {
 	}
 	ioctx.Stdout("")
 	ioctx.Stdout("Run `putnami cloud <command> help` for the verbs of one command.")
-	return nil
 }
 
 func resultParamsFor(command string, args []string, env map[string]string) map[string]any {
