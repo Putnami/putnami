@@ -135,15 +135,84 @@ The extension installs the gems with Bundler.
 
 | Job | What it does |
 |---|---|
+| `workspace-fetch` | Runs `bundle cache` at each stack root that has a `Gemfile.lock`, which downloads the locked gems into the extension's gem cache. It installs nothing, so no gem code runs. It keeps Bundler's install path and local configuration in private directories, so it writes nothing in the repository. A stack root with no `Gemfile.lock` is skipped. With no Ruby on the machine it warns and passes. |
 | `install`, before `lint` and `test` | Runs `bundle check` at the component's stack root, then `bundle install` when the bundle is incomplete or when `bundle --version` is not the `BUNDLED WITH` of `Gemfile.lock`, one run per stack root at a time. |
 | `workspace-install`, from `putnami install` | Runs the same at each stack root of the workspace's projects, except the projects `disable.tags` excludes; `--force` installs a root whose bundle and Bundler pass as well. With no Ruby on the machine it warns and passes. |
 | `deps-upgrade` | Runs `bundle update` at each stack root. |
 
 With offline dependencies, such as in a hosted run, `bundle install --local`
-installs from the gems already on the machine, a Bundler mismatch alone
-installs nothing, and `deps-upgrade` fails.
-There is no `workspace-fetch`: Bundler downloads a gem only as it installs
-it, and `bundle cache` writes `vendor/cache` into the repository.
+installs from the gems already on the machine and from the gem cache that
+`workspace-fetch` fills, a Bundler mismatch alone installs nothing, and
+`deps-upgrade` fails. The gem cache sits under the extension's machine cache,
+and every stack root shares it: no fetch removes a gem another root locked.
+
+## Run an application
+
+A component is an application when its directory holds `config.ru`, the file
+that makes it a Rack application. Any other component is a library. `serve`,
+`run` and `package` skip a library.
+
+| Command | What it runs |
+|---|---|
+| `putnami serve <project>` | `bundle exec rails server -b 0.0.0.0 -p <port>` in the project directory when it holds `bin/rails`, else `bundle exec rackup -o 0.0.0.0 -p <port>`. `--port` defaults to 3000, and 0 selects a free port; the port is also in `PORT`. It reports the server ready once the port accepts connections, so `putnami qualify` and compose can wait on it. It runs in the development environment. |
+| `putnami run <project> --args "<arguments>"` | `bundle exec ruby <entrypoint> <arguments>` in the project directory, and exits with its exit code. `--entrypoint` defaults to `bin/rails`, so `--args "db:migrate"` runs a Rails command. |
+
+Both run the install step first, with the Ruby the toolchain check selects.
+
+## Package and publish an image
+
+An application reaches a registry as an OCI image, a standard container image.
+Declare the channel in the project's `putnami.json`:
+
+```json
+{ "options": { "package": { "docker": true }, "publish": { "docker": true } } }
+```
+
+`putnami package` assembles the image with no Docker daemon. `--docker-load`
+also loads it into the local Docker daemon. `putnami publish` pushes it to the
+registry that `registries.oci.publish` of `putnami.workspace.json` declares,
+through the shared publisher of the Go and TypeScript extensions.
+`--docker-registry <registry>` overrides that registry for one push.
+
+| Layer | Content |
+|---|---|
+| Bundle | `bundle install` with `BUNDLE_DEPLOYMENT=1` and `BUNDLE_WITHOUT=development:test`, under `/usr/local/bundle`, without the `.gem` archives and the Git history of a Git source |
+| Files | The stack root under `/app`, without `.git`, `tmp`, `log`, `storage`, `node_modules`, `spec`, `test`, `coverage`, `.bundle`, `vendor/bundle`, Putnami's `.putnami` and `.gen`, and the files that hold secrets: `config/master.key`, `config/credentials/*.key` and every `.env*` file |
+| Writable directories | `tmp/`, `tmp/cache`, `tmp/pids`, `tmp/sockets` and `log/`, owned by the image's user |
+
+The image runs as the user `65534:65534`, for whom `/app` is read-only but
+`tmp/` and `log/`. It listens on `PORT`, 8080 by default, with `RAILS_ENV` and
+`RACK_ENV` set to `production`, `RAILS_LOG_TO_STDOUT=1` and
+`RAILS_SERVE_STATIC_FILES=1`. Its command is `bundle exec rails server` on
+`$PORT` when the application holds `bin/rails`, else `bundle exec rackup`. A
+Rails application still needs its `RAILS_MASTER_KEY` or `SECRET_KEY_BASE` at
+run time, from the platform that runs the image.
+
+The base is the official `ruby:<version>-slim-trixie` image for the minor
+version of the Ruby that installs the bundle, pinned by digest for 3.2, 3.3,
+3.4 and 4.0. A slim image has no compiler and no database client library:
+`libpq` for the `pg` gem, for example. An application that needs one names its
+own base with `--docker-base-image image@sha256:<digest>`. A base with no
+digest fails with `ruby.base_not_pinned`.
+
+The bundle is installed on the machine that runs `package`, so its native
+extensions, such as those of `puma` or `nokogiri`, are built for that machine.
+The machine must therefore be a Linux machine with glibc, of the image's
+architecture. The default base follows the machine's Ruby minor version; a
+base you name must hold the same Ruby minor version. `--platform` selects
+the target, `linux/amd64` by default. Any other machine, such as a Mac, fails
+with `ruby.package_host_mismatch`, which names the machine and the target:
+package on a Linux runner of the target architecture. A CI runner such as
+`ubuntu-latest` with the application's Ruby is one.
+[ADR 0001](adr/0001-an-application-image-copies-onto-the-official-ruby-image.md)
+records why.
+
+An image packages an application whose stack root is its own directory, with a
+`Gemfile.lock`. A path gem outside that directory or a symbolic link fails the
+package.
+
+A library packages nothing: a gem reaches its registry through `gem push`.
+Putnami publishes no gem and no base image.
 
 ## Filter the tests and check the links
 
@@ -279,4 +348,7 @@ design of the stack core is in
 - `--watch` matches the stack-root inputs without their exclusions, so a
   repository that keeps `spec/examples.txt` reruns its packs' tests after
   each run.
-- No build or publish task.
+- No build task, and no gem publishing: `package` and `publish` produce the
+  image of an application only.
+- `package` builds native extensions on the packaging machine, so it cannot
+  build an image for another architecture or OS. A Mac packages nothing.
