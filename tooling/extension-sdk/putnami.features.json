@@ -301,7 +301,8 @@
               "private-loopback-routes-workload-images",
               "one-manifest-existence-check-per-image",
               "image-member-matches-native-plan",
-              "image-private-publish-writes-only-digest"
+              "image-private-publish-writes-only-digest",
+              "the-registry-flag-overrides-the-workspace-registry"
             ]
           }
         },
