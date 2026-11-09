@@ -5,35 +5,31 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
 
 	"go.putnami.dev/protocol/evidence"
 	"go.putnami.dev/protocol/features/spectest"
-	"go.putnami.dev/tooling/observe/internal/detectors/moon"
+	"go.putnami.dev/tooling/observe/detect/moon"
 )
 
-// moonBase is a moon workspace: a TypeScript API whose moon.yml depends on
-// the Rust pricing library, which has no package.json, and a web front end.
-// apps/* is globbed, pricing is mapped by name.
-var moonBase = map[string]string{
-	".moon/workspace.yml":         "projects:\n  globs: ['apps/*']\n  sources:\n    pricing: 'packages/pricing'\n",
-	"package.json":                `{"name": "demo-observe-moon", "private": true, "workspaces": ["apps/*"]}`,
-	"apps/api/moon.yml":           "language: 'typescript'\ndependsOn: ['pricing']\n",
-	"apps/api/package.json":       `{"name": "@demo/api"}`,
-	"apps/api/src/index.ts":       "export const api = 1;\n",
-	"apps/web/package.json":       `{"name": "@demo/web"}`,
-	"apps/web/src/main.ts":        "export const web = 1;\n",
-	"packages/pricing/moon.yml":   "language: 'rust'\n",
-	"packages/pricing/Cargo.toml": "[package]\nname = \"pricing\"\nversion = \"0.1.0\"\n",
-	"packages/pricing/src/lib.rs": "pub fn price() -> u32 { 1 }\n",
+// moonDemo reads testdata/demos/moon.txtar: its base files, its change and
+// the export its CI wrote.
+func moonDemo(t *testing.T) (base, head map[string]string, graph string) {
+	t.Helper()
+	base, head = map[string]string{}, map[string]string{}
+	for _, f := range readDemo(t, "moon") {
+		switch prefix, rel, _ := strings.Cut(f.name, "/"); prefix {
+		case "base":
+			base[rel] = f.content
+		case "head":
+			head[rel] = f.content
+		case "ci":
+			graph = f.content
+		}
+	}
+	return base, head, graph
 }
-
-// moonGraph is what `moon project-graph --json` writes for the demo.
-const moonGraph = `{"graph": {"nodes": [
-  {"id": "api", "source": "apps/api", "alias": "@demo/api"},
-  {"id": "pricing", "source": "packages/pricing"},
-  {"id": "web", "source": "apps/web", "alias": "@demo/web"}
-], "node_holes": [], "edge_property": "directed", "edges": [[0, 1, "production"]]}}`
 
 // observeMoon commits the demo, then a change to pricing, and observes it
 // with the extra working-tree files and the named export.
@@ -46,7 +42,10 @@ func observeMoon(t *testing.T, base map[string]string, extra map[string]string, 
 	}
 	git(t, root, "add", "--all")
 	git(t, root, "commit", "--quiet", "-m", "base")
-	writeDemoFile(t, root, "packages/pricing/src/lib.rs", "pub fn price() -> u32 { 2 }\n")
+	_, head, _ := moonDemo(t)
+	for name, content := range head {
+		writeDemoFile(t, root, name, content)
+	}
 	git(t, root, "commit", "--quiet", "-am", "head")
 	for name, content := range extra {
 		writeDemoFile(t, root, name, content)
@@ -67,6 +66,7 @@ func observeMoon(t *testing.T, base map[string]string, extra map[string]string, 
 
 func TestTheMoonWorkspaceIsExplainedWithAndWithoutAnExport(t *testing.T) {
 	spectest.Proves(t, "tooling/observe-moon", "moon-change-analysis", "the-moon-workspace-is-explained-with-and-without-an-export")
+	moonBase, _, moonGraph := moonDemo(t)
 	named := filepath.Join(t.TempDir(), "graph.json")
 	if err := os.WriteFile(named, []byte(moonGraph), 0o644); err != nil {
 		t.Fatal(err)
@@ -103,6 +103,7 @@ func TestTheMoonWorkspaceIsExplainedWithAndWithoutAnExport(t *testing.T) {
 
 func TestAMalformedWorkspaceYMLLeavesTheRepositoryToTheOtherDetectors(t *testing.T) {
 	spectest.Proves(t, "tooling/observe-moon", "moon-projects", "a-malformed-workspace-yml-leaves-the-repository-to-the-other-detectors")
+	moonBase, _, _ := moonDemo(t)
 	base := map[string]string{}
 	for name, content := range moonBase {
 		base[name] = content

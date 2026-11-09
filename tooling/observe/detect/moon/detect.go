@@ -1,0 +1,400 @@
+package moon
+
+import (
+	"encoding/json"
+	"io/fs"
+	"os"
+	"path"
+	"path/filepath"
+	"slices"
+	"sort"
+	"strings"
+
+	diag "go.putnami.dev/protocol/diagnostic"
+	"go.putnami.dev/protocol/evidence"
+)
+
+// TasksFile is the file whose tasks every project inherits, in moon 1.x.
+const TasksFile = ".moon/tasks.yml"
+
+// TasksDir holds the task files a project inherits by its language, stack,
+// layer or tags.
+const TasksDir = ".moon/tasks"
+
+// ExportCommand is the command that writes DefaultGraphFile.
+const ExportCommand = "moon project-graph --json > " + DefaultGraphFile
+
+// Task is one moon task of a project.
+type Task struct {
+	// Name is the task id within its project.
+	Name string
+	// Tags are the task's own tags.
+	Tags []string
+}
+
+// Project is one moon project, with what an integration needs to run it.
+type Project struct {
+	// ID is the moon project id.
+	ID string
+	// Dir is the workspace-relative project directory, "." for the root.
+	Dir string
+	// Language is moon's language of the project: the one its moon.yml
+	// states, else the one its files imply, else "unknown".
+	Language string
+	// Stack and Layer classify the project; Layer reads moon 1.x's type
+	// when no layer is stated. Empty when unstated.
+	Stack string
+	Layer string
+	// Tags are the project's tags, sorted.
+	Tags []string
+	// Tasks are the project's tasks, sorted by name: its own over those it
+	// inherits.
+	Tasks []Task
+	// DependsOn are the workspace-relative directories of the projects it
+	// depends on.
+	DependsOn []string
+	// SourceFile is the workspace-relative moon.yml of the project, or the
+	// export it comes from, or empty.
+	SourceFile string
+}
+
+// Detection is what Detect read.
+type Detection struct {
+	// Projects are sorted by directory; empty outside a moon workspace.
+	Projects []Project
+	// FromExport reports that the projects come from the graph export.
+	FromExport bool
+	// Diagnostics are the findings of the read; a file that cannot be read
+	// costs what it would have stated, never the run.
+	Diagnostics []diag.Diagnostic
+}
+
+// IsWorkspace reports whether root holds a moon workspace: its
+// .moon/workspace.yml.
+func IsWorkspace(root string) bool {
+	return exists(root, WorkspaceFile)
+}
+
+// Detect reads the moon projects of the repository at root, from the graph
+// export when there is a usable one, else from the moon configuration, with
+// each project's language, stack, layer, tags and tasks. The tasks of the
+// export win; without them a project's tasks are its moon.yml tasks over the
+// ones it inherits from .moon/tasks.yml and .moon/tasks/*.yml.
+func Detect(root string, opts Options) Detection {
+	d := &detector{root: root}
+	found, source, _ := d.projects(opts.GraphFile)
+	inherited := d.taskFiles()
+	out := Detection{FromExport: source == evidence.SourceOrchestrator}
+	for _, p := range found {
+		out.Projects = append(out.Projects, d.describe(p, inherited))
+	}
+	sort.Slice(out.Projects, func(i, j int) bool { return out.Projects[i].Dir < out.Projects[j].Dir })
+	out.Diagnostics = d.diagnostics
+	return out
+}
+
+// taskFile is one file of inherited tasks.
+type taskFile struct {
+	// rel is its workspace-relative path.
+	rel string
+	// name is its file name without the extension, which names who inherits
+	// it in moon 1.x.
+	name string
+	// by is its inheritedBy condition, moon 2.x's; nil without one.
+	by map[string]any
+	// tasks are its tasks, by name.
+	tasks map[string]map[string]any
+}
+
+// taskFiles reads .moon/tasks.yml, then the .yml files under .moon/tasks in
+// path order: a later file's task replaces an earlier one of the same name.
+func (d *detector) taskFiles() []taskFile {
+	var rels []string
+	if exists(d.root, TasksFile) {
+		rels = append(rels, TasksFile)
+	}
+	dir := filepath.Join(d.root, filepath.FromSlash(TasksDir))
+	_ = filepath.WalkDir(dir, func(p string, entry fs.DirEntry, err error) error {
+		if err != nil || entry.IsDir() {
+			return nil
+		}
+		if ext := path.Ext(entry.Name()); ext == ".yml" || ext == ".yaml" {
+			rels = append(rels, relative(d.root, p))
+		}
+		return nil
+	})
+	var out []taskFile
+	for _, rel := range rels {
+		data, err := os.ReadFile(filepath.Join(d.root, filepath.FromSlash(rel)))
+		if err != nil {
+			d.warn(CodeManifestUnreadable, rel, "%s cannot be read: %v; no project inherits its tasks", rel, err)
+			continue
+		}
+		tasks, _, err := topLevel(string(data), "tasks")
+		var by any
+		if err == nil {
+			by, _, err = topLevel(string(data), "inheritedBy")
+		}
+		if err != nil {
+			d.warn(CodeManifestUnreadable, rel, "%s cannot be read: %v; no project inherits its tasks", rel, err)
+			continue
+		}
+		f := taskFile{rel: rel, name: strings.TrimSuffix(path.Base(rel), path.Ext(rel)), tasks: taskMap(tasks)}
+		f.by, _ = by.(map[string]any)
+		out = append(out, f)
+	}
+	return out
+}
+
+// taskMap reads a tasks mapping: each task's settings, by name.
+func taskMap(value any) map[string]map[string]any {
+	byName, _ := value.(map[string]any)
+	out := make(map[string]map[string]any, len(byName))
+	for name, settings := range byName {
+		s, _ := settings.(map[string]any)
+		out[name] = s
+	}
+	return out
+}
+
+// describe completes one project with its moon.yml and the tasks it
+// inherits, then with what the export states.
+func (d *detector) describe(p *project, inherited []taskFile) Project {
+	out := Project{ID: p.id, Dir: p.dir, SourceFile: p.sourceFile, DependsOn: slices.Clone(p.deps)}
+	cfg := d.projectConfig(p.dir)
+	out.Language, out.Stack, out.Layer, out.Tags = cfg.language, cfg.stack, cfg.layer, cfg.tags
+	if e := p.export; e != nil {
+		var language string
+		if json.Unmarshal(e.Language, &language) == nil && language != "" {
+			out.Language = language
+		}
+		if e.Stack != "" {
+			out.Stack = e.Stack
+		}
+		if layer := cmpOr(e.Layer, e.Type); layer != "" {
+			out.Layer = layer
+		}
+		if e.Config != nil && e.Config.Tags != nil {
+			out.Tags = slices.Clone(e.Config.Tags)
+		}
+	}
+	if out.Language == "" {
+		out.Language = d.inferLanguage(p.dir)
+	}
+	slices.Sort(out.Tags)
+	out.Tags = slices.Compact(out.Tags)
+
+	tasks := map[string][]string{}
+	if p.export != nil && p.export.Tasks != nil {
+		for name, t := range p.export.Tasks {
+			tasks[name] = t.Tags
+		}
+	} else {
+		for _, f := range inherited {
+			if !f.inheritedBy(out) {
+				continue
+			}
+			for name, settings := range f.tasks {
+				tasks[name] = stringsOf(settings["tags"])
+			}
+		}
+		tasks = cfg.inheritance.apply(tasks)
+		for name, settings := range cfg.tasks {
+			tasks[name] = stringsOf(settings["tags"])
+		}
+	}
+	for name, tags := range tasks {
+		tags = slices.Clone(tags)
+		slices.Sort(tags)
+		out.Tasks = append(out.Tasks, Task{Name: name, Tags: slices.Compact(tags)})
+	}
+	sort.Slice(out.Tasks, func(i, j int) bool { return out.Tasks[i].Name < out.Tasks[j].Name })
+	return out
+}
+
+func cmpOr(values ...string) string {
+	for _, v := range values {
+		if v != "" {
+			return v
+		}
+	}
+	return ""
+}
+
+// projectConfig is what one moon.yml states for Detect.
+type projectConfig struct {
+	language, stack, layer string
+	tags                   []string
+	tasks                  map[string]map[string]any
+	inheritance            inheritance
+}
+
+// projectConfig reads the moon.yml of a project directory; a missing or
+// unreadable file states nothing, and the reader of the edges already
+// reported an unreadable one.
+func (d *detector) projectConfig(dir string) projectConfig {
+	var cfg projectConfig
+	data, err := os.ReadFile(filepath.Join(d.root, filepath.FromSlash(path.Join(dir, ProjectFile))))
+	if err != nil {
+		return cfg
+	}
+	text := string(data)
+	scalarOf := func(key string) string {
+		v, _, err := topLevel(text, key)
+		if err != nil {
+			return ""
+		}
+		s, _ := v.(string)
+		return s
+	}
+	cfg.language = scalarOf("language")
+	cfg.stack = scalarOf("stack")
+	cfg.layer = cmpOr(scalarOf("layer"), scalarOf("type"))
+	if tags, _, err := topLevel(text, "tags"); err == nil {
+		cfg.tags = stringsOf(tags)
+	}
+	if tasks, _, err := topLevel(text, "tasks"); err == nil {
+		cfg.tasks = taskMap(tasks)
+	}
+	if ws, _, err := topLevel(text, "workspace"); err == nil {
+		settings, _ := ws.(map[string]any)
+		inherited, _ := settings["inheritedTasks"].(map[string]any)
+		cfg.inheritance = readInheritance(inherited)
+	}
+	return cfg
+}
+
+// inheritance is a project's workspace.inheritedTasks: which inherited tasks
+// it keeps, and under which names.
+type inheritance struct {
+	// include lists the only tasks kept when set; an empty, non-nil list
+	// keeps none.
+	include []string
+	exclude []string
+	rename  map[string]string
+}
+
+func readInheritance(settings map[string]any) inheritance {
+	var in inheritance
+	if v, ok := settings["include"]; ok {
+		in.include = stringsOf(v)
+		if in.include == nil {
+			in.include = []string{}
+		}
+	}
+	in.exclude = stringsOf(settings["exclude"])
+	if rename, ok := settings["rename"].(map[string]any); ok {
+		in.rename = map[string]string{}
+		for from, to := range rename {
+			if s, ok := to.(string); ok {
+				in.rename[from] = s
+			}
+		}
+	}
+	return in
+}
+
+// apply keeps the included tasks less the excluded ones, then renames them.
+func (in inheritance) apply(tasks map[string][]string) map[string][]string {
+	out := map[string][]string{}
+	for name, tags := range tasks {
+		if in.include != nil && !slices.Contains(in.include, name) || slices.Contains(in.exclude, name) {
+			continue
+		}
+		if to, ok := in.rename[name]; ok {
+			name = to
+		}
+		out[name] = tags
+	}
+	return out
+}
+
+// inheritedBy reports whether the project inherits the file's tasks. A file
+// with an inheritedBy condition, moon 2.x's, matches when each of its
+// languages, stacks, layers and tags lists that is set names the project's
+// value, one of its tags for tags. Without one, the file's name decides, as
+// in moon 1.x: tasks.yml and all for every project, then the project's
+// language, its platform (node for JavaScript and TypeScript), its stack,
+// <language|stack|platform>-<layer>, and tag-<tag>.
+func (f taskFile) inheritedBy(p Project) bool {
+	if f.by != nil {
+		for key, value := range map[string][]string{"languages": {p.Language}, "stacks": {p.Stack}, "layers": {p.Layer}, "tags": p.Tags} {
+			wanted, set := f.by[key]
+			if !set {
+				continue
+			}
+			if !slices.ContainsFunc(stringsOf(wanted), func(w string) bool { return slices.Contains(value, w) }) {
+				return false
+			}
+		}
+		return true
+	}
+	if f.rel == TasksFile || f.name == "all" || f.name == "*" {
+		return true
+	}
+	kinds := []string{p.Language, p.Stack}
+	if p.Language == "javascript" || p.Language == "typescript" {
+		kinds = append(kinds, "node")
+	}
+	for _, kind := range kinds {
+		if kind == "" {
+			continue
+		}
+		if f.name == kind || p.Layer != "" && f.name == kind+"-"+p.Layer {
+			return true
+		}
+	}
+	for _, tag := range p.Tags {
+		if f.name == "tag-"+tag {
+			return true
+		}
+	}
+	return false
+}
+
+// languageFiles are the files that imply a project's language when its
+// moon.yml states none, in the order moon checks them.
+var languageFiles = []struct {
+	files    []string
+	language string
+}{
+	{[]string{"go.mod", "go.sum"}, "go"},
+	{[]string{"composer.json", "composer.lock"}, "php"},
+	{[]string{"pyproject.toml", "requirements.txt", "Pipfile", "poetry.lock", "uv.lock"}, "python"},
+	{[]string{"Gemfile", "Gemfile.lock"}, "ruby"},
+	{[]string{"Cargo.toml", "Cargo.lock"}, "rust"},
+	{[]string{"tsconfig.json", "deno.json", "deno.jsonc"}, "typescript"},
+	{[]string{"package.json"}, "javascript"},
+}
+
+// inferLanguage is the language a project's files imply, "unknown" when none
+// does.
+func (d *detector) inferLanguage(dir string) string {
+	for _, entry := range languageFiles {
+		for _, file := range entry.files {
+			if exists(d.root, path.Join(dir, file)) {
+				return entry.language
+			}
+		}
+	}
+	return "unknown"
+}
+
+// stringsOf reads a list of strings, skipping any other entry; any other
+// value reads as nil.
+func stringsOf(value any) []string {
+	list, ok := value.([]any)
+	if !ok {
+		if s, isString := value.(string); isString && s != "" {
+			return []string{s}
+		}
+		return nil
+	}
+	var out []string
+	for _, item := range list {
+		if s, ok := item.(string); ok {
+			out = append(out, s)
+		}
+	}
+	return out
+}

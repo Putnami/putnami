@@ -95,14 +95,12 @@ func Answer(root string, opts Options) workspace.ProbeAnswerFunc {
 func Probe(root string, req workspace.ProbeRequest, opts Options) workspace.ProbeResult {
 	result := workspace.ProbeResult{Version: workspace.ProbeProtocolVersion, Extension: Extension}
 	d := &detector{root: root}
-	projects, watched, ok := d.fromGraph(opts.GraphFile)
-	if !ok {
-		projects, watched = d.fromConfiguration()
-	}
+	found, source, watched := d.projects(opts.GraphFile)
 	result.Diagnostics = d.diagnostics
-	if len(projects) == 0 {
+	if len(found) == 0 {
 		return result
 	}
+	projects := d.probeProjects(found, source)
 	result.Projects = keep(projects, req.Paths)
 	result.WatchedFiles = watched
 	workspace.NormalizeProbeResult(&result)
@@ -112,6 +110,16 @@ func Probe(root string, req workspace.ProbeRequest, opts Options) workspace.Prob
 type detector struct {
 	root        string
 	diagnostics []diag.Diagnostic
+}
+
+// projects reads the projects of the graph export, else of the moon
+// configuration, with the evidence source they come from and the files read.
+func (d *detector) projects(graphFile string) ([]*project, string, []string) {
+	if projects, watched, ok := d.fromGraph(graphFile); ok {
+		return projects, evidence.SourceOrchestrator, watched
+	}
+	projects, watched := d.fromConfiguration()
+	return projects, evidence.SourceWorkspace, watched
 }
 
 func (d *detector) warn(code, field, format string, args ...any) {
@@ -129,6 +137,9 @@ type project struct {
 	packages   []string
 	deps       []string
 	watched    []string
+	// export is what the graph export states about the project beyond its
+	// source; nil for a project of the configuration.
+	export *exportProject
 }
 
 func (d *detector) probeProjects(projects []*project, source string) []workspace.ProbeProject {
@@ -165,13 +176,29 @@ type exportProject struct {
 	ID     string `json:"id"`
 	Source string `json:"source"`
 	Alias  string `json:"alias"`
+	// Language, Stack, Layer and Type are moon's resolved classification;
+	// a language moon names as an object, such as a custom one, reads as
+	// none.
+	Language json.RawMessage `json:"language"`
+	Stack    string          `json:"stack"`
+	Layer    string          `json:"layer"`
+	Type     string          `json:"type"`
+	// Config is the project's moon.yml as moon resolved it, with its tags.
+	Config *struct {
+		Tags []string `json:"tags"`
+	} `json:"config"`
+	// Tasks are the project's resolved tasks, inherited ones included; nil
+	// when the export omits them.
+	Tasks map[string]struct {
+		Tags []string `json:"tags"`
+	} `json:"tasks"`
 }
 
 // fromGraph reads the graph export. It reports ok=false when there is no
 // usable export. A missing default file is no finding; a missing named file
 // is one, and so is a file that is not a moon graph export when the caller
 // named it or the repository holds the workspace file.
-func (d *detector) fromGraph(named string) ([]workspace.ProbeProject, []string, bool) {
+func (d *detector) fromGraph(named string) ([]*project, []string, bool) {
 	graphFile := named
 	if graphFile == "" {
 		graphFile = DefaultGraphFile
@@ -217,7 +244,7 @@ func (d *detector) fromGraph(named string) ([]workspace.ProbeProject, []string, 
 			continue
 		}
 		owners[dir] = node.ID
-		p := &project{id: node.ID, dir: dir, alias: node.Alias, sourceFile: d.projectFile(dir)}
+		p := &project{id: node.ID, dir: dir, alias: node.Alias, sourceFile: d.projectFile(dir), export: &nodes[i]}
 		if exportFile, inside := workspace.NormalizeProbePath(relative(d.root, file)); p.sourceFile == "" && inside {
 			p.sourceFile = exportFile
 		}
@@ -235,7 +262,7 @@ func (d *detector) fromGraph(named string) ([]workspace.ProbeProject, []string, 
 	if exists(d.root, WorkspaceFile) {
 		watched = append(watched, WorkspaceFile)
 	}
-	return d.probeProjects(projects, evidence.SourceOrchestrator), watched, true
+	return projects, watched, true
 }
 
 type exportEdge struct {
@@ -299,7 +326,7 @@ func decodeExport(data []byte) ([]exportProject, []exportEdge, error) {
 
 // fromConfiguration reads .moon/workspace.yml, each project's moon.yml and
 // package.json.
-func (d *detector) fromConfiguration() ([]workspace.ProbeProject, []string) {
+func (d *detector) fromConfiguration() ([]*project, []string) {
 	data, err := os.ReadFile(filepath.Join(d.root, filepath.FromSlash(WorkspaceFile)))
 	if errors.Is(err, fs.ErrNotExist) {
 		return nil, nil
@@ -309,7 +336,7 @@ func (d *detector) fromConfiguration() ([]workspace.ProbeProject, []string) {
 		projects, err = d.workspaceProjects(string(data))
 		if err == nil {
 			d.edges(projects)
-			return d.probeProjects(projects, evidence.SourceWorkspace), []string{WorkspaceFile}
+			return projects, []string{WorkspaceFile}
 		}
 	}
 	d.warn(CodeWorkspaceUnreadable, WorkspaceFile, "%s cannot be read: %v; the repository is left to the other detectors", WorkspaceFile, err)
