@@ -463,6 +463,19 @@ func TestNameCollidingMembers_KeepsAStatedName(t *testing.T) {
 	}
 }
 
+func TestNameCollidingMembers_StopsWhenAStatedNameEqualsAPath(t *testing.T) {
+	ws := workspaceWithMembers(t, "apps/foo", "libs/foo", "tools/foo")
+	stated := `{"name":"apps/foo"}`
+	writeProjectFile(t, filepath.Join(ws, "tools", "foo", "putnami.json"), stated)
+	added := []string{"apps/foo", "libs/foo", "tools/foo"}
+	if err := nameCollidingMembers(ws, added, nil); err != nil {
+		t.Fatalf("nameCollidingMembers: %v", err)
+	}
+	if got := readText(t, filepath.Join(ws, "tools", "foo", "putnami.json")); got != stated {
+		t.Errorf("tools/foo keeps its file: %s", got)
+	}
+}
+
 // collidingWorkspace has two members that resolve to the name foo.
 func collidingWorkspace(t *testing.T) string {
 	t.Helper()

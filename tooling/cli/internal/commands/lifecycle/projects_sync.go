@@ -165,8 +165,8 @@ func ProjectsSync(ctx context.Context, wsRoot string, cfg *wsproto.Config, args 
 	wsCfgName := filepath.Base(wsproto.ResolveFile(wsRoot, wsproto.WorkspaceConfigFilename))
 	iox.Fprintf(os.Stdout, "\n  Updated %s\n", wsCfgName)
 
-	// A new member is named by its directory until a provider answers for it,
-	// so two that resolve to one name would stop the next load.
+	// A new member that shares a name with another project takes a written
+	// name, before any provider view exists.
 	if err := nameCollidingMembers(wsRoot, added, adapters.boundTo(ctx)); err != nil {
 		return err
 	}
