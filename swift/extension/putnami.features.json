@@ -7,7 +7,7 @@
       "id": "swift/stack-extension",
       "type": "feature",
       "name": "Run the Swift packages and Xcode projects of a repository as Putnami tasks",
-      "outcome": "A team with Swift packages and Xcode projects adds @putnami/swift and runs putnami lint, test and build over them with Putnami's runner and cache: each package and Xcode project is a project with its edges, each task runs swift or xcodebuild after a toolchain check, a package installing the stated Swift when the machine has none, and reads its JUnit and coverage reports, a component overrides any profile value, install, upgrade, serve and run reach the packages, and package and publish produce the image of an application",
+      "outcome": "A team with Swift packages and Xcode projects adds @putnami/swift and runs putnami lint, test and build over them with Putnami's runner and cache: each package and Xcode project is a project with its edges, each task checks its toolchain, a package installing the stated Swift when the machine has none, and reads its JUnit and coverage reports, a component overrides any profile value, install, upgrade, serve and run reach the packages, and package and publish produce an application's image",
       "owner": "swift",
       "target": "coded",
       "requirements": [
