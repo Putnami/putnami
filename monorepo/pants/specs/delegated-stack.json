@@ -16,7 +16,7 @@
   "requirements": [
     {
       "id": "packages-become-projects",
-      "text": "The probe answers, for each candidate directory the observe Pants detector knows as a component: its directory as source name, the components it depends on in pants-graph.json when the root holds one and the edges the sync wrote, each attributed build-graph, the extension @putnami/pants, the tag pants, and metadata: the component, the root as stack root, GLOBAL.pants_version. Any other candidate holding a BUILD file, the root included, is bare: named by its directory, with no extension, so it runs no task."
+      "text": "The probe answers, for each candidate the observe Pants detector knows as a component: its directory as source name, the components it depends on in pants-graph.json when the root holds one and its putnami.json edges on a BUILD directory, each attributed build-graph, the extension @putnami/pants, the tag pants, and metadata: component, root as stack root, GLOBAL.pants_version. Any other candidate holding a BUILD file, the root included, is bare: named by its directory, with no extension, so it runs no task."
     },
     {
       "id": "sync-writes-the-package-graph",
