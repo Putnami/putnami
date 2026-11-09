@@ -286,12 +286,21 @@ func recordInitAdoption(wsRoot, ext, mode string, missing []string, recordMode b
 		return err
 	}
 	if len(missing) > 0 {
+		// extensions is a list of names, or an object of name to version
+		// constraint: each keeps its form.
 		value, _ := raw.Get("extensions")
-		items, _ := value.([]any)
-		for _, e := range missing {
-			items = append(items, e)
+		switch declared := value.(type) {
+		case *jsonutil.OrderedMap:
+			for _, e := range missing {
+				declared.Set(e, "")
+			}
+		case []any:
+			raw.Set("extensions", append(declared, stringsToAny(missing)...))
+		case nil:
+			raw.Set("extensions", stringsToAny(missing))
+		default:
+			return fmt.Errorf("extensions is neither a list nor an object")
 		}
-		raw.Set("extensions", items)
 	}
 	if recordMode {
 		options := raw.GetMap("options")
@@ -307,4 +316,12 @@ func recordInitAdoption(wsRoot, ext, mode string, missing []string, recordMode b
 		layer.Set(initModeOption, mode)
 	}
 	return jsonutil.WriteFile(path, raw)
+}
+
+func stringsToAny(list []string) []any {
+	out := make([]any, len(list))
+	for i, s := range list {
+		out[i] = s
+	}
+	return out
 }

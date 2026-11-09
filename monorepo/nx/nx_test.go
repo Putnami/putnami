@@ -14,6 +14,7 @@ import (
 	wsproto "go.putnami.dev/protocol/workspace"
 	pctx "go.putnami.dev/sdk/extension/context"
 	"go.putnami.dev/sdk/extension/jsonl"
+	detect "go.putnami.dev/tooling/observe/detect/nx"
 	"go.putnami.dev/tooling/stacks"
 	"go.putnami.dev/tooling/stacks/stackstest"
 )
@@ -262,7 +263,7 @@ func TestTheSyncWritesEachProjectPutnamiJSONInBothModes(t *testing.T) {
 	if after, _ := os.ReadFile(filepath.Join(root, "apps/api/putnami.json")); string(after) != string(before) {
 		t.Errorf("a dry run wrote %s", after)
 	}
-	if diff := Diff(dry.Changes[0].File, dry.Changes[0].Before, dry.Changes[0].After); !strings.Contains(diff, "+++ b/apps/api/putnami.json") || !strings.Contains(diff, `+      "@putnami/nx:build",`) {
+	if diff := Diff(dry.Changes[0].File, dry.Changes[0].Before, dry.Changes[0].After); !strings.Contains(diff, "+++ b/apps/api/putnami.json") || !strings.Contains(diff, `+      "@putnami/typescript:build",`) {
 		t.Errorf("diff = %s", diff)
 	}
 
@@ -281,31 +282,40 @@ func TestImportMapsEachTypeScriptTargetToTheTypeScriptTask(t *testing.T) {
 	spectest.Proves(t, feature, "import-maps-typescript-targets", "import-maps-each-typescript-target-to-the-typescript-task")
 	d := readDemo(t)
 	root := repository(t, d, ModeImport, TypeScriptExtension)
-	// The api builds with webpack, which the TypeScript extension does not
-	// run: its build keeps running through Nx.
+	// pricing's scripts already run what @putnami/typescript runs: they move
+	// to it. The api keeps jest, a webpack build and an eslint lint, which
+	// stay on Nx.
+	writeFile(t, root, "packages/pricing/package.json", `{"name": "@demo/pricing", "scripts": {"build": "bun build src/index.ts --outdir dist", "test": "bun test", "lint": "biome check ."}}`)
 	writeFile(t, root, "apps/api/project.json", `{"name": "@demo/api", "targets": {"build": {"executor": "@nx/webpack:webpack"}, "lint": {"executor": "@nx/eslint:lint"}}}`)
 	result := sync(t, root, SyncOptions{})
 	if result.Mode != ModeImport {
 		t.Fatalf("mode = %s", result.Mode)
 	}
 	jobs := func(dir string) any { return readProjectFile(t, root, dir)["disable"].(map[string]any)["jobs"] }
-	if got, want := jobs("packages/pricing"), []any{"@putnami/nx:build", "@putnami/nx:test", "lint"}; !reflect.DeepEqual(got, want) {
+	if got, want := jobs("packages/pricing"), []any{"@putnami/nx:build", "@putnami/nx:lint", "@putnami/nx:test"}; !reflect.DeepEqual(got, want) {
 		t.Errorf("pricing jobs = %v, want %v", got, want)
 	}
-	if got, want := jobs("apps/api"), []any{"@putnami/nx:lint", "@putnami/nx:test", "@putnami/typescript:build"}; !reflect.DeepEqual(got, want) {
+	if got, want := jobs("apps/api"), []any{"@putnami/typescript:build", "@putnami/typescript:lint", "@putnami/typescript:test"}; !reflect.DeepEqual(got, want) {
 		t.Errorf("api jobs = %v, want %v", got, want)
 	}
-	// The test runs as the TypeScript task: the delegated task reads no report.
+	// A test the TypeScript extension runs carries no Nx reports; one that
+	// stays on Nx does.
 	if _, ok := readProjectFile(t, root, "packages/pricing")["options"]; ok {
 		t.Errorf("an imported test carries no Nx reports")
 	}
+	if _, ok := readProjectFile(t, root, "apps/api")["options"]; !ok {
+		t.Errorf("a test that stays on Nx carries its reports")
+	}
 
 	// Without @putnami/typescript in the workspace, import runs every target
-	// through Nx.
+	// through Nx, and says why.
 	root = repository(t, d, ModeImport)
-	sync(t, root, SyncOptions{})
+	result = sync(t, root, SyncOptions{})
 	if got := jobs("packages/pricing"); !reflect.DeepEqual(got, []any{"lint"}) {
 		t.Errorf("jobs without the TypeScript extension = %v", got)
+	}
+	if !slices.ContainsFunc(result.Unmapped, func(u Unmapped) bool { return strings.Contains(u.Reason, "does not declare @putnami/typescript") }) {
+		t.Errorf("unmapped = %+v, want the undeclared extension named", result.Unmapped)
 	}
 }
 
@@ -315,20 +325,19 @@ func TestAnUnmappedTargetIsListedWithItsReason(t *testing.T) {
 	root := repository(t, d, ModeImport, TypeScriptExtension)
 	writeFile(t, root, "apps/api/project.json", `{"name": "@demo/api", "targets": {"build": {"executor": "@nx/webpack:webpack"}}}`)
 	result := sync(t, root, SyncOptions{})
-	var got []string
+	reasons := map[string]string{}
 	for _, u := range result.Unmapped {
-		got = append(got, u.Project+":"+u.Target)
+		reasons[u.Project+":"+u.Target] = u.Reason
 	}
-	slices.Sort(got)
-	if want := []string{"@demo/api:build", "@demo/api:start"}; !reflect.DeepEqual(got, want) {
-		t.Errorf("unmapped = %v (%+v), want %v", got, result.Unmapped, want)
-	}
-	for _, u := range result.Unmapped {
-		if u.Target == "start" && !strings.Contains(u.Reason, "nx run @demo/api:start") {
-			t.Errorf("start reason = %q", u.Reason)
-		}
-		if u.Target == "build" && !strings.Contains(u.Reason, "@nx/webpack:webpack") {
-			t.Errorf("build reason = %q", u.Reason)
+	for key, want := range map[string]string{
+		"@demo/api:start":     "nx run @demo/api:start",
+		"@demo/api:build":     "@nx/webpack:webpack",
+		"@demo/api:test":      `not "jest"`,
+		"@demo/pricing:build": `not "tsc -p tsconfig.json"`,
+		"@demo/pricing:test":  `not "jest"`,
+	} {
+		if !strings.Contains(reasons[key], want) {
+			t.Errorf("%s reason = %q, want %q (all: %v)", key, reasons[key], want, reasons)
 		}
 	}
 
@@ -343,6 +352,30 @@ func TestAnUnmappedTargetIsListedWithItsReason(t *testing.T) {
 	}
 	if _, ok := readProjectFile(t, root, "apps/api")["options"]; ok {
 		t.Errorf("a test without reports carries no reports override")
+	}
+}
+
+func TestTheReportsResolveRootDirAndTheNxJestWorkingDirectory(t *testing.T) {
+	spectest.Proves(t, feature, "reports-from-project-options", "the-junit-and-coverage-files-the-project-names-become-the-summary")
+	root := t.TempDir()
+	config := func(text string) {
+		writeFile(t, root, "libs/a/jest.config.ts", text)
+	}
+	reports := func(executor string) map[string]any {
+		return testReports(root, "libs/a", detect.Target{Name: "test", Executor: executor})
+	}
+	config(`export default { reporters: ['default', ['jest-junit', { outputDirectory: '<rootDir>/reports' }]], coverageDirectory: '<rootDir>/coverage', coverageReporters: ['lcov'] };`)
+	want := map[string]any{"junit": []any{"reports/junit.xml"}, "coverage": []any{map[string]any{"format": "lcov", "paths": []any{"coverage/lcov.info"}}}}
+	if got := reports("@nx/jest:jest"); !reflect.DeepEqual(got, want) {
+		t.Errorf("<rootDir> reports = %v, want %v", got, want)
+	}
+	// Under @nx/jest, jest-junit writes in the workspace root.
+	config(`export default { reporters: [['jest-junit', { outputDirectory: 'reports/libs/a' }]] };`)
+	if got, want := reports("@nx/jest:jest"), map[string]any{"junit": []any{"{root}/reports/libs/a/junit.xml"}}; !reflect.DeepEqual(got, want) {
+		t.Errorf("@nx/jest reports = %v, want %v", got, want)
+	}
+	if got, want := reports("nx:run-script"), map[string]any{"junit": []any{"reports/libs/a/junit.xml"}}; !reflect.DeepEqual(got, want) {
+		t.Errorf("run-script reports = %v, want %v", got, want)
 	}
 }
 

@@ -312,10 +312,10 @@ func planProject(root string, p detect.Project, mode string, typeScript bool) pr
 			// runs through Nx alone.
 			plan.disabled = append(plan.disabled, TypeScriptExtension+":"+task)
 			if mode == ModeImport {
-				plan.unmapped = append(plan.unmapped, Unmapped{Project: p.Name, Target: task, Reason: importReason(isTS, task, target)})
+				plan.unmapped = append(plan.unmapped, Unmapped{Project: p.Name, Target: task, Reason: importReason(typeScript, isTS, task, target)})
 			}
 		case mode == ModeImport:
-			plan.unmapped = append(plan.unmapped, Unmapped{Project: p.Name, Target: task, Reason: importReason(isTS, task, target)})
+			plan.unmapped = append(plan.unmapped, Unmapped{Project: p.Name, Target: task, Reason: importReason(typeScript, isTS, task, target)})
 		}
 	}
 	if test, ok := targets["test"]; ok && !slices.Contains(plan.disabled, ExtensionName+":test") {
@@ -329,15 +329,18 @@ func planProject(root string, p detect.Project, mode string, typeScript bool) pr
 	return plan
 }
 
-func importReason(isTS bool, task string, target detect.Target) string {
+func importReason(declared, isTS bool, task string, target detect.Target) string {
 	runs := target.Executor
 	if target.Command != "" && (runs == "" || runs == "nx:run-script" || runs == "nx:run-commands") {
 		runs = target.Command
 	}
+	if !declared {
+		return fmt.Sprintf("the workspace does not declare %s: %s keeps running through nx run", TypeScriptExtension, task)
+	}
 	if !isTS {
 		return fmt.Sprintf("the project is no TypeScript project (package.json, and tsconfig.json or a .ts source): %s keeps running through nx run", task)
 	}
-	return fmt.Sprintf("@putnami/typescript has no counterpart for %q: %s keeps running through nx run", runs, task)
+	return fmt.Sprintf("@putnami/typescript runs %s, not %q: %s keeps running through nx run", strings.Join(typeScriptCommands[task], " or "), runs, task)
 }
 
 // isTypeScriptProject reports whether a project directory holds package.json
@@ -359,30 +362,24 @@ func hasManifest(root, dir string) bool {
 	return exists(root, path.Join(dir, "package.json"))
 }
 
-// typeScriptExecutors are the executors whose target the TypeScript
-// extension's task of the same name covers.
-var typeScriptExecutors = map[string][]string{
-	"build": {"@nx/js:tsc", "@nrwl/js:tsc", "@nx/js:swc", "@nrwl/js:swc"},
-	"test":  {"@nx/jest:jest", "@nrwl/jest:jest", "@nx/vite:test", "@nx/vitest:test"},
-	"lint":  {"@nx/eslint:lint", "@nx/linter:eslint", "@nrwl/linter:eslint"},
-}
-
-// typeScriptCommands are the programs whose command the TypeScript
-// extension's task of the same name covers.
+// typeScriptCommands are the programs the TypeScript extension's task of the
+// same name runs: a target whose script runs one keeps its runner when the
+// extension takes it over. A jest, eslint or tsc target, or one an Nx
+// executor runs, stays on Nx.
 var typeScriptCommands = map[string][]string{
-	"build": {"tsc"},
-	"test":  {"jest", "vitest", "bun test"},
-	"lint":  {"eslint", "biome"},
+	"build": {"bun build"},
+	"test":  {"bun test"},
+	"lint":  {"biome", "bunx biome", "bunx @biomejs/biome"},
 }
 
-// coveredByTypeScript reports whether the TypeScript extension's task covers
-// a target: by its executor, or, for a script or a command, by the program
-// its command runs.
+// coveredByTypeScript reports whether the TypeScript extension's task runs
+// what a target runs: a script or a command whose program is the one that
+// task runs.
 func coveredByTypeScript(task string, target detect.Target) bool {
 	switch target.Executor {
 	case "", "nx:run-script", "nx:run-commands":
 	default:
-		return slices.Contains(typeScriptExecutors[task], target.Executor)
+		return false
 	}
 	command := strings.TrimSpace(target.Command)
 	for _, program := range typeScriptCommands[task] {
@@ -406,7 +403,10 @@ func configString(text, key string) string {
 	if m == nil {
 		return ""
 	}
-	return m[1]
+	// jest reads <rootDir> as the directory of its configuration, the
+	// project's.
+	value := strings.ReplaceAll(m[1], "<rootDir>/", "")
+	return strings.ReplaceAll(value, "<rootDir>", ".")
 }
 
 // testReports is the reports override of a project's test task: the JUnit
@@ -417,7 +417,6 @@ func configString(text, key string) string {
 // under coverageDirectory, or vitest's coverage.reportsDirectory, coverage by
 // default. nil when the configuration names neither.
 func testReports(root, dir string, target detect.Target) map[string]any {
-	_ = target
 	var text string
 	for _, name := range testConfigs {
 		if data, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(dir), name)); err == nil { //nolint:gosec // a project file
@@ -437,12 +436,21 @@ func testReports(root, dir string, target detect.Target) map[string]any {
 				outName = "junit.xml"
 			}
 			file = path.Join(outDir, outName)
+			// Under @nx/jest, jest runs in the workspace root, where
+			// jest-junit resolves its outputDirectory, unless it names
+			// <rootDir>.
+			if strings.HasPrefix(target.Executor, "@nx/jest:") || strings.HasPrefix(target.Executor, "@nrwl/jest:") {
+				if !strings.Contains(text, "<rootDir>") && !strings.HasPrefix(file, "../") {
+					reports["junit"] = []any{"{root}/" + file}
+					file = ""
+				}
+			}
 		} else if out := configString(text, "junit"); out != "" {
 			file = path.Clean(out)
 		} else if out := configString(text, "outputFile"); out != "" {
 			file = path.Clean(out)
 		}
-		if file != "" && !strings.HasPrefix(file, "../") && !path.IsAbs(file) {
+		if file != "" && !strings.HasPrefix(file, "../") && !path.IsAbs(file) && !strings.Contains(file, "<") {
 			reports["junit"] = []any{file}
 		}
 	}
@@ -462,7 +470,7 @@ func testReports(root, dir string, target detect.Target) map[string]any {
 			covDir = "coverage"
 		}
 		file := path.Join(covDir, name)
-		if !strings.HasPrefix(file, "../") && !path.IsAbs(file) {
+		if !strings.HasPrefix(file, "../") && !path.IsAbs(file) && !strings.Contains(file, "<") {
 			reports["coverage"] = []any{map[string]any{"format": format, "paths": []any{file}}}
 		}
 	}

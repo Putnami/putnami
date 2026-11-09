@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"maps"
 	"os"
 	"path/filepath"
 	"slices"
@@ -361,5 +362,30 @@ func TestInitFromRerunPreviewsAndWritesOnlyWithApply(t *testing.T) {
 	}
 	if cfg := readInitConfig(t, dir); !slices.Equal(cfg.Extensions, []string{"@putnami/nx", "@putnami/typescript"}) || cfg.Options["@putnami/nx"].Mode != "import" {
 		t.Errorf("workspace config = %+v", cfg)
+	}
+}
+
+func TestInitFromApplyKeepsTheObjectFormOfExtensions(t *testing.T) {
+	spectest.Proves(t, initFromFeature, "init-rerun-shows-a-diff", "init-from-rerun-previews-and-writes-only-with-apply")
+	dir := nxRepository(t)
+	if err := os.WriteFile(filepath.Join(dir, wsproto.WorkspaceConfigFilename), []byte(`{"name": "shop", "extensions": {"@putnami/nx": "^0.4.0", "@putnami/go": ""}}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	calls := stubInitFrom(t, false, "")
+	out, err := captureStdout(t, func() error {
+		return WorkspaceInit(context.Background(), dir, []string{"--from", "nx", "--mode", "import", "--apply"}, LifecycleEnv{})
+	})
+	if err != nil || !slices.Equal(calls.installed, []string{"@putnami/typescript"}) {
+		t.Fatalf("err %v, installed %v\n%s", err, calls.installed, out)
+	}
+	data, _ := os.ReadFile(filepath.Join(dir, wsproto.WorkspaceConfigFilename))
+	var doc struct {
+		Extensions map[string]string `json:"extensions"`
+	}
+	if err := json.Unmarshal(data, &doc); err != nil {
+		t.Fatalf("extensions lost their object form: %v\n%s", err, data)
+	}
+	if want := map[string]string{"@putnami/nx": "^0.4.0", "@putnami/go": "", "@putnami/typescript": ""}; !maps.Equal(doc.Extensions, want) {
+		t.Errorf("extensions = %v, want %v", doc.Extensions, want)
 	}
 }
