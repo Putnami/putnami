@@ -1,9 +1,16 @@
 import Foundation
 import Hummingbird
 
-/// The routes of the sample: GET / answers a greeting, and HEAD / its status.
+/// The routes of the sample: GET / answers a greeting, HEAD / its status, and
+/// GET /robots.txt the file the target ships as a resource.
 func buildRouter() -> Router<BasicRequestContext> {
     let router = Router()
+    router.get("/robots.txt") { _, _ -> String in
+        guard let url = Bundle.module.url(forResource: "robots", withExtension: "txt", subdirectory: "Public") else {
+            throw HTTPError(.notFound)
+        }
+        return try String(contentsOf: url, encoding: .utf8)
+    }
     router.get("/") { _, _ in
         "Hello from Swift\n"
     }

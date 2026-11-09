@@ -15,7 +15,20 @@
         "package": "swift-example-application",
         "sourceKind": "manual"
       }
+    },
+    {
+      "match": "exact",
+      "path": "/robots.txt",
+      "methods": [
+        "GET"
+      ],
+      "publicEdge": true,
+      "provenance": {
+        "project": "swift-example-application",
+        "package": "swift-example-application",
+        "sourceKind": "manual"
+      }
     }
   ],
-  "digest": "sha256:d9764b559978ee86b2cde36ce30ba846925bec5edba85bc5f60d28c8eb4762a8"
+  "digest": "sha256:fae3f3345c97319ae8efdf686e6db5c9a8eb8404cfe20b5647abf6a8000d8db4"
 }

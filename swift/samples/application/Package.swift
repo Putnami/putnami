@@ -13,7 +13,8 @@ let package = Package(
     targets: [
         .executableTarget(
             name: "App",
-            dependencies: [.product(name: "Hummingbird", package: "hummingbird")]
+            dependencies: [.product(name: "Hummingbird", package: "hummingbird")],
+            resources: [.copy("Public")]
         ),
         .testTarget(
             name: "AppTests",

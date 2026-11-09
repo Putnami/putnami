@@ -14,4 +14,14 @@ final class AppTests: XCTestCase {
             }
         }
     }
+
+    func testRobotsTxtIsTheTargetResource() async throws {
+        let app = Application(router: buildRouter())
+        try await app.test(.router) { client in
+            try await client.execute(uri: "/robots.txt", method: .get) { response in
+                XCTAssertEqual(response.status, .ok)
+                XCTAssertEqual(String(buffer: response.body), "User-agent: *\nAllow: /\n")
+            }
+        }
+    }
 }

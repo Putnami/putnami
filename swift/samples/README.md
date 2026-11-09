@@ -1,7 +1,8 @@
 # @putnami/swift sample
 
 `application` is a Hummingbird server: `GET /` answers a greeting on the port
-`PORT` names.
+`PORT` names, and `GET /robots.txt` the file its target ships as a resource,
+which the image holds in the resource bundle beside the executable.
 
 The project carries the `e2e` tag, so the default gate skips it. To run it,
 you need a Swift 6.3 or 6.4 toolchain from swift.org on `PATH`. `package`
