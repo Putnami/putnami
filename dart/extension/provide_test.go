@@ -263,7 +263,7 @@ func TestTheTestTaskActivatesTojunitAndFormatCoverageInItsOwnPubCache(t *testing
 		}
 	}
 	launcher, err := os.ReadFile(filepath.Join(dirs[0], "tojunit"))
-	if err != nil || !strings.Contains(string(launcher), "exec dart pub global run junitreport:tojunit") || !strings.Contains(string(launcher), cache) {
+	if err != nil || !strings.Contains(string(launcher), "exec '"+filepath.Join(bin, "dart")+"' pub global run junitreport:tojunit") || !strings.Contains(string(launcher), cache) {
 		t.Errorf("the tojunit launcher runs from the extension's pub cache: %s %v", launcher, err)
 	}
 	_ = os.Remove(log)
@@ -286,5 +286,40 @@ func TestTheTestTaskActivatesTojunitAndFormatCoverageInItsOwnPubCache(t *testing
 	}
 	if _, err := Tools(context.Background(), stacks.TaskTest, stacks.Metadata{}, []string{"PATH=" + t.TempDir()}, func(string) {}); err == nil {
 		t.Error("no dart to activate the tools with")
+	}
+}
+
+func TestAFlutterTestTaskActivatesTheToolsWithTheFlutterSDKsDart(t *testing.T) {
+	spectest.Proves(t, feature, "installs-the-test-tools", "the-test-task-activates-tojunit-and-format-coverage-in-its-own-pub-cache")
+	t.Setenv(putnamihome.Env, t.TempDir())
+	// A standalone dart comes first on PATH; the Flutter SDK has its own.
+	standalone, sdk := t.TempDir(), t.TempDir()
+	log := filepath.Join(sdk, "dart.log")
+	for dir, version := range map[string]string{standalone: "3.9.0", sdk: "3.7.2"} {
+		writeFile(t, dir, "dart", "#!/bin/sh\nif [ \"$1\" = --version ]; then echo 'Dart SDK version: "+version+" (stable)'; exit 0; fi\necho \""+dir+" $PUB_CACHE $*\" >> "+log+"\n")
+		if err := os.Chmod(filepath.Join(dir, "dart"), 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	writeFile(t, sdk, "flutter", "#!/bin/sh\n")
+	if err := os.Chmod(filepath.Join(sdk, "flutter"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	env := []string{"PATH=" + standalone + string(os.PathListSeparator) + sdk}
+	for _, variant := range []string{VariantFlutter, VariantDartInFlutter} {
+		dirs, err := Tools(context.Background(), stacks.TaskTest, stacks.Metadata{Variant: variant}, env, func(string) {})
+		if err != nil || len(dirs) != 1 {
+			t.Fatalf("%s: Tools = %v, %v", variant, dirs, err)
+		}
+		launcher, err := os.ReadFile(filepath.Join(dirs[0], "tojunit"))
+		if err != nil || !strings.Contains(string(launcher), "exec '"+filepath.Join(sdk, "dart")+"' pub global run junitreport:tojunit") {
+			t.Errorf("%s: the launcher runs the Flutter SDK's dart: %s %v", variant, launcher, err)
+		}
+	}
+	if ran, _ := os.ReadFile(log); strings.Contains(string(ran), standalone) || !strings.Contains(string(ran), "pub-cache-3.7.2 pub global activate junitreport") {
+		t.Errorf("the Flutter SDK's dart activates the tools into the pub cache of its version:\n%s", ran)
+	}
+	if _, err := Tools(context.Background(), stacks.TaskTest, stacks.Metadata{Variant: VariantFlutter}, []string{"PATH=" + standalone}, func(string) {}); err == nil {
+		t.Error("no flutter: no dart to activate the tools with")
 	}
 }

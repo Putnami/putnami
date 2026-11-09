@@ -200,3 +200,43 @@ func TestASwitchBehindOneShimMakesTheRootStale(t *testing.T) {
 		t.Errorf("another SDK behind the same shim resolves again: %q", got)
 	}
 }
+
+func TestATaskNeverWritesTheLockfileItReads(t *testing.T) {
+	spectest.Proves(t, feature, "tasks-run-the-profile", "a-task-runs-the-variant-steps-after-the-toolchain-check")
+	root := fixture(t)
+	log := stubTools(t, "3.29.2", "3.7.2", junitPass)
+	t.Setenv(extensionproto.OfflineDependenciesEnv, "")
+	gen := filepath.Join(root, "tools/gen")
+	lock := filepath.Join(gen, pubspecLock)
+	if err := os.Remove(lock); err != nil {
+		t.Fatal(err)
+	}
+	status, _, err := runProjectJob(t, root, "tools/gen", InstallJob(stack(t)), nil)
+	if status != "FAILED" || err == nil || !strings.Contains(err.Error(), CodePubGetFailed) {
+		t.Errorf("the install of a root with no pubspec.lock fails: %s %v", status, err)
+	}
+	if got := ran(t, log); got != gen+": dart pub get --enforce-lockfile\n" {
+		t.Errorf("the install enforces the lockfile it lacks: %q", got)
+	}
+	if status, err := runWorkspaceJob(t, root, WorkspaceFetchJob(stack(t)), nil, "tools/gen"); status != "FAILED" || err == nil || ran(t, log) != gen+": dart pub get --enforce-lockfile\n" {
+		t.Errorf("workspace-fetch, which a hosted run calls before its tasks, fails too: %s %v", status, err)
+	}
+	if _, err := os.Stat(lock); !os.IsNotExist(err) {
+		t.Errorf("neither wrote a pubspec.lock: %v", err)
+	}
+
+	// workspace-install resolves the lockfile a root lacks; the next task
+	// install finds the root current.
+	if status, err := runWorkspaceJob(t, root, WorkspaceInstallJob(stack(t)), nil, "tools/gen"); status != "OK" || err != nil {
+		t.Fatalf("workspace-install: %s %v", status, err)
+	}
+	if got := ran(t, log); got != gen+": dart pub get\n" {
+		t.Errorf("workspace-install resolves a lockfile: %q", got)
+	}
+	if _, err := os.Stat(lock); err != nil {
+		t.Errorf("workspace-install wrote pubspec.lock: %v", err)
+	}
+	if status, _, err := runProjectJob(t, root, "tools/gen", InstallJob(stack(t)), nil); status != "OK" || err != nil || ran(t, log) != "" {
+		t.Errorf("the root workspace-install resolved is current: %s %v", status, err)
+	}
+}

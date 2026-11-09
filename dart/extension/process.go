@@ -123,14 +123,9 @@ func ServeJob(stack stacks.Stack) cli.JobFunc {
 // for a package that resolves with Flutter, whatever comes first on PATH.
 func dartProgram(ctx *pctx.Context, root stacks.RootStep) string {
 	if v := variant(ctx); v == VariantFlutter || v == VariantDartInFlutter {
-		flutter := root.Program("flutter")
-		if !filepath.IsAbs(flutter) {
-			flutter, _ = stacks.LookPathIn(root.Env, flutter)
-		}
-		if flutter != "" {
-			if dart, ok := stacks.LookPathIn([]string{"PATH=" + filepath.Dir(flutter)}, "dart"); ok {
-				return dart
-			}
+		// The selected flutter is first on the PATH of the root's env.
+		if dart, ok := taskDart(stacks.Metadata{Variant: v}, root.Env); ok {
+			return dart
 		}
 	}
 	return root.Program("dart")

@@ -36,7 +36,9 @@ truncated or altered download, not a compromised publisher.
 The test task needs `tojunit` and `format_coverage`. For each one its `PATH`
 lacks, it activates `junitreport` 2.0.2 or `coverage` 1.x, which pub resolves
 for the selected SDK, into a pub cache of that SDK version under the Putnami
-home, and runs them from there. The machine's pub cache is untouched.
+home, and runs them from there with the SDK's `dart`: the one beside `flutter`
+for a Flutter package, whatever `dart` comes first on `PATH`. The machine's pub
+cache is untouched.
 
 ## Consequences
 

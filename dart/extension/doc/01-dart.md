@@ -51,7 +51,8 @@ with `flutter` when the root holds a Flutter package, unless the selected SDK
 resolved it last: a marker in `.dart_tool/` records the SDK program and the
 version it answers, the pubspecs, `pubspec.lock` and `package_config.json` of
 that resolution, so a resolution another SDK or an editor wrote since, or a
-shim that now selects another SDK, runs `pub get` again. The input-only root
+shim that now selects another SDK, runs `pub get` again. A root with no
+`pubspec.lock` fails: no task writes the lockfile it reads. The input-only root
 of a pub workspace below the workspace root resolves nothing itself: its
 members' install steps resolve it with their SDK. An offline run resolves nothing there: `workspace-install`
 resolved every root from the pub cache before.
@@ -125,8 +126,9 @@ archive for Linux on arm64, where `flutter` must be on `PATH`.
 
 The test task runs `tojunit` and `format_coverage`. For each one its `PATH`
 lacks, it activates `junitreport` 2.0.2 or `coverage` 1.x with the task's
-`dart` into a pub cache of that Dart SDK version under the Putnami home, and
-runs it from there: the machine's pub cache is untouched. A team that has activated them itself, with
+`dart`, the one beside the selected `flutter` for a package that resolves with
+Flutter, into a pub cache of that Dart SDK version under the Putnami home, and
+runs it from there with that `dart`: the machine's pub cache is untouched. A team that has activated them itself, with
 `~/.pub-cache/bin` on `PATH`, runs its own.
 
 ## The SDK version check
@@ -227,7 +229,7 @@ the host system. The design of the stack core is in
 
 | Command | What it runs |
 |---|---|
-| `putnami workspace-fetch` | `pub get` at each stack root, which downloads the locked packages into the pub cache and runs none of their code. A hosted run calls it with the network, before any repository process. |
+| `putnami workspace-fetch` | `pub get --enforce-lockfile` at each stack root, which downloads the locked packages into the pub cache and runs none of their code. A hosted run calls it with the network, before any repository process. A root with no `pubspec.lock` fails it. |
 | `putnami workspace-install` | `pub get --enforce-lockfile` at each stack root, with `flutter` when the root holds a Flutter package, `--offline` in an offline run. A root the selected SDK resolved last, with the same pubspecs, `pubspec.lock` and `package_config.json`, is current and skipped; `--force` resolves it anyway. A root with no `pubspec.lock` yet resolves one. A root whose SDK the machine lacks in an offline run is left out with a warning. |
 | `putnami deps-upgrade` | `pub upgrade` at each stack root. It needs the network. |
 | `putnami run` | `dart run` in a Dart command-line package, with `--entrypoint` and `--args`, and forwards its exit code. A Flutter app runs on a device with `flutter run`, outside Putnami. |

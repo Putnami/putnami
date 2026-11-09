@@ -168,7 +168,8 @@ func tomlString(data []byte, key string) string {
 }
 
 // yamlString reads the scalar value of a dotted key ("environment.sdk") from
-// YAML text. It reads block mappings indented with spaces and plain or quoted
+// YAML text. It reads block mappings indented with spaces, flow mappings
+// ("environment: {sdk: ^3.7.0}", on one line or several) and plain or quoted
 // scalars: what a pubspec.yaml environment holds. A key it does not find, or
 // that holds no scalar, reads as "".
 func yamlString(data []byte, key string) string {
@@ -176,6 +177,26 @@ func yamlString(data []byte, key string) string {
 	type level struct{ indent, child int }
 	var matched []level
 	sc := bufio.NewScanner(bytes.NewReader(data))
+	// flow reads the flow collection that starts text, over the lines it
+	// spans, and answers the scalar at the rest of the key.
+	flow := func(text string, rest []string) string {
+		for !yamlFlowClosed(text) && sc.Scan() {
+			text += "\n" + sc.Text()
+		}
+		value, ok := yamlFlow(text)
+		if !ok {
+			return ""
+		}
+		for _, k := range rest {
+			m, isMap := value.(map[string]any)
+			if !isMap {
+				return ""
+			}
+			value = m[k]
+		}
+		s, _ := value.(string)
+		return s
+	}
 	for sc.Scan() {
 		line := strings.TrimRight(sc.Text(), " \t\r")
 		trimmed := strings.TrimLeft(line, " ")
@@ -196,10 +217,18 @@ func yamlString(data []byte, key string) string {
 		if indent != want {
 			continue
 		}
-		k, v, ok := yamlKeyValue(trimmed)
+		if strings.HasPrefix(trimmed, "{") {
+			// The mapping the key walks is a flow mapping.
+			return flow(trimmed, segments[len(matched):])
+		}
+		k, raw, ok := yamlSplit(trimmed)
 		if !ok || k != segments[len(matched)] {
 			continue
 		}
+		if strings.HasPrefix(raw, "{") || strings.HasPrefix(raw, "[") {
+			return flow(raw, segments[len(matched)+1:])
+		}
+		v := yamlScalar(raw)
 		if len(matched) == len(segments)-1 {
 			return v
 		}
@@ -211,9 +240,9 @@ func yamlString(data []byte, key string) string {
 	return ""
 }
 
-// yamlKeyValue splits a "key: value" line, with the value unquoted and its
-// comment removed.
-func yamlKeyValue(line string) (string, string, bool) {
+// yamlSplit splits a "key: value" line into its unquoted key and the raw text
+// of its value.
+func yamlSplit(line string) (string, string, bool) {
 	i := strings.Index(line, ":")
 	for i >= 0 && i+1 < len(line) && line[i+1] != ' ' {
 		next := strings.Index(line[i+1:], ":")
@@ -226,21 +255,207 @@ func yamlKeyValue(line string) (string, string, bool) {
 	if i <= 0 {
 		return "", "", false
 	}
-	key := strings.Trim(strings.TrimSpace(line[:i]), `"'`)
-	value := strings.TrimSpace(line[i+1:])
+	return strings.Trim(strings.TrimSpace(line[:i]), `"'`), strings.TrimSpace(line[i+1:]), true
+}
+
+// yamlScalar reads the raw text of a block value as a scalar: unquoted, with
+// its comment removed.
+func yamlScalar(value string) string {
 	if value != "" && (value[0] == '"' || value[0] == '\'') {
 		if end := strings.IndexByte(value[1:], value[0]); end >= 0 {
-			return key, value[1 : end+1], true
+			return value[1 : end+1]
 		}
-		return key, "", true
+		return ""
 	}
 	if strings.HasPrefix(value, "#") {
-		value = ""
+		return ""
 	}
 	if c := strings.Index(value, " #"); c >= 0 {
 		value = strings.TrimSpace(value[:c])
 	}
-	return key, value, true
+	return value
+}
+
+// yamlFlowClosed reports whether text holds a whole flow collection: every
+// bracket it opens outside quotes and comments is closed.
+func yamlFlowClosed(text string) bool {
+	p := &flowParser{s: text}
+	depth := 0
+	// A quote opens a quoted scalar only where a scalar starts.
+	start := true
+	for p.skip(); p.i < len(p.s); p.skip() {
+		c := p.s[p.i]
+		switch {
+		case c == '{' || c == '[':
+			depth++
+			p.i++
+		case c == '}' || c == ']':
+			depth--
+			p.i++
+			if depth <= 0 {
+				return true
+			}
+		case (c == '"' || c == '\'') && start:
+			if _, ok := p.quoted(); !ok {
+				return false
+			}
+		default:
+			p.i++
+		}
+		start = strings.ContainsRune("{[,:", rune(c))
+	}
+	return false
+}
+
+// yamlFlow reads the flow collection at the start of text: a mapping is a
+// map[string]any, a sequence a []any, a scalar a string.
+func yamlFlow(text string) (any, bool) {
+	p := &flowParser{s: text}
+	return p.value()
+}
+
+// flowParser reads YAML flow collections.
+type flowParser struct {
+	s string
+	i int
+}
+
+// skip passes white space, line breaks and comments.
+func (p *flowParser) skip() {
+	for p.i < len(p.s) {
+		switch c := p.s[p.i]; {
+		case c == ' ' || c == '\t' || c == '\r' || c == '\n':
+			p.i++
+		case c == '#' && (p.i == 0 || strings.ContainsRune(" \t\n", rune(p.s[p.i-1]))):
+			for p.i < len(p.s) && p.s[p.i] != '\n' {
+				p.i++
+			}
+		default:
+			return
+		}
+	}
+}
+
+func (p *flowParser) value() (any, bool) {
+	p.skip()
+	if p.i >= len(p.s) {
+		return nil, false
+	}
+	switch p.s[p.i] {
+	case '{':
+		return p.mapping()
+	case '[':
+		return p.sequence()
+	case '"', '\'':
+		return p.quoted()
+	}
+	return p.plain(), true
+}
+
+func (p *flowParser) mapping() (any, bool) {
+	p.i++
+	m := map[string]any{}
+	for {
+		p.skip()
+		if p.i >= len(p.s) {
+			return nil, false
+		}
+		if p.s[p.i] == '}' {
+			p.i++
+			return m, true
+		}
+		k, ok := p.value()
+		key, isString := k.(string)
+		if !ok || !isString {
+			return nil, false
+		}
+		p.skip()
+		var v any
+		if p.i < len(p.s) && p.s[p.i] == ':' {
+			p.i++
+			p.skip()
+			if p.i < len(p.s) && p.s[p.i] != ',' && p.s[p.i] != '}' {
+				if v, ok = p.value(); !ok {
+					return nil, false
+				}
+			}
+		}
+		m[key] = v
+		p.skip()
+		if p.i < len(p.s) && p.s[p.i] == ',' {
+			p.i++
+		} else if p.i >= len(p.s) || p.s[p.i] != '}' {
+			return nil, false
+		}
+	}
+}
+
+func (p *flowParser) sequence() (any, bool) {
+	p.i++
+	var list []any
+	for {
+		p.skip()
+		if p.i >= len(p.s) {
+			return nil, false
+		}
+		if p.s[p.i] == ']' {
+			p.i++
+			return list, true
+		}
+		v, ok := p.value()
+		if !ok {
+			return nil, false
+		}
+		list = append(list, v)
+		p.skip()
+		if p.i < len(p.s) && p.s[p.i] == ',' {
+			p.i++
+		} else if p.i >= len(p.s) || p.s[p.i] != ']' {
+			return nil, false
+		}
+	}
+}
+
+// quoted reads a single- or double-quoted scalar.
+func (p *flowParser) quoted() (any, bool) {
+	quote := p.s[p.i]
+	var b strings.Builder
+	for p.i++; p.i < len(p.s); p.i++ {
+		c := p.s[p.i]
+		switch {
+		case c == quote && quote == '\'' && p.i+1 < len(p.s) && p.s[p.i+1] == '\'':
+			b.WriteByte('\'')
+			p.i++
+		case c == quote:
+			p.i++
+			return b.String(), true
+		case c == '\\' && quote == '"' && p.i+1 < len(p.s):
+			p.i++
+			b.WriteByte(p.s[p.i])
+		default:
+			b.WriteByte(c)
+		}
+	}
+	return nil, false
+}
+
+// plain reads a plain scalar: up to a flow indicator, a ": " or a comment,
+// with its line breaks folded.
+func (p *flowParser) plain() string {
+	start := p.i
+	for ; p.i < len(p.s); p.i++ {
+		c := p.s[p.i]
+		if c == ',' || c == '{' || c == '}' || c == '[' || c == ']' {
+			break
+		}
+		if c == ':' && (p.i+1 == len(p.s) || strings.ContainsRune(" \t\r\n,{}[]", rune(p.s[p.i+1]))) {
+			break
+		}
+		if c == '#' && p.i > start && strings.ContainsRune(" \t\n", rune(p.s[p.i-1])) {
+			break
+		}
+	}
+	return strings.Join(strings.Fields(p.s[start:p.i]), " ")
 }
 
 // MachineVersion runs the toolchain command in dir and matches its output:

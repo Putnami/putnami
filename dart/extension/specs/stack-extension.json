@@ -30,7 +30,7 @@
     },
     {
       "id": "tasks-run-the-profile",
-      "text": "Each task first checks the SDKs: dart --version against environment.sdk, or flutter --version against environment.flutter and its Dart against environment.sdk, read as pub reads them; outside, it fails with stacks.toolchain_mismatch unless toolchain.check is warn. An install step resolves the stack root with pub get --enforce-lockfile; lint runs dart analyze on lib and bin; test runs flutter test or dart test; build runs flutter build per platform of an app, or dart compile exe per bin/*.dart."
+      "text": "Each task first checks the SDKs: dart --version against environment.sdk, or flutter --version against environment.flutter and its Dart against environment.sdk, read as pub reads them; outside, it fails with stacks.toolchain_mismatch unless toolchain.check is warn. Install runs pub get --enforce-lockfile at the stack root and never writes pubspec.lock; lint runs dart analyze on lib and bin; test runs flutter test or dart test; build runs flutter build per app platform, or dart compile exe per bin/*.dart."
     },
     {
       "id": "reports-become-the-summary",
@@ -54,11 +54,11 @@
     },
     {
       "id": "installs-the-test-tools",
-      "text": "The test task finds tojunit and format_coverage on its PATH, or activates junitreport 2.0.2 and coverage 1.x with the selected dart into a pub cache of that Dart SDK version under the Putnami home, and runs them from there. The machine's pub cache is untouched."
+      "text": "The test task finds tojunit and format_coverage on its PATH, or activates junitreport 2.0.2 and coverage 1.x with the selected dart, beside flutter for a Flutter package, into a pub cache of that Dart SDK version under the Putnami home, and runs them from there with that dart. The machine's pub cache is untouched."
     },
     {
       "id": "workspace-commands",
-      "text": "workspace-fetch runs pub get at each stack root to fill the pub cache; workspace-install runs pub get --enforce-lockfile, --offline in an offline run, and skips a root the selected SDK resolved last, with the same pubspecs, lockfile and package_config.json, unless --force; deps-upgrade runs pub upgrade; each uses flutter for a root that holds a Flutter package. lint --docs-links checks the README.md and doc/ links."
+      "text": "workspace-fetch runs pub get --enforce-lockfile at each stack root to fill the pub cache; workspace-install runs pub get --enforce-lockfile, or pub get for a root with no pubspec.lock yet, --offline in an offline run, and skips a root the selected SDK resolved last, with the same pubspecs, lockfile and package_config.json, unless --force; deps-upgrade runs pub upgrade; each uses flutter for a root that holds a Flutter package. lint --docs-links checks the README.md and doc/ links."
     },
     {
       "id": "runs-and-serves",

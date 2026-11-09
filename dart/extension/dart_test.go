@@ -33,6 +33,17 @@ func writeFile(t *testing.T, root, rel, content string) {
 	}
 }
 
+// tempDir is a temporary directory by its real path: a step's $PWD names that
+// path, and on macOS the temporary directory sits behind the /var symlink.
+func tempDir(t *testing.T) string {
+	t.Helper()
+	dir, err := filepath.EvalSymlinks(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	return dir
+}
+
 // fixture writes the shop fixture, the base tree of the putnami observe Dart
 // demo, and a pure Dart package of its own beside it, tools/gen, with a
 // library, an executable and a test.
@@ -42,7 +53,7 @@ func fixture(t *testing.T) string {
 	if err != nil {
 		t.Fatal(err)
 	}
-	root := t.TempDir()
+	root := tempDir(t)
 	parts := strings.Split(string(data), "\n-- ")
 	for _, part := range parts[1:] {
 		header, body, _ := strings.Cut(part, "\n")
@@ -126,7 +137,13 @@ func stubTools(t *testing.T, flutterVersion, dartVersion, junit string) string {
 	log := filepath.Join(bin, "tools.log")
 	writeFile(t, bin, "junit.xml", junit)
 	common := `echo "$PWD: $tool $*" >> "` + log + `"
-if [ "$1 $2" = "pub get" ]; then mkdir -p .dart_tool && echo "{\"by\": \"$tool\"}" > .dart_tool/package_config.json; fi
+if [ "$1 $2" = "pub get" ]; then
+  case " $* " in
+    *" --enforce-lockfile "*) [ -f pubspec.lock ] || { echo "Cannot do --enforce-lockfile without an existing pubspec.lock" >&2; exit 66; };;
+    *) [ -f pubspec.lock ] || echo "packages: {}" > pubspec.lock;;
+  esac
+  mkdir -p .dart_tool && echo "{\"by\": \"$tool\"}" > .dart_tool/package_config.json
+fi
 for a in "$@"; do
   case "$a" in
     --file-reporter=json:*) printf '{"type":"done","success":true}\n' > "${a#--file-reporter=json:}";;
@@ -466,7 +483,7 @@ func TestAPureDartPackageInAFlutterWorkspaceResolvesWithFlutter(t *testing.T) {
 
 func TestANestedPubWorkspaceIsAStackRoot(t *testing.T) {
 	spectest.Proves(t, feature, "packages-become-projects", "the-packages-of-a-pub-workspace-become-projects-with-their-edges")
-	root := t.TempDir()
+	root := tempDir(t)
 	writeFile(t, root, "mono/pubspec.yaml", "name: mono\npublish_to: none\nenvironment:\n  sdk: ^3.7.0\nworkspace:\n  - app\n  - core\n")
 	writeFile(t, root, "mono/pubspec.lock", "packages: {}\n")
 	writeFile(t, root, "mono/app/pubspec.yaml", "name: app\nresolution: workspace\nenvironment:\n  sdk: ^3.7.0\ndependencies:\n  core:\n")

@@ -254,6 +254,27 @@ dependencies:
 	}
 }
 
+func TestReadVersionReadsYAMLFlowMappings(t *testing.T) {
+	for _, c := range []struct{ pubspec, key, want string }{
+		{"name: shop\nenvironment: {sdk: ^3.7.0, flutter: \">=3.29.0\"}\n", "environment.sdk", "^3.7.0"},
+		{"name: shop\nenvironment: {sdk: ^3.7.0, flutter: \">=3.29.0\"}\n", "environment.flutter", ">=3.29.0"},
+		{"environment: {sdk: '>=3.0.0 <4.0.0'} # the SDK\n", "environment.sdk", ">=3.0.0 <4.0.0"},
+		{"environment: {\"sdk\":\"^3.7.0\"}\n", "environment.sdk", "^3.7.0"},
+		{"environment: {\n  sdk: ^3.7.0, # the Dart SDK\n  flutter: '>=3.29.0'\n}\nname: shop\n", "environment.flutter", ">=3.29.0"},
+		{"environment:\n  {sdk: >=3.0.0 <4.0.0}\n", "environment.sdk", ">=3.0.0 <4.0.0"},
+		{"{name: shop, environment: {sdk: ^3.7.0}}\n", "environment.sdk", "^3.7.0"},
+		{"dependencies: {flutter: {sdk: flutter}}\n", "dependencies.flutter.sdk", "flutter"},
+		{"environment: {sdk: ^3.7.0}\n", "environment.flutter", ""},
+		{"environment: {sdk: [3]}\n", "environment.sdk", ""},
+		{"environment: {sdk: ^3.7.0\n", "environment.sdk", ""},
+		{"environment: {description: it's, sdk: ^3.7.0}\n", "environment.sdk", "^3.7.0"},
+	} {
+		if got, err := readVersion("pubspec.yaml", []byte(c.pubspec), c.key); err != nil || got != c.want {
+			t.Errorf("%s of %q = %q, %v; want %q", c.key, c.pubspec, got, err, c.want)
+		}
+	}
+}
+
 func TestPubDialectsReadARangeAsPubDoes(t *testing.T) {
 	tc := mustProfile(t).Toolchain
 	sdk, flutter := tc, tc

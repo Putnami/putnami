@@ -46,16 +46,17 @@ const (
 )
 
 // InstallJob resolves the stack root of the job's component with pub get
-// before its lint, test or build, unless its resolution is current. An offline
-// run resolves nothing: workspace-install resolved every root from the pub
-// cache before.
+// --enforce-lockfile before its lint, test or build, unless its resolution is
+// current: a task never writes the lockfile it reads, so a root with no
+// pubspec.lock fails with pub's own message. An offline run resolves nothing:
+// workspace-install resolved every root from the pub cache before.
 func InstallJob(stack stacks.Stack) cli.JobFunc {
 	install := stack.RootJob(func(ctx context.Context, root stacks.RootStep, emit *jsonl.Emitter) error {
 		if offline() {
 			emit.Info("offline dependencies: pub get does not run")
 			return nil
 		}
-		return pubGet(ctx, root, emit, false)
+		return pubGet(ctx, root, emit, false, false)
 	})
 	return func(ctx *pctx.Context, emit *jsonl.Emitter, args []string) (string, map[string]any, error) {
 		// The root of a pub workspace below the workspace root resolves with
@@ -69,16 +70,13 @@ func InstallJob(stack stacks.Stack) cli.JobFunc {
 	}
 }
 
-// WorkspaceFetchJob runs pub get at each stack root, which downloads the
-// locked packages into the pub cache and runs none of their code. A hosted run
-// calls it before any repository process, with the network.
+// WorkspaceFetchJob runs pub get --enforce-lockfile at each stack root, which
+// downloads the locked packages into the pub cache and runs none of their
+// code. A hosted run calls it before any repository process, with the network:
+// a root with no pubspec.lock fails it, as it fails a task.
 func WorkspaceFetchJob(stack stacks.Stack) cli.JobFunc {
 	return stack.WorkspaceRootJob(stacks.WarnOnMissingToolchain, func(ctx context.Context, root stacks.RootStep, emit *jsonl.Emitter) error {
-		args := []string{"pub", "get"}
-		if hasLock(root.Dir) {
-			args = append(args, "--enforce-lockfile")
-		}
-		if err := runPub(ctx, root, emit, args...); err != nil {
+		if err := runPub(ctx, root, emit, "pub", "get", "--enforce-lockfile"); err != nil {
 			emit.DiagnosticWithCode("error", err.Error(), "", 0, 0, CodePubGetFailed)
 			return fmt.Errorf("%s: %w", CodePubGetFailed, err)
 		}
@@ -86,14 +84,14 @@ func WorkspaceFetchJob(stack stacks.Stack) cli.JobFunc {
 	})
 }
 
-// WorkspaceInstallJob runs pub get at each stack root of the workspace. A
-// root whose package_config.json is newer than its pubspec.yaml and
-// pubspec.lock is current and skipped, unless the force flag is set.
+// WorkspaceInstallJob runs pub get at each stack root of the workspace, which
+// resolves a pubspec.lock for a root that has none. A root the selected SDK
+// resolved last is current and skipped, unless the force flag is set.
 func WorkspaceInstallJob(stack stacks.Stack) cli.JobFunc {
 	return func(ctx *pctx.Context, emit *jsonl.Emitter, args []string) (string, map[string]any, error) {
 		force := ctx.Params.Bool("force", false)
 		install := func(ctx context.Context, root stacks.RootStep, emit *jsonl.Emitter) error {
-			return pubGet(ctx, root, emit, force)
+			return pubGet(ctx, root, emit, force, true)
 		}
 		return stack.WorkspaceRootJob(stacks.WarnOnMissingToolchain, install)(ctx, emit, args)
 	}
@@ -104,16 +102,18 @@ func DepsUpgradeJob(stack stacks.Stack) cli.JobFunc {
 	return stack.WorkspaceRootJob(stacks.FailOnMissingToolchain, pubUpgrade)
 }
 
-func pubGet(ctx context.Context, root stacks.RootStep, emit *jsonl.Emitter, force bool) error {
+// pubGet resolves the stack root with pub get --enforce-lockfile, unless its
+// resolution is current and force is unset. With writeLock set, a root with no
+// pubspec.lock resolves one.
+func pubGet(ctx context.Context, root stacks.RootStep, emit *jsonl.Emitter, force, writeLock bool) error {
 	tool := rootTool(root.Dir)
 	if !force && current(root, tool) {
 		emit.Info(root.Dir + " is current: the selected " + tool + " resolved its pubspecs and " + pubspecLock + " last")
 		return nil
 	}
 	args := []string{"pub", "get"}
-	// The install keeps the locked versions; a root with no lockfile yet
-	// resolves one.
-	if hasLock(root.Dir) {
+	// The install keeps the locked versions.
+	if !writeLock || hasLock(root.Dir) {
 		args = append(args, "--enforce-lockfile")
 	}
 	if offline() {
