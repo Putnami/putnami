@@ -875,38 +875,36 @@ func removeReports(profile Profile, task, projectAbs, rootAbs string) error {
 // match outside its base, or that the inputs of any task of the profile
 // select, is kept.
 func removeOutputs(patterns []string, profile Profile, projectAbs, rootAbs string) error {
-	var projectInputs, rootInputs, excludes []string
-	for _, task := range TaskNames {
-		project, root := profile.TaskPatterns(task)
-		projectInputs = append(projectInputs, project...)
-		rootInputs = append(rootInputs, root...)
-		excludes = append(excludes, profile.TaskExcludes(task)...)
-	}
 	kept := profile.KeptInputs()
-	isInput := func(m string) bool {
+	// Each task's own exclusions decide what that task reads: a file one
+	// task reads stays a source though another task's set leaves it out.
+	selects := func(task, m string) bool {
+		project, root := profile.TaskPatterns(task)
 		if rel, err := filepath.Rel(projectAbs, m); err == nil && filepath.IsLocal(rel) {
-			if rel = filepath.ToSlash(rel); slices.Contains(kept, rel) {
+			rel = filepath.ToSlash(rel)
+			if !Excluded(profile.TaskExcludes(task), rel) && slices.ContainsFunc(project, func(p string) bool { return MatchPattern(p, rel) }) {
 				return true
 			}
-			if Excluded(excludes, rel) {
-				return false
-			}
 		}
-		for _, in := range []struct {
-			base     string
-			patterns []string
-		}{{projectAbs, projectInputs}, {rootAbs, rootInputs}} {
-			rel, err := filepath.Rel(in.base, m)
-			if err != nil || strings.HasPrefix(rel, "..") {
-				continue
-			}
-			for _, p := range in.patterns {
-				if MatchPattern(p, filepath.ToSlash(rel)) {
-					return true
+		if rel, err := filepath.Rel(rootAbs, m); err == nil && filepath.IsLocal(rel) {
+			rel = filepath.ToSlash(rel)
+			var includes, excludes []string
+			for _, p := range root {
+				if e, ok := strings.CutPrefix(p, "!"); ok {
+					excludes = append(excludes, e)
+				} else {
+					includes = append(includes, p)
 				}
 			}
+			return !Excluded(excludes, rel) && slices.ContainsFunc(includes, func(p string) bool { return MatchPattern(p, rel) })
 		}
 		return false
+	}
+	isInput := func(m string) bool {
+		if rel, err := filepath.Rel(projectAbs, m); err == nil && filepath.IsLocal(rel) && slices.Contains(kept, filepath.ToSlash(rel)) {
+			return true
+		}
+		return slices.ContainsFunc(TaskNames, func(task string) bool { return selects(task, m) })
 	}
 	for _, p := range patterns {
 		if strings.HasPrefix(p, "{output}/") {

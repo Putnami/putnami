@@ -101,6 +101,7 @@ use (
 	./java/extension
 	./php/extension
 	./python/extension
+	./ruby/extension
 	./rust/extension
 	./sites/telemetry.putnami.dev
 	./swift/extension

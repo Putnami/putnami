@@ -169,6 +169,12 @@ func Detect(root string) Detection {
 	return out
 }
 
+// SkipsDir reports whether the walk skips a directory of that name: a hidden
+// one, or one of node_modules, vendor, tmp, log and coverage.
+func SkipsDir(name string) bool {
+	return strings.HasPrefix(name, ".") || skippedDirs[name]
+}
+
 // walk lists the directories that hold a package.yml, a gemspec or a
 // Gemfile. It skips node_modules, vendor, tmp, log, coverage and hidden
 // directories, such as .git and .bundle.
@@ -187,7 +193,7 @@ func walk(root string) (map[string]*dir, []diag.Diagnostic) {
 		}
 		name := entry.Name()
 		if entry.IsDir() {
-			if p != root && (strings.HasPrefix(name, ".") || skippedDirs[name]) {
+			if p != root && SkipsDir(name) {
 				return fs.SkipDir
 			}
 			return nil

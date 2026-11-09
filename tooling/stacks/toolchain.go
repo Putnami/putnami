@@ -60,7 +60,7 @@ func (t Toolchain) ExpectedVersion(root, projectDir, stackRoot string) (Expected
 			if err != nil {
 				return Expected{}, err
 			}
-			version, err := readVersion(f.Path, data, f.Key)
+			version, err := f.read(data)
 			if err != nil {
 				return Expected{}, fmt.Errorf("%s: %w", rel, err)
 			}
@@ -98,6 +98,23 @@ func (t Toolchain) reading(f VersionFile, data []byte) string {
 		return ReadingPlain
 	}
 	return ""
+}
+
+// read reads the version the file's content states: the "version" group of
+// its pattern, else what readVersion reads at its key.
+func (f VersionFile) read(data []byte) (string, error) {
+	if f.Pattern == "" {
+		return readVersion(f.Path, data, f.Key)
+	}
+	re, err := regexp.Compile(f.Pattern)
+	if err != nil {
+		return "", err
+	}
+	m := re.FindSubmatch(data)
+	if m == nil {
+		return "", nil
+	}
+	return strings.TrimSpace(string(m[re.SubexpIndex("version")])), nil
 }
 
 // readVersion reads a version from the content of the file name: the string

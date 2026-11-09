@@ -71,6 +71,6 @@
   "decisions": [
     "tooling/stacks/doc/adr/0001-one-extension-per-stack-on-a-shared-core.md",
     "tooling/stacks/doc/adr/0005-profile-variants-for-a-stack-with-several-builds.md",
-    "tooling/stacks/doc/adr/0007-a-profile-adapts-to-each-component.md"
+    "tooling/stacks/doc/adr/0009-a-profile-adapts-to-each-component.md"
   ]
 }

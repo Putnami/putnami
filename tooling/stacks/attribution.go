@@ -39,7 +39,14 @@ func (s Stack) attribution(root, projectAbs, reportBase, component string) Attri
 	a.File = func(p string) Owner {
 		abs := filepath.FromSlash(p)
 		if !filepath.IsAbs(abs) {
-			abs = filepath.Join(reportBase, abs)
+			// A relative path is the steps' directory's, such as the stack
+			// root's for a report a run there writes, unless only the
+			// project holds the file.
+			rel := abs
+			abs = filepath.Join(reportBase, rel)
+			if reportBase != projectAbs && !isRegular(abs) && isRegular(filepath.Join(projectAbs, rel)) {
+				abs = filepath.Join(projectAbs, rel)
+			}
 		}
 		dir, ok := owners(abs)
 		switch {
@@ -85,8 +92,12 @@ func (s Stack) fileOwners(root string) func(abs string) (string, bool) {
 		}
 		var candidates []string
 		for dir := path.Dir(rel); ; dir = path.Dir(dir) {
-			if _, seen := isComponent[dir]; !seen && s.hasMarker(root, dir) {
-				candidates = append(candidates, dir)
+			if _, seen := isComponent[dir]; !seen {
+				if s.hasMarker(root, dir) {
+					candidates = append(candidates, dir)
+				} else {
+					isComponent[dir] = false
+				}
 			}
 			if dir == "." {
 				break
@@ -96,10 +107,16 @@ func (s Stack) fileOwners(root string) func(abs string) (string, bool) {
 			for _, c := range candidates {
 				isComponent[c] = false
 			}
-			components, _ := s.Detect(root, wsproto.ProbeRequest{Version: wsproto.ProbeProtocolVersion, Extension: s.Extension, Paths: candidates})
-			for _, c := range components {
-				if c.Name != "" {
-					isComponent[c.Path] = true
+			if s.IsComponent != nil {
+				for _, c := range candidates {
+					isComponent[c] = s.IsComponent(root, c)
+				}
+			} else {
+				components, _ := s.Detect(root, wsproto.ProbeRequest{Version: wsproto.ProbeProtocolVersion, Extension: s.Extension, Paths: candidates})
+				for _, c := range components {
+					if c.Name != "" {
+						isComponent[c.Path] = true
+					}
 				}
 			}
 		}
@@ -153,4 +170,9 @@ func relSlash(base, target string) (string, bool) {
 		return "", false
 	}
 	return filepath.ToSlash(rel), true
+}
+
+func isRegular(p string) bool {
+	info, err := os.Stat(p)
+	return err == nil && info.Mode().IsRegular()
 }
