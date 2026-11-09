@@ -126,7 +126,12 @@ func writeImageFile(t *testing.T, root, rel, content string) {
 // answers the application files it must ship.
 func shopWorkspace(t *testing.T) (string, []string) {
 	t.Helper()
-	root := t.TempDir()
+	// The fake uv logs the shell's physical working directory, so the root is
+	// resolved too: on macOS the temporary directory sits behind /var -> /private/var.
+	root, err := filepath.EvalSymlinks(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
 	writeImageFile(t, root, "pyproject.toml", "[tool.uv.workspace]\nmembers = [\"apps/shop\", \"libs/discount\"]\n")
 	writeImageFile(t, root, "uv.lock", "version = 1\n")
 	writeImageFile(t, root, "apps/shop/pyproject.toml", "[project]\nname = \"shop\"\n")

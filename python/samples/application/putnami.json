@@ -6,8 +6,10 @@
   "featureAuthority": {"owner": "python/experimental-workspace-integration"},
   "dependencies": ["/python/samples/library"],
   "options": {
+    "package": {
+      "docker": true
+    },
     "publish": {
-      "archives": false,
       "docker": true
     }
   }

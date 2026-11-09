@@ -5,6 +5,9 @@
   "extensionDependencies": {
     "@putnami/dev": ""
   },
+  "uses": [
+    "oci"
+  ],
   "runtime": {
     "executable": "compiled/putnami-java",
     "toolchains": {
