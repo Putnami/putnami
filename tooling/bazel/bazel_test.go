@@ -233,16 +233,37 @@ func TestThePackagesOfABazelWorkspaceBecomeProjects(t *testing.T) {
 		t.Errorf("projects = %+v", result.Projects)
 	}
 
-	// Without the export, the BUILD files name the packages with no edge,
-	// and the edges come from each package's putnami.json.
-	result = probe(t, repository(t, d, false))
-	if len(result.Projects) != 3 || len(result.Diagnostics) != 0 {
+	// Without the export, a BUILD file is not parsed: before the sync every
+	// directory with one is bare, so a directory with no rule runs no task.
+	stubBazel(t, d)
+	root = repository(t, d, false)
+	writeFile(t, root, "tools/BUILD", "exports_files([\"lint.sh\"])\n")
+	result = probe(t, root)
+	if len(result.Projects) != 4 || len(result.Diagnostics) != 0 {
 		t.Errorf("without the export: projects %+v, diagnostics %v", result.Projects, result.Diagnostics)
 	}
 	for _, p := range result.Projects {
-		if len(p.Dependencies) != 0 {
-			t.Errorf("without the export %s has edges %v", p.Path, p.Dependencies)
+		if len(p.Extensions) != 0 {
+			t.Errorf("before the sync %s = %+v, want a bare project", p.Path, p)
 		}
+	}
+	// After the sync, the packages of the query are the projects that name
+	// the extension, with no edge from the probe: their putnami.json holds
+	// the edges. tools, which holds no rule, stays bare.
+	if _, err := Sync(context.Background(), root, &bytes.Buffer{}); err != nil {
+		t.Fatal(err)
+	}
+	got = map[string]wsproto.ProbeProject{}
+	for _, p := range probe(t, root).Projects {
+		got[p.Path] = p
+	}
+	for _, path := range []string{"api", "pricing", "web"} {
+		if p := got[path]; !reflect.DeepEqual(p.Extensions, []string{ExtensionName}) || len(p.Dependencies) != 0 {
+			t.Errorf("after the sync %s = %+v", path, p)
+		}
+	}
+	if tools := got["tools"]; len(tools.Extensions) != 0 || tools.SourceFile != "tools/BUILD" {
+		t.Errorf("after the sync tools = %+v, want a bare project", tools)
 	}
 
 	// A directory that is no Bazel workspace answers nothing.

@@ -17,7 +17,7 @@
   "requirements": [
     {
       "id": "packages-become-projects",
-      "text": "The probe answers, for each candidate directory the observe Bazel detector knows as a package: its directory as source name, the packages bazel-graph.json says it depends on, the extension @putnami/bazel, the tag bazel, and metadata naming the package, the workspace root as stack root and the .bazelversion version. Any other candidate holding a BUILD or BUILD.bazel file, the root package included, is bare: named by its directory, with no extension, so it runs no task."
+      "text": "The probe answers, for each package of bazel-graph.json, or without it each directory whose putnami.json the sync wrote for @putnami/bazel: its directory as source name, the packages the export says it depends on, the extension @putnami/bazel, the tag bazel, and metadata naming the package, the workspace root as stack root and the .bazelversion version. Any other candidate holding a BUILD or BUILD.bazel file, the root package included, is bare: named by its directory, with no extension, so it runs no task."
     },
     {
       "id": "sync-writes-the-package-graph",

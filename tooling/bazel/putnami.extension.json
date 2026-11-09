@@ -275,7 +275,7 @@
             "root": "command-output",
             "path": "build",
             "optionalEmpty": true,
-            "description": "The reports the task copied: each JUnit report and LCOV coverage file of a test task, and its build-event file."
+            "description": "The task's command output, which a build task leaves empty."
           }
         },
         "effects": [
