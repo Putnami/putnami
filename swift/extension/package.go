@@ -18,9 +18,11 @@ import (
 	"go.putnami.dev/sdk/extension/cli"
 	pctx "go.putnami.dev/sdk/extension/context"
 	"go.putnami.dev/sdk/extension/dockerpublish"
+	"go.putnami.dev/sdk/extension/filelock"
 	"go.putnami.dev/sdk/extension/jsonl"
 	"go.putnami.dev/sdk/extension/oci"
 	"go.putnami.dev/sdk/extension/pkgmeta"
+	"go.putnami.dev/sdk/extension/putnamihome"
 	"go.putnami.dev/tooling/stacks"
 )
 
@@ -103,24 +105,35 @@ func staticSDKFor(release string) (staticSDK, error) {
 	}, nil
 }
 
-// PublishDockerJob pushes the packaged image through the shared publisher.
+// PublishDockerJob pushes the packaged image of an application through the
+// shared publisher. Any other component publishes nothing.
 func PublishDockerJob() cli.JobFunc {
-	return dockerpublish.Publish
+	return func(ctx *pctx.Context, emit *jsonl.Emitter, args []string) (string, map[string]any, error) {
+		if ctx.Project.Type != "application" {
+			return "SKIP", nil, nil
+		}
+		return dockerpublish.Publish(ctx, emit, args)
+	}
 }
 
 // PackageDockerJob assembles the image of an application: its executable
 // product, built static with the Static Linux SDK, and the resource bundles
-// beside it, on a digest-pinned distroless base. It needs no Docker daemon.
+// beside it, on a digest-pinned distroless base. It needs no Docker daemon,
+// and holds the lock of the stack root while it builds. A library or an Xcode
+// project packages nothing.
 func PackageDockerJob(stack stacks.Stack) cli.JobFunc {
 	return func(ctx *pctx.Context, emit *jsonl.Emitter, args []string) (string, map[string]any, error) {
-		if ctx.Project.Type == "library" {
+		if ctx.Project.Type != "application" {
 			return "SKIP", nil, nil
 		}
-		root, product, err := executableOf(stack, ctx, emit)
+		err := stack.Locked(ctx, emit, func(run context.Context, root stacks.RootStep, emit *jsonl.Emitter) error {
+			product, err := executableAt(root, ctx, emit)
+			if err != nil {
+				return err
+			}
+			return assembleImage(run, ctx, root, product, cli.ParseFlags(args), emit)
+		})
 		if err != nil {
-			return "FAILED", nil, err
-		}
-		if err := assembleImage(context.Background(), ctx, root, product, cli.ParseFlags(args), emit); err != nil {
 			return "FAILED", nil, err
 		}
 		return "OK", nil, nil
@@ -164,16 +177,23 @@ func assembleImage(run context.Context, ctx *pctx.Context, root stacks.RootStep,
 	if err != nil {
 		return err
 	}
-	build := []string{"build", "-c", "release", "--force-resolved-versions", "--swift-sdk", triple, "--product", product, "-Xlinker", "-s"}
-	emit.Info("$ swift " + strings.Join(build, " ") + " (" + sdk.ID + ")")
-	if _, err := swiftOutput(run, root, build...); err != nil {
-		return fail(emit, CodeImageFailed, err)
-	}
-	binPath, err := swiftOutput(run, root, "build", "-c", "release", "--swift-sdk", triple, "--show-bin-path")
+	// The bin path keeps the resource bundles of every product built before,
+	// so the job removes them and the build writes those of this product.
+	selection := []string{"-c", "release", "--swift-sdk", sdk.ID, "--triple", triple}
+	binPath, err := swiftOutput(run, root, append(append([]string{"build"}, selection...), "--show-bin-path")...)
 	if err != nil {
 		return fail(emit, CodeImageFailed, err)
 	}
-	spec, err := imageSpec(strings.TrimSpace(lastLine(binPath)), product, base, platform, defaultImagePort)
+	binPath = strings.TrimSpace(lastLine(binPath))
+	if err := removeResourceBundles(binPath); err != nil {
+		return fail(emit, CodeImageFailed, err)
+	}
+	build := append(append([]string{"build"}, selection...), "--force-resolved-versions", "--product", product, "-Xlinker", "-s")
+	emit.Info("$ swift " + strings.Join(build, " "))
+	if _, err := swiftOutput(run, root, build...); err != nil {
+		return fail(emit, CodeImageFailed, err)
+	}
+	spec, err := imageSpec(binPath, product, base, platform, defaultImagePort)
 	if err != nil {
 		return fail(emit, CodeImageFailed, err)
 	}
@@ -236,11 +256,72 @@ func selectStaticSDK(run context.Context, root stacks.RootStep, emit *jsonl.Emit
 	if slices.Contains(strings.Fields(installed), sdk.ID) {
 		return sdk, nil
 	}
+	// One install of a bundle runs at a time on the machine: a job that waited
+	// finds it installed.
+	lock, err := lockSDKInstall(root, sdk.ID)
+	if err != nil {
+		return staticSDK{}, fail(emit, CodeStaticSDKUnavailable, err)
+	}
+	defer func() { _ = lock.Release() }()
+	if installed, err = swiftOutput(run, root, "sdk", "list"); err != nil {
+		return staticSDK{}, fail(emit, CodeStaticSDKUnavailable, err)
+	}
+	if slices.Contains(strings.Fields(installed), sdk.ID) {
+		return sdk, nil
+	}
 	emit.Info("$ swift sdk install " + sdk.URL + " --checksum " + sdk.Checksum)
 	if _, err := swiftOutput(run, root, "sdk", "install", sdk.URL, "--checksum", sdk.Checksum); err != nil {
 		return staticSDK{}, fail(emit, CodeStaticSDKUnavailable, err)
 	}
 	return sdk, nil
+}
+
+// lockSDKInstall takes the machine's lock on the install of a Swift SDK
+// bundle, under locks/ of the Putnami home, or of the system's temporary
+// directory when the environment names no home.
+func lockSDKInstall(root stacks.RootStep, id string) (*filelock.Lock, error) {
+	lookup := func(key string) string {
+		prefix := key + "="
+		for i := len(root.Env) - 1; i >= 0; i-- {
+			if strings.HasPrefix(root.Env[i], prefix) {
+				return root.Env[i][len(prefix):]
+			}
+		}
+		return ""
+	}
+	home := putnamihome.Resolve(lookup)
+	if home == "" {
+		home = filepath.Join(os.TempDir(), "putnami")
+	}
+	dir := filepath.Join(home, "locks")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return nil, err
+	}
+	return filelock.Acquire(filepath.Join(dir, "swift-sdk-"+id+".lock"), true, false)
+}
+
+// removeResourceBundles removes the .resources and .bundle directories of a
+// bin path. A bin path that does not exist yet holds none.
+func removeResourceBundles(binPath string) error {
+	entries, err := os.ReadDir(binPath)
+	if errors.Is(err, fs.ErrNotExist) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	for _, entry := range entries {
+		if entry.IsDir() && isResourceBundle(entry.Name()) {
+			if err := os.RemoveAll(filepath.Join(binPath, entry.Name())); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+func isResourceBundle(name string) bool {
+	return strings.HasSuffix(name, ".resources") || strings.HasSuffix(name, ".bundle")
 }
 
 // swiftOutput runs the selected swift in the package directory and answers
@@ -303,7 +384,7 @@ func resourceBundles(binPath string) ([]oci.File, error) {
 	}
 	var files []oci.File
 	for _, entry := range entries {
-		if !entry.IsDir() || (!strings.HasSuffix(entry.Name(), ".resources") && !strings.HasSuffix(entry.Name(), ".bundle")) {
+		if !entry.IsDir() || !isResourceBundle(entry.Name()) {
 			continue
 		}
 		err := filepath.WalkDir(filepath.Join(binPath, entry.Name()), func(path string, d fs.DirEntry, err error) error {

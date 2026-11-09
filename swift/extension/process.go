@@ -115,24 +115,31 @@ func executableOf(stack stacks.Stack, ctx *pctx.Context, emit *jsonl.Emitter) (s
 	if err != nil {
 		return stacks.RootStep{}, "", err
 	}
+	product, err := executableAt(root, ctx, emit)
+	return root, product, err
+}
+
+// executableAt answers the executable product of the selected component, as
+// executableOf chooses it.
+func executableAt(root stacks.RootStep, ctx *pctx.Context, emit *jsonl.Emitter) (string, error) {
 	if !isPackage(root.Project) {
-		return root, "", fail(emit, CodeNoExecutable, fmt.Errorf("%s is an Xcode project: serve and run start a package's executable product", root.Project))
+		return "", fail(emit, CodeNoExecutable, fmt.Errorf("%s is an Xcode project: serve and run start a package's executable product", root.Project))
 	}
 	if named := ctx.Params.String("entrypoint"); named != "" {
-		return root, named, nil
+		return named, nil
 	}
 	manifest, _ := os.ReadFile(filepath.Join(root.Project, "Package.swift")) //nolint:gosec // the package's manifest
 	executables := ExecutableProducts(manifest)
 	switch {
 	case len(executables) == 1:
-		return root, executables[0], nil
+		return executables[0], nil
 	case len(executables) == 0:
-		return root, "", fail(emit, CodeNoExecutable, fmt.Errorf("%s declares no executable product or target", root.Project))
+		return "", fail(emit, CodeNoExecutable, fmt.Errorf("%s declares no executable product or target", root.Project))
 	}
 	if slices.Contains(executables, ctx.Project.Name) {
-		return root, ctx.Project.Name, nil
+		return ctx.Project.Name, nil
 	}
-	return root, "", fail(emit, CodeNoExecutable, fmt.Errorf("%s declares several executables (%s): name one with --entrypoint", root.Project, strings.Join(executables, ", ")))
+	return "", fail(emit, CodeNoExecutable, fmt.Errorf("%s declares several executables (%s): name one with --entrypoint", root.Project, strings.Join(executables, ", ")))
 }
 
 var (

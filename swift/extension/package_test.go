@@ -80,6 +80,8 @@ func TestPackageAssemblesTheImageOfAStaticExecutable(t *testing.T) {
 	root := t.TempDir()
 	serverPackage(t, root)
 	host, base := imageRegistry(t)
+	// A bundle an earlier build of another product left in the bin path.
+	writeFile(t, root, "server/.build/out/Products/Release-staticlinux-x86_64/Server_Admin.resources/admin.css", "a {}\n")
 
 	status, _, err := runServerJob(t, root, PackageDockerJob(stack(t)), "--docker-base-image", base)
 	if status != "OK" || err != nil {
@@ -89,7 +91,7 @@ func TestPackageAssemblesTheImageOfAStaticExecutable(t *testing.T) {
 	sdk := staticSDKs["6.4.2"]
 	for _, want := range []string{
 		"swift sdk install https://download.swift.org/swift-6.4.2-release/static-sdk/swift-6.4.2-RELEASE/swift-6.4.2-RELEASE_static-linux-0.1.0.artifactbundle.tar.gz --checksum " + sdk.checksum + "\n",
-		"swift build -c release --force-resolved-versions --swift-sdk x86_64-swift-linux-musl --product Server -Xlinker -s\n",
+		"swift build -c release --swift-sdk swift-6.4.2-RELEASE_static-linux-0.1.0 --triple x86_64-swift-linux-musl --force-resolved-versions --product Server -Xlinker -s\n",
 	} {
 		if !strings.Contains(ran, want) {
 			t.Errorf("swift did not run %q:\n%s", want, ran)
@@ -127,8 +129,8 @@ func TestPackageAssemblesTheImageOfAStaticExecutable(t *testing.T) {
 			t.Errorf("the image has no %s", want)
 		}
 	}
-	if files["app/Server.swiftmodule/x"] {
-		t.Errorf("the image holds build products other than the executable and its resources")
+	if files["app/Server.swiftmodule/x"] || files["app/Server_Admin.resources/admin.css"] {
+		t.Errorf("the image holds build products other than the executable and its resources: %v", files)
 	}
 	config, err := image.ConfigFile()
 	if err != nil {
@@ -150,7 +152,7 @@ func TestPackageBuildsForTheArm64Platform(t *testing.T) {
 	if status, _, err := runServerJob(t, root, PackageDockerJob(stack(t)), "--docker-base-image", base, "--platform", "linux/arm64"); status != "OK" || err != nil {
 		t.Fatalf("package: %s %v", status, err)
 	}
-	if !strings.Contains(readFileString(t, log), "--swift-sdk aarch64-swift-linux-musl --product Server") {
+	if !strings.Contains(readFileString(t, log), "--swift-sdk swift-6.4.2-RELEASE_static-linux-0.1.0 --triple aarch64-swift-linux-musl --force-resolved-versions --product Server") {
 		t.Errorf("swift ran %s", readFileString(t, log))
 	}
 }
@@ -217,10 +219,15 @@ func TestADryRunPackageRecordsTheChannelAndRunsNoSwift(t *testing.T) {
 	}
 }
 
-func TestAPackagedLibraryIsSkipped(t *testing.T) {
-	ctx := &pctx.Context{Project: pctx.Project{Name: "lib", Path: "lib", Type: "library"}}
-	if status, _, err := PackageDockerJob(stack(t))(ctx, jsonl.New(), nil); status != "SKIP" || err != nil {
-		t.Errorf("library: %s %v", status, err)
+func TestOnlyAnApplicationPackagesAndPublishes(t *testing.T) {
+	for _, kind := range []string{"library", ""} {
+		ctx := &pctx.Context{Project: pctx.Project{Name: "lib", Path: "lib", Type: kind}}
+		if status, _, err := PackageDockerJob(stack(t))(ctx, jsonl.New(), nil); status != "SKIP" || err != nil {
+			t.Errorf("package of %q: %s %v", kind, status, err)
+		}
+		if status, _, err := PublishDockerJob()(ctx, jsonl.New(), []string{"--docker"}); status != "SKIP" || err != nil {
+			t.Errorf("publish of %q: %s %v", kind, status, err)
+		}
 	}
 }
 

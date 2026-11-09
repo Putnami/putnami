@@ -167,16 +167,19 @@ of the selected Swift, so the same command packages from macOS and from Linux
    pinned ones. The Swift of Xcode cannot build with the SDK: on macOS, select
    a swift.org toolchain with swiftly or the swift.org installer.
 2. When `swift sdk list` does not name the SDK, `swift sdk install <url>
-   --checksum <pin>` installs it, once per machine.
-3. `swift build -c release --force-resolved-versions --swift-sdk
-   <arch>-swift-linux-musl --product <executable> -Xlinker -s` builds the
-   executable, stripped, with the versions `Package.resolved` pins. The
+   --checksum <pin>` installs it, once per machine: one install of a bundle
+   runs at a time.
+3. `swift build -c release --swift-sdk <bundle> --triple
+   <arch>-swift-linux-musl --force-resolved-versions --product <executable>
+   -Xlinker -s` builds the executable, stripped, with the pinned SDK and the
+   versions `Package.resolved` pins, holding the lock of the package as the
+   other tasks do. The
    executable is the one `serve` starts; `--entrypoint` names it among several.
    `--platform` selects `linux/amd64`, the default, or `linux/arm64`.
 
 | Layer | Content |
 |---|---|
-| Resources | The `.resources` and `.bundle` directories SwiftPM wrote beside the executable, under `/app`, where `Bundle.module` finds them. Only a package with resources has this layer. |
+| Resources | The `.resources` and `.bundle` directories SwiftPM writes beside the executable, under `/app`, where `Bundle.module` finds them. The job removes those of earlier builds first, so the image holds the bundles of its product only. Only a package with resources has this layer. |
 | Executable | `/app/<executable>`, the image's entrypoint |
 
 The image runs as the user `65532`, the `nonroot` user of distroless, in
@@ -338,7 +341,7 @@ An override that names an unknown member, changes `id`, `markers` or
 - An image holds a static binary only: a package that links a system library
   musl does not offer, or that needs the Foundation of a native Linux build,
   cannot be packaged: it builds its own image.
-- An arm64 image has not been run.
+- An arm64 image is assembled as an amd64 one is; no test runs one.
 - With the build layout of Swift 6.4, where a test target builds to
   `<Target>.so` beside `<Target>-test-runner`, the test task finds no
   `*PackageTests.xctest` to export coverage from, and fails after the tests

@@ -264,6 +264,7 @@
       "run": [
         {
           "id": "docker",
+          "heavy": true,
           "task": "package-docker",
           "if": "params.docker"
         }
@@ -576,7 +577,7 @@
       }
     },
     "package-docker": {
-      "description": "Install the pinned Static Linux SDK of the selected Swift when it is missing, build the application's executable product with swift build -c release --swift-sdk <arch>-swift-linux-musl and the versions Package.resolved pins, and assemble a local OCI image of it and its resource bundles on a digest-pinned distroless static base. Sole owner of <command-output>/docker.",
+      "description": "Install the pinned Static Linux SDK of the selected Swift when it is missing, under a machine-wide lock, then, holding the lock of the stack root, build the application's executable product with swift build -c release --swift-sdk <bundle> --triple <arch>-swift-linux-musl and the versions Package.resolved pins, and assemble a local OCI image of it and its resource bundles on a digest-pinned distroless static base. Sole owner of <command-output>/docker.",
       "kind": "command",
       "command": "{extensionRuntime}",
       "args": [
@@ -607,6 +608,24 @@
         },
         "extensionVersion": {
           "from": "runtime"
+        },
+        "entrypoint": {
+          "from": "params"
+        },
+        "platform": {
+          "from": "params"
+        },
+        "docker-base-image": {
+          "from": "params"
+        },
+        "docker-tag": {
+          "from": "params"
+        },
+        "docker-load": {
+          "from": "params"
+        },
+        "dry-run": {
+          "from": "params"
         }
       },
       "cwd": "{projectRoot}",
