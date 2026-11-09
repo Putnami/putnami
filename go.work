@@ -107,6 +107,7 @@ use (
 	./sites/telemetry.putnami.dev
 	./swift/extension
 	./intelligence/areas
+	./tooling/bazel
 	./tooling/cli
 	./tooling/cli-documents
 	./tooling/cli-model

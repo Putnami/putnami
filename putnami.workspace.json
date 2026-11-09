@@ -21,6 +21,7 @@
     "/rust/extension",
     "/swift/extension",
     "/tooling/pants",
+    "/tooling/bazel",
     "/dotnet/extension",
     "/tooling/scaffold",
     "/tooling/sdd-extension",

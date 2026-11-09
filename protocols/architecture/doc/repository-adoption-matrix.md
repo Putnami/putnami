@@ -1,11 +1,11 @@
 # Repository adoption matrix
 
-This repository maps **105 of its 187 projects** to **10 architecture domains**.
-The other **82 are excluded on purpose**: 42 samples, 7 templates, 2 template
+This repository maps **105 of its 188 projects** to **10 architecture domains**.
+The other **83 are excluded on purpose**: 42 samples, 7 templates, 2 template
 proofs, 2 protocol proofs, the standalone area detector, the 2 Cloud runtime
 destinations, the Cloud CLI extension with its 14 generated clients, the new
 development verb vocabulary, the new evidence report readers, and the new
-stack core with its first eight stack extensions. Every one of the 187 appears
+stack core with its first nine stack extensions. Every one of the 188 appears
 in a table below, mapped or excluded, with a reason.
 
 The matrix exists so the adoption frontier is measurable instead of implied.
@@ -354,11 +354,11 @@ permissions its import of the protocols and its consumer in
 |---|---|---|
 | `/tooling/evidence-readers` | Evidence report readers | `tooling` |
 
-### Stack core and stack extensions — 9 projects
+### Stack core and stack extensions — 10 projects
 
 **Why excluded:** `@putnami/stacks` is a new library, the stack core, and
 `@putnami/rust`, `@putnami/php`, `@putnami/dotnet`, `@putnami/dart`, `@putnami/java`,
-`@putnami/swift`, `@putnami/ruby` and `@putnami/pants` its first stack
+`@putnami/swift`, `@putnami/ruby`, `@putnami/pants` and `@putnami/bazel` its first stack
 extensions, each a manifest, a stack profile and the core's entrypoint, which run a stack's components as Putnami tasks from
 the components the `putnami observe` detectors find. A new project starts excluded
 (rule 4), and no review has yet named the domain that owns running a stack
@@ -378,6 +378,7 @@ detectors need; the next stack extensions join the same section until then.
 | `/ruby/extension` | Stack extension | `tooling` |
 | `/rust/extension` | Stack extension | `tooling` |
 | `/swift/extension` | Stack extension | `tooling` |
+| `/tooling/bazel` | Delegated stack extension | `tooling` |
 | `/tooling/pants` | Delegated stack extension | `tooling` |
 | `/tooling/stacks` | Stack core | `tooling` |
 

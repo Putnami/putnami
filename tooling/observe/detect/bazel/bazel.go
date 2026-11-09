@@ -68,6 +68,10 @@ type Package struct {
 	Label string
 	// DependsOn lists the directories of the packages it depends on.
 	DependsOn []string
+	// Tested reports that the export lists a test rule of the package: a
+	// rule whose class ends in _test, or a test_suite. A package the BUILD
+	// files give, without the export, is not known to be tested.
+	Tested bool
 }
 
 // Detection is what the detector found.
@@ -172,7 +176,13 @@ func (d Detection) TestTarget(report string) (string, bool) {
 // rule is the part of a query target the detector reads.
 type rule struct {
 	Name      string   `json:"name"`
+	RuleClass string   `json:"ruleClass"`
 	RuleInput []string `json:"ruleInput"`
+}
+
+// isTest reports whether a rule class is a test rule: bazel test runs it.
+func isTest(class string) bool {
+	return strings.HasSuffix(class, "_test") || class == "test_suite"
 }
 
 // target is one target of the export: a rule, a source file, a generated
@@ -226,6 +236,7 @@ func readExport(file string) ([]rule, error) {
 // rule of the export, with the edges its rules' inputs give.
 func (d *Detection) fromExport(root string, rules []rule) {
 	edges := map[string]map[string]bool{}
+	tested := map[string]bool{}
 	d.targets = map[string]string{}
 	known := map[string]bool{}
 	for _, r := range rules {
@@ -237,6 +248,9 @@ func (d *Detection) fromExport(root string, rules []rule) {
 			continue
 		}
 		d.targets[logDir(dir, name)] = dir
+		if isTest(r.RuleClass) {
+			tested[dir] = true
+		}
 		if edges[dir] == nil {
 			edges[dir] = map[string]bool{}
 		}
@@ -247,7 +261,7 @@ func (d *Detection) fromExport(root string, rules []rule) {
 		}
 	}
 	for dir, targets := range edges {
-		p := Package{Dir: dir, Label: label(dir)}
+		p := Package{Dir: dir, Label: label(dir), Tested: tested[dir]}
 		for other := range targets {
 			p.DependsOn = append(p.DependsOn, other)
 		}
@@ -374,12 +388,18 @@ func isBuildFile(name string) bool {
 }
 
 func holdsBuildFile(root, dir string) bool {
+	return BuildFile(root, dir) != ""
+}
+
+// BuildFile is the repository-relative BUILD.bazel or BUILD file of a
+// package directory, or empty when it holds none.
+func BuildFile(root, dir string) string {
 	for _, name := range buildFiles {
 		if regular(filepath.Join(root, filepath.FromSlash(dir), name)) {
-			return true
+			return path.Join(dir, name)
 		}
 	}
-	return false
+	return ""
 }
 
 func regular(file string) bool {
