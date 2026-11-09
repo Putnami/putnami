@@ -351,6 +351,10 @@ func provideSwiftly(ctx context.Context, base string, artifact swiftlyArtifact) 
 	if err := extractPkgFile(pkg, "bin/swiftly", filepath.Join(stage, "swiftly")); err != nil {
 		return "", fmt.Errorf("unpack swiftly %s: %w", swiftlyVersion, err)
 	}
+	// The directory may hold swiftly's proxies without swiftly itself.
+	if err := os.RemoveAll(dir); err != nil {
+		return "", err
+	}
 	return path, robustio.Rename(stage, dir)
 }
 
