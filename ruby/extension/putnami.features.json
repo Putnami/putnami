@@ -7,7 +7,7 @@
       "id": "ruby/stack-extension",
       "type": "feature",
       "name": "Run the components of a Ruby or Rails repository as Putnami tasks",
-      "outcome": "A team with a Ruby or Rails repository adds @putnami/ruby and runs putnami install, lint and test over its packs and local gems with Putnami's runner and cache, without rewriting its build: each component is a project with its edges, lint runs RuboCop and test RSpec or Rails's Minitest runner after a Ruby and Bundler check and a bundle install, with the Ruby the workspace pins when the machine has none that fits, and a component overrides any profile value in its putnami.json",
+      "outcome": "A team with a Ruby or Rails repository adds @putnami/ruby and runs putnami install, lint and test over its packs and local gems with Putnami's runner and cache, without rewriting its build: each component is a project with its edges, lint runs RuboCop and test RSpec or Rails's Minitest runner after a Ruby and Bundler check and a bundle install, with the Ruby the workspace pins when the machine has none that fits, serve and run start an application, package and publish produce its image, and a component overrides any profile value in its putnami.json",
       "owner": "ruby",
       "target": "coded",
       "requirements": [
@@ -127,7 +127,8 @@
             "checks": [
               "workspace-install-installs-each-stack-root-the-workspace-includes",
               "workspace-install-force-installs-a-root-whose-bundle-is-complete",
-              "workspace-install-installs-again-when-the-bundler-differs-from-the-lock"
+              "workspace-install-installs-again-when-the-bundler-differs-from-the-lock",
+              "an-offline-workspace-install-installs-from-the-gem-cache"
             ]
           }
         },
@@ -194,6 +195,86 @@
             "kind": "acceptance",
             "checks": [
               "a-task-uses-the-provisioned-ruby-only-when-the-machine-ruby-is-unusable"
+            ]
+          }
+        },
+        {
+          "id": "fetches-the-locked-gems",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "workspace-fetch-downloads-the-locked-gems-and-runs-none-of-their-code"
+            ]
+          }
+        },
+        {
+          "id": "serves-an-application",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "serve-runs-rails-server-or-rackup-on-an-application"
+            ]
+          }
+        },
+        {
+          "id": "runs-an-application-once",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "run-forwards-the-exit-code-of-the-entrypoint"
+            ]
+          }
+        },
+        {
+          "id": "packages-an-application-image",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "package-assembles-an-image-of-an-application-and-its-production-bundle",
+              "a-static-ruby-builds-extensions-the-images-ruby-finds",
+              "the-base-is-the-official-ruby-slim-image-or-a-digest-pinned-base"
+            ]
+          }
+        },
+        {
+          "id": "refuses-a-foreign-packaging-host",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "package-refuses-a-host-that-cannot-build-the-images-native-extensions"
+            ]
+          }
+        },
+        {
+          "id": "publishes-an-application-image",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "publish-pushes-the-application-image"
             ]
           }
         }

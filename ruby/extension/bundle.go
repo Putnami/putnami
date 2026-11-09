@@ -36,9 +36,12 @@ const (
 // not the one its Gemfile.lock states.
 func InstallJob(stack stacks.Stack) cli.JobFunc {
 	bundler := bundlerCheck(stack)
-	return stack.RootJob(func(ctx context.Context, root stacks.RootStep, emit *jsonl.Emitter) error {
-		return bundleInstall(ctx, root, emit, bundler, false)
-	})
+	return func(ctx *pctx.Context, emit *jsonl.Emitter, args []string) (string, map[string]any, error) {
+		cache := gemCache(ctx.WorkspaceRoot)
+		return stack.RootJob(func(run context.Context, root stacks.RootStep, emit *jsonl.Emitter) error {
+			return bundleInstall(run, root, emit, bundler, false, cache)
+		})(ctx, emit, args)
+	}
 }
 
 // WorkspaceInstallJob runs bundle install at each stack root. The force flag
@@ -47,8 +50,9 @@ func WorkspaceInstallJob(stack stacks.Stack) cli.JobFunc {
 	bundler := bundlerCheck(stack)
 	return func(ctx *pctx.Context, emit *jsonl.Emitter, args []string) (string, map[string]any, error) {
 		force := ctx.Params.Bool("force", false)
-		install := func(ctx context.Context, root stacks.RootStep, emit *jsonl.Emitter) error {
-			return bundleInstall(ctx, root, emit, bundler, force)
+		cache := gemCache(ctx.WorkspaceRoot)
+		install := func(run context.Context, root stacks.RootStep, emit *jsonl.Emitter) error {
+			return bundleInstall(run, root, emit, bundler, force, cache)
 		}
 		return stack.WorkspaceRootJob(stacks.WarnOnMissingToolchain, install)(ctx, emit, args)
 	}
@@ -63,9 +67,10 @@ func DepsUpgradeJob(stack stacks.Stack) cli.JobFunc {
 // no Gemfile or, without force, bundle check accepts its bundle and the
 // Bundler that runs is the locked one. bundle install installs the locked
 // Bundler and switches to it, so the next task runs that one. With offline
-// dependencies it installs from the gems already on the machine, and a
-// Bundler other than the locked one alone installs nothing.
-func bundleInstall(ctx context.Context, root stacks.RootStep, emit *jsonl.Emitter, bundler stacks.Toolchain, force bool) error {
+// dependencies it installs from the gems already on the machine and from the
+// gem cache that workspace-fetch fills, and a Bundler other than the locked
+// one alone installs nothing.
+func bundleInstall(ctx context.Context, root stacks.RootStep, emit *jsonl.Emitter, bundler stacks.Toolchain, force bool, cache string) error {
 	if !hasGemfile(root.Dir) {
 		emit.Info("no Gemfile in " + root.Dir + ": nothing to install")
 		return nil
@@ -79,6 +84,9 @@ func bundleInstall(ctx context.Context, root stacks.RootStep, emit *jsonl.Emitte
 	args := []string{"install"}
 	if offlineDependencies() {
 		args = append(args, "--local")
+		if cache != "" {
+			root.Env = cacheEnv(root.Env, cache)
+		}
 	}
 	emit.Info(fmt.Sprintf("$ bundle %v in %s", args, root.Dir))
 	if err := runBundle(ctx, root, os.Stderr, args...); err != nil {

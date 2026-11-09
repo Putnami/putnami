@@ -54,7 +54,8 @@ func IsComponent(_, dir string) bool {
 // detector. A component's name is its gem's, else its pack's path, else, for
 // the workspace root, the workspace directory's name. Its stack root is the
 // nearest directory, from its own up to the workspace root, that holds a
-// Gemfile: the bundle its commands run in.
+// Gemfile: the bundle its commands run in. A component whose directory holds
+// config.ru is an application, any other a library.
 func Detect(root string, request wsproto.ProbeRequest) ([]stacks.Component, []diag.Diagnostic) {
 	detection := rubydetect.Detect(root)
 	var out []stacks.Component
@@ -69,13 +70,17 @@ func Detect(root string, request wsproto.ProbeRequest) ([]stacks.Component, []di
 		if name == wsproto.ProbeRootPath {
 			name = filepath.Base(root)
 		}
+		stackRoot := bundleRoot(root, c.ID)
+		kind := componentType(root, c.ID)
 		out = append(out, stacks.Component{
-			Path:         c.ID,
-			Name:         name,
-			Variant:      testVariant(root, c.ID),
-			SourceFile:   sourceFile(root, c.ID),
-			Root:         bundleRoot(root, c.ID),
-			Dependencies: slices.Clone(c.DependsOn),
+			Path:           c.ID,
+			Name:           name,
+			Variant:        testVariant(root, c.ID),
+			SourceFile:     sourceFile(root, c.ID),
+			Root:           stackRoot,
+			Dependencies:   slices.Clone(c.DependsOn),
+			Type:           kind,
+			ReleaseMembers: imageMember(root, c.ID, name, stackRoot, kind),
 		})
 	}
 	return out, detection.Diagnostics

@@ -130,7 +130,20 @@
       "Gemfile.lock"
     ]
   },
+  "uses": [
+    "oci"
+  ],
   "commands": {
+    "workspace-fetch": {
+      "description": "Download the gems each stack root's Gemfile.lock names into the extension's gem cache, running none of their code.",
+      "quiet": true,
+      "run": [
+        {
+          "id": "workspace-fetch",
+          "task": "workspace-fetch-exec"
+        }
+      ]
+    },
     "workspace-install": {
       "description": "Install the bundle of each stack root of the workspace.",
       "quiet": true,
@@ -202,6 +215,139 @@
         }
       ]
     },
+    "serve": {
+      "description": "Serve a Ruby application with rails server, or rackup for another Rack application.",
+      "traits": {
+        "requiresRunnable": true,
+        "workload": "serve"
+      },
+      "flags": {
+        "port": {
+          "type": "number",
+          "default": 3000,
+          "description": "Port for the server"
+        }
+      },
+      "run": [
+        {
+          "id": "install",
+          "task": "install-run"
+        },
+        {
+          "id": "serve",
+          "task": "serve-run",
+          "dependsOn": [
+            "install"
+          ]
+        }
+      ]
+    },
+    "run": {
+      "description": "Run a Ruby application once with bundle exec ruby and forward its exit code.",
+      "traits": {
+        "requiresRunnable": true,
+        "workload": "once"
+      },
+      "flags": {
+        "entrypoint": {
+          "type": "string",
+          "description": "Entry point to run (defaults to bin/rails)"
+        },
+        "args": {
+          "type": "string",
+          "description": "Additional arguments to pass to the entrypoint"
+        }
+      },
+      "run": [
+        {
+          "id": "install",
+          "task": "install-run"
+        },
+        {
+          "id": "run",
+          "task": "run-exec",
+          "dependsOn": [
+            "install"
+          ]
+        }
+      ]
+    },
+    "package": {
+      "description": "Assemble the image of an application for the docker publish channel.",
+      "traits": {
+        "injectPublishChannels": true
+      },
+      "flags": {
+        "docker": {
+          "type": "boolean",
+          "default": false,
+          "description": "Assemble the image"
+        },
+        "docker-tag": {
+          "type": "string",
+          "description": "Override the image tag"
+        },
+        "docker-base-image": {
+          "type": "string",
+          "description": "Replace the official Ruby image with a base pinned by digest (image@sha256:...)"
+        },
+        "docker-load": {
+          "type": "boolean",
+          "default": false,
+          "description": "Also load the assembled image into the local docker daemon"
+        },
+        "platform": {
+          "type": "string",
+          "default": "linux/amd64",
+          "description": "Target platform of the image"
+        },
+        "dry-run": {
+          "type": "boolean",
+          "default": false,
+          "description": "Plan the image without assembling it"
+        }
+      },
+      "run": [
+        {
+          "id": "docker",
+          "task": "package-docker",
+          "if": "params.docker"
+        }
+      ]
+    },
+    "publish": {
+      "dependsOn": [
+        "package"
+      ],
+      "traits": {
+        "injectPublishChannels": true,
+        "sideEffects": "registry"
+      },
+      "description": "Push the image of an application to its OCI registry. A library reaches its gem registry through gem push.",
+      "flags": {
+        "docker": {
+          "type": "boolean",
+          "default": false,
+          "description": "Push the image"
+        },
+        "docker-registry": {
+          "type": "string",
+          "description": "Registry to push the image to, above registries.oci.publish"
+        },
+        "dry-run": {
+          "type": "boolean",
+          "default": false,
+          "description": "Push nothing; report what would be published"
+        }
+      },
+      "run": [
+        {
+          "id": "docker",
+          "task": "publish-docker",
+          "if": "params.docker"
+        }
+      ]
+    },
     "deps-upgrade": {
       "description": "Update the bundle of each stack root of the workspace.",
       "visibility": "internal",
@@ -216,7 +362,7 @@
   },
   "tasks": {
     "install-run": {
-      "description": "Run bundle check at the component's stack root, then bundle install when the bundle is incomplete; with offline dependencies, bundle install --local.",
+      "description": "Run bundle check at the component's stack root, then bundle install when the bundle is incomplete; with offline dependencies, bundle install --local, which also reads the gem cache workspace-fetch fills.",
       "kind": "command",
       "command": "{extensionRuntime}",
       "toolchains": [
@@ -412,8 +558,26 @@
       },
       "declares": {}
     },
+    "workspace-fetch-exec": {
+      "description": "Run bundle cache with no install, a frozen lockfile, a private install path and a private local configuration, which leaves the locked gems in the extension's gem cache and writes nothing in the repository.",
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": [
+        "workspace-fetch"
+      ],
+      "cwd": "{workspaceRoot}",
+      "cache": false,
+      "timeoutMs": 1800000,
+      "declares": {
+        "effects": [
+          "network",
+          "process",
+          "toolchain-cache"
+        ]
+      }
+    },
     "workspace-install-exec": {
-      "description": "Run bundle install at each stack root of the workspace, except the projects disable.tags excludes and the roots whose bundle check passes, unless the force flag is set. With offline dependencies it runs bundle install --local.",
+      "description": "Run bundle install at each stack root of the workspace, except the projects disable.tags excludes and the roots whose bundle check passes, unless the force flag is set. With offline dependencies it runs bundle install --local, which also reads the gem cache workspace-fetch fills.",
       "kind": "command",
       "command": "{extensionRuntime}",
       "toolchains": [
@@ -453,6 +617,128 @@
           "process",
           "toolchain-cache",
           "workspace-files"
+        ]
+      }
+    },
+    "serve-run": {
+      "description": "Run bundle exec rails server, or bundle exec rackup for an application without bin/rails, on 0.0.0.0 and the port flag in the application directory until the user stops it.",
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": [
+        "serve"
+      ],
+      "cwd": "{projectRoot}",
+      "cache": false,
+      "timeoutMs": -1,
+      "declares": {
+        "effects": [
+          "network",
+          "process"
+        ]
+      }
+    },
+    "run-exec": {
+      "description": "Run bundle exec ruby with the entrypoint in the application directory and forward its exit code.",
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": [
+        "run"
+      ],
+      "cwd": "{projectRoot}",
+      "cache": false,
+      "timeoutMs": -1,
+      "declares": {
+        "effects": [
+          "network",
+          "process",
+          "workspace-files"
+        ]
+      }
+    },
+    "package-docker": {
+      "description": "Assemble a local OCI image of an application from its production bundle, installed on this Linux host, and its files, on a digest-pinned official Ruby slim base. Sole owner of <command-output>/docker.",
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": [
+        "package-docker"
+      ],
+      "inputs": {
+        "application": {
+          "from": "project",
+          "files": [
+            "git:**/*",
+            "**/*",
+            ".*",
+            "vendor/**/*",
+            "!../**",
+            "!.bundle/**",
+            "!.gen/**",
+            "!.git/**",
+            "!.putnami/**",
+            "!coverage/**",
+            "!log/**",
+            "!node_modules/**",
+            "!spec/**",
+            "!storage/**",
+            "!test/**",
+            "!tmp/**",
+            "!vendor/bundle/**",
+            "!config/master.key",
+            "!config/credentials/*.key",
+            "!**/.env*"
+          ]
+        },
+        "extensionVersion": {
+          "from": "runtime"
+        }
+      },
+      "cwd": "{projectRoot}",
+      "timeoutMs": 1800000,
+      "cache": {
+        "versionAware": true
+      },
+      "declares": {
+        "outputs": {
+          "docker": {
+            "kind": "directory",
+            "root": "command-output",
+            "path": "docker",
+            "optionalEmpty": true,
+            "description": "Local OCI candidate layout, its manifest and the docker channel record."
+          }
+        },
+        "effects": [
+          "network",
+          "toolchain-cache"
+        ]
+      }
+    },
+    "publish-docker": {
+      "description": "Push the packaged image to the container registry through the shared publisher.",
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": [
+        "publish-docker"
+      ],
+      "cwd": "{projectRoot}",
+      "timeoutMs": 300000,
+      "cache": false,
+      "declares": {
+        "outputs": {
+          "published-image": {
+            "kind": "file",
+            "root": "command-output",
+            "path": "docker/published-image.json",
+            "optionalEmpty": true,
+            "description": "Verified remote image record, written after the registry digest is read back."
+          }
+        },
+        "effects": [
+          "network",
+          "registry"
+        ],
+        "publishChannels": [
+          "docker"
         ]
       }
     }

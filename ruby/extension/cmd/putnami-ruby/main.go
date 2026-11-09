@@ -32,8 +32,13 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer, runJobs func(
 				jobs[stacks.TaskTest] = ruby.TestJob(stack)
 				jobs["lint-docs"] = docslinks.Job("Gemfile", "package.yml")
 				jobs[ruby.InstallJobName] = ruby.InstallJob(stack)
+				jobs[ruby.WorkspaceFetchJobName] = ruby.WorkspaceFetchJob(stack)
 				jobs[ruby.WorkspaceInstallJobName] = ruby.WorkspaceInstallJob(stack)
+				jobs[ruby.ServeJobName] = ruby.ServeJob(stack)
+				jobs[ruby.RunJobName] = ruby.RunJob(stack)
 				jobs[ruby.DepsUpgradeJobName] = ruby.DepsUpgradeJob(stack)
+				jobs[ruby.PackageDockerJobName] = ruby.PackageDockerJob(stack)
+				jobs[ruby.PublishDockerJobName] = ruby.PublishDockerJob()
 				runJobs(jobs)
 			})
 		}
