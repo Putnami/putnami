@@ -8,7 +8,6 @@ import (
 
 	"go.putnami.dev/protocol/features/spectest"
 	"go.putnami.dev/tooling/cli/internal/cmderr"
-	"go.putnami.dev/tooling/cli/internal/engine"
 	"go.putnami.dev/tooling/cli/internal/extension"
 )
 
@@ -46,7 +45,7 @@ func resolvedJobParams(t *testing.T, discovered *extension.DiscoveryResult, args
 		return "", err
 	}
 	renames := commandParamRenames(parsed)(discovered)
-	return fmt.Sprint(engine.RenameParams(buildCommandParams(parsed.RawJobArgs), renames)), nil
+	return fmt.Sprint(renameParams(buildCommandParams(parsed.RawJobArgs), renames)), nil
 }
 
 // `-t x` reaches the test task as `test: x`, the params `--test x` gives, so
@@ -106,11 +105,11 @@ func TestAShortNameNoTaskDeclaresKeepsItsName(t *testing.T) {
 	// A renamed alias wins over a long name only the passthrough gave, and
 	// the map the rename read is left as it was.
 	passthrough := map[string]string{"t": "a", "test": "b"}
-	if got := fmt.Sprint(engine.RenameParams(passthrough, map[string]string{"t": "test"})); got != "map[test:a]" {
-		t.Errorf("RenameParams = %s, want map[test:a]", got)
+	if got := fmt.Sprint(renameParams(passthrough, map[string]string{"t": "test"})); got != "map[test:a]" {
+		t.Errorf("renameParams = %s, want map[test:a]", got)
 	}
 	if got := fmt.Sprint(passthrough); got != "map[t:a test:b]" {
-		t.Errorf("RenameParams changed its input: %s", got)
+		t.Errorf("renameParams changed its input: %s", got)
 	}
 }
 

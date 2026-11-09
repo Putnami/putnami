@@ -2,6 +2,7 @@ package cli
 
 import (
 	"fmt"
+	"maps"
 	"sort"
 	"strings"
 
@@ -158,4 +159,28 @@ func shortAliasRenames(rawArgs []string, declared map[string]extension.FlagDefin
 		}
 	}
 	return renames, nil
+}
+
+// renameParams returns params with each key renames names moved to the name
+// it maps to, such as a short alias's "t" to its flag's "test", the rename the
+// engine applies to a job command's params (Request.CommandParamRenames). A
+// moved key replaces a value already under the new name. params itself is
+// left unchanged; with nothing to move it is returned as is.
+func renameParams[V any](params map[string]V, renames map[string]string) map[string]V {
+	var renamed map[string]V
+	for from, to := range renames {
+		value, ok := params[from]
+		if !ok {
+			continue
+		}
+		if renamed == nil {
+			renamed = maps.Clone(params)
+		}
+		delete(renamed, from)
+		renamed[to] = value
+	}
+	if renamed == nil {
+		return params
+	}
+	return renamed
 }

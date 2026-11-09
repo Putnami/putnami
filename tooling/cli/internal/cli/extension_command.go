@@ -392,7 +392,7 @@ func buildExtensionCommandParams(parsed *ParsedArgs, flags map[string]extension.
 	// A short alias reaches the job under its long name; the caller has
 	// already refused a flag spelled both ways.
 	renames, _ := shortAliasRenames(parsed.RawJobArgs, flags)
-	params := engine.RenameParams(buildCommandParams(parsed.RawJobArgs), renames)
+	params := renameParams(buildCommandParams(parsed.RawJobArgs), renames)
 	// Extension command groups such as `putnami cloud config publish` use
 	// command-local flags, but ParseArgs consumes globally-known flags before
 	// dispatch. Preserve the common dry-run flag only for commands whose
@@ -609,7 +609,7 @@ func runPlannedExtensionAlias(
 		// would change which last-build marker a bare `putnami <group> <sub>`
 		// looks up — and, through it, what an unrelated terminal run considers
 		// impacted.
-		RunMarkerParams: engine.RenameParams(buildCommandParams(aliasParsed.RawJobArgs), markerRenames),
+		RunMarkerParams: renameParams(buildCommandParams(aliasParsed.RawJobArgs), markerRenames),
 		// One extension, rebound by stable owner identity after before-hooks,
 		// with the group/subcommand flag layers overlaid on the fresh command.
 		// Planning against the whole discovered set would schedule every other
