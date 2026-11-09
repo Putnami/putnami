@@ -123,8 +123,9 @@ func ResolveApp(params map[string]any, workspaceRoot string) (string, error) {
 	return "", NewError("could not determine app; pass it as the first positional (`putnami cloud <command> <app>`) or cd into a workload directory", ExitUsage)
 }
 
-// FindAppDir locates the workspace project that owns appName by walking the
-// workspace for a putnami.json with a matching `name`. If the workspace
+// FindAppDir locates the workspace project that owns appName: the project of
+// the invocation's workspace membership with that name, or without one, the
+// putnami.json whose `name` matches. If the workspace
 // root *is* the app, we use it directly. The walk is shallow (we stop
 // descending into .gen, node_modules, hidden dirs) so a busy workspace
 // doesn't slow publish to a crawl.
@@ -148,37 +149,11 @@ func FindAppDir(workspaceRoot, appName string) (string, error) {
 	// dirs whose project `name`'s unqualified tail (the segment after the last
 	// "/") equals appName — the fallback when no exact name matches.
 	var tailMatches []string
-	walkErr := filepath.WalkDir(workspaceRoot, func(path string, d os.DirEntry, err error) error {
-		if err != nil {
-			return nil
-		}
-		base := d.Name()
-		if d.IsDir() {
-			if path == workspaceRoot {
-				return nil
-			}
-			// Prune noisy descents that never contain workloads.
-			// .claude/worktrees/<name>/ and .context/ hold full repo copies
-			// for assistant sessions — each contains duplicate putnami.json files
-			// for every workload, and without this skip FindAppDir would
-			// match a worktree copy instead of the real workload.
-			if skipProjectWalkDir(base) {
-				return filepath.SkipDir
-			}
-			return nil
-		}
-		if base != "putnami.json" {
-			return nil
-		}
-		dir := filepath.Dir(path)
-		name, _ := ProjectNameAt(dir)
-		if name == "" {
-			return nil
-		}
-		// An exact putnami.json `name` match always wins outright.
+	walkErr := walkWorkspaceProjects(workspaceRoot, func(dir, name string) bool {
+		// An exact name match always wins outright.
 		if name == appName {
 			exact = dir
-			return filepath.SkipAll
+			return false
 		}
 		// Otherwise accept the unqualified tail: `api` resolves
 		// `apps/api`, the same way `services/put-server` is also
@@ -188,7 +163,7 @@ func FindAppDir(workspaceRoot, appName string) (string, error) {
 		if ProjectNameTail(name) == appName {
 			tailMatches = append(tailMatches, dir)
 		}
-		return nil
+		return true
 	})
 	if walkErr != nil {
 		return "", walkErr
@@ -200,7 +175,7 @@ func FindAppDir(workspaceRoot, appName string) (string, error) {
 	case 1:
 		return tailMatches[0], nil
 	case 0:
-		return "", NewError(fmt.Sprintf("no workspace project named %q under %s — pass --app <name> matching a putnami.json `name` (its full name or its unqualified tail)", appName, workspaceRoot), ExitUsage)
+		return "", NewError(fmt.Sprintf("no workspace project named %q under %s — pass --app <name> matching a workspace project name (its full name or its unqualified tail)", appName, workspaceRoot), ExitUsage)
 	default:
 		names := make([]string, 0, len(tailMatches))
 		for _, dir := range tailMatches {
@@ -209,8 +184,48 @@ func FindAppDir(workspaceRoot, appName string) (string, error) {
 			}
 		}
 		sort.Strings(names)
-		return "", NewError(fmt.Sprintf("ambiguous app %q matches multiple projects (%s) — pass the full putnami.json `name`", appName, strings.Join(names, ", ")), ExitUsage)
+		return "", NewError(fmt.Sprintf("ambiguous app %q matches multiple projects (%s) — pass the full project name", appName, strings.Join(names, ", ")), ExitUsage)
 	}
+}
+
+// walkWorkspaceProjects visits each project of the workspace with the name the
+// workspace gives it, until visit returns false. With the membership of the
+// invocation's job context it visits that membership, which also names the
+// projects their provider names; without one it walks the tree for the
+// putnami.json files that declare a `name`.
+func walkWorkspaceProjects(workspaceRoot string, visit func(dir, name string) bool) error {
+	if projects, ok := resolvedWorkspaceProjects(workspaceRoot); ok {
+		for _, project := range projects {
+			if !visit(project.Dir, project.Name) {
+				return nil
+			}
+		}
+		return nil
+	}
+	return filepath.WalkDir(workspaceRoot, func(path string, d os.DirEntry, err error) error {
+		if err != nil {
+			return nil
+		}
+		if d.IsDir() {
+			// Prune noisy descents that never contain workloads.
+			// .claude/worktrees/<name>/ and .context/ hold full repo copies
+			// for assistant sessions — each contains duplicate putnami.json
+			// files for every workload, and without this skip a lookup would
+			// match a worktree copy instead of the real workload.
+			if path != workspaceRoot && skipProjectWalkDir(d.Name()) {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		if d.Name() != "putnami.json" {
+			return nil
+		}
+		dir := filepath.Dir(path)
+		if name, _ := ProjectNameAt(dir); name != "" && !visit(dir, name) {
+			return filepath.SkipAll
+		}
+		return nil
+	})
 }
 
 // skipProjectWalkDir names the directories a project walk never enters:
@@ -225,7 +240,7 @@ func skipProjectWalkDir(base string) bool {
 }
 
 // WorkspaceProjectKeys is every key a project of the checkout answers to: the
-// putnami.json `name` of each project and its directory relative to the
+// name the workspace gives each project and its directory relative to the
 // workspace root. A server-side record keyed by anything else was left by an
 // earlier project name. The set is empty when the walk finds no project.
 func WorkspaceProjectKeys(workspaceRoot string) map[string]bool {
@@ -233,27 +248,12 @@ func WorkspaceProjectKeys(workspaceRoot string) map[string]bool {
 	if resolved, err := filepath.EvalSymlinks(workspaceRoot); err == nil {
 		workspaceRoot = resolved
 	}
-	_ = filepath.WalkDir(workspaceRoot, func(path string, d os.DirEntry, err error) error {
-		if err != nil {
-			return nil
+	_ = walkWorkspaceProjects(workspaceRoot, func(dir, name string) bool {
+		keys[name] = true
+		if relative, err := filepath.Rel(workspaceRoot, dir); err == nil && relative != "." {
+			keys[filepath.ToSlash(relative)] = true
 		}
-		if d.IsDir() {
-			if path != workspaceRoot && skipProjectWalkDir(d.Name()) {
-				return filepath.SkipDir
-			}
-			return nil
-		}
-		if d.Name() != "putnami.json" {
-			return nil
-		}
-		dir := filepath.Dir(path)
-		if name, _ := ProjectNameAt(dir); name != "" {
-			keys[name] = true
-			if relative, err := filepath.Rel(workspaceRoot, dir); err == nil && relative != "." {
-				keys[filepath.ToSlash(relative)] = true
-			}
-		}
-		return nil
+		return true
 	})
 	return keys
 }
@@ -312,8 +312,13 @@ func CanonicalProjectName(workspaceRoot, appName string) (string, error) {
 	return name, nil
 }
 
-// ProjectNameAt reads the `name` field from the putnami.json in dir.
+// ProjectNameAt returns the name the workspace gives the project in dir: the
+// resolved name the invocation's job context carries for it, else the `name`
+// field of the putnami.json in dir.
 func ProjectNameAt(dir string) (string, error) {
+	if name, ok := workspaceNameAt(dir); ok {
+		return name, nil
+	}
 	data, err := os.ReadFile(filepath.Join(dir, "putnami.json"))
 	if err != nil {
 		return "", err
@@ -382,7 +387,8 @@ func manifestLink(options map[string]any) (map[string]any, bool, error) {
 }
 
 // FindActiveProject walks up from start looking for the nearest workload
-// putnami.json. Returns the project's `name` field + true on hit. The
+// project. Returns the name the workspace gives it (ProjectNameAt) + true on
+// hit. The
 // native putnami CLI uses an equivalent walk for project resolution; this
 // is the cloud extension catching up so `cd <workload> && putnami cloud
 // config publish` doesn't need an explicit --app flag.
@@ -406,13 +412,8 @@ func FindActiveProject(start, workspaceRoot string) (string, bool) {
 		if _, err := os.Stat(filepath.Join(dir, "putnami.workspace.json")); err == nil {
 			return "", false
 		}
-		if data, err := os.ReadFile(filepath.Join(dir, "putnami.json")); err == nil {
-			var project map[string]any
-			if err := json.Unmarshal(data, &project); err == nil {
-				if name := StringValue(project["name"]); name != "" {
-					return name, true
-				}
-			}
+		if name, _ := ProjectNameAt(dir); name != "" {
+			return name, true
 		}
 		// Don't climb past the workspace root even if no marker file is
 		// present there (some workspaces use a different layout).

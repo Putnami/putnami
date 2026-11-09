@@ -246,6 +246,10 @@ func RunCommand(command string, ioctx IO, args []string) error {
 	if err != nil {
 		return err
 	}
+	// The workspace names a project from more sources than its putnami.json
+	// `name`: its provider's source name, a scope name pattern, its directory.
+	// Every project lookup reads the names the native CLI resolved.
+	useWorkspaceProjects(context)
 	params := mergeParams(context.Params, parseFlags(args))
 	params["command"] = commandPath(command, args)
 	if err := clicore.ValidateOutputMode(params); err != nil {
@@ -1193,6 +1197,20 @@ func adoptContextProject(params map[string]any, ctx putnamiContext) {
 	}
 	params["app"] = proj
 	params["_contextApp"] = proj
+}
+
+// useWorkspaceProjects records the workspace membership of the job context for
+// the project lookups of this invocation; a context without one clears it.
+func useWorkspaceProjects(ctx putnamiContext) {
+	projects := make([]clicore.WorkspaceProject, 0, len(ctx.WorkspaceProjects))
+	for _, ref := range ctx.WorkspaceProjects {
+		dir := ref.FullPath
+		if dir == "" && ref.Path != "" && ctx.WorkspaceRoot != "" {
+			dir = filepath.Join(ctx.WorkspaceRoot, filepath.FromSlash(ref.Path))
+		}
+		projects = append(projects, clicore.WorkspaceProject{Name: ref.Name, Dir: dir})
+	}
+	clicore.UseWorkspaceProjects(projects)
 }
 
 // workspaceName reads the `name` field from putnami.workspace.json at the
