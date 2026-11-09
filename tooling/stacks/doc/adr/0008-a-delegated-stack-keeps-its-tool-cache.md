@@ -3,7 +3,8 @@
 - **Status**: accepted
 - **Date**: 2026-11-08
 - **Scope**: `tooling/stacks` (`@putnami/stacks`), `monorepo/pants`
-  (`@putnami/pants`) and the delegated stacks that follow it (Bazel)
+  (`@putnami/pants`), `monorepo/nx` (`@putnami/nx`) and the delegated stacks
+  that follow it (Bazel)
 
 ## Context
 
@@ -33,7 +34,9 @@ decides what reruns:
   writes: a change runs the tool on its package and the packages that depend
   on it, and a package it depends on runs its `graph` step only.
 
-`@putnami/pants` is the first delegated stack. `putnami init --from pants`
+`@putnami/pants` is the first delegated stack, and `@putnami/nx` the
+second: its tasks run `nx run <project>:<target>` at the workspace root, and
+Nx's `dependsOn` and cache, local or Nx Cloud, answer the upstream targets. `putnami init --from pants`
 declares it and synchronizes the projects; its sync task writes each
 package's `putnami.json` with the edges of the `pants peek ::` export.
 

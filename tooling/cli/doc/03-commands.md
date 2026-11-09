@@ -394,6 +394,7 @@ Initialize and inspect workspaces.
 putnami init                    # Create a new workspace (putnami.workspace.json)
 putnami init --from pants       # Turn a Pants repository into a workspace
 putnami init --from bazel       # Turn a Bazel repository into a workspace
+putnami init --from nx          # Turn a Nx repository into a workspace, in the mode you pick
 putnami workspace describe      # Show workspace details
 ```
 
@@ -407,12 +408,19 @@ putnami workspace describe      # Show workspace details
 |---|---|---|---|
 | `pants` | `pants.toml` | `@putnami/pants` | Each package's edges from the `pants peek ::` export; Pants keeps its own cache. See [Run a Pants repository with Putnami](../../../monorepo/pants/doc/01-pants.md) |
 | `bazel` | `MODULE.bazel`, `WORKSPACE` or `WORKSPACE.bazel` | `@putnami/bazel` | Each package's edges from `bazel query //...`, or from a `bazel-graph.json` export; Bazel keeps its own cache. See [Run a Bazel workspace with Putnami](../../../monorepo/bazel/doc/01-bazel.md) |
+| `nx` | `nx.json` | `@putnami/nx`, and `@putnami/typescript` in import mode | Each project's edges, and which extension runs its build, test and lint, from the Nx graph export or configuration. See [Run a Nx repository with Putnami](../../../monorepo/nx/doc/01-nx.md) |
 
-`@putnami/pants` and `@putnami/bazel` are not published yet: until their first release, `init --from <tool>` stops at the extension install, after it has written the workspace files.
+A tool whose extension offers two modes, Nx, adopts in the one the team picks (D-064): `import`, where Putnami's runner and cache take over the targets it can map, or `delegate`, where the tool keeps running each target with its cache. In a terminal `init` asks, with `import` preselected; without one it imports. `--mode import|delegate` skips the question. `init` records the mode in the workspace options of the tool's extension, `options["@putnami/nx"].mode`, which its sync task reads. Bazel and Pants adopt in `delegate` alone.
+
+Rerun in a workspace that exists, `init --from <tool>` runs the workspace sync tasks as a dry run in the mode it resolves (`--mode`, else the recorded one), shows what each would change and the mode change, and writes nothing. `--apply` records the mode, declares and installs the extensions the mode needs, and runs `putnami projects sync`.
+
+`@putnami/pants`, `@putnami/bazel` and `@putnami/nx` are not published yet: until their first release, `init --from <tool>` stops at the extension install, after it has written the workspace files.
 
 ```bash
 putnami init --from pants
 putnami init --from bazel
+putnami init --from nx --mode delegate
+putnami init --from nx --mode import --apply
 ```
 
 `init` resolves the extensions, the template and the starter's dependencies on one release channel. It takes the first of:

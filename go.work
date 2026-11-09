@@ -99,6 +99,7 @@ use (
 	./protocols/transaction
 	./protocols/workspace
 	./java/extension
+	./monorepo/nx
 	./php/extension
 	./dotnet/extension
 	./python/extension

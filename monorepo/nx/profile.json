@@ -1,0 +1,40 @@
+{
+  "id": "nx",
+  "delegated": true,
+  "markers": ["project.json", "package.json"],
+  "toolchain": {
+    "command": ["npx", "--no", "nx", "--version"],
+    "pattern": "(?m)(?:^|Local: )v?(?<version>[0-9]+\\.[0-9]+\\.[0-9]+\\S*)\\s*$",
+    "files": [
+      { "path": "package.json", "key": "devDependencies.nx" },
+      { "path": "package.json", "key": "dependencies.nx" }
+    ]
+  },
+  "inputs": {
+    "sources": ["**"]
+  },
+  "excludes": ["node_modules", "dist", ".nx"],
+  "tasks": {
+    "lint": {
+      "steps": [
+        ["npx", "--no", "nx", "run", "{component}:lint", "--outputStyle=static"]
+      ],
+      "inputs": ["sources"],
+      "dir": "root"
+    },
+    "test": {
+      "steps": [
+        ["npx", "--no", "nx", "run", "{component}:test", "--outputStyle=static"]
+      ],
+      "inputs": ["sources"],
+      "dir": "root"
+    },
+    "build": {
+      "steps": [
+        ["npx", "--no", "nx", "run", "{component}:build", "--outputStyle=static"]
+      ],
+      "inputs": ["sources"],
+      "dir": "root"
+    }
+  }
+}

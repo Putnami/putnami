@@ -1,0 +1,384 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-extension.json",
+  "name": "@putnami/nx",
+  "cliContract": 14,
+  "extensionDependencies": {
+    "@putnami/dev": ""
+  },
+  "runtime": {
+    "executable": "compiled/putnami-nx",
+    "toolchains": {
+      "runtimeCompiler": {
+        "lock": "go",
+        "candidates": [
+          {
+            "from": "environment",
+            "environment": "GOROOT",
+            "path": "bin/go"
+          },
+          {
+            "from": "path",
+            "path": "go"
+          },
+          {
+            "from": "putnami-home",
+            "path": "toolchains/go/go-{version}/go/bin/go"
+          }
+        ],
+        "probe": {
+          "args": [
+            "env",
+            "GOVERSION"
+          ],
+          "expect": "go{version}",
+          "unset": [
+            "GOROOT"
+          ],
+          "environment": {
+            "GOTOOLCHAIN": "local"
+          }
+        },
+        "environment": {
+          "GOROOT": {
+            "from": "ancestor",
+            "levels": 2
+          },
+          "GOTOOLCHAIN": {
+            "from": "literal",
+            "value": "local"
+          }
+        },
+        "prependPath": true
+      }
+    },
+    "prepare": {
+      "command": "{extensionRoot}/bin/prepare",
+      "args": [
+        "--output",
+        "{runtimeOutput}"
+      ],
+      "inputs": [
+        "bin/prepare",
+        "cmd/**",
+        "go.mod",
+        "go.sum",
+        "*.go",
+        "profile.json"
+      ],
+      "toolchains": [
+        "runtimeCompiler"
+      ]
+    },
+    "inputSelectors": [
+      "nx:build",
+      "nx:lint",
+      "nx:test"
+    ]
+  },
+  "workspace": {
+    "markers": [
+      "project.json",
+      "package.json"
+    ],
+    "inputs": [
+      "nx.json",
+      "project.json",
+      "package.json",
+      "graph.json"
+    ],
+    "excludes": [
+      "dist",
+      "node_modules",
+      ".nx"
+    ],
+    "syncTask": "workspace-sync-exec"
+  },
+  "commands": {
+    "lint": {
+      "description": "Lint each project with nx run <project>:lint, which keeps its own cache.",
+      "run": [
+        {
+          "id": "graph",
+          "task": "graph-run",
+          "dependsOn": [
+            "^graph"
+          ]
+        },
+        {
+          "id": "lint",
+          "task": "lint-run",
+          "dependsOn": [
+            "graph"
+          ]
+        }
+      ]
+    },
+    "test": {
+      "description": "Test each project with nx run <project>:test, and read the JUnit and coverage reports its test configuration names; Nx keeps its own cache.",
+      "run": [
+        {
+          "id": "graph",
+          "task": "graph-run",
+          "dependsOn": [
+            "^graph"
+          ]
+        },
+        {
+          "id": "test",
+          "heavy": true,
+          "task": "test-run",
+          "dependsOn": [
+            "graph"
+          ]
+        }
+      ]
+    },
+    "build": {
+      "description": "Build each project with nx run <project>:build, which keeps its own cache.",
+      "run": [
+        {
+          "id": "graph",
+          "task": "graph-run",
+          "dependsOn": [
+            "^graph"
+          ]
+        },
+        {
+          "id": "build",
+          "heavy": true,
+          "task": "build-run",
+          "dependsOn": [
+            "graph"
+          ]
+        }
+      ]
+    },
+    "validate": {
+      "description": "Fail when a project's putnami.json no longer matches the Nx project graph, such as after an import that changes the edges Nx infers.",
+      "activation": "workspace-once",
+      "run": [
+        {
+          "id": "nx-graph-check",
+          "task": "nx-graph-check-exec"
+        }
+      ]
+    },
+    "workspace-sync": {
+      "description": "Write each Nx project's putnami.json from the Nx project graph, in the mode the workspace records.",
+      "visibility": "internal",
+      "activation": "workspace-once",
+      "run": [
+        {
+          "id": "workspace-sync",
+          "task": "workspace-sync-exec"
+        }
+      ]
+    }
+  },
+  "tasks": {
+    "graph-run": {
+      "description": "Carry the package graph: each lint, test and build step depends on the graph step of its own project, which alone depends on the graph step of each project upstream, so a change selects the projects that depend on it while a dependency runs no nx. Runs nothing and passes.",
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": [
+        "graph"
+      ],
+      "cwd": "{projectRoot}",
+      "timeoutMs": 60000,
+      "inputs": {
+        "sources": {
+          "from": "project",
+          "files": [
+            "nx:test"
+          ]
+        }
+      },
+      "cache": {
+        "enabled": false
+      }
+    },
+    "lint-run": {
+      "description": "Run npx --no nx run <project>:lint at the workspace root for one project, after the Nx version check. Putnami's cache is off: Nx's cache decides what reruns.",
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": [
+        "lint",
+        "--report-dir",
+        "{outputRoot}"
+      ],
+      "cwd": "{projectRoot}",
+      "timeoutMs": 1800000,
+      "inputs": {
+        "sources": {
+          "from": "project",
+          "files": [
+            "nx:lint"
+          ]
+        },
+        "stackRoot": {
+          "from": "workspace",
+          "files": [
+            "package.json"
+          ]
+        },
+        "extensionVersion": {
+          "from": "runtime"
+        }
+      },
+      "outputs": {
+        "data": {
+          "description": "The task result: delegatedTo nx, and the test and coverage totals of a test task."
+        }
+      },
+      "cache": {
+        "enabled": false
+      },
+      "declares": {
+        "outputs": {
+          "reports": {
+            "kind": "directory",
+            "root": "command-output",
+            "path": "lint",
+            "optionalEmpty": true,
+            "description": "The reports the task copied: the JUnit and coverage reports of a test task."
+          }
+        },
+        "effects": [
+          "network",
+          "toolchain-cache"
+        ]
+      }
+    },
+    "test-run": {
+      "description": "Run npx --no nx run <project>:test at the workspace root for one project, after the Nx version check; then read the JUnit and coverage reports the sync names in the project's options from its test configuration, removed before the run. A failed case or a step that exits non-zero fails the task. Putnami's cache is off: Nx's cache decides what reruns.",
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": [
+        "test",
+        "--report-dir",
+        "{outputRoot}"
+      ],
+      "cwd": "{projectRoot}",
+      "timeoutMs": 1800000,
+      "inputs": {
+        "sources": {
+          "from": "project",
+          "files": [
+            "nx:test"
+          ]
+        },
+        "stackRoot": {
+          "from": "workspace",
+          "files": [
+            "package.json"
+          ]
+        },
+        "extensionVersion": {
+          "from": "runtime"
+        }
+      },
+      "outputs": {
+        "data": {
+          "description": "The task result: delegatedTo nx, and the test and coverage totals of a test task."
+        }
+      },
+      "cache": {
+        "enabled": false
+      },
+      "declares": {
+        "outputs": {
+          "reports": {
+            "kind": "directory",
+            "root": "command-output",
+            "path": "test",
+            "optionalEmpty": true,
+            "description": "The reports the task copied: the JUnit and coverage reports of a test task."
+          }
+        },
+        "effects": [
+          "network",
+          "toolchain-cache"
+        ]
+      }
+    },
+    "build-run": {
+      "description": "Run npx --no nx run <project>:build at the workspace root for one project, after the Nx version check; Nx's dependsOn runs the upstream targets. Putnami's cache is off: Nx's cache decides what reruns.",
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": [
+        "build",
+        "--report-dir",
+        "{outputRoot}"
+      ],
+      "cwd": "{projectRoot}",
+      "timeoutMs": 1800000,
+      "inputs": {
+        "sources": {
+          "from": "project",
+          "files": [
+            "nx:build"
+          ]
+        },
+        "stackRoot": {
+          "from": "workspace",
+          "files": [
+            "package.json"
+          ]
+        },
+        "extensionVersion": {
+          "from": "runtime"
+        }
+      },
+      "outputs": {
+        "data": {
+          "description": "The task result: delegatedTo nx, and the test and coverage totals of a test task."
+        }
+      },
+      "cache": {
+        "enabled": false
+      },
+      "declares": {
+        "outputs": {
+          "reports": {
+            "kind": "directory",
+            "root": "command-output",
+            "path": "build",
+            "optionalEmpty": true,
+            "description": "The reports the task copied: the JUnit and coverage reports of a test task."
+          }
+        },
+        "effects": [
+          "network",
+          "toolchain-cache"
+        ]
+      }
+    },
+    "workspace-sync-exec": {
+      "description": "Write in each Nx project's putnami.json the extension, its dependencies as project IDs, the build, test and lint jobs it disables in the mode the workspace records, or the mode parameter, and the test reports its test configuration names; list each target it does not map. With the dryRun parameter it writes nothing and prints the diff. Declares no outputs: it rewrites tracked project files, which the workspace-files effect states.",
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": [
+        "workspace-sync"
+      ],
+      "cwd": "{workspaceRoot}",
+      "cache": false,
+      "timeoutMs": 600000,
+      "declares": {
+        "effects": [
+          "workspace-files"
+        ]
+      }
+    },
+    "nx-graph-check-exec": {
+      "description": "Compare each Nx project's putnami.json with what a sync in the recorded mode would write, and fail with nx.sync_stale when it would change one. Writes nothing.",
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": [
+        "nx-graph-check"
+      ],
+      "cwd": "{workspaceRoot}",
+      "cache": false,
+      "timeoutMs": 600000
+    }
+  }
+}

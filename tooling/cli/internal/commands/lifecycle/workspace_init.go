@@ -60,19 +60,32 @@ var initExtensions = map[string]initExtensionConfig{
 }
 
 // initSource is a monorepo tool `putnami init --from` adopts: the starter
-// that declares the tool's stack extension, and the files, any one of which
-// marks a repository the tool describes. The extension owns everything else: its
-// probe names the packages and its workspace sync task writes their
-// putnami.json, so init only declares it and runs projects sync.
+// that declares the tool's stack extension, the files, any one of which marks
+// a repository the tool describes, and the modes its extension adopts in. The
+// extension owns everything else: its probe names the packages and its
+// workspace sync task writes their putnami.json in the mode the workspace
+// records, so init only declares it, records the mode and runs projects sync.
 type initSource struct {
 	starter initExtensionConfig
 	markers []string
+	// modes are the adoption modes the extension offers, the default first:
+	// import, delegate, or both, which makes init ask (D-064).
+	modes []string
+	// importExtensions are the extensions import mode hands targets to,
+	// which init declares and installs beside the tool's.
+	importExtensions []string
 }
 
 // initSources are the tools --from accepts, by name.
 var initSources = map[string]initSource{
-	"bazel": {starter: initExtensionConfig{packageName: "@putnami/bazel"}, markers: []string{"MODULE.bazel", "WORKSPACE", "WORKSPACE.bazel"}},
-	"pants": {starter: initExtensionConfig{packageName: "@putnami/pants"}, markers: []string{"pants.toml"}},
+	"bazel": {starter: initExtensionConfig{packageName: "@putnami/bazel"}, markers: []string{"MODULE.bazel", "WORKSPACE", "WORKSPACE.bazel"}, modes: []string{initModeDelegate}},
+	"nx": {
+		starter:          initExtensionConfig{packageName: "@putnami/nx"},
+		markers:          []string{"nx.json"},
+		modes:            []string{initModeImport, initModeDelegate},
+		importExtensions: []string{"@putnami/typescript"},
+	},
+	"pants": {starter: initExtensionConfig{packageName: "@putnami/pants"}, markers: []string{"pants.toml"}, modes: []string{initModeDelegate}},
 }
 
 // holdsAny reports whether dir holds one of the files.
@@ -130,6 +143,12 @@ type initFlags struct {
 	// was given: a flag with no value is a usage error, not an absent flag.
 	from    string
 	fromSet bool
+	// mode is the adoption mode of --mode, and modeSet reports that the flag
+	// was given.
+	mode    string
+	modeSet bool
+	// apply lets a rerun of init --from write what it previews.
+	apply bool
 	// channel is the value of --channel, and channelSet reports that the flag
 	// was given: a flag with no value is a usage error, not an absent flag.
 	channel    string
@@ -145,6 +164,10 @@ func parseInitFlags(args []string) initFlags {
 		}
 		if value, ok := strings.CutPrefix(args[i], "--from="); ok {
 			f.from, f.fromSet = value, true
+			continue
+		}
+		if value, ok := strings.CutPrefix(args[i], "--mode="); ok {
+			f.mode, f.modeSet = value, true
 			continue
 		}
 		switch args[i] {
@@ -183,6 +206,14 @@ func parseInitFlags(args []string) initFlags {
 				f.from = args[i+1]
 				i++
 			}
+		case "--mode":
+			f.modeSet = true
+			if i+1 < len(args) {
+				f.mode = args[i+1]
+				i++
+			}
+		case "--apply":
+			f.apply = true
 		}
 	}
 	return f
@@ -248,7 +279,12 @@ func resolveInitRequest(flags initFlags) (initExtensionConfig, initChannel, erro
 		if flags.project != "" || flags.projectPath != "" || flags.extensionSet {
 			return initExtensionConfig{}, initChannel{}, cmderr.Usagef("--from %s does not combine with --project, --project-path or --extension: the %s packages become the projects", flags.from, flags.from)
 		}
+		if err := validateInitMode(flags, source); err != nil {
+			return initExtensionConfig{}, initChannel{}, err
+		}
 		extConfig, ok = source.starter, true
+	} else if flags.modeSet || flags.apply {
+		return initExtensionConfig{}, initChannel{}, cmderr.Usagef("--mode and --apply adopt a monorepo tool: give --from <tool> (choose: %s)", initSourceNames())
 	}
 	if !ok {
 		return initExtensionConfig{}, initChannel{}, cmderr.Usagef("unknown extension %q (choose: ts, go, py)", flags.extension)
@@ -299,6 +335,15 @@ func WorkspaceInit(ctx context.Context, wsRoot string, args []string, env Lifecy
 		projectPath = resolvedProjectPath
 	}
 
+	// A rerun of init --from previews the adoption, and writes only with
+	// --apply.
+	if source, ok := initSources[flags.from]; ok && wsRoot != "" && !flags.force {
+		if !holdsAny(wsRoot, source.markers) {
+			return cmderr.Usagef("putnami init --from %s runs at the root of a %s repository, and %s holds no %s", flags.from, flags.from, wsRoot, strings.Join(source.markers, ", "))
+		}
+		return rerunInitFrom(ctx, wsRoot, flags, source, env)
+	}
+
 	// Check existing workspace
 	if wsRoot != "" && !flags.force {
 		iox.Fprintln(os.Stdout)
@@ -316,8 +361,21 @@ func WorkspaceInit(ctx context.Context, wsRoot string, args []string, env Lifecy
 	if err != nil {
 		return fmt.Errorf("get cwd: %w", err)
 	}
-	if source, ok := initSources[flags.from]; ok && !holdsAny(cwd, source.markers) {
-		return cmderr.Usagef("putnami init --from %s runs at the root of a %s repository, and %s holds no %s", flags.from, flags.from, cwd, strings.Join(source.markers, ", "))
+	declared := initDeclaredExtensions(extConfig)
+	var options map[string]initToolOptions
+	if source, ok := initSources[flags.from]; ok {
+		if !holdsAny(cwd, source.markers) {
+			return cmderr.Usagef("putnami init --from %s runs at the root of a %s repository, and %s holds no %s", flags.from, flags.from, cwd, strings.Join(source.markers, ", "))
+		}
+		mode, err := resolveInitMode(flags, source, "")
+		if err != nil {
+			return err
+		}
+		declared = source.extensionsFor(mode)
+		options = initOptions(source, mode)
+		if source.offersBothModes() {
+			iox.Fprintf(os.Stdout, "  Mode: %s\n", mode)
+		}
 	}
 
 	// --- Phase 1: Initialize workspace ---
@@ -383,11 +441,12 @@ func WorkspaceInit(ctx context.Context, wsRoot string, args []string, env Lifecy
 	cfg := initConfig{
 		Schema:         "https://putnami.dev/schemas/putnami-workspace.json",
 		Name:           name,
-		Extensions:     initDeclaredExtensions(extConfig),
+		Extensions:     declared,
 		Templates:      templates,
 		AgentArtifacts: initAgentArtifacts(cwd, extConfig),
 		Registries:     initRegistries(cwd, extConfig),
 		Includes:       []string{},
+		Options:        options,
 	}
 
 	data, err := json.MarshalIndent(cfg, "", "  ")
@@ -409,11 +468,20 @@ func WorkspaceInit(ctx context.Context, wsRoot string, args []string, env Lifecy
 	// Reload config from disk (now that putnami.workspace.json exists)
 	wsCfg := wsproto.Load(cwd)
 
-	if err := installExtension(ctx, cwd, wsCfg, []string{shared.ChannelArtifact(extConfig.packageName, env.channel)}, ""); err != nil {
-		return protocolcli.WithNext(
-			fmt.Errorf("install extension %s: %w", extConfig.packageName, err),
-			"putnami extensions install",
-		)
+	installs := []string{extConfig.packageName}
+	if flags.from != "" {
+		// A tool's import mode hands targets to other extensions, which
+		// install beside the tool's.
+		installs = declared
+	}
+	for _, name := range installs {
+		if err := installExtension(ctx, cwd, wsCfg, []string{shared.ChannelArtifact(name, env.channel)}, ""); err != nil {
+			return protocolcli.WithNext(
+				fmt.Errorf("install extension %s: %w", name, err),
+				"putnami extensions install",
+			)
+		}
+		wsCfg = wsproto.Load(cwd)
 	}
 
 	// Regenerate shared AI context now that the extension is installed.
@@ -482,7 +550,7 @@ func WorkspaceInit(ctx context.Context, wsRoot string, args []string, env Lifecy
 	iox.Fprintln(os.Stdout)
 	iox.Fprintf(os.Stdout, "  ✓ Workspace ready: %s\n", name)
 	iox.Fprintf(os.Stdout, "    Path: %s\n", cwd)
-	iox.Fprintf(os.Stdout, "    Extension: %s\n", extConfig.packageName)
+	iox.Fprintf(os.Stdout, "    Extension: %s\n", strings.Join(installs, ", "))
 	iox.Fprintln(os.Stdout, "    Agent skills: not installed. To add them, run putnami extensions install @putnami/contributor")
 	iox.Fprintln(os.Stdout)
 
@@ -622,6 +690,7 @@ type initConfig struct {
 	AgentArtifacts []string                   `json:"agentArtifacts,omitempty"`
 	Registries     map[string]json.RawMessage `json:"registries,omitempty"`
 	Includes       []string                   `json:"includes"`
+	Options        map[string]initToolOptions `json:"options,omitempty"`
 }
 
 // initRegistries is the new workspace's `registries`: the starter's entries,

@@ -522,3 +522,24 @@ func TestPeekWaitsForTheTasksOfTheStackRoot(t *testing.T) {
 		t.Fatal("peek never ran after the lock was released")
 	}
 }
+
+func TestTheSyncJobWritesNothingInADryRun(t *testing.T) {
+	spectest.Proves(t, feature, "sync-writes-the-package-graph", "the-sync-writes-each-package-putnami-json-from-the-export")
+	d := readDemo(t)
+	t.Setenv("PATH", t.TempDir())
+	root := repository(t, d, true)
+	var events strings.Builder
+	emit := jsonl.New()
+	emit.Observe(func(message string) { events.WriteString(message + "\n") })
+	ctx := &pctx.Context{WorkspaceRoot: root, Params: pctx.Params{"dryRun": json.RawMessage(`true`)}}
+	status, data, err := RunSync(ctx, emit, nil)
+	if err != nil || status != "OK" || data["dryRun"] != true {
+		t.Fatalf("status %s, data %v, err %v", status, data, err)
+	}
+	if _, err := os.Stat(filepath.Join(root, "src/python/api/putnami.json")); !os.IsNotExist(err) {
+		t.Errorf("a dry run writes no putnami.json: %v", err)
+	}
+	if !strings.Contains(events.String(), "src/python/api/putnami.json would change") {
+		t.Errorf("a dry run names what would change: %s", events.String())
+	}
+}

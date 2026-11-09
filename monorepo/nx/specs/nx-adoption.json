@@ -1,0 +1,55 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-spec.json",
+  "protocolVersion": 1,
+  "feature": "monorepo/nx-adoption",
+  "outcomes": [
+    "Each Nx project is a Putnami project with an edge to each project Nx says it depends on, in both modes",
+    "In delegate mode, putnami lint, test and build run nx run on each affected project, and Nx's cache decides what reruns",
+    "In import mode, a TypeScript project's build, test and lint run as @putnami/typescript tasks, and every other target keeps running through Nx",
+    "The sync lists every target it does not map, with the reason, and a stale graph fails putnami validate"
+  ],
+  "nonGoals": [
+    "Rewriting nx.json, project.json or package.json files",
+    "Installing or switching a Nx version: the toolchain check compares and never installs",
+    "Caching a delegated Nx result in Putnami's cache",
+    "Mapping a target other than build, test and lint to a Putnami task"
+  ],
+  "requirements": [
+    {
+      "id": "projects-become-projects",
+      "text": "The probe answers, for each candidate directory the observe Nx detector knows as a project, from nx graph --file graph.json when the root holds it, else nx.json and each project.json and workspace package.json: its Nx project name as source name, the projects it depends on, the extension @putnami/nx, the tag nx, and metadata naming the project for nx run. Any other candidate is no member of the extension."
+    },
+    {
+      "id": "sync-writes-the-project-graph",
+      "text": "The workspace sync task writes in each Nx project's putnami.json the extension, the project IDs it depends on, and in disable.jobs each of build, test and lint the project has no target for; it owns those entries and their @putnami/nx: and @putnami/typescript: forms. It reads the mode from options[\"@putnami/nx\"].mode, import by default, retracts a former project, rewrites a file only when a member it owns changes, and with dryRun writes nothing and reports each diff."
+    },
+    {
+      "id": "import-maps-typescript-targets",
+      "text": "In import mode, a project with package.json and a tsconfig*.json or a .ts source is TypeScript: its build, test and lint targets whose script already runs what @putnami/typescript runs (bun build, bun test, biome) run as its task, and @putnami/nx:<task> is disabled. Every other build, test or lint target, such as jest, eslint, tsc or an Nx executor, keeps running through Nx, is listed with its reason, and @putnami/typescript:<task> is disabled, so no runner changes silently."
+    },
+    {
+      "id": "unmapped-targets-are-listed",
+      "text": "The sync writes nothing it cannot map. It lists each target it maps to no Putnami task, such as serve or e2e, and in import mode each build, test or lint target that keeps running through Nx, with the project, the target and the reason, and each such target keeps running through nx run."
+    },
+    {
+      "id": "validate-fails-on-a-stale-graph",
+      "text": "putnami validate compares each Nx project's putnami.json with the graph the sync reads, writes nothing, and fails with nx.sync_stale when a sync would change one, so an import that changes the edges Nx infers cannot pass the gate."
+    },
+    {
+      "id": "tasks-delegate-to-nx",
+      "text": "Each delegated task compares nx --version with the nx version the root package.json states, then runs nx run <project>:<target> at the workspace root, where Nx's dependsOn runs the upstream targets and its cache answers them. Each task depends only on its project's graph step, which runs no nx. Putnami's cache is off for every task, the result records delegatedTo nx, and a failing step fails with stacks.step_failed."
+    },
+    {
+      "id": "reports-from-project-options",
+      "text": "The sync writes, as the project's test reports, the JUnit file and the Cobertura or LCOV report its jest or vitest configuration names (jest-junit outputDirectory and outputName, coverageDirectory or reportsDirectory, <rootDir> as the project), at the workspace root for jest-junit under @nx/jest. The test task removes them before its run and reads them into the test and coverage summary. A project whose configuration names none has the exit code alone as result, and the sync lists it."
+    },
+    {
+      "id": "manifest-follows-the-profile",
+      "text": "The manifest passes the stack core's conformance kit: its markers are the profile's, it lists the nx:lint, nx:test and nx:build selectors, each command runs the graph step, which depends on the graph step upstream, then its task, which depends on its own graph step alone, and every task, the graph task included, sets cache.enabled to false."
+    }
+  ],
+  "decisions": [
+    "tooling/stacks/doc/adr/0008-a-delegated-stack-keeps-its-tool-cache.md",
+    "monorepo/nx/doc/adr/0001-the-adoption-mode-is-a-workspace-option.md"
+  ]
+}

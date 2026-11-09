@@ -728,3 +728,54 @@ func TestTheNxDemoMapsChangedFilesWithAndWithoutAGraphExport(t *testing.T) {
 		})
 	}
 }
+
+func TestDetectListsTheTargetsOfEachProject(t *testing.T) {
+	root := tree(t, map[string]string{
+		"nx.json":                 `{"targetDefaults": {"test": {"outputs": ["{projectRoot}/reports"]}}}`,
+		"package.json":            `{"name": "ws", "workspaces": ["packages/*"]}`,
+		"packages/a/package.json": `{"name": "@demo/a", "scripts": {"build": "tsc -p tsconfig.json", "test": "jest"}}`,
+		"packages/b/project.json": `{"name": "b", "implicitDependencies": ["@demo/a"], "targets": {"lint": {"executor": "@nx/eslint:lint"}, "serve": {"executor": "nx:run-commands", "options": {"command": "node main.js"}}}}`,
+	})
+
+	detection := Detect(root, Options{})
+	if len(detection.Projects) != 2 {
+		t.Fatalf("projects = %+v, want 2", detection.Projects)
+	}
+	a, b := detection.Projects[0], detection.Projects[1]
+	if a.Path != "packages/a" || a.Name != "@demo/a" || a.SourceFile != "packages/a/package.json" {
+		t.Errorf("a = %+v", a)
+	}
+	wantA := []Target{
+		{Name: "build", Executor: "nx:run-script", Command: "tsc -p tsconfig.json"},
+		{Name: "test", Executor: "nx:run-script", Command: "jest", Outputs: []string{"packages/a/reports"}, Test: true},
+	}
+	if !reflect.DeepEqual(a.Targets, wantA) {
+		t.Errorf("a targets = %+v, want %+v", a.Targets, wantA)
+	}
+	if !reflect.DeepEqual(b.Dependencies, []string{"packages/a"}) {
+		t.Errorf("b dependencies = %v, want [packages/a]", b.Dependencies)
+	}
+	wantB := []Target{
+		{Name: "lint", Executor: "@nx/eslint:lint"},
+		{Name: "serve", Executor: "nx:run-commands", Command: "node main.js"},
+	}
+	if !reflect.DeepEqual(b.Targets, wantB) {
+		t.Errorf("b targets = %+v, want %+v", b.Targets, wantB)
+	}
+}
+
+func TestDetectReadsTheScriptOfARunScriptTargetInAGraphExport(t *testing.T) {
+	root := tree(t, map[string]string{
+		"nx.json":             `{}`,
+		"libs/a/package.json": `{"name": "a", "scripts": {"build": "tsc"}}`,
+		"graph.json":          `{"graph": {"nodes": {"a": {"name": "a", "type": "lib", "data": {"root": "libs/a", "targets": {"build": {"executor": "nx:run-script", "options": {"script": "build"}}}}}}, "dependencies": {}}}`,
+	})
+	detection := Detect(root, Options{})
+	if len(detection.Projects) != 1 || !detection.Projects[0].FromGraph {
+		t.Fatalf("projects = %+v", detection.Projects)
+	}
+	want := []Target{{Name: "build", Executor: "nx:run-script", Command: "tsc"}}
+	if got := detection.Projects[0].Targets; !reflect.DeepEqual(got, want) {
+		t.Errorf("targets = %+v, want %+v", got, want)
+	}
+}

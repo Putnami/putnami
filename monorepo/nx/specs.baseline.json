@@ -1,0 +1,14 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-specs-baseline.json",
+  "protocolVersion": 2,
+  "executableRequirements": [
+    "monorepo/nx-adoption#import-maps-typescript-targets",
+    "monorepo/nx-adoption#manifest-follows-the-profile",
+    "monorepo/nx-adoption#projects-become-projects",
+    "monorepo/nx-adoption#reports-from-project-options",
+    "monorepo/nx-adoption#sync-writes-the-project-graph",
+    "monorepo/nx-adoption#tasks-delegate-to-nx",
+    "monorepo/nx-adoption#unmapped-targets-are-listed",
+    "monorepo/nx-adoption#validate-fails-on-a-stale-graph"
+  ]
+}

@@ -414,11 +414,16 @@ const (
 	// SyncStaleSuffix is a package whose putnami.json no longer matches the
 	// export.
 	SyncStaleSuffix = ".sync_stale"
+	// SyncPreviewSuffix is a putnami.json a dry run of the sync would change.
+	SyncPreviewSuffix = ".sync_preview"
 )
 
 // RunSync is the job of the workspace sync task, reported line by line.
+// With the dryRun parameter it answers what a sync would change, names each
+// file, and writes nothing.
 func (j GraphJobs) RunSync(ctx *pctx.Context, emit *jsonl.Emitter, _ []string) (string, map[string]any, error) {
-	result, err := j.Sync(context.Background(), ctx.WorkspaceRoot, os.Stderr, false)
+	dry := ctx.Params.Bool("dryRun", false)
+	result, err := j.Sync(context.Background(), ctx.WorkspaceRoot, os.Stderr, dry)
 	if err != nil {
 		emit.DiagnosticWithCode("error", err.Error(), "", 0, 0, j.Tool+SyncFailedSuffix)
 		return statusFailed, nil, errors.New(j.Tool + SyncFailedSuffix)
@@ -428,7 +433,12 @@ func (j GraphJobs) RunSync(ctx *pctx.Context, emit *jsonl.Emitter, _ []string) (
 	} else {
 		emit.Info(j.Summary(result))
 	}
-	return statusOK, map[string]any{"written": result.Written, "retracted": result.Retracted}, nil
+	if dry {
+		for _, file := range append(slices.Clone(result.Written), result.Retracted...) {
+			emit.DiagnosticWithCode("warning", fmt.Sprintf("%s would change", file), file, 0, 0, j.Tool+SyncPreviewSuffix)
+		}
+	}
+	return statusOK, map[string]any{"written": result.Written, "retracted": result.Retracted, "dryRun": dry}, nil
 }
 
 // RunCheck is the job of the validate task: it fails when a sync would change
