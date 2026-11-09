@@ -63,6 +63,16 @@ While `bazel-graph.json` lies at the root, the sync and `putnami validate`
 read it and never run `bazel query`, so a stale export hides a new edge. Do
 not commit it: write it in the CI job that runs the sync and the gate.
 
+## How Putnami judges the edges
+
+The probe reports each package's edges as the Bazel graph's (`build-graph`):
+those of the export, and each dependency of its `putnami.json` on a package or
+another directory with a `BUILD` file, which is what the sync writes. Bazel
+builds with them, so the declared-edge check counts them as real and warns no
+`workspace.declared_edge` for them. Visibility does not judge them: Bazel's own
+`visibility` attribute, not Putnami's scopes, says which package may depend on
+which.
+
 ## What each task runs
 
 Each task first compares `bazel --version` with `.bazelversion`, then runs one

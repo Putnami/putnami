@@ -36,12 +36,12 @@
   "definitions": {
     "dependencySource": {
       "type": "string",
-      "enum": ["declared", "go-module", "package-json", "contract"],
-      "description": "Where one dependency edge came from: a declaration, a go.mod require or replace, a package.json dependency on a workspace package, or a generated client's committed contract."
+      "enum": ["declared", "go-module", "package-json", "contract", "build-graph"],
+      "description": "Where one dependency edge came from: a declaration, a go.mod require or replace, a package.json dependency on a workspace package, a generated client's committed contract, or the graph of the build tool a delegated stack runs."
     },
     "providerDependencySource": {
       "type": "string",
-      "enum": ["declared", "go-module", "package-json"],
+      "enum": ["declared", "go-module", "package-json", "build-graph"],
       "description": "The subset of dependencySource a provider may claim. The contract source is core's own derivation and belongs to no provider's answer."
     },
     "relativePath": {

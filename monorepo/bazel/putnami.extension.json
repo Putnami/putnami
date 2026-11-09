@@ -1,7 +1,7 @@
 {
   "$schema": "https://putnami.dev/schemas/putnami-extension.json",
   "name": "@putnami/bazel",
-  "cliContract": 14,
+  "cliContract": 21,
   "extensionDependencies": {
     "@putnami/dev": ""
   },
@@ -94,7 +94,9 @@
       "bazel-out",
       "bazel-testlogs"
     ],
-    "syncTask": "workspace-sync-exec"
+    "syncTask": "workspace-sync-exec",
+    "dependencySources": true,
+    "buildGraphEdges": true
   },
   "commands": {
     "test": {

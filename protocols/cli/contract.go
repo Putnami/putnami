@@ -313,7 +313,14 @@ const ProviderContract = 19
 // extension in the user scope without them, refuses the stamp instead.
 const UserScopeSkillsContract = 20
 
+// BuildGraphEdgesContract is required by a manifest whose workspace adapter
+// declares `buildGraphEdges`: its probe attributes edges to build-graph, the
+// source of a delegated build tool's own graph. A reader at this contract
+// accepts that source in a probe answer, so an older reader, which would reject
+// every answer that names it, refuses the stamp instead.
+const BuildGraphEdgesContract = 21
+
 // LatestContract is the highest contract this CLI reads. A manifest stamped
 // above it is refused as written for a newer putnami; a manifest stamped at or
 // below it loads when the stamp covers the vocabulary the manifest uses.
-const LatestContract = UserScopeSkillsContract
+const LatestContract = BuildGraphEdgesContract

@@ -45,6 +45,12 @@ type Component struct {
 	// Dependencies are the workspace-relative directories of the components
 	// this one depends on.
 	Dependencies []string
+	// EdgeSource is the provenance of every edge the probe answers for the
+	// component, its stack-root edge included, such as
+	// wsproto.DependencySourceBuildGraph for a delegated stack whose tool's
+	// graph states them. The probe reports it to a request that asks for
+	// provenance. Empty reports none: the edges stay unattributed.
+	EdgeSource wsproto.DependencySource
 	// Type is the detector's classification, "library" or "application". The
 	// planner gives a library no runnable command. Empty leaves it to the
 	// project's own configuration.
@@ -257,19 +263,34 @@ func (s Stack) Probe(root string, request wsproto.ProbeRequest) (wsproto.ProbeRe
 		}
 		slices.Sort(watched)
 		result.Projects = append(result.Projects, wsproto.ProbeProject{
-			Path:         c.Path,
-			SourceName:   c.Name,
-			SourceFile:   c.SourceFile,
-			Type:         c.Type,
-			Dependencies: deps[c.Path],
-			Extensions:   []string{s.Extension},
-			Tags:         []string{s.Profile.ID},
-			WatchedFiles: watched,
-			Metadata:     meta,
+			Path:              c.Path,
+			SourceName:        c.Name,
+			SourceFile:        c.SourceFile,
+			Type:              c.Type,
+			Dependencies:      deps[c.Path],
+			DependencySources: edgeSources(request, c.EdgeSource, deps[c.Path]),
+			Extensions:        []string{s.Extension},
+			Tags:              []string{s.Profile.ID},
+			WatchedFiles:      watched,
+			Metadata:          meta,
 		})
 	}
 	wsproto.NormalizeProbeResult(&result)
 	return result, nil
+}
+
+// edgeSources attributes each of a component's edges to its edge source, for
+// a request that asks for provenance. A component with no edge answers an
+// empty map: it is attributed, and nothing is left to judge.
+func edgeSources(request wsproto.ProbeRequest, source wsproto.DependencySource, deps []string) map[string]wsproto.DependencySource {
+	if !request.DependencySources || source == "" {
+		return nil
+	}
+	out := make(map[string]wsproto.DependencySource, len(deps))
+	for _, dep := range deps {
+		out[dep] = source
+	}
+	return out
 }
 
 // firstPerPath keeps the first component the detector names at each path,

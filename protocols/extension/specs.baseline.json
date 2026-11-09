@@ -5,6 +5,7 @@
     "extension/manifest-contract#a-contract-matches-or-the-manifest-does-not-load",
     "extension/manifest-contract#a-registry-extension-dependency-requires-rung-8",
     "extension/manifest-contract#an-additive-vocabulary-raises-the-contract-floor",
+    "extension/manifest-contract#build-graph-edges-are-declared-by-the-adapter",
     "extension/manifest-contract#declared-paths-follow-one-rule",
     "extension/manifest-contract#every-first-party-manifest-conforms",
     "extension/manifest-contract#first-party-packagers-stamp-and-gate-the-contract",

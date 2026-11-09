@@ -37,8 +37,9 @@ func Stack() (stacks.Stack, error) {
 
 // Detect names the components among the candidate paths with the Pants
 // detector: each directory whose BUILD file declares a first-party target,
-// named by its directory, with the workspace root for stack root and the
-// edges of the export pants-graph.json when the root holds one. Every other
+// named by its directory, with the workspace root for stack root, and as edges
+// those of the export pants-graph.json when the root holds one and those the
+// sync wrote in its putnami.json, each attributed to the Pants graph. Every other
 // candidate that holds a BUILD file, a directory whose BUILD file declares
 // only third-party targets or BUILD file symbols and the repository root, is
 // bare: it is named by its directory, the root by the workspace, and runs no
@@ -48,6 +49,10 @@ func Detect(root string, request wsproto.ProbeRequest) ([]stacks.Component, []di
 	components := make(map[string]detect.Component, len(detection.Components))
 	for _, c := range detection.Components {
 		components[c.ID] = c
+	}
+	packages := make(map[string]bool, len(components))
+	for id := range components {
+		packages[id] = true
 	}
 	var out []stacks.Component
 	for _, p := range request.Paths {
@@ -69,7 +74,8 @@ func Detect(root string, request wsproto.ProbeRequest) ([]stacks.Component, []di
 			Name:         c.ID,
 			SourceFile:   buildFile(root, c.ID),
 			Root:         wsproto.ProbeRootPath,
-			Dependencies: withoutRoot(c.DependsOn),
+			Dependencies: union(withoutRoot(c.DependsOn), graphSync.SyncedEdges(root, c.ID, packages)),
+			EdgeSource:   wsproto.DependencySourceBuildGraph,
 		})
 	}
 	// Without an export the edges come from each package's putnami.json,
@@ -81,6 +87,13 @@ func Detect(root string, request wsproto.ProbeRequest) ([]stacks.Component, []di
 		}
 	}
 	return out, diags
+}
+
+// union is the sorted set of two edge lists.
+func union(a, b []string) []string {
+	out := append(slices.Clone(a), b...)
+	slices.Sort(out)
+	return slices.Compact(out)
 }
 
 func withoutRoot(dirs []string) []string {

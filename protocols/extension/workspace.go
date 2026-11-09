@@ -97,6 +97,12 @@ type WorkspaceAdapter struct {
 	// declares it, because a provider built before the request member would
 	// reject a request carrying it.
 	DependencySources bool `json:"dependencySources,omitempty"`
+	// BuildGraphEdges declares that the probe attributes edges to build-graph:
+	// the edges the build tool of a delegated stack states in its own graph.
+	// It requires DependencySources, and contract 21
+	// (protocolcli.BuildGraphEdgesContract), so a CLI that predates the source
+	// refuses the manifest instead of rejecting every answer that names it.
+	BuildGraphEdges bool `json:"buildGraphEdges,omitempty"`
 	// InstallInputs are the files whose content change makes the installed
 	// tree stale: a lockfile, or a file that names the modules an install
 	// prepares ("bun.lock", "uv.lock", "go.work"). Each one is a literal file
@@ -221,7 +227,20 @@ func ValidateWorkspaceAdapter(m *Manifest) []diag.Diagnostic {
 		}
 	}
 
+	if adapter.BuildGraphEdges && !adapter.DependencySources {
+		diags = append(diags, diag.Errorf("build-graph-without-dependency-sources", "workspace.buildGraphEdges",
+			"workspace.buildGraphEdges needs workspace.dependencySources: core asks for edge provenance only "+
+				"from an adapter that declares it"))
+	}
+
 	return diags
+}
+
+// DeclaresBuildGraphEdges reports whether the manifest's workspace adapter
+// attributes edges to build-graph, which requires
+// protocolcli.BuildGraphEdgesContract.
+func DeclaresBuildGraphEdges(m *Manifest) bool {
+	return m != nil && m.Workspace != nil && m.Workspace.BuildGraphEdges
 }
 
 // validatePatternSet checks one pattern list and returns its normalized

@@ -27,7 +27,7 @@
     },
     {
       "id": "an-additive-vocabulary-raises-the-contract-floor",
-      "text": "Agent content, verbs, command kinds, publish channels, a provisioned toolchain, a group default with positionals, input selectors, a source-bound task, a git or release baseline input, a dependency on one step of a command, providers (contract 19) and user-scope skills (contract 20) each raise the contract a manifest requires, only when used. RequiredCLIContract takes the highest rung, and a manifest stamped below its vocabulary's rung does not load."
+      "text": "Agent content, verbs, command kinds, publish channels, a provisioned toolchain, a group default with positionals, input selectors, a source-bound task, a git or release baseline input, a dependency on one step of a command, providers (contract 19), user-scope skills (contract 20) and build-graph edges (contract 21) each raise the contract a manifest requires, only when used. RequiredCLIContract takes the highest rung, and a manifest stamped below its vocabulary's rung does not load."
     },
     {
       "id": "a-registry-extension-dependency-requires-rung-8",
@@ -80,6 +80,10 @@
     {
       "id": "first-party-publishers-emit-what-the-protocol-reads",
       "text": "The Go, TypeScript and Cloud publishers emit a published member that validates. The Go, TypeScript and SDK probes pass the strict reader, and the SDK reader refuses what ParseMemberProbe refuses. The Go, TypeScript, SDK and Cloud outbox writers produce a descriptor ParsePublicationOutbox accepts, and the SDK reader refuses an invalid one."
+    },
+    {
+      "id": "build-graph-edges-are-declared-by-the-adapter",
+      "text": "`workspace.buildGraphEdges` declares that the adapter's probe attributes edges to build-graph, the source an edge takes from the build tool a delegated stack runs. It requires `workspace.dependencySources`, and declaring it requires contract 21 (BuildGraphEdgesContract), so a CLI that predates the source refuses the manifest instead of rejecting every probe answer that names it."
     },
     {
       "id": "user-scope-skills-are-named-by-the-author",

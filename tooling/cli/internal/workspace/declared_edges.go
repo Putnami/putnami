@@ -28,7 +28,9 @@ import (
 // reported:
 //
 //   - an IMPORT: the provider attributed the edge to its own manifest family
-//     after reading the project's sources;
+//     after reading the project's sources, or to the graph of the build tool a
+//     delegated stack runs, which performs the edge (wsproto
+//     DependencySource.Backs);
 //   - a CONTRACT: a generated client reads its provider's committed contract.
 //     It backs the contract edge itself, not a `dependencies` entry that
 //     duplicates it — see ContractBacked;
@@ -293,7 +295,7 @@ func projectDeclaredEdges(ws *Workspace, project *Project,
 				// entry removable rather than load-bearing.
 				ContractBacked: target.ID == contractProvider,
 			})
-		case reported && !source.IsImport():
+		case reported && !source.Backs():
 			findings = append(findings, DeclaredEdgeFinding{
 				Project: project.ID, ProjectName: project.Name, Entry: entry,
 				Target: target.ID, TargetName: target.Name,
@@ -335,7 +337,7 @@ func orphanClientFinding(ws *Workspace, project *Project) *DeclaredEdgeFinding {
 func backedTargets(ws *Workspace, project *Project, assets map[string][]string) map[string]bool {
 	backed := make(map[string]bool, len(project.Dependencies))
 	for entry, source := range project.DependencySources {
-		if !source.IsImport() {
+		if !source.Backs() {
 			continue
 		}
 		if target := dependencyTargetID(ws, entry); target != "" {

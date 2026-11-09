@@ -292,6 +292,20 @@
           }
         },
         {
+          "id": "build-graph-edges-are-declared-by-the-adapter",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "build-graph-edges-require-dependency-sources",
+              "build-graph-edges-require-contract-21"
+            ]
+          }
+        },
+        {
           "id": "user-scope-skills-are-named-by-the-author",
           "stage": "coded",
           "evidenceKinds": [

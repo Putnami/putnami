@@ -327,6 +327,8 @@ covers everything the answer read. The wire, its rules, and the
 | `inputs` | **yes** | Patterns whose **content** determines the probe's answer. Core hashes this bounded set on ordinary loads |
 | `excludes` | no | Directory patterns the scan must not descend into |
 | `syncTask` | no | A task in this manifest that performs the extension's own workspace mutations |
+| `dependencySources` | no | The probe attributes each edge it reports to the manifest family it came from; core asks for it only from an adapter that declares it |
+| `buildGraphEdges` | no | The probe attributes edges to `build-graph`, the graph of the build tool a delegated stack runs. Requires `dependencySources` and CLI contract 21 |
 | `installInputs` | no | Files whose content change makes the installed tree stale, such as a lockfile. Each is a literal file name at the **workspace root**, not a candidate-relative pattern: no `/`, no glob, each name once. Core records the set in `.putnami/workspace-index.json` |
 | `language` | no | The lowercase id of the language whose projects the adapter claims (`go`, `typescript`, `python`), matching `^[a-z][a-z0-9-]*$`. An empty value declares none. Core records it in `.putnami/workspace-index.json` |
 
@@ -591,6 +593,7 @@ validation codes, which never use the dotted spelling:
 | `invalid-workspace-path` | A marker, input, or exclude is absolute, escapes its root, or uses a template variable |
 | `marker-not-input` | A declared marker is missing from `workspace.inputs` |
 | `unresolved-sync-task` | `workspace.syncTask` names a task the manifest does not define |
+| `build-graph-without-dependency-sources` | `workspace.buildGraphEdges` is declared without `workspace.dependencySources` |
 | `unknown-reference` | A toolchain reference names no `runtime.toolchains` alias, or a `provisioned` candidate's `lock` identity is missing from `runtime.resolves` |
 | `redundant-exclude` | *(warning)* An exclude restates a core-owned exclusion |
 | `duplicate-value` | A pattern set declares the same pattern twice |

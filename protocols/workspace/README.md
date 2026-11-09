@@ -279,8 +279,11 @@ every graph-dependent command fails, the repair commands stay reachable.
 
 `dependencySources` attributes each reported edge to the manifest family it was
 derived from: `go-module` for a go.mod `require` or `replace`, `package-json`
-for a package.json dependency on a workspace package, `declared` for an edge a
-declaration states. It never changes WHICH edges a provider reports — a provider
+for a package.json dependency on a workspace package, `build-graph` for an edge
+the build tool of a delegated stack states in its own graph, which backs the edge
+as an import does but crosses no visibility boundary
+([ADR 0007](doc/adr/0007-a-delegated-build-graph-backs-its-edges.md)),
+`declared` for an edge a declaration states. It never changes WHICH edges a provider reports — a provider
 whose answer folds a declared list into the same list as its real imports
 reports both here, so a consumer that must act on imports alone can tell them
 apart without re-reading the provider's manifests. A dependency the map does not

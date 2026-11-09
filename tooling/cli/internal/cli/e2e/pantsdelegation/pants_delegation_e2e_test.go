@@ -184,6 +184,11 @@ func pantsTests(t *testing.T, root, base, log string) ([]string, string) {
 	if !strings.Contains(out, "Cache: 0 local hit · 0 miss") {
 		t.Errorf("the run looked up or stored Putnami cache entries for delegated tasks:\n%s", out)
 	}
+	// The probe attributes each Pants edge to the Pants graph, so the
+	// declared-edge check judges them and finds every one backed.
+	if strings.Contains(out, "workspace.declared_edge") {
+		t.Errorf("the run warns workspace.declared_edge for a Pants package:\n%s", out)
+	}
 	return tested, out
 }
 
@@ -360,5 +365,68 @@ func TestARootRequirementOrAStrayLockfileRunsThePackagesThatUseIt(t *testing.T) 
 	}
 	if code, out := clitest.RunGateArgs(t, root, "projects", "list"); code != 0 {
 		t.Errorf("a fresh clone does not load, exit %d:\n%s", code, out)
+	}
+}
+
+// nestedDemo is a repository whose package src/app/sub lies inside the
+// package src/app, and imports src/core, which lies outside it.
+func nestedDemo(junit, coverage string) map[string]map[string]string {
+	return map[string]map[string]string{
+		"base": {
+			"pants.toml":              "[GLOBAL]\npants_version = \"2.25.0\"\nbackend_packages = [\"pants.backend.python\"]\n",
+			"src/core/BUILD":          "python_sources()\n\npython_tests(name=\"tests\")\n",
+			"src/core/core.py":        "def one() -> int:\n    return 1\n",
+			"src/core/core_test.py":   "from core.core import one\n\n\ndef test_one():\n    assert one() == 1\n",
+			"src/app/BUILD":           "python_sources()\n",
+			"src/app/app.py":          "from core.core import one\n",
+			"src/app/sub/BUILD":       "python_tests(name=\"tests\")\n",
+			"src/app/sub/sub_test.py": "from core.core import one\n\n\ndef test_sub():\n    assert one() == 1\n",
+		},
+		"ci": {
+			"pants-graph.json": `[
+  {"address": "src/core/core.py", "target_type": "python_source", "dependencies": [], "sources": ["src/core/core.py"]},
+  {"address": "src/core/core_test.py:tests", "target_type": "python_test", "dependencies": ["src/core/core.py"], "sources": ["src/core/core_test.py"]},
+  {"address": "src/app/app.py", "target_type": "python_source", "dependencies": ["src/core/core.py"], "sources": ["src/app/app.py"]},
+  {"address": "src/app/sub/sub_test.py:tests", "target_type": "python_test", "dependencies": ["src/core/core.py"], "sources": ["src/app/sub/sub_test.py"]}
+]`,
+			"dist/test/reports/src.core.core_test.py.tests.xml":   junit,
+			"dist/test/reports/src.app.sub.sub_test.py.tests.xml": junit,
+			"dist/coverage/python/coverage.xml":                   coverage,
+		},
+	}
+}
+
+// A package nested in another sits in its parent's scope, since the sync
+// writes the parent's putnami.json. Its edge to a package outside that scope
+// is a build-graph edge, which visibility does not judge: the graph loads and
+// the run warns nothing.
+func TestANestedPantsPackageRunsWithItsEdgesAcrossScopes(t *testing.T) {
+	spectest.Proves(t, "cli/init-from-a-monorepo-tool", "pants-impact-runs-through-pants", "a-change-to-one-pants-package-runs-it-and-its-dependents-through-pants-uncached")
+	clitest.RequireShell(t)
+	t.Setenv("PUTNAMI_NO_AUTO_INSTALL", "1")
+	t.Setenv("PUTNAMI_STORE_DIR", filepath.Join(t.TempDir(), "store"))
+	ci := readDemo(t)["ci"]
+	demo := nestedDemo(ci["dist/test/reports/src.python.pricing.pricing_test.py.tests.xml"], ci["dist/coverage/python/coverage.xml"])
+	root := pantsWorkspace(t, demo, buildRuntime(t))
+	log := stubPants(t, demo)
+
+	code, out := clitest.RunGateArgs(t, root, "projects", "sync")
+	if code != 0 {
+		t.Fatalf("projects sync exit %d:\n%s", code, out)
+	}
+	if strings.Contains(out, "visibility") || strings.Contains(out, "workspace.declared_edge") {
+		t.Errorf("the sync judged a Pants edge:\n%s", out)
+	}
+	clitest.InitGitRepo(t, root)
+	base := strings.TrimSpace(clitest.GitOutput(t, root, "rev-parse", "HEAD"))
+
+	clitest.WriteFile(t, filepath.Join(root, "src/core/core.py"), "def one() -> int:\n    return 1  # unchanged value\n")
+	commit(t, root, "change core")
+	tested, out := pantsTests(t, root, base, log)
+	if want := []string{"src/app/sub:", "src/core:"}; !slices.Equal(tested, want) {
+		t.Errorf("pants test ran on %v, want %v: the changed package and its nested dependent\n%s", tested, want, out)
+	}
+	if strings.Contains(out, "visibility") {
+		t.Errorf("the run judged a Pants edge for visibility:\n%s", out)
 	}
 }

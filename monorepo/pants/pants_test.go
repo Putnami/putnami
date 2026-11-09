@@ -195,6 +195,87 @@ func TestThePackagesOfAPantsRepositoryBecomeProjects(t *testing.T) {
 	}
 }
 
+func TestTheProbeAttributesThePantsEdgesToTheBuildGraph(t *testing.T) {
+	spectest.Proves(t, feature, "packages-become-projects", "the-packages-of-a-pants-repository-become-projects-with-their-edges")
+	d := readDemo(t)
+	stubPants(t, d)
+	root := repository(t, d, false)
+	if _, err := Sync(context.Background(), root, &bytes.Buffer{}); err != nil {
+		t.Fatal(err)
+	}
+	// An edge the author keeps on a directory with no BUILD file is no Pants
+	// edge: the core judges it as a declaration.
+	writeFile(t, root, "docs/README.md", "")
+	doc := readProjectFile(t, root, "src/python/api")
+	doc["dependencies"] = append(doc["dependencies"].([]any), "/docs")
+	data, err := json.Marshal(doc)
+	if err != nil {
+		t.Fatal(err)
+	}
+	writeFile(t, root, "src/python/api/putnami.json", string(data))
+
+	s := stack(t)
+	request := wsproto.ProbeRequest{Version: wsproto.ProbeProtocolVersion, Extension: s.Extension, DependencySources: true,
+		Paths: []string{".", "3rdparty/python", "src/python/api", "src/python/pricing", "src/python/web"}}
+	result, err := s.Probe(root, request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if diags := wsproto.ValidateProbeResult(&result); len(diags) != 0 {
+		t.Fatalf("the answer breaks the protocol: %v", diags)
+	}
+	got := map[string]wsproto.ProbeProject{}
+	for _, p := range result.Projects {
+		got[p.Path] = p
+	}
+	// Without the export, the edges are those the sync wrote from pants peek.
+	api := got["src/python/api"]
+	graph := wsproto.DependencySourceBuildGraph
+	if want := []string{"3rdparty/python", "src/python/pricing"}; !reflect.DeepEqual(api.Dependencies, want) {
+		t.Errorf("api dependencies = %v, want %v", api.Dependencies, want)
+	}
+	if want := map[string]wsproto.DependencySource{"3rdparty/python": graph, "src/python/pricing": graph}; !reflect.DeepEqual(api.DependencySources, want) {
+		t.Errorf("api dependencySources = %v, want %v", api.DependencySources, want)
+	}
+	// Every package is attributed, each edge to the Pants graph; a bare
+	// directory is not.
+	for _, path := range []string{"src/python/pricing", "src/python/web"} {
+		p := got[path]
+		if p.DependencySources == nil || len(p.DependencySources) != len(p.Dependencies) {
+			t.Errorf("%s dependencySources = %v for dependencies %v", path, p.DependencySources, p.Dependencies)
+		}
+		for _, source := range p.DependencySources {
+			if source != graph {
+				t.Errorf("%s dependencySources = %v, want build-graph", path, p.DependencySources)
+			}
+		}
+	}
+	if bare := got["3rdparty/python"]; bare.DependencySources != nil {
+		t.Errorf("a bare directory answers provenance: %v", bare.DependencySources)
+	}
+
+	// With the export, its edges and the sync's are one set.
+	root = repository(t, d, true)
+	if _, err := Sync(context.Background(), root, &bytes.Buffer{}); err != nil {
+		t.Fatal(err)
+	}
+	result, err = s.Probe(root, request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, p := range result.Projects {
+		if p.Path != "src/python/api" {
+			continue
+		}
+		if !reflect.DeepEqual(p.Dependencies, []string{"3rdparty/python", "src/python/pricing"}) {
+			t.Errorf("api dependencies with the export = %v", p.Dependencies)
+		}
+		if want := map[string]wsproto.DependencySource{"3rdparty/python": graph, "src/python/pricing": graph}; !reflect.DeepEqual(p.DependencySources, want) {
+			t.Errorf("api dependencySources with the export = %v, want %v", p.DependencySources, want)
+		}
+	}
+}
+
 func readProjectFile(t *testing.T, root, dir string) map[string]any {
 	t.Helper()
 	data, err := os.ReadFile(filepath.Join(root, dir, "putnami.json"))

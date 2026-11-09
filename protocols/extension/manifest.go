@@ -134,6 +134,8 @@ func NegotiateManifest(path string, data []byte) (*Manifest, error) {
 	default:
 		reason := ""
 		switch {
+		case required == protocolcli.BuildGraphEdgesContract:
+			reason = " for its build-graph edges"
 		case required == protocolcli.UserScopeSkillsContract:
 			reason = " for its user-scope skills"
 		case required == protocolcli.ProviderContract:
