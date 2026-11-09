@@ -29,7 +29,7 @@
     },
     {
       "id": "test-runner-per-component",
-      "text": "The probe names each component's profile variant: rspec when it holds a spec/**/*_spec.rb file, which runs bundle exec rspec on its spec directory with the RspecJunitFormatter; minitest when it holds a test/**/*_test.rb file and no spec file, which runs bundle exec rails test on its test directory with minitest-junit; untested otherwise, whose test runs nothing and passes. Such a file is a workspace input, so adding or removing one changes the variant and the key."
+      "text": "The probe names each component's profile variant: rspec when it holds a spec/**/*_spec.rb file, which runs bundle exec rspec on its spec directory with the RspecJunitFormatter; minitest when it holds a test/**/*_test.rb file and no spec file, which runs bundle exec rails test on its test directory; untested when it holds no Ruby file under spec/ or test/, whose test runs nothing and passes; rspec otherwise. Such a file is a workspace input, so it changes the variant and the key."
     },
     {
       "id": "reports-become-the-summary",

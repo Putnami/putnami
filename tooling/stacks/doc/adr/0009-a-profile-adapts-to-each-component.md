@@ -27,7 +27,9 @@ component.
 ## Decision
 
 The stack profile gains three members. Each is optional, and a profile that
-names none resolves and runs as before:
+names none resolves and runs as before, except that a task a profile does
+not declare now reads the version files, which moves the key of such a task
+once, such as a Java variant's:
 
 - `toolchain.files[].pattern`: a regular expression whose `version` group
   reads the expected version from the file, such as `ruby-3.3.6` in
