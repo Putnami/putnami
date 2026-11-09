@@ -1127,23 +1127,20 @@ describe('report bounds', () => {
       -1,
       [{ code: VIOLATION_CODE.invalidValue, path: 'jobs[0].failureDetailsTruncated' }],
     ],
-  ] as [
-    string,
-    number,
-    number,
-    number,
-    Violation[],
-  ][])('%s', (_name, count, truncatedCount, failureDetailsTruncated, expected) => {
-    const diagnostics = Array.from({ length: count }, (_, i) => ({ severity: 'warning', message: `w${i}` }));
-    const job: Record<string, unknown> = { ...reportJob(0), diagnostics };
-    if (truncatedCount !== 0) {
-      job['truncatedCount'] = truncatedCount;
-    }
-    if (failureDetailsTruncated !== 0) {
-      job['failureDetailsTruncated'] = failureDetailsTruncated;
-    }
-    expect(validateDocument(DOCUMENT_KIND.reportFile, reportFile(1, 0, { jobs: [job] }))).toEqual(expected);
-  });
+  ] as [string, number, number, number, Violation[]][])(
+    '%s',
+    (_name, count, truncatedCount, failureDetailsTruncated, expected) => {
+      const diagnostics = Array.from({ length: count }, (_, i) => ({ severity: 'warning', message: `w${i}` }));
+      const job: Record<string, unknown> = { ...reportJob(0), diagnostics };
+      if (truncatedCount !== 0) {
+        job['truncatedCount'] = truncatedCount;
+      }
+      if (failureDetailsTruncated !== 0) {
+        job['failureDetailsTruncated'] = failureDetailsTruncated;
+      }
+      expect(validateDocument(DOCUMENT_KIND.reportFile, reportFile(1, 0, { jobs: [job] }))).toEqual(expected);
+    },
+  );
 });
 
 describe('test-case bounds', () => {
