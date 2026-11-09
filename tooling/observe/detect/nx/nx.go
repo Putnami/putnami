@@ -114,6 +114,89 @@ type detector struct {
 	root        string
 	lockfile    string
 	diagnostics []diag.Diagnostic
+	// targets are the targets of each project root the detector answered,
+	// with the outputs resolved, for Detect.
+	targets map[string][]Target
+}
+
+// Target is one Nx target of a project.
+type Target struct {
+	// Name is the target name, such as build or test.
+	Name string `json:"name"`
+	// Executor is the target's executor, such as @nx/jest:jest, or
+	// nx:run-script for a package.json script.
+	Executor string `json:"executor,omitempty"`
+	// Command is the command the target runs: the package.json script, or
+	// options.command or options.commands of nx:run-commands. Empty for an
+	// executor that names no command.
+	Command string `json:"command,omitempty"`
+	// Outputs are the repository-relative outputs of the target, its tokens
+	// resolved and any glob cut to the directory before it; the targetDefaults
+	// of nx.json answer for a target that names none.
+	Outputs []string `json:"outputs,omitempty"`
+	// Test reports whether the target runs tests.
+	Test bool `json:"test,omitempty"`
+}
+
+// Project is one Nx project with its targets.
+type Project struct {
+	// Path is the repository-relative project root.
+	Path string
+	// Name is the Nx project name.
+	Name string
+	// SourceFile is the project's project.json, else its package.json.
+	SourceFile string
+	// Dependencies are the repository-relative roots of the projects it
+	// depends on.
+	Dependencies []string
+	// Targets are the project's targets, sorted by name.
+	Targets []Target
+	// FromGraph reports that a graph export answered for the project.
+	FromGraph bool
+}
+
+// Detection is what Detect found in one repository.
+type Detection struct {
+	// Projects are the Nx projects, sorted by path.
+	Projects []Project
+	// Watched are the repository-relative files the detection read.
+	Watched []string
+	// Diagnostics are the findings of the detection.
+	Diagnostics []diag.Diagnostic
+}
+
+// Detect reads every project of the Nx workspace at root with its targets:
+// from the graph export when one exists, else from nx.json and each
+// project.json and workspace package.json. It reads files only.
+func Detect(root string, opts Options) Detection {
+	graphFile := opts.GraphFile
+	if graphFile == "" {
+		graphFile = DefaultGraphFile
+	}
+	d := &detector{root: root, lockfile: firstExisting(root, lockfiles), targets: map[string][]Target{}}
+	projects, watched, fromGraph := d.fromGraph(graphFile, opts.GraphFile != "")
+	if !fromGraph {
+		projects, watched = d.fromConfiguration()
+	}
+	out := Detection{Watched: watched, Diagnostics: d.diagnostics}
+	for _, p := range projects {
+		out.Projects = append(out.Projects, Project{
+			Path:         p.Path,
+			Name:         p.SourceName,
+			SourceFile:   p.SourceFile,
+			Dependencies: sortedUnique(p.Dependencies),
+			Targets:      d.targets[p.Path],
+			FromGraph:    fromGraph,
+		})
+	}
+	sort.Slice(out.Projects, func(i, j int) bool { return out.Projects[i].Path < out.Projects[j].Path })
+	return out
+}
+
+func sortedUnique(list []string) []string {
+	out := slices.Clone(list)
+	slices.Sort(out)
+	return slices.Compact(out)
 }
 
 func (d *detector) warn(code, field, format string, args ...any) {
@@ -717,9 +800,6 @@ func (d *detector) metadata(name, source, root string, targets map[string]nxTarg
 	sort.Strings(targetNames)
 	for _, targetName := range targetNames {
 		target := targets[targetName]
-		if !isTestTarget(targetName, target) {
-			continue
-		}
 		outputs := target.Outputs
 		if outputs == nil {
 			if byName, ok := defaults[targetName]; ok {
@@ -731,17 +811,68 @@ func (d *detector) metadata(name, source, root string, targets map[string]nxTarg
 				outputs = byExecutor.Outputs
 			}
 		}
+		test := isTestTarget(targetName, target)
+		described := Target{Name: targetName, Executor: target.Executor, Command: targetCommand(target), Test: test}
+		if script, ok := target.Options["script"].(string); ok && described.Command == "" && target.Executor == "nx:run-script" {
+			described.Command = d.script(root, script)
+		}
 		for _, output := range outputs {
 			resolved, ok := resolveOutput(output, root, name, target.Options)
-			if ok && !seen[resolved] {
+			if !ok {
+				continue
+			}
+			described.Outputs = append(described.Outputs, resolved)
+			if test && !seen[resolved] {
 				seen[resolved] = true
 				m.TestOutputs = append(m.TestOutputs, resolved)
 			}
+		}
+		if d.targets != nil {
+			d.targets[root] = append(d.targets[root], described)
 		}
 	}
 	sort.Strings(m.TestOutputs)
 	data, _ := json.Marshal(m)
 	return data
+}
+
+// script reads the command of a package.json script of a project root; an
+// unreadable manifest or a missing script reads as empty.
+func (d *detector) script(root, name string) string {
+	data, err := os.ReadFile(filepath.Join(d.root, filepath.FromSlash(root), "package.json"))
+	if err != nil {
+		return ""
+	}
+	var pkg packageJSON
+	if json.Unmarshal(data, &pkg) != nil {
+		return ""
+	}
+	return pkg.Scripts[name]
+}
+
+// targetCommand is the command a target runs: its package.json script, or
+// options.command, else options.commands joined by " && ", of
+// nx:run-commands.
+func targetCommand(target nxTarget) string {
+	if target.Command != "" {
+		return target.Command
+	}
+	if command, ok := target.Options["command"].(string); ok {
+		return command
+	}
+	commands, _ := target.Options["commands"].([]any)
+	var parts []string
+	for _, c := range commands {
+		switch v := c.(type) {
+		case string:
+			parts = append(parts, v)
+		case map[string]any:
+			if s, ok := v["command"].(string); ok {
+				parts = append(parts, s)
+			}
+		}
+	}
+	return strings.Join(parts, " && ")
 }
 
 // resolveOutput turns one Nx output into a repository-relative path: its
