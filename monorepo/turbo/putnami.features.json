@@ -1,0 +1,121 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-features.json",
+  "protocolVersion": 2,
+  "namespace": "monorepo",
+  "features": [
+    {
+      "id": "monorepo/turbo-adoption",
+      "type": "feature",
+      "name": "Adopt a Turborepo repository",
+      "outcome": "A team with a Turborepo repository reaches Putnami's runner and verdict in the mode it picks: import, where a TypeScript package's tasks that already run what @putnami/typescript runs move to Putnami's tasks and cache, or delegate, where each task runs turbo on its package and Turborepo keeps its cache",
+      "owner": "tooling",
+      "target": "coded",
+      "requirements": [
+        {
+          "id": "packages-become-projects",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-members-of-a-turborepo-workspace-become-projects-with-their-edges"
+            ]
+          }
+        },
+        {
+          "id": "sync-writes-the-package-graph",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-sync-writes-each-package-putnami-json-in-the-chosen-mode"
+            ]
+          }
+        },
+        {
+          "id": "sync-previews-a-diff",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-dry-run-sync-prints-the-diff-and-writes-nothing"
+            ]
+          }
+        },
+        {
+          "id": "unmapped-tasks-are-listed",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-sync-lists-the-tasks-it-cannot-map-and-the-packages-without-reports"
+            ]
+          }
+        },
+        {
+          "id": "validate-fails-on-a-stale-graph",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-stale-package-graph-fails-validate"
+            ]
+          }
+        },
+        {
+          "id": "tasks-delegate-to-turbo",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-task-runs-turbo-on-its-package-and-records-the-delegation"
+            ]
+          }
+        },
+        {
+          "id": "reports-from-the-package-options",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-reports-the-package-options-name-become-the-test-summary"
+            ]
+          }
+        },
+        {
+          "id": "manifest-follows-the-profile",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-manifest-conforms-to-the-stack-core"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

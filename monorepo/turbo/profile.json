@@ -1,0 +1,76 @@
+{
+  "id": "turbo",
+  "delegated": true,
+  "markers": [
+    "package.json"
+  ],
+  "toolchain": {
+    "command": [
+      "turbo",
+      "--version"
+    ],
+    "pattern": "(?m)^(?<version>[0-9]+\\.[0-9]+\\.[0-9]+\\S*)\\s*$",
+    "files": [
+      {
+        "path": "package.json",
+        "key": "devDependencies.turbo"
+      }
+    ]
+  },
+  "inputs": {
+    "sources": [
+      "**",
+      "{root}/turbo.json",
+      "{root}/package.json"
+    ]
+  },
+  "excludes": [
+    "node_modules",
+    "dist",
+    ".turbo"
+  ],
+  "tasks": {
+    "lint": {
+      "steps": [
+        [
+          "turbo",
+          "run",
+          "lint",
+          "--filter={component}"
+        ]
+      ],
+      "inputs": [
+        "sources"
+      ],
+      "dir": "root"
+    },
+    "test": {
+      "steps": [
+        [
+          "turbo",
+          "run",
+          "test",
+          "--filter={component}"
+        ]
+      ],
+      "inputs": [
+        "sources"
+      ],
+      "dir": "root"
+    },
+    "build": {
+      "steps": [
+        [
+          "turbo",
+          "run",
+          "build",
+          "--filter={component}"
+        ]
+      ],
+      "inputs": [
+        "sources"
+      ],
+      "dir": "root"
+    }
+  }
+}

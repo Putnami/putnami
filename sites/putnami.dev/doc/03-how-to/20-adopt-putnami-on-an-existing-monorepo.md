@@ -20,6 +20,7 @@ Putnami adopts a tool in one of two modes:
 | Bazel | Delegate | `putnami init --from bazel` |
 | Nx | Import or delegate, asked | `putnami init --from nx` |
 | moon | Import or delegate, asked | `putnami init --from moon` |
+| Turborepo | Import or delegate, asked | `putnami init --from turbo` |
 
 ## Pants
 
@@ -389,6 +390,135 @@ moon infers edges from manifests and task inputs, so an edit can change them:
 longer matches moon's project graph. Run `putnami projects sync` and commit
 the result.
 
+## Turborepo
+
+Turborepo adopts in either mode:
+
+- **Import**: a TypeScript package's task whose script already runs
+  `bun build`, `bun test` or `biome` runs the `@putnami/typescript` task,
+  with Putnami's cache. Every other task, such as a `tsc`, `vitest`, `jest` or
+  `eslint` script, keeps running through Turborepo: moving it would change the
+  tool that checks the code. Import mode also declares `@putnami/typescript`,
+  whose setup adds its devDependencies and a `workspaces` list to the root
+  `package.json`, and writes a root `tsconfig.json`, `biome.json` and
+  `bun.lock` when they are missing. When a package's `build` moves to
+  `@putnami/typescript`, a package that depends on it and still builds through
+  Turborepo builds it again through `^build`.
+- **Delegate**: every package runs through Turborepo, which keeps its cache,
+  local and remote.
+
+### Before you start
+
+- `@putnami/turbo` is not published yet: until its first release,
+  `putnami init --from turbo` stops at the extension install.
+- `turbo.json` lies at the root of the repository, which becomes the
+  workspace root, beside the npm, pnpm or yarn workspace that lists the
+  packages.
+- In delegate mode, `turbo` is on `PATH`: a global install defers to the
+  repository's own version.
+
+### Turn the repository into a workspace
+
+At the repository root:
+
+```bash
+putnami init --from turbo
+```
+
+In a terminal, `init` asks the mode:
+
+```text
+  How should Putnami adopt the turbo packages?
+    1) Import (preselected): Putnami's runner and cache take over the packages
+    2) Delegate: the tool keeps running each package, and keeps its cache
+  Mode [1]:
+```
+
+`init` declares `@putnami/turbo`, and `@putnami/typescript` in import mode,
+records the mode in `putnami.workspace.json`, installs the extensions and
+synchronizes the projects. The sync reads the package manifests and
+`turbo.json`, and writes in each package's `putnami.json` the extension that
+runs it and the packages it depends on:
+
+```json
+{
+  "$schema": "https://putnami.dev/schemas/putnami-project.json",
+  "extensions": ["@putnami/turbo"],
+  "dependencies": ["/packages/pricing"],
+  "tags": ["turbo"],
+  "disable": { "jobs": ["lint"] }
+}
+```
+
+A package with no `build`, `lint` or `test` task, that is no script of that
+name or no task of that name in `turbo.json`, has it disabled. The sync then
+lists what it does not map, which keeps running through Turborepo:
+
+```text
+Not mapped, kept on Turborepo:
+  @demo/api#test: @putnami/typescript runs bun test, not "vitest run": it keeps running through Turborepo, with turbo run test
+  dev: no Putnami task maps it: it keeps running through Turborepo, with turbo run dev
+Test result from the exit code alone, no JUnit report named: apps/api, packages/pricing
+```
+
+Add `.putnami/` and `.gen/` to `.gitignore`, then commit the files. Run
+`putnami projects sync` again after a change to the dependencies between
+packages: `putnami validate` fails with `turbo.sync_stale` until the files
+match the package manifests.
+
+### Run what a change affects in delegate mode
+
+```bash
+putnami test --impacted
+```
+
+After a change to `packages/pricing`, Putnami runs `pricing` and the packages
+that depend on it, each with one command at the root:
+
+```text
+turbo run test --filter=@demo/pricing
+turbo run test --filter=@demo/api
+```
+
+Turborepo's `dependsOn` runs the upstream tasks, such as `^build`, and its
+cache answers them. Putnami stores no cache entry for these tasks, and each
+result records `delegatedTo: turbo`. A change to `api` alone runs `api`
+alone. A change to the root lockfile, `pnpm-workspace.yaml` or `.npmrc`
+runs every package, since Turborepo hashes them into each one.
+
+A delegated test task's result is the exit code of `turbo run test`. To read
+the test and coverage summary, name the reports the package writes in its
+`putnami.json`:
+
+```json
+{
+  "options": {
+    "@putnami/turbo": {
+      "tasks": {
+        "test": {
+          "reports": {
+            "junit": ["reports/junit.xml"],
+            "coverage": [{ "format": "lcov", "paths": ["reports/coverage/lcov.info"] }]
+          }
+        }
+      }
+    }
+  }
+}
+```
+
+### Change the mode
+
+Run `init` again with the other mode; without `--mode`, a rerun keeps the recorded one. It prints the change to the workspace
+config and the diff of each `putnami.json`, and writes nothing:
+
+```bash
+putnami init --from turbo --mode delegate
+```
+
+Add `--apply` to write it, install an extension the mode needs, and
+synchronize the projects.
+
 ## Next
 
 - [Run a Pants repository with Putnami](https://github.com/Putnami/putnami/blob/main/monorepo/pants/doc/01-pants.md):
@@ -399,5 +529,7 @@ the result.
   both modes, what the sync owns, which targets import maps.
 - [Run a moon workspace with Putnami](https://github.com/Putnami/putnami/blob/main/monorepo/moon/doc/01-moon.md):
   the two modes, task matching, reports, what the sync owns.
+- [Run a Turborepo repository with Putnami](https://github.com/Putnami/putnami/blob/main/monorepo/turbo/doc/01-turbo.md):
+  the two modes, what the sync owns, the test reports.
 - [Observe a change in your CI](/docs/how-to/observe-a-change-in-your-ci): the
   report on a pull request, before you adopt anything.

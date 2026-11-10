@@ -4,7 +4,8 @@
 - **Date**: 2026-11-08
 - **Scope**: `tooling/stacks` (`@putnami/stacks`), `monorepo/pants`
   (`@putnami/pants`), `monorepo/nx` (`@putnami/nx`), `monorepo/moon`
-  (`@putnami/moon`) and the delegated stacks that follow it (Bazel)
+  (`@putnami/moon`), `monorepo/turbo` (`@putnami/turbo`) and the delegated
+  stacks that follow it (Bazel)
 
 ## Context
 
@@ -72,3 +73,15 @@ package's `putnami.json` with the edges of the `pants peek ::` export.
   a Putnami extension runs that extension under Putnami's cache, and every
   other project stays delegated: no project runs both, so no Putnami cache
   sits over moon's.
+- Turborepo is delegated the same way: each task runs
+  `turbo run <task> --filter=<package>` at the workspace root, so
+  Turborepo's `dependsOn` runs the upstream tasks and its cache, local or
+  remote, answers them. Its edges come from the package manifests, which the
+  repository commits, so its sync reads no export, and a change to a root
+  lockfile, `pnpm-workspace.yaml` or `.npmrc` runs every package. In import
+  mode, a task of a TypeScript package moves to the TypeScript extension only
+  when its script already runs what that extension's task runs (`bun build`,
+  `bun test`, Biome), as `@putnami/nx` does: the sync disables the other
+  extension's job of each task. A `tsc`, `vitest`, `jest` or `eslint` task
+  keeps running through Turborepo, because moving it would change the tool
+  that checks the code.

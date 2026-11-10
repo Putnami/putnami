@@ -94,6 +94,15 @@ var initSources = map[string]initSource{
 		modes:   []string{initModeImport, initModeDelegate},
 	},
 	"pants": {starter: initExtensionConfig{packageName: "@putnami/pants"}, markers: []string{"pants.toml"}, modes: []string{initModeDelegate}},
+	// Turborepo's import mode moves a TypeScript package's task to
+	// @putnami/typescript when its script already runs what that extension's
+	// task runs; every other task stays on Turborepo.
+	"turbo": {
+		starter:          initExtensionConfig{packageName: "@putnami/turbo"},
+		markers:          []string{"turbo.json"},
+		modes:            []string{initModeImport, initModeDelegate},
+		importExtensions: []string{"@putnami/typescript"},
+	},
 }
 
 // holdsAny reports whether dir holds one of the files.

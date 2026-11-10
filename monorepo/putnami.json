@@ -5,6 +5,7 @@
     "bazel",
     "moon",
     "nx",
-    "pants"
+    "pants",
+    "turbo"
   ]
 }
