@@ -133,7 +133,7 @@
     },
     {
       "id": "test-runner-choice",
-      "text": "A project's test runner is options[\"@putnami/typescript\"].test.runner in its putnami.json (bun, vitest or jest), else the runner its package.json test script runs, else Bun. Vitest and Jest run from the node_modules/.bin of the project or of the workspace with the node on PATH; with no node the task fails and names node."
+      "text": "A project's test runner is options[\"@putnami/typescript\"].test.runner in its putnami.json (bun, vitest or jest), else the runner its package.json test script runs, else Bun. Vitest and Jest run from the node_modules/.bin of the project or of the workspace with the node on PATH; with no node the task fails and names node. The test type check of a Vitest or Jest project loads the ambient types its tsconfig names, where the runner's globals are declared, instead of Bun's alone."
     },
     {
       "id": "test-runner-reports",
