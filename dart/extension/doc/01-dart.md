@@ -236,6 +236,17 @@ the host system. The design of the stack core is in
 | `putnami serve` | A Dart server: `dart run` on `bin/server.dart`, or `--entrypoint`, or the package's executable, with `PORT` set. A Flutter app with `web/`: `flutter run -d web-server --web-port <port> --web-hostname 0.0.0.0`. It reports ready once the port accepts connections; `--port 0` picks a free one. |
 | `putnami lint --docs-links` | Checks every relative link and anchor of the package's `README.md` and `doc/`, on by default. |
 
+On a hosted run, the engine hands `workspace-fetch` a read credential on an
+inherited descriptor. The job reads that descriptor and closes it before it
+starts any process, the SDK check included, so no `dart` or `flutter`
+inherits it or finds the credential in its environment. The job then uses
+nothing the descriptor held: the credential's hosts are the Putnami
+registries, which serve no pub package, so no pub source can use it. `pub get`
+reaches pub.dev, which needs no credential to download, and a hosted
+repository a pubspec names with the tokens `dart pub token add` stored on the
+machine. A descriptor the job cannot read fails it with `dart.pub_get_failed`
+before any process starts.
+
 A package with `bin/*.dart` or `lib/main.dart` is an application, which `run`
 and `serve` accept; any other is a library.
 

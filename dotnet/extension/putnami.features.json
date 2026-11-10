@@ -196,6 +196,20 @@
           }
         },
         {
+          "id": "fetch-reads-the-credential-first",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "workspace-fetch-reads-the-credential-before-any-process",
+              "an-unreadable-credential-fails-the-fetch-before-any-process"
+            ]
+          }
+        },
+        {
           "id": "upgrades-the-packages",
           "stage": "coded",
           "evidenceKinds": [

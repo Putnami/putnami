@@ -14,6 +14,7 @@ import (
 	"go.putnami.dev/sdk/extension/cli"
 	pctx "go.putnami.dev/sdk/extension/context"
 	"go.putnami.dev/sdk/extension/jsonl"
+	"go.putnami.dev/sdk/extension/registrycred"
 	"go.putnami.dev/tooling/stacks"
 )
 
@@ -53,14 +54,33 @@ func WorkspaceInstallJob(stack stacks.Stack) cli.JobFunc {
 	}
 }
 
+// readJobCredential reads the credential descriptor the engine hands
+// workspace-fetch, closes it and removes its variable from the environment.
+// Tests replace it.
+var readJobCredential = registrycred.ReadJobCredential
+
 // WorkspaceFetchJob runs dotnet restore on the file of every project of the
 // workspace, which downloads the packages it references into the NuGet global
 // packages folder. A hosted run calls it before any repository process, with
 // the network, so the tasks then restore from that folder.
+//
+// A hosted run's engine may hand this job a credential descriptor. The hosts
+// of that credential are the Putnami registries, which serve no NuGet package,
+// so the job reads and closes the descriptor before it starts any process, the
+// SDK check included, and uses nothing it held. A descriptor it cannot read
+// fails the job with dotnet.restore_failed before any process starts.
 func WorkspaceFetchJob(stack stacks.Stack) cli.JobFunc {
-	return stack.WorkspaceRootJob(stacks.WarnOnMissingToolchain, func(ctx context.Context, root stacks.RootStep, emit *jsonl.Emitter) error {
+	fetch := stack.WorkspaceRootJob(stacks.WarnOnMissingToolchain, func(ctx context.Context, root stacks.RootStep, emit *jsonl.Emitter) error {
 		return restoreAll(ctx, root, emit, false)
 	})
+	return func(ctx *pctx.Context, emit *jsonl.Emitter, args []string) (string, map[string]any, error) {
+		if _, err := readJobCredential(); err != nil {
+			err = fmt.Errorf("cannot read the registry credential the engine handed workspace-fetch: %w", err)
+			emit.DiagnosticWithCode("error", err.Error(), "", 0, 0, CodeRestoreFailed)
+			return "FAILED", nil, fmt.Errorf("%s: %w", CodeRestoreFailed, err)
+		}
+		return fetch(ctx, emit, args)
+	}
 }
 
 // DepsUpgradeJob runs dotnet package update on the file of every project of

@@ -1,19 +1,75 @@
 package dart
 
 import (
+	"bufio"
 	"encoding/json"
+	"errors"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 
 	extensionproto "go.putnami.dev/protocol/extension"
 	"go.putnami.dev/protocol/features/spectest"
 	job "go.putnami.dev/protocol/job"
+	registry "go.putnami.dev/protocol/registry"
 	"go.putnami.dev/sdk/extension/cli"
 	pctx "go.putnami.dev/sdk/extension/context"
 	"go.putnami.dev/sdk/extension/jsonl"
 )
+
+// credentialFD is the descriptor the tests hand workspace-fetch its
+// credential on, as the engine does.
+const credentialFD = 9
+
+// fetchBearer is the bearer the tests hand workspace-fetch. No process the job
+// starts may see it.
+const fetchBearer = "pkt_dart-fetch-bearer-5e2b7c1d"
+
+// inheritedDescriptor is what a stub records when it inherited descriptor
+// credentialFD.
+var inheritedDescriptor = "inherited descriptor " + strconv.Itoa(credentialFD)
+
+// startedRecord is the shell line a stub runs first: it appends its arguments,
+// its environment and whether it inherited descriptor credentialFD to the
+// started record of log.
+func startedRecord(log string) string {
+	return `{ echo "$tool $*"; env; [ -e /dev/fd/` + strconv.Itoa(credentialFD) + ` ] && echo "` + inheritedDescriptor + `"; } >> "` + log + `.started"
+`
+}
+
+// started returns what every stub process recorded since the last call, and
+// forgets it.
+func started(t *testing.T, log string) string {
+	t.Helper()
+	return ran(t, log+".started")
+}
+
+// handCredential makes readJobCredential answer read.
+func handCredential(t *testing.T, read func() (*registry.Credential, error)) {
+	t.Helper()
+	orig := readJobCredential
+	t.Cleanup(func() { readJobCredential = orig })
+	readJobCredential = read
+}
+
+// event is the part of a job protocol event the tests read.
+type event struct {
+	Type    string `json:"type"`
+	Message string `json:"message"`
+	Code    string `json:"code"`
+}
+
+// workspaceContext is the context of a workspace job over the packages at
+// paths.
+func workspaceContext(root string, params job.Params, paths ...string) *pctx.Context {
+	var refs []job.ProjectRef
+	for _, p := range paths {
+		refs = append(refs, job.ProjectRef{Name: p, Path: p, FullPath: filepath.Join(root, p), Extensions: []string{ExtensionName}, Config: []byte(`{}`)})
+	}
+	return &pctx.Context{WorkspaceRoot: root, WorkspaceProjects: refs, Params: params}
+}
 
 // quiet runs fn with the job protocol's stdout sent nowhere.
 func quiet(t *testing.T, fn func()) {
@@ -32,14 +88,35 @@ func quiet(t *testing.T, fn func()) {
 // runWorkspaceJob runs a workspace job over the packages at paths.
 func runWorkspaceJob(t *testing.T, root string, jobFunc cli.JobFunc, params job.Params, paths ...string) (status string, err error) {
 	t.Helper()
-	var refs []job.ProjectRef
-	for _, p := range paths {
-		refs = append(refs, job.ProjectRef{Name: p, Path: p, FullPath: filepath.Join(root, p), Extensions: []string{ExtensionName}, Config: []byte(`{}`)})
-	}
 	quiet(t, func() {
-		status, _, err = jobFunc(&pctx.Context{WorkspaceRoot: root, WorkspaceProjects: refs, Params: params}, jsonl.New(), nil)
+		status, _, err = jobFunc(workspaceContext(root, params, paths...), jsonl.New(), nil)
 	})
 	return status, err
+}
+
+// runWorkspaceJobEvents runs a workspace job over the packages at paths and
+// returns the events it wrote.
+func runWorkspaceJobEvents(t *testing.T, root string, jobFunc cli.JobFunc, paths ...string) (status string, events []event, err error) {
+	t.Helper()
+	out, openErr := os.Create(filepath.Join(t.TempDir(), "events.jsonl"))
+	if openErr != nil {
+		t.Fatal(openErr)
+	}
+	defer out.Close()
+	stdout := os.Stdout
+	os.Stdout = out
+	status, _, err = jobFunc(workspaceContext(root, nil, paths...), jsonl.New(), nil)
+	os.Stdout = stdout
+	if _, seekErr := out.Seek(0, 0); seekErr != nil {
+		t.Fatal(seekErr)
+	}
+	for scanner := bufio.NewScanner(out); scanner.Scan(); {
+		var e event
+		if json.Unmarshal(scanner.Bytes(), &e) == nil {
+			events = append(events, e)
+		}
+	}
+	return status, events, err
 }
 
 // runProjectJob runs a job of the package at rel, with its probe metadata.
@@ -166,6 +243,64 @@ func TestWorkspaceFetchFillsThePubCacheAtEachStackRoot(t *testing.T) {
 	gen := filepath.Join(root, "tools/gen")
 	if got, want := ran(t, log), root+": flutter pub get --enforce-lockfile\n"+gen+": dart pub get --enforce-lockfile\n"; got != want {
 		t.Errorf("workspace-fetch ran\n%s\nwant\n%s", got, want)
+	}
+}
+
+// workspace-fetch reads the credential the engine hands it before it starts
+// any process, the SDK check included, and then fetches each stack root.
+func TestWorkspaceFetchReadsTheCredentialBeforeAnyProcess(t *testing.T) {
+	spectest.Proves(t, feature, "fetch-reads-the-credential-first", "workspace-fetch-reads-the-credential-before-any-process")
+	root := fixture(t)
+	log := stubTools(t, "3.29.2", "3.7.2", junitPass)
+	t.Setenv(extensionproto.OfflineDependenciesEnv, "")
+	reads := 0
+	handCredential(t, func() (*registry.Credential, error) {
+		reads++
+		if got := started(t, log); got != "" {
+			t.Errorf("a process started before the credential read:\n%s", got)
+		}
+		return &registry.Credential{Bearer: fetchBearer, ExpiresAt: "2099-01-01T00:00:00Z", Hosts: []string{"registry.example.test"}}, nil
+	})
+	if status, err := runWorkspaceJob(t, root, WorkspaceFetchJob(stack(t)), nil, "apps/mobile", "tools/gen"); status != "OK" || err != nil {
+		t.Fatalf("workspace-fetch: %s %v", status, err)
+	}
+	if reads != 1 {
+		t.Errorf("workspace-fetch read the credential %d times, want once", reads)
+	}
+	gen := filepath.Join(root, "tools/gen")
+	if got, want := ran(t, log), root+": flutter pub get --enforce-lockfile\n"+gen+": dart pub get --enforce-lockfile\n"; got != want {
+		t.Errorf("workspace-fetch ran\n%s\nwant\n%s", got, want)
+	}
+	if got := started(t, log); !strings.Contains(got, "dart --version") {
+		t.Errorf("the SDK check did not run after the read:\n%s", got)
+	}
+}
+
+// A credential descriptor workspace-fetch cannot read fails the job with
+// dart.pub_get_failed before any process starts, the SDK check included.
+func TestAnUnreadableCredentialFailsTheFetchBeforePubRuns(t *testing.T) {
+	spectest.Proves(t, feature, "fetch-reads-the-credential-first", "an-unreadable-credential-fails-the-fetch-before-any-process")
+	root := fixture(t)
+	log := stubTools(t, "3.29.2", "3.7.2", junitPass)
+	t.Setenv(extensionproto.OfflineDependenciesEnv, "")
+	handCredential(t, func() (*registry.Credential, error) {
+		return nil, errors.New(extensionproto.JobCredentialFDEnv + " names descriptor 9, which is not open")
+	})
+	status, events, err := runWorkspaceJobEvents(t, root, WorkspaceFetchJob(stack(t)), "apps/mobile", "tools/gen")
+	if status != "FAILED" || err == nil || !strings.HasPrefix(err.Error(), CodePubGetFailed+": ") {
+		t.Fatalf("workspace-fetch: %s %v", status, err)
+	}
+	diagnosed := false
+	for _, e := range events {
+		if e.Type == "diagnostic" && e.Code == CodePubGetFailed && strings.HasPrefix(e.Message, "cannot read the registry credential the engine handed workspace-fetch: ") {
+			diagnosed = true
+		}
+	}
+	if !diagnosed {
+		t.Errorf("no %s diagnostic names the unreadable credential: %+v", CodePubGetFailed, events)
+	}
+	if got := started(t, log); got != "" {
+		t.Errorf("a process started after the credential read failed:\n%s", got)
 	}
 }
 

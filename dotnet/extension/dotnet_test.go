@@ -151,8 +151,10 @@ func under(dir, name string) string { return dir + "/" + name }
 // --list-sdks lists the others. It logs every other call, and for dotnet
 // test writes into the results directory the TRX report and the Coverlet
 // Cobertura report the real tools write, with trx as the report body, and
-// exits 1 when a case failed, as dotnet test does. The real SDK is the
-// stack's own build: the stub stands at that boundary.
+// exits 1 when a case failed, as dotnet test does. Every call, a --version
+// included, also records its arguments, its environment and whether it
+// inherited descriptor credentialFD (started). The real SDK is the stack's own
+// build: the stub stands at that boundary.
 func stubDotnet(t *testing.T, versions, trx string) string {
 	t.Helper()
 	isolateSDKs(t)
@@ -160,7 +162,8 @@ func stubDotnet(t *testing.T, versions, trx string) string {
 	log := filepath.Join(bin, "dotnet.log")
 	writeFile(t, bin, "trx.xml", trx)
 	writeFile(t, bin, "dotnet", `#!/bin/sh
-set -- "$@"
+tool=dotnet
+`+startedRecord(log)+`set -- "$@"
 selected="$(echo "`+versions+`" | cut -d' ' -f1)"
 if [ "$1" = "--version" ]; then
   if [ "$selected" = "none" ]; then echo "A compatible .NET SDK was not found." >&2; exit 145; fi

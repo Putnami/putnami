@@ -61,6 +61,10 @@
       "text": "workspace-fetch runs pub get --enforce-lockfile at each stack root to fill the pub cache; workspace-install runs pub get --enforce-lockfile, or pub get for a root with no pubspec.lock yet, --offline in an offline run, and skips a root the selected SDK resolved last, with the same pubspecs, lockfile and package_config.json, unless --force; deps-upgrade runs pub upgrade; each uses flutter for a root that holds a Flutter package. lint --docs-links checks the README.md and doc/ links."
     },
     {
+      "id": "fetch-reads-the-credential-first",
+      "text": "workspace-fetch reads the credential descriptor a hosted run's engine hands it, closes it and removes its variable before it starts any process, the SDK check included, so no dart or flutter inherits the descriptor or sees the bearer. It uses nothing the descriptor held: the credential's hosts are the Putnami registries, which serve no pub package. A descriptor it cannot read fails the job with dart.pub_get_failed before any process starts."
+    },
+    {
       "id": "runs-and-serves",
       "text": "run runs a Dart command-line package with dart run and its entrypoint and args, and answers its exit code; serve runs a Dart server with dart run and PORT set, or a Flutter app with web/ through flutter run -d web-server on that port, and reports ready once the port accepts connections."
     }

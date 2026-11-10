@@ -7,6 +7,7 @@ require (
 	go.putnami.dev/protocol/extension v0.0.0
 	go.putnami.dev/protocol/features v0.0.0
 	go.putnami.dev/protocol/job v0.0.0
+	go.putnami.dev/protocol/registry v0.0.0
 	go.putnami.dev/protocol/workspace v0.0.0
 	go.putnami.dev/sdk/extension v0.0.0
 	go.putnami.dev/tooling/observe v0.0.0
