@@ -46,6 +46,10 @@ func (p *MyPlugin) Start(ctx context.Context, owner *app.Module) error     { /* 
 func (p *MyPlugin) Stop(ctx context.Context, owner *app.Module) error      { /* cleanup */ return nil }
 ```
 
+`app.RegisterDefaultPlugin(func() app.Plugin { ... })`, called from `init()`,
+adds the returned plugin to every application before its own plugins; nil adds
+nothing.
+
 ### Auto-Provide
 
 Plugins can self-register DI providers via the `Provider` interface:

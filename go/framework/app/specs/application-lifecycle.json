@@ -43,6 +43,10 @@
     {
       "id": "no-source-claim",
       "text": "A scheduler stamp whose capability packages all carry sourceBindingUnavailable with an empty sourceBinding and a sourceRoot makes no source claim: describe emits the capability manifest bytes it emits for a bound stamp, writes no feature evidence, and removes stale scratch evidence. A marked package that carries a binding, a mix of marked and bound packages, an unmarked package without a valid binding, and a package without sourceRoot are refused."
+    },
+    {
+      "id": "default-plugins",
+      "text": "A plugin factory registered with RegisterDefaultPlugin adds its plugin to every application New creates afterwards, before any plugin the workload adds, and runs once per application. A factory that returns nil adds nothing, and a nil factory is ignored."
     }
   ],
   "decisions": [
