@@ -5,6 +5,7 @@ package main
 import (
 	"fmt"
 	"io"
+	"maps"
 	"os"
 
 	rust "go.putnami.dev/rust/extension"
@@ -24,7 +25,10 @@ func main() {
 func run(args []string, stdin io.Reader, stdout, stderr io.Writer, runJobs func(map[string]cli.JobFunc)) int {
 	stack, err := rust.Stack()
 	if err == nil {
-		err = stack.Entrypoint(args, stdin, stdout, runtimeVersion, runJobs)
+		err = stack.Entrypoint(args, stdin, stdout, runtimeVersion, func(jobs map[string]cli.JobFunc) {
+			maps.Copy(jobs, rust.Jobs(stack))
+			runJobs(jobs)
+		})
 	}
 	if err != nil {
 		fmt.Fprintf(stderr, "%s: %v\n", rust.ExtensionName, err)

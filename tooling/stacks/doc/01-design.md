@@ -56,7 +56,9 @@ Rust extension grows beyond what the reference proves.
 A project names its stack's extension like any other:
 `"extensions": ["/rust/extension"]`, or the probe assigns it. A stack whose
 extension later needs more than a profile (a framework, a `serve`, a
-`publish`) grows inside its own extension; no project changes.
+`publish`) grows inside its own extension; no project changes. `@putnami/rust`
+adds `run`, `serve`, `package` and `publish` this way
+([ADR 0011](adr/0011-rust-runs-on-the-core-helpers-and-owns-its-packaging.md)).
 
 ### Projects come from the workspace probe
 
@@ -220,7 +222,13 @@ version rule, says so in its extension's Go code
   version: the .NET stack applies `global.json`'s `rollForward`;
 - a root step lists the absolute manifests it runs for
   (`RootStep.Manifests`): the job's component, or, in a workspace job, every
-  component of the workspace at that stack root.
+  component of the workspace at that stack root;
+- a root step names its component (`RootStep.Component`), empty at a stack
+  root that holds none, and the version its first toolchain check expects
+  (`RootStep.Expected`), so a job of the extension installs the toolchain the
+  tasks select;
+- `Stack.SelectorSets` exposes input sets as selectors of their own, see
+  [Inputs are input selectors](#inputs-are-input-selectors).
 
 Several components share one stack root: one Cargo workspace, one
 `target/`, one `target/nextest/ci/junit.xml`. The core runs the tasks of one
@@ -303,6 +311,13 @@ extension lists them in `runtime.inputSelectors`, and the core answers
 `__putnami input-resolve` with the files the resolved profile selects for that
 task, and the project's `putnami.json`. Its basis covers them, so an
 override that changes the inputs changes the answer.
+
+A stack may also expose an input set as a selector of its own, through
+`Stack.SelectorSets`, for a job the extension runs itself. `@putnami/rust`
+does this for `rust:package`, the whole crate less its `target/` directory and
+the `.gen/version.json` stamp, because a released binary may embed any file of
+the crate. A walk does not enter a directory an exclusion of the form
+`!<dir>/**` leaves out, so the build directory is never read.
 
 A selector answers files under the project only, never under a `.git` or
 `.putnami` directory. The stack-root files
@@ -513,7 +528,7 @@ package's task whose script already runs `bun build`, `bun test` or Biome runs
 
 - **Publish and package.** A stack's release goes through its own tool
   (crates.io, Packagist, Maven Central); no profile declares a `publish`
-  task. A stack extension may add one later, in its own issue.
+  task. A stack extension adds one in its own code, as `@putnami/rust` does.
 - **Serve and qualify.** No profile declares a workload, so `putnami qualify`
   reports no reachable workload for a stack project.
 - **Go, TypeScript and Python.** They keep their full extensions and do not

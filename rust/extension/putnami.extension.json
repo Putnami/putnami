@@ -72,6 +72,7 @@
     "inputSelectors": [
       "rust:build",
       "rust:lint",
+      "rust:package",
       "rust:test"
     ]
   },
@@ -115,6 +116,24 @@
         }
       ]
     },
+    "run": {
+      "description": "Build a binary crate for the host with cargo run, run it once, and forward its exit code.",
+      "traits": { "requiresRunnable": true, "workload": "once" },
+      "flags": {
+        "port": { "type": "number", "description": "Port (set via the PORT environment variable)" },
+        "args": { "type": "string", "description": "Arguments passed to the program" }
+      },
+      "run": [{ "id": "run", "task": "run-exec" }]
+    },
+    "serve": {
+      "description": "Serve a binary crate with cargo run and PORT set, until the user stops it.",
+      "traits": { "requiresRunnable": true, "workload": "serve" },
+      "flags": {
+        "port": { "type": "number", "default": 3000, "description": "Port (set via the PORT environment variable); 0 selects a free port" },
+        "args": { "type": "string", "description": "Arguments passed to the program" }
+      },
+      "run": [{ "id": "serve", "task": "serve-run" }]
+    },
     "build": {
       "description": "Build the crates with cargo build.",
       "run": [
@@ -127,9 +146,164 @@
           ]
         }
       ]
+    },
+    "package": {
+      "description": "Package the binary of a crate: platform archives, an OCI image, a staged crate.",
+      "traits": {
+        "injectPublishChannels": true
+      },
+      "flags": {
+        "archives": {
+          "type": "boolean",
+          "default": false,
+          "description": "Create one archive per platform"
+        },
+        "docker": {
+          "type": "boolean",
+          "default": false,
+          "description": "Assemble an OCI image, with no docker daemon"
+        },
+        "platforms": {
+          "type": "string",
+          "description": "Archive platforms: all, or a comma-separated list (linux/amd64,darwin/arm64). Defaults to the five archive platforms"
+        },
+        "platform": {
+          "type": "string",
+          "default": "linux/amd64",
+          "description": "Image platform: linux/amd64 or linux/arm64"
+        },
+        "port": {
+          "type": "number",
+          "default": 3000,
+          "description": "Port the image exposes and sets as PORT"
+        },
+        "docker-tag": {
+          "type": "string",
+          "description": "Extra image tag"
+        },
+        "docker-base-image": {
+          "type": "string",
+          "description": "Override the digest-pinned base image (must include @sha256:... for reproducible digests)"
+        },
+        "docker-load": {
+          "type": "boolean",
+          "default": false,
+          "description": "Also load the assembled image into the local docker daemon"
+        },
+        "crates": {
+          "type": "boolean",
+          "default": false,
+          "description": "Stage the crate at the release version, leaving the checkout untouched"
+        }
+      },
+      "run": [
+        {
+          "id": "compile",
+          "heavy": true,
+          "task": "package-compile",
+          "dependsOn": [
+            "^compile"
+          ]
+        },
+        {
+          "id": "archives",
+          "task": "package-archives",
+          "dependsOn": [
+            "compile"
+          ],
+          "if": "params.archives"
+        },
+        {
+          "id": "docker",
+          "task": "package-docker",
+          "dependsOn": [
+            "compile"
+          ],
+          "if": "params.docker"
+        },
+        {
+          "id": "crate",
+          "task": "package-crate",
+          "if": "params.crates"
+        }
+      ]
+    },
+    "publish": {
+      "dependsOn": [
+        "package"
+      ],
+      "traits": {
+        "injectPublishChannels": true,
+        "sideEffects": "registry"
+      },
+      "description": "Publish the crate to a registry and push the image of the package step.",
+      "flags": {
+        "crates": {
+          "type": "boolean",
+          "default": false,
+          "description": "Publish the staged crate with cargo publish"
+        },
+        "crates-registry": {
+          "type": "string",
+          "description": "Name of the Cargo registry, as cargo publish --registry takes it"
+        },
+        "docker": {
+          "type": "boolean",
+          "default": false,
+          "description": "Push the image"
+        },
+        "docker-registry": {
+          "type": "string",
+          "description": "Docker registry URL prefix (e.g. us-docker.pkg.dev/project/repo)"
+        },
+        "dry-run": {
+          "type": "boolean",
+          "default": false,
+          "description": "Upload nothing"
+        }
+      },
+      "run": [
+        {
+          "id": "crates",
+          "task": "publish-crates",
+          "dependsOn": [
+            "^crates"
+          ],
+          "if": "params.crates"
+        },
+        {
+          "id": "docker",
+          "task": "publish-docker",
+          "if": "params.docker"
+        }
+      ]
     }
   },
   "tasks": {
+    "run-exec": {
+      "description": "Run the crate's binary once with cargo run, after the toolchain check, and forward its exit code. It declares no output: a run produces only the program's exit status and streams.",
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": ["run"],
+      "cwd": "{projectRoot}",
+      "cache": false,
+      "timeoutMs": -1,
+      "declares": {
+        "effects": ["network", "process", "toolchain-cache"]
+      }
+    },
+    "serve-run": {
+      "description": "Serve the crate's binary with cargo run and PORT set, after the toolchain check, and announce it ready once its port accepts connections. It declares no output: a cache hit cannot reproduce a live process.",
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": ["serve"],
+      "cwd": "{projectRoot}",
+      "cache": false,
+      "timeoutMs": -1,
+      "declares": {
+        "effects": ["network", "process", "toolchain-cache"]
+      }
+    },
     "lint-run": {
       "description": "Run the Rust profile's lint steps, cargo fmt --check then cargo clippy, on one crate in its directory, after the toolchain check. Its inputs are the files the rust:lint selector answers from the resolved profile, and the stack-root files of the profile.",
       "kind": "command",
@@ -302,6 +476,275 @@
         "effects": [
           "network",
           "toolchain-cache"
+        ]
+      }
+    },
+    "package-compile": {
+      "description": "Compile the crate's binary in release mode with cargo zigbuild for each platform the package channels need, under the stack root's lock, and copy it to bin/<platform-suffix>/ in the command output. A Linux binary links against glibc 2.36. Installs Rust, zig, cargo-zigbuild and the Rust targets in the Putnami home.",
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": [
+        "package-compile"
+      ],
+      "cwd": "{projectRoot}",
+      "timeoutMs": 1800000,
+      "inputs": {
+        "sources": {
+          "from": "project",
+          "files": [
+            "rust:package"
+          ]
+        },
+        "stackRoot": {
+          "from": "workspace",
+          "files": [
+            ".cargo/config",
+            ".cargo/config.toml",
+            "Cargo.lock",
+            "Cargo.toml",
+            "rust-toolchain",
+            "rust-toolchain.toml"
+          ]
+        },
+        "config": {
+          "from": "project",
+          "files": [
+            "putnami.json"
+          ]
+        },
+        "archives": {
+          "from": "params"
+        },
+        "docker": {
+          "from": "params"
+        },
+        "platform": {
+          "from": "params"
+        },
+        "platforms": {
+          "from": "params"
+        },
+        "RUSTFLAGS": {
+          "from": "env"
+        },
+        "CARGO_ENCODED_RUSTFLAGS": {
+          "from": "env"
+        },
+        "RUSTC_WRAPPER": {
+          "from": "env"
+        },
+        "CARGO_BUILD_RUSTFLAGS": {
+          "from": "env"
+        },
+        "CARGO_BUILD_RUSTC_WRAPPER": {
+          "from": "env"
+        },
+        "CARGO_PROFILE_RELEASE_OVERFLOW_CHECKS": {
+          "from": "env"
+        },
+        "CARGO_PROFILE_RELEASE_DEBUG_ASSERTIONS": {
+          "from": "env"
+        },
+        "CARGO_PROFILE_RELEASE_RPATH": {
+          "from": "env"
+        },
+        "CARGO_PROFILE_RELEASE_SPLIT_DEBUGINFO": {
+          "from": "env"
+        },
+        "CARGO_PROFILE_RELEASE_OPT_LEVEL": {
+          "from": "env"
+        },
+        "CARGO_PROFILE_RELEASE_LTO": {
+          "from": "env"
+        },
+        "CARGO_PROFILE_RELEASE_CODEGEN_UNITS": {
+          "from": "env"
+        },
+        "CARGO_PROFILE_RELEASE_DEBUG": {
+          "from": "env"
+        },
+        "CARGO_PROFILE_RELEASE_STRIP": {
+          "from": "env"
+        },
+        "CARGO_PROFILE_RELEASE_PANIC": {
+          "from": "env"
+        },
+        "extensionVersion": {
+          "from": "runtime"
+        }
+      },
+      "cache": {
+        "enabled": true
+      },
+      "declares": {
+        "outputs": {
+          "bin": {
+            "kind": "directory",
+            "root": "command-output",
+            "path": "bin",
+            "optionalEmpty": true,
+            "description": "The binary of each platform at bin/<platform-suffix>/<name>. Sole owner of <command-output>/bin. Empty for a library."
+          }
+        },
+        "effects": [
+          "network",
+          "toolchain-cache"
+        ]
+      }
+    },
+    "package-archives": {
+      "description": "Write one reproducible tar.gz per platform with the binary at its root, the archive channel record and the publication manifest. Reads the bin tree package-compile owns.",
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": [
+        "package-archives"
+      ],
+      "cwd": "{projectRoot}",
+      "timeoutMs": 300000,
+      "inputs": {
+        "config": {
+          "from": "project",
+          "files": [
+            "putnami.json"
+          ]
+        },
+        "extensionVersion": {
+          "from": "runtime"
+        }
+      },
+      "cache": {
+        "versionAware": true
+      },
+      "declares": {
+        "outputs": {
+          "archives": {
+            "kind": "directory",
+            "root": "command-output",
+            "path": "archives",
+            "optionalEmpty": true,
+            "description": "Per-platform .tar.gz archives and the archive channel record. Sole owner of <command-output>/archives."
+          },
+          "publication-manifest": {
+            "kind": "file",
+            "root": "command-output",
+            "path": "metadata.json",
+            "optionalEmpty": true,
+            "description": "Archive publication manifest read by the archive uploader. Sole owner of <command-output>/metadata.json."
+          }
+        }
+      }
+    },
+    "package-docker": {
+      "description": "Assemble a reproducible OCI layout for one Linux platform with no docker daemon, the manifest the shared Docker publisher reads and the docker channel record. Reads the bin tree package-compile owns, and pulls the base image.",
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": [
+        "package-docker"
+      ],
+      "cwd": "{projectRoot}",
+      "timeoutMs": 300000,
+      "inputs": {
+        "config": {
+          "from": "project",
+          "files": [
+            "putnami.json"
+          ]
+        },
+        "extensionVersion": {
+          "from": "runtime"
+        }
+      },
+      "cache": {
+        "versionAware": true
+      },
+      "declares": {
+        "outputs": {
+          "docker": {
+            "kind": "directory",
+            "root": "command-output",
+            "path": "docker",
+            "optionalEmpty": true,
+            "description": "Local OCI layout, manifest and docker channel record. Sole owner of <command-output>/docker."
+          }
+        },
+        "effects": [
+          "network"
+        ]
+      }
+    },
+    "package-crate": {
+      "description": "Copy the stack root without its build output to crates/workspace in the command output, write the release version into each manifest and each normal path dependency, and refresh the copy's lockfile. The checkout stays untouched.",
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": [
+        "package-crate"
+      ],
+      "cwd": "{projectRoot}",
+      "timeoutMs": 600000,
+      "cache": false,
+      "declares": {
+        "outputs": {
+          "crates": {
+            "kind": "directory",
+            "root": "command-output",
+            "path": "crates",
+            "optionalEmpty": true,
+            "description": "The staged copy of the stack root and the crates channel record. Sole owner of <command-output>/crates."
+          }
+        },
+        "effects": [
+          "network",
+          "toolchain-cache"
+        ]
+      }
+    },
+    "publish-crates": {
+      "description": "Run cargo publish from the staged copy. A version the registry already holds is reused. Dry run uploads nothing.",
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": [
+        "publish-crates"
+      ],
+      "cwd": "{projectRoot}",
+      "timeoutMs": 1800000,
+      "cache": false,
+      "declares": {
+        "effects": [
+          "network",
+          "registry",
+          "toolchain-cache"
+        ],
+        "publishChannels": [
+          "crates"
+        ]
+      }
+    },
+    "publish-docker": {
+      "description": "Push the assembled image with the shared Docker publisher. Declares the registry effect.",
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": [
+        "publish-docker"
+      ],
+      "cwd": "{projectRoot}",
+      "timeoutMs": 300000,
+      "cache": false,
+      "declares": {
+        "outputs": {
+          "published-image": {
+            "kind": "file",
+            "root": "command-output",
+            "path": "docker/published-image.json",
+            "optionalEmpty": true,
+            "description": "Publish-owned verified remote image record, present only after registry digest verification."
+          }
+        },
+        "effects": [
+          "network",
+          "registry"
+        ],
+        "publishChannels": [
+          "docker"
         ]
       }
     }

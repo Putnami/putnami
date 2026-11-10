@@ -427,6 +427,40 @@ func VirtualWorkspace(root, dir string) bool {
 	return workspace && !pkg
 }
 
+// HasBinaryTarget reports whether the crate at dir builds a binary: a [[bin]]
+// table, or, unless package.autobins is false, src/main.rs or a target under
+// src/bin.
+func HasBinaryTarget(root, dir string) bool {
+	manifest, ok, err := readManifest(root, dir)
+	if err != nil || !ok {
+		return false
+	}
+	if len(toml.Tables(manifest["bin"])) > 0 {
+		return true
+	}
+	if pkg, ok := manifest["package"].(toml.Table); ok {
+		if auto, ok := pkg["autobins"].(bool); ok && !auto {
+			return false
+		}
+	}
+	if existing(root, join(dir, "src/main.rs")) != "" {
+		return true
+	}
+	entries, err := os.ReadDir(abs(root, join(dir, "src/bin")))
+	if err != nil {
+		return false
+	}
+	for _, entry := range entries {
+		if !entry.IsDir() && strings.HasSuffix(entry.Name(), ".rs") {
+			return true
+		}
+		if entry.IsDir() && existing(root, join(dir, "src/bin/"+entry.Name()+"/main.rs")) != "" {
+			return true
+		}
+	}
+	return false
+}
+
 // readManifest reads the Cargo.toml of a directory. found is false when there
 // is none.
 func readManifest(root, dir string) (toml.Table, bool, error) {

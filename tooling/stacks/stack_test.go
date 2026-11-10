@@ -102,6 +102,54 @@ func resolveOne(t *testing.T, s Stack, root, project, selector string) wsproto.I
 	return result.Inputs[0]
 }
 
+func TestASelectorNamesAnInputSetAndLeavesOutADirectory(t *testing.T) {
+	root := t.TempDir()
+	for _, f := range []string{"Cargo.toml", "src/main.rs", "dist/app.js", "src/target/mod.rs", "target/release/app"} {
+		writeFile(t, root, "tools/gen/"+f, "x")
+	}
+	writeFile(t, root, "tools/gen/.gen/version.json", "{}")
+	writeFile(t, root, "tools/gen/tools/widget/.gen/version.json", "{}")
+	writeFile(t, root, "tools/gen/.gen/client.rs", "// generated")
+	writeFile(t, root, "tools/gen/.git", "gitdir: /elsewhere")
+	if err := os.Symlink("missing", filepath.Join(root, "tools/gen/dangling")); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink("src", filepath.Join(root, "tools/gen/srclink")); err != nil {
+		t.Fatal(err)
+	}
+	s := testStack(t)
+	s.Profile.Inputs["package"] = []string{"**/*", "!target/**", "!**/.gen/version.json"}
+	s.SelectorSets = []string{"package"}
+	if !slices.Contains(s.Selectors(), "rust:package") {
+		t.Errorf("selectors %v miss rust:package", s.Selectors())
+	}
+	answer := resolveOne(t, s, root, "tools/gen", "rust:package")
+	if answer.Error != "" {
+		t.Fatal(answer.Error)
+	}
+	for _, want := range []string{"Cargo.toml", ".gen/client.rs", "dist/app.js", "src/main.rs", "src/target/mod.rs"} {
+		if !slices.Contains(answer.Files, want) {
+			t.Errorf("files %v miss %s", answer.Files, want)
+		}
+	}
+	for _, absent := range []string{"target/release/app", ".gen/version.json", "tools/widget/.gen/version.json", ".git", "dangling", "srclink"} {
+		if slices.Contains(answer.Files, absent) {
+			t.Errorf("files %v hold %s", answer.Files, absent)
+		}
+	}
+	for _, f := range answer.Files {
+		if !slices.ContainsFunc(answer.Basis.Content, func(set []string) bool { return wsproto.SelectsPath(f, set) }) {
+			t.Errorf("the basis does not select %s", f)
+		}
+	}
+	if wsproto.SelectsPath("target/release/app", answer.Basis.Content[0]) {
+		t.Errorf("the basis selects the excluded build directory: %v", answer.Basis.Content[0])
+	}
+	if got := resolveOne(t, s, root, "tools/gen", "rust:sources"); got.Error == "" {
+		t.Errorf("an input set the stack does not expose answers %v", got.Files)
+	}
+}
+
 func TestResolveInputsAnswersTheProfileFiles(t *testing.T) {
 	root := t.TempDir()
 	writeFile(t, root, "Cargo.lock", "")

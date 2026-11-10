@@ -22,7 +22,8 @@ func TestRunHandsTheTasksToTheJobDispatcher(t *testing.T) {
 			got = append(got, name)
 		}
 	})
-	if code != 0 || len(got) != 3 {
+	// lint, test, build, run, serve, four package and two publish steps.
+	if code != 0 || len(got) != 11 {
 		t.Fatalf("exit %d, jobs %v", code, got)
 	}
 }

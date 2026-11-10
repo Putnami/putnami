@@ -118,6 +118,87 @@
             "kind": "acceptance",
             "checks": ["a-rust-with-no-llvm-tools-runs-the-tests-without-a-coverage-report"]
           }
+        },
+        {
+          "id": "crate-kind-is-detected",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": ["a-crate-with-a-binary-target-is-an-application"]
+          }
+        },
+        {
+          "id": "run-forwards-the-exit-code",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": ["run-forwards-the-exit-code-of-the-program"]
+          }
+        },
+        {
+          "id": "serve-sets-the-port",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": ["serve-runs-the-crate-with-port-set"]
+          }
+        },
+        {
+          "id": "package-builds-each-platform",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": ["package-compiles-each-platform-its-channels-need"]
+          }
+        },
+        {
+          "id": "package-provides-its-cross-tools",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": ["package-installs-zigbuild-zig-and-the-targets"]
+          }
+        },
+        {
+          "id": "package-writes-archives",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": ["package-writes-one-archive-per-platform"]
+          }
+        },
+        {
+          "id": "package-assembles-an-image",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": ["package-assembles-an-image-for-the-platform"]
+          }
+        },
+        {
+          "id": "publish-sends-the-staged-crate",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": ["publish-sends-a-crate-at-the-release-version"]
+          }
+        },
+        {
+          "id": "publish-pushes-the-image",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": ["publish-pushes-the-image-through-the-shared-publisher"]
+          }
         }
       ]
     }

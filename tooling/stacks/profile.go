@@ -841,7 +841,24 @@ func (p Profile) TaskPatterns(task string) (project, root []string) {
 	if !slices.Contains(TaskNames, task) {
 		return nil, nil
 	}
-	for _, set := range p.Tasks[task].Inputs {
+	return p.setPatterns(p.Tasks[task].Inputs)
+}
+
+// SelectorPatterns are the patterns a selector reads, split as TaskPatterns
+// splits them: a task's input sets, or the one input set a stack exposes as a
+// selector of its own (Stack.SelectorSets).
+func (p Profile) SelectorPatterns(name string) (project, root []string) {
+	if slices.Contains(TaskNames, name) {
+		return p.TaskPatterns(name)
+	}
+	if _, ok := p.Inputs[name]; !ok {
+		return nil, nil
+	}
+	return p.setPatterns([]string{name})
+}
+
+func (p Profile) setPatterns(sets []string) (project, root []string) {
+	for _, set := range sets {
 		for _, pattern := range p.Inputs[set] {
 			if excluded, ok := strings.CutPrefix(pattern, "!"); ok {
 				if rest, ok := strings.CutPrefix(excluded, "{root}/"); ok {
@@ -867,8 +884,21 @@ func (p Profile) TaskPatterns(task string) (project, root []string) {
 // task's input sets leave out: a file the build tool writes, such as a
 // generated registrant, under a directory the task reads.
 func (p Profile) TaskExcludes(task string) []string {
+	return p.setExcludes(p.Tasks[task].Inputs)
+}
+
+// SelectorExcludes are the exclusions of a selector, as TaskExcludes: those
+// of a task's input sets, or of the input set a stack exposes as a selector.
+func (p Profile) SelectorExcludes(name string) []string {
+	if slices.Contains(TaskNames, name) {
+		return p.TaskExcludes(name)
+	}
+	return p.setExcludes([]string{name})
+}
+
+func (p Profile) setExcludes(sets []string) []string {
 	var out []string
-	for _, set := range p.Tasks[task].Inputs {
+	for _, set := range sets {
 		for _, pattern := range p.Inputs[set] {
 			if excluded, ok := strings.CutPrefix(pattern, "!"); ok && !strings.HasPrefix(excluded, "{root}/") {
 				out = appendNew(out, excluded)

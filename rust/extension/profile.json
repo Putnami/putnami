@@ -22,7 +22,8 @@
       "{root}/rustfmt.toml", "{root}/.rustfmt.toml", "{root}/clippy.toml", "{root}/.clippy.toml"
     ],
     "testConfig": ["{root}/.config/nextest.toml"],
-    "lockfiles": ["Cargo.lock", "{root}/Cargo.lock"]
+    "lockfiles": ["Cargo.lock", "{root}/Cargo.lock"],
+    "package": ["**/*", "!target/**", "!**/.gen/version.json"]
   },
   "tasks": {
     "lint": {

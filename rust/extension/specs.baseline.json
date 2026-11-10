@@ -5,14 +5,23 @@
     "rust/stack-extension#cases-are-attributed",
     "rust/stack-extension#coverage-is-attributed",
     "rust/stack-extension#coverage-is-optional",
+    "rust/stack-extension#crate-kind-is-detected",
     "rust/stack-extension#crates-become-projects",
     "rust/stack-extension#inputs-are-per-task",
     "rust/stack-extension#manifest-follows-the-profile",
     "rust/stack-extension#nested-roots-reach-the-key",
     "rust/stack-extension#overrides-are-honored",
+    "rust/stack-extension#package-assembles-an-image",
+    "rust/stack-extension#package-builds-each-platform",
+    "rust/stack-extension#package-provides-its-cross-tools",
+    "rust/stack-extension#package-writes-archives",
     "rust/stack-extension#provides-its-test-tools",
     "rust/stack-extension#provides-its-toolchain",
+    "rust/stack-extension#publish-pushes-the-image",
+    "rust/stack-extension#publish-sends-the-staged-crate",
     "rust/stack-extension#reports-become-the-summary",
-    "rust/stack-extension#tasks-run-the-profile"
+    "rust/stack-extension#run-forwards-the-exit-code",
+    "rust/stack-extension#serve-sets-the-port",
+        "rust/stack-extension#tasks-run-the-profile"
   ]
 }
