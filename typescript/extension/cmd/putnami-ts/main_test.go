@@ -613,6 +613,27 @@ func TestEnsureWorkspaceDevDeps_AddsMissingDeps(t *testing.T) {
 	}
 }
 
+// Adding the extension's devDependencies keeps the order of the root
+// manifest's top-level keys and of its existing devDependencies: an adopted
+// repository's package.json changes by the added entries alone.
+func TestEnsureWorkspaceDevDeps_KeepsTheManifestKeyOrder(t *testing.T) {
+	spectest.Proves(t, "typescript/typescript-project-toolchain", "catalog-seeding", "the-root-manifest-top-level-key-order-is-preserved")
+	wsDir := t.TempDir()
+	extDir := t.TempDir()
+	os.WriteFile(filepath.Join(extDir, "putnami.extension.json"), []byte(`{"workspaceDevDependencies":{"typescript":"^6.0.2","@types/bun":"^1.4.0","@biomejs/biome":"2.5.15"}}`), 0644)
+	original := "{\n  \"name\": \"shop\",\n  \"private\": true,\n  \"packageManager\": \"pnpm@10.26.1\",\n  \"scripts\": {\n    \"test\": \"turbo run test\"\n  },\n  \"devDependencies\": {\n    \"turbo\": \"^2.5.0\",\n    \"typescript\": \"^5.6.0\"\n  }\n}\n"
+	os.WriteFile(filepath.Join(wsDir, "package.json"), []byte(original), 0644)
+	ctx := &pctx.Context{WorkspaceRoot: wsDir, Extension: pctx.Extension{Root: extDir}}
+	if err := ensureWorkspaceDevDeps(ctx, jsonl.New()); err != nil {
+		t.Fatal(err)
+	}
+	got, _ := os.ReadFile(filepath.Join(wsDir, "package.json"))
+	want := "{\n  \"name\": \"shop\",\n  \"private\": true,\n  \"packageManager\": \"pnpm@10.26.1\",\n  \"scripts\": {\n    \"test\": \"turbo run test\"\n  },\n  \"devDependencies\": {\n    \"turbo\": \"^2.5.0\",\n    \"typescript\": \"^5.6.0\",\n    \"@biomejs/biome\": \"2.5.15\",\n    \"@types/bun\": \"^1.4.0\"\n  }\n}\n"
+	if string(got) != want {
+		t.Fatalf("package.json =\n%s\nwant\n%s", got, want)
+	}
+}
+
 func TestEnsureWorkspaceDevDeps_AllPresent(t *testing.T) {
 	wsDir := t.TempDir()
 	extDir := t.TempDir()

@@ -233,6 +233,11 @@ with **Import** preselected; in CI or from an agent it imports unless you pass
 - `nx.json` lies at the root of the repository, which becomes the workspace
   root, and Nx is installed in `node_modules`: each task runs
   `npx --no nx`, which never downloads one.
+- In import mode, the package manager the repository declares, in the
+  `packageManager` field of the root `package.json` or by its root lockfile,
+  is on `PATH`: npm, or pnpm or Yarn through Corepack or a global install.
+  Putnami installs with it and keeps its lockfile; Bun runs the tasks Putnami
+  takes over.
 
 ### Turn the repository into a workspace
 
@@ -266,10 +271,12 @@ target: `@putnami/nx:test` when a `bun test` script moves to
 entries. The output lists each target Putnami does not run itself, such as
 `serve`, `e2e` or a `jest` test, with the reason.
 
-In import mode, `@putnami/typescript`'s workspace install writes the root
-`package.json` with the projects as `workspaces` and installs them with Bun,
-recorded in `bun.lock`: the repository's npm, pnpm or yarn lockfile and its
-install are no longer used.
+In import mode, `@putnami/typescript`'s workspace install keeps the
+repository's package manager: it lists the projects where that manager reads
+its members, `pnpm-workspace.yaml` for pnpm and the root `package.json`
+`workspaces` otherwise, and runs that manager's install, which keeps
+`pnpm-lock.yaml`, `yarn.lock` or `package-lock.json` as the repository's lock.
+It writes no `bun.lock`.
 
 ### Switch mode, or see what a sync would change
 
@@ -327,6 +334,11 @@ project delegated to moon, so no Putnami cache sits over moon's.
   workspace root.
 - In delegate mode, moon is on `PATH`, at the version `.prototools` pins.
   Without a pin, each task warns that the version is not pinned.
+- In import mode, the package manager the repository declares, in the
+  `packageManager` field of the root `package.json` or by its root lockfile,
+  is on `PATH`: npm, or pnpm or Yarn through Corepack or a global install.
+  Putnami installs with it and keeps its lockfile; Bun runs the tasks Putnami
+  takes over.
 
 ### Turn the repository into a workspace
 
@@ -362,9 +374,9 @@ In import mode, `putnami init --from moon` writes `@putnami/typescript` in
 the `putnami.json` of a TypeScript project, declares the extension in the
 workspace and installs it; a project in a language with no Putnami extension
 stays on `@putnami/moon`. `@putnami/typescript`'s workspace install then
-writes the root `package.json` with the projects as `workspaces` and installs
-them with Bun, recorded in `bun.lock`: the repository's npm, pnpm or yarn
-lockfile and its install are no longer used.
+lists the projects where the repository's package manager reads its members
+and installs with that manager, which keeps its lockfile; it writes no
+`bun.lock`.
 
 Commit the files: they are the project graph Putnami selects on. Run
 `init --from moon` again later to see what the sync would change, and
@@ -412,9 +424,10 @@ Turborepo adopts in either mode:
   with Putnami's cache. Every other task, such as a `tsc`, `vitest`, `jest` or
   `eslint` script, keeps running through Turborepo: moving it would change the
   tool that checks the code. Import mode also declares `@putnami/typescript`,
-  whose setup adds its devDependencies and a `workspaces` list to the root
-  `package.json`, and writes a root `tsconfig.json`, `biome.json` and
-  `bun.lock` when they are missing. When a package's `build` moves to
+  whose setup adds its devDependencies to the root `package.json`, lists the
+  packages where the repository's package manager reads its members, writes a
+  root `tsconfig.json` and `biome.json` when they are missing, and installs
+  with that manager, which keeps its lockfile. When a package's `build` moves to
   `@putnami/typescript`, a package that depends on it and still builds through
   Turborepo builds it again through `^build`.
 - **Delegate**: every package runs through Turborepo, which keeps its cache,
@@ -429,6 +442,11 @@ Turborepo adopts in either mode:
   packages.
 - In delegate mode, `turbo` is on `PATH`: a global install defers to the
   repository's own version.
+- In import mode, the package manager the repository declares, in the
+  `packageManager` field of the root `package.json` or by its root lockfile,
+  is on `PATH`: npm, or pnpm or Yarn through Corepack or a global install.
+  Putnami installs with it and keeps its lockfile; Bun runs the tasks Putnami
+  takes over.
 
 ### Turn the repository into a workspace
 

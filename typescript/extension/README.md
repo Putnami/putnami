@@ -11,7 +11,7 @@ TypeScript extension for Putnami — provides build, test, lint, serve, run, and
 - **Serve** — Development server with hot-reload, debugger, and structured log forwarding
 - **Run** — One-shot workload runner that forwards the child process exit code
 - **Package** — npm tarball and Docker image creation from build output
-- **Workspace Install** — Workspace-wide `bun install`; on a hosted run, `workspace-fetch` first downloads the locked packages without running their code
+- **Workspace Install** — Workspace-wide install with the package manager the repository declares (Bun, npm, pnpm or Yarn); on a hosted run, `workspace-fetch` first downloads the locked packages without running their code
 - **Templates** — Scaffold libraries, API servers, and React web apps
 
 ## Installation

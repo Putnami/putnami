@@ -303,63 +303,58 @@ func ensureWorkspaceDevDeps(ctx *pctx.Context, emit *jsonl.Emitter) error {
 		return nil
 	}
 
-	// Read workspace package.json, which ensureRootManifest has created.
+	// Read workspace package.json, which ensureRootManifest has created, with
+	// the order of its top-level keys.
 	pkgPath := filepath.Join(ctx.WorkspaceRoot, "package.json")
-	pkgData, err := os.ReadFile(pkgPath)
-	if err != nil {
+	if _, err := os.Stat(pkgPath); err != nil {
 		return fmt.Errorf("read package.json: %w", err)
 	}
-
-	var pkg map[string]json.RawMessage
-	if err := json.Unmarshal(pkgData, &pkg); err != nil {
-		return fmt.Errorf("parse package.json: %w", err)
+	pkg, order, err := readRootManifest(pkgPath)
+	if err != nil {
+		return err
 	}
 
-	// Parse existing devDependencies.
-	devDeps := make(map[string]string)
+	// Parse existing devDependencies, with the order of their keys.
+	devDeps := make(map[string]json.RawMessage)
+	var devOrder []string
 	if raw, ok := pkg["devDependencies"]; ok {
 		if err := json.Unmarshal(raw, &devDeps); err != nil {
 			return fmt.Errorf("parse devDependencies: %w", err)
 		}
-	}
-
-	// Add missing dependencies.
-	var added []string
-	for name, version := range manifest.WorkspaceDevDeps {
-		if _, exists := devDeps[name]; !exists {
-			devDeps[name] = version
-			added = append(added, name)
+		if devOrder, err = topLevelKeyOrder(raw); err != nil {
+			return fmt.Errorf("parse devDependencies key order: %w", err)
 		}
 	}
 
+	// Add missing dependencies, after the existing ones, in name order.
+	var added []string
+	for name := range manifest.WorkspaceDevDeps {
+		if _, exists := devDeps[name]; !exists {
+			added = append(added, name)
+		}
+	}
 	if len(added) == 0 {
 		return nil
 	}
-
 	sort.Strings(added)
 	for _, name := range added {
-		emit.Log("info", "adding workspace devDependency: "+name+"@"+devDeps[name])
+		version, err := json.Marshal(manifest.WorkspaceDevDeps[name])
+		if err != nil {
+			return fmt.Errorf("marshal devDependency %s: %w", name, err)
+		}
+		devDeps[name] = version
+		devOrder = append(devOrder, name)
+		emit.Log("info", "adding workspace devDependency: "+name+"@"+manifest.WorkspaceDevDeps[name])
 	}
 
-	// Write back devDependencies.
-	devDepsJSON, err := json.Marshal(devDeps)
+	// Write back devDependencies; the root manifest and the devDependencies
+	// keep the key order they were read in.
+	devDepsJSON, err := json.Marshal(orderedRawObject{keys: manifestKeyOrder(devDeps, devOrder), values: devDeps})
 	if err != nil {
 		return fmt.Errorf("marshal devDependencies: %w", err)
 	}
 	pkg["devDependencies"] = devDepsJSON
-
-	// Write package.json with 2-space indent.
-	out, err := json.MarshalIndent(pkg, "", "  ")
-	if err != nil {
-		return fmt.Errorf("marshal package.json: %w", err)
-	}
-	out = append(out, '\n')
-
-	if err := os.WriteFile(pkgPath, out, 0644); err != nil {
-		return fmt.Errorf("write package.json: %w", err)
-	}
-
-	return nil
+	return writeRootManifest(pkgPath, pkg, order)
 }
 
 // ensureWorkspaceNpmrc renders the workspace .npmrc scope lines from the
