@@ -63,6 +63,9 @@ type initSource struct {
 	// importExtensions are the extensions import mode hands targets to,
 	// which init declares and installs beside the tool's.
 	importExtensions []string
+	// importList reports that the extension reads options import, the
+	// projects a delegated workspace imports, which --import adds to.
+	importList bool
 }
 
 // initSources are the tools --from accepts, by name.
@@ -73,6 +76,7 @@ var initSources = map[string]initSource{
 		markers:          []string{"nx.json"},
 		modes:            []string{initModeImport, initModeDelegate},
 		importExtensions: []string{"@putnami/typescript"},
+		importList:       true,
 	},
 	// moon's import mode maps each project to its language's extension: the
 	// sync declares the ones the projects need, and init installs them after
@@ -91,6 +95,7 @@ var initSources = map[string]initSource{
 		markers:          []string{"turbo.json"},
 		modes:            []string{initModeImport, initModeDelegate},
 		importExtensions: []string{"@putnami/typescript"},
+		importList:       true,
 	},
 	"rush": {
 		starter:          initExtensionConfig{packageName: "@putnami/rush"},
@@ -161,6 +166,10 @@ type initFlags struct {
 	modeSet bool
 	// apply lets a rerun of init --from write what it previews.
 	apply bool
+	// imports are the project paths of --import, and importSet reports that
+	// the flag was given.
+	imports   []string
+	importSet bool
 	// channel is the value of --channel, and channelSet reports that the flag
 	// was given: a flag with no value is a usage error, not an absent flag.
 	channel    string
@@ -180,6 +189,10 @@ func parseInitFlags(args []string) initFlags {
 		}
 		if value, ok := strings.CutPrefix(args[i], "--mode="); ok {
 			f.mode, f.modeSet = value, true
+			continue
+		}
+		if value, ok := strings.CutPrefix(args[i], "--import="); ok {
+			f.imports, f.importSet = append(f.imports, splitImportFlag(value)...), true
 			continue
 		}
 		switch args[i] {
@@ -226,6 +239,13 @@ func parseInitFlags(args []string) initFlags {
 			}
 		case "--apply":
 			f.apply = true
+		case "--import":
+			f.importSet = true
+			// The next flag is no project path: --import then has none.
+			if i+1 < len(args) && !strings.HasPrefix(args[i+1], "-") {
+				f.imports = append(f.imports, splitImportFlag(args[i+1])...)
+				i++
+			}
 		}
 	}
 	return f
@@ -325,10 +345,13 @@ func resolveInitRequest(flags initFlags) (initPlan, initChannel, error) {
 		if err := validateInitMode(flags, source); err != nil {
 			return initPlan{}, initChannel{}, err
 		}
+		if err := validateInitImport(flags, source); err != nil {
+			return initPlan{}, initChannel{}, err
+		}
 		plan = initPlan{configs: []initExtensionConfig{source.starter}}
 	} else {
-		if flags.modeSet || flags.apply {
-			return initPlan{}, initChannel{}, cmderr.Usagef("--mode and --apply adopt a monorepo tool: give --from <tool> (choose: %s)", initSourceNames())
+		if flags.modeSet || flags.apply || flags.importSet {
+			return initPlan{}, initChannel{}, cmderr.Usagef("--mode, --import and --apply adopt a monorepo tool: give --from <tool> (choose: %s)", initSourceNames())
 		}
 		value := flags.extension
 		if !flags.extensionSet {
@@ -445,8 +468,12 @@ func WorkspaceInit(ctx context.Context, wsRoot string, args []string, env Lifecy
 		if err != nil {
 			return err
 		}
-		declared = source.extensionsFor(mode)
-		options = initOptions(source, mode)
+		imports, _, err := initImportList(flags, mode, nil)
+		if err != nil {
+			return err
+		}
+		declared = source.extensionsFor(mode, len(imports) > 0)
+		options = initOptions(source, mode, imports)
 		if source.offersBothModes() {
 			iox.Fprintf(os.Stdout, "  Mode: %s\n", mode)
 		}

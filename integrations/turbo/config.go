@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	wsproto "go.putnami.dev/protocol/workspace"
+	"go.putnami.dev/tooling/stacks"
 )
 
 // Adoption modes.
@@ -56,6 +57,25 @@ func WorkspaceMode(root string) (string, error) {
 	}
 	mode, _ := value.(string)
 	return checkMode(mode)
+}
+
+// WorkspaceImport reads options["@putnami/turbo"].import of the workspace
+// config at root; nil when it records none.
+func WorkspaceImport(root string) ([]string, error) {
+	data, err := os.ReadFile(filepath.Join(root, wsproto.WorkspaceConfigFilename))
+	if errors.Is(err, os.ErrNotExist) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	var cfg struct {
+		Options map[string]map[string]any `json:"options"`
+	}
+	if err := json.Unmarshal(data, &cfg); err != nil {
+		return nil, fmt.Errorf("%s: %w", wsproto.WorkspaceConfigFilename, err)
+	}
+	return stacks.ImportEntries(ExtensionName, cfg.Options[ExtensionName])
 }
 
 func checkMode(mode string) (string, error) {

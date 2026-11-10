@@ -132,6 +132,8 @@ type initFromCalls struct {
 	previewed []string
 	// declares are the extensions each preview was told --apply declares.
 	declares [][]string
+	// imports are the import lists each preview was given, nil for none.
+	imports [][]string
 }
 
 func stubInitFrom(t *testing.T, terminal bool, answer string) *initFromCalls {
@@ -150,9 +152,10 @@ func stubInitFrom(t *testing.T, terminal bool, answer string) *initFromCalls {
 		calls.synced = cfg
 		return nil
 	}
-	previewInitSync = func(_ context.Context, _ string, _ *wsproto.Config, mode string, declares []string, _ LifecycleEnv) error {
+	previewInitSync = func(_ context.Context, _ string, _ *wsproto.Config, mode string, declares, imports []string, _ LifecycleEnv) error {
 		calls.previewed = append(calls.previewed, mode)
 		calls.declares = append(calls.declares, declares)
+		calls.imports = append(calls.imports, imports)
 		return nil
 	}
 	initIsTerminal = func() bool { return terminal }
@@ -396,10 +399,10 @@ func TestInitFromPreviewReadsTheExtensionsApplyDeclaresAsDeclared(t *testing.T) 
 
 	// The preview's sync tasks receive them as a parameter beside the mode.
 	want := map[string]any{"dryRun": true, "mode": "import", "declaredExtensions": []string{"@putnami/typescript"}}
-	if got := initPreviewParams("import", calls.declares[0]); !reflect.DeepEqual(got, want) {
+	if got := initPreviewParams("import", calls.declares[0], nil); !reflect.DeepEqual(got, want) {
 		t.Errorf("preview params = %v, want %v", got, want)
 	}
-	if got := initPreviewParams("delegate", nil); !reflect.DeepEqual(got, map[string]any{"dryRun": true, "mode": "delegate"}) {
+	if got := initPreviewParams("delegate", nil, nil); !reflect.DeepEqual(got, map[string]any{"dryRun": true, "mode": "delegate"}) {
 		t.Errorf("a preview that declares nothing passes no extension: %v", got)
 	}
 
@@ -609,5 +612,150 @@ func TestInitFromRushDeclaresTheExtensionsOfTheModeAndSyncsTheProjects(t *testin
 	t.Chdir(t.TempDir())
 	if err := WorkspaceInit(context.Background(), "", []string{"--from", "rush"}, LifecycleEnv{}); err == nil || !strings.Contains(err.Error(), "holds no rush.json") || !errors.Is(err, protocolcli.ErrUsage) {
 		t.Errorf("err = %v, want a usage error naming rush.json", err)
+	}
+}
+
+func TestInitFromImportAddsProjectsToTheListAndPreviewsWithoutApply(t *testing.T) {
+	spectest.Proves(t, initFromFeature, "init-import-adds-projects", "init-from-import-adds-projects-to-the-list-and-previews-without-apply")
+
+	// What --import cannot do is a usage error, and nothing is written.
+	for name, c := range map[string]struct {
+		args []string
+		want string
+	}{
+		"without --from":      {[]string{"--import", "/packages/pricing"}, "--mode, --import and --apply adopt a monorepo tool"},
+		"a tool without list": {[]string{"--from", "moon", "--import", "/packages/pricing"}, "--from moon keeps no import list"},
+		"a delegate-only one": {[]string{"--from", "pants", "--import", "/packages/pricing"}, "--from pants keeps no import list"},
+		"no path":             {[]string{"--from", "nx", "--import"}, "--import needs project paths"},
+		"a flag after it":     {[]string{"--from", "nx", "--import", "--apply"}, "--import needs project paths"},
+		"a flag as a path":    {[]string{"--from", "nx", "--import=--apply"}, `--import "--apply" names no project directory`},
+		"a double star":       {[]string{"--from", "nx", "--import", "packages/**"}, `--import "packages/**" uses **, which matches within one path segment only`},
+		"an empty path":       {[]string{"--from", "nx", "--import=/a,,/b"}, `--import "" names no project directory`},
+		"a path outside":      {[]string{"--from", "nx", "--import", "../elsewhere"}, `--import "../elsewhere" names no project directory`},
+		"a malformed glob":    {[]string{"--from", "nx", "--import", "packages/["}, `--import "packages/[" names no project directory`},
+		"import mode":         {[]string{"--from", "nx", "--mode", "import", "--import", "/packages/pricing"}, "give --mode delegate"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			dir := nxRepository(t)
+			stubInitFrom(t, false, "")
+			err := WorkspaceInit(context.Background(), "", c.args, LifecycleEnv{})
+			if err == nil || !strings.Contains(err.Error(), c.want) || !errors.Is(err, protocolcli.ErrUsage) {
+				t.Fatalf("err = %v, want a usage error with %q", err, c.want)
+			}
+			if _, err := os.Stat(filepath.Join(dir, wsproto.WorkspaceConfigFilename)); !os.IsNotExist(err) {
+				t.Errorf("a refused init writes no workspace config: %v", err)
+			}
+		})
+	}
+
+	// A delegated workspace that does not declare @putnami/typescript yet.
+	dir := nxRepository(t)
+	delegated := `{"name": "shop", "extensions": ["@putnami/nx"], "options": {"@putnami/nx": {"mode": "delegate"}}}`
+	if err := os.WriteFile(filepath.Join(dir, wsproto.WorkspaceConfigFilename), []byte(delegated), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	// Without --apply, the run previews the sync with the list it would
+	// record and the extension it would declare, and writes nothing.
+	calls := stubInitFrom(t, false, "")
+	out, err := captureStdout(t, func() error {
+		return WorkspaceInit(context.Background(), dir, []string{"--from", "nx", "--import", "/packages/pricing"}, LifecycleEnv{})
+	})
+	if err != nil || !slices.Equal(calls.previewed, []string{"delegate"}) || calls.synced != nil || len(calls.installed) != 0 {
+		t.Fatalf("err %v, calls %+v\n%s", err, calls, out)
+	}
+	if !slices.Equal(calls.imports[0], []string{"/packages/pricing"}) || !slices.Equal(calls.declares[0], []string{"@putnami/typescript"}) {
+		t.Errorf("the preview read imports %v and declares %v", calls.imports, calls.declares)
+	}
+	for _, want := range []string{
+		`options["@putnami/nx"].import + /packages/pricing`,
+		"extensions + @putnami/typescript",
+		"putnami init --from nx --mode delegate --import /packages/pricing --apply",
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("the preview prints %q:\n%s", want, out)
+		}
+	}
+	if strings.Contains(out, ".mode") {
+		t.Errorf("the preview names a mode change that does not happen:\n%s", out)
+	}
+	if data, _ := os.ReadFile(filepath.Join(dir, wsproto.WorkspaceConfigFilename)); string(data) != delegated {
+		t.Errorf("a preview wrote %s", data)
+	}
+	// The preview's sync tasks receive the list as their import parameter.
+	if got := initPreviewParams("delegate", calls.declares[0], calls.imports[0]); !reflect.DeepEqual(got["import"], []string{"/packages/pricing"}) || got["mode"] != "delegate" {
+		t.Errorf("preview params = %v, want the mode and the list", got)
+	}
+
+	// --apply records the list, declares and installs @putnami/typescript,
+	// and synchronizes.
+	calls = stubInitFrom(t, false, "")
+	out, err = captureStdout(t, func() error {
+		return WorkspaceInit(context.Background(), dir, []string{"--from", "nx", "--import", "/packages/pricing", "--apply"}, LifecycleEnv{})
+	})
+	if err != nil || calls.synced == nil || !slices.Equal(calls.installed, []string{"@putnami/typescript"}) {
+		t.Fatalf("err %v, calls %+v\n%s", err, calls, out)
+	}
+	cfg := readInitConfig(t, dir)
+	if got := cfg.Options["@putnami/nx"]; got.Mode != "delegate" || !slices.Equal(got.Import, []string{"/packages/pricing"}) {
+		t.Errorf("options = %+v", got)
+	}
+	if !slices.Equal(cfg.Extensions, []string{"@putnami/nx", "@putnami/typescript"}) {
+		t.Errorf("extensions = %v", cfg.Extensions)
+	}
+
+	// An entry the list holds in another spelling adds nothing; a new one is
+	// appended after the recorded ones.
+	calls = stubInitFrom(t, false, "")
+	out, err = captureStdout(t, func() error {
+		return WorkspaceInit(context.Background(), dir, []string{"--from", "nx", "--import=packages/pricing,apps/*", "--apply"}, LifecycleEnv{})
+	})
+	if err != nil || len(calls.installed) != 0 {
+		t.Fatalf("err %v, calls %+v\n%s", err, calls, out)
+	}
+	if got := readInitConfig(t, dir).Options["@putnami/nx"].Import; !slices.Equal(got, []string{"/packages/pricing", "apps/*"}) {
+		t.Errorf("import = %v, want the recorded entry then the new one", got)
+	}
+	if strings.Contains(out, "import + packages/pricing") || !strings.Contains(out, "import + apps/*") {
+		t.Errorf("the run lists what it adds:\n%s", out)
+	}
+
+	// A rerun without --import previews with the recorded list.
+	calls = stubInitFrom(t, false, "")
+	if out, err := captureStdout(t, func() error {
+		return WorkspaceInit(context.Background(), dir, []string{"--from", "nx"}, LifecycleEnv{})
+	}); err != nil || len(calls.imports) != 1 || calls.imports[0] != nil {
+		t.Fatalf("err %v, imports %v\n%s", err, calls.imports, out)
+	}
+
+	// A workspace in import mode refuses --import.
+	if err := os.WriteFile(filepath.Join(dir, wsproto.WorkspaceConfigFilename), []byte(`{"name": "shop", "extensions": ["@putnami/nx", "@putnami/typescript"], "options": {"@putnami/nx": {"mode": "import"}}}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	stubInitFrom(t, false, "")
+	if err := WorkspaceInit(context.Background(), dir, []string{"--from", "nx", "--import", "/packages/pricing"}, LifecycleEnv{}); err == nil || !strings.Contains(err.Error(), "adopts in import mode") || !errors.Is(err, protocolcli.ErrUsage) {
+		t.Errorf("err = %v, want a usage error naming import mode", err)
+	}
+
+	// A new workspace from Turborepo: --import alone adopts in delegate
+	// mode, records the list and declares @putnami/typescript.
+	turbo := t.TempDir()
+	t.Chdir(turbo)
+	if err := os.WriteFile(filepath.Join(turbo, "turbo.json"), []byte(`{"tasks": {"build": {}}}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	calls = stubInitFrom(t, true, "")
+	out, err = captureStdout(t, func() error {
+		return WorkspaceInit(context.Background(), "", []string{"--from", "turbo", "--import", "/packages/pricing", "--workspace", "shop"}, LifecycleEnv{})
+	})
+	if err != nil || strings.Contains(out, "1) import") {
+		t.Fatalf("WorkspaceInit: %v\n%s", err, out)
+	}
+	cfg = readInitConfig(t, turbo)
+	if got := cfg.Options["@putnami/turbo"]; got.Mode != "delegate" || !slices.Equal(got.Import, []string{"/packages/pricing"}) {
+		t.Errorf("options = %+v", got)
+	}
+	if want := []string{"@putnami/turbo", "@putnami/typescript"}; !slices.Equal(cfg.Extensions, want) || !slices.Equal(calls.installed, want) {
+		t.Errorf("extensions %v, installed %v, want %v", cfg.Extensions, calls.installed, want)
 	}
 }

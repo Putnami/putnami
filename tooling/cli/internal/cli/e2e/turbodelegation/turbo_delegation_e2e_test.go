@@ -19,11 +19,17 @@ import (
 )
 
 func TestMain(m *testing.M) {
+	abs, err := filepath.Abs("../../../../../..")
+	if err != nil {
+		panic(err)
+	}
+	repoRoot = abs
 	os.Exit(clitest.Main(m))
 }
 
-// repoRoot is the root of this repository, from this package's directory.
-const repoRoot = "../../../../../.."
+// repoRoot is the root of this repository, absolute, since the CLI runs
+// change the working directory.
+var repoRoot string
 
 const feature = "cli/init-from-a-monorepo-tool"
 

@@ -536,6 +536,10 @@
           ]
         },
         {
+          "long": "--import",
+          "type": "value"
+        },
+        {
           "long": "--mode",
           "type": "value",
           "values": [
@@ -1043,6 +1047,10 @@
             "rush",
             "turbo"
           ]
+        },
+        {
+          "long": "--import",
+          "type": "value"
         },
         {
           "long": "--mode",

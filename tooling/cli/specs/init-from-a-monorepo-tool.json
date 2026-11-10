@@ -74,6 +74,14 @@
       "text": "On the same fixture, in import mode, the sync keeps the edges putnami observe reads, gives a TypeScript package @putnami/typescript for a task whose script already runs bun test and disables @putnami/turbo for it, and lists each tsc or vitest task it leaves on Turborepo."
     },
     {
+      "id": "init-import-adds-projects",
+      "text": "putnami init --from nx|turbo --import <path>,<path> in delegate mode adds each path not listed yet to options[\"@putnami/<tool>\"].import and declares @putnami/typescript. In a workspace that exists, it previews the change and the sync's dry run with that list, and writes only with --apply, which records it, installs the extensions and runs projects sync. A new workspace records it with the mode. --import with another tool, no path, or import mode is a usage error."
+    },
+    {
+      "id": "delegate-import-runs-one-project-on-putnami",
+      "text": "On the delegated Nx and Turborepo fixtures of the putnami observe detector, with pricing's scripts running bun build and bun test, putnami init --from <tool> --import /packages/pricing --apply then putnami lint,test,build pass: pricing runs on @putnami/typescript with Putnami's cache, and api still runs through the tool, its results recording delegatedTo <tool>."
+    },
+    {
       "id": "init-from-rush",
       "text": "putnami init --from rush, at the root of a repository that holds rush.json, declares @putnami/rush, records the mode in its options, also declares @putnami/typescript in import mode, installs them and runs projects sync, whose Rush sync task writes each Rush project's putnami.json. In import mode the TypeScript install writes the root package.json with the projects as workspaces. Without rush.json it is a usage error that names the file."
     },

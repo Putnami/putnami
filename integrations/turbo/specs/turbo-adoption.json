@@ -5,7 +5,8 @@
   "outcomes": [
     "Each package of a Turborepo repository is a Putnami project, with an edge to each workspace package it depends on",
     "In delegate mode, putnami lint, test and build run turbo run on each affected package, and Turborepo's cache, local and remote, decides what reruns",
-    "In import mode, a TypeScript package's task whose script already runs what @putnami/typescript runs moves to Putnami's runner and cache, and every other task keeps running through Turborepo"
+    "In import mode, a TypeScript package's task whose script already runs what @putnami/typescript runs moves to Putnami's runner and cache, and every other task keeps running through Turborepo",
+    "In delegate mode, the packages options[\"@putnami/turbo\"].import selects are imported as import mode imports them, so a team moves one package at a time"
   ],
   "nonGoals": [
     "Caching a Turborepo result in Putnami's cache, or putting Putnami's cache over Turborepo's",
@@ -21,6 +22,10 @@
     {
       "id": "sync-writes-the-package-graph",
       "text": "The sync reads options[\"@putnami/turbo\"].mode, import by default, and writes in each member's putnami.json @putnami/turbo, its edges as project IDs, and in disable.jobs each of build, test and lint it has no script or turbo.json task for. In import mode a TypeScript package also declares @putnami/typescript, which runs a task whose script already runs bun build, bun test or biome; the other extension's job of each task is disabled. It retracts a former member and rewrites only a changed file."
+    },
+    {
+      "id": "delegate-imports-listed-packages",
+      "text": "In delegate mode, the sync reads options[\"@putnami/turbo\"].import, or the import parameter in its place: package paths and globs matched against each package's directory, a leading / ignored, * ? [...] within one segment. Each selected package is written as import mode writes it, the others stay delegated, and an entry that selects none is listed as turbo.import_unmatched. Import mode reads no list. validate fails with turbo.sync_stale when a putnami.json does not match the list."
     },
     {
       "id": "sync-previews-a-diff",
@@ -48,6 +53,7 @@
     }
   ],
   "decisions": [
-    "tooling/stacks/doc/adr/0008-a-delegated-stack-keeps-its-tool-cache.md"
+    "tooling/stacks/doc/adr/0008-a-delegated-stack-keeps-its-tool-cache.md",
+    "integrations/nx/doc/adr/0002-a-delegated-workspace-imports-the-projects-a-list-names.md"
   ]
 }

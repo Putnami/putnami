@@ -4582,6 +4582,29 @@
           }
         },
         {
+          "id": "init-import-adds-projects",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "init-from-import-adds-projects-to-the-list-and-previews-without-apply"
+            ]
+          }
+        },
+        {
+          "id": "delegate-import-runs-one-project-on-putnami",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-delegated-nx-workspace-imports-pricing-and-passes-lint-test-build",
+              "a-delegated-turborepo-imports-pricing-and-passes-lint-test-build"
+            ]
+          }
+        },
+        {
           "id": "init-from-rush",
           "stage": "coded",
           "evidenceKinds": [

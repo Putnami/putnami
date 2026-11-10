@@ -350,6 +350,7 @@ _putnami_flags_for() {
                 '--extension[Languages to declare, such as rust or rust,java (ts and py name typescript and python): each one'\''s extension is installed, and its projects synchronized when the repository holds its markers]:languages:'
                 '--force[Reinitialize an existing workspace]'
                 '--from[Turn the repository a monorepo tool describes into a workspace: declare the tool'\''s extension and synchronize its packages as projects; rerun in the workspace to preview what would change]:bazel|moon|nx|pants|rush|turbo:(bazel moon nx pants rush turbo)'
+                '--import[With --from nx or turbo in delegate mode: add project paths or globs to the projects the delegated workspace imports, and declare @putnami/typescript]:path>,<path:'
                 '--mode[With --from: import hands the targets Putnami can map to its runner and cache, delegate keeps the tool running each target with its cache (default: asked in a terminal, else import; Bazel and Pants delegate)]:import|delegate:(delegate import)'
                 '--project[Create an initial project from the starter of the first --extension language]:name:'
                 '--project-path[Workspace-relative path for the initial project]:path:'
@@ -471,6 +472,7 @@ _putnami_flags_for() {
                 '--extension[Languages to declare, such as rust or rust,java (ts and py name typescript and python): each one'\''s extension is installed, and its projects synchronized when the repository holds its markers]:languages:'
                 '--force[Reinitialize an existing workspace]'
                 '--from[Turn the repository a monorepo tool describes into a workspace: declare the tool'\''s extension and synchronize its packages as projects; rerun in the workspace to preview what would change]:bazel|moon|nx|pants|rush|turbo:(bazel moon nx pants rush turbo)'
+                '--import[With --from nx or turbo in delegate mode: add project paths or globs to the projects the delegated workspace imports, and declare @putnami/typescript]:path>,<path:'
                 '--mode[With --from: import hands the targets Putnami can map to its runner and cache, delegate keeps the tool running each target with its cache (default: asked in a terminal, else import; Bazel and Pants delegate)]:import|delegate:(delegate import)'
                 '--project[Create an initial project from the starter of the first --extension language]:name:'
                 '--project-path[Workspace-relative path for the initial project]:path:'
@@ -715,6 +717,11 @@ _putnami() {
                         )
                         value_slot=1
                         ;;
+                    'init --import')
+                        cmd_values=(
+                        )
+                        value_slot=1
+                        ;;
                     'init --mode')
                         cmd_values=(
                             'delegate'
@@ -837,6 +844,11 @@ _putnami() {
                             'pants'
                             'rush'
                             'turbo'
+                        )
+                        value_slot=1
+                        ;;
+                    'workspace init --import')
+                        cmd_values=(
                         )
                         value_slot=1
                         ;;

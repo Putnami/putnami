@@ -2,6 +2,7 @@
   "$schema": "https://putnami.dev/schemas/putnami-specs-baseline.json",
   "protocolVersion": 2,
   "executableRequirements": [
+    "monorepo/nx-adoption#delegate-imports-listed-projects",
     "monorepo/nx-adoption#import-maps-typescript-targets",
     "monorepo/nx-adoption#manifest-follows-the-profile",
     "monorepo/nx-adoption#projects-become-projects",

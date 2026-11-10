@@ -57,6 +57,24 @@ depends on it and still builds through Turborepo builds it again through
 `^build`: `@putnami/typescript` builds it once for Putnami, and Turborepo once
 for the delegated package.
 
+### Import some packages of a delegated workspace
+
+In delegate mode, `options["@putnami/turbo"].import` lists package paths and
+globs, such as `/packages/pricing` or `/packages/*`: a leading `/` is
+ignored, and `*`, `?` and `[...]` match within one path segment. The sync
+writes each package an entry selects as import mode writes it, and every
+other package as delegate mode writes it. Import mode reads no list.
+
+```bash
+putnami init --from turbo --import /packages/pricing --apply
+```
+
+adds the entry, declares `@putnami/typescript`, and synchronizes; without
+`--apply` it previews. The sync job's `import` parameter outranks the option,
+as `mode` does, so a preview reads the list it would record.
+
+### What import mode installs
+
 Import mode declares `@putnami/typescript` in the workspace, and its own
 workspace setup then runs: it adds its devDependencies to the root
 `package.json`, writes there the `workspaces` list of the members, and writes
@@ -72,10 +90,10 @@ package, and writes in each package's `putnami.json`:
 
 | Member | Value |
 |---|---|
-| `extensions` | `@putnami/turbo`, and `@putnami/typescript` for a TypeScript package in import mode, beside any other extension the file names |
+| `extensions` | `@putnami/turbo`, and `@putnami/typescript` for a TypeScript package in import mode or on the import list, beside any other extension the file names |
 | `dependencies` | The project ID of each workspace package it depends on, such as `/packages/pricing`; a dependency on a project that is no package is kept |
 | `tags` | `turbo`, which marks the packages the sync owns |
-| `disable.jobs` | Each of `build`, `lint` and `test` the package has no task for: no script of that name in its `package.json`, or no task of that name, or `<package>#<task>`, in `turbo.json`. In import mode, for each task of a TypeScript package, the job of the extension that does not run it: `@putnami/turbo:<task>` when `@putnami/typescript` runs it, `@putnami/typescript:<task>` otherwise. The sync owns these entries, bare and qualified |
+| `disable.jobs` | Each of `build`, `lint` and `test` the package has no task for: no script of that name in its `package.json`, or no task of that name, or `<package>#<task>`, in `turbo.json`. In import mode, or for a TypeScript package on the import list, for each task the job of the extension that does not run it: `@putnami/turbo:<task>` when `@putnami/typescript` runs it, `@putnami/typescript:<task>` otherwise. The sync owns these entries, bare and qualified |
 
 It keeps every other member, and rewrites a file only when a member it owns
 changes, with two-space indentation and sorted keys. A package that left the
@@ -151,3 +169,4 @@ with `stacks.test_failed`, and a named report the run did not write with
 | `turbo.sync_stale` | A package's `putnami.json` no longer matches what the sync writes |
 | `turbo.task_unmapped` | A `turbo.json` task no Putnami task maps; it keeps running through Turborepo |
 | `turbo.reports_unnamed` | A delegated package's test task names no JUnit report |
+| `turbo.import_unmatched` | An entry of `options["@putnami/turbo"].import` selects no package; a warning |

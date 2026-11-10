@@ -6,6 +6,7 @@
     "Each Nx project is a Putnami project with an edge to each project Nx says it depends on, in both modes",
     "In delegate mode, putnami lint, test and build run nx run on each affected project, and Nx's cache decides what reruns",
     "In import mode, a TypeScript project's build, test and lint run as @putnami/typescript tasks, and every other target keeps running through Nx",
+    "In delegate mode, the projects options[\"@putnami/nx\"].import selects are imported as import mode imports them, so a team moves one project at a time",
     "The sync lists every target it does not map, with the reason, and a stale graph fails putnami validate"
   ],
   "nonGoals": [
@@ -25,7 +26,11 @@
     },
     {
       "id": "import-maps-typescript-targets",
-      "text": "In import mode, a project with package.json and a tsconfig*.json or a .ts source is TypeScript: its build, test and lint targets whose script already runs what @putnami/typescript runs (bun build, bun test, biome) run as its task, and @putnami/nx:<task> is disabled. Every other build, test or lint target, such as jest, eslint, tsc or an Nx executor, keeps running through Nx, is listed with its reason, and @putnami/typescript:<task> is disabled, so no runner changes silently."
+      "text": "In import mode, a project with package.json and a tsconfig*.json or a .ts source is TypeScript: its putnami.json names @putnami/typescript beside @putnami/nx, its build, test and lint targets whose script already runs bun build, bun test or biome run as that extension's task, and @putnami/nx:<task> is disabled. Every other build, test or lint target, such as jest, eslint, tsc or an Nx executor, keeps running through Nx, is listed with its reason, and @putnami/typescript:<task> is disabled."
+    },
+    {
+      "id": "delegate-imports-listed-projects",
+      "text": "In delegate mode, the sync reads options[\"@putnami/nx\"].import, or the import parameter in its place: project paths and globs matched against each project's directory, a leading / ignored, * ? [...] within one segment. Each selected project is written as import mode writes it, the others stay delegated, and an entry that selects none is listed as nx.import_unmatched. Import mode reads no list. validate fails with nx.sync_stale when a putnami.json does not match the list."
     },
     {
       "id": "unmapped-targets-are-listed",
@@ -50,6 +55,7 @@
   ],
   "decisions": [
     "tooling/stacks/doc/adr/0008-a-delegated-stack-keeps-its-tool-cache.md",
-    "integrations/nx/doc/adr/0001-the-adoption-mode-is-a-workspace-option.md"
+    "integrations/nx/doc/adr/0001-the-adoption-mode-is-a-workspace-option.md",
+    "integrations/nx/doc/adr/0002-a-delegated-workspace-imports-the-projects-a-list-names.md"
   ]
 }
