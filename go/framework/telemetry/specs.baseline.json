@@ -3,6 +3,7 @@
   "protocolVersion": 2,
   "executableRequirements": [
     "go/service-telemetry#bounded-shutdown",
+    "go/service-telemetry#default-from-environment",
     "go/service-telemetry#duration-precision",
     "go/service-telemetry#endpoint-required",
     "go/service-telemetry#explicit-sampling",

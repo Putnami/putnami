@@ -1,7 +1,9 @@
 package telemetry
 
 import (
+	"context"
 	"fmt"
+	"sync"
 	"time"
 
 	"go.opentelemetry.io/otel"
@@ -9,38 +11,63 @@ import (
 	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/metric"
 	"go.opentelemetry.io/otel/propagation"
+	"go.opentelemetry.io/otel/trace"
 
 	putnami_http "go.putnami.dev/http"
 	"go.putnami.dev/logger"
 )
 
+// instrumentedKey marks a request an outer HTTPMiddleware already traces and
+// counts.
+type instrumentedKey struct{}
+
 // HTTPMiddleware returns an HTTP middleware that traces each request and records
 // metrics (request count, duration histogram).
 //
 //	server.Use(telemetry.HTTPMiddleware("my-service"))
+//
+// A request passes through every HTTPMiddleware nested under the first one it
+// meets untouched, so a server that FromEnvironment instruments and that also
+// installs this middleware itself records each request once.
 func HTTPMiddleware(serviceName string) putnami_http.Middleware {
-	tracer := Tracer(serviceName)
-	meter := Meter(serviceName)
-	// Use the framework logger (matching plugin.go) so these diagnostics carry
-	// the "telemetry" logger name and route through the configured sink, rather
-	// than going straight to log/slog and bypassing the framework's conventions.
-	log := logger.Default().Named("telemetry")
+	// The tracer and instruments are created on the first request, not here:
+	// a middleware is often built before the application installs its
+	// providers, and an instrument stays bound to the provider that created it.
+	var (
+		once            sync.Once
+		tracer          trace.Tracer
+		requestCount    metric.Int64Counter
+		requestDuration metric.Float64Histogram
+	)
+	instruments := func() {
+		tracer = Tracer(serviceName)
+		meter := Meter(serviceName)
+		// Use the framework logger (matching plugin.go) so these diagnostics carry
+		// the "telemetry" logger name and route through the configured sink, rather
+		// than going straight to log/slog and bypassing the framework's conventions.
+		log := logger.Default().Named("telemetry")
 
-	requestCount, err := meter.Int64Counter("http.server.request_count",
-		metric.WithDescription("Total HTTP requests"),
-	)
-	if err != nil {
-		log.Error("telemetry: failed to create request_count counter, metrics will be unavailable", err)
-	}
-	requestDuration, err := meter.Float64Histogram("http.server.duration",
-		metric.WithDescription("HTTP request duration in milliseconds"),
-		metric.WithUnit("ms"),
-	)
-	if err != nil {
-		log.Error("telemetry: failed to create duration histogram, metrics will be unavailable", err)
+		var err error
+		requestCount, err = meter.Int64Counter("http.server.request_count",
+			metric.WithDescription("Total HTTP requests"),
+		)
+		if err != nil {
+			log.Error("telemetry: failed to create request_count counter, metrics will be unavailable", err)
+		}
+		requestDuration, err = meter.Float64Histogram("http.server.duration",
+			metric.WithDescription("HTTP request duration in milliseconds"),
+			metric.WithUnit("ms"),
+		)
+		if err != nil {
+			log.Error("telemetry: failed to create duration histogram, metrics will be unavailable", err)
+		}
 	}
 
 	return func(ctx *putnami_http.Context, next func() *putnami_http.Response) *putnami_http.Response {
+		if ctx.Request.Context().Value(instrumentedKey{}) != nil {
+			return next()
+		}
+		once.Do(instruments)
 		// Extract W3C trace context from incoming headers for distributed trace correlation
 		propagator := otel.GetTextMapPropagator()
 		parentCtx := propagator.Extract(ctx.Request.Context(), propagation.HeaderCarrier(ctx.Request.Header))
@@ -50,7 +77,7 @@ func HTTPMiddleware(serviceName string) putnami_http.Middleware {
 		// in the batch processor (the panic recovery below runs first and marks
 		// the span errored before this defer ends it).
 		defer span.End()
-		ctx.Request = ctx.Request.WithContext(spanCtx)
+		ctx.Request = ctx.Request.WithContext(context.WithValue(spanCtx, instrumentedKey{}, true))
 
 		span.SetAttributes(
 			attribute.String("http.method", ctx.Method),

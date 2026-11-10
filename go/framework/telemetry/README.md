@@ -25,6 +25,37 @@ The plugin registers `trace.TracerProvider` and `metric.MeterProvider` in the DI
 Leave `TraceSampleRate` nil to sample every trace. Use `telemetry.SampleRate(0)`
 to explicitly sample nothing.
 
+## Default telemetry from the environment
+
+`FromEnvironment` returns the telemetry a service gets without wiring it. Register
+it once as a default plugin, and every `app.New` starts with it:
+
+```go
+func init() {
+    app.RegisterDefaultPlugin(func() app.Plugin {
+        return telemetry.FromEnvironment(telemetry.EnvironmentOptions{
+            BearerTokenSource: telemetry.NewGCPIDTokenSource, // optional
+        })
+    })
+}
+```
+
+It reads the standard OpenTelemetry variables:
+
+| Variable | Effect |
+|----------|--------|
+| `OTEL_EXPORTER_OTLP_ENDPOINT` | Collector base URL. Without it, the factory returns nil and the application gets no plugin. |
+| `OTEL_SDK_DISABLED=true` | Turns the default telemetry off, whatever the endpoint says. |
+| `OTEL_SERVICE_NAME`, `OTEL_RESOURCE_ATTRIBUTES` | Service identity on every metric and span. |
+
+The plugin adds `HTTPMiddleware` outermost on every HTTP server of the
+application, so a request that an inner middleware refuses is still counted. It
+builds the tracer and meter providers that push to the collector, unless the
+application installs its own `NewPlugin`: that plugin then owns the providers.
+A server that also adds `HTTPMiddleware` itself counts each request once. The
+plugin registers nothing in the DI container. See [ADR
+0003](doc/adr/0003-telemetry-is-on-by-default-from-the-environment.md).
+
 ## Push telemetry (OTLP/JSON over HTTP)
 
 Putnami is serverless-first, so telemetry is **pushed** to a collector rather than scraped. The built-in exporters render the OTLP/JSON wire format (per the [telemetry protocol](../../../protocols/telemetry/README.md)) and POST it — no OpenTelemetry exporter SDK dependency.
@@ -163,6 +194,9 @@ The middleware creates a span per request with attributes (`http.method`, `http.
 
 The span is always ended, even if a downstream handler or middleware panics: the panic is recovered just long enough to mark the span errored (`http.panic=true`, `http.status_code=500`) and record metrics, then re-panicked so any outer recovery middleware behaves normally. This means `HTTPMiddleware` can safely sit outermost regardless of where a recovery middleware is installed.
 
+When two `HTTPMiddleware` wrap the same request, for example the one from
+`FromEnvironment` and one the workload adds, only the outer one records it.
+
 ## Configuration
 
 | Field | Default | Description |
@@ -186,8 +220,10 @@ every pre-1.0 minor.
 
 The [service telemetry specification](specs/service-telemetry.json) defines what
 the framework adds, backed by two durable decisions: [push OTLP/JSON without an
-exporter SDK](doc/adr/0001-push-otlp-json-without-an-exporter-sdk.md) and [the
-middleware owns the span](doc/adr/0002-the-middleware-owns-the-span.md). The
+exporter SDK](doc/adr/0001-push-otlp-json-without-an-exporter-sdk.md), [the
+middleware owns the span](doc/adr/0002-the-middleware-owns-the-span.md), and
+[telemetry is on by default from the
+environment](doc/adr/0003-telemetry-is-on-by-default-from-the-environment.md). The
 export defaults, the final flush and the dropped collector error belong to the
 feature of the [telemetry protocol](../../../protocols/telemetry/README.md),
 `telemetry/otlp-push-contract`; the exporter, log sink and mapping tests here
@@ -196,4 +232,5 @@ prove its checks.
 Regression evidence covers [tracing, metrics, HTTP middleware, sampling, and the
 error bridge](telemetry_test.go), [plugin lifecycle purity and bounded
 shutdown](plugin_extra_test.go), and [the OTLP/JSON exporters, log sink, and
-mapping tables](otlp_test.go).
+mapping tables](otlp_test.go), and [the default telemetry from the
+environment](environment_test.go).

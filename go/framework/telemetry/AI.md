@@ -4,6 +4,21 @@ OpenTelemetry integration with distributed tracing, metrics, and HTTP middleware
 
 ## Quick Start
 
+With `OTEL_EXPORTER_OTLP_ENDPOINT` set, register `FromEnvironment` once as a
+default plugin and every application counts, times and traces its HTTP requests
+with no other wiring:
+
+```go
+app.RegisterDefaultPlugin(func() app.Plugin {
+	return telemetry.FromEnvironment(telemetry.EnvironmentOptions{})
+})
+```
+
+`OTEL_SDK_DISABLED=true` turns it off. An explicit `NewPlugin` owns the
+providers; the default plugin then only instruments the servers.
+
+To configure telemetry yourself:
+
 ```go
 import (
 	"go.putnami.dev/app"
@@ -60,6 +75,7 @@ options as their OpenTelemetry counterparts (e.g. `metric.WithDescription`,
 
 ```go
 server.Use(telemetry.HTTPMiddleware("my-service")) // auto-traces all requests
+// Two HTTPMiddleware on one request record it once: the outer one wins.
 ```
 
 See `doc/getting-started.md` for full reference.
@@ -69,8 +85,10 @@ See `doc/getting-started.md` for full reference.
 This public package is `stable` in the workspace [support
 catalog](../../../putnami.support.json). Its behavior is defined by the [service
 telemetry specification](specs/service-telemetry.json), the [push-transport
-ADR](doc/adr/0001-push-otlp-json-without-an-exporter-sdk.md), and the
-[span-ownership ADR](doc/adr/0002-the-middleware-owns-the-span.md). Before v1.0,
+ADR](doc/adr/0001-push-otlp-json-without-an-exporter-sdk.md), the
+[span-ownership ADR](doc/adr/0002-the-middleware-owns-the-span.md), and the
+[default-telemetry ADR](doc/adr/0003-telemetry-is-on-by-default-from-the-environment.md).
+Before v1.0,
 follow the workspace [migration-based compatibility
 policy](../../../RELEASE.md); do not infer strict compatibility between every
 `0.x` minor.

@@ -66,6 +66,11 @@ type Config struct {
 	// ShutdownTimeout is the maximum time to wait for exporters to flush.
 	// Defaults to 5 seconds.
 	ShutdownTimeout time.Duration
+
+	// fromEnvironment makes the resource read OTEL_SERVICE_NAME and
+	// OTEL_RESOURCE_ATTRIBUTES when the providers are built, not once per
+	// process as the SDK default resource does. FromEnvironment sets it.
+	fromEnvironment bool
 }
 
 // SampleRate returns a pointer to rate for use as Config.TraceSampleRate.
@@ -99,10 +104,20 @@ func (c Config) resource() *resource.Resource {
 	if c.ServiceVersion != "" {
 		attrs = append(attrs, attribute.String("service.version", c.ServiceVersion))
 	}
-	if len(attrs) == 0 {
+	if len(attrs) == 0 && !c.fromEnvironment {
 		return nil
 	}
-	merged, err := resource.Merge(resource.Default(), resource.NewSchemaless(attrs...))
+	base := resource.Default()
+	if c.fromEnvironment {
+		// The environment is read now, so it wins over the default resource,
+		// which the SDK computed once, maybe before the variables were set.
+		if env, err := resource.New(context.Background(), resource.WithFromEnv()); err == nil {
+			if merged, err := resource.Merge(base, env); err == nil {
+				base = merged
+			}
+		}
+	}
+	merged, err := resource.Merge(base, resource.NewSchemaless(attrs...))
 	if err != nil {
 		// Schema URLs conflicted; fall back to the service attributes alone
 		// rather than dropping them.

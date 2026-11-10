@@ -27,6 +27,21 @@
           }
         },
         {
+          "id": "default-from-environment",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "no-endpoint-or-the-opt-out-means-no-plugin",
+              "the-environment-alone-exports-request-metrics-and-a-span",
+              "an-explicit-plugin-owns-the-providers-and-each-request-counts-once"
+            ]
+          }
+        },
+        {
           "id": "duration-precision",
           "stage": "coded",
           "evidenceKinds": [
