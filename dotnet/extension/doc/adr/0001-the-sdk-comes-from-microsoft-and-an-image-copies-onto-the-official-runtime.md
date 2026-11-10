@@ -1,6 +1,6 @@
 # ADR 0001 — The SDK comes from Microsoft's releases, and an application image copies onto the official .NET runtime image
 
-- **Status**: accepted
+- **Status**: accepted; amended by [ADR 0002](0002-the-extension-pins-the-sdk-and-runtime-releases-it-installs.md)
 - **Date**: 2026-11-08
 - **Scope**: `@putnami/dotnet`, the SDK a task runs, and the `serve`, `run`,
   `package` and `publish` commands

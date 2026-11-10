@@ -41,9 +41,9 @@ differ:
 - **Image port.** `package --docker` takes `--port`, 8080 by default, in every
   stack, and the image sets `PORT` from it.
 - **Dry run.** `package` and `publish` take `--dry-run` in every stack:
-  `package` checks its flags, writes the channel record and builds nothing,
-  as Java's did; Rust still stages a crate, which `cargo publish --dry-run`
-  checks.
+  `package` writes the channel record and builds nothing, as Java's does;
+  Rust's also checks the platforms its flags name, and still stages a crate,
+  which `cargo publish --dry-run` checks.
 - **Run and serve.** `serve` takes `--port`, 3000 by default and 0 for a free
   port. `run` and `serve` take `--args`, the words passed to the program,
   except PHP's `serve`, whose built-in server takes no program arguments.

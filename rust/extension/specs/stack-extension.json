@@ -100,7 +100,7 @@
     },
     {
       "id": "package-dry-run-builds-nothing",
-      "text": "package --dry-run checks the platform and the binary its flags name, compiles nothing, writes no archive and no image layout, and writes the channel record publish --dry-run reads; package --crates still stages the crate, which cargo publish --dry-run checks."
+      "text": "package --dry-run checks the platforms its flags name, compiles nothing, writes no archive and no image layout, and writes the channel record; package --crates still stages the crate, which cargo publish --dry-run checks."
     },
     {
       "id": "publish-sends-the-staged-crate",
