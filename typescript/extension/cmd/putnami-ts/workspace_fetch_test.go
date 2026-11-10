@@ -590,7 +590,7 @@ func TestShapeWorkspaceManifests_IsIdempotent(t *testing.T) {
 		return &exec.Result{Success: true, Stdout: "1.4.0"}, nil
 	})
 
-	if err := shapeWorkspaceManifests(ctx, jsonl.New(), "/mock/bun"); err != nil {
+	if err := shapeWorkspaceManifests(ctx, jsonl.New(), bunManager, "/mock/bun"); err != nil {
 		t.Fatal(err)
 	}
 	shaped := []string{"package.json", ".npmrc", "tsconfig.json", "biome.json"}
@@ -609,7 +609,7 @@ func TestShapeWorkspaceManifests_IsIdempotent(t *testing.T) {
 		}
 	}
 
-	if err := shapeWorkspaceManifests(ctx, jsonl.New(), "/mock/bun"); err != nil {
+	if err := shapeWorkspaceManifests(ctx, jsonl.New(), bunManager, "/mock/bun"); err != nil {
 		t.Fatal(err)
 	}
 	for _, rel := range shaped {

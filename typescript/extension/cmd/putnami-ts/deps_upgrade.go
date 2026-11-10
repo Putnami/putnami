@@ -20,6 +20,7 @@ import (
 	pctx "go.putnami.dev/sdk/extension/context"
 	"go.putnami.dev/sdk/extension/jsonl"
 	"go.putnami.dev/typescript/extension/internal/catalog"
+	"go.putnami.dev/typescript/extension/internal/pnpmworkspace"
 )
 
 var npmMetadataClient = &http.Client{Timeout: 30 * time.Second}
@@ -819,23 +820,32 @@ func collectWorkspacePackageNames(wsRoot string) map[string]bool {
 }
 
 // workspaceMemberDirs resolves the directories of the workspace members listed
-// in the root package.json "workspaces" field. It accepts both the array form
-// (["packages/*"]) and the object form ({"packages": [...]}), and expands glob
-// patterns the way Bun does.
+// in the root package.json "workspaces" field, or, when it lists none, in the
+// packages of pnpm-workspace.yaml. It accepts both package.json forms, the
+// array (["packages/*"]) and the object ({"packages": [...]}), and expands
+// glob patterns the way Bun does; a pnpm exclusion (a pattern starting with
+// "!") selects no directory.
 func workspaceMemberDirs(wsRoot string) []string {
-	data, err := os.ReadFile(filepath.Join(wsRoot, "package.json"))
-	if err != nil {
-		return nil
+	var patterns []string
+	if data, err := os.ReadFile(filepath.Join(wsRoot, "package.json")); err == nil {
+		var root struct {
+			Workspaces json.RawMessage `json:"workspaces"`
+		}
+		if json.Unmarshal(data, &root) == nil && len(root.Workspaces) > 0 {
+			patterns = parseWorkspacePatterns(root.Workspaces)
+		}
 	}
-	var root struct {
-		Workspaces json.RawMessage `json:"workspaces"`
-	}
-	if json.Unmarshal(data, &root) != nil || len(root.Workspaces) == 0 {
-		return nil
+	if len(patterns) == 0 {
+		if data, err := os.ReadFile(pnpmWorkspaceFile(wsRoot)); err == nil {
+			patterns, _, _ = pnpmworkspace.Packages(string(data))
+		}
 	}
 
 	var dirs []string
-	for _, pattern := range parseWorkspacePatterns(root.Workspaces) {
+	for _, pattern := range patterns {
+		if strings.HasPrefix(pattern, "!") {
+			continue
+		}
 		pattern = filepath.FromSlash(pattern)
 		full := filepath.Join(wsRoot, pattern)
 		if strings.ContainsAny(pattern, "*?[") {

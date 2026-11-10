@@ -737,7 +737,7 @@ func TestEnsureWorkspaceDevDeps_AddsTheBiomeTheRulesTarget(t *testing.T) {
 
 	wsDir := t.TempDir()
 	ctx := &pctx.Context{WorkspaceRoot: wsDir, Extension: pctx.Extension{Root: extensionRoot}}
-	if err := ensureRootManifest(ctx, jsonl.New()); err != nil {
+	if err := ensureRootManifest(ctx, jsonl.New(), bunManager); err != nil {
 		t.Fatal(err)
 	}
 	if err := ensureWorkspaceDevDeps(ctx, jsonl.New()); err != nil {

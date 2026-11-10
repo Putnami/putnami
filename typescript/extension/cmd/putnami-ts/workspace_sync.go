@@ -10,6 +10,7 @@ import (
 
 	pctx "go.putnami.dev/sdk/extension/context"
 	"go.putnami.dev/sdk/extension/jsonl"
+	"go.putnami.dev/typescript/extension/internal/pnpmworkspace"
 )
 
 // The TypeScript workspace-sync task.
@@ -81,7 +82,10 @@ func syncTypeScriptWorkspace(root string, selected []pctx.ProjectRef, dryRun boo
 	}
 	changes = append(changes, nameChanges...)
 
-	workspaceChange, err := syncRootWorkspaces(root, members, dryRun)
+	// The membership goes where the workspace's package manager reads it. A
+	// declaration the install refuses still has its members in package.json.
+	manager, _ := detectPackageManager(root)
+	workspaceChange, err := syncWorkspaceMembers(root, manager, members, dryRun)
 	if err != nil {
 		return nil, err
 	}
@@ -178,6 +182,60 @@ func alignPackageNames(root string, members []typeScriptMember, dryRun bool) ([]
 		}
 	}
 	return changes, nil
+}
+
+// syncWorkspaceMembers writes the members where manager reads them: the
+// packages of pnpm-workspace.yaml for pnpm, and the root package.json
+// workspaces otherwise.
+func syncWorkspaceMembers(root string, manager packageManager, members []typeScriptMember, dryRun bool) (*workspaceSyncChange, error) {
+	if manager.listsMembersInPNPMWorkspace() {
+		return syncPNPMWorkspacePackages(root, members, dryRun)
+	}
+	return syncRootWorkspaces(root, members, dryRun)
+}
+
+// syncPNPMWorkspacePackages rewrites the `packages` list of pnpm-workspace.yaml
+// to exactly the members' paths, keeping every other line of the file. A
+// workspace with no root package.json is left alone, as syncRootWorkspaces
+// leaves it, and so is one with no member and no pnpm-workspace.yaml. An
+// unchanged list is not rewritten.
+func syncPNPMWorkspacePackages(root string, members []typeScriptMember, dryRun bool) (*workspaceSyncChange, error) {
+	if _, err := os.Stat(filepath.Join(root, workspaceMarkerFile)); err != nil {
+		return nil, nil //nolint:nilerr // no root manifest is an ordinary state, not a failure
+	}
+	path := pnpmWorkspaceFile(root)
+	data, err := os.ReadFile(path)
+	if err != nil && !os.IsNotExist(err) {
+		return nil, fmt.Errorf("read %s: %w", pnpmworkspace.File, err)
+	}
+
+	desired := make([]string, 0, len(members))
+	for _, member := range members {
+		desired = append(desired, member.Path)
+	}
+	sort.Strings(desired)
+
+	current, found, err := pnpmworkspace.Packages(string(data))
+	if err != nil {
+		return nil, err
+	}
+	if (found && equalStringSlices(current, desired)) || (!found && len(desired) == 0) {
+		return nil, nil
+	}
+
+	change := &workspaceSyncChange{
+		Path:   pnpmworkspace.File,
+		Field:  "packages",
+		Before: fmt.Sprintf("%d entries", len(current)),
+		After:  fmt.Sprintf("%d entries", len(desired)),
+	}
+	if dryRun {
+		return change, nil
+	}
+	if err := os.WriteFile(path, []byte(pnpmworkspace.SetPackages(string(data), desired)), 0644); err != nil {
+		return nil, fmt.Errorf("write %s: %w", pnpmworkspace.File, err)
+	}
+	return change, nil
 }
 
 // syncRootWorkspaces rewrites the root package.json `workspaces` membership to
