@@ -1,4 +1,4 @@
-# ADR 0008 — Task targets, input exclusions and pub ranges
+# ADR 0013 — Task targets, input exclusions and pub ranges
 
 - **Status**: accepted
 - **Date**: 2026-11-08

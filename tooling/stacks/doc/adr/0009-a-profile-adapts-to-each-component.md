@@ -6,7 +6,7 @@
   it, first `ruby/extension` (`@putnami/ruby`); builds on
   [ADR 0005](0005-profile-variants-for-a-stack-with-several-builds.md),
   [ADR 0007](0007-nested-markers-excludes-and-runtime-commands.md) and
-  [ADR 0008](0008-task-targets-exclusions-and-pub-ranges.md)
+  [ADR 0013](0013-task-targets-exclusions-and-pub-ranges.md)
 
 ## Context
 
@@ -20,7 +20,7 @@ Bundler version in its `BUNDLED WITH` section; and the stack-root files a
 pack's specs load sit beside reports the run itself writes. ADR 0005's
 variants name the test runner per component, `tasks.<task>.dir` runs the
 steps at the stack root, `toolchain.also` checks Bundler beside Ruby, and
-ADR 0008's `!` patterns leave project files out. The rest needs the profile
+ADR 0013's `!` patterns leave project files out. The rest needs the profile
 to say more, or each repository needs a `putnami.json` override per
 component.
 

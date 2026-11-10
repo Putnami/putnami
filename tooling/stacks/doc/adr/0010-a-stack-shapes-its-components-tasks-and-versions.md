@@ -8,11 +8,11 @@
 ## Context
 
 The core of [ADR 0001](0001-one-extension-per-stack-on-a-shared-core.md), with
-ADR 0002 to 0009, runs every task of a profile on every component of a
-variant, reads JUnit test reports, keys a task on the files its input
-patterns select under the project, and matches the machine's toolchain
-version with one rule: equal, or a stable release of a shorter version.
-ADR 0007's `excludes`, ADR 0008's `!` patterns and ADR 0009's `!{root}/`
+ADR 0002 to 0009, 0012 and 0013, runs every task of a profile on every
+component of a variant, reads JUnit test reports, keys a task on the files
+its input patterns select under the project, and matches the machine's
+toolchain version with one rule: equal, or a stable release of a shorter version.
+ADR 0007's `excludes`, ADR 0013's `!` patterns and ADR 0009's `!{root}/`
 stack-root exclusions keep build outputs out of a task's files. .NET breaks
 the rest on a typical repository:
 

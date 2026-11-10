@@ -323,7 +323,7 @@ design of the stack core is in
   and its own specs do not run. Its files still reach every pack's test key.
 - An application below the workspace root, such as `apps/shop`, is a
   component, and each of its packs depends on it, so its files reach every
-  pack's key through that edge (ADR 0002 of the stack core). A local gem the
+  pack's key through that edge (ADR 0012 of the stack core). A local gem the
   application's `Gemfile` names and whose stack root is the application is
   left out with `stacks.stack_root_unsupported`: the edge would close a
   cycle.

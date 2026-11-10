@@ -155,7 +155,7 @@ The Rust reference profile:
 | `toolchain.provisioned` | The environment variable that holds the toolchain the workspace lock pins, for a stack extension that pins one. |
 | `tasks.<task>.withoutCoverage` | How the task runs on a toolchain with no coverage support: a `probe` that exits non-zero there, and the `steps` that replace the task's. Its coverage reports are not read, and the task warns with `stacks.coverage_unavailable`. |
 | `toolchain.files` | The files that state the expected version or range, read in the project directory, then at the stack root. `key` reads one string value of a TOML table, a JSON object or, in a `.yaml` or `.yml` file, a YAML block or flow mapping; `pattern`, a regular expression matched against the file's content, reads its `version` group, such as `^(?:ruby-)?(?<version>\S+)` for `ruby-3.3.6`; without either, the file's first non-empty line. |
-| `toolchain.ranges` | How a range a file states reads: Composer's syntax, or `pub-sdk` and `pub-flutter`, as pub reads a Dart or Flutter SDK constraint ([ADR 0008](adr/0008-task-targets-exclusions-and-pub-ranges.md)). `toolchain.version` reads plain. |
+| `toolchain.ranges` | How a range a file states reads: Composer's syntax, or `pub-sdk` and `pub-flutter`, as pub reads a Dart or Flutter SDK constraint ([ADR 0013](adr/0013-task-targets-exclusions-and-pub-ranges.md)). `toolchain.version` reads plain. |
 | `toolchain.also` | Further checks with the same members, such as the Dart SDK a Flutter SDK bundles or the Bundler beside Ruby, run with the selected toolchain. An entry without `check` takes the first check's. |
 | `inputs.<set>` | Named sets of file patterns. A plain pattern is relative to the project directory; `{root}/` makes it relative to the stack root, the directory of the build that holds the component (the Cargo workspace, the Gradle settings); a pattern that starts with `!` leaves its files out of the task's inputs, such as a file the build tool writes under a directory the task reads or `!vendor/**` beside `**/*.rb`, never `putnami.json` or a toolchain file. A stack-root exclusion, such as `!{root}/**/obj/**`, reaches the manifest's workspace input with the other stack-root patterns. |
 | `tasks.<task>.steps` | The commands the task runs in order, each an argument vector run in the directory `dir` names, with no shell. `{root}` is the stack root, `{component}` the build's name for the component (`Component.Ref`, or its name), `{manifest}` the absolute path of the manifest the detector read it from, `{output}` the task's output directory under the project, `{target}` one of the task's targets. |
@@ -201,7 +201,7 @@ are task inputs, so a target that appears or disappears changes the key. A
 task whose targets name `hosts` declares the `hostPlatform` runtime input, so
 the host system reaches its key; the conformance kit holds it, and an
 override cannot add `hosts` to another task.
-([ADR 0008](adr/0008-task-targets-exclusions-and-pub-ranges.md)).
+([ADR 0013](adr/0013-task-targets-exclusions-and-pub-ranges.md)).
 
 ### What a stack shapes beyond its profile
 
@@ -332,7 +332,7 @@ one.
 A component whose stack root is neither the workspace root nor its own
 directory, such as a crate of a Cargo workspace under `services/billing`,
 reads the root's files through an edge
-([ADR 0002](adr/0002-a-nested-stack-root-is-an-input-only-project.md)). The
+([ADR 0012](adr/0012-a-nested-stack-root-is-an-input-only-project.md)). The
 detector answers that root as a component with no name when it holds none, a
 virtual Cargo workspace: an **input-only project**, whose tasks run no step
 and whose selector answers the stack-root files of each task in its own
@@ -352,15 +352,17 @@ project claims.
 
 | File | Content |
 |---|---|
-| `putnami.extension.json` | The manifest: the runtime, the workspace adapter with the profile's markers, the `lint`, `test` and `build` commands and their tasks, the three input selectors. |
+| `putnami.extension.json` | The manifest: the runtime, the workspace adapter with the profile's markers, a command, a task and an input selector for each of `lint`, `test` and `build` the profile declares, and the jobs the extension adds in its own code, such as `serve`, `run`, `package` and `publish`. |
 | `profile.json` | The stack profile, embedded in the runtime. |
 | `cmd/putnami-<stack>/main.go` | `Stack.Entrypoint` of the stack the extension builds from its name, its profile and its detector: the observe detector that names the components and their edges. |
 | `doc/`, `putnami.features.json`, `specs/` | The stack's own docs and requirements. |
 
 The manifests repeat one shape. The core ships a test kit that every stack
-extension runs: its manifest declares the three commands, their tasks and
-selectors, and markers equal to its profile's; its profile passes the decoder.
-A stack extension that drifts from the core fails its own gate.
+extension runs: its manifest declares a command, a task and a selector for
+each of `lint`, `test` and `build` its profile declares, and no command for
+one the profile does not declare, as `build` for Ruby and PHP; its markers
+equal its profile's; its profile passes the decoder. A stack extension that
+drifts from the core fails its own gate.
 
 ## The cache key
 
@@ -438,7 +440,7 @@ an exact file first, such as `.php-version`, so an exact statement wins. A
 Dart or Flutter SDK constraint in `pubspec.yaml` reads as pub reads it, under
 `toolchain.ranges`, and `toolchain.also` adds a further check, such as the
 Dart SDK a Flutter SDK bundles
-([ADR 0008](adr/0008-task-targets-exclusions-and-pub-ranges.md)).
+([ADR 0013](adr/0013-task-targets-exclusions-and-pub-ranges.md)).
 
 So a stored result was produced by the versions, or versions of the ranges,
 its key names, unless a project chose `warn`. A project that states no
@@ -518,19 +520,31 @@ affected component instead of importing its targets
   Bazel's test logs, keeps them, and the extension's runtime copies the run's
   reports into `{output}`, which the core never reads from another run.
 
-`@putnami/pants` and `@putnami/bazel` are the delegated stacks. `@putnami/turbo`
-delegates a Turborepo repository with a sync of its own, which reads the
-package manifests and the adoption mode; in import mode a TypeScript
-package's task whose script already runs `bun build`, `bun test` or Biome runs
-`@putnami/typescript` instead, so no Putnami cache sits over Turborepo's.
+`@putnami/pants` and `@putnami/bazel` delegate alone. `@putnami/nx`,
+`@putnami/moon`, `@putnami/turbo` and `@putnami/rush` delegate too, and also
+offer import mode: each has a sync of its own that reads the adoption mode
+and, in import mode, moves to a Putnami language extension what that
+extension can run. Nx and Turborepo move a TypeScript project's task whose
+script already runs `bun build`, `bun test` or Biome to `@putnami/typescript`;
+moon moves each project whose language has a Putnami extension to it; Rush
+moves every project to `@putnami/typescript`. What stays delegated runs the
+tool, so no Putnami cache sits over the tool's.
 
 ## What stays out
 
-- **Publish and package.** A stack's release goes through its own tool
-  (crates.io, Packagist, Maven Central); no profile declares a `publish`
-  task. A stack extension adds one in its own code, as `@putnami/rust` does.
-- **Serve and qualify.** No profile declares a workload, so `putnami qualify`
-  reports no reachable workload for a stack project.
+- **Serve, run, package and publish in the profile.** No profile declares
+  these tasks or a workload: each stack starts its programs and ships its
+  artifacts its own way, so each extension adds them as jobs in its own code.
+  All seven stacks serve and run their applications; Rust, Ruby, PHP and Dart
+  do so on helpers the core shares (`RunForeground`, `AnnounceReady`,
+  `FreePort`). `serve` reports the server ready once its port accepts
+  connections, so `putnami qualify` and compose can wait on it. Rust, Java,
+  Swift, .NET, Ruby and PHP package an application's image and publish it
+  through the shared Docker publisher, and Rust also packages release
+  archives and publishes its crates
+  ([ADR 0011](adr/0011-rust-runs-on-the-core-helpers-and-owns-its-packaging.md)).
+  Dart packages nothing, and a library of the other stacks reaches its
+  registry through its own tool, such as Packagist or Maven Central.
 - **Go, TypeScript and Python.** They keep their full extensions and do not
   move to the core.
 - **Bazel and Pants as cached stacks.** They delegate: they keep their own

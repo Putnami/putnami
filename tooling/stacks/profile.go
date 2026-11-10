@@ -112,7 +112,7 @@ type Toolchain struct {
 	// Ranges names the rules a range a file states follows: "" for Composer's
 	// syntax (ADR 0002), "pub-sdk" for a Dart SDK constraint and
 	// "pub-flutter" for a Flutter SDK constraint, as pub reads them for a
-	// package below language version 3.9 (ADR 0008). Version reads plain.
+	// package below language version 3.9 (ADR 0013). Version reads plain.
 	Ranges string `json:"ranges,omitempty"`
 	// Also are further toolchain checks every task runs, such as the Dart SDK
 	// a Flutter SDK bundles. An entry with no check takes this one's.
