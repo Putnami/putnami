@@ -40,12 +40,14 @@
     "typescript/typescript-project-toolchain#structured-reports",
     "typescript/typescript-project-toolchain#test-files-are-type-checked",
     "typescript/typescript-project-toolchain#test-rerun-each",
+    "typescript/typescript-project-toolchain#the-lockfile-in-use-keys-the-cache",
     "typescript/typescript-project-toolchain#the-packager-refuses-a-nameless-manifest",
     "typescript/typescript-project-toolchain#upgrade-reports-unresolved-packages",
     "typescript/typescript-project-toolchain#upgrade-table-shows-source-revision",
     "typescript/typescript-project-toolchain#workspace-biome-default",
     "typescript/typescript-project-toolchain#workspace-bun-pin",
     "typescript/typescript-project-toolchain#workspace-install-creates-the-root-manifest",
+    "typescript/typescript-project-toolchain#workspace-install-keeps-the-package-manager",
     "typescript/typescript-project-toolchain#workspace-install-lists-the-members"
   ]
 }
