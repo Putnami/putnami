@@ -98,9 +98,9 @@ func TestInitFromRefusesWhatItCannotAdopt(t *testing.T) {
 	}{
 		"no pants.toml":   {[]string{"--from", "pants"}, false, "holds no pants.toml"},
 		"no Bazel root":   {[]string{"--from", "bazel"}, true, "holds no MODULE.bazel, WORKSPACE, WORKSPACE.bazel"},
-		"no tool":         {[]string{"--from"}, true, "--from needs a tool (choose: bazel, moon, nx, pants)"},
-		"an empty tool":   {[]string{"--from="}, true, "--from needs a tool (choose: bazel, moon, nx, pants)"},
-		"an unknown tool": {[]string{"--from", "gradle"}, true, `unknown --from tool "gradle" (choose: bazel, moon, nx, pants)`},
+		"no tool":         {[]string{"--from"}, true, "--from needs a tool (choose: bazel, moon, nx, pants, turbo)"},
+		"an empty tool":   {[]string{"--from="}, true, "--from needs a tool (choose: bazel, moon, nx, pants, turbo)"},
+		"an unknown tool": {[]string{"--from", "gradle"}, true, `unknown --from tool "gradle" (choose: bazel, moon, nx, pants, turbo)`},
 		"a project":       {[]string{"--from", "pants", "--project", "web"}, true, "does not combine with --project"},
 		"an extension":    {[]string{"--from", "pants", "--extension", "go"}, true, "does not combine with --project, --project-path or --extension"},
 	} {
@@ -461,5 +461,44 @@ func TestInitFromMoonDeclaresTheMoonExtensionAndSyncsTheProjects(t *testing.T) {
 	t.Chdir(t.TempDir())
 	if err := WorkspaceInit(context.Background(), "", []string{"--from", "moon"}, LifecycleEnv{}); err == nil || !strings.Contains(err.Error(), "holds no .moon/workspace.yml") || !errors.Is(err, protocolcli.ErrUsage) {
 		t.Errorf("err = %v, want a usage error naming .moon/workspace.yml", err)
+	}
+}
+
+func TestInitFromTurboDeclaresTheTurboExtensionAndRecordsTheMode(t *testing.T) {
+	spectest.Proves(t, initFromFeature, "init-from-turbo", "init-from-turbo-declares-the-turbo-extension-and-records-the-mode")
+	for mode, want := range map[string][]string{
+		"import":   {"@putnami/turbo", "@putnami/typescript"},
+		"delegate": {"@putnami/turbo"},
+	} {
+		t.Run(mode, func(t *testing.T) {
+			dir := t.TempDir()
+			t.Chdir(dir)
+			if err := os.WriteFile(filepath.Join(dir, "turbo.json"), []byte(`{"tasks": {"build": {}}}`), 0o644); err != nil {
+				t.Fatal(err)
+			}
+			calls := stubInitFrom(t, false, "")
+			out, err := captureStdout(t, func() error {
+				return WorkspaceInit(context.Background(), "", []string{"--from", "turbo", "--mode", mode, "--workspace", "shop"}, LifecycleEnv{})
+			})
+			if err != nil {
+				t.Fatalf("WorkspaceInit: %v\n%s", err, out)
+			}
+			cfg := readInitConfig(t, dir)
+			if !slices.Equal(cfg.Extensions, want) || cfg.Options["@putnami/turbo"].Mode != mode {
+				t.Errorf("workspace config = %+v, want %v and the mode %s", cfg, want, mode)
+			}
+			if !slices.Equal(calls.installed, want) {
+				t.Errorf("installed = %v, want %v", calls.installed, want)
+			}
+			if calls.synced == nil || !slices.Contains(calls.synced.Extensions.Names(), "@putnami/turbo") {
+				t.Errorf("projects sync ran on %+v", calls.synced)
+			}
+		})
+	}
+
+	// Without turbo.json, init refuses.
+	t.Chdir(t.TempDir())
+	if err := WorkspaceInit(context.Background(), "", []string{"--from", "turbo"}, LifecycleEnv{}); err == nil || !strings.Contains(err.Error(), "holds no turbo.json") || !errors.Is(err, protocolcli.ErrUsage) {
+		t.Errorf("err = %v, want a usage error naming turbo.json", err)
 	}
 }

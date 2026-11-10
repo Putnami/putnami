@@ -209,7 +209,7 @@ Usage:
 Command Flags:
   --workspace <name>           Workspace name override
   --extension <ts|go|py>       Default extension to install
-  --from <bazel|moon|nx|pants> Turn the repository a monorepo tool describes into a workspace: declare the tool's extension and synchronize its packages as projects; rerun in the workspace to preview what would change
+  --from <bazel|moon|nx|pants|turbo> Turn the repository a monorepo tool describes into a workspace: declare the tool's extension and synchronize its packages as projects; rerun in the workspace to preview what would change
   --mode <import|delegate>     With --from: import hands the targets Putnami can map to its runner and cache, delegate keeps the tool running each target with its cache (default: asked in a terminal, else import; Bazel and Pants delegate)
   --apply                      With --from in an existing workspace: record the mode and synchronize, instead of previewing
   --project <name>             Create an initial project
@@ -227,6 +227,7 @@ Examples:
   putnami init --from nx --mode delegate
   putnami init --from nx --mode import --apply
   putnami init --from moon --mode delegate
+  putnami init --from turbo --mode delegate
 
 Global Options:
   Common: --verbose, --debug, --help
@@ -1471,7 +1472,7 @@ Usage:
 Command Flags:
   --workspace <name>           Workspace name override
   --extension <ts|go|py>       Default extension to install
-  --from <bazel|moon|nx|pants> Turn the repository a monorepo tool describes into a workspace: declare the tool's extension and synchronize its packages as projects; rerun in the workspace to preview what would change
+  --from <bazel|moon|nx|pants|turbo> Turn the repository a monorepo tool describes into a workspace: declare the tool's extension and synchronize its packages as projects; rerun in the workspace to preview what would change
   --mode <import|delegate>     With --from: import hands the targets Putnami can map to its runner and cache, delegate keeps the tool running each target with its cache (default: asked in a terminal, else import; Bazel and Pants delegate)
   --apply                      With --from in an existing workspace: record the mode and synchronize, instead of previewing
   --project <name>             Create an initial project
@@ -1489,6 +1490,7 @@ Examples:
   putnami init --from nx --mode delegate
   putnami init --from nx --mode import --apply
   putnami init --from moon --mode delegate
+  putnami init --from turbo --mode delegate
 
 Global Options:
   Common: --verbose, --debug, --help

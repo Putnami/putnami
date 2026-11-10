@@ -535,7 +535,8 @@
             "bazel",
             "moon",
             "nx",
-            "pants"
+            "pants",
+            "turbo"
           ]
         },
         {
@@ -1047,7 +1048,8 @@
             "bazel",
             "moon",
             "nx",
-            "pants"
+            "pants",
+            "turbo"
           ]
         },
         {

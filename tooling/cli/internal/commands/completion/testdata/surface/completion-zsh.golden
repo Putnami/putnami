@@ -349,7 +349,7 @@ _putnami_flags_for() {
                 '--channel[Resolve the extensions, the template and the starter dependencies on one release channel (default: PUTNAMI_CHANNEL, then the channel the CLI was installed from, then latest)]:channel:'
                 '--extension[Default extension to install]:ts|go|py:(go py ts)'
                 '--force[Reinitialize an existing workspace]'
-                '--from[Turn the repository a monorepo tool describes into a workspace: declare the tool'\''s extension and synchronize its packages as projects; rerun in the workspace to preview what would change]:bazel|moon|nx|pants:(bazel moon nx pants)'
+                '--from[Turn the repository a monorepo tool describes into a workspace: declare the tool'\''s extension and synchronize its packages as projects; rerun in the workspace to preview what would change]:bazel|moon|nx|pants|turbo:(bazel moon nx pants turbo)'
                 '--mode[With --from: import hands the targets Putnami can map to its runner and cache, delegate keeps the tool running each target with its cache (default: asked in a terminal, else import; Bazel and Pants delegate)]:import|delegate:(delegate import)'
                 '--project[Create an initial project]:name:'
                 '--project-path[Workspace-relative path for the initial project]:path:'
@@ -470,7 +470,7 @@ _putnami_flags_for() {
                 '--channel[Resolve the extensions, the template and the starter dependencies on one release channel (default: PUTNAMI_CHANNEL, then the channel the CLI was installed from, then latest)]:channel:'
                 '--extension[Default extension to install]:ts|go|py:(go py ts)'
                 '--force[Reinitialize an existing workspace]'
-                '--from[Turn the repository a monorepo tool describes into a workspace: declare the tool'\''s extension and synchronize its packages as projects; rerun in the workspace to preview what would change]:bazel|moon|nx|pants:(bazel moon nx pants)'
+                '--from[Turn the repository a monorepo tool describes into a workspace: declare the tool'\''s extension and synchronize its packages as projects; rerun in the workspace to preview what would change]:bazel|moon|nx|pants|turbo:(bazel moon nx pants turbo)'
                 '--mode[With --from: import hands the targets Putnami can map to its runner and cache, delegate keeps the tool running each target with its cache (default: asked in a terminal, else import; Bazel and Pants delegate)]:import|delegate:(delegate import)'
                 '--project[Create an initial project]:name:'
                 '--project-path[Workspace-relative path for the initial project]:path:'
@@ -713,6 +713,7 @@ _putnami() {
                             'moon'
                             'nx'
                             'pants'
+                            'turbo'
                         )
                         value_slot=1
                         ;;
@@ -839,6 +840,7 @@ _putnami() {
                             'moon'
                             'nx'
                             'pants'
+                            'turbo'
                         )
                         value_slot=1
                         ;;
