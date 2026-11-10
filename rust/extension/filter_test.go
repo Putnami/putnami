@@ -13,6 +13,7 @@ import (
 	"go.putnami.dev/protocol/job"
 	pctx "go.putnami.dev/sdk/extension/context"
 	"go.putnami.dev/tooling/stacks"
+	"go.putnami.dev/tooling/stacks/stackstest"
 )
 
 func TestTestPassesTheFilterToNextestAndKeysTheTaskOnIt(t *testing.T) {
@@ -39,7 +40,7 @@ func TestTestPassesTheFilterToNextestAndKeysTheTaskOnIt(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	writeFile(t, bin, "cargo", strings.Replace(string(original), "#!/bin/sh\n", "#!/bin/sh\ncase \"$*\" in *show-env*) exit 1;; esac\n", 1))
+	stackstest.WriteFile(t, bin, "cargo", strings.Replace(string(original), "#!/bin/sh\n", "#!/bin/sh\ncase \"$*\" in *show-env*) exit 1;; esac\n", 1))
 	if err := os.Chmod(filepath.Join(bin, "cargo"), 0o755); err != nil {
 		t.Fatal(err)
 	}

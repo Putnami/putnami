@@ -17,6 +17,7 @@ import (
 	"go.putnami.dev/sdk/extension/jsonl"
 	"go.putnami.dev/sdk/extension/putnamihome"
 	"go.putnami.dev/tooling/stacks"
+	"go.putnami.dev/tooling/stacks/stackstest"
 )
 
 // runWorkspaceJob runs a workspace job of the runtime over the workspace
@@ -221,10 +222,10 @@ func TestWorkspaceInstallFetchesEachStackRootTheWorkspaceIncludes(t *testing.T) 
 	t.Setenv(putnamihome.Env, t.TempDir())
 	downloads := stubTestTools(t)
 	t.Setenv(extensionproto.OfflineDependenciesEnv, "")
-	writeFile(t, root, "putnami.workspace.json", `{"disable": {"tags": ["e2e"]}}`)
-	writeFile(t, root, "samples/demo/Cargo.toml", "[package]\nname = \"demo\"\nversion = \"0.1.0\"\n")
-	writeFile(t, root, "samples/demo/src/main.rs", "fn main() {}\n")
-	writeFile(t, root, "other/Cargo.toml", "[package]\nname = \"other\"\nversion = \"0.1.0\"\n")
+	stackstest.WriteFile(t, root, "putnami.workspace.json", `{"disable": {"tags": ["e2e"]}}`)
+	stackstest.WriteFile(t, root, "samples/demo/Cargo.toml", "[package]\nname = \"demo\"\nversion = \"0.1.0\"\n")
+	stackstest.WriteFile(t, root, "samples/demo/src/main.rs", "fn main() {}\n")
+	stackstest.WriteFile(t, root, "other/Cargo.toml", "[package]\nname = \"other\"\nversion = \"0.1.0\"\n")
 	foreign := crateRef(root, "other", `{}`)
 	foreign.Extensions = []string{"@putnami/typescript"}
 	refs := append(crateRefs(root), crateRef(root, "samples/demo", `{"tags": ["e2e"]}`), foreign)
@@ -274,7 +275,7 @@ func TestAnOfflineWorkspaceInstallChecksTheCacheAndWritesNothing(t *testing.T) {
 	log := stubTools(t, root, "1.82.0", junitPass)
 	t.Setenv(putnamihome.Env, t.TempDir())
 	downloads := stubTestTools(t)
-	writeFile(t, root, ".stub-fetched", "")
+	stackstest.WriteFile(t, root, ".stub-fetched", "")
 	status, emitted, err := runWorkspaceJob(t, root, WorkspaceInstallJobName, nil, crateRefs(root)...)
 	if status != "OK" || err != nil {
 		t.Fatalf("install: %s %v\n%s", status, err, emitted)

@@ -20,6 +20,7 @@ import (
 	"go.putnami.dev/protocol/features/spectest"
 	"go.putnami.dev/sdk/extension/putnamihome"
 	"go.putnami.dev/tooling/stacks"
+	"go.putnami.dev/tooling/stacks/stackstest"
 )
 
 // stubRustup installs what a rustup publishes: a script that, like rustup,
@@ -134,7 +135,7 @@ func TestProvideRefusesARustupWhoseDigestDiffers(t *testing.T) {
 func TestATaskInstallsRustWhenTheMachineHasNone(t *testing.T) {
 	spectest.Proves(t, feature, "provides-its-toolchain", "a-task-installs-the-stated-rust-when-the-machine-has-none")
 	root := fixture(t)
-	writeFile(t, root, "rust-toolchain.toml", "[toolchain]\nchannel = \"1.82.0\"\n")
+	stackstest.WriteFile(t, root, "rust-toolchain.toml", "[toolchain]\nchannel = \"1.82.0\"\n")
 	stubRustup(t, root, "1.82.0")
 	stubTestTools(t)
 	t.Setenv("PATH", t.TempDir())
@@ -231,7 +232,7 @@ func TestTheTestTaskInstallsTheToolsTheMachineDoesNotHold(t *testing.T) {
 	downloads := stubTestTools(t)
 	t.Setenv(putnamihome.Env, t.TempDir())
 	held := t.TempDir()
-	writeFile(t, held, "cargo-nextest", "#!/bin/sh\n")
+	stackstest.WriteFile(t, held, "cargo-nextest", "#!/bin/sh\n")
 	if err := os.Chmod(filepath.Join(held, "cargo-nextest"), 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -270,7 +271,7 @@ func TestARustWithNoLLVMToolsRunsTheTestsWithoutACoverageReport(t *testing.T) {
 		t.Fatal(err)
 	}
 	shim := strings.Replace(string(original), "#!/bin/sh\n", "#!/bin/sh\ncase \"$*\" in *show-env*) exit 1;; esac\n", 1)
-	writeFile(t, bin, "cargo", shim)
+	stackstest.WriteFile(t, bin, "cargo", shim)
 	if err := os.Chmod(filepath.Join(bin, "cargo"), 0o755); err != nil {
 		t.Fatal(err)
 	}

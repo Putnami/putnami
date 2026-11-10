@@ -18,6 +18,7 @@ import (
 	"go.putnami.dev/sdk/extension/cli"
 	pctx "go.putnami.dev/sdk/extension/context"
 	"go.putnami.dev/sdk/extension/jsonl"
+	"go.putnami.dev/tooling/stacks/stackstest"
 )
 
 // credentialFD is the descriptor the tests hand workspace-fetch its
@@ -115,7 +116,7 @@ func TestWorkspaceInstallRestoresEveryProject(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	writeFile(t, root, "src/Pricing/"+packagesLock, `{"version": 1}`)
+	stackstest.WriteFile(t, root, "src/Pricing/"+packagesLock, `{"version": 1}`)
 	log := stubDotnet(t, "8.0.404", trxPass)
 	if status, err := runWorkspaceJob(t, root, WorkspaceInstallJob(stack(t)), nil); status != "OK" || err != nil {
 		t.Fatalf("workspace-install: %s %v", status, err)
@@ -220,7 +221,7 @@ func TestAWorkspaceJobWithNoSDKOfflineWarnsAndPasses(t *testing.T) {
 func TestDepsUpgradeUpdatesThePackagesOfEveryProject(t *testing.T) {
 	spectest.Proves(t, feature, "upgrades-the-packages", "deps-upgrade-runs-dotnet-package-update-on-every-project")
 	root := fixture(t)
-	writeFile(t, root, "global.json", `{"sdk": {"version": "10.0.100", "rollForward": "latestFeature"}}`)
+	stackstest.WriteFile(t, root, "global.json", `{"sdk": {"version": "10.0.100", "rollForward": "latestFeature"}}`)
 	log := stubDotnet(t, "10.0.100", trxPass)
 	t.Setenv(extensionproto.OfflineDependenciesEnv, "")
 	if status, err := runWorkspaceJob(t, root, DepsUpgradeJob(stack(t)), nil); status != "OK" || err != nil {

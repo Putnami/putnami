@@ -19,17 +19,6 @@ import (
 
 const feature = "ruby/stack-extension"
 
-func writeFile(t *testing.T, root, rel, content string) {
-	t.Helper()
-	p := filepath.Join(root, filepath.FromSlash(rel))
-	if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(p, []byte(content), 0o644); err != nil {
-		t.Fatal(err)
-	}
-}
-
 // fixture writes a Rails modular monolith: the application at the root, the
 // RSpec pack pricing, the Minitest pack checkout that lists pricing, and the
 // gem audit_log with a Gemfile of its own.
@@ -42,35 +31,35 @@ func fixture(t *testing.T) string {
 		t.Fatal(err)
 	}
 	root := filepath.Join(tmp, "shop")
-	writeFile(t, root, "Gemfile", "source \"https://rubygems.org\"\n\ngem \"rails\", \"~> 7.2.0\"\n")
-	writeFile(t, root, "Gemfile.lock", "GEM\n  remote: https://rubygems.org/\n  specs:\n    rails (7.2.4)\n\nBUNDLED WITH\n   2.5.22\n")
-	writeFile(t, root, ".ruby-version", "ruby-3.3.6\n")
-	writeFile(t, root, ".rspec", "--require spec_helper\n")
-	writeFile(t, root, ".rubocop.yml", "inherit_gem: { rubocop-rails-omakase: rubocop.yml }\n")
-	writeFile(t, root, "package.yml", "enforce_dependencies: true\n")
-	writeFile(t, root, "app/services/order_summary.rb", "class OrderSummary; end\n")
-	writeFile(t, root, "config/application.rb", "require \"rails\"\n")
-	writeFile(t, root, "spec/spec_helper.rb", "require \"simplecov\"\n")
-	writeFile(t, root, "spec/services/order_summary_spec.rb", "RSpec.describe OrderSummary\n")
-	writeFile(t, root, "packs/pricing/package.yml", "enforce_dependencies: true\n")
-	writeFile(t, root, "packs/pricing/app/models/pricing/calculator.rb", "module Pricing; end\n")
-	writeFile(t, root, "packs/pricing/app/views/pricing/show.html.erb", "<p></p>\n")
-	writeFile(t, root, "packs/pricing/spec/models/pricing/calculator_spec.rb", "RSpec.describe Pricing\n")
-	writeFile(t, root, "packs/pricing/spec/fixtures/prices.yml", "unit: 100\n")
-	writeFile(t, root, "packs/checkout/package.yml", "dependencies:\n  - packs/pricing\n")
-	writeFile(t, root, "packs/checkout/app/models/checkout/cart.rb", "module Checkout; end\n")
-	writeFile(t, root, "packs/checkout/test/models/checkout/cart_test.rb", "class CartTest; end\n")
-	writeFile(t, root, "gems/audit_log/audit_log.gemspec", "Gem::Specification.new do |s|\n  s.name = \"audit_log\"\nend\n")
-	writeFile(t, root, "gems/audit_log/Gemfile", "source \"https://rubygems.org\"\ngemspec\n")
-	writeFile(t, root, "gems/audit_log/lib/audit_log.rb", "module AuditLog; end\n")
-	writeFile(t, root, "gems/audit_log/spec/audit_log_spec.rb", "RSpec.describe AuditLog\n")
-	writeFile(t, root, "packs/pricing/.simplecov", "SimpleCov.start\n")
-	writeFile(t, root, "packs/pricing/app/views/pricing/show.json.jbuilder", "json.unit 100\n")
-	writeFile(t, root, "packs/pricing/vendor/bundle/ruby/3.3.0/gems/rake/lib/rake.rb", "module Rake; end\n")
-	writeFile(t, root, "packs/pricing/tmp/cache/bootsnap.rb", "\n")
-	writeFile(t, root, "packs/pricing/.gen/version.json", "{}\n")
-	writeFile(t, root, "packs/docs/package.yml", "enforce_dependencies: true\n")
-	writeFile(t, root, "packs/docs/app/models/docs/page.rb", "module Docs; end\n")
+	stackstest.WriteFile(t, root, "Gemfile", "source \"https://rubygems.org\"\n\ngem \"rails\", \"~> 7.2.0\"\n")
+	stackstest.WriteFile(t, root, "Gemfile.lock", "GEM\n  remote: https://rubygems.org/\n  specs:\n    rails (7.2.4)\n\nBUNDLED WITH\n   2.5.22\n")
+	stackstest.WriteFile(t, root, ".ruby-version", "ruby-3.3.6\n")
+	stackstest.WriteFile(t, root, ".rspec", "--require spec_helper\n")
+	stackstest.WriteFile(t, root, ".rubocop.yml", "inherit_gem: { rubocop-rails-omakase: rubocop.yml }\n")
+	stackstest.WriteFile(t, root, "package.yml", "enforce_dependencies: true\n")
+	stackstest.WriteFile(t, root, "app/services/order_summary.rb", "class OrderSummary; end\n")
+	stackstest.WriteFile(t, root, "config/application.rb", "require \"rails\"\n")
+	stackstest.WriteFile(t, root, "spec/spec_helper.rb", "require \"simplecov\"\n")
+	stackstest.WriteFile(t, root, "spec/services/order_summary_spec.rb", "RSpec.describe OrderSummary\n")
+	stackstest.WriteFile(t, root, "packs/pricing/package.yml", "enforce_dependencies: true\n")
+	stackstest.WriteFile(t, root, "packs/pricing/app/models/pricing/calculator.rb", "module Pricing; end\n")
+	stackstest.WriteFile(t, root, "packs/pricing/app/views/pricing/show.html.erb", "<p></p>\n")
+	stackstest.WriteFile(t, root, "packs/pricing/spec/models/pricing/calculator_spec.rb", "RSpec.describe Pricing\n")
+	stackstest.WriteFile(t, root, "packs/pricing/spec/fixtures/prices.yml", "unit: 100\n")
+	stackstest.WriteFile(t, root, "packs/checkout/package.yml", "dependencies:\n  - packs/pricing\n")
+	stackstest.WriteFile(t, root, "packs/checkout/app/models/checkout/cart.rb", "module Checkout; end\n")
+	stackstest.WriteFile(t, root, "packs/checkout/test/models/checkout/cart_test.rb", "class CartTest; end\n")
+	stackstest.WriteFile(t, root, "gems/audit_log/audit_log.gemspec", "Gem::Specification.new do |s|\n  s.name = \"audit_log\"\nend\n")
+	stackstest.WriteFile(t, root, "gems/audit_log/Gemfile", "source \"https://rubygems.org\"\ngemspec\n")
+	stackstest.WriteFile(t, root, "gems/audit_log/lib/audit_log.rb", "module AuditLog; end\n")
+	stackstest.WriteFile(t, root, "gems/audit_log/spec/audit_log_spec.rb", "RSpec.describe AuditLog\n")
+	stackstest.WriteFile(t, root, "packs/pricing/.simplecov", "SimpleCov.start\n")
+	stackstest.WriteFile(t, root, "packs/pricing/app/views/pricing/show.json.jbuilder", "json.unit 100\n")
+	stackstest.WriteFile(t, root, "packs/pricing/vendor/bundle/ruby/3.3.0/gems/rake/lib/rake.rb", "module Rake; end\n")
+	stackstest.WriteFile(t, root, "packs/pricing/tmp/cache/bootsnap.rb", "\n")
+	stackstest.WriteFile(t, root, "packs/pricing/.gen/version.json", "{}\n")
+	stackstest.WriteFile(t, root, "packs/docs/package.yml", "enforce_dependencies: true\n")
+	stackstest.WriteFile(t, root, "packs/docs/app/models/docs/page.rb", "module Docs; end\n")
 	return root
 }
 
@@ -148,8 +137,8 @@ func stubTools(t *testing.T, rubyVersion, bundlerVersion string, failures int) s
 	if failures > 0 {
 		failure = `<failure message="expected 400, got 0"/>`
 	}
-	writeFile(t, bin, "ruby", "#!/bin/sh\necho 'ruby "+rubyVersion+" (2024-11-05 revision 75015d4c1f) [x86_64-linux]'\n")
-	writeFile(t, bin, "bundle", `#!/bin/sh
+	stackstest.WriteFile(t, bin, "ruby", "#!/bin/sh\necho 'ruby "+rubyVersion+" (2024-11-05 revision 75015d4c1f) [x86_64-linux]'\n")
+	stackstest.WriteFile(t, bin, "bundle", `#!/bin/sh
 if [ "$1" = "--version" ]; then echo 'Bundler version `+bundlerVersion+`'; exit 0; fi
 if [ "$1" = "check" ]; then exit "${STUB_BUNDLE_CHECK:-0}"; fi
 echo "$PWD: bundle $*" >> "`+log+`"
@@ -286,7 +275,7 @@ func TestAComponentRunsRSpecOrRailsTestByItsTestFiles(t *testing.T) {
 	}
 
 	_ = os.Remove(log)
-	writeFile(t, root, "gems/audit_log/test/test_audit_log.rb", "class TestAuditLog; end\n")
+	stackstest.WriteFile(t, root, "gems/audit_log/test/test_audit_log.rb", "class TestAuditLog; end\n")
 	if err := os.RemoveAll(filepath.Join(root, "gems/audit_log/spec")); err != nil {
 		t.Fatal(err)
 	}
@@ -304,7 +293,7 @@ func TestAComponentRunsRSpecOrRailsTestByItsTestFiles(t *testing.T) {
 		return result.Inputs[0].Files
 	}
 	before := answer()
-	writeFile(t, root, "packs/checkout/spec/cart_spec.rb", "RSpec.describe Checkout\n")
+	stackstest.WriteFile(t, root, "packs/checkout/spec/cart_spec.rb", "RSpec.describe Checkout\n")
 	if after := answer(); slices.Equal(before, after) || !slices.Contains(after, "spec/cart_spec.rb") {
 		t.Errorf("a spec file that changes the runner is an input: %v", after)
 	}
@@ -383,7 +372,7 @@ func TestATestOnlyChangeKeepsTheLintInputs(t *testing.T) {
 func TestAPutnamiJSONOverrideChangesTheStepsAndTheInputs(t *testing.T) {
 	spectest.Proves(t, feature, "overrides-are-honored", "a-putnami-json-override-changes-the-steps-and-the-inputs")
 	root := fixture(t)
-	writeFile(t, root, "packs/pricing/putnami.json", `{"options": {"@putnami/ruby": {
+	stackstest.WriteFile(t, root, "packs/pricing/putnami.json", `{"options": {"@putnami/ruby": {
 	  "inputs": {"ruby": ["app/**/*.rb"]},
 	  "tasks": {"lint": {"steps": [["bundle", "exec", "rubocop", "--parallel"]]}}
 	}}}`)
@@ -397,7 +386,7 @@ func TestAPutnamiJSONOverrideChangesTheStepsAndTheInputs(t *testing.T) {
 	if got := calls(t, log); len(got) != 1 || !strings.HasSuffix(got[0], "bundle exec rubocop --parallel") {
 		t.Errorf("a step override is honored: %q", got)
 	}
-	writeFile(t, root, "packs/pricing/putnami.json", `{"options": {"@putnami/ruby": {"tasks": {"lint": {"stepz": []}}}}}`)
+	stackstest.WriteFile(t, root, "packs/pricing/putnami.json", `{"options": {"@putnami/ruby": {"tasks": {"lint": {"stepz": []}}}}}`)
 	if r := runJob(t, root, "packs/pricing", stacks.TaskLint); r.status != "FAILED" || r.err == nil || r.err.Error() != stacks.CodeProjectConfigInvalid {
 		t.Errorf("an invalid override fails the task: %+v", r)
 	}

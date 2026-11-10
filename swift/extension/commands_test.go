@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"go.putnami.dev/tooling/stacks/stackstest"
 )
 
 // The jobs run the commands in a child process; these run them in this one.
@@ -23,13 +25,13 @@ func TestSwiftPMTestExportsTheLCOVOfTheTestBinary(t *testing.T) {
 	if err := exportLCOV(io.Discard, nil, "lcov.info"); err == nil || !strings.Contains(err.Error(), "no coverage profile") {
 		t.Errorf("no profile before swift test: %v", err)
 	}
-	writeFile(t, pkg, ".build/debug/codecov/default.profdata", "")
+	stackstest.WriteFile(t, pkg, ".build/debug/codecov/default.profdata", "")
 	if err := exportLCOV(io.Discard, nil, "lcov.info"); err == nil || !strings.Contains(err.Error(), "PackageTests.xctest") {
 		t.Errorf("no test binary: %v", err)
 	}
 	// A macOS test product is a bundle; swift test leaves it, and the stub
 	// writes the Linux file beside it.
-	writeFile(t, pkg, ".build/debug/NetworkingPackageTests.xctest/Contents/MacOS/NetworkingPackageTests", "")
+	stackstest.WriteFile(t, pkg, ".build/debug/NetworkingPackageTests.xctest/Contents/MacOS/NetworkingPackageTests", "")
 	if err := exportLCOV(io.Discard, nil, filepath.Join(pkg, "lcov.info")); err != nil {
 		t.Fatal(err)
 	}
@@ -40,8 +42,8 @@ func TestSwiftPMTestExportsTheLCOVOfTheTestBinary(t *testing.T) {
 	// llvm-cov reads together.
 	_ = os.RemoveAll(filepath.Join(pkg, ".build/debug/NetworkingPackageTests.xctest"))
 	_ = os.Remove(filepath.Join(pkg, ".build/debug/NetworkingPackageTests.xctest"))
-	writeFile(t, pkg, ".build/debug/ClientTests.xctest/Contents/MacOS/ClientTests", "")
-	writeFile(t, pkg, ".build/debug/ServerTests.xctest/Contents/MacOS/ServerTests", "")
+	stackstest.WriteFile(t, pkg, ".build/debug/ClientTests.xctest/Contents/MacOS/ClientTests", "")
+	stackstest.WriteFile(t, pkg, ".build/debug/ServerTests.xctest/Contents/MacOS/ServerTests", "")
 	if err := exportLCOV(io.Discard, nil, filepath.Join(pkg, "lcov.info")); err != nil {
 		t.Fatal(err)
 	}
@@ -51,8 +53,8 @@ func TestSwiftPMTestExportsTheLCOVOfTheTestBinary(t *testing.T) {
 	// On Linux, each test target is a library its test runner loads.
 	_ = os.RemoveAll(filepath.Join(pkg, ".build/debug/ClientTests.xctest"))
 	_ = os.RemoveAll(filepath.Join(pkg, ".build/debug/ServerTests.xctest"))
-	writeFile(t, pkg, ".build/debug/ClientTests-test-runner", "")
-	writeFile(t, pkg, ".build/debug/ClientTests.so", "")
+	stackstest.WriteFile(t, pkg, ".build/debug/ClientTests-test-runner", "")
+	stackstest.WriteFile(t, pkg, ".build/debug/ClientTests.so", "")
 	if err := exportLCOV(io.Discard, nil, filepath.Join(pkg, "lcov.info")); err != nil {
 		t.Fatal(err)
 	}
@@ -90,7 +92,7 @@ func TestSwiftFormatLintNeedsAConfiguration(t *testing.T) {
 	s := stubTools(t)
 	t.Chdir(filepath.Join(root, "Packages/Networking"))
 	cmd := Commands()[CommandSwiftFormatLint]
-	writeFile(t, root, "Packages/Networking/.swift-format", "{}")
+	stackstest.WriteFile(t, root, "Packages/Networking/.swift-format", "{}")
 	if err := cmd([]string{"Missing"}, io.Discard, io.Discard); err != nil || strings.Contains(s.ran(t), "swift format") {
 		t.Errorf("no path to lint lints nothing: %v %s", err, s.ran(t))
 	}
@@ -158,7 +160,7 @@ func TestXcresultWritesFailuresAndSkips(t *testing.T) {
 	if err := cmd([]string{"--bundle", "x"}, io.Discard, io.Discard); err == nil {
 		t.Error("no report to write is refused")
 	}
-	writeFile(t, root, "App/T.xcresult/Info.plist", "")
+	stackstest.WriteFile(t, root, "App/T.xcresult/Info.plist", "")
 	if err := cmd([]string{"--bundle", "T.xcresult", "--junit", "out/j.xml", "--cobertura", "out/c.xml"}, io.Discard, io.Discard); err != nil {
 		t.Fatal(err)
 	}

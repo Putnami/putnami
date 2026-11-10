@@ -15,6 +15,7 @@ import (
 	job "go.putnami.dev/protocol/job"
 	pctx "go.putnami.dev/sdk/extension/context"
 	"go.putnami.dev/sdk/extension/jsonl"
+	"go.putnami.dev/tooling/stacks/stackstest"
 )
 
 // installWorkspace is a workspace with a Gradle build in shop, whose api
@@ -28,23 +29,23 @@ func installWorkspace(t *testing.T) (string, string, []job.ProjectRef) {
 	root := t.TempDir()
 	bin := t.TempDir()
 	log := filepath.Join(bin, "install.log")
-	writeFile(t, root, "putnami.workspace.json", `{"disable": {"tags": ["e2e"]}}`)
-	writeFile(t, root, ".java-version", "21\n")
+	stackstest.WriteFile(t, root, "putnami.workspace.json", `{"disable": {"tags": ["e2e"]}}`)
+	stackstest.WriteFile(t, root, ".java-version", "21\n")
 	gradlew := "#!/bin/sh\necho \"$PWD: gradlew $*\" >> \"" + log + "\"\ncase \"$*\" in *putnamiResolveDependencies*) echo 'PUTNAMI-UNRESOLVED :api compileClasspath: Could not find com.acme:gone:1.0.';; esac\n"
 	for _, dir := range []string{"shop", "samples/gradle"} {
-		writeFile(t, root, dir+"/settings.gradle.kts", "include(\":api\")\n")
-		writeFile(t, root, dir+"/api/build.gradle.kts", "plugins { `java-library` }\njava { toolchain { languageVersion = JavaLanguageVersion.of(17) } }\n")
-		writeFile(t, root, dir+"/api/src/main/java/A.java", "class A {}\n")
-		writeFile(t, root, dir+"/gradlew", gradlew)
+		stackstest.WriteFile(t, root, dir+"/settings.gradle.kts", "include(\":api\")\n")
+		stackstest.WriteFile(t, root, dir+"/api/build.gradle.kts", "plugins { `java-library` }\njava { toolchain { languageVersion = JavaLanguageVersion.of(17) } }\n")
+		stackstest.WriteFile(t, root, dir+"/api/src/main/java/A.java", "class A {}\n")
+		stackstest.WriteFile(t, root, dir+"/gradlew", gradlew)
 		if err := os.Chmod(filepath.Join(root, dir, "gradlew"), 0o755); err != nil {
 			t.Fatal(err)
 		}
 	}
-	writeFile(t, root, "billing/pom.xml", `<project><groupId>com.acme</groupId><artifactId>billing</artifactId><packaging>pom</packaging><modules><module>invoices</module></modules></project>`)
-	writeFile(t, root, "billing/invoices/pom.xml", `<project><parent><groupId>com.acme</groupId></parent><artifactId>invoices</artifactId></project>`)
-	writeFile(t, root, "other/build.gradle.kts", "\n")
-	writeFile(t, bin, "javac", "#!/bin/sh\necho 'javac 21.0.4'\n")
-	writeFile(t, bin, "mvn", "#!/bin/sh\necho \"$PWD: mvn $*\" >> \""+log+"\"\n")
+	stackstest.WriteFile(t, root, "billing/pom.xml", `<project><groupId>com.acme</groupId><artifactId>billing</artifactId><packaging>pom</packaging><modules><module>invoices</module></modules></project>`)
+	stackstest.WriteFile(t, root, "billing/invoices/pom.xml", `<project><parent><groupId>com.acme</groupId></parent><artifactId>invoices</artifactId></project>`)
+	stackstest.WriteFile(t, root, "other/build.gradle.kts", "\n")
+	stackstest.WriteFile(t, bin, "javac", "#!/bin/sh\necho 'javac 21.0.4'\n")
+	stackstest.WriteFile(t, bin, "mvn", "#!/bin/sh\necho \"$PWD: mvn $*\" >> \""+log+"\"\n")
 	for _, f := range []string{"javac", "mvn"} {
 		if err := os.Chmod(filepath.Join(bin, f), 0o755); err != nil {
 			t.Fatal(err)
@@ -154,9 +155,9 @@ func TestWorkspaceInstallReportsWhatItCannotPrepare(t *testing.T) {
 	spectest.Proves(t, feature, "workspace-install-prepares-each-build", "workspace-install-is-best-effort-for-maven-and-fails-on-a-gradle-build-that-does-not-resolve")
 	root, log, refs := installWorkspace(t)
 	t.Setenv("PUTNAMI_HOME", t.TempDir())
-	writeFile(t, root, "shop/api/build.gradle.kts", "plugins { `java-library` }\n")
+	stackstest.WriteFile(t, root, "shop/api/build.gradle.kts", "plugins { `java-library` }\n")
 	mvn := filepath.Join(filepath.Dir(log), "mvn")
-	writeFile(t, filepath.Dir(log), "mvn", "#!/bin/sh\necho \"$PWD: mvn $*\" >> \""+log+"\"\nexit 1\n")
+	stackstest.WriteFile(t, filepath.Dir(log), "mvn", "#!/bin/sh\necho \"$PWD: mvn $*\" >> \""+log+"\"\nexit 1\n")
 	if err := os.Chmod(mvn, 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -164,7 +165,7 @@ func TestWorkspaceInstallReportsWhatItCannotPrepare(t *testing.T) {
 	if status != "OK" || !strings.Contains(strings.Join(diags, "\n"), "warning "+CodeDependenciesIncomplete+": "+filepath.Join(root, "billing")+": dependency:go-offline did not complete") {
 		t.Errorf("a go-offline that fails is a warning: %s %v", status, diags)
 	}
-	writeFile(t, root, "shop/gradlew", "#!/bin/sh\ncase \"$*\" in *putnamiResolveDependencies*) exit 1;; esac\n")
+	stackstest.WriteFile(t, root, "shop/gradlew", "#!/bin/sh\ncase \"$*\" in *putnamiResolveDependencies*) exit 1;; esac\n")
 	if status, diags := runInstall(t, root, false, refs); status == "OK" || !strings.Contains(strings.Join(diags, "\n"), "error "+CodeInstallFailed+": ") {
 		t.Errorf("a Gradle build that does not resolve fails the install: %s %v", status, diags)
 	}
@@ -176,7 +177,7 @@ func TestAnOfflineWorkspaceInstallInstallsNothing(t *testing.T) {
 	downloads := serveJDKs(t)
 	t.Setenv("PUTNAMI_HOME", t.TempDir())
 	t.Setenv(extensionproto.OfflineDependenciesEnv, "1")
-	writeFile(t, root, "shop/gradle/wrapper/gradle-wrapper.properties", "distributionUrl=https\\://services.gradle.org/distributions/gradle-8.14.3-bin.zip\n")
+	stackstest.WriteFile(t, root, "shop/gradle/wrapper/gradle-wrapper.properties", "distributionUrl=https\\://services.gradle.org/distributions/gradle-8.14.3-bin.zip\n")
 
 	status, diags := runInstall(t, root, false, refs)
 	joined := strings.Join(diags, "\n")
@@ -190,7 +191,7 @@ func TestAnOfflineWorkspaceInstallInstallsNothing(t *testing.T) {
 	// The wrapper's distribution, once in GRADLE_USER_HOME, is verified offline.
 	url := "https://services.gradle.org/distributions/gradle-8.14.3-bin.zip"
 	sum := md5.Sum([]byte(url)) //nolint:gosec // the wrapper's directory name
-	writeFile(t, os.Getenv("GRADLE_USER_HOME"), "wrapper/dists/gradle-8.14.3-bin/"+new(big.Int).SetBytes(sum[:]).Text(36)+"/gradle-8.14.3-bin.zip.ok", "")
+	stackstest.WriteFile(t, os.Getenv("GRADLE_USER_HOME"), "wrapper/dists/gradle-8.14.3-bin/"+new(big.Int).SetBytes(sum[:]).Text(36)+"/gradle-8.14.3-bin.zip.ok", "")
 	if err := os.Remove(log); err != nil {
 		t.Fatal(err)
 	}

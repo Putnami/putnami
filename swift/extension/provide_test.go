@@ -23,6 +23,7 @@ import (
 	"go.putnami.dev/protocol/features/spectest"
 	"go.putnami.dev/sdk/extension/putnamihome"
 	"go.putnami.dev/tooling/stacks"
+	"go.putnami.dev/tooling/stacks/stackstest"
 )
 
 // swiftlyScript is what the stub swiftly does: like swiftly, init writes the
@@ -231,7 +232,7 @@ func TestProvideRefusesASwiftlyWhoseDigestDiffers(t *testing.T) {
 func TestAPackageTaskInstallsSwiftWhenTheMachineHasNone(t *testing.T) {
 	spectest.Proves(t, feature, "provides-its-toolchain", "a-package-task-installs-the-stated-swift-when-the-machine-has-none")
 	root := fixture(t)
-	writeFile(t, root, "Packages/Pricing/.swift-version", "6.0\n")
+	stackstest.WriteFile(t, root, "Packages/Pricing/.swift-version", "6.0\n")
 	log, downloads := stubSwiftly(t, false)
 	t.Setenv("PATH", t.TempDir())
 	for range 2 {
@@ -264,7 +265,7 @@ func TestAnOfflinePackageTaskInstallsNothing(t *testing.T) {
 func TestASwiftOnPathThatSatisfiesTheStatementIsKept(t *testing.T) {
 	spectest.Proves(t, feature, "provides-its-toolchain", "a-package-task-installs-the-stated-swift-when-the-machine-has-none")
 	root := fixture(t)
-	writeFile(t, root, "Packages/Pricing/.swift-version", "6.0\n")
+	stackstest.WriteFile(t, root, "Packages/Pricing/.swift-version", "6.0\n")
 	stubTools(t)
 	log, downloads := stubSwiftly(t, false)
 	if status, _, _, err := runJob(t, root, "Packages/Pricing", stacks.TaskBuild); status != "OK" || err != nil {
@@ -382,7 +383,7 @@ func TestExtractPkgFileReadsTheNestedPayload(t *testing.T) {
 
 func writeExecutable(t *testing.T, dir, name, content string) {
 	t.Helper()
-	writeFile(t, dir, name, content)
+	stackstest.WriteFile(t, dir, name, content)
 	if err := os.Chmod(filepath.Join(dir, name), 0o755); err != nil {
 		t.Fatal(err)
 	}

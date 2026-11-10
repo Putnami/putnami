@@ -19,6 +19,7 @@ import (
 	extensionproto "go.putnami.dev/protocol/extension"
 	"go.putnami.dev/protocol/features/spectest"
 	"go.putnami.dev/tooling/stacks"
+	"go.putnami.dev/tooling/stacks/stackstest"
 )
 
 func TestATaskInstallsTheJDKItsBuildStates(t *testing.T) {
@@ -208,12 +209,12 @@ func TestAMavenBuildRunsTheReleaseItsWrapperStates(t *testing.T) {
 	root := t.TempDir()
 	// A mvn on PATH does not run in place of the stated release.
 	machine := t.TempDir()
-	writeFile(t, machine, "mvn", "#!/bin/sh\n")
+	stackstest.WriteFile(t, machine, "mvn", "#!/bin/sh\n")
 	if err := os.Chmod(filepath.Join(machine, "mvn"), 0o755); err != nil {
 		t.Fatal(err)
 	}
 	env := []string{"PATH=" + machine}
-	writeFile(t, root, mavenWrapperProperties, "wrapperVersion=3.3.2\ndistributionType=only-script\ndistributionUrl="+strings.Replace(server.URL, ":", "\\:", 1)+"/maven2/apache-maven-3.9.6-bin.tar.gz\n")
+	stackstest.WriteFile(t, root, mavenWrapperProperties, "wrapperVersion=3.3.2\ndistributionType=only-script\ndistributionUrl="+strings.Replace(server.URL, ":", "\\:", 1)+"/maven2/apache-maven-3.9.6-bin.tar.gz\n")
 
 	mvn, err := mavenProgram(ctx, root, env, func(string) {})
 	if err != nil || !strings.HasSuffix(mvn, filepath.Join("maven-3.9.6", "apache-maven-3.9.6", "bin", "mvn")) {
@@ -239,11 +240,11 @@ func TestAMavenBuildRunsTheReleaseItsWrapperStates(t *testing.T) {
 		t.Errorf("an archive with no published checksum is refused: %v", err)
 	}
 	sum256 := sha256.Sum256(stated)
-	writeFile(t, root, mavenWrapperProperties, "distributionUrl="+server.URL+"/maven2/apache-maven-3.9.6-bin.tar.gz\ndistributionSha256Sum="+hex.EncodeToString(sum256[:])+"\n")
+	stackstest.WriteFile(t, root, mavenWrapperProperties, "distributionUrl="+server.URL+"/maven2/apache-maven-3.9.6-bin.tar.gz\ndistributionSha256Sum="+hex.EncodeToString(sum256[:])+"\n")
 	if mvn, err := mavenProgram(ctx, root, env, func(string) {}); err != nil || !strings.Contains(mvn, "apache-maven-3.9.6") {
 		t.Errorf("a stated SHA-256 pins the release: %q %v", mvn, err)
 	}
-	writeFile(t, root, mavenWrapperProperties, "distributionUrl="+server.URL+"/maven2/apache-maven-3.9.6-bin.tar.gz\ndistributionSha256Sum="+strings.Repeat("1", 64)+"\n")
+	stackstest.WriteFile(t, root, mavenWrapperProperties, "distributionUrl="+server.URL+"/maven2/apache-maven-3.9.6-bin.tar.gz\ndistributionSha256Sum="+strings.Repeat("1", 64)+"\n")
 	t.Setenv("PUTNAMI_HOME", t.TempDir())
 	if _, err := mavenProgram(ctx, root, env, func(string) {}); err == nil {
 		t.Error("an archive that differs from the stated SHA-256 is refused")
@@ -256,7 +257,7 @@ func TestAMavenBuildRunsTheReleaseItsWrapperStates(t *testing.T) {
 	}
 
 	for _, bad := range []string{"distributionUrl=file:///tmp/apache-maven-3.9.6-bin.zip", "distributionUrl=https://user:secret@example.test/apache-maven-3.9.6-bin.zip", "distributionUrl=https://example.test/maven.zip"} {
-		writeFile(t, root, mavenWrapperProperties, bad+"\n")
+		stackstest.WriteFile(t, root, mavenWrapperProperties, bad+"\n")
 		if _, err := mavenProgram(ctx, root, env, func(string) {}); err == nil {
 			t.Errorf("%s is refused", bad)
 		}
@@ -290,7 +291,7 @@ func TestJavaVersionsMatchTheirJavac(t *testing.T) {
 	}
 	tc := stack(t).Profile.Toolchain
 	root := t.TempDir()
-	writeFile(t, root, ".java-version", "# the team's JDK\n1.8.0_512\n")
+	stackstest.WriteFile(t, root, ".java-version", "# the team's JDK\n1.8.0_512\n")
 	expected, err := tc.ExpectedVersion(root, ".", ".")
 	if err != nil || expected.Version != "1.8.0" {
 		t.Errorf(".java-version 1.8.0_512 states %+v, %v", expected, err)
@@ -306,16 +307,16 @@ func TestTheProvidedJDKIsTheTasksJavaHome(t *testing.T) {
 	log := stubTools(t, g, "21.0.4", junitPass)
 	// The machine's javac is replaced by one outside .java-version; the pinned
 	// JDK's javac answers 21.
-	writeFile(t, filepath.Dir(log), "javac", "#!/bin/sh\necho 'javac 17.0.9'\n")
+	stackstest.WriteFile(t, filepath.Dir(log), "javac", "#!/bin/sh\necho 'javac 17.0.9'\n")
 	home := t.TempDir()
 	pinned := filepath.Join(home, "bin", "javac")
-	writeFile(t, home, "bin/javac", "#!/bin/sh\necho 'javac 21.0.13'\n")
+	stackstest.WriteFile(t, home, "bin/javac", "#!/bin/sh\necho 'javac 21.0.13'\n")
 	if err := os.Chmod(pinned, 0o755); err != nil {
 		t.Fatal(err)
 	}
 	t.Setenv("PUTNAMI_JAVA_EXECUTABLE", pinned)
 	t.Setenv("JAVA_HOME", "/elsewhere")
-	writeFile(t, g, "gradlew", "#!/bin/sh\necho \"JAVA_HOME=$JAVA_HOME\" >> \""+log+"\"\n")
+	stackstest.WriteFile(t, g, "gradlew", "#!/bin/sh\necho \"JAVA_HOME=$JAVA_HOME\" >> \""+log+"\"\n")
 	if err := os.Chmod(filepath.Join(g, "gradlew"), 0o755); err != nil {
 		t.Fatal(err)
 	}

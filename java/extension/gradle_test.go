@@ -20,23 +20,24 @@ import (
 	"go.putnami.dev/protocol/features/spectest"
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/tooling/stacks"
+	"go.putnami.dev/tooling/stacks/stackstest"
 )
 
 func TestTheJavaVersionsAGradleBuildAsksForAreRead(t *testing.T) {
 	spectest.Proves(t, feature, "gradle-toolchains-are-provided", "the-toolchain-versions-of-the-build-are-read")
 	root := t.TempDir()
-	writeFile(t, root, "settings.gradle.kts", "include(\":api\", \":legacy\", \":tools\")\n")
-	writeFile(t, root, "build.gradle.kts", "subprojects {\n    // jvmToolchain(25)\n}\n")
-	writeFile(t, root, "api/build.gradle.kts", "kotlin {\n    jvmToolchain(17)\n}\n")
-	writeFile(t, root, "legacy/build.gradle", "java {\n    toolchain {\n        languageVersion = JavaLanguageVersion.of('11')\n    }\n}\n")
-	writeFile(t, root, "tools/build.gradle.kts", "java.toolchain.languageVersion.set(JavaLanguageVersion.of(libs.versions.tools.jdk.get().toInt()))\n")
-	writeFile(t, root, "gradle/libs.versions.toml", "[versions]\ntools-jdk = \"21\"\nkotlin = \"2.0.21\"\n[libraries]\njdk = \"x:y:9\"\n")
-	writeFile(t, root, "gradle/quality.gradle", "javaToolchains.launcherFor { languageVersion = JavaLanguageVersion.of(JavaVersion.VERSION_1_8.majorVersion) }\n")
-	writeFile(t, root, "buildSrc/src/main/kotlin/conventions.gradle.kts", "java {\n    toolchain.languageVersion = JavaLanguageVersion.of(\"16\")\n}\n")
-	writeFile(t, root, "buildSrc/build/generated/Stale.kt", "JavaLanguageVersion.of(9)\n")
-	writeFile(t, root, "build-logic/convention/src/main/java/Conventions.java", "class Conventions { void apply() { JavaLanguageVersion.of(13); } }\n")
-	writeFile(t, root, "build-logic/convention/build.gradle.kts", "kotlin { jvmToolchain(javaVersion) }\n")
-	writeFile(t, root, "gradle/gradle-daemon-jvm.properties", "toolchainVendor=ADOPTIUM\ntoolchainVersion=24\n")
+	stackstest.WriteFile(t, root, "settings.gradle.kts", "include(\":api\", \":legacy\", \":tools\")\n")
+	stackstest.WriteFile(t, root, "build.gradle.kts", "subprojects {\n    // jvmToolchain(25)\n}\n")
+	stackstest.WriteFile(t, root, "api/build.gradle.kts", "kotlin {\n    jvmToolchain(17)\n}\n")
+	stackstest.WriteFile(t, root, "legacy/build.gradle", "java {\n    toolchain {\n        languageVersion = JavaLanguageVersion.of('11')\n    }\n}\n")
+	stackstest.WriteFile(t, root, "tools/build.gradle.kts", "java.toolchain.languageVersion.set(JavaLanguageVersion.of(libs.versions.tools.jdk.get().toInt()))\n")
+	stackstest.WriteFile(t, root, "gradle/libs.versions.toml", "[versions]\ntools-jdk = \"21\"\nkotlin = \"2.0.21\"\n[libraries]\njdk = \"x:y:9\"\n")
+	stackstest.WriteFile(t, root, "gradle/quality.gradle", "javaToolchains.launcherFor { languageVersion = JavaLanguageVersion.of(JavaVersion.VERSION_1_8.majorVersion) }\n")
+	stackstest.WriteFile(t, root, "buildSrc/src/main/kotlin/conventions.gradle.kts", "java {\n    toolchain.languageVersion = JavaLanguageVersion.of(\"16\")\n}\n")
+	stackstest.WriteFile(t, root, "buildSrc/build/generated/Stale.kt", "JavaLanguageVersion.of(9)\n")
+	stackstest.WriteFile(t, root, "build-logic/convention/src/main/java/Conventions.java", "class Conventions { void apply() { JavaLanguageVersion.of(13); } }\n")
+	stackstest.WriteFile(t, root, "build-logic/convention/build.gradle.kts", "kotlin { jvmToolchain(javaVersion) }\n")
+	stackstest.WriteFile(t, root, "gradle/gradle-daemon-jvm.properties", "toolchainVendor=ADOPTIUM\ntoolchainVersion=24\n")
 	if got, want := requestedJavaMajors(root), []int{8, 11, 13, 16, 17, 21, 24}; !slices.Equal(got, want) {
 		t.Errorf("the build asks for %v, want %v", got, want)
 	}
@@ -98,9 +99,9 @@ func TestAGradleStepGetsTheJDKsItsToolchainsAskFor(t *testing.T) {
 	spectest.Proves(t, feature, "gradle-toolchains-are-provided", "each-gradle-step-gets-the-jdks-the-toolchains-ask-for")
 	g := gradleFixture(t)
 	log := stubTools(t, g, "21.0.4", junitPass)
-	writeFile(t, g, "api/build.gradle.kts", "plugins {\n    alias(libs.plugins.kotlin.jvm)\n    jacoco\n}\nkotlin { jvmToolchain(17) }\ndependencies {\n    implementation(projects.pricing)\n}\n")
-	writeFile(t, g, "pricing/build.gradle.kts", "plugins {\n    alias(libs.plugins.kotlin.jvm)\n    jacoco\n}\njava { toolchain { languageVersion = JavaLanguageVersion.of(11) } }\n")
-	writeFile(t, g, "libs/model/build.gradle.kts", "plugins {\n    `java-library`\n}\njava { toolchain { languageVersion = JavaLanguageVersion.of(21) } }\nkotlin { jvmToolchain(23) }\n")
+	stackstest.WriteFile(t, g, "api/build.gradle.kts", "plugins {\n    alias(libs.plugins.kotlin.jvm)\n    jacoco\n}\nkotlin { jvmToolchain(17) }\ndependencies {\n    implementation(projects.pricing)\n}\n")
+	stackstest.WriteFile(t, g, "pricing/build.gradle.kts", "plugins {\n    alias(libs.plugins.kotlin.jvm)\n    jacoco\n}\njava { toolchain { languageVersion = JavaLanguageVersion.of(11) } }\n")
+	stackstest.WriteFile(t, g, "libs/model/build.gradle.kts", "plugins {\n    `java-library`\n}\njava { toolchain { languageVersion = JavaLanguageVersion.of(21) } }\nkotlin { jvmToolchain(23) }\n")
 	downloads := serveJDKs(t)
 	home := t.TempDir()
 	t.Setenv("PUTNAMI_HOME", home)
@@ -188,8 +189,8 @@ func TestABuildWithoutAWrapperRunsThePinnedGradle(t *testing.T) {
 	}
 
 	// A JDK older than 17 runs the newest pinned Gradle that runs on it.
-	writeFile(t, g, ".java-version", "11\n")
-	writeFile(t, filepath.Dir(log), "javac", "#!/bin/sh\necho 'javac 11.0.33'\n")
+	stackstest.WriteFile(t, g, ".java-version", "11\n")
+	stackstest.WriteFile(t, filepath.Dir(log), "javac", "#!/bin/sh\necho 'javac 11.0.33'\n")
 	if status, _, err := runJob(t, g, "api", stacks.TaskBuild); status != "OK" || err != nil {
 		t.Fatalf("build on 11: %s %v", status, err)
 	}
@@ -199,7 +200,7 @@ func TestABuildWithoutAWrapperRunsThePinnedGradle(t *testing.T) {
 
 	// A step that names gradle runs the one on PATH.
 	bin := t.TempDir()
-	writeFile(t, bin, "gradle", "#!/bin/sh\n")
+	stackstest.WriteFile(t, bin, "gradle", "#!/bin/sh\n")
 	if err := os.Chmod(filepath.Join(bin, "gradle"), 0o755); err != nil {
 		t.Fatal(err)
 	}

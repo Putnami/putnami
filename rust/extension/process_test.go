@@ -12,16 +12,17 @@ import (
 
 	"go.putnami.dev/protocol/features/spectest"
 	pctx "go.putnami.dev/sdk/extension/context"
+	"go.putnami.dev/tooling/stacks/stackstest"
 )
 
 func TestACrateWithABinaryTargetIsAnApplication(t *testing.T) {
 	spectest.Proves(t, feature, "crate-kind-is-detected", "a-crate-with-a-binary-target-is-an-application")
 	root := fixture(t)
-	writeFile(t, root, "crates/tool/Cargo.toml", "[package]\nname = \"tool\"\nversion = \"0.1.0\"\n\n[[bin]]\nname = \"tool\"\npath = \"cli.rs\"\n")
-	writeFile(t, root, "crates/multi/Cargo.toml", "[package]\nname = \"multi\"\nversion = \"0.1.0\"\n")
-	writeFile(t, root, "crates/multi/src/bin/one.rs", "fn main() {}\n")
-	writeFile(t, root, "crates/off/Cargo.toml", "[package]\nname = \"off\"\nversion = \"0.1.0\"\nautobins = false\n")
-	writeFile(t, root, "crates/off/src/main.rs", "fn main() {}\n")
+	stackstest.WriteFile(t, root, "crates/tool/Cargo.toml", "[package]\nname = \"tool\"\nversion = \"0.1.0\"\n\n[[bin]]\nname = \"tool\"\npath = \"cli.rs\"\n")
+	stackstest.WriteFile(t, root, "crates/multi/Cargo.toml", "[package]\nname = \"multi\"\nversion = \"0.1.0\"\n")
+	stackstest.WriteFile(t, root, "crates/multi/src/bin/one.rs", "fn main() {}\n")
+	stackstest.WriteFile(t, root, "crates/off/Cargo.toml", "[package]\nname = \"off\"\nversion = \"0.1.0\"\nautobins = false\n")
+	stackstest.WriteFile(t, root, "crates/off/src/main.rs", "fn main() {}\n")
 	types := map[string]string{}
 	for _, p := range probe(t, root).Projects {
 		types[p.Path] = p.Type

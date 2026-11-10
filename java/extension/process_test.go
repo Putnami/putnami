@@ -16,6 +16,7 @@ import (
 	"go.putnami.dev/sdk/extension/filelock"
 	"go.putnami.dev/sdk/extension/jsonl"
 	"go.putnami.dev/sdk/extension/pkgmeta"
+	"go.putnami.dev/tooling/stacks/stackstest"
 )
 
 // appFixture writes a nested Gradle build whose app applies the application
@@ -27,12 +28,12 @@ func appFixture(t *testing.T) (string, string) {
 	root := t.TempDir()
 	bin := t.TempDir()
 	log := filepath.Join(bin, "run.log")
-	writeFile(t, root, "g/settings.gradle.kts", "include(\":app\", \":boot\", \":lib\")\n")
-	writeFile(t, root, "g/app/build.gradle.kts", "plugins {\n    application\n}\n")
-	writeFile(t, root, "g/app/src/main/java/App.java", "class App {}\n")
-	writeFile(t, root, "g/boot/build.gradle.kts", "plugins {\n    id(\"org.springframework.boot\") version \"3.5.16\"\n    java\n}\n")
-	writeFile(t, root, "g/lib/build.gradle.kts", "plugins {\n    `java-library`\n}\n")
-	writeFile(t, root, "g/gradlew", `#!/bin/sh
+	stackstest.WriteFile(t, root, "g/settings.gradle.kts", "include(\":app\", \":boot\", \":lib\")\n")
+	stackstest.WriteFile(t, root, "g/app/build.gradle.kts", "plugins {\n    application\n}\n")
+	stackstest.WriteFile(t, root, "g/app/src/main/java/App.java", "class App {}\n")
+	stackstest.WriteFile(t, root, "g/boot/build.gradle.kts", "plugins {\n    id(\"org.springframework.boot\") version \"3.5.16\"\n    java\n}\n")
+	stackstest.WriteFile(t, root, "g/lib/build.gradle.kts", "plugins {\n    `java-library`\n}\n")
+	stackstest.WriteFile(t, root, "g/gradlew", `#!/bin/sh
 echo "$PWD: gradlew $*" >> "`+log+`"
 for a in "$@"; do
   case "$a" in
@@ -47,11 +48,11 @@ for a in "$@"; do
   esac
 done
 `)
-	writeFile(t, root, "m/pom.xml", `<project><groupId>com.acme</groupId><artifactId>shop</artifactId><packaging>pom</packaging><modules><module>app</module></modules></project>`)
-	writeFile(t, root, "m/app/pom.xml", `<project><parent><groupId>com.acme</groupId></parent><artifactId>app</artifactId><build><plugins><plugin><artifactId>spring-boot-maven-plugin</artifactId></plugin></plugins></build></project>`)
-	writeFile(t, bin, "javac", "#!/bin/sh\necho 'javac 21.0.13'\n")
-	writeFile(t, bin, "java", "#!/bin/sh\necho \"$PWD: java $1 $(basename \"$2\") $3 PORT=$PORT\" >> \""+log+"\"\nexit ${STUB_EXIT:-0}\n")
-	writeFile(t, bin, "mvn", "#!/bin/sh\necho \"$PWD: mvn $*\" >> \""+log+"\"\nmkdir -p target && echo boot > target/app-1.0.jar && echo src > target/app-1.0-sources.jar\n")
+	stackstest.WriteFile(t, root, "m/pom.xml", `<project><groupId>com.acme</groupId><artifactId>shop</artifactId><packaging>pom</packaging><modules><module>app</module></modules></project>`)
+	stackstest.WriteFile(t, root, "m/app/pom.xml", `<project><parent><groupId>com.acme</groupId></parent><artifactId>app</artifactId><build><plugins><plugin><artifactId>spring-boot-maven-plugin</artifactId></plugin></plugins></build></project>`)
+	stackstest.WriteFile(t, bin, "javac", "#!/bin/sh\necho 'javac 21.0.13'\n")
+	stackstest.WriteFile(t, bin, "java", "#!/bin/sh\necho \"$PWD: java $1 $(basename \"$2\") $3 PORT=$PORT\" >> \""+log+"\"\nexit ${STUB_EXIT:-0}\n")
+	stackstest.WriteFile(t, bin, "mvn", "#!/bin/sh\necho \"$PWD: mvn $*\" >> \""+log+"\"\nmkdir -p target && echo boot > target/app-1.0.jar && echo src > target/app-1.0-sources.jar\n")
 	for _, f := range []string{filepath.Join(root, "g/gradlew"), filepath.Join(bin, "javac"), filepath.Join(bin, "java"), filepath.Join(bin, "mvn")} {
 		if err := os.Chmod(f, 0o755); err != nil {
 			t.Fatal(err)
@@ -197,9 +198,9 @@ func TestPackageAssemblesTheImageOfAnApplication(t *testing.T) {
 func TestAnApplicationThatPublishesAnImageIsAReleaseMember(t *testing.T) {
 	spectest.Proves(t, feature, "publish-pushes-the-image", "an-application-that-publishes-an-image-is-a-release-member")
 	root, _ := appFixture(t)
-	writeFile(t, root, "putnami.workspace.json", `{"registries": {"oci": {"publish": "ghcr.io/acme"}}}`)
-	writeFile(t, root, "g/app/putnami.json", `{"name": "shop-app", "publish": ["docker"]}`)
-	writeFile(t, root, "g/lib/putnami.json", `{"publish": ["docker"]}`)
+	stackstest.WriteFile(t, root, "putnami.workspace.json", `{"registries": {"oci": {"publish": "ghcr.io/acme"}}}`)
+	stackstest.WriteFile(t, root, "g/app/putnami.json", `{"name": "shop-app", "publish": ["docker"]}`)
+	stackstest.WriteFile(t, root, "g/lib/putnami.json", `{"publish": ["docker"]}`)
 	got := probe(t, root, "g", "g/app", "g/lib")
 	var meta struct {
 		ReleaseSet struct {
@@ -218,8 +219,8 @@ func TestAnApplicationThatPublishesAnImageIsAReleaseMember(t *testing.T) {
 
 func TestAProjectNamedWithUppercaseLettersPackagesALowercaseImage(t *testing.T) {
 	root, _ := appFixture(t)
-	writeFile(t, root, "putnami.workspace.json", `{"registries": {"oci": {"publish": "ghcr.io/acme"}}}`)
-	writeFile(t, root, "g/app/putnami.json", `{"name": "userService", "publish": ["docker"]}`)
+	stackstest.WriteFile(t, root, "putnami.workspace.json", `{"registries": {"oci": {"publish": "ghcr.io/acme"}}}`)
+	stackstest.WriteFile(t, root, "g/app/putnami.json", `{"name": "userService", "publish": ["docker"]}`)
 	p := probe(t, root, "g", "g/app")["g/app"]
 	// The shared publisher finds the release-set member of the packaged image
 	// by its name.
@@ -289,8 +290,8 @@ func TestTheRunnableFormIsBuiltUnderTheRootLock(t *testing.T) {
 func TestTheNewestJarOfAnEarlierVersionIsNotPicked(t *testing.T) {
 	dir := t.TempDir()
 	old := filepath.Join(dir, "app-1.0.jar")
-	writeFile(t, dir, "app-1.0.jar", "old")
-	writeFile(t, dir, "app-1.1.jar", "new")
+	stackstest.WriteFile(t, dir, "app-1.0.jar", "old")
+	stackstest.WriteFile(t, dir, "app-1.1.jar", "new")
 	past := time.Now().Add(-time.Hour)
 	if err := os.Chtimes(old, past, past); err != nil {
 		t.Fatal(err)

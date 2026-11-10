@@ -19,6 +19,7 @@ import (
 	pctx "go.putnami.dev/sdk/extension/context"
 	"go.putnami.dev/sdk/extension/jsonl"
 	"go.putnami.dev/sdk/extension/pkgmeta"
+	"go.putnami.dev/tooling/stacks/stackstest"
 )
 
 func TestStampManifestWritesTheVersionAndPinsPathDependencies(t *testing.T) {
@@ -132,9 +133,9 @@ func runCrate(t *testing.T, task string, ctx *pctx.Context) (string, error) {
 
 func TestACargoWorkspaceWithNoCrateStagesAndPublishesNothing(t *testing.T) {
 	root := fixture(t)
-	writeFile(t, root, "services/billing/Cargo.toml", "[workspace]\nmembers = [\"http\"]\n")
-	writeFile(t, root, "services/billing/http/Cargo.toml", "[package]\nname = \"billing-http\"\nversion = \"0.1.0\"\n")
-	writeFile(t, root, "services/billing/http/src/lib.rs", "")
+	stackstest.WriteFile(t, root, "services/billing/Cargo.toml", "[workspace]\nmembers = [\"http\"]\n")
+	stackstest.WriteFile(t, root, "services/billing/http/Cargo.toml", "[package]\nname = \"billing-http\"\nversion = \"0.1.0\"\n")
+	stackstest.WriteFile(t, root, "services/billing/http/src/lib.rs", "")
 	var meta json.RawMessage
 	for _, p := range probe(t, root).Projects {
 		if p.Path == "services/billing" {
@@ -160,16 +161,16 @@ func TestACargoWorkspaceWithNoCrateStagesAndPublishesNothing(t *testing.T) {
 func TestPublishSendsACrateAtTheReleaseVersion(t *testing.T) {
 	spectest.Proves(t, feature, "publish-sends-the-staged-crate", "publish-sends-a-crate-at-the-release-version")
 	root := fixture(t)
-	writeFile(t, root, "tools/gen/run.sh", "#!/bin/sh\n")
+	stackstest.WriteFile(t, root, "tools/gen/run.sh", "#!/bin/sh\n")
 	if err := os.Chmod(filepath.Join(root, "tools/gen/run.sh"), 0o755); err != nil { //nolint:gosec // a test script
 		t.Fatal(err)
 	}
 	if err := os.Symlink("run.sh", filepath.Join(root, "tools/gen/link.sh")); err != nil {
 		t.Fatal(err)
 	}
-	writeFile(t, root, "tools/gen/target/stale", "x")
-	writeFile(t, root, "tools/gen/nested/target/stale", "x")
-	writeFile(t, root, "tools/gen/.git/config", "x")
+	stackstest.WriteFile(t, root, "tools/gen/target/stale", "x")
+	stackstest.WriteFile(t, root, "tools/gen/nested/target/stale", "x")
+	stackstest.WriteFile(t, root, "tools/gen/.git/config", "x")
 	before, err := os.ReadFile(filepath.Join(root, "tools/gen/Cargo.toml"))
 	if err != nil {
 		t.Fatal(err)
@@ -212,10 +213,10 @@ func TestPublishSendsACrateAtTheReleaseVersion(t *testing.T) {
 func TestPackageStagesAPathDependencyOutsideTheStackRoot(t *testing.T) {
 	spectest.Proves(t, feature, "publish-sends-the-staged-crate", "publish-sends-a-crate-at-the-release-version")
 	root := fixture(t)
-	writeFile(t, root, "tools/gen/Cargo.toml", "[package]\nname = \"gen\"\nversion = \"0.1.0\"\n\n[dependencies]\nsibling = { path = \"../sibling\" }\n")
-	writeFile(t, root, "tools/sibling/Cargo.toml", "[package]\nname = \"sibling\"\nversion = \"0.1.0\"\n\n[dev-dependencies]\nfar = { path = \"../far\" }\n")
-	writeFile(t, root, "tools/sibling/src/lib.rs", "")
-	writeFile(t, root, "tools/far/Cargo.toml", "[package]\nname = \"far\"\nversion = \"0.1.0\"\n")
+	stackstest.WriteFile(t, root, "tools/gen/Cargo.toml", "[package]\nname = \"gen\"\nversion = \"0.1.0\"\n\n[dependencies]\nsibling = { path = \"../sibling\" }\n")
+	stackstest.WriteFile(t, root, "tools/sibling/Cargo.toml", "[package]\nname = \"sibling\"\nversion = \"0.1.0\"\n\n[dev-dependencies]\nfar = { path = \"../far\" }\n")
+	stackstest.WriteFile(t, root, "tools/sibling/src/lib.rs", "")
+	stackstest.WriteFile(t, root, "tools/far/Cargo.toml", "[package]\nname = \"far\"\nversion = \"0.1.0\"\n")
 	stubTools(t, root, "1.82.0", junitPass)
 	ctx := packageContext(t, root, nil)
 	if status, err := runCrate(t, "package-crate", ctx); err != nil || status != "OK" {
@@ -230,7 +231,7 @@ func TestPackageStagesAPathDependencyOutsideTheStackRoot(t *testing.T) {
 	if !strings.Contains(string(data), `version = "`+testVersion+`"`) {
 		t.Errorf("the sibling keeps its version: %s", data)
 	}
-	writeFile(t, root, "tools/gen/Cargo.toml", "[package]\nname = \"gen\"\nversion = \"0.1.0\"\n\n[dependencies]\nout = { path = \"../../../out\" }\n")
+	stackstest.WriteFile(t, root, "tools/gen/Cargo.toml", "[package]\nname = \"gen\"\nversion = \"0.1.0\"\n\n[dependencies]\nout = { path = \"../../../out\" }\n")
 	if status, err := runCrate(t, "package-crate", ctx); err == nil || status != "FAILED" || !strings.Contains(err.Error(), "outside the Putnami workspace") {
 		t.Fatalf("status = %s, err = %v", status, err)
 	}
@@ -249,11 +250,11 @@ func git(t *testing.T, dir string, args ...string) {
 func TestACorruptGitIndexStopsTheStagedCopy(t *testing.T) {
 	spectest.Proves(t, feature, "publish-sends-the-staged-crate", "publish-sends-a-crate-at-the-release-version")
 	root := fixture(t)
-	writeFile(t, root, ".gitignore", "*.pem\n")
-	writeFile(t, root, "tools/gen/server.pem", "private")
+	stackstest.WriteFile(t, root, ".gitignore", "*.pem\n")
+	stackstest.WriteFile(t, root, "tools/gen/server.pem", "private")
 	git(t, root, "init", "-q")
 	git(t, root, "add", ".gitignore")
-	writeFile(t, root, ".git/index", "not an index")
+	stackstest.WriteFile(t, root, ".git/index", "not an index")
 	stubTools(t, root, "1.82.0", junitPass)
 	ctx := packageContext(t, root, nil)
 	if status, err := runCrate(t, "package-crate", ctx); err == nil || status != "FAILED" {
@@ -267,7 +268,7 @@ func TestACorruptGitIndexStopsTheStagedCopy(t *testing.T) {
 func TestTheStagedCopyHoldsTheFilesOfASubmodule(t *testing.T) {
 	spectest.Proves(t, feature, "publish-sends-the-staged-crate", "publish-sends-a-crate-at-the-release-version")
 	library := t.TempDir()
-	writeFile(t, library, "foo.c", "int foo;\n")
+	stackstest.WriteFile(t, library, "foo.c", "int foo;\n")
 	git(t, library, "init", "-q")
 	git(t, library, "add", ".")
 	git(t, library, "commit", "-q", "-m", "c")
@@ -306,11 +307,11 @@ d = { path = "../d" }
 func TestTheStagedCopyHoldsNoFileGitIgnores(t *testing.T) {
 	spectest.Proves(t, feature, "publish-sends-the-staged-crate", "publish-sends-a-crate-at-the-release-version")
 	root := fixture(t)
-	writeFile(t, root, ".gitignore", "secrets/\n*.pem\n")
-	writeFile(t, root, "tools/gen/secrets/key.txt", "private")
-	writeFile(t, root, "tools/gen/server.pem", "private")
-	writeFile(t, root, "tools/gen/src/added.rs", "// not committed, not ignored\n")
-	writeFile(t, root, "tools/gen/tracked/target/kept", "skipped")
+	stackstest.WriteFile(t, root, ".gitignore", "secrets/\n*.pem\n")
+	stackstest.WriteFile(t, root, "tools/gen/secrets/key.txt", "private")
+	stackstest.WriteFile(t, root, "tools/gen/server.pem", "private")
+	stackstest.WriteFile(t, root, "tools/gen/src/added.rs", "// not committed, not ignored\n")
+	stackstest.WriteFile(t, root, "tools/gen/tracked/target/kept", "skipped")
 	for _, args := range [][]string{{"init", "-q"}, {"add", "tools/gen/Cargo.toml", "tools/gen/src/main.rs", ".gitignore"}} {
 		cmd := exec.Command("git", args...) //nolint:gosec // fixed arguments
 		cmd.Dir = root
@@ -388,7 +389,7 @@ func TestADryRunNamesTheCrateAndItsPathDependencies(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	writeFile(t, stagedWorkspace(ctx), "tools/gen/.stub-metadata.json", string(raw))
+	stackstest.WriteFile(t, stagedWorkspace(ctx), "tools/gen/.stub-metadata.json", string(raw))
 	if status, err := runCrate(t, "publish-crates", ctx); err != nil || status != "OK" {
 		t.Fatalf("status = %s, err = %v", status, err)
 	}
@@ -397,7 +398,7 @@ func TestADryRunNamesTheCrateAndItsPathDependencies(t *testing.T) {
 	if !strings.Contains(string(logged), want) {
 		t.Errorf("the log misses %q:\n%s", want, logged)
 	}
-	writeFile(t, stagedWorkspace(ctx), "tools/gen/.stub-metadata.json", "nope")
+	stackstest.WriteFile(t, stagedWorkspace(ctx), "tools/gen/.stub-metadata.json", "nope")
 	if status, err := runCrate(t, "publish-crates", ctx); err == nil || status != "FAILED" {
 		t.Fatalf("status = %s, err = %v", status, err)
 	}
@@ -411,7 +412,7 @@ func TestADryRunChecksTheFilesOfACrateWithAPathDependencyOutsideItsWorkspace(t *
 	if _, err := runCrate(t, "package-crate", ctx); err != nil {
 		t.Fatal(err)
 	}
-	writeFile(t, stagedWorkspace(ctx), "tools/gen/.stub-metadata.json", `{"packages":[{"name":"gen","dependencies":[{"name":"sibling","kind":null,"path":"/s"}]}]}`)
+	stackstest.WriteFile(t, stagedWorkspace(ctx), "tools/gen/.stub-metadata.json", `{"packages":[{"name":"gen","dependencies":[{"name":"sibling","kind":null,"path":"/s"}]}]}`)
 	if status, err := runCrate(t, "publish-crates", ctx); err != nil || status != "OK" {
 		t.Fatalf("status = %s, err = %v", status, err)
 	}
@@ -429,7 +430,7 @@ func TestADryRunOfSeveralCratesInstallsTheRustThatAcceptsThem(t *testing.T) {
 	if _, err := runCrate(t, "package-crate", ctx); err != nil {
 		t.Fatal(err)
 	}
-	writeFile(t, stagedWorkspace(ctx), "tools/gen/.stub-metadata.json", `{"packages":[{"name":"gen","dependencies":[{"name":"dep","kind":null,"path":"/d"}]},{"name":"dep","dependencies":[]}]}`)
+	stackstest.WriteFile(t, stagedWorkspace(ctx), "tools/gen/.stub-metadata.json", `{"packages":[{"name":"gen","dependencies":[{"name":"dep","kind":null,"path":"/d"}]},{"name":"dep","dependencies":[]}]}`)
 	rustup, _ := stubRustup(t, root, defaultChannel)
 	t.Setenv(extensionproto.OfflineDependenciesEnv, "")
 	if status, err := runCrate(t, "publish-crates", ctx); err != nil || status != "OK" {

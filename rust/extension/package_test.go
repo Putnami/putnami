@@ -37,6 +37,7 @@ import (
 	"go.putnami.dev/sdk/extension/pkgmeta"
 	"go.putnami.dev/sdk/extension/putnamihome"
 	"go.putnami.dev/tooling/stacks"
+	"go.putnami.dev/tooling/stacks/stackstest"
 )
 
 const testVersion = "1.2.3-20260902173000-8e6fb533"
@@ -73,8 +74,8 @@ func stubCompiler(t *testing.T, root, metadata string) string {
 	if metadata == "" {
 		metadata = `{"target_directory":"` + root + `/target","packages":[{"name":"gen","default_run":null,"targets":[{"name":"gen","kind":["bin"]}]}]}`
 	}
-	writeFile(t, dir, "cargo", "#!/bin/sh\ncat <<'JSON'\n"+metadata+"\nJSON\n")
-	writeFile(t, dir, "cargo-zigbuild", `#!/bin/sh
+	stackstest.WriteFile(t, dir, "cargo", "#!/bin/sh\ncat <<'JSON'\n"+metadata+"\nJSON\n")
+	stackstest.WriteFile(t, dir, "cargo-zigbuild", `#!/bin/sh
 echo "$*" >> "`+log+`"
 prev=""
 for a in "$@"; do
@@ -371,7 +372,7 @@ func writeBinaries(t *testing.T, root string, suffixes ...string) {
 		if strings.HasPrefix(suffix, "windows") {
 			name = "gen.exe"
 		}
-		writeFile(t, pkgmeta.PackageOutputDir(root, "tools/gen", "bin"), suffix+"/"+name, "binary "+suffix)
+		stackstest.WriteFile(t, pkgmeta.PackageOutputDir(root, "tools/gen", "bin"), suffix+"/"+name, "binary "+suffix)
 	}
 }
 
@@ -445,8 +446,8 @@ func TestPackageArchivesFailsWithoutACompiledBinaryOrAVersion(t *testing.T) {
 	if _, _, err := packageArchives(ctx, jsonl.New(), nil); err == nil || !strings.Contains(err.Error(), "no binary for linux/amd64") {
 		t.Errorf("err = %v", err)
 	}
-	writeFile(t, pkgmeta.PackageOutputDir(root, "tools/gen", "bin"), "linux-x64/a", "")
-	writeFile(t, pkgmeta.PackageOutputDir(root, "tools/gen", "bin"), "linux-x64/b", "")
+	stackstest.WriteFile(t, pkgmeta.PackageOutputDir(root, "tools/gen", "bin"), "linux-x64/a", "")
+	stackstest.WriteFile(t, pkgmeta.PackageOutputDir(root, "tools/gen", "bin"), "linux-x64/b", "")
 	if _, _, err := packageArchives(ctx, jsonl.New(), nil); err == nil || !strings.Contains(err.Error(), "want the one binary") {
 		t.Errorf("err = %v", err)
 	}
@@ -497,7 +498,7 @@ func TestPackageAssemblesAnImageForThePlatform(t *testing.T) {
 	base, _ := baseImage(t)
 	log := filepath.Join(t.TempDir(), "docker.log")
 	stubs := t.TempDir()
-	writeFile(t, stubs, "docker", "#!/bin/sh\necho \"$*\" >> \""+log+"\"\n")
+	stackstest.WriteFile(t, stubs, "docker", "#!/bin/sh\necho \"$*\" >> \""+log+"\"\n")
 	if err := os.Chmod(filepath.Join(stubs, "docker"), 0o755); err != nil { //nolint:gosec // a test script
 		t.Fatal(err)
 	}

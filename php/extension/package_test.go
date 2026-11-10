@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
-	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"slices"
@@ -14,11 +13,7 @@ import (
 	"testing"
 
 	"github.com/google/go-containerregistry/pkg/name"
-	"github.com/google/go-containerregistry/pkg/registry"
-	v1 "github.com/google/go-containerregistry/pkg/v1"
-	"github.com/google/go-containerregistry/pkg/v1/empty"
 	"github.com/google/go-containerregistry/pkg/v1/mutate"
-	"github.com/google/go-containerregistry/pkg/v1/random"
 	"github.com/google/go-containerregistry/pkg/v1/remote"
 	"go.putnami.dev/protocol/features/spectest"
 	job "go.putnami.dev/protocol/job"
@@ -28,21 +23,22 @@ import (
 	"go.putnami.dev/sdk/extension/jsonl"
 	"go.putnami.dev/sdk/extension/pkgmeta"
 	"go.putnami.dev/tooling/stacks"
+	"go.putnami.dev/tooling/stacks/stackstest"
 )
 
 // application writes a Composer application with a front controller.
 func application(t *testing.T, root string) {
 	t.Helper()
-	writeFile(t, root, "composer.json", `{"type": "project", "require": {"php": ">=8.4"}}`)
-	writeFile(t, root, "composer.lock", `{"packages": []}`)
-	writeFile(t, root, frontController, "<?php\n")
+	stackstest.WriteFile(t, root, "composer.json", `{"type": "project", "require": {"php": ">=8.4"}}`)
+	stackstest.WriteFile(t, root, "composer.lock", `{"packages": []}`)
+	stackstest.WriteFile(t, root, frontController, "<?php\n")
 }
 
 func TestPackageAssemblesAnImageOfAnApplicationAndItsProductionDependencies(t *testing.T) {
 	spectest.Proves(t, feature, "packages-an-application-image", "package-assembles-an-image-of-an-application-and-its-production-dependencies")
 	log, _ := prepareComposer(t)
 	root := t.TempDir()
-	host, base := imageRegistry(t)
+	host, base := stackstest.ImageRegistry(t)
 	shipped := imageApplication(t, root)
 
 	status, _, err := runShopJob(t, root, PackageDockerJob(stack(t)), "--docker-base-image", base)
@@ -92,46 +88,13 @@ func TestPackageAssemblesAnImageOfAnApplicationAndItsProductionDependencies(t *t
 func imageApplication(t *testing.T, root string) []string {
 	t.Helper()
 	application(t, filepath.Join(root, "shop"))
-	writeFile(t, root, "shop/.env", "APP_ENV=prod\n")
-	writeFile(t, root, "shop/auth.json", "{}")
-	writeFile(t, root, "shop/.env.local", "SECRET=1\n")
-	writeFile(t, root, "shop/.env.local.php", "<?php\n")
-	writeFile(t, root, "shop/config/secrets/prod/prod.decrypt.private.php", "<?php\n")
-	writeFile(t, root, "shop/tests/AppTest.php", "<?php\n")
+	stackstest.WriteFile(t, root, "shop/.env", "APP_ENV=prod\n")
+	stackstest.WriteFile(t, root, "shop/auth.json", "{}")
+	stackstest.WriteFile(t, root, "shop/.env.local", "SECRET=1\n")
+	stackstest.WriteFile(t, root, "shop/.env.local.php", "<?php\n")
+	stackstest.WriteFile(t, root, "shop/config/secrets/prod/prod.decrypt.private.php", "<?php\n")
+	stackstest.WriteFile(t, root, "shop/tests/AppTest.php", "<?php\n")
 	return []string{".env", frontController, "vendor/composer/installed.json"}
-}
-
-// imageRegistry starts a registry double holding a two-platform base image, and
-// answers its host and the digest reference of the base.
-func imageRegistry(t *testing.T) (string, string) {
-	t.Helper()
-	server := httptest.NewServer(registry.New())
-	t.Cleanup(server.Close)
-	host := strings.TrimPrefix(server.URL, "http://")
-	amd64, err := random.Image(256, 1)
-	if err != nil {
-		t.Fatal(err)
-	}
-	arm64, err := random.Image(256, 1)
-	if err != nil {
-		t.Fatal(err)
-	}
-	index := mutate.AppendManifests(empty.Index,
-		mutate.IndexAddendum{Add: amd64, Descriptor: v1.Descriptor{Platform: &v1.Platform{OS: "linux", Architecture: "amd64"}}},
-		mutate.IndexAddendum{Add: arm64, Descriptor: v1.Descriptor{Platform: &v1.Platform{OS: "linux", Architecture: "arm64"}}},
-	)
-	reference, err := name.ParseReference(host + "/base:latest")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := remote.WriteIndex(reference, index); err != nil {
-		t.Fatal(err)
-	}
-	digest, err := index.Digest()
-	if err != nil {
-		t.Fatal(err)
-	}
-	return host, host + "/base@" + digest.String()
 }
 
 // imageFilesAt answers the paths of the files in the image at reference.
@@ -197,12 +160,12 @@ func TestAStagedImageNeverCarriesASecretFile(t *testing.T) {
 
 func TestAnImageSplitsDependenciesFilesAndConfigurationIntoLayers(t *testing.T) {
 	staged := t.TempDir()
-	writeFile(t, staged, "vendor/autoload.php", "<?php\n")
-	writeFile(t, staged, "bin/console", "#!/usr/bin/env php\n")
+	stackstest.WriteFile(t, staged, "vendor/autoload.php", "<?php\n")
+	stackstest.WriteFile(t, staged, "bin/console", "#!/usr/bin/env php\n")
 	if err := os.Chmod(filepath.Join(staged, "bin/console"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	writeFile(t, staged, frontController, "<?php\n")
+	stackstest.WriteFile(t, staged, frontController, "<?php\n")
 	base := "php:8.4.23-apache@sha256:abc"
 	spec, err := imageSpec(staged, t.TempDir(), base, "linux/arm64", defaultImagePort)
 	if err != nil {
@@ -236,16 +199,16 @@ func TestAnImageSplitsDependenciesFilesAndConfigurationIntoLayers(t *testing.T) 
 func TestStagingCopiesThePathRepositoryAndLeavesTheMachineOut(t *testing.T) {
 	root := t.TempDir()
 	app := filepath.Join(root, "apps/shop")
-	writeFile(t, root, "apps/shop/composer.json", `{"repositories": [{"type": "path", "url": "../../libs/*"}, {"type": "composer", "url": "https://x"}]}`)
-	writeFile(t, root, "apps/shop/composer.lock", "{}")
-	writeFile(t, root, "apps/shop/.env", "A=1\n")
-	writeFile(t, root, "apps/shop/.env.local", "SECRET=1\n")
-	writeFile(t, root, "apps/shop/.env.prod.local", "SECRET=1\n")
-	writeFile(t, root, "apps/shop/vendor/x.php", "<?php\n")
-	writeFile(t, root, "apps/shop/tests/ATest.php", "<?php\n")
-	writeFile(t, root, "apps/shop/src/tests/Kept.php", "<?php\n")
-	writeFile(t, root, "libs/discount/composer.json", "{}")
-	writeFile(t, root, "libs/discount/.phpunit.cache/x", "")
+	stackstest.WriteFile(t, root, "apps/shop/composer.json", `{"repositories": [{"type": "path", "url": "../../libs/*"}, {"type": "composer", "url": "https://x"}]}`)
+	stackstest.WriteFile(t, root, "apps/shop/composer.lock", "{}")
+	stackstest.WriteFile(t, root, "apps/shop/.env", "A=1\n")
+	stackstest.WriteFile(t, root, "apps/shop/.env.local", "SECRET=1\n")
+	stackstest.WriteFile(t, root, "apps/shop/.env.prod.local", "SECRET=1\n")
+	stackstest.WriteFile(t, root, "apps/shop/vendor/x.php", "<?php\n")
+	stackstest.WriteFile(t, root, "apps/shop/tests/ATest.php", "<?php\n")
+	stackstest.WriteFile(t, root, "apps/shop/src/tests/Kept.php", "<?php\n")
+	stackstest.WriteFile(t, root, "libs/discount/composer.json", "{}")
+	stackstest.WriteFile(t, root, "libs/discount/.phpunit.cache/x", "")
 
 	workspace := t.TempDir()
 	staged, err := stageApplication(root, app, workspace)
@@ -271,8 +234,8 @@ func TestStagingCopiesThePathRepositoryAndLeavesTheMachineOut(t *testing.T) {
 func TestStagingRefusesAPathRepositoryOutsideTheWorkspace(t *testing.T) {
 	outer := t.TempDir()
 	root := filepath.Join(outer, "repo")
-	writeFile(t, outer, "lib/composer.json", "{}")
-	writeFile(t, root, "composer.json", `{"repositories": [{"type": "path", "url": "../lib"}]}`)
+	stackstest.WriteFile(t, outer, "lib/composer.json", "{}")
+	stackstest.WriteFile(t, root, "composer.json", `{"repositories": [{"type": "path", "url": "../lib"}]}`)
 	if _, err := stageApplication(root, root, t.TempDir()); err == nil || !strings.Contains(err.Error(), "outside the workspace") {
 		t.Errorf("err = %v", err)
 	}
@@ -280,7 +243,7 @@ func TestStagingRefusesAPathRepositoryOutsideTheWorkspace(t *testing.T) {
 
 func TestStagingReadsTheObjectFormOfRepositories(t *testing.T) {
 	root := t.TempDir()
-	writeFile(t, root, "composer.json", `{"repositories": {"packagist.org": false}}`)
+	stackstest.WriteFile(t, root, "composer.json", `{"repositories": {"packagist.org": false}}`)
 	if _, err := stageApplication(root, root, t.TempDir()); err != nil {
 		t.Errorf("err = %v", err)
 	}
@@ -392,8 +355,8 @@ func TestPublishDryRunPushesNothing(t *testing.T) {
 func TestAnApplicationThatPublishesAnImageIsAReleaseSetMember(t *testing.T) {
 	root := t.TempDir()
 	application(t, filepath.Join(root, "shop"))
-	writeFile(t, root, "shop/putnami.json", `{"options": {"publish": {"docker": true}}}`)
-	writeFile(t, root, "putnami.workspace.json", `{"registries": {"oci": {"publish": "registry.test/acme"}}}`)
+	stackstest.WriteFile(t, root, "shop/putnami.json", `{"options": {"publish": {"docker": true}}}`)
+	stackstest.WriteFile(t, root, "putnami.workspace.json", `{"registries": {"oci": {"publish": "registry.test/acme"}}}`)
 	s := stack(t)
 	result, err := s.Probe(root, wsproto.ProbeRequest{Version: wsproto.ProbeProtocolVersion, Extension: s.Extension, Paths: []string{"shop"}})
 	if err != nil || len(result.Projects) != 1 {
@@ -416,8 +379,8 @@ func TestAProjectNamedWithUppercaseLettersPackagesALowercaseImage(t *testing.T) 
 	prepareComposer(t)
 	root := t.TempDir()
 	application(t, filepath.Join(root, "Shop"))
-	writeFile(t, root, "Shop/putnami.json", `{"publish": ["docker"]}`)
-	writeFile(t, root, "putnami.workspace.json", `{"registries": {"oci": {"publish": "registry.test/acme"}}}`)
+	stackstest.WriteFile(t, root, "Shop/putnami.json", `{"publish": ["docker"]}`)
+	stackstest.WriteFile(t, root, "putnami.workspace.json", `{"registries": {"oci": {"publish": "registry.test/acme"}}}`)
 	s := stack(t)
 	result, err := s.Probe(root, wsproto.ProbeRequest{Version: wsproto.ProbeProtocolVersion, Extension: s.Extension, Paths: []string{"Shop"}})
 	if err != nil || len(result.Projects) != 1 {
@@ -453,8 +416,8 @@ func TestAProjectNamedWithUppercaseLettersPackagesALowercaseImage(t *testing.T) 
 
 func TestAComposerPackageWithoutTheProjectTypeIsALibraryAndPublishesNoImage(t *testing.T) {
 	root := t.TempDir()
-	writeFile(t, root, "lib/composer.json", `{"name": "acme/lib", "require": {"php": ">=8.4"}}`)
-	writeFile(t, root, "lib/putnami.json", `{"options": {"publish": {"docker": true}}}`)
+	stackstest.WriteFile(t, root, "lib/composer.json", `{"name": "acme/lib", "require": {"php": ">=8.4"}}`)
+	stackstest.WriteFile(t, root, "lib/putnami.json", `{"options": {"publish": {"docker": true}}}`)
 	s := stack(t)
 	result, err := s.Probe(root, wsproto.ProbeRequest{Version: wsproto.ProbeProtocolVersion, Extension: s.Extension, Paths: []string{"lib"}})
 	if err != nil || len(result.Projects) != 1 {
@@ -499,7 +462,7 @@ func TestDepsUpgradeRefusesOfflineDependencies(t *testing.T) {
 
 func TestAStagedSymbolicLinkFailsPackaging(t *testing.T) {
 	source := t.TempDir()
-	writeFile(t, source, "public/app.js", "a")
+	stackstest.WriteFile(t, source, "public/app.js", "a")
 	if err := os.Symlink("app.js", filepath.Join(source, "public/linked.js")); err != nil {
 		t.Skipf("no symbolic links: %v", err)
 	}

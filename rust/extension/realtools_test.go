@@ -12,6 +12,7 @@ import (
 	"go.putnami.dev/protocol/job"
 	pctx "go.putnami.dev/sdk/extension/context"
 	"go.putnami.dev/tooling/stacks"
+	"go.putnami.dev/tooling/stacks/stackstest"
 )
 
 // RealToolsVariable makes the real-tool proof fail, instead of skip, when a
@@ -42,7 +43,7 @@ func writeDemo(t *testing.T, root string) {
 	for _, stage := range []string{"base/", "head/"} {
 		for _, f := range files {
 			if rest, ok := strings.CutPrefix(f.name, stage); ok {
-				writeFile(t, root, rest, f.content)
+				stackstest.WriteFile(t, root, rest, f.content)
 			}
 		}
 	}
@@ -119,7 +120,7 @@ func TestTheFixtureRepositoryPassesWithTheRealTools(t *testing.T) {
 			// A cargo-llvm-cov that finds no llvm-tools fails the coverage
 			// probe, so the task runs cargo nextest run.
 			shim := t.TempDir()
-			writeFile(t, shim, "cargo-llvm-cov", "#!/bin/sh\nexit 1\n")
+			stackstest.WriteFile(t, shim, "cargo-llvm-cov", "#!/bin/sh\nexit 1\n")
 			if err := os.Chmod(filepath.Join(shim, "cargo-llvm-cov"), 0o755); err != nil {
 				t.Fatal(err)
 			}

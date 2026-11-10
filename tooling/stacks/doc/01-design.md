@@ -434,11 +434,17 @@ states, and add arguments; its error fails the task with
 last step
 ([ADR 0014](adr/0014-a-stack-adapts-each-step-of-a-task.md)). `Stack.Selected`,
 `RunForeground`, `AnnounceReady` and `FreePort` serve a stack's `run` and
-`serve` commands. `ImageName` and `ImageMember` serve a stack that packages an
-image: the image is the project's name as one lowercase path segment, the name
-the shared Docker publisher expects, so a project named `userService` packages
-`userservice`; `ImageMember` declares that image as a release-set member when
-the project's `putnami.json` publishes it.
+`serve` commands. `ImageName`, `ImageMember` and `LoadImage` serve a stack
+that packages an image: the image is the project's name as one lowercase path
+segment, the name the shared Docker publisher expects, so a project named
+`userService` packages `userservice`; `ImageMember` declares that image as a
+release-set member when the project's `putnami.json` publishes it; `LoadImage`
+loads it into the local Docker daemon under each of its tags.
+`LockedToolsHome`, `ExecutableSuffix`, `CompareVersions`, `Accepted` and
+`Choose` serve a stack that installs its toolchain, and
+`ServeToolchainResolve` one that pins it in the workspace lock. The test kit
+`stackstest` gives every stack extension `CheckManifest`, `WriteFile` and
+`ImageRegistry`, an in-memory registry that serves a two-platform base image.
 
 A file may state a range instead, in Composer's constraint syntax: the PHP
 profile reads `require.php` of `composer.json`, such as `>=8.4` or `^8.2`
@@ -551,9 +557,8 @@ tool, so no Putnami cache sits over the tool's.
 - **Serve, run, package and publish in the profile.** No profile declares
   these tasks or a workload: each stack starts its programs and ships its
   artifacts its own way, so each extension adds them as jobs in its own code.
-  All seven stacks serve and run their applications; Rust, Ruby, PHP and Dart
-  do so on helpers the core shares (`RunForeground`, `AnnounceReady`,
-  `FreePort`). `serve` reports the server ready once its port accepts
+  All seven stacks serve and run their applications on helpers the core
+  shares (`RunForeground`, `AnnounceReady`, `FreePort`). `serve` reports the server ready once its port accepts
   connections, so `putnami qualify` and compose can wait on it. Rust, Java,
   Swift, .NET, Ruby and PHP package an application's image and publish it
   through the shared Docker publisher, and Rust also packages release

@@ -44,17 +44,6 @@ func TestMain(m *testing.M) {
 	os.Exit(m.Run())
 }
 
-func writeFile(t *testing.T, root, rel, content string) {
-	t.Helper()
-	p := filepath.Join(root, filepath.FromSlash(rel))
-	if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(p, []byte(content), 0o644); err != nil {
-		t.Fatal(err)
-	}
-}
-
 var txtarFile = regexp.MustCompile(`(?m)^-- (.+?) --\n`)
 
 // fixture writes the observe Swift demo repository: App/Shop.xcodeproj uses
@@ -78,7 +67,7 @@ func fixture(t *testing.T) string {
 		if i+1 < len(marks) {
 			end = marks[i+1][0]
 		}
-		writeFile(t, root, src[m[2]:m[3]], src[m[1]:end])
+		stackstest.WriteFile(t, root, src[m[2]:m[3]], src[m[1]:end])
 	}
 	return root
 }
@@ -140,7 +129,7 @@ func TestThePackagesAndXcodeProjectsBecomeProjects(t *testing.T) {
 
 	// A directory with a package and an Xcode project keeps the package.
 	root := fixture(t)
-	writeFile(t, root, "App/Package.swift", "let package = Package(name: \"AppKit\")\n")
+	stackstest.WriteFile(t, root, "App/Package.swift", "let package = Package(name: \"AppKit\")\n")
 	result = probe(t, root)
 	if p := result.Projects[0]; p.Path != "App" || p.SourceName != "AppKit" || len(result.Diagnostics) != 1 || result.Diagnostics[0].Code != stacks.CodeComponentConflict {
 		t.Errorf("conflict: %+v %v", p, result.Diagnostics)
@@ -197,7 +186,7 @@ esac`,
 esac`,
 	}
 	for name, body := range scripts {
-		writeFile(t, bin, name, "#!/bin/sh\necho \"$PWD: "+name+" $*\" >> \""+s.log+"\"\n"+body+"\n")
+		stackstest.WriteFile(t, bin, name, "#!/bin/sh\necho \"$PWD: "+name+" $*\" >> \""+s.log+"\"\n"+body+"\n")
 		if err := os.Chmod(filepath.Join(bin, name), 0o755); err != nil {
 			t.Fatal(err)
 		}
@@ -210,7 +199,7 @@ esac`,
 
 func (s stubs) write(t *testing.T, name, content string) {
 	t.Helper()
-	writeFile(t, s.dir, name, content)
+	stackstest.WriteFile(t, s.dir, name, content)
 }
 
 func (s stubs) ran(t *testing.T) string {
@@ -316,8 +305,8 @@ func TestAPackageRunsSwiftAndReadsItsXunitAndLCOVReports(t *testing.T) {
 	if status, _, _, err := runJob(t, root, "Packages/Pricing", stacks.TaskLint); status != "OK" || err != nil || strings.Contains(s.ran(t), "swift format") {
 		t.Fatalf("lint without a configuration: %s %v %s", status, err, s.ran(t))
 	}
-	writeFile(t, root, "putnami.workspace.json", "{}")
-	writeFile(t, root, ".swift-format", `{"indentation": {"spaces": 4}}`)
+	stackstest.WriteFile(t, root, "putnami.workspace.json", "{}")
+	stackstest.WriteFile(t, root, ".swift-format", `{"indentation": {"spaces": 4}}`)
 	for _, task := range []string{stacks.TaskLint, stacks.TaskBuild} {
 		if status, _, _, err := runJob(t, root, "Packages/Pricing", task); status != "OK" || err != nil {
 			t.Fatalf("%s: %s %v", task, status, err)
@@ -363,11 +352,11 @@ func TestAPackageRunsSwiftAndReadsItsXunitAndLCOVReports(t *testing.T) {
 
 	// Offline, a mismatch installs nothing and fails the task.
 	t.Setenv(extensionproto.OfflineDependenciesEnv, "1")
-	writeFile(t, root, "Packages/Pricing/.swift-version", "5.10\n")
+	stackstest.WriteFile(t, root, "Packages/Pricing/.swift-version", "5.10\n")
 	if status, _, _, err := runJob(t, root, "Packages/Pricing", stacks.TaskBuild); status != "FAILED" || err == nil || err.Error() != stacks.CodeToolchainMismatch {
 		t.Errorf("a toolchain mismatch fails the task: %s %v", status, err)
 	}
-	writeFile(t, root, "Packages/Pricing/.swift-version", "6.0\n")
+	stackstest.WriteFile(t, root, "Packages/Pricing/.swift-version", "6.0\n")
 	if status, _, _, err := runJob(t, root, "Packages/Pricing", stacks.TaskBuild); status != "OK" || err != nil {
 		t.Errorf("6.0 names the 6.0 releases: %s %v", status, err)
 	}
@@ -376,15 +365,15 @@ func TestAPackageRunsSwiftAndReadsItsXunitAndLCOVReports(t *testing.T) {
 func TestAnXcodeProjectRunsXcodebuildAndReadsItsConvertedResultBundle(t *testing.T) {
 	spectest.Proves(t, feature, "xcode-projects-run-xcodebuild", "an-xcode-project-runs-xcodebuild-and-reads-its-converted-result-bundle")
 	root := fixture(t)
-	writeFile(t, root, "App/.xcode-version", "16.1\n")
+	stackstest.WriteFile(t, root, "App/.xcode-version", "16.1\n")
 	s := stubTools(t)
 	s.demoReports(t, root, false)
 	app := filepath.Join(root, "App")
-	writeFile(t, root, "App/.swift-format", "{}")
-	writeFile(t, root, "App/Pods/Alamofire/Source/AF.swift", "")
-	writeFile(t, root, "App/README.md", "# Shop\n")
-	writeFile(t, root, "App/Info.plist", "<plist/>\n")
-	writeFile(t, root, "App/AppDelegate.swift", "")
+	stackstest.WriteFile(t, root, "App/.swift-format", "{}")
+	stackstest.WriteFile(t, root, "App/Pods/Alamofire/Source/AF.swift", "")
+	stackstest.WriteFile(t, root, "App/README.md", "# Shop\n")
+	stackstest.WriteFile(t, root, "App/Info.plist", "<plist/>\n")
+	stackstest.WriteFile(t, root, "App/AppDelegate.swift", "")
 	for _, task := range []string{stacks.TaskLint, stacks.TaskBuild} {
 		if status, _, _, err := runJob(t, root, "App", task); status != "OK" || err != nil {
 			t.Fatalf("%s: %s %v", task, status, err)
@@ -433,7 +422,7 @@ func TestAnXcodeProjectRunsXcodebuildAndReadsItsConvertedResultBundle(t *testing
 	}
 	t.Setenv("STUB_FAIL", "")
 
-	writeFile(t, root, "App/.xcode-version", "15.4\n")
+	stackstest.WriteFile(t, root, "App/.xcode-version", "15.4\n")
 	if status, _, _, err := runJob(t, root, "App", stacks.TaskTest); status != "FAILED" || err == nil || err.Error() != stacks.CodeToolchainMismatch {
 		t.Errorf("an Xcode mismatch fails the task: %s %v", status, err)
 	}
@@ -512,16 +501,16 @@ func TestAPutnamiJSONOverrideChangesTheStepsAndTheInputs(t *testing.T) {
 		}
 		return result.Inputs[0]
 	}
-	writeFile(t, root, "Packages/Pricing/.build/debug/Generated.swift", "")
+	stackstest.WriteFile(t, root, "Packages/Pricing/.build/debug/Generated.swift", "")
 	if got := resolve("Packages/Pricing", "swift:lint"); !reflect.DeepEqual(got.Files, []string{"Package.swift", "Sources/Pricing/PriceCalculator.swift"}) {
 		t.Errorf("lint reads no test: %+v", got)
 	}
 	if got := resolve("Packages/Pricing", "swift:test"); !slices.Contains(got.Files, "Tests/PricingTests/PriceCalculatorTests.swift") {
 		t.Errorf("test reads the tests: %+v", got)
 	}
-	writeFile(t, root, "App/Shop/Model.xcdatamodeld/Model.xcdatamodel/contents", "")
-	writeFile(t, root, "App/Shop.xcodeproj/xcuserdata/me.xcuserdatad/UserInterfaceState.xcuserstate", "")
-	writeFile(t, root, "App/DerivedData/Build/x.o", "")
+	stackstest.WriteFile(t, root, "App/Shop/Model.xcdatamodeld/Model.xcdatamodel/contents", "")
+	stackstest.WriteFile(t, root, "App/Shop.xcodeproj/xcuserdata/me.xcuserdatad/UserInterfaceState.xcuserstate", "")
+	stackstest.WriteFile(t, root, "App/DerivedData/Build/x.o", "")
 	if got := resolve("App", "swift:test"); !reflect.DeepEqual(got.Files, []string{
 		"Shop.xcodeproj/project.pbxproj", "Shop.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved",
 		"Shop/Checkout.swift", "Shop/Model.xcdatamodeld/Model.xcdatamodel/contents", "Shop/ShopApp.swift", "ShopTests/CheckoutTests.swift",
@@ -532,8 +521,8 @@ func TestAPutnamiJSONOverrideChangesTheStepsAndTheInputs(t *testing.T) {
 		t.Errorf("the Xcode lint reads its Swift files: %+v", got)
 	}
 
-	writeFile(t, root, "App/Fixtures/cart.json", "{}")
-	writeFile(t, root, "App/putnami.json", `{"options": {"@putnami/swift": {
+	stackstest.WriteFile(t, root, "App/Fixtures/cart.json", "{}")
+	stackstest.WriteFile(t, root, "App/putnami.json", `{"options": {"@putnami/swift": {
 	  "inputs": {"sources": ["Shop/**", "Fixtures/**"]},
 	  "tasks": {"build": {"steps": [["{runtime}", "xcodebuild", "build", "--scheme", "ShopDev", "--destination", "platform=macOS"]]}}
 	}}}`)
@@ -550,7 +539,7 @@ func TestAPutnamiJSONOverrideChangesTheStepsAndTheInputs(t *testing.T) {
 		t.Errorf("a step override is honored: %s", ran)
 	}
 
-	writeFile(t, root, "App/putnami.json", `{"options": {"@putnami/swift": {"tasks": {"lint": {"stepz": []}}}}}`)
+	stackstest.WriteFile(t, root, "App/putnami.json", `{"options": {"@putnami/swift": {"tasks": {"lint": {"stepz": []}}}}}`)
 	if status, _, _, err := runJob(t, root, "App", stacks.TaskLint); status != "FAILED" || err == nil {
 		t.Errorf("an invalid override fails the task: %s %v", status, err)
 	}

@@ -22,17 +22,6 @@ import (
 
 const feature = "dart/stack-extension"
 
-func writeFile(t *testing.T, root, rel, content string) {
-	t.Helper()
-	p := filepath.Join(root, filepath.FromSlash(rel))
-	if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(p, []byte(content), 0o644); err != nil {
-		t.Fatal(err)
-	}
-}
-
 // tempDir is a temporary directory by its real path: a step's $PWD names that
 // path, and on macOS the temporary directory sits behind the /var symlink.
 func tempDir(t *testing.T) string {
@@ -57,13 +46,13 @@ func fixture(t *testing.T) string {
 	parts := strings.Split(string(data), "\n-- ")
 	for _, part := range parts[1:] {
 		header, body, _ := strings.Cut(part, "\n")
-		writeFile(t, root, strings.TrimSuffix(header, " --"), body+"\n")
+		stackstest.WriteFile(t, root, strings.TrimSuffix(header, " --"), body+"\n")
 	}
-	writeFile(t, root, "tools/gen/pubspec.yaml", "name: gen\nenvironment:\n  sdk: ^3.7.0\ndependencies:\n  args: ^2.6.0\n")
-	writeFile(t, root, "tools/gen/pubspec.lock", "packages: {}\n")
-	writeFile(t, root, "tools/gen/lib/gen.dart", "String greet() => 'hi';\n")
-	writeFile(t, root, "tools/gen/bin/gen.dart", "void main() {}\n")
-	writeFile(t, root, "tools/gen/test/gen_test.dart", "void main() {}\n")
+	stackstest.WriteFile(t, root, "tools/gen/pubspec.yaml", "name: gen\nenvironment:\n  sdk: ^3.7.0\ndependencies:\n  args: ^2.6.0\n")
+	stackstest.WriteFile(t, root, "tools/gen/pubspec.lock", "packages: {}\n")
+	stackstest.WriteFile(t, root, "tools/gen/lib/gen.dart", "String greet() => 'hi';\n")
+	stackstest.WriteFile(t, root, "tools/gen/bin/gen.dart", "void main() {}\n")
+	stackstest.WriteFile(t, root, "tools/gen/test/gen_test.dart", "void main() {}\n")
 	return root
 }
 
@@ -138,7 +127,7 @@ func stubTools(t *testing.T, flutterVersion, dartVersion, junit string) string {
 	t.Helper()
 	bin := t.TempDir()
 	log := filepath.Join(bin, "tools.log")
-	writeFile(t, bin, "junit.xml", junit)
+	stackstest.WriteFile(t, bin, "junit.xml", junit)
 	record := startedRecord(log)
 	common := `echo "$PWD: $tool $*" >> "` + log + `"
 if [ "$1 $2" = "pub get" ]; then
@@ -161,7 +150,7 @@ for a in "$@"; do
   prev="$a"
 done
 `
-	writeFile(t, bin, "flutter", `#!/bin/sh
+	stackstest.WriteFile(t, bin, "flutter", `#!/bin/sh
 tool=flutter
 `+record+`if [ "$1" = --version ]; then printf 'Flutter `+flutterVersion+` • channel stable • https://github.com/flutter/flutter.git\nTools • Dart `+dartVersion+`\n'; exit 0; fi
 `+common+`
@@ -169,7 +158,7 @@ if [ "$1" = test ]; then mkdir -p coverage; printf 'SF:lib/src/price.dart\nDA:3,
 echo "PORT=$PORT" >> "`+log+`.env"
 exit ${STUB_EXIT:-0}
 `)
-	writeFile(t, bin, "dart", `#!/bin/sh
+	stackstest.WriteFile(t, bin, "dart", `#!/bin/sh
 tool=dart
 `+record+`if [ "$1" = --version ]; then echo 'Dart SDK version: `+dartVersion+` (stable) (Wed Feb 5 2025) on "linux_x64"'; exit 0; fi
 `+common+`
@@ -177,7 +166,7 @@ echo "PORT=$PORT" >> "`+log+`.env"
 exit ${STUB_EXIT:-0}
 `)
 	for _, tool := range []string{"tojunit", "format_coverage"} {
-		writeFile(t, bin, tool, "#!/bin/sh\ntool="+tool+"\n"+record+common)
+		stackstest.WriteFile(t, bin, tool, "#!/bin/sh\ntool="+tool+"\n"+record+common)
 	}
 	for _, f := range []string{"dart", "flutter", "tojunit", "format_coverage"} {
 		if err := os.Chmod(filepath.Join(bin, f), 0o755); err != nil {
@@ -267,14 +256,14 @@ func TestATaskRunsTheVariantStepsAfterTheToolchainCheck(t *testing.T) {
 	if status, _, _, err := runJob(t, root, "apps/mobile", stacks.TaskBuild); status != "OK" || err != nil || ran(t, log) != "" {
 		t.Errorf("an app with no platform directory builds nothing: %s %v", status, err)
 	}
-	writeFile(t, root, "apps/mobile/web/index.html", "<html></html>\n")
+	stackstest.WriteFile(t, root, "apps/mobile/web/index.html", "<html></html>\n")
 	if status, _, _, err := runJob(t, root, "apps/mobile", stacks.TaskBuild); status != "OK" || err != nil {
 		t.Fatalf("build mobile: %s %v", status, err)
 	}
 	if got, want := ran(t, log), mobile+": flutter build web\n"; got != want {
 		t.Errorf("an app builds each platform directory it holds:\n%s\nwant\n%s", got, want)
 	}
-	writeFile(t, root, "packages/ui/web/index.html", "<html></html>\n")
+	stackstest.WriteFile(t, root, "packages/ui/web/index.html", "<html></html>\n")
 	if status, _, _, err := runJob(t, root, "packages/ui", stacks.TaskBuild); status != "OK" || err != nil || strings.Contains(ran(t, log), "flutter build") {
 		t.Errorf("a package with no lib/main.dart is no app: %s %v", status, err)
 	}
@@ -290,12 +279,12 @@ func TestATaskRunsTheVariantStepsAfterTheToolchainCheck(t *testing.T) {
 	if status, _, _, err := runJob(t, root, "tools/gen", stacks.TaskLint); status != "FAILED" || err == nil || err.Error() != stacks.CodeToolchainMismatch {
 		t.Errorf("a Dart version outside environment.sdk fails the task: %s %v", status, err)
 	}
-	writeFile(t, root, "apps/mobile/putnami.json", `{"options": {"@putnami/dart": {"toolchain": {"version": "3.29.2"}}}}`)
+	stackstest.WriteFile(t, root, "apps/mobile/putnami.json", `{"options": {"@putnami/dart": {"toolchain": {"version": "3.29.2"}}}}`)
 	stubTools(t, "3.35.0", "3.9.0", junitPass)
 	if status, _, _, err := runJob(t, root, "apps/mobile", stacks.TaskLint); status != "FAILED" || err == nil || err.Error() != stacks.CodeToolchainMismatch {
 		t.Errorf("an exact toolchain.version pins Flutter, whatever pub's reading of the pubspec: %s %v", status, err)
 	}
-	writeFile(t, root, "tools/gen/pubspec.yaml", "name: gen\nenvironment:\n  sdk: '>=2.17.0 <3.0.0'\n")
+	stackstest.WriteFile(t, root, "tools/gen/pubspec.yaml", "name: gen\nenvironment:\n  sdk: '>=2.17.0 <3.0.0'\n")
 	stubTools(t, "3.29.2", "3.7.2", junitPass)
 	if status, _, _, err := runJob(t, root, "tools/gen", stacks.TaskLint); status != "OK" || err != nil {
 		t.Errorf("a null-safe <3.0.0 reads as <4.0.0, as pub reads it: %s %v", status, err)
@@ -364,12 +353,12 @@ func resolve(t *testing.T, root, project, selector string) wsproto.InputResolveA
 func TestTheLintSelectorReadsNoTestFile(t *testing.T) {
 	spectest.Proves(t, feature, "lint-skips-test-changes", "the-lint-selector-reads-no-test-file")
 	root := fixture(t)
-	writeFile(t, root, "packages/pricing/assets/rates.json", "{}")
-	writeFile(t, root, "apps/mobile/web/index.html", "<html></html>\n")
-	writeFile(t, root, "apps/mobile/linux/CMakeLists.txt", "project(mobile)\n")
-	writeFile(t, root, "apps/mobile/linux/flutter/ephemeral/generated_config.cmake", "# written by flutter build\n")
-	writeFile(t, root, "apps/mobile/android/app/src/main/AndroidManifest.xml", "<manifest/>\n")
-	writeFile(t, root, "apps/mobile/android/app/src/main/java/io/flutter/plugins/GeneratedPluginRegistrant.java", "// written by flutter pub get\n")
+	stackstest.WriteFile(t, root, "packages/pricing/assets/rates.json", "{}")
+	stackstest.WriteFile(t, root, "apps/mobile/web/index.html", "<html></html>\n")
+	stackstest.WriteFile(t, root, "apps/mobile/linux/CMakeLists.txt", "project(mobile)\n")
+	stackstest.WriteFile(t, root, "apps/mobile/linux/flutter/ephemeral/generated_config.cmake", "# written by flutter build\n")
+	stackstest.WriteFile(t, root, "apps/mobile/android/app/src/main/AndroidManifest.xml", "<manifest/>\n")
+	stackstest.WriteFile(t, root, "apps/mobile/android/app/src/main/java/io/flutter/plugins/GeneratedPluginRegistrant.java", "// written by flutter pub get\n")
 	if got := resolve(t, root, "packages/pricing", "dart:lint").Files; !reflect.DeepEqual(got, []string{"lib/pricing.dart", "lib/src/price.dart", "pubspec.yaml"}) {
 		t.Errorf("lint inputs = %v", got)
 	}
@@ -387,8 +376,8 @@ func TestTheLintSelectorReadsNoTestFile(t *testing.T) {
 func TestAPutnamiJSONOverrideChangesTheStepsAndTheInputs(t *testing.T) {
 	spectest.Proves(t, feature, "overrides-are-honored", "a-putnami-json-override-changes-the-steps-and-the-inputs")
 	root := fixture(t)
-	writeFile(t, root, "packages/pricing/fixtures/rates.json", "{}")
-	writeFile(t, root, "packages/pricing/putnami.json", `{"options": {"@putnami/dart": {
+	stackstest.WriteFile(t, root, "packages/pricing/fixtures/rates.json", "{}")
+	stackstest.WriteFile(t, root, "packages/pricing/putnami.json", `{"options": {"@putnami/dart": {
 	  "inputs": {"code": ["lib/**", "bin/**", "fixtures/**"]},
 	  "tasks": {"lint": {"steps": [["flutter", "analyze", "--no-pub"]]}}
 	}}}`)
@@ -410,7 +399,7 @@ func TestAPutnamiJSONOverrideChangesTheStepsAndTheInputs(t *testing.T) {
 		`{"options": {"@putnami/dart": {"tasks": {"lint": {"targets": [{"name": "lib", "when": ["lib"], "hosts": ["darwin"]}]}}}}}`,
 		`{"options": {"@putnami/dart": {"inputs": {"manifests": ["pubspec.yaml", "{root}/melos.yaml"]}}}}`,
 	} {
-		writeFile(t, root, "packages/pricing/putnami.json", bad)
+		stackstest.WriteFile(t, root, "packages/pricing/putnami.json", bad)
 		if status, _, _, err := runJob(t, root, "packages/pricing", stacks.TaskLint); status != "FAILED" || err == nil || err.Error() != stacks.CodeProjectConfigInvalid {
 			t.Errorf("%s fails the task: %s %v", bad, status, err)
 		}
@@ -432,9 +421,9 @@ func TestAPureDartPackageInAFlutterWorkspaceResolvesWithFlutter(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	writeFile(t, root, "pubspec.yaml", strings.Replace(string(pubspec), "  - packages/ui\n", "  - packages/ui\n  - packages/model\n", 1))
-	writeFile(t, root, "packages/model/pubspec.yaml", "name: model\nresolution: workspace\nenvironment:\n  sdk: ^3.7.0\ndev_dependencies:\n  test: ^1.25.0\n")
-	writeFile(t, root, "packages/model/lib/model.dart", "class Item {}\n")
+	stackstest.WriteFile(t, root, "pubspec.yaml", strings.Replace(string(pubspec), "  - packages/ui\n", "  - packages/ui\n  - packages/model\n", 1))
+	stackstest.WriteFile(t, root, "packages/model/pubspec.yaml", "name: model\nresolution: workspace\nenvironment:\n  sdk: ^3.7.0\ndev_dependencies:\n  test: ^1.25.0\n")
+	stackstest.WriteFile(t, root, "packages/model/lib/model.dart", "class Item {}\n")
 	s := stack(t)
 	result, err := s.Probe(root, wsproto.ProbeRequest{Version: wsproto.ProbeProtocolVersion, Extension: s.Extension, Paths: []string{"packages/model", "packages/pricing", "tools/gen"}})
 	if err != nil {
@@ -472,7 +461,7 @@ func TestAPureDartPackageInAFlutterWorkspaceResolvesWithFlutter(t *testing.T) {
 	// A dart that comes first on PATH is not the Flutter SDK's: run uses the
 	// one beside the selected flutter.
 	other := t.TempDir()
-	writeFile(t, other, "dart", "#!/bin/sh\necho \"OTHER $*\" >> "+log+"\n")
+	stackstest.WriteFile(t, other, "dart", "#!/bin/sh\necho \"OTHER $*\" >> "+log+"\n")
 	if err := os.Chmod(filepath.Join(other, "dart"), 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -488,12 +477,12 @@ func TestAPureDartPackageInAFlutterWorkspaceResolvesWithFlutter(t *testing.T) {
 func TestANestedPubWorkspaceIsAStackRoot(t *testing.T) {
 	spectest.Proves(t, feature, "packages-become-projects", "the-packages-of-a-pub-workspace-become-projects-with-their-edges")
 	root := tempDir(t)
-	writeFile(t, root, "mono/pubspec.yaml", "name: mono\npublish_to: none\nenvironment:\n  sdk: ^3.7.0\nworkspace:\n  - app\n  - core\n")
-	writeFile(t, root, "mono/pubspec.lock", "packages: {}\n")
-	writeFile(t, root, "mono/app/pubspec.yaml", "name: app\nresolution: workspace\nenvironment:\n  sdk: ^3.7.0\ndependencies:\n  core:\n")
-	writeFile(t, root, "mono/app/bin/app.dart", "void main() {}\n")
-	writeFile(t, root, "mono/core/pubspec.yaml", "name: core\nresolution: workspace\nenvironment:\n  sdk: ^3.7.0\n")
-	writeFile(t, root, "mono/core/lib/core.dart", "int one() => 1;\n")
+	stackstest.WriteFile(t, root, "mono/pubspec.yaml", "name: mono\npublish_to: none\nenvironment:\n  sdk: ^3.7.0\nworkspace:\n  - app\n  - core\n")
+	stackstest.WriteFile(t, root, "mono/pubspec.lock", "packages: {}\n")
+	stackstest.WriteFile(t, root, "mono/app/pubspec.yaml", "name: app\nresolution: workspace\nenvironment:\n  sdk: ^3.7.0\ndependencies:\n  core:\n")
+	stackstest.WriteFile(t, root, "mono/app/bin/app.dart", "void main() {}\n")
+	stackstest.WriteFile(t, root, "mono/core/pubspec.yaml", "name: core\nresolution: workspace\nenvironment:\n  sdk: ^3.7.0\n")
+	stackstest.WriteFile(t, root, "mono/core/lib/core.dart", "int one() => 1;\n")
 	s := stack(t)
 	result, err := s.Probe(root, wsproto.ProbeRequest{Version: wsproto.ProbeProtocolVersion, Extension: s.Extension, Paths: []string{"mono", "mono/app", "mono/core"}})
 	if err != nil {

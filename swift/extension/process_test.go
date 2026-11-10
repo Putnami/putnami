@@ -11,6 +11,7 @@ import (
 	"go.putnami.dev/protocol/features/spectest"
 	"go.putnami.dev/protocol/job"
 	wsproto "go.putnami.dev/protocol/workspace"
+	"go.putnami.dev/tooling/stacks/stackstest"
 )
 
 const serverManifest = `// swift-tools-version:5.9
@@ -30,8 +31,8 @@ let package = Package(
 func TestAnExecutablePackageServesAndRuns(t *testing.T) {
 	spectest.Proves(t, feature, "applications-serve-and-run", "an-executable-package-serves-and-runs")
 	root := fixture(t)
-	writeFile(t, root, "Packages/Server/Package.swift", serverManifest)
-	writeFile(t, root, "Packages/Server/Sources/Server/main.swift", "print(\"up\")\n")
+	stackstest.WriteFile(t, root, "Packages/Server/Package.swift", serverManifest)
+	stackstest.WriteFile(t, root, "Packages/Server/Sources/Server/main.swift", "print(\"up\")\n")
 	s := stubTools(t)
 	st := stack(t)
 	types := map[string]string{}
@@ -67,7 +68,7 @@ func TestAnExecutablePackageServesAndRuns(t *testing.T) {
 	t.Setenv("STUB_RUN_EXIT", "0")
 
 	// A package with several executables names one with --entrypoint.
-	writeFile(t, root, "Packages/Server/Package.swift", strings.Replace(serverManifest, "    targets: [\n",
+	stackstest.WriteFile(t, root, "Packages/Server/Package.swift", strings.Replace(serverManifest, "    targets: [\n",
 		"    products: [.executable(name: \"admin\", targets: [\"Admin\"]), .executable(name: \"Server\", targets: [\"Server\"])],\n    targets: [\n", 1))
 	if status, _, _, err := runJobWith(t, root, "Packages/Server", "run", RunJob(st), nil); status != "FAILED" || err == nil || !strings.Contains(err.Error(), CodeNoExecutable) {
 		t.Errorf("several executables need --entrypoint: %s %v", status, err)

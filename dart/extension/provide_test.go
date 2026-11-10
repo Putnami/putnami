@@ -19,6 +19,7 @@ import (
 	"go.putnami.dev/protocol/features/spectest"
 	"go.putnami.dev/sdk/extension/putnamihome"
 	"go.putnami.dev/tooling/stacks"
+	"go.putnami.dev/tooling/stacks/stackstest"
 )
 
 // publisher is a local stand-in for the dart-archive and the Flutter release
@@ -220,7 +221,7 @@ func TestATaskWithNoSDKOnPathRunsTheOneItInstalls(t *testing.T) {
 	bin := t.TempDir()
 	log := filepath.Join(bin, "tools.log")
 	for _, tool := range []string{"tojunit", "format_coverage"} {
-		writeFile(t, bin, tool, "#!/bin/sh\necho \"$0 $*\" >> "+log+"\n")
+		stackstest.WriteFile(t, bin, tool, "#!/bin/sh\necho \"$0 $*\" >> "+log+"\n")
 		_ = os.Chmod(filepath.Join(bin, tool), 0o755)
 	}
 	// No dart on PATH: the task installs one, then runs its steps with it.
@@ -242,8 +243,8 @@ func TestTheTestTaskActivatesTojunitAndFormatCoverageInItsOwnPubCache(t *testing
 	bin := t.TempDir()
 	log := filepath.Join(bin, "dart.log")
 	version := filepath.Join(bin, "version")
-	writeFile(t, bin, "version", "3.7.2")
-	writeFile(t, bin, "dart", "#!/bin/sh\nif [ \"$1\" = --version ]; then read v < "+version+"; echo \"Dart SDK version: $v (stable)\"; exit 0; fi\necho \"PUB_CACHE=$PUB_CACHE $*\" >> "+log+"\n")
+	stackstest.WriteFile(t, bin, "version", "3.7.2")
+	stackstest.WriteFile(t, bin, "dart", "#!/bin/sh\nif [ \"$1\" = --version ]; then read v < "+version+"; echo \"Dart SDK version: $v (stable)\"; exit 0; fi\necho \"PUB_CACHE=$PUB_CACHE $*\" >> "+log+"\n")
 	if err := os.Chmod(filepath.Join(bin, "dart"), 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -276,7 +277,7 @@ func TestTheTestTaskActivatesTojunitAndFormatCoverageInItsOwnPubCache(t *testing
 	if dirs, err := Tools(context.Background(), stacks.TaskTest, stacks.Metadata{}, []string{"PATH=" + dirs[0] + string(os.PathListSeparator) + bin}, func(string) {}); err != nil || dirs != nil {
 		t.Errorf("tools already on PATH need nothing: %v %v", dirs, err)
 	}
-	writeFile(t, bin, "version", "3.9.1")
+	stackstest.WriteFile(t, bin, "version", "3.9.1")
 	other, err := Tools(context.Background(), stacks.TaskTest, stacks.Metadata{}, env, func(string) {})
 	if err != nil || len(other) != 1 || other[0] == dirs[0] {
 		t.Fatalf("another SDK version gets its own tools: %v %v", other, err)
@@ -296,12 +297,12 @@ func TestAFlutterTestTaskActivatesTheToolsWithTheFlutterSDKsDart(t *testing.T) {
 	standalone, sdk := t.TempDir(), t.TempDir()
 	log := filepath.Join(sdk, "dart.log")
 	for dir, version := range map[string]string{standalone: "3.9.0", sdk: "3.7.2"} {
-		writeFile(t, dir, "dart", "#!/bin/sh\nif [ \"$1\" = --version ]; then echo 'Dart SDK version: "+version+" (stable)'; exit 0; fi\necho \""+dir+" $PUB_CACHE $*\" >> "+log+"\n")
+		stackstest.WriteFile(t, dir, "dart", "#!/bin/sh\nif [ \"$1\" = --version ]; then echo 'Dart SDK version: "+version+" (stable)'; exit 0; fi\necho \""+dir+" $PUB_CACHE $*\" >> "+log+"\n")
 		if err := os.Chmod(filepath.Join(dir, "dart"), 0o755); err != nil {
 			t.Fatal(err)
 		}
 	}
-	writeFile(t, sdk, "flutter", "#!/bin/sh\n")
+	stackstest.WriteFile(t, sdk, "flutter", "#!/bin/sh\n")
 	if err := os.Chmod(filepath.Join(sdk, "flutter"), 0o755); err != nil {
 		t.Fatal(err)
 	}

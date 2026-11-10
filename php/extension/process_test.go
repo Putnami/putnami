@@ -17,6 +17,7 @@ import (
 	pctx "go.putnami.dev/sdk/extension/context"
 	"go.putnami.dev/sdk/extension/jsonl"
 	"go.putnami.dev/tooling/stacks"
+	"go.putnami.dev/tooling/stacks/stackstest"
 )
 
 // runProjectJob runs a job for the component at rel with the job arguments.
@@ -47,7 +48,7 @@ func TestServeRunsThePhpBuiltInServerOnAnApplication(t *testing.T) {
 	spectest.Proves(t, feature, "serves-an-application", "serve-runs-the-php-built-in-server-on-an-application")
 	log, _ := prepareComposer(t)
 	root := fixture(t)
-	writeFile(t, root, frontController, "<?php\n")
+	stackstest.WriteFile(t, root, frontController, "<?php\n")
 
 	status, _, err := runProjectJob(t, root, ".", ServeJob(stack(t)), nil)
 	if status != "OK" || err != nil {
@@ -75,7 +76,7 @@ func TestServeNeedsAFrontController(t *testing.T) {
 func TestServeFailsWhenTheServerExitsOnItsOwn(t *testing.T) {
 	prepareComposer(t)
 	root := fixture(t)
-	writeFile(t, root, frontController, "<?php\n")
+	stackstest.WriteFile(t, root, frontController, "<?php\n")
 	t.Setenv("STUB_EXIT", "5")
 	status, data, err := runProjectJob(t, root, ".", ServeJob(stack(t)), nil)
 	if status != "FAILED" || err != nil || data[exitCodeKey] != 5 {

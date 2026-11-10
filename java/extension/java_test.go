@@ -26,17 +26,6 @@ func init() {
 	mavenURL = "http://127.0.0.1:1/no-download-in-tests"
 }
 
-func writeFile(t *testing.T, root, rel, content string) {
-	t.Helper()
-	p := filepath.Join(root, filepath.FromSlash(rel))
-	if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(p, []byte(content), 0o644); err != nil {
-		t.Fatal(err)
-	}
-}
-
 // gradleFixture writes the build of the observe gradle demo: :api depends on
 // :pricing through projects.pricing and applies jacoco; :app, an Android
 // library with unit test coverage, depends on it through project(":pricing");
@@ -44,25 +33,25 @@ func writeFile(t *testing.T, root, rel, content string) {
 func gradleFixture(t *testing.T) string {
 	t.Helper()
 	root := t.TempDir()
-	writeFile(t, root, ".java-version", "21\n")
-	writeFile(t, root, "settings.gradle.kts", "rootProject.name = \"shop\"\nenableFeaturePreview(\"TYPESAFE_PROJECT_ACCESSORS\")\ninclude(\":app\", \":api\", \":pricing\", \":libs:model\", \":bom\", \":catalog\")\n")
-	writeFile(t, root, "build.gradle.kts", "plugins {\n    alias(libs.plugins.android.library) apply false\n}\n")
-	writeFile(t, root, "gradle/libs.versions.toml", "[versions]\nkotlin = \"2.0.21\"\n")
-	writeFile(t, root, "gradle/wrapper/gradle-wrapper.properties", "distributionUrl=https\\://services.gradle.org/distributions/gradle-8.14.3-bin.zip\n")
-	writeFile(t, root, "api/build.gradle.kts", "plugins {\n    alias(libs.plugins.kotlin.jvm)\n    jacoco\n}\ndependencies {\n    implementation(projects.pricing)\n}\n")
-	writeFile(t, root, "api/src/main/kotlin/com/acme/api/Quotes.kt", "class Quotes\n")
-	writeFile(t, root, "api/src/test/kotlin/com/acme/api/QuotesTest.kt", "class QuotesTest\n")
-	writeFile(t, root, "app/build.gradle.kts", "plugins {\n    alias(libs.plugins.android.library)\n}\nandroid {\n    buildTypes {\n        debug {\n            enableUnitTestCoverage = true\n        }\n    }\n}\ndependencies {\n    implementation(project(\":pricing\"))\n}\n")
-	writeFile(t, root, "app/src/main/kotlin/com/acme/app/CartScreen.kt", "class CartScreen\n")
-	writeFile(t, root, "app/src/test/kotlin/com/acme/app/CartScreenTest.kt", "class CartScreenTest\n")
-	writeFile(t, root, "pricing/build.gradle.kts", "plugins {\n    alias(libs.plugins.kotlin.jvm)\n    jacoco\n}\n")
-	writeFile(t, root, "pricing/gradle.lockfile", "empty=\n")
-	writeFile(t, root, "pricing/src/main/kotlin/com/acme/pricing/Pricing.kt", "object Pricing\n")
-	writeFile(t, root, "pricing/src/test/kotlin/com/acme/pricing/PricingTest.kt", "class PricingTest\n")
-	writeFile(t, root, "libs/model/build.gradle.kts", "plugins {\n    // jacoco\n    `java-library`\n}\n")
-	writeFile(t, root, "libs/model/src/main/java/com/acme/model/Line.java", "class Line {}\n")
-	writeFile(t, root, "bom/build.gradle.kts", "plugins {\n    `java-platform`\n}\n")
-	writeFile(t, root, "catalog/build.gradle.kts", "plugins {\n    `version-catalog`\n}\n")
+	stackstest.WriteFile(t, root, ".java-version", "21\n")
+	stackstest.WriteFile(t, root, "settings.gradle.kts", "rootProject.name = \"shop\"\nenableFeaturePreview(\"TYPESAFE_PROJECT_ACCESSORS\")\ninclude(\":app\", \":api\", \":pricing\", \":libs:model\", \":bom\", \":catalog\")\n")
+	stackstest.WriteFile(t, root, "build.gradle.kts", "plugins {\n    alias(libs.plugins.android.library) apply false\n}\n")
+	stackstest.WriteFile(t, root, "gradle/libs.versions.toml", "[versions]\nkotlin = \"2.0.21\"\n")
+	stackstest.WriteFile(t, root, "gradle/wrapper/gradle-wrapper.properties", "distributionUrl=https\\://services.gradle.org/distributions/gradle-8.14.3-bin.zip\n")
+	stackstest.WriteFile(t, root, "api/build.gradle.kts", "plugins {\n    alias(libs.plugins.kotlin.jvm)\n    jacoco\n}\ndependencies {\n    implementation(projects.pricing)\n}\n")
+	stackstest.WriteFile(t, root, "api/src/main/kotlin/com/acme/api/Quotes.kt", "class Quotes\n")
+	stackstest.WriteFile(t, root, "api/src/test/kotlin/com/acme/api/QuotesTest.kt", "class QuotesTest\n")
+	stackstest.WriteFile(t, root, "app/build.gradle.kts", "plugins {\n    alias(libs.plugins.android.library)\n}\nandroid {\n    buildTypes {\n        debug {\n            enableUnitTestCoverage = true\n        }\n    }\n}\ndependencies {\n    implementation(project(\":pricing\"))\n}\n")
+	stackstest.WriteFile(t, root, "app/src/main/kotlin/com/acme/app/CartScreen.kt", "class CartScreen\n")
+	stackstest.WriteFile(t, root, "app/src/test/kotlin/com/acme/app/CartScreenTest.kt", "class CartScreenTest\n")
+	stackstest.WriteFile(t, root, "pricing/build.gradle.kts", "plugins {\n    alias(libs.plugins.kotlin.jvm)\n    jacoco\n}\n")
+	stackstest.WriteFile(t, root, "pricing/gradle.lockfile", "empty=\n")
+	stackstest.WriteFile(t, root, "pricing/src/main/kotlin/com/acme/pricing/Pricing.kt", "object Pricing\n")
+	stackstest.WriteFile(t, root, "pricing/src/test/kotlin/com/acme/pricing/PricingTest.kt", "class PricingTest\n")
+	stackstest.WriteFile(t, root, "libs/model/build.gradle.kts", "plugins {\n    // jacoco\n    `java-library`\n}\n")
+	stackstest.WriteFile(t, root, "libs/model/src/main/java/com/acme/model/Line.java", "class Line {}\n")
+	stackstest.WriteFile(t, root, "bom/build.gradle.kts", "plugins {\n    `java-platform`\n}\n")
+	stackstest.WriteFile(t, root, "catalog/build.gradle.kts", "plugins {\n    `version-catalog`\n}\n")
 	return root
 }
 
@@ -71,12 +60,12 @@ func gradleFixture(t *testing.T) string {
 func mavenFixture(t *testing.T) string {
 	t.Helper()
 	root := t.TempDir()
-	writeFile(t, root, "pom.xml", `<project><modelVersion>4.0.0</modelVersion><groupId>com.acme</groupId><artifactId>shop</artifactId><version>1.0.0</version><packaging>pom</packaging><modules><module>pricing</module><module>api</module></modules></project>`)
-	writeFile(t, root, "pricing/pom.xml", `<project><parent><groupId>com.acme</groupId><artifactId>shop</artifactId><version>1.0.0</version></parent><artifactId>pricing</artifactId></project>`)
-	writeFile(t, root, "pricing/src/main/java/com/acme/pricing/Pricing.java", "class Pricing {}\n")
-	writeFile(t, root, "pricing/src/test/java/com/acme/pricing/PricingTest.java", "class PricingTest {}\n")
-	writeFile(t, root, "api/pom.xml", `<project><parent><groupId>com.acme</groupId><artifactId>shop</artifactId><version>1.0.0</version></parent><artifactId>api</artifactId><dependencies><dependency><groupId>${project.groupId}</groupId><artifactId>pricing</artifactId></dependency></dependencies></project>`)
-	writeFile(t, root, "api/src/main/java/com/acme/api/Quotes.java", "class Quotes {}\n")
+	stackstest.WriteFile(t, root, "pom.xml", `<project><modelVersion>4.0.0</modelVersion><groupId>com.acme</groupId><artifactId>shop</artifactId><version>1.0.0</version><packaging>pom</packaging><modules><module>pricing</module><module>api</module></modules></project>`)
+	stackstest.WriteFile(t, root, "pricing/pom.xml", `<project><parent><groupId>com.acme</groupId><artifactId>shop</artifactId><version>1.0.0</version></parent><artifactId>pricing</artifactId></project>`)
+	stackstest.WriteFile(t, root, "pricing/src/main/java/com/acme/pricing/Pricing.java", "class Pricing {}\n")
+	stackstest.WriteFile(t, root, "pricing/src/test/java/com/acme/pricing/PricingTest.java", "class PricingTest {}\n")
+	stackstest.WriteFile(t, root, "api/pom.xml", `<project><parent><groupId>com.acme</groupId><artifactId>shop</artifactId><version>1.0.0</version></parent><artifactId>api</artifactId><dependencies><dependency><groupId>${project.groupId}</groupId><artifactId>pricing</artifactId></dependency></dependencies></project>`)
+	stackstest.WriteFile(t, root, "api/src/main/java/com/acme/api/Quotes.java", "class Quotes {}\n")
 	return root
 }
 
@@ -157,14 +146,14 @@ func TestTheGradleProjectsAndMavenModulesBecomeProjects(t *testing.T) {
 	// A single-project Gradle build is the root project, which keeps its
 	// directory's name and runs its tasks by their root path.
 	single := t.TempDir()
-	writeFile(t, single, "settings.gradle", "rootProject.name = 'one'\n")
-	writeFile(t, single, "build.gradle", "plugins { id 'java' }\n")
-	writeFile(t, single, "src/main/java/A.java", "class A {}\n")
+	stackstest.WriteFile(t, single, "settings.gradle", "rootProject.name = 'one'\n")
+	stackstest.WriteFile(t, single, "build.gradle", "plugins { id 'java' }\n")
+	stackstest.WriteFile(t, single, "src/main/java/A.java", "class A {}\n")
 	check(probe(t, single, "."), map[string]want{".": {"", ":", "build.gradle", nil}})
 
 	// A directory that is both a Gradle project and a Maven module runs as
 	// the Gradle project, with a warning.
-	writeFile(t, single, "pom.xml", `<project><groupId>com.acme</groupId><artifactId>one</artifactId></project>`)
+	stackstest.WriteFile(t, single, "pom.xml", `<project><groupId>com.acme</groupId><artifactId>one</artifactId></project>`)
 	s := stack(t)
 	result, _ := s.Probe(single, wsproto.ProbeRequest{Version: wsproto.ProbeProtocolVersion, Extension: s.Extension, Paths: []string{"."}})
 	if len(result.Projects) != 1 || metadata(t, result.Projects[0]).Variant != VariantGradle || len(result.Diagnostics) != 1 || result.Diagnostics[0].Code != CodeBuildConflict {
@@ -217,11 +206,11 @@ func stubTools(t *testing.T, root, version, junit string) string {
 	t.Helper()
 	bin := t.TempDir()
 	log := filepath.Join(bin, "build.log")
-	writeFile(t, bin, "javac", "#!/bin/sh\necho 'Picked up JAVA_TOOL_OPTIONS: -Dx=y' >&2\necho 'javac "+version+"'\n")
+	stackstest.WriteFile(t, bin, "javac", "#!/bin/sh\necho 'Picked up JAVA_TOOL_OPTIONS: -Dx=y' >&2\necho 'javac "+version+"'\n")
 	report := "cat > \"$dir/TEST-stub.xml\" <<'XML'\n" + junit + "\nXML\n"
 	jacoco := `<?xml version="1.0"?><report name="r"><package name="p"><sourcefile name="A.kt"><line nr="1" mi="0" ci="3"/><line nr="2" mi="2" ci="0"/><line nr="3" mi="0" ci="1"/></sourcefile></package></report>`
-	writeFile(t, bin, "mvn", "#!/bin/sh\necho \"$PWD: mvn $*\" >> \""+log+"\"\ncase \"$*\" in *-DskipTests*|*-Dtest=NoSuch*|*clean) exit 0;; esac\ndir=target/surefire-reports\nmkdir -p $dir\n"+report)
-	writeFile(t, root, "gradlew", `#!/bin/sh
+	stackstest.WriteFile(t, bin, "mvn", "#!/bin/sh\necho \"$PWD: mvn $*\" >> \""+log+"\"\ncase \"$*\" in *-DskipTests*|*-Dtest=NoSuch*|*clean) exit 0;; esac\ndir=target/surefire-reports\nmkdir -p $dir\n"+report)
+	stackstest.WriteFile(t, root, "gradlew", `#!/bin/sh
 echo "$PWD: gradlew $*" >> "`+log+`"
 case "$*" in *-Dputnami.testFilter=NoSuch*) exit 0;; esac
 for a in "$@"; do
@@ -368,7 +357,7 @@ func TestJUnitAndJaCoCoBecomeTheTestAndCoverageSummary(t *testing.T) {
 	if status != "OK" || err != nil || data["testSummary"].(map[string]any)["total"] != 2 || data["coverageSummary"] != nil {
 		t.Errorf("maven test: %s %v %v", status, err, data)
 	}
-	writeFile(t, m, "pricing/target/site/jacoco/jacoco.xml", `<report name="r"><package name="p"><sourcefile name="P.java"><line nr="1" mi="0" ci="1"/><line nr="2" mi="1" ci="0"/></sourcefile></package></report>`)
+	stackstest.WriteFile(t, m, "pricing/target/site/jacoco/jacoco.xml", `<report name="r"><package name="p"><sourcefile name="P.java"><line nr="1" mi="0" ci="1"/><line nr="2" mi="1" ci="0"/></sourcefile></package></report>`)
 	_, data, _ = runJob(t, m, "pricing", stacks.TaskTest)
 	if data["coverageSummary"] != nil {
 		t.Errorf("a stale JaCoCo report is removed before the steps: %v", data["coverageSummary"])
@@ -400,8 +389,8 @@ func TestALockfileChangeKeepsTheLintKey(t *testing.T) {
 	if got := resolve(t, g, "pricing", "java:test"); !slices.Contains(got.Files, "gradle.lockfile") {
 		t.Errorf("gradle test reads the lockfile = %+v", got)
 	}
-	writeFile(t, g, "catalog/libs.versions.toml", "[versions]\n")
-	writeFile(t, g, "catalog/build/version-catalog/libs.versions.toml", "[versions]\n")
+	stackstest.WriteFile(t, g, "catalog/libs.versions.toml", "[versions]\n")
+	stackstest.WriteFile(t, g, "catalog/build/version-catalog/libs.versions.toml", "[versions]\n")
 	if got := resolve(t, g, "catalog", "java:build"); !reflect.DeepEqual(got.Files, []string{"build.gradle.kts", "libs.versions.toml"}) {
 		t.Errorf("a catalog build reads its own TOML, not its output = %+v", got)
 	}
@@ -444,14 +433,14 @@ func TestALockfileChangeKeepsTheLintKey(t *testing.T) {
 func TestAPutnamiJSONOverrideChangesTheStepsAndTheInputs(t *testing.T) {
 	spectest.Proves(t, feature, "overrides-are-honored", "a-putnami-json-override-changes-the-steps-and-the-inputs")
 	g := gradleFixture(t)
-	writeFile(t, g, "app/putnami.json", `{"options": {"@putnami/java": {
+	stackstest.WriteFile(t, g, "app/putnami.json", `{"options": {"@putnami/java": {
 	  "inputs": {"tests": ["src/test/**", "src/testFree/**"]},
 	  "tasks": {"test": {
 	    "steps": [["{root}/gradlew", "{component}testFreeDebugUnitTest"]],
 	    "reports": {"junit": ["build/test-results/testFreeDebugUnitTest/*.xml"], "coverage": []}
 	  }}
 	}}}`)
-	writeFile(t, g, "app/src/testFree/kotlin/FreeTest.kt", "class FreeTest\n")
+	stackstest.WriteFile(t, g, "app/src/testFree/kotlin/FreeTest.kt", "class FreeTest\n")
 	if got := resolve(t, g, "app", "java:test"); !slices.Contains(got.Files, "src/testFree/kotlin/FreeTest.kt") || !slices.Contains(got.Files, "putnami.json") {
 		t.Errorf("an input override is honored: %v", got.Files)
 	}
@@ -463,11 +452,11 @@ func TestAPutnamiJSONOverrideChangesTheStepsAndTheInputs(t *testing.T) {
 		t.Errorf("a step override is honored: %s", ran(t, log))
 	}
 
-	writeFile(t, g, "app/putnami.json", `{"options": {"@putnami/java": {"variants": {}}}}`)
+	stackstest.WriteFile(t, g, "app/putnami.json", `{"options": {"@putnami/java": {"variants": {}}}}`)
 	if status, _, err := runJob(t, g, "app", stacks.TaskLint); status != "FAILED" || err == nil || err.Error() != stacks.CodeProjectConfigInvalid {
 		t.Errorf("an override cannot change the variants: %s %v", status, err)
 	}
-	writeFile(t, g, "app/putnami.json", `{"options": {"@putnami/java": {"inputs": {"sources": ["{root}/secrets.properties"]}}}}`)
+	stackstest.WriteFile(t, g, "app/putnami.json", `{"options": {"@putnami/java": {"inputs": {"sources": ["{root}/secrets.properties"]}}}}`)
 	if got := resolve(t, g, "app", "java:lint"); got.Error == "" {
 		t.Errorf("an override cannot add a stack-root input: %+v", got)
 	}
@@ -493,24 +482,24 @@ func runJobNoXML(t *testing.T, g string) (string, map[string]any, error) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	writeFile(t, g, "gradlew", strings.Replace(string(data), "*:jacocoTestReport) mkdir", "*:jacocoTestReport) continue; mkdir", 1))
-	defer writeFile(t, g, "gradlew", string(data))
+	stackstest.WriteFile(t, g, "gradlew", strings.Replace(string(data), "*:jacocoTestReport) mkdir", "*:jacocoTestReport) continue; mkdir", 1))
+	defer stackstest.WriteFile(t, g, "gradlew", string(data))
 	return runJob(t, g, "api", stacks.TaskTest)
 }
 
 func TestNestedBuildsHaveTheirOwnStackRoot(t *testing.T) {
 	spectest.Proves(t, feature, "nested-builds-are-stack-roots", "nested-gradle-and-maven-builds-are-their-components-stack-roots")
 	root := t.TempDir()
-	writeFile(t, root, "samples/gradle/settings.gradle.kts", "include(\":app\", \":lib\")\n")
-	writeFile(t, root, "samples/gradle/app/build.gradle.kts", "plugins {\n    application\n}\ndependencies {\n    implementation(project(\":lib\"))\n}\n")
-	writeFile(t, root, "samples/gradle/app/src/main/java/App.java", "class App {}\n")
-	writeFile(t, root, "samples/gradle/lib/build.gradle.kts", "plugins {\n    `java-library`\n}\n")
-	writeFile(t, root, "samples/gradle/lib/src/main/java/Lib.java", "class Lib {}\n")
-	writeFile(t, root, "samples/gradle/buildSrc/settings.gradle.kts", "\n")
-	writeFile(t, root, "samples/gradle/buildSrc/build.gradle.kts", "plugins { `kotlin-dsl` }\n")
-	writeFile(t, root, "samples/maven/pom.xml", `<project><groupId>com.acme</groupId><artifactId>shop</artifactId><packaging>pom</packaging><modules><module>app</module><module>lib</module></modules></project>`)
-	writeFile(t, root, "samples/maven/app/pom.xml", `<project><parent><groupId>com.acme</groupId></parent><artifactId>app</artifactId><dependencies><dependency><groupId>com.acme</groupId><artifactId>lib</artifactId></dependency></dependencies><build><plugins><plugin><artifactId>spring-boot-maven-plugin</artifactId></plugin></plugins></build></project>`)
-	writeFile(t, root, "samples/maven/lib/pom.xml", `<project><parent><groupId>com.acme</groupId></parent><artifactId>lib</artifactId></project>`)
+	stackstest.WriteFile(t, root, "samples/gradle/settings.gradle.kts", "include(\":app\", \":lib\")\n")
+	stackstest.WriteFile(t, root, "samples/gradle/app/build.gradle.kts", "plugins {\n    application\n}\ndependencies {\n    implementation(project(\":lib\"))\n}\n")
+	stackstest.WriteFile(t, root, "samples/gradle/app/src/main/java/App.java", "class App {}\n")
+	stackstest.WriteFile(t, root, "samples/gradle/lib/build.gradle.kts", "plugins {\n    `java-library`\n}\n")
+	stackstest.WriteFile(t, root, "samples/gradle/lib/src/main/java/Lib.java", "class Lib {}\n")
+	stackstest.WriteFile(t, root, "samples/gradle/buildSrc/settings.gradle.kts", "\n")
+	stackstest.WriteFile(t, root, "samples/gradle/buildSrc/build.gradle.kts", "plugins { `kotlin-dsl` }\n")
+	stackstest.WriteFile(t, root, "samples/maven/pom.xml", `<project><groupId>com.acme</groupId><artifactId>shop</artifactId><packaging>pom</packaging><modules><module>app</module><module>lib</module></modules></project>`)
+	stackstest.WriteFile(t, root, "samples/maven/app/pom.xml", `<project><parent><groupId>com.acme</groupId></parent><artifactId>app</artifactId><dependencies><dependency><groupId>com.acme</groupId><artifactId>lib</artifactId></dependency></dependencies><build><plugins><plugin><artifactId>spring-boot-maven-plugin</artifactId></plugin></plugins></build></project>`)
+	stackstest.WriteFile(t, root, "samples/maven/lib/pom.xml", `<project><parent><groupId>com.acme</groupId></parent><artifactId>lib</artifactId></project>`)
 	got := probe(t, root, "samples/gradle", "samples/gradle/app", "samples/gradle/buildSrc", "samples/gradle/lib", "samples/maven", "samples/maven/app", "samples/maven/lib")
 	want := map[string]struct {
 		root, ref, typ string
@@ -545,16 +534,16 @@ func TestNestedBuildsHaveTheirOwnStackRoot(t *testing.T) {
 func TestAModuleUnderAFolderWithNoPOMBelongsToItsOuterBuild(t *testing.T) {
 	spectest.Proves(t, feature, "nested-builds-are-stack-roots", "nested-gradle-and-maven-builds-are-their-components-stack-roots")
 	root := t.TempDir()
-	writeFile(t, root, "pom.xml", `<project><groupId>com.acme</groupId><artifactId>shop</artifactId><packaging>pom</packaging><modules><module>services/api</module><module>lib</module></modules></project>`)
-	writeFile(t, root, "lib/pom.xml", `<project><parent><groupId>com.acme</groupId></parent><artifactId>lib</artifactId></project>`)
-	writeFile(t, root, "services/api/pom.xml", `<project><parent><groupId>com.acme</groupId></parent><artifactId>api</artifactId><dependencies><dependency><groupId>com.acme</groupId><artifactId>lib</artifactId></dependency></dependencies></project>`)
-	writeFile(t, root, "lib/src/it/simple/pom.xml", `<project><groupId>it</groupId><artifactId>simple</artifactId></project>`)
-	writeFile(t, root, "lib/src/main/resources/archetype-resources/pom.xml", `<project><groupId>x</groupId><artifactId>tpl</artifactId></project>`)
+	stackstest.WriteFile(t, root, "pom.xml", `<project><groupId>com.acme</groupId><artifactId>shop</artifactId><packaging>pom</packaging><modules><module>services/api</module><module>lib</module></modules></project>`)
+	stackstest.WriteFile(t, root, "lib/pom.xml", `<project><parent><groupId>com.acme</groupId></parent><artifactId>lib</artifactId></project>`)
+	stackstest.WriteFile(t, root, "services/api/pom.xml", `<project><parent><groupId>com.acme</groupId></parent><artifactId>api</artifactId><dependencies><dependency><groupId>com.acme</groupId><artifactId>lib</artifactId></dependency></dependencies></project>`)
+	stackstest.WriteFile(t, root, "lib/src/it/simple/pom.xml", `<project><groupId>it</groupId><artifactId>simple</artifactId></project>`)
+	stackstest.WriteFile(t, root, "lib/src/main/resources/archetype-resources/pom.xml", `<project><groupId>x</groupId><artifactId>tpl</artifactId></project>`)
 	// A build under a plain src directory, with no build file above it, is a
 	// build of its own.
-	writeFile(t, root, "demo/src/adservice/settings.gradle", "rootProject.name = 'adservice'\n")
-	writeFile(t, root, "demo/src/adservice/build.gradle", "plugins {\n    id 'application'\n}\n")
-	writeFile(t, root, "demo/src/adservice/src/main/java/A.java", "class A {}\n")
+	stackstest.WriteFile(t, root, "demo/src/adservice/settings.gradle", "rootProject.name = 'adservice'\n")
+	stackstest.WriteFile(t, root, "demo/src/adservice/build.gradle", "plugins {\n    id 'application'\n}\n")
+	stackstest.WriteFile(t, root, "demo/src/adservice/src/main/java/A.java", "class A {}\n")
 	s := stack(t)
 	result, err := s.Probe(root, wsproto.ProbeRequest{Version: wsproto.ProbeProtocolVersion, Extension: s.Extension, Paths: []string{".", "demo/src/adservice", "lib", "lib/src/it/simple", "lib/src/main/resources/archetype-resources", "services/api"}})
 	if err != nil {
@@ -618,15 +607,15 @@ func TestAPluginDeclaredApplyFalseIsNotApplied(t *testing.T) {
 func TestARootBuildMayListModulesUnderSrc(t *testing.T) {
 	spectest.Proves(t, feature, "nested-builds-are-stack-roots", "nested-gradle-and-maven-builds-are-their-components-stack-roots")
 	maven := t.TempDir()
-	writeFile(t, maven, "pom.xml", `<project><groupId>com.acme</groupId><artifactId>shop</artifactId><packaging>pom</packaging><modules><module>src/backend</module></modules></project>`)
-	writeFile(t, maven, "src/backend/pom.xml", `<project><parent><groupId>com.acme</groupId></parent><artifactId>backend</artifactId></project>`)
+	stackstest.WriteFile(t, maven, "pom.xml", `<project><groupId>com.acme</groupId><artifactId>shop</artifactId><packaging>pom</packaging><modules><module>src/backend</module></modules></project>`)
+	stackstest.WriteFile(t, maven, "src/backend/pom.xml", `<project><parent><groupId>com.acme</groupId></parent><artifactId>backend</artifactId></project>`)
 	if got := probe(t, maven, ".", "src/backend"); len(got) != 1 || metadata(t, got["src/backend"]).Root != "." {
 		t.Errorf("a module the root lists under src = %+v", got)
 	}
 	gradleRoot := t.TempDir()
-	writeFile(t, gradleRoot, "settings.gradle", "include 'src:api'\n")
-	writeFile(t, gradleRoot, "build.gradle", "plugins { id 'base' }\n")
-	writeFile(t, gradleRoot, "src/api/build.gradle", "plugins { id 'java' }\n")
+	stackstest.WriteFile(t, gradleRoot, "settings.gradle", "include 'src:api'\n")
+	stackstest.WriteFile(t, gradleRoot, "build.gradle", "plugins { id 'base' }\n")
+	stackstest.WriteFile(t, gradleRoot, "src/api/build.gradle", "plugins { id 'java' }\n")
 	// The root holds src/, so the Gradle detector also makes it a project.
 	if got := probe(t, gradleRoot, ".", "src/api"); len(got) != 2 || metadata(t, got["src/api"]).Component != ":src:api:" || metadata(t, got["src/api"]).Root != "." {
 		t.Errorf("a project the root includes under src = %+v", got)

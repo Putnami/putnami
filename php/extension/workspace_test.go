@@ -14,6 +14,7 @@ import (
 	"go.putnami.dev/sdk/extension/cli"
 	pctx "go.putnami.dev/sdk/extension/context"
 	"go.putnami.dev/sdk/extension/jsonl"
+	"go.putnami.dev/tooling/stacks/stackstest"
 )
 
 // runWorkspaceJob runs a workspace job over the workspace projects refs.
@@ -108,10 +109,10 @@ func TestWorkspaceInstallInstallsEachStackRootTheWorkspaceIncludes(t *testing.T)
 	spectest.Proves(t, feature, "workspace-install-runs-composer", "workspace-install-installs-each-stack-root-the-workspace-includes")
 	log, cache := prepareComposer(t)
 	root := fixture(t)
-	writeFile(t, root, "putnami.workspace.json", `{"disable": {"tags": ["e2e"]}}`)
-	writeFile(t, root, "samples/app/composer.json", `{"type": "project"}`)
-	writeFile(t, root, "samples/app/composer.lock", `{"packages": []}`)
-	writeFile(t, root, "other/composer.json", `{"type": "project"}`)
+	stackstest.WriteFile(t, root, "putnami.workspace.json", `{"disable": {"tags": ["e2e"]}}`)
+	stackstest.WriteFile(t, root, "samples/app/composer.json", `{"type": "project"}`)
+	stackstest.WriteFile(t, root, "samples/app/composer.lock", `{"packages": []}`)
+	stackstest.WriteFile(t, root, "other/composer.json", `{"type": "project"}`)
 
 	foreign := phpProject(root, "other", `{}`)
 	foreign.Extensions = []string{"@putnami/typescript"}

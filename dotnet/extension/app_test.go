@@ -5,18 +5,14 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
-	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/google/go-containerregistry/pkg/name"
-	"github.com/google/go-containerregistry/pkg/registry"
 	v1 "github.com/google/go-containerregistry/pkg/v1"
-	"github.com/google/go-containerregistry/pkg/v1/empty"
 	"github.com/google/go-containerregistry/pkg/v1/mutate"
-	"github.com/google/go-containerregistry/pkg/v1/random"
 	"github.com/google/go-containerregistry/pkg/v1/remote"
 	"go.putnami.dev/protocol/features/spectest"
 	job "go.putnami.dev/protocol/job"
@@ -26,6 +22,7 @@ import (
 	"go.putnami.dev/sdk/extension/pkgmeta"
 	"go.putnami.dev/sdk/extension/releaseset"
 	"go.putnami.dev/tooling/stacks"
+	"go.putnami.dev/tooling/stacks/stackstest"
 )
 
 const webProject = `<Project Sdk="Microsoft.NET.Sdk.Web">
@@ -44,8 +41,8 @@ func stubApp(t *testing.T, props string) string {
 	isolateSDKs(t)
 	bin := t.TempDir()
 	log := filepath.Join(bin, "dotnet.log")
-	writeFile(t, bin, "props.json", props)
-	writeFile(t, bin, "dotnet", `#!/bin/sh
+	stackstest.WriteFile(t, bin, "props.json", props)
+	stackstest.WriteFile(t, bin, "dotnet", `#!/bin/sh
 if [ "$1" = "--version" ]; then echo 8.0.404; exit 0; fi
 echo "$PWD: dotnet $* PORT=$PORT URLS=$ASPNETCORE_URLS" >> "`+log+`"
 case "$1" in
@@ -82,7 +79,7 @@ func appFixture(t *testing.T) string {
 	if err != nil {
 		t.Fatal(err)
 	}
-	writeFile(t, root, "src/Api/Api.csproj", webProject)
+	stackstest.WriteFile(t, root, "src/Api/Api.csproj", webProject)
 	return root
 }
 
@@ -124,8 +121,8 @@ func readLines(t *testing.T, path string) []string {
 func TestAWebOrExecutableProjectIsAnApplication(t *testing.T) {
 	spectest.Proves(t, feature, "applications-are-told-apart", "a-web-or-executable-project-is-an-application")
 	root := appFixture(t)
-	writeFile(t, root, "src/Api/putnami.json", `{"options": {"publish": {"docker": true}}}`)
-	writeFile(t, root, "putnami.workspace.json", `{"registries": {"oci": {"publish": "registry.test/acme"}}}`)
+	stackstest.WriteFile(t, root, "src/Api/putnami.json", `{"options": {"publish": {"docker": true}}}`)
+	stackstest.WriteFile(t, root, "putnami.workspace.json", `{"registries": {"oci": {"publish": "registry.test/acme"}}}`)
 	types := map[string]string{}
 	var member []releaseset.MemberDeclaration
 	for _, p := range probe(t, root).Projects {
@@ -193,7 +190,7 @@ func TestPackageAssemblesAnImageOfThePublishedApplication(t *testing.T) {
 	spectest.Proves(t, feature, "packages-an-application-image", "package-assembles-an-image-of-the-published-application")
 	root := appFixture(t)
 	log := stubApp(t, webProps)
-	host, base := imageRegistry(t)
+	host, base := stackstest.ImageRegistry(t)
 	status, _, err := runAppJob(t, root, "src/Api", PackageDockerJob(stack(t)), nil, "--docker-base-image", base, "--platform", "linux/arm64")
 	if status != "OK" || err != nil {
 		t.Fatalf("package: %s %v", status, err)
@@ -275,39 +272,6 @@ func TestTheOfficialBaseFollowsTheFrameworkAndTheSDK(t *testing.T) {
 	}
 }
 
-// imageRegistry starts a registry double holding a two-platform base image, and
-// answers its host and the digest reference of the base.
-func imageRegistry(t *testing.T) (string, string) {
-	t.Helper()
-	server := httptest.NewServer(registry.New())
-	t.Cleanup(server.Close)
-	host := strings.TrimPrefix(server.URL, "http://")
-	amd64, err := random.Image(256, 1)
-	if err != nil {
-		t.Fatal(err)
-	}
-	arm64, err := random.Image(256, 1)
-	if err != nil {
-		t.Fatal(err)
-	}
-	index := mutate.AppendManifests(empty.Index,
-		mutate.IndexAddendum{Add: amd64, Descriptor: v1.Descriptor{Platform: &v1.Platform{OS: "linux", Architecture: "amd64"}}},
-		mutate.IndexAddendum{Add: arm64, Descriptor: v1.Descriptor{Platform: &v1.Platform{OS: "linux", Architecture: "arm64"}}},
-	)
-	reference, err := name.ParseReference(host + "/base:latest")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := remote.WriteIndex(reference, index); err != nil {
-		t.Fatal(err)
-	}
-	digest, err := index.Digest()
-	if err != nil {
-		t.Fatal(err)
-	}
-	return host, host + "/base@" + digest.String()
-}
-
 // imageLayerFiles answers the paths of the files in an image.
 func imageLayerFiles(t *testing.T, image v1.Image) map[string]bool {
 	t.Helper()
@@ -329,15 +293,15 @@ func imageLayerFiles(t *testing.T, image v1.Image) map[string]bool {
 
 func TestTheBaseFollowsThePublishedFrameworks(t *testing.T) {
 	dir := t.TempDir()
-	writeFile(t, dir, "Api.runtimeconfig.json", `{"runtimeOptions": {"framework": {"name": "Microsoft.NETCore.App"}, "frameworks": [{"name": "Microsoft.AspNetCore.App"}]}}`)
+	stackstest.WriteFile(t, dir, "Api.runtimeconfig.json", `{"runtimeOptions": {"framework": {"name": "Microsoft.NETCore.App"}, "frameworks": [{"name": "Microsoft.AspNetCore.App"}]}}`)
 	if web, err := needsASPNET(dir, "Api"); err != nil || !web {
 		t.Errorf("a framework reference to ASP.NET Core needs the aspnet base: %v %v", web, err)
 	}
-	writeFile(t, dir, "Tool.runtimeconfig.json", `{"runtimeOptions": {"framework": {"name": "Microsoft.NETCore.App"}}}`)
+	stackstest.WriteFile(t, dir, "Tool.runtimeconfig.json", `{"runtimeOptions": {"framework": {"name": "Microsoft.NETCore.App"}}}`)
 	if web, err := needsASPNET(dir, "Tool"); err != nil || web {
 		t.Errorf("a console application needs the runtime base: %v %v", web, err)
 	}
-	writeFile(t, dir, "Desk.runtimeconfig.json", `{"runtimeOptions": {"framework": {"name": "Microsoft.WindowsDesktop.App"}}}`)
+	stackstest.WriteFile(t, dir, "Desk.runtimeconfig.json", `{"runtimeOptions": {"framework": {"name": "Microsoft.WindowsDesktop.App"}}}`)
 	if _, err := needsASPNET(dir, "Desk"); err == nil {
 		t.Errorf("a Windows desktop application has no Linux image")
 	}

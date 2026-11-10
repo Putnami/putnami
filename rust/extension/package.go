@@ -460,7 +460,7 @@ func assembleImage(ctx *pctx.Context, emit *jsonl.Emitter) (map[string]any, erro
 		tags = append(tags, image+":"+tag)
 	}
 	if ctx.Params.Bool("docker-load", false) {
-		if err := loadImage(ctx, filepath.Join(dir, "oci"), content, tags[1:], emit); err != nil {
+		if err := stacks.LoadImage(filepath.Join(dir, "oci"), tags, emit); err != nil {
 			return nil, err
 		}
 	}
@@ -478,32 +478,4 @@ func assembleImage(ctx *pctx.Context, emit *jsonl.Emitter) (map[string]any, erro
 	}
 	emit.Info("assembled " + content)
 	return map[string]any{"image": content, "contentHash": contentHash, "digest": digest}, nil
-}
-
-// loadImage puts the image in the local docker daemon, with its other tags.
-func loadImage(ctx *pctx.Context, layout, ref string, aliases []string, emit *jsonl.Emitter) error {
-	tarball := filepath.Join(pkgmeta.PackageOutputDir(ctx.WorkspaceRoot, ctx.Project.Path, channelDocker), "load.tar")
-	defer func() { _ = os.Remove(tarball) }()
-	if err := oci.WriteDockerTarball(layout, ref, tarball); err != nil {
-		return fmt.Errorf("write the docker tarball: %w", err)
-	}
-	background := context.Background()
-	run := func(args ...string) error {
-		timed, cancel := context.WithTimeout(background, 5*time.Minute)
-		defer cancel()
-		cmd := exec.CommandContext(timed, "docker", args...) //nolint:gosec // fixed verbs with the task's own tags
-		if err := runForwarding(cmd, emit, nil); err != nil {
-			return fmt.Errorf("docker %s: %w", args[0], err)
-		}
-		return nil
-	}
-	if err := run("load", "-i", tarball); err != nil {
-		return err
-	}
-	for _, alias := range aliases {
-		if err := run("tag", ref, alias); err != nil {
-			return err
-		}
-	}
-	return nil
 }

@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"slices"
@@ -15,11 +14,8 @@ import (
 	"time"
 
 	"github.com/google/go-containerregistry/pkg/name"
-	"github.com/google/go-containerregistry/pkg/registry"
 	v1 "github.com/google/go-containerregistry/pkg/v1"
-	"github.com/google/go-containerregistry/pkg/v1/empty"
 	"github.com/google/go-containerregistry/pkg/v1/mutate"
-	"github.com/google/go-containerregistry/pkg/v1/random"
 	"github.com/google/go-containerregistry/pkg/v1/remote"
 	"go.putnami.dev/protocol/features/spectest"
 	wsproto "go.putnami.dev/protocol/workspace"
@@ -28,6 +24,7 @@ import (
 	"go.putnami.dev/sdk/extension/filelock"
 	"go.putnami.dev/sdk/extension/jsonl"
 	"go.putnami.dev/sdk/extension/pkgmeta"
+	"go.putnami.dev/tooling/stacks/stackstest"
 )
 
 // stubSwiftBuild puts first on PATH a swift that logs its arguments, prints
@@ -39,7 +36,7 @@ func stubSwiftBuild(t *testing.T) string {
 	bin := t.TempDir()
 	log := filepath.Join(bin, "swift.log")
 	state := t.TempDir()
-	writeFile(t, bin, "swift", `#!/bin/sh
+	stackstest.WriteFile(t, bin, "swift", `#!/bin/sh
 echo "$PWD: swift $*" >> "`+log+`"
 case "$1" in
 --version) echo "${SWIFT_STUB_BANNER:-Swift version ${SWIFT_STUB_RELEASE:-6.4.2} (swift-${SWIFT_STUB_RELEASE:-6.4.2}-RELEASE)}"; echo "Target: x86_64-unknown-linux-gnu";;
@@ -67,7 +64,7 @@ esac
 // serverPackage writes the executable package server under root.
 func serverPackage(t *testing.T, root string) {
 	t.Helper()
-	writeFile(t, root, "server/Package.swift", `// swift-tools-version:6.0
+	stackstest.WriteFile(t, root, "server/Package.swift", `// swift-tools-version:6.0
 import PackageDescription
 
 let package = Package(
@@ -76,7 +73,7 @@ let package = Package(
     targets: [.executableTarget(name: "Server")]
 )
 `)
-	writeFile(t, root, "server/Sources/Server/main.swift", "print(\"up\")\n")
+	stackstest.WriteFile(t, root, "server/Sources/Server/main.swift", "print(\"up\")\n")
 }
 
 func TestPackageAssemblesTheImageOfAStaticExecutable(t *testing.T) {
@@ -84,9 +81,9 @@ func TestPackageAssemblesTheImageOfAStaticExecutable(t *testing.T) {
 	log := stubSwiftBuild(t)
 	root := t.TempDir()
 	serverPackage(t, root)
-	host, base := imageRegistry(t)
+	host, base := stackstest.ImageRegistry(t)
 	// A bundle an earlier build of another product left in the bin path.
-	writeFile(t, root, "server/.build/out/Products/Release-staticlinux-x86_64/Server_Admin.resources/admin.css", "a {}\n")
+	stackstest.WriteFile(t, root, "server/.build/out/Products/Release-staticlinux-x86_64/Server_Admin.resources/admin.css", "a {}\n")
 
 	status, _, err := runServerJob(t, root, PackageDockerJob(stack(t)), "--docker-base-image", base)
 	if status != "OK" || err != nil {
@@ -156,7 +153,7 @@ func TestPackageBuildsForTheArm64Platform(t *testing.T) {
 	log := stubSwiftBuild(t)
 	root := t.TempDir()
 	serverPackage(t, root)
-	_, base := imageRegistry(t)
+	_, base := stackstest.ImageRegistry(t)
 	if status, _, err := runServerJob(t, root, PackageDockerJob(stack(t)), "--docker-base-image", base, "--platform", "linux/arm64"); status != "OK" || err != nil {
 		t.Fatalf("package: %s %v", status, err)
 	}
@@ -267,7 +264,7 @@ func TestADryRunChoosesTheExecutableAsARunDoes(t *testing.T) {
 	stubSwiftBuild(t)
 	root := t.TempDir()
 	serverPackage(t, root)
-	writeFile(t, root, "server/Package.swift", `let package = Package(
+	stackstest.WriteFile(t, root, "server/Package.swift", `let package = Package(
     name: "Server",
     products: [.executable(name: "Server", targets: ["Server"]), .executable(name: "Migrate", targets: ["Migrate"])],
     targets: [.executableTarget(name: "Server"), .executableTarget(name: "Migrate")]
@@ -284,7 +281,7 @@ func TestAJobThatWaitedForAnInstallInstallsNothing(t *testing.T) {
 	log := stubSwiftBuild(t)
 	root := t.TempDir()
 	serverPackage(t, root)
-	_, base := imageRegistry(t)
+	_, base := stackstest.ImageRegistry(t)
 	locks := filepath.Join(os.Getenv("PUTNAMI_HOME"), "locks")
 	if err := os.MkdirAll(locks, 0o755); err != nil {
 		t.Fatal(err)
@@ -305,7 +302,7 @@ func TestAJobThatWaitedForAnInstallInstallsNothing(t *testing.T) {
 		}
 		time.Sleep(10 * time.Millisecond)
 	}
-	writeFile(t, os.Getenv("STUB_SWIFT_STATE"), "sdk", "swift-6.4.2-RELEASE_static-linux-0.1.0\n")
+	stackstest.WriteFile(t, os.Getenv("STUB_SWIFT_STATE"), "sdk", "swift-6.4.2-RELEASE_static-linux-0.1.0\n")
 	if err := held.Release(); err != nil {
 		t.Fatal(err)
 	}
@@ -320,7 +317,7 @@ func TestAJobThatWaitedForAnInstallInstallsNothing(t *testing.T) {
 func TestALibraryOrAnXcodeProjectNeitherPackagesNorPublishes(t *testing.T) {
 	root := t.TempDir()
 	serverPackage(t, root)
-	writeFile(t, root, "App/Shop.xcodeproj/project.pbxproj", "// !$*UTF8*$!\n")
+	stackstest.WriteFile(t, root, "App/Shop.xcodeproj/project.pbxproj", "// !$*UTF8*$!\n")
 	for _, project := range []pctx.Project{
 		{Name: "server", Path: "server", FullPath: filepath.Join(root, "server"), Type: "library"},
 		{Name: "Shop", Path: "App", FullPath: filepath.Join(root, "App")},
@@ -338,8 +335,8 @@ func TestALibraryOrAnXcodeProjectNeitherPackagesNorPublishes(t *testing.T) {
 func TestAnApplicationThatPublishesAnImageIsAReleaseSetMember(t *testing.T) {
 	root := t.TempDir()
 	serverPackage(t, root)
-	writeFile(t, root, "lib/Package.swift", `let package = Package(name: "Lib", targets: [.target(name: "Lib")])`)
-	writeFile(t, root, "putnami.workspace.json", `{"registries": {"oci": {"publish": "ghcr.io/acme/apps"}}}`)
+	stackstest.WriteFile(t, root, "lib/Package.swift", `let package = Package(name: "Lib", targets: [.target(name: "Lib")])`)
+	stackstest.WriteFile(t, root, "putnami.workspace.json", `{"registries": {"oci": {"publish": "ghcr.io/acme/apps"}}}`)
 	members := func() map[string]string {
 		s := stack(t)
 		result, err := s.Probe(root, wsproto.ProbeRequest{Version: wsproto.ProbeProtocolVersion, Extension: s.Extension, Paths: []string{"server", "lib"}})
@@ -369,44 +366,11 @@ func TestAnApplicationThatPublishesAnImageIsAReleaseSetMember(t *testing.T) {
 	if got := members(); len(got) != 0 {
 		t.Errorf("an application that publishes no image is a member: %v", got)
 	}
-	writeFile(t, root, "server/putnami.json", `{"options": {"publish": {"docker": true}}}`)
-	writeFile(t, root, "lib/putnami.json", `{"options": {"publish": {"docker": true}}}`)
+	stackstest.WriteFile(t, root, "server/putnami.json", `{"options": {"publish": {"docker": true}}}`)
+	stackstest.WriteFile(t, root, "lib/putnami.json", `{"options": {"publish": {"docker": true}}}`)
 	if got := members(); len(got) != 1 || got["server"] != "oci:acme/apps/server" {
 		t.Errorf("members = %v", got)
 	}
-}
-
-// imageRegistry starts a registry double holding a two-platform base image, and
-// answers its host and the digest reference of the base.
-func imageRegistry(t *testing.T) (string, string) {
-	t.Helper()
-	server := httptest.NewServer(registry.New())
-	t.Cleanup(server.Close)
-	host := strings.TrimPrefix(server.URL, "http://")
-	amd64, err := random.Image(256, 1)
-	if err != nil {
-		t.Fatal(err)
-	}
-	arm64, err := random.Image(256, 1)
-	if err != nil {
-		t.Fatal(err)
-	}
-	index := mutate.AppendManifests(empty.Index,
-		mutate.IndexAddendum{Add: amd64, Descriptor: v1.Descriptor{Platform: &v1.Platform{OS: "linux", Architecture: "amd64"}}},
-		mutate.IndexAddendum{Add: arm64, Descriptor: v1.Descriptor{Platform: &v1.Platform{OS: "linux", Architecture: "arm64"}}},
-	)
-	reference, err := name.ParseReference(host + "/base:latest")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := remote.WriteIndex(reference, index); err != nil {
-		t.Fatal(err)
-	}
-	digest, err := index.Digest()
-	if err != nil {
-		t.Fatal(err)
-	}
-	return host, host + "/base@" + digest.String()
 }
 
 func remoteImage(t *testing.T, reference string) v1.Image {

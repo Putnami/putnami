@@ -22,6 +22,7 @@ import (
 	"go.putnami.dev/protocol/features/spectest"
 	"go.putnami.dev/sdk/extension/putnamihome"
 	"go.putnami.dev/tooling/stacks"
+	"go.putnami.dev/tooling/stacks/stackstest"
 )
 
 // sdkArchive is a tar.gz that holds a dotnet that prints version for
@@ -169,7 +170,7 @@ func TestTheSDKToInstallFollowsTheRollForwardPolicy(t *testing.T) {
 			if policy != "" {
 				doc = `{"sdk": {"version": "` + stated + `", "rollForward": "` + policy + `"}}`
 			}
-			writeFile(t, root, "global.json", doc)
+			stackstest.WriteFile(t, root, "global.json", doc)
 			plan, err := planInstall(context.Background(), stacks.Expected{Version: stated, Source: "global.json", Root: root}, "linux-x64")
 			if err != nil || plan.sdk.Version != want {
 				t.Errorf("%s with rollForward %q: %s %v, want %s", stated, policy, plan.sdk.Version, err, want)
@@ -185,7 +186,7 @@ func TestTheSDKToInstallFollowsTheRollForwardPolicy(t *testing.T) {
 	if got := strings.Join(plan.runtimeVersions(), " "); !sameWords(got, "10.0.7 8.0.7 9.0.7") {
 		t.Errorf("runtimes = %s", got)
 	}
-	writeFile(t, root, "global.json", `{"sdk": {"version": "7.0.100", "rollForward": "disable"}}`)
+	stackstest.WriteFile(t, root, "global.json", `{"sdk": {"version": "7.0.100", "rollForward": "disable"}}`)
 	if _, err := planInstall(context.Background(), stacks.Expected{Version: "7.0.100", Source: "global.json", Root: root}, "linux-x64"); err == nil {
 		t.Errorf("an SDK no channel lists is an error")
 	}
@@ -202,7 +203,7 @@ func TestProvideInstallsTheSDKWithItsRuntimesOnceAndChecksItsHash(t *testing.T) 
 	log := filepath.Join(t.TempDir(), "log")
 	downloads := releaseServer(t, log, "9.0.300")
 	root := t.TempDir()
-	writeFile(t, root, "global.json", `{"sdk": {"version": "8.0.404"}}`)
+	stackstest.WriteFile(t, root, "global.json", `{"sdk": {"version": "8.0.404"}}`)
 	expected := stacks.Expected{Version: "8.0.404", Source: "global.json", Root: root}
 	var infos []string
 	provided, err := Provide(context.Background(), expected, func(s string) { infos = append(infos, s) })
@@ -225,7 +226,7 @@ func TestProvideInstallsTheSDKWithItsRuntimesOnceAndChecksItsHash(t *testing.T) 
 
 	// An installed SDK the statement accepts is reused with no network.
 	metadataBase = "https://127.0.0.1:1"
-	writeFile(t, root, "global.json", `{"sdk": {"version": "8.0.400"}}`)
+	stackstest.WriteFile(t, root, "global.json", `{"sdk": {"version": "8.0.400"}}`)
 	if again, err := Provide(context.Background(), stacks.Expected{Version: "8.0.400", Source: "global.json", Root: root}, func(string) {}); err != nil || again.Executable != provided.Executable || len(infos) != 1 {
 		t.Errorf("a second call reuses the SDK: %+v %v, infos %v", again, err, infos)
 	}
@@ -244,7 +245,7 @@ func TestProvideInstallsTheSDKWithItsRuntimesOnceAndChecksItsHash(t *testing.T) 
 func TestAnArchiveWhoseHashDiffersIsRefused(t *testing.T) {
 	releaseServer(t, filepath.Join(t.TempDir(), "log"), "9.0.300")
 	root := t.TempDir()
-	writeFile(t, root, "global.json", `{"sdk": {"version": "9.0.300", "rollForward": "disable"}}`)
+	stackstest.WriteFile(t, root, "global.json", `{"sdk": {"version": "9.0.300", "rollForward": "disable"}}`)
 	_, err := Provide(context.Background(), stacks.Expected{Version: "9.0.300", Source: "global.json", Root: root}, func(string) {})
 	if err == nil || !strings.Contains(err.Error(), "SHA-512") {
 		t.Errorf("an archive whose hash differs is refused: %v", err)
@@ -280,7 +281,7 @@ func TestATaskRunsTheInstalledSDKWhenTheMachineOneIsRefused(t *testing.T) {
 	log := filepath.Join(t.TempDir(), "log")
 	releaseServer(t, log, "")
 	root := fixture(t)
-	writeFile(t, root, "global.json", `{"sdk": {"version": "8.0.404"}}`)
+	stackstest.WriteFile(t, root, "global.json", `{"sdk": {"version": "8.0.404"}}`)
 	if status, _, _, err := runJob(t, root, "src/Api", stacks.TaskBuild); status != "OK" || err != nil {
 		t.Fatalf("build: %s %v", status, err)
 	}
@@ -298,10 +299,10 @@ func TestAnInstalledSDKIsPickedAsThePublishedOneWouldBe(t *testing.T) {
 			_ = os.RemoveAll(filepath.Join(base, e.Name()))
 		}
 		for _, v := range versions {
-			writeFile(t, base, sdkFolder(v, "linux-x64")+"/"+installedMarker, "")
+			stackstest.WriteFile(t, base, sdkFolder(v, "linux-x64")+"/"+installedMarker, "")
 		}
 		// Another platform's install is never reused.
-		writeFile(t, base, sdkFolder("8.0.499", "linux-musl-x64")+"/"+installedMarker, "")
+		stackstest.WriteFile(t, base, sdkFolder("8.0.499", "linux-musl-x64")+"/"+installedMarker, "")
 	}
 	for _, c := range []struct {
 		policy    string
@@ -319,7 +320,7 @@ func TestAnInstalledSDKIsPickedAsThePublishedOneWouldBe(t *testing.T) {
 		if c.policy != "" {
 			doc = `{"sdk": {"version": "8.0.400", "rollForward": "` + c.policy + `"}}`
 		}
-		writeFile(t, root, "global.json", doc)
+		stackstest.WriteFile(t, root, "global.json", doc)
 		if got, ok := installedSDK(base, stacks.Expected{Version: "8.0.400", Source: "global.json", Root: root}, "linux-x64"); !ok || got != c.want {
 			t.Errorf("rollForward %q over %v: %s, want %s", c.policy, c.installed, got, c.want)
 		}
@@ -387,7 +388,7 @@ func TestMuslIsTheCLibraryTheShellRunsOn(t *testing.T) {
 		}
 	}
 	notELF := filepath.Join(t.TempDir(), "sh")
-	writeFile(t, filepath.Dir(notELF), "sh", "#!/bin/true\n")
+	stackstest.WriteFile(t, filepath.Dir(notELF), "sh", "#!/bin/true\n")
 	for _, path := range []string{notELF, filepath.Join(t.TempDir(), "none")} {
 		if musl, known := muslProgram(path); musl || known {
 			t.Errorf("%s says nothing of the C library: %v %v", path, musl, known)

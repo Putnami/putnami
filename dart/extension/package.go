@@ -3,7 +3,6 @@ package dart
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -284,7 +283,7 @@ func assembleImage(ctx *pctx.Context, flags map[string]string, executable, base,
 		tags = append(tags, name+":"+tag)
 	}
 	if cli.FlagBool(flags, "docker-load", ctx.Params.Bool("docker-load", false, "dockerLoad")) {
-		if err := loadImage(filepath.Join(output, "oci"), tags); err != nil {
+		if err := stacks.LoadImage(filepath.Join(output, "oci"), tags, emit); err != nil {
 			return fail(emit, CodeImageFailed, err)
 		}
 	}
@@ -318,33 +317,6 @@ func imageSpec(executable, base, platform, port string) oci.Spec {
 		User:         imageUser,
 		ExposedPorts: []string{port + "/tcp"},
 	}
-}
-
-// loadImage loads the assembled image into the local Docker daemon under its
-// tags.
-func loadImage(layout string, tags []string) error {
-	archive, err := os.CreateTemp("", "putnami-dart-image-*.tar")
-	if err != nil {
-		return err
-	}
-	_ = archive.Close()
-	defer func() { _ = os.Remove(archive.Name()) }()
-	if err := oci.WriteDockerTarball(layout, tags[0], archive.Name()); err != nil {
-		return err
-	}
-	load := exec.Command("docker", "load", "-i", archive.Name()) //nolint:gosec // fixed program, a path from CreateTemp
-	load.Stderr = os.Stderr
-	if err := load.Run(); err != nil {
-		return errors.New("docker load failed for " + tags[0])
-	}
-	for _, alias := range tags[1:] {
-		tag := exec.Command("docker", "tag", tags[0], alias) //nolint:gosec // fixed program
-		tag.Stderr = os.Stderr
-		if err := tag.Run(); err != nil {
-			return errors.New("docker tag failed for " + alias)
-		}
-	}
-	return nil
 }
 
 func fail(emit *jsonl.Emitter, code string, err error) error {
