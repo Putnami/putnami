@@ -154,6 +154,7 @@ cat > "$out" <<XML
 <?xml version="1.0"?>
 <testsuite name="rspec" tests="2"><testcase classname="pricing" name="sums the lines" file="./packs/pricing/spec/models/pricing/calculator_spec.rb">`+failure+`</testcase><testcase classname="pricing" name="totals no line as zero"/></testsuite>
 XML
+if [ -z "$STUB_NO_COVERAGE" ]; then
 mkdir -p coverage
 cat > coverage/coverage.xml <<XML
 <?xml version="1.0"?>
@@ -167,6 +168,7 @@ cat > coverage/coverage.xml <<XML
   </classes></package></packages>
 </coverage>
 XML
+fi
 `)
 	for _, f := range []string{"ruby", "bundle"} {
 		if err := os.Chmod(filepath.Join(bin, f), 0o755); err != nil {
@@ -327,6 +329,17 @@ func TestJUnitAndCoberturaBecomeTheComponentSummary(t *testing.T) {
 	if got := app.data["coverageSummary"].(map[string]any); app.status != "OK" || got["covered"] != 1 || got["total"] != 1 {
 		t.Errorf("the application leaves its packs' files out: %+v", app)
 	}
+
+	// A bundle that does not set up SimpleCov writes no coverage report: the
+	// task passes, with no coverage.
+	t.Setenv("STUB_NO_COVERAGE", "1")
+	if err := os.Remove(filepath.Join(root, "coverage", "coverage.xml")); err != nil {
+		t.Fatal(err)
+	}
+	if r := runJob(t, root, "packs/pricing", stacks.TaskTest); r.status != "OK" || r.err != nil || r.data["coverageSummary"] != nil || r.data["testSummary"].(map[string]any)["passed"] != 2 {
+		t.Errorf("no SimpleCov: %+v", r)
+	}
+	t.Setenv("STUB_NO_COVERAGE", "")
 
 	stubTools(t, "3.3.6", "2.5.22", 1)
 	if r := runJob(t, root, "packs/pricing", stacks.TaskTest); r.status != "FAILED" || r.err == nil || r.data["testSummary"].(map[string]any)["failed"] != 1 {

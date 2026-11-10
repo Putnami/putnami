@@ -256,7 +256,10 @@ may be empty so the project keeps its directory's name.
 
 A task's `reports.when` names project files: when none exists, the task
 expects no report, so a module without tests passes. A coverage report marked
-`optional` is read when it exists and fails nothing when it does not.
+`optional`, one the project's own setup produces such as Coverlet's or
+SimpleCov's, is read when it exists; when it does not, the task warns with
+`stacks.coverage_unavailable` and its summary carries no coverage
+([ADR 0015](adr/0015-the-stack-extensions-share-one-command-surface.md)).
 
 ### Nested markers, excluded directories and runtime commands
 

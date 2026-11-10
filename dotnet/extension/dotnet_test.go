@@ -167,8 +167,10 @@ if [ "$1" = "test" ]; then
       mkdir -p "$a/3f6c0e9a-run" "$a/_vm_2026-11-08/In/vm"
       cp "`+filepath.Join(bin, "trx.xml")+`" "$a/_vm_2026-11-08.trx"
       covered="$(cd "$PWD/../../src/Pricing" && pwd)/Calculator.cs"
-      printf '<coverage line-rate="0.5"><sources><source>/</source></sources><packages><package name="Pricing"><classes><class name="Pricing.Calculator" filename="%s"><lines><line number="1" hits="1"/><line number="2" hits="0"/></lines></class></classes></package></packages></coverage>' "${covered#/}" > "$a/3f6c0e9a-run/coverage.cobertura.xml"
-      cp "$a/3f6c0e9a-run/coverage.cobertura.xml" "$a/_vm_2026-11-08/In/vm/coverage.cobertura.xml"
+      if [ -z "$STUB_NO_COVERAGE" ]; then
+        printf '<coverage line-rate="0.5"><sources><source>/</source></sources><packages><package name="Pricing"><classes><class name="Pricing.Calculator" filename="%s"><lines><line number="1" hits="1"/><line number="2" hits="0"/></lines></class></classes></package></packages></coverage>' "${covered#/}" > "$a/3f6c0e9a-run/coverage.cobertura.xml"
+        cp "$a/3f6c0e9a-run/coverage.cobertura.xml" "$a/_vm_2026-11-08/In/vm/coverage.cobertura.xml"
+      fi
     fi
     prev="$a"
   done
@@ -328,6 +330,15 @@ func TestTRXAndCoberturaBecomeTheTestAndCoverageSummary(t *testing.T) {
 	if !strings.Contains(string(ran), want) {
 		t.Errorf("test ran\n%s\nwant %q", ran, want)
 	}
+
+	// A test project with no Coverlet collector writes no Cobertura report: it
+	// passes, with no coverage.
+	t.Setenv("STUB_NO_COVERAGE", "1")
+	stubDotnet(t, "8.0.404", trxPass)
+	if status, data, _, err := runJob(t, root, "tests/Pricing.Tests", stacks.TaskTest); status != "OK" || err != nil || data["coverageSummary"] != nil || data["testSummary"].(map[string]any)["passed"] != 2 {
+		t.Errorf("no Cobertura report: %s %v %v", status, err, data)
+	}
+	t.Setenv("STUB_NO_COVERAGE", "")
 
 	stubDotnet(t, "8.0.404", trxFail)
 	if status, data, _, err := runJob(t, root, "tests/Pricing.Tests", stacks.TaskTest); status != "FAILED" || err == nil || data["testSummary"].(map[string]any)["failed"] != 1 {

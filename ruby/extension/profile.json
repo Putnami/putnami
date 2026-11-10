@@ -182,7 +182,8 @@
             "format": "cobertura",
             "paths": [
               "{root}/coverage/coverage.xml"
-            ]
+            ],
+            "optional": true
           }
         ]
       }

@@ -67,7 +67,10 @@ it into the test and coverage summary, even when `dotnet test` exits
 non-zero. The `coverlet.collector` package that `dotnet new` adds to a test
 project writes it. A failed case fails the task with `stacks.test_failed`,
 which names it; a step that exits non-zero with no failed case, or a missing
-TRX or Cobertura report, fails it too. The output directory is emptied before
+TRX report, fails it too. A test project with no Coverlet collector writes no
+Cobertura report: the task passes with the warning
+`stacks.coverage_unavailable` and no coverage, and `--enforce-coverage` fails
+it. The output directory is emptied before
 the step.
 
 `lint` also checks every relative link and anchor of the project's
@@ -272,7 +275,8 @@ uses most:
   can report JUnit instead of TRX: replace the test step's
   `--logger trx` with `--logger "junit;LogFilePath={output}/junit.xml"`, and
   `tasks.test.reports` with `{"junit": ["{output}/junit.xml"], "coverage": [{"format": "cobertura", "paths": ["{output}/*/coverage.cobertura.xml"]}]}`.
-- **No coverage.** A test project without `coverlet.collector` drops
+- **No coverage.** A test project without `coverlet.collector` runs and warns
+  with `stacks.coverage_unavailable`. To silence the warning, it drops
   `--collect "XPlat Code Coverage"` from its step and sets
   `tasks.test.reports` to `{"trx": ["{output}/*.trx"]}`.
 - **Microsoft.Testing.Platform.** A test project that runs on it replaces the
