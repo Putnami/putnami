@@ -28,11 +28,11 @@ oci-server, put-server, runtime-api and source-api.
 
 Each `<service>/schema/openapi.json` is a byte-for-byte copy of the package
 file. `delivery-api` comes from a later source: the package's
-`services/delivery-api/openapi.json` as Putnami/putnami-cloud#4758 generates
-it at commit `daa035a87`, the change that adds the merge queue setting
+`services/delivery-api/openapi.json` as the Putnami Cloud repository
+generates it at commit `13ece114a`, which adds the merge queue setting
 (`getV1_Workspaces_Workspace_Ci_Queue`, `putV1_Workspaces_Workspace_Ci_Queue`).
-The main run publishes it on `canary` once that pull request merges; record
-the published version and its archive digest here then.
+The main run publishes it on `canary` once that commit merges; record the
+published version and its archive digest here then.
 
 ## Update the schemas
 

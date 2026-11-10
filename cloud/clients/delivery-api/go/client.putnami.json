@@ -16,7 +16,7 @@
       }
     ]
   },
-  "contractSha256": "63ec3b47cc7ff94865821047862ce6afd73f95770eb5d25c7e9b29786742b6bd",
+  "contractSha256": "877fae65738639aaecf103ed4eb28935876ed0dbd9a9a5bbbb42fc2055341ba6",
   "operations": [
     {
       "operationId": "getV1_Workspaces_Workspace_Ci_Queue",

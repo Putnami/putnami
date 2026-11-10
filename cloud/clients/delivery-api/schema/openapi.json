@@ -5548,7 +5548,7 @@
     },
     "/v1/workspaces/{workspace}/ci/queue": {
       "get": {
-        "description": "Read the merge queue setting of one branch of the repository the workspace binds. configured is false while the branch has no setting: it has no queue, and its pull requests merge through the pull request gate. depth is the depth the branch runs at: 1 until the putnami CLI can cut a release set from the entry ahead (Putnami/putnami#990). Requires platform.workspace.read at the path workspace. Responses are not cacheable.\n\nRequired scopes: platform.workspace.read.",
+        "description": "Read the merge queue setting of one branch of the repository the workspace binds. configured is false while the branch has no setting: it has no queue, and its pull requests merge through the pull request gate. depth is the depth the branch runs at: 1 until the putnami CLI can cut a release set from the entry ahead (`putnami publish --inherit-channel`). Requires platform.workspace.read at the path workspace. Responses are not cacheable.\n\nRequired scopes: platform.workspace.read.",
         "operationId": "getV1_Workspaces_Workspace_Ci_Queue",
         "parameters": [
           {
@@ -5707,7 +5707,7 @@
         }
       },
       "put": {
-        "description": "Turn the merge queue of one branch on or off, and set its depth: the number of queue runs in flight at most, 1 to 16, 4 when zero or absent. Until the putnami CLI can cut a release set from the entry ahead (Putnami/putnami#990), a depth above 1 answers 400 with the reason, and the branch runs at depth 1. Turning it on first asks Source that the workspace's code host builds queue commits and that the branch's rules make the Putnami App the bypass actor of the pull request rule and of no other rule; otherwise it answers 409 with the reason, and changes nothing. Turning it off asks nothing. Requires platform.workspace.manage at the path workspace, and a person: the setting records the principal ID of who changed it.\n\nRequired scopes: platform.workspace.manage.",
+        "description": "Turn the merge queue of one branch on or off, and set its depth: the number of queue runs in flight at most, 1 to 16, 4 when zero or absent. Until the putnami CLI can cut a release set from the entry ahead (`putnami publish --inherit-channel`), a depth above 1 answers 400 with the reason, and the branch runs at depth 1. Turning it on first asks Source that the workspace's code host builds queue commits and that the branch's rules make the Putnami App the bypass actor of the pull request rule and of no other rule; otherwise it answers 409 with the reason, and changes nothing. Turning it off asks nothing. Requires platform.workspace.manage at the path workspace, and a person: the setting records the principal ID of who changed it.\n\nRequired scopes: platform.workspace.manage.",
         "operationId": "putV1_Workspaces_Workspace_Ci_Queue",
         "parameters": [
           {
