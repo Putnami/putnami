@@ -209,8 +209,10 @@ func TestEachComponentGetsTheVariantOfItsBuild(t *testing.T) {
 // stubTools puts first on PATH a java that prints version and a mvn that
 // logs its arguments and writes the Surefire report, and writes a gradlew at
 // root that logs its arguments and writes the reports Gradle's test,
-// jacocoTestReport and the Android unit test tasks write. The real builds
-// are the stack's own tools: the stubs stand at that boundary.
+// jacocoTestReport and the Android unit test tasks write. A test filter that
+// names NoSuch selects no test: both then pass and write no report, as Gradle
+// and Maven do. The real builds are the stack's own tools: the stubs stand at
+// that boundary.
 func stubTools(t *testing.T, root, version, junit string) string {
 	t.Helper()
 	bin := t.TempDir()
@@ -218,9 +220,10 @@ func stubTools(t *testing.T, root, version, junit string) string {
 	writeFile(t, bin, "javac", "#!/bin/sh\necho 'Picked up JAVA_TOOL_OPTIONS: -Dx=y' >&2\necho 'javac "+version+"'\n")
 	report := "cat > \"$dir/TEST-stub.xml\" <<'XML'\n" + junit + "\nXML\n"
 	jacoco := `<?xml version="1.0"?><report name="r"><package name="p"><sourcefile name="A.kt"><line nr="1" mi="0" ci="3"/><line nr="2" mi="2" ci="0"/><line nr="3" mi="0" ci="1"/></sourcefile></package></report>`
-	writeFile(t, bin, "mvn", "#!/bin/sh\necho \"$PWD: mvn $*\" >> \""+log+"\"\ncase \"$*\" in *-DskipTests*) exit 0;; esac\ndir=target/surefire-reports\nmkdir -p $dir\n"+report)
+	writeFile(t, bin, "mvn", "#!/bin/sh\necho \"$PWD: mvn $*\" >> \""+log+"\"\ncase \"$*\" in *-DskipTests*|*-Dtest=NoSuch*|*clean) exit 0;; esac\ndir=target/surefire-reports\nmkdir -p $dir\n"+report)
 	writeFile(t, root, "gradlew", `#!/bin/sh
 echo "$PWD: gradlew $*" >> "`+log+`"
+case "$*" in *-Dputnami.testFilter=NoSuch*) exit 0;; esac
 for a in "$@"; do
   case "$a" in
     *:test) dir=build/test-results/test;;

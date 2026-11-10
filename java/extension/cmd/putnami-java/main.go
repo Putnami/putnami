@@ -9,6 +9,8 @@ import (
 
 	java "go.putnami.dev/java/extension"
 	"go.putnami.dev/sdk/extension/cli"
+	"go.putnami.dev/sdk/extension/docslinks"
+	"go.putnami.dev/tooling/stacks"
 )
 
 var runtimeVersion string
@@ -25,6 +27,10 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer, runJobs func(
 	stack, err := java.Stack()
 	if err == nil {
 		err = stack.Entrypoint(args, stdin, stdout, runtimeVersion, func(jobs map[string]cli.JobFunc) {
+			jobs[stacks.TaskTest] = java.TestJob(stack)
+			// A directory that holds a build file is a component or a build
+			// root of its own, which answers for its own documents.
+			jobs["lint-docs"] = docslinks.Job(stack.Profile.Markers...)
 			jobs[java.ServeJobName] = java.ServeJob(stack)
 			jobs[java.RunJobName] = java.RunJob(stack)
 			jobs[java.PackageDockerJobName] = java.PackageDockerJob(stack)

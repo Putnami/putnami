@@ -7,7 +7,7 @@
       "id": "java/stack-extension",
       "type": "feature",
       "name": "Run the Gradle projects and Maven modules of a Java or Kotlin build as Putnami tasks",
-      "outcome": "A team with a Gradle build, Android included, or a Maven build adds @putnami/java and runs putnami lint, test and build over its components with Putnami's runner and cache, without rewriting its build and without a JDK on the machine: each component is a project with its edges, each task runs the steps of its build, the test task reads its JUnit and JaCoCo reports, an application serves, runs, and ships as an image, and a component overrides any profile value in its putnami.json",
+      "outcome": "A team with a Gradle build, Android included, or a Maven build adds @putnami/java and runs putnami lint, test and build over its components with Putnami's runner and cache, without rewriting its build or a JDK on the machine: each component is a project with its edges, each task runs the steps of its build, test reads the JUnit and JaCoCo reports and runs the tests a filter names, lint checks documentation links, an application serves, runs and ships an image, and a component overrides any profile value",
       "owner": "java",
       "target": "coded",
       "requirements": [
@@ -92,6 +92,21 @@
           }
         },
         {
+          "id": "filters-the-tests",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-test-filter-reaches-each-gradle-variant-and-maven",
+              "the-gradle-init-script-applies-the-filter-to-every-test-task",
+              "a-component-in-which-the-filter-selects-no-test-passes"
+            ]
+          }
+        },
+        {
           "id": "lint-skips-the-lockfiles",
           "stage": "coded",
           "evidenceKinds": [
@@ -153,6 +168,19 @@
             "kind": "acceptance",
             "checks": [
               "an-application-that-publishes-an-image-is-a-release-member"
+            ]
+          }
+        },
+        {
+          "id": "checks-documentation-links",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "lint-fails-on-a-broken-documentation-link-unless-docs-links-is-off"
             ]
           }
         },

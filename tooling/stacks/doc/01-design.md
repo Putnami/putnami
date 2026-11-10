@@ -480,7 +480,11 @@ step that wrote no report is `stacks.step_failed`, not a missing report. The tot
 the coverage reach the task result. A JUnit or coverage pattern of the profile
 that matches no report fails the task with `stacks.report_missing`; JUnit
 and TRX patterns count together: a command
-that ran nothing is not a pass. The reports a task reads outside its own
+that ran nothing is not a pass. A test filter an extension passes through
+`RunFiltered` is the one exception: the filter also reaches the components the
+selected ones depend on, where it may select no test, and a runner writes no
+report for such a run, so a filtered run whose steps pass and that finds no
+JUnit or TRX report reads zero tests and no coverage. The reports a task reads outside its own
 output directory are removed before its steps, so a report another component
 or an earlier run left is never read as this run's. A file the task's inputs
 select is a source and is kept, and a report pattern outside the output

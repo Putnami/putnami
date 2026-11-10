@@ -8,6 +8,7 @@
     "A machine with no JDK or no Maven runs the tasks: the extension installs an Eclipse Temurin JDK and Apache Maven, each pinned by SHA-256",
     "The test task reads the JUnit reports and the JaCoCo report the build writes into the test and coverage summary",
     "A change to a lockfile reruns test and build, never lint",
+    "putnami test --test runs the tests a filter names, and a component in which it selects none passes; putnami lint also checks the documentation links",
     "putnami serve and putnami run start an application, and putnami package and publish build and push its image",
     "A component overrides any value of the Java profile in its putnami.json, and the override reaches the cache key"
   ],
@@ -16,7 +17,8 @@
     "Gradle composite builds: an included build is part of the build that includes it",
     "Android product flavors: a flavored app overrides the test step",
     "Publishing a library to a Maven repository: Gradle or Maven publishes it",
-    "An application image for a build other than the Gradle application plugin and Spring Boot"
+    "An application image for a build other than the Gradle application plugin and Spring Boot",
+    "A workspace-fetch that fills a dependency cache ahead of a hosted run: resolving a Gradle build's dependencies evaluates its settings and build scripts, which run their plugins' code, through the repository's own wrapper jar, and Maven's dependency:go-offline loads the build's extensions and misses the dependencies a plugin resolves when it runs"
   ],
   "requirements": [
     {
@@ -44,6 +46,10 @@
       "text": "The test task reads the JUnit reports, build/test-results/test (testDebugUnitTest for Android) or target/surefire-reports, and the JaCoCo XML report into the test and coverage summary. A component with no file under src/test expects no report. A missing JaCoCo report is read as none, except for android-coverage, where it fails the task with stacks.report_missing."
     },
     {
+      "id": "filters-the-tests",
+      "text": "test --test, short -t, runs the tests the filter names. gradlew or gradle gets --init-script <script> -Dputnami.testFilter=<filter>, global options after the last task; the script, in the task's output, gives every test task the filter as --tests does, with failOnNoMatchingTests off. mvn, mvnw or mvnd gets -Dtest=<filter> -Dsurefire.failIfNoSpecifiedTests=false -DskipITs; another program, none. A component it selects no test in passes with zero tests. The filter keys the task."
+    },
+    {
       "id": "lint-skips-the-lockfiles",
       "text": "The java:lint selector answers the sources, the test sources the lint commands compile or check, the build files and the lint configurations, never the lockfiles: a lockfile change reruns test and build and keeps lint's key."
     },
@@ -64,6 +70,10 @@
       "text": "putnami publish --docker pushes the packaged image through the shared publisher, and an application that publishes an image declares it as a member of the release set."
     },
     {
+      "id": "checks-documentation-links",
+      "text": "lint checks every relative link and anchor of the component's README.md files and doc/ trees with the SDK's documentation link check, a directory below it that holds a Gradle build, settings or Maven POM file answering for its own, and a broken one fails lint, unless the docs-links flag is false. The check needs no JDK."
+    },
+    {
       "id": "overrides-are-honored",
       "text": "options[\"@putnami/java\"] in a component's own putnami.json overrides its variant's profile: an object merges, any other value replaces the variant's whole. The steps run and the files the java:<task> selectors answer follow the resolved profile, and putnami.json is an input of every task. An unknown member, a change to id, markers or variants, or a stack-root input the manifest does not declare fails the task with stacks.project_config_invalid."
     },
@@ -77,6 +87,7 @@
     "tooling/stacks/doc/adr/0005-profile-variants-for-a-stack-with-several-builds.md",
     "tooling/stacks/doc/adr/0006-a-pinned-toolchain-sets-its-home-and-tools-know-the-component.md",
     "java/extension/doc/adr/0001-the-extension-installs-a-pinned-jdk.md",
-    "java/extension/doc/adr/0002-an-application-image-copies-onto-the-temurin-jre.md"
+    "java/extension/doc/adr/0002-an-application-image-copies-onto-the-temurin-jre.md",
+    "java/extension/doc/adr/0003-a-test-filter-reaches-gradle-through-an-init-script.md"
   ]
 }

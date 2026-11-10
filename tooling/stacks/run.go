@@ -46,9 +46,24 @@ func (s Stack) Run(task string) func(ctx *pctx.Context, emit *jsonl.Emitter, arg
 
 // RunWith is Run with the arguments extra answers appended to the task's last
 // step, the one that does the task's work. It calls extra with the task's
-// selected toolchain and that step's expanded command, under the stack root's
-// lock. A nil extra adds none.
+// selected toolchain, its output directory and that step's expanded command,
+// under the stack root's lock. A nil extra adds none.
 func (s Stack) RunWith(task string, extra func(ctx *pctx.Context, root RootStep, lastStep []string) []string) func(ctx *pctx.Context, emit *jsonl.Emitter, args []string) (string, map[string]any, error) {
+	return s.runWith(task, extra, false)
+}
+
+// RunFiltered is RunWith for a test filter: filter answers the arguments that
+// pass the filter to the task's last step, or none without a filter. A filter
+// also reaches the components the selected ones depend on, where it may select
+// no test, and a test runner writes no report for a run that selects none: a
+// filtered run whose steps pass and that finds no JUnit or TRX report reads
+// zero tests and no coverage, where any other run fails with
+// CodeReportMissing.
+func (s Stack) RunFiltered(task string, filter func(ctx *pctx.Context, root RootStep, lastStep []string) []string) func(ctx *pctx.Context, emit *jsonl.Emitter, args []string) (string, map[string]any, error) {
+	return s.runWith(task, filter, true)
+}
+
+func (s Stack) runWith(task string, extra func(ctx *pctx.Context, root RootStep, lastStep []string) []string, filters bool) func(ctx *pctx.Context, emit *jsonl.Emitter, args []string) (string, map[string]any, error) {
 	return func(ctx *pctx.Context, emit *jsonl.Emitter, args []string) (string, map[string]any, error) {
 		output, err := outputFlag(args)
 		if err != nil {
@@ -61,6 +76,7 @@ func (s Stack) RunWith(task string, extra func(ctx *pctx.Context, root RootStep,
 		return s.run(context.Background(), runInput{
 			task:          task,
 			stepArgs:      stepArgs,
+			filters:       filters,
 			workspaceRoot: ctx.WorkspaceRoot,
 			projectAbs:    ctx.Project.FullPath,
 			metadata:      ctx.Project.Metadata[s.Extension],
@@ -87,7 +103,10 @@ type runInput struct {
 	task string
 	// stepArgs answers the arguments appended to the task's last step, given
 	// that step's expanded command.
-	stepArgs      func(RootStep, []string) []string
+	stepArgs func(RootStep, []string) []string
+	// filters reads the arguments stepArgs answers as a test filter: a run
+	// they select no test in reads zero tests.
+	filters       bool
 	workspaceRoot string
 	projectAbs    string
 	metadata      json.RawMessage
@@ -287,6 +306,10 @@ type RootStep struct {
 	Expected Expected
 	// Env is the environment of the step.
 	Env []string
+	// Output is the task's output directory, emptied before its steps, for
+	// the arguments RunWith and RunFiltered append to a task's last step;
+	// empty for a step a root job runs.
+	Output string
 	// Program returns the program to run for a command name: the pinned
 	// toolchain for the toolchain command, and name otherwise.
 	Program func(name string) string
@@ -687,9 +710,10 @@ func (s Stack) run(ctx context.Context, in runInput, emit reporter) (string, map
 	var stepErr error
 	var stepArgs []string
 	if in.stepArgs != nil && len(t.Steps) > 0 {
-		root := RootStep{Dir: rootAbs, Project: in.projectAbs, Env: env, Program: func(name string) string { return selected.Program(profile.Toolchain, name) }}
+		root := RootStep{Dir: rootAbs, Project: in.projectAbs, Env: env, Output: outDir, Program: func(name string) string { return selected.Program(profile.Toolchain, name) }}
 		stepArgs = in.stepArgs(root, expandStep(t.Steps[len(t.Steps)-1], vars))
 	}
+	filtered := in.filters && len(stepArgs) > 0
 	for n, step := range t.Steps {
 		argv := expandStep(step, vars)
 		if n == len(t.Steps)-1 {
@@ -741,13 +765,19 @@ func (s Stack) run(ctx context.Context, in runInput, emit reporter) (string, map
 	}
 
 	copied := 0
-	resolve := func(pattern string) ([]string, error) {
-		base, rest := in.projectAbs, pattern
+	// locate answers the directory a report pattern is relative to, and the
+	// pattern below it.
+	locate := func(pattern string) (string, string) {
 		if r, ok := strings.CutPrefix(pattern, "{output}/"); ok {
-			base, rest = outDir, r
-		} else if r, ok := strings.CutPrefix(pattern, "{root}/"); ok {
-			base, rest = rootAbs, r
+			return outDir, r
 		}
+		if r, ok := strings.CutPrefix(pattern, "{root}/"); ok {
+			return rootAbs, r
+		}
+		return in.projectAbs, pattern
+	}
+	resolve := func(pattern string) ([]string, error) {
+		base, rest := locate(pattern)
 		matches, err := globFiles(base, rest)
 		if err != nil || base == outDir {
 			return matches, err
@@ -767,6 +797,16 @@ func (s Stack) run(ctx context.Context, in runInput, emit reporter) (string, map
 	if reports != nil && len(reports.When) > 0 && !anyFile(in.projectAbs, reports.When) {
 		emit.Info(fmt.Sprintf("no file matches %s: the %s task of %s expects no report", strings.Join(reports.When, ", "), in.task, meta.Component))
 		reports = nil
+	}
+	// A filter that selects no test of the component leaves no test report:
+	// the run reads zero tests, and no coverage of them.
+	noTests := false
+	if filtered && stepErr == nil && reports.HasTests() && !slices.ContainsFunc(slices.Concat(reports.JUnit, reports.TRX), func(pattern string) bool {
+		matches, err := globFiles(locate(pattern))
+		return err != nil || len(matches) > 0
+	}) {
+		emit.Info(fmt.Sprintf("the test filter selects no test of %s: its %s task reads zero tests", meta.Component, in.task))
+		reports, noTests = nil, true
 	}
 	reportBase := in.projectAbs
 	if t.Dir == DirRoot {
@@ -788,7 +828,7 @@ func (s Stack) run(ctx context.Context, in runInput, emit reporter) (string, map
 		data["delegatedTo"] = profile.ID
 		emit.Info(fmt.Sprintf("%s ran %s on %s; its own cache decides what reran", profile.ID, in.task, meta.Component))
 	}
-	if reports.HasTests() {
+	if reports.HasTests() || noTests {
 		data["testSummary"] = map[string]any{
 			"total": summary.Tests.Total, "passed": summary.Tests.Passed,
 			"failed": summary.Tests.Failed, "skipped": summary.Tests.Skipped,
