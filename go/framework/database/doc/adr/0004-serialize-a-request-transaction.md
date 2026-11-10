@@ -22,9 +22,10 @@ operation at a time:
 
 - An operation holds the transaction from the moment it is sent until the
   connection is free again: `Exec`, `CopyFrom`, `Prepare` and a savepoint
-  `Begin`, `Commit` or `Rollback` for their call; `Query` and `QueryRow` until
-  their rows are closed, drained or scanned; `SendBatch` until its results are
-  closed.
+  `Begin`, `Commit` or `Rollback` for their call; `Query` until its rows are
+  closed or drained; `SendBatch` until its results are closed. `QueryRow`
+  sends its statement when the row is scanned and holds the transaction for
+  that `Scan`, so a row never scanned never holds it.
 - A query waiting for its turn waits under its own context. When the context
   ends first, the query fails with a `db.transaction` error that says another
   query of the request holds the transaction until its result is closed.
