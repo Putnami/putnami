@@ -2051,6 +2051,14 @@
             "package.json"
           ]
         },
+        "runnerConfig": {
+          "from": "project",
+          "files": [
+            "vitest.config.*",
+            "vite.config.*",
+            "jest.config.*"
+          ]
+        },
         "DATABASE_TEST_BINDINGS": {
           "from": "env"
         },

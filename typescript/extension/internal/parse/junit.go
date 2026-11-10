@@ -2,6 +2,7 @@ package parse
 
 import (
 	"errors"
+	"regexp"
 	"strings"
 
 	"go.putnami.dev/evidence/readers"
@@ -97,7 +98,7 @@ func ParseJUnitFile(path string) (TestSummary, error) {
 			}
 			summary.FailedTests = append(summary.FailedTests, FailedTest{
 				Name:    tc.Name,
-				File:    tc.File,
+				File:    caseFile(tc),
 				Line:    tc.Line,
 				Failure: &TestFailure{Type: tc.Failure.Type, Message: message},
 			})
@@ -118,10 +119,14 @@ func testCase(tc readers.TestCase) TestCase {
 			names = append(names, describe.Name)
 		}
 	}
+	file := caseFile(tc)
+	if suiteFile == "" {
+		suiteFile = file
+	}
 	testCase := TestCase{
 		Name:       strings.Join(append(names, tc.Name), " > "),
 		SuiteFile:  suiteFile,
-		File:       tc.File,
+		File:       file,
 		Line:       tc.Line,
 		Status:     TestCasePassed,
 		DurationMs: tc.DurationMs,
@@ -138,6 +143,19 @@ func testCase(tc readers.TestCase) TestCase {
 		}
 	}
 	return testCase
+}
+
+// classnameFileRe matches a classname that names a test file, the form
+// Vitest's junit reporter writes in place of a file attribute.
+var classnameFileRe = regexp.MustCompile(`\.(test|spec)\.[cm]?[jt]sx?$`)
+
+// caseFile is the file of a case: its file attribute, else the one of its
+// nearest suite, else its classname when that names a test file.
+func caseFile(tc readers.TestCase) string {
+	if tc.File != "" || !classnameFileRe.MatchString(tc.Classname) {
+		return tc.File
+	}
+	return tc.Classname
 }
 
 // failureOutput joins a failure's message and body. A body that already

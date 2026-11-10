@@ -42,7 +42,11 @@ type TypeCheckResult struct {
 // buildInfoDir, when non-empty, is a persistent scratch directory that holds
 // the scratch tsconfig and tsc's incremental build info, so a later run
 // re-checks only what changed.
-func RunTypeCheck(bunBin, projectPath, buildInfoDir string) (*TypeCheckResult, error) {
+//
+// projectTypes leaves the ambient type packages to the project: tsc reads the
+// types of its tsconfig, else every visible @types package, so the globals of
+// a Vitest or Jest suite resolve. Without it the check loads Bun's types only.
+func RunTypeCheck(bunBin, projectPath, buildInfoDir string, projectTypes bool) (*TypeCheckResult, error) {
 	scope, err := typeCheckScope(projectPath)
 	if err != nil {
 		return nil, err
@@ -74,7 +78,11 @@ func RunTypeCheck(bunBin, projectPath, buildInfoDir string) (*TypeCheckResult, e
 		return nil, err
 	}
 	fsRoot := filepath.VolumeName(absProject) + string(filepath.Separator)
-	args := append([]string{"x", "tsc", "--noEmit", "--rootDir", fsRoot}, tscCompilerFlags(typeScriptIgnoreDeprecations(projectPath))...)
+	flags := tscCompilerFlags(typeScriptIgnoreDeprecations(projectPath))
+	if projectTypes {
+		flags = withoutFlag(flags, "--types")
+	}
+	args := append([]string{"x", "tsc", "--noEmit", "--rootDir", fsRoot}, flags...)
 	if buildInfoDir != "" {
 		args = append(args, "--incremental", "--tsBuildInfoFile", filepath.Join(buildInfoDir, "typecheck.tsbuildinfo"))
 	}
@@ -193,4 +201,17 @@ func isTypeScriptFile(name string) bool {
 		return true
 	}
 	return false
+}
+
+// withoutFlag returns flags without name and the value that follows it.
+func withoutFlag(flags []string, name string) []string {
+	out := make([]string, 0, len(flags))
+	for i := 0; i < len(flags); i++ {
+		if flags[i] == name {
+			i++
+			continue
+		}
+		out = append(out, flags[i])
+	}
+	return out
 }
