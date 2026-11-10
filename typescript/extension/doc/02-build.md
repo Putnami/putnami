@@ -373,9 +373,11 @@ A guard is a `typeof Bun` test that shows Bun present where the code runs:
 `typeof` itself, the branch of an `if`, a conditional or a logical expression
 that the test selects when Bun is present, and the statements after an
 `if (typeof Bun === 'undefined')` whose branch leaves the block are guarded. A
-reference in the branch where Bun is absent is not. `globalThis.Bun?.` reads
-the global without needing it, which is how `@putnami/utils` falls back from
-`Bun.escapeHTML`. A binding named `Bun` that the module declares, other than
+reference in the branch where Bun is absent is not. `typeof Bun.serve` reads a member of Bun
+and is not a guard. `globalThis.Bun?.` reads the global without needing it,
+which is how `@putnami/utils` falls back from `Bun.escapeHTML`; a truthiness
+test such as `if (globalThis.Bun)` is not read as a guard, so write
+`typeof Bun !== 'undefined'`. A binding named `Bun` that the module declares, other than
 an ambient `declare`, shadows the global.
 
 The check reads every module the graph imports, whether or not the bundler

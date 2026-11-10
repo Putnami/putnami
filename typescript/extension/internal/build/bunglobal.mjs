@@ -145,8 +145,12 @@ function guardedBy(parent, child) {
 // guarded says whether node runs only where Bun was shown to be present.
 function guarded(node) {
   for (let child = node, parent = node.parent; parent; child = parent, parent = parent.parent) {
-    if (ts.isTypeOfExpression(parent)) return true;
-    if (guardedBy(parent, child)) return true;
+    // `typeof Bun` reads nothing; `typeof Bun.serve` reads a member of Bun.
+    if (ts.isTypeOfExpression(parent)) {
+      if (ts.isIdentifier(node) && unwrap(parent.expression) === node) return true;
+    } else if (guardedBy(parent, child)) {
+      return true;
+    }
   }
   return false;
 }

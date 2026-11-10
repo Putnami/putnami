@@ -164,6 +164,9 @@ func TestScanModulesKeepsOnlyUnguardedUses(t *testing.T) {
 			"(globalThis as any)['Bun'].version;",
 			"declare const flag: () => boolean;",
 			"export { e };",
+			"export const f = typeof Bun.serve;",
+			"export const g = typeof Bun?.serve === 'function';",
+			"export const h = typeof globalThis.Bun.serve;",
 		}, "\n"),
 		"ambient.ts": strings.Join([]string{
 			"declare const Bun: { file(path: string): { text(): Promise<string> } };",
@@ -188,6 +191,7 @@ func TestScanModulesKeepsOnlyUnguardedUses(t *testing.T) {
 		"unguarded.ts": {Uses: []SourcePosition{
 			{Line: 1, Column: 41}, {Line: 3, Column: 10}, {Line: 5, Column: 35},
 			{Line: 6, Column: 40}, {Line: 7, Column: 45}, {Line: 8, Column: 1}, {Line: 9, Column: 1},
+			{Line: 12, Column: 25}, {Line: 13, Column: 25}, {Line: 14, Column: 25},
 		}},
 	}
 	if !reflect.DeepEqual(scans, want) {
