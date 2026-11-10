@@ -98,7 +98,7 @@ tool that declares what it touches. Decisions live in versioned files that bind
 every contributor, human or agent, and `putnami validate` enforces the ones a
 machine can check.
 
-Putnami is built this way. This repository is one workspace of 193 projects,
+Putnami is built this way. This repository is one workspace of 196 projects,
 changed by people and coding agents through the same gates.
 The repository of Putnami Cloud builds, tests, and deploys through Putnami on
 every merge to `main`.
