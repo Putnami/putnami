@@ -1,11 +1,11 @@
 # Repository adoption matrix
 
-This repository maps **105 of its 192 projects** to **10 architecture domains**.
-The other **87 are excluded on purpose**: 42 samples, 7 templates, 2 template
+This repository maps **105 of its 193 projects** to **10 architecture domains**.
+The other **88 are excluded on purpose**: 43 samples, 7 templates, 2 template
 proofs, 2 protocol proofs, the standalone area detector, the 2 Cloud runtime
 destinations, the Cloud CLI extension with its 14 generated clients, the new
 development verb vocabulary, the new evidence report readers, and the new
-stack core with its first thirteen stack extensions. Every one of the 192 appears
+stack core with its first thirteen stack extensions. Every one of the 193 appears
 in a table below, mapped or excluded, with a reason.
 
 The matrix exists so the adoption frontier is measurable instead of implied.
@@ -424,6 +424,7 @@ reviewed permissions.
 | `/rust/samples/application` | Rust sample | `tooling` |
 | `/rust/samples/library` | Rust sample | `tooling` |
 | `/swift/samples/application` | Swift sample | `tooling` |
+| `/dart/samples/application` | Dart sample | `tooling` |
 | `/python/samples/application` | Python sample | `extension-providers` |
 | `/python/samples/library` | Python sample | `extension-providers` |
 | `/typescript/samples/01-hello-world` | TypeScript sample | `framework` |

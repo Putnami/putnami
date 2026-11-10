@@ -1,0 +1,8 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-project.json",
+  "name": "dart-example-application",
+  "tags": ["sample", "dart", "e2e"],
+  "extensions": ["/dart/extension"],
+  "featureAuthority": { "owner": "dart/stack-extension" },
+  "options": { "package": { "docker": true } }
+}

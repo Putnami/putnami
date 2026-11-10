@@ -97,6 +97,10 @@ func Detect(root string, request wsproto.ProbeRequest) ([]stacks.Component, []di
 		if c.DeclaresWorkspace && c.PubWorkspace == "" {
 			component.Name, component.InputOnly, component.Type = "", true, ""
 		}
+		// A pure Dart application may publish an image of its executable.
+		if component.Type == "application" && variant != VariantFlutter && len(executables(filepath.Join(root, filepath.FromSlash(c.ID)))) > 0 {
+			component.ReleaseMembers = stacks.ImageMember(root, c.ID, c.Name)
+		}
 		out = append(out, component)
 	}
 	return out, detection.Diagnostics

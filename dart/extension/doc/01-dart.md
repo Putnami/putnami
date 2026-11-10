@@ -250,6 +250,63 @@ before any process starts.
 A package with `bin/*.dart` or `lib/main.dart` is an application, which `run`
 and `serve` accept; any other is a library.
 
+## Package and publish an image
+
+A Dart server application reaches a registry as an OCI image, a standard
+container image. It is a pure Dart package, not a Flutter one, with a
+`bin/*.dart`. Declare the channel in the project's `putnami.json`:
+
+```json
+{ "options": { "package": { "docker": true }, "publish": { "docker": true } } }
+```
+
+`putnami package` resolves the stack root as the other tasks do, then
+assembles the image with no Docker daemon. `--docker-load` also loads it into
+the local Docker daemon, and `--docker-tag` adds a tag. The image name is the
+project name in lowercase. `putnami publish` pushes it to the registry that
+`registries.oci.publish` of `putnami.workspace.json` declares, through the
+shared publisher of the other stacks; `--docker-registry <registry>` overrides
+that registry for one push. A library and a Flutter package package and
+publish nothing: a Flutter app ships through a store.
+
+The image holds one executable, compiled ahead of time for Linux from any
+machine ([ADR 0002](adr/0002-an-application-image-holds-an-aot-executable-on-a-glibc-base.md)):
+
+1. The entrypoint is the one `options.package.entrypoint` or `--entrypoint`
+   names, a Dart file of the package such as `bin/api.dart`, or the name of a
+   `bin/` executable such as `api`. Without one, it is `bin/server.dart`,
+   which `serve` starts, else `bin/<package>.dart`, which `dart run` starts,
+   else the package's only `bin/*.dart`. A package with several and none of
+   these fails with `dart.no_entrypoint`, which names them.
+2. The selected `dart`, the one `build` runs, must be 3.8.0 or later: earlier
+   releases cannot compile for another architecture, and fail with
+   `dart.cross_compile_unsupported`. State `environment.sdk: ^3.8.0` so that a
+   task installs a release that can.
+3. `dart compile exe <entrypoint> -o <name> --target-os linux --target-arch
+   <x64|arm64>` compiles the executable in the package directory, holding the
+   lock of the stack root as the other tasks do, into a directory of its own.
+   `--platform` selects `linux/amd64`, the default, or `linux/arm64`; another
+   fails with `dart.platform_unsupported`. A target other than the machine's
+   downloads its compiler and runtime from the dart-archive into `~/.dart` the
+   first time.
+
+| Path | Content |
+|---|---|
+| `/app/<name>` | The executable, named after its entrypoint file, the image's entrypoint |
+
+The executable links the C library dynamically, so the base is
+`gcr.io/distroless/cc-debian12:nonroot` pinned by digest, which holds glibc,
+CA certificates and time zones and no shell. The image runs as the user
+`65532`, the `nonroot` user of distroless, in `/app`, with `PORT=8080` set and
+exposed: the server reads `PORT` to listen, as it does under `serve`. A
+project names another base with `--docker-base-image image@sha256:<digest>`; a
+base with no digest fails with `dart.base_not_pinned`. The cache key of
+`package` covers the package's build inputs, the `lib/` and `pubspec.yaml` of
+each package it depends on, and the flags above.
+
+The image holds no file but the executable: a server that reads files at run
+time, such as a `public/` directory, names a base that holds them.
+
 `putnami test --test` is not offered: `dart test` and `flutter test` fail a
 run whose filter selects no test, so a filter that reaches the packages a
 selected one depends on would fail them.
@@ -263,7 +320,13 @@ selected one depends on would fail them.
 - Each package selects its SDK from its own pubspec, then its stack root's:
   the members of one pub workspace whose constraints admit no common SDK
   resolve with whichever installs first.
-- No package or publish: a package reaches pub.dev through
-  `dart pub publish`, and an application image is built outside Putnami.
+- No package reaches pub.dev through Putnami: publish it with
+  `dart pub publish`.
+- An image holds a pure Dart application only. A package with build hooks
+  cannot be packaged, since `dart compile` refuses it, and a program that loads
+  a native library through `dart:ffi` finds only what the base holds.
+- An offline `package` for an architecture other than the machine's needs the
+  target's compiler in `~/.dart` already.
+- An arm64 image is assembled as an amd64 one is; no test runs one.
 - melos scripts do not run: the tasks run the profile's dart and flutter
   steps.

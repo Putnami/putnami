@@ -9,7 +9,8 @@
     "lint reads the package's code, manifests and lockfiles and no test file, so a change under test/ reruns test alone",
     "A package overrides any value of the Dart profile in its putnami.json, and the override reaches the cache key",
     "A task whose Dart or Flutter SDK is missing or outside the pubspec constraint installs the newest stable release in it under the Putnami home, and the test task installs tojunit and format_coverage, so a repository runs on a machine with no SDK",
-    "workspace-fetch, workspace-install, deps-upgrade, run and serve fetch, resolve, upgrade, run and serve the packages the way pub, dart and flutter do, and lint checks the documentation links"
+    "workspace-fetch, workspace-install, deps-upgrade, run and serve fetch, resolve, upgrade, run and serve the packages the way pub, dart and flutter do, and lint checks the documentation links",
+    "putnami package and publish produce the image of a Dart server application: the executable serve starts, compiled ahead of time for Linux on a digest-pinned glibc distroless base, pushed to the workspace's OCI registry"
   ],
   "nonGoals": [
     "Publishing a package to pub.dev",
@@ -17,7 +18,8 @@
     "Running melos scripts: the tasks run the profile's dart and flutter steps",
     "Installing an SDK from a source other than the publisher's archives, or for a platform the publisher does not build, such as Flutter on Linux arm64",
     "A test filter: dart test fails a run whose filter selects no test, so a filter reaching the packages a selected one depends on would fail them",
-    "Packaging or publishing an application image"
+    "Packaging or publishing a Flutter app: its mobile and desktop artifacts go to stores, and Flutter web is out of scope",
+    "An image of a package with build hooks, which dart compile refuses: dart build cli bundles native assets an image would need beside the executable"
   ],
   "requirements": [
     {
@@ -67,12 +69,29 @@
     {
       "id": "runs-and-serves",
       "text": "run runs a Dart command-line package with dart run and its entrypoint and args, and answers its exit code; serve runs a Dart server with dart run and PORT set, or a Flutter app with web/ through flutter run -d web-server on that port, and reports ready once the port accepts connections."
+    },
+    {
+      "id": "packages-an-application-image",
+      "text": "package with the docker channel assembles an OCI image of a pure Dart application with no Docker daemon: holding the lock of its stack root, it compiles the entrypoint with the selected dart, dart compile exe --target-os linux --target-arch x64 or arm64, and copies the executable onto distroless cc-debian12:nonroot pinned by digest, or a digest-pinned base the project names. The image runs it as the user 65532 with PORT=8080. A library or a Flutter package packages nothing."
+    },
+    {
+      "id": "refuses-what-it-cannot-cross-compile",
+      "text": "Before it compiles anything, package fails with dart.cross_compile_unsupported for a selected Dart below 3.8.0, which cannot cross-compile, with dart.platform_unsupported for a platform other than linux/amd64 and linux/arm64, and with dart.base_not_pinned for a base the project names with no digest."
+    },
+    {
+      "id": "chooses-the-entrypoint",
+      "text": "The image's entrypoint is the one the project names with entrypoint, a Dart file of the package or the name of a bin/ executable, else bin/server.dart, which serve starts, else bin/<package>.dart, which dart run starts, else the package's only bin/*.dart. A package with several and none of these fails with dart.no_entrypoint naming them."
+    },
+    {
+      "id": "publishes-an-application-image",
+      "text": "publish with the docker channel pushes the packaged image to registries.oci.publish through the shared publisher, and an application that publishes the docker channel declares it as an oci release-set member. A library or a Flutter package publishes nothing."
     }
   ],
   "decisions": [
     "tooling/stacks/doc/adr/0001-one-extension-per-stack-on-a-shared-core.md",
     "tooling/stacks/doc/adr/0002-a-stated-version-range-is-checked.md",
     "tooling/stacks/doc/adr/0013-task-targets-exclusions-and-pub-ranges.md",
-    "dart/extension/doc/adr/0001-the-sdk-installs-from-the-publishers-archives.md"
+    "dart/extension/doc/adr/0001-the-sdk-installs-from-the-publishers-archives.md",
+    "dart/extension/doc/adr/0002-an-application-image-holds-an-aot-executable-on-a-glibc-base.md"
   ]
 }

@@ -1,5 +1,5 @@
 // Command putnami-dart is the runtime of @putnami/dart: the stack core run
-// with the Dart profile and the Dart detector.
+// with the Dart profile and the Dart detector, and the Dart runtime commands.
 package main
 
 import (
@@ -33,6 +33,8 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer, runJobs func(
 			jobs[dart.DepsUpgradeJobName] = dart.DepsUpgradeJob(stack)
 			jobs[dart.ServeJobName] = dart.ServeJob(stack)
 			jobs[dart.RunJobName] = dart.RunJob(stack)
+			jobs[dart.PackageDockerJobName] = dart.PackageDockerJob(stack)
+			jobs[dart.PublishDockerJobName] = dart.PublishDockerJob()
 			runJobs(jobs)
 		})
 	}

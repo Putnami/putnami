@@ -5,7 +5,9 @@ projects: `putnami lint`, `putnami test` and `putnami build` run each
 package's dart or flutter steps with Putnami's runner and cache, without
 changing the build, and installs the Dart or Flutter SDK a package needs when
 the machine has none. `workspace-install`, `deps-upgrade`, `run` and `serve`
-resolve, upgrade, run and serve the packages.
+resolve, upgrade, run and serve the packages, and `package` and `publish`
+produce the image of a Dart server application, its entrypoint compiled ahead
+of time for Linux on a distroless base.
 
 It is a stack extension: a manifest, the Dart stack profile (`profile.json`,
 with its `dart`, `flutter` and `dart-in-flutter` variants) and the entrypoint of the
