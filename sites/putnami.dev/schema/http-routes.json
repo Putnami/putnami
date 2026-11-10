@@ -1895,6 +1895,231 @@
     },
     {
       "match": "exact",
+      "path": "/docs/languages",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "publicEdge": true,
+      "provenance": {
+        "project": "putnami.dev",
+        "package": "@putnami/web",
+        "sourceKind": "file-route",
+        "evidencePath": "src/app/docs/[...page]/page.tsx"
+      }
+    },
+    {
+      "match": "exact",
+      "path": "/docs/languages/dart",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "publicEdge": true,
+      "provenance": {
+        "project": "putnami.dev",
+        "package": "@putnami/web",
+        "sourceKind": "file-route",
+        "evidencePath": "src/app/docs/[...page]/page.tsx"
+      }
+    },
+    {
+      "match": "exact",
+      "path": "/docs/languages/dotnet",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "publicEdge": true,
+      "provenance": {
+        "project": "putnami.dev",
+        "package": "@putnami/web",
+        "sourceKind": "file-route",
+        "evidencePath": "src/app/docs/[...page]/page.tsx"
+      }
+    },
+    {
+      "match": "exact",
+      "path": "/docs/languages/java",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "publicEdge": true,
+      "provenance": {
+        "project": "putnami.dev",
+        "package": "@putnami/web",
+        "sourceKind": "file-route",
+        "evidencePath": "src/app/docs/[...page]/page.tsx"
+      }
+    },
+    {
+      "match": "exact",
+      "path": "/docs/languages/php",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "publicEdge": true,
+      "provenance": {
+        "project": "putnami.dev",
+        "package": "@putnami/web",
+        "sourceKind": "file-route",
+        "evidencePath": "src/app/docs/[...page]/page.tsx"
+      }
+    },
+    {
+      "match": "exact",
+      "path": "/docs/languages/ruby",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "publicEdge": true,
+      "provenance": {
+        "project": "putnami.dev",
+        "package": "@putnami/web",
+        "sourceKind": "file-route",
+        "evidencePath": "src/app/docs/[...page]/page.tsx"
+      }
+    },
+    {
+      "match": "exact",
+      "path": "/docs/languages/rust",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "publicEdge": true,
+      "provenance": {
+        "project": "putnami.dev",
+        "package": "@putnami/web",
+        "sourceKind": "file-route",
+        "evidencePath": "src/app/docs/[...page]/page.tsx"
+      }
+    },
+    {
+      "match": "exact",
+      "path": "/docs/languages/swift",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "publicEdge": true,
+      "provenance": {
+        "project": "putnami.dev",
+        "package": "@putnami/web",
+        "sourceKind": "file-route",
+        "evidencePath": "src/app/docs/[...page]/page.tsx"
+      }
+    },
+    {
+      "match": "exact",
+      "path": "/docs/monorepo-tools",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "publicEdge": true,
+      "provenance": {
+        "project": "putnami.dev",
+        "package": "@putnami/web",
+        "sourceKind": "file-route",
+        "evidencePath": "src/app/docs/[...page]/page.tsx"
+      }
+    },
+    {
+      "match": "exact",
+      "path": "/docs/monorepo-tools/bazel",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "publicEdge": true,
+      "provenance": {
+        "project": "putnami.dev",
+        "package": "@putnami/web",
+        "sourceKind": "file-route",
+        "evidencePath": "src/app/docs/[...page]/page.tsx"
+      }
+    },
+    {
+      "match": "exact",
+      "path": "/docs/monorepo-tools/moon",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "publicEdge": true,
+      "provenance": {
+        "project": "putnami.dev",
+        "package": "@putnami/web",
+        "sourceKind": "file-route",
+        "evidencePath": "src/app/docs/[...page]/page.tsx"
+      }
+    },
+    {
+      "match": "exact",
+      "path": "/docs/monorepo-tools/nx",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "publicEdge": true,
+      "provenance": {
+        "project": "putnami.dev",
+        "package": "@putnami/web",
+        "sourceKind": "file-route",
+        "evidencePath": "src/app/docs/[...page]/page.tsx"
+      }
+    },
+    {
+      "match": "exact",
+      "path": "/docs/monorepo-tools/pants",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "publicEdge": true,
+      "provenance": {
+        "project": "putnami.dev",
+        "package": "@putnami/web",
+        "sourceKind": "file-route",
+        "evidencePath": "src/app/docs/[...page]/page.tsx"
+      }
+    },
+    {
+      "match": "exact",
+      "path": "/docs/monorepo-tools/rush",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "publicEdge": true,
+      "provenance": {
+        "project": "putnami.dev",
+        "package": "@putnami/web",
+        "sourceKind": "file-route",
+        "evidencePath": "src/app/docs/[...page]/page.tsx"
+      }
+    },
+    {
+      "match": "exact",
+      "path": "/docs/monorepo-tools/turbo",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "publicEdge": true,
+      "provenance": {
+        "project": "putnami.dev",
+        "package": "@putnami/web",
+        "sourceKind": "file-route",
+        "evidencePath": "src/app/docs/[...page]/page.tsx"
+      }
+    },
+    {
+      "match": "exact",
       "path": "/docs/platform",
       "methods": [
         "GET",
@@ -4669,6 +4894,231 @@
     },
     {
       "match": "exact",
+      "path": "/fr/docs/languages",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "publicEdge": true,
+      "provenance": {
+        "project": "putnami.dev",
+        "package": "@putnami/web",
+        "sourceKind": "file-route",
+        "evidencePath": "src/app/docs/[...page]/page.tsx"
+      }
+    },
+    {
+      "match": "exact",
+      "path": "/fr/docs/languages/dart",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "publicEdge": true,
+      "provenance": {
+        "project": "putnami.dev",
+        "package": "@putnami/web",
+        "sourceKind": "file-route",
+        "evidencePath": "src/app/docs/[...page]/page.tsx"
+      }
+    },
+    {
+      "match": "exact",
+      "path": "/fr/docs/languages/dotnet",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "publicEdge": true,
+      "provenance": {
+        "project": "putnami.dev",
+        "package": "@putnami/web",
+        "sourceKind": "file-route",
+        "evidencePath": "src/app/docs/[...page]/page.tsx"
+      }
+    },
+    {
+      "match": "exact",
+      "path": "/fr/docs/languages/java",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "publicEdge": true,
+      "provenance": {
+        "project": "putnami.dev",
+        "package": "@putnami/web",
+        "sourceKind": "file-route",
+        "evidencePath": "src/app/docs/[...page]/page.tsx"
+      }
+    },
+    {
+      "match": "exact",
+      "path": "/fr/docs/languages/php",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "publicEdge": true,
+      "provenance": {
+        "project": "putnami.dev",
+        "package": "@putnami/web",
+        "sourceKind": "file-route",
+        "evidencePath": "src/app/docs/[...page]/page.tsx"
+      }
+    },
+    {
+      "match": "exact",
+      "path": "/fr/docs/languages/ruby",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "publicEdge": true,
+      "provenance": {
+        "project": "putnami.dev",
+        "package": "@putnami/web",
+        "sourceKind": "file-route",
+        "evidencePath": "src/app/docs/[...page]/page.tsx"
+      }
+    },
+    {
+      "match": "exact",
+      "path": "/fr/docs/languages/rust",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "publicEdge": true,
+      "provenance": {
+        "project": "putnami.dev",
+        "package": "@putnami/web",
+        "sourceKind": "file-route",
+        "evidencePath": "src/app/docs/[...page]/page.tsx"
+      }
+    },
+    {
+      "match": "exact",
+      "path": "/fr/docs/languages/swift",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "publicEdge": true,
+      "provenance": {
+        "project": "putnami.dev",
+        "package": "@putnami/web",
+        "sourceKind": "file-route",
+        "evidencePath": "src/app/docs/[...page]/page.tsx"
+      }
+    },
+    {
+      "match": "exact",
+      "path": "/fr/docs/monorepo-tools",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "publicEdge": true,
+      "provenance": {
+        "project": "putnami.dev",
+        "package": "@putnami/web",
+        "sourceKind": "file-route",
+        "evidencePath": "src/app/docs/[...page]/page.tsx"
+      }
+    },
+    {
+      "match": "exact",
+      "path": "/fr/docs/monorepo-tools/bazel",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "publicEdge": true,
+      "provenance": {
+        "project": "putnami.dev",
+        "package": "@putnami/web",
+        "sourceKind": "file-route",
+        "evidencePath": "src/app/docs/[...page]/page.tsx"
+      }
+    },
+    {
+      "match": "exact",
+      "path": "/fr/docs/monorepo-tools/moon",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "publicEdge": true,
+      "provenance": {
+        "project": "putnami.dev",
+        "package": "@putnami/web",
+        "sourceKind": "file-route",
+        "evidencePath": "src/app/docs/[...page]/page.tsx"
+      }
+    },
+    {
+      "match": "exact",
+      "path": "/fr/docs/monorepo-tools/nx",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "publicEdge": true,
+      "provenance": {
+        "project": "putnami.dev",
+        "package": "@putnami/web",
+        "sourceKind": "file-route",
+        "evidencePath": "src/app/docs/[...page]/page.tsx"
+      }
+    },
+    {
+      "match": "exact",
+      "path": "/fr/docs/monorepo-tools/pants",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "publicEdge": true,
+      "provenance": {
+        "project": "putnami.dev",
+        "package": "@putnami/web",
+        "sourceKind": "file-route",
+        "evidencePath": "src/app/docs/[...page]/page.tsx"
+      }
+    },
+    {
+      "match": "exact",
+      "path": "/fr/docs/monorepo-tools/rush",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "publicEdge": true,
+      "provenance": {
+        "project": "putnami.dev",
+        "package": "@putnami/web",
+        "sourceKind": "file-route",
+        "evidencePath": "src/app/docs/[...page]/page.tsx"
+      }
+    },
+    {
+      "match": "exact",
+      "path": "/fr/docs/monorepo-tools/turbo",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "publicEdge": true,
+      "provenance": {
+        "project": "putnami.dev",
+        "package": "@putnami/web",
+        "sourceKind": "file-route",
+        "evidencePath": "src/app/docs/[...page]/page.tsx"
+      }
+    },
+    {
+      "match": "exact",
       "path": "/fr/docs/platform",
       "methods": [
         "GET",
@@ -5876,5 +6326,5 @@
       }
     }
   ],
-  "digest": "sha256:9d66519ffe7e3867996c3ab8c0ced1f4a26169165be27931cc1c9a4b3cc89d98"
+  "digest": "sha256:838a2d80551888107a0c9c0e90cd019219f242be6f67c07092ead0a66b97b0b5"
 }

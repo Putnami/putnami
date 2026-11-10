@@ -8,7 +8,7 @@ snapshot, and detector coverage. [Stability](#stability) states the promise.
 This repository gates on it. `architecture validate` runs inside the fixed
 maintainer gate (`lint,test,build,validate`, see
 [Maintainer CI](../../CONTRIBUTING.md#maintainer-ci)), reached through
-`validate`, and that is what keeps its ten declared domains honest. A finding
+`validate`, and that is what keeps its eleven declared domains honest. A finding
 ID or a detector's coverage may change between releases, so a workspace that
 commits a baseline or waivers re-reads them when the protocol moves;
 `validate-workspace` warns such a workspace on each run.
@@ -198,7 +198,7 @@ Published schemas:
 
 ## Current repository adoption
 
-The Putnami repository maps **105 of its 193 projects to 10 domains** and
+The Putnami repository maps **105 of its 193 projects to 11 domains** and
 excludes the other 88 with a reason and an owner each. There is no workspace-root
 baseline and no waiver file: adoption started clean and every wave landed with
 its declarations complete, so there has never been debt to record.
@@ -207,12 +207,12 @@ its declarations complete, so there has never been debt to record.
 
 | Measure | Value |
 |---|---|
-| Domains | 10 |
-| Exports | 13 |
-| Imports | 21 |
-| Observed cross-domain edges | 526, every one covered by an exact binding |
+| Domains | 11 |
+| Exports | 16 |
+| Imports | 28 |
+| Observed cross-domain edges | 741, every one covered by an exact binding |
 | Findings | 0 |
-| Evidence rows | 8 |
+| Evidence rows | 12 |
 | `coverage.projectDependencies` | `enforced-for-mapped-projects` |
 | `coverage.domainAccess` | `framework-evidence` |
 
@@ -228,6 +228,7 @@ its declarations complete, so there has never been debt to record.
 | `agent-workflows` | tooling | 1 | The agent content of the `@putnami/contributor` extension |
 | `observability` | observability | 1 | Anonymous CLI-usage aggregates |
 | `public-docs` | public-docs | 1 | What the public documentation site publishes |
+| `stacks` | tooling | 0 | The reference pages of the stack extensions and the monorepo tool integrations |
 
 The excluded 67 are the 32 samples, 7 templates, 2 template proofs, 2 protocol
 proofs, the standalone area detector, the 2 Cloud runtime
@@ -253,29 +254,32 @@ fails on a project that is neither mapped nor excluded.
 
 Two different things are declared here and it matters which is which:
 
-- **ARC project permissions.** Nineteen of the twenty imports authorize exact
+- **ARC project permissions.** Seventeen of the twenty-eight imports authorize exact
   project dependencies. `go-framework.protocol-contracts.v1` is 222 reviewed
   `(consumer, producer)` pairs, and nothing observes them at run time — the gate
   compares them with the resolved graph and that is the whole contract.
-- **DARC runtime-enforced flows.** Five imports are `snapshot` contracts owned by
-  `public-docs`, one per repository-owned documentation source. They are
-  configuration for a running component, not a description of one.
+- **DARC runtime-enforced flows.** Eight imports are `snapshot` contracts owned by
+  `public-docs`: one per repository-owned documentation tree, and one for each
+  set of reference pages it publishes together. They are configuration for a
+  running component, not a description of one.
 
 A package edge is never a semantic data-access contract, and a `bindings` list is
 never evidence that anything runs.
 
 ### The documentation snapshot, as a worked example
 
-The public site publishes documentation five other domains write. That flow used
+The public site publishes documentation six other domains write. That flow used
 to exist only as `generate.assets` copies in `sites/putnami.dev/putnami.json`,
 where a deleted source produced a skipped copy, a warning nobody reads, and a
 section that silently disappeared.
 
 It is now declared at both halves. `cli`, `sdd`, `go-framework`,
-`typescript-framework` and `extension-providers` each export the documentation
-fact they are authoritative for; `public-docs` imports each one as a `snapshot`
-carrying a deterministic tree digest as its source version, `fail-closed` on a
-missing source and `use-stale` past its freshness bound. The site's runtime takes
+`typescript-framework`, `extension-providers` and `stacks` each export the
+documentation fact they are authoritative for; `public-docs` imports each one as
+a `snapshot` carrying a deterministic tree digest as its source version,
+`fail-closed` on a missing source and `use-stale` past its freshness bound. One
+import may govern several copies: the seven stack extension references are one
+`stacks` export and one import, and a missing reference fails the whole set. The site's runtime takes
 those declarations as its configuration through the `darc` module of
 [`@putnami/application`](../../typescript/framework/application/src/darc), so a
 missing source now fails the build instead of shrinking the site.
@@ -288,8 +292,9 @@ domain adopts the runtime half all at once or not at all:
 
 - `observability` implements both of its imports and emits two rows from
   `/sites/telemetry.putnami.dev`.
-- `public-docs` implements all six and emits six rows from `/sites/putnami.dev`.
-- The other eight domains emit nothing, and pass.
+- `public-docs` implements all ten of its imports and emits ten rows from
+  `/sites/putnami.dev`.
+- The other nine domains emit nothing, and pass.
 
 That silence is a decision, not an omission. The CLI, the SDD extension and the
 language extensions enforce their imports at precise, real code paths, but none

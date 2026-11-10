@@ -1,6 +1,6 @@
 # Repository adoption matrix
 
-This repository maps **105 of its 193 projects** to **10 architecture domains**.
+This repository maps **105 of its 193 projects** to **11 architecture domains**.
 The other **88 are excluded on purpose**: 43 samples, 7 templates, 2 template
 proofs, 2 protocol proofs, the standalone area detector, the 2 Cloud runtime
 destinations, the Cloud CLI extension with its 14 generated clients, the new
@@ -26,7 +26,7 @@ an unmapped project is simply invisible to it. This file is that second half.
 4. A new project starts excluded and unmapped. It joins a domain when someone
    states which authority it carries — not when it compiles.
 
-## The 10 domains
+## The 11 domains
 
 | Domain | Owner | Projects | Manifest |
 |---|---|---|---|
@@ -40,6 +40,7 @@ an unmapped project is simply invisible to it. This file is that second half.
 | `agent-workflows` | `tooling` | 1 | `tooling/contributor/putnami.architecture.json` |
 | `observability` | `observability` | 1 | `sites/telemetry.putnami.dev/putnami.architecture.json` |
 | `public-docs` | `public-docs` | 1 | `sites/putnami.dev/putnami.architecture.json` |
+| `stacks` | `tooling` | 0 | `tooling/stacks/putnami.architecture.json` |
 
 A manifest does not have to live inside a mapped project. `protocols`,
 `go-framework`, and `typescript-framework` each declare a manifest at the root of
@@ -244,7 +245,18 @@ owning none of their content.
 
 | Project | Name | Authority it carries |
 |---|---|---|
-| `/sites/putnami.dev` | `putnami.dev` | Placement, navigation, and the site's own authored pages. Six documentation trees are copied in from five other domains, and none of them is edited here. |
+| `/sites/putnami.dev` | `putnami.dev` | Placement, navigation, and the site's own authored pages. Nineteen documentation sources are copied in from six other domains, under eight imports, and none of them is edited here. |
+
+### `stacks` — 0 projects
+
+**Membership test:** none yet. The domain owns one kind of fact: the reference
+page each stack extension and each monorepo tool integration writes in its own
+`doc/` folder, which `public-docs` publishes and never edits. It maps no
+project, because no review has named the domain that owns *running* a stack;
+the stack core and its extensions stay excluded until one does (see
+[Stack core and stack extensions](#stack-core-and-stack-extensions--14-projects)).
+A manifest with no project is how the protocol states a domain that holds a
+fact before it holds code.
 
 ## Excluded projects
 
@@ -362,7 +374,9 @@ permissions its import of the protocols and its consumer in
 extensions, each a manifest, a stack profile and the core's entrypoint, which run a stack's components as Putnami tasks from
 the components the `putnami observe` detectors find. A new project starts excluded
 (rule 4), and no review has yet named the domain that owns running a stack
-that Putnami has no full extension for.
+that Putnami has no full extension for. The reference page each of them
+writes is a documentation fact of the `stacks` domain, which maps none of
+these projects.
 
 **What would change it:** a review that states which domain carries the stack
 core and its extensions, with the exact cross-domain permissions their imports

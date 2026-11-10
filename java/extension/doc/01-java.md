@@ -6,10 +6,14 @@ lint, test and build with the build the team already uses. It reads the
 repository the way `putnami observe` does. A machine with no JDK and no Maven
 runs it: the extension installs a pinned Eclipse Temurin JDK and Apache Maven
 when the machine has none. An application also serves, runs, and ships as an
-image. The samples in [`java/samples`](../../samples/README.md) show both
+image. The samples in [`java/samples`](https://github.com/Putnami/putnami/blob/main/java/samples/README.md) show both
 builds.
 
 ## Adopt it
+
+`@putnami/java` is not published yet: until its first release, `putnami init
+--extension java` stops at the extension install, after it has written the
+workspace files, and a workspace loads the extension from a source checkout.
 
 1. At the root of the repository, run:
 
@@ -151,7 +155,7 @@ skips Failsafe instead, so the filter narrows the run as on Gradle, whose test
 step runs no integration test task. A filter that names an integration test
 runs it in Surefire's test phase, without Failsafe's pre- and
 post-integration-test phases. The choices are in
-[ADR 0003](adr/0003-a-test-filter-reaches-gradle-through-an-init-script.md).
+[ADR 0003](https://github.com/Putnami/putnami/blob/main/java/extension/doc/adr/0003-a-test-filter-reaches-gradle-through-an-init-script.md).
 
 A step override keeps the filter when its last step runs `gradlew`, `gradle`,
 `mvn`, `mvnw` or `mvnd`; a last step that runs any other program gets none.
@@ -343,7 +347,7 @@ them where the variant reads them, or the override also replaces
 `stacks.project_config_invalid` when it names an unknown member, changes `id`,
 `markers` or `variants`, or adds a build-root input the extension does not
 declare. The design of the stack core is in
-[its design note](../../../tooling/stacks/doc/01-design.md).
+[its design note](https://github.com/Putnami/putnami/blob/main/tooling/stacks/doc/01-design.md).
 
 ## Limits
 

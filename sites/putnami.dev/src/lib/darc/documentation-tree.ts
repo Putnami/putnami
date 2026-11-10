@@ -1,14 +1,14 @@
 /**
- * `putnami.documentation-tree.v1` — the carrier the six documentation snapshot
+ * `putnami.documentation-tree.v1` — the carrier the documentation snapshot
  * contracts name.
  *
  * It is not a published wire schema. It names the thing one `generate.assets`
- * entry copies: the markdown tree under one repository source root, addressed by
- * a deterministic digest over its sorted `(relative path, content digest)`
- * pairs. Two checkouts of the same tree produce the same version; one changed
- * byte produces a different one; a cold build and a warm build produce the same
- * one, because nothing outside the file contents and their paths reaches the
- * hash.
+ * entry copies: the markdown tree under one repository source root, or the one
+ * markdown file a source root names, addressed by a deterministic digest over
+ * its sorted `(relative path, content digest)` pairs. Two checkouts of the same
+ * tree produce the same version; one changed byte produces a different one; a
+ * cold build and a warm build produce the same one, because nothing outside the
+ * file contents and their paths reaches the hash.
  *
  * The digest deliberately does NOT cover the source root. A version is the
  * identity of a producer STATE, and moving a tree does not change the
@@ -20,7 +20,7 @@ import { createHash } from 'node:crypto';
 import { readFileSync, statSync } from 'node:fs';
 import { fileExists, joinPath } from '@putnami/utils';
 
-/** The transport contract the six documentation snapshot imports declare. */
+/** The transport contract the documentation snapshot imports declare. */
 export const DOCUMENTATION_TREE_CONTRACT = 'putnami.documentation-tree.v1';
 
 /** The glob that decides which files a documentation tree is made of. */
@@ -28,7 +28,7 @@ export const DOCUMENTATION_TREE_PATTERN = '**/*.md';
 
 /** One published documentation file: its path inside the source root, and its content digest. */
 export interface DocumentationFile {
-  /** POSIX path relative to the source root. */
+  /** POSIX path relative to the source root; empty when the source root is the file itself. */
   readonly path: string;
   /** `sha256:<hex>` over the file's exact bytes. */
   readonly digest: string;
@@ -101,15 +101,23 @@ export function observeDocumentationTree(root: string, files: readonly Documenta
 /**
  * Read one source root from the workspace.
  *
- * Returns `undefined` for a root that does not exist, is not a directory, or
- * holds no markdown at all. All three publish an empty documentation section,
- * which is the failure this contract exists to close, so all three are ABSENT
- * rather than "an empty snapshot" — an empty snapshot would be a successful
- * observation of nothing.
+ * A root names a directory, whose tree is every markdown file under it, or one
+ * markdown file, whose tree is that file alone under the empty path.
+ *
+ * Returns `undefined` for a root that does not exist, is neither a directory
+ * nor a markdown file, or holds no markdown at all. All three publish an empty
+ * documentation section, which is the failure this contract exists to close, so
+ * all three are ABSENT rather than "an empty snapshot" — an empty snapshot would
+ * be a successful observation of nothing.
  */
 export function readDocumentationTree(workspaceRoot: string, root: string): ObservedDocumentationTree | undefined {
   const absolute = joinPath(workspaceRoot, root.replace(/^\/+/, ''));
-  if (!fileExists(absolute) || !statSync(absolute).isDirectory()) return undefined;
+  if (!fileExists(absolute)) return undefined;
+  const stat = statSync(absolute);
+  if (stat.isFile() && root.toLowerCase().endsWith('.md')) {
+    return observeDocumentationTree(root, [{ path: '', digest: contentDigest(readFileSync(absolute)) }]);
+  }
+  if (!stat.isDirectory()) return undefined;
 
   const files: DocumentationFile[] = [];
   for (const relative of new Glob(DOCUMENTATION_TREE_PATTERN).scanSync({ cwd: absolute })) {
@@ -118,4 +126,35 @@ export function readDocumentationTree(workspaceRoot: string, root: string): Obse
   }
   if (files.length === 0) return undefined;
   return observeDocumentationTree(root, files);
+}
+
+/**
+ * The one tree a contract that governs several source roots holds.
+ *
+ * Each file's path becomes its path from the workspace root — the member's
+ * source root, then its path inside that root — and the version is the same
+ * digest over those pairs. A member's root is therefore part of the set's
+ * identity, and a set is only ever composed from every member it declares: the
+ * caller attaches nothing when one member is absent.
+ */
+export function composeDocumentationSet(members: readonly ObservedDocumentationTree[]): ObservedDocumentationTree {
+  const files = members.flatMap(({ tree }) => {
+    const base = tree.root.replace(/^\/+/, '');
+    return tree.files.map((file) => ({ path: file.path ? `${base}/${file.path}` : base, digest: file.digest }));
+  });
+  return observeDocumentationTree('/', files);
+}
+
+/** The tree one member root contributes to a composed set, with paths relative to that root again. */
+export function documentationSetMember(set: DocumentationTree, root: string): DocumentationTree {
+  const base = root.replace(/^\/+/, '');
+  const files: DocumentationFile[] = [];
+  for (const file of set.files) {
+    if (file.path === base) {
+      files.push({ path: '', digest: file.digest });
+    } else if (file.path.startsWith(`${base}/`)) {
+      files.push({ path: file.path.slice(base.length + 1), digest: file.digest });
+    }
+  }
+  return { root, files };
 }

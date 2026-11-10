@@ -68,6 +68,27 @@ function internalLinks(docsRoot: string, files: string[]): DocLink[] {
   return links;
 }
 
+/** Every link of a markdown document that is neither a URL, a site path nor a fragment. */
+function relativeLinks(source: string): string[] {
+  const links: string[] = [];
+  for (const match of source.matchAll(/(!?)\[[^\]]*\]\(([^)\s]+)[^)]*\)/g)) {
+    const target = match[2] as string;
+    if (target.startsWith('/') || target.startsWith('#') || /^[a-z][a-z0-9+.-]*:/i.test(target)) continue;
+    links.push(target);
+  }
+  return links;
+}
+
+/** The `generate.assets` copies that publish one markdown file under the docs tree. */
+function singleFileDocCopies(): { from: string; to: string }[] {
+  const config = JSON.parse(readFileSync(joinPath(import.meta.dir, '..', 'putnami.json'), 'utf8')) as {
+    options?: { generate?: { assets?: { from: string; to: string }[] } };
+  };
+  return (config.options?.generate?.assets ?? []).filter(
+    (entry) => entry.to.startsWith('public/docs/') && entry.from.toLowerCase().endsWith('.md'),
+  );
+}
+
 function withoutFragment(target: string): string {
   const hash = target.indexOf('#');
   return hash === -1 ? target : target.slice(0, hash);
@@ -114,6 +135,31 @@ describe('documentation internal links', () => {
     expect(offenders).toEqual([]);
   });
 
+  specTest(
+    'never leaves a relative link in a page published as a single file',
+    {
+      feature: 'putnami-dev/public-documentation',
+      requirement: 'every-language-and-tool-is-published',
+      check: 'single-file-copies-carry-no-relative-link',
+    },
+    () => {
+      // A page copied on its own is published without the files beside it in
+      // the repository, so a relative link resolves against a directory the
+      // site does not serve. Such a page links a published page by its /docs
+      // route and anything else by its full URL.
+      const copies = singleFileDocCopies();
+      expect(copies.length).toBeGreaterThanOrEqual(13);
+      const offenders: string[] = [];
+      for (const copy of copies) {
+        const published = copy.to.slice('public/docs/'.length);
+        for (const target of relativeLinks(readFileSync(joinPath(docsRoot, published), 'utf8'))) {
+          offenders.push(`${published} -> ${target}`);
+        }
+      }
+      expect(offenders).toEqual([]);
+    },
+  );
+
   it('publishes the generated support page as a resolvable route', async () => {
     const splats = new Set(await getDocsPaths());
     expect(splats.has('support')).toBe(true);
@@ -123,7 +169,16 @@ describe('documentation internal links', () => {
     // Each top-level section must expose an index the nav can point at, or the
     // section exists in the tree but has no front door.
     const splats = new Set(await getDocsPaths());
-    for (const section of ['getting-started', 'concepts', 'how-to', 'principles', 'frameworks', 'support']) {
+    for (const section of [
+      'getting-started',
+      'concepts',
+      'how-to',
+      'principles',
+      'frameworks',
+      'languages',
+      'monorepo-tools',
+      'support',
+    ]) {
       expect(splats.has(section)).toBe(true);
     }
   });

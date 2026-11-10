@@ -156,6 +156,63 @@ export function frameworkStartList(): Tool[] {
   return [TOOLS['ts'], TOOLS['go'], TOOLS['py']];
 }
 
+/**
+ * A language or monorepo tool a workspace runs through one Putnami extension,
+ * and the reference that documents it.
+ */
+export interface RunTarget {
+  /** Display name, e.g. "Java and Kotlin". */
+  name: string;
+  /** The extension a workspace declares to run it. */
+  extension: string;
+  /** Its reference page on this site. */
+  href: string;
+  /**
+   * The subject in `putnami.support.json` whose reviewed status represents it.
+   * Named, never restated: a subject the catalog does not classify yet renders
+   * as having no reviewed status, and a reviewed entry shows up on the next
+   * build without an edit here.
+   */
+  supportSubject: SupportSubject;
+}
+
+function extensionTarget(name: string, extension: string, href: string): RunTarget {
+  return { name, extension, href, supportSubject: { kind: 'package', id: extension } };
+}
+
+function frameworkTarget(id: 'ts' | 'go' | 'py'): RunTarget {
+  const { name, href, supportSubject } = TOOLS[id] as Tool;
+  if (!supportSubject) throw new Error(`tools: the ${id} surface names no support subject`);
+  return { name, extension: supportSubject.id, href, supportSubject };
+}
+
+/**
+ * Every language Putnami runs: the three full extensions first, then each stack
+ * extension, whose reference the languages section publishes.
+ */
+export const LANGUAGES: readonly RunTarget[] = [
+  frameworkTarget('ts'),
+  frameworkTarget('go'),
+  frameworkTarget('py'),
+  extensionTarget('Dart and Flutter', '@putnami/dart', '/docs/languages/dart'),
+  extensionTarget('.NET', '@putnami/dotnet', '/docs/languages/dotnet'),
+  extensionTarget('Java and Kotlin', '@putnami/java', '/docs/languages/java'),
+  extensionTarget('PHP', '@putnami/php', '/docs/languages/php'),
+  extensionTarget('Ruby', '@putnami/ruby', '/docs/languages/ruby'),
+  extensionTarget('Rust', '@putnami/rust', '/docs/languages/rust'),
+  extensionTarget('Swift', '@putnami/swift', '/docs/languages/swift'),
+];
+
+/** Every monorepo tool Putnami runs a repository on, whose reference the monorepo tools section publishes. */
+export const MONOREPO_TOOLS: readonly RunTarget[] = [
+  extensionTarget('Bazel', '@putnami/bazel', '/docs/monorepo-tools/bazel'),
+  extensionTarget('moon', '@putnami/moon', '/docs/monorepo-tools/moon'),
+  extensionTarget('Nx', '@putnami/nx', '/docs/monorepo-tools/nx'),
+  extensionTarget('Pants', '@putnami/pants', '/docs/monorepo-tools/pants'),
+  extensionTarget('Rush', '@putnami/rush', '/docs/monorepo-tools/rush'),
+  extensionTarget('Turborepo', '@putnami/turbo', '/docs/monorepo-tools/turbo'),
+];
+
 /** Human-readable page count label. */
 export function pageCountLabel(count: number): string {
   return `${count} ${count === 1 ? 'page' : 'pages'}`;
