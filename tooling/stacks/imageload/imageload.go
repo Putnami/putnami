@@ -11,6 +11,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"strings"
 	"sync"
 	"time"
 
@@ -73,7 +74,9 @@ func docker(emit *jsonl.Emitter, args ...string) error {
 	return err
 }
 
-// lineLog writes each complete line it receives to the job's log at level.
+// lineLog forwards each line it receives to the job's log as jsonl.ForwardPipe
+// does: a structured log record keeps its fields, and any other line logs at
+// level.
 type lineLog struct {
 	emit    *jsonl.Emitter
 	level   string
@@ -93,9 +96,7 @@ func (l *lineLog) Write(p []byte) (int, error) {
 			l.pending.WriteString(line)
 			return len(p), nil
 		}
-		if text := line[:len(line)-1]; text != "" {
-			l.emit.Log(l.level, text)
-		}
+		jsonl.ForwardLine(l.emit, strings.TrimSuffix(line[:len(line)-1], "\r"), l.level)
 	}
 }
 
@@ -104,7 +105,7 @@ func (l *lineLog) flush() {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	if l.pending.Len() > 0 {
-		l.emit.Log(l.level, l.pending.String())
+		jsonl.ForwardLine(l.emit, strings.TrimSuffix(l.pending.String(), "\r"), l.level)
 		l.pending.Reset()
 	}
 }
