@@ -35,6 +35,12 @@ const initModeOption = "mode"
 // initSyncJob is the workspace-level job each extension's sync task runs as.
 const initSyncJob = "workspace-sync"
 
+// initDeclaredParam is the parameter of the preview's sync tasks that lists
+// the extensions --apply would declare before its sync: a task that reads
+// what the workspace declares, such as Nx's, reads them as declared, so the
+// preview shows what --apply writes.
+const initDeclaredParam = "declaredExtensions"
+
 // initIsTerminal reports whether init can ask a question: stdin and stdout
 // are terminals. Swapped in tests.
 var initIsTerminal = func() bool {
@@ -45,13 +51,11 @@ var initIsTerminal = func() bool {
 // in tests.
 var initPromptInput io.Reader = os.Stdin
 
-// previewInitSync runs the workspace sync tasks as a dry run with the mode as
-// a parameter. Swapped in tests.
-var previewInitSync = func(ctx context.Context, root string, cfg *wsproto.Config, mode string, env LifecycleEnv) error {
-	params := map[string]any{"dryRun": true}
-	if mode != "" {
-		params[initModeOption] = mode
-	}
+// previewInitSync runs the workspace sync tasks as a dry run with, as
+// parameters, the mode and the extensions --apply would declare. Swapped in
+// tests.
+var previewInitSync = func(ctx context.Context, root string, cfg *wsproto.Config, mode string, declares []string, env LifecycleEnv) error {
+	params := initPreviewParams(mode, declares)
 	result, err := runWorkspaceJob(ctx, env, WorkspaceJobRequest{
 		WorkspaceRoot: root,
 		Config:        cfg,
@@ -70,6 +74,19 @@ var previewInitSync = func(ctx context.Context, root string, cfg *wsproto.Config
 		iox.Fprintln(os.Stdout, "  No project is a member yet, so no sync previews a change: --apply records the members and writes each one's putnami.json.")
 	}
 	return nil
+}
+
+// initPreviewParams are the parameters of the preview's sync tasks: a dry
+// run, the mode, and the extensions --apply would declare.
+func initPreviewParams(mode string, declares []string) map[string]any {
+	params := map[string]any{"dryRun": true}
+	if mode != "" {
+		params[initModeOption] = mode
+	}
+	if len(declares) > 0 {
+		params[initDeclaredParam] = slices.Clone(declares)
+	}
+	return params
 }
 
 func isCharDevice(f *os.File) bool {
@@ -213,11 +230,12 @@ func rerunInitFrom(ctx context.Context, wsRoot string, flags initFlags, source i
 
 	if !flags.apply {
 		// An extension the workspace does not declare yet cannot preview its
-		// sync: the preview covers the declared ones.
+		// sync: the preview covers the declared ones, which read the
+		// extensions --apply declares as declared.
 		if slices.Contains(declared, ext) {
 			iox.Fprintln(os.Stdout)
 			iox.Fprintf(os.Stdout, "  → Previewing the %s sync (nothing is written)…\n", flags.from)
-			if err := previewInitSync(ctx, wsRoot, cfg, mode, env); err != nil {
+			if err := previewInitSync(ctx, wsRoot, cfg, mode, missing, env); err != nil {
 				return protocolcli.WithNext(fmt.Errorf("preview the %s sync: %w", flags.from, err), "putnami projects sync --dry-run")
 			}
 		}

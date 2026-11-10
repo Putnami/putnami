@@ -583,3 +583,44 @@ func TestAnUnknownRecordedModeFailsTheSync(t *testing.T) {
 		t.Error("the probe delegates a workspace whose mode is unknown")
 	}
 }
+
+func TestTheDryRunOfASwitchToImportPreviewsWhatTheApplyWrites(t *testing.T) {
+	spectest.Proves(t, feature, "sync-writes-each-project", "the-sync-writes-each-moon-project-putnami-json")
+	d := readDemo(t)
+	// The workspace was adopted in delegate mode and synchronized.
+	root := repository(t, d, ModeDelegate, true)
+	if _, err := Sync(context.Background(), root); err != nil {
+		t.Fatal(err)
+	}
+	// The preview of putnami init --from moon --mode import: the sync maps
+	// each project to its language extension without reading what the
+	// workspace declares, and declares those extensions itself.
+	preview, err := synchronize(context.Background(), root, true, ModeImport)
+	if err != nil {
+		t.Fatal(err)
+	}
+	previewed := map[string][]byte{}
+	for _, c := range preview.Changes {
+		if c.File != wsproto.WorkspaceConfigFilename {
+			previewed[c.File] = c.After
+		}
+	}
+	if len(previewed) == 0 || !slices.Contains(preview.Written, wsproto.WorkspaceConfigFilename) {
+		t.Fatalf("the preview changes %v", preview.Written)
+	}
+
+	// --apply records the mode, then synchronizes in the recorded mode.
+	writeFile(t, root, wsproto.WorkspaceConfigFilename, `{"name": "demo", "extensions": ["@putnami/moon"], "options": {"@putnami/moon": {"mode": "import"}}}`+"\n")
+	applied, err := Sync(context.Background(), root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(applied.Written, preview.Written) || !reflect.DeepEqual(applied.Retracted, preview.Retracted) || !reflect.DeepEqual(applied.Extensions, preview.Extensions) {
+		t.Errorf("the preview wrote %v, retracted %v, declared %v; the apply %v, %v, %v", preview.Written, preview.Retracted, preview.Extensions, applied.Written, applied.Retracted, applied.Extensions)
+	}
+	for file, want := range previewed {
+		if got, _ := os.ReadFile(filepath.Join(root, filepath.FromSlash(file))); string(got) != string(want) {
+			t.Errorf("%s: the apply wrote\n%s\nthe preview showed\n%s", file, got, want)
+		}
+	}
+}

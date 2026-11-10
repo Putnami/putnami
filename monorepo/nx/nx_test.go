@@ -544,3 +544,91 @@ func TestTheSyncJobPreviewsAnotherModeAndWritesNothing(t *testing.T) {
 		t.Errorf("an unknown mode: %s", status)
 	}
 }
+
+func TestTheDryRunOfASwitchToImportPreviewsWhatTheApplyWrites(t *testing.T) {
+	spectest.Proves(t, feature, "sync-writes-the-project-graph", "the-sync-writes-each-project-putnami-json-in-both-modes")
+	d := readDemo(t)
+	for name, adopted := range map[string]func(root string){
+		// The workspace was adopted in delegate mode and synchronized.
+		"delegate to import": func(root string) {
+			writeFile(t, root, wsproto.WorkspaceConfigFilename, `{"name": "shop", "extensions": ["@putnami/nx"], "options": {"@putnami/nx": {"mode": "delegate"}}}`)
+			sync(t, root, SyncOptions{})
+		},
+		// The workspace declares the extension alone, records no mode and
+		// was never synchronized.
+		"a first import": func(root string) {
+			writeFile(t, root, wsproto.WorkspaceConfigFilename, `{"name": "shop", "extensions": ["@putnami/nx"]}`)
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			root := repository(t, d, "")
+			// pricing's scripts run what @putnami/typescript runs, so import
+			// moves its targets; the api's stay on Nx.
+			writeFile(t, root, "packages/pricing/package.json", `{"name": "@demo/pricing", "scripts": {"build": "bun build src/index.ts --outdir dist", "test": "bun test", "lint": "biome check ."}}`)
+			adopted(root)
+			workspace, _ := os.ReadFile(filepath.Join(root, wsproto.WorkspaceConfigFilename))
+
+			// The preview of putnami init --from nx --mode import: the mode,
+			// and @putnami/typescript, which --apply declares before its sync.
+			preview := sync(t, root, SyncOptions{Mode: ModeImport, DryRun: true, Declared: []string{TypeScriptExtension}})
+			var events strings.Builder
+			emit := jsonl.New()
+			emit.Observe(func(message string) { events.WriteString(message + "\n") })
+			ctx := &pctx.Context{WorkspaceRoot: root, Params: pctx.Params{
+				"dryRun":      json.RawMessage(`true`),
+				ModeOption:    json.RawMessage(`"import"`),
+				DeclaredParam: json.RawMessage(`["@putnami/typescript"]`),
+			}}
+			status, data, err := RunSync(ctx, emit, nil)
+			if err != nil || status != "OK" || !reflect.DeepEqual(data["written"], preview.Written) {
+				t.Fatalf("the job's dry run: status %s, data %v, err %v, want %v written\n%s", status, data, err, preview.Written, events.String())
+			}
+			if !strings.Contains(events.String(), `+      "@putnami/nx:build",`) {
+				t.Errorf("the preview moves pricing's build to @putnami/typescript:\n%s", events.String())
+			}
+			if after, _ := os.ReadFile(filepath.Join(root, wsproto.WorkspaceConfigFilename)); string(after) != string(workspace) {
+				t.Errorf("a dry run wrote %s", after)
+			}
+			// Without the extension --apply declares, the dry run moves no
+			// target: it previewed something else than --apply writes.
+			if without := sync(t, root, SyncOptions{Mode: ModeImport, DryRun: true}); reflect.DeepEqual(changes(without), changes(preview)) {
+				t.Errorf("the dry run without the declared extension previews the apply: %v", changes(without))
+			}
+
+			// --apply records the mode and declares @putnami/typescript, then
+			// synchronizes in the recorded mode.
+			writeFile(t, root, wsproto.WorkspaceConfigFilename, `{"name": "shop", "extensions": ["@putnami/nx", "@putnami/typescript"], "options": {"@putnami/nx": {"mode": "import"}}}`)
+			applied := sync(t, root, SyncOptions{})
+			if len(applied.Written) == 0 || !reflect.DeepEqual(preview.Written, applied.Written) || !reflect.DeepEqual(preview.Retracted, applied.Retracted) {
+				t.Errorf("preview wrote %v and retracted %v, apply %v and %v", preview.Written, preview.Retracted, applied.Written, applied.Retracted)
+			}
+			if got, want := changes(preview), changes(applied); !reflect.DeepEqual(got, want) {
+				t.Errorf("the preview's changes:\n%v\nthe apply's:\n%v", got, want)
+			}
+			if !reflect.DeepEqual(preview.Unmapped, applied.Unmapped) {
+				t.Errorf("the preview lists %+v unmapped, the apply %+v", preview.Unmapped, applied.Unmapped)
+			}
+		})
+	}
+
+	// A declaredExtensions parameter that names no list fails the job.
+	root := repository(t, d, ModeDelegate)
+	ctx := &pctx.Context{WorkspaceRoot: root, Params: pctx.Params{"dryRun": json.RawMessage(`true`), DeclaredParam: json.RawMessage(`{"a": 1}`)}}
+	if status, _, _ := RunSync(ctx, jsonl.New(), nil); status != "FAILED" {
+		t.Errorf("a malformed %s: %s", DeclaredParam, status)
+	}
+	// A comma-separated one, as a flag gives it, reads as a list.
+	if got, err := stringsParam(pctx.Params{DeclaredParam: json.RawMessage(`"@putnami/typescript, @putnami/go"`)}, DeclaredParam); err != nil || !reflect.DeepEqual(got, []string{TypeScriptExtension, "@putnami/go"}) {
+		t.Errorf("a comma-separated %s = %v, %v", DeclaredParam, got, err)
+	}
+}
+
+// changes renders the changes of a sync as file, content before and content
+// after.
+func changes(r SyncResult) []string {
+	var out []string
+	for _, c := range r.Changes {
+		out = append(out, c.File+"\n"+string(c.Before)+"\n→\n"+string(c.After))
+	}
+	return out
+}

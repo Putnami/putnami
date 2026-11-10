@@ -354,7 +354,7 @@
       }
     },
     "workspace-sync-exec": {
-      "description": "Write in each Nx project's putnami.json the extension, its dependencies as project IDs, the build, test and lint jobs it disables in the mode the workspace records, or the mode parameter, and the test reports its test configuration names; list each target it does not map. With the dryRun parameter it writes nothing and prints the diff. Declares no outputs: it rewrites tracked project files, which the workspace-files effect states.",
+      "description": "Write in each Nx project's putnami.json the extension, its dependencies as project IDs, the build, test and lint jobs it disables in the mode the workspace records, or the mode parameter, reading the extensions of the declaredExtensions parameter as declared, and the test reports its test configuration names; list each target it does not map. With the dryRun parameter it writes nothing and prints the diff. Declares no outputs: it rewrites tracked project files, which the workspace-files effect states.",
       "kind": "command",
       "command": "{extensionRuntime}",
       "args": [
